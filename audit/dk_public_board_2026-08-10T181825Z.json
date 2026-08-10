@@ -1,0 +1,31 @@
+{
+  "manifest_version": "1.0",
+  "captured_at_utc": "2026-08-10T18:18:25Z",
+  "provider": "DRAFTKINGS",
+  "source_surface": "PUBLIC_SPORTSBOOK_PAGE",
+  "source_url": "https://sportsbook.draftkings.com/leagues/baseball/mlb",
+  "source_capture": "Screenshot 2026-08-10 at 1.18.33 PM.pdf",
+  "server_time_local": "2026-08-10T13:18:25-05:00",
+  "ttl_seconds": 300,
+  "fact_type": "PRICE_ONLY",
+  "model_input_allowed": false,
+  "model_p_allowed": false,
+  "execution_equivalence": "UNATTESTED_VS_AUTHENTICATED_BETSLIP_FEED",
+  "notes": [
+    "Public DraftKings board is market-price provenance only; it must never become SportsEdge Model_P.",
+    "Freshness must be checked at ingestion and again immediately before BET_STATUS finalization.",
+    "This public display surface is distinct provenance from any authenticated/in-app execution feed until equivalence is explicitly attested."
+  ],
+  "games": [
+    {"game_id":"BOS_TOR_2026-08-10","away":"BOS","home":"TOR","moneyline":{"BOS":-148,"TOR":138},"run_line":{"BOS -1.5":113,"TOR +1.5":-136},"total":{"line":8.5,"over":-101,"under":-119}},
+    {"game_id":"NYM_ATL_2026-08-10","away":"NYM","home":"ATL","moneyline":{"NYM":130,"ATL":-140},"run_line":{"NYM +1.5":-178,"ATL -1.5":146},"total":{"line":8.5,"over":-107,"under":-113}},
+    {"game_id":"BAL_MIN_2026-08-10","away":"BAL","home":"MIN","moneyline":{"BAL":-115,"MIN":107},"run_line":{"BAL -1.5":141,"MIN +1.5":-171},"total":{"line":8.5,"over":-107,"under":-113}},
+    {"game_id":"PHI_STL_2026-08-10","away":"PHI","home":"STL","moneyline":{"PHI":-115,"STL":107},"run_line":{"PHI -1.5":135,"STL +1.5":-163},"total":{"line":9.0,"over":-109,"under":-111}},
+    {"game_id":"TEX_LAA_2026-08-10","away":"TEX","home":"LAA","moneyline":{"TEX":-112,"LAA":104},"run_line":{"TEX -1.5":141,"LAA +1.5":-171},"total":{"line":8.0,"over":-110,"under":-110}},
+    {"game_id":"TB_ATH_2026-08-10","away":"TB","home":"ATH","moneyline":{"TB":-154,"ATH":143},"run_line":{"TB -1.5":-102,"ATH +1.5":-118},"total":{"line":10.0,"over":-103,"under":-117}},
+    {"game_id":"COL_ARI_2026-08-10","away":"COL","home":"ARI","moneyline":{"COL":180,"ARI":-194},"run_line":{"COL +1.5":-119,"ARI -1.5":-101},"total":{"line":8.5,"over":-117,"under":-103}},
+    {"game_id":"MIL_SD_2026-08-10","away":"MIL","home":"SD","moneyline":{"MIL":-115,"SD":107},"run_line":{"MIL -1.5":145,"SD +1.5":-176},"total":{"line":7.0,"over":-112,"under":-108}},
+    {"game_id":"HOU_SF_2026-08-10","away":"HOU","home":"SF","moneyline":{"HOU":-142,"SF":132},"run_line":{"HOU -1.5":112,"SF +1.5":-135},"total":{"line":8.5,"over":-103,"under":-117}},
+    {"game_id":"KC_LAD_2026-08-10","away":"KC","home":"LAD","moneyline":{"KC":245,"LAD":-266},"run_line":{"KC +1.5":104,"LAD -1.5":-126},"total":{"line":7.5,"over":101,"under":-122}}
+  ]
+}
