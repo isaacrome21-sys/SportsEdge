@@ -1,0 +1,66 @@
+{
+  "schema_version": "0.1",
+  "policy": "research_only_fail_closed_until_oos_and_deployment_parity",
+  "sports": {
+    "nfl": {
+      "regimes": {
+        "preseason": {
+          "status": "RESEARCH_ONLY",
+          "official_eligible": false,
+          "required_inputs": [
+            "schedule",
+            "current_prices",
+            "qb_rotation",
+            "starter_snap_plan",
+            "injuries",
+            "depth_chart",
+            "weather"
+          ]
+        },
+        "regular_season": {
+          "status": "RESEARCH_ONLY",
+          "official_eligible": false
+        }
+      },
+      "markets": {
+        "moneyline": "RESEARCH_ONLY",
+        "spread": "RESEARCH_ONLY",
+        "total": "RESEARCH_ONLY",
+        "team_total": "RESEARCH_ONLY",
+        "first_half": "RESEARCH_ONLY",
+        "quarter": "RESEARCH_ONLY",
+        "passing_props": "RESEARCH_ONLY",
+        "rushing_props": "RESEARCH_ONLY",
+        "receiving_props": "RESEARCH_ONLY",
+        "touchdown_props": "RESEARCH_ONLY",
+        "sgp": "BLOCKED_UNTIL_JOINT_PATH_VALIDATION"
+      }
+    },
+    "cfb": {
+      "regimes": {
+        "regular_season": {
+          "status": "RESEARCH_ONLY",
+          "official_eligible": false
+        }
+      },
+      "markets": {
+        "moneyline": "RESEARCH_ONLY",
+        "spread": "RESEARCH_ONLY",
+        "total": "RESEARCH_ONLY",
+        "team_total": "RESEARCH_ONLY",
+        "first_half": "RESEARCH_ONLY",
+        "player_props": "BLOCKED_UNTIL_POINT_IN_TIME_ROLE_DATA_VALIDATED"
+      }
+    }
+  },
+  "promotion_requirements": [
+    "chronological_oos_validation",
+    "market_benchmark_m0_m1_m2_comparison",
+    "shuffle_target_negative_control",
+    "temporal_availability_audit",
+    "calibration_by_season_and_probability_bucket",
+    "artifact_hash_and_runtime_load_attestation",
+    "live_source_manifest_with_ttl_and_authority",
+    "model_status_separate_from_bet_status"
+  ]
+}
