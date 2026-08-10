@@ -2,9 +2,9 @@
 """SportsEdge deployment-parity guard v0.3.
 
 Consumes the external validation registry and a runtime capability attestation.
-Statistical validation is never treated as sufficient by itself: official
-eligibility is intersected with artifact identity, explicit deployment
-requirements, and scope restrictions.
+Statistical validation is never sufficient by itself: official eligibility is
+intersected with exact registry-version parity, artifact identity + runtime-load
+attestation, explicit deployment requirements, and market scope restrictions.
 """
 from __future__ import annotations
 
@@ -28,7 +28,22 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
-def _artifact_check(market: str, rec: Dict[str, Any], runtime_root: Path) -> Dict[str, Any]:
+def _registry_check(registry: Dict[str, Any], capabilities: Dict[str, Any]) -> Dict[str, Any]:
+    if registry.get("policy") != "fail_closed_external_registry_with_deployment_parity":
+        return {"status": "FAIL_CLOSED", "reason": "UNSUPPORTED_REGISTRY_POLICY"}
+    schema = str(registry.get("schema_version") or "")
+    runtime_schema = str(capabilities.get("registry_schema_version") or "")
+    if not schema or runtime_schema != schema:
+        return {
+            "status": "FAIL_CLOSED",
+            "reason": "REGISTRY_RUNTIME_VERSION_MISMATCH",
+            "registry_schema_version": schema,
+            "runtime_registry_schema_version": runtime_schema or None,
+        }
+    return {"status": "PASS", "schema_version": schema}
+
+
+def _artifact_check(market: str, rec: Dict[str, Any], runtime_root: Path, capabilities: Dict[str, Any]) -> Dict[str, Any]:
     art = rec.get("artifact")
     if not art:
         return {"status": "NOT_REQUIRED"}
@@ -55,7 +70,17 @@ def _artifact_check(market: str, rec: Dict[str, Any], runtime_root: Path) -> Dic
             "expected_hash": expected,
             "actual_hash": actual,
         }
-    return {"status": "PASS", "path": rel, "hash": actual}
+    loaded = capabilities.get("loaded_artifacts") or {}
+    if loaded.get(market) != expected:
+        return {
+            "status": "FAIL_CLOSED",
+            "reason": "ARTIFACT_PRESENT_BUT_RUNTIME_LOAD_UNPROVEN",
+            "market": market,
+            "path": rel,
+            "expected_hash": expected,
+            "runtime_loaded_hash": loaded.get(market),
+        }
+    return {"status": "PASS", "path": rel, "hash": actual, "runtime_loaded_hash": expected}
 
 
 def _scope_check(market: str, rec: Dict[str, Any], candidate_line: Optional[float]) -> Dict[str, Any]:
@@ -70,7 +95,6 @@ def _scope_check(market: str, rec: Dict[str, Any], candidate_line: Optional[floa
         if line in caution:
             return {"status": "CAUTION", "reason": "REGISTRY_SCOPE_CAUTION_LINE", "line": line}
         if allowed:
-            # v1.6 encodes 5.5+ as a threshold rather than enumerating every line.
             if "5.5+" in allowed and float(candidate_line) >= 5.5:
                 return {"status": "PASS", "line": line}
             return {"status": "BLOCKED", "reason": "REGISTRY_SCOPE_NOT_ALLOWED", "line": line}
@@ -85,6 +109,10 @@ def market_deployment_status(
     candidate_line: Optional[float] = None,
 ) -> Dict[str, Any]:
     capabilities = capabilities or {}
+    registry_check = _registry_check(registry, capabilities)
+    if registry_check["status"] != "PASS":
+        return {"market": market, "status": "BLOCKED_DEPLOYMENT_PARITY", **registry_check}
+
     rec = (registry.get("markets") or {}).get(market)
     if rec is None:
         return {"market": market, "status": "BLOCKED", "reason": "MARKET_ABSENT_FROM_REGISTRY"}
@@ -96,7 +124,7 @@ def market_deployment_status(
             "registry_status": rec.get("status"),
         }
 
-    artifact = _artifact_check(market, rec, runtime_root)
+    artifact = _artifact_check(market, rec, runtime_root, capabilities)
     if artifact["status"] == "FAIL_CLOSED":
         return {
             "market": market,
@@ -117,6 +145,21 @@ def market_deployment_status(
             "registry_status": rec.get("status"),
         }
 
+    # Any registry deployment requirement not otherwise captured must be
+    # explicitly attested. This prevents future v1.7+ requirements from being
+    # silently ignored by an older runtime.
+    requirement = rec.get("deployment_requirement")
+    if requirement:
+        verified_requirements = set(capabilities.get("verified_requirements") or [])
+        if cap is None and requirement not in verified_requirements:
+            return {
+                "market": market,
+                "status": "BLOCKED_DEPLOYMENT_PARITY",
+                "reason": "DEPLOYMENT_REQUIREMENT_UNATTESTED",
+                "deployment_requirement": requirement,
+                "registry_status": rec.get("status"),
+            }
+
     scope = _scope_check(market, rec, candidate_line)
     if scope["status"] == "BLOCKED":
         return {
@@ -133,6 +176,7 @@ def market_deployment_status(
         "status": effective,
         "reason": "REGISTRY_ELIGIBLE_AND_DEPLOYMENT_PARITY_VERIFIED",
         "registry_status": rec.get("status"),
+        "registry_parity": registry_check,
         "artifact": artifact,
         "scope": scope,
     }
@@ -151,6 +195,7 @@ def audit_deployment_parity(
     return {
         "policy": "REGISTRY_AUTHORIZATION_INTERSECT_DEPLOYMENT_PARITY",
         "registry_schema_version": registry.get("schema_version"),
+        "runtime_registry_schema_version": capabilities.get("registry_schema_version"),
         "overall_status": "PASS" if not blocked else "FAIL_CLOSED",
         "blocked_count": len(blocked),
         "results": results,
