@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Reusable double-TTL sportsbook price freshness gate."""
+import math
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
@@ -13,6 +14,8 @@ class PriceCheckResult:
 
 
 def _parse(ts: str) -> Optional[datetime]:
+    if not isinstance(ts, str):
+        return None
     try:
         d = datetime.fromisoformat(ts.replace("Z", "+00:00"))
     except Exception:
@@ -23,29 +26,35 @@ def _parse(ts: str) -> Optional[datetime]:
 
 
 def check_price_freshness(price: dict, now: datetime) -> PriceCheckResult:
+    if not isinstance(price, dict):
+        return PriceCheckResult(False, "price must be a dict")
+    if not isinstance(now, datetime) or now.tzinfo is None:
+        return PriceCheckResult(False, "now must be timezone-aware")
     required = ("sportsbook", "source_surface", "game_id", "market", "line", "side",
                 "odds", "retrieved_at", "ttl_seconds")
     missing = [f for f in required if f not in price]
     if missing:
         return PriceCheckResult(False, f"missing fields: {missing}")
     ttl = price["ttl_seconds"]
-    if isinstance(ttl, bool) or not isinstance(ttl, (int, float)) or ttl <= 0:
-        return PriceCheckResult(False, f"missing/invalid TTL: {ttl}")
+    if (isinstance(ttl, bool) or not isinstance(ttl, (int, float))
+            or not math.isfinite(float(ttl)) or float(ttl) <= 0):
+        return PriceCheckResult(False, f"missing/invalid TTL: {ttl!r}")
     ts = _parse(price["retrieved_at"])
     if ts is None:
         return PriceCheckResult(False, "malformed or timezone-naive retrieved_at timestamp")
-    if now.tzinfo is None:
-        return PriceCheckResult(False, "now must be timezone-aware")
     age = (now.astimezone(timezone.utc) - ts).total_seconds()
     if age < 0:
         return PriceCheckResult(False, "retrieved_at is in the future", age)
-    if age > ttl:
+    if age > float(ttl):
         return PriceCheckResult(False, f"stale: age={age:.1f}s > ttl={ttl}s", age)
     return PriceCheckResult(True, "fresh", age)
 
 
 def check_double_ttl(price: dict, ingestion_now: datetime,
                      finalization_now: datetime) -> PriceCheckResult:
+    if (not isinstance(ingestion_now, datetime) or ingestion_now.tzinfo is None
+            or not isinstance(finalization_now, datetime) or finalization_now.tzinfo is None):
+        return PriceCheckResult(False, "pipeline timestamps must be timezone-aware")
     if finalization_now < ingestion_now:
         return PriceCheckResult(False, "pipeline time moved backwards")
     first = check_price_freshness(price, ingestion_now)
