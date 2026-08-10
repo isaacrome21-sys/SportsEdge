@@ -1,0 +1,94 @@
+{
+  "manifest_version": "1.0",
+  "captured_at_utc": "2026-08-10T13:13:20Z",
+  "model_status": "NOT_AUTHORIZED_BY_THIS_ARTIFACT",
+  "bet_status": "NOT_AUTHORIZED_BY_THIS_ARTIFACT",
+  "sources": [
+    {
+      "id": "mlb_astros_injury_2026-07-28",
+      "authority": 1,
+      "source": "MLB.com / Houston Astros",
+      "url": "https://www.mlb.com/news/astros-injuries-and-roster-moves",
+      "observed_claim": "Hayden Wesneski was scheduled to be reinstated to start July 29 after Tommy John rehab.",
+      "observed_source_update": "2026-07-28",
+      "ttl_seconds": 86400,
+      "status": "VERIFIED_SOURCE",
+      "use": "starter-role continuity context only; must be revalidated for Aug 10 start"
+    },
+    {
+      "id": "mlb_dbacks_soroka_il_2026-06-21",
+      "authority": 1,
+      "source": "MLB.com / Arizona Diamondbacks",
+      "url": "https://www.mlb.com/dbacks/news/michael-soroka-jordan-lawlar-d-backs-injured-list",
+      "observed_claim": "Michael Soroka was placed on the 15-day IL with a strained left glute on June 21.",
+      "observed_source_update": "2026-06-21",
+      "ttl_seconds": 86400,
+      "status": "HISTORICAL_VERIFIED_SOURCE",
+      "use": "injury provenance only"
+    },
+    {
+      "id": "reuters_soroka_return_2026-08-10",
+      "authority": 2,
+      "source": "Reuters",
+      "url": "https://www.reuters.com/sports/michael-soroka-draws-rockies-he-returns-d-backs-rotation--flm-2026-08-10/",
+      "observed_claim": "Michael Soroka is set to return to Arizona's rotation against Colorado on Aug. 10 after the glute injury.",
+      "observed_source_update": "2026-08-10",
+      "ttl_seconds": 21600,
+      "status": "VERIFIED_SOURCE",
+      "use": "starter-status challenger; confirm against official game card before authorization"
+    },
+    {
+      "id": "reuters_mlb_roundup_2026-08-10",
+      "authority": 2,
+      "source": "Reuters",
+      "url": "https://www.reuters.com/sports/mlb-roundup-phillies-walk-off-blue-jays-12-avoid-sweep--flm-2026-08-10/",
+      "observed_claim": "Sunday Aug. 9 games included extra-inning workloads for PHI/TOR and ATL/NYY and other bullpen-use context relevant to Aug. 10 fatigue checks.",
+      "observed_source_update": "2026-08-10",
+      "ttl_seconds": 21600,
+      "status": "VERIFIED_SOURCE",
+      "use": "bullpen workload trigger only; pitch-level reliever availability still required"
+    },
+    {
+      "id": "reuters_or_press_kimbrel_2026-08-10",
+      "authority": 2,
+      "source": "Reuters/search corroboration via established outlets",
+      "url": "https://nypost.com/2026/08/09/sports/craig-kimbrel-signing-with-12th-mlb-team-after-two-failed-stints-this-season/",
+      "observed_claim": "Craig Kimbrel signed with Kansas City after leaving Tampa Bay.",
+      "observed_source_update": "2026-08-10",
+      "ttl_seconds": 21600,
+      "status": "SECONDARY_VERIFIED_SOURCE",
+      "use": "KC bullpen roster-change trigger; active-roster status must be confirmed before use"
+    },
+    {
+      "id": "cbs_kc_lad_gametracker_2026-08-10",
+      "authority": 3,
+      "source": "CBS Sports",
+      "url": "https://www.cbssports.com/mlb/gametracker/live/MLB_20260810_KC%40LAD/",
+      "observed_claim": "KC-LAD Aug. 10 game page is live and reflects current 2026 roster/stat context.",
+      "observed_source_update": "2026-08-10",
+      "ttl_seconds": 7200,
+      "status": "VERIFIED_SOURCE",
+      "use": "secondary slate identity only; not authoritative for confirmed lineups"
+    }
+  ],
+  "source_conflicts": [
+    {
+      "key": "ARI_STARTER_STATUS_SOROKA",
+      "severity": "MATERIAL",
+      "state": "RESOLVING",
+      "details": "Official MLB injury page still reflects June IL placement while Reuters reports Aug. 10 rotation return. Treat Reuters as fresh starter-status evidence but require official active-roster/game-card confirmation before BET_STATUS can pass."
+    }
+  ],
+  "repo_baseline": {
+    "repository": "isaacrome21-sys/SportsEdge",
+    "default_branch": "main",
+    "baseline_commit": "03bcb7aa02e585c12720bd8e9f3af7ff07f054ce",
+    "baseline_commit_time_utc": "2026-08-10T03:37:53Z",
+    "top_level_verified_files": [
+      "README.md",
+      "SportsEdge_Automation_Wrapper_v1_1_1.zip"
+    ],
+    "source_tree_state": "OPAQUE_ARCHIVE_ONLY",
+    "implementation_gate": "BLOCKED_UNTIL_SOURCE_ARCHIVE_IS_EXPANDED_OR_INDIVIDUAL_SOURCE_PATHS_ARE_ACCESSIBLE"
+  }
+}
