@@ -39,8 +39,10 @@ jobs:
         run: python foundation/test_orchestrator_v0_2.py
       - name: End-to-end orchestrator v0.3 candidate-binding regression
         run: python foundation/test_orchestrator_v0_3_binding.py
-      - name: Total-bases live MC reference regression
+      - name: Total-bases live MC reference regression v0.1
         run: python foundation/test_total_bases_live_engine_v0_1.py
+      - name: Total-bases hash-derived seed policy regression v0.2
+        run: python foundation/test_total_bases_live_engine_v0_2.py
       - name: Live-era model-selection guard regression
         run: python foundation/test_live_era_guard_v0_1.py
       - name: Canonical registry JSON validity
