@@ -15,7 +15,7 @@
       "status": "PASS",
       "official_eligible": true,
       "artifact": {
-        "path": "rbi_model.joblib",
+        "path": "sportsedge_rbi_direct_v1.joblib",
         "artifact_hash": "d77779e682bebf7c47a41829f1db240b7137eef4acd2baa553b346a28bff8375"
       }
     }
