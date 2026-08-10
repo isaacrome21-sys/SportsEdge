@@ -111,7 +111,7 @@ def market_deployment_status(
     capabilities = capabilities or {}
     registry_check = _registry_check(registry, capabilities)
     if registry_check["status"] != "PASS":
-        return {"market": market, "status": "BLOCKED_DEPLOYMENT_PARITY", **registry_check}
+        return {**registry_check, "market": market, "status": "BLOCKED_DEPLOYMENT_PARITY"}
 
     rec = (registry.get("markets") or {}).get(market)
     if rec is None:
