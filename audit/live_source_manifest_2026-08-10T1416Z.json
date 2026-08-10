@@ -1,0 +1,79 @@
+{
+  "manifest_version": "1.1",
+  "captured_at_utc": "2026-08-10T14:16:28Z",
+  "model_status": "UNCHANGED_BY_LIVE_SOURCE_AUDIT",
+  "bet_status": "NOT_AUTHORIZED_BY_THIS_ARTIFACT",
+  "sources": [
+    {
+      "source_id": "reuters_soroka_return_2026-08-10T1416Z",
+      "fact_key": "starter:COL_ARI:home",
+      "value": "Michael Soroka",
+      "provider": "ESTABLISHED_OUTLET",
+      "source_name": "Reuters",
+      "source_url": "https://www.reuters.com/sports/michael-soroka-draws-rockies-he-returns-d-backs-rotation--flm-2026-08-10/",
+      "as_of": "2026-08-10T00:00:00Z",
+      "retrieved_at": "2026-08-10T14:16:28Z",
+      "ttl_seconds": 21600,
+      "confidence": "verified_secondary",
+      "use": "fresh starter-status challenger; require MLB/team game-card confirmation before starter gate passes"
+    },
+    {
+      "source_id": "reuters_padres_astros_result_2026-08-10T1416Z",
+      "fact_key": "bullpen_usage:SD:2026-08-09",
+      "value": "Padres bullpen covered four perfect innings after Randy Vasquez",
+      "provider": "ESTABLISHED_OUTLET",
+      "source_name": "Reuters",
+      "source_url": "https://www.reuters.com/sports/baseball/padres-go-yard-4-times-win-rubber-match-vs-astros--flm-2026-08-10/",
+      "as_of": "2026-08-10T00:00:00Z",
+      "retrieved_at": "2026-08-10T14:16:28Z",
+      "ttl_seconds": 21600,
+      "confidence": "verified_secondary",
+      "use": "bullpen-workload trigger only; pitch-level reliever availability still required for MIL-SD authorization"
+    },
+    {
+      "source_id": "mlb_starting_lineups_search_cache_2026-08-10T1416Z",
+      "fact_key": "confirmed_lineup:SLATE",
+      "value": "search-indexed MLB starting-lineup page returned late-July snapshots rather than Aug. 10 current state",
+      "provider": "MLB_OFFICIAL",
+      "source_name": "MLB.com Starting Lineups",
+      "source_url": "https://www.mlb.com/starting-lineups",
+      "as_of": "2026-07-29T00:00:00Z",
+      "retrieved_at": "2026-08-10T14:16:28Z",
+      "ttl_seconds": 900,
+      "confidence": "rejected_stale_cache",
+      "status": "REJECTED_SOURCE",
+      "use": "must not satisfy Aug. 10 confirmed-lineup freshness gate"
+    },
+    {
+      "source_id": "mlb_probable_pitchers_search_cache_2026-08-10T1416Z",
+      "fact_key": "starter:SLATE",
+      "value": "search-indexed MLB probable-pitcher page returned late-July snapshots rather than Aug. 10 current state",
+      "provider": "MLB_OFFICIAL",
+      "source_name": "MLB.com Probable Pitchers",
+      "source_url": "https://www.mlb.com/probable-pitchers",
+      "as_of": "2026-07-29T00:00:00Z",
+      "retrieved_at": "2026-08-10T14:16:28Z",
+      "ttl_seconds": 1800,
+      "confidence": "rejected_stale_cache",
+      "status": "REJECTED_SOURCE",
+      "use": "must not satisfy Aug. 10 starter freshness gate"
+    }
+  ],
+  "live_gate_effects": [
+    {
+      "gate": "COL_ARI_HOME_STARTER",
+      "state": "CHALLENGER_PRESENT_NOT_OFFICIAL_CONFIRMED",
+      "detail": "Reuters reports Soroka returning to start; official current-state game-card confirmation is still required."
+    },
+    {
+      "gate": "SLATE_LINEUPS",
+      "state": "DO_NOT_USE_SEARCH_CACHE",
+      "detail": "Search-indexed official MLB lineup results are stale for this run and cannot authorize lineup-dependent markets."
+    },
+    {
+      "gate": "SLATE_STARTERS",
+      "state": "DO_NOT_USE_SEARCH_CACHE",
+      "detail": "Search-indexed official probable-pitcher results are stale for this run and cannot authorize starter-dependent markets."
+    }
+  ]
+}
