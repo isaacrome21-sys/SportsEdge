@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.6",
+  "markets": {
+    "moneyline": {
+      "status": "PASS_BETA",
+      "official_eligible": true,
+      "reason": "frozen beta anchor"
+    },
+    "run line": {
+      "status": "BLOCKED_DEPLOYMENT_PARITY",
+      "official_eligible": false,
+      "reason": "parity unproven"
+    },
+    "rbi": {
+      "status": "PASS",
+      "official_eligible": true,
+      "artifact": {
+        "path": "sportsedge_rbi_direct_v1.joblib",
+        "artifact_hash": "d77779e682bebf7c47a41829f1db240b7137eef4acd2baa553b346a28bff8375"
+      }
+    }
+  }
+}
