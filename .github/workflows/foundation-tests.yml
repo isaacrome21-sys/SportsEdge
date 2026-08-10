@@ -23,3 +23,7 @@ jobs:
         run: python foundation/test_schedule_completeness_v0_3.py
       - name: Deployment parity tests
         run: python foundation/test_deployment_parity_v0_3.py
+      - name: Canonical registry JSON validity
+        run: python -m json.tool foundation/registry_v1_6.json >/dev/null
+      - name: Runtime capabilities JSON validity
+        run: python -m json.tool foundation/runtime_capabilities_v1_6.json >/dev/null
