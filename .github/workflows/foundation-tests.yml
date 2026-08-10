@@ -1,0 +1,25 @@
+name: SportsEdge Foundation Tests
+
+on:
+  push:
+    branches:
+      - sportsedge/live-engine-v0.3
+  pull_request:
+    paths:
+      - 'foundation/**'
+      - '.github/workflows/foundation-tests.yml'
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Source policy tests
+        run: python foundation/test_foundation_v0_2.py
+      - name: Schedule completeness tests
+        run: python foundation/test_schedule_completeness_v0_3.py
+      - name: Deployment parity tests
+        run: python foundation/test_deployment_parity_v0_3.py
