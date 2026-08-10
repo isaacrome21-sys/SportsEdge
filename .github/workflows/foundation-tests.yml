@@ -1,0 +1,55 @@
+name: SportsEdge Foundation Tests
+
+on:
+  push:
+    branches:
+      - sportsedge/live-engine-v0.3
+  pull_request:
+    paths:
+      - 'foundation/**'
+      - '.github/workflows/foundation-tests.yml'
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install model runtime dependencies
+        run: python -m pip install --upgrade pip joblib numpy scikit-learn
+      - name: Source policy tests
+        run: python foundation/test_foundation_v0_2.py
+      - name: Schedule completeness tests
+        run: python foundation/test_schedule_completeness_v0_3.py
+      - name: Deployment parity tests
+        run: python foundation/test_deployment_parity_v0_3.py
+      - name: Exact RBI/Runs loader parity tests
+        run: python foundation/test_direct_threshold_loader_v0_3.py
+      - name: Live feature bridge hardening tests
+        run: python foundation/test_live_feature_bridge_v0_2.py
+      - name: Live feature bridge authority-order regression
+        run: python foundation/test_live_feature_bridge_v0_3_authority.py
+      - name: MLB source adapter hardening tests
+        run: python foundation/test_mlb_source_adapters_v0_2.py
+      - name: End-to-end orchestrator v0.1 fail-closed regression
+        run: python foundation/test_orchestrator_v0_1.py
+      - name: End-to-end orchestrator v0.2 native-MC regression
+        run: python foundation/test_orchestrator_v0_2.py
+      - name: End-to-end orchestrator v0.3 candidate-binding regression
+        run: python foundation/test_orchestrator_v0_3_binding.py
+      - name: Total-bases live MC reference regression v0.1
+        run: python foundation/test_total_bases_live_engine_v0_1.py
+      - name: Total-bases hash-derived seed policy regression v0.2
+        run: python foundation/test_total_bases_live_engine_v0_2.py
+      - name: Hitter-hits live engine structural regression
+        run: python foundation/test_hits_live_engine_v0_1.py
+      - name: Shared production utilities regression
+        run: python foundation/test_shared_production_utils.py
+      - name: Live-era model-selection guard regression
+        run: python foundation/test_live_era_guard_v0_1.py
+      - name: Canonical registry JSON validity
+        run: python -m json.tool foundation/registry_v1_6.json >/dev/null
+      - name: Runtime capabilities JSON validity
+        run: python -m json.tool foundation/runtime_capabilities_v1_6.json >/dev/null
