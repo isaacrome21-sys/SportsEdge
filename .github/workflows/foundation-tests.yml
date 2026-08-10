@@ -33,8 +33,12 @@ jobs:
         run: python foundation/test_live_feature_bridge_v0_3_authority.py
       - name: MLB source adapter hardening tests
         run: python foundation/test_mlb_source_adapters_v0_2.py
-      - name: End-to-end orchestrator fail-closed regression
+      - name: End-to-end orchestrator v0.1 fail-closed regression
         run: python foundation/test_orchestrator_v0_1.py
+      - name: End-to-end orchestrator v0.2 native-MC regression
+        run: python foundation/test_orchestrator_v0_2.py
+      - name: Total-bases live MC reference regression
+        run: python foundation/test_total_bases_live_engine_v0_1.py
       - name: Live-era model-selection guard regression
         run: python foundation/test_live_era_guard_v0_1.py
       - name: Canonical registry JSON validity
