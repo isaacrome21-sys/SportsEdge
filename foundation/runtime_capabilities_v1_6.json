@@ -1,0 +1,13 @@
+{
+  "registry_schema_version": "1.6",
+  "loaded_artifacts": {},
+  "team_total_line_policy_v1": false,
+  "rolling_pitcher_walks_recalibration_45d": false,
+  "shared_game_effect_sigma_0_20": false,
+  "verified_requirements": [],
+  "notes": [
+    "Fail-closed runtime attestation template.",
+    "Fields may only be promoted to true/loaded after executable runtime verification.",
+    "This file is operational state, not statistical validation evidence."
+  ]
+}
