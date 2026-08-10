@@ -33,6 +33,8 @@ jobs:
         run: python foundation/test_live_feature_bridge_v0_3_authority.py
       - name: MLB source adapter hardening tests
         run: python foundation/test_mlb_source_adapters_v0_2.py
+      - name: End-to-end orchestrator fail-closed regression
+        run: python foundation/test_orchestrator_v0_1.py
       - name: Canonical registry JSON validity
         run: python -m json.tool foundation/registry_v1_6.json >/dev/null
       - name: Runtime capabilities JSON validity
