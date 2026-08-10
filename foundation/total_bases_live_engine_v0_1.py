@@ -12,7 +12,8 @@ acceptance against the full holdout fixture.
 """
 from __future__ import annotations
 
-from typing import Any, Dict
+import hashlib
+from typing import Any, Dict, Optional, Tuple
 import numpy as np
 
 from sportsedge_shared_game_effect import (
@@ -33,6 +34,7 @@ SCALE_CONSTANT = 0.997832032579663
 PA_SHRINKAGE = 5
 SUPPORTED_LINES = (0.5, 1.5, 2.5)
 DEFAULT_PATHS = 25_000
+SEED_POLICY = "sha256_build_hash_seedsequence_v1"
 
 # Exact empirical value counts from the accepted 2021-2022 train_pa_pool.
 # Reconstructing the multiset from counts preserves the sampling distribution.
@@ -59,6 +61,18 @@ def _baseline_pa_pool() -> np.ndarray:
     if len(arr) != TRAIN_PA_POOL_SIZE:
         raise TotalBasesEngineError("BASELINE_PA_POOL_SIZE_MISMATCH")
     return arr
+
+
+def _seed_sequence_from_build_hash(build_hash: str) -> Tuple[np.random.SeedSequence, str]:
+    """Map immutable candidate identity to a deterministic, well-spread PRNG seed.
+
+    The complete SHA-256 digest of the build_hash string is split into eight
+    independent 32-bit entropy words and fed to NumPy SeedSequence. No row
+    number, batch position, wall clock, or low-order-bit truncation participates.
+    """
+    digest = hashlib.sha256(build_hash.encode("utf-8")).digest()
+    entropy_words = [int.from_bytes(digest[i:i + 4], "big") for i in range(0, 32, 4)]
+    return np.random.SeedSequence(entropy_words), digest.hex()
 
 
 def _validate_input(model_input: Dict[str, Any]) -> Dict[str, Any]:
@@ -97,7 +111,7 @@ def simulate_total_bases(
     line: float,
     side: str = "over",
     n_paths: int = DEFAULT_PATHS,
-    seed: int = 0,
+    seed: Optional[int] = None,
 ) -> Dict[str, Any]:
     f = _validate_input(model_input)
     if float(line) not in SUPPORTED_LINES:
@@ -106,10 +120,18 @@ def simulate_total_bases(
         raise TotalBasesEngineError("UNSUPPORTED_SIDE")
     if isinstance(n_paths, bool) or not isinstance(n_paths, int) or n_paths < 1:
         raise TotalBasesEngineError("INVALID_PATH_COUNT")
-    if isinstance(seed, bool) or not isinstance(seed, int):
+    if seed is not None and (isinstance(seed, bool) or not isinstance(seed, int)):
         raise TotalBasesEngineError("INVALID_SEED")
 
-    rng = np.random.default_rng(seed)
+    if seed is None:
+        seed_material, seed_fingerprint = _seed_sequence_from_build_hash(model_input["build_hash"])
+        seed_policy = SEED_POLICY
+    else:
+        seed_material = seed
+        seed_fingerprint = hashlib.sha256(f"explicit:{seed}".encode("utf-8")).hexdigest()
+        seed_policy = "explicit_integer_seed_research_only"
+
+    rng = np.random.default_rng(seed_material)
     pa_pool = np.asarray(f["pa_pool"], dtype=np.int16)
     baseline = _baseline_pa_pool()
 
@@ -166,7 +188,8 @@ def simulate_total_bases(
         "origin_fixture_sha256": ORIGIN_FIXTURE_SHA256,
         "mc_status": "PASS",
         "mc_paths": n_paths,
-        "seed": seed,
+        "seed_policy": seed_policy,
+        "seed_fingerprint": seed_fingerprint,
         "line": float(line),
         "side": side,
     }
