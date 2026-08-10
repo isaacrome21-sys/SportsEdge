@@ -43,6 +43,10 @@ jobs:
         run: python foundation/test_total_bases_live_engine_v0_1.py
       - name: Total-bases hash-derived seed policy regression v0.2
         run: python foundation/test_total_bases_live_engine_v0_2.py
+      - name: Hitter-hits live engine structural regression
+        run: python foundation/test_hits_live_engine_v0_1.py
+      - name: Shared production utilities regression
+        run: python foundation/test_shared_production_utils.py
       - name: Live-era model-selection guard regression
         run: python foundation/test_live_era_guard_v0_1.py
       - name: Canonical registry JSON validity
