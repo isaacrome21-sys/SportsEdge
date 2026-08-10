@@ -27,6 +27,8 @@ jobs:
         run: python foundation/test_deployment_parity_v0_3.py
       - name: Exact RBI/Runs loader parity tests
         run: python foundation/test_direct_threshold_loader_v0_3.py
+      - name: Live feature bridge hardening tests
+        run: python foundation/test_live_feature_bridge_v0_2.py
       - name: Canonical registry JSON validity
         run: python -m json.tool foundation/registry_v1_6.json >/dev/null
       - name: Runtime capabilities JSON validity
