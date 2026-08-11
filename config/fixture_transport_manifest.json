@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "transport": "gzip_mtime_0_compresslevel_9",
+  "note": "Transport hashes identify deterministic compressed containers only. Acceptance always hashes decompressed canonical bytes.",
+  "markets": {
+    "HITS": {
+      "canonical_file": "bb_hits_data.pkl",
+      "canonical_size_bytes": 16743400,
+      "canonical_sha256": "8c15e196efa5fc7ef979d0a9cf5ec113cba54cd756482babc256c44d53642409",
+      "gzip_size_bytes": 2961564,
+      "gzip_sha256": "04e0d566701ffd8f3f64c3aa599f99b652aa2cdb1c6b7f9c4e6d8f306e285d84"
+    },
+    "TOTAL_BASES": {
+      "canonical_file": "tb_gameeffect_data.pkl",
+      "canonical_size_bytes": 21611347,
+      "canonical_sha256": "3abd596ae720529f5354f724c02c11e284a5044ac5842207599c27f4cb562e82",
+      "gzip_size_bytes": 6316856,
+      "gzip_sha256": "757d97004e11b7a4d24560ce6e85fd06e2726479ae57375a1bf74b800054e5dc"
+    }
+  }
+}
