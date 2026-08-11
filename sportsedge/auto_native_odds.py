@@ -9,11 +9,13 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 import json
+from pathlib import Path
 from typing import Any, Callable, Mapping
 from urllib.request import urlopen
 from zoneinfo import ZoneInfo
 
 from .auto_runner import AutoRunReport, run_auto_mlb
+from .mlb_history_cache import MLBHistoryCachedOpener
 from .mlb_hits_features import MLBHitsFeatureError, MLBHitsHistorySource
 from .mlb_source import fetch_boxscore, fetch_schedule
 from .mlb_total_bases_features import MLBTBFeatureError, MLBTBHistorySource
@@ -102,6 +104,7 @@ def run_auto_mlb_native_odds(
     min_edge: float = 0.0,
     kelly_multiplier: float = 0.25,
     bookmakers: tuple[str, ...] = ("draftkings",),
+    history_cache_dir: str | Path | None = None,
 ) -> AutoRunReport:
     current = now or datetime.now(timezone.utc)
     if not isinstance(current, datetime) or current.tzinfo is None or current.utcoffset() is None:
@@ -138,8 +141,13 @@ def run_auto_mlb_native_odds(
     selected_feature_url = feature_url
     if not selected_feature_url:
         selected_feature_url = MEMORY_FEATURES_URL
-        hits_history = MLBHitsHistorySource(opener=opener, retrieved_at=current)
-        tb_history = MLBTBHistorySource(opener=opener, retrieved_at=current)
+        history_opener = MLBHistoryCachedOpener(
+            target_date=date.fromisoformat(slate_date_ct),
+            cache_dir=history_cache_dir,
+            opener=opener,
+        )
+        hits_history = MLBHitsHistorySource(opener=history_opener, retrieved_at=current)
+        tb_history = MLBTBHistorySource(opener=history_opener, retrieved_at=current)
         schedule_by_pk = {int(game.game_pk): game for game in schedule}
         seen: set[tuple[int, int, str]] = set()
         for quote in quote_payload:
