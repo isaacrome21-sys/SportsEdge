@@ -24,6 +24,7 @@ class BBEngineError(ValueError):
 class BBModelOutput:
     engine_version: str
     model_input_hash: str
+    seed_policy: str
     window_days: int
     shrinkage: int
     runtime_capability_attested: bool
@@ -90,4 +91,13 @@ def simulate_bb(model_input: dict, thresholds=(0.5, 1.5, 2.5, 3.5), n_sim: int =
         draws[~use_own] = rng.choice(league_pool, size=n_sim - n_own, replace=True)
     walks = rng.binomial(draws, rate)
     probs = {t: float((walks > t).mean()) for t in clean}
-    return BBModelOutput(ENGINE_VERSION, model_input["build_hash"], WINDOW_DAYS, SHRINKAGE, True, n_sim, probs)
+    return BBModelOutput(
+        ENGINE_VERSION,
+        model_input["build_hash"],
+        "identity_sha256_seedsequence_256bit",
+        WINDOW_DAYS,
+        SHRINKAGE,
+        True,
+        n_sim,
+        probs,
+    )
