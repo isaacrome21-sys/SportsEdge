@@ -1,0 +1,28 @@
+name: recover-legacy-wrapper
+on:
+  push:
+    branches: [manual-full-model-20260811]
+    paths:
+      - '.github/workflows/recover-legacy-wrapper.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract legacy wrapper
+        run: |
+          rm -rf artifacts/legacy_wrapper
+          mkdir -p artifacts/legacy_wrapper
+          unzip -q SportsEdge_Automation_Wrapper_v1_1_1.zip -d artifacts/legacy_wrapper
+          find artifacts/legacy_wrapper -type f | sort | tee artifacts/legacy_wrapper_filelist.txt
+      - name: Upload extracted wrapper
+        uses: actions/upload-artifact@v4
+        with:
+          name: legacy-wrapper-extracted
+          path: |
+            artifacts/legacy_wrapper
+            artifacts/legacy_wrapper_filelist.txt
+          retention-days: 1
