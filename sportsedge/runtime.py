@@ -37,7 +37,7 @@ def runtime_deployments(path: str | Path = "config/deployments.json") -> dict[st
 
 def _normalize_candidates(candidates: list[Any]) -> list[dict[str, Any]]:
     normalized: list[dict[str, Any]] = []
-    for i, item in enumerate(candidates):
+    for item in candidates:
         if not isinstance(item, Mapping):
             normalized.append({"model_input": None, "quote": None})
             continue
@@ -96,11 +96,11 @@ def result_to_dict(result: RunResult) -> dict[str, Any]:
     }
     if result.decision is not None:
         out["decision"] = {
+            "model_status": result.decision.model_status,
             "bet_status": result.decision.bet_status,
-            "model_p": result.decision.model_p,
-            "implied_p": result.decision.implied_p,
+            "implied_probability": result.decision.implied_probability,
             "edge": result.decision.edge,
-            "ev_per_unit": result.decision.ev_per_unit,
+            "ev_per_dollar": result.decision.ev_per_dollar,
             "kelly_fraction": result.decision.kelly_fraction,
         }
     else:
