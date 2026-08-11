@@ -24,6 +24,10 @@ class CardResult:
     model_p: float | None
     bet_status: str
     reason: str
+    implied_probability: float | None = None
+    edge: float | None = None
+    ev_per_dollar: float | None = None
+    kelly_fraction: float | None = None
 
 
 def _quote_identity(quote: Mapping[str, Any]) -> tuple[str, str, str, Any, str]:
@@ -80,7 +84,14 @@ def run_hitter_card(*, games: list[LiveGame], feature_rows: list[Mapping[str, An
             if engine is None or deployment is None:
                 raise LiveSlateError("market engine/deployment registration missing")
             rr = run_candidate(model_input=candidate["model_input"], quote=candidate["quote"], deployment=deployment, engine_fn=engine, ingestion_now=ingestion_now, finalization_now=finalization_now, min_edge=min_edge, kelly_multiplier=kelly_multiplier)
-            out.append(CardResult(game_id, market, entity_id, line, side, odds, rr.model_p, rr.bet_status, rr.reason))
+            d = rr.decision
+            out.append(CardResult(
+                game_id, market, entity_id, line, side, odds, rr.model_p, rr.bet_status, rr.reason,
+                d.implied_probability if d else None,
+                d.edge if d else None,
+                d.ev_per_dollar if d else None,
+                d.kelly_fraction if d else None,
+            ))
         except Exception as exc:
             try:
                 game_id, market, entity_id, line, side = _quote_identity(raw_quote)
