@@ -35,11 +35,13 @@ jobs:
           restore-keys: |
             sportsedge-mlb-history-v1-${{ runner.os }}-
       - name: Verify automation safety tests
-        run: python -m unittest tests.test_auto_runner tests.test_odds_api_source tests.test_auto_native_odds tests.test_mlb_hits_features tests.test_mlb_total_bases_features tests.test_mlb_history_cache -v
+        run: python -m unittest tests.test_auto_runner tests.test_odds_api_source tests.test_auto_native_odds tests.test_mlb_hits_features tests.test_mlb_total_bases_features tests.test_mlb_history_cache tests.test_odds_keyring -v
       - name: Run automated MLB card
         env:
           SPORTSEDGE_QUOTES_URL: ${{ secrets.SPORTSEDGE_QUOTES_URL }}
           SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+          SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
+          SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
           SPORTSEDGE_ODDS_BOOKMAKERS: draftkings
           SPORTSEDGE_FEATURES_URL: ${{ secrets.SPORTSEDGE_FEATURES_URL }}
           SPORTSEDGE_PROJECTED_LINEUPS_URL: ${{ secrets.SPORTSEDGE_PROJECTED_LINEUPS_URL }}
