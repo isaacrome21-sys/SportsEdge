@@ -18,6 +18,7 @@ class LiveSlateTests(unittest.TestCase):
             away_probable_pitcher_id=11, away_probable_pitcher_name="A SP",
             home_probable_pitcher_id=22, home_probable_pitcher_name="H SP",
             retrieved_at="2026-08-10T20:00:00+00:00",
+            game_number=2, double_header="Y", venue_id=17, official_date="2026-08-10",
         )
 
     def feature(self, player_id=100):
@@ -51,10 +52,15 @@ class LiveSlateTests(unittest.TestCase):
         r=rows(100); r[-1]={"player_id":100,"slot":9,"sequence":0}
         with self.assertRaises(LiveSlateError): lineup_from_rows(1,"away",r)
 
+    def test_live_game_retains_expanded_schedule_identity(self):
+        g = self.game()
+        self.assertEqual((g.game_number, g.double_header, g.venue_id, g.official_date, g.status), (2,"Y",17,"2026-08-10","Preview"))
+
     def test_builds_canonical_hits_candidate(self):
         c=assemble_hitter_candidate(game=self.game(),market="HITS",feature_row=self.feature(),quote=self.quote())
         mi=c["model_input"]
         self.assertEqual(mi["feature_version"],HITS_FEATURE_VERSION)
+        self.assertEqual(mi["team_id"],"1")
         self.assertEqual(set(mi["features"]),{"b_rate","p_rate","pa_pool"})
         self.assertNotIn("american_odds",mi)
 
@@ -62,6 +68,16 @@ class LiveSlateTests(unittest.TestCase):
         c=assemble_hitter_candidate(game=self.game(),market="TOTAL_BASES",feature_row=self.tb_feature(),quote=self.quote(market="TOTAL_BASES"))
         self.assertEqual(c["model_input"]["feature_version"],TB_FEATURE_VERSION)
         self.assertEqual(set(c["model_input"]["features"]),{"rates","p_h","p_hr","park","pa_pool"})
+
+    def test_stale_team_after_transaction_fails_closed(self):
+        f=self.feature(); f["team_id"]=2
+        with self.assertRaisesRegex(LiveSlateError, "PLAYER_TEAM_MISMATCH"):
+            assemble_hitter_candidate(game=self.game(),market="HITS",feature_row=f,quote=self.quote())
+
+    def test_player_in_home_lineup_requires_home_team_feature(self):
+        f=self.feature(player_id=200); f["team_id"]=2
+        c=assemble_hitter_candidate(game=self.game(),market="HITS",feature_row=f,quote=self.quote(200))
+        self.assertEqual(c["model_input"]["team_id"],"2")
 
     def test_missing_feature_version_fails_closed(self):
         f=self.feature(); del f["feature_version"]
