@@ -13,7 +13,7 @@ from math import isfinite
 from typing import Any, Iterable, Mapping
 
 from .hits_engine import FEATURE_CONTRACT_VERSION as HITS_FEATURE_CONTRACT_VERSION
-from .identity_rng import build_hash
+from .identity_rng import build_hash, validate_build_hash
 from .mlb_source import GameSnapshot
 from .total_bases_engine import FEATURE_CONTRACT_VERSION as TB_FEATURE_CONTRACT_VERSION
 
@@ -107,7 +107,10 @@ def _clean_pa_pool(value: Any) -> list[int]:
 
 
 def _feature_payload(market: str, feature_row: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
-    common = {"game_pk", "player_id", "team_id", "market", "feature_version"}
+    common = {
+        "game_pk", "player_id", "team_id", "market", "feature_version",
+        "source_subset_hash", "provenance", "source_lineup_status",
+    }
     if feature_row.get("market") != market:
         raise LiveSlateError("feature market does not match candidate market")
     expected_version = FEATURE_CONTRACTS[market]
@@ -170,6 +173,19 @@ def _player_lineup_status(game: LiveGame, player_id: int) -> str:
     raise LiveSlateError("player not present in MLB lineup snapshot")
 
 
+def _feature_source_hash(feature_row: Mapping[str, Any]) -> str:
+    raw = feature_row.get("source_subset_hash")
+    provenance = feature_row.get("provenance")
+    if raw is None:
+        if provenance is not None:
+            raise LiveSlateError("provenance requires source_subset_hash")
+        return "NO_PROVENANCE_HASH"
+    try:
+        return validate_build_hash(raw)
+    except Exception as exc:
+        raise LiveSlateError("invalid source_subset_hash") from exc
+
+
 def assemble_hitter_candidate(
     *,
     game: LiveGame,
@@ -192,6 +208,9 @@ def assemble_hitter_candidate(
         raise LiveSlateError("feature player_id invalid")
 
     lineup_status = _player_lineup_status(game, player_id)
+    source_lineup_status = feature_row.get("source_lineup_status")
+    if source_lineup_status is not None and source_lineup_status != lineup_status:
+        raise LiveSlateError("feature-source lineup status conflicts with live MLB lineup")
     if require_confirmed_lineup and lineup_status != "CONFIRMED":
         raise LiveSlateError("confirmed MLB batting order required")
 
@@ -206,10 +225,11 @@ def assemble_hitter_candidate(
         raise LiveSlateError("quote side must be OVER or UNDER")
 
     feature_version, features = _feature_payload(market, feature_row)
+    source_subset_hash = _feature_source_hash(feature_row)
     feature_json = json.dumps(features, sort_keys=True, separators=(",", ":"))
     identity = build_hash([
         str(game.game_pk), market, str(player_id), format(line, ".12g"), side,
-        lineup_status, feature_version, feature_json,
+        lineup_status, feature_version, source_subset_hash, feature_json,
     ])
 
     model_input = {
@@ -220,10 +240,13 @@ def assemble_hitter_candidate(
         "side": side,
         "build_hash": identity,
         "feature_version": feature_version,
+        "feature_source_hash": source_subset_hash,
         "lineup_status": lineup_status,
         "require_confirmed_lineup": require_confirmed_lineup,
         "features": features,
     }
+    if feature_row.get("provenance") is not None:
+        model_input["provenance"] = feature_row["provenance"]
     clean_quote = dict(quote)
     clean_quote["game_id"] = str(game.game_pk)
     clean_quote["entity_id"] = str(player_id)
