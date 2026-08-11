@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "markets": {
+    "HITS": {
+      "engine_version": "hits_engine_v1.2",
+      "feature_version": "hits_features_v1",
+      "fixture_sha256": "8c15e196efa5fc7ef979d0a9cf5ec113cba54cd756482babc256c44d53642409",
+      "required_verdict": "PASS"
+    },
+    "TOTAL_BASES": {
+      "engine_version": "total_bases_engine_v0.2",
+      "feature_version": "total_bases_features_v1",
+      "fixture_sha256": null,
+      "required_verdict": "PASS"
+    }
+  }
+}
