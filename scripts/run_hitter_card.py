@@ -8,6 +8,7 @@ from sportsedge.card_io import normalize_feature_rows, normalize_quotes
 from sportsedge.card_pipeline import run_hitter_card, card_result_to_dict
 from sportsedge.feature_plan import resolve_feature_plan
 from sportsedge.live_capture import capture_slate
+from sportsedge.quote_bridge import normalize_offer_snapshot
 
 
 def _load_json(path: str):
@@ -21,7 +22,10 @@ def main() -> int:
     feature_group.add_argument("--features", help="JSON list of already-resolved market-specific feature rows")
     feature_group.add_argument("--feature-plan", help="JSON list of feature targets resolved from timestamped source facts")
     p.add_argument("--sources", help="JSON list of timestamped source facts; required with --feature-plan")
-    p.add_argument("--quotes", required=True, help="JSON list of canonical sportsbook quotes")
+    quote_group = p.add_mutually_exclusive_group(required=True)
+    quote_group.add_argument("--quotes", help="JSON list of canonical sportsbook quotes")
+    quote_group.add_argument("--offer-snapshot", help="JSON list of raw canonical-identity sportsbook offers")
+    p.add_argument("--quote-ttl-seconds", type=int, default=300)
     p.add_argument("--registry", default="config/deployments.json")
     p.add_argument("--allow-projected-lineups", action="store_true")
     p.add_argument("--min-edge", type=float, default=0.0)
@@ -41,7 +45,15 @@ def main() -> int:
             now=ingestion_now,
         )
 
-    quotes = normalize_quotes(_load_json(args.quotes))
+    quote_failures = []
+    if args.quotes:
+        quotes = normalize_quotes(_load_json(args.quotes))
+    else:
+        quotes, quote_failures = normalize_offer_snapshot(
+            _load_json(args.offer_snapshot),
+            default_ttl_seconds=args.quote_ttl_seconds,
+        )
+
     captures = capture_slate(args.date)
     games = [x.live_game for x in captures if x.live_game is not None]
     finalization_now = datetime.now(timezone.utc)
@@ -71,6 +83,11 @@ def main() -> int:
             "resolved": len(features),
             "blocked": len(feature_failures),
             "failures": feature_failures,
+        },
+        "quote_resolution": {
+            "resolved": len(quotes),
+            "blocked": len(quote_failures),
+            "failures": quote_failures,
         },
         "card": [card_result_to_dict(x) for x in card],
         "counts": {
