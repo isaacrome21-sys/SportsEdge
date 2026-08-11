@@ -23,7 +23,7 @@ jobs:
       - name: Install runtime dependencies
         run: python -m pip install --disable-pip-version-check numpy
       - name: Verify automation safety tests
-        run: python -m unittest tests.test_auto_runner tests.test_odds_api_source -v
+        run: python -m unittest tests.test_auto_runner tests.test_odds_api_source tests.test_auto_native_odds -v
       - name: Run automated MLB card
         env:
           SPORTSEDGE_QUOTES_URL: ${{ secrets.SPORTSEDGE_QUOTES_URL }}
