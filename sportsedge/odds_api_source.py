@@ -143,6 +143,8 @@ def parse_event_odds(
     failures: list[dict[str, Any]] = []
     if not isinstance(payload, Mapping):
         return OddsApiSnapshot((), ({"reason": "ODDS_EVENT_ODDS_MALFORMED", "game_id": str(game.game_pk)},))
+    display_home = str(payload.get("home_team") or game.home_name or "").strip()
+    display_away = str(payload.get("away_team") or game.away_name or "").strip()
     for bookmaker in payload.get("bookmakers") or []:
         if not isinstance(bookmaker, Mapping):
             failures.append({"reason": "ODDS_BOOKMAKER_MALFORMED", "game_id": str(game.game_pk)})
@@ -171,7 +173,8 @@ def parse_event_odds(
                     side = str(outcome.get("name") or "").upper()
                     if side not in {"OVER", "UNDER"}:
                         raise OddsApiSourceError("ODDS_SIDE_UNSUPPORTED")
-                    player_id = _participant_id(outcome.get("description"), game_pk=game.game_pk, participant_index=participant_index)
+                    player_name = str(outcome.get("description") or "").strip()
+                    player_id = _participant_id(player_name, game_pk=game.game_pk, participant_index=participant_index)
                     point = outcome.get("point")
                     price = outcome.get("price")
                     if point is None or price is None:
@@ -190,6 +193,9 @@ def parse_event_odds(
                         "american_odds": price,
                         "ttl_seconds": ttl_seconds,
                         "sportsbook": book_title,
+                        "player_name": player_name,
+                        "away_team": display_away,
+                        "home_team": display_home,
                     }
                     if outcome.get("sid") not in (None, ""):
                         quote["offer_id"] = str(outcome["sid"])
