@@ -28,6 +28,7 @@ def main() -> int:
     features = os.environ.get("SPORTSEDGE_FEATURES_URL", "").strip()
     projected = os.environ.get("SPORTSEDGE_PROJECTED_LINEUPS_URL", "").strip() or None
     token = os.environ.get("SPORTSEDGE_PROVIDER_TOKEN", "").strip() or None
+    history_cache_dir = os.environ.get("SPORTSEDGE_HISTORY_CACHE_DIR", "").strip() or None
     now = datetime.now(timezone.utc)
     infrastructure_blocked = False
     try:
@@ -48,6 +49,7 @@ def main() -> int:
                 odds_api_key=odds_api_key,
                 feature_url=features or None,
                 bookmakers=odds_books,
+                history_cache_dir=history_cache_dir,
                 **common,
             )
         else:
