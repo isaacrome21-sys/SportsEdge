@@ -20,6 +20,7 @@ from .mlb_hits_features import MLBHitsFeatureError, MLBHitsHistorySource
 from .mlb_source import fetch_boxscore, fetch_schedule
 from .mlb_total_bases_features import MLBTBFeatureError, MLBTBHistorySource
 from .odds_api_source import build_participant_index, fetch_mlb_player_prop_quotes
+from .odds_keyring import fetch_with_key_failover
 
 CHICAGO_TZ = ZoneInfo("America/Chicago")
 MEMORY_QUOTES_URL = "https://sportsedge.local/native-odds"
@@ -94,6 +95,7 @@ def _official_date(game) -> date:
 def run_auto_mlb_native_odds(
     *,
     odds_api_key: str,
+    odds_api_keys: tuple[str, ...] = (),
     feature_url: str | None = None,
     projected_lineups_url: str | None = None,
     provider_token: str | None = None,
@@ -127,13 +129,21 @@ def run_auto_mlb_native_odds(
             roster_failures.append({"stage": "MLB_ROSTER_IDENTITY", "game_id": str(game.game_pk), "reason": f"{type(exc).__name__}: {exc}"})
 
     participant_index = build_participant_index(schedule=schedule, confirmed_names_by_game=roster_names)
-    odds = fetch_mlb_player_prop_quotes(
-        api_key=odds_api_key,
-        schedule=schedule,
-        participant_index=participant_index,
-        opener=opener,
-        bookmakers=bookmakers,
+    keyring = fetch_with_key_failover(
+        (odds_api_key, *odds_api_keys),
+        lambda key: fetch_mlb_player_prop_quotes(
+            api_key=key,
+            schedule=schedule,
+            participant_index=participant_index,
+            opener=opener,
+            bookmakers=bookmakers,
+        ),
     )
+    odds = keyring.value
+    key_failures = [
+        {"stage": "ODDS_API_KEY_FAILOVER", "key_slot": item.key_slot, "reason": item.reason}
+        for item in keyring.failures
+    ]
     quote_payload = list(odds.quotes)
 
     native_feature_failures: list[dict[str, Any]] = []
@@ -216,7 +226,7 @@ def run_auto_mlb_native_odds(
         min_edge=min_edge,
         kelly_multiplier=kelly_multiplier,
     )
-    acquisition_failures = [
+    acquisition_failures = key_failures + [
         {"stage": "ODDS_API", **dict(item)} for item in odds.failures
     ] + roster_failures + native_feature_failures
     return AutoRunReport(
