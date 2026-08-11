@@ -18,10 +18,17 @@ class CardResult:
     game_id: str
     market: str
     entity_id: str
+    player_name: str
+    away_team: str
+    home_team: str
     line: Any
     side: str
     american_odds: Any
     model_p: float | None
+    implied_probability: float | None
+    edge: float | None
+    ev_per_dollar: float | None
+    kelly_fraction: float | None
     bet_status: str
     reason: str
 
@@ -29,6 +36,14 @@ class CardResult:
 def _quote_identity(quote: Mapping[str, Any]) -> tuple[str, str, str, Any, str]:
     q = validate_canonical_quote(quote)
     return q["game_id"], q["market"], q["entity_id"], q["line"], q["side"]
+
+
+def _display(raw_quote: Mapping[str, Any]) -> tuple[str, str, str]:
+    return (
+        str(raw_quote.get("player_name") or "").strip(),
+        str(raw_quote.get("away_team") or "").strip(),
+        str(raw_quote.get("home_team") or "").strip(),
+    )
 
 
 def run_hitter_card(*, games: list[LiveGame], feature_rows: list[Mapping[str, Any]], quotes: list[Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, registry_path: str = "config/deployments.json", require_confirmed_lineup: bool = True, min_edge: float = 0.0, kelly_multiplier: float = 0.25) -> list[CardResult]:
@@ -58,6 +73,7 @@ def run_hitter_card(*, games: list[LiveGame], feature_rows: list[Mapping[str, An
 
     for raw_quote in quotes:
         odds = raw_quote.get("american_odds") if isinstance(raw_quote, Mapping) else None
+        player_name, away_team, home_team = _display(raw_quote) if isinstance(raw_quote, Mapping) else ("", "", "")
         try:
             quote = validate_canonical_quote(raw_quote)
             game_id, market, entity_id, line, side = _quote_identity(quote)
@@ -80,13 +96,25 @@ def run_hitter_card(*, games: list[LiveGame], feature_rows: list[Mapping[str, An
             if engine is None or deployment is None:
                 raise LiveSlateError("market engine/deployment registration missing")
             rr = run_candidate(model_input=candidate["model_input"], quote=candidate["quote"], deployment=deployment, engine_fn=engine, ingestion_now=ingestion_now, finalization_now=finalization_now, min_edge=min_edge, kelly_multiplier=kelly_multiplier)
-            out.append(CardResult(game_id, market, entity_id, line, side, odds, rr.model_p, rr.bet_status, rr.reason))
+            dec = rr.decision
+            out.append(CardResult(
+                game_id, market, entity_id, player_name, away_team, home_team, line, side, odds,
+                rr.model_p,
+                dec.implied_probability if dec else None,
+                dec.edge if dec else None,
+                dec.ev_per_dollar if dec else None,
+                dec.kelly_fraction if dec else None,
+                rr.bet_status, rr.reason,
+            ))
         except Exception as exc:
             try:
                 game_id, market, entity_id, line, side = _quote_identity(raw_quote)
             except Exception:
                 game_id, market, entity_id, line, side = "UNKNOWN", "UNKNOWN", "UNKNOWN", None, "UNKNOWN"
-            out.append(CardResult(game_id, market, entity_id, line, side, odds, None, "BLOCKED", f"{type(exc).__name__}: {exc}"))
+            out.append(CardResult(
+                game_id, market, entity_id, player_name, away_team, home_team, line, side, odds,
+                None, None, None, None, None, "BLOCKED", f"{type(exc).__name__}: {exc}"
+            ))
     return out
 
 
