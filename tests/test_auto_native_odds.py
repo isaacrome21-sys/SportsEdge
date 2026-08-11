@@ -54,7 +54,7 @@ def events():
     return [{"id": "provider-event", "commence_time": "2026-08-11T23:00:00Z", "away_team": "Chicago Cubs", "home_team": "New York Yankees"}]
 
 
-def event_odds(player="Cubs Batter 1"):
+def event_odds(player="Cubs Batter 1", market="batter_hits"):
     return {
         "id": "provider-event",
         "bookmakers": [{
@@ -62,7 +62,7 @@ def event_odds(player="Cubs Batter 1"):
             "title": "DraftKings",
             "last_update": "2026-08-11T14:59:00Z",
             "markets": [{
-                "key": "batter_hits",
+                "key": market,
                 "outcomes": [
                     {"name": "Over", "description": player, "point": 0.5, "price": -110, "sid": "over-1"},
                     {"name": "Under", "description": player, "point": 0.5, "price": -110, "sid": "under-1"},
@@ -72,14 +72,46 @@ def event_odds(player="Cubs Batter 1"):
     }
 
 
+def stat_payload(rows): return {"stats": [{"splits": rows}]}
+
+def hrow(day, pk, h, pa): return {"date": day, "game": {"gamePk": pk}, "stat": {"hits": h, "plateAppearances": pa}}
+
+def frow(day, pk, started, pos="1B"): return {"date": day, "game": {"gamePk": pk}, "position": {"abbreviation": pos}, "stat": {"gamesStarted": started, "innings": "0.0" if pos == "DH" else "9.0"}}
+
+def prow(day, pk, h, bfp, started=1): return {"date": day, "game": {"gamePk": pk}, "stat": {"hits": h, "battersFaced": bfp, "gamesStarted": started}}
+
+
 class AutoNativeOddsTests(unittest.TestCase):
-    def opener(self, req, timeout=15, *, player="Cubs Batter 1"):
+    def opener(self, req, timeout=15, *, player="Cubs Batter 1", market="batter_hits"):
         url = req if isinstance(req, str) else req.full_url
         if "statsapi.mlb.com/api/v1/schedule?" in url: return Resp(schedule())
         if "statsapi.mlb.com/api/v1/game/777/boxscore" in url: return Resp(boxscore())
         if url == "https://features": return Resp(features())
         if "api.the-odds-api.com/v4/sports/baseball_mlb/events?" in url: return Resp(events())
-        if "api.the-odds-api.com/v4/sports/baseball_mlb/events/provider-event/odds?" in url: return Resp(event_odds(player))
+        if "api.the-odds-api.com/v4/sports/baseball_mlb/events/provider-event/odds?" in url: return Resp(event_odds(player, market))
+        raise AssertionError(url)
+
+    def native_opener(self, req, timeout=15, *, market="batter_hits"):
+        url = req if isinstance(req, str) else req.full_url
+        if "statsapi.mlb.com/api/v1/schedule?" in url: return Resp(schedule())
+        if "statsapi.mlb.com/api/v1/game/777/boxscore" in url: return Resp(boxscore())
+        if "api.the-odds-api.com/v4/sports/baseball_mlb/events?" in url: return Resp(events())
+        if "api.the-odds-api.com/v4/sports/baseball_mlb/events/provider-event/odds?" in url: return Resp(event_odds(market=market))
+        if "/people/" in url and any(f"season={year}" in url for year in range(2021, 2026)):
+            return Resp(stat_payload([]))
+        if "/people/100/stats?" in url and "group=hitting" in url and "season=2026" in url:
+            return Resp(stat_payload([
+                hrow("2026-04-01", 501, 1, 4), hrow("2026-04-02", 502, 1, 5),
+                hrow("2026-04-03", 503, 0, 4), hrow("2026-04-04", 504, 2, 5),
+                hrow("2026-04-05", 505, 1, 4),
+            ]))
+        if "/people/100/stats?" in url and "group=fielding" in url and "season=2026" in url:
+            return Resp(stat_payload([
+                frow("2026-04-01", 501, 1), frow("2026-04-02", 502, 1, "DH"),
+                frow("2026-04-03", 503, 1), frow("2026-04-04", 504, 1), frow("2026-04-05", 505, 1),
+            ]))
+        if "/people/22/stats?" in url and "group=pitching" in url and "season=2026" in url:
+            return Resp(stat_payload([prow("2026-04-01", 601, 5, 24), prow("2026-04-08", 602, 6, 26)]))
         raise AssertionError(url)
 
     def test_native_odds_path_binds_provider_player_to_exact_mlb_id(self):
@@ -106,6 +138,33 @@ class AutoNativeOddsTests(unittest.TestCase):
         self.assertEqual(report.results, ())
         self.assertEqual(report.run_status, "NO_QUOTES")
         self.assertTrue(any("ODDS_PLAYER_ID_UNRESOLVED" in str(x) for x in report.source_failures))
+
+    def test_no_feature_url_builds_hits_features_from_official_history(self):
+        report = run_auto_mlb_native_odds(
+            odds_api_key="secret",
+            feature_url=None,
+            now=NOW,
+            opener=self.native_opener,
+        )
+        self.assertEqual(len(report.results), 2)
+        self.assertEqual({r.market for r in report.results}, {"HITS"})
+        self.assertTrue(all(r.bet_status == "BLOCKED" for r in report.results))
+        self.assertTrue(all("feature snapshot missing" not in r.reason.lower() for r in report.results))
+        self.assertTrue(all("deployment" in r.reason.lower() or "eligible" in r.reason.lower() for r in report.results))
+        self.assertFalse(any(x.get("stage") == "MLB_HITS_FEATURE" for x in report.source_failures))
+
+    def test_no_feature_url_does_not_fabricate_total_bases_features(self):
+        def op(req, timeout=15): return self.native_opener(req, timeout, market="batter_total_bases")
+        report = run_auto_mlb_native_odds(
+            odds_api_key="secret",
+            feature_url=None,
+            now=NOW,
+            opener=op,
+        )
+        self.assertEqual(len(report.results), 2)
+        self.assertEqual({r.market for r in report.results}, {"TOTAL_BASES"})
+        self.assertTrue(all(r.bet_status == "BLOCKED" for r in report.results))
+        self.assertTrue(all("feature" in r.reason.lower() for r in report.results))
 
 
 if __name__ == "__main__": unittest.main()

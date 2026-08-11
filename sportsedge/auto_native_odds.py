@@ -1,25 +1,26 @@
-"""Automated MLB runner using native sportsbook acquisition.
+"""Automated MLB runner using native sportsbook and Hits feature acquisition.
 
-This wrapper deliberately reuses run_auto_mlb for all modeling, feature, lineup,
-TTL, deployment, and Truth Gate behavior. It only replaces the manual quote
-snapshot URL with canonical quotes acquired from The Odds API after binding
-provider games/players to exact MLB identity.
+The wrapper deliberately reuses run_auto_mlb for all modeling, feature-bridge,
+lineup, TTL, deployment, and Truth Gate behavior. When no external feature URL
+is supplied, validated HITS features are reconstructed from official MLB game
+logs; unsupported native feature markets remain fail-closed.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import json
 from typing import Any, Callable, Mapping
 from urllib.request import urlopen
 from zoneinfo import ZoneInfo
 
 from .auto_runner import AutoRunReport, run_auto_mlb
+from .mlb_hits_features import MLBHitsFeatureError, MLBHitsHistorySource
 from .mlb_source import fetch_boxscore, fetch_schedule
 from .odds_api_source import build_participant_index, fetch_mlb_player_prop_quotes
 
 CHICAGO_TZ = ZoneInfo("America/Chicago")
 MEMORY_QUOTES_URL = "https://sportsedge.local/native-odds"
+MEMORY_FEATURES_URL = "https://sportsedge.local/native-features"
 
 
 class _MemoryResponse:
@@ -37,30 +38,60 @@ def _url(req: Any) -> str:
     return req if isinstance(req, str) else str(req.full_url)
 
 
-def _roster_names(boxscore: Mapping[str, Any]) -> list[tuple[int, str]]:
+def _side_players(boxscore: Mapping[str, Any], side: str) -> list[tuple[int, str]]:
     out: list[tuple[int, str]] = []
-    for side in ("away", "home"):
-        players = ((((boxscore.get("teams") or {}).get(side) or {}).get("players")) or {})
-        if not isinstance(players, Mapping):
+    players = ((((boxscore.get("teams") or {}).get(side) or {}).get("players")) or {})
+    if not isinstance(players, Mapping):
+        return out
+    for row in players.values():
+        if not isinstance(row, Mapping):
             continue
-        for row in players.values():
-            if not isinstance(row, Mapping):
-                continue
-            person = row.get("person") or {}
-            try:
-                player_id = int(person.get("id"))
-            except (TypeError, ValueError):
-                continue
-            name = str(person.get("fullName") or "").strip()
-            if player_id > 0 and name:
-                out.append((player_id, name))
+        person = row.get("person") or {}
+        try:
+            player_id = int(person.get("id"))
+        except (TypeError, ValueError):
+            continue
+        name = str(person.get("fullName") or "").strip()
+        if player_id > 0 and name:
+            out.append((player_id, name))
     return out
+
+
+def _roster_names(boxscore: Mapping[str, Any]) -> list[tuple[int, str]]:
+    return _side_players(boxscore, "away") + _side_players(boxscore, "home")
+
+
+def _player_team_index(*, game, boxscore: Mapping[str, Any]) -> dict[int, tuple[int, int]]:
+    """Map player_id -> (current_team_id, opposing_probable_pitcher_id)."""
+    out: dict[int, tuple[int, int]] = {}
+    sides = (
+        ("away", int(game.away_id), game.home_probable_pitcher_id),
+        ("home", int(game.home_id), game.away_probable_pitcher_id),
+    )
+    for side, team_id, opponent_pitcher in sides:
+        if opponent_pitcher is None:
+            continue
+        for player_id, _ in _side_players(boxscore, side):
+            if player_id in out and out[player_id] != (team_id, int(opponent_pitcher)):
+                raise ValueError("MLB_ROSTER_PLAYER_AMBIGUOUS")
+            out[player_id] = (team_id, int(opponent_pitcher))
+    return out
+
+
+def _official_date(game) -> date:
+    value = game.official_date
+    if not isinstance(value, str) or not value:
+        raise ValueError("MLB_OFFICIAL_DATE_MISSING")
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise ValueError("MLB_OFFICIAL_DATE_INVALID") from exc
 
 
 def run_auto_mlb_native_odds(
     *,
     odds_api_key: str,
-    feature_url: str,
+    feature_url: str | None = None,
     projected_lineups_url: str | None = None,
     provider_token: str | None = None,
     now: datetime | None = None,
@@ -79,12 +110,16 @@ def run_auto_mlb_native_odds(
 
     schedule = fetch_schedule(slate_date_ct, opener=opener, now=current)
     roster_names: dict[int, list[tuple[int, str]]] = {}
+    player_teams: dict[int, dict[int, tuple[int, int]]] = {}
     roster_failures: list[dict[str, Any]] = []
     for game in schedule:
         try:
-            roster_names[game.game_pk] = _roster_names(fetch_boxscore(game.game_pk, opener=opener))
+            box = fetch_boxscore(game.game_pk, opener=opener)
+            roster_names[game.game_pk] = _roster_names(box)
+            player_teams[game.game_pk] = _player_team_index(game=game, boxscore=box)
         except Exception as exc:
             roster_names[game.game_pk] = []
+            player_teams[game.game_pk] = {}
             roster_failures.append({"stage": "MLB_ROSTER_IDENTITY", "game_id": str(game.game_pk), "reason": f"{type(exc).__name__}: {exc}"})
 
     participant_index = build_participant_index(schedule=schedule, confirmed_names_by_game=roster_names)
@@ -97,14 +132,57 @@ def run_auto_mlb_native_odds(
     )
     quote_payload = list(odds.quotes)
 
+    native_feature_failures: list[dict[str, Any]] = []
+    native_features: list[dict[str, Any]] = []
+    selected_feature_url = feature_url
+    if not selected_feature_url:
+        selected_feature_url = MEMORY_FEATURES_URL
+        history = MLBHitsHistorySource(opener=opener, retrieved_at=current)
+        schedule_by_pk = {int(game.game_pk): game for game in schedule}
+        seen: set[tuple[int, int, str]] = set()
+        for quote in quote_payload:
+            if str(quote.get("market")) != "HITS":
+                continue
+            try:
+                game_pk = int(quote["game_id"])
+                player_id = int(quote["entity_id"])
+                identity = (game_pk, player_id, "HITS")
+                if identity in seen:
+                    continue
+                seen.add(identity)
+                game = schedule_by_pk.get(game_pk)
+                if game is None:
+                    raise MLBHitsFeatureError("MLB_FEATURE_GAME_NOT_FOUND", {"game_pk": game_pk})
+                binding = (player_teams.get(game_pk) or {}).get(player_id)
+                if binding is None:
+                    raise MLBHitsFeatureError("MLB_FEATURE_PLAYER_TEAM_UNRESOLVED", {"game_pk": game_pk, "player_id": player_id})
+                team_id, starter_id = binding
+                native_features.append(history.feature_envelope(
+                    game_pk=game_pk,
+                    team_id=team_id,
+                    target_date=_official_date(game),
+                    batter_id=player_id,
+                    starter_id=starter_id,
+                ))
+            except Exception as exc:
+                native_feature_failures.append({
+                    "stage": "MLB_HITS_FEATURE",
+                    "game_id": str(quote.get("game_id", "UNKNOWN")),
+                    "entity_id": str(quote.get("entity_id", "UNKNOWN")),
+                    "reason": f"{type(exc).__name__}: {exc}",
+                })
+
     def wrapped(req, timeout=15):
-        if _url(req) == MEMORY_QUOTES_URL:
+        url = _url(req)
+        if url == MEMORY_QUOTES_URL:
             return _MemoryResponse(quote_payload)
+        if url == MEMORY_FEATURES_URL:
+            return _MemoryResponse(native_features)
         return opener(req, timeout=timeout)
 
     report = run_auto_mlb(
         quote_url=MEMORY_QUOTES_URL,
-        feature_url=feature_url,
+        feature_url=selected_feature_url,
         projected_lineups_url=projected_lineups_url,
         provider_token=provider_token,
         now=current,
@@ -116,7 +194,7 @@ def run_auto_mlb_native_odds(
     )
     acquisition_failures = [
         {"stage": "ODDS_API", **dict(item)} for item in odds.failures
-    ] + roster_failures
+    ] + roster_failures + native_feature_failures
     return AutoRunReport(
         report.slate_date_ct,
         report.generated_at_utc,
