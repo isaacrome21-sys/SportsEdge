@@ -23,7 +23,13 @@ def main() -> int:
     p.add_argument("--kelly-multiplier", type=float, default=0.25)
     args = p.parse_args()
     quotes = os.environ.get("SPORTSEDGE_QUOTES_URL", "").strip()
-    odds_api_key = os.environ.get("SPORTSEDGE_ODDS_API_KEY", "").strip()
+    odds_api_keys = tuple(
+        value for value in (
+            os.environ.get("SPORTSEDGE_ODDS_API_KEY", "").strip(),
+            os.environ.get("SPORTSEDGE_ODDS_API_KEY_2", "").strip(),
+            os.environ.get("SPORTSEDGE_ODDS_API_KEY_3", "").strip(),
+        ) if value
+    )
     odds_books = tuple(x.strip() for x in os.environ.get("SPORTSEDGE_ODDS_BOOKMAKERS", "draftkings").split(",") if x.strip())
     features = os.environ.get("SPORTSEDGE_FEATURES_URL", "").strip()
     projected = os.environ.get("SPORTSEDGE_PROJECTED_LINEUPS_URL", "").strip() or None
@@ -44,9 +50,10 @@ def main() -> int:
             if not features:
                 raise AutoRunnerError("FEATURE_PROVIDER_CONFIG_MISSING")
             report = run_auto_mlb(quote_url=quotes, feature_url=features, **common)
-        elif odds_api_key:
+        elif odds_api_keys:
             report = run_auto_mlb_native_odds(
-                odds_api_key=odds_api_key,
+                odds_api_key=odds_api_keys[0],
+                odds_api_keys=odds_api_keys[1:],
                 feature_url=features or None,
                 bookmakers=odds_books,
                 history_cache_dir=history_cache_dir,
