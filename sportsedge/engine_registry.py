@@ -9,6 +9,7 @@ from __future__ import annotations
 from math import isfinite
 from typing import Any, Callable, Mapping
 
+from .bb_engine import simulate_bb
 from .hits_engine import simulate_hits
 from .total_bases_engine import simulate_total_bases
 
@@ -18,6 +19,7 @@ class EngineDispatchError(ValueError):
 
 
 _HITTER_LINES = (0.5, 1.5, 2.5)
+_BB_LINES = (0.5, 1.5, 2.5, 3.5)
 
 
 def _finite_line(value: Any) -> float:
@@ -77,8 +79,24 @@ def total_bases_engine_adapter(model_input: Mapping[str, Any]) -> dict[str, Any]
     return _common_output(model_input, result, p_over if side == "OVER" else 1.0 - p_over, "TOTAL_BASES")
 
 
+def pitcher_bb_engine_adapter(model_input: Mapping[str, Any]) -> dict[str, Any]:
+    if model_input.get("market") != "PITCHER_BB":
+        raise EngineDispatchError("Pitcher BB adapter requires market=PITCHER_BB")
+    line = _finite_line(model_input.get("line"))
+    if line not in _BB_LINES:
+        raise EngineDispatchError(f"unsupported PITCHER_BB line {line}; allowed={_BB_LINES}")
+    side = model_input.get("side")
+    if side not in ("OVER", "UNDER"):
+        raise EngineDispatchError("PITCHER_BB side must be OVER or UNDER")
+    internal = dict(model_input); internal["market"] = "pitcher_walks"
+    result = simulate_bb(internal, thresholds=(line,))
+    p_over = float(result.probs[line])
+    return _common_output(model_input, result, p_over if side == "OVER" else 1.0 - p_over, "PITCHER_BB")
+
+
 def engine_registry() -> dict[str, Callable[[Mapping[str, Any]], Mapping[str, Any]]]:
     return {
         "HITS": hits_engine_adapter,
         "TOTAL_BASES": total_bases_engine_adapter,
+        "PITCHER_BB": pitcher_bb_engine_adapter,
     }
