@@ -12,7 +12,7 @@ class MLBSourceTests(unittest.TestCase):
         return {
             "gamePk": game_pk,
             "gameDate": game_date,
-            "status":{"detailedState":"Scheduled"},
+            "status":{"abstractGameState":"Preview","detailedState":"Scheduled"},
             "teams":{
                 "away":{"team":{"id":116,"name":"Detroit Tigers"},"probablePitcher":{"id":1,"fullName":"Away P"}},
                 "home":{"team":{"id":117,"name":"Houston Astros"},"probablePitcher":{"id":2,"fullName":"Home P"}},
@@ -28,7 +28,25 @@ class MLBSourceTests(unittest.TestCase):
         self.assertEqual(got.home_probable_pitcher_id, 2)
         self.assertEqual(got.source, "MLB_STATSAPI_SCHEDULE")
         self.assertEqual(got.game_date, "2024-06-15T20:10:00+00:00")
+        self.assertEqual(got.status, "Preview")
+        self.assertEqual(got.detailed_status, "Scheduled")
         self.assertEqual((got.game_number,got.double_header,got.venue_id,got.official_date),(2,"Y",2392,"2024-06-15"))
+
+    def test_missing_or_invalid_abstract_game_state_blocks(self):
+        for state in (None, "", "UNKNOWN", "Scheduled"):
+            game=self._game()
+            if state is None:
+                game["status"].pop("abstractGameState")
+            else:
+                game["status"]["abstractGameState"] = state
+            with self.subTest(state=state), self.assertRaisesRegex(MLBSourceError,"GAME_STATE_MISSING_OR_INVALID"):
+                parse_schedule({"dates":[{"games":[game]}]}, datetime(2026,8,10,tzinfo=timezone.utc))
+
+    def test_live_and_final_states_are_preserved_not_reinterpreted(self):
+        for state in ("Live", "Final"):
+            game=self._game(); game["status"]["abstractGameState"] = state
+            got=parse_schedule({"dates":[{"games":[game]}]}, datetime(2026,8,10,tzinfo=timezone.utc))[0]
+            self.assertEqual(got.status,state)
 
     def test_doubleheader_without_game_number_blocks(self):
         game=self._game(); game["doubleHeader"]="Y"
@@ -41,7 +59,7 @@ class MLBSourceTests(unittest.TestCase):
             parse_schedule({"dates":[{"games":[game]}]}, datetime(2026,8,10,tzinfo=timezone.utc))
 
     def test_schedule_missing_identity_blocks(self):
-        payload = {"dates":[{"games":[{"gamePk":1,"gameDate":"2026-08-10T20:00:00Z","teams":{"away":{"team":{}},"home":{"team":{"id":2}}}}]}]}
+        payload = {"dates":[{"games":[{"gamePk":1,"gameDate":"2026-08-10T20:00:00Z","status":{"abstractGameState":"Preview"},"teams":{"away":{"team":{}},"home":{"team":{"id":2}}}}]}]}
         with self.assertRaises(MLBSourceError):
             parse_schedule(payload, datetime(2026,8,10,tzinfo=timezone.utc))
 
@@ -76,6 +94,8 @@ class MLBSourceTests(unittest.TestCase):
         out = snapshot_to_dict(snap)
         self.assertEqual(out["game_time_utc"], "2026-08-10T23:07:00+00:00")
         self.assertEqual(out["game_time_ct"], "2026-08-10T18:07:00-05:00")
+        self.assertEqual(out["status"], "Preview")
+        self.assertEqual(out["detailed_status"], "Scheduled")
 
     def test_lineup_decodes_slot_and_substitution(self):
         box = {"teams":{"home":{"players":{

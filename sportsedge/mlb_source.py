@@ -33,6 +33,7 @@ class GameSnapshot:
     double_header: str | None = None
     venue_id: int | None = None
     official_date: str | None = None
+    detailed_status: str | None = None
 
 
 def _get_json(url: str, opener: Callable = urlopen) -> dict[str, Any]:
@@ -103,7 +104,13 @@ def parse_schedule(payload: dict[str, Any], retrieved_at: datetime) -> list[Game
             game_start = parse_game_start(game.get("gameDate"))
             apid, apname = _pitcher(away)
             hpid, hpname = _pitcher(home)
-            status = ((game.get("status") or {}).get("detailedState") or "UNKNOWN")
+            status_obj = game.get("status") or {}
+            abstract_status = status_obj.get("abstractGameState")
+            if abstract_status not in {"Preview", "Live", "Final"}:
+                raise MLBSourceError("GAME_STATE_MISSING_OR_INVALID")
+            detailed_status = status_obj.get("detailedState")
+            if detailed_status is not None:
+                detailed_status = str(detailed_status)
             game_number = _optional_positive_int("gameNumber", game.get("gameNumber"))
             double_header = game.get("doubleHeader")
             if double_header is not None:
@@ -117,13 +124,14 @@ def parse_schedule(payload: dict[str, Any], retrieved_at: datetime) -> list[Game
             if official_date is not None:
                 official_date = str(official_date)
             out.append(GameSnapshot(
-                game_pk, game_start.isoformat(), str(status),
+                game_pk, game_start.isoformat(), str(abstract_status),
                 int(away_team["id"]), str(away_team.get("name", "")),
                 int(home_team["id"]), str(home_team.get("name", "")),
                 apid, apname, hpid, hpname,
                 retrieved_at.astimezone(timezone.utc).isoformat(),
                 game_number=game_number, double_header=double_header,
                 venue_id=venue_id, official_date=official_date,
+                detailed_status=detailed_status,
             ))
     out.sort(key=lambda g: (parse_game_start(g.game_date), g.game_pk))
     return out
