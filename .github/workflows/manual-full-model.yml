@@ -20,9 +20,11 @@ jobs:
           python-version: '3.12'
       - name: Install runtime dependencies
         run: python -m pip install --disable-pip-version-check numpy
-      - name: Probe Odds API event markets safely
+      - name: Probe all Odds API key slots safely
         env:
           SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+          SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
+          SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
         run: |
           python - <<'PY'
           import os, json
@@ -31,54 +33,50 @@ jobs:
           from urllib.request import Request, urlopen
           from urllib.error import HTTPError
 
-          key = os.environ.get('SPORTSEDGE_ODDS_API_KEY','').strip()
-          if not key:
-              print('PROBE KEY MISSING')
-              raise SystemExit(0)
-          def get(path, params):
+          def request(key, path, params):
               q = urlencode({'apiKey': key, **params})
               req = Request('https://api.the-odds-api.com'+path+'?'+q, headers={'Accept':'application/json'})
               try:
                   with urlopen(req, timeout=15) as r:
-                      body = r.read().decode('utf-8')
-                      print('HTTP', r.status, path)
-                      return json.loads(body)
+                      return r.status, json.loads(r.read().decode('utf-8'))
               except HTTPError as e:
                   body = e.read().decode('utf-8','replace')
-                  try:
-                      parsed = json.loads(body)
-                  except Exception:
-                      parsed = {'raw': body[:500]}
-                  print('HTTP_ERROR', e.code, path, json.dumps(parsed, sort_keys=True))
-                  return None
-          events = get('/v4/sports/baseball_mlb/events', {}) or []
-          now = datetime.now(timezone.utc)
-          future = []
+                  try: parsed=json.loads(body)
+                  except Exception: parsed={'raw':body[:300]}
+                  return e.code, parsed
+
+          keys=[os.environ.get('SPORTSEDGE_ODDS_API_KEY','').strip(), os.environ.get('SPORTSEDGE_ODDS_API_KEY_2','').strip(), os.environ.get('SPORTSEDGE_ODDS_API_KEY_3','').strip()]
+          primary=next((k for k in keys if k), None)
+          if not primary:
+              print('NO_KEYS')
+              raise SystemExit(0)
+          status, events = request(primary, '/v4/sports/baseball_mlb/events', {})
+          print('EVENTS_STATUS', status)
+          if status != 200 or not isinstance(events,list):
+              raise SystemExit(0)
+          now=datetime.now(timezone.utc)
+          future=[]
           for e in events:
-              try:
-                  dt = datetime.fromisoformat(str(e['commence_time']).replace('Z','+00:00'))
-              except Exception:
-                  continue
-              if dt > now:
-                  future.append((dt,e))
+              try: dt=datetime.fromisoformat(str(e['commence_time']).replace('Z','+00:00'))
+              except Exception: continue
+              if dt>now: future.append((dt,e))
           future.sort(key=lambda x:x[0])
           if not future:
-              print('PROBE NO FUTURE EVENT')
+              print('NO_FUTURE_EVENT')
               raise SystemExit(0)
-          event = future[0][1]
-          event_id = event['id']
-          print('PROBE EVENT', event.get('away_team'), '@', event.get('home_team'), event.get('commence_time'))
-          markets = get(f'/v4/sports/baseball_mlb/events/{event_id}/markets', {'regions':'us','bookmakers':'draftkings','dateFormat':'iso'})
-          if isinstance(markets, dict):
-              keys=[]
-              for b in markets.get('bookmakers') or []:
-                  for m in b.get('markets') or []:
-                      if isinstance(m,dict) and m.get('key'):
-                          keys.append(m['key'])
-              print('DK_MARKETS', ','.join(sorted(set(keys))))
-          odds = get(f'/v4/sports/baseball_mlb/events/{event_id}/odds', {'regions':'us','bookmakers':'draftkings','markets':'batter_hits','oddsFormat':'american','dateFormat':'iso','includeSids':'true'})
-          if isinstance(odds, dict):
-              print('BATTER_HITS_BOOKMAKERS', len(odds.get('bookmakers') or []))
+          event=future[0][1]; eid=event['id']
+          print('PROBE_EVENT', event.get('away_team'), '@', event.get('home_team'), event.get('commence_time'))
+          for idx,key in enumerate(keys,1):
+              if not key:
+                  print('KEY_SLOT',idx,'MISSING')
+                  continue
+              status, body = request(key, f'/v4/sports/baseball_mlb/events/{eid}/odds', {'regions':'us','bookmakers':'draftkings','markets':'batter_hits','oddsFormat':'american','dateFormat':'iso','includeSids':'true'})
+              if status==200:
+                  books=len(body.get('bookmakers') or []) if isinstance(body,dict) else -1
+                  print('KEY_SLOT',idx,'HTTP',status,'BOOKMAKERS',books)
+              else:
+                  code=body.get('error_code') if isinstance(body,dict) else None
+                  print('KEY_SLOT',idx,'HTTP',status,'ERROR_CODE',code)
           PY
       - name: Run full SportsEdge MLB card
         env:
