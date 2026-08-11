@@ -45,6 +45,11 @@ class LiveGame:
     home_probable_pitcher_id: int | None
     away_lineup: TeamLineup
     home_lineup: TeamLineup
+    game_number: int | None = None
+    double_header: str | None = None
+    venue_id: int | None = None
+    official_date: str | None = None
+    status: str = "UNKNOWN"
 
 
 def lineup_from_rows(team_id: int, side: str, rows: Iterable[Mapping[str, Any]]) -> TeamLineup:
@@ -82,6 +87,11 @@ def make_live_game(snapshot: GameSnapshot, away_rows: Iterable[Mapping[str, Any]
         home_probable_pitcher_id=snapshot.home_probable_pitcher_id,
         away_lineup=lineup_from_rows(snapshot.away_id, "away", away_rows),
         home_lineup=lineup_from_rows(snapshot.home_id, "home", home_rows),
+        game_number=snapshot.game_number,
+        double_header=snapshot.double_header,
+        venue_id=snapshot.venue_id,
+        official_date=snapshot.official_date,
+        status=snapshot.status,
     )
 
 
@@ -163,15 +173,15 @@ def _feature_payload(market: str, feature_row: Mapping[str, Any]) -> tuple[str, 
     raise LiveSlateError(f"unsupported hitter market: {market}")
 
 
-def _player_lineup_status(game: LiveGame, player_id: int) -> str:
+def _player_live_team_and_lineup_status(game: LiveGame, player_id: int) -> tuple[int, str]:
     in_away = player_id in game.away_lineup.player_ids
     in_home = player_id in game.home_lineup.player_ids
     if in_away and in_home:
         raise LiveSlateError("player appears in both lineups")
     if in_away:
-        return "CONFIRMED" if game.away_lineup.confirmed else "PROJECTED"
+        return game.away_team_id, "CONFIRMED" if game.away_lineup.confirmed else "PROJECTED"
     if in_home:
-        return "CONFIRMED" if game.home_lineup.confirmed else "PROJECTED"
+        return game.home_team_id, "CONFIRMED" if game.home_lineup.confirmed else "PROJECTED"
     raise LiveSlateError("player not present in MLB lineup snapshot")
 
 
@@ -202,11 +212,16 @@ def assemble_hitter_candidate(
         raise LiveSlateError("require_confirmed_lineup must be boolean")
     game_pk = feature_row.get("game_pk")
     player_id = feature_row.get("player_id")
+    feature_team_id = feature_row.get("team_id")
     if game_pk != game.game_pk:
         raise LiveSlateError("feature game_pk does not match live game")
     if isinstance(player_id, bool) or not isinstance(player_id, int) or player_id <= 0:
         raise LiveSlateError("feature player_id invalid")
-    lineup_status = _player_lineup_status(game, player_id)
+    if isinstance(feature_team_id, bool) or not isinstance(feature_team_id, int) or feature_team_id <= 0:
+        raise LiveSlateError("feature team_id invalid")
+    live_team_id, lineup_status = _player_live_team_and_lineup_status(game, player_id)
+    if feature_team_id != live_team_id:
+        raise LiveSlateError("PLAYER_TEAM_MISMATCH")
     source_lineup_status = feature_row.get("source_lineup_status")
     if source_lineup_status is not None and source_lineup_status != lineup_status:
         raise LiveSlateError("feature-source lineup status conflicts with live MLB lineup")
@@ -225,15 +240,15 @@ def assemble_hitter_candidate(
     source_subset_hash = _feature_source_hash(feature_row)
     feature_json = json.dumps(features, sort_keys=True, separators=(",", ":"))
     identity = build_hash([
-        str(game.game_pk), market, str(player_id), format(line, ".12g"), side,
+        str(game.game_pk), str(live_team_id), market, str(player_id), format(line, ".12g"), side,
         lineup_status, feature_version, source_subset_hash, feature_json,
     ])
     model_input = {
         "game_id": str(game.game_pk), "market": market, "entity_id": str(player_id),
-        "line": quote.get("line"), "side": side, "build_hash": identity,
-        "feature_version": feature_version, "feature_source_hash": source_subset_hash,
-        "lineup_status": lineup_status, "require_confirmed_lineup": require_confirmed_lineup,
-        "features": features,
+        "team_id": str(live_team_id), "line": quote.get("line"), "side": side,
+        "build_hash": identity, "feature_version": feature_version,
+        "feature_source_hash": source_subset_hash, "lineup_status": lineup_status,
+        "require_confirmed_lineup": require_confirmed_lineup, "features": features,
     }
     if feature_row.get("provenance") is not None:
         model_input["provenance"] = feature_row["provenance"]

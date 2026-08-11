@@ -20,12 +20,25 @@ class MLBSourceTests(unittest.TestCase):
         }
 
     def test_schedule_identity_and_probables(self):
-        payload = {"dates":[{"games":[self._game()]}]}
+        game = self._game()
+        game.update({"gameNumber":2,"doubleHeader":"Y","venue":{"id":2392},"officialDate":"2024-06-15"})
+        payload = {"dates":[{"games":[game]}]}
         got = parse_schedule(payload, datetime(2026,8,10,tzinfo=timezone.utc))[0]
         self.assertEqual(got.game_pk, 746381)
         self.assertEqual(got.home_probable_pitcher_id, 2)
         self.assertEqual(got.source, "MLB_STATSAPI_SCHEDULE")
         self.assertEqual(got.game_date, "2024-06-15T20:10:00+00:00")
+        self.assertEqual((got.game_number,got.double_header,got.venue_id,got.official_date),(2,"Y",2392,"2024-06-15"))
+
+    def test_doubleheader_without_game_number_blocks(self):
+        game=self._game(); game["doubleHeader"]="Y"
+        with self.assertRaisesRegex(MLBSourceError,"doubleheader game missing gameNumber"):
+            parse_schedule({"dates":[{"games":[game]}]}, datetime(2026,8,10,tzinfo=timezone.utc))
+
+    def test_invalid_doubleheader_flag_blocks(self):
+        game=self._game(); game["doubleHeader"]="X"; game["gameNumber"]=1
+        with self.assertRaises(MLBSourceError):
+            parse_schedule({"dates":[{"games":[game]}]}, datetime(2026,8,10,tzinfo=timezone.utc))
 
     def test_schedule_missing_identity_blocks(self):
         payload = {"dates":[{"games":[{"gamePk":1,"gameDate":"2026-08-10T20:00:00Z","teams":{"away":{"team":{}},"home":{"team":{"id":2}}}}]}]}
@@ -38,8 +51,6 @@ class MLBSourceTests(unittest.TestCase):
                 parse_game_start(value)
 
     def test_provider_offset_normalizes_to_utc_then_chicago(self):
-        # 23:07 UTC on Aug 10 is 6:07 PM CDT. This is the exact class of
-        # conversion that must come from timezone data, never hand arithmetic.
         dt = parse_game_start("2026-08-10T23:07:00Z")
         self.assertEqual(dt.isoformat(), "2026-08-10T23:07:00+00:00")
         self.assertEqual(game_time_chicago(dt.isoformat()), "2026-08-10T18:07:00-05:00")

@@ -29,6 +29,10 @@ class GameSnapshot:
     home_probable_pitcher_name: str | None
     retrieved_at: str
     source: str = "MLB_STATSAPI_SCHEDULE"
+    game_number: int | None = None
+    double_header: str | None = None
+    venue_id: int | None = None
+    official_date: str | None = None
 
 
 def _get_json(url: str, opener: Callable = urlopen) -> dict[str, Any]:
@@ -45,11 +49,6 @@ def _pitcher(team: dict[str, Any]) -> tuple[int | None, str | None]:
 
 
 def parse_game_start(value: Any) -> datetime:
-    """Parse MLB gameDate and return a canonical aware UTC datetime.
-
-    The runtime never hand-converts slate times. MLB's gameDate is the source of
-    truth, and malformed/naive timestamps fail closed rather than being guessed.
-    """
     if not isinstance(value, str) or not value.strip():
         raise MLBSourceError("schedule game missing gameDate")
     text = value.strip()
@@ -65,9 +64,22 @@ def parse_game_start(value: Any) -> datetime:
 
 
 def game_time_chicago(value: str | GameSnapshot) -> str:
-    """Return canonical America/Chicago display time derived from MLB gameDate."""
     raw = value.game_date if isinstance(value, GameSnapshot) else value
     return parse_game_start(raw).astimezone(CHICAGO_TZ).isoformat()
+
+
+def _optional_positive_int(name: str, value: Any) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise MLBSourceError(f"{name} must be a positive integer")
+    try:
+        out = int(value)
+    except (TypeError, ValueError) as exc:
+        raise MLBSourceError(f"{name} must be a positive integer") from exc
+    if out <= 0:
+        raise MLBSourceError(f"{name} must be a positive integer")
+    return out
 
 
 def parse_schedule(payload: dict[str, Any], retrieved_at: datetime) -> list[GameSnapshot]:
@@ -92,15 +104,27 @@ def parse_schedule(payload: dict[str, Any], retrieved_at: datetime) -> list[Game
             apid, apname = _pitcher(away)
             hpid, hpname = _pitcher(home)
             status = ((game.get("status") or {}).get("detailedState") or "UNKNOWN")
+            game_number = _optional_positive_int("gameNumber", game.get("gameNumber"))
+            double_header = game.get("doubleHeader")
+            if double_header is not None:
+                double_header = str(double_header)
+                if double_header not in {"Y", "N", "S"}:
+                    raise MLBSourceError("doubleHeader must be Y, N, S, or null")
+            if double_header in {"Y", "S"} and game_number is None:
+                raise MLBSourceError("doubleheader game missing gameNumber")
+            venue_id = _optional_positive_int("venue.id", (game.get("venue") or {}).get("id"))
+            official_date = game.get("officialDate") or date_block.get("date")
+            if official_date is not None:
+                official_date = str(official_date)
             out.append(GameSnapshot(
                 game_pk, game_start.isoformat(), str(status),
                 int(away_team["id"]), str(away_team.get("name", "")),
                 int(home_team["id"]), str(home_team.get("name", "")),
                 apid, apname, hpid, hpname,
                 retrieved_at.astimezone(timezone.utc).isoformat(),
+                game_number=game_number, double_header=double_header,
+                venue_id=venue_id, official_date=official_date,
             ))
-    # MLB normally returns chronological order, but downstream code must not rely
-    # on provider ordering. This also handles doubleheaders deterministically.
     out.sort(key=lambda g: (parse_game_start(g.game_date), g.game_pk))
     return out
 
