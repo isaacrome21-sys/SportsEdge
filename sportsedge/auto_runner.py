@@ -35,10 +35,17 @@ class AutoCardResult:
     game_id: str
     market: str
     entity_id: str
+    player_name: str
+    away_team: str
+    home_team: str
     line: Any
     side: str
     american_odds: Any
     model_p: float | None
+    implied_probability: float | None
+    edge: float | None
+    ev_per_dollar: float | None
+    kelly_fraction: float | None
     bet_status: str
     reason: str
 
@@ -97,7 +104,13 @@ def _canonical_quotes(raw_quotes: list[Mapping[str, Any]]) -> tuple[list[Mapping
             if key in seen:
                 raise QuoteBridgeError("duplicate sportsbook offer")
             seen.add(key)
-            quotes.append({"source_index": i, **q})
+            quotes.append({
+                "source_index": i,
+                **q,
+                "player_name": str(raw.get("player_name") or "").strip(),
+                "away_team": str(raw.get("away_team") or "").strip(),
+                "home_team": str(raw.get("home_team") or "").strip(),
+            })
         except Exception as exc:
             failures[i] = f"{type(exc).__name__}: {exc}"
     return quotes, failures
@@ -214,11 +227,43 @@ def _resolve_feature(envelope: Mapping[str, Any], *, now: datetime, game_start: 
 
 def _blocked(index: int, raw: Mapping[str, Any] | None, reason: str) -> AutoCardResult:
     raw = raw or {}
-    return AutoCardResult(index, str(raw.get("game_id", "UNKNOWN")), str(raw.get("market", "UNKNOWN")), str(raw.get("entity_id", "UNKNOWN")), raw.get("line"), str(raw.get("side", "UNKNOWN")), raw.get("american_odds"), None, "BLOCKED", reason)
+    return AutoCardResult(
+        index,
+        str(raw.get("game_id", "UNKNOWN")),
+        str(raw.get("market", "UNKNOWN")),
+        str(raw.get("entity_id", "UNKNOWN")),
+        str(raw.get("player_name") or "").strip(),
+        str(raw.get("away_team") or "").strip(),
+        str(raw.get("home_team") or "").strip(),
+        raw.get("line"),
+        str(raw.get("side", "UNKNOWN")),
+        raw.get("american_odds"),
+        None, None, None, None, None,
+        "BLOCKED",
+        reason,
+    )
 
 
 def _convert(index: int, result: UnifiedCardResult) -> AutoCardResult:
-    return AutoCardResult(index, result.game_id, result.market, result.entity_id, result.line, result.side, result.american_odds, result.model_p, result.bet_status, result.reason)
+    return AutoCardResult(
+        index,
+        result.game_id,
+        result.market,
+        result.entity_id,
+        result.player_name,
+        result.away_team,
+        result.home_team,
+        result.line,
+        result.side,
+        result.american_odds,
+        result.model_p,
+        result.implied_probability,
+        result.edge,
+        result.ev_per_dollar,
+        result.kelly_fraction,
+        result.bet_status,
+        result.reason,
+    )
 
 
 def run_auto_mlb(*, quote_url: str, feature_url: str, projected_lineups_url: str | None = None, provider_token: str | None = None, now: datetime | None = None, opener: Callable = urlopen, registry_path: str = "config/deployments.json", require_confirmed_lineup: bool = False, min_edge: float = 0.0, kelly_multiplier: float = 0.25) -> AutoRunReport:
