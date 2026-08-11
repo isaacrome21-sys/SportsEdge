@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Run the authoritative full Hits production-engine holdout.
 
-The historical fixture is intentionally external until fixture portability is
-solved. This command refuses to run against bytes other than the frozen fixture
-hash and refuses promotion on identity collision or calibration > 2.63 SE.
+The command accepts raw or gzip transport, but always verifies the decompressed
+canonical fixture bytes against the frozen SHA-256 before scoring.
 """
 import argparse
 import hashlib
@@ -12,6 +11,7 @@ from pathlib import Path
 
 import numpy as np
 
+from sportsedge.fixture_io import FixtureIOError, read_canonical_fixture_bytes
 from sportsedge.hits_engine import (
     FROZEN_MEAN_MODEL_COEF,
     reset_frozen_mean_model,
@@ -25,12 +25,12 @@ FROZEN_TOLERANCE_SE = 2.63
 
 def main() -> int:
     p = argparse.ArgumentParser()
-    p.add_argument("fixture", type=Path, help="path to frozen bb_hits_data.pkl")
+    p.add_argument("fixture", type=Path, help="path to frozen bb_hits_data.pkl or byte-preserving .gz transport")
     args = p.parse_args()
-    raw = args.fixture.read_bytes()
-    digest = hashlib.sha256(raw).hexdigest()
-    if digest != EXPECTED_FIXTURE_SHA256:
-        raise SystemExit(f"fixture hash mismatch: {digest}")
+    try:
+        raw = read_canonical_fixture_bytes(args.fixture, expected_sha256=EXPECTED_FIXTURE_SHA256)
+    except FixtureIOError as exc:
+        raise SystemExit(str(exc)) from exc
 
     data = pickle.loads(raw)
     train = [x for x in data["dataset"] if x["season"] in ("2021", "2022")]
