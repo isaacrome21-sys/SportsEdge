@@ -28,7 +28,15 @@ def game():
 
 
 def feature(pid=100):
-    return {"game_pk": 777, "player_id": pid, "team_id": 1, "b_rate": .60, "p_rate": .60, "pa_pool": [4,5,4,5]}
+    return {"game_pk": 777, "player_id": pid, "team_id": 1, "market": "HITS", "b_rate": .60, "p_rate": .60, "pa_pool": [4,5,4,5]}
+
+
+def tb_feature(pid=100):
+    return {
+        "game_pk": 777, "player_id": pid, "team_id": 1, "market": "TOTAL_BASES",
+        "rates": {"s": .20, "d": .08, "t": .01, "hr": .08},
+        "p_h": .35, "p_hr": .06, "park": 1.20, "pa_pool": [4,5,4,5],
+    }
 
 
 def quote(pid=100, market="HITS"):
@@ -39,12 +47,12 @@ def quote(pid=100, market="HITS"):
     }
 
 
-def deployed_registry(path):
+def deployed_registry(path, deploy_tb=False):
     path.write_text(json.dumps({
         "schema_version": 1,
         "markets": {
             "HITS": {"eligible": True, "stage": "DEPLOYED", "reason": "test"},
-            "TOTAL_BASES": {"eligible": False, "stage": "PRODUCTION_LOGIC_PASS", "reason": "test"},
+            "TOTAL_BASES": {"eligible": bool(deploy_tb), "stage": "DEPLOYED" if deploy_tb else "PRODUCTION_LOGIC_PASS", "reason": "test"},
         },
     }))
 
@@ -65,9 +73,35 @@ class CardPipelineTests(unittest.TestCase):
         self.assertIsNotNone(out[0].model_p)
         self.assertGreater(out[0].model_p, .5)
 
+    def test_deployed_test_registry_runs_actual_total_bases_engine(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "deployments.json"
+            deployed_registry(p, deploy_tb=True)
+            out = run_hitter_card(
+                games=[game()], feature_rows=[tb_feature()], quotes=[quote(market="TOTAL_BASES")],
+                ingestion_now=NOW, finalization_now=NOW, registry_path=str(p)
+            )
+        self.assertEqual(out[0].bet_status, "OFFICIAL_BET")
+        self.assertIsNotNone(out[0].model_p)
+        self.assertGreater(out[0].model_p, .5)
+
+    def test_hits_and_tb_features_can_coexist_for_same_player(self):
+        out = run_hitter_card(
+            games=[game()], feature_rows=[feature(), tb_feature()],
+            quotes=[quote(), quote(market="TOTAL_BASES")], ingestion_now=NOW, finalization_now=NOW
+        )
+        self.assertEqual(len(out), 2)
+        self.assertTrue(all(x.bet_status == "BLOCKED" for x in out))
+        self.assertFalse(any("duplicate feature" in x.reason for x in out))
+
     def test_missing_feature_is_preserved_as_blocked_row(self):
         out = run_hitter_card(games=[game()], feature_rows=[], quotes=[quote()], ingestion_now=NOW, finalization_now=NOW)
         self.assertEqual(len(out), 1)
+        self.assertEqual(out[0].bet_status, "BLOCKED")
+        self.assertIn("feature snapshot missing", out[0].reason)
+
+    def test_wrong_market_feature_does_not_cross_feed(self):
+        out = run_hitter_card(games=[game()], feature_rows=[feature()], quotes=[quote(market="TOTAL_BASES")], ingestion_now=NOW, finalization_now=NOW)
         self.assertEqual(out[0].bet_status, "BLOCKED")
         self.assertIn("feature snapshot missing", out[0].reason)
 

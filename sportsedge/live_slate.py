@@ -77,40 +77,69 @@ def make_live_game(snapshot: GameSnapshot, away_rows: Iterable[Mapping[str, Any]
     )
 
 
-def _finite_number(name: str, value: Any) -> float:
+def _finite_number(name: str, value: Any, lo: float | None = None, hi: float | None = None) -> float:
     if isinstance(value, bool):
         raise LiveSlateError(f"{name} must be finite numeric")
     try:
         out = float(value)
     except (TypeError, ValueError) as exc:
         raise LiveSlateError(f"{name} must be finite numeric") from exc
-    if not isfinite(out):
-        raise LiveSlateError(f"{name} must be finite numeric")
+    if not isfinite(out) or (lo is not None and out < lo) or (hi is not None and out > hi):
+        raise LiveSlateError(f"{name} out of range")
     return out
 
 
-def _canonical_feature_hash_parts(feature_row: Mapping[str, Any]) -> list[str]:
-    allowed = {"b_rate", "p_rate", "pa_pool"}
-    extra = set(feature_row) - {"game_pk", "player_id", "team_id", *allowed}
-    if extra:
-        raise LiveSlateError(f"unexpected feature fields: {sorted(extra)}")
-    missing = allowed - set(feature_row)
-    if missing:
-        raise LiveSlateError(f"missing feature fields: {sorted(missing)}")
-    b_rate = _finite_number("b_rate", feature_row["b_rate"])
-    p_rate = _finite_number("p_rate", feature_row["p_rate"])
-    if not 0 <= b_rate <= 1 or not 0 <= p_rate <= 1:
-        raise LiveSlateError("b_rate/p_rate must be in [0,1]")
-    pa_pool = feature_row["pa_pool"]
-    if not isinstance(pa_pool, (list, tuple)) or not pa_pool:
+def _clean_pa_pool(value: Any) -> list[int]:
+    if not isinstance(value, (list, tuple)) or not value:
         raise LiveSlateError("pa_pool must be a non-empty list/tuple")
-    clean_pa = []
-    for x in pa_pool:
+    out: list[int] = []
+    for x in value:
         if isinstance(x, bool) or not isinstance(x, int) or not 0 <= x <= 9:
             raise LiveSlateError("pa_pool must contain integer PA counts in [0,9]")
-        clean_pa.append(x)
-    payload = {"b_rate": b_rate, "p_rate": p_rate, "pa_pool": clean_pa}
-    return [json.dumps(payload, sort_keys=True, separators=(",", ":"))]
+        out.append(x)
+    return out
+
+
+def _feature_payload(market: str, feature_row: Mapping[str, Any]) -> dict[str, Any]:
+    common = {"game_pk", "player_id", "team_id", "market"}
+    if feature_row.get("market") != market:
+        raise LiveSlateError("feature market does not match candidate market")
+
+    if market == "HITS":
+        expected = {"b_rate", "p_rate", "pa_pool"}
+        extra = set(feature_row) - common - expected
+        missing = expected - set(feature_row)
+        if extra:
+            raise LiveSlateError(f"unexpected HITS feature fields: {sorted(extra)}")
+        if missing:
+            raise LiveSlateError(f"missing HITS feature fields: {sorted(missing)}")
+        b_rate = _finite_number("b_rate", feature_row["b_rate"], 0, 1)
+        p_rate = _finite_number("p_rate", feature_row["p_rate"], 0, 1)
+        return {"b_rate": b_rate, "p_rate": p_rate, "pa_pool": _clean_pa_pool(feature_row["pa_pool"])}
+
+    if market == "TOTAL_BASES":
+        expected = {"rates", "p_h", "p_hr", "park", "pa_pool"}
+        extra = set(feature_row) - common - expected
+        missing = expected - set(feature_row)
+        if extra:
+            raise LiveSlateError(f"unexpected TOTAL_BASES feature fields: {sorted(extra)}")
+        if missing:
+            raise LiveSlateError(f"missing TOTAL_BASES feature fields: {sorted(missing)}")
+        rates = feature_row["rates"]
+        if not isinstance(rates, Mapping) or set(rates) != {"s", "d", "t", "hr"}:
+            raise LiveSlateError("TOTAL_BASES rates must contain exactly s,d,t,hr")
+        clean_rates = {k: _finite_number(f"rates.{k}", rates[k], 0, 1) for k in ("s", "d", "t", "hr")}
+        if sum(clean_rates.values()) >= 1:
+            raise LiveSlateError("TOTAL_BASES hit-event rates must sum to < 1")
+        return {
+            "rates": clean_rates,
+            "p_h": _finite_number("p_h", feature_row["p_h"], 1e-8, 1),
+            "p_hr": _finite_number("p_hr", feature_row["p_hr"], 1e-8, 1),
+            "park": _finite_number("park", feature_row["park"], 0.01, 10),
+            "pa_pool": _clean_pa_pool(feature_row["pa_pool"]),
+        }
+
+    raise LiveSlateError(f"unsupported hitter market: {market}")
 
 
 def _player_lineup_status(game: LiveGame, player_id: int) -> str:
@@ -164,10 +193,11 @@ def assemble_hitter_candidate(
     if side not in ("OVER", "UNDER"):
         raise LiveSlateError("quote side must be OVER or UNDER")
 
-    feature_hash_parts = _canonical_feature_hash_parts(feature_row)
+    features = _feature_payload(market, feature_row)
+    feature_json = json.dumps(features, sort_keys=True, separators=(",", ":"))
     identity = build_hash([
         str(game.game_pk), market, str(player_id), format(line, ".12g"), side,
-        lineup_status, *feature_hash_parts,
+        lineup_status, feature_json,
     ])
 
     model_input = {
@@ -179,11 +209,7 @@ def assemble_hitter_candidate(
         "build_hash": identity,
         "lineup_status": lineup_status,
         "require_confirmed_lineup": require_confirmed_lineup,
-        "features": {
-            "b_rate": float(feature_row["b_rate"]),
-            "p_rate": float(feature_row["p_rate"]),
-            "pa_pool": list(feature_row["pa_pool"]),
-        },
+        "features": features,
     }
     clean_quote = dict(quote)
     clean_quote["game_id"] = str(game.game_pk)
