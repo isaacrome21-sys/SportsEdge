@@ -27,8 +27,28 @@ def seed_int(build_hash: str) -> int:
 
 
 def candidate_rng(build_hash: str) -> random.Random:
-    """Stable per-candidate RNG independent of process, row order, clock, or batch."""
+    """Stable pure-Python per-candidate RNG for non-Monte-Carlo plumbing."""
     return random.Random(seed_int(build_hash))
+
+
+def candidate_numpy_seed_sequence(build_hash: str):
+    """Validated Hits/TB MC seed policy using all 256 digest bits.
+
+    The canonical 64-hex candidate identity is SHA-256 hashed once more and all
+    eight uint32 words are fed into numpy SeedSequence. This preserves the
+    production-logic result that fixed the correlated-seed holdout bug while
+    keeping the existing pure-Python candidate_rng stable for other callers.
+    """
+    import numpy as np
+    canonical = validate_build_hash(build_hash)
+    digest = hashlib.sha256(canonical.encode("ascii")).digest()
+    words = [int.from_bytes(digest[i:i+4], "big") for i in range(0, 32, 4)]
+    return np.random.SeedSequence(words)
+
+
+def candidate_numpy_rng(build_hash: str):
+    import numpy as np
+    return np.random.default_rng(candidate_numpy_seed_sequence(build_hash))
 
 
 def build_hash(payload_parts: Iterable[str]) -> str:
