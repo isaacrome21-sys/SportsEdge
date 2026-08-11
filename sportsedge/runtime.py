@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from math import isfinite
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -34,6 +35,22 @@ def runtime_deployments(path: str | Path = "config/deployments.json") -> dict[st
     return {market: {"market": market, **meta} for market, meta in reg["markets"].items()}
 
 
+def _normalize_candidates(candidates: list[Any]) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    for i, item in enumerate(candidates):
+        if not isinstance(item, Mapping):
+            normalized.append({"model_input": None, "quote": None})
+            continue
+        model_input = item.get("model_input")
+        quote = item.get("quote")
+        if isinstance(quote, Mapping):
+            quote = dict(quote)
+            if "retrieved_at" in quote and isinstance(quote["retrieved_at"], str):
+                quote["retrieved_at"] = parse_timestamp(quote["retrieved_at"])
+        normalized.append({"model_input": model_input, "quote": quote})
+    return normalized
+
+
 def run_payload(payload: Mapping[str, Any], *, registry_path: str | Path = "config/deployments.json") -> list[RunResult]:
     if not isinstance(payload, Mapping):
         raise RuntimeInputError("payload must be an object")
@@ -54,9 +71,13 @@ def run_payload(payload: Mapping[str, Any], *, registry_path: str | Path = "conf
         kelly_multiplier = float(kelly_multiplier)
     except (TypeError, ValueError) as exc:
         raise RuntimeInputError("min_edge/kelly_multiplier must be numeric") from exc
+    if not isfinite(min_edge) or min_edge < 0:
+        raise RuntimeInputError("min_edge must be finite and >= 0")
+    if not isfinite(kelly_multiplier) or not 0 <= kelly_multiplier <= 1:
+        raise RuntimeInputError("kelly_multiplier must be finite and in [0,1]")
 
     return run_slate(
-        candidates,
+        _normalize_candidates(candidates),
         engines=engine_registry(),
         deployments=runtime_deployments(registry_path),
         ingestion_now=ingestion_now,
