@@ -15,7 +15,7 @@ from datetime import date, datetime, time, timezone
 import hashlib
 import json
 from pathlib import Path
-from typing import Any, Callable, Iterable, Mapping
+from typing import Any, Callable, Mapping
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -36,19 +36,19 @@ class MLBHitsFeatureError(RuntimeError):
 
 
 class JsonHistoryCache:
-    """Optional content cache for immutable/prior-date MLB responses."""
+    """Content cache. Callers supply date-aware keys for mutable season logs."""
     def __init__(self, directory: str | Path | None = None):
         self.directory = Path(directory) if directory else None
         if self.directory:
             self.directory.mkdir(parents=True, exist_ok=True)
 
-    def _path(self, url: str) -> Path | None:
+    def _path(self, key: str) -> Path | None:
         if self.directory is None:
             return None
-        return self.directory / (hashlib.sha256(url.encode("utf-8")).hexdigest() + ".json")
+        return self.directory / (hashlib.sha256(key.encode("utf-8")).hexdigest() + ".json")
 
-    def get(self, url: str) -> Any | None:
-        p = self._path(url)
+    def get(self, key: str) -> Any | None:
+        p = self._path(key)
         if p is None or not p.exists():
             return None
         try:
@@ -56,8 +56,8 @@ class JsonHistoryCache:
         except Exception as exc:
             raise MLBHitsFeatureError("HISTORY_CACHE_CORRUPT") from exc
 
-    def put(self, url: str, value: Any) -> None:
-        p = self._path(url)
+    def put(self, key: str, value: Any) -> None:
+        p = self._path(key)
         if p is None:
             return
         raw = json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
@@ -73,9 +73,13 @@ def _url(path: str, params: Mapping[str, Any] | None = None) -> str:
     return out
 
 
-def _get_json(url: str, *, opener: Callable = urlopen, cache: JsonHistoryCache | None = None) -> Any:
+def _get_json(
+    url: str, *, opener: Callable = urlopen, cache: JsonHistoryCache | None = None,
+    cache_key: str | None = None,
+) -> Any:
+    key = cache_key or url
     if cache:
-        hit = cache.get(url)
+        hit = cache.get(key)
         if hit is not None:
             return hit
     try:
@@ -84,7 +88,7 @@ def _get_json(url: str, *, opener: Callable = urlopen, cache: JsonHistoryCache |
     except Exception as exc:
         raise MLBHitsFeatureError("MLB_HISTORY_FETCH_FAILED") from exc
     if cache:
-        cache.put(url, value)
+        cache.put(key, value)
     return value
 
 
@@ -116,15 +120,23 @@ def _positive_id(name: str, value: Any) -> int:
     return out
 
 
-def _game_logs(player_id: int, group: str, *, through: date, opener: Callable, cache: JsonHistoryCache | None) -> list[Mapping[str, Any]]:
+def _game_logs(
+    player_id: int, group: str, *, through: date, opener: Callable,
+    cache: JsonHistoryCache | None,
+) -> list[Mapping[str, Any]]:
     if group not in {"hitting", "pitching"}:
         raise MLBHitsFeatureError("HISTORY_GROUP_INVALID")
     rows: list[Mapping[str, Any]] = []
     for season in range(FIRST_SEASON, through.year + 1):
-        payload = _get_json(
-            _url(f"/people/{player_id}/stats", {"stats": "gameLog", "group": group, "season": season, "gameType": "R"}),
-            opener=opener, cache=cache,
+        url = _url(
+            f"/people/{player_id}/stats",
+            {"stats": "gameLog", "group": group, "season": season, "gameType": "R"},
         )
+        # The active-season gameLog URL is mutable. Key it by target date so all
+        # 15-minute runs on one slate reuse the same safe snapshot, while the
+        # next Chicago slate date forces a fresh fetch that can include yesterday.
+        key = f"{url}#through={through.isoformat()}" if season == through.year else url
+        payload = _get_json(url, opener=opener, cache=cache, cache_key=key)
         stats = payload.get("stats") if isinstance(payload, Mapping) else None
         splits = ((stats or [{}])[0].get("splits") or []) if isinstance(stats, list) and stats else []
         for raw in splits:
@@ -179,11 +191,13 @@ def _started_game(boxscore: Mapping[str, Any], player_id: int) -> bool:
     return False
 
 
-def _batter_state(player_id: int, *, through: date, opener: Callable, cache: JsonHistoryCache | None) -> tuple[dict[str, Any], str]:
+def _batter_state(
+    player_id: int, *, through: date, opener: Callable, cache: JsonHistoryCache | None,
+) -> tuple[dict[str, Any], str]:
     rows = _game_logs(player_id, "hitting", through=through, opener=opener, cache=cache)
-    h = pa = n_start = 0
-    pa_pool: list[int] = []
+    h = pa = 0
     latest = None
+    parsed: list[tuple[int, int]] = []  # (gamePk, PA), chronological
     for row in rows:
         stat = row.get("stat") or {}
         game = row.get("game") or {}
@@ -197,14 +211,24 @@ def _batter_state(player_id: int, *, through: date, opener: Callable, cache: Jso
             raise MLBHitsFeatureError("BATTING_GAME_LOG_INVALID")
         h += hits
         pa += plate_appearances
-        if _started_game(_boxscore(game_pk, opener=opener, cache=cache), player_id):
-            n_start += 1
-            pa_pool.append(plate_appearances)
+        parsed.append((game_pk, plate_appearances))
         latest = str(row.get("date"))
-    return {"h": h, "pa": pa, "n_start": n_start, "pa_pool": pa_pool[-PA_POOL_LIMIT:]}, latest or ""
+
+    # Only the last 30 true starts matter. Scan backward and stop at 30 so we do
+    # not fetch every historical boxscore merely to discard older workloads.
+    reverse_pool: list[int] = []
+    for game_pk, plate_appearances in reversed(parsed):
+        if _started_game(_boxscore(game_pk, opener=opener, cache=cache), player_id):
+            reverse_pool.append(plate_appearances)
+            if len(reverse_pool) == PA_POOL_LIMIT:
+                break
+    pa_pool = list(reversed(reverse_pool))
+    return {"h": h, "pa": pa, "n_start": len(pa_pool), "pa_pool": pa_pool}, latest or ""
 
 
-def _starter_state(player_id: int, *, through: date, opener: Callable, cache: JsonHistoryCache | None) -> tuple[dict[str, int], str]:
+def _starter_state(
+    player_id: int, *, through: date, opener: Callable, cache: JsonHistoryCache | None,
+) -> tuple[dict[str, int], str]:
     rows = _game_logs(player_id, "pitching", through=through, opener=opener, cache=cache)
     h = bfp = 0
     latest = None
@@ -225,7 +249,10 @@ def _starter_state(player_id: int, *, through: date, opener: Callable, cache: Js
     return {"h": h, "bfp": bfp}, latest or ""
 
 
-def build_live_hits_features(*, game_date: str | date, batter_id: Any, starter_id: Any, opener: Callable = urlopen, cache: JsonHistoryCache | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
+def build_live_hits_features(
+    *, game_date: str | date, batter_id: Any, starter_id: Any,
+    opener: Callable = urlopen, cache: JsonHistoryCache | None = None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
     target = _target_date(game_date)
     batter = _positive_id("BATTER_ID", batter_id)
     starter = _positive_id("STARTER_ID", starter_id)
@@ -246,13 +273,20 @@ def build_live_hits_features(*, game_date: str | date, batter_id: Any, starter_i
     return features, provenance
 
 
-def build_hits_feature_envelope(*, game_pk: Any, game_date: str | date, batter_id: Any, starter_id: Any, team_id: Any, retrieved_at: datetime, opener: Callable = urlopen, cache: JsonHistoryCache | None = None) -> dict[str, Any]:
+def build_hits_feature_envelope(
+    *, game_pk: Any, game_date: str | date, batter_id: Any, starter_id: Any,
+    team_id: Any, retrieved_at: datetime, opener: Callable = urlopen,
+    cache: JsonHistoryCache | None = None,
+) -> dict[str, Any]:
     game_pk_i = _positive_id("GAME_PK", game_pk)
     team_id_i = _positive_id("TEAM_ID", team_id)
     if not isinstance(retrieved_at, datetime) or retrieved_at.tzinfo is None or retrieved_at.utcoffset() is None:
         raise MLBHitsFeatureError("RETRIEVED_AT_TIMEZONE_REQUIRED")
     current = retrieved_at.astimezone(timezone.utc)
-    features, prov = build_live_hits_features(game_date=game_date, batter_id=batter_id, starter_id=starter_id, opener=opener, cache=cache)
+    features, prov = build_live_hits_features(
+        game_date=game_date, batter_id=batter_id, starter_id=starter_id,
+        opener=opener, cache=cache,
+    )
     dates = [x for x in (prov["latest_batter_event_date"], prov["latest_starter_event_date"]) if x]
     if not dates:
         raise MLBHitsFeatureError("HISTORY_EVENT_TIME_MISSING")
