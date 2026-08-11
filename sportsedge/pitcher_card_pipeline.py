@@ -25,6 +25,10 @@ class PitcherCardResult:
     model_p: float | None
     bet_status: str
     reason: str
+    implied_probability: float | None = None
+    edge: float | None = None
+    ev_per_dollar: float | None = None
+    kelly_fraction: float | None = None
 
 
 def _identity(quote: Mapping[str, Any]) -> tuple[str, str, str, Any, str]:
@@ -75,7 +79,14 @@ def run_pitcher_bb_card(*, games: list[LiveGame], feature_rows: list[Mapping[str
                 raise LiveSlateError("pitcher BB engine/deployment registration missing")
             candidate = assemble_pitcher_bb_candidate(game=game, feature_row=feature, quote=quote)
             rr = run_candidate(model_input=candidate["model_input"], quote=candidate["quote"], deployment=deployment, engine_fn=engine, ingestion_now=ingestion_now, finalization_now=finalization_now, min_edge=min_edge, kelly_multiplier=kelly_multiplier)
-            out.append(PitcherCardResult(game_id, market, entity_id, line, side, odds, rr.model_p, rr.bet_status, rr.reason))
+            d = rr.decision
+            out.append(PitcherCardResult(
+                game_id, market, entity_id, line, side, odds, rr.model_p, rr.bet_status, rr.reason,
+                d.implied_probability if d else None,
+                d.edge if d else None,
+                d.ev_per_dollar if d else None,
+                d.kelly_fraction if d else None,
+            ))
         except Exception as exc:
             try:
                 game_id, market, entity_id, line, side = _identity(raw_quote)
