@@ -46,12 +46,20 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], d
             if key not in output and key in model_input:
                 output[key] = model_input[key]
         bind_candidate(output, quote, deployment)
+        deployed = deployment.get("eligible") is True
         decision = decide_bet(
             output["model_p"], quote["american_odds"],
-            bound=True, fresh=True, deployed=deployment.get("eligible") is True,
+            bound=True, fresh=True, deployed=deployed,
             min_edge=min_edge, kelly_multiplier=kelly_multiplier,
         )
-        return RunResult(market, float(output["model_p"]), decision.bet_status, decision, "ok")
+        if not deployed:
+            detail = str(deployment.get("reason") or "deployment not eligible")
+            reason = f"DEPLOYMENT_NOT_ELIGIBLE: {detail}"
+        elif decision.bet_status == "PASS":
+            reason = "NO_QUALIFYING_EDGE"
+        else:
+            reason = "ok"
+        return RunResult(market, float(output["model_p"]), decision.bet_status, decision, reason)
     except Exception as exc:
         return RunResult(market, None, "BLOCKED", None, f"{type(exc).__name__}: {exc}")
 
