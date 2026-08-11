@@ -14,7 +14,14 @@ class QuoteBridgeError(ValueError):
 
 SUPPORTED_MARKETS = {"HITS", "TOTAL_BASES", "PITCHER_BB"}
 SUPPORTED_SIDES = {"OVER", "UNDER"}
-SUPPORTED_PERIODS = {"FG", "F5", "1ST"}
+# Current production engines model full-game outcomes only. Keep period support
+# market-specific so future F5/1ST engines must earn an explicit contract rather
+# than silently reusing full-game Model_P.
+SUPPORTED_PERIODS_BY_MARKET = {
+    "HITS": {"FG"},
+    "TOTAL_BASES": {"FG"},
+    "PITCHER_BB": {"FG"},
+}
 
 
 def _finite(name: str, value: Any) -> float:
@@ -55,8 +62,8 @@ def validate_canonical_quote(raw: Mapping[str, Any], *, default_ttl_seconds: int
         raise QuoteBridgeError(f"unsupported market: {market}")
     if side not in SUPPORTED_SIDES:
         raise QuoteBridgeError(f"unsupported side: {side}")
-    if period not in SUPPORTED_PERIODS:
-        raise QuoteBridgeError(f"unsupported period: {period}")
+    if period not in SUPPORTED_PERIODS_BY_MARKET[market]:
+        raise QuoteBridgeError("QUOTE_PERIOD_MODEL_MISMATCH")
 
     is_alternate = raw.get("is_alternate")
     if type(is_alternate) is not bool:
