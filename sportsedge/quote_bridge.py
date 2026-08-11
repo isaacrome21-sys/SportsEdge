@@ -1,6 +1,7 @@
 """Normalize timestamped sportsbook offers into canonical SportsEdge quotes."""
 from __future__ import annotations
 
+from datetime import datetime
 from math import isfinite
 from typing import Any, Mapping
 
@@ -38,21 +39,17 @@ def _required_text(raw: Mapping[str, Any], key: str) -> str:
     return out
 
 
-def normalize_offer(raw: Mapping[str, Any], *, default_ttl_seconds: int = 300) -> dict[str, Any]:
+def validate_canonical_quote(raw: Mapping[str, Any], *, default_ttl_seconds: int = 300) -> dict[str, Any]:
+    """Validate and canonicalize a quote regardless of ingestion path."""
     if not isinstance(raw, Mapping):
         raise QuoteBridgeError("offer must be an object")
-    try:
-        game_id = _required_text(raw, "game_id")
-        market = _required_text(raw, "market").upper()
-        entity_id = _required_text(raw, "entity_id")
-        side = _required_text(raw, "side").upper()
-        period = _required_text(raw, "period").upper()
-        book_key = _required_text(raw, "book_key")
-        raw_market_name = _required_text(raw, "raw_market_name")
-    except QuoteBridgeError:
-        raise
-    except Exception as exc:
-        raise QuoteBridgeError("QUOTE_IDENTITY_INCOMPLETE") from exc
+    game_id = _required_text(raw, "game_id")
+    market = _required_text(raw, "market").upper()
+    entity_id = _required_text(raw, "entity_id")
+    side = _required_text(raw, "side").upper()
+    period = _required_text(raw, "period").upper()
+    book_key = _required_text(raw, "book_key")
+    raw_market_name = _required_text(raw, "raw_market_name")
 
     if market not in SUPPORTED_MARKETS:
         raise QuoteBridgeError(f"unsupported market: {market}")
@@ -73,12 +70,17 @@ def normalize_offer(raw: Mapping[str, Any], *, default_ttl_seconds: int = 300) -
         raise QuoteBridgeError("american_odds must be an integer")
 
     retrieved_at = raw.get("retrieved_at")
-    if not isinstance(retrieved_at, str):
-        raise QuoteBridgeError("retrieved_at must be an ISO timestamp string")
-    try:
-        retrieved = parse_timestamp(retrieved_at)
-    except RuntimeInputError as exc:
-        raise QuoteBridgeError("invalid retrieved_at") from exc
+    if isinstance(retrieved_at, str):
+        try:
+            retrieved = parse_timestamp(retrieved_at)
+        except RuntimeInputError as exc:
+            raise QuoteBridgeError("invalid retrieved_at") from exc
+    elif isinstance(retrieved_at, datetime):
+        if retrieved_at.tzinfo is None or retrieved_at.utcoffset() is None:
+            raise QuoteBridgeError("invalid retrieved_at")
+        retrieved = retrieved_at
+    else:
+        raise QuoteBridgeError("retrieved_at must be an aware datetime or ISO timestamp string")
 
     ttl = raw.get("ttl_seconds", default_ttl_seconds)
     if isinstance(ttl, bool):
@@ -110,6 +112,10 @@ def normalize_offer(raw: Mapping[str, Any], *, default_ttl_seconds: int = 300) -
     return out
 
 
+def normalize_offer(raw: Mapping[str, Any], *, default_ttl_seconds: int = 300) -> dict[str, Any]:
+    return validate_canonical_quote(raw, default_ttl_seconds=default_ttl_seconds)
+
+
 def normalize_offer_snapshot(data: Any, *, default_ttl_seconds: int = 300) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     if not isinstance(data, list):
         raise QuoteBridgeError("offer snapshot must be a JSON list")
@@ -118,7 +124,7 @@ def normalize_offer_snapshot(data: Any, *, default_ttl_seconds: int = 300) -> tu
     seen: set[tuple[str, str, str, str, str, str, str, bool, int]] = set()
     for i, raw in enumerate(data):
         try:
-            q = normalize_offer(raw, default_ttl_seconds=default_ttl_seconds)
+            q = validate_canonical_quote(raw, default_ttl_seconds=default_ttl_seconds)
             key = (
                 q["game_id"], q["period"], q["market"], q["entity_id"],
                 repr(q["line"]), q["side"], q["book_key"], q["is_alternate"],
