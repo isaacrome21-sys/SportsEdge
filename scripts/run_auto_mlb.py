@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from sportsedge.auto_native_odds import run_auto_mlb_native_odds
 from sportsedge.auto_runner import AutoRunnerError, report_to_dict, run_auto_mlb
 
 CHICAGO_TZ = ZoneInfo("America/Chicago")
@@ -22,16 +23,17 @@ def main() -> int:
     p.add_argument("--kelly-multiplier", type=float, default=0.25)
     args = p.parse_args()
     quotes = os.environ.get("SPORTSEDGE_QUOTES_URL", "").strip()
+    odds_api_key = os.environ.get("SPORTSEDGE_ODDS_API_KEY", "").strip()
+    odds_books = tuple(x.strip() for x in os.environ.get("SPORTSEDGE_ODDS_BOOKMAKERS", "draftkings").split(",") if x.strip())
     features = os.environ.get("SPORTSEDGE_FEATURES_URL", "").strip()
     projected = os.environ.get("SPORTSEDGE_PROJECTED_LINEUPS_URL", "").strip() or None
     token = os.environ.get("SPORTSEDGE_PROVIDER_TOKEN", "").strip() or None
     now = datetime.now(timezone.utc)
     infrastructure_blocked = False
     try:
-        if not quotes or not features:
-            raise AutoRunnerError("PROVIDER_CONFIG_MISSING")
-        report = run_auto_mlb(
-            quote_url=quotes,
+        if not features:
+            raise AutoRunnerError("FEATURE_PROVIDER_CONFIG_MISSING")
+        common = dict(
             feature_url=features,
             projected_lineups_url=projected,
             provider_token=token,
@@ -40,6 +42,12 @@ def main() -> int:
             min_edge=args.min_edge,
             kelly_multiplier=args.kelly_multiplier,
         )
+        if quotes:
+            report = run_auto_mlb(quote_url=quotes, **common)
+        elif odds_api_key:
+            report = run_auto_mlb_native_odds(odds_api_key=odds_api_key, bookmakers=odds_books, **common)
+        else:
+            raise AutoRunnerError("QUOTE_PROVIDER_CONFIG_MISSING")
         payload = report_to_dict(report)
     except Exception as exc:
         infrastructure_blocked = True
