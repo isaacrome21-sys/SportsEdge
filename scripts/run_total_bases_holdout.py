@@ -2,8 +2,8 @@
 """Authoritative fixture-backed Total Bases production-engine holdout.
 
 Every holdout row calls sportsedge.total_bases_engine.simulate_total_bases.
-The reducer only sums integer/float candidate results; workers cannot change
-identity, fixture, engine constants, or acceptance target.
+The command accepts raw or gzip transport, but always verifies decompressed
+canonical fixture bytes before scoring.
 """
 import argparse
 import hashlib
@@ -14,6 +14,7 @@ from pathlib import Path
 
 import numpy as np
 
+from sportsedge.fixture_io import FixtureIOError, read_canonical_fixture_bytes
 from sportsedge.total_bases_engine import TRAIN_PA_COUNTS, TRAIN_PA_POOL, TRAIN_SCALE, simulate_total_bases
 
 EXPECTED_FIXTURE_SHA256 = "3abd596ae720529f5354f724c02c11e284a5044ac5842207599c27f4cb562e82"
@@ -53,16 +54,16 @@ def _score(item):
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("fixture", type=Path)
+    parser.add_argument("fixture", type=Path, help="path to frozen tb_gameeffect_data.pkl or byte-preserving .gz transport")
     parser.add_argument("--workers", type=int, default=max(1, min(8, mp.cpu_count())))
     args = parser.parse_args()
     if args.workers <= 0:
         raise SystemExit("workers must be positive")
 
-    raw = args.fixture.read_bytes()
-    digest = hashlib.sha256(raw).hexdigest()
-    if digest != EXPECTED_FIXTURE_SHA256:
-        raise SystemExit(f"fixture hash mismatch: {digest}")
+    try:
+        raw = read_canonical_fixture_bytes(args.fixture, expected_sha256=EXPECTED_FIXTURE_SHA256)
+    except FixtureIOError as exc:
+        raise SystemExit(str(exc)) from exc
     data = pickle.loads(raw)
     dataset = data["dataset"]
     train = [x for x in dataset if x["season"] in ("2021", "2022")]
