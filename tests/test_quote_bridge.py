@@ -42,10 +42,16 @@ class QuoteBridgeTests(unittest.TestCase):
         with self.assertRaisesRegex(QuoteBridgeError, "QUOTE_IDENTITY_INCOMPLETE"):
             normalize_offer(o)
 
-    def test_unsupported_period_fails_closed(self):
-        o = offer(); o["period"] = "UNKNOWN"
-        with self.assertRaises(QuoteBridgeError):
-            normalize_offer(o)
+    def test_non_full_game_periods_fail_closed_for_every_current_engine(self):
+        for market, raw_name in (
+            ("HITS", "Player Hits"),
+            ("TOTAL_BASES", "Player Total Bases"),
+            ("PITCHER_BB", "Pitcher Walks"),
+        ):
+            for period in ("F5", "1ST", "UNKNOWN"):
+                o = offer(); o["market"] = market; o["raw_market_name"] = raw_name; o["period"] = period
+                with self.subTest(market=market, period=period), self.assertRaisesRegex(QuoteBridgeError, "QUOTE_PERIOD_MODEL_MISMATCH"):
+                    normalize_offer(o)
 
     def test_invalid_odds_fail_closed(self):
         o = offer(); o["american_odds"] = -95
