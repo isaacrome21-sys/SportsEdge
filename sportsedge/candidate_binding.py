@@ -28,10 +28,18 @@ def _key(m: Mapping[str, Any]) -> CandidateKey:
 
 
 def bind_candidate(model_output: Mapping[str, Any], sportsbook_quote: Mapping[str, Any], deployment_attestation: Mapping[str, Any] | None) -> CandidateKey:
+    """Bind model output to the exact quote and deployment market identity.
+
+    Deployment *eligibility* is intentionally not authorization at this layer.
+    A well-formed eligible=False record is valid binding metadata and is enforced
+    later by the Truth Gate. This keeps model capability separate from permission
+    to publish an OFFICIAL_BET while malformed/truthy deployment values still
+    fail closed.
+    """
     if deployment_attestation is None or not isinstance(deployment_attestation, Mapping):
         raise BindingError("deployment attestation missing or malformed")
-    if deployment_attestation.get("eligible") is not True:
-        raise BindingError("deployment not eligible")
+    if type(deployment_attestation.get("eligible")) is not bool:
+        raise BindingError("deployment eligible must be boolean")
 
     model_key = _key(model_output)
     quote_key = _key(sportsbook_quote)
