@@ -46,7 +46,9 @@ def run_hitter_card(*, games: list[LiveGame], feature_rows: list[Mapping[str, An
         except Exception as exc:
             raise LiveSlateError("feature row missing game_pk/player_id/market") from exc
         if key in feature_map:
-            raise LiveSlateError(f"duplicate feature row: {key}")
+            if dict(feature_map[key]) != dict(row):
+                raise LiveSlateError(f"conflicting duplicate feature row: {key}")
+            continue
         feature_map[key] = row
 
     deployments = runtime_deployments(registry_path)
