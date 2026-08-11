@@ -60,7 +60,7 @@ class FeatureBridgeTests(unittest.TestCase):
         self.assertEqual(cm.exception.reason,"MISSING")
 
     def test_stale_fact_fails_closed(self):
-        s=hits_sources(); s[0]["retrieved_at"]="2026-08-10T18:00:00Z"
+        s=hits_sources(); s[0]["event_time"]="2026-08-10T17:59:00Z"; s[0]["retrieved_at"]="2026-08-10T18:00:00Z"
         with self.assertRaises(FeatureBridgeError) as cm: self.resolve(s)
         self.assertEqual(cm.exception.reason,"STALE")
 
