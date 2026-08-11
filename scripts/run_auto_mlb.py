@@ -31,10 +31,7 @@ def main() -> int:
     now = datetime.now(timezone.utc)
     infrastructure_blocked = False
     try:
-        if not features:
-            raise AutoRunnerError("FEATURE_PROVIDER_CONFIG_MISSING")
         common = dict(
-            feature_url=features,
             projected_lineups_url=projected,
             provider_token=token,
             now=now,
@@ -43,9 +40,16 @@ def main() -> int:
             kelly_multiplier=args.kelly_multiplier,
         )
         if quotes:
-            report = run_auto_mlb(quote_url=quotes, **common)
+            if not features:
+                raise AutoRunnerError("FEATURE_PROVIDER_CONFIG_MISSING")
+            report = run_auto_mlb(quote_url=quotes, feature_url=features, **common)
         elif odds_api_key:
-            report = run_auto_mlb_native_odds(odds_api_key=odds_api_key, bookmakers=odds_books, **common)
+            report = run_auto_mlb_native_odds(
+                odds_api_key=odds_api_key,
+                feature_url=features or None,
+                bookmakers=odds_books,
+                **common,
+            )
         else:
             raise AutoRunnerError("QUOTE_PROVIDER_CONFIG_MISSING")
         payload = report_to_dict(report)
