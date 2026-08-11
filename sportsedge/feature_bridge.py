@@ -118,10 +118,14 @@ def _resolve_one(*, feature: str, fact_key: str, facts: Sequence[SourceFact], no
     for f in candidates:
         if _banned(f.fact_key):
             raise FeatureBridgeError("BANNED_FACT", {"fact_key": f.fact_key, "source_id": f.source_id})
+        if f.event_time > f.retrieved_at:
+            raise FeatureBridgeError("IMPOSSIBLE_SOURCE_CHRONOLOGY", {"fact_key": fact_key, "source_id": f.source_id})
         if f.event_time > wager_cutoff:
             raise FeatureBridgeError("FUTURE_EVENT_TIME", {"fact_key": fact_key, "source_id": f.source_id})
         if f.retrieved_at > now:
             raise FeatureBridgeError("FUTURE_RETRIEVAL_TIME", {"fact_key": fact_key, "source_id": f.source_id})
+        if f.retrieved_at > wager_cutoff:
+            raise FeatureBridgeError("POST_CUTOFF_RETRIEVAL", {"fact_key": fact_key, "source_id": f.source_id})
         age = (now - f.retrieved_at).total_seconds()
         if age > ttl_seconds:
             stale.append({"source_id": f.source_id, "age_seconds": age})
