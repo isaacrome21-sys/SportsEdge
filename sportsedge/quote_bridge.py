@@ -13,6 +13,7 @@ class QuoteBridgeError(ValueError):
 
 SUPPORTED_MARKETS = {"HITS", "TOTAL_BASES", "PITCHER_BB"}
 SUPPORTED_SIDES = {"OVER", "UNDER"}
+SUPPORTED_PERIODS = {"FG", "F5", "1ST"}
 
 
 def _finite(name: str, value: Any) -> float:
@@ -27,22 +28,42 @@ def _finite(name: str, value: Any) -> float:
     return out
 
 
+def _required_text(raw: Mapping[str, Any], key: str) -> str:
+    value = raw.get(key)
+    if value is None:
+        raise QuoteBridgeError("QUOTE_IDENTITY_INCOMPLETE")
+    out = str(value).strip()
+    if not out:
+        raise QuoteBridgeError("QUOTE_IDENTITY_INCOMPLETE")
+    return out
+
+
 def normalize_offer(raw: Mapping[str, Any], *, default_ttl_seconds: int = 300) -> dict[str, Any]:
     if not isinstance(raw, Mapping):
         raise QuoteBridgeError("offer must be an object")
     try:
-        game_id = str(raw["game_id"])
-        market = str(raw["market"]).upper()
-        entity_id = str(raw["entity_id"])
-        side = str(raw["side"]).upper()
+        game_id = _required_text(raw, "game_id")
+        market = _required_text(raw, "market").upper()
+        entity_id = _required_text(raw, "entity_id")
+        side = _required_text(raw, "side").upper()
+        period = _required_text(raw, "period").upper()
+        book_key = _required_text(raw, "book_key")
+        raw_market_name = _required_text(raw, "raw_market_name")
+    except QuoteBridgeError:
+        raise
     except Exception as exc:
-        raise QuoteBridgeError("offer missing canonical identity") from exc
-    if not game_id or not entity_id:
-        raise QuoteBridgeError("game_id/entity_id cannot be blank")
+        raise QuoteBridgeError("QUOTE_IDENTITY_INCOMPLETE") from exc
+
     if market not in SUPPORTED_MARKETS:
         raise QuoteBridgeError(f"unsupported market: {market}")
     if side not in SUPPORTED_SIDES:
         raise QuoteBridgeError(f"unsupported side: {side}")
+    if period not in SUPPORTED_PERIODS:
+        raise QuoteBridgeError(f"unsupported period: {period}")
+
+    is_alternate = raw.get("is_alternate")
+    if type(is_alternate) is not bool:
+        raise QuoteBridgeError("QUOTE_IDENTITY_INCOMPLETE")
 
     line = _finite("line", raw.get("line"))
     odds = _finite("american_odds", raw.get("american_odds"))
@@ -71,12 +92,16 @@ def normalize_offer(raw: Mapping[str, Any], *, default_ttl_seconds: int = 300) -
 
     out = {
         "game_id": game_id,
+        "period": period,
         "market": market,
         "entity_id": entity_id,
-        "line": line,
         "side": side,
-        "american_odds": int(odds),
+        "line": line,
+        "book_key": book_key,
         "retrieved_at": retrieved,
+        "is_alternate": is_alternate,
+        "raw_market_name": raw_market_name,
+        "american_odds": int(odds),
         "ttl_seconds": ttl,
     }
     for key in ("sportsbook", "offer_id", "source_url"):
@@ -90,11 +115,15 @@ def normalize_offer_snapshot(data: Any, *, default_ttl_seconds: int = 300) -> tu
         raise QuoteBridgeError("offer snapshot must be a JSON list")
     quotes: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
-    seen: set[tuple[str, str, str, str, str, int]] = set()
+    seen: set[tuple[str, str, str, str, str, str, str, bool, int]] = set()
     for i, raw in enumerate(data):
         try:
             q = normalize_offer(raw, default_ttl_seconds=default_ttl_seconds)
-            key = (q["game_id"], q["market"], q["entity_id"], repr(q["line"]), q["side"], q["american_odds"])
+            key = (
+                q["game_id"], q["period"], q["market"], q["entity_id"],
+                repr(q["line"]), q["side"], q["book_key"], q["is_alternate"],
+                q["american_odds"],
+            )
             if key in seen:
                 raise QuoteBridgeError("duplicate sportsbook offer")
             seen.add(key)
