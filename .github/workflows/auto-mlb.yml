@@ -23,10 +23,12 @@ jobs:
       - name: Install runtime dependencies
         run: python -m pip install --disable-pip-version-check numpy
       - name: Verify automation safety tests
-        run: python -m unittest tests.test_auto_runner -v
+        run: python -m unittest tests.test_auto_runner tests.test_odds_api_source -v
       - name: Run automated MLB card
         env:
           SPORTSEDGE_QUOTES_URL: ${{ secrets.SPORTSEDGE_QUOTES_URL }}
+          SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+          SPORTSEDGE_ODDS_BOOKMAKERS: draftkings
           SPORTSEDGE_FEATURES_URL: ${{ secrets.SPORTSEDGE_FEATURES_URL }}
           SPORTSEDGE_PROJECTED_LINEUPS_URL: ${{ secrets.SPORTSEDGE_PROJECTED_LINEUPS_URL }}
           SPORTSEDGE_PROVIDER_TOKEN: ${{ secrets.SPORTSEDGE_PROVIDER_TOKEN }}
