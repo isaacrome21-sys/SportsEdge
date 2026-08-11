@@ -5,10 +5,10 @@
   "markets": {
     "HITS": {
       "canonical_file": "bb_hits_data.pkl",
-      "canonical_size_bytes": 16743400,
-      "canonical_sha256": "8c15e196efa5fc7ef979d0a9cf5ec113cba54cd756482babc256c44d53642409",
-      "gzip_size_bytes": 2961564,
-      "gzip_sha256": "04e0d566701ffd8f3f64c3aa599f99b652aa2cdb1c6b7f9c4e6d8f306e285d84"
+      "canonical_size_bytes": 19948081,
+      "canonical_sha256": "aaa006155de8078057fae0bd764a6aebca7e06057d9e83669d816536c5471776",
+      "gzip_size_bytes": 4089956,
+      "gzip_sha256": "84bc9bab6f36ff27b91bb23cd13429b677d58db429f3eb4b935f4354c96ca2dc"
     },
     "TOTAL_BASES": {
       "canonical_file": "tb_gameeffect_data.pkl",
