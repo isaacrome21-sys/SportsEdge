@@ -20,6 +20,8 @@ class LiveMLBStatsSchemaProbe(unittest.TestCase):
         self.assertTrue(bsplit, 'no Altuve batting splits')
         print('BATTING_SPLIT_KEYS', sorted(bsplit[-1].keys()))
         print('BATTING_STAT', json.dumps(bsplit[-1].get('stat') or {}, sort_keys=True))
+        print('BATTING_POSITIONS', json.dumps(bsplit[-1].get('positionsPlayed') or [], sort_keys=True))
+        print('BATTING_FIRST_POSITIONS', json.dumps(bsplit[0].get('positionsPlayed') or [], sort_keys=True))
         print('BATTING_DATE', bsplit[-1].get('date'))
         print('BATTING_GAME', json.dumps(bsplit[-1].get('game') or {}, sort_keys=True))
 
