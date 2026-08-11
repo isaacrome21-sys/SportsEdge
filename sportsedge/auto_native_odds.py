@@ -66,7 +66,6 @@ def _roster_names(boxscore: Mapping[str, Any]) -> list[tuple[int, str]]:
 
 
 def _player_team_index(*, game, boxscore: Mapping[str, Any]) -> dict[int, tuple[int, int]]:
-    """Map player_id -> (current_team_id, opposing_probable_pitcher_id)."""
     out: dict[int, tuple[int, int]] = {}
     sides = (
         ("away", int(game.away_id), game.home_probable_pitcher_id),
@@ -90,6 +89,26 @@ def _official_date(game) -> date:
         return date.fromisoformat(value)
     except ValueError as exc:
         raise ValueError("MLB_OFFICIAL_DATE_INVALID") from exc
+
+
+def _fetch_odds_snapshot(*, key: str, schedule, participant_index, opener, bookmakers):
+    snapshot = fetch_mlb_player_prop_quotes(
+        api_key=key,
+        schedule=schedule,
+        participant_index=participant_index,
+        opener=opener,
+        bookmakers=bookmakers,
+    )
+    # A provider key that can list events but cannot fetch any event-level odds
+    # is not a successful acquisition. Force keyring failover without treating a
+    # legitimate zero-prop slate (no provider fetch failures) as an error.
+    fetch_failures = [
+        item for item in snapshot.failures
+        if str(item.get("reason", "")).startswith("ODDS_API_FETCH_FAILED:")
+    ]
+    if not snapshot.quotes and fetch_failures:
+        raise RuntimeError(f"ODDS_API_ZERO_QUOTES_WITH_FETCH_FAILURES:{len(fetch_failures)}")
+    return snapshot
 
 
 def run_auto_mlb_native_odds(
@@ -131,8 +150,8 @@ def run_auto_mlb_native_odds(
     participant_index = build_participant_index(schedule=schedule, confirmed_names_by_game=roster_names)
     keyring = fetch_with_key_failover(
         (odds_api_key, *odds_api_keys),
-        lambda key: fetch_mlb_player_prop_quotes(
-            api_key=key,
+        lambda key: _fetch_odds_snapshot(
+            key=key,
             schedule=schedule,
             participant_index=participant_index,
             opener=opener,
