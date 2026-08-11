@@ -1,0 +1,38 @@
+name: manual-full-model
+
+on:
+  push:
+    branches:
+      - manual-full-model-20260811
+
+permissions:
+  contents: read
+
+jobs:
+  run-card:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime dependencies
+        run: python -m pip install --disable-pip-version-check numpy
+      - name: Run full SportsEdge MLB card
+        env:
+          SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+          SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
+          SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
+          SPORTSEDGE_ODDS_BOOKMAKERS: draftkings
+          SPORTSEDGE_HISTORY_CACHE_DIR: .cache/sportsedge/mlb-history
+        run: python scripts/run_auto_mlb.py --output artifacts/live_mlb_card.json
+      - name: Upload full model artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-mlb-card
+          path: artifacts/live_mlb_card.json
+          if-no-files-found: error
+          retention-days: 1
