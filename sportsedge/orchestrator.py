@@ -33,6 +33,19 @@ def _reject_market_leakage(model_input: Mapping[str, Any]) -> None:
         raise OrchestrationError(f"sportsbook/market data prohibited in Model_Input: {sorted(present)}")
 
 
+def _decision_reason(decision: BetDecision, deployment: Mapping[str, Any]) -> str:
+    if decision.bet_status == "BLOCKED":
+        if deployment.get("eligible") is not True:
+            detail = str(deployment.get("reason") or "market not deployment-eligible").strip()
+            return f"DEPLOYMENT_BLOCKED: {detail}"
+        return "TRUTH_GATE_BLOCKED"
+    if decision.bet_status == "PASS":
+        return "NO_BET: edge/EV threshold not met"
+    if decision.bet_status == "OFFICIAL_BET":
+        return "OFFICIAL_BET"
+    return str(decision.bet_status)
+
+
 def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], deployment: Mapping[str, Any], engine_fn: Callable[[Mapping[str, Any]], Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, min_edge: float = 0.0, kelly_multiplier: float = 0.25) -> RunResult:
     """Run one candidate end-to-end. Any integrity failure returns BLOCKED, never a guessed bet."""
     market = str(model_input.get("market", "UNKNOWN"))
@@ -51,7 +64,7 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], d
             bound=True, fresh=True, deployed=deployment.get("eligible") is True,
             min_edge=min_edge, kelly_multiplier=kelly_multiplier,
         )
-        return RunResult(market, float(output["model_p"]), decision.bet_status, decision, "ok")
+        return RunResult(market, float(output["model_p"]), decision.bet_status, decision, _decision_reason(decision, deployment))
     except Exception as exc:
         return RunResult(market, None, "BLOCKED", None, f"{type(exc).__name__}: {exc}")
 
