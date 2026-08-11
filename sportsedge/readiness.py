@@ -11,6 +11,7 @@ from .engine_registry import engine_registry
 RUNTIME_COMPONENTS = {
     "HITS": ("engine", "live_lineup", "feature_bridge", "quote_bridge", "truth_gate"),
     "TOTAL_BASES": ("engine", "live_lineup", "feature_bridge", "quote_bridge", "truth_gate"),
+    "PITCHER_BB": ("engine", "probable_pitcher_identity", "feature_bridge", "quote_bridge", "truth_gate"),
 }
 
 
