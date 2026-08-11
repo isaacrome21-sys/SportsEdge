@@ -19,9 +19,9 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install runtime dependencies
-        run: python -m pip install --disable-pip-version-check numpy
+        run: python -m pip install --disable-pip-version-check numpy pytest
       - name: Verify core game-market source
-        run: python -m pytest -q tests/test_game_odds_source.py
+        run: python -m pytest -q tests/test_game_odds_source.py tests/test_game_market_contract.py
       - name: Acquire fresh DraftKings ML RL totals
         env:
           SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
