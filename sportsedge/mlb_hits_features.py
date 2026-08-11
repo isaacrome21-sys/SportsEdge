@@ -8,8 +8,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
+import hashlib
 import json
 from math import isfinite
+from pathlib import Path
 from typing import Any, Callable, Mapping
 from urllib.parse import urlencode
 from urllib.request import urlopen
@@ -88,22 +90,74 @@ def _splits(payload: Any, *, group: str, player_id: int, season: int) -> list[Ma
 
 
 class MLBHitsHistorySource:
-    """Run-scoped cached StatsAPI history source."""
+    """Run-scoped plus optional persistent, date-safe StatsAPI history source."""
 
-    def __init__(self, *, opener: Callable = urlopen, retrieved_at: datetime | None = None):
+    def __init__(
+        self, *, opener: Callable = urlopen, retrieved_at: datetime | None = None,
+        cache_dir: str | Path | None = None,
+    ):
         current = retrieved_at or datetime.now(timezone.utc)
         if not isinstance(current, datetime) or current.tzinfo is None or current.utcoffset() is None:
             raise MLBHitsFeatureError("MLB_FEATURE_TIMEZONE_REQUIRED")
         self.opener = opener
         self.retrieved_at = current.astimezone(timezone.utc)
-        self._cache: dict[tuple[int, str, int], list[Mapping[str, Any]]] = {}
+        self._cache: dict[tuple[int, str, int, str], list[Mapping[str, Any]]] = {}
+        self.cache_dir = Path(cache_dir) if cache_dir else None
+        if self.cache_dir is not None:
+            try:
+                self.cache_dir.mkdir(parents=True, exist_ok=True)
+            except OSError as exc:
+                raise MLBHitsFeatureError("MLB_FEATURE_CACHE_UNAVAILABLE", {"path": str(self.cache_dir)}) from exc
 
-    def _fetch(self, player_id: int, group: str, season: int) -> list[Mapping[str, Any]]:
-        key = (int(player_id), group, int(season))
-        if key in self._cache:
-            return self._cache[key]
+    @staticmethod
+    def _cache_marker(season: int, target_date: date) -> str:
+        # Completed seasons are immutable. The active season endpoint is mutable,
+        # so its cache identity includes the exact target official date. This lets
+        # every 15-minute run on one slate reuse the same safe snapshot while the
+        # next slate date refreshes the active season and can incorporate yesterday.
+        return target_date.isoformat() if season == target_date.year else "frozen"
+
+    def _disk_path(self, key: tuple[int, str, int, str]) -> Path | None:
+        if self.cache_dir is None:
+            return None
+        raw = "|".join(map(str, key))
+        return self.cache_dir / (hashlib.sha256(raw.encode("utf-8")).hexdigest() + ".json")
+
+    def _load_disk(self, key: tuple[int, str, int, str]) -> list[Mapping[str, Any]] | None:
+        path = self._disk_path(key)
+        if path is None or not path.exists():
+            return None
+        try:
+            value = json.loads(path.read_text())
+        except Exception as exc:
+            raise MLBHitsFeatureError("MLB_FEATURE_CACHE_CORRUPT", {"path": str(path)}) from exc
+        if not isinstance(value, list) or any(not isinstance(row, Mapping) for row in value):
+            raise MLBHitsFeatureError("MLB_FEATURE_CACHE_CORRUPT", {"path": str(path)})
+        return value
+
+    def _write_disk(self, key: tuple[int, str, int, str], rows: list[Mapping[str, Any]]) -> None:
+        path = self._disk_path(key)
+        if path is None:
+            return
+        try:
+            raw = json.dumps(rows, sort_keys=True, separators=(",", ":"), allow_nan=False)
+            tmp = path.with_suffix(path.suffix + ".tmp")
+            tmp.write_text(raw)
+            tmp.replace(path)
+        except Exception as exc:
+            raise MLBHitsFeatureError("MLB_FEATURE_CACHE_WRITE_FAILED", {"path": str(path)}) from exc
+
+    def _fetch(self, player_id: int, group: str, season: int, target_date: date) -> list[Mapping[str, Any]]:
         if group not in {"hitting", "fielding", "pitching"}:
             raise MLBHitsFeatureError("MLB_FEATURE_GROUP_UNSUPPORTED", {"group": group})
+        marker = self._cache_marker(int(season), target_date)
+        key = (int(player_id), group, int(season), marker)
+        if key in self._cache:
+            return self._cache[key]
+        disk_rows = self._load_disk(key)
+        if disk_rows is not None:
+            self._cache[key] = disk_rows
+            return disk_rows
         params = urlencode({"stats": "gameLog", "group": group, "season": season, "gameType": "R"})
         url = f"{BASE}/people/{int(player_id)}/stats?{params}"
         try:
@@ -113,6 +167,7 @@ class MLBHitsHistorySource:
             raise MLBHitsFeatureError("MLB_FEATURE_FETCH_FAILED", {"group": group, "player_id": int(player_id), "season": season}) from exc
         rows = _splits(payload, group=group, player_id=int(player_id), season=season)
         self._cache[key] = rows
+        self._write_disk(key, rows)
         return rows
 
     def _years(self, target_date: date):
@@ -124,7 +179,7 @@ class MLBHitsHistorySource:
         out: list[GameLine] = []
         seen: set[int] = set()
         for year in self._years(target_date):
-            for split in self._fetch(player_id, "hitting", year):
+            for split in self._fetch(player_id, "hitting", year, target_date):
                 d = _date(split.get("date"))
                 if d >= target_date:
                     continue
@@ -147,7 +202,7 @@ class MLBHitsHistorySource:
         started: set[int] = set()
         observed: set[int] = set()
         for year in self._years(target_date):
-            for split in self._fetch(player_id, "fielding", year):
+            for split in self._fetch(player_id, "fielding", year, target_date):
                 d = _date(split.get("date"))
                 if d >= target_date:
                     continue
@@ -167,7 +222,7 @@ class MLBHitsHistorySource:
         out: list[PitchLine] = []
         seen: set[int] = set()
         for year in self._years(target_date):
-            for split in self._fetch(player_id, "pitching", year):
+            for split in self._fetch(player_id, "pitching", year, target_date):
                 d = _date(split.get("date"))
                 if d >= target_date:
                     continue
