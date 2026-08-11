@@ -14,6 +14,7 @@ from .identity_rng import candidate_numpy_rng
 from .shared_game_effect import SIGMA_GAME_EFFECT, apply_shared_game_effect
 
 ENGINE_VERSION = "hits_engine_v1.2"
+FEATURE_CONTRACT_VERSION = "hits_batter_pitcher_pa_v1"
 N_MC_PATHS = 2000
 FROZEN_MEAN_MODEL_COEF = (
     -0.05944065851222977,

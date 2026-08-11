@@ -13,6 +13,7 @@ from .identity_rng import candidate_numpy_rng
 from .shared_game_effect import SIGMA_GAME_EFFECT, sample_game_effect
 
 ENGINE_VERSION = "total_bases_engine_v0.2"
+FEATURE_CONTRACT_VERSION = "tb_event_rates_pitcher_park_pa_v1"
 N_MC_PATHS = 2000
 LG_P_H = 0.2258
 LG_P_HR = 0.03357

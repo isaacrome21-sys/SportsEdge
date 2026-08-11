@@ -1,9 +1,9 @@
 """Fail-closed live MLB slate assembly for validated hitter markets.
 
 This module does not invent projections. It binds three independently sourced
-objects: MLB schedule/lineup identity, a precomputed model-feature snapshot, and
-a sportsbook quote. A candidate is emitted only when all identity fields match
-and (when requested) the hitter is present in a confirmed batting order.
+objects: MLB schedule/lineup identity, a versioned precomputed model-feature
+snapshot, and a sportsbook quote. A candidate is emitted only when all identity
+and feature-contract fields match.
 """
 from __future__ import annotations
 
@@ -12,11 +12,17 @@ import json
 from math import isfinite
 from typing import Any, Iterable, Mapping
 
+from .hits_engine import FEATURE_CONTRACT_VERSION as HITS_FEATURE_CONTRACT_VERSION
 from .identity_rng import build_hash
 from .mlb_source import GameSnapshot
+from .total_bases_engine import FEATURE_CONTRACT_VERSION as TB_FEATURE_CONTRACT_VERSION
 
 
 SUPPORTED_HITTER_MARKETS = {"HITS", "TOTAL_BASES"}
+FEATURE_CONTRACTS = {
+    "HITS": HITS_FEATURE_CONTRACT_VERSION,
+    "TOTAL_BASES": TB_FEATURE_CONTRACT_VERSION,
+}
 
 
 class LiveSlateError(ValueError):
@@ -100,10 +106,16 @@ def _clean_pa_pool(value: Any) -> list[int]:
     return out
 
 
-def _feature_payload(market: str, feature_row: Mapping[str, Any]) -> dict[str, Any]:
-    common = {"game_pk", "player_id", "team_id", "market"}
+def _feature_payload(market: str, feature_row: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
+    common = {"game_pk", "player_id", "team_id", "market", "feature_version"}
     if feature_row.get("market") != market:
         raise LiveSlateError("feature market does not match candidate market")
+    expected_version = FEATURE_CONTRACTS[market]
+    version = feature_row.get("feature_version")
+    if version != expected_version:
+        raise LiveSlateError(
+            f"feature contract mismatch for {market}: expected {expected_version!r}, got {version!r}"
+        )
 
     if market == "HITS":
         expected = {"b_rate", "p_rate", "pa_pool"}
@@ -113,9 +125,12 @@ def _feature_payload(market: str, feature_row: Mapping[str, Any]) -> dict[str, A
             raise LiveSlateError(f"unexpected HITS feature fields: {sorted(extra)}")
         if missing:
             raise LiveSlateError(f"missing HITS feature fields: {sorted(missing)}")
-        b_rate = _finite_number("b_rate", feature_row["b_rate"], 0, 1)
-        p_rate = _finite_number("p_rate", feature_row["p_rate"], 0, 1)
-        return {"b_rate": b_rate, "p_rate": p_rate, "pa_pool": _clean_pa_pool(feature_row["pa_pool"])}
+        payload = {
+            "b_rate": _finite_number("b_rate", feature_row["b_rate"], 0, 1),
+            "p_rate": _finite_number("p_rate", feature_row["p_rate"], 0, 1),
+            "pa_pool": _clean_pa_pool(feature_row["pa_pool"]),
+        }
+        return version, payload
 
     if market == "TOTAL_BASES":
         expected = {"rates", "p_h", "p_hr", "park", "pa_pool"}
@@ -131,13 +146,14 @@ def _feature_payload(market: str, feature_row: Mapping[str, Any]) -> dict[str, A
         clean_rates = {k: _finite_number(f"rates.{k}", rates[k], 0, 1) for k in ("s", "d", "t", "hr")}
         if sum(clean_rates.values()) >= 1:
             raise LiveSlateError("TOTAL_BASES hit-event rates must sum to < 1")
-        return {
+        payload = {
             "rates": clean_rates,
             "p_h": _finite_number("p_h", feature_row["p_h"], 1e-8, 1),
             "p_hr": _finite_number("p_hr", feature_row["p_hr"], 1e-8, 1),
             "park": _finite_number("park", feature_row["park"], 0.01, 10),
             "pa_pool": _clean_pa_pool(feature_row["pa_pool"]),
         }
+        return version, payload
 
     raise LiveSlateError(f"unsupported hitter market: {market}")
 
@@ -162,11 +178,7 @@ def assemble_hitter_candidate(
     quote: Mapping[str, Any],
     require_confirmed_lineup: bool = True,
 ) -> dict[str, Any]:
-    """Create one canonical runtime candidate or fail closed.
-
-    The quote remains outside Model_Input. Sportsbook odds never participate in
-    feature construction or RNG identity.
-    """
+    """Create one canonical runtime candidate or fail closed."""
     if market not in SUPPORTED_HITTER_MARKETS:
         raise LiveSlateError(f"unsupported hitter market: {market}")
     if type(require_confirmed_lineup) is not bool:
@@ -193,11 +205,11 @@ def assemble_hitter_candidate(
     if side not in ("OVER", "UNDER"):
         raise LiveSlateError("quote side must be OVER or UNDER")
 
-    features = _feature_payload(market, feature_row)
+    feature_version, features = _feature_payload(market, feature_row)
     feature_json = json.dumps(features, sort_keys=True, separators=(",", ":"))
     identity = build_hash([
         str(game.game_pk), market, str(player_id), format(line, ".12g"), side,
-        lineup_status, feature_json,
+        lineup_status, feature_version, feature_json,
     ])
 
     model_input = {
@@ -207,6 +219,7 @@ def assemble_hitter_candidate(
         "line": quote.get("line"),
         "side": side,
         "build_hash": identity,
+        "feature_version": feature_version,
         "lineup_status": lineup_status,
         "require_confirmed_lineup": require_confirmed_lineup,
         "features": features,
