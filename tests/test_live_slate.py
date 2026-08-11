@@ -25,13 +25,20 @@ class LiveSlateTests(unittest.TestCase):
 
     def feature(self, player_id=100):
         return {
-            "game_pk": 777, "player_id": player_id, "team_id": 1,
+            "game_pk": 777, "player_id": player_id, "team_id": 1, "market": "HITS",
             "b_rate": .245, "p_rate": .232, "pa_pool": [4,4,5,3,4,4],
         }
 
-    def quote(self, player_id=100):
+    def tb_feature(self, player_id=100):
         return {
-            "game_id": "777", "market": "HITS", "entity_id": str(player_id),
+            "game_pk": 777, "player_id": player_id, "team_id": 1, "market": "TOTAL_BASES",
+            "rates": {"s": .15, "d": .05, "t": .005, "hr": .04},
+            "p_h": .23, "p_hr": .035, "park": 1.02, "pa_pool": [4,4,5,3,4,4],
+        }
+
+    def quote(self, player_id=100, market="HITS"):
+        return {
+            "game_id": "777", "market": market, "entity_id": str(player_id),
             "line": 0.5, "side": "OVER", "american_odds": -125,
             "retrieved_at": "2026-08-10T20:00:00+00:00", "ttl_seconds": 300,
         }
@@ -55,7 +62,7 @@ class LiveSlateTests(unittest.TestCase):
         with self.assertRaises(LiveSlateError):
             lineup_from_rows(1, "away", r)
 
-    def test_builds_canonical_candidate_without_odds_in_model_input(self):
+    def test_builds_canonical_hits_candidate_without_odds_in_model_input(self):
         c = assemble_hitter_candidate(
             game=self.game(), market="HITS", feature_row=self.feature(), quote=self.quote()
         )
@@ -64,9 +71,22 @@ class LiveSlateTests(unittest.TestCase):
         self.assertEqual(mi["game_id"], "777")
         self.assertEqual(mi["entity_id"], "100")
         self.assertEqual(len(mi["build_hash"]), 64)
+        self.assertEqual(set(mi["features"]), {"b_rate", "p_rate", "pa_pool"})
         self.assertNotIn("american_odds", mi)
         self.assertNotIn("ttl_seconds", mi)
         self.assertEqual(c["quote"]["american_odds"], -125)
+
+    def test_builds_total_bases_candidate_with_native_feature_contract(self):
+        c = assemble_hitter_candidate(
+            game=self.game(), market="TOTAL_BASES", feature_row=self.tb_feature(), quote=self.quote(market="TOTAL_BASES")
+        )
+        feats = c["model_input"]["features"]
+        self.assertEqual(set(feats), {"rates", "p_h", "p_hr", "park", "pa_pool"})
+        self.assertEqual(set(feats["rates"]), {"s", "d", "t", "hr"})
+
+    def test_feature_market_mismatch_fails(self):
+        with self.assertRaises(LiveSlateError):
+            assemble_hitter_candidate(game=self.game(), market="TOTAL_BASES", feature_row=self.feature(), quote=self.quote(market="TOTAL_BASES"))
 
     def test_quote_player_mismatch_fails(self):
         q = self.quote(player_id=101)
