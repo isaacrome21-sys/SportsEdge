@@ -1,0 +1,39 @@
+name: auto-mlb
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/15 * * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auto-mlb
+  cancel-in-progress: true
+
+jobs:
+  run-card:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime dependencies
+        run: python -m pip install --disable-pip-version-check numpy
+      - name: Run automated MLB card
+        env:
+          SPORTSEDGE_QUOTES_URL: ${{ secrets.SPORTSEDGE_QUOTES_URL }}
+          SPORTSEDGE_FEATURES_URL: ${{ secrets.SPORTSEDGE_FEATURES_URL }}
+          SPORTSEDGE_PROJECTED_LINEUPS_URL: ${{ secrets.SPORTSEDGE_PROJECTED_LINEUPS_URL }}
+          SPORTSEDGE_PROVIDER_TOKEN: ${{ secrets.SPORTSEDGE_PROVIDER_TOKEN }}
+        run: python scripts/run_auto_mlb.py --output artifacts/live_mlb_card.json
+      - name: Upload automated card evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-mlb-card
+          path: artifacts/live_mlb_card.json
+          if-no-files-found: error
+          retention-days: 14
