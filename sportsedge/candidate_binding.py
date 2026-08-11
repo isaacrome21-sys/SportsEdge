@@ -30,8 +30,9 @@ def _key(m: Mapping[str, Any]) -> CandidateKey:
 def bind_candidate(model_output: Mapping[str, Any], sportsbook_quote: Mapping[str, Any], deployment_attestation: Mapping[str, Any] | None) -> CandidateKey:
     if deployment_attestation is None or not isinstance(deployment_attestation, Mapping):
         raise BindingError("deployment attestation missing or malformed")
-    if deployment_attestation.get("eligible") is not True:
-        raise BindingError("deployment not eligible")
+    eligible = deployment_attestation.get("eligible")
+    if type(eligible) is not bool:
+        raise BindingError("deployment eligibility missing or malformed")
 
     model_key = _key(model_output)
     quote_key = _key(sportsbook_quote)
