@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any, Mapping
 
 from .engine_registry import engine_registry
+from .game_state import require_mlb_pregame
 from .live_slate import LiveGame, LiveSlateError, SUPPORTED_HITTER_MARKETS, assemble_hitter_candidate
 from .orchestrator import run_candidate
 from .quote_bridge import validate_canonical_quote
@@ -67,6 +68,7 @@ def run_hitter_card(*, games: list[LiveGame], feature_rows: list[Mapping[str, An
             game = game_map.get(game_id)
             if game is None:
                 raise LiveSlateError("live game missing for quote")
+            require_mlb_pregame(game)
             feature = feature_map.get((game_id, entity_id, market))
             if feature is None:
                 raise LiveSlateError("market-specific feature snapshot missing for quote")
