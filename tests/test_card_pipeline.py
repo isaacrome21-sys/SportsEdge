@@ -19,7 +19,7 @@ def game():
     return make_live_game(s,rows(100),rows(200))
 def feature(pid=100): return {"game_pk":777,"player_id":pid,"team_id":1,"market":"HITS","feature_version":HITS_FEATURE_VERSION,"b_rate":.60,"p_rate":.60,"pa_pool":[4,5,4,5]}
 def tb_feature(pid=100): return {"game_pk":777,"player_id":pid,"team_id":1,"market":"TOTAL_BASES","feature_version":TB_FEATURE_VERSION,"rates":{"s":.20,"d":.08,"t":.01,"hr":.08},"p_h":.35,"p_hr":.06,"park":1.20,"pa_pool":[4,5,4,5]}
-def quote(pid=100,market="HITS"): return {"game_id":"777","market":market,"entity_id":str(pid),"line":.5,"side":"OVER","american_odds":100,"retrieved_at":NOW,"ttl_seconds":300}
+def quote(pid=100,market="HITS"): return {"game_id":"777","period":"FG","market":market,"entity_id":str(pid),"line":.5,"side":"OVER","book_key":"draftkings","is_alternate":False,"raw_market_name":"Player Hits" if market=="HITS" else "Player Total Bases","american_odds":100,"retrieved_at":NOW,"ttl_seconds":300}
 def deployed_registry(path,deploy_tb=False):
     path.write_text(json.dumps({"schema_version":1,"markets":{"HITS":{"eligible":True,"stage":"DEPLOYED","reason":"test"},"TOTAL_BASES":{"eligible":bool(deploy_tb),"stage":"DEPLOYED" if deploy_tb else "PRODUCTION_LOGIC_PASS","reason":"test"}}}))
 
@@ -40,6 +40,10 @@ class CardPipelineTests(unittest.TestCase):
     def test_hits_and_tb_can_coexist(self):
         out=run_hitter_card(games=[game()],feature_rows=[feature(),tb_feature()],quotes=[quote(),quote(market="TOTAL_BASES")],ingestion_now=NOW,finalization_now=NOW)
         self.assertEqual(len(out),2)
+    def test_direct_quote_missing_taxonomy_blocks(self):
+        q=quote(); del q["book_key"]
+        out=run_hitter_card(games=[game()],feature_rows=[feature()],quotes=[q],ingestion_now=NOW,finalization_now=NOW)
+        self.assertEqual(out[0].bet_status,"BLOCKED"); self.assertIn("QUOTE_IDENTITY_INCOMPLETE",out[0].reason)
     def test_unversioned_live_feature_blocks(self):
         f=feature(); del f["feature_version"]
         out=run_hitter_card(games=[game()],feature_rows=[f],quotes=[quote()],ingestion_now=NOW,finalization_now=NOW)
