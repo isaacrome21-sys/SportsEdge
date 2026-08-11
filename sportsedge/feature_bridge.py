@@ -1,8 +1,7 @@
 """Deterministic fail-closed bridge from timestamped source facts to live features.
 
-Implements the checked design contract used by SportsEdge: future facts, stale
-facts, conflicting facts, missing facts, and sportsbook-derived model features
-all fail closed. The bridge produces *features*, never Model_P.
+Future, stale, conflicting, missing, malformed, or sportsbook-derived facts fail
+closed. The bridge produces validated feature rows, never Model_P.
 """
 from __future__ import annotations
 
@@ -13,6 +12,7 @@ import json
 from math import isfinite
 from typing import Any, Mapping, Sequence
 
+from .bb_engine import FEATURE_CONTRACT_VERSION as BB_FEATURE_VERSION
 from .hits_engine import FEATURE_CONTRACT_VERSION as HITS_FEATURE_VERSION
 from .runtime import parse_timestamp
 from .total_bases_engine import FEATURE_CONTRACT_VERSION as TB_FEATURE_VERSION
@@ -34,11 +34,13 @@ BANNED_FACT_PATTERNS = (
 FEATURE_VERSIONS = {
     "HITS": HITS_FEATURE_VERSION,
     "TOTAL_BASES": TB_FEATURE_VERSION,
+    "PITCHER_BB": BB_FEATURE_VERSION,
 }
 
 REQUIRED_FEATURES = {
     "HITS": ("b_rate", "p_rate", "pa_pool"),
     "TOTAL_BASES": ("rates_s", "rates_d", "rates_t", "rates_hr", "p_h", "p_hr", "park", "pa_pool"),
+    "PITCHER_BB": ("own_bb", "own_bfp", "rolling_league_rate", "pool", "league_pool"),
 }
 
 
@@ -105,10 +107,7 @@ def _canonical_value(value: Any) -> str:
         raise FeatureBridgeError("MALFORMED", {"detail": "fact value not canonical JSON"}) from exc
 
 
-def _resolve_one(
-    *, feature: str, fact_key: str, facts: Sequence[SourceFact], now: datetime,
-    wager_cutoff: datetime, ttl_seconds: float,
-) -> tuple[Any, Provenance, str | None]:
+def _resolve_one(*, feature: str, fact_key: str, facts: Sequence[SourceFact], now: datetime, wager_cutoff: datetime, ttl_seconds: float) -> tuple[Any, Provenance, str | None]:
     if _banned(fact_key):
         raise FeatureBridgeError("BANNED_FACT", {"fact_key": fact_key})
     candidates = [f for f in facts if f.fact_key == fact_key]
@@ -130,29 +129,17 @@ def _resolve_one(
         valid.append(f)
     if not valid:
         raise FeatureBridgeError("STALE", {"fact_key": fact_key, "limit_seconds": ttl_seconds, "candidates": stale})
-
     by_value: dict[str, list[SourceFact]] = {}
     for f in valid:
         by_value.setdefault(_canonical_value(f.value), []).append(f)
     if len(by_value) != 1:
         raise FeatureBridgeError("CONFLICT", {"fact_key": fact_key, "source_ids": sorted(f.source_id for f in valid)})
-
-    # Identical duplicates are harmless; canonical source selection makes output
-    # invariant to input ordering.
     chosen = sorted(valid, key=lambda f: (f.retrieved_at, f.source_id), reverse=True)[0]
-    prov = Provenance(
-        feature, chosen.source_id, chosen.provider,
-        chosen.event_time.isoformat(), chosen.retrieved_at.isoformat(),
-    )
+    prov = Provenance(feature, chosen.source_id, chosen.provider, chosen.event_time.isoformat(), chosen.retrieved_at.isoformat())
     return chosen.value, prov, chosen.status
 
 
-def resolve_feature_row(
-    *, market: str, game_pk: int, player_id: int, team_id: int,
-    feature_fact_keys: Mapping[str, str], sources: Sequence[Mapping[str, Any]],
-    ttl_by_feature: Mapping[str, float], now: datetime | str, wager_cutoff: datetime | str,
-) -> dict[str, Any]:
-    """Resolve one versioned feature row for live_slate. Never emits probability."""
+def resolve_feature_row(*, market: str, game_pk: int, player_id: int, team_id: int, feature_fact_keys: Mapping[str, str], sources: Sequence[Mapping[str, Any]], ttl_by_feature: Mapping[str, float], now: datetime | str, wager_cutoff: datetime | str) -> dict[str, Any]:
     if market not in REQUIRED_FEATURES:
         raise FeatureBridgeError("UNSUPPORTED_MARKET", {"market": market})
     required = REQUIRED_FEATURES[market]
@@ -163,7 +150,6 @@ def resolve_feature_row(
     current = _dt(now, "now")
     cutoff = _dt(wager_cutoff, "wager_cutoff")
     facts = [parse_source_fact(x) for x in sources]
-
     values: dict[str, Any] = {}
     provenance: list[dict[str, Any]] = []
     statuses: set[str] = set()
@@ -177,36 +163,34 @@ def resolve_feature_row(
             raise FeatureBridgeError("MALFORMED", {"feature": feature, "detail": "ttl invalid"}) from exc
         if not isfinite(ttl) or ttl <= 0:
             raise FeatureBridgeError("MALFORMED", {"feature": feature, "detail": "ttl must be finite > 0"})
-        value, prov, status = _resolve_one(
-            feature=feature, fact_key=feature_fact_keys[feature], facts=facts,
-            now=current, wager_cutoff=cutoff, ttl_seconds=ttl,
-        )
+        value, prov, status = _resolve_one(feature=feature, fact_key=feature_fact_keys[feature], facts=facts, now=current, wager_cutoff=cutoff, ttl_seconds=ttl)
         values[feature] = value
         provenance.append(asdict(prov))
         if status is not None:
             statuses.add(status)
-
     if len(statuses) > 1:
         raise FeatureBridgeError("CONFLICT", {"detail": "mixed lineup statuses", "statuses": sorted(statuses)})
     lineup_status = next(iter(statuses)) if statuses else None
 
     if market == "HITS":
         payload = {"b_rate": values["b_rate"], "p_rate": values["p_rate"], "pa_pool": values["pa_pool"]}
+    elif market == "TOTAL_BASES":
+        payload = {
+            "rates": {"s": values["rates_s"], "d": values["rates_d"], "t": values["rates_t"], "hr": values["rates_hr"]},
+            "p_h": values["p_h"], "p_hr": values["p_hr"], "park": values["park"], "pa_pool": values["pa_pool"],
+        }
     else:
         payload = {
-            "rates": {"s":values["rates_s"],"d":values["rates_d"],"t":values["rates_t"],"hr":values["rates_hr"]},
-            "p_h":values["p_h"], "p_hr":values["p_hr"], "park":values["park"], "pa_pool":values["pa_pool"],
+            "own_bb": values["own_bb"], "own_bfp": values["own_bfp"],
+            "rolling_league_rate": values["rolling_league_rate"],
+            "pool": values["pool"], "league_pool": values["league_pool"],
         }
 
-    # Source-subset hash is for audit/provenance. live_slate derives the final
-    # candidate build_hash after line/side and confirmed MLB identity are bound.
-    audit_material = json.dumps({"market":market,"features":payload,"provenance":provenance}, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    audit_material = json.dumps({"market": market, "features": payload, "provenance": provenance}, sort_keys=True, separators=(",", ":"), allow_nan=False)
     row = {
         "game_pk": int(game_pk), "player_id": int(player_id), "team_id": int(team_id),
-        "market": market, "feature_version": FEATURE_VERSIONS[market],
-        **payload,
-        "source_subset_hash": hashlib.sha256(audit_material.encode()).hexdigest(),
-        "provenance": provenance,
+        "market": market, "feature_version": FEATURE_VERSIONS[market], **payload,
+        "source_subset_hash": hashlib.sha256(audit_material.encode()).hexdigest(), "provenance": provenance,
     }
     if lineup_status is not None:
         row["source_lineup_status"] = lineup_status
