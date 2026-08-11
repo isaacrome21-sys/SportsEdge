@@ -11,7 +11,7 @@
     "TOTAL_BASES": {
       "engine_version": "total_bases_engine_v0.2",
       "feature_version": "tb_event_rates_pitcher_park_pa_v1",
-      "fixture_sha256": "3abd596ae720529f5354f724c02c11e284a5044ac5842207599c27f4cb562e82",
+      "fixture_sha256": "1a816f5f46bf1042c2dcc13078092b6205b359a2ad49dca3fcfdb7b787914859",
       "required_verdict": "PASS",
       "required_test_name": "full_holdout_acceptance"
     }
