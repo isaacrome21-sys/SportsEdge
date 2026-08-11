@@ -1,9 +1,7 @@
 """Fail-closed live MLB slate assembly for validated hitter markets.
 
-This module does not invent projections. It binds three independently sourced
-objects: MLB schedule/lineup identity, a versioned precomputed model-feature
-snapshot, and a sportsbook quote. A candidate is emitted only when all identity
-and feature-contract fields match.
+This module binds official MLB game identity, lineup state, validated feature
+snapshots, and sportsbook quotes without inventing missing information.
 """
 from __future__ import annotations
 
@@ -43,6 +41,8 @@ class LiveGame:
     game_pk: int
     away_team_id: int
     home_team_id: int
+    away_probable_pitcher_id: int | None
+    home_probable_pitcher_id: int | None
     away_lineup: TeamLineup
     home_lineup: TeamLineup
 
@@ -78,6 +78,8 @@ def make_live_game(snapshot: GameSnapshot, away_rows: Iterable[Mapping[str, Any]
         game_pk=snapshot.game_pk,
         away_team_id=snapshot.away_id,
         home_team_id=snapshot.home_id,
+        away_probable_pitcher_id=snapshot.away_probable_pitcher_id,
+        home_probable_pitcher_id=snapshot.home_probable_pitcher_id,
         away_lineup=lineup_from_rows(snapshot.away_id, "away", away_rows),
         home_lineup=lineup_from_rows(snapshot.home_id, "home", home_rows),
     )
@@ -194,26 +196,22 @@ def assemble_hitter_candidate(
     quote: Mapping[str, Any],
     require_confirmed_lineup: bool = True,
 ) -> dict[str, Any]:
-    """Create one canonical runtime candidate or fail closed."""
     if market not in SUPPORTED_HITTER_MARKETS:
         raise LiveSlateError(f"unsupported hitter market: {market}")
     if type(require_confirmed_lineup) is not bool:
         raise LiveSlateError("require_confirmed_lineup must be boolean")
-
     game_pk = feature_row.get("game_pk")
     player_id = feature_row.get("player_id")
     if game_pk != game.game_pk:
         raise LiveSlateError("feature game_pk does not match live game")
     if isinstance(player_id, bool) or not isinstance(player_id, int) or player_id <= 0:
         raise LiveSlateError("feature player_id invalid")
-
     lineup_status = _player_lineup_status(game, player_id)
     source_lineup_status = feature_row.get("source_lineup_status")
     if source_lineup_status is not None and source_lineup_status != lineup_status:
         raise LiveSlateError("feature-source lineup status conflicts with live MLB lineup")
     if require_confirmed_lineup and lineup_status != "CONFIRMED":
         raise LiveSlateError("confirmed MLB batting order required")
-
     q_game = quote.get("game_id")
     q_market = quote.get("market")
     q_entity = quote.get("entity_id")
@@ -223,7 +221,6 @@ def assemble_hitter_candidate(
     side = quote.get("side")
     if side not in ("OVER", "UNDER"):
         raise LiveSlateError("quote side must be OVER or UNDER")
-
     feature_version, features = _feature_payload(market, feature_row)
     source_subset_hash = _feature_source_hash(feature_row)
     feature_json = json.dumps(features, sort_keys=True, separators=(",", ":"))
@@ -231,18 +228,11 @@ def assemble_hitter_candidate(
         str(game.game_pk), market, str(player_id), format(line, ".12g"), side,
         lineup_status, feature_version, source_subset_hash, feature_json,
     ])
-
     model_input = {
-        "game_id": str(game.game_pk),
-        "market": market,
-        "entity_id": str(player_id),
-        "line": quote.get("line"),
-        "side": side,
-        "build_hash": identity,
-        "feature_version": feature_version,
-        "feature_source_hash": source_subset_hash,
-        "lineup_status": lineup_status,
-        "require_confirmed_lineup": require_confirmed_lineup,
+        "game_id": str(game.game_pk), "market": market, "entity_id": str(player_id),
+        "line": quote.get("line"), "side": side, "build_hash": identity,
+        "feature_version": feature_version, "feature_source_hash": source_subset_hash,
+        "lineup_status": lineup_status, "require_confirmed_lineup": require_confirmed_lineup,
         "features": features,
     }
     if feature_row.get("provenance") is not None:
