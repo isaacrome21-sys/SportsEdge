@@ -22,8 +22,18 @@ jobs:
           python-version: '3.12'
       - name: Install runtime dependencies
         run: python -m pip install --disable-pip-version-check numpy
+      - name: Resolve Chicago slate date
+        id: slate
+        run: echo "date_ct=$(TZ=America/Chicago date +%F)" >> "$GITHUB_OUTPUT"
+      - name: Restore MLB history cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/sportsedge/mlb-history
+          key: mlb-history-${{ runner.os }}-${{ steps.slate.outputs.date_ct }}
+          restore-keys: |
+            mlb-history-${{ runner.os }}-
       - name: Verify automation safety tests
-        run: python -m unittest tests.test_auto_runner tests.test_odds_api_source tests.test_auto_native_odds -v
+        run: python -m unittest tests.test_auto_runner tests.test_odds_api_source tests.test_auto_native_odds tests.test_mlb_hits_features tests.test_auto_native_hits -v
       - name: Run automated MLB card
         env:
           SPORTSEDGE_QUOTES_URL: ${{ secrets.SPORTSEDGE_QUOTES_URL }}
@@ -32,6 +42,7 @@ jobs:
           SPORTSEDGE_FEATURES_URL: ${{ secrets.SPORTSEDGE_FEATURES_URL }}
           SPORTSEDGE_PROJECTED_LINEUPS_URL: ${{ secrets.SPORTSEDGE_PROJECTED_LINEUPS_URL }}
           SPORTSEDGE_PROVIDER_TOKEN: ${{ secrets.SPORTSEDGE_PROVIDER_TOKEN }}
+          SPORTSEDGE_HISTORY_CACHE_DIR: .cache/sportsedge/mlb-history
         run: python scripts/run_auto_mlb.py --output artifacts/live_mlb_card.json
       - name: Upload automated card evidence
         if: always()
