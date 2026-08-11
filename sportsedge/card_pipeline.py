@@ -63,12 +63,12 @@ def run_hitter_card(
             raise LiveSlateError(f"duplicate live game: {key}")
         game_map[key] = game
 
-    feature_map: dict[tuple[str, str], Mapping[str, Any]] = {}
+    feature_map: dict[tuple[str, str, str], Mapping[str, Any]] = {}
     for row in feature_rows:
         try:
-            key = (str(row["game_pk"]), str(row["player_id"]))
+            key = (str(row["game_pk"]), str(row["player_id"]), str(row["market"]))
         except Exception as exc:
-            raise LiveSlateError("feature row missing game_pk/player_id") from exc
+            raise LiveSlateError("feature row missing game_pk/player_id/market") from exc
         if key in feature_map:
             raise LiveSlateError(f"duplicate feature row: {key}")
         feature_map[key] = row
@@ -91,9 +91,9 @@ def run_hitter_card(
             game = game_map.get(game_id)
             if game is None:
                 raise LiveSlateError("live game missing for quote")
-            feature = feature_map.get((game_id, entity_id))
+            feature = feature_map.get((game_id, entity_id, market))
             if feature is None:
-                raise LiveSlateError("feature snapshot missing for quote")
+                raise LiveSlateError("market-specific feature snapshot missing for quote")
             candidate = assemble_hitter_candidate(
                 game=game,
                 market=market,
@@ -117,7 +117,6 @@ def run_hitter_card(
             )
             out.append(CardResult(game_id, market, entity_id, line, side, odds, rr.model_p, rr.bet_status, rr.reason))
         except Exception as exc:
-            # Preserve malformed/missing requests as explicit blocked card rows.
             try:
                 game_id, market, entity_id, line, side = _quote_identity(quote)
             except Exception:
