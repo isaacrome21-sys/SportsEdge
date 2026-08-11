@@ -1,9 +1,9 @@
-"""Automated MLB runner using native sportsbook and Hits feature acquisition.
+"""Automated MLB runner using native sportsbook and hitter feature acquisition.
 
 The wrapper deliberately reuses run_auto_mlb for all modeling, feature-bridge,
 lineup, TTL, deployment, and Truth Gate behavior. When no external feature URL
-is supplied, validated HITS features are reconstructed from official MLB game
-logs; unsupported native feature markets remain fail-closed.
+is supplied, validated HITS and TOTAL_BASES features are reconstructed from
+official MLB history. Unsupported native markets remain fail-closed.
 """
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 from .auto_runner import AutoRunReport, run_auto_mlb
 from .mlb_hits_features import MLBHitsFeatureError, MLBHitsHistorySource
 from .mlb_source import fetch_boxscore, fetch_schedule
+from .mlb_total_bases_features import MLBTBFeatureError, MLBTBHistorySource
 from .odds_api_source import build_participant_index, fetch_mlb_player_prop_quotes
 
 CHICAGO_TZ = ZoneInfo("America/Chicago")
@@ -137,36 +138,51 @@ def run_auto_mlb_native_odds(
     selected_feature_url = feature_url
     if not selected_feature_url:
         selected_feature_url = MEMORY_FEATURES_URL
-        history = MLBHitsHistorySource(opener=opener, retrieved_at=current)
+        hits_history = MLBHitsHistorySource(opener=opener, retrieved_at=current)
+        tb_history = MLBTBHistorySource(opener=opener, retrieved_at=current)
         schedule_by_pk = {int(game.game_pk): game for game in schedule}
         seen: set[tuple[int, int, str]] = set()
         for quote in quote_payload:
-            if str(quote.get("market")) != "HITS":
+            market = str(quote.get("market"))
+            if market not in {"HITS", "TOTAL_BASES"}:
                 continue
             try:
                 game_pk = int(quote["game_id"])
                 player_id = int(quote["entity_id"])
-                identity = (game_pk, player_id, "HITS")
+                identity = (game_pk, player_id, market)
                 if identity in seen:
                     continue
                 seen.add(identity)
                 game = schedule_by_pk.get(game_pk)
                 if game is None:
-                    raise MLBHitsFeatureError("MLB_FEATURE_GAME_NOT_FOUND", {"game_pk": game_pk})
+                    raise ValueError("MLB_FEATURE_GAME_NOT_FOUND")
                 binding = (player_teams.get(game_pk) or {}).get(player_id)
                 if binding is None:
-                    raise MLBHitsFeatureError("MLB_FEATURE_PLAYER_TEAM_UNRESOLVED", {"game_pk": game_pk, "player_id": player_id})
+                    raise ValueError("MLB_FEATURE_PLAYER_TEAM_UNRESOLVED")
                 team_id, starter_id = binding
-                native_features.append(history.feature_envelope(
-                    game_pk=game_pk,
-                    team_id=team_id,
-                    target_date=_official_date(game),
-                    batter_id=player_id,
-                    starter_id=starter_id,
-                ))
+                if market == "HITS":
+                    native_features.append(hits_history.feature_envelope(
+                        game_pk=game_pk,
+                        team_id=team_id,
+                        target_date=_official_date(game),
+                        batter_id=player_id,
+                        starter_id=starter_id,
+                    ))
+                else:
+                    if game.venue_id is None:
+                        raise MLBTBFeatureError("VENUE_UNMAPPED", {"venue_id": None, "game_pk": game_pk})
+                    native_features.append(tb_history.feature_envelope(
+                        game_pk=game_pk,
+                        team_id=team_id,
+                        target_date=_official_date(game),
+                        batter_id=player_id,
+                        starter_id=starter_id,
+                        venue_id=int(game.venue_id),
+                    ))
             except Exception as exc:
+                stage = "MLB_HITS_FEATURE" if market == "HITS" else "MLB_TOTAL_BASES_FEATURE"
                 native_feature_failures.append({
-                    "stage": "MLB_HITS_FEATURE",
+                    "stage": stage,
                     "game_id": str(quote.get("game_id", "UNKNOWN")),
                     "entity_id": str(quote.get("entity_id", "UNKNOWN")),
                     "reason": f"{type(exc).__name__}: {exc}",
