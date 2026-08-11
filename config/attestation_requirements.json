@@ -2,9 +2,9 @@
   "schema_version": 1,
   "markets": {
     "HITS": {
-      "engine_version": "hits_engine_v1.2",
+      "engine_version": "hits_engine_v1.3",
       "feature_version": "hits_batter_pitcher_pa_v1",
-      "fixture_sha256": "8c15e196efa5fc7ef979d0a9cf5ec113cba54cd756482babc256c44d53642409",
+      "fixture_sha256": "aaa006155de8078057fae0bd764a6aebca7e06057d9e83669d816536c5471776",
       "required_verdict": "PASS",
       "required_test_name": "full_holdout_acceptance"
     },

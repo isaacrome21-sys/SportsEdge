@@ -1,7 +1,9 @@
 import unittest
 
 from sportsedge.hits_engine import (
+    FROZEN_MEAN_MODEL_COEF,
     HitsEngineError,
+    get_configured_mean_model,
     reset_frozen_mean_model,
     set_frozen_mean_model,
     simulate_hits,
@@ -21,10 +23,18 @@ def mk(build_hash="a" * 64, market="hits", lineup="CONFIRMED", b_rate=0.28,
 
 class HitsEngineTests(unittest.TestCase):
     def setUp(self):
-        set_frozen_mean_model((-0.06, 0.70, 0.55))
+        reset_frozen_mean_model()
 
     def tearDown(self):
         reset_frozen_mean_model()
+
+    def test_exact_attested_configuration_is_default(self):
+        self.assertEqual(get_configured_mean_model(), FROZEN_MEAN_MODEL_COEF)
+
+    def test_configuration_mismatch_fails_closed(self):
+        set_frozen_mean_model((-0.06, 0.70, 0.55))
+        with self.assertRaisesRegex(HitsEngineError, "ENGINE_CONFIGURATION_MISMATCH"):
+            simulate_hits(mk())
 
     def test_same_candidate_is_reproducible(self):
         self.assertEqual(simulate_hits(mk()).probs, simulate_hits(mk()).probs)
@@ -61,6 +71,8 @@ class HitsEngineTests(unittest.TestCase):
             with self.subTest(value=value):
                 with self.assertRaises(HitsEngineError):
                     simulate_hits(mk(b_rate=value))
+                with self.assertRaises(HitsEngineError):
+                    simulate_hits(mk(p_rate=value))
 
     def test_zero_pa_historical_entry_is_supported(self):
         x = mk()
@@ -68,11 +80,25 @@ class HitsEngineTests(unittest.TestCase):
         out = simulate_hits(x, n_sim=100)
         self.assertTrue(all(0 <= p <= 1 for p in out.probs.values()))
 
+    def test_bad_pa_pool_fails_closed(self):
+        for pool in ([], [4, float("nan")], [-1, 4], [10, 4], [4.5, 4]):
+            with self.subTest(pool=pool):
+                x = mk(); x["features"]["pa_pool"] = pool
+                with self.assertRaises(HitsEngineError): simulate_hits(x)
+
     def test_invalid_mc_count_rejected(self):
         for value in (0, -1, True, 1.5):
             with self.subTest(value=value):
                 with self.assertRaises(HitsEngineError):
                     simulate_hits(mk(), n_sim=value)
+
+    def test_invalid_threshold_rejected(self):
+        for thresholds in ((True,), (-0.5,), (float("nan"),), None):
+            with self.subTest(thresholds=thresholds):
+                with self.assertRaises(HitsEngineError): simulate_hits(mk(), thresholds=thresholds)
+
+    def test_invalid_build_hash_is_wrapped(self):
+        with self.assertRaises(HitsEngineError): simulate_hits(mk("not-a-sha"))
 
 
 if __name__ == "__main__":

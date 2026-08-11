@@ -2,7 +2,9 @@
 """Run the authoritative full Hits production-engine holdout.
 
 The command accepts raw or gzip transport, but always verifies the decompressed
-canonical fixture bytes against the frozen SHA-256 before scoring.
+canonical fixture bytes against the frozen SHA-256. Candidate RNG identity is
+pregame-only: game_id + player_id + market + feature contract. Outcome fields
+never influence the simulation stream.
 """
 import argparse
 import hashlib
@@ -13,19 +15,30 @@ import numpy as np
 
 from sportsedge.fixture_io import FixtureIOError, read_canonical_fixture_bytes
 from sportsedge.hits_engine import (
+    FEATURE_CONTRACT_VERSION,
     FROZEN_MEAN_MODEL_COEF,
     reset_frozen_mean_model,
     set_frozen_mean_model,
     simulate_hits,
 )
 
-EXPECTED_FIXTURE_SHA256 = "8c15e196efa5fc7ef979d0a9cf5ec113cba54cd756482babc256c44d53642409"
+EXPECTED_FIXTURE_SHA256 = "aaa006155de8078057fae0bd764a6aebca7e06057d9e83669d816536c5471776"
+EXPECTED_HOLDOUT_ROWS = 83769
 FROZEN_TOLERANCE_SE = 2.63
+
+
+def candidate_identity(g: dict) -> str:
+    game_id = str(g.get("game_id", "")).strip()
+    player_id = str(g.get("player_id", "")).strip()
+    if not game_id or not player_id:
+        raise SystemExit("fixture row missing pregame game_id/player_id identity")
+    material = "|".join(("market=HITS", f"game_id={game_id}", f"player_id={player_id}", f"feature_version={FEATURE_CONTRACT_VERSION}"))
+    return hashlib.sha256(material.encode()).hexdigest()
 
 
 def main() -> int:
     p = argparse.ArgumentParser()
-    p.add_argument("fixture", type=Path, help="path to frozen bb_hits_data.pkl or byte-preserving .gz transport")
+    p.add_argument("fixture", type=Path, help="path to frozen rebuilt bb_hits_data.pkl or byte-preserving .gz transport")
     args = p.parse_args()
     try:
         raw = read_canonical_fixture_bytes(args.fixture, expected_sha256=EXPECTED_FIXTURE_SHA256)
@@ -35,7 +48,7 @@ def main() -> int:
     data = pickle.loads(raw)
     train = [x for x in data["dataset"] if x["season"] in ("2021", "2022")]
     holdout = [x for x in data["dataset"] if x["season"] in ("2023", "2024")]
-    if len(holdout) != 83769:
+    if len(holdout) != EXPECTED_HOLDOUT_ROWS:
         raise SystemExit(f"unexpected holdout row count: {len(holdout)}")
 
     X = np.column_stack([
@@ -56,19 +69,7 @@ def main() -> int:
     seen = set()
     try:
         for g in holdout:
-            identity_fields = {
-                "market": "hits",
-                "season": g["season"],
-                "date": g.get("date", ""),
-                "line": 0.5,
-                "side": "over",
-                "b_rate": round(g["b_rate"], 12),
-                "p_rate": round(g["p_rate"], 12),
-                "actual_pa": g["actual_pa"],
-                "pa_pool_hash": hashlib.sha256(str(g["pa_pool"]).encode()).hexdigest(),
-            }
-            identity_key = "|".join(f"{k}={v}" for k, v in sorted(identity_fields.items()))
-            build_hash = hashlib.sha256(identity_key.encode()).hexdigest()
+            build_hash = candidate_identity(g)
             if build_hash in seen:
                 raise SystemExit("candidate identity collision in holdout")
             seen.add(build_hash)
@@ -85,6 +86,10 @@ def main() -> int:
     finally:
         reset_frozen_mean_model()
 
+    if len(seen) != EXPECTED_HOLDOUT_ROWS:
+        raise SystemExit("identity cardinality mismatch")
+    print(f"holdout rows: {len(holdout)}")
+    print("identity collisions in holdout: 0")
     worst = 0.0
     for t in thresholds:
         s = np.asarray(pred[t]); a = np.asarray(actual[t])

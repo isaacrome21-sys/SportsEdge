@@ -13,7 +13,7 @@ import numpy as np
 from .identity_rng import candidate_numpy_rng
 from .shared_game_effect import SIGMA_GAME_EFFECT, apply_shared_game_effect
 
-ENGINE_VERSION = "hits_engine_v1.2"
+ENGINE_VERSION = "hits_engine_v1.3"
 FEATURE_CONTRACT_VERSION = "hits_batter_pitcher_pa_v1"
 N_MC_PATHS = 2000
 FROZEN_MEAN_MODEL_COEF = (
@@ -59,11 +59,12 @@ def _finite_probability(name: str, value) -> float:
 def _validate_pa_pool(pa_pool) -> np.ndarray:
     if not isinstance(pa_pool, (list, tuple, np.ndarray)) or len(pa_pool) == 0:
         raise HitsEngineError("pa_pool must be a non-empty sequence")
-    vals = np.asarray(pa_pool, dtype=float)
+    try:
+        vals = np.asarray(pa_pool, dtype=float)
+    except (TypeError, ValueError) as exc:
+        raise HitsEngineError("pa_pool must contain numeric PA counts") from exc
     if vals.ndim != 1 or not np.all(np.isfinite(vals)):
         raise HitsEngineError("pa_pool must contain finite values")
-    # Zero-PA starts exist in the validated historical fixture (e.g. a starter
-    # removed before recording a PA), so 0 is legitimate workload history.
     if np.any(vals < 0) or np.any(vals > 9) or np.any(vals != np.floor(vals)):
         raise HitsEngineError("pa_pool must contain integer PA counts in [0,9]")
     return vals.astype(np.int64)
@@ -96,7 +97,7 @@ def _validate(model_input: dict) -> tuple[float, float, np.ndarray]:
     if lineup_status not in ("CONFIRMED", "PROJECTED"):
         raise HitsEngineError(f"invalid/missing lineup_status: {lineup_status}")
     require_confirmed = model_input.get("require_confirmed_lineup", False)
-    if require_confirmed is not True and require_confirmed is not False:
+    if type(require_confirmed) is not bool:
         raise HitsEngineError("require_confirmed_lineup must be boolean")
     if require_confirmed and lineup_status != "CONFIRMED":
         raise HitsEngineError("confirmed lineup required but status is PROJECTED")
@@ -104,7 +105,7 @@ def _validate(model_input: dict) -> tuple[float, float, np.ndarray]:
 
 
 def set_frozen_mean_model(coef) -> None:
-    """Validation/test hook. Production starts with the frozen train-only fit."""
+    """Validation hook; scoring still requires the exact attested tuple."""
     global MEAN_MODEL_COEF
     if not isinstance(coef, (tuple, list)) or len(coef) != 3:
         raise HitsEngineError("mean model coefficients must have length 3")
@@ -114,6 +115,10 @@ def set_frozen_mean_model(coef) -> None:
     MEAN_MODEL_COEF = vals
 
 
+def get_configured_mean_model() -> tuple[float, float, float]:
+    return tuple(MEAN_MODEL_COEF)
+
+
 def reset_frozen_mean_model() -> None:
     global MEAN_MODEL_COEF
     MEAN_MODEL_COEF = FROZEN_MEAN_MODEL_COEF
@@ -121,10 +126,18 @@ def reset_frozen_mean_model() -> None:
 
 def simulate_hits(model_input: dict, thresholds=(0.5, 1.5, 2.5), n_sim: int = N_MC_PATHS) -> HitsModelOutput:
     b_rate, p_rate, pa_pool = _validate(model_input)
+    if tuple(MEAN_MODEL_COEF) != FROZEN_MEAN_MODEL_COEF:
+        raise HitsEngineError("ENGINE_CONFIGURATION_MISMATCH")
     if isinstance(n_sim, bool) or not isinstance(n_sim, int) or n_sim <= 0:
         raise HitsEngineError("n_sim must be a positive integer")
     clean_thresholds = []
-    for threshold in thresholds:
+    try:
+        threshold_values = list(thresholds)
+    except TypeError as exc:
+        raise HitsEngineError("thresholds must be iterable") from exc
+    for threshold in threshold_values:
+        if isinstance(threshold, bool):
+            raise HitsEngineError(f"invalid threshold: {threshold!r}")
         try:
             t = float(threshold)
         except (TypeError, ValueError) as exc:
@@ -133,7 +146,10 @@ def simulate_hits(model_input: dict, thresholds=(0.5, 1.5, 2.5), n_sim: int = N_
             raise HitsEngineError(f"invalid threshold: {threshold!r}")
         clean_thresholds.append(t)
 
-    rng = candidate_numpy_rng(model_input["build_hash"])
+    try:
+        rng = candidate_numpy_rng(model_input["build_hash"])
+    except Exception as exc:
+        raise HitsEngineError("invalid build_hash") from exc
     c0, c1, c2 = MEAN_MODEL_COEF
     p = float(np.clip(c0 + c1 * b_rate + c2 * p_rate, 0.02, 0.60))
     draws_pa = rng.choice(pa_pool, size=n_sim, replace=True)

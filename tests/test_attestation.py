@@ -3,7 +3,7 @@ import unittest
 from sportsedge.attestation import AttestationError, validate_attestation
 
 
-HITS_FIXTURE = "8c15e196efa5fc7ef979d0a9cf5ec113cba54cd756482babc256c44d53642409"
+HITS_FIXTURE = "aaa006155de8078057fae0bd764a6aebca7e06057d9e83669d816536c5471776"
 TB_FIXTURE = "3abd596ae720529f5354f724c02c11e284a5044ac5842207599c27f4cb562e82"
 CI_SHA = "a" * 40
 
@@ -12,7 +12,7 @@ def good_hits():
     return {
         "market": "HITS",
         "verdict": "PASS",
-        "engine_version": "hits_engine_v1.2",
+        "engine_version": "hits_engine_v1.3",
         "feature_version": "hits_batter_pitcher_pa_v1",
         "fixture_sha256": HITS_FIXTURE,
         "ci_commit_sha": CI_SHA,
@@ -70,7 +70,7 @@ class AttestationTests(unittest.TestCase):
         mutations = {
             "fixture_sha256": "0" * 64,
             "feature_version": "hits_features_v1",
-            "engine_version": "hits_engine_v1.1",
+            "engine_version": "hits_engine_v1.2",
             "test_name": "some_other_test",
         }
         for field, value in mutations.items():
