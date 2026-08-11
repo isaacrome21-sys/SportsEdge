@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from .runtime import parse_timestamp, RuntimeInputError
+from .quote_bridge import QuoteBridgeError, validate_canonical_quote
 
 
 class CardIOError(ValueError):
@@ -28,13 +28,8 @@ def normalize_quotes(data: Any) -> list[dict[str, Any]]:
     for i, row in enumerate(data):
         if not isinstance(row, Mapping):
             raise CardIOError(f"quote row {i} must be an object")
-        q = dict(row)
-        if "retrieved_at" not in q:
-            raise CardIOError(f"quote row {i} missing retrieved_at")
-        if isinstance(q["retrieved_at"], str):
-            try:
-                q["retrieved_at"] = parse_timestamp(q["retrieved_at"])
-            except RuntimeInputError as exc:
-                raise CardIOError(f"quote row {i} has invalid retrieved_at") from exc
-        out.append(q)
+        try:
+            out.append(validate_canonical_quote(row))
+        except QuoteBridgeError as exc:
+            raise CardIOError(f"quote row {i}: {exc}") from exc
     return out
