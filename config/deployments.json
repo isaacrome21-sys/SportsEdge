@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "markets": {
+    "HITS": {"eligible": false, "stage": "PRODUCTION_LOGIC_PASS", "reason": "fixture-backed CI attestation pending"},
+    "TOTAL_BASES": {"eligible": false, "stage": "PRODUCTION_LOGIC_PASS", "reason": "fixture-backed CI attestation pending"},
+    "PITCHER_BB": {"eligible": false, "stage": "VALIDATED_MATH", "reason": "production residual gap unresolved"},
+    "MONEYLINE": {"eligible": false, "stage": "VALIDATED_MATH", "reason": "live production inference path not attested"},
+    "RUN_LINE": {"eligible": false, "stage": "VALIDATED_MATH", "reason": "deployment parity unresolved"},
+    "TOTALS": {"eligible": false, "stage": "VALIDATED_MATH", "reason": "fresh calibration required"},
+    "NRFI": {"eligible": false, "stage": "VALIDATED_MATH", "reason": "live production path not attested"},
+    "YRFI": {"eligible": false, "stage": "VALIDATED_MATH", "reason": "live production path not attested"},
+    "RBI": {"eligible": false, "stage": "VALIDATED_MATH", "reason": "2026 artifact-selection policy unresolved"},
+    "RUNS": {"eligible": false, "stage": "VALIDATED_MATH", "reason": "2026 artifact-selection policy unresolved"}
+  }
+}
