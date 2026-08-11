@@ -11,7 +11,7 @@ class QuoteBridgeError(ValueError):
     pass
 
 
-SUPPORTED_MARKETS = {"HITS", "TOTAL_BASES"}
+SUPPORTED_MARKETS = {"HITS", "TOTAL_BASES", "PITCHER_BB"}
 SUPPORTED_SIDES = {"OVER", "UNDER"}
 
 
@@ -86,7 +86,6 @@ def normalize_offer(raw: Mapping[str, Any], *, default_ttl_seconds: int = 300) -
 
 
 def normalize_offer_snapshot(data: Any, *, default_ttl_seconds: int = 300) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Normalize every provider offer and preserve malformed rows as failures."""
     if not isinstance(data, list):
         raise QuoteBridgeError("offer snapshot must be a JSON list")
     quotes: list[dict[str, Any]] = []
