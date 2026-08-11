@@ -39,8 +39,8 @@ def game():
 
 
 class FeatureBridgeTests(unittest.TestCase):
-    def resolve(self,sources=None):
-        return resolve_feature_row(market="HITS",game_pk=777,player_id=100,team_id=1,feature_fact_keys=hit_keys(),sources=sources or hits_sources(),ttl_by_feature=hit_ttls(),now=NOW,wager_cutoff=CUTOFF)
+    def resolve(self,sources=None, now=NOW, cutoff=CUTOFF):
+        return resolve_feature_row(market="HITS",game_pk=777,player_id=100,team_id=1,feature_fact_keys=hit_keys(),sources=sources or hits_sources(),ttl_by_feature=hit_ttls(),now=now,wager_cutoff=cutoff)
 
     def test_resolves_versioned_hits_row_with_provenance(self):
         row=self.resolve()
@@ -65,9 +65,19 @@ class FeatureBridgeTests(unittest.TestCase):
         self.assertEqual(cm.exception.reason,"STALE")
 
     def test_future_event_time_fails_closed(self):
-        s=hits_sources(); s[0]["event_time"]="2026-08-10T23:01:00Z"
+        s=hits_sources(); s[0]["event_time"]="2026-08-10T23:01:00Z"; s[0]["retrieved_at"]="2026-08-10T19:59:00Z"
         with self.assertRaises(FeatureBridgeError) as cm: self.resolve(s)
-        self.assertEqual(cm.exception.reason,"FUTURE_EVENT_TIME")
+        self.assertEqual(cm.exception.reason,"IMPOSSIBLE_SOURCE_CHRONOLOGY")
+
+    def test_impossible_source_chronology_fails_closed(self):
+        s=hits_sources(); s[0]["event_time"]="2026-08-10T19:59:30Z"; s[0]["retrieved_at"]="2026-08-10T19:59:00Z"
+        with self.assertRaises(FeatureBridgeError) as cm: self.resolve(s)
+        self.assertEqual(cm.exception.reason,"IMPOSSIBLE_SOURCE_CHRONOLOGY")
+
+    def test_post_cutoff_retrieval_fails_closed(self):
+        s=hits_sources(); s[0]["event_time"]="2026-08-10T22:59:00Z"; s[0]["retrieved_at"]="2026-08-10T23:00:30Z"
+        with self.assertRaises(FeatureBridgeError) as cm: self.resolve(s, now=datetime(2026,8,10,23,1,tzinfo=UTC))
+        self.assertEqual(cm.exception.reason,"POST_CUTOFF_RETRIEVAL")
 
     def test_conflicting_fresh_values_fail_closed(self):
         s=hits_sources()+[fact("b_rate:777:100",.30,"b2")]
