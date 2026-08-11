@@ -20,6 +20,66 @@ jobs:
           python-version: '3.12'
       - name: Install runtime dependencies
         run: python -m pip install --disable-pip-version-check numpy
+      - name: Probe Odds API event markets safely
+        env:
+          SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+        run: |
+          python - <<'PY'
+          import os, json
+          from datetime import datetime, timezone
+          from urllib.parse import urlencode
+          from urllib.request import Request, urlopen
+          from urllib.error import HTTPError
+
+          key = os.environ.get('SPORTSEDGE_ODDS_API_KEY','').strip()
+          if not key:
+              print('PROBE KEY MISSING')
+              raise SystemExit(0)
+          def get(path, params):
+              q = urlencode({'apiKey': key, **params})
+              req = Request('https://api.the-odds-api.com'+path+'?'+q, headers={'Accept':'application/json'})
+              try:
+                  with urlopen(req, timeout=15) as r:
+                      body = r.read().decode('utf-8')
+                      print('HTTP', r.status, path)
+                      return json.loads(body)
+              except HTTPError as e:
+                  body = e.read().decode('utf-8','replace')
+                  try:
+                      parsed = json.loads(body)
+                  except Exception:
+                      parsed = {'raw': body[:500]}
+                  print('HTTP_ERROR', e.code, path, json.dumps(parsed, sort_keys=True))
+                  return None
+          events = get('/v4/sports/baseball_mlb/events', {}) or []
+          now = datetime.now(timezone.utc)
+          future = []
+          for e in events:
+              try:
+                  dt = datetime.fromisoformat(str(e['commence_time']).replace('Z','+00:00'))
+              except Exception:
+                  continue
+              if dt > now:
+                  future.append((dt,e))
+          future.sort(key=lambda x:x[0])
+          if not future:
+              print('PROBE NO FUTURE EVENT')
+              raise SystemExit(0)
+          event = future[0][1]
+          event_id = event['id']
+          print('PROBE EVENT', event.get('away_team'), '@', event.get('home_team'), event.get('commence_time'))
+          markets = get(f'/v4/sports/baseball_mlb/events/{event_id}/markets', {'regions':'us','bookmakers':'draftkings','dateFormat':'iso'})
+          if isinstance(markets, dict):
+              keys=[]
+              for b in markets.get('bookmakers') or []:
+                  for m in b.get('markets') or []:
+                      if isinstance(m,dict) and m.get('key'):
+                          keys.append(m['key'])
+              print('DK_MARKETS', ','.join(sorted(set(keys))))
+          odds = get(f'/v4/sports/baseball_mlb/events/{event_id}/odds', {'regions':'us','bookmakers':'draftkings','markets':'batter_hits','oddsFormat':'american','dateFormat':'iso','includeSids':'true'})
+          if isinstance(odds, dict):
+              print('BATTER_HITS_BOOKMAKERS', len(odds.get('bookmakers') or []))
+          PY
       - name: Run full SportsEdge MLB card
         env:
           SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
