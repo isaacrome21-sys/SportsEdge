@@ -12,10 +12,10 @@
     },
     "TOTAL_BASES": {
       "canonical_file": "tb_gameeffect_data.pkl",
-      "canonical_size_bytes": 21611347,
-      "canonical_sha256": "3abd596ae720529f5354f724c02c11e284a5044ac5842207599c27f4cb562e82",
-      "gzip_size_bytes": 6316856,
-      "gzip_sha256": "757d97004e11b7a4d24560ce6e85fd06e2726479ae57375a1bf74b800054e5dc"
+      "canonical_size_bytes": 24223755,
+      "canonical_sha256": "1a816f5f46bf1042c2dcc13078092b6205b359a2ad49dca3fcfdb7b787914859",
+      "gzip_size_bytes": 7305084,
+      "gzip_sha256": "578f2c7e99c8615cb8f312b9b4ecbb3292db8b8a44d2155f6754d86710c23988"
     }
   }
 }
