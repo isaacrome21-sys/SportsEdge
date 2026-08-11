@@ -235,6 +235,7 @@ def fetch_mlb_player_prop_quotes(
                 f"/sports/{SPORT_KEY}/events/{event_id}/odds",
                 api_key=api_key,
                 params={
+                    "regions": "us",
                     "bookmakers": requested_books,
                     "markets": requested_markets,
                     "oddsFormat": "american",
