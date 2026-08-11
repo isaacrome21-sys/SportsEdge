@@ -4,7 +4,7 @@ from sportsedge.attestation import AttestationError, validate_attestation
 
 
 HITS_FIXTURE = "aaa006155de8078057fae0bd764a6aebca7e06057d9e83669d816536c5471776"
-TB_FIXTURE = "3abd596ae720529f5354f724c02c11e284a5044ac5842207599c27f4cb562e82"
+TB_FIXTURE = "1a816f5f46bf1042c2dcc13078092b6205b359a2ad49dca3fcfdb7b787914859"
 CI_SHA = "a" * 40
 
 
