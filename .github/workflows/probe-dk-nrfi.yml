@@ -10,41 +10,59 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Extract DraftKings sportsbook endpoints
+      - name: Probe DraftKings Kambi MLB offering routes
         run: |
           mkdir -p artifacts
           python - <<'PY'
-          import json,re,urllib.request,pathlib,urllib.parse
-          url='https://sportsbook.draftkings.com/leagues/baseball/mlb?category=1st-inning&subcategory=1st-inning-runs'
-          req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0','Accept':'text/html,application/xhtml+xml'})
-          out={'requested_url':url}
-          with urllib.request.urlopen(req,timeout=20) as r:
-              body=r.read(); text=body.decode('utf-8','replace')
-              out.update(status=r.status,final_url=r.geturl(),bytes=len(body))
-              urls=sorted(set(re.findall(r'https?://[^\"\'<>\\ ]+',text)))
-              out['candidate_urls']=[u for u in urls if any(k in u.lower() for k in ['draftkings','sportsbook','api','offer','eventgroup'])][:250]
-              out['script_srcs']=re.findall(r'<script[^>]+src=["\']([^"\']+)',text,re.I)[:100]
-              marker='window.__INITIAL_STATE__ = '
-              pos=text.find(marker)
-              if pos>=0:
-                  state,consumed=json.JSONDecoder().raw_decode(text[pos+len(marker):])
-                  flat=[]
-                  def walk(x,path='root'):
-                      if isinstance(x,dict):
-                          for k,v in x.items():
-                              if isinstance(v,str) and any(t in (k+' '+v).lower() for t in ['api','offer','eventgroup','sportsbook','url']):
-                                  if len(flat)<300: flat.append({'path':f'{path}.{k}','value':v[:500]})
-                              walk(v,f'{path}.{k}')
-                      elif isinstance(x,list):
+          import json, urllib.request, urllib.error, pathlib, re
+          roots=['https://eu-offering.kambicdn.org/offering/v2018/dkusaz','https://eu-offering-api.kambicdn.org/offering/v2018/dkusaz']
+          paths=[
+            '/listView/baseball.json?lang=en_US&market=US',
+            '/listView/baseball/mlb.json?lang=en_US&market=US',
+            '/listView/baseball/mlb/all/all/matches.json?lang=en_US&market=US',
+            '/listView/baseball/usa/mlb/all/matches.json?lang=en_US&market=US',
+            '/listView/baseball/usa/mlb.json?lang=en_US&market=US',
+            '/listView/baseball/all/all/all/matches.json?lang=en_US&market=US',
+          ]
+          out=[]
+          for root in roots:
+            for p in paths:
+              url=root+p; row={'url':url}
+              try:
+                req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0','Accept':'application/json,text/plain,*/*','Origin':'https://sportsbook.draftkings.com','Referer':'https://sportsbook.draftkings.com/'})
+                with urllib.request.urlopen(req,timeout=20) as r:
+                  b=r.read(); text=b.decode('utf-8','replace')
+                  row.update(status=r.status,final_url=r.geturl(),content_type=r.headers.get('content-type'),bytes=len(b),prefix=text[:500])
+                  if 'json' in (r.headers.get('content-type') or '').lower() or text[:1] in '[{':
+                    try:
+                      d=json.loads(text); row['json_ok']=True
+                      raw=json.dumps(d,separators=(',',':'))
+                      terms=['1st inning','first inning','no run','yes run','total runs','inning']
+                      row['term_counts']={t:raw.lower().count(t) for t in terms}
+                      row['top_keys']=list(d)[:30] if isinstance(d,dict) else None
+                      # Collect offer-like strings mentioning inning from full JSON, capped.
+                      hits=[]
+                      def walk(x,path='root'):
+                        if len(hits)>=80:return
+                        if isinstance(x,dict):
+                          joined=' '.join(str(v) for v in x.values() if isinstance(v,(str,int,float,bool)))
+                          if 'inning' in joined.lower(): hits.append({'path':path,'value':joined[:1200]})
+                          for k,v in x.items(): walk(v,f'{path}.{k}')
+                        elif isinstance(x,list):
                           for i,v in enumerate(x): walk(v,f'{path}[{i}]')
-                  walk(state)
-                  out['state_endpoint_like']=flat
-          pathlib.Path('artifacts/dk_endpoint_probe.json').write_text(json.dumps(out,indent=2,sort_keys=True))
-          print('status',out['status'],'final',out['final_url'],'candidate_urls',len(out['candidate_urls']),'state_endpoint_like',len(out.get('state_endpoint_like',[])))
+                      walk(d); row['inning_nodes']=hits
+                    except Exception as e: row['json_error']=str(e)
+              except urllib.error.HTTPError as e:
+                body=e.read(500).decode('utf-8','replace'); row.update(status=e.code,error='HTTPError',prefix=body)
+              except Exception as e: row.update(error=type(e).__name__,message=str(e))
+              out.append(row)
+          pathlib.Path('artifacts/kambi_probe.json').write_text(json.dumps(out,indent=2,sort_keys=True)+'\n')
+          for r in out:
+            print(r.get('status'),r['url'],'bytes',r.get('bytes'),'terms',r.get('term_counts'))
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: dk-endpoint-probe
-          path: artifacts/dk_endpoint_probe.json
+          name: dk-kambi-nrfi-probe
+          path: artifacts/kambi_probe.json
           if-no-files-found: error
           retention-days: 3
