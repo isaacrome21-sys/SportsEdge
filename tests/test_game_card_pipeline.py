@@ -1,5 +1,5 @@
 import json, tempfile, unittest
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import numpy as np
 from sportsedge.game_card_pipeline import run_game_card
@@ -19,8 +19,8 @@ def artifacts():
     nrfi={'version':'NRFI_V4_CUTOFF_CORRECT','features':FI_FEATURES,'model':ProbModel(),'calibrator':Cal()}
     return game,nrfi
 
-def quote(market,side,line):
-    return {'game_id':'123','period':'1ST' if market in {'NRFI','YRFI'} else 'FG','market':market,'side':side,'line':line,'book_key':'draftkings','retrieved_at':datetime(2026,8,12,12,0,tzinfo=timezone.utc),'is_alternate':False,'raw_market_name':'fixture','american_odds':-110,'ttl_seconds':600}
+def quote(market,side,line,retrieved_at=None):
+    return {'game_id':'123','period':'1ST' if market in {'NRFI','YRFI'} else 'FG','market':market,'side':side,'line':line,'book_key':'draftkings','retrieved_at':retrieved_at or datetime(2026,8,12,12,0,tzinfo=timezone.utc),'is_alternate':False,'raw_market_name':'fixture','american_odds':-110,'ttl_seconds':600}
 
 class Tests(unittest.TestCase):
     def test_all_five_game_markets_reach_model_path(self):
@@ -34,10 +34,13 @@ class Tests(unittest.TestCase):
         self.assertTrue(all(x.model_p is not None for x in out))
         self.assertTrue(all(x.bet_status in {'PASS','OFFICIAL_BET'} for x in out))
 
-    def test_real_registry_blocks_without_erasing_model_p(self):
+    def test_real_registry_deploys_game_market_but_stale_price_fails_closed_before_model(self):
         game,nrfi=artifacts(); now=datetime(2026,8,12,12,1,tzinfo=timezone.utc)
         rows=[{'game_id':'123','run_rows':[[4.4,4.4,4.4,4.4,4.4,0,4,0,0,1],[4.4,4.4,4.4,4.4,4.4,1,4,0,0,1]],'fi_row':[.28]*13+[4,4,0,1]}]
-        out=run_game_card(feature_rows=rows,quotes=[quote('MONEYLINE','HOME',None)],game_score_artifact=game,nrfi_artifact=nrfi,ingestion_now=now,finalization_now=now)
-        self.assertEqual(out[0].bet_status,'BLOCKED'); self.assertIsNotNone(out[0].model_p); self.assertIn('DEPLOYMENT_BLOCKED',out[0].reason)
+        fresh=run_game_card(feature_rows=rows,quotes=[quote('MONEYLINE','HOME',None)],game_score_artifact=game,nrfi_artifact=nrfi,ingestion_now=now,finalization_now=now)
+        self.assertIn(fresh[0].bet_status,{'PASS','OFFICIAL_BET'}); self.assertIsNotNone(fresh[0].model_p); self.assertNotIn('DEPLOYMENT_BLOCKED',fresh[0].reason)
+        stale_quote=quote('MONEYLINE','HOME',None,retrieved_at=now-timedelta(seconds=601))
+        stale=run_game_card(feature_rows=rows,quotes=[stale_quote],game_score_artifact=game,nrfi_artifact=nrfi,ingestion_now=now,finalization_now=now)
+        self.assertEqual(stale[0].bet_status,'BLOCKED'); self.assertIsNone(stale[0].model_p); self.assertIn('price is stale',stale[0].reason.lower())
 
 if __name__=='__main__': unittest.main()
