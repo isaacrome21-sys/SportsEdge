@@ -4,6 +4,10 @@ on:
     branches: [full-model-completion-20260812]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
