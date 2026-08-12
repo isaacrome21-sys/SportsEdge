@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 from sportsedge.auto_native_odds import run_auto_mlb_native_odds
 from sportsedge.auto_runner import AutoRunnerError, AutoRunReport, report_to_dict, run_auto_mlb
 from sportsedge.bettor_card import build_bettor_card
+from sportsedge.decision_ledger import append_run_history, write_decision_ledger
 from sportsedge.game_artifacts import load_frozen_game_artifacts
 from sportsedge.game_history_live import build_live_game_feature_rows
 from sportsedge.mlb_context import context_to_dict, fetch_slate_context
@@ -68,6 +69,14 @@ def _native_provider_notes(report: AutoRunReport) -> list[dict]:
     return [{"stage":"QUOTE_PROVIDER","provider":"ODDS_API_NATIVE","status":"PASS"}]
 
 
+def _automation_run_id(now: datetime) -> str:
+    workflow_run=os.environ.get("GITHUB_RUN_ID","").strip()
+    attempt=os.environ.get("GITHUB_RUN_ATTEMPT","").strip()
+    if workflow_run:
+        return f"github:{workflow_run}:{attempt or '1'}"
+    return f"manual:{now.isoformat()}"
+
+
 def main()->int:
     p=argparse.ArgumentParser(); p.add_argument("--output",default="artifacts/live_mlb_card.json"); p.add_argument("--require-confirmed-lineup",action="store_true"); p.add_argument("--min-edge",type=float,default=0.0); p.add_argument("--kelly-multiplier",type=float,default=0.25); args=p.parse_args()
     quotes=os.environ.get("SPORTSEDGE_QUOTES_URL","").strip()
@@ -102,6 +111,11 @@ def main()->int:
         payload={"slate_date_ct":now.astimezone(CHICAGO_TZ).date().isoformat(),"generated_at_utc":now.isoformat(),"run_status":"BLOCKED","results":[],"source_failures":[{"reason":f"{type(exc).__name__}: {exc}"}],"provider_status":provider_notes,"bettor_card":build_bettor_card([],min_edge=args.min_edge)}
     payload["slate_context"]=slate_context
     payload["context_failures"]=context_failures
-    out=Path(args.output); out.parent.mkdir(parents=True,exist_ok=True); out.write_text(json.dumps(payload,indent=2,sort_keys=True)+"\n"); print(json.dumps(payload,indent=2,sort_keys=True)); return 2 if infrastructure_blocked else 0
+    run_id=_automation_run_id(now); payload["run_id"]=run_id
+    out=Path(args.output); out.parent.mkdir(parents=True,exist_ok=True); out.write_text(json.dumps(payload,indent=2,sort_keys=True)+"\n")
+    ledger=write_decision_ledger(payload,"artifacts/live_mlb_decision_ledger.json",run_id=run_id)
+    history_path=Path(".cache/sportsedge/decision-ledger")/f"{payload['slate_date_ct']}.jsonl"
+    append_run_history(ledger,history_path)
+    print(json.dumps(payload,indent=2,sort_keys=True)); return 2 if infrastructure_blocked else 0
 
 if __name__=="__main__": raise SystemExit(main())
