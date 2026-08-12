@@ -55,6 +55,7 @@ jobs:
       - name: Verify automation safety tests
         run: python -m pytest -q tests/test_auto_runner.py tests/test_odds_api_source.py tests/test_auto_native_odds.py tests/test_mlb_hits_features.py tests/test_mlb_total_bases_features.py tests/test_mlb_history_cache.py tests/test_odds_keyring.py tests/test_game_odds_source.py tests/test_game_market_contract.py tests/test_full_slate_accounting.py tests/test_pregame_archive.py tests/test_game_card_pipeline.py tests/test_game_history_live.py tests/test_bettor_card.py tests/test_deployment_audit.py
       - name: Acquire fresh DraftKings game-market probe
+        continue-on-error: true
         env:
           SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
           SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
