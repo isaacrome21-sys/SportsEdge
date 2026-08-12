@@ -34,13 +34,13 @@ class Tests(unittest.TestCase):
         self.assertTrue(all(x.model_p is not None for x in out))
         self.assertTrue(all(x.bet_status in {'PASS','OFFICIAL_BET'} for x in out))
 
-    def test_real_registry_deploys_game_market_but_stale_price_still_blocks(self):
+    def test_real_registry_deploys_game_market_but_stale_price_fails_closed_before_model(self):
         game,nrfi=artifacts(); now=datetime(2026,8,12,12,1,tzinfo=timezone.utc)
         rows=[{'game_id':'123','run_rows':[[4.4,4.4,4.4,4.4,4.4,0,4,0,0,1],[4.4,4.4,4.4,4.4,4.4,1,4,0,0,1]],'fi_row':[.28]*13+[4,4,0,1]}]
         fresh=run_game_card(feature_rows=rows,quotes=[quote('MONEYLINE','HOME',None)],game_score_artifact=game,nrfi_artifact=nrfi,ingestion_now=now,finalization_now=now)
         self.assertIn(fresh[0].bet_status,{'PASS','OFFICIAL_BET'}); self.assertIsNotNone(fresh[0].model_p); self.assertNotIn('DEPLOYMENT_BLOCKED',fresh[0].reason)
         stale_quote=quote('MONEYLINE','HOME',None,retrieved_at=now-timedelta(seconds=601))
         stale=run_game_card(feature_rows=rows,quotes=[stale_quote],game_score_artifact=game,nrfi_artifact=nrfi,ingestion_now=now,finalization_now=now)
-        self.assertEqual(stale[0].bet_status,'BLOCKED'); self.assertIsNotNone(stale[0].model_p); self.assertIn('PRICE_STALE',stale[0].reason)
+        self.assertEqual(stale[0].bet_status,'BLOCKED'); self.assertIsNone(stale[0].model_p); self.assertIn('PRICE_STALE',stale[0].reason)
 
 if __name__=='__main__': unittest.main()
