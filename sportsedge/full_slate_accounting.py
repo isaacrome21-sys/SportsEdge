@@ -1,6 +1,6 @@
 """Per-game, per-market accounting for a full MLB slate.
 
-This module is intentionally model-agnostic. It prevents a Full Model run made
+This module is intentionally model-agnostic.  It prevents a Full Model run made
 late in the day from silently shrinking to only games that are still pregame.
 Every scheduled game remains visible in evidence, while started/final games are
 explicitly non-actionable unless a preserved pregame evaluation already exists.
@@ -13,6 +13,7 @@ from typing import Any, Iterable, Mapping
 
 from .market_coverage import REQUIRED_MARKET_FAMILIES
 from .mlb_source import parse_game_start
+from .pregame_archive import archived_game
 
 
 def _rows(value: Any) -> list[Mapping[str, Any]]:
@@ -50,6 +51,7 @@ def build_full_slate_accounting(
     now: datetime,
     card_payload: Mapping[str, Any] | None = None,
     game_odds_payload: Mapping[str, Any] | None = None,
+    pregame_archive: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     if not isinstance(now, datetime) or now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("NOW_TIMEZONE_REQUIRED")
@@ -68,8 +70,16 @@ def build_full_slate_accounting(
     for snap in schedule:
         gid = str(getattr(snap, "game_pk"))
         state, actionable, reason = _status(snap, now=current)
-        card = card_by_game.get(gid, [])
-        quotes = quote_by_game.get(gid, [])
+        current_card = card_by_game.get(gid, [])
+        current_quotes = quote_by_game.get(gid, [])
+        archived = archived_game(pregame_archive, gid)
+        archived_card = list((archived or {}).get("card_rows") or [])
+        archived_quotes = list((archived or {}).get("game_quotes") or [])
+        # Once a game is not pregame, never trust rows from the current run as
+        # evidence of a pregame decision. Only the immutable pregame archive may
+        # populate it; otherwise show no evaluated rows.
+        card = current_card if actionable else archived_card
+        quotes = current_quotes if actionable else archived_quotes
         card_market_counts = Counter(_market(x) for x in card)
         quote_market_counts = Counter(_market(x) for x in quotes)
         family_rows: list[dict[str, Any]] = []
@@ -78,7 +88,7 @@ def build_full_slate_accounting(
             statuses = Counter(str(x.get("bet_status") or "UNKNOWN") for x in rows)
             if rows:
                 if statuses.get("OFFICIAL_BET", 0):
-                    fam_state = "ACTIONABLE" if actionable else "PRESERVED_PREGAME_RESULT"
+                    fam_state = "ACTIONABLE" if actionable else "ARCHIVED_PREGAME_ACTIONABLE"
                 elif statuses.get("BLOCKED", 0) == len(rows):
                     fam_state = "BLOCKED"
                 else:
@@ -101,6 +111,8 @@ def build_full_slate_accounting(
             "game_state": state,
             "new_bets_allowed": actionable,
             "reason": reason,
+            "pregame_archive_present": bool(archived),
+            "pregame_archive_at_utc": (archived or {}).get("archived_at_utc"),
             "market_families": family_rows,
         })
 
