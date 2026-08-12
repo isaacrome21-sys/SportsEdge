@@ -10,48 +10,41 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Probe DraftKings MLB first-inning sportsbook page
+      - name: Extract DraftKings sportsbook endpoints
         run: |
           mkdir -p artifacts
           python - <<'PY'
-          import json,re,urllib.request,pathlib
+          import json,re,urllib.request,pathlib,urllib.parse
           url='https://sportsbook.draftkings.com/leagues/baseball/mlb?category=1st-inning&subcategory=1st-inning-runs'
           req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0','Accept':'text/html,application/xhtml+xml'})
           out={'requested_url':url}
-          try:
-              with urllib.request.urlopen(req,timeout=20) as r:
-                  body=r.read(); text=body.decode('utf-8','replace')
-                  out.update(status=r.status,final_url=r.geturl(),bytes=len(body))
-                  marker='window.__INITIAL_STATE__ = '
-                  pos=text.find(marker)
-                  if pos < 0: raise RuntimeError('INITIAL_STATE_NOT_FOUND')
-                  state, consumed = json.JSONDecoder().raw_decode(text[pos+len(marker):])
-                  out['initial_state_chars']=consumed
-                  matches=[]
+          with urllib.request.urlopen(req,timeout=20) as r:
+              body=r.read(); text=body.decode('utf-8','replace')
+              out.update(status=r.status,final_url=r.geturl(),bytes=len(body))
+              urls=sorted(set(re.findall(r'https?://[^\"\'<>\\ ]+',text)))
+              out['candidate_urls']=[u for u in urls if any(k in u.lower() for k in ['draftkings','sportsbook','api','offer','eventgroup'])][:250]
+              out['script_srcs']=re.findall(r'<script[^>]+src=["\']([^"\']+)',text,re.I)[:100]
+              marker='window.__INITIAL_STATE__ = '
+              pos=text.find(marker)
+              if pos>=0:
+                  state,consumed=json.JSONDecoder().raw_decode(text[pos+len(marker):])
+                  flat=[]
                   def walk(x,path='root'):
                       if isinstance(x,dict):
-                          blob=json.dumps(x,sort_keys=True,default=str)
-                          low=blob.lower()
-                          if any(t in low for t in ['nrfi','no run first inning','no run in the first','1st inning runs','first inning runs']):
-                              sample={k:v for k,v in x.items() if k in {'id','eventId','eventGroupId','name','label','displayName','marketName','outcomeType','participant','oddsAmerican','americanOdds','oddsDecimal','line','startDate','startDateTime','status','isLive','offerCategoryId','offerSubcategoryId'}}
-                              if sample and len(matches)<80:
-                                  matches.append({'path':path,'keys':sorted(x.keys())[:80],'sample':sample})
                           for k,v in x.items():
+                              if isinstance(v,str) and any(t in (k+' '+v).lower() for t in ['api','offer','eventgroup','sportsbook','url']):
+                                  if len(flat)<300: flat.append({'path':f'{path}.{k}','value':v[:500]})
                               walk(v,f'{path}.{k}')
                       elif isinstance(x,list):
                           for i,v in enumerate(x): walk(v,f'{path}[{i}]')
                   walk(state)
-                  out['nrfi_nodes']=matches
-                  out['nrfi_node_count']=len(matches)
-          except Exception as e:
-              out['error']=f'{type(e).__name__}: {e}'
-          pathlib.Path('artifacts/dk_nrfi_probe.json').write_text(json.dumps(out,indent=2,sort_keys=True))
-          print('status',out.get('status'),'bytes',out.get('bytes'),'nrfi_node_count',out.get('nrfi_node_count'),'error',out.get('error'))
-          if 'error' in out: raise SystemExit(out['error'])
+                  out['state_endpoint_like']=flat
+          pathlib.Path('artifacts/dk_endpoint_probe.json').write_text(json.dumps(out,indent=2,sort_keys=True))
+          print('status',out['status'],'final',out['final_url'],'candidate_urls',len(out['candidate_urls']),'state_endpoint_like',len(out.get('state_endpoint_like',[])))
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: dk-nrfi-probe
-          path: artifacts/dk_nrfi_probe.json
+          name: dk-endpoint-probe
+          path: artifacts/dk_endpoint_probe.json
           if-no-files-found: error
           retention-days: 3
