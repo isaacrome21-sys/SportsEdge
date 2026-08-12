@@ -11,37 +11,37 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
-      - name: Probe ESPN web-header explicit slate date
+      - name: Inspect ESPN event identity structure
         run: |
           python - <<'PY'
           import json, urllib.request
-          base='https://site.web.api.espn.com/apis/v2/scoreboard/header?sport=baseball&league=mlb&region=us&lang=en&contentorigin=espn'
-          urls={
-            'default':base,
-            'dates':base+'&dates=20260812',
+          url='https://site.web.api.espn.com/apis/v2/scoreboard/header?sport=baseball&league=mlb&region=us&lang=en&contentorigin=espn&dates=20260812'
+          req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0','Accept':'application/json','Referer':'https://www.espn.com/'})
+          with urllib.request.urlopen(req,timeout=25) as r: obj=json.load(r)
+          events=[]
+          for sport in obj.get('sports') or []:
+            for league in sport.get('leagues') or []:
+              if str(league.get('slug') or '').lower()!='mlb': continue
+              events.extend(league.get('events') or [])
+          e=events[0]
+          def summary(v,depth=0):
+            if depth>2: return type(v).__name__
+            if isinstance(v,dict):
+              return {k:summary(x,depth+1) for k,x in v.items() if k in {
+                'id','name','shortName','date','status','competitions','competitors','team','homeAway',
+                'displayName','shortDisplayName','abbreviation','uid','links','odds'
+              }}
+            if isinstance(v,list): return [summary(x,depth+1) for x in v[:3]]
+            return v
+          out={
+            'event_keys':sorted(e.keys()),
+            'event_identity_summary':summary(e),
+            'competition_type':type(e.get('competitions')).__name__,
+            'competition_count':len(e.get('competitions') or []) if isinstance(e.get('competitions'),list) else None,
+            'competitors_top_type':type(e.get('competitors')).__name__,
+            'competitors_top_count':len(e.get('competitors') or []) if isinstance(e.get('competitors'),list) else None,
+            'name':e.get('name'),'shortName':e.get('shortName'),'date':e.get('date'),'status':e.get('status'),
           }
-          out={}
-          for label,url in urls.items():
-            req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0','Accept':'application/json','Referer':'https://www.espn.com/'})
-            with urllib.request.urlopen(req,timeout=25) as r: obj=json.load(r)
-            events=[]
-            for sport in obj.get('sports') or []:
-              for league in sport.get('leagues') or []:
-                if str(league.get('slug') or '').lower()!='mlb': continue
-                for e in league.get('events') or []:
-                  odds=e.get('odds') if isinstance(e,dict) else None
-                  events.append({
-                    'id':e.get('id'),'name':e.get('name'),'date':e.get('date'),'status':e.get('status'),
-                    'provider':((odds or {}).get('provider') or {}).get('name') if isinstance(odds,dict) else None,
-                    'details':(odds or {}).get('details') if isinstance(odds,dict) else None,
-                    'home_ml':((odds or {}).get('home') or {}).get('moneyLine') if isinstance(odds,dict) else None,
-                    'away_ml':((odds or {}).get('away') or {}).get('moneyLine') if isinstance(odds,dict) else None,
-                    'over_under':(odds or {}).get('overUnder') if isinstance(odds,dict) else None,
-                    'over_odds':(odds or {}).get('overOdds') if isinstance(odds,dict) else None,
-                    'under_odds':(odds or {}).get('underOdds') if isinstance(odds,dict) else None,
-                    'point_spread':(odds or {}).get('pointSpread') if isinstance(odds,dict) else None,
-                  })
-            out[label]={'event_count':len(events),'events':events}
           print(json.dumps(out,indent=2,default=str))
           open('price_fallback_probe.json','w').write(json.dumps(out,indent=2,default=str))
           PY
