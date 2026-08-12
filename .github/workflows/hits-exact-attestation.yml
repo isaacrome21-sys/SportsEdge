@@ -1,0 +1,135 @@
+name: hits-exact-attestation
+
+on:
+  push:
+    branches: [hits-ci-attestation-20260812]
+  pull_request:
+    paths:
+      - 'fixtures/hits/**'
+      - 'scripts/run_hits_holdout.py'
+      - 'sportsedge/hits_engine.py'
+      - 'sportsedge/fixture_io.py'
+      - 'config/attestation_requirements.json'
+      - '.github/workflows/hits-exact-attestation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  attest-hits:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install exact holdout runtime
+        run: python -m pip install --disable-pip-version-check numpy
+
+      - name: Verify transport and canonical fixture identity
+        env:
+          FIXTURE_GZ: fixtures/hits/bb_hits_data.pkl.gz
+          EXPECTED_GZIP_SIZE: '4089956'
+          EXPECTED_GZIP_SHA256: '84bc9bab6f36ff27b91bb23cd13429b677d58db429f3eb4b935f4354c96ca2dc'
+          EXPECTED_CANONICAL_SIZE: '19948081'
+          EXPECTED_CANONICAL_SHA256: 'aaa006155de8078057fae0bd764a6aebca7e06057d9e83669d816536c5471776'
+        run: |
+          python - <<'PY'
+          import gzip, hashlib, os, pathlib, sys
+          p = pathlib.Path(os.environ['FIXTURE_GZ'])
+          if not p.is_file():
+              raise SystemExit(f'MISSING_EXACT_HITS_TRANSPORT: {p}')
+          transport = p.read_bytes()
+          if len(transport) != int(os.environ['EXPECTED_GZIP_SIZE']):
+              raise SystemExit(f'GZIP_SIZE_MISMATCH: {len(transport)}')
+          got_gz = hashlib.sha256(transport).hexdigest()
+          if got_gz != os.environ['EXPECTED_GZIP_SHA256']:
+              raise SystemExit(f'GZIP_SHA256_MISMATCH: {got_gz}')
+          try:
+              canonical = gzip.decompress(transport)
+          except Exception as exc:
+              raise SystemExit(f'GZIP_DECOMPRESSION_FAILED: {exc}') from exc
+          if len(canonical) != int(os.environ['EXPECTED_CANONICAL_SIZE']):
+              raise SystemExit(f'CANONICAL_SIZE_MISMATCH: {len(canonical)}')
+          got = hashlib.sha256(canonical).hexdigest()
+          if got != os.environ['EXPECTED_CANONICAL_SHA256']:
+              raise SystemExit(f'CANONICAL_SHA256_MISMATCH: {got}')
+          out = pathlib.Path('artifacts/hits_exact_fixture')
+          out.mkdir(parents=True, exist_ok=True)
+          (out / 'bb_hits_data.pkl').write_bytes(canonical)
+          print('EXACT_HITS_FIXTURE_OK')
+          print(f'canonical_sha256={got}')
+          print(f'canonical_size={len(canonical)}')
+          PY
+
+      - name: Run authoritative full Hits holdout
+        run: |
+          mkdir -p artifacts/hits_exact_attestation
+          set -o pipefail
+          python scripts/run_hits_holdout.py artifacts/hits_exact_fixture/bb_hits_data.pkl | tee artifacts/hits_exact_attestation/holdout.log
+          grep -F 'PASS: full 83,769-row production Hits holdout' artifacts/hits_exact_attestation/holdout.log
+          grep -F 'identity collisions in holdout: 0' artifacts/hits_exact_attestation/holdout.log
+
+      - name: Emit commit-bound attestation
+        env:
+          EXPECTED_CANONICAL_SHA256: 'aaa006155de8078057fae0bd764a6aebca7e06057d9e83669d816536c5471776'
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, pathlib, re
+          sha = os.environ['GITHUB_SHA']
+          if not re.fullmatch(r'[0-9a-f]{40}', sha):
+              raise SystemExit(f'INVALID_GITHUB_SHA: {sha!r}')
+          log = pathlib.Path('artifacts/hits_exact_attestation/holdout.log').read_text()
+          if 'PASS: full 83,769-row production Hits holdout' not in log:
+              raise SystemExit('HOLDOUT_PASS_MARKER_MISSING')
+          payload = {
+              'schema_version': 1,
+              'market': 'HITS',
+              'test_name': 'full_holdout_acceptance',
+              'verdict': 'PASS',
+              'engine_version': 'hits_engine_v1.3',
+              'feature_version': 'hits_batter_pitcher_pa_v1',
+              'fixture_sha256': os.environ['EXPECTED_CANONICAL_SHA256'],
+              'ci_commit': sha,
+              'workflow_run_id': os.environ['GITHUB_RUN_ID'],
+              'workflow_run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
+              'holdout_rows': 83769,
+              'identity_collisions': 0,
+              'holdout_log_sha256': hashlib.sha256(log.encode()).hexdigest(),
+          }
+          out = pathlib.Path('artifacts/hits_exact_attestation/hits_attestation.json')
+          out.write_text(json.dumps(payload, sort_keys=True, indent=2) + '\n')
+          print(out.read_text())
+          PY
+
+      - name: Verify attestation contract against checked-in requirements
+        run: |
+          python - <<'PY'
+          import json, pathlib, re
+          req = json.loads(pathlib.Path('config/attestation_requirements.json').read_text())['markets']['HITS']
+          att = json.loads(pathlib.Path('artifacts/hits_exact_attestation/hits_attestation.json').read_text())
+          checks = {
+              'engine_version': req['engine_version'],
+              'feature_version': req['feature_version'],
+              'fixture_sha256': req['fixture_sha256'],
+              'verdict': req['required_verdict'],
+              'test_name': req['required_test_name'],
+          }
+          for key, expected in checks.items():
+              if att.get(key) != expected:
+                  raise SystemExit(f'ATTESTATION_CONTRACT_MISMATCH {key}: {att.get(key)!r} != {expected!r}')
+          if not re.fullmatch(r'[0-9a-f]{40}', att.get('ci_commit','')):
+              raise SystemExit('ATTESTATION_COMMIT_NOT_EXACT_SHA')
+          print('HITS_ATTESTATION_CONTRACT_OK')
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hits-exact-attestation-${{ github.sha }}
+          path: artifacts/hits_exact_attestation/
+          if-no-files-found: warn
+          retention-days: 90
