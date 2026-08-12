@@ -30,6 +30,30 @@ def _decision_id(run_id: str, row: Mapping[str, Any]) -> str:
         "line": row.get("line"),
         "side": row.get("side"),
         "american_odds": row.get("american_odds"),
+        "book_key": row.get("book_key"),
+    }
+    return hashlib.sha256(_stable_json(identity).encode("utf-8")).hexdigest()
+
+
+def _wager_key(row: Mapping[str, Any]) -> str | None:
+    """Stable exact-bet identity across runs and price changes.
+
+    Odds and run_id are deliberately excluded. The book is mandatory: a wager
+    at DraftKings and the same line at another book are distinct executions.
+    """
+    book = str(row.get("book_key") or "").strip()
+    game_id = str(row.get("game_id") or "").strip()
+    market = str(row.get("market") or "").strip()
+    side = str(row.get("side") or "").strip()
+    if not (book and game_id and market and side):
+        return None
+    identity = {
+        "book_key": book,
+        "game_id": game_id,
+        "market": market,
+        "entity_id": str(row.get("entity_id") or ""),
+        "line": row.get("line"),
+        "side": side,
     }
     return hashlib.sha256(_stable_json(identity).encode("utf-8")).hexdigest()
 
@@ -55,8 +79,11 @@ def build_decision_ledger(payload: Mapping[str, Any], *, run_id: str | None = No
         if not isinstance(raw, Mapping):
             raise DecisionLedgerError("RESULT_ROW_NOT_MAPPING")
         row = dict(raw)
+        wager_key = _wager_key(row)
         rows.append({
             "decision_id": _decision_id(rid, row),
+            "wager_key": wager_key,
+            "execution_ready": bool(wager_key) and row.get("bet_status") == "OFFICIAL_BET",
             "run_id": rid,
             "slate_date_ct": payload.get("slate_date_ct"),
             "generated_at_utc": generated,
@@ -66,6 +93,7 @@ def build_decision_ledger(payload: Mapping[str, Any], *, run_id: str | None = No
             "entity_id": row.get("entity_id"),
             "line": row.get("line"),
             "side": row.get("side"),
+            "book_key": row.get("book_key"),
             "american_odds": row.get("american_odds"),
             "model_p": row.get("model_p"),
             "bet_status": row.get("bet_status"),
@@ -73,7 +101,7 @@ def build_decision_ledger(payload: Mapping[str, Any], *, run_id: str | None = No
             "provider_status": provider_status,
         })
     return {
-        "schema_version": "sportsedge_decision_ledger_v1",
+        "schema_version": "sportsedge_decision_ledger_v2",
         "run_id": rid,
         "slate_date_ct": payload.get("slate_date_ct"),
         "generated_at_utc": generated,
@@ -105,6 +133,7 @@ def append_run_history(ledger: Mapping[str, Any], path: str | Path) -> None:
         "run_status": ledger.get("run_status"),
         "decision_count": ledger.get("decision_count"),
         "decision_ids": [x.get("decision_id") for x in (ledger.get("decisions") or [])],
+        "wager_keys": [x.get("wager_key") for x in (ledger.get("decisions") or []) if x.get("wager_key")],
         "recorded_at_utc": datetime.now(timezone.utc).isoformat(),
     }
     with p.open("a", encoding="utf-8") as fh:
