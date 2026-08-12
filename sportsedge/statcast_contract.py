@@ -11,13 +11,17 @@ from typing import Any, Mapping
 
 STATCAST_CONTRACT_VERSION = "SPORTSEDGE_STATCAST_V1"
 
+# These metrics are reproducible from the official Baseball Savant event CSV:
+# estimated_woba_using_speedangle, estimated_ba_using_speedangle, launch_speed,
+# and launch_speed_angle (6 == barrel). Hard-hit is launch_speed >= 95 mph.
 GAME_STATCAST_FEATURES = (
     "off_xwoba",
-    "off_xslg",
+    "off_xba",
     "off_barrel_rate",
     "off_hard_hit_rate",
     "off_avg_exit_velocity",
     "opp_sp_xwoba_allowed",
+    "opp_sp_xba_allowed",
     "opp_sp_barrel_rate_allowed",
     "opp_sp_hard_hit_rate_allowed",
     "opp_sp_avg_exit_velocity_allowed",
@@ -36,11 +40,12 @@ NRFI_STATCAST_FEATURES = (
 
 HITTER_STATCAST_FEATURES = (
     "batter_xwoba",
-    "batter_xslg",
+    "batter_xba",
     "batter_barrel_rate",
     "batter_hard_hit_rate",
     "batter_avg_exit_velocity",
     "opp_sp_xwoba_allowed",
+    "opp_sp_xba_allowed",
     "opp_sp_hard_hit_rate_allowed",
 )
 
