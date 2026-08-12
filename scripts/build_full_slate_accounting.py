@@ -24,17 +24,25 @@ def main() -> int:
     now = datetime.now(timezone.utc)
     slate_date = now.astimezone(CT).date().isoformat()
     schedule = fetch_schedule(slate_date, now=now)
+    card_path = Path("artifacts/live_mlb_card.json")
+    odds_path = Path("artifacts/live_game_odds.json")
+    output_path = Path("artifacts/full_slate_accounting.json")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    archive_path = Path(".cache/sportsedge/pregame-archive") / f"{slate_date}.json"
     payload = build_full_slate_accounting(
         schedule=schedule,
         now=now,
-        card_payload=_load(Path("artifacts/live_mlb_card.json")),
-        game_odds_payload=_load(Path("artifacts/live_game_odds.json")),
+        card_payload=_load(card_path),
+        game_odds_payload=_load(odds_path),
+        pregame_archive=_load(archive_path),
     )
     payload["slate_date_ct"] = slate_date
-    out = Path("artifacts/full_slate_accounting.json")
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(json.dumps({"slate_date_ct": slate_date, "scheduled_games": payload["scheduled_games"], "complete_game_accounting": payload["complete_game_accounting"]}, indent=2))
+    output_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    print(json.dumps({
+        "slate_date_ct": slate_date,
+        "scheduled_games": payload["scheduled_games"],
+        "complete_game_accounting": payload["complete_game_accounting"],
+    }, indent=2))
     return 0
 
 
