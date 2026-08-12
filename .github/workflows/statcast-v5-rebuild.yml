@@ -6,6 +6,7 @@ on:
     paths:
       - 'sportsedge/statcast_v5_pipeline.py'
       - 'scripts/rebuild_statcast_v5.py'
+      - 'scripts/run_statcast_v5_rebuild.py'
       - 'tests/test_statcast_v5_pipeline.py'
       - 'audit/STATCAST_V5_PREDECLARED_PROTOCOL_2026-08-12.md'
       - '.github/workflows/statcast-v5-rebuild.yml'
@@ -36,16 +37,16 @@ jobs:
         run: python -m pytest -q tests/test_statcast_contract.py tests/test_statcast_v5_pipeline.py
 
       - name: Compile V5 rebuild path
-        run: python -m py_compile sportsedge/statcast_v5_pipeline.py scripts/rebuild_statcast_v5.py
+        run: python -m py_compile sportsedge/statcast_v5_pipeline.py scripts/rebuild_statcast_v5.py scripts/run_statcast_v5_rebuild.py
 
       - name: Restore bounded Savant/StatsAPI cache
         uses: actions/cache@v4
         with:
           path: .cache/sportsedge/statcast-v5
-          key: statcast-v5-raw-2021-2025-v1
+          key: statcast-v5-raw-2021-2025-v2
 
       - name: Rebuild frozen contact transformer and V5 models
-        run: python scripts/rebuild_statcast_v5.py
+        run: python scripts/run_statcast_v5_rebuild.py
 
       - name: Verify emitted manifest hashes
         if: always()
