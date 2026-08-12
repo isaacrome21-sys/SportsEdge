@@ -1,0 +1,42 @@
+name: rebuild-core-game-markets
+
+on:
+  push:
+    branches: [full-slate-market-completion-20260811]
+    paths:
+      - scripts/rebuild_game_nrfi_models.py
+      - .github/workflows/rebuild-core-game-markets.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install model-build dependencies
+        run: python -m pip install --disable-pip-version-check numpy scikit-learn joblib
+      - name: Restore historical schedule cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/sportsedge/game-rebuild
+          key: sportsedge-game-rebuild-v1-${{ runner.os }}
+      - name: Rebuild and independently validate core game markets
+        run: python scripts/rebuild_game_nrfi_models.py
+      - name: Upload validation evidence and frozen candidates
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-game-market-rebuild
+          path: |
+            artifacts/core_game_markets_validation.json
+            artifacts/sportsedge_game_score_v2.joblib
+            artifacts/sportsedge_nrfi_v2.joblib
+          if-no-files-found: warn
+          retention-days: 14
