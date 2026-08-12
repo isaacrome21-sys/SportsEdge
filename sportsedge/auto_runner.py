@@ -143,12 +143,17 @@ def _blocked(index:int, raw:Mapping[str,Any]|None, reason:str) -> AutoCardResult
 def _convert(index:int, result:UnifiedCardResult) -> AutoCardResult:
     return AutoCardResult(index,result.game_id,result.market,result.entity_id,result.line,result.side,result.american_odds,result.model_p,result.bet_status,result.reason)
 
-def run_auto_mlb(*, quote_url:str, feature_url:str, projected_lineups_url:str|None=None, provider_token:str|None=None, now:datetime|None=None, opener:Callable=urlopen, registry_path:str="config/deployments.json", require_confirmed_lineup:bool=False, min_edge:float=0.0, kelly_multiplier:float=0.25, game_feature_rows:list[Mapping[str,Any]]|None=None, game_score_artifact:Mapping[str,Any]|None=None, nrfi_artifact:Mapping[str,Any]|None=None) -> AutoRunReport:
+def run_auto_mlb(*, quote_url:str, feature_url:str, projected_lineups_url:str|None=None, projected_lineup_rows:list[Mapping[str,Any]]|None=None, provider_token:str|None=None, now:datetime|None=None, opener:Callable=urlopen, registry_path:str="config/deployments.json", require_confirmed_lineup:bool=False, min_edge:float=0.0, kelly_multiplier:float=0.25, game_feature_rows:list[Mapping[str,Any]]|None=None, game_score_artifact:Mapping[str,Any]|None=None, nrfi_artifact:Mapping[str,Any]|None=None) -> AutoRunReport:
     current=_aware_utc(now or datetime.now(timezone.utc)); slate_date_ct=current.astimezone(CHICAGO_TZ).date().isoformat()
     raw_quote_rows=_snapshot_list("QUOTE",_http_json(quote_url,opener=opener,token=provider_token))
     feature_rows_raw=_snapshot_list("FEATURE",_http_json(feature_url,opener=opener,token=provider_token))
-    projected_raw=[]
-    if projected_lineups_url: projected_raw=_snapshot_list("PROJECTED_LINEUP",_http_json(projected_lineups_url,opener=opener,token=provider_token))
+    if projected_lineups_url and projected_lineup_rows is not None: raise AutoRunnerError("PROJECTED_LINEUP_SOURCE_AMBIGUOUS")
+    if projected_lineups_url:
+        projected_raw=_snapshot_list("PROJECTED_LINEUP",_http_json(projected_lineups_url,opener=opener,token=provider_token))
+    elif projected_lineup_rows is not None:
+        projected_raw=_snapshot_list("PROJECTED_LINEUP",projected_lineup_rows)
+    else:
+        projected_raw=[]
     canonical_quotes,quote_failures=_canonical_quotes(raw_quote_rows); projected=_projected_index(projected_raw); envelopes=_feature_envelopes(feature_rows_raw)
     schedule=fetch_schedule(slate_date_ct,opener=opener,now=current); snapshots={str(g.game_pk):g for g in schedule}; games=[]; game_failures={}
     for snap in schedule:
