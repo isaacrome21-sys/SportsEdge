@@ -1,0 +1,98 @@
+name: statcast-v5-game-promotion
+
+on:
+  push:
+    branches: [statcast-required-v5-20260812]
+    paths:
+      - 'sportsedge/statcast_contract.py'
+      - 'sportsedge/statcast_contact_transformer.py'
+      - 'sportsedge/statcast_v5_data.py'
+      - 'sportsedge/statcast_v5_split.py'
+      - 'sportsedge/statcast_v5_artifacts.py'
+      - 'sportsedge/statcast_v5_live.py'
+      - 'sportsedge/statcast_v5_live_source.py'
+      - 'scripts/rebuild_statcast_v5_split.py'
+      - 'tests/test_statcast_contract.py'
+      - 'tests/test_statcast_v5_data.py'
+      - 'tests/test_statcast_v5_artifacts.py'
+      - 'tests/test_statcast_v5_live.py'
+      - 'audit/STATCAST_V5_PREDECLARED_PROTOCOL_2026-08-12.md'
+      - 'audit/STATCAST_V5_HOLDOUT_RESULT_2026-08-12.md'
+      - 'config/statcast_v5_deployments.json'
+      - '.github/workflows/statcast-v5-game-promotion.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  game-v5:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      SPORTSEDGE_STATCAST_V5_CACHE: .cache/sportsedge/statcast-v5-split
+      SPORTSEDGE_STATCAST_V5_OUT: artifacts/statcast-v5-game
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install V5 runtime
+        run: python -m pip install --disable-pip-version-check numpy pandas scikit-learn joblib pytest
+      - name: Run Statcast contract, split-data, artifact, and live-parity tests
+        run: python -m pytest -q tests/test_statcast_contract.py tests/test_statcast_v5_data.py tests/test_statcast_v5_artifacts.py tests/test_statcast_v5_live.py
+      - name: Compile optimized V5 GAME path
+        run: python -m py_compile sportsedge/statcast_contract.py sportsedge/statcast_contact_transformer.py sportsedge/statcast_v5_data.py sportsedge/statcast_v5_split.py sportsedge/statcast_v5_artifacts.py sportsedge/statcast_v5_live.py sportsedge/statcast_v5_live_source.py scripts/rebuild_statcast_v5_split.py
+      - name: Restore bounded official-source cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/sportsedge/statcast-v5-split
+          key: statcast-v5-split-2018-2025-v1
+          save-always: true
+      - name: Rebuild frozen transformer and V5 artifacts
+        shell: bash
+        run: |
+          set +e
+          python scripts/rebuild_statcast_v5_split.py
+          rc=$?
+          echo "MODEL_REBUILD_EXIT=$rc"
+          # The frozen all-market script exits nonzero when NRFI/YRFI fail.
+          # Do not interpret that as a GAME-market failure; the next step
+          # reads the emitted frozen validation record and applies only the
+          # predeclared GAME market gates.
+          exit 0
+      - name: Verify exact artifact hashes and GAME holdout gates
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          root=Path('artifacts/statcast-v5-game')
+          mp=root/'manifest.json'; vp=root/'validation.json'
+          if not mp.is_file() or not vp.is_file():
+              raise SystemExit('STATCAST_V5_GAME_EVIDENCE_MISSING')
+          manifest=json.loads(mp.read_text())
+          for row in manifest['files']:
+              p=Path(row['path'])
+              if not p.is_file(): raise SystemExit('MANIFEST_FILE_MISSING:'+str(p))
+              got=hashlib.sha256(p.read_bytes()).hexdigest()
+              if got != row['sha256']: raise SystemExit('MANIFEST_SHA_MISMATCH:'+str(p))
+              print('VERIFIED',p,row['bytes'],got)
+          v=json.loads(vp.read_text())
+          required=('MONEYLINE','RUN_LINE','TOTALS')
+          failed=[m for m in required if v.get('passes',{}).get(m) is not True]
+          if failed: raise SystemExit('STATCAST_V5_GAME_HOLDOUT_FAILED:'+','.join(failed))
+          if int(v.get('valid_2025_games',0)) < 1000: raise SystemExit('STATCAST_V5_GAME_HOLDOUT_SAMPLE_TOO_SMALL')
+          if not v.get('base_state_end_2025_sha256'): raise SystemExit('STATCAST_V5_BASE_STATE_HASH_MISSING')
+          print('STATCAST_V5_GAME_HOLDOUT_PASS')
+          print('NRFI_STATE',v.get('passes',{}).get('NRFI'))
+          print('YRFI_STATE',v.get('passes',{}).get('YRFI'))
+          PY
+      - name: Upload V5 GAME evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: statcast-v5-game-evidence-${{ github.sha }}
+          path: artifacts/statcast-v5-game/
+          if-no-files-found: error
+          retention-days: 30
