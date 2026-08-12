@@ -1,6 +1,6 @@
 """Cutoff-correct Statcast primitives for SportsEdge V5.
 
-Historical expected-stat columns are deliberately ignored.  Expected contact is
+Historical expected-stat columns are deliberately ignored. Expected contact is
 reconstructed from raw launch speed/angle with a transformer fitted only on the
 2021-2023 training window declared in the V5 protocol.
 """
@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from io import StringIO
 import hashlib
-import json
 from pathlib import Path
 from typing import Iterable, Mapping, Any
 from urllib.parse import urlencode
@@ -28,12 +27,7 @@ RAW_REQUIRED = (
     "launch_angle", "launch_speed_angle", "inning", "inning_topbot",
     "at_bat_number", "home_team", "away_team",
 )
-CONTACT_WOBA = {
-    "single": 0.88,
-    "double": 1.24,
-    "triple": 1.56,
-    "home_run": 2.00,
-}
+CONTACT_WOBA = {"single": 0.88, "double": 1.24, "triple": 1.56, "home_run": 2.00}
 HIT_EVENTS = frozenset(CONTACT_WOBA)
 
 class StatcastV5Error(ValueError):
@@ -50,30 +44,30 @@ def _daterange_chunks(start: date, end: date, days: int = 14):
 
 def _csv_url(start: date, end: date) -> str:
     params = {
-        "all": "true",
-        "type": "details",
-        "player_type": "batter",
-        "game_date_gt": start.isoformat(),
-        "game_date_lt": end.isoformat(),
-        "hfGT": "R|",
+        "all": "true", "type": "details", "player_type": "batter",
+        "game_date_gt": start.isoformat(), "game_date_lt": end.isoformat(), "hfGT": "R|",
     }
     return f"{SAVANT_CSV}?{urlencode(params)}"
 
 
 def fetch_savant_events(start: date, end: date, cache_dir: Path) -> pd.DataFrame:
-    """Fetch official Savant event CSV in bounded chunks and cache raw bytes.
+    """Fetch official Savant rows in bounded chunks and retain only required columns.
 
-    The raw cache identity includes the exact requested dates.  Duplicate pitches
-    caused by inclusive endpoint behavior are removed with a stable pitch key.
+    Queries intentionally overlap each chunk by one calendar day on both sides,
+    then filter locally to the exact chunk. This makes endpoint boundary semantics
+    irrelevant and prevents silent date gaps. Raw response bytes are cached under
+    the exact target chunk identity.
     """
     cache_dir.mkdir(parents=True, exist_ok=True)
     parts: list[pd.DataFrame] = []
+    keep = list(RAW_REQUIRED) + ["pitch_number"]
     for lo, hi in _daterange_chunks(start, end):
         p = cache_dir / f"savant_{lo.isoformat()}_{hi.isoformat()}.csv"
         if p.exists():
             raw = p.read_text(errors="replace")
         else:
-            req = Request(_csv_url(lo, hi), headers={"Accept": "text/csv", "User-Agent": "SportsEdge/1.0"})
+            qlo, qhi = lo - timedelta(days=1), hi + timedelta(days=1)
+            req = Request(_csv_url(qlo, qhi), headers={"Accept": "text/csv", "User-Agent": "SportsEdge/1.0"})
             with urlopen(req, timeout=120) as r:
                 raw = r.read().decode("utf-8", errors="replace")
             if not raw.lstrip().startswith(("pitch_type,", "game_date,")) and ",game_pk," not in raw[:5000]:
@@ -85,18 +79,26 @@ def fetch_savant_events(start: date, end: date, cache_dir: Path) -> pd.DataFrame
         missing = [c for c in RAW_REQUIRED if c not in frame.columns]
         if missing:
             raise StatcastV5Error(f"SAVANT_COLUMNS_MISSING:{','.join(missing)}")
+        cols = [c for c in keep if c in frame.columns]
+        frame = frame[cols].copy()
+        frame["game_date"] = pd.to_datetime(frame["game_date"], errors="coerce").dt.date
+        frame = frame[(frame["game_date"] >= lo) & (frame["game_date"] <= hi)].copy()
         parts.append(frame)
     if not parts:
         raise StatcastV5Error("SAVANT_NO_ROWS")
     df = pd.concat(parts, ignore_index=True)
-    for c in ("game_pk", "batter", "pitcher", "inning", "at_bat_number"):
-        df[c] = pd.to_numeric(df[c], errors="coerce")
-    df["game_date"] = pd.to_datetime(df["game_date"], errors="coerce").dt.date
+    for c in ("game_pk", "batter", "pitcher", "inning", "at_bat_number", "pitch_number"):
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
     df = df[df["game_date"].notna() & df["game_pk"].notna()].copy()
-    # at_bat_number + pitcher/batter is stable enough when pitch_number is absent.
     key = [c for c in ("game_pk", "at_bat_number", "pitch_number", "pitcher", "batter") if c in df.columns]
-    df = df.sort_values(["game_date", "game_pk", "at_bat_number"] + (["pitch_number"] if "pitch_number" in df.columns else []))
-    df = df.drop_duplicates(key, keep="last")
+    sort_cols = ["game_date", "game_pk", "at_bat_number"] + (["pitch_number"] if "pitch_number" in df.columns else [])
+    df = df.sort_values(sort_cols).drop_duplicates(key, keep="last")
+    if df.empty:
+        raise StatcastV5Error(f"SAVANT_NO_VALID_ROWS:{start}:{end}")
+    mind, maxd = min(df["game_date"]), max(df["game_date"])
+    if mind < start or maxd > end:
+        raise StatcastV5Error(f"SAVANT_LOCAL_CUTOFF_FAILURE:{mind}:{maxd}:{start}:{end}")
     return df.reset_index(drop=True)
 
 
@@ -117,34 +119,21 @@ def fit_contact_transformer(train_events: pd.DataFrame) -> dict[str, Any]:
     bb = batted_balls(train_events)
     if len(bb) < 100000:
         raise StatcastV5Error(f"CONTACT_TRAIN_SAMPLE_TOO_SMALL:{len(bb)}")
+    years = pd.to_datetime(bb["game_date"]).dt.year
+    if int(years.max()) > 2023:
+        raise StatcastV5Error("CONTACT_TRANSFORMER_POST_2023_LEAK")
     X = bb[["launch_speed", "launch_angle"]].to_numpy(float)
-    hit_model = HistGradientBoostingClassifier(
-        learning_rate=0.05, max_iter=180, max_leaf_nodes=31,
-        min_samples_leaf=150, l2_regularization=2.0, random_state=71,
-    )
-    woba_model = HistGradientBoostingRegressor(
-        loss="squared_error", learning_rate=0.05, max_iter=180, max_leaf_nodes=31,
-        min_samples_leaf=150, l2_regularization=2.0, random_state=73,
-    )
-    hit_model.fit(X, bb["is_hit"].to_numpy(int))
-    woba_model.fit(X, bb["contact_woba"].to_numpy(float))
+    hit_model = HistGradientBoostingClassifier(learning_rate=.05, max_iter=180, max_leaf_nodes=31, min_samples_leaf=150, l2_regularization=2.0, random_state=71)
+    woba_model = HistGradientBoostingRegressor(loss="squared_error", learning_rate=.05, max_iter=180, max_leaf_nodes=31, min_samples_leaf=150, l2_regularization=2.0, random_state=73)
+    hit_model.fit(X, bb["is_hit"].to_numpy(int)); woba_model.fit(X, bb["contact_woba"].to_numpy(float))
     global_prior = {
-        "xwoba": float(bb["contact_woba"].mean()),
-        "xba": float(bb["is_hit"].mean()),
-        "barrel": float(bb["barrel"].mean()),
-        "hard_hit": float(bb["hard_hit"].mean()),
-        "ev": float(bb["launch_speed"].mean()),
+        "xwoba": float(bb["contact_woba"].mean()), "xba": float(bb["is_hit"].mean()),
+        "barrel": float(bb["barrel"].mean()), "hard_hit": float(bb["hard_hit"].mean()), "ev": float(bb["launch_speed"].mean()),
     }
     return {
-        "version": CONTACT_TRANSFORMER_VERSION,
-        "train_start": str(min(bb["game_date"])),
-        "train_end": str(max(bb["game_date"])),
-        "inputs": ("launch_speed", "launch_angle"),
-        "hit_model": hit_model,
-        "woba_model": woba_model,
-        "global_prior": global_prior,
-        "n_train_batted_balls": int(len(bb)),
-        "target_woba_values": dict(CONTACT_WOBA),
+        "version": CONTACT_TRANSFORMER_VERSION, "train_start": str(min(bb["game_date"])), "train_end": str(max(bb["game_date"])),
+        "inputs": ("launch_speed", "launch_angle"), "hit_model": hit_model, "woba_model": woba_model,
+        "global_prior": global_prior, "n_train_batted_balls": int(len(bb)), "target_woba_values": dict(CONTACT_WOBA),
     }
 
 
@@ -155,8 +144,7 @@ def save_joblib_hashed(obj: Any, path: Path) -> str:
 
 
 def load_contact_transformer(path: Path, expected_sha256: str | None = None) -> dict[str, Any]:
-    raw = path.read_bytes()
-    sha = hashlib.sha256(raw).hexdigest()
+    raw = path.read_bytes(); sha = hashlib.sha256(raw).hexdigest()
     if expected_sha256 and sha != expected_sha256:
         raise StatcastV5Error(f"CONTACT_TRANSFORMER_SHA_MISMATCH:{sha}")
     obj = joblib.load(path)
@@ -166,6 +154,8 @@ def load_contact_transformer(path: Path, expected_sha256: str | None = None) -> 
 
 
 def apply_contact_transformer(events: pd.DataFrame, transformer: Mapping[str, Any]) -> pd.DataFrame:
+    if transformer.get("version") != CONTACT_TRANSFORMER_VERSION:
+        raise StatcastV5Error("CONTACT_TRANSFORMER_VERSION_MISMATCH")
     bb = batted_balls(events)
     if bb.empty:
         return bb
@@ -186,54 +176,40 @@ class ContactState:
 
     def add(self, row: Mapping[str, Any]) -> None:
         self.n += 1
-        self.xwoba += float(row["frozen_xwoba"])
-        self.xba += float(row["frozen_xba"])
-        self.barrel += float(row["barrel"])
-        self.hard_hit += float(row["hard_hit"])
-        self.ev += float(row["launch_speed"])
+        self.xwoba += float(row["frozen_xwoba"]); self.xba += float(row["frozen_xba"])
+        self.barrel += float(row["barrel"]); self.hard_hit += float(row["hard_hit"]); self.ev += float(row["launch_speed"])
 
 
 def smoothed(state: ContactState | None, prior: Mapping[str, float], pseudo_n: float) -> dict[str, float]:
-    s = state or ContactState()
-    den = float(s.n) + float(pseudo_n)
+    s = state or ContactState(); den = float(s.n) + float(pseudo_n)
     return {
         "xwoba": (s.xwoba + pseudo_n * float(prior["xwoba"])) / den,
         "xba": (s.xba + pseudo_n * float(prior["xba"])) / den,
         "barrel": (s.barrel + pseudo_n * float(prior["barrel"])) / den,
         "hard_hit": (s.hard_hit + pseudo_n * float(prior["hard_hit"])) / den,
-        "ev": (s.ev + pseudo_n * float(prior["ev"])) / den,
-        "n": float(s.n),
+        "ev": (s.ev + pseudo_n * float(prior["ev"])) / den, "n": float(s.n),
     }
 
 
 def game_identity(events: pd.DataFrame) -> dict[str, Any]:
-    """Extract only identities needed pregame: teams, starters, first-three hitters."""
     if events.empty:
         raise StatcastV5Error("GAME_STATCAST_EMPTY")
     e = events.sort_values(["inning", "at_bat_number"] + (["pitch_number"] if "pitch_number" in events.columns else []))
     home = str(e["home_team"].dropna().iloc[0]); away = str(e["away_team"].dropna().iloc[0])
-    top = e[e["inning_topbot"].astype(str).str.lower().eq("top")]
-    bot = e[e["inning_topbot"].astype(str).str.lower().eq("bot")]
+    top = e[e["inning_topbot"].astype(str).str.lower().eq("top")]; bot = e[e["inning_topbot"].astype(str).str.lower().eq("bot")]
     if top.empty or bot.empty:
         raise StatcastV5Error("GAME_HALFINNING_IDENTITY_MISSING")
-    home_sp = int(pd.to_numeric(top["pitcher"], errors="coerce").dropna().iloc[0])
-    away_sp = int(pd.to_numeric(bot["pitcher"], errors="coerce").dropna().iloc[0])
-    top1 = top[pd.to_numeric(top["inning"], errors="coerce").eq(1)].sort_values("at_bat_number")
-    bot1 = bot[pd.to_numeric(bot["inning"], errors="coerce").eq(1)].sort_values("at_bat_number")
+    home_sp = int(pd.to_numeric(top["pitcher"], errors="coerce").dropna().iloc[0]); away_sp = int(pd.to_numeric(bot["pitcher"], errors="coerce").dropna().iloc[0])
+    top1 = top[pd.to_numeric(top["inning"], errors="coerce").eq(1)].sort_values("at_bat_number"); bot1 = bot[pd.to_numeric(bot["inning"], errors="coerce").eq(1)].sort_values("at_bat_number")
     away_order = list(dict.fromkeys(int(x) for x in pd.to_numeric(top1["batter"], errors="coerce").dropna().tolist()))[:3]
     home_order = list(dict.fromkeys(int(x) for x in pd.to_numeric(bot1["batter"], errors="coerce").dropna().tolist()))[:3]
     if len(away_order) != 3 or len(home_order) != 3:
         raise StatcastV5Error("TOP_ORDER_IDENTITY_INCOMPLETE")
-    return {
-        "away_team": away, "home_team": home,
-        "away_sp": away_sp, "home_sp": home_sp,
-        "away_top3": tuple(away_order), "home_top3": tuple(home_order),
-    }
+    return {"away_team": away, "home_team": home, "away_sp": away_sp, "home_sp": home_sp, "away_top3": tuple(away_order), "home_top3": tuple(home_order)}
 
 
 def canonical_manifest(paths: Iterable[Path]) -> dict[str, Any]:
     files = []
     for p in paths:
-        b = p.read_bytes()
-        files.append({"path": str(p), "bytes": len(b), "sha256": hashlib.sha256(b).hexdigest()})
+        b = p.read_bytes(); files.append({"path": str(p), "bytes": len(b), "sha256": hashlib.sha256(b).hexdigest()})
     return {"schema_version": 1, "files": files}
