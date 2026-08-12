@@ -78,14 +78,16 @@ def run_auto_mlb_native_odds(*, odds_api_key:str, odds_api_keys:tuple[str,...]=(
         except Exception as exc:
             roster_names[game.game_pk]=[]; player_teams[game.game_pk]={}; roster_failures.append({"stage":"MLB_ROSTER_IDENTITY","game_id":str(game.game_pk),"reason":f"{type(exc).__name__}: {exc}"})
     participant_index=build_participant_index(schedule=schedule,confirmed_names_by_game=roster_names)
+    game_runtime_enabled=game_score_artifact is not None and nrfi_artifact is not None
     def fetch_all(key:str)->_CombinedOdds:
         props=fetch_mlb_player_prop_quotes(api_key=key,schedule=schedule,participant_index=participant_index,opener=opener,bookmakers=bookmakers)
+        if not game_runtime_enabled:
+            return _CombinedOdds(tuple(props.quotes),tuple(props.failures))
         games=fetch_all_mlb_game_quotes(api_key=key,schedule=schedule,opener=opener,bookmakers=bookmakers)
         return _CombinedOdds(tuple(props.quotes)+tuple(games.quotes),tuple(props.failures)+tuple(games.failures))
     keyring=fetch_with_key_failover((odds_api_key,*odds_api_keys),fetch_all); odds=keyring.value
     key_failures=[{"stage":"ODDS_API_KEY_FAILOVER","key_slot":item.key_slot,"reason":item.reason} for item in keyring.failures]
     quote_payload=list(odds.quotes)
-
     native_feature_failures=[]; native_features=[]; selected_feature_url=feature_url
     cache_root=Path(history_cache_dir or ".cache/sportsedge/mlb-history")
     if not selected_feature_url:
@@ -111,21 +113,18 @@ def run_auto_mlb_native_odds(*, odds_api_key:str, odds_api_keys:tuple[str,...]=(
             except Exception as exc:
                 stage="MLB_HITS_FEATURE" if market=="HITS" else "MLB_TOTAL_BASES_FEATURE"
                 native_feature_failures.append({"stage":stage,"game_id":str(quote.get("game_id","UNKNOWN")),"entity_id":str(quote.get("entity_id","UNKNOWN")),"reason":f"{type(exc).__name__}: {exc}"})
-
     game_feature_rows=None; game_feature_failures=[]
-    if game_score_artifact is not None and nrfi_artifact is not None:
+    if game_runtime_enabled:
         try:
             game_feature_rows,excluded=build_live_game_feature_rows(slate_date=slate_day,schedule=schedule,cache_dir=cache_root/"game-core",opener=opener)
             game_feature_failures.extend({"stage":"GAME_HISTORY_EXCLUSION",**dict(x)} for x in excluded)
         except Exception as exc:
             game_feature_failures.append({"stage":"GAME_LIVE_FEATURES","reason":f"{type(exc).__name__}: {exc}"}); game_feature_rows=None
-
     def wrapped(req,timeout=15):
         url=_url(req)
         if url==MEMORY_QUOTES_URL: return _MemoryResponse(quote_payload)
         if url==MEMORY_FEATURES_URL: return _MemoryResponse(native_features)
         return opener(req,timeout=timeout)
-
     report=run_auto_mlb(quote_url=MEMORY_QUOTES_URL,feature_url=selected_feature_url,projected_lineups_url=projected_lineups_url,provider_token=provider_token,now=current,opener=wrapped,registry_path=registry_path,require_confirmed_lineup=require_confirmed_lineup,min_edge=min_edge,kelly_multiplier=kelly_multiplier,game_feature_rows=game_feature_rows,game_score_artifact=game_score_artifact,nrfi_artifact=nrfi_artifact)
     acquisition_failures=key_failures+[{"stage":"ODDS_API",**dict(item)} for item in odds.failures]+roster_failures+native_feature_failures+game_feature_failures
     return AutoRunReport(report.slate_date_ct,report.generated_at_utc,report.run_status,report.results,tuple(acquisition_failures)+report.source_failures)
