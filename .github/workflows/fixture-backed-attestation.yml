@@ -1,0 +1,164 @@
+name: fixture-backed-attestation
+
+on:
+  push:
+    branches: [fixture-attestation-generic-20260812]
+    paths:
+      - 'fixtures/hits/**'
+      - 'fixtures/total_bases/**'
+      - 'scripts/run_hits_holdout.py'
+      - 'scripts/run_total_bases_holdout.py'
+      - 'sportsedge/hits_engine.py'
+      - 'sportsedge/total_bases_engine.py'
+      - 'sportsedge/fixture_io.py'
+      - 'config/attestation_requirements.json'
+      - '.github/workflows/fixture-backed-attestation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  attest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - market: HITS
+            fixture: fixtures/hits/bb_hits_data.pkl
+            expected_size: '19948081'
+            expected_sha256: aaa006155de8078057fae0bd764a6aebca7e06057d9e83669d816536c5471776
+            runner: scripts/run_hits_holdout.py
+            pass_marker: 'PASS: full 83,769-row production Hits holdout'
+            rows: '83769'
+            engine_version: hits_engine_v1.3
+            feature_version: hits_batter_pitcher_pa_v1
+            attestation_name: hits_attestation.json
+          - market: TOTAL_BASES
+            fixture: fixtures/total_bases/tb_gameeffect_data.pkl
+            expected_size: '24223755'
+            expected_sha256: 1a816f5f46bf1042c2dcc13078092b6205b359a2ad49dca3fcfdb7b787914859
+            runner: scripts/run_total_bases_holdout.py
+            pass_marker: 'PASS: full 73,036-row production Total Bases holdout'
+            rows: '73036'
+            engine_version: total_bases_engine_v0.2
+            feature_version: tb_event_rates_pitcher_park_pa_v1
+            attestation_name: total_bases_attestation.json
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install exact holdout runtime
+        run: python -m pip install --disable-pip-version-check numpy
+
+      - name: Verify canonical fixture before scoring
+        env:
+          FIXTURE: ${{ matrix.fixture }}
+          EXPECTED_SIZE: ${{ matrix.expected_size }}
+          EXPECTED_SHA256: ${{ matrix.expected_sha256 }}
+          MARKET: ${{ matrix.market }}
+        run: |
+          python - <<'PY'
+          import hashlib, os, pathlib
+          p = pathlib.Path(os.environ['FIXTURE'])
+          if not p.is_file():
+              raise SystemExit(f'MISSING_CANONICAL_FIXTURE[{os.environ["MARKET"]}]: {p}')
+          raw = p.read_bytes()
+          if len(raw) != int(os.environ['EXPECTED_SIZE']):
+              raise SystemExit(f'FIXTURE_SIZE_MISMATCH[{os.environ["MARKET"]}]: {len(raw)} != {os.environ["EXPECTED_SIZE"]}')
+          got = hashlib.sha256(raw).hexdigest()
+          if got != os.environ['EXPECTED_SHA256']:
+              raise SystemExit(f'FIXTURE_SHA256_MISMATCH[{os.environ["MARKET"]}]: {got}')
+          print(f'CANONICAL_FIXTURE_OK[{os.environ["MARKET"]}] size={len(raw)} sha256={got}')
+          PY
+
+      - name: Run authoritative full holdout
+        env:
+          FIXTURE: ${{ matrix.fixture }}
+          RUNNER: ${{ matrix.runner }}
+          PASS_MARKER: ${{ matrix.pass_marker }}
+          MARKET: ${{ matrix.market }}
+        run: |
+          mkdir -p artifacts/${{ matrix.market }}
+          set -o pipefail
+          python "$RUNNER" "$FIXTURE" | tee artifacts/${{ matrix.market }}/holdout.log
+          grep -F "$PASS_MARKER" artifacts/${{ matrix.market }}/holdout.log
+
+      - name: Emit exact-commit attestation
+        env:
+          MARKET: ${{ matrix.market }}
+          FIXTURE_SHA256: ${{ matrix.expected_sha256 }}
+          ENGINE_VERSION: ${{ matrix.engine_version }}
+          FEATURE_VERSION: ${{ matrix.feature_version }}
+          HOLDOUT_ROWS: ${{ matrix.rows }}
+          PASS_MARKER: ${{ matrix.pass_marker }}
+          ATTESTATION_NAME: ${{ matrix.attestation_name }}
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, pathlib, re
+          sha = os.environ['GITHUB_SHA']
+          if not re.fullmatch(r'[0-9a-f]{40}', sha):
+              raise SystemExit(f'INVALID_GITHUB_SHA: {sha!r}')
+          log_path = pathlib.Path('artifacts') / os.environ['MARKET'] / 'holdout.log'
+          log = log_path.read_text()
+          if os.environ['PASS_MARKER'] not in log:
+              raise SystemExit('HOLDOUT_PASS_MARKER_MISSING')
+          payload = {
+              'schema_version': 1,
+              'market': os.environ['MARKET'],
+              'test_name': 'full_holdout_acceptance',
+              'verdict': 'PASS',
+              'engine_version': os.environ['ENGINE_VERSION'],
+              'feature_version': os.environ['FEATURE_VERSION'],
+              'fixture_sha256': os.environ['FIXTURE_SHA256'],
+              'ci_commit': sha,
+              'workflow_run_id': os.environ['GITHUB_RUN_ID'],
+              'workflow_run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
+              'holdout_rows': int(os.environ['HOLDOUT_ROWS']),
+              'holdout_log_sha256': hashlib.sha256(log.encode()).hexdigest(),
+          }
+          out = pathlib.Path('artifacts') / os.environ['MARKET'] / os.environ['ATTESTATION_NAME']
+          out.write_text(json.dumps(payload, sort_keys=True, indent=2) + '\n')
+          print(out.read_text())
+          PY
+
+      - name: Verify attestation against checked-in requirements
+        env:
+          MARKET: ${{ matrix.market }}
+          ATTESTATION_NAME: ${{ matrix.attestation_name }}
+        run: |
+          python - <<'PY'
+          import json, os, pathlib, re
+          market = os.environ['MARKET']
+          req = json.loads(pathlib.Path('config/attestation_requirements.json').read_text())['markets'][market]
+          att = json.loads((pathlib.Path('artifacts') / market / os.environ['ATTESTATION_NAME']).read_text())
+          checks = {
+              'engine_version': req['engine_version'],
+              'feature_version': req['feature_version'],
+              'fixture_sha256': req['fixture_sha256'],
+              'verdict': req['required_verdict'],
+              'test_name': req['required_test_name'],
+          }
+          for key, expected in checks.items():
+              if att.get(key) != expected:
+                  raise SystemExit(f'ATTESTATION_CONTRACT_MISMATCH[{market}] {key}: {att.get(key)!r} != {expected!r}')
+          if att.get('ci_commit') != os.environ['GITHUB_SHA']:
+              raise SystemExit(f'ATTESTATION_COMMIT_MISMATCH[{market}]')
+          if not re.fullmatch(r'[0-9a-f]{40}', att.get('ci_commit','')):
+              raise SystemExit(f'ATTESTATION_COMMIT_NOT_EXACT_SHA[{market}]')
+          print(f'ATTESTATION_CONTRACT_OK[{market}] commit={att["ci_commit"]}')
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fixture-attestation-${{ matrix.market }}-${{ github.sha }}
+          path: artifacts/${{ matrix.market }}/
+          if-no-files-found: warn
+          retention-days: 90
