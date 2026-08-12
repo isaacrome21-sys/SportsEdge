@@ -12,16 +12,28 @@ class QuoteBridgeError(ValueError):
     pass
 
 
-SUPPORTED_MARKETS = {"HITS", "TOTAL_BASES", "PITCHER_BB"}
-SUPPORTED_SIDES = {"OVER", "UNDER"}
-# Current production engines model full-game outcomes only. Keep period support
-# market-specific so future F5/1ST engines must earn an explicit contract rather
-# than silently reusing full-game Model_P.
+SUPPORTED_MARKETS = {"HITS", "TOTAL_BASES", "PITCHER_BB", "MONEYLINE", "RUN_LINE", "TOTALS", "NRFI", "YRFI"}
+SUPPORTED_SIDES = {"OVER", "UNDER", "HOME", "AWAY"}
+# Current production engines model full-game outcomes only, EXCEPT NRFI/YRFI
+# which are inherently first-inning markets by definition -- their period is
+# always 1ST, never FG. Keep period support market-specific so future F5/1ST
+# engines for OTHER markets must earn an explicit contract rather than
+# silently reusing full-game Model_P.
 SUPPORTED_PERIODS_BY_MARKET = {
     "HITS": {"FG"},
     "TOTAL_BASES": {"FG"},
     "PITCHER_BB": {"FG"},
+    "MONEYLINE": {"FG"},
+    "RUN_LINE": {"FG"},
+    "TOTALS": {"FG"},
+    "NRFI": {"1ST"},
+    "YRFI": {"1ST"},
 }
+PLAYER_PROP_MARKETS = {"HITS", "TOTAL_BASES", "PITCHER_BB"}
+GAME_LEVEL_MARKETS = {"MONEYLINE", "RUN_LINE", "TOTALS", "NRFI", "YRFI"}
+# MONEYLINE structurally has no line (it is a straight win/loss price) --
+# every other supported market requires one.
+MARKETS_WITHOUT_LINE = {"MONEYLINE"}
 
 
 def _finite(name: str, value: Any) -> float:
@@ -52,7 +64,14 @@ def validate_canonical_quote(raw: Mapping[str, Any], *, default_ttl_seconds: int
         raise QuoteBridgeError("offer must be an object")
     game_id = _required_text(raw, "game_id")
     market = _required_text(raw, "market").upper()
-    entity_id = _required_text(raw, "entity_id")
+    if market in PLAYER_PROP_MARKETS:
+        entity_id = _required_text(raw, "entity_id")
+    else:
+        # Game-level markets have no player-level entity; game_id + side
+        # (+ line, where applicable) already uniquely identifies the quote.
+        # entity_id stays present in the canonical shape for a stable schema
+        # across all markets, but is not required to carry real content.
+        entity_id = str(raw.get("entity_id") or "").strip()
     side = _required_text(raw, "side").upper()
     period = _required_text(raw, "period").upper()
     book_key = _required_text(raw, "book_key")
@@ -69,7 +88,12 @@ def validate_canonical_quote(raw: Mapping[str, Any], *, default_ttl_seconds: int
     if type(is_alternate) is not bool:
         raise QuoteBridgeError("QUOTE_IDENTITY_INCOMPLETE")
 
-    line = _finite("line", raw.get("line"))
+    if market in MARKETS_WITHOUT_LINE:
+        if raw.get("line") is not None:
+            raise QuoteBridgeError(f"{market} must not carry a line")
+        line = None
+    else:
+        line = _finite("line", raw.get("line"))
     odds = _finite("american_odds", raw.get("american_odds"))
     if odds == 0 or -100 < odds < 100:
         raise QuoteBridgeError("american_odds must be <= -100 or >= 100")
