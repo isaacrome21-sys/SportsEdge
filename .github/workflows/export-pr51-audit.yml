@@ -1,0 +1,57 @@
+name: export-pr51-audit
+
+on:
+  push:
+    branches: [export-pr51-audit-bytes-20260811]
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact PR51 head
+        uses: actions/checkout@v4
+        with:
+          ref: 2c2fec3feadd72c176aae22242d342f6984a78b0
+          fetch-depth: 0
+
+      - name: Build exact audit bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p audit_export/pr51_changed
+          files=(
+            ".github/workflows/auto-mlb.yml"
+            ".github/workflows/automation-core.yml"
+            "AUDIT_HANDOFF_FULL_SYSTEM_2026-08-11.md"
+            "scripts/probe_game_odds.py"
+            "scripts/run_auto_mlb.py"
+            "sportsedge/game_market_contract.py"
+            "sportsedge/game_odds_source.py"
+            "sportsedge/market_coverage.py"
+            "sportsedge/odds_api_source.py"
+            "tests/test_game_market_contract.py"
+            "tests/test_game_odds_source.py"
+          )
+          for f in "${files[@]}"; do
+            mkdir -p "audit_export/pr51_changed/$(dirname "$f")"
+            cp -p "$f" "audit_export/pr51_changed/$f"
+          done
+          printf '%s\n' "${files[@]}" > audit_export/PR51_CHANGED_FILES.txt
+          printf '%s\n' 'PR=51' 'HEAD_SHA=2c2fec3feadd72c176aae22242d342f6984a78b0' 'BASE_SHA=ae6d484556ec209460ee46796e7ab417ae616c0e' > audit_export/METADATA.txt
+          git diff --binary ae6d484556ec209460ee46796e7ab417ae616c0e..2c2fec3feadd72c176aae22242d342f6984a78b0 > audit_export/PR51.diff
+          git archive --format=zip --output=audit_export/SportsEdge_PR51_full_repo_2c2fec3.zip 2c2fec3feadd72c176aae22242d342f6984a78b0
+          (cd audit_export/pr51_changed && zip -qr ../SportsEdge_PR51_changed_files_2c2fec3.zip .)
+          zip -qr audit_export/SportsEdge_PR51_tests_and_fixtures_2c2fec3.zip tests acceptance config 2>/dev/null || true
+          git ls-tree -r --name-only 2c2fec3feadd72c176aae22242d342f6984a78b0 > audit_export/FULL_TREE.txt
+          (cd audit_export && sha256sum SportsEdge_PR51_full_repo_2c2fec3.zip SportsEdge_PR51_changed_files_2c2fec3.zip SportsEdge_PR51_tests_and_fixtures_2c2fec3.zip PR51.diff > SHA256SUMS.txt)
+
+      - name: Upload audit bytes
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr51-independent-audit-bytes
+          path: audit_export/
+          if-no-files-found: error
+          retention-days: 14
