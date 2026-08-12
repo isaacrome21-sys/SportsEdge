@@ -26,8 +26,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install validation dependencies
-        run: python -m pip install --disable-pip-version-check numpy scikit-learn joblib pytest
+      - name: Install original sklearn-era validation runtime
+        run: |
+          python -m pip install --disable-pip-version-check 'scikit-learn==1.8.0' joblib pytest
+          python - <<'PY'
+          import sklearn, numpy, scipy, joblib
+          print('sklearn', sklearn.__version__)
+          print('numpy', numpy.__version__)
+          print('scipy', scipy.__version__)
+          print('joblib', joblib.__version__)
+          PY
       - name: Verify chronology and source-bound tests
         run: python -m pytest -q tests/test_historical_cutoff.py tests/test_bb_cutoff_chronology.py tests/test_source_range.py
       - name: Restore BB historical cache
