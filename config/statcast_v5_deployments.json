@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "contract": "SPORTSEDGE_STATCAST_V1",
+  "source_holdout_run": 31627930135,
+  "source_holdout_commit": "0571a3b0d0d063279840735f88230e9112bed07a",
+  "markets": {
+    "MONEYLINE": {
+      "eligible": false,
+      "stage": "HOLDOUT_PASS_AWAITING_LIVE_PARITY",
+      "artifact_sha256": "d467b1221898fdb84562ea2b72a06287bfae3e58603e3b15a28fba40c9cc668e",
+      "reason": "untouched 2025 holdout passed; exact live Statcast parity and runtime attestation still required"
+    },
+    "RUN_LINE": {
+      "eligible": false,
+      "stage": "HOLDOUT_PASS_AWAITING_LIVE_PARITY",
+      "artifact_sha256": "d467b1221898fdb84562ea2b72a06287bfae3e58603e3b15a28fba40c9cc668e",
+      "reason": "untouched 2025 holdout passed; exact live Statcast parity and runtime attestation still required"
+    },
+    "TOTALS": {
+      "eligible": false,
+      "stage": "HOLDOUT_PASS_AWAITING_LIVE_PARITY",
+      "artifact_sha256": "d467b1221898fdb84562ea2b72a06287bfae3e58603e3b15a28fba40c9cc668e",
+      "reason": "untouched 2025 holdout passed; exact live Statcast parity and runtime attestation still required"
+    },
+    "NRFI": {
+      "eligible": false,
+      "stage": "HOLDOUT_FAILED",
+      "artifact_sha256": "a12881071bb53a52c6dcfaaacbf6e7c844e329beb7bb2df204124c064d4b21cc",
+      "reason": "untouched 2025 overall calibration z=2.5616523851699866 exceeded frozen 2.5 gate"
+    },
+    "YRFI": {
+      "eligible": false,
+      "stage": "HOLDOUT_FAILED",
+      "artifact_sha256": "a12881071bb53a52c6dcfaaacbf6e7c844e329beb7bb2df204124c064d4b21cc",
+      "reason": "untouched 2025 overall calibration z=2.5616523851699866 exceeded frozen 2.5 gate"
+    }
+  }
+}
