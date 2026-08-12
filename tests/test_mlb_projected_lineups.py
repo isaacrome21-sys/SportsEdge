@@ -40,7 +40,8 @@ def side_players(ids, confirmed=False):
     return out
 
 def current_box(confirmed_away=False):
-    return {'teams':{'away':{'players':side_players(range(101,111),confirmed_away)},'home':{'players':side_players(range(201,211),False)}}}
+    away_ids=range(101,110) if confirmed_away else range(101,111)
+    return {'teams':{'away':{'players':side_players(away_ids,confirmed_away)},'home':{'players':side_players(range(201,211),False)}}}
 
 def prior_box(ids):
     return {'teams':{'away':{'players':side_players(ids,True)},'home':{'players':{}}}}
