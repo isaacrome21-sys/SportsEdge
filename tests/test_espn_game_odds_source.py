@@ -24,12 +24,13 @@ def game(pk=100, status="Preview", start="2026-08-12T17:40:00+00:00"):
 
 def event(status="pre", provider="DraftKings"):
     return {
-        "id": "401816500", "name": "Baltimore Orioles at Minnesota Twins",
+        "id": "401816500", "name": "Baltimore Orioles at Minnesota Twins", "shortName": "BAL @ MIN",
         "date": "2026-08-12T17:40:00Z", "status": status,
-        "competitions": [{"competitors": [
-            {"homeAway": "away", "team": {"displayName": "Baltimore Orioles"}},
-            {"homeAway": "home", "team": {"displayName": "Minnesota Twins"}},
-        ]}],
+        # Exact structural shape observed from the live ESPN web-header endpoint.
+        "competitors": [
+            {"id": "110", "homeAway": "away", "displayName": "Baltimore Orioles", "abbreviation": "BAL"},
+            {"id": "142", "homeAway": "home", "displayName": "Minnesota Twins", "abbreviation": "MIN"},
+        ],
         "odds": {
             "provider": {"name": provider},
             "home": {"moneyLine": -105}, "away": {"moneyLine": -102},
@@ -105,6 +106,21 @@ class TestEspnGameOddsSource(unittest.TestCase):
             bind_espn_event(event(), [game(100), game(101)])
         with self.assertRaisesRegex(EspnGameOddsError, "NOT_FOUND"):
             bind_espn_event(event(), [game(100, start="2026-08-12T22:40:00+00:00")])
+
+    def test_competitor_identity_must_be_exactly_one_home_and_one_away(self):
+        e = event(); e["competitors"][1]["homeAway"] = "away"
+        with self.assertRaisesRegex(EspnGameOddsError, "AMBIGUOUS"):
+            bind_espn_event(e, [game()])
+        e = event(); e["competitors"].append({"homeAway":"home","displayName":"Other"})
+        with self.assertRaisesRegex(EspnGameOddsError, "COMPETITOR_IDENTITY_INVALID"):
+            bind_espn_event(e, [game()])
+
+    def test_event_name_is_not_used_to_guess_teams(self):
+        e = event(); e["name"] = "Wrong Team at Wrong Team"; e["shortName"] = "XXX @ YYY"
+        self.assertEqual(bind_espn_event(e, [game()]).game_pk, 100)
+        e = event(); e["competitors"][0]["displayName"] = "Wrong Team"
+        with self.assertRaisesRegex(EspnGameOddsError, "NOT_FOUND"):
+            bind_espn_event(e, [game()])
 
     def test_fetch_uses_explicit_slate_date_and_fetch_time(self):
         payload = {"sports": [{"leagues": [{"slug": "mlb", "events": [event()]}]}]}
