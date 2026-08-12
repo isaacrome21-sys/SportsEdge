@@ -12,7 +12,24 @@ class Resp:
     def read(self): return self.raw
 
 def snapshot():
-    return GameSnapshot(game_pk=999,game_date='2026-08-12T23:00:00Z',official_date='2026-08-12',away_id=1,home_id=2,away_name='A',home_name='H',away_probable_pitcher_id=11,home_probable_pitcher_id=22,game_number=1,double_header='N',venue_id=1,status='Preview')
+    return GameSnapshot(
+        game_pk=999,
+        game_date='2026-08-12T23:00:00Z',
+        official_date='2026-08-12',
+        away_id=1,
+        home_id=2,
+        away_name='A',
+        home_name='H',
+        away_probable_pitcher_id=11,
+        home_probable_pitcher_id=22,
+        away_probable_pitcher_name='Away Starter',
+        home_probable_pitcher_name='Home Starter',
+        game_number=1,
+        double_header='N',
+        venue_id=1,
+        status='Preview',
+        retrieved_at=NOW,
+    )
 
 def side_players(ids, confirmed=False):
     out={}
