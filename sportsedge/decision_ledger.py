@@ -16,6 +16,9 @@ class DecisionLedgerError(ValueError):
     pass
 
 
+INVALID_BOOK_KEYS = frozenset({"", "MISSING", "UNKNOWN", "LEGACY_BOOK_UNKNOWN"})
+
+
 def _stable_json(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
 
@@ -35,13 +38,20 @@ def _decision_id(run_id: str, row: Mapping[str, Any]) -> str:
     return hashlib.sha256(_stable_json(identity).encode("utf-8")).hexdigest()
 
 
+def _exact_book_key(row: Mapping[str, Any]) -> str | None:
+    book = str(row.get("book_key") or "").strip()
+    if book.upper() in INVALID_BOOK_KEYS:
+        return None
+    return book
+
+
 def _wager_key(row: Mapping[str, Any]) -> str | None:
     """Stable exact-bet identity across runs and price changes.
 
     Odds and run_id are deliberately excluded. The book is mandatory: a wager
     at DraftKings and the same line at another book are distinct executions.
     """
-    book = str(row.get("book_key") or "").strip()
+    book = _exact_book_key(row)
     game_id = str(row.get("game_id") or "").strip()
     market = str(row.get("market") or "").strip()
     side = str(row.get("side") or "").strip()
@@ -56,6 +66,21 @@ def _wager_key(row: Mapping[str, Any]) -> str | None:
         "side": side,
     }
     return hashlib.sha256(_stable_json(identity).encode("utf-8")).hexdigest()
+
+
+def reconciliation_status(row: Mapping[str, Any], *, schema_version: str | None = None) -> str:
+    """Classify whether a historical decision can support execution/CLV joins.
+
+    Pre-v2 records did not guarantee exact sportsbook identity. They are retained
+    as audit evidence but must never be silently reconciled to a guessed book.
+    """
+    if schema_version and schema_version != "sportsedge_decision_ledger_v2":
+        return "LEGACY_BOOK_UNKNOWN"
+    if _exact_book_key(row) is None:
+        return "LEGACY_BOOK_UNKNOWN"
+    if not row.get("wager_key") and _wager_key(row) is None:
+        return "LEGACY_WAGER_IDENTITY_INCOMPLETE"
+    return "EXACT_BOOK_RECONCILABLE"
 
 
 def build_decision_ledger(payload: Mapping[str, Any], *, run_id: str | None = None) -> dict[str, Any]:
@@ -80,10 +105,12 @@ def build_decision_ledger(payload: Mapping[str, Any], *, run_id: str | None = No
             raise DecisionLedgerError("RESULT_ROW_NOT_MAPPING")
         row = dict(raw)
         wager_key = _wager_key(row)
+        book_key = _exact_book_key(row)
         rows.append({
             "decision_id": _decision_id(rid, row),
             "wager_key": wager_key,
             "execution_ready": bool(wager_key) and row.get("bet_status") == "OFFICIAL_BET",
+            "reconciliation_status": "EXACT_BOOK_RECONCILABLE" if book_key else "LEGACY_BOOK_UNKNOWN",
             "run_id": rid,
             "slate_date_ct": payload.get("slate_date_ct"),
             "generated_at_utc": generated,
@@ -93,7 +120,7 @@ def build_decision_ledger(payload: Mapping[str, Any], *, run_id: str | None = No
             "entity_id": row.get("entity_id"),
             "line": row.get("line"),
             "side": row.get("side"),
-            "book_key": row.get("book_key"),
+            "book_key": book_key or "LEGACY_BOOK_UNKNOWN",
             "american_odds": row.get("american_odds"),
             "model_p": row.get("model_p"),
             "bet_status": row.get("bet_status"),
@@ -125,6 +152,7 @@ def append_run_history(ledger: Mapping[str, Any], path: str | Path) -> None:
         raise DecisionLedgerError("LEDGER_NOT_MAPPING")
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
+    decisions = ledger.get("decisions") or []
     compact = {
         "schema_version": ledger.get("schema_version"),
         "run_id": ledger.get("run_id"),
@@ -132,8 +160,13 @@ def append_run_history(ledger: Mapping[str, Any], path: str | Path) -> None:
         "generated_at_utc": ledger.get("generated_at_utc"),
         "run_status": ledger.get("run_status"),
         "decision_count": ledger.get("decision_count"),
-        "decision_ids": [x.get("decision_id") for x in (ledger.get("decisions") or [])],
-        "wager_keys": [x.get("wager_key") for x in (ledger.get("decisions") or []) if x.get("wager_key")],
+        "decision_ids": [x.get("decision_id") for x in decisions],
+        "wager_keys": [x.get("wager_key") for x in decisions if x.get("wager_key")],
+        "reconciliation_status": (
+            "LEGACY_BOOK_UNKNOWN"
+            if any(x.get("reconciliation_status") != "EXACT_BOOK_RECONCILABLE" for x in decisions)
+            else "EXACT_BOOK_RECONCILABLE"
+        ),
         "recorded_at_utc": datetime.now(timezone.utc).isoformat(),
     }
     with p.open("a", encoding="utf-8") as fh:
