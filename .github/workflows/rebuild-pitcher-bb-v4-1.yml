@@ -1,0 +1,49 @@
+name: rebuild-pitcher-bb-v4-1
+
+on:
+  push:
+    branches: [full-slate-market-completion-20260811]
+    paths:
+      - sportsedge/source_range.py
+      - scripts/rebuild_pitcher_bb_v4_1.py
+      - tests/test_source_range.py
+      - .github/workflows/rebuild-pitcher-bb-v4-1.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install model-build dependencies
+        run: python -m pip install --disable-pip-version-check numpy scikit-learn joblib pytest
+      - name: Verify chronology and source-bound tests
+        run: python -m pytest -q tests/test_historical_cutoff.py tests/test_bb_cutoff_chronology.py tests/test_source_range.py
+      - name: Restore BB historical cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/sportsedge/bb-rebuild
+          key: sportsedge-bb-rebuild-v4-${{ runner.os }}
+          restore-keys: |
+            sportsedge-bb-rebuild-v3-${{ runner.os }}
+      - name: Rebuild source-bounded cutoff-correct BB holdout
+        run: python scripts/rebuild_pitcher_bb_v4_1.py
+      - name: Upload source-bounded BB validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitcher-bb-v4-1-source-bounded
+          path: |
+            artifacts/pitcher_bb_v4_validation.json
+            artifacts/sportsedge_pitcher_bb_v4.joblib
+          if-no-files-found: warn
+          retention-days: 14
