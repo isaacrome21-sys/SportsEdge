@@ -28,6 +28,7 @@ def main() -> int:
             os.environ.get("SPORTSEDGE_ODDS_API_KEY", "").strip(),
             os.environ.get("SPORTSEDGE_ODDS_API_KEY_2", "").strip(),
             os.environ.get("SPORTSEDGE_ODDS_API_KEY_3", "").strip(),
+            os.environ.get("SPORTSEDGE_ODDS_API_KEY_4", "").strip(),
         ) if value
     )
     odds_books = tuple(x.strip() for x in os.environ.get("SPORTSEDGE_ODDS_BOOKMAKERS", "draftkings").split(",") if x.strip())
@@ -75,8 +76,6 @@ def main() -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
     print(json.dumps(payload, indent=2, sort_keys=True))
-    # A legitimate no-play card is success. Missing/broken infrastructure is not:
-    # preserve the evidence artifact, but make automation visibly fail closed.
     return 2 if infrastructure_blocked else 0
 
 
