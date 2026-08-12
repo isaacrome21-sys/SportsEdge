@@ -2,11 +2,11 @@
 """Strict SportsEdge Statcast V5 rebuild under the committed predeclaration.
 
 2018-2020 raw Statcast contact outcomes pretrain the frozen contact transformer.
-2021-2023 train the downstream game/first-inning models, 2024 alone selects and
-calibrates, and 2025 is scored exactly once as final holdout.
+2021-2023 train downstream game/first-inning models, 2024 alone selects/calibrates,
+and 2025 is the untouched final holdout.
 """
 from __future__ import annotations
-import calendar, hashlib, json, os
+import hashlib, json, os
 from datetime import date, timedelta
 from pathlib import Path
 from urllib.parse import urlencode
@@ -31,8 +31,9 @@ def chunks(year,days=14):
         hi=min(end,cur+timedelta(days=days-1)); yield cur,hi; cur=hi+timedelta(days=1)
 
 
-def fetch_savant_year(year:int,cache:Path)->str:
-    cache.mkdir(parents=True,exist_ok=True); header=None; rows=[]
+def fetch_savant_year(year:int,cache:Path):
+    """Fetch overlapped Savant chunks then locally enforce exact non-overlap dates."""
+    cache.mkdir(parents=True,exist_ok=True); out=[]; manifest=[]
     for lo,hi in chunks(year):
         p=cache/f"{lo}_{hi}.csv"
         if not p.exists():
@@ -41,22 +42,14 @@ def fetch_savant_year(year:int,cache:Path)->str:
             with urlopen(Request(url,headers={"Accept":"text/csv","User-Agent":"SportsEdge/5.0"}),timeout=180) as r: raw=r.read()
             if b"game_date" not in raw[:5000] or b"game_pk" not in raw[:5000]: raise RuntimeError(f"SAVANT_NON_CSV:{lo}:{hi}")
             p.write_bytes(raw)
-        text=p.read_text(errors="replace"); lines=text.splitlines()
-        if not lines: continue
-        if header is None: header=lines[0]
-        elif lines[0]!=header: raise RuntimeError("SAVANT_HEADER_DRIFT")
-        # local exact-date filter happens through parser rows below; overlap is intentional
-        rows.extend(lines[1:])
-    if header is None: raise RuntimeError(f"SAVANT_YEAR_EMPTY:{year}")
-    parsed=parse_savant_csv(header+"\n"+"\n".join(rows)+"\n")
-    parsed=[r for r in parsed if int(r.game_date[:4])==year]
-    # Re-serialize only canonical fields accepted by parse_savant_csv.
-    cols=("game_date","game_pk","batter","pitcher","events","home_team","away_team","inning","inning_topbot","at_bat_number","launch_speed","launch_angle","launch_speed_angle")
-    out=[",".join(cols)]
-    for r in parsed:
-        vals=[r.game_date,r.game_pk,r.batter,r.pitcher,r.event,r.home_team,r.away_team,r.inning,r.topbot,r.at_bat_number,"" if r.launch_speed is None else r.launch_speed,"" if r.launch_angle is None else r.launch_angle,"" if r.launch_speed_angle is None else r.launch_speed_angle]
-        out.append(",".join(str(v) for v in vals))
-    return "\n".join(out)+"\n"
+        raw=p.read_bytes(); manifest.append({"year":year,"lo":str(lo),"hi":str(hi),"bytes":len(raw),"sha256":hashlib.sha256(raw).hexdigest()})
+        parsed=parse_savant_csv(raw.decode("utf-8-sig",errors="replace"))
+        out.extend(r for r in parsed if lo<=date.fromisoformat(r.game_date)<=hi)
+    # Chunk-local exact filtering means any duplicate identity now indicates source duplication.
+    keys=[(r.game_pk,r.at_bat_number) for r in out]
+    if len(keys)!=len(set(keys)): raise RuntimeError(f"SAVANT_DUPLICATE_PA_AFTER_LOCAL_BOUND:{year}")
+    if not out: raise RuntimeError(f"SAVANT_YEAR_EMPTY:{year}")
+    return out,manifest
 
 
 def fit_contact(pa):
@@ -67,8 +60,7 @@ def fit_contact(pa):
 
 
 def align(legacy,sc_rows):
-    by={int(r["game_pk"]):r for r in sc_rows if "blocked" not in r}
-    rk=[]; rs=[]
+    by={int(r["game_pk"]):r for r in sc_rows if "blocked" not in r}; rk=[]; rs=[]
     for i,(gid,side) in enumerate(zip(legacy["run_gid"].astype(int),legacy["run_side"].astype(str))):
         row=by.get(int(gid))
         if row is not None: rk.append(i); rs.append([float(row[side][k]) for k in GAME_STATCAST_FEATURES])
@@ -76,8 +68,9 @@ def align(legacy,sc_rows):
     for i,gid in enumerate(legacy["fi_gid"].astype(int)):
         row=by.get(int(gid))
         if row is not None: fk.append(i); fs.append([float(row["first_inning"][k]) for k in NRFI_STATCAST_FEATURES])
-    rk=np.asarray(rk,int); fk=np.asarray(fk,int); out={}
-    out["run_X"]=np.column_stack([legacy["run_X"][rk],np.asarray(rs,float)]); out["fi_X"]=np.column_stack([legacy["fi_X"][fk],np.asarray(fs,float)])
+    rk=np.asarray(rk,int); fk=np.asarray(fk,int)
+    if not len(rk) or not len(fk): raise RuntimeError("V5_FEATURE_ALIGNMENT_EMPTY")
+    out={"run_X":np.column_stack([legacy["run_X"][rk],np.asarray(rs,float)]),"fi_X":np.column_stack([legacy["fi_X"][fk],np.asarray(fs,float)])}
     for k in ("run_y","run_year","run_gid","run_side"): out[k]=legacy[k][rk]
     for k in ("fi_y","fi_year","fi_gid"): out[k]=legacy[k][fk]
     return out
@@ -93,16 +86,27 @@ def paired(f,pred,mask):
     return tuple(np.asarray([r[i] for r in rows]) for i in range(6))
 
 
+def calibrate_ml(rows,calibrator=None):
+    raw=np.asarray([r["home_ml"] for r in rows],float)
+    if calibrator is None:
+        y=np.asarray([r["actual_home_ml"] for r in rows],float)
+        calibrator=LogisticRegression(C=100.,solver="lbfgs").fit(logit(raw).reshape(-1,1),y)
+    p=calibrator.predict_proba(logit(raw).reshape(-1,1))[:,1]
+    out=[]
+    for r,pp in zip(rows,p): q=dict(r); q["home_ml"]=float(pp); out.append(q)
+    return out,calibrator
+
+
 def main():
     cache=Path(os.getenv("SPORTSEDGE_STATCAST_V5_CACHE",".cache/sportsedge/statcast-v5-strict")); out=Path(os.getenv("SPORTSEDGE_STATCAST_V5_OUT","artifacts/statcast-v5-strict")); out.mkdir(parents=True,exist_ok=True)
-    contact_texts=[fetch_savant_year(y,cache/"savant"/str(y)) for y in CONTACT_YEARS]
-    contact_pa=[]
-    for t in contact_texts: contact_pa.extend(parse_savant_csv(t))
+    source_manifest=[]; contact_pa=[]
+    for y in CONTACT_YEARS:
+        rows,m=fetch_savant_year(y,cache/"savant"/str(y)); contact_pa.extend(rows); source_manifest.extend(m)
     transformer,n_contact=fit_contact(contact_pa); tp=out/"sportsedge_contact_transformer_v1.joblib"; joblib.dump(transformer,tp,compress=3); tsha=hashlib.sha256(tp.read_bytes()).hexdigest()
     v5_pa=[]
-    for y in V5_YEARS: v5_pa.extend(parse_savant_csv(fetch_savant_year(y,cache/"savant"/str(y))))
-    sc=build_prior_only_game_features(v5_pa,transformer,min_team_bbe=75,min_pitcher_bbe=30,min_batter_bbe=20)
-    blocked=sum(1 for r in sc if "blocked" in r)
+    for y in V5_YEARS:
+        rows,m=fetch_savant_year(y,cache/"savant"/str(y)); v5_pa.extend(rows); source_manifest.extend(m)
+    sc=build_prior_only_game_features(v5_pa,transformer,min_team_bbe=75,min_pitcher_bbe=30,min_batter_bbe=20); blocked=sum(1 for r in sc if "blocked" in r)
     games=fetch_games(cache/"statsapi"); legacy=build_features(games); f=align(legacy,sc)
     rf=tuple(RUN_FEATURES)+tuple(GAME_STATCAST_FEATURES); ff=tuple(FI_FEATURES)+tuple(NRFI_STATCAST_FEATURES)
     ry=f["run_year"].astype(int); train=ry<=2023; cal=ry==2024; hold=ry==2025; sides=f["run_side"].astype(str)
@@ -113,7 +117,9 @@ def main():
     grid=[]
     for alpha in (.10,.18,.26,.34,.42):
         for sigma in (0.,.08,.16,.24): grid.append((loss(score_distribution(*ca,alpha,sigma,800)),alpha,sigma))
-    grid.sort(); _,alpha,sigma=grid[0]; calrows=score_distribution(*ca,alpha,sigma,4000); holdrows=score_distribution(*ho,alpha,sigma,6000); gh=report_rows(holdrows)
+    grid.sort(); _,alpha,sigma=grid[0]
+    cal_raw=score_distribution(*ca,alpha,sigma,4000); calrows,ml_cal=calibrate_ml(cal_raw)
+    hold_raw=score_distribution(*ho,alpha,sigma,6000); holdrows,_=calibrate_ml(hold_raw,ml_cal); gh=report_rows(holdrows)
     fy=f["fi_year"].astype(int); ft=fy<=2023; fc=fy==2024; fh=fy==2025
     if int(fh.sum())<1000: raise RuntimeError(f"V5_2025_FI_ROWS_TOO_SMALL:{int(fh.sum())}")
     fim=HistGradientBoostingClassifier(learning_rate=.04,max_iter=220,max_leaf_nodes=15,min_samples_leaf=100,l2_regularization=3.0,random_state=541); fim.fit(f["fi_X"][ft],f["fi_y"][ft]); praw=fim.predict_proba(f["fi_X"])[:,1]; platt=LogisticRegression(C=100.,solver="lbfgs").fit(logit(praw[fc]).reshape(-1,1),f["fi_y"][fc]); p=platt.predict_proba(logit(praw).reshape(-1,1))[:,1]
@@ -121,11 +127,12 @@ def main():
     for lo,hi in ((0,.2),(.2,.4),(.4,.6),(.6,.8),(.8,1.000001)):
         m=fh&(p>=lo)&(p<hi)
         if m.sum()>=30: buckets.append({"lo":lo,"hi":hi,**metric(p[m],f["fi_y"][m])})
-    passes={"MONEYLINE":gh["home_ml"]["z"]<=2.5,"RUN_LINE":max(gh[k]["z"] for k in gh if k.startswith("rl_"))<=2.5,"TOTALS":max(gh[k]["z"] for k in gh if k.startswith("over_"))<=2.5,"NRFI":fi_hold["z"]<=2.5 and max([b["z"] for b in buckets] or [0])<=3.0,"YRFI":fi_hold["z"]<=2.5 and max([b["z"] for b in buckets] or [0])<=3.0}
-    ga={"version":"GAME_SCORE_V5_STATCAST","run_model":run_model,"run_features":rf,"away_scale":sa,"home_scale":sh,"alpha":alpha,"shared_sigma":sigma,"statcast_contract_version":STATCAST_CONTRACT_VERSION,"statcast_consumed_by_model":True,"statcast_features":GAME_STATCAST_FEATURES,"contact_transformer_sha256":tsha,"train":"2021-2023","calibration":"2024","holdout":"2025"}
+    nrfi_ok=fi_hold["z"]<=2.5 and max([b["z"] for b in buckets] or [0])<=3.0
+    passes={"MONEYLINE":gh["home_ml"]["z"]<=2.5,"RUN_LINE":max(gh[k]["z"] for k in gh if k.startswith("rl_"))<=2.5,"TOTALS":max(gh[k]["z"] for k in gh if k.startswith("over_"))<=2.5,"NRFI":nrfi_ok,"YRFI":nrfi_ok}
+    ga={"version":"GAME_SCORE_V5_STATCAST","run_model":run_model,"run_features":rf,"away_scale":sa,"home_scale":sh,"alpha":alpha,"shared_sigma":sigma,"ml_calibrator":ml_cal,"statcast_contract_version":STATCAST_CONTRACT_VERSION,"statcast_consumed_by_model":True,"statcast_features":GAME_STATCAST_FEATURES,"contact_transformer_sha256":tsha,"train":"2021-2023","calibration":"2024","holdout":"2025"}
     na={"version":"NRFI_V5_STATCAST","model":fim,"calibrator":platt,"features":ff,"statcast_contract_version":STATCAST_CONTRACT_VERSION,"statcast_consumed_by_model":True,"statcast_features":NRFI_STATCAST_FEATURES,"contact_transformer_sha256":tsha,"positive_class":"YRFI","train":"2021-2023","calibration":"2024","holdout":"2025"}
     gp=out/"sportsedge_game_score_v5_statcast.joblib"; npth=out/"sportsedge_nrfi_v5_statcast.joblib"; joblib.dump(ga,gp,compress=3); joblib.dump(na,npth,compress=3)
-    report={"schema_version":"statcast_v5_strict_holdout_v1","protocol_commit_precedes_fit":True,"contact_pretrain_years":list(CONTACT_YEARS),"contact_training_bbe":n_contact,"contact_transformer_sha256":tsha,"game_artifact_sha256":hashlib.sha256(gp.read_bytes()).hexdigest(),"nrfi_artifact_sha256":hashlib.sha256(npth.read_bytes()).hexdigest(),"valid_2025_games":len(ho[0]),"valid_2025_fi":int(fh.sum()),"blocked_games":blocked,"passes":passes,"game_holdout_2025":gh,"fi_holdout_2025":fi_hold,"fi_buckets_2025":buckets}
+    report={"schema_version":"statcast_v5_strict_holdout_v1","protocol":"audit/STATCAST_V5_PREDECLARED_PROTOCOL_2026-08-12.md","contact_pretrain_years":list(CONTACT_YEARS),"contact_training_bbe":n_contact,"contact_transformer_sha256":tsha,"game_artifact_sha256":hashlib.sha256(gp.read_bytes()).hexdigest(),"nrfi_artifact_sha256":hashlib.sha256(npth.read_bytes()).hexdigest(),"valid_2025_games":len(ho[0]),"valid_2025_fi":int(fh.sum()),"blocked_games":blocked,"passes":passes,"game_holdout_2025":gh,"fi_holdout_2025":fi_hold,"fi_buckets_2025":buckets,"source_manifest":source_manifest}
     vp=out/"validation.json"; vp.write_text(json.dumps(report,indent=2,sort_keys=True)+"\n")
     manifest={"schema_version":1,"files":[]}
     for q in (tp,gp,npth,vp): manifest["files"].append({"path":str(q),"bytes":q.stat().st_size,"sha256":hashlib.sha256(q.read_bytes()).hexdigest()})
