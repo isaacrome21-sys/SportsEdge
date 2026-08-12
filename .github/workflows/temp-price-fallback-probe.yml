@@ -10,67 +10,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Probe independent public price sources
+        with: {python-version: '3.12'}
+      - name: Inspect ESPN web-header MLB price data
         run: |
           python - <<'PY'
-          import json, urllib.request, urllib.error, datetime, re, hashlib
-          now=datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-5)))
-          d=now.strftime('%Y%m%d')
-          urls={
-            'espn_site':f'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates={d}',
-            'espn_cdn':f'https://cdn.espn.com/core/mlb/scoreboard?xhr=1&limit=50&dates={d}',
-            'espn_web_header':'https://site.web.api.espn.com/apis/v2/scoreboard/header?sport=baseball&league=mlb&region=us&lang=en&contentorigin=espn',
-            'dk_il_v5':'https://sportsbook.draftkings.com/sites/US-IL-SB/api/v5/eventgroups/84240?format=json',
-            'dk_il_v1':'https://sportsbook.draftkings.com/sites/US-IL-SB/api/v1/eventgroup/84240/full?format=json',
-            'dk_us_v5':'https://sportsbook.draftkings.com/sites/US-SB/api/v5/eventgroups/84240?format=json',
-          }
-          out={}; dk_html=None
-          for name,url in urls.items():
-            req=urllib.request.Request(url,headers={
-              'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36',
-              'Accept':'application/json,text/plain,*/*',
-              'Accept-Language':'en-US,en;q=0.9',
-              'Referer':'https://sportsbook.draftkings.com/sports/mlb' if name.startswith('dk_') else 'https://www.espn.com/',
-            })
-            try:
-              with urllib.request.urlopen(req,timeout=25) as r:
-                raw=r.read(); ct=r.headers.get('content-type'); final_url=r.geturl()
-              row={'status':200,'bytes':len(raw),'content_type':ct,'final_url':final_url,'sha256':hashlib.sha256(raw).hexdigest()}
-              try:
-                obj=json.loads(raw); row['json_type']=type(obj).__name__; row['top_keys']=sorted(obj.keys())[:50] if isinstance(obj,dict) else None
-                if isinstance(obj,dict):
-                  ev=obj.get('events') or (obj.get('content') or {}).get('sbData',{}).get('events') or []
-                  row['events']=len(ev)
-                  odds=[]
-                  for e in ev[:10]:
-                    comps=e.get('competitions') or []
-                    if comps: odds.extend(comps[0].get('odds') or [])
-                  row['odds_examples']=odds[:4]
-              except Exception as e:
-                text=raw.decode('utf-8','replace'); row['json_error']=f'{type(e).__name__}: {e}'; row['prefix']=text[:250]
-                if name=='dk_il_v1': dk_html=text
-              out[name]=row
-            except urllib.error.HTTPError as e:
-              out[name]={'status':e.code,'reason':str(e),'body_prefix':e.read(500).decode('utf-8','replace')}
-            except Exception as e: out[name]={'status':'ERROR','reason':f'{type(e).__name__}: {e}'}
-          if dk_html is not None:
-            pats=['__NEXT_DATA__','eventGroup','offerCategories','offers','outcomes','American','oddsAmerican','displayOdds','sportsbookEventId','eventId','marketId','selectionId','Chicago Cubs','MLB']
-            analysis={'pattern_counts':{p:dk_html.count(p) for p in pats},'scripts':len(re.findall(r'<script',dk_html,re.I))}
-            snippets={}
-            for p in pats:
-              i=dk_html.find(p)
-              if i>=0: snippets[p]=dk_html[max(0,i-300):i+700]
-            analysis['snippets']=snippets
-            # Capture script tags likely containing serialized state, but never execute them.
-            candidates=[]
-            for m in re.finditer(r'<script([^>]*)>(.*?)</script>',dk_html,re.I|re.S):
-              attrs,body=m.group(1),m.group(2).strip()
-              if body and any(x in body for x in ('eventGroup','offerCategories','outcomes','sportsbookEventId','__NEXT_DATA__')):
-                candidates.append({'attrs':attrs[:300],'bytes':len(body),'prefix':body[:1200]})
-            analysis['state_script_candidates']=candidates[:10]
-            out['dk_html_analysis']=analysis
+          import json, urllib.request, hashlib
+          url='https://site.web.api.espn.com/apis/v2/scoreboard/header?sport=baseball&league=mlb&region=us&lang=en&contentorigin=espn'
+          req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0','Accept':'application/json','Referer':'https://www.espn.com/'})
+          with urllib.request.urlopen(req,timeout=25) as r: obj=json.load(r)
+          out={'top_keys':list(obj),'odds_key_count':json.dumps(obj,separators=(',',':')).count('"odds"'),'sports':[]}
+          for sport in obj.get('sports') or []:
+            s={'name':sport.get('name'),'slug':sport.get('slug'),'leagues':[]}
+            for league in sport.get('leagues') or []:
+              events=league.get('events') or []
+              le={'name':league.get('name'),'slug':league.get('slug'),'event_count':len(events),'events':[]}
+              for e in events[:20]:
+                row={'id':e.get('id'),'name':e.get('name'),'date':e.get('date'),'status':e.get('status'),'odds':e.get('odds')}
+                comps=e.get('competitions') or []
+                if comps:
+                  c=comps[0]; row['competition_odds']=c.get('odds'); row['competitors']=[{'name':((x.get('team') or {}).get('displayName')),'homeAway':x.get('homeAway')} for x in c.get('competitors') or []]
+                le['events'].append(row)
+              s['leagues'].append(le)
+            out['sports'].append(s)
           print(json.dumps(out,indent=2,default=str)); open('price_fallback_probe.json','w').write(json.dumps(out,indent=2,default=str))
           PY
       - uses: actions/upload-artifact@v4
