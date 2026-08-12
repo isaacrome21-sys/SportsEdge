@@ -1,0 +1,57 @@
+name: validate-recovered-bb-v2
+
+on:
+  push:
+    branches: [full-slate-market-completion-20260811]
+    paths:
+      - scripts/validate_recovered_bb_v2.py
+      - scripts/rebuild_pitcher_bb_v4.py
+      - scripts/rebuild_pitcher_bb_v4_1.py
+      - sportsedge/source_range.py
+      - SportsEdge_Automation_Wrapper_v1_1_1.zip
+      - .github/workflows/validate-recovered-bb-v2.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install original sklearn-era validation runtime
+        run: |
+          python -m pip install --disable-pip-version-check 'scikit-learn==1.8.0' joblib pytest
+          python - <<'PY'
+          import sklearn, numpy, scipy, joblib
+          print('sklearn', sklearn.__version__)
+          print('numpy', numpy.__version__)
+          print('scipy', scipy.__version__)
+          print('joblib', joblib.__version__)
+          PY
+      - name: Verify chronology and source-bound tests
+        run: python -m pytest -q tests/test_historical_cutoff.py tests/test_bb_cutoff_chronology.py tests/test_source_range.py
+      - name: Restore BB historical cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/sportsedge/bb-rebuild
+          key: sportsedge-bb-rebuild-v4-${{ runner.os }}
+          restore-keys: |
+            sportsedge-bb-rebuild-v3-${{ runner.os }}
+      - name: Validate frozen recovered BB v2 without retraining
+        run: python scripts/validate_recovered_bb_v2.py
+      - name: Upload external validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recovered-bb-v2-external-validation
+          path: artifacts/recovered_bb_v2_external_validation.json
+          if-no-files-found: warn
+          retention-days: 14

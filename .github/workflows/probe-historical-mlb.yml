@@ -1,0 +1,31 @@
+name: probe-historical-mlb
+
+on:
+  push:
+    branches: [full-slate-market-completion-20260811]
+    paths:
+      - scripts/probe_historical_mlb_sources.py
+      - .github/workflows/probe-historical-mlb.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Probe official MLB historical sources
+        run: python scripts/probe_historical_mlb_sources.py
+      - name: Upload probe evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: historical-mlb-source-probe
+          path: artifacts/historical_mlb_source_probe.json
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,50 @@
+name: rebuild-core-game-markets-v3
+
+on:
+  push:
+    branches: [full-slate-market-completion-20260811]
+    paths:
+      - sportsedge/historical_cutoff.py
+      - scripts/rebuild_game_nrfi_models_v3.py
+      - tests/test_historical_cutoff.py
+      - tests/test_rebuild_cutoff_chronology.py
+      - audit/validation_events.jsonl
+      - .github/workflows/rebuild-core-game-markets-v3.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install model-build dependencies
+        run: python -m pip install --disable-pip-version-check numpy scikit-learn joblib pytest
+      - name: Verify cutoff chronology tests
+        run: python -m pytest -q tests/test_historical_cutoff.py tests/test_rebuild_cutoff_chronology.py
+      - name: Restore cutoff-correct historical schedule cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/sportsedge/game-rebuild-v3
+          key: sportsedge-game-rebuild-v3-${{ runner.os }}
+      - name: Rebuild with cutoff-correct untouched 2026 holdout
+        run: python scripts/rebuild_game_nrfi_models_v3.py
+      - name: Upload cutoff-correct validation evidence and frozen candidates
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-game-market-rebuild-v3-cutoff-correct
+          path: |
+            artifacts/core_game_markets_validation_v3.json
+            artifacts/sportsedge_game_score_v4.joblib
+            artifacts/sportsedge_nrfi_v4.joblib
+          if-no-files-found: warn
+          retention-days: 14
