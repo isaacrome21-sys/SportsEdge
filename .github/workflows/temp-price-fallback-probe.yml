@@ -11,28 +11,39 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
-      - name: Inspect ESPN web-header MLB price data
+      - name: Probe ESPN web-header explicit slate date
         run: |
           python - <<'PY'
-          import json, urllib.request, hashlib
-          url='https://site.web.api.espn.com/apis/v2/scoreboard/header?sport=baseball&league=mlb&region=us&lang=en&contentorigin=espn'
-          req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0','Accept':'application/json','Referer':'https://www.espn.com/'})
-          with urllib.request.urlopen(req,timeout=25) as r: obj=json.load(r)
-          out={'top_keys':list(obj),'odds_key_count':json.dumps(obj,separators=(',',':')).count('"odds"'),'sports':[]}
-          for sport in obj.get('sports') or []:
-            s={'name':sport.get('name'),'slug':sport.get('slug'),'leagues':[]}
-            for league in sport.get('leagues') or []:
-              events=league.get('events') or []
-              le={'name':league.get('name'),'slug':league.get('slug'),'event_count':len(events),'events':[]}
-              for e in events[:20]:
-                row={'id':e.get('id'),'name':e.get('name'),'date':e.get('date'),'status':e.get('status'),'odds':e.get('odds')}
-                comps=e.get('competitions') or []
-                if comps:
-                  c=comps[0]; row['competition_odds']=c.get('odds'); row['competitors']=[{'name':((x.get('team') or {}).get('displayName')),'homeAway':x.get('homeAway')} for x in c.get('competitors') or []]
-                le['events'].append(row)
-              s['leagues'].append(le)
-            out['sports'].append(s)
-          print(json.dumps(out,indent=2,default=str)); open('price_fallback_probe.json','w').write(json.dumps(out,indent=2,default=str))
+          import json, urllib.request
+          base='https://site.web.api.espn.com/apis/v2/scoreboard/header?sport=baseball&league=mlb&region=us&lang=en&contentorigin=espn'
+          urls={
+            'default':base,
+            'dates':base+'&dates=20260812',
+          }
+          out={}
+          for label,url in urls.items():
+            req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0','Accept':'application/json','Referer':'https://www.espn.com/'})
+            with urllib.request.urlopen(req,timeout=25) as r: obj=json.load(r)
+            events=[]
+            for sport in obj.get('sports') or []:
+              for league in sport.get('leagues') or []:
+                if str(league.get('slug') or '').lower()!='mlb': continue
+                for e in league.get('events') or []:
+                  odds=e.get('odds') if isinstance(e,dict) else None
+                  events.append({
+                    'id':e.get('id'),'name':e.get('name'),'date':e.get('date'),'status':e.get('status'),
+                    'provider':((odds or {}).get('provider') or {}).get('name') if isinstance(odds,dict) else None,
+                    'details':(odds or {}).get('details') if isinstance(odds,dict) else None,
+                    'home_ml':((odds or {}).get('home') or {}).get('moneyLine') if isinstance(odds,dict) else None,
+                    'away_ml':((odds or {}).get('away') or {}).get('moneyLine') if isinstance(odds,dict) else None,
+                    'over_under':(odds or {}).get('overUnder') if isinstance(odds,dict) else None,
+                    'over_odds':(odds or {}).get('overOdds') if isinstance(odds,dict) else None,
+                    'under_odds':(odds or {}).get('underOdds') if isinstance(odds,dict) else None,
+                    'point_spread':(odds or {}).get('pointSpread') if isinstance(odds,dict) else None,
+                  })
+            out[label]={'event_count':len(events),'events':events}
+          print(json.dumps(out,indent=2,default=str))
+          open('price_fallback_probe.json','w').write(json.dumps(out,indent=2,default=str))
           PY
       - uses: actions/upload-artifact@v4
         with:
