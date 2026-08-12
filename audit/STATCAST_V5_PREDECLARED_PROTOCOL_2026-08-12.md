@@ -23,16 +23,17 @@ The user requires Statcast to be an actual predictive input, not presentation co
 The new game scoring model must consume the legacy sportsbook-independent history/context feature family plus, at minimum:
 
 - off_xwoba
-- off_xslg
+- off_xba
 - off_barrel_rate
 - off_hard_hit_rate
 - off_avg_exit_velocity
 - opp_sp_xwoba_allowed
+- opp_sp_xba_allowed
 - opp_sp_barrel_rate_allowed
 - opp_sp_hard_hit_rate_allowed
 - opp_sp_avg_exit_velocity_allowed
 
-These fields must appear in the serialized artifact's actual run_features array and the artifact must declare SPORTSEDGE_STATCAST_V1 and statcast_consumed_by_model=true. Metadata declaration without actual model-column membership is a hard failure.
+The contact-quality metrics must be reproducible from official Savant event fields (estimated_woba_using_speedangle, estimated_ba_using_speedangle, launch_speed, launch_speed_angle; launch_speed_angle=6 is a Barrel; hard-hit is launch_speed >= 95 mph). These fields must appear in the serialized artifact's actual run_features array and the artifact must declare SPORTSEDGE_STATCAST_V1 and statcast_consumed_by_model=true. Metadata declaration without actual model-column membership is a hard failure.
 
 ## Required NRFI_V5_STATCAST feature family
 
@@ -51,7 +52,7 @@ Top-order values must be derived from the resolved projected/confirmed batting o
 
 ## HITS / TOTAL_BASES direction
 
-Future Statcast-aware hitter artifacts must explicitly consume batter xwOBA, xSLG, barrel rate, hard-hit rate and average exit velocity plus opposing-starter allowed contact quality. Existing HITS/TOTAL_BASES artifacts are not relabeled or self-promoted by this protocol.
+Future Statcast-aware hitter artifacts must explicitly consume batter xwOBA, xBA, barrel rate, hard-hit rate and average exit velocity plus opposing-starter allowed contact quality. Existing HITS/TOTAL_BASES artifacts are not relabeled or self-promoted by this protocol.
 
 ## Fail-closed rules
 
