@@ -1,0 +1,38 @@
+name: probe-public-game-odds
+on:
+  push:
+    branches: [temp-public-odds-probe-20260812]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Probe ESPN scoreboard odds shape
+        run: |
+          python - <<'PY'
+          import json, urllib.request, datetime
+          d=datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-5))).strftime('%Y%m%d')
+          u=f'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates={d}&limit=100'
+          req=urllib.request.Request(u,headers={'User-Agent':'Mozilla/5.0','Accept':'application/json'})
+          with urllib.request.urlopen(req,timeout=20) as r: data=json.load(r)
+          events=data.get('events') or []
+          summary={'date':d,'events':len(events),'games':[]}
+          for e in events:
+            comp=(e.get('competitions') or [{}])[0]
+            summary['games'].append({
+              'id':e.get('id'),'name':e.get('name'),'date':e.get('date'),
+              'odds':comp.get('odds'),
+              'status':(e.get('status') or {}).get('type',{}).get('name')
+            })
+          print(json.dumps(summary,indent=2))
+          open('public_odds_probe.json','w').write(json.dumps(summary,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: public-game-odds-probe
+          path: public_odds_probe.json
