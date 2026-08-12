@@ -1,0 +1,41 @@
+name: rebuild-pitcher-bb-v3
+
+on:
+  push:
+    branches: [full-slate-market-completion-20260811]
+    paths:
+      - scripts/rebuild_pitcher_bb_v3.py
+      - .github/workflows/rebuild-pitcher-bb-v3.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install model-build dependencies
+        run: python -m pip install --disable-pip-version-check numpy scikit-learn joblib
+      - name: Restore BB historical cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/sportsedge/bb-rebuild
+          key: sportsedge-bb-rebuild-v3-${{ runner.os }}
+      - name: Rebuild and independently validate pitcher BB
+        run: python scripts/rebuild_pitcher_bb_v3.py
+      - name: Upload BB validation evidence and frozen candidate
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitcher-bb-v3-rebuild
+          path: |
+            artifacts/pitcher_bb_v3_validation.json
+            artifacts/sportsedge_pitcher_bb_v3.joblib
+          if-no-files-found: warn
+          retention-days: 14
