@@ -1,0 +1,56 @@
+name: temp-price-fallback-probe
+on:
+  push:
+    branches: [temp-price-fallback-probe-20260812]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Probe independent public price sources
+        run: |
+          python - <<'PY'
+          import json, urllib.request, urllib.error, datetime
+          d=datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-5))).strftime('%Y%m%d')
+          urls={
+            'espn':f'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates={d}',
+            'dk_il_v5':'https://sportsbook.draftkings.com/sites/US-IL-SB/api/v5/eventgroups/84240?format=json',
+            'dk_il_v1':'https://sportsbook.draftkings.com/sites/US-IL-SB/api/v1/eventgroup/84240/full?format=json',
+            'dk_us_v5':'https://sportsbook.draftkings.com/sites/US-SB/api/v5/eventgroups/84240?format=json',
+          }
+          out={}
+          for name,url in urls.items():
+            req=urllib.request.Request(url,headers={
+              'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36',
+              'Accept':'application/json,text/plain,*/*',
+              'Referer':'https://sportsbook.draftkings.com/sports/mlb' if name.startswith('dk_') else 'https://www.espn.com/',
+            })
+            try:
+              with urllib.request.urlopen(req,timeout=20) as r:
+                raw=r.read(); ct=r.headers.get('content-type');
+              row={'status':200,'bytes':len(raw),'content_type':ct,'sha256':__import__('hashlib').sha256(raw).hexdigest()}
+              try:
+                obj=json.loads(raw); row['json_type']=type(obj).__name__; row['top_keys']=sorted(obj.keys())[:40] if isinstance(obj,dict) else None
+                if name=='espn' and isinstance(obj,dict):
+                  ev=obj.get('events') or []; row['events']=len(ev)
+                  row['odds_examples']=[((e.get('competitions') or [{}])[0].get('odds') or [])[:2] for e in ev[:3]]
+                elif isinstance(obj,dict):
+                  row['event_count']=len(obj.get('events') or obj.get('eventGroup',{}).get('events') or [])
+                  row['offer_categories_count']=len(obj.get('offerCategories') or obj.get('eventGroup',{}).get('offerCategories') or [])
+              except Exception as e: row['json_error']=f'{type(e).__name__}: {e}'; row['prefix']=raw[:300].decode('utf-8','replace')
+              out[name]=row
+            except urllib.error.HTTPError as e:
+              out[name]={'status':e.code,'reason':str(e),'body_prefix':e.read(500).decode('utf-8','replace')}
+            except Exception as e:
+              out[name]={'status':'ERROR','reason':f'{type(e).__name__}: {e}'}
+          print(json.dumps(out,indent=2,default=str)); open('price_fallback_probe.json','w').write(json.dumps(out,indent=2,default=str))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: price-fallback-probe
+          path: price_fallback_probe.json
