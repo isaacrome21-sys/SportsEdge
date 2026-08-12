@@ -59,6 +59,7 @@ jobs:
           tests/test_odds_keyring.py
           tests/test_game_odds_source.py
           tests/test_game_market_contract.py
+          tests/test_game_context_gate.py
           tests/test_full_slate_accounting.py
           tests/test_pregame_archive.py
           tests/test_game_card_pipeline.py
@@ -100,10 +101,22 @@ jobs:
           results=p.get('results') or []
           game=[x for x in results if x.get('market') in {'MONEYLINE','RUN_LINE','TOTALS'}]
           assert game, 'NO_GAME_PRICE_CANDIDATES_REACHED_RUNTIME'
-          assert all(x.get('model_p') is not None for x in game), 'GAME_CANDIDATE_MODEL_P_MISSING'
           assert all(x.get('bet_status') in {'OFFICIAL_BET','PASS','BLOCKED'} for x in game), 'TRUTH_GATE_STATUS_MISSING'
+          resolved=[x for x in game if x.get('bet_status')!='BLOCKED']
+          blocked=[x for x in game if x.get('bet_status')=='BLOCKED']
+          assert resolved, 'NO_RESOLVED_GAME_CANDIDATE_REACHED_MODEL'
+          assert all(x.get('model_p') is not None for x in resolved), 'RESOLVED_GAME_CANDIDATE_MODEL_P_MISSING'
+          assert all(x.get('model_p') is None for x in blocked), 'BLOCKED_GAME_CANDIDATE_MUST_NOT_HAVE_MODEL_P'
           assert not any(x.get('market') in {'NRFI','YRFI'} for x in results), 'FALLBACK_MUST_NOT_INVENT_NRFI_YRFI_QUOTES'
-          print(json.dumps({'run_status':p.get('run_status'),'results':len(results),'game_results':len(game),'provider_status':providers},indent=2))
+          print(json.dumps({
+              'run_status':p.get('run_status'),
+              'results':len(results),
+              'game_results':len(game),
+              'resolved_game_results':len(resolved),
+              'blocked_game_results':len(blocked),
+              'blocked_reasons':sorted({x.get('reason') for x in blocked}),
+              'provider_status':providers,
+          },indent=2))
           PY
       - name: Upload fallback smoke evidence
         if: always()
