@@ -22,22 +22,31 @@ jobs:
               with urllib.request.urlopen(req,timeout=20) as r:
                   body=r.read(); text=body.decode('utf-8','replace')
                   out.update(status=r.status,final_url=r.geturl(),bytes=len(body))
-                  terms=['1st Inning','1st-inning','No Run','Yes','No','NRFI','YRFI','sportsbook','__NEXT_DATA__','application/ld+json']
-                  out['term_counts']={t:text.lower().count(t.lower()) for t in terms}
-                  scripts=re.findall(r'<script[^>]*>(.*?)</script>',text,re.S|re.I)
-                  out['script_count']=len(scripts)
+                  marker='window.__INITIAL_STATE__ = '
+                  pos=text.find(marker)
+                  if pos < 0: raise RuntimeError('INITIAL_STATE_NOT_FOUND')
+                  state, consumed = json.JSONDecoder().raw_decode(text[pos+len(marker):])
+                  out['initial_state_chars']=consumed
                   matches=[]
-                  for i,s in enumerate(scripts):
-                      low=s.lower()
-                      if any(x in low for x in ['1st inning','first inning','no run','nrfi','yrfi']):
-                          compact=re.sub(r'\s+',' ',s)
-                          matches.append({'index':i,'length':len(s),'preview':compact[:2000]})
-                          if len(matches)>=3: break
-                  out['matching_scripts']=matches
+                  def walk(x,path='root'):
+                      if isinstance(x,dict):
+                          blob=json.dumps(x,sort_keys=True,default=str)
+                          low=blob.lower()
+                          if any(t in low for t in ['nrfi','no run first inning','no run in the first','1st inning runs','first inning runs']):
+                              sample={k:v for k,v in x.items() if k in {'id','eventId','eventGroupId','name','label','displayName','marketName','outcomeType','participant','oddsAmerican','americanOdds','oddsDecimal','line','startDate','startDateTime','status','isLive','offerCategoryId','offerSubcategoryId'}}
+                              if sample and len(matches)<80:
+                                  matches.append({'path':path,'keys':sorted(x.keys())[:80],'sample':sample})
+                          for k,v in x.items():
+                              walk(v,f'{path}.{k}')
+                      elif isinstance(x,list):
+                          for i,v in enumerate(x): walk(v,f'{path}[{i}]')
+                  walk(state)
+                  out['nrfi_nodes']=matches
+                  out['nrfi_node_count']=len(matches)
           except Exception as e:
               out['error']=f'{type(e).__name__}: {e}'
           pathlib.Path('artifacts/dk_nrfi_probe.json').write_text(json.dumps(out,indent=2,sort_keys=True))
-          print(json.dumps(out,indent=2,sort_keys=True))
+          print('status',out.get('status'),'bytes',out.get('bytes'),'nrfi_node_count',out.get('nrfi_node_count'),'error',out.get('error'))
           if 'error' in out: raise SystemExit(out['error'])
           PY
       - uses: actions/upload-artifact@v4
