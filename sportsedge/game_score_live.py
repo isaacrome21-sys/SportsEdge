@@ -1,12 +1,13 @@
-"""Live ML/RL/TOTALS inference for the canonical GAME_SCORE_V4 artifact."""
+"""Live ML/RL/TOTALS inference for a Statcast-attested SportsEdge game artifact."""
 from __future__ import annotations
 
 import math
 from typing import Any, Mapping
 import numpy as np
 from .game_live_features import RUN_FEATURES, verify_artifact_feature_contract
+from .statcast_contract import require_statcast_artifact
 
-ENGINE_VERSION = "game_score_live_v1"
+ENGINE_VERSION = "game_score_live_v2_statcast_required"
 BANNED_FEATURE_PATTERNS = (
     "market_prob", "novig", "implied_prob", "dk_prob", "sportsbook_prob",
     "consensus_prob", "closing_prob", "american_odds", "price", "odds",
@@ -33,19 +34,27 @@ def assert_no_sportsbook_contamination(feature_payload: Mapping[str, Any] | None
         if any(p in low for p in BANNED_FEATURE_PATTERNS):
             raise GameScoreInferenceError(f"SPORTSBOOK_FEATURE_BANNED: {key}")
 
-def _validate_rows(run_rows: list[list[float]]) -> np.ndarray:
+def _artifact_features(artifact: Mapping[str, Any]) -> tuple[str, ...]:
+    return tuple(artifact.get("run_features") or ())
+
+def _validate_rows(artifact: Mapping[str, Any], run_rows: list[list[float]]) -> np.ndarray:
+    features = _artifact_features(artifact)
+    if not features:
+        raise GameScoreInferenceError("RUN_FEATURE_CONTRACT_MISSING")
     if not isinstance(run_rows, (list, tuple)) or len(run_rows) != 2:
         raise GameScoreInferenceError("RUN_ROWS_MUST_HAVE_AWAY_AND_HOME")
     for row in run_rows:
-        if len(row) != len(RUN_FEATURES):
+        if len(row) != len(features):
             raise GameScoreInferenceError("RUN_FEATURE_ROW_LENGTH_MISMATCH")
         if any(isinstance(v, bool) or not isinstance(v, (int, float)) or not np.isfinite(v) for v in row):
             raise GameScoreInferenceError("RUN_FEATURE_INVALID")
     return np.asarray(run_rows, dtype=float)
 
 def expected_runs(artifact: Mapping[str, Any], run_rows: list[list[float]]) -> tuple[float, float]:
-    verify_artifact_feature_contract(artifact, kind="run")
-    X = _validate_rows(run_rows)
+    # This is intentionally stronger than the legacy V4 verifier. It prevents a
+    # frozen pre-Statcast artifact from producing any new official probability.
+    require_statcast_artifact(artifact, kind="game")
+    X = _validate_rows(artifact, run_rows)
     raw = artifact["run_model"].predict(X)
     away = float(raw[0]) * float(artifact["away_scale"])
     home = float(raw[1]) * float(artifact["home_scale"])
@@ -54,7 +63,6 @@ def expected_runs(artifact: Mapping[str, Any], run_rows: list[list[float]]) -> t
     return away, home
 
 def simulate_game(artifact: Mapping[str, Any], run_rows: list[list[float]], *, game_id: int, n_sims: int = 7000) -> dict[str, Any]:
-    """Reproduce the validated v3.1 holdout simulation exactly for one game."""
     away_mu, home_mu = expected_runs(artifact, run_rows)
     alpha = float(artifact["alpha"]); sigma = float(artifact["shared_sigma"])
     rng = np.random.default_rng(99173 + int(game_id) % 100000)
@@ -66,6 +74,8 @@ def simulate_game(artifact: Mapping[str, Any], run_rows: list[list[float]], *, g
     home_ml = float(artifact["ml_calibrator"].predict_proba(_logit(np.asarray([raw_home_ml])).reshape(-1, 1))[0, 1])
     return {
         "engine_version": ENGINE_VERSION, "artifact_version": artifact.get("version"),
+        "statcast_contract_version": artifact.get("statcast_contract_version"),
+        "statcast_consumed_by_model": True,
         "game_id": int(game_id), "n_sims": int(n_sims), "away_mu": away_mu, "home_mu": home_mu,
         "home_ml_p": home_ml, "away_ml_p": 1.0 - home_ml, "margin": margin, "total_runs": total,
     }
@@ -92,4 +102,4 @@ def price_game_quote(sim: Mapping[str, Any], quote: Mapping[str, Any]) -> dict[s
         else: raise GameScoreInferenceError("TOTAL_SIDE_INVALID")
     else:
         raise GameScoreInferenceError(f"UNSUPPORTED_GAME_MARKET: {market}")
-    return {"market": market, "side": side, "model_p": p, "engine_version": sim["engine_version"], "artifact_version": sim["artifact_version"], "n_sims": sim["n_sims"]}
+    return {"market": market, "side": side, "model_p": p, "engine_version": sim["engine_version"], "artifact_version": sim["artifact_version"], "n_sims": sim["n_sims"], "statcast_contract_version": sim.get("statcast_contract_version")}
