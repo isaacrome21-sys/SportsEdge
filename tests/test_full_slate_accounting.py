@@ -33,13 +33,23 @@ class FullSlateAccountingTests(unittest.TestCase):
         late_hits = next(x for x in out["games"][1]["market_families"] if x["market_family"] == "HITS")
         self.assertEqual(late_hits["state"], "EVALUATED")
 
-    def test_preserved_pregame_official_result_is_labeled_not_recreated(self):
+    def test_started_game_does_not_reuse_current_run_rows_without_archive(self):
         now = datetime(2026, 8, 12, 2, 0, tzinfo=timezone.utc)
         schedule = [game(1, "Live", "2026-08-12T00:00:00Z")]
         card = {"results": [{"game_id": "1", "market": "HITS", "bet_status": "OFFICIAL_BET"}]}
         out = build_full_slate_accounting(schedule=schedule, now=now, card_payload=card)
         hits = next(x for x in out["games"][0]["market_families"] if x["market_family"] == "HITS")
-        self.assertEqual(hits["state"], "PRESERVED_PREGAME_RESULT")
+        self.assertEqual(hits["state"], "NOT_BETTABLE_GAME_STATE")
+        self.assertFalse(out["games"][0]["new_bets_allowed"])
+
+    def test_started_game_uses_archived_pregame_rows_when_current_card_has_none(self):
+        now = datetime(2026, 8, 12, 2, 0, tzinfo=timezone.utc)
+        schedule = [game(1, "Live", "2026-08-12T00:00:00Z")]
+        archive = {"games": {"1": {"archived_at_utc": "2026-08-11T23:50:00+00:00", "card_rows": [{"game_id":"1","market":"HITS","bet_status":"OFFICIAL_BET"}], "game_quotes": []}}}
+        out = build_full_slate_accounting(schedule=schedule, now=now, pregame_archive=archive)
+        self.assertTrue(out["games"][0]["pregame_archive_present"])
+        hits = next(x for x in out["games"][0]["market_families"] if x["market_family"] == "HITS")
+        self.assertEqual(hits["state"], "ARCHIVED_PREGAME_ACTIONABLE")
         self.assertFalse(out["games"][0]["new_bets_allowed"])
 
 
