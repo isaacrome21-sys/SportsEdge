@@ -1,16 +1,16 @@
-"""NRFI/YRFI live inference bound to the canonical sportsedge_nrfi_v4 artifact.
+"""NRFI/YRFI live inference for a Statcast-attested SportsEdge artifact.
 
-The artifact filename says NRFI, but the trained positive class is YRFI because
-its validated training label is 1 when any first-inning run scored. Therefore
-model-positive-class P == P(YRFI), and NRFI is the exact binary complement.
+The trained positive class remains YRFI (any first-inning run). New production
+artifacts are required to prove Statcast features are part of the actual model
+feature contract before any Model_P can be emitted.
 """
 from __future__ import annotations
 
 from typing import Any, Mapping
 import numpy as np
-from .game_live_features import FI_FEATURES, verify_artifact_feature_contract
+from .statcast_contract import require_statcast_artifact
 
-ENGINE_VERSION = "nrfi_yrfi_live_v1"
+ENGINE_VERSION = "nrfi_yrfi_live_v2_statcast_required"
 ARTIFACT_POSITIVE_CLASS = "YRFI"
 SUPPORTED_PERIOD = "1ST"
 REQUIRED_LINE = 0.5
@@ -37,12 +37,15 @@ def assert_no_sportsbook_contamination(feature_row: Mapping[str, Any] | None) ->
             raise NrfiInferenceError(f"SPORTSBOOK_FEATURE_BANNED: {key}")
 
 def first_inning_model_p(artifact: Mapping[str, Any], fi_row: list[float]) -> dict[str, float]:
-    verify_artifact_feature_contract(artifact, kind="nrfi")
-    if not isinstance(fi_row, (list, tuple)) or len(fi_row) != len(FI_FEATURES):
-        raise NrfiInferenceError(f"FI_FEATURE_ROW_LENGTH_MISMATCH expected={len(FI_FEATURES)} got={len(fi_row) if hasattr(fi_row,'__len__') else 'n/a'}")
+    require_statcast_artifact(artifact, kind="nrfi")
+    features = tuple(artifact.get("features") or ())
+    if not features:
+        raise NrfiInferenceError("FI_FEATURE_CONTRACT_MISSING")
+    if not isinstance(fi_row, (list, tuple)) or len(fi_row) != len(features):
+        raise NrfiInferenceError(f"FI_FEATURE_ROW_LENGTH_MISMATCH expected={len(features)} got={len(fi_row) if hasattr(fi_row,'__len__') else 'n/a'}")
     for i, v in enumerate(fi_row):
         if isinstance(v, bool) or not isinstance(v, (int, float)) or not np.isfinite(v):
-            raise NrfiInferenceError(f"FI_FEATURE_INVALID index={i} name={FI_FEATURES[i]} value={v!r}")
+            raise NrfiInferenceError(f"FI_FEATURE_INVALID index={i} name={features[i]} value={v!r}")
     X = np.array([list(fi_row)], dtype=float)
     raw = artifact["model"].predict_proba(X)[:, 1]
     calibrated = artifact["calibrator"].predict_proba(_logit(raw).reshape(-1, 1))[:, 1]
@@ -64,6 +67,7 @@ def price_first_inning_quote(artifact: Mapping[str, Any], fi_row: list[float], q
     probs = first_inning_model_p(artifact, fi_row)
     return {
         "engine_version": ENGINE_VERSION, "artifact_version": artifact.get("version"),
+        "statcast_contract_version": artifact.get("statcast_contract_version"),
         "artifact_positive_class": ARTIFACT_POSITIVE_CLASS, "market": market,
         "period": period, "line": REQUIRED_LINE, "model_p": probs[market],
         "complement_p": probs["NRFI" if market == "YRFI" else "YRFI"],
