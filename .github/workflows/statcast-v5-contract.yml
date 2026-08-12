@@ -1,0 +1,36 @@
+name: statcast-v5-contract
+
+on:
+  push:
+    branches: [statcast-required-v5-20260812]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install contract test runtime
+        run: python -m pip install --disable-pip-version-check numpy pytest
+      - name: Prove Statcast contract is fail-closed
+        run: python -m pytest -q tests/test_statcast_contract.py
+      - name: Prove legacy V4 artifacts are not Statcast contracts
+        run: |
+          python - <<'PY'
+          from sportsedge.statcast_contract import require_statcast_artifact, StatcastContractError
+          legacy_game={"version":"GAME_SCORE_V4_CUTOFF_CORRECT","run_features":("off_rf_pg","opp_ra_pg")}
+          legacy_nrfi={"version":"NRFI_V4_CUTOFF_CORRECT","features":("away_fi_for","home_fi_for")}
+          for kind, artifact in (("game",legacy_game),("nrfi",legacy_nrfi)):
+              try:
+                  require_statcast_artifact(artifact,kind=kind)
+              except StatcastContractError as exc:
+                  print(f"EXPECTED_BLOCK[{kind}]={exc}")
+              else:
+                  raise SystemExit(f"LEGACY_ARTIFACT_FALSELY_ACCEPTED:{kind}")
+          PY
