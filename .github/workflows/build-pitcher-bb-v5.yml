@@ -43,7 +43,7 @@ jobs:
         continue-on-error: true
         env:
           SPORTSEDGE_BB_REBUILD_CACHE: .cache/sportsedge/bb-rebuild-v5
-        run: python scripts/build_pitcher_bb_v5.py
+        run: python -m scripts.build_pitcher_bb_v5
       - name: Upload BB-v5 evidence
         if: always()
         uses: actions/upload-artifact@v4
