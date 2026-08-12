@@ -36,6 +36,7 @@ class AutoCardResult:
     entity_id: str
     line: Any
     side: str
+    book_key: str
     american_odds: Any
     model_p: float | None
     bet_status: str
@@ -138,10 +139,13 @@ def _resolve_feature(envelope:Mapping[str,Any], *, now:datetime, game_start:date
 
 def _blocked(index:int, raw:Mapping[str,Any]|None, reason:str) -> AutoCardResult:
     raw=raw or {}
-    return AutoCardResult(index,str(raw.get("game_id","UNKNOWN")),str(raw.get("market","UNKNOWN")),str(raw.get("entity_id","UNKNOWN")),raw.get("line"),str(raw.get("side","UNKNOWN")),raw.get("american_odds"),None,"BLOCKED",reason)
+    return AutoCardResult(index,str(raw.get("game_id","UNKNOWN")),str(raw.get("market","UNKNOWN")),str(raw.get("entity_id","UNKNOWN")),raw.get("line"),str(raw.get("side","UNKNOWN")),str(raw.get("book_key") or "MISSING"),raw.get("american_odds"),None,"BLOCKED",reason)
 
-def _convert(index:int, result:UnifiedCardResult) -> AutoCardResult:
-    return AutoCardResult(index,result.game_id,result.market,result.entity_id,result.line,result.side,result.american_odds,result.model_p,result.bet_status,result.reason)
+def _convert(index:int, result:UnifiedCardResult, *, book_key:str) -> AutoCardResult:
+    book=str(book_key or "").strip()
+    if not book:
+        raise AutoRunnerError("BOOK_KEY_MISSING_AT_FINAL_CARD")
+    return AutoCardResult(index,result.game_id,result.market,result.entity_id,result.line,result.side,book,result.american_odds,result.model_p,result.bet_status,result.reason)
 
 def run_auto_mlb(*, quote_url:str, feature_url:str, projected_lineups_url:str|None=None, projected_lineup_rows:list[Mapping[str,Any]]|None=None, provider_token:str|None=None, now:datetime|None=None, opener:Callable=urlopen, registry_path:str="config/deployments.json", require_confirmed_lineup:bool=False, min_edge:float=0.0, kelly_multiplier:float=0.25, game_feature_rows:list[Mapping[str,Any]]|None=None, game_score_artifact:Mapping[str,Any]|None=None, nrfi_artifact:Mapping[str,Any]|None=None) -> AutoRunReport:
     current=_aware_utc(now or datetime.now(timezone.utc)); slate_date_ct=current.astimezone(CHICAGO_TZ).date().isoformat()
@@ -185,7 +189,7 @@ def run_auto_mlb(*, quote_url:str, feature_url:str, projected_lineups_url:str|No
         if q["game_id"] in game_failures: output[i]=_blocked(i,q,game_failures[q["game_id"]])
         elif snapshots.get(q["game_id"]) is None: output[i]=_blocked(i,q,"MLB_GAME_ID_NOT_FOUND")
         elif q["market"] not in GAME_MARKETS and identity in feature_failures: output[i]=_blocked(i,q,feature_failures[identity])
-        else: output[i]=_convert(i,result)
+        else: output[i]=_convert(i,result,book_key=q["book_key"])
     results=tuple(output[i] for i in range(len(raw_quote_rows))); source_failures=tuple({"source_index":r.source_index,"reason":r.reason} for r in results if r.bet_status=="BLOCKED")
     status="PASS" if results else "NO_QUOTES"
     return AutoRunReport(slate_date_ct,current.isoformat(),status,results,source_failures)
