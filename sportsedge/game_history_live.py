@@ -2,14 +2,15 @@
 from __future__ import annotations
 
 import calendar, json
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
-from typing import Callable, Any
+from typing import Callable, Any, Iterable
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from .historical_cutoff import suspended_or_resumed_reason
 from .source_range import partition_schedule_games
+from .game_live_features import new_history_state, feature_one, apply_result
 
 BASE = "https://statsapi.mlb.com"
 
@@ -72,3 +73,38 @@ def fetch_prior_finals(*, through_date: date, cache_dir: str|Path, opener: Calla
                 exclusions.append({"game_pk":pk,"official_date":official,"reason_code":"FIRST_INNING_RESULT_INVALID"}); continue
             by_pk[pk]={"game_pk":pk,"officialDate":official,"date":official,"away_id":aid,"home_id":hid,"away_runs":ar,"home_runs":hr,"away_fi":afi,"home_fi":hfi}
     return sorted(by_pk.values(),key=lambda g:(g["officialDate"],g["game_pk"])), exclusions
+
+
+def build_live_game_feature_rows(*, slate_date: date, schedule: Iterable[Any], cache_dir: str|Path, opener: Callable=urlopen) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Build today's v4 game features from history frozen strictly through yesterday."""
+    if not isinstance(slate_date, date):
+        raise GameHistoryLiveError("SLATE_DATE_INVALID")
+    cutoff = slate_date - timedelta(days=1)
+    history, exclusions = fetch_prior_finals(through_date=cutoff, cache_dir=cache_dir, opener=opener)
+    state = new_history_state()
+    i = 0
+    while i < len(history):
+        day = history[i]["officialDate"]
+        batch = []
+        while i < len(history) and history[i]["officialDate"] == day:
+            batch.append(history[i]); i += 1
+        # Freeze same-day state before any result is applied.
+        for game in batch:
+            feature_one(state, game)
+        for game in batch:
+            apply_result(state, game)
+    rows=[]
+    for g in schedule:
+        official = str(getattr(g, "official_date", "") or "")
+        if official != slate_date.isoformat():
+            raise GameHistoryLiveError("LIVE_SCHEDULE_DATE_MISMATCH")
+        run_rows, fi_row = feature_one(state, {
+            "game_pk": int(g.game_pk), "officialDate": official,
+            "away_id": int(g.away_id), "home_id": int(g.home_id),
+        })
+        rows.append({
+            "game_id": str(g.game_pk), "game_pk": int(g.game_pk),
+            "official_date": official, "away_id": int(g.away_id), "home_id": int(g.home_id),
+            "run_rows": run_rows, "fi_row": fi_row, "history_cutoff": cutoff.isoformat(),
+        })
+    return rows, exclusions
