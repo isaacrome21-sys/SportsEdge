@@ -1,0 +1,61 @@
+name: export-pr53-snapshot
+
+on:
+  push:
+    branches:
+      - export-pr53-snapshot-20260812
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 64d0f0ba1e580eea1097cf8347dd845a2a1a9cda
+      - name: Build snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, json, os, pathlib, zipfile
+          root = pathlib.Path('.')
+          files = []
+          for p in sorted(root.rglob('*')):
+              if not p.is_file():
+                  continue
+              rp = p.relative_to(root).as_posix()
+              if rp.startswith('.git/'):
+                  continue
+              data = p.read_bytes()
+              files.append({
+                  'path': rp,
+                  'bytes': len(data),
+                  'sha256': hashlib.sha256(data).hexdigest(),
+              })
+          manifest = {
+              'snapshot_commit': '64d0f0ba1e580eea1097cf8347dd845a2a1a9cda',
+              'source_pr': 53,
+              'file_count': len(files),
+              'files': files,
+          }
+          pathlib.Path('PR53_MANIFEST.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+          with open('PR53_SHA256SUMS.txt', 'w', encoding='utf-8') as f:
+              for x in files:
+                  f.write(f"{x['sha256']}  {x['path']}\n")
+          with zipfile.ZipFile('SportsEdge_PR53_head_64d0f0b.zip', 'w', compression=zipfile.ZIP_DEFLATED) as z:
+              for x in files:
+                  z.write(x['path'], arcname=x['path'])
+          print('files', len(files))
+          print('zip_sha256', hashlib.sha256(pathlib.Path('SportsEdge_PR53_head_64d0f0b.zip').read_bytes()).hexdigest())
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sportsedge-pr53-head-snapshot
+          path: |
+            SportsEdge_PR53_head_64d0f0b.zip
+            PR53_MANIFEST.json
+            PR53_SHA256SUMS.txt
+          if-no-files-found: error
