@@ -69,17 +69,29 @@ def _line(value: Any) -> float:
 
 
 def _event_team_names(event: Mapping[str, Any]) -> tuple[str, str]:
-    comps = event.get("competitions") or []
-    if not isinstance(comps, list) or len(comps) != 1 or not isinstance(comps[0], Mapping):
-        raise EspnGameOddsError("ESPN_COMPETITION_IDENTITY_INVALID")
+    """Extract exact home/away team labels from the ESPN header event shape.
+
+    The web-header endpoint exposes competitors directly on the event (not under
+    a competitions wrapper). Require exactly two structured competitors and one
+    unambiguous home + away designation; never infer sides from event-name order.
+    """
+    competitors = event.get("competitors") or []
+    if not isinstance(competitors, list) or len(competitors) != 2:
+        raise EspnGameOddsError("ESPN_COMPETITOR_IDENTITY_INVALID")
     away = home = ""
-    for row in comps[0].get("competitors") or []:
+    for row in competitors:
         if not isinstance(row, Mapping):
-            continue
-        name = str(((row.get("team") or {}).get("displayName")) or "").strip()
+            raise EspnGameOddsError("ESPN_COMPETITOR_IDENTITY_INVALID")
+        name = str(row.get("displayName") or "").strip()
         side = str(row.get("homeAway") or "").lower()
-        if side == "away": away = name
-        elif side == "home": home = name
+        if not name or side not in {"home", "away"}:
+            raise EspnGameOddsError("ESPN_TEAM_IDENTITY_MISSING")
+        if side == "away":
+            if away: raise EspnGameOddsError("ESPN_TEAM_IDENTITY_AMBIGUOUS")
+            away = name
+        else:
+            if home: raise EspnGameOddsError("ESPN_TEAM_IDENTITY_AMBIGUOUS")
+            home = name
     if not away or not home:
         raise EspnGameOddsError("ESPN_TEAM_IDENTITY_MISSING")
     return away, home
@@ -145,7 +157,6 @@ def parse_espn_event_odds(
     failures: list[dict[str, Any]] = []
     quotes: list[dict[str, Any]] = []
 
-    # MONEYLINE
     for side, key, selection in (("HOME", "home", game.home_name), ("AWAY", "away", game.away_name)):
         try:
             row = odds.get(key) or {}
@@ -155,7 +166,6 @@ def parse_espn_event_odds(
         except Exception as exc:
             failures.append({"game_id": str(game.game_pk), "market": "MONEYLINE", "side": side, "reason": str(exc)})
 
-    # RUN LINE
     point_spread = odds.get("pointSpread") or {}
     if isinstance(point_spread, Mapping):
         for side, key, selection in (("HOME", "home", game.home_name), ("AWAY", "away", game.away_name)):
@@ -168,7 +178,6 @@ def parse_espn_event_odds(
     else:
         failures.append({"game_id": str(game.game_pk), "market": "RUN_LINE", "reason": "ESPN_RUNLINE_MISSING"})
 
-    # TOTALS
     try:
         total = _line(odds.get("overUnder"))
         over = _american(odds.get("overOdds")); under = _american(odds.get("underOdds"))
