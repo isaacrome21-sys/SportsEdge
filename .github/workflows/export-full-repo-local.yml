@@ -1,0 +1,31 @@
+name: export-full-repo-local
+
+on:
+  push:
+    branches:
+      - full-slate-market-completion-20260811
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Record exact source commit
+        run: |
+          printf '%s\n' "${GITHUB_SHA}" > SOURCE_COMMIT_SHA.txt
+      - name: Upload complete repository snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: sportsedge-full-repo-${{ github.sha }}
+          path: |
+            .
+            !.git/**
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 2
