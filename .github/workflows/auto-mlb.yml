@@ -54,6 +54,12 @@ jobs:
           echo '38c5ca528ffc0f6966e0b1d4be96f26a748467707b36865670cba421a20fe565  .cache/sportsedge/game-v4/sportsedge_nrfi_v4.joblib' | sha256sum -c -
       - name: Verify automation safety tests
         run: python -m pytest -q tests/test_auto_runner.py tests/test_odds_api_source.py tests/test_auto_native_odds.py tests/test_mlb_hits_features.py tests/test_mlb_total_bases_features.py tests/test_mlb_history_cache.py tests/test_odds_keyring.py tests/test_game_odds_source.py tests/test_game_market_contract.py tests/test_full_slate_accounting.py tests/test_pregame_archive.py tests/test_game_card_pipeline.py tests/test_game_history_live.py tests/test_bettor_card.py tests/test_deployment_audit.py
+      - name: Attest today's canonical game-model runtime
+        env:
+          SPORTSEDGE_GAME_SCORE_ARTIFACT: .cache/sportsedge/game-v4/sportsedge_game_score_v4.joblib
+          SPORTSEDGE_NRFI_ARTIFACT: .cache/sportsedge/game-v4/sportsedge_nrfi_v4.joblib
+          SPORTSEDGE_GAME_HISTORY_CACHE_DIR: .cache/sportsedge/mlb-history/game-core
+        run: python scripts/attest_live_game_runtime.py
       - name: Acquire fresh DraftKings game-market probe
         continue-on-error: true
         env:
@@ -98,6 +104,7 @@ jobs:
           path: |
             artifacts/live_mlb_card.json
             artifacts/live_game_odds.json
+            artifacts/live_game_runtime_attestation.json
             artifacts/full_slate_accounting.json
             .cache/sportsedge/pregame-archive/${{ steps.slate.outputs.date }}.json
           if-no-files-found: error
