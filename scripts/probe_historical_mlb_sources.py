@@ -10,8 +10,9 @@ from urllib.request import Request, urlopen
 BASE = "https://statsapi.mlb.com"
 
 
-def get(path: str, params: dict) -> dict:
-    url = f"{BASE}{path}?{urlencode(params)}"
+def get(path: str, params: dict | None = None) -> dict:
+    query = f"?{urlencode(params)}" if params else ""
+    url = f"{BASE}{path}{query}"
     with urlopen(Request(url, headers={"Accept":"application/json"}), timeout=30) as r:
         return json.loads(r.read().decode("utf-8"))
 
@@ -38,6 +39,14 @@ def main() -> int:
         "game_keys": sorted(game.keys()),
         "game_sample": game,
     }
+    game_pk = int(game["gamePk"])
+    box = get(f"/api/v1/game/{game_pk}/boxscore")
+    out["boxscore"] = {
+        "game_pk": game_pk,
+        "team_keys": sorted((box.get("teams") or {}).keys()),
+        "away": (box.get("teams") or {}).get("away"),
+        "home": (box.get("teams") or {}).get("home"),
+    }
     stats = get("/api/v1/stats", {
         "stats": "gameLog",
         "group": "pitching",
@@ -56,6 +65,7 @@ def main() -> int:
     path.write_text(json.dumps(out, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps({
         "schedule_games": out["schedule"]["totalGames"],
+        "sample_game_pk": game_pk,
         "pitching_stats_blocks": len(stats.get("stats") or []),
         "players": out["players"]["count"],
     }, indent=2))
