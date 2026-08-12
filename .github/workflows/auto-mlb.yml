@@ -1,6 +1,8 @@
 name: auto-mlb
 
 on:
+  push:
+    branches: [full-model-completion-20260812]
   workflow_dispatch:
   schedule:
     - cron: '*/15 * * * *'
