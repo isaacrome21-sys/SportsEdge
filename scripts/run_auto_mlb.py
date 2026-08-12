@@ -14,6 +14,7 @@ from sportsedge.auto_runner import AutoRunnerError, AutoRunReport, report_to_dic
 from sportsedge.bettor_card import build_bettor_card
 from sportsedge.game_artifacts import load_frozen_game_artifacts
 from sportsedge.game_history_live import build_live_game_feature_rows
+from sportsedge.mlb_context import context_to_dict, fetch_slate_context
 from sportsedge.mlb_source import fetch_schedule
 
 CHICAGO_TZ=ZoneInfo("America/Chicago")
@@ -43,6 +44,18 @@ def _external_report(*, quote_url, feature_url, projected, token, now, min_edge,
     return AutoRunReport(report.slate_date_ct,report.generated_at_utc,report.run_status,report.results,tuple(game_failures)+report.source_failures)
 
 
+def _capture_context(now: datetime) -> tuple[list[dict], list[dict]]:
+    """Context is presentation evidence only; failures never alter a bet verdict."""
+    try:
+        slate_date=now.astimezone(CHICAGO_TZ).date().isoformat()
+        schedule=fetch_schedule(slate_date,now=now)
+        rows=fetch_slate_context(schedule)
+        failures=[{"stage":"MLB_CONTEXT","game_id":row.game_id,"reason":row.error} for row in rows if row.error]
+        return [context_to_dict(row) for row in rows],failures
+    except Exception as exc:
+        return [],[{"stage":"MLB_CONTEXT","reason":f"{type(exc).__name__}: {exc}"}]
+
+
 def main()->int:
     p=argparse.ArgumentParser(); p.add_argument("--output",default="artifacts/live_mlb_card.json"); p.add_argument("--require-confirmed-lineup",action="store_true"); p.add_argument("--min-edge",type=float,default=0.0); p.add_argument("--kelly-multiplier",type=float,default=0.25); args=p.parse_args()
     quotes=os.environ.get("SPORTSEDGE_QUOTES_URL","").strip()
@@ -51,6 +64,7 @@ def main()->int:
     features=os.environ.get("SPORTSEDGE_FEATURES_URL","").strip(); projected=os.environ.get("SPORTSEDGE_PROJECTED_LINEUPS_URL","").strip() or None; token=os.environ.get("SPORTSEDGE_PROVIDER_TOKEN","").strip() or None; history_cache_dir=os.environ.get("SPORTSEDGE_HISTORY_CACHE_DIR","").strip() or None
     game_score_path=os.environ.get("SPORTSEDGE_GAME_SCORE_ARTIFACT","").strip(); nrfi_path=os.environ.get("SPORTSEDGE_NRFI_ARTIFACT","").strip()
     now=datetime.now(timezone.utc); infrastructure_blocked=False; provider_notes=[]
+    slate_context,context_failures=_capture_context(now)
     try:
         game_score_artifact=nrfi_artifact=None
         if game_score_path or nrfi_path:
@@ -74,6 +88,8 @@ def main()->int:
     except Exception as exc:
         infrastructure_blocked=True
         payload={"slate_date_ct":now.astimezone(CHICAGO_TZ).date().isoformat(),"generated_at_utc":now.isoformat(),"run_status":"BLOCKED","results":[],"source_failures":[{"reason":f"{type(exc).__name__}: {exc}"}],"provider_status":provider_notes,"bettor_card":build_bettor_card([],min_edge=args.min_edge)}
+    payload["slate_context"]=slate_context
+    payload["context_failures"]=context_failures
     out=Path(args.output); out.parent.mkdir(parents=True,exist_ok=True); out.write_text(json.dumps(payload,indent=2,sort_keys=True)+"\n"); print(json.dumps(payload,indent=2,sort_keys=True)); return 2 if infrastructure_blocked else 0
 
 if __name__=="__main__": raise SystemExit(main())
