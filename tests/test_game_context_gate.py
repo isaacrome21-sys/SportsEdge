@@ -74,7 +74,7 @@ def quote(market):
 
 
 class GameContextGateTests(unittest.TestCase):
-    def run(self, live_game, markets, *, require_confirmed_lineup=False):
+    def _run_card(self, live_game, markets, *, require_confirmed_lineup=False):
         return run_unified_card(
             games=[] if live_game is None else [live_game],
             feature_rows=[],
@@ -86,35 +86,35 @@ class GameContextGateTests(unittest.TestCase):
 
     def test_missing_probable_pitcher_blocks_every_game_market_before_model(self):
         markets = ["MONEYLINE", "RUN_LINE", "TOTALS", "NRFI", "YRFI"]
-        out = self.run(game(home_pitcher=None), markets)
+        out = self._run_card(game(home_pitcher=None), markets)
         self.assertEqual([x.market for x in out], markets)
         self.assertTrue(all(x.bet_status == "BLOCKED" for x in out))
         self.assertTrue(all(x.model_p is None for x in out))
         self.assertTrue(all(x.reason == "PROBABLE_PITCHER_UNRESOLVED" for x in out))
 
     def test_missing_live_game_context_blocks_before_model(self):
-        out = self.run(None, ["MONEYLINE"])
+        out = self._run_card(None, ["MONEYLINE"])
         self.assertEqual(out[0].bet_status, "BLOCKED")
         self.assertIsNone(out[0].model_p)
         self.assertEqual(out[0].reason, "LIVE_GAME_CONTEXT_MISSING")
 
     def test_incomplete_lineup_blocks_even_when_projected_lineups_are_allowed(self):
-        out = self.run(game(away_rows=rows(100, 8)), ["MONEYLINE"])
+        out = self._run_card(game(away_rows=rows(100, 8)), ["MONEYLINE"])
         self.assertEqual(out[0].bet_status, "BLOCKED")
         self.assertEqual(out[0].reason, "LINEUP_UNRESOLVED")
 
     def test_complete_projected_lineups_pass_context_gate_when_allowed(self):
-        out = self.run(projected_game(), ["MONEYLINE"], require_confirmed_lineup=False)
+        out = self._run_card(projected_game(), ["MONEYLINE"], require_confirmed_lineup=False)
         self.assertEqual(out[0].bet_status, "BLOCKED")
         self.assertEqual(out[0].reason, "GAME_RUNTIME_INPUTS_MISSING")
 
     def test_complete_projected_lineups_block_when_confirmation_is_required(self):
-        out = self.run(projected_game(), ["MONEYLINE"], require_confirmed_lineup=True)
+        out = self._run_card(projected_game(), ["MONEYLINE"], require_confirmed_lineup=True)
         self.assertEqual(out[0].bet_status, "BLOCKED")
         self.assertEqual(out[0].reason, "CONFIRMED_LINEUP_REQUIRED")
 
     def test_resolved_starters_and_lineups_reach_existing_runtime_gate(self):
-        out = self.run(game(), ["MONEYLINE"])
+        out = self._run_card(game(), ["MONEYLINE"])
         self.assertEqual(out[0].bet_status, "BLOCKED")
         self.assertEqual(out[0].reason, "GAME_RUNTIME_INPUTS_MISSING")
 
