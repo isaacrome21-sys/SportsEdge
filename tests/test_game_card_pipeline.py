@@ -41,6 +41,6 @@ class Tests(unittest.TestCase):
         self.assertIn(fresh[0].bet_status,{'PASS','OFFICIAL_BET'}); self.assertIsNotNone(fresh[0].model_p); self.assertNotIn('DEPLOYMENT_BLOCKED',fresh[0].reason)
         stale_quote=quote('MONEYLINE','HOME',None,retrieved_at=now-timedelta(seconds=601))
         stale=run_game_card(feature_rows=rows,quotes=[stale_quote],game_score_artifact=game,nrfi_artifact=nrfi,ingestion_now=now,finalization_now=now)
-        self.assertEqual(stale[0].bet_status,'BLOCKED'); self.assertIsNone(stale[0].model_p); self.assertIn('PRICE_STALE',stale[0].reason)
+        self.assertEqual(stale[0].bet_status,'BLOCKED'); self.assertIsNone(stale[0].model_p); self.assertIn('price is stale',stale[0].reason.lower())
 
 if __name__=='__main__': unittest.main()
