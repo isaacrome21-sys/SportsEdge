@@ -34,8 +34,15 @@ jobs:
           key: sportsedge-mlb-history-v1-${{ runner.os }}-${{ steps.slate.outputs.date }}
           restore-keys: |
             sportsedge-mlb-history-v1-${{ runner.os }}-
+      - name: Restore full-slate pregame archive
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache/sportsedge/pregame-archive
+          key: sportsedge-pregame-v1-${{ runner.os }}-${{ steps.slate.outputs.date }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            sportsedge-pregame-v1-${{ runner.os }}-${{ steps.slate.outputs.date }}-
       - name: Verify automation safety tests
-        run: python -m pytest -q tests/test_auto_runner.py tests/test_odds_api_source.py tests/test_auto_native_odds.py tests/test_mlb_hits_features.py tests/test_mlb_total_bases_features.py tests/test_mlb_history_cache.py tests/test_odds_keyring.py tests/test_game_odds_source.py tests/test_game_market_contract.py tests/test_full_slate_accounting.py
+        run: python -m pytest -q tests/test_auto_runner.py tests/test_odds_api_source.py tests/test_auto_native_odds.py tests/test_mlb_hits_features.py tests/test_mlb_total_bases_features.py tests/test_mlb_history_cache.py tests/test_odds_keyring.py tests/test_game_odds_source.py tests/test_game_market_contract.py tests/test_full_slate_accounting.py tests/test_pregame_archive.py tests/test_game_model_engine.py
       - name: Acquire fresh DraftKings ML RL totals
         env:
           SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
@@ -57,9 +64,18 @@ jobs:
           SPORTSEDGE_PROVIDER_TOKEN: ${{ secrets.SPORTSEDGE_PROVIDER_TOKEN }}
           SPORTSEDGE_HISTORY_CACHE_DIR: .cache/sportsedge/mlb-history
         run: python scripts/run_auto_mlb.py --output artifacts/live_mlb_card.json
+      - name: Update immutable pregame archive
+        if: always()
+        run: python scripts/update_pregame_archive.py
       - name: Build full-slate market accounting
         if: always()
         run: python scripts/build_full_slate_accounting.py
+      - name: Save full-slate pregame archive
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/sportsedge/pregame-archive
+          key: sportsedge-pregame-v1-${{ runner.os }}-${{ steps.slate.outputs.date }}-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Upload automated card evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -69,5 +85,6 @@ jobs:
             artifacts/live_mlb_card.json
             artifacts/live_game_odds.json
             artifacts/full_slate_accounting.json
+            .cache/sportsedge/pregame-archive/${{ steps.slate.outputs.date }}.json
           if-no-files-found: error
           retention-days: 14
