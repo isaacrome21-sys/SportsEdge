@@ -10,6 +10,7 @@ from urllib.request import urlopen
 from zoneinfo import ZoneInfo
 
 from .auto_runner import AutoRunReport, run_auto_mlb
+from .espn_game_odds_source import fetch_espn_draftkings_game_quotes
 from .game_history_live import build_live_game_feature_rows
 from .game_odds_source import fetch_all_mlb_game_quotes
 from .mlb_history_cache import MLBHistoryCachedOpener
@@ -18,7 +19,7 @@ from .mlb_projected_lineups import build_native_projected_lineups
 from .mlb_source import fetch_boxscore, fetch_schedule
 from .mlb_total_bases_features import MLBTBFeatureError, MLBTBHistorySource
 from .odds_api_source import build_participant_index, fetch_mlb_player_prop_quotes
-from .odds_keyring import fetch_with_key_failover
+from .odds_keyring import OddsKeyringError, fetch_with_key_failover
 
 CHICAGO_TZ=ZoneInfo("America/Chicago")
 MEMORY_QUOTES_URL="https://sportsedge.local/native-odds"
@@ -86,8 +87,22 @@ def run_auto_mlb_native_odds(*, odds_api_key:str, odds_api_keys:tuple[str,...]=(
         if not game_runtime_enabled: return _CombinedOdds(tuple(props.quotes),tuple(props.failures))
         games=fetch_all_mlb_game_quotes(api_key=key,schedule=schedule,opener=opener,bookmakers=bookmakers)
         return _CombinedOdds(tuple(props.quotes)+tuple(games.quotes),tuple(props.failures)+tuple(games.failures))
-    keyring=fetch_with_key_failover((odds_api_key,*odds_api_keys),fetch_all); odds=keyring.value
-    key_failures=[{"stage":"ODDS_API_KEY_FAILOVER","key_slot":item.key_slot,"reason":item.reason} for item in keyring.failures]
+
+    key_failures=[]; fallback_failures=[]
+    try:
+        keyring=fetch_with_key_failover((odds_api_key,*odds_api_keys),fetch_all); odds=keyring.value
+        key_failures=[{"stage":"ODDS_API_KEY_FAILOVER","key_slot":item.key_slot,"reason":item.reason} for item in keyring.failures]
+    except OddsKeyringError as exc:
+        if not game_runtime_enabled:
+            raise
+        # Preserve the exhausted-key failure and fall through only to the
+        # credential-free DraftKings full-game source. Player props and
+        # NRFI/YRFI remain unavailable rather than being guessed/substituted.
+        key_failures.append({"stage":"ODDS_API_KEYRING_EXHAUSTED","reason":str(exc)})
+        fallback=fetch_espn_draftkings_game_quotes(slate_date=slate_day,schedule=schedule,retrieved_at=current,opener=opener)
+        fallback_failures=[{"stage":"ESPN_DK_GAME_FALLBACK",**dict(item)} for item in fallback.failures]
+        fallback_failures.insert(0,{"stage":"ESPN_DK_GAME_FALLBACK","reason":"PRIMARY_ODDS_KEYRING_EXHAUSTED_USING_FETCH_TIME_TTL","markets":["MONEYLINE","RUN_LINE","TOTALS"],"ttl_seconds":60})
+        odds=_CombinedOdds(tuple(fallback.quotes),())
     quote_payload=list(odds.quotes)
 
     projection_rows=None; projection_failures=[]
@@ -132,5 +147,5 @@ def run_auto_mlb_native_odds(*, odds_api_key:str, odds_api_keys:tuple[str,...]=(
         if url==MEMORY_FEATURES_URL: return _MemoryResponse(native_features)
         return opener(req,timeout=timeout)
     report=run_auto_mlb(quote_url=MEMORY_QUOTES_URL,feature_url=selected_feature_url,projected_lineups_url=projected_lineups_url,projected_lineup_rows=projection_rows,provider_token=provider_token,now=current,opener=wrapped,registry_path=registry_path,require_confirmed_lineup=require_confirmed_lineup,min_edge=min_edge,kelly_multiplier=kelly_multiplier,game_feature_rows=game_feature_rows,game_score_artifact=game_score_artifact,nrfi_artifact=nrfi_artifact)
-    acquisition_failures=key_failures+[{"stage":"ODDS_API",**dict(item)} for item in odds.failures]+roster_failures+projection_failures+native_feature_failures+game_feature_failures
+    acquisition_failures=key_failures+fallback_failures+[{"stage":"ODDS_API",**dict(item)} for item in odds.failures]+roster_failures+projection_failures+native_feature_failures+game_feature_failures
     return AutoRunReport(report.slate_date_ct,report.generated_at_utc,report.run_status,report.results,tuple(acquisition_failures)+report.source_failures)

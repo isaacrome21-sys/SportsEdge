@@ -56,6 +56,18 @@ def _capture_context(now: datetime) -> tuple[list[dict], list[dict]]:
         return [],[{"stage":"MLB_CONTEXT","reason":f"{type(exc).__name__}: {exc}"}]
 
 
+def _native_provider_notes(report: AutoRunReport) -> list[dict]:
+    """Describe the actual price transport used by the native acquisition path."""
+    fallback=any(x.get("stage")=="ESPN_DK_GAME_FALLBACK" for x in report.source_failures)
+    exhausted=any(x.get("stage")=="ODDS_API_KEYRING_EXHAUSTED" for x in report.source_failures)
+    if fallback:
+        return [
+            {"stage":"QUOTE_PROVIDER","provider":"ODDS_API_NATIVE","status":"EXHAUSTED" if exhausted else "FAILED_OVER"},
+            {"stage":"QUOTE_PROVIDER","provider":"ESPN_WEB_HEADER_DRAFTKINGS","status":"PASS","markets":["MONEYLINE","RUN_LINE","TOTALS"],"freshness_basis":"SPORTSEDGE_HTTP_RETRIEVAL_TIME","ttl_seconds":60},
+        ]
+    return [{"stage":"QUOTE_PROVIDER","provider":"ODDS_API_NATIVE","status":"PASS"}]
+
+
 def main()->int:
     p=argparse.ArgumentParser(); p.add_argument("--output",default="artifacts/live_mlb_card.json"); p.add_argument("--require-confirmed-lineup",action="store_true"); p.add_argument("--min-edge",type=float,default=0.0); p.add_argument("--kelly-multiplier",type=float,default=0.25); args=p.parse_args()
     quotes=os.environ.get("SPORTSEDGE_QUOTES_URL","").strip()
@@ -76,7 +88,7 @@ def main()->int:
             try:
                 if game_score_artifact is None or nrfi_artifact is None: raise AutoRunnerError("GAME_ARTIFACT_CONFIG_MISSING")
                 report=run_auto_mlb_native_odds(odds_api_key=odds_api_keys[0],odds_api_keys=odds_api_keys[1:],feature_url=features or None,bookmakers=odds_books,history_cache_dir=history_cache_dir,game_score_artifact=game_score_artifact,nrfi_artifact=nrfi_artifact,**common)
-                provider_notes.append({"stage":"QUOTE_PROVIDER","provider":"ODDS_API_NATIVE","status":"PASS"})
+                provider_notes.extend(_native_provider_notes(report))
             except Exception as native_exc:
                 provider_notes.append({"stage":"QUOTE_PROVIDER","provider":"ODDS_API_NATIVE","status":"FAILED_OVER","reason":f"{type(native_exc).__name__}: {native_exc}"})
                 if not quotes:
