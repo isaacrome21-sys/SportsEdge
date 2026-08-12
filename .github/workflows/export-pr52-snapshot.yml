@@ -1,0 +1,55 @@
+name: export-pr52-snapshot
+
+on:
+  push:
+    branches: [export-pr52-snapshot-20260811]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 3d3c0e6edcdf79ea666c63755a106e4ec17d2e3e
+          fetch-depth: 1
+      - name: Build snapshot
+        run: |
+          mkdir -p export
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json, zipfile
+          root=Path('.')
+          out=Path('export')
+          files=[]
+          for p in sorted(root.rglob('*')):
+              if not p.is_file():
+                  continue
+              s=p.as_posix()
+              if s.startswith('.git/') or s.startswith('export/'):
+                  continue
+              files.append(p)
+          manifest=[]
+          zpath=out/'SportsEdge_PR52_head_3d3c0e6.zip'
+          with zipfile.ZipFile(zpath,'w',zipfile.ZIP_DEFLATED) as zf:
+              for p in files:
+                  data=p.read_bytes()
+                  zf.writestr(p.as_posix(),data)
+                  manifest.append({'path':p.as_posix(),'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()})
+          (out/'MANIFEST.json').write_text(json.dumps({'source_commit':'3d3c0e6edcdf79ea666c63755a106e4ec17d2e3e','file_count':len(manifest),'files':manifest},indent=2)+'\n')
+          with (out/'SHA256SUMS.txt').open('w') as fh:
+              for row in manifest:
+                  fh.write(f"{row['sha256']}  {row['path']}\n")
+              fh.write(f"{hashlib.sha256(zpath.read_bytes()).hexdigest()}  {zpath.name}\n")
+          print('file_count',len(manifest))
+          print('zip_sha256',hashlib.sha256(zpath.read_bytes()).hexdigest())
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sportsedge-pr52-head-snapshot
+          path: export/
+          if-no-files-found: error
+          retention-days: 14
