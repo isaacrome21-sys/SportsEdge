@@ -1,0 +1,67 @@
+name: build-pitcher-bb-v5
+on:
+  push:
+    branches: [full-model-completion-20260812]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install exact runtime
+        run: python -m pip install --disable-pip-version-check numpy 'scikit-learn==1.9.0' joblib pytest
+      - name: Download frozen BB-v4 source artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p phase6_artifacts phase6_source
+          gh run download 31558928640 -n pitcher-bb-v4-1-source-bounded -D phase6_source
+          cp phase6_source/sportsedge_pitcher_bb_v4.joblib phase6_artifacts/sportsedge_pitcher_bb_v4.joblib
+          echo '67fc9d5c96ab469d888c7e137072d156043eb31fa3576fbe31d97e4436b9e7bc  phase6_artifacts/sportsedge_pitcher_bb_v4.joblib' | sha256sum -c -
+      - name: Verify pre-fit locks and chronology/source tests
+        run: |
+          python -m pytest -q tests/test_bb_cutoff_chronology.py tests/test_source_range.py tests/test_historical_cutoff.py
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          p=Path('audit/BB_V5_PREDECLARED_PROTOCOL_2026-08-12.md')
+          f=Path('audit/BB_V5_FUNCTIONAL_FORM_LOCK_2026-08-12.md')
+          assert p.exists() and f.exists()
+          print('protocol_sha256', hashlib.sha256(p.read_bytes()).hexdigest())
+          print('form_lock_sha256', hashlib.sha256(f.read_bytes()).hexdigest())
+          PY
+      - name: Build BB-v5 candidate
+        id: build
+        continue-on-error: true
+        env:
+          SPORTSEDGE_BB_REBUILD_CACHE: .cache/sportsedge/bb-rebuild-v5
+        run: python scripts/build_pitcher_bb_v5.py
+      - name: Upload BB-v5 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitcher-bb-v5-development
+          path: |
+            artifacts/pitcher_bb_v5_validation.json
+            artifacts/sportsedge_pitcher_bb_v5.joblib
+            audit/BB_V5_PREDECLARED_PROTOCOL_2026-08-12.md
+            audit/BB_V5_FUNCTIONAL_FORM_LOCK_2026-08-12.md
+          if-no-files-found: error
+      - name: Enforce development verdict
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('artifacts/pitcher_bb_v5_validation.json')
+          assert p.exists(), 'BB_V5_VALIDATION_MISSING'
+          d=json.loads(p.read_text())
+          print(json.dumps({k:d.get(k) for k in ('development_pass','deployment_eligible','deployment_block_reason','rows_2025','rows_2026_through_aug10')}, indent=2))
+          assert d['development_pass'] is True, 'BB_V5_DEVELOPMENT_GATE_FAIL'
+          assert d['deployment_eligible'] is False
+          assert d['deployment_block_reason']=='FORWARD_SHADOW_GATE_PENDING'
+          PY
