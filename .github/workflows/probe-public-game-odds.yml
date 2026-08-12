@@ -12,27 +12,33 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Probe ESPN scoreboard odds shape
+      - name: Probe MLB-native context shape
         run: |
           python - <<'PY'
           import json, urllib.request, datetime
-          d=datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-5))).strftime('%Y%m%d')
-          u=f'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates={d}&limit=100'
-          req=urllib.request.Request(u,headers={'User-Agent':'Mozilla/5.0','Accept':'application/json'})
-          with urllib.request.urlopen(req,timeout=20) as r: data=json.load(r)
-          events=data.get('events') or []
-          summary={'date':d,'events':len(events),'games':[]}
-          for e in events:
-            comp=(e.get('competitions') or [{}])[0]
-            summary['games'].append({
-              'id':e.get('id'),'name':e.get('name'),'date':e.get('date'),
-              'odds':comp.get('odds'),
-              'status':(e.get('status') or {}).get('type',{}).get('name')
+          d=datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-5))).date().isoformat()
+          def get(u):
+            req=urllib.request.Request(u,headers={'User-Agent':'SportsEdge/1.0','Accept':'application/json'})
+            with urllib.request.urlopen(req,timeout=20) as r: return json.load(r)
+          sched=get(f'https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={d}&hydrate=probablePitcher,team,venue')
+          games=[g for b in sched.get('dates',[]) for g in b.get('games',[])]
+          out={'date':d,'scheduled':len(games),'games':[],'umpire_jobs':None}
+          try:
+            jobs=get(f'https://statsapi.mlb.com/api/v1/jobs/umpires?date={d}&sportId=1')
+            out['umpire_jobs']=jobs
+          except Exception as e: out['umpire_jobs']={'error':f'{type(e).__name__}: {e}'}
+          for g in games[:5]:
+            pk=g['gamePk']; feed=get(f'https://statsapi.mlb.com/api/v1.1/game/{pk}/feed/live')
+            gd=feed.get('gameData') or {}; live=feed.get('liveData') or {}; box=(live.get('boxscore') or {})
+            out['games'].append({
+              'gamePk':pk,'status':gd.get('status'),'weather':gd.get('weather'),
+              'venue':gd.get('venue'),'officials':box.get('officials'),
+              'probablePitchers':gd.get('probablePitchers'),
             })
-          print(json.dumps(summary,indent=2))
-          open('public_odds_probe.json','w').write(json.dumps(summary,indent=2))
+          print(json.dumps(out,indent=2))
+          open('mlb_context_probe.json','w').write(json.dumps(out,indent=2))
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: public-game-odds-probe
-          path: public_odds_probe.json
+          name: mlb-context-probe
+          path: mlb_context_probe.json
