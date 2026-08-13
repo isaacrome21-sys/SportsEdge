@@ -1,0 +1,92 @@
+name: props-v6-forward-shadow
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/15 * * * *'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/props-v6-forward-shadow.yml'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: props-v6-forward-shadow
+  cancel-in-progress: true
+
+jobs:
+  nrfi-v6-shadow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      SPORTSEDGE_NRFI_V6_SHA256: 0bdf71e272e406611e241e2427904f3c8e3a9405700f440bedacf0b74ed1580e
+      SPORTSEDGE_NRFI_V6_ARTIFACT: artifacts/nrfi-v6-shadow/sportsedge_nrfi_v6_shadow.joblib
+      SPORTSEDGE_STATCAST_V5_OUT: artifacts/statcast-v5-game
+      SPORTSEDGE_PROJECTED_LINEUPS_URL: ${{ secrets.SPORTSEDGE_PROJECTED_LINEUPS_URL }}
+      SPORTSEDGE_PROVIDER_TOKEN: ${{ secrets.SPORTSEDGE_PROVIDER_TOKEN }}
+    steps:
+      - name: Checkout frozen V6 research code
+        uses: actions/checkout@v4
+        with:
+          ref: props-v6-forward-shadow-20260813
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime
+        run: python -m pip install --disable-pip-version-check numpy pandas scikit-learn joblib
+      - name: Download exact frozen NRFI V6 candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p artifacts/nrfi-v6-shadow nrfi_candidate
+          gh run download 31688818222 -n nrfi-v6-shadow-44f4180e34110f1f9e1bfeb9bb69fdca74faa45b -D nrfi_candidate
+          cp nrfi_candidate/artifacts/nrfi-v6-shadow/sportsedge_nrfi_v6_shadow.joblib artifacts/nrfi-v6-shadow/
+          echo "$SPORTSEDGE_NRFI_V6_SHA256  artifacts/nrfi-v6-shadow/sportsedge_nrfi_v6_shadow.joblib" | sha256sum -c -
+      - name: Download exact live-attested Statcast state and transformer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p artifacts/statcast-v5-game promotion
+          gh run download 31656118369 -n statcast-v5-game-evidence-3b67fcfc30c2ba4c1da958858761711b57cd4780 -D promotion
+          cp promotion/statcast-v5-game/* artifacts/statcast-v5-game/
+          echo 'bf61487279ac9a506318e9dfa078a866450dd4e363b1d06356e58852954133b2  artifacts/statcast-v5-game/sportsedge_contact_transformer_v1.joblib' | sha256sum -c -
+          test -s artifacts/statcast-v5-game/sportsedge_statcast_state_end_2025.joblib
+          test -s artifacts/statcast-v5-game/base_state_manifest.json
+      - name: Restore prior-only source caches
+        uses: actions/cache@v4
+        with:
+          path: .cache/sportsedge/nrfi-v6-shadow
+          key: nrfi-v6-shadow-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            nrfi-v6-shadow-${{ runner.os }}-
+      - name: Capture immutable pregame NRFI/YRFI V6 predictions
+        run: python scripts/capture_nrfi_v6_shadow.py
+      - name: Verify outcomeless ledger
+        if: always()
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          p=Path('artifacts/forward-shadow/nrfi_v6_manifest.json')
+          if not p.exists():
+              raise SystemExit('NRFI_V6_SHADOW_MANIFEST_MISSING')
+          d=json.loads(p.read_text())
+          assert d['outcomes_present'] is False
+          assert d['prediction_count'] > 0
+          print('NRFI_V6_SHADOW_LEDGER_PASS', d['prediction_count'], d['ledger_file_sha256'])
+          PY
+      - name: Upload CI-bound forward evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nrfi-v6-forward-shadow-${{ github.run_id }}
+          path: |
+            artifacts/forward-shadow/nrfi_v6_predictions.json
+            artifacts/forward-shadow/nrfi_v6_manifest.json
+            artifacts/forward-shadow/nrfi_v6_status.json
+          if-no-files-found: warn
+          retention-days: 90
