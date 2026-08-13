@@ -66,6 +66,13 @@ class AttestationTests(unittest.TestCase):
                 self.assertFalse(out["eligible_for_promotion"])
                 self.assertFalse(out["checks"]["ci_commit_sha"])
 
+    def test_legacy_ci_commit_field_cannot_substitute_for_canonical_ci_commit_sha(self):
+        candidate = good_hits()
+        candidate["ci_commit"] = candidate.pop("ci_commit_sha")
+        out = validate_attestation(candidate, expected_ci_commit_sha=CI_SHA)
+        self.assertFalse(out["eligible_for_promotion"])
+        self.assertFalse(out["checks"]["ci_commit_sha"])
+
     def test_fixture_feature_engine_and_test_identity_are_exact(self):
         mutations = {
             "fixture_sha256": "0" * 64,
