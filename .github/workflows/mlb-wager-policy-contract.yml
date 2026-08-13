@@ -45,7 +45,7 @@ jobs:
           )
           bad=0
           for f in "${files[@]}"; do
-            if grep -nE 'min_edge([^\n]*)(default=0\.0|= 0\.0|=0\.0)' "$f"; then
+            if grep -nE 'min_edge([^\n]*)(default=0\.0([^0-9]|$)|= 0\.0([^0-9]|$)|=0\.0([^0-9]|$))' "$f"; then
               echo "ZERO_EDGE_DEFAULT[$f]"
               bad=1
             fi
