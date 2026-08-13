@@ -36,8 +36,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install runtime
-        run: python -m pip install --disable-pip-version-check numpy pandas scikit-learn joblib
+      - name: Install pinned runtime
+        run: python -m pip install --disable-pip-version-check numpy==2.5.2 pandas==3.0.5 scikit-learn==1.9.0 joblib==1.5.3
       - name: Download exact frozen NRFI V6 candidate
         env:
           GH_TOKEN: ${{ github.token }}
@@ -65,21 +65,18 @@ jobs:
             nrfi-v6-shadow-${{ runner.os }}-
       - name: Capture immutable pregame NRFI/YRFI V6 predictions
         run: python scripts/capture_nrfi_v6_shadow.py
-      - name: Verify outcomeless ledger
+      - name: Verify outcomeless NRFI ledger
         if: always()
         run: |
           python - <<'PY'
           from pathlib import Path
           import json
           p=Path('artifacts/forward-shadow/nrfi_v6_manifest.json')
-          if not p.exists():
-              raise SystemExit('NRFI_V6_SHADOW_MANIFEST_MISSING')
-          d=json.loads(p.read_text())
-          assert d['outcomes_present'] is False
-          assert d['prediction_count'] > 0
+          if not p.exists(): raise SystemExit('NRFI_V6_SHADOW_MANIFEST_MISSING')
+          d=json.loads(p.read_text()); assert d['outcomes_present'] is False; assert d['prediction_count'] > 0
           print('NRFI_V6_SHADOW_LEDGER_PASS', d['prediction_count'], d['ledger_file_sha256'])
           PY
-      - name: Upload CI-bound forward evidence
+      - name: Upload CI-bound NRFI forward evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -88,5 +85,60 @@ jobs:
             artifacts/forward-shadow/nrfi_v6_predictions.json
             artifacts/forward-shadow/nrfi_v6_manifest.json
             artifacts/forward-shadow/nrfi_v6_status.json
+          if-no-files-found: warn
+          retention-days: 90
+
+  pitcher-bb-v6-shadow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      SPORTSEDGE_BB_V6_OUT: artifacts/bb-v6-shadow
+      SPORTSEDGE_BB_V6_SHA256: fa408d9a086f409e073ce811c93b1d47454a43d93cc08143038def793792a9cf
+      SPORTSEDGE_BB_V6_STATE_SHA256: 4867110378bce127f316005a7583eb8d213b213dc98a1145d1d9e2f5d0a6215f
+    steps:
+      - name: Checkout frozen V6 research code
+        uses: actions/checkout@v4
+        with:
+          ref: props-v6-forward-shadow-20260813
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned runtime
+        run: python -m pip install --disable-pip-version-check numpy==2.5.2 scikit-learn==1.9.0 joblib==1.5.3
+      - name: Download exact frozen BB V6 candidate and base state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/bb-v6-shadow bb_candidate
+          name=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/31689194437/artifacts" --jq '.artifacts[] | select(.name | startswith("pitcher-bb-v6-shadow-")) | .name' | head -1)
+          test -n "$name"
+          gh run download 31689194437 -n "$name" -D bb_candidate
+          cp bb_candidate/artifacts/bb-v6-shadow/* artifacts/bb-v6-shadow/
+          echo "$SPORTSEDGE_BB_V6_SHA256  artifacts/bb-v6-shadow/sportsedge_pitcher_bb_v6_shadow.joblib" | sha256sum -c -
+          echo "$SPORTSEDGE_BB_V6_STATE_SHA256  artifacts/bb-v6-shadow/bb_v6_base_state.joblib" | sha256sum -c -
+      - name: Capture immutable pregame Pitcher BB V6 predictions
+        run: python scripts/capture_bb_v6_shadow.py
+      - name: Verify outcomeless BB ledger
+        if: always()
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          p=Path('artifacts/forward-shadow/bb_v6_manifest.json')
+          if not p.exists(): raise SystemExit('BB_V6_SHADOW_MANIFEST_MISSING')
+          d=json.loads(p.read_text()); assert d['outcomes_present'] is False; assert d['prediction_count'] > 0
+          print('BB_V6_SHADOW_LEDGER_PASS', d['prediction_count'], d['ledger_file_sha256'])
+          PY
+      - name: Upload CI-bound BB forward evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitcher-bb-v6-forward-shadow-${{ github.run_id }}
+          path: |
+            artifacts/forward-shadow/bb_v6_predictions.json
+            artifacts/forward-shadow/bb_v6_manifest.json
+            artifacts/forward-shadow/bb_v6_status.json
           if-no-files-found: warn
           retention-days: 90
