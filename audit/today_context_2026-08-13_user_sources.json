@@ -1,0 +1,114 @@
+{
+  "schema_version": "sportsedge_today_context_snapshot_v1",
+  "slate_date": "2026-08-13",
+  "purpose": "auditable source snapshot only; does not alter frozen Model_P feature contract",
+  "sources": {
+    "lineups": "user-uploaded MLB Starting Lineups page captured 2026-08-13 11:32 AM",
+    "umpires": "user-uploaded RefMetrics screenshots captured 2026-08-13 11:34 AM"
+  },
+  "games": [
+    {
+      "away": "Guardians",
+      "home": "Tigers",
+      "away_starter": "Parker Messick",
+      "home_starter": "Keider Montero",
+      "lineup_status": "CONFIRMED_BOTH",
+      "away_lineup": ["S Kwan","C DeLauter","J Ramirez","N Lowe","J Adell","T Bazzana","A Genao","A Hedges","B Rocchio"],
+      "home_lineup": ["G Torres","D Dingler","K McGonigle","E Valencia","S Torkelson","H Lee","M Clark","J Baez","B Malgeri"],
+      "away_catcher": "A Hedges",
+      "home_catcher": "D Dingler",
+      "refmetrics_hp": "James Hoye",
+      "umpire_status": "REFMETRICS_CROSSCHECK_PENDING_MLB_CONFIRMATION"
+    },
+    {
+      "away": "Reds",
+      "home": "White Sox",
+      "away_starter": "Andrew Abbott",
+      "home_starter": "Davis Martin",
+      "lineup_status": "CONFIRMED_BOTH",
+      "away_lineup": ["E De La Cruz","S Stewart","J Bleday","T Stephenson","E Suarez","D Myers","H Rodriguez","M McLain","K Hayes"],
+      "home_lineup": ["C Meidroth","R Grichuk","M Vargas","B Montgomery","B Doyle","C Montgomery","E Quero","S Antonacci","L Acuna"],
+      "away_catcher": "T Stephenson",
+      "home_catcher": "E Quero",
+      "refmetrics_hp": "Alan Porter",
+      "umpire_status": "REFMETRICS_CROSSCHECK_PENDING_MLB_CONFIRMATION"
+    },
+    {
+      "away": "Pirates",
+      "home": "Marlins",
+      "away_starter": "Braxton Ashcraft",
+      "home_starter": "Tyler Phillips",
+      "lineup_status": "CONFIRMED_BOTH",
+      "away_lineup": ["S Horwitz","B Lowe","B Reynolds","N Gonzales","E Valdez","J Gonzalez","J Mangum","J Triolo","R Flores Jr."],
+      "home_lineup": ["J Marsee","X Edwards","O Lopez","G Conine","A Ramirez","L Jimenez","O Caissie","J Sanoja","E Ruiz"],
+      "away_catcher": "R Flores Jr.",
+      "home_catcher": "A Ramirez",
+      "refmetrics_hp": "Chris Guccione",
+      "umpire_status": "CONFLICT_REQUIRES_MLB_CONFIRMATION"
+    },
+    {
+      "away": "Mariners",
+      "home": "Yankees",
+      "away_starter": "Logan Gilbert",
+      "home_starter": "Max Fried",
+      "lineup_status": "CONFIRMED_BOTH",
+      "away_lineup": ["R Arozarena","J Rodriguez","D Canzone","C Raleigh","J Naylor","B Donovan","W Wilson","J Pereda","L Rivas"],
+      "home_lineup": ["T Grisham","B Rice","S Jones","L Garcia Jr.","G Lombard Jr.","J Chisholm Jr.","J Caballero","R McMahon","A Sanchez"],
+      "away_catcher": "J Pereda",
+      "home_catcher": "A Sanchez",
+      "refmetrics_hp": "Rob Drake",
+      "umpire_status": "REFMETRICS_CROSSCHECK_PENDING_MLB_CONFIRMATION"
+    },
+    {
+      "away": "Red Sox",
+      "home": "Blue Jays",
+      "away_starter": "Payton Tolle",
+      "home_starter": "Max Scherzer",
+      "lineup_status": "CONFIRMED_BOTH",
+      "away_lineup": ["N Sogard","C Rafaela","W Abreu","W Contreras","M Yoshida","C Durbin","J Duran","A Monasterio","C Wong"],
+      "home_lineup": ["C McAdoo","E Clement","V Guerrero Jr.","G Springer","K Okamoto","A Gimenez","B Valenzuela","M Straw","N Lukes"],
+      "away_catcher": "C Wong",
+      "home_catcher": "B Valenzuela",
+      "refmetrics_hp": "Chris Guccione",
+      "umpire_status": "CONFLICT_REQUIRES_MLB_CONFIRMATION"
+    },
+    {
+      "away": "Cubs",
+      "home": "Nationals",
+      "away_starter": "Kevin Gausman",
+      "home_starter": "Cade Cavalli",
+      "lineup_status": "TBD_BOTH",
+      "refmetrics_hp": null,
+      "umpire_status": "AWAITING_ASSIGNMENT"
+    },
+    {
+      "away": "Phillies",
+      "home": "Twins",
+      "away_starter": "Aaron Nola",
+      "home_starter": "Taj Bradley",
+      "lineup_status": "TBD_BOTH"
+    },
+    {
+      "away": "Rangers",
+      "home": "Angels",
+      "away_starter": "Jacob deGrom",
+      "home_starter": "Walbert Urena",
+      "lineup_status": "TBD_BOTH"
+    },
+    {
+      "away": "Brewers",
+      "home": "Dodgers",
+      "away_starter": "Shane Drohan",
+      "home_starter": "Roki Sasaki",
+      "lineup_status": "TBD_BOTH"
+    }
+  ],
+  "policy": {
+    "confirmed_lineups": "use when identical MLB live-feed identity resolves; otherwise MLB live feed remains authoritative",
+    "tbd_lineups": "retain SportsEdge MLB-prior-confirmed projection fallback until official order posts",
+    "catchers": "source context captured; not Model_P-driving in V5",
+    "umpires": "RefMetrics cross-check only until MLB official identity confirms; conflicting assignment is never guessed",
+    "weather": "not supplied by attached files; continue current live-source handling",
+    "model_p_contract": "unchanged GAME_SCORE_V5_STATCAST"
+  }
+}
