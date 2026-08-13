@@ -1,0 +1,131 @@
+name: full-context-integration
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [full-context-integration-20260813]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: full-context-integration
+  cancel-in-progress: true
+
+jobs:
+  full-context:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      SPORTSEDGE_STATCAST_V5_OUT: artifacts/statcast-v5-game
+      SPORTSEDGE_V5_LIVE_SIMS: '250000'
+      SPORTSEDGE_EXPECTED_V5_GAME_SHA256: d467b1221898fdb84562ea2b72a06287bfae3e58603e3b15a28fba40c9cc668e
+      SPORTSEDGE_EXPECTED_V5_TRANSFORMER_SHA256: bf61487279ac9a506318e9dfa078a866450dd4e363b1d06356e58852954133b2
+      SPORTSEDGE_PROJECTED_LINEUPS_URL: ${{ secrets.SPORTSEDGE_PROJECTED_LINEUPS_URL }}
+      SPORTSEDGE_PROVIDER_TOKEN: ${{ secrets.SPORTSEDGE_PROVIDER_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned MLB runtime
+        run: python -m pip install --disable-pip-version-check -r requirements-runtime.txt
+      - name: Verify runtime fingerprint
+        run: |
+          python - <<'PY'
+          from importlib.metadata import version
+          expected={'numpy':'2.5.2','pandas':'3.0.5','scikit-learn':'1.9.0','joblib':'1.5.3','fungo':'2.0.0'}
+          actual={k:version(k) for k in expected}
+          assert actual==expected,(actual,expected)
+          print(actual)
+          PY
+      - name: Compile integration modules
+        run: python -m py_compile sportsedge/catcher_context.py sportsedge/mlb_context.py sportsedge/mlb_lineup_resolver.py sportsedge/pregame_context.py scripts/enrich_v5_pregame_context.py scripts/finalize_statcast_v5_game_card.py
+      - name: Run existing automation regression suite
+        run: python -m unittest discover -s tests -v
+      - name: Resolve exact deployed promotion run
+        id: deployment
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          d=json.load(open('config/statcast_v5_deployments.json'))
+          for m in ('MONEYLINE','RUN_LINE','TOTALS'):
+              r=d['markets'][m]
+              assert r['eligible'] is True and r['stage']=='LIVE_ATTESTED'
+          run=d.get('promotion_run_id')
+          assert isinstance(run,int) and run>0
+          print('run_id='+str(run))
+          PY
+      - name: Download and verify exact frozen V5 evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ steps.deployment.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/statcast-v5-game artifacts/promotion
+          name=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts" --jq '.artifacts[] | select(.name | startswith("statcast-v5-game-evidence-")) | .name' | head -1)
+          test -n "$name"
+          gh run download "$RUN_ID" -n "$name" -D artifacts/promotion
+          cp artifacts/promotion/statcast-v5-game/* artifacts/statcast-v5-game/
+          echo "$SPORTSEDGE_EXPECTED_V5_GAME_SHA256  artifacts/statcast-v5-game/sportsedge_game_score_v5_statcast.joblib" | sha256sum -c -
+          echo "$SPORTSEDGE_EXPECTED_V5_TRANSFORMER_SHA256  artifacts/statcast-v5-game/sportsedge_contact_transformer_v1.joblib" | sha256sum -c -
+      - name: Restore prior-only live caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/sportsedge/statcast-v5-live
+            .cache/sportsedge/mlb-history/game-v5
+          key: full-context-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            v5-production-live-${{ runner.os }}-
+            full-context-${{ runner.os }}-
+      - name: Run frozen V5 250k live scorer
+        run: python scripts/attest_live_statcast_v5_game.py
+      - name: Enrich with full lineup weather umpire and catcher context
+        run: python scripts/enrich_v5_pregame_context.py
+      - name: Verify context contract and exact scored Top-3 parity
+        run: |
+          python - <<'PY'
+          import json
+          a=json.load(open('artifacts/live_statcast_v5_game_attestation.json'))
+          assert a['context_schema_version']=='sportsedge_full_pregame_context_v1'
+          c=a['context_model_p_consumption']
+          assert c['statcast'] is True and c['lineup_identity'] is True
+          assert c['weather'] is False and c['plate_umpire'] is False and c['catcher'] is False
+          scored=[g for g in a['games'] if g.get('status')=='SCORED_V5_ATTESTATION']
+          assert scored
+          for g in scored:
+              assert len(g['away_lineup_1_9'])==9 and len(set(g['away_lineup_1_9']))==9
+              assert len(g['home_lineup_1_9'])==9 and len(set(g['home_lineup_1_9']))==9
+              assert tuple(g['away_lineup_1_9'][:3])==tuple(g['away_top3'])
+              assert tuple(g['home_lineup_1_9'][:3])==tuple(g['home_top3'])
+              ctx=g.get('pregame_context') or {}
+              assert 'weather_status' in ctx and 'plate_umpire_status' in ctx and 'catcher_status' in ctx
+          print({'scored':len(scored),'context_ok':True})
+          PY
+      - name: Finalize Truth Gate risk guard and eight-market accounting
+        run: python scripts/finalize_statcast_v5_game_card.py
+      - name: Verify whole-model accounting
+        run: |
+          python - <<'PY'
+          import json
+          c=json.load(open('artifacts/live_statcast_v5_full_model_card.json'))
+          s=c['required_market_status']
+          assert s['complete_accounting'] is True
+          assert set(s['markets'])=={'MONEYLINE','RUN_LINE','TOTALS','NRFI','YRFI','HITS','TOTAL_BASES','PITCHER_BB'}
+          assert c['n_sims']==250000
+          print({'official':c['official_bets_count'],'markets':s['markets'],'context':c['context_model_p_consumption']})
+          PY
+      - name: Upload end-to-end evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-context-integration-${{ github.run_id }}
+          path: |
+            artifacts/live_statcast_v5_game_attestation.json
+            artifacts/live_statcast_v5_full_context.json
+            artifacts/live_statcast_v5_full_model_card.json
+          if-no-files-found: warn
+          retention-days: 30
