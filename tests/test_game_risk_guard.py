@@ -15,8 +15,8 @@ def row(*, market, selection, odds, edge, ev, p=.55, kelly=.03, game='1', status
     }
 
 
-def by_market(rows):
-    return {r['market']:r for r in rows}
+def by_identity(rows):
+    return {(r['market'], r['selection']):r for r in rows}
 
 
 def test_heavy_dog_moneyline_and_linked_runline_are_blocked():
@@ -25,11 +25,13 @@ def test_heavy_dog_moneyline_and_linked_runline_are_blocked():
         row(market='RUN_LINE',selection='Kansas City Royals',odds=-111,edge=.0668,ev=.1270,p=.5929),
         row(market='MONEYLINE',selection='Los Angeles Dodgers',odds=-217,edge=-.10,ev=-.15,p=.58,status='PASS'),
     ])
-    m=by_market(rows)
-    assert m['MONEYLINE']['bet_status']=='PASS'
-    assert m['MONEYLINE']['risk_gate_reason']=='HEAVY_DOG_SIDE_UNVALIDATED'
-    assert m['RUN_LINE']['bet_status']=='PASS'
-    assert m['RUN_LINE']['risk_gate_reason']=='HEAVY_DOG_SIDE_UNVALIDATED'
+    m=by_identity(rows)
+    kc_ml=m[('MONEYLINE','Kansas City Royals')]
+    kc_rl=m[('RUN_LINE','Kansas City Royals')]
+    assert kc_ml['bet_status']=='PASS'
+    assert kc_ml['risk_gate_reason']=='HEAVY_DOG_SIDE_UNVALIDATED'
+    assert kc_rl['bet_status']=='PASS'
+    assert kc_rl['risk_gate_reason']=='HEAVY_DOG_SIDE_UNVALIDATED'
 
 
 def test_moderate_dog_requires_real_buffer_and_caps_kelly():
@@ -63,11 +65,11 @@ def test_correlated_moderate_dog_side_exposure_prefers_runline_only():
         row(market='MONEYLINE',selection='Dog',odds=145,edge=.060,ev=.15,p=.47),
         row(market='RUN_LINE',selection='Dog',odds=-125,edge=.055,ev=.11,p=.61),
     ])
-    m=by_market(rows)
-    assert m['MONEYLINE']['bet_status']=='PASS'
-    assert m['MONEYLINE']['risk_gate_reason']=='CORRELATED_SIDE_EXPOSURE_SUPPRESSED'
-    assert m['RUN_LINE']['bet_status']=='OFFICIAL_BET'
-    assert 'GAME_SIDE_EXPOSURE_SELECTED' in m['RUN_LINE']['risk_gate_reason']
+    m=by_identity(rows)
+    assert m[('MONEYLINE','Dog')]['bet_status']=='PASS'
+    assert m[('MONEYLINE','Dog')]['risk_gate_reason']=='CORRELATED_SIDE_EXPOSURE_SUPPRESSED'
+    assert m[('RUN_LINE','Dog')]['bet_status']=='OFFICIAL_BET'
+    assert 'GAME_SIDE_EXPOSURE_SELECTED' in m[('RUN_LINE','Dog')]['risk_gate_reason']
 
 
 def test_favorite_side_exposure_prefers_moneyline_only():
@@ -75,10 +77,10 @@ def test_favorite_side_exposure_prefers_moneyline_only():
         row(market='MONEYLINE',selection='Favorite',odds=-145,edge=.045,ev=.07,p=.63),
         row(market='RUN_LINE',selection='Favorite',odds=135,edge=.050,ev=.12,p=.48),
     ])
-    m=by_market(rows)
-    assert m['MONEYLINE']['bet_status']=='OFFICIAL_BET'
-    assert m['RUN_LINE']['bet_status']=='PASS'
-    assert m['RUN_LINE']['risk_gate_reason']=='CORRELATED_SIDE_EXPOSURE_SUPPRESSED'
+    m=by_identity(rows)
+    assert m[('MONEYLINE','Favorite')]['bet_status']=='OFFICIAL_BET'
+    assert m[('RUN_LINE','Favorite')]['bet_status']=='PASS'
+    assert m[('RUN_LINE','Favorite')]['risk_gate_reason']=='CORRELATED_SIDE_EXPOSURE_SUPPRESSED'
 
 
 def test_runline_without_underlying_moneyline_fails_closed():
