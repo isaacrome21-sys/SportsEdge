@@ -108,7 +108,10 @@ def evaluate(*, prediction_rows: Iterable[Mapping[str, Any]], outcomes: Mapping[
     v5 = [float(p["v5_yrfi_p"]) for p in observed]
     ys = [int(outcomes[p["game_id"]]) for p in observed]
     n = len(observed)
-    full_days = max(0, (as_of_date - FORWARD_START).days)
+    # A "full calendar day after 2026-08-13" is a date strictly between the
+    # forward-start date and as_of_date. Thus Aug 14-27 are the first 14 full
+    # completed days, and Aug 28 is the earliest date that can satisfy the gate.
+    full_days = max(0, (as_of_date - FORWARD_START).days - 1)
     coverage_den = int(source_available_games if source_available_games is not None else len({p["game_id"] for p in pairs}))
     coverage = (n / coverage_den) if coverage_den > 0 else 0.0
 
