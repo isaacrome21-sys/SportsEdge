@@ -6,7 +6,11 @@ on:
       - full-model-reconcile-20260813
     paths:
       - sportsedge/mlb_portfolio_guard.py
+      - sportsedge/mlb_decision_settlement.py
+      - sportsedge/ml_dog_calibration.py
       - tests/test_mlb_portfolio_guard.py
+      - tests/test_mlb_decision_settlement.py
+      - tests/test_ml_dog_calibration.py
       - audit/ML_V5_DOG_FAVORITE_CALIBRATION_PREDECLARATION_2026-08-13.md
       - .github/workflows/mlb-portfolio-guard-ci.yml
   workflow_dispatch:
@@ -15,7 +19,7 @@ permissions:
   contents: read
 
 jobs:
-  test-portfolio-guard:
+  test-ml-calibration-safety:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -25,7 +29,14 @@ jobs:
           python-version: '3.11'
       - name: Install test runtime
         run: python -m pip install --disable-pip-version-check pytest
-      - name: Compile guard
-        run: python -m py_compile sportsedge/mlb_portfolio_guard.py
-      - name: Run portfolio guard regression tests
-        run: PYTHONPATH=. python -m pytest -q tests/test_mlb_portfolio_guard.py
+      - name: Compile modules
+        run: |
+          python -m py_compile sportsedge/mlb_portfolio_guard.py
+          python -m py_compile sportsedge/mlb_decision_settlement.py
+          python -m py_compile sportsedge/ml_dog_calibration.py
+      - name: Run calibration and concentration regression tests
+        run: |
+          PYTHONPATH=. python -m pytest -q \
+            tests/test_mlb_portfolio_guard.py \
+            tests/test_mlb_decision_settlement.py \
+            tests/test_ml_dog_calibration.py
