@@ -42,6 +42,8 @@ jobs:
       SPORTSEDGE_STATCAST_V5_CACHE: .cache/sportsedge/statcast-v5-split
       SPORTSEDGE_STATCAST_V5_OUT: artifacts/statcast-v5-game
       SPORTSEDGE_V5_LIVE_SIMS: '250000'
+      SPORTSEDGE_EXPECTED_V5_GAME_SHA256: d467b1221898fdb84562ea2b72a06287bfae3e58603e3b15a28fba40c9cc668e
+      SPORTSEDGE_EXPECTED_V5_TRANSFORMER_SHA256: bf614872049a5f8367dca42fefef7755a5d885094c24b86b403fc2ad54133b2
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -83,7 +85,7 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          import hashlib,json
+          import hashlib,json,os
           root=Path('artifacts/statcast-v5-game')
           mp=root/'manifest.json'; vp=root/'validation.json'
           if not mp.is_file() or not vp.is_file():
@@ -96,12 +98,18 @@ jobs:
               if got != row['sha256']: raise SystemExit('MANIFEST_SHA_MISMATCH:'+str(p))
               print('VERIFIED',p,row['bytes'],got)
           v=json.loads(vp.read_text())
+          expected_game=os.environ['SPORTSEDGE_EXPECTED_V5_GAME_SHA256']
+          expected_transformer=os.environ['SPORTSEDGE_EXPECTED_V5_TRANSFORMER_SHA256']
+          if v.get('game_artifact_sha256') != expected_game:
+              raise SystemExit('STATCAST_V5_GAME_NOT_EXACT_FROZEN_ARTIFACT:'+str(v.get('game_artifact_sha256')))
+          if v.get('contact_transformer_sha256') != expected_transformer:
+              raise SystemExit('STATCAST_V5_TRANSFORMER_NOT_EXACT_FROZEN_ARTIFACT:'+str(v.get('contact_transformer_sha256')))
           required=('MONEYLINE','RUN_LINE','TOTALS')
           failed=[m for m in required if v.get('passes',{}).get(m) is not True]
           if failed: raise SystemExit('STATCAST_V5_GAME_HOLDOUT_FAILED:'+','.join(failed))
           if int(v.get('valid_2025_games',0)) < 1000: raise SystemExit('STATCAST_V5_GAME_HOLDOUT_SAMPLE_TOO_SMALL')
           if not v.get('base_state_end_2025_sha256'): raise SystemExit('STATCAST_V5_BASE_STATE_HASH_MISSING')
-          print('STATCAST_V5_GAME_HOLDOUT_PASS')
+          print('STATCAST_V5_GAME_EXACT_FROZEN_ARTIFACT_PASS')
           print('NRFI_STATE',v.get('passes',{}).get('NRFI'))
           print('YRFI_STATE',v.get('passes',{}).get('YRFI'))
           PY
@@ -110,11 +118,13 @@ jobs:
       - name: Verify live attestation is bound to exact rebuilt artifact
         run: |
           python - <<'PY'
-          import hashlib,json
+          import hashlib,json,os
           from pathlib import Path
           a=json.loads(Path('artifacts/live_statcast_v5_game_attestation.json').read_text())
           g=Path('artifacts/statcast-v5-game/sportsedge_game_score_v5_statcast.joblib')
-          assert hashlib.sha256(g.read_bytes()).hexdigest()==a['game_artifact_sha256'], 'LIVE_GAME_ARTIFACT_SHA_MISMATCH'
+          got=hashlib.sha256(g.read_bytes()).hexdigest()
+          assert got==os.environ['SPORTSEDGE_EXPECTED_V5_GAME_SHA256'], 'LIVE_NOT_FROZEN_GAME_ARTIFACT'
+          assert got==a['game_artifact_sha256'], 'LIVE_GAME_ARTIFACT_SHA_MISMATCH'
           assert a['model_p_sportsbook_independent'] is True, 'MODEL_P_INDEPENDENCE_NOT_ATTESTED'
           assert a['price_source']=='ESPN_WEB_HEADER_DRAFTKINGS', 'DK_PRICE_SOURCE_NOT_ATTESTED'
           assert int(a['n_sims'])==250000, 'MONTE_CARLO_PATH_COUNT_MISMATCH'
