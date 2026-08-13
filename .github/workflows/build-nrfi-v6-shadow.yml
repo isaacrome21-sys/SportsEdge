@@ -1,0 +1,71 @@
+name: build-nrfi-v6-shadow
+
+on:
+  push:
+    branches: [props-v6-forward-shadow-20260813]
+    paths:
+      - 'audit/NRFI_V6_FORWARD_SHADOW_PROTOCOL_2026-08-13.md'
+      - 'audit/NRFI_V6_FUNCTIONAL_FORM_LOCK_2026-08-13.md'
+      - 'scripts/build_nrfi_v6_shadow.py'
+      - '.github/workflows/build-nrfi-v6-shadow.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      SPORTSEDGE_NRFI_V6_OUT: artifacts/nrfi-v6-shadow
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install exact runtime
+        run: python -m pip install --disable-pip-version-check numpy scikit-learn joblib
+      - name: Download exact failed-but-frozen Statcast V5 base evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p phase6_artifacts v5_source
+          gh run download 31627930135 -n statcast-v5-strict-evidence-0571a3b0d0d063279840735f88230e9112bed07a -D v5_source
+          cp v5_source/sportsedge_nrfi_v5_statcast.joblib phase6_artifacts/sportsedge_nrfi_v5_statcast.joblib
+          echo 'a12881071bb53a52c6dcfaaacbf6e7c844e329beb7bb2df204124c064d4b21cc  phase6_artifacts/sportsedge_nrfi_v5_statcast.joblib' | sha256sum -c -
+      - name: Verify functional-form lock and compile
+        run: |
+          test -s audit/NRFI_V6_FORWARD_SHADOW_PROTOCOL_2026-08-13.md
+          test -s audit/NRFI_V6_FUNCTIONAL_FORM_LOCK_2026-08-13.md
+          python -m py_compile scripts/build_nrfi_v6_shadow.py
+      - name: Build frozen V6 shadow candidate
+        run: python scripts/build_nrfi_v6_shadow.py
+      - name: Enforce inherited Statcast contract and nondeployment
+        run: |
+          python - <<'PY'
+          import json
+          d=json.load(open('artifacts/nrfi-v6-shadow/validation.json'))
+          assert d['base_artifact_sha256']=='a12881071bb53a52c6dcfaaacbf6e7c844e329beb7bb2df204124c064d4b21cc'
+          assert d['contact_transformer_sha256']=='bf61487279ac9a506318e9dfa078a866450dd4e363b1d06356e58852954133b2'
+          assert d['required_statcast_features_present'] is True
+          assert d['development_cutoff']=='2026-08-12'
+          assert d['forward_shadow_start']=='2026-08-13'
+          assert d['outcomes_2026_08_13_or_later_used'] is False
+          assert d['sportsbook_data_used'] is False
+          assert d['deployment_eligible'] is False
+          assert d['deployment_block_reason']=='FORWARD_SHADOW_INSUFFICIENT_SAMPLE'
+          print('NRFI_V6_CANDIDATE_FREEZE_PASS', d['artifact_sha256'])
+          PY
+      - name: Upload frozen NRFI V6 shadow candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: nrfi-v6-shadow-${{ github.sha }}
+          path: |
+            artifacts/nrfi-v6-shadow/
+            audit/NRFI_V6_FORWARD_SHADOW_PROTOCOL_2026-08-13.md
+            audit/NRFI_V6_FUNCTIONAL_FORM_LOCK_2026-08-13.md
+          if-no-files-found: error
+          retention-days: 30
