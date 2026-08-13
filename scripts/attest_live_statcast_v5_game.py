@@ -8,9 +8,10 @@ MLB probable starters and the best admissible batting-order evidence, runs
 fixed-seed Monte Carlo, and only then joins legitimate DraftKings prices.
 
 Confirmed MLB batting slots 1-3 always win. Before confirmation, a configured
-projected-lineup provider may supply a complete, timestamped, TTL-bounded 1-9
-order under the same fail-closed contract already used by SportsEdge automation.
-Sportsbook values never enter Model_P.
+fresh projected-lineup provider may supply a complete 1-9 order. If none is
+available, SportsEdge deterministically projects 1-9 from prior confirmed MLB
+lineups strictly before the slate date and validates players against the current
+active roster. Sportsbook values never enter Model_P.
 """
 from __future__ import annotations
 
@@ -26,6 +27,7 @@ from sportsedge.espn_game_odds_source import fetch_espn_draftkings_game_quotes
 from sportsedge.game_history_live import build_live_game_feature_rows
 from sportsedge.game_live_features import RUN_FEATURES
 from sportsedge.game_score_live import assert_no_sportsbook_contamination, price_game_quote, simulate_game
+from sportsedge.mlb_lineup_projection import build_slate_projections
 from sportsedge.mlb_source import fetch_boxscore, fetch_schedule, fetch_team_abbreviation, parse_confirmed_lineup, parse_game_start
 from sportsedge.statcast_contract import GAME_STATCAST_FEATURES, require_statcast_artifact
 from sportsedge.statcast_v5_live import assemble_live_statcast_features, resolved_top3
@@ -77,16 +79,27 @@ def _projection_index(now:datetime):
     raw=_snapshot_list('PROJECTED_LINEUP',_http_json(url,token=token))
     return _projected_index(raw),'CONFIGURED'
 
-def _top3(*,box:dict,side:str,game_pk:int,team_id:int,projected:dict,now:datetime):
+def _top3(*,box:dict,side:str,game_pk:int,team_id:int,projected:dict,mlb_projected:dict,now:datetime):
     confirmed_rows=parse_confirmed_lineup(box,side)
     try:
-        return resolved_top3(confirmed_rows),'CONFIRMED_MLB'
+        return resolved_top3(confirmed_rows),'CONFIRMED_MLB',()
     except Exception as confirmed_exc:
+        provider_exc=None
         envelope=projected.get((int(game_pk),int(team_id),side))
-        if envelope is None: raise ValueError(f'TOP3_UNRESOLVED_NO_FRESH_PROJECTION:{side}:{confirmed_exc}')
-        lineup=_projected_lineup(envelope,team_id=int(team_id),side=side,now=now)
-        rows=[{'slot':int(slot),'player_id':int(pid),'sequence':0} for pid,slot in zip(lineup.player_ids,lineup.batting_slots)]
-        return resolved_top3(rows),'PROJECTED_FRESH'
+        if envelope is not None:
+            try:
+                lineup=_projected_lineup(envelope,team_id=int(team_id),side=side,now=now)
+                rows=[{'slot':int(slot),'player_id':int(pid),'sequence':0} for pid,slot in zip(lineup.player_ids,lineup.batting_slots)]
+                return resolved_top3(rows),'PROJECTED_PROVIDER_FRESH',()
+            except Exception as exc:
+                provider_exc=exc
+        internal=mlb_projected.get(int(team_id))
+        if internal is not None:
+            rows=[{'slot':int(slot),'player_id':int(pid),'sequence':0} for pid,slot in zip(internal.player_ids,internal.batting_slots)]
+            return resolved_top3(rows),'PROJECTED_MLB_PRIOR_CONFIRMED',tuple(internal.source_game_pks)
+        detail=f'confirmed={confirmed_exc}'
+        if provider_exc is not None: detail+=f';provider={provider_exc}'
+        raise ValueError(f'TOP3_UNRESOLVED_NO_ADMISSIBLE_PROJECTION:{side}:{detail}')
 
 def main()->int:
     now=datetime.now(timezone.utc); slate=now.astimezone(CT).date()
@@ -97,6 +110,8 @@ def main()->int:
     artifact,transformer,base_state,gp,tp,sp,state_sha=_verify(root,v,state_record)
     schedule=fetch_schedule(slate.isoformat(),now=now)
     projected,projection_source_status=_projection_index(now)
+    team_ids={int(x.away_id) for x in schedule}|{int(x.home_id) for x in schedule}
+    mlb_projected,mlb_projection_failures=build_slate_projections(team_ids=team_ids,slate_date=slate,now=now)
     season_start,_=regular_season_bounds(2026,Path('.cache/sportsedge/statcast-v5-live/bounds'))
     state=roll_state_to_cutoff(base_state=base_state,transformer=transformer,year=2026,start_date=season_start,cutoff_date=slate,cache_dir=Path('.cache/sportsedge/statcast-v5-live/savant'))
     baseline,history_exclusions=build_live_game_feature_rows(slate_date=slate,schedule=schedule,cache_dir=Path('.cache/sportsedge/mlb-history/game-v5'))
@@ -115,8 +130,8 @@ def main()->int:
         try:
             if not g.away_probable_pitcher_id or not g.home_probable_pitcher_id: raise ValueError('PROBABLE_PITCHER_UNRESOLVED')
             box=fetch_boxscore(g.game_pk)
-            away_top3,away_lineup_basis=_top3(box=box,side='away',game_pk=g.game_pk,team_id=g.away_id,projected=projected,now=now)
-            home_top3,home_lineup_basis=_top3(box=box,side='home',game_pk=g.game_pk,team_id=g.home_id,projected=projected,now=now)
+            away_top3,away_lineup_basis,away_lineup_source_games=_top3(box=box,side='away',game_pk=g.game_pk,team_id=g.away_id,projected=projected,mlb_projected=mlb_projected,now=now)
+            home_top3,home_lineup_basis,home_lineup_source_games=_top3(box=box,side='home',game_pk=g.game_pk,team_id=g.home_id,projected=projected,mlb_projected=mlb_projected,now=now)
             away_abbr=fetch_team_abbreviation(g.away_id); home_abbr=fetch_team_abbreviation(g.home_id)
             sf=assemble_live_statcast_features(state,away_team=away_abbr,home_team=home_abbr,away_starter_id=int(g.away_probable_pitcher_id),home_starter_id=int(g.home_probable_pitcher_id),away_top3=away_top3,home_top3=home_top3)
             base=baseline_by_game[gid]['run_rows']
@@ -130,13 +145,13 @@ def main()->int:
                     candidates.append({'market':q['market'],'side':q['side'],'status':'BLOCKED','reason':'PRICE_STALE_OR_FUTURE'}); continue
                 priced=price_game_quote(sim,q); d=decide_bet(priced['model_p'],q['american_odds'],bound=True,fresh=True,deployed=False,min_edge=0.0)
                 candidates.append({'market':q['market'],'side':q['side'],'selection':q.get('selection'),'line':q.get('line'),'american_odds':q['american_odds'],'model_p':priced['model_p'],'edge':d.edge,'ev_per_dollar':d.ev_per_dollar,'attestation_status':'DEPLOYMENT_PENDING','price_source':q.get('source_url')})
-            games.append({'game_id':gid,'away':g.away_name,'home':g.home_name,'status':'SCORED_V5_ATTESTATION','away_starter_id':g.away_probable_pitcher_id,'home_starter_id':g.home_probable_pitcher_id,'away_top3':list(away_top3),'home_top3':list(home_top3),'away_lineup_basis':away_lineup_basis,'home_lineup_basis':home_lineup_basis,'away_mu':sim['away_mu'],'home_mu':sim['home_mu'],'home_ml_p':sim['home_ml_p'],'n_sims':n_sims,'candidates':candidates}); scored+=1
+            games.append({'game_id':gid,'away':g.away_name,'home':g.home_name,'status':'SCORED_V5_ATTESTATION','away_starter_id':g.away_probable_pitcher_id,'home_starter_id':g.home_probable_pitcher_id,'away_top3':list(away_top3),'home_top3':list(home_top3),'away_lineup_basis':away_lineup_basis,'home_lineup_basis':home_lineup_basis,'away_lineup_source_game_pks':list(away_lineup_source_games),'home_lineup_source_game_pks':list(home_lineup_source_games),'away_mu':sim['away_mu'],'home_mu':sim['home_mu'],'home_ml_p':sim['home_ml_p'],'n_sims':n_sims,'candidates':candidates}); scored+=1
         except Exception as exc:
             games.append({'game_id':gid,'away':g.away_name,'home':g.home_name,'status':'BLOCKED','reason':str(exc)})
 
-    out={'schema_version':'sportsedge_live_statcast_v5_game_attestation_v2','generated_at_utc':now.isoformat(),'slate_date_ct':slate.isoformat(),'engine':'GAME_SCORE_V5_STATCAST','n_sims':n_sims,'game_artifact_sha256':sha(gp),'contact_transformer_sha256':sha(tp),'base_state_end_2025_sha256':state_sha,'holdout_source_commit':'0571a3b0d0d063279840735f88230e9112bed07a','holdout_passes':{k:(v.get('passes') or {}).get(k) for k in ('MONEYLINE','RUN_LINE','TOTALS')},'model_p_sportsbook_independent':True,'lineup_policy':'CONFIRMED_MLB_ELSE_FRESH_COMPLETE_PROJECTED_PROVIDER','projected_lineup_source_status':projection_source_status,'price_source':'ESPN_WEB_HEADER_DRAFTKINGS','price_ttl_seconds':60,'price_failures':list(price_snapshot.failures),'history_exclusions_count':len(history_exclusions),'scheduled_games':len(schedule),'scored_pregame_games':scored,'games':games}
+    out={'schema_version':'sportsedge_live_statcast_v5_game_attestation_v3','generated_at_utc':now.isoformat(),'slate_date_ct':slate.isoformat(),'engine':'GAME_SCORE_V5_STATCAST','n_sims':n_sims,'game_artifact_sha256':sha(gp),'contact_transformer_sha256':sha(tp),'base_state_end_2025_sha256':state_sha,'holdout_source_commit':'0571a3b0d0d063279840735f88230e9112bed07a','holdout_passes':{k:(v.get('passes') or {}).get(k) for k in ('MONEYLINE','RUN_LINE','TOTALS')},'model_p_sportsbook_independent':True,'lineup_policy':'CONFIRMED_MLB_ELSE_FRESH_PROVIDER_ELSE_MLB_PRIOR_CONFIRMED_ACTIVE_ROSTER','projected_lineup_source_status':projection_source_status,'mlb_prior_projection_teams':len(mlb_projected),'mlb_prior_projection_failures':{str(k):v for k,v in sorted(mlb_projection_failures.items())},'price_source':'ESPN_WEB_HEADER_DRAFTKINGS','price_ttl_seconds':60,'price_failures':list(price_snapshot.failures),'history_exclusions_count':len(history_exclusions),'scheduled_games':len(schedule),'scored_pregame_games':scored,'games':games}
     p=Path('artifacts/live_statcast_v5_game_attestation.json'); p.parent.mkdir(parents=True,exist_ok=True); p.write_text(json.dumps(out,indent=2,sort_keys=True,default=str)+'\n')
-    print(json.dumps({'scheduled_games':len(schedule),'scored_pregame_games':scored,'artifact':str(p),'projection_source_status':projection_source_status},indent=2))
+    print(json.dumps({'scheduled_games':len(schedule),'scored_pregame_games':scored,'artifact':str(p),'projection_source_status':projection_source_status,'mlb_prior_projection_teams':len(mlb_projected),'mlb_prior_projection_failures':len(mlb_projection_failures)},indent=2))
     if scored<1: raise SystemExit('STATCAST_V5_LIVE_NO_PREGAME_GAME_SCORED')
     return 0
 
