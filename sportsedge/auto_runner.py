@@ -147,7 +147,7 @@ def _convert(index:int, result:UnifiedCardResult, *, book_key:str) -> AutoCardRe
         raise AutoRunnerError("BOOK_KEY_MISSING_AT_FINAL_CARD")
     return AutoCardResult(index,result.game_id,result.market,result.entity_id,result.line,result.side,book,result.american_odds,result.model_p,result.bet_status,result.reason)
 
-def run_auto_mlb(*, quote_url:str, feature_url:str, projected_lineups_url:str|None=None, projected_lineup_rows:list[Mapping[str,Any]]|None=None, provider_token:str|None=None, now:datetime|None=None, opener:Callable=urlopen, registry_path:str="config/deployments.json", require_confirmed_lineup:bool=False, min_edge:float=0.0, kelly_multiplier:float=0.25, game_feature_rows:list[Mapping[str,Any]]|None=None, game_score_artifact:Mapping[str,Any]|None=None, nrfi_artifact:Mapping[str,Any]|None=None) -> AutoRunReport:
+def run_auto_mlb(*, quote_url:str, feature_url:str, projected_lineups_url:str|None=None, projected_lineup_rows:list[Mapping[str,Any]]|None=None, provider_token:str|None=None, now:datetime|None=None, opener:Callable=urlopen, registry_path:str="config/deployments.json", require_confirmed_lineup:bool=False, min_edge:float=0.025, kelly_multiplier:float=0.25, game_feature_rows:list[Mapping[str,Any]]|None=None, game_score_artifact:Mapping[str,Any]|None=None, nrfi_artifact:Mapping[str,Any]|None=None) -> AutoRunReport:
     current=_aware_utc(now or datetime.now(timezone.utc)); slate_date_ct=current.astimezone(CHICAGO_TZ).date().isoformat()
     raw_quote_rows=_snapshot_list("QUOTE",_http_json(quote_url,opener=opener,token=provider_token))
     feature_rows_raw=_snapshot_list("FEATURE",_http_json(feature_url,opener=opener,token=provider_token))
