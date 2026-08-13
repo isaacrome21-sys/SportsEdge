@@ -38,7 +38,16 @@ def main()->int:
         for c in game.get('candidates') or []:
             if c.get('model_p') is None or c.get('american_odds') is None: continue
             d=decide_bet(float(c['model_p']),float(c['american_odds']),bound=True,fresh=True,deployed=True,min_edge=0.0)
-            row={**c,'game_id':gid,'away':game.get('away'),'home':game.get('home'),'bet_status':d.bet_status,'implied_probability':d.implied_probability,'edge':d.edge,'ev_per_dollar':d.ev_per_dollar,'kelly_fraction':d.kelly_fraction,'artifact_version':'GAME_SCORE_V5_STATCAST','n_sims':a['n_sims'],'statcast_contract':'SPORTSEDGE_STATCAST_V1'}
+            row={
+                **c,
+                'game_id':gid,'away':game.get('away'),'home':game.get('home'),
+                'bet_status':d.bet_status,'implied_probability':d.implied_probability,
+                'edge':d.edge,'ev_per_dollar':d.ev_per_dollar,'kelly_fraction':d.kelly_fraction,
+                'artifact_version':'GAME_SCORE_V5_STATCAST','n_sims':a['n_sims'],
+                'statcast_contract':'SPORTSEDGE_STATCAST_V1',
+                'attestation_status':'LIVE_ATTESTED_DEPLOYED',
+                'deployment_run_id':strict.get('promotion_run_id'),
+            }
             rows.append(row)
             quotes.append({'market':c['market'],'game_id':gid})
     official=sorted((r for r in rows if r['bet_status']=='OFFICIAL_BET'),key=lambda r:(r['ev_per_dollar'],r['edge']),reverse=True)
