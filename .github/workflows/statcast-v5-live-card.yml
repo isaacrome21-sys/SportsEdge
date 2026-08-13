@@ -6,6 +6,7 @@ on:
     branches: [statcast-required-v5-20260812]
     paths:
       - 'config/statcast_v5_deployments.json'
+      - 'scripts/attest_live_statcast_v5_game.py'
       - 'scripts/finalize_statcast_v5_game_card.py'
       - '.github/workflows/statcast-v5-live-card.yml'
 
@@ -23,6 +24,8 @@ jobs:
       SPORTSEDGE_V5_LIVE_SIMS: '250000'
       SPORTSEDGE_EXPECTED_V5_GAME_SHA256: d467b1221898fdb84562ea2b72a06287bfae3e58603e3b15a28fba40c9cc668e
       SPORTSEDGE_EXPECTED_V5_TRANSFORMER_SHA256: bf61487279ac9a506318e9dfa078a866450dd4e363b1d06356e58852954133b2
+      SPORTSEDGE_PROJECTED_LINEUPS_URL: ${{ secrets.SPORTSEDGE_PROJECTED_LINEUPS_URL }}
+      SPORTSEDGE_PROVIDER_TOKEN: ${{ secrets.SPORTSEDGE_PROVIDER_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
