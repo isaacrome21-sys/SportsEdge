@@ -1,0 +1,35 @@
+name: props-v6-contract
+
+on:
+  push:
+    branches: [props-v6-forward-shadow-20260813]
+    paths:
+      - 'audit/NRFI_V6_FORWARD_SHADOW_PROTOCOL_2026-08-13.md'
+      - 'audit/BB_V6_FORWARD_SHADOW_PROTOCOL_2026-08-13.md'
+      - 'sportsedge/forward_shadow.py'
+      - 'tests/test_forward_shadow.py'
+      - '.github/workflows/props-v6-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile
+        run: python -m py_compile sportsedge/forward_shadow.py tests/test_forward_shadow.py
+      - name: Test forward-shadow invariants
+        run: python -m unittest tests.test_forward_shadow -v
+      - name: Verify protocols predate forward scoring
+        run: |
+          test -s audit/NRFI_V6_FORWARD_SHADOW_PROTOCOL_2026-08-13.md
+          test -s audit/BB_V6_FORWARD_SHADOW_PROTOCOL_2026-08-13.md
+          grep -q '2026-08-13' audit/NRFI_V6_FORWARD_SHADOW_PROTOCOL_2026-08-13.md
+          grep -q '2026-08-13' audit/BB_V6_FORWARD_SHADOW_PROTOCOL_2026-08-13.md
+          echo PROPS_V6_CONTRACT_PASS
