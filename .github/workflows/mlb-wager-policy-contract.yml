@@ -1,0 +1,69 @@
+name: mlb-wager-policy-contract
+
+on:
+  push:
+    branches:
+      - full-model-reconcile-20260813
+    paths:
+      - scripts/run_auto_mlb.py
+      - sportsedge/truth_gate.py
+      - sportsedge/auto_runner.py
+      - sportsedge/unified_card.py
+      - sportsedge/card_pipeline.py
+      - sportsedge/pitcher_card_pipeline.py
+      - sportsedge/game_card_pipeline.py
+      - sportsedge/orchestrator.py
+      - sportsedge/mlb_portfolio_guard.py
+      - .github/workflows/mlb-wager-policy-contract.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  enforce-wager-policy-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify generic automated minimum edge is not zero
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            scripts/run_auto_mlb.py
+            sportsedge/truth_gate.py
+            sportsedge/auto_runner.py
+            sportsedge/unified_card.py
+            sportsedge/card_pipeline.py
+            sportsedge/pitcher_card_pipeline.py
+            sportsedge/game_card_pipeline.py
+            sportsedge/orchestrator.py
+          )
+          bad=0
+          for f in "${files[@]}"; do
+            if grep -nE 'min_edge([^\n]*)(default=0\.0|= 0\.0|=0\.0)' "$f"; then
+              echo "ZERO_EDGE_DEFAULT[$f]"
+              bad=1
+            fi
+          done
+          if [ "$bad" -ne 0 ]; then
+            exit 1
+          fi
+      - name: Verify portfolio guard is wired into automated runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'mlb_portfolio_guard' scripts/run_auto_mlb.py || {
+            echo 'PORTFOLIO_GUARD_NOT_IMPORTED_IN_AUTOMATED_RUNNER'
+            exit 1
+          }
+          grep -q 'apply_mlb_portfolio_guard' scripts/run_auto_mlb.py || {
+            echo 'PORTFOLIO_GUARD_NOT_APPLIED_IN_AUTOMATED_RUNNER'
+            exit 1
+          }
+      - name: Compile guard
+        run: python -m py_compile sportsedge/mlb_portfolio_guard.py
