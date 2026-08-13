@@ -1,0 +1,74 @@
+name: build-bb-v6-shadow
+
+on:
+  push:
+    branches: [props-v6-forward-shadow-20260813]
+    paths:
+      - 'audit/BB_V6_FORWARD_SHADOW_PROTOCOL_2026-08-13.md'
+      - 'scripts/build_pitcher_bb_v6_shadow.py'
+      - '.github/workflows/build-bb-v6-shadow.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      SPORTSEDGE_BB_V6_CACHE: .cache/sportsedge/bb-v6-shadow
+      SPORTSEDGE_BB_V6_OUT: artifacts/bb-v6-shadow
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install exact runtime
+        run: python -m pip install --disable-pip-version-check numpy 'scikit-learn==1.9.0' joblib
+      - name: Download exact frozen BB-v4 artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p phase6_artifacts phase6_source
+          gh run download 31558928640 -n pitcher-bb-v4-1-source-bounded -D phase6_source
+          cp phase6_source/sportsedge_pitcher_bb_v4.joblib phase6_artifacts/sportsedge_pitcher_bb_v4.joblib
+          echo '67fc9d5c96ab469d888c7e137072d156043eb31fa3576fbe31d97e4436b9e7bc  phase6_artifacts/sportsedge_pitcher_bb_v4.joblib' | sha256sum -c -
+      - name: Verify chronology code and protocol
+        run: |
+          python -m py_compile scripts/build_pitcher_bb_v6_shadow.py sportsedge/forward_shadow.py
+          test -s audit/BB_V6_FORWARD_SHADOW_PROTOCOL_2026-08-13.md
+      - name: Restore official-source cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/sportsedge/bb-v6-shadow
+          key: bb-v6-shadow-source-${{ runner.os }}-${{ github.run_number }}
+          restore-keys: |
+            bb-v6-shadow-source-${{ runner.os }}-
+      - name: Build frozen development candidate
+        run: python scripts/build_pitcher_bb_v6_shadow.py
+      - name: Enforce nondeployment and cutoff
+        run: |
+          python - <<'PY'
+          import json
+          d=json.load(open('artifacts/bb-v6-shadow/validation.json'))
+          assert d['deployment_eligible'] is False
+          assert d['deployment_block_reason']=='FORWARD_SHADOW_INSUFFICIENT_SAMPLE'
+          assert d['development_cutoff']=='2026-08-12'
+          assert d['forward_shadow_start']=='2026-08-13'
+          assert d['observed_date_max'] <= '2026-08-12'
+          assert d['outcomes_after_cutoff_used'] is False
+          assert d['sportsbook_data_used'] is False
+          print('BB_V6_CANDIDATE_FREEZE_PASS', d['artifact_sha256'])
+          PY
+      - name: Upload frozen BB V6 shadow candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitcher-bb-v6-shadow-${{ github.sha }}
+          path: |
+            artifacts/bb-v6-shadow/
+            audit/BB_V6_FORWARD_SHADOW_PROTOCOL_2026-08-13.md
+          if-no-files-found: error
+          retention-days: 30
