@@ -6,6 +6,7 @@ on:
     branches: [statcast-required-v5-20260812]
     paths:
       - 'config/statcast_v5_deployments.json'
+      - 'scripts/finalize_statcast_v5_game_card.py'
       - '.github/workflows/statcast-v5-live-card.yml'
 
 permissions:
