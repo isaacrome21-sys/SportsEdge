@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 from sportsedge.full_model_status import build_required_market_status
+from sportsedge.game_risk_guard import GLOBAL_MIN_EDGE, RISK_GATE_VERSION, apply_game_risk_guard
 from sportsedge.mlb_source import fetch_schedule, parse_game_start
 from sportsedge.truth_gate import decide_bet
 
@@ -37,7 +38,11 @@ def main()->int:
         if snap is None or snap.status!='Preview' or now>=parse_game_start(snap.game_date): continue
         for c in game.get('candidates') or []:
             if c.get('model_p') is None or c.get('american_odds') is None: continue
-            d=decide_bet(float(c['model_p']),float(c['american_odds']),bound=True,fresh=True,deployed=True,min_edge=0.0)
+            # V5's untouched holdout currently proves aggregate game-market
+            # calibration, but not moneyline tail/market-disagreement behavior.
+            # A 2.5pp raw edge floor therefore applies before the downstream
+            # underdog/correlation safety overlay.
+            d=decide_bet(float(c['model_p']),float(c['american_odds']),bound=True,fresh=True,deployed=True,min_edge=GLOBAL_MIN_EDGE)
             row={
                 **c,
                 'game_id':gid,'away':game.get('away'),'home':game.get('home'),
@@ -50,11 +55,33 @@ def main()->int:
             }
             rows.append(row)
             quotes.append({'market':c['market'],'game_id':gid})
+
+    rows=apply_game_risk_guard(rows)
     official=sorted((r for r in rows if r['bet_status']=='OFFICIAL_BET'),key=lambda r:(r['ev_per_dollar'],r['edge']),reverse=True)
     status=build_required_market_status(legacy_registry=legacy,strict_registry=strict,quote_rows=quotes,card_rows=rows,source_failures=[])
-    payload={'schema_version':'sportsedge_v5_full_model_card_v1','generated_at_utc':now.isoformat(),'source_attestation_generated_at_utc':a['generated_at_utc'],'slate_date_ct':slate,'game_artifact_sha256':a['game_artifact_sha256'],'contact_transformer_sha256':a['contact_transformer_sha256'],'base_state_end_2025_sha256':a['base_state_end_2025_sha256'],'n_sims':a['n_sims'],'official_bets_count':len(official),'best_bets':official,'game_candidates':rows,'required_market_status':status}
+    payload={
+        'schema_version':'sportsedge_v5_full_model_card_v2_risk_guard',
+        'generated_at_utc':now.isoformat(),
+        'source_attestation_generated_at_utc':a['generated_at_utc'],
+        'slate_date_ct':slate,
+        'game_artifact_sha256':a['game_artifact_sha256'],
+        'contact_transformer_sha256':a['contact_transformer_sha256'],
+        'base_state_end_2025_sha256':a['base_state_end_2025_sha256'],
+        'n_sims':a['n_sims'],
+        'official_bets_count':len(official),
+        'best_bets':official,
+        'game_candidates':rows,
+        'required_market_status':status,
+        'risk_gate':{
+            'version':RISK_GATE_VERSION,
+            'model_p_modified':False,
+            'sportsbook_used_as_model_feature':False,
+            'global_min_edge':GLOBAL_MIN_EDGE,
+            'purpose':'downstream wager-selection safety while ML tail validation is pending',
+        },
+    }
     OUT.parent.mkdir(parents=True,exist_ok=True); OUT.write_text(json.dumps(payload,indent=2,sort_keys=True)+'\n')
-    print(json.dumps({'official_bets_count':len(official),'best_bets':[{'market':x['market'],'selection':x.get('selection'),'line':x.get('line'),'odds':x['american_odds'],'model_p':x['model_p'],'ev':x['ev_per_dollar']} for x in official[:10]],'market_status':status['markets']},indent=2))
+    print(json.dumps({'official_bets_count':len(official),'best_bets':[{'market':x['market'],'selection':x.get('selection'),'line':x.get('line'),'odds':x['american_odds'],'model_p':x['model_p'],'ev':x['ev_per_dollar'],'risk_gate_reason':x.get('risk_gate_reason')} for x in official[:10]],'market_status':status['markets'],'risk_gate':payload['risk_gate']},indent=2))
     return 0
 
 if __name__=='__main__': raise SystemExit(main())
