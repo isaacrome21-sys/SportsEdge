@@ -31,7 +31,7 @@ def _quote_identity(quote: Mapping[str, Any]) -> tuple[str, str, str, Any, str]:
     return q["game_id"], q["market"], q["entity_id"], q["line"], q["side"]
 
 
-def run_hitter_card(*, games: list[LiveGame], feature_rows: list[Mapping[str, Any]], quotes: list[Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, registry_path: str = "config/deployments.json", require_confirmed_lineup: bool = True, min_edge: float = 0.0, kelly_multiplier: float = 0.25) -> list[CardResult]:
+def run_hitter_card(*, games: list[LiveGame], feature_rows: list[Mapping[str, Any]], quotes: list[Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, registry_path: str = "config/deployments.json", require_confirmed_lineup: bool = True, min_edge: float = 0.025, kelly_multiplier: float = 0.25) -> list[CardResult]:
     game_map: dict[str, LiveGame] = {}
     for game in games:
         key = str(game.game_pk)
