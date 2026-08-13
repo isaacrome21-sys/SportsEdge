@@ -12,6 +12,7 @@ on:
       - 'sportsedge/statcast_v5_live.py'
       - 'sportsedge/statcast_v5_live_source.py'
       - 'scripts/rebuild_statcast_v5_split.py'
+      - 'scripts/rebuild_statcast_v5_split_v2.py'
       - 'tests/test_statcast_contract.py'
       - 'tests/test_statcast_v5_data.py'
       - 'tests/test_statcast_v5_artifacts.py'
@@ -43,18 +44,18 @@ jobs:
       - name: Run Statcast contract, split-data, artifact, and live-parity tests
         run: python -m pytest -q tests/test_statcast_contract.py tests/test_statcast_v5_data.py tests/test_statcast_v5_artifacts.py tests/test_statcast_v5_live.py
       - name: Compile optimized V5 GAME path
-        run: python -m py_compile sportsedge/statcast_contract.py sportsedge/statcast_contact_transformer.py sportsedge/statcast_v5_data.py sportsedge/statcast_v5_split.py sportsedge/statcast_v5_artifacts.py sportsedge/statcast_v5_live.py sportsedge/statcast_v5_live_source.py scripts/rebuild_statcast_v5_split.py
+        run: python -m py_compile sportsedge/statcast_contract.py sportsedge/statcast_contact_transformer.py sportsedge/statcast_v5_data.py sportsedge/statcast_v5_split.py sportsedge/statcast_v5_artifacts.py sportsedge/statcast_v5_live.py sportsedge/statcast_v5_live_source.py scripts/rebuild_statcast_v5_split.py scripts/rebuild_statcast_v5_split_v2.py
       - name: Restore bounded official-source cache
         uses: actions/cache@v4
         with:
           path: .cache/sportsedge/statcast-v5-split
-          key: statcast-v5-split-2018-2025-v1
+          key: statcast-v5-split-2018-2025-v2-local-contact-filter
           save-always: true
       - name: Rebuild frozen transformer and V5 artifacts
         shell: bash
         run: |
           set +e
-          python scripts/rebuild_statcast_v5_split.py
+          python scripts/rebuild_statcast_v5_split_v2.py
           rc=$?
           echo "MODEL_REBUILD_EXIT=$rc"
           # The frozen all-market script exits nonzero when NRFI/YRFI fail.
