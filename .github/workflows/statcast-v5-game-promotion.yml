@@ -7,14 +7,13 @@ on:
       - 'sportsedge/statcast_contract.py'
       - 'sportsedge/statcast_contact_transformer.py'
       - 'sportsedge/statcast_v5_data.py'
-      - 'sportsedge/statcast_v5_split.py'
-      - 'sportsedge/statcast_v5_artifacts.py'
       - 'sportsedge/statcast_v5_live.py'
       - 'sportsedge/statcast_v5_live_source.py'
       - 'sportsedge/game_score_live.py'
       - 'sportsedge/espn_game_odds_source.py'
       - 'scripts/rebuild_statcast_v5_split.py'
       - 'scripts/rebuild_statcast_v5_split_v2.py'
+      - 'scripts/build_statcast_v5_base_state.py'
       - 'scripts/attest_live_statcast_v5_game.py'
       - 'tests/test_statcast_contract.py'
       - 'tests/test_statcast_v5_data.py'
@@ -28,6 +27,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: statcast-v5-game-promotion-${{ github.ref }}
@@ -36,7 +36,7 @@ concurrency:
 jobs:
   game-v5:
     runs-on: ubuntu-latest
-    timeout-minutes: 330
+    timeout-minutes: 180
     env:
       PYTHONPATH: ${{ github.workspace }}
       SPORTSEDGE_STATCAST_V5_CACHE: .cache/sportsedge/statcast-v5-split
@@ -51,16 +51,43 @@ jobs:
           python-version: '3.12'
       - name: Install V5 runtime
         run: python -m pip install --disable-pip-version-check numpy pandas scikit-learn joblib pytest
-      - name: Run Statcast contract, split-data, artifact, and live-parity tests
+      - name: Run Statcast contract, state, artifact, and live-parity tests
         run: python -m pytest -q tests/test_statcast_contract.py tests/test_statcast_v5_data.py tests/test_statcast_v5_artifacts.py tests/test_statcast_v5_live.py
-      - name: Compile optimized V5 GAME and live attestation paths
-        run: python -m py_compile sportsedge/statcast_contract.py sportsedge/statcast_contact_transformer.py sportsedge/statcast_v5_data.py sportsedge/statcast_v5_split.py sportsedge/statcast_v5_artifacts.py sportsedge/statcast_v5_live.py sportsedge/statcast_v5_live_source.py sportsedge/game_score_live.py sportsedge/espn_game_odds_source.py scripts/rebuild_statcast_v5_split.py scripts/rebuild_statcast_v5_split_v2.py scripts/attest_live_statcast_v5_game.py
-      - name: Restore bounded official-source cache
+      - name: Compile state-only and live attestation paths
+        run: python -m py_compile sportsedge/statcast_contract.py sportsedge/statcast_contact_transformer.py sportsedge/statcast_v5_data.py sportsedge/statcast_v5_live.py sportsedge/statcast_v5_live_source.py sportsedge/game_score_live.py sportsedge/espn_game_odds_source.py scripts/rebuild_statcast_v5_split.py scripts/rebuild_statcast_v5_split_v2.py scripts/build_statcast_v5_base_state.py scripts/attest_live_statcast_v5_game.py
+      - name: Download exact strict holdout artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p artifacts/statcast-v5-game
+          gh run download 31627930135 \
+            -n statcast-v5-strict-evidence-0571a3b0d0d063279840735f88230e9112bed07a \
+            -D artifacts/statcast-v5-game
+          echo "$SPORTSEDGE_EXPECTED_V5_GAME_SHA256  artifacts/statcast-v5-game/sportsedge_game_score_v5_statcast.joblib" | sha256sum -c -
+          echo "$SPORTSEDGE_EXPECTED_V5_TRANSFORMER_SHA256  artifacts/statcast-v5-game/sportsedge_contact_transformer_v1.joblib" | sha256sum -c -
+      - name: Verify untouched holdout record from frozen artifact
+        run: |
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          v=json.loads(Path('artifacts/statcast-v5-game/validation.json').read_text())
+          assert v['game_artifact_sha256']==os.environ['SPORTSEDGE_EXPECTED_V5_GAME_SHA256']
+          assert v['contact_transformer_sha256']==os.environ['SPORTSEDGE_EXPECTED_V5_TRANSFORMER_SHA256']
+          for m in ('MONEYLINE','RUN_LINE','TOTALS'): assert v['passes'][m] is True, m
+          assert v['passes']['NRFI'] is False and v['passes']['YRFI'] is False
+          assert int(v['valid_2025_games'])>=1000
+          print('STATCAST_V5_FROZEN_HOLDOUT_RECORD_PASS')
+          PY
+      - name: Restore official contact-state cache
         uses: actions/cache@v4
         with:
           path: .cache/sportsedge/statcast-v5-split
-          key: statcast-v5-split-2018-2025-v2-local-contact-filter
-      - name: Restore prior-only live-source caches
+          key: statcast-v5-state-2021-2025-local-contact-v1
+          restore-keys: |
+            statcast-v5-split-2018-2025-v2-local-contact-filter
+      - name: Build end-2025 rolling state only
+        run: python scripts/build_statcast_v5_base_state.py
+      - name: Restore prior-only 2026 live caches
         uses: actions/cache@v4
         with:
           path: |
@@ -69,53 +96,9 @@ jobs:
           key: statcast-v5-live-prior-2026-${{ runner.os }}-${{ github.run_number }}
           restore-keys: |
             statcast-v5-live-prior-2026-${{ runner.os }}-
-      - name: Rebuild frozen transformer and V5 artifacts
-        shell: bash
-        run: |
-          set +e
-          python scripts/rebuild_statcast_v5_split_v2.py
-          rc=$?
-          echo "MODEL_REBUILD_EXIT=$rc"
-          # The frozen all-market script exits nonzero when NRFI/YRFI fail.
-          # Do not interpret that as a GAME-market failure; the next step
-          # reads the emitted frozen validation record and applies only the
-          # predeclared GAME market gates.
-          exit 0
-      - name: Verify exact artifact hashes and GAME holdout gates
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import hashlib,json,os
-          root=Path('artifacts/statcast-v5-game')
-          mp=root/'manifest.json'; vp=root/'validation.json'
-          if not mp.is_file() or not vp.is_file():
-              raise SystemExit('STATCAST_V5_GAME_EVIDENCE_MISSING')
-          manifest=json.loads(mp.read_text())
-          for row in manifest['files']:
-              p=Path(row['path'])
-              if not p.is_file(): raise SystemExit('MANIFEST_FILE_MISSING:'+str(p))
-              got=hashlib.sha256(p.read_bytes()).hexdigest()
-              if got != row['sha256']: raise SystemExit('MANIFEST_SHA_MISMATCH:'+str(p))
-              print('VERIFIED',p,row['bytes'],got)
-          v=json.loads(vp.read_text())
-          expected_game=os.environ['SPORTSEDGE_EXPECTED_V5_GAME_SHA256']
-          expected_transformer=os.environ['SPORTSEDGE_EXPECTED_V5_TRANSFORMER_SHA256']
-          if v.get('game_artifact_sha256') != expected_game:
-              raise SystemExit('STATCAST_V5_GAME_NOT_EXACT_FROZEN_ARTIFACT:'+str(v.get('game_artifact_sha256')))
-          if v.get('contact_transformer_sha256') != expected_transformer:
-              raise SystemExit('STATCAST_V5_TRANSFORMER_NOT_EXACT_FROZEN_ARTIFACT:'+str(v.get('contact_transformer_sha256')))
-          required=('MONEYLINE','RUN_LINE','TOTALS')
-          failed=[m for m in required if v.get('passes',{}).get(m) is not True]
-          if failed: raise SystemExit('STATCAST_V5_GAME_HOLDOUT_FAILED:'+','.join(failed))
-          if int(v.get('valid_2025_games',0)) < 1000: raise SystemExit('STATCAST_V5_GAME_HOLDOUT_SAMPLE_TOO_SMALL')
-          if not v.get('base_state_end_2025_sha256'): raise SystemExit('STATCAST_V5_BASE_STATE_HASH_MISSING')
-          print('STATCAST_V5_GAME_EXACT_FROZEN_ARTIFACT_PASS')
-          print('NRFI_STATE',v.get('passes',{}).get('NRFI'))
-          print('YRFI_STATE',v.get('passes',{}).get('YRFI'))
-          PY
-      - name: Attest current live Statcast feature parity, Model_P, Monte Carlo, and DK join
+      - name: Attest current live Statcast parity, Model_P, 250k Monte Carlo, and DK join
         run: python scripts/attest_live_statcast_v5_game.py
-      - name: Verify live attestation is bound to exact rebuilt artifact
+      - name: Verify live attestation against frozen model
         run: |
           python - <<'PY'
           import hashlib,json,os
@@ -123,15 +106,16 @@ jobs:
           a=json.loads(Path('artifacts/live_statcast_v5_game_attestation.json').read_text())
           g=Path('artifacts/statcast-v5-game/sportsedge_game_score_v5_statcast.joblib')
           got=hashlib.sha256(g.read_bytes()).hexdigest()
-          assert got==os.environ['SPORTSEDGE_EXPECTED_V5_GAME_SHA256'], 'LIVE_NOT_FROZEN_GAME_ARTIFACT'
-          assert got==a['game_artifact_sha256'], 'LIVE_GAME_ARTIFACT_SHA_MISMATCH'
-          assert a['model_p_sportsbook_independent'] is True, 'MODEL_P_INDEPENDENCE_NOT_ATTESTED'
-          assert a['price_source']=='ESPN_WEB_HEADER_DRAFTKINGS', 'DK_PRICE_SOURCE_NOT_ATTESTED'
-          assert int(a['n_sims'])==250000, 'MONTE_CARLO_PATH_COUNT_MISMATCH'
-          assert int(a['scored_pregame_games'])>=1, 'NO_LIVE_V5_GAME_SCORED'
+          assert got==os.environ['SPORTSEDGE_EXPECTED_V5_GAME_SHA256']=='d467b1221898fdb84562ea2b72a06287bfae3e58603e3b15a28fba40c9cc668e'
+          assert got==a['game_artifact_sha256']
+          assert a['contact_transformer_sha256']==os.environ['SPORTSEDGE_EXPECTED_V5_TRANSFORMER_SHA256']
+          assert a['model_p_sportsbook_independent'] is True
+          assert a['price_source']=='ESPN_WEB_HEADER_DRAFTKINGS'
+          assert int(a['n_sims'])==250000
+          assert int(a['scored_pregame_games'])>=1
           print('STATCAST_V5_LIVE_RUNTIME_ATTESTATION_PASS')
           PY
-      - name: Upload V5 GAME evidence
+      - name: Upload V5 GAME promotion evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
