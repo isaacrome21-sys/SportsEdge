@@ -6,6 +6,7 @@ on:
     branches: [statcast-required-v5-20260812]
     paths:
       - 'config/statcast_v5_deployments.json'
+      - '.github/workflows/statcast-v5-live-card.yml'
 
 permissions:
   contents: read
@@ -49,12 +50,9 @@ jobs:
           name=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts" --jq '.artifacts[] | select(.name | startswith("statcast-v5-game-evidence-")) | .name' | head -1)
           test -n "$name"
           gh run download "$RUN_ID" -n "$name" -D artifacts/promotion
-          cp artifacts/promotion/sportsedge_game_score_v5_statcast.joblib artifacts/statcast-v5-game/
-          cp artifacts/promotion/sportsedge_contact_transformer_v1.joblib artifacts/statcast-v5-game/
-          cp artifacts/promotion/sportsedge_nrfi_v5_statcast.joblib artifacts/statcast-v5-game/
-          cp artifacts/promotion/validation.json artifacts/statcast-v5-game/
-          cp artifacts/promotion/base_state_manifest.json artifacts/statcast-v5-game/
-          cp artifacts/promotion/sportsedge_statcast_state_end_2025.joblib artifacts/statcast-v5-game/
+          test -d artifacts/promotion/statcast-v5-game
+          cp artifacts/promotion/statcast-v5-game/* artifacts/statcast-v5-game/
+          test -f artifacts/promotion/live_statcast_v5_game_attestation.json
           echo "$SPORTSEDGE_EXPECTED_V5_GAME_SHA256  artifacts/statcast-v5-game/sportsedge_game_score_v5_statcast.joblib" | sha256sum -c -
           echo "$SPORTSEDGE_EXPECTED_V5_TRANSFORMER_SHA256  artifacts/statcast-v5-game/sportsedge_contact_transformer_v1.joblib" | sha256sum -c -
       - name: Restore prior-only live caches
