@@ -1,0 +1,42 @@
+name: game-risk-guard
+
+on:
+  push:
+    branches: [game-risk-guard-20260813]
+    paths:
+      - 'sportsedge/game_risk_guard.py'
+      - 'scripts/finalize_statcast_v5_game_card.py'
+      - 'tests/test_game_risk_guard.py'
+      - '.github/workflows/game-risk-guard.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test runtime
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Compile changed runtime
+        run: python -m py_compile sportsedge/game_risk_guard.py scripts/finalize_statcast_v5_game_card.py
+      - name: Run risk-guard regression tests
+        run: pytest -q tests/test_game_risk_guard.py
+      - name: Replay the exact +201 heavy-dog structure
+        run: |
+          python - <<'PY'
+          from sportsedge.game_risk_guard import apply_game_risk_guard
+          rows=apply_game_risk_guard([
+            {'game_id':'823916','market':'MONEYLINE','selection':'Kansas City Royals','american_odds':201,'model_p':.4201452791,'edge':.0879193655,'ev_per_dollar':.2646372901,'kelly_fraction':.032915,'bet_status':'OFFICIAL_BET'},
+            {'game_id':'823916','market':'RUN_LINE','selection':'Kansas City Royals','american_odds':-111,'model_p':.592896,'edge':.0668296493,'ev_per_dollar':.1270365405,'kelly_fraction':.035253,'bet_status':'OFFICIAL_BET'},
+          ])
+          assert all(r['bet_status']=='PASS' for r in rows), rows
+          assert all(r['risk_gate_reason']=='HEAVY_DOG_SIDE_UNVALIDATED' for r in rows), rows
+          print('HEAVY_DOG_REPLAY_PASS')
+          PY
