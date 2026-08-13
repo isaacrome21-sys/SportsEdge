@@ -43,7 +43,7 @@ def _features_by_game(rows: list[Mapping[str, Any]]) -> dict[str, Mapping[str, A
     return out
 
 
-def run_game_card(*, feature_rows: list[Mapping[str, Any]], quotes: list[Mapping[str, Any]], game_score_artifact: Mapping[str, Any], nrfi_artifact: Mapping[str, Any], ingestion_now: datetime, finalization_now: datetime, registry_path: str = "config/deployments.json", min_edge: float = 0.0, kelly_multiplier: float = 0.25) -> list[GameCardResult]:
+def run_game_card(*, feature_rows: list[Mapping[str, Any]], quotes: list[Mapping[str, Any]], game_score_artifact: Mapping[str, Any], nrfi_artifact: Mapping[str, Any], ingestion_now: datetime, finalization_now: datetime, registry_path: str = "config/deployments.json", min_edge: float = 0.025, kelly_multiplier: float = 0.25) -> list[GameCardResult]:
     features = _features_by_game(feature_rows)
     sims: dict[str, Mapping[str, Any]] = {}
     out: list[GameCardResult] = []
