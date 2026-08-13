@@ -6,6 +6,7 @@ on:
     paths:
       - 'audit/BB_V6_FORWARD_SHADOW_PROTOCOL_2026-08-13.md'
       - 'scripts/build_pitcher_bb_v6_shadow.py'
+      - 'scripts/build_bb_v6_base_state.py'
       - '.github/workflows/build-bb-v6-shadow.yml'
   workflow_dispatch:
 
@@ -38,7 +39,7 @@ jobs:
           echo '67fc9d5c96ab469d888c7e137072d156043eb31fa3576fbe31d97e4436b9e7bc  phase6_artifacts/sportsedge_pitcher_bb_v4.joblib' | sha256sum -c -
       - name: Verify chronology code and protocol
         run: |
-          python -m py_compile scripts/build_pitcher_bb_v6_shadow.py sportsedge/forward_shadow.py
+          python -m py_compile scripts/build_pitcher_bb_v6_shadow.py scripts/build_bb_v6_base_state.py sportsedge/forward_shadow.py
           test -s audit/BB_V6_FORWARD_SHADOW_PROTOCOL_2026-08-13.md
       - name: Restore official-source cache
         uses: actions/cache@v4
@@ -49,11 +50,14 @@ jobs:
             bb-v6-shadow-source-${{ runner.os }}-
       - name: Build frozen development candidate
         run: python scripts/build_pitcher_bb_v6_shadow.py
+      - name: Build hashed end-Aug12 live base state
+        run: python scripts/build_bb_v6_base_state.py
       - name: Enforce nondeployment and cutoff
         run: |
           python - <<'PY'
           import json
           d=json.load(open('artifacts/bb-v6-shadow/validation.json'))
+          s=json.load(open('artifacts/bb-v6-shadow/bb_v6_base_state_manifest.json'))
           assert d['deployment_eligible'] is False
           assert d['deployment_block_reason']=='FORWARD_SHADOW_INSUFFICIENT_SAMPLE'
           assert d['development_cutoff']=='2026-08-12'
@@ -61,7 +65,12 @@ jobs:
           assert d['observed_date_max'] <= '2026-08-12'
           assert d['outcomes_after_cutoff_used'] is False
           assert d['sportsbook_data_used'] is False
+          assert s['cutoff']=='2026-08-12'
+          assert s['observed_date_max'] <= '2026-08-12'
+          assert s['outcomes_after_cutoff_used'] is False
+          assert s['sportsbook_data_used'] is False
           print('BB_V6_CANDIDATE_FREEZE_PASS', d['artifact_sha256'])
+          print('BB_V6_BASE_STATE_PASS', s['state_sha256'])
           PY
       - name: Upload frozen BB V6 shadow candidate
         uses: actions/upload-artifact@v4
