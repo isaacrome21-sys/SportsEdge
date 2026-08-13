@@ -3,24 +3,26 @@
   "contract": "SPORTSEDGE_STATCAST_V1",
   "source_holdout_run": 31627930135,
   "source_holdout_commit": "0571a3b0d0d063279840735f88230e9112bed07a",
+  "live_attestation_run": 31656118369,
+  "live_attestation_commit": "3b67fcfc30c2ba4c1da958858761711b57cd4780",
   "markets": {
     "MONEYLINE": {
-      "eligible": false,
-      "stage": "HOLDOUT_PASS_AWAITING_LIVE_PARITY",
+      "eligible": true,
+      "stage": "LIVE_ATTESTED",
       "artifact_sha256": "d467b1221898fdb84562ea2b72a06287bfae3e58603e3b15a28fba40c9cc668e",
-      "reason": "untouched 2025 holdout passed; exact live Statcast parity and runtime attestation still required"
+      "reason": "untouched 2025 holdout passed and exact frozen V5 artifact passed current live Statcast parity, 250000-path Monte Carlo, and DraftKings price-join attestation in run 31656118369"
     },
     "RUN_LINE": {
-      "eligible": false,
-      "stage": "HOLDOUT_PASS_AWAITING_LIVE_PARITY",
+      "eligible": true,
+      "stage": "LIVE_ATTESTED",
       "artifact_sha256": "d467b1221898fdb84562ea2b72a06287bfae3e58603e3b15a28fba40c9cc668e",
-      "reason": "untouched 2025 holdout passed; exact live Statcast parity and runtime attestation still required"
+      "reason": "untouched 2025 holdout passed and exact frozen V5 artifact passed current live Statcast parity, 250000-path Monte Carlo, and DraftKings price-join attestation in run 31656118369"
     },
     "TOTALS": {
-      "eligible": false,
-      "stage": "HOLDOUT_PASS_AWAITING_LIVE_PARITY",
+      "eligible": true,
+      "stage": "LIVE_ATTESTED",
       "artifact_sha256": "d467b1221898fdb84562ea2b72a06287bfae3e58603e3b15a28fba40c9cc668e",
-      "reason": "untouched 2025 holdout passed; exact live Statcast parity and runtime attestation still required"
+      "reason": "untouched 2025 holdout passed and exact frozen V5 artifact passed current live Statcast parity, 250000-path Monte Carlo, and DraftKings price-join attestation in run 31656118369"
     },
     "NRFI": {
       "eligible": false,
