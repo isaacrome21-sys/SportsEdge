@@ -16,16 +16,18 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Drive transport client
+        run: python -m pip install --disable-pip-version-check gdown
       - name: Download transport-only fixture copies
         run: |
           set -euo pipefail
           mkdir -p /tmp/fixtures
-          curl --fail --location --retry 3 --connect-timeout 10 \
-            'https://drive.usercontent.google.com/download?id=1oX54qdZMlZlPjD0ybJqcRPNX7vz07Ir7&export=download&confirm=t' \
-            -o /tmp/fixtures/hits.pkl.gz
-          curl --fail --location --retry 3 --connect-timeout 10 \
-            'https://drive.usercontent.google.com/download?id=1ht4fJHzFeD7od5AqmuTTjDM2dCT1AVim&export=download&confirm=t' \
-            -o /tmp/fixtures/tb.pkl.gz
+          gdown --id '1oX54qdZMlZlPjD0ybJqcRPNX7vz07Ir7' -O /tmp/fixtures/hits.pkl.gz
+          gdown --id '1ht4fJHzFeD7od5AqmuTTjDM2dCT1AVim' -O /tmp/fixtures/tb.pkl.gz
+          file /tmp/fixtures/hits.pkl.gz /tmp/fixtures/tb.pkl.gz
           test "$(stat -c%s /tmp/fixtures/hits.pkl.gz)" = '4089956'
           test "$(stat -c%s /tmp/fixtures/tb.pkl.gz)" = '7305084'
       - name: Verify canonical decompressed bytes
