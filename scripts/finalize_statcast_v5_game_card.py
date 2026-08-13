@@ -24,7 +24,7 @@ def main()->int:
     a=load(ATT); legacy=load(LEGACY); strict=load(STRICT); now=datetime.now(timezone.utc)
     generated=datetime.fromisoformat(str(a['generated_at_utc']).replace('Z','+00:00')).astimezone(timezone.utc)
     age=(now-generated).total_seconds()
-    if age<0 or age>120: raise SystemExit(f'V5_ATTESTATION_TOO_OLD_FOR_CARD:{age:.3f}')
+    if age<0 or age>60: raise SystemExit(f'V5_ATTESTATION_TOO_OLD_FOR_CARD:{age:.3f}')
     if a.get('model_p_sportsbook_independent') is not True: raise SystemExit('MODEL_P_INDEPENDENCE_NOT_ATTESTED')
     for m in ('MONEYLINE','RUN_LINE','TOTALS'):
         row=(strict.get('markets') or {}).get(m) or {}
