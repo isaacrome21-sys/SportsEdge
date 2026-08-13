@@ -91,7 +91,11 @@ def _fetch_adaptive(year:int,lo:date,hi:date,cache:Path,opener:Callable=urlopen)
         mid=lo+timedelta(days=(hi-lo).days//2)
         return _fetch_adaptive(year,lo,mid,cache,opener)+_fetch_adaptive(year,mid+timedelta(days=1),hi,cache,opener)
     rows=parse_savant_csv(raw.decode('utf-8-sig',errors='replace'))
-    return [r for r in rows if lo<=date.fromisoformat(r.game_date)<=hi]
+    # Savant's hfBBT query parameter is an upstream efficiency hint, not a
+    # trusted semantic contract. Preserve/cache the raw official response, then
+    # enforce the exact same local contact predicate used by the historical V5
+    # rebuild before any row is allowed to advance rolling state.
+    return [r for r in rows if lo<=date.fromisoformat(r.game_date)<=hi and r.is_contact]
 
 
 def fetch_prior_season_contacts(*,year:int,start_date:date,cutoff_date:date,cache_dir:str|Path,opener:Callable=urlopen)->list[PlateAppearance]:
@@ -103,6 +107,7 @@ def fetch_prior_season_contacts(*,year:int,start_date:date,cutoff_date:date,cach
         hi=min(last,cur+timedelta(days=6)); out.extend(_fetch_adaptive(year,cur,hi,cache,opener)); cur=hi+timedelta(days=1)
     bad=[r for r in out if date.fromisoformat(r.game_date)>=cutoff_date]
     if bad: raise StatcastLiveSourceError("STATCAST_LIVE_CUTOFF_VIOLATION")
+    if any(not r.is_contact for r in out): raise StatcastLiveSourceError("STATCAST_LIVE_NONCONTACT_ROW")
     keys=[(r.game_pk,r.at_bat_number) for r in out]
     if len(keys)!=len(set(keys)): raise StatcastLiveSourceError("STATCAST_LIVE_DUPLICATE_PA")
     return out
