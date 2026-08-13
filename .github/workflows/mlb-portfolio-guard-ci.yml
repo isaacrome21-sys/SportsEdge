@@ -5,9 +5,13 @@ on:
     branches:
       - full-model-reconcile-20260813
     paths:
+      - scripts/run_auto_mlb.py
+      - sportsedge/truth_gate.py
+      - sportsedge/game_risk_guard.py
       - sportsedge/mlb_portfolio_guard.py
       - sportsedge/mlb_decision_settlement.py
       - sportsedge/ml_dog_calibration.py
+      - tests/test_game_risk_guard.py
       - tests/test_mlb_portfolio_guard.py
       - tests/test_mlb_decision_settlement.py
       - tests/test_ml_dog_calibration.py
@@ -29,14 +33,18 @@ jobs:
           python-version: '3.11'
       - name: Install test runtime
         run: python -m pip install --disable-pip-version-check pytest
-      - name: Compile modules
+      - name: Compile modules and hardened runner
         run: |
+          python -m py_compile sportsedge/truth_gate.py
+          python -m py_compile sportsedge/game_risk_guard.py
           python -m py_compile sportsedge/mlb_portfolio_guard.py
           python -m py_compile sportsedge/mlb_decision_settlement.py
           python -m py_compile sportsedge/ml_dog_calibration.py
-      - name: Run calibration and concentration regression tests
+          python -m py_compile scripts/run_auto_mlb.py
+      - name: Run calibration and wager-guard regression tests
         run: |
           PYTHONPATH=. python -m pytest -q \
+            tests/test_game_risk_guard.py \
             tests/test_mlb_portfolio_guard.py \
             tests/test_mlb_decision_settlement.py \
             tests/test_ml_dog_calibration.py
