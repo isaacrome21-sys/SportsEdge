@@ -6,6 +6,9 @@ class TruthGateError(ValueError):
     pass
 
 
+DEFAULT_MIN_EDGE = 0.025
+
+
 @dataclass(frozen=True)
 class BetDecision:
     model_status: str
@@ -27,7 +30,7 @@ def american_to_decimal(odds: float) -> float:
     return 1.0 + (100.0 / abs(odds) if odds < 0 else odds / 100.0)
 
 
-def decide_bet(model_p: float, american_odds: float, *, bound: bool, fresh: bool, deployed: bool, min_edge: float = 0.0, kelly_multiplier: float = 0.25) -> BetDecision:
+def decide_bet(model_p: float, american_odds: float, *, bound: bool, fresh: bool, deployed: bool, min_edge: float = DEFAULT_MIN_EDGE, kelly_multiplier: float = 0.25) -> BetDecision:
     if any(type(v) is not bool for v in (bound, fresh, deployed)):
         raise TruthGateError("bound/fresh/deployed must be bool")
     if not isinstance(model_p, (int, float)) or isinstance(model_p, bool) or not math.isfinite(float(model_p)) or not 0 <= float(model_p) <= 1:
@@ -45,10 +48,11 @@ def decide_bet(model_p: float, american_odds: float, *, bound: bool, fresh: bool
     b = dec - 1.0
     raw_kelly = max(0.0, (b * p - (1.0 - p)) / b) if b > 0 else 0.0
     kelly = raw_kelly * float(kelly_multiplier)
+    effective_min_edge = max(DEFAULT_MIN_EDGE, float(min_edge))
 
     if not (bound and fresh and deployed):
         status = "BLOCKED"
-    elif edge <= float(min_edge) or ev <= 0:
+    elif edge <= effective_min_edge or ev <= 0:
         status = "PASS"
     else:
         status = "OFFICIAL_BET"
