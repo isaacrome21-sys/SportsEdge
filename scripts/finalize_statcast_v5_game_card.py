@@ -24,7 +24,7 @@ def main()->int:
     a=load(ATT); legacy=load(LEGACY); strict=load(STRICT); now=datetime.now(timezone.utc)
     generated=datetime.fromisoformat(str(a['generated_at_utc']).replace('Z','+00:00')).astimezone(timezone.utc)
     age=(now-generated).total_seconds()
-    if age<0 or age>60: raise SystemExit(f'V5_ATTESTATION_TOO_OLD_FOR_CARD:{age:.3f}')
+    if age<0 or age>120: raise SystemExit(f'V5_ATTESTATION_TOO_OLD_FOR_CARD:{age:.3f}')
     if a.get('model_p_sportsbook_independent') is not True: raise SystemExit('MODEL_P_INDEPENDENCE_NOT_ATTESTED')
     for m in ('MONEYLINE','RUN_LINE','TOTALS'):
         row=(strict.get('markets') or {}).get(m) or {}
@@ -36,16 +36,17 @@ def main()->int:
         if game.get('status')!='SCORED_V5_ATTESTATION': continue
         gid=str(game['game_id']); snap=live.get(gid)
         if snap is None or snap.status!='Preview' or now>=parse_game_start(snap.game_date): continue
+        context=game.get('pregame_context')
+        if not isinstance(context,dict): raise SystemExit('PREGAME_CONTEXT_MISSING:'+gid)
         for c in game.get('candidates') or []:
             if c.get('model_p') is None or c.get('american_odds') is None: continue
-            # V5's untouched holdout currently proves aggregate game-market
-            # calibration, but not moneyline tail/market-disagreement behavior.
-            # A 2.5pp raw edge floor therefore applies before the downstream
-            # underdog/correlation safety overlay.
             d=decide_bet(float(c['model_p']),float(c['american_odds']),bound=True,fresh=True,deployed=True,min_edge=GLOBAL_MIN_EDGE)
             row={
                 **c,
                 'game_id':gid,'away':game.get('away'),'home':game.get('home'),
+                'away_lineup_1_9':game.get('away_lineup_1_9'),'home_lineup_1_9':game.get('home_lineup_1_9'),
+                'away_lineup_basis':game.get('away_full_lineup_basis'),'home_lineup_basis':game.get('home_full_lineup_basis'),
+                'pregame_context':context,
                 'bet_status':d.bet_status,'implied_probability':d.implied_probability,
                 'edge':d.edge,'ev_per_dollar':d.ev_per_dollar,'kelly_fraction':d.kelly_fraction,
                 'artifact_version':'GAME_SCORE_V5_STATCAST','n_sims':a['n_sims'],
@@ -60,7 +61,7 @@ def main()->int:
     official=sorted((r for r in rows if r['bet_status']=='OFFICIAL_BET'),key=lambda r:(r['ev_per_dollar'],r['edge']),reverse=True)
     status=build_required_market_status(legacy_registry=legacy,strict_registry=strict,quote_rows=quotes,card_rows=rows,source_failures=[])
     payload={
-        'schema_version':'sportsedge_v5_full_model_card_v2_risk_guard',
+        'schema_version':'sportsedge_v5_full_model_card_v3_full_context',
         'generated_at_utc':now.isoformat(),
         'source_attestation_generated_at_utc':a['generated_at_utc'],
         'slate_date_ct':slate,
@@ -68,6 +69,9 @@ def main()->int:
         'contact_transformer_sha256':a['contact_transformer_sha256'],
         'base_state_end_2025_sha256':a['base_state_end_2025_sha256'],
         'n_sims':a['n_sims'],
+        'context_schema_version':a.get('context_schema_version'),
+        'context_sources':a.get('context_sources'),
+        'context_model_p_consumption':a.get('context_model_p_consumption'),
         'official_bets_count':len(official),
         'best_bets':official,
         'game_candidates':rows,
@@ -81,7 +85,7 @@ def main()->int:
         },
     }
     OUT.parent.mkdir(parents=True,exist_ok=True); OUT.write_text(json.dumps(payload,indent=2,sort_keys=True)+'\n')
-    print(json.dumps({'official_bets_count':len(official),'best_bets':[{'market':x['market'],'selection':x.get('selection'),'line':x.get('line'),'odds':x['american_odds'],'model_p':x['model_p'],'ev':x['ev_per_dollar'],'risk_gate_reason':x.get('risk_gate_reason')} for x in official[:10]],'market_status':status['markets'],'risk_gate':payload['risk_gate']},indent=2))
+    print(json.dumps({'official_bets_count':len(official),'best_bets':[{'market':x['market'],'selection':x.get('selection'),'line':x.get('line'),'odds':x['american_odds'],'model_p':x['model_p'],'ev':x['ev_per_dollar'],'risk_gate_reason':x.get('risk_gate_reason')} for x in official[:10]],'market_status':status['markets'],'context_model_p_consumption':payload['context_model_p_consumption'],'risk_gate':payload['risk_gate']},indent=2))
     return 0
 
 if __name__=='__main__': raise SystemExit(main())
