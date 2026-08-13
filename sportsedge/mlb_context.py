@@ -1,6 +1,7 @@
-"""MLB-native bettor context that is informative but never model-driving."""
+"""MLB-native bettor context that is informative but never silently model-driving."""
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass
 import json
 from typing import Any, Callable, Mapping
@@ -61,90 +62,65 @@ def _plate_umpire(officials: Any) -> dict[str, Any] | None:
             return None
         out: dict[str, Any] = {"name": name}
         if official.get("id") is not None:
-            try:
-                out["id"] = int(official["id"])
-            except (TypeError, ValueError):
-                pass
+            try: out["id"] = int(official["id"])
+            except (TypeError, ValueError): pass
         return out
     return None
 
 
 def parse_context(snapshot: GameSnapshot, payload: Mapping[str, Any]) -> GameContext:
-    game_data = payload.get("gameData") or {}
-    live_data = payload.get("liveData") or {}
+    game_data = payload.get("gameData") or {}; live_data = payload.get("liveData") or {}
     if not isinstance(game_data, Mapping) or not isinstance(live_data, Mapping):
         raise MLBContextError("MLB_CONTEXT_SHAPE_INVALID")
-
     venue = game_data.get("venue") or {}
-    if not isinstance(venue, Mapping):
-        venue = {}
+    if not isinstance(venue, Mapping): venue = {}
     field_info = venue.get("fieldInfo") or {}
-    if not isinstance(field_info, Mapping):
-        field_info = {}
+    if not isinstance(field_info, Mapping): field_info = {}
     venue_name = str(venue.get("name") or "").strip() or None
     roof_type = str(field_info.get("roofType") or "").strip() or None
-
     raw_weather = game_data.get("weather")
-    if isinstance(raw_weather, Mapping) and raw_weather:
-        weather_status = "POSTED"
-        weather = dict(raw_weather)
-    else:
-        weather_status = "NOT_POSTED"
-        weather = None
-
+    weather_status = "POSTED" if isinstance(raw_weather, Mapping) and raw_weather else "NOT_POSTED"
+    weather = dict(raw_weather) if weather_status == "POSTED" else None
     boxscore = live_data.get("boxscore") or {}
-    if not isinstance(boxscore, Mapping):
-        boxscore = {}
-    plate = _plate_umpire(boxscore.get("officials"))
-    plate_status = "POSTED" if plate is not None else "NOT_POSTED"
-
+    if not isinstance(boxscore, Mapping): boxscore = {}
+    plate = _plate_umpire(boxscore.get("officials")); plate_status = "POSTED" if plate else "NOT_POSTED"
     probables = game_data.get("probablePitchers") or {}
-    if not isinstance(probables, Mapping):
-        probables = {}
-    away_p = probables.get("away") or {}
-    home_p = probables.get("home") or {}
+    if not isinstance(probables, Mapping): probables = {}
+    away_p = probables.get("away") or {}; home_p = probables.get("home") or {}
     away_name = str(away_p.get("fullName") or "").strip() if isinstance(away_p, Mapping) else ""
     home_name = str(home_p.get("fullName") or "").strip() if isinstance(home_p, Mapping) else ""
-
     return GameContext(
-        game_id=str(snapshot.game_pk),
-        away_team=snapshot.away_name,
-        home_team=snapshot.home_name,
+        game_id=str(snapshot.game_pk), away_team=snapshot.away_name, home_team=snapshot.home_name,
         away_probable_pitcher=away_name or snapshot.away_probable_pitcher_name,
         home_probable_pitcher=home_name or snapshot.home_probable_pitcher_name,
-        venue_name=venue_name,
-        roof_type=roof_type,
-        weather_status=weather_status,
-        weather=weather,
-        plate_umpire_status=plate_status,
-        plate_umpire=plate,
+        venue_name=venue_name, roof_type=roof_type, weather_status=weather_status, weather=weather,
+        plate_umpire_status=plate_status, plate_umpire=plate,
     )
+
+
+def _one(snapshot: GameSnapshot, opener: Callable) -> GameContext:
+    try:
+        payload = _get_json(f"{BASE}/api/v1.1/game/{int(snapshot.game_pk)}/feed/live", opener)
+        return parse_context(snapshot, payload)
+    except Exception as exc:
+        return GameContext(
+            str(snapshot.game_pk), snapshot.away_name, snapshot.home_name,
+            snapshot.away_probable_pitcher_name, snapshot.home_probable_pitcher_name,
+            None, None, "FETCH_FAILED", None, "FETCH_FAILED", None,
+            error=f"{type(exc).__name__}: {exc}",
+        )
 
 
 def fetch_slate_context(schedule: list[GameSnapshot], *, opener: Callable = urlopen) -> list[GameContext]:
     """Return one context row per scheduled game; failures are explicit, never dropped."""
-    rows: list[GameContext] = []
     seen: set[int] = set()
     for snapshot in schedule:
         if snapshot.game_pk in seen:
-            rows.append(GameContext(
-                str(snapshot.game_pk), snapshot.away_name, snapshot.home_name,
-                snapshot.away_probable_pitcher_name, snapshot.home_probable_pitcher_name,
-                None, None, "FETCH_FAILED", None, "FETCH_FAILED", None,
-                error="DUPLICATE_GAME_PK",
-            ))
-            continue
+            raise MLBContextError("DUPLICATE_GAME_PK")
         seen.add(snapshot.game_pk)
-        try:
-            payload = _get_json(f"{BASE}/api/v1.1/game/{int(snapshot.game_pk)}/feed/live", opener)
-            rows.append(parse_context(snapshot, payload))
-        except Exception as exc:
-            rows.append(GameContext(
-                str(snapshot.game_pk), snapshot.away_name, snapshot.home_name,
-                snapshot.away_probable_pitcher_name, snapshot.home_probable_pitcher_name,
-                None, None, "FETCH_FAILED", None, "FETCH_FAILED", None,
-                error=f"{type(exc).__name__}: {exc}",
-            ))
+    workers = max(1, min(8, len(schedule)))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        rows = list(pool.map(lambda s: _one(s, opener), schedule))
     return rows
 
 
