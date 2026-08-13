@@ -5,18 +5,22 @@ from __future__ import annotations
 import argparse
 from datetime import date, datetime, timezone
 import json
+import math
 import os
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from sportsedge.auto_native_odds import run_auto_mlb_native_odds
 from sportsedge.auto_runner import AutoRunnerError, AutoRunReport, report_to_dict, run_auto_mlb
-from sportsedge.bettor_card import build_bettor_card
+from sportsedge.bettor_card import build_bettor_card, enrich_result
 from sportsedge.decision_ledger import append_run_history, write_decision_ledger
 from sportsedge.game_artifacts import load_frozen_game_artifacts
 from sportsedge.game_history_live import build_live_game_feature_rows
+from sportsedge.game_risk_guard import GLOBAL_MIN_EDGE, RISK_GATE_VERSION, apply_game_risk_guard
 from sportsedge.mlb_context import context_to_dict, fetch_slate_context
+from sportsedge.mlb_portfolio_guard import PORTFOLIO_GUARD_VERSION, apply_mlb_portfolio_guard
 from sportsedge.mlb_source import fetch_schedule
+from sportsedge.truth_gate import decide_bet
 
 CHICAGO_TZ=ZoneInfo("America/Chicago")
 
@@ -77,8 +81,36 @@ def _automation_run_id(now: datetime) -> str:
     return f"manual:{now.isoformat()}"
 
 
+def _apply_wager_policy(rows: list[dict], *, min_edge: float, kelly_multiplier: float) -> list[dict]:
+    """Apply candidate- and slate-level risk controls before ledger emission."""
+    prepared=[]
+    for raw in rows:
+        row=enrich_result(raw,min_edge=min_edge)
+        row["selection"]=str(row.get("entity_id") or row.get("side") or "")
+        if row.get("model_p") is not None and row.get("american_odds") is not None:
+            d=decide_bet(float(row["model_p"]),float(row["american_odds"]),bound=True,fresh=True,deployed=True,min_edge=min_edge,kelly_multiplier=kelly_multiplier)
+            row["kelly_fraction"]=d.kelly_fraction
+        else:
+            row["kelly_fraction"]=0.0
+        prepared.append(row)
+
+    guarded=apply_game_risk_guard(prepared)
+    guarded=apply_mlb_portfolio_guard(guarded,dog_calibration_validated=False)
+    for row in guarded:
+        pre=row.get("pre_risk_gate_status")
+        pre_portfolio=row.get("pre_portfolio_bet_status")
+        if pre=="OFFICIAL_BET" and row.get("bet_status")!="OFFICIAL_BET":
+            row["reason"]=f"GAME_RISK_GUARD:{row.get('risk_gate_reason')}"
+        if pre_portfolio=="OFFICIAL_BET" and row.get("bet_status")!="OFFICIAL_BET":
+            row["reason"]=f"MLB_PORTFOLIO_GUARD:{row.get('portfolio_guard_reason')}"
+        row.pop("classification",None)
+        row.pop("price_needed_for_official",None)
+    return guarded
+
+
 def main()->int:
-    p=argparse.ArgumentParser(); p.add_argument("--output",default="artifacts/live_mlb_card.json"); p.add_argument("--require-confirmed-lineup",action="store_true"); p.add_argument("--min-edge",type=float,default=0.0); p.add_argument("--kelly-multiplier",type=float,default=0.25); args=p.parse_args()
+    p=argparse.ArgumentParser(); p.add_argument("--output",default="artifacts/live_mlb_card.json"); p.add_argument("--require-confirmed-lineup",action="store_true"); p.add_argument("--min-edge",type=float,default=GLOBAL_MIN_EDGE); p.add_argument("--kelly-multiplier",type=float,default=0.25); args=p.parse_args()
+    effective_min_edge=GLOBAL_MIN_EDGE if not math.isfinite(args.min_edge) else max(GLOBAL_MIN_EDGE,float(args.min_edge))
     quotes=os.environ.get("SPORTSEDGE_QUOTES_URL","").strip()
     odds_api_keys=tuple(value for value in (os.environ.get("SPORTSEDGE_ODDS_API_KEY","").strip(),os.environ.get("SPORTSEDGE_ODDS_API_KEY_2","").strip(),os.environ.get("SPORTSEDGE_ODDS_API_KEY_3","").strip(),os.environ.get("SPORTSEDGE_ODDS_API_KEY_4","").strip()) if value)
     odds_books=tuple(x.strip() for x in os.environ.get("SPORTSEDGE_ODDS_BOOKMAKERS","draftkings").split(",") if x.strip())
@@ -91,7 +123,7 @@ def main()->int:
         if game_score_path or nrfi_path:
             if not (game_score_path and nrfi_path): raise AutoRunnerError("GAME_ARTIFACT_CONFIG_INCOMPLETE")
             game_score_artifact,nrfi_artifact=load_frozen_game_artifacts(game_score_path=game_score_path,nrfi_path=nrfi_path)
-        common=dict(projected_lineups_url=projected,provider_token=token,now=now,require_confirmed_lineup=args.require_confirmed_lineup,min_edge=args.min_edge,kelly_multiplier=args.kelly_multiplier)
+        common=dict(projected_lineups_url=projected,provider_token=token,now=now,require_confirmed_lineup=args.require_confirmed_lineup,min_edge=effective_min_edge,kelly_multiplier=args.kelly_multiplier)
         report=None
         if odds_api_keys:
             try:
@@ -103,12 +135,16 @@ def main()->int:
                 if not quotes:
                     raise
         if report is None:
-            report=_external_report(quote_url=quotes,feature_url=features,projected=projected,token=token,now=now,min_edge=args.min_edge,kelly_multiplier=args.kelly_multiplier,require_confirmed_lineup=args.require_confirmed_lineup,history_cache_dir=history_cache_dir,game_score_artifact=game_score_artifact,nrfi_artifact=nrfi_artifact)
+            report=_external_report(quote_url=quotes,feature_url=features,projected=projected,token=token,now=now,min_edge=effective_min_edge,kelly_multiplier=args.kelly_multiplier,require_confirmed_lineup=args.require_confirmed_lineup,history_cache_dir=history_cache_dir,game_score_artifact=game_score_artifact,nrfi_artifact=nrfi_artifact)
             provider_notes.append({"stage":"QUOTE_PROVIDER","provider":"CONFIGURED_QUOTES_URL","status":"PASS"})
-        payload=report_to_dict(report); payload["provider_status"]=provider_notes; payload["bettor_card"]=build_bettor_card(report.results,min_edge=args.min_edge)
+        payload=report_to_dict(report)
+        payload["results"]=_apply_wager_policy(payload["results"],min_edge=effective_min_edge,kelly_multiplier=args.kelly_multiplier)
+        payload["provider_status"]=provider_notes
+        payload["wager_policy"]={"global_min_edge":GLOBAL_MIN_EDGE,"effective_min_edge":effective_min_edge,"candidate_guard":RISK_GATE_VERSION,"portfolio_guard":PORTFOLIO_GUARD_VERSION,"dog_calibration_validated":False,"model_p_modified":False}
+        payload["bettor_card"]=build_bettor_card(payload["results"],min_edge=effective_min_edge)
     except Exception as exc:
         infrastructure_blocked=True
-        payload={"slate_date_ct":now.astimezone(CHICAGO_TZ).date().isoformat(),"generated_at_utc":now.isoformat(),"run_status":"BLOCKED","results":[],"source_failures":[{"reason":f"{type(exc).__name__}: {exc}"}],"provider_status":provider_notes,"bettor_card":build_bettor_card([],min_edge=args.min_edge)}
+        payload={"slate_date_ct":now.astimezone(CHICAGO_TZ).date().isoformat(),"generated_at_utc":now.isoformat(),"run_status":"BLOCKED","results":[],"source_failures":[{"reason":f"{type(exc).__name__}: {exc}"}],"provider_status":provider_notes,"wager_policy":{"global_min_edge":GLOBAL_MIN_EDGE,"effective_min_edge":effective_min_edge,"candidate_guard":RISK_GATE_VERSION,"portfolio_guard":PORTFOLIO_GUARD_VERSION,"dog_calibration_validated":False,"model_p_modified":False},"bettor_card":build_bettor_card([],min_edge=effective_min_edge)}
     payload["slate_context"]=slate_context
     payload["context_failures"]=context_failures
     run_id=_automation_run_id(now); payload["run_id"]=run_id
