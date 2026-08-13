@@ -32,7 +32,7 @@ def _identity(quote: Mapping[str, Any]) -> tuple[str, str, str, Any, str]:
     return q["game_id"], q["market"], q["entity_id"], q["line"], q["side"]
 
 
-def run_pitcher_bb_card(*, games: list[LiveGame], feature_rows: list[Mapping[str, Any]], quotes: list[Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, registry_path: str = "config/deployments.json", min_edge: float = 0.0, kelly_multiplier: float = 0.25) -> list[PitcherCardResult]:
+def run_pitcher_bb_card(*, games: list[LiveGame], feature_rows: list[Mapping[str, Any]], quotes: list[Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, registry_path: str = "config/deployments.json", min_edge: float = 0.025, kelly_multiplier: float = 0.25) -> list[PitcherCardResult]:
     game_map = {str(g.game_pk): g for g in games}
     if len(game_map) != len(games):
         raise LiveSlateError("duplicate live game")
