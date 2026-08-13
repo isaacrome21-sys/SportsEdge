@@ -1,0 +1,222 @@
+name: hitter-fixture-transport-attest
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [full-model-reconcile-20260813]
+    paths:
+      - 'fixtures/transport/bb_hits_data.pkl.gz'
+      - 'fixtures/transport/tb_gameeffect_data.pkl.gz'
+      - 'scripts/run_hits_holdout.py'
+      - 'scripts/run_total_bases_holdout.py'
+      - 'sportsedge/hits_engine.py'
+      - 'sportsedge/total_bases_engine.py'
+      - 'sportsedge/fixture_io.py'
+      - 'config/attestation_requirements.json'
+      - 'config/fixture_transport_manifest.json'
+      - '.github/workflows/hitter-fixture-transport-attest.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  attest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - market: HITS
+            transport: fixtures/transport/bb_hits_data.pkl.gz
+            gzip_size: '4089956'
+            gzip_sha256: 84bc9bab6f36ff27b91bb23cd13429b677d58db429f3eb4b935f4354c96ca2dc
+            canonical: fixtures/hits/bb_hits_data.pkl
+            canonical_size: '19948081'
+            canonical_sha256: aaa006155de8078057fae0bd764a6aebca7e06057d9e83669d816536c5471776
+            runner: scripts/run_hits_holdout.py
+            pass_marker: 'PASS: full 83,769-row production Hits holdout'
+            rows: '83769'
+            engine_version: hits_engine_v1.3
+            feature_version: hits_batter_pitcher_pa_v1
+            attestation_name: hits_attestation.json
+          - market: TOTAL_BASES
+            transport: fixtures/transport/tb_gameeffect_data.pkl.gz
+            gzip_size: '7305084'
+            gzip_sha256: 578f2c7e99c8615cb8f312b9b4ecbb3292db8b8a44d2155f6754d86710c23988
+            canonical: fixtures/total_bases/tb_gameeffect_data.pkl
+            canonical_size: '24223755'
+            canonical_sha256: 1a816f5f46bf1042c2dcc13078092b6205b359a2ad49dca3fcfdb7b787914859
+            runner: scripts/run_total_bases_holdout.py
+            pass_marker: 'PASS: full 73,036-row production Total Bases holdout'
+            rows: '73036'
+            engine_version: total_bases_engine_v0.2
+            feature_version: tb_event_rates_pitcher_park_pa_v1
+            attestation_name: total_bases_attestation.json
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install exact holdout runtime
+        run: python -m pip install --disable-pip-version-check numpy
+
+      - name: Verify transport container and materialize canonical fixture
+        env:
+          MARKET: ${{ matrix.market }}
+          TRANSPORT: ${{ matrix.transport }}
+          GZIP_SIZE: ${{ matrix.gzip_size }}
+          GZIP_SHA256: ${{ matrix.gzip_sha256 }}
+          CANONICAL: ${{ matrix.canonical }}
+          CANONICAL_SIZE: ${{ matrix.canonical_size }}
+          CANONICAL_SHA256: ${{ matrix.canonical_sha256 }}
+        run: |
+          python - <<'PY'
+          import gzip, hashlib, os, pathlib
+
+          market = os.environ['MARKET']
+          src = pathlib.Path(os.environ['TRANSPORT'])
+          dst = pathlib.Path(os.environ['CANONICAL'])
+          if not src.is_file():
+              raise SystemExit(f'MISSING_TRANSPORT_FIXTURE[{market}]: {src}')
+
+          compressed = src.read_bytes()
+          if len(compressed) != int(os.environ['GZIP_SIZE']):
+              raise SystemExit(f'TRANSPORT_SIZE_MISMATCH[{market}]: {len(compressed)} != {os.environ["GZIP_SIZE"]}')
+          compressed_sha = hashlib.sha256(compressed).hexdigest()
+          if compressed_sha != os.environ['GZIP_SHA256']:
+              raise SystemExit(f'TRANSPORT_SHA256_MISMATCH[{market}]: {compressed_sha}')
+
+          try:
+              canonical = gzip.decompress(compressed)
+          except Exception as exc:
+              raise SystemExit(f'TRANSPORT_GZIP_INVALID[{market}]: {exc}') from exc
+
+          if len(canonical) != int(os.environ['CANONICAL_SIZE']):
+              raise SystemExit(f'CANONICAL_SIZE_MISMATCH[{market}]: {len(canonical)} != {os.environ["CANONICAL_SIZE"]}')
+          canonical_sha = hashlib.sha256(canonical).hexdigest()
+          if canonical_sha != os.environ['CANONICAL_SHA256']:
+              raise SystemExit(f'CANONICAL_SHA256_MISMATCH[{market}]: {canonical_sha}')
+
+          dst.parent.mkdir(parents=True, exist_ok=True)
+          dst.write_bytes(canonical)
+          print(f'TRANSPORT_OK[{market}] gzip_size={len(compressed)} gzip_sha256={compressed_sha}')
+          print(f'CANONICAL_OK[{market}] canonical_size={len(canonical)} canonical_sha256={canonical_sha}')
+          PY
+
+      - name: Verify checked-in transport manifest agrees
+        env:
+          MARKET: ${{ matrix.market }}
+          TRANSPORT: ${{ matrix.transport }}
+          GZIP_SIZE: ${{ matrix.gzip_size }}
+          GZIP_SHA256: ${{ matrix.gzip_sha256 }}
+          CANONICAL_SIZE: ${{ matrix.canonical_size }}
+          CANONICAL_SHA256: ${{ matrix.canonical_sha256 }}
+        run: |
+          python - <<'PY'
+          import json, os, pathlib
+          d = json.loads(pathlib.Path('config/fixture_transport_manifest.json').read_text())
+          row = d['markets'][os.environ['MARKET']]
+          expected = {
+              'gzip_size_bytes': int(os.environ['GZIP_SIZE']),
+              'gzip_sha256': os.environ['GZIP_SHA256'],
+              'canonical_size_bytes': int(os.environ['CANONICAL_SIZE']),
+              'canonical_sha256': os.environ['CANONICAL_SHA256'],
+          }
+          for key, value in expected.items():
+              if row.get(key) != value:
+                  raise SystemExit(f'TRANSPORT_MANIFEST_MISMATCH[{os.environ["MARKET"]}] {key}: {row.get(key)!r} != {value!r}')
+          print(f'TRANSPORT_MANIFEST_OK[{os.environ["MARKET"]}]')
+          PY
+
+      - name: Run authoritative untouched holdout
+        env:
+          MARKET: ${{ matrix.market }}
+          CANONICAL: ${{ matrix.canonical }}
+          RUNNER: ${{ matrix.runner }}
+          PASS_MARKER: ${{ matrix.pass_marker }}
+        run: |
+          mkdir -p artifacts/${{ matrix.market }}
+          set -o pipefail
+          python "$RUNNER" "$CANONICAL" | tee artifacts/${{ matrix.market }}/holdout.log
+          grep -F "$PASS_MARKER" artifacts/${{ matrix.market }}/holdout.log
+
+      - name: Emit exact-commit attestation
+        env:
+          MARKET: ${{ matrix.market }}
+          GZIP_SHA256: ${{ matrix.gzip_sha256 }}
+          CANONICAL_SHA256: ${{ matrix.canonical_sha256 }}
+          ENGINE_VERSION: ${{ matrix.engine_version }}
+          FEATURE_VERSION: ${{ matrix.feature_version }}
+          HOLDOUT_ROWS: ${{ matrix.rows }}
+          PASS_MARKER: ${{ matrix.pass_marker }}
+          ATTESTATION_NAME: ${{ matrix.attestation_name }}
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, pathlib, re
+          sha = os.environ['GITHUB_SHA']
+          if not re.fullmatch(r'[0-9a-f]{40}', sha):
+              raise SystemExit(f'INVALID_GITHUB_SHA: {sha!r}')
+          log_path = pathlib.Path('artifacts') / os.environ['MARKET'] / 'holdout.log'
+          log = log_path.read_text()
+          if os.environ['PASS_MARKER'] not in log:
+              raise SystemExit('HOLDOUT_PASS_MARKER_MISSING')
+          payload = {
+              'schema_version': 2,
+              'market': os.environ['MARKET'],
+              'test_name': 'full_holdout_acceptance',
+              'verdict': 'PASS',
+              'engine_version': os.environ['ENGINE_VERSION'],
+              'feature_version': os.environ['FEATURE_VERSION'],
+              'transport_gzip_sha256': os.environ['GZIP_SHA256'],
+              'fixture_sha256': os.environ['CANONICAL_SHA256'],
+              'ci_commit': sha,
+              'workflow_run_id': os.environ['GITHUB_RUN_ID'],
+              'workflow_run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
+              'holdout_rows': int(os.environ['HOLDOUT_ROWS']),
+              'holdout_log_sha256': hashlib.sha256(log.encode()).hexdigest(),
+          }
+          out = pathlib.Path('artifacts') / os.environ['MARKET'] / os.environ['ATTESTATION_NAME']
+          out.write_text(json.dumps(payload, sort_keys=True, indent=2) + '\n')
+          print(out.read_text())
+          PY
+
+      - name: Verify attestation contract
+        env:
+          MARKET: ${{ matrix.market }}
+          ATTESTATION_NAME: ${{ matrix.attestation_name }}
+          GZIP_SHA256: ${{ matrix.gzip_sha256 }}
+        run: |
+          python - <<'PY'
+          import json, os, pathlib, re
+          market = os.environ['MARKET']
+          req = json.loads(pathlib.Path('config/attestation_requirements.json').read_text())['markets'][market]
+          att = json.loads((pathlib.Path('artifacts') / market / os.environ['ATTESTATION_NAME']).read_text())
+          checks = {
+              'engine_version': req['engine_version'],
+              'feature_version': req['feature_version'],
+              'fixture_sha256': req['fixture_sha256'],
+              'verdict': req['required_verdict'],
+              'test_name': req['required_test_name'],
+              'transport_gzip_sha256': os.environ['GZIP_SHA256'],
+          }
+          for key, expected in checks.items():
+              if att.get(key) != expected:
+                  raise SystemExit(f'ATTESTATION_CONTRACT_MISMATCH[{market}] {key}: {att.get(key)!r} != {expected!r}')
+          if att.get('ci_commit') != os.environ['GITHUB_SHA']:
+              raise SystemExit(f'ATTESTATION_COMMIT_MISMATCH[{market}]')
+          if not re.fullmatch(r'[0-9a-f]{40}', att.get('ci_commit','')):
+              raise SystemExit(f'ATTESTATION_COMMIT_NOT_EXACT_SHA[{market}]')
+          print(f'ATTESTATION_CONTRACT_OK[{market}] commit={att["ci_commit"]}')
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hitter-fixture-attestation-${{ matrix.market }}-${{ github.sha }}
+          path: artifacts/${{ matrix.market }}/
+          if-no-files-found: warn
+          retention-days: 90
