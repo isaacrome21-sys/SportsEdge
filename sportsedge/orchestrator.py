@@ -33,7 +33,7 @@ def _reject_market_leakage(model_input: Mapping[str, Any]) -> None:
         raise OrchestrationError(f"sportsbook/market data prohibited in Model_Input: {sorted(present)}")
 
 
-def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], deployment: Mapping[str, Any], engine_fn: Callable[[Mapping[str, Any]], Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, min_edge: float = 0.0, kelly_multiplier: float = 0.25) -> RunResult:
+def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], deployment: Mapping[str, Any], engine_fn: Callable[[Mapping[str, Any]], Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, min_edge: float = 0.025, kelly_multiplier: float = 0.25) -> RunResult:
     """Run one candidate end-to-end. Any integrity failure returns BLOCKED, never a guessed bet."""
     market = str(model_input.get("market", "UNKNOWN"))
     try:
@@ -56,7 +56,7 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], d
         return RunResult(market, None, "BLOCKED", None, f"{type(exc).__name__}: {exc}")
 
 
-def run_slate(candidates: list[Mapping[str, Any]], *, engines: Mapping[str, Callable[[Mapping[str, Any]], Mapping[str, Any]]], deployments: Mapping[str, Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, min_edge: float = 0.0, kelly_multiplier: float = 0.25) -> list[RunResult]:
+def run_slate(candidates: list[Mapping[str, Any]], *, engines: Mapping[str, Callable[[Mapping[str, Any]], Mapping[str, Any]]], deployments: Mapping[str, Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, min_edge: float = 0.025, kelly_multiplier: float = 0.25) -> list[RunResult]:
     results: list[RunResult] = []
     for item in candidates:
         model_input = item.get("model_input")
