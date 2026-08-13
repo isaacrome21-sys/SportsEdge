@@ -3,6 +3,7 @@
   "contract": "SPORTSEDGE_STATCAST_V1",
   "source_holdout_run": 31627930135,
   "source_holdout_commit": "0571a3b0d0d063279840735f88230e9112bed07a",
+  "promotion_run_id": 31656118369,
   "live_attestation_run": 31656118369,
   "live_attestation_commit": "3b67fcfc30c2ba4c1da958858761711b57cd4780",
   "markets": {
