@@ -71,7 +71,7 @@ def _game_context_block_reason(game: LiveGame | None, *, require_confirmed_lineu
     return None
 
 
-def run_unified_card(*, games: list[LiveGame], feature_rows: list[Mapping[str, Any]], quotes: list[Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, registry_path: str = "config/deployments.json", require_confirmed_lineup: bool = True, min_edge: float = 0.0, kelly_multiplier: float = 0.25, game_feature_rows: list[Mapping[str, Any]] | None = None, game_score_artifact: Mapping[str, Any] | None = None, nrfi_artifact: Mapping[str, Any] | None = None) -> list[UnifiedCardResult]:
+def run_unified_card(*, games: list[LiveGame], feature_rows: list[Mapping[str, Any]], quotes: list[Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, registry_path: str = "config/deployments.json", require_confirmed_lineup: bool = True, min_edge: float = 0.025, kelly_multiplier: float = 0.25, game_feature_rows: list[Mapping[str, Any]] | None = None, game_score_artifact: Mapping[str, Any] | None = None, nrfi_artifact: Mapping[str, Any] | None = None) -> list[UnifiedCardResult]:
     indexed_hitter: list[tuple[int, Mapping[str, Any]]] = []
     indexed_pitcher: list[tuple[int, Mapping[str, Any]]] = []
     indexed_game: list[tuple[int, Mapping[str, Any]]] = []
