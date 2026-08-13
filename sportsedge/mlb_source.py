@@ -44,6 +44,31 @@ def _get_json(url: str, opener: Callable = urlopen) -> dict[str, Any]:
         raise MLBSourceError(f"MLB fetch failed: {exc}") from exc
 
 
+def fetch_team_abbreviation(team_id: int, opener: Callable = urlopen) -> str:
+    """Resolve one exact MLB team ID to the official StatsAPI abbreviation."""
+    if isinstance(team_id, bool):
+        raise MLBSourceError("team_id must be a positive integer")
+    try:
+        tid = int(team_id)
+    except (TypeError, ValueError) as exc:
+        raise MLBSourceError("team_id must be a positive integer") from exc
+    if tid <= 0:
+        raise MLBSourceError("team_id must be a positive integer")
+    payload = _get_json(f"{BASE}/api/v1/teams/{tid}", opener)
+    teams = payload.get("teams") or []
+    if not isinstance(teams, list) or len(teams) != 1:
+        raise MLBSourceError("MLB_TEAM_IDENTITY_UNRESOLVED")
+    row = teams[0] or {}
+    try:
+        returned = int(row.get("id"))
+    except (TypeError, ValueError) as exc:
+        raise MLBSourceError("MLB_TEAM_IDENTITY_UNRESOLVED") from exc
+    abbr = str(row.get("abbreviation") or "").strip().upper()
+    if returned != tid or not abbr or len(abbr) > 4:
+        raise MLBSourceError("MLB_TEAM_ABBREVIATION_UNRESOLVED")
+    return abbr
+
+
 def _pitcher(team: dict[str, Any]) -> tuple[int | None, str | None]:
     p = team.get("probablePitcher") or {}
     return p.get("id"), p.get("fullName")
