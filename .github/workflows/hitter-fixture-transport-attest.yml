@@ -12,6 +12,7 @@ on:
       - 'sportsedge/hits_engine.py'
       - 'sportsedge/total_bases_engine.py'
       - 'sportsedge/fixture_io.py'
+      - 'sportsedge/attestation.py'
       - 'config/attestation_requirements.json'
       - 'config/fixture_transport_manifest.json'
       - '.github/workflows/hitter-fixture-transport-attest.yml'
@@ -76,31 +77,26 @@ jobs:
         run: |
           python - <<'PY'
           import gzip, hashlib, os, pathlib
-
           market = os.environ['MARKET']
           src = pathlib.Path(os.environ['TRANSPORT'])
           dst = pathlib.Path(os.environ['CANONICAL'])
           if not src.is_file():
               raise SystemExit(f'MISSING_TRANSPORT_FIXTURE[{market}]: {src}')
-
           compressed = src.read_bytes()
           if len(compressed) != int(os.environ['GZIP_SIZE']):
               raise SystemExit(f'TRANSPORT_SIZE_MISMATCH[{market}]: {len(compressed)} != {os.environ["GZIP_SIZE"]}')
           compressed_sha = hashlib.sha256(compressed).hexdigest()
           if compressed_sha != os.environ['GZIP_SHA256']:
               raise SystemExit(f'TRANSPORT_SHA256_MISMATCH[{market}]: {compressed_sha}')
-
           try:
               canonical = gzip.decompress(compressed)
           except Exception as exc:
               raise SystemExit(f'TRANSPORT_GZIP_INVALID[{market}]: {exc}') from exc
-
           if len(canonical) != int(os.environ['CANONICAL_SIZE']):
               raise SystemExit(f'CANONICAL_SIZE_MISMATCH[{market}]: {len(canonical)} != {os.environ["CANONICAL_SIZE"]}')
           canonical_sha = hashlib.sha256(canonical).hexdigest()
           if canonical_sha != os.environ['CANONICAL_SHA256']:
               raise SystemExit(f'CANONICAL_SHA256_MISMATCH[{market}]: {canonical_sha}')
-
           dst.parent.mkdir(parents=True, exist_ok=True)
           dst.write_bytes(canonical)
           print(f'TRANSPORT_OK[{market}] gzip_size={len(compressed)} gzip_sha256={compressed_sha}')
@@ -110,7 +106,6 @@ jobs:
       - name: Verify checked-in transport manifest agrees
         env:
           MARKET: ${{ matrix.market }}
-          TRANSPORT: ${{ matrix.transport }}
           GZIP_SIZE: ${{ matrix.gzip_size }}
           GZIP_SHA256: ${{ matrix.gzip_sha256 }}
           CANONICAL_SIZE: ${{ matrix.canonical_size }}
@@ -118,8 +113,7 @@ jobs:
         run: |
           python - <<'PY'
           import json, os, pathlib
-          d = json.loads(pathlib.Path('config/fixture_transport_manifest.json').read_text())
-          row = d['markets'][os.environ['MARKET']]
+          row = json.loads(pathlib.Path('config/fixture_transport_manifest.json').read_text())['markets'][os.environ['MARKET']]
           expected = {
               'gzip_size_bytes': int(os.environ['GZIP_SIZE']),
               'gzip_sha256': os.environ['GZIP_SHA256'],
@@ -173,7 +167,7 @@ jobs:
               'feature_version': os.environ['FEATURE_VERSION'],
               'transport_gzip_sha256': os.environ['GZIP_SHA256'],
               'fixture_sha256': os.environ['CANONICAL_SHA256'],
-              'ci_commit': sha,
+              'ci_commit_sha': sha,
               'workflow_run_id': os.environ['GITHUB_RUN_ID'],
               'workflow_run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
               'holdout_rows': int(os.environ['HOLDOUT_ROWS']),
@@ -184,33 +178,25 @@ jobs:
           print(out.read_text())
           PY
 
-      - name: Verify attestation contract
+      - name: Validate attestation with canonical repository validator
         env:
           MARKET: ${{ matrix.market }}
           ATTESTATION_NAME: ${{ matrix.attestation_name }}
           GZIP_SHA256: ${{ matrix.gzip_sha256 }}
         run: |
           python - <<'PY'
-          import json, os, pathlib, re
+          import json, os, pathlib
+          from sportsedge.attestation import validate_attestation
           market = os.environ['MARKET']
-          req = json.loads(pathlib.Path('config/attestation_requirements.json').read_text())['markets'][market]
-          att = json.loads((pathlib.Path('artifacts') / market / os.environ['ATTESTATION_NAME']).read_text())
-          checks = {
-              'engine_version': req['engine_version'],
-              'feature_version': req['feature_version'],
-              'fixture_sha256': req['fixture_sha256'],
-              'verdict': req['required_verdict'],
-              'test_name': req['required_test_name'],
-              'transport_gzip_sha256': os.environ['GZIP_SHA256'],
-          }
-          for key, expected in checks.items():
-              if att.get(key) != expected:
-                  raise SystemExit(f'ATTESTATION_CONTRACT_MISMATCH[{market}] {key}: {att.get(key)!r} != {expected!r}')
-          if att.get('ci_commit') != os.environ['GITHUB_SHA']:
-              raise SystemExit(f'ATTESTATION_COMMIT_MISMATCH[{market}]')
-          if not re.fullmatch(r'[0-9a-f]{40}', att.get('ci_commit','')):
-              raise SystemExit(f'ATTESTATION_COMMIT_NOT_EXACT_SHA[{market}]')
-          print(f'ATTESTATION_CONTRACT_OK[{market}] commit={att["ci_commit"]}')
+          att_path = pathlib.Path('artifacts') / market / os.environ['ATTESTATION_NAME']
+          att = json.loads(att_path.read_text())
+          result = validate_attestation(att, expected_ci_commit_sha=os.environ['GITHUB_SHA'])
+          print(json.dumps(result, sort_keys=True, indent=2))
+          if not result['eligible_for_promotion']:
+              raise SystemExit(f'ATTESTATION_NOT_ELIGIBLE[{market}]')
+          if att.get('transport_gzip_sha256') != os.environ['GZIP_SHA256']:
+              raise SystemExit(f'ATTESTATION_TRANSPORT_HASH_MISMATCH[{market}]')
+          print(f'CANONICAL_ATTESTATION_OK[{market}] commit={att["ci_commit_sha"]}')
           PY
 
       - uses: actions/upload-artifact@v4
