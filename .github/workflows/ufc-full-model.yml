@@ -1,6 +1,12 @@
 name: ufc-full-model
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'sportsedge/ufc_*.py'
+      - 'scripts/*ufc*.py'
+      - '.github/workflows/ufc-full-model.yml'
   pull_request:
     paths:
       - 'sportsedge/ufc_*.py'
