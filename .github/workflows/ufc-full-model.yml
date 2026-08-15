@@ -1,0 +1,81 @@
+name: ufc-full-model
+
+on:
+  workflow_dispatch:
+    inputs:
+      fighters_path:
+        description: JSON fighter snapshot file
+        required: false
+        default: data/ufc/fighters_today.json
+      contexts_path:
+        description: JSON fight context file
+        required: false
+        default: data/ufc/contexts_today.json
+      model_artifact:
+        description: Trained UFC logistic artifact
+        required: false
+        default: models/ufc_logistic_v1.json
+  schedule:
+    - cron: '0 15 * * 6'
+    - cron: '0 19 * * 6'
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: ${{ github.workspace }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Run UFC unit tests
+        run: python -m pytest -q tests/test_ufc_engine.py tests/test_ufc_training.py tests/test_ufc_runtime.py
+
+  run:
+    needs: test
+    runs-on: ubuntu-latest
+    if: ${{ secrets.ODDS_API_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Resolve input paths
+        id: paths
+        shell: bash
+        run: |
+          FIGHTERS='${{ inputs.fighters_path }}'
+          CONTEXTS='${{ inputs.contexts_path }}'
+          MODEL='${{ inputs.model_artifact }}'
+          [ -n "$FIGHTERS" ] || FIGHTERS='data/ufc/fighters_today.json'
+          [ -n "$CONTEXTS" ] || CONTEXTS='data/ufc/contexts_today.json'
+          [ -n "$MODEL" ] || MODEL='models/ufc_logistic_v1.json'
+          echo "fighters=$FIGHTERS" >> "$GITHUB_OUTPUT"
+          echo "contexts=$CONTEXTS" >> "$GITHUB_OUTPUT"
+          echo "model=$MODEL" >> "$GITHUB_OUTPUT"
+      - name: Preflight inputs
+        shell: bash
+        run: |
+          test -f '${{ steps.paths.outputs.fighters }}' || { echo 'UFC_FIGHTER_SNAPSHOT_MISSING'; exit 1; }
+          test -f '${{ steps.paths.outputs.contexts }}' || { echo 'UFC_CONTEXT_SNAPSHOT_MISSING'; exit 1; }
+          test -f '${{ steps.paths.outputs.model }}' || { echo 'UFC_TRAINED_MODEL_MISSING'; exit 1; }
+      - name: Run 250k UFC model
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+        run: |
+          python scripts/run_ufc_full_model.py \
+            --fighters '${{ steps.paths.outputs.fighters }}' \
+            --contexts '${{ steps.paths.outputs.contexts }}' \
+            --model-artifact '${{ steps.paths.outputs.model }}' \
+            --sims 250000 \
+            --output artifacts/ufc_card.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ufc-full-model-${{ github.run_id }}
+          path: artifacts/ufc_card.json
+          if-no-files-found: error
