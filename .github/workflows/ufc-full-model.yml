@@ -1,20 +1,12 @@
 name: ufc-full-model
 
 on:
+  pull_request:
+    paths:
+      - 'sportsedge/ufc_*.py'
+      - 'scripts/*ufc*.py'
+      - '.github/workflows/ufc-full-model.yml'
   workflow_dispatch:
-    inputs:
-      fighters_path:
-        description: JSON fighter snapshot file
-        required: false
-        default: data/ufc/fighters_today.json
-      contexts_path:
-        description: JSON fight context file
-        required: false
-        default: data/ufc/contexts_today.json
-      model_artifact:
-        description: Trained UFC logistic artifact
-        required: false
-        default: models/ufc_logistic_v1.json
   schedule:
     - cron: '0 15 * * 6'
     - cron: '0 19 * * 6'
@@ -26,54 +18,62 @@ env:
   PYTHONPATH: ${{ github.workspace }}
 
 jobs:
-  test:
+  test-and-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
-      - name: Run UFC unit tests
+      - name: Run UFC tests
         run: python -m pytest -q tests/test_ufc_engine.py tests/test_ufc_training.py tests/test_ufc_runtime.py
+      - name: Train chronological UFC model from public historical snapshot
+        run: python scripts/build_ufc_training_artifact.py --output models/ufc_logistic_v1.json --metrics artifacts/ufc_training_metrics.json
+      - name: Build current UFC fighter/context snapshots
+        run: python scripts/build_ufc_live_inputs.py --fighters data/ufc/fighters_today.json --contexts data/ufc/contexts_today.json
+      - name: Verify artifacts
+        run: |
+          test -s models/ufc_logistic_v1.json
+          test -s data/ufc/fighters_today.json
+          test -s data/ufc/contexts_today.json
+          python - <<'PY'
+          import json
+          m=json.load(open('models/ufc_logistic_v1.json'))
+          f=json.load(open('data/ufc/fighters_today.json'))
+          c=json.load(open('data/ufc/contexts_today.json'))
+          assert m['training_rows'] >= 1000
+          assert m['holdout_metrics']['n'] >= 100
+          assert len(f['fighters']) >= 20
+          assert len(c) >= 10
+          print('UFC_BOOTSTRAP_OK',m['training_rows'],m['holdout_metrics'],len(f['fighters']),len(c))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ufc-bootstrap-${{ github.run_id }}
+          path: |
+            models/ufc_logistic_v1.json
+            artifacts/ufc_training_metrics.json
+            data/ufc/fighters_today.json
+            data/ufc/contexts_today.json
+          if-no-files-found: error
 
-  run:
-    needs: test
+  run-card:
+    needs: test-and-build
     runs-on: ubuntu-latest
-    if: ${{ secrets.ODDS_API_KEY != '' }}
+    if: ${{ github.event_name != 'pull_request' && secrets.ODDS_API_KEY != '' }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
-      - name: Resolve input paths
-        id: paths
-        shell: bash
+      - name: Rebuild model and live inputs
         run: |
-          FIGHTERS='${{ inputs.fighters_path }}'
-          CONTEXTS='${{ inputs.contexts_path }}'
-          MODEL='${{ inputs.model_artifact }}'
-          [ -n "$FIGHTERS" ] || FIGHTERS='data/ufc/fighters_today.json'
-          [ -n "$CONTEXTS" ] || CONTEXTS='data/ufc/contexts_today.json'
-          [ -n "$MODEL" ] || MODEL='models/ufc_logistic_v1.json'
-          echo "fighters=$FIGHTERS" >> "$GITHUB_OUTPUT"
-          echo "contexts=$CONTEXTS" >> "$GITHUB_OUTPUT"
-          echo "model=$MODEL" >> "$GITHUB_OUTPUT"
-      - name: Preflight inputs
-        shell: bash
-        run: |
-          test -f '${{ steps.paths.outputs.fighters }}' || { echo 'UFC_FIGHTER_SNAPSHOT_MISSING'; exit 1; }
-          test -f '${{ steps.paths.outputs.contexts }}' || { echo 'UFC_CONTEXT_SNAPSHOT_MISSING'; exit 1; }
-          test -f '${{ steps.paths.outputs.model }}' || { echo 'UFC_TRAINED_MODEL_MISSING'; exit 1; }
+          python scripts/build_ufc_training_artifact.py --output models/ufc_logistic_v1.json --metrics artifacts/ufc_training_metrics.json
+          python scripts/build_ufc_live_inputs.py --fighters data/ufc/fighters_today.json --contexts data/ufc/contexts_today.json
       - name: Run 250k UFC model
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
-        run: |
-          python scripts/run_ufc_full_model.py \
-            --fighters '${{ steps.paths.outputs.fighters }}' \
-            --contexts '${{ steps.paths.outputs.contexts }}' \
-            --model-artifact '${{ steps.paths.outputs.model }}' \
-            --sims 250000 \
-            --output artifacts/ufc_card.json
+        run: python scripts/run_ufc_full_model.py --fighters data/ufc/fighters_today.json --contexts data/ufc/contexts_today.json --model-artifact models/ufc_logistic_v1.json --sims 250000 --output artifacts/ufc_card.json
       - uses: actions/upload-artifact@v4
         with:
           name: ufc-full-model-${{ github.run_id }}
