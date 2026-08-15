@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import argparse,csv,json,re
+import argparse,csv,json,unicodedata
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.request import Request,urlopen
 from sportsedge.ufc_source import upcoming_event_urls,parse_event,fighter_urls_from_bout,parse_fighter_profile
@@ -14,14 +14,8 @@ def _f(r,k,d=0.0):
     try:return float(r.get(k) or d)
     except:return d
 
-def _age(dob,event_date):
-    if not dob:return 30.0
-    for fmt in ('%b %d, %Y','%B %d, %Y'):
-        try:
-            d=datetime.strptime(dob,fmt); e=datetime.strptime(event_date,'%B %d, %Y')
-            return (e-d).days/365.2425
-        except:pass
-    return 30.0
+def _norm(s):
+    return ''.join(c for c in unicodedata.normalize('NFKD',str(s or '')) if not unicodedata.combining(c)).lower().replace("'",'').replace('-',' ').strip()
 
 def _history():
     req=Request(DATA_URL,headers={'User-Agent':'SportsEdge/1.0'})
@@ -29,41 +23,79 @@ def _history():
     rows=list(csv.DictReader(text.splitlines())); rows=[r for r in rows if r.get('winner') in {'Red','Blue'} and r.get('date')]
     rows.sort(key=lambda r:r['date']); latest={}; last_date={}; elo=defaultdict(lambda:1500.0)
     for r in rows:
-        rn,bn=r['r_fighter'],r['b_fighter']; er,eb=elo[rn],elo[bn]; y=1.0 if r['winner']=='Red' else 0.0
-        for side,name in [('r',rn),('b',bn)]: latest[name]=(side,r); last_date[name]=r['date']
-        elo[rn],elo[bn]=update_elo(er,eb,y)
+        rn,bn=r['r_fighter'],r['b_fighter']; er,eb=elo[_norm(rn)],elo[_norm(bn)]; y=1.0 if r['winner']=='Red' else 0.0
+        for side,name in [('r',rn),('b',bn)]: latest[_norm(name)]=(side,r); last_date[_norm(name)]=r['date']
+        elo[_norm(rn)],elo[_norm(bn)]=update_elo(er,eb,y)
     return latest,last_date,elo
 
-def main():
-    ap=argparse.ArgumentParser();ap.add_argument('--fighters',default='data/ufc/fighters_today.json');ap.add_argument('--contexts',default='data/ufc/contexts_today.json');a=ap.parse_args()
+def _event_dt(text):
+    for fmt in ('%B %d, %Y','%b %d, %Y','%Y-%m-%d'):
+        try:return datetime.strptime(text,fmt)
+        except:pass
+    raise ValueError('UFC_EVENT_DATE_INVALID')
+
+def _snapshot_from_history(name, weight_class, event_date, latest,last_date,elo, *, late_replacement=False):
+    key=_norm(name); side,row=latest.get(key,('',{})); event_dt=_event_dt(event_date)
+    if not side:
+        return {'name':name,'age':30.0,'height_in':0.0,'reach_in':0.0,'stance':'Unknown','wins':0,'losses':0,'draws':0,
+          'sig_strikes_landed_pm':0.0,'sig_strikes_absorbed_pm':0.0,'sig_strike_accuracy':0.0,'sig_strike_defense':0.0,
+          'takedowns_per_15':0.0,'takedown_accuracy':0.0,'takedown_defense':0.0,'submissions_per_15':0.0,'control_seconds_per_15':0.0,'knockdowns_per_15':0.0,
+          'finish_win_rate':0.0,'finish_loss_rate':0.0,'recent_win_rate':0.5,'strength_of_schedule':0.5,'elo':elo[key],
+          'days_since_last_fight':180.0,'weight_class':weight_class,'late_replacement':late_replacement,'missingness':1.0}
+    last_dt=datetime.strptime(last_date[key],'%Y-%m-%d'); days=max(0,(event_dt-last_dt).days)
+    hist_age=_f(row,f'{side}_age',30.0); age=hist_age + days/365.2425
+    height=_f(row,f'{side}_height_cms')/2.54; reach=_f(row,f'{side}_reach_cms')/2.54
+    slpm=_f(row,f'{side}_avg_sig_str_landed'); stracc=_f(row,f'{side}_avg_sig_str_pct'); tdavg=_f(row,f'{side}_avg_td_landed'); tdacc=_f(row,f'{side}_avg_td_pct'); subavg=_f(row,f'{side}_avg_sub_att')
+    wins=int(_f(row,f'{side}_wins')); losses=int(_f(row,f'{side}_losses'))
+    finish_wins=_f(row,f'{side}_win_by_ko_tko')+_f(row,f'{side}_win_by_submission')
+    rw=min(1.0,max(0.0,0.5+0.08*(_f(row,f'{side}_current_win_streak')-_f(row,f'{side}_current_lose_streak'))))
+    core=(height,reach,slpm,stracc,tdavg,tdacc,subavg); missing=sum(x==0.0 for x in core)/len(core)
+    return {'name':name,'age':age,'height_in':height,'reach_in':reach,'stance':str(row.get(f'{side}_stance') or 'Unknown'),'wins':wins,'losses':losses,'draws':0,
+      'sig_strikes_landed_pm':slpm,'sig_strikes_absorbed_pm':0.0,'sig_strike_accuracy':stracc,'sig_strike_defense':0.0,
+      'takedowns_per_15':tdavg,'takedown_accuracy':tdacc,'takedown_defense':0.0,'submissions_per_15':subavg,'control_seconds_per_15':0.0,'knockdowns_per_15':0.0,
+      'finish_win_rate':(finish_wins/wins if wins else 0.0),'finish_loss_rate':0.0,'recent_win_rate':rw,'strength_of_schedule':0.5,'elo':elo[key],
+      'days_since_last_fight':float(days),'weight_class':weight_class,'late_replacement':late_replacement,'missingness':min(1.0,missing+0.15)}
+
+def _from_override(path, latest,last_date,elo):
+    cfg=json.loads(Path(path).read_text()); fighters={}; contexts=[]
+    for b in cfg['bouts']:
+        late=str(b.get('late_replacement') or '')
+        for name in (b['fighter_a'],b['fighter_b']):
+            fighters[name]=_snapshot_from_history(name,b.get('weight_class',''),cfg['event_date'],latest,last_date,elo,late_replacement=(name==late))
+        contexts.append({'fighter_a':b['fighter_a'],'fighter_b':b['fighter_b'],'rounds':int(b.get('rounds',3)),'title_fight':bool(b.get('title_fight',False)),
+                         'short_notice_days':b.get('short_notice_days'),'altitude_ft':0.0})
+    return cfg['event'],cfg['event_date'],fighters,contexts
+
+def _from_ufcstats(latest,last_date,elo):
     urls=upcoming_event_urls()
-    if not urls: raise SystemExit('UFC_UPCOMING_EVENT_MISSING')
-    bouts=parse_event(urls[0]);
-    if not bouts: raise SystemExit('UFC_UPCOMING_BOUTS_MISSING')
-    latest,last_date,elo=_history(); fighters={}; contexts=[]
+    if not urls:return None
+    bouts=parse_event(urls[0])
+    if not bouts:return None
+    fighters={}; contexts=[]
     for i,b in enumerate(bouts):
         try: ua,ub=fighter_urls_from_bout(b.bout_url); pa,pb=parse_fighter_profile(ua),parse_fighter_profile(ub)
-        except Exception as exc:
-            print('snapshot skip',b.fighter_a,b.fighter_b,exc); continue
+        except Exception: continue
         for p in (pa,pb):
-            side,row=latest.get(p.name,('',{})); wins=int(_f(row,f'{side}_wins',0)); losses=int(_f(row,f'{side}_losses',0))
-            finish_wins=_f(row,f'{side}_win_by_ko_tko')+_f(row,f'{side}_win_by_submission')
-            rw=min(1.0,max(0.0,0.5+0.08*(_f(row,f'{side}_current_win_streak')-_f(row,f'{side}_current_lose_streak')))) if side else 0.5
-            height=p.height_in or 0.0; reach=p.reach_in or 0.0; missing=sum(x==0.0 for x in (height,reach,p.slpm,p.sapm))/4.0
-            days=180.0
-            if p.name in last_date:
-                try: days=max(0.0,(datetime.strptime(b.event_date,'%B %d, %Y')-datetime.strptime(last_date[p.name],'%Y-%m-%d')).days)
-                except: pass
-            fighters[p.name]={'name':p.name,'age':_age(p.dob,b.event_date),'height_in':height,'reach_in':reach,'stance':p.stance or 'Unknown','wins':wins,'losses':losses,'draws':0,
-              'sig_strikes_landed_pm':p.slpm,'sig_strikes_absorbed_pm':p.sapm,'sig_strike_accuracy':p.str_acc,'sig_strike_defense':p.str_def,
-              'takedowns_per_15':p.td_avg,'takedown_accuracy':p.td_acc,'takedown_defense':p.td_def,'submissions_per_15':p.sub_avg,'control_seconds_per_15':0.0,'knockdowns_per_15':0.0,
-              'finish_win_rate':(finish_wins/wins if wins else 0.0),'finish_loss_rate':0.0,'recent_win_rate':rw,'strength_of_schedule':0.5,'elo':elo[p.name],'days_since_last_fight':days,
-              'weight_class':b.weight_class,'late_replacement':False,'missingness':missing}
-        title = i < 2 and ('330' in b.event or 'title' in b.weight_class.lower())
-        rounds=5 if title or i<2 else 3
-        contexts.append({'fighter_a':b.fighter_a,'fighter_b':b.fighter_b,'rounds':rounds,'title_fight':bool(title),'short_notice_days':None,'altitude_ft':0.0})
+            snap=_snapshot_from_history(p.name,b.weight_class,b.event_date,latest,last_date,elo)
+            snap.update({'height_in':p.height_in or snap['height_in'],'reach_in':p.reach_in or snap['reach_in'],'stance':p.stance or snap['stance'],
+                         'sig_strikes_landed_pm':p.slpm or snap['sig_strikes_landed_pm'],'sig_strikes_absorbed_pm':p.sapm,
+                         'sig_strike_accuracy':p.str_acc or snap['sig_strike_accuracy'],'sig_strike_defense':p.str_def,
+                         'takedowns_per_15':p.td_avg or snap['takedowns_per_15'],'takedown_accuracy':p.td_acc or snap['takedown_accuracy'],
+                         'takedown_defense':p.td_def,'submissions_per_15':p.sub_avg or snap['submissions_per_15']})
+            fighters[p.name]=snap
+        title=i<2; contexts.append({'fighter_a':b.fighter_a,'fighter_b':b.fighter_b,'rounds':5 if title else 3,'title_fight':title,'short_notice_days':None,'altitude_ft':0.0})
+    return bouts[0].event,bouts[0].event_date,fighters,contexts
+
+def main():
+    ap=argparse.ArgumentParser();ap.add_argument('--fighters',default='data/ufc/fighters_today.json');ap.add_argument('--contexts',default='data/ufc/contexts_today.json');ap.add_argument('--override',default='config/ufc_330_current.json');a=ap.parse_args()
+    latest,last_date,elo=_history(); result=_from_ufcstats(latest,last_date,elo)
+    if result is None:
+        if not Path(a.override).exists(): raise SystemExit('UFC_LIVE_INPUTS_UNAVAILABLE')
+        result=_from_override(a.override,latest,last_date,elo)
+    event,event_date,fighters,contexts=result
+    if len(fighters)<20 or len(contexts)<10: raise SystemExit(f'UFC_LIVE_INPUTS_INCOMPLETE fighters={len(fighters)} bouts={len(contexts)}')
     Path(a.fighters).parent.mkdir(parents=True,exist_ok=True);Path(a.contexts).parent.mkdir(parents=True,exist_ok=True)
-    Path(a.fighters).write_text(json.dumps({'event':bouts[0].event,'event_date':bouts[0].event_date,'fighters':list(fighters.values())},indent=2,sort_keys=True))
+    Path(a.fighters).write_text(json.dumps({'event':event,'event_date':event_date,'generated_at':datetime.now(timezone.utc).isoformat(),'fighters':list(fighters.values())},indent=2,sort_keys=True))
     Path(a.contexts).write_text(json.dumps(contexts,indent=2,sort_keys=True))
-    print(json.dumps({'event':bouts[0].event,'fighters':len(fighters),'bouts':len(contexts)},sort_keys=True))
+    print(json.dumps({'event':event,'fighters':len(fighters),'bouts':len(contexts),'max_missingness':max(x['missingness'] for x in fighters.values())},sort_keys=True))
 if __name__=='__main__':main()
