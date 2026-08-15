@@ -31,6 +31,8 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
+      - name: Install test dependency
+        run: python -m pip install --disable-pip-version-check pytest
       - name: Run UFC tests
         run: python -m pytest -q tests/test_ufc_engine.py tests/test_ufc_training.py tests/test_ufc_runtime.py
       - name: Train chronological UFC model from public historical snapshot
