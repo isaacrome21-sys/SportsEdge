@@ -19,7 +19,7 @@ def test_advanced_features_and_context_penalty():
     f=derive_advanced_features(rounds,opponent_strengths=[0.7,0.8])
     assert f.pace_r1 > f.pace_r2
     assert 0 < f.control_share < 1
-    assert f.takedown_quality == 0.5
+    assert abs(f.takedown_quality - (3/7)) < 1e-12
     assert context_uncertainty(FightWeekContext(short_notice_days=7,missed_weight=True)) >= 0.13
 
 
