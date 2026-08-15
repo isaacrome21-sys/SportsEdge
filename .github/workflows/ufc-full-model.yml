@@ -66,21 +66,30 @@ jobs:
   run-card:
     needs: test-and-build
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' && secrets.ODDS_API_KEY != '' }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
+      - name: Check live odds credential
+        id: odds
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+        shell: bash
+        run: |
+          if [ -n "$ODDS_API_KEY" ]; then echo 'available=true' >> "$GITHUB_OUTPUT"; else echo 'available=false' >> "$GITHUB_OUTPUT"; fi
       - name: Rebuild model and live inputs
+        if: ${{ steps.odds.outputs.available == 'true' }}
         run: |
           python scripts/build_ufc_training_artifact.py --output models/ufc_logistic_v1.json --metrics artifacts/ufc_training_metrics.json
           python scripts/build_ufc_live_inputs.py --fighters data/ufc/fighters_today.json --contexts data/ufc/contexts_today.json
       - name: Run 250k UFC model
+        if: ${{ steps.odds.outputs.available == 'true' }}
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
         run: python scripts/run_ufc_full_model.py --fighters data/ufc/fighters_today.json --contexts data/ufc/contexts_today.json --model-artifact models/ufc_logistic_v1.json --sims 250000 --output artifacts/ufc_card.json
       - uses: actions/upload-artifact@v4
+        if: ${{ steps.odds.outputs.available == 'true' }}
         with:
           name: ufc-full-model-${{ github.run_id }}
           path: artifacts/ufc_card.json
