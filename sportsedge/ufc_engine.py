@@ -190,7 +190,8 @@ def no_vig_two_way(odds_a: int, odds_b: int) -> tuple[float, float]:
 
 def expected_value(prob: float, american_odds: int) -> float:
     profit = american_odds / 100.0 if american_odds > 0 else 100.0 / (-american_odds)
-    return prob * profit - (1.0 - prob)
+    value = prob * profit - (1.0 - prob)
+    return 0.0 if abs(value) < 1e-12 else value
 
 
 def fair_american(prob: float) -> int:
