@@ -1,0 +1,19 @@
+{
+  "event": "UFC 330: Makhachev vs Machado Garry",
+  "event_date": "August 15, 2026",
+  "source_note": "Current fight-card override for Aug. 15, 2026. Two title fights verified from UFC; late Charles Johnson opponent replacement verified from current reporting. Missing historical fighter data must remain uncertainty, never imputed as certainty.",
+  "bouts": [
+    {"fighter_a":"Islam Makhachev","fighter_b":"Ian Machado Garry","weight_class":"Welterweight","rounds":5,"title_fight":true},
+    {"fighter_a":"Mackenzie Dern","fighter_b":"Gillian Robertson","weight_class":"Women's Strawweight","rounds":5,"title_fight":true},
+    {"fighter_a":"Jalin Turner","fighter_b":"Kaue Fernandes","weight_class":"Lightweight","rounds":3,"title_fight":false},
+    {"fighter_a":"Mansur Abdul-Malik","fighter_b":"Dustin Stoltzfus","weight_class":"Middleweight","rounds":3,"title_fight":false},
+    {"fighter_a":"Edson Barboza","fighter_b":"Esteban Ribovics","weight_class":"Lightweight","rounds":3,"title_fight":false},
+    {"fighter_a":"Chidi Njokuani","fighter_b":"Joel Alvarez","weight_class":"Welterweight","rounds":3,"title_fight":false},
+    {"fighter_a":"Charles Johnson","fighter_b":"Eduardo Henrique","weight_class":"Catchweight 130","rounds":3,"title_fight":false,"late_replacement":"Eduardo Henrique","short_notice_days":3},
+    {"fighter_a":"Donte Johnson","fighter_b":"Eric McConico","weight_class":"Middleweight","rounds":3,"title_fight":false},
+    {"fighter_a":"Vicente Luque","fighter_b":"Tresean Gore","weight_class":"Middleweight","rounds":3,"title_fight":false},
+    {"fighter_a":"Rafael Tobias","fighter_b":"Lucas Fernando","weight_class":"Middleweight","rounds":3,"title_fight":false},
+    {"fighter_a":"Neil Magny","fighter_b":"Ramiz Brahimaj","weight_class":"Welterweight","rounds":3,"title_fight":false},
+    {"fighter_a":"Myktybek Orolbai","fighter_b":"Jeremiah Wells","weight_class":"Welterweight","rounds":3,"title_fight":false}
+  ]
+}
