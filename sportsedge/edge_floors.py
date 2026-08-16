@@ -3,7 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from enum import Enum
+import json
+from pathlib import Path
 from typing import Any, Mapping
+
+
+DEFAULT_EDGE_FLOOR_CONFIG = "config/truth_gate_floors.json"
 
 
 class EdgeFloorError(ValueError):
@@ -26,6 +31,16 @@ class FrozenEdgeFloor:
     frozen_by_commit: str
 
 
+def load_edge_floor_config(path: str = DEFAULT_EDGE_FLOOR_CONFIG) -> Mapping[str, Any]:
+    try:
+        raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise EdgeFloorError(f"unable to load edge-floor config: {path}") from exc
+    if not isinstance(raw, Mapping):
+        raise EdgeFloorError("edge-floor config root must be an object")
+    return raw
+
+
 def _as_positive_decimal(value: Any) -> Decimal:
     try:
         d = Decimal(str(value))
@@ -43,6 +58,12 @@ def require_frozen_edge_floor(*, market: str, config: Mapping[str, Any]) -> Froz
     truth_gate = config.get("truth_gate")
     if not isinstance(truth_gate, Mapping):
         raise EdgeFloorError("missing truth_gate config")
+
+    production = truth_gate.get("production")
+    if not isinstance(production, Mapping) or production.get("fail_closed") is not True:
+        raise EdgeFloorError("truth_gate.production.fail_closed must be true")
+    if production.get("allow_cli_floor_override") is not False:
+        raise EdgeFloorError("production CLI floor overrides must be disabled")
 
     floors = truth_gate.get("edge_floors")
     if not isinstance(floors, Mapping):
@@ -85,3 +106,7 @@ def require_frozen_edge_floor(*, market: str, config: Mapping[str, Any]) -> Froz
         oos_cutoff_utc=evidence["oos_cutoff_utc"],
         frozen_by_commit=frozen_by_commit,
     )
+
+
+def require_production_edge_floor(*, market: str, path: str = DEFAULT_EDGE_FLOOR_CONFIG) -> FrozenEdgeFloor:
+    return require_frozen_edge_floor(market=market, config=load_edge_floor_config(path))
