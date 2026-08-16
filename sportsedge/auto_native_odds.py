@@ -20,7 +20,11 @@ from .mlb_history_cache import MLBHistoryCachedOpener
 from .mlb_hits_features import MLBHitsFeatureError, MLBHitsHistorySource
 from .mlb_source import fetch_boxscore, fetch_schedule
 from .mlb_total_bases_features import MLBTBFeatureError, MLBTBHistorySource
-from .odds_api_source import build_participant_index, fetch_mlb_player_prop_quotes
+from .odds_api_source import (
+    build_participant_index,
+    fetch_mlb_player_prop_quotes,
+    fetch_odds_api_usage,
+)
 from .odds_keyring import fetch_with_key_failover
 
 CHICAGO_TZ = ZoneInfo("America/Chicago")
@@ -107,6 +111,7 @@ def run_auto_mlb_native_odds(
     kelly_multiplier: float = 0.25,
     bookmakers: tuple[str, ...] = ("draftkings",),
     history_cache_dir: str | Path | None = None,
+    prop_window_hours: float | None = None,
 ) -> AutoRunReport:
     current = now or datetime.now(timezone.utc)
     if not isinstance(current, datetime) or current.tzinfo is None or current.utcoffset() is None:
@@ -129,16 +134,21 @@ def run_auto_mlb_native_odds(
             roster_failures.append({"stage": "MLB_ROSTER_IDENTITY", "game_id": str(game.game_pk), "reason": f"{type(exc).__name__}: {exc}"})
 
     participant_index = build_participant_index(schedule=schedule, confirmed_names_by_game=roster_names)
-    keyring = fetch_with_key_failover(
-        (odds_api_key, *odds_api_keys),
-        lambda key: fetch_mlb_player_prop_quotes(
+
+    def fetch_for_key(key: str):
+        usage = fetch_odds_api_usage(api_key=key, opener=opener)
+        return fetch_mlb_player_prop_quotes(
             api_key=key,
             schedule=schedule,
             participant_index=participant_index,
             opener=opener,
             bookmakers=bookmakers,
-        ),
-    )
+            now=current,
+            max_hours_ahead=prop_window_hours,
+            quota_remaining=usage.remaining,
+        )
+
+    keyring = fetch_with_key_failover((odds_api_key, *odds_api_keys), fetch_for_key)
     odds = keyring.value
     key_failures = [
         {"stage": "ODDS_API_KEY_FAILOVER", "key_slot": item.key_slot, "reason": item.reason}
