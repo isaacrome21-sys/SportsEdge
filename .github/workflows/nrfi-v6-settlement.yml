@@ -2,6 +2,10 @@ name: nrfi-v6-cumulative-settlement
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/nrfi-v6-settlement.yml'
+      - 'scripts/score_nrfi_v6_forward_shadow.py'
   schedule:
     - cron: '17 * * * *'
 
@@ -10,7 +14,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: nrfi-v6-cumulative-settlement
+  group: nrfi-v6-cumulative-settlement-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -28,6 +32,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
+      - name: Compile scorer
+        run: python -m py_compile scripts/score_nrfi_v6_forward_shadow.py
 
       - name: Restore rolling evidence state
         uses: actions/cache@v4
