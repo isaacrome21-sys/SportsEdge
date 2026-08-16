@@ -11,23 +11,37 @@ from .engine_registry import engine_registry
 DEFAULT_CATALOG = Path("config/mlb_market_catalog.json")
 DEFAULT_FLOORS = Path("config/truth_gate_floors.json")
 
-# Acquisition classes from the canonical catalog. These describe parser/quote
-# support only; they do not imply model or betting eligibility.
 
 def _load_json(path: str | Path) -> dict[str, Any]:
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
 def _catalog_markets(catalog: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Normalize both the checked-in v1 catalog and a future grouped schema."""
     out: dict[str, dict[str, Any]] = {}
-    for group, rows in (catalog.get("markets") or {}).items():
-        if not isinstance(rows, list):
+
+    # Current schema: top-level named lists such as game_markets/batter_markets.
+    for key, rows in catalog.items():
+        if key == "schema_version" or not isinstance(rows, list):
             continue
+        group = key
         for row in rows:
             if isinstance(row, str):
                 out[row] = {"group": group, "acquisition": True}
             elif isinstance(row, dict) and row.get("market"):
-                out[str(row["market"])] = {"group": group, **row}
+                out[str(row["market"])] = {"group": group, "acquisition": True, **row}
+
+    # Forward-compatible grouped schema: {"markets": {group: [...]}}.
+    nested = catalog.get("markets")
+    if isinstance(nested, dict):
+        for group, rows in nested.items():
+            if not isinstance(rows, list):
+                continue
+            for row in rows:
+                if isinstance(row, str):
+                    out[row] = {"group": group, "acquisition": True}
+                elif isinstance(row, dict) and row.get("market"):
+                    out[str(row["market"])] = {"group": group, "acquisition": True, **row}
     return out
 
 
@@ -83,6 +97,9 @@ def audit_readiness(
             classes.append("EVIDENCE" if has_engine else "ENGINEERING")
         if not has_floor:
             blockers.append("NO_FROZEN_EDGE_FLOOR")
+            classes.append("EVIDENCE")
+        if "fixture-backed ci attestation pending" in reason.lower():
+            blockers.append("FIXTURE_CI_PENDING")
             classes.append("EVIDENCE")
         if "quota" in reason.lower() or "provider" in reason.lower():
             classes.append("PROVIDER")
