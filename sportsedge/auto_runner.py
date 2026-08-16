@@ -25,6 +25,7 @@ from .unified_card import UnifiedCardResult, run_unified_card
 
 CHICAGO_TZ = ZoneInfo("America/Chicago")
 VALIDATED_BRIDGE_MARKETS = frozenset({"HITS", "TOTAL_BASES", "PITCHER_BB"})
+GENERIC_FEATURE_MARKETS = frozenset(set(GENERIC_MARKETS) | {"PITCHER_BB"})
 BANNED_GENERIC_KEYS = frozenset({
     "sportsbook_probability", "implied_probability", "market_probability",
     "american_odds", "decimal_odds", "sportsbook_price", "dk_probability",
@@ -226,7 +227,7 @@ def _walk_keys(value: Any):
 
 
 def _resolve_generic_feature(row: Mapping[str, Any], *, now: datetime, game_start: datetime) -> dict[str, Any]:
-    if str(row.get("market")) not in GENERIC_MARKETS:
+    if str(row.get("market")) not in GENERIC_FEATURE_MARKETS:
         raise AutoRunnerError("GENERIC_FEATURE_MARKET_UNSUPPORTED")
     if BANNED_GENERIC_KEYS.intersection(_walk_keys(row)):
         raise AutoRunnerError("GENERIC_FEATURE_MARKET_DATA_PROHIBITED")
@@ -303,7 +304,9 @@ def run_auto_mlb(*, quote_url: str, feature_url: str, projected_lineups_url: str
             if env is None:
                 raise FeatureBridgeError("MISSING", {"detail": "feature envelope missing"})
             game_start = parse_game_start(snap.game_date)
-            if market in VALIDATED_BRIDGE_MARKETS:
+            if market == "PITCHER_BB" and env.get("generic_feature_version") == "mlb_generic_feature_v1":
+                resolved = _resolve_generic_feature(env, now=current, game_start=game_start)
+            elif market in VALIDATED_BRIDGE_MARKETS:
                 resolved = _resolve_feature(env, now=current, game_start=game_start)
             elif market in GENERIC_MARKETS:
                 resolved = _resolve_generic_feature(env, now=current, game_start=game_start)
