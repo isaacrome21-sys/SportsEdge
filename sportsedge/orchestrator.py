@@ -35,22 +35,14 @@ def _reject_market_leakage(model_input: Mapping[str, Any]) -> None:
 
 
 def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], deployment: Mapping[str, Any], engine_fn: Callable[[Mapping[str, Any]], Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG, kelly_multiplier: float = 0.25) -> RunResult:
-    """Run one candidate end-to-end.
-
-    Integrity/deployment/evidence failures remain BLOCKED. Once the model itself has
-    run successfully, however, Model_P is retained even if a later production gate
-    blocks the wager. This permits auditable shadow cards without weakening the
-    OFFICIAL_BET contract.
-    """
+    """Run one candidate end-to-end. Any integrity failure returns BLOCKED, never a guessed bet."""
     market = str(model_input.get("market", "UNKNOWN"))
-    model_p: float | None = None
     try:
         _reject_market_leakage(model_input)
         double_ttl_gate(quote, ingestion_now, finalization_now)
         output = dict(engine_fn(model_input))
         if "model_p" not in output:
             raise OrchestrationError("engine output missing model_p")
-        model_p = float(output["model_p"])
         for key in ("game_id", "market", "entity_id", "line", "side"):
             if key not in output and key in model_input:
                 output[key] = model_input[key]
@@ -61,9 +53,9 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], d
             bound=True, fresh=True, deployed=deployment.get("eligible") is True,
             edge_floor=float(floor.value_probability_points), kelly_multiplier=kelly_multiplier,
         )
-        return RunResult(market, model_p, decision.bet_status, decision, "ok")
+        return RunResult(market, float(output["model_p"]), decision.bet_status, decision, "ok")
     except Exception as exc:
-        return RunResult(market, model_p, "BLOCKED", None, f"{type(exc).__name__}: {exc}")
+        return RunResult(market, None, "BLOCKED", None, f"{type(exc).__name__}: {exc}")
 
 
 def run_slate(candidates: list[Mapping[str, Any]], *, engines: Mapping[str, Callable[[Mapping[str, Any]], Mapping[str, Any]]], deployments: Mapping[str, Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG, kelly_multiplier: float = 0.25) -> list[RunResult]:
