@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 from sportsedge.auto_native_odds import run_auto_mlb_native_odds
 from sportsedge.auto_runner import AutoRunnerError, report_to_dict, run_auto_mlb
 from sportsedge.edge_floors import DEFAULT_EDGE_FLOOR_CONFIG
+from sportsedge.funnel import build_funnel
 from sportsedge.live_odds_failover import should_rotate_odds_key
 
 CHICAGO_TZ = ZoneInfo("America/Chicago")
@@ -93,7 +94,35 @@ def main() -> int:
                 )
         else:
             raise AutoRunnerError("QUOTE_PROVIDER_CONFIG_MISSING")
+
         payload = report_to_dict(report)
+        game_ids = {
+            str(item.game_id) for item in report.results
+            if str(item.game_id).isdigit() and int(str(item.game_id)) > 0
+        }
+        feature_built = sum(item.model_p is not None for item in report.results)
+        lineup_block_tokens = ("LINEUP", "PROJECTED_LINEUP")
+        lineup_blocked_games = {
+            str(item.game_id) for item in report.results
+            if any(token in str(item.reason).upper() for token in lineup_block_tokens)
+        }
+        funnel = build_funnel(
+            results=report.results,
+            source_failures=report.source_failures,
+            games_scheduled=len(game_ids) if game_ids else None,
+            lineups_confirmed=max(0, len(game_ids) - len(lineup_blocked_games)) if game_ids else None,
+            features_built=feature_built,
+        )
+        payload["funnel"] = funnel
+
+        # A valid no-edge/no-bet slate is success. Zero sportsbook rows is not.
+        if funnel["odds_rows_fetched"] == 0:
+            infrastructure_blocked = True
+            payload["run_status"] = "BLOCKED_NO_ODDS"
+            payload.setdefault("source_failures", []).append({
+                "stage": "FUNNEL",
+                "reason": "NO_ODDS_ROWS_REACHED_PRICING",
+            })
     except Exception as exc:
         infrastructure_blocked = True
         payload = {
@@ -102,6 +131,21 @@ def main() -> int:
             "run_status": "BLOCKED",
             "results": [],
             "source_failures": [{"reason": f"{type(exc).__name__}: {exc}"}],
+            "funnel": {
+                "games_scheduled": None,
+                "odds_rows_fetched": 0,
+                "lineups_confirmed": None,
+                "features_built": 0,
+                "model_priced": 0,
+                "edge_positive": 0,
+                "shadow_bets": 0,
+                "bets_emitted": 0,
+                "blocked_rows": 0,
+                "pipeline_health": "BROKEN",
+                "pipeline_health_reason": "RUNNER_EXCEPTION",
+                "gate_kill_counts": {f"{type(exc).__name__}: {exc}": 1},
+                "edge_distribution": [],
+            },
         }
 
     out = Path(args.output)

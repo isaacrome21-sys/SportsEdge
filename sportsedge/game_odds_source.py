@@ -32,12 +32,12 @@ class GameOddsSnapshot:
     failures: tuple[dict[str, Any], ...]
 
 
-def _team_side(name: Any, game: GameSnapshot) -> str:
+def _team_side(name: Any, game: GameSnapshot) -> tuple[str, int]:
     key = normalize_name(name)
     if key == normalize_name(game.home_name):
-        return "HOME"
+        return "HOME", int(game.home_id)
     if key == normalize_name(game.away_name):
-        return "AWAY"
+        return "AWAY", int(game.away_id)
     raise OddsApiSourceError("ODDS_GAME_TEAM_UNRESOLVED")
 
 
@@ -84,16 +84,17 @@ def parse_game_event_odds(payload: Mapping[str, Any], *, game: GameSnapshot, ttl
                         "sportsbook": book_title, "retrieved_at": retrieved_at, "ttl_seconds": ttl_seconds,
                         "american_odds": price, "raw_market_name": market_key,
                         "away_team": str(game.away_name), "home_team": str(game.home_name),
+                        "is_alternate": False,
                     }
                     if market_key == "h2h":
-                        side = _team_side(outcome.get("name"), game)
-                        quotes.append({**base, "market": "MONEYLINE", "side": side, "selection": str(outcome.get("name") or "").strip(), "line": None})
+                        side, team_id = _team_side(outcome.get("name"), game)
+                        quotes.append({**base, "market": "MONEYLINE", "entity_id": str(team_id), "side": side, "selection": str(outcome.get("name") or "").strip(), "line": 0.0})
                     elif market_key == "spreads":
-                        side = _team_side(outcome.get("name"), game)
+                        side, team_id = _team_side(outcome.get("name"), game)
                         point = outcome.get("point")
                         if point is None:
                             raise OddsApiSourceError("ODDS_OUTCOME_LINE_MISSING")
-                        quotes.append({**base, "market": "RUN_LINE", "side": side, "selection": str(outcome.get("name") or "").strip(), "line": point})
+                        quotes.append({**base, "market": "RUN_LINE", "entity_id": str(team_id), "side": side, "selection": str(outcome.get("name") or "").strip(), "line": point})
                     else:
                         side = str(outcome.get("name") or "").upper()
                         if side not in {"OVER", "UNDER"}:
@@ -101,7 +102,7 @@ def parse_game_event_odds(payload: Mapping[str, Any], *, game: GameSnapshot, ttl
                         point = outcome.get("point")
                         if point is None:
                             raise OddsApiSourceError("ODDS_OUTCOME_LINE_MISSING")
-                        quotes.append({**base, "market": "TOTALS", "side": side, "selection": side.title(), "line": point})
+                        quotes.append({**base, "market": "TOTALS", "entity_id": str(game.game_pk), "side": side, "selection": side.title(), "line": point})
                 except Exception as exc:
                     failures.append({"reason": str(exc), "game_id": str(game.game_pk), "book_key": book_key, "raw_market_name": market_key})
     return GameOddsSnapshot(tuple(quotes), tuple(failures))
@@ -117,9 +118,12 @@ def fetch_mlb_game_quotes(*, api_key: str, schedule: Iterable[GameSnapshot], ope
         api_key=api_key,
         params={"regions": "us", "bookmakers": requested_books, "markets": ",".join(GAME_MARKETS), "oddsFormat": "american", "dateFormat": "iso", "includeSids": "true"},
     )
-    payload = _get_json(url, opener=opener, label="game-markets")
+    try:
+        payload = _get_json(url, opener=opener, label="game-markets")
+    except Exception as exc:
+        return GameOddsSnapshot((), ({"reason": f"{type(exc).__name__}: {exc}", "stage": "GAME_MARKET_PROVIDER"},))
     if not isinstance(payload, list):
-        raise OddsApiSourceError("ODDS_GAME_MARKETS_RESPONSE_NOT_LIST")
+        return GameOddsSnapshot((), ({"reason": "ODDS_GAME_MARKETS_RESPONSE_NOT_LIST", "stage": "GAME_MARKET_PROVIDER"},))
     quotes: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
     for event in payload:

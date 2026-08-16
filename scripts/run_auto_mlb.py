@@ -31,6 +31,7 @@ def main() -> int:
             os.environ.get("SPORTSEDGE_ODDS_API_KEY", "").strip(),
             os.environ.get("SPORTSEDGE_ODDS_API_KEY_2", "").strip(),
             os.environ.get("SPORTSEDGE_ODDS_API_KEY_3", "").strip(),
+            os.environ.get("SPORTSEDGE_ODDS_API_KEY_4", "").strip(),
         ) if value
     )
     odds_books = tuple(x.strip() for x in os.environ.get("SPORTSEDGE_ODDS_BOOKMAKERS", "draftkings").split(",") if x.strip())

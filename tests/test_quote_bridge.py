@@ -64,9 +64,11 @@ class QuoteBridgeTests(unittest.TestCase):
             normalize_offer(o)
 
     def test_snapshot_preserves_bad_rows_as_failures(self):
-        bad = offer(); bad["market"] = "RBI"
-        quotes, failures = normalize_offer_snapshot([offer(), bad])
-        self.assertEqual(len(quotes), 1)
+        supported = offer(); supported["market"] = "RBI"; supported["raw_market_name"] = "Player RBI"
+        bad = offer(); bad["market"] = "NOT_A_REAL_MARKET"; bad["raw_market_name"] = "Unknown"
+        quotes, failures = normalize_offer_snapshot([offer(), supported, bad])
+        self.assertEqual(len(quotes), 2)
+        self.assertEqual({q["market"] for q in quotes}, {"HITS", "RBI"})
         self.assertEqual(len(failures), 1)
         self.assertIn("unsupported market", failures[0]["reason"])
 

@@ -1,4 +1,9 @@
-"""Normalize timestamped sportsbook offers into canonical SportsEdge quotes."""
+"""Normalize timestamped sportsbook offers into canonical SportsEdge quotes.
+
+The original validated HITS/TOTAL_BASES/PITCHER_BB contracts remain unchanged.
+Expanded markets are admitted for the separate shadow/runtime lane; admission here
+never implies deployment or production eligibility.
+"""
 from __future__ import annotations
 
 from datetime import datetime
@@ -12,16 +17,40 @@ class QuoteBridgeError(ValueError):
     pass
 
 
-SUPPORTED_MARKETS = {"HITS", "TOTAL_BASES", "PITCHER_BB"}
-SUPPORTED_SIDES = {"OVER", "UNDER"}
-# Current production engines model full-game outcomes only. Keep period support
-# market-specific so future F5/1ST engines must earn an explicit contract rather
-# than silently reusing full-game Model_P.
-SUPPORTED_PERIODS_BY_MARKET = {
-    "HITS": {"FG"},
-    "TOTAL_BASES": {"FG"},
-    "PITCHER_BB": {"FG"},
+VALIDATED_MARKETS = {"HITS", "TOTAL_BASES", "PITCHER_BB"}
+COUNT_MARKETS = {
+    "HOME_RUNS", "RBI", "RUNS", "HITS_RUNS_RBIS", "SINGLES", "DOUBLES", "TRIPLES",
+    "BATTER_BB", "BATTER_K", "STOLEN_BASES", "PITCHER_K", "PITCHER_HITS_ALLOWED",
+    "PITCHER_ER", "PITCHER_OUTS",
 }
+BINARY_MARKETS = {"PITCHER_RECORD_WIN", "FIRST_HOME_RUN"}
+GAME_MARKETS = {
+    "MONEYLINE", "RUN_LINE", "TOTALS", "NRFI", "YRFI",
+    "F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS",
+}
+SUPPORTED_MARKETS = VALIDATED_MARKETS | COUNT_MARKETS | BINARY_MARKETS | GAME_MARKETS
+
+SUPPORTED_PERIODS_BY_MARKET = {
+    **{m: {"FG"} for m in VALIDATED_MARKETS | COUNT_MARKETS | BINARY_MARKETS | {"MONEYLINE", "RUN_LINE", "TOTALS"}},
+    "NRFI": {"FG", "1ST", "1"},
+    "YRFI": {"FG", "1ST", "1"},
+    "F5_MONEYLINE": {"FG", "F5", "5"},
+    "F5_RUN_LINE": {"FG", "F5", "5"},
+    "F5_TOTALS": {"FG", "F5", "5"},
+}
+
+SIDE_BY_MARKET = {
+    **{m: {"OVER", "UNDER"} for m in VALIDATED_MARKETS | COUNT_MARKETS | {"TOTALS", "F5_TOTALS"}},
+    **{m: {"YES", "NO"} for m in BINARY_MARKETS},
+    "MONEYLINE": {"HOME", "AWAY", "HOME_ML", "AWAY_ML"},
+    "F5_MONEYLINE": {"HOME", "AWAY", "HOME_ML", "AWAY_ML"},
+    "RUN_LINE": {"HOME", "AWAY", "HOME_RL", "AWAY_RL"},
+    "F5_RUN_LINE": {"HOME", "AWAY", "HOME_RL", "AWAY_RL"},
+    "NRFI": {"YES", "NRFI"},
+    "YRFI": {"YES", "YRFI"},
+}
+
+LINE_OPTIONAL_MARKETS = {"MONEYLINE", "F5_MONEYLINE", "NRFI", "YRFI"} | BINARY_MARKETS
 
 
 def _finite(name: str, value: Any) -> float:
@@ -60,8 +89,8 @@ def validate_canonical_quote(raw: Mapping[str, Any], *, default_ttl_seconds: int
 
     if market not in SUPPORTED_MARKETS:
         raise QuoteBridgeError(f"unsupported market: {market}")
-    if side not in SUPPORTED_SIDES:
-        raise QuoteBridgeError(f"unsupported side: {side}")
+    if side not in SIDE_BY_MARKET[market]:
+        raise QuoteBridgeError(f"unsupported side for {market}: {side}")
     if period not in SUPPORTED_PERIODS_BY_MARKET[market]:
         raise QuoteBridgeError("QUOTE_PERIOD_MODEL_MISMATCH")
 
@@ -69,7 +98,14 @@ def validate_canonical_quote(raw: Mapping[str, Any], *, default_ttl_seconds: int
     if type(is_alternate) is not bool:
         raise QuoteBridgeError("QUOTE_IDENTITY_INCOMPLETE")
 
-    line = _finite("line", raw.get("line"))
+    raw_line = raw.get("line")
+    if raw_line is None and market in LINE_OPTIONAL_MARKETS:
+        line = 0.0
+    else:
+        line = _finite("line", raw_line)
+    if market in VALIDATED_MARKETS | COUNT_MARKETS and line < 0:
+        raise QuoteBridgeError("line must be >= 0")
+
     odds = _finite("american_odds", raw.get("american_odds"))
     if odds == 0 or -100 < odds < 100:
         raise QuoteBridgeError("american_odds must be <= -100 or >= 100")
@@ -113,7 +149,7 @@ def validate_canonical_quote(raw: Mapping[str, Any], *, default_ttl_seconds: int
         "american_odds": int(odds),
         "ttl_seconds": ttl,
     }
-    for key in ("sportsbook", "offer_id", "source_url"):
+    for key in ("sportsbook", "offer_id", "source_url", "selection"):
         if raw.get(key) not in (None, ""):
             out[key] = str(raw[key])
     return out
