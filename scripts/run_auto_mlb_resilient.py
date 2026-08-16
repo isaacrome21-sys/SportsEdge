@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import json
+import math
 import os
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -31,6 +32,19 @@ def _keys_from_env() -> tuple[str, ...]:
     return tuple(values)
 
 
+def _prop_window_hours() -> float | None:
+    raw = os.environ.get("SPORTSEDGE_ODDS_PROP_WINDOW_HOURS", "").strip()
+    if not raw:
+        return None
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise AutoRunnerError("ODDS_PROP_WINDOW_INVALID") from exc
+    if not math.isfinite(value) or value <= 0:
+        raise AutoRunnerError("ODDS_PROP_WINDOW_INVALID")
+    return value
+
+
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--output", default="artifacts/live_mlb_card.json")
@@ -50,6 +64,7 @@ def main() -> int:
     projected = os.environ.get("SPORTSEDGE_PROJECTED_LINEUPS_URL", "").strip() or None
     token = os.environ.get("SPORTSEDGE_PROVIDER_TOKEN", "").strip() or None
     history_cache_dir = os.environ.get("SPORTSEDGE_HISTORY_CACHE_DIR", "").strip() or None
+    prop_window_hours = _prop_window_hours()
     now = datetime.now(timezone.utc)
 
     infrastructure_blocked = False
@@ -70,14 +85,23 @@ def main() -> int:
             attempts = []
             report = None
             for slot, key in enumerate(odds_api_keys, start=1):
-                candidate = run_auto_mlb_native_odds(
-                    odds_api_key=key,
-                    odds_api_keys=(),
-                    feature_url=features or None,
-                    bookmakers=odds_books,
-                    history_cache_dir=history_cache_dir,
-                    **common,
-                )
+                try:
+                    candidate = run_auto_mlb_native_odds(
+                        odds_api_key=key,
+                        odds_api_keys=(),
+                        feature_url=features or None,
+                        bookmakers=odds_books,
+                        history_cache_dir=history_cache_dir,
+                        prop_window_hours=prop_window_hours,
+                        **common,
+                    )
+                except Exception as exc:
+                    attempts.append({
+                        "key_slot": slot,
+                        "rotated": True,
+                        "reason": f"{type(exc).__name__}: {exc}",
+                    })
+                    continue
                 rotate = should_rotate_odds_key(
                     run_status=candidate.run_status,
                     results=candidate.results,
@@ -88,9 +112,10 @@ def main() -> int:
                     report = candidate
                     break
             if report is None:
-                raise AutoRunnerError(
-                    "ODDS_API_ALL_CONFIGURED_KEYS_EXHAUSTED:" + ",".join(str(x["key_slot"]) for x in attempts)
+                reasons = ";".join(
+                    f"slot{x['key_slot']}={x.get('reason', 'NO_QUOTES')}" for x in attempts
                 )
+                raise AutoRunnerError("ODDS_API_NO_KEY_CAN_COVER_RUN:" + reasons)
         else:
             raise AutoRunnerError("QUOTE_PROVIDER_CONFIG_MISSING")
         payload = report_to_dict(report)
