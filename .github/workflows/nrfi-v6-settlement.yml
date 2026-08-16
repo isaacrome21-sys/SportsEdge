@@ -1,0 +1,109 @@
+name: nrfi-v6-cumulative-settlement
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/nrfi-v6-settlement.yml'
+      - 'scripts/score_nrfi_v6_forward_shadow.py'
+      - 'scripts/score_nrfi_v6_forward_shadow_v2.py'
+  schedule:
+    - cron: '17 * * * *'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: nrfi-v6-cumulative-settlement-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  settle-and-score:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      SPORTSEDGE_NRFI_V6_SHA256: 0bdf71e272e406611e241e2427904f3c8e3a9405700f440bedacf0b74ed1580e
+      SPORTSEDGE_NRFI_V6_FEATURE_SHA256: f38df78312de2fbcbd64824a1d5c2fb4d5c96b51e758da30e55a001f445fbda2
+      SPORTSEDGE_NRFI_V6_INPUT: artifacts/forward-shadow-state/captures
+      SPORTSEDGE_NRFI_V6_SCORE_OUT: artifacts/forward-shadow-state/scored
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile scorer
+        run: python -m py_compile scripts/score_nrfi_v6_forward_shadow.py scripts/score_nrfi_v6_forward_shadow_v2.py
+
+      - name: Restore rolling evidence state
+        uses: actions/cache@v4
+        with:
+          path: artifacts/forward-shadow-state
+          key: nrfi-v6-settlement-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            nrfi-v6-settlement-${{ runner.os }}-
+
+      - name: Rehydrate every missing immutable NRFI capture artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$SPORTSEDGE_NRFI_V6_INPUT"
+          gh api --paginate "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.expired == false and (.name | startswith("nrfi-v6-forward-shadow-"))) | .id' \
+            | sort -n -u > /tmp/nrfi_artifact_ids.txt
+          total=$(wc -l < /tmp/nrfi_artifact_ids.txt | tr -d ' ')
+          new=0
+          while read -r artifact_id; do
+            test -n "$artifact_id" || continue
+            dest="$SPORTSEDGE_NRFI_V6_INPUT/artifact-${artifact_id}"
+            if test -f "$dest/.complete"; then
+              continue
+            fi
+            rm -rf "$dest"
+            mkdir -p "$dest"
+            zip="/tmp/nrfi-${artifact_id}.zip"
+            if gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" > "$zip"; then
+              unzip -q "$zip" -d "$dest"
+              touch "$dest/.complete"
+              new=$((new+1))
+            else
+              rm -rf "$dest"
+            fi
+            rm -f "$zip"
+          done < /tmp/nrfi_artifact_ids.txt
+          echo "NRFI_CAPTURE_ARTIFACTS_DISCOVERED=$total"
+          echo "NRFI_CAPTURE_ARTIFACTS_NEW=$new"
+
+      - name: Settle MLB first-inning outcomes and score frozen promotion gates
+        run: python scripts/score_nrfi_v6_forward_shadow_v2.py
+
+      - name: Verify fail-closed eligibility report
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('artifacts/forward-shadow-state/scored/nrfi_v6_forward_shadow_report.json')
+          d=json.loads(p.read_text())
+          assert d['candidate_sha256']=='0bdf71e272e406611e241e2427904f3c8e3a9405700f440bedacf0b74ed1580e'
+          assert d['feature_contract_sha256']=='f38df78312de2fbcbd64824a1d5c2fb4d5c96b51e758da30e55a001f445fbda2'
+          assert d['sportsbook_data_used'] is False
+          assert d['markets']['NRFI']['eligible'] == d['markets']['YRFI']['eligible']
+          settlements=json.loads(Path('artifacts/forward-shadow-state/scored/nrfi_v6_settlements.json').read_text())
+          assert all(x.get('source')=='MLB_STATSAPI_LIVE_FEED_LINESCORE_V2' for x in settlements)
+          print('NRFI_V6_SETTLEMENT_REPORT_PASS', d['state'], d['settled_unique_games'])
+          PY
+
+      - name: Upload cumulative scored evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nrfi-v6-cumulative-evidence-${{ github.run_id }}
+          path: |
+            artifacts/forward-shadow-state/scored/nrfi_v6_settlements.json
+            artifacts/forward-shadow-state/scored/nrfi_v6_forward_shadow_report.json
+            artifacts/forward-shadow-state/scored/nrfi_v6_forward_shadow_manifest.json
+          if-no-files-found: error
+          retention-days: 90
