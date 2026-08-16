@@ -8,6 +8,7 @@ from typing import Any
 from .deployments import load_registry
 from .engine_registry import engine_registry
 
+DEFAULT_REGISTRY = Path("config/deployments.json")
 DEFAULT_CATALOG = Path("config/mlb_market_catalog.json")
 DEFAULT_FLOORS = Path("config/truth_gate_floors.json")
 
@@ -59,7 +60,7 @@ def _frozen_floor_markets(floors: dict[str, Any]) -> set[str]:
 
 
 def audit_readiness(
-    registry_path: str | Path = "config/deployments.json",
+    registry_path: str | Path = DEFAULT_REGISTRY,
     catalog_path: str | Path = DEFAULT_CATALOG,
     floors_path: str | Path = DEFAULT_FLOORS,
 ) -> dict[str, Any]:
@@ -68,7 +69,14 @@ def audit_readiness(
     catalog = _catalog_markets(_load_json(catalog_path))
     frozen_floors = _frozen_floor_markets(_load_json(floors_path))
 
-    all_markets = sorted(set(catalog) | set(registry["markets"]))
+    # Production audit covers the full catalog. A caller supplying a custom
+    # registry gets a registry-scoped audit, preserving deterministic fixture
+    # and unit-test behavior instead of mixing production catalog rows into it.
+    if Path(registry_path) == DEFAULT_REGISTRY:
+        all_markets = sorted(set(catalog) | set(registry["markets"]))
+    else:
+        all_markets = sorted(set(registry["markets"]))
+
     rows: list[dict[str, Any]] = []
     for market in all_markets:
         meta = registry["markets"].get(market, {})
