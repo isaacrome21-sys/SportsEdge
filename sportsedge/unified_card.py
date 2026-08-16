@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any, Mapping
 
 from .card_pipeline import run_hitter_card
+from .edge_floors import DEFAULT_EDGE_FLOOR_CONFIG
 from .live_slate import LiveGame
 from .pitcher_card_pipeline import run_pitcher_bb_card
 from .quote_bridge import validate_canonical_quote
@@ -37,7 +38,7 @@ def _convert(result) -> UnifiedCardResult:
     return UnifiedCardResult(result.game_id, result.market, result.entity_id, result.line, result.side, result.american_odds, result.model_p, result.bet_status, result.reason)
 
 
-def run_unified_card(*, games: list[LiveGame], feature_rows: list[Mapping[str, Any]], quotes: list[Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, registry_path: str = "config/deployments.json", require_confirmed_lineup: bool = True, min_edge: float = 0.0, kelly_multiplier: float = 0.25) -> list[UnifiedCardResult]:
+def run_unified_card(*, games: list[LiveGame], feature_rows: list[Mapping[str, Any]], quotes: list[Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, registry_path: str = "config/deployments.json", require_confirmed_lineup: bool = True, edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG, kelly_multiplier: float = 0.25) -> list[UnifiedCardResult]:
     indexed_hitter: list[tuple[int, Mapping[str, Any]]] = []
     indexed_pitcher: list[tuple[int, Mapping[str, Any]]] = []
     output: dict[int, UnifiedCardResult] = {}
@@ -57,14 +58,14 @@ def run_unified_card(*, games: list[LiveGame], feature_rows: list[Mapping[str, A
             output[i] = UnifiedCardResult(game_id, market, entity_id, line, side, odds, None, "BLOCKED", f"unsupported unified market: {market}")
 
     if indexed_hitter:
-        results = run_hitter_card(games=games, feature_rows=feature_rows, quotes=[q for _, q in indexed_hitter], ingestion_now=ingestion_now, finalization_now=finalization_now, registry_path=registry_path, require_confirmed_lineup=require_confirmed_lineup, min_edge=min_edge, kelly_multiplier=kelly_multiplier)
+        results = run_hitter_card(games=games, feature_rows=feature_rows, quotes=[q for _, q in indexed_hitter], ingestion_now=ingestion_now, finalization_now=finalization_now, registry_path=registry_path, require_confirmed_lineup=require_confirmed_lineup, edge_floor_config_path=edge_floor_config_path, kelly_multiplier=kelly_multiplier)
         if len(results) != len(indexed_hitter):
             raise RuntimeError("hitter pipeline changed quote cardinality")
         for (i, _), result in zip(indexed_hitter, results):
             output[i] = _convert(result)
 
     if indexed_pitcher:
-        results = run_pitcher_bb_card(games=games, feature_rows=feature_rows, quotes=[q for _, q in indexed_pitcher], ingestion_now=ingestion_now, finalization_now=finalization_now, registry_path=registry_path, min_edge=min_edge, kelly_multiplier=kelly_multiplier)
+        results = run_pitcher_bb_card(games=games, feature_rows=feature_rows, quotes=[q for _, q in indexed_pitcher], ingestion_now=ingestion_now, finalization_now=finalization_now, registry_path=registry_path, edge_floor_config_path=edge_floor_config_path, kelly_multiplier=kelly_multiplier)
         if len(results) != len(indexed_pitcher):
             raise RuntimeError("pitcher pipeline changed quote cardinality")
         for (i, _), result in zip(indexed_pitcher, results):
