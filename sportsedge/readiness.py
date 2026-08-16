@@ -88,6 +88,7 @@ def audit_readiness(
             classes.append("PROVIDER")
 
         classes = list(dict.fromkeys(classes))
+        runnable_live = quote_supported and has_engine
         rows.append({
             "market": market,
             "group": cat.get("group", "registry_only"),
@@ -100,8 +101,9 @@ def audit_readiness(
             "reason": reason,
             "blocker_classes": classes,
             "blockers": blockers,
-            "shadow_runnable": quote_supported and has_engine,
-            "official_bet_enabled": quote_supported and has_engine and eligible and has_floor,
+            "shadow_runnable": runnable_live,
+            "runnable_live": runnable_live,
+            "official_bet_enabled": runnable_live and eligible and has_floor,
         })
 
     return {
@@ -113,6 +115,7 @@ def audit_readiness(
             "registered": sum(x["registered"] for x in rows),
             "runtime_engines": sum(x["runtime_engine"] for x in rows),
             "shadow_runnable": sum(x["shadow_runnable"] for x in rows),
+            "runnable_live": sum(x["runnable_live"] for x in rows),
             "frozen_edge_floors": sum(x["frozen_edge_floor"] for x in rows),
             "official_bet_enabled": sum(x["official_bet_enabled"] for x in rows),
             "engineering_blocked": sum("ENGINEERING" in x["blocker_classes"] for x in rows),
