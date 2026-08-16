@@ -1,0 +1,59 @@
+name: v7-shadow-cycle
+
+on:
+  schedule:
+    - cron: '41 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Restore V7 shadow state
+        uses: actions/cache@v4
+        with:
+          path: artifacts/v7-shadow-state
+          key: v7-shadow-state-${{ github.run_id }}
+          restore-keys: |
+            v7-shadow-state-
+
+      - name: Run V7 shadow cycle
+        run: |
+          python scripts/run_v7_shadow_cycle.py --allow-blocked
+
+      - name: Verify blocked/captured state is explicit
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('artifacts/v7-shadow-state/v7_shadow_status.json')
+          if not p.exists():
+              raise SystemExit('V7_SHADOW_STATUS_MISSING')
+          value = json.loads(p.read_text())
+          if value.get('state') not in {'BLOCKED', 'CAPTURED'}:
+              raise SystemExit('V7_SHADOW_STATUS_INVALID')
+          if value.get('state') == 'CAPTURED' and value.get('sportsbook_data_used') is not False:
+              raise SystemExit('V7_SPORTSBOOK_CONTAMINATION')
+          print(json.dumps(value, sort_keys=True))
+          PY
+
+      - name: Upload V7 shadow state
+        uses: actions/upload-artifact@v4
+        with:
+          name: v7-shadow-cycle-${{ github.run_id }}
+          path: artifacts/v7-shadow-state
+          if-no-files-found: error
+          retention-days: 90
