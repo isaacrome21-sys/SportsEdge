@@ -1,9 +1,8 @@
 """Fully automated MLB slate orchestration with fail-closed live-source guards.
 
-The runner acquires MLB schedule/boxscore state directly and consumes configured
-HTTP JSON snapshots for sportsbook quotes, model feature source facts, and
-(optional) projected lineups. It never invents missing prices, features, teams,
-or lineups and never derives Model_P from sportsbook prices.
+Validated HITS/TOTAL_BASES/PITCHER_BB continue through the frozen feature bridge.
+Expanded markets use a separate price-independent generic pregame feature contract.
+No Model_P is ever derived from sportsbook price or implied probability.
 """
 from __future__ import annotations
 
@@ -17,6 +16,7 @@ from zoneinfo import ZoneInfo
 
 from .edge_floors import DEFAULT_EDGE_FLOOR_CONFIG
 from .feature_bridge import FeatureBridgeError, parse_source_fact, resolve_feature_row
+from .generic_card_pipeline import GENERIC_MARKETS
 from .live_slate import LiveGame, TeamLineup, lineup_from_rows
 from .mlb_source import fetch_boxscore, fetch_schedule, parse_confirmed_lineup, parse_game_start
 from .quote_bridge import QuoteBridgeError, validate_canonical_quote
@@ -24,6 +24,11 @@ from .runtime import parse_timestamp
 from .unified_card import UnifiedCardResult, run_unified_card
 
 CHICAGO_TZ = ZoneInfo("America/Chicago")
+VALIDATED_BRIDGE_MARKETS = frozenset({"HITS", "TOTAL_BASES", "PITCHER_BB"})
+BANNED_GENERIC_KEYS = frozenset({
+    "sportsbook_probability", "implied_probability", "market_probability",
+    "american_odds", "decimal_odds", "sportsbook_price", "dk_probability",
+})
 
 
 class AutoRunnerError(RuntimeError):
@@ -42,6 +47,10 @@ class AutoCardResult:
     model_p: float | None
     bet_status: str
     reason: str
+    shadow_status: str | None = None
+    implied_probability: float | None = None
+    edge: float | None = None
+    ev_per_dollar: float | None = None
 
 
 @dataclass(frozen=True)
@@ -108,9 +117,7 @@ def _projected_index(rows: list[Mapping[str, Any]]) -> dict[tuple[int, int, str]
     out: dict[tuple[int, int, str], Mapping[str, Any]] = {}
     for row in rows:
         try:
-            game_pk = int(row["game_pk"])
-            team_id = int(row["team_id"])
-            side = str(row["side"])
+            game_pk = int(row["game_pk"]); team_id = int(row["team_id"]); side = str(row["side"])
         except Exception as exc:
             raise AutoRunnerError("PROJECTED_LINEUP_IDENTITY_MALFORMED") from exc
         if game_pk <= 0 or team_id <= 0 or side not in {"away", "home"}:
@@ -138,9 +145,7 @@ def _projected_lineup(envelope: Mapping[str, Any] | None, *, team_id: int, side:
         ttl = float(ttl)
     except (TypeError, ValueError) as exc:
         raise AutoRunnerError("PROJECTED_LINEUP_TTL_INVALID") from exc
-    if not isfinite(ttl) or ttl <= 0:
-        raise AutoRunnerError("PROJECTED_LINEUP_TTL_INVALID")
-    if (now - retrieved).total_seconds() > ttl:
+    if not isfinite(ttl) or ttl <= 0 or (now - retrieved).total_seconds() > ttl:
         raise AutoRunnerError("PROJECTED_LINEUP_STALE")
     rows = envelope.get("rows")
     if not isinstance(rows, list):
@@ -158,32 +163,34 @@ def _live_game(snapshot, *, boxscore: Mapping[str, Any], projected: dict[tuple[i
         if confirmed.confirmed:
             return confirmed
         return _projected_lineup(projected.get((snapshot.game_pk, team_id, side)), team_id=team_id, side=side, now=now)
-
     return LiveGame(
-        game_pk=snapshot.game_pk,
-        away_team_id=snapshot.away_id,
-        home_team_id=snapshot.home_id,
-        away_probable_pitcher_id=snapshot.away_probable_pitcher_id,
-        home_probable_pitcher_id=snapshot.home_probable_pitcher_id,
-        away_lineup=side_lineup("away", snapshot.away_id),
-        home_lineup=side_lineup("home", snapshot.home_id),
-        game_number=snapshot.game_number,
-        double_header=snapshot.double_header,
-        venue_id=snapshot.venue_id,
-        official_date=snapshot.official_date,
-        status=snapshot.status,
+        game_pk=snapshot.game_pk, away_team_id=snapshot.away_id, home_team_id=snapshot.home_id,
+        away_probable_pitcher_id=snapshot.away_probable_pitcher_id, home_probable_pitcher_id=snapshot.home_probable_pitcher_id,
+        away_lineup=side_lineup("away", snapshot.away_id), home_lineup=side_lineup("home", snapshot.home_id),
+        game_number=snapshot.game_number, double_header=snapshot.double_header, venue_id=snapshot.venue_id,
+        official_date=snapshot.official_date, status=snapshot.status,
     )
 
 
-def _feature_envelopes(rows: list[Mapping[str, Any]]) -> dict[tuple[int, int, str], Mapping[str, Any]]:
-    out: dict[tuple[int, int, str], Mapping[str, Any]] = {}
+def _feature_identity(row: Mapping[str, Any]) -> tuple[str, str, str]:
+    try:
+        game_id = str(int(row["game_pk"]))
+        market = str(row["market"])
+        entity = row.get("entity_id", row.get("player_id"))
+        if entity is None:
+            raise ValueError("missing entity")
+        entity_id = str(entity)
+    except Exception as exc:
+        raise AutoRunnerError("FEATURE_ENVELOPE_IDENTITY_MALFORMED") from exc
+    if int(game_id) <= 0 or not entity_id or not market:
+        raise AutoRunnerError("FEATURE_ENVELOPE_IDENTITY_MALFORMED")
+    return game_id, entity_id, market
+
+
+def _feature_envelopes(rows: list[Mapping[str, Any]]) -> dict[tuple[str, str, str], Mapping[str, Any]]:
+    out: dict[tuple[str, str, str], Mapping[str, Any]] = {}
     for row in rows:
-        try:
-            key = (int(row["game_pk"]), int(row["player_id"]), str(row["market"]))
-        except Exception as exc:
-            raise AutoRunnerError("FEATURE_ENVELOPE_IDENTITY_MALFORMED") from exc
-        if key[0] <= 0 or key[1] <= 0:
-            raise AutoRunnerError("FEATURE_ENVELOPE_IDENTITY_MALFORMED")
+        key = _feature_identity(row)
         if key in out:
             raise AutoRunnerError("FEATURE_ENVELOPE_DUPLICATE")
         out[key] = row
@@ -201,16 +208,44 @@ def _resolve_feature(envelope: Mapping[str, Any], *, now: datetime, game_start: 
         if fact.retrieved_at > game_start:
             raise FeatureBridgeError("POST_CUTOFF_RETRIEVAL", {"source_id": fact.source_id, "fact_key": fact.fact_key})
     return resolve_feature_row(
-        market=str(envelope.get("market")),
-        game_pk=int(envelope.get("game_pk")),
-        player_id=int(envelope.get("player_id")),
-        team_id=int(envelope.get("team_id")),
-        feature_fact_keys=envelope.get("feature_fact_keys") or {},
-        sources=sources,
-        ttl_by_feature=envelope.get("ttl_by_feature") or {},
-        now=now,
-        wager_cutoff=game_start,
+        market=str(envelope.get("market")), game_pk=int(envelope.get("game_pk")),
+        player_id=int(envelope.get("player_id")), team_id=int(envelope.get("team_id")),
+        feature_fact_keys=envelope.get("feature_fact_keys") or {}, sources=sources,
+        ttl_by_feature=envelope.get("ttl_by_feature") or {}, now=now, wager_cutoff=game_start,
     )
+
+
+def _walk_keys(value: Any):
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            yield str(key)
+            yield from _walk_keys(item)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            yield from _walk_keys(item)
+
+
+def _resolve_generic_feature(row: Mapping[str, Any], *, now: datetime, game_start: datetime) -> dict[str, Any]:
+    if str(row.get("market")) not in GENERIC_MARKETS:
+        raise AutoRunnerError("GENERIC_FEATURE_MARKET_UNSUPPORTED")
+    if BANNED_GENERIC_KEYS.intersection(_walk_keys(row)):
+        raise AutoRunnerError("GENERIC_FEATURE_MARKET_DATA_PROHIBITED")
+    version = str(row.get("generic_feature_version", ""))
+    if version != "mlb_generic_feature_v1":
+        raise AutoRunnerError("GENERIC_FEATURE_VERSION_INVALID")
+    try:
+        retrieved = parse_timestamp(row.get("retrieved_at"))
+        asof = parse_timestamp(row.get("asof"))
+    except Exception as exc:
+        raise AutoRunnerError("GENERIC_FEATURE_TIMESTAMP_INVALID") from exc
+    if retrieved > now or asof > now:
+        raise AutoRunnerError("GENERIC_FEATURE_FUTURE_TIMESTAMP")
+    if retrieved > game_start or asof >= game_start:
+        raise AutoRunnerError("GENERIC_FEATURE_POST_CUTOFF")
+    out = dict(row)
+    out["game_pk"] = int(row["game_pk"])
+    out["entity_id"] = str(row.get("entity_id", row.get("player_id")))
+    return out
 
 
 def _blocked(index: int, raw: Mapping[str, Any] | None, reason: str) -> AutoCardResult:
@@ -219,7 +254,11 @@ def _blocked(index: int, raw: Mapping[str, Any] | None, reason: str) -> AutoCard
 
 
 def _convert(index: int, result: UnifiedCardResult) -> AutoCardResult:
-    return AutoCardResult(index, result.game_id, result.market, result.entity_id, result.line, result.side, result.american_odds, result.model_p, result.bet_status, result.reason)
+    return AutoCardResult(
+        index, result.game_id, result.market, result.entity_id, result.line, result.side,
+        result.american_odds, result.model_p, result.bet_status, result.reason,
+        result.shadow_status, result.implied_probability, result.edge, result.ev_per_dollar,
+    )
 
 
 def run_auto_mlb(*, quote_url: str, feature_url: str, projected_lineups_url: str | None = None, provider_token: str | None = None, now: datetime | None = None, opener: Callable = urlopen, registry_path: str = "config/deployments.json", require_confirmed_lineup: bool = False, edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG, kelly_multiplier: float = 0.25) -> AutoRunReport:
@@ -260,10 +299,17 @@ def run_auto_mlb(*, quote_url: str, feature_url: str, projected_lineups_url: str
         if snap is None:
             continue
         try:
-            env = envelopes.get((int(game_id), int(entity_id), market))
+            env = envelopes.get(identity)
             if env is None:
                 raise FeatureBridgeError("MISSING", {"detail": "feature envelope missing"})
-            resolved_features.append(_resolve_feature(env, now=current, game_start=parse_game_start(snap.game_date)))
+            game_start = parse_game_start(snap.game_date)
+            if market in VALIDATED_BRIDGE_MARKETS:
+                resolved = _resolve_feature(env, now=current, game_start=game_start)
+            elif market in GENERIC_MARKETS:
+                resolved = _resolve_generic_feature(env, now=current, game_start=game_start)
+            else:
+                raise AutoRunnerError("FEATURE_MARKET_UNSUPPORTED")
+            resolved_features.append(resolved)
         except Exception as exc:
             feature_failures[identity] = f"{type(exc).__name__}: {exc}"
     q_for_runner = [{k: v for k, v in q.items() if k != "source_index"} for q in canonical_quotes]
@@ -272,8 +318,7 @@ def run_auto_mlb(*, quote_url: str, feature_url: str, projected_lineups_url: str
     for i, reason in quote_failures.items():
         output[i] = _blocked(i, raw_quote_rows[i], reason)
     for q, result in zip(canonical_quotes, unified):
-        i = int(q["source_index"])
-        identity = (q["game_id"], q["entity_id"], q["market"])
+        i = int(q["source_index"]); identity = (q["game_id"], q["entity_id"], q["market"])
         if q["game_id"] in game_failures:
             output[i] = _blocked(i, q, game_failures[q["game_id"]])
         elif snapshots.get(q["game_id"]) is None:
@@ -283,7 +328,7 @@ def run_auto_mlb(*, quote_url: str, feature_url: str, projected_lineups_url: str
         else:
             output[i] = _convert(i, result)
     results = tuple(output[i] for i in range(len(raw_quote_rows)))
-    source_failures = tuple({"source_index": result.source_index, "reason": result.reason} for result in results if result.bet_status == "BLOCKED")
+    source_failures = tuple({"source_index": result.source_index, "reason": result.reason} for result in results if result.bet_status == "BLOCKED" and result.model_p is None)
     status = "PASS" if results else "NO_QUOTES"
     return AutoRunReport(slate_date_ct, current.isoformat(), status, results, source_failures)
 
