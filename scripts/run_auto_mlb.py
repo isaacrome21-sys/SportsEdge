@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 
 from sportsedge.auto_native_odds import run_auto_mlb_native_odds
 from sportsedge.auto_runner import AutoRunnerError, report_to_dict, run_auto_mlb
+from sportsedge.edge_floors import DEFAULT_EDGE_FLOOR_CONFIG
 
 CHICAGO_TZ = ZoneInfo("America/Chicago")
 
@@ -19,7 +20,7 @@ def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--output", default="artifacts/live_mlb_card.json")
     p.add_argument("--require-confirmed-lineup", action="store_true")
-    p.add_argument("--min-edge", type=float, default=0.0)
+    p.add_argument("--edge-floor-config", default=DEFAULT_EDGE_FLOOR_CONFIG)
     p.add_argument("--kelly-multiplier", type=float, default=0.25)
     args = p.parse_args()
     quotes = os.environ.get("SPORTSEDGE_QUOTES_URL", "").strip()
@@ -43,7 +44,7 @@ def main() -> int:
             provider_token=token,
             now=now,
             require_confirmed_lineup=args.require_confirmed_lineup,
-            min_edge=args.min_edge,
+            edge_floor_config_path=args.edge_floor_config,
             kelly_multiplier=args.kelly_multiplier,
         )
         if quotes:
@@ -75,8 +76,6 @@ def main() -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
     print(json.dumps(payload, indent=2, sort_keys=True))
-    # A legitimate no-play card is success. Missing/broken infrastructure is not:
-    # preserve the evidence artifact, but make automation visibly fail closed.
     return 2 if infrastructure_blocked else 0
 
 
