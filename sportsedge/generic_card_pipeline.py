@@ -206,6 +206,19 @@ def run_generic_card(
             deployment = deployments.get(market)
             if engine is None or deployment is None:
                 raise ValueError("market missing engine/deployment registration")
+
+            # Run the model independently of promotion. This is the predeployment
+            # recommendation lane: it may surface SHADOW_BET/SHADOW_PASS but cannot
+            # mutate deployment state or bypass Truth Gate.
+            shadow_output = dict(engine(model_input))
+            if "model_p" not in shadow_output:
+                raise ValueError("engine output missing model_p")
+            model_p = float(shadow_output["model_p"])
+            shadow_status, implied, edge, ev = _shadow(model_p, quote["american_odds"])
+
+            # Production lane remains exactly fail-closed. Missing evidence floors or
+            # non-deployed status therefore stays BLOCKED/OFFICIAL according to the
+            # existing orchestrator contract.
             run = run_candidate(
                 model_input=model_input,
                 quote=quote,
@@ -216,10 +229,9 @@ def run_generic_card(
                 edge_floor_config_path=edge_floor_config_path,
                 kelly_multiplier=kelly_multiplier,
             )
-            shadow_status, implied, edge, ev = _shadow(run.model_p, quote["american_odds"])
             results.append(GenericCardResult(
                 str(quote["game_id"]), market, str(quote["entity_id"]), quote["line"],
-                str(quote["side"]), quote["american_odds"], run.model_p, run.bet_status,
+                str(quote["side"]), quote["american_odds"], model_p, run.bet_status,
                 run.reason, shadow_status, implied, edge, ev,
             ))
         except Exception as exc:
