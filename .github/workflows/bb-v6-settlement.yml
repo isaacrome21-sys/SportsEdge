@@ -1,0 +1,87 @@
+name: bb-v6-cumulative-settlement
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/bb-v6-settlement.yml'
+      - 'scripts/score_bb_v6_forward_shadow.py'
+  schedule:
+    - cron: '37 * * * *'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: bb-v6-cumulative-settlement-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  settle-and-score:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      SPORTSEDGE_BB_V6_SHA256: fa408d9a086f409e073ce811c93b1d47454a43d93cc08143038def793792a9cf
+      SPORTSEDGE_BB_V6_INPUT: artifacts/bb-forward-shadow-state/captures
+      SPORTSEDGE_BB_V6_SCORE_OUT: artifacts/bb-forward-shadow-state/scored
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile scorer
+        run: python -m py_compile scripts/score_bb_v6_forward_shadow.py
+      - name: Restore rolling BB evidence state
+        uses: actions/cache@v4
+        with:
+          path: artifacts/bb-forward-shadow-state
+          key: bb-v6-settlement-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            bb-v6-settlement-${{ runner.os }}-
+      - name: Rehydrate missing immutable BB capture artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$SPORTSEDGE_BB_V6_INPUT"
+          gh api --paginate "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.expired == false and (.name | startswith("pitcher-bb-v6-forward-shadow-"))) | .id' \
+            | sort -n -u > /tmp/bb_artifact_ids.txt
+          while read -r artifact_id; do
+            test -n "$artifact_id" || continue
+            dest="$SPORTSEDGE_BB_V6_INPUT/artifact-${artifact_id}"
+            test -f "$dest/.complete" && continue
+            rm -rf "$dest"; mkdir -p "$dest"
+            zip="/tmp/bb-${artifact_id}.zip"
+            if gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" > "$zip"; then
+              unzip -q "$zip" -d "$dest"; touch "$dest/.complete"
+            else
+              rm -rf "$dest"
+            fi
+            rm -f "$zip"
+          done < /tmp/bb_artifact_ids.txt
+      - name: Settle official walks and score frozen gates
+        run: python scripts/score_bb_v6_forward_shadow.py
+      - name: Verify fail-closed report
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('artifacts/bb-forward-shadow-state/scored/bb_v6_forward_shadow_report.json').read_text())
+          assert d['candidate_sha256']=='fa408d9a086f409e073ce811c93b1d47454a43d93cc08143038def793792a9cf'
+          assert d['sportsbook_data_used'] is False
+          print('BB_V6_SETTLEMENT_REPORT_PASS', d['state'], d['settled_unique_pitchers'])
+          PY
+      - name: Upload cumulative BB evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bb-v6-cumulative-evidence-${{ github.run_id }}
+          path: |
+            artifacts/bb-forward-shadow-state/scored/bb_v6_settlements.json
+            artifacts/bb-forward-shadow-state/scored/bb_v6_forward_shadow_report.json
+            artifacts/bb-forward-shadow-state/scored/bb_v6_forward_shadow_manifest.json
+          if-no-files-found: error
+          retention-days: 90
