@@ -10,6 +10,12 @@ from math import isfinite
 from typing import Any, Callable, Mapping
 
 from .bb_engine import simulate_bb
+from .generic_market_engine import (
+    BINARY_MARKETS,
+    COUNT_MARKETS,
+    GAME_MARKETS,
+    generic_market_engine_adapter,
+)
 from .hits_engine import simulate_hits
 from .total_bases_engine import simulate_total_bases
 
@@ -95,8 +101,11 @@ def pitcher_bb_engine_adapter(model_input: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def engine_registry() -> dict[str, Callable[[Mapping[str, Any]], Mapping[str, Any]]]:
-    return {
+    registry: dict[str, Callable[[Mapping[str, Any]], Mapping[str, Any]]] = {
         "HITS": hits_engine_adapter,
         "TOTAL_BASES": total_bases_engine_adapter,
         "PITCHER_BB": pitcher_bb_engine_adapter,
     }
+    for market in sorted(GAME_MARKETS | COUNT_MARKETS | BINARY_MARKETS):
+        registry[market] = generic_market_engine_adapter
+    return registry
