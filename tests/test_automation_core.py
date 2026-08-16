@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 
@@ -14,6 +17,33 @@ class AutomationCoreTests(unittest.TestCase):
         self.key = {"game_id":"g1","market":"HITS","entity_id":"p1","line":"0.5","side":"OVER"}
         self.quote = dict(self.key, american_odds=120, retrieved_at=self.now-timedelta(seconds=10), ttl_seconds=300)
         self.deploy = {"market":"HITS","eligible":True}
+        self.tmp = tempfile.TemporaryDirectory()
+        self.floor_path = str(Path(self.tmp.name) / "floors.json")
+        Path(self.floor_path).write_text(json.dumps({
+            "truth_gate": {
+                "production": {
+                    "fail_closed": True,
+                    "allow_cli_floor_override": False,
+                    "require_frozen_floor_for_eligible_market": True,
+                },
+                "edge_floors": {
+                    "HITS": {
+                        "status": "FROZEN",
+                        "value_probability_points": 0.01,
+                        "method_version": "test_fixture_v1",
+                        "evidence": {
+                            "evidence_sha256": "e" * 64,
+                            "derivation_code_sha256": "d" * 64,
+                            "oos_cutoff_utc": "2026-08-01T00:00:00Z",
+                        },
+                        "frozen": {"frozen_by_commit": "a" * 40},
+                    }
+                },
+            }
+        }), encoding="utf-8")
+
+    def tearDown(self):
+        self.tmp.cleanup()
 
     def test_rng_reproducible_and_identity_specific(self):
         a = build_hash(["g1","HITS","p1","0.5","OVER"])
@@ -42,19 +72,23 @@ class AutomationCoreTests(unittest.TestCase):
                 double_ttl_gate(dict(self.quote, ttl_seconds=ttl), self.now, self.now)
 
     def test_truth_gate_official_pass_blocked(self):
-        self.assertEqual(decide_bet(.60, 120, bound=True, fresh=True, deployed=True).bet_status, "OFFICIAL_BET")
-        self.assertEqual(decide_bet(.40, 120, bound=True, fresh=True, deployed=True).bet_status, "PASS")
-        self.assertEqual(decide_bet(.60, 120, bound=False, fresh=True, deployed=True).bet_status, "BLOCKED")
+        self.assertEqual(decide_bet(.60, 120, bound=True, fresh=True, deployed=True, edge_floor=.01).bet_status, "OFFICIAL_BET")
+        self.assertEqual(decide_bet(.40, 120, bound=True, fresh=True, deployed=True, edge_floor=.01).bet_status, "PASS")
+        self.assertEqual(decide_bet(.60, 120, bound=False, fresh=True, deployed=True, edge_floor=.01).bet_status, "BLOCKED")
 
-    def test_truth_gate_rejects_invalid_odds(self):
+    def test_truth_gate_rejects_invalid_odds_and_floor(self):
         for odds in (0, 99, -99, float("inf"), float("nan")):
             with self.assertRaises(TruthGateError):
-                decide_bet(.6, odds, bound=True, fresh=True, deployed=True)
+                decide_bet(.6, odds, bound=True, fresh=True, deployed=True, edge_floor=.01)
+        for floor in (0, -0.01, float("inf"), float("nan")):
+            with self.assertRaises(TruthGateError):
+                decide_bet(.6, 120, bound=True, fresh=True, deployed=True, edge_floor=floor)
 
     def test_end_to_end_blocks_price_leakage(self):
         model_input = dict(self.key, build_hash="a"*64, sportsbook_probability=.5)
         result = run_candidate(model_input=model_input, quote=self.quote, deployment=self.deploy,
-            engine_fn=lambda x: dict(self.key, model_p=.6), ingestion_now=self.now, finalization_now=self.now)
+            engine_fn=lambda x: dict(self.key, model_p=.6), ingestion_now=self.now, finalization_now=self.now,
+            edge_floor_config_path=self.floor_path)
         self.assertEqual(result.bet_status, "BLOCKED")
         self.assertIn("prohibited", result.reason)
 
@@ -62,12 +96,22 @@ class AutomationCoreTests(unittest.TestCase):
         model_input = dict(self.key, build_hash="a"*64)
         engine = lambda x: dict(self.key, model_p=.60)
         result = run_candidate(model_input=model_input, quote=self.quote, deployment=self.deploy,
-            engine_fn=engine, ingestion_now=self.now, finalization_now=self.now)
+            engine_fn=engine, ingestion_now=self.now, finalization_now=self.now,
+            edge_floor_config_path=self.floor_path)
         self.assertEqual(result.bet_status, "OFFICIAL_BET")
         stale = dict(self.quote, retrieved_at=self.now-timedelta(seconds=301))
         result2 = run_candidate(model_input=model_input, quote=stale, deployment=self.deploy,
-            engine_fn=engine, ingestion_now=self.now, finalization_now=self.now)
+            engine_fn=engine, ingestion_now=self.now, finalization_now=self.now,
+            edge_floor_config_path=self.floor_path)
         self.assertEqual(result2.bet_status, "BLOCKED")
+
+    def test_missing_floor_fails_closed(self):
+        missing = str(Path(self.tmp.name) / "missing.json")
+        result = run_candidate(model_input=dict(self.key, build_hash="a"*64), quote=self.quote,
+            deployment=self.deploy, engine_fn=lambda x: dict(self.key, model_p=.60),
+            ingestion_now=self.now, finalization_now=self.now, edge_floor_config_path=missing)
+        self.assertEqual(result.bet_status, "BLOCKED")
+        self.assertIn("EdgeFloorError", result.reason)
 
 
 if __name__ == "__main__":
