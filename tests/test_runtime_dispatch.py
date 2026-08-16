@@ -38,7 +38,6 @@ def payload(q=None, mi=None):
     return {
         "ingestion_now": "2026-08-10T20:01:00Z",
         "finalization_now": "2026-08-10T20:01:10Z",
-        "min_edge": 0.0,
         "kelly_multiplier": 0.25,
         "candidates": [{"model_input": mi or model_input(), "quote": q or quote()}],
     }
@@ -48,6 +47,31 @@ def registry(path: Path, *, eligible: bool, stage: str):
     path.write_text(json.dumps({
         "schema_version": 1,
         "markets": {"HITS": {"eligible": eligible, "stage": stage, "reason": "test"}},
+    }), encoding="utf-8")
+
+
+def floors(path: Path):
+    path.write_text(json.dumps({
+        "truth_gate": {
+            "production": {
+                "fail_closed": True,
+                "allow_cli_floor_override": False,
+                "require_frozen_floor_for_eligible_market": True,
+            },
+            "edge_floors": {
+                "HITS": {
+                    "status": "FROZEN",
+                    "value_probability_points": 0.01,
+                    "method_version": "test_fixture_v1",
+                    "evidence": {
+                        "evidence_sha256": "e" * 64,
+                        "derivation_code_sha256": "d" * 64,
+                        "oos_cutoff_utc": "2026-08-01T00:00:00Z",
+                    },
+                    "frozen": {"frozen_by_commit": "a" * 40},
+                }
+            },
+        }
     }), encoding="utf-8")
 
 
@@ -72,14 +96,16 @@ class RuntimeDispatchTests(unittest.TestCase):
     def test_checked_in_registry_blocks_hits_even_with_positive_edge(self):
         result = run_payload(payload())[0]
         self.assertEqual(result.bet_status, "BLOCKED")
-        self.assertIsNone(result.model_p)  # binding failure does not leak an official-looking probability
+        self.assertIsNone(result.model_p)
         self.assertIn("deployment not eligible", result.reason)
 
     def test_deployed_test_registry_can_reach_truth_gate(self):
         with tempfile.TemporaryDirectory() as td:
             p = Path(td) / "registry.json"
+            f = Path(td) / "floors.json"
             registry(p, eligible=True, stage="DEPLOYED")
-            result = run_payload(payload(), registry_path=p)[0]
+            floors(f)
+            result = run_payload(payload(), registry_path=p, edge_floor_config_path=str(f))[0]
             self.assertIn(result.bet_status, ("OFFICIAL_BET", "PASS"))
             self.assertIsNotNone(result.model_p)
             doc = result_to_dict(result)
@@ -89,22 +115,25 @@ class RuntimeDispatchTests(unittest.TestCase):
     def test_quote_timestamp_string_is_parsed_and_double_ttl_blocks_final_stale(self):
         with tempfile.TemporaryDirectory() as td:
             p = Path(td) / "registry.json"
+            f = Path(td) / "floors.json"
             registry(p, eligible=True, stage="DEPLOYED")
+            floors(f)
             x = payload(q=quote(retrieved="2026-08-10T19:56:30Z", ttl=300))
-            # Age 270s at ingestion, 310s at finalization.
             x["ingestion_now"] = "2026-08-10T20:01:00Z"
             x["finalization_now"] = "2026-08-10T20:01:40Z"
-            result = run_payload(x, registry_path=p)[0]
+            result = run_payload(x, registry_path=p, edge_floor_config_path=str(f))[0]
             self.assertEqual(result.bet_status, "BLOCKED")
             self.assertIn("price is stale", result.reason)
 
     def test_candidate_binding_mismatch_blocks(self):
         with tempfile.TemporaryDirectory() as td:
             p = Path(td) / "registry.json"
+            f = Path(td) / "floors.json"
             registry(p, eligible=True, stage="DEPLOYED")
+            floors(f)
             q = quote()
             q["entity_id"] = "wrong-batter"
-            result = run_payload(payload(q=q), registry_path=p)[0]
+            result = run_payload(payload(q=q), registry_path=p, edge_floor_config_path=str(f))[0]
             self.assertEqual(result.bet_status, "BLOCKED")
             self.assertIn("candidate mismatch: entity_id", result.reason)
 
@@ -114,11 +143,24 @@ class RuntimeDispatchTests(unittest.TestCase):
         with self.assertRaises(RuntimeInputError):
             run_payload(x)
 
-    def test_invalid_risk_controls_fail_closed(self):
-        for field, value in (("min_edge", float("nan")), ("kelly_multiplier", 1.1), ("kelly_multiplier", True)):
+    def test_runtime_floor_overrides_are_prohibited(self):
+        for field, value in (
+            ("min_edge", 0.0),
+            ("edge_floor", 0.01),
+            ("edge_floor_config", "other.json"),
+            ("edge_floor_config_path", "other.json"),
+        ):
             x = payload()
             x[field] = value
-            with self.subTest(field=field, value=value):
+            with self.subTest(field=field):
+                with self.assertRaises(RuntimeInputError):
+                    run_payload(x)
+
+    def test_invalid_kelly_controls_fail_closed(self):
+        for value in (1.1, True, float("nan")):
+            x = payload()
+            x["kelly_multiplier"] = value
+            with self.subTest(value=value):
                 with self.assertRaises(RuntimeInputError):
                     run_payload(x)
 

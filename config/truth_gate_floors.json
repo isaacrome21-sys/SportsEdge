@@ -1,0 +1,11 @@
+{
+  "truth_gate": {
+    "schema_version": 1,
+    "production": {
+      "fail_closed": true,
+      "allow_cli_floor_override": false,
+      "require_frozen_floor_for_eligible_market": true
+    },
+    "edge_floors": {}
+  }
+}

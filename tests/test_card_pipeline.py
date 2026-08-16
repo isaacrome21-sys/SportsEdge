@@ -22,6 +22,13 @@ def tb_feature(pid=100): return {"game_pk":777,"player_id":pid,"team_id":1,"mark
 def quote(pid=100,market="HITS"): return {"game_id":"777","period":"FG","market":market,"entity_id":str(pid),"line":.5,"side":"OVER","book_key":"draftkings","is_alternate":False,"raw_market_name":"Player Hits" if market=="HITS" else "Player Total Bases","american_odds":100,"retrieved_at":NOW,"ttl_seconds":300}
 def deployed_registry(path,deploy_tb=False):
     path.write_text(json.dumps({"schema_version":1,"markets":{"HITS":{"eligible":True,"stage":"DEPLOYED","reason":"test"},"TOTAL_BASES":{"eligible":bool(deploy_tb),"stage":"DEPLOYED" if deploy_tb else "PRODUCTION_LOGIC_PASS","reason":"test"}}}))
+def floor_registry(path, markets):
+    record = {
+        "status":"FROZEN","value_probability_points":0.01,"method_version":"test_fixture_v1",
+        "evidence":{"evidence_sha256":"e"*64,"derivation_code_sha256":"d"*64,"oos_cutoff_utc":"2026-08-01T00:00:00Z"},
+        "frozen":{"frozen_by_commit":"a"*40},
+    }
+    path.write_text(json.dumps({"truth_gate":{"production":{"fail_closed":True,"allow_cli_floor_override":False,"require_frozen_floor_for_eligible_market":True},"edge_floors":{m:dict(record) for m in markets}}}))
 
 class CardPipelineTests(unittest.TestCase):
     def test_checked_in_registry_keeps_hits_blocked(self):
@@ -29,13 +36,13 @@ class CardPipelineTests(unittest.TestCase):
         self.assertEqual(out[0].bet_status,"BLOCKED")
     def test_deployed_hits_reaches_official_bet(self):
         with tempfile.TemporaryDirectory() as td:
-            p=Path(td)/"d.json"; deployed_registry(p)
-            out=run_hitter_card(games=[game()],feature_rows=[feature()],quotes=[quote()],ingestion_now=NOW,finalization_now=NOW,registry_path=str(p))
+            p=Path(td)/"d.json"; f=Path(td)/"floors.json"; deployed_registry(p); floor_registry(f,["HITS"])
+            out=run_hitter_card(games=[game()],feature_rows=[feature()],quotes=[quote()],ingestion_now=NOW,finalization_now=NOW,registry_path=str(p),edge_floor_config_path=str(f))
         self.assertEqual(out[0].bet_status,"OFFICIAL_BET")
     def test_deployed_tb_reaches_official_bet(self):
         with tempfile.TemporaryDirectory() as td:
-            p=Path(td)/"d.json"; deployed_registry(p,True)
-            out=run_hitter_card(games=[game()],feature_rows=[tb_feature()],quotes=[quote(market="TOTAL_BASES")],ingestion_now=NOW,finalization_now=NOW,registry_path=str(p))
+            p=Path(td)/"d.json"; f=Path(td)/"floors.json"; deployed_registry(p,True); floor_registry(f,["TOTAL_BASES"])
+            out=run_hitter_card(games=[game()],feature_rows=[tb_feature()],quotes=[quote(market="TOTAL_BASES")],ingestion_now=NOW,finalization_now=NOW,registry_path=str(p),edge_floor_config_path=str(f))
         self.assertEqual(out[0].bet_status,"OFFICIAL_BET")
     def test_hits_and_tb_can_coexist(self):
         out=run_hitter_card(games=[game()],feature_rows=[feature(),tb_feature()],quotes=[quote(),quote(market="TOTAL_BASES")],ingestion_now=NOW,finalization_now=NOW)

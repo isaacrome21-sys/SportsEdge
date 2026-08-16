@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .deployments import load_registry
+from .edge_floors import DEFAULT_EDGE_FLOOR_CONFIG
 from .engine_registry import engine_registry
 from .orchestrator import RunResult, run_slate
 
@@ -51,7 +52,7 @@ def _normalize_candidates(candidates: list[Any]) -> list[dict[str, Any]]:
     return normalized
 
 
-def run_payload(payload: Mapping[str, Any], *, registry_path: str | Path = "config/deployments.json") -> list[RunResult]:
+def run_payload(payload: Mapping[str, Any], *, registry_path: str | Path = "config/deployments.json", edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG) -> list[RunResult]:
     if not isinstance(payload, Mapping):
         raise RuntimeInputError("payload must be an object")
     candidates = payload.get("candidates")
@@ -62,17 +63,18 @@ def run_payload(payload: Mapping[str, Any], *, registry_path: str | Path = "conf
     if finalization_now < ingestion_now:
         raise RuntimeInputError("finalization_now cannot precede ingestion_now")
 
-    min_edge = payload.get("min_edge", 0.0)
+    forbidden_floor_keys = {"min_edge", "edge_floor", "edge_floor_config", "edge_floor_config_path"}
+    present = sorted(forbidden_floor_keys.intersection(payload.keys()))
+    if present:
+        raise RuntimeInputError(f"production edge-floor overrides are prohibited: {present}")
+
     kelly_multiplier = payload.get("kelly_multiplier", 0.25)
-    if isinstance(min_edge, bool) or isinstance(kelly_multiplier, bool):
-        raise RuntimeInputError("min_edge/kelly_multiplier must be numeric")
+    if isinstance(kelly_multiplier, bool):
+        raise RuntimeInputError("kelly_multiplier must be numeric")
     try:
-        min_edge = float(min_edge)
         kelly_multiplier = float(kelly_multiplier)
     except (TypeError, ValueError) as exc:
-        raise RuntimeInputError("min_edge/kelly_multiplier must be numeric") from exc
-    if not isfinite(min_edge) or min_edge < 0:
-        raise RuntimeInputError("min_edge must be finite and >= 0")
+        raise RuntimeInputError("kelly_multiplier must be numeric") from exc
     if not isfinite(kelly_multiplier) or not 0 <= kelly_multiplier <= 1:
         raise RuntimeInputError("kelly_multiplier must be finite and in [0,1]")
 
@@ -82,7 +84,7 @@ def run_payload(payload: Mapping[str, Any], *, registry_path: str | Path = "conf
         deployments=runtime_deployments(registry_path),
         ingestion_now=ingestion_now,
         finalization_now=finalization_now,
-        min_edge=min_edge,
+        edge_floor_config_path=edge_floor_config_path,
         kelly_multiplier=kelly_multiplier,
     )
 

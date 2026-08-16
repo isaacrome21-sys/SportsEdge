@@ -15,6 +15,7 @@ from typing import Any, Callable, Mapping
 from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo
 
+from .edge_floors import DEFAULT_EDGE_FLOOR_CONFIG
 from .feature_bridge import FeatureBridgeError, parse_source_fact, resolve_feature_row
 from .live_slate import LiveGame, TeamLineup, lineup_from_rows
 from .mlb_source import fetch_boxscore, fetch_schedule, parse_confirmed_lineup, parse_game_start
@@ -221,7 +222,7 @@ def _convert(index: int, result: UnifiedCardResult) -> AutoCardResult:
     return AutoCardResult(index, result.game_id, result.market, result.entity_id, result.line, result.side, result.american_odds, result.model_p, result.bet_status, result.reason)
 
 
-def run_auto_mlb(*, quote_url: str, feature_url: str, projected_lineups_url: str | None = None, provider_token: str | None = None, now: datetime | None = None, opener: Callable = urlopen, registry_path: str = "config/deployments.json", require_confirmed_lineup: bool = False, min_edge: float = 0.0, kelly_multiplier: float = 0.25) -> AutoRunReport:
+def run_auto_mlb(*, quote_url: str, feature_url: str, projected_lineups_url: str | None = None, provider_token: str | None = None, now: datetime | None = None, opener: Callable = urlopen, registry_path: str = "config/deployments.json", require_confirmed_lineup: bool = False, edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG, kelly_multiplier: float = 0.25) -> AutoRunReport:
     current = _aware_utc(now or datetime.now(timezone.utc))
     slate_date_ct = current.astimezone(CHICAGO_TZ).date().isoformat()
     raw_quote_rows = _snapshot_list("QUOTE", _http_json(quote_url, opener=opener, token=provider_token))
@@ -266,7 +267,7 @@ def run_auto_mlb(*, quote_url: str, feature_url: str, projected_lineups_url: str
         except Exception as exc:
             feature_failures[identity] = f"{type(exc).__name__}: {exc}"
     q_for_runner = [{k: v for k, v in q.items() if k != "source_index"} for q in canonical_quotes]
-    unified = run_unified_card(games=games, feature_rows=resolved_features, quotes=q_for_runner, ingestion_now=current, finalization_now=current, registry_path=registry_path, require_confirmed_lineup=require_confirmed_lineup, min_edge=min_edge, kelly_multiplier=kelly_multiplier)
+    unified = run_unified_card(games=games, feature_rows=resolved_features, quotes=q_for_runner, ingestion_now=current, finalization_now=current, registry_path=registry_path, require_confirmed_lineup=require_confirmed_lineup, edge_floor_config_path=edge_floor_config_path, kelly_multiplier=kelly_multiplier)
     output: dict[int, AutoCardResult] = {}
     for i, reason in quote_failures.items():
         output[i] = _blocked(i, raw_quote_rows[i], reason)

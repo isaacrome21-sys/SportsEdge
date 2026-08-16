@@ -27,13 +27,13 @@ def american_to_decimal(odds: float) -> float:
     return 1.0 + (100.0 / abs(odds) if odds < 0 else odds / 100.0)
 
 
-def decide_bet(model_p: float, american_odds: float, *, bound: bool, fresh: bool, deployed: bool, min_edge: float = 0.0, kelly_multiplier: float = 0.25) -> BetDecision:
+def decide_bet(model_p: float, american_odds: float, *, bound: bool, fresh: bool, deployed: bool, edge_floor: float, kelly_multiplier: float = 0.25) -> BetDecision:
     if any(type(v) is not bool for v in (bound, fresh, deployed)):
         raise TruthGateError("bound/fresh/deployed must be bool")
     if not isinstance(model_p, (int, float)) or isinstance(model_p, bool) or not math.isfinite(float(model_p)) or not 0 <= float(model_p) <= 1:
         raise TruthGateError("Model_P must be finite in [0,1]")
-    if not isinstance(min_edge, (int, float)) or not math.isfinite(float(min_edge)) or min_edge < 0:
-        raise TruthGateError("min_edge must be finite and >= 0")
+    if not isinstance(edge_floor, (int, float)) or isinstance(edge_floor, bool) or not math.isfinite(float(edge_floor)) or float(edge_floor) <= 0:
+        raise TruthGateError("edge_floor must be finite and > 0")
     if not isinstance(kelly_multiplier, (int, float)) or not math.isfinite(float(kelly_multiplier)) or kelly_multiplier < 0:
         raise TruthGateError("kelly_multiplier must be finite and >= 0")
 
@@ -48,7 +48,7 @@ def decide_bet(model_p: float, american_odds: float, *, bound: bool, fresh: bool
 
     if not (bound and fresh and deployed):
         status = "BLOCKED"
-    elif edge <= float(min_edge) or ev <= 0:
+    elif edge <= float(edge_floor) or ev <= 0:
         status = "PASS"
     else:
         status = "OFFICIAL_BET"

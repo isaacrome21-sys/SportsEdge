@@ -15,6 +15,7 @@ from urllib.request import urlopen
 from zoneinfo import ZoneInfo
 
 from .auto_runner import AutoRunReport, run_auto_mlb
+from .edge_floors import DEFAULT_EDGE_FLOOR_CONFIG
 from .mlb_history_cache import MLBHistoryCachedOpener
 from .mlb_hits_features import MLBHitsFeatureError, MLBHitsHistorySource
 from .mlb_source import fetch_boxscore, fetch_schedule
@@ -66,7 +67,6 @@ def _roster_names(boxscore: Mapping[str, Any]) -> list[tuple[int, str]]:
 
 
 def _player_team_index(*, game, boxscore: Mapping[str, Any]) -> dict[int, tuple[int, int]]:
-    """Map player_id -> (current_team_id, opposing_probable_pitcher_id)."""
     out: dict[int, tuple[int, int]] = {}
     sides = (
         ("away", int(game.away_id), game.home_probable_pitcher_id),
@@ -103,7 +103,7 @@ def run_auto_mlb_native_odds(
     opener: Callable = urlopen,
     registry_path: str = "config/deployments.json",
     require_confirmed_lineup: bool = False,
-    min_edge: float = 0.0,
+    edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG,
     kelly_multiplier: float = 0.25,
     bookmakers: tuple[str, ...] = ("draftkings",),
     history_cache_dir: str | Path | None = None,
@@ -223,7 +223,7 @@ def run_auto_mlb_native_odds(
         opener=wrapped,
         registry_path=registry_path,
         require_confirmed_lineup=require_confirmed_lineup,
-        min_edge=min_edge,
+        edge_floor_config_path=edge_floor_config_path,
         kelly_multiplier=kelly_multiplier,
     )
     acquisition_failures = key_failures + [

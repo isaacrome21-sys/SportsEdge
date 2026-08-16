@@ -5,6 +5,7 @@ from dataclasses import dataclass, asdict
 from datetime import datetime
 from typing import Any, Mapping
 
+from .edge_floors import DEFAULT_EDGE_FLOOR_CONFIG
 from .engine_registry import engine_registry
 from .game_state import require_mlb_pregame
 from .live_slate import LiveGame, LiveSlateError, SUPPORTED_HITTER_MARKETS, assemble_hitter_candidate
@@ -31,7 +32,7 @@ def _quote_identity(quote: Mapping[str, Any]) -> tuple[str, str, str, Any, str]:
     return q["game_id"], q["market"], q["entity_id"], q["line"], q["side"]
 
 
-def run_hitter_card(*, games: list[LiveGame], feature_rows: list[Mapping[str, Any]], quotes: list[Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, registry_path: str = "config/deployments.json", require_confirmed_lineup: bool = True, min_edge: float = 0.0, kelly_multiplier: float = 0.25) -> list[CardResult]:
+def run_hitter_card(*, games: list[LiveGame], feature_rows: list[Mapping[str, Any]], quotes: list[Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, registry_path: str = "config/deployments.json", require_confirmed_lineup: bool = True, edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG, kelly_multiplier: float = 0.25) -> list[CardResult]:
     game_map: dict[str, LiveGame] = {}
     for game in games:
         key = str(game.game_pk)
@@ -79,7 +80,7 @@ def run_hitter_card(*, games: list[LiveGame], feature_rows: list[Mapping[str, An
             deployment = deployments.get(market)
             if engine is None or deployment is None:
                 raise LiveSlateError("market engine/deployment registration missing")
-            rr = run_candidate(model_input=candidate["model_input"], quote=candidate["quote"], deployment=deployment, engine_fn=engine, ingestion_now=ingestion_now, finalization_now=finalization_now, min_edge=min_edge, kelly_multiplier=kelly_multiplier)
+            rr = run_candidate(model_input=candidate["model_input"], quote=candidate["quote"], deployment=deployment, engine_fn=engine, ingestion_now=ingestion_now, finalization_now=finalization_now, edge_floor_config_path=edge_floor_config_path, kelly_multiplier=kelly_multiplier)
             out.append(CardResult(game_id, market, entity_id, line, side, odds, rr.model_p, rr.bet_status, rr.reason))
         except Exception as exc:
             try:
