@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 import json
 import unicodedata
 from typing import Any, Callable, Iterable, Mapping
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -23,11 +24,19 @@ DEFAULT_BOOKMAKERS = ("draftkings",)
 DEFAULT_TTL_SECONDS = 300
 EVENT_TIME_TOLERANCE_SECONDS = 90 * 60
 
+# Market keys are provider identities only. Presence here does not make a market
+# official-eligible; deployment/validation policy remains a separate gate.
 MARKETS = {
     "batter_hits": ("HITS", False),
     "batter_hits_alternate": ("HITS", True),
     "batter_total_bases": ("TOTAL_BASES", False),
     "batter_total_bases_alternate": ("TOTAL_BASES", True),
+    "pitcher_strikeouts": ("PITCHER_K", False),
+    "pitcher_strikeouts_alternate": ("PITCHER_K", True),
+    "pitcher_outs": ("PITCHER_OUTS", False),
+    "pitcher_outs_alternate": ("PITCHER_OUTS", True),
+    "pitcher_hits_allowed": ("PITCHER_HITS", False),
+    "pitcher_hits_allowed_alternate": ("PITCHER_HITS", True),
     "pitcher_walks": ("PITCHER_BB", False),
     "pitcher_walks_alternate": ("PITCHER_BB", True),
 }
@@ -50,11 +59,28 @@ def normalize_name(value: Any) -> str:
 
 
 def _get_json(url: str, *, opener: Callable = urlopen, label: str) -> Any:
+    """Fetch JSON while preserving safe provider failure identity.
+
+    Never includes the request URL or API key in diagnostics. HTTP status and
+    provider error code are enough to distinguish quota/auth/market failures.
+    """
     try:
         with opener(Request(url, headers={"Accept": "application/json"}), timeout=15) as response:
             return json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        provider_code = "UNKNOWN"
+        try:
+            raw = exc.read().decode("utf-8")
+            parsed = json.loads(raw)
+            if isinstance(parsed, Mapping):
+                provider_code = str(parsed.get("error_code") or parsed.get("code") or "UNKNOWN")
+        except Exception:
+            pass
+        raise OddsApiSourceError(f"ODDS_API_HTTP_ERROR:{label}:status={int(exc.code)}:code={provider_code}") from exc
+    except URLError as exc:
+        raise OddsApiSourceError(f"ODDS_API_NETWORK_ERROR:{label}:{type(exc.reason).__name__}") from exc
     except Exception as exc:
-        raise OddsApiSourceError(f"ODDS_API_FETCH_FAILED:{label}") from exc
+        raise OddsApiSourceError(f"ODDS_API_FETCH_FAILED:{label}:{type(exc).__name__}") from exc
 
 
 def _event_url(path: str, *, api_key: str, params: Mapping[str, Any] | None = None) -> str:
@@ -177,28 +203,17 @@ def parse_event_odds(
                     if point is None or price is None:
                         raise OddsApiSourceError("ODDS_OUTCOME_PRICE_IDENTITY_MISSING")
                     quote = {
-                        "game_id": str(game.game_pk),
-                        "period": "FG",
-                        "market": sportsedge_market,
-                        "entity_id": str(player_id),
-                        "side": side,
-                        "line": point,
-                        "book_key": book_key,
-                        "retrieved_at": retrieved_at,
-                        "is_alternate": alternate,
-                        "raw_market_name": market_key,
-                        "american_odds": price,
-                        "ttl_seconds": ttl_seconds,
-                        "sportsbook": book_title,
+                        "game_id": str(game.game_pk), "period": "FG", "market": sportsedge_market,
+                        "entity_id": str(player_id), "side": side, "line": point, "book_key": book_key,
+                        "retrieved_at": retrieved_at, "is_alternate": alternate, "raw_market_name": market_key,
+                        "american_odds": price, "ttl_seconds": ttl_seconds, "sportsbook": book_title,
                     }
                     if outcome.get("sid") not in (None, ""):
                         quote["offer_id"] = str(outcome["sid"])
                     quotes.append(quote)
                 except Exception as exc:
                     failures.append({
-                        "reason": str(exc),
-                        "game_id": str(game.game_pk),
-                        "book_key": book_key,
+                        "reason": str(exc), "game_id": str(game.game_pk), "book_key": book_key,
                         "raw_market_name": market_key,
                         "player_name": str(outcome.get("description") if isinstance(outcome, Mapping) else ""),
                     })
