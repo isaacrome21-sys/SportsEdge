@@ -11,6 +11,7 @@ from sportsedge.v7_training import train_chronological_candidate
 
 class V7StaticContractTrainingTests(unittest.TestCase):
     def _payload(self, *, as_of: str, starter_event: str, starter_pitches: int):
+        forecast_day = as_of[:10]
         return build_v7_feature_payload(
             as_of=as_of,
             starter_rows=[{"event_time": starter_event, "pitches": starter_pitches, "is_start": True}],
@@ -23,8 +24,8 @@ class V7StaticContractTrainingTests(unittest.TestCase):
             },
             park={"venue_id": 1, "run_factor": 1.01, "hr_factor_lhb": 0.99, "hr_factor_rhb": 1.02},
             weather={
-                "issued_at": "2026-08-16T12:00:00Z",
-                "valid_at": "2026-08-16T20:00:00Z",
+                "issued_at": f"{forecast_day}T12:00:00Z",
+                "valid_at": f"{forecast_day}T20:00:00Z",
                 "temperature_f": 80, "humidity_pct": 50, "pressure_hpa": 1012,
                 "wind_mph": 8, "wind_out_to_center_mph": 3,
                 "precip_probability": 0.1, "roof_closed": False,
