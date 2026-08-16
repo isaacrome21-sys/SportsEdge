@@ -7,11 +7,10 @@ model-derived event_probability. Missing model features fail closed.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 from math import exp, floor, isfinite
 from typing import Any, Mapping
-
-from .source_lineage import canonical_json_sha256
-from .v7_distribution import simulate_game_distribution
 
 GENERIC_ENGINE_VERSION = "mlb_full_market_runtime_v1"
 
@@ -29,6 +28,11 @@ BINARY_MARKETS = {"PITCHER_RECORD_WIN", "FIRST_HOME_RUN"}
 
 class GenericMarketEngineError(ValueError):
     pass
+
+
+def _canonical_json_sha256(value: Any) -> str:
+    raw = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
 
 
 def _finite(value: Any, name: str, *, lower: float | None = None, upper: float | None = None) -> float:
@@ -82,9 +86,6 @@ def _count_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
     side = str(model_input.get("side", "")).upper()
     if side not in {"OVER", "UNDER"}:
         raise GenericMarketEngineError("count market side must be OVER or UNDER")
-    # Sports prop half-lines are the normal case. For integer lines, this intentionally
-    # treats OVER as X > line and UNDER as X < line; push probability is excluded from
-    # either side and must be handled upstream for push-capable quote semantics.
     k_over = floor(line)
     p_over = 1.0 - _poisson_cdf(k_over, lam)
     if float(line).is_integer():
@@ -92,7 +93,7 @@ def _count_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
     else:
         p_under = 1.0 - p_over
     p = p_over if side == "OVER" else p_under
-    digest = canonical_json_sha256({
+    digest = _canonical_json_sha256({
         "engine": GENERIC_ENGINE_VERSION,
         "market": market,
         "expected_count": lam,
@@ -113,7 +114,7 @@ def _binary_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
     if side not in {"YES", "NO"}:
         raise GenericMarketEngineError("binary market side must be YES or NO")
     p = p_yes if side == "YES" else 1.0 - p_yes
-    digest = canonical_json_sha256({
+    digest = _canonical_json_sha256({
         "engine": GENERIC_ENGINE_VERSION,
         "market": market,
         "event_probability": p_yes,
@@ -125,6 +126,9 @@ def _binary_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
+    # Lazy import prevents runtime -> engine_registry -> generic_engine -> v7 -> source_lineage -> runtime cycle.
+    from .v7_distribution import simulate_game_distribution
+
     market = str(model_input.get("market"))
     if market not in GAME_MARKETS:
         raise GenericMarketEngineError("game adapter received non-game market")
@@ -154,7 +158,6 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
         else:
             raise GenericMarketEngineError("moneyline side must be HOME or AWAY")
     elif market in {"RUN_LINE", "F5_RUN_LINE"}:
-        # Current V7 distribution exposes the canonical MLB +/-1.5 pair only.
         if line == -1.5 and side in {"HOME", "HOME_RL"}:
             p = result.home_minus_1_5_probability
         elif line == 1.5 and side in {"AWAY", "AWAY_RL"}:
