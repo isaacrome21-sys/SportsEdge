@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any, Callable, Mapping
 
 from .candidate_binding import bind_candidate
+from .edge_floors import DEFAULT_EDGE_FLOOR_CONFIG, require_production_edge_floor
 from .price_ttl import double_ttl_gate
 from .truth_gate import BetDecision, decide_bet
 
@@ -33,7 +34,7 @@ def _reject_market_leakage(model_input: Mapping[str, Any]) -> None:
         raise OrchestrationError(f"sportsbook/market data prohibited in Model_Input: {sorted(present)}")
 
 
-def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], deployment: Mapping[str, Any], engine_fn: Callable[[Mapping[str, Any]], Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, min_edge: float = 0.0, kelly_multiplier: float = 0.25) -> RunResult:
+def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], deployment: Mapping[str, Any], engine_fn: Callable[[Mapping[str, Any]], Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG, kelly_multiplier: float = 0.25) -> RunResult:
     """Run one candidate end-to-end. Any integrity failure returns BLOCKED, never a guessed bet."""
     market = str(model_input.get("market", "UNKNOWN"))
     try:
@@ -46,17 +47,18 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], d
             if key not in output and key in model_input:
                 output[key] = model_input[key]
         bind_candidate(output, quote, deployment)
+        floor = require_production_edge_floor(market=market, path=edge_floor_config_path)
         decision = decide_bet(
             output["model_p"], quote["american_odds"],
             bound=True, fresh=True, deployed=deployment.get("eligible") is True,
-            min_edge=min_edge, kelly_multiplier=kelly_multiplier,
+            edge_floor=float(floor.value_probability_points), kelly_multiplier=kelly_multiplier,
         )
         return RunResult(market, float(output["model_p"]), decision.bet_status, decision, "ok")
     except Exception as exc:
         return RunResult(market, None, "BLOCKED", None, f"{type(exc).__name__}: {exc}")
 
 
-def run_slate(candidates: list[Mapping[str, Any]], *, engines: Mapping[str, Callable[[Mapping[str, Any]], Mapping[str, Any]]], deployments: Mapping[str, Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, min_edge: float = 0.0, kelly_multiplier: float = 0.25) -> list[RunResult]:
+def run_slate(candidates: list[Mapping[str, Any]], *, engines: Mapping[str, Callable[[Mapping[str, Any]], Mapping[str, Any]]], deployments: Mapping[str, Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG, kelly_multiplier: float = 0.25) -> list[RunResult]:
     results: list[RunResult] = []
     for item in candidates:
         model_input = item.get("model_input")
@@ -73,6 +75,6 @@ def run_slate(candidates: list[Mapping[str, Any]], *, engines: Mapping[str, Call
         results.append(run_candidate(
             model_input=model_input, quote=quote, deployment=deployment, engine_fn=engine,
             ingestion_now=ingestion_now, finalization_now=finalization_now,
-            min_edge=min_edge, kelly_multiplier=kelly_multiplier,
+            edge_floor_config_path=edge_floor_config_path, kelly_multiplier=kelly_multiplier,
         ))
     return results
