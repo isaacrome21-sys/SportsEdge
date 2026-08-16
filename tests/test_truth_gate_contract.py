@@ -51,6 +51,11 @@ class TruthGateContractTests(unittest.TestCase):
         text = Path("scripts/run_auto_mlb.py").read_text(encoding="utf-8")
         self.assertNotIn("--min-edge", text)
 
+    def test_cli_cannot_switch_production_floor_registry(self):
+        text = Path("scripts/run_auto_mlb.py").read_text(encoding="utf-8")
+        self.assertIn("production edge-floor config override is prohibited", text)
+        self.assertIn("edge_floor_config_path=DEFAULT_EDGE_FLOOR_CONFIG", text)
+
     def test_orchestrator_is_the_only_truth_gate_decision_callsite(self):
         callsites = []
         for path in PRODUCTION_PATHS:
