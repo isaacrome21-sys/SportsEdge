@@ -1,4 +1,4 @@
-import pytest
+import unittest
 
 from sportsedge.edge_floors import EdgeFloorError, require_frozen_edge_floor
 
@@ -31,44 +31,45 @@ def _frozen(value="0.02"):
     }
 
 
-def test_missing_market_fails_closed():
-    with pytest.raises(EdgeFloorError):
-        require_frozen_edge_floor(market="MLB_MONEYLINE", config=_cfg())
+class EdgeFloorTests(unittest.TestCase):
+    def test_missing_market_fails_closed(self):
+        with self.assertRaises(EdgeFloorError):
+            require_frozen_edge_floor(market="MLB_MONEYLINE", config=_cfg())
+
+    def test_unproven_market_fails_closed(self):
+        with self.assertRaises(EdgeFloorError):
+            require_frozen_edge_floor(
+                market="MLB_MONEYLINE",
+                config=_cfg({"status": "UNPROVEN", "value_probability_points": None}),
+            )
+
+    def test_nonpositive_or_invalid_floor_is_rejected(self):
+        for value in (0, 0.0, "0", -0.01, "-0.02", None, "nan", "inf"):
+            with self.subTest(value=value):
+                with self.assertRaises(EdgeFloorError):
+                    require_frozen_edge_floor(market="MLB_MONEYLINE", config=_cfg(_frozen(value)))
+
+    def test_frozen_floor_requires_evidence_hashes_and_cutoff(self):
+        record = _frozen()
+        del record["evidence"]["evidence_sha256"]
+        with self.assertRaises(EdgeFloorError):
+            require_frozen_edge_floor(market="MLB_MONEYLINE", config=_cfg(record))
+
+    def test_production_policy_must_be_fail_closed_and_override_disabled(self):
+        cfg = _cfg(_frozen())
+        cfg["truth_gate"]["production"]["fail_closed"] = False
+        with self.assertRaises(EdgeFloorError):
+            require_frozen_edge_floor(market="MLB_MONEYLINE", config=cfg)
+
+        cfg = _cfg(_frozen())
+        cfg["truth_gate"]["production"]["allow_cli_floor_override"] = True
+        with self.assertRaises(EdgeFloorError):
+            require_frozen_edge_floor(market="MLB_MONEYLINE", config=cfg)
+
+    def test_valid_frozen_floor_resolves_positive_value(self):
+        floor = require_frozen_edge_floor(market="MLB_MONEYLINE", config=_cfg(_frozen("0.021")))
+        self.assertEqual(str(floor.value_probability_points), "0.021")
 
 
-def test_unproven_market_fails_closed():
-    with pytest.raises(EdgeFloorError):
-        require_frozen_edge_floor(
-            market="MLB_MONEYLINE",
-            config=_cfg({"status": "UNPROVEN", "value_probability_points": None}),
-        )
-
-
-@pytest.mark.parametrize("value", [0, 0.0, "0", -0.01, "-0.02", None, "nan", "inf"])
-def test_nonpositive_or_invalid_floor_is_rejected(value):
-    with pytest.raises(EdgeFloorError):
-        require_frozen_edge_floor(market="MLB_MONEYLINE", config=_cfg(_frozen(value)))
-
-
-def test_frozen_floor_requires_evidence_hashes_and_cutoff():
-    record = _frozen()
-    del record["evidence"]["evidence_sha256"]
-    with pytest.raises(EdgeFloorError):
-        require_frozen_edge_floor(market="MLB_MONEYLINE", config=_cfg(record))
-
-
-def test_production_policy_must_be_fail_closed_and_override_disabled():
-    cfg = _cfg(_frozen())
-    cfg["truth_gate"]["production"]["fail_closed"] = False
-    with pytest.raises(EdgeFloorError):
-        require_frozen_edge_floor(market="MLB_MONEYLINE", config=cfg)
-
-    cfg = _cfg(_frozen())
-    cfg["truth_gate"]["production"]["allow_cli_floor_override"] = True
-    with pytest.raises(EdgeFloorError):
-        require_frozen_edge_floor(market="MLB_MONEYLINE", config=cfg)
-
-
-def test_valid_frozen_floor_resolves_positive_value():
-    floor = require_frozen_edge_floor(market="MLB_MONEYLINE", config=_cfg(_frozen("0.021")))
-    assert str(floor.value_probability_points) == "0.021"
+if __name__ == "__main__":
+    unittest.main()
