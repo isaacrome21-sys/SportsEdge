@@ -30,7 +30,7 @@ class OddsNormalizationTests(unittest.TestCase):
         self.assertTrue(q.sportsedge_game_id.startswith("MLB:777:"))
         self.assertAlmostEqual(q.decimal_price, 1 + 100/110)
 
-    def test_rejects_post_first-pitch_fetch(self):
+    def test_rejects_post_first_pitch_fetch(self):
         with self.assertRaises(OddsNormalizationError):
             quote(fetched="2026-08-16T19:05:00Z", updated="2026-08-16T19:04:00Z")
 
