@@ -20,7 +20,7 @@ GENERIC_FEATURE_VERSION = "mlb_generic_feature_v1"
 PLAYER_COUNT_MARKETS = frozenset({
     "HOME_RUNS", "RBI", "RUNS", "HITS_RUNS_RBIS", "SINGLES", "DOUBLES", "TRIPLES",
     "BATTER_BB", "BATTER_K", "STOLEN_BASES", "PITCHER_K", "PITCHER_HITS_ALLOWED",
-    "PITCHER_ER", "PITCHER_OUTS",
+    "PITCHER_BB", "PITCHER_ER", "PITCHER_OUTS",
 })
 BINARY_MARKETS = frozenset({"PITCHER_RECORD_WIN", "FIRST_HOME_RUN"})
 GAME_MARKETS = frozenset({"MONEYLINE", "RUN_LINE", "TOTALS", "NRFI", "YRFI", "F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS"})
@@ -38,6 +38,7 @@ BATTER_STAT_KEYS = {
 PITCHER_STAT_KEYS = {
     "PITCHER_K": "strikeOuts",
     "PITCHER_HITS_ALLOWED": "hits",
+    "PITCHER_BB": "baseOnBalls",
     "PITCHER_ER": "earnedRuns",
 }
 
@@ -257,14 +258,11 @@ class MLBGenericHistorySource:
             if game_hr <= 0:
                 p = 0.0
             else:
-                # Homogeneous Poisson-race shadow baseline: player's HR intensity share
-                # times the probability at least one HR occurs in the game.
                 p = min(1.0, max(0.0, (player_hr / game_hr) * (1.0 - exp(-game_hr))))
             base["event_probability"] = p
         elif market in GAME_MARKETS:
             away_runs, home_runs, _ = self.team_means(away_team_id=away_team_id, home_team_id=home_team_id, target_date=target_date)
             if market.startswith("F5_"):
-                # Shadow baseline only. Promotion requires a separately validated F5 model.
                 base["f5_away_mean_runs"] = away_runs * (5.0 / 9.0)
                 base["f5_home_mean_runs"] = home_runs * (5.0 / 9.0)
             else:
