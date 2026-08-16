@@ -118,9 +118,12 @@ def fetch_mlb_game_quotes(*, api_key: str, schedule: Iterable[GameSnapshot], ope
         api_key=api_key,
         params={"regions": "us", "bookmakers": requested_books, "markets": ",".join(GAME_MARKETS), "oddsFormat": "american", "dateFormat": "iso", "includeSids": "true"},
     )
-    payload = _get_json(url, opener=opener, label="game-markets")
+    try:
+        payload = _get_json(url, opener=opener, label="game-markets")
+    except Exception as exc:
+        return GameOddsSnapshot((), ({"reason": f"{type(exc).__name__}: {exc}", "stage": "GAME_MARKET_PROVIDER"},))
     if not isinstance(payload, list):
-        raise OddsApiSourceError("ODDS_GAME_MARKETS_RESPONSE_NOT_LIST")
+        return GameOddsSnapshot((), ({"reason": "ODDS_GAME_MARKETS_RESPONSE_NOT_LIST", "stage": "GAME_MARKET_PROVIDER"},))
     quotes: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
     for event in payload:
