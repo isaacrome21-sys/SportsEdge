@@ -48,3 +48,4 @@ jobs:
           name: live-full-model-expansion
           path: artifacts/
           if-no-files-found: error
+# rerun marker: game-market provider failures are isolated from player props
