@@ -3,12 +3,18 @@
 Provider event IDs and player names are never trusted as MLB identity: every
 event must bind uniquely to a StatsAPI schedule game and every player description
 must bind uniquely to an MLB player id for that exact game.
+
+Production acquisition is quota-aware. The provider's /sports endpoint is used
+for zero-cost usage headers before expensive event-market calls. Scheduled polls
+can also be restricted to a pregame horizon so a full six-market event fan-out
+is not repeated across the entire slate every few minutes.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
+import math
 import unicodedata
 from typing import Any, Callable, Iterable, Mapping
 from urllib.parse import urlencode
@@ -43,6 +49,13 @@ class OddsApiSnapshot:
     failures: tuple[dict[str, Any], ...]
 
 
+@dataclass(frozen=True)
+class OddsApiUsage:
+    remaining: int
+    used: int | None = None
+    last_cost: int | None = None
+
+
 def normalize_name(value: Any) -> str:
     text = unicodedata.normalize("NFKD", str(value or ""))
     text = "".join(ch for ch in text if not unicodedata.combining(ch))
@@ -62,6 +75,35 @@ def _event_url(path: str, *, api_key: str, params: Mapping[str, Any] | None = No
         raise OddsApiSourceError("ODDS_API_KEY_MISSING")
     query = {"apiKey": api_key.strip(), **dict(params or {})}
     return f"{BASE}{path}?{urlencode(query)}"
+
+
+def _header_int(headers: Any, name: str) -> int | None:
+    try:
+        value = headers.get(name)
+    except Exception:
+        return None
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def fetch_odds_api_usage(*, api_key: str, opener: Callable = urlopen) -> OddsApiUsage:
+    """Read provider quota headers using the zero-cost /sports endpoint."""
+    url = _event_url("/sports/", api_key=api_key)
+    try:
+        with opener(Request(url, headers={"Accept": "application/json"}), timeout=15) as response:
+            response.read()
+            remaining = _header_int(getattr(response, "headers", None), "x-requests-remaining")
+            used = _header_int(getattr(response, "headers", None), "x-requests-used")
+            last = _header_int(getattr(response, "headers", None), "x-requests-last")
+    except Exception as exc:
+        raise OddsApiSourceError("ODDS_API_USAGE_PROBE_FAILED") from exc
+    if remaining is None or remaining < 0:
+        raise OddsApiSourceError("ODDS_API_USAGE_REMAINING_MISSING")
+    return OddsApiUsage(remaining=remaining, used=used, last_cost=last)
 
 
 def _provider_time(value: Any) -> datetime:
@@ -213,21 +255,72 @@ def fetch_mlb_player_prop_quotes(
     opener: Callable = urlopen,
     bookmakers: Iterable[str] = DEFAULT_BOOKMAKERS,
     ttl_seconds: int = DEFAULT_TTL_SECONDS,
+    now: datetime | None = None,
+    max_hours_ahead: float | None = None,
+    quota_remaining: int | None = None,
 ) -> OddsApiSnapshot:
     games = list(schedule)
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None or current.utcoffset() is None:
+        raise OddsApiSourceError("ODDS_NOW_TIMEZONE_REQUIRED")
+    current = current.astimezone(timezone.utc)
+    if max_hours_ahead is not None:
+        if not isinstance(max_hours_ahead, (int, float)) or not math.isfinite(float(max_hours_ahead)) or float(max_hours_ahead) <= 0:
+            raise OddsApiSourceError("ODDS_PREGAME_WINDOW_INVALID")
+        max_hours_ahead = float(max_hours_ahead)
+
     events_url = _event_url(f"/sports/{SPORT_KEY}/events", api_key=api_key)
     events = _get_json(events_url, opener=opener, label="events")
     if not isinstance(events, list):
         raise OddsApiSourceError("ODDS_EVENTS_RESPONSE_NOT_LIST")
-    quotes: list[dict[str, Any]] = []
+
     failures: list[dict[str, Any]] = []
-    requested_markets = ",".join(MARKETS)
+    bound_events: list[tuple[Mapping[str, Any], GameSnapshot]] = []
+    for event in events:
+        if not isinstance(event, Mapping):
+            failures.append({"reason": "ODDS_EVENT_MALFORMED", "provider_event_id": ""})
+            continue
+        try:
+            game = bind_provider_event(event, games)
+        except OddsApiSourceError as exc:
+            # The provider events endpoint may contain tomorrow's games. Only
+            # same-slate games that bind uniquely are eligible for this run.
+            if str(exc) == "ODDS_EVENT_GAME_AMBIGUOUS":
+                failures.append({"reason": str(exc), "provider_event_id": str(event.get("id") or "")})
+            continue
+        commence = _provider_time(event.get("commence_time"))
+        seconds_to_start = (commence - current).total_seconds()
+        if seconds_to_start <= 0:
+            continue
+        if max_hours_ahead is not None and seconds_to_start > max_hours_ahead * 3600:
+            continue
+        bound_events.append((event, game))
+
     requested_books = ",".join(str(x).strip() for x in bookmakers if str(x).strip())
     if not requested_books:
         raise OddsApiSourceError("ODDS_BOOKMAKERS_MISSING")
-    for event in events:
+    requested_markets = ",".join(MARKETS)
+
+    # Up to ten explicit bookmakers are billed as one region. For our current
+    # single-book production contract, six requested prop market keys per event
+    # is the conservative maximum request cost. Refuse to start a partial-slate
+    # fan-out when the key cannot cover it.
+    estimated_credits = len(bound_events) * len(MARKETS)
+    if quota_remaining is not None:
         try:
-            game = bind_provider_event(event, games)
+            remaining = int(quota_remaining)
+        except (TypeError, ValueError) as exc:
+            raise OddsApiSourceError("ODDS_API_QUOTA_INVALID") from exc
+        if remaining < 0:
+            raise OddsApiSourceError("ODDS_API_QUOTA_INVALID")
+        if remaining < estimated_credits:
+            raise OddsApiSourceError(
+                f"ODDS_API_INSUFFICIENT_CREDITS:required={estimated_credits}:remaining={remaining}"
+            )
+
+    quotes: list[dict[str, Any]] = []
+    for event, game in bound_events:
+        try:
             event_id = str(event.get("id") or "").strip()
             if not event_id:
                 raise OddsApiSourceError("ODDS_EVENT_ID_MISSING")
@@ -251,5 +344,5 @@ def fetch_mlb_player_prop_quotes(
             quotes.extend(snapshot.quotes)
             failures.extend(snapshot.failures)
         except Exception as exc:
-            failures.append({"reason": str(exc), "provider_event_id": str(event.get("id") if isinstance(event, Mapping) else "")})
+            failures.append({"reason": str(exc), "provider_event_id": str(event.get("id") or "")})
     return OddsApiSnapshot(tuple(quotes), tuple(failures))
