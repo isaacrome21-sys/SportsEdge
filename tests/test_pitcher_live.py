@@ -28,6 +28,22 @@ def quote(pid=11):
 def deployed_registry(path):
     path.write_text(json.dumps({"schema_version":1,"markets":{"PITCHER_BB":{"eligible":True,"stage":"DEPLOYED","reason":"test"}}}))
 
+def floor_registry(path):
+    path.write_text(json.dumps({
+        "truth_gate": {
+            "production": {"fail_closed": True, "allow_cli_floor_override": False, "require_frozen_floor_for_eligible_market": True},
+            "edge_floors": {
+                "PITCHER_BB": {
+                    "status": "FROZEN",
+                    "value_probability_points": 0.01,
+                    "method_version": "test_fixture_v1",
+                    "evidence": {"evidence_sha256": "e"*64, "derivation_code_sha256": "d"*64, "oos_cutoff_utc": "2026-08-01T00:00:00Z"},
+                    "frozen": {"frozen_by_commit": "a"*40}
+                }
+            }
+        }
+    }))
+
 
 class PitcherLiveTests(unittest.TestCase):
     def test_probable_pitcher_identity_is_bound(self):
@@ -46,8 +62,8 @@ class PitcherLiveTests(unittest.TestCase):
         self.assertEqual(out[0].bet_status,"BLOCKED"); self.assertIn("QUOTE_IDENTITY_INCOMPLETE",out[0].reason)
     def test_temp_deployed_registry_reaches_actual_engine(self):
         with tempfile.TemporaryDirectory() as td:
-            p=Path(td)/"deployments.json"; deployed_registry(p)
-            out=run_pitcher_bb_card(games=[game()],feature_rows=[feature()],quotes=[quote()],ingestion_now=NOW,finalization_now=NOW,registry_path=str(p))
+            p=Path(td)/"deployments.json"; f=Path(td)/"floors.json"; deployed_registry(p); floor_registry(f)
+            out=run_pitcher_bb_card(games=[game()],feature_rows=[feature()],quotes=[quote()],ingestion_now=NOW,finalization_now=NOW,registry_path=str(p),edge_floor_config_path=str(f))
         self.assertIn(out[0].bet_status,("OFFICIAL_BET","PASS")); self.assertIsNotNone(out[0].model_p)
 
 
