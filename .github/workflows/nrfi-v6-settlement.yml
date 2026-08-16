@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/nrfi-v6-settlement.yml'
       - 'scripts/score_nrfi_v6_forward_shadow.py'
+      - 'scripts/score_nrfi_v6_forward_shadow_v2.py'
   schedule:
     - cron: '17 * * * *'
 
@@ -34,7 +35,7 @@ jobs:
           python-version: '3.12'
 
       - name: Compile scorer
-        run: python -m py_compile scripts/score_nrfi_v6_forward_shadow.py
+        run: python -m py_compile scripts/score_nrfi_v6_forward_shadow.py scripts/score_nrfi_v6_forward_shadow_v2.py
 
       - name: Restore rolling evidence state
         uses: actions/cache@v4
@@ -77,7 +78,7 @@ jobs:
           echo "NRFI_CAPTURE_ARTIFACTS_NEW=$new"
 
       - name: Settle MLB first-inning outcomes and score frozen promotion gates
-        run: python scripts/score_nrfi_v6_forward_shadow.py
+        run: python scripts/score_nrfi_v6_forward_shadow_v2.py
 
       - name: Verify fail-closed eligibility report
         run: |
@@ -90,6 +91,8 @@ jobs:
           assert d['feature_contract_sha256']=='f38df78312de2fbcbd64824a1d5c2fb4d5c96b51e758da30e55a001f445fbda2'
           assert d['sportsbook_data_used'] is False
           assert d['markets']['NRFI']['eligible'] == d['markets']['YRFI']['eligible']
+          settlements=json.loads(Path('artifacts/forward-shadow-state/scored/nrfi_v6_settlements.json').read_text())
+          assert all(x.get('source')=='MLB_STATSAPI_LIVE_FEED_LINESCORE_V2' for x in settlements)
           print('NRFI_V6_SETTLEMENT_REPORT_PASS', d['state'], d['settled_unique_games'])
           PY
 
