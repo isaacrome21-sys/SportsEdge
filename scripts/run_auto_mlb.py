@@ -23,6 +23,8 @@ def main() -> int:
     p.add_argument("--edge-floor-config", default=DEFAULT_EDGE_FLOOR_CONFIG)
     p.add_argument("--kelly-multiplier", type=float, default=0.25)
     args = p.parse_args()
+    if args.edge_floor_config != DEFAULT_EDGE_FLOOR_CONFIG:
+        p.error("production edge-floor config override is prohibited")
     quotes = os.environ.get("SPORTSEDGE_QUOTES_URL", "").strip()
     odds_api_keys = tuple(
         value for value in (
@@ -44,7 +46,7 @@ def main() -> int:
             provider_token=token,
             now=now,
             require_confirmed_lineup=args.require_confirmed_lineup,
-            edge_floor_config_path=args.edge_floor_config,
+            edge_floor_config_path=DEFAULT_EDGE_FLOOR_CONFIG,
             kelly_multiplier=args.kelly_multiplier,
         )
         if quotes:
