@@ -1,9 +1,9 @@
-"""Automated MLB runner using native sportsbook and hitter feature acquisition.
+"""Automated MLB runner using native sportsbook and MLB-history feature acquisition.
 
-The wrapper deliberately reuses run_auto_mlb for all modeling, feature-bridge,
-lineup, TTL, deployment, and Truth Gate behavior. When no external feature URL
-is supplied, validated HITS and TOTAL_BASES features are reconstructed from
-official MLB history. Unsupported native markets remain fail-closed.
+Validated HITS/TOTAL_BASES retain their existing feature builders. Expanded MLB
+markets use a separate chronological, price-independent generic feature lane for
+shadow recommendations. Full-game ML/RL/totals are acquired alongside player
+props. Sportsbook prices are never model features.
 """
 from __future__ import annotations
 
@@ -16,8 +16,15 @@ from zoneinfo import ZoneInfo
 
 from .auto_runner import AutoRunReport, run_auto_mlb
 from .edge_floors import DEFAULT_EDGE_FLOOR_CONFIG
+from .game_odds_source import fetch_mlb_game_quotes
+from .mlb_generic_features import (
+    BINARY_MARKETS,
+    GAME_MARKETS,
+    PLAYER_COUNT_MARKETS,
+    MLBGenericHistorySource,
+)
 from .mlb_history_cache import MLBHistoryCachedOpener
-from .mlb_hits_features import MLBHitsFeatureError, MLBHitsHistorySource
+from .mlb_hits_features import MLBHitsHistorySource
 from .mlb_source import fetch_boxscore, fetch_schedule
 from .mlb_total_bases_features import MLBTBFeatureError, MLBTBHistorySource
 from .odds_api_source import build_participant_index, fetch_mlb_player_prop_quotes
@@ -73,12 +80,11 @@ def _player_team_index(*, game, boxscore: Mapping[str, Any]) -> dict[int, tuple[
         ("home", int(game.home_id), game.away_probable_pitcher_id),
     )
     for side, team_id, opponent_pitcher in sides:
-        if opponent_pitcher is None:
-            continue
         for player_id, _ in _side_players(boxscore, side):
-            if player_id in out and out[player_id] != (team_id, int(opponent_pitcher)):
+            starter = int(opponent_pitcher) if opponent_pitcher is not None else 0
+            if player_id in out and out[player_id] != (team_id, starter):
                 raise ValueError("MLB_ROSTER_PLAYER_AMBIGUOUS")
-            out[player_id] = (team_id, int(opponent_pitcher))
+            out[player_id] = (team_id, starter)
     return out
 
 
@@ -129,22 +135,34 @@ def run_auto_mlb_native_odds(
             roster_failures.append({"stage": "MLB_ROSTER_IDENTITY", "game_id": str(game.game_pk), "reason": f"{type(exc).__name__}: {exc}"})
 
     participant_index = build_participant_index(schedule=schedule, confirmed_names_by_game=roster_names)
-    keyring = fetch_with_key_failover(
-        (odds_api_key, *odds_api_keys),
-        lambda key: fetch_mlb_player_prop_quotes(
+
+    def fetch_all(key: str) -> dict[str, Any]:
+        player = fetch_mlb_player_prop_quotes(
             api_key=key,
             schedule=schedule,
             participant_index=participant_index,
             opener=opener,
             bookmakers=bookmakers,
-        ),
-    )
+        )
+        game = fetch_mlb_game_quotes(
+            api_key=key,
+            schedule=schedule,
+            opener=opener,
+            bookmakers=bookmakers,
+        )
+        return {
+            "quotes": tuple(player.quotes) + tuple(game.quotes),
+            "failures": tuple({"surface": "PLAYER", **dict(x)} for x in player.failures)
+                + tuple({"surface": "GAME", **dict(x)} for x in game.failures),
+        }
+
+    keyring = fetch_with_key_failover((odds_api_key, *odds_api_keys), fetch_all)
     odds = keyring.value
     key_failures = [
         {"stage": "ODDS_API_KEY_FAILOVER", "key_slot": item.key_slot, "reason": item.reason}
         for item in keyring.failures
     ]
-    quote_payload = list(odds.quotes)
+    quote_payload = list(odds["quotes"])
 
     native_feature_failures: list[dict[str, Any]] = []
     native_features: list[dict[str, Any]] = []
@@ -158,49 +176,91 @@ def run_auto_mlb_native_odds(
         )
         hits_history = MLBHitsHistorySource(opener=history_opener, retrieved_at=current)
         tb_history = MLBTBHistorySource(opener=history_opener, retrieved_at=current)
+        generic_history = MLBGenericHistorySource(opener=history_opener, retrieved_at=current)
         schedule_by_pk = {int(game.game_pk): game for game in schedule}
-        seen: set[tuple[int, int, str]] = set()
+        seen: set[tuple[int, str, str]] = set()
+
         for quote in quote_payload:
             market = str(quote.get("market"))
-            if market not in {"HITS", "TOTAL_BASES"}:
-                continue
             try:
                 game_pk = int(quote["game_id"])
-                player_id = int(quote["entity_id"])
-                identity = (game_pk, player_id, market)
+                entity_id = str(quote["entity_id"])
+                identity = (game_pk, entity_id, market)
                 if identity in seen:
                     continue
                 seen.add(identity)
                 game = schedule_by_pk.get(game_pk)
                 if game is None:
                     raise ValueError("MLB_FEATURE_GAME_NOT_FOUND")
-                binding = (player_teams.get(game_pk) or {}).get(player_id)
-                if binding is None:
-                    raise ValueError("MLB_FEATURE_PLAYER_TEAM_UNRESOLVED")
-                team_id, starter_id = binding
-                if market == "HITS":
-                    native_features.append(hits_history.feature_envelope(
+                target_date = _official_date(game)
+
+                if market in {"HITS", "TOTAL_BASES"}:
+                    player_id = int(entity_id)
+                    binding = (player_teams.get(game_pk) or {}).get(player_id)
+                    if binding is None:
+                        raise ValueError("MLB_FEATURE_PLAYER_TEAM_UNRESOLVED")
+                    team_id, starter_id = binding
+                    if starter_id <= 0:
+                        raise ValueError("MLB_FEATURE_OPPONENT_STARTER_UNRESOLVED")
+                    if market == "HITS":
+                        native_features.append(hits_history.feature_envelope(
+                            game_pk=game_pk,
+                            team_id=team_id,
+                            target_date=target_date,
+                            batter_id=player_id,
+                            starter_id=starter_id,
+                        ))
+                    else:
+                        if game.venue_id is None:
+                            raise MLBTBFeatureError("VENUE_UNMAPPED", {"venue_id": None, "game_pk": game_pk})
+                        native_features.append(tb_history.feature_envelope(
+                            game_pk=game_pk,
+                            team_id=team_id,
+                            target_date=target_date,
+                            batter_id=player_id,
+                            starter_id=starter_id,
+                            venue_id=int(game.venue_id),
+                        ))
+                    continue
+
+                if market == "PITCHER_BB":
+                    # Validated BB production features remain a separate exact contract.
+                    # Until the native rate/workload builder is available, preserve the
+                    # quote and fail closed rather than manufacturing those inputs.
+                    raise ValueError("MLB_PITCHER_BB_NATIVE_VALIDATED_FEATURES_UNAVAILABLE")
+
+                if market in GAME_MARKETS:
+                    native_features.append(generic_history.feature_row(
                         game_pk=game_pk,
-                        team_id=team_id,
-                        target_date=_official_date(game),
-                        batter_id=player_id,
-                        starter_id=starter_id,
+                        market=market,
+                        entity_id=entity_id,
+                        target_date=target_date,
+                        away_team_id=int(game.away_id),
+                        home_team_id=int(game.home_id),
                     ))
-                else:
-                    if game.venue_id is None:
-                        raise MLBTBFeatureError("VENUE_UNMAPPED", {"venue_id": None, "game_pk": game_pk})
-                    native_features.append(tb_history.feature_envelope(
+                    continue
+
+                if market in PLAYER_COUNT_MARKETS or market in BINARY_MARKETS:
+                    player_id = int(entity_id)
+                    binding = (player_teams.get(game_pk) or {}).get(player_id)
+                    team_id = binding[0] if binding is not None else None
+                    native_features.append(generic_history.feature_row(
                         game_pk=game_pk,
+                        market=market,
+                        entity_id=entity_id,
+                        target_date=target_date,
+                        away_team_id=int(game.away_id),
+                        home_team_id=int(game.home_id),
+                        player_id=player_id,
                         team_id=team_id,
-                        target_date=_official_date(game),
-                        batter_id=player_id,
-                        starter_id=starter_id,
-                        venue_id=int(game.venue_id),
                     ))
+                    continue
+
+                raise ValueError("MLB_NATIVE_FEATURE_MARKET_UNSUPPORTED")
             except Exception as exc:
-                stage = "MLB_HITS_FEATURE" if market == "HITS" else "MLB_TOTAL_BASES_FEATURE"
                 native_feature_failures.append({
-                    "stage": stage,
+                    "stage": "MLB_NATIVE_FEATURE",
+                    "market": market,
                     "game_id": str(quote.get("game_id", "UNKNOWN")),
                     "entity_id": str(quote.get("entity_id", "UNKNOWN")),
                     "reason": f"{type(exc).__name__}: {exc}",
@@ -227,7 +287,7 @@ def run_auto_mlb_native_odds(
         kelly_multiplier=kelly_multiplier,
     )
     acquisition_failures = key_failures + [
-        {"stage": "ODDS_API", **dict(item)} for item in odds.failures
+        {"stage": "ODDS_API", **dict(item)} for item in odds["failures"]
     ] + roster_failures + native_feature_failures
     return AutoRunReport(
         report.slate_date_ct,
