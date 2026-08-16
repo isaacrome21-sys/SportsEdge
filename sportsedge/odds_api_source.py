@@ -23,13 +23,42 @@ DEFAULT_BOOKMAKERS = ("draftkings",)
 DEFAULT_TTL_SECONDS = 300
 EVENT_TIME_TOLERANCE_SECONDS = 90 * 60
 
+# Canonical SportsEdge market names. These are acquisition mappings only;
+# downstream deployment/model eligibility remains fail-closed market-by-market.
 MARKETS = {
+    "batter_home_runs": ("HOME_RUNS", False),
+    "batter_home_runs_alternate": ("HOME_RUNS", True),
     "batter_hits": ("HITS", False),
     "batter_hits_alternate": ("HITS", True),
     "batter_total_bases": ("TOTAL_BASES", False),
     "batter_total_bases_alternate": ("TOTAL_BASES", True),
+    "batter_rbis": ("RBI", False),
+    "batter_rbis_alternate": ("RBI", True),
+    "batter_runs_scored": ("RUNS", False),
+    "batter_runs_scored_alternate": ("RUNS", True),
+    "batter_hits_runs_rbis": ("HITS_RUNS_RBIS", False),
+    "batter_hits_runs_rbis_alternate": ("HITS_RUNS_RBIS", True),
+    "batter_singles": ("SINGLES", False),
+    "batter_singles_alternate": ("SINGLES", True),
+    "batter_doubles": ("DOUBLES", False),
+    "batter_doubles_alternate": ("DOUBLES", True),
+    "batter_triples": ("TRIPLES", False),
+    "batter_triples_alternate": ("TRIPLES", True),
+    "batter_walks": ("BATTER_BB", False),
+    "batter_walks_alternate": ("BATTER_BB", True),
+    "batter_strikeouts": ("BATTER_K", False),
+    "batter_strikeouts_alternate": ("BATTER_K", True),
+    "batter_stolen_bases": ("STOLEN_BASES", False),
+    "pitcher_strikeouts": ("PITCHER_K", False),
+    "pitcher_strikeouts_alternate": ("PITCHER_K", True),
+    "pitcher_hits_allowed": ("PITCHER_HITS_ALLOWED", False),
+    "pitcher_hits_allowed_alternate": ("PITCHER_HITS_ALLOWED", True),
     "pitcher_walks": ("PITCHER_BB", False),
     "pitcher_walks_alternate": ("PITCHER_BB", True),
+    "pitcher_earned_runs": ("PITCHER_ER", False),
+    "pitcher_earned_runs_alternate": ("PITCHER_ER", True),
+    "pitcher_outs": ("PITCHER_OUTS", False),
+    "pitcher_outs_alternate": ("PITCHER_OUTS", True),
 }
 
 
