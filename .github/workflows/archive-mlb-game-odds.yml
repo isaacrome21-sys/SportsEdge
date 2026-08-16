@@ -1,0 +1,54 @@
+name: archive-mlb-game-odds
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/15 * * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: archive-mlb-game-odds
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+      SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
+      SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
+      SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
+      SPORTSEDGE_ODDS_BOOKMAKERS: draftkings
+      SPORTSEDGE_ODDS_DAILY_BUDGET_CREDITS: '12'
+      SPORTSEDGE_ODDS_BUDGET_LEDGER: .cache/sportsedge/odds-budget/ledger.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Resolve UTC day
+        id: day
+        run: echo "date=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+      - name: Restore rolling daily budget ledger
+        uses: actions/cache@v4
+        with:
+          path: .cache/sportsedge/odds-budget
+          key: sportsedge-odds-budget-${{ steps.day.outputs.date }}-${{ github.run_id }}
+          restore-keys: |
+            sportsedge-odds-budget-${{ steps.day.outputs.date }}-
+      - name: Capture raw game-market snapshot when inside target window
+        run: python scripts/archive_raw_game_odds.py
+      - name: Upload immutable raw capture
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlb-raw-game-odds-${{ github.run_id }}
+          path: |
+            artifacts/raw_odds/**
+            .cache/sportsedge/odds-budget/ledger.json
+          if-no-files-found: ignore
+          retention-days: 90
