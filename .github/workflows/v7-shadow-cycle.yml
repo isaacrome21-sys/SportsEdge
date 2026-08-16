@@ -30,6 +30,14 @@ jobs:
           restore-keys: |
             v7-shadow-state-
 
+      - name: Build current V7 feature bundle when normalized sources exist
+        run: |
+          if [ -f artifacts/v7-shadow-state/source_bundle.json ]; then
+            python scripts/build_v7_feature_bundle.py
+          else
+            echo 'V7_SOURCE_BUNDLE_MISSING; shadow cycle will remain explicitly blocked.'
+          fi
+
       - name: Run V7 shadow cycle
         run: |
           python scripts/run_v7_shadow_cycle.py --allow-blocked
