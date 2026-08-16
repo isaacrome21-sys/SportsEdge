@@ -5,7 +5,16 @@ from sportsedge.edge_floors import EdgeFloorError, require_frozen_edge_floor
 
 def _cfg(record=None):
     floors = {} if record is None else {"MLB_MONEYLINE": record}
-    return {"truth_gate": {"edge_floors": floors}}
+    return {
+        "truth_gate": {
+            "production": {
+                "fail_closed": True,
+                "allow_cli_floor_override": False,
+                "require_frozen_floor_for_eligible_market": True,
+            },
+            "edge_floors": floors,
+        }
+    }
 
 
 def _frozen(value="0.02"):
@@ -46,6 +55,18 @@ def test_frozen_floor_requires_evidence_hashes_and_cutoff():
     del record["evidence"]["evidence_sha256"]
     with pytest.raises(EdgeFloorError):
         require_frozen_edge_floor(market="MLB_MONEYLINE", config=_cfg(record))
+
+
+def test_production_policy_must_be_fail_closed_and_override_disabled():
+    cfg = _cfg(_frozen())
+    cfg["truth_gate"]["production"]["fail_closed"] = False
+    with pytest.raises(EdgeFloorError):
+        require_frozen_edge_floor(market="MLB_MONEYLINE", config=cfg)
+
+    cfg = _cfg(_frozen())
+    cfg["truth_gate"]["production"]["allow_cli_floor_override"] = True
+    with pytest.raises(EdgeFloorError):
+        require_frozen_edge_floor(market="MLB_MONEYLINE", config=cfg)
 
 
 def test_valid_frozen_floor_resolves_positive_value():
