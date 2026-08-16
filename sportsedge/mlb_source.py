@@ -6,6 +6,8 @@ from typing import Any, Callable
 from urllib.request import urlopen
 from zoneinfo import ZoneInfo
 
+from .source_lineage import canonical_game_identity
+
 BASE = "https://statsapi.mlb.com"
 CHICAGO_TZ = ZoneInfo("America/Chicago")
 
@@ -172,8 +174,21 @@ def fetch_boxscore(game_pk: int, opener: Callable = urlopen) -> dict[str, Any]:
     return _get_json(f"{BASE}/api/v1/game/{int(game_pk)}/boxscore", opener)
 
 
+def game_identity(snapshot: GameSnapshot):
+    return canonical_game_identity(
+        mlb_game_pk=snapshot.game_pk,
+        scheduled_start=snapshot.game_date,
+        away_team_id=snapshot.away_id,
+        home_team_id=snapshot.home_id,
+        game_number=snapshot.game_number,
+    )
+
+
 def snapshot_to_dict(snapshot: GameSnapshot) -> dict[str, Any]:
     out = asdict(snapshot)
+    identity = game_identity(snapshot)
     out["game_time_utc"] = parse_game_start(snapshot.game_date).isoformat()
     out["game_time_ct"] = game_time_chicago(snapshot)
+    out["sportsedge_game_id"] = identity.sportsedge_game_id
+    out["mlb_game_pk"] = identity.mlb_game_pk
     return out
