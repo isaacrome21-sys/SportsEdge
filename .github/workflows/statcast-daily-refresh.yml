@@ -36,7 +36,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git fetch --depth=1 origin data:data
+          git fetch origin data:data
           git worktree add .data-branch data
           RUN_DIR=".data-branch/runtime/statcast/runs/${GITHUB_RUN_ID}"
           LATEST_DIR=".data-branch/runtime/statcast/latest"
@@ -49,7 +49,18 @@ jobs:
           git config user.name sportsedge-data-bot
           git config user.email sportsedge-data-bot@users.noreply.github.com
           git add runtime/statcast
-          if ! git diff --cached --quiet; then
-            git commit -m "statcast: durable run ${GITHUB_RUN_ID}"
-            git push origin HEAD:data
+          if git diff --cached --quiet; then
+            exit 0
           fi
+          git commit -m "statcast: durable run ${GITHUB_RUN_ID}"
+          pushed=0
+          for attempt in 1 2 3 4 5; do
+            git fetch origin data
+            git rebase origin/data || { git rebase --abort || true; sleep $((attempt * 2)); continue; }
+            if git push origin HEAD:data; then
+              pushed=1
+              break
+            fi
+            sleep $((attempt * 2))
+          done
+          test "$pushed" -eq 1
