@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "status_semantics": {
+    "FRESH": "source present and within its source-specific freshness window",
+    "ABSENT": "source has not been published or observed yet; may be a legitimate pregame state depending on source policy",
+    "STALE": "source was previously observed but last verification exceeds its source-specific freshness window",
+    "INVALID": "source payload exists but fails schema, identity, or timestamp validation"
+  },
+  "sources": {
+    "confirmed_lineup": {"max_age_seconds": 1200, "freshness_clock": "last_verified_at", "absence_policy": "DEGRADE_TO_PROJECTED_UNTIL_MARKET_SPECIFIC_LINEUP_DEADLINE", "stale_policy": "BLOCK_CONFIRMED_LINEUP_DEPENDENT_MARKETS", "provider_tier": "PRIMARY_GAME_CONTEXT"},
+    "weather_first_pitch_forecast": {"max_age_seconds": 3600, "freshness_clock": "forecast_retrieved_at", "target_time_semantics": "forecast_valid_at_first_pitch", "absence_policy": "DEGRADE_IF_DOME_OR_CLOSED_ROOF_ELSE_BLOCK_WEATHER_SENSITIVE_MARKETS", "stale_policy": "BLOCK_WEATHER_SENSITIVE_MARKETS", "provider_tier": "PRIMARY_GAME_CONTEXT"},
+    "plate_umpire": {"max_age_seconds": 43200, "freshness_clock": "last_verified_at", "absence_policy": "ALLOW_EXPLICIT_ABSENT_NOT_YET_POSTED_WITH_UNCERTAINTY_PENALTY", "stale_policy": "BLOCK_UMPIRE_DEPENDENT_MARKETS", "provider_tier": "PRIMARY_GAME_CONTEXT"},
+    "starting_catcher": {"max_age_seconds": 43200, "freshness_clock": "last_verified_at", "absence_policy": "ALLOW_EXPLICIT_ABSENT_NOT_YET_POSTED_WITH_UNCERTAINTY_PENALTY", "stale_policy": "BLOCK_CATCHER_DEPENDENT_MARKETS", "provider_tier": "PRIMARY_GAME_CONTEXT"},
+    "probable_starter": {"max_age_seconds": 1800, "freshness_clock": "last_verified_at", "absence_policy": "BLOCK_STARTER_DEPENDENT_MARKETS", "stale_policy": "BLOCK_STARTER_DEPENDENT_MARKETS", "provider_tier": "PRIMARY_GAME_CONTEXT"},
+    "statcast_batter_30d": {"max_age_seconds": 172800, "freshness_clock": "retrieved_at", "absence_policy": "BLOCK_STATCAST_DEPENDENT_HITTER_MARKETS", "stale_policy": "BLOCK_STATCAST_DEPENDENT_HITTER_MARKETS", "provider_tier": "PRIMARY_STATS"},
+    "statcast_pitcher_30d": {"max_age_seconds": 172800, "freshness_clock": "retrieved_at", "absence_policy": "BLOCK_STATCAST_DEPENDENT_PITCHER_MARKETS", "stale_policy": "BLOCK_STATCAST_DEPENDENT_PITCHER_MARKETS", "provider_tier": "PRIMARY_STATS"},
+    "park_factor_frozen": {"max_age_seconds": null, "freshness_clock": "artifact_hash", "absence_policy": "BLOCK_PARK_DEPENDENT_MARKETS", "stale_policy": "NOT_APPLICABLE_IMMUTABLE_HASH_VERIFIED_ARTIFACT", "provider_tier": "VALIDATED_STATIC_ARTIFACT"}
+  },
+  "collector_promotion": {
+    "required_consecutive_durable_passes": 2,
+    "durable_truth_source": "data_branch",
+    "run_logs_are_not_acceptance_evidence": true,
+    "required_non_empty_artifacts": {
+      "statcast-daily-refresh": ["manifest.json", "batters.json", "pitchers.json"],
+      "mlb-game-context-refresh": ["manifest.json", "game_*.json"]
+    },
+    "promotion_rule": "collector is production-proven only after two consecutive successful executions each produce non-empty durable artifacts on the data branch and each manifest reports PASS"
+  }
+}
