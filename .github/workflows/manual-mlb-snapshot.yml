@@ -27,7 +27,7 @@ jobs:
       - name: Install runtime dependencies
         run: python -m pip install --disable-pip-version-check numpy
       - name: Run SportsEdge on supplied lines
-        run: python scripts/run_manual_mlb_snapshot.py --input manual_inputs/mlb/2026-08-17_stl_cin_g1_dk.json --output artifacts/manual_mlb_snapshot_card.json
+        run: PYTHONPATH=. python scripts/run_manual_mlb_snapshot.py --input manual_inputs/mlb/2026-08-17_stl_cin_g1_dk.json --output artifacts/manual_mlb_snapshot_card.json
       - name: Upload result
         uses: actions/upload-artifact@v4
         with:
