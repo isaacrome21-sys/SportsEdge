@@ -13,6 +13,8 @@ DEFAULT_CATALOG = Path("config/mlb_market_catalog.json")
 DEFAULT_FLOORS = Path("config/truth_gate_floors.json")
 DEFAULT_VALIDATION = Path("config/mlb_validation_evidence.json")
 DEFAULT_FEATURES = Path("config/mlb_market_feature_requirements.json")
+DEFAULT_COLLECTORS = Path("config/mlb_collector_validation.json")
+REQUIRED_DYNAMIC_COLLECTORS = ("mlb-game-context-refresh", "statcast-daily-refresh")
 
 
 def _load_json(path: str | Path) -> dict[str, Any]:
@@ -66,15 +68,11 @@ def _validation_state(validation: dict[str, Any], market: str) -> tuple[bool, li
     row = markets.get(market)
     if not isinstance(row, dict):
         return False, list(required), {}
-
     missing: list[str] = []
     statuses: dict[str, str] = {}
     for gate in required:
         value = row.get(gate)
-        if isinstance(value, dict):
-            status = str(value.get("status", "MISSING")).upper()
-        else:
-            status = str(value or "MISSING").upper()
+        status = str(value.get("status", "MISSING") if isinstance(value, dict) else value or "MISSING").upper()
         statuses[gate] = status
         if status != "PASS":
             missing.append(gate)
@@ -98,12 +96,28 @@ def _feature_contract_state(features: dict[str, Any], market: str) -> tuple[bool
     return not missing_defs, missing_defs
 
 
+def _collector_validation_state(collectors: dict[str, Any]) -> tuple[bool, list[str], dict[str, str]]:
+    records = collectors.get("collectors")
+    if not isinstance(records, dict):
+        raise ValueError("collector validation registry requires collectors object")
+    missing: list[str] = []
+    statuses: dict[str, str] = {}
+    for name in REQUIRED_DYNAMIC_COLLECTORS:
+        row = records.get(name)
+        status = str(row.get("status", "MISSING") if isinstance(row, dict) else "MISSING").upper()
+        statuses[name] = status
+        if status != "VALIDATED_COLLECTOR":
+            missing.append(name)
+    return not missing, missing, statuses
+
+
 def audit_readiness(
     registry_path: str | Path = DEFAULT_REGISTRY,
     catalog_path: str | Path = DEFAULT_CATALOG,
     floors_path: str | Path = DEFAULT_FLOORS,
     validation_path: str | Path = DEFAULT_VALIDATION,
     features_path: str | Path = DEFAULT_FEATURES,
+    collectors_path: str | Path = DEFAULT_COLLECTORS,
 ) -> dict[str, Any]:
     registry = load_registry(registry_path)
     engines = engine_registry()
@@ -111,6 +125,7 @@ def audit_readiness(
     frozen_floors = _frozen_floor_markets(_load_json(floors_path))
     validation = _load_json(validation_path)
     features = _load_json(features_path)
+    collector_complete, collector_missing, collector_status = _collector_validation_state(_load_json(collectors_path))
 
     if Path(registry_path) == DEFAULT_REGISTRY:
         all_markets = sorted(set(catalog) | set(registry["markets"]))
@@ -134,35 +149,33 @@ def audit_readiness(
         blockers: list[str] = []
         classes: list[str] = []
         if not quote_supported:
-            blockers.append("NO_QUOTE_ACQUISITION")
-            classes.append("ENGINEERING")
+            blockers.append("NO_QUOTE_ACQUISITION"); classes.append("ENGINEERING")
         if not registered:
-            blockers.append("NOT_REGISTERED")
-            classes.append("ENGINEERING")
+            blockers.append("NOT_REGISTERED"); classes.append("ENGINEERING")
         if not has_engine:
-            blockers.append("NO_RUNTIME_ENGINE")
-            classes.append("ENGINEERING")
+            blockers.append("NO_RUNTIME_ENGINE"); classes.append("ENGINEERING")
         if not feature_contract_complete:
             blockers.append("NO_COMPLETE_FEATURE_CONTRACT")
             blockers.extend(f"UNKNOWN_FEATURE_FAMILY_{x}" for x in missing_feature_definitions)
             classes.append("ENGINEERING")
-        if not eligible:
-            blockers.append("NOT_DEPLOYED")
-            classes.append("EVIDENCE" if has_engine else "ENGINEERING")
-        if not has_floor:
-            blockers.append("NO_FROZEN_EDGE_FLOOR")
+        if not collector_complete:
+            blockers.extend(f"COLLECTOR_{x.upper().replace('-', '_')}_NOT_VALIDATED" for x in collector_missing)
             classes.append("EVIDENCE")
+        if not eligible:
+            blockers.append("NOT_DEPLOYED"); classes.append("EVIDENCE" if has_engine else "ENGINEERING")
+        if not has_floor:
+            blockers.append("NO_FROZEN_EDGE_FLOOR"); classes.append("EVIDENCE")
         if not validation_complete:
             blockers.extend(f"VALIDATION_{gate.upper()}_PENDING" for gate in validation_missing)
             classes.append("EVIDENCE")
         if "fixture-backed ci attestation pending" in reason.lower():
-            blockers.append("FIXTURE_CI_PENDING")
-            classes.append("EVIDENCE")
+            blockers.append("FIXTURE_CI_PENDING"); classes.append("EVIDENCE")
         if "quota" in reason.lower() or "provider" in reason.lower():
             classes.append("PROVIDER")
 
         classes = list(dict.fromkeys(classes))
-        runnable_live = quote_supported and has_engine and feature_contract_complete
+        shadow_runnable = quote_supported and has_engine and feature_contract_complete
+        runnable_live = shadow_runnable and collector_complete
         official = runnable_live and eligible and has_floor and validation_complete
         rows.append({
             "market": market,
@@ -172,6 +185,9 @@ def audit_readiness(
             "runtime_engine": has_engine,
             "feature_contract_complete": feature_contract_complete,
             "missing_feature_definitions": missing_feature_definitions,
+            "collector_validation_complete": collector_complete,
+            "collector_validation_status": collector_status,
+            "collector_validation_missing": collector_missing,
             "eligible": eligible,
             "frozen_edge_floor": has_floor,
             "validation_complete": validation_complete,
@@ -181,13 +197,18 @@ def audit_readiness(
             "reason": reason,
             "blocker_classes": classes,
             "blockers": blockers,
-            "shadow_runnable": runnable_live,
+            "shadow_runnable": shadow_runnable,
             "runnable_live": runnable_live,
             "official_bet_enabled": official,
         })
 
     return {
-        "schema_version": 4,
+        "schema_version": 5,
+        "collector_validation": {
+            "complete": collector_complete,
+            "status": collector_status,
+            "missing": collector_missing,
+        },
         "markets": rows,
         "summary": {
             "catalog_or_registered": len(rows),
@@ -195,6 +216,7 @@ def audit_readiness(
             "registered": sum(x["registered"] for x in rows),
             "runtime_engines": sum(x["runtime_engine"] for x in rows),
             "feature_contract_complete": sum(x["feature_contract_complete"] for x in rows),
+            "collector_validation_complete": sum(x["collector_validation_complete"] for x in rows),
             "shadow_runnable": sum(x["shadow_runnable"] for x in rows),
             "runnable_live": sum(x["runnable_live"] for x in rows),
             "frozen_edge_floors": sum(x["frozen_edge_floor"] for x in rows),
