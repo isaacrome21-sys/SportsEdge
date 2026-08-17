@@ -1,0 +1,48 @@
+{
+  "cap_credits": 12,
+  "credits_consumed_actual": 0,
+  "last_run_at_utc": "2026-08-17T13:57:46.992896+00:00",
+  "last_status": "SKIP_OUTSIDE_CAPTURE_WINDOW",
+  "runs": [
+    {
+      "capture_completeness": null,
+      "capture_window": null,
+      "counter_source": "native",
+      "credits_consumed_actual": 0,
+      "games_captured": 0,
+      "games_eligible": 0,
+      "markets_requested": [
+        "h2h",
+        "spreads",
+        "totals"
+      ],
+      "provider_credits_remaining": null,
+      "provider_credits_used": null,
+      "request_cost_estimate": 3,
+      "run_at_utc": "2026-08-17T13:57:46.992896+00:00",
+      "slate_date_ct": "2026-08-17",
+      "status": "EXECUTED_STARTED"
+    },
+    {
+      "capture_completeness": null,
+      "capture_window": null,
+      "counter_source": "native",
+      "credits_consumed_actual": 0,
+      "games_captured": 0,
+      "games_eligible": 0,
+      "games_scheduled": 11,
+      "markets_requested": [
+        "h2h",
+        "spreads",
+        "totals"
+      ],
+      "provider_credits_remaining": null,
+      "provider_credits_used": null,
+      "request_cost_estimate": 3,
+      "run_at_utc": "2026-08-17T13:57:46.992896+00:00",
+      "slate_date_ct": "2026-08-17",
+      "status": "SKIP_OUTSIDE_CAPTURE_WINDOW"
+    }
+  ],
+  "utc_date": "2026-08-17"
+}
