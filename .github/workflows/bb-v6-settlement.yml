@@ -2,6 +2,10 @@ name: bb-v6-cumulative-settlement
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/bb-v6-settlement.yml'
+      - 'scripts/score_bb_v6_forward_shadow.py'
   pull_request:
     paths:
       - '.github/workflows/bb-v6-settlement.yml'
