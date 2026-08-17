@@ -12,6 +12,7 @@ DEFAULT_REGISTRY = Path("config/deployments.json")
 DEFAULT_CATALOG = Path("config/mlb_market_catalog.json")
 DEFAULT_FLOORS = Path("config/truth_gate_floors.json")
 DEFAULT_VALIDATION = Path("config/mlb_validation_evidence.json")
+DEFAULT_FEATURES = Path("config/mlb_market_feature_requirements.json")
 
 
 def _load_json(path: str | Path) -> dict[str, Any]:
@@ -19,9 +20,7 @@ def _load_json(path: str | Path) -> dict[str, Any]:
 
 
 def _catalog_markets(catalog: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """Normalize both the checked-in v1 catalog and a future grouped schema."""
     out: dict[str, dict[str, Any]] = {}
-
     for key, rows in catalog.items():
         if key == "schema_version" or not isinstance(rows, list):
             continue
@@ -31,7 +30,6 @@ def _catalog_markets(catalog: dict[str, Any]) -> dict[str, dict[str, Any]]:
                 out[row] = {"group": group, "acquisition": True}
             elif isinstance(row, dict) and row.get("market"):
                 out[str(row["market"])] = {"group": group, "acquisition": True, **row}
-
     nested = catalog.get("markets")
     if isinstance(nested, dict):
         for group, rows in nested.items():
@@ -83,17 +81,36 @@ def _validation_state(validation: dict[str, Any], market: str) -> tuple[bool, li
     return not missing, missing, statuses
 
 
+def _feature_contract_state(features: dict[str, Any], market: str) -> tuple[bool, list[str]]:
+    global_required = features.get("global_required")
+    families = features.get("feature_families")
+    markets = features.get("markets")
+    if not isinstance(global_required, list) or not global_required:
+        raise ValueError("feature registry requires non-empty global_required")
+    if not isinstance(families, dict) or not families:
+        raise ValueError("feature registry requires feature_families")
+    if not isinstance(markets, dict):
+        raise ValueError("feature registry requires markets object")
+    required_families = markets.get(market)
+    if not isinstance(required_families, list) or not required_families:
+        return False, []
+    missing_defs = [name for name in required_families if name not in families]
+    return not missing_defs, missing_defs
+
+
 def audit_readiness(
     registry_path: str | Path = DEFAULT_REGISTRY,
     catalog_path: str | Path = DEFAULT_CATALOG,
     floors_path: str | Path = DEFAULT_FLOORS,
     validation_path: str | Path = DEFAULT_VALIDATION,
+    features_path: str | Path = DEFAULT_FEATURES,
 ) -> dict[str, Any]:
     registry = load_registry(registry_path)
     engines = engine_registry()
     catalog = _catalog_markets(_load_json(catalog_path))
     frozen_floors = _frozen_floor_markets(_load_json(floors_path))
     validation = _load_json(validation_path)
+    features = _load_json(features_path)
 
     if Path(registry_path) == DEFAULT_REGISTRY:
         all_markets = sorted(set(catalog) | set(registry["markets"]))
@@ -112,6 +129,7 @@ def audit_readiness(
         stage = str(meta.get("stage", "UNREGISTERED"))
         reason = str(meta.get("reason", "market absent from deployment registry"))
         validation_complete, validation_missing, validation_status = _validation_state(validation, market)
+        feature_contract_complete, missing_feature_definitions = _feature_contract_state(features, market)
 
         blockers: list[str] = []
         classes: list[str] = []
@@ -123,6 +141,10 @@ def audit_readiness(
             classes.append("ENGINEERING")
         if not has_engine:
             blockers.append("NO_RUNTIME_ENGINE")
+            classes.append("ENGINEERING")
+        if not feature_contract_complete:
+            blockers.append("NO_COMPLETE_FEATURE_CONTRACT")
+            blockers.extend(f"UNKNOWN_FEATURE_FAMILY_{x}" for x in missing_feature_definitions)
             classes.append("ENGINEERING")
         if not eligible:
             blockers.append("NOT_DEPLOYED")
@@ -140,7 +162,7 @@ def audit_readiness(
             classes.append("PROVIDER")
 
         classes = list(dict.fromkeys(classes))
-        runnable_live = quote_supported and has_engine
+        runnable_live = quote_supported and has_engine and feature_contract_complete
         official = runnable_live and eligible and has_floor and validation_complete
         rows.append({
             "market": market,
@@ -148,6 +170,8 @@ def audit_readiness(
             "quote_supported": quote_supported,
             "registered": registered,
             "runtime_engine": has_engine,
+            "feature_contract_complete": feature_contract_complete,
+            "missing_feature_definitions": missing_feature_definitions,
             "eligible": eligible,
             "frozen_edge_floor": has_floor,
             "validation_complete": validation_complete,
@@ -163,13 +187,14 @@ def audit_readiness(
         })
 
     return {
-        "schema_version": 3,
+        "schema_version": 4,
         "markets": rows,
         "summary": {
             "catalog_or_registered": len(rows),
             "quote_supported": sum(x["quote_supported"] for x in rows),
             "registered": sum(x["registered"] for x in rows),
             "runtime_engines": sum(x["runtime_engine"] for x in rows),
+            "feature_contract_complete": sum(x["feature_contract_complete"] for x in rows),
             "shadow_runnable": sum(x["shadow_runnable"] for x in rows),
             "runnable_live": sum(x["runnable_live"] for x in rows),
             "frozen_edge_floors": sum(x["frozen_edge_floor"] for x in rows),
