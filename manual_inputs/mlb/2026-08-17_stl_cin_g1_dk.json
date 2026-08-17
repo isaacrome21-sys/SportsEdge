@@ -1,1 +1,84 @@
-{"schema_version":1,"source":"USER_SUPPLIED_DRAFTKINGS_SCREENSHOT_2026-08-17_1227CT","book_key":"draftkings","captured_at":"2026-08-17T12:27:52-05:00","game":{"away_team":"St. Louis Cardinals","home_team":"Cincinnati Reds","scheduled_start_ct":"2026-08-17T12:40:00-05:00","game_number":1},"offers":[{"period":"FG","market":"MONEYLINE","side":"AWAY","line":0,"american_odds":-108,"raw_market_name":"To Win","selection":"St. Louis Cardinals"},{"period":"FG","market":"MONEYLINE","side":"HOME","line":0,"american_odds":104,"raw_market_name":"To Win","selection":"Cincinnati Reds"},{"period":"FG","market":"TOTALS","side":"OVER","line":9.5,"american_odds":104,"raw_market_name":"Total Runs","selection":"Over 9.5"},{"period":"FG","market":"TOTALS","side":"UNDER","line":9.5,"american_odds":-108,"raw_market_name":"Total Runs","selection":"Under 9.5"}]}
+{
+  "rows": [
+    {
+      "game_id": "824514",
+      "market_type": "MONEYLINE",
+      "side": "AWAY",
+      "line": 0,
+      "price": -108,
+      "paired_side": "HOME",
+      "paired_price": 104,
+      "book": "draftkings",
+      "observed_at": "2026-08-17T12:27:00-05:00",
+      "first_pitch_at": "2026-08-17T12:40:00-05:00",
+      "source": "MANUAL"
+    },
+    {
+      "game_id": "824514",
+      "market_type": "RUN_LINE",
+      "side": "AWAY",
+      "line": -1.5,
+      "price": 138,
+      "paired_side": "HOME",
+      "paired_price": -150,
+      "book": "draftkings",
+      "observed_at": "2026-08-17T12:27:00-05:00",
+      "first_pitch_at": "2026-08-17T12:40:00-05:00",
+      "source": "MANUAL"
+    },
+    {
+      "game_id": "824514",
+      "market_type": "GAME_TOTAL",
+      "side": "OVER",
+      "line": 9.5,
+      "price": 104,
+      "paired_side": "UNDER",
+      "paired_price": -108,
+      "book": "draftkings",
+      "observed_at": "2026-08-17T12:27:00-05:00",
+      "first_pitch_at": "2026-08-17T12:40:00-05:00",
+      "source": "MANUAL"
+    },
+    {
+      "game_id": "824514",
+      "market_type": "FIRST_INNING_TOTAL",
+      "side": "OVER",
+      "line": 0.5,
+      "price": -122,
+      "paired_side": "UNDER",
+      "paired_price": -113,
+      "book": "draftkings",
+      "observed_at": "2026-08-17T12:28:00-05:00",
+      "first_pitch_at": "2026-08-17T12:40:00-05:00",
+      "source": "MANUAL"
+    },
+    {
+      "game_id": "824514",
+      "market_type": "PITCHER_STRIKEOUTS",
+      "subject_id": "687273",
+      "side": "OVER",
+      "line": 4.5,
+      "price": -127,
+      "paired_side": "UNDER",
+      "paired_price": 108,
+      "book": "draftkings",
+      "observed_at": "2026-08-17T12:28:00-05:00",
+      "first_pitch_at": "2026-08-17T12:40:00-05:00",
+      "source": "MANUAL"
+    },
+    {
+      "game_id": "824514",
+      "market_type": "PITCHER_OUTS",
+      "subject_id": "687273",
+      "side": "OVER",
+      "line": 13.5,
+      "price": -133,
+      "paired_side": "UNDER",
+      "paired_price": -117,
+      "book": "draftkings",
+      "observed_at": "2026-08-17T12:28:00-05:00",
+      "first_pitch_at": "2026-08-17T12:40:00-05:00",
+      "source": "MANUAL"
+    }
+  ]
+}
