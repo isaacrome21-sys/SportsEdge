@@ -56,9 +56,14 @@ def audit_nfl_history_rows(
 
     denominator = len(margins)
     absolute = [abs(x) for x in margins]
-    margin_pmf = {
+    absolute_margin_pmf = {
         str(k): sum(1 for value in absolute if value == k) / denominator
         for k in (1, 2, 3, 4, 6, 7, 8, 10, 14)
+    }
+    signed_keys = (-14, -10, -8, -7, -6, -4, -3, -2, -1, 1, 2, 3, 4, 6, 7, 8, 10, 14)
+    signed_margin_pmf = {
+        str(k): sum(1 for value in margins if value == k) / denominator
+        for k in signed_keys
     }
 
     per_season = []
@@ -82,6 +87,8 @@ def audit_nfl_history_rows(
             "spread_line": _null_rate(data, "spread_line"),
             "total_line": _null_rate(data, "total_line"),
         },
-        "margin_pmf": margin_pmf,
+        "margin_pmf": absolute_margin_pmf,
+        "absolute_margin_pmf": absolute_margin_pmf,
+        "signed_margin_pmf": signed_margin_pmf,
         "per_season": per_season,
     }
