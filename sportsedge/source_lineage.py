@@ -4,9 +4,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 import hashlib
 import json
-from typing import Any, Iterable, Mapping
-
-from .runtime import parse_timestamp
+from typing import Any, Iterable
 
 
 class SourceLineageError(ValueError):
@@ -44,14 +42,26 @@ class FeatureLineage:
     lineage_sha256: str
 
 
+def _parse_timestamp(value: Any) -> datetime:
+    if isinstance(value, datetime):
+        dt = value
+    elif isinstance(value, str) and value.strip():
+        text = value.strip()
+        if text.endswith("Z"):
+            text = text[:-1] + "+00:00"
+        dt = datetime.fromisoformat(text)
+    else:
+        raise ValueError("timestamp must be datetime or ISO-8601 string")
+    if dt.tzinfo is None or dt.utcoffset() is None:
+        raise ValueError("timestamp must be timezone-aware")
+    return dt.astimezone(timezone.utc)
+
+
 def _utc(value: Any, field: str) -> datetime:
     try:
-        dt = value if isinstance(value, datetime) else parse_timestamp(value)
+        return _parse_timestamp(value)
     except Exception as exc:
         raise SourceLineageError(f"{field} must be timezone-aware ISO-8601") from exc
-    if not isinstance(dt, datetime) or dt.tzinfo is None or dt.utcoffset() is None:
-        raise SourceLineageError(f"{field} must be timezone-aware")
-    return dt.astimezone(timezone.utc)
 
 
 def _positive_int(value: Any, field: str) -> int:
@@ -100,16 +110,7 @@ def build_source_snapshot(*, source_name: str, source_record_id: str, source_eve
     fetched_at = _utc(fetched_at_utc, "fetched_at_utc")
     if event_time > fetched_at:
         raise SourceLineageError("source_event_time cannot be after fetched_at_utc")
-    return SourceSnapshot(
-        source_name=str(source_name),
-        source_record_id=str(source_record_id),
-        source_event_time=event_time.isoformat(),
-        fetched_at_utc=fetched_at.isoformat(),
-        sportsedge_game_id=game.sportsedge_game_id,
-        mlb_game_pk=game.mlb_game_pk,
-        payload_sha256=canonical_json_sha256(payload),
-        parser_version=str(parser_version),
-    )
+    return SourceSnapshot(str(source_name), str(source_record_id), event_time.isoformat(), fetched_at.isoformat(), game.sportsedge_game_id, game.mlb_game_pk, canonical_json_sha256(payload), str(parser_version))
 
 
 def build_feature_lineage(*, feature_as_of_utc: Any, scheduled_first_pitch: Any, feature_contract_version: str, feature_contract: Any, snapshots: Iterable[SourceSnapshot]) -> FeatureLineage:
@@ -137,13 +138,7 @@ def build_feature_lineage(*, feature_as_of_utc: Any, scheduled_first_pitch: Any,
         "feature_contract_sha256": contract_hash,
         "upstream_snapshot_hashes": snapshot_hashes,
     }
-    return FeatureLineage(
-        feature_as_of_utc=as_of.isoformat(),
-        feature_contract_version=str(feature_contract_version),
-        feature_contract_sha256=contract_hash,
-        upstream_snapshot_hashes=snapshot_hashes,
-        lineage_sha256=canonical_json_sha256(material),
-    )
+    return FeatureLineage(as_of.isoformat(), str(feature_contract_version), contract_hash, snapshot_hashes, canonical_json_sha256(material))
 
 
 def snapshot_to_dict(snapshot: SourceSnapshot) -> dict[str, Any]:
