@@ -1,0 +1,63 @@
+name: archive-provider-acceptance-probe
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/archive-provider-acceptance-probe.yml']
+permissions:
+  contents: write
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe provider
+        id: probe
+        shell: bash
+        run: |
+          set +e
+          python - <<'PY'
+          from datetime import datetime, timezone
+          import json, os
+          from pathlib import Path
+          from urllib.parse import urlencode
+          from urllib.request import Request, urlopen
+          from urllib.error import HTTPError
+          now=datetime.now(timezone.utc)
+          out=Path('artifacts/provider-probe')/now.date().isoformat(); out.mkdir(parents=True,exist_ok=True)
+          p=out/f"probe_{now.strftime('%Y%m%dT%H%M%S.%fZ')}.json"
+          key=os.environ.get('SPORTSEDGE_ODDS_API_KEY','').strip()
+          row={'run_at_utc':now.isoformat(),'acceptance_scope':'PROVIDER_PATH_ONLY_NOT_TIMEPOINT_CAPTURE','market':'h2h','bookmaker':'draftkings'}
+          if not key:
+              row['status']='BLOCKED_NO_ODDS_KEY'; p.write_text(json.dumps(row,indent=2)+'\n'); print(json.dumps(row)); raise SystemExit(2)
+          q=urlencode({'apiKey':key,'bookmakers':'draftkings','markets':'h2h','oddsFormat':'american','dateFormat':'iso'})
+          try:
+              with urlopen(Request('https://api.the-odds-api.com/v4/sports/baseball_mlb/odds?'+q,headers={'Accept':'application/json','User-Agent':'SportsEdge-provider-probe/1'}),timeout=20) as r:
+                  raw=r.read(); payload=json.loads(raw)
+                  row.update({'status':'PROVIDER_PATH_PASS','http_status':getattr(r,'status',200),'events_returned':len(payload) if isinstance(payload,list) else None,'credits_consumed_actual':r.headers.get('x-requests-last'),'provider_credits_remaining':r.headers.get('x-requests-remaining'),'provider_credits_used':r.headers.get('x-requests-used')})
+                  rp=out/f"raw_{now.strftime('%Y%m%dT%H%M%SZ')}.json"; rp.write_bytes(raw); row['raw_file']=str(rp)
+          except HTTPError as e:
+              row.update({'status':'PROVIDER_PATH_HTTP_ERROR','http_status':e.code,'provider_body':e.read().decode('utf-8',errors='replace')[:1000]})
+          except Exception as e:
+              row.update({'status':'PROVIDER_PATH_ERROR','reason':f'{type(e).__name__}:{e}'})
+          p.write_text(json.dumps(row,indent=2,sort_keys=True)+'\n'); print(json.dumps(row)); raise SystemExit(0 if row['status']=='PROVIDER_PATH_PASS' else 3)
+          PY
+          code=$?; echo "exit_code=$code" >> "$GITHUB_OUTPUT"; exit 0
+      - name: Persist evidence
+        if: always()
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data:data
+          git worktree add .data-branch data
+          mkdir -p .data-branch/runtime/provider-acceptance
+          cp -R artifacts/provider-probe/. .data-branch/runtime/provider-acceptance/ 2>/dev/null || true
+          cd .data-branch
+          git config user.name sportsedge-archive-bot
+          git config user.email sportsedge-archive-bot@users.noreply.github.com
+          git add runtime/provider-acceptance
+          if ! git diff --cached --quiet; then git commit -m "archive: persist provider probe ${{ github.run_id }}"; git push origin HEAD:data; fi
+      - name: Propagate result
+        if: always()
+        run: exit '${{ steps.probe.outputs.exit_code }}'
