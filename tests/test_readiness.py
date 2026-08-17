@@ -14,7 +14,9 @@ class ReadinessTests(unittest.TestCase):
             self.assertTrue(rows[market]["runtime_engine"])
             self.assertTrue(rows[market]["runnable_live"])
             self.assertFalse(rows[market]["official_bet_enabled"])
+            self.assertFalse(rows[market]["validation_complete"])
             self.assertIn("FIXTURE_CI_PENDING", rows[market]["blockers"])
+            self.assertIn("historical_point_in_time", rows[market]["validation_missing"])
 
     def test_unknown_runtime_market_is_not_claimed_runnable(self):
         with tempfile.TemporaryDirectory() as td:
@@ -28,6 +30,55 @@ class ReadinessTests(unittest.TestCase):
         self.assertFalse(row["runtime_engine"])
         self.assertFalse(row["runnable_live"])
         self.assertIn("NO_RUNTIME_ENGINE", row["blockers"])
+
+    def test_eligible_market_stays_officially_blocked_without_validation(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            registry = root / "deployments.json"
+            floors = root / "floors.json"
+            validation = root / "validation.json"
+            registry.write_text(json.dumps({
+                "schema_version": 1,
+                "markets": {"HITS": {"eligible": True, "stage": "PRODUCTION", "reason": "test"}},
+            }))
+            floors.write_text(json.dumps({
+                "truth_gate": {"edge_floors": {"HITS": {"status": "FROZEN", "value": 0.02}}}
+            }))
+            validation.write_text(json.dumps({
+                "required_gates": ["historical_point_in_time", "untouched_holdout"],
+                "markets": {"HITS": {"historical_point_in_time": "PASS"}},
+            }))
+            out = audit_readiness(registry, floors_path=floors, validation_path=validation)
+        row = out["markets"][0]
+        self.assertTrue(row["runnable_live"])
+        self.assertFalse(row["validation_complete"])
+        self.assertFalse(row["official_bet_enabled"])
+        self.assertIn("VALIDATION_UNTOUCHED_HOLDOUT_PENDING", row["blockers"])
+
+    def test_official_enablement_requires_every_validation_gate_pass(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            registry = root / "deployments.json"
+            floors = root / "floors.json"
+            validation = root / "validation.json"
+            registry.write_text(json.dumps({
+                "schema_version": 1,
+                "markets": {"HITS": {"eligible": True, "stage": "PRODUCTION", "reason": "test"}},
+            }))
+            floors.write_text(json.dumps({
+                "truth_gate": {"edge_floors": {"HITS": {"status": "FROZEN", "value": 0.02}}}
+            }))
+            validation.write_text(json.dumps({
+                "required_gates": ["historical_point_in_time", "untouched_holdout"],
+                "markets": {"HITS": {
+                    "historical_point_in_time": {"status": "PASS", "evidence": "fixture"},
+                    "untouched_holdout": {"status": "PASS", "evidence": "fixture"}
+                }},
+            }))
+            out = audit_readiness(registry, floors_path=floors, validation_path=validation)
+        row = out["markets"][0]
+        self.assertTrue(row["validation_complete"])
+        self.assertTrue(row["official_bet_enabled"])
 
 
 if __name__ == "__main__":
