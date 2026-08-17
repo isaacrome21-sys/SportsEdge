@@ -23,10 +23,24 @@ jobs:
       - name: Verify no sportsedge imports
         shell: bash
         run: |
-          if grep -Eq '(^|[[:space:]])(from|import)[[:space:]]+sportsedge' scripts/archive_raw_game_odds.py; then
-            echo 'Archive must not import sportsedge/*' >&2
-            exit 1
-          fi
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          tree = ast.parse(Path('scripts/archive_raw_game_odds.py').read_text())
+          bad = []
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Import):
+                  for alias in node.names:
+                      if alias.name == 'sportsedge' or alias.name.startswith('sportsedge.'):
+                          bad.append(alias.name)
+              elif isinstance(node, ast.ImportFrom):
+                  module = node.module or ''
+                  if module == 'sportsedge' or module.startswith('sportsedge.'):
+                      bad.append(module)
+          if bad:
+              raise SystemExit(f'Archive must not import sportsedge/*: {sorted(set(bad))}')
+          print('No sportsedge imports found')
+          PY
       - name: Compile in isolated mode
         run: python -I -m py_compile scripts/archive_raw_game_odds.py
       - name: Run bare stdlib self-test
