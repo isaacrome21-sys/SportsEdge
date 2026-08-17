@@ -126,7 +126,6 @@ def _binary_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
-    # Lazy import prevents runtime -> engine_registry -> generic_engine -> v7 -> source_lineage -> runtime cycle.
     from .v7_distribution import simulate_game_distribution
 
     market = str(model_input.get("market"))
@@ -172,13 +171,19 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
         else:
             raise GenericMarketEngineError("totals side must be OVER or UNDER")
     elif market == "NRFI":
-        if side not in {"YES", "NRFI"}:
-            raise GenericMarketEngineError("NRFI side must be YES/NRFI")
-        p = result.nrfi_probability
+        if side in {"YES", "NRFI"}:
+            p = result.nrfi_probability
+        elif side == "NO":
+            p = result.yrfi_probability
+        else:
+            raise GenericMarketEngineError("NRFI side must be YES/NO")
     elif market == "YRFI":
-        if side not in {"YES", "YRFI"}:
-            raise GenericMarketEngineError("YRFI side must be YES/YRFI")
-        p = result.yrfi_probability
+        if side in {"YES", "YRFI"}:
+            p = result.yrfi_probability
+        elif side == "NO":
+            p = result.nrfi_probability
+        else:
+            raise GenericMarketEngineError("YRFI side must be YES/NO")
     else:
         raise GenericMarketEngineError(f"unsupported game market {market}")
     out = _base_output(model_input, p, model_hash=result.result_sha256)
