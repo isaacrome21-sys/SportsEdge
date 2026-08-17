@@ -1,0 +1,56 @@
+name: mlb-fixture-full-pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - 'fix/**'
+    paths:
+      - 'sportsedge/**'
+      - 'tests/**'
+      - 'config/**'
+      - 'scripts/run_auto_mlb*.py'
+      - '.github/workflows/mlb-fixture-full-pipeline.yml'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mlb-fixture-full-pipeline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frozen-full-pipeline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.13'
+      - name: Install runtime dependencies
+        run: python -m pip install --disable-pip-version-check numpy
+      - name: Prove frozen MLB pipeline on current SHA
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          echo "fixture_sha=${GITHUB_SHA}"
+          python -m unittest \
+            tests.test_mlb_fixture_pipeline \
+            tests.test_auto_runner \
+            tests.test_unified_card \
+            tests.test_generic_market_engine \
+            tests.test_truth_gate_contract \
+            -v
+      - name: Assert no provider secrets are required
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "${SPORTSEDGE_ODDS_API_KEY:-}"
+          test -z "${SPORTSEDGE_QUOTES_URL:-}"
+          test -z "${SPORTSEDGE_FEATURES_URL:-}"

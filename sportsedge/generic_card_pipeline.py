@@ -74,7 +74,9 @@ def _feature_index(rows: list[Mapping[str, Any]]) -> dict[tuple[str, str, str], 
             continue
         key = (game_id, entity_id, market)
         if key in out:
-            raise ValueError(f"duplicate generic feature identity {key}")
+            if dict(out[key]) != dict(row):
+                raise ValueError(f"conflicting generic feature identity {key}")
+            continue
         out[key] = row
     return out
 
