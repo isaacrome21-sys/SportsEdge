@@ -34,8 +34,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git fetch --depth=1 origin data:data
-          git worktree add .data-branch data
+          git fetch --depth=1 origin data
+          git worktree add --detach .data-branch FETCH_HEAD
       - name: Refresh weather lineups umpire catcher context
         id: refresh
         shell: bash
