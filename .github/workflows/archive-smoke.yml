@@ -41,6 +41,29 @@ jobs:
               raise SystemExit(f'Archive must not import sportsedge/*: {sorted(set(bad))}')
           print('No sportsedge imports found')
           PY
+      - name: Verify durable ledger workflow contract
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          text = Path('.github/workflows/archive-mlb-game-odds.yml').read_text()
+          required = [
+              'permissions:\n  contents: write',
+              'git fetch --depth=1 origin data:data',
+              'git worktree add .data-branch data',
+              'runtime/odds-budget/ledger.json',
+              'runtime/archive-status/',
+              'git push origin HEAD:data',
+          ]
+          missing = [item for item in required if item not in text]
+          if missing:
+              raise SystemExit(f'Missing durable archive contract: {missing}')
+          forbidden = ['actions/cache@', 'save-always:']
+          found = [item for item in forbidden if item in text]
+          if found:
+              raise SystemExit(f'Archive workflow must not depend on ephemeral Actions cache: {found}')
+          print('Durable data-branch ledger contract verified')
+          PY
       - name: Compile in isolated mode
         run: python -I -m py_compile scripts/archive_raw_game_odds.py
       - name: Run bare stdlib self-test
