@@ -68,7 +68,12 @@ def write_registry(path):
     path.write_text(json.dumps({
         "schema_version": 1,
         "markets": {
-            "TOTALS": {"eligible": True, "stage": "DEPLOYED", "reason": "frozen-fixture-ci"}
+            "TOTALS": {
+                "market": "TOTALS",
+                "eligible": True,
+                "stage": "DEPLOYED",
+                "reason": "frozen-fixture-ci",
+            }
         },
     }))
 
@@ -146,7 +151,7 @@ class MLBFixtureFullPipelineTests(unittest.TestCase):
         self.assertFalse(any("duplicate generic feature identity" in r.reason for r in results))
 
         self.assertEqual(len(captured), 2)
-        self.assertTrue(all(r.decision is not None for r in captured))
+        self.assertTrue(all(r.decision is not None for r in captured), [r.reason for r in captured])
         self.assertTrue(all(r.decision.model_status == "MODEL_OK" for r in captured))
         self.assertTrue(all(r.decision.kelly_fraction >= 0.0 for r in captured))
         self.assertTrue(all(r.bet_status in {"PASS", "OFFICIAL_BET"} for r in captured))
