@@ -36,19 +36,26 @@ def runtime_deployments(path: str | Path = "config/deployments.json") -> dict[st
     return {market: {"market": market, **meta} for market, meta in reg["markets"].items()}
 
 
+def _normalize_quote(value: Any) -> Any:
+    if not isinstance(value, Mapping):
+        return value
+    quote = dict(value)
+    if "retrieved_at" in quote and isinstance(quote["retrieved_at"], str):
+        quote["retrieved_at"] = parse_timestamp(quote["retrieved_at"])
+    return quote
+
+
 def _normalize_candidates(candidates: list[Any]) -> list[dict[str, Any]]:
     normalized: list[dict[str, Any]] = []
     for item in candidates:
         if not isinstance(item, Mapping):
-            normalized.append({"model_input": None, "quote": None})
+            normalized.append({"model_input": None, "quote": None, "paired_quote": None})
             continue
-        model_input = item.get("model_input")
-        quote = item.get("quote")
-        if isinstance(quote, Mapping):
-            quote = dict(quote)
-            if "retrieved_at" in quote and isinstance(quote["retrieved_at"], str):
-                quote["retrieved_at"] = parse_timestamp(quote["retrieved_at"])
-        normalized.append({"model_input": model_input, "quote": quote})
+        normalized.append({
+            "model_input": item.get("model_input"),
+            "quote": _normalize_quote(item.get("quote")),
+            "paired_quote": _normalize_quote(item.get("paired_quote")),
+        })
     return normalized
 
 
@@ -80,22 +87,14 @@ def run_payload(payload: Mapping[str, Any], *, registry_path: str | Path = "conf
 
     return run_slate(
         _normalize_candidates(candidates),
-        engines=engine_registry(),
-        deployments=runtime_deployments(registry_path),
-        ingestion_now=ingestion_now,
-        finalization_now=finalization_now,
-        edge_floor_config_path=edge_floor_config_path,
-        kelly_multiplier=kelly_multiplier,
+        engines=engine_registry(), deployments=runtime_deployments(registry_path),
+        ingestion_now=ingestion_now, finalization_now=finalization_now,
+        edge_floor_config_path=edge_floor_config_path, kelly_multiplier=kelly_multiplier,
     )
 
 
 def result_to_dict(result: RunResult) -> dict[str, Any]:
-    out = {
-        "market": result.market,
-        "model_p": result.model_p,
-        "bet_status": result.bet_status,
-        "reason": result.reason,
-    }
+    out = {"market": result.market, "model_p": result.model_p, "bet_status": result.bet_status, "reason": result.reason}
     if result.decision is not None:
         out["decision"] = {
             "model_status": result.decision.model_status,
