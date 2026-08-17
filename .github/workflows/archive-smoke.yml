@@ -1,0 +1,47 @@
+name: archive-smoke
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/archive_raw_game_odds.py'
+      - '.github/workflows/archive-mlb-game-odds.yml'
+      - '.github/workflows/archive-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bare-stdlib:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.13'
+      - name: Verify no sportsedge imports
+        shell: bash
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          tree = ast.parse(Path('scripts/archive_raw_game_odds.py').read_text())
+          bad = []
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Import):
+                  for alias in node.names:
+                      if alias.name == 'sportsedge' or alias.name.startswith('sportsedge.'):
+                          bad.append(alias.name)
+              elif isinstance(node, ast.ImportFrom):
+                  module = node.module or ''
+                  if module == 'sportsedge' or module.startswith('sportsedge.'):
+                      bad.append(module)
+          if bad:
+              raise SystemExit(f'Archive must not import sportsedge/*: {sorted(set(bad))}')
+          print('No sportsedge imports found')
+          PY
+      - name: Compile in isolated mode
+        run: python -I -m py_compile scripts/archive_raw_game_odds.py
+      - name: Run bare stdlib self-test
+        run: python -I scripts/archive_raw_game_odds.py --self-test
