@@ -55,13 +55,12 @@ def run_canonical_manual_mlb(rows: Iterable[Mapping[str, Any]], *, opener=urlope
     if not raw: raise CanonicalManualMLBError("manual rows must be non-empty")
     parsed = [validate_manual_quote(r) for r in raw]
     if len({r.game_id for r in parsed}) != 1: raise CanonicalManualMLBError("one game_id per run is required")
-    if len({r.observed_at for r in parsed}) != 1: raise CanonicalManualMLBError("all rows must share observed_at")
     if len({r.first_pitch_at for r in parsed}) != 1: raise CanonicalManualMLBError("all rows must share first_pitch_at")
-    g = _resolve_game(parsed[0], opener=opener)
+    g = _resolve_game(max(parsed, key=lambda r: r.observed_at), opener=opener)
     live = LiveGame(g.game_pk,g.away_id,g.home_id,g.away_probable_pitcher_id,g.home_probable_pitcher_id,
                     TeamLineup(g.away_id,"away",(),(),False),TeamLineup(g.home_id,"home",(),(),False),
                     g.game_number,g.double_header,g.venue_id,g.official_date,g.status)
-    captured = parsed[0].observed_at.astimezone(timezone.utc)
+    captured = max(r.observed_at for r in parsed).astimezone(timezone.utc)
     hist = MLBGenericHistorySource(opener=MLBHistoryCachedOpener(target_date=captured.date(),cache_dir=history_cache_dir,opener=opener), retrieved_at=captured)
     target_date = datetime.fromisoformat(str(g.official_date)).date() if g.official_date else captured.date()
     quotes, features, resolutions, seen = [], [], [], set()
@@ -75,7 +74,7 @@ def run_canonical_manual_mlb(rows: Iterable[Mapping[str, Any]], *, opener=urlope
             seen.add(key)
             features.append(hist.feature_row(game_pk=g.game_pk,market=market,entity_id=entity_id,target_date=target_date,
                 away_team_id=int(g.away_id),home_team_id=int(g.home_id),player_id=int(row.subject_id) if row.subject_id else None))
-        resolutions.append({"market_type":row.market_type,"engine_market":market,"subject_id":row.subject_id})
+        resolutions.append({"market_type":row.market_type,"engine_market":market,"subject_id":row.subject_id,"observed_at":row.observed_at.isoformat()})
     results = run_generic_card(games=[live],feature_rows=features,quotes=quotes,ingestion_now=captured,finalization_now=captured,
         registry_path=registry_path,edge_floor_config_path=edge_floor_config_path,kelly_multiplier=kelly_multiplier)
     return {"schema_version":2,"run_type":"CANONICAL_MANUAL_QUOTES","source":"MANUAL","observed_at_utc":captured.isoformat(),
