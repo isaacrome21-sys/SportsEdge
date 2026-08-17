@@ -1,0 +1,31 @@
+name: archive-mlb-game-odds-backup-dispatch
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Independent scheduler queue, offset five minutes from the primary archive.
+    # GitHub documents that scheduled jobs can be delayed/dropped under load;
+    # this separate workflow gives each capture window another chance to fire.
+    - cron: '2,12,22,32,42,52 * * * *'
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: archive-mlb-game-odds-backup-dispatch
+  cancel-in-progress: true
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Dispatch archive failover workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh workflow run archive-mlb-game-odds-failover.yml --ref main
+          echo "DISPATCHED archive-mlb-game-odds-failover.yml"
