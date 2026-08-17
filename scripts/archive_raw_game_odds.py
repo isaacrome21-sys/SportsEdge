@@ -14,12 +14,12 @@ changes cannot break the only forward data that cannot be reconstructed later.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from http.client import HTTPResponse
+from datetime import datetime, timedelta, timezone
 import json
 import os
 from pathlib import Path
 import sys
+from tempfile import TemporaryDirectory
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -176,7 +176,6 @@ def _write_status(status_path: Path, ledger_path: Path, ledger: dict[str, Any], 
     _atomic_json(status_path, row)
     runs = ledger.setdefault("runs", [])
     runs.append(row)
-    # Keep ledger bounded while preserving the full daily operational trail.
     if len(runs) > 500:
         del runs[:-500]
     ledger["last_status"] = row.get("status")
@@ -202,13 +201,54 @@ def _http_error_code(exc: HTTPError) -> tuple[str | None, str | None]:
     return provider_code, provider_message
 
 
+def _final_block_status(*, exhausted_keys: int, key_count: int) -> str:
+    return "BLOCKED_NO_CREDITS" if key_count > 0 and exhausted_keys == key_count else "BLOCKED_NO_ODDS"
+
+
 def _self_test() -> int:
     # This path must succeed in a bare stdlib Python environment and make no network calls.
-    now = datetime(2026, 8, 16, 12, 0, tzinfo=timezone.utc)
-    assert _parse_iso("2026-08-16T12:00:00Z") == now
+    now = datetime(2026, 8, 17, 13, 0, tzinfo=timezone.utc)
+    assert _parse_iso("2026-08-17T13:00:00Z") == now
     assert _int_or_none("12") == 12
     assert set(MARKETS) == {"h2h", "spreads", "totals"}
-    print(json.dumps({"status": "SELF_TEST_OK", "stdlib_only": True}))
+
+    # Deterministic capture-window acceptance: two games are inside T-3h and one is not.
+    games = [
+        {"gameDate": (now + timedelta(minutes=180)).isoformat()},
+        {"gameDate": (now + timedelta(minutes=184)).isoformat()},
+        {"gameDate": (now + timedelta(minutes=120)).isoformat()},
+    ]
+    target, eligible = _eligible_games(now, games)
+    assert target == "T-180m", (target, eligible)
+    assert len(eligible) == 2, eligible
+
+    # Provider exhaustion must classify distinctly from generic no-odds failure.
+    assert _final_block_status(exhausted_keys=4, key_count=4) == "BLOCKED_NO_CREDITS"
+    assert _final_block_status(exhausted_keys=3, key_count=4) == "BLOCKED_NO_ODDS"
+    assert _final_block_status(exhausted_keys=0, key_count=0) == "BLOCKED_NO_ODDS"
+
+    # Every execution must leave both a pre-acquisition and final ledger record.
+    with TemporaryDirectory() as td:
+        root = Path(td)
+        ledger_path = root / "ledger.json"
+        status_path = root / "status.json"
+        ledger = _load_ledger(ledger_path, cap=12, now=now)
+        started = {"run_at_utc": now.isoformat(), "status": "EXECUTED_STARTED"}
+        final = {"run_at_utc": now.isoformat(), "status": "BLOCKED_NO_CREDITS"}
+        _write_status(status_path, ledger_path, ledger, started)
+        _write_status(status_path, ledger_path, ledger, final)
+        persisted = json.loads(ledger_path.read_text())
+        assert [row["status"] for row in persisted["runs"]] == ["EXECUTED_STARTED", "BLOCKED_NO_CREDITS"]
+        assert persisted["last_status"] == "BLOCKED_NO_CREDITS"
+        assert json.loads(status_path.read_text())["status"] == "BLOCKED_NO_CREDITS"
+
+    print(json.dumps({
+        "status": "SELF_TEST_OK",
+        "stdlib_only": True,
+        "window_math": "PASS",
+        "blocked_no_credits": "PASS",
+        "ledger_pre_post": "PASS",
+    }))
     return 0
 
 
@@ -239,7 +279,6 @@ def main() -> int:
         "counter_source": "native",
     }
 
-    # Write before any network call: existence of this row proves execution even if acquisition dies.
     _write_status(status_path, ledger_path, ledger, {**base, "status": "EXECUTED_STARTED"})
 
     try:
@@ -330,7 +369,7 @@ def main() -> int:
         except Exception as exc:
             attempts.append({"key_slot": slot, "reason": f"{type(exc).__name__}:{exc}"})
 
-    status = "BLOCKED_NO_CREDITS" if exhausted == len(keys) and keys else "BLOCKED_NO_ODDS"
+    status = _final_block_status(exhausted_keys=exhausted, key_count=len(keys))
     row = {**base, "status": status, "attempts": attempts}
     _write_status(status_path, ledger_path, ledger, row)
     print(json.dumps(row))
