@@ -1,0 +1,48 @@
+name: mlb-game-context-refresh
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '8,23,38,53 15-23 * * *'
+    - cron: '8,23,38,53 0-5 * * *'
+  push:
+    paths:
+      - 'sportsedge/mlb_game_context_source.py'
+      - 'scripts/refresh_mlb_game_context.py'
+      - '.github/workflows/mlb-game-context-refresh.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mlb-game-context-refresh
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.13'
+      - name: Refresh weather lineups umpire catcher context
+        run: python scripts/refresh_mlb_game_context.py
+      - name: Persist context to data branch
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data:data
+          git worktree add .data-branch data
+          mkdir -p .data-branch/runtime/mlb-context
+          cp -R artifacts/mlb-context/. .data-branch/runtime/mlb-context/ 2>/dev/null || true
+          cd .data-branch
+          git config user.name sportsedge-data-bot
+          git config user.email sportsedge-data-bot@users.noreply.github.com
+          git add runtime/mlb-context
+          if ! git diff --cached --quiet; then
+            git commit -m "mlb-context: refresh ${{ github.run_id }}"
+            git push origin HEAD:data
+          fi
