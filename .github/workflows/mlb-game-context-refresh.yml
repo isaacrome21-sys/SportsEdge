@@ -9,6 +9,7 @@ on:
     paths:
       - 'sportsedge/mlb_game_context_source.py'
       - 'scripts/refresh_mlb_game_context.py'
+      - 'scripts/run_mlb_context_diagnostic.sh'
       - 'config/mlb_source_freshness_contract.json'
       - '.github/workflows/mlb-game-context-refresh.yml'
 
@@ -41,7 +42,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          PYTHONPATH=. python scripts/refresh_mlb_game_context.py
+          bash scripts/run_mlb_context_diagnostic.sh
           code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           exit 0
@@ -50,10 +51,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ ! -d .data-branch/.git ] && [ ! -f .data-branch/.git ]; then
-            echo 'data branch worktree is unavailable' >&2
-            exit 98
-          fi
+          if [ ! -d .data-branch/.git ] && [ ! -f .data-branch/.git ]; then exit 98; fi
           RUN_DIR=".data-branch/runtime/mlb-context/runs/${GITHUB_RUN_ID}"
           LATEST_DIR=".data-branch/runtime/mlb-context/latest"
           mkdir -p "$RUN_DIR" "$LATEST_DIR"
@@ -65,18 +63,13 @@ jobs:
           git config user.name sportsedge-data-bot
           git config user.email sportsedge-data-bot@users.noreply.github.com
           git add runtime/mlb-context
-          if git diff --cached --quiet; then
-            exit 0
-          fi
+          if git diff --cached --quiet; then exit 0; fi
           git commit -m "mlb-context: durable run ${GITHUB_RUN_ID}"
           pushed=0
           for attempt in 1 2 3 4 5; do
             git fetch origin data
             git rebase origin/data || { git rebase --abort || true; sleep $((attempt * 2)); continue; }
-            if git push origin HEAD:data; then
-              pushed=1
-              break
-            fi
+            if git push origin HEAD:data; then pushed=1; break; fi
             sleep $((attempt * 2))
           done
           test "$pushed" -eq 1
@@ -93,8 +86,5 @@ jobs:
         shell: bash
         run: |
           code='${{ steps.refresh.outputs.exit_code }}'
-          if [ -z "$code" ]; then
-            echo 'Refresh step did not emit an exit code.' >&2
-            exit 99
-          fi
+          if [ -z "$code" ]; then exit 99; fi
           exit "$code"
