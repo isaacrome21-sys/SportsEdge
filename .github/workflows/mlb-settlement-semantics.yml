@@ -35,12 +35,16 @@ jobs:
           import json
           from pathlib import Path
           d=json.loads(Path('artifacts/mlb-settlement-semantics/report.json').read_text())
+          assert d['schema_version']=='mlb_settlement_semantics_v2'
           assert d['state']=='SETTLEMENT_SEMANTICS_PASS'
           assert d['sportsbook_data_used'] is False
           assert d['source']=='MLB_STATSAPI_BOX_SCORE_AND_LIVE_FEED'
-          assert 'FIRST_HOME_RUN' not in d['proven_markets']
-          assert 'PITCHER_RECORD_WIN' not in d['proven_markets']
-          assert len(d['proven_markets']) >= 20
+          assert 'FIRST_HOME_RUN' in d['proven_markets']
+          assert 'PITCHER_RECORD_WIN' in d['proven_markets']
+          assert d['excluded_markets']==[]
+          assert len(d['proven_markets']) == 27
+          assert d['facts']['first_home_run']['batter_id']
+          assert d['facts']['winning_pitcher']['pitcher_id']
           print('MLB_SETTLEMENT_SEMANTICS_PASS', len(d['proven_markets']), d['facts_sha256'])
           PY
       - name: Persist immutable settlement evidence to data branch
