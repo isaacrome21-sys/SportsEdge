@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run SportsEdge MLB production card with report-aware Odds API key rotation."""
+"""Run SportsEdge MLB card with paid-key rotation and ESPN game-market fallback."""
 from __future__ import annotations
 
 import argparse
@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from sportsedge.auto_espn_odds import run_auto_mlb_espn_game_odds
 from sportsedge.auto_native_odds import run_auto_mlb_native_odds
 from sportsedge.auto_runner import AutoRunnerError, report_to_dict, run_auto_mlb
 from sportsedge.edge_floors import DEFAULT_EDGE_FLOOR_CONFIG
@@ -67,7 +68,7 @@ def main() -> int:
             if not features:
                 raise AutoRunnerError("FEATURE_PROVIDER_CONFIG_MISSING")
             report = run_auto_mlb(quote_url=quotes, feature_url=features, **common)
-        elif odds_api_keys:
+        else:
             attempts = []
             report = None
             for slot, key in enumerate(odds_api_keys, start=1):
@@ -88,12 +89,17 @@ def main() -> int:
                 if not rotate:
                     report = candidate
                     break
+
+            # The Odds API may be exhausted or entirely unconfigured. Preserve
+            # full-game ML/RL/totals via ESPN's no-key scoreboard odds instead
+            # of turning the whole card into BLOCKED_NO_ODDS. Player props stay
+            # fail-closed and are explicitly reported as unavailable on this lane.
             if report is None:
-                raise AutoRunnerError(
-                    "ODDS_API_ALL_CONFIGURED_KEYS_EXHAUSTED:" + ",".join(str(x["key_slot"]) for x in attempts)
+                report = run_auto_mlb_espn_game_odds(
+                    feature_url=features or None,
+                    history_cache_dir=history_cache_dir,
+                    **common,
                 )
-        else:
-            raise AutoRunnerError("QUOTE_PROVIDER_CONFIG_MISSING")
 
         payload = report_to_dict(report)
         game_ids = {
