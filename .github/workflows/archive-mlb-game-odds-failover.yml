@@ -5,6 +5,7 @@ on:
   workflow_run:
     workflows:
       - props-v6-forward-shadow
+      - auto-mlb
     types: [completed]
 
 permissions:
@@ -16,8 +17,6 @@ concurrency:
 
 jobs:
   capture:
-    # workflow_run executes from the default branch. Keep this guard explicit so
-    # only completions of the intended upstream workflow can trigger acquisition.
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'schedule'
     runs-on: ubuntu-24.04
     timeout-minutes: 8
@@ -52,10 +51,76 @@ jobs:
           if [ -f .data-branch/runtime/odds-budget/ledger.json ]; then
             cp .data-branch/runtime/odds-budget/ledger.json "$SPORTSEDGE_ODDS_BUDGET_LEDGER"
           fi
+      - name: Deduplicate recent successful capture
+        id: dedupe
+        shell: bash
+        run: |
+          python - <<'PY'
+          from datetime import datetime, timezone
+          import json
+          import os
+          from pathlib import Path
+
+          ledger_path = Path(os.environ['SPORTSEDGE_ODDS_BUDGET_LEDGER'])
+          now = datetime.now(timezone.utc)
+          skip = False
+          source = None
+          ledger = {}
+          try:
+              ledger = json.loads(ledger_path.read_text())
+          except Exception:
+              ledger = {}
+
+          for row in reversed(ledger.get('runs', [])):
+              if row.get('status') != 'CAPTURED':
+                  continue
+              try:
+                  stamp = str(row['run_at_utc']).replace('Z', '+00:00')
+                  captured_at = datetime.fromisoformat(stamp).astimezone(timezone.utc)
+              except Exception:
+                  continue
+              age = (now - captured_at).total_seconds()
+              if 0 <= age <= 20 * 60:
+                  skip = True
+                  source = row
+              break
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as out:
+              out.write(f"skip={'true' if skip else 'false'}\n")
+
+          if skip and source is not None:
+              day = now.date().isoformat()
+              status_dir = Path('artifacts/raw_odds/status') / day
+              status_dir.mkdir(parents=True, exist_ok=True)
+              stamp = now.strftime('%Y%m%dT%H%M%S.%fZ')
+              row = {
+                  'run_at_utc': now.isoformat(),
+                  'status': 'SKIP_RECENT_CAPTURE_DEDUP',
+                  'credits_consumed_actual': 0,
+                  'source_run_at_utc': source.get('run_at_utc'),
+                  'source_capture_window': source.get('capture_window'),
+                  'source_raw_file': source.get('raw_file'),
+                  'dedupe_horizon_seconds': 1200,
+              }
+              (status_dir / f'run_{stamp}.json').write_text(json.dumps(row, indent=2, sort_keys=True) + '\n')
+              runs = ledger.setdefault('runs', [])
+              runs.append(row)
+              if len(runs) > 500:
+                  del runs[:-500]
+              ledger['last_status'] = row['status']
+              ledger['last_run_at_utc'] = row['run_at_utc']
+              ledger_path.parent.mkdir(parents=True, exist_ok=True)
+              ledger_path.write_text(json.dumps(ledger, indent=2, sort_keys=True) + '\n')
+              print(json.dumps(row))
+          PY
       - name: Capture raw game-market snapshot when inside target window
         id: capture
         shell: bash
         run: |
+          if [ '${{ steps.dedupe.outputs.skip }}' = 'true' ]; then
+            echo 'exit_code=0' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           set +e
           python -I scripts/archive_raw_game_odds.py
           code=$?
