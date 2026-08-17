@@ -11,6 +11,7 @@ from .engine_registry import engine_registry
 DEFAULT_REGISTRY = Path("config/deployments.json")
 DEFAULT_CATALOG = Path("config/mlb_market_catalog.json")
 DEFAULT_FLOORS = Path("config/truth_gate_floors.json")
+DEFAULT_VALIDATION = Path("config/mlb_validation_evidence.json")
 
 
 def _load_json(path: str | Path) -> dict[str, Any]:
@@ -21,7 +22,6 @@ def _catalog_markets(catalog: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """Normalize both the checked-in v1 catalog and a future grouped schema."""
     out: dict[str, dict[str, Any]] = {}
 
-    # Current schema: top-level named lists such as game_markets/batter_markets.
     for key, rows in catalog.items():
         if key == "schema_version" or not isinstance(rows, list):
             continue
@@ -32,7 +32,6 @@ def _catalog_markets(catalog: dict[str, Any]) -> dict[str, dict[str, Any]]:
             elif isinstance(row, dict) and row.get("market"):
                 out[str(row["market"])] = {"group": group, "acquisition": True, **row}
 
-    # Forward-compatible grouped schema: {"markets": {group: [...]}}.
     nested = catalog.get("markets")
     if isinstance(nested, dict):
         for group, rows in nested.items():
@@ -59,19 +58,43 @@ def _frozen_floor_markets(floors: dict[str, Any]) -> set[str]:
     }
 
 
+def _validation_state(validation: dict[str, Any], market: str) -> tuple[bool, list[str], dict[str, str]]:
+    required = validation.get("required_gates")
+    if not isinstance(required, list) or not required or not all(isinstance(x, str) and x for x in required):
+        raise ValueError("validation registry requires non-empty required_gates")
+    markets = validation.get("markets")
+    if not isinstance(markets, dict):
+        raise ValueError("validation registry requires markets object")
+    row = markets.get(market)
+    if not isinstance(row, dict):
+        return False, list(required), {}
+
+    missing: list[str] = []
+    statuses: dict[str, str] = {}
+    for gate in required:
+        value = row.get(gate)
+        if isinstance(value, dict):
+            status = str(value.get("status", "MISSING")).upper()
+        else:
+            status = str(value or "MISSING").upper()
+        statuses[gate] = status
+        if status != "PASS":
+            missing.append(gate)
+    return not missing, missing, statuses
+
+
 def audit_readiness(
     registry_path: str | Path = DEFAULT_REGISTRY,
     catalog_path: str | Path = DEFAULT_CATALOG,
     floors_path: str | Path = DEFAULT_FLOORS,
+    validation_path: str | Path = DEFAULT_VALIDATION,
 ) -> dict[str, Any]:
     registry = load_registry(registry_path)
     engines = engine_registry()
     catalog = _catalog_markets(_load_json(catalog_path))
     frozen_floors = _frozen_floor_markets(_load_json(floors_path))
+    validation = _load_json(validation_path)
 
-    # Production audit covers the full catalog. A caller supplying a custom
-    # registry gets a registry-scoped audit, preserving deterministic fixture
-    # and unit-test behavior instead of mixing production catalog rows into it.
     if Path(registry_path) == DEFAULT_REGISTRY:
         all_markets = sorted(set(catalog) | set(registry["markets"]))
     else:
@@ -88,6 +111,7 @@ def audit_readiness(
         has_floor = market in frozen_floors
         stage = str(meta.get("stage", "UNREGISTERED"))
         reason = str(meta.get("reason", "market absent from deployment registry"))
+        validation_complete, validation_missing, validation_status = _validation_state(validation, market)
 
         blockers: list[str] = []
         classes: list[str] = []
@@ -106,6 +130,9 @@ def audit_readiness(
         if not has_floor:
             blockers.append("NO_FROZEN_EDGE_FLOOR")
             classes.append("EVIDENCE")
+        if not validation_complete:
+            blockers.extend(f"VALIDATION_{gate.upper()}_PENDING" for gate in validation_missing)
+            classes.append("EVIDENCE")
         if "fixture-backed ci attestation pending" in reason.lower():
             blockers.append("FIXTURE_CI_PENDING")
             classes.append("EVIDENCE")
@@ -114,6 +141,7 @@ def audit_readiness(
 
         classes = list(dict.fromkeys(classes))
         runnable_live = quote_supported and has_engine
+        official = runnable_live and eligible and has_floor and validation_complete
         rows.append({
             "market": market,
             "group": cat.get("group", "registry_only"),
@@ -122,17 +150,20 @@ def audit_readiness(
             "runtime_engine": has_engine,
             "eligible": eligible,
             "frozen_edge_floor": has_floor,
+            "validation_complete": validation_complete,
+            "validation_status": validation_status,
+            "validation_missing": validation_missing,
             "stage": stage,
             "reason": reason,
             "blocker_classes": classes,
             "blockers": blockers,
             "shadow_runnable": runnable_live,
             "runnable_live": runnable_live,
-            "official_bet_enabled": runnable_live and eligible and has_floor,
+            "official_bet_enabled": official,
         })
 
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "markets": rows,
         "summary": {
             "catalog_or_registered": len(rows),
@@ -142,6 +173,7 @@ def audit_readiness(
             "shadow_runnable": sum(x["shadow_runnable"] for x in rows),
             "runnable_live": sum(x["runnable_live"] for x in rows),
             "frozen_edge_floors": sum(x["frozen_edge_floor"] for x in rows),
+            "validation_complete": sum(x["validation_complete"] for x in rows),
             "official_bet_enabled": sum(x["official_bet_enabled"] for x in rows),
             "engineering_blocked": sum("ENGINEERING" in x["blocker_classes"] for x in rows),
             "evidence_blocked": sum("EVIDENCE" in x["blocker_classes"] for x in rows),
