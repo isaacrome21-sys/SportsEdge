@@ -25,18 +25,35 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12.13'
+      - name: Prepare durable data worktree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data:data
+          git worktree add .data-branch data
       - name: Refresh weather lineups umpire catcher context
-        run: python scripts/refresh_mlb_game_context.py
+        id: refresh
+        shell: bash
+        run: |
+          set +e
+          python scripts/refresh_mlb_game_context.py
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
       - name: Persist immutable context evidence to data branch
         if: always()
         shell: bash
         run: |
           set -euo pipefail
-          git fetch origin data:data
-          git worktree add .data-branch data
+          if [ ! -d .data-branch/.git ] && [ ! -f .data-branch/.git ]; then
+            echo 'data branch worktree is unavailable' >&2
+            exit 98
+          fi
           RUN_DIR=".data-branch/runtime/mlb-context/runs/${GITHUB_RUN_ID}"
           LATEST_DIR=".data-branch/runtime/mlb-context/latest"
           mkdir -p "$RUN_DIR" "$LATEST_DIR"
@@ -63,3 +80,21 @@ jobs:
             sleep $((attempt * 2))
           done
           test "$pushed" -eq 1
+      - name: Upload context evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlb-context-${{ github.run_id }}
+          path: artifacts/mlb-context/**
+          if-no-files-found: error
+          retention-days: 30
+      - name: Propagate collector result after persistence
+        if: always()
+        shell: bash
+        run: |
+          code='${{ steps.refresh.outputs.exit_code }}'
+          if [ -z "$code" ]; then
+            echo 'Refresh step did not emit an exit code.' >&2
+            exit 99
+          fi
+          exit "$code"
