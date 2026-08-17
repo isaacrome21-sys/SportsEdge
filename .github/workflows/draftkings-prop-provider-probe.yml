@@ -1,0 +1,86 @@
+name: draftkings-prop-provider-probe
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'sportsedge/draftkings_prop_source.py'
+      - '.github/workflows/draftkings-prop-provider-probe.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.13'
+      - name: Probe DraftKings MLB prop surface
+        id: probe
+        shell: bash
+        run: |
+          set +e
+          python - <<'PY'
+          from datetime import datetime, timezone
+          import json
+          from pathlib import Path
+          from sportsedge.draftkings_prop_source import fetch_mlb_prop_quotes
+
+          now = datetime.now(timezone.utc)
+          out = Path('artifacts/provider-probe') / now.date().isoformat()
+          out.mkdir(parents=True, exist_ok=True)
+          path = out / f"draftkings_props_{now.strftime('%Y%m%dT%H%M%S.%fZ')}.json"
+          try:
+              snap = fetch_mlb_prop_quotes()
+              markets = {}
+              for q in snap.quotes:
+                  markets[q['market']] = markets.get(q['market'], 0) + 1
+              row = {
+                  'run_at_utc': now.isoformat(),
+                  'provider': 'DRAFTKINGS_WEB_RESEARCH',
+                  'status': 'PASS' if snap.quotes else 'BLOCKED_NO_PROP_QUOTES',
+                  'league_id': snap.league_id,
+                  'base_url_present': bool(snap.base_url),
+                  'quotes_returned': len(snap.quotes),
+                  'market_counts': markets,
+                  'failure_count': len(snap.failures),
+                  'failure_sample': list(snap.failures[:20]),
+              }
+          except Exception as exc:
+              row = {
+                  'run_at_utc': now.isoformat(),
+                  'provider': 'DRAFTKINGS_WEB_RESEARCH',
+                  'status': 'ERROR',
+                  'reason': f'{type(exc).__name__}:{exc}',
+              }
+          path.write_text(json.dumps(row, indent=2, sort_keys=True) + '\n')
+          print(json.dumps(row, indent=2, sort_keys=True))
+          raise SystemExit(0 if row['status'] == 'PASS' else 3)
+          PY
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Persist provider evidence
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data:data
+          git worktree add .data-branch data
+          mkdir -p .data-branch/runtime/provider-acceptance
+          cp -R artifacts/provider-probe/. .data-branch/runtime/provider-acceptance/ 2>/dev/null || true
+          cd .data-branch
+          git config user.name sportsedge-archive-bot
+          git config user.email sportsedge-archive-bot@users.noreply.github.com
+          git add runtime/provider-acceptance
+          if ! git diff --cached --quiet; then
+            git commit -m "provider: persist DraftKings prop probe ${{ github.run_id }}"
+            git push origin HEAD:data
+          fi
+      - name: Propagate result
+        if: always()
+        run: exit '${{ steps.probe.outputs.exit_code }}'
