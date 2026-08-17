@@ -1,0 +1,34 @@
+{
+  "acceptance_scope": "PROVIDER_PATH_ONLY_NOT_TIMEPOINT_CAPTURE",
+  "attempts": [
+    {
+      "http_status": 401,
+      "key_slot": 1,
+      "provider_body": "{\"message\":\"Usage quota has been reached. See usage plans at https://the-odds-api.com\",\"error_code\":\"OUT_OF_USAGE_CREDITS\",\"details_url\":\"https://the-odds-api.com/liveapi/guides/v4/api-error-codes.html#out-of-usage-credits\"}\n",
+      "provider_code": "OUT_OF_USAGE_CREDITS"
+    },
+    {
+      "http_status": 401,
+      "key_slot": 2,
+      "provider_body": "{\"message\":\"Usage quota has been reached. See usage plans at https://the-odds-api.com\",\"error_code\":\"OUT_OF_USAGE_CREDITS\",\"details_url\":\"https://the-odds-api.com/liveapi/guides/v4/api-error-codes.html#out-of-usage-credits\"}\n",
+      "provider_code": "OUT_OF_USAGE_CREDITS"
+    },
+    {
+      "http_status": 401,
+      "key_slot": 3,
+      "provider_body": "{\"message\":\"Usage quota has been reached. See usage plans at https://the-odds-api.com\",\"error_code\":\"OUT_OF_USAGE_CREDITS\",\"details_url\":\"https://the-odds-api.com/liveapi/guides/v4/api-error-codes.html#out-of-usage-credits\"}\n",
+      "provider_code": "OUT_OF_USAGE_CREDITS"
+    },
+    {
+      "http_status": 401,
+      "key_slot": 4,
+      "provider_body": "{\"message\":\"Usage quota has been reached. See usage plans at https://the-odds-api.com\",\"error_code\":\"OUT_OF_USAGE_CREDITS\",\"details_url\":\"https://the-odds-api.com/liveapi/guides/v4/api-error-codes.html#out-of-usage-credits\"}\n",
+      "provider_code": "OUT_OF_USAGE_CREDITS"
+    }
+  ],
+  "bookmaker": "draftkings",
+  "key_slots_present": 4,
+  "market": "h2h",
+  "run_at_utc": "2026-08-17T14:58:38.076083+00:00",
+  "status": "BLOCKED_NO_CREDITS"
+}
