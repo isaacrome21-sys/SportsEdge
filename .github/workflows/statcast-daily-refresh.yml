@@ -1,0 +1,47 @@
+name: statcast-daily-refresh
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '35 12 * * *'
+  push:
+    paths:
+      - 'sportsedge/statcast_daily_source.py'
+      - 'scripts/refresh_statcast_daily.py'
+      - '.github/workflows/statcast-daily-refresh.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: statcast-daily-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.13'
+      - name: Refresh 30-day Statcast batter/pitcher snapshot
+        run: python scripts/refresh_statcast_daily.py --days 30 --output-dir artifacts/statcast
+      - name: Persist snapshot to data branch
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data:data
+          git worktree add .data-branch data
+          mkdir -p .data-branch/runtime/statcast
+          cp -R artifacts/statcast/. .data-branch/runtime/statcast/ 2>/dev/null || true
+          cd .data-branch
+          git config user.name sportsedge-data-bot
+          git config user.email sportsedge-data-bot@users.noreply.github.com
+          git add runtime/statcast
+          if ! git diff --cached --quiet; then
+            git commit -m "statcast: daily refresh ${{ github.run_id }}"
+            git push origin HEAD:data
+          fi
