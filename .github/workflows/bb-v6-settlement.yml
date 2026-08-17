@@ -10,7 +10,7 @@ on:
     - cron: '37 * * * *'
 
 permissions:
-  contents: read
+  contents: write
   actions: read
 
 concurrency:
@@ -28,6 +28,8 @@ jobs:
       SPORTSEDGE_BB_V6_SCORE_OUT: artifacts/bb-forward-shadow-state/scored
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -74,6 +76,34 @@ jobs:
           assert d['sportsbook_data_used'] is False
           print('BB_V6_SETTLEMENT_REPORT_PASS', d['state'], d['settled_unique_pitchers'])
           PY
+      - name: Persist immutable BB validation evidence to data branch
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data
+          git worktree add --detach .data-branch FETCH_HEAD
+          RUN_DIR=".data-branch/runtime/model-validation/PITCHER_BB/runs/${GITHUB_RUN_ID}"
+          LATEST_DIR=".data-branch/runtime/model-validation/PITCHER_BB/latest"
+          mkdir -p "$RUN_DIR" "$LATEST_DIR"
+          cp -R "$SPORTSEDGE_BB_V6_SCORE_OUT"/. "$RUN_DIR"/ 2>/dev/null || true
+          rm -rf "$LATEST_DIR"/*
+          cp -R "$SPORTSEDGE_BB_V6_SCORE_OUT"/. "$LATEST_DIR"/ 2>/dev/null || true
+          printf '%s\n' "$GITHUB_RUN_ID" > .data-branch/runtime/model-validation/PITCHER_BB/latest_run_id.txt
+          cd .data-branch
+          git config user.name sportsedge-data-bot
+          git config user.email sportsedge-data-bot@users.noreply.github.com
+          git add runtime/model-validation/PITCHER_BB
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "validation: persist PITCHER_BB run ${GITHUB_RUN_ID}"
+          pushed=0
+          for attempt in 1 2 3 4 5; do
+            git fetch origin data
+            git rebase origin/data || { git rebase --abort || true; sleep $((attempt * 2)); continue; }
+            if git push origin HEAD:data; then pushed=1; break; fi
+            sleep $((attempt * 2))
+          done
+          test "$pushed" -eq 1
       - name: Upload cumulative BB evidence
         if: always()
         uses: actions/upload-artifact@v4
