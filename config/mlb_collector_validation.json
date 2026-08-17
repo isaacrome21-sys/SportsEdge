@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "validated_at_utc": "2026-08-17T15:48:00+00:00",
+  "criterion": "two consecutive successful executions with PASS manifests and required non-empty artifacts durably persisted on the data branch",
+  "collectors": {
+    "mlb-game-context-refresh": {
+      "status": "VALIDATED_COLLECTOR",
+      "consecutive_durable_passes": 2,
+      "evidence_run_ids": ["32043251545", "32043344520"],
+      "coverage": ["weather", "confirmed_lineups", "plate_umpire", "starting_catcher"],
+      "important_semantics": "field-level ABSENT is permitted when not yet posted; STALE and INVALID remain distinct blocking states under the source freshness contract"
+    },
+    "statcast-daily-refresh": {
+      "status": "VALIDATED_COLLECTOR",
+      "consecutive_durable_passes": 2,
+      "evidence_run_ids": ["32043043779", "32043344495"],
+      "coverage": ["statcast_batter_30d", "statcast_pitcher_30d"],
+      "latest_verified_counts": {
+        "raw_pitch_rows": 116182,
+        "batter_entities": 487,
+        "pitcher_entities": 550
+      },
+      "ttl_seconds": 129600
+    }
+  },
+  "scope_note": "Collector validation proves acquisition, persistence, schema/coverage, and freshness plumbing. It does not by itself validate any betting model or market; each market still requires the separate PIT/holdout/calibration/settlement/forward/production-parity gates."
+}
