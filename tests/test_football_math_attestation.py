@@ -55,3 +55,21 @@ def test_attestation_hash_changes_when_evidence_changes():
     first = attest_validated_math(_artifact())
     second = attest_validated_math(_artifact(per_key_abs_error={"-7": 0.002, "-3": 0.003, "3": 0.002, "7": 0.003}))
     assert first["artifact_sha256"] != second["artifact_sha256"]
+
+
+def test_promotion_entrypoint_derives_math_state_from_artifact():
+    from sportsedge.core.promotion.football import evaluate_football_promotion_from_math_artifact
+
+    result = evaluate_football_promotion_from_math_artifact(
+        _artifact(per_key_abs_error={"-7": 0.002, "-3": 0.003, "3": 0.009, "7": 0.004}),
+        fold_wins=100,
+        fold_total=100,
+        ci_attested=True,
+        calibration_max_bin_deviation=0.0,
+        calibration_threshold=0.02,
+        logged_plays=1000,
+        mean_clv=0.05,
+        clv_t_stat=5.0,
+    )
+    assert result["stage"] == "BLOCKED_MATH"
+    assert result["math_attestation"]["math_valid"] is False
