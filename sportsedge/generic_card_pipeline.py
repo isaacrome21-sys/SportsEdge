@@ -1,12 +1,4 @@
-"""Fail-closed card pipeline for the expanded MLB market surface.
-
-This pipeline is deliberately separate from the frozen HITS/TOTAL_BASES/PITCHER_BB
-pipelines. It binds a pregame feature row to a canonical quote, applies lineup or
-probable-pitcher identity where relevant, dispatches to the registered runtime
-engine, and preserves deployment/Truth Gate controls. Predeployment markets may
-produce a SHADOW_BET recommendation but can never be labeled OFFICIAL_BET until
-normal deployment and frozen edge-floor requirements are satisfied.
-"""
+"""Fail-closed card pipeline for the expanded MLB market surface."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -15,6 +7,7 @@ from math import isfinite
 from typing import Any, Mapping
 
 from .deployments import load_registry
+from .devig import multiplicative_devig, validate_pair
 from .engine_registry import engine_registry
 from .generic_market_engine import BINARY_MARKETS, COUNT_MARKETS, GAME_MARKETS
 from .live_slate import LiveGame
@@ -157,18 +150,43 @@ def _model_input(*, game: LiveGame, quote: Mapping[str, Any], feature: Mapping[s
     return out
 
 
-def _shadow(model_p: float | None, odds: Any) -> tuple[str | None, float | None, float | None, float | None]:
+def _validated_quotes(quotes: list[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    out = []
+    for raw in quotes:
+        try:
+            out.append(validate_canonical_quote(raw))
+        except Exception:
+            continue
+    return out
+
+
+def _paired_quote(candidate: Mapping[str, Any], quotes: list[Mapping[str, Any]]) -> Mapping[str, Any]:
+    matches = []
+    for quote in quotes:
+        if quote is candidate or dict(quote) == dict(candidate):
+            continue
+        try:
+            validate_pair(candidate, quote)
+            matches.append(quote)
+        except Exception:
+            continue
+    if len(matches) != 1:
+        raise ValueError(f"PAIRED_PRICE_REQUIRED_FOR_DEVIG: found={len(matches)}")
+    return matches[0]
+
+
+def _shadow(model_p: float | None, quote: Mapping[str, Any], opposite: Mapping[str, Any]) -> tuple[str | None, float | None, float | None, float | None]:
     if model_p is None:
         return None, None, None, None
     try:
-        dec = american_to_decimal(odds)
-        implied = 1.0 / dec
+        fair = multiplicative_devig(quote, opposite).candidate_fair_probability
+        dec = american_to_decimal(quote["american_odds"])
         p = float(model_p)
         if not isfinite(p) or not 0 <= p <= 1:
             raise ValueError("invalid Model_P")
-        edge = p - implied
+        edge = p - fair
         ev = p * (dec - 1.0) - (1.0 - p)
-        return ("SHADOW_BET" if edge > 0 and ev > 0 else "SHADOW_PASS", implied, edge, ev)
+        return ("SHADOW_BET" if edge > 0 and ev > 0 else "SHADOW_PASS", fair, edge, ev)
     except Exception:
         return None, None, None, None
 
@@ -188,6 +206,7 @@ def run_generic_card(
     features = _feature_index(feature_rows)
     deployments = load_registry(registry_path)["markets"]
     engines = engine_registry()
+    valid_quotes = _validated_quotes(quotes)
     results: list[GenericCardResult] = []
 
     for raw in quotes:
@@ -196,6 +215,7 @@ def run_generic_card(
             market = str(quote["market"])
             if market not in GENERIC_MARKETS:
                 raise ValueError(f"unsupported generic market: {market}")
+            opposite = _paired_quote(quote, valid_quotes)
             game = games_by_id.get(str(quote["game_id"]))
             if game is None:
                 raise ValueError("MLB_GAME_ID_NOT_FOUND")
@@ -209,21 +229,16 @@ def run_generic_card(
             if engine is None or deployment is None:
                 raise ValueError("market missing engine/deployment registration")
 
-            # Run the model independently of promotion. This is the predeployment
-            # recommendation lane: it may surface SHADOW_BET/SHADOW_PASS but cannot
-            # mutate deployment state or bypass Truth Gate.
             shadow_output = dict(engine(model_input))
             if "model_p" not in shadow_output:
                 raise ValueError("engine output missing model_p")
             model_p = float(shadow_output["model_p"])
-            shadow_status, implied, edge, ev = _shadow(model_p, quote["american_odds"])
+            shadow_status, implied, edge, ev = _shadow(model_p, quote, opposite)
 
-            # Production lane remains exactly fail-closed. Missing evidence floors or
-            # non-deployed status therefore stays BLOCKED/OFFICIAL according to the
-            # existing orchestrator contract.
             run = run_candidate(
                 model_input=model_input,
                 quote=quote,
+                paired_quote=opposite,
                 deployment=deployment,
                 engine_fn=engine,
                 ingestion_now=ingestion_now,
