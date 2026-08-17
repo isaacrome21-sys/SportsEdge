@@ -33,6 +33,28 @@ def failed_gate_names(report: dict[str, Any]) -> list[str]:
     return sorted(out)
 
 
+def settlement_state(root: Path) -> dict[str, dict[str, Any]]:
+    p=root/"SETTLEMENT"/"latest"/"report.json"
+    if not p.is_file(): return {}
+    r=load(p)
+    invariants=r.get("invariants") or {}
+    valid=(
+        r.get("state")=="SETTLEMENT_SEMANTICS_PASS"
+        and r.get("sportsbook_data_used") is False
+        and r.get("source")=="MLB_STATSAPI_BOX_SCORE_AND_LIVE_FEED"
+        and bool(r.get("facts_sha256"))
+        and bool(invariants)
+        and all(v is True for v in invariants.values())
+    )
+    if not valid: return {}
+    out={}
+    for market in r.get("proven_markets") or []:
+        out[str(market)]={"settlement_semantics":status("PASS",evidence=str(p),game_pk=r.get("game_pk"),facts_sha256=r.get("facts_sha256"))}
+    for market in r.get("excluded_markets") or []:
+        out[str(market)]={"settlement_semantics":status("PENDING",evidence=str(p),reason="SPECIAL_SETTLEMENT_SEMANTICS_NOT_YET_PROVEN")}
+    return out
+
+
 def bb_state(root: Path) -> dict[str, Any] | None:
     p=root/"PITCHER_BB"/"latest"/"bb_v6_forward_shadow_report.json"
     s=root/"PITCHER_BB"/"latest"/"bb_v6_settlements.json"
@@ -86,6 +108,10 @@ def main() -> int:
         raise SystemExit("VALIDATION_GATE_CONTRACT_MISMATCH")
     root=Path(args.data_root)
     derived={m:{g:status("PENDING") for g in REQUIRED_GATES} for m in sorted(markets)}
+
+    generic_settlement=settlement_state(root)
+    for m,evidence in generic_settlement.items():
+        if m in derived: derived[m].update(evidence)
 
     bb=bb_state(root)
     if bb and "PITCHER_BB" in derived:
