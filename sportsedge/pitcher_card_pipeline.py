@@ -5,6 +5,7 @@ from dataclasses import dataclass, asdict
 from datetime import datetime
 from typing import Any, Mapping
 
+from .devig import DevigError, find_paired_quote
 from .edge_floors import DEFAULT_EDGE_FLOOR_CONFIG
 from .engine_registry import engine_registry
 from .game_state import require_mlb_pregame
@@ -33,6 +34,23 @@ def _identity(quote: Mapping[str, Any]) -> tuple[str, str, str, Any, str]:
     return q["game_id"], q["market"], q["entity_id"], q["line"], q["side"]
 
 
+def _valid_quotes(quotes: list[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    out = []
+    for raw in quotes:
+        try:
+            out.append(validate_canonical_quote(raw))
+        except Exception:
+            continue
+    return out
+
+
+def _optional_pair(quote: Mapping[str, Any], quotes: list[Mapping[str, Any]]) -> Mapping[str, Any] | None:
+    try:
+        return find_paired_quote(quote, quotes)
+    except DevigError:
+        return None
+
+
 def run_pitcher_bb_card(*, games: list[LiveGame], feature_rows: list[Mapping[str, Any]], quotes: list[Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, registry_path: str = "config/deployments.json", edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG, kelly_multiplier: float = 0.25) -> list[PitcherCardResult]:
     game_map = {str(g.game_pk): g for g in games}
     if len(game_map) != len(games):
@@ -52,6 +70,7 @@ def run_pitcher_bb_card(*, games: list[LiveGame], feature_rows: list[Mapping[str
     deployments = runtime_deployments(registry_path)
     engine = engine_registry().get("PITCHER_BB")
     deployment = deployments.get("PITCHER_BB")
+    valid_quotes = _valid_quotes(quotes)
     out: list[PitcherCardResult] = []
     seen: set[tuple[str, str, str, str, str, str, bool]] = set()
     for raw_quote in quotes:
@@ -75,7 +94,12 @@ def run_pitcher_bb_card(*, games: list[LiveGame], feature_rows: list[Mapping[str
             if engine is None or deployment is None:
                 raise LiveSlateError("pitcher BB engine/deployment registration missing")
             candidate = assemble_pitcher_bb_candidate(game=game, feature_row=feature, quote=quote)
-            rr = run_candidate(model_input=candidate["model_input"], quote=candidate["quote"], deployment=deployment, engine_fn=engine, ingestion_now=ingestion_now, finalization_now=finalization_now, edge_floor_config_path=edge_floor_config_path, kelly_multiplier=kelly_multiplier)
+            rr = run_candidate(
+                model_input=candidate["model_input"], quote=candidate["quote"],
+                paired_quote=_optional_pair(quote, valid_quotes), deployment=deployment,
+                engine_fn=engine, ingestion_now=ingestion_now, finalization_now=finalization_now,
+                edge_floor_config_path=edge_floor_config_path, kelly_multiplier=kelly_multiplier,
+            )
             out.append(PitcherCardResult(game_id, market, entity_id, line, side, odds, rr.model_p, rr.bet_status, rr.reason))
         except Exception as exc:
             try:
