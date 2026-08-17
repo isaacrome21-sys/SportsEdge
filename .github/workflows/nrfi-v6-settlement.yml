@@ -2,6 +2,11 @@ name: nrfi-v6-cumulative-settlement
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/nrfi-v6-settlement.yml'
+      - 'scripts/score_nrfi_v6_forward_shadow.py'
+      - 'scripts/score_nrfi_v6_forward_shadow_v2.py'
   pull_request:
     paths:
       - '.github/workflows/nrfi-v6-settlement.yml'
