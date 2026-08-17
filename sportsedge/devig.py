@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import isfinite
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping
 
 from .truth_gate import american_to_decimal
 
@@ -54,7 +54,10 @@ def _line_key(quote: Mapping[str, Any]) -> float:
 
 def _complementary_sides(a: str, b: str) -> bool:
     pair = {a.upper(), b.upper()}
-    return pair in ({"OVER", "UNDER"}, {"HOME", "AWAY"}, {"HOME_ML", "AWAY_ML"}, {"HOME_RL", "AWAY_RL"}, {"YES", "NO"})
+    return pair in (
+        {"OVER", "UNDER"}, {"HOME", "AWAY"}, {"HOME_ML", "AWAY_ML"},
+        {"HOME_RL", "AWAY_RL"}, {"YES", "NO"},
+    )
 
 
 def validate_pair(candidate: Mapping[str, Any], opposite: Mapping[str, Any]) -> None:
@@ -64,6 +67,21 @@ def validate_pair(candidate: Mapping[str, Any], opposite: Mapping[str, Any]) -> 
         raise DevigError("paired quote line mismatch")
     if not _complementary_sides(str(candidate.get("side", "")), str(opposite.get("side", ""))):
         raise DevigError("paired quote sides are not complementary")
+
+
+def find_paired_quote(candidate: Mapping[str, Any], quotes: Iterable[Mapping[str, Any]]) -> Mapping[str, Any]:
+    matches: list[Mapping[str, Any]] = []
+    for quote in quotes:
+        if quote is candidate or dict(quote) == dict(candidate):
+            continue
+        try:
+            validate_pair(candidate, quote)
+        except DevigError:
+            continue
+        matches.append(quote)
+    if len(matches) != 1:
+        raise DevigError(f"PAIRED_PRICE_REQUIRED_FOR_DEVIG: found={len(matches)}")
+    return matches[0]
 
 
 def multiplicative_devig(candidate: Mapping[str, Any], opposite: Mapping[str, Any]) -> DevigResult:
