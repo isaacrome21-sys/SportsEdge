@@ -1,4 +1,4 @@
-"""NFL implementation shell for the shared football SportAdapter."""
+"""NFL adapter for the shared football SportAdapter."""
 
 from __future__ import annotations
 
@@ -8,11 +8,18 @@ from typing import Any
 class NFLAdapter:
     sport = "nfl"
 
+    def __init__(self, history_ingestor: Any | None = None) -> None:
+        self.history_ingestor = history_ingestor
+
     def load_schedule(self, seasons: list[int]) -> Any:
-        raise NotImplementedError("NFL schedule loading is implemented in roadmap task 3")
+        if self.history_ingestor is None:
+            raise NotImplementedError("NFL history ingestor is not configured")
+        return self.history_ingestor.load(seasons)
 
     def load_lines_history(self, seasons: list[int]) -> Any:
-        raise NotImplementedError("NFL lines history is implemented in roadmap task 3")
+        if self.history_ingestor is None:
+            raise NotImplementedError("NFL history ingestor is not configured")
+        return self.history_ingestor.load(seasons)
 
     def build_features(self, asof_ts: Any, games: Any) -> Any:
         raise NotImplementedError("NFL M2 features are implemented in roadmap task 13")
