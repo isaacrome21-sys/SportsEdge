@@ -12,8 +12,8 @@
     "plate_umpire": {"max_age_seconds": 43200, "freshness_clock": "last_verified_at", "absence_policy": "ALLOW_EXPLICIT_ABSENT_NOT_YET_POSTED_WITH_UNCERTAINTY_PENALTY", "stale_policy": "BLOCK_UMPIRE_DEPENDENT_MARKETS", "provider_tier": "PRIMARY_GAME_CONTEXT"},
     "starting_catcher": {"max_age_seconds": 43200, "freshness_clock": "last_verified_at", "absence_policy": "ALLOW_EXPLICIT_ABSENT_NOT_YET_POSTED_WITH_UNCERTAINTY_PENALTY", "stale_policy": "BLOCK_CATCHER_DEPENDENT_MARKETS", "provider_tier": "PRIMARY_GAME_CONTEXT"},
     "probable_starter": {"max_age_seconds": 1800, "freshness_clock": "last_verified_at", "absence_policy": "BLOCK_STARTER_DEPENDENT_MARKETS", "stale_policy": "BLOCK_STARTER_DEPENDENT_MARKETS", "provider_tier": "PRIMARY_GAME_CONTEXT"},
-    "statcast_batter_30d": {"max_age_seconds": 172800, "freshness_clock": "retrieved_at", "absence_policy": "BLOCK_STATCAST_DEPENDENT_HITTER_MARKETS", "stale_policy": "BLOCK_STATCAST_DEPENDENT_HITTER_MARKETS", "provider_tier": "PRIMARY_STATS"},
-    "statcast_pitcher_30d": {"max_age_seconds": 172800, "freshness_clock": "retrieved_at", "absence_policy": "BLOCK_STATCAST_DEPENDENT_PITCHER_MARKETS", "stale_policy": "BLOCK_STATCAST_DEPENDENT_PITCHER_MARKETS", "provider_tier": "PRIMARY_STATS"},
+    "statcast_batter_30d": {"max_age_seconds": 129600, "freshness_clock": "retrieved_at", "absence_policy": "BLOCK_STATCAST_DEPENDENT_HITTER_MARKETS", "stale_policy": "BLOCK_STATCAST_DEPENDENT_HITTER_MARKETS", "provider_tier": "PRIMARY_STATS"},
+    "statcast_pitcher_30d": {"max_age_seconds": 129600, "freshness_clock": "retrieved_at", "absence_policy": "BLOCK_STATCAST_DEPENDENT_PITCHER_MARKETS", "stale_policy": "BLOCK_STATCAST_DEPENDENT_PITCHER_MARKETS", "provider_tier": "PRIMARY_STATS"},
     "park_factor_frozen": {"max_age_seconds": null, "freshness_clock": "artifact_hash", "absence_policy": "BLOCK_PARK_DEPENDENT_MARKETS", "stale_policy": "NOT_APPLICABLE_IMMUTABLE_HASH_VERIFIED_ARTIFACT", "provider_tier": "VALIDATED_STATIC_ARTIFACT"}
   },
   "collector_promotion": {
