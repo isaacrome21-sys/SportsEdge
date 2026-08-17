@@ -75,8 +75,27 @@ def write_registry(path):
 
 def write_floors(path):
     path.write_text(json.dumps({
-        "schema_version": 1,
-        "markets": {"TOTALS": {"value_probability_points": 0.01}},
+        "truth_gate": {
+            "schema_version": 1,
+            "production": {
+                "fail_closed": True,
+                "allow_cli_floor_override": False,
+                "require_frozen_floor_for_eligible_market": True,
+            },
+            "edge_floors": {
+                "TOTALS": {
+                    "status": "FROZEN",
+                    "value_probability_points": 0.01,
+                    "method_version": "fixture-ci-v1",
+                    "evidence": {
+                        "evidence_sha256": "fixture-evidence-sha256",
+                        "derivation_code_sha256": "fixture-derivation-sha256",
+                        "oos_cutoff_utc": "2026-08-09T00:00:00Z",
+                    },
+                    "frozen": {"frozen_by_commit": "fixture-ci"},
+                }
+            },
+        }
     }))
 
 
