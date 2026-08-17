@@ -11,7 +11,7 @@ on:
     - cron: '17 * * * *'
 
 permissions:
-  contents: read
+  contents: write
   actions: read
 
 concurrency:
@@ -30,6 +30,8 @@ jobs:
       SPORTSEDGE_NRFI_V6_SCORE_OUT: artifacts/forward-shadow-state/scored
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -59,16 +61,11 @@ jobs:
           while read -r artifact_id; do
             test -n "$artifact_id" || continue
             dest="$SPORTSEDGE_NRFI_V6_INPUT/artifact-${artifact_id}"
-            if test -f "$dest/.complete"; then
-              continue
-            fi
-            rm -rf "$dest"
-            mkdir -p "$dest"
+            if test -f "$dest/.complete"; then continue; fi
+            rm -rf "$dest"; mkdir -p "$dest"
             zip="/tmp/nrfi-${artifact_id}.zip"
             if gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" > "$zip"; then
-              unzip -q "$zip" -d "$dest"
-              touch "$dest/.complete"
-              new=$((new+1))
+              unzip -q "$zip" -d "$dest"; touch "$dest/.complete"; new=$((new+1))
             else
               rm -rf "$dest"
             fi
@@ -95,6 +92,35 @@ jobs:
           assert all(x.get('source')=='MLB_STATSAPI_LIVE_FEED_LINESCORE_V2' for x in settlements)
           print('NRFI_V6_SETTLEMENT_REPORT_PASS', d['state'], d['settled_unique_games'])
           PY
+
+      - name: Persist immutable NRFI YRFI validation evidence to data branch
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data
+          git worktree add --detach .data-branch FETCH_HEAD
+          RUN_DIR=".data-branch/runtime/model-validation/NRFI_YRFI/runs/${GITHUB_RUN_ID}"
+          LATEST_DIR=".data-branch/runtime/model-validation/NRFI_YRFI/latest"
+          mkdir -p "$RUN_DIR" "$LATEST_DIR"
+          cp -R "$SPORTSEDGE_NRFI_V6_SCORE_OUT"/. "$RUN_DIR"/ 2>/dev/null || true
+          rm -rf "$LATEST_DIR"/*
+          cp -R "$SPORTSEDGE_NRFI_V6_SCORE_OUT"/. "$LATEST_DIR"/ 2>/dev/null || true
+          printf '%s\n' "$GITHUB_RUN_ID" > .data-branch/runtime/model-validation/NRFI_YRFI/latest_run_id.txt
+          cd .data-branch
+          git config user.name sportsedge-data-bot
+          git config user.email sportsedge-data-bot@users.noreply.github.com
+          git add runtime/model-validation/NRFI_YRFI
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "validation: persist NRFI YRFI run ${GITHUB_RUN_ID}"
+          pushed=0
+          for attempt in 1 2 3 4 5; do
+            git fetch origin data
+            git rebase origin/data || { git rebase --abort || true; sleep $((attempt * 2)); continue; }
+            if git push origin HEAD:data; then pushed=1; break; fi
+            sleep $((attempt * 2))
+          done
+          test "$pushed" -eq 1
 
       - name: Upload cumulative scored evidence
         if: always()
