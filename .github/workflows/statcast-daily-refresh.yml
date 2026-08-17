@@ -63,7 +63,7 @@ jobs:
             exit 0
           fi
           set +e
-          python scripts/refresh_statcast_daily.py --days 30 --output-dir artifacts/statcast
+          PYTHONPATH=. python scripts/refresh_statcast_daily.py --days 30 --output-dir artifacts/statcast
           code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           exit 0
