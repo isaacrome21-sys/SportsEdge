@@ -1,0 +1,78 @@
+name: mlb-settlement-semantics
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/probe_mlb_settlement_semantics.py'
+      - '.github/workflows/mlb-settlement-semantics.yml'
+  schedule:
+    - cron: '23 10 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mlb-settlement-semantics
+  cancel-in-progress: true
+
+jobs:
+  prove:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.13'
+      - name: Derive canonical official settlement facts
+        run: python scripts/probe_mlb_settlement_semantics.py
+      - name: Verify fail-closed settlement report
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('artifacts/mlb-settlement-semantics/report.json').read_text())
+          assert d['state']=='SETTLEMENT_SEMANTICS_PASS'
+          assert d['sportsbook_data_used'] is False
+          assert d['source']=='MLB_STATSAPI_BOX_SCORE_AND_LIVE_FEED'
+          assert 'FIRST_HOME_RUN' not in d['proven_markets']
+          assert 'PITCHER_RECORD_WIN' not in d['proven_markets']
+          assert len(d['proven_markets']) >= 20
+          print('MLB_SETTLEMENT_SEMANTICS_PASS', len(d['proven_markets']), d['facts_sha256'])
+          PY
+      - name: Persist immutable settlement evidence to data branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data
+          git worktree add --detach .data-branch FETCH_HEAD
+          RUN_DIR=".data-branch/runtime/model-validation/SETTLEMENT/runs/${GITHUB_RUN_ID}"
+          LATEST_DIR=".data-branch/runtime/model-validation/SETTLEMENT/latest"
+          mkdir -p "$RUN_DIR" "$LATEST_DIR"
+          cp artifacts/mlb-settlement-semantics/report.json "$RUN_DIR/report.json"
+          cp artifacts/mlb-settlement-semantics/report.json "$LATEST_DIR/report.json"
+          printf '%s\n' "$GITHUB_RUN_ID" > .data-branch/runtime/model-validation/SETTLEMENT/latest_run_id.txt
+          cd .data-branch
+          git config user.name sportsedge-data-bot
+          git config user.email sportsedge-data-bot@users.noreply.github.com
+          git add runtime/model-validation/SETTLEMENT
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "validation: persist settlement semantics ${GITHUB_RUN_ID}"
+          pushed=0
+          for attempt in 1 2 3 4 5; do
+            git fetch origin data
+            git rebase origin/data || { git rebase --abort || true; sleep $((attempt * 2)); continue; }
+            if git push origin HEAD:data; then pushed=1; break; fi
+            sleep $((attempt * 2))
+          done
+          test "$pushed" -eq 1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mlb-settlement-semantics-${{ github.run_id }}
+          path: artifacts/mlb-settlement-semantics/report.json
+          if-no-files-found: error
+          retention-days: 90
