@@ -1,0 +1,40 @@
+name: football-nfl-real-history-audit
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 11 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run real NFL history audit
+        run: python scripts/audit_nfl_real_history.py
+      - name: Assert report is real and multi-season
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('artifacts/football/nfl_real_history_audit.json')
+          r = json.loads(p.read_text())
+          assert r['provenance'] == 'REAL_PUBLIC_HISTORY'
+          assert len(r['source_sha256']) == 64
+          assert len(r['seasons']) >= 2
+          assert r['row_count'] > 1000
+          assert '3' in r['margin_pmf'] and '7' in r['margin_pmf']
+          print(json.dumps(r, indent=2, sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nfl-real-history-audit
+          path: artifacts/football/nfl_real_history_audit.json
+          retention-days: 90
