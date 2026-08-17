@@ -9,6 +9,7 @@ on:
     paths:
       - 'sportsedge/mlb_game_context_source.py'
       - 'scripts/refresh_mlb_game_context.py'
+      - 'config/mlb_source_freshness_contract.json'
       - '.github/workflows/mlb-game-context-refresh.yml'
 
 permissions:
@@ -16,7 +17,7 @@ permissions:
 
 concurrency:
   group: mlb-game-context-refresh
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   refresh:
@@ -29,20 +30,25 @@ jobs:
           python-version: '3.12.13'
       - name: Refresh weather lineups umpire catcher context
         run: python scripts/refresh_mlb_game_context.py
-      - name: Persist context to data branch
+      - name: Persist immutable context evidence to data branch
         if: always()
         shell: bash
         run: |
           set -euo pipefail
           git fetch --depth=1 origin data:data
           git worktree add .data-branch data
-          mkdir -p .data-branch/runtime/mlb-context
-          cp -R artifacts/mlb-context/. .data-branch/runtime/mlb-context/ 2>/dev/null || true
+          RUN_DIR=".data-branch/runtime/mlb-context/runs/${GITHUB_RUN_ID}"
+          LATEST_DIR=".data-branch/runtime/mlb-context/latest"
+          mkdir -p "$RUN_DIR" "$LATEST_DIR"
+          cp -R artifacts/mlb-context/. "$RUN_DIR"/ 2>/dev/null || true
+          rm -rf "$LATEST_DIR"/*
+          cp -R artifacts/mlb-context/. "$LATEST_DIR"/ 2>/dev/null || true
+          printf '%s\n' "${GITHUB_RUN_ID}" > .data-branch/runtime/mlb-context/latest_run_id.txt
           cd .data-branch
           git config user.name sportsedge-data-bot
           git config user.email sportsedge-data-bot@users.noreply.github.com
           git add runtime/mlb-context
           if ! git diff --cached --quiet; then
-            git commit -m "mlb-context: refresh ${{ github.run_id }}"
+            git commit -m "mlb-context: durable run ${GITHUB_RUN_ID}"
             git push origin HEAD:data
           fi
