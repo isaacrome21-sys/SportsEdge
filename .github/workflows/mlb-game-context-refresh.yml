@@ -8,6 +8,7 @@ on:
   push:
     paths:
       - 'sportsedge/mlb_game_context_source.py'
+      - 'sportsedge/source_lineage.py'
       - 'scripts/refresh_mlb_game_context.py'
       - 'scripts/run_mlb_context_diagnostic.sh'
       - 'config/mlb_source_freshness_contract.json'
