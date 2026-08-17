@@ -4,19 +4,31 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from sportsedge.mlb_game_context_source import fetch_game_context
 from sportsedge.mlb_source import fetch_schedule
 
+CHICAGO_TZ = ZoneInfo("America/Chicago")
+
 
 def main() -> int:
     now = datetime.now(timezone.utc)
-    slate_date = now.date().isoformat()
-    schedule = fetch_schedule(slate_date, now=now)
+    slate_date = now.astimezone(CHICAGO_TZ).date().isoformat()
     out = Path("artifacts/mlb-context") / slate_date
     out.mkdir(parents=True, exist_ok=True)
+    summary = {"retrieved_at": now.isoformat(), "slate_date_ct": slate_date, "games": 0, "weather": 0, "lineups": 0, "umpires": 0, "catchers": 0, "failures": []}
 
-    summary = {"retrieved_at": now.isoformat(), "games": 0, "weather": 0, "lineups": 0, "umpires": 0, "catchers": 0, "failures": []}
+    try:
+        schedule = fetch_schedule(slate_date, now=now)
+    except Exception as exc:
+        summary["status"] = "ERROR"
+        summary["failures"].append({"stage": "SCHEDULE", "reason": f"{type(exc).__name__}:{exc}"})
+        (out / "manifest.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return 3
+
+    summary["games_scheduled"] = len(schedule)
     for game in schedule:
         try:
             snap = fetch_game_context(game.game_pk, now=now)
@@ -36,7 +48,7 @@ def main() -> int:
             summary["umpires"] += int(bool(snap.umpire.get("home_plate_umpire_id")))
             summary["catchers"] += len(snap.catchers)
         except Exception as exc:
-            summary["failures"].append({"game_id": str(game.game_pk), "reason": f"{type(exc).__name__}:{exc}"})
+            summary["failures"].append({"stage": "GAME_CONTEXT", "game_id": str(game.game_pk), "reason": f"{type(exc).__name__}:{exc}"})
 
     summary["status"] = "PASS" if summary["games"] > 0 else "INCOMPLETE"
     (out / "manifest.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
