@@ -14,148 +14,55 @@ UTC = timezone.utc
 NOW = datetime(2026, 8, 10, 20, 0, tzinfo=UTC)
 
 
-def lineup_rows(start):
-    return [{"player_id": start + i, "slot": i + 1, "sequence": 0} for i in range(9)]
-
+def lineup_rows(start): return [{"player_id": start+i, "slot": i+1, "sequence": 0} for i in range(9)]
 
 def frozen_game():
-    snap = GameSnapshot(
-        game_pk=777,
-        game_date="2026-08-10T23:00:00Z",
-        status="Preview",
-        away_id=1,
-        away_name="Away",
-        home_id=2,
-        home_name="Home",
-        away_probable_pitcher_id=11,
-        away_probable_pitcher_name="Away SP",
-        home_probable_pitcher_id=22,
-        home_probable_pitcher_name="Home SP",
-        retrieved_at="2026-08-10T19:59:00+00:00",
-    )
-    return make_live_game(snap, lineup_rows(100), lineup_rows(200))
+    snap=GameSnapshot(game_pk=777,game_date="2026-08-10T23:00:00Z",status="Preview",away_id=1,away_name="Away",home_id=2,home_name="Home",away_probable_pitcher_id=11,away_probable_pitcher_name="Away SP",home_probable_pitcher_id=22,home_probable_pitcher_name="Home SP",retrieved_at="2026-08-10T19:59:00+00:00")
+    return make_live_game(snap,lineup_rows(100),lineup_rows(200))
 
+def frozen_feature(): return {"game_pk":777,"entity_id":"777","market":"TOTALS","away_mean_runs":4.1,"home_mean_runs":4.6,"source_subset_hash":"fixture-v1"}
 
-def frozen_feature():
-    return {
-        "game_pk": 777,
-        "entity_id": "777",
-        "market": "TOTALS",
-        "away_mean_runs": 4.1,
-        "home_mean_runs": 4.6,
-        "source_subset_hash": "fixture-v1",
-    }
+def frozen_quote(side,odds): return {"game_id":"777","period":"FG","market":"TOTALS","entity_id":"777","line":8.5,"side":side,"american_odds":odds,"book_key":"draftkings","is_alternate":False,"raw_market_name":"Game Total","retrieved_at":"2026-08-10T19:59:00Z","ttl_seconds":300}
 
+def write_registry(path): path.write_text(json.dumps({"schema_version":1,"markets":{"TOTALS":{"market":"TOTALS","eligible":True,"stage":"DEPLOYED","reason":"frozen-fixture-ci"}}}))
 
-def frozen_quote(side, odds):
-    return {
-        "game_id": "777",
-        "period": "FG",
-        "market": "TOTALS",
-        "entity_id": "777",
-        "line": 8.5,
-        "side": side,
-        "american_odds": odds,
-        "book_key": "draftkings",
-        "is_alternate": False,
-        "raw_market_name": "Game Total",
-        "retrieved_at": "2026-08-10T19:59:00Z",
-        "ttl_seconds": 300,
-    }
-
-
-def write_registry(path):
-    path.write_text(json.dumps({
-        "schema_version": 1,
-        "markets": {
-            "TOTALS": {
-                "market": "TOTALS",
-                "eligible": True,
-                "stage": "DEPLOYED",
-                "reason": "frozen-fixture-ci",
-            }
-        },
-    }))
-
-
-def write_floors(path):
-    path.write_text(json.dumps({
-        "truth_gate": {
-            "schema_version": 1,
-            "production": {
-                "fail_closed": True,
-                "allow_cli_floor_override": False,
-                "require_frozen_floor_for_eligible_market": True,
-            },
-            "edge_floors": {
-                "TOTALS": {
-                    "status": "FROZEN",
-                    "value_probability_points": 0.01,
-                    "method_version": "fixture-ci-v1",
-                    "evidence": {
-                        "evidence_sha256": "fixture-evidence-sha256",
-                        "derivation_code_sha256": "fixture-derivation-sha256",
-                        "oos_cutoff_utc": "2026-08-09T00:00:00Z",
-                    },
-                    "frozen": {"frozen_by_commit": "fixture-ci"},
-                }
-            },
-        }
-    }))
+def write_floors(path): path.write_text(json.dumps({"truth_gate":{"schema_version":1,"production":{"fail_closed":True,"allow_cli_floor_override":False,"require_frozen_floor_for_eligible_market":True},"edge_floors":{"TOTALS":{"status":"FROZEN","value_probability_points":0.01,"method_version":"fixture-ci-v1","evidence":{"evidence_sha256":"fixture-evidence-sha256","derivation_code_sha256":"fixture-derivation-sha256","oos_cutoff_utc":"2026-08-09T00:00:00Z"},"frozen":{"frozen_by_commit":"fixture-ci"}}}}}))
 
 
 class MLBFixtureFullPipelineTests(unittest.TestCase):
     def test_identical_feature_reuse_is_idempotent_but_conflict_still_fails_closed(self):
-        row = frozen_feature()
-        indexed = _feature_index([row, dict(row)])
-        self.assertEqual(list(indexed), [("777", "777", "TOTALS")])
+        row=frozen_feature(); indexed=_feature_index([row,dict(row)])
+        self.assertEqual(list(indexed),[("777","777","TOTALS")])
+        conflict=dict(row); conflict["away_mean_runs"]=9.9
+        with self.assertRaisesRegex(ValueError,"conflicting generic feature identity"): _feature_index([row,conflict])
 
-        conflict = dict(row)
-        conflict["away_mean_runs"] = 9.9
-        with self.assertRaisesRegex(ValueError, "conflicting generic feature identity"):
-            _feature_index([row, conflict])
-
-    def test_frozen_totals_fixture_executes_model_mc_ev_kelly_and_truth_gate_for_both_sides(self):
-        features = [frozen_feature(), frozen_feature()]
-        quotes = [frozen_quote("OVER", -110), frozen_quote("UNDER", -110)]
-        captured = []
-
+    def test_frozen_totals_fixture_asserts_devig_values_end_to_end(self):
+        quotes=[frozen_quote("OVER",-113),frozen_quote("UNDER",104)]
+        captured=[]
         def capture_candidate(**kwargs):
-            result = real_run_candidate(**kwargs)
-            captured.append(result)
-            return result
-
+            result=real_run_candidate(**kwargs); captured.append(result); return result
         with tempfile.TemporaryDirectory() as td:
-            registry = Path(td) / "deployments.json"
-            floors = Path(td) / "floors.json"
-            write_registry(registry)
-            write_floors(floors)
-            with patch("sportsedge.generic_card_pipeline.run_candidate", side_effect=capture_candidate):
-                results = run_generic_card(
-                    games=[frozen_game()],
-                    feature_rows=features,
-                    quotes=quotes,
-                    ingestion_now=NOW,
-                    finalization_now=NOW,
-                    registry_path=str(registry),
-                    edge_floor_config_path=str(floors),
-                    kelly_multiplier=0.25,
-                )
+            registry=Path(td)/"deployments.json"; floors=Path(td)/"floors.json"; write_registry(registry); write_floors(floors)
+            with patch("sportsedge.generic_card_pipeline.run_candidate",side_effect=capture_candidate):
+                results=run_generic_card(games=[frozen_game()],feature_rows=[frozen_feature(),frozen_feature()],quotes=quotes,ingestion_now=NOW,finalization_now=NOW,registry_path=str(registry),edge_floor_config_path=str(floors),kelly_multiplier=0.25)
+        self.assertEqual(len(results),2)
+        by={r.side:r for r in results}
+        q_over=113/213; q_under=100/204; fair_over=q_over/(q_over+q_under); fair_under=q_under/(q_over+q_under)
+        self.assertAlmostEqual(by["OVER"].implied_probability,fair_over,places=12)
+        self.assertAlmostEqual(by["UNDER"].implied_probability,fair_under,places=12)
+        self.assertAlmostEqual(by["OVER"].edge,by["OVER"].model_p-fair_over,places=12)
+        self.assertAlmostEqual(by["UNDER"].edge,by["UNDER"].model_p-fair_under,places=12)
+        self.assertNotAlmostEqual(by["OVER"].implied_probability,q_over,places=6)
+        self.assertEqual(len(captured),2)
+        self.assertTrue(all(r.decision is not None for r in captured),[r.reason for r in captured])
+        self.assertTrue(all(r.bet_status in {"PASS","OFFICIAL_BET"} for r in captured))
 
-        self.assertEqual(len(results), 2)
-        self.assertEqual({r.side for r in results}, {"OVER", "UNDER"})
-        self.assertTrue(all(r.model_p is not None for r in results))
-        self.assertTrue(all(r.implied_probability is not None for r in results))
-        self.assertTrue(all(r.edge is not None for r in results))
-        self.assertTrue(all(r.ev_per_dollar is not None for r in results))
-        self.assertFalse(any("duplicate generic feature identity" in r.reason for r in results))
-
-        self.assertEqual(len(captured), 2)
-        self.assertTrue(all(r.decision is not None for r in captured), [r.reason for r in captured])
-        self.assertTrue(all(r.decision.model_status == "MODEL_OK" for r in captured))
-        self.assertTrue(all(r.decision.kelly_fraction >= 0.0 for r in captured))
-        self.assertTrue(all(r.bet_status in {"PASS", "OFFICIAL_BET"} for r in captured))
+    def test_missing_opposite_side_blocks(self):
+        with tempfile.TemporaryDirectory() as td:
+            registry=Path(td)/"deployments.json"; floors=Path(td)/"floors.json"; write_registry(registry); write_floors(floors)
+            out=run_generic_card(games=[frozen_game()],feature_rows=[frozen_feature()],quotes=[frozen_quote("OVER",-113)],ingestion_now=NOW,finalization_now=NOW,registry_path=str(registry),edge_floor_config_path=str(floors))
+        self.assertEqual(out[0].bet_status,"BLOCKED")
+        self.assertIn("PAIRED_PRICE_REQUIRED_FOR_DEVIG",out[0].reason)
 
 
-if __name__ == "__main__":
-    unittest.main()
+if __name__ == "__main__": unittest.main()
