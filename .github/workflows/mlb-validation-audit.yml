@@ -1,0 +1,68 @@
+name: mlb-validation-audit
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/audit_mlb_validation_state.py'
+      - 'config/mlb_validation_evidence.json'
+      - '.github/workflows/mlb-validation-audit.yml'
+  schedule:
+    - cron: '49 * * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mlb-validation-audit
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.13'
+      - name: Prepare durable data worktree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data
+          git worktree add --detach .data-branch FETCH_HEAD
+      - name: Derive validation state from durable evidence
+        run: python scripts/audit_mlb_validation_state.py
+      - name: Persist immutable validation audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN_DIR=".data-branch/runtime/model-validation/SUMMARY/runs/${GITHUB_RUN_ID}"
+          LATEST_DIR=".data-branch/runtime/model-validation/SUMMARY/latest"
+          mkdir -p "$RUN_DIR" "$LATEST_DIR"
+          cp artifacts/mlb-validation/derived_status.json "$RUN_DIR/derived_status.json"
+          cp artifacts/mlb-validation/derived_status.json "$LATEST_DIR/derived_status.json"
+          printf '%s\n' "$GITHUB_RUN_ID" > .data-branch/runtime/model-validation/SUMMARY/latest_run_id.txt
+          cd .data-branch
+          git config user.name sportsedge-data-bot
+          git config user.email sportsedge-data-bot@users.noreply.github.com
+          git add runtime/model-validation/SUMMARY
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "validation: persist six-gate audit ${GITHUB_RUN_ID}"
+          pushed=0
+          for attempt in 1 2 3 4 5; do
+            git fetch origin data
+            git rebase origin/data || { git rebase --abort || true; sleep $((attempt * 2)); continue; }
+            if git push origin HEAD:data; then pushed=1; break; fi
+            sleep $((attempt * 2))
+          done
+          test "$pushed" -eq 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mlb-validation-audit-${{ github.run_id }}
+          path: artifacts/mlb-validation/derived_status.json
+          if-no-files-found: error
+          retention-days: 90
