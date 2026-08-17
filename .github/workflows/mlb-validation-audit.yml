@@ -5,7 +5,9 @@ on:
   push:
     paths:
       - 'scripts/audit_mlb_validation_state.py'
+      - 'scripts/probe_mlb_settlement_semantics.py'
       - 'config/mlb_validation_evidence.json'
+      - '.github/workflows/mlb-settlement-semantics.yml'
       - '.github/workflows/mlb-validation-audit.yml'
   schedule:
     - cron: '49 * * * *'
