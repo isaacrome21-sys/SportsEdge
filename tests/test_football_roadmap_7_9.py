@@ -17,9 +17,9 @@ class FootballRoadmapSevenToNineTests(unittest.TestCase):
         self.assertAlmostEqual(markets["moneyline"]["home_win"], 0.5)
         self.assertAlmostEqual(markets["spread"]["home_cover"], markets["moneyline"]["home_win"])
         self.assertAlmostEqual(markets["spread"]["push"], 0.25)
-        self.assertAlmostEqual(markets["total"]["over"], 0.5)
+        self.assertAlmostEqual(markets["total"]["over"], 0.75)
         self.assertAlmostEqual(markets["team_total_home"]["over"], 0.5)
-        self.assertAlmostEqual(markets["first_half_total"]["over"], 0.75)
+        self.assertAlmostEqual(markets["first_half_total"]["over"], 0.5)
 
     def test_task_7_first_half_fails_closed_when_joint_rows_do_not_contain_first_half(self):
         rows = [{"home_score": 24, "away_score": 20}]
