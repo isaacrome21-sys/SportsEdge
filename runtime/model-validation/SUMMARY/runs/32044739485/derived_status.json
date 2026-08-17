@@ -1,0 +1,590 @@
+{
+  "markets": {
+    "BATTER_BB": {
+      "calibration": {
+        "status": "PENDING"
+      },
+      "forward_evidence": {
+        "status": "PENDING"
+      },
+      "historical_point_in_time": {
+        "status": "PENDING"
+      },
+      "production_parity": {
+        "status": "PENDING"
+      },
+      "settlement_semantics": {
+        "status": "PENDING"
+      },
+      "untouched_holdout": {
+        "status": "PENDING"
+      }
+    },
+    "BATTER_K": {
+      "calibration": {
+        "status": "PENDING"
+      },
+      "forward_evidence": {
+        "status": "PENDING"
+      },
+      "historical_point_in_time": {
+        "status": "PENDING"
+      },
+      "production_parity": {
+        "status": "PENDING"
+      },
+      "settlement_semantics": {
+        "status": "PENDING"
+      },
+      "untouched_holdout": {
+        "status": "PENDING"
+      }
+    },
+    "DOUBLES": {
+      "calibration": {
+        "status": "PENDING"
+      },
+      "forward_evidence": {
+        "status": "PENDING"
+      },
+      "historical_point_in_time": {
+        "status": "PENDING"
+      },
+      "production_parity": {
+        "status": "PENDING"
+      },
+      "settlement_semantics": {
+        "status": "PENDING"
+      },
+      "untouched_holdout": {
+        "status": "PENDING"
+      }
+    },
+    "F5_MONEYLINE": {
+      "calibration": {
+        "status": "PENDING"
+      },
+      "forward_evidence": {
+        "status": "PENDING"
+      },
+      "historical_point_in_time": {
+        "status": "PENDING"
+      },
+      "production_parity": {
+        "status": "PENDING"
+      },
+      "settlement_semantics": {
+        "status": "PENDING"
+      },
+      "untouched_holdout": {
+        "status": "PENDING"
+      }
+    },
+    "F5_RUN_LINE": {
+      "calibration": {
+        "status": "PENDING"
+      },
+      "forward_evidence": {
+        "status": "PENDING"
+      },
+      "historical_point_in_time": {
+        "status": "PENDING"
+      },
+      "production_parity": {
+        "status": "PENDING"
+      },
+      "settlement_semantics": {
+        "status": "PENDING"
+      },
+      "untouched_holdout": {
+        "status": "PENDING"
+      }
+    },
+    "F5_TOTALS": {
+      "calibration": {
+        "status": "PENDING"
+      },
+      "forward_evidence": {
+        "status": "PENDING"
+      },
+      "historical_point_in_time": {
+        "status": "PENDING"
+      },
+      "production_parity": {
+        "status": "PENDING"
+      },
+      "settlement_semantics": {
+        "status": "PENDING"
+      },
+      "untouched_holdout": {
+        "status": "PENDING"
+      }
+    },
+    "FIRST_HOME_RUN": {
+      "calibration": {
+        "status": "PENDING"
+      },
+      "forward_evidence": {
+        "status": "PENDING"
+      },
+      "historical_point_in_time": {
+        "status": "PENDING"
+      },
+      "production_parity": {
+        "status": "PENDING"
+      },
+      "settlement_semantics": {
+        "status": "PENDING"
+      },
+      "untouched_holdout": {
+        "status": "PENDING"
+      }
+    },
+    "HITS": {
+      "calibration": {
+        "status": "PENDING"
+      },
+      "forward_evidence": {
+        "status": "PENDING"
+      },
+      "historical_point_in_time": {
+        "status": "PENDING"
+      },
+      "production_parity": {
+        "status": "PENDING"
+      },
+      "settlement_semantics": {
+        "status": "PENDING"
+      },
+      "untouched_holdout": {
+        "status": "PENDING"
+      }
+    },
+    "HITS_RUNS_RBIS": {
+      "calibration": {
+        "status": "PENDING"
+      },
+      "forward_evidence": {
+        "status": "PENDING"
+      },
+      "historical_point_in_time": {
+        "status": "PENDING"
+      },
+      "production_parity": {
+        "status": "PENDING"
+      },
+      "settlement_semantics": {
+        "status": "PENDING"
+      },
+      "untouched_holdout": {
+        "status": "PENDING"
+      }
+    },
+    "HOME_RUNS": {
+      "calibration": {
+        "status": "PENDING"
+      },
+      "forward_evidence": {
+        "status": "PENDING"
+      },
+      "historical_point_in_time": {
+        "status": "PENDING"
+      },
+      "production_parity": {
+        "status": "PENDING"
+      },
+      "settlement_semantics": {
+        "status": "PENDING"
+      },
+      "untouched_holdout": {
+        "status": "PENDING"
+      }
+    },
+    "MONEYLINE": {
+      "calibration": {
+        "status": "PENDING"
+      },
+      "forward_evidence": {
+        "status": "PENDING"
+      },
+      "historical_point_in_time": {
+        "status": "PENDING"
+      },
+      "production_parity": {
+        "status": "PENDING"
+      },
+      "settlement_semantics": {
+        "status": "PENDING"
+      },
+      "untouched_holdout": {
+        "status": "PENDING"
+      }
+    },
+    "NRFI": {
+      "calibration": {
+        "status": "PENDING"
+      },
+      "forward_evidence": {
+        "evidence": ".data-branch/runtime/model-validation/NRFI_YRFI/latest/nrfi_v6_forward_shadow_report.json",
+        "failed_gates": [
+          "age_days",
+          "paired_brier",
+          "paired_logloss",
+          "settled_unique_games"
+        ],
+        "settled": 53,
+        "state": "MODEL_NOT_ELIGIBLE",
+        "status": "FAIL"
+      },
+      "historical_point_in_time": {
+        "status": "PENDING"
+      },
+      "production_parity": {
+        "status": "PENDING"
+      },
+      "settlement_semantics": {
+        "evidence": ".data-branch/runtime/model-validation/NRFI_YRFI/latest/nrfi_v6_forward_shadow_report.json",
+        "status": "PASS"
+      },
+      "untouched_holdout": {
+        "status": "PENDING"
+      }
+    },
+    "PITCHER_BB": {
+      "calibration": {
+        "status": "PENDING"
+      },
+      "forward_evidence": {
+        "evidence": ".data-branch/runtime/model-validation/PITCHER_BB/latest/bb_v6_forward_shadow_report.json",
+        "failed_gates": [
+          "age_days",
+          "paired_brier",
+          "paired_logloss",
+          "settled_pitchers"
+        ],
+        "settled": 106,
+        "state": "MODEL_NOT_ELIGIBLE",
+        "status": "FAIL"
+      },
+      "historical_point_in_time": {
+        "status": "PENDING"
+      },
+      "production_parity": {
+        "status": "PENDING"
+      },
+      "settlement_semantics": {
+        "evidence": ".data-branch/runtime/model-validation/PITCHER_BB/latest/bb_v6_forward_shadow_report.json",
+        "status": "PASS"
+      },
+      "untouched_holdout": {
+        "status": "PENDING"
+      }
+    },
+    "PITCHER_ER": {
+      "calibration": {
+        "status": "PENDING"
+      },
+      "forward_evidence": {
+        "status": "PENDING"
+      },
+      "historical_point_in_time": {
+        "status": "PENDING"
+      },
+      "production_parity": {
+        "status": "PENDING"
+      },
+      "settlement_semantics": {
+        "status": "PENDING"
+      },
+      "untouched_holdout": {
+        "status": "PENDING"
+      }
+    },
+    "PITCHER_HITS_ALLOWED": {
+      "calibration": {
+        "status": "PENDING"
+      },
+      "forward_evidence": {
+        "status": "PENDING"
+      },
+      "historical_point_in_time": {
+        "status": "PENDING"
+      },
+      "production_parity": {
+        "status": "PENDING"
+      },
+      "settlement_semantics": {
+        "status": "PENDING"
+      },
+      "untouched_holdout": {
+        "status": "PENDING"
+      }
+    },
+    "PITCHER_K": {
+      "calibration": {
+        "status": "PENDING"
+      },
+      "forward_evidence": {
+        "status": "PENDING"
+      },
+      "historical_point_in_time": {
+        "status": "PENDING"
+      },
+      "production_parity": {
+        "status": "PENDING"
+      },
+      "settlement_semantics": {
+        "status": "PENDING"
+      },
+      "untouched_holdout": {
+        "status": "PENDING"
+      }
+    },
+    "PITCHER_OUTS": {
+      "calibration": {
+        "status": "PENDING"
+      },
+      "forward_evidence": {
+        "status": "PENDING"
+      },
+      "historical_point_in_time": {
+        "status": "PENDING"
+      },
+      "production_parity": {
+        "status": "PENDING"
+      },
+      "settlement_semantics": {
+        "status": "PENDING"
+      },
+      "untouched_holdout": {
+        "status": "PENDING"
+      }
+    },
+    "PITCHER_RECORD_WIN": {
+      "calibration": {
+        "status": "PENDING"
+      },
+      "forward_evidence": {
+        "status": "PENDING"
+      },
+      "historical_point_in_time": {
+        "status": "PENDING"
+      },
+      "production_parity": {
+        "status": "PENDING"
+      },
+      "settlement_semantics": {
+        "status": "PENDING"
+      },
+      "untouched_holdout": {
+        "status": "PENDING"
+      }
+    },
+    "RBI": {
+      "calibration": {
+        "status": "PENDING"
+      },
+      "forward_evidence": {
+        "status": "PENDING"
+      },
+      "historical_point_in_time": {
+        "status": "PENDING"
+      },
+      "production_parity": {
+        "status": "PENDING"
+      },
+      "settlement_semantics": {
+        "status": "PENDING"
+      },
+      "untouched_holdout": {
+        "status": "PENDING"
+      }
+    },
+    "RUNS": {
+      "calibration": {
+        "status": "PENDING"
+      },
+      "forward_evidence": {
+        "status": "PENDING"
+      },
+      "historical_point_in_time": {
+        "status": "PENDING"
+      },
+      "production_parity": {
+        "status": "PENDING"
+      },
+      "settlement_semantics": {
+        "status": "PENDING"
+      },
+      "untouched_holdout": {
+        "status": "PENDING"
+      }
+    },
+    "RUN_LINE": {
+      "calibration": {
+        "status": "PENDING"
+      },
+      "forward_evidence": {
+        "status": "PENDING"
+      },
+      "historical_point_in_time": {
+        "status": "PENDING"
+      },
+      "production_parity": {
+        "status": "PENDING"
+      },
+      "settlement_semantics": {
+        "status": "PENDING"
+      },
+      "untouched_holdout": {
+        "status": "PENDING"
+      }
+    },
+    "SINGLES": {
+      "calibration": {
+        "status": "PENDING"
+      },
+      "forward_evidence": {
+        "status": "PENDING"
+      },
+      "historical_point_in_time": {
+        "status": "PENDING"
+      },
+      "production_parity": {
+        "status": "PENDING"
+      },
+      "settlement_semantics": {
+        "status": "PENDING"
+      },
+      "untouched_holdout": {
+        "status": "PENDING"
+      }
+    },
+    "STOLEN_BASES": {
+      "calibration": {
+        "status": "PENDING"
+      },
+      "forward_evidence": {
+        "status": "PENDING"
+      },
+      "historical_point_in_time": {
+        "status": "PENDING"
+      },
+      "production_parity": {
+        "status": "PENDING"
+      },
+      "settlement_semantics": {
+        "status": "PENDING"
+      },
+      "untouched_holdout": {
+        "status": "PENDING"
+      }
+    },
+    "TOTALS": {
+      "calibration": {
+        "status": "PENDING"
+      },
+      "forward_evidence": {
+        "status": "PENDING"
+      },
+      "historical_point_in_time": {
+        "status": "PENDING"
+      },
+      "production_parity": {
+        "status": "PENDING"
+      },
+      "settlement_semantics": {
+        "status": "PENDING"
+      },
+      "untouched_holdout": {
+        "status": "PENDING"
+      }
+    },
+    "TOTAL_BASES": {
+      "calibration": {
+        "status": "PENDING"
+      },
+      "forward_evidence": {
+        "status": "PENDING"
+      },
+      "historical_point_in_time": {
+        "status": "PENDING"
+      },
+      "production_parity": {
+        "status": "PENDING"
+      },
+      "settlement_semantics": {
+        "status": "PENDING"
+      },
+      "untouched_holdout": {
+        "status": "PENDING"
+      }
+    },
+    "TRIPLES": {
+      "calibration": {
+        "status": "PENDING"
+      },
+      "forward_evidence": {
+        "status": "PENDING"
+      },
+      "historical_point_in_time": {
+        "status": "PENDING"
+      },
+      "production_parity": {
+        "status": "PENDING"
+      },
+      "settlement_semantics": {
+        "status": "PENDING"
+      },
+      "untouched_holdout": {
+        "status": "PENDING"
+      }
+    },
+    "YRFI": {
+      "calibration": {
+        "status": "PENDING"
+      },
+      "forward_evidence": {
+        "evidence": ".data-branch/runtime/model-validation/NRFI_YRFI/latest/nrfi_v6_forward_shadow_report.json",
+        "failed_gates": [
+          "age_days",
+          "paired_brier",
+          "paired_logloss",
+          "settled_unique_games"
+        ],
+        "settled": 53,
+        "state": "MODEL_NOT_ELIGIBLE",
+        "status": "FAIL"
+      },
+      "historical_point_in_time": {
+        "status": "PENDING"
+      },
+      "production_parity": {
+        "status": "PENDING"
+      },
+      "settlement_semantics": {
+        "evidence": ".data-branch/runtime/model-validation/NRFI_YRFI/latest/nrfi_v6_forward_shadow_report.json",
+        "status": "PASS"
+      },
+      "untouched_holdout": {
+        "status": "PENDING"
+      }
+    }
+  },
+  "required_gates": [
+    "historical_point_in_time",
+    "untouched_holdout",
+    "calibration",
+    "settlement_semantics",
+    "forward_evidence",
+    "production_parity"
+  ],
+  "schema_version": 1,
+  "summary": {
+    "fully_validated_markets": 0,
+    "gate_failures": 3,
+    "gate_passes": 3,
+    "gate_pending": 156,
+    "markets": 27
+  }
+}
