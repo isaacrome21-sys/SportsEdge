@@ -6,7 +6,7 @@ on:
     - cron: '*/15 * * * *'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: archive-mlb-game-odds
@@ -26,6 +26,8 @@ jobs:
       SPORTSEDGE_ODDS_BUDGET_LEDGER: .cache/sportsedge/odds-budget/ledger.json
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12.13'
@@ -34,14 +36,16 @@ jobs:
       - name: Resolve UTC day
         id: day
         run: echo "date=$(date -u +%F)" >> "$GITHUB_OUTPUT"
-      - name: Restore rolling daily budget ledger
-        uses: actions/cache@v4
-        with:
-          path: .cache/sportsedge/odds-budget
-          key: sportsedge-odds-budget-${{ steps.day.outputs.date }}-${{ github.run_id }}
-          restore-keys: |
-            sportsedge-odds-budget-${{ steps.day.outputs.date }}-
-          save-always: true
+      - name: Restore durable budget ledger from data branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data:data
+          git worktree add .data-branch data
+          mkdir -p .cache/sportsedge/odds-budget
+          if [ -f .data-branch/runtime/odds-budget/ledger.json ]; then
+            cp .data-branch/runtime/odds-budget/ledger.json "$SPORTSEDGE_ODDS_BUDGET_LEDGER"
+          fi
       - name: Capture raw game-market snapshot when inside target window
         id: capture
         shell: bash
@@ -51,6 +55,31 @@ jobs:
           code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           exit 0
+      - name: Persist budget ledger and status rows to data branch
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -d .data-branch/.git ] && [ ! -f .data-branch/.git ]; then
+            echo 'data branch worktree is unavailable' >&2
+            exit 98
+          fi
+          mkdir -p .data-branch/runtime/odds-budget
+          mkdir -p ".data-branch/runtime/archive-status/${{ steps.day.outputs.date }}"
+          if [ -f "$SPORTSEDGE_ODDS_BUDGET_LEDGER" ]; then
+            cp "$SPORTSEDGE_ODDS_BUDGET_LEDGER" .data-branch/runtime/odds-budget/ledger.json
+          fi
+          if [ -d "artifacts/raw_odds/status/${{ steps.day.outputs.date }}" ]; then
+            cp artifacts/raw_odds/status/${{ steps.day.outputs.date }}/*.json ".data-branch/runtime/archive-status/${{ steps.day.outputs.date }}/" 2>/dev/null || true
+          fi
+          cd .data-branch
+          git config user.name 'sportsedge-archive-bot'
+          git config user.email 'sportsedge-archive-bot@users.noreply.github.com'
+          git add runtime/odds-budget/ledger.json runtime/archive-status || true
+          if ! git diff --cached --quiet; then
+            git commit -m "archive: persist MLB odds run ${{ github.run_id }}"
+            git push origin HEAD:data
+          fi
       - name: Upload execution status, budget ledger, and raw capture
         if: always()
         uses: actions/upload-artifact@v4
