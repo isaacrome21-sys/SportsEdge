@@ -46,8 +46,10 @@ SIDE_BY_MARKET = {
     "F5_MONEYLINE": {"HOME", "AWAY", "HOME_ML", "AWAY_ML"},
     "RUN_LINE": {"HOME", "AWAY", "HOME_RL", "AWAY_RL"},
     "F5_RUN_LINE": {"HOME", "AWAY", "HOME_RL", "AWAY_RL"},
-    "NRFI": {"YES", "NRFI"},
-    "YRFI": {"YES", "YRFI"},
+    # YES/NO is the canonical paired-price representation. Legacy NRFI/YRFI
+    # one-sided spellings remain accepted for ingestion compatibility.
+    "NRFI": {"YES", "NO", "NRFI"},
+    "YRFI": {"YES", "NO", "YRFI"},
 }
 
 LINE_OPTIONAL_MARKETS = {"MONEYLINE", "F5_MONEYLINE", "NRFI", "YRFI"} | BINARY_MARKETS
