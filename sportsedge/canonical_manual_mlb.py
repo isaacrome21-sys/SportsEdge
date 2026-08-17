@@ -41,12 +41,13 @@ def _side(market_type: str, side: str) -> str:
 
 def _pair(row: ManualQuote, market: str, entity_id: str) -> list[dict[str, Any]]:
     period = "1ST" if row.market_type == "FIRST_INNING_TOTAL" else ("F5" if row.market_type.startswith("FIRST_FIVE_") else "FG")
-    def q(side: str, price: int):
-        return validate_canonical_quote({"game_id":str(row.game_id),"period":period,"market":market,"entity_id":entity_id,"line":row.line,
+    paired_line = -row.line if row.market_type in {"RUN_LINE", "FIRST_FIVE_RUN_LINE"} else row.line
+    def q(side: str, price: int, line: float):
+        return validate_canonical_quote({"game_id":str(row.game_id),"period":period,"market":market,"entity_id":entity_id,"line":line,
             "side":_side(row.market_type, side),"american_odds":price,"book_key":row.book,"is_alternate":False,
             "raw_market_name":row.market_type,"retrieved_at":row.observed_at,"ttl_seconds":3600,"sportsbook":row.book,
             "selection":side,"source_url":"MANUAL"})
-    return [q(row.side,row.price), q(row.paired_side,row.paired_price)]
+    return [q(row.side,row.price,row.line), q(row.paired_side,row.paired_price,paired_line)]
 
 def run_canonical_manual_mlb(rows: Iterable[Mapping[str, Any]], *, opener=urlopen, registry_path="config/deployments.json",
                              edge_floor_config_path="config/truth_gate_floors.json", kelly_multiplier=0.25,
