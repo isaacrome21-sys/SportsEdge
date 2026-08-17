@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+"""Fetch nflverse games.csv, hash exact bytes, and emit a real-history audit."""
+from __future__ import annotations
+
+import argparse
+import csv
+import hashlib
+import io
+import json
+from pathlib import Path
+from urllib.request import Request, urlopen
+
+from sportsedge.sports.nfl.history import NFLVERSE_SCHEDULE_CSV
+from sportsedge.sports.nfl.real_history_audit import audit_nfl_history_rows
+
+
+def fetch_bytes(url: str) -> bytes:
+    request = Request(url, headers={"User-Agent": "SportsEdge-football-validation/1.0"})
+    with urlopen(request, timeout=30) as response:
+        return response.read()
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", default="artifacts/football/nfl_real_history_audit.json")
+    parser.add_argument("--min-season", type=int, default=1999)
+    parser.add_argument("--max-season", type=int, default=2025)
+    args = parser.parse_args()
+
+    payload = fetch_bytes(NFLVERSE_SCHEDULE_CSV)
+    source_sha256 = hashlib.sha256(payload).hexdigest()
+    text = payload.decode("utf-8-sig")
+    rows = list(csv.DictReader(io.StringIO(text)))
+    rows = [
+        row for row in rows
+        if row.get("season") and args.min_season <= int(row["season"]) <= args.max_season
+    ]
+    report = audit_nfl_history_rows(
+        rows,
+        source_url=NFLVERSE_SCHEDULE_CSV,
+        source_sha256=source_sha256,
+    )
+    report["requested_season_range"] = [args.min_season, args.max_season]
+
+    output = Path(args.output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    print(json.dumps(report, indent=2, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
