@@ -12,11 +12,17 @@ class ReadinessTests(unittest.TestCase):
         rows = {x["market"]: x for x in out["markets"]}
         for market in ("HITS", "TOTAL_BASES"):
             self.assertTrue(rows[market]["runtime_engine"])
+            self.assertTrue(rows[market]["feature_contract_complete"])
             self.assertTrue(rows[market]["runnable_live"])
             self.assertFalse(rows[market]["official_bet_enabled"])
             self.assertFalse(rows[market]["validation_complete"])
             self.assertIn("FIXTURE_CI_PENDING", rows[market]["blockers"])
             self.assertIn("historical_point_in_time", rows[market]["validation_missing"])
+
+    def test_every_checked_in_market_has_feature_contract(self):
+        out = audit_readiness()
+        missing = [x["market"] for x in out["markets"] if not x["feature_contract_complete"]]
+        self.assertEqual(missing, [])
 
     def test_unknown_runtime_market_is_not_claimed_runnable(self):
         with tempfile.TemporaryDirectory() as td:
@@ -28,8 +34,10 @@ class ReadinessTests(unittest.TestCase):
             out = audit_readiness(p)
         row = out["markets"][0]
         self.assertFalse(row["runtime_engine"])
+        self.assertFalse(row["feature_contract_complete"])
         self.assertFalse(row["runnable_live"])
         self.assertIn("NO_RUNTIME_ENGINE", row["blockers"])
+        self.assertIn("NO_COMPLETE_FEATURE_CONTRACT", row["blockers"])
 
     def test_eligible_market_stays_officially_blocked_without_validation(self):
         with tempfile.TemporaryDirectory() as td:
