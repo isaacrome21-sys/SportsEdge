@@ -23,27 +23,38 @@ def main() -> int:
     now = datetime.now(timezone.utc)
     end = date.fromisoformat(args.end_date) if args.end_date else now.date()
     start = end - timedelta(days=args.days - 1)
-
-    frame = statcast(start.isoformat(), end.isoformat(), verbose=False, parallel=False)
-    if frame is None or frame.empty:
-        raise SystemExit("STATCAST_NO_ROWS")
-    rows = frame.where(frame.notna(), None).to_dict(orient="records")
-    batter_rows, pitcher_rows = aggregate_statcast(rows, start_date=start, end_date=end, retrieved_at=now)
-    snap = StatcastSnapshot(
-        start_date=start.isoformat(),
-        end_date=end.isoformat(),
-        retrieved_at=now.isoformat(),
-        source="BASEBALL_SAVANT_STATCAST_VIA_PYBASEBALL",
-        batter_rows=tuple(batter_rows),
-        pitcher_rows=tuple(pitcher_rows),
-        raw_pitch_rows=len(rows),
-    )
-
-    out_dir = Path(args.output_dir) / snap.end_date
+    out_dir = Path(args.output_dir) / end.isoformat()
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "batters.json").write_text(json.dumps(list(snap.batter_rows), indent=2, sort_keys=True, default=str) + "\n")
-    (out_dir / "pitchers.json").write_text(json.dumps(list(snap.pitcher_rows), indent=2, sort_keys=True, default=str) + "\n")
-    manifest = snapshot_manifest(snap)
+
+    try:
+        frame = statcast(start.isoformat(), end.isoformat(), verbose=False, parallel=False)
+        if frame is None or frame.empty:
+            raise RuntimeError("STATCAST_NO_ROWS")
+        rows = frame.where(frame.notna(), None).to_dict(orient="records")
+        batter_rows, pitcher_rows = aggregate_statcast(rows, start_date=start, end_date=end, retrieved_at=now)
+        snap = StatcastSnapshot(
+            start_date=start.isoformat(),
+            end_date=end.isoformat(),
+            retrieved_at=now.isoformat(),
+            source="BASEBALL_SAVANT_STATCAST_VIA_PYBASEBALL",
+            batter_rows=tuple(batter_rows),
+            pitcher_rows=tuple(pitcher_rows),
+            raw_pitch_rows=len(rows),
+        )
+        (out_dir / "batters.json").write_text(json.dumps(list(snap.batter_rows), indent=2, sort_keys=True, default=str) + "\n")
+        (out_dir / "pitchers.json").write_text(json.dumps(list(snap.pitcher_rows), indent=2, sort_keys=True, default=str) + "\n")
+        manifest = snapshot_manifest(snap)
+    except Exception as exc:
+        manifest = {
+            "source": "BASEBALL_SAVANT_STATCAST_VIA_PYBASEBALL",
+            "provider_tier": "PRIMARY_STATS",
+            "retrieved_at": now.isoformat(),
+            "window_start": start.isoformat(),
+            "window_end": end.isoformat(),
+            "status": "ERROR",
+            "reason": f"{type(exc).__name__}:{exc}",
+        }
+
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
     print(json.dumps(manifest, indent=2, sort_keys=True))
     return 0 if manifest["status"] == "PASS" else 3
