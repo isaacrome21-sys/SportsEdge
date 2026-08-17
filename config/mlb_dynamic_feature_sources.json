@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "policy": {
+    "require_source": true,
+    "require_retrieved_at": true,
+    "require_provider_tier": true,
+    "fail_closed_when_stale": true,
+    "never_mix_provider_tiers_inside_one_clv_series": true
+  },
+  "sources": {
+    "statcast_batter": {
+      "primary": "BASEBALL_SAVANT_STATCAST",
+      "provider_tier": "PRIMARY_STATS",
+      "ttl_seconds": 129600,
+      "cadence": "DAILY",
+      "required_for": ["HOME_RUNS", "HITS", "TOTAL_BASES", "RBI", "RUNS", "HITS_RUNS_RBIS", "SINGLES", "DOUBLES", "TRIPLES", "BATTER_BB", "BATTER_K", "STOLEN_BASES"]
+    },
+    "statcast_pitcher": {
+      "primary": "BASEBALL_SAVANT_STATCAST",
+      "provider_tier": "PRIMARY_STATS",
+      "ttl_seconds": 129600,
+      "cadence": "DAILY",
+      "required_for": ["PITCHER_K", "PITCHER_HITS_ALLOWED", "PITCHER_BB", "PITCHER_ER", "PITCHER_OUTS", "HOME_RUNS", "HITS", "TOTAL_BASES", "RBI", "RUNS", "BATTER_K", "BATTER_BB"]
+    },
+    "weather": {
+      "primary": "LIVE_WEATHER_PROVIDER",
+      "provider_tier": "PRIMARY_CONTEXT",
+      "ttl_seconds": 1800,
+      "cadence": "INTRADAY",
+      "required_fields": ["temperature_f", "humidity_pct", "wind_speed_mph", "wind_direction_deg", "wind_out_component_mph", "wind_in_component_mph", "precip_probability", "roof_state", "air_density_proxy"],
+      "required_for": ["MONEYLINE", "RUN_LINE", "TOTALS", "NRFI", "YRFI", "HOME_RUNS", "HITS", "TOTAL_BASES", "RBI", "RUNS", "PITCHER_ER"]
+    },
+    "lineups": {
+      "primary": "MLB_OFFICIAL_LINEUP",
+      "provider_tier": "PRIMARY_CONTEXT",
+      "ttl_seconds": 900,
+      "cadence": "INTRADAY",
+      "required_fields": ["player_id", "team_id", "batting_order", "starter_status", "lineup_status", "retrieved_at"],
+      "required_for": ["HOME_RUNS", "HITS", "TOTAL_BASES", "RBI", "RUNS", "HITS_RUNS_RBIS", "SINGLES", "DOUBLES", "TRIPLES", "BATTER_BB", "BATTER_K", "STOLEN_BASES"]
+    },
+    "umpires": {
+      "primary": "MLB_GAME_OFFICIALS",
+      "provider_tier": "PRIMARY_CONTEXT",
+      "ttl_seconds": 3600,
+      "cadence": "GAMEDAY",
+      "required_fields": ["home_plate_umpire_id", "home_plate_umpire_name", "retrieved_at"],
+      "required_for": ["TOTALS", "NRFI", "YRFI", "PITCHER_K", "PITCHER_BB", "BATTER_K", "BATTER_BB"]
+    },
+    "park_factors": {
+      "primary": "SPORTSEDGE_PARK_FACTOR_TABLE",
+      "provider_tier": "MODEL_REFERENCE",
+      "ttl_seconds": 604800,
+      "cadence": "WEEKLY_OR_ON_CHANGE",
+      "required_fields": ["venue_id", "run_factor", "hr_factor", "lhb_hr_factor", "rhb_hr_factor", "hit_factor"],
+      "required_for": ["TOTALS", "HOME_RUNS", "HITS", "TOTAL_BASES", "RBI", "RUNS", "PITCHER_ER"]
+    },
+    "catchers": {
+      "primary": "MLB_LINEUP_PLUS_CATCHER_METRICS",
+      "provider_tier": "PRIMARY_CONTEXT",
+      "ttl_seconds": 86400,
+      "cadence": "DAILY_AND_LINEUP_CONFIRMATION",
+      "required_fields": ["catcher_id", "team_id", "framing_metric", "caught_stealing_rate", "pop_time", "retrieved_at"],
+      "required_for": ["STOLEN_BASES", "PITCHER_K", "PITCHER_BB", "NRFI", "YRFI"]
+    }
+  }
+}
