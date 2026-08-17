@@ -1,4 +1,4 @@
-"""CFB implementation shell for the shared football SportAdapter."""
+"""CFB adapter for the shared football SportAdapter."""
 
 from __future__ import annotations
 
@@ -8,11 +8,18 @@ from typing import Any
 class CFBAdapter:
     sport = "cfb"
 
+    def __init__(self, history_ingestor: Any | None = None) -> None:
+        self.history_ingestor = history_ingestor
+
     def load_schedule(self, seasons: list[int]) -> Any:
-        raise NotImplementedError("CFB schedule loading is implemented in roadmap task 4")
+        if self.history_ingestor is None:
+            raise NotImplementedError("CFB history ingestor is not configured")
+        return self.history_ingestor.load(seasons)
 
     def load_lines_history(self, seasons: list[int]) -> Any:
-        raise NotImplementedError("CFB lines history is implemented in roadmap task 4")
+        if self.history_ingestor is None:
+            raise NotImplementedError("CFB history ingestor is not configured")
+        return self.history_ingestor.load(seasons)
 
     def build_features(self, asof_ts: Any, games: Any) -> Any:
         raise NotImplementedError("CFB M2 features are implemented in roadmap task 12")
