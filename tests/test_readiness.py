@@ -47,7 +47,7 @@ class ReadinessTests(unittest.TestCase):
             validation = root / "validation.json"
             registry.write_text(json.dumps({
                 "schema_version": 1,
-                "markets": {"HITS": {"eligible": True, "stage": "PRODUCTION", "reason": "test"}},
+                "markets": {"HITS": {"eligible": True, "stage": "DEPLOYED", "reason": "test"}},
             }))
             floors.write_text(json.dumps({
                 "truth_gate": {"edge_floors": {"HITS": {"status": "FROZEN", "value": 0.02}}}
@@ -71,7 +71,7 @@ class ReadinessTests(unittest.TestCase):
             validation = root / "validation.json"
             registry.write_text(json.dumps({
                 "schema_version": 1,
-                "markets": {"HITS": {"eligible": True, "stage": "PRODUCTION", "reason": "test"}},
+                "markets": {"HITS": {"eligible": True, "stage": "DEPLOYED", "reason": "test"}},
             }))
             floors.write_text(json.dumps({
                 "truth_gate": {"edge_floors": {"HITS": {"status": "FROZEN", "value": 0.02}}}

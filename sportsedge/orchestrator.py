@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any, Callable, Mapping
 
 from .candidate_binding import bind_candidate
+from .devig import multiplicative_devig
 from .edge_floors import DEFAULT_EDGE_FLOOR_CONFIG, require_production_edge_floor
 from .price_ttl import double_ttl_gate
 from .truth_gate import BetDecision, decide_bet
@@ -34,11 +35,13 @@ def _reject_market_leakage(model_input: Mapping[str, Any]) -> None:
         raise OrchestrationError(f"sportsbook/market data prohibited in Model_Input: {sorted(present)}")
 
 
-def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], deployment: Mapping[str, Any], engine_fn: Callable[[Mapping[str, Any]], Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG, kelly_multiplier: float = 0.25) -> RunResult:
+def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], paired_quote: Mapping[str, Any] | None = None, deployment: Mapping[str, Any], engine_fn: Callable[[Mapping[str, Any]], Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG, kelly_multiplier: float = 0.25) -> RunResult:
     """Run one candidate end-to-end. Any integrity failure returns BLOCKED, never a guessed bet."""
     market = str(model_input.get("market", "UNKNOWN"))
     try:
         _reject_market_leakage(model_input)
+        # Preserve the original fail-closed precedence: quote freshness, model/output
+        # identity, deployment eligibility, and frozen floor are checked before devig.
         double_ttl_gate(quote, ingestion_now, finalization_now)
         output = dict(engine_fn(model_input))
         if "model_p" not in output:
@@ -48,8 +51,17 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], d
                 output[key] = model_input[key]
         bind_candidate(output, quote, deployment)
         floor = require_production_edge_floor(market=market, path=edge_floor_config_path)
+
+        # No official edge calculation is permitted without a fresh complementary
+        # price from the same offer identity.
+        if not isinstance(paired_quote, Mapping):
+            raise OrchestrationError("PAIRED_PRICE_REQUIRED_FOR_DEVIG")
+        double_ttl_gate(paired_quote, ingestion_now, finalization_now)
+        devig = multiplicative_devig(quote, paired_quote)
+
         decision = decide_bet(
             output["model_p"], quote["american_odds"],
+            fair_market_probability=devig.candidate_fair_probability,
             bound=True, fresh=True, deployed=deployment.get("eligible") is True,
             edge_floor=float(floor.value_probability_points), kelly_multiplier=kelly_multiplier,
         )
@@ -63,6 +75,7 @@ def run_slate(candidates: list[Mapping[str, Any]], *, engines: Mapping[str, Call
     for item in candidates:
         model_input = item.get("model_input")
         quote = item.get("quote")
+        paired_quote = item.get("paired_quote")
         if not isinstance(model_input, Mapping) or not isinstance(quote, Mapping):
             results.append(RunResult("UNKNOWN", None, "BLOCKED", None, "candidate missing model_input/quote"))
             continue
@@ -73,7 +86,8 @@ def run_slate(candidates: list[Mapping[str, Any]], *, engines: Mapping[str, Call
             results.append(RunResult(str(market), None, "BLOCKED", None, "unsupported or undeployed market"))
             continue
         results.append(run_candidate(
-            model_input=model_input, quote=quote, deployment=deployment, engine_fn=engine,
+            model_input=model_input, quote=quote, paired_quote=paired_quote,
+            deployment=deployment, engine_fn=engine,
             ingestion_now=ingestion_now, finalization_now=finalization_now,
             edge_floor_config_path=edge_floor_config_path, kelly_multiplier=kelly_multiplier,
         ))
