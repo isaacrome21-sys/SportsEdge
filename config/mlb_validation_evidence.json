@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "required_gates": [
+    "historical_point_in_time",
+    "untouched_holdout",
+    "calibration",
+    "settlement_semantics",
+    "forward_evidence",
+    "production_parity"
+  ],
+  "markets": {
+    "MONEYLINE": {},
+    "RUN_LINE": {},
+    "TOTALS": {},
+    "HOME_RUNS": {},
+    "HITS": {},
+    "TOTAL_BASES": {},
+    "RBI": {},
+    "RUNS": {},
+    "HITS_RUNS_RBIS": {},
+    "SINGLES": {},
+    "DOUBLES": {},
+    "TRIPLES": {},
+    "BATTER_BB": {},
+    "BATTER_K": {},
+    "STOLEN_BASES": {},
+    "PITCHER_K": {},
+    "PITCHER_HITS_ALLOWED": {},
+    "PITCHER_BB": {},
+    "PITCHER_ER": {},
+    "PITCHER_OUTS": {},
+    "NRFI": {},
+    "YRFI": {},
+    "PITCHER_RECORD_WIN": {},
+    "FIRST_HOME_RUN": {},
+    "F5_MONEYLINE": {},
+    "F5_RUN_LINE": {},
+    "F5_TOTALS": {}
+  }
+}
