@@ -51,7 +51,7 @@ jobs:
           if [ -f .data-branch/runtime/odds-budget/ledger.json ]; then
             cp .data-branch/runtime/odds-budget/ledger.json "$SPORTSEDGE_ODDS_BUDGET_LEDGER"
           fi
-      - name: Deduplicate recent successful capture
+      - name: Deduplicate near-simultaneous successful capture
         id: dedupe
         shell: bash
         run: |
@@ -80,7 +80,7 @@ jobs:
               except Exception:
                   continue
               age = (now - captured_at).total_seconds()
-              if 0 <= age <= 20 * 60:
+              if 0 <= age <= 5 * 60:
                   skip = True
                   source = row
               break
@@ -100,7 +100,7 @@ jobs:
                   'source_run_at_utc': source.get('run_at_utc'),
                   'source_capture_window': source.get('capture_window'),
                   'source_raw_file': source.get('raw_file'),
-                  'dedupe_horizon_seconds': 1200,
+                  'dedupe_horizon_seconds': 300,
               }
               (status_dir / f'run_{stamp}.json').write_text(json.dumps(row, indent=2, sort_keys=True) + '\n')
               runs = ledger.setdefault('runs', [])
@@ -126,7 +126,7 @@ jobs:
           code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           exit 0
-      - name: Persist budget ledger and status rows to data branch
+      - name: Persist ledger, status, and replayable raw odds to data branch
         if: always()
         shell: bash
         run: |
@@ -143,10 +143,14 @@ jobs:
           if [ -d "artifacts/raw_odds/status/${{ steps.day.outputs.date }}" ]; then
             cp artifacts/raw_odds/status/${{ steps.day.outputs.date }}/*.json ".data-branch/runtime/archive-status/${{ steps.day.outputs.date }}/" 2>/dev/null || true
           fi
+          if [ -d "artifacts/raw_odds/${{ steps.day.outputs.date }}" ]; then
+            mkdir -p ".data-branch/archive/raw_odds/${{ steps.day.outputs.date }}"
+            cp -R "artifacts/raw_odds/${{ steps.day.outputs.date }}/." ".data-branch/archive/raw_odds/${{ steps.day.outputs.date }}/"
+          fi
           cd .data-branch
           git config user.name 'sportsedge-archive-bot'
           git config user.email 'sportsedge-archive-bot@users.noreply.github.com'
-          git add runtime/odds-budget/ledger.json runtime/archive-status || true
+          git add runtime/odds-budget/ledger.json runtime/archive-status archive/raw_odds || true
           if ! git diff --cached --quiet; then
             git commit -m "archive: persist MLB odds failover run ${{ github.run_id }}"
             git push origin HEAD:data
