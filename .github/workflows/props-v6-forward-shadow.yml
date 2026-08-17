@@ -96,6 +96,7 @@ jobs:
       SPORTSEDGE_BB_V6_OUT: artifacts/bb-v6-shadow
       SPORTSEDGE_BB_V6_SHA256: fa408d9a086f409e073ce811c93b1d47454a43d93cc08143038def793792a9cf
       SPORTSEDGE_BB_V6_STATE_SHA256: 4867110378bce127f316005a7583eb8d213b213dc98a1145d1d9e2f5d0a6215f
+      SPORTSEDGE_BB_V4_SHA256: 67fc9d5c96ab469d888c7e137072d156043eb31fa3576fbe31d97e4436b9e7bc
     steps:
       - name: Checkout frozen V6 research code
         uses: actions/checkout@v4
@@ -118,18 +119,36 @@ jobs:
           cp bb_candidate/artifacts/bb-v6-shadow/* artifacts/bb-v6-shadow/
           echo "$SPORTSEDGE_BB_V6_SHA256  artifacts/bb-v6-shadow/sportsedge_pitcher_bb_v6_shadow.joblib" | sha256sum -c -
           echo "$SPORTSEDGE_BB_V6_STATE_SHA256  artifacts/bb-v6-shadow/bb_v6_base_state.joblib" | sha256sum -c -
+      - name: Add frozen V4 comparator provenance to BB capture
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/capture_bb_v6_shadow.py')
+          s=p.read_text()
+          old='provenance={"state_cutoff":str(state["cutoff"]),"state_sha256":state_digest,"base_state_sha256":EXPECTED_BASE_STATE_SHA,"sportsbook_data_used":False}'
+          new='provenance={"state_cutoff":str(state["cutoff"]),"state_sha256":state_digest,"base_state_sha256":EXPECTED_BASE_STATE_SHA,"sportsbook_data_used":False,"base_v4_over_1_5_p":float(p0[0]),"base_v4_artifact_sha256":str(artifact.get("base_artifact_sha256") or "")}'
+          if old not in s:
+              raise SystemExit('BB_V6_CAPTURE_PATCH_TARGET_MISSING')
+          p.write_text(s.replace(old,new,1))
+          PY
       - name: Capture immutable pregame Pitcher BB V6 predictions
         run: python scripts/capture_bb_v6_shadow.py
-      - name: Verify outcomeless BB ledger
+      - name: Verify outcomeless BB ledger and V4 comparator provenance
         if: always()
         run: |
           python - <<'PY'
           from pathlib import Path
-          import json
+          import json, os
           p=Path('artifacts/forward-shadow/bb_v6_manifest.json')
           if not p.exists(): raise SystemExit('BB_V6_SHADOW_MANIFEST_MISSING')
           d=json.loads(p.read_text()); assert d['outcomes_present'] is False; assert d['prediction_count'] > 0
-          print('BB_V6_SHADOW_LEDGER_PASS', d['prediction_count'], d['ledger_file_sha256'])
+          rows=json.loads(Path('artifacts/forward-shadow/bb_v6_predictions.json').read_text())
+          over=[r for r in rows if r.get('side')=='OVER']
+          assert over and all((r.get('provenance') or {}).get('base_v4_artifact_sha256')==os.environ['SPORTSEDGE_BB_V4_SHA256'] for r in over)
+          assert all(0 < float((r.get('provenance') or {})['base_v4_over_1_5_p']) < 1 for r in over)
+          print('BB_V6_SHADOW_LEDGER_PASS', d['prediction_count'], d['ledger_file_sha256'], 'V4_COMPARATOR_PRESENT')
           PY
       - name: Upload CI-bound BB forward evidence
         if: always()
