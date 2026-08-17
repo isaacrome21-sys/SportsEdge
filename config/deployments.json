@@ -11,7 +11,7 @@
     "YRFI": {"eligible": false, "stage": "VALIDATED_MATH", "reason": "forward evidence protocol in progress"},
     "RBI": {"eligible": false, "stage": "VALIDATED_MATH", "reason": "2026 artifact-selection policy unresolved"},
     "RUNS": {"eligible": false, "stage": "VALIDATED_MATH", "reason": "2026 artifact-selection policy unresolved"},
-    "HOME_RUNS": {"eligible": false, "stage": "ACQUISITION_READY", "reason": "quote normalization available; independent runtime model not yet validated"},
+    "HOME_RUNS": {"eligible": false, "stage": "RESEARCH_MODEL", "reason": "dedicated price-independent runtime engine exists; PIT training, untouched holdout, calibration, forward evidence, production parity, and frozen edge floor still required"},
     "HITS_RUNS_RBIS": {"eligible": false, "stage": "ACQUISITION_READY", "reason": "quote normalization available; independent runtime model not yet validated"},
     "SINGLES": {"eligible": false, "stage": "ACQUISITION_READY", "reason": "quote normalization available; independent runtime model not yet validated"},
     "DOUBLES": {"eligible": false, "stage": "ACQUISITION_READY", "reason": "quote normalization available; independent runtime model not yet validated"},
