@@ -41,7 +41,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          python scripts/refresh_mlb_game_context.py
+          PYTHONPATH=. python scripts/refresh_mlb_game_context.py
           code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           exit 0
