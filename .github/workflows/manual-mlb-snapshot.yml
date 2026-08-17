@@ -1,0 +1,35 @@
+name: manual-mlb-snapshot
+
+on:
+  push:
+    branches: [main, feat/manual-mlb-snapshot-runner]
+    paths:
+      - sportsedge/manual_mlb_snapshot.py
+      - scripts/run_manual_mlb_snapshot.py
+      - manual_inputs/mlb/**
+      - .github/workflows/manual-mlb-snapshot.yml
+  pull_request:
+    paths:
+      - sportsedge/manual_mlb_snapshot.py
+      - scripts/run_manual_mlb_snapshot.py
+      - manual_inputs/mlb/**
+      - .github/workflows/manual-mlb-snapshot.yml
+  workflow_dispatch:
+
+jobs:
+  run-snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime dependencies
+        run: python -m pip install --disable-pip-version-check numpy
+      - name: Run SportsEdge on supplied lines
+        run: python scripts/run_manual_mlb_snapshot.py --input manual_inputs/mlb/2026-08-17_stl_cin_g1_dk.json --output artifacts/manual_mlb_snapshot_card.json
+      - name: Upload result
+        uses: actions/upload-artifact@v4
+        with:
+          name: manual-mlb-snapshot-card
+          path: artifacts/manual_mlb_snapshot_card.json
