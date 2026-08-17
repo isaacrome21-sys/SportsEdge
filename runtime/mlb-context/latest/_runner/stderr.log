@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/home/runner/work/SportsEdge/SportsEdge/scripts/refresh_mlb_game_context.py", line 10, in <module>
+    from sportsedge.mlb_source import fetch_schedule
+  File "/home/runner/work/SportsEdge/SportsEdge/sportsedge/mlb_source.py", line 9, in <module>
+    from .source_lineage import canonical_game_identity
+  File "/home/runner/work/SportsEdge/SportsEdge/sportsedge/source_lineage.py", line 9, in <module>
+    from .runtime import parse_timestamp
+  File "/home/runner/work/SportsEdge/SportsEdge/sportsedge/runtime.py", line 11, in <module>
+    from .engine_registry import engine_registry
+  File "/home/runner/work/SportsEdge/SportsEdge/sportsedge/engine_registry.py", line 12, in <module>
+    from .bb_engine import simulate_bb
+  File "/home/runner/work/SportsEdge/SportsEdge/sportsedge/bb_engine.py", line 14, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
