@@ -28,6 +28,32 @@ class EngineDispatchError(ValueError):
 _HITTER_LINES = (0.5, 1.5, 2.5)
 _BB_LINES = (0.5, 1.5, 2.5, 3.5)
 
+MANUAL_MARKET_TYPE_TO_ENGINE_MARKET = {
+    "MONEYLINE": "MONEYLINE",
+    "GAME_TOTAL": "TOTALS",
+    "RUN_LINE": "RUN_LINE",
+    "FIRST_FIVE_MONEYLINE": "F5_MONEYLINE",
+    "FIRST_FIVE_RUN_LINE": "F5_RUN_LINE",
+    "FIRST_FIVE_TOTAL": "F5_TOTALS",
+    "FIRST_INNING_TOTAL": "YRFI",
+    "PITCHER_STRIKEOUTS": "PITCHER_K",
+    "PITCHER_OUTS": "PITCHER_OUTS",
+    "PITCHER_HITS_ALLOWED": "PITCHER_HITS_ALLOWED",
+    "PITCHER_EARNED_RUNS": "PITCHER_ER",
+    "PITCHER_WALKS": "PITCHER_BB",
+    "BATTER_HOME_RUNS": "HOME_RUNS",
+    "BATTER_HITS": "HITS",
+    "BATTER_TOTAL_BASES": "TOTAL_BASES",
+}
+
+
+def resolve_manual_market_type(market_type: str) -> str:
+    key = str(market_type or "").strip().upper()
+    market = MANUAL_MARKET_TYPE_TO_ENGINE_MARKET.get(key)
+    if market is None or market not in engine_registry():
+        raise EngineDispatchError(f"NO_ENGINE_FOR_MARKET: {key}")
+    return market
+
 
 def _finite_line(value: Any) -> float:
     if isinstance(value, bool):
