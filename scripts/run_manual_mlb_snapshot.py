@@ -40,6 +40,33 @@ def validate_live_rows(rows, *, run_date: str | None, max_age_minutes: int, as_o
             )
 
 
+def _run_canonical_rows(rows, *, history_cache_dir: str) -> dict:
+    grouped: dict[str, list] = {}
+    for row in rows:
+        grouped.setdefault(str(row.get("game_id")), []).append(row)
+    if len(grouped) == 1:
+        return run_canonical_manual_mlb(rows, history_cache_dir=history_cache_dir)
+    games = []
+    results = []
+    for game_id, game_rows in grouped.items():
+        payload = run_canonical_manual_mlb(game_rows, history_cache_dir=history_cache_dir)
+        games.append({
+            "input_game_id": game_id,
+            "resolved_game": payload.get("resolved_game"),
+            "observed_at_utc": payload.get("observed_at_utc"),
+            "market_resolution": payload.get("market_resolution", []),
+            "feature_lineage": payload.get("feature_lineage", []),
+        })
+        results.extend(payload.get("results", []))
+    return {
+        "schema_version": 2,
+        "run_type": "CANONICAL_MANUAL_QUOTES_MULTI_GAME",
+        "source": "MANUAL",
+        "games": games,
+        "results": results,
+    }
+
+
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--input", required=True)
@@ -58,9 +85,9 @@ def main() -> int:
         validate_live_rows(rows, run_date=args.run_date, max_age_minutes=args.max_age_minutes, as_of=as_of)
 
     if isinstance(snapshot, dict) and isinstance(snapshot.get("rows"), list):
-        payload = run_canonical_manual_mlb(snapshot["rows"], history_cache_dir=args.history_cache_dir)
+        payload = _run_canonical_rows(snapshot["rows"], history_cache_dir=args.history_cache_dir)
     elif isinstance(snapshot, list):
-        payload = run_canonical_manual_mlb(snapshot, history_cache_dir=args.history_cache_dir)
+        payload = _run_canonical_rows(snapshot, history_cache_dir=args.history_cache_dir)
     else:
         payload = run_manual_mlb_snapshot(snapshot, history_cache_dir=args.history_cache_dir)
     out = Path(args.output)
