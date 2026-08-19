@@ -21,9 +21,19 @@ class CanonicalManualMLBError(ValueError): pass
 def _sha(v: Any) -> str:
     return hashlib.sha256(json.dumps(v, sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest()
 
+def _norm_team(value: str) -> str:
+    return " ".join(str(value or "").strip().lower().replace(".", "").split())
+
 def _resolve_game(row: ManualQuote, opener=urlopen):
     rows = fetch_schedule(row.first_pitch_at.date().isoformat(), opener=opener, now=row.observed_at)
-    matches = [g for g in rows if str(g.game_pk) == str(row.game_id)]
+    game_key = str(row.game_id).strip()
+    matches = [g for g in rows if str(g.game_pk) == game_key]
+    if not matches and "@" in game_key:
+        away_key, home_key = (_norm_team(v) for v in game_key.split("@", 1))
+        matches = [
+            g for g in rows
+            if _norm_team(g.away_name) == away_key and _norm_team(g.home_name) == home_key
+        ]
     if len(matches) != 1: raise CanonicalManualMLBError(f"MANUAL_GAME_RESOLUTION_FAILED: game_id={row.game_id} found={len(matches)}")
     g = matches[0]
     scheduled = parse_game_start(g.game_date)
@@ -39,11 +49,12 @@ def _side(market_type: str, side: str) -> str:
         raise CanonicalManualMLBError("FIRST_INNING_TOTAL side must be OVER/UNDER")
     return s
 
-def _pair(row: ManualQuote, market: str, entity_id: str) -> list[dict[str, Any]]:
+def _pair(row: ManualQuote, market: str, entity_id: str, *, resolved_game_id: str | None = None) -> list[dict[str, Any]]:
     period = "1ST" if row.market_type == "FIRST_INNING_TOTAL" else ("F5" if row.market_type.startswith("FIRST_FIVE_") else "FG")
     paired_line = -row.line if row.market_type in {"RUN_LINE", "FIRST_FIVE_RUN_LINE"} else row.line
+    game_id = str(resolved_game_id or row.game_id)
     def q(side: str, price: int, line: float):
-        return validate_canonical_quote({"game_id":str(row.game_id),"period":period,"market":market,"entity_id":entity_id,"line":line,
+        return validate_canonical_quote({"game_id":game_id,"period":period,"market":market,"entity_id":entity_id,"line":line,
             "side":_side(row.market_type, side),"american_odds":price,"book_key":row.book,"is_alternate":False,
             "raw_market_name":row.market_type,"retrieved_at":row.observed_at,"ttl_seconds":3600,"sportsbook":row.book,
             "selection":side,"source_url":"MANUAL"})
@@ -69,7 +80,7 @@ def run_canonical_manual_mlb(rows: Iterable[Mapping[str, Any]], *, opener=urlope
         market = resolve_manual_market_type(row.market_type)
         entity_id = row.subject_id or str(g.game_pk)
         if row.market_type.startswith("PITCHER_") and not row.subject_id: raise CanonicalManualMLBError(f"subject_id required for {row.market_type}")
-        quotes.extend(_pair(row, market, entity_id))
+        quotes.extend(_pair(row, market, entity_id, resolved_game_id=str(g.game_pk)))
         key = (market, entity_id)
         if key not in seen:
             seen.add(key)
