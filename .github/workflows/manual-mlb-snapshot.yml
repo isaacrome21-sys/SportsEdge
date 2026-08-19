@@ -37,7 +37,7 @@ on:
       max_age_minutes:
         description: 'Maximum quote age for a live run.'
         required: false
-        default: '30'
+        default: '60'
 
 permissions:
   contents: write
@@ -86,7 +86,7 @@ jobs:
         run: PYTHONPATH=. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.resolve.outputs.path }}" --allow-stale --output artifacts/manual_mlb_snapshot_card.json
       - name: Run SportsEdge on live supplied lines
         if: steps.resolve.outputs.live == 'true'
-        run: PYTHONPATH=. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.resolve.outputs.path }}" --run-date "${{ steps.resolve.outputs.run_date }}" --max-age-minutes "${{ github.event.inputs.max_age_minutes || '30' }}" --output artifacts/manual_mlb_snapshot_card.json
+        run: PYTHONPATH=. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.resolve.outputs.path }}" --run-date "${{ steps.resolve.outputs.run_date }}" --max-age-minutes "${{ github.event.inputs.max_age_minutes || '60' }}" --output artifacts/manual_mlb_snapshot_card.json
       - name: Persist latest audited result
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
