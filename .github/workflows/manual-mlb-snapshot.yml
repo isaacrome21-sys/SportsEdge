@@ -27,6 +27,15 @@ on:
       - manual_inputs/mlb/**
       - .github/workflows/manual-mlb-snapshot.yml
   workflow_dispatch:
+    inputs:
+      input_path:
+        description: 'Canonical manual MLB JSON path. Leave blank to resolve today automatically.'
+        required: false
+        default: ''
+      max_age_minutes:
+        description: 'Maximum quote age for a live run.'
+        required: false
+        default: '30'
 
 jobs:
   run-snapshot:
@@ -40,8 +49,39 @@ jobs:
         run: python -m pip install --disable-pip-version-check numpy
       - name: Verify canonical manual market contract
         run: PYTHONPATH=. python -m unittest tests.test_manual_quote_contract
-      - name: Run SportsEdge on supplied lines
-        run: PYTHONPATH=. python scripts/run_manual_mlb_snapshot.py --input manual_inputs/mlb/2026-08-17_stl_cin_g1_dk.json --output artifacts/manual_mlb_snapshot_card.json
+      - name: Resolve input
+        id: resolve
+        shell: bash
+        env:
+          DISPATCH_INPUT: ${{ github.event.inputs.input_path }}
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" != "workflow_dispatch" ]]; then
+            echo "path=manual_inputs/mlb/2026-08-17_stl_cin_g1_dk.json" >> "$GITHUB_OUTPUT"
+            echo "live=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          RUN_DATE="$(date -u +%F)"
+          if [[ -n "${DISPATCH_INPUT:-}" ]]; then
+            INPUT="$DISPATCH_INPUT"
+          else
+            mapfile -t MATCHES < <(find manual_inputs/mlb -maxdepth 1 -type f -name "${RUN_DATE}*.json" | sort)
+            if [[ ${#MATCHES[@]} -eq 0 ]]; then
+              echo "TODAY_INPUT_NOT_LOADED: no manual_inputs/mlb/${RUN_DATE}*.json" >&2
+              exit 1
+            fi
+            INPUT="${MATCHES[-1]}"
+          fi
+          [[ -f "$INPUT" ]] || { echo "MANUAL_INPUT_NOT_FOUND: $INPUT" >&2; exit 1; }
+          echo "path=$INPUT" >> "$GITHUB_OUTPUT"
+          echo "run_date=$RUN_DATE" >> "$GITHUB_OUTPUT"
+          echo "live=true" >> "$GITHUB_OUTPUT"
+      - name: Run regression fixture
+        if: steps.resolve.outputs.live != 'true'
+        run: PYTHONPATH=. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.resolve.outputs.path }}" --allow-stale --output artifacts/manual_mlb_snapshot_card.json
+      - name: Run SportsEdge on live supplied lines
+        if: steps.resolve.outputs.live == 'true'
+        run: PYTHONPATH=. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.resolve.outputs.path }}" --run-date "${{ steps.resolve.outputs.run_date }}" --max-age-minutes "${{ github.event.inputs.max_age_minutes }}" --output artifacts/manual_mlb_snapshot_card.json
       - name: Upload result
         uses: actions/upload-artifact@v4
         with:
