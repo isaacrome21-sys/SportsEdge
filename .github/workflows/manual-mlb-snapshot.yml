@@ -39,6 +39,9 @@ on:
         required: false
         default: '30'
 
+permissions:
+  contents: write
+
 jobs:
   run-snapshot:
     runs-on: ubuntu-latest
@@ -84,6 +87,16 @@ jobs:
       - name: Run SportsEdge on live supplied lines
         if: steps.resolve.outputs.live == 'true'
         run: PYTHONPATH=. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.resolve.outputs.path }}" --run-date "${{ steps.resolve.outputs.run_date }}" --max-age-minutes "${{ github.event.inputs.max_age_minutes || '30' }}" --output artifacts/manual_mlb_snapshot_card.json
+      - name: Persist latest audited result
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          cp artifacts/manual_mlb_snapshot_card.json artifacts/manual_mlb_snapshot_card_latest.json
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add artifacts/manual_mlb_snapshot_card_latest.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Persist latest manual MLB SportsEdge result"
+          git push
       - name: Upload result
         uses: actions/upload-artifact@v4
         with:
