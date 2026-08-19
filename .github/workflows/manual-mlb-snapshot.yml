@@ -74,6 +74,7 @@ jobs:
             else
               echo "path=manual_inputs/mlb/2026-08-17_stl_cin_g1_dk.json" >> "$GITHUB_OUTPUT"
               echo "live=false" >> "$GITHUB_OUTPUT"
+              echo "accepted_stale=false" >> "$GITHUB_OUTPUT"
               exit 0
             fi
           fi
@@ -81,11 +82,19 @@ jobs:
           echo "path=$INPUT" >> "$GITHUB_OUTPUT"
           echo "run_date=$RUN_DATE" >> "$GITHUB_OUTPUT"
           echo "live=true" >> "$GITHUB_OUTPUT"
+          if [[ "$INPUT" == *"accepted_lines"* ]]; then
+            echo "accepted_stale=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "accepted_stale=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Run regression fixture
         if: steps.resolve.outputs.live != 'true'
         run: PYTHONPATH=. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.resolve.outputs.path }}" --allow-stale --output artifacts/manual_mlb_snapshot_card.json
+      - name: Run SportsEdge on user-accepted supplied lines
+        if: steps.resolve.outputs.live == 'true' && steps.resolve.outputs.accepted_stale == 'true'
+        run: PYTHONPATH=. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.resolve.outputs.path }}" --allow-stale --output artifacts/manual_mlb_snapshot_card.json
       - name: Run SportsEdge on live supplied lines
-        if: steps.resolve.outputs.live == 'true'
+        if: steps.resolve.outputs.live == 'true' && steps.resolve.outputs.accepted_stale != 'true'
         run: PYTHONPATH=. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.resolve.outputs.path }}" --run-date "${{ steps.resolve.outputs.run_date }}" --max-age-minutes "${{ github.event.inputs.max_age_minutes || '60' }}" --output artifacts/manual_mlb_snapshot_card.json
       - name: Persist latest audited result
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
