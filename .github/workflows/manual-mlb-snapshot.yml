@@ -107,7 +107,9 @@ jobs:
           git commit -m "Persist latest manual MLB SportsEdge result"
           git push
       - name: Upload result
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: manual-mlb-snapshot-card
           path: artifacts/manual_mlb_snapshot_card.json
+          if-no-files-found: warn
