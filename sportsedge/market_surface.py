@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 import json
+from math import isfinite
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -33,6 +34,17 @@ class MarketSlot:
     reason: str | None = None
 
 
+def _window_minutes(window: Mapping[str, Any]) -> tuple[float, float]:
+    try:
+        opens = float(window["opens_minutes_before_first_pitch"])
+        terminal = float(window["terminal_minutes_before_first_pitch"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("MARKET_SURFACE_AVAILABILITY_WINDOW_INVALID") from exc
+    if not isfinite(opens) or not isfinite(terminal) or opens < 0 or terminal < 0 or opens < terminal:
+        raise ValueError("MARKET_SURFACE_AVAILABILITY_WINDOW_INVALID")
+    return opens, terminal
+
+
 def load_market_surface(path: str = "config/mlb_market_surface.json") -> tuple[str, list[MarketSurfaceEntry]]:
     raw = json.loads(Path(path).read_text())
     version = str(raw.get("version", ""))
@@ -51,6 +63,7 @@ def load_market_surface(path: str = "config/mlb_market_surface.json") -> tuple[s
         window = row.get("availability_window")
         if not isinstance(window, Mapping):
             raise ValueError("MARKET_SURFACE_AVAILABILITY_WINDOW_INVALID")
+        _window_minutes(window)
         entries.append(MarketSurfaceEntry(
             market=market,
             scope=str(row.get("scope", "")),
@@ -72,8 +85,8 @@ def _absent_state(entry: MarketSurfaceEntry, *, now: datetime, first_pitch_at: d
     if not entry.provider_expected:
         return "PROVIDER_UNSUPPORTED", False
     minutes = _minutes_to_first_pitch(now, first_pitch_at)
-    terminal_minutes = float(entry.availability_window.get("terminal_minutes_before_first_pitch", 0))
-    if entry.retry_eligible and minutes > terminal_minutes:
+    opens_minutes, terminal_minutes = _window_minutes(entry.availability_window)
+    if entry.retry_eligible and (minutes > opens_minutes or minutes > terminal_minutes):
         return "NOT_OFFERED", True
     return entry.terminal_if_absent, False
 
