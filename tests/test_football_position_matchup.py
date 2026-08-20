@@ -34,6 +34,31 @@ def test_direct_oe_shape_builds_weighted_features():
     assert abs(out["opp_wr_target_share_oe_weighted"]) < 0.08
 
 
+def test_offensive_usage_crosses_defensive_oe():
+    out = build_positional_matchup_features({
+        "positional_target_share_oe_allowed": {"WR": 0.02, "TE": 0.10, "RB": -0.04},
+        "same_defensive_playcaller": True,
+        "returning_defensive_starter_share": 1.0,
+        "offense_positional_target_share": {"WR": 0.55, "TE": 0.30, "RB": 0.15},
+    })
+    assert abs(out["wr_usage_x_opp_target_oe"] - 0.011) < 1e-12
+    assert abs(out["te_usage_x_opp_target_oe"] - 0.030) < 1e-12
+    assert abs(out["rb_usage_x_opp_target_oe"] + 0.006) < 1e-12
+    assert abs(out["positional_target_matchup_pressure"] - 0.035) < 1e-12
+
+
+def test_usage_interaction_rejects_broken_share_sum():
+    try:
+        build_positional_matchup_features({
+            "positional_target_share_oe_allowed": {"WR": 0.02, "TE": 0.10, "RB": -0.04},
+            "offense_positional_target_share": {"WR": 0.30, "TE": 0.10, "RB": 0.05},
+        })
+    except ValueError as exc:
+        assert str(exc) == "POSITION_MATCHUP_USAGE_SUM_OUT_OF_RANGE"
+    else:
+        raise AssertionError("expected usage-share validation failure")
+
+
 def _nfl_source():
     return {
         "feature_asof_ts": "2026-08-19T12:00:00+00:00",
@@ -60,6 +85,7 @@ def _nfl_source():
         "qb_adjustment": 0.03,
         "prior_efficiency": 0.02,
         "positional_target_share_oe_allowed": {"WR": 0.05, "TE": 0.09, "RB": -0.04},
+        "offense_positional_target_share": {"WR": 0.58, "TE": 0.24, "RB": 0.18},
         "same_defensive_playcaller": True,
         "returning_defensive_starter_share": 0.9,
     }
@@ -69,6 +95,8 @@ def test_nfl_m2_includes_positional_matchup_features():
     out = build_nfl_m2_features(_nfl_source())
     assert out["opp_te_target_share_oe_allowed"] == 0.09
     assert out["defensive_playcaller_changed"] == 0.0
+    assert "te_usage_x_opp_target_oe" in out
+    assert "positional_target_matchup_pressure" in out
 
 
 def test_cfb_m2_includes_positional_matchup_features():
@@ -84,6 +112,7 @@ def test_cfb_m2_includes_positional_matchup_features():
         "venue_hfa": 2.2,
         "positional_target_share_allowed": {"WR": 0.62, "TE": 0.18, "RB": 0.20},
         "positional_target_share_expected": {"WR": 0.57, "TE": 0.21, "RB": 0.22},
+        "offense_positional_target_share": {"WR": 0.61, "TE": 0.20, "RB": 0.19},
         "same_defensive_playcaller": False,
         "returning_defensive_starter_share": 0.55,
     }
@@ -91,3 +120,4 @@ def test_cfb_m2_includes_positional_matchup_features():
     assert abs(out["opp_wr_target_share_oe_allowed"] - 0.05) < 1e-12
     assert abs(out["opp_te_target_share_oe_allowed"] + 0.03) < 1e-12
     assert out["defensive_playcaller_changed"] == 1.0
+    assert "wr_usage_x_opp_target_oe" in out
