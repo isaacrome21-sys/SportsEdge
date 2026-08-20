@@ -1,8 +1,9 @@
 """CFB M2 v1: market-blind football features and walk-forward comparison.
 
 Feature contract: opponent-adjusted efficiency, returning production,
-preseason prior rating, and venue HFA. Sportsbook lines/prices/probabilities
-are explicitly prohibited from M2 features.
+preseason prior rating, venue HFA, and positional target-share over expected
+allowed. Sportsbook lines/prices/probabilities are explicitly prohibited from
+M2 features.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ from datetime import datetime
 from math import log
 from typing import Any, Iterable
 
+from sportsedge.core.position_matchup import build_positional_matchup_features
 from sportsedge.core.walkforward.season import season_walk_forward
 
 
@@ -69,7 +71,7 @@ def build_cfb_m2_features(source: dict[str, Any]) -> dict[str, float | str]:
     prior = _num(source, "prior_rating")
     hfa = _num(source, "venue_hfa")
 
-    return {
+    features: dict[str, float | str] = {
         "adj_off_eff": off_epa - opp_def,
         "adj_def_eff": def_epa - opp_off,
         "returning_production": returning,
@@ -77,6 +79,8 @@ def build_cfb_m2_features(source: dict[str, Any]) -> dict[str, float | str]:
         "venue_hfa": hfa,
         "feature_asof_ts": asof.isoformat(),
     }
+    features.update(build_positional_matchup_features(source))
+    return features
 
 
 @dataclass(frozen=True)
