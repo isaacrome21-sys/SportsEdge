@@ -6,6 +6,7 @@ from datetime import datetime
 from math import log
 from typing import Any, Iterable
 
+from sportsedge.core.position_matchup import build_positional_matchup_features
 from sportsedge.core.walkforward.season import season_walk_forward
 
 BANNED_MARKET_KEYS = {
@@ -32,8 +33,6 @@ def _is_market_derived_key(key: Any) -> bool:
     name = str(key).strip().lower()
     if name in BANNED_MARKET_KEYS or name in BANNED_MARKET_ALIASES:
         return True
-    # Probability aliases are specific enough to reject by phrase while
-    # avoiding broad token rules that would flag normal football features.
     if "implied_prob" in name or "implied_probability" in name:
         return True
     if "novig_prob" in name or "no_vig_prob" in name or "no_vig_probability" in name:
@@ -87,7 +86,7 @@ def build_nfl_m2_features(source: dict[str, Any]) -> dict[str, float | str]:
     if not 0.0 <= prior_weight <= 1.0:
         raise ValueError("M2_PRIOR_WEIGHT_OUT_OF_RANGE")
 
-    return {
+    features: dict[str, float | str] = {
         "adj_off_epa": off - opp_def,
         "adj_def_epa": deff - opp_off,
         "pass_epa": _num(source, "pass_epa"),
@@ -109,6 +108,8 @@ def build_nfl_m2_features(source: dict[str, Any]) -> dict[str, float | str]:
         "prior_weight": prior_weight,
         "feature_asof_ts": asof.isoformat(),
     }
+    features.update(build_positional_matchup_features(source))
+    return features
 
 
 @dataclass(frozen=True)
