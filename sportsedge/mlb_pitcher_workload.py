@@ -153,6 +153,16 @@ class PitcherWorkloadEngine:
             state.removed = True
             self._index += 1
 
+    def record_non_pa_out(self, pitcher_id: str, *, outs: int = 1) -> None:
+        """Credit a defensive out (e.g. caught stealing) without adding BF."""
+        if outs < 1:
+            raise ValueError("NON_PA_OUT_MUST_BE_POSITIVE")
+        current = self.assign_pitcher()
+        state = self._state[pitcher_id]
+        if pitcher_id != current or state.removed:
+            raise ValueError(f"NON_PA_OUT_AFTER_PITCHER_REMOVAL:{pitcher_id}")
+        state.outs += outs
+
     def snapshots(self) -> dict[str, PitcherWorkloadSnapshot]:
         return {
             pitcher_id: PitcherWorkloadSnapshot(
