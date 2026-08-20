@@ -13,6 +13,7 @@ import random
 from typing import Iterable, Mapping, Sequence
 
 from .mlb_pitcher_workload import PitchingStaffConfig, PitcherWorkloadEngine, PitcherWorkloadSnapshot
+from .mlb_baserunning import BaserunningConfig, BaserunningEngine
 
 _OUTCOMES = ("K", "BB_HBP", "1B", "2B", "3B", "HR", "BIP_OUT")
 
@@ -79,6 +80,8 @@ class PlayerPathStats:
     bip_outs: int = 0
     runs: int = 0
     rbi: int = 0
+    stolen_bases: int = 0
+    caught_stealing: int = 0
 
     @property
     def bb_hbp(self) -> int:
@@ -101,6 +104,8 @@ class GameConfig:
     max_plate_appearances_per_half_inning: int = 200
     away_pitching: PitchingStaffConfig | None = None
     home_pitching: PitchingStaffConfig | None = None
+    away_baserunning: BaserunningConfig | None = None
+    home_baserunning: BaserunningConfig | None = None
 
     def __post_init__(self) -> None:
         if not self.away or not self.home:
@@ -118,6 +123,8 @@ class GameConfig:
 @dataclass(frozen=True)
 class SBPathAttempt:
     runner_id: str
+    from_base: int
+    to_base: int
     base_occupied_before: bool
     success: bool
 
@@ -184,6 +191,17 @@ class GameMarketReadouts:
     f5_total_pmf: Mapping[int, float]
     nrfi_probability: float
     yrfi_probability: float
+
+
+@dataclass(frozen=True)
+class PlayerMarketReadouts:
+    hits_pmf: Mapping[int, float]
+    total_bases_pmf: Mapping[int, float]
+    hr_pmf: Mapping[int, float]
+    rbi_pmf: Mapping[int, float]
+    runs_pmf: Mapping[int, float]
+    h_r_rbi_pmf: Mapping[int, float]
+    stolen_bases_pmf: Mapping[int, float]
 
 
 def _stats(stats: dict[str, PlayerPathStats], player_id: str) -> PlayerPathStats:
@@ -275,7 +293,9 @@ def _half_inning(
     inning: int,
     half: str,
     pitching: PitcherWorkloadEngine | None,
+    baserunning: BaserunningEngine | None,
     events: list[PAPathEvent],
+    sb_attempts: list[SBPathAttempt],
 ) -> tuple[int, int, int]:
     outs = 0
     runs = 0
@@ -297,6 +317,42 @@ def _half_inning(
         outs += outs_added
         runs += runs_added
         batters_faced += 1
+
+        if baserunning is not None and outs < 3:
+            steal_pitcher_id = pitching.assign_pitcher() if pitching is not None else pitcher_id
+            decision = baserunning.maybe_attempt(
+                bases=bases,
+                pitcher_id=steal_pitcher_id,
+                catcher_id=None,
+                outs=outs,
+                score_diff=0,
+            )
+            if decision is not None:
+                from_idx = decision.from_base - 1
+                to_idx = decision.to_base - 1
+                runner = bases[from_idx]
+                if runner is None or runner.player_id != decision.runner_id:
+                    raise ValueError("SB_RUNNER_STATE_MISMATCH")
+                sb_attempts.append(SBPathAttempt(
+                    runner_id=decision.runner_id,
+                    from_base=decision.from_base,
+                    to_base=decision.to_base,
+                    base_occupied_before=True,
+                    success=decision.success,
+                ))
+                runner_stats = _stats(stats, decision.runner_id)
+                if decision.success:
+                    if bases[to_idx] is not None:
+                        raise ValueError("SB_DESTINATION_OCCUPIED")
+                    bases[to_idx] = runner
+                    bases[from_idx] = None
+                    runner_stats.stolen_bases += 1
+                else:
+                    bases[from_idx] = None
+                    runner_stats.caught_stealing += 1
+                    outs += 1
+                    if pitching is not None and steal_pitcher_id is not None:
+                        pitching.record_non_pa_out(steal_pitcher_id, outs=1)
     return runs, lineup_index, batters_faced
 
 
@@ -304,6 +360,7 @@ def simulate_game(config: GameConfig, rng: random.Random | None = None) -> GameP
     rng = rng or random.Random()
     stats: dict[str, PlayerPathStats] = {}
     events: list[PAPathEvent] = []
+    sb_attempts: list[SBPathAttempt] = []
     away_idx = home_idx = 0
     away_runs_by_inning: list[int] = []
     home_runs_by_inning: list[int] = []
@@ -311,11 +368,14 @@ def simulate_game(config: GameConfig, rng: random.Random | None = None) -> GameP
     away_outs = home_outs = 0
     away_pitching = PitcherWorkloadEngine(config.away_pitching, rng) if config.away_pitching else None
     home_pitching = PitcherWorkloadEngine(config.home_pitching, rng) if config.home_pitching else None
+    away_baserunning = BaserunningEngine(config.away_baserunning, rng) if config.away_baserunning else None
+    home_baserunning = BaserunningEngine(config.home_baserunning, rng) if config.home_baserunning else None
 
     for inning in range(1, config.innings + 1):
         away_runs, away_idx, away_pa = _half_inning(
             config.away, away_idx, rng, stats, config.max_plate_appearances_per_half_inning,
-            inning=inning, half="TOP", pitching=home_pitching, events=events,
+            inning=inning, half="TOP", pitching=home_pitching, baserunning=away_baserunning,
+            events=events, sb_attempts=sb_attempts,
         )
         away_runs_by_inning.append(away_runs)
         away_bf += away_pa
@@ -327,7 +387,8 @@ def simulate_game(config: GameConfig, rng: random.Random | None = None) -> GameP
 
         home_runs, home_idx, home_pa = _half_inning(
             config.home, home_idx, rng, stats, config.max_plate_appearances_per_half_inning,
-            inning=inning, half="BOTTOM", pitching=away_pitching, events=events,
+            inning=inning, half="BOTTOM", pitching=away_pitching, baserunning=home_baserunning,
+            events=events, sb_attempts=sb_attempts,
         )
         home_runs_by_inning.append(home_runs)
         home_bf += home_pa
@@ -351,6 +412,7 @@ def simulate_game(config: GameConfig, rng: random.Random | None = None) -> GameP
         home_outs=home_outs,
         pa_events=events,
         pitcher_stats=pitcher_stats,
+        sb_attempts=sb_attempts,
     )
     validate_path_conservation(path)
     return path
@@ -392,6 +454,21 @@ def read_game_markets(paths: Sequence[GamePath]) -> GameMarketReadouts:
         f5_total_pmf=_pmf(sum(p.first_five_runs) for p in paths),
         nrfi_probability=nrfi,
         yrfi_probability=1.0 - nrfi,
+    )
+
+
+def read_player_markets(paths: Sequence[GamePath], player_id: str) -> PlayerMarketReadouts:
+    if not paths:
+        raise ValueError("EMPTY_SIMULATION_SET")
+    stats_by_path = [p.player_stats.get(player_id, PlayerPathStats()) for p in paths]
+    return PlayerMarketReadouts(
+        hits_pmf=_pmf(s.hits for s in stats_by_path),
+        total_bases_pmf=_pmf(s.total_bases for s in stats_by_path),
+        hr_pmf=_pmf(s.hr for s in stats_by_path),
+        rbi_pmf=_pmf(s.rbi for s in stats_by_path),
+        runs_pmf=_pmf(s.runs for s in stats_by_path),
+        h_r_rbi_pmf=_pmf(s.hits + s.runs + s.rbi for s in stats_by_path),
+        stolen_bases_pmf=_pmf(s.stolen_bases for s in stats_by_path),
     )
 
 
