@@ -4,11 +4,14 @@ from __future__ import annotations
 import argparse, json
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from sportsedge.canonical_manual_mlb import run_canonical_manual_mlb
 from sportsedge.manual_mlb_snapshot import run_manual_mlb_snapshot
 from sportsedge.manual_quote import validate_manual_quote
 from sportsedge.runtime import parse_timestamp
+
+CHICAGO_TZ = ZoneInfo("America/Chicago")
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -20,17 +23,22 @@ def _as_utc(value: datetime) -> datetime:
 def validate_live_rows(rows, *, run_date: str | None, max_age_minutes: int, as_of: datetime) -> None:
     if not isinstance(rows, list) or not rows:
         raise ValueError("MANUAL_INPUT_EMPTY")
+    if max_age_minutes <= 0:
+        raise ValueError("MANUAL_MAX_AGE_INVALID")
     now = _as_utc(as_of)
     for index, raw in enumerate(rows):
         quote = validate_manual_quote(raw)
-        if run_date and quote.first_pitch_at.date().isoformat() != run_date:
+        first_pitch_utc = _as_utc(quote.first_pitch_at)
+        first_pitch_ct_date = first_pitch_utc.astimezone(CHICAGO_TZ).date().isoformat()
+        if run_date and first_pitch_ct_date != run_date:
             raise ValueError(
                 f"MANUAL_INPUT_DATE_MISMATCH row={index} expected={run_date} "
-                f"first_pitch_date={quote.first_pitch_at.date().isoformat()}"
+                f"first_pitch_date_ct={first_pitch_ct_date}"
             )
-        if _as_utc(quote.first_pitch_at) <= now:
+        if first_pitch_utc <= now:
             raise ValueError(f"MANUAL_QUOTE_GAME_STARTED row={index} game_id={quote.game_id}")
-        age_minutes = (now - _as_utc(quote.observed_at)).total_seconds() / 60.0
+        observed_utc = _as_utc(quote.observed_at)
+        age_minutes = (now - observed_utc).total_seconds() / 60.0
         if age_minutes < 0:
             raise ValueError(f"MANUAL_QUOTE_FROM_FUTURE row={index} game_id={quote.game_id}")
         if age_minutes > max_age_minutes:
@@ -72,7 +80,7 @@ def main() -> int:
     p.add_argument("--input", required=True)
     p.add_argument("--output", default="artifacts/manual_mlb_snapshot_card.json")
     p.add_argument("--history-cache-dir", default=".cache/mlb-history")
-    p.add_argument("--run-date", help="Expected local first-pitch date (YYYY-MM-DD)")
+    p.add_argument("--run-date", help="Expected Chicago-local first-pitch date (YYYY-MM-DD)")
     p.add_argument("--max-age-minutes", type=int, default=30)
     p.add_argument("--as-of", help="Override current time for deterministic regression tests")
     p.add_argument("--allow-stale", action="store_true", help="Regression fixtures only; bypass live date/recency gates")
