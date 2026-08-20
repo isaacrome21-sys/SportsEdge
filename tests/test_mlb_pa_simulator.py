@@ -34,11 +34,13 @@ class MLBPASimulatorTests(unittest.TestCase):
         away = (hr_batter("slugger"),) + tuple(out_batter(f"a{i}") for i in range(1, 9))
         home = tuple(out_batter(f"h{i}") for i in range(9))
         path = simulate_game(GameConfig(away=away, home=home, innings=9), random.Random(2))
-        self.assertEqual(path.away_runs, 3)
+        # With a continuous batting order and three outs per inning, the leadoff
+        # hitter bats in innings 1, 3, 6 and 9 in this deterministic toy path.
+        self.assertEqual(path.away_runs, 4)
         self.assertEqual(path.home_runs, 0)
-        self.assertEqual(path.player_stats["slugger"].hr, 3)
-        self.assertEqual(path.player_stats["slugger"].hits, 3)
-        self.assertEqual(path.player_stats["slugger"].total_bases, 12)
+        self.assertEqual(path.player_stats["slugger"].hr, 4)
+        self.assertEqual(path.player_stats["slugger"].hits, 4)
+        self.assertEqual(path.player_stats["slugger"].total_bases, 16)
         validate_path_conservation(path)
 
     def test_readouts_come_from_same_paths(self):
@@ -48,9 +50,9 @@ class MLBPASimulatorTests(unittest.TestCase):
         markets = read_game_markets(sim)
         self.assertEqual(markets.home_moneyline_probability, 0.0)
         self.assertEqual(markets.away_moneyline_probability, 1.0)
-        self.assertEqual(markets.margin_pmf, {-3: 1.0})
-        self.assertEqual(markets.total_pmf, {3: 1.0})
-        self.assertEqual(markets.away_team_total_pmf, {3: 1.0})
+        self.assertEqual(markets.margin_pmf, {-4: 1.0})
+        self.assertEqual(markets.total_pmf, {4: 1.0})
+        self.assertEqual(markets.away_team_total_pmf, {4: 1.0})
         self.assertEqual(markets.home_team_total_pmf, {0: 1.0})
         self.assertEqual(markets.nrfi_probability, 0.0)
         self.assertEqual(markets.yrfi_probability, 1.0)
