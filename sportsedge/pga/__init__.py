@@ -32,6 +32,7 @@ from .market_pricing import (
     probability_to_american,
     two_way_no_vig,
 )
+from .pin_locations import PinDifficulty, PinLocation, pin_difficulty, round_pin_adjustment
 from .runner import LiveRunOutput, run_live_pga_model
 from .snapshot import (
     SnapshotEnvelope,
@@ -51,6 +52,8 @@ __all__ = [
     "LiveWeights",
     "MarketIdentity",
     "MarketPrice",
+    "PinDifficulty",
+    "PinLocation",
     "PlayerLiveState",
     "SnapshotEnvelope",
     "SourceStamp",
@@ -70,9 +73,11 @@ __all__ = [
     "make_snapshot_envelope",
     "normalize_player_name",
     "payload_sha256",
+    "pin_difficulty",
     "price_selection",
     "probability_to_american",
     "read_snapshot",
+    "round_pin_adjustment",
     "run_live_pga_model",
     "simulate_remaining_tournament",
     "two_way_no_vig",
