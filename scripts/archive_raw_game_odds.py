@@ -263,10 +263,12 @@ def main() -> int:
     ledger_path = _ledger_path()
     ledger = _load_ledger(ledger_path, cap=cap, now=now)
     status_path = _status_path(now)
+    execution_mode = os.environ.get("SPORTSEDGE_EXECUTION_MODE", "UNSPECIFIED").strip() or "UNSPECIFIED"
 
     base = {
         "run_at_utc": now.isoformat(),
         "slate_date_ct": slate,
+        "execution_mode": execution_mode,
         "markets_requested": list(MARKETS),
         "request_cost_estimate": estimated_cost,
         "credits_consumed_actual": 0,
