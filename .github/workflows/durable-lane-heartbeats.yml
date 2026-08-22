@@ -1,0 +1,176 @@
+name: durable-lane-heartbeats
+
+on:
+  workflow_run:
+    workflows:
+      - archive-mlb-game-odds
+      - nrfi-v6-cumulative-settlement
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: durable-lane-heartbeats
+  cancel-in-progress: false
+
+jobs:
+  persist-heartbeat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Resolve source workflow context
+        id: ctx
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            echo "workflow_name=${{ github.event.workflow_run.name }}" >> "$GITHUB_OUTPUT"
+            echo "workflow_run_id=${{ github.event.workflow_run.id }}" >> "$GITHUB_OUTPUT"
+            echo "workflow_head_sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+            echo "trigger=${{ github.event.workflow_run.event }}" >> "$GITHUB_OUTPUT"
+            echo "started_at=${{ github.event.workflow_run.run_started_at }}" >> "$GITHUB_OUTPUT"
+            echo "updated_at=${{ github.event.workflow_run.updated_at }}" >> "$GITHUB_OUTPUT"
+            echo "conclusion=${{ github.event.workflow_run.conclusion }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "workflow_name=manual" >> "$GITHUB_OUTPUT"
+            echo "workflow_run_id=${GITHUB_RUN_ID}" >> "$GITHUB_OUTPUT"
+            echo "workflow_head_sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+            echo "trigger=workflow_dispatch" >> "$GITHUB_OUTPUT"
+            echo "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+            echo "updated_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+            echo "conclusion=manual" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout durable data branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data
+          git worktree add --detach .data-branch FETCH_HEAD
+
+      - name: Resolve durable source artifact
+        id: source
+        shell: bash
+        env:
+          WORKFLOW_NAME: ${{ steps.ctx.outputs.workflow_name }}
+          WORKFLOW_RUN_ID: ${{ steps.ctx.outputs.workflow_run_id }}
+          STARTED_AT: ${{ steps.ctx.outputs.started_at }}
+          UPDATED_AT: ${{ steps.ctx.outputs.updated_at }}
+        run: |
+          set -euo pipefail
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os
+          from datetime import datetime, timezone, timedelta
+          from pathlib import Path
+
+          root=Path('.data-branch')
+          name=os.environ['WORKFLOW_NAME']
+          run_id=os.environ['WORKFLOW_RUN_ID']
+
+          if name == 'nrfi-v6-cumulative-settlement':
+              rel=f'runtime/model-validation/NRFI_YRFI/runs/{run_id}/nrfi_v6_forward_shadow_report.json'
+              p=root/rel
+              if not p.is_file():
+                  raise SystemExit(f'NRFI durable source missing for run {run_id}: {rel}')
+              d=json.loads(p.read_text())
+              print('lane=nrfi')
+              print(f'source_artifact={rel}')
+              print(f'status={d.get("state","UNKNOWN")}')
+          elif name == 'archive-mlb-game-odds':
+              def parse(x):
+                  if x.endswith('Z'): x=x[:-1]+'+00:00'
+                  return datetime.fromisoformat(x).astimezone(timezone.utc)
+              started=parse(os.environ['STARTED_AT'])-timedelta(minutes=1)
+              updated=parse(os.environ['UPDATED_AT'])+timedelta(minutes=1)
+              candidates=[]
+              for p in root.glob('runtime/archive-status/*/run_*.json'):
+                  try:
+                      d=json.loads(p.read_text())
+                      t=parse(str(d['run_at_utc']))
+                  except Exception:
+                      continue
+                  if started <= t <= updated:
+                      candidates.append((t,p,d))
+              if not candidates:
+                  raise SystemExit(f'archive durable source missing inside workflow interval for run {run_id}')
+              t,p,d=max(candidates,key=lambda x:x[0])
+              rel=str(p.relative_to(root))
+              print('lane=archive')
+              print(f'source_artifact={rel}')
+              print(f'status={d.get("status","UNKNOWN")}')
+          else:
+              raise SystemExit(f'unsupported source workflow: {name}')
+          PY
+
+      - name: Verify source is durable and build pointer cache
+        shell: bash
+        env:
+          LANE: ${{ steps.source.outputs.lane }}
+          SOURCE_ARTIFACT: ${{ steps.source.outputs.source_artifact }}
+          STATUS: ${{ steps.source.outputs.status }}
+          WORKFLOW_RUN_ID: ${{ steps.ctx.outputs.workflow_run_id }}
+          TRIGGER: ${{ steps.ctx.outputs.trigger }}
+          WORKFLOW_HEAD_SHA: ${{ steps.ctx.outputs.workflow_head_sha }}
+          WORKFLOW_CONCLUSION: ${{ steps.ctx.outputs.conclusion }}
+        run: |
+          set -euo pipefail
+          DURABLE_SHA=$(git -C .data-branch rev-parse HEAD)
+          POINTER="runtime/heartbeat/${LANE}_latest.json"
+          python scripts/update_lane_heartbeat.py \
+            --data-root .data-branch \
+            --lane "$LANE" \
+            --source-artifact "$SOURCE_ARTIFACT" \
+            --durable-sha "$DURABLE_SHA" \
+            --status "$STATUS" \
+            --pointer "$POINTER" \
+            --workflow-run-id "$WORKFLOW_RUN_ID" \
+            --trigger "$TRIGGER"
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          from pathlib import Path
+          root=Path('.data-branch')
+          lane=os.environ['LANE']
+          run_id=os.environ['WORKFLOW_RUN_ID']
+          rel=f'runtime/run-metadata/{lane}/{run_id}.json'
+          p=root/rel
+          p.parent.mkdir(parents=True,exist_ok=True)
+          payload={
+            'lane': lane,
+            'workflow_run_id': run_id,
+            'workflow_head_sha': os.environ['WORKFLOW_HEAD_SHA'],
+            'workflow_conclusion': os.environ['WORKFLOW_CONCLUSION'],
+            'trigger': os.environ['TRIGGER'],
+            'source_artifact': os.environ['SOURCE_ARTIFACT'],
+            'evidence_commit_sha': __import__('subprocess').check_output(['git','-C',str(root),'rev-parse','HEAD'],text=True).strip(),
+            'persisted_at_utc': datetime.now(timezone.utc).isoformat(),
+            'role': 'DURABLE_RUN_METADATA_COMPANION',
+          }
+          p.write_text(json.dumps(payload,indent=2,sort_keys=True)+'\n')
+          PY
+          python scripts/build_lane_status.py --data-root .data-branch
+
+      - name: Persist pointers and status view in a second commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd .data-branch
+          git config user.name sportsedge-heartbeat-bot
+          git config user.email sportsedge-heartbeat-bot@users.noreply.github.com
+          git add runtime/heartbeat runtime/run-metadata
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "heartbeat: persist durable lane pointer for run ${{ steps.ctx.outputs.workflow_run_id }}"
+          pushed=0
+          for attempt in 1 2 3 4 5; do
+            git fetch origin data
+            git rebase origin/data || { git rebase --abort || true; sleep $((attempt * 2)); continue; }
+            if git push origin HEAD:data; then pushed=1; break; fi
+            sleep $((attempt * 2))
+          done
+          test "$pushed" -eq 1
