@@ -6,7 +6,6 @@ on:
       - archive-mlb-game-odds
       - nrfi-v6-cumulative-settlement
     types: [completed]
-  workflow_dispatch:
 
 permissions:
   contents: write
@@ -29,23 +28,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ "${{ github.event_name }}" = "workflow_run" ]; then
-            echo "workflow_name=${{ github.event.workflow_run.name }}" >> "$GITHUB_OUTPUT"
-            echo "workflow_run_id=${{ github.event.workflow_run.id }}" >> "$GITHUB_OUTPUT"
-            echo "workflow_head_sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
-            echo "trigger=${{ github.event.workflow_run.event }}" >> "$GITHUB_OUTPUT"
-            echo "started_at=${{ github.event.workflow_run.run_started_at }}" >> "$GITHUB_OUTPUT"
-            echo "updated_at=${{ github.event.workflow_run.updated_at }}" >> "$GITHUB_OUTPUT"
-            echo "conclusion=${{ github.event.workflow_run.conclusion }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "workflow_name=manual" >> "$GITHUB_OUTPUT"
-            echo "workflow_run_id=${GITHUB_RUN_ID}" >> "$GITHUB_OUTPUT"
-            echo "workflow_head_sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-            echo "trigger=workflow_dispatch" >> "$GITHUB_OUTPUT"
-            echo "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
-            echo "updated_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
-            echo "conclusion=manual" >> "$GITHUB_OUTPUT"
-          fi
+          echo "workflow_name=${{ github.event.workflow_run.name }}" >> "$GITHUB_OUTPUT"
+          echo "workflow_run_id=${{ github.event.workflow_run.id }}" >> "$GITHUB_OUTPUT"
+          echo "workflow_head_sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          echo "trigger=${{ github.event.workflow_run.event }}" >> "$GITHUB_OUTPUT"
+          echo "started_at=${{ github.event.workflow_run.run_started_at }}" >> "$GITHUB_OUTPUT"
+          echo "updated_at=${{ github.event.workflow_run.updated_at }}" >> "$GITHUB_OUTPUT"
+          echo "conclusion=${{ github.event.workflow_run.conclusion }}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout durable data branch
         shell: bash
@@ -82,6 +71,8 @@ jobs:
               print('lane=nrfi')
               print(f'source_artifact={rel}')
               print(f'status={d.get("state","UNKNOWN")}')
+              print(f'source_event_at_utc={d.get("generated_at_utc","")}')
+              print(f'evidence_count={int(d.get("settled_unique_games",0) or 0)}')
           elif name == 'archive-mlb-game-odds':
               def parse(x):
                   if x.endswith('Z'): x=x[:-1]+'+00:00'
@@ -104,6 +95,8 @@ jobs:
               print('lane=archive')
               print(f'source_artifact={rel}')
               print(f'status={d.get("status","UNKNOWN")}')
+              print(f'source_event_at_utc={d.get("run_at_utc","")}')
+              print(f'evidence_count={int(d.get("games_captured",0) or 0)}')
           else:
               raise SystemExit(f'unsupported source workflow: {name}')
           PY
@@ -114,6 +107,8 @@ jobs:
           LANE: ${{ steps.source.outputs.lane }}
           SOURCE_ARTIFACT: ${{ steps.source.outputs.source_artifact }}
           STATUS: ${{ steps.source.outputs.status }}
+          SOURCE_EVENT_AT_UTC: ${{ steps.source.outputs.source_event_at_utc }}
+          EVIDENCE_COUNT: ${{ steps.source.outputs.evidence_count }}
           WORKFLOW_RUN_ID: ${{ steps.ctx.outputs.workflow_run_id }}
           TRIGGER: ${{ steps.ctx.outputs.trigger }}
           WORKFLOW_HEAD_SHA: ${{ steps.ctx.outputs.workflow_head_sha }}
@@ -130,9 +125,11 @@ jobs:
             --status "$STATUS" \
             --pointer "$POINTER" \
             --workflow-run-id "$WORKFLOW_RUN_ID" \
-            --trigger "$TRIGGER"
+            --trigger "$TRIGGER" \
+            --source-event-at-utc "$SOURCE_EVENT_AT_UTC" \
+            --evidence-count "$EVIDENCE_COUNT"
           python - <<'PY'
-          import json, os
+          import json, os, subprocess
           from datetime import datetime, timezone
           from pathlib import Path
           root=Path('.data-branch')
@@ -148,7 +145,9 @@ jobs:
             'workflow_conclusion': os.environ['WORKFLOW_CONCLUSION'],
             'trigger': os.environ['TRIGGER'],
             'source_artifact': os.environ['SOURCE_ARTIFACT'],
-            'evidence_commit_sha': __import__('subprocess').check_output(['git','-C',str(root),'rev-parse','HEAD'],text=True).strip(),
+            'source_event_at_utc': os.environ['SOURCE_EVENT_AT_UTC'],
+            'evidence_count': int(os.environ['EVIDENCE_COUNT']),
+            'evidence_commit_sha': subprocess.check_output(['git','-C',str(root),'rev-parse','HEAD'],text=True).strip(),
             'persisted_at_utc': datetime.now(timezone.utc).isoformat(),
             'role': 'DURABLE_RUN_METADATA_COMPANION',
           }
