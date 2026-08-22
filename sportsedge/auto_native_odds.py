@@ -224,9 +224,6 @@ def run_auto_mlb_native_odds(
                     continue
 
                 if market == "PITCHER_BB":
-                    # Validated BB production features remain a separate exact contract.
-                    # Until the native rate/workload builder is available, preserve the
-                    # quote and fail closed rather than manufacturing those inputs.
                     raise ValueError("MLB_PITCHER_BB_NATIVE_VALIDATED_FEATURES_UNAVAILABLE")
 
                 if market in GAME_MARKETS:
@@ -290,9 +287,12 @@ def run_auto_mlb_native_odds(
         {"stage": "ODDS_API", **dict(item)} for item in odds["failures"]
     ] + roster_failures + native_feature_failures
     return AutoRunReport(
-        report.slate_date_ct,
-        report.generated_at_utc,
-        report.run_status,
-        report.results,
-        tuple(acquisition_failures) + report.source_failures,
+        slate_date_ct=report.slate_date_ct,
+        generated_at_utc=report.generated_at_utc,
+        run_status=report.run_status,
+        card_status=report.card_status,
+        results=report.results,
+        coverage_slots=report.coverage_slots,
+        source_failures=tuple(acquisition_failures) + report.source_failures,
+        market_surface_version=report.market_surface_version,
     )
