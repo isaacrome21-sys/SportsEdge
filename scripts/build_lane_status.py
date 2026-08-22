@@ -3,12 +3,19 @@ import argparse
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 LANES = ("archive_latest.json", "nrfi_latest.json")
 STALE_AFTER_SECONDS = {
     "archive": 3 * 60 * 60,
     "nrfi": 36 * 60 * 60,
 }
+CT = ZoneInfo("America/Chicago")
+# Archive captures can legitimately be idle overnight. T-180 capture opportunities
+# can begin in the morning and late West Coast games can keep the lane active past
+# midnight CT, so only suppress ordinary age-based staleness from 02:00-08:00 CT.
+ARCHIVE_QUIET_START_HOUR_CT = 2
+ARCHIVE_QUIET_END_HOUR_CT = 8
 
 
 def _parse_utc(value: str | None):
@@ -24,6 +31,11 @@ def _parse_utc(value: str | None):
         return dt.astimezone(timezone.utc)
     except Exception:
         return None
+
+
+def _archive_quiet_window(now: datetime) -> bool:
+    hour = now.astimezone(CT).hour
+    return ARCHIVE_QUIET_START_HOUR_CT <= hour < ARCHIVE_QUIET_END_HOUR_CT
 
 
 def load_json_state(path: Path):
@@ -70,11 +82,14 @@ def build(root: Path, *, now: datetime | None = None) -> dict:
         if durable_at is not None:
             age_seconds = max(0, int((now - durable_at).total_seconds()))
         stale_after = STALE_AFTER_SECONDS[lane]
+        quiet_window = lane == "archive" and _archive_quiet_window(now)
 
         if not source_ok:
             state = "POINTER_SOURCE_MISSING"
         elif durable_at is None:
             state = "POINTER_TIMESTAMP_UNREADABLE"
+        elif lane == "archive" and quiet_window and age_seconds is not None and age_seconds > stale_after:
+            state = "LANE_QUIET_WINDOW"
         elif age_seconds is not None and age_seconds > stale_after:
             state = "LANE_STALE"
         else:
@@ -87,6 +102,8 @@ def build(root: Path, *, now: datetime | None = None) -> dict:
             "last_durable_at_utc": d.get("last_durable_at_utc"),
             "age_seconds": age_seconds,
             "stale_after_seconds": stale_after,
+            "quiet_window_active": quiet_window,
+            "quiet_window_ct": "02:00-08:00" if lane == "archive" else None,
             "pointer_updated_at_utc": d.get("pointer_updated_at_utc"),
             "durable_commit_sha": d.get("durable_commit_sha"),
             "source_artifact": source_rel,
