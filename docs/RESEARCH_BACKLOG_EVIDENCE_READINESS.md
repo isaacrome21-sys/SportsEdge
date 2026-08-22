@@ -13,21 +13,30 @@ Applies across ML, RL, full-game totals, F5 markets, team totals, NRFI/YRFI, pit
    - Chronological grading holdout plus a second reserved holdout untouched by hyperparameter/config search.
    - Addresses model-selection bias.
    - Complementary to null-slate/rank-selection work, which addresses bet-selection bias.
+   - Must preregister candidate/config identity before opening the second holdout.
 
 2. **Leakage audits**
    - MLB residual layers and football M2.
    - Search for sportsbook line, total, implied probability, closing price, or any market-derived quantity entering predictive features where prohibited.
-   - Any leak invalidates downstream evidence.
+   - Any observed leak invalidates downstream evidence.
+   - **Audit-derived hardening item:** current NFL M2 has alias/pattern protection beyond exact banned names; CFB M2 currently has the exact-key guard but lacks the same alias/pattern layer. No current emitted CFB market leak was observed, but this asymmetric guard should be closed before CFB evidence is trusted.
 
-3. **Deterministic fixtures**
+3. **Deterministic fixtures and RNG contract**
    - Frozen inputs and frozen market snapshot.
    - Same-input and irrelevant-environment variation tests.
+   - **Audit-derived hardening item:** current `JointScoreSimulator` accepts `seed=None`; omitted seed permits nondeterministic NumPy entropy. Production/event-rich football replay must require a stable seed identity rather than rely on caller discipline.
+   - Canonical decision artifacts must separate volatile execution metadata from decision bytes.
 
-4. **CLV / market-comparison plumbing**
+4. **AutoRunReport constructor guard**
+   - Known schema-drift seam.
+   - Local AST research guard exists and rejects any `AutoRunReport(...)` call with positional arguments.
+   - Must run against the exact Sept. 1 composed tree before it counts as runtime hardening.
+
+5. **CLV / market-comparison plumbing**
    - Keep model quality and market comparison separate from realized ROI.
    - Manual-analysis bets do not enter the pipeline CLV series.
 
-5. **Executable-price rules**
+6. **Executable-price rules**
    - Preserve the #106 contract as research target: book, price, availability, max stake, timestamp.
    - Rejection classes: `NO_EXECUTABLE_QUOTE`, `QUOTE_UNAVAILABLE`, `LIMIT_TOO_LOW`, `EXECUTABLE_EV_TOO_SMALL`.
 
@@ -94,3 +103,10 @@ Each backlog item carries three independent states:
 - `EVIDENCE`: durable result meeting its prespecified evidence rules exists.
 
 A spec can be PRESENT while EXECUTED=NO and EVIDENCE=NO.
+
+Current research-freeze classification:
+
+- Backlog specification: PRESENT ON MAIN = **NO**; present on docs branch only.
+- Local constructor guard: RUNTIME EXECUTED = **LOCAL_RECONSTRUCTED_PASS (3/3)**.
+- Audit-derived CFB/football findings: RUNTIME EXECUTED = **NO**; source inspection only.
+- PRODUCING EVIDENCE = **NO** for every item above.
