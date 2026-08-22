@@ -30,10 +30,15 @@ def build(root: Path) -> dict:
             "state": "POINTER_SOURCE_OK" if source_ok else "POINTER_SOURCE_MISSING",
             "pointer": str(p.relative_to(root)),
             "last_durable_at_utc": d.get("last_durable_at_utc"),
+            "pointer_updated_at_utc": d.get("pointer_updated_at_utc"),
             "durable_commit_sha": d.get("durable_commit_sha"),
             "source_artifact": d.get("source_artifact"),
+            "source_artifact_sha256": d.get("source_artifact_sha256"),
             "source_exists": source_ok,
             "status": d.get("status"),
+            "evidence_count": d.get("evidence_count"),
+            "workflow_run_id": d.get("workflow_run_id"),
+            "trigger": d.get("trigger"),
         }
     return {
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
