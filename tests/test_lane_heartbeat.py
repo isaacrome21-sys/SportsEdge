@@ -1,9 +1,11 @@
 import json
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 
+from scripts.build_lane_status import build
 from scripts.update_lane_heartbeat import build_pointer, write_pointer
 
 
@@ -64,3 +66,40 @@ def test_sha_mismatch_does_not_move_pointer(tmp_path):
         build_pointer(root, "mlb_archive", "runtime/archive-status/2026-08-21/run.json", "0" * 40, "CAPTURED", None, None)
 
     assert json.loads(pointer.read_text()) == {"sentinel": True}
+
+
+def test_status_distinguishes_missing_unreadable_and_stale(tmp_path):
+    root = tmp_path / "data"
+    root.mkdir()
+    hb = root / "runtime/heartbeat"
+    hb.mkdir(parents=True)
+
+    # Archive pointer exists but is malformed: this is pointer failure, not staleness.
+    (hb / "archive_latest.json").write_text('{not-json\n', encoding="utf-8")
+
+    # NRFI pointer is valid and its canonical source exists, but evidence is old.
+    source_rel = "runtime/model-validation/NRFI_YRFI/runs/123/report.json"
+    source = root / source_rel
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_text('{}\n', encoding="utf-8")
+    (hb / "nrfi_latest.json").write_text(json.dumps({
+        "last_durable_at_utc": "2026-08-20T00:00:00+00:00",
+        "source_artifact": source_rel,
+        "durable_commit_sha": "a" * 40,
+        "status": "MODEL_NOT_ELIGIBLE",
+        "evidence_count": 53,
+    }) + "\n", encoding="utf-8")
+
+    status = build(root, now=datetime(2026, 8, 22, 0, 0, tzinfo=timezone.utc))
+    assert status["lanes"]["archive"]["state"] == "POINTER_UNREADABLE"
+    assert status["lanes"]["archive"]["pointer_state"] == "UNREADABLE"
+    assert status["lanes"]["nrfi"]["state"] == "LANE_STALE"
+    assert status["lanes"]["nrfi"]["pointer_state"] == "OK"
+
+
+def test_status_marks_missing_pointer_separately(tmp_path):
+    root = tmp_path / "data"
+    root.mkdir()
+    status = build(root, now=datetime(2026, 8, 22, 0, 0, tzinfo=timezone.utc))
+    assert status["lanes"]["archive"]["state"] == "POINTER_MISSING"
+    assert status["lanes"]["nrfi"]["state"] == "POINTER_MISSING"
