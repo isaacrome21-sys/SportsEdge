@@ -34,6 +34,24 @@ On PR #96 (`sportsedge/stage0-coverage-health-v2`, head `701792a8c1fb17a2aa9e900
 
 PR changed-file inspection for #101-#108 confirms none of those PRs modifies `auto_runner.py` or `auto_native_odds.py`. Therefore those branches inherit constructor behavior from their bases; they do not independently repair this seam.
 
+### Local guard, test-first
+
+A standalone AST guard was written locally. Initial test collection failed because the guard module did not yet exist:
+
+```text
+ModuleNotFoundError: No module named 'autorunreport_lint_local'
+1 error in 0.07s
+```
+
+After implementation:
+
+```text
+...                                                                      [100%]
+3 passed in 0.02s
+```
+
+The guard rejects any `AutoRunReport(...)` call containing positional arguments and accepts keyword-only construction. The tests use reconstructed known call shapes, not an authenticated clone.
+
 ### Coverage limitation
 
 The connected private-repo code-search index returned zero results even for the known symbol `AutoRunReport`. Therefore a claim that every construction site in all historical/unlisted branches was exhaustively found would be false. Exhaustive AST/grep coverage requires an authenticated clone or a functioning private-repo code index.
@@ -41,13 +59,13 @@ The connected private-repo code-search index returned zero results even for the 
 ### Required Sept. 1 hardening
 
 1. Convert every surviving `AutoRunReport(...)` construction site in the frozen composed tree to keyword arguments.
-2. Add an AST/lint test that fails any `AutoRunReport` call containing positional arguments.
-3. Run that guard against the exact composed tree, not reconstructed files.
+2. Install the AST/lint guard in that exact tree.
+3. Run it against the exact composition, not reconstructed snippets.
 
 Status:
 
-- PRESENT ON MAIN: **YES — positional risk exists on main**
-- RUNTIME EXECUTED: **NO — inspection only**
+- PRESENT ON MAIN: **YES — positional risk exists on main; guard itself is not on main**
+- RUNTIME EXECUTED: **LOCAL_RECONSTRUCTED_PASS — guard 3/3; production tree not executed**
 - PRODUCING EVIDENCE: **NO**
 
 ---
@@ -99,7 +117,7 @@ Unblock for exhaustive audit: authenticated clone + repository-wide AST/grep ove
 - `auto_runner.py` defaults to `datetime.now(...)` when `now` is not injected.
 - `scripts/archive_raw_game_odds.py` intentionally reads the wall clock and embeds run timestamps in status/raw paths.
 
-The frozen-fixture determinism target must therefore be the **canonical decision payload**, with all decision-relevant as-of times frozen. Operational envelope fields such as the execution timestamp/process metadata must either be frozen or kept outside the byte-identity comparison. A raw operational archive artifact containing a new run timestamp is not a valid byte-identical target.
+The frozen-fixture determinism target must therefore be the **canonical decision payload**, with all decision-relevant as-of times frozen. Operational envelope fields such as execution timestamp/process metadata must either be frozen or kept outside the byte-identity comparison. A raw operational archive artifact containing a new run timestamp is not a valid byte-identical target.
 
 ### Exhaustiveness limitation
 
@@ -160,7 +178,7 @@ Covered locally:
 - `POST_FIRST_PITCH_PREDICTION_COMMIT` contributes zero to the promotion aggregate.
 - `PREDICTION_COMMIT_UNRESOLVABLE` contributes zero.
 - `FIRST_PITCH_PROOF_MISSING` contributes zero.
-- Push witness must contain the exact commit SHA.
+- generic witness must contain the exact commit SHA.
 - delayed witness is ineligible.
 - valid clock ordering yields witnessed eligibility.
 
@@ -172,7 +190,103 @@ Status:
 - RUNTIME EXECUTED: **LOCAL_RECONSTRUCTED_PASS — 6/6**
 - PRODUCING EVIDENCE: **NO**
 
-Production unblock: compose the integrity code onto the frozen Sept. 1 tree, run the adversarial tests branch-faithfully, and persist push witnesses at push time before any restored V6 observation is eligible.
+Production unblock: compose the integrity code onto the frozen Sept. 1 tree, run the adversarial tests branch-faithfully, and persist a valid remote witness before any restored V6 observation is eligible.
+
+---
+
+## C3 — remote witness semantic verification
+
+Official GitHub documentation exposed a critical distinction:
+
+- Enterprise Cloud REST Events API `PushEvent` exposes event `created_at` and push payload `ref`, `head`, `before`, but the current documented payload does not expose `commits[]`.
+- GitHub push **webhook** payloads do expose the pushed `commits` array.
+- Repository webhook delivery metadata exposes `delivered_at` and the request payload.
+- Events API timelines are capped (up to 300 events, only events from the preceding 30 days) and are explicitly not real-time.
+
+Therefore the old combined assumption "REST PushEvent `created_at` + target SHA appears in that same payload" is not valid for arbitrary non-head commits. The V6 integrity spec was refined to require a versioned witness source that proves both remote time and exact commit membership, preferring a push-webhook delivery witness. Unverifiable membership remains fail-closed.
+
+Status:
+
+- PRESENT ON MAIN: **NO — refined integrity spec is docs-branch research only**
+- RUNTIME EXECUTED: **NO — semantic/source verification, not production execution**
+- PRODUCING EVIDENCE: **NO**
+
+---
+
+## D1 — Retrosheet feasibility
+
+Official Retrosheet field documentation confirms starter/substitution identity, inning/outs/score state, pitcher/batter identity, pitch sequences/counts when known, and game metadata. It does **not** provide a complete structured starter-removal-cause field.
+
+Research conclusion:
+
+- `COMPLETED_PATH`: partial/inferential; actual path is observable, manager intent is not.
+- `PITCH_COUNT_EXHAUSTION`: partial; pitch detail can be missing and pregame workload prior is external.
+- `PERFORMANCE_HOOK`: inferential; surrounding performance state is observable, managerial motive is not.
+- `TACTICAL_SUBSTITUTION`: inferential/low-confidence; substitution and matchup state are observable, motive is not.
+- `INJURY_HEALTH`: mostly unclassifiable; no complete standardized player-injury exit field.
+- `WEATHER_DELAY`: partial/sparse; suspension/delay comments exist, but weather cause must be explicit.
+- `UNKNOWN`: fully available and required fallback.
+
+Structured ejections are outside the seven-label taxonomy and therefore remain `UNKNOWN`; they must not be forced into performance/tactical categories.
+
+Status:
+
+- PRESENT ON MAIN: **NO — research doc only**
+- RUNTIME EXECUTED: **NO — source-field audit only**
+- PRODUCING EVIDENCE: **NO**
+
+---
+
+## D2/D3/D4 — local LABELRULES_V1 + coverage/version harness
+
+### Test-first history
+
+Initial collection before implementation:
+
+```text
+ModuleNotFoundError: No module named 'engine_b_labelrules_local'
+1 error in 0.09s
+```
+
+The first implementation then produced a useful failure rather than being papered over:
+
+```text
+4 failed, 4 passed in 0.05s
+```
+
+The failures showed that the default synthetic workload prior was causing `PITCH_COUNT_EXHAUSTION` to absorb cases intended to exercise competing hazards. That exposed the otherwise ambiguous "Rule 2 / Rule 3" wording.
+
+The research contract was made explicit: labels are numbered in listed order, so Rule 2 = `PITCH_COUNT_EXHAUSTION` and Rule 3 = `PERFORMANCE_HOOK`. Unresolved competing inferred hazards fail closed to `UNKNOWN`; no silent rule-order tie break is allowed.
+
+Final local result:
+
+```text
+.........                                                                [100%]
+9 passed in 0.03s
+```
+
+Covered:
+
+- 75 pitches can classify differently under different **pregame workload priors**; no universal pitch threshold.
+- Rule 2/Rule 3 near-tie -> `UNKNOWN`.
+- a predeclared dominance margin can resolve Rule 2/Rule 3 where one evidence strength clearly dominates.
+- unclassified injury does not inflate `PERFORMANCE_HOOK`.
+- explicit weather delay receives its own label.
+- large positive and negative score differentials do not by themselves become a monotone cause label.
+- unresolved multi-hazard inferred cases -> `UNKNOWN`.
+- labels are exhaustive/mutually exclusive in the harness.
+- coverage audit reports unknown separately and frequencies sum to 1.
+- frozen historical seasons are `[2021, 2022, 2023, 2024, 2025]`.
+
+The version harness emits placeholders for `starter_class_version` and `workload_prior_version` because those models have not been fit; this prevents the local rule test from masquerading as a historical mechanism result.
+
+Status:
+
+- PRESENT ON MAIN: **NO — local research code only**
+- RUNTIME EXECUTED: **LOCAL_RECONSTRUCTED_PASS — 9/9**
+- PRODUCING EVIDENCE: **NO — no Retrosheet historical exits were classified**
+
+Unblock for mechanism evidence: acquire/freeze 2021-2025 Retrosheet data, build ex-ante pregame workload priors/starter classes, execute the source extractor, report actual cause-label coverage, then validate distribution/threshold/mechanism out of time.
 
 ---
 
