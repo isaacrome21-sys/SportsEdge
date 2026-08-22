@@ -1,0 +1,8 @@
+record_id,record_type,source,sport,market,selection,line,american_odds_taken,sportsbook,stake,placed_at_utc,result,profit_loss,model_probability,model_version,model_commit_sha,config_hash,closing_american_odds,closing_line,clv_probability_points,notes
+legacy_1_6_summary,aggregate_summary,manual_analysis,MLB,UNKNOWN,UNKNOWN,,,,,,,,,,,,,,,"Prior stretch reported as 1-6; individual ticket identities not reconstructible from authoritative pipeline artifacts. Do not expand into synthetic rows."
+sea_hou_nrfi_loss,bet,manual_analysis,MLB,NRFI,SEA/HOU NRFI,,,,,,,LOSS,,,,,,,,"Known loss; exact odds/stake/timestamp not durably established here. Relationship to 1-6 summary unresolved; do not double-count."
+manual_2026_08_21_padres_ml,bet,manual_analysis,MLB,MONEYLINE,San Diego Padres ML,,-118,,,,OPEN_AT_LAST_REPORT,,,,,,,,"Manual ticket confirmed in conversation. No pipeline Model_P/version/hash exists."
+manual_2026_08_21_cin_ari_u85,bet,manual_analysis,MLB,TOTALS,CIN/ARI Under,8.5,-118,,,,OPEN_AT_LAST_REPORT,,,,,,,,"Manual ticket confirmed in conversation. No pipeline Model_P/version/hash exists."
+manual_2026_08_21_pit_lad_u8,bet,manual_analysis,MLB,TOTALS,PIT/LAD Under,8,-106,,,,OPEN_AT_LAST_REPORT,,,,,,,,"Manual ticket confirmed in conversation. No pipeline Model_P/version/hash exists."
+manual_2026_08_21_cubs_ml,bet,manual_analysis,MLB,MONEYLINE,Chicago Cubs ML,,-102,,,,OPEN_AT_LAST_REPORT,,,,,,,,"Manual replacement ticket confirmed after Mariners cash-out. No pipeline Model_P/version/hash exists."
+manual_2026_08_21_mariners_cashout,execution_event,manual_analysis,MLB,MONEYLINE,Seattle Mariners ML,,-105,,,,CASHED_OUT,,,,,,,,"User reported cash-out before replacing with Cubs -102. Cash-out value/P&L not established here; do not infer."
