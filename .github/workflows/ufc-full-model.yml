@@ -34,7 +34,7 @@ jobs:
       - name: Install test dependency
         run: python -m pip install --disable-pip-version-check pytest
       - name: Run UFC tests
-        run: python -m pytest -q tests/test_ufc_engine.py tests/test_ufc_training.py tests/test_ufc_runtime.py
+        run: python -m pytest -q tests/test_ufc_engine.py tests/test_ufc_training.py tests/test_ufc_runtime.py tests/test_ufc_advanced.py
       - name: Train chronological UFC model from public historical snapshot
         run: python scripts/build_ufc_training_artifact.py --output models/ufc_logistic_v1.json --metrics artifacts/ufc_training_metrics.json
       - name: Build current UFC fighter/context snapshots
