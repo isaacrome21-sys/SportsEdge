@@ -57,7 +57,7 @@ def test_persistence_failure_does_not_move_pointer(tmp_path):
 
 def test_sha_mismatch_does_not_move_pointer(tmp_path):
     root = _repo(tmp_path)
-    sha = _commit(root, "runtime/archive-status/2026-08-21/run.json", '{}\n')
+    _commit(root, "runtime/archive-status/2026-08-21/run.json", '{}\n')
     pointer = root / "runtime/heartbeat/archive_latest.json"
     pointer.parent.mkdir(parents=True, exist_ok=True)
     pointer.write_text('{"sentinel":true}\n')
@@ -73,11 +73,8 @@ def test_status_distinguishes_missing_unreadable_and_stale(tmp_path):
     root.mkdir()
     hb = root / "runtime/heartbeat"
     hb.mkdir(parents=True)
-
-    # Archive pointer exists but is malformed: this is pointer failure, not staleness.
     (hb / "archive_latest.json").write_text('{not-json\n', encoding="utf-8")
 
-    # NRFI pointer is valid and its canonical source exists, but evidence is old.
     source_rel = "runtime/model-validation/NRFI_YRFI/runs/123/report.json"
     source = root / source_rel
     source.parent.mkdir(parents=True, exist_ok=True)
@@ -103,3 +100,40 @@ def test_status_marks_missing_pointer_separately(tmp_path):
     status = build(root, now=datetime(2026, 8, 22, 0, 0, tzinfo=timezone.utc))
     assert status["lanes"]["archive"]["state"] == "POINTER_MISSING"
     assert status["lanes"]["nrfi"]["state"] == "POINTER_MISSING"
+
+
+def _write_archive_pointer(root: Path, last_durable: str):
+    hb = root / "runtime/heartbeat"
+    hb.mkdir(parents=True, exist_ok=True)
+    source_rel = "runtime/archive-status/2026-08-21/run.json"
+    source = root / source_rel
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_text('{}\n', encoding="utf-8")
+    (hb / "archive_latest.json").write_text(json.dumps({
+        "last_durable_at_utc": last_durable,
+        "source_artifact": source_rel,
+        "durable_commit_sha": "b" * 40,
+        "status": "CAPTURED",
+    }) + "\n", encoding="utf-8")
+
+
+def test_archive_old_evidence_is_quiet_not_stale_overnight(tmp_path):
+    root = tmp_path / "data"
+    root.mkdir()
+    _write_archive_pointer(root, "2026-08-21T20:00:00+00:00")
+    # 09:00 UTC is 04:00 CT in August: intentionally inside 02:00-08:00 CT quiet window.
+    status = build(root, now=datetime(2026, 8, 22, 9, 0, tzinfo=timezone.utc))
+    archive = status["lanes"]["archive"]
+    assert archive["state"] == "LANE_QUIET_WINDOW"
+    assert archive["quiet_window_active"] is True
+
+
+def test_archive_old_evidence_becomes_stale_after_quiet_window(tmp_path):
+    root = tmp_path / "data"
+    root.mkdir()
+    _write_archive_pointer(root, "2026-08-21T20:00:00+00:00")
+    # 14:00 UTC is 09:00 CT in August: monitoring is active again.
+    status = build(root, now=datetime(2026, 8, 22, 14, 0, tzinfo=timezone.utc))
+    archive = status["lanes"]["archive"]
+    assert archive["state"] == "LANE_STALE"
+    assert archive["quiet_window_active"] is False
