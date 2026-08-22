@@ -1,6 +1,7 @@
 from math import exp
 
 from sportsedge.mlb.prop_monte_carlo import (
+    DEFAULT_SIMULATIONS, MIN_SIMULATIONS,
     simulate_count_line, simulate_hitter_one_plus_hit, simulate_nrfi,
 )
 
@@ -9,7 +10,7 @@ def test_count_sim_is_deterministic_and_sums_to_one():
     a = simulate_count_line(mean=5.2, line=4.5, market="PITCHER_K", seed=7)
     b = simulate_count_line(mean=5.2, line=4.5, market="PITCHER_K", seed=7)
     assert a == b
-    assert a.simulations == 10_000
+    assert a.simulations == DEFAULT_SIMULATIONS == 50_000
     assert abs(a.over_prob + a.under_prob + a.push_prob - 1.0) < 1e-12
     assert a.push_prob == 0
     assert a.promotion_evidence is False
@@ -36,8 +37,8 @@ def test_nrfi_matches_poisson_zero_run_baseline_when_no_mean_uncertainty():
 
 def test_low_sim_count_fails_closed():
     try:
-        simulate_count_line(mean=4.0, line=3.5, market="PITCHER_K", simulations=999)
+        simulate_count_line(mean=4.0, line=3.5, market="PITCHER_K", simulations=MIN_SIMULATIONS - 1)
     except ValueError as exc:
-        assert "1000" in str(exc)
+        assert str(MIN_SIMULATIONS) in str(exc)
     else:
         raise AssertionError("undersized simulation must fail")
