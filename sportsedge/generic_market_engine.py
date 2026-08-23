@@ -60,16 +60,11 @@ def _finite(value: Any, name: str, *, lower: float | None = None, upper: float |
 
 def _base_output(model_input: Mapping[str, Any], model_p: float, *, model_hash: str) -> dict[str, Any]:
     return {
-        "game_id": model_input.get("game_id"),
-        "market": model_input.get("market"),
-        "entity_id": model_input.get("entity_id"),
-        "line": model_input.get("line"),
-        "side": model_input.get("side"),
-        "model_p": float(model_p),
-        "model_input_hash": model_hash,
-        "engine_version": GENERIC_ENGINE_VERSION,
-        "seed_policy": "analytic_or_identity_bound",
-        "mc_paths": 0,
+        "game_id": model_input.get("game_id"), "market": model_input.get("market"),
+        "entity_id": model_input.get("entity_id"), "line": model_input.get("line"),
+        "side": model_input.get("side"), "model_p": float(model_p),
+        "model_input_hash": model_hash, "engine_version": GENERIC_ENGINE_VERSION,
+        "seed_policy": "analytic_or_identity_bound", "mc_paths": 0,
     }
 
 
@@ -94,6 +89,24 @@ def _binomial_cdf(k: int, n: int, p: float) -> float:
     return min(1.0, max(0.0, total))
 
 
+def _joint_states(joint_score_pmf: Mapping[str, float]):
+    total = 0.0
+    for key, raw_p in joint_score_pmf.items():
+        try:
+            away_text, home_text = str(key).split(",", 1)
+            away = int(away_text)
+            home = int(home_text)
+            p = float(raw_p)
+        except (TypeError, ValueError) as exc:
+            raise GenericMarketEngineError("invalid V7 joint score state") from exc
+        if away < 0 or home < 0 or not isfinite(p) or p < 0:
+            raise GenericMarketEngineError("invalid V7 joint score probability")
+        total += p
+        yield away, home, p
+    if abs(total - 1.0) > 1e-9:
+        raise GenericMarketEngineError("V7 joint score PMF does not conserve probability")
+
+
 def _count_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
     market = str(model_input.get("market"))
     if market not in COUNT_MARKETS:
@@ -109,12 +122,8 @@ def _count_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
     k_over = floor(line)
     engine_version = GENERIC_ENGINE_VERSION
     digest_fields: dict[str, Any] = {
-        "market": market,
-        "expected_count": lam,
-        "line": line,
-        "side": side,
-        "game_id": model_input.get("game_id"),
-        "entity_id": model_input.get("entity_id"),
+        "market": market, "expected_count": lam, "line": line, "side": side,
+        "game_id": model_input.get("game_id"), "entity_id": model_input.get("entity_id"),
         "feature_source_hash": model_input.get("feature_source_hash"),
     }
 
@@ -153,11 +162,8 @@ def _binary_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
         raise GenericMarketEngineError("binary market side must be YES or NO")
     p = p_yes if side == "YES" else 1.0 - p_yes
     digest = _canonical_json_sha256({
-        "engine": GENERIC_ENGINE_VERSION,
-        "market": market,
-        "event_probability": p_yes,
-        "side": side,
-        "game_id": model_input.get("game_id"),
+        "engine": GENERIC_ENGINE_VERSION, "market": market, "event_probability": p_yes,
+        "side": side, "game_id": model_input.get("game_id"),
         "entity_id": model_input.get("entity_id"),
         "feature_source_hash": model_input.get("feature_source_hash"),
     })
@@ -182,49 +188,45 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
     away_mean = _finite(model_input.get("away_mean_runs"), "away_mean_runs", lower=0.000001)
     home_mean = _finite(model_input.get("home_mean_runs"), "home_mean_runs", lower=0.000001)
     line = _finite(model_input.get("line", 0.0), "line")
+    if market in {"RUN_LINE", "TOTALS"} and float(line).is_integer():
+        raise GenericMarketEngineError(f"{market}_INTEGER_LINE_REQUIRES_PUSH_AWARE_EV")
     total_line = line if market == "TOTALS" else _finite(model_input.get("total_line", 0.0), "total_line", lower=0.0)
     simulations = int(model_input.get("simulations", 50000))
 
     game_build_hash = _canonical_json_sha256({
-        "engine": V7_DISTRIBUTION_VERSION,
-        "game_id": model_input.get("game_id"),
-        "away_mean_runs": away_mean,
-        "home_mean_runs": home_mean,
+        "engine": V7_DISTRIBUTION_VERSION, "game_id": model_input.get("game_id"),
+        "away_mean_runs": away_mean, "home_mean_runs": home_mean,
         "feature_source_hash": model_input.get("feature_source_hash"),
     })
     result = simulate_game_distribution(
-        away_mean_runs=away_mean,
-        home_mean_runs=home_mean,
-        total_line=total_line,
-        simulations=simulations,
-        build_hash=game_build_hash,
-        # These candidate-form parameters are intentionally locked here rather than
-        # inherited from the obsolete generic feature knob. They remain unpromoted
-        # until fitted/validated on the historical substrate.
+        away_mean_runs=away_mean, home_mean_runs=home_mean, total_line=total_line,
+        simulations=simulations, build_hash=game_build_hash,
         first_inning_share=DEFAULT_FIRST_INNING_SHARE,
         first_inning_dispersion_r=DEFAULT_FIRST_INNING_DISPERSION_R,
         extra_half_inning_mean=DEFAULT_EXTRA_HALF_INNING_MEAN,
     )
     side = str(model_input.get("side", "")).upper()
+    states = list(_joint_states(result.joint_score_pmf))
+
     if market == "MONEYLINE":
         if side in {"HOME", "HOME_ML"}:
-            p = result.home_win_probability
+            p = sum(prob for away, home, prob in states if home > away)
         elif side in {"AWAY", "AWAY_ML"}:
-            p = result.away_win_probability
+            p = sum(prob for away, home, prob in states if away > home)
         else:
             raise GenericMarketEngineError("moneyline side must be HOME or AWAY")
     elif market == "RUN_LINE":
-        if line == -1.5 and side in {"HOME", "HOME_RL"}:
-            p = result.home_minus_1_5_probability
-        elif line == 1.5 and side in {"AWAY", "AWAY_RL"}:
-            p = result.away_plus_1_5_probability
+        if side in {"HOME", "HOME_RL"}:
+            p = sum(prob for away, home, prob in states if (home - away) + line > 0)
+        elif side in {"AWAY", "AWAY_RL"}:
+            p = sum(prob for away, home, prob in states if (away - home) + line > 0)
         else:
-            raise GenericMarketEngineError("run-line adapter currently supports HOME -1.5 or AWAY +1.5")
+            raise GenericMarketEngineError("run-line side must be HOME or AWAY")
     elif market == "TOTALS":
         if side == "OVER":
-            p = result.over_probability
+            p = sum(prob for away, home, prob in states if away + home > line)
         elif side == "UNDER":
-            p = result.under_probability
+            p = sum(prob for away, home, prob in states if away + home < line)
         else:
             raise GenericMarketEngineError("totals side must be OVER or UNDER")
     elif market == "NRFI":
