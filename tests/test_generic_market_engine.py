@@ -13,11 +13,17 @@ from sportsedge.generic_market_engine import (
 class GenericMarketEngineTests(unittest.TestCase):
     def test_registry_covers_every_expanded_runtime_market(self):
         registry = engine_registry()
-        expected = {
-            "HITS", "TOTAL_BASES", "PITCHER_BB",
-            *GAME_MARKETS, *COUNT_MARKETS, *BINARY_MARKETS,
-        }
+        expected = {"HITS", "TOTAL_BASES", "PITCHER_BB", *GAME_MARKETS, *COUNT_MARKETS, *BINARY_MARKETS}
         self.assertEqual(set(registry), expected)
+
+    def test_home_runs_routes_to_measured_generic_path(self):
+        self.assertIs(engine_registry()["HOME_RUNS"], generic_market_engine_adapter)
+        out = generic_market_engine_adapter({
+            "game_id": "g1", "market": "HOME_RUNS", "entity_id": "b1",
+            "line": 0.5, "side": "OVER", "expected_count": 0.32,
+        })
+        self.assertGreater(out["model_p"], 0.0)
+        self.assertLess(out["model_p"], 1.0)
 
     def test_count_market_produces_probability_without_sportsbook_input(self):
         out = generic_market_engine_adapter({
@@ -111,6 +117,17 @@ class GenericMarketEngineTests(unittest.TestCase):
         })
         self.assertGreater(out["model_p"], 0.48)
         self.assertLess(out["model_p"], 0.59)
+
+    def test_v7_extras_candidate_removes_old_under_bias_direction(self):
+        out = generic_market_engine_adapter({
+            "game_id": "g1", "market": "TOTALS", "entity_id": "game",
+            "line": 8.5, "side": "OVER", "away_mean_runs": 4.3,
+            "home_mean_runs": 4.3, "simulations": 12000,
+        })
+        # Old frozen-at-nine implementation measured ~0.485. Coherent extras should
+        # move the over materially upward into the low-0.50s at this environment.
+        self.assertGreater(out["model_p"], 0.50)
+        self.assertLess(out["model_p"], 0.57)
 
     def test_missing_model_feature_fails_closed(self):
         with self.assertRaises(Exception):
