@@ -176,17 +176,22 @@ def _paired_quote(candidate: Mapping[str, Any], quotes: list[Mapping[str, Any]])
     return matches[0]
 
 
-def _shadow(model_p: float | None, quote: Mapping[str, Any], opposite: Mapping[str, Any]) -> tuple[str | None, float | None, float | None, float | None]:
+def _shadow(model_p: float | None, push_p: float, quote: Mapping[str, Any], opposite: Mapping[str, Any]) -> tuple[str | None, float | None, float | None, float | None]:
     if model_p is None:
         return None, None, None, None
     try:
         fair = multiplicative_devig(quote, opposite).candidate_fair_probability
         dec = american_to_decimal(quote["american_odds"])
-        p = float(model_p)
-        if not isfinite(p) or not 0 <= p <= 1:
+        p_win = float(model_p)
+        p_push = float(push_p)
+        if not isfinite(p_win) or not 0 <= p_win <= 1:
             raise ValueError("invalid Model_P")
-        edge = p - fair
-        ev = p * (dec - 1.0) - (1.0 - p)
+        if not isfinite(p_push) or not 0 <= p_push < 1 or p_win + p_push > 1.0 + 1e-12:
+            raise ValueError("invalid push probability")
+        p_loss = max(0.0, 1.0 - p_win - p_push)
+        conditional_win = p_win / (1.0 - p_push)
+        edge = conditional_win - fair
+        ev = p_win * (dec - 1.0) - p_loss
         return ("SHADOW_BET" if edge > 0 and ev > 0 else "SHADOW_PASS", fair, edge, ev)
     except Exception:
         return None, None, None, None
@@ -222,7 +227,8 @@ def run_generic_card(*, games: list[LiveGame], feature_rows: list[Mapping[str, A
             if "model_p" not in shadow_output:
                 raise ValueError("engine output missing model_p")
             model_p = float(shadow_output["model_p"])
-            shadow_status, implied, edge, ev = _shadow(model_p, quote, opposite)
+            push_p = float(shadow_output.get("push_p", 0.0))
+            shadow_status, implied, edge, ev = _shadow(model_p, push_p, quote, opposite)
             run = run_candidate(model_input=model_input, quote=quote, paired_quote=opposite, deployment=deployment, engine_fn=engine, ingestion_now=ingestion_now, finalization_now=finalization_now, edge_floor_config_path=edge_floor_config_path, kelly_multiplier=kelly_multiplier)
             results.append(GenericCardResult(str(quote["game_id"]), market, str(quote["entity_id"]), quote["line"], str(quote["side"]), quote["american_odds"], model_p, run.bet_status, run.reason, shadow_status, implied, edge, ev))
         except Exception as exc:
