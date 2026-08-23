@@ -15,7 +15,10 @@ from .orchestrator import run_candidate
 from .quote_bridge import validate_canonical_quote
 from .truth_gate import american_to_decimal
 
-GENERIC_MARKETS = frozenset(GAME_MARKETS | COUNT_MARKETS | BINARY_MARKETS)
+# PITCHER_BB is owned by pitcher_card_pipeline / run_pitcher_bb_card. Keeping it
+# out of this set prevents the generic scalar feature contract from being fed to
+# the dedicated workload engine by direct generic-pipeline callers.
+GENERIC_MARKETS = frozenset((GAME_MARKETS | COUNT_MARKETS | BINARY_MARKETS) - {"PITCHER_BB"})
 BATTER_GENERIC_MARKETS = frozenset({
     "HOME_RUNS", "RBI", "RUNS", "HITS_RUNS_RBIS", "SINGLES", "DOUBLES",
     "TRIPLES", "BATTER_BB", "BATTER_K", "STOLEN_BASES", "FIRST_HOME_RUN",
@@ -24,6 +27,7 @@ PITCHER_GENERIC_MARKETS = frozenset({
     "PITCHER_K", "PITCHER_HITS_ALLOWED", "PITCHER_ER", "PITCHER_OUTS",
     "PITCHER_RECORD_WIN",
 })
+
 
 @dataclass(frozen=True)
 class GenericCardResult:
@@ -41,6 +45,7 @@ class GenericCardResult:
     edge: float | None = None
     ev_per_dollar: float | None = None
 
+
 def _game_index(games: list[LiveGame]) -> dict[str, LiveGame]:
     out: dict[str, LiveGame] = {}
     for game in games:
@@ -49,6 +54,7 @@ def _game_index(games: list[LiveGame]) -> dict[str, LiveGame]:
             raise ValueError("duplicate live game_pk")
         out[key] = game
     return out
+
 
 def _feature_index(rows: list[Mapping[str, Any]]) -> dict[tuple[str, str, str], Mapping[str, Any]]:
     out: dict[tuple[str, str, str], Mapping[str, Any]] = {}
@@ -70,6 +76,7 @@ def _feature_index(rows: list[Mapping[str, Any]]) -> dict[tuple[str, str, str], 
         out[key] = row
     return out
 
+
 def _lineup_team(game: LiveGame, entity_id: str) -> int:
     try:
         pid = int(entity_id)
@@ -85,6 +92,7 @@ def _lineup_team(game: LiveGame, entity_id: str) -> int:
         return int(game.home_team_id)
     raise ValueError("player not present in MLB lineup snapshot")
 
+
 def _bind_entity(game: LiveGame, market: str, entity_id: str, feature: Mapping[str, Any]) -> None:
     if market in BATTER_GENERIC_MARKETS:
         live_team = _lineup_team(game, entity_id)
@@ -99,6 +107,7 @@ def _bind_entity(game: LiveGame, market: str, entity_id: str, feature: Mapping[s
             raise ValueError("pitcher entity_id must be numeric MLB id") from exc
         if pid not in {game.away_probable_pitcher_id, game.home_probable_pitcher_id}:
             raise ValueError("NON_PROBABLE_PITCHER")
+
 
 def _model_input(*, game: LiveGame, quote: Mapping[str, Any], feature: Mapping[str, Any]) -> dict[str, Any]:
     market = str(quote["market"])
@@ -141,6 +150,7 @@ def _model_input(*, game: LiveGame, quote: Mapping[str, Any], feature: Mapping[s
         out["feature_source_hash"] = feature["source_subset_hash"]
     return out
 
+
 def _validated_quotes(quotes: list[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
     out = []
     for raw in quotes:
@@ -149,6 +159,7 @@ def _validated_quotes(quotes: list[Mapping[str, Any]]) -> list[Mapping[str, Any]
         except Exception:
             continue
     return out
+
 
 def _paired_quote(candidate: Mapping[str, Any], quotes: list[Mapping[str, Any]]) -> Mapping[str, Any]:
     matches = []
@@ -164,6 +175,7 @@ def _paired_quote(candidate: Mapping[str, Any], quotes: list[Mapping[str, Any]])
         raise ValueError(f"PAIRED_PRICE_REQUIRED_FOR_DEVIG: found={len(matches)}")
     return matches[0]
 
+
 def _shadow(model_p: float | None, quote: Mapping[str, Any], opposite: Mapping[str, Any]) -> tuple[str | None, float | None, float | None, float | None]:
     if model_p is None:
         return None, None, None, None
@@ -178,6 +190,7 @@ def _shadow(model_p: float | None, quote: Mapping[str, Any], opposite: Mapping[s
         return ("SHADOW_BET" if edge > 0 and ev > 0 else "SHADOW_PASS", fair, edge, ev)
     except Exception:
         return None, None, None, None
+
 
 def run_generic_card(*, games: list[LiveGame], feature_rows: list[Mapping[str, Any]], quotes: list[Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, registry_path: str = "config/deployments.json", edge_floor_config_path: str = "config/truth_gate_floors.json", kelly_multiplier: float = 0.25) -> list[GenericCardResult]:
     games_by_id = _game_index(games)
