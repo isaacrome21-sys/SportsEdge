@@ -109,6 +109,35 @@ class GenericMarketEngineTests(unittest.TestCase):
         self.assertAlmostEqual(home["model_p"] + away["model_p"], 1.0, places=12)
         self.assertEqual(home["seed_policy"], "identity_sha256_256bit")
 
+    def test_moneyline_equals_home_minus_half_run_on_same_v7_paths(self):
+        common = {
+            "game_id": "g1", "entity_id": "game", "away_mean_runs": 4.1,
+            "home_mean_runs": 4.6, "total_line": 8.5, "simulations": 5000,
+        }
+        ml = generic_market_engine_adapter({**common, "market": "MONEYLINE", "line": 0.0, "side": "HOME"})
+        rl = generic_market_engine_adapter({**common, "market": "RUN_LINE", "line": -0.5, "side": "HOME"})
+        self.assertAlmostEqual(ml["model_p"], rl["model_p"], places=12)
+
+    def test_alternate_half_run_line_is_derived_from_joint_distribution(self):
+        common = {
+            "game_id": "g1", "market": "RUN_LINE", "entity_id": "game",
+            "away_mean_runs": 4.1, "home_mean_runs": 4.6, "total_line": 8.5,
+            "simulations": 5000,
+        }
+        home_minus = generic_market_engine_adapter({**common, "line": -2.5, "side": "HOME"})
+        away_plus = generic_market_engine_adapter({**common, "line": 2.5, "side": "AWAY"})
+        self.assertAlmostEqual(home_minus["model_p"] + away_plus["model_p"], 1.0, places=12)
+
+    def test_integer_game_lines_fail_closed_until_push_aware_ev_exists(self):
+        for market, side, line in (("RUN_LINE", "HOME", -1.0), ("TOTALS", "OVER", 9.0)):
+            with self.subTest(market=market):
+                with self.assertRaisesRegex(Exception, "INTEGER_LINE_REQUIRES_PUSH_AWARE_EV"):
+                    generic_market_engine_adapter({
+                        "game_id": "g1", "market": market, "entity_id": "game",
+                        "line": line, "side": side, "away_mean_runs": 4.3,
+                        "home_mean_runs": 4.3, "total_line": 8.5, "simulations": 3000,
+                    })
+
     def test_v7_nrfi_candidate_has_plausible_base_rate(self):
         out = generic_market_engine_adapter({
             "game_id": "g1", "market": "NRFI", "entity_id": "game",
@@ -124,8 +153,6 @@ class GenericMarketEngineTests(unittest.TestCase):
             "line": 8.5, "side": "OVER", "away_mean_runs": 4.3,
             "home_mean_runs": 4.3, "simulations": 12000,
         })
-        # Old frozen-at-nine implementation measured ~0.485. Coherent extras should
-        # move the over materially upward into the low-0.50s at this environment.
         self.assertGreater(out["model_p"], 0.50)
         self.assertLess(out["model_p"], 0.57)
 
