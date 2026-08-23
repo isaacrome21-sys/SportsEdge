@@ -26,8 +26,6 @@ COUNT_MARKETS = {
 PA_BOUNDED_COUNT_MARKETS = {"BATTER_K", "BATTER_BB", "SINGLES", "DOUBLES"}
 BINARY_MARKETS = {"PITCHER_RECORD_WIN", "FIRST_HOME_RUN"}
 
-# Runtime safety contract: these markets have measured or structural defects and
-# must not emit prices from the old generic form while their rebuild is pending.
 FAIL_CLOSED_MARKETS = {
     "F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS",
     "PITCHER_OUTS", "HITS_RUNS_RBIS", "FIRST_HOME_RUN",
@@ -187,9 +185,6 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
     total_line = line if market == "TOTALS" else _finite(model_input.get("total_line", 0.0), "total_line", lower=0.0)
     simulations = int(model_input.get("simulations", 50000))
 
-    # RNG identity deliberately excludes side/line/market label so all read-outs for
-    # one modeled game share the same underlying random paths, while different games
-    # cannot accidentally share the old global seed stream.
     game_build_hash = _canonical_json_sha256({
         "engine": V7_DISTRIBUTION_VERSION,
         "game_id": model_input.get("game_id"),
@@ -203,9 +198,12 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
         total_line=total_line,
         simulations=simulations,
         build_hash=game_build_hash,
-        first_inning_share=model_input.get("first_inning_share", DEFAULT_FIRST_INNING_SHARE),
-        first_inning_dispersion_r=model_input.get("first_inning_dispersion_r", DEFAULT_FIRST_INNING_DISPERSION_R),
-        extra_half_inning_mean=model_input.get("extra_half_inning_mean", DEFAULT_EXTRA_HALF_INNING_MEAN),
+        # These candidate-form parameters are intentionally locked here rather than
+        # inherited from the obsolete generic feature knob. They remain unpromoted
+        # until fitted/validated on the historical substrate.
+        first_inning_share=DEFAULT_FIRST_INNING_SHARE,
+        first_inning_dispersion_r=DEFAULT_FIRST_INNING_DISPERSION_R,
+        extra_half_inning_mean=DEFAULT_EXTRA_HALF_INNING_MEAN,
     )
     side = str(model_input.get("side", "")).upper()
     if market == "MONEYLINE":
