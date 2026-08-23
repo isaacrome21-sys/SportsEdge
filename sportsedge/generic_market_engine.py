@@ -91,6 +91,7 @@ def _binomial_cdf(k: int, n: int, p: float) -> float:
 
 def _joint_states(joint_score_pmf: Mapping[str, float]):
     total = 0.0
+    rows = []
     for key, raw_p in joint_score_pmf.items():
         try:
             away_text, home_text = str(key).split(",", 1)
@@ -102,9 +103,10 @@ def _joint_states(joint_score_pmf: Mapping[str, float]):
         if away < 0 or home < 0 or not isfinite(p) or p < 0:
             raise GenericMarketEngineError("invalid V7 joint score probability")
         total += p
-        yield away, home, p
+        rows.append((away, home, p))
     if abs(total - 1.0) > 1e-9:
         raise GenericMarketEngineError("V7 joint score PMF does not conserve probability")
+    return rows
 
 
 def _count_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
@@ -120,6 +122,7 @@ def _count_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
         raise GenericMarketEngineError("count market side must be OVER or UNDER")
 
     k_over = floor(line)
+    integer_line = float(line).is_integer()
     engine_version = GENERIC_ENGINE_VERSION
     digest_fields: dict[str, Any] = {
         "market": market, "expected_count": lam, "line": line, "side": side,
@@ -136,17 +139,32 @@ def _count_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
         if p_event > 1.0:
             raise GenericMarketEngineError("expected_count/projected_pa implies p > 1")
         p_over = 1.0 - _binomial_cdf(k_over, n, p_event)
-        p_under = _binomial_cdf(int(line) - 1, n, p_event) if float(line).is_integer() else 1.0 - p_over
+        if integer_line:
+            threshold = int(line)
+            p_under = _binomial_cdf(threshold - 1, n, p_event)
+            p_push = _binomial_cdf(threshold, n, p_event) - p_under
+        else:
+            p_under = 1.0 - p_over
+            p_push = 0.0
         engine_version = PA_BOUNDED_ENGINE_VERSION
         digest_fields.update({"projected_pa": projected_pa, "n": n, "p": p_event})
     else:
         p_over = 1.0 - _poisson_cdf(k_over, lam)
-        p_under = _poisson_cdf(int(line) - 1, lam) if float(line).is_integer() else 1.0 - p_over
+        if integer_line:
+            threshold = int(line)
+            p_under = _poisson_cdf(threshold - 1, lam)
+            p_push = _poisson_cdf(threshold, lam) - p_under
+        else:
+            p_under = 1.0 - p_over
+            p_push = 0.0
 
     p = p_over if side == "OVER" else p_under
+    if abs((p_over + p_under + p_push) - 1.0) > 1e-10:
+        raise GenericMarketEngineError("count probability mass does not conserve")
     digest_fields["engine"] = engine_version
     out = _base_output(model_input, p, model_hash=_canonical_json_sha256(digest_fields))
     out["engine_version"] = engine_version
+    out["push_p"] = float(p_push)
     return out
 
 
@@ -167,7 +185,9 @@ def _binary_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
         "entity_id": model_input.get("entity_id"),
         "feature_source_hash": model_input.get("feature_source_hash"),
     })
-    return _base_output(model_input, p, model_hash=digest)
+    out = _base_output(model_input, p, model_hash=digest)
+    out["push_p"] = 0.0
+    return out
 
 
 def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
@@ -188,8 +208,6 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
     away_mean = _finite(model_input.get("away_mean_runs"), "away_mean_runs", lower=0.000001)
     home_mean = _finite(model_input.get("home_mean_runs"), "home_mean_runs", lower=0.000001)
     line = _finite(model_input.get("line", 0.0), "line")
-    if market in {"RUN_LINE", "TOTALS"} and float(line).is_integer():
-        raise GenericMarketEngineError(f"{market}_INTEGER_LINE_REQUIRES_PUSH_AWARE_EV")
     total_line = line if market == "TOTALS" else _finite(model_input.get("total_line", 0.0), "total_line", lower=0.0)
     simulations = int(model_input.get("simulations", 50000))
 
@@ -206,7 +224,8 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
         extra_half_inning_mean=DEFAULT_EXTRA_HALF_INNING_MEAN,
     )
     side = str(model_input.get("side", "")).upper()
-    states = list(_joint_states(result.joint_score_pmf))
+    states = _joint_states(result.joint_score_pmf)
+    p_push = 0.0
 
     if market == "MONEYLINE":
         if side in {"HOME", "HOME_ML"}:
@@ -217,11 +236,13 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
             raise GenericMarketEngineError("moneyline side must be HOME or AWAY")
     elif market == "RUN_LINE":
         if side in {"HOME", "HOME_RL"}:
-            p = sum(prob for away, home, prob in states if (home - away) + line > 0)
+            adjusted = [(home - away) + line for away, home, _ in states]
         elif side in {"AWAY", "AWAY_RL"}:
-            p = sum(prob for away, home, prob in states if (away - home) + line > 0)
+            adjusted = [(away - home) + line for away, home, _ in states]
         else:
             raise GenericMarketEngineError("run-line side must be HOME or AWAY")
+        p = sum(prob for (_, _, prob), value in zip(states, adjusted) if value > 0)
+        p_push = sum(prob for (_, _, prob), value in zip(states, adjusted) if abs(value) < 1e-12)
     elif market == "TOTALS":
         if side == "OVER":
             p = sum(prob for away, home, prob in states if away + home > line)
@@ -229,6 +250,7 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
             p = sum(prob for away, home, prob in states if away + home < line)
         else:
             raise GenericMarketEngineError("totals side must be OVER or UNDER")
+        p_push = sum(prob for away, home, prob in states if abs((away + home) - line) < 1e-12)
     elif market == "NRFI":
         if side in {"YES", "NRFI"}:
             p = result.nrfi_probability
@@ -245,10 +267,14 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
             raise GenericMarketEngineError("YRFI side must be YES/NO")
     else:
         raise GenericMarketEngineError(f"unsupported game market {market}")
+
+    if p < -1e-12 or p_push < -1e-12 or p + p_push > 1.0 + 1e-9:
+        raise GenericMarketEngineError("game probability mass invalid")
     out = _base_output(model_input, p, model_hash=result.result_sha256)
     out["mc_paths"] = result.simulations
     out["engine_version"] = V7_DISTRIBUTION_VERSION
     out["seed_policy"] = result.seed_policy
+    out["push_p"] = float(p_push)
     return out
 
 
