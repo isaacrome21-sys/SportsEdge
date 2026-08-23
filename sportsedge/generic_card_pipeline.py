@@ -139,8 +139,6 @@ def _model_input(*, game: LiveGame, quote: Mapping[str, Any], feature: Mapping[s
             }
         if market not in {"TOTALS", "F5_TOTALS"}:
             model_features["total_line"] = feature.get("total_line", 0.0)
-        if market in {"NRFI", "YRFI"}:
-            model_features["first_inning_share"] = feature.get("first_inning_share", 1.0 / 9.0)
 
     out = {
         "game_id": str(game.game_pk), "market": market, "entity_id": entity_id,
