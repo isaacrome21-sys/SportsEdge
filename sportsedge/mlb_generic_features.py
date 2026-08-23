@@ -243,8 +243,6 @@ class MLBGenericHistorySource:
             else:
                 base["away_mean_runs"] = away_runs
                 base["home_mean_runs"] = home_runs
-            if market in {"NRFI", "YRFI"}:
-                base["first_inning_share"] = 1.0 / 9.0
         else:
             raise MLBGenericFeatureError(f"unsupported generic market {market}")
 
