@@ -5,9 +5,14 @@ from math import exp, isfinite
 import random
 from typing import Any
 
+from .identity_rng import candidate_rng
 from .source_lineage import canonical_json_sha256
 
-V7_DISTRIBUTION_VERSION = "mlb_v7_distribution_v1"
+V7_DISTRIBUTION_VERSION = "mlb_v7_distribution_v2_candidate"
+FIRST_INNING_MODEL_VERSION = "mlb_first_inning_nb_v1_candidate"
+DEFAULT_FIRST_INNING_SHARE = 0.118
+DEFAULT_FIRST_INNING_DISPERSION_R = 0.35
+DEFAULT_EXTRA_HALF_INNING_MEAN = 0.55
 
 
 class V7DistributionError(ValueError):
@@ -17,7 +22,8 @@ class V7DistributionError(ValueError):
 @dataclass(frozen=True)
 class GameDistribution:
     simulations: int
-    seed: int
+    seed: int | None
+    seed_policy: str
     away_mean_runs: float
     home_mean_runs: float
     away_win_probability: float
@@ -29,6 +35,11 @@ class GameDistribution:
     push_probability: float
     nrfi_probability: float
     yrfi_probability: float
+    regulation_tie_probability: float
+    first_inning_share: float
+    first_inning_dispersion_r: float
+    extra_half_inning_mean: float
+    joint_score_pmf: dict[str, float]
     result_sha256: str
 
 
@@ -44,6 +55,35 @@ def _finite_positive(value: Any, field: str, *, allow_zero: bool = False) -> flo
     return out
 
 
+def first_inning_probabilities(
+    *,
+    away_mean_runs: Any,
+    home_mean_runs: Any,
+    first_inning_share: Any = DEFAULT_FIRST_INNING_SHARE,
+    dispersion_r: Any = DEFAULT_FIRST_INNING_DISPERSION_R,
+) -> tuple[float, float]:
+    """Analytic NRFI/YRFI candidate under per-half-inning NB clustering.
+
+    This is deliberately a marginal model, not a sampled sub-state of V7 final
+    scores. Until an inning-level joint simulator exists, keeping it separate avoids
+    impossible paths such as first-inning runs exceeding final runs.
+    """
+    away_mean = _finite_positive(away_mean_runs, "away_mean_runs")
+    home_mean = _finite_positive(home_mean_runs, "home_mean_runs")
+    share = _finite_positive(first_inning_share, "first_inning_share")
+    r = _finite_positive(dispersion_r, "dispersion_r")
+    if share > 1:
+        raise V7DistributionError("first_inning_share must be <= 1")
+
+    def p_zero(full_game_mean: float) -> float:
+        half_mean = full_game_mean * share
+        return (r / (r + half_mean)) ** r
+
+    nrfi = p_zero(away_mean) * p_zero(home_mean)
+    nrfi = min(1.0, max(0.0, nrfi))
+    return nrfi, 1.0 - nrfi
+
+
 def _poisson(rng: random.Random, lam: float) -> int:
     if lam <= 0:
         return 0
@@ -55,8 +95,39 @@ def _poisson(rng: random.Random, lam: float) -> int:
             k += 1
             product *= rng.random()
         return k - 1
-    # Stable approximation for unusually high lambdas; MLB team means are far below this.
     return max(0, int(round(rng.gauss(lam, lam ** 0.5))))
+
+
+def _resolve_extras(
+    rng: random.Random,
+    away_runs: int,
+    home_runs: int,
+    *,
+    away_lam: float,
+    home_lam: float,
+    extra_half_inning_mean: float,
+) -> tuple[int, int]:
+    if away_runs != home_runs:
+        return away_runs, home_runs
+    avg_lam = max(1e-9, (away_lam + home_lam) / 2.0)
+    away_extra_mean = extra_half_inning_mean * away_lam / avg_lam
+    home_extra_mean = extra_half_inning_mean * home_lam / avg_lam
+    for _ in range(30):
+        away_extra = _poisson(rng, away_extra_mean)
+        home_extra = _poisson(rng, home_extra_mean)
+        away_runs += away_extra
+        if home_extra > away_extra:
+            home_runs += away_extra + 1
+            return away_runs, home_runs
+        home_runs += home_extra
+        if away_extra > home_extra:
+            return away_runs, home_runs
+    p_home = home_lam / (home_lam + away_lam)
+    if rng.random() < p_home:
+        home_runs += 1
+    else:
+        away_runs += 1
+    return away_runs, home_runs
 
 
 def simulate_game_distribution(
@@ -65,10 +136,13 @@ def simulate_game_distribution(
     home_mean_runs: Any,
     total_line: Any,
     simulations: int = 50000,
-    seed: int = 7,
+    seed: int | None = None,
+    build_hash: str | None = None,
     shared_game_sigma: Any = 0.12,
     team_sigma: Any = 0.08,
-    first_inning_share: Any = 1.0 / 9.0,
+    first_inning_share: Any = DEFAULT_FIRST_INNING_SHARE,
+    first_inning_dispersion_r: Any = DEFAULT_FIRST_INNING_DISPERSION_R,
+    extra_half_inning_mean: Any = DEFAULT_EXTRA_HALF_INNING_MEAN,
 ) -> GameDistribution:
     away_mean = _finite_positive(away_mean_runs, "away_mean_runs")
     home_mean = _finite_positive(home_mean_runs, "home_mean_runs")
@@ -76,17 +150,38 @@ def simulate_game_distribution(
     shared_sigma = _finite_positive(shared_game_sigma, "shared_game_sigma", allow_zero=True)
     idio_sigma = _finite_positive(team_sigma, "team_sigma", allow_zero=True)
     fi_share = _finite_positive(first_inning_share, "first_inning_share")
+    fi_r = _finite_positive(first_inning_dispersion_r, "first_inning_dispersion_r")
+    extras_mean = _finite_positive(extra_half_inning_mean, "extra_half_inning_mean")
     if fi_share > 1:
         raise V7DistributionError("first_inning_share must be <= 1")
     if isinstance(simulations, bool) or int(simulations) < 1000:
         raise V7DistributionError("simulations must be >= 1000")
     simulations = int(simulations)
-    seed = int(seed)
-    rng = random.Random(seed)
+    if build_hash is not None and seed is not None:
+        raise V7DistributionError("provide build_hash or seed, not both")
+    explicit_seed: int | None
+    if build_hash is not None:
+        rng = candidate_rng(build_hash)
+        seed_policy = "identity_sha256_256bit"
+        explicit_seed = None
+    elif seed is not None:
+        explicit_seed = int(seed)
+        rng = random.Random(explicit_seed)
+        seed_policy = "explicit_test_seed"
+    else:
+        raise V7DistributionError("identity-bound build_hash required when explicit test seed is absent")
+
+    nrfi, yrfi = first_inning_probabilities(
+        away_mean_runs=away_mean,
+        home_mean_runs=home_mean,
+        first_inning_share=fi_share,
+        dispersion_r=fi_r,
+    )
 
     away_wins = home_wins = away_cover = home_cover = 0
-    overs = unders = pushes = yrfi = 0
+    overs = unders = pushes = regulation_ties = 0
     away_sum = home_sum = 0
+    score_counts: dict[tuple[int, int], int] = {}
 
     for _ in range(simulations):
         shared = rng.gauss(0.0, shared_sigma)
@@ -96,19 +191,22 @@ def simulate_game_distribution(
         home_lam = home_mean * exp(shared + home_noise - 0.5 * (shared_sigma ** 2 + idio_sigma ** 2))
         away_runs = _poisson(rng, away_lam)
         home_runs = _poisson(rng, home_lam)
+
+        if away_runs == home_runs:
+            regulation_ties += 1
+            away_runs, home_runs = _resolve_extras(
+                rng, away_runs, home_runs,
+                away_lam=away_lam, home_lam=home_lam,
+                extra_half_inning_mean=extras_mean,
+            )
+
+        score_counts[(away_runs, home_runs)] = score_counts.get((away_runs, home_runs), 0) + 1
         away_sum += away_runs
         home_sum += home_runs
         if away_runs > home_runs:
             away_wins += 1
-        elif home_runs > away_runs:
-            home_wins += 1
         else:
-            # Pregame baseball ML excludes ties; resolve extra innings symmetrically around latent strength.
-            p_home = home_lam / (home_lam + away_lam)
-            if rng.random() < p_home:
-                home_wins += 1
-            else:
-                away_wins += 1
+            home_wins += 1
         if away_runs + 1.5 > home_runs:
             away_cover += 1
         if home_runs - 1.5 > away_runs:
@@ -121,33 +219,31 @@ def simulate_game_distribution(
         else:
             pushes += 1
 
-        # First-inning event is sampled from the same shared scoring environment, not a separate market model.
-        fi_lambda = (away_lam + home_lam) * fi_share
-        if _poisson(rng, fi_lambda) > 0:
-            yrfi += 1
-
-    home_p = home_wins / simulations
-    away_p = away_wins / simulations
-    over_p = overs / simulations
-    under_p = unders / simulations
-    push_p = pushes / simulations
-    yrfi_p = yrfi / simulations
-    nrfi_p = 1.0 - yrfi_p
+    joint_score_pmf = {
+        f"{away},{home}": count / simulations
+        for (away, home), count in sorted(score_counts.items())
+    }
     raw = {
         "version": V7_DISTRIBUTION_VERSION,
         "simulations": simulations,
-        "seed": seed,
+        "seed": explicit_seed,
+        "seed_policy": seed_policy,
         "away_mean_runs": away_sum / simulations,
         "home_mean_runs": home_sum / simulations,
-        "away_win_probability": away_p,
-        "home_win_probability": home_p,
+        "away_win_probability": away_wins / simulations,
+        "home_win_probability": home_wins / simulations,
         "away_plus_1_5_probability": away_cover / simulations,
         "home_minus_1_5_probability": home_cover / simulations,
-        "over_probability": over_p,
-        "under_probability": under_p,
-        "push_probability": push_p,
-        "nrfi_probability": nrfi_p,
-        "yrfi_probability": yrfi_p,
+        "over_probability": overs / simulations,
+        "under_probability": unders / simulations,
+        "push_probability": pushes / simulations,
+        "nrfi_probability": nrfi,
+        "yrfi_probability": yrfi,
+        "regulation_tie_probability": regulation_ties / simulations,
+        "first_inning_share": fi_share,
+        "first_inning_dispersion_r": fi_r,
+        "extra_half_inning_mean": extras_mean,
+        "joint_score_pmf": joint_score_pmf,
     }
     digest = canonical_json_sha256(raw)
     return GameDistribution(**{k: raw[k] for k in raw if k != "version"}, result_sha256=digest)

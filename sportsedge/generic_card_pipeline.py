@@ -9,13 +9,16 @@ from typing import Any, Mapping
 from .deployments import load_registry
 from .devig import multiplicative_devig, validate_pair
 from .engine_registry import engine_registry
-from .generic_market_engine import BINARY_MARKETS, COUNT_MARKETS, GAME_MARKETS
+from .generic_market_engine import BINARY_MARKETS, COUNT_MARKETS, GAME_MARKETS, PA_BOUNDED_COUNT_MARKETS
 from .live_slate import LiveGame
 from .orchestrator import run_candidate
 from .quote_bridge import validate_canonical_quote
 from .truth_gate import american_to_decimal
 
-GENERIC_MARKETS = frozenset(GAME_MARKETS | COUNT_MARKETS | BINARY_MARKETS)
+# PITCHER_BB is owned by pitcher_card_pipeline / run_pitcher_bb_card. Keeping it
+# out of this set prevents the generic scalar feature contract from being fed to
+# the dedicated workload engine by direct generic-pipeline callers.
+GENERIC_MARKETS = frozenset((GAME_MARKETS | COUNT_MARKETS | BINARY_MARKETS) - {"PITCHER_BB"})
 BATTER_GENERIC_MARKETS = frozenset({
     "HOME_RUNS", "RBI", "RUNS", "HITS_RUNS_RBIS", "SINGLES", "DOUBLES",
     "TRIPLES", "BATTER_BB", "BATTER_K", "STOLEN_BASES", "FIRST_HOME_RUN",
@@ -119,6 +122,8 @@ def _model_input(*, game: LiveGame, quote: Mapping[str, Any], feature: Mapping[s
 
     if market in COUNT_MARKETS:
         model_features = {"expected_count": feature.get("expected_count")}
+        if market in PA_BOUNDED_COUNT_MARKETS:
+            model_features["projected_pa"] = feature.get("projected_pa")
     elif market in BINARY_MARKETS:
         model_features = {"event_probability": feature.get("event_probability")}
     else:
@@ -134,16 +139,10 @@ def _model_input(*, game: LiveGame, quote: Mapping[str, Any], feature: Mapping[s
             }
         if market not in {"TOTALS", "F5_TOTALS"}:
             model_features["total_line"] = feature.get("total_line", 0.0)
-        if market in {"NRFI", "YRFI"}:
-            model_features["first_inning_share"] = feature.get("first_inning_share", 1.0 / 9.0)
 
     out = {
-        "game_id": str(game.game_pk),
-        "market": market,
-        "entity_id": entity_id,
-        "line": quote.get("line"),
-        "side": quote.get("side"),
-        **model_features,
+        "game_id": str(game.game_pk), "market": market, "entity_id": entity_id,
+        "line": quote.get("line"), "side": quote.get("side"), **model_features,
     }
     if feature.get("source_subset_hash") is not None:
         out["feature_source_hash"] = feature["source_subset_hash"]
@@ -175,40 +174,34 @@ def _paired_quote(candidate: Mapping[str, Any], quotes: list[Mapping[str, Any]])
     return matches[0]
 
 
-def _shadow(model_p: float | None, quote: Mapping[str, Any], opposite: Mapping[str, Any]) -> tuple[str | None, float | None, float | None, float | None]:
+def _shadow(model_p: float | None, push_p: float, quote: Mapping[str, Any], opposite: Mapping[str, Any]) -> tuple[str | None, float | None, float | None, float | None]:
     if model_p is None:
         return None, None, None, None
     try:
         fair = multiplicative_devig(quote, opposite).candidate_fair_probability
         dec = american_to_decimal(quote["american_odds"])
-        p = float(model_p)
-        if not isfinite(p) or not 0 <= p <= 1:
+        p_win = float(model_p)
+        p_push = float(push_p)
+        if not isfinite(p_win) or not 0 <= p_win <= 1:
             raise ValueError("invalid Model_P")
-        edge = p - fair
-        ev = p * (dec - 1.0) - (1.0 - p)
+        if not isfinite(p_push) or not 0 <= p_push < 1 or p_win + p_push > 1.0 + 1e-12:
+            raise ValueError("invalid push probability")
+        p_loss = max(0.0, 1.0 - p_win - p_push)
+        conditional_win = p_win / (1.0 - p_push)
+        edge = conditional_win - fair
+        ev = p_win * (dec - 1.0) - p_loss
         return ("SHADOW_BET" if edge > 0 and ev > 0 else "SHADOW_PASS", fair, edge, ev)
     except Exception:
         return None, None, None, None
 
 
-def run_generic_card(
-    *,
-    games: list[LiveGame],
-    feature_rows: list[Mapping[str, Any]],
-    quotes: list[Mapping[str, Any]],
-    ingestion_now: datetime,
-    finalization_now: datetime,
-    registry_path: str = "config/deployments.json",
-    edge_floor_config_path: str = "config/truth_gate_floors.json",
-    kelly_multiplier: float = 0.25,
-) -> list[GenericCardResult]:
+def run_generic_card(*, games: list[LiveGame], feature_rows: list[Mapping[str, Any]], quotes: list[Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, registry_path: str = "config/deployments.json", edge_floor_config_path: str = "config/truth_gate_floors.json", kelly_multiplier: float = 0.25) -> list[GenericCardResult]:
     games_by_id = _game_index(games)
     features = _feature_index(feature_rows)
     deployments = load_registry(registry_path)["markets"]
     engines = engine_registry()
     valid_quotes = _validated_quotes(quotes)
     results: list[GenericCardResult] = []
-
     for raw in quotes:
         try:
             quote = validate_canonical_quote(raw)
@@ -228,29 +221,14 @@ def run_generic_card(
             deployment = deployments.get(market)
             if engine is None or deployment is None:
                 raise ValueError("market missing engine/deployment registration")
-
             shadow_output = dict(engine(model_input))
             if "model_p" not in shadow_output:
                 raise ValueError("engine output missing model_p")
             model_p = float(shadow_output["model_p"])
-            shadow_status, implied, edge, ev = _shadow(model_p, quote, opposite)
-
-            run = run_candidate(
-                model_input=model_input,
-                quote=quote,
-                paired_quote=opposite,
-                deployment=deployment,
-                engine_fn=engine,
-                ingestion_now=ingestion_now,
-                finalization_now=finalization_now,
-                edge_floor_config_path=edge_floor_config_path,
-                kelly_multiplier=kelly_multiplier,
-            )
-            results.append(GenericCardResult(
-                str(quote["game_id"]), market, str(quote["entity_id"]), quote["line"],
-                str(quote["side"]), quote["american_odds"], model_p, run.bet_status,
-                run.reason, shadow_status, implied, edge, ev,
-            ))
+            push_p = float(shadow_output.get("push_p", 0.0))
+            shadow_status, implied, edge, ev = _shadow(model_p, push_p, quote, opposite)
+            run = run_candidate(model_input=model_input, quote=quote, paired_quote=opposite, deployment=deployment, engine_fn=engine, ingestion_now=ingestion_now, finalization_now=finalization_now, edge_floor_config_path=edge_floor_config_path, kelly_multiplier=kelly_multiplier)
+            results.append(GenericCardResult(str(quote["game_id"]), market, str(quote["entity_id"]), quote["line"], str(quote["side"]), quote["american_odds"], model_p, run.bet_status, run.reason, shadow_status, implied, edge, ev))
         except Exception as exc:
             try:
                 quote = validate_canonical_quote(raw)

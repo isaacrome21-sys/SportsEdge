@@ -40,8 +40,6 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], p
     market = str(model_input.get("market", "UNKNOWN"))
     try:
         _reject_market_leakage(model_input)
-        # Preserve the original fail-closed precedence: quote freshness, model/output
-        # identity, deployment eligibility, and frozen floor are checked before devig.
         double_ttl_gate(quote, ingestion_now, finalization_now)
         output = dict(engine_fn(model_input))
         if "model_p" not in output:
@@ -52,8 +50,6 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], p
         bind_candidate(output, quote, deployment)
         floor = require_production_edge_floor(market=market, path=edge_floor_config_path)
 
-        # No official edge calculation is permitted without a fresh complementary
-        # price from the same offer identity.
         if not isinstance(paired_quote, Mapping):
             raise OrchestrationError("PAIRED_PRICE_REQUIRED_FOR_DEVIG")
         double_ttl_gate(paired_quote, ingestion_now, finalization_now)
@@ -64,6 +60,7 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], p
             fair_market_probability=devig.candidate_fair_probability,
             bound=True, fresh=True, deployed=deployment.get("eligible") is True,
             edge_floor=float(floor.value_probability_points), kelly_multiplier=kelly_multiplier,
+            push_probability=float(output.get("push_p", 0.0)),
         )
         return RunResult(market, float(output["model_p"]), decision.bet_status, decision, "ok")
     except Exception as exc:

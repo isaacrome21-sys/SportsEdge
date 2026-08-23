@@ -10,12 +10,7 @@ from math import isfinite
 from typing import Any, Callable, Mapping
 
 from .bb_engine import simulate_bb
-from .generic_market_engine import (
-    BINARY_MARKETS,
-    COUNT_MARKETS,
-    GAME_MARKETS,
-    generic_market_engine_adapter,
-)
+from .generic_market_engine import BINARY_MARKETS, COUNT_MARKETS, GAME_MARKETS, generic_market_engine_adapter
 from .hits_engine import simulate_hits
 from .home_runs_engine import simulate_home_runs
 from .total_bases_engine import simulate_total_bases
@@ -24,26 +19,17 @@ from .total_bases_engine import simulate_total_bases
 class EngineDispatchError(ValueError):
     pass
 
-
 _HITTER_LINES = (0.5, 1.5, 2.5)
 _BB_LINES = (0.5, 1.5, 2.5, 3.5)
 
 MANUAL_MARKET_TYPE_TO_ENGINE_MARKET = {
-    "MONEYLINE": "MONEYLINE",
-    "GAME_TOTAL": "TOTALS",
-    "RUN_LINE": "RUN_LINE",
-    "FIRST_FIVE_MONEYLINE": "F5_MONEYLINE",
-    "FIRST_FIVE_RUN_LINE": "F5_RUN_LINE",
-    "FIRST_FIVE_TOTAL": "F5_TOTALS",
-    "FIRST_INNING_TOTAL": "YRFI",
-    "PITCHER_STRIKEOUTS": "PITCHER_K",
-    "PITCHER_OUTS": "PITCHER_OUTS",
-    "PITCHER_HITS_ALLOWED": "PITCHER_HITS_ALLOWED",
-    "PITCHER_EARNED_RUNS": "PITCHER_ER",
-    "PITCHER_WALKS": "PITCHER_BB",
-    "BATTER_HOME_RUNS": "HOME_RUNS",
-    "BATTER_HITS": "HITS",
-    "BATTER_TOTAL_BASES": "TOTAL_BASES",
+    "MONEYLINE": "MONEYLINE", "GAME_TOTAL": "TOTALS", "RUN_LINE": "RUN_LINE",
+    "FIRST_FIVE_MONEYLINE": "F5_MONEYLINE", "FIRST_FIVE_RUN_LINE": "F5_RUN_LINE",
+    "FIRST_FIVE_TOTAL": "F5_TOTALS", "FIRST_INNING_TOTAL": "YRFI",
+    "PITCHER_STRIKEOUTS": "PITCHER_K", "PITCHER_OUTS": "PITCHER_OUTS",
+    "PITCHER_HITS_ALLOWED": "PITCHER_HITS_ALLOWED", "PITCHER_EARNED_RUNS": "PITCHER_ER",
+    "PITCHER_WALKS": "PITCHER_BB", "BATTER_HOME_RUNS": "HOME_RUNS",
+    "BATTER_HITS": "HITS", "BATTER_TOTAL_BASES": "TOTAL_BASES",
 }
 
 
@@ -69,16 +55,11 @@ def _finite_line(value: Any) -> float:
 
 def _common_output(model_input: Mapping[str, Any], result, model_p: float, market: str) -> dict[str, Any]:
     return {
-        "game_id": model_input.get("game_id"),
-        "market": market,
-        "entity_id": model_input.get("entity_id"),
-        "line": model_input.get("line"),
-        "side": model_input.get("side"),
-        "model_p": float(model_p),
-        "model_input_hash": result.model_input_hash,
-        "engine_version": result.engine_version,
-        "seed_policy": result.seed_policy,
-        "mc_paths": result.mc_paths,
+        "game_id": model_input.get("game_id"), "market": market,
+        "entity_id": model_input.get("entity_id"), "line": model_input.get("line"),
+        "side": model_input.get("side"), "model_p": float(model_p),
+        "model_input_hash": result.model_input_hash, "engine_version": result.engine_version,
+        "seed_policy": result.seed_policy, "mc_paths": result.mc_paths,
     }
 
 
@@ -105,7 +86,7 @@ def total_bases_engine_adapter(model_input: Mapping[str, Any]) -> dict[str, Any]
         raise EngineDispatchError(f"unsupported TOTAL_BASES line {line}; allowed={_HITTER_LINES}")
     side = model_input.get("side")
     if side not in ("OVER", "UNDER"):
-        raise EngineDispatchError("TOTAL_BASES side must be OVER or UNDER")
+        raise EngineDispatchError("Total Bases side must be OVER or UNDER")
     internal = dict(model_input); internal["market"] = "total_bases"
     result = simulate_total_bases(internal, thresholds=(line,))
     p_over = float(result.probs[line])
@@ -113,6 +94,7 @@ def total_bases_engine_adapter(model_input: Mapping[str, Any]) -> dict[str, Any]
 
 
 def home_runs_engine_adapter(model_input: Mapping[str, Any]) -> dict[str, Any]:
+    """Research adapter retained for direct callers; not selected by runtime registry."""
     if model_input.get("market") != "HOME_RUNS":
         raise EngineDispatchError("Home Runs adapter requires market=HOME_RUNS")
     line = _finite_line(model_input.get("line"))
@@ -143,10 +125,11 @@ def pitcher_bb_engine_adapter(model_input: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def engine_registry() -> dict[str, Callable[[Mapping[str, Any]], Mapping[str, Any]]]:
+    # HOME_RUNS intentionally falls through to generic_market_engine_adapter until
+    # the richer research feature bridge is implemented end-to-end.
     registry: dict[str, Callable[[Mapping[str, Any]], Mapping[str, Any]]] = {
         "HITS": hits_engine_adapter,
         "TOTAL_BASES": total_bases_engine_adapter,
-        "HOME_RUNS": home_runs_engine_adapter,
         "PITCHER_BB": pitcher_bb_engine_adapter,
     }
     for market in sorted(GAME_MARKETS | COUNT_MARKETS | BINARY_MARKETS):

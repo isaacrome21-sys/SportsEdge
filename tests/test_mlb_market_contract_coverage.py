@@ -20,14 +20,22 @@ class MLBMarketContractCoverageTests(unittest.TestCase):
     def test_every_catalog_market_has_feature_contract(self):
         catalog = self._catalog_markets()
         features = json.loads(Path("config/mlb_market_feature_requirements.json").read_text())
-        feature_markets = set(features["markets"])
-        self.assertEqual(catalog, feature_markets)
+        self.assertEqual(catalog, set(features["markets"]))
 
     def test_every_catalog_market_has_validation_record(self):
         catalog = self._catalog_markets()
         validation = json.loads(Path("config/mlb_validation_evidence.json").read_text())
-        validation_markets = set(validation["markets"])
-        self.assertEqual(catalog, validation_markets)
+        self.assertEqual(catalog, set(validation["markets"]))
+
+    def test_every_catalog_market_has_feature_realization_record(self):
+        catalog = self._catalog_markets()
+        realization = json.loads(Path("config/mlb_feature_realization.json").read_text())
+        self.assertEqual(catalog, set(realization["markets"]))
+        self.assertEqual(len(catalog), 27)
+        allowed = {"COMPLETE", "PARTIAL", "MINIMAL", "PLANNED", "UNVERIFIED"}
+        for market, row in realization["markets"].items():
+            self.assertIn(row["status"], allowed, market)
+            self.assertIsInstance(row.get("gaps"), list, market)
 
     def test_validation_registry_contains_all_required_evidence_classes(self):
         validation = json.loads(Path("config/mlb_validation_evidence.json").read_text())
@@ -43,7 +51,7 @@ class MLBMarketContractCoverageTests(unittest.TestCase):
             ],
         )
 
-    def test_no_market_is_official_without_complete_validation(self):
+    def test_no_market_is_official_without_complete_validation_and_realization(self):
         from sportsedge.readiness import audit_readiness
 
         out = audit_readiness()
@@ -51,6 +59,7 @@ class MLBMarketContractCoverageTests(unittest.TestCase):
             if row["official_bet_enabled"]:
                 self.assertTrue(row["validation_complete"], row["market"])
                 self.assertTrue(row["feature_contract_complete"], row["market"])
+                self.assertTrue(row["feature_realization_complete"], row["market"])
                 self.assertTrue(row["frozen_edge_floor"], row["market"])
                 self.assertTrue(row["runtime_engine"], row["market"])
 

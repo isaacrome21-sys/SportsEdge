@@ -2,6 +2,8 @@ import ast
 from pathlib import Path
 import unittest
 
+from sportsedge.truth_gate import TruthGateError, decide_bet
+
 
 PRODUCTION_PATHS = (
     "sportsedge/truth_gate.py",
@@ -73,6 +75,47 @@ class TruthGateContractTests(unittest.TestCase):
         text = Path("sportsedge/orchestrator.py").read_text(encoding="utf-8")
         self.assertIn("require_production_edge_floor", text)
         self.assertIn("edge_floor=float(floor.value_probability_points)", text)
+
+    def test_push_is_neutral_in_ev_and_edge_is_conditional_on_non_push(self):
+        decision = decide_bet(
+            0.45, 100,
+            fair_market_probability=0.50,
+            bound=True, fresh=True, deployed=True,
+            edge_floor=0.01,
+            kelly_multiplier=1.0,
+            push_probability=0.10,
+        )
+        # 45% win, 10% push, 45% loss is exactly 50/50 conditional on settlement.
+        self.assertAlmostEqual(decision.conditional_model_probability, 0.50, places=12)
+        self.assertAlmostEqual(decision.edge, 0.0, places=12)
+        self.assertAlmostEqual(decision.ev_per_dollar, 0.0, places=12)
+        self.assertAlmostEqual(decision.kelly_fraction, 0.0, places=12)
+        self.assertEqual(decision.push_probability, 0.10)
+
+    def test_push_aware_ev_does_not_treat_returned_stake_as_loss(self):
+        decision = decide_bet(
+            0.50, 100,
+            fair_market_probability=0.50,
+            bound=True, fresh=True, deployed=True,
+            edge_floor=0.01,
+            kelly_multiplier=1.0,
+            push_probability=0.10,
+        )
+        # Loss mass is 0.40, so even-money EV is +0.10, not zero.
+        self.assertAlmostEqual(decision.ev_per_dollar, 0.10, places=12)
+        self.assertAlmostEqual(decision.conditional_model_probability, 0.50 / 0.90, places=12)
+        self.assertGreater(decision.edge, 0.05)
+        self.assertEqual(decision.bet_status, "OFFICIAL_BET")
+
+    def test_invalid_push_mass_fails_closed(self):
+        with self.assertRaises(TruthGateError):
+            decide_bet(
+                0.8, -110,
+                fair_market_probability=0.5,
+                bound=True, fresh=True, deployed=True,
+                edge_floor=0.01,
+                push_probability=0.3,
+            )
 
 
 if __name__ == "__main__":

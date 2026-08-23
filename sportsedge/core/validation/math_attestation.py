@@ -2,8 +2,8 @@
 
 A caller does not get to promote math by setting ``math_valid=True``. This
 module derives that state from a hash-bound simulator validation artifact whose
-provenance, multi-season history, signed NFL key coverage, and per-key fit are
-all mechanically checked.
+provenance, multi-season history, signed NFL key coverage, and emergent-frequency
+fit are all mechanically checked.
 """
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from collections.abc import Mapping
 from typing import Any
 
 _REQUIRED_SIGNED_KEYS = (-7, -3, 3, 7)
+_REQUIRED_KEY_CONTRACT = "EMERGENT_VALIDATION_TARGET_V1"
 
 
 def _valid_sha256(value: object) -> bool:
@@ -31,13 +32,6 @@ def _canonical_sha256(artifact: Mapping[str, Any]) -> str:
 
 
 def attest_validated_math(artifact: Mapping[str, Any]) -> dict[str, Any]:
-    """Derive football math validity from simulator-validation evidence.
-
-    Raises only for malformed/untrusted evidence. A well-formed real-history
-    artifact that simply misses the fit tolerance returns ``BLOCKED_MATH`` so
-    the failure is measurable rather than disguised as a transport/schema
-    error.
-    """
     data = dict(artifact)
     if data.get("provenance") != "REAL_PUBLIC_HISTORY":
         raise ValueError("REAL_PUBLIC_HISTORY_REQUIRED")
@@ -45,6 +39,8 @@ def attest_validated_math(artifact: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError("SOURCE_SHA256_INVALID")
     if not isinstance(data.get("profile_version"), str) or not data["profile_version"].strip():
         raise ValueError("PROFILE_VERSION_REQUIRED")
+    if data.get("key_number_contract") != _REQUIRED_KEY_CONTRACT:
+        raise ValueError("EMERGENT_KEY_NUMBER_CONTRACT_REQUIRED")
 
     seasons_raw = data.get("seasons")
     if not isinstance(seasons_raw, (list, tuple)):
@@ -89,6 +85,7 @@ def attest_validated_math(artifact: Mapping[str, Any]) -> dict[str, Any]:
         "artifact_sha256": artifact_sha256,
         "source_sha256": str(data["source_sha256"]).lower(),
         "profile_version": data["profile_version"],
+        "key_number_contract": _REQUIRED_KEY_CONTRACT,
         "seasons": seasons,
         "signed_key_numbers": list(_REQUIRED_SIGNED_KEYS),
         "max_allowed_abs_error": tolerance,
