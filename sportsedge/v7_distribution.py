@@ -38,6 +38,7 @@ class GameDistribution:
     first_inning_share: float
     first_inning_dispersion_r: float
     extra_half_inning_mean: float
+    joint_score_pmf: dict[str, float]
     result_sha256: str
 
 
@@ -150,6 +151,7 @@ def simulate_game_distribution(
     away_wins = home_wins = away_cover = home_cover = 0
     overs = unders = pushes = yrfi = regulation_ties = 0
     away_sum = home_sum = 0
+    score_counts: dict[tuple[int, int], int] = {}
 
     for _ in range(simulations):
         shared = rng.gauss(0.0, shared_sigma)
@@ -173,6 +175,7 @@ def simulate_game_distribution(
                 extra_half_inning_mean=extras_mean,
             )
 
+        score_counts[(away_runs, home_runs)] = score_counts.get((away_runs, home_runs), 0) + 1
         away_sum += away_runs
         home_sum += home_runs
         if away_runs > home_runs:
@@ -191,6 +194,10 @@ def simulate_game_distribution(
         else:
             pushes += 1
 
+    joint_score_pmf = {
+        f"{away},{home}": count / simulations
+        for (away, home), count in sorted(score_counts.items())
+    }
     raw = {
         "version": V7_DISTRIBUTION_VERSION,
         "simulations": simulations,
@@ -211,6 +218,7 @@ def simulate_game_distribution(
         "first_inning_share": fi_share,
         "first_inning_dispersion_r": fi_r,
         "extra_half_inning_mean": extras_mean,
+        "joint_score_pmf": joint_score_pmf,
     }
     digest = canonical_json_sha256(raw)
     return GameDistribution(**{k: raw[k] for k in raw if k != "version"}, result_sha256=digest)
