@@ -33,6 +33,19 @@ class GenericMarketEngineTests(unittest.TestCase):
         self.assertGreater(out["model_p"], 0.0)
         self.assertLess(out["model_p"], 1.0)
 
+    def test_integer_count_line_exposes_push_mass_and_conserves(self):
+        over = generic_market_engine_adapter({
+            "game_id": "g1", "market": "PITCHER_K", "entity_id": "p1",
+            "line": 6.0, "side": "OVER", "expected_count": 6.2,
+        })
+        under = generic_market_engine_adapter({
+            "game_id": "g1", "market": "PITCHER_K", "entity_id": "p1",
+            "line": 6.0, "side": "UNDER", "expected_count": 6.2,
+        })
+        self.assertGreater(over["push_p"], 0.0)
+        self.assertAlmostEqual(over["push_p"], under["push_p"], places=12)
+        self.assertAlmostEqual(over["model_p"] + under["model_p"] + over["push_p"], 1.0, places=12)
+
     def test_batter_k_uses_pa_bounded_binomial(self):
         out = generic_market_engine_adapter({
             "game_id": "g1", "market": "BATTER_K", "entity_id": "b1",
@@ -127,16 +140,31 @@ class GenericMarketEngineTests(unittest.TestCase):
         home_minus = generic_market_engine_adapter({**common, "line": -2.5, "side": "HOME"})
         away_plus = generic_market_engine_adapter({**common, "line": 2.5, "side": "AWAY"})
         self.assertAlmostEqual(home_minus["model_p"] + away_plus["model_p"], 1.0, places=12)
+        self.assertEqual(home_minus["push_p"], 0.0)
 
-    def test_integer_game_lines_fail_closed_until_push_aware_ev_exists(self):
-        for market, side, line in (("RUN_LINE", "HOME", -1.0), ("TOTALS", "OVER", 9.0)):
-            with self.subTest(market=market):
-                with self.assertRaisesRegex(Exception, "INTEGER_LINE_REQUIRES_PUSH_AWARE_EV"):
-                    generic_market_engine_adapter({
-                        "game_id": "g1", "market": market, "entity_id": "game",
-                        "line": line, "side": side, "away_mean_runs": 4.3,
-                        "home_mean_runs": 4.3, "total_line": 8.5, "simulations": 3000,
-                    })
+    def test_integer_run_line_exposes_shared_push_mass(self):
+        common = {
+            "game_id": "g1", "market": "RUN_LINE", "entity_id": "game",
+            "away_mean_runs": 4.1, "home_mean_runs": 4.6, "total_line": 8.5,
+            "simulations": 6000,
+        }
+        home = generic_market_engine_adapter({**common, "line": -1.0, "side": "HOME"})
+        away = generic_market_engine_adapter({**common, "line": 1.0, "side": "AWAY"})
+        self.assertGreater(home["push_p"], 0.0)
+        self.assertAlmostEqual(home["push_p"], away["push_p"], places=12)
+        self.assertAlmostEqual(home["model_p"] + away["model_p"] + home["push_p"], 1.0, places=12)
+
+    def test_integer_total_exposes_push_mass_and_conserves(self):
+        common = {
+            "game_id": "g1", "market": "TOTALS", "entity_id": "game",
+            "away_mean_runs": 4.3, "home_mean_runs": 4.3, "line": 9.0,
+            "simulations": 6000,
+        }
+        over = generic_market_engine_adapter({**common, "side": "OVER"})
+        under = generic_market_engine_adapter({**common, "side": "UNDER"})
+        self.assertGreater(over["push_p"], 0.0)
+        self.assertAlmostEqual(over["push_p"], under["push_p"], places=12)
+        self.assertAlmostEqual(over["model_p"] + under["model_p"] + over["push_p"], 1.0, places=12)
 
     def test_v7_nrfi_candidate_has_plausible_base_rate(self):
         out = generic_market_engine_adapter({
