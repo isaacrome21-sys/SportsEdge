@@ -2,25 +2,29 @@ import unittest
 
 
 class FootballSimulatorTests(unittest.TestCase):
-    def test_key_number_mixture_preserves_empirical_mass(self):
+    def test_imposed_key_number_mass_is_rejected(self):
         from sportsedge.core.simulate.football import KeyNumberMarginModel
 
         empirical = {-7: 0.07, -3: 0.09, 3: 0.10, 7: 0.08}
-        model = KeyNumberMarginModel(mean=0.0, sigma=13.4, empirical_key_mass=empirical)
-        pmf = model.margin_pmf(range(-60, 61))
+        with self.assertRaisesRegex(ValueError, "IMPOSED_KEY_MASS_PROHIBITED"):
+            KeyNumberMarginModel(mean=0.0, sigma=13.4, empirical_key_mass=empirical)
 
+    def test_margin_pmf_is_normalized_without_special_key_injection(self):
+        from sportsedge.core.simulate.football import KeyNumberMarginModel
+
+        model = KeyNumberMarginModel(mean=0.0, sigma=13.4)
+        pmf = model.margin_pmf(range(-60, 61))
         self.assertAlmostEqual(sum(pmf.values()), 1.0, places=10)
-        for margin, target in empirical.items():
-            self.assertAlmostEqual(pmf[margin], target, delta=0.002)
+        # Symmetric candidate around zero; ±3 and ±7 are ordinary emergent bins.
+        self.assertAlmostEqual(pmf[3], pmf[-3], places=12)
+        self.assertAlmostEqual(pmf[7], pmf[-7], places=12)
+        self.assertGreater(pmf[3], 0.0)
+        self.assertGreater(pmf[7], 0.0)
 
     def test_joint_score_simulator_returns_integer_nonnegative_scores(self):
         from sportsedge.core.simulate.football import JointScoreSimulator, KeyNumberMarginModel
 
-        model = KeyNumberMarginModel(
-            mean=3.0,
-            sigma=13.4,
-            empirical_key_mass={-7: 0.05, -3: 0.08, 3: 0.11, 7: 0.09},
-        )
+        model = KeyNumberMarginModel(mean=3.0, sigma=13.4)
         sim = JointScoreSimulator(margin_model=model, total_mean=46.0, total_sigma=10.0, seed=7)
         rows = sim.simulate(2000)
         self.assertEqual(len(rows), 2000)
