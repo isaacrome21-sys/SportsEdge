@@ -34,6 +34,9 @@ class GameDistribution:
     nrfi_probability: float
     yrfi_probability: float
     regulation_tie_probability: float
+    first_inning_share: float
+    first_inning_dispersion_r: float
+    extra_half_inning_mean: float
     result_sha256: str
 
 
@@ -80,14 +83,7 @@ def _resolve_extras(
     home_lam: float,
     extra_half_inning_mean: float,
 ) -> tuple[int, int]:
-    """Resolve tied regulation paths into a coherent final score.
-
-    The candidate extras model uses the regulation latent-strength ratio to scale
-    a ghost-runner-era half-inning mean. Home scoring is walk-off truncated: once
-    the home club scores the winning run, no additional home runs are credited.
-    This is a candidate model addition and must earn behavioral validation before
-    production promotion.
-    """
+    """Resolve a tied regulation state into one coherent final score."""
     if away_runs != home_runs:
         return away_runs, home_runs
     avg_lam = max(1e-9, (away_lam + home_lam) / 2.0)
@@ -103,7 +99,6 @@ def _resolve_extras(
         home_runs += home_extra
         if away_extra > home_extra:
             return away_runs, home_runs
-    # Extremely rare safety fallback: preserve score coherence rather than return a tie.
     p_home = home_lam / (home_lam + away_lam)
     if rng.random() < p_home:
         home_runs += 1
@@ -163,8 +158,6 @@ def simulate_game_distribution(
         away_runs = _poisson(rng, away_lam)
         home_runs = _poisson(rng, home_lam)
 
-        # First inning is modeled per half-inning with overdispersion. Splitting the
-        # means preserves offense asymmetry; using only the combined lambda cannot.
         away_fi = _negative_binomial(rng, away_lam * fi_share, fi_r)
         home_fi = _negative_binomial(rng, home_lam * fi_share, fi_r)
         if away_fi + home_fi > 0:
@@ -215,6 +208,9 @@ def simulate_game_distribution(
         "nrfi_probability": 1.0 - (yrfi / simulations),
         "yrfi_probability": yrfi / simulations,
         "regulation_tie_probability": regulation_ties / simulations,
+        "first_inning_share": fi_share,
+        "first_inning_dispersion_r": fi_r,
+        "extra_half_inning_mean": extras_mean,
     }
     digest = canonical_json_sha256(raw)
     return GameDistribution(**{k: raw[k] for k in raw if k != "version"}, result_sha256=digest)
