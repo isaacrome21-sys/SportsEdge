@@ -15,6 +15,7 @@ DEFAULT_VALIDATION = Path("config/mlb_validation_evidence.json")
 DEFAULT_FEATURES = Path("config/mlb_market_feature_requirements.json")
 DEFAULT_COLLECTORS = Path("config/mlb_collector_validation.json")
 DEFAULT_FEATURE_REALIZATION = Path("config/mlb_feature_realization.json")
+DEFAULT_BEHAVIORAL = Path("config/mlb_behavioral_disposition.json")
 REQUIRED_DYNAMIC_COLLECTORS = ("mlb-game-context-refresh", "statcast-daily-refresh")
 
 
@@ -105,11 +106,7 @@ def _feature_contract_state(features: dict[str, Any], market: str) -> tuple[bool
 
 
 def _feature_realization_state(realization: dict[str, Any], market: str) -> tuple[bool, str, list[str]]:
-    """Return whether the declared feature contract is proven active end-to-end.
-
-    Statuses are deliberately explicit. PARTIAL/MINIMAL/PLANNED/UNVERIFIED may run
-    in shadow for behavioral research, but cannot satisfy official readiness.
-    """
+    """Return whether the declared feature contract is proven active end-to-end."""
     markets = realization.get("markets")
     if not isinstance(markets, dict):
         return False, "UNVERIFIED", ["FEATURE_REALIZATION_REGISTRY_MISSING"]
@@ -124,6 +121,24 @@ def _feature_realization_state(realization: dict[str, Any], market: str) -> tupl
     if not isinstance(gaps, list):
         raise ValueError(f"feature realization gaps must be list for {market}")
     return status == "COMPLETE", status, [str(x) for x in gaps]
+
+
+def _behavioral_state(behavioral: dict[str, Any], market: str) -> tuple[bool, str, str | None]:
+    """Measured behavioral acceptance is independent of implementation/validation plumbing."""
+    markets = behavioral.get("markets")
+    if not isinstance(markets, dict):
+        return False, "UNVERIFIED", "BEHAVIORAL_REGISTRY_MISSING"
+    row = markets.get(market)
+    if not isinstance(row, dict):
+        return False, "UNVERIFIED", "BEHAVIORAL_UNATTESTED"
+    status = str(row.get("status", "UNVERIFIED")).upper()
+    allowed = {"KEEP_MEASURED", "WATCH", "FIX", "REBUILD", "UPSTREAM_MODEL_REVIEW", "UNVERIFIED"}
+    if status not in allowed:
+        raise ValueError(f"invalid behavioral status for {market}: {status}")
+    root_cause = row.get("root_cause")
+    if root_cause is not None:
+        root_cause = str(root_cause)
+    return status == "KEEP_MEASURED", status, root_cause
 
 
 def _collector_validation_state(collectors: dict[str, Any]) -> tuple[bool, list[str], dict[str, str]]:
@@ -149,6 +164,7 @@ def audit_readiness(
     features_path: str | Path = DEFAULT_FEATURES,
     collectors_path: str | Path = DEFAULT_COLLECTORS,
     feature_realization_path: str | Path = DEFAULT_FEATURE_REALIZATION,
+    behavioral_path: str | Path = DEFAULT_BEHAVIORAL,
 ) -> dict[str, Any]:
     registry = load_registry(registry_path)
     engines = engine_registry()
@@ -157,6 +173,7 @@ def audit_readiness(
     validation = _load_json(validation_path)
     features = _load_json(features_path)
     realization = _load_optional_json(feature_realization_path)
+    behavioral = _load_optional_json(behavioral_path)
     collector_complete, collector_missing, collector_status = _collector_validation_state(_load_json(collectors_path))
 
     if Path(registry_path) == DEFAULT_REGISTRY:
@@ -178,6 +195,7 @@ def audit_readiness(
         validation_complete, validation_missing, validation_status = _validation_state(validation, market)
         feature_contract_declared, missing_feature_definitions = _feature_contract_state(features, market)
         feature_realization_complete, feature_realization_status, feature_realization_gaps = _feature_realization_state(realization, market)
+        behavioral_complete, behavioral_status, behavioral_root_cause = _behavioral_state(behavioral, market)
 
         blockers: list[str] = []
         classes: list[str] = []
@@ -195,6 +213,11 @@ def audit_readiness(
             blockers.append(f"FEATURE_REALIZATION_{feature_realization_status}")
             blockers.extend(f"FEATURE_GAP_{x}" for x in feature_realization_gaps)
             classes.append("ENGINEERING")
+        if not behavioral_complete:
+            blockers.append(f"BEHAVIORAL_{behavioral_status}")
+            if behavioral_root_cause:
+                blockers.append(f"BEHAVIORAL_CAUSE_{behavioral_root_cause}")
+            classes.append("MODEL_VALIDATION")
         if not collector_complete:
             blockers.extend(f"COLLECTOR_{x.upper().replace('-', '_')}_NOT_VALIDATED" for x in collector_missing)
             classes.append("EVIDENCE")
@@ -211,12 +234,10 @@ def audit_readiness(
             classes.append("PROVIDER")
 
         classes = list(dict.fromkeys(classes))
-        # Partial baselines remain runnable in shadow specifically so behavioral
-        # acceptance can measure them. Official readiness requires realization.
         shadow_runnable = quote_supported and has_engine and feature_contract_declared
         runnable_live = shadow_runnable and collector_complete
         official = (
-            runnable_live and feature_realization_complete and eligible
+            runnable_live and feature_realization_complete and behavioral_complete and eligible
             and has_floor and validation_complete
         )
         rows.append({
@@ -231,6 +252,9 @@ def audit_readiness(
             "feature_realization_complete": feature_realization_complete,
             "feature_realization_status": feature_realization_status,
             "feature_realization_gaps": feature_realization_gaps,
+            "behavioral_complete": behavioral_complete,
+            "behavioral_status": behavioral_status,
+            "behavioral_root_cause": behavioral_root_cause,
             "collector_validation_complete": collector_complete,
             "collector_validation_status": collector_status,
             "collector_validation_missing": collector_missing,
@@ -249,7 +273,7 @@ def audit_readiness(
         })
 
     return {
-        "schema_version": 6,
+        "schema_version": 7,
         "collector_validation": {
             "complete": collector_complete,
             "status": collector_status,
@@ -263,6 +287,7 @@ def audit_readiness(
             "runtime_engines": sum(x["runtime_engine"] for x in rows),
             "feature_contract_complete": sum(x["feature_contract_complete"] for x in rows),
             "feature_realization_complete": sum(x["feature_realization_complete"] for x in rows),
+            "behavioral_complete": sum(x["behavioral_complete"] for x in rows),
             "collector_validation_complete": sum(x["collector_validation_complete"] for x in rows),
             "shadow_runnable": sum(x["shadow_runnable"] for x in rows),
             "runnable_live": sum(x["runnable_live"] for x in rows),
@@ -270,6 +295,7 @@ def audit_readiness(
             "validation_complete": sum(x["validation_complete"] for x in rows),
             "official_bet_enabled": sum(x["official_bet_enabled"] for x in rows),
             "engineering_blocked": sum("ENGINEERING" in x["blocker_classes"] for x in rows),
+            "model_validation_blocked": sum("MODEL_VALIDATION" in x["blocker_classes"] for x in rows),
             "evidence_blocked": sum("EVIDENCE" in x["blocker_classes"] for x in rows),
         },
     }
