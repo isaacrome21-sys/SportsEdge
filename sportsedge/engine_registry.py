@@ -17,7 +17,6 @@ from .generic_market_engine import (
     generic_market_engine_adapter,
 )
 from .hits_engine import simulate_hits
-from .home_runs_engine import simulate_home_runs
 from .total_bases_engine import simulate_total_bases
 
 
@@ -105,26 +104,11 @@ def total_bases_engine_adapter(model_input: Mapping[str, Any]) -> dict[str, Any]
         raise EngineDispatchError(f"unsupported TOTAL_BASES line {line}; allowed={_HITTER_LINES}")
     side = model_input.get("side")
     if side not in ("OVER", "UNDER"):
-        raise EngineDispatchError("TOTAL_BASES side must be OVER or UNDER")
+        raise EngineDispatchError("Total Bases side must be OVER or UNDER")
     internal = dict(model_input); internal["market"] = "total_bases"
     result = simulate_total_bases(internal, thresholds=(line,))
     p_over = float(result.probs[line])
     return _common_output(model_input, result, p_over if side == "OVER" else 1.0 - p_over, "TOTAL_BASES")
-
-
-def home_runs_engine_adapter(model_input: Mapping[str, Any]) -> dict[str, Any]:
-    if model_input.get("market") != "HOME_RUNS":
-        raise EngineDispatchError("Home Runs adapter requires market=HOME_RUNS")
-    line = _finite_line(model_input.get("line"))
-    if line != 0.5:
-        raise EngineDispatchError("HOME_RUNS currently supports line=0.5 only")
-    side = model_input.get("side")
-    if side not in ("OVER", "UNDER"):
-        raise EngineDispatchError("HOME_RUNS side must be OVER or UNDER")
-    internal = dict(model_input); internal["market"] = "home_runs"
-    result = simulate_home_runs(internal, thresholds=(line,))
-    p_over = float(result.probs[line])
-    return _common_output(model_input, result, p_over if side == "OVER" else 1.0 - p_over, "HOME_RUNS")
 
 
 def pitcher_bb_engine_adapter(model_input: Mapping[str, Any]) -> dict[str, Any]:
@@ -143,10 +127,12 @@ def pitcher_bb_engine_adapter(model_input: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def engine_registry() -> dict[str, Callable[[Mapping[str, Any]], Mapping[str, Any]]]:
+    # HOME_RUNS deliberately uses the generic analytic runtime for now. The richer
+    # research HR adapter expects a different feature contract than the generic card
+    # pipeline supplies and must not be selected until that bridge is implemented.
     registry: dict[str, Callable[[Mapping[str, Any]], Mapping[str, Any]]] = {
         "HITS": hits_engine_adapter,
         "TOTAL_BASES": total_bases_engine_adapter,
-        "HOME_RUNS": home_runs_engine_adapter,
         "PITCHER_BB": pitcher_bb_engine_adapter,
     }
     for market in sorted(GAME_MARKETS | COUNT_MARKETS | BINARY_MARKETS):
