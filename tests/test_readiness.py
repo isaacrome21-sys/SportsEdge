@@ -15,10 +15,13 @@ class ReadinessTests(unittest.TestCase):
             self.assertTrue(rows[market]["feature_contract_declared"])
             self.assertFalse(rows[market]["feature_realization_complete"])
             self.assertEqual(rows[market]["feature_realization_status"], "PARTIAL")
+            self.assertFalse(rows[market]["behavioral_complete"])
+            self.assertEqual(rows[market]["behavioral_status"], "FIX")
             self.assertTrue(rows[market]["runnable_live"])
             self.assertFalse(rows[market]["official_bet_enabled"])
             self.assertFalse(rows[market]["validation_complete"])
             self.assertIn("FIXTURE_CI_PENDING", rows[market]["blockers"])
+            self.assertIn("BEHAVIORAL_FIX", rows[market]["blockers"])
             self.assertIn("historical_point_in_time", rows[market]["validation_missing"])
 
     def test_every_checked_in_market_has_declared_contract_but_realization_is_separate(self):
@@ -26,6 +29,7 @@ class ReadinessTests(unittest.TestCase):
         missing = [x["market"] for x in out["markets"] if not x["feature_contract_declared"]]
         self.assertEqual(missing, [])
         self.assertLess(out["summary"]["feature_realization_complete"], out["summary"]["feature_contract_complete"])
+        self.assertEqual(out["summary"]["behavioral_complete"], 7)
 
     def test_unknown_runtime_market_is_not_claimed_runnable(self):
         with tempfile.TemporaryDirectory() as td:
@@ -39,6 +43,7 @@ class ReadinessTests(unittest.TestCase):
         self.assertFalse(row["runtime_engine"])
         self.assertFalse(row["feature_contract_declared"])
         self.assertFalse(row["feature_realization_complete"])
+        self.assertFalse(row["behavioral_complete"])
         self.assertFalse(row["runnable_live"])
         self.assertIn("NO_RUNTIME_ENGINE", row["blockers"])
         self.assertIn("NO_DECLARED_FEATURE_CONTRACT", row["blockers"])
@@ -99,13 +104,41 @@ class ReadinessTests(unittest.TestCase):
         self.assertFalse(row["official_bet_enabled"])
         self.assertIn("FEATURE_REALIZATION_PARTIAL", row["blockers"])
 
-    def test_official_enablement_requires_validation_and_complete_feature_realization(self):
+    def test_behavioral_fix_blocks_official_even_when_other_gates_pass(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             registry = root / "deployments.json"
             floors = root / "floors.json"
             validation = root / "validation.json"
             realization = root / "realization.json"
+            behavioral = root / "behavioral.json"
+            registry.write_text(json.dumps({"schema_version": 1, "markets": {"HITS": {"eligible": True, "stage": "DEPLOYED", "reason": "test"}}}))
+            floors.write_text(json.dumps({"truth_gate": {"edge_floors": {"HITS": {"status": "FROZEN", "value": 0.02}}}}))
+            validation.write_text(json.dumps({
+                "required_gates": ["historical_point_in_time", "untouched_holdout"],
+                "markets": {"HITS": {"historical_point_in_time": "PASS", "untouched_holdout": "PASS"}},
+            }))
+            realization.write_text(json.dumps({"schema_version": 1, "markets": {"HITS": {"status": "COMPLETE", "gaps": []}}}))
+            behavioral.write_text(json.dumps({"schema_version": 1, "markets": {"HITS": {"status": "FIX", "root_cause": "RNG_IDENTITY_EVIDENCE"}}}))
+            out = audit_readiness(
+                registry, floors_path=floors, validation_path=validation,
+                feature_realization_path=realization, behavioral_path=behavioral,
+            )
+        row = out["markets"][0]
+        self.assertTrue(row["validation_complete"])
+        self.assertTrue(row["feature_realization_complete"])
+        self.assertFalse(row["behavioral_complete"])
+        self.assertFalse(row["official_bet_enabled"])
+        self.assertIn("BEHAVIORAL_FIX", row["blockers"])
+
+    def test_official_enablement_requires_validation_realization_and_measured_behavior(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            registry = root / "deployments.json"
+            floors = root / "floors.json"
+            validation = root / "validation.json"
+            realization = root / "realization.json"
+            behavioral = root / "behavioral.json"
             registry.write_text(json.dumps({
                 "schema_version": 1,
                 "markets": {"HITS": {"eligible": True, "stage": "DEPLOYED", "reason": "test"}},
@@ -121,13 +154,15 @@ class ReadinessTests(unittest.TestCase):
                 }},
             }))
             realization.write_text(json.dumps({"schema_version": 1, "markets": {"HITS": {"status": "COMPLETE", "gaps": []}}}))
+            behavioral.write_text(json.dumps({"schema_version": 1, "markets": {"HITS": {"status": "KEEP_MEASURED", "root_cause": None}}}))
             out = audit_readiness(
                 registry, floors_path=floors, validation_path=validation,
-                feature_realization_path=realization,
+                feature_realization_path=realization, behavioral_path=behavioral,
             )
         row = out["markets"][0]
         self.assertTrue(row["validation_complete"])
         self.assertTrue(row["feature_realization_complete"])
+        self.assertTrue(row["behavioral_complete"])
         self.assertTrue(row["official_bet_enabled"])
 
 

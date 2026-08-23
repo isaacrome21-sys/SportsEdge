@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "acceptance_rule": "KEEP_MEASURED requires line-level behavioral evidence; plausibility alone cannot promote a market.",
+  "markets": {
+    "MONEYLINE": {"status": "KEEP_MEASURED", "root_cause": null},
+    "PITCHER_K": {"status": "KEEP_MEASURED", "root_cause": null},
+    "PITCHER_HITS_ALLOWED": {"status": "KEEP_MEASURED", "root_cause": null},
+    "STOLEN_BASES": {"status": "KEEP_MEASURED", "root_cause": null},
+    "HOME_RUNS": {"status": "KEEP_MEASURED", "root_cause": null},
+    "RUNS": {"status": "KEEP_MEASURED", "root_cause": null},
+    "TRIPLES": {"status": "KEEP_MEASURED", "root_cause": null},
+    "DOUBLES": {"status": "WATCH", "root_cause": "PA_BOUNDED_COUNT_FORM"},
+    "RUN_LINE": {"status": "FIX", "root_cause": "EXTRAS_FINAL_STATE"},
+    "TOTALS": {"status": "FIX", "root_cause": "EXTRAS_FINAL_STATE"},
+    "HITS": {"status": "FIX", "root_cause": "RNG_IDENTITY_EVIDENCE"},
+    "TOTAL_BASES": {"status": "FIX", "root_cause": "RNG_IDENTITY_EVIDENCE"},
+    "PITCHER_BB": {"status": "FIX", "root_cause": "RNG_IDENTITY_EVIDENCE"},
+    "BATTER_K": {"status": "FIX", "root_cause": "PA_BOUNDED_COUNT_FORM"},
+    "PITCHER_ER": {"status": "FIX", "root_cause": "DISTRIBUTION_SHAPE"},
+    "RBI": {"status": "FIX", "root_cause": "DISTRIBUTION_SHAPE"},
+    "BATTER_BB": {"status": "FIX", "root_cause": "PA_BOUNDED_COUNT_FORM"},
+    "SINGLES": {"status": "FIX", "root_cause": "PA_BOUNDED_COUNT_FORM"},
+    "NRFI": {"status": "REBUILD", "root_cause": "FIRST_INNING_MODEL_FORM"},
+    "YRFI": {"status": "REBUILD", "root_cause": "FIRST_INNING_MODEL_FORM"},
+    "F5_MONEYLINE": {"status": "REBUILD", "root_cause": "F5_STATE_AND_TIE_SEMANTICS"},
+    "F5_RUN_LINE": {"status": "REBUILD", "root_cause": "F5_STATE_AND_TIE_SEMANTICS"},
+    "F5_TOTALS": {"status": "REBUILD", "root_cause": "F5_STATE_AND_TIE_SEMANTICS"},
+    "PITCHER_OUTS": {"status": "REBUILD", "root_cause": "PHYSICAL_SUPPORT_VIOLATION"},
+    "HITS_RUNS_RBIS": {"status": "REBUILD", "root_cause": "JOINT_COMPONENT_COHERENCE"},
+    "FIRST_HOME_RUN": {"status": "REBUILD", "root_cause": "EXCHANGEABILITY_VIOLATION"},
+    "PITCHER_RECORD_WIN": {"status": "UPSTREAM_MODEL_REVIEW", "root_cause": "ROLLING_WIN_RATE_FEATURE"}
+  }
+}
