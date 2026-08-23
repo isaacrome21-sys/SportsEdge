@@ -195,7 +195,9 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
         DEFAULT_EXTRA_HALF_INNING_MEAN,
         DEFAULT_FIRST_INNING_DISPERSION_R,
         DEFAULT_FIRST_INNING_SHARE,
+        FIRST_INNING_MODEL_VERSION,
         V7_DISTRIBUTION_VERSION,
+        first_inning_probabilities,
         simulate_game_distribution,
     )
 
@@ -208,9 +210,47 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
     away_mean = _finite(model_input.get("away_mean_runs"), "away_mean_runs", lower=0.000001)
     home_mean = _finite(model_input.get("home_mean_runs"), "home_mean_runs", lower=0.000001)
     line = _finite(model_input.get("line", 0.0), "line")
+    side = str(model_input.get("side", "")).upper()
+
+    if market in {"NRFI", "YRFI"}:
+        nrfi, yrfi = first_inning_probabilities(
+            away_mean_runs=away_mean,
+            home_mean_runs=home_mean,
+            first_inning_share=DEFAULT_FIRST_INNING_SHARE,
+            dispersion_r=DEFAULT_FIRST_INNING_DISPERSION_R,
+        )
+        if market == "NRFI":
+            if side in {"YES", "NRFI"}:
+                p = nrfi
+            elif side == "NO":
+                p = yrfi
+            else:
+                raise GenericMarketEngineError("NRFI side must be YES/NO")
+        else:
+            if side in {"YES", "YRFI"}:
+                p = yrfi
+            elif side == "NO":
+                p = nrfi
+            else:
+                raise GenericMarketEngineError("YRFI side must be YES/NO")
+        digest = _canonical_json_sha256({
+            "engine": FIRST_INNING_MODEL_VERSION,
+            "game_id": model_input.get("game_id"),
+            "away_mean_runs": away_mean,
+            "home_mean_runs": home_mean,
+            "first_inning_share": DEFAULT_FIRST_INNING_SHARE,
+            "dispersion_r": DEFAULT_FIRST_INNING_DISPERSION_R,
+            "feature_source_hash": model_input.get("feature_source_hash"),
+        })
+        out = _base_output(model_input, p, model_hash=digest)
+        out["engine_version"] = FIRST_INNING_MODEL_VERSION
+        out["seed_policy"] = "analytic_negative_binomial_marginal"
+        out["mc_paths"] = 0
+        out["push_p"] = 0.0
+        return out
+
     total_line = line if market == "TOTALS" else _finite(model_input.get("total_line", 0.0), "total_line", lower=0.0)
     simulations = int(model_input.get("simulations", 50000))
-
     game_build_hash = _canonical_json_sha256({
         "engine": V7_DISTRIBUTION_VERSION, "game_id": model_input.get("game_id"),
         "away_mean_runs": away_mean, "home_mean_runs": home_mean,
@@ -223,7 +263,6 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
         first_inning_dispersion_r=DEFAULT_FIRST_INNING_DISPERSION_R,
         extra_half_inning_mean=DEFAULT_EXTRA_HALF_INNING_MEAN,
     )
-    side = str(model_input.get("side", "")).upper()
     states = _joint_states(result.joint_score_pmf)
     p_push = 0.0
 
@@ -251,20 +290,6 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
         else:
             raise GenericMarketEngineError("totals side must be OVER or UNDER")
         p_push = sum(prob for away, home, prob in states if abs((away + home) - line) < 1e-12)
-    elif market == "NRFI":
-        if side in {"YES", "NRFI"}:
-            p = result.nrfi_probability
-        elif side == "NO":
-            p = result.yrfi_probability
-        else:
-            raise GenericMarketEngineError("NRFI side must be YES/NO")
-    elif market == "YRFI":
-        if side in {"YES", "YRFI"}:
-            p = result.yrfi_probability
-        elif side == "NO":
-            p = result.nrfi_probability
-        else:
-            raise GenericMarketEngineError("YRFI side must be YES/NO")
     else:
         raise GenericMarketEngineError(f"unsupported game market {market}")
 
