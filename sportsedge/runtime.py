@@ -100,6 +100,8 @@ def result_to_dict(result: RunResult) -> dict[str, Any]:
             "model_status": result.decision.model_status,
             "bet_status": result.decision.bet_status,
             "implied_probability": result.decision.implied_probability,
+            "conditional_model_probability": result.decision.conditional_model_probability,
+            "push_probability": result.decision.push_probability,
             "edge": result.decision.edge,
             "ev_per_dollar": result.decision.ev_per_dollar,
             "kelly_fraction": result.decision.kelly_fraction,
