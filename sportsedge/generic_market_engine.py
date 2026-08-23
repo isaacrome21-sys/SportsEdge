@@ -2,17 +2,18 @@
 
 This module does not consume sportsbook probabilities or prices. Game markets are
 resolved from the shared V7 run distribution. Count props are resolved analytically
-from an explicit model-derived expected_count. Binary props require an explicit
-model-derived event_probability. Missing model features fail closed.
+from explicit model-derived inputs. Binary props require an explicit model-derived
+event_probability. Missing model features fail closed.
 """
 from __future__ import annotations
 
 import hashlib
 import json
-from math import exp, floor, isfinite
+from math import comb, exp, floor, isfinite
 from typing import Any, Mapping
 
 GENERIC_ENGINE_VERSION = "mlb_full_market_runtime_v1"
+PA_BOUNDED_ENGINE_VERSION = "mlb_pa_bounded_count_v1"
 
 GAME_MARKETS = {
     "MONEYLINE", "RUN_LINE", "TOTALS", "NRFI", "YRFI",
@@ -23,6 +24,7 @@ COUNT_MARKETS = {
     "BATTER_BB", "BATTER_K", "STOLEN_BASES", "PITCHER_K", "PITCHER_HITS_ALLOWED",
     "PITCHER_ER", "PITCHER_OUTS",
 }
+PA_BOUNDED_COUNT_MARKETS = {"BATTER_K", "BATTER_BB", "SINGLES", "DOUBLES"}
 BINARY_MARKETS = {"PITCHER_RECORD_WIN", "FIRST_HOME_RUN"}
 
 
@@ -77,6 +79,18 @@ def _poisson_cdf(k: int, lam: float) -> float:
     return min(1.0, max(0.0, total))
 
 
+def _binomial_cdf(k: int, n: int, p: float) -> float:
+    if k < 0:
+        return 0.0
+    if k >= n:
+        return 1.0
+    total = 0.0
+    q = 1.0 - p
+    for x in range(0, k + 1):
+        total += comb(n, x) * (p ** x) * (q ** (n - x))
+    return min(1.0, max(0.0, total))
+
+
 def _count_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
     market = str(model_input.get("market"))
     if market not in COUNT_MARKETS:
@@ -86,23 +100,46 @@ def _count_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
     side = str(model_input.get("side", "")).upper()
     if side not in {"OVER", "UNDER"}:
         raise GenericMarketEngineError("count market side must be OVER or UNDER")
+
     k_over = floor(line)
-    p_over = 1.0 - _poisson_cdf(k_over, lam)
-    if float(line).is_integer():
-        p_under = _poisson_cdf(int(line) - 1, lam)
-    else:
-        p_under = 1.0 - p_over
-    p = p_over if side == "OVER" else p_under
-    digest = _canonical_json_sha256({
-        "engine": GENERIC_ENGINE_VERSION,
+    engine_version = GENERIC_ENGINE_VERSION
+    digest_fields: dict[str, Any] = {
         "market": market,
         "expected_count": lam,
         "line": line,
         "side": side,
         "game_id": model_input.get("game_id"),
         "entity_id": model_input.get("entity_id"),
-    })
-    return _base_output(model_input, p, model_hash=digest)
+    }
+
+    if market in PA_BOUNDED_COUNT_MARKETS:
+        projected_pa = _finite(model_input.get("projected_pa"), "projected_pa", lower=0.0)
+        n = floor(projected_pa + 0.5)
+        if n < 1:
+            raise GenericMarketEngineError("projected_pa rounds to invalid n < 1")
+        p_event = lam / n
+        if p_event > 1.0:
+            raise GenericMarketEngineError("expected_count/projected_pa implies p > 1")
+        p_over = 1.0 - _binomial_cdf(k_over, n, p_event)
+        if float(line).is_integer():
+            p_under = _binomial_cdf(int(line) - 1, n, p_event)
+        else:
+            p_under = 1.0 - p_over
+        engine_version = PA_BOUNDED_ENGINE_VERSION
+        digest_fields.update({"projected_pa": projected_pa, "n": n, "p": p_event})
+    else:
+        p_over = 1.0 - _poisson_cdf(k_over, lam)
+        if float(line).is_integer():
+            p_under = _poisson_cdf(int(line) - 1, lam)
+        else:
+            p_under = 1.0 - p_over
+
+    p = p_over if side == "OVER" else p_under
+    digest_fields["engine"] = engine_version
+    digest = _canonical_json_sha256(digest_fields)
+    out = _base_output(model_input, p, model_hash=digest)
+    out["engine_version"] = engine_version
+    return out
 
 
 def _binary_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
