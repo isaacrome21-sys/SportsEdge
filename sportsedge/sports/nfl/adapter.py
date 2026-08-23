@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .m2 import build_nfl_m2_features
+
 
 class NFLAdapter:
     sport = "nfl"
@@ -22,16 +24,28 @@ class NFLAdapter:
         return self.history_ingestor.load(seasons)
 
     def build_features(self, asof_ts: Any, games: Any) -> Any:
-        raise NotImplementedError("NFL M2 features are implemented in roadmap task 13")
+        """Mechanical adapter seam into the already-implemented NFL M2 builder."""
+        def one(game: Any) -> dict[str, float | str]:
+            if not isinstance(game, dict):
+                raise TypeError("NFL feature source must be a mapping")
+            source = dict(game)
+            source["feature_asof_ts"] = asof_ts
+            return build_nfl_m2_features(source)
+
+        if isinstance(games, dict):
+            return one(games)
+        if isinstance(games, (list, tuple)):
+            return [one(game) for game in games]
+        raise TypeError("NFL games must be a mapping or sequence of mappings")
 
     def margin_sigma(self, context: Any) -> float:
-        raise NotImplementedError
+        raise NotImplementedError("NFL margin sigma requires validated historical-window methodology")
 
     def total_sigma(self, context: Any) -> float:
-        raise NotImplementedError
+        raise NotImplementedError("NFL total sigma requires validated historical-window methodology")
 
     def key_numbers(self) -> dict[int, float]:
-        raise NotImplementedError
+        raise NotImplementedError("NFL key numbers remain blocked on compliant emergent-margin rewrite")
 
     def hfa_prior(self, venue: Any, context: Any) -> float:
-        raise NotImplementedError
+        raise NotImplementedError("NFL HFA requires an empirical venue/context contract")
