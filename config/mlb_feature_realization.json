@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "status_semantics": {
+    "COMPLETE": "Every declared required family is traceable source -> builder -> runtime input -> price influence.",
+    "PARTIAL": "Some declared families are active, but material declared families remain absent or captured-only.",
+    "MINIMAL": "A narrow baseline is active and behaviorally testable, but most of the declared target contract is not realized.",
+    "PLANNED": "The currently registered baseline is intentionally fail-closed pending a replacement model/state contract.",
+    "UNVERIFIED": "No end-to-end realization attestation exists."
+  },
+  "markets": {
+    "MONEYLINE": {"status": "MINIMAL", "gaps": ["rich_pitcher_team_bullpen_environment_contract_not_active"]},
+    "RUN_LINE": {"status": "MINIMAL", "gaps": ["rich_game_context_not_active", "extras_candidate_unvalidated"]},
+    "TOTALS": {"status": "MINIMAL", "gaps": ["rich_game_context_not_active", "extras_candidate_unvalidated"]},
+    "NRFI": {"status": "MINIMAL", "gaps": ["first_inning_candidate_parameters_unvalidated", "declared_first_inning_context_not_active"]},
+    "YRFI": {"status": "MINIMAL", "gaps": ["first_inning_candidate_parameters_unvalidated", "declared_first_inning_context_not_active"]},
+    "F5_MONEYLINE": {"status": "PLANNED", "gaps": ["inning_state_model_required", "tie_semantics_required"]},
+    "F5_RUN_LINE": {"status": "PLANNED", "gaps": ["inning_state_model_required", "tie_semantics_required"]},
+    "F5_TOTALS": {"status": "PLANNED", "gaps": ["inning_state_model_required", "tie_semantics_required"]},
+    "HOME_RUNS": {"status": "MINIMAL", "gaps": ["generic_expected_count_baseline_only", "rich_hr_feature_bridge_not_active"]},
+    "HITS": {"status": "PARTIAL", "gaps": ["full_declared_matchup_contact_defense_contract_not_all_active", "seed_safe_evidence_regeneration_required"]},
+    "TOTAL_BASES": {"status": "PARTIAL", "gaps": ["full_declared_matchup_environment_contract_not_all_active", "seed_safe_evidence_regeneration_required"]},
+    "RBI": {"status": "PLANNED", "gaps": ["measured_distribution_shape_error", "base_state_opportunity_model_required"]},
+    "RUNS": {"status": "MINIMAL", "gaps": ["generic_expected_count_baseline_only"]},
+    "HITS_RUNS_RBIS": {"status": "PLANNED", "gaps": ["joint_pa_path_required_for_component_coherence"]},
+    "SINGLES": {"status": "PARTIAL", "gaps": ["pa_bounded_form_candidate_requires_behavioral_acceptance", "declared_contact_matchup_defense_features_not_active"]},
+    "DOUBLES": {"status": "PARTIAL", "gaps": ["pa_bounded_form_candidate_requires_behavioral_acceptance", "watch_level_current_pricing_error"]},
+    "TRIPLES": {"status": "MINIMAL", "gaps": ["generic_low_rate_baseline_only"]},
+    "BATTER_BB": {"status": "PARTIAL", "gaps": ["pa_bounded_form_candidate_requires_behavioral_acceptance", "declared_matchup_umpire_features_not_active"]},
+    "BATTER_K": {"status": "PARTIAL", "gaps": ["pa_bounded_form_candidate_requires_behavioral_acceptance", "declared_matchup_umpire_features_not_active"]},
+    "STOLEN_BASES": {"status": "MINIMAL", "gaps": ["stolen_base_context_not_active"]},
+    "PITCHER_K": {"status": "MINIMAL", "gaps": ["generic_expected_count_baseline_only"]},
+    "PITCHER_HITS_ALLOWED": {"status": "MINIMAL", "gaps": ["generic_expected_count_baseline_only"]},
+    "PITCHER_BB": {"status": "PARTIAL", "gaps": ["seed_safe_evidence_regeneration_required", "full_declared_context_not_all_active"]},
+    "PITCHER_ER": {"status": "PLANNED", "gaps": ["measured_distribution_shape_error"]},
+    "PITCHER_OUTS": {"status": "PLANNED", "gaps": ["physical_support_0_to_27_required", "workload_model_required"]},
+    "PITCHER_RECORD_WIN": {"status": "PLANNED", "gaps": ["rolling_win_rate_upstream_model_review_required"]},
+    "FIRST_HOME_RUN": {"status": "PLANNED", "gaps": ["ordering_aware_pa_simulation_required", "exchangeability_violation"]}
+  }
+}
