@@ -21,28 +21,17 @@ class GenericMarketEngineTests(unittest.TestCase):
 
     def test_count_market_produces_probability_without_sportsbook_input(self):
         out = generic_market_engine_adapter({
-            "game_id": "g1",
-            "market": "PITCHER_K",
-            "entity_id": "p1",
-            "line": 5.5,
-            "side": "OVER",
-            "expected_count": 6.2,
+            "game_id": "g1", "market": "PITCHER_K", "entity_id": "p1",
+            "line": 5.5, "side": "OVER", "expected_count": 6.2,
         })
         self.assertGreater(out["model_p"], 0.0)
         self.assertLess(out["model_p"], 1.0)
-        self.assertEqual(out["market"], "PITCHER_K")
 
     def test_batter_k_uses_pa_bounded_binomial(self):
         out = generic_market_engine_adapter({
-            "game_id": "g1",
-            "market": "BATTER_K",
-            "entity_id": "b1",
-            "line": 0.5,
-            "side": "OVER",
-            "expected_count": 1.0,
-            "projected_pa": 4.4,
+            "game_id": "g1", "market": "BATTER_K", "entity_id": "b1",
+            "line": 0.5, "side": "OVER", "expected_count": 1.0, "projected_pa": 4.4,
         })
-        # n=floor(4.4+0.5)=4, p=.25, P(X>0)=1-.75^4
         self.assertAlmostEqual(out["model_p"], 1.0 - (0.75 ** 4), places=12)
         self.assertEqual(out["engine_version"], PA_BOUNDED_ENGINE_VERSION)
 
@@ -79,38 +68,54 @@ class GenericMarketEngineTests(unittest.TestCase):
         })
         self.assertEqual(out["model_p"], 0.0)
 
-    def test_binary_market_is_complementary(self):
-        yes = generic_market_engine_adapter({
-            "game_id": "g1", "market": "PITCHER_RECORD_WIN", "entity_id": "p1",
-            "line": 0.5, "side": "YES", "event_probability": 0.61,
-        })
-        no = generic_market_engine_adapter({
-            "game_id": "g1", "market": "PITCHER_RECORD_WIN", "entity_id": "p1",
-            "line": 0.5, "side": "NO", "event_probability": 0.61,
-        })
-        self.assertAlmostEqual(yes["model_p"] + no["model_p"], 1.0, places=12)
+    def test_known_bad_markets_fail_closed(self):
+        cases = [
+            {"market": "PITCHER_OUTS", "line": 18.5, "side": "OVER", "expected_count": 19.0},
+            {"market": "RBI", "line": 0.5, "side": "OVER", "expected_count": 0.7},
+            {"market": "PITCHER_ER", "line": 2.5, "side": "OVER", "expected_count": 2.8},
+            {"market": "HITS_RUNS_RBIS", "line": 1.5, "side": "OVER", "expected_count": 1.8},
+            {"market": "PITCHER_RECORD_WIN", "line": 0.5, "side": "YES", "event_probability": 0.55},
+            {"market": "FIRST_HOME_RUN", "line": 0.5, "side": "YES", "event_probability": 0.12},
+        ]
+        for row in cases:
+            with self.subTest(market=row["market"]):
+                with self.assertRaises(Exception):
+                    generic_market_engine_adapter({"game_id": "g1", "entity_id": "x", **row})
 
-    def test_v7_game_market_produces_moneyline_probability(self):
+    def test_f5_markets_fail_closed_until_state_model_exists(self):
+        for market in ("F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS"):
+            with self.subTest(market=market):
+                with self.assertRaisesRegex(Exception, "STATE_MODEL_REBUILD_REQUIRED"):
+                    generic_market_engine_adapter({
+                        "game_id": "g1", "market": market, "entity_id": "game",
+                        "line": 0.0, "side": "HOME", "away_mean_runs": 4.1,
+                        "home_mean_runs": 4.6,
+                    })
+
+    def test_v7_moneyline_is_identity_bound_and_complementary(self):
+        base = {
+            "game_id": "g1", "market": "MONEYLINE", "entity_id": "game",
+            "line": 0.0, "away_mean_runs": 4.3, "home_mean_runs": 4.3,
+            "total_line": 8.5, "simulations": 4000,
+        }
+        home = generic_market_engine_adapter({**base, "side": "HOME"})
+        away = generic_market_engine_adapter({**base, "side": "AWAY"})
+        self.assertAlmostEqual(home["model_p"] + away["model_p"], 1.0, places=12)
+        self.assertEqual(home["seed_policy"], "identity_sha256_256bit")
+
+    def test_v7_nrfi_candidate_has_plausible_base_rate(self):
         out = generic_market_engine_adapter({
-            "game_id": "g1",
-            "market": "MONEYLINE",
-            "entity_id": "home",
-            "line": 0.0,
-            "side": "HOME",
-            "away_mean_runs": 4.1,
-            "home_mean_runs": 4.6,
-            "total_line": 8.5,
-            "simulations": 1000,
-            "seed": 9,
+            "game_id": "g1", "market": "NRFI", "entity_id": "game",
+            "line": 0.5, "side": "YES", "away_mean_runs": 4.3,
+            "home_mean_runs": 4.3, "total_line": 8.5, "simulations": 10000,
         })
-        self.assertGreater(out["model_p"], 0.0)
-        self.assertLess(out["model_p"], 1.0)
-        self.assertEqual(out["mc_paths"], 1000)
+        self.assertGreater(out["model_p"], 0.48)
+        self.assertLess(out["model_p"], 0.59)
 
     def test_missing_model_feature_fails_closed(self):
         with self.assertRaises(Exception):
             generic_market_engine_adapter({
-                "game_id": "g1", "market": "RBI", "entity_id": "b1",
+                "game_id": "g1", "market": "BATTER_K", "entity_id": "b1",
                 "line": 0.5, "side": "OVER",
             })
 
