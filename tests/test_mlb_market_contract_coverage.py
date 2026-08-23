@@ -37,6 +37,26 @@ class MLBMarketContractCoverageTests(unittest.TestCase):
             self.assertIn(row["status"], allowed, market)
             self.assertIsInstance(row.get("gaps"), list, market)
 
+    def test_every_catalog_market_has_behavioral_disposition(self):
+        catalog = self._catalog_markets()
+        behavioral = json.loads(Path("config/mlb_behavioral_disposition.json").read_text())
+        self.assertEqual(catalog, set(behavioral["markets"]))
+        self.assertEqual(len(catalog), 27)
+        allowed = {"KEEP_MEASURED", "WATCH", "FIX", "REBUILD", "UPSTREAM_MODEL_REVIEW", "UNVERIFIED"}
+        for market, row in behavioral["markets"].items():
+            self.assertIn(row["status"], allowed, market)
+            self.assertIn("root_cause", row, market)
+
+    def test_canonical_behavioral_counts_are_stable(self):
+        behavioral = json.loads(Path("config/mlb_behavioral_disposition.json").read_text())
+        counts = {}
+        for row in behavioral["markets"].values():
+            counts[row["status"]] = counts.get(row["status"], 0) + 1
+        self.assertEqual(
+            counts,
+            {"KEEP_MEASURED": 7, "WATCH": 1, "FIX": 10, "REBUILD": 8, "UPSTREAM_MODEL_REVIEW": 1},
+        )
+
     def test_validation_registry_contains_all_required_evidence_classes(self):
         validation = json.loads(Path("config/mlb_validation_evidence.json").read_text())
         self.assertEqual(
@@ -51,7 +71,7 @@ class MLBMarketContractCoverageTests(unittest.TestCase):
             ],
         )
 
-    def test_no_market_is_official_without_complete_validation_and_realization(self):
+    def test_no_market_is_official_without_complete_validation_realization_and_behavior(self):
         from sportsedge.readiness import audit_readiness
 
         out = audit_readiness()
@@ -60,6 +80,8 @@ class MLBMarketContractCoverageTests(unittest.TestCase):
                 self.assertTrue(row["validation_complete"], row["market"])
                 self.assertTrue(row["feature_contract_complete"], row["market"])
                 self.assertTrue(row["feature_realization_complete"], row["market"])
+                self.assertTrue(row["behavioral_complete"], row["market"])
+                self.assertEqual(row["behavioral_status"], "KEEP_MEASURED", row["market"])
                 self.assertTrue(row["frozen_edge_floor"], row["market"])
                 self.assertTrue(row["runtime_engine"], row["market"])
 
