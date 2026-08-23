@@ -14,11 +14,19 @@ DEFAULT_FLOORS = Path("config/truth_gate_floors.json")
 DEFAULT_VALIDATION = Path("config/mlb_validation_evidence.json")
 DEFAULT_FEATURES = Path("config/mlb_market_feature_requirements.json")
 DEFAULT_COLLECTORS = Path("config/mlb_collector_validation.json")
+DEFAULT_FEATURE_REALIZATION = Path("config/mlb_feature_realization.json")
 REQUIRED_DYNAMIC_COLLECTORS = ("mlb-game-context-refresh", "statcast-daily-refresh")
 
 
 def _load_json(path: str | Path) -> dict[str, Any]:
     return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+def _load_optional_json(path: str | Path) -> dict[str, Any]:
+    p = Path(path)
+    if not p.exists():
+        return {"schema_version": 1, "markets": {}}
+    return _load_json(p)
 
 
 def _catalog_markets(catalog: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -96,6 +104,28 @@ def _feature_contract_state(features: dict[str, Any], market: str) -> tuple[bool
     return not missing_defs, missing_defs
 
 
+def _feature_realization_state(realization: dict[str, Any], market: str) -> tuple[bool, str, list[str]]:
+    """Return whether the declared feature contract is proven active end-to-end.
+
+    Statuses are deliberately explicit. PARTIAL/MINIMAL/PLANNED/UNVERIFIED may run
+    in shadow for behavioral research, but cannot satisfy official readiness.
+    """
+    markets = realization.get("markets")
+    if not isinstance(markets, dict):
+        return False, "UNVERIFIED", ["FEATURE_REALIZATION_REGISTRY_MISSING"]
+    row = markets.get(market)
+    if not isinstance(row, dict):
+        return False, "UNVERIFIED", ["FEATURE_REALIZATION_UNATTESTED"]
+    status = str(row.get("status", "UNVERIFIED")).upper()
+    allowed = {"COMPLETE", "PARTIAL", "MINIMAL", "PLANNED", "UNVERIFIED"}
+    if status not in allowed:
+        raise ValueError(f"invalid feature realization status for {market}: {status}")
+    gaps = row.get("gaps", [])
+    if not isinstance(gaps, list):
+        raise ValueError(f"feature realization gaps must be list for {market}")
+    return status == "COMPLETE", status, [str(x) for x in gaps]
+
+
 def _collector_validation_state(collectors: dict[str, Any]) -> tuple[bool, list[str], dict[str, str]]:
     records = collectors.get("collectors")
     if not isinstance(records, dict):
@@ -118,6 +148,7 @@ def audit_readiness(
     validation_path: str | Path = DEFAULT_VALIDATION,
     features_path: str | Path = DEFAULT_FEATURES,
     collectors_path: str | Path = DEFAULT_COLLECTORS,
+    feature_realization_path: str | Path = DEFAULT_FEATURE_REALIZATION,
 ) -> dict[str, Any]:
     registry = load_registry(registry_path)
     engines = engine_registry()
@@ -125,6 +156,7 @@ def audit_readiness(
     frozen_floors = _frozen_floor_markets(_load_json(floors_path))
     validation = _load_json(validation_path)
     features = _load_json(features_path)
+    realization = _load_optional_json(feature_realization_path)
     collector_complete, collector_missing, collector_status = _collector_validation_state(_load_json(collectors_path))
 
     if Path(registry_path) == DEFAULT_REGISTRY:
@@ -144,7 +176,8 @@ def audit_readiness(
         stage = str(meta.get("stage", "UNREGISTERED"))
         reason = str(meta.get("reason", "market absent from deployment registry"))
         validation_complete, validation_missing, validation_status = _validation_state(validation, market)
-        feature_contract_complete, missing_feature_definitions = _feature_contract_state(features, market)
+        feature_contract_declared, missing_feature_definitions = _feature_contract_state(features, market)
+        feature_realization_complete, feature_realization_status, feature_realization_gaps = _feature_realization_state(realization, market)
 
         blockers: list[str] = []
         classes: list[str] = []
@@ -154,9 +187,13 @@ def audit_readiness(
             blockers.append("NOT_REGISTERED"); classes.append("ENGINEERING")
         if not has_engine:
             blockers.append("NO_RUNTIME_ENGINE"); classes.append("ENGINEERING")
-        if not feature_contract_complete:
-            blockers.append("NO_COMPLETE_FEATURE_CONTRACT")
+        if not feature_contract_declared:
+            blockers.append("NO_DECLARED_FEATURE_CONTRACT")
             blockers.extend(f"UNKNOWN_FEATURE_FAMILY_{x}" for x in missing_feature_definitions)
+            classes.append("ENGINEERING")
+        if not feature_realization_complete:
+            blockers.append(f"FEATURE_REALIZATION_{feature_realization_status}")
+            blockers.extend(f"FEATURE_GAP_{x}" for x in feature_realization_gaps)
             classes.append("ENGINEERING")
         if not collector_complete:
             blockers.extend(f"COLLECTOR_{x.upper().replace('-', '_')}_NOT_VALIDATED" for x in collector_missing)
@@ -174,17 +211,26 @@ def audit_readiness(
             classes.append("PROVIDER")
 
         classes = list(dict.fromkeys(classes))
-        shadow_runnable = quote_supported and has_engine and feature_contract_complete
+        # Partial baselines remain runnable in shadow specifically so behavioral
+        # acceptance can measure them. Official readiness requires realization.
+        shadow_runnable = quote_supported and has_engine and feature_contract_declared
         runnable_live = shadow_runnable and collector_complete
-        official = runnable_live and eligible and has_floor and validation_complete
+        official = (
+            runnable_live and feature_realization_complete and eligible
+            and has_floor and validation_complete
+        )
         rows.append({
             "market": market,
             "group": cat.get("group", "registry_only"),
             "quote_supported": quote_supported,
             "registered": registered,
             "runtime_engine": has_engine,
-            "feature_contract_complete": feature_contract_complete,
+            "feature_contract_complete": feature_contract_declared,
+            "feature_contract_declared": feature_contract_declared,
             "missing_feature_definitions": missing_feature_definitions,
+            "feature_realization_complete": feature_realization_complete,
+            "feature_realization_status": feature_realization_status,
+            "feature_realization_gaps": feature_realization_gaps,
             "collector_validation_complete": collector_complete,
             "collector_validation_status": collector_status,
             "collector_validation_missing": collector_missing,
@@ -203,7 +249,7 @@ def audit_readiness(
         })
 
     return {
-        "schema_version": 5,
+        "schema_version": 6,
         "collector_validation": {
             "complete": collector_complete,
             "status": collector_status,
@@ -216,6 +262,7 @@ def audit_readiness(
             "registered": sum(x["registered"] for x in rows),
             "runtime_engines": sum(x["runtime_engine"] for x in rows),
             "feature_contract_complete": sum(x["feature_contract_complete"] for x in rows),
+            "feature_realization_complete": sum(x["feature_realization_complete"] for x in rows),
             "collector_validation_complete": sum(x["collector_validation_complete"] for x in rows),
             "shadow_runnable": sum(x["shadow_runnable"] for x in rows),
             "runnable_live": sum(x["runnable_live"] for x in rows),
