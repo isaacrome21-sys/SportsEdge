@@ -1,9 +1,8 @@
 """Generic price-independent runtime engines for the expanded MLB market surface.
 
-This module does not consume sportsbook probabilities or prices. Game markets are
-resolved from the shared V7 run distribution. Count props are resolved analytically
-from explicit model-derived inputs. Binary props require an explicit model-derived
-event_probability. Missing model features fail closed.
+Known behaviorally non-compliant markets fail closed until their replacement model
+is implemented and validated. Generic analytic paths remain available only where
+behavioral evidence or an explicitly isolated challenger supports them.
 """
 from __future__ import annotations
 
@@ -12,7 +11,7 @@ import json
 from math import comb, exp, floor, isfinite
 from typing import Any, Mapping
 
-GENERIC_ENGINE_VERSION = "mlb_full_market_runtime_v1"
+GENERIC_ENGINE_VERSION = "mlb_full_market_runtime_v2"
 PA_BOUNDED_ENGINE_VERSION = "mlb_pa_bounded_count_v1"
 
 GAME_MARKETS = {
@@ -26,6 +25,14 @@ COUNT_MARKETS = {
 }
 PA_BOUNDED_COUNT_MARKETS = {"BATTER_K", "BATTER_BB", "SINGLES", "DOUBLES"}
 BINARY_MARKETS = {"PITCHER_RECORD_WIN", "FIRST_HOME_RUN"}
+
+# Runtime safety contract: these markets have measured or structural defects and
+# must not emit prices from the old generic form while their rebuild is pending.
+FAIL_CLOSED_MARKETS = {
+    "F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS",
+    "PITCHER_OUTS", "HITS_RUNS_RBIS", "FIRST_HOME_RUN",
+    "PITCHER_ER", "RBI", "PITCHER_RECORD_WIN",
+}
 
 
 class GenericMarketEngineError(ValueError):
@@ -63,7 +70,7 @@ def _base_output(model_input: Mapping[str, Any], model_p: float, *, model_hash: 
         "model_p": float(model_p),
         "model_input_hash": model_hash,
         "engine_version": GENERIC_ENGINE_VERSION,
-        "seed_policy": "identity-bound-v7-or-analytic",
+        "seed_policy": "analytic_or_identity_bound",
         "mc_paths": 0,
     }
 
@@ -84,10 +91,8 @@ def _binomial_cdf(k: int, n: int, p: float) -> float:
         return 0.0
     if k >= n:
         return 1.0
-    total = 0.0
     q = 1.0 - p
-    for x in range(0, k + 1):
-        total += comb(n, x) * (p ** x) * (q ** (n - x))
+    total = sum(comb(n, x) * (p ** x) * (q ** (n - x)) for x in range(k + 1))
     return min(1.0, max(0.0, total))
 
 
@@ -95,6 +100,8 @@ def _count_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
     market = str(model_input.get("market"))
     if market not in COUNT_MARKETS:
         raise GenericMarketEngineError("count adapter received non-count market")
+    if market in FAIL_CLOSED_MARKETS:
+        raise GenericMarketEngineError(f"{market}_BEHAVIORAL_REBUILD_REQUIRED")
     lam = _finite(model_input.get("expected_count"), "expected_count", lower=0.0)
     line = _finite(model_input.get("line"), "line", lower=0.0)
     side = str(model_input.get("side", "")).upper()
@@ -110,6 +117,7 @@ def _count_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
         "side": side,
         "game_id": model_input.get("game_id"),
         "entity_id": model_input.get("entity_id"),
+        "feature_source_hash": model_input.get("feature_source_hash"),
     }
 
     if market in PA_BOUNDED_COUNT_MARKETS:
@@ -121,23 +129,16 @@ def _count_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
         if p_event > 1.0:
             raise GenericMarketEngineError("expected_count/projected_pa implies p > 1")
         p_over = 1.0 - _binomial_cdf(k_over, n, p_event)
-        if float(line).is_integer():
-            p_under = _binomial_cdf(int(line) - 1, n, p_event)
-        else:
-            p_under = 1.0 - p_over
+        p_under = _binomial_cdf(int(line) - 1, n, p_event) if float(line).is_integer() else 1.0 - p_over
         engine_version = PA_BOUNDED_ENGINE_VERSION
         digest_fields.update({"projected_pa": projected_pa, "n": n, "p": p_event})
     else:
         p_over = 1.0 - _poisson_cdf(k_over, lam)
-        if float(line).is_integer():
-            p_under = _poisson_cdf(int(line) - 1, lam)
-        else:
-            p_under = 1.0 - p_over
+        p_under = _poisson_cdf(int(line) - 1, lam) if float(line).is_integer() else 1.0 - p_over
 
     p = p_over if side == "OVER" else p_under
     digest_fields["engine"] = engine_version
-    digest = _canonical_json_sha256(digest_fields)
-    out = _base_output(model_input, p, model_hash=digest)
+    out = _base_output(model_input, p, model_hash=_canonical_json_sha256(digest_fields))
     out["engine_version"] = engine_version
     return out
 
@@ -146,6 +147,8 @@ def _binary_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
     market = str(model_input.get("market"))
     if market not in BINARY_MARKETS:
         raise GenericMarketEngineError("binary adapter received non-binary market")
+    if market in FAIL_CLOSED_MARKETS:
+        raise GenericMarketEngineError(f"{market}_BEHAVIORAL_REBUILD_REQUIRED")
     p_yes = _finite(model_input.get("event_probability"), "event_probability", lower=0.0, upper=1.0)
     side = str(model_input.get("side", "")).upper()
     if side not in {"YES", "NO"}:
@@ -158,49 +161,68 @@ def _binary_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
         "side": side,
         "game_id": model_input.get("game_id"),
         "entity_id": model_input.get("entity_id"),
+        "feature_source_hash": model_input.get("feature_source_hash"),
     })
     return _base_output(model_input, p, model_hash=digest)
 
 
 def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
-    from .v7_distribution import simulate_game_distribution
+    from .v7_distribution import (
+        DEFAULT_EXTRA_HALF_INNING_MEAN,
+        DEFAULT_FIRST_INNING_DISPERSION_R,
+        DEFAULT_FIRST_INNING_SHARE,
+        V7_DISTRIBUTION_VERSION,
+        simulate_game_distribution,
+    )
 
     market = str(model_input.get("market"))
     if market not in GAME_MARKETS:
         raise GenericMarketEngineError("game adapter received non-game market")
-    is_f5 = market.startswith("F5_")
-    away_key = "f5_away_mean_runs" if is_f5 else "away_mean_runs"
-    home_key = "f5_home_mean_runs" if is_f5 else "home_mean_runs"
-    away_mean = _finite(model_input.get(away_key), away_key, lower=0.000001)
-    home_mean = _finite(model_input.get(home_key), home_key, lower=0.000001)
+    if market in FAIL_CLOSED_MARKETS:
+        raise GenericMarketEngineError(f"{market}_STATE_MODEL_REBUILD_REQUIRED")
+
+    away_mean = _finite(model_input.get("away_mean_runs"), "away_mean_runs", lower=0.000001)
+    home_mean = _finite(model_input.get("home_mean_runs"), "home_mean_runs", lower=0.000001)
     line = _finite(model_input.get("line", 0.0), "line")
-    total_line = line if market in {"TOTALS", "F5_TOTALS"} else _finite(model_input.get("total_line", 0.0), "total_line", lower=0.0)
-    seed = int(model_input.get("seed", 7))
+    total_line = line if market == "TOTALS" else _finite(model_input.get("total_line", 0.0), "total_line", lower=0.0)
     simulations = int(model_input.get("simulations", 50000))
+
+    # RNG identity deliberately excludes side/line/market label so all read-outs for
+    # one modeled game share the same underlying random paths, while different games
+    # cannot accidentally share the old global seed stream.
+    game_build_hash = _canonical_json_sha256({
+        "engine": V7_DISTRIBUTION_VERSION,
+        "game_id": model_input.get("game_id"),
+        "away_mean_runs": away_mean,
+        "home_mean_runs": home_mean,
+        "feature_source_hash": model_input.get("feature_source_hash"),
+    })
     result = simulate_game_distribution(
         away_mean_runs=away_mean,
         home_mean_runs=home_mean,
         total_line=total_line,
         simulations=simulations,
-        seed=seed,
-        first_inning_share=model_input.get("first_inning_share", 1.0 / 9.0),
+        build_hash=game_build_hash,
+        first_inning_share=model_input.get("first_inning_share", DEFAULT_FIRST_INNING_SHARE),
+        first_inning_dispersion_r=model_input.get("first_inning_dispersion_r", DEFAULT_FIRST_INNING_DISPERSION_R),
+        extra_half_inning_mean=model_input.get("extra_half_inning_mean", DEFAULT_EXTRA_HALF_INNING_MEAN),
     )
     side = str(model_input.get("side", "")).upper()
-    if market in {"MONEYLINE", "F5_MONEYLINE"}:
+    if market == "MONEYLINE":
         if side in {"HOME", "HOME_ML"}:
             p = result.home_win_probability
         elif side in {"AWAY", "AWAY_ML"}:
             p = result.away_win_probability
         else:
             raise GenericMarketEngineError("moneyline side must be HOME or AWAY")
-    elif market in {"RUN_LINE", "F5_RUN_LINE"}:
+    elif market == "RUN_LINE":
         if line == -1.5 and side in {"HOME", "HOME_RL"}:
             p = result.home_minus_1_5_probability
         elif line == 1.5 and side in {"AWAY", "AWAY_RL"}:
             p = result.away_plus_1_5_probability
         else:
             raise GenericMarketEngineError("run-line adapter currently supports HOME -1.5 or AWAY +1.5")
-    elif market in {"TOTALS", "F5_TOTALS"}:
+    elif market == "TOTALS":
         if side == "OVER":
             p = result.over_probability
         elif side == "UNDER":
@@ -225,7 +247,8 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
         raise GenericMarketEngineError(f"unsupported game market {market}")
     out = _base_output(model_input, p, model_hash=result.result_sha256)
     out["mc_paths"] = result.simulations
-    out["engine_version"] = "mlb_v7_distribution_v1"
+    out["engine_version"] = V7_DISTRIBUTION_VERSION
+    out["seed_policy"] = result.seed_policy
     return out
 
 
