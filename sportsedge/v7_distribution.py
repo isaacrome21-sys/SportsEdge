@@ -21,6 +21,7 @@ class V7DistributionError(ValueError):
 @dataclass(frozen=True)
 class GameDistribution:
     simulations: int
+    seed: int | None
     seed_policy: str
     away_mean_runs: float
     home_mean_runs: float
@@ -67,7 +68,6 @@ def _poisson(rng: random.Random, lam: float) -> int:
 
 
 def _negative_binomial(rng: random.Random, mean: float, dispersion_r: float) -> int:
-    """Gamma-Poisson negative-binomial draw parameterized by mean and size r."""
     if mean <= 0:
         return 0
     rate = rng.gammavariate(dispersion_r, mean / dispersion_r)
@@ -83,7 +83,6 @@ def _resolve_extras(
     home_lam: float,
     extra_half_inning_mean: float,
 ) -> tuple[int, int]:
-    """Resolve a tied regulation state into one coherent final score."""
     if away_runs != home_runs:
         return away_runs, home_runs
     avg_lam = max(1e-9, (away_lam + home_lam) / 2.0)
@@ -136,11 +135,14 @@ def simulate_game_distribution(
     simulations = int(simulations)
     if build_hash is not None and seed is not None:
         raise V7DistributionError("provide build_hash or seed, not both")
+    explicit_seed: int | None
     if build_hash is not None:
         rng = candidate_rng(build_hash)
         seed_policy = "identity_sha256_256bit"
+        explicit_seed = None
     elif seed is not None:
-        rng = random.Random(int(seed))
+        explicit_seed = int(seed)
+        rng = random.Random(explicit_seed)
         seed_policy = "explicit_test_seed"
     else:
         raise V7DistributionError("identity-bound build_hash required when explicit test seed is absent")
@@ -166,11 +168,8 @@ def simulate_game_distribution(
         if away_runs == home_runs:
             regulation_ties += 1
             away_runs, home_runs = _resolve_extras(
-                rng,
-                away_runs,
-                home_runs,
-                away_lam=away_lam,
-                home_lam=home_lam,
+                rng, away_runs, home_runs,
+                away_lam=away_lam, home_lam=home_lam,
                 extra_half_inning_mean=extras_mean,
             )
 
@@ -195,6 +194,7 @@ def simulate_game_distribution(
     raw = {
         "version": V7_DISTRIBUTION_VERSION,
         "simulations": simulations,
+        "seed": explicit_seed,
         "seed_policy": seed_policy,
         "away_mean_runs": away_sum / simulations,
         "home_mean_runs": home_sum / simulations,
