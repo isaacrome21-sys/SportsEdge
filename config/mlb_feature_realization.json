@@ -22,6 +22,11 @@
     "RBI": {"status": "PLANNED", "gaps": ["measured_distribution_shape_error", "base_state_opportunity_model_required"]},
     "RUNS": {"status": "MINIMAL", "gaps": ["generic_expected_count_baseline_only"]},
     "HITS_RUNS_RBIS": {"status": "PLANNED", "gaps": ["joint_pa_path_required_for_component_coherence"]},
+    "EXTRA_BASE_HITS": {"status": "PARTIAL", "gaps": ["full_declared_contact_matchup_environment_contract_not_all_active", "independent_behavioral_evidence_required"]},
+    "HITS_RUNS_STOLEN_BASES": {"status": "PARTIAL", "gaps": ["full_declared_hit_run_steal_context_not_all_active", "independent_behavioral_evidence_required"]},
+    "RUNS_RBIS": {"status": "PARTIAL", "gaps": ["full_declared_run_rbi_context_not_all_active", "independent_behavioral_evidence_required"]},
+    "HITS_STOLEN_BASES": {"status": "PARTIAL", "gaps": ["full_declared_hit_steal_context_not_all_active", "independent_behavioral_evidence_required"]},
+    "HITS_WALKS_STOLEN_BASES": {"status": "PARTIAL", "gaps": ["full_declared_hit_walk_steal_context_not_all_active", "independent_behavioral_evidence_required"]},
     "SINGLES": {"status": "PARTIAL", "gaps": ["pa_bounded_form_candidate_requires_behavioral_acceptance", "declared_contact_matchup_defense_features_not_active"]},
     "DOUBLES": {"status": "PARTIAL", "gaps": ["pa_bounded_form_candidate_requires_behavioral_acceptance", "watch_level_current_pricing_error"]},
     "TRIPLES": {"status": "MINIMAL", "gaps": ["generic_low_rate_baseline_only"]},
@@ -33,6 +38,10 @@
     "PITCHER_BB": {"status": "PARTIAL", "gaps": ["seed_safe_evidence_regeneration_required", "full_declared_context_not_all_active"]},
     "PITCHER_ER": {"status": "PLANNED", "gaps": ["measured_distribution_shape_error"]},
     "PITCHER_OUTS": {"status": "PLANNED", "gaps": ["physical_support_0_to_27_required", "workload_model_required"]},
+    "PITCHER_HITS_WALKS_ER": {"status": "PARTIAL", "gaps": ["full_declared_combined_pitcher_context_not_all_active", "independent_behavioral_evidence_required"]},
+    "EITHER_PITCHER_HITS_ALLOWED": {"status": "PARTIAL", "gaps": ["full_declared_two_pitcher_hits_context_not_all_active", "settlement_semantics_and_behavioral_evidence_required"]},
+    "EITHER_PITCHER_BB": {"status": "PARTIAL", "gaps": ["full_declared_two_pitcher_walk_context_not_all_active", "settlement_semantics_and_behavioral_evidence_required"]},
+    "EITHER_PITCHER_ER": {"status": "PARTIAL", "gaps": ["full_declared_two_pitcher_er_context_not_all_active", "settlement_semantics_and_behavioral_evidence_required"]},
     "PITCHER_RECORD_WIN": {"status": "PLANNED", "gaps": ["rolling_win_rate_upstream_model_review_required"]},
     "FIRST_HOME_RUN": {"status": "PLANNED", "gaps": ["ordering_aware_pa_simulation_required", "exchangeability_violation"]}
   }
