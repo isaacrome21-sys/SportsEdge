@@ -266,8 +266,11 @@ def parse_additional_event_odds(
 
                     elif market_key in {"batter_first_home_run", "pitcher_record_a_win"}:
                         side = _binary_side(outcome.get("name"))
+                        provider_participant_name = str(outcome.get("description") or "").strip()
+                        if not provider_participant_name:
+                            raise AdditionalMLBOddsSourceError("ODDS_PLAYER_NAME_MISSING")
                         player_id = _participant_id(
-                            outcome.get("description"),
+                            provider_participant_name,
                             game_pk=game.game_pk,
                             participant_index=participant_index,
                         )
@@ -281,6 +284,8 @@ def parse_additional_event_odds(
                             "period": "FG",
                             "market": canonical_market,
                             "entity_id": str(player_id),
+                            "provider_participant_name": provider_participant_name,
+                            "provider_participant_name_normalized": normalize_name(provider_participant_name),
                             "side": side,
                             "selection": side.title(),
                             "line": 0.0,
