@@ -13,7 +13,7 @@ from typing import Any
 
 from .mlb_generic_features import MLBGenericHistorySource, _number, _outs_from_ip
 
-FEATURE_VERSION = "mlb_joint_features_v2"
+FEATURE_VERSION = "mlb_joint_features_v3"
 
 class MLBJointFeatureError(ValueError):
     pass
@@ -24,13 +24,7 @@ def _sha(v: Any) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-def build_hitter_joint_features(
-    source: MLBGenericHistorySource,
-    *,
-    batter_id: int,
-    target_date: date,
-    window: int = 30,
-) -> dict[str, Any]:
+def build_hitter_joint_features(source: MLBGenericHistorySource, *, batter_id: int, target_date: date, window: int = 30) -> dict[str, Any]:
     batting = source.player_rows(player_id=batter_id, group="hitting", target_date=target_date)[-window:]
     pool: list[dict[str, int]] = []
     for row in batting:
@@ -45,38 +39,29 @@ def build_hitter_joint_features(
         singles = hits - doubles - triples - hr
         if singles < 0:
             raise MLBJointFeatureError("historical batter row has negative singles")
-        total_bases = singles + 2 * doubles + 3 * triples + 4 * hr
-        extra_base_hits = doubles + triples + hr
         values = {
             "plate_appearances": pa,
             "hits": hits,
+            "singles": singles,
+            "doubles": doubles,
+            "triples": triples,
             "home_runs": hr,
-            "total_bases": total_bases,
+            "total_bases": singles + 2 * doubles + 3 * triples + 4 * hr,
             "rbi": int(_number(s.get("rbi", 0), "rbi")),
             "runs": int(_number(s.get("runs", 0), "runs")),
             "stolen_bases": int(_number(s.get("stolenBases", 0), "stolenBases")),
             "walks": int(_number(s.get("baseOnBalls", 0), "baseOnBalls")),
-            "extra_base_hits": extra_base_hits,
+            "strikeouts": int(_number(s.get("strikeOuts", 0), "strikeOuts")),
+            "extra_base_hits": doubles + triples + hr,
         }
         pool.append(values)
     if len(pool) < 10:
         raise MLBJointFeatureError(f"batter history insufficient {len(pool)}<10")
-    identity = {
-        "feature_version": FEATURE_VERSION,
-        "batter_id": int(batter_id),
-        "target_date": target_date.isoformat(),
-        "history_pool": pool,
-    }
+    identity = {"feature_version": FEATURE_VERSION, "batter_id": int(batter_id), "target_date": target_date.isoformat(), "history_pool": pool}
     return {"history_pool": pool, "feature_version": FEATURE_VERSION, "feature_source_hash": _sha(identity)}
 
 
-def build_pitcher_joint_features(
-    source: MLBGenericHistorySource,
-    *,
-    pitcher_id: int,
-    target_date: date,
-    window: int = 10,
-) -> dict[str, Any]:
+def build_pitcher_joint_features(source: MLBGenericHistorySource, *, pitcher_id: int, target_date: date, window: int = 10) -> dict[str, Any]:
     pitching = source.player_rows(player_id=pitcher_id, group="pitching", target_date=target_date)
     starts = [r for r in pitching if _number(r["stat"].get("gamesStarted", 0), "gamesStarted") >= 1][-window:]
     if len(starts) < 5:
@@ -94,8 +79,5 @@ def build_pitcher_joint_features(
         if not 0 <= vals["outs"] <= 27:
             raise MLBJointFeatureError("historical outs outside [0,27]")
         pool.append(vals)
-    identity = {
-        "feature_version": FEATURE_VERSION, "pitcher_id": int(pitcher_id),
-        "target_date": target_date.isoformat(), "history_pool": pool,
-    }
+    identity = {"feature_version": FEATURE_VERSION, "pitcher_id": int(pitcher_id), "target_date": target_date.isoformat(), "history_pool": pool}
     return {"history_pool": pool, "feature_version": FEATURE_VERSION, "feature_source_hash": _sha(identity)}
