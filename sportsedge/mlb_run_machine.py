@@ -14,7 +14,8 @@ HYBRID
 AUTOMATIC
     SportsEdge acquires sportsbook quotes plus MLB context automatically.
 AUTO_SELECT
-    Full frozen snapshot -> MANUAL; quotes only -> HYBRID; no quotes -> AUTOMATIC.
+    Full frozen snapshot -> MANUAL; non-empty supplied quotes -> HYBRID; otherwise
+    AUTOMATIC.
 """
 from __future__ import annotations
 
@@ -108,16 +109,56 @@ def _resolve_mode(
     if selected != "AUTO_SELECT":
         return selected
 
-    has_quotes = quotes is not None
+    has_snapshot_quotes = quotes is not None
+    has_nonempty_quotes = bool(quotes)
     has_games = games is not None
     has_features = feature_rows is not None
-    if has_quotes and has_games and has_features:
+    if has_snapshot_quotes and has_games and has_features:
         return "MANUAL"
-    if has_quotes and not has_games and not has_features:
+    if has_nonempty_quotes and not has_games and not has_features:
         return "HYBRID"
-    if not has_quotes and not has_games and not has_features:
+    if not has_nonempty_quotes and not has_games and not has_features:
         return "AUTOMATIC"
     raise MLBRunMachineError("AUTO_SELECT_INPUTS_AMBIGUOUS")
+
+
+def _hybrid_period(market: str) -> str:
+    name = str(market or "").strip().upper()
+    if name.startswith("F5_"):
+        return "F5"
+    if name in {"NRFI", "YRFI"}:
+        return "1ST"
+    return "FG"
+
+
+def _prepare_hybrid_quotes(
+    quotes: Sequence[Mapping[str, Any]],
+    *,
+    current: datetime,
+) -> list[dict[str, Any]]:
+    """Add only canonical transport/provenance fields to supplied market prices.
+
+    Market, entity, side, line and odds are never inferred or changed here. Missing
+    provider-specific metadata is labeled as manual input rather than pretending it
+    came from a sportsbook API.
+    """
+    out: list[dict[str, Any]] = []
+    for raw in quotes:
+        if not isinstance(raw, Mapping):
+            raise MLBRunMachineError("HYBRID_QUOTE_MUST_BE_OBJECT")
+        row = dict(raw)
+        market = str(row.get("market") or "").strip().upper()
+        if market:
+            row["market"] = market
+        row.setdefault("retrieved_at", current.isoformat())
+        row.setdefault("ttl_seconds", 300)
+        row.setdefault("period", _hybrid_period(market))
+        row.setdefault("book_key", "manual_input")
+        row.setdefault("sportsbook", "Manual Input")
+        row.setdefault("raw_market_name", f"MANUAL:{market or 'UNKNOWN'}")
+        row.setdefault("is_alternate", False)
+        out.append(row)
+    return out
 
 
 def _summary(results: Sequence[MLBMachineResult]) -> dict[str, Any]:
@@ -141,22 +182,28 @@ def _summary(results: Sequence[MLBMachineResult]) -> dict[str, Any]:
     }
 
 
+def _row_value(row: Any, name: str, default: Any = None) -> Any:
+    if isinstance(row, Mapping):
+        return row.get(name, default)
+    return getattr(row, name, default)
+
+
 def _machine_result(source_index: int, row: Any) -> MLBMachineResult:
     return MLBMachineResult(
-        source_index=int(getattr(row, "source_index", source_index)),
-        game_id=str(getattr(row, "game_id", "UNKNOWN")),
-        market=str(getattr(row, "market", "UNKNOWN")),
-        entity_id=str(getattr(row, "entity_id", "UNKNOWN")),
-        line=getattr(row, "line", None),
-        side=str(getattr(row, "side", "UNKNOWN")),
-        american_odds=getattr(row, "american_odds", None),
-        model_p=getattr(row, "model_p", None),
-        bet_status=str(getattr(row, "bet_status", "BLOCKED")),
-        reason=str(getattr(row, "reason", "UNKNOWN")),
-        shadow_status=getattr(row, "shadow_status", None),
-        implied_probability=getattr(row, "implied_probability", None),
-        edge=getattr(row, "edge", None),
-        ev_per_dollar=getattr(row, "ev_per_dollar", None),
+        source_index=int(_row_value(row, "source_index", source_index)),
+        game_id=str(_row_value(row, "game_id", "UNKNOWN")),
+        market=str(_row_value(row, "market", "UNKNOWN")),
+        entity_id=str(_row_value(row, "entity_id", "UNKNOWN")),
+        line=_row_value(row, "line"),
+        side=str(_row_value(row, "side", "UNKNOWN")),
+        american_odds=_row_value(row, "american_odds"),
+        model_p=_row_value(row, "model_p"),
+        bet_status=str(_row_value(row, "bet_status", "BLOCKED")),
+        reason=str(_row_value(row, "reason", "UNKNOWN")),
+        shadow_status=_row_value(row, "shadow_status"),
+        implied_probability=_row_value(row, "implied_probability"),
+        edge=_row_value(row, "edge"),
+        ev_per_dollar=_row_value(row, "ev_per_dollar"),
     )
 
 
@@ -201,11 +248,7 @@ def run_mlb_machine(
     bookmakers: tuple[str, ...] = ("draftkings",),
     history_cache_dir: str | Path | None = None,
 ) -> MLBMachineReport:
-    """Run the canonical MLB machine.
-
-    This function never turns deployment/evidence blockers into bets. It only
-    standardizes input ownership and orchestration around the same runtime engines.
-    """
+    """Run the canonical MLB machine without overriding deployment/evidence gates."""
     current = _aware_utc(now)
     selected = _resolve_mode(mode, quotes=quotes, games=games, feature_rows=feature_rows)
     slate_date = target_date or current.astimezone(CHICAGO_TZ).date()
@@ -236,7 +279,7 @@ def run_mlb_machine(
     if selected == "HYBRID":
         if quotes is None or games is not None or feature_rows is not None:
             raise MLBRunMachineError("HYBRID_REQUIRES_QUOTES_ONLY")
-        quote_payload = [dict(row) for row in quotes]
+        quote_payload = _prepare_hybrid_quotes(quotes, current=current)
 
         def wrapped(req: Any, timeout: int = 15):
             if _url(req) == MEMORY_QUOTES_URL:

@@ -56,6 +56,7 @@ jobs:
           tests.test_live_odds_failover
           tests.test_game_odds_source_unittest
           tests.test_additional_mlb_odds_source
+          tests.test_additional_binary_quote_provenance
           tests.test_mlb_quote_source_coverage
           tests.test_mlb_run_machine
           tests.test_run_auto_mlb_resilient_machine

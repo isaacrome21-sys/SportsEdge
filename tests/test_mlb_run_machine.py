@@ -77,7 +77,7 @@ class MLBRunMachineTests(unittest.TestCase):
         runner.assert_called_once()
 
     @patch("sportsedge.mlb_run_machine.run_auto_joint_mlb")
-    def test_auto_select_quotes_only_routes_hybrid_and_preserves_quote_payload(self, runner):
+    def test_auto_select_quotes_only_routes_hybrid_and_preserves_market_inputs(self, runner):
         captured = {}
 
         def fake(**kwargs):
@@ -87,11 +87,62 @@ class MLBRunMachineTests(unittest.TestCase):
             return auto_report()
 
         runner.side_effect = fake
-        quotes = [{"game_id": "123", "market": "HITS", "entity_id": "301", "side": "OVER", "line": 0.5, "american_odds": -110}]
+        quotes = [{
+            "game_id": "123",
+            "market": "HITS",
+            "entity_id": "301",
+            "side": "OVER",
+            "line": 1.5,
+            "american_odds": 125,
+        }]
         report = run_mlb_machine(quotes=quotes, now=NOW)
         self.assertEqual(report.mode, "HYBRID")
-        self.assertEqual(captured["quotes"], quotes)
+        sent = captured["quotes"][0]
+        self.assertEqual(sent["game_id"], "123")
+        self.assertEqual(sent["market"], "HITS")
+        self.assertEqual(sent["entity_id"], "301")
+        self.assertEqual(sent["side"], "OVER")
+        self.assertEqual(sent["line"], 1.5)
+        self.assertEqual(sent["american_odds"], 125)
+        self.assertEqual(sent["period"], "FG")
+        self.assertEqual(sent["book_key"], "manual_input")
+        self.assertEqual(sent["raw_market_name"], "MANUAL:HITS")
+        self.assertEqual(sent["retrieved_at"], NOW.isoformat())
+        self.assertFalse(sent["is_alternate"])
         self.assertNotIn("odds_api_key", captured)
+
+    @patch("sportsedge.mlb_run_machine.run_auto_joint_mlb")
+    def test_hybrid_preserves_explicit_sportsbook_provenance(self, runner):
+        captured = {}
+
+        def fake(**kwargs):
+            with kwargs["opener"](kwargs["quote_url"]) as response:
+                captured["quotes"] = json.loads(response.read())
+            return auto_report()
+
+        runner.side_effect = fake
+        run_mlb_machine(
+            mode="HYBRID",
+            quotes=[{
+                "game_id": "123",
+                "market": "F5_TOTALS",
+                "entity_id": "123",
+                "side": "UNDER",
+                "line": 4.5,
+                "american_odds": -105,
+                "book_key": "draftkings",
+                "sportsbook": "DraftKings",
+                "is_alternate": True,
+                "retrieved_at": "2026-08-24T14:29:00+00:00",
+            }],
+            now=NOW,
+        )
+        sent = captured["quotes"][0]
+        self.assertEqual(sent["period"], "F5")
+        self.assertEqual(sent["book_key"], "draftkings")
+        self.assertEqual(sent["sportsbook"], "DraftKings")
+        self.assertTrue(sent["is_alternate"])
+        self.assertEqual(sent["retrieved_at"], "2026-08-24T14:29:00+00:00")
 
     @patch("sportsedge.mlb_run_machine.run_auto_mlb_native_odds")
     def test_auto_select_no_quotes_routes_automatic_and_forces_canonical_features(self, runner):
@@ -101,6 +152,13 @@ class MLBRunMachineTests(unittest.TestCase):
         kwargs = runner.call_args.kwargs
         self.assertEqual(kwargs["odds_api_key"], "secret")
         self.assertIsNone(kwargs["feature_url"])
+
+    @patch("sportsedge.mlb_run_machine.run_auto_mlb_native_odds")
+    def test_auto_select_empty_quote_sequence_means_automatic(self, runner):
+        runner.return_value = auto_report()
+        report = run_mlb_machine(quotes=[], odds_api_key="secret", now=NOW)
+        self.assertEqual(report.mode, "AUTOMATIC")
+        runner.assert_called_once()
 
     @patch("sportsedge.mlb_run_machine.run_auto_joint_mlb")
     def test_explicit_hybrid_never_fetches_sportsbook_quotes(self, runner):
@@ -118,6 +176,14 @@ class MLBRunMachineTests(unittest.TestCase):
             run_mlb_machine(mode="AUTOMATIC", now=NOW)
 
     @patch("sportsedge.mlb_run_machine.run_auto_mlb_native_odds")
+    def test_automatic_accepts_keyring_without_singular_key(self, runner):
+        runner.return_value = auto_report()
+        run_mlb_machine(mode="AUTOMATIC", odds_api_keys=("k1", "k2"), now=NOW)
+        kwargs = runner.call_args.kwargs
+        self.assertEqual(kwargs["odds_api_key"], "k1")
+        self.assertEqual(kwargs["odds_api_keys"], ("k2",))
+
+    @patch("sportsedge.mlb_run_machine.run_auto_mlb_native_odds")
     def test_run_it_alias_uses_same_machine(self, runner):
         runner.return_value = auto_report([result(status="OFFICIAL_BET")])
         report = run_it_mlb(odds_api_key="secret", now=NOW)
@@ -132,6 +198,29 @@ class MLBRunMachineTests(unittest.TestCase):
         self.assertEqual(report.summary["blocked"], 1)
         self.assertEqual(report.summary["model_priced"], 0)
         self.assertEqual(len(report.results), 1)
+
+    def test_report_conversion_accepts_mapping_rows(self):
+        from sportsedge.mlb_run_machine import _report
+        report = _report(
+            mode="MANUAL",
+            current=NOW,
+            slate_date_ct="2026-08-24",
+            run_status="PASS",
+            rows=[{
+                "source_index": 7,
+                "game_id": "123",
+                "market": "HITS",
+                "entity_id": "301",
+                "line": 0.5,
+                "side": "OVER",
+                "american_odds": -110,
+                "model_p": 0.6,
+                "bet_status": "BLOCKED",
+                "reason": "fixture",
+            }],
+        )
+        self.assertEqual(report.results[0].source_index, 7)
+        self.assertEqual(report.results[0].market, "HITS")
 
 
 if __name__ == "__main__":

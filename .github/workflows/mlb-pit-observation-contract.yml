@@ -6,19 +6,31 @@ on:
     paths:
       - 'sportsedge/mlb_pit_observation.py'
       - 'sportsedge/mlb_pit_joiner.py'
+      - 'sportsedge/mlb_additional_pit_joiner.py'
+      - 'sportsedge/mlb_pit_archive_router.py'
+      - 'sportsedge/mlb_run_machine.py'
+      - 'scripts/run_auto_mlb_resilient.py'
       - 'sportsedge/mlb_settlement_evidence.py'
       - 'sportsedge/quote_bridge.py'
       - 'tests/test_mlb_pit_observation.py'
       - 'tests/test_mlb_pit_joiner.py'
+      - 'tests/test_mlb_additional_pit_joiner.py'
+      - 'tests/test_pr131_133_composition_repairs.py'
       - '.github/workflows/mlb-pit-observation-contract.yml'
   push:
     paths:
       - 'sportsedge/mlb_pit_observation.py'
       - 'sportsedge/mlb_pit_joiner.py'
+      - 'sportsedge/mlb_additional_pit_joiner.py'
+      - 'sportsedge/mlb_pit_archive_router.py'
+      - 'sportsedge/mlb_run_machine.py'
+      - 'scripts/run_auto_mlb_resilient.py'
       - 'sportsedge/mlb_settlement_evidence.py'
       - 'sportsedge/quote_bridge.py'
       - 'tests/test_mlb_pit_observation.py'
       - 'tests/test_mlb_pit_joiner.py'
+      - 'tests/test_mlb_additional_pit_joiner.py'
+      - 'tests/test_pr131_133_composition_repairs.py'
       - '.github/workflows/mlb-pit-observation-contract.yml'
 
 permissions:
@@ -28,17 +40,30 @@ jobs:
   contract:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    env:
+      PYTHONPATH: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12.13'
-      - name: Compile PIT evidence modules
-        run: python -m py_compile sportsedge/mlb_pit_observation.py sportsedge/mlb_pit_joiner.py
+      - name: Compile repaired orchestration and PIT modules
+        run: >-
+          python -m py_compile
+          sportsedge/mlb_pit_observation.py
+          sportsedge/mlb_pit_joiner.py
+          sportsedge/mlb_additional_pit_joiner.py
+          sportsedge/mlb_pit_archive_router.py
+          sportsedge/mlb_run_machine.py
+          scripts/run_auto_mlb_resilient.py
       - name: Run strict PIT observation tests
         run: python -m unittest discover -s tests -p 'test_mlb_pit_observation.py'
-      - name: Run deterministic archive join tests
+      - name: Run count-prop archive join tests
         run: python -m unittest discover -s tests -p 'test_mlb_pit_joiner.py'
+      - name: Run additional-market archive join tests
+        run: python -m unittest discover -s tests -p 'test_mlb_additional_pit_joiner.py'
+      - name: Run PR131-133 composition regressions
+        run: python -m unittest discover -s tests -p 'test_pr131_133_composition_repairs.py'
       - name: Recheck settlement separation
         run: python -m unittest discover -s tests -p 'test_mlb_settlement_evidence.py'
 
