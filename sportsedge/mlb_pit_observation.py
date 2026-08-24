@@ -1,8 +1,9 @@
 """Strict all-market MLB point-in-time observation evidence contract.
 
-This layer joins already-captured quote evidence to canonical MLB identity, strictly
-pregame model/history identity, official finalized facts, and a sportsbook-rule
-settlement decision. It never guesses unresolved identity or ambiguous settlement.
+This layer represents the output of a provenance-checked join: archived quote,
+canonical MLB identity, strictly point-in-time model/history identity, official
+finalized facts, and sportsbook-rule settlement evidence. Synthetic inputs may
+exercise the contract but can never become durable historical evidence.
 """
 from __future__ import annotations
 
@@ -16,7 +17,7 @@ from typing import Any, Iterable, Mapping, Sequence
 
 from .behavioral_acceptance import analyze_challenger
 from .odds_api_source import normalize_name
-from .quote_bridge import SUPPORTED_MARKETS
+from .quote_bridge import COUNT_MARKETS, SIDE_BY_MARKET, SUPPORTED_MARKETS
 
 
 class MLBPITObservationError(ValueError):
@@ -33,8 +34,12 @@ _SETTLEMENT_STATES = {
     "VOID",
 }
 _SETTLED_OUTCOMES = {"WIN", "LOSS", "PUSH"}
-_LIVE_SOURCE_CLASS = "LIVE_PROVIDER_QUOTE_ARCHIVE"
-_SYNTHETIC_SOURCE_CLASS = "SYNTHETIC_CONTRACT_TEST"
+_LIVE_QUOTE_CLASS = "LIVE_PROVIDER_QUOTE_ARCHIVE"
+_LIVE_MODEL_CLASS = "LIVE_PIT_MODEL"
+_LIVE_FACT_CLASS = "LIVE_OFFICIAL_FACT_PROBE"
+_LIVE_RULE_CLASS = "LIVE_BOOK_RULE_CAPTURE"
+_SYNTHETIC_CLASS = "SYNTHETIC_CONTRACT_TEST"
+_MISSING_RULE_CLASS = "MISSING"
 
 
 def _parse_ts(value: Any, name: str) -> datetime:
@@ -73,6 +78,16 @@ def _sha(value: Any, name: str) -> str:
     text = str(value or "").strip().lower()
     if not _HEX64.fullmatch(text):
         raise MLBPITObservationError(f"{name} must be a SHA-256 hex digest")
+    return text
+
+
+def _evidence_class(value: Any, name: str, *, live: str, allow_missing: bool = False) -> str:
+    text = str(value or "").strip().upper()
+    allowed = {live, _SYNTHETIC_CLASS}
+    if allow_missing:
+        allowed.add(_MISSING_RULE_CLASS)
+    if text not in allowed:
+        raise MLBPITObservationError(f"{name} unsupported")
     return text
 
 
@@ -174,6 +189,9 @@ class PITObservation:
     sportsbook: str
     book_key: str
     source_evidence_class: str
+    model_evidence_class: str
+    official_fact_evidence_class: str
+    book_rule_evidence_class: str
     quote_source_hash: str
     provider_event_hash: str
     identity_binding_hash: str
@@ -196,6 +214,25 @@ class PITObservation:
         return self.settlement_state == "SETTLEMENT_ELIGIBLE" and self.settled_outcome in {"WIN", "LOSS"}
 
     @property
+    def has_synthetic_component(self) -> bool:
+        return _SYNTHETIC_CLASS in {
+            self.source_evidence_class,
+            self.model_evidence_class,
+            self.official_fact_evidence_class,
+            self.book_rule_evidence_class,
+        }
+
+    @property
+    def is_durable_scored(self) -> bool:
+        return bool(
+            self.is_scored
+            and self.source_evidence_class == _LIVE_QUOTE_CLASS
+            and self.model_evidence_class == _LIVE_MODEL_CLASS
+            and self.official_fact_evidence_class == _LIVE_FACT_CLASS
+            and self.book_rule_evidence_class == _LIVE_RULE_CLASS
+        )
+
+    @property
     def reference_p(self) -> float | None:
         if self.settled_outcome == "WIN":
             return 1.0
@@ -210,6 +247,13 @@ def normalize_pit_observation(raw: Mapping[str, Any]) -> PITObservation:
     market = str(raw.get("market") or "").strip().upper()
     if market not in SUPPORTED_MARKETS:
         raise MLBPITObservationError(f"unsupported market {market!r}")
+    side = str(raw.get("side") or "").strip().upper()
+    if side not in SIDE_BY_MARKET[market]:
+        raise MLBPITObservationError(f"unsupported side for {market}: {side}")
+    line = _finite(raw.get("line"), "line")
+    if market in COUNT_MARKETS and line < 0:
+        raise MLBPITObservationError("line must be >= 0 for count markets")
+
     game_id = str(raw.get("game_id") or "").strip()
     entity_id = str(raw.get("entity_id") or "").strip()
     if not game_id or not entity_id:
@@ -220,18 +264,37 @@ def normalize_pit_observation(raw: Mapping[str, Any]) -> PITObservation:
     history_dt = _parse_ts(raw.get("history_asof_ts"), "history_asof_ts")
     if quote_dt >= first_pitch_dt:
         raise MLBPITObservationError("quote_ts must be before first_pitch_ts")
+    if history_dt > quote_dt:
+        raise MLBPITObservationError("history_asof_ts must be at or before quote_ts")
     if history_dt >= first_pitch_dt:
         raise MLBPITObservationError("history_asof_ts must be before first_pitch_ts")
 
-    source_class = str(raw.get("source_evidence_class") or "").strip().upper()
-    if source_class not in {_LIVE_SOURCE_CLASS, _SYNTHETIC_SOURCE_CLASS}:
-        raise MLBPITObservationError("source_evidence_class unsupported")
+    quote_class = _evidence_class(
+        raw.get("source_evidence_class"), "source_evidence_class", live=_LIVE_QUOTE_CLASS
+    )
+    model_class = _evidence_class(
+        raw.get("model_evidence_class"), "model_evidence_class", live=_LIVE_MODEL_CLASS
+    )
+    fact_class = _evidence_class(
+        raw.get("official_fact_evidence_class"),
+        "official_fact_evidence_class",
+        live=_LIVE_FACT_CLASS,
+    )
+    rule_class = _evidence_class(
+        raw.get("book_rule_evidence_class"),
+        "book_rule_evidence_class",
+        live=_LIVE_RULE_CLASS,
+        allow_missing=True,
+    )
+
     settlement_state = str(raw.get("settlement_state") or "").strip().upper()
     if settlement_state not in _SETTLEMENT_STATES:
         raise MLBPITObservationError("settlement_state unsupported")
     outcome_raw = raw.get("settled_outcome")
     outcome = None if outcome_raw in (None, "") else str(outcome_raw).strip().upper()
     if settlement_state == "SETTLEMENT_ELIGIBLE":
+        if rule_class == _MISSING_RULE_CLASS:
+            raise MLBPITObservationError("SETTLEMENT_ELIGIBLE requires book-rule evidence")
         if outcome not in _SETTLED_OUTCOMES:
             raise MLBPITObservationError("SETTLEMENT_ELIGIBLE requires WIN, LOSS, or PUSH outcome")
     elif outcome is not None:
@@ -239,6 +302,8 @@ def normalize_pit_observation(raw: Mapping[str, Any]) -> PITObservation:
 
     rules_hash: str | None = None
     if settlement_state in {"SETTLEMENT_ELIGIBLE", "VOID", "AMBIGUOUS_SETTLEMENT"}:
+        if rule_class == _MISSING_RULE_CLASS:
+            raise MLBPITObservationError(f"{settlement_state} requires book-rule evidence")
         rules_hash = _sha(raw.get("settlement_rules_hash"), "settlement_rules_hash")
     elif raw.get("settlement_rules_hash") not in (None, ""):
         rules_hash = _sha(raw.get("settlement_rules_hash"), "settlement_rules_hash")
@@ -256,11 +321,14 @@ def normalize_pit_observation(raw: Mapping[str, Any]) -> PITObservation:
         entity_id=entity_id,
         quote_ts=quote_dt.isoformat(),
         first_pitch_ts=first_pitch_dt.isoformat(),
-        line=_finite(raw.get("line"), "line"),
-        side=str(raw.get("side") or "").strip().upper(),
+        line=line,
+        side=side,
         sportsbook=sportsbook,
         book_key=book_key,
-        source_evidence_class=source_class,
+        source_evidence_class=quote_class,
+        model_evidence_class=model_class,
+        official_fact_evidence_class=fact_class,
+        book_rule_evidence_class=rule_class,
         quote_source_hash=_sha(raw.get("quote_source_hash"), "quote_source_hash"),
         provider_event_hash=_sha(raw.get("provider_event_hash"), "provider_event_hash"),
         identity_binding_hash=_sha(raw.get("identity_binding_hash"), "identity_binding_hash"),
@@ -290,10 +358,13 @@ def analyze_pit_observations(raw_rows: Iterable[Mapping[str, Any]]) -> dict[str,
     if not rows:
         raise MLBPITObservationError("at least one PIT observation is required")
 
-    state_counts = {state: sum(row.settlement_state == state for row in rows) for state in sorted(_SETTLEMENT_STATES)}
+    state_counts = {
+        state: sum(row.settlement_state == state for row in rows)
+        for state in sorted(_SETTLEMENT_STATES)
+    }
     pushes = sum(row.is_push for row in rows)
     scored = [row for row in rows if row.is_scored]
-    synthetic = any(row.source_evidence_class == _SYNTHETIC_SOURCE_CLASS for row in rows)
+    synthetic_rows = [row for row in rows if row.has_synthetic_component]
     candidate_metrics = _binary_metrics(scored, "candidate_p") if scored else None
 
     comparable = [row for row in scored if row.incumbent_p is not None]
@@ -313,21 +384,25 @@ def analyze_pit_observations(raw_rows: Iterable[Mapping[str, Any]]) -> dict[str,
             ]
         )
 
-    counts_as_historical = bool(scored and not synthetic and all(row.source_evidence_class == _LIVE_SOURCE_CLASS for row in rows))
+    counts_as_historical = bool(
+        scored and not synthetic_rows and all(row.is_durable_scored for row in scored)
+    )
     evidence_class = (
         "SYNTHETIC_CONTRACT_TEST"
-        if synthetic
+        if synthetic_rows
         else "HISTORICAL_PIT"
         if counts_as_historical
         else "LIVE_PIT_UNSCORABLE"
     )
 
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "evidence_class": evidence_class,
         "counts_as_historical_pit": counts_as_historical,
         "source_row_count": len(rows),
         "scored_row_count": len(scored),
+        "durable_scored_row_count": sum(row.is_durable_scored for row in rows),
+        "synthetic_component_row_count": len(synthetic_rows),
         "push_rows_excluded_from_binary_error": pushes,
         "settlement_state_counts": state_counts,
         "void_rows_excluded": state_counts["VOID"],
