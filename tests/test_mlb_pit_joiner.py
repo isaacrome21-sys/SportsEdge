@@ -364,6 +364,31 @@ class MLBPITJoinerTests(unittest.TestCase):
         self.assertIn("QUOTE_NOT_PREGAME_CANONICAL", joined["failures"][0]["reason"])
         self.assertNotIn("MODEL_ROW_NOT_FOUND_OR_AMBIGUOUS", joined["failures"][0]["reason"])
 
+    def test_event_time_replay_skips_invalid_earlier_field_like_producer(self):
+        archive = _archive()
+        quote = archive["quotes"][0]
+        quote["provider_event_snapshot"]["startDate"] = "not-a-time"
+        quote["provider_event_snapshot"]["commence_time"] = "2026-08-24T00:10:00+00:00"
+        quote["provider_event_sha256"] = content_sha256(quote["provider_event_snapshot"])
+        _rehash_archive(archive)
+
+        joined = self._join(archive_payload=archive)
+
+        self.assertEqual(joined["joined_observation_count"], 1)
+        self.assertEqual(joined["failure_count"], 0)
+
+    def test_event_time_replay_accepts_naive_provider_time_as_utc_like_producer(self):
+        archive = _archive()
+        quote = archive["quotes"][0]
+        quote["provider_event_snapshot"]["startDate"] = "2026-08-24T00:10:00"
+        quote["provider_event_sha256"] = content_sha256(quote["provider_event_snapshot"])
+        _rehash_archive(archive)
+
+        joined = self._join(archive_payload=archive)
+
+        self.assertEqual(joined["joined_observation_count"], 1)
+        self.assertEqual(joined["failure_count"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()
