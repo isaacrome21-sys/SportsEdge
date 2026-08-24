@@ -14,81 +14,56 @@ from .mlb_joint_features import FEATURE_VERSION, build_hitter_joint_features, bu
 from .pitcher_joint_engine import PITCHER_MARKETS
 from .quote_bridge import validate_canonical_quote
 
-
 class MLBJointModeBridgeError(ValueError):
     pass
-
 
 def _content_sha(value: Any) -> str:
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest()
 
-
-def _batter_team(game: LiveGame, entity_id: str) -> int:
-    try:
-        pid = int(entity_id)
-    except (TypeError, ValueError) as exc:
-        raise MLBJointModeBridgeError("batter entity_id must be MLB player id") from exc
+def _batter_context(game: LiveGame, entity_id: str) -> tuple[int,int]:
+    try: pid=int(entity_id)
+    except (TypeError,ValueError) as exc: raise MLBJointModeBridgeError("batter entity_id must be MLB player id") from exc
     if pid in game.away_lineup.player_ids:
-        return int(game.away_team_id)
+        if game.home_probable_pitcher_id is None: raise MLBJointModeBridgeError("home probable pitcher required")
+        return int(game.away_team_id),int(game.home_probable_pitcher_id)
     if pid in game.home_lineup.player_ids:
-        return int(game.home_team_id)
+        if game.away_probable_pitcher_id is None: raise MLBJointModeBridgeError("away probable pitcher required")
+        return int(game.home_team_id),int(game.away_probable_pitcher_id)
     raise MLBJointModeBridgeError("batter not present in live lineup")
 
-
-def build_canonical_feature_row(*, game: LiveGame, quote: Mapping[str, Any], source: MLBGenericHistorySource, target_date: date) -> dict[str, Any]:
-    q = validate_canonical_quote(quote)
-    if str(q["game_id"]) != str(game.game_pk):
-        raise MLBJointModeBridgeError("quote/game identity mismatch")
-    market = str(q["market"]); entity_id = str(q["entity_id"])
-    base = {
-        "game_pk": int(game.game_pk), "market": market, "entity_id": entity_id,
-        "retrieved_at": source.retrieved_at.isoformat(), "asof": source.retrieved_at.isoformat(),
-        "source": "MLB_STATSAPI_STRICTLY_PRIOR_JOINT_FEATURES",
-    }
+def build_canonical_feature_row(*,game:LiveGame,quote:Mapping[str,Any],source:MLBGenericHistorySource,target_date:date)->dict[str,Any]:
+    q=validate_canonical_quote(quote)
+    if str(q["game_id"])!=str(game.game_pk): raise MLBJointModeBridgeError("quote/game identity mismatch")
+    market=str(q["market"]); entity_id=str(q["entity_id"])
+    base={"game_pk":int(game.game_pk),"market":market,"entity_id":entity_id,"retrieved_at":source.retrieved_at.isoformat(),"asof":source.retrieved_at.isoformat(),"source":"MLB_STATSAPI_STRICTLY_PRIOR_JOINT_FEATURES"}
     if market in HITTER_MARKETS:
-        team_id = _batter_team(game, entity_id)
-        built = build_hitter_joint_features(source, batter_id=int(entity_id), target_date=target_date)
-        return {**base, "team_id": team_id, "joint_feature_version": built["feature_version"],
-                "feature_source_hash": built["feature_source_hash"], "features": {"history_pool": built["history_pool"]}}
+        team_id,opposing_pitcher_id=_batter_context(game,entity_id)
+        built=build_hitter_joint_features(source,batter_id=int(entity_id),opposing_pitcher_id=opposing_pitcher_id,target_date=target_date)
+        return {**base,"team_id":team_id,"opposing_pitcher_id":opposing_pitcher_id,"joint_feature_version":built["feature_version"],"feature_source_hash":built["feature_source_hash"],"features":{"history_pool":built["history_pool"],"history_weights":built["history_weights"],"matchup":built["matchup"]}}
     if market in PITCHER_MARKETS:
         if market.startswith("EITHER_PITCHER_"):
-            if game.away_probable_pitcher_id is None or game.home_probable_pitcher_id is None:
-                raise MLBJointModeBridgeError("both probable pitchers required for either-pitcher market")
-            a = build_pitcher_joint_features(source, pitcher_id=int(game.away_probable_pitcher_id), target_date=target_date)
-            b = build_pitcher_joint_features(source, pitcher_id=int(game.home_probable_pitcher_id), target_date=target_date)
-            payload = {"pitcher_a_history": a["history_pool"], "pitcher_b_history": b["history_pool"]}
-            return {**base, "joint_feature_version": FEATURE_VERSION,
-                    "feature_source_hash": _content_sha({"version": FEATURE_VERSION, "payload": payload, "game_pk": game.game_pk}),
-                    "features": payload}
-        try:
-            pid = int(entity_id)
-        except (TypeError, ValueError) as exc:
-            raise MLBJointModeBridgeError("pitcher entity_id must be MLB player id") from exc
-        if pid not in {game.away_probable_pitcher_id, game.home_probable_pitcher_id}:
-            raise MLBJointModeBridgeError("NON_PROBABLE_PITCHER")
-        built = build_pitcher_joint_features(source, pitcher_id=pid, target_date=target_date)
-        return {**base, "joint_feature_version": built["feature_version"],
-                "feature_source_hash": built["feature_source_hash"], "features": {"history_pool": built["history_pool"]}}
+            if game.away_probable_pitcher_id is None or game.home_probable_pitcher_id is None: raise MLBJointModeBridgeError("both probable pitchers required for either-pitcher market")
+            a=build_pitcher_joint_features(source,pitcher_id=int(game.away_probable_pitcher_id),target_date=target_date); b=build_pitcher_joint_features(source,pitcher_id=int(game.home_probable_pitcher_id),target_date=target_date)
+            payload={"pitcher_a_history":a["history_pool"],"pitcher_b_history":b["history_pool"]}
+            return {**base,"joint_feature_version":FEATURE_VERSION,"feature_source_hash":_content_sha({"version":FEATURE_VERSION,"payload":payload,"game_pk":game.game_pk}),"features":payload}
+        try: pid=int(entity_id)
+        except (TypeError,ValueError) as exc: raise MLBJointModeBridgeError("pitcher entity_id must be MLB player id") from exc
+        if pid not in {game.away_probable_pitcher_id,game.home_probable_pitcher_id}: raise MLBJointModeBridgeError("NON_PROBABLE_PITCHER")
+        built=build_pitcher_joint_features(source,pitcher_id=pid,target_date=target_date)
+        return {**base,"joint_feature_version":built["feature_version"],"feature_source_hash":built["feature_source_hash"],"features":{"history_pool":built["history_pool"]}}
     if market in GAME_MARKETS:
-        away, home, _ = source.team_means(away_team_id=int(game.away_team_id), home_team_id=int(game.home_team_id), target_date=target_date)
-        if market.startswith("F5_"):
-            raise MLBJointModeBridgeError("F5_INNING_STATE_MODEL_REQUIRED")
-        identity = {"version": "mlb_generic_feature_v1", "game_pk": int(game.game_pk), "target_date": target_date.isoformat(), "away_mean_runs": away, "home_mean_runs": home, "retrieved_at": source.retrieved_at.isoformat()}
-        return {**base, "generic_feature_version": "mlb_generic_feature_v1", "away_mean_runs": away, "home_mean_runs": home, "source_subset_hash": _content_sha(identity)}
+        away,home,_=source.team_means(away_team_id=int(game.away_team_id),home_team_id=int(game.home_team_id),target_date=target_date)
+        if market.startswith("F5_"): raise MLBJointModeBridgeError("F5_INNING_STATE_MODEL_REQUIRED")
+        identity={"version":"mlb_generic_feature_v1","game_pk":int(game.game_pk),"target_date":target_date.isoformat(),"away_mean_runs":away,"home_mean_runs":home,"retrieved_at":source.retrieved_at.isoformat()}
+        return {**base,"generic_feature_version":"mlb_generic_feature_v1","away_mean_runs":away,"home_mean_runs":home,"source_subset_hash":_content_sha(identity)}
     raise MLBJointModeBridgeError(f"unsupported market {market}")
 
-
-def build_feature_rows_for_quotes(*, games: Sequence[LiveGame], quotes: Sequence[Mapping[str, Any]], source: MLBGenericHistorySource, target_date: date) -> list[dict[str, Any]]:
-    games_by_id = {str(g.game_pk): g for g in games}
-    out: list[dict[str, Any]] = []; seen: set[tuple[str, str, str]] = set()
+def build_feature_rows_for_quotes(*,games:Sequence[LiveGame],quotes:Sequence[Mapping[str,Any]],source:MLBGenericHistorySource,target_date:date)->list[dict[str,Any]]:
+    games_by_id={str(g.game_pk):g for g in games}; out=[]; seen=set()
     for raw in quotes:
-        q = validate_canonical_quote(raw)
-        identity = (str(q["game_id"]), str(q["entity_id"]), str(q["market"]))
-        if identity in seen:
-            continue
-        game = games_by_id.get(identity[0])
-        if game is None:
-            raise MLBJointModeBridgeError(f"game not found for {identity[0]}")
-        out.append(build_canonical_feature_row(game=game, quote=q, source=source, target_date=target_date))
-        seen.add(identity)
+        q=validate_canonical_quote(raw); identity=(str(q["game_id"]),str(q["entity_id"]),str(q["market"]))
+        if identity in seen: continue
+        game=games_by_id.get(identity[0])
+        if game is None: raise MLBJointModeBridgeError(f"game not found for {identity[0]}")
+        out.append(build_canonical_feature_row(game=game,quote=q,source=source,target_date=target_date)); seen.add(identity)
     return out
