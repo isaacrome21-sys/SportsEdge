@@ -1,6 +1,7 @@
 import unittest
 
 from sportsedge.engine_registry import engine_registry
+from sportsedge.generic_market_engine import generic_market_engine_adapter
 from sportsedge.home_runs_engine import HomeRunsEngineError, simulate_home_runs
 
 
@@ -52,16 +53,16 @@ class HomeRunsEngineTests(unittest.TestCase):
         with self.assertRaises(HomeRunsEngineError):
             simulate_home_runs(model_input)
 
-    def test_registry_uses_dedicated_home_run_adapter(self):
+    def test_registry_intentionally_uses_measured_generic_home_run_baseline(self):
         adapter = engine_registry()["HOME_RUNS"]
-        model_input = self._input()
-        model_input.update({
+        self.assertIs(adapter, generic_market_engine_adapter)
+        out = adapter({
             "market": "HOME_RUNS", "game_id": "1", "entity_id": "2",
-            "line": 0.5, "side": "OVER",
+            "line": 0.5, "side": "OVER", "expected_count": 0.22,
+            "feature_source_hash": "f" * 64,
         })
-        out = adapter(model_input)
         self.assertEqual(out["market"], "HOME_RUNS")
-        self.assertTrue(out["engine_version"].startswith("home_runs_research_"))
+        self.assertEqual(out["engine_version"], "mlb_full_market_runtime_v2")
         self.assertGreater(out["model_p"], 0.0)
         self.assertLess(out["model_p"], 1.0)
 

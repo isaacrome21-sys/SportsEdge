@@ -239,13 +239,16 @@ def assemble_hitter_candidate(
     feature_version, features = _feature_payload(market, feature_row)
     source_subset_hash = _feature_source_hash(feature_row)
     feature_json = json.dumps(features, sort_keys=True, separators=(",", ":"))
+    # RNG identity belongs to the predictive candidate, not the sportsbook
+    # proposition. line/side remain settlement/read-out inputs but must not
+    # perturb the Monte Carlo stream for the same game/player/features.
     identity = build_hash([
-        str(game.game_pk), str(live_team_id), market, str(player_id), format(line, ".12g"), side,
+        str(game.game_pk), str(live_team_id), market, str(player_id),
         lineup_status, feature_version, source_subset_hash, feature_json,
     ])
     model_input = {
         "game_id": str(game.game_pk), "market": market, "entity_id": str(player_id),
-        "team_id": str(live_team_id), "line": quote.get("line"), "side": side,
+        "team_id": str(live_team_id), "line": line, "side": side,
         "build_hash": identity, "feature_version": feature_version,
         "feature_source_hash": source_subset_hash, "lineup_status": lineup_status,
         "require_confirmed_lineup": require_confirmed_lineup, "features": features,

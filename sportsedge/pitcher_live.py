@@ -103,13 +103,16 @@ def assemble_pitcher_bb_candidate(*, game: LiveGame, feature_row: Mapping[str, A
 
     source_hash = _source_hash(feature_row)
     feature_json = json.dumps(features, sort_keys=True, separators=(",", ":"))
+    # The stochastic candidate identity is independent of sportsbook line/side.
+    # Different propositions over the same pitcher/game/features must share the
+    # same underlying random stream; line and side are read-out semantics only.
     identity = build_hash([
-        str(game.game_pk), "PITCHER_BB", str(pitcher_id), format(line, ".12g"), side,
+        str(game.game_pk), "PITCHER_BB", str(pitcher_id),
         FEATURE_CONTRACT_VERSION, source_hash, feature_json,
     ])
     model_input = {
         "game_id": str(game.game_pk), "market": "PITCHER_BB", "entity_id": str(pitcher_id),
-        "line": quote.get("line"), "side": side, "build_hash": identity,
+        "line": line, "side": side, "build_hash": identity,
         "feature_version": FEATURE_CONTRACT_VERSION, "feature_source_hash": source_hash,
         "features": features,
     }

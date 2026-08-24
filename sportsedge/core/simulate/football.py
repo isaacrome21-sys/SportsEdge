@@ -64,7 +64,13 @@ class KeyNumberMarginModel:
 
 
 class JointScoreSimulator:
-    """Simulate internally consistent home/away integer football scores."""
+    """Simulate internally consistent home/away integer football scores.
+
+    This candidate is not allowed to use ambient entropy. Callers must supply an
+    explicit deterministic seed so every validation run is reproducible and can
+    later be replaced by an identity-bound seed contract without changing model
+    semantics.
+    """
 
     def __init__(
         self,
@@ -75,10 +81,15 @@ class JointScoreSimulator:
     ) -> None:
         if total_sigma <= 0:
             raise ValueError("total_sigma must be positive")
+        if seed is None:
+            raise ValueError("EXPLICIT_SEED_REQUIRED")
+        if isinstance(seed, bool) or not isinstance(seed, (int, np.integer)):
+            raise ValueError("seed must be an integer")
         self.margin_model = margin_model
         self.total_mean = float(total_mean)
         self.total_sigma = float(total_sigma)
-        self.rng = np.random.default_rng(seed)
+        self.seed = int(seed)
+        self.rng = np.random.default_rng(self.seed)
 
     def simulate(self, n: int) -> list[dict[str, int]]:
         if n <= 0:
