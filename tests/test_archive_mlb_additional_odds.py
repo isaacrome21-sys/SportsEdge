@@ -82,11 +82,11 @@ class ArchiveMLBAdditionalOddsTests(unittest.TestCase):
             return replace(base, game_pk=game_pk, game_date=start.isoformat())
 
         games = [
-            at(83, 1),   # lower boundary: accepted
-            at(90, 2),   # target: accepted
-            at(97, 3),   # upper boundary: accepted
-            at(82, 4),   # one minute outside: rejected
-            at(98, 5),   # one minute outside: rejected
+            at(83, 1),
+            at(90, 2),
+            at(97, 3),
+            at(82, 4),
+            at(98, 5),
         ]
         eligible = mod._eligible_games(now, games)
         self.assertEqual([game.game_pk for game in eligible], [1, 2, 3])
@@ -124,9 +124,10 @@ class ArchiveMLBAdditionalOddsTests(unittest.TestCase):
     def test_provider_event_must_rebind_to_same_canonical_game(self):
         payload = self._build(events=[self._event(away="Other Team")])
         self.assertEqual(payload["pit_quote_count"], 0)
+        reason = payload["rejected_quotes"][0]["reason"]
         self.assertTrue(
-            "PROVIDER_EVENT_GAME_NOT_FOUND" in payload["rejected_quotes"][0]["reason"]
-            or "CANONICAL_GAME_MISMATCH" in payload["rejected_quotes"][0]["reason"]
+            "ODDS_EVENT_GAME_NOT_FOUND" in reason
+            or "PROVIDER_EVENT_CANONICAL_GAME_MISMATCH" in reason
         )
 
     def test_binary_player_entity_must_be_reproducible_from_participant_index(self):
