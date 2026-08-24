@@ -14,6 +14,14 @@ from sportsedge.mlb_run_machine import (
 from sportsedge.unified_card import SUPPORTED_MARKETS
 
 NOW = datetime(2026, 8, 24, 14, 30, tzinfo=timezone.utc)
+CATALOG_GROUPS = (
+    "game_markets",
+    "batter_markets",
+    "pitcher_markets",
+    "separate_protocol_markets",
+    "binary_markets_not_coerced",
+    "period_markets_not_coerced",
+)
 
 
 def result(*, market="HITS", status="BLOCKED", model_p=0.61, source_index=0):
@@ -48,8 +56,10 @@ def auto_report(rows=None):
 class MLBRunMachineTests(unittest.TestCase):
     def test_full_36_market_surface_is_one_registry(self):
         catalog = json.loads(Path("config/mlb_market_catalog.json").read_text())
-        markets = set(catalog["markets"])
-        self.assertEqual(len(markets), 36)
+        flat = [market for group in CATALOG_GROUPS for market in catalog[group]]
+        self.assertEqual(len(flat), 36)
+        self.assertEqual(len(set(flat)), 36)
+        markets = set(flat)
         self.assertEqual(markets, set(SUPPORTED_MARKETS))
         self.assertEqual(markets, set(engine_registry()))
 
