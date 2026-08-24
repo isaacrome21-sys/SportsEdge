@@ -1,5 +1,6 @@
 import importlib.util
-from datetime import datetime, timezone
+from dataclasses import replace
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import tempfile
 import unittest
@@ -72,6 +73,26 @@ class ArchiveMLBAdditionalOddsTests(unittest.TestCase):
         self.assertEqual(mod.TARGET_MARKETS, mod.CANONICAL_MARKETS)
         self.assertEqual(len(mod.TARGET_MARKETS), 7)
 
+    def test_t90_window_accepts_only_plus_or_minus_seven_minutes(self):
+        now = datetime(2026, 8, 11, 20, 0, tzinfo=timezone.utc)
+        base = self._game()
+
+        def at(minutes, game_pk):
+            start = now + timedelta(minutes=minutes)
+            return replace(base, game_pk=game_pk, game_date=start.isoformat())
+
+        games = [
+            at(83, 1),   # lower boundary: accepted
+            at(90, 2),   # target: accepted
+            at(97, 3),   # upper boundary: accepted
+            at(82, 4),   # one minute outside: rejected
+            at(98, 5),   # one minute outside: rejected
+        ]
+        eligible = mod._eligible_games(now, games)
+        self.assertEqual([game.game_pk for game in eligible], [1, 2, 3])
+        self.assertEqual(mod.TARGET_MINUTES, 90)
+        self.assertEqual(mod.WINDOW_SECONDS, 7 * 60)
+
     def test_pregame_quote_is_archived_with_replayable_provider_and_canonical_hashes(self):
         payload = self._build()
         self.assertEqual(payload["pit_quote_count"], 1)
@@ -85,7 +106,7 @@ class ArchiveMLBAdditionalOddsTests(unittest.TestCase):
             mod._sha256_json(row["canonical_game_snapshot"]),
         )
         self.assertEqual(len(row["identity_binding_sha256"]), 64)
-        expected_payload_hash = mod._sha256_json({k: v for k, v in payload.items() if k != "payload_sha256"})
+        expected_payload_hash = mod._payload_sha(payload)
         self.assertEqual(payload["payload_sha256"], expected_payload_hash)
 
     def test_quote_at_first_pitch_is_rejected(self):
