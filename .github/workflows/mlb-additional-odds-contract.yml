@@ -1,0 +1,46 @@
+name: mlb-additional-odds-contract
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'sportsedge/additional_mlb_odds_source.py'
+      - 'sportsedge/auto_native_odds.py'
+      - 'tests/test_additional_mlb_odds_source.py'
+      - 'tests/test_auto_native_additional_odds.py'
+      - 'tests/test_mlb_quote_source_coverage.py'
+      - '.github/workflows/mlb-additional-odds-contract.yml'
+  push:
+    paths:
+      - 'sportsedge/additional_mlb_odds_source.py'
+      - 'sportsedge/auto_native_odds.py'
+      - 'tests/test_additional_mlb_odds_source.py'
+      - 'tests/test_auto_native_additional_odds.py'
+      - 'tests/test_mlb_quote_source_coverage.py'
+      - '.github/workflows/mlb-additional-odds-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.13'
+      - name: Compile additional acquisition modules
+        run: python -m py_compile sportsedge/additional_mlb_odds_source.py sportsedge/auto_native_odds.py
+      - name: Test seven additional MLB market mappings
+        run: python -m unittest discover -s tests -p 'test_additional_mlb_odds_source.py'
+      - name: Test native auto additional acquisition wiring
+        run: python -m unittest discover -s tests -p 'test_auto_native_additional_odds.py'
+      - name: Test 36-market quote-source capability
+        run: python -m unittest discover -s tests -p 'test_mlb_quote_source_coverage.py'
+      - name: Recheck existing native odds tests
+        run: python -m unittest discover -s tests -p 'test_auto_native_odds.py'
+
+# Capability contract only. Passing this workflow does not prove that every
+# sportsbook posts every market, and it creates no validation evidence.
