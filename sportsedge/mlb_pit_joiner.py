@@ -9,13 +9,11 @@ from __future__ import annotations
 from typing import Any, Iterable, Mapping
 
 from .mlb_pit_observation import (
-    MLBPITObservationError,
     bind_participant_to_player,
     bind_provider_event_to_game,
     content_sha256,
     normalize_pit_observation,
 )
-from .pitcher_joint_engine import PITCHER_MARKETS
 
 
 class MLBPITJoinError(ValueError):
@@ -95,6 +93,34 @@ def _model_index(rows: Iterable[Mapping[str, Any]]) -> dict[tuple[str, str, str,
     return out
 
 
+def _fact_game_id(row: Mapping[str, Any]) -> str:
+    direct = str(row.get("game_id") or row.get("game_pk") or "").strip()
+    if direct:
+        return direct
+    facts = row.get("facts")
+    if isinstance(facts, Mapping):
+        return str(facts.get("game_id") or facts.get("game_pk") or "").strip()
+    return ""
+
+
+def _fact_index(rows: Iterable[Mapping[str, Any]]) -> dict[str, Mapping[str, Any]]:
+    out: dict[str, Mapping[str, Any]] = {}
+    duplicates: set[str] = set()
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        key = _fact_game_id(row)
+        if not key:
+            continue
+        if key in out:
+            duplicates.add(key)
+        else:
+            out[key] = row
+    for key in duplicates:
+        out.pop(key, None)
+    return out
+
+
 def _either_pitcher_entity(game: Mapping[str, Any]) -> str:
     away = str(game.get("away_probable_pitcher_id") or "").strip()
     home = str(game.get("home_probable_pitcher_id") or "").strip()
@@ -124,7 +150,7 @@ def join_prop_archive(
     games = [dict(row) for row in game_candidates if isinstance(row, Mapping)]
     game_by_id = _index_unique(games, "game_id")
     model_idx = _model_index(model_rows)
-    fact_idx = _index_unique(official_fact_reports, "game_id")
+    fact_idx = _fact_index(official_fact_reports)
     settlement_idx = _index_unique(settlement_rows, "observation_key")
 
     joined: list[dict[str, Any]] = []
@@ -163,15 +189,13 @@ def join_prop_archive(
             model = model_idx.get(key)
             if model is None:
                 raise MLBPITJoinError("MODEL_ROW_NOT_FOUND_OR_AMBIGUOUS")
+
             fact_report = fact_idx.get(str(game_id))
             if fact_report is None:
-                official_facts_hash = "0" * 64
-                default_settlement_state = "OFFICIAL_FACTS_INCOMPLETE"
-            else:
-                official_facts_hash = str(fact_report.get("facts_sha256") or "")
-                if len(official_facts_hash) != 64:
-                    raise MLBPITJoinError("OFFICIAL_FACTS_HASH_INVALID")
-                default_settlement_state = "BOOK_SETTLEMENT_UNVALIDATED"
+                raise MLBPITJoinError("OFFICIAL_FACT_REPORT_NOT_FOUND_OR_AMBIGUOUS")
+            official_facts_hash = str(fact_report.get("facts_sha256") or "").lower()
+            if len(official_facts_hash) != 64:
+                raise MLBPITJoinError("OFFICIAL_FACTS_HASH_INVALID")
 
             identity_payload = {
                 "provider_event_id": quote.get("provider_event_id"),
@@ -192,7 +216,9 @@ def join_prop_archive(
                 quote_ts=quote_ts,
             )
             settlement = settlement_idx.get(obs_key) or {}
-            settlement_state = str(settlement.get("settlement_state") or default_settlement_state).upper()
+            settlement_state = str(
+                settlement.get("settlement_state") or "BOOK_SETTLEMENT_UNVALIDATED"
+            ).upper()
 
             raw = {
                 "market": market,
@@ -249,5 +275,4 @@ def join_prop_archive(
 
 
 def asdict_compat(row: Any) -> dict[str, Any]:
-    # Local helper avoids exporting dataclasses internals from the observation module.
     return {field: getattr(row, field) for field in row.__dataclass_fields__}
