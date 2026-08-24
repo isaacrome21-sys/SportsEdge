@@ -3,17 +3,18 @@ import unittest
 from sportsedge.engine_registry import engine_registry
 from sportsedge.generic_market_engine import (
     BINARY_MARKETS,
-    COUNT_MARKETS,
     GAME_MARKETS,
     PA_BOUNDED_ENGINE_VERSION,
     generic_market_engine_adapter,
 )
+from sportsedge.hitter_joint_engine import HITTER_MARKETS
+from sportsedge.pitcher_joint_engine import PITCHER_MARKETS
 
 
 class GenericMarketEngineTests(unittest.TestCase):
     def test_registry_covers_every_expanded_runtime_market(self):
         registry = engine_registry()
-        expected = {"HITS", "TOTAL_BASES", "PITCHER_BB", *GAME_MARKETS, *COUNT_MARKETS, *BINARY_MARKETS}
+        expected = set(GAME_MARKETS) | set(BINARY_MARKETS) | set(HITTER_MARKETS) | set(PITCHER_MARKETS)
         self.assertEqual(set(registry), expected)
 
     def test_home_runs_routes_to_measured_generic_path(self):
