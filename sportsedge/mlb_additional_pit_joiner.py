@@ -1,6 +1,6 @@
 """Join the seven additional MLB PIT quote families into canonical observations.
 
-PR #131 archives these markets after exact provider-event/player binding.  The
+PR #131 archives these markets after exact provider-event/player binding. The
 original PR #129 joiner is intentionally count-prop-specific, so this module keeps
 that path unchanged while giving the additional archive an equally strict join.
 No settlement outcome is trusted from upstream input; it is derived from verified
@@ -40,6 +40,8 @@ from .mlb_settlement_evidence import (
 from .odds_api_source import EVENT_TIME_TOLERANCE_SECONDS, normalize_name
 
 ARCHIVE_TYPE = "MLB_ADDITIONAL_PIT_QUOTES"
+_BINARY_MARKETS = frozenset({"FIRST_HOME_RUN", "PITCHER_RECORD_WIN"})
+_MISSING_RAW_PARTICIPANT = "PROVIDER_PARTICIPANT_RAW_IDENTITY_NOT_ARCHIVED"
 
 
 def _parse_ts(value: Any, name: str) -> datetime:
@@ -141,7 +143,7 @@ def _verify_entity(
     market: str,
     entity_id: str,
     game: Mapping[str, Any],
-    player_candidates: Iterable[Mapping[str, Any]],
+    player_candidates: list[Mapping[str, Any]],
 ) -> None:
     if market in {"F5_MONEYLINE", "F5_RUN_LINE"}:
         team_ids = {str(game.get("away_team_id") or ""), str(game.get("home_team_id") or "")}
@@ -152,7 +154,7 @@ def _verify_entity(
         if entity_id != str(game.get("game_id") or ""):
             raise MLBPITJoinError("CANONICAL_GAME_ENTITY_NOT_REPRODUCIBLE")
         return
-    if market in {"FIRST_HOME_RUN", "PITCHER_RECORD_WIN"}:
+    if market in _BINARY_MARKETS:
         matches = {
             str(row.get("player_id") or "")
             for row in player_candidates
@@ -162,6 +164,34 @@ def _verify_entity(
             raise MLBPITJoinError("CANONICAL_PLAYER_ENTITY_NOT_REPRODUCIBLE")
         return
     raise MLBPITJoinError("ADDITIONAL_MARKET_IDENTITY_UNSUPPORTED")
+
+
+def _binary_identity_ambiguity(
+    *,
+    quote: Mapping[str, Any],
+    market: str,
+    entity_id: str,
+    player_candidates: list[Mapping[str, Any]],
+) -> list[str]:
+    if market not in _BINARY_MARKETS:
+        return []
+    provider_name = str(quote.get("provider_participant_name") or "").strip()
+    if not provider_name:
+        return [_MISSING_RAW_PARTICIPANT]
+    normalized = normalize_name(provider_name)
+    stored_normalized = str(quote.get("provider_participant_name_normalized") or "").strip()
+    if stored_normalized and stored_normalized != normalized:
+        raise MLBPITJoinError("PROVIDER_PARTICIPANT_NORMALIZATION_MISMATCH")
+    matches = [
+        row
+        for row in player_candidates
+        if isinstance(row, Mapping)
+        and str(row.get("player_id") or "") == entity_id
+        and normalize_name(row.get("player_name")) == normalized
+    ]
+    if len(matches) != 1:
+        raise MLBPITJoinError("PROVIDER_PARTICIPANT_IDENTITY_NOT_REPRODUCIBLE")
+    return []
 
 
 def _binary_outcome(event_true: bool, side: Any) -> str:
@@ -267,6 +297,10 @@ def join_additional_archive(
     source_class, quote_source_hash, quotes = _verify_archive(archive_payload)
     games = [dict(row) for row in game_candidates if isinstance(row, Mapping)]
     game_by_id = _index_unique(games, "game_id")
+    players_by_game = {
+        str(game_id): [dict(row) for row in rows if isinstance(row, Mapping)]
+        for game_id, rows in player_candidates_by_game.items()
+    }
     model_idx = _model_index(model_rows)
     fact_idx = _fact_index(official_fact_reports)
     settlement_list = [dict(row) for row in settlement_rows if isinstance(row, Mapping)]
@@ -292,11 +326,13 @@ def join_additional_archive(
             if game is None:
                 raise MLBPITJoinError("CANONICAL_GAME_ROW_NOT_UNIQUE")
             entity_id = _verify_archive_identity(quote, game_id)
-            _verify_entity(
+            candidates = players_by_game.get(game_id, [])
+            _verify_entity(market=market, entity_id=entity_id, game=game, player_candidates=candidates)
+            identity_ambiguity = _binary_identity_ambiguity(
+                quote=quote,
                 market=market,
                 entity_id=entity_id,
-                game=game,
-                player_candidates=player_candidates_by_game.get(game_id, ()),
+                player_candidates=candidates,
             )
 
             model_key = (
@@ -347,7 +383,7 @@ def join_additional_archive(
             if settlement is None:
                 rule_class = _MISSING_RULE_CLASS
                 rule_evidence: Mapping[str, Any] | None = None
-                ambiguity_reasons: list[str] = []
+                ambiguity_reasons = list(identity_ambiguity)
                 void_reasons: list[str] = []
             else:
                 rule_class = str(settlement.get("evidence_class") or "").strip().upper()
@@ -355,7 +391,10 @@ def join_additional_archive(
                     raise MLBPITJoinError("BOOK_RULE_EVIDENCE_CLASS_REQUIRED")
                 candidate = settlement.get("book_rule_evidence")
                 rule_evidence = candidate if isinstance(candidate, Mapping) else None
-                ambiguity_reasons = [str(x) for x in settlement.get("ambiguity_reasons", ()) if str(x)]
+                ambiguity_reasons = [
+                    *identity_ambiguity,
+                    *[str(x) for x in settlement.get("ambiguity_reasons", ()) if str(x)],
+                ]
                 void_reasons = [str(x) for x in settlement.get("void_reasons", ()) if str(x)]
 
             book_valid, _ = _rules_match_sportsbook(
