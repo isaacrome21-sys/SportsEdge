@@ -8,6 +8,7 @@ on:
     paths:
       - 'scripts/archive_mlb_prop_odds.py'
       - 'sportsedge/draftkings_prop_source.py'
+      - 'tests/test_archive_mlb_prop_odds.py'
       - '.github/workflows/mlb-prop-pit-archive.yml'
 
 permissions:
@@ -24,6 +25,8 @@ jobs:
           python-version: '3.12.13'
       - name: Self-test archive contract
         run: python scripts/archive_mlb_prop_odds.py --self-test
+      - name: Run archive unit tests
+        run: python -m unittest tests.test_archive_mlb_prop_odds
       - name: Capture DraftKings MLB prop PIT quotes
         id: capture
         shell: bash
