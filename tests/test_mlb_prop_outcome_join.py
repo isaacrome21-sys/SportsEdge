@@ -2,6 +2,7 @@ import unittest
 
 from sportsedge.mlb_prop_outcome_join import (
     PropOutcomeJoinError,
+    bind_archived_quote,
     build_join_report,
     join_evidence_row,
 )
@@ -22,6 +23,7 @@ class MLBPropOutcomeJoinTests(unittest.TestCase):
             "quote_ts": "2026-08-10T18:00:00-05:00",
             "first_pitch_ts": "2026-08-10T19:10:00-05:00",
             "quote_archive_sha256": "a" * 64,
+            "identity_binding_sha256": "d" * 64,
             "evidence_origin": origin,
         }
         fact = {
@@ -76,7 +78,6 @@ class MLBPropOutcomeJoinTests(unittest.TestCase):
 
     def test_ambiguous_rain_delay_eligibility_blocks_batch(self):
         bundle = self._bundle(
-            market="PITCHER_OUTS",
             settlement_state="AMBIGUOUS",
             settlement_reason="RAIN_DELAY_BEFORE_REQUIRED_APPEARANCE_RULE_UNRESOLVED",
         )
@@ -99,6 +100,60 @@ class MLBPropOutcomeJoinTests(unittest.TestCase):
         row = join_evidence_row(**bundle)
         self.assertTrue(row.realized_push)
         self.assertFalse(row.realized_win)
+        report = build_join_report([bundle])
+        self.assertEqual(report["push_row_count"], 1)
+
+    def test_binding_requires_verified_provider_event_and_player_identity(self):
+        archived = {
+            "market": "RBI",
+            "provider_event_id": "dk-123",
+            "entity_name_normalized": "sample batter",
+            "line": 0.5,
+            "side": "OVER",
+            "quote_retrieved_at": "2026-08-10T18:00:00-05:00",
+            "first_pitch_at": "2026-08-10T19:10:00-05:00",
+        }
+        binding = {
+            "provider_event_id": "dk-123",
+            "entity_name_normalized": "sample batter",
+            "game_id": "mlb-999",
+            "entity_id": "mlb-player-42",
+            "identity_binding_sha256": "d" * 64,
+        }
+        quote = bind_archived_quote(
+            archived,
+            binding,
+            quote_archive_sha256="a" * 64,
+            evidence_origin="SYNTHETIC_FIXTURE",
+        )
+        self.assertEqual(quote["game_id"], "mlb-999")
+        self.assertEqual(quote["entity_id"], "mlb-player-42")
+        self.assertEqual(quote["evidence_origin"], "SYNTHETIC_FIXTURE")
+
+    def test_binding_rejects_player_name_mismatch_instead_of_fuzzy_matching(self):
+        archived = {
+            "market": "RBI",
+            "provider_event_id": "dk-123",
+            "entity_name_normalized": "sample batter",
+            "line": 0.5,
+            "side": "OVER",
+            "quote_retrieved_at": "2026-08-10T18:00:00-05:00",
+            "first_pitch_at": "2026-08-10T19:10:00-05:00",
+        }
+        binding = {
+            "provider_event_id": "dk-123",
+            "entity_name_normalized": "different batter",
+            "game_id": "mlb-999",
+            "entity_id": "mlb-player-42",
+            "identity_binding_sha256": "d" * 64,
+        }
+        with self.assertRaisesRegex(PropOutcomeJoinError, "player identity mismatch"):
+            bind_archived_quote(
+                archived,
+                binding,
+                quote_archive_sha256="a" * 64,
+                evidence_origin="SYNTHETIC_FIXTURE",
+            )
 
     def test_synthetic_happy_path_cannot_claim_historical_pit(self):
         report = build_join_report([
