@@ -21,6 +21,13 @@ class FootballSimulatorTests(unittest.TestCase):
         self.assertGreater(pmf[3], 0.0)
         self.assertGreater(pmf[7], 0.0)
 
+    def test_joint_score_simulator_requires_explicit_seed(self):
+        from sportsedge.core.simulate.football import JointScoreSimulator, KeyNumberMarginModel
+
+        model = KeyNumberMarginModel(mean=3.0, sigma=13.4)
+        with self.assertRaisesRegex(ValueError, "EXPLICIT_SEED_REQUIRED"):
+            JointScoreSimulator(margin_model=model, total_mean=46.0, total_sigma=10.0)
+
     def test_joint_score_simulator_returns_integer_nonnegative_scores(self):
         from sportsedge.core.simulate.football import JointScoreSimulator, KeyNumberMarginModel
 
@@ -35,6 +42,39 @@ class FootballSimulatorTests(unittest.TestCase):
             self.assertGreaterEqual(row["away_score"], 0)
             self.assertEqual(row["margin"], row["home_score"] - row["away_score"])
             self.assertEqual(row["total"], row["home_score"] + row["away_score"])
+
+    def test_smooth_candidate_is_blocked_by_emergent_key_attestation(self):
+        from collections import Counter
+        from sportsedge.core.simulate.football import JointScoreSimulator, KeyNumberMarginModel
+        from sportsedge.core.validation.math_attestation import attest_validated_math
+
+        model = KeyNumberMarginModel(mean=-2.5, sigma=13.5)
+        rows = JointScoreSimulator(
+            margin_model=model, total_mean=45.5, total_sigma=10.5, seed=20260823,
+        ).simulate(100000)
+        counts = Counter(row["margin"] for row in rows)
+        simulated = {key: counts[key] / len(rows) for key in (-7, -3, 3, 7)}
+
+        # Representative key-number validation targets are deliberately external
+        # to the simulator. The smooth score-level candidate must not certify
+        # itself merely because it runs; it should fail when emergent key mass is
+        # materially below historical-style targets.
+        targets = {-7: 0.060, -3: 0.080, 3: 0.090, 7: 0.065}
+        errors = {str(key): abs(simulated[key] - targets[key]) for key in targets}
+        artifact = {
+            "provenance": "REAL_PUBLIC_HISTORY",
+            "source_sha256": "a" * 64,
+            "profile_version": "smooth_candidate_behavioral_test_v1",
+            "key_number_contract": "EMERGENT_VALIDATION_TARGET_V1",
+            "seasons": [2024, 2025],
+            "key_numbers": [-7, -3, 3, 7],
+            "max_allowed_abs_error": 0.01,
+            "per_key_abs_error": errors,
+        }
+        result = attest_validated_math(artifact)
+        self.assertFalse(result["math_valid"])
+        self.assertEqual(result["attestation"], "BLOCKED_MATH")
+        self.assertTrue(result["failed_keys"])
 
 
 if __name__ == "__main__":
