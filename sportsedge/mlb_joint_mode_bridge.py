@@ -37,6 +37,19 @@ def build_canonical_feature_row(*,game:LiveGame,quote:Mapping[str,Any],source:ML
     if str(q["game_id"])!=str(game.game_pk):raise MLBJointModeBridgeError("quote/game identity mismatch")
     market=str(q["market"]);entity_id=str(q["entity_id"])
     base={"game_pk":int(game.game_pk),"market":market,"entity_id":entity_id,"retrieved_at":source.retrieved_at.isoformat(),"asof":source.retrieved_at.isoformat(),"source":"MLB_STATSAPI_STRICTLY_PRIOR_JOINT_FEATURES"}
+
+    # HOME_RUNS intentionally remains on the behaviorally measured generic
+    # baseline. Build the generic PIT scalar feature even when the caller is one
+    # of the new joint-mode runners; the unpromoted joint HR candidate remains
+    # directly testable but is not canonical runtime.
+    if market=="HOME_RUNS":
+        team_id,_,_=_batter_context(game,entity_id)
+        return source.feature_row(
+            game_pk=int(game.game_pk),market=market,entity_id=entity_id,
+            target_date=target_date,away_team_id=int(game.away_team_id),
+            home_team_id=int(game.home_team_id),player_id=int(entity_id),team_id=team_id,
+        )
+
     if market in HITTER_MARKETS:
         team_id,opposing_pitcher_id,venue_id=_batter_context(game,entity_id)
         built=build_hitter_joint_features(source,batter_id=int(entity_id),opposing_pitcher_id=opposing_pitcher_id,venue_id=venue_id,target_date=target_date)
