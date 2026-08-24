@@ -1,0 +1,129 @@
+name: mlb-additional-pit-archive
+
+on:
+  workflow_dispatch:
+  schedule:
+    # One T-90 +/-7 minute opportunity per game cluster without polling every few minutes.
+    - cron: '7,22,37,52 * * * *'
+  pull_request:
+    paths:
+      - 'scripts/archive_mlb_additional_odds.py'
+      - 'sportsedge/additional_mlb_odds_source.py'
+      - 'tests/test_archive_mlb_additional_odds.py'
+      - '.github/workflows/mlb-additional-pit-archive.yml'
+  push:
+    paths:
+      - 'scripts/archive_mlb_additional_odds.py'
+      - 'sportsedge/additional_mlb_odds_source.py'
+      - 'tests/test_archive_mlb_additional_odds.py'
+      - '.github/workflows/mlb-additional-pit-archive.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mlb-additional-pit-archive-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.13'
+      - name: Compile additional PIT lane
+        run: python -m py_compile scripts/archive_mlb_additional_odds.py sportsedge/additional_mlb_odds_source.py
+      - name: Self-test additional PIT lane
+        run: python scripts/archive_mlb_additional_odds.py --self-test
+      - name: Run additional PIT archive tests
+        run: python -m unittest discover -s tests -p 'test_archive_mlb_additional_odds.py'
+      - name: Recheck additional quote mappings
+        run: python -m unittest discover -s tests -p 'test_additional_mlb_odds_source.py'
+      - name: Recheck 36-market source capability
+        run: python -m unittest discover -s tests -p 'test_mlb_quote_source_coverage.py'
+
+  archive:
+    if: github.event_name != 'pull_request'
+    needs: contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+      SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
+      SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
+      SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.13'
+      - name: Capture T-90 additional-market PIT quotes
+        id: capture
+        shell: bash
+        run: |
+          set +e
+          mkdir -p artifacts/additional_odds/status
+          status_file="artifacts/additional_odds/status/run_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}.json"
+          python scripts/archive_mlb_additional_odds.py | tee "$status_file"
+          code=${PIPESTATUS[0]}
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Persist immutable archive and execution status to data branch
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data:data
+          git worktree add .data-branch data
+          mkdir -p .data-branch/runtime/mlb-additional-pit
+          if [ -d artifacts/additional_odds ]; then
+            cp -R artifacts/additional_odds/. .data-branch/runtime/mlb-additional-pit/
+          fi
+          cd .data-branch
+          git config user.name sportsedge-archive-bot
+          git config user.email sportsedge-archive-bot@users.noreply.github.com
+          git add runtime/mlb-additional-pit
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "archive: MLB additional PIT ${{ github.run_id }}"
+          pushed=0
+          for attempt in 1 2 3 4 5; do
+            git fetch origin data
+            git rebase origin/data || { git rebase --abort || true; sleep $((attempt * 2)); continue; }
+            if git push origin HEAD:data; then
+              pushed=1
+              break
+            fi
+            sleep $((attempt * 2))
+          done
+          test "$pushed" -eq 1
+      - name: Upload archive/status artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlb-additional-pit-${{ github.run_id }}
+          path: artifacts/additional_odds/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Propagate capture result after persistence
+        if: always()
+        shell: bash
+        run: |
+          code='${{ steps.capture.outputs.exit_code }}'
+          if [ -z "$code" ]; then
+            echo 'Capture step did not emit an exit code.' >&2
+            exit 99
+          fi
+          exit "$code"
+
+# This lane captures quote evidence only. It does not grade outcomes, validate
+# sportsbook settlement rules, create historical model scores, or promote markets.
