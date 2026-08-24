@@ -8,6 +8,7 @@ trusted from an upstream label.
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import hashlib
 from typing import Any, Iterable, Mapping
 
@@ -39,6 +40,85 @@ _LIVE_FACT_CLASS = "LIVE_OFFICIAL_FACT_PROBE"
 _LIVE_RULE_CLASS = "LIVE_BOOK_RULE_CAPTURE"
 _SYNTHETIC_CLASS = "SYNTHETIC_CONTRACT_TEST"
 _MISSING_RULE_CLASS = "MISSING"
+_EVENT_TIME_KEYS = ("startDate", "startDateTime", "startTime", "commenceTime", "commence_time")
+_EVENT_TIME_CONTAINERS = ("event", "metadata", "schedule")
+
+
+def _parse_pit_ts(value: Any, name: str) -> datetime:
+    text = str(value or "").strip().replace("Z", "+00:00")
+    if not text:
+        raise MLBPITJoinError(f"{name} required")
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError as exc:
+        raise MLBPITJoinError(f"{name} invalid") from exc
+    if dt.tzinfo is None or dt.utcoffset() is None:
+        raise MLBPITJoinError(f"{name} timezone required")
+    return dt.astimezone(timezone.utc)
+
+
+def _parse_provider_event_ts(value: Any) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _event_snapshot_first_pitch(event: Mapping[str, Any]) -> datetime:
+    for key in _EVENT_TIME_KEYS:
+        dt = _parse_provider_event_ts(event.get(key))
+        if dt is not None:
+            return dt
+    for container_key in _EVENT_TIME_CONTAINERS:
+        nested = event.get(container_key)
+        if not isinstance(nested, Mapping):
+            continue
+        for key in _EVENT_TIME_KEYS:
+            dt = _parse_provider_event_ts(nested.get(key))
+            if dt is not None:
+                return dt
+    raise MLBPITJoinError("PROVIDER_EVENT_FIRST_PITCH_MISSING")
+
+
+def _verify_provider_archive_replay(quote: Mapping[str, Any]) -> None:
+    event = quote.get("provider_event_snapshot")
+    if not isinstance(event, Mapping):
+        raise MLBPITJoinError("PROVIDER_EVENT_SNAPSHOT_REQUIRED")
+    event_hash = str(quote.get("provider_event_sha256") or "").strip().lower()
+    if len(event_hash) != 64 or content_sha256(dict(event)) != event_hash:
+        raise MLBPITJoinError("PROVIDER_EVENT_HASH_MISMATCH")
+
+    event_id = str(event.get("id") or "").strip()
+    quote_event_id = str(quote.get("provider_event_id") or "").strip()
+    if not event_id or not quote_event_id or event_id != quote_event_id:
+        raise MLBPITJoinError("PROVIDER_EVENT_ID_SNAPSHOT_MISMATCH")
+
+    event_first_pitch = _event_snapshot_first_pitch(event)
+    archived_first_pitch = _parse_pit_ts(quote.get("first_pitch_at"), "first_pitch_at")
+    if event_first_pitch != archived_first_pitch:
+        raise MLBPITJoinError("ARCHIVED_FIRST_PITCH_EVENT_MISMATCH")
+
+
+def _verify_quote_before_canonical_first_pitch(
+    quote: Mapping[str, Any], game: Mapping[str, Any]
+) -> None:
+    quote_ts = _parse_pit_ts(
+        quote.get("quote_retrieved_at") or quote.get("retrieved_at"),
+        "quote_retrieved_at",
+    )
+    canonical_first_pitch = _parse_pit_ts(
+        game.get("first_pitch_ts"), "game_candidate.first_pitch_ts"
+    )
+    if quote_ts >= canonical_first_pitch:
+        raise MLBPITJoinError("QUOTE_NOT_PREGAME_CANONICAL")
 
 
 def _line_key(value: Any) -> str:
@@ -309,6 +389,8 @@ def join_prop_archive(
             game = game_by_id.get(game_id)
             if game is None:
                 raise MLBPITJoinError("CANONICAL_GAME_ROW_NOT_UNIQUE")
+            _verify_quote_before_canonical_first_pitch(quote, game)
+            _verify_provider_archive_replay(quote)
             if market.startswith("EITHER_PITCHER_"):
                 entity_id = _either_pitcher_entity(game)
             else:
