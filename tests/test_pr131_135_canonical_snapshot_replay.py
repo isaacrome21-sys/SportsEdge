@@ -44,6 +44,34 @@ def _snapshot():
     }
 
 
+def _binding_for_quote(quote):
+    return {
+        "provider_event_id": str(quote.get("provider_event_id") or ""),
+        "provider_event_sha256": str(quote.get("provider_event_sha256") or ""),
+        "canonical_game_id": str(quote.get("game_id") or ""),
+        "canonical_entity_id": str(quote.get("entity_id") or ""),
+        "canonical_game_snapshot_sha256": str(
+            quote.get("canonical_game_snapshot_sha256") or ""
+        ),
+        "resolver_contract": "EXACT_NORMALIZED_TEAM_TIME_AND_PARTICIPANT_IDENTITY",
+    }
+
+
+def _rehash_archive(payload):
+    payload.pop("payload_sha256", None)
+    payload["payload_sha256"] = content_sha256(payload)
+    return payload
+
+
+def _rehash_quote_identity(payload):
+    quote = payload["quotes"][0]
+    quote["canonical_game_snapshot_sha256"] = content_sha256(
+        quote["canonical_game_snapshot"]
+    )
+    quote["identity_binding_sha256"] = content_sha256(_binding_for_quote(quote))
+    return _rehash_archive(payload)
+
+
 def _archive_with_snapshot(snapshot):
     event = _event()
     event_hash = content_sha256(event)
@@ -146,6 +174,55 @@ class PR131135CanonicalSnapshotReplayTests(unittest.TestCase):
         self.assertEqual(joined["failure_count"], 1)
         self.assertIn("MODEL_ROW_NOT_FOUND_OR_AMBIGUOUS", joined["failures"][0]["reason"])
         self.assertNotIn("CANONICAL_GAME_SNAPSHOT_REPRODUCTION_MISMATCH", joined["failures"][0]["reason"])
+
+    def test_provider_event_id_must_match_hashed_snapshot_id(self):
+        payload = _archive_with_snapshot(_snapshot())
+        quote = payload["quotes"][0]
+        quote["provider_event_id"] = "event-other"
+        quote["identity_binding_sha256"] = content_sha256(_binding_for_quote(quote))
+        _rehash_archive(payload)
+
+        joined = _join(payload)
+
+        self.assertEqual(joined["joined_observation_count"], 0)
+        self.assertEqual(joined["failure_count"], 1)
+        self.assertIn(
+            "PROVIDER_EVENT_ID_SNAPSHOT_MISMATCH",
+            joined["failures"][0]["reason"],
+        )
+        self.assertNotIn("MODEL_ROW_NOT_FOUND_OR_AMBIGUOUS", joined["failures"][0]["reason"])
+
+    def test_quote_first_pitch_must_match_hashed_canonical_snapshot(self):
+        payload = _archive_with_snapshot(_snapshot())
+        quote = payload["quotes"][0]
+        quote["first_pitch_at"] = "2026-08-24T01:00:00+00:00"
+        _rehash_archive(payload)
+
+        joined = _join(payload)
+
+        self.assertEqual(joined["joined_observation_count"], 0)
+        self.assertEqual(joined["failure_count"], 1)
+        self.assertIn(
+            "ARCHIVED_FIRST_PITCH_SNAPSHOT_MISMATCH",
+            joined["failures"][0]["reason"],
+        )
+        self.assertNotIn("MODEL_ROW_NOT_FOUND_OR_AMBIGUOUS", joined["failures"][0]["reason"])
+
+    def test_rehashed_post_first_pitch_quote_cannot_hide_behind_shifted_snapshot(self):
+        payload = _archive_with_snapshot(_snapshot())
+        quote = payload["quotes"][0]
+        quote["retrieved_at"] = "2026-08-24T01:00:00+00:00"
+        quote["quote_retrieved_at"] = "2026-08-24T01:00:00+00:00"
+        quote["first_pitch_at"] = "2026-08-24T01:30:00+00:00"
+        quote["canonical_game_snapshot"]["first_pitch_at"] = "2026-08-24T01:30:00+00:00"
+        _rehash_quote_identity(payload)
+
+        joined = _join(payload)
+
+        self.assertEqual(joined["joined_observation_count"], 0)
+        self.assertEqual(joined["failure_count"], 1)
+        self.assertIn("QUOTE_NOT_PREGAME_CANONICAL", joined["failures"][0]["reason"])
+        self.assertNotIn("MODEL_ROW_NOT_FOUND_OR_AMBIGUOUS", joined["failures"][0]["reason"])
 
 
 if __name__ == "__main__":
