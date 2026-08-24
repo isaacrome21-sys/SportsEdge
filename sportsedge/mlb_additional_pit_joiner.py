@@ -85,6 +85,11 @@ def _bind_odds_api_event(quote: Mapping[str, Any], games: Iterable[Mapping[str, 
     if len(event_hash) != 64 or content_sha256(dict(event)) != event_hash:
         raise MLBPITJoinError("PROVIDER_EVENT_HASH_MISMATCH")
 
+    event_id = str(event.get("id") or "").strip()
+    quote_event_id = str(quote.get("provider_event_id") or "").strip()
+    if not event_id or not quote_event_id or event_id != quote_event_id:
+        raise MLBPITJoinError("PROVIDER_EVENT_ID_SNAPSHOT_MISMATCH")
+
     away = normalize_name(event.get("away_team"))
     home = normalize_name(event.get("home_team"))
     if not away or not home or away == home:
@@ -145,6 +150,22 @@ def _verify_archive_identity(
     if str(snapshot.get("game_id") or "") != str(game_id):
         raise MLBPITJoinError("CANONICAL_GAME_SNAPSHOT_ID_MISMATCH")
     _verify_snapshot_reproduces_game(snapshot, game)
+
+    snapshot_first_pitch = _parse_ts(
+        snapshot.get("first_pitch_at"), "canonical_game_snapshot.first_pitch_at"
+    )
+    quote_first_pitch = _parse_ts(quote.get("first_pitch_at"), "quote.first_pitch_at")
+    if quote_first_pitch != snapshot_first_pitch:
+        raise MLBPITJoinError("ARCHIVED_FIRST_PITCH_SNAPSHOT_MISMATCH")
+    quote_ts = _parse_ts(
+        quote.get("quote_retrieved_at") or quote.get("retrieved_at"),
+        "quote_retrieved_at",
+    )
+    game_first_pitch = _parse_ts(game.get("first_pitch_ts"), "game_candidate.first_pitch_ts")
+    if quote_ts >= game_first_pitch:
+        raise MLBPITJoinError("QUOTE_NOT_PREGAME_CANONICAL")
+    if quote_ts >= snapshot_first_pitch:
+        raise MLBPITJoinError("QUOTE_NOT_PREGAME_ARCHIVED_SNAPSHOT")
 
     entity_id = str(quote.get("entity_id") or "").strip()
     if not entity_id:
