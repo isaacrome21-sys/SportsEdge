@@ -11,7 +11,7 @@
     "F5_TOTALS": {"eligible": false, "stage": "REBUILD_REQUIRED", "reason": "inning-level state model required"},
 
     "HITS": {"eligible": false, "stage": "JOINT_ENGINE_CANDIDATE", "reason": "shared strictly-prior game-row engine implemented; PIT holdout, calibration, forward evidence, and parity required"},
-    "HOME_RUNS": {"eligible": false, "stage": "JOINT_ENGINE_CANDIDATE", "reason": "shared strictly-prior game-row engine implemented; evidence ladder required"},
+    "HOME_RUNS": {"eligible": false, "stage": "GENERIC_MEASURED_BASELINE", "reason": "measured generic baseline remains canonical; joint HOME_RUNS candidate requires independent behavioral revalidation before routing"},
     "TOTAL_BASES": {"eligible": false, "stage": "JOINT_ENGINE_CANDIDATE", "reason": "shared game-row engine implemented; HITS/TB coherence repaired; evidence ladder required"},
     "RBI": {"eligible": false, "stage": "JOINT_ENGINE_CANDIDATE", "reason": "shared game-row engine preserves multi-RBI outcomes; behavioral validation required"},
     "RUNS": {"eligible": false, "stage": "JOINT_ENGINE_CANDIDATE", "reason": "shared strictly-prior game-row engine implemented; evidence ladder required"},
