@@ -100,7 +100,7 @@ class ResilientMachineRoutingTests(unittest.TestCase):
             payload = json.loads(output.read_text())
             reasons = [str(x.get("reason")) for x in payload["source_failures"]]
             self.assertTrue(any("native down" in reason for reason in reasons))
-            self.assertIn("NATIVE_RUN_IT", payload["funnel"]["gate_kill_counts"] or {}) if False else None
+            self.assertIn("RuntimeError: native down", payload["funnel"]["gate_kill_counts"])
 
     def test_unusable_native_report_falls_back_once(self):
         with tempfile.TemporaryDirectory() as td:
