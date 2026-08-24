@@ -111,11 +111,6 @@ def _bind_odds_api_event(quote: Mapping[str, Any], games: Iterable[Mapping[str, 
     return next(iter(unique))
 
 
-def _optional_id(value: Any) -> str | None:
-    text = str(value or "").strip()
-    return text or None
-
-
 def _verify_snapshot_reproduces_game(snapshot: Mapping[str, Any], game: Mapping[str, Any]) -> None:
     checks = {
         "game_id": str(snapshot.get("game_id") or "") == str(game.get("game_id") or ""),
@@ -123,10 +118,6 @@ def _verify_snapshot_reproduces_game(snapshot: Mapping[str, Any], game: Mapping[
         "home_team_id": str(snapshot.get("home_team_id") or "") == str(game.get("home_team_id") or ""),
         "away_team_name": normalize_name(snapshot.get("away_team_name")) == normalize_name(game.get("away_name")),
         "home_team_name": normalize_name(snapshot.get("home_team_name")) == normalize_name(game.get("home_name")),
-        "away_probable_pitcher_id": _optional_id(snapshot.get("away_probable_pitcher_id"))
-        == _optional_id(game.get("away_probable_pitcher_id")),
-        "home_probable_pitcher_id": _optional_id(snapshot.get("home_probable_pitcher_id"))
-        == _optional_id(game.get("home_probable_pitcher_id")),
     }
     for field, valid in checks.items():
         if not valid:
@@ -136,7 +127,7 @@ def _verify_snapshot_reproduces_game(snapshot: Mapping[str, Any], game: Mapping[
         snapshot.get("first_pitch_at"), "canonical_game_snapshot.first_pitch_at"
     )
     game_start = _parse_ts(game.get("first_pitch_ts"), "game_candidate.first_pitch_ts")
-    if snapshot_start != game_start:
+    if abs((snapshot_start - game_start).total_seconds()) > EVENT_TIME_TOLERANCE_SECONDS:
         raise MLBPITJoinError("CANONICAL_GAME_SNAPSHOT_REPRODUCTION_MISMATCH:first_pitch_at")
 
 
