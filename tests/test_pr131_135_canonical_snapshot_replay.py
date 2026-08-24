@@ -192,6 +192,22 @@ class PR131135CanonicalSnapshotReplayTests(unittest.TestCase):
         )
         self.assertNotIn("MODEL_ROW_NOT_FOUND_OR_AMBIGUOUS", joined["failures"][0]["reason"])
 
+    def test_quote_first_pitch_must_match_hashed_canonical_snapshot(self):
+        payload = _archive_with_snapshot(_snapshot())
+        quote = payload["quotes"][0]
+        quote["first_pitch_at"] = "2026-08-24T01:00:00+00:00"
+        _rehash_archive(payload)
+
+        joined = _join(payload)
+
+        self.assertEqual(joined["joined_observation_count"], 0)
+        self.assertEqual(joined["failure_count"], 1)
+        self.assertIn(
+            "ARCHIVED_FIRST_PITCH_SNAPSHOT_MISMATCH",
+            joined["failures"][0]["reason"],
+        )
+        self.assertNotIn("MODEL_ROW_NOT_FOUND_OR_AMBIGUOUS", joined["failures"][0]["reason"])
+
     def test_rehashed_post_first_pitch_quote_cannot_hide_behind_shifted_snapshot(self):
         payload = _archive_with_snapshot(_snapshot())
         quote = payload["quotes"][0]
