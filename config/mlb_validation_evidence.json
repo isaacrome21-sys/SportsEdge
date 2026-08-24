@@ -9,32 +9,20 @@
     "production_parity"
   ],
   "markets": {
-    "MONEYLINE": {},
-    "RUN_LINE": {},
-    "TOTALS": {},
-    "HOME_RUNS": {},
-    "HITS": {},
-    "TOTAL_BASES": {},
-    "RBI": {},
-    "RUNS": {},
-    "HITS_RUNS_RBIS": {},
-    "SINGLES": {},
-    "DOUBLES": {},
-    "TRIPLES": {},
-    "BATTER_BB": {},
-    "BATTER_K": {},
-    "STOLEN_BASES": {},
-    "PITCHER_K": {},
-    "PITCHER_HITS_ALLOWED": {},
-    "PITCHER_BB": {},
-    "PITCHER_ER": {},
-    "PITCHER_OUTS": {},
-    "NRFI": {},
-    "YRFI": {},
-    "PITCHER_RECORD_WIN": {},
-    "FIRST_HOME_RUN": {},
-    "F5_MONEYLINE": {},
-    "F5_RUN_LINE": {},
-    "F5_TOTALS": {}
+    "MONEYLINE": {}, "RUN_LINE": {}, "TOTALS": {},
+    "NRFI": {}, "YRFI": {}, "F5_MONEYLINE": {}, "F5_RUN_LINE": {}, "F5_TOTALS": {},
+
+    "HITS": {}, "HOME_RUNS": {}, "TOTAL_BASES": {}, "RBI": {}, "RUNS": {},
+    "STOLEN_BASES": {}, "BATTER_BB": {}, "EXTRA_BASE_HITS": {},
+    "HITS_RUNS_RBIS": {}, "HITS_RUNS_STOLEN_BASES": {}, "RUNS_RBIS": {},
+    "HITS_STOLEN_BASES": {}, "HITS_WALKS_STOLEN_BASES": {},
+
+    "SINGLES": {}, "DOUBLES": {}, "TRIPLES": {}, "BATTER_K": {},
+
+    "PITCHER_K": {}, "PITCHER_OUTS": {}, "PITCHER_ER": {},
+    "PITCHER_HITS_ALLOWED": {}, "PITCHER_BB": {}, "PITCHER_HITS_WALKS_ER": {},
+    "EITHER_PITCHER_HITS_ALLOWED": {}, "EITHER_PITCHER_BB": {}, "EITHER_PITCHER_ER": {},
+
+    "PITCHER_RECORD_WIN": {}, "FIRST_HOME_RUN": {}
   }
 }
