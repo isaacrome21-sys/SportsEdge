@@ -1,0 +1,68 @@
+name: mlb-prop-pit-archive
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 * * * *'
+  push:
+    paths:
+      - 'scripts/archive_mlb_prop_odds.py'
+      - 'sportsedge/draftkings_prop_source.py'
+      - '.github/workflows/mlb-prop-pit-archive.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  archive:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.13'
+      - name: Self-test archive contract
+        run: python scripts/archive_mlb_prop_odds.py --self-test
+      - name: Capture DraftKings MLB prop PIT quotes
+        id: capture
+        shell: bash
+        run: |
+          set +e
+          python scripts/archive_mlb_prop_odds.py | tee /tmp/prop_archive_status.json
+          code=${PIPESTATUS[0]}
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Persist immutable archive to data branch
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data:data
+          git worktree add .data-branch data
+          mkdir -p .data-branch/runtime/mlb-prop-pit
+          cp -R artifacts/prop_odds/. .data-branch/runtime/mlb-prop-pit/ 2>/dev/null || true
+          cd .data-branch
+          git config user.name sportsedge-archive-bot
+          git config user.email sportsedge-archive-bot@users.noreply.github.com
+          git add runtime/mlb-prop-pit
+          if ! git diff --cached --quiet; then
+            git commit -m "archive: MLB prop PIT quotes ${{ github.run_id }}"
+            for attempt in 1 2 3; do
+              if git push origin HEAD:data; then exit 0; fi
+              sleep $((attempt * 3))
+              git pull --rebase origin data
+            done
+            exit 1
+          fi
+      - name: Upload archive artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlb-prop-pit-${{ github.run_id }}
+          path: artifacts/prop_odds/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Propagate capture result
+        if: always()
+        run: exit '${{ steps.capture.outputs.exit_code }}'
