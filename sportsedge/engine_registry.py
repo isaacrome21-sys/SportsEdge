@@ -109,6 +109,13 @@ def legacy_pitcher_bb_engine_adapter(model_input: Mapping[str, Any]) -> dict[str
     return _common_output(model_input, result, p_over if side == "OVER" else 1.0 - p_over, "PITCHER_BB")
 
 
+# Public compatibility names retained for direct callers/tests that imported these
+# adapters before the joint-engine migration.
+hits_engine_adapter = legacy_hits_engine_adapter
+total_bases_engine_adapter = legacy_total_bases_engine_adapter
+pitcher_bb_engine_adapter = legacy_pitcher_bb_engine_adapter
+
+
 def hitter_joint_adapter(model_input: Mapping[str, Any]) -> Mapping[str, Any]:
     market = str(model_input.get("market", "")).upper()
     features = model_input.get("features")
