@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Append-only PIT archive for the seven additional MLB quote families.
+"""Append-only T-90 PIT archive for the seven additional MLB quote families.
 
 This lane archives acquisition evidence only. It never prices models, grades
 outcomes, validates sportsbook settlement rules, or promotes markets.
@@ -7,6 +7,10 @@ outcomes, validates sportsbook settlement rules, or promotes markets.
 The additional Odds API source resolves provider identities against MLB StatsAPI at
 acquisition time. This archive independently rechecks the event->game binding and
 persists both provider and canonical identity snapshots with SHA-256 identities.
+
+Cost guard: live event-odds acquisition is attempted only for games inside a single
+T-90 +/-7 minute window. With a 15-minute scheduler cadence, a game should have one
+capture opportunity instead of being polled repeatedly all day.
 """
 from __future__ import annotations
 
@@ -31,6 +35,9 @@ TARGET_MARKETS = frozenset(CANONICAL_MARKETS)
 ARCHIVE_TYPE = "MLB_ADDITIONAL_PIT_QUOTES"
 LIVE_EVIDENCE_CLASS = "LIVE_PROVIDER_QUOTE_ARCHIVE"
 IDENTITY_STATE = "CANONICAL_MLB_IDENTITY_RESOLVED_EXACT"
+TARGET_MINUTES = 90
+WINDOW_SECONDS = 7 * 60
+CAPTURE_WINDOW = "T-90m"
 
 
 class AdditionalPITArchiveError(RuntimeError):
@@ -52,6 +59,15 @@ def _sha256_json(value: Any) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def _payload_sha(payload: Mapping[str, Any]) -> str:
+    return _sha256_json({k: v for k, v in payload.items() if k != "payload_sha256"})
+
+
+def _rehash(payload: dict[str, Any]) -> dict[str, Any]:
+    payload["payload_sha256"] = _payload_sha(payload)
+    return payload
+
+
 def _atomic_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
@@ -70,6 +86,20 @@ def _keys() -> list[str]:
         value = os.environ.get(name, "").strip()
         if value and value not in out:
             out.append(value)
+    return out
+
+
+def _eligible_games(now: datetime, schedule: Sequence[GameSnapshot]) -> list[GameSnapshot]:
+    current = now.astimezone(timezone.utc)
+    out: list[GameSnapshot] = []
+    for game in schedule:
+        try:
+            start = parse_game_start(game.game_date).astimezone(timezone.utc)
+        except Exception:
+            continue
+        seconds_to = (start - current).total_seconds()
+        if abs(seconds_to - TARGET_MINUTES * 60) <= WINDOW_SECONDS:
+            out.append(game)
     return out
 
 
@@ -122,8 +152,7 @@ def _entity_is_canonical(
     if market in {"F5_TOTALS", "NRFI", "YRFI"}:
         return entity == str(game.game_pk)
     if market in {"FIRST_HOME_RUN", "PITCHER_RECORD_WIN"}:
-        known_players = {str(v) for v in (participant_index.get(game.game_pk) or {}).values()}
-        return entity in known_players
+        return entity in {str(v) for v in (participant_index.get(game.game_pk) or {}).values()}
     return False
 
 
@@ -247,8 +276,7 @@ def build_archive_from_inputs(
         "rejected_quotes": rejected,
         "quotes": accepted,
     }
-    payload["payload_sha256"] = _sha256_json(payload)
-    return payload
+    return _rehash(payload)
 
 
 def persist_payload(
@@ -270,6 +298,7 @@ def persist_payload(
             "payload_sha256": payload.get("payload_sha256"),
             "pit_quote_count": payload.get("pit_quote_count"),
             "market_counts": payload.get("market_counts"),
+            "capture_window": payload.get("capture_window"),
             "immutable_file": str(immutable),
         },
     )
@@ -285,11 +314,30 @@ def build_archive_payload(
 ) -> dict[str, Any]:
     captured = (now or _utcnow()).astimezone(timezone.utc)
     slate = captured.astimezone(CT).date().isoformat()
-    schedule = fetch_schedule(slate, opener=opener, now=captured)
+    full_schedule = fetch_schedule(slate, opener=opener, now=captured)
+    eligible = _eligible_games(captured, full_schedule)
+
+    if not eligible:
+        payload = build_archive_from_inputs(
+            schedule=[],
+            quote_rows=[],
+            provider_events=[],
+            participant_index={},
+            captured_at=captured,
+        )
+        payload.update(
+            {
+                "capture_status": "SKIP_OUTSIDE_CAPTURE_WINDOW",
+                "capture_window": CAPTURE_WINDOW,
+                "games_scheduled": len(full_schedule),
+                "games_eligible": 0,
+            }
+        )
+        return _rehash(payload)
 
     roster_names: dict[int, list[tuple[int, str]]] = {}
     roster_failures: list[dict[str, Any]] = []
-    for game in schedule:
+    for game in eligible:
         try:
             roster_names[game.game_pk] = _roster_names(fetch_boxscore(game.game_pk, opener=opener))
         except Exception as exc:
@@ -302,13 +350,13 @@ def build_archive_payload(
                 }
             )
     participant_index = build_participant_index(
-        schedule=schedule,
+        schedule=eligible,
         confirmed_names_by_game=roster_names,
     )
 
     snapshot = fetch_mlb_additional_quotes(
         api_key=api_key,
-        schedule=schedule,
+        schedule=eligible,
         participant_index=participant_index,
         opener=opener,
         bookmakers=bookmakers,
@@ -321,25 +369,38 @@ def build_archive_payload(
     if not isinstance(events, list):
         raise AdditionalPITArchiveError("ODDS_EVENTS_RESPONSE_NOT_LIST")
 
-    return build_archive_from_inputs(
-        schedule=schedule,
+    payload = build_archive_from_inputs(
+        schedule=eligible,
         quote_rows=snapshot.quotes,
         provider_events=events,
         participant_index=participant_index,
         captured_at=captured,
         source_failures=[*roster_failures, *[dict(x) for x in snapshot.failures]],
     )
+    payload.update(
+        {
+            "capture_status": "CAPTURE_ATTEMPTED",
+            "capture_window": CAPTURE_WINDOW,
+            "games_scheduled": len(full_schedule),
+            "games_eligible": len(eligible),
+            "eligible_game_ids": [str(game.game_pk) for game in eligible],
+        }
+    )
+    return _rehash(payload)
 
 
 def _self_test() -> int:
     assert len(TARGET_MARKETS) == 7
     assert TARGET_MARKETS == CANONICAL_MARKETS
+    assert TARGET_MINUTES == 90
+    assert WINDOW_SECONDS == 420
     assert len(_sha256_json({"a": 1})) == 64
     print(
         json.dumps(
             {
                 "status": "SELF_TEST_OK",
                 "target_market_count": len(TARGET_MARKETS),
+                "capture_window": CAPTURE_WINDOW,
                 "pit_guard": "PASS",
                 "identity_rebind_contract": "PASS",
                 "hash": "PASS",
@@ -356,10 +417,24 @@ def main() -> int:
     if not keys:
         print(json.dumps({"status": "BLOCKED_NO_ODDS_KEY"}))
         return 2
+
     attempts: list[dict[str, Any]] = []
     for slot, key in enumerate(keys, start=1):
         try:
             payload = build_archive_payload(api_key=key)
+            if payload.get("capture_status") == "SKIP_OUTSIDE_CAPTURE_WINDOW":
+                print(
+                    json.dumps(
+                        {
+                            "status": "SKIP_OUTSIDE_CAPTURE_WINDOW",
+                            "capture_window": CAPTURE_WINDOW,
+                            "games_scheduled": payload.get("games_scheduled"),
+                            "games_eligible": 0,
+                        }
+                    )
+                )
+                return 0
+
             immutable, latest = persist_payload(payload)
             status = "CAPTURED" if int(payload["pit_quote_count"]) > 0 else "BLOCKED_NO_TARGET_QUOTES"
             print(
@@ -367,6 +442,8 @@ def main() -> int:
                     {
                         "status": status,
                         "key_slot": slot,
+                        "capture_window": payload.get("capture_window"),
+                        "games_eligible": payload.get("games_eligible"),
                         "pit_quote_count": payload["pit_quote_count"],
                         "market_counts": payload["market_counts"],
                         "payload_sha256": payload["payload_sha256"],
@@ -378,6 +455,7 @@ def main() -> int:
             return 0 if status == "CAPTURED" else 3
         except Exception as exc:
             attempts.append({"key_slot": slot, "reason": f"{type(exc).__name__}:{exc}"})
+
     print(json.dumps({"status": "ERROR", "attempts": attempts}))
     return 4
 
