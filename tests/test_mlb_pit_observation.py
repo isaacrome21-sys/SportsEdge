@@ -169,8 +169,10 @@ class MLBPITObservationTests(unittest.TestCase):
                 kwargs["book_rule_evidence_class"] = "MISSING"
             normalized = normalize_pit_observation(_row(**kwargs))
             self.assertFalse(normalized.is_scored)
+            bad = dict(kwargs)
+            bad["settled_outcome"] = "LOSS"
             with self.assertRaisesRegex(MLBPITObservationError, "must not carry a scored outcome"):
-                normalize_pit_observation(_row(**kwargs, settled_outcome="LOSS"))
+                normalize_pit_observation(_row(**bad))
 
     def test_push_void_and_ambiguity_are_excluded_not_scored_as_losses(self):
         report = analyze_pit_observations(
