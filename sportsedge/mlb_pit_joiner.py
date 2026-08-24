@@ -6,6 +6,7 @@ actual line/side; official-fact and settlement evidence remain separate inputs.
 """
 from __future__ import annotations
 
+import hashlib
 from typing import Any, Iterable, Mapping
 
 from .mlb_pit_observation import (
@@ -14,6 +15,7 @@ from .mlb_pit_observation import (
     content_sha256,
     normalize_pit_observation,
 )
+from .mlb_settlement_evidence import canonical_bytes
 
 
 class MLBPITJoinError(ValueError):
@@ -146,6 +148,11 @@ def join_prop_archive(
     quote_source_hash = str(archive_payload.get("payload_sha256") or "").lower()
     if len(quote_source_hash) != 64:
         raise MLBPITJoinError("archive payload_sha256 required")
+    archive_without_hash = {
+        key: value for key, value in archive_payload.items() if key != "payload_sha256"
+    }
+    if content_sha256(archive_without_hash) != quote_source_hash:
+        raise MLBPITJoinError("ARCHIVE_PAYLOAD_HASH_MISMATCH")
 
     games = [dict(row) for row in game_candidates if isinstance(row, Mapping)]
     game_by_id = _index_unique(games, "game_id")
@@ -193,9 +200,14 @@ def join_prop_archive(
             fact_report = fact_idx.get(str(game_id))
             if fact_report is None:
                 raise MLBPITJoinError("OFFICIAL_FACT_REPORT_NOT_FOUND_OR_AMBIGUOUS")
+            facts = fact_report.get("facts")
+            if not isinstance(facts, Mapping):
+                raise MLBPITJoinError("OFFICIAL_FACTS_PAYLOAD_MISSING")
             official_facts_hash = str(fact_report.get("facts_sha256") or "").lower()
             if len(official_facts_hash) != 64:
                 raise MLBPITJoinError("OFFICIAL_FACTS_HASH_INVALID")
+            if hashlib.sha256(canonical_bytes(dict(facts))).hexdigest() != official_facts_hash:
+                raise MLBPITJoinError("OFFICIAL_FACTS_HASH_MISMATCH")
 
             identity_payload = {
                 "provider_event_id": quote.get("provider_event_id"),
