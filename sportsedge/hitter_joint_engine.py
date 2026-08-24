@@ -1,10 +1,9 @@
 """Coherent hitter prop challenger from strictly-prior game rows.
 
-Every prior game is one joint state containing PA, hits, HR, total bases, RBI,
-runs, stolen bases, walks and extra-base hits. All individual and combination
-markets are marginals of the same rows, so overlapping propositions cannot
-contradict one another. This is the honest v1 until PA-level play-by-play state
-is available; it does not pretend game logs identify within-PA RBI/run structure.
+Every prior game is one joint state containing PA and all hitter counting outcomes.
+All individual and combination markets are marginals of the same rows, so overlapping
+propositions cannot contradict one another. This is the honest v1 until PA-level
+play-by-play state is available.
 """
 from __future__ import annotations
 
@@ -13,11 +12,12 @@ import json
 from math import isfinite
 from typing import Any, Mapping, Sequence
 
-ENGINE_VERSION = "mlb_hitter_joint_empirical_v1"
+ENGINE_VERSION = "mlb_hitter_joint_empirical_v2"
 
 HITTER_MARKETS = frozenset({
     "HITS", "HOME_RUNS", "TOTAL_BASES", "RBI", "RUNS", "STOLEN_BASES", "BATTER_BB",
-    "EXTRA_BASE_HITS", "HITS_RUNS_RBIS", "HITS_RUNS_STOLEN_BASES", "RUNS_RBIS",
+    "EXTRA_BASE_HITS", "SINGLES", "DOUBLES", "TRIPLES", "BATTER_K",
+    "HITS_RUNS_RBIS", "HITS_RUNS_STOLEN_BASES", "RUNS_RBIS",
     "HITS_STOLEN_BASES", "HITS_WALKS_STOLEN_BASES",
 })
 
@@ -46,8 +46,8 @@ def _normalize_pool(raw: Any) -> list[dict[str, int]]:
     if not isinstance(raw, Sequence) or isinstance(raw, (str, bytes)):
         raise HitterJointEngineError("history_pool must be a sequence")
     required = (
-        "plate_appearances", "hits", "home_runs", "total_bases", "rbi",
-        "runs", "stolen_bases", "walks", "extra_base_hits",
+        "plate_appearances", "hits", "singles", "doubles", "triples", "home_runs",
+        "total_bases", "rbi", "runs", "stolen_bases", "walks", "strikeouts", "extra_base_hits",
     )
     rows: list[dict[str, int]] = []
     for i, item in enumerate(raw):
@@ -62,12 +62,17 @@ def _normalize_pool(raw: Any) -> list[dict[str, int]]:
         pa = row["plate_appearances"]
         if pa < 1 or pa > 9:
             raise HitterJointEngineError(f"history_pool[{i}].plate_appearances outside [1,9]")
-        if row["hits"] > pa or row["walks"] > pa or row["hits"] + row["walks"] > pa:
+        if row["hits"] > pa or row["walks"] > pa or row["strikeouts"] > pa:
             raise HitterJointEngineError(f"history_pool[{i}] violates PA support")
-        if not (row["home_runs"] <= row["extra_base_hits"] <= row["hits"]):
-            raise HitterJointEngineError(f"history_pool[{i}] violates HR/XBH/hit nesting")
-        if not (row["hits"] <= row["total_bases"] <= 4 * row["hits"]):
-            raise HitterJointEngineError(f"history_pool[{i}] violates total-base support")
+        if row["hits"] + row["walks"] > pa:
+            raise HitterJointEngineError(f"history_pool[{i}] violates mutually exclusive hit/walk support")
+        if row["singles"] + row["doubles"] + row["triples"] + row["home_runs"] != row["hits"]:
+            raise HitterJointEngineError(f"history_pool[{i}] hit-type sum mismatch")
+        if row["doubles"] + row["triples"] + row["home_runs"] != row["extra_base_hits"]:
+            raise HitterJointEngineError(f"history_pool[{i}] XBH arithmetic mismatch")
+        expected_tb = row["singles"] + 2 * row["doubles"] + 3 * row["triples"] + 4 * row["home_runs"]
+        if expected_tb != row["total_bases"]:
+            raise HitterJointEngineError(f"history_pool[{i}] total-base arithmetic mismatch")
         if row["runs"] > pa or row["rbi"] > 4 * pa:
             raise HitterJointEngineError(f"history_pool[{i}] violates run/RBI support")
         rows.append(row)
@@ -77,14 +82,13 @@ def _normalize_pool(raw: Any) -> list[dict[str, int]]:
 
 
 def _value(row: Mapping[str, int], market: str) -> int:
-    if market == "HITS": return row["hits"]
-    if market == "HOME_RUNS": return row["home_runs"]
-    if market == "TOTAL_BASES": return row["total_bases"]
-    if market == "RBI": return row["rbi"]
-    if market == "RUNS": return row["runs"]
-    if market == "STOLEN_BASES": return row["stolen_bases"]
-    if market == "BATTER_BB": return row["walks"]
-    if market == "EXTRA_BASE_HITS": return row["extra_base_hits"]
+    keys = {
+        "HITS": "hits", "HOME_RUNS": "home_runs", "TOTAL_BASES": "total_bases",
+        "RBI": "rbi", "RUNS": "runs", "STOLEN_BASES": "stolen_bases", "BATTER_BB": "walks",
+        "EXTRA_BASE_HITS": "extra_base_hits", "SINGLES": "singles", "DOUBLES": "doubles",
+        "TRIPLES": "triples", "BATTER_K": "strikeouts",
+    }
+    if market in keys: return row[keys[market]]
     if market == "HITS_RUNS_RBIS": return row["hits"] + row["runs"] + row["rbi"]
     if market == "HITS_RUNS_STOLEN_BASES": return row["hits"] + row["runs"] + row["stolen_bases"]
     if market == "RUNS_RBIS": return row["runs"] + row["rbi"]
@@ -112,11 +116,7 @@ def price_hitter_market(model_input: Mapping[str, Any]) -> dict[str, Any]:
     p_push = sum(v == line for v in values) / n if float(line).is_integer() else 0.0
     if abs(p_over + p_under + p_push - 1.0) > 1e-12:
         raise HitterJointEngineError("probability mass does not conserve")
-    digest = _sha({
-        "engine": ENGINE_VERSION, "game_id": model_input.get("game_id"),
-        "entity_id": model_input.get("entity_id"), "feature_source_hash": model_input.get("feature_source_hash"),
-        "history_pool": pool,
-    })
+    digest = _sha({"engine": ENGINE_VERSION, "game_id": model_input.get("game_id"), "entity_id": model_input.get("entity_id"), "feature_source_hash": model_input.get("feature_source_hash"), "history_pool": pool})
     return {
         "game_id": model_input.get("game_id"), "market": market, "entity_id": model_input.get("entity_id"),
         "line": line, "side": side, "model_p": p_over if side == "OVER" else p_under,
