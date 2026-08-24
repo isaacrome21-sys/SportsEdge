@@ -13,6 +13,7 @@ from typing import Any, Callable, Mapping
 from urllib.request import urlopen
 from zoneinfo import ZoneInfo
 
+from .additional_mlb_odds_source import fetch_mlb_additional_quotes
 from .auto_joint_runner import run_auto_joint_mlb
 from .auto_runner import AutoRunReport, run_auto_mlb
 from .edge_floors import DEFAULT_EDGE_FLOOR_CONFIG
@@ -63,7 +64,15 @@ def run_auto_mlb_native_odds(*,odds_api_key:str,odds_api_keys:tuple[str,...]=(),
     def fetch_all(key:str)->dict[str,Any]:
         player=fetch_mlb_player_prop_quotes(api_key=key,schedule=schedule,participant_index=participant_index,opener=opener,bookmakers=bookmakers)
         game=fetch_mlb_game_quotes(api_key=key,schedule=schedule,opener=opener,bookmakers=bookmakers)
-        return {"quotes":tuple(player.quotes)+tuple(game.quotes),"failures":tuple({"surface":"PLAYER",**dict(x)} for x in player.failures)+tuple({"surface":"GAME",**dict(x)} for x in game.failures)}
+        additional=fetch_mlb_additional_quotes(api_key=key,schedule=schedule,participant_index=participant_index,opener=opener,bookmakers=bookmakers)
+        return {
+            "quotes":tuple(player.quotes)+tuple(game.quotes)+tuple(additional.quotes),
+            "failures":(
+                tuple({"surface":"PLAYER",**dict(x)} for x in player.failures)
+                +tuple({"surface":"GAME",**dict(x)} for x in game.failures)
+                +tuple({"surface":"ADDITIONAL",**dict(x)} for x in additional.failures)
+            ),
+        }
 
     keyring=fetch_with_key_failover((odds_api_key,*odds_api_keys),fetch_all);odds=keyring.value;quote_payload=list(odds["quotes"])
     key_failures=[{"stage":"ODDS_API_KEY_FAILOVER","key_slot":item.key_slot,"reason":item.reason} for item in keyring.failures]
