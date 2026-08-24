@@ -47,7 +47,7 @@ def _feature_index(rows: list[Mapping[str, Any]]) -> dict[tuple[str,str,str], Ma
         game_id=str(row.get("game_pk",row.get("game_id",""))); entity_id=str(row.get("entity_id",row.get("player_id","")))
         if not game_id or not entity_id: continue
         key=(game_id,entity_id,market)
-        if key in out and dict(out[key])!=dict(row): raise ValueError(f"conflicting feature identity {key}")
+        if key in out and dict(out[key])!=dict(row): raise ValueError(f"conflicting generic feature identity {key}")
         out[key]=row
     return out
 
@@ -80,7 +80,11 @@ def _model_input(*,game:LiveGame,quote:Mapping[str,Any],feature:Mapping[str,Any]
     if str(feature.get("entity_id",feature.get("player_id")))!=entity_id: raise ValueError("feature entity identity mismatch")
     if str(feature.get("market"))!=market: raise ValueError("feature market mismatch")
     out={"game_id":str(game.game_pk),"market":market,"entity_id":entity_id,"line":quote.get("line"),"side":quote.get("side")}
-    if market in HITTER_MARKETS|PITCHER_MARKETS:
+    if market=="HOME_RUNS":
+        # HOME_RUNS remains on the measured generic scalar baseline until its
+        # joint candidate earns independent behavioral evidence.
+        out["expected_count"]=feature.get("expected_count")
+    elif market in HITTER_MARKETS|PITCHER_MARKETS:
         payload=feature.get("features")
         if not isinstance(payload,Mapping):
             ignored={"game_pk","game_id","market","entity_id","player_id","team_id","retrieved_at","asof","generic_feature_version","joint_feature_version","feature_version","feature_source_hash","source_subset_hash","source"}
