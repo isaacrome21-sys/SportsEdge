@@ -57,19 +57,34 @@ def _parse_pit_ts(value: Any, name: str) -> datetime:
     return dt.astimezone(timezone.utc)
 
 
+def _parse_provider_event_ts(value: Any) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
 def _event_snapshot_first_pitch(event: Mapping[str, Any]) -> datetime:
     for key in _EVENT_TIME_KEYS:
-        value = event.get(key)
-        if str(value or "").strip():
-            return _parse_pit_ts(value, f"provider_event_snapshot.{key}")
+        dt = _parse_provider_event_ts(event.get(key))
+        if dt is not None:
+            return dt
     for container_key in _EVENT_TIME_CONTAINERS:
         nested = event.get(container_key)
         if not isinstance(nested, Mapping):
             continue
         for key in _EVENT_TIME_KEYS:
-            value = nested.get(key)
-            if str(value or "").strip():
-                return _parse_pit_ts(value, f"provider_event_snapshot.{container_key}.{key}")
+            dt = _parse_provider_event_ts(nested.get(key))
+            if dt is not None:
+                return dt
     raise MLBPITJoinError("PROVIDER_EVENT_FIRST_PITCH_MISSING")
 
 
