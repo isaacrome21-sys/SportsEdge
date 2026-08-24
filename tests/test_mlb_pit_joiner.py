@@ -57,6 +57,12 @@ def _archive(*, source_class=SYNTHETIC, quote=None):
     return payload
 
 
+def _rehash_archive(payload):
+    payload.pop("payload_sha256", None)
+    payload["payload_sha256"] = content_sha256(payload)
+    return payload
+
+
 def _game():
     return {
         "game_id": "999",
@@ -312,6 +318,49 @@ class MLBPITJoinerTests(unittest.TestCase):
         self.assertEqual(row["entity_id"], "701|702")
         self.assertEqual(row["settlement_state"], "AMBIGUOUS_SETTLEMENT")
         self.assertIsNone(row["settled_outcome"])
+
+    def test_provider_event_id_must_match_hashed_event_snapshot(self):
+        archive = _archive()
+        archive["quotes"][0]["provider_event_id"] = "456"
+        _rehash_archive(archive)
+
+        joined = self._join(archive_payload=archive)
+
+        self.assertEqual(joined["joined_observation_count"], 0)
+        self.assertEqual(joined["failure_count"], 1)
+        self.assertIn("PROVIDER_EVENT_ID_SNAPSHOT_MISMATCH", joined["failures"][0]["reason"])
+        self.assertNotIn("MODEL_ROW_NOT_FOUND_OR_AMBIGUOUS", joined["failures"][0]["reason"])
+
+    def test_archived_first_pitch_must_match_hashed_event_snapshot(self):
+        archive = _archive()
+        archive["quotes"][0]["first_pitch_at"] = "2026-08-24T01:00:00+00:00"
+        _rehash_archive(archive)
+
+        joined = self._join(archive_payload=archive)
+
+        self.assertEqual(joined["joined_observation_count"], 0)
+        self.assertEqual(joined["failure_count"], 1)
+        self.assertIn("ARCHIVED_FIRST_PITCH_EVENT_MISMATCH", joined["failures"][0]["reason"])
+        self.assertNotIn("MODEL_ROW_NOT_FOUND_OR_AMBIGUOUS", joined["failures"][0]["reason"])
+
+    def test_rehashed_post_first_pitch_count_quote_cannot_hide_behind_shifted_archive_time(self):
+        archive = _archive()
+        quote = archive["quotes"][0]
+        quote["retrieved_at"] = "2026-08-24T00:20:00+00:00"
+        quote["quote_retrieved_at"] = "2026-08-24T00:20:00+00:00"
+        quote["first_pitch_at"] = "2026-08-24T01:00:00+00:00"
+        _rehash_archive(archive)
+
+        joined = self._join(
+            archive_payload=archive,
+            model_rows=[_model(history_asof="2026-08-24T00:00:00+00:00")],
+            settlement_rows=[],
+        )
+
+        self.assertEqual(joined["joined_observation_count"], 0)
+        self.assertEqual(joined["failure_count"], 1)
+        self.assertIn("QUOTE_NOT_PREGAME_CANONICAL", joined["failures"][0]["reason"])
+        self.assertNotIn("MODEL_ROW_NOT_FOUND_OR_AMBIGUOUS", joined["failures"][0]["reason"])
 
 
 if __name__ == "__main__":
