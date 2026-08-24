@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run SportsEdge MLB card with paid-key rotation and ESPN game-market fallback."""
+"""Run the canonical SportsEdge MLB machine with key rotation and ESPN fallback."""
 from __future__ import annotations
 
 import argparse
@@ -10,11 +10,11 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from sportsedge.auto_espn_odds import run_auto_mlb_espn_game_odds
-from sportsedge.auto_native_odds import run_auto_mlb_native_odds
 from sportsedge.auto_runner import AutoRunnerError, report_to_dict, run_auto_mlb
 from sportsedge.edge_floors import DEFAULT_EDGE_FLOOR_CONFIG
 from sportsedge.funnel import build_funnel
 from sportsedge.live_odds_failover import should_rotate_odds_key
+from sportsedge.mlb_run_machine import MLBMachineReport, machine_report_to_dict, run_it_mlb
 
 CHICAGO_TZ = ZoneInfo("America/Chicago")
 
@@ -31,6 +31,12 @@ def _keys_from_env() -> tuple[str, ...]:
         if value and value not in values:
             values.append(value)
     return tuple(values)
+
+
+def _serialize_report(report):
+    if isinstance(report, MLBMachineReport):
+        return machine_report_to_dict(report)
+    return report_to_dict(report)
 
 
 def main() -> int:
@@ -65,17 +71,18 @@ def main() -> int:
             kelly_multiplier=args.kelly_multiplier,
         )
         if quotes:
+            # Explicit external quote+feature snapshots remain a legacy compatibility
+            # lane. They are never selected by native automatic RUN IT acquisition.
             if not features:
                 raise AutoRunnerError("FEATURE_PROVIDER_CONFIG_MISSING")
             report = run_auto_mlb(quote_url=quotes, feature_url=features, **common)
         else:
-            attempts = []
             report = None
             for slot, key in enumerate(odds_api_keys, start=1):
-                candidate = run_auto_mlb_native_odds(
+                candidate = run_it_mlb(
+                    mode="AUTOMATIC",
                     odds_api_key=key,
                     odds_api_keys=(),
-                    feature_url=features or None,
                     bookmakers=odds_books,
                     history_cache_dir=history_cache_dir,
                     **common,
@@ -85,15 +92,13 @@ def main() -> int:
                     results=candidate.results,
                     source_failures=candidate.source_failures,
                 )
-                attempts.append({"key_slot": slot, "rotated": bool(rotate)})
                 if not rotate:
                     report = candidate
                     break
 
-            # The Odds API may be exhausted or entirely unconfigured. Preserve
-            # full-game ML/RL/totals via ESPN's no-key scoreboard odds instead
-            # of turning the whole card into BLOCKED_NO_ODDS. Player props stay
-            # fail-closed and are explicitly reported as unavailable on this lane.
+            # If every paid key is unusable or no key is configured, preserve only
+            # the full-game ML/RL/totals lane via ESPN. Player/additional markets
+            # remain explicitly unavailable rather than being synthesized.
             if report is None:
                 report = run_auto_mlb_espn_game_odds(
                     feature_url=features or None,
@@ -101,7 +106,7 @@ def main() -> int:
                     **common,
                 )
 
-        payload = report_to_dict(report)
+        payload = _serialize_report(report)
         game_ids = {
             str(item.game_id) for item in report.results
             if str(item.game_id).isdigit() and int(str(item.game_id)) > 0

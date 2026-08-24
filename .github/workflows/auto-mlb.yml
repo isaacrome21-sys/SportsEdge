@@ -43,8 +43,23 @@ jobs:
           key: sportsedge-mlb-history-v1-${{ runner.os }}-${{ steps.slate.outputs.date }}
           restore-keys: |
             sportsedge-mlb-history-v1-${{ runner.os }}-
-      - name: Verify automation safety tests
-        run: python -m unittest tests.test_auto_runner tests.test_odds_api_source tests.test_auto_native_odds tests.test_mlb_hits_features tests.test_mlb_total_bases_features tests.test_mlb_history_cache tests.test_odds_keyring tests.test_live_odds_failover tests.test_game_odds_source_unittest -v
+      - name: Verify canonical MLB machine safety tests
+        run: >-
+          python -m unittest
+          tests.test_auto_runner
+          tests.test_odds_api_source
+          tests.test_auto_native_odds
+          tests.test_mlb_hits_features
+          tests.test_mlb_total_bases_features
+          tests.test_mlb_history_cache
+          tests.test_odds_keyring
+          tests.test_live_odds_failover
+          tests.test_game_odds_source_unittest
+          tests.test_additional_mlb_odds_source
+          tests.test_mlb_quote_source_coverage
+          tests.test_mlb_run_machine
+          tests.test_run_auto_mlb_resilient_machine
+          -v
       - name: Diagnose Odds API credentials safely
         if: always()
         env:
@@ -62,7 +77,7 @@ jobs:
           SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
           SPORTSEDGE_ODDS_BOOKMAKERS: draftkings
         run: python scripts/probe_game_odds.py
-      - name: Run automated MLB card
+      - name: Run canonical automated MLB machine
         env:
           SPORTSEDGE_QUOTES_URL: ${{ secrets.SPORTSEDGE_QUOTES_URL }}
           SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
