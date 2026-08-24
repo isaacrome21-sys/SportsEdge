@@ -6,6 +6,124 @@
     "synthetic_structural_tests_count_as_historical_evidence": false,
     "ci_waiver_counts_as_validation_evidence": false
   },
-  "dimensions": ["runtime_contract","structural_behavior","settlement_semantics","historical_point_in_time","untouched_holdout","calibration","forward_evidence","production_parity"],
-  "families": {}
+  "dimensions": [
+    "runtime_contract",
+    "structural_behavior",
+    "settlement_semantics",
+    "historical_point_in_time",
+    "untouched_holdout",
+    "calibration",
+    "forward_evidence",
+    "production_parity"
+  ],
+  "families": {
+    "GAME_SCORE_FULL": {
+      "markets": ["MONEYLINE", "RUN_LINE", "TOTALS"],
+      "structural_checks": [
+        "COHERENT_FINAL_SCORE_DISTRIBUTION",
+        "QUOTE_SIDE_EXCLUDED_FROM_MODEL_IDENTITY",
+        "MONOTONIC_LINE_PRICING",
+        "PUSH_PROBABILITY_FIRST_CLASS_WHERE_APPLICABLE",
+        "EXTRAS_STATE_COHERENT"
+      ],
+      "settlement_checks": ["FULL_GAME_FINAL_SCORE_SETTLEMENT"]
+    },
+    "FIRST_INNING": {
+      "markets": ["NRFI", "YRFI"],
+      "structural_checks": [
+        "COMPLEMENTARY_BINARY_PROBABILITIES",
+        "FIRST_INNING_ONLY_STATE",
+        "QUOTE_SIDE_EXCLUDED_FROM_MODEL_IDENTITY"
+      ],
+      "settlement_checks": ["FIRST_INNING_COMPLETION_AND_VOID_RULES"]
+    },
+    "FIRST_FIVE": {
+      "markets": ["F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS"],
+      "structural_checks": [
+        "REAL_INNING_STATE_SUBSTRATE",
+        "TOP_BOTTOM_FIFTH_COMPLETION",
+        "F5_TIE_PROBABILITY_FIRST_CLASS",
+        "NO_FULL_GAME_SCALING_SHORTCUT",
+        "MONOTONIC_LINE_PRICING"
+      ],
+      "settlement_checks": ["FIRST_FIVE_COMPLETION_AND_TIE_RULES"]
+    },
+    "HITTER_JOINT": {
+      "markets": [
+        "HITS", "TOTAL_BASES", "RBI", "RUNS", "STOLEN_BASES", "BATTER_BB",
+        "EXTRA_BASE_HITS", "HITS_RUNS_RBIS", "HITS_RUNS_STOLEN_BASES",
+        "RUNS_RBIS", "HITS_STOLEN_BASES", "HITS_WALKS_STOLEN_BASES",
+        "SINGLES", "DOUBLES", "TRIPLES", "BATTER_K"
+      ],
+      "structural_checks": [
+        "SAME_PRIOR_GAME_ROW_STATE_ACROSS_COMPONENTS",
+        "HIT_TYPE_ARITHMETIC_CONSERVED",
+        "TOTAL_BASE_ARITHMETIC_CONSERVED",
+        "HR_SUBSET_XBH_SUBSET_HITS",
+        "MULTI_RBI_SUPPORT",
+        "COUNT_SUPPORT_NONNEGATIVE_INTEGER",
+        "QUOTE_LINE_SIDE_EXCLUDED_FROM_LATENT_STATE_IDENTITY",
+        "MONOTONIC_LINE_PRICING",
+        "STRICTLY_PRIOR_HISTORY"
+      ],
+      "settlement_checks": ["PLAYER_PROP_PARTICIPATION_VOID_PUSH_RULES"]
+    },
+    "HOME_RUN_GENERIC_INCUMBENT": {
+      "markets": ["HOME_RUNS"],
+      "structural_checks": [
+        "MEASURED_GENERIC_BASELINE_REMAINS_CANONICAL",
+        "NONNEGATIVE_COUNT_DISTRIBUTION",
+        "QUOTE_LINE_SIDE_EXCLUDED_FROM_MODEL_IDENTITY",
+        "MONOTONIC_LINE_PRICING"
+      ],
+      "settlement_checks": ["PLAYER_PROP_PARTICIPATION_VOID_PUSH_RULES"]
+    },
+    "PITCHER_JOINT": {
+      "markets": [
+        "PITCHER_K", "PITCHER_OUTS", "PITCHER_ER", "PITCHER_HITS_ALLOWED",
+        "PITCHER_BB", "PITCHER_HITS_WALKS_ER"
+      ],
+      "structural_checks": [
+        "SAME_PRIOR_START_ROW_STATE_ACROSS_COMPONENTS",
+        "OUTS_SUPPORT_0_TO_27",
+        "COMBO_ARITHMETIC_CONSERVED",
+        "COUNT_SUPPORT_NONNEGATIVE_INTEGER",
+        "QUOTE_LINE_SIDE_EXCLUDED_FROM_LATENT_STATE_IDENTITY",
+        "MONOTONIC_LINE_PRICING",
+        "STRICTLY_PRIOR_HISTORY"
+      ],
+      "settlement_checks": ["PITCHER_START_PROP_PARTICIPATION_INJURY_RAIN_VOID_PUSH_RULES"]
+    },
+    "EITHER_PITCHER_JOINT": {
+      "markets": ["EITHER_PITCHER_HITS_ALLOWED", "EITHER_PITCHER_BB", "EITHER_PITCHER_ER"],
+      "structural_checks": [
+        "TWO_PITCHER_EXHAUSTIVE_CROSS_PRODUCT",
+        "NO_RANDOM_SAMPLING_APPROXIMATION",
+        "COUNT_SUPPORT_NONNEGATIVE_INTEGER",
+        "QUOTE_LINE_SIDE_EXCLUDED_FROM_LATENT_STATE_IDENTITY",
+        "MONOTONIC_LINE_PRICING",
+        "STRICTLY_PRIOR_HISTORY_BOTH_PITCHERS"
+      ],
+      "settlement_checks": ["EITHER_PITCHER_BOOK_SPECIFIC_SETTLEMENT_AND_VOID_RULES"]
+    },
+    "FIRST_HOME_RUN_ORDERED": {
+      "markets": ["FIRST_HOME_RUN"],
+      "structural_checks": [
+        "ORDERING_AWARE_PLATE_APPEARANCE_SIMULATION",
+        "AWAY_TEAM_BATS_FIRST",
+        "BATTER_ORDER_NOT_EXCHANGEABLE",
+        "NO_HOME_RUN_OUTCOME_INCLUDED"
+      ],
+      "settlement_checks": ["FIRST_HOME_RUN_BOOK_SPECIFIC_NO_HR_VOID_RULES"]
+    },
+    "PITCHER_RECORD_WIN_UPSTREAM": {
+      "markets": ["PITCHER_RECORD_WIN"],
+      "structural_checks": [
+        "WIN_CREDIT_RULES_MODELED",
+        "STARTER_EXIT_AND_BULLPEN_STATE_MODELED",
+        "NO_ROLLING_WIN_RATE_PROXY"
+      ],
+      "settlement_checks": ["PITCHER_WIN_CREDIT_OFFICIAL_SCORER_RULES"]
+    }
+  }
 }
