@@ -1,7 +1,7 @@
 """Fail-closed quote -> identity -> outcome -> challenger evidence join for MLB props.
 
-Evidence plumbing only. Official box-score facts and sportsbook settlement are kept
-separate. Synthetic fixtures are permanently labeled synthetic and can never be
+Evidence plumbing only. Official facts, sportsbook settlement, prior-history state,
+and model outputs remain separately identified. Synthetic fixtures can never be
 reported as historical PIT evidence.
 """
 from __future__ import annotations
@@ -39,6 +39,10 @@ class JoinedEvidenceRow:
     facts_sha256: str
     history_asof_ts: str
     history_source_hash: str
+    history_sample_size: int
+    model_input_sha256: str
+    incumbent_model_version: str
+    challenger_model_version: str
     incumbent_p: float
     challenger_p: float
     evidence_origin: str
@@ -113,6 +117,13 @@ def _nonnegative_int(raw: Mapping[str, Any], key: str) -> int:
     return out
 
 
+def _positive_int(raw: Mapping[str, Any], key: str) -> int:
+    out = _nonnegative_int(raw, key)
+    if out < 1:
+        raise PropOutcomeJoinError(f"{key} must be >= 1")
+    return out
+
+
 def bind_archived_quote(
     archived_quote: Mapping[str, Any],
     identity_binding: Mapping[str, Any],
@@ -122,8 +133,8 @@ def bind_archived_quote(
 ) -> dict[str, Any]:
     """Bind provider event/name identity to canonical MLB game/player IDs.
 
-    No fuzzy name matching is performed here. The caller must provide a separately
-    verified binding artifact and its SHA-256 identity.
+    No fuzzy name matching is performed. A separately verified identity artifact is
+    required and hash-bound into the eventual evidence row.
     """
     market = _text(archived_quote, "market").upper()
     if market not in SUPPORTED_MARKETS:
@@ -223,6 +234,10 @@ def join_evidence_row(
         facts_sha256=_sha(fact, "facts_sha256"),
         history_asof_ts=history_dt.isoformat(),
         history_source_hash=_sha(model_eval, "history_source_hash"),
+        history_sample_size=_positive_int(model_eval, "history_sample_size"),
+        model_input_sha256=_sha(model_eval, "model_input_sha256"),
+        incumbent_model_version=_text(model_eval, "incumbent_model_version"),
+        challenger_model_version=_text(model_eval, "challenger_model_version"),
         incumbent_p=_prob(model_eval, "incumbent_p"),
         challenger_p=_prob(model_eval, "challenger_p"),
         evidence_origin=origin,
@@ -261,7 +276,7 @@ def build_join_report(raw_rows: Iterable[Mapping[str, Mapping[str, Any]]]) -> di
         state, evidence_class = "SYNTHETIC_CONTRACT_PASS", "SYNTHETIC_CONTRACT_TEST"
 
     return {
-        "schema_version": 3,
+        "schema_version": 4,
         "state": state,
         "evidence_class": evidence_class,
         "source_row_count": len(joined) + len(excluded) + len(ambiguous),
