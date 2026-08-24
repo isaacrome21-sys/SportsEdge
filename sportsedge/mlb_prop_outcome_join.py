@@ -1,15 +1,8 @@
-"""Fail-closed quote -> outcome -> challenger evidence join for MLB props.
+"""Fail-closed quote -> identity -> outcome -> challenger evidence join for MLB props.
 
-This module is deliberately evidence plumbing, not a pricing model. It joins a
-point-in-time quote, an official realized fact, an explicit sportsbook settlement
-resolution, and incumbent/challenger probabilities from the same prior-history
-observation.
-
-Important distinctions:
-- Official box-score fact != sportsbook settlement.
-- VOID and AMBIGUOUS rows never become scored validation evidence.
-- Synthetic fixtures are permanently labeled SYNTHETIC_CONTRACT_TEST and cannot be
-  reported as HISTORICAL_PIT.
+Evidence plumbing only. Official box-score facts and sportsbook settlement are kept
+separate. Synthetic fixtures are permanently labeled synthetic and can never be
+reported as historical PIT evidence.
 """
 from __future__ import annotations
 
@@ -17,7 +10,6 @@ from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from math import isfinite
 from typing import Any, Iterable, Mapping
-
 
 SUPPORTED_MARKETS = frozenset({"PITCHER_OUTS", "PITCHER_ER", "RBI"})
 ORIGINS = frozenset({"SYNTHETIC_FIXTURE", "REAL_ARCHIVE"})
@@ -41,6 +33,7 @@ class JoinedEvidenceRow:
     settlement_state: str
     settlement_reason: str
     quote_archive_sha256: str
+    identity_binding_sha256: str
     facts_sha256: str
     history_asof_ts: str
     history_source_hash: str
@@ -54,9 +47,9 @@ class JoinedEvidenceRow:
 
     @property
     def realized_win(self) -> bool:
-        if self.side == "OVER":
-            return self.realized_count > self.line
-        return self.realized_count < self.line
+        if self.realized_push:
+            return False
+        return self.realized_count > self.line if self.side == "OVER" else self.realized_count < self.line
 
 
 def _text(raw: Mapping[str, Any], key: str) -> str:
@@ -118,6 +111,44 @@ def _nonnegative_int(raw: Mapping[str, Any], key: str) -> int:
     return out
 
 
+def bind_archived_quote(
+    archived_quote: Mapping[str, Any],
+    identity_binding: Mapping[str, Any],
+    *,
+    quote_archive_sha256: str,
+    evidence_origin: str,
+) -> dict[str, Any]:
+    """Bind provider event/name identity to canonical MLB game/player IDs.
+
+    No fuzzy name matching is performed here. The caller must provide a separately
+    verified binding artifact and its SHA-256 identity.
+    """
+    market = _text(archived_quote, "market").upper()
+    if market not in SUPPORTED_MARKETS:
+        raise PropOutcomeJoinError(f"unsupported market {market!r}")
+    provider_event_id = _text(archived_quote, "provider_event_id")
+    entity_name_normalized = _text(archived_quote, "entity_name_normalized")
+    if _text(identity_binding, "provider_event_id") != provider_event_id:
+        raise PropOutcomeJoinError("provider event identity mismatch")
+    if _text(identity_binding, "entity_name_normalized") != entity_name_normalized:
+        raise PropOutcomeJoinError("provider player identity mismatch")
+    origin = str(evidence_origin).strip().upper()
+    if origin not in ORIGINS:
+        raise PropOutcomeJoinError("evidence_origin must be SYNTHETIC_FIXTURE or REAL_ARCHIVE")
+    return {
+        "market": market,
+        "game_id": _text(identity_binding, "game_id"),
+        "entity_id": _text(identity_binding, "entity_id"),
+        "line": archived_quote.get("line"),
+        "side": _text(archived_quote, "side").upper(),
+        "quote_ts": _text(archived_quote, "quote_retrieved_at"),
+        "first_pitch_ts": _text(archived_quote, "first_pitch_at"),
+        "quote_archive_sha256": str(quote_archive_sha256).strip().lower(),
+        "identity_binding_sha256": _sha(identity_binding, "identity_binding_sha256"),
+        "evidence_origin": origin,
+    }
+
+
 def _identity(raw: Mapping[str, Any]) -> tuple[str, str, str]:
     market = _text(raw, "market").upper()
     if market not in SUPPORTED_MARKETS:
@@ -138,13 +169,7 @@ def join_evidence_row(
     settlement: Mapping[str, Any],
     model_eval: Mapping[str, Any],
 ) -> JoinedEvidenceRow:
-    """Join one evidence row or fail closed.
-
-    The caller must resolve sportsbook settlement separately from official facts.
-    AMBIGUOUS and VOID are never converted into wins/losses from the box score.
-    """
     market, game_id, entity_id = _assert_same_identity(quote, fact, settlement, model_eval)
-
     settlement_state = _text(settlement, "settlement_state").upper()
     if settlement_state not in SETTLEMENT_STATES:
         raise PropOutcomeJoinError("settlement_state must be SETTLED, VOID, or AMBIGUOUS")
@@ -157,7 +182,6 @@ def join_evidence_row(
     origin = _text(quote, "evidence_origin").upper()
     if origin not in ORIGINS:
         raise PropOutcomeJoinError("evidence_origin must be SYNTHETIC_FIXTURE or REAL_ARCHIVE")
-
     quote_dt = _ts(quote, "quote_ts")
     first_pitch_dt = _ts(quote, "first_pitch_ts")
     history_dt = _ts(model_eval, "history_asof_ts")
@@ -165,15 +189,12 @@ def join_evidence_row(
         raise PropOutcomeJoinError("quote_ts must be before first_pitch_ts")
     if history_dt >= first_pitch_dt:
         raise PropOutcomeJoinError("history_asof_ts must be before first_pitch_ts")
-
     side = _text(quote, "side").upper()
     if side not in {"OVER", "UNDER"}:
         raise PropOutcomeJoinError("side must be OVER or UNDER")
     line = _finite(quote, "line")
     if line < 0:
         raise PropOutcomeJoinError("line must be >= 0")
-
-    # The official result adapter must explicitly say the game/player fact is final.
     if _text(fact, "fact_state").upper() != "FINAL_OFFICIAL":
         raise PropOutcomeJoinError("fact_state must be FINAL_OFFICIAL")
 
@@ -189,6 +210,7 @@ def join_evidence_row(
         settlement_state=settlement_state,
         settlement_reason=reason,
         quote_archive_sha256=_sha(quote, "quote_archive_sha256"),
+        identity_binding_sha256=_sha(quote, "identity_binding_sha256"),
         facts_sha256=_sha(fact, "facts_sha256"),
         history_asof_ts=history_dt.isoformat(),
         history_source_hash=_sha(model_eval, "history_source_hash"),
@@ -199,16 +221,9 @@ def join_evidence_row(
 
 
 def build_join_report(raw_rows: Iterable[Mapping[str, Mapping[str, Any]]]) -> dict[str, Any]:
-    """Build a deterministic join report from explicit component rows.
-
-    Any ambiguous settlement blocks the batch classification. Known VOID rows are
-    recorded as excluded. Synthetic rows can prove the contract but can never earn
-    HISTORICAL_PIT classification.
-    """
     joined: list[JoinedEvidenceRow] = []
     excluded: list[dict[str, Any]] = []
     ambiguous: list[dict[str, Any]] = []
-
     for index, bundle in enumerate(raw_rows):
         quote = bundle.get("quote") or {}
         fact = bundle.get("fact") or {}
@@ -228,24 +243,21 @@ def build_join_report(raw_rows: Iterable[Mapping[str, Mapping[str, Any]]]) -> di
 
     origins = {row.evidence_origin for row in joined}
     if ambiguous:
-        state = "BLOCKED_AMBIGUOUS_SETTLEMENT"
-        evidence_class = "UNAVAILABLE"
+        state, evidence_class = "BLOCKED_AMBIGUOUS_SETTLEMENT", "UNAVAILABLE"
     elif not joined:
-        state = "BLOCKED_NO_SCORABLE_ROWS"
-        evidence_class = "UNAVAILABLE"
+        state, evidence_class = "BLOCKED_NO_SCORABLE_ROWS", "UNAVAILABLE"
     elif origins == {"REAL_ARCHIVE"}:
-        state = "JOIN_READY_FOR_PIT_VALIDATION"
-        evidence_class = "HISTORICAL_PIT_CANDIDATE"
+        state, evidence_class = "JOIN_READY_FOR_PIT_VALIDATION", "HISTORICAL_PIT_CANDIDATE"
     else:
-        state = "SYNTHETIC_CONTRACT_PASS"
-        evidence_class = "SYNTHETIC_CONTRACT_TEST"
+        state, evidence_class = "SYNTHETIC_CONTRACT_PASS", "SYNTHETIC_CONTRACT_TEST"
 
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "state": state,
         "evidence_class": evidence_class,
         "source_row_count": len(joined) + len(excluded) + len(ambiguous),
         "joined_row_count": len(joined),
+        "push_row_count": sum(row.realized_push for row in joined),
         "void_excluded_count": len(excluded),
         "ambiguous_count": len(ambiguous),
         "rows": [asdict(row) for row in joined],
