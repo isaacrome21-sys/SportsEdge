@@ -48,7 +48,7 @@ def canonical_snapshot():
     }
 
 
-def quote(*, market, entity_id, side, line=0.0):
+def quote(*, market, entity_id, side, line=0.0, provider_participant_name=None):
     ev = event()
     snap = canonical_snapshot()
     ev_hash = content_sha256(ev)
@@ -61,7 +61,7 @@ def quote(*, market, entity_id, side, line=0.0):
         "canonical_game_snapshot_sha256": snap_hash,
         "resolver_contract": "EXACT_NORMALIZED_TEAM_TIME_AND_PARTICIPANT_IDENTITY",
     }
-    return {
+    row = {
         "game_id": "999",
         "period": "F5" if market.startswith("F5_") else ("1ST" if market in {"NRFI", "YRFI"} else "FG"),
         "market": market,
@@ -85,6 +85,9 @@ def quote(*, market, entity_id, side, line=0.0):
         "canonical_game_snapshot_sha256": snap_hash,
         "identity_binding_sha256": content_sha256(binding),
     }
+    if provider_participant_name is not None:
+        row["provider_participant_name"] = provider_participant_name
+    return row
 
 
 def archive(q, *, source_class=SYNTHETIC):
@@ -174,19 +177,23 @@ def settlement(*, market, entity_id, side, line=0.0, evidence_class=SYNTHETIC):
     }
 
 
+def players():
+    return {
+        "999": [
+            {"player_id": "301", "player_name": "Batter A"},
+            {"player_id": "701", "player_name": "Away Pitcher"},
+            {"player_id": "702", "player_name": "Home Pitcher"},
+        ]
+    }
+
+
 class AdditionalPITJoinerTests(unittest.TestCase):
     def run_case(self, *, market, entity_id, side, line=0.0, source_class=SYNTHETIC, model_class=SYNTHETIC, fact_class=SYNTHETIC, rule_class=SYNTHETIC):
         q = quote(market=market, entity_id=entity_id, side=side, line=line)
         return join_additional_archive(
             archive_payload=archive(q, source_class=source_class),
             game_candidates=[game()],
-            player_candidates_by_game={
-                "999": [
-                    {"player_id": "301", "player_name": "Batter A"},
-                    {"player_id": "701", "player_name": "Away Pitcher"},
-                    {"player_id": "702", "player_name": "Home Pitcher"},
-                ]
-            },
+            player_candidates_by_game=players(),
             model_rows=[model(market=market, entity_id=entity_id, side=side, line=line, evidence_class=model_class)],
             official_fact_reports=[facts(evidence_class=fact_class)],
             settlement_rows=[settlement(market=market, entity_id=entity_id, side=side, line=line, evidence_class=rule_class)],
@@ -195,10 +202,8 @@ class AdditionalPITJoinerTests(unittest.TestCase):
     def test_f5_moneyline_and_run_line_and_total_derive_outcomes(self):
         ml = self.run_case(market="F5_MONEYLINE", entity_id="20", side="HOME")
         self.assertEqual(ml["observations"][0]["settled_outcome"], "WIN")
-
         rl = self.run_case(market="F5_RUN_LINE", entity_id="20", side="HOME", line=-1.5)
         self.assertEqual(rl["observations"][0]["settled_outcome"], "WIN")
-
         total = self.run_case(market="F5_TOTALS", entity_id="999", side="UNDER", line=4.0)
         self.assertEqual(total["observations"][0]["settled_outcome"], "PUSH")
 
@@ -208,7 +213,7 @@ class AdditionalPITJoinerTests(unittest.TestCase):
         self.assertEqual(nrfi["observations"][0]["settled_outcome"], "WIN")
         self.assertEqual(yrfi["observations"][0]["settled_outcome"], "LOSS")
 
-    def test_first_home_run_and_pitcher_record_win_use_canonical_player_id(self):
+    def test_first_home_run_and_pitcher_record_win_direct_join_use_canonical_player_id(self):
         first_hr = self.run_case(market="FIRST_HOME_RUN", entity_id="301", side="YES")
         pitcher = self.run_case(market="PITCHER_RECORD_WIN", entity_id="701", side="NO")
         self.assertEqual(first_hr["observations"][0]["settled_outcome"], "WIN")
@@ -230,7 +235,7 @@ class AdditionalPITJoinerTests(unittest.TestCase):
         self.assertEqual(joined["joined_observation_count"], 0)
         self.assertIn("PROVIDER_EVENT_HASH_MISMATCH", joined["failures"][0]["reason"])
 
-    def test_full_live_chain_can_be_durable_for_additional_market(self):
+    def test_full_live_chain_can_be_durable_for_non_player_additional_market(self):
         joined = self.run_case(
             market="NRFI",
             entity_id="999",
@@ -256,6 +261,40 @@ class AdditionalPITJoinerTests(unittest.TestCase):
         )
         self.assertEqual(joined["archive_type"], "MLB_ADDITIONAL_PIT_QUOTES")
         self.assertEqual(joined["joined_observation_count"], 1)
+
+    def test_router_blocks_binary_durability_when_raw_provider_participant_was_not_archived(self):
+        q = quote(market="FIRST_HOME_RUN", entity_id="301", side="YES")
+        joined = join_mlb_pit_archive(
+            archive_payload=archive(q, source_class="LIVE_PROVIDER_QUOTE_ARCHIVE"),
+            game_candidates=[game()],
+            player_candidates_by_game=players(),
+            model_rows=[model(market="FIRST_HOME_RUN", entity_id="301", side="YES", evidence_class="LIVE_PIT_MODEL")],
+            official_fact_reports=[facts(evidence_class="LIVE_OFFICIAL_FACT_PROBE")],
+            settlement_rows=[settlement(market="FIRST_HOME_RUN", entity_id="301", side="YES", evidence_class="LIVE_BOOK_RULE_CAPTURE")],
+        )
+        row = joined["observations"][0]
+        self.assertEqual(row["settlement_state"], "AMBIGUOUS_SETTLEMENT")
+        self.assertIsNone(row["settled_outcome"])
+        report = analyze_pit_observations(joined["observations"])
+        self.assertFalse(report["counts_as_historical_pit"])
+
+    def test_router_accepts_future_binary_capture_with_exact_raw_provider_participant(self):
+        q = quote(
+            market="FIRST_HOME_RUN",
+            entity_id="301",
+            side="YES",
+            provider_participant_name="Batter A",
+        )
+        joined = join_mlb_pit_archive(
+            archive_payload=archive(q),
+            game_candidates=[game()],
+            player_candidates_by_game=players(),
+            model_rows=[model(market="FIRST_HOME_RUN", entity_id="301", side="YES")],
+            official_fact_reports=[facts()],
+            settlement_rows=[settlement(market="FIRST_HOME_RUN", entity_id="301", side="YES")],
+        )
+        self.assertEqual(joined["observations"][0]["settlement_state"], "SETTLEMENT_ELIGIBLE")
+        self.assertEqual(joined["observations"][0]["settled_outcome"], "WIN")
 
 
 if __name__ == "__main__":
