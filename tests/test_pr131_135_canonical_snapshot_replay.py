@@ -93,10 +93,10 @@ def _archive_with_snapshot(snapshot):
     return payload
 
 
-def _join(payload):
+def _join(payload, *, game=None):
     return join_additional_archive(
         archive_payload=payload,
-        game_candidates=[_game()],
+        game_candidates=[game or _game()],
         player_candidates_by_game={"999": []},
         model_rows=[],
         official_fact_reports=[],
@@ -120,6 +120,27 @@ class PR131135CanonicalSnapshotReplayTests(unittest.TestCase):
 
     def test_untampered_snapshot_passes_identity_layer(self):
         joined = _join(_archive_with_snapshot(_snapshot()))
+
+        self.assertEqual(joined["joined_observation_count"], 0)
+        self.assertEqual(joined["failure_count"], 1)
+        self.assertIn("MODEL_ROW_NOT_FOUND_OR_AMBIGUOUS", joined["failures"][0]["reason"])
+        self.assertNotIn("CANONICAL_GAME_SNAPSHOT_REPRODUCTION_MISMATCH", joined["failures"][0]["reason"])
+
+    def test_probable_pitcher_change_does_not_break_game_identity_replay(self):
+        game = _game()
+        game["away_probable_pitcher_id"] = "799"
+        game["home_probable_pitcher_id"] = "899"
+        joined = _join(_archive_with_snapshot(_snapshot()), game=game)
+
+        self.assertEqual(joined["joined_observation_count"], 0)
+        self.assertEqual(joined["failure_count"], 1)
+        self.assertIn("MODEL_ROW_NOT_FOUND_OR_AMBIGUOUS", joined["failures"][0]["reason"])
+        self.assertNotIn("CANONICAL_GAME_SNAPSHOT_REPRODUCTION_MISMATCH", joined["failures"][0]["reason"])
+
+    def test_small_first_pitch_shift_uses_existing_event_binding_tolerance(self):
+        game = _game()
+        game["first_pitch_ts"] = "2026-08-24T01:00:00+00:00"
+        joined = _join(_archive_with_snapshot(_snapshot()), game=game)
 
         self.assertEqual(joined["joined_observation_count"], 0)
         self.assertEqual(joined["failure_count"], 1)
