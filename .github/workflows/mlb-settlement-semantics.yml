@@ -1,10 +1,24 @@
-name: mlb-settlement-semantics
+name: mlb-settlement-evidence
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - 'sportsedge/mlb_settlement_evidence.py'
+      - 'sportsedge/mlb_acceptance_matrix.py'
+      - 'config/mlb_acceptance_matrix.json'
+      - 'config/mlb_market_catalog.json'
+      - 'scripts/probe_mlb_settlement_semantics.py'
+      - 'tests/test_mlb_settlement_evidence.py'
+      - '.github/workflows/mlb-settlement-semantics.yml'
   push:
     paths:
+      - 'sportsedge/mlb_settlement_evidence.py'
+      - 'sportsedge/mlb_acceptance_matrix.py'
+      - 'config/mlb_acceptance_matrix.json'
+      - 'config/mlb_market_catalog.json'
       - 'scripts/probe_mlb_settlement_semantics.py'
+      - 'tests/test_mlb_settlement_evidence.py'
       - '.github/workflows/mlb-settlement-semantics.yml'
   schedule:
     - cron: '23 10 * * *'
@@ -13,11 +27,11 @@ permissions:
   contents: write
 
 concurrency:
-  group: mlb-settlement-semantics
+  group: mlb-settlement-evidence-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  prove:
+  contract:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -27,44 +41,69 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12.13'
-      - name: Derive canonical official settlement facts
+      - name: Compile settlement evidence code
+        run: python -m py_compile sportsedge/mlb_settlement_evidence.py scripts/probe_mlb_settlement_semantics.py
+      - name: Run settlement evidence contract tests
+        run: python -m unittest discover -s tests -p 'test_mlb_settlement_evidence.py'
+      - name: Recheck acceptance matrix contract
+        run: python -m unittest discover -s tests -p 'test_mlb_acceptance_matrix.py'
+
+  official-facts:
+    if: github.event_name != 'pull_request'
+    needs: contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.13'
+      - name: Derive canonical official MLB facts
         run: python scripts/probe_mlb_settlement_semantics.py
-      - name: Verify fail-closed settlement report
+      - name: Verify facts are proven but book settlement is not fabricated
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
           d=json.loads(Path('artifacts/mlb-settlement-semantics/report.json').read_text())
-          assert d['schema_version']=='mlb_settlement_semantics_v2'
-          assert d['state']=='SETTLEMENT_SEMANTICS_PASS'
-          assert d['sportsbook_data_used'] is False
+          assert d['schema_version']=='mlb_settlement_evidence_v3'
+          assert d['evidence_class']=='LIVE_OFFICIAL_FACT_PROBE'
           assert d['source']=='MLB_STATSAPI_BOX_SCORE_AND_LIVE_FEED'
-          assert 'FIRST_HOME_RUN' in d['proven_markets']
-          assert 'PITCHER_RECORD_WIN' in d['proven_markets']
-          assert d['excluded_markets']==[]
-          assert len(d['proven_markets']) == 27
-          assert d['facts']['first_home_run']['batter_id']
+          assert d['sportsbook_data_used'] is False
+          assert d['market_count']==36
+          assert d['official_fact_market_count']==36
+          assert d['official_facts_state']=='OFFICIAL_FACTS_PROVEN'
+          assert d['book_settlement_validated_market_count']==0
+          assert d['book_settlement_state']=='BOOK_SETTLEMENT_UNVALIDATED'
+          assert d['settlement_semantics_validation_gate']=='MISSING'
+          assert d['counts_as_settlement_semantics_evidence'] is False
+          assert all(x['official_fact_state']=='OFFICIAL_FACTS_PROVEN' for x in d['markets'])
+          assert all(x['book_rules_validated'] is False for x in d['markets'])
+          assert 'occurred' in d['facts']['first_home_run']
           assert d['facts']['winning_pitcher']['pitcher_id']
-          print('MLB_SETTLEMENT_SEMANTICS_PASS', len(d['proven_markets']), d['facts_sha256'])
+          print('MLB_OFFICIAL_FACTS_PROVEN_BOOK_SETTLEMENT_UNVALIDATED', d['market_count'], d['facts_sha256'])
           PY
-      - name: Persist immutable settlement evidence to data branch
+      - name: Persist immutable official-facts evidence to data branch
         shell: bash
         run: |
           set -euo pipefail
           git fetch --depth=1 origin data
           git worktree add --detach .data-branch FETCH_HEAD
-          RUN_DIR=".data-branch/runtime/model-validation/SETTLEMENT/runs/${GITHUB_RUN_ID}"
-          LATEST_DIR=".data-branch/runtime/model-validation/SETTLEMENT/latest"
+          ROOT=".data-branch/runtime/model-validation/SETTLEMENT_OFFICIAL_FACTS"
+          RUN_DIR="$ROOT/runs/${GITHUB_RUN_ID}"
+          LATEST_DIR="$ROOT/latest"
           mkdir -p "$RUN_DIR" "$LATEST_DIR"
           cp artifacts/mlb-settlement-semantics/report.json "$RUN_DIR/report.json"
           cp artifacts/mlb-settlement-semantics/report.json "$LATEST_DIR/report.json"
-          printf '%s\n' "$GITHUB_RUN_ID" > .data-branch/runtime/model-validation/SETTLEMENT/latest_run_id.txt
+          printf '%s\n' "$GITHUB_RUN_ID" > "$ROOT/latest_run_id.txt"
           cd .data-branch
           git config user.name sportsedge-data-bot
           git config user.email sportsedge-data-bot@users.noreply.github.com
-          git add runtime/model-validation/SETTLEMENT
+          git add runtime/model-validation/SETTLEMENT_OFFICIAL_FACTS
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m "validation: persist settlement semantics ${GITHUB_RUN_ID}"
+          git commit -m "evidence: persist MLB official settlement facts ${GITHUB_RUN_ID}"
           pushed=0
           for attempt in 1 2 3 4 5; do
             git fetch origin data
@@ -76,7 +115,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: mlb-settlement-semantics-${{ github.run_id }}
+          name: mlb-settlement-official-facts-${{ github.run_id }}
           path: artifacts/mlb-settlement-semantics/report.json
           if-no-files-found: error
           retention-days: 90
