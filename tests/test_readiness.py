@@ -10,6 +10,14 @@ class ReadinessTests(unittest.TestCase):
     def test_checked_in_registry_reports_hits_tb_runnable_but_not_deployed(self):
         out = audit_readiness()
         rows = {x["market"]: x for x in out["markets"]}
+        expected_validation_blockers = {
+            "VALIDATION_HISTORICAL_POINT_IN_TIME_PENDING",
+            "VALIDATION_UNTOUCHED_HOLDOUT_PENDING",
+            "VALIDATION_CALIBRATION_PENDING",
+            "VALIDATION_SETTLEMENT_SEMANTICS_PENDING",
+            "VALIDATION_FORWARD_EVIDENCE_PENDING",
+            "VALIDATION_PRODUCTION_PARITY_PENDING",
+        }
         for market in ("HITS", "TOTAL_BASES"):
             self.assertTrue(rows[market]["runtime_engine"])
             self.assertTrue(rows[market]["feature_contract_declared"])
@@ -20,7 +28,8 @@ class ReadinessTests(unittest.TestCase):
             self.assertTrue(rows[market]["runnable_live"])
             self.assertFalse(rows[market]["official_bet_enabled"])
             self.assertFalse(rows[market]["validation_complete"])
-            self.assertIn("FIXTURE_CI_PENDING", rows[market]["blockers"])
+            self.assertTrue(expected_validation_blockers <= set(rows[market]["blockers"]))
+            self.assertNotIn("FIXTURE_CI_PENDING", rows[market]["blockers"])
             self.assertIn("BEHAVIORAL_FIX", rows[market]["blockers"])
             self.assertIn("historical_point_in_time", rows[market]["validation_missing"])
 
