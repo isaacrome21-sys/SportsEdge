@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from datetime import date
+import hashlib
+import json
 from typing import Any, Mapping, Sequence
 
 from .generic_market_engine import GAME_MARKETS
@@ -15,6 +17,10 @@ from .quote_bridge import validate_canonical_quote
 
 class MLBJointModeBridgeError(ValueError):
     pass
+
+
+def _content_sha(value: Any) -> str:
+    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest()
 
 
 def _batter_context(game: LiveGame, entity_id: str) -> tuple[int, int]:
@@ -67,9 +73,8 @@ def build_canonical_feature_row(
                 raise MLBJointModeBridgeError("both probable pitchers required for either-pitcher market")
             a = build_pitcher_joint_features(source, pitcher_id=int(game.away_probable_pitcher_id), target_date=target_date)
             b = build_pitcher_joint_features(source, pitcher_id=int(game.home_probable_pitcher_id), target_date=target_date)
-            import hashlib, json
             payload = {"pitcher_a_history": a["history_pool"], "pitcher_b_history": b["history_pool"]}
-            digest = hashlib.sha256(json.dumps({"version": FEATURE_VERSION, "payload": payload, "game_pk": game.game_pk}, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+            digest = _content_sha({"version": FEATURE_VERSION, "payload": payload, "game_pk": game.game_pk})
             return {**base, "joint_feature_version": FEATURE_VERSION, "feature_source_hash": digest, "features": payload}
         try:
             pid = int(entity_id)
@@ -86,12 +91,16 @@ def build_canonical_feature_row(
         away, home, _ = source.team_means(
             away_team_id=int(game.away_team_id), home_team_id=int(game.home_team_id), target_date=target_date,
         )
-        # F5 remains deliberately fail-closed in the game engine; no 5/9 surrogate is emitted.
         if market.startswith("F5_"):
             raise MLBJointModeBridgeError("F5_INNING_STATE_MODEL_REQUIRED")
+        identity = {
+            "version": "mlb_generic_feature_v1", "game_pk": int(game.game_pk),
+            "target_date": target_date.isoformat(), "away_mean_runs": away, "home_mean_runs": home,
+            "retrieved_at": source.retrieved_at.isoformat(),
+        }
         return {**base, "generic_feature_version": "mlb_generic_feature_v1",
                 "away_mean_runs": away, "home_mean_runs": home,
-                "source_subset_hash": source.retrieved_at.strftime("%Y%m%d%H%M%S").ljust(64, "0")[:64]}
+                "source_subset_hash": _content_sha(identity)}
 
     raise MLBJointModeBridgeError(f"unsupported market {market}")
 
