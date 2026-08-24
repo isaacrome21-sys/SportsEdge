@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """Append-only PIT archive for the seven additional MLB quote families.
 
-This lane archives acquisition evidence only. It does not price models, grade
-outcomes, validate sportsbook settlement rules, or promote markets.
+This lane archives acquisition evidence only. It never prices models, grades
+outcomes, validates sportsbook settlement rules, or promotes markets.
 
-Unlike the provider-native DraftKings count-prop archive, the additional Odds API
-source already resolves provider event/player identity against MLB StatsAPI. The
-archive independently rechecks the provider-event binding and persists both raw
-provider and canonical MLB identity snapshots with content hashes.
+The additional Odds API source resolves provider identities against MLB StatsAPI at
+acquisition time. This archive independently rechecks the event->game binding and
+persists both provider and canonical identity snapshots with SHA-256 identities.
 """
 from __future__ import annotations
 
@@ -23,9 +22,6 @@ from zoneinfo import ZoneInfo
 
 from sportsedge.additional_mlb_odds_source import CANONICAL_MARKETS, fetch_mlb_additional_quotes
 from sportsedge.mlb_source import GameSnapshot, fetch_boxscore, fetch_schedule, parse_game_start
-from sportsedge.odds_api_source import (
-    AdditionalMLBOddsSnapshot if False else OddsApiSnapshot,  # type-only compatibility sentinel
-)
 from sportsedge.odds_api_source import _event_url, _get_json, bind_provider_event, build_participant_index
 from sportsedge.quote_bridge import validate_canonical_quote
 from sportsedge.runtime import parse_timestamp
@@ -78,10 +74,10 @@ def _keys() -> list[str]:
 
 
 def _side_players(boxscore: Mapping[str, Any], side: str) -> list[tuple[int, str]]:
-    out: list[tuple[int, str]] = []
     players = ((((boxscore.get("teams") or {}).get(side) or {}).get("players")) or {})
     if not isinstance(players, Mapping):
-        return out
+        return []
+    out: list[tuple[int, str]] = []
     for row in players.values():
         if not isinstance(row, Mapping):
             continue
@@ -126,7 +122,8 @@ def _entity_is_canonical(
     if market in {"F5_TOTALS", "NRFI", "YRFI"}:
         return entity == str(game.game_pk)
     if market in {"FIRST_HOME_RUN", "PITCHER_RECORD_WIN"}:
-        return entity in {str(v) for v in (participant_index.get(game.game_pk) or {}).values()}
+        known_players = {str(v) for v in (participant_index.get(game.game_pk) or {}).values()}
+        return entity in known_players
     return False
 
 
@@ -142,6 +139,8 @@ def build_archive_from_inputs(
     if captured_at.tzinfo is None or captured_at.utcoffset() is None:
         raise AdditionalPITArchiveError("captured_at must be timezone-aware")
     captured = captured_at.astimezone(timezone.utc)
+    quotes_in = [dict(x) if isinstance(x, Mapping) else {} for x in quote_rows]
+    failures_in = [dict(x) for x in source_failures if isinstance(x, Mapping)]
     games = list(schedule)
     game_by_id = {str(game.game_pk): game for game in games}
 
@@ -164,8 +163,7 @@ def build_archive_from_inputs(
     rejected: list[dict[str, Any]] = []
     market_counts = {market: 0 for market in sorted(TARGET_MARKETS)}
 
-    for source_index, raw_quote in enumerate(quote_rows):
-        quote = dict(raw_quote) if isinstance(raw_quote, Mapping) else {}
+    for source_index, quote in enumerate(quotes_in):
         market = str(quote.get("market") or "").upper()
         if market not in TARGET_MARKETS:
             continue
@@ -204,21 +202,22 @@ def build_archive_from_inputs(
                 "resolver_contract": "EXACT_NORMALIZED_TEAM_TIME_AND_PARTICIPANT_IDENTITY",
             }
 
-            row = {
-                **quote,
-                "retrieved_at": retrieved.isoformat(),
-                "quote_retrieved_at": retrieved.isoformat(),
-                "first_pitch_at": first_pitch.isoformat(),
-                "archive_captured_at": captured.isoformat(),
-                "pit_eligible": True,
-                "identity_binding_state": IDENTITY_STATE,
-                "provider_event_snapshot": provider_event_snapshot,
-                "provider_event_sha256": provider_event_hash,
-                "canonical_game_snapshot": game_snapshot,
-                "canonical_game_snapshot_sha256": game_snapshot_hash,
-                "identity_binding_sha256": _sha256_json(identity_binding),
-            }
-            accepted.append(row)
+            accepted.append(
+                {
+                    **quote,
+                    "retrieved_at": retrieved.isoformat(),
+                    "quote_retrieved_at": retrieved.isoformat(),
+                    "first_pitch_at": first_pitch.isoformat(),
+                    "archive_captured_at": captured.isoformat(),
+                    "pit_eligible": True,
+                    "identity_binding_state": IDENTITY_STATE,
+                    "provider_event_snapshot": provider_event_snapshot,
+                    "provider_event_sha256": provider_event_hash,
+                    "canonical_game_snapshot": game_snapshot,
+                    "canonical_game_snapshot_sha256": game_snapshot_hash,
+                    "identity_binding_sha256": _sha256_json(identity_binding),
+                }
+            )
             market_counts[market] += 1
         except Exception as exc:
             rejected.append(
@@ -239,12 +238,12 @@ def build_archive_from_inputs(
         "provider": "THE_ODDS_API",
         "captured_at": captured.isoformat(),
         "target_markets": sorted(TARGET_MARKETS),
-        "source_quote_count": len(list(quote_rows)) if isinstance(quote_rows, Sequence) else len(accepted) + len(rejected),
+        "source_quote_count": len(quotes_in),
         "pit_quote_count": len(accepted),
         "market_counts": market_counts,
-        "source_failure_count": len(list(source_failures)) if isinstance(source_failures, Sequence) else 0,
+        "source_failure_count": len(failures_in),
         "rejected_count": len(rejected),
-        "source_failures": [dict(x) for x in source_failures if isinstance(x, Mapping)],
+        "source_failures": failures_in,
         "rejected_quotes": rejected,
         "quotes": accepted,
     }
@@ -324,7 +323,7 @@ def build_archive_payload(
 
     return build_archive_from_inputs(
         schedule=schedule,
-        quote_rows=list(snapshot.quotes),
+        quote_rows=snapshot.quotes,
         provider_events=events,
         participant_index=participant_index,
         captured_at=captured,
@@ -335,8 +334,7 @@ def build_archive_payload(
 def _self_test() -> int:
     assert len(TARGET_MARKETS) == 7
     assert TARGET_MARKETS == CANONICAL_MARKETS
-    digest = _sha256_json({"a": 1})
-    assert len(digest) == 64
+    assert len(_sha256_json({"a": 1})) == 64
     print(
         json.dumps(
             {
