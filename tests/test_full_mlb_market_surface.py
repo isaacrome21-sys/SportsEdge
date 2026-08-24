@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 from sportsedge.engine_registry import engine_registry, resolve_manual_market_type
+from sportsedge.generic_market_engine import generic_market_engine_adapter
 from sportsedge.hitter_joint_engine import HITTER_MARKETS
 from sportsedge.pitcher_joint_engine import PITCHER_MARKETS
 from sportsedge.quote_bridge import SUPPORTED_MARKETS
@@ -51,10 +52,12 @@ class FullMLBMarketSurfaceTests(unittest.TestCase):
 
     def test_overlapping_hitter_and_pitcher_surfaces_are_single_engine_families(self):
         registry = engine_registry()
-        hitter_fns = {registry[m].__name__ for m in HITTER_MARKETS}
+        joint_hitter_markets = set(HITTER_MARKETS) - {"HOME_RUNS"}
+        hitter_fns = {registry[m].__name__ for m in joint_hitter_markets}
         pitcher_fns = {registry[m].__name__ for m in PITCHER_MARKETS}
         self.assertEqual(hitter_fns, {"hitter_joint_adapter"})
         self.assertEqual(pitcher_fns, {"pitcher_joint_adapter"})
+        self.assertIs(registry["HOME_RUNS"], generic_market_engine_adapter)
 
 
 if __name__ == "__main__":
