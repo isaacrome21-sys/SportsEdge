@@ -132,7 +132,7 @@ def _behavioral_state(behavioral: dict[str, Any], market: str) -> tuple[bool, st
     if not isinstance(row, dict):
         return False, "UNVERIFIED", "BEHAVIORAL_UNATTESTED"
     status = str(row.get("status", "UNVERIFIED")).upper()
-    allowed = {"KEEP_MEASURED", "WATCH", "FIX", "REBUILD", "UPSTREAM_MODEL_REVIEW", "UNVERIFIED"}
+    allowed = {"KEEP_MEASURED", "WATCH", "FIX", "REBUILD", "UPSTREAM_MODEL_REVIEW", "UNVERIFIED", "UNMEASURED"}
     if status not in allowed:
         raise ValueError(f"invalid behavioral status for {market}: {status}")
     root_cause = row.get("root_cause")
