@@ -32,6 +32,8 @@ class JoinedEvidenceRow:
     realized_count: int
     settlement_state: str
     settlement_reason: str
+    settlement_rule_source: str
+    settlement_rule_sha256: str
     quote_archive_sha256: str
     identity_binding_sha256: str
     facts_sha256: str
@@ -135,6 +137,9 @@ def bind_archived_quote(
     origin = str(evidence_origin).strip().upper()
     if origin not in ORIGINS:
         raise PropOutcomeJoinError("evidence_origin must be SYNTHETIC_FIXTURE or REAL_ARCHIVE")
+    archive_hash = str(quote_archive_sha256).strip().lower()
+    if len(archive_hash) != 64 or any(ch not in "0123456789abcdef" for ch in archive_hash):
+        raise PropOutcomeJoinError("quote_archive_sha256 must be SHA-256 hex")
     return {
         "market": market,
         "game_id": _text(identity_binding, "game_id"),
@@ -143,7 +148,7 @@ def bind_archived_quote(
         "side": _text(archived_quote, "side").upper(),
         "quote_ts": _text(archived_quote, "quote_retrieved_at"),
         "first_pitch_ts": _text(archived_quote, "first_pitch_at"),
-        "quote_archive_sha256": str(quote_archive_sha256).strip().lower(),
+        "quote_archive_sha256": archive_hash,
         "identity_binding_sha256": _sha(identity_binding, "identity_binding_sha256"),
         "evidence_origin": origin,
     }
@@ -174,6 +179,8 @@ def join_evidence_row(
     if settlement_state not in SETTLEMENT_STATES:
         raise PropOutcomeJoinError("settlement_state must be SETTLED, VOID, or AMBIGUOUS")
     reason = _text(settlement, "settlement_reason")
+    rule_source = _text(settlement, "settlement_rule_source")
+    rule_hash = _sha(settlement, "settlement_rule_sha256")
     if settlement_state == "AMBIGUOUS":
         raise PropOutcomeJoinError(f"AMBIGUOUS_SETTLEMENT:{reason}")
     if settlement_state == "VOID":
@@ -209,6 +216,8 @@ def join_evidence_row(
         realized_count=_nonnegative_int(fact, "realized_count"),
         settlement_state=settlement_state,
         settlement_reason=reason,
+        settlement_rule_source=rule_source,
+        settlement_rule_sha256=rule_hash,
         quote_archive_sha256=_sha(quote, "quote_archive_sha256"),
         identity_binding_sha256=_sha(quote, "identity_binding_sha256"),
         facts_sha256=_sha(fact, "facts_sha256"),
@@ -252,7 +261,7 @@ def build_join_report(raw_rows: Iterable[Mapping[str, Mapping[str, Any]]]) -> di
         state, evidence_class = "SYNTHETIC_CONTRACT_PASS", "SYNTHETIC_CONTRACT_TEST"
 
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "state": state,
         "evidence_class": evidence_class,
         "source_row_count": len(joined) + len(excluded) + len(ambiguous),
