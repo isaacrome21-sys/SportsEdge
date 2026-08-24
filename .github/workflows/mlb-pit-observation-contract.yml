@@ -1,0 +1,50 @@
+name: mlb-pit-observation-contract
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'sportsedge/mlb_pit_observation.py'
+      - 'sportsedge/mlb_pit_joiner.py'
+      - 'sportsedge/mlb_settlement_evidence.py'
+      - 'sportsedge/quote_bridge.py'
+      - 'tests/test_mlb_pit_observation.py'
+      - 'tests/test_mlb_pit_joiner.py'
+      - '.github/workflows/mlb-pit-observation-contract.yml'
+  push:
+    paths:
+      - 'sportsedge/mlb_pit_observation.py'
+      - 'sportsedge/mlb_pit_joiner.py'
+      - 'sportsedge/mlb_settlement_evidence.py'
+      - 'sportsedge/quote_bridge.py'
+      - 'tests/test_mlb_pit_observation.py'
+      - 'tests/test_mlb_pit_joiner.py'
+      - '.github/workflows/mlb-pit-observation-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.13'
+      - name: Compile PIT evidence modules
+        run: python -m py_compile sportsedge/mlb_pit_observation.py sportsedge/mlb_pit_joiner.py
+      - name: Run strict PIT observation tests
+        run: python -m unittest discover -s tests -p 'test_mlb_pit_observation.py'
+      - name: Run deterministic archive join tests
+        run: python -m unittest discover -s tests -p 'test_mlb_pit_joiner.py'
+      - name: Recheck settlement separation
+        run: python -m unittest discover -s tests -p 'test_mlb_settlement_evidence.py'
+
+# Deliberately no scheduled scoring job yet. Real historical scoring requires:
+# - executed live provider quote archives,
+# - unique MLB game/player identity binding,
+# - executed official-fact artifacts,
+# - validated sportsbook settlement rules,
+# - pregame model/history artifacts.
