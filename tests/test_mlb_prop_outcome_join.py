@@ -40,6 +40,8 @@ class MLBPropOutcomeJoinTests(unittest.TestCase):
             "entity_id": quote["entity_id"],
             "settlement_state": settlement_state,
             "settlement_reason": settlement_reason,
+            "settlement_rule_source": "SYNTHETIC_BOOK_RULE_FIXTURE",
+            "settlement_rule_sha256": "e" * 64,
         }
         model_eval = {
             "market": market,
@@ -94,6 +96,12 @@ class MLBPropOutcomeJoinTests(unittest.TestCase):
         self.assertEqual(report["state"], "BLOCKED_NO_SCORABLE_ROWS")
         self.assertEqual(report["void_excluded_count"], 1)
         self.assertEqual(report["joined_row_count"], 0)
+
+    def test_settlement_without_hashed_rule_source_fails_closed(self):
+        bundle = self._bundle()
+        bundle["settlement"] = {**bundle["settlement"], "settlement_rule_sha256": ""}
+        with self.assertRaisesRegex(PropOutcomeJoinError, "settlement_rule_sha256"):
+            join_evidence_row(**bundle)
 
     def test_push_is_preserved_for_downstream_push_semantics(self):
         bundle = self._bundle(market="PITCHER_ER", realized=2, line=2.0)
