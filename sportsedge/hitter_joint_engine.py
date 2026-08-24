@@ -1,19 +1,19 @@
-"""Coherent PA-level hitter market challenger.
+"""Coherent hitter prop challenger from strictly-prior game rows.
 
-Every hitter market is derived from one per-PA state model and repeated across a
-fixed PIT projected-PA count. Overlapping propositions therefore share the same
-latent batting result instead of being independently parameterized engines.
-
-This is candidate runtime code; promotion still requires behavioral evidence.
+Every prior game is one joint state containing PA, hits, HR, total bases, RBI,
+runs, stolen bases, walks and extra-base hits. All individual and combination
+markets are marginals of the same rows, so overlapping propositions cannot
+contradict one another. This is the honest v1 until PA-level play-by-play state
+is available; it does not pretend game logs identify within-PA RBI/run structure.
 """
 from __future__ import annotations
 
 import hashlib
 import json
-from math import floor, isfinite
-from typing import Any, Mapping
+from math import isfinite
+from typing import Any, Mapping, Sequence
 
-ENGINE_VERSION = "mlb_hitter_joint_pa_v2"
+ENGINE_VERSION = "mlb_hitter_joint_empirical_v1"
 
 HITTER_MARKETS = frozenset({
     "HITS", "HOME_RUNS", "TOTAL_BASES", "RBI", "RUNS", "STOLEN_BASES", "BATTER_BB",
@@ -25,15 +25,15 @@ class HitterJointEngineError(ValueError):
     pass
 
 
-def _f(v: Any, name: str, lo: float = 0.0, hi: float | None = None) -> float:
+def _f(v: Any, name: str, lo: float = 0.0) -> float:
     if isinstance(v, bool):
         raise HitterJointEngineError(f"{name} must be numeric")
     try:
         x = float(v)
     except (TypeError, ValueError) as exc:
         raise HitterJointEngineError(f"{name} must be numeric") from exc
-    if not isfinite(x) or x < lo or (hi is not None and x > hi):
-        raise HitterJointEngineError(f"{name} out of bounds")
+    if not isfinite(x) or x < lo:
+        raise HitterJointEngineError(f"{name} invalid")
     return x
 
 
@@ -42,100 +42,55 @@ def _sha(v: Any) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-def _convolve(a: list[float], b: list[float]) -> list[float]:
-    out = [0.0] * (len(a) + len(b) - 1)
-    for i, x in enumerate(a):
-        for j, y in enumerate(b):
-            out[i + j] += x * y
-    return out
-
-
-def _repeat_pa(single_pa: list[float], n: int) -> list[float]:
-    pmf = [1.0]
-    for _ in range(n):
-        pmf = _convolve(pmf, single_pa)
-    return pmf
-
-
-def _bernoulli_states(p: float) -> tuple[tuple[int, float], tuple[int, float]]:
-    return ((0, 1.0 - p), (1, p))
-
-
-def _market_pmf(features: Mapping[str, Any], market: str) -> tuple[list[float], dict[str, Any]]:
-    pa_proj = _f(features.get("projected_pa"), "projected_pa", 0.0)
-    n = floor(pa_proj + 0.5)
-    if n < 1:
-        raise HitterJointEngineError("projected_pa rounds to n < 1")
-
-    # One mutually-exclusive batting-result state per PA.
-    p1 = _f(features.get("p_single", 0.0), "p_single", 0.0, 1.0)
-    p2 = _f(features.get("p_double", 0.0), "p_double", 0.0, 1.0)
-    p3 = _f(features.get("p_triple", 0.0), "p_triple", 0.0, 1.0)
-    phr = _f(features.get("p_hr", 0.0), "p_hr", 0.0, 1.0)
-    pbb = _f(features.get("p_bb", 0.0), "p_bb", 0.0, 1.0)
-    p_batted = p1 + p2 + p3 + phr + pbb
-    if p_batted > 1.0 + 1e-12:
-        raise HitterJointEngineError("PA event probabilities exceed 1")
-    pout = max(0.0, 1.0 - p_batted)
-
-    # Run/RBI/SB are additional same-PA outcomes in v2. They are not separate
-    # game-level engines. Their conditional structure is intentionally explicit:
-    # until richer base/out state is available, each is conditionally independent
-    # given the shared batting-result state, using PIT per-PA probabilities.
-    prun = _f(features.get("p_run_per_pa", 0.0), "p_run_per_pa", 0.0, 1.0)
-    prbi = _f(features.get("p_rbi_per_pa", 0.0), "p_rbi_per_pa", 0.0, 1.0)
-    psb = _f(features.get("p_sb_per_pa", 0.0), "p_sb_per_pa", 0.0, 1.0)
-
-    batting_states = (
-        {"hit": 0, "hr": 0, "tb": 0, "bb": 0, "xbh": 0, "p": pout},
-        {"hit": 1, "hr": 0, "tb": 1, "bb": 0, "xbh": 0, "p": p1},
-        {"hit": 1, "hr": 0, "tb": 2, "bb": 0, "xbh": 1, "p": p2},
-        {"hit": 1, "hr": 0, "tb": 3, "bb": 0, "xbh": 1, "p": p3},
-        {"hit": 1, "hr": 1, "tb": 4, "bb": 0, "xbh": 1, "p": phr},
-        {"hit": 0, "hr": 0, "tb": 0, "bb": 1, "xbh": 0, "p": pbb},
+def _normalize_pool(raw: Any) -> list[dict[str, int]]:
+    if not isinstance(raw, Sequence) or isinstance(raw, (str, bytes)):
+        raise HitterJointEngineError("history_pool must be a sequence")
+    required = (
+        "plate_appearances", "hits", "home_runs", "total_bases", "rbi",
+        "runs", "stolen_bases", "walks", "extra_base_hits",
     )
+    rows: list[dict[str, int]] = []
+    for i, item in enumerate(raw):
+        if not isinstance(item, Mapping):
+            raise HitterJointEngineError(f"history_pool[{i}] must be object")
+        row: dict[str, int] = {}
+        for key in required:
+            x = _f(item.get(key), f"history_pool[{i}].{key}")
+            if int(x) != x:
+                raise HitterJointEngineError(f"history_pool[{i}].{key} must be integer")
+            row[key] = int(x)
+        pa = row["plate_appearances"]
+        if pa < 1 or pa > 9:
+            raise HitterJointEngineError(f"history_pool[{i}].plate_appearances outside [1,9]")
+        if row["hits"] > pa or row["walks"] > pa or row["hits"] + row["walks"] > pa:
+            raise HitterJointEngineError(f"history_pool[{i}] violates PA support")
+        if not (row["home_runs"] <= row["extra_base_hits"] <= row["hits"]):
+            raise HitterJointEngineError(f"history_pool[{i}] violates HR/XBH/hit nesting")
+        if not (row["hits"] <= row["total_bases"] <= 4 * row["hits"]):
+            raise HitterJointEngineError(f"history_pool[{i}] violates total-base support")
+        if row["runs"] > pa or row["rbi"] > 4 * pa:
+            raise HitterJointEngineError(f"history_pool[{i}] violates run/RBI support")
+        rows.append(row)
+    if len(rows) < 10:
+        raise HitterJointEngineError(f"history_pool requires at least 10 prior games; got {len(rows)}")
+    return rows
 
-    max_single = {
-        "HITS": 1, "HOME_RUNS": 1, "TOTAL_BASES": 4, "RBI": 1,
-        "RUNS": 1, "STOLEN_BASES": 1, "BATTER_BB": 1, "EXTRA_BASE_HITS": 1,
-        "HITS_RUNS_RBIS": 3, "HITS_RUNS_STOLEN_BASES": 3, "RUNS_RBIS": 2,
-        "HITS_STOLEN_BASES": 2, "HITS_WALKS_STOLEN_BASES": 3,
-    }[market]
-    single = [0.0] * (max_single + 1)
 
-    for b in batting_states:
-        if b["p"] <= 0:
-            continue
-        for run, pr in _bernoulli_states(prun):
-            for rbi, pi in _bernoulli_states(prbi):
-                for sb, ps in _bernoulli_states(psb):
-                    prob = b["p"] * pr * pi * ps
-                    if market == "HITS": value = b["hit"]
-                    elif market == "HOME_RUNS": value = b["hr"]
-                    elif market == "TOTAL_BASES": value = b["tb"]
-                    elif market == "RBI": value = rbi
-                    elif market == "RUNS": value = run
-                    elif market == "STOLEN_BASES": value = sb
-                    elif market == "BATTER_BB": value = b["bb"]
-                    elif market == "EXTRA_BASE_HITS": value = b["xbh"]
-                    elif market == "HITS_RUNS_RBIS": value = b["hit"] + run + rbi
-                    elif market == "HITS_RUNS_STOLEN_BASES": value = b["hit"] + run + sb
-                    elif market == "RUNS_RBIS": value = run + rbi
-                    elif market == "HITS_STOLEN_BASES": value = b["hit"] + sb
-                    elif market == "HITS_WALKS_STOLEN_BASES": value = b["hit"] + b["bb"] + sb
-                    else: raise HitterJointEngineError(f"unsupported hitter market {market}")
-                    single[value] += prob
-
-    if abs(sum(single) - 1.0) > 1e-10:
-        raise HitterJointEngineError("single-PA probability mass does not conserve")
-    pmf = _repeat_pa(single, n)
-    return pmf, {
-        "n": n,
-        "shared_pa_state": True,
-        "p_hit": p1 + p2 + p3 + phr,
-        "p_xbh": p2 + p3 + phr,
-        "conditional_structure": "RUN_RBI_SB_INDEPENDENT_GIVEN_BATTING_STATE_V1",
-    }
+def _value(row: Mapping[str, int], market: str) -> int:
+    if market == "HITS": return row["hits"]
+    if market == "HOME_RUNS": return row["home_runs"]
+    if market == "TOTAL_BASES": return row["total_bases"]
+    if market == "RBI": return row["rbi"]
+    if market == "RUNS": return row["runs"]
+    if market == "STOLEN_BASES": return row["stolen_bases"]
+    if market == "BATTER_BB": return row["walks"]
+    if market == "EXTRA_BASE_HITS": return row["extra_base_hits"]
+    if market == "HITS_RUNS_RBIS": return row["hits"] + row["runs"] + row["rbi"]
+    if market == "HITS_RUNS_STOLEN_BASES": return row["hits"] + row["runs"] + row["stolen_bases"]
+    if market == "RUNS_RBIS": return row["runs"] + row["rbi"]
+    if market == "HITS_STOLEN_BASES": return row["hits"] + row["stolen_bases"]
+    if market == "HITS_WALKS_STOLEN_BASES": return row["hits"] + row["walks"] + row["stolen_bases"]
+    raise HitterJointEngineError(f"unsupported hitter market {market}")
 
 
 def price_hitter_market(model_input: Mapping[str, Any]) -> dict[str, Any]:
@@ -145,30 +100,27 @@ def price_hitter_market(model_input: Mapping[str, Any]) -> dict[str, Any]:
     side = str(model_input.get("side", "")).upper()
     if side not in {"OVER", "UNDER"}:
         raise HitterJointEngineError("side must be OVER or UNDER")
-    line = _f(model_input.get("line"), "line", 0.0)
+    line = _f(model_input.get("line"), "line")
     features = model_input.get("features")
     if not isinstance(features, Mapping):
         raise HitterJointEngineError("features required")
-    pmf, meta = _market_pmf(features, market)
-    k = floor(line)
-    p_over = sum(pmf[k + 1:]) if k + 1 < len(pmf) else 0.0
-    if float(line).is_integer():
-        t = int(line)
-        p_push = pmf[t] if 0 <= t < len(pmf) else 0.0
-        p_under = sum(pmf[:t])
-    else:
-        p_push = 0.0
-        p_under = sum(pmf[: k + 1])
-    if abs(p_over + p_under + p_push - 1.0) > 1e-9:
+    pool = _normalize_pool(features.get("history_pool"))
+    values = [_value(row, market) for row in pool]
+    n = len(values)
+    p_over = sum(v > line for v in values) / n
+    p_under = sum(v < line for v in values) / n
+    p_push = sum(v == line for v in values) / n if float(line).is_integer() else 0.0
+    if abs(p_over + p_under + p_push - 1.0) > 1e-12:
         raise HitterJointEngineError("probability mass does not conserve")
     digest = _sha({
         "engine": ENGINE_VERSION, "game_id": model_input.get("game_id"),
         "entity_id": model_input.get("entity_id"), "feature_source_hash": model_input.get("feature_source_hash"),
-        "features": dict(features),
+        "history_pool": pool,
     })
     return {
         "game_id": model_input.get("game_id"), "market": market, "entity_id": model_input.get("entity_id"),
         "line": line, "side": side, "model_p": p_over if side == "OVER" else p_under,
         "push_p": p_push, "model_input_hash": digest, "engine_version": ENGINE_VERSION,
-        "seed_policy": "analytic_shared_pa_state", "mc_paths": 0, "meta": meta,
+        "seed_policy": "analytic_empirical_joint_game_rows", "mc_paths": 0,
+        "meta": {"history_games": len(pool), "shared_joint_rows": True},
     }
