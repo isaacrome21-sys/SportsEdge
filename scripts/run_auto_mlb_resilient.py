@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the canonical SportsEdge MLB machine with key rotation and ESPN fallback."""
+"""Run the canonical SportsEdge MLB machine with native keyring and ESPN fallback."""
 from __future__ import annotations
 
 import argparse
@@ -70,6 +70,8 @@ def main() -> int:
             edge_floor_config_path=DEFAULT_EDGE_FLOOR_CONFIG,
             kelly_multiplier=args.kelly_multiplier,
         )
+        pre_source_failures: list[dict[str, str]] = []
+
         if quotes:
             # Explicit external quote+feature snapshots remain a legacy compatibility
             # lane. They are never selected by native automatic RUN IT acquisition.
@@ -78,35 +80,54 @@ def main() -> int:
             report = run_auto_mlb(quote_url=quotes, feature_url=features, **common)
         else:
             report = None
-            for slot, key in enumerate(odds_api_keys, start=1):
-                candidate = run_it_mlb(
-                    mode="AUTOMATIC",
-                    odds_api_key=key,
-                    odds_api_keys=(),
-                    bookmakers=odds_books,
-                    history_cache_dir=history_cache_dir,
-                    **common,
-                )
-                rotate = should_rotate_odds_key(
-                    run_status=candidate.run_status,
-                    results=candidate.results,
-                    source_failures=candidate.source_failures,
-                )
-                if not rotate:
-                    report = candidate
-                    break
+            if odds_api_keys:
+                try:
+                    # The canonical machine owns the complete keyring in one run.
+                    candidate = run_it_mlb(
+                        mode="AUTOMATIC",
+                        odds_api_key=odds_api_keys[0],
+                        odds_api_keys=odds_api_keys[1:],
+                        bookmakers=odds_books,
+                        history_cache_dir=history_cache_dir,
+                        **common,
+                    )
+                    native_unusable = should_rotate_odds_key(
+                        run_status=candidate.run_status,
+                        results=candidate.results,
+                        source_failures=candidate.source_failures,
+                    )
+                    if native_unusable:
+                        pre_source_failures.append({
+                            "stage": "NATIVE_RUN_IT",
+                            "reason": "NATIVE_ODDS_UNUSABLE_AFTER_INTERNAL_KEYRING",
+                        })
+                    else:
+                        report = candidate
+                except Exception as exc:
+                    pre_source_failures.append({
+                        "stage": "NATIVE_RUN_IT",
+                        "reason": f"{type(exc).__name__}: {exc}",
+                    })
+            else:
+                pre_source_failures.append({
+                    "stage": "NATIVE_RUN_IT",
+                    "reason": "ODDS_API_KEY_MISSING",
+                })
 
-            # If every paid key is unusable or no key is configured, preserve only
-            # the full-game ML/RL/totals lane via ESPN. Player/additional markets
-            # remain explicitly unavailable rather than being synthesized.
+            # Native acquisition failure never skips the fallback. ESPN remains
+            # deliberately game-only and builds its own price-independent features;
+            # a configured legacy feature URL cannot hijack this native fallback.
             if report is None:
                 report = run_auto_mlb_espn_game_odds(
-                    feature_url=features or None,
+                    feature_url=None,
                     history_cache_dir=history_cache_dir,
                     **common,
                 )
 
         payload = _serialize_report(report)
+        if pre_source_failures:
+            payload.setdefault("source_failures", []).extend(pre_source_failures)
+
         game_ids = {
             str(item.game_id) for item in report.results
             if str(item.game_id).isdigit() and int(str(item.game_id)) > 0
@@ -117,9 +138,10 @@ def main() -> int:
             str(item.game_id) for item in report.results
             if any(token in str(item.reason).upper() for token in lineup_block_tokens)
         }
+        funnel_failures = [*report.source_failures, *pre_source_failures]
         funnel = build_funnel(
             results=report.results,
-            source_failures=report.source_failures,
+            source_failures=funnel_failures,
             games_scheduled=len(game_ids) if game_ids else None,
             lineups_confirmed=max(0, len(game_ids) - len(lineup_blocked_games)) if game_ids else None,
             features_built=feature_built,
