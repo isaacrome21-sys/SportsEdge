@@ -1,9 +1,13 @@
 import hashlib
 import unittest
 
+from sportsedge.mlb_acceptance_matrix import build_acceptance_matrix
 from sportsedge.mlb_pit_joiner import join_prop_archive, observation_key
 from sportsedge.mlb_pit_observation import analyze_pit_observations, content_sha256
 from sportsedge.mlb_settlement_evidence import canonical_bytes
+
+
+SYNTHETIC = "SYNTHETIC_CONTRACT_TEST"
 
 
 def _event():
@@ -18,14 +22,14 @@ def _event():
     }
 
 
-def _quote(market="HITS", entity_name="Player A", line=0.5):
+def _quote(market="HITS", entity_name="Player A", line=0.5, side="OVER"):
     event = _event()
     return {
         "provider_event_id": "123",
         "market": market,
         "entity_name": entity_name,
         "entity_name_normalized": "playera",
-        "side": "OVER",
+        "side": side,
         "line": line,
         "sportsbook": "DraftKings",
         "book_key": "draftkings_direct",
@@ -38,15 +42,16 @@ def _quote(market="HITS", entity_name="Player A", line=0.5):
     }
 
 
-def _archive(*, source_class="SYNTHETIC_CONTRACT_TEST", quote=None):
+def _archive(*, source_class=SYNTHETIC, quote=None):
+    q = quote or _quote()
     payload = {
         "schema_version": 2,
         "archive_type": "MLB_PROP_PIT_QUOTES",
         "evidence_class": source_class,
         "provider": "DRAFTKINGS_WEB_RESEARCH",
         "captured_at": "2026-08-23T23:46:00+00:00",
-        "target_markets": ["HITS"],
-        "quotes": [quote or _quote()],
+        "target_markets": [q["market"]],
+        "quotes": [q],
     }
     payload["payload_sha256"] = content_sha256(payload)
     return payload
@@ -63,23 +68,70 @@ def _game():
     }
 
 
-def _facts():
-    facts = {"game_pk": "999", "status": "Final", "source": "SYNTHETIC_CONTRACT_TEST"}
+def _facts(*, evidence_class=SYNTHETIC):
+    facts = {
+        "game_pk": "999",
+        "status": "Final",
+        "batters": [
+            {
+                "player_id": "42",
+                "hits": 2,
+                "home_runs": 1,
+                "total_bases": 5,
+                "rbi": 2,
+                "runs": 1,
+                "stolen_bases": 0,
+                "walks": 1,
+                "strikeouts": 1,
+                "extra_base_hits": 1,
+                "hits_runs_rbis": 5,
+                "hits_runs_stolen_bases": 3,
+                "runs_rbis": 3,
+                "hits_stolen_bases": 2,
+                "hits_walks_stolen_bases": 3,
+                "singles": 1,
+                "doubles": 0,
+                "triples": 0,
+            }
+        ],
+        "pitchers": [
+            {
+                "player_id": "701",
+                "strikeouts": 7,
+                "outs": 18,
+                "earned_runs": 2,
+                "hits_allowed": 5,
+                "walks_allowed": 2,
+                "hits_walks_er": 9,
+            },
+            {
+                "player_id": "702",
+                "strikeouts": 5,
+                "outs": 17,
+                "earned_runs": 3,
+                "hits_allowed": 6,
+                "walks_allowed": 1,
+                "hits_walks_er": 10,
+            },
+        ],
+    }
     return {
         "schema_version": "mlb_settlement_evidence_v3",
+        "evidence_class": evidence_class,
         "facts_sha256": hashlib.sha256(canonical_bytes(facts)).hexdigest(),
         "facts": facts,
     }
 
 
-def _model(market="HITS", entity_id="42", line=0.5):
+def _model(market="HITS", entity_id="42", line=0.5, *, evidence_class=SYNTHETIC, history_asof=None):
     return {
         "game_id": "999",
         "market": market,
         "entity_id": entity_id,
         "line": line,
         "side": "OVER",
-        "history_asof_ts": "2026-08-23T23:40:00+00:00",
+        "evidence_class": evidence_class,
+        "history_asof_ts": history_asof or "2026-08-23T23:40:00+00:00",
         "history_source_hash": "4" * 64,
         "model_input_hash": "5" * 64,
         "candidate_p": 0.65,
@@ -87,7 +139,28 @@ def _model(market="HITS", entity_id="42", line=0.5):
     }
 
 
-def _settlement(*, market="HITS", entity_id="42", line=0.5, state="SETTLEMENT_ELIGIBLE", outcome="WIN"):
+def _required_rules(market):
+    for row in build_acceptance_matrix()["markets"]:
+        if row["market"] == market:
+            return tuple(row["requirements"]["settlement_semantics"])
+    raise AssertionError(market)
+
+
+def _rule_evidence(market="HITS", sportsbook="DraftKings"):
+    out = {}
+    for rule in _required_rules(market):
+        out[rule] = {
+            "status": "VALIDATED",
+            "sportsbook": sportsbook,
+            "source_sha256": hashlib.sha256(rule.encode("utf-8")).hexdigest(),
+            "captured_at_utc": "2026-08-23T20:00:00+00:00",
+            "source_locator": f"fixture://{rule}",
+        }
+    return out
+
+
+def _settlement(*, market="HITS", entity_id="42", line=0.5, evidence_class=SYNTHETIC,
+                sportsbook="DraftKings", ambiguity_reasons=None, void_reasons=None):
     key = observation_key(
         game_id="999",
         market=market,
@@ -99,9 +172,10 @@ def _settlement(*, market="HITS", entity_id="42", line=0.5, state="SETTLEMENT_EL
     )
     return {
         "observation_key": key,
-        "settlement_state": state,
-        "settled_outcome": outcome,
-        "settlement_rules_hash": "7" * 64 if state in {"SETTLEMENT_ELIGIBLE", "VOID", "AMBIGUOUS_SETTLEMENT"} else None,
+        "evidence_class": evidence_class,
+        "book_rule_evidence": _rule_evidence(market, sportsbook=sportsbook),
+        "ambiguity_reasons": list(ambiguity_reasons or []),
+        "void_reasons": list(void_reasons or []),
     }
 
 
@@ -118,7 +192,7 @@ class MLBPITJoinerTests(unittest.TestCase):
         args.update(changes)
         return join_prop_archive(**args)
 
-    def test_end_to_end_synthetic_join_produces_scored_but_not_historical_row(self):
+    def test_end_to_end_synthetic_join_derives_win_but_not_historical(self):
         joined = self._join()
         self.assertEqual(joined["joined_observation_count"], 1)
         self.assertEqual(joined["failure_count"], 0)
@@ -126,19 +200,53 @@ class MLBPITJoinerTests(unittest.TestCase):
         self.assertEqual(row["game_id"], "999")
         self.assertEqual(row["entity_id"], "42")
         self.assertEqual(row["settlement_state"], "SETTLEMENT_ELIGIBLE")
+        self.assertEqual(row["settled_outcome"], "WIN")
         report = analyze_pit_observations(joined["observations"])
         self.assertEqual(report["scored_row_count"], 1)
         self.assertFalse(report["counts_as_historical_pit"])
 
-    def test_without_book_settlement_row_join_is_unscored_and_book_unvalidated(self):
+    def test_full_live_chain_is_required_for_historical_label(self):
+        joined = self._join(
+            archive_payload=_archive(source_class="LIVE_PROVIDER_QUOTE_ARCHIVE"),
+            model_rows=[_model(evidence_class="LIVE_PIT_MODEL")],
+            official_fact_reports=[_facts(evidence_class="LIVE_OFFICIAL_FACT_PROBE")],
+            settlement_rows=[_settlement(evidence_class="LIVE_BOOK_RULE_CAPTURE")],
+        )
+        report = analyze_pit_observations(joined["observations"])
+        self.assertTrue(report["counts_as_historical_pit"])
+        self.assertEqual(report["durable_scored_row_count"], 1)
+
+    def test_live_quote_plus_synthetic_model_never_becomes_historical(self):
+        joined = self._join(
+            archive_payload=_archive(source_class="LIVE_PROVIDER_QUOTE_ARCHIVE"),
+            model_rows=[_model(evidence_class=SYNTHETIC)],
+            official_fact_reports=[_facts(evidence_class="LIVE_OFFICIAL_FACT_PROBE")],
+            settlement_rows=[_settlement(evidence_class="LIVE_BOOK_RULE_CAPTURE")],
+        )
+        report = analyze_pit_observations(joined["observations"])
+        self.assertFalse(report["counts_as_historical_pit"])
+        self.assertEqual(report["evidence_class"], "SYNTHETIC_CONTRACT_TEST")
+
+    def test_without_book_rule_row_join_is_unscored_and_book_unvalidated(self):
         joined = self._join(settlement_rows=[])
         self.assertEqual(joined["joined_observation_count"], 1)
         row = joined["observations"][0]
         self.assertEqual(row["settlement_state"], "BOOK_SETTLEMENT_UNVALIDATED")
+        self.assertEqual(row["book_rule_evidence_class"], "MISSING")
         self.assertIsNone(row["settled_outcome"])
-        report = analyze_pit_observations(joined["observations"])
-        self.assertEqual(report["scored_row_count"], 0)
-        self.assertEqual(report["book_unvalidated_rows_excluded"], 1)
+
+    def test_wrong_sportsbook_rule_evidence_cannot_make_row_eligible(self):
+        joined = self._join(settlement_rows=[_settlement(sportsbook="FanDuel")])
+        self.assertEqual(joined["joined_observation_count"], 1)
+        self.assertEqual(joined["observations"][0]["settlement_state"], "BOOK_SETTLEMENT_UNVALIDATED")
+        self.assertIsNone(joined["observations"][0]["settled_outcome"])
+
+    def test_model_history_after_quote_is_rejected_as_lookahead(self):
+        joined = self._join(
+            model_rows=[_model(history_asof="2026-08-23T23:46:00+00:00")]
+        )
+        self.assertEqual(joined["joined_observation_count"], 0)
+        self.assertIn("history_asof_ts must be at or before quote_ts", joined["failures"][0]["reason"])
 
     def test_missing_official_fact_artifact_fails_instead_of_faking_hash(self):
         joined = self._join(official_fact_reports=[])
@@ -164,16 +272,34 @@ class MLBPITJoinerTests(unittest.TestCase):
         self.assertEqual(joined["joined_observation_count"], 0)
         self.assertIn("MODEL_ROW_NOT_FOUND_OR_AMBIGUOUS", joined["failures"][0]["reason"])
 
+    def test_duplicate_settlement_identity_fails_closed(self):
+        settlement = _settlement()
+        joined = self._join(settlement_rows=[settlement, dict(settlement)])
+        self.assertEqual(joined["joined_observation_count"], 0)
+        self.assertIn("SETTLEMENT_EVIDENCE_AMBIGUOUS", joined["failures"][0]["reason"])
+
     def test_unresolved_player_identity_fails_closed(self):
         joined = self._join(player_candidates_by_game={"999": []})
         self.assertEqual(joined["joined_observation_count"], 0)
         self.assertIn("PLAYER_NOT_FOUND", joined["failures"][0]["reason"])
 
-    def test_either_pitcher_market_uses_both_canonical_probable_pitcher_ids(self):
+    def test_observation_ambiguity_excludes_row_instead_of_scoring(self):
+        joined = self._join(
+            settlement_rows=[_settlement(ambiguity_reasons=["RAIN_SHORTENED_RULE_UNRESOLVED"])]
+        )
+        row = joined["observations"][0]
+        self.assertEqual(row["settlement_state"], "AMBIGUOUS_SETTLEMENT")
+        self.assertIsNone(row["settled_outcome"])
+
+    def test_validated_void_excludes_row_instead_of_scoring(self):
+        joined = self._join(settlement_rows=[_settlement(void_reasons=["DID_NOT_START"])] )
+        row = joined["observations"][0]
+        self.assertEqual(row["settlement_state"], "VOID")
+        self.assertIsNone(row["settled_outcome"])
+
+    def test_either_pitcher_market_remains_ambiguous_until_dedicated_interpreter_exists(self):
         quote = _quote(market="EITHER_PITCHER_ER", entity_name="Either Pitcher", line=2.5)
         archive = _archive(quote=quote)
-        archive["target_markets"] = ["EITHER_PITCHER_ER"]
-        archive["payload_sha256"] = content_sha256({k: v for k, v in archive.items() if k != "payload_sha256"})
         model = _model(market="EITHER_PITCHER_ER", entity_id="701|702", line=2.5)
         settlement = _settlement(market="EITHER_PITCHER_ER", entity_id="701|702", line=2.5)
         joined = self._join(
@@ -182,7 +308,10 @@ class MLBPITJoinerTests(unittest.TestCase):
             settlement_rows=[settlement],
         )
         self.assertEqual(joined["joined_observation_count"], 1)
-        self.assertEqual(joined["observations"][0]["entity_id"], "701|702")
+        row = joined["observations"][0]
+        self.assertEqual(row["entity_id"], "701|702")
+        self.assertEqual(row["settlement_state"], "AMBIGUOUS_SETTLEMENT")
+        self.assertIsNone(row["settled_outcome"])
 
 
 if __name__ == "__main__":
