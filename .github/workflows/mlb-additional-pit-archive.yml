@@ -29,6 +29,8 @@ jobs:
   contract:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    env:
+      PYTHONPATH: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -51,6 +53,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
+      PYTHONPATH: ${{ github.workspace }}
       SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
       SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
       SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
