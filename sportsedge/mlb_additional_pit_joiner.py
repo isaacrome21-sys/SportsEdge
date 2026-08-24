@@ -42,6 +42,8 @@ from .odds_api_source import EVENT_TIME_TOLERANCE_SECONDS, normalize_name
 ARCHIVE_TYPE = "MLB_ADDITIONAL_PIT_QUOTES"
 _BINARY_MARKETS = frozenset({"FIRST_HOME_RUN", "PITCHER_RECORD_WIN"})
 _MISSING_RAW_PARTICIPANT = "PROVIDER_PARTICIPANT_RAW_IDENTITY_NOT_ARCHIVED"
+_F5_TIE_POLICY_MISSING = "F5_MONEYLINE_TIE_POLICY_NOT_NORMALIZED"
+_FIRST_HOME_RUN_NO_HR_POLICY_MISSING = "FIRST_HOME_RUN_NO_HR_POLICY_NOT_NORMALIZED"
 
 
 def _parse_ts(value: Any, name: str) -> datetime:
@@ -216,7 +218,7 @@ def _f5_moneyline_outcome(facts: Mapping[str, Any], side: Any) -> str:
     else:
         raise MLBPITJoinError("F5_MONEYLINE_SIDE_INVALID")
     if selected == other:
-        return "PUSH"
+        raise MLBPITJoinError(_F5_TIE_POLICY_MISSING)
     return "WIN" if selected > other else "LOSS"
 
 
@@ -255,6 +257,20 @@ def _f5_total_outcome(facts: Mapping[str, Any], line: Any, side: Any) -> str:
     return "WIN" if won else "LOSS"
 
 
+def _policy_ambiguity(facts: Mapping[str, Any], market: str) -> list[str]:
+    reasons: list[str] = []
+    if market == "F5_MONEYLINE":
+        f5 = facts.get("f5")
+        if isinstance(f5, Mapping) and "away_runs" in f5 and "home_runs" in f5:
+            if float(f5["away_runs"]) == float(f5["home_runs"]):
+                reasons.append(_F5_TIE_POLICY_MISSING)
+    elif market == "FIRST_HOME_RUN":
+        first_hr = facts.get("first_home_run")
+        if isinstance(first_hr, Mapping) and first_hr.get("occurred") is False:
+            reasons.append(_FIRST_HOME_RUN_NO_HR_POLICY_MISSING)
+    return reasons
+
+
 def _derive_outcome(facts: Mapping[str, Any], market: str, entity_id: str, line: Any, side: Any) -> str:
     if market == "F5_MONEYLINE":
         return _f5_moneyline_outcome(facts, side)
@@ -275,7 +291,9 @@ def _derive_outcome(facts: Mapping[str, Any], market: str, entity_id: str, line:
         first_hr = facts.get("first_home_run")
         if not isinstance(first_hr, Mapping) or type(first_hr.get("occurred")) is not bool:
             raise MLBPITJoinError("FIRST_HOME_RUN_FACT_MISSING")
-        event_true = bool(first_hr["occurred"]) and str(first_hr.get("batter_id") or "") == entity_id
+        if first_hr.get("occurred") is False:
+            raise MLBPITJoinError(_FIRST_HOME_RUN_NO_HR_POLICY_MISSING)
+        event_true = str(first_hr.get("batter_id") or "") == entity_id
         return _binary_outcome(event_true, side)
     if market == "PITCHER_RECORD_WIN":
         winner = facts.get("winning_pitcher")
@@ -408,6 +426,7 @@ def join_additional_archive(
                 sportsbook=sportsbook,
             )
             fact_state = str((official_fact_coverage(facts).get(market) or {}).get("state") or "OFFICIAL_FACTS_MISSING")
+            ambiguity_reasons = [*ambiguity_reasons, *_policy_ambiguity(facts, market)]
             settlement_state = classify_observation_settlement(
                 official_fact_state=fact_state,
                 book_rules_validated=book_valid,
