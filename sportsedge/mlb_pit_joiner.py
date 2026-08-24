@@ -2,24 +2,43 @@
 
 The join is deterministic and fail-closed. Provider identities are resolved using
 exact team/time and exact normalized participant matching; model rows must match the
-actual line/side; official-fact and settlement evidence remain separate inputs.
+actual line/side; official facts are hash verified; book-rule evidence is validated
+against the acceptance contract; scored outcomes are derived here rather than
+trusted from an upstream label.
 """
 from __future__ import annotations
 
 import hashlib
 from typing import Any, Iterable, Mapping
 
+from .mlb_acceptance_matrix import build_acceptance_matrix
 from .mlb_pit_observation import (
     bind_participant_to_player,
     bind_provider_event_to_game,
     content_sha256,
     normalize_pit_observation,
 )
-from .mlb_settlement_evidence import canonical_bytes
+from .mlb_settlement_evidence import (
+    _BATTER_FIELD_BY_MARKET,
+    _PITCHER_FIELD_BY_MARKET,
+    canonical_bytes,
+    classify_observation_settlement,
+    official_fact_coverage,
+    validate_book_rules,
+)
+from .odds_api_source import normalize_name
+from .quote_bridge import COUNT_MARKETS
 
 
 class MLBPITJoinError(ValueError):
     pass
+
+
+_LIVE_MODEL_CLASS = "LIVE_PIT_MODEL"
+_LIVE_FACT_CLASS = "LIVE_OFFICIAL_FACT_PROBE"
+_LIVE_RULE_CLASS = "LIVE_BOOK_RULE_CAPTURE"
+_SYNTHETIC_CLASS = "SYNTHETIC_CONTRACT_TEST"
+_MISSING_RULE_CLASS = "MISSING"
 
 
 def _line_key(value: Any) -> str:
@@ -67,6 +86,21 @@ def _index_unique(rows: Iterable[Mapping[str, Any]], key_name: str) -> dict[str,
     for key in duplicates:
         out.pop(key, None)
     return out
+
+
+def _duplicate_keys(rows: Iterable[Mapping[str, Any]], key_name: str) -> set[str]:
+    seen: set[str] = set()
+    dup: set[str] = set()
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        key = str(row.get(key_name) or "").strip()
+        if not key:
+            continue
+        if key in seen:
+            dup.add(key)
+        seen.add(key)
+    return dup
 
 
 def _model_key(row: Mapping[str, Any]) -> tuple[str, str, str, str, str]:
@@ -131,6 +165,97 @@ def _either_pitcher_entity(game: Mapping[str, Any]) -> str:
     return f"{away}|{home}"
 
 
+def _required_rules_by_market() -> dict[str, tuple[str, ...]]:
+    matrix = build_acceptance_matrix()
+    return {
+        str(row["market"]): tuple(
+            str(x) for x in row["requirements"]["settlement_semantics"]
+        )
+        for row in matrix["markets"]
+    }
+
+
+def _unique_player_fact(rows: Any, entity_id: str, field: str) -> float | None:
+    if not isinstance(rows, list):
+        return None
+    matches = [
+        row for row in rows
+        if isinstance(row, Mapping) and str(row.get("player_id") or "") == str(entity_id)
+    ]
+    if len(matches) != 1 or field not in matches[0]:
+        return None
+    value = matches[0].get(field)
+    if isinstance(value, bool):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _fact_value(facts: Mapping[str, Any], market: str, entity_id: str) -> float | None:
+    if market.startswith("EITHER_PITCHER_"):
+        return None
+    if market in _BATTER_FIELD_BY_MARKET:
+        return _unique_player_fact(
+            facts.get("batters"), entity_id, _BATTER_FIELD_BY_MARKET[market]
+        )
+    if market in _PITCHER_FIELD_BY_MARKET:
+        return _unique_player_fact(
+            facts.get("pitchers"), entity_id, _PITCHER_FIELD_BY_MARKET[market]
+        )
+    return None
+
+
+def _derive_count_outcome(*, value: float, line: Any, side: Any) -> str:
+    threshold = float(line)
+    direction = str(side or "").upper()
+    if direction not in {"OVER", "UNDER"}:
+        raise MLBPITJoinError("COUNT_PROP_SIDE_MUST_BE_OVER_OR_UNDER")
+    if abs(value - threshold) <= 1e-12:
+        return "PUSH"
+    won = value > threshold if direction == "OVER" else value < threshold
+    return "WIN" if won else "LOSS"
+
+
+def _rules_match_sportsbook(
+    *,
+    required_rules: tuple[str, ...],
+    evidence: Mapping[str, Any] | None,
+    sportsbook: str,
+) -> tuple[bool, list[str]]:
+    valid, missing = validate_book_rules(required_rules, evidence)
+    if not valid:
+        return False, list(missing)
+    expected = normalize_name(sportsbook)
+    mismatched = []
+    assert isinstance(evidence, Mapping)
+    for rule in required_rules:
+        record = evidence.get(rule)
+        actual = normalize_name(record.get("sportsbook") if isinstance(record, Mapping) else "")
+        if not expected or actual != expected:
+            mismatched.append(f"SPORTSBOOK_MISMATCH:{rule}")
+    return not mismatched, mismatched
+
+
+def _rules_hash(
+    *,
+    required_rules: tuple[str, ...],
+    evidence: Mapping[str, Any] | None,
+    sportsbook: str,
+) -> str | None:
+    if not isinstance(evidence, Mapping) or not evidence:
+        return None
+    selected = {rule: evidence.get(rule) for rule in required_rules}
+    return content_sha256(
+        {
+            "sportsbook": sportsbook,
+            "required_rules": list(required_rules),
+            "rule_evidence": selected,
+        }
+    )
+
+
 def join_prop_archive(
     *,
     archive_payload: Mapping[str, Any],
@@ -143,7 +268,7 @@ def join_prop_archive(
     if str(archive_payload.get("archive_type") or "") != "MLB_PROP_PIT_QUOTES":
         raise MLBPITJoinError("MLB_PROP_PIT_QUOTES archive required")
     source_class = str(archive_payload.get("evidence_class") or "").upper()
-    if source_class not in {"LIVE_PROVIDER_QUOTE_ARCHIVE", "SYNTHETIC_CONTRACT_TEST"}:
+    if source_class not in {"LIVE_PROVIDER_QUOTE_ARCHIVE", _SYNTHETIC_CLASS}:
         raise MLBPITJoinError("archive evidence_class unsupported")
     quote_source_hash = str(archive_payload.get("payload_sha256") or "").lower()
     if len(quote_source_hash) != 64:
@@ -158,7 +283,10 @@ def join_prop_archive(
     game_by_id = _index_unique(games, "game_id")
     model_idx = _model_index(model_rows)
     fact_idx = _fact_index(official_fact_reports)
-    settlement_idx = _index_unique(settlement_rows, "observation_key")
+    settlement_list = [dict(row) for row in settlement_rows if isinstance(row, Mapping)]
+    settlement_idx = _index_unique(settlement_list, "observation_key")
+    settlement_duplicates = _duplicate_keys(settlement_list, "observation_key")
+    required_rules_by_market = _required_rules_by_market()
 
     joined: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
@@ -173,11 +301,14 @@ def join_prop_archive(
         try:
             if quote.get("pit_eligible") is not True:
                 raise MLBPITJoinError("QUOTE_NOT_PIT_ELIGIBLE")
+            market = str(quote.get("market") or "").upper()
+            if market not in COUNT_MARKETS:
+                raise MLBPITJoinError("PROP_ARCHIVE_COUNT_MARKET_REQUIRED")
+
             game_id = bind_provider_event_to_game(quote, games)
             game = game_by_id.get(game_id)
             if game is None:
                 raise MLBPITJoinError("CANONICAL_GAME_ROW_NOT_UNIQUE")
-            market = str(quote.get("market") or "").upper()
             if market.startswith("EITHER_PITCHER_"):
                 entity_id = _either_pitcher_entity(game)
             else:
@@ -196,10 +327,16 @@ def join_prop_archive(
             model = model_idx.get(key)
             if model is None:
                 raise MLBPITJoinError("MODEL_ROW_NOT_FOUND_OR_AMBIGUOUS")
+            model_class = str(model.get("evidence_class") or "").strip().upper()
+            if model_class not in {_LIVE_MODEL_CLASS, _SYNTHETIC_CLASS}:
+                raise MLBPITJoinError("MODEL_EVIDENCE_CLASS_REQUIRED")
 
             fact_report = fact_idx.get(str(game_id))
             if fact_report is None:
                 raise MLBPITJoinError("OFFICIAL_FACT_REPORT_NOT_FOUND_OR_AMBIGUOUS")
+            fact_class = str(fact_report.get("evidence_class") or "").strip().upper()
+            if fact_class not in {_LIVE_FACT_CLASS, _SYNTHETIC_CLASS}:
+                raise MLBPITJoinError("OFFICIAL_FACT_EVIDENCE_CLASS_REQUIRED")
             facts = fact_report.get("facts")
             if not isinstance(facts, Mapping):
                 raise MLBPITJoinError("OFFICIAL_FACTS_PAYLOAD_MISSING")
@@ -227,10 +364,71 @@ def join_prop_archive(
                 book_key=quote.get("book_key"),
                 quote_ts=quote_ts,
             )
-            settlement = settlement_idx.get(obs_key) or {}
-            settlement_state = str(
-                settlement.get("settlement_state") or "BOOK_SETTLEMENT_UNVALIDATED"
-            ).upper()
+            if obs_key in settlement_duplicates:
+                raise MLBPITJoinError("SETTLEMENT_EVIDENCE_AMBIGUOUS")
+            settlement = settlement_idx.get(obs_key)
+
+            required_rules = required_rules_by_market.get(market)
+            if required_rules is None:
+                raise MLBPITJoinError("SETTLEMENT_RULE_CONTRACT_MISSING")
+            sportsbook = str(quote.get("sportsbook") or "DraftKings")
+            if settlement is None:
+                rule_class = _MISSING_RULE_CLASS
+                rule_evidence: Mapping[str, Any] | None = None
+                ambiguity_reasons: list[str] = []
+                void_reasons: list[str] = []
+            else:
+                rule_class = str(settlement.get("evidence_class") or "").strip().upper()
+                if rule_class not in {_LIVE_RULE_CLASS, _SYNTHETIC_CLASS}:
+                    raise MLBPITJoinError("BOOK_RULE_EVIDENCE_CLASS_REQUIRED")
+                candidate_evidence = settlement.get("book_rule_evidence")
+                rule_evidence = candidate_evidence if isinstance(candidate_evidence, Mapping) else None
+                ambiguity_reasons = [
+                    str(x) for x in (settlement.get("ambiguity_reasons") or []) if str(x)
+                ]
+                void_reasons = [
+                    str(x) for x in (settlement.get("void_reasons") or []) if str(x)
+                ]
+
+            book_valid, _book_failures = _rules_match_sportsbook(
+                required_rules=required_rules,
+                evidence=rule_evidence,
+                sportsbook=sportsbook,
+            )
+            rules_hash = _rules_hash(
+                required_rules=required_rules,
+                evidence=rule_evidence,
+                sportsbook=sportsbook,
+            )
+
+            coverage = official_fact_coverage(facts)
+            fact_state = str((coverage.get(market) or {}).get("state") or "OFFICIAL_FACTS_MISSING")
+            fact_value = _fact_value(facts, market, str(entity_id))
+            if market.startswith("EITHER_PITCHER_"):
+                ambiguity_reasons = [
+                    *ambiguity_reasons,
+                    "EITHER_PITCHER_SETTLEMENT_INTERPRETER_REQUIRED",
+                ]
+            elif fact_value is None:
+                fact_state = "OFFICIAL_FACTS_MISSING"
+
+            settlement_state = classify_observation_settlement(
+                official_fact_state=fact_state,
+                book_rules_validated=book_valid,
+                ambiguity_reasons=ambiguity_reasons,
+            )
+            if settlement_state == "SETTLEMENT_ELIGIBLE" and void_reasons:
+                settlement_state = "VOID"
+
+            settled_outcome = None
+            if settlement_state == "SETTLEMENT_ELIGIBLE":
+                if fact_value is None:
+                    raise MLBPITJoinError("SETTLEMENT_ELIGIBLE_WITHOUT_FACT_VALUE")
+                settled_outcome = _derive_count_outcome(
+                    value=fact_value,
+                    line=quote.get("line"),
+                    side=quote.get("side"),
+                )
 
             raw = {
                 "market": market,
@@ -240,9 +438,12 @@ def join_prop_archive(
                 "first_pitch_ts": quote.get("first_pitch_at"),
                 "line": quote.get("line"),
                 "side": quote.get("side"),
-                "sportsbook": quote.get("sportsbook") or "DraftKings",
+                "sportsbook": sportsbook,
                 "book_key": quote.get("book_key") or "draftkings_direct",
                 "source_evidence_class": source_class,
+                "model_evidence_class": model_class,
+                "official_fact_evidence_class": fact_class,
+                "book_rule_evidence_class": rule_class,
                 "quote_source_hash": quote_source_hash,
                 "provider_event_hash": quote.get("provider_event_sha256"),
                 "identity_binding_hash": identity_hash,
@@ -250,9 +451,9 @@ def join_prop_archive(
                 "history_source_hash": model.get("history_source_hash"),
                 "model_input_hash": model.get("model_input_hash"),
                 "official_facts_hash": official_facts_hash,
-                "settlement_rules_hash": settlement.get("settlement_rules_hash"),
+                "settlement_rules_hash": rules_hash,
                 "settlement_state": settlement_state,
-                "settled_outcome": settlement.get("settled_outcome"),
+                "settled_outcome": settled_outcome,
                 "candidate_p": model.get("candidate_p"),
                 "incumbent_p": model.get("incumbent_p"),
             }
@@ -276,7 +477,7 @@ def join_prop_archive(
             )
 
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "archive_payload_sha256": quote_source_hash,
         "source_quote_count": len(quotes),
         "joined_observation_count": len(joined),
