@@ -49,6 +49,10 @@ class MLBPropOutcomeJoinTests(unittest.TestCase):
             "entity_id": quote["entity_id"],
             "history_asof_ts": "2026-08-10T17:59:00-05:00",
             "history_source_hash": "c" * 64,
+            "history_sample_size": 10,
+            "model_input_sha256": "f" * 64,
+            "incumbent_model_version": "synthetic_incumbent_v1",
+            "challenger_model_version": "synthetic_challenger_v1",
             "incumbent_p": 0.55,
             "challenger_p": 0.63,
         }
@@ -162,6 +166,30 @@ class MLBPropOutcomeJoinTests(unittest.TestCase):
                 quote_archive_sha256="a" * 64,
                 evidence_origin="SYNTHETIC_FIXTURE",
             )
+
+    def test_missing_history_pool_identity_fails_closed(self):
+        bundle = self._bundle()
+        bundle["model_eval"] = {**bundle["model_eval"], "history_source_hash": ""}
+        with self.assertRaisesRegex(PropOutcomeJoinError, "history_source_hash"):
+            join_evidence_row(**bundle)
+
+    def test_empty_history_pool_fails_closed(self):
+        bundle = self._bundle()
+        bundle["model_eval"] = {**bundle["model_eval"], "history_sample_size": 0}
+        with self.assertRaisesRegex(PropOutcomeJoinError, "history_sample_size must be >= 1"):
+            join_evidence_row(**bundle)
+
+    def test_missing_model_identity_fails_closed(self):
+        bundle = self._bundle()
+        bundle["model_eval"] = {**bundle["model_eval"], "challenger_model_version": ""}
+        with self.assertRaisesRegex(PropOutcomeJoinError, "challenger_model_version required"):
+            join_evidence_row(**bundle)
+
+    def test_post_first_pitch_history_fails_closed(self):
+        bundle = self._bundle()
+        bundle["model_eval"] = {**bundle["model_eval"], "history_asof_ts": "2026-08-10T19:11:00-05:00"}
+        with self.assertRaisesRegex(PropOutcomeJoinError, "history_asof_ts must be before"):
+            join_evidence_row(**bundle)
 
     def test_synthetic_happy_path_cannot_claim_historical_pit(self):
         report = build_join_report([
