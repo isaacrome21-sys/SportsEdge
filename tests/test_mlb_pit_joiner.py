@@ -349,6 +349,8 @@ class MLBPITJoinerTests(unittest.TestCase):
         quote["retrieved_at"] = "2026-08-24T00:20:00+00:00"
         quote["quote_retrieved_at"] = "2026-08-24T00:20:00+00:00"
         quote["first_pitch_at"] = "2026-08-24T01:00:00+00:00"
+        quote["provider_event_snapshot"]["startDate"] = "2026-08-24T01:00:00Z"
+        quote["provider_event_sha256"] = content_sha256(quote["provider_event_snapshot"])
         _rehash_archive(archive)
 
         joined = self._join(
