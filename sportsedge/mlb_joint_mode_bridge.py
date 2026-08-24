@@ -20,17 +20,23 @@ class MLBJointModeBridgeError(ValueError):
 def _content_sha(value: Any) -> str:
     return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(",",":"),default=str).encode()).hexdigest()
 
-def _batter_context(game:LiveGame,entity_id:str)->tuple[int,int,int]:
+def _batter_team(game:LiveGame,entity_id:str)->int:
     try:pid=int(entity_id)
     except (TypeError,ValueError) as exc:raise MLBJointModeBridgeError("batter entity_id must be MLB player id") from exc
-    if game.venue_id is None:raise MLBJointModeBridgeError("VENUE_UNMAPPED")
-    if pid in game.away_lineup.player_ids:
-        if game.home_probable_pitcher_id is None:raise MLBJointModeBridgeError("home probable pitcher required")
-        return int(game.away_team_id),int(game.home_probable_pitcher_id),int(game.venue_id)
-    if pid in game.home_lineup.player_ids:
-        if game.away_probable_pitcher_id is None:raise MLBJointModeBridgeError("away probable pitcher required")
-        return int(game.home_team_id),int(game.away_probable_pitcher_id),int(game.venue_id)
+    away=pid in game.away_lineup.player_ids;home=pid in game.home_lineup.player_ids
+    if away and home:raise MLBJointModeBridgeError("batter appears in both lineups")
+    if away:return int(game.away_team_id)
+    if home:return int(game.home_team_id)
     raise MLBJointModeBridgeError("batter not present in live lineup")
+
+def _batter_context(game:LiveGame,entity_id:str)->tuple[int,int,int]:
+    team_id=_batter_team(game,entity_id);pid=int(entity_id)
+    if game.venue_id is None:raise MLBJointModeBridgeError("VENUE_UNMAPPED")
+    if team_id==int(game.away_team_id):
+        if game.home_probable_pitcher_id is None:raise MLBJointModeBridgeError("home probable pitcher required")
+        return team_id,int(game.home_probable_pitcher_id),int(game.venue_id)
+    if game.away_probable_pitcher_id is None:raise MLBJointModeBridgeError("away probable pitcher required")
+    return team_id,int(game.away_probable_pitcher_id),int(game.venue_id)
 
 def build_canonical_feature_row(*,game:LiveGame,quote:Mapping[str,Any],source:MLBGenericHistorySource,target_date:date)->dict[str,Any]:
     q=validate_canonical_quote(quote)
@@ -39,11 +45,10 @@ def build_canonical_feature_row(*,game:LiveGame,quote:Mapping[str,Any],source:ML
     base={"game_pk":int(game.game_pk),"market":market,"entity_id":entity_id,"retrieved_at":source.retrieved_at.isoformat(),"asof":source.retrieved_at.isoformat(),"source":"MLB_STATSAPI_STRICTLY_PRIOR_JOINT_FEATURES"}
 
     # HOME_RUNS intentionally remains on the behaviorally measured generic
-    # baseline. Build the generic PIT scalar feature even when the caller is one
-    # of the new joint-mode runners; the unpromoted joint HR candidate remains
-    # directly testable but is not canonical runtime.
+    # baseline. It requires only batter/team identity plus strictly-prior hitter
+    # history; do not inherit joint-only venue or opposing-starter prerequisites.
     if market=="HOME_RUNS":
-        team_id,_,_=_batter_context(game,entity_id)
+        team_id=_batter_team(game,entity_id)
         return source.feature_row(
             game_pk=int(game.game_pk),market=market,entity_id=entity_id,
             target_date=target_date,away_team_id=int(game.away_team_id),
