@@ -10,12 +10,14 @@ on:
       - 'scripts/archive_mlb_additional_odds.py'
       - 'sportsedge/additional_mlb_odds_source.py'
       - 'tests/test_archive_mlb_additional_odds.py'
+      - 'tests/test_additional_binary_quote_provenance.py'
       - '.github/workflows/mlb-additional-pit-archive.yml'
   push:
     paths:
       - 'scripts/archive_mlb_additional_odds.py'
       - 'sportsedge/additional_mlb_odds_source.py'
       - 'tests/test_archive_mlb_additional_odds.py'
+      - 'tests/test_additional_binary_quote_provenance.py'
       - '.github/workflows/mlb-additional-pit-archive.yml'
 
 permissions:
@@ -42,6 +44,8 @@ jobs:
         run: python scripts/archive_mlb_additional_odds.py --self-test
       - name: Run additional PIT archive tests
         run: python -m unittest discover -s tests -p 'test_archive_mlb_additional_odds.py'
+      - name: Verify binary participant provenance survives source to archive
+        run: python -m unittest discover -s tests -p 'test_additional_binary_quote_provenance.py'
       - name: Recheck additional quote mappings
         run: python -m unittest discover -s tests -p 'test_additional_mlb_odds_source.py'
       - name: Recheck 36-market source capability
