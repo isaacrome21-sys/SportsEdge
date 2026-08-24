@@ -1,4 +1,4 @@
-"""Fail-closed card pipeline for the expanded MLB market surface."""
+"""Fail-closed canonical card pipeline for MLB game and joint prop markets."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -9,24 +9,17 @@ from typing import Any, Mapping
 from .deployments import load_registry
 from .devig import multiplicative_devig, validate_pair
 from .engine_registry import engine_registry
-from .generic_market_engine import BINARY_MARKETS, COUNT_MARKETS, GAME_MARKETS, PA_BOUNDED_COUNT_MARKETS
+from .generic_market_engine import GAME_MARKETS
+from .hitter_joint_engine import HITTER_MARKETS
 from .live_slate import LiveGame
 from .orchestrator import run_candidate
+from .pitcher_joint_engine import PITCHER_MARKETS
 from .quote_bridge import validate_canonical_quote
 from .truth_gate import american_to_decimal
 
-# PITCHER_BB is owned by pitcher_card_pipeline / run_pitcher_bb_card. Keeping it
-# out of this set prevents the generic scalar feature contract from being fed to
-# the dedicated workload engine by direct generic-pipeline callers.
-GENERIC_MARKETS = frozenset((GAME_MARKETS | COUNT_MARKETS | BINARY_MARKETS) - {"PITCHER_BB"})
-BATTER_GENERIC_MARKETS = frozenset({
-    "HOME_RUNS", "RBI", "RUNS", "HITS_RUNS_RBIS", "SINGLES", "DOUBLES",
-    "TRIPLES", "BATTER_BB", "BATTER_K", "STOLEN_BASES", "FIRST_HOME_RUN",
-})
-PITCHER_GENERIC_MARKETS = frozenset({
-    "PITCHER_K", "PITCHER_HITS_ALLOWED", "PITCHER_ER", "PITCHER_OUTS",
-    "PITCHER_RECORD_WIN",
-})
+GENERIC_MARKETS = frozenset(GAME_MARKETS | HITTER_MARKETS | PITCHER_MARKETS)
+BATTER_GENERIC_MARKETS = frozenset(HITTER_MARKETS)
+PITCHER_GENERIC_MARKETS = frozenset(PITCHER_MARKETS)
 
 
 @dataclass(frozen=True)
@@ -69,10 +62,8 @@ def _feature_index(rows: list[Mapping[str, Any]]) -> dict[tuple[str, str, str], 
         if not game_id or not entity_id:
             continue
         key = (game_id, entity_id, market)
-        if key in out:
-            if dict(out[key]) != dict(row):
-                raise ValueError(f"conflicting generic feature identity {key}")
-            continue
+        if key in out and dict(out[key]) != dict(row):
+            raise ValueError(f"conflicting feature identity {key}")
         out[key] = row
     return out
 
@@ -101,6 +92,8 @@ def _bind_entity(game: LiveGame, market: str, entity_id: str, feature: Mapping[s
             raise ValueError("PLAYER_TEAM_MISMATCH")
         return
     if market in PITCHER_GENERIC_MARKETS:
+        if market.startswith("EITHER_PITCHER_"):
+            return
         try:
             pid = int(entity_id)
         except (TypeError, ValueError) as exc:
@@ -120,32 +113,37 @@ def _model_input(*, game: LiveGame, quote: Mapping[str, Any], feature: Mapping[s
     if str(feature.get("market")) != market:
         raise ValueError("feature market mismatch")
 
-    if market in COUNT_MARKETS:
-        model_features = {"expected_count": feature.get("expected_count")}
-        if market in PA_BOUNDED_COUNT_MARKETS:
-            model_features["projected_pa"] = feature.get("projected_pa")
-    elif market in BINARY_MARKETS:
-        model_features = {"event_probability": feature.get("event_probability")}
+    out: dict[str, Any] = {
+        "game_id": str(game.game_pk), "market": market, "entity_id": entity_id,
+        "line": quote.get("line"), "side": quote.get("side"),
+    }
+    if market in HITTER_MARKETS | PITCHER_MARKETS:
+        payload = feature.get("features")
+        if not isinstance(payload, Mapping):
+            # Joint feature snapshots may place canonical payload keys at top level.
+            ignored = {
+                "game_pk", "game_id", "market", "entity_id", "player_id", "team_id",
+                "retrieved_at", "asof", "generic_feature_version", "joint_feature_version",
+                "feature_version", "feature_source_hash", "source_subset_hash", "source",
+            }
+            payload = {k: v for k, v in feature.items() if k not in ignored}
+        out["features"] = dict(payload)
     else:
         if market.startswith("F5_"):
-            model_features = {
+            out.update({
                 "f5_away_mean_runs": feature.get("f5_away_mean_runs"),
                 "f5_home_mean_runs": feature.get("f5_home_mean_runs"),
-            }
+            })
         else:
-            model_features = {
+            out.update({
                 "away_mean_runs": feature.get("away_mean_runs"),
                 "home_mean_runs": feature.get("home_mean_runs"),
-            }
+            })
         if market not in {"TOTALS", "F5_TOTALS"}:
-            model_features["total_line"] = feature.get("total_line", 0.0)
-
-    out = {
-        "game_id": str(game.game_pk), "market": market, "entity_id": entity_id,
-        "line": quote.get("line"), "side": quote.get("side"), **model_features,
-    }
-    if feature.get("source_subset_hash") is not None:
-        out["feature_source_hash"] = feature["source_subset_hash"]
+            out["total_line"] = feature.get("total_line", 0.0)
+    source_hash = feature.get("feature_source_hash", feature.get("source_subset_hash"))
+    if source_hash is not None:
+        out["feature_source_hash"] = source_hash
     return out
 
 
@@ -180,8 +178,7 @@ def _shadow(model_p: float | None, push_p: float, quote: Mapping[str, Any], oppo
     try:
         fair = multiplicative_devig(quote, opposite).candidate_fair_probability
         dec = american_to_decimal(quote["american_odds"])
-        p_win = float(model_p)
-        p_push = float(push_p)
+        p_win = float(model_p); p_push = float(push_p)
         if not isfinite(p_win) or not 0 <= p_win <= 1:
             raise ValueError("invalid Model_P")
         if not isfinite(p_push) or not 0 <= p_push < 1 or p_win + p_push > 1.0 + 1e-12:
@@ -207,7 +204,7 @@ def run_generic_card(*, games: list[LiveGame], feature_rows: list[Mapping[str, A
             quote = validate_canonical_quote(raw)
             market = str(quote["market"])
             if market not in GENERIC_MARKETS:
-                raise ValueError(f"unsupported generic market: {market}")
+                raise ValueError(f"unsupported canonical market: {market}")
             opposite = _paired_quote(quote, valid_quotes)
             game = games_by_id.get(str(quote["game_id"]))
             if game is None:
@@ -215,17 +212,15 @@ def run_generic_card(*, games: list[LiveGame], feature_rows: list[Mapping[str, A
             key = (str(quote["game_id"]), str(quote["entity_id"]), market)
             feature = features.get(key)
             if feature is None:
-                raise ValueError("generic feature row missing")
+                raise ValueError("feature row missing")
             model_input = _model_input(game=game, quote=quote, feature=feature)
-            engine = engines.get(market)
-            deployment = deployments.get(market)
+            engine = engines.get(market); deployment = deployments.get(market)
             if engine is None or deployment is None:
                 raise ValueError("market missing engine/deployment registration")
             shadow_output = dict(engine(model_input))
             if "model_p" not in shadow_output:
                 raise ValueError("engine output missing model_p")
-            model_p = float(shadow_output["model_p"])
-            push_p = float(shadow_output.get("push_p", 0.0))
+            model_p = float(shadow_output["model_p"]); push_p = float(shadow_output.get("push_p", 0.0))
             shadow_status, implied, edge, ev = _shadow(model_p, push_p, quote, opposite)
             run = run_candidate(model_input=model_input, quote=quote, paired_quote=opposite, deployment=deployment, engine_fn=engine, ingestion_now=ingestion_now, finalization_now=finalization_now, edge_floor_config_path=edge_floor_config_path, kelly_multiplier=kelly_multiplier)
             results.append(GenericCardResult(str(quote["game_id"]), market, str(quote["entity_id"]), quote["line"], str(quote["side"]), quote["american_odds"], model_p, run.bet_status, run.reason, shadow_status, implied, edge, ev))
