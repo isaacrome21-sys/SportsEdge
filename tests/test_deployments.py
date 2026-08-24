@@ -7,10 +7,10 @@ from sportsedge.deployments import load_registry, deployment_for, DeploymentRegi
 
 
 class DeploymentTests(unittest.TestCase):
-    def test_checked_in_registry_loads_and_hits_is_not_deployed(self):
+    def test_checked_in_registry_loads_and_hits_is_candidate_not_deployed(self):
         reg = load_registry()
         self.assertFalse(reg["markets"]["HITS"]["eligible"])
-        self.assertEqual(deployment_for("HITS")["stage"], "PRODUCTION_LOGIC_PASS")
+        self.assertEqual(deployment_for("HITS")["stage"], "JOINT_ENGINE_CANDIDATE")
 
     def test_unknown_market_fails_closed(self):
         self.assertFalse(deployment_for("DOES_NOT_EXIST")["eligible"])
