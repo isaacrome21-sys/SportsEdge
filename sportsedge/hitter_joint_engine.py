@@ -1,9 +1,9 @@
 """Coherent hitter prop challenger from strictly-prior game rows.
 
 Every prior game is one joint state containing PA and all hitter counting outcomes.
-All individual and combination markets are marginals of the same rows, so overlapping
-propositions cannot contradict one another. This is the honest v1 until PA-level
-play-by-play state is available.
+All individual and combination markets are marginals of the same weighted rows, so
+overlapping propositions cannot contradict one another. Optional matchup weights may
+reweight whole rows, but no market receives a separate predictive formula.
 """
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import json
 from math import isfinite
 from typing import Any, Mapping, Sequence
 
-ENGINE_VERSION = "mlb_hitter_joint_empirical_v2"
+ENGINE_VERSION = "mlb_hitter_joint_empirical_v3"
 
 HITTER_MARKETS = frozenset({
     "HITS", "HOME_RUNS", "TOTAL_BASES", "RBI", "RUNS", "STOLEN_BASES", "BATTER_BB",
@@ -81,6 +81,20 @@ def _normalize_pool(raw: Any) -> list[dict[str, int]]:
     return rows
 
 
+def _normalize_weights(raw: Any, n: int) -> list[float]:
+    if raw is None:
+        return [1.0 / n] * n
+    if not isinstance(raw, Sequence) or isinstance(raw, (str, bytes)) or len(raw) != n:
+        raise HitterJointEngineError("history_weights must align one-to-one with history_pool")
+    vals = [_f(v, f"history_weights[{i}]", 0.0) for i, v in enumerate(raw)]
+    if any(v <= 0 for v in vals):
+        raise HitterJointEngineError("history_weights must be strictly positive")
+    total = sum(vals)
+    if not isfinite(total) or total <= 0:
+        raise HitterJointEngineError("history_weights total invalid")
+    return [v / total for v in vals]
+
+
 def _value(row: Mapping[str, int], market: str) -> int:
     keys = {
         "HITS": "hits", "HOME_RUNS": "home_runs", "TOTAL_BASES": "total_bases",
@@ -109,18 +123,18 @@ def price_hitter_market(model_input: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(features, Mapping):
         raise HitterJointEngineError("features required")
     pool = _normalize_pool(features.get("history_pool"))
+    weights = _normalize_weights(features.get("history_weights"), len(pool))
     values = [_value(row, market) for row in pool]
-    n = len(values)
-    p_over = sum(v > line for v in values) / n
-    p_under = sum(v < line for v in values) / n
-    p_push = sum(v == line for v in values) / n if float(line).is_integer() else 0.0
+    p_over = sum(w for v, w in zip(values, weights) if v > line)
+    p_under = sum(w for v, w in zip(values, weights) if v < line)
+    p_push = sum(w for v, w in zip(values, weights) if v == line) if float(line).is_integer() else 0.0
     if abs(p_over + p_under + p_push - 1.0) > 1e-12:
         raise HitterJointEngineError("probability mass does not conserve")
-    digest = _sha({"engine": ENGINE_VERSION, "game_id": model_input.get("game_id"), "entity_id": model_input.get("entity_id"), "feature_source_hash": model_input.get("feature_source_hash"), "history_pool": pool})
+    digest = _sha({"engine": ENGINE_VERSION, "game_id": model_input.get("game_id"), "entity_id": model_input.get("entity_id"), "feature_source_hash": model_input.get("feature_source_hash"), "history_pool": pool, "history_weights": weights})
     return {
         "game_id": model_input.get("game_id"), "market": market, "entity_id": model_input.get("entity_id"),
         "line": line, "side": side, "model_p": p_over if side == "OVER" else p_under,
         "push_p": p_push, "model_input_hash": digest, "engine_version": ENGINE_VERSION,
-        "seed_policy": "analytic_empirical_joint_game_rows", "mc_paths": 0,
-        "meta": {"history_games": len(pool), "shared_joint_rows": True},
+        "seed_policy": "analytic_weighted_empirical_joint_game_rows", "mc_paths": 0,
+        "meta": {"history_games": len(pool), "shared_joint_rows": True, "weighted": features.get("history_weights") is not None},
     }
