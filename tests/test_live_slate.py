@@ -36,8 +36,8 @@ class LiveSlateTests(unittest.TestCase):
             "p_h":.23,"p_hr":.035,"park":1.02,"pa_pool":[4,4,5,3,4,4],
         }
 
-    def quote(self, player_id=100, market="HITS"):
-        return {"game_id":"777","market":market,"entity_id":str(player_id),"line":.5,"side":"OVER","american_odds":-125,"retrieved_at":"2026-08-10T20:00:00+00:00","ttl_seconds":300}
+    def quote(self, player_id=100, market="HITS", line=.5, side="OVER"):
+        return {"game_id":"777","market":market,"entity_id":str(player_id),"line":line,"side":side,"american_odds":-125,"retrieved_at":"2026-08-10T20:00:00+00:00","ttl_seconds":300}
 
     def game(self, away=None, home=None):
         return make_live_game(self.snapshot(), away or rows(100), home or rows(200))
@@ -112,6 +112,16 @@ class LiveSlateTests(unittest.TestCase):
         f2=self.feature(); f2["pa_pool"]=[4,4,5,3,4,5]
         c2=assemble_hitter_candidate(game=self.game(),market="HITS",feature_row=f2,quote=self.quote())
         self.assertNotEqual(c1["model_input"]["build_hash"],c2["model_input"]["build_hash"])
+
+    def test_hits_rng_identity_is_invariant_to_quote_side_and_line(self):
+        over=assemble_hitter_candidate(game=self.game(),market="HITS",feature_row=self.feature(),quote=self.quote(line=.5,side="OVER"))
+        under=assemble_hitter_candidate(game=self.game(),market="HITS",feature_row=self.feature(),quote=self.quote(line=1.5,side="UNDER"))
+        self.assertEqual(over["model_input"]["build_hash"],under["model_input"]["build_hash"])
+
+    def test_total_bases_rng_identity_is_invariant_to_quote_side_and_line(self):
+        over=assemble_hitter_candidate(game=self.game(),market="TOTAL_BASES",feature_row=self.tb_feature(),quote=self.quote(market="TOTAL_BASES",line=.5,side="OVER"))
+        under=assemble_hitter_candidate(game=self.game(),market="TOTAL_BASES",feature_row=self.tb_feature(),quote=self.quote(market="TOTAL_BASES",line=2.5,side="UNDER"))
+        self.assertEqual(over["model_input"]["build_hash"],under["model_input"]["build_hash"])
 
     def test_nonfinite_features_fail(self):
         f=self.feature(); f["b_rate"]=float("nan")
