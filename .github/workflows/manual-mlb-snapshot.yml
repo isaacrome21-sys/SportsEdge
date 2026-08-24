@@ -61,40 +61,36 @@ jobs:
           DISPATCH_INPUT: ${{ github.event.inputs.input_path }}
         run: |
           set -euo pipefail
-          RUN_DATE="$(date -u +%F)"
+          RUN_DATE="$(TZ=America/Chicago date +%F)"
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${DISPATCH_INPUT:-}" ]]; then
             INPUT="$DISPATCH_INPUT"
           else
             mapfile -t MATCHES < <(find manual_inputs/mlb -maxdepth 1 -type f -name "${RUN_DATE}*.json" | sort)
-            if [[ ${#MATCHES[@]} -gt 0 ]]; then
-              INPUT="${MATCHES[-1]}"
-            elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            if [[ ${#MATCHES[@]} -eq 0 ]]; then
               echo "TODAY_INPUT_NOT_LOADED: no manual_inputs/mlb/${RUN_DATE}*.json" >&2
               exit 1
-            else
-              echo "path=manual_inputs/mlb/2026-08-17_stl_cin_g1_dk.json" >> "$GITHUB_OUTPUT"
-              echo "live=false" >> "$GITHUB_OUTPUT"
-              echo "accepted_stale=false" >> "$GITHUB_OUTPUT"
-              exit 0
             fi
+            INPUT="${MATCHES[-1]}"
           fi
           [[ -f "$INPUT" ]] || { echo "MANUAL_INPUT_NOT_FOUND: $INPUT" >&2; exit 1; }
+          INPUT_BASE="$(basename "$INPUT")"
+          INPUT_DATE="${INPUT_BASE:0:10}"
+          [[ "$INPUT_DATE" == "$RUN_DATE" ]] || {
+            echo "MANUAL_INPUT_DATE_MISMATCH: input_date=$INPUT_DATE run_date=$RUN_DATE path=$INPUT" >&2
+            exit 1
+          }
           echo "path=$INPUT" >> "$GITHUB_OUTPUT"
           echo "run_date=$RUN_DATE" >> "$GITHUB_OUTPUT"
-          echo "live=true" >> "$GITHUB_OUTPUT"
           if [[ "$INPUT" == *"accepted_lines"* ]]; then
             echo "accepted_stale=true" >> "$GITHUB_OUTPUT"
           else
             echo "accepted_stale=false" >> "$GITHUB_OUTPUT"
           fi
-      - name: Run regression fixture
-        if: steps.resolve.outputs.live != 'true'
-        run: PYTHONPATH=. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.resolve.outputs.path }}" --allow-stale --output artifacts/manual_mlb_snapshot_card.json
       - name: Run SportsEdge on user-accepted supplied lines
-        if: steps.resolve.outputs.live == 'true' && steps.resolve.outputs.accepted_stale == 'true'
-        run: PYTHONPATH=. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.resolve.outputs.path }}" --allow-stale --output artifacts/manual_mlb_snapshot_card.json
+        if: steps.resolve.outputs.accepted_stale == 'true'
+        run: PYTHONPATH=. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.resolve.outputs.path }}" --run-date "${{ steps.resolve.outputs.run_date }}" --max-age-minutes "${{ github.event.inputs.max_age_minutes || '60' }}" --output artifacts/manual_mlb_snapshot_card.json
       - name: Run SportsEdge on live supplied lines
-        if: steps.resolve.outputs.live == 'true' && steps.resolve.outputs.accepted_stale != 'true'
+        if: steps.resolve.outputs.accepted_stale != 'true'
         run: PYTHONPATH=. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.resolve.outputs.path }}" --run-date "${{ steps.resolve.outputs.run_date }}" --max-age-minutes "${{ github.event.inputs.max_age_minutes || '60' }}" --output artifacts/manual_mlb_snapshot_card.json
       - name: Persist latest audited result
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
