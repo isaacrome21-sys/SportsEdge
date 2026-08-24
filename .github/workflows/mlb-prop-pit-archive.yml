@@ -4,6 +4,12 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '17 * * * *'
+  pull_request:
+    paths:
+      - 'scripts/archive_mlb_prop_odds.py'
+      - 'sportsedge/draftkings_prop_source.py'
+      - 'tests/test_archive_mlb_prop_odds.py'
+      - '.github/workflows/mlb-prop-pit-archive.yml'
   push:
     paths:
       - 'scripts/archive_mlb_prop_odds.py'
@@ -15,9 +21,9 @@ permissions:
   contents: write
 
 jobs:
-  archive:
+  contract:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -27,6 +33,17 @@ jobs:
         run: python scripts/archive_mlb_prop_odds.py --self-test
       - name: Run archive unit tests
         run: python -m unittest tests.test_archive_mlb_prop_odds
+
+  archive:
+    if: github.event_name != 'pull_request'
+    needs: contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.13'
       - name: Capture DraftKings MLB prop PIT quotes
         id: capture
         shell: bash
