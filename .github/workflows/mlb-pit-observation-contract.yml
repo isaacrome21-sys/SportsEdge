@@ -17,6 +17,7 @@ on:
       - 'tests/test_mlb_additional_pit_joiner.py'
       - 'tests/test_pr131_133_composition_repairs.py'
       - 'tests/test_composed_tree_settlement_adversarial.py'
+      - 'tests/test_pr131_135_canonical_snapshot_replay.py'
       - '.github/workflows/mlb-pit-observation-contract.yml'
   push:
     paths:
@@ -33,6 +34,7 @@ on:
       - 'tests/test_mlb_additional_pit_joiner.py'
       - 'tests/test_pr131_133_composition_repairs.py'
       - 'tests/test_composed_tree_settlement_adversarial.py'
+      - 'tests/test_pr131_135_canonical_snapshot_replay.py'
       - '.github/workflows/mlb-pit-observation-contract.yml'
 
 permissions:
@@ -68,6 +70,8 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_pr131_133_composition_repairs.py'
       - name: Run composed-tree adversarial settlement checks
         run: python -m unittest discover -s tests -p 'test_composed_tree_settlement_adversarial.py'
+      - name: Run PR131-136 canonical snapshot replay checks
+        run: python -m unittest discover -s tests -p 'test_pr131_135_canonical_snapshot_replay.py'
       - name: Recheck settlement separation
         run: python -m unittest discover -s tests -p 'test_mlb_settlement_evidence.py'
 
