@@ -264,12 +264,16 @@ def run_mlb_machine(
         )
 
     if selected == "AUTOMATIC":
-        key = str(odds_api_key or "").strip()
-        if not key:
+        keys: list[str] = []
+        for raw in (odds_api_key, *odds_api_keys):
+            key = str(raw or "").strip()
+            if key and key not in keys:
+                keys.append(key)
+        if not keys:
             raise MLBRunMachineError("AUTOMATIC_REQUIRES_ODDS_API_KEY")
         report = run_auto_mlb_native_odds(
-            odds_api_key=key,
-            odds_api_keys=tuple(odds_api_keys),
+            odds_api_key=keys[0],
+            odds_api_keys=tuple(keys[1:]),
             feature_url=None,
             projected_lineups_url=projected_lineups_url,
             provider_token=provider_token,
