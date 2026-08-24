@@ -15,7 +15,7 @@ def game():
     snap=GameSnapshot(game_pk=777,game_date="2026-08-10T23:00:00Z",status="Preview",away_id=1,away_name="Away",home_id=2,home_name="Home",away_probable_pitcher_id=11,away_probable_pitcher_name="Away SP",home_probable_pitcher_id=22,home_probable_pitcher_name="Home SP",retrieved_at="2026-08-10T19:59:00+00:00")
     return make_live_game(snap,rows(100),rows(200))
 def feature(pid=11,team=1): return {"game_pk":777,"player_id":pid,"team_id":team,"market":"PITCHER_BB","feature_version":"pitcher_bb_features_v1","own_bb":20,"own_bfp":220,"rolling_league_rate":.082,"pool":[22,24,25,27],"league_pool":[20,21,23,24,25,26,27,28]}
-def quote(pid=11,side="OVER",odds=100): return {"game_id":"777","period":"FG","market":"PITCHER_BB","entity_id":str(pid),"line":1.5,"side":side,"book_key":"draftkings","is_alternate":False,"raw_market_name":"Pitcher Walks","american_odds":odds,"retrieved_at":NOW,"ttl_seconds":300}
+def quote(pid=11,side="OVER",odds=100,line=1.5): return {"game_id":"777","period":"FG","market":"PITCHER_BB","entity_id":str(pid),"line":line,"side":side,"book_key":"draftkings","is_alternate":False,"raw_market_name":"Pitcher Walks","american_odds":odds,"retrieved_at":NOW,"ttl_seconds":300}
 def pair(): return [quote(side="OVER",odds=100),quote(side="UNDER",odds=-120)]
 def deployed_registry(path): path.write_text(json.dumps({"schema_version":1,"markets":{"PITCHER_BB":{"eligible":True,"stage":"DEPLOYED","reason":"test"}}}))
 def floor_registry(path): path.write_text(json.dumps({"truth_gate":{"production":{"fail_closed":True,"allow_cli_floor_override":False,"require_frozen_floor_for_eligible_market":True},"edge_floors":{"PITCHER_BB":{"status":"FROZEN","value_probability_points":0.01,"method_version":"test_fixture_v1","evidence":{"evidence_sha256":"e"*64,"derivation_code_sha256":"d"*64,"oos_cutoff_utc":"2026-08-01T00:00:00Z"},"frozen":{"frozen_by_commit":"a"*40}}}}}))
@@ -23,6 +23,10 @@ def floor_registry(path): path.write_text(json.dumps({"truth_gate":{"production"
 class PitcherLiveTests(unittest.TestCase):
     def test_probable_pitcher_identity_is_bound(self):
         c=assemble_pitcher_bb_candidate(game=game(),feature_row=feature(),quote=quote()); self.assertEqual(c["model_input"]["entity_id"],"11"); self.assertEqual(c["model_input"]["market"],"PITCHER_BB"); self.assertEqual(len(c["model_input"]["build_hash"]),64)
+    def test_rng_identity_is_invariant_to_quote_side_and_line(self):
+        over=assemble_pitcher_bb_candidate(game=game(),feature_row=feature(),quote=quote(side="OVER",line=1.5))
+        under=assemble_pitcher_bb_candidate(game=game(),feature_row=feature(),quote=quote(side="UNDER",line=2.5))
+        self.assertEqual(over["model_input"]["build_hash"],under["model_input"]["build_hash"])
     def test_non_probable_pitcher_fails_closed(self):
         with self.assertRaises(LiveSlateError): assemble_pitcher_bb_candidate(game=game(),feature_row=feature(99),quote=quote(99))
     def test_wrong_team_fails_closed(self):
