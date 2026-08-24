@@ -25,6 +25,11 @@ class EngineDispatchError(ValueError):
 
 _HITTER_LINES = (0.5, 1.5, 2.5)
 _BB_LINES = (0.5, 1.5, 2.5, 3.5)
+_HITS_LEGACY_KEYS = frozenset({"b_rate", "p_rate", "pa_pool"})
+_TOTAL_BASES_LEGACY_KEYS = frozenset({"rates", "p_h", "p_hr", "park", "pa_pool"})
+_PITCHER_BB_LEGACY_KEYS = frozenset({
+    "recalibrated_rate", "own_bb", "own_bfp", "rolling_league_rate", "pool", "league_pool",
+})
 
 MANUAL_MARKET_TYPE_TO_ENGINE_MARKET = {
     "MONEYLINE":"MONEYLINE","ML":"MONEYLINE","GAME_TOTAL":"TOTALS","TOTAL":"TOTALS","O/U":"TOTALS","OU":"TOTALS","RUN_LINE":"RUN_LINE","RL":"RUN_LINE",
@@ -54,6 +59,38 @@ def _finite_line(value: Any) -> float:
     return line
 
 
+def _detect_payload_shape(
+    features: Any,
+    *,
+    joint_keys: frozenset[str],
+    legacy_keys: frozenset[str],
+    label: str,
+) -> str:
+    """Classify migration payloads in one place and reject mixed contracts.
+
+    Compatibility markets historically defaulted to their legacy adapter whenever no
+    joint-history key was present. Preserve that behavior, but make the boundary named
+    and fail closed when callers mix legacy and joint feature contracts.
+    """
+    if not isinstance(features, Mapping):
+        return "legacy"
+    present_joint = sorted(key for key in joint_keys if key in features)
+    present_legacy = sorted(key for key in legacy_keys if key in features)
+    if present_joint and present_legacy:
+        raise EngineDispatchError(
+            f"AMBIGUOUS_PROP_PAYLOAD: {label} mixes joint keys={present_joint} "
+            f"with legacy keys={present_legacy}"
+        )
+    return "joint" if present_joint else "legacy"
+
+
+def _legacy_line_unsupported(market: str, line: float, allowed: tuple[float, ...]) -> EngineDispatchError:
+    return EngineDispatchError(
+        f"LEGACY_LINE_UNSUPPORTED: {market} line={line}; legacy_allowed={allowed}; "
+        "canonical joint payload supports arbitrary non-negative count thresholds"
+    )
+
+
 def _common_output(model_input: Mapping[str, Any], result: Any, model_p: float, market: str) -> dict[str, Any]:
     return {
         "game_id": model_input.get("game_id"), "market": market,
@@ -69,7 +106,7 @@ def legacy_hits_engine_adapter(model_input: Mapping[str, Any]) -> dict[str, Any]
         raise EngineDispatchError("Hits adapter requires market=HITS")
     line = _finite_line(model_input.get("line"))
     if line not in _HITTER_LINES:
-        raise EngineDispatchError(f"unsupported HITS line {line}; allowed={_HITTER_LINES}")
+        raise _legacy_line_unsupported("HITS", line, _HITTER_LINES)
     side = model_input.get("side")
     if side not in ("OVER", "UNDER"):
         raise EngineDispatchError("HITS side must be OVER or UNDER")
@@ -84,7 +121,7 @@ def legacy_total_bases_engine_adapter(model_input: Mapping[str, Any]) -> dict[st
         raise EngineDispatchError("Total Bases adapter requires market=TOTAL_BASES")
     line = _finite_line(model_input.get("line"))
     if line not in _HITTER_LINES:
-        raise EngineDispatchError(f"unsupported TOTAL_BASES line {line}; allowed={_HITTER_LINES}")
+        raise _legacy_line_unsupported("TOTAL_BASES", line, _HITTER_LINES)
     side = model_input.get("side")
     if side not in ("OVER", "UNDER"):
         raise EngineDispatchError("TOTAL_BASES side must be OVER or UNDER")
@@ -99,7 +136,7 @@ def legacy_pitcher_bb_engine_adapter(model_input: Mapping[str, Any]) -> dict[str
         raise EngineDispatchError("Pitcher BB adapter requires market=PITCHER_BB")
     line = _finite_line(model_input.get("line"))
     if line not in _BB_LINES:
-        raise EngineDispatchError(f"unsupported PITCHER_BB line {line}; allowed={_BB_LINES}")
+        raise _legacy_line_unsupported("PITCHER_BB", line, _BB_LINES)
     side = model_input.get("side")
     if side not in ("OVER", "UNDER"):
         raise EngineDispatchError("PITCHER_BB side must be OVER or UNDER")
@@ -119,22 +156,33 @@ pitcher_bb_engine_adapter = legacy_pitcher_bb_engine_adapter
 def hitter_joint_adapter(model_input: Mapping[str, Any]) -> Mapping[str, Any]:
     market = str(model_input.get("market", "")).upper()
     features = model_input.get("features")
-    has_joint = isinstance(features, Mapping) and "history_pool" in features
-    if not has_joint and market == "HITS":
-        return legacy_hits_engine_adapter(model_input)
-    if not has_joint and market == "TOTAL_BASES":
-        return legacy_total_bases_engine_adapter(model_input)
+    if market == "HITS":
+        shape = _detect_payload_shape(
+            features, joint_keys=frozenset({"history_pool"}), legacy_keys=_HITS_LEGACY_KEYS, label=market,
+        )
+        if shape == "legacy":
+            return legacy_hits_engine_adapter(model_input)
+    elif market == "TOTAL_BASES":
+        shape = _detect_payload_shape(
+            features, joint_keys=frozenset({"history_pool"}), legacy_keys=_TOTAL_BASES_LEGACY_KEYS, label=market,
+        )
+        if shape == "legacy":
+            return legacy_total_bases_engine_adapter(model_input)
     return price_hitter_market(model_input)
 
 
 def pitcher_joint_adapter(model_input: Mapping[str, Any]) -> Mapping[str, Any]:
     market = str(model_input.get("market", "")).upper()
     features = model_input.get("features")
-    has_joint = isinstance(features, Mapping) and (
-        "history_pool" in features or "pitcher_a_history" in features
-    )
-    if not has_joint and market == "PITCHER_BB":
-        return legacy_pitcher_bb_engine_adapter(model_input)
+    if market == "PITCHER_BB":
+        shape = _detect_payload_shape(
+            features,
+            joint_keys=frozenset({"history_pool", "pitcher_a_history", "pitcher_b_history"}),
+            legacy_keys=_PITCHER_BB_LEGACY_KEYS,
+            label=market,
+        )
+        if shape == "legacy":
+            return legacy_pitcher_bb_engine_adapter(model_input)
     return price_pitcher_market(model_input)
 
 
