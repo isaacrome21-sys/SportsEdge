@@ -25,17 +25,40 @@ jobs:
       FORWARD_EVENT: ${{ github.event.workflow_run.event }}
       FORWARD_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
       GH_TOKEN: ${{ github.token }}
+
     steps:
+      - name: Detect whether cumulative evidence advanced in this scheduled run
+        id: bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          NAME="nfl-forward-clv-$FORWARD_RUN_ID"
+          ARTIFACT_ID="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$FORWARD_RUN_ID/artifacts" \
+            --jq ".artifacts[] | select(.name == \"$NAME\") | .id" | head -n 1)"
+          if [[ -z "$ARTIFACT_ID" ]]; then
+            echo 'available=false' >> "$GITHUB_OUTPUT"
+            echo 'No new completed forward pair was published by this scheduled run; attestation is a clean no-op.'
+            exit 0
+          fi
+          echo 'available=true' >> "$GITHUB_OUTPUT"
+          echo "artifact_id=$ARTIFACT_ID" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
+        if: steps.bundle.outputs.available == 'true'
         with:
           ref: ${{ env.FORWARD_HEAD_SHA }}
+
       - uses: actions/setup-python@v5
+        if: steps.bundle.outputs.available == 'true'
         with:
           python-version: '3.12'
+
       - name: Install runtime dependency
+        if: steps.bundle.outputs.available == 'true'
         run: python -m pip install --disable-pip-version-check numpy
 
       - name: Download exact scheduled forward bundle
+        if: steps.bundle.outputs.available == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -50,6 +73,7 @@ jobs:
           test -f artifacts/football/forward-attested/nfl_m2_model.json
 
       - name: Resolve pinned model release from captured manifest
+        if: steps.bundle.outputs.available == 'true'
         id: release
         shell: bash
         run: |
@@ -62,6 +86,7 @@ jobs:
           echo "sha=$MODEL_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Find successful production evidence run for pinned model release
+        if: steps.bundle.outputs.available == 'true'
         id: ci_run
         env:
           MODEL_SHA: ${{ steps.release.outputs.sha }}
@@ -79,6 +104,7 @@ jobs:
           echo "run_id=$CI_RUN_ID" >> "$GITHUB_OUTPUT"
 
       - name: Download exact model-release production evidence bundle
+        if: steps.bundle.outputs.available == 'true'
         env:
           CI_RUN_ID: ${{ steps.ci_run.outputs.run_id }}
           MODEL_SHA: ${{ steps.release.outputs.sha }}
@@ -93,6 +119,7 @@ jobs:
           test -f artifacts/football/ci-attested/nfl_m2_model.json
 
       - name: Verify independent collector and model-release evidence
+        if: steps.bundle.outputs.available == 'true'
         env:
           CI_RUN_ID: ${{ steps.ci_run.outputs.run_id }}
           MODEL_SHA: ${{ steps.release.outputs.sha }}
@@ -114,6 +141,7 @@ jobs:
           --out artifacts/football/nfl_externally_attested_registry.json
 
       - name: Assert collector and model identities stayed separate and bound
+        if: steps.bundle.outputs.available == 'true'
         env:
           MODEL_SHA: ${{ steps.release.outputs.sha }}
         run: |
@@ -132,6 +160,7 @@ jobs:
           PY
 
       - uses: actions/upload-artifact@v4
+        if: steps.bundle.outputs.available == 'true'
         with:
           name: nfl-externally-attested-registry-${{ env.FORWARD_RUN_ID }}
           path: artifacts/football/nfl_externally_attested_registry.json
