@@ -65,6 +65,41 @@ class PredictionJournalTests(unittest.TestCase):
             "source_failures": [],
         }
 
+    def reset_prop_payload(self, market="HITS"):
+        return {
+            "slate_date_ct": "2026-08-25",
+            "generated_at_utc": "2026-08-25T10:30:00+00:00",
+            "run_status": "PASS",
+            "card_status": "PASS",
+            "results": [
+                {
+                    "source_index": 0,
+                    "game_id": "777",
+                    "market": market,
+                    "entity_id": "10",
+                    "line": 0.5,
+                    "side": "OVER",
+                    "american_odds": -110,
+                    "model_p": 0.53,
+                    "bet_status": "PASS",
+                    "reason": "ok",
+                    "model_input_hash": "a" * 64,
+                    "engine_version": (
+                        "mlb_pitcher_joint_empirical_v2"
+                        if market == "PITCHER_BB"
+                        else "mlb_hitter_joint_empirical_v3"
+                    ),
+                    "seed_policy": (
+                        "analytic_empirical_joint_start_rows"
+                        if market == "PITCHER_BB"
+                        else "analytic_weighted_empirical_joint_game_rows"
+                    ),
+                    "mc_paths": 0,
+                }
+            ],
+            "source_failures": [],
+        }
+
     def test_modeled_rows_are_written_content_addressed_and_blocked_rows_excluded(self):
         with tempfile.TemporaryDirectory() as tmp:
             result = write_prediction_journal(self.payload(), root=tmp)
@@ -114,6 +149,32 @@ class PredictionJournalTests(unittest.TestCase):
             with self.assertRaisesRegex(PredictionJournalError, "distribution_sha256"):
                 write_prediction_journal(payload, root=tmp)
 
+    def test_reset_props_persist_full_corrected_engine_identity(self):
+        for market in ("HITS", "TOTAL_BASES", "PITCHER_BB"):
+            with self.subTest(market=market), tempfile.TemporaryDirectory() as tmp:
+                result = write_prediction_journal(self.reset_prop_payload(market), root=tmp)
+                record = json.loads(Path(result.path).read_text())
+                row = record["predictions"][0]
+                self.assertEqual(row["model_input_hash"], "a" * 64)
+                self.assertTrue(row["engine_version"])
+                self.assertTrue(row["seed_policy"])
+                self.assertEqual(row["mc_paths"], 0)
+
+    def test_reset_prop_missing_engine_identity_is_rejected(self):
+        for field in ("model_input_hash", "engine_version", "seed_policy", "mc_paths"):
+            payload = self.reset_prop_payload("HITS")
+            payload["results"][0][field] = None
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as tmp:
+                with self.assertRaisesRegex(PredictionJournalError, field):
+                    write_prediction_journal(payload, root=tmp)
+
+    def test_reset_prop_malformed_mc_paths_is_rejected(self):
+        payload = self.reset_prop_payload("TOTAL_BASES")
+        payload["results"][0]["mc_paths"] = 1.5
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(PredictionJournalError, "mc_paths"):
+                write_prediction_journal(payload, root=tmp)
+
     def test_modeled_blocked_row_is_rejected(self):
         payload = self.payload()
         payload["results"][0]["bet_status"] = "BLOCKED"
@@ -131,7 +192,7 @@ class PredictionJournalTests(unittest.TestCase):
             self.assertIsNone(result)
             self.assertEqual(list(Path(tmp).iterdir()), [])
 
-    def test_canonical_machine_preserves_stage1_provenance(self):
+    def test_canonical_machine_preserves_stage1_and_engine_provenance(self):
         row = SimpleNamespace(
             source_index=4,
             game_id="777",
@@ -151,6 +212,9 @@ class PredictionJournalTests(unittest.TestCase):
             distribution_sha256="b" * 64,
             readout_sha256="c" * 64,
             readout_version="mlb_v7_game_readout_v1",
+            engine_version="mlb_v7_shared_game_engine_v1",
+            seed_policy="deterministic_distribution_readout",
+            mc_paths=20000,
         )
         result = _machine_result(0, row)
         self.assertIsInstance(result, MLBMachineResult)
@@ -159,6 +223,9 @@ class PredictionJournalTests(unittest.TestCase):
         self.assertEqual(result.distribution_sha256, "b" * 64)
         self.assertEqual(result.readout_sha256, "c" * 64)
         self.assertEqual(result.readout_version, "mlb_v7_game_readout_v1")
+        self.assertEqual(result.engine_version, "mlb_v7_shared_game_engine_v1")
+        self.assertEqual(result.seed_policy, "deterministic_distribution_readout")
+        self.assertEqual(result.mc_paths, 20000)
 
     def test_existing_machine_result_positional_constructor_remains_compatible(self):
         result = MLBMachineResult(
@@ -169,6 +236,9 @@ class PredictionJournalTests(unittest.TestCase):
         self.assertIsNone(result.distribution_sha256)
         self.assertIsNone(result.readout_sha256)
         self.assertIsNone(result.readout_version)
+        self.assertIsNone(result.engine_version)
+        self.assertIsNone(result.seed_policy)
+        self.assertIsNone(result.mc_paths)
 
 
 if __name__ == "__main__":

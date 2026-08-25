@@ -32,6 +32,9 @@ class UnifiedCardResult:
     distribution_sha256: str | None = None
     readout_sha256: str | None = None
     readout_version: str | None = None
+    engine_version: str | None = None
+    seed_policy: str | None = None
+    mc_paths: int | None = None
 
 
 def _convert(result) -> UnifiedCardResult:
@@ -42,6 +45,8 @@ def _convert(result) -> UnifiedCardResult:
         getattr(result, "edge", None), getattr(result, "ev_per_dollar", None),
         getattr(result, "model_input_hash", None), getattr(result, "distribution_sha256", None),
         getattr(result, "readout_sha256", None), getattr(result, "readout_version", None),
+        getattr(result, "engine_version", None), getattr(result, "seed_policy", None),
+        getattr(result, "mc_paths", None),
     )
 
 

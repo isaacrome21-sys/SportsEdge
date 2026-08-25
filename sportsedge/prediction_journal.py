@@ -4,7 +4,8 @@ The live card remains a mutable latest-view artifact. This journal is the append
 prediction evidence lane: every modeled BET/PASS row is frozen into a create-only,
 content-addressed JSON record before the caller may treat the run as operationally
 complete. Stage 1 game-market rows additionally require their shared V7 distribution
-and deterministic read-out provenance.
+and deterministic read-out provenance. Reset prop markets require corrected engine
+and seed-policy identity before new evidence may accumulate.
 """
 from __future__ import annotations
 
@@ -22,11 +23,18 @@ from .runtime import parse_timestamp
 JOURNAL_SCHEMA_VERSION = "mlb_prediction_journal_v1"
 DECISION_STATUSES = frozenset({"BET", "OFFICIAL_BET", "PASS"})
 STAGE1_GAME_MARKETS = frozenset({"MONEYLINE", "RUN_LINE", "TOTALS"})
+RESET_PROP_MARKETS = frozenset({"HITS", "TOTAL_BASES", "PITCHER_BB"})
 STAGE1_PROVENANCE_FIELDS = (
     "model_input_hash",
     "distribution_sha256",
     "readout_sha256",
     "readout_version",
+)
+RESET_PROP_PROVENANCE_FIELDS = (
+    "model_input_hash",
+    "engine_version",
+    "seed_policy",
+    "mc_paths",
 )
 
 
@@ -67,6 +75,26 @@ def _valid_sha256(value: Any, field: str) -> str:
     return text
 
 
+def _required_text(value: Any, field: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        raise PredictionJournalError(f"{field} required")
+    return text
+
+
+def _nonnegative_int(value: Any, field: str) -> int:
+    if isinstance(value, bool):
+        raise PredictionJournalError(f"{field} must be a nonnegative integer")
+    try:
+        parsed = int(value)
+        numeric = float(value)
+    except (TypeError, ValueError) as exc:
+        raise PredictionJournalError(f"{field} must be a nonnegative integer") from exc
+    if parsed < 0 or numeric != parsed:
+        raise PredictionJournalError(f"{field} must be a nonnegative integer")
+    return parsed
+
+
 def _modeled_prediction(row: Mapping[str, Any], index: int) -> dict[str, Any] | None:
     model_p = row.get("model_p")
     if model_p is None:
@@ -100,10 +128,15 @@ def _modeled_prediction(row: Mapping[str, Any], index: int) -> dict[str, Any] | 
             row.get("distribution_sha256"), "distribution_sha256"
         )
         out["readout_sha256"] = _valid_sha256(row.get("readout_sha256"), "readout_sha256")
-        readout_version = str(row.get("readout_version") or "").strip()
-        if not readout_version:
-            raise PredictionJournalError("readout_version required for Stage 1 game market")
-        out["readout_version"] = readout_version
+        out["readout_version"] = _required_text(
+            row.get("readout_version"), "readout_version"
+        )
+
+    if market in RESET_PROP_MARKETS:
+        out["model_input_hash"] = _valid_sha256(row.get("model_input_hash"), "model_input_hash")
+        out["engine_version"] = _required_text(row.get("engine_version"), "engine_version")
+        out["seed_policy"] = _required_text(row.get("seed_policy"), "seed_policy")
+        out["mc_paths"] = _nonnegative_int(row.get("mc_paths"), "mc_paths")
     return out
 
 

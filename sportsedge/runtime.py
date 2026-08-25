@@ -94,7 +94,19 @@ def run_payload(payload: Mapping[str, Any], *, registry_path: str | Path = "conf
 
 
 def result_to_dict(result: RunResult) -> dict[str, Any]:
-    out = {"market": result.market, "model_p": result.model_p, "bet_status": result.bet_status, "reason": result.reason}
+    out = {
+        "market": result.market,
+        "model_p": result.model_p,
+        "bet_status": result.bet_status,
+        "reason": result.reason,
+        "model_input_hash": result.model_input_hash,
+        "distribution_sha256": result.distribution_sha256,
+        "readout_sha256": result.readout_sha256,
+        "readout_version": result.readout_version,
+        "engine_version": result.engine_version,
+        "seed_policy": result.seed_policy,
+        "mc_paths": result.mc_paths,
+    }
     if result.decision is not None:
         out["decision"] = {
             "model_status": result.decision.model_status,

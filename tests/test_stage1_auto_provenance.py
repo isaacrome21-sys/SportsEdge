@@ -14,19 +14,26 @@ class Stage1AutoProvenanceTests(unittest.TestCase):
         self.assertIsNone(row.distribution_sha256)
         self.assertIsNone(row.readout_sha256)
         self.assertIsNone(row.readout_version)
+        self.assertIsNone(row.engine_version)
+        self.assertIsNone(row.seed_policy)
+        self.assertIsNone(row.mc_paths)
 
     def test_convert_and_report_preserve_stage1_provenance(self):
-        hashes = {
+        provenance = {
             "model_input_hash": "a" * 64,
             "distribution_sha256": "b" * 64,
             "readout_sha256": "c" * 64,
             "readout_version": "mlb_v7_game_readout_v1",
+            "engine_version": "mlb_v7_shared_game_engine_v1",
+            "seed_policy": "deterministic_distribution_readout",
+            "mc_paths": 20000,
         }
         unified = UnifiedCardResult(
             "1", "TOTALS", "1", 8.5, "OVER", -105,
             0.53, "PASS", "ok", None, 0.5, 0.03, 0.02,
-            hashes["model_input_hash"], hashes["distribution_sha256"],
-            hashes["readout_sha256"], hashes["readout_version"],
+            provenance["model_input_hash"], provenance["distribution_sha256"],
+            provenance["readout_sha256"], provenance["readout_version"],
+            provenance["engine_version"], provenance["seed_policy"], provenance["mc_paths"],
         )
         auto = _convert(7, unified)
         report = AutoRunReport(
@@ -42,7 +49,7 @@ class Stage1AutoProvenanceTests(unittest.TestCase):
         payload = report_to_dict(report)
 
         self.assertEqual(auto.source_index, 7)
-        for key, value in hashes.items():
+        for key, value in provenance.items():
             with self.subTest(key=key):
                 self.assertEqual(getattr(auto, key), value)
                 self.assertEqual(payload["results"][0][key], value)
