@@ -13,6 +13,12 @@ fail closed rather than silently reporting zero CLV when juice is unchanged.
 When close rows carry a sportsbook identity, scoring pairs by the same book.
 Legacy close objects without ``book`` remain usable for older replay callers,
 but promotion-grade NFL evidence requires explicit book identity upstream.
+
+``SHADOW_QUALIFIED`` is intentionally promotion evidence, not a deployed bet.
+That distinction breaks the otherwise circular gate where a market would need
+200 deployed bets before it could ever become DEPLOYED. Both shadow-qualified
+and already-deployed ``OFFICIAL`` decisions enter the promotion CLV bucket;
+rejected decisions remain a separate diagnostic bucket.
 """
 
 from __future__ import annotations
@@ -49,11 +55,7 @@ class CLVClose:
     closing_line: float | None
     closing_price: float
     closing_novig_prob: float
-    # Threshold at which ``closing_novig_prob`` was measured. When omitted,
-    # ``closing_line`` is the implicit threshold for line markets.
     probability_line: float | None = None
-    # Optional for compatibility in the core scorer. Promotion-grade builders
-    # require it so one sportsbook's close cannot score another sportsbook's play.
     book: str | None = None
 
 
@@ -97,14 +99,11 @@ def _book(value: str | None) -> str:
 
 
 def _assert_comparable_reference(decision: CLVDecision, close: CLVClose) -> None:
-    """Require close probability and decision probability to share a threshold."""
     decision_line = _line(decision.line_at_decision, "line_at_decision")
     closing_line = _line(close.closing_line, "closing_line")
     probability_line = _line(close.probability_line, "probability_line")
 
     if decision_line is None:
-        # Moneyline and other line-free markets have no threshold to re-anchor.
-        # Supplying one would make the probability's meaning ambiguous.
         if probability_line is not None:
             raise ValueError("CLV_REFERENCE_LINE_MISMATCH")
         return
@@ -112,8 +111,6 @@ def _assert_comparable_reference(decision: CLVDecision, close: CLVClose) -> None
     if probability_line is not None:
         reference_line = probability_line
     else:
-        # Backward-compatible path: the closing probability is understood to be
-        # attached to closing_line. It is comparable only if that line did not move.
         if closing_line is None:
             raise ValueError("CLV_REFERENCE_LINE_MISMATCH")
         reference_line = closing_line
@@ -150,7 +147,10 @@ def score_clv(decisions: Iterable[CLVDecision], closes: Iterable[CLVClose]) -> l
 
 
 def _gate_bucket(gate_result: str) -> str:
-    return "OFFICIAL" if gate_result == "OFFICIAL" else "REJECTED"
+    state = str(gate_result or "").strip().upper()
+    if state in {"SHADOW_QUALIFIED", "OFFICIAL"}:
+        return "PROMOTION"
+    return "REJECTED"
 
 
 def summarize_clv(scored: Iterable[CLVScored]) -> dict[tuple[str, str, str], CLVSummary]:
@@ -174,5 +174,4 @@ def summarize_clv(scored: Iterable[CLVScored]) -> dict[tuple[str, str, str], CLV
 
 
 def replay_clv_week(decisions: Iterable[CLVDecision], closes: Iterable[CLVClose]) -> dict[tuple[str, str, str], CLVSummary]:
-    """End-to-end replay entry point for one archived historical week."""
     return summarize_clv(score_clv(decisions, closes))
