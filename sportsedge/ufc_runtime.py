@@ -178,9 +178,12 @@ def load_promotion_evidence(path: str | Path | None) -> Mapping[str, object]:
     return value
 
 
+def model_is_promoted(evidence: Mapping[str, object]) -> bool:
+    return bool(evidence.get("promoted")) and str(evidence.get("status") or "").upper() == "PROMOTED"
+
+
 def enforce_model_promotion(candidates: Sequence[UFCCandidate], evidence: Mapping[str, object]) -> list[UFCCandidate]:
-    promoted = bool(evidence.get("promoted")) and str(evidence.get("status") or "").upper() == "PROMOTED"
-    if promoted:
+    if model_is_promoted(evidence):
         return list(candidates)
     blockers = [str(x) for x in (evidence.get("blockers") or [])]
     suffix = "MODEL_UNPROMOTED" + ((":" + ",".join(blockers)) if blockers else "")
@@ -198,7 +201,7 @@ def write_card(path: str | Path, candidates: Sequence[UFCCandidate], *, source: 
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "source": source,
             "sportsbook_independent_model": True,
-            "model_promoted": bool(promotion_evidence.get("promoted")),
+            "model_promoted": model_is_promoted(promotion_evidence),
             "promotion_status": str(promotion_evidence.get("status") or "UNVERIFIED"),
             "promotion_blockers": [str(x) for x in (promotion_evidence.get("blockers") or [])],
         },
