@@ -6,6 +6,7 @@ import hashlib
 import json
 from typing import Any, Mapping, Sequence
 
+from .first_hr_order_engine import build_first_hr_features
 from .generic_market_engine import GAME_MARKETS
 from .hitter_joint_engine import HITTER_MARKETS
 from .live_slate import LiveGame
@@ -102,6 +103,18 @@ def build_canonical_feature_row(
             team_id=team_id,
         )
 
+    if market == "FIRST_HOME_RUN":
+        team_id = _batter_team(game, entity_id)
+        built = build_first_hr_features(source, game=game, target_date=target_date)
+        return {
+            **base,
+            "team_id": team_id,
+            "source": "MLB_STATSAPI_STRICTLY_PRIOR_FIRST_HR_LINEUP_ORDER",
+            "first_hr_feature_version": built["feature_version"],
+            "feature_source_hash": built["feature_source_hash"],
+            "features": dict(built["features"]),
+        }
+
     if market in HITTER_MARKETS:
         team_id, opposing_pitcher_id, venue_id = _batter_context(game, entity_id)
         built = build_hitter_joint_features(
@@ -129,28 +142,13 @@ def build_canonical_feature_row(
         if market.startswith("EITHER_PITCHER_"):
             if game.away_probable_pitcher_id is None or game.home_probable_pitcher_id is None:
                 raise MLBJointModeBridgeError("both probable pitchers required for either-pitcher market")
-            a = build_pitcher_joint_features(
-                source,
-                pitcher_id=int(game.away_probable_pitcher_id),
-                target_date=target_date,
-            )
-            b = build_pitcher_joint_features(
-                source,
-                pitcher_id=int(game.home_probable_pitcher_id),
-                target_date=target_date,
-            )
-            payload = {
-                "pitcher_a_history": a["history_pool"],
-                "pitcher_b_history": b["history_pool"],
-            }
+            a = build_pitcher_joint_features(source, pitcher_id=int(game.away_probable_pitcher_id), target_date=target_date)
+            b = build_pitcher_joint_features(source, pitcher_id=int(game.home_probable_pitcher_id), target_date=target_date)
+            payload = {"pitcher_a_history": a["history_pool"], "pitcher_b_history": b["history_pool"]}
             return {
                 **base,
                 "joint_feature_version": FEATURE_VERSION,
-                "feature_source_hash": _content_sha({
-                    "version": FEATURE_VERSION,
-                    "payload": payload,
-                    "game_pk": game.game_pk,
-                }),
+                "feature_source_hash": _content_sha({"version": FEATURE_VERSION, "payload": payload, "game_pk": game.game_pk}),
                 "features": payload,
             }
         try:
@@ -169,10 +167,7 @@ def build_canonical_feature_row(
 
     if market in GAME_MARKETS:
         if market.startswith("F5_"):
-            f5 = f5_source or MLBF5HistorySource(
-                opener=source.opener,
-                retrieved_at=source.retrieved_at,
-            )
+            f5 = f5_source or MLBF5HistorySource(opener=source.opener, retrieved_at=source.retrieved_at)
             built = f5.matchup_features(
                 away_team_id=int(game.away_team_id),
                 home_team_id=int(game.home_team_id),
