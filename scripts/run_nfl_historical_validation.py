@@ -27,6 +27,7 @@ def _fetch(url: str) -> bytes:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source-url", default=NFLVERSE_SCHEDULE_CSV)
+    parser.add_argument("--source-file", type=Path)
     parser.add_argument("--start-season", type=int, default=2006)
     parser.add_argument("--end-season", type=int, default=2025)
     parser.add_argument("--min-history-seasons", type=int, default=2)
@@ -43,9 +44,9 @@ def main() -> int:
     if not 0.0 < args.fold_win_threshold <= 1.0:
         raise SystemExit("FOLD_WIN_THRESHOLD_INVALID")
 
-    raw = _fetch(args.source_url)
+    raw = args.source_file.read_bytes() if args.source_file is not None else _fetch(args.source_url)
     source_hash = sha256(raw).hexdigest()
-    text = raw.decode("utf-8")
+    text = raw.decode("utf-8-sig")
     seasons = range(args.start_season, args.end_season + 1)
     history_rows = normalize_nfl_rows(parse_schedule_csv(text), seasons)
     evaluations = build_nfl_game_evaluations(
@@ -91,6 +92,7 @@ def main() -> int:
         "provenance": "REAL_PUBLIC_HISTORY",
         "source_url": args.source_url,
         "source_sha256": source_hash,
+        "source_transport": "FROZEN_LOCAL_BYTES" if args.source_file is not None else "LIVE_FETCH",
         "season_range": [args.start_season, args.end_season],
         "history_row_count": len(history_rows),
         "evaluation_game_count": len(evaluations),
