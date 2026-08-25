@@ -263,7 +263,7 @@ class NFLRegularSeasonOTSimulator:
         profile = self._special_profile(team)
         self._c_kernel._require_kicker(profile)
         made = bool(self.rng.random() < self._c_kernel._fg_probability(profile, distance))
-        return (3 if made else 0, "FG_MADE" if made else 0, "FG_MADE" if made else "FG_MISSED")
+        return (3 if made else 0, "FG_MADE" if made else "FG_MISSED")
 
     @staticmethod
     def _scores(opportunities: list[NFLRegularSeasonOTOpportunity], home: str, away: str) -> dict[str, int]:
