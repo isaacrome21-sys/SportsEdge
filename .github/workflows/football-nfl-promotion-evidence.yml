@@ -1,0 +1,85 @@
+name: football-nfl-promotion-evidence
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'sportsedge/core/simulate/**'
+      - 'sportsedge/core/validation/**'
+      - 'sportsedge/core/promotion/**'
+      - 'sportsedge/sports/nfl/**'
+      - 'scripts/run_nfl_historical_validation.py'
+      - 'scripts/audit_nfl_real_history.py'
+      - 'scripts/validate_nfl_simulator_profile.py'
+      - 'tests/test_football*.py'
+      - 'tests/test_nfl*.py'
+      - '.github/workflows/football-nfl-promotion-evidence.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'sportsedge/core/simulate/**'
+      - 'sportsedge/core/validation/**'
+      - 'sportsedge/core/promotion/**'
+      - 'sportsedge/sports/nfl/**'
+      - 'scripts/run_nfl_historical_validation.py'
+      - 'scripts/audit_nfl_real_history.py'
+      - 'scripts/validate_nfl_simulator_profile.py'
+      - 'tests/test_football*.py'
+      - 'tests/test_nfl*.py'
+      - '.github/workflows/football-nfl-promotion-evidence.yml'
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime test dependencies
+        run: python -m pip install --disable-pip-version-check numpy pytest
+      - name: Compile NFL evidence surface
+        run: |
+          python -m py_compile \
+            sportsedge/core/simulate/drive_play.py \
+            sportsedge/core/simulate/usage.py \
+            sportsedge/core/simulate/player_markets.py \
+            sportsedge/core/simulate/special_teams.py \
+            sportsedge/sports/nfl/historical_validation.py \
+            sportsedge/sports/nfl/simulator_profile.py \
+            scripts/run_nfl_historical_validation.py \
+            scripts/validate_nfl_simulator_profile.py
+      - name: Run football contract tests
+        run: python -m unittest discover -s tests -p 'test_football*.py' -v
+      - name: Run NFL contract tests
+        run: python -m unittest discover -s tests -p 'test_nfl*.py' -v
+      - name: Build real-history audit
+        run: python scripts/audit_nfl_real_history.py --min-season 1999 --max-season 2025 --output artifacts/football/nfl_real_history_audit.json
+      - name: Build emergent key-number math evidence
+        run: python scripts/validate_nfl_simulator_profile.py artifacts/football/nfl_real_history_audit.json --out artifacts/football/nfl_simulator_profile.json
+      - name: Build real-history M1-vs-M2 walk-forward evidence
+        run: python scripts/run_nfl_historical_validation.py --start-season 2006 --end-season 2025 --out artifacts/football/nfl_historical_validation.json
+      - name: Write evidence manifest
+        run: |
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          paths = sorted(Path('artifacts/football').glob('*.json'))
+          manifest = {
+              'schema_version': 1,
+              'git_sha': '${{ github.sha }}',
+              'artifacts': [
+                  {'path': str(p), 'sha256': hashlib.sha256(p.read_bytes()).hexdigest()}
+                  for p in paths
+              ],
+          }
+          Path('artifacts/football/nfl_promotion_evidence_manifest.json').write_text(
+              json.dumps(manifest, indent=2, sort_keys=True) + '\n'
+          )
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nfl-promotion-evidence-${{ github.sha }}
+          path: artifacts/football/*.json
+          if-no-files-found: error
