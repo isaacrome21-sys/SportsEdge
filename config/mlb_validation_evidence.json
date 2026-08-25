@@ -47,6 +47,7 @@
     "PITCHER_HITS_WALKS_ER": {},
     "EITHER_PITCHER_HITS_ALLOWED": {}, "EITHER_PITCHER_BB": {}, "EITHER_PITCHER_ER": {},
 
-    "PITCHER_RECORD_WIN": {}, "FIRST_HOME_RUN": {}
+    "PITCHER_RECORD_WIN": {"evidence_count": 0, "evidence_status": "UNRUN"},
+    "FIRST_HOME_RUN": {"evidence_count": 0, "evidence_status": "UNRUN"}
   }
 }
