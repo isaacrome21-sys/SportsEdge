@@ -17,6 +17,7 @@ DECISION_STATUSES = frozenset({"BET", "OFFICIAL_BET", "PASS"})
 STAGE1_GAME_MARKETS = frozenset({
     "MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS",
     "F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS", "F5_TEAM_TOTALS",
+    "FIRST_HOME_RUN", "PITCHER_RECORD_WIN",
 })
 RESET_PROP_MARKETS = frozenset({"HITS", "TOTAL_BASES", "PITCHER_BB"})
 STAGE1_PROVENANCE_FIELDS = ("model_input_hash", "distribution_sha256", "readout_sha256", "readout_version")

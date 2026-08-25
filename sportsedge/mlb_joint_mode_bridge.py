@@ -14,6 +14,7 @@ from .mlb_f5_features import MLBF5HistorySource
 from .mlb_generic_features import MLBGenericHistorySource
 from .mlb_joint_features import FEATURE_VERSION, build_hitter_joint_features, build_pitcher_joint_features
 from .pitcher_joint_engine import PITCHER_MARKETS
+from .pitcher_record_win_engine import build_pitcher_record_win_features
 from .quote_bridge import validate_canonical_quote
 
 
@@ -113,6 +114,34 @@ def build_canonical_feature_row(
             "first_hr_feature_version": built["feature_version"],
             "feature_source_hash": built["feature_source_hash"],
             "features": dict(built["features"]),
+        }
+
+    if market == "PITCHER_RECORD_WIN":
+        try:
+            pid = int(entity_id)
+        except (TypeError, ValueError) as exc:
+            raise MLBJointModeBridgeError("pitcher entity_id must be MLB player id") from exc
+        built = build_pitcher_record_win_features(
+            source, game=game, pitcher_id=pid, target_date=target_date
+        )
+        team_side = str(built["team_side"])
+        team_id = int(game.away_team_id if team_side == "AWAY" else game.home_team_id)
+        return {
+            **base,
+            "team_id": team_id,
+            "team_side": team_side,
+            "source": "MLB_STATSAPI_STRICTLY_PRIOR_PITCHER_DECISIONS_PLUS_GAME_STATE",
+            "pitcher_record_win_feature_version": built["feature_version"],
+            "feature_source_hash": built["feature_source_hash"],
+            "away_mean_runs": built["away_mean_runs"],
+            "home_mean_runs": built["home_mean_runs"],
+            "features": {
+                "decision_rate": built["decision_rate"],
+                "qualification_rate": built["qualification_rate"],
+                "game_source_hash": built["game_source_hash"],
+                "pitcher_source_hash": built["pitcher_source_hash"],
+                "history": list(built["history"]),
+            },
         }
 
     if market in HITTER_MARKETS:

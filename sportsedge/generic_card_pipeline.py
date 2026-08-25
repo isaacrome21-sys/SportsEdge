@@ -73,6 +73,10 @@ def _model_input(*,game,quote,feature):
         payload=feature.get("features")
         if not isinstance(payload,Mapping):raise ValueError(f"{market} state feature payload missing")
         out["features"]=dict(payload)
+    elif market=="PITCHER_RECORD_WIN":
+        payload=feature.get("features")
+        if not isinstance(payload,Mapping):raise ValueError("PITCHER_RECORD_WIN state feature payload missing")
+        out["features"]=dict(payload); out["team_side"]=feature.get("team_side"); out["away_mean_runs"]=feature.get("away_mean_runs"); out["home_mean_runs"]=feature.get("home_mean_runs")
     elif market in HITTER_MARKETS|PITCHER_MARKETS:
         payload=feature.get("features")
         if not isinstance(payload,Mapping):
