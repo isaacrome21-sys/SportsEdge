@@ -40,7 +40,7 @@ jobs:
       - name: Install test dependency
         run: python -m pip install --disable-pip-version-check pytest
       - name: Run UFC tests
-        run: python -m pytest -q tests/test_ufc_engine.py tests/test_ufc_training.py tests/test_ufc_runtime.py
+        run: python -m pytest -q tests/test_ufc_engine.py tests/test_ufc_training.py tests/test_ufc_runtime.py tests/test_ufc_source.py
       - name: Train chronological UFC model and promotion evidence
         run: >-
           python scripts/build_ufc_training_artifact.py
