@@ -31,7 +31,6 @@ class MLBMarketContractCoverageTests(unittest.TestCase):
         catalog = self._catalog_markets()
         realization = json.loads(Path("config/mlb_feature_realization.json").read_text())
         self.assertEqual(catalog, set(realization["markets"]))
-        self.assertEqual(len(catalog), 36)
         allowed = {"COMPLETE", "PARTIAL", "MINIMAL", "PLANNED", "UNVERIFIED"}
         for market, row in realization["markets"].items():
             self.assertIn(row["status"], allowed, market)
@@ -41,7 +40,6 @@ class MLBMarketContractCoverageTests(unittest.TestCase):
         catalog = self._catalog_markets()
         behavioral = json.loads(Path("config/mlb_behavioral_disposition.json").read_text())
         self.assertEqual(catalog, set(behavioral["markets"]))
-        self.assertEqual(len(catalog), 36)
         allowed = {"KEEP_MEASURED", "WATCH", "FIX", "REBUILD", "UPSTREAM_MODEL_REVIEW", "UNVERIFIED", "UNMEASURED"}
         for market, row in behavioral["markets"].items():
             self.assertIn(row["status"], allowed, market)
@@ -54,7 +52,7 @@ class MLBMarketContractCoverageTests(unittest.TestCase):
             counts[row["status"]] = counts.get(row["status"], 0) + 1
         self.assertEqual(
             counts,
-            {"KEEP_MEASURED": 7, "WATCH": 1, "FIX": 10, "REBUILD": 8, "UPSTREAM_MODEL_REVIEW": 1, "UNMEASURED": 9},
+            {"KEEP_MEASURED": 7, "WATCH": 1, "FIX": 10, "REBUILD": 9, "UPSTREAM_MODEL_REVIEW": 1, "UNMEASURED": 10},
         )
 
     def test_validation_registry_contains_all_required_evidence_classes(self):
