@@ -47,6 +47,12 @@ jobs:
             tests.test_unified_card \
             tests.test_generic_market_engine \
             tests.test_truth_gate_contract \
+            tests.test_game_distribution_readout \
+            tests.test_shared_game_engine \
+            tests.test_mlb_joint_mode_game_provenance \
+            tests.test_stage1_provenance_ledger \
+            tests.test_stage1_auto_provenance \
+            tests.test_prediction_journal \
             -v
       - name: Assert no provider secrets are required
         shell: bash

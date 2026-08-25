@@ -58,6 +58,10 @@ class MLBMachineResult:
     implied_probability: float | None = None
     edge: float | None = None
     ev_per_dollar: float | None = None
+    model_input_hash: str | None = None
+    distribution_sha256: str | None = None
+    readout_sha256: str | None = None
+    readout_version: str | None = None
 
 
 @dataclass(frozen=True)
@@ -204,6 +208,10 @@ def _machine_result(source_index: int, row: Any) -> MLBMachineResult:
         implied_probability=_row_value(row, "implied_probability"),
         edge=_row_value(row, "edge"),
         ev_per_dollar=_row_value(row, "ev_per_dollar"),
+        model_input_hash=_row_value(row, "model_input_hash"),
+        distribution_sha256=_row_value(row, "distribution_sha256"),
+        readout_sha256=_row_value(row, "readout_sha256"),
+        readout_version=_row_value(row, "readout_version"),
     )
 
 
