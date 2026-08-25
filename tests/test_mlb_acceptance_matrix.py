@@ -7,12 +7,27 @@ from sportsedge.mlb_acceptance_matrix import MLBAcceptanceMatrixError, build_acc
 
 
 class MLBAcceptanceMatrixTests(unittest.TestCase):
-    def test_exactly_all_36_catalog_markets_have_one_acceptance_family(self):
+    @staticmethod
+    def _catalog_markets():
+        raw = json.loads(Path("config/mlb_market_catalog.json").read_text())
+        markets = set()
+        for key, rows in raw.items():
+            if key == "schema_version" or not isinstance(rows, list):
+                continue
+            for row in rows:
+                if isinstance(row, str):
+                    markets.add(row)
+                elif isinstance(row, dict) and row.get("market"):
+                    markets.add(str(row["market"]))
+        return markets
+
+    def test_every_catalog_market_has_one_acceptance_family(self):
         out = build_acceptance_matrix()
-        self.assertEqual(out["market_count"], 36)
+        catalog = self._catalog_markets()
         markets = [row["market"] for row in out["markets"]]
+        self.assertEqual(out["market_count"], len(catalog))
+        self.assertEqual(set(markets), catalog)
         self.assertEqual(len(markets), len(set(markets)))
-        self.assertEqual(len(markets), 36)
         self.assertTrue(all(row["acceptance_family"] for row in out["markets"]))
 
     def test_every_market_has_structural_settlement_and_six_evidence_requirements(self):
@@ -67,12 +82,19 @@ class MLBAcceptanceMatrixTests(unittest.TestCase):
 
     def test_new_unmeasured_markets_cannot_be_complete_by_architecture_alone(self):
         out = build_acceptance_matrix()
-        unmeasured = [
-            row for row in out["markets"]
+        unmeasured = {
+            row["market"]
+            for row in out["markets"]
             if row["current_state"]["behavioral_status"] == "UNMEASURED"
-        ]
-        self.assertEqual(len(unmeasured), 9)
-        self.assertTrue(all(not row["acceptance_complete"] for row in unmeasured))
+        }
+        behavioral = json.loads(Path("config/mlb_behavioral_disposition.json").read_text())
+        expected_unmeasured = {
+            market for market, row in behavioral["markets"].items()
+            if row["status"] == "UNMEASURED"
+        }
+        self.assertEqual(unmeasured, expected_unmeasured)
+        by_market = {row["market"]: row for row in out["markets"]}
+        self.assertTrue(all(not by_market[market]["acceptance_complete"] for market in unmeasured))
 
     def test_matrix_fails_if_a_catalog_market_is_unassigned(self):
         raw = json.loads(Path("config/mlb_acceptance_matrix.json").read_text())
