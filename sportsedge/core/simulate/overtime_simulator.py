@@ -1,17 +1,14 @@
 """Predictive NFL regular-season overtime over shared Engine A+C primitives.
 
-The simulator extends a tied, already-resolved regulation path. It does not draw
-an overtime winner or final score directly. Each possession opportunity advances
-clock, down, distance, field position and play type using the same TeamDriveProfile
-and Engine A play kernel used in regulation. Field-goal and post-TD try outcomes
-use the same Engine C probability methods and bound SpecialTeamsProfile objects.
-Completed opportunities are then settled by the Rule 16 state machine in
-``overtime.py``.
+The simulator extends a tied resolved regulation path. Scrimmage opportunities
+advance clock, down, distance, field position and play type with the same A play
+kernel used in regulation; field goals and post-TD tries use the same C kick
+probabilities. Sacks, safeties and turnover-return touchdowns are therefore real
+path events rather than independent market draws.
 
-Sacks and offensive safeties are emitted as Engine A football events so full-game
-defensive markets can reconcile regulation and overtime. Kickoff/return/onside
-and defensive-return touchdowns remain explicit subsequent Engine C/A extensions
-and therefore validation blockers for those rare event components.
+Opening/score kickoffs and punt-return touchdown geometry are not yet integrated
+into this OT generator and remain explicit full-game special-teams validation
+blockers. They are not assigned a synthetic rate inside market read-outs.
 """
 
 from __future__ import annotations
@@ -27,6 +24,7 @@ from .overtime import (
     NFLRegularSeasonOvertimeResult,
     settle_nfl_regular_season_overtime,
 )
+from .return_scoring import NFLReturnScoringProfile, NFLReturnScoringResolver
 from .special_teams import (
     EngineCSpecialTeamsResolver,
     ResolvedFootballPath,
@@ -81,7 +79,7 @@ class NFLRegularSeasonOTPlay:
             raise ValueError("OT_PLAY_RAW_POINTS_INVALID")
         if self.special_teams_points not in (0, 1, 2, 3):
             raise ValueError("OT_PLAY_SPECIAL_TEAMS_POINTS_INVALID")
-        if self.defensive_points not in (0, 2):
+        if self.defensive_points not in (0, 2, 6):
             raise ValueError("OT_PLAY_DEFENSIVE_POINTS_INVALID")
         if self.raw_points == 6 and self.play_type not in {"PASS", "RUSH"}:
             raise ValueError("OT_TOUCHDOWN_PLAY_TYPE_INVALID")
@@ -107,6 +105,11 @@ class NFLRegularSeasonOTPlay:
             raise ValueError("OT_ZERO_DEFENSIVE_POINTS_HAS_SCORING_TEAM")
         if self.defensive_points > 0 and self.raw_points > 0:
             raise ValueError("OT_OFFENSIVE_DEFENSIVE_SCORE_COLLISION")
+        if self.defensive_points == 6:
+            if self.turnover_type not in {"INTERCEPTION", "FUMBLE"}:
+                raise ValueError("OT_DEFENSIVE_RETURN_TD_REQUIRES_TURNOVER")
+            if self.defensive_scoring_team == self.opportunity_team:
+                raise ValueError("OT_DEFENSIVE_RETURN_TD_TEAM_INVALID")
 
 
 @dataclass(frozen=True)
@@ -170,6 +173,8 @@ class NFLRegularSeasonOTSimulator:
         regulation_path: ResolvedFootballPath,
         home_profile: TeamDriveProfile,
         away_profile: TeamDriveProfile,
+        home_return_scoring: NFLReturnScoringProfile | None = None,
+        away_return_scoring: NFLReturnScoringProfile | None = None,
         seed: int | None = None,
     ) -> None:
         if seed is None:
@@ -183,17 +188,28 @@ class NFLRegularSeasonOTSimulator:
         if regulation_path.home_profile is None or regulation_path.away_profile is None:
             raise ValueError("OVERTIME_SPECIAL_TEAMS_PROFILES_REQUIRED")
 
+        home = regulation_path.base_path.home_team
+        away = regulation_path.base_path.away_team
+        home_return = home_return_scoring or NFLReturnScoringProfile(home)
+        away_return = away_return_scoring or NFLReturnScoringProfile(away)
+        if not isinstance(home_return, NFLReturnScoringProfile) or not isinstance(away_return, NFLReturnScoringProfile):
+            raise TypeError("NFL_RETURN_SCORING_PROFILE_REQUIRED")
+        if home_return.team != home or away_return.team != away:
+            raise ValueError("OVERTIME_RETURN_SCORING_TEAM_MISMATCH")
+
         self.regulation_path = regulation_path
         self.home_profile = home_profile
         self.away_profile = away_profile
         self.home_special = regulation_path.home_profile
         self.away_special = regulation_path.away_profile
+        self.home_return_scoring = home_return
+        self.away_return_scoring = away_return
         self.seed = int(seed)
 
         self._a_kernel = EngineADrivePlaySimulator(
             game_id=regulation_path.base_path.game_id,
-            home_team=regulation_path.base_path.home_team,
-            away_team=regulation_path.base_path.away_team,
+            home_team=home,
+            away_team=away,
             home_profile=home_profile,
             away_profile=away_profile,
             seed=self.seed,
@@ -203,6 +219,11 @@ class NFLRegularSeasonOTSimulator:
             home_profile=self.home_special,
             away_profile=self.away_special,
             seed=self.seed,
+        )
+        self._returns = NFLReturnScoringResolver(
+            home_return,
+            away_return,
+            seed=self.seed + 1,
         )
 
     def _drive_profile(self, team: str) -> TeamDriveProfile:
@@ -242,7 +263,7 @@ class NFLRegularSeasonOTSimulator:
         profile = self._special_profile(team)
         self._c_kernel._require_kicker(profile)
         made = bool(self.rng.random() < self._c_kernel._fg_probability(profile, distance))
-        return (3 if made else 0, "FG_MADE" if made else "FG_MISSED")
+        return (3 if made else 0, "FG_MADE" if made else 0, "FG_MADE" if made else "FG_MISSED")
 
     @staticmethod
     def _scores(opportunities: list[NFLRegularSeasonOTOpportunity], home: str, away: str) -> dict[str, int]:
@@ -353,14 +374,32 @@ class NFLRegularSeasonOTSimulator:
                 turnover_type = "INTERCEPTION" if play_type == "PASS" else "FUMBLE"
                 pass_complete = False if play_type == "PASS" else None
                 yards = 0 if play_type == "PASS" else self._a_kernel._regular_play_yards(profile, play_type)
+                defense = self._other(team)
+                return_td = self._returns.is_touchdown(defense, "TURNOVER")
+                defensive_points = 6 if return_td else 0
                 plays.append(
                     NFLRegularSeasonOTPlay(
                         opportunity_index, play_index, team, clock_remaining,
                         down, distance, yardline, play_type, yards,
                         pass_complete=pass_complete,
                         turnover_type=turnover_type,
+                        defensive_points=defensive_points,
+                        defensive_scoring_team=defense if return_td else None,
                     )
                 )
+                if return_td:
+                    return (
+                        NFLRegularSeasonOTOpportunity(
+                            opportunity_index=opportunity_index,
+                            opportunity_team=team,
+                            scoring_team=defense,
+                            points=6,
+                            clock_end_seconds_remaining=clock_remaining,
+                            outcome_type="DEFENSIVE_RETURN_TOUCHDOWN",
+                        ),
+                        plays,
+                        play_index + 1,
+                    )
                 return (
                     NFLRegularSeasonOTOpportunity(
                         opportunity_index, team, None, 0, clock_remaining, "TURNOVER"
