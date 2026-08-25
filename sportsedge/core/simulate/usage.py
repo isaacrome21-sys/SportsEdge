@@ -14,6 +14,10 @@ import numpy as np
 from .drive_play import FootballPlayPath, PlayEvent
 
 
+def _is_offensive_touchdown(play: PlayEvent) -> bool:
+    return play.score_type == "TOUCHDOWN_CANDIDATE" and play.points == 6
+
+
 @dataclass(frozen=True)
 class PlayerUsageProfile:
     player_id: str
@@ -109,14 +113,14 @@ class AttributedPlay:
                 raise ValueError("INCOMPLETE_PASS_HAS_RECEIVER")
             if self.rusher_id is not None:
                 raise ValueError("PASS_CANNOT_HAVE_RUSHER")
-            if self.base_play.points == 7 and self.touchdown_scorer_id != self.receiver_id:
+            if _is_offensive_touchdown(self.base_play) and self.touchdown_scorer_id != self.receiver_id:
                 raise ValueError("PASS_TD_SCORER_MISMATCH")
         elif play_type == "RUSH":
             if self.rusher_id is None:
                 raise ValueError("RUSH_ATTRIBUTION_REQUIRED")
             if any(value is not None for value in (self.passer_id, self.target_id, self.receiver_id)):
                 raise ValueError("RUSH_CANNOT_HAVE_PASS_ATTRIBUTION")
-            if self.base_play.points == 7 and self.touchdown_scorer_id != self.rusher_id:
+            if _is_offensive_touchdown(self.base_play) and self.touchdown_scorer_id != self.rusher_id:
                 raise ValueError("RUSH_TD_SCORER_MISMATCH")
         else:
             if any(
@@ -209,7 +213,7 @@ class AttributedFootballPath:
                         if receiver["receptions"] == 1
                         else max(receiver["longest_reception"], play.yards)
                     )
-                    if play.points == 7:
+                    if _is_offensive_touchdown(play):
                         passer["passing_tds"] += 1
                         receiver["receiving_tds"] += 1
                         receiver["touchdowns"] += 1
@@ -223,7 +227,7 @@ class AttributedFootballPath:
                     if rusher["rush_attempts"] == 1
                     else max(rusher["longest_rush"], play.yards)
                 )
-                if play.points == 7:
+                if _is_offensive_touchdown(play):
                     rusher["rushing_tds"] += 1
                     rusher["touchdowns"] += 1
 
@@ -249,7 +253,7 @@ class AttributedFootballPath:
             expected_rush_attempts = len(rush_plays)
             expected_rush_yards = sum(play.yards for play in rush_plays)
             expected_offensive_tds = sum(
-                play.points == 7 and play.play_type.upper() in {"PASS", "RUSH"}
+                _is_offensive_touchdown(play) and play.play_type.upper() in {"PASS", "RUSH"}
                 for play in plays
             )
 
@@ -408,7 +412,7 @@ class EngineBUsageAllocator:
             receiver_id: str | None = None
             rusher_id: str | None = None
             touchdown_scorer_id: str | None = None
-            red_zone = play.yardline_100 <= 20 or play.points == 7
+            red_zone = play.yardline_100 <= 20 or _is_offensive_touchdown(play)
 
             if play_type == "PASS":
                 passer_id = usage.quarterback_id
@@ -418,14 +422,14 @@ class EngineBUsageAllocator:
                 active_ids.add(target_id)
                 if play.pass_complete:
                     receiver_id = target_id
-                    if play.points == 7:
+                    if _is_offensive_touchdown(play):
                         touchdown_scorer_id = target_id
             elif play_type == "RUSH":
                 rusher, rush_fallback = self._rusher(usage, active, red_zone=red_zone)
                 fallback = fallback or rush_fallback
                 rusher_id = rusher.player_id
                 active_ids.add(rusher_id)
-                if play.points == 7:
+                if _is_offensive_touchdown(play):
                     touchdown_scorer_id = rusher_id
 
             attributed.append(
