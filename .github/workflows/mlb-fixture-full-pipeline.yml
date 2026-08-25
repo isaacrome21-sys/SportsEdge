@@ -49,6 +49,9 @@ jobs:
             tests.test_truth_gate_contract \
             tests.test_game_distribution_readout \
             tests.test_shared_game_engine \
+            tests.test_f5_distribution \
+            tests.test_mlb_f5_features \
+            tests.test_f5_stage1_routing \
             tests.test_mlb_joint_mode_game_provenance \
             tests.test_stage1_provenance_ledger \
             tests.test_stage1_auto_provenance \

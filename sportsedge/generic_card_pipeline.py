@@ -9,6 +9,7 @@ from typing import Any, Mapping
 from .deployments import load_registry
 from .devig import multiplicative_devig, validate_pair
 from .engine_registry import engine_registry
+from .f5_distribution import F5_MARKETS
 from .generic_market_engine import BINARY_MARKETS, GAME_MARKETS
 from .hitter_joint_engine import HITTER_MARKETS
 from .live_slate import LiveGame
@@ -153,6 +154,11 @@ def _model_input(*, game: LiveGame, quote: Mapping[str, Any], feature: Mapping[s
         # HOME_RUNS remains on the measured generic scalar baseline until its
         # joint candidate earns independent behavioral evidence.
         out["expected_count"] = feature.get("expected_count")
+    elif market in F5_MARKETS:
+        payload = feature.get("features")
+        if not isinstance(payload, Mapping):
+            raise ValueError("F5 state feature payload missing")
+        out["features"] = dict(payload)
     elif market in HITTER_MARKETS | PITCHER_MARKETS:
         payload = feature.get("features")
         if not isinstance(payload, Mapping):
@@ -166,17 +172,11 @@ def _model_input(*, game: LiveGame, quote: Mapping[str, Any], feature: Mapping[s
     elif market in BINARY_MARKETS:
         out["event_probability"] = feature.get("event_probability")
     else:
-        if market.startswith("F5_"):
-            out.update({
-                "f5_away_mean_runs": feature.get("f5_away_mean_runs"),
-                "f5_home_mean_runs": feature.get("f5_home_mean_runs"),
-            })
-        else:
-            out.update({
-                "away_mean_runs": feature.get("away_mean_runs"),
-                "home_mean_runs": feature.get("home_mean_runs"),
-            })
-        if market not in {"TOTALS", "TEAM_TOTALS", "F5_TOTALS", "F5_TEAM_TOTALS"}:
+        out.update({
+            "away_mean_runs": feature.get("away_mean_runs"),
+            "home_mean_runs": feature.get("home_mean_runs"),
+        })
+        if market not in {"TOTALS", "TEAM_TOTALS"}:
             out["total_line"] = feature.get("total_line", 0.0)
     source_hash = feature.get("feature_source_hash", feature.get("source_subset_hash"))
     if source_hash is not None:

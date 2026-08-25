@@ -16,6 +16,7 @@ from .generic_market_engine import BINARY_MARKETS, GAME_MARKETS, generic_market_
 from .hits_engine import simulate_hits
 from .hitter_joint_engine import HITTER_MARKETS, price_hitter_market
 from .pitcher_joint_engine import PITCHER_MARKETS, price_pitcher_market
+from .shared_f5_engine import STAGE1_F5_MARKETS, build_shared_f5_engine_session
 from .shared_game_engine import STAGE1_GAME_MARKETS, build_shared_game_engine_session
 from .total_bases_engine import simulate_total_bases
 
@@ -34,7 +35,7 @@ _PITCHER_BB_LEGACY_KEYS = frozenset({
 
 MANUAL_MARKET_TYPE_TO_ENGINE_MARKET = {
     "MONEYLINE":"MONEYLINE","ML":"MONEYLINE","GAME_TOTAL":"TOTALS","TOTAL":"TOTALS","O/U":"TOTALS","OU":"TOTALS","RUN_LINE":"RUN_LINE","RL":"RUN_LINE",
-    "NRFI":"NRFI","YRFI":"YRFI","FIRST_INNING_TOTAL":"YRFI","FIRST_FIVE_MONEYLINE":"F5_MONEYLINE","FIRST_FIVE_RUN_LINE":"F5_RUN_LINE","FIRST_FIVE_TOTAL":"F5_TOTALS",
+    "NRFI":"NRFI","YRFI":"YRFI","FIRST_INNING_TOTAL":"YRFI","FIRST_FIVE_MONEYLINE":"F5_MONEYLINE","FIRST_FIVE_RUN_LINE":"F5_RUN_LINE","FIRST_FIVE_TOTAL":"F5_TOTALS","FIRST_FIVE_TEAM_TOTAL":"F5_TEAM_TOTALS","F5_TEAM_TOTAL":"F5_TEAM_TOTALS",
     "BATTER_HITS":"HITS","HITS":"HITS","BATTER_HOME_RUNS":"HOME_RUNS","HOME_RUNS":"HOME_RUNS","ANYTIME_HOME_RUN":"HOME_RUNS",
     "BATTER_TOTAL_BASES":"TOTAL_BASES","TOTAL_BASES":"TOTAL_BASES","BATTER_RBI":"RBI","RBI":"RBI","RBIS":"RBI","BATTER_RUNS":"RUNS","RUNS":"RUNS",
     "BATTER_STOLEN_BASES":"STOLEN_BASES","STOLEN_BASES":"STOLEN_BASES","BATTER_WALKS":"BATTER_BB","BATTER_BB":"BATTER_BB","WALKS":"BATTER_BB",
@@ -67,12 +68,7 @@ def _detect_payload_shape(
     legacy_keys: frozenset[str],
     label: str,
 ) -> str:
-    """Classify migration payloads in one place and reject mixed contracts.
-
-    Compatibility markets historically defaulted to their legacy adapter whenever no
-    joint-history key was present. Preserve that behavior, but make the boundary named
-    and fail closed when callers mix legacy and joint feature contracts.
-    """
+    """Classify migration payloads in one place and reject mixed contracts."""
     if not isinstance(features, Mapping):
         return "legacy"
     present_joint = sorted(key for key in joint_keys if key in features)
@@ -147,8 +143,6 @@ def legacy_pitcher_bb_engine_adapter(model_input: Mapping[str, Any]) -> dict[str
     return _common_output(model_input, result, p_over if side == "OVER" else 1.0 - p_over, "PITCHER_BB")
 
 
-# Public compatibility names retained for direct callers/tests that imported these
-# adapters before the joint-engine migration.
 hits_engine_adapter = legacy_hits_engine_adapter
 total_bases_engine_adapter = legacy_total_bases_engine_adapter
 pitcher_bb_engine_adapter = legacy_pitcher_bb_engine_adapter
@@ -198,14 +192,17 @@ def resolve_manual_market_type(market_type: str) -> str:
 def engine_registry() -> dict[str, Callable[[Mapping[str, Any]], Mapping[str, Any]]]:
     registry: dict[str, Callable[[Mapping[str, Any]], Mapping[str, Any]]] = {}
     shared_game_engine = build_shared_game_engine_session()
+    shared_f5_engine = build_shared_f5_engine_session()
     for market in sorted(GAME_MARKETS | BINARY_MARKETS):
-        registry[market] = shared_game_engine if market in STAGE1_GAME_MARKETS else generic_market_engine_adapter
+        if market in STAGE1_GAME_MARKETS:
+            registry[market] = shared_game_engine
+        elif market in STAGE1_F5_MARKETS:
+            registry[market] = shared_f5_engine
+        else:
+            registry[market] = generic_market_engine_adapter
     for market in sorted(HITTER_MARKETS):
         registry[market] = hitter_joint_adapter
     for market in sorted(PITCHER_MARKETS):
         registry[market] = pitcher_joint_adapter
-    # Preserve the measured incumbent until the joint HOME_RUNS candidate earns
-    # its own line-level behavioral evidence. Candidate code remains directly
-    # testable via price_hitter_market without becoming canonical runtime.
     registry["HOME_RUNS"] = generic_market_engine_adapter
     return registry
