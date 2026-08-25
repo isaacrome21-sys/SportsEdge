@@ -37,17 +37,38 @@ def _score(value: Any) -> float | None:
     return parsed if isfinite(parsed) else None
 
 
-def _neutral(value: Any) -> bool:
+def _neutral_flag(value: Any, *, field: str) -> bool | None:
+    if value in (None, ""):
+        return None
     if isinstance(value, bool):
         return value
-    if value in (None, ""):
-        return False
+    if isinstance(value, (int, float)) and value in (0, 1):
+        return bool(value)
     text = str(value).strip().lower()
+    if field == "location":
+        if text == "neutral":
+            return True
+        if text == "home":
+            return False
+        raise ValueError(f"NFL_LOCATION_VALUE_INVALID:{value}")
     if text in {"1", "true", "yes", "y"}:
         return True
     if text in {"0", "false", "no", "n"}:
         return False
     raise ValueError(f"NEUTRAL_SITE_VALUE_INVALID:{value}")
+
+
+def _row_is_neutral(row: Mapping[str, Any]) -> bool:
+    flags: list[bool] = []
+    for field in ("neutral_site", "neutral", "location"):
+        if field not in row:
+            continue
+        parsed = _neutral_flag(row.get(field), field=field)
+        if parsed is not None:
+            flags.append(parsed)
+    if len(set(flags)) > 1:
+        raise ValueError("NEUTRAL_SITE_CONTEXT_CONFLICT")
+    return flags[0] if flags else False
 
 
 def validate_nfl_environment_profile(profile: Mapping[str, Any]) -> dict[str, Any]:
@@ -108,10 +129,14 @@ def fit_nfl_environment_profile(
 ) -> dict[str, Any]:
     """Fit global NFL score-distribution environment values from real history.
 
-    Only scored regular-season rows are used. ``hfa_points`` is the empirical
-    mean home scoring margin across non-neutral regular-season games. It is a
-    deliberately simple league-level prior; venue/context refinements can be
-    layered later without changing the provenance contract.
+    Only scored regular-season rows are used. nflverse schedule rows commonly
+    identify neutral sites through ``location == 'Neutral'``; the legacy
+    ``neutral_site`` and ``neutral`` aliases are also accepted. Conflicting
+    neutral-site fields fail closed.
+
+    ``hfa_points`` is the empirical mean home scoring margin across non-neutral
+    regular-season games. It is a deliberately simple league-level prior;
+    venue/context refinements can be layered later without changing provenance.
     """
 
     if not str(source_url).startswith("https://"):
@@ -132,8 +157,7 @@ def fit_nfl_environment_profile(
         away = _score(row.get("away_score"))
         if home is None or away is None:
             continue
-        neutral_value = row.get("neutral_site", row.get("neutral", False))
-        scored.append((int(row["season"]), home, away, _neutral(neutral_value)))
+        scored.append((int(row["season"]), home, away, _row_is_neutral(row)))
 
     seasons = sorted({season for season, _, _, _ in scored})
     if len(seasons) < 2:
@@ -168,6 +192,7 @@ def fit_nfl_environment_profile(
             "margin_sigma": "sample_stdev(home_score-away_score)",
             "total_sigma": "sample_stdev(home_score+away_score)",
             "hfa_points": "mean(home_score-away_score) on non-neutral REG games",
+            "neutral_site": "location=Neutral with neutral_site/neutral aliases",
         },
     }
     return validate_nfl_environment_profile(profile)
