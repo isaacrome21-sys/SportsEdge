@@ -10,6 +10,7 @@ from .generic_market_engine import BINARY_MARKETS, GAME_MARKETS, generic_market_
 from .hits_engine import simulate_hits
 from .hitter_joint_engine import HITTER_MARKETS, price_hitter_market
 from .pitcher_joint_engine import PITCHER_MARKETS, price_pitcher_market
+from .pitcher_win_state_engine import build_shared_pitcher_win_engine_session
 from .shared_f5_engine import STAGE1_F5_MARKETS, build_shared_f5_engine_session
 from .shared_game_engine import STAGE1_GAME_MARKETS, build_shared_game_engine_session
 from .total_bases_engine import simulate_total_bases
@@ -67,11 +68,12 @@ def resolve_manual_market_type(market_type):
     if market is None or market not in engine_registry(): raise EngineDispatchError(f"NO_ENGINE_FOR_MARKET: {key}")
     return market
 def engine_registry():
-    registry={}; shared_game=build_shared_game_engine_session(); shared_f5=build_shared_f5_engine_session(); shared_first_hr=build_shared_first_hr_engine_session()
+    registry={}; shared_game=build_shared_game_engine_session(); shared_f5=build_shared_f5_engine_session(); shared_first_hr=build_shared_first_hr_engine_session(); shared_pitcher_win=build_shared_pitcher_win_engine_session()
     for market in sorted(GAME_MARKETS|BINARY_MARKETS):
         if market in STAGE1_GAME_MARKETS: registry[market]=shared_game
         elif market in STAGE1_F5_MARKETS: registry[market]=shared_f5
         elif market=="FIRST_HOME_RUN": registry[market]=shared_first_hr
+        elif market=="PITCHER_RECORD_WIN": registry[market]=shared_pitcher_win
         else: registry[market]=generic_market_engine_adapter
     for market in sorted(HITTER_MARKETS): registry[market]=hitter_joint_adapter
     for market in sorted(PITCHER_MARKETS): registry[market]=pitcher_joint_adapter
