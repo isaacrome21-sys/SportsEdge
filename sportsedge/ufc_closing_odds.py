@@ -230,6 +230,7 @@ def match_closing_market(
     *,
     min_bookmakers: int = 2,
     date_tolerance_days: int = 1,
+    max_lag_seconds: int = 900,
 ) -> ClosingMatch | None:
     fighter_a = str(meta.get("fighter_a") or "")
     fighter_b = str(meta.get("fighter_b") or "")
@@ -241,7 +242,8 @@ def match_closing_market(
     candidates = [
         quote
         for quote in quotes
-        if quote.pair_key == pair
+        if quote_is_valid_closing(quote, max_lag_seconds=max_lag_seconds)
+        and quote.pair_key == pair
         and abs((quote.commence_time.date() - fight_day).days) <= date_tolerance_days
     ]
     if not candidates:
@@ -281,6 +283,7 @@ def enrich_metadata_with_closing_market(
     *,
     min_bookmakers: int = 2,
     date_tolerance_days: int = 1,
+    max_lag_seconds: int = 900,
 ) -> tuple[list[dict[str, object]], dict[str, object]]:
     rows: list[dict[str, object]] = []
     matched = 0
@@ -292,6 +295,7 @@ def enrich_metadata_with_closing_market(
             quotes,
             min_bookmakers=min_bookmakers,
             date_tolerance_days=date_tolerance_days,
+            max_lag_seconds=max_lag_seconds,
         )
         if match is not None:
             row["market_probability_a"] = match.probability_a
