@@ -68,6 +68,9 @@ class NFLPromotionRegistryTests(unittest.TestCase):
             "code_git_sha": "1" * 40,
             "decision_log_sha256": "c" * 64,
             "close_log_sha256": "d" * 64,
+            "decision_count": n,
+            "close_count": n,
+            "unique_observation_count": n,
             "clv_probability_reference": "DECISION_THRESHOLD",
             "forward_time_contract": "PREGAME_DECISION_TO_PREGAME_CLOSE",
             "close_book_contract": "SAME_BOOK_AS_DECISION",
@@ -79,6 +82,7 @@ class NFLPromotionRegistryTests(unittest.TestCase):
                     "beat_close_rate": 0.55,
                 }
             },
+            "rejected_markets": {},
         }
 
     def test_missing_market_evidence_never_inherits_another_market_promotion(self):
