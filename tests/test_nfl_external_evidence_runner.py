@@ -20,7 +20,7 @@ class NFLExternalEvidenceRunnerTests(unittest.TestCase):
         self.assertIn('"ci_attestation_state": "EXTERNAL_RUNNER_UNATTESTED"', self.text)
         self.assertIn('"promotion_allowed": False', self.text)
         self.assertIn("EXTERNAL_RUNNER_CANNOT_CREATE_DEPLOYED_STATE", self.text)
-        self.assertNotIn("scripts/attest_nfl_ci_and_build_registry.py \\", self.text)
+        self.assertNotIn('"$PYTHON_BIN" scripts/attest_nfl_ci_and_build_registry.py', self.text)
 
     def test_runner_uses_same_historical_source_window_and_manifest_binding(self):
         self.assertIn("--start-season 2016 --end-season 2025", self.text)
