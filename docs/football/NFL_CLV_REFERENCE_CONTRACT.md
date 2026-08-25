@@ -69,11 +69,25 @@ For backward-compatible same-line core replays, `probability_line` may be omitte
 
 Line-free markets such as moneyline have no threshold and must not provide `probability_line`.
 
-## Sample-count integrity
+## Sample-count and numeric integrity
 
 A `game_id / market / side` observation counts once for NFL promotion. The same model play repeated at several books cannot be multiplied into several CLV observations merely to increase `n`.
 
 The evidence artifact's `decision_count`, `close_count`, and `unique_observation_count` must agree, and the sum of `logged_plays` across official and rejected market summaries must reproduce that same unique-observation count. A summary cannot claim a promotion sample larger than its paired logs.
+
+Promotion summaries must also contain finite numeric evidence. `mean_clv`, `clv_t_stat`, calibration deviations, and calibration thresholds cannot be NaN or infinity; `beat_close_rate` must remain in `[0, 1]`; and the persisted calibration `pass` flag must exactly agree with its threshold comparison.
+
+## External authenticity boundary
+
+Internal hashes and reconciliation prove that an artifact is self-consistent. They do **not** prove that a hostile caller did not fabricate both the logs and their hashes.
+
+For that reason, `scripts/attest_nfl_ci_and_build_registry.py` does not accept free-form CLV as deployment evidence. The CI-attestation workflow can advance a market only as far as CI attestation and emits:
+
+```text
+clv_attestation_state = "EXTERNAL_ATTESTATION_REQUIRED"
+```
+
+A future forward-CLV collection lane must provide its own external workflow attestation binding the captured decision/close bytes to the exact production code SHA before those observations may be used for `DEPLOYED` promotion. Until that external capture/attestation exists and executes successfully, NFL markets remain non-DEPLOYED regardless of how favorable a standalone CLV JSON summary appears.
 
 ## Fail-closed rules
 
@@ -89,9 +103,10 @@ NFL_CLV_DUPLICATE_OBSERVATION
 NFL_CLV_DECISION_CLOSE_COUNT_MISMATCH
 NFL_CLV_UNIQUE_OBSERVATION_COUNT_MISMATCH
 NFL_CLV_MARKET_COUNT_MISMATCH
+NFL_CLV_EXTERNAL_ATTESTATION_REQUIRED
 ```
 
-Do not replace missing comparable probability with raw line delta, a probability at the new threshold, an inferred conversion, another book's close, or a post-start quote.
+Do not replace missing comparable probability with raw line delta, a probability at the new threshold, an inferred conversion, another book's close, a post-start quote, or an unattested summary file.
 
 ## Promotion binding
 
@@ -104,4 +119,4 @@ forward_time_contract = "PREGAME_DECISION_TO_PREGAME_CLOSE"
 close_book_contract = "SAME_BOOK_AS_DECISION"
 ```
 
-The CLV evidence must also match the exact production model ID, feature contract, and code Git SHA used by the math and historical evidence. A code change resets the forward CLV evidence identity.
+The CLV evidence must also match the exact production model ID, feature contract, and code Git SHA used by the math and historical evidence. A code change resets the forward CLV evidence identity. Internal contract compliance is necessary but not sufficient for deployment; external forward-CLV attestation is a separate gate.
