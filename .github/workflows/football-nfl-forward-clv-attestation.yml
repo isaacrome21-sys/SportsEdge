@@ -1,0 +1,168 @@
+name: football-nfl-forward-clv-attestation
+
+on:
+  workflow_run:
+    workflows: ["football-nfl-forward-clv-collection"]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  attest:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'schedule' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      FORWARD_RUN_ID: ${{ github.event.workflow_run.id }}
+      FORWARD_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      FORWARD_WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+      FORWARD_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+      FORWARD_EVENT: ${{ github.event.workflow_run.event }}
+      FORWARD_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Detect whether cumulative evidence advanced in this scheduled run
+        id: bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          NAME="nfl-forward-clv-$FORWARD_RUN_ID"
+          ARTIFACT_ID="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$FORWARD_RUN_ID/artifacts" \
+            --jq ".artifacts[] | select(.name == \"$NAME\") | .id" | head -n 1)"
+          if [[ -z "$ARTIFACT_ID" ]]; then
+            echo 'available=false' >> "$GITHUB_OUTPUT"
+            echo 'No new completed forward pair was published by this scheduled run; attestation is a clean no-op.'
+            exit 0
+          fi
+          echo 'available=true' >> "$GITHUB_OUTPUT"
+          echo "artifact_id=$ARTIFACT_ID" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        if: steps.bundle.outputs.available == 'true'
+        with:
+          ref: ${{ env.FORWARD_HEAD_SHA }}
+
+      - uses: actions/setup-python@v5
+        if: steps.bundle.outputs.available == 'true'
+        with:
+          python-version: '3.12'
+
+      - name: Install runtime dependency
+        if: steps.bundle.outputs.available == 'true'
+        run: python -m pip install --disable-pip-version-check numpy
+
+      - name: Download exact scheduled forward bundle
+        if: steps.bundle.outputs.available == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/football/forward-attested
+          gh run download "$FORWARD_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name "nfl-forward-clv-$FORWARD_RUN_ID" \
+            --dir artifacts/football/forward-attested
+          test -f artifacts/football/forward-attested/nfl_forward_clv_manifest.json
+          test -f artifacts/football/forward-attested/nfl_forward_decisions.jsonl
+          test -f artifacts/football/forward-attested/nfl_forward_closes.jsonl
+          test -f artifacts/football/forward-attested/nfl_clv_evidence.json
+          test -f artifacts/football/forward-attested/nfl_m2_model.json
+
+      - name: Resolve pinned model release from captured manifest
+        if: steps.bundle.outputs.available == 'true'
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          MODEL_SHA="$(jq -r '.model_code_git_sha // empty' artifacts/football/forward-attested/nfl_forward_clv_manifest.json)"
+          if [[ ! "$MODEL_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "NFL_FORWARD_MODEL_RELEASE_SHA_INVALID:$MODEL_SHA" >&2
+            exit 1
+          fi
+          echo "sha=$MODEL_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Find successful production evidence run for pinned model release
+        if: steps.bundle.outputs.available == 'true'
+        id: ci_run
+        env:
+          MODEL_SHA: ${{ steps.release.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          CI_RUN_ID="$(gh run list --repo "$GITHUB_REPOSITORY" \
+            --workflow football-nfl-promotion-evidence.yml --branch main --event push \
+            --status success --limit 100 --json databaseId,headSha,conclusion \
+            | jq -r --arg sha "$MODEL_SHA" '[.[] | select(.headSha == $sha and .conclusion == "success")][0].databaseId // empty')"
+          if [[ -z "$CI_RUN_ID" ]]; then
+            echo "NFL_MATCHING_CI_ATTESTATION_RUN_MISSING:$MODEL_SHA" >&2
+            exit 1
+          fi
+          echo "run_id=$CI_RUN_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Download exact model-release production evidence bundle
+        if: steps.bundle.outputs.available == 'true'
+        env:
+          CI_RUN_ID: ${{ steps.ci_run.outputs.run_id }}
+          MODEL_SHA: ${{ steps.release.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/football/ci-attested
+          gh run download "$CI_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name "nfl-promotion-evidence-$MODEL_SHA" \
+            --dir artifacts/football/ci-attested
+          test -f artifacts/football/ci-attested/nfl_promotion_evidence_manifest.json
+          test -f artifacts/football/ci-attested/nfl_m2_model.json
+
+      - name: Verify independent collector and model-release evidence
+        if: steps.bundle.outputs.available == 'true'
+        env:
+          CI_RUN_ID: ${{ steps.ci_run.outputs.run_id }}
+          MODEL_SHA: ${{ steps.release.outputs.sha }}
+        run: >-
+          python scripts/attest_nfl_forward_clv_and_build_registry.py
+          --ci-bundle-dir artifacts/football/ci-attested
+          --ci-workflow-name football-nfl-promotion-evidence
+          --ci-workflow-conclusion success
+          --ci-workflow-head-sha "$MODEL_SHA"
+          --ci-workflow-run-id "$CI_RUN_ID"
+          --forward-bundle-dir artifacts/football/forward-attested
+          --forward-workflow-name "$FORWARD_WORKFLOW_NAME"
+          --forward-workflow-conclusion "$FORWARD_CONCLUSION"
+          --forward-workflow-event "$FORWARD_EVENT"
+          --forward-workflow-head-branch "$FORWARD_HEAD_BRANCH"
+          --forward-workflow-head-sha "$FORWARD_HEAD_SHA"
+          --forward-workflow-run-id "$FORWARD_RUN_ID"
+          --market-surface config/football_market_surface.json
+          --out artifacts/football/nfl_externally_attested_registry.json
+
+      - name: Assert collector and model identities stayed separate and bound
+        if: steps.bundle.outputs.available == 'true'
+        env:
+          MODEL_SHA: ${{ steps.release.outputs.sha }}
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p=json.loads(Path('artifacts/football/nfl_externally_attested_registry.json').read_text())
+          if p.get('clv_attestation_state') != 'EXTERNALLY_ATTESTED':
+              raise SystemExit('NFL_FORWARD_CLV_EXTERNAL_ATTESTATION_STATE_INVALID')
+          if p.get('code_git_sha') != os.environ['MODEL_SHA']:
+              raise SystemExit('NFL_FORWARD_CLV_FINAL_MODEL_SHA_MISMATCH')
+          if p.get('clv_attestation',{}).get('collector_git_sha') != os.environ['FORWARD_HEAD_SHA'].lower():
+              raise SystemExit('NFL_FORWARD_CLV_FINAL_COLLECTOR_SHA_MISMATCH')
+          if p.get('ci_attestation',{}).get('model_artifact_sha256') != p.get('clv_attestation',{}).get('model_artifact_sha256'):
+              raise SystemExit('NFL_FORWARD_CLV_FINAL_MODEL_ARTIFACT_MISMATCH')
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: steps.bundle.outputs.available == 'true'
+        with:
+          name: nfl-externally-attested-registry-${{ env.FORWARD_RUN_ID }}
+          path: artifacts/football/nfl_externally_attested_registry.json
+          if-no-files-found: error
+          retention-days: 90
