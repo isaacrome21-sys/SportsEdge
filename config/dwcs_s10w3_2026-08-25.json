@@ -1,0 +1,12 @@
+{
+  "event": "Dana White's Contender Series Season 10, Week 3",
+  "event_date": "August 25, 2026",
+  "source_note": "Recovery-only card definition. Matchups and divisions verified from current UFC.com DWCS Week 3 previews; Season 10 format is five three-round bouts. build_ufc_live_inputs.py rejects this override outside a +/-1 day UTC freshness window so it cannot silently become a stale future card.",
+  "bouts": [
+    {"fighter_a":"Bella Mir","fighter_b":"Alex Apodaca","weight_class":"Women's Bantamweight","rounds":3,"title_fight":false},
+    {"fighter_a":"Mario Piazzon","fighter_b":"Guilherme Uriel","weight_class":"Heavyweight","rounds":3,"title_fight":false},
+    {"fighter_a":"Gary Balletto Jr.","fighter_b":"Sean Clancy Jr.","weight_class":"Welterweight","rounds":3,"title_fight":false},
+    {"fighter_a":"Ronald Humphrey","fighter_b":"Alexis Miranda","weight_class":"Welterweight","rounds":3,"title_fight":false},
+    {"fighter_a":"Carlos Petruzzella","fighter_b":"Nick Galanti","weight_class":"Middleweight","rounds":3,"title_fight":false}
+  ]
+}
