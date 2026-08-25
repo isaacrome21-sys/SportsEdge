@@ -106,7 +106,6 @@ def _inches(text: str) -> float | None:
 def completed_event_urls(*, opener: Callable = urlopen) -> list[str]:
     html = _get_text(f"{UFCSTATS_BASE}/statistics/events/completed?page=all", opener=opener)
     urls = re.findall(r'href="(http://ufcstats\.com/event-details/[^"]+)"', html)
-    # preserve order and remove duplicate first featured row
     return list(dict.fromkeys(urls))
 
 
@@ -130,8 +129,10 @@ def parse_event(url: str, *, opener: Callable = urlopen) -> list[BoutListing]:
             continue
         cells = [_strip_html(x) for x in re.findall(r'<td[^>]*>(.*?)</td>', row, flags=re.S)]
         weight_class = next((c for c in cells if "weight" in c.lower() or c in {"Flyweight", "Bantamweight", "Featherweight", "Lightweight", "Welterweight", "Middleweight", "Light Heavyweight", "Heavyweight", "Women’s Strawweight", "Women’s Flyweight", "Women’s Bantamweight"}), "")
-        rounds = 5 if any(token in event.lower() for token in ("title",)) else 3
-        out.append(BoutListing(event, event_date, bout_url, fighters[0], fighters[1], weight_class, rounds))
+        # Event listings do not reliably expose scheduled rounds. Use a neutral
+        # three-round placeholder here; live-input construction resolves the
+        # authoritative per-bout TIME_FORMAT from the bout detail page.
+        out.append(BoutListing(event, event_date, bout_url, fighters[0], fighters[1], weight_class, 3))
     return out
 
 
@@ -167,6 +168,18 @@ def fighter_urls_from_bout(bout_url: str, *, opener: Callable = urlopen) -> tupl
     if len(unique) < 2:
         raise UFCSourceError("BOUT_FIGHTER_URLS_MISSING")
     return unique[0], unique[1]
+
+
+def bout_rounds_from_detail(bout_url: str, *, opener: Callable = urlopen) -> int:
+    """Return scheduled rounds from UFCStats TIME_FORMAT on the bout page."""
+    html = _get_text(bout_url, opener=opener)
+    m = re.search(r'TIME_FORMAT:\s*</i>\s*([^<]+)', html, flags=re.I)
+    value = _strip_html(m.group(1)) if m else ""
+    # UFCStats formats include "3 Rnd (5-5-5)" and "5 Rnd (5-5-5-5-5)".
+    r = re.search(r'\b([35])\s*Rnd\b', value, flags=re.I)
+    if not r:
+        raise UFCSourceError(f"BOUT_TIME_FORMAT_MISSING {bout_url}")
+    return int(r.group(1))
 
 
 def fetch_live_mma_odds(*, api_key: str, bookmakers: Sequence[str] = ("draftkings",),
