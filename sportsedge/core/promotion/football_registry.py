@@ -4,7 +4,9 @@ Structural implementation never implies promotion. This layer composes the
 canonical football ladder with hash-bound math/history evidence, held-out
 calibration, an external CI attestation state, and forward CLV evidence.
 Missing market evidence is represented explicitly and cannot inherit another
-market's stage.
+market's stage. Historical evidence must also be produced by the exact
+production NFL M2 feature/model contract; a simpler challenger cannot promote
+another model by accident.
 """
 from __future__ import annotations
 
@@ -13,6 +15,7 @@ from typing import Any
 
 from sportsedge.core.promotion.football import evaluate_football_promotion_from_math_artifact
 from sportsedge.core.validation.math_attestation import attest_validated_math
+from sportsedge.sports.nfl.m2 import NFL_M2_FEATURE_CONTRACT, PRODUCTION_NFL_M2_MODEL_ID
 
 
 def _mapping(value: Any) -> Mapping[str, Any] | None:
@@ -82,6 +85,11 @@ def build_nfl_promotion_registry(
     if math_hash != history_hash:
         raise ValueError("NFL_PROMOTION_SOURCE_HASH_MISMATCH")
 
+    if historical_evidence.get("model_id") != PRODUCTION_NFL_M2_MODEL_ID:
+        raise ValueError("NFL_PROMOTION_MODEL_ID_MISMATCH")
+    if historical_evidence.get("feature_contract") != NFL_M2_FEATURE_CONTRACT:
+        raise ValueError("NFL_PROMOTION_FEATURE_CONTRACT_MISMATCH")
+
     math_attestation = attest_validated_math(math_artifact)
     promotion_raw = _mapping(historical_evidence.get("promotion_evidence")) or {}
     clv_raw: Mapping[str, Mapping[str, Any]] = clv_evidence or {}
@@ -118,9 +126,6 @@ def build_nfl_promotion_registry(
             calibration_threshold = float(raw_threshold) if raw_threshold is not None else 0.0
             if calibration_max < 0 or calibration_threshold < 0:
                 raise ValueError(f"NFL_CALIBRATION_EVIDENCE_INVALID:{market}")
-            # A producer cannot claim calibration pass with numbers that fail the
-            # numeric contract, or vice versa. The numeric values remain the
-            # canonical promotion inputs.
             numeric_pass = calibration_max <= calibration_threshold
             if calibration.get("pass") is True and not numeric_pass:
                 raise ValueError(f"NFL_CALIBRATION_PASS_CONTRADICTION:{market}")
@@ -164,6 +169,8 @@ def build_nfl_promotion_registry(
     return {
         "schema_version": 1,
         "sport": "nfl",
+        "model_id": PRODUCTION_NFL_M2_MODEL_ID,
+        "feature_contract": NFL_M2_FEATURE_CONTRACT,
         "source_sha256": math_hash,
         "math_attestation": math_attestation,
         "markets": registry,
