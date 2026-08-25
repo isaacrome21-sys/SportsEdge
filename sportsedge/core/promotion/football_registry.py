@@ -5,8 +5,8 @@ produced by the exact production NFL M2 feature/model contract, share the same
 canonical multi-source manifest and exact code SHA as simulator math, and carry
 forward CLV from that same exact code contract. Missing market evidence never
 inherits a stage from another market, a caller-supplied CI boolean can never
-self-attest execution, and line-market CLV must be measured at the original
-decision threshold rather than at a moved closing threshold.
+self-attest execution, and promotion-grade CLV must prove comparable threshold,
+pregame timing, and same-sportsbook close identity.
 """
 from __future__ import annotations
 
@@ -20,8 +20,10 @@ from sportsedge.sports.nfl.m2 import NFL_M2_FEATURE_CONTRACT, PRODUCTION_NFL_M2_
 
 _GIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 _EXPECTED_CI_WORKFLOW = "football-nfl-promotion-evidence"
-_EXPECTED_CLV_SCHEMA = 3
+_EXPECTED_CLV_SCHEMA = 4
 _EXPECTED_CLV_REFERENCE = "DECISION_THRESHOLD"
+_EXPECTED_CLV_FORWARD_TIME = "PREGAME_DECISION_TO_PREGAME_CLOSE"
+_EXPECTED_CLV_BOOK = "SAME_BOOK_AS_DECISION"
 
 
 def _mapping(value: Any) -> Mapping[str, Any] | None:
@@ -192,6 +194,10 @@ def build_nfl_promotion_registry(
             raise ValueError("NFL_CLV_FEATURE_CONTRACT_MISMATCH")
         if clv_evidence.get("clv_probability_reference") != _EXPECTED_CLV_REFERENCE:
             raise ValueError("NFL_CLV_PROBABILITY_REFERENCE_INVALID")
+        if clv_evidence.get("forward_time_contract") != _EXPECTED_CLV_FORWARD_TIME:
+            raise ValueError("NFL_CLV_FORWARD_TIME_CONTRACT_INVALID")
+        if clv_evidence.get("close_book_contract") != _EXPECTED_CLV_BOOK:
+            raise ValueError("NFL_CLV_CLOSE_BOOK_CONTRACT_INVALID")
         clv_code_sha = _git_sha(clv_evidence.get("code_git_sha"), "NFL_CLV_CODE_SHA_INVALID")
         if clv_code_sha != math_code_sha:
             raise ValueError("NFL_CLV_CODE_SHA_MISMATCH")
@@ -206,6 +212,8 @@ def build_nfl_promotion_registry(
             "feature_contract": NFL_M2_FEATURE_CONTRACT,
             "code_git_sha": clv_code_sha,
             "clv_probability_reference": _EXPECTED_CLV_REFERENCE,
+            "forward_time_contract": _EXPECTED_CLV_FORWARD_TIME,
+            "close_book_contract": _EXPECTED_CLV_BOOK,
             "decision_log_sha256": _sha256(
                 clv_evidence.get("decision_log_sha256"), "NFL_CLV_DECISION_LOG_SHA256_INVALID"
             ),
@@ -280,7 +288,7 @@ def build_nfl_promotion_registry(
         }
 
     return {
-        "schema_version": 6,
+        "schema_version": 7,
         "sport": "nfl",
         "model_id": PRODUCTION_NFL_M2_MODEL_ID,
         "feature_contract": NFL_M2_FEATURE_CONTRACT,
