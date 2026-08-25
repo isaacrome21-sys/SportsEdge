@@ -375,7 +375,10 @@ class EngineADrivePlaySimulator:
         plays: list[PlayEvent] = []
         possession = self.home_team if self.rng.random() < 0.5 else self.away_team
 
-        while remaining > 0 and drive_id < 40:
+        # Every drive consumes at least one positive-duration scrimmage play.
+        # Regulation clock therefore provides the natural termination bound;
+        # an arbitrary drive-count cap can silently return a partial game.
+        while remaining > 0:
             drive_id += 1
             profile = self.home_profile if possession == self.home_team else self.away_profile
             yardline = 75

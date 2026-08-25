@@ -93,6 +93,27 @@ class FootballEngineADrivePlayTests(unittest.TestCase):
                 self.assertEqual(row["home_score"], last.score_after_home)
                 self.assertEqual(row["away_score"], last.score_after_away)
 
+    def test_generated_game_always_consumes_full_regulation_clock(self):
+        from sportsedge.core.simulate.drive_play import EngineADrivePlaySimulator, TeamDriveProfile
+
+        # turnover_rate=1.0 is a valid profile. Every drive can end after one
+        # scrimmage play, so a fixed drive-count cap must not silently return a
+        # partial regulation game with clock still remaining.
+        profile = TeamDriveProfile(turnover_rate=1.0)
+        paths = EngineADrivePlaySimulator(
+            game_id="NFL_CLOCK_COMPLETION_TEST",
+            home_team="HOME",
+            away_team="AWAY",
+            home_profile=profile,
+            away_profile=profile,
+            seed=20260825,
+        ).simulate(5)
+        for path in paths:
+            self.assertTrue(path.plays)
+            last = path.plays[-1]
+            self.assertEqual(last.quarter, 4)
+            self.assertEqual(last.clock_seconds_remaining, 0)
+
     def test_generated_scores_only_change_on_tagged_scoring_plays(self):
         from sportsedge.core.simulate.drive_play import EngineADrivePlaySimulator, TeamDriveProfile
 
