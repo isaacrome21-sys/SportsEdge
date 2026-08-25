@@ -82,6 +82,29 @@ class FootballEngineBUsageTests(unittest.TestCase):
         self.assertEqual(td.receiver_id, "H_WR")
         self.assertEqual(td.touchdown_scorer_id, "H_WR")
 
+    def test_negative_only_longest_stats_preserve_the_credited_play_value(self):
+        from sportsedge.core.simulate.drive_play import FootballPlayPath, PlayEvent
+        from sportsedge.core.simulate.usage import EngineBUsageAllocator
+
+        path = FootballPlayPath(
+            game_id="NFL_TEST", simulation_id=2, home_team="HOME", away_team="AWAY",
+            plays=(
+                PlayEvent(
+                    1, 1, 1, 850, "HOME", 0, 0, 0, 0, 1, 10, 75,
+                    "PASS", -2, 0, pass_complete=True,
+                ),
+                PlayEvent(
+                    1, 2, 1, 815, "HOME", 0, 0, 0, 0, 2, 12, 77,
+                    "RUSH", -3, 0,
+                ),
+            ),
+        )
+        home, away = self._usage()
+        stats = EngineBUsageAllocator(home, away, seed=7).attribute(path).player_stats()
+        self.assertEqual(stats["H_QB"]["longest_completion"], -2)
+        self.assertEqual(stats["H_WR"]["longest_reception"], -2)
+        self.assertEqual(stats["H_RB"]["longest_rush"], -3)
+
     def test_seeded_usage_allocation_is_reproducible_on_generated_paths(self):
         from sportsedge.core.simulate.drive_play import EngineADrivePlaySimulator, TeamDriveProfile
         from sportsedge.core.simulate.usage import EngineBUsageAllocator
