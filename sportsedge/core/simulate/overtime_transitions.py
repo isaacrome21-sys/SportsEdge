@@ -32,10 +32,17 @@ class NFLRegularSeasonOTTransition:
     return_touchdown: bool = False
     return_yards: int | None = None
     net_kick_yards: int | None = None
+    opportunity_index: int | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.transition_index, bool) or not isinstance(self.transition_index, int) or self.transition_index <= 0:
             raise ValueError("OT_TRANSITION_INDEX_INVALID")
+        if self.opportunity_index is not None and (
+            isinstance(self.opportunity_index, bool)
+            or not isinstance(self.opportunity_index, int)
+            or self.opportunity_index <= 0
+        ):
+            raise ValueError("OT_TRANSITION_OPPORTUNITY_INDEX_INVALID")
         if not str(self.transition_type).strip():
             raise ValueError("OT_TRANSITION_TYPE_REQUIRED")
         for team in (self.from_team, self.receiving_team, self.next_possession_team):
@@ -72,6 +79,25 @@ class NFLRegularSeasonOTTransition:
             raise ValueError("OT_TRANSITION_RETURN_YARDS_INVALID")
         if self.net_kick_yards is not None and self.net_kick_yards < 0:
             raise ValueError("OT_TRANSITION_NET_KICK_YARDS_INVALID")
+
+    def with_points(self, points: int, *, scoring_team: str) -> "NFLRegularSeasonOTTransition":
+        """Attach a resolved post-return try without mutating transition identity."""
+        return NFLRegularSeasonOTTransition(
+            transition_index=self.transition_index,
+            transition_type=self.transition_type,
+            from_team=self.from_team,
+            receiving_team=self.receiving_team,
+            next_possession_team=self.next_possession_team,
+            next_yardline_100=self.next_yardline_100,
+            clock_seconds_remaining=self.clock_seconds_remaining,
+            points=points,
+            scoring_team=scoring_team,
+            creates_opportunity=self.creates_opportunity,
+            return_touchdown=self.return_touchdown,
+            return_yards=self.return_yards,
+            net_kick_yards=self.net_kick_yards,
+            opportunity_index=self.opportunity_index,
+        )
 
 
 class NFLRegularSeasonOTTransitionResolver:
@@ -124,6 +150,7 @@ class NFLRegularSeasonOTTransitionResolver:
         self,
         *,
         transition_index: int,
+        opportunity_index: int,
         kicking_team: str,
         receiving_team: str,
         clock_seconds_remaining: int = 600,
@@ -141,11 +168,13 @@ class NFLRegularSeasonOTTransitionResolver:
             return NFLRegularSeasonOTTransition(
                 transition_index, "OPENING_KICKOFF_TOUCHBACK_35",
                 kicking_team, receiving_team, receiving_team, 65, end_clock,
+                opportunity_index=opportunity_index,
             )
         if draw < kicking.deep_touchback_rate + kicking.landing_touchback_rate:
             return NFLRegularSeasonOTTransition(
                 transition_index, "OPENING_KICKOFF_TOUCHBACK_20",
                 kicking_team, receiving_team, receiving_team, 80, end_clock,
+                opportunity_index=opportunity_index,
             )
 
         if self._return_scoring.is_touchdown(receiving_team, "KICKOFF"):
@@ -153,6 +182,7 @@ class NFLRegularSeasonOTTransitionResolver:
                 transition_index, "OPENING_KICKOFF_RETURN_TOUCHDOWN",
                 kicking_team, receiving_team, receiving_team, None, end_clock,
                 points=6, scoring_team=receiving_team, return_touchdown=True,
+                opportunity_index=opportunity_index,
             )
 
         yards = int(round(self.rng.normal(
@@ -164,13 +194,14 @@ class NFLRegularSeasonOTTransitionResolver:
             transition_index, "OPENING_KICKOFF_RETURN",
             kicking_team, receiving_team, receiving_team,
             max(1, min(99, 100 - yards)), end_clock,
-            return_yards=yards,
+            return_yards=yards, opportunity_index=opportunity_index,
         )
 
     def punt(
         self,
         *,
         transition_index: int,
+        opportunity_index: int,
         punting_team: str,
         receiving_team: str,
         clock_seconds_remaining: int,
@@ -192,7 +223,7 @@ class NFLRegularSeasonOTTransitionResolver:
             return NFLRegularSeasonOTTransition(
                 transition_index, "PUNT_TOUCHBACK_20",
                 punting_team, receiving_team, receiving_team, 80, end_clock,
-                net_kick_yards=net,
+                net_kick_yards=net, opportunity_index=opportunity_index,
             )
 
         if self._return_scoring.is_touchdown(receiving_team, "PUNT"):
@@ -200,12 +231,12 @@ class NFLRegularSeasonOTTransitionResolver:
                 transition_index, "PUNT_RETURN_TOUCHDOWN",
                 punting_team, receiving_team, receiving_team, None, end_clock,
                 points=6, scoring_team=receiving_team, return_touchdown=True,
-                net_kick_yards=net,
+                net_kick_yards=net, opportunity_index=opportunity_index,
             )
 
         next_yardline = max(1, min(99, 100 - remaining_to_goal))
         return NFLRegularSeasonOTTransition(
             transition_index, "PUNT_RETURN",
             punting_team, receiving_team, receiving_team, next_yardline, end_clock,
-            net_kick_yards=net,
+            net_kick_yards=net, opportunity_index=opportunity_index,
         )
