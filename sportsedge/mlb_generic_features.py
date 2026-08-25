@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 import hashlib
 import json
-from math import exp, isfinite
+from math import isfinite
 from statistics import fmean
 from typing import Any, Callable, Mapping
 from urllib.parse import urlencode
@@ -17,7 +17,7 @@ PLAYER_COUNT_MARKETS = frozenset({
     "PITCHER_BB", "PITCHER_ER", "PITCHER_OUTS",
 })
 PA_BOUNDED_BATTER_MARKETS = frozenset({"BATTER_K", "BATTER_BB", "SINGLES", "DOUBLES"})
-BINARY_MARKETS = frozenset({"PITCHER_RECORD_WIN", "FIRST_HOME_RUN"})
+STATEFUL_SPECIAL_MARKETS = frozenset({"PITCHER_RECORD_WIN", "FIRST_HOME_RUN"})
 GAME_MARKETS = frozenset({"MONEYLINE", "RUN_LINE", "TOTALS", "NRFI", "YRFI", "F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS"})
 
 BATTER_STAT_KEYS = {
@@ -36,7 +36,6 @@ class MLBGenericFeatureError(ValueError):
 def _digest(value: Any) -> str:
     raw = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
     return hashlib.sha256(raw).hexdigest()
-
 def _read_json(url: str, *, opener: Callable) -> Mapping[str, Any]:
     req = Request(url, headers={"Accept": "application/json", "User-Agent": "SportsEdge/1.0"})
     try:
@@ -47,7 +46,6 @@ def _read_json(url: str, *, opener: Callable) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise MLBGenericFeatureError("MLB_GENERIC_HISTORY_NOT_OBJECT")
     return value
-
 def _number(value: Any, field: str) -> float:
     if isinstance(value, bool):
         raise MLBGenericFeatureError(f"{field}: boolean is invalid")
@@ -58,7 +56,6 @@ def _number(value: Any, field: str) -> float:
     if not isfinite(out):
         raise MLBGenericFeatureError(f"{field}: nonfinite")
     return out
-
 def _outs_from_ip(value: Any) -> float:
     text = str(value).strip()
     if not text:
@@ -69,7 +66,6 @@ def _outs_from_ip(value: Any) -> float:
     if frac not in {"0", "1", "2"}:
         raise MLBGenericFeatureError("inningsPitched uses invalid baseball notation")
     return float(int(whole) * 3 + int(frac))
-
 def _split_date(split: Mapping[str, Any]) -> date | None:
     raw = split.get("date")
     if not raw:
@@ -78,7 +74,6 @@ def _split_date(split: Mapping[str, Any]) -> date | None:
         return date.fromisoformat(str(raw)[:10])
     except ValueError:
         return None
-
 def _splits(payload: Mapping[str, Any], *, target_date: date) -> list[Mapping[str, Any]]:
     rows: list[Mapping[str, Any]] = []
     stats = payload.get("stats")
@@ -188,12 +183,6 @@ class MLBGenericHistorySource:
             values.append(value)
         return self._mean(values, minimum=5, window=10, name=f"pitcher:{market}")
 
-    def pitcher_win_probability(self, *, player_id: int, target_date: date) -> float:
-        rows = self.player_rows(player_id=player_id, group="pitching", target_date=target_date)
-        starts = [r for r in rows if _number(r["stat"].get("gamesStarted", 0), "gamesStarted") >= 1]
-        values = [1.0 if _number(r["stat"].get("wins", 0), "wins") >= 1 else 0.0 for r in starts]
-        return min(1.0, max(0.0, self._mean(values, minimum=5, window=20, name="pitcher:win")))
-
     def team_means(self, *, away_team_id: int, home_team_id: int, target_date: date) -> tuple[float, float, float]:
         def one(team_id: int) -> tuple[float, float]:
             rows = self.team_rows(team_id=team_id, target_date=target_date)
@@ -214,6 +203,8 @@ class MLBGenericHistorySource:
         if team_id is not None:
             base["team_id"] = int(team_id)
 
+        if market in STATEFUL_SPECIAL_MARKETS:
+            raise MLBGenericFeatureError(f"{market}_STATEFUL_FEATURE_PATH_REQUIRED")
         if market in PLAYER_COUNT_MARKETS:
             if player_id is None:
                 raise MLBGenericFeatureError("player_id required")
@@ -225,16 +216,6 @@ class MLBGenericHistorySource:
                 base["projected_pa"] = projected_pa
             else:
                 base["expected_count"] = self.batter_expected(player_id=player_id, market=market, target_date=target_date)
-        elif market == "PITCHER_RECORD_WIN":
-            if player_id is None:
-                raise MLBGenericFeatureError("player_id required")
-            base["event_probability"] = self.pitcher_win_probability(player_id=player_id, target_date=target_date)
-        elif market == "FIRST_HOME_RUN":
-            if player_id is None:
-                raise MLBGenericFeatureError("player_id required")
-            player_hr = self.batter_expected(player_id=player_id, market="HOME_RUNS", target_date=target_date)
-            _, _, game_hr = self.team_means(away_team_id=away_team_id, home_team_id=home_team_id, target_date=target_date)
-            base["event_probability"] = 0.0 if game_hr <= 0 else min(1.0, max(0.0, (player_hr / game_hr) * (1.0 - exp(-game_hr))))
         elif market in GAME_MARKETS:
             away_runs, home_runs, _ = self.team_means(away_team_id=away_team_id, home_team_id=home_team_id, target_date=target_date)
             if market.startswith("F5_"):
