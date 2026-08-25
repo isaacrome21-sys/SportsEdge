@@ -1,12 +1,9 @@
 """Fail-closed per-market NFL promotion registry.
 
-Structural implementation never implies promotion. This layer composes the
-canonical football ladder with hash-bound math/history evidence, held-out
-calibration, an external CI attestation state, and forward CLV evidence.
-Missing market evidence is represented explicitly and cannot inherit another
-market's stage. Historical evidence must also be produced by the exact
-production NFL M2 feature/model contract; a simpler challenger cannot promote
-another model by accident.
+Structural implementation never implies promotion. Historical evidence must be
+produced by the exact production NFL M2 feature/model contract, share the same
+schedule-byte anchor as the simulator math artifact, and carry a separate hash
+for the complete multi-source feature manifest.
 """
 from __future__ import annotations
 
@@ -22,31 +19,27 @@ def _mapping(value: Any) -> Mapping[str, Any] | None:
     return value if isinstance(value, Mapping) else None
 
 
-def _source_hash(value: Mapping[str, Any], name: str) -> str:
-    raw = str(value.get("source_sha256") or "").strip().lower()
+def _sha256(value: Any, error: str) -> str:
+    raw = str(value or "").strip().lower()
     if len(raw) != 64:
-        raise ValueError(f"{name}_SOURCE_SHA256_INVALID")
+        raise ValueError(error)
     try:
         int(raw, 16)
     except ValueError as exc:
-        raise ValueError(f"{name}_SOURCE_SHA256_INVALID") from exc
+        raise ValueError(error) from exc
     return raw
 
 
-def _reason(
-    *,
-    stage: str,
-    history: Mapping[str, Any] | None,
-    calibration: Mapping[str, Any] | None,
-    ci_attested: bool,
-    clv: Mapping[str, Any] | None,
-) -> str:
+def _source_hash(value: Mapping[str, Any], name: str) -> str:
+    return _sha256(value.get("source_sha256"), f"{name}_SOURCE_SHA256_INVALID")
+
+
+def _reason(*, stage: str, history: Mapping[str, Any] | None, calibration: Mapping[str, Any] | None,
+            ci_attested: bool, clv: Mapping[str, Any] | None) -> str:
     if stage == "BLOCKED_MATH":
         return "MATH_ATTESTATION_FAILED"
     if stage == "VALIDATED_MATH":
-        if history is None:
-            return "WALKFORWARD_EVIDENCE_MISSING"
-        return "FOLD_WIN_RATE_BELOW_THRESHOLD"
+        return "WALKFORWARD_EVIDENCE_MISSING" if history is None else "FOLD_WIN_RATE_BELOW_THRESHOLD"
     if stage == "PRODUCTION_LOGIC_PASS":
         if calibration is None:
             return "CALIBRATION_EVIDENCE_MISSING"
@@ -56,9 +49,7 @@ def _reason(
             return "CI_ATTESTATION_MISSING"
         return "CI_OR_CALIBRATION_GATE_NOT_ATTESTED"
     if stage == "CI_ATTESTED":
-        if clv is None:
-            return "CLV_EVIDENCE_MISSING"
-        return "CLV_GATE_NOT_MET"
+        return "CLV_EVIDENCE_MISSING" if clv is None else "CLV_GATE_NOT_MET"
     if stage == "DEPLOYED":
         return "ALL_PROMOTION_GATES_PASS"
     return "UNKNOWN_PROMOTION_STAGE"
@@ -72,19 +63,16 @@ def build_nfl_promotion_registry(
     ci_attested: bool = False,
     clv_evidence: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Evaluate every declared NFL market independently.
-
-    ``ci_attested`` must come from executable evidence outside this function; the
-    registry cannot attest its own workflow. ``clv_evidence`` is expected to be
-    forward decision-vs-close evidence. Missing CLV never defaults to pass.
-    """
     if not isinstance(ci_attested, bool):
         raise ValueError("CI_ATTESTED_STATE_INVALID")
     math_hash = _source_hash(math_artifact, "MATH")
     history_hash = _source_hash(historical_evidence, "HISTORY")
     if math_hash != history_hash:
         raise ValueError("NFL_PROMOTION_SOURCE_HASH_MISMATCH")
-
+    manifest_hash = _sha256(
+        historical_evidence.get("source_manifest_sha256"),
+        "NFL_PROMOTION_SOURCE_MANIFEST_SHA256_INVALID",
+    )
     if historical_evidence.get("model_id") != PRODUCTION_NFL_M2_MODEL_ID:
         raise ValueError("NFL_PROMOTION_MODEL_ID_MISMATCH")
     if historical_evidence.get("feature_contract") != NFL_M2_FEATURE_CONTRACT:
@@ -94,14 +82,13 @@ def build_nfl_promotion_registry(
     promotion_raw = _mapping(historical_evidence.get("promotion_evidence")) or {}
     clv_raw: Mapping[str, Mapping[str, Any]] = clv_evidence or {}
 
-    markets = []
+    markets: list[str] = []
     seen: set[str] = set()
     for raw in declared_markets:
         market = str(raw).strip().lower()
-        if not market or market in seen:
-            continue
-        seen.add(market)
-        markets.append(market)
+        if market and market not in seen:
+            seen.add(market)
+            markets.append(market)
     if not markets:
         raise ValueError("NFL_DECLARED_MARKETS_REQUIRED")
 
@@ -110,15 +97,13 @@ def build_nfl_promotion_registry(
         history = _mapping(promotion_raw.get(market))
         calibration = _mapping(history.get("calibration")) if history is not None else None
         clv = _mapping(clv_raw.get(market))
-
         fold_wins = int(history.get("fold_wins", 0)) if history is not None else 0
         fold_total = int(history.get("fold_total", 0)) if history is not None else 0
         if fold_wins < 0 or fold_total < 0 or fold_wins > fold_total:
             raise ValueError(f"NFL_FOLD_EVIDENCE_INVALID:{market}")
 
         if calibration is None:
-            calibration_max = 1.0
-            calibration_threshold = 0.0
+            calibration_max, calibration_threshold = 1.0, 0.0
         else:
             raw_max = calibration.get("max_bin_deviation")
             raw_threshold = calibration.get("threshold")
@@ -126,8 +111,7 @@ def build_nfl_promotion_registry(
             calibration_threshold = float(raw_threshold) if raw_threshold is not None else 0.0
             if calibration_max < 0 or calibration_threshold < 0:
                 raise ValueError(f"NFL_CALIBRATION_EVIDENCE_INVALID:{market}")
-            numeric_pass = calibration_max <= calibration_threshold
-            if calibration.get("pass") is True and not numeric_pass:
+            if calibration.get("pass") is True and calibration_max > calibration_threshold:
                 raise ValueError(f"NFL_CALIBRATION_PASS_CONTRADICTION:{market}")
 
         logged_plays = int(clv.get("logged_plays", 0)) if clv is not None else 0
@@ -151,13 +135,8 @@ def build_nfl_promotion_registry(
         registry[market] = {
             "stage": stage,
             "eligible": stage == "DEPLOYED",
-            "reason": _reason(
-                stage=stage,
-                history=history,
-                calibration=calibration,
-                ci_attested=ci_attested,
-                clv=clv,
-            ),
+            "reason": _reason(stage=stage, history=history, calibration=calibration,
+                              ci_attested=ci_attested, clv=clv),
             "fold_wins": fold_wins,
             "fold_total": fold_total,
             "fold_win_rate": (fold_wins / fold_total) if fold_total else None,
@@ -167,11 +146,12 @@ def build_nfl_promotion_registry(
         }
 
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "sport": "nfl",
         "model_id": PRODUCTION_NFL_M2_MODEL_ID,
         "feature_contract": NFL_M2_FEATURE_CONTRACT,
         "source_sha256": math_hash,
+        "source_manifest_sha256": manifest_hash,
         "math_attestation": math_attestation,
         "markets": registry,
         "deployed_markets": sorted(market for market, row in registry.items() if row["eligible"]),
