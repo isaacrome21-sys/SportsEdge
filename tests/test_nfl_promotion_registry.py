@@ -21,7 +21,7 @@ class NFLPromotionRegistryTests(unittest.TestCase):
         return {
             "provenance": "REAL_PUBLIC_HISTORY",
             "source_sha256": "a" * 64,
-            "source_manifest_sha256": "c" * 64,
+            "source_manifest_sha256": "a" * 64,
             "model_id": PRODUCTION_NFL_M2_MODEL_ID,
             "feature_contract": NFL_M2_FEATURE_CONTRACT,
             "promotion_evidence": {
@@ -44,60 +44,102 @@ class NFLPromotionRegistryTests(unittest.TestCase):
             },
         }
 
+    def _clv(self, n=200, mean_clv=0.001, t_stat=2.01):
+        return {
+            "schema_version": 1,
+            "sport": "nfl",
+            "model_id": PRODUCTION_NFL_M2_MODEL_ID,
+            "feature_contract": NFL_M2_FEATURE_CONTRACT,
+            "decision_log_sha256": "c" * 64,
+            "close_log_sha256": "d" * 64,
+            "markets": {
+                "spread": {
+                    "logged_plays": n,
+                    "mean_clv": mean_clv,
+                    "clv_t_stat": t_stat,
+                    "beat_close_rate": 0.55,
+                }
+            },
+        }
+
     def test_missing_market_evidence_never_inherits_another_market_promotion(self):
-        registry = build_nfl_promotion_registry(self._math(), self._history(), declared_markets=["spread", "total", "passing_yards"])
+        registry = build_nfl_promotion_registry(
+            self._math(), self._history(), declared_markets=["spread", "total", "passing_yards"]
+        )
         self.assertEqual(registry["markets"]["passing_yards"]["stage"], "VALIDATED_MATH")
         self.assertFalse(registry["markets"]["passing_yards"]["eligible"])
         self.assertEqual(registry["markets"]["passing_yards"]["reason"], "WALKFORWARD_EVIDENCE_MISSING")
 
     def test_fold_gate_is_per_market(self):
-        registry = build_nfl_promotion_registry(self._math(), self._history(), declared_markets=["spread", "total"])
+        registry = build_nfl_promotion_registry(
+            self._math(), self._history(), declared_markets=["spread", "total"]
+        )
         self.assertEqual(registry["markets"]["spread"]["stage"], "PRODUCTION_LOGIC_PASS")
         self.assertEqual(registry["markets"]["total"]["stage"], "VALIDATED_MATH")
 
     def test_ci_attestation_and_calibration_are_both_required_for_ci_stage(self):
-        no_ci = build_nfl_promotion_registry(self._math(), self._history(), declared_markets=["spread"], ci_attested=False)
+        no_ci = build_nfl_promotion_registry(
+            self._math(), self._history(), declared_markets=["spread"], ci_attested=False
+        )
         self.assertEqual(no_ci["markets"]["spread"]["stage"], "PRODUCTION_LOGIC_PASS")
-        with_ci = build_nfl_promotion_registry(self._math(), self._history(), declared_markets=["spread"], ci_attested=True)
+        with_ci = build_nfl_promotion_registry(
+            self._math(), self._history(), declared_markets=["spread"], ci_attested=True
+        )
         self.assertEqual(with_ci["markets"]["spread"]["stage"], "CI_ATTESTED")
-        bad_cal = build_nfl_promotion_registry(self._math(), self._history(calibration_pass=False), declared_markets=["spread"], ci_attested=True)
+        bad_cal = build_nfl_promotion_registry(
+            self._math(), self._history(calibration_pass=False), declared_markets=["spread"], ci_attested=True
+        )
         self.assertEqual(bad_cal["markets"]["spread"]["stage"], "PRODUCTION_LOGIC_PASS")
 
     def test_deployment_requires_real_clv_sample_gate(self):
         base = build_nfl_promotion_registry(
             self._math(), self._history(), declared_markets=["spread"], ci_attested=True,
-            clv_evidence={"spread": {"logged_plays": 199, "mean_clv": 0.02, "clv_t_stat": 3.0}},
+            clv_evidence=self._clv(n=199, mean_clv=0.02, t_stat=3.0),
         )
         self.assertEqual(base["markets"]["spread"]["stage"], "CI_ATTESTED")
         passed = build_nfl_promotion_registry(
             self._math(), self._history(), declared_markets=["spread"], ci_attested=True,
-            clv_evidence={"spread": {"logged_plays": 200, "mean_clv": 0.001, "clv_t_stat": 2.01}},
+            clv_evidence=self._clv(),
         )
         self.assertEqual(passed["markets"]["spread"]["stage"], "DEPLOYED")
         self.assertTrue(passed["markets"]["spread"]["eligible"])
 
     def test_source_hash_mismatch_fails_closed_before_any_market_evaluation(self):
-        history = self._history(); history["source_sha256"] = "b" * 64
+        history = self._history()
+        history["source_sha256"] = "b" * 64
         with self.assertRaisesRegex(ValueError, "NFL_PROMOTION_SOURCE_HASH_MISMATCH"):
             build_nfl_promotion_registry(self._math(), history, declared_markets=["spread"])
 
-    def test_multi_source_history_requires_manifest_hash(self):
-        history = self._history(); history.pop("source_manifest_sha256")
-        with self.assertRaisesRegex(ValueError, "NFL_PROMOTION_SOURCE_MANIFEST_SHA256_INVALID"):
+    def test_manifest_hash_must_be_same_identity_as_bound_math_and_history(self):
+        history = self._history()
+        history["source_manifest_sha256"] = "b" * 64
+        with self.assertRaisesRegex(ValueError, "NFL_PROMOTION_MANIFEST_BINDING_MISMATCH"):
             build_nfl_promotion_registry(self._math(), history, declared_markets=["spread"])
 
     def test_schedule_only_challenger_cannot_promote_production_m2(self):
-        history = self._history(); history["model_id"] = "nfl_schedule_score_challenger_v1"
+        history = self._history()
+        history["model_id"] = "nfl_schedule_score_challenger_v1"
         with self.assertRaisesRegex(ValueError, "NFL_PROMOTION_MODEL_ID_MISMATCH"):
             build_nfl_promotion_registry(self._math(), history, declared_markets=["spread"])
 
     def test_wrong_feature_contract_cannot_promote_production_m2(self):
-        history = self._history(); history["feature_contract"] = "SCHEDULE_ONLY"
+        history = self._history()
+        history["feature_contract"] = "SCHEDULE_ONLY"
         with self.assertRaisesRegex(ValueError, "NFL_PROMOTION_FEATURE_CONTRACT_MISMATCH"):
             build_nfl_promotion_registry(self._math(), history, declared_markets=["spread"])
 
+    def test_clv_from_another_model_cannot_promote(self):
+        clv = self._clv()
+        clv["model_id"] = "some_other_model"
+        with self.assertRaisesRegex(ValueError, "NFL_CLV_MODEL_ID_MISMATCH"):
+            build_nfl_promotion_registry(
+                self._math(), self._history(), declared_markets=["spread"], ci_attested=True, clv_evidence=clv
+            )
+
     def test_bad_math_blocks_every_market(self):
-        registry = build_nfl_promotion_registry(self._math(bad=True), self._history(), declared_markets=["spread", "total"])
+        registry = build_nfl_promotion_registry(
+            self._math(bad=True), self._history(), declared_markets=["spread", "total"]
+        )
         self.assertTrue(all(row["stage"] == "BLOCKED_MATH" for row in registry["markets"].values()))
         self.assertTrue(all(row["eligible"] is False for row in registry["markets"].values()))
 
