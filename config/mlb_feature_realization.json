@@ -14,10 +14,10 @@
     "TEAM_TOTALS": {"status": "PARTIAL", "gaps": ["shared_score_distribution_readout_unvalidated", "historical_pit_and_production_parity_required"]},
     "NRFI": {"status": "MINIMAL", "gaps": ["first_inning_candidate_parameters_unvalidated", "declared_first_inning_context_not_active"]},
     "YRFI": {"status": "MINIMAL", "gaps": ["first_inning_candidate_parameters_unvalidated", "declared_first_inning_context_not_active"]},
-    "F5_MONEYLINE": {"status": "PLANNED", "gaps": ["inning_state_model_required", "tie_semantics_required"]},
-    "F5_RUN_LINE": {"status": "PLANNED", "gaps": ["inning_state_model_required", "tie_semantics_required"]},
-    "F5_TOTALS": {"status": "PLANNED", "gaps": ["inning_state_model_required", "tie_semantics_required"]},
-    "F5_TEAM_TOTALS": {"status": "PLANNED", "gaps": ["inning_level_team_scoring_state_model_required", "no_full_game_scaling_shortcut"]},
+    "F5_MONEYLINE": {"status": "PARTIAL", "gaps": ["actual_first_five_state_candidate_unvalidated", "tie_rule_and_evidence_required"]},
+    "F5_RUN_LINE": {"status": "PARTIAL", "gaps": ["actual_first_five_state_candidate_unvalidated", "settlement_and_evidence_required"]},
+    "F5_TOTALS": {"status": "PARTIAL", "gaps": ["actual_first_five_state_candidate_unvalidated", "settlement_and_evidence_required"]},
+    "F5_TEAM_TOTALS": {"status": "PARTIAL", "gaps": ["actual_first_five_team_state_candidate_unvalidated", "provider_acquisition_and_evidence_required"]},
     "HOME_RUNS": {"status": "MINIMAL", "gaps": ["generic_expected_count_baseline_only", "rich_hr_feature_bridge_not_active"]},
     "HITS": {"status": "PARTIAL", "gaps": ["full_declared_matchup_contact_defense_contract_not_all_active", "seed_safe_evidence_regeneration_required"]},
     "TOTAL_BASES": {"status": "PARTIAL", "gaps": ["full_declared_matchup_environment_contract_not_all_active", "seed_safe_evidence_regeneration_required"]},
@@ -44,7 +44,7 @@
     "EITHER_PITCHER_HITS_ALLOWED": {"status": "PARTIAL", "gaps": ["full_declared_two_pitcher_hits_context_not_all_active", "settlement_semantics_and_behavioral_evidence_required"]},
     "EITHER_PITCHER_BB": {"status": "PARTIAL", "gaps": ["full_declared_two_pitcher_walk_context_not_all_active", "settlement_semantics_and_behavioral_evidence_required"]},
     "EITHER_PITCHER_ER": {"status": "PARTIAL", "gaps": ["full_declared_two_pitcher_er_context_not_all_active", "settlement_semantics_and_behavioral_evidence_required"]},
-    "PITCHER_RECORD_WIN": {"status": "PLANNED", "gaps": ["rolling_win_rate_upstream_model_review_required"]},
-    "FIRST_HOME_RUN": {"status": "PLANNED", "gaps": ["ordering_aware_pa_simulation_required", "exchangeability_violation"]}
+    "PITCHER_RECORD_WIN": {"status": "PARTIAL", "gaps": ["game_state_candidate_unvalidated", "bullpen_state_parameterization_minimal", "official_scorer_rule_and_evidence_required"]},
+    "FIRST_HOME_RUN": {"status": "PARTIAL", "gaps": ["ordering_aware_candidate_unvalidated", "book_specific_no_hr_settlement_and_evidence_required"]}
   }
 }
