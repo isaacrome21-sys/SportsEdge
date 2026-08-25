@@ -8,18 +8,18 @@ class FootballEngineBUsageTests(unittest.TestCase):
         home = TeamUsageProfile(
             team="HOME",
             players=(
-                PlayerUsageProfile("H_QB", "HOME", "QB", True, 1.0, 0.0, 0.0, 0.05, 0.10),
-                PlayerUsageProfile("H_WR", "HOME", "WR", None if unresolved else True, 0.95, 0.98, 0.70, 0.00, 0.50),
-                PlayerUsageProfile("H_RB", "HOME", "RB", True, 0.70, 0.35, 0.30, 0.95, 0.50),
+                PlayerUsageProfile("H_QB", "HOME", "QB", True, 1.0, 0.0, 0.0, 0.00, 0.10),
+                PlayerUsageProfile("H_WR", "HOME", "WR", None if unresolved else True, 0.95, 0.98, 1.00, 0.00, 0.50),
+                PlayerUsageProfile("H_RB", "HOME", "RB", True, 0.70, 0.35, 0.00, 1.00, 0.50),
             ),
             quarterback_id="H_QB",
         )
         away = TeamUsageProfile(
             team="AWAY",
             players=(
-                PlayerUsageProfile("A_QB", "AWAY", "QB", True, 1.0, 0.0, 0.0, 0.05, 0.10),
-                PlayerUsageProfile("A_WR", "AWAY", "WR", True, 0.95, 0.98, 0.75, 0.00, 0.55),
-                PlayerUsageProfile("A_RB", "AWAY", "RB", True, 0.70, 0.30, 0.25, 0.95, 0.45),
+                PlayerUsageProfile("A_QB", "AWAY", "QB", True, 1.0, 0.0, 0.0, 0.00, 0.10),
+                PlayerUsageProfile("A_WR", "AWAY", "WR", True, 0.95, 0.98, 1.00, 0.00, 0.55),
+                PlayerUsageProfile("A_RB", "AWAY", "RB", True, 0.70, 0.30, 0.00, 1.00, 0.45),
             ),
             quarterback_id="A_QB",
         )
