@@ -12,6 +12,11 @@ import json
 import re
 from typing import Any, Mapping, Sequence
 
+from .first_home_run_book_policy import (
+    FIRST_HOME_RUN_NO_HR_RULE,
+    normalized_no_hr_policy,
+    normalized_no_hr_policy_from_record,
+)
 from .mlb_acceptance_matrix import build_acceptance_matrix
 
 
@@ -142,15 +147,20 @@ def official_fact_coverage(facts: Mapping[str, Any]) -> dict[str, dict[str, Any]
     return out
 
 
-def _valid_rule_record(value: Any) -> bool:
+def _valid_rule_record(value: Any, *, rule: str | None = None) -> bool:
     if not isinstance(value, Mapping): return False
     sha = str(value.get("source_sha256") or "").lower()
-    return bool(str(value.get("status") or "").upper() == "VALIDATED" and str(value.get("sportsbook") or "").strip() and _HEX64.fullmatch(sha) and str(value.get("captured_at_utc") or "").strip() and str(value.get("source_locator") or "").strip())
+    metadata_valid = bool(str(value.get("status") or "").upper() == "VALIDATED" and str(value.get("sportsbook") or "").strip() and _HEX64.fullmatch(sha) and str(value.get("captured_at_utc") or "").strip() and str(value.get("source_locator") or "").strip())
+    if not metadata_valid:
+        return False
+    if str(rule or "") == FIRST_HOME_RUN_NO_HR_RULE:
+        return normalized_no_hr_policy_from_record(value) is not None
+    return True
 
 
 def validate_book_rules(required_rules: Sequence[str], rule_evidence: Mapping[str, Any] | None) -> tuple[bool, list[str]]:
     evidence = rule_evidence if isinstance(rule_evidence, Mapping) else {}
-    missing = [str(rule) for rule in required_rules if not _valid_rule_record(evidence.get(str(rule)))]
+    missing = [str(rule) for rule in required_rules if not _valid_rule_record(evidence.get(str(rule)), rule=str(rule))]
     return not missing, missing
 
 
@@ -171,6 +181,7 @@ def build_settlement_report(facts: Mapping[str, Any], *, source: str, evidence_c
             "official_fact_source_key": coverage[market]["source_key"],
             "required_book_rules": required_rules, "book_rules_validated": book_valid,
             "missing_book_rules": missing_rules,
+            "normalized_book_policy": normalized_no_hr_policy(book_rule_evidence) if market == "FIRST_HOME_RUN" and book_valid else None,
             "settlement_semantics_state": classify_observation_settlement(official_fact_state=fact_state, book_rules_validated=book_valid, ambiguity_reasons=[]),
         })
     fact_complete = all(row["official_fact_state"] == "OFFICIAL_FACTS_PROVEN" for row in market_rows); book_complete = all(bool(row["book_rules_validated"]) for row in market_rows); synthetic = str(evidence_class).upper() == "SYNTHETIC_CONTRACT_TEST"; validation_gate_pass = bool(fact_complete and book_complete and not synthetic)
