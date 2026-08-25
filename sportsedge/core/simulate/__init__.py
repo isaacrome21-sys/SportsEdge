@@ -10,6 +10,12 @@ from .situational import (
     derive_race_to_n,
     derive_winning_margin_band,
 )
+from .special_teams import (
+    EngineCSpecialTeamsResolver,
+    ResolvedFootballPath,
+    SpecialTeamsEvent,
+    SpecialTeamsProfile,
+)
 from .usage import (
     AttributedFootballPath,
     AttributedPlay,
@@ -28,6 +34,10 @@ __all__ = [
     "FootballPlayPath",
     "PlayEvent",
     "TeamDriveProfile",
+    "SpecialTeamsProfile",
+    "SpecialTeamsEvent",
+    "ResolvedFootballPath",
+    "EngineCSpecialTeamsResolver",
     "PlayerUsageProfile",
     "TeamUsageProfile",
     "AttributedPlay",

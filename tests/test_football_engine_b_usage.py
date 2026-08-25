@@ -40,8 +40,8 @@ class FootballEngineBUsageTests(unittest.TestCase):
                     "RUSH", 5, 0,
                 ),
                 PlayEvent(
-                    1, 3, 1, 780, "HOME", 0, 0, 7, 0, 2, 5, 5,
-                    "PASS", 5, 7, score_type="TOUCHDOWN_CANDIDATE", pass_complete=True,
+                    1, 3, 1, 780, "HOME", 0, 0, 6, 0, 2, 5, 5,
+                    "PASS", 5, 6, score_type="TOUCHDOWN_CANDIDATE", pass_complete=True,
                 ),
             ),
         )
@@ -77,7 +77,8 @@ class FootballEngineBUsageTests(unittest.TestCase):
 
         home, away = self._usage()
         attributed = EngineBUsageAllocator(home, away, seed=7).attribute(self._path())
-        td = [play for play in attributed.plays if play.base_play.points == 7][0]
+        td = [play for play in attributed.plays if play.base_play.score_type == "TOUCHDOWN_CANDIDATE"][0]
+        self.assertEqual(td.base_play.points, 6)
         self.assertEqual(td.passer_id, "H_QB")
         self.assertEqual(td.receiver_id, "H_WR")
         self.assertEqual(td.touchdown_scorer_id, "H_WR")
