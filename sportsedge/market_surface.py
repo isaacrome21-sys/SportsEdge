@@ -1,4 +1,9 @@
-"""Declared MLB market-surface coverage and run-health composition."""
+"""Declared MLB market-surface coverage and run-health composition.
+
+Market identity is owned by ``config/mlb_market_catalog.json``. The surface file
+adds acquisition/runtime metadata for those identities and must match the
+canonical catalog exactly when loaded through the production path.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -8,6 +13,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 DEFAULT_MARKET_SURFACE_PATH = "config/mlb_market_surface.json"
+DEFAULT_MLB_MARKET_CATALOG_PATH = "config/mlb_market_catalog.json"
 
 RUN_STATES = frozenset({"READY", "DEGRADED", "BLOCKED"})
 ACQUISITION_STATES = frozenset({"OFFERED", "NOT_OFFERED", "ACQUISITION_MISSING", "PROVIDER_UNSUPPORTED"})
@@ -45,7 +51,34 @@ class CoverageSlot:
     reason: str
 
 
-def load_market_surface(path: str | Path = DEFAULT_MARKET_SURFACE_PATH) -> tuple[str, tuple[MarketSpec, ...]]:
+def _load_canonical_market_ids(path: str | Path) -> set[str]:
+    raw = json.loads(Path(path).read_text())
+    if not isinstance(raw, Mapping):
+        raise MarketSurfaceError("MLB_MARKET_CATALOG_NOT_OBJECT")
+    out: set[str] = set()
+    for key, rows in raw.items():
+        if key == "schema_version" or not isinstance(rows, list):
+            continue
+        for row in rows:
+            if isinstance(row, str):
+                market = row
+            elif isinstance(row, Mapping):
+                market = str(row.get("market") or "")
+            else:
+                market = ""
+            if not market or market in out:
+                raise MarketSurfaceError("MLB_MARKET_CATALOG_IDENTITY_INVALID")
+            out.add(market)
+    if not out:
+        raise MarketSurfaceError("MLB_MARKET_CATALOG_EMPTY")
+    return out
+
+
+def load_market_surface(
+    path: str | Path = DEFAULT_MARKET_SURFACE_PATH,
+    *,
+    catalog_path: str | Path | None = DEFAULT_MLB_MARKET_CATALOG_PATH,
+) -> tuple[str, tuple[MarketSpec, ...]]:
     raw = json.loads(Path(path).read_text())
     if not isinstance(raw, Mapping):
         raise MarketSurfaceError("MARKET_SURFACE_NOT_OBJECT")
@@ -82,6 +115,15 @@ def load_market_surface(path: str | Path = DEFAULT_MARKET_SURFACE_PATH) -> tuple
             opens_minutes_before_first_pitch=opens,
             expected_by_minutes_before_first_pitch=expected_by,
         ))
+
+    if catalog_path is not None:
+        canonical = _load_canonical_market_ids(catalog_path)
+        if seen != canonical:
+            missing = sorted(canonical - seen)
+            extra = sorted(seen - canonical)
+            raise MarketSurfaceError(
+                f"MARKET_SURFACE_CATALOG_MISMATCH missing={missing} extra={extra}"
+            )
     return version, tuple(out)
 
 
