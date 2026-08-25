@@ -1,5 +1,6 @@
 import unittest
 
+from sportsedge.first_home_run_book_policy import FIRST_HOME_RUN_NO_HR_RULE
 from sportsedge.mlb_acceptance_matrix import build_acceptance_matrix
 from sportsedge.mlb_settlement_evidence import (
     batter_fact, build_settlement_report, classify_observation_settlement,
@@ -30,8 +31,15 @@ def _facts():
     }
 
 
-def _validated_rule_record(rule):
-    return {"status": "VALIDATED", "sportsbook": "SYNTHETIC_BOOK", "source_sha256": "a" * 64, "captured_at_utc": "2026-08-24T12:00:00+00:00", "source_locator": f"synthetic://{rule}"}
+def _validated_rule_record(rule, *, no_hr_policy=None):
+    record = {"status": "VALIDATED", "sportsbook": "SYNTHETIC_BOOK", "source_sha256": "a" * 64, "captured_at_utc": "2026-08-24T12:00:00+00:00", "source_locator": f"synthetic://{rule}"}
+    if rule == FIRST_HOME_RUN_NO_HR_RULE:
+        record["normalized_policy"] = {"no_home_run": no_hr_policy or {"YES": "LOSS", "NO": "WIN"}}
+    return record
+
+
+def _market_row(report, market):
+    return next(row for row in report["markets"] if row["market"] == market)
 
 
 class MLBSettlementEvidenceTests(unittest.TestCase):
@@ -70,6 +78,29 @@ class MLBSettlementEvidenceTests(unittest.TestCase):
         self.assertFalse(ok); self.assertEqual(missing, ["RULE_B"])
         ok2, missing2 = validate_book_rules(["RULE_A"], {"RULE_A": _validated_rule_record("RULE_A")})
         self.assertTrue(ok2); self.assertEqual(missing2, [])
+
+    def test_first_home_run_rule_requires_normalized_semantics_not_metadata_only(self):
+        metadata_only = _validated_rule_record("OTHER_RULE")
+        ok, missing = validate_book_rules([FIRST_HOME_RUN_NO_HR_RULE], {FIRST_HOME_RUN_NO_HR_RULE: metadata_only})
+        self.assertFalse(ok)
+        self.assertEqual(missing, [FIRST_HOME_RUN_NO_HR_RULE])
+
+    def test_first_home_run_event_false_policy_is_exposed_in_market_row(self):
+        evidence = {FIRST_HOME_RUN_NO_HR_RULE: _validated_rule_record(FIRST_HOME_RUN_NO_HR_RULE)}
+        report = build_settlement_report(_facts(), source="synthetic", evidence_class="SYNTHETIC_CONTRACT_TEST", generated_at_utc="2026-08-24T12:00:00+00:00", book_rule_evidence=evidence)
+        row = _market_row(report, "FIRST_HOME_RUN")
+        self.assertTrue(row["book_rules_validated"])
+        self.assertEqual(row["normalized_book_policy"], {"YES": "LOSS", "NO": "WIN"})
+
+    def test_first_home_run_void_all_policy_is_valid(self):
+        evidence = {FIRST_HOME_RUN_NO_HR_RULE: _validated_rule_record(FIRST_HOME_RUN_NO_HR_RULE, no_hr_policy={"YES": "VOID", "NO": "VOID"})}
+        ok, missing = validate_book_rules([FIRST_HOME_RUN_NO_HR_RULE], evidence)
+        self.assertTrue(ok); self.assertEqual(missing, [])
+
+    def test_first_home_run_mixed_void_policy_fails_closed(self):
+        evidence = {FIRST_HOME_RUN_NO_HR_RULE: _validated_rule_record(FIRST_HOME_RUN_NO_HR_RULE, no_hr_policy={"YES": "LOSS", "NO": "VOID"})}
+        ok, missing = validate_book_rules([FIRST_HOME_RUN_NO_HR_RULE], evidence)
+        self.assertFalse(ok); self.assertEqual(missing, [FIRST_HOME_RUN_NO_HR_RULE])
 
     def test_observation_ambiguity_fails_closed(self):
         self.assertEqual(classify_observation_settlement(official_fact_state="OFFICIAL_FACTS_PROVEN", book_rules_validated=True, ambiguity_reasons=["RAIN_SHORTENED_GAME"]), "AMBIGUOUS_SETTLEMENT")
