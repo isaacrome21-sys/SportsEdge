@@ -6,15 +6,17 @@ game being predicted. Sportsbook fields are used only after the market-blind
 score prediction exists, to define the closing spread/total event and M1 no-vig
 benchmark. They never enter the M2 score-state update.
 
-This module is an evidence producer, not a claim that the candidate beats the
-market. Promotion remains fail-closed if the resulting folds do not clear the
-configured gates.
+Calibration is fit strictly on prior seasons and transformed on the held-out
+season. This module is an evidence producer, not a claim that the candidate
+beats the market. Promotion remains fail-closed if any gate does not clear.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 from math import erf, isfinite, log, sqrt
 from typing import Any, Iterable, Mapping
+
+from sportsedge.core.calibrate.isotonic import FoldSafeIsotonicCalibrator
 
 
 @dataclass
@@ -244,6 +246,58 @@ def build_nfl_game_evaluations(
     return out
 
 
+def calibrate_nfl_evaluations(
+    evaluations: Iterable[Mapping[str, Any]],
+    *,
+    min_fit_seasons: int = 2,
+) -> list[dict[str, Any]]:
+    """Fit isotonic calibrators on prior seasons only and transform held-out games."""
+    if min_fit_seasons < 1:
+        raise ValueError("MIN_CALIBRATION_FIT_SEASONS_INVALID")
+    rows = [dict(row) for row in evaluations]
+    seasons = sorted({int(row["season"]) for row in rows})
+    for row in rows:
+        row["m2_home_cover_calibrated_prob"] = None
+        row["m2_over_calibrated_prob"] = None
+        row["spread_calibration_fit_seasons"] = ()
+        row["total_calibration_fit_seasons"] = ()
+
+    specs = {
+        "spread": ("home_cover_outcome", "m2_home_cover_prob", "m2_home_cover_calibrated_prob", "spread_calibration_fit_seasons"),
+        "total": ("over_outcome", "m2_over_prob", "m2_over_calibrated_prob", "total_calibration_fit_seasons"),
+    }
+    for test_season in seasons:
+        for _, (outcome_key, raw_key, calibrated_key, fit_key) in specs.items():
+            train = [
+                row for row in rows
+                if int(row["season"]) < test_season
+                and row.get(outcome_key) in (0, 1)
+                and row.get(raw_key) is not None
+            ]
+            fit_seasons = tuple(sorted({int(row["season"]) for row in train}))
+            if len(fit_seasons) < min_fit_seasons:
+                continue
+            test = [
+                row for row in rows
+                if int(row["season"]) == test_season
+                and row.get(outcome_key) in (0, 1)
+                and row.get(raw_key) is not None
+            ]
+            if not test:
+                continue
+            calibrator = FoldSafeIsotonicCalibrator().fit(
+                [float(row[raw_key]) for row in train],
+                [float(row[outcome_key]) for row in train],
+                fit_seasons=set(fit_seasons),
+                test_season=test_season,
+            )
+            transformed = calibrator.transform([float(row[raw_key]) for row in test])
+            for row, probability in zip(test, transformed):
+                row[calibrated_key] = _clip_probability(probability)
+                row[fit_key] = fit_seasons
+    return rows
+
+
 def _log_loss(rows: list[tuple[int, float]]) -> float:
     if not rows:
         raise ValueError("EMPTY_LOG_LOSS_ROWS")
@@ -256,14 +310,24 @@ def _log_loss(rows: list[tuple[int, float]]) -> float:
     return total / len(rows)
 
 
-def build_nfl_fold_rows(evaluations: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+def build_nfl_fold_rows(
+    evaluations: Iterable[Mapping[str, Any]],
+    *,
+    require_calibrated: bool = False,
+) -> list[dict[str, Any]]:
     """Aggregate comparable M1/M2 log loss by season and market."""
     data = [dict(row) for row in evaluations]
     seasons = sorted({int(row["season"]) for row in data})
     folds: list[dict[str, Any]] = []
     specs = {
-        "spread": ("home_cover_outcome", "m1_home_cover_prob", "m2_home_cover_prob"),
-        "total": ("over_outcome", "m1_over_prob", "m2_over_prob"),
+        "spread": (
+            "home_cover_outcome", "m1_home_cover_prob",
+            "m2_home_cover_calibrated_prob" if require_calibrated else "m2_home_cover_prob",
+        ),
+        "total": (
+            "over_outcome", "m1_over_prob",
+            "m2_over_calibrated_prob" if require_calibrated else "m2_over_prob",
+        ),
     }
     for season in seasons:
         season_rows = [row for row in data if int(row["season"]) == season]
@@ -290,5 +354,76 @@ def build_nfl_fold_rows(evaluations: Iterable[Mapping[str, Any]]) -> list[dict[s
                 "m1_log_loss": m1_loss,
                 "m2_log_loss": m2_loss,
                 "m2_beats_m1": m2_loss < m1_loss,
+                "m2_probability_source": "FOLD_SAFE_ISOTONIC" if require_calibrated else "RAW_MODEL",
             })
     return folds
+
+
+def build_calibration_evidence(
+    evaluations: Iterable[Mapping[str, Any]],
+    *,
+    bins: int = 10,
+    min_bin_n: int = 25,
+    max_bin_deviation_threshold: float = 0.05,
+) -> dict[str, dict[str, Any]]:
+    """Build held-out reliability evidence from fold-safe calibrated predictions."""
+    if bins <= 1:
+        raise ValueError("CALIBRATION_BINS_INVALID")
+    if min_bin_n <= 0:
+        raise ValueError("CALIBRATION_MIN_BIN_N_INVALID")
+    if not 0.0 <= max_bin_deviation_threshold <= 1.0:
+        raise ValueError("CALIBRATION_THRESHOLD_INVALID")
+    data = [dict(row) for row in evaluations]
+    specs = {
+        "spread": ("home_cover_outcome", "m2_home_cover_calibrated_prob"),
+        "total": ("over_outcome", "m2_over_calibrated_prob"),
+    }
+    out: dict[str, dict[str, Any]] = {}
+    for market, (outcome_key, probability_key) in specs.items():
+        rows = [
+            row for row in data
+            if row.get(outcome_key) in (0, 1) and row.get(probability_key) is not None
+        ]
+        buckets: dict[int, list[tuple[float, int]]] = {}
+        for row in rows:
+            probability = _clip_probability(float(row[probability_key]))
+            index = min(bins - 1, int(probability * bins))
+            buckets.setdefault(index, []).append((probability, int(row[outcome_key])))
+
+        reliability_bins: list[dict[str, Any]] = []
+        deviations: list[float] = []
+        for index in range(bins):
+            bucket = buckets.get(index, [])
+            if not bucket:
+                continue
+            mean_probability = sum(item[0] for item in bucket) / len(bucket)
+            empirical_rate = sum(item[1] for item in bucket) / len(bucket)
+            deviation = abs(empirical_rate - mean_probability)
+            eligible = len(bucket) >= min_bin_n
+            if eligible:
+                deviations.append(deviation)
+            reliability_bins.append({
+                "bin": index,
+                "n": len(bucket),
+                "mean_probability": mean_probability,
+                "empirical_rate": empirical_rate,
+                "abs_deviation": deviation,
+                "eligible": eligible,
+            })
+
+        max_deviation = max(deviations) if deviations else None
+        passed = max_deviation is not None and max_deviation <= max_bin_deviation_threshold
+        out[market] = {
+            "n": len(rows),
+            "bins": reliability_bins,
+            "eligible_bin_count": len(deviations),
+            "max_bin_deviation": max_deviation,
+            "threshold": float(max_bin_deviation_threshold),
+            "pass": bool(passed),
+            "reason": (
+                "PASS" if passed
+                else "CALIBRATION_BINS_UNDERPOWERED" if max_deviation is None
+                else "CALIBRATION_DEVIATION_EXCEEDS_THRESHOLD"
+            ),
+        }
+    return out
