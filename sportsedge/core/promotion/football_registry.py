@@ -2,18 +2,21 @@
 
 Structural implementation never implies promotion. Historical evidence must be
 produced by the exact production NFL M2 feature/model contract, share the same
-canonical multi-source manifest identity as simulator math, and carry forward
-CLV from that same model contract. Missing market evidence never inherits a
-stage from another market.
+canonical multi-source manifest and exact code SHA as simulator math, and carry
+forward CLV from that same model contract. Missing market evidence never
+inherits a stage from another market.
 """
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+import re
 from typing import Any
 
 from sportsedge.core.promotion.football import evaluate_football_promotion_from_math_artifact
 from sportsedge.core.validation.math_attestation import attest_validated_math
 from sportsedge.sports.nfl.m2 import NFL_M2_FEATURE_CONTRACT, PRODUCTION_NFL_M2_MODEL_ID
+
+_GIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
 def _mapping(value: Any) -> Mapping[str, Any] | None:
@@ -28,6 +31,13 @@ def _sha256(value: Any, error: str) -> str:
         int(raw, 16)
     except ValueError as exc:
         raise ValueError(error) from exc
+    return raw
+
+
+def _git_sha(value: Any, error: str) -> str:
+    raw = str(value or "").strip().lower()
+    if not _GIT_SHA_RE.fullmatch(raw):
+        raise ValueError(error)
     return raw
 
 
@@ -76,6 +86,15 @@ def build_nfl_promotion_registry(
     )
     if math_hash != manifest_hash:
         raise ValueError("NFL_PROMOTION_MANIFEST_BINDING_MISMATCH")
+
+    math_code_sha = _git_sha(math_artifact.get("code_git_sha"), "NFL_PROMOTION_MATH_CODE_SHA_INVALID")
+    history_code_sha = _git_sha(
+        historical_evidence.get("code_git_sha"),
+        "NFL_PROMOTION_HISTORY_CODE_SHA_INVALID",
+    )
+    if math_code_sha != history_code_sha:
+        raise ValueError("NFL_PROMOTION_CODE_SHA_MISMATCH")
+
     if historical_evidence.get("model_id") != PRODUCTION_NFL_M2_MODEL_ID:
         raise ValueError("NFL_PROMOTION_MODEL_ID_MISMATCH")
     if historical_evidence.get("feature_contract") != NFL_M2_FEATURE_CONTRACT:
@@ -98,8 +117,12 @@ def build_nfl_promotion_registry(
         clv_log_identity = {
             "model_id": PRODUCTION_NFL_M2_MODEL_ID,
             "feature_contract": NFL_M2_FEATURE_CONTRACT,
-            "decision_log_sha256": _sha256(clv_evidence.get("decision_log_sha256"), "NFL_CLV_DECISION_LOG_SHA256_INVALID"),
-            "close_log_sha256": _sha256(clv_evidence.get("close_log_sha256"), "NFL_CLV_CLOSE_LOG_SHA256_INVALID"),
+            "decision_log_sha256": _sha256(
+                clv_evidence.get("decision_log_sha256"), "NFL_CLV_DECISION_LOG_SHA256_INVALID"
+            ),
+            "close_log_sha256": _sha256(
+                clv_evidence.get("close_log_sha256"), "NFL_CLV_CLOSE_LOG_SHA256_INVALID"
+            ),
         }
 
     markets: list[str] = []
@@ -155,8 +178,10 @@ def build_nfl_promotion_registry(
         registry[market] = {
             "stage": stage,
             "eligible": stage == "DEPLOYED",
-            "reason": _reason(stage=stage, history=history, calibration=calibration,
-                              ci_attested=ci_attested, clv=clv),
+            "reason": _reason(
+                stage=stage, history=history, calibration=calibration,
+                ci_attested=ci_attested, clv=clv,
+            ),
             "fold_wins": fold_wins,
             "fold_total": fold_total,
             "fold_win_rate": (fold_wins / fold_total) if fold_total else None,
@@ -166,10 +191,11 @@ def build_nfl_promotion_registry(
         }
 
     return {
-        "schema_version": 3,
+        "schema_version": 4,
         "sport": "nfl",
         "model_id": PRODUCTION_NFL_M2_MODEL_ID,
         "feature_contract": NFL_M2_FEATURE_CONTRACT,
+        "code_git_sha": math_code_sha,
         "source_sha256": math_hash,
         "source_manifest_sha256": manifest_hash,
         "math_attestation": math_attestation,
