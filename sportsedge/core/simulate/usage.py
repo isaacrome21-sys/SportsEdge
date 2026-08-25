@@ -8,7 +8,6 @@ TD events. Unresolved participation fails closed.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 import numpy as np
 
@@ -198,10 +197,18 @@ class AttributedFootballPath:
                     receiver = stats[attributed.receiver_id]
                     passer["completions"] += 1
                     passer["passing_yards"] += play.yards
-                    passer["longest_completion"] = max(passer["longest_completion"], play.yards)
+                    passer["longest_completion"] = (
+                        play.yards
+                        if passer["completions"] == 1
+                        else max(passer["longest_completion"], play.yards)
+                    )
                     receiver["receptions"] += 1
                     receiver["receiving_yards"] += play.yards
-                    receiver["longest_reception"] = max(receiver["longest_reception"], play.yards)
+                    receiver["longest_reception"] = (
+                        play.yards
+                        if receiver["receptions"] == 1
+                        else max(receiver["longest_reception"], play.yards)
+                    )
                     if play.points == 7:
                         passer["passing_tds"] += 1
                         receiver["receiving_tds"] += 1
@@ -211,7 +218,11 @@ class AttributedFootballPath:
                 rusher = stats[attributed.rusher_id]
                 rusher["rush_attempts"] += 1
                 rusher["rushing_yards"] += play.yards
-                rusher["longest_rush"] = max(rusher["longest_rush"], play.yards)
+                rusher["longest_rush"] = (
+                    play.yards
+                    if rusher["rush_attempts"] == 1
+                    else max(rusher["longest_rush"], play.yards)
+                )
                 if play.points == 7:
                     rusher["rushing_tds"] += 1
                     rusher["touchdowns"] += 1
