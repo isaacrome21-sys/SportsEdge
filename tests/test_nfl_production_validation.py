@@ -2,7 +2,11 @@ import copy
 import unittest
 
 from sportsedge.sports.nfl.m2 import NFL_M2_FEATURE_CONTRACT, PRODUCTION_NFL_M2_MODEL_ID, build_nfl_m2_features
-from sportsedge.sports.nfl.production_validation import build_production_nfl_raw_evaluations, build_production_nfl_validation_evidence
+from sportsedge.sports.nfl.production_validation import (
+    build_production_nfl_raw_evaluations,
+    build_production_nfl_validation_evidence,
+    nflverse_spread_to_home_handicap,
+)
 
 
 class NFLProductionValidationTests(unittest.TestCase):
@@ -38,12 +42,18 @@ class NFLProductionValidationTests(unittest.TestCase):
                 })
         return rows
 
+    def test_nflverse_favorite_positive_line_converts_to_home_handicap(self):
+        self.assertEqual(nflverse_spread_to_home_handicap(3.0), -3.0)
+        self.assertEqual(nflverse_spread_to_home_handicap(-2.5), 2.5)
+        self.assertEqual(nflverse_spread_to_home_handicap(0.0), 0.0)
+
     def test_raw_evaluations_are_fold_safe_and_use_joint_distribution(self):
         evaluations = build_production_nfl_raw_evaluations(self._rows(), min_train_seasons=2, ridge_alpha=1.0)
         self.assertTrue(evaluations)
         self.assertTrue(all(row["model_id"] == PRODUCTION_NFL_M2_MODEL_ID for row in evaluations))
         self.assertTrue(all(row["feature_contract"] == NFL_M2_FEATURE_CONTRACT for row in evaluations))
         self.assertTrue(all(row["season"] > max(row["train_seasons"]) for row in evaluations))
+        self.assertTrue(all(row["home_handicap"] == -row["spread_line"] for row in evaluations))
         self.assertTrue(all(0.0 < row["m2_home_cover_prob"] < 1.0 for row in evaluations))
         self.assertTrue(all(0.0 < row["m2_over_prob"] < 1.0 for row in evaluations))
 
