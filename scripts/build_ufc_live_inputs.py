@@ -5,7 +5,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.request import Request,urlopen
-from sportsedge.ufc_source import upcoming_event_urls,parse_event,fighter_urls_from_bout,parse_fighter_profile
+from sportsedge.ufc_source import bout_rounds_from_detail,upcoming_event_urls,parse_event,fighter_urls_from_bout,parse_fighter_profile
 from sportsedge.ufc_training import update_elo
 
 DATA_URL='https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2026/2026-07-07/ultimate_ufc_dataset.csv'
@@ -86,8 +86,12 @@ def _from_ufcstats(latest,last_date,elo):
     if not bouts:return None
     fighters={}; contexts=[]
     for b in bouts:
-        try: ua,ub=fighter_urls_from_bout(b.bout_url); pa,pb=parse_fighter_profile(ua),parse_fighter_profile(ub)
-        except Exception: continue
+        try:
+            ua,ub=fighter_urls_from_bout(b.bout_url)
+            rounds=bout_rounds_from_detail(b.bout_url)
+            pa,pb=parse_fighter_profile(ua),parse_fighter_profile(ub)
+        except Exception:
+            continue
         for p in (pa,pb):
             snap=_snapshot_from_history(p.name,b.weight_class,b.event_date,latest,last_date,elo)
             age=_age_from_dob(p.dob,b.event_date)
@@ -97,7 +101,7 @@ def _from_ufcstats(latest,last_date,elo):
                          'takedowns_per_15':p.td_avg or snap['takedowns_per_15'],'takedown_accuracy':p.td_acc or snap['takedown_accuracy'],
                          'takedown_defense':p.td_def,'submissions_per_15':p.sub_avg or snap['submissions_per_15']})
             fighters[p.name]=snap
-        rounds=int(b.rounds or 3); title=rounds >= 5
+        title='title' in b.weight_class.lower()
         contexts.append({'fighter_a':b.fighter_a,'fighter_b':b.fighter_b,'rounds':rounds,'title_fight':title,'short_notice_days':None,'altitude_ft':0.0})
     return bouts[0].event,bouts[0].event_date,fighters,contexts
 
