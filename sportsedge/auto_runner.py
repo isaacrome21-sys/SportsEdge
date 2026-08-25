@@ -18,6 +18,14 @@ from .edge_floors import DEFAULT_EDGE_FLOOR_CONFIG
 from .feature_bridge import FeatureBridgeError, parse_source_fact, resolve_feature_row
 from .generic_card_pipeline import GENERIC_MARKETS
 from .live_slate import LiveGame, TeamLineup, lineup_from_rows
+from .market_surface import (
+    CoverageSlot,
+    DEFAULT_MARKET_SURFACE_PATH,
+    build_market_grid,
+    compose_card_status,
+    compose_run_status,
+    load_market_surface,
+)
 from .mlb_source import fetch_boxscore, fetch_schedule, parse_confirmed_lineup, parse_game_start
 from .quote_bridge import QuoteBridgeError, validate_canonical_quote
 from .runtime import parse_timestamp
@@ -26,6 +34,7 @@ from .unified_card import UnifiedCardResult, run_unified_card
 CHICAGO_TZ = ZoneInfo("America/Chicago")
 VALIDATED_BRIDGE_MARKETS = frozenset({"HITS", "TOTAL_BASES", "PITCHER_BB"})
 GENERIC_FEATURE_MARKETS = frozenset(set(GENERIC_MARKETS) | {"PITCHER_BB"})
+ENGINE_CAPABLE_MARKETS = frozenset(set(GENERIC_MARKETS) | set(VALIDATED_BRIDGE_MARKETS))
 BANNED_GENERIC_KEYS = frozenset({
     "sportsbook_probability", "implied_probability", "market_probability",
     "american_odds", "decimal_odds", "sportsbook_price", "dk_probability",
@@ -54,13 +63,16 @@ class AutoCardResult:
     ev_per_dollar: float | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class AutoRunReport:
     slate_date_ct: str
     generated_at_utc: str
     run_status: str
+    card_status: str
     results: tuple[AutoCardResult, ...]
+    coverage_slots: tuple[CoverageSlot, ...]
     source_failures: tuple[dict[str, Any], ...]
+    market_surface_version: str
 
 
 def _aware_utc(value: datetime) -> datetime:
@@ -262,9 +274,10 @@ def _convert(index: int, result: UnifiedCardResult) -> AutoCardResult:
     )
 
 
-def run_auto_mlb(*, quote_url: str, feature_url: str, projected_lineups_url: str | None = None, provider_token: str | None = None, now: datetime | None = None, opener: Callable = urlopen, registry_path: str = "config/deployments.json", require_confirmed_lineup: bool = False, edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG, kelly_multiplier: float = 0.25) -> AutoRunReport:
+def run_auto_mlb(*, quote_url: str, feature_url: str, projected_lineups_url: str | None = None, provider_token: str | None = None, now: datetime | None = None, opener: Callable = urlopen, registry_path: str = "config/deployments.json", require_confirmed_lineup: bool = False, edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG, kelly_multiplier: float = 0.25, market_surface_path: str = DEFAULT_MARKET_SURFACE_PATH) -> AutoRunReport:
     current = _aware_utc(now or datetime.now(timezone.utc))
     slate_date_ct = current.astimezone(CHICAGO_TZ).date().isoformat()
+    surface_version, market_specs = load_market_surface(market_surface_path)
     raw_quote_rows = _snapshot_list("QUOTE", _http_json(quote_url, opener=opener, token=provider_token))
     feature_rows_raw = _snapshot_list("FEATURE", _http_json(feature_url, opener=opener, token=provider_token))
     projected_raw: list[Mapping[str, Any]] = []
@@ -332,9 +345,39 @@ def run_auto_mlb(*, quote_url: str, feature_url: str, projected_lineups_url: str
             output[i] = _convert(i, result)
     results = tuple(output[i] for i in range(len(raw_quote_rows)))
     source_failures = tuple({"source_index": result.source_index, "reason": result.reason} for result in results if result.bet_status == "BLOCKED" and result.model_p is None)
-    status = "PASS" if results else "NO_QUOTES"
-    return AutoRunReport(slate_date_ct, current.isoformat(), status, results, source_failures)
+    grid_games = tuple((str(s.game_pk), parse_game_start(s.game_date)) for s in schedule)
+    coverage_slots = build_market_grid(
+        games=grid_games,
+        specs=market_specs,
+        quotes=canonical_quotes,
+        engine_capable_markets=ENGINE_CAPABLE_MARKETS,
+        feature_failures=feature_failures,
+        result_rows=results,
+        now=current,
+    )
+    all_results_blocked = bool(results) and all(r.bet_status == "BLOCKED" for r in results)
+    status = "BLOCKED" if all_results_blocked else compose_run_status(coverage_slots)
+    card_status = compose_card_status(slot.decision_status for slot in coverage_slots)
+    return AutoRunReport(
+        slate_date_ct=slate_date_ct,
+        generated_at_utc=current.isoformat(),
+        run_status=status,
+        card_status=card_status,
+        results=results,
+        coverage_slots=coverage_slots,
+        source_failures=source_failures,
+        market_surface_version=surface_version,
+    )
 
 
 def report_to_dict(report: AutoRunReport) -> dict[str, Any]:
-    return {"slate_date_ct": report.slate_date_ct, "generated_at_utc": report.generated_at_utc, "run_status": report.run_status, "results": [asdict(x) for x in report.results], "source_failures": list(report.source_failures)}
+    return {
+        "slate_date_ct": report.slate_date_ct,
+        "generated_at_utc": report.generated_at_utc,
+        "run_status": report.run_status,
+        "card_status": report.card_status,
+        "market_surface_version": report.market_surface_version,
+        "coverage_slots": [asdict(x) for x in report.coverage_slots],
+        "results": [asdict(x) for x in report.results],
+        "source_failures": list(report.source_failures),
+    }

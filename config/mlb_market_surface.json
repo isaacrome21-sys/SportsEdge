@@ -1,0 +1,26 @@
+{
+  "version": "mlb_market_surface_v1",
+  "markets": [
+    {"market":"MONEYLINE","scope":"game","provider_expected":true,"retry_eligible":false,"terminal_if_absent":"ACQUISITION_MISSING","availability_window":{"opens_minutes_before_first_pitch":2880,"expected_by_minutes_before_first_pitch":720}},
+    {"market":"RUN_LINE","scope":"game","provider_expected":true,"retry_eligible":false,"terminal_if_absent":"ACQUISITION_MISSING","availability_window":{"opens_minutes_before_first_pitch":2880,"expected_by_minutes_before_first_pitch":720}},
+    {"market":"TOTALS","scope":"game","provider_expected":true,"retry_eligible":false,"terminal_if_absent":"ACQUISITION_MISSING","availability_window":{"opens_minutes_before_first_pitch":2880,"expected_by_minutes_before_first_pitch":720}},
+    {"market":"TEAM_TOTALS","scope":"team","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","availability_window":{"opens_minutes_before_first_pitch":1440,"expected_by_minutes_before_first_pitch":180}},
+    {"market":"F5_MONEYLINE","scope":"game","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","availability_window":{"opens_minutes_before_first_pitch":1440,"expected_by_minutes_before_first_pitch":180}},
+    {"market":"F5_RUN_LINE","scope":"game","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","availability_window":{"opens_minutes_before_first_pitch":1440,"expected_by_minutes_before_first_pitch":180}},
+    {"market":"F5_TOTALS","scope":"game","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","availability_window":{"opens_minutes_before_first_pitch":1440,"expected_by_minutes_before_first_pitch":180}},
+    {"market":"NRFI","scope":"game","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":120}},
+    {"market":"YRFI","scope":"game","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":120}},
+    {"market":"PITCHER_OUTS","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}},
+    {"market":"PITCHER_K","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}},
+    {"market":"PITCHER_HITS_ALLOWED","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}},
+    {"market":"PITCHER_ER","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}},
+    {"market":"PITCHER_BB","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}},
+    {"market":"HITS","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}},
+    {"market":"TOTAL_BASES","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}},
+    {"market":"HOME_RUNS","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}},
+    {"market":"RBI","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}},
+    {"market":"RUNS","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}},
+    {"market":"STOLEN_BASES","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":60}},
+    {"market":"HITS_RUNS_RBIS","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}}
+  ]
+}

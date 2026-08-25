@@ -87,6 +87,9 @@ class AutoRunnerTests(unittest.TestCase):
         report = run_auto_mlb(quote_url="https://quotes", feature_url="https://features", now=NOW, opener=op)
         self.assertEqual(len(report.results), 1)
         self.assertIn("QUOTE_IDENTITY_INCOMPLETE", report.results[0].reason)
+        self.assertTrue(all(row.bet_status == "BLOCKED" for row in report.results))
+        self.assertNotEqual(report.run_status, "READY")
+        self.assertEqual(report.run_status, "BLOCKED")
 
 
 if __name__ == "__main__": unittest.main()
