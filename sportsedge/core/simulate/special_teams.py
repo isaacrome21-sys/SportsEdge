@@ -92,10 +92,21 @@ class SpecialTeamsEvent:
 
 @dataclass(frozen=True)
 class ResolvedFootballPath:
-    """Engine A path plus Engine C kick/try outcomes."""
+    """Engine A path plus Engine C kick/try outcomes and profile identity."""
 
     base_path: FootballPlayPath
     special_teams_events: tuple[SpecialTeamsEvent, ...]
+    home_profile: SpecialTeamsProfile | None = None
+    away_profile: SpecialTeamsProfile | None = None
+
+    def __post_init__(self) -> None:
+        if (self.home_profile is None) != (self.away_profile is None):
+            raise ValueError("RESOLVED_SPECIAL_TEAMS_PROFILE_PAIR_REQUIRED")
+        if self.home_profile is not None and self.away_profile is not None:
+            if self.home_profile.team != self.base_path.home_team:
+                raise ValueError("RESOLVED_HOME_SPECIAL_TEAMS_TEAM_MISMATCH")
+            if self.away_profile.team != self.base_path.away_team:
+                raise ValueError("RESOLVED_AWAY_SPECIAL_TEAMS_TEAM_MISMATCH")
 
     def to_scoring_path(self) -> FootballGamePath:
         base = list(self.base_path.to_scoring_path().events)
@@ -295,7 +306,12 @@ class EngineCSpecialTeamsResolver:
             elif play.play_type.upper() == "FIELD_GOAL":
                 events.append(self._resolve_field_goal(path, play))
 
-        resolved = ResolvedFootballPath(path, tuple(events))
+        resolved = ResolvedFootballPath(
+            path,
+            tuple(events),
+            self.home_profile,
+            self.away_profile,
+        )
         resolved.assert_reconciliation()
         return resolved
 

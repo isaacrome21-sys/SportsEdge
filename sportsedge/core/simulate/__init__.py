@@ -3,6 +3,7 @@
 from .drive_play import EngineADrivePlaySimulator, FootballPlayPath, PlayEvent, TeamDriveProfile
 from .football import JointScoreSimulator, KeyNumberMarginModel
 from .football_path import EngineAPathSimulator, FootballGamePath, ScoringEvent
+from .kicker_markets import derive_kicker_stat_market
 from .player_markets import derive_player_stat_market
 from .situational import (
     derive_both_teams_to_n,
@@ -44,6 +45,7 @@ __all__ = [
     "AttributedFootballPath",
     "EngineBUsageAllocator",
     "derive_player_stat_market",
+    "derive_kicker_stat_market",
     "derive_race_to_n",
     "derive_largest_lead",
     "derive_winning_margin_band",
