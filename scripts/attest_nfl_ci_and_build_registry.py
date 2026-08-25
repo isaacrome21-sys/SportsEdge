@@ -60,17 +60,17 @@ def main() -> int:
         history,
         declared_markets=markets,
         ci_attested=True,
+        ci_attestation=attestation,
         clv_evidence=clv,
     )
     registry["ci_attestation_state"] = "ATTESTED_BY_SEPARATE_WORKFLOW"
-    registry["ci_attestation"] = attestation
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(registry, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps({
         "git_sha": registry["code_git_sha"],
         "source_manifest_sha256": registry["source_manifest_sha256"],
         "deployed_markets": registry["deployed_markets"],
-        "ci_attestation": attestation,
+        "ci_attestation": registry["ci_attestation"],
     }, sort_keys=True))
     return 0
 
