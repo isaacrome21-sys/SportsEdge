@@ -65,6 +65,10 @@ class MLBMachineResult:
     engine_version: str | None = None
     seed_policy: str | None = None
     mc_paths: int | None = None
+    book_key: str | None = None
+    sportsbook: str | None = None
+    quote_retrieved_at: str | None = None
+    offer_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -218,6 +222,10 @@ def _machine_result(source_index: int, row: Any) -> MLBMachineResult:
         engine_version=_row_value(row, "engine_version"),
         seed_policy=_row_value(row, "seed_policy"),
         mc_paths=_row_value(row, "mc_paths"),
+        book_key=_row_value(row, "book_key"),
+        sportsbook=_row_value(row, "sportsbook"),
+        quote_retrieved_at=_row_value(row, "quote_retrieved_at"),
+        offer_id=_row_value(row, "offer_id"),
     )
 
 
@@ -360,5 +368,5 @@ def run_it_mlb(**kwargs: Any) -> MLBMachineReport:
     return run_mlb_machine(**kwargs)
 
 
-def machine_report_to_dict(report: MLBMachineReport) -> dict[str, Any]:
+def report_to_dict(report: MLBMachineReport) -> dict[str, Any]:
     return asdict(report)

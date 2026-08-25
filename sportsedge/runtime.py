@@ -106,6 +106,10 @@ def result_to_dict(result: RunResult) -> dict[str, Any]:
         "engine_version": result.engine_version,
         "seed_policy": result.seed_policy,
         "mc_paths": result.mc_paths,
+        "book_key": result.book_key,
+        "sportsbook": result.sportsbook,
+        "quote_retrieved_at": result.quote_retrieved_at,
+        "offer_id": result.offer_id,
     }
     if result.decision is not None:
         out["decision"] = {

@@ -68,6 +68,10 @@ class AutoCardResult:
     engine_version: str | None = None
     seed_policy: str | None = None
     mc_paths: int | None = None
+    book_key: str | None = None
+    sportsbook: str | None = None
+    quote_retrieved_at: str | None = None
+    offer_id: str | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -281,6 +285,7 @@ def _convert(index: int, result: UnifiedCardResult) -> AutoCardResult:
         result.model_input_hash, result.distribution_sha256,
         result.readout_sha256, result.readout_version,
         result.engine_version, result.seed_policy, result.mc_paths,
+        result.book_key, result.sportsbook, result.quote_retrieved_at, result.offer_id,
     )
 
 

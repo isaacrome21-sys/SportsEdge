@@ -45,6 +45,10 @@ class GenericCardResult:
     engine_version: str | None = None
     seed_policy: str | None = None
     mc_paths: int | None = None
+    book_key: str | None = None
+    sportsbook: str | None = None
+    quote_retrieved_at: str | None = None
+    offer_id: str | None = None
 
 
 def _game_index(games: list[LiveGame]) -> dict[str, LiveGame]:
@@ -289,6 +293,10 @@ def run_generic_card(
                 run.model_input_hash, run.distribution_sha256,
                 run.readout_sha256, run.readout_version,
                 run.engine_version, run.seed_policy, run.mc_paths,
+                book_key=run.book_key,
+                sportsbook=run.sportsbook,
+                quote_retrieved_at=run.quote_retrieved_at,
+                offer_id=run.offer_id,
             ))
         except Exception as exc:
             try:
