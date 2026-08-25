@@ -72,7 +72,8 @@ class FootballPeriodReadoutTests(unittest.TestCase):
         q1 = derive_period_markets(self.rows, period="q1", spread_line=0.0, total_line=10.0)
         self.assertEqual(q1["moneyline"]["home_win"], 0.5)
         self.assertEqual(q1["moneyline"]["away_win"], 0.5)
-        self.assertEqual(q1["total"]["push"], 1.0)
+        self.assertEqual(q1["total"]["push"], 0.5)
+        self.assertEqual(q1["total"]["under"], 0.5)
 
     def test_invalid_period_fails_closed(self):
         from sportsedge.core.simulate.markets import derive_period_markets
