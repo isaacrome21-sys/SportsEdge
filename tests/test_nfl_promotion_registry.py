@@ -61,7 +61,7 @@ class NFLPromotionRegistryTests(unittest.TestCase):
 
     def _clv(self, n=200, mean_clv=0.001, t_stat=2.01):
         return {
-            "schema_version": 3,
+            "schema_version": 4,
             "sport": "nfl",
             "model_id": PRODUCTION_NFL_M2_MODEL_ID,
             "feature_contract": NFL_M2_FEATURE_CONTRACT,
@@ -69,6 +69,8 @@ class NFLPromotionRegistryTests(unittest.TestCase):
             "decision_log_sha256": "c" * 64,
             "close_log_sha256": "d" * 64,
             "clv_probability_reference": "DECISION_THRESHOLD",
+            "forward_time_contract": "PREGAME_DECISION_TO_PREGAME_CLOSE",
+            "close_book_contract": "SAME_BOOK_AS_DECISION",
             "markets": {
                 "spread": {
                     "logged_plays": n,
@@ -132,7 +134,7 @@ class NFLPromotionRegistryTests(unittest.TestCase):
 
     def test_legacy_clv_schema_cannot_promote(self):
         clv = self._clv()
-        clv["schema_version"] = 2
+        clv["schema_version"] = 3
         with self.assertRaisesRegex(ValueError, "NFL_CLV_SCHEMA_INVALID"):
             build_nfl_promotion_registry(
                 self._math(), self._history(), declared_markets=["spread"],
@@ -143,6 +145,24 @@ class NFLPromotionRegistryTests(unittest.TestCase):
         clv = self._clv()
         clv["clv_probability_reference"] = "CLOSING_THRESHOLD"
         with self.assertRaisesRegex(ValueError, "NFL_CLV_PROBABILITY_REFERENCE_INVALID"):
+            build_nfl_promotion_registry(
+                self._math(), self._history(), declared_markets=["spread"],
+                ci_attested=True, ci_attestation=self._ci(), clv_evidence=clv,
+            )
+
+    def test_clv_must_prove_pregame_forward_timing(self):
+        clv = self._clv()
+        clv["forward_time_contract"] = "UNVERIFIED"
+        with self.assertRaisesRegex(ValueError, "NFL_CLV_FORWARD_TIME_CONTRACT_INVALID"):
+            build_nfl_promotion_registry(
+                self._math(), self._history(), declared_markets=["spread"],
+                ci_attested=True, ci_attestation=self._ci(), clv_evidence=clv,
+            )
+
+    def test_clv_must_prove_same_book_close_identity(self):
+        clv = self._clv()
+        clv["close_book_contract"] = "ANY_BOOK"
+        with self.assertRaisesRegex(ValueError, "NFL_CLV_CLOSE_BOOK_CONTRACT_INVALID"):
             build_nfl_promotion_registry(
                 self._math(), self._history(), declared_markets=["spread"],
                 ci_attested=True, ci_attestation=self._ci(), clv_evidence=clv,
