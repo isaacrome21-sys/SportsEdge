@@ -4,6 +4,11 @@
 Every decision and close row must carry the same exact production code SHA.
 Promotion evidence therefore resets across code changes instead of silently
 combining forward CLV from different executable implementations.
+
+For spread/total markets, ``closing_novig_prob`` must be measured at the same
+threshold as ``line_at_decision``. A moved market close may therefore carry a
+separate ``probability_line`` identifying the alternate closing quote used to
+measure the original threshold. Incomparable thresholds fail closed.
 """
 from __future__ import annotations
 
@@ -85,6 +90,7 @@ def main() -> int:
         game_id=str(row["game_id"]), market=str(row["market"]).lower(), side=str(row["side"]),
         closing_line=None if row.get("closing_line") is None else float(row["closing_line"]),
         closing_price=float(row["closing_price"]), closing_novig_prob=float(row["closing_novig_prob"]),
+        probability_line=None if row.get("probability_line") is None else float(row["probability_line"]),
     ) for row in close_rows]
 
     summaries = summarize_clv(score_clv(decisions, closes))
@@ -102,7 +108,7 @@ def main() -> int:
         (official if bucket == "OFFICIAL" else rejected)[market] = row
 
     payload = {
-        "schema_version": 2,
+        "schema_version": 3,
         "sport": "nfl",
         "model_id": PRODUCTION_NFL_M2_MODEL_ID,
         "feature_contract": NFL_M2_FEATURE_CONTRACT,
@@ -111,9 +117,14 @@ def main() -> int:
         "close_log_sha256": _sha(args.closes),
         "decision_count": len(decisions),
         "close_count": len(closes),
+        "clv_probability_reference": "DECISION_THRESHOLD",
         "markets": official,
         "rejected_markets": rejected,
-        "promotion_note": "Only OFFICIAL decisions from this exact code SHA populate promotion markets; rejected decisions are reported separately for gate diagnostics.",
+        "promotion_note": (
+            "Only OFFICIAL decisions from this exact code SHA populate promotion markets; "
+            "line-market closing probabilities must be measured at the original decision threshold. "
+            "Rejected decisions are reported separately for gate diagnostics."
+        ),
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
