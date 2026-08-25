@@ -5,10 +5,10 @@ import unittest
 class NFLEnvironmentProfileTests(unittest.TestCase):
     def _rows(self):
         return [
-            {"season": 2023, "game_type": "REG", "home_score": 24, "away_score": 20, "neutral_site": False},
-            {"season": 2023, "game_type": "REG", "home_score": 17, "away_score": 21, "neutral_site": False},
-            {"season": 2024, "game_type": "REG", "home_score": 30, "away_score": 20, "neutral_site": False},
-            {"season": 2024, "game_type": "REG", "home_score": 20, "away_score": 20, "neutral_site": True},
+            {"season": 2023, "game_type": "REG", "home_score": 24, "away_score": 20, "location": "Home"},
+            {"season": 2023, "game_type": "REG", "home_score": 17, "away_score": 21, "location": "Home"},
+            {"season": 2024, "game_type": "REG", "home_score": 30, "away_score": 20, "location": "Home"},
+            {"season": 2024, "game_type": "REG", "home_score": 20, "away_score": 20, "location": "Neutral"},
         ]
 
     def _sha(self):
@@ -32,11 +32,11 @@ class NFLEnvironmentProfileTests(unittest.TestCase):
         self.assertGreater(profile["margin_sigma"], 0)
         self.assertGreater(profile["total_sigma"], 0)
 
-    def test_neutral_games_do_not_contribute_to_hfa(self):
+    def test_nflverse_location_neutral_games_do_not_contribute_to_hfa(self):
         from sportsedge.sports.nfl.environment_profile import fit_nfl_environment_profile
 
         rows = self._rows() + [
-            {"season": 2024, "game_type": "REG", "home_score": 60, "away_score": 0, "neutral_site": True},
+            {"season": 2024, "game_type": "REG", "home_score": 60, "away_score": 0, "location": "Neutral"},
         ]
         profile = fit_nfl_environment_profile(
             rows,
@@ -45,6 +45,33 @@ class NFLEnvironmentProfileTests(unittest.TestCase):
             min_games=5,
         )
         self.assertAlmostEqual(profile["hfa_points"], (4 - 4 + 10) / 3)
+
+    def test_explicit_neutral_site_alias_is_still_supported(self):
+        from sportsedge.sports.nfl.environment_profile import fit_nfl_environment_profile
+
+        rows = [dict(row) for row in self._rows()]
+        rows[-1].pop("location")
+        rows[-1]["neutral_site"] = True
+        profile = fit_nfl_environment_profile(
+            rows,
+            source_url="https://example.invalid/nfl.csv",
+            source_sha256=self._sha(),
+            min_games=4,
+        )
+        self.assertEqual(profile["non_neutral_game_count"], 3)
+
+    def test_conflicting_neutral_site_fields_fail_closed(self):
+        from sportsedge.sports.nfl.environment_profile import fit_nfl_environment_profile
+
+        rows = [dict(row) for row in self._rows()]
+        rows[-1]["neutral_site"] = False
+        with self.assertRaisesRegex(ValueError, "NEUTRAL_SITE_CONTEXT_CONFLICT"):
+            fit_nfl_environment_profile(
+                rows,
+                source_url="https://example.invalid/nfl.csv",
+                source_sha256=self._sha(),
+                min_games=4,
+            )
 
     def test_profile_requires_multiple_seasons_enough_games_and_valid_hash(self):
         from sportsedge.sports.nfl.environment_profile import fit_nfl_environment_profile
@@ -75,8 +102,8 @@ class NFLEnvironmentProfileTests(unittest.TestCase):
         from sportsedge.sports.nfl.environment_profile import fit_nfl_environment_profile
 
         rows = self._rows() + [
-            {"season": 2024, "game_type": "PRE", "home_score": 40, "away_score": 0},
-            {"season": 2024, "game_type": "REG", "home_score": None, "away_score": 10},
+            {"season": 2024, "game_type": "PRE", "home_score": 40, "away_score": 0, "location": "Home"},
+            {"season": 2024, "game_type": "REG", "home_score": None, "away_score": 10, "location": "Home"},
         ]
         profile = fit_nfl_environment_profile(
             rows,
@@ -103,6 +130,22 @@ class NFLEnvironmentProfileTests(unittest.TestCase):
         self.assertEqual(adapter.total_sigma({}), profile["total_sigma"])
         self.assertEqual(adapter.hfa_prior(None, {}), profile["hfa_points"])
         self.assertEqual(adapter.hfa_prior(None, {"neutral_site": True}), 0.0)
+        self.assertEqual(adapter.hfa_prior(None, {"location": "Neutral"}), 0.0)
+        self.assertEqual(adapter.hfa_prior(None, {"location": "Home"}), profile["hfa_points"])
+
+    def test_adapter_fails_closed_on_conflicting_location_and_neutral_flag(self):
+        from sportsedge.sports.nfl.adapter import NFLAdapter
+        from sportsedge.sports.nfl.environment_profile import fit_nfl_environment_profile
+
+        profile = fit_nfl_environment_profile(
+            self._rows(),
+            source_url="https://example.invalid/nfl.csv",
+            source_sha256=self._sha(),
+            min_games=4,
+        )
+        adapter = NFLAdapter(environment_profile=profile)
+        with self.assertRaisesRegex(ValueError, "NEUTRAL_SITE_CONTEXT_CONFLICT"):
+            adapter.hfa_prior(None, {"location": "Neutral", "neutral_site": False})
 
     def test_adapter_fails_closed_without_profile(self):
         from sportsedge.sports.nfl.adapter import NFLAdapter
