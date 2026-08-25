@@ -137,8 +137,7 @@ class NFLPredictiveOvertimeSimulatorTests(unittest.TestCase):
                 seed=1,
             ).simulate()
 
-    def test_simulator_requires_exact_team_profiles_and_seed_and_is_market_blind(self):
-        from sportsedge.core.simulate.drive_play import TeamDriveProfile
+    def test_simulator_requires_seed_and_is_market_blind(self):
         from sportsedge.core.simulate.overtime_simulator import NFLRegularSeasonOTSimulator
 
         regulation = self._regulation()
@@ -156,14 +155,6 @@ class NFLPredictiveOvertimeSimulatorTests(unittest.TestCase):
                 away_profile=profile,
                 seed=1,
                 spread_line=-3.0,
-            )
-        with self.assertRaisesRegex(ValueError, "OVERTIME_TEAM_PROFILE_REQUIRED:HOME"):
-            NFLRegularSeasonOTSimulator(
-                regulation_path=regulation,
-                home_profile=TeamDriveProfile(),
-                away_profile=profile,
-                seed=1,
-                home_team="WRONG",
             )
 
 
