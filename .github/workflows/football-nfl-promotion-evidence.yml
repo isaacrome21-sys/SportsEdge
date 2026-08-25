@@ -54,12 +54,53 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_football*.py' -v
       - name: Run NFL contract tests
         run: python -m unittest discover -s tests -p 'test_nfl*.py' -v
-      - name: Build real-history audit
-        run: python scripts/audit_nfl_real_history.py --min-season 1999 --max-season 2025 --output artifacts/football/nfl_real_history_audit.json
+      - name: Freeze nflverse source bytes once
+        run: |
+          mkdir -p artifacts/football
+          python - <<'PY'
+          from pathlib import Path
+          from urllib.request import Request, urlopen
+          from sportsedge.sports.nfl.history import NFLVERSE_SCHEDULE_CSV
+          req = Request(NFLVERSE_SCHEDULE_CSV, headers={'User-Agent': 'SportsEdge-NFL-evidence/1.0'})
+          with urlopen(req, timeout=45) as response:
+              payload = response.read()
+          Path('artifacts/football/nfl_games.csv').write_bytes(payload)
+          PY
+      - name: Build real-history audit from frozen bytes
+        run: >-
+          python scripts/audit_nfl_real_history.py
+          --source-file artifacts/football/nfl_games.csv
+          --min-season 1999 --max-season 2025
+          --output artifacts/football/nfl_real_history_audit.json
       - name: Build emergent key-number math evidence
-        run: python scripts/validate_nfl_simulator_profile.py artifacts/football/nfl_real_history_audit.json --out artifacts/football/nfl_simulator_profile.json
-      - name: Build real-history M1-vs-M2 walk-forward evidence
-        run: python scripts/run_nfl_historical_validation.py --start-season 2006 --end-season 2025 --out artifacts/football/nfl_historical_validation.json
+        run: >-
+          python scripts/validate_nfl_simulator_profile.py
+          artifacts/football/nfl_real_history_audit.json
+          --out artifacts/football/nfl_simulator_profile.json
+      - name: Build real-history M1-vs-M2 walk-forward evidence from same bytes
+        run: >-
+          python scripts/run_nfl_historical_validation.py
+          --source-file artifacts/football/nfl_games.csv
+          --start-season 2006 --end-season 2025
+          --out artifacts/football/nfl_historical_validation.json
+      - name: Verify source-hash identity across evidence
+        run: |
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          raw_sha = hashlib.sha256(Path('artifacts/football/nfl_games.csv').read_bytes()).hexdigest()
+          audit = json.loads(Path('artifacts/football/nfl_real_history_audit.json').read_text())
+          history = json.loads(Path('artifacts/football/nfl_historical_validation.json').read_text())
+          math = json.loads(Path('artifacts/football/nfl_simulator_profile.json').read_text())
+          hashes = {
+              raw_sha,
+              audit['source_sha256'],
+              history['source_sha256'],
+              math['math_artifact']['source_sha256'],
+          }
+          if len(hashes) != 1:
+              raise SystemExit(f'NFL_EVIDENCE_SOURCE_HASH_MISMATCH:{sorted(hashes)}')
+          PY
       - name: Write evidence manifest
         run: |
           python - <<'PY'
@@ -69,6 +110,7 @@ jobs:
           manifest = {
               'schema_version': 1,
               'git_sha': '${{ github.sha }}',
+              'source_sha256': hashlib.sha256(Path('artifacts/football/nfl_games.csv').read_bytes()).hexdigest(),
               'artifacts': [
                   {'path': str(p), 'sha256': hashlib.sha256(p.read_bytes()).hexdigest()}
                   for p in paths
@@ -81,5 +123,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: nfl-promotion-evidence-${{ github.sha }}
-          path: artifacts/football/*.json
+          path: |
+            artifacts/football/*.json
+            artifacts/football/nfl_games.csv
           if-no-files-found: error
