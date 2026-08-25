@@ -29,6 +29,9 @@ class TeamDriveProfile:
     success_rate: float = 0.45
     explosive_rate: float = 0.10
     turnover_rate: float = 0.018
+    # Matchup-level probability that a called pass becomes a sack before a pass
+    # attempt is recorded. This is a structural candidate input until fitted.
+    sack_rate: float = 0.065
     field_goal_attempt_rate: float = 0.82
     # Deprecated structural field retained for source compatibility only.
     # Engine A does not consume this value; Engine C owns kick resolution.
@@ -42,6 +45,7 @@ class TeamDriveProfile:
             "success_rate",
             "explosive_rate",
             "turnover_rate",
+            "sack_rate",
             "field_goal_attempt_rate",
             "field_goal_skill",
         ):
@@ -127,6 +131,11 @@ class PlayEvent:
                 raise ValueError("ENGINE_A_FIELD_GOAL_ATTEMPT_TAG_REQUIRED")
             if self.kick_distance is None:
                 raise ValueError("FIELD_GOAL_DISTANCE_REQUIRED")
+        if play_type == "SACK":
+            if self.yards >= 0:
+                raise ValueError("SACK_YARDS_MUST_BE_NEGATIVE")
+            if self.turnover_type == "INTERCEPTION":
+                raise ValueError("SACK_CANNOT_BE_INTERCEPTION")
 
         if play_type == "PASS":
             if not isinstance(self.pass_complete, bool):
@@ -319,6 +328,10 @@ class EngineADrivePlaySimulator:
             yards += int(self.rng.integers(10, 26))
         return max(-12, min(45, yards))
 
+    def _sack_yards(self) -> int:
+        loss = int(round(abs(self.rng.normal(7.0, 3.0))))
+        return -max(1, min(20, loss))
+
     def _simulate_one(self, simulation_id: int) -> FootballPlayPath:
         remaining = 3600
         home_score = 0
@@ -401,40 +414,45 @@ class EngineADrivePlaySimulator:
                 quarter, clock = self._period_clock(remaining)
                 play_type = "PASS" if self.rng.random() < profile.pass_rate else "RUSH"
 
-                if self.rng.random() < profile.turnover_rate:
-                    turnover_type = "INTERCEPTION" if play_type == "PASS" else "FUMBLE"
-                    pass_complete = False if play_type == "PASS" else None
-                    yards = 0 if play_type == "PASS" else self._regular_play_yards(profile, play_type)
-                    play_id += 1
-                    plays.append(
-                        PlayEvent(
-                            drive_id=drive_id,
-                            play_id=play_id,
-                            quarter=quarter,
-                            clock_seconds_remaining=clock,
-                            possession=possession,
-                            score_before_home=before_home,
-                            score_before_away=before_away,
-                            score_after_home=home_score,
-                            score_after_away=away_score,
-                            down=down,
-                            distance=distance,
-                            yardline_100=yardline,
-                            play_type=play_type,
-                            yards=yards,
-                            points=0,
-                            turnover_type=turnover_type,
-                            pass_complete=pass_complete,
-                        )
-                    )
-                    break
-
-                if play_type == "PASS":
-                    pass_complete = bool(self.rng.random() < profile.completion_rate)
-                    yards = self._regular_play_yards(profile, play_type) if pass_complete else 0
-                else:
+                if play_type == "PASS" and self.rng.random() < profile.sack_rate:
+                    play_type = "SACK"
                     pass_complete = None
-                    yards = self._regular_play_yards(profile, play_type)
+                    yards = self._sack_yards()
+                else:
+                    if self.rng.random() < profile.turnover_rate:
+                        turnover_type = "INTERCEPTION" if play_type == "PASS" else "FUMBLE"
+                        pass_complete = False if play_type == "PASS" else None
+                        yards = 0 if play_type == "PASS" else self._regular_play_yards(profile, play_type)
+                        play_id += 1
+                        plays.append(
+                            PlayEvent(
+                                drive_id=drive_id,
+                                play_id=play_id,
+                                quarter=quarter,
+                                clock_seconds_remaining=clock,
+                                possession=possession,
+                                score_before_home=before_home,
+                                score_before_away=before_away,
+                                score_after_home=home_score,
+                                score_after_away=away_score,
+                                down=down,
+                                distance=distance,
+                                yardline_100=yardline,
+                                play_type=play_type,
+                                yards=yards,
+                                points=0,
+                                turnover_type=turnover_type,
+                                pass_complete=pass_complete,
+                            )
+                        )
+                        break
+
+                    if play_type == "PASS":
+                        pass_complete = bool(self.rng.random() < profile.completion_rate)
+                        yards = self._regular_play_yards(profile, play_type) if pass_complete else 0
+                    else:
+                        pass_complete = None
+                        yards = self._regular_play_yards(profile, play_type)
 
                 new_yardline = max(0, min(99, yardline - yards))
                 touchdown = new_yardline == 0 and (play_type != "PASS" or pass_complete)
@@ -470,7 +488,7 @@ class EngineADrivePlaySimulator:
                 if touchdown:
                     break
                 converted = (pass_complete is True and yards >= distance) if play_type == "PASS" else yards >= distance
-                yardline = new_yardline
+                yardline = max(1, min(99, new_yardline))
                 if converted:
                     down = 1
                     distance = max(1, min(10, yardline))
