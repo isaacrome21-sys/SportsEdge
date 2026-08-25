@@ -42,7 +42,8 @@ if ! command -v curl >/dev/null 2>&1; then
 fi
 
 export EVIDENCE_GIT_SHA="$HEAD_SHA"
-ARTIFACT_ROOT="${NFL_EVIDENCE_ARTIFACT_ROOT:-artifacts/football}"
+export NFL_EVIDENCE_ARTIFACT_ROOT="${NFL_EVIDENCE_ARTIFACT_ROOT:-artifacts/football}"
+ARTIFACT_ROOT="$NFL_EVIDENCE_ARTIFACT_ROOT"
 SOURCE_ROOT="$ARTIFACT_ROOT/sources"
 mkdir -p "$SOURCE_ROOT"/{pbp,participation,depth}
 
@@ -119,7 +120,7 @@ import json, os
 from pathlib import Path
 from sportsedge.sports.nfl.m2 import NFL_M2_FEATURE_CONTRACT, PRODUCTION_NFL_M2_MODEL_ID
 
-root = Path(os.environ.get("NFL_EVIDENCE_ARTIFACT_ROOT", "artifacts/football"))
+root = Path(os.environ["NFL_EVIDENCE_ARTIFACT_ROOT"])
 history = json.loads((root / "nfl_production_validation.json").read_text())
 math = json.loads((root / "nfl_simulator_profile.json").read_text())["math_artifact"]
 manifest = json.loads((root / "nfl_source_manifest.json").read_text())
@@ -144,7 +145,7 @@ PY
 # External execution may establish historical/math evidence, but it must never
 # impersonate GitHub CI. Record that limitation in a hash manifest and verify
 # the pre-CI registry has not produced DEPLOYED markets.
-NFL_EVIDENCE_ARTIFACT_ROOT="$ARTIFACT_ROOT" "$PYTHON_BIN" - <<'PY'
+"$PYTHON_BIN" - <<'PY'
 import hashlib, json, os
 from pathlib import Path
 
