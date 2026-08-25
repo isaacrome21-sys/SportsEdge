@@ -5,15 +5,14 @@ Every decision and close row must carry the same exact production code SHA.
 Promotion evidence therefore resets across code changes instead of silently
 combining forward CLV from different executable implementations.
 
-Promotion-grade CLV also has two non-negotiable comparability contracts:
+Promotion-grade CLV is allowed to accumulate from ``SHADOW_QUALIFIED`` plays
+before a market is DEPLOYED. This is evidence only, never permission to emit a
+user-facing official bet. Already-deployed ``OFFICIAL`` plays remain promotion
+evidence too. Rejected plays are retained separately as gate diagnostics.
 
-* closing no-vig probability for a line market is measured at the original
-  decision threshold, even when the market's headline closing line moved;
-* a close is from the same sportsbook, after the decision, and still pregame.
-
-Rows that cannot prove those contracts fail closed instead of being counted in
-``n``. A game/market/side observation can count only once even if the same model
-play was available at multiple books, preventing cross-book sample inflation.
+Line-market closing probability is measured at the original decision threshold;
+closes must be from the same sportsbook, after the decision, and still pregame.
+A game/market/side observation can count only once across books.
 """
 from __future__ import annotations
 
@@ -188,7 +187,7 @@ def main() -> int:
     ) for row in close_rows]
 
     summaries = summarize_clv(score_clv(decisions, closes))
-    official: dict[str, dict] = {}
+    promotion: dict[str, dict] = {}
     rejected: dict[str, dict] = {}
     for (sport, market, bucket), summary in sorted(summaries.items()):
         if sport != "nfl":
@@ -199,7 +198,7 @@ def main() -> int:
             "beat_close_rate": summary.beat_close_rate,
             "clv_t_stat": summary.t_stat,
         }
-        (official if bucket == "OFFICIAL" else rejected)[market] = row
+        (promotion if bucket == "PROMOTION" else rejected)[market] = row
 
     payload = {
         "schema_version": 4,
@@ -217,14 +216,14 @@ def main() -> int:
         "clv_probability_reference": "DECISION_THRESHOLD",
         "forward_time_contract": "PREGAME_DECISION_TO_PREGAME_CLOSE",
         "close_book_contract": "SAME_BOOK_AS_DECISION",
-        "markets": official,
+        "promotion_decision_contract": "SHADOW_QUALIFIED_OR_OFFICIAL",
+        "markets": promotion,
         "rejected_markets": rejected,
         "promotion_note": (
-            "Only OFFICIAL decisions from this exact code SHA populate promotion markets; "
-            "line-market closing probabilities are measured at the original decision threshold, "
-            "and every close is from the same book after the decision but before game start. "
-            "A game/market/side observation counts once across books. Rejected decisions are "
-            "reported separately for gate diagnostics."
+            "SHADOW_QUALIFIED decisions accumulate pre-deployment CLV evidence without becoming user-facing bets; "
+            "already-deployed OFFICIAL decisions also remain promotion-grade. Line-market closing probabilities are "
+            "measured at the original decision threshold, and every close is from the same book after the decision "
+            "but before game start. A game/market/side observation counts once across books."
         ),
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)

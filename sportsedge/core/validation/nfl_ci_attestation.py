@@ -1,10 +1,8 @@
 """External attestation contract for the NFL promotion evidence workflow.
 
-The evidence-producing workflow cannot attest itself.  This module is intended
-for a *separate* workflow triggered by ``workflow_run``.  It binds a successful
-named upstream run to the exact code SHA and verifies every hashed artifact
-before any caller is allowed to rebuild the promotion registry with
-``ci_attested=True``.
+The evidence-producing workflow cannot attest itself. This verifier binds a
+successful named upstream run to the exact code SHA, canonical frozen source
+manifest, historical/math evidence, and the exact fitted production M2 artifact.
 """
 from __future__ import annotations
 
@@ -15,6 +13,7 @@ import re
 from typing import Any
 
 from sportsedge.sports.nfl.m2 import NFL_M2_FEATURE_CONTRACT, PRODUCTION_NFL_M2_MODEL_ID
+from sportsedge.sports.nfl.model_artifact import load_nfl_m2_model_artifact
 
 _EXPECTED_WORKFLOW = "football-nfl-promotion-evidence"
 _GIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -64,7 +63,7 @@ def verify_nfl_pre_ci_bundle(
     workflow_head_sha: str,
     workflow_run_id: int,
 ) -> dict[str, Any]:
-    """Verify exact upstream-run identity plus all pre-CI evidence bytes."""
+    """Verify exact upstream-run identity plus all pre-CI evidence/model bytes."""
     if str(workflow_name) != _EXPECTED_WORKFLOW:
         raise ValueError("NFL_CI_WORKFLOW_NAME_MISMATCH")
     if str(workflow_conclusion).strip().lower() != "success":
@@ -78,8 +77,7 @@ def verify_nfl_pre_ci_bundle(
     head_sha = _git_sha(workflow_head_sha, "NFL_CI_WORKFLOW_HEAD_SHA_INVALID")
 
     root = Path(bundle_dir)
-    manifest_path = root / "nfl_promotion_evidence_manifest.json"
-    manifest = _json(manifest_path)
+    manifest = _json(root / "nfl_promotion_evidence_manifest.json")
     if int(manifest.get("schema_version", 0)) != 2:
         raise ValueError("NFL_CI_EVIDENCE_MANIFEST_SCHEMA_INVALID")
     if manifest.get("ci_attestation_state") != "PRE_CI_WORKFLOW_CANNOT_SELF_ATTEST":
@@ -87,35 +85,33 @@ def verify_nfl_pre_ci_bundle(
     manifest_git_sha = _git_sha(manifest.get("git_sha"), "NFL_CI_EVIDENCE_GIT_SHA_INVALID")
     if manifest_git_sha != head_sha:
         raise ValueError("NFL_CI_HEAD_SHA_MISMATCH")
-    source_manifest_sha = _hash(
-        manifest.get("source_manifest_sha256"),
-        "NFL_CI_SOURCE_MANIFEST_SHA256_INVALID",
-    )
+    source_manifest_sha = _hash(manifest.get("source_manifest_sha256"), "NFL_CI_SOURCE_MANIFEST_SHA256_INVALID")
 
     artifact_rows = manifest.get("artifacts")
     if not isinstance(artifact_rows, list) or not artifact_rows:
         raise ValueError("NFL_CI_ARTIFACT_MANIFEST_EMPTY")
-    seen: set[str] = set()
+    seen: dict[str, str] = {}
     for row in artifact_rows:
         if not isinstance(row, dict):
             raise ValueError("NFL_CI_ARTIFACT_MANIFEST_ROW_INVALID")
         name = str(row.get("path") or "").strip()
         if not name or Path(name).name != name or name in seen:
             raise ValueError("NFL_CI_ARTIFACT_PATH_INVALID")
-        seen.add(name)
         expected = _hash(row.get("sha256"), f"NFL_CI_ARTIFACT_SHA256_INVALID:{name}")
         actual = _sha256(root / name)
         if actual != expected:
             raise ValueError(f"NFL_CI_ARTIFACT_HASH_MISMATCH:{name}")
+        seen[name] = actual
 
     required = {
         "nfl_simulator_profile.json",
         "nfl_production_validation.json",
         "nfl_promotion_registry.json",
         "nfl_source_manifest.json",
+        "nfl_m2_model.json",
     }
     if not required.issubset(seen):
-        missing = sorted(required - seen)[0]
+        missing = sorted(required - set(seen))[0]
         raise ValueError(f"NFL_CI_REQUIRED_ARTIFACT_MISSING:{missing}")
 
     math_payload = _json(root / "nfl_simulator_profile.json")
@@ -125,6 +121,7 @@ def verify_nfl_pre_ci_bundle(
     history = _json(root / "nfl_production_validation.json")
     registry = _json(root / "nfl_promotion_registry.json")
     source_manifest = _json(root / "nfl_source_manifest.json")
+    model_artifact = _json(root / "nfl_m2_model.json")
 
     if _hash(math.get("source_sha256"), "NFL_CI_MATH_SOURCE_SHA256_INVALID") != source_manifest_sha:
         raise ValueError("NFL_CI_SOURCE_IDENTITY_MISMATCH")
@@ -148,6 +145,14 @@ def verify_nfl_pre_ci_bundle(
     if registry.get("ci_attestation_state") != "UNATTESTED_IN_RUNNING_WORKFLOW":
         raise ValueError("NFL_CI_PRE_REGISTRY_STATE_INVALID")
 
+    model = load_nfl_m2_model_artifact(
+        model_artifact,
+        expected_code_git_sha=head_sha,
+        expected_source_manifest_sha256=source_manifest_sha,
+    )
+    if model.model_id != PRODUCTION_NFL_M2_MODEL_ID or model.feature_contract != NFL_M2_FEATURE_CONTRACT:
+        raise ValueError("NFL_CI_MODEL_ARTIFACT_IDENTITY_MISMATCH")
+
     return {
         "schema_version": 1,
         "workflow_name": _EXPECTED_WORKFLOW,
@@ -157,5 +162,7 @@ def verify_nfl_pre_ci_bundle(
         "source_manifest_sha256": source_manifest_sha,
         "model_id": PRODUCTION_NFL_M2_MODEL_ID,
         "feature_contract": NFL_M2_FEATURE_CONTRACT,
+        "model_artifact_sha256": seen["nfl_m2_model.json"],
+        "trained_through_season": max(model.train_seasons),
         "verified_artifact_count": len(seen),
     }
