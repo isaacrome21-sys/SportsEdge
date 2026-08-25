@@ -28,8 +28,12 @@ jobs:
   evidence:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      EVIDENCE_GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EVIDENCE_GIT_SHA }}
 
       - uses: actions/setup-python@v5
         with:
@@ -42,6 +46,7 @@ jobs:
         run: |
           python -m py_compile \
             sportsedge/core/promotion/football_registry.py \
+            sportsedge/core/validation/nfl_ci_attestation.py \
             sportsedge/sports/nfl/m2.py \
             sportsedge/sports/nfl/m2_history_features.py \
             sportsedge/sports/nfl/m2_history_policy.py \
@@ -52,7 +57,9 @@ jobs:
             scripts/run_nfl_production_validation.py \
             scripts/bind_nfl_math_to_source_manifest.py \
             scripts/validate_nfl_simulator_profile.py \
-            scripts/build_nfl_promotion_registry.py
+            scripts/build_nfl_promotion_registry.py \
+            scripts/build_nfl_clv_evidence.py \
+            scripts/attest_nfl_ci_and_build_registry.py
 
       - name: Run football contract tests
         run: python -m unittest discover -s tests -p 'test_football*.py' -v
@@ -91,6 +98,7 @@ jobs:
           --participation-dir artifacts/football/sources/participation
           --depth-dir artifacts/football/sources/depth
           --stadium-file artifacts/football/sources/team_stadiums.csv
+          --git-sha "$EVIDENCE_GIT_SHA"
           --start-season 2016 --end-season 2025
           --neutral-site-policy exclude_from_evaluation
           --out artifacts/football/nfl_production_validation.json
@@ -109,29 +117,33 @@ jobs:
           artifacts/football/nfl_real_history_audit.json
           --out artifacts/football/nfl_simulator_profile_schedule.json
 
-      - name: Bind math evidence to canonical multi-source manifest
+      - name: Bind math evidence to canonical multi-source manifest and code SHA
         run: >-
           python scripts/bind_nfl_math_to_source_manifest.py
           --math-evidence artifacts/football/nfl_simulator_profile_schedule.json
           --source-manifest artifacts/football/nfl_source_manifest.json
+          --git-sha "$EVIDENCE_GIT_SHA"
           --out artifacts/football/nfl_simulator_profile.json
 
-      - name: Verify exact production identity and manifest binding
+      - name: Verify exact production identity, manifest, and code binding
         run: |
           python - <<'PY'
-          import json
+          import json, os
           from pathlib import Path
           from sportsedge.sports.nfl.m2 import NFL_M2_FEATURE_CONTRACT, PRODUCTION_NFL_M2_MODEL_ID
           history = json.loads(Path('artifacts/football/nfl_production_validation.json').read_text())
           math = json.loads(Path('artifacts/football/nfl_simulator_profile.json').read_text())['math_artifact']
           manifest = json.loads(Path('artifacts/football/nfl_source_manifest.json').read_text())
-          expected = manifest['manifest_sha256']
+          expected_source = manifest['manifest_sha256']
+          expected_git = os.environ['EVIDENCE_GIT_SHA'].lower()
           if history['model_id'] != PRODUCTION_NFL_M2_MODEL_ID:
               raise SystemExit('NFL_EVIDENCE_MODEL_ID_MISMATCH')
           if history['feature_contract'] != NFL_M2_FEATURE_CONTRACT:
               raise SystemExit('NFL_EVIDENCE_FEATURE_CONTRACT_MISMATCH')
-          if {history['source_sha256'], math['source_sha256'], expected} != {expected}:
+          if {history['source_sha256'], math['source_sha256'], expected_source} != {expected_source}:
               raise SystemExit('NFL_EVIDENCE_MANIFEST_BINDING_MISMATCH')
+          if {history['code_git_sha'], math['code_git_sha'], expected_git} != {expected_git}:
+              raise SystemExit('NFL_EVIDENCE_CODE_SHA_MISMATCH')
           PY
 
       - name: Build fail-closed pre-CI per-market promotion registry
@@ -145,17 +157,17 @@ jobs:
       - name: Write exact-head evidence manifest
         run: |
           python - <<'PY'
-          import hashlib, json
+          import hashlib, json, os
           from pathlib import Path
           source = json.loads(Path('artifacts/football/nfl_source_manifest.json').read_text())
           paths = sorted(Path('artifacts/football').glob('*.json'))
           payload = {
               'schema_version': 2,
-              'git_sha': '${{ github.sha }}',
+              'git_sha': os.environ['EVIDENCE_GIT_SHA'].lower(),
               'source_manifest_sha256': source['manifest_sha256'],
               'ci_attestation_state': 'PRE_CI_WORKFLOW_CANNOT_SELF_ATTEST',
               'artifacts': [
-                  {'path': str(p), 'sha256': hashlib.sha256(p.read_bytes()).hexdigest()}
+                  {'path': p.name, 'sha256': hashlib.sha256(p.read_bytes()).hexdigest()}
                   for p in paths
               ],
           }
@@ -166,7 +178,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: nfl-promotion-evidence-${{ github.sha }}
+          name: nfl-promotion-evidence-${{ env.EVIDENCE_GIT_SHA }}
           path: |
             artifacts/football/*.json
             artifacts/football/sources/games.csv
