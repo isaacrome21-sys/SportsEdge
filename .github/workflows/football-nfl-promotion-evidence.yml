@@ -11,6 +11,7 @@ on:
       - 'scripts/run_nfl_historical_validation.py'
       - 'scripts/audit_nfl_real_history.py'
       - 'scripts/validate_nfl_simulator_profile.py'
+      - 'scripts/build_nfl_promotion_registry.py'
       - 'tests/test_football*.py'
       - 'tests/test_nfl*.py'
       - '.github/workflows/football-nfl-promotion-evidence.yml'
@@ -24,6 +25,7 @@ on:
       - 'scripts/run_nfl_historical_validation.py'
       - 'scripts/audit_nfl_real_history.py'
       - 'scripts/validate_nfl_simulator_profile.py'
+      - 'scripts/build_nfl_promotion_registry.py'
       - 'tests/test_football*.py'
       - 'tests/test_nfl*.py'
       - '.github/workflows/football-nfl-promotion-evidence.yml'
@@ -46,10 +48,12 @@ jobs:
             sportsedge/core/simulate/usage.py \
             sportsedge/core/simulate/player_markets.py \
             sportsedge/core/simulate/special_teams.py \
+            sportsedge/core/promotion/football_registry.py \
             sportsedge/sports/nfl/historical_validation.py \
             sportsedge/sports/nfl/simulator_profile.py \
             scripts/run_nfl_historical_validation.py \
-            scripts/validate_nfl_simulator_profile.py
+            scripts/validate_nfl_simulator_profile.py \
+            scripts/build_nfl_promotion_registry.py
       - name: Run football contract tests
         run: python -m unittest discover -s tests -p 'test_football*.py' -v
       - name: Run NFL contract tests
@@ -77,7 +81,7 @@ jobs:
           python scripts/validate_nfl_simulator_profile.py
           artifacts/football/nfl_real_history_audit.json
           --out artifacts/football/nfl_simulator_profile.json
-      - name: Build real-history M1-vs-M2 walk-forward evidence from same bytes
+      - name: Build fold-safe real-history M1-vs-M2 evidence from same bytes
         run: >-
           python scripts/run_nfl_historical_validation.py
           --source-file artifacts/football/nfl_games.csv
@@ -101,6 +105,13 @@ jobs:
           if len(hashes) != 1:
               raise SystemExit(f'NFL_EVIDENCE_SOURCE_HASH_MISMATCH:{sorted(hashes)}')
           PY
+      - name: Build fail-closed pre-CI per-market promotion registry
+        run: >-
+          python scripts/build_nfl_promotion_registry.py
+          --math-evidence artifacts/football/nfl_simulator_profile.json
+          --historical-evidence artifacts/football/nfl_historical_validation.json
+          --market-surface config/football_market_surface.json
+          --out artifacts/football/nfl_promotion_registry.json
       - name: Write evidence manifest
         run: |
           python - <<'PY'
