@@ -19,24 +19,25 @@ class QuoteBridgeError(ValueError):
 
 
 GAME_MARKETS = {
-    "MONEYLINE", "RUN_LINE", "TOTALS", "NRFI", "YRFI",
-    "F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS",
+    "MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS", "NRFI", "YRFI",
+    "F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS", "F5_TEAM_TOTALS",
 }
 COUNT_MARKETS = set(HITTER_MARKETS | PITCHER_MARKETS)
 BINARY_MARKETS = {"PITCHER_RECORD_WIN", "FIRST_HOME_RUN"}
 SUPPORTED_MARKETS = GAME_MARKETS | COUNT_MARKETS | BINARY_MARKETS
 
 SUPPORTED_PERIODS_BY_MARKET = {
-    **{m: {"FG"} for m in COUNT_MARKETS | BINARY_MARKETS | {"MONEYLINE", "RUN_LINE", "TOTALS"}},
+    **{m: {"FG"} for m in COUNT_MARKETS | BINARY_MARKETS | {"MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS"}},
     "NRFI": {"FG", "1ST", "1"},
     "YRFI": {"FG", "1ST", "1"},
     "F5_MONEYLINE": {"FG", "F5", "5"},
     "F5_RUN_LINE": {"FG", "F5", "5"},
     "F5_TOTALS": {"FG", "F5", "5"},
+    "F5_TEAM_TOTALS": {"F5", "5"},
 }
 
 SIDE_BY_MARKET = {
-    **{m: {"OVER", "UNDER"} for m in COUNT_MARKETS | {"TOTALS", "F5_TOTALS"}},
+    **{m: {"OVER", "UNDER"} for m in COUNT_MARKETS | {"TOTALS", "TEAM_TOTALS", "F5_TOTALS", "F5_TEAM_TOTALS"}},
     **{m: {"YES", "NO"} for m in BINARY_MARKETS},
     "MONEYLINE": {"HOME", "AWAY", "HOME_ML", "AWAY_ML"},
     "F5_MONEYLINE": {"HOME", "AWAY", "HOME_ML", "AWAY_ML"},
@@ -95,7 +96,7 @@ def validate_canonical_quote(raw: Mapping[str, Any], *, default_ttl_seconds: int
         line = 0.0
     else:
         line = _finite("line", raw_line)
-    if market in COUNT_MARKETS and line < 0:
+    if market in COUNT_MARKETS | {"TEAM_TOTALS", "F5_TEAM_TOTALS"} and line < 0:
         raise QuoteBridgeError("line must be >= 0")
     odds = _finite("american_odds", raw.get("american_odds"))
     if odds == 0 or -100 < odds < 100 or odds != int(odds):
