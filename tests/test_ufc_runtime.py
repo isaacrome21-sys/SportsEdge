@@ -1,6 +1,7 @@
 from sportsedge.ufc_engine import FighterSnapshot, FightContext
-from sportsedge.ufc_runtime import evaluate_h2h
+from sportsedge.ufc_runtime import evaluate_h2h, _stable_seed
 from sportsedge.ufc_source import OddsQuote
+from sportsedge.ufc_training import LogisticArtifact
 
 
 def fighter(name, elo, missingness=0.0):
@@ -43,3 +44,22 @@ def test_context_can_be_supplied_by_pair():
         quotes=quotes(), contexts={key: FightContext(rounds=5, title_fight=True)}, n_sims=500,
     )
     assert len(out) == 2
+
+
+def test_monte_carlo_recenters_to_ensemble_probability():
+    artifact = LogisticArtifact(
+        feature_names=("elo_diff",), coefficients=(0.0,), intercept=2.197224577,
+        means=(0.0,), scales=(1.0,),
+    )
+    out = evaluate_h2h(
+        fighters=[fighter("Alpha", 1650), fighter("Beta", 1450)],
+        quotes=quotes(), artifact=artifact, n_sims=5000,
+    )
+    alpha = next(x for x in out if x.fighter == "Alpha")
+    assert alpha.trained_probability is not None
+    assert abs(alpha.trained_probability - 0.9) < 1e-6
+    assert abs(alpha.monte_carlo_probability - alpha.model_probability) < 0.05
+
+
+def test_monte_carlo_seed_is_cross_process_stable():
+    assert _stable_seed("e1", "alpha", "beta", "draftkings") == 2031464258
