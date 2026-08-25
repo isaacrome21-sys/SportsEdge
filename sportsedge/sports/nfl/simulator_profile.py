@@ -95,3 +95,51 @@ def validate_profile_fit(
         "max_abs_error": float(max_abs_error),
         "per_key": per_key,
     }
+
+
+def build_math_attestation_artifact(
+    profile: Mapping[str, Any],
+    fit: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Translate simulator-fit evidence into the canonical math gate contract."""
+    if profile.get("key_number_contract") != KEY_NUMBER_CONTRACT:
+        raise ValueError("EMERGENT_KEY_NUMBER_CONTRACT_REQUIRED")
+    if fit.get("contract") != profile.get("key_number_contract"):
+        raise ValueError("FIT_PROFILE_CONTRACT_MISMATCH")
+    source_sha256 = profile.get("source_sha256")
+    if not _valid_sha256(source_sha256):
+        raise ValueError("SOURCE_SHA256_INVALID")
+    version = profile.get("version")
+    if not isinstance(version, str) or not version.strip():
+        raise ValueError("PROFILE_VERSION_REQUIRED")
+    seasons = sorted({int(x) for x in profile.get("seasons", [])})
+    if len(seasons) < 2:
+        raise ValueError("MULTI_SEASON_HISTORY_REQUIRED")
+    per_key = fit.get("per_key")
+    if not isinstance(per_key, Mapping):
+        raise ValueError("FIT_PER_KEY_REQUIRED")
+
+    errors: dict[str, float] = {}
+    for key in _REQUIRED_KEYS:
+        row = per_key.get(key, per_key.get(str(key)))
+        if not isinstance(row, Mapping) or "abs_error" not in row:
+            raise ValueError(f"FIT_KEY_REQUIRED:{key}")
+        error = float(row["abs_error"])
+        if error < 0:
+            raise ValueError(f"FIT_KEY_ERROR_INVALID:{key}")
+        errors[str(key)] = error
+
+    tolerance = float(fit.get("max_abs_error", -1.0))
+    if tolerance < 0:
+        raise ValueError("FIT_TOLERANCE_INVALID")
+
+    return {
+        "provenance": "REAL_PUBLIC_HISTORY",
+        "source_sha256": str(source_sha256).lower(),
+        "profile_version": version,
+        "key_number_contract": KEY_NUMBER_CONTRACT,
+        "seasons": seasons,
+        "key_numbers": list(_REQUIRED_KEYS),
+        "per_key_abs_error": errors,
+        "max_allowed_abs_error": tolerance,
+    }

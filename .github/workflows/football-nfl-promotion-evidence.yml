@@ -1,0 +1,186 @@
+name: football-nfl-promotion-evidence
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'sportsedge/core/simulate/**'
+      - 'sportsedge/core/validation/**'
+      - 'sportsedge/core/promotion/**'
+      - 'sportsedge/sports/nfl/**'
+      - 'scripts/*nfl*.py'
+      - 'tests/test_football*.py'
+      - 'tests/test_nfl*.py'
+      - '.github/workflows/football-nfl-promotion-evidence.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'sportsedge/core/simulate/**'
+      - 'sportsedge/core/validation/**'
+      - 'sportsedge/core/promotion/**'
+      - 'sportsedge/sports/nfl/**'
+      - 'scripts/*nfl*.py'
+      - 'tests/test_football*.py'
+      - 'tests/test_nfl*.py'
+      - '.github/workflows/football-nfl-promotion-evidence.yml'
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      EVIDENCE_GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EVIDENCE_GIT_SHA }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install runtime test dependencies
+        run: python -m pip install --disable-pip-version-check numpy pytest
+
+      - name: Compile exact NFL promotion surface
+        run: |
+          python -m py_compile \
+            sportsedge/core/promotion/football_registry.py \
+            sportsedge/core/validation/nfl_ci_attestation.py \
+            sportsedge/sports/nfl/m2.py \
+            sportsedge/sports/nfl/m2_history_features.py \
+            sportsedge/sports/nfl/m2_history_policy.py \
+            sportsedge/sports/nfl/historical_validation.py \
+            sportsedge/sports/nfl/production_validation.py \
+            sportsedge/sports/nfl/source_manifest.py \
+            sportsedge/sports/nfl/simulator_profile.py \
+            scripts/run_nfl_production_validation.py \
+            scripts/bind_nfl_math_to_source_manifest.py \
+            scripts/validate_nfl_simulator_profile.py \
+            scripts/build_nfl_promotion_registry.py \
+            scripts/build_nfl_clv_evidence.py \
+            scripts/attest_nfl_ci_and_build_registry.py
+
+      - name: Run football contract tests
+        run: python -m unittest discover -s tests -p 'test_football*.py' -v
+
+      - name: Run NFL contract tests
+        run: python -m unittest discover -s tests -p 'test_nfl*.py' -v
+
+      - name: Freeze public NFL production sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/football/sources/{pbp,participation,depth}
+          curl --fail --location --retry 3 \
+            'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv' \
+            -o artifacts/football/sources/games.csv
+          curl --fail --location --retry 3 \
+            'https://raw.githubusercontent.com/greerreNFL/Stadiums/efa9543af50b01424754219fa0e4f3c7044ff198/data/team_stadiums.csv' \
+            -o artifacts/football/sources/team_stadiums.csv
+          for season in $(seq 2016 2025); do
+            curl --fail --location --retry 3 \
+              "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_${season}.csv.gz" \
+              -o "artifacts/football/sources/pbp/play_by_play_${season}.csv.gz"
+            curl --fail --location --retry 3 \
+              "https://github.com/nflverse/nflverse-data/releases/download/pbp_participation/pbp_participation_${season}.csv" \
+              -o "artifacts/football/sources/participation/pbp_participation_${season}.csv"
+            curl --fail --location --retry 3 \
+              "https://github.com/nflverse/nflverse-data/releases/download/depth_charts/depth_charts_${season}.csv" \
+              -o "artifacts/football/sources/depth/depth_charts_${season}.csv"
+          done
+
+      - name: Build exact production-M2 walk-forward evidence
+        run: >-
+          python scripts/run_nfl_production_validation.py
+          --schedule-file artifacts/football/sources/games.csv
+          --pbp-dir artifacts/football/sources/pbp
+          --participation-dir artifacts/football/sources/participation
+          --depth-dir artifacts/football/sources/depth
+          --stadium-file artifacts/football/sources/team_stadiums.csv
+          --git-sha "$EVIDENCE_GIT_SHA"
+          --start-season 2016 --end-season 2025
+          --neutral-site-policy exclude_from_evaluation
+          --out artifacts/football/nfl_production_validation.json
+          --manifest-out artifacts/football/nfl_source_manifest.json
+
+      - name: Build schedule audit from the same frozen schedule bytes
+        run: >-
+          python scripts/audit_nfl_real_history.py
+          --source-file artifacts/football/sources/games.csv
+          --min-season 1999 --max-season 2025
+          --output artifacts/football/nfl_real_history_audit.json
+
+      - name: Build emergent key-number math evidence
+        run: >-
+          python scripts/validate_nfl_simulator_profile.py
+          artifacts/football/nfl_real_history_audit.json
+          --out artifacts/football/nfl_simulator_profile_schedule.json
+
+      - name: Bind math evidence to canonical multi-source manifest and code SHA
+        run: >-
+          python scripts/bind_nfl_math_to_source_manifest.py
+          --math-evidence artifacts/football/nfl_simulator_profile_schedule.json
+          --source-manifest artifacts/football/nfl_source_manifest.json
+          --git-sha "$EVIDENCE_GIT_SHA"
+          --out artifacts/football/nfl_simulator_profile.json
+
+      - name: Verify exact production identity, manifest, and code binding
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          from sportsedge.sports.nfl.m2 import NFL_M2_FEATURE_CONTRACT, PRODUCTION_NFL_M2_MODEL_ID
+          history = json.loads(Path('artifacts/football/nfl_production_validation.json').read_text())
+          math = json.loads(Path('artifacts/football/nfl_simulator_profile.json').read_text())['math_artifact']
+          manifest = json.loads(Path('artifacts/football/nfl_source_manifest.json').read_text())
+          expected_source = manifest['manifest_sha256']
+          expected_git = os.environ['EVIDENCE_GIT_SHA'].lower()
+          if history['model_id'] != PRODUCTION_NFL_M2_MODEL_ID:
+              raise SystemExit('NFL_EVIDENCE_MODEL_ID_MISMATCH')
+          if history['feature_contract'] != NFL_M2_FEATURE_CONTRACT:
+              raise SystemExit('NFL_EVIDENCE_FEATURE_CONTRACT_MISMATCH')
+          if {history['source_sha256'], math['source_sha256'], expected_source} != {expected_source}:
+              raise SystemExit('NFL_EVIDENCE_MANIFEST_BINDING_MISMATCH')
+          if {history['code_git_sha'], math['code_git_sha'], expected_git} != {expected_git}:
+              raise SystemExit('NFL_EVIDENCE_CODE_SHA_MISMATCH')
+          PY
+
+      - name: Build fail-closed pre-CI per-market promotion registry
+        run: >-
+          python scripts/build_nfl_promotion_registry.py
+          --math-evidence artifacts/football/nfl_simulator_profile.json
+          --historical-evidence artifacts/football/nfl_production_validation.json
+          --market-surface config/football_market_surface.json
+          --out artifacts/football/nfl_promotion_registry.json
+
+      - name: Write exact-head evidence manifest
+        run: |
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          source = json.loads(Path('artifacts/football/nfl_source_manifest.json').read_text())
+          paths = sorted(Path('artifacts/football').glob('*.json'))
+          payload = {
+              'schema_version': 2,
+              'git_sha': os.environ['EVIDENCE_GIT_SHA'].lower(),
+              'source_manifest_sha256': source['manifest_sha256'],
+              'ci_attestation_state': 'PRE_CI_WORKFLOW_CANNOT_SELF_ATTEST',
+              'artifacts': [
+                  {'path': p.name, 'sha256': hashlib.sha256(p.read_bytes()).hexdigest()}
+                  for p in paths
+              ],
+          }
+          Path('artifacts/football/nfl_promotion_evidence_manifest.json').write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + '\n'
+          )
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nfl-promotion-evidence-${{ env.EVIDENCE_GIT_SHA }}
+          path: |
+            artifacts/football/*.json
+            artifacts/football/sources/games.csv
+          if-no-files-found: error
+          retention-days: 30

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch nflverse games.csv, hash exact bytes, and emit a real-history audit."""
+"""Fetch or read nflverse games.csv, hash exact bytes, and emit a real-history audit."""
 from __future__ import annotations
 
 import argparse
@@ -25,9 +25,10 @@ def main() -> int:
     parser.add_argument("--output", default="artifacts/football/nfl_real_history_audit.json")
     parser.add_argument("--min-season", type=int, default=1999)
     parser.add_argument("--max-season", type=int, default=2025)
+    parser.add_argument("--source-file", type=Path)
     args = parser.parse_args()
 
-    payload = fetch_bytes(NFLVERSE_SCHEDULE_CSV)
+    payload = args.source_file.read_bytes() if args.source_file is not None else fetch_bytes(NFLVERSE_SCHEDULE_CSV)
     source_sha256 = hashlib.sha256(payload).hexdigest()
     text = payload.decode("utf-8-sig")
     rows = list(csv.DictReader(io.StringIO(text)))
@@ -41,6 +42,7 @@ def main() -> int:
         source_sha256=source_sha256,
     )
     report["requested_season_range"] = [args.min_season, args.max_season]
+    report["source_transport"] = "FROZEN_LOCAL_BYTES" if args.source_file is not None else "LIVE_FETCH"
 
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
