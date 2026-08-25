@@ -52,6 +52,17 @@ def _novig(a: Any, b: Any) -> tuple[float | None, float | None]:
         return None, None
 
 
+def nflverse_spread_to_home_handicap(spread_line: float) -> float:
+    """Convert nflverse favorite-positive spread into SportsEdge home handicap.
+
+    nflverse schedule history stores a home favorite as a positive value (for
+    example ``+3`` means the home team is favored by three). The shared
+    SportsEdge market pricer stores the handicap applied to the home margin, so
+    the same market is ``-3`` and settles via ``margin + handicap``.
+    """
+    return -float(spread_line)
+
+
 def _empirical_binary_probability(win_probability: float, loss_probability: float, n: int) -> float | None:
     """Jeffreys-smoothed conditional win probability after push removal."""
     if n <= 0:
@@ -77,10 +88,19 @@ def build_production_nfl_raw_evaluations(
             raise ValueError("NFL_PRODUCTION_VALIDATION_TEST_SEASON_IN_TRAINING")
         for raw in fold.test_rows:
             row = dict(raw); distribution = derive_nfl_m2_score_distribution(model, row); n = len(distribution)
+            # Source contract: nflverse spread_line is favorite-positive for the
+            # home team. Shared pricer contract: spread_line is the home handicap.
+            # Keep both values in evidence so the conversion is auditable.
             spread_line = _float(row.get("spread_line")); total_line = _float(row.get("total_line"))
+            home_handicap = nflverse_spread_to_home_handicap(spread_line) if spread_line is not None else None
             m2_home = None; m2_over = None
             if spread_line is not None and total_line is not None:
-                pricing = price_nfl_m2_game_markets(distribution, spread_line=spread_line, total_line=total_line)
+                assert home_handicap is not None
+                pricing = price_nfl_m2_game_markets(
+                    distribution,
+                    spread_line=home_handicap,
+                    total_line=total_line,
+                )
                 m2_home = _empirical_binary_probability(pricing["spread"]["home"], pricing["spread"]["away"], n)
                 m2_over = _empirical_binary_probability(pricing["total"]["over"], pricing["total"]["under"], n)
 
@@ -88,6 +108,8 @@ def build_production_nfl_raw_evaluations(
             if home_score is None or away_score is None:
                 raise ValueError("NFL_PRODUCTION_VALIDATION_REALIZED_SCORE_MISSING")
             actual_margin = home_score - away_score; actual_total = home_score + away_score
+            # Realized settlement remains in the nflverse source convention:
+            # +3 means the home favorite must win by more than three to cover.
             spread_push = spread_line is not None and actual_margin == spread_line
             total_push = total_line is not None and actual_total == total_line
             home_cover = None if spread_line is None or spread_push else int(actual_margin > spread_line)
@@ -100,7 +122,8 @@ def build_production_nfl_raw_evaluations(
                 "train_seasons": model.train_seasons, "ridge_alpha": model.ridge_alpha,
                 "residual_distribution_n": n, "margin_sigma": model.margin_sigma,
                 "total_sigma": model.total_sigma, "residual_correlation": model.residual_correlation,
-                "spread_line": spread_line, "total_line": total_line, "spread_push": bool(spread_push),
+                "spread_line": spread_line, "home_handicap": home_handicap,
+                "total_line": total_line, "spread_push": bool(spread_push),
                 "total_push": bool(total_push), "home_cover_outcome": home_cover, "over_outcome": over,
                 "m1_home_cover_prob": m1_home, "m1_over_prob": m1_over,
                 "m2_home_cover_prob": m2_home, "m2_over_prob": m2_over,
@@ -201,7 +224,8 @@ def build_production_nfl_validation_evidence(
         },
         "evidence_note": (
             "Exact production model identity. M2 is fit only on prior-season market-blind features; paired training "
-            "residuals generate the joint score distribution; closing lines enter only after that distribution exists; "
-            "isotonic calibration is fit only on prior OOS seasons."
+            "residuals generate the joint score distribution; nflverse favorite-positive spreads are converted to the "
+            "shared home-handicap convention only at the pricing boundary; closing lines enter only after the distribution "
+            "exists; isotonic calibration is fit only on prior OOS seasons."
         ),
     }
