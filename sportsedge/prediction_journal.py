@@ -17,8 +17,8 @@ DECISION_STATUSES = frozenset({"BET", "OFFICIAL_BET", "PASS"})
 STAGE1_GAME_MARKETS = frozenset({
     "MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS",
     "F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS", "F5_TEAM_TOTALS",
-    "FIRST_HOME_RUN", "PITCHER_RECORD_WIN",
 })
+STATEFUL_SPECIAL_MARKETS = frozenset({"FIRST_HOME_RUN", "PITCHER_RECORD_WIN"})
 RESET_PROP_MARKETS = frozenset({"HITS", "TOTAL_BASES", "PITCHER_BB"})
 STAGE1_PROVENANCE_FIELDS = ("model_input_hash", "distribution_sha256", "readout_sha256", "readout_version")
 RESET_PROP_PROVENANCE_FIELDS = ("model_input_hash", "engine_version", "seed_policy", "mc_paths")
@@ -74,6 +74,19 @@ def _nonnegative_int(value: Any, field: str) -> int:
     return parsed
 
 
+def _bind_distribution_provenance(out: dict[str, Any], row: Mapping[str, Any]) -> None:
+    out["model_input_hash"] = _valid_sha256(row.get("model_input_hash"), "model_input_hash")
+    out["distribution_sha256"] = _valid_sha256(row.get("distribution_sha256"), "distribution_sha256")
+    out["readout_sha256"] = _valid_sha256(row.get("readout_sha256"), "readout_sha256")
+    out["readout_version"] = _required_text(row.get("readout_version"), "readout_version")
+
+
+def _bind_engine_provenance(out: dict[str, Any], row: Mapping[str, Any]) -> None:
+    out["engine_version"] = _required_text(row.get("engine_version"), "engine_version")
+    out["seed_policy"] = _required_text(row.get("seed_policy"), "seed_policy")
+    out["mc_paths"] = _nonnegative_int(row.get("mc_paths"), "mc_paths")
+
+
 def _modeled_prediction(row: Mapping[str, Any], index: int) -> dict[str, Any] | None:
     model_p = row.get("model_p")
     if model_p is None:
@@ -94,15 +107,13 @@ def _modeled_prediction(row: Mapping[str, Any], index: int) -> dict[str, Any] | 
         raise PredictionJournalError(f"result[{index}].market missing")
     out = dict(row); out["market"] = market; out["bet_status"] = status; out["model_p"] = probability
     if market in STAGE1_GAME_MARKETS:
-        out["model_input_hash"] = _valid_sha256(row.get("model_input_hash"), "model_input_hash")
-        out["distribution_sha256"] = _valid_sha256(row.get("distribution_sha256"), "distribution_sha256")
-        out["readout_sha256"] = _valid_sha256(row.get("readout_sha256"), "readout_sha256")
-        out["readout_version"] = _required_text(row.get("readout_version"), "readout_version")
+        _bind_distribution_provenance(out, row)
+    if market in STATEFUL_SPECIAL_MARKETS:
+        _bind_distribution_provenance(out, row)
+        _bind_engine_provenance(out, row)
     if market in RESET_PROP_MARKETS:
         out["model_input_hash"] = _valid_sha256(row.get("model_input_hash"), "model_input_hash")
-        out["engine_version"] = _required_text(row.get("engine_version"), "engine_version")
-        out["seed_policy"] = _required_text(row.get("seed_policy"), "seed_policy")
-        out["mc_paths"] = _nonnegative_int(row.get("mc_paths"), "mc_paths")
+        _bind_engine_provenance(out, row)
     return out
 
 
