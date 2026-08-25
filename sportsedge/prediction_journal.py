@@ -14,7 +14,10 @@ from .runtime import parse_timestamp
 
 JOURNAL_SCHEMA_VERSION = "mlb_prediction_journal_v1"
 DECISION_STATUSES = frozenset({"BET", "OFFICIAL_BET", "PASS"})
-STAGE1_GAME_MARKETS = frozenset({"MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS"})
+STAGE1_GAME_MARKETS = frozenset({
+    "MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS",
+    "F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS", "F5_TEAM_TOTALS",
+})
 RESET_PROP_MARKETS = frozenset({"HITS", "TOTAL_BASES", "PITCHER_BB"})
 STAGE1_PROVENANCE_FIELDS = ("model_input_hash", "distribution_sha256", "readout_sha256", "readout_version")
 RESET_PROP_PROVENANCE_FIELDS = ("model_input_hash", "engine_version", "seed_policy", "mc_paths")
