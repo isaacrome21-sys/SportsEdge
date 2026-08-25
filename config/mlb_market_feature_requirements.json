@@ -75,6 +75,6 @@
     "recent_form": "recency_weighted_not_last_n_hit_rate_chasing",
     "weather": "use timestamped game-time forecast and roof state; never use generic daily weather when roof/dome nullifies it",
     "sportsbook_prices": "excluded_from_model_features_used_only_after_model_probability_for_value_comparison",
-    "validation": "each_market_must_pass_all_required_gates_in_mlb_validation_evidence before_official_bet_enabled"
+    "validation": "each_market_must_pass_all_required_gates_in_mlb_validation_evidence_before_official_bet_enabled"
   }
 }
