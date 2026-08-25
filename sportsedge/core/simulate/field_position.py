@@ -78,6 +78,7 @@ class NFLPossessionTransition:
     return_yards: int | None = None
     net_kick_yards: int | None = None
     kicking_team_was_trailing: bool = False
+    creates_next_drive: bool = True
 
     def __post_init__(self) -> None:
         if isinstance(self.transition_index, bool) or not isinstance(self.transition_index, int) or self.transition_index <= 0:
@@ -107,6 +108,8 @@ class NFLPossessionTransition:
             raise ValueError("FIELD_POSITION_NET_KICK_YARDS_INVALID")
         if not isinstance(self.kicking_team_was_trailing, bool):
             raise ValueError("FIELD_POSITION_TRAILING_FLAG_INVALID")
+        if not isinstance(self.creates_next_drive, bool):
+            raise ValueError("FIELD_POSITION_CREATES_NEXT_DRIVE_INVALID")
         if "ONSIDE" in self.transition_type and not self.kicking_team_was_trailing:
             raise ValueError("ONSIDE_REQUIRES_TRAILING_KICKING_TEAM")
 
@@ -170,19 +173,11 @@ class NFLFieldPositionResolver:
         receiving = self._profile(receiving_team)
         trailing = bool(kicking_team_trailing)
 
-        if (
-            allow_onside
-            and trailing
-            and self.rng.random() < kicking.onside_attempt_rate_when_trailing
-        ):
+        if allow_onside and trailing and self.rng.random() < kicking.onside_attempt_rate_when_trailing:
             kicking_recovers = bool(self.rng.random() < kicking.onside_recovery_rate)
             return NFLPossessionTransition(
                 transition_index=transition_index,
-                transition_type=(
-                    "ONSIDE_RECOVERED_KICKING"
-                    if kicking_recovers
-                    else "ONSIDE_RECOVERED_RECEIVING"
-                ),
+                transition_type="ONSIDE_RECOVERED_KICKING" if kicking_recovers else "ONSIDE_RECOVERED_RECEIVING",
                 source_play_id=source_play_id,
                 next_drive_id=next_drive_id,
                 period=period,
@@ -190,11 +185,7 @@ class NFLFieldPositionResolver:
                 from_team=kicking_team,
                 nominal_receiving_team=receiving_team,
                 next_possession_team=kicking_team if kicking_recovers else receiving_team,
-                next_yardline_100=(
-                    kicking.onside_kicking_recovery_yardline_100
-                    if kicking_recovers
-                    else kicking.onside_receiving_recovery_yardline_100
-                ),
+                next_yardline_100=kicking.onside_kicking_recovery_yardline_100 if kicking_recovers else kicking.onside_receiving_recovery_yardline_100,
                 kicking_team_was_trailing=True,
             )
 
@@ -208,10 +199,7 @@ class NFLFieldPositionResolver:
             yardline = 80
             return_yards = None
         else:
-            yards = int(round(self.rng.normal(
-                receiving.kickoff_return_yards_mean,
-                receiving.kickoff_return_yards_sd,
-            )))
+            yards = int(round(self.rng.normal(receiving.kickoff_return_yards_mean, receiving.kickoff_return_yards_sd)))
             yards = max(1, min(50, yards))
             transition_type = f"{label}_RETURN"
             yardline = max(50, min(99, 100 - yards))
@@ -288,11 +276,7 @@ class NFLFieldPositionResolver:
         if not 1 <= los <= 99:
             raise ValueError("MISSED_FIELD_GOAL_YARDLINE_INVALID")
         kick_spot_distance_to_receiving_goal = los + 7
-        next_yardline = (
-            80
-            if kick_spot_distance_to_receiving_goal <= 20
-            else 100 - kick_spot_distance_to_receiving_goal
-        )
+        next_yardline = 80 if kick_spot_distance_to_receiving_goal <= 20 else 100 - kick_spot_distance_to_receiving_goal
         next_yardline = max(1, min(99, int(next_yardline)))
         return NFLPossessionTransition(
             transition_index=transition_index,
