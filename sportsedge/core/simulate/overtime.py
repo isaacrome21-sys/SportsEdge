@@ -135,6 +135,11 @@ def _score_leader(scores: dict[str, int]) -> str | None:
     return teams[0] if scores[teams[0]] > scores[teams[1]] else teams[1]
 
 
+def _require_terminal_is_last(position: int, data: tuple[NFLRegularSeasonOTOpportunity, ...]) -> None:
+    if position != len(data) - 1:
+        raise ValueError("OVERTIME_EVENTS_AFTER_GAME_END")
+
+
 def settle_nfl_regular_season_overtime(
     regulation_path: ResolvedFootballPath,
     opportunities: Iterable[NFLRegularSeasonOTOpportunity],
@@ -192,9 +197,10 @@ def settle_nfl_regular_season_overtime(
             if item.scoring_team == item.opportunity_team:
                 raise ValueError("OVERTIME_KICKOFF_SAFETY_TEAM_INVALID")
             assert item.scoring_team is not None
+            _require_terminal_is_last(position, data)
             return NFLRegularSeasonOvertimeResult(
                 regulation_path=regulation_path,
-                opportunities=data[: position + 1],
+                opportunities=data,
                 winner=item.scoring_team,
                 tie=False,
                 final_clock_seconds_remaining=item.clock_end_seconds_remaining,
@@ -205,9 +211,10 @@ def settle_nfl_regular_season_overtime(
         # score produces a regular-season tie.
         if item.clock_end_seconds_remaining == 0:
             leader = _score_leader(scores)
+            _require_terminal_is_last(position, data)
             return NFLRegularSeasonOvertimeResult(
                 regulation_path=regulation_path,
-                opportunities=data[: position + 1],
+                opportunities=data,
                 winner=leader,
                 tie=leader is None,
                 final_clock_seconds_remaining=0,
@@ -217,9 +224,10 @@ def settle_nfl_regular_season_overtime(
             both_opportunities_reached = True
             leader = _score_leader(scores)
             if leader is not None:
+                _require_terminal_is_last(position, data)
                 return NFLRegularSeasonOvertimeResult(
                     regulation_path=regulation_path,
-                    opportunities=data[: position + 1],
+                    opportunities=data,
                     winner=leader,
                     tie=False,
                     final_clock_seconds_remaining=item.clock_end_seconds_remaining,
@@ -229,9 +237,10 @@ def settle_nfl_regular_season_overtime(
 
         if both_opportunities_reached and item.points > 0:
             assert item.scoring_team is not None
+            _require_terminal_is_last(position, data)
             return NFLRegularSeasonOvertimeResult(
                 regulation_path=regulation_path,
-                opportunities=data[: position + 1],
+                opportunities=data,
                 winner=item.scoring_team,
                 tie=False,
                 final_clock_seconds_remaining=item.clock_end_seconds_remaining,
