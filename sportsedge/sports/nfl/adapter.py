@@ -108,14 +108,20 @@ class NFLAdapter:
         )
 
     @staticmethod
-    def _neutral_flag(value: Any) -> bool | None:
-        if value is None:
+    def _neutral_flag(value: Any, *, field: str) -> bool | None:
+        if value in (None, ""):
             return None
         if isinstance(value, bool):
             return value
         if isinstance(value, (int, float)) and value in (0, 1):
             return bool(value)
         text = str(value).strip().lower()
+        if field == "location":
+            if text == "neutral":
+                return True
+            if text == "home":
+                return False
+            raise ValueError(f"NFL_LOCATION_VALUE_INVALID:{value}")
         if text in {"true", "yes", "y", "1"}:
             return True
         if text in {"false", "no", "n", "0"}:
@@ -129,10 +135,12 @@ class NFLAdapter:
         for source in (venue, context):
             if not isinstance(source, Mapping):
                 continue
-            raw = source.get("neutral_site", source.get("neutral"))
-            parsed = self._neutral_flag(raw)
-            if parsed is not None:
-                flags.append(parsed)
+            for field in ("neutral_site", "neutral", "location"):
+                if field not in source:
+                    continue
+                parsed = self._neutral_flag(source.get(field), field=field)
+                if parsed is not None:
+                    flags.append(parsed)
         if len(set(flags)) > 1:
             raise ValueError("NEUTRAL_SITE_CONTEXT_CONFLICT")
         if flags and flags[0]:
