@@ -64,7 +64,7 @@ class NFLRegularSeasonOTOpportunity:
             raise ValueError("OVERTIME_POSITIVE_POINTS_SCORING_TEAM_REQUIRED")
         if self.outcome_type == "KICKOFF_SAFETY" and self.points != 2:
             raise ValueError("OVERTIME_KICKOFF_SAFETY_POINTS_INVALID")
-        if self.outcome_type == "DEFENSIVE_RETURN_TOUCHDOWN" and self.points not in {6, 7, 8}:
+        if self.outcome_type == "DEFENSIVE_RETURN_TOUCHDOWN" and self.points != 6:
             raise ValueError("OVERTIME_DEFENSIVE_RETURN_TD_POINTS_INVALID")
         if self.outcome_type == "DEFENSIVE_RETURN_TOUCHDOWN" and self.scoring_team == self.opportunity_team:
             raise ValueError("OVERTIME_DEFENSIVE_RETURN_TD_TEAM_INVALID")
