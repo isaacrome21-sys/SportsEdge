@@ -172,6 +172,7 @@ def main() -> int:
         history_rows,
         source_uri=f"manifest://sha256/{manifest_hash}",
         source_sha256=manifest_hash,
+        source_manifest_sha256=manifest_hash,
         min_train_seasons=args.min_train_seasons,
         ridge_alpha=args.ridge_alpha,
     )
