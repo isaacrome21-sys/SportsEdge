@@ -1,0 +1,80 @@
+name: football-nfl-ci-attestation
+
+on:
+  workflow_run:
+    workflows: ["football-nfl-promotion-evidence"]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  attest:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      UPSTREAM_RUN_ID: ${{ github.event.workflow_run.id }}
+      UPSTREAM_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      UPSTREAM_WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+      UPSTREAM_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout exact upstream code head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.UPSTREAM_HEAD_SHA }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install runtime dependency
+        run: python -m pip install --disable-pip-version-check numpy
+
+      - name: Download exact upstream evidence artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/football/attested
+          gh run download "$UPSTREAM_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "nfl-promotion-evidence-$UPSTREAM_HEAD_SHA" \
+            --dir artifacts/football/attested
+          test -f artifacts/football/attested/nfl_promotion_evidence_manifest.json
+
+      - name: Verify prior run and build CI-attested registry
+        run: >-
+          python scripts/attest_nfl_ci_and_build_registry.py
+          --bundle-dir artifacts/football/attested
+          --workflow-name "$UPSTREAM_WORKFLOW_NAME"
+          --workflow-conclusion "$UPSTREAM_CONCLUSION"
+          --workflow-head-sha "$UPSTREAM_HEAD_SHA"
+          --workflow-run-id "$UPSTREAM_RUN_ID"
+          --market-surface config/football_market_surface.json
+          --out artifacts/football/nfl_ci_attested_registry.json
+
+      - name: Assert no forward-CLV promotion was invented
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          payload = json.loads(Path('artifacts/football/nfl_ci_attested_registry.json').read_text())
+          if payload.get('ci_attestation_state') != 'ATTESTED_BY_SEPARATE_WORKFLOW':
+              raise SystemExit('NFL_EXTERNAL_CI_ATTESTATION_STATE_INVALID')
+          # This workflow receives no CLV log by design. A market cannot become
+          # DEPLOYED merely because CI recovered.
+          if payload.get('deployed_markets'):
+              raise SystemExit(f"NFL_DEPLOYED_WITHOUT_FORWARD_CLV:{payload['deployed_markets']}")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nfl-ci-attested-${{ env.UPSTREAM_HEAD_SHA }}
+          path: artifacts/football/nfl_ci_attested_registry.json
+          if-no-files-found: error
+          retention-days: 90
