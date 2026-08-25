@@ -35,6 +35,10 @@ class UnifiedCardResult:
     engine_version: str | None = None
     seed_policy: str | None = None
     mc_paths: int | None = None
+    book_key: str | None = None
+    sportsbook: str | None = None
+    quote_retrieved_at: str | None = None
+    offer_id: str | None = None
 
 
 def _convert(result) -> UnifiedCardResult:
@@ -47,6 +51,8 @@ def _convert(result) -> UnifiedCardResult:
         getattr(result, "readout_sha256", None), getattr(result, "readout_version", None),
         getattr(result, "engine_version", None), getattr(result, "seed_policy", None),
         getattr(result, "mc_paths", None),
+        getattr(result, "book_key", None), getattr(result, "sportsbook", None),
+        getattr(result, "quote_retrieved_at", None), getattr(result, "offer_id", None),
     )
 
 

@@ -34,6 +34,10 @@ class RunResult:
     engine_version: str | None = None
     seed_policy: str | None = None
     mc_paths: int | None = None
+    book_key: str | None = None
+    sportsbook: str | None = None
+    quote_retrieved_at: str | None = None
+    offer_id: str | None = None
 
 
 def _reject_market_leakage(model_input: Mapping[str, Any]) -> None:
@@ -81,12 +85,27 @@ def _optional_nonnegative_int(output: Mapping[str, Any], key: str) -> int | None
     return parsed
 
 
+def _quote_identity(quote: Mapping[str, Any]) -> tuple[str, str | None, str, str | None]:
+    book_key = str(quote.get("book_key") or "").strip()
+    if not book_key:
+        raise OrchestrationError("quote book_key missing")
+    sportsbook_raw = quote.get("sportsbook")
+    sportsbook = str(sportsbook_raw).strip() if sportsbook_raw not in (None, "") else None
+    retrieved = quote.get("retrieved_at")
+    if not isinstance(retrieved, datetime) or retrieved.tzinfo is None or retrieved.utcoffset() is None:
+        raise OrchestrationError("quote retrieved_at must be timezone-aware")
+    offer_raw = quote.get("offer_id")
+    offer_id = str(offer_raw).strip() if offer_raw not in (None, "") else None
+    return book_key, sportsbook, retrieved.isoformat(), offer_id
+
+
 def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], paired_quote: Mapping[str, Any] | None = None, deployment: Mapping[str, Any], engine_fn: Callable[[Mapping[str, Any]], Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG, kelly_multiplier: float = 0.25) -> RunResult:
     """Run one candidate end-to-end. Any integrity failure returns BLOCKED, never a guessed bet."""
     market = str(model_input.get("market", "UNKNOWN"))
     try:
         _reject_market_leakage(model_input)
         double_ttl_gate(quote, ingestion_now, finalization_now)
+        book_key, sportsbook, quote_retrieved_at, offer_id = _quote_identity(quote)
         output = dict(engine_fn(model_input))
         if "model_p" not in output:
             raise OrchestrationError("engine output missing model_p")
@@ -124,6 +143,10 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], p
             engine_version=engine_version,
             seed_policy=seed_policy,
             mc_paths=mc_paths,
+            book_key=book_key,
+            sportsbook=sportsbook,
+            quote_retrieved_at=quote_retrieved_at,
+            offer_id=offer_id,
         )
     except Exception as exc:
         return RunResult(market, None, "BLOCKED", None, f"{type(exc).__name__}: {exc}")
