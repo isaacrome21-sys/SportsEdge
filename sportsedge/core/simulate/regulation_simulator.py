@@ -247,7 +247,6 @@ class NFLIntegratedRegulationSimulator:
             self._seconds_to_period_boundary(remaining),
             self._a_kernel._duration(profile, low=low, high=high),
         )
-
     def _short_duration(self, remaining: int, low: int, high: int) -> int:
         return min(
             remaining,
@@ -558,7 +557,7 @@ class NFLIntegratedRegulationSimulator:
             drive_ended = False
 
             for _ in range(30):
-                if remaining <= 0 or remaining == 1800:
+                if remaining <= 0 or (remaining == 1800 and not halftime_kicked):
                     break
 
                 opponent = self._other(possession)
@@ -871,7 +870,7 @@ class NFLIntegratedRegulationSimulator:
                 converted = (pass_complete is True and yards >= distance) if play_type == "PASS" else yards >= distance
                 yardline = new_yardline
 
-                if remaining == 1800:
+                if remaining == 1800 and not halftime_kicked:
                     drive_ended = True
                     break
                 if converted:
@@ -899,7 +898,7 @@ class NFLIntegratedRegulationSimulator:
                 distance = max(1, distance - yards)
                 down += 1
 
-            if remaining == 1800:
+            if remaining == 1800 and not halftime_kicked:
                 pending = None
                 continue
             if remaining <= 0:
