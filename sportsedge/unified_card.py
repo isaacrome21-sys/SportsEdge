@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any, Mapping
 
 from .edge_floors import DEFAULT_EDGE_FLOOR_CONFIG
-from .generic_card_pipeline import GENERIC_MARKETS, run_generic_card
+from .generic_card_pipeline import DECISION_STATUSES, GENERIC_MARKETS, run_generic_card
 from .live_slate import LiveGame
 from .quote_bridge import validate_canonical_quote
 
@@ -39,7 +39,28 @@ def _convert(result) -> UnifiedCardResult:
     )
 
 
-def run_unified_card(*, games: list[LiveGame], feature_rows: list[Mapping[str, Any]], quotes: list[Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, registry_path: str = "config/deployments.json", require_confirmed_lineup: bool = True, edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG, kelly_multiplier: float = 0.25) -> list[UnifiedCardResult]:
+def _assert_ledger_precondition(result: UnifiedCardResult) -> None:
+    modeled = result.model_p is not None
+    decided = result.bet_status in DECISION_STATUSES
+    if modeled != decided:
+        raise RuntimeError(
+            "priced decision ledger invariant violated: "
+            f"market={result.market} status={result.bet_status} model_p={result.model_p}"
+        )
+
+
+def run_unified_card(
+    *,
+    games: list[LiveGame],
+    feature_rows: list[Mapping[str, Any]],
+    quotes: list[Mapping[str, Any]],
+    ingestion_now: datetime,
+    finalization_now: datetime,
+    registry_path: str = "config/deployments.json",
+    require_confirmed_lineup: bool = True,
+    edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG,
+    kelly_multiplier: float = 0.25,
+) -> list[UnifiedCardResult]:
     indexed: list[tuple[int, Mapping[str, Any]]] = []
     output: dict[int, UnifiedCardResult] = {}
     for i, raw_quote in enumerate(quotes):
@@ -50,19 +71,28 @@ def run_unified_card(*, games: list[LiveGame], feature_rows: list[Mapping[str, A
                 raise ValueError(f"unsupported unified market: {market}")
             indexed.append((i, quote))
         except Exception as exc:
-            output[i] = UnifiedCardResult("UNKNOWN", "UNKNOWN", "UNKNOWN", None, "UNKNOWN", None, None, "BLOCKED", f"{type(exc).__name__}: {exc}")
+            output[i] = UnifiedCardResult(
+                "UNKNOWN", "UNKNOWN", "UNKNOWN", None, "UNKNOWN", None,
+                None, "BLOCKED", f"{type(exc).__name__}: {exc}",
+            )
 
     if indexed:
         results = run_generic_card(
-            games=games, feature_rows=feature_rows, quotes=[q for _, q in indexed],
-            ingestion_now=ingestion_now, finalization_now=finalization_now,
-            registry_path=registry_path, edge_floor_config_path=edge_floor_config_path,
+            games=games,
+            feature_rows=feature_rows,
+            quotes=[q for _, q in indexed],
+            ingestion_now=ingestion_now,
+            finalization_now=finalization_now,
+            registry_path=registry_path,
+            edge_floor_config_path=edge_floor_config_path,
             kelly_multiplier=kelly_multiplier,
         )
         if len(results) != len(indexed):
             raise RuntimeError("canonical pipeline changed quote cardinality")
         for (i, _), result in zip(indexed, results):
-            output[i] = _convert(result)
+            converted = _convert(result)
+            _assert_ledger_precondition(converted)
+            output[i] = converted
     if len(output) != len(quotes):
         raise RuntimeError("unified runner failed to preserve quote cardinality")
     return [output[i] for i in range(len(quotes))]
