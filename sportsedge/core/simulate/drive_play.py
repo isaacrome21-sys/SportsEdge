@@ -124,6 +124,15 @@ class PlayEvent:
         play_type = str(self.play_type).upper()
         if self.score_type == "TOUCHDOWN_CANDIDATE" and self.points != 6:
             raise ValueError("ENGINE_A_TOUCHDOWN_MUST_BE_SIX_RAW_POINTS")
+        if self.score_type == "DEFENSIVE_RETURN_TOUCHDOWN_CANDIDATE":
+            if self.points != 6:
+                raise ValueError("ENGINE_A_DEFENSIVE_RETURN_TD_MUST_BE_SIX_RAW_POINTS")
+            if self.turnover_type not in {"INTERCEPTION", "FUMBLE"}:
+                raise ValueError("DEFENSIVE_RETURN_TD_REQUIRES_TURNOVER")
+            if play_type == "PASS" and self.turnover_type != "INTERCEPTION":
+                raise ValueError("PASS_DEFENSIVE_RETURN_TD_REQUIRES_INTERCEPTION")
+            if play_type == "RUSH" and self.turnover_type != "FUMBLE":
+                raise ValueError("RUSH_DEFENSIVE_RETURN_TD_REQUIRES_FUMBLE")
         if play_type == "FIELD_GOAL":
             if self.points != 0 or home_delta != 0 or away_delta != 0:
                 raise ValueError("ENGINE_A_FIELD_GOAL_MUST_BE_UNRESOLVED")
@@ -142,7 +151,14 @@ class PlayEvent:
                 raise ValueError("PASS_COMPLETION_STATE_REQUIRED")
             if self.turnover_type == "INTERCEPTION" and self.pass_complete:
                 raise ValueError("INTERCEPTION_CANNOT_BE_COMPLETE")
-            if not self.pass_complete and (self.yards != 0 or self.points != 0):
+            defensive_pick_six = (
+                self.score_type == "DEFENSIVE_RETURN_TOUCHDOWN_CANDIDATE"
+                and self.turnover_type == "INTERCEPTION"
+                and self.points == 6
+            )
+            if not self.pass_complete and (
+                self.yards != 0 or (self.points != 0 and not defensive_pick_six)
+            ):
                 raise ValueError("INCOMPLETE_PASS_STATE_INVALID")
         elif self.pass_complete is not None:
             raise ValueError("NON_PASS_COMPLETION_STATE_INVALID")
