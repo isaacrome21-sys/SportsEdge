@@ -93,6 +93,41 @@ class NFLReturnScoringTests(unittest.TestCase):
                 pass_complete=False,
             )
 
+    def test_defensive_return_td_path_must_score_non_possession_team(self):
+        from sportsedge.core.simulate.drive_play import FootballPlayPath, PlayEvent
+
+        bad = PlayEvent(
+            1, 1, 2, 500, "AWAY",
+            0, 0, 0, 6,
+            1, 10, 65,
+            "PASS", 0, 6,
+            score_type="DEFENSIVE_RETURN_TOUCHDOWN_CANDIDATE",
+            turnover_type="INTERCEPTION",
+            pass_complete=False,
+        )
+        with self.assertRaisesRegex(ValueError, "DEFENSIVE_RETURN_TD_SCORING_TEAM_MISMATCH"):
+            FootballPlayPath("NFL_BAD_PICK_SIX", 1, "HOME", "AWAY", (bad,))
+
+    def test_safety_is_two_points_for_non_possession_team(self):
+        from sportsedge.core.simulate.drive_play import FootballPlayPath, PlayEvent
+
+        good = PlayEvent(
+            1, 1, 1, 700, "HOME",
+            0, 0, 0, 2,
+            1, 10, 99,
+            "SACK", -2, 2,
+            score_type="SAFETY_CANDIDATE",
+        )
+        FootballPlayPath("NFL_SAFETY", 1, "HOME", "AWAY", (good,))
+        with self.assertRaisesRegex(ValueError, "ENGINE_A_SAFETY_MUST_BE_TWO_RAW_POINTS"):
+            PlayEvent(
+                1, 2, 1, 680, "HOME",
+                0, 2, 0, 5,
+                1, 10, 99,
+                "SACK", -2, 3,
+                score_type="SAFETY_CANDIDATE",
+            )
+
     def test_special_teams_resolver_uses_defensive_scoring_team_for_return_td_try(self):
         from sportsedge.core.simulate.drive_play import FootballPlayPath, PlayEvent
         from sportsedge.core.simulate.special_teams import EngineCSpecialTeamsResolver, SpecialTeamsProfile
