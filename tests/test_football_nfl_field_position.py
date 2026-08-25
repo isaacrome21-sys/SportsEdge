@@ -66,7 +66,7 @@ class NFLFieldPositionResolverTests(unittest.TestCase):
         self.assertEqual(event.transition_type, "KICKOFF_TOUCHBACK_20")
         self.assertEqual(event.next_yardline_100, 80)
 
-    def test_2026_declared_onside_is_available_any_time_kicking_team_is_trailing(self):
+    def test_2026_declared_onside_is_available_while_trailing(self):
         from sportsedge.core.simulate.field_position import NFLFieldPositionResolver
 
         home, away = self._profiles(
@@ -83,11 +83,13 @@ class NFLFieldPositionResolverTests(unittest.TestCase):
         self.assertEqual(event.transition_type, "ONSIDE_RECOVERED_KICKING")
         self.assertEqual(event.next_possession_team, "HOME")
         self.assertEqual(event.next_yardline_100, 55)
+        self.assertTrue(event.kicking_team_was_trailing)
 
-    def test_onside_is_not_attempted_when_kicking_team_is_not_trailing(self):
+    def test_2026_declared_onside_is_also_available_when_not_trailing(self):
         from sportsedge.core.simulate.field_position import NFLFieldPositionResolver
 
         home, away = self._profiles(
+            deep_touchback_rate=0.0,
             onside_attempt_rate_when_trailing=1.0,
             onside_recovery_rate=1.0,
         )
@@ -96,8 +98,9 @@ class NFLFieldPositionResolverTests(unittest.TestCase):
             kicking_team="HOME", receiving_team="AWAY", period=1,
             clock_seconds_remaining=600, kicking_team_trailing=False,
         )
-        self.assertNotIn("ONSIDE", event.transition_type)
-        self.assertEqual(event.next_possession_team, "AWAY")
+        self.assertEqual(event.transition_type, "ONSIDE_RECOVERED_KICKING")
+        self.assertEqual(event.next_possession_team, "HOME")
+        self.assertFalse(event.kicking_team_was_trailing)
 
     def test_punt_net_field_position_flips_to_receiving_team_coordinates(self):
         from sportsedge.core.simulate.field_position import NFLFieldPositionResolver
