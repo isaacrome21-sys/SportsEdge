@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "holdout_n_min": 500,
+  "debut_n_min": 100,
+  "calibration_error_max": 0.05,
+  "max_brier_delta_vs_market": 0.0,
+  "max_log_loss_delta_vs_market": 0.0,
+  "closing_market_provenance_required": true,
+  "short_notice_slice_required": true,
+  "notes": [
+    "Promotion uses chronological holdout evidence only.",
+    "Aggregate Brier score and log loss must be no worse than the no-vig market baseline.",
+    "UFC-debut exposure must have enough holdout observations to be evaluated separately.",
+    "Closing-market provenance and short-notice validation are hard gates; missing evidence is UNVERIFIED, never PASS."
+  ]
+}
