@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from math import isfinite
 
+from .defense_full_game import FullGameDefensivePath
 from .defense_usage import AttributedDefensivePath, DefenderUsageProfile
 
 
@@ -21,12 +22,14 @@ _TEAM_STAT_ALIASES = {
     "team_turnovers": "team_turnovers",
 }
 
+_DefensivePath = AttributedDefensivePath | FullGameDefensivePath
 
-def _paths(paths: Iterable[AttributedDefensivePath]) -> list[AttributedDefensivePath]:
+
+def _paths(paths: Iterable[_DefensivePath]) -> list[_DefensivePath]:
     data = list(paths)
     if not data:
         raise ValueError("ATTRIBUTED_DEFENSIVE_PATHS_EMPTY")
-    if any(not isinstance(path, AttributedDefensivePath) for path in data):
+    if any(not isinstance(path, (AttributedDefensivePath, FullGameDefensivePath)) for path in data):
         raise TypeError("ATTRIBUTED_DEFENSIVE_PATH_REQUIRED")
     game_ids = {path.base_path.game_id for path in data}
     if len(game_ids) != 1:
@@ -48,7 +51,7 @@ def _three_way(values: list[float], line: float) -> dict[str, float]:
     }
 
 
-def _profile(path: AttributedDefensivePath, player_id: str) -> DefenderUsageProfile:
+def _profile(path: _DefensivePath, player_id: str) -> DefenderUsageProfile:
     matches = [
         player
         for usage in (path.home_defense, path.away_defense)
@@ -61,17 +64,19 @@ def _profile(path: AttributedDefensivePath, player_id: str) -> DefenderUsageProf
 
 
 def derive_defender_stat_market(
-    paths: Iterable[AttributedDefensivePath],
+    paths: Iterable[_DefensivePath],
     *,
     player_id: str,
     stat: str,
     line: float,
     tackle_settlement_provider: str | None = None,
 ) -> dict[str, float]:
-    """Price one defender prop from path-attributed defensive statistics.
+    """Price one defender prop from regulation-only or full-game attribution.
 
-    Tackle+assist markets require an explicit settlement-provider binding because
-    official/stat-provider tackle credit can be corrected after initial grading.
+    Full-game sportsbook props should pass ``FullGameDefensivePath`` instances so
+    any simulated overtime events are included. Tackle+assist markets require an
+    explicit settlement-provider binding because official/stat-provider tackle
+    credit can be corrected after initial grading.
     """
 
     data = _paths(paths)
@@ -99,7 +104,7 @@ def derive_defender_stat_market(
 
 
 def derive_team_defense_stat_market(
-    paths: Iterable[AttributedDefensivePath],
+    paths: Iterable[_DefensivePath],
     *,
     team: str,
     stat: str,
