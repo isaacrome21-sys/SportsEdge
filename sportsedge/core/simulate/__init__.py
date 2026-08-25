@@ -1,5 +1,6 @@
 """Shared simulation engines."""
 
+from .drive_play import EngineADrivePlaySimulator, FootballPlayPath, PlayEvent, TeamDriveProfile
 from .football import JointScoreSimulator, KeyNumberMarginModel
 from .football_path import EngineAPathSimulator, FootballGamePath, ScoringEvent
 from .situational import (
@@ -15,6 +16,10 @@ __all__ = [
     "EngineAPathSimulator",
     "FootballGamePath",
     "ScoringEvent",
+    "EngineADrivePlaySimulator",
+    "FootballPlayPath",
+    "PlayEvent",
+    "TeamDriveProfile",
     "derive_race_to_n",
     "derive_largest_lead",
     "derive_winning_margin_band",
