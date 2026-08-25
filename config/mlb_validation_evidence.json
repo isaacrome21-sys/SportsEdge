@@ -9,8 +9,8 @@
     "production_parity"
   ],
   "markets": {
-    "MONEYLINE": {}, "RUN_LINE": {}, "TOTALS": {},
-    "NRFI": {}, "YRFI": {}, "F5_MONEYLINE": {}, "F5_RUN_LINE": {}, "F5_TOTALS": {},
+    "MONEYLINE": {}, "RUN_LINE": {}, "TOTALS": {}, "TEAM_TOTALS": {"evidence_count": 0, "evidence_status": "UNRUN"},
+    "NRFI": {}, "YRFI": {}, "F5_MONEYLINE": {}, "F5_RUN_LINE": {}, "F5_TOTALS": {}, "F5_TEAM_TOTALS": {"evidence_count": 0, "evidence_status": "UNRUN"},
 
     "HITS": {
       "evidence_count": 0,
