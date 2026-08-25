@@ -6,7 +6,8 @@ canonical multi-source manifest and exact code SHA as simulator math, and carry
 forward CLV from that same exact code contract. Missing market evidence never
 inherits a stage from another market, a caller-supplied CI boolean can never
 self-attest execution, and promotion-grade CLV must prove comparable threshold,
-pregame timing, and same-sportsbook close identity.
+pregame timing, same-sportsbook close identity, and internally reconciled row
+counts before it can advance a market.
 """
 from __future__ import annotations
 
@@ -50,6 +51,36 @@ def _git_sha(value: Any, error: str) -> str:
 
 def _source_hash(value: Mapping[str, Any], name: str) -> str:
     return _sha256(value.get("source_sha256"), f"{name}_SOURCE_SHA256_INVALID")
+
+
+def _count(value: Any, error: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(error)
+    return value
+
+
+def _clv_bucket(
+    value: Any,
+    *,
+    required_error: str,
+    row_error_prefix: str,
+) -> tuple[Mapping[str, Any], int]:
+    payload = _mapping(value)
+    if payload is None:
+        raise ValueError(required_error)
+    total = 0
+    for raw_market, raw_row in payload.items():
+        market = str(raw_market).strip().lower()
+        if not market:
+            raise ValueError(f"{row_error_prefix}_MARKET_INVALID")
+        row = _mapping(raw_row)
+        if row is None:
+            raise ValueError(f"{row_error_prefix}_ROW_INVALID:{market}")
+        total += _count(
+            row.get("logged_plays"),
+            f"{row_error_prefix}_LOGGED_PLAYS_INVALID:{market}",
+        )
+    return payload, total
 
 
 def _verify_ci_attestation(
@@ -201,9 +232,35 @@ def build_nfl_promotion_registry(
         clv_code_sha = _git_sha(clv_evidence.get("code_git_sha"), "NFL_CLV_CODE_SHA_INVALID")
         if clv_code_sha != math_code_sha:
             raise ValueError("NFL_CLV_CODE_SHA_MISMATCH")
-        markets_payload = _mapping(clv_evidence.get("markets"))
-        if markets_payload is None:
-            raise ValueError("NFL_CLV_MARKETS_REQUIRED")
+
+        markets_payload, official_logged = _clv_bucket(
+            clv_evidence.get("markets"),
+            required_error="NFL_CLV_MARKETS_REQUIRED",
+            row_error_prefix="NFL_CLV_OFFICIAL",
+        )
+        rejected_payload, rejected_logged = _clv_bucket(
+            clv_evidence.get("rejected_markets"),
+            required_error="NFL_CLV_REJECTED_MARKETS_REQUIRED",
+            row_error_prefix="NFL_CLV_REJECTED",
+        )
+        decision_count = _count(
+            clv_evidence.get("decision_count"), "NFL_CLV_DECISION_COUNT_INVALID"
+        )
+        close_count = _count(
+            clv_evidence.get("close_count"), "NFL_CLV_CLOSE_COUNT_INVALID"
+        )
+        unique_count = _count(
+            clv_evidence.get("unique_observation_count"),
+            "NFL_CLV_UNIQUE_OBSERVATION_COUNT_INVALID",
+        )
+        if decision_count != close_count:
+            raise ValueError("NFL_CLV_DECISION_CLOSE_COUNT_MISMATCH")
+        if unique_count != decision_count:
+            raise ValueError("NFL_CLV_UNIQUE_OBSERVATION_COUNT_MISMATCH")
+        summarized_count = official_logged + rejected_logged
+        if summarized_count != unique_count:
+            raise ValueError("NFL_CLV_MARKET_COUNT_MISMATCH")
+
         clv_raw = markets_payload
         clv_log_identity = {
             "schema_version": _EXPECTED_CLV_SCHEMA,
@@ -214,6 +271,11 @@ def build_nfl_promotion_registry(
             "clv_probability_reference": _EXPECTED_CLV_REFERENCE,
             "forward_time_contract": _EXPECTED_CLV_FORWARD_TIME,
             "close_book_contract": _EXPECTED_CLV_BOOK,
+            "decision_count": decision_count,
+            "close_count": close_count,
+            "unique_observation_count": unique_count,
+            "summarized_observation_count": summarized_count,
+            "rejected_observation_count": rejected_logged,
             "decision_log_sha256": _sha256(
                 clv_evidence.get("decision_log_sha256"), "NFL_CLV_DECISION_LOG_SHA256_INVALID"
             ),
@@ -288,7 +350,7 @@ def build_nfl_promotion_registry(
         }
 
     return {
-        "schema_version": 7,
+        "schema_version": 8,
         "sport": "nfl",
         "model_id": PRODUCTION_NFL_M2_MODEL_ID,
         "feature_contract": NFL_M2_FEATURE_CONTRACT,
