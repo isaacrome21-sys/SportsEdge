@@ -30,9 +30,13 @@
       "evidence_reset_at": "2026-08-25"
     },
     "RBI": {}, "RUNS": {},
-    "STOLEN_BASES": {}, "BATTER_BB": {}, "EXTRA_BASE_HITS": {},
-    "HITS_RUNS_RBIS": {}, "HITS_RUNS_STOLEN_BASES": {}, "RUNS_RBIS": {},
-    "HITS_STOLEN_BASES": {}, "HITS_WALKS_STOLEN_BASES": {},
+    "STOLEN_BASES": {}, "BATTER_BB": {},
+    "EXTRA_BASE_HITS": {"evidence_count": 0, "evidence_status": "UNRUN"},
+    "HITS_RUNS_RBIS": {},
+    "HITS_RUNS_STOLEN_BASES": {"evidence_count": 0, "evidence_status": "UNRUN"},
+    "RUNS_RBIS": {"evidence_count": 0, "evidence_status": "UNRUN"},
+    "HITS_STOLEN_BASES": {"evidence_count": 0, "evidence_status": "UNRUN"},
+    "HITS_WALKS_STOLEN_BASES": {"evidence_count": 0, "evidence_status": "UNRUN"},
 
     "SINGLES": {}, "DOUBLES": {}, "TRIPLES": {}, "BATTER_K": {},
 
@@ -44,8 +48,10 @@
       "evidence_reset_reason": "RNG_IDENTITY_QUOTE_SIDE_REMOVED",
       "evidence_reset_at": "2026-08-25"
     },
-    "PITCHER_HITS_WALKS_ER": {},
-    "EITHER_PITCHER_HITS_ALLOWED": {}, "EITHER_PITCHER_BB": {}, "EITHER_PITCHER_ER": {},
+    "PITCHER_HITS_WALKS_ER": {"evidence_count": 0, "evidence_status": "UNRUN"},
+    "EITHER_PITCHER_HITS_ALLOWED": {"evidence_count": 0, "evidence_status": "UNRUN"},
+    "EITHER_PITCHER_BB": {"evidence_count": 0, "evidence_status": "UNRUN"},
+    "EITHER_PITCHER_ER": {"evidence_count": 0, "evidence_status": "UNRUN"},
 
     "PITCHER_RECORD_WIN": {"evidence_count": 0, "evidence_status": "UNRUN"},
     "FIRST_HOME_RUN": {"evidence_count": 0, "evidence_status": "UNRUN"}
