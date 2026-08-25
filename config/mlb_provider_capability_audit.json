@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "provider": "THE_ODDS_API",
+  "verified_at_utc": "2026-08-25T18:07:00Z",
+  "scope": "PUBLISHED_PROVIDER_MARKET_KEY_CATALOG_NOT_EVENT_LIVE_AVAILABILITY",
+  "source": {
+    "betting_market_catalog": "https://the-odds-api.com/sports-odds-data/betting-markets.html",
+    "event_odds_documentation": "https://the-odds-api.com/liveapi/guides/v4/"
+  },
+  "published_mlb_player_market_keys": [
+    "batter_home_runs",
+    "batter_first_home_run",
+    "batter_hits",
+    "batter_total_bases",
+    "batter_rbis",
+    "batter_runs_scored",
+    "batter_hits_runs_rbis",
+    "batter_singles",
+    "batter_doubles",
+    "batter_triples",
+    "batter_walks",
+    "batter_strikeouts",
+    "batter_stolen_bases",
+    "batter_fantasy_score",
+    "pitcher_strikeouts",
+    "pitcher_record_a_win",
+    "pitcher_hits_allowed",
+    "pitcher_walks",
+    "pitcher_earned_runs",
+    "pitcher_outs"
+  ],
+  "published_baseball_period_market_keys_relevant_to_catalog": [
+    "h2h_1st_1_innings",
+    "h2h_1st_5_innings",
+    "spreads_1st_5_innings",
+    "totals_1st_5_innings",
+    "team_totals"
+  ],
+  "external_market_count": 10,
+  "external_markets": {
+    "F5_TEAM_TOTALS": {
+      "status": "NO_PUBLISHED_EQUIVALENT",
+      "checked_equivalent": "team_totals_1st_5_innings",
+      "reason": "published baseball period catalog has first-five moneyline/spread/total but no first-five team-total key"
+    },
+    "EXTRA_BASE_HITS": {
+      "status": "NO_PUBLISHED_EQUIVALENT",
+      "checked_equivalent": "batter_extra_base_hits",
+      "reason": "not listed in published MLB player-prop keys"
+    },
+    "HITS_RUNS_STOLEN_BASES": {
+      "status": "NO_PUBLISHED_EQUIVALENT",
+      "checked_equivalent": "batter_hits_runs_stolen_bases",
+      "reason": "not listed in published MLB player-prop keys"
+    },
+    "RUNS_RBIS": {
+      "status": "NO_PUBLISHED_EQUIVALENT",
+      "checked_equivalent": "batter_runs_rbis",
+      "reason": "not listed in published MLB player-prop keys"
+    },
+    "HITS_STOLEN_BASES": {
+      "status": "NO_PUBLISHED_EQUIVALENT",
+      "checked_equivalent": "batter_hits_stolen_bases",
+      "reason": "not listed in published MLB player-prop keys"
+    },
+    "HITS_WALKS_STOLEN_BASES": {
+      "status": "NO_PUBLISHED_EQUIVALENT",
+      "checked_equivalent": "batter_hits_walks_stolen_bases",
+      "reason": "not listed in published MLB player-prop keys"
+    },
+    "PITCHER_HITS_WALKS_ER": {
+      "status": "NO_PUBLISHED_EQUIVALENT",
+      "checked_equivalent": "pitcher_hits_walks_earned_runs",
+      "reason": "not listed in published MLB player-prop keys"
+    },
+    "EITHER_PITCHER_HITS_ALLOWED": {
+      "status": "NO_PUBLISHED_EQUIVALENT",
+      "checked_equivalent": "either_pitcher_hits_allowed",
+      "reason": "not listed in published MLB player-prop keys"
+    },
+    "EITHER_PITCHER_BB": {
+      "status": "NO_PUBLISHED_EQUIVALENT",
+      "checked_equivalent": "either_pitcher_walks",
+      "reason": "not listed in published MLB player-prop keys"
+    },
+    "EITHER_PITCHER_ER": {
+      "status": "NO_PUBLISHED_EQUIVALENT",
+      "checked_equivalent": "either_pitcher_earned_runs",
+      "reason": "not listed in published MLB player-prop keys"
+    }
+  }
+}

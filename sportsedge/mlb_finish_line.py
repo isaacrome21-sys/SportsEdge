@@ -3,7 +3,7 @@
 Engineering completion and evidence completion are deliberately different states.
 This module proves that every canonical market has named runtime/settlement code and
 then classifies what still prevents operational promotion: external acquisition,
-book-rule policy, or the six validation/evidence gates.
+book-rule policy, structural/behavioral revalidation, or the six evidence gates.
 """
 from __future__ import annotations
 
@@ -24,6 +24,7 @@ DEFAULT_SURFACE = Path("config/mlb_market_surface.json")
 DEFAULT_DEPLOYMENTS = Path("config/deployments.json")
 DEFAULT_BEHAVIORAL = Path("config/mlb_behavioral_disposition.json")
 DEFAULT_VALIDATION = Path("config/mlb_validation_evidence.json")
+DEFAULT_PROVIDER_CAPABILITY = Path("config/mlb_provider_capability_audit.json")
 
 # These are not guesses about sportsbook rules. They identify catalog families where
 # the repo already knows a book-specific policy must be validated before settlement.
@@ -68,12 +69,67 @@ def _surface_index(payload: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
     return out
 
 
+def _provider_capability_index(payload: Mapping[str, Any]) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
+    if str(payload.get("provider") or "").strip().upper() != "THE_ODDS_API":
+        raise MLBFinishLineError("provider capability audit must identify THE_ODDS_API")
+    verified_at = str(payload.get("verified_at_utc") or "").strip()
+    scope = str(payload.get("scope") or "").strip()
+    source = payload.get("source")
+    rows = payload.get("external_markets")
+    if not verified_at or not scope or not isinstance(source, Mapping) or not isinstance(rows, Mapping):
+        raise MLBFinishLineError("provider capability audit metadata incomplete")
+    if not str(source.get("betting_market_catalog") or "").startswith("https://"):
+        raise MLBFinishLineError("provider capability market-catalog source missing")
+    if not str(source.get("event_odds_documentation") or "").startswith("https://"):
+        raise MLBFinishLineError("provider capability event-odds source missing")
+    out: dict[str, dict[str, Any]] = {}
+    for market, raw in rows.items():
+        name = str(market).strip().upper()
+        if not name or name in out or not isinstance(raw, Mapping):
+            raise MLBFinishLineError(f"provider capability row invalid/duplicate:{name}")
+        row = dict(raw)
+        if str(row.get("status") or "") != "NO_PUBLISHED_EQUIVALENT":
+            raise MLBFinishLineError(f"unsupported provider capability status:{name}")
+        if not str(row.get("checked_equivalent") or "").strip() or not str(row.get("reason") or "").strip():
+            raise MLBFinishLineError(f"provider capability row incomplete:{name}")
+        out[name] = row
+    try:
+        declared_count = int(payload.get("external_market_count"))
+    except (TypeError, ValueError) as exc:
+        raise MLBFinishLineError("provider capability external_market_count invalid") from exc
+    if declared_count != len(out):
+        raise MLBFinishLineError("provider capability external_market_count mismatch")
+    metadata = {
+        "provider": "THE_ODDS_API",
+        "verified_at_utc": verified_at,
+        "scope": scope,
+        "source": dict(source),
+        "external_market_count": declared_count,
+    }
+    return out, metadata
+
+
+def _requires_structural_revalidation(dep: Mapping[str, Any], beh: Mapping[str, Any]) -> bool:
+    remediation = str(beh.get("remediation_state") or "").upper()
+    status = str(beh.get("status") or "UNVERIFIED").upper()
+    stage = str(dep.get("stage") or "").upper()
+    if "PARAMETERS_UNVALIDATED" in remediation:
+        return True
+    if not any(token in remediation for token in ("REVALIDATION_REQUIRED", "EVIDENCE_REQUIRED")):
+        return False
+    # A measured incumbent does not become structurally unmeasured merely because
+    # an unpromoted challenger exists. Candidate deployments, however, must earn
+    # their own behavioral evidence before promotion.
+    return status != "KEEP_MEASURED" or "CANDIDATE" in stage
+
+
 def build_mlb_finish_line(
     *,
     surface_path: str | Path = DEFAULT_SURFACE,
     deployments_path: str | Path = DEFAULT_DEPLOYMENTS,
     behavioral_path: str | Path = DEFAULT_BEHAVIORAL,
     validation_path: str | Path = DEFAULT_VALIDATION,
+    provider_capability_path: str | Path = DEFAULT_PROVIDER_CAPABILITY,
 ) -> dict[str, Any]:
     acceptance = build_acceptance_matrix(
         deployments_path=deployments_path,
@@ -83,6 +139,7 @@ def build_mlb_finish_line(
     acceptance_rows = {str(row["market"]): dict(row) for row in acceptance["markets"]}
     catalog = set(acceptance_rows)
     surface = _surface_index(_load(surface_path))
+    provider_capability, provider_metadata = _provider_capability_index(_load(provider_capability_path))
     deployments = _load(deployments_path).get("markets")
     behavioral = _load(behavioral_path).get("markets")
     validation = _load(validation_path).get("markets")
@@ -102,6 +159,16 @@ def build_mlb_finish_line(
             raise MLBFinishLineError(
                 f"finish-line catalog mismatch {label}: missing={sorted(catalog-names)} extra={sorted(names-catalog)}"
             )
+
+    surface_external = {
+        market for market, spec in surface.items() if spec.get("provider_expected") is not True
+    }
+    if set(provider_capability) != surface_external:
+        raise MLBFinishLineError(
+            "provider capability/surface mismatch "
+            f"missing={sorted(surface_external-set(provider_capability))} "
+            f"extra={sorted(set(provider_capability)-surface_external)}"
+        )
 
     rows = []
     for market in sorted(catalog):
@@ -134,9 +201,7 @@ def build_mlb_finish_line(
         if market in BOOK_RULE_VALIDATION_MARKETS:
             blockers.append("BOOK_RULE_VALIDATION_REQUIRED")
         remediation = str(beh.get("remediation_state") or "")
-        if any(token in remediation for token in (
-            "REVALIDATION_REQUIRED", "PARAMETERS_UNVALIDATED", "EVIDENCE_REQUIRED",
-        )):
+        if _requires_structural_revalidation(dep, beh):
             blockers.append("STRUCTURAL_OR_BEHAVIORAL_REVALIDATION_REQUIRED")
         if validation_missing:
             blockers.append("VALIDATION_EVIDENCE_REQUIRED")
@@ -149,6 +214,8 @@ def build_mlb_finish_line(
             primary = "BOOK_POLICY_NORMALIZATION_REQUIRED"
         elif "BOOK_RULE_VALIDATION_REQUIRED" in blockers:
             primary = "BOOK_RULE_VALIDATION_REQUIRED"
+        elif "STRUCTURAL_OR_BEHAVIORAL_REVALIDATION_REQUIRED" in blockers:
+            primary = "STRUCTURAL_OR_BEHAVIORAL_REVALIDATION_REQUIRED"
         elif "VALIDATION_EVIDENCE_REQUIRED" in blockers:
             primary = "VALIDATION_EVIDENCE_REQUIRED"
         else:
@@ -165,6 +232,7 @@ def build_mlb_finish_line(
             "provider_expected": provider_expected,
             "acquisition_route": acquisition_route,
             "acquisition_state": "PROVIDER_ROUTE_DECLARED" if provider_expected else "EXTERNAL_PROVIDER_REQUIRED",
+            "provider_capability_basis": None if provider_expected else dict(provider_capability[market]),
             "behavioral_status": str(beh.get("status") or ""),
             "remediation_state": remediation,
             "validation_missing": validation_missing,
@@ -177,15 +245,18 @@ def build_mlb_finish_line(
     external = [row["market"] for row in rows if row["acquisition_state"] == "EXTERNAL_PROVIDER_REQUIRED"]
     book_policy = [row["market"] for row in rows if "BOOK_POLICY_NORMALIZATION_REQUIRED" in row["blockers"]]
     book_rule = [row["market"] for row in rows if "BOOK_RULE_VALIDATION_REQUIRED" in row["blockers"]]
+    structural = [row["market"] for row in rows if "STRUCTURAL_OR_BEHAVIORAL_REVALIDATION_REQUIRED" in row["blockers"]]
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "market_count": len(rows),
         "engineering_finish_line_complete": not code_missing,
         "evidence_finish_line_complete": all(bool(row["acceptance_complete"]) for row in rows),
         "code_missing_markets": code_missing,
         "external_provider_markets": external,
+        "provider_capability_audit": provider_metadata,
         "book_policy_markets": book_policy,
         "book_rule_validation_markets": book_rule,
+        "structural_revalidation_markets": structural,
         "acceptance_complete_count": sum(bool(row["acceptance_complete"]) for row in rows),
         "markets": rows,
     }
