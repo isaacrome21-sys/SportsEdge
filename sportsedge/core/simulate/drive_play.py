@@ -23,6 +23,7 @@ class TeamDriveProfile:
     """Market-blind candidate parameters for one offense's drive process."""
 
     pass_rate: float = 0.56
+    completion_rate: float = 0.64
     success_rate: float = 0.45
     explosive_rate: float = 0.10
     turnover_rate: float = 0.018
@@ -33,6 +34,7 @@ class TeamDriveProfile:
     def __post_init__(self) -> None:
         for name in (
             "pass_rate",
+            "completion_rate",
             "success_rate",
             "explosive_rate",
             "turnover_rate",
@@ -67,6 +69,7 @@ class PlayEvent:
     points: int = 0
     score_type: str | None = None
     turnover_type: str | None = None
+    pass_complete: bool | None = None
     penalty_no_play: bool = False
     personnel_package: str = "UNKNOWN"
     kick_distance: int | None = None
@@ -109,6 +112,18 @@ class PlayEvent:
             raise ValueError("PLAY_MULTIPLE_SCORING_TEAMS_INVALID")
         if self.points > 0 and not self.score_type:
             raise ValueError("PLAY_SCORE_TYPE_REQUIRED")
+
+        play_type = str(self.play_type).upper()
+        if play_type == "PASS":
+            if not isinstance(self.pass_complete, bool):
+                raise ValueError("PASS_COMPLETION_STATE_REQUIRED")
+            if self.turnover_type == "INTERCEPTION" and self.pass_complete:
+                raise ValueError("INTERCEPTION_CANNOT_BE_COMPLETE")
+            if not self.pass_complete and (self.yards != 0 or self.points != 0):
+                raise ValueError("INCOMPLETE_PASS_STATE_INVALID")
+        elif self.pass_complete is not None:
+            raise ValueError("NON_PASS_COMPLETION_STATE_INVALID")
+
         if self.penalty_no_play and (
             self.points != 0
             or home_delta != 0
@@ -270,17 +285,12 @@ class EngineADrivePlaySimulator:
         draw = int(round(self.rng.normal(profile.pace_seconds_mean, 5.0)))
         return max(low, min(high, draw))
 
-    @staticmethod
-    def _field_goal_make_probability(profile: TeamDriveProfile, kick_distance: int) -> float:
-        distance_penalty = max(0, kick_distance - 40) * 0.012
-        return max(0.20, min(0.99, profile.field_goal_skill - distance_penalty))
-
     def _regular_play_yards(self, profile: TeamDriveProfile, play_type: str) -> int:
         success = bool(self.rng.random() < profile.success_rate)
         explosive = bool(self.rng.random() < profile.explosive_rate)
         if play_type == "PASS":
-            mean = 7.5 if success else 0.0
-            deviation = 5.5 if success else 4.0
+            mean = 7.5 if success else 3.0
+            deviation = 5.5 if success else 3.5
         else:
             mean = 5.0 if success else 1.0
             deviation = 3.5 if success else 2.5
@@ -288,6 +298,11 @@ class EngineADrivePlaySimulator:
         if success and explosive:
             yards += int(self.rng.integers(10, 26))
         return max(-12, min(45, yards))
+
+    @staticmethod
+    def _field_goal_make_probability(profile: TeamDriveProfile, kick_distance: int) -> float:
+        distance_penalty = max(0, kick_distance - 40) * 0.012
+        return max(0.20, min(0.99, profile.field_goal_skill - distance_penalty))
 
     def _simulate_one(self, simulation_id: int) -> FootballPlayPath:
         remaining = 3600
@@ -309,8 +324,6 @@ class EngineADrivePlaySimulator:
                 if remaining <= 0:
                     break
 
-                # Explicit fourth-down terminal decisions. This is only a coarse
-                # special-teams candidate until Engine C replaces the kick layer.
                 if down == 4 and yardline <= 35 and self.rng.random() < profile.field_goal_attempt_rate:
                     duration = min(remaining, int(self.rng.integers(4, 9)))
                     remaining -= duration
@@ -384,7 +397,8 @@ class EngineADrivePlaySimulator:
 
                 if self.rng.random() < profile.turnover_rate:
                     turnover_type = "INTERCEPTION" if play_type == "PASS" else "FUMBLE"
-                    yards = self._regular_play_yards(profile, play_type)
+                    pass_complete = False if play_type == "PASS" else None
+                    yards = 0 if play_type == "PASS" else self._regular_play_yards(profile, play_type)
                     play_id += 1
                     plays.append(
                         PlayEvent(
@@ -404,13 +418,20 @@ class EngineADrivePlaySimulator:
                             yards=yards,
                             points=0,
                             turnover_type=turnover_type,
+                            pass_complete=pass_complete,
                         )
                     )
                     break
 
-                yards = self._regular_play_yards(profile, play_type)
+                if play_type == "PASS":
+                    pass_complete = bool(self.rng.random() < profile.completion_rate)
+                    yards = self._regular_play_yards(profile, play_type) if pass_complete else 0
+                else:
+                    pass_complete = None
+                    yards = self._regular_play_yards(profile, play_type)
+
                 new_yardline = max(0, min(99, yardline - yards))
-                touchdown = new_yardline == 0
+                touchdown = new_yardline == 0 and (play_type != "PASS" or pass_complete)
                 points = 7 if touchdown else 0
                 if touchdown and possession == self.home_team:
                     home_score += 7
@@ -436,12 +457,13 @@ class EngineADrivePlaySimulator:
                         yards=yards,
                         points=points,
                         score_type="TOUCHDOWN_CANDIDATE" if touchdown else None,
+                        pass_complete=pass_complete,
                     )
                 )
 
                 if touchdown:
                     break
-                converted = yards >= distance
+                converted = (pass_complete is True and yards >= distance) if play_type == "PASS" else yards >= distance
                 yardline = new_yardline
                 if converted:
                     down = 1

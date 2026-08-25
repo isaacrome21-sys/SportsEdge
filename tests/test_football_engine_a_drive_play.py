@@ -22,7 +22,7 @@ class FootballEngineADrivePlayTests(unittest.TestCase):
                     possession="HOME", score_before_home=0, score_before_away=0,
                     score_after_home=7, score_after_away=0, down=2, distance=5,
                     yardline_100=5, play_type="PASS", yards=5, points=7,
-                    score_type="TOUCHDOWN_CANDIDATE",
+                    score_type="TOUCHDOWN_CANDIDATE", pass_complete=True,
                 ),
                 PlayEvent(
                     drive_id=2, play_id=3, quarter=1, clock_seconds_remaining=700,
