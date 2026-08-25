@@ -69,6 +69,52 @@ def _count(value: Any, error: str) -> int:
     return value
 
 
+def _jsonl_identities(path: Path, *, expected_git_sha: str, kind: str) -> tuple[int, set[tuple[str, str, str, str]], set[tuple[str, str, str]]]:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        raise ValueError(f"NFL_FORWARD_CLV_ARTIFACT_MISSING:{path.name}") from exc
+    keys: set[tuple[str, str, str, str]] = set()
+    observations: set[tuple[str, str, str]] = set()
+    count = 0
+    for number, raw in enumerate(lines, 1):
+        if not raw.strip():
+            continue
+        try:
+            row = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"NFL_FORWARD_CLV_{kind}_JSON_INVALID:{number}") from exc
+        if not isinstance(row, dict):
+            raise ValueError(f"NFL_FORWARD_CLV_{kind}_ROW_NOT_OBJECT:{number}")
+        count += 1
+        if str(row.get("sport") or "").strip().lower() != "nfl":
+            raise ValueError(f"NFL_FORWARD_CLV_{kind}_SPORT_INVALID:{number}")
+        if row.get("model_id") != PRODUCTION_NFL_M2_MODEL_ID:
+            raise ValueError(f"NFL_FORWARD_CLV_{kind}_MODEL_ID_MISMATCH:{number}")
+        if row.get("feature_contract") != NFL_M2_FEATURE_CONTRACT:
+            raise ValueError(f"NFL_FORWARD_CLV_{kind}_FEATURE_CONTRACT_MISMATCH:{number}")
+        row_sha = _git_sha(row.get("code_git_sha"), f"NFL_FORWARD_CLV_{kind}_CODE_SHA_INVALID:{number}")
+        if row_sha != expected_git_sha:
+            raise ValueError(f"NFL_FORWARD_CLV_{kind}_CODE_SHA_MISMATCH:{number}")
+        game_id = str(row.get("game_id") or "").strip()
+        market = str(row.get("market") or "").strip().lower()
+        side = str(row.get("side") or "").strip()
+        book = str(row.get("book") or "").strip().lower()
+        if not game_id or not market or not side or not book:
+            raise ValueError(f"NFL_FORWARD_CLV_{kind}_IDENTITY_MISSING:{number}")
+        key = (game_id, market, side, book)
+        observation = key[:3]
+        if key in keys:
+            raise ValueError(f"NFL_FORWARD_CLV_{kind}_DUPLICATE_KEY:{number}")
+        if kind == "DECISION" and observation in observations:
+            raise ValueError(f"NFL_FORWARD_CLV_DUPLICATE_OBSERVATION:{number}")
+        keys.add(key)
+        observations.add(observation)
+    if count <= 0:
+        raise ValueError(f"NFL_FORWARD_CLV_{kind}_LOG_EMPTY")
+    return count, keys, observations
+
+
 def canonical_clv_payload_sha256(payload: Mapping[str, Any]) -> str:
     """Hash semantic CLV content independently of JSON whitespace formatting."""
     material = json.dumps(
@@ -161,6 +207,17 @@ def verify_nfl_forward_clv_bundle(
     if close_hash != seen["nfl_forward_closes.jsonl"]:
         raise ValueError("NFL_FORWARD_CLV_CLOSE_LOG_IDENTITY_MISMATCH")
 
+    decision_rows, decision_keys, decision_observations = _jsonl_identities(
+        root / "nfl_forward_decisions.jsonl", expected_git_sha=head_sha, kind="DECISION"
+    )
+    close_rows, close_keys, close_observations = _jsonl_identities(
+        root / "nfl_forward_closes.jsonl", expected_git_sha=head_sha, kind="CLOSE"
+    )
+    if decision_keys != close_keys:
+        raise ValueError("NFL_FORWARD_CLV_DECISION_CLOSE_IDENTITY_MISMATCH")
+    if decision_observations != close_observations:
+        raise ValueError("NFL_FORWARD_CLV_OBSERVATION_IDENTITY_MISMATCH")
+
     decision_count = _count(evidence.get("decision_count"), "NFL_FORWARD_CLV_DECISION_COUNT_INVALID")
     close_count = _count(evidence.get("close_count"), "NFL_FORWARD_CLV_CLOSE_COUNT_INVALID")
     unique_count = _count(
@@ -168,6 +225,12 @@ def verify_nfl_forward_clv_bundle(
     )
     if decision_count != close_count or decision_count != unique_count:
         raise ValueError("NFL_FORWARD_CLV_COUNT_IDENTITY_MISMATCH")
+    if decision_count != decision_rows:
+        raise ValueError("NFL_FORWARD_CLV_DECISION_ROW_COUNT_MISMATCH")
+    if close_count != close_rows:
+        raise ValueError("NFL_FORWARD_CLV_CLOSE_ROW_COUNT_MISMATCH")
+    if unique_count != len(decision_observations):
+        raise ValueError("NFL_FORWARD_CLV_UNIQUE_ROW_COUNT_MISMATCH")
     if unique_count <= 0:
         raise ValueError("NFL_FORWARD_CLV_OBSERVATIONS_EMPTY")
 
