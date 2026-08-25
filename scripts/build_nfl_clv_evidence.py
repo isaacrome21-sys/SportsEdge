@@ -1,14 +1,22 @@
 #!/usr/bin/env python3
-"""Build hash-bound NFL forward CLV promotion evidence from JSONL logs."""
+"""Build hash-bound NFL forward CLV promotion evidence from JSONL logs.
+
+Every decision and close row must carry the same exact production code SHA.
+Promotion evidence therefore resets across code changes instead of silently
+combining forward CLV from different executable implementations.
+"""
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 
 from sportsedge.core.clv.football import CLVClose, CLVDecision, score_clv, summarize_clv
 from sportsedge.sports.nfl.m2 import NFL_M2_FEATURE_CONTRACT, PRODUCTION_NFL_M2_MODEL_ID
+
+_GIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
 def _sha(path: Path) -> str:
@@ -32,28 +40,38 @@ def _jsonl(path: Path) -> list[dict]:
     return rows
 
 
-def _identity(row: dict, *, path: Path, number: int) -> None:
+def _identity(row: dict, *, path: Path, number: int, expected_git_sha: str) -> None:
     if str(row.get("sport") or "").lower() != "nfl":
         raise SystemExit(f"NFL_CLV_SPORT_MISMATCH:{path}:{number}")
     if row.get("model_id") != PRODUCTION_NFL_M2_MODEL_ID:
         raise SystemExit(f"NFL_CLV_MODEL_ID_MISMATCH:{path}:{number}")
     if row.get("feature_contract") != NFL_M2_FEATURE_CONTRACT:
         raise SystemExit(f"NFL_CLV_FEATURE_CONTRACT_MISMATCH:{path}:{number}")
+    code_git_sha = str(row.get("code_git_sha") or "").strip().lower()
+    if not _GIT_SHA_RE.fullmatch(code_git_sha):
+        raise SystemExit(f"NFL_CLV_CODE_SHA_INVALID:{path}:{number}")
+    if code_git_sha != expected_git_sha:
+        raise SystemExit(f"NFL_CLV_CODE_SHA_MISMATCH:{path}:{number}")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--decisions", type=Path, required=True)
     parser.add_argument("--closes", type=Path, required=True)
+    parser.add_argument("--git-sha", required=True)
     parser.add_argument("--out", type=Path, default=Path("artifacts/football/nfl_clv_evidence.json"))
     args = parser.parse_args()
+
+    git_sha = str(args.git_sha).strip().lower()
+    if not _GIT_SHA_RE.fullmatch(git_sha):
+        raise SystemExit("NFL_CLV_EXPECTED_CODE_SHA_INVALID")
 
     decision_rows = _jsonl(args.decisions)
     close_rows = _jsonl(args.closes)
     for i, row in enumerate(decision_rows, 1):
-        _identity(row, path=args.decisions, number=i)
+        _identity(row, path=args.decisions, number=i, expected_git_sha=git_sha)
     for i, row in enumerate(close_rows, 1):
-        _identity(row, path=args.closes, number=i)
+        _identity(row, path=args.closes, number=i, expected_git_sha=git_sha)
 
     decisions = [CLVDecision(
         decision_ts=str(row["decision_ts"]), game_id=str(row["game_id"]), sport="nfl",
@@ -84,17 +102,18 @@ def main() -> int:
         (official if bucket == "OFFICIAL" else rejected)[market] = row
 
     payload = {
-        "schema_version": 1,
+        "schema_version": 2,
         "sport": "nfl",
         "model_id": PRODUCTION_NFL_M2_MODEL_ID,
         "feature_contract": NFL_M2_FEATURE_CONTRACT,
+        "code_git_sha": git_sha,
         "decision_log_sha256": _sha(args.decisions),
         "close_log_sha256": _sha(args.closes),
         "decision_count": len(decisions),
         "close_count": len(closes),
         "markets": official,
         "rejected_markets": rejected,
-        "promotion_note": "Only OFFICIAL decisions populate promotion markets; rejected decisions are reported separately for gate diagnostics.",
+        "promotion_note": "Only OFFICIAL decisions from this exact code SHA populate promotion markets; rejected decisions are reported separately for gate diagnostics.",
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
