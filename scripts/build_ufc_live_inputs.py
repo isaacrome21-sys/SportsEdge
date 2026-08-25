@@ -34,6 +34,16 @@ def _event_dt(text):
         except:pass
     raise ValueError('UFC_EVENT_DATE_INVALID')
 
+def _age_from_dob(dob,event_date):
+    if not dob:return None
+    birth=None
+    for fmt in ('%b %d, %Y','%B %d, %Y','%Y-%m-%d'):
+        try:birth=datetime.strptime(dob,fmt);break
+        except:pass
+    if birth is None:return None
+    event=_event_dt(event_date)
+    return max(18.0,(event-birth).days/365.2425)
+
 def _snapshot_from_history(name, weight_class, event_date, latest,last_date,elo, *, late_replacement=False):
     key=_norm(name); side,row=latest.get(key,('',{})); event_dt=_event_dt(event_date)
     if not side:
@@ -58,6 +68,9 @@ def _snapshot_from_history(name, weight_class, event_date, latest,last_date,elo,
 
 def _from_override(path, latest,last_date,elo):
     cfg=json.loads(Path(path).read_text()); fighters={}; contexts=[]
+    event_day=_event_dt(cfg['event_date']).date(); today=datetime.now(timezone.utc).date()
+    if abs((today-event_day).days)>1:
+        raise SystemExit(f'UFC_OVERRIDE_DATE_MISMATCH event_date={event_day.isoformat()} utc_today={today.isoformat()}')
     for b in cfg['bouts']:
         late=str(b.get('late_replacement') or '')
         for name in (b['fighter_a'],b['fighter_b']):
@@ -77,25 +90,22 @@ def _from_ufcstats(latest,last_date,elo):
         except Exception: continue
         for p in (pa,pb):
             snap=_snapshot_from_history(p.name,b.weight_class,b.event_date,latest,last_date,elo)
-            snap.update({'height_in':p.height_in or snap['height_in'],'reach_in':p.reach_in or snap['reach_in'],'stance':p.stance or snap['stance'],
+            age=_age_from_dob(p.dob,b.event_date)
+            snap.update({'age':age or snap['age'],'height_in':p.height_in or snap['height_in'],'reach_in':p.reach_in or snap['reach_in'],'stance':p.stance or snap['stance'],
                          'sig_strikes_landed_pm':p.slpm or snap['sig_strikes_landed_pm'],'sig_strikes_absorbed_pm':p.sapm,
                          'sig_strike_accuracy':p.str_acc or snap['sig_strike_accuracy'],'sig_strike_defense':p.str_def,
                          'takedowns_per_15':p.td_avg or snap['takedowns_per_15'],'takedown_accuracy':p.td_acc or snap['takedown_accuracy'],
                          'takedown_defense':p.td_def,'submissions_per_15':p.sub_avg or snap['submissions_per_15']})
             fighters[p.name]=snap
-        # Never infer title/main-event rounds from card position. UFCStats' parsed bout
-        # metadata is the source of truth; DWCS cards are five three-round bouts.
         rounds=int(b.rounds or 3); title=rounds >= 5
         contexts.append({'fighter_a':b.fighter_a,'fighter_b':b.fighter_b,'rounds':rounds,'title_fight':title,'short_notice_days':None,'altitude_ft':0.0})
     return bouts[0].event,bouts[0].event_date,fighters,contexts
 
 def _validate_card(fighters, contexts):
     bouts=len(contexts); count=len(fighters)
-    if bouts < 1:
-        raise SystemExit('UFC_LIVE_INPUTS_INCOMPLETE fighters=0 bouts=0')
+    if bouts < 1:raise SystemExit('UFC_LIVE_INPUTS_INCOMPLETE fighters=0 bouts=0')
     expected=2*bouts
-    if count != expected:
-        raise SystemExit(f'UFC_LIVE_INPUTS_INCOMPLETE fighters={count} bouts={bouts} expected_fighters={expected}')
+    if count != expected:raise SystemExit(f'UFC_LIVE_INPUTS_INCOMPLETE fighters={count} bouts={bouts} expected_fighters={expected}')
 
 def main():
     ap=argparse.ArgumentParser();ap.add_argument('--fighters',default='data/ufc/fighters_today.json');ap.add_argument('--contexts',default='data/ufc/contexts_today.json');ap.add_argument('--override',default='');a=ap.parse_args()
@@ -103,8 +113,7 @@ def main():
     if result is None:
         if not a.override or not Path(a.override).exists(): raise SystemExit('UFC_LIVE_INPUTS_UNAVAILABLE')
         result=_from_override(a.override,latest,last_date,elo)
-    event,event_date,fighters,contexts=result
-    _validate_card(fighters,contexts)
+    event,event_date,fighters,contexts=result; _validate_card(fighters,contexts)
     Path(a.fighters).parent.mkdir(parents=True,exist_ok=True);Path(a.contexts).parent.mkdir(parents=True,exist_ok=True)
     Path(a.fighters).write_text(json.dumps({'event':event,'event_date':event_date,'generated_at':datetime.now(timezone.utc).isoformat(),'fighters':list(fighters.values())},indent=2,sort_keys=True))
     Path(a.contexts).write_text(json.dumps(contexts,indent=2,sort_keys=True))
