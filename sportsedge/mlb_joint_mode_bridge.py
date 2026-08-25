@@ -14,6 +14,7 @@ from .mlb_f5_features import MLBF5HistorySource
 from .mlb_generic_features import MLBGenericHistorySource
 from .mlb_joint_features import FEATURE_VERSION, build_hitter_joint_features, build_pitcher_joint_features
 from .pitcher_joint_engine import PITCHER_MARKETS
+from .pitcher_win_state_engine import build_pitcher_win_features
 from .quote_bridge import validate_canonical_quote
 
 
@@ -111,6 +112,22 @@ def build_canonical_feature_row(
             "team_id": team_id,
             "source": "MLB_STATSAPI_STRICTLY_PRIOR_FIRST_HR_LINEUP_ORDER",
             "first_hr_feature_version": built["feature_version"],
+            "feature_source_hash": built["feature_source_hash"],
+            "features": dict(built["features"]),
+        }
+
+    if market == "PITCHER_RECORD_WIN":
+        try:
+            pid = int(entity_id)
+        except (TypeError, ValueError) as exc:
+            raise MLBJointModeBridgeError("pitcher entity_id must be MLB player id") from exc
+        if pid not in {game.away_probable_pitcher_id, game.home_probable_pitcher_id}:
+            raise MLBJointModeBridgeError("NON_PROBABLE_PITCHER")
+        built = build_pitcher_win_features(source, game=game, target_date=target_date)
+        return {
+            **base,
+            "source": "MLB_STATSAPI_STRICTLY_PRIOR_PITCHER_WIN_GAME_STATE",
+            "pitcher_win_feature_version": built["feature_version"],
             "feature_source_hash": built["feature_source_hash"],
             "features": dict(built["features"]),
         }
