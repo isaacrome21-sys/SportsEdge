@@ -3,8 +3,9 @@
 Structural implementation never implies promotion. Historical evidence must be
 produced by the exact production NFL M2 feature/model contract, share the same
 canonical multi-source manifest and exact code SHA as simulator math, and carry
-forward CLV from that same model contract. Missing market evidence never
-inherits a stage from another market.
+forward CLV from that same exact code contract. Missing market evidence never
+inherits a stage from another market, and a caller-supplied CI boolean can never
+self-attest execution.
 """
 from __future__ import annotations
 
@@ -17,6 +18,7 @@ from sportsedge.core.validation.math_attestation import attest_validated_math
 from sportsedge.sports.nfl.m2 import NFL_M2_FEATURE_CONTRACT, PRODUCTION_NFL_M2_MODEL_ID
 
 _GIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+_EXPECTED_CI_WORKFLOW = "football-nfl-promotion-evidence"
 
 
 def _mapping(value: Any) -> Mapping[str, Any] | None:
@@ -43,6 +45,61 @@ def _git_sha(value: Any, error: str) -> str:
 
 def _source_hash(value: Mapping[str, Any], name: str) -> str:
     return _sha256(value.get("source_sha256"), f"{name}_SOURCE_SHA256_INVALID")
+
+
+def _verify_ci_attestation(
+    value: Mapping[str, Any] | None,
+    *,
+    code_git_sha: str,
+    source_manifest_sha256: str,
+) -> dict[str, Any]:
+    attestation = _mapping(value)
+    if attestation is None:
+        raise ValueError("NFL_CI_ATTESTATION_EVIDENCE_REQUIRED")
+    if int(attestation.get("schema_version", 0)) != 1:
+        raise ValueError("NFL_CI_ATTESTATION_SCHEMA_INVALID")
+    if str(attestation.get("workflow_name") or "") != _EXPECTED_CI_WORKFLOW:
+        raise ValueError("NFL_CI_ATTESTATION_WORKFLOW_MISMATCH")
+    if str(attestation.get("workflow_conclusion") or "").strip().lower() != "success":
+        raise ValueError("NFL_CI_ATTESTATION_NOT_SUCCESSFUL")
+    try:
+        run_id = int(attestation.get("workflow_run_id"))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("NFL_CI_ATTESTATION_RUN_ID_INVALID") from exc
+    if run_id <= 0:
+        raise ValueError("NFL_CI_ATTESTATION_RUN_ID_INVALID")
+    attested_code_sha = _git_sha(
+        attestation.get("git_sha"), "NFL_CI_ATTESTATION_CODE_SHA_INVALID"
+    )
+    if attested_code_sha != code_git_sha:
+        raise ValueError("NFL_CI_ATTESTATION_CODE_SHA_MISMATCH")
+    attested_source_sha = _sha256(
+        attestation.get("source_manifest_sha256"),
+        "NFL_CI_ATTESTATION_SOURCE_SHA256_INVALID",
+    )
+    if attested_source_sha != source_manifest_sha256:
+        raise ValueError("NFL_CI_ATTESTATION_SOURCE_MISMATCH")
+    if attestation.get("model_id") != PRODUCTION_NFL_M2_MODEL_ID:
+        raise ValueError("NFL_CI_ATTESTATION_MODEL_ID_MISMATCH")
+    if attestation.get("feature_contract") != NFL_M2_FEATURE_CONTRACT:
+        raise ValueError("NFL_CI_ATTESTATION_FEATURE_CONTRACT_MISMATCH")
+    try:
+        verified_count = int(attestation.get("verified_artifact_count"))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("NFL_CI_ATTESTATION_ARTIFACT_COUNT_INVALID") from exc
+    if verified_count <= 0:
+        raise ValueError("NFL_CI_ATTESTATION_ARTIFACT_COUNT_INVALID")
+    return {
+        "schema_version": 1,
+        "workflow_name": _EXPECTED_CI_WORKFLOW,
+        "workflow_conclusion": "success",
+        "workflow_run_id": run_id,
+        "git_sha": attested_code_sha,
+        "source_manifest_sha256": attested_source_sha,
+        "model_id": PRODUCTION_NFL_M2_MODEL_ID,
+        "feature_contract": NFL_M2_FEATURE_CONTRACT,
+        "verified_artifact_count": verified_count,
+    }
 
 
 def _reason(*, stage: str, history: Mapping[str, Any] | None, calibration: Mapping[str, Any] | None,
@@ -72,6 +129,7 @@ def build_nfl_promotion_registry(
     *,
     declared_markets: Iterable[str],
     ci_attested: bool = False,
+    ci_attestation: Mapping[str, Any] | None = None,
     clv_evidence: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     if not isinstance(ci_attested, bool):
@@ -100,6 +158,17 @@ def build_nfl_promotion_registry(
     if historical_evidence.get("feature_contract") != NFL_M2_FEATURE_CONTRACT:
         raise ValueError("NFL_PROMOTION_FEATURE_CONTRACT_MISMATCH")
 
+    if ci_attested:
+        ci_identity = _verify_ci_attestation(
+            ci_attestation,
+            code_git_sha=math_code_sha,
+            source_manifest_sha256=manifest_hash,
+        )
+    else:
+        if ci_attestation is not None:
+            raise ValueError("NFL_CI_ATTESTATION_STATE_CONTRADICTION")
+        ci_identity = None
+
     math_attestation = attest_validated_math(math_artifact)
     promotion_raw = _mapping(historical_evidence.get("promotion_evidence")) or {}
 
@@ -110,6 +179,9 @@ def build_nfl_promotion_registry(
             raise ValueError("NFL_CLV_MODEL_ID_MISMATCH")
         if clv_evidence.get("feature_contract") != NFL_M2_FEATURE_CONTRACT:
             raise ValueError("NFL_CLV_FEATURE_CONTRACT_MISMATCH")
+        clv_code_sha = _git_sha(clv_evidence.get("code_git_sha"), "NFL_CLV_CODE_SHA_INVALID")
+        if clv_code_sha != math_code_sha:
+            raise ValueError("NFL_CLV_CODE_SHA_MISMATCH")
         markets_payload = _mapping(clv_evidence.get("markets"))
         if markets_payload is None:
             raise ValueError("NFL_CLV_MARKETS_REQUIRED")
@@ -117,6 +189,7 @@ def build_nfl_promotion_registry(
         clv_log_identity = {
             "model_id": PRODUCTION_NFL_M2_MODEL_ID,
             "feature_contract": NFL_M2_FEATURE_CONTRACT,
+            "code_git_sha": clv_code_sha,
             "decision_log_sha256": _sha256(
                 clv_evidence.get("decision_log_sha256"), "NFL_CLV_DECISION_LOG_SHA256_INVALID"
             ),
@@ -191,7 +264,7 @@ def build_nfl_promotion_registry(
         }
 
     return {
-        "schema_version": 4,
+        "schema_version": 5,
         "sport": "nfl",
         "model_id": PRODUCTION_NFL_M2_MODEL_ID,
         "feature_contract": NFL_M2_FEATURE_CONTRACT,
@@ -199,6 +272,7 @@ def build_nfl_promotion_registry(
         "source_sha256": math_hash,
         "source_manifest_sha256": manifest_hash,
         "math_attestation": math_attestation,
+        "ci_attestation": ci_identity,
         "clv_log_identity": clv_log_identity,
         "markets": registry,
         "deployed_markets": sorted(market for market, row in registry.items() if row["eligible"]),
