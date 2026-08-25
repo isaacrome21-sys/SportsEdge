@@ -28,6 +28,10 @@ class UnifiedCardResult:
     implied_probability: float | None = None
     edge: float | None = None
     ev_per_dollar: float | None = None
+    model_input_hash: str | None = None
+    distribution_sha256: str | None = None
+    readout_sha256: str | None = None
+    readout_version: str | None = None
 
 
 def _convert(result) -> UnifiedCardResult:
@@ -36,6 +40,8 @@ def _convert(result) -> UnifiedCardResult:
         result.american_odds, result.model_p, result.bet_status, result.reason,
         getattr(result, "shadow_status", None), getattr(result, "implied_probability", None),
         getattr(result, "edge", None), getattr(result, "ev_per_dollar", None),
+        getattr(result, "model_input_hash", None), getattr(result, "distribution_sha256", None),
+        getattr(result, "readout_sha256", None), getattr(result, "readout_version", None),
     )
 
 

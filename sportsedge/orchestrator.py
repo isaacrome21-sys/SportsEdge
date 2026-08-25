@@ -27,12 +27,36 @@ class RunResult:
     bet_status: str
     decision: BetDecision | None
     reason: str
+    model_input_hash: str | None = None
+    distribution_sha256: str | None = None
+    readout_sha256: str | None = None
+    readout_version: str | None = None
 
 
 def _reject_market_leakage(model_input: Mapping[str, Any]) -> None:
     present = BANNED_MODEL_INPUT_KEYS.intersection(model_input.keys())
     if present:
         raise OrchestrationError(f"sportsbook/market data prohibited in Model_Input: {sorted(present)}")
+
+
+def _optional_sha256(output: Mapping[str, Any], key: str) -> str | None:
+    value = output.get(key)
+    if value is None:
+        return None
+    text = str(value).lower()
+    if len(text) != 64 or any(ch not in "0123456789abcdef" for ch in text):
+        raise OrchestrationError(f"engine output malformed {key}")
+    return text
+
+
+def _optional_text(output: Mapping[str, Any], key: str) -> str | None:
+    value = output.get(key)
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        raise OrchestrationError(f"engine output malformed {key}")
+    return text
 
 
 def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], paired_quote: Mapping[str, Any] | None = None, deployment: Mapping[str, Any], engine_fn: Callable[[Mapping[str, Any]], Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG, kelly_multiplier: float = 0.25) -> RunResult:
@@ -48,6 +72,10 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], p
             if key not in output and key in model_input:
                 output[key] = model_input[key]
         bind_candidate(output, quote, deployment)
+        model_input_hash = _optional_sha256(output, "model_input_hash")
+        distribution_sha256 = _optional_sha256(output, "distribution_sha256")
+        readout_sha256 = _optional_sha256(output, "readout_sha256")
+        readout_version = _optional_text(output, "readout_version")
         floor = require_production_edge_floor(market=market, path=edge_floor_config_path)
 
         if not isinstance(paired_quote, Mapping):
@@ -62,7 +90,13 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], p
             edge_floor=float(floor.value_probability_points), kelly_multiplier=kelly_multiplier,
             push_probability=float(output.get("push_p", 0.0)),
         )
-        return RunResult(market, float(output["model_p"]), decision.bet_status, decision, "ok")
+        return RunResult(
+            market, float(output["model_p"]), decision.bet_status, decision, "ok",
+            model_input_hash=model_input_hash,
+            distribution_sha256=distribution_sha256,
+            readout_sha256=readout_sha256,
+            readout_version=readout_version,
+        )
     except Exception as exc:
         return RunResult(market, None, "BLOCKED", None, f"{type(exc).__name__}: {exc}")
 

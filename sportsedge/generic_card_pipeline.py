@@ -38,6 +38,10 @@ class GenericCardResult:
     implied_probability: float | None = None
     edge: float | None = None
     ev_per_dollar: float | None = None
+    model_input_hash: str | None = None
+    distribution_sha256: str | None = None
+    readout_sha256: str | None = None
+    readout_version: str | None = None
 
 
 def _game_index(games: list[LiveGame]) -> dict[str, LiveGame]:
@@ -279,6 +283,8 @@ def run_generic_card(
                 quote["line"], str(quote["side"]), quote["american_odds"],
                 model_p, run.bet_status, run.reason,
                 shadow_status, implied, edge, ev,
+                run.model_input_hash, run.distribution_sha256,
+                run.readout_sha256, run.readout_version,
             ))
         except Exception as exc:
             try:
