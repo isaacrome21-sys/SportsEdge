@@ -1,8 +1,14 @@
-"""Deterministic outcome interpreter for canonical Either-Pitcher count markets.
+"""Either-Pitcher structural outcome helpers and fail-closed book settlement gate.
 
-This module mirrors the active joint engine semantics exactly. It does not decide
-whether a sportsbook rule is valid; the catalog settlement gate must validate the
-book-specific rule before calling this interpreter.
+The active joint engine currently defines each side independently with OR semantics:
+OVER wins when either pitcher is above the line and UNDER wins when either pitcher
+is below the line. Those events overlap for cross-states (for example 7 and 4 at
+5.5), so they are not a normalized opposite-side sportsbook contract.
+
+`settle_either_pitcher_engine_semantics` is retained only for structural parity
+checks against the candidate engine. `settle_either_pitcher` deliberately fails
+closed until validated sportsbook evidence defines the actual proposition and
+void/push semantics required by the acceptance matrix.
 """
 from __future__ import annotations
 
@@ -69,7 +75,7 @@ def _pitcher_value(rows: Any, pitcher_id: str, field: str) -> float:
     return value
 
 
-def settle_either_pitcher(
+def settle_either_pitcher_engine_semantics(
     facts: Mapping[str, Any],
     *,
     market: str,
@@ -77,7 +83,7 @@ def settle_either_pitcher(
     line: Any,
     side: Any,
 ) -> str:
-    """Return WIN/LOSS/PUSH using the same OR semantics as pitcher_joint_engine."""
+    """Mirror the candidate engine's current OR/OR semantics for structural tests only."""
     market = str(market or "").upper()
     if market not in EITHER_PITCHER_MARKETS:
         raise EitherPitcherSettlementError(f"unsupported either-pitcher market:{market}")
@@ -103,3 +109,25 @@ def settle_either_pitcher(
     if float(threshold).is_integer() and (a == threshold or b == threshold):
         return "PUSH"
     return "LOSS"
+
+
+def settle_either_pitcher(
+    facts: Mapping[str, Any],
+    *,
+    market: str,
+    entity_id: Any,
+    line: Any,
+    side: Any,
+) -> str:
+    """Fail closed until book-specific Either-Pitcher semantics are normalized."""
+    # Validate the canonical shape enough to prevent malformed rows from being
+    # mistaken for a policy-only block, but do not infer sportsbook semantics.
+    market = str(market or "").upper()
+    if market not in EITHER_PITCHER_MARKETS:
+        raise EitherPitcherSettlementError(f"unsupported either-pitcher market:{market}")
+    parse_pair_entity_id(entity_id)
+    _line(line)
+    direction = str(side or "").upper()
+    if direction not in {"OVER", "UNDER"}:
+        raise EitherPitcherSettlementError("side must be OVER or UNDER")
+    raise EitherPitcherSettlementError("EITHER_PITCHER_BOOK_SPECIFIC_SEMANTICS_REQUIRED")
