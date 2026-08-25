@@ -1,0 +1,309 @@
+name: football-nfl-forward-clv-collection
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Ten-minute cadence gives multiple independent chances in both the
+    # T-120..T-45 decision window and the T-20..T-2 closing window.
+    - cron: '7,17,27,37,47,57 * * * *'
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: football-nfl-forward-clv-collection
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+      SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
+      SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
+      SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
+      GH_TOKEN: ${{ github.token }}
+      COLLECTOR_GIT_SHA: ${{ github.sha }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pinned runtime dependency
+        run: python -m pip install --disable-pip-version-check numpy
+
+      - name: Freeze current NFL schedule before any decision
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/football/forward-run
+          curl --fail --location --retry 3 \
+            'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv' \
+            -o artifacts/football/forward-run/games.csv
+
+      - name: Resolve latest successful main production-model release
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN_JSON="$(gh run list --repo "$GITHUB_REPOSITORY" \
+            --workflow football-nfl-promotion-evidence.yml --branch main --event push \
+            --status success --limit 100 --json databaseId,headSha,conclusion)"
+          RUN_ID="$(jq -r '[.[] | select(.conclusion == "success")][0].databaseId // empty' <<<"$RUN_JSON")"
+          MODEL_SHA="$(jq -r '[.[] | select(.conclusion == "success")][0].headSha // empty' <<<"$RUN_JSON")"
+          if [[ -z "$RUN_ID" || ! "$MODEL_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo 'available=false' >> "$GITHUB_OUTPUT"
+            echo '{"state":"NO_SUCCESSFUL_PRODUCTION_MODEL_RELEASE"}' > artifacts/football/forward-run/release-status.json
+            exit 0
+          fi
+          mkdir -p artifacts/football/model-release
+          set +e
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name "nfl-promotion-evidence-$MODEL_SHA" \
+            --dir artifacts/football/model-release
+          code=$?
+          set -e
+          if [[ $code -ne 0 || ! -f artifacts/football/model-release/nfl_m2_model.json ]]; then
+            echo 'available=false' >> "$GITHUB_OUTPUT"
+            jq -n --arg sha "$MODEL_SHA" --argjson run "$RUN_ID" \
+              '{state:"LATEST_SUCCESSFUL_RELEASE_LACKS_MODEL_ARTIFACT",model_code_git_sha:$sha,workflow_run_id:$run}' \
+              > artifacts/football/forward-run/release-status.json
+            exit 0
+          fi
+          ARTIFACT_SHA="$(sha256sum artifacts/football/model-release/nfl_m2_model.json | awk '{print $1}')"
+          echo 'available=true' >> "$GITHUB_OUTPUT"
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "model_sha=$MODEL_SHA" >> "$GITHUB_OUTPUT"
+          echo "model_artifact_sha=$ARTIFACT_SHA" >> "$GITHUB_OUTPUT"
+          jq -n --arg sha "$MODEL_SHA" --arg hash "$ARTIFACT_SHA" --argjson run "$RUN_ID" \
+            '{state:"MODEL_RELEASE_AVAILABLE",model_code_git_sha:$sha,model_artifact_sha256:$hash,workflow_run_id:$run}' \
+            > artifacts/football/forward-run/release-status.json
+
+      - name: Checkout exact model-release implementation
+        if: steps.release.outputs.available == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.release.outputs.model_sha }}
+          path: model-release
+          fetch-depth: 1
+
+      - name: Restore release-scoped durable forward state
+        if: steps.release.outputs.available == 'true'
+        shell: bash
+        env:
+          MODEL_SHA: ${{ steps.release.outputs.model_sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p .nfl-forward-state
+          git fetch --depth=1 origin data:data
+          git worktree add .data-branch data
+          SOURCE=".data-branch/runtime/nfl-forward/$MODEL_SHA"
+          if [[ -d "$SOURCE" ]]; then
+            cp -R "$SOURCE/." .nfl-forward-state/
+          fi
+
+      - name: Plan decision and close windows from frozen schedule
+        if: steps.release.outputs.available == 'true'
+        id: plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          NOW="$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
+          (cd model-release && PYTHONPATH=. python scripts/update_nfl_forward_state.py plan \
+            --schedule-file "$GITHUB_WORKSPACE/artifacts/football/forward-run/games.csv" \
+            --state-dir "$GITHUB_WORKSPACE/.nfl-forward-state" --now "$NOW" \
+            --out "$GITHUB_WORKSPACE/artifacts/football/forward-run/plan-before.json")
+          echo "decision_due=$(jq -r '.decision_due' artifacts/football/forward-run/plan-before.json)" >> "$GITHUB_OUTPUT"
+          echo "current_season=$(jq -r '.current_season' artifacts/football/forward-run/plan-before.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Freeze strictly-prior public feature sources only when a decision is due
+        if: steps.release.outputs.available == 'true' && steps.plan.outputs.decision_due == 'true'
+        shell: bash
+        env:
+          CURRENT_SEASON: ${{ steps.plan.outputs.current_season }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$CURRENT_SEASON" =~ ^20[0-9]{2}$ ]]; then
+            echo "NFL_FORWARD_CURRENT_SEASON_INVALID:$CURRENT_SEASON" >&2
+            exit 1
+          fi
+          mkdir -p artifacts/football/live-sources/{pbp,participation,depth}
+          cp artifacts/football/forward-run/games.csv artifacts/football/live-sources/games.csv
+          curl --fail --location --retry 3 \
+            'https://raw.githubusercontent.com/greerreNFL/Stadiums/efa9543af50b01424754219fa0e4f3c7044ff198/data/team_stadiums.csv' \
+            -o artifacts/football/live-sources/team_stadiums.csv
+          for season in $(seq 2016 "$CURRENT_SEASON"); do
+            curl --fail --location --retry 3 \
+              "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_${season}.csv.gz" \
+              -o "artifacts/football/live-sources/pbp/play_by_play_${season}.csv.gz"
+            curl --fail --location --retry 3 \
+              "https://github.com/nflverse/nflverse-data/releases/download/pbp_participation/pbp_participation_${season}.csv" \
+              -o "artifacts/football/live-sources/participation/pbp_participation_${season}.csv"
+            curl --fail --location --retry 3 \
+              "https://github.com/nflverse/nflverse-data/releases/download/depth_charts/depth_charts_${season}.csv" \
+              -o "artifacts/football/live-sources/depth/depth_charts_${season}.csv"
+          done
+          date -u +%Y-%m-%dT%H:%M:%S.%NZ > artifacts/football/forward-run/live-source-asof.txt
+
+      - name: Build exact-release strictly-asof live M2 features
+        if: steps.release.outputs.available == 'true' && steps.plan.outputs.decision_due == 'true'
+        shell: bash
+        env:
+          CURRENT_SEASON: ${{ steps.plan.outputs.current_season }}
+        run: |
+          set -euo pipefail
+          ASOF="$(cat artifacts/football/forward-run/live-source-asof.txt)"
+          (cd model-release && PYTHONPATH=. python scripts/build_nfl_live_feature_rows.py \
+            --schedule-file "$GITHUB_WORKSPACE/artifacts/football/live-sources/games.csv" \
+            --pbp-dir "$GITHUB_WORKSPACE/artifacts/football/live-sources/pbp" \
+            --participation-dir "$GITHUB_WORKSPACE/artifacts/football/live-sources/participation" \
+            --depth-dir "$GITHUB_WORKSPACE/artifacts/football/live-sources/depth" \
+            --stadium-file "$GITHUB_WORKSPACE/artifacts/football/live-sources/team_stadiums.csv" \
+            --asof "$ASOF" --start-season 2016 --current-season "$CURRENT_SEASON" \
+            --min-lead-minutes 45 --horizon-minutes 120 \
+            --out "$GITHUB_WORKSPACE/artifacts/football/forward-run/nfl_live_features.json")
+
+      - name: Fetch raw DraftKings decision snapshot
+        if: steps.release.outputs.available == 'true' && steps.plan.outputs.decision_due == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd model-release && PYTHONPATH=. python scripts/fetch_nfl_forward_odds.py \
+            --out "$GITHUB_WORKSPACE/artifacts/football/forward-run/decision-odds.json")
+          date -u +%Y-%m-%dT%H:%M:%S.%NZ > artifacts/football/forward-run/decision-captured-at.txt
+
+      - name: Add immutable exact-release decisions
+        if: steps.release.outputs.available == 'true' && steps.plan.outputs.decision_due == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          CAPTURED="$(cat artifacts/football/forward-run/decision-captured-at.txt)"
+          (cd model-release && PYTHONPATH=. python scripts/update_nfl_forward_state.py decision \
+            --state-dir "$GITHUB_WORKSPACE/.nfl-forward-state" \
+            --model-artifact "$GITHUB_WORKSPACE/artifacts/football/model-release/nfl_m2_model.json" \
+            --live-features "$GITHUB_WORKSPACE/artifacts/football/forward-run/nfl_live_features.json" \
+            --odds "$GITHUB_WORKSPACE/artifacts/football/forward-run/decision-odds.json" \
+            --captured-at "$CAPTURED" \
+            --out "$GITHUB_WORKSPACE/artifacts/football/forward-run/decision-status.json")
+
+      - name: Re-plan close window after any new decisions
+        if: steps.release.outputs.available == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          NOW="$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
+          (cd model-release && PYTHONPATH=. python scripts/update_nfl_forward_state.py plan \
+            --schedule-file "$GITHUB_WORKSPACE/artifacts/football/forward-run/games.csv" \
+            --state-dir "$GITHUB_WORKSPACE/.nfl-forward-state" --now "$NOW" \
+            --out "$GITHUB_WORKSPACE/artifacts/football/forward-run/plan-after.json")
+
+      - name: Fetch exact-event closing snapshots for due observations
+        if: steps.release.outputs.available == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/football/forward-run/close-odds
+          jq -r '.close_event_ids[]' artifacts/football/forward-run/plan-after.json | while IFS= read -r event_id; do
+            [[ -n "$event_id" ]] || continue
+            if ! [[ "$event_id" =~ ^[A-Za-z0-9_-]{1,128}$ ]]; then
+              echo "NFL_FORWARD_EVENT_ID_INVALID:$event_id" >&2
+              exit 1
+            fi
+            (cd model-release && PYTHONPATH=. python scripts/fetch_nfl_forward_odds.py \
+              --event-id "$event_id" \
+              --out "$GITHUB_WORKSPACE/artifacts/football/forward-run/close-odds/$event_id.json")
+          done
+          date -u +%Y-%m-%dT%H:%M:%S.%NZ > artifacts/football/forward-run/close-captured-at.txt
+
+      - name: Add fail-closed original-threshold closes
+        if: steps.release.outputs.available == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          CAPTURED="$(cat artifacts/football/forward-run/close-captured-at.txt)"
+          (cd model-release && PYTHONPATH=. python scripts/update_nfl_forward_state.py close \
+            --state-dir "$GITHUB_WORKSPACE/.nfl-forward-state" \
+            --model-artifact "$GITHUB_WORKSPACE/artifacts/football/model-release/nfl_m2_model.json" \
+            --odds-dir "$GITHUB_WORKSPACE/artifacts/football/forward-run/close-odds" \
+            --captured-at "$CAPTURED" \
+            --out "$GITHUB_WORKSPACE/artifacts/football/forward-run/close-status.json")
+
+      - name: Export cumulative completed promotion pairs
+        if: steps.release.outputs.available == 'true'
+        id: export
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/football/forward-export
+          (cd model-release && PYTHONPATH=. python scripts/update_nfl_forward_state.py export \
+            --state-dir "$GITHUB_WORKSPACE/.nfl-forward-state" \
+            --out-dir "$GITHUB_WORKSPACE/artifacts/football/forward-export" \
+            --out "$GITHUB_WORKSPACE/artifacts/football/forward-run/export-status.json")
+          COUNT="$(jq -r '.complete_pair_count' artifacts/football/forward-run/export-status.json)"
+          PRIOR="0"
+          if [[ -f .nfl-forward-state/published.json ]]; then PRIOR="$(jq -r '.complete_pair_count // 0' .nfl-forward-state/published.json)"; fi
+          if (( COUNT > PRIOR )); then echo 'publish=true' >> "$GITHUB_OUTPUT"; else echo 'publish=false' >> "$GITHUB_OUTPUT"; fi
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+
+      - name: Finalize new cumulative externally-attestable bundle
+        if: steps.release.outputs.available == 'true' && steps.export.outputs.publish == 'true'
+        shell: bash
+        env:
+          MODEL_SHA: ${{ steps.release.outputs.model_sha }}
+        run: |
+          set -euo pipefail
+          rm -rf artifacts/football/forward
+          (cd model-release && PYTHONPATH=. python scripts/finalize_nfl_forward_bundle.py \
+            --decisions "$GITHUB_WORKSPACE/artifacts/football/forward-export/nfl_forward_decisions.jsonl" \
+            --closes "$GITHUB_WORKSPACE/artifacts/football/forward-export/nfl_forward_closes.jsonl" \
+            --model-artifact "$GITHUB_WORKSPACE/artifacts/football/model-release/nfl_m2_model.json" \
+            --collector-git-sha "$COLLECTOR_GIT_SHA" --model-code-git-sha "$MODEL_SHA" \
+            --out-dir "$GITHUB_WORKSPACE/artifacts/football/forward")
+          jq -n --argjson n '${{ steps.export.outputs.count }}' --arg run "$GITHUB_RUN_ID" \
+            '{complete_pair_count:$n,published_by_run_id:$run}' > .nfl-forward-state/published.json
+
+      - name: Persist release-scoped decision/close state to data branch
+        if: steps.release.outputs.available == 'true' && always()
+        shell: bash
+        env:
+          MODEL_SHA: ${{ steps.release.outputs.model_sha }}
+        run: |
+          set -euo pipefail
+          DEST=".data-branch/runtime/nfl-forward/$MODEL_SHA"
+          mkdir -p "$DEST"
+          cp -R .nfl-forward-state/. "$DEST/"
+          cd .data-branch
+          git config user.name 'sportsedge-nfl-forward-bot'
+          git config user.email 'sportsedge-nfl-forward-bot@users.noreply.github.com'
+          git add "runtime/nfl-forward/$MODEL_SHA"
+          if ! git diff --cached --quiet; then
+            git commit -m "nfl-forward: persist release $MODEL_SHA run $GITHUB_RUN_ID"
+            git push origin HEAD:data
+          fi
+
+      - name: Upload scheduled collection diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nfl-forward-status-${{ github.run_id }}
+          path: |
+            artifacts/football/forward-run/*.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload cumulative forward bundle only when evidence advanced
+        if: steps.release.outputs.available == 'true' && steps.export.outputs.publish == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: nfl-forward-clv-${{ github.run_id }}
+          path: artifacts/football/forward/*
+          if-no-files-found: error
+          retention-days: 90
