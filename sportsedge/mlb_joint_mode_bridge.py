@@ -121,25 +121,37 @@ def build_canonical_feature_row(
             pid = int(entity_id)
         except (TypeError, ValueError) as exc:
             raise MLBJointModeBridgeError("pitcher entity_id must be MLB player id") from exc
+        f5 = f5_source or MLBF5HistorySource(
+            opener=source.opener, retrieved_at=source.retrieved_at
+        )
         built = build_pitcher_record_win_features(
-            source, game=game, pitcher_id=pid, target_date=target_date
+            source,
+            game=game,
+            pitcher_id=pid,
+            target_date=target_date,
+            f5_source=f5,
         )
         team_side = str(built["team_side"])
-        team_id = int(game.away_team_id if team_side == "AWAY" else game.home_team_id)
         return {
             **base,
-            "team_id": team_id,
+            "team_id": int(built["team_id"]),
             "team_side": team_side,
-            "source": "MLB_STATSAPI_STRICTLY_PRIOR_PITCHER_DECISIONS_PLUS_GAME_STATE",
+            "source": "MLB_STATSAPI_STRICTLY_PRIOR_STARTER_OUTS_PLUS_F5_WIN_CREDIT_PATHS",
             "pitcher_record_win_feature_version": built["feature_version"],
             "feature_source_hash": built["feature_source_hash"],
-            "away_mean_runs": built["away_mean_runs"],
-            "home_mean_runs": built["home_mean_runs"],
             "features": {
-                "decision_rate": built["decision_rate"],
                 "qualification_rate": built["qualification_rate"],
+                "starter_outs_history": list(built["starter_outs_history"]),
+                "f5_features": dict(built["f5_features"]),
+                "post_f5_credit_paths": {
+                    state: list(values)
+                    for state, values in built["post_f5_credit_paths"].items()
+                },
+                "credit_path_state_counts": dict(built["credit_path_state_counts"]),
                 "game_source_hash": built["game_source_hash"],
                 "pitcher_source_hash": built["pitcher_source_hash"],
+                "f5_feature_source_hash": built["f5_feature_source_hash"],
+                "credit_path_source_hash": built["credit_path_source_hash"],
                 "history": list(built["history"]),
             },
         }

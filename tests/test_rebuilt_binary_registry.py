@@ -10,7 +10,7 @@ class RebuiltBinaryRegistryTests(unittest.TestCase):
         behavior = json.loads(Path("config/mlb_behavioral_disposition.json").read_text())["markets"]
 
         self.assertEqual(deployments["FIRST_HOME_RUN"]["stage"], "ORDERING_AWARE_CANDIDATE")
-        self.assertEqual(deployments["PITCHER_RECORD_WIN"]["stage"], "GAME_STATE_CANDIDATE")
+        self.assertEqual(deployments["PITCHER_RECORD_WIN"]["stage"], "WIN_CREDIT_STATE_CANDIDATE")
         for market in ("FIRST_HOME_RUN", "PITCHER_RECORD_WIN"):
             self.assertFalse(deployments[market]["eligible"])
             self.assertEqual(evidence[market]["evidence_count"], 0)
