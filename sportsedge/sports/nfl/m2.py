@@ -328,7 +328,13 @@ def price_nfl_m2_game_markets(
     spread_line: float,
     total_line: float,
 ) -> dict[str, dict[str, float]]:
-    """Apply sportsbook thresholds only after the model distribution exists."""
+    """Apply sportsbook thresholds only after the model distribution exists.
+
+    ``spread_line`` is the home-team handicap, consistent with the shared
+    football market contract. A home cover therefore occurs when
+    ``margin + spread_line > 0``; at a zero spread, cover probability equals
+    home moneyline win probability.
+    """
     rows = [dict(row) for row in distribution]
     if not rows:
         raise ValueError("NFL_M2_SCORE_DISTRIBUTION_EMPTY")
@@ -337,6 +343,7 @@ def price_nfl_m2_game_markets(
     if not isfinite(spread) or not isfinite(total):
         raise ValueError("NFL_M2_MARKET_LINE_NONFINITE")
     n = float(len(rows))
+    adjusted_margins = [float(row["margin"]) + spread for row in rows]
     return {
         "moneyline": {
             "home": sum(int(row["margin"]) > 0 for row in rows) / n,
@@ -344,9 +351,9 @@ def price_nfl_m2_game_markets(
             "tie": sum(int(row["margin"]) == 0 for row in rows) / n,
         },
         "spread": {
-            "home": sum(float(row["margin"]) > spread for row in rows) / n,
-            "away": sum(float(row["margin"]) < spread for row in rows) / n,
-            "push": sum(float(row["margin"]) == spread for row in rows) / n,
+            "home": sum(value > 0 for value in adjusted_margins) / n,
+            "away": sum(value < 0 for value in adjusted_margins) / n,
+            "push": sum(value == 0 for value in adjusted_margins) / n,
         },
         "total": {
             "over": sum(float(row["total"]) > total for row in rows) / n,
