@@ -18,7 +18,7 @@
   ],
   "families": {
     "GAME_SCORE_FULL": {
-      "markets": ["MONEYLINE", "RUN_LINE", "TOTALS"],
+      "markets": ["MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS"],
       "structural_checks": [
         "COHERENT_FINAL_SCORE_DISTRIBUTION",
         "QUOTE_SIDE_EXCLUDED_FROM_MODEL_IDENTITY",
@@ -38,7 +38,7 @@
       "settlement_checks": ["FIRST_INNING_COMPLETION_AND_VOID_RULES"]
     },
     "FIRST_FIVE": {
-      "markets": ["F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS"],
+      "markets": ["F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS", "F5_TEAM_TOTALS"],
       "structural_checks": [
         "REAL_INNING_STATE_SUBSTRATE",
         "TOP_BOTTOM_FIFTH_COMPLETION",
