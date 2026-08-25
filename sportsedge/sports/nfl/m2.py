@@ -1,13 +1,24 @@
-"""NFL M2 v1: market-blind features with explicit starting-QB adjustment."""
+"""NFL M2 v1: market-blind features and season-ordered production fitting.
+
+The production M2 path is deliberately separated from sportsbook evaluation.
+Feature construction rejects market-derived inputs, score-model fitting consumes
+only the validated feature dictionaries plus realized scores, and closing lines
+are allowed only later when predictions are evaluated against M1.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from math import log
+from math import isfinite, log
 from typing import Any, Iterable
+
+import numpy as np
 
 from sportsedge.core.position_matchup import build_positional_matchup_features
 from sportsedge.core.walkforward.season import season_walk_forward
+
+NFL_M2_FEATURE_CONTRACT = "NFL_M2_V1_MARKET_BLIND"
+PRODUCTION_NFL_M2_MODEL_ID = "nfl_m2_ridge_v1"
 
 BANNED_MARKET_KEYS = {
     "spread", "spread_line", "total", "total_line", "line", "price",
@@ -27,6 +38,50 @@ BANNED_MARKET_ALIASES = {
     "opening_odds", "market_odds", "consensus_odds", "sportsbook_odds",
     "opening_spread", "opening_total", "book_spread", "book_total",
 }
+
+_REQUIRED_MODEL_FEATURES = (
+    "adj_off_epa",
+    "adj_def_epa",
+    "pass_epa",
+    "rush_epa",
+    "pressure_for",
+    "pressure_allowed",
+    "success_rate",
+    "explosive_rate",
+    "rest_diff_days",
+    "travel_miles",
+    "timezone_crossings",
+    "short_week",
+    "bye_week",
+    "wind_mph",
+    "roof_closed",
+    "qb_adjustment",
+    "prior_efficiency",
+    "prior_weight",
+)
+
+# These are emitted only when the point-in-time positional layer is available.
+# Keeping stable zero-filled columns allows one versioned model contract without
+# silently changing dimensionality from game to game.
+_OPTIONAL_MODEL_FEATURES = (
+    "opp_wr_target_share_oe_allowed",
+    "opp_te_target_share_oe_allowed",
+    "opp_rb_target_share_oe_allowed",
+    "opp_wr_target_share_oe_weighted",
+    "opp_te_target_share_oe_weighted",
+    "opp_rb_target_share_oe_weighted",
+    "defensive_playcaller_continuity_weight",
+    "defensive_playcaller_changed",
+    "off_wr_target_share",
+    "off_te_target_share",
+    "off_rb_target_share",
+    "wr_usage_x_opp_target_oe",
+    "te_usage_x_opp_target_oe",
+    "rb_usage_x_opp_target_oe",
+    "positional_target_matchup_pressure",
+)
+
+_MODEL_FEATURES = _REQUIRED_MODEL_FEATURES + _OPTIONAL_MODEL_FEATURES
 
 
 def _is_market_derived_key(key: Any) -> bool:
@@ -63,7 +118,7 @@ def _num(row: dict[str, Any], key: str) -> float:
     if key not in row:
         raise ValueError(f"M2_FEATURE_MISSING:{key}")
     value = float(row[key])
-    if value != value or value in (float("inf"), float("-inf")):
+    if not isfinite(value):
         raise ValueError(f"M2_FEATURE_NONFINITE:{key}")
     return value
 
@@ -87,6 +142,7 @@ def build_nfl_m2_features(source: dict[str, Any]) -> dict[str, float | str]:
         raise ValueError("M2_PRIOR_WEIGHT_OUT_OF_RANGE")
 
     features: dict[str, float | str] = {
+        "feature_contract": NFL_M2_FEATURE_CONTRACT,
         "adj_off_epa": off - opp_def,
         "adj_def_epa": deff - opp_off,
         "pass_epa": _num(source, "pass_epa"),
@@ -110,6 +166,170 @@ def build_nfl_m2_features(source: dict[str, Any]) -> dict[str, float | str]:
     }
     features.update(build_positional_matchup_features(source))
     return features
+
+
+def _validated_feature_vector(features: dict[str, Any], side: str) -> list[float]:
+    _assert_market_blind(features, path=f"{side}_features")
+    if features.get("feature_contract") != NFL_M2_FEATURE_CONTRACT:
+        raise ValueError("NFL_M2_FEATURE_CONTRACT_REQUIRED")
+    if not str(features.get("qb_id", "")).strip():
+        raise ValueError("NFL_M2_QB_ID_REQUIRED")
+    if not str(features.get("feature_asof_ts", "")).strip():
+        raise ValueError("NFL_M2_FEATURE_ASOF_REQUIRED")
+
+    values: list[float] = []
+    for key in _REQUIRED_MODEL_FEATURES:
+        if key not in features:
+            raise ValueError(f"NFL_M2_MODEL_FEATURE_MISSING:{key}")
+        value = float(features[key])
+        if not isfinite(value):
+            raise ValueError(f"NFL_M2_MODEL_FEATURE_NONFINITE:{key}")
+        values.append(value)
+    for key in _OPTIONAL_MODEL_FEATURES:
+        raw = features.get(key, 0.0)
+        value = float(raw)
+        if not isfinite(value):
+            raise ValueError(f"NFL_M2_MODEL_FEATURE_NONFINITE:{key}")
+        values.append(value)
+    return values
+
+
+def _game_feature_vector(row: dict[str, Any]) -> list[float]:
+    home = row.get("home_features")
+    away = row.get("away_features")
+    if not isinstance(home, dict) or not isinstance(away, dict):
+        raise ValueError("NFL_M2_GAME_FEATURES_REQUIRED")
+    return _validated_feature_vector(home, "home") + _validated_feature_vector(away, "away")
+
+
+def _target_scores(row: dict[str, Any]) -> tuple[float, float]:
+    try:
+        home = float(row["home_score"])
+        away = float(row["away_score"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("NFL_M2_REALIZED_SCORE_REQUIRED") from exc
+    if not isfinite(home) or not isfinite(away):
+        raise ValueError("NFL_M2_REALIZED_SCORE_NONFINITE")
+    return home - away, home + away
+
+
+@dataclass(frozen=True)
+class NFLM2ScoreModel:
+    model_id: str
+    feature_contract: str
+    feature_names: tuple[str, ...]
+    feature_means: tuple[float, ...]
+    feature_scales: tuple[float, ...]
+    margin_coefficients: tuple[float, ...]
+    total_coefficients: tuple[float, ...]
+    train_seasons: tuple[int, ...]
+    ridge_alpha: float
+
+    def predict(self, row: dict[str, Any]) -> tuple[float, float]:
+        raw = np.asarray(_game_feature_vector(row), dtype=float)
+        means = np.asarray(self.feature_means, dtype=float)
+        scales = np.asarray(self.feature_scales, dtype=float)
+        if raw.shape != means.shape or raw.shape != scales.shape:
+            raise ValueError("NFL_M2_MODEL_FEATURE_DIMENSION_MISMATCH")
+        z = (raw - means) / scales
+        design = np.concatenate(([1.0], z))
+        margin = float(design @ np.asarray(self.margin_coefficients, dtype=float))
+        total = float(design @ np.asarray(self.total_coefficients, dtype=float))
+        if not isfinite(margin) or not isfinite(total):
+            raise ValueError("NFL_M2_MODEL_PREDICTION_NONFINITE")
+        return margin, total
+
+
+def _ridge_coefficients(design: np.ndarray, target: np.ndarray, ridge_alpha: float) -> np.ndarray:
+    penalty = np.eye(design.shape[1], dtype=float) * float(ridge_alpha)
+    penalty[0, 0] = 0.0
+    lhs = design.T @ design + penalty
+    rhs = design.T @ target
+    try:
+        return np.linalg.solve(lhs, rhs)
+    except np.linalg.LinAlgError:
+        return np.linalg.pinv(lhs) @ rhs
+
+
+def fit_nfl_m2_score_model(
+    rows: Iterable[dict[str, Any]],
+    *,
+    ridge_alpha: float = 10.0,
+) -> NFLM2ScoreModel:
+    """Fit margin and total ridge models from validated market-blind features."""
+    data = [dict(row) for row in rows]
+    if not data:
+        raise ValueError("NFL_M2_TRAINING_ROWS_REQUIRED")
+    alpha = float(ridge_alpha)
+    if not isfinite(alpha) or alpha < 0.0:
+        raise ValueError("NFL_M2_RIDGE_ALPHA_INVALID")
+
+    raw_x = np.asarray([_game_feature_vector(row) for row in data], dtype=float)
+    if raw_x.ndim != 2 or raw_x.shape[0] != len(data):
+        raise ValueError("NFL_M2_TRAINING_MATRIX_INVALID")
+    means = raw_x.mean(axis=0)
+    scales = raw_x.std(axis=0)
+    scales = np.where(scales > 1e-12, scales, 1.0)
+    z = (raw_x - means) / scales
+    design = np.column_stack((np.ones(len(data), dtype=float), z))
+
+    targets = [_target_scores(row) for row in data]
+    margin_y = np.asarray([target[0] for target in targets], dtype=float)
+    total_y = np.asarray([target[1] for target in targets], dtype=float)
+    margin_coef = _ridge_coefficients(design, margin_y, alpha)
+    total_coef = _ridge_coefficients(design, total_y, alpha)
+
+    train_seasons = tuple(sorted({int(row["season"]) for row in data}))
+    if not train_seasons:
+        raise ValueError("NFL_M2_TRAINING_SEASONS_REQUIRED")
+    feature_names = tuple(
+        [f"home_{name}" for name in _MODEL_FEATURES]
+        + [f"away_{name}" for name in _MODEL_FEATURES]
+    )
+    return NFLM2ScoreModel(
+        model_id=PRODUCTION_NFL_M2_MODEL_ID,
+        feature_contract=NFL_M2_FEATURE_CONTRACT,
+        feature_names=feature_names,
+        feature_means=tuple(float(value) for value in means.tolist()),
+        feature_scales=tuple(float(value) for value in scales.tolist()),
+        margin_coefficients=tuple(float(value) for value in margin_coef.tolist()),
+        total_coefficients=tuple(float(value) for value in total_coef.tolist()),
+        train_seasons=train_seasons,
+        ridge_alpha=alpha,
+    )
+
+
+def walkforward_fit_nfl_m2_score_model(
+    rows: Iterable[dict[str, Any]],
+    *,
+    min_train_seasons: int = 2,
+    ridge_alpha: float = 10.0,
+) -> list[dict[str, Any]]:
+    """Fit on earlier seasons only and predict every held-out season."""
+    data = [dict(row) for row in rows]
+    if not data:
+        return []
+    folds = season_walk_forward(data, season_key="season", min_train_seasons=min_train_seasons)
+    out: list[dict[str, Any]] = []
+    for fold in folds:
+        model = fit_nfl_m2_score_model(fold.train_rows, ridge_alpha=ridge_alpha)
+        if int(fold.test_season) in model.train_seasons:
+            raise ValueError("NFL_M2_TEST_SEASON_IN_TRAINING")
+        for raw in fold.test_rows:
+            row = dict(raw)
+            margin, total = model.predict(row)
+            out.append({
+                "game_id": str(row.get("game_id") or ""),
+                "season": int(row["season"]),
+                "week": row.get("week"),
+                "model_id": model.model_id,
+                "feature_contract": model.feature_contract,
+                "train_seasons": model.train_seasons,
+                "ridge_alpha": model.ridge_alpha,
+                "model_margin_mu": margin,
+                "model_total_mu": total,
+            })
+    return out
 
 
 @dataclass(frozen=True)
