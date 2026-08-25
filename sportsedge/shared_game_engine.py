@@ -1,8 +1,9 @@
 """Stage 1 shared V7 game-distribution engine session.
 
 One immutable V7 score distribution is simulated per distinct pregame game state and
-then reused for MONEYLINE, RUN_LINE, and TOTALS read-outs. Sportsbook proposition
-line/side never enter the stochastic distribution identity.
+then reused for MONEYLINE, RUN_LINE, TOTALS, and TEAM_TOTALS read-outs. Sportsbook
+proposition line/side and selected team never enter the stochastic distribution
+identity.
 """
 from __future__ import annotations
 
@@ -20,7 +21,7 @@ from .v7_distribution import (
     simulate_game_distribution,
 )
 
-STAGE1_GAME_MARKETS = frozenset({"MONEYLINE", "RUN_LINE", "TOTALS"})
+STAGE1_GAME_MARKETS = frozenset({"MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS"})
 
 
 class SharedGameEngineError(ValueError):
@@ -52,13 +53,7 @@ def _simulation_count(value: Any) -> int:
 
 
 def score_distribution_sha256(distribution: GameDistribution) -> str:
-    """Hash only the reusable final-score distribution, not any sportsbook read-out.
-
-    V7's legacy ``result_sha256`` also binds total-line-specific over/under/push
-    summaries. Stage 1 needs a digest whose identity is invariant to proposition line
-    and side, because those are deterministic read-out semantics applied after the
-    score PMF has already been simulated.
-    """
+    """Hash only the reusable final-score distribution, not any sportsbook read-out."""
     if not isinstance(distribution, GameDistribution):
         raise SharedGameEngineError("distribution must be GameDistribution")
     return canonical_json_sha256({
@@ -127,6 +122,7 @@ def build_shared_game_engine_session(
             market=market,
             line=model_input.get("line"),
             side=str(model_input.get("side", "")),
+            team_side=model_input.get("team_side"),
         )
         return {
             "game_id": model_input.get("game_id"),
