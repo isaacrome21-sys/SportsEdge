@@ -2,8 +2,9 @@
 
 Structural implementation never implies promotion. Historical evidence must be
 produced by the exact production NFL M2 feature/model contract, share the same
-schedule-byte anchor as the simulator math artifact, and carry a separate hash
-for the complete multi-source feature manifest.
+canonical multi-source manifest identity as simulator math, and carry forward
+CLV from that same model contract. Missing market evidence never inherits a
+stage from another market.
 """
 from __future__ import annotations
 
@@ -61,7 +62,7 @@ def build_nfl_promotion_registry(
     *,
     declared_markets: Iterable[str],
     ci_attested: bool = False,
-    clv_evidence: Mapping[str, Mapping[str, Any]] | None = None,
+    clv_evidence: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     if not isinstance(ci_attested, bool):
         raise ValueError("CI_ATTESTED_STATE_INVALID")
@@ -73,6 +74,8 @@ def build_nfl_promotion_registry(
         historical_evidence.get("source_manifest_sha256"),
         "NFL_PROMOTION_SOURCE_MANIFEST_SHA256_INVALID",
     )
+    if math_hash != manifest_hash:
+        raise ValueError("NFL_PROMOTION_MANIFEST_BINDING_MISMATCH")
     if historical_evidence.get("model_id") != PRODUCTION_NFL_M2_MODEL_ID:
         raise ValueError("NFL_PROMOTION_MODEL_ID_MISMATCH")
     if historical_evidence.get("feature_contract") != NFL_M2_FEATURE_CONTRACT:
@@ -80,7 +83,24 @@ def build_nfl_promotion_registry(
 
     math_attestation = attest_validated_math(math_artifact)
     promotion_raw = _mapping(historical_evidence.get("promotion_evidence")) or {}
-    clv_raw: Mapping[str, Mapping[str, Any]] = clv_evidence or {}
+
+    clv_raw: Mapping[str, Any] = {}
+    clv_log_identity: dict[str, Any] | None = None
+    if clv_evidence is not None:
+        if clv_evidence.get("model_id") != PRODUCTION_NFL_M2_MODEL_ID:
+            raise ValueError("NFL_CLV_MODEL_ID_MISMATCH")
+        if clv_evidence.get("feature_contract") != NFL_M2_FEATURE_CONTRACT:
+            raise ValueError("NFL_CLV_FEATURE_CONTRACT_MISMATCH")
+        markets_payload = _mapping(clv_evidence.get("markets"))
+        if markets_payload is None:
+            raise ValueError("NFL_CLV_MARKETS_REQUIRED")
+        clv_raw = markets_payload
+        clv_log_identity = {
+            "model_id": PRODUCTION_NFL_M2_MODEL_ID,
+            "feature_contract": NFL_M2_FEATURE_CONTRACT,
+            "decision_log_sha256": _sha256(clv_evidence.get("decision_log_sha256"), "NFL_CLV_DECISION_LOG_SHA256_INVALID"),
+            "close_log_sha256": _sha256(clv_evidence.get("close_log_sha256"), "NFL_CLV_CLOSE_LOG_SHA256_INVALID"),
+        }
 
     markets: list[str] = []
     seen: set[str] = set()
@@ -146,13 +166,14 @@ def build_nfl_promotion_registry(
         }
 
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "sport": "nfl",
         "model_id": PRODUCTION_NFL_M2_MODEL_ID,
         "feature_contract": NFL_M2_FEATURE_CONTRACT,
         "source_sha256": math_hash,
         "source_manifest_sha256": manifest_hash,
         "math_attestation": math_attestation,
+        "clv_log_identity": clv_log_identity,
         "markets": registry,
         "deployed_markets": sorted(market for market, row in registry.items() if row["eligible"]),
     }
