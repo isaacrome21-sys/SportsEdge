@@ -7,12 +7,12 @@ from sportsedge.mlb_acceptance_matrix import MLBAcceptanceMatrixError, build_acc
 
 
 class MLBAcceptanceMatrixTests(unittest.TestCase):
-    def test_exactly_all_36_catalog_markets_have_one_acceptance_family(self):
+    def test_exactly_all_38_catalog_markets_have_one_acceptance_family(self):
         out = build_acceptance_matrix()
-        self.assertEqual(out["market_count"], 36)
+        self.assertEqual(out["market_count"], 38)
         markets = [row["market"] for row in out["markets"]]
         self.assertEqual(len(markets), len(set(markets)))
-        self.assertEqual(len(markets), 36)
+        self.assertEqual(len(markets), 38)
         self.assertTrue(all(row["acceptance_family"] for row in out["markets"]))
 
     def test_every_market_has_structural_settlement_and_six_evidence_requirements(self):
@@ -71,7 +71,7 @@ class MLBAcceptanceMatrixTests(unittest.TestCase):
             row for row in out["markets"]
             if row["current_state"]["behavioral_status"] == "UNMEASURED"
         ]
-        self.assertEqual(len(unmeasured), 9)
+        self.assertEqual(len(unmeasured), 10)
         self.assertTrue(all(not row["acceptance_complete"] for row in unmeasured))
 
     def test_matrix_fails_if_a_catalog_market_is_unassigned(self):

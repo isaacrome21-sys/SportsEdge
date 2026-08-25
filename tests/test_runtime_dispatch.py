@@ -11,7 +11,7 @@ def model_input(side="OVER", line=0.5):
     return {"build_hash":"a"*64,"game_id":"game-1","market":"HITS","entity_id":"batter-1","line":line,"side":side,"lineup_status":"CONFIRMED","require_confirmed_lineup":True,"features":{"b_rate":0.31,"p_rate":0.27,"pa_pool":[3,4,4,4,5]}}
 
 def quote(*,side="OVER",line=0.5,odds=100,retrieved="2026-08-10T20:00:00Z",ttl=300):
-    return {"game_id":"game-1","market":"HITS","entity_id":"batter-1","line":line,"side":side,"american_odds":odds,"retrieved_at":retrieved,"ttl_seconds":ttl}
+    return {"game_id":"game-1","market":"HITS","entity_id":"batter-1","line":line,"side":side,"american_odds":odds,"retrieved_at":retrieved,"ttl_seconds":ttl,"book_key":"draftkings"}
 
 def payload(q=None,mi=None):
     candidate_quote=q or quote()

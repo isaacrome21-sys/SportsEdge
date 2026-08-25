@@ -15,7 +15,7 @@ class AutomationCoreTests(unittest.TestCase):
     def setUp(self):
         self.now = datetime(2026, 8, 10, 20, 0, tzinfo=timezone.utc)
         self.key = {"game_id":"g1","market":"HITS","entity_id":"p1","line":"0.5","side":"OVER"}
-        self.quote = dict(self.key, american_odds=120, retrieved_at=self.now-timedelta(seconds=10), ttl_seconds=300)
+        self.quote = dict(self.key, american_odds=120, retrieved_at=self.now-timedelta(seconds=10), ttl_seconds=300, book_key="draftkings")
         self.paired_quote = dict(self.quote, side="UNDER", american_odds=-130)
         self.deploy = {"market":"HITS","eligible":True}
         self.tmp = tempfile.TemporaryDirectory()
