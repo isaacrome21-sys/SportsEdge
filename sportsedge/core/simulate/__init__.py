@@ -38,6 +38,7 @@ from .regulation_simulator import (
     NFLIntegratedRegulationSimulation,
     NFLIntegratedRegulationSimulator,
 )
+from .return_scoring import NFLReturnScoringProfile, NFLReturnScoringResolver
 from .situational import (
     derive_both_teams_to_n,
     derive_largest_lead,
@@ -71,6 +72,8 @@ __all__ = [
     "NFLFieldPositionProfile",
     "NFLPossessionTransition",
     "NFLFieldPositionResolver",
+    "NFLReturnScoringProfile",
+    "NFLReturnScoringResolver",
     "NFLIntegratedRegulationSimulation",
     "NFLIntegratedRegulationSimulator",
     "SpecialTeamsProfile",
