@@ -5,7 +5,9 @@ from sportsedge.sports.nfl.m2 import (
     NFL_M2_FEATURE_CONTRACT,
     PRODUCTION_NFL_M2_MODEL_ID,
     build_nfl_m2_features,
+    derive_nfl_m2_score_distribution,
     fit_nfl_m2_score_model,
+    price_nfl_m2_game_markets,
     walkforward_fit_nfl_m2_score_model,
 )
 
@@ -55,8 +57,8 @@ class NFLM2ProductionModelTests(unittest.TestCase):
                     qb=f"A_{season}_{i}", strength=away_strength,
                     asof=asof, start=start, side="away",
                 )
-                margin = 3.0 + 80.0 * (home_strength - away_strength)
-                total = 43.0 + 35.0 * (home_strength + away_strength)
+                margin = 3.0 + 80.0 * (home_strength - away_strength) + (i % 2) * 1.7
+                total = 43.0 + 35.0 * (home_strength + away_strength) + ((season + i) % 3) * 1.3
                 rows.append({
                     "game_id": f"{season}_{i}",
                     "season": season,
@@ -89,12 +91,21 @@ class NFLM2ProductionModelTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "NFL_M2_QB_ID_REQUIRED"):
             fit_nfl_m2_score_model(bad)
 
+    def test_fit_carries_joint_residual_structure_from_train_rows_only(self):
+        model = fit_nfl_m2_score_model(self._rows()[:15], ridge_alpha=1.0)
+        self.assertGreater(model.margin_sigma, 0.0)
+        self.assertGreater(model.total_sigma, 0.0)
+        self.assertGreaterEqual(model.residual_correlation, -1.0)
+        self.assertLessEqual(model.residual_correlation, 1.0)
+        self.assertEqual(len(model.residual_pairs), 15)
+
     def test_walkforward_is_season_ordered_and_emits_production_model_identity(self):
         predictions = walkforward_fit_nfl_m2_score_model(self._rows(), min_train_seasons=2, ridge_alpha=1.0)
         self.assertTrue(predictions)
         self.assertTrue(all(row["model_id"] == PRODUCTION_NFL_M2_MODEL_ID for row in predictions))
         self.assertTrue(all(row["feature_contract"] == NFL_M2_FEATURE_CONTRACT for row in predictions))
         self.assertTrue(all(row["season"] > max(row["train_seasons"]) for row in predictions))
+        self.assertTrue(all(row["margin_sigma"] > 0.0 and row["total_sigma"] > 0.0 for row in predictions))
 
     def test_heldout_outcomes_cannot_change_the_same_fold_predictions(self):
         rows = self._rows()
@@ -111,8 +122,8 @@ class NFLM2ProductionModelTests(unittest.TestCase):
         left = [row for row in baseline if row["season"] == first_test_season]
         right = [row for row in changed if row["season"] == first_test_season]
         self.assertEqual(
-            [(r["game_id"], r["model_margin_mu"], r["model_total_mu"]) for r in left],
-            [(r["game_id"], r["model_margin_mu"], r["model_total_mu"]) for r in right],
+            [(r["game_id"], r["model_margin_mu"], r["model_total_mu"], r["margin_sigma"], r["total_sigma"]) for r in left],
+            [(r["game_id"], r["model_margin_mu"], r["model_total_mu"], r["margin_sigma"], r["total_sigma"]) for r in right],
         )
 
     def test_market_fields_at_game_row_level_do_not_change_fit(self):
@@ -130,6 +141,31 @@ class NFLM2ProductionModelTests(unittest.TestCase):
             [(r["game_id"], r["model_margin_mu"], r["model_total_mu"]) for r in changed],
         )
 
+    def test_joint_distribution_is_integer_reconciled_and_uses_train_residual_pairs(self):
+        rows = self._rows()
+        model = fit_nfl_m2_score_model(rows[:15], ridge_alpha=1.0)
+        distribution = derive_nfl_m2_score_distribution(model, rows[15])
+        self.assertEqual(len(distribution), len(model.residual_pairs))
+        for path in distribution:
+            self.assertIsInstance(path["home_score"], int)
+            self.assertIsInstance(path["away_score"], int)
+            self.assertGreaterEqual(path["home_score"], 0)
+            self.assertGreaterEqual(path["away_score"], 0)
+            self.assertEqual(path["margin"], path["home_score"] - path["away_score"])
+            self.assertEqual(path["total"], path["home_score"] + path["away_score"])
+
+    def test_market_lines_are_applied_only_after_joint_distribution_exists(self):
+        rows = self._rows()
+        model = fit_nfl_m2_score_model(rows[:15], ridge_alpha=1.0)
+        distribution = derive_nfl_m2_score_distribution(model, rows[15])
+        first = price_nfl_m2_game_markets(distribution, spread_line=-3.5, total_line=45.5)
+        second = price_nfl_m2_game_markets(distribution, spread_line=10.5, total_line=70.5)
+        self.assertAlmostEqual(sum(first["spread"].values()), 1.0)
+        self.assertAlmostEqual(sum(first["total"].values()), 1.0)
+        self.assertNotEqual(first["spread"], second["spread"])
+        self.assertNotEqual(first["total"], second["total"])
+        self.assertAlmostEqual(first["moneyline"]["home"] + first["moneyline"]["away"] + first["moneyline"]["tie"], 1.0)
+
     def test_fit_is_deterministic(self):
         rows = self._rows()[:15]
         first = fit_nfl_m2_score_model(rows, ridge_alpha=2.0)
@@ -138,6 +174,7 @@ class NFLM2ProductionModelTests(unittest.TestCase):
         self.assertEqual(first.total_coefficients, second.total_coefficients)
         self.assertEqual(first.feature_means, second.feature_means)
         self.assertEqual(first.feature_scales, second.feature_scales)
+        self.assertEqual(first.residual_pairs, second.residual_pairs)
 
 
 if __name__ == "__main__":
