@@ -2,9 +2,23 @@ import unittest
 
 
 class NFLRegularSeasonOvertimeRule16Tests(unittest.TestCase):
+    def _resolve_raw(self, raw):
+        from sportsedge.core.simulate.special_teams import EngineCSpecialTeamsResolver, SpecialTeamsProfile
+
+        return EngineCSpecialTeamsResolver(
+            home_profile=SpecialTeamsProfile(
+                team="HOME", kicker_id="H_K", kicker_active=True,
+                xp_make_rate=1.0, two_point_attempt_rate=0.0,
+            ),
+            away_profile=SpecialTeamsProfile(
+                team="AWAY", kicker_id="A_K", kicker_active=True,
+                xp_make_rate=1.0, two_point_attempt_rate=0.0,
+            ),
+            seed=1,
+        ).resolve(raw)
+
     def _tied_regulation(self):
         from sportsedge.core.simulate.drive_play import FootballPlayPath, PlayEvent
-        from sportsedge.core.simulate.special_teams import EngineCSpecialTeamsResolver, SpecialTeamsProfile
 
         raw = FootballPlayPath(
             game_id="NFL_OT_TEST",
@@ -22,17 +36,24 @@ class NFLRegularSeasonOvertimeRule16Tests(unittest.TestCase):
                 ),
             ),
         )
-        return EngineCSpecialTeamsResolver(
-            home_profile=SpecialTeamsProfile(
-                team="HOME", kicker_id="H_K", kicker_active=True,
-                xp_make_rate=1.0, two_point_attempt_rate=0.0,
+        return self._resolve_raw(raw)
+
+    def _home_lead_regulation(self):
+        from sportsedge.core.simulate.drive_play import FootballPlayPath, PlayEvent
+
+        raw = FootballPlayPath(
+            game_id="NFL_NOT_TIED",
+            simulation_id=2,
+            home_team="HOME",
+            away_team="AWAY",
+            plays=(
+                PlayEvent(
+                    1, 1, 2, 700, "HOME", 0, 0, 6, 0, 1, 4, 4,
+                    "RUSH", 4, 6, score_type="TOUCHDOWN_CANDIDATE",
+                ),
             ),
-            away_profile=SpecialTeamsProfile(
-                team="AWAY", kicker_id="A_K", kicker_active=True,
-                xp_make_rate=1.0, two_point_attempt_rate=0.0,
-            ),
-            seed=1,
-        ).resolve(raw)
+        )
+        return self._resolve_raw(raw)
 
     def _opp(self, index, team, points, clock, scoring_team=None, outcome="NO_SCORE"):
         from sportsedge.core.simulate.overtime import NFLRegularSeasonOTOpportunity
@@ -135,16 +156,12 @@ class NFLRegularSeasonOvertimeRule16Tests(unittest.TestCase):
 
         result = settle_nfl_regular_season_overtime(
             self._tied_regulation(),
-            (
-                self._opp(
-                    1, "HOME", 2, 590, "AWAY", "KICKOFF_SAFETY"
-                ),
-            ),
+            (self._opp(1, "HOME", 2, 590, "AWAY", "KICKOFF_SAFETY"),),
         )
         self.assertEqual(result.winner, "AWAY")
         self.assertFalse(result.tie)
 
-    def test_opportunity_credit_can_represent_kick_recovery_without_actual_offensive_drive(self):
+    def test_opportunity_credit_can_represent_kick_recovery_without_offensive_drive(self):
         from sportsedge.core.simulate.overtime import settle_nfl_regular_season_overtime
 
         result = settle_nfl_regular_season_overtime(
@@ -157,19 +174,26 @@ class NFLRegularSeasonOvertimeRule16Tests(unittest.TestCase):
         self.assertEqual(result.winner, "HOME")
 
     def test_non_tied_regulation_cannot_enter_overtime(self):
-        from sportsedge.core.simulate.drive_play import FootballPlayPath
         from sportsedge.core.simulate.overtime import settle_nfl_regular_season_overtime
-        from sportsedge.core.simulate.special_teams import ResolvedFootballPath
 
-        raw = FootballPlayPath("NFL_NOT_TIED", 1, "HOME", "AWAY", ())
-        # Add a regulation score directly through a minimal raw score path is not
-        # necessary here: an empty path is tied, so use the tied fixture and
-        # deliberately append a positive regulation scoring event would bypass A.
-        # Instead prove the API rejects a manually altered resolved score path in
-        # a separate validation test below.
-        self.assertEqual(ResolvedFootballPath(raw, ()).to_scoring_path().to_market_row()["total"], 0)
-        with self.assertRaisesRegex(ValueError, "OVERTIME_OPPORTUNITIES_REQUIRED"):
-            settle_nfl_regular_season_overtime(ResolvedFootballPath(raw, ()), ())
+        with self.assertRaisesRegex(ValueError, "OVERTIME_REQUIRES_TIED_REGULATION"):
+            settle_nfl_regular_season_overtime(
+                self._home_lead_regulation(),
+                (self._opp(1, "AWAY", 0, 400),),
+            )
+
+    def test_events_after_terminal_state_fail_closed(self):
+        from sportsedge.core.simulate.overtime import settle_nfl_regular_season_overtime
+
+        with self.assertRaisesRegex(ValueError, "OVERTIME_EVENTS_AFTER_GAME_END"):
+            settle_nfl_regular_season_overtime(
+                self._tied_regulation(),
+                (
+                    self._opp(1, "HOME", 0, 450),
+                    self._opp(2, "AWAY", 3, 300, "AWAY", "FIELD_GOAL"),
+                    self._opp(3, "HOME", 3, 200, "HOME", "FIELD_GOAL"),
+                ),
+            )
 
     def test_clock_and_opportunity_identity_fail_closed(self):
         from sportsedge.core.simulate.overtime import settle_nfl_regular_season_overtime
