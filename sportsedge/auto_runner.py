@@ -65,6 +65,9 @@ class AutoCardResult:
     distribution_sha256: str | None = None
     readout_sha256: str | None = None
     readout_version: str | None = None
+    engine_version: str | None = None
+    seed_policy: str | None = None
+    mc_paths: int | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -277,6 +280,7 @@ def _convert(index: int, result: UnifiedCardResult) -> AutoCardResult:
         result.shadow_status, result.implied_probability, result.edge, result.ev_per_dollar,
         result.model_input_hash, result.distribution_sha256,
         result.readout_sha256, result.readout_version,
+        result.engine_version, result.seed_policy, result.mc_paths,
     )
 
 

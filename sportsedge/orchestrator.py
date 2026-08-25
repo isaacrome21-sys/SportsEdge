@@ -31,6 +31,9 @@ class RunResult:
     distribution_sha256: str | None = None
     readout_sha256: str | None = None
     readout_version: str | None = None
+    engine_version: str | None = None
+    seed_policy: str | None = None
+    mc_paths: int | None = None
 
 
 def _reject_market_leakage(model_input: Mapping[str, Any]) -> None:
@@ -59,6 +62,25 @@ def _optional_text(output: Mapping[str, Any], key: str) -> str | None:
     return text
 
 
+def _optional_nonnegative_int(output: Mapping[str, Any], key: str) -> int | None:
+    value = output.get(key)
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise OrchestrationError(f"engine output malformed {key}")
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise OrchestrationError(f"engine output malformed {key}") from exc
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError) as exc:
+        raise OrchestrationError(f"engine output malformed {key}") from exc
+    if parsed < 0 or numeric != parsed:
+        raise OrchestrationError(f"engine output malformed {key}")
+    return parsed
+
+
 def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], paired_quote: Mapping[str, Any] | None = None, deployment: Mapping[str, Any], engine_fn: Callable[[Mapping[str, Any]], Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG, kelly_multiplier: float = 0.25) -> RunResult:
     """Run one candidate end-to-end. Any integrity failure returns BLOCKED, never a guessed bet."""
     market = str(model_input.get("market", "UNKNOWN"))
@@ -76,6 +98,9 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], p
         distribution_sha256 = _optional_sha256(output, "distribution_sha256")
         readout_sha256 = _optional_sha256(output, "readout_sha256")
         readout_version = _optional_text(output, "readout_version")
+        engine_version = _optional_text(output, "engine_version")
+        seed_policy = _optional_text(output, "seed_policy")
+        mc_paths = _optional_nonnegative_int(output, "mc_paths")
         floor = require_production_edge_floor(market=market, path=edge_floor_config_path)
 
         if not isinstance(paired_quote, Mapping):
@@ -96,6 +121,9 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], p
             distribution_sha256=distribution_sha256,
             readout_sha256=readout_sha256,
             readout_version=readout_version,
+            engine_version=engine_version,
+            seed_policy=seed_policy,
+            mc_paths=mc_paths,
         )
     except Exception as exc:
         return RunResult(market, None, "BLOCKED", None, f"{type(exc).__name__}: {exc}")

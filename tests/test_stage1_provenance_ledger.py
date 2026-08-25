@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from sportsedge.generic_card_pipeline import GenericCardResult
 from sportsedge.orchestrator import RunResult, run_candidate
+from sportsedge.runtime import result_to_dict
 from sportsedge.unified_card import UnifiedCardResult, _convert, unified_result_to_dict
 
 
@@ -19,8 +20,13 @@ class Stage1ProvenanceLedgerTests(unittest.TestCase):
             0.51, "PASS", "ok", None, None, None, None,
         )
         self.assertIsNone(run.distribution_sha256)
+        self.assertIsNone(run.engine_version)
+        self.assertIsNone(run.seed_policy)
+        self.assertIsNone(run.mc_paths)
         self.assertIsNone(generic.readout_sha256)
+        self.assertIsNone(generic.engine_version)
         self.assertIsNone(unified.model_input_hash)
+        self.assertIsNone(unified.seed_policy)
 
     @patch("sportsedge.orchestrator.decide_bet")
     @patch("sportsedge.orchestrator.multiplicative_devig")
@@ -33,11 +39,14 @@ class Stage1ProvenanceLedgerTests(unittest.TestCase):
         floor.return_value = SimpleNamespace(value_probability_points=0.0)
         devig.return_value = SimpleNamespace(candidate_fair_probability=0.5)
         decide.return_value = SimpleNamespace(bet_status="PASS", push_probability=0.0)
-        hashes = {
+        provenance = {
             "model_input_hash": "a" * 64,
             "distribution_sha256": "b" * 64,
             "readout_sha256": "c" * 64,
             "readout_version": "mlb_v7_game_readout_v1",
+            "engine_version": "mlb_hitter_joint_empirical_v3",
+            "seed_policy": "analytic_weighted_empirical_joint_game_rows",
+            "mc_paths": 0,
         }
 
         result = run_candidate(
@@ -51,17 +60,16 @@ class Stage1ProvenanceLedgerTests(unittest.TestCase):
             engine_fn=lambda _: {
                 "game_id": "1", "market": "MONEYLINE", "entity_id": "10",
                 "line": 0.0, "side": "HOME", "model_p": 0.51, "push_p": 0.0,
-                **hashes,
+                **provenance,
             },
             ingestion_now=SimpleNamespace(),
             finalization_now=SimpleNamespace(),
         )
 
         self.assertEqual(result.bet_status, "PASS")
-        self.assertEqual(result.model_input_hash, hashes["model_input_hash"])
-        self.assertEqual(result.distribution_sha256, hashes["distribution_sha256"])
-        self.assertEqual(result.readout_sha256, hashes["readout_sha256"])
-        self.assertEqual(result.readout_version, hashes["readout_version"])
+        for key, value in provenance.items():
+            with self.subTest(key=key):
+                self.assertEqual(getattr(result, key), value)
 
     @patch("sportsedge.orchestrator.bind_candidate")
     @patch("sportsedge.orchestrator.double_ttl_gate")
@@ -86,22 +94,77 @@ class Stage1ProvenanceLedgerTests(unittest.TestCase):
         self.assertIsNone(result.model_p)
         self.assertIn("malformed distribution_sha256", result.reason)
 
-    def test_unified_serialization_preserves_provenance(self):
-        hashes = {
+    @patch("sportsedge.orchestrator.bind_candidate")
+    @patch("sportsedge.orchestrator.double_ttl_gate")
+    def test_invalid_mc_paths_fails_closed_before_decision(self, _ttl, _bind):
+        result = run_candidate(
+            model_input={
+                "game_id": "1", "market": "HITS", "entity_id": "10",
+                "line": 0.5, "side": "OVER",
+            },
+            quote={"american_odds": -110},
+            paired_quote={"american_odds": -110},
+            deployment={"eligible": False},
+            engine_fn=lambda _: {
+                "game_id": "1", "market": "HITS", "entity_id": "10",
+                "line": 0.5, "side": "OVER", "model_p": 0.51,
+                "model_input_hash": "a" * 64,
+                "engine_version": "mlb_hitter_joint_empirical_v3",
+                "seed_policy": "analytic_weighted_empirical_joint_game_rows",
+                "mc_paths": -1,
+            },
+            ingestion_now=SimpleNamespace(),
+            finalization_now=SimpleNamespace(),
+        )
+        self.assertEqual(result.bet_status, "BLOCKED")
+        self.assertIsNone(result.model_p)
+        self.assertIn("malformed mc_paths", result.reason)
+
+    def test_direct_runtime_serialization_preserves_provenance(self):
+        provenance = {
             "model_input_hash": "a" * 64,
             "distribution_sha256": "b" * 64,
             "readout_sha256": "c" * 64,
             "readout_version": "mlb_v7_game_readout_v1",
+            "engine_version": "mlb_hitter_joint_empirical_v3",
+            "seed_policy": "analytic_weighted_empirical_joint_game_rows",
+            "mc_paths": 0,
+        }
+        run = RunResult(
+            "HITS", 0.53, "PASS", None, "ok",
+            model_input_hash=provenance["model_input_hash"],
+            distribution_sha256=provenance["distribution_sha256"],
+            readout_sha256=provenance["readout_sha256"],
+            readout_version=provenance["readout_version"],
+            engine_version=provenance["engine_version"],
+            seed_policy=provenance["seed_policy"],
+            mc_paths=provenance["mc_paths"],
+        )
+        payload = result_to_dict(run)
+        for key, value in provenance.items():
+            with self.subTest(key=key):
+                self.assertEqual(payload[key], value)
+
+    def test_unified_serialization_preserves_provenance(self):
+        provenance = {
+            "model_input_hash": "a" * 64,
+            "distribution_sha256": "b" * 64,
+            "readout_sha256": "c" * 64,
+            "readout_version": "mlb_v7_game_readout_v1",
+            "engine_version": "mlb_v7_shared_game_engine_v1",
+            "seed_policy": "deterministic_distribution_readout",
+            "mc_paths": 20000,
         }
         generic = GenericCardResult(
             "1", "TOTALS", "1", 8.5, "OVER", -105,
             0.53, "PASS", "ok", None, 0.5, 0.03, 0.02,
-            hashes["model_input_hash"], hashes["distribution_sha256"],
-            hashes["readout_sha256"], hashes["readout_version"],
+            provenance["model_input_hash"], provenance["distribution_sha256"],
+            provenance["readout_sha256"], provenance["readout_version"],
+            provenance["engine_version"], provenance["seed_policy"], provenance["mc_paths"],
         )
         unified = _convert(generic)
         payload = unified_result_to_dict(unified)
-        for key, value in hashes.items():
+        for key, value in provenance.items():
             with self.subTest(key=key):
                 self.assertEqual(getattr(unified, key), value)
                 self.assertEqual(payload[key], value)

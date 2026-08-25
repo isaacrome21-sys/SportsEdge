@@ -62,6 +62,9 @@ class MLBMachineResult:
     distribution_sha256: str | None = None
     readout_sha256: str | None = None
     readout_version: str | None = None
+    engine_version: str | None = None
+    seed_policy: str | None = None
+    mc_paths: int | None = None
 
 
 @dataclass(frozen=True)
@@ -212,6 +215,9 @@ def _machine_result(source_index: int, row: Any) -> MLBMachineResult:
         distribution_sha256=_row_value(row, "distribution_sha256"),
         readout_sha256=_row_value(row, "readout_sha256"),
         readout_version=_row_value(row, "readout_version"),
+        engine_version=_row_value(row, "engine_version"),
+        seed_policy=_row_value(row, "seed_policy"),
+        mc_paths=_row_value(row, "mc_paths"),
     )
 
 

@@ -42,6 +42,9 @@ class GenericCardResult:
     distribution_sha256: str | None = None
     readout_sha256: str | None = None
     readout_version: str | None = None
+    engine_version: str | None = None
+    seed_policy: str | None = None
+    mc_paths: int | None = None
 
 
 def _game_index(games: list[LiveGame]) -> dict[str, LiveGame]:
@@ -285,6 +288,7 @@ def run_generic_card(
                 shadow_status, implied, edge, ev,
                 run.model_input_hash, run.distribution_sha256,
                 run.readout_sha256, run.readout_version,
+                run.engine_version, run.seed_policy, run.mc_paths,
             ))
         except Exception as exc:
             try:
