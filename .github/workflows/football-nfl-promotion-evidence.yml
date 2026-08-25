@@ -5,6 +5,7 @@ on:
   pull_request:
     paths:
       - 'sportsedge/core/simulate/**'
+      - 'sportsedge/core/clv/**'
       - 'sportsedge/core/validation/**'
       - 'sportsedge/core/promotion/**'
       - 'sportsedge/sports/nfl/**'
@@ -16,6 +17,7 @@ on:
     branches: [main]
     paths:
       - 'sportsedge/core/simulate/**'
+      - 'sportsedge/core/clv/**'
       - 'sportsedge/core/validation/**'
       - 'sportsedge/core/promotion/**'
       - 'sportsedge/sports/nfl/**'
@@ -45,6 +47,7 @@ jobs:
       - name: Compile exact NFL promotion surface
         run: |
           python -m py_compile \
+            sportsedge/core/clv/football.py \
             sportsedge/core/promotion/football_registry.py \
             sportsedge/core/validation/nfl_ci_attestation.py \
             sportsedge/sports/nfl/m2.py \
