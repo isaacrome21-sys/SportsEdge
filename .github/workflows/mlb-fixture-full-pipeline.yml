@@ -53,6 +53,7 @@ jobs:
             tests.test_stage1_provenance_ledger \
             tests.test_stage1_auto_provenance \
             tests.test_prediction_journal \
+            tests.test_mlb_prediction_settlement \
             -v
       - name: Assert no provider secrets are required
         shell: bash
