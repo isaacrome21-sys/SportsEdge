@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 from sportsedge.auto_native_odds import run_auto_mlb_native_odds
 from sportsedge.auto_runner import AutoRunnerError, report_to_dict, run_auto_mlb
 from sportsedge.edge_floors import DEFAULT_EDGE_FLOOR_CONFIG
+from sportsedge.prediction_journal import journal_reference, write_prediction_journal
 
 CHICAGO_TZ = ZoneInfo("America/Chicago")
 
@@ -19,6 +20,7 @@ CHICAGO_TZ = ZoneInfo("America/Chicago")
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--output", default="artifacts/live_mlb_card.json")
+    p.add_argument("--prediction-journal-dir", default="artifacts/prediction_journal")
     p.add_argument("--require-confirmed-lineup", action="store_true")
     p.add_argument("--edge-floor-config", default=DEFAULT_EDGE_FLOOR_CONFIG)
     p.add_argument("--kelly-multiplier", type=float, default=0.25)
@@ -75,6 +77,19 @@ def main() -> int:
             "results": [],
             "source_failures": [{"reason": f"{type(exc).__name__}: {exc}"}],
         }
+
+    try:
+        journal = write_prediction_journal(payload, root=args.prediction_journal_dir)
+        if journal is not None:
+            payload["prediction_journal"] = journal_reference(journal)
+    except Exception as exc:
+        infrastructure_blocked = True
+        payload["run_status"] = "BLOCKED_JOURNAL"
+        payload.setdefault("source_failures", []).append({
+            "stage": "PREDICTION_JOURNAL",
+            "reason": f"{type(exc).__name__}: {exc}",
+        })
+
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
