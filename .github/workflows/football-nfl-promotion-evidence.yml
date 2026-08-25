@@ -1,0 +1,140 @@
+name: football-nfl-promotion-evidence
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'sportsedge/core/simulate/**'
+      - 'sportsedge/core/validation/**'
+      - 'sportsedge/core/promotion/**'
+      - 'sportsedge/sports/nfl/**'
+      - 'scripts/run_nfl_historical_validation.py'
+      - 'scripts/audit_nfl_real_history.py'
+      - 'scripts/validate_nfl_simulator_profile.py'
+      - 'scripts/build_nfl_promotion_registry.py'
+      - 'tests/test_football*.py'
+      - 'tests/test_nfl*.py'
+      - '.github/workflows/football-nfl-promotion-evidence.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'sportsedge/core/simulate/**'
+      - 'sportsedge/core/validation/**'
+      - 'sportsedge/core/promotion/**'
+      - 'sportsedge/sports/nfl/**'
+      - 'scripts/run_nfl_historical_validation.py'
+      - 'scripts/audit_nfl_real_history.py'
+      - 'scripts/validate_nfl_simulator_profile.py'
+      - 'scripts/build_nfl_promotion_registry.py'
+      - 'tests/test_football*.py'
+      - 'tests/test_nfl*.py'
+      - '.github/workflows/football-nfl-promotion-evidence.yml'
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime test dependencies
+        run: python -m pip install --disable-pip-version-check numpy pytest
+      - name: Compile NFL evidence surface
+        run: |
+          python -m py_compile \
+            sportsedge/core/simulate/drive_play.py \
+            sportsedge/core/simulate/usage.py \
+            sportsedge/core/simulate/player_markets.py \
+            sportsedge/core/simulate/special_teams.py \
+            sportsedge/core/promotion/football_registry.py \
+            sportsedge/sports/nfl/historical_validation.py \
+            sportsedge/sports/nfl/simulator_profile.py \
+            scripts/run_nfl_historical_validation.py \
+            scripts/validate_nfl_simulator_profile.py \
+            scripts/build_nfl_promotion_registry.py
+      - name: Run football contract tests
+        run: python -m unittest discover -s tests -p 'test_football*.py' -v
+      - name: Run NFL contract tests
+        run: python -m unittest discover -s tests -p 'test_nfl*.py' -v
+      - name: Freeze nflverse source bytes once
+        run: |
+          mkdir -p artifacts/football
+          python - <<'PY'
+          from pathlib import Path
+          from urllib.request import Request, urlopen
+          from sportsedge.sports.nfl.history import NFLVERSE_SCHEDULE_CSV
+          req = Request(NFLVERSE_SCHEDULE_CSV, headers={'User-Agent': 'SportsEdge-NFL-evidence/1.0'})
+          with urlopen(req, timeout=45) as response:
+              payload = response.read()
+          Path('artifacts/football/nfl_games.csv').write_bytes(payload)
+          PY
+      - name: Build real-history audit from frozen bytes
+        run: >-
+          python scripts/audit_nfl_real_history.py
+          --source-file artifacts/football/nfl_games.csv
+          --min-season 1999 --max-season 2025
+          --output artifacts/football/nfl_real_history_audit.json
+      - name: Build emergent key-number math evidence
+        run: >-
+          python scripts/validate_nfl_simulator_profile.py
+          artifacts/football/nfl_real_history_audit.json
+          --out artifacts/football/nfl_simulator_profile.json
+      - name: Build fold-safe real-history M1-vs-M2 evidence from same bytes
+        run: >-
+          python scripts/run_nfl_historical_validation.py
+          --source-file artifacts/football/nfl_games.csv
+          --start-season 2006 --end-season 2025
+          --out artifacts/football/nfl_historical_validation.json
+      - name: Verify source-hash identity across evidence
+        run: |
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          raw_sha = hashlib.sha256(Path('artifacts/football/nfl_games.csv').read_bytes()).hexdigest()
+          audit = json.loads(Path('artifacts/football/nfl_real_history_audit.json').read_text())
+          history = json.loads(Path('artifacts/football/nfl_historical_validation.json').read_text())
+          math = json.loads(Path('artifacts/football/nfl_simulator_profile.json').read_text())
+          hashes = {
+              raw_sha,
+              audit['source_sha256'],
+              history['source_sha256'],
+              math['math_artifact']['source_sha256'],
+          }
+          if len(hashes) != 1:
+              raise SystemExit(f'NFL_EVIDENCE_SOURCE_HASH_MISMATCH:{sorted(hashes)}')
+          PY
+      - name: Build fail-closed pre-CI per-market promotion registry
+        run: >-
+          python scripts/build_nfl_promotion_registry.py
+          --math-evidence artifacts/football/nfl_simulator_profile.json
+          --historical-evidence artifacts/football/nfl_historical_validation.json
+          --market-surface config/football_market_surface.json
+          --out artifacts/football/nfl_promotion_registry.json
+      - name: Write evidence manifest
+        run: |
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          paths = sorted(Path('artifacts/football').glob('*.json'))
+          manifest = {
+              'schema_version': 1,
+              'git_sha': '${{ github.sha }}',
+              'source_sha256': hashlib.sha256(Path('artifacts/football/nfl_games.csv').read_bytes()).hexdigest(),
+              'artifacts': [
+                  {'path': str(p), 'sha256': hashlib.sha256(p.read_bytes()).hexdigest()}
+                  for p in paths
+              ],
+          }
+          Path('artifacts/football/nfl_promotion_evidence_manifest.json').write_text(
+              json.dumps(manifest, indent=2, sort_keys=True) + '\n'
+          )
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nfl-promotion-evidence-${{ github.sha }}
+          path: |
+            artifacts/football/*.json
+            artifacts/football/nfl_games.csv
+          if-no-files-found: error
