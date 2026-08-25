@@ -5,6 +5,7 @@ import tempfile
 import unittest
 
 from sportsedge.live_slate import LiveGame, TeamLineup
+from sportsedge.mlb_generic_features import MLBGenericFeatureError, MLBGenericHistorySource
 from sportsedge.pitcher_win_state_engine import (
     build_pitcher_win_features,
     build_shared_pitcher_win_engine_session,
@@ -90,6 +91,40 @@ class PitcherWinStateTests(unittest.TestCase):
         self.assertEqual(built["features"]["away_starter_id"], 501)
         self.assertEqual(built["features"]["home_starter_id"], 601)
         self.assertEqual(len(built["feature_source_hash"]), 64)
+
+    def test_legacy_generic_special_market_proxies_are_retired_fail_closed(self):
+        calls = []
+
+        def opener(*args, **kwargs):
+            calls.append((args, kwargs))
+            raise AssertionError("legacy special-market path must fail before network fetch")
+
+        source = MLBGenericHistorySource(
+            opener=opener,
+            retrieved_at=datetime(2026, 8, 25, 15, tzinfo=timezone.utc),
+        )
+        common = dict(
+            game_pk=777,
+            entity_id="501",
+            target_date=date(2026, 8, 25),
+            away_team_id=10,
+            home_team_id=20,
+            player_id=501,
+        )
+        for market in ("PITCHER_RECORD_WIN", "FIRST_HOME_RUN"):
+            with self.subTest(market=market):
+                with self.assertRaisesRegex(MLBGenericFeatureError, "STATEFUL_FEATURE_PATH_REQUIRED"):
+                    source.feature_row(market=market, **common)
+        with self.assertRaisesRegex(MLBGenericFeatureError, "F5_STATEFUL_FEATURE_PATH_REQUIRED"):
+            source.feature_row(
+                market="F5_TOTALS",
+                game_pk=777,
+                entity_id="GAME",
+                target_date=date(2026, 8, 25),
+                away_team_id=10,
+                home_team_id=20,
+            )
+        self.assertEqual(calls, [])
 
     def test_starter_win_credit_requires_five_innings_and_preserved_lead(self):
         self.assertFalse(starter_win_credit(
