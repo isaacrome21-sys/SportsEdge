@@ -8,9 +8,10 @@ use the same Engine C probability methods and bound SpecialTeamsProfile objects.
 Completed opportunities are then settled by the Rule 16 state machine in
 ``overtime.py``.
 
-Kickoff/return/onside and defensive-return scoring are not invented here; those
-remain explicit subsequent Engine C/A extensions and therefore validation blockers
-for those rare event components.
+Sacks and offensive safeties are emitted as Engine A football events so full-game
+defensive markets can reconcile regulation and overtime. Kickoff/return/onside
+and defensive-return touchdowns remain explicit subsequent Engine C/A extensions
+and therefore validation blockers for those rare event components.
 """
 
 from __future__ import annotations
@@ -56,6 +57,8 @@ class NFLRegularSeasonOTPlay:
     raw_points: int = 0
     special_teams_points: int = 0
     special_teams_event_type: str | None = None
+    defensive_points: int = 0
+    defensive_scoring_team: str | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.opportunity_index, bool) or not isinstance(self.opportunity_index, int) or self.opportunity_index <= 0:
@@ -78,12 +81,19 @@ class NFLRegularSeasonOTPlay:
             raise ValueError("OT_PLAY_RAW_POINTS_INVALID")
         if self.special_teams_points not in (0, 1, 2, 3):
             raise ValueError("OT_PLAY_SPECIAL_TEAMS_POINTS_INVALID")
+        if self.defensive_points not in (0, 2):
+            raise ValueError("OT_PLAY_DEFENSIVE_POINTS_INVALID")
         if self.raw_points == 6 and self.play_type not in {"PASS", "RUSH"}:
             raise ValueError("OT_TOUCHDOWN_PLAY_TYPE_INVALID")
         if self.play_type == "PASS" and not isinstance(self.pass_complete, bool):
             raise ValueError("OT_PASS_COMPLETION_STATE_REQUIRED")
         if self.play_type != "PASS" and self.pass_complete is not None:
             raise ValueError("OT_NON_PASS_COMPLETION_STATE_INVALID")
+        if self.play_type == "SACK":
+            if self.yards >= 0:
+                raise ValueError("OT_SACK_YARDS_MUST_BE_NEGATIVE")
+            if self.turnover_type is not None:
+                raise ValueError("OT_SACK_TURNOVER_COLLISION")
         if self.play_type == "FIELD_GOAL":
             if self.kick_distance is None:
                 raise ValueError("OT_FIELD_GOAL_DISTANCE_REQUIRED")
@@ -91,6 +101,12 @@ class NFLRegularSeasonOTPlay:
                 raise ValueError("OT_FIELD_GOAL_RESULT_REQUIRED")
         if self.special_teams_points > 0 and self.special_teams_event_type is None:
             raise ValueError("OT_SPECIAL_TEAMS_EVENT_TYPE_REQUIRED")
+        if self.defensive_points > 0 and not str(self.defensive_scoring_team or "").strip():
+            raise ValueError("OT_DEFENSIVE_SCORING_TEAM_REQUIRED")
+        if self.defensive_points == 0 and self.defensive_scoring_team is not None:
+            raise ValueError("OT_ZERO_DEFENSIVE_POINTS_HAS_SCORING_TEAM")
+        if self.defensive_points > 0 and self.raw_points > 0:
+            raise ValueError("OT_OFFENSIVE_DEFENSIVE_SCORE_COLLISION")
 
 
 @dataclass(frozen=True)
@@ -115,7 +131,7 @@ class NFLRegularSeasonOTSimulation:
     def assert_reconciliation(self) -> None:
         for opportunity in self.opportunities:
             points = sum(
-                play.raw_points + play.special_teams_points
+                play.raw_points + play.special_teams_points + play.defensive_points
                 for play in self.plays
                 if play.opportunity_index == opportunity.opportunity_index
             )
@@ -174,9 +190,6 @@ class NFLRegularSeasonOTSimulator:
         self.away_special = regulation_path.away_profile
         self.seed = int(seed)
 
-        # Reuse Engine A's actual candidate play kernel rather than duplicating
-        # its duration/yardage formulas. The RNG owned by this kernel is the OT
-        # simulation RNG, preserving deterministic seeded path identity.
         self._a_kernel = EngineADrivePlaySimulator(
             game_id=regulation_path.base_path.game_id,
             home_team=regulation_path.base_path.home_team,
@@ -186,10 +199,6 @@ class NFLRegularSeasonOTSimulator:
             seed=self.seed,
         )
         self.rng = self._a_kernel.rng
-
-        # Engine C instance is used for its exact kick probability/participation
-        # semantics. OT draws use the shared OT RNG so path reproducibility is
-        # controlled by one seed rather than an independent hidden simulation.
         self._c_kernel = EngineCSpecialTeamsResolver(
             home_profile=self.home_special,
             away_profile=self.away_special,
@@ -208,6 +217,15 @@ class NFLRegularSeasonOTSimulator:
             return self.home_special
         if team == self.regulation_path.base_path.away_team:
             return self.away_special
+        raise ValueError("OVERTIME_TEAM_NOT_IN_GAME")
+
+    def _other(self, team: str) -> str:
+        home = self.regulation_path.base_path.home_team
+        away = self.regulation_path.base_path.away_team
+        if team == home:
+            return away
+        if team == away:
+            return home
         raise ValueError("OVERTIME_TEAM_NOT_IN_GAME")
 
     def _resolve_try(self, team: str, *, force_two: bool = False) -> tuple[int, str]:
@@ -242,9 +260,6 @@ class NFLRegularSeasonOTSimulator:
         clock_remaining: int,
         prior_opportunities: list[NFLRegularSeasonOTOpportunity],
     ) -> tuple[int, str | None, str]:
-        # At 0:00 the period itself determines the result; no post-game try is
-        # generated. After both clubs have had their guaranteed opportunity, a
-        # touchdown is sudden-death and likewise ends the game before a try.
         if clock_remaining == 0:
             return 0, None, "TOUCHDOWN_CLOCK_EXPIRED"
         if opportunity_index > 2:
@@ -256,15 +271,12 @@ class NFLRegularSeasonOTSimulator:
             points, event = self._resolve_try(team)
             return points, event, "TOUCHDOWN_WITH_TRY"
 
-        # Second guaranteed opportunity: the touchdown itself ends the game if
-        # it creates a lead. Otherwise the try is necessary to tie or win.
         scores = self._scores(prior_opportunities, home, away)
         opponent = away if team == home else home
         raw_after_td = scores[team] + 6
         if raw_after_td > scores[opponent]:
             return 0, None, "TOUCHDOWN_SECOND_POSSESSION_WIN"
 
-        # If the opponent has eight points, only a two-point conversion can tie.
         force_two = scores[opponent] - raw_after_td == 2
         points, event = self._resolve_try(team, force_two=force_two)
         return points, event, "TOUCHDOWN_WITH_TRY"
@@ -285,9 +297,6 @@ class NFLRegularSeasonOTSimulator:
         plays: list[NFLRegularSeasonOTPlay] = []
         play_index = next_play_index
 
-        # With the A-kernel minimum duration, a 600-second OT period cannot
-        # contain 40 live plays. This bound is therefore a corruption guard, not
-        # a football approximation.
         for _ in range(40):
             if clock_remaining <= 0:
                 break
@@ -360,15 +369,20 @@ class NFLRegularSeasonOTSimulator:
                     play_index + 1,
                 )
 
-            if play_type == "PASS":
+            if play_type == "PASS" and self.rng.random() < profile.sack_rate:
+                play_type = "SACK"
+                pass_complete = None
+                yards = -int(self.rng.integers(1, 13))
+            elif play_type == "PASS":
                 pass_complete = bool(self.rng.random() < profile.completion_rate)
                 yards = self._a_kernel._regular_play_yards(profile, play_type) if pass_complete else 0
             else:
                 pass_complete = None
                 yards = self._a_kernel._regular_play_yards(profile, play_type)
 
-            new_yardline = max(0, min(99, yardline - yards))
-            touchdown = new_yardline == 0 and (play_type != "PASS" or pass_complete)
+            raw_new_yardline = yardline - yards
+            safety = raw_new_yardline >= 100 and yards < 0
+            touchdown = raw_new_yardline <= 0 and (play_type != "PASS" or pass_complete)
             try_points = 0
             try_event: str | None = None
             outcome_type = "NO_SCORE"
@@ -380,6 +394,8 @@ class NFLRegularSeasonOTSimulator:
                     prior_opportunities=prior_opportunities,
                 )
 
+            defense = self._other(team)
+            defensive_points = 2 if safety else 0
             plays.append(
                 NFLRegularSeasonOTPlay(
                     opportunity_index, play_index, team, clock_remaining,
@@ -388,9 +404,25 @@ class NFLRegularSeasonOTSimulator:
                     raw_points=6 if touchdown else 0,
                     special_teams_points=try_points,
                     special_teams_event_type=try_event,
+                    defensive_points=defensive_points,
+                    defensive_scoring_team=defense if safety else None,
                 )
             )
             play_index += 1
+
+            if safety:
+                return (
+                    NFLRegularSeasonOTOpportunity(
+                        opportunity_index=opportunity_index,
+                        opportunity_team=team,
+                        scoring_team=defense,
+                        points=2,
+                        clock_end_seconds_remaining=clock_remaining,
+                        outcome_type="KICKOFF_SAFETY" if opportunity_index == 1 else "SAFETY",
+                    ),
+                    plays,
+                    play_index,
+                )
 
             if touchdown:
                 return (
@@ -415,6 +447,7 @@ class NFLRegularSeasonOTSimulator:
                     play_index,
                 )
 
+            new_yardline = max(1, min(99, raw_new_yardline))
             converted = (pass_complete is True and yards >= distance) if play_type == "PASS" else yards >= distance
             yardline = new_yardline
             if converted:

@@ -1,5 +1,19 @@
 """Shared simulation engines."""
 
+from .defense_full_game import (
+    AttributedOTDefensivePlay,
+    AttributedOvertimeDefensivePath,
+    EngineBOvertimeDefenseAllocator,
+    FullGameDefensivePath,
+)
+from .defense_markets import derive_defender_stat_market, derive_team_defense_stat_market
+from .defense_usage import (
+    AttributedDefensivePath,
+    AttributedDefensivePlay,
+    DefenderUsageProfile,
+    EngineBDefenseAllocator,
+    TeamDefenseUsageProfile,
+)
 from .drive_play import EngineADrivePlaySimulator, FootballPlayPath, PlayEvent, TeamDriveProfile
 from .field_position import (
     NFLFieldPositionProfile,
@@ -74,8 +88,19 @@ __all__ = [
     "AttributedPlay",
     "AttributedFootballPath",
     "EngineBUsageAllocator",
+    "DefenderUsageProfile",
+    "TeamDefenseUsageProfile",
+    "AttributedDefensivePlay",
+    "AttributedDefensivePath",
+    "EngineBDefenseAllocator",
+    "AttributedOTDefensivePlay",
+    "AttributedOvertimeDefensivePath",
+    "EngineBOvertimeDefenseAllocator",
+    "FullGameDefensivePath",
     "derive_player_stat_market",
     "derive_kicker_stat_market",
+    "derive_defender_stat_market",
+    "derive_team_defense_stat_market",
     "derive_race_to_n",
     "derive_largest_lead",
     "derive_winning_margin_band",

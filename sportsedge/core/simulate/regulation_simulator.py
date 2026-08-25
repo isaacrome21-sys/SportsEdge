@@ -144,7 +144,7 @@ class NFLIntegratedRegulationSimulator:
         self.away_field_position = away_field_position
         self.seed = int(seed)
 
-        # Reuse the exact structural Engine A play kernel for pace and yards.
+        # Reuse the exact structural Engine A play kernel for pace, yards and sacks.
         self._a_kernel = EngineADrivePlaySimulator(
             game_id=game_id,
             home_team=home_team,
@@ -437,48 +437,53 @@ class NFLIntegratedRegulationSimulator:
                 quarter, clock = self._play_end_period_clock(remaining)
                 play_type = "PASS" if self.rng.random() < profile.pass_rate else "RUSH"
 
-                if self.rng.random() < profile.turnover_rate:
-                    turnover_type = "INTERCEPTION" if play_type == "PASS" else "FUMBLE"
-                    pass_complete = False if play_type == "PASS" else None
-                    yards = 0 if play_type == "PASS" else self._a_kernel._regular_play_yards(profile, play_type)
-                    after_yardline = max(0, min(100, yardline - yards))
-                    play_id += 1
-                    play = PlayEvent(
-                        drive_id=drive_id, play_id=play_id,
-                        quarter=quarter, clock_seconds_remaining=clock,
-                        possession=possession,
-                        score_before_home=before_home, score_before_away=before_away,
-                        score_after_home=raw_home, score_after_away=raw_away,
-                        down=down, distance=distance, yardline_100=yardline,
-                        play_type=play_type, yards=yards, points=0,
-                        turnover_type=turnover_type,
-                        pass_complete=pass_complete,
-                    )
-                    plays.append(play)
-                    if remaining not in (0, 1800):
-                        transition_index += 1
-                        period, transition_clock = self._transition_period_clock(remaining)
-                        pending = self._field.turnover(
-                            transition_index=transition_index,
-                            source_play_id=play.play_id,
-                            next_drive_id=next_id,
-                            offense_team=possession,
-                            defense_team=opponent,
-                            period=period,
-                            clock_seconds_remaining=transition_clock,
-                            offense_yardline_100_after_play=after_yardline,
-                            transition_type=turnover_type,
-                        )
-                        transitions.append(pending)
-                    drive_ended = True
-                    break
-
-                if play_type == "PASS":
-                    pass_complete = bool(self.rng.random() < profile.completion_rate)
-                    yards = self._a_kernel._regular_play_yards(profile, play_type) if pass_complete else 0
-                else:
+                if play_type == "PASS" and self.rng.random() < profile.sack_rate:
+                    play_type = "SACK"
                     pass_complete = None
-                    yards = self._a_kernel._regular_play_yards(profile, play_type)
+                    yards = self._a_kernel._sack_yards()
+                else:
+                    if self.rng.random() < profile.turnover_rate:
+                        turnover_type = "INTERCEPTION" if play_type == "PASS" else "FUMBLE"
+                        pass_complete = False if play_type == "PASS" else None
+                        yards = 0 if play_type == "PASS" else self._a_kernel._regular_play_yards(profile, play_type)
+                        after_yardline = max(0, min(100, yardline - yards))
+                        play_id += 1
+                        play = PlayEvent(
+                            drive_id=drive_id, play_id=play_id,
+                            quarter=quarter, clock_seconds_remaining=clock,
+                            possession=possession,
+                            score_before_home=before_home, score_before_away=before_away,
+                            score_after_home=raw_home, score_after_away=raw_away,
+                            down=down, distance=distance, yardline_100=yardline,
+                            play_type=play_type, yards=yards, points=0,
+                            turnover_type=turnover_type,
+                            pass_complete=pass_complete,
+                        )
+                        plays.append(play)
+                        if remaining not in (0, 1800):
+                            transition_index += 1
+                            period, transition_clock = self._transition_period_clock(remaining)
+                            pending = self._field.turnover(
+                                transition_index=transition_index,
+                                source_play_id=play.play_id,
+                                next_drive_id=next_id,
+                                offense_team=possession,
+                                defense_team=opponent,
+                                period=period,
+                                clock_seconds_remaining=transition_clock,
+                                offense_yardline_100_after_play=after_yardline,
+                                transition_type=turnover_type,
+                            )
+                            transitions.append(pending)
+                        drive_ended = True
+                        break
+
+                    if play_type == "PASS":
+                        pass_complete = bool(self.rng.random() < profile.completion_rate)
+                        yards = self._a_kernel._regular_play_yards(profile, play_type) if pass_complete else 0
+                    else:
+                        pass_complete = None
+                        yards = self._a_kernel._regular_play_yards(profile, play_type)
 
                 raw_new_yardline = yardline - yards
                 safety = raw_new_yardline >= 100 and yards < 0
@@ -527,6 +532,7 @@ class NFLIntegratedRegulationSimulator:
                         # touchback contract. Declared safety-kick onside recovery
                         # geometry remains a later fitted extension, so onside is
                         # disabled here rather than assigned a false spot.
+                        trailing = self._resolved_score(possession, resolved_home, resolved_away) < self._resolved_score(opponent, resolved_home, resolved_away)
                         pending = self._field.kickoff(
                             transition_index=transition_index,
                             source_play_id=play.play_id,
@@ -535,7 +541,7 @@ class NFLIntegratedRegulationSimulator:
                             receiving_team=opponent,
                             period=period,
                             clock_seconds_remaining=transition_clock,
-                            kicking_team_trailing=True,
+                            kicking_team_trailing=trailing,
                             label="SAFETY_KICK",
                             allow_onside=False,
                         )
