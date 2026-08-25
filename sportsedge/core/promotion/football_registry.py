@@ -6,12 +6,13 @@ canonical multi-source manifest and exact code SHA as simulator math, and carry
 forward CLV from that same exact code contract. Missing market evidence never
 inherits a stage from another market, a caller-supplied CI boolean can never
 self-attest execution, and promotion-grade CLV must prove comparable threshold,
-pregame timing, same-sportsbook close identity, and internally reconciled row
-counts before it can advance a market.
+pregame timing, same-sportsbook close identity, internally reconciled row counts,
+and finite numeric evidence before it can advance a market.
 """
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from math import isfinite
 import re
 from typing import Any
 
@@ -59,6 +60,16 @@ def _count(value: Any, error: str) -> int:
     return value
 
 
+def _finite_float(value: Any, error: str) -> float:
+    try:
+        out = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(error) from exc
+    if not isfinite(out):
+        raise ValueError(error)
+    return out
+
+
 def _clv_bucket(
     value: Any,
     *,
@@ -80,6 +91,20 @@ def _clv_bucket(
             row.get("logged_plays"),
             f"{row_error_prefix}_LOGGED_PLAYS_INVALID:{market}",
         )
+        _finite_float(
+            row.get("mean_clv"),
+            f"{row_error_prefix}_MEAN_CLV_INVALID:{market}",
+        )
+        _finite_float(
+            row.get("clv_t_stat"),
+            f"{row_error_prefix}_T_STAT_INVALID:{market}",
+        )
+        beat_close_rate = _finite_float(
+            row.get("beat_close_rate"),
+            f"{row_error_prefix}_BEAT_CLOSE_RATE_INVALID:{market}",
+        )
+        if not 0.0 <= beat_close_rate <= 1.0:
+            raise ValueError(f"{row_error_prefix}_BEAT_CLOSE_RATE_INVALID:{market}")
     return payload, total
 
 
@@ -307,18 +332,32 @@ def build_nfl_promotion_registry(
         if calibration is None:
             calibration_max, calibration_threshold = 1.0, 0.0
         else:
-            raw_max = calibration.get("max_bin_deviation")
-            raw_threshold = calibration.get("threshold")
-            calibration_max = float(raw_max) if raw_max is not None else 1.0
-            calibration_threshold = float(raw_threshold) if raw_threshold is not None else 0.0
+            calibration_pass = calibration.get("pass")
+            if not isinstance(calibration_pass, bool):
+                raise ValueError(f"NFL_CALIBRATION_EVIDENCE_INVALID:{market}")
+            calibration_max = _finite_float(
+                calibration.get("max_bin_deviation"),
+                f"NFL_CALIBRATION_EVIDENCE_INVALID:{market}",
+            )
+            calibration_threshold = _finite_float(
+                calibration.get("threshold"),
+                f"NFL_CALIBRATION_EVIDENCE_INVALID:{market}",
+            )
             if calibration_max < 0 or calibration_threshold < 0:
                 raise ValueError(f"NFL_CALIBRATION_EVIDENCE_INVALID:{market}")
-            if calibration.get("pass") is True and calibration_max > calibration_threshold:
+            computed_pass = calibration_max <= calibration_threshold
+            if calibration_pass is not computed_pass:
                 raise ValueError(f"NFL_CALIBRATION_PASS_CONTRADICTION:{market}")
 
         logged_plays = int(clv.get("logged_plays", 0)) if clv is not None else 0
-        mean_clv = float(clv.get("mean_clv", 0.0)) if clv is not None else 0.0
-        clv_t_stat = float(clv.get("clv_t_stat", 0.0)) if clv is not None else 0.0
+        mean_clv = _finite_float(
+            clv.get("mean_clv", 0.0) if clv is not None else 0.0,
+            f"NFL_CLV_EVIDENCE_INVALID:{market}",
+        )
+        clv_t_stat = _finite_float(
+            clv.get("clv_t_stat", 0.0) if clv is not None else 0.0,
+            f"NFL_CLV_EVIDENCE_INVALID:{market}",
+        )
         if logged_plays < 0:
             raise ValueError(f"NFL_CLV_EVIDENCE_INVALID:{market}")
 
@@ -350,7 +389,7 @@ def build_nfl_promotion_registry(
         }
 
     return {
-        "schema_version": 8,
+        "schema_version": 9,
         "sport": "nfl",
         "model_id": PRODUCTION_NFL_M2_MODEL_ID,
         "feature_contract": NFL_M2_FEATURE_CONTRACT,
