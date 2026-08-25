@@ -1,6 +1,6 @@
 import unittest
 
-from sportsedge.sports.nfl.m2_history_features import build_nfl_m2_history_rows
+from sportsedge.sports.nfl.m2_history_policy import build_nfl_m2_history_rows
 
 
 class NFLM2NeutralPolicyTests(unittest.TestCase):
@@ -47,6 +47,10 @@ class NFLM2NeutralPolicyTests(unittest.TestCase):
         # The excluded neutral Week 1 game must still be in the prior state used
         # for Week 2, so B's current-season offensive EPA is 0.9 rather than 0.
         self.assertAlmostEqual(rows[0]["home_features"]["pass_epa"], 0.9)
+
+    def test_unknown_neutral_policy_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "NFL_NEUTRAL_SITE_POLICY_INVALID"):
+            build_nfl_m2_history_rows([], [], [], [], [], prior_decay_curves={}, neutral_site_policy="guess")
 
 
 if __name__ == "__main__": unittest.main()
