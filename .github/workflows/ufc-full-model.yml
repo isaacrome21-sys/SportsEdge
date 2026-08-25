@@ -14,6 +14,10 @@ on:
       - '.github/workflows/ufc-full-model.yml'
   workflow_dispatch:
   schedule:
+    # DWCS Season 10 airs Tuesdays; run an early and late pre-card refresh.
+    - cron: '0 16 * * 2'
+    - cron: '0 21 * * 2'
+    # UFC Saturday refreshes retained for standard cards.
     - cron: '0 15 * * 6'
     - cron: '0 19 * * 6'
 
@@ -51,8 +55,9 @@ jobs:
           c=json.load(open('data/ufc/contexts_today.json'))
           assert m['training_rows'] >= 1000
           assert m['holdout_metrics']['n'] >= 100
-          assert len(f['fighters']) >= 20
-          assert len(c) >= 10
+          assert len(c) >= 1
+          assert len(f['fighters']) == 2 * len(c)
+          assert all(int(x.get('rounds', 0)) in {3, 5} for x in c)
           print('UFC_BOOTSTRAP_OK',m['training_rows'],m['holdout_metrics'],len(f['fighters']),len(c))
           PY
       - uses: actions/upload-artifact@v4

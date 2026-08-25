@@ -72,7 +72,7 @@ def _from_ufcstats(latest,last_date,elo):
     bouts=parse_event(urls[0])
     if not bouts:return None
     fighters={}; contexts=[]
-    for i,b in enumerate(bouts):
+    for b in bouts:
         try: ua,ub=fighter_urls_from_bout(b.bout_url); pa,pb=parse_fighter_profile(ua),parse_fighter_profile(ub)
         except Exception: continue
         for p in (pa,pb):
@@ -83,17 +83,28 @@ def _from_ufcstats(latest,last_date,elo):
                          'takedowns_per_15':p.td_avg or snap['takedowns_per_15'],'takedown_accuracy':p.td_acc or snap['takedown_accuracy'],
                          'takedown_defense':p.td_def,'submissions_per_15':p.sub_avg or snap['submissions_per_15']})
             fighters[p.name]=snap
-        title=i<2; contexts.append({'fighter_a':b.fighter_a,'fighter_b':b.fighter_b,'rounds':5 if title else 3,'title_fight':title,'short_notice_days':None,'altitude_ft':0.0})
+        # Never infer title/main-event rounds from card position. UFCStats' parsed bout
+        # metadata is the source of truth; DWCS cards are five three-round bouts.
+        rounds=int(b.rounds or 3); title=rounds >= 5
+        contexts.append({'fighter_a':b.fighter_a,'fighter_b':b.fighter_b,'rounds':rounds,'title_fight':title,'short_notice_days':None,'altitude_ft':0.0})
     return bouts[0].event,bouts[0].event_date,fighters,contexts
 
+def _validate_card(fighters, contexts):
+    bouts=len(contexts); count=len(fighters)
+    if bouts < 1:
+        raise SystemExit('UFC_LIVE_INPUTS_INCOMPLETE fighters=0 bouts=0')
+    expected=2*bouts
+    if count != expected:
+        raise SystemExit(f'UFC_LIVE_INPUTS_INCOMPLETE fighters={count} bouts={bouts} expected_fighters={expected}')
+
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('--fighters',default='data/ufc/fighters_today.json');ap.add_argument('--contexts',default='data/ufc/contexts_today.json');ap.add_argument('--override',default='config/ufc_330_current.json');a=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('--fighters',default='data/ufc/fighters_today.json');ap.add_argument('--contexts',default='data/ufc/contexts_today.json');ap.add_argument('--override',default='');a=ap.parse_args()
     latest,last_date,elo=_history(); result=_from_ufcstats(latest,last_date,elo)
     if result is None:
-        if not Path(a.override).exists(): raise SystemExit('UFC_LIVE_INPUTS_UNAVAILABLE')
+        if not a.override or not Path(a.override).exists(): raise SystemExit('UFC_LIVE_INPUTS_UNAVAILABLE')
         result=_from_override(a.override,latest,last_date,elo)
     event,event_date,fighters,contexts=result
-    if len(fighters)<20 or len(contexts)<10: raise SystemExit(f'UFC_LIVE_INPUTS_INCOMPLETE fighters={len(fighters)} bouts={len(contexts)}')
+    _validate_card(fighters,contexts)
     Path(a.fighters).parent.mkdir(parents=True,exist_ok=True);Path(a.contexts).parent.mkdir(parents=True,exist_ok=True)
     Path(a.fighters).write_text(json.dumps({'event':event,'event_date':event_date,'generated_at':datetime.now(timezone.utc).isoformat(),'fighters':list(fighters.values())},indent=2,sort_keys=True))
     Path(a.contexts).write_text(json.dumps(contexts,indent=2,sort_keys=True))

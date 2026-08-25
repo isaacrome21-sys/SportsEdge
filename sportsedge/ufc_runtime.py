@@ -6,13 +6,14 @@ probability is produced.
 """
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
+import hashlib
 import json
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
-from .ufc_engine import FighterSnapshot, FightContext, project_fight, monte_carlo, no_vig_two_way, truth_gate
+from .ufc_engine import FighterSnapshot, FightContext, FightProjection, project_fight, monte_carlo, no_vig_two_way, truth_gate
 from .ufc_source import OddsQuote, normalize_name, pair_h2h_quotes
 from .ufc_training import LogisticArtifact
 
@@ -85,6 +86,48 @@ def _lookup_snapshots(fighters: Iterable[FighterSnapshot]) -> dict[str, FighterS
     return out
 
 
+def _recenter_projection(proj: FightProjection, p_a_win: float) -> FightProjection:
+    """Reconcile method distribution to the ensemble ML probability.
+
+    Preserve each fighter's conditional KO/sub/decision mix while making the
+    Monte Carlo winner distribution agree with the ensemble probability used by
+    pricing and the Truth Gate.
+    """
+    p_a = min(1.0, max(0.0, float(p_a_win)))
+    p_b = 1.0 - p_a
+    a = [proj.p_a_ko, proj.p_a_sub, proj.p_a_dec]
+    b = [proj.p_b_ko, proj.p_b_sub, proj.p_b_dec]
+    a_total = sum(a)
+    b_total = sum(b)
+    if a_total <= 0.0:
+        a = [0.0, 0.0, 1.0]
+        a_total = 1.0
+    if b_total <= 0.0:
+        b = [0.0, 0.0, 1.0]
+        b_total = 1.0
+    a_ko, a_sub, a_dec = [p_a * x / a_total for x in a]
+    b_ko, b_sub, b_dec = [p_b * x / b_total for x in b]
+    p_gtd = a_dec + b_dec
+    return replace(
+        proj,
+        p_a_win=p_a,
+        p_b_win=p_b,
+        p_a_ko=a_ko,
+        p_a_sub=a_sub,
+        p_a_dec=a_dec,
+        p_b_ko=b_ko,
+        p_b_sub=b_sub,
+        p_b_dec=b_dec,
+        p_goes_distance=p_gtd,
+        p_inside_distance=1.0 - p_gtd,
+    )
+
+
+def _stable_seed(*parts: str) -> int:
+    payload = "\x1f".join(parts).encode("utf-8")
+    return int.from_bytes(hashlib.sha256(payload).digest()[:4], "big")
+
+
 def evaluate_h2h(*, fighters: Iterable[FighterSnapshot], quotes: Iterable[OddsQuote],
                  contexts: Mapping[frozenset[str], FightContext] | None = None,
                  artifact: LogisticArtifact | None = None,
@@ -103,11 +146,10 @@ def evaluate_h2h(*, fighters: Iterable[FighterSnapshot], quotes: Iterable[OddsQu
         m1, m2 = no_vig_two_way(q1.price, q2.price)
         gate1 = truth_gate(prob=p1, odds=q1.price, market_novig=m1, uncertainty=uncertainty,
                            min_edge=min_edge, min_ev=min_ev, max_uncertainty=max_uncertainty)
-        proj = project_fight(a, b, ctx)
-        # Recenter outcome projection to ensemble ML while preserving conditional method mix.
-        sim = monte_carlo(proj, n=n_sims, seed=abs(hash((q1.event_id, n1, n2))) % (2**31))
+        proj = _recenter_projection(project_fight(a, b, ctx), p1)
+        seed = _stable_seed(q1.event_id, n1, n2, q1.bookmaker)
+        sim = monte_carlo(proj, n=n_sims, seed=seed)
         sim_p1 = sim["a_win"]
-        # Monte Carlo engine is an outcome-distribution diagnostic; the ensemble ML is source of truth.
         reason1 = "PASS" if gate1["pass"] else "TRUTH_GATE"
         out.append(UFCCandidate(q1.event_id, q1.selection, q2.selection, q1.bookmaker, q1.price,
                                 p1, base, trained, m1, float(gate1["edge"]), float(gate1["ev"]),
