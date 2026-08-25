@@ -40,7 +40,7 @@
     "EITHER_PITCHER_BB": {"eligible": false, "stage": "JOINT_ENGINE_CANDIDATE", "reason": "new two-pitcher market; book settlement and held-out evidence required"},
     "EITHER_PITCHER_ER": {"eligible": false, "stage": "JOINT_ENGINE_CANDIDATE", "reason": "new two-pitcher market; book settlement and held-out evidence required"},
 
-    "PITCHER_RECORD_WIN": {"eligible": false, "stage": "UPSTREAM_MODEL_REVIEW", "reason": "win-probability source model requires redesign"},
-    "FIRST_HOME_RUN": {"eligible": false, "stage": "REBUILD_REQUIRED", "reason": "ordering-aware PA simulation required"}
+    "PITCHER_RECORD_WIN": {"eligible": false, "stage": "GAME_STATE_CANDIDATE", "reason": "today's shared game-state win probability plus strictly-prior starter decision propensity implemented; PIT holdout, calibration, settlement validation, forward evidence, and parity required"},
+    "FIRST_HOME_RUN": {"eligible": false, "stage": "ORDERING_AWARE_CANDIDATE", "reason": "confirmed-lineup ordering-aware first-HR simulation implemented; no-HR sportsbook policy, PIT holdout, calibration, forward evidence, and parity required"}
   }
 }
