@@ -17,6 +17,15 @@ from dataclasses import dataclass
 import numpy as np
 
 
+def _validate_period_clock(period: int, clock_seconds_remaining: int) -> tuple[int, int]:
+    if period not in (1, 2, 3, 4, 5):
+        raise ValueError("FIELD_POSITION_PERIOD_INVALID")
+    maximum = 600 if period == 5 else 900
+    if not 0 <= clock_seconds_remaining <= maximum:
+        raise ValueError("FIELD_POSITION_CLOCK_INVALID")
+    return period, clock_seconds_remaining
+
+
 @dataclass(frozen=True)
 class NFLFieldPositionProfile:
     team: str
@@ -26,6 +35,9 @@ class NFLFieldPositionProfile:
     kickoff_return_yards_sd: float = 8.0
     punt_net_yards_mean: float = 41.0
     punt_net_yards_sd: float = 8.0
+    # Legacy field name retained for artifact/source compatibility. Under the
+    # 2026 rule this is the declared-onside attempt rate whenever `allow_onside`
+    # is true; the kicking team no longer has to be trailing.
     onside_attempt_rate_when_trailing: float = 0.0
     onside_recovery_rate: float = 0.12
     onside_kicking_recovery_yardline_100: int = 55
@@ -91,10 +103,7 @@ class NFLPossessionTransition:
             raise ValueError("FIELD_POSITION_SOURCE_PLAY_ID_INVALID")
         if isinstance(self.next_drive_id, bool) or not isinstance(self.next_drive_id, int) or self.next_drive_id <= 0:
             raise ValueError("FIELD_POSITION_NEXT_DRIVE_ID_INVALID")
-        if self.period not in (1, 2, 3, 4):
-            raise ValueError("FIELD_POSITION_PERIOD_INVALID")
-        if not 0 <= self.clock_seconds_remaining <= 900:
-            raise ValueError("FIELD_POSITION_CLOCK_INVALID")
+        _validate_period_clock(self.period, self.clock_seconds_remaining)
         if not str(self.transition_type).strip():
             raise ValueError("FIELD_POSITION_TRANSITION_TYPE_REQUIRED")
         for team in (self.from_team, self.nominal_receiving_team, self.next_possession_team):
@@ -110,8 +119,6 @@ class NFLPossessionTransition:
             raise ValueError("FIELD_POSITION_TRAILING_FLAG_INVALID")
         if not isinstance(self.creates_next_drive, bool):
             raise ValueError("FIELD_POSITION_CREATES_NEXT_DRIVE_INVALID")
-        if "ONSIDE" in self.transition_type and not self.kicking_team_was_trailing:
-            raise ValueError("ONSIDE_REQUIRES_TRAILING_KICKING_TEAM")
 
 
 class NFLFieldPositionResolver:
@@ -146,11 +153,7 @@ class NFLFieldPositionResolver:
 
     @staticmethod
     def _period_clock(period: int, clock_seconds_remaining: int) -> tuple[int, int]:
-        if period not in (1, 2, 3, 4):
-            raise ValueError("FIELD_POSITION_PERIOD_INVALID")
-        if not 0 <= clock_seconds_remaining <= 900:
-            raise ValueError("FIELD_POSITION_CLOCK_INVALID")
-        return period, clock_seconds_remaining
+        return _validate_period_clock(period, clock_seconds_remaining)
 
     def kickoff(
         self,
@@ -173,7 +176,9 @@ class NFLFieldPositionResolver:
         receiving = self._profile(receiving_team)
         trailing = bool(kicking_team_trailing)
 
-        if allow_onside and trailing and self.rng.random() < kicking.onside_attempt_rate_when_trailing:
+        # 2026 Rule 6 permits a declared onside kick at any time. `trailing` is
+        # retained only as an audit field; it is no longer an eligibility gate.
+        if allow_onside and self.rng.random() < kicking.onside_attempt_rate_when_trailing:
             kicking_recovers = bool(self.rng.random() < kicking.onside_recovery_rate)
             return NFLPossessionTransition(
                 transition_index=transition_index,
@@ -186,7 +191,7 @@ class NFLFieldPositionResolver:
                 nominal_receiving_team=receiving_team,
                 next_possession_team=kicking_team if kicking_recovers else receiving_team,
                 next_yardline_100=kicking.onside_kicking_recovery_yardline_100 if kicking_recovers else kicking.onside_receiving_recovery_yardline_100,
-                kicking_team_was_trailing=True,
+                kicking_team_was_trailing=trailing,
             )
 
         draw = self.rng.random()
