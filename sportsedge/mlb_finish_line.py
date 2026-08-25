@@ -1,0 +1,191 @@
+"""Executable finish-line inventory for the complete SportsEdge MLB catalog.
+
+Engineering completion and evidence completion are deliberately different states.
+This module proves that every canonical market has named runtime/settlement code and
+then classifies what still prevents operational promotion: external acquisition,
+book-rule policy, or the six validation/evidence gates.
+"""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any, Mapping
+
+from .engine_registry import engine_registry
+from .mlb_acceptance_matrix import build_acceptance_matrix
+from .mlb_catalog_prediction_settlement import (
+    ADDITIONAL_MARKETS,
+    EITHER_PITCHER_MARKETS,
+    GAME_MARKETS,
+)
+from .mlb_settlement_evidence import _BATTER_FIELD_BY_MARKET, _PITCHER_FIELD_BY_MARKET
+
+DEFAULT_SURFACE = Path("config/mlb_market_surface.json")
+DEFAULT_DEPLOYMENTS = Path("config/deployments.json")
+DEFAULT_BEHAVIORAL = Path("config/mlb_behavioral_disposition.json")
+DEFAULT_VALIDATION = Path("config/mlb_validation_evidence.json")
+
+# These are not guesses about sportsbook rules. They identify catalog families where
+# the repo already knows a book-specific policy must be validated before settlement.
+BOOK_POLICY_MARKETS = frozenset({"FIRST_HOME_RUN"})
+BOOK_RULE_VALIDATION_MARKETS = frozenset(EITHER_PITCHER_MARKETS)
+
+# _resolve_prediction covers these families after the Either-Pitcher interpreter is
+# installed. F5_TEAM_TOTALS is the one F5 market settled outside ADDITIONAL_MARKETS.
+SETTLEMENT_CODE_MARKETS = frozenset(
+    set(GAME_MARKETS)
+    | {"F5_TEAM_TOTALS"}
+    | set(ADDITIONAL_MARKETS)
+    | set(EITHER_PITCHER_MARKETS)
+    | set(_BATTER_FIELD_BY_MARKET)
+    | set(_PITCHER_FIELD_BY_MARKET)
+)
+
+
+class MLBFinishLineError(ValueError):
+    pass
+
+
+def _load(path: str | Path) -> dict[str, Any]:
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise MLBFinishLineError(f"expected JSON object: {path}")
+    return payload
+
+
+def _surface_index(payload: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    rows = payload.get("markets")
+    if not isinstance(rows, list):
+        raise MLBFinishLineError("market surface requires markets list")
+    out: dict[str, dict[str, Any]] = {}
+    for raw in rows:
+        if not isinstance(raw, Mapping):
+            raise MLBFinishLineError("market surface row must be object")
+        market = str(raw.get("market") or "").strip().upper()
+        if not market or market in out:
+            raise MLBFinishLineError(f"market surface identity invalid/duplicate:{market}")
+        out[market] = dict(raw)
+    return out
+
+
+def build_mlb_finish_line(
+    *,
+    surface_path: str | Path = DEFAULT_SURFACE,
+    deployments_path: str | Path = DEFAULT_DEPLOYMENTS,
+    behavioral_path: str | Path = DEFAULT_BEHAVIORAL,
+    validation_path: str | Path = DEFAULT_VALIDATION,
+) -> dict[str, Any]:
+    acceptance = build_acceptance_matrix(
+        deployments_path=deployments_path,
+        behavioral_path=behavioral_path,
+        validation_path=validation_path,
+    )
+    acceptance_rows = {str(row["market"]): dict(row) for row in acceptance["markets"]}
+    catalog = set(acceptance_rows)
+    surface = _surface_index(_load(surface_path))
+    deployments = _load(deployments_path).get("markets")
+    behavioral = _load(behavioral_path).get("markets")
+    validation = _load(validation_path).get("markets")
+    if not all(isinstance(x, Mapping) for x in (deployments, behavioral, validation)):
+        raise MLBFinishLineError("canonical registries require markets objects")
+    engines = engine_registry()
+
+    registries = {
+        "surface": set(surface),
+        "deployments": set(map(str, deployments)),
+        "behavioral": set(map(str, behavioral)),
+        "validation": set(map(str, validation)),
+        "settlement_code": set(SETTLEMENT_CODE_MARKETS),
+    }
+    for label, names in registries.items():
+        if names != catalog:
+            raise MLBFinishLineError(
+                f"finish-line catalog mismatch {label}: missing={sorted(catalog-names)} extra={sorted(names-catalog)}"
+            )
+
+    rows = []
+    for market in sorted(catalog):
+        dep = dict(deployments[market])
+        beh = dict(behavioral[market])
+        val = dict(validation[market])
+        spec = surface[market]
+        acceptance_row = acceptance_rows[market]
+        runtime_engine = market in engines
+        registered = market in deployments
+        settlement_code = market in SETTLEMENT_CODE_MARKETS
+        code_complete = bool(runtime_engine and registered and settlement_code)
+
+        provider_expected = spec.get("provider_expected") is True
+        acquisition_route = str(spec.get("acquisition_route") or "").strip()
+        acquisition_external = not provider_expected
+        if provider_expected and (not acquisition_route or acquisition_route == "UNMAPPED_PROVIDER_MARKET"):
+            raise MLBFinishLineError(f"provider-expected market lacks acquisition route:{market}")
+        if acquisition_external and str(spec.get("terminal_if_absent") or "") != "PROVIDER_UNSUPPORTED":
+            raise MLBFinishLineError(f"external-provider market lacks fail-closed terminal state:{market}")
+
+        validation_missing = list(acceptance_row["current_state"]["validation_missing"])
+        blockers: list[str] = []
+        if not code_complete:
+            blockers.append("CODE_MISSING")
+        if acquisition_external:
+            blockers.append("EXTERNAL_PROVIDER_REQUIRED")
+        if market in BOOK_POLICY_MARKETS:
+            blockers.append("BOOK_POLICY_NORMALIZATION_REQUIRED")
+        if market in BOOK_RULE_VALIDATION_MARKETS:
+            blockers.append("BOOK_RULE_VALIDATION_REQUIRED")
+        remediation = str(beh.get("remediation_state") or "")
+        if any(token in remediation for token in (
+            "REVALIDATION_REQUIRED", "PARAMETERS_UNVALIDATED", "EVIDENCE_REQUIRED",
+        )):
+            blockers.append("STRUCTURAL_OR_BEHAVIORAL_REVALIDATION_REQUIRED")
+        if validation_missing:
+            blockers.append("VALIDATION_EVIDENCE_REQUIRED")
+
+        if "CODE_MISSING" in blockers:
+            primary = "CODE_MISSING"
+        elif "EXTERNAL_PROVIDER_REQUIRED" in blockers:
+            primary = "EXTERNAL_PROVIDER_REQUIRED"
+        elif "BOOK_POLICY_NORMALIZATION_REQUIRED" in blockers:
+            primary = "BOOK_POLICY_NORMALIZATION_REQUIRED"
+        elif "BOOK_RULE_VALIDATION_REQUIRED" in blockers:
+            primary = "BOOK_RULE_VALIDATION_REQUIRED"
+        elif "VALIDATION_EVIDENCE_REQUIRED" in blockers:
+            primary = "VALIDATION_EVIDENCE_REQUIRED"
+        else:
+            primary = "ACCEPTANCE_COMPLETE" if acceptance_row["acceptance_complete"] else "REVIEW_REQUIRED"
+
+        rows.append({
+            "market": market,
+            "runtime_engine_present": runtime_engine,
+            "deployment_registered": registered,
+            "deployment_stage": str(dep.get("stage") or ""),
+            "deployment_eligible": dep.get("eligible") is True,
+            "settlement_interpreter_present": settlement_code,
+            "engineering_code_complete": code_complete,
+            "provider_expected": provider_expected,
+            "acquisition_route": acquisition_route,
+            "acquisition_state": "PROVIDER_ROUTE_DECLARED" if provider_expected else "EXTERNAL_PROVIDER_REQUIRED",
+            "behavioral_status": str(beh.get("status") or ""),
+            "remediation_state": remediation,
+            "validation_missing": validation_missing,
+            "acceptance_complete": bool(acceptance_row["acceptance_complete"]),
+            "primary_blocker": primary,
+            "blockers": blockers,
+        })
+
+    code_missing = [row["market"] for row in rows if not row["engineering_code_complete"]]
+    external = [row["market"] for row in rows if row["acquisition_state"] == "EXTERNAL_PROVIDER_REQUIRED"]
+    book_policy = [row["market"] for row in rows if "BOOK_POLICY_NORMALIZATION_REQUIRED" in row["blockers"]]
+    book_rule = [row["market"] for row in rows if "BOOK_RULE_VALIDATION_REQUIRED" in row["blockers"]]
+    return {
+        "schema_version": 1,
+        "market_count": len(rows),
+        "engineering_finish_line_complete": not code_missing,
+        "evidence_finish_line_complete": all(bool(row["acceptance_complete"]) for row in rows),
+        "code_missing_markets": code_missing,
+        "external_provider_markets": external,
+        "book_policy_markets": book_policy,
+        "book_rule_validation_markets": book_rule,
+        "acceptance_complete_count": sum(bool(row["acceptance_complete"]) for row in rows),
+        "markets": rows,
+    }

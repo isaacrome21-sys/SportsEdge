@@ -57,6 +57,7 @@ jobs:
             tests.test_rebuilt_binary_journal_provenance \
             tests.test_rebuilt_binary_registry \
             tests.test_either_pitcher_settlement \
+            tests.test_mlb_finish_line \
             tests.test_mlb_joint_mode_game_provenance \
             tests.test_stage1_provenance_ledger \
             tests.test_stage1_auto_provenance \
