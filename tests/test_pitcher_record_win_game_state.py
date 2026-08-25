@@ -1,35 +1,46 @@
+import json
 import unittest
 from datetime import date, datetime, timezone
 
 from sportsedge.live_slate import LiveGame, TeamLineup
+from sportsedge.mlb_generic_features import MLBGenericFeatureError, MLBGenericHistorySource
 from sportsedge.pitcher_record_win_engine import (
     build_pitcher_record_win_features,
     build_shared_pitcher_record_win_engine_session,
+    simulate_pitcher_record_win_distribution,
+    starter_win_credit,
 )
-from sportsedge.v7_distribution import GameDistribution
 
 
 class _Source:
     retrieved_at = datetime(2026, 8, 25, 12, tzinfo=timezone.utc)
 
+    def __init__(self, *, away_outs=18, home_outs=18):
+        self.away_outs = away_outs
+        self.home_outs = home_outs
+
     def player_rows(self, *, player_id, group, target_date):
         assert group == "pitching"
-        decisions = [(1, 0), (0, 1), (0, 0), (1, 0), (0, 1)]
+        outs = self.away_outs if player_id == 111 else self.home_outs
+        whole, frac = divmod(outs, 3)
         rows = []
-        for index, (wins, losses) in enumerate(decisions, 1):
+        for index in range(12):
             rows.append({
-                "date": date(2026, 8, index),
+                "date": date(2026, 8, index + 1),
                 "stat": {
                     "gamesStarted": 1,
-                    "wins": wins,
-                    "losses": losses,
-                    "inningsPitched": "5.0",
+                    "inningsPitched": f"{whole}.{frac}",
+                    "earnedRuns": 1 if player_id == 111 else 2,
+                    # These are deliberately present to prove the rebuilt feature
+                    # contract never consumes historical pitcher decisions.
+                    "wins": 1 if index % 2 == 0 else 0,
+                    "losses": 0 if index % 2 == 0 else 1,
                 },
             })
         return rows
 
     def team_means(self, *, away_team_id, home_team_id, target_date):
-        return 4.0, 5.0, None
+        return 4.6, 5.1, None
 
 
 def _lineup(team_id, side, start):
@@ -57,100 +68,138 @@ def _game():
     )
 
 
-def _distribution():
-    return GameDistribution(
-        simulations=1000,
-        seed=1,
-        seed_policy="identity_sha256_256bit",
-        away_mean_runs=4.0,
-        home_mean_runs=5.0,
-        away_win_probability=0.25,
-        home_win_probability=0.75,
-        away_plus_1_5_probability=0.25,
-        home_minus_1_5_probability=0.75,
-        over_probability=0.5,
-        under_probability=0.5,
-        push_probability=0.0,
-        nrfi_probability=0.5,
-        yrfi_probability=0.5,
-        regulation_tie_probability=0.0,
-        first_inning_share=0.118,
-        first_inning_dispersion_r=0.35,
-        extra_half_inning_mean=0.55,
-        joint_score_pmf={"3,4": 0.75, "5,2": 0.25},
-        result_sha256="0" * 64,
-    )
+def _features(*, away_outs=18, home_outs=18):
+    def rows(outs, er):
+        return [{"outs": outs, "earned_runs": er} for _ in range(12)]
+    return {
+        "away_team_id": 10,
+        "home_team_id": 20,
+        "away_starter_id": 111,
+        "home_starter_id": 222,
+        "away_team_mean_runs": 4.6,
+        "home_team_mean_runs": 5.1,
+        "away_starter_history": rows(away_outs, 1),
+        "home_starter_history": rows(home_outs, 2),
+    }
 
 
 class PitcherRecordWinGameStateTests(unittest.TestCase):
-    def test_features_use_decision_propensity_not_historical_win_rate(self):
-        built = build_pitcher_record_win_features(
+    def test_features_exclude_historical_win_loss_decisions_and_bind_both_starters(self):
+        away = build_pitcher_record_win_features(
+            _Source(), game=_game(), pitcher_id=111, target_date=date(2026, 8, 25)
+        )
+        home = build_pitcher_record_win_features(
             _Source(), game=_game(), pitcher_id=222, target_date=date(2026, 8, 25)
         )
-        # Four of five starts had a decision; only two were wins. The candidate
-        # intentionally carries decision propensity, not the old 2/5 win rate.
-        self.assertAlmostEqual(built["decision_rate"], 0.8)
-        self.assertAlmostEqual(built["qualification_rate"], 1.0)
-        self.assertEqual(built["team_side"], "HOME")
-        self.assertEqual(len(built["game_source_hash"]), 64)
-        self.assertEqual(len(built["pitcher_source_hash"]), 64)
+        self.assertEqual(away["team_side"], "AWAY")
+        self.assertEqual(home["team_side"], "HOME")
+        self.assertEqual(away["feature_source_hash"], home["feature_source_hash"])
+        self.assertEqual(away["features"], home["features"])
+        self.assertEqual(away["features"]["away_starter_id"], 111)
+        self.assertEqual(away["features"]["home_starter_id"], 222)
+        encoded = json.dumps(away["features"], sort_keys=True)
+        self.assertNotIn('"wins"', encoded)
+        self.assertNotIn('"losses"', encoded)
+        self.assertIsNone(away["decision_rate"])
+        self.assertIsNone(away["qualification_rate"])
 
-    def test_today_team_state_multiplies_decision_propensity(self):
+    def test_legacy_generic_binary_proxies_fail_before_any_history_fetch(self):
         calls = []
 
-        def simulator(**kwargs):
-            calls.append(kwargs)
-            return _distribution()
+        def opener(*args, **kwargs):
+            calls.append((args, kwargs))
+            raise AssertionError("stateful binary fallback must fail before network access")
 
-        engine = build_shared_pitcher_record_win_engine_session(simulator=simulator)
+        source = MLBGenericHistorySource(
+            opener=opener,
+            retrieved_at=datetime(2026, 8, 25, 12, tzinfo=timezone.utc),
+        )
+        common = dict(
+            game_pk=123,
+            entity_id="222",
+            target_date=date(2026, 8, 25),
+            away_team_id=10,
+            home_team_id=20,
+            player_id=222,
+        )
+        for market in ("PITCHER_RECORD_WIN", "FIRST_HOME_RUN"):
+            with self.subTest(market=market):
+                with self.assertRaisesRegex(MLBGenericFeatureError, "STATEFUL_FEATURE_PATH_REQUIRED"):
+                    source.feature_row(market=market, **common)
+        self.assertEqual(calls, [])
+
+    def test_starter_credit_requires_five_innings_lead_and_lead_preservation(self):
+        self.assertFalse(starter_win_credit(
+            outs_recorded=14, leading_at_exit=True, lead_relinquished=False
+        ))
+        self.assertFalse(starter_win_credit(
+            outs_recorded=18, leading_at_exit=False, lead_relinquished=False
+        ))
+        self.assertFalse(starter_win_credit(
+            outs_recorded=18, leading_at_exit=True, lead_relinquished=True
+        ))
+        self.assertTrue(starter_win_credit(
+            outs_recorded=18, leading_at_exit=True, lead_relinquished=False
+        ))
+
+    def test_sub_five_inning_starter_has_exactly_zero_win_probability(self):
+        result = simulate_pitcher_record_win_distribution(
+            _features(away_outs=14, home_outs=18),
+            simulations=2000,
+            build_hash="a" * 64,
+        )
+        self.assertEqual(result.away_starter_win_probability, 0.0)
+        self.assertGreaterEqual(result.home_starter_win_probability, 0.0)
+        self.assertAlmostEqual(
+            result.away_starter_win_probability
+            + result.home_starter_win_probability
+            + result.no_starting_pitcher_win_probability,
+            1.0,
+            places=12,
+        )
+
+    def test_both_starters_and_yes_no_share_one_latent_distribution(self):
+        engine = build_shared_pitcher_record_win_engine_session()
         common = {
             "game_id": "123",
             "market": "PITCHER_RECORD_WIN",
-            "entity_id": "222",
             "line": 0.5,
-            "team_side": "HOME",
-            "away_mean_runs": 4.0,
-            "home_mean_runs": 5.0,
-            "features": {
-                "decision_rate": 0.8,
-                "game_source_hash": "1" * 64,
-                "pitcher_source_hash": "2" * 64,
-            },
-            "simulations": 1000,
+            "features": _features(),
+            "feature_source_hash": "1" * 64,
+            "simulations": 2000,
         }
-        yes = engine({**common, "side": "YES"})
-        no = engine({**common, "side": "NO"})
-        self.assertAlmostEqual(yes["team_win_probability"], 0.75)
-        self.assertAlmostEqual(yes["model_p"], 0.60)
-        self.assertAlmostEqual(no["model_p"], 0.40)
-        self.assertEqual(len(calls), 1)
-        self.assertEqual(yes["distribution_sha256"], no["distribution_sha256"])
-        self.assertEqual(yes["model_input_hash"], no["model_input_hash"])
-        self.assertNotEqual(yes["readout_sha256"], no["readout_sha256"])
+        away_yes = engine({**common, "entity_id": "111", "side": "YES"})
+        away_no = engine({**common, "entity_id": "111", "side": "NO"})
+        home_yes = engine({**common, "entity_id": "222", "side": "YES"})
+        self.assertEqual(away_yes["model_input_hash"], away_no["model_input_hash"])
+        self.assertEqual(away_yes["model_input_hash"], home_yes["model_input_hash"])
+        self.assertEqual(away_yes["distribution_sha256"], away_no["distribution_sha256"])
+        self.assertEqual(away_yes["distribution_sha256"], home_yes["distribution_sha256"])
+        self.assertNotEqual(away_yes["readout_sha256"], away_no["readout_sha256"])
+        self.assertNotEqual(away_yes["readout_sha256"], home_yes["readout_sha256"])
+        self.assertAlmostEqual(away_yes["model_p"] + away_no["model_p"], 1.0, places=12)
+        self.assertLessEqual(away_yes["model_p"] + home_yes["model_p"], 1.0 + 1e-12)
 
-    def test_two_pitchers_share_same_game_distribution(self):
+    def test_v1_final_score_simulator_hook_cannot_bypass_exit_state(self):
         calls = []
 
-        def simulator(**kwargs):
+        def old_shortcut(**kwargs):
             calls.append(kwargs)
-            return _distribution()
+            raise AssertionError("v1 final-score shortcut must not execute")
 
-        engine = build_shared_pitcher_record_win_engine_session(simulator=simulator)
-        home = engine({
-            "game_id": "123", "market": "PITCHER_RECORD_WIN", "entity_id": "222",
-            "line": 0.5, "side": "YES", "team_side": "HOME",
-            "away_mean_runs": 4.0, "home_mean_runs": 5.0, "simulations": 1000,
-            "features": {"decision_rate": 0.8, "game_source_hash": "1" * 64, "pitcher_source_hash": "2" * 64},
+        engine = build_shared_pitcher_record_win_engine_session(simulator=old_shortcut)
+        row = engine({
+            "game_id": "123",
+            "market": "PITCHER_RECORD_WIN",
+            "entity_id": "111",
+            "line": 0.5,
+            "side": "YES",
+            "features": _features(),
+            "feature_source_hash": "2" * 64,
+            "simulations": 1000,
         })
-        away = engine({
-            "game_id": "123", "market": "PITCHER_RECORD_WIN", "entity_id": "111",
-            "line": 0.5, "side": "YES", "team_side": "AWAY",
-            "away_mean_runs": 4.0, "home_mean_runs": 5.0, "simulations": 1000,
-            "features": {"decision_rate": 0.6, "game_source_hash": "1" * 64, "pitcher_source_hash": "3" * 64},
-        })
-        self.assertEqual(len(calls), 1)
-        self.assertEqual(home["distribution_sha256"], away["distribution_sha256"])
-        self.assertAlmostEqual(away["model_p"], 0.25 * 0.6)
+        self.assertEqual(calls, [])
+        self.assertEqual(row["engine_version"], "mlb_pitcher_record_win_exit_bullpen_v2_candidate")
 
 
 if __name__ == "__main__":
