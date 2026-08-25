@@ -9,6 +9,11 @@ from .overtime import (
     NFLRegularSeasonOvertimeResult,
     settle_nfl_regular_season_overtime,
 )
+from .overtime_simulator import (
+    NFLRegularSeasonOTPlay,
+    NFLRegularSeasonOTSimulation,
+    NFLRegularSeasonOTSimulator,
+)
 from .player_markets import derive_player_stat_market
 from .situational import (
     derive_both_teams_to_n,
@@ -47,6 +52,9 @@ __all__ = [
     "NFLRegularSeasonOTOpportunity",
     "NFLRegularSeasonOvertimeResult",
     "settle_nfl_regular_season_overtime",
+    "NFLRegularSeasonOTPlay",
+    "NFLRegularSeasonOTSimulation",
+    "NFLRegularSeasonOTSimulator",
     "PlayerUsageProfile",
     "TeamUsageProfile",
     "AttributedPlay",
