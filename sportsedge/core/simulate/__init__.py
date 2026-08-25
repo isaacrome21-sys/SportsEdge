@@ -1,6 +1,11 @@
 """Shared simulation engines."""
 
 from .drive_play import EngineADrivePlaySimulator, FootballPlayPath, PlayEvent, TeamDriveProfile
+from .field_position import (
+    NFLFieldPositionProfile,
+    NFLFieldPositionResolver,
+    NFLPossessionTransition,
+)
 from .football import JointScoreSimulator, KeyNumberMarginModel
 from .football_path import EngineAPathSimulator, FootballGamePath, ScoringEvent
 from .kicker_markets import derive_kicker_stat_market
@@ -15,6 +20,10 @@ from .overtime_simulator import (
     NFLRegularSeasonOTSimulator,
 )
 from .player_markets import derive_player_stat_market
+from .regulation_simulator import (
+    NFLIntegratedRegulationSimulation,
+    NFLIntegratedRegulationSimulator,
+)
 from .situational import (
     derive_both_teams_to_n,
     derive_largest_lead,
@@ -45,6 +54,11 @@ __all__ = [
     "FootballPlayPath",
     "PlayEvent",
     "TeamDriveProfile",
+    "NFLFieldPositionProfile",
+    "NFLPossessionTransition",
+    "NFLFieldPositionResolver",
+    "NFLIntegratedRegulationSimulation",
+    "NFLIntegratedRegulationSimulator",
     "SpecialTeamsProfile",
     "SpecialTeamsEvent",
     "ResolvedFootballPath",
