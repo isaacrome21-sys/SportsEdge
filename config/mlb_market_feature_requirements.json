@@ -34,9 +34,11 @@
     "MONEYLINE": ["pitcher_quality", "pitcher_splits", "team_offense", "team_defense", "bullpen", "environment", "starter_workload"],
     "RUN_LINE": ["pitcher_quality", "pitcher_splits", "team_offense", "team_defense", "bullpen", "environment", "starter_workload"],
     "TOTALS": ["pitcher_quality", "pitcher_contact_allowed", "team_offense", "bullpen", "environment", "starter_workload", "umpire_context"],
+    "TEAM_TOTALS": ["pitcher_quality", "pitcher_contact_allowed", "team_offense", "bullpen", "environment", "starter_workload", "umpire_context"],
     "F5_MONEYLINE": ["pitcher_quality", "pitcher_splits", "team_offense", "environment", "starter_workload"],
     "F5_RUN_LINE": ["pitcher_quality", "pitcher_splits", "team_offense", "environment", "starter_workload"],
     "F5_TOTALS": ["pitcher_quality", "pitcher_contact_allowed", "team_offense", "environment", "starter_workload", "umpire_context"],
+    "F5_TEAM_TOTALS": ["pitcher_quality", "pitcher_contact_allowed", "team_offense", "environment", "starter_workload", "umpire_context"],
     "NRFI": ["first_inning", "pitcher_quality", "pitcher_splits", "batter_quality", "lineup_pa", "environment", "umpire_context"],
     "YRFI": ["first_inning", "pitcher_quality", "pitcher_splits", "batter_quality", "lineup_pa", "environment", "umpire_context"],
     "HOME_RUNS": ["batter_quality", "batter_contact", "batter_splits", "pitcher_contact_allowed", "pitcher_splits", "matchup", "environment", "lineup_pa", "bullpen"],
@@ -73,6 +75,6 @@
     "recent_form": "recency_weighted_not_last_n_hit_rate_chasing",
     "weather": "use timestamped game-time forecast and roof state; never use generic daily weather when roof/dome nullifies it",
     "sportsbook_prices": "excluded_from_model_features_used_only_after_model_probability_for_value_comparison",
-    "validation": "each_market_must_pass_all_required_gates_in_mlb_validation_evidence_before_official_bet_enabled"
+    "validation": "each_market_must_pass_all_required_gates_in_mlb_validation_evidence before_official_bet_enabled"
   }
 }
