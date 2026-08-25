@@ -7,12 +7,17 @@
   "max_log_loss_delta_vs_market": 0.0,
   "training_data_max_age_days": 45,
   "closing_market_provenance_required": true,
+  "closing_market_coverage_min": 0.8,
+  "closing_market_min_bookmakers": 2,
+  "closing_market_max_snapshot_lag_seconds": 900,
   "short_notice_slice_required": true,
   "notes": [
     "Promotion uses chronological holdout evidence only.",
-    "Aggregate Brier score and log loss must be no worse than the no-vig market baseline.",
+    "Aggregate Brier score and log loss must be no worse than the verified no-vig closing-market baseline.",
     "UFC-debut exposure must have enough holdout observations to be evaluated separately.",
     "The newest historical training fight must be within 45 days of evaluation.",
+    "Closing-market evidence must come from the SportsEdge The Odds API historical archive contract, use at least two bookmakers per matched fight, and use the latest valid snapshot no more than 15 minutes before commence time.",
+    "At least 80% of chronological holdout fights must have verified closing-market coverage before market-comparison gates can promote.",
     "Closing-market provenance and short-notice validation are hard gates; missing evidence is UNVERIFIED, never PASS."
   ]
 }
