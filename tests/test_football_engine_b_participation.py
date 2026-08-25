@@ -76,7 +76,7 @@ class FootballEngineBParticipationTests(unittest.TestCase):
         overlay = engine.assign(path)
         boxes = aggregate_player_box_scores(path, overlay)
         team_pass_yards = sum(
-            max(0, play.yards) for play in path.plays if play.play_type == "PASS_COMPLETE"
+            play.yards for play in path.plays if play.play_type == "PASS_COMPLETE"
         )
         player_pass_yards = sum(box.passing_yards for box in boxes.values())
         self.assertEqual(player_pass_yards, team_pass_yards)
