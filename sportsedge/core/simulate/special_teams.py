@@ -153,30 +153,34 @@ class ResolvedFootballPath:
         if resolved["away_score"] != raw["away_score"] + away_st:
             raise ValueError("ENGINE_C_AWAY_SCORE_RECONCILIATION_FAILED")
 
-        fg_attempt_ids = {
+        fg_attempt_ids = [
             play.play_id
             for play in self.base_path.plays
             if play.play_type.upper() == "FIELD_GOAL"
-        }
-        fg_event_ids = {
+        ]
+        fg_event_ids = [
             event.source_play_id
             for event in self.special_teams_events
             if event.event_type.startswith("FG_")
-        }
-        if fg_event_ids != fg_attempt_ids:
+        ]
+        if len(fg_event_ids) != len(fg_attempt_ids):
+            raise ValueError("ENGINE_C_FIELD_GOAL_RESOLUTION_COUNT_INVALID")
+        if sorted(fg_event_ids) != sorted(fg_attempt_ids):
             raise ValueError("ENGINE_C_FIELD_GOAL_ATTEMPT_RECONCILIATION_FAILED")
 
-        td_play_ids = {
+        td_play_ids = [
             play.play_id
             for play in self.base_path.plays
             if play.score_type == "TOUCHDOWN_CANDIDATE" and play.points == 6
-        }
-        try_event_ids = {
+        ]
+        try_event_ids = [
             event.source_play_id
             for event in self.special_teams_events
             if event.event_type.startswith("XP_") or event.event_type.startswith("TWO_POINT_")
-        }
-        if try_event_ids != td_play_ids:
+        ]
+        if len(try_event_ids) != len(td_play_ids):
+            raise ValueError("ENGINE_C_TD_TRY_RESOLUTION_COUNT_INVALID")
+        if sorted(try_event_ids) != sorted(td_play_ids):
             raise ValueError("ENGINE_C_TD_TRY_RECONCILIATION_FAILED")
 
 
