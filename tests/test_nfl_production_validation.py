@@ -88,5 +88,21 @@ class NFLProductionValidationTests(unittest.TestCase):
         last = next(row for row in evaluations if row["game_id"] == rows[-1]["game_id"])
         self.assertIsNone(last["m1_home_cover_prob"]); self.assertIsNotNone(last["m2_home_cover_prob"])
 
+    def test_missing_total_line_does_not_delete_spread_evidence(self):
+        rows = self._rows(); rows[-1]["total_line"] = None
+        evaluations = build_production_nfl_raw_evaluations(rows, min_train_seasons=2, ridge_alpha=1.0)
+        last = next(row for row in evaluations if row["game_id"] == rows[-1]["game_id"])
+        self.assertIsNotNone(last["m2_home_cover_prob"])
+        self.assertIsNone(last["m2_over_prob"])
+        self.assertIsNotNone(last["home_handicap"])
+
+    def test_missing_spread_line_does_not_delete_total_evidence(self):
+        rows = self._rows(); rows[-1]["spread_line"] = None
+        evaluations = build_production_nfl_raw_evaluations(rows, min_train_seasons=2, ridge_alpha=1.0)
+        last = next(row for row in evaluations if row["game_id"] == rows[-1]["game_id"])
+        self.assertIsNone(last["m2_home_cover_prob"])
+        self.assertIsNotNone(last["m2_over_prob"])
+        self.assertIsNone(last["home_handicap"])
+
 
 if __name__ == "__main__": unittest.main()
