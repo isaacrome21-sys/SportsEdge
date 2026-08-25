@@ -31,7 +31,7 @@ def _prediction(market, entity, side, line, *, sportsbook="DraftKings"):
     row = {"source_index": 0, "game_id": GAME_ID, "market": market, "entity_id": entity, "line": line, "side": side, "american_odds": -110, "model_p": 0.55, "bet_status": "PASS", "reason": "TEST"}
     if sportsbook is not None:
         row["sportsbook"] = sportsbook; row["book_key"] = sportsbook.lower().replace(" ", "")
-    if market in {"MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS"}:
+    if market in {"MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS", "F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS", "F5_TEAM_TOTALS", "FIRST_HOME_RUN", "PITCHER_RECORD_WIN"}:
         row.update({"model_input_hash": SHA, "distribution_sha256": "b" * 64, "readout_sha256": "c" * 64, "readout_version": "mlb_v7_game_readout_v1"})
     if market in {"HITS", "TOTAL_BASES", "PITCHER_BB"}:
         row.update({"model_input_hash": SHA, "engine_version": "test-engine-v1", "seed_policy": "identity-derived-v1", "mc_paths": 1000})
