@@ -1,18 +1,18 @@
 """Deterministic football Engine-A play-path candidate.
 
-This is a structural simulator, not a promoted predictive model.  It creates one
+This is a structural simulator, not a promoted predictive model. It creates one
 shared play path per simulation and derives quarter/half/final scores from the
-same events.  Market prices must be read-outs from these paths; no half/quarter
-market is allowed to draw an independent score.
+same events. Market prices must be read-outs from these paths; no half/quarter
+market may draw an independent score.
 
-The team profiles are expected to be produced from market-blind point-in-time
-features.  Historical fitting/calibration and promotion remain separate gates.
+Team profiles are expected to come from market-blind point-in-time features.
+Historical fitting, calibration, behavioral validation, and promotion remain
+separate evidence gates.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 from math import isfinite
-from typing import Iterable
 
 import numpy as np
 
@@ -138,10 +138,9 @@ class GamePath:
 
 
 def _quarter(seconds_remaining: int) -> int:
-    # Regulation clock represented as one 3600-second countdown.
     if seconds_remaining <= 0:
         return 4
-    elapsed = 3600 - seconds_remaining
+    elapsed = 3600 - int(seconds_remaining)
     return min(4, max(1, elapsed // 900 + 1))
 
 
@@ -188,107 +187,51 @@ class FootballPathSimulator:
         draw = int(round(self.rng.normal(profile.pace_seconds_mean, 5.0)))
         return max(12, min(45, draw))
 
-    def _record_event(
-        self,
-        *,
-        simulation_id: int,
-        drive_id: int,
-        play_id: int,
-        seconds_before: int,
-        seconds_after: int,
-        possession: str,
-        home_before: int,
-        away_before: int,
-        home_after: int,
-        away_after: int,
-        down: int,
-        distance: int,
-        yardline: int,
-        play_type: str,
-        yards: int,
-        turnover_type: str | None = None,
-        scoring_team: str | None = None,
-        points: int = 0,
-        drive_terminal: str | None = None,
-    ) -> PlayEvent:
-        return PlayEvent(
-            game_id=self.game_id,
-            simulation_id=simulation_id,
-            drive_id=drive_id,
-            play_id=play_id,
-            quarter=_quarter(seconds_before),
-            seconds_remaining_before=seconds_before,
-            seconds_remaining_after=seconds_after,
-            possession=possession,
-            score_before_home=home_before,
-            score_before_away=away_before,
-            score_after_home=home_after,
-            score_after_away=away_after,
-            down=down,
-            distance=distance,
-            yardline=yardline,
-            play_type=play_type,
-            yards=int(yards),
-            turnover_type=turnover_type,
-            scoring_team=scoring_team,
-            points=int(points),
-            drive_terminal=drive_terminal,
-        )
-
     def _simulate_one(self, simulation_id: int) -> GamePath:
         seconds = 3600
         possession = self.home_team if bool(self.rng.integers(0, 2)) else self.away_team
-        yardline = 25
-        down = 1
-        distance = 10
-        drive_id = 1
-        play_id = 1
-        home_score = 0
-        away_score = 0
+        yardline, down, distance = 25, 1, 10
+        drive_id, play_id = 1, 1
+        home_score = away_score = 0
         quarter_points = {
-            1: {self.home_team: 0, self.away_team: 0},
-            2: {self.home_team: 0, self.away_team: 0},
-            3: {self.home_team: 0, self.away_team: 0},
-            4: {self.home_team: 0, self.away_team: 0},
+            q: {self.home_team: 0, self.away_team: 0} for q in (1, 2, 3, 4)
         }
         events: list[PlayEvent] = []
 
         while seconds > 0:
             if play_id > 500:
                 raise RuntimeError("ENGINE_A_MAX_PLAYS_EXCEEDED")
+
             profile = self._profile(possession)
-            home_before, away_before = home_score, away_score
             quarter = _quarter(seconds)
+            pre_down, pre_distance, pre_yardline = down, distance, yardline
+            home_before, away_before = home_score, away_score
+
+            play_type = ""
+            yards = 0
+            turnover_type: str | None = None
             scoring_team: str | None = None
             points = 0
-            turnover_type: str | None = None
             terminal: str | None = None
-            yards = 0
             stopped_clock = False
             next_yardline: int | None = None
 
-            # Fourth-down decision is part of the same path. This candidate uses
-            # a conservative deterministic field-position rule; policy fitting
-            # belongs to later validation, not hidden market-specific logic.
-            if down == 4 and yardline >= 60:
-                made = bool(self.rng.random() < profile.field_goal_make_prob)
+            # Explicit fourth-down decisions keep drive termination in the path.
+            if pre_down == 4 and pre_yardline >= 60:
                 play_type = "FIELD_GOAL"
                 stopped_clock = True
-                if made:
+                if self.rng.random() < profile.field_goal_make_prob:
                     scoring_team = possession
                     points = 3
                     terminal = "FIELD_GOAL_MADE"
                     next_yardline = 25
                 else:
                     terminal = "FIELD_GOAL_MISSED"
-                    next_yardline = max(20, min(80, 100 - yardline))
-            elif down == 4 and yardline < 60 and self.rng.random() >= 0.16:
+                    next_yardline = max(20, min(80, 100 - pre_yardline))
+            elif pre_down == 4 and pre_yardline < 60 and self.rng.random() >= 0.16:
                 play_type = "PUNT"
                 stopped_clock = True
                 terminal = "PUNT"
-                # Coarse net-punt field position; the event remains explicit so
-                # Engine C can later replace this candidate without changing path
-                # identity/reconciliation semantics.
                 next_yardline = 20
             else:
                 if self.rng.random() < profile.pass_rate:
@@ -303,22 +246,23 @@ class FootballPathSimulator:
                         stopped_clock = True
                     elif self.rng.random() < profile.completion_rate:
                         play_type = "PASS_COMPLETE"
-                        yards = int(round(self.rng.normal(profile.completion_yards_mean, profile.completion_yards_sd)))
-                        yards = max(-5, min(70, yards))
+                        yards = max(-5, min(70, int(round(self.rng.normal(
+                            profile.completion_yards_mean, profile.completion_yards_sd
+                        )))))
                     else:
                         play_type = "PASS_INCOMPLETE"
-                        yards = 0
                         stopped_clock = True
                 else:
                     play_type = "RUSH"
-                    yards = int(round(self.rng.normal(profile.run_yards_mean, profile.run_yards_sd)))
-                    yards = max(-8, min(45, yards))
+                    yards = max(-8, min(45, int(round(self.rng.normal(
+                        profile.run_yards_mean, profile.run_yards_sd
+                    )))))
                     if self.rng.random() < profile.fumble_rate:
                         turnover_type = "FUMBLE"
                         terminal = "TURNOVER"
                         stopped_clock = True
 
-                new_yardline = yardline + yards
+                new_yardline = pre_yardline + yards
                 if new_yardline <= 0:
                     scoring_team = self._other(possession)
                     points = 2
@@ -333,16 +277,21 @@ class FootballPathSimulator:
                     next_yardline = 25
                 elif terminal == "TURNOVER":
                     next_yardline = max(5, min(95, 100 - _bounded_yardline(new_yardline)))
+                elif yards >= pre_distance:
+                    yardline = _bounded_yardline(new_yardline)
+                    down = 1
+                    distance = max(1, min(10, 100 - yardline))
+                elif pre_down == 4:
+                    # Failed fourth-down conversion is a drive terminal; never
+                    # permit a fifth down to enter the event stream.
+                    terminal = "TURNOVER_ON_DOWNS"
+                    turnover_type = "DOWNS"
+                    stopped_clock = True
+                    next_yardline = max(5, min(95, 100 - _bounded_yardline(new_yardline)))
                 else:
-                    gained = yards
-                    if gained >= distance:
-                        yardline = _bounded_yardline(new_yardline)
-                        down = 1
-                        distance = max(1, min(10, 100 - yardline))
-                    else:
-                        yardline = _bounded_yardline(new_yardline)
-                        down += 1
-                        distance = max(1, distance - gained)
+                    yardline = _bounded_yardline(new_yardline)
+                    down = pre_down + 1
+                    distance = max(1, pre_distance - yards)
 
             cost = self._clock_cost(profile, stopped=stopped_clock)
             seconds_after = max(0, seconds - cost)
@@ -356,20 +305,22 @@ class FootballPathSimulator:
                     raise RuntimeError("SCORING_TEAM_INVALID")
                 quarter_points[quarter][scoring_team] += points
 
-            events.append(self._record_event(
+            events.append(PlayEvent(
+                game_id=self.game_id,
                 simulation_id=simulation_id,
                 drive_id=drive_id,
                 play_id=play_id,
-                seconds_before=seconds,
-                seconds_after=seconds_after,
+                quarter=quarter,
+                seconds_remaining_before=seconds,
+                seconds_remaining_after=seconds_after,
                 possession=possession,
-                home_before=home_before,
-                away_before=away_before,
-                home_after=home_score,
-                away_after=away_score,
-                down=max(1, min(4, down if terminal is None else 4 if play_type in {"FIELD_GOAL", "PUNT"} else down)),
-                distance=max(1, int(distance)),
-                yardline=_bounded_yardline(yardline),
+                score_before_home=home_before,
+                score_before_away=away_before,
+                score_after_home=home_score,
+                score_after_away=away_score,
+                down=pre_down,
+                distance=pre_distance,
+                yardline=pre_yardline,
                 play_type=play_type,
                 yards=yards,
                 turnover_type=turnover_type,
@@ -380,7 +331,6 @@ class FootballPathSimulator:
 
             seconds = seconds_after
             play_id += 1
-
             if terminal is not None:
                 possession = self._other(possession)
                 drive_id += 1
@@ -417,31 +367,30 @@ class FootballPathSimulator:
 
 
 def validate_game_path(path: GamePath) -> None:
-    """Hard structural acceptance checks for a single Engine-A path."""
+    """Hard structural acceptance checks for one Engine-A path."""
     if not path.plays:
         raise ValueError("ENGINE_A_PATH_EMPTY")
-    if any(event.game_id != path.game_id for event in path.plays):
+    if any(e.game_id != path.game_id for e in path.plays):
         raise ValueError("ENGINE_A_GAME_ID_DRIFT")
-    if any(event.simulation_id != path.simulation_id for event in path.plays):
+    if any(e.simulation_id != path.simulation_id for e in path.plays):
         raise ValueError("ENGINE_A_SIMULATION_ID_DRIFT")
-    if any(event.play_id != i for i, event in enumerate(path.plays, start=1)):
+    if any(e.play_id != i for i, e in enumerate(path.plays, start=1)):
         raise ValueError("ENGINE_A_PLAY_ID_NONCONTIGUOUS")
-    if any(event.quarter not in {1, 2, 3, 4} for event in path.plays):
+    if any(e.quarter not in {1, 2, 3, 4} for e in path.plays):
         raise ValueError("ENGINE_A_QUARTER_INVALID")
-    if any(event.seconds_remaining_after > event.seconds_remaining_before for event in path.plays):
+    if any(e.seconds_remaining_after > e.seconds_remaining_before for e in path.plays):
         raise ValueError("ENGINE_A_CLOCK_REVERSED")
-    if any(event.down < 1 or event.down > 4 for event in path.plays):
+    if any(e.down < 1 or e.down > 4 for e in path.plays):
         raise ValueError("ENGINE_A_DOWN_INVALID")
-    if any(event.distance < 1 for event in path.plays):
+    if any(e.distance < 1 for e in path.plays):
         raise ValueError("ENGINE_A_DISTANCE_INVALID")
-    if any(event.yardline < 0 or event.yardline > 100 for event in path.plays):
+    if any(e.yardline < 0 or e.yardline > 100 for e in path.plays):
         raise ValueError("ENGINE_A_YARDLINE_INVALID")
 
     home_event_points = sum(e.points for e in path.plays if e.scoring_team == path.home_team)
     away_event_points = sum(e.points for e in path.plays if e.scoring_team == path.away_team)
-    if home_event_points != path.home_score or away_event_points != path.away_score:
+    if (home_event_points, away_event_points) != (path.home_score, path.away_score):
         raise ValueError("ENGINE_A_SCORE_EVENT_RECONCILIATION_FAILED")
-
     if path.q1_home + path.q2_home != path.first_half_home_score:
         raise ValueError("ENGINE_A_HOME_FIRST_HALF_RECONCILIATION_FAILED")
     if path.q1_away + path.q2_away != path.first_half_away_score:
@@ -455,17 +404,21 @@ def validate_game_path(path: GamePath) -> None:
     if path.margin != path.home_score - path.away_score:
         raise ValueError("ENGINE_A_MARGIN_RECONCILIATION_FAILED")
 
-    previous_home = 0
-    previous_away = 0
-    for event in path.plays:
-        if event.score_before_home != previous_home or event.score_before_away != previous_away:
+    previous_home = previous_away = 0
+    previous_seconds = 3600
+    for e in path.plays:
+        if e.score_before_home != previous_home or e.score_before_away != previous_away:
             raise ValueError("ENGINE_A_SCORE_CHAIN_BROKEN")
-        if event.score_after_home < event.score_before_home or event.score_after_away < event.score_before_away:
+        if e.seconds_remaining_before != previous_seconds:
+            raise ValueError("ENGINE_A_CLOCK_CHAIN_BROKEN")
+        if e.score_after_home < e.score_before_home or e.score_after_away < e.score_before_away:
             raise ValueError("ENGINE_A_SCORE_DECREASED")
-        delta = (event.score_after_home - event.score_before_home) + (event.score_after_away - event.score_before_away)
-        if delta != event.points:
+        delta = (e.score_after_home - e.score_before_home) + (e.score_after_away - e.score_before_away)
+        if delta != e.points:
             raise ValueError("ENGINE_A_EVENT_POINT_DELTA_MISMATCH")
-        previous_home = event.score_after_home
-        previous_away = event.score_after_away
+        previous_home, previous_away = e.score_after_home, e.score_after_away
+        previous_seconds = e.seconds_remaining_after
     if previous_home != path.home_score or previous_away != path.away_score:
         raise ValueError("ENGINE_A_TERMINAL_SCORE_MISMATCH")
+    if previous_seconds != 0:
+        raise ValueError("ENGINE_A_REGULATION_CLOCK_NOT_EXHAUSTED")
