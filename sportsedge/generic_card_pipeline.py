@@ -69,7 +69,7 @@ def _model_input(*,game,quote,feature):
     out={"game_id":str(game.game_pk),"market":market,"entity_id":entity_id,"line":quote.get("line"),"side":quote.get("side")}
     if market in TEAM_TOTAL_MARKETS:out["team_side"]=_team_side(game,entity_id)
     if market=="HOME_RUNS":out["expected_count"]=feature.get("expected_count")
-    elif market in F5_MARKETS or market=="FIRST_HOME_RUN":
+    elif market in F5_MARKETS or market in {"FIRST_HOME_RUN","PITCHER_RECORD_WIN"}:
         payload=feature.get("features")
         if not isinstance(payload,Mapping):raise ValueError(f"{market} state feature payload missing")
         out["features"]=dict(payload)
