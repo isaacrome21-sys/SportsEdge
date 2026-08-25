@@ -1,6 +1,7 @@
 import unittest
 
 from sportsedge.core.promotion.football_registry import build_nfl_promotion_registry
+from sportsedge.sports.nfl.m2 import NFL_M2_FEATURE_CONTRACT, PRODUCTION_NFL_M2_MODEL_ID
 
 
 class NFLPromotionRegistryTests(unittest.TestCase):
@@ -20,6 +21,8 @@ class NFLPromotionRegistryTests(unittest.TestCase):
         return {
             "provenance": "REAL_PUBLIC_HISTORY",
             "source_sha256": "a" * 64,
+            "model_id": PRODUCTION_NFL_M2_MODEL_ID,
+            "feature_contract": NFL_M2_FEATURE_CONTRACT,
             "promotion_evidence": {
                 "spread": {
                     "fold_wins": spread_wins,
@@ -86,6 +89,18 @@ class NFLPromotionRegistryTests(unittest.TestCase):
         history = self._history()
         history["source_sha256"] = "b" * 64
         with self.assertRaisesRegex(ValueError, "NFL_PROMOTION_SOURCE_HASH_MISMATCH"):
+            build_nfl_promotion_registry(self._math(), history, declared_markets=["spread"])
+
+    def test_schedule_only_challenger_cannot_promote_production_m2(self):
+        history = self._history()
+        history["model_id"] = "nfl_schedule_score_challenger_v1"
+        with self.assertRaisesRegex(ValueError, "NFL_PROMOTION_MODEL_ID_MISMATCH"):
+            build_nfl_promotion_registry(self._math(), history, declared_markets=["spread"])
+
+    def test_wrong_feature_contract_cannot_promote_production_m2(self):
+        history = self._history()
+        history["feature_contract"] = "SCHEDULE_ONLY"
+        with self.assertRaisesRegex(ValueError, "NFL_PROMOTION_FEATURE_CONTRACT_MISMATCH"):
             build_nfl_promotion_registry(self._math(), history, declared_markets=["spread"])
 
     def test_bad_math_blocks_every_market(self):
