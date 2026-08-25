@@ -130,18 +130,12 @@ def build_canonical_feature_row(
             **base,
             "team_id": team_id,
             "team_side": team_side,
-            "source": "MLB_STATSAPI_STRICTLY_PRIOR_PITCHER_DECISIONS_PLUS_GAME_STATE",
+            "source": "MLB_STATSAPI_STRICTLY_PRIOR_STARTER_EXIT_AND_GAME_STATE",
             "pitcher_record_win_feature_version": built["feature_version"],
             "feature_source_hash": built["feature_source_hash"],
             "away_mean_runs": built["away_mean_runs"],
             "home_mean_runs": built["home_mean_runs"],
-            "features": {
-                "decision_rate": built["decision_rate"],
-                "qualification_rate": built["qualification_rate"],
-                "game_source_hash": built["game_source_hash"],
-                "pitcher_source_hash": built["pitcher_source_hash"],
-                "history": list(built["history"]),
-            },
+            "features": dict(built["features"]),
         }
 
     if market in HITTER_MARKETS:
