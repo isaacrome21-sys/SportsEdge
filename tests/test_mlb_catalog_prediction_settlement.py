@@ -22,7 +22,10 @@ def _facts():
         "f5": {**ids, "away_runs": 1, "home_runs": 2, "run_diff_home": 1, "total_runs": 3},
         "first_inning": {"away_runs": 0, "home_runs": 0, "nrfi": True, "yrfi": False},
         "batters": [{"player_id": "10", "plate_appearances": 4, "hits": 2, "singles": 1, "doubles": 0, "triples": 0, "home_runs": 1, "total_bases": 5, "rbi": 2, "runs": 1, "walks": 1, "strikeouts": 1, "stolen_bases": 0, "extra_base_hits": 1, "hits_runs_rbis": 5, "hits_runs_stolen_bases": 3, "runs_rbis": 3, "hits_stolen_bases": 2, "hits_walks_stolen_bases": 3}],
-        "pitchers": [{"player_id": "20", "walks": 2, "walks_allowed": 2, "strikeouts": 7, "hits_allowed": 4, "earned_runs": 1, "outs": 18, "hits_walks_er": 7}],
+        "pitchers": [
+            {"player_id": "20", "walks": 2, "walks_allowed": 2, "strikeouts": 7, "hits_allowed": 4, "earned_runs": 1, "outs": 18, "hits_walks_er": 7},
+            {"player_id": "21", "walks": 4, "walks_allowed": 4, "strikeouts": 5, "hits_allowed": 6, "earned_runs": 3, "outs": 15, "hits_walks_er": 13},
+        ],
         "first_home_run": {"occurred": True, "batter_id": "10"}, "winning_pitcher": {"pitcher_id": "20"},
     }
 
@@ -91,10 +94,12 @@ class MLBCatalogPredictionSettlementTests(unittest.TestCase):
         record = build_catalog_prediction_settlement_record(journal, settlement_reports_by_game={GAME_ID: _report(evidence_class="SYNTHETIC_CONTRACT_TEST")}, settled_at_utc="2026-08-25T12:10:00+00:00")
         self.assertEqual(record["outcomes"][0]["settlement_reason"], "SYNTHETIC_SETTLEMENT_EVIDENCE_PROHIBITED")
 
-    def test_either_pitcher_family_remains_unresolved_until_interpreter_is_normalized(self):
+    def test_either_pitcher_family_remains_unresolved_without_book_specific_semantics(self):
         journal = _journal(_prediction("EITHER_PITCHER_BB", "20|21", "OVER", 2.5))
         record = build_catalog_prediction_settlement_record(journal, settlement_reports_by_game={GAME_ID: _report()}, settled_at_utc="2026-08-25T12:10:00+00:00")
-        self.assertEqual(record["outcomes"][0]["settlement_reason"], "EITHER_PITCHER_SETTLEMENT_INTERPRETER_REQUIRED")
+        row = record["outcomes"][0]
+        self.assertEqual(row["settlement_result"], "UNRESOLVED")
+        self.assertIn("EITHER_PITCHER_BOOK_SPECIFIC_SEMANTICS_REQUIRED", row["settlement_reason"])
 
     def test_first_home_run_no_hr_game_preserves_policy_ambiguity(self):
         facts = _facts(); facts["first_home_run"] = {"occurred": False}
