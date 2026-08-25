@@ -9,6 +9,13 @@ from .situational import (
     derive_race_to_n,
     derive_winning_margin_band,
 )
+from .usage import (
+    AttributedFootballPath,
+    AttributedPlay,
+    EngineBUsageAllocator,
+    PlayerUsageProfile,
+    TeamUsageProfile,
+)
 
 __all__ = [
     "JointScoreSimulator",
@@ -20,6 +27,11 @@ __all__ = [
     "FootballPlayPath",
     "PlayEvent",
     "TeamDriveProfile",
+    "PlayerUsageProfile",
+    "TeamUsageProfile",
+    "AttributedPlay",
+    "AttributedFootballPath",
+    "EngineBUsageAllocator",
     "derive_race_to_n",
     "derive_largest_lead",
     "derive_winning_margin_band",
