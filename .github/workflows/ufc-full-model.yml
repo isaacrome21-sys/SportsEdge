@@ -40,7 +40,14 @@ jobs:
       - name: Install test dependency
         run: python -m pip install --disable-pip-version-check pytest
       - name: Run UFC tests
-        run: python -m pytest -q tests/test_ufc_engine.py tests/test_ufc_training.py tests/test_ufc_runtime.py tests/test_ufc_source.py
+        run: >-
+          python -m pytest -q
+          tests/test_ufc_engine.py
+          tests/test_ufc_training.py
+          tests/test_ufc_history.py
+          tests/test_ufc_promotion.py
+          tests/test_ufc_runtime.py
+          tests/test_ufc_source.py
       - name: Train chronological UFC model and promotion evidence
         run: >-
           python scripts/build_ufc_training_artifact.py
@@ -69,13 +76,30 @@ jobs:
           c=json.load(open('data/ufc/contexts_today.json'))
           assert m['training_rows'] >= 1000
           assert m['holdout_metrics']['n'] >= 100
+          assert m['last_training_fight_date'] >= '2026-08-22'
+          assert m['history_semantics']['current_fight_stats_in_current_row'] is False
           assert p['status'] in {'PROMOTED','UNVERIFIED'}
           assert isinstance(p.get('blockers'), list)
+          assert p['training_source'] == 'Greco1899/scrape_ufc_stats UFCStats mirror'
+          assert p['history_semantics']['feature_time'] == 'pre_fight_snapshot'
           assert 'ufc_debut_any' in p['slices']
+          assert p['dwcs_specific_validation']['status'] in {'PROMOTED','UNVERIFIED'}
           assert len(c) >= 1
           assert len(f['fighters']) == 2 * len(c)
+          assert f['history_last_fight_date'] == m['last_training_fight_date']
           assert all(int(x.get('rounds', 0)) in {3, 5} for x in c)
-          print('UFC_BOOTSTRAP_OK',m['training_rows'],m['holdout_metrics'],p['status'],p['blockers'],len(f['fighters']),len(c))
+          print(
+              'UFC_BOOTSTRAP_OK',
+              m['training_rows'],
+              m['last_training_fight_date'],
+              m['holdout_metrics'],
+              p['status'],
+              p['blockers'],
+              p['dwcs_specific_validation']['status'],
+              f.get('card_source'),
+              len(f['fighters']),
+              len(c),
+          )
           PY
       - uses: actions/upload-artifact@v4
         with:
