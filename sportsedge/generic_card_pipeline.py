@@ -20,6 +20,7 @@ from .truth_gate import american_to_decimal
 GENERIC_MARKETS = frozenset(GAME_MARKETS | HITTER_MARKETS | PITCHER_MARKETS | BINARY_MARKETS)
 BATTER_GENERIC_MARKETS = frozenset(HITTER_MARKETS | {"FIRST_HOME_RUN"})
 PITCHER_GENERIC_MARKETS = frozenset(PITCHER_MARKETS | {"PITCHER_RECORD_WIN"})
+TEAM_TOTAL_MARKETS = frozenset({"TEAM_TOTALS", "F5_TEAM_TOTALS"})
 DECISION_STATUSES = frozenset({"BET", "OFFICIAL_BET", "PASS"})
 
 
@@ -96,7 +97,22 @@ def _lineup_team(game: LiveGame, entity_id: str) -> int:
     raise ValueError("player not present in MLB lineup snapshot")
 
 
+def _team_side(game: LiveGame, entity_id: str) -> str:
+    try:
+        team_id = int(entity_id)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("team-total entity_id must be numeric MLB team id") from exc
+    if team_id == int(game.away_team_id):
+        return "AWAY"
+    if team_id == int(game.home_team_id):
+        return "HOME"
+    raise ValueError("TEAM_TOTAL_ENTITY_NOT_IN_GAME")
+
+
 def _bind_entity(game: LiveGame, market: str, entity_id: str, feature: Mapping[str, Any]) -> None:
+    if market in TEAM_TOTAL_MARKETS:
+        _team_side(game, entity_id)
+        return
     if market in BATTER_GENERIC_MARKETS:
         live_team = _lineup_team(game, entity_id)
         feature_team = feature.get("team_id")
@@ -131,6 +147,8 @@ def _model_input(*, game: LiveGame, quote: Mapping[str, Any], feature: Mapping[s
         "line": quote.get("line"),
         "side": quote.get("side"),
     }
+    if market in TEAM_TOTAL_MARKETS:
+        out["team_side"] = _team_side(game, entity_id)
     if market == "HOME_RUNS":
         # HOME_RUNS remains on the measured generic scalar baseline until its
         # joint candidate earns independent behavioral evidence.
@@ -158,7 +176,7 @@ def _model_input(*, game: LiveGame, quote: Mapping[str, Any], feature: Mapping[s
                 "away_mean_runs": feature.get("away_mean_runs"),
                 "home_mean_runs": feature.get("home_mean_runs"),
             })
-        if market not in {"TOTALS", "F5_TOTALS"}:
+        if market not in {"TOTALS", "TEAM_TOTALS", "F5_TOTALS", "F5_TEAM_TOTALS"}:
             out["total_line"] = feature.get("total_line", 0.0)
     source_hash = feature.get("feature_source_hash", feature.get("source_subset_hash"))
     if source_hash is not None:
@@ -248,9 +266,6 @@ def run_generic_card(
             if engine is None or deployment is None:
                 raise ValueError("market missing engine/deployment registration")
 
-            # Complete priceability is a precondition to entering the modeled
-            # BET/PASS ledger. A missing opposite price remains BLOCKED with no
-            # model_p, rather than looking like a modeled decision row.
             try:
                 opposite = _paired_quote(quote, valid_quotes)
             except Exception as pair_exc:

@@ -1,8 +1,8 @@
 """Deterministic market probability read-outs from one MLB V7 score distribution.
 
 The stochastic game distribution is produced separately. This module consumes the
-same joint score PMF to derive MONEYLINE, RUN_LINE, and TOTALS probabilities without
-re-running or perturbing the simulator.
+same joint score PMF to derive MONEYLINE, RUN_LINE, TOTALS, and TEAM_TOTALS
+probabilities without re-running or perturbing the simulator.
 """
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from .source_lineage import canonical_json_sha256
 from .v7_distribution import GameDistribution
 
 READOUT_VERSION = "mlb_v7_game_readout_v1"
-SUPPORTED_READOUTS = frozenset({"MONEYLINE", "RUN_LINE", "TOTALS"})
+SUPPORTED_READOUTS = frozenset({"MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS"})
 
 
 class GameReadoutError(ValueError):
@@ -31,6 +31,7 @@ class GameReadout:
     distribution_sha256: str
     readout_sha256: str
     readout_version: str = READOUT_VERSION
+    team_side: str | None = None
 
 
 def _finite_line(value: Any, *, required: bool) -> float | None:
@@ -86,12 +87,14 @@ def read_game_probability(
     market: str,
     line: Any = None,
     side: str,
+    team_side: str | None = None,
 ) -> GameReadout:
     market = str(market or "").upper()
     side = str(side or "").upper()
     if market not in SUPPORTED_READOUTS:
         raise GameReadoutError(f"unsupported readout market: {market}")
     rows, distribution_sha = _states(distribution)
+    resolved_team_side: str | None = None
 
     if market == "MONEYLINE":
         resolved_line = _finite_line(line, required=False)
@@ -112,6 +115,23 @@ def read_game_probability(
             raise GameReadoutError("run-line side must be HOME or AWAY")
         probability = sum(p for (_, _, p), value in zip(rows, margins) if value > 0)
         push_probability = sum(p for (_, _, p), value in zip(rows, margins) if abs(value) < 1e-12)
+    elif market == "TEAM_TOTALS":
+        resolved_line = _finite_line(line, required=True)
+        if resolved_line is None or resolved_line < 0:
+            raise GameReadoutError("team-total line must be >= 0")
+        resolved_team_side = str(team_side or "").upper()
+        if resolved_team_side not in {"HOME", "AWAY"}:
+            raise GameReadoutError("team_side must be HOME or AWAY")
+        if side not in {"OVER", "UNDER"}:
+            raise GameReadoutError("team-total side must be OVER or UNDER")
+        values = tuple(home if resolved_team_side == "HOME" else away for away, home, _ in rows)
+        if side == "OVER":
+            probability = sum(p for (_, _, p), value in zip(rows, values) if value > resolved_line)
+        else:
+            probability = sum(p for (_, _, p), value in zip(rows, values) if value < resolved_line)
+        push_probability = sum(
+            p for (_, _, p), value in zip(rows, values) if abs(value - resolved_line) < 1e-12
+        )
     else:
         resolved_line = _finite_line(line, required=True)
         if resolved_line is None or resolved_line < 0:
@@ -128,7 +148,7 @@ def read_game_probability(
 
     if probability < -1e-12 or push_probability < -1e-12 or probability + push_probability > 1.0 + 1e-9:
         raise GameReadoutError("readout probability mass invalid")
-    readout_sha = canonical_json_sha256({
+    readout_identity = {
         "version": READOUT_VERSION,
         "distribution_sha256": distribution_sha,
         "market": market,
@@ -136,7 +156,10 @@ def read_game_probability(
         "side": side,
         "probability": float(probability),
         "push_probability": float(push_probability),
-    })
+    }
+    if market == "TEAM_TOTALS":
+        readout_identity["team_side"] = resolved_team_side
+    readout_sha = canonical_json_sha256(readout_identity)
     return GameReadout(
         market=market,
         line=resolved_line,
@@ -145,4 +168,5 @@ def read_game_probability(
         push_probability=float(push_probability),
         distribution_sha256=distribution_sha,
         readout_sha256=readout_sha,
+        team_side=resolved_team_side,
     )

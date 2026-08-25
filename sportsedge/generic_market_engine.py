@@ -15,8 +15,8 @@ GENERIC_ENGINE_VERSION = "mlb_full_market_runtime_v2"
 PA_BOUNDED_ENGINE_VERSION = "mlb_pa_bounded_count_v1"
 
 GAME_MARKETS = {
-    "MONEYLINE", "RUN_LINE", "TOTALS", "NRFI", "YRFI",
-    "F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS",
+    "MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS", "NRFI", "YRFI",
+    "F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS", "F5_TEAM_TOTALS",
 }
 COUNT_MARKETS = {
     "HOME_RUNS", "RBI", "RUNS", "HITS_RUNS_RBIS", "SINGLES", "DOUBLES", "TRIPLES",
@@ -27,7 +27,7 @@ PA_BOUNDED_COUNT_MARKETS = {"BATTER_K", "BATTER_BB", "SINGLES", "DOUBLES"}
 BINARY_MARKETS = {"PITCHER_RECORD_WIN", "FIRST_HOME_RUN"}
 
 FAIL_CLOSED_MARKETS = {
-    "F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS",
+    "TEAM_TOTALS", "F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS", "F5_TEAM_TOTALS",
     "PITCHER_OUTS", "HITS_RUNS_RBIS", "FIRST_HOME_RUN",
     "PITCHER_ER", "RBI", "PITCHER_RECORD_WIN",
 }
@@ -205,6 +205,8 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
     if market not in GAME_MARKETS:
         raise GenericMarketEngineError("game adapter received non-game market")
     if market in FAIL_CLOSED_MARKETS:
+        if market == "TEAM_TOTALS":
+            raise GenericMarketEngineError("TEAM_TOTALS_SHARED_GAME_ENGINE_REQUIRED")
         raise GenericMarketEngineError(f"{market}_STATE_MODEL_REBUILD_REQUIRED")
 
     away_mean = _finite(model_input.get("away_mean_runs"), "away_mean_runs", lower=0.000001)

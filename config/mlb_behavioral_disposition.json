@@ -6,11 +6,13 @@
     "MONEYLINE": {"status":"KEEP_MEASURED","root_cause":null,"remediation_state":"NONE_REQUIRED"},
     "RUN_LINE": {"status":"FIX","root_cause":"EXTRAS_FINAL_STATE","remediation_state":"IMPLEMENTED_REVALIDATION_REQUIRED"},
     "TOTALS": {"status":"FIX","root_cause":"EXTRAS_FINAL_STATE","remediation_state":"IMPLEMENTED_REVALIDATION_REQUIRED"},
+    "TEAM_TOTALS": {"status":"UNMEASURED","root_cause":"NEW_MARKET_NO_BEHAVIORAL_BASELINE","remediation_state":"SHARED_SCORE_DISTRIBUTION_READOUT_IMPLEMENTED_EVIDENCE_REQUIRED"},
     "NRFI": {"status":"REBUILD","root_cause":"FIRST_INNING_MODEL_FORM","remediation_state":"FORM_IMPLEMENTED_PARAMETERS_UNVALIDATED"},
     "YRFI": {"status":"REBUILD","root_cause":"FIRST_INNING_MODEL_FORM","remediation_state":"FORM_IMPLEMENTED_PARAMETERS_UNVALIDATED"},
     "F5_MONEYLINE": {"status":"REBUILD","root_cause":"F5_STATE_AND_TIE_SEMANTICS","remediation_state":"FAIL_CLOSED_PENDING_MODEL"},
     "F5_RUN_LINE": {"status":"REBUILD","root_cause":"F5_STATE_AND_TIE_SEMANTICS","remediation_state":"FAIL_CLOSED_PENDING_MODEL"},
     "F5_TOTALS": {"status":"REBUILD","root_cause":"F5_STATE_AND_TIE_SEMANTICS","remediation_state":"FAIL_CLOSED_PENDING_MODEL"},
+    "F5_TEAM_TOTALS": {"status":"REBUILD","root_cause":"F5_TEAM_SCORING_STATE_REQUIRED","remediation_state":"FAIL_CLOSED_PENDING_MODEL"},
 
     "HITS": {"status":"FIX","root_cause":"RNG_IDENTITY_EVIDENCE+JOINT_COMPONENT_COHERENCE","remediation_state":"JOINT_ENGINE_CANDIDATE_IMPLEMENTED_REVALIDATION_REQUIRED"},
     "HOME_RUNS": {"status":"KEEP_MEASURED","root_cause":null,"remediation_state":"GENERIC_MEASURED_BASELINE_ACTIVE;JOINT_ENGINE_CANDIDATE_UNPROMOTED_REVALIDATION_REQUIRED"},

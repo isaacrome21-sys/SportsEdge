@@ -4,11 +4,13 @@
     "MONEYLINE": {"eligible": false, "stage": "VALIDATED_MATH", "reason": "live production inference path not attested"},
     "RUN_LINE": {"eligible": false, "stage": "VALIDATED_MATH", "reason": "deployment parity unresolved"},
     "TOTALS": {"eligible": false, "stage": "VALIDATED_MATH", "reason": "fresh calibration required"},
+    "TEAM_TOTALS": {"eligible": false, "stage": "SHARED_READOUT_CANDIDATE", "reason": "shared V7 score-distribution readout implemented; historical PIT, calibration, forward evidence, settlement validation, and production parity required"},
     "NRFI": {"eligible": false, "stage": "CANDIDATE_FORM", "reason": "negative-binomial form implemented; empirical parameters and forward evidence still required"},
     "YRFI": {"eligible": false, "stage": "CANDIDATE_FORM", "reason": "negative-binomial form implemented; empirical parameters and forward evidence still required"},
     "F5_MONEYLINE": {"eligible": false, "stage": "REBUILD_REQUIRED", "reason": "inning-level state model required"},
     "F5_RUN_LINE": {"eligible": false, "stage": "REBUILD_REQUIRED", "reason": "inning-level state model required"},
     "F5_TOTALS": {"eligible": false, "stage": "REBUILD_REQUIRED", "reason": "inning-level state model required"},
+    "F5_TEAM_TOTALS": {"eligible": false, "stage": "REBUILD_REQUIRED", "reason": "inning-level team scoring state model required; no full-game scaling shortcut permitted"},
 
     "HITS": {"eligible": false, "stage": "JOINT_ENGINE_CANDIDATE", "reason": "shared strictly-prior game-row engine implemented; PIT holdout, calibration, forward evidence, and parity required"},
     "HOME_RUNS": {"eligible": false, "stage": "GENERIC_MEASURED_BASELINE", "reason": "measured generic baseline remains canonical; joint HOME_RUNS candidate requires independent behavioral revalidation before routing"},

@@ -29,6 +29,13 @@ def _batter_team(game:LiveGame,entity_id:str)->int:
     if home:return int(game.home_team_id)
     raise MLBJointModeBridgeError("batter not present in live lineup")
 
+def _team_side(game:LiveGame,entity_id:str)->str:
+    try:team_id=int(entity_id)
+    except (TypeError,ValueError) as exc:raise MLBJointModeBridgeError("team-total entity_id must be MLB team id") from exc
+    if team_id==int(game.away_team_id):return "AWAY"
+    if team_id==int(game.home_team_id):return "HOME"
+    raise MLBJointModeBridgeError("TEAM_TOTAL_ENTITY_NOT_IN_GAME")
+
 def _batter_context(game:LiveGame,entity_id:str)->tuple[int,int,int]:
     team_id=_batter_team(game,entity_id);pid=int(entity_id)
     if game.venue_id is None:raise MLBJointModeBridgeError("VENUE_UNMAPPED")
@@ -44,9 +51,6 @@ def build_canonical_feature_row(*,game:LiveGame,quote:Mapping[str,Any],source:ML
     market=str(q["market"]);entity_id=str(q["entity_id"])
     base={"game_pk":int(game.game_pk),"market":market,"entity_id":entity_id,"retrieved_at":source.retrieved_at.isoformat(),"asof":source.retrieved_at.isoformat(),"source":"MLB_STATSAPI_STRICTLY_PRIOR_JOINT_FEATURES"}
 
-    # HOME_RUNS intentionally remains on the behaviorally measured generic
-    # baseline. It requires only batter/team identity plus strictly-prior hitter
-    # history; do not inherit joint-only venue or opposing-starter prerequisites.
     if market=="HOME_RUNS":
         team_id=_batter_team(game,entity_id)
         return source.feature_row(
@@ -74,7 +78,9 @@ def build_canonical_feature_row(*,game:LiveGame,quote:Mapping[str,Any],source:ML
         away,home,_=source.team_means(away_team_id=int(game.away_team_id),home_team_id=int(game.home_team_id),target_date=target_date)
         if market.startswith("F5_"):raise MLBJointModeBridgeError("F5_INNING_STATE_MODEL_REQUIRED")
         identity={"version":"mlb_generic_feature_v1","game_pk":int(game.game_pk),"target_date":target_date.isoformat(),"away_mean_runs":away,"home_mean_runs":home,"retrieved_at":source.retrieved_at.isoformat()}
-        return {**base,"generic_feature_version":"mlb_generic_feature_v1","away_mean_runs":away,"home_mean_runs":home,"source_subset_hash":_content_sha(identity)}
+        row={**base,"generic_feature_version":"mlb_generic_feature_v1","away_mean_runs":away,"home_mean_runs":home,"source_subset_hash":_content_sha(identity)}
+        if market=="TEAM_TOTALS":row["team_side"]=_team_side(game,entity_id)
+        return row
     raise MLBJointModeBridgeError(f"unsupported market {market}")
 
 def build_feature_rows_for_quotes(*,games:Sequence[LiveGame],quotes:Sequence[Mapping[str,Any]],source:MLBGenericHistorySource,target_date:date)->list[dict[str,Any]]:
