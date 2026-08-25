@@ -66,9 +66,10 @@ class MLBFinishLineTests(unittest.TestCase):
 
     def test_pitcher_record_win_structural_revalidation_outranks_generic_evidence(self):
         row = self.rows["PITCHER_RECORD_WIN"]
-        self.assertEqual(row["deployment_stage"], "GAME_STATE_CANDIDATE")
+        self.assertEqual(row["deployment_stage"], "WIN_CREDIT_STATE_CANDIDATE")
         self.assertFalse(row["deployment_eligible"])
         self.assertTrue(row["engineering_code_complete"])
+        self.assertEqual(row["remediation_state"], "WIN_CREDIT_STATE_CANDIDATE_IMPLEMENTED_REVALIDATION_REQUIRED")
         self.assertIn("STRUCTURAL_OR_BEHAVIORAL_REVALIDATION_REQUIRED", row["blockers"])
         self.assertIn("VALIDATION_EVIDENCE_REQUIRED", row["blockers"])
         self.assertEqual(row["primary_blocker"], "STRUCTURAL_OR_BEHAVIORAL_REVALIDATION_REQUIRED")
