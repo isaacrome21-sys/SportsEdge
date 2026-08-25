@@ -94,15 +94,25 @@ def build_production_nfl_raw_evaluations(
             spread_line = _float(row.get("spread_line")); total_line = _float(row.get("total_line"))
             home_handicap = nflverse_spread_to_home_handicap(spread_line) if spread_line is not None else None
             m2_home = None; m2_over = None
-            if spread_line is not None and total_line is not None:
-                assert home_handicap is not None
+            if spread_line is not None or total_line is not None:
+                # The shared pricer requires both thresholds, but the market
+                # read-outs are independent predicates over the same distribution.
+                # A neutral placeholder is supplied only for an unavailable market
+                # and its output is discarded; this prevents one missing quote
+                # from deleting evidence for the other market.
                 pricing = price_nfl_m2_game_markets(
                     distribution,
-                    spread_line=home_handicap,
-                    total_line=total_line,
+                    spread_line=home_handicap if home_handicap is not None else 0.0,
+                    total_line=total_line if total_line is not None else 0.0,
                 )
-                m2_home = _empirical_binary_probability(pricing["spread"]["home"], pricing["spread"]["away"], n)
-                m2_over = _empirical_binary_probability(pricing["total"]["over"], pricing["total"]["under"], n)
+                if spread_line is not None:
+                    m2_home = _empirical_binary_probability(
+                        pricing["spread"]["home"], pricing["spread"]["away"], n
+                    )
+                if total_line is not None:
+                    m2_over = _empirical_binary_probability(
+                        pricing["total"]["over"], pricing["total"]["under"], n
+                    )
 
             home_score = _float(row.get("home_score")); away_score = _float(row.get("away_score"))
             if home_score is None or away_score is None:
@@ -225,7 +235,8 @@ def build_production_nfl_validation_evidence(
         "evidence_note": (
             "Exact production model identity. M2 is fit only on prior-season market-blind features; paired training "
             "residuals generate the joint score distribution; nflverse favorite-positive spreads are converted to the "
-            "shared home-handicap convention only at the pricing boundary; closing lines enter only after the distribution "
-            "exists; isotonic calibration is fit only on prior OOS seasons."
+            "shared home-handicap convention only at the pricing boundary; spread/total evidence coverage remains "
+            "independent; closing lines enter only after the distribution exists; isotonic calibration is fit only on "
+            "prior OOS seasons."
         ),
     }
