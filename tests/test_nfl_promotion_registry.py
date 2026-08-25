@@ -9,6 +9,7 @@ class NFLPromotionRegistryTests(unittest.TestCase):
         return {
             "provenance": "REAL_PUBLIC_HISTORY",
             "source_sha256": "a" * 64,
+            "code_git_sha": "1" * 40,
             "profile_version": "nfl-key-emergent-v3",
             "key_number_contract": "EMERGENT_VALIDATION_TARGET_V1",
             "seasons": [2018, 2019, 2020, 2021, 2022, 2023],
@@ -22,6 +23,7 @@ class NFLPromotionRegistryTests(unittest.TestCase):
             "provenance": "REAL_PUBLIC_HISTORY",
             "source_sha256": "a" * 64,
             "source_manifest_sha256": "a" * 64,
+            "code_git_sha": "1" * 40,
             "model_id": PRODUCTION_NFL_M2_MODEL_ID,
             "feature_contract": NFL_M2_FEATURE_CONTRACT,
             "promotion_evidence": {
@@ -114,6 +116,12 @@ class NFLPromotionRegistryTests(unittest.TestCase):
         history = self._history()
         history["source_manifest_sha256"] = "b" * 64
         with self.assertRaisesRegex(ValueError, "NFL_PROMOTION_MANIFEST_BINDING_MISMATCH"):
+            build_nfl_promotion_registry(self._math(), history, declared_markets=["spread"])
+
+    def test_math_and_history_must_come_from_same_exact_code_sha(self):
+        history = self._history()
+        history["code_git_sha"] = "2" * 40
+        with self.assertRaisesRegex(ValueError, "NFL_PROMOTION_CODE_SHA_MISMATCH"):
             build_nfl_promotion_registry(self._math(), history, declared_markets=["spread"])
 
     def test_schedule_only_challenger_cannot_promote_production_m2(self):
