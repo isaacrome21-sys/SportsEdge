@@ -48,8 +48,14 @@ class CFBAdapter:
     def total_sigma(self, context: Any) -> float:
         raise NotImplementedError("CFB total sigma requires validated historical-window methodology")
 
+    def key_number_validation_targets(self) -> dict[int, float]:
+        raise NotImplementedError("CFB key-number validation targets require real-history profile")
+
     def key_numbers(self) -> dict[int, float]:
-        raise NotImplementedError("CFB key-number treatment requires emergent-margin design validation")
+        raise ValueError(
+            "HISTORICAL_KEY_NUMBERS_ARE_VALIDATION_ONLY:"
+            "use key_number_validation_targets"
+        )
 
     def hfa_prior(self, venue: Any, context: Any) -> float:
         raise NotImplementedError("CFB HFA requires an empirical venue/context contract")
