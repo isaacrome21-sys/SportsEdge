@@ -16,6 +16,7 @@ from .generic_market_engine import BINARY_MARKETS, GAME_MARKETS, generic_market_
 from .hits_engine import simulate_hits
 from .hitter_joint_engine import HITTER_MARKETS, price_hitter_market
 from .pitcher_joint_engine import PITCHER_MARKETS, price_pitcher_market
+from .shared_game_engine import STAGE1_GAME_MARKETS, build_shared_game_engine_session
 from .total_bases_engine import simulate_total_bases
 
 
@@ -196,8 +197,9 @@ def resolve_manual_market_type(market_type: str) -> str:
 
 def engine_registry() -> dict[str, Callable[[Mapping[str, Any]], Mapping[str, Any]]]:
     registry: dict[str, Callable[[Mapping[str, Any]], Mapping[str, Any]]] = {}
+    shared_game_engine = build_shared_game_engine_session()
     for market in sorted(GAME_MARKETS | BINARY_MARKETS):
-        registry[market] = generic_market_engine_adapter
+        registry[market] = shared_game_engine if market in STAGE1_GAME_MARKETS else generic_market_engine_adapter
     for market in sorted(HITTER_MARKETS):
         registry[market] = hitter_joint_adapter
     for market in sorted(PITCHER_MARKETS):

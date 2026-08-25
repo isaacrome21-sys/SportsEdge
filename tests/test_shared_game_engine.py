@@ -1,0 +1,102 @@
+import unittest
+
+from sportsedge.engine_registry import engine_registry
+from sportsedge.generic_market_engine import generic_market_engine_adapter
+from sportsedge.shared_game_engine import build_shared_game_engine_session
+from sportsedge.v7_distribution import simulate_game_distribution
+
+
+class SharedGameEngineStage1Tests(unittest.TestCase):
+    def base_input(self):
+        return {
+            "game_id": "777",
+            "entity_id": "GAME",
+            "away_mean_runs": 4.1,
+            "home_mean_runs": 4.6,
+            "feature_source_hash": "source-v1",
+            "simulations": 2000,
+        }
+
+    def test_one_distribution_is_reused_for_ml_rl_totals(self):
+        calls = []
+
+        def counting_simulator(**kwargs):
+            calls.append(dict(kwargs))
+            return simulate_game_distribution(**kwargs)
+
+        engine = build_shared_game_engine_session(simulator=counting_simulator)
+        base = self.base_input()
+        outputs = [
+            engine({**base, "market": "MONEYLINE", "line": 0.0, "side": "HOME"}),
+            engine({**base, "market": "RUN_LINE", "line": -1.5, "side": "HOME"}),
+            engine({**base, "market": "TOTALS", "line": 8.5, "side": "OVER"}),
+        ]
+
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0]["total_line"], 0.0)
+        self.assertEqual({row["distribution_sha256"] for row in outputs}, {outputs[0]["distribution_sha256"]})
+        self.assertEqual({row["model_input_hash"] for row in outputs}, {outputs[0]["model_input_hash"]})
+        self.assertEqual({row["market"] for row in outputs}, {"MONEYLINE", "RUN_LINE", "TOTALS"})
+        self.assertEqual(len({row["readout_sha256"] for row in outputs}), 3)
+
+    def test_line_and_side_change_readout_not_stochastic_identity(self):
+        calls = []
+
+        def counting_simulator(**kwargs):
+            calls.append(dict(kwargs))
+            return simulate_game_distribution(**kwargs)
+
+        engine = build_shared_game_engine_session(simulator=counting_simulator)
+        base = self.base_input()
+        over_85 = engine({**base, "market": "TOTALS", "line": 8.5, "side": "OVER"})
+        under_95 = engine({**base, "market": "TOTALS", "line": 9.5, "side": "UNDER"})
+
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(over_85["distribution_sha256"], under_95["distribution_sha256"])
+        self.assertEqual(over_85["model_input_hash"], under_95["model_input_hash"])
+        self.assertNotEqual(over_85["readout_sha256"], under_95["readout_sha256"])
+
+    def test_distinct_feature_provenance_forces_new_distribution(self):
+        calls = []
+
+        def counting_simulator(**kwargs):
+            calls.append(dict(kwargs))
+            return simulate_game_distribution(**kwargs)
+
+        engine = build_shared_game_engine_session(simulator=counting_simulator)
+        base = self.base_input()
+        engine({**base, "market": "MONEYLINE", "line": 0.0, "side": "HOME"})
+        engine({**base, "feature_source_hash": "source-v2", "market": "MONEYLINE", "line": 0.0, "side": "HOME"})
+        self.assertEqual(len(calls), 2)
+
+    def test_stage1_readouts_match_incumbent_probabilities(self):
+        shared = build_shared_game_engine_session()
+        base = self.base_input()
+        cases = (
+            {"market": "MONEYLINE", "line": 0.0, "side": "HOME"},
+            {"market": "MONEYLINE", "line": 0.0, "side": "AWAY"},
+            {"market": "RUN_LINE", "line": -1.5, "side": "HOME"},
+            {"market": "RUN_LINE", "line": 1.5, "side": "AWAY"},
+            {"market": "TOTALS", "line": 8.0, "side": "OVER"},
+            {"market": "TOTALS", "line": 8.0, "side": "UNDER"},
+        )
+        for case in cases:
+            model_input = {**base, **case}
+            incumbent = generic_market_engine_adapter(model_input)
+            candidate = shared(model_input)
+            with self.subTest(case=case):
+                self.assertAlmostEqual(candidate["model_p"], incumbent["model_p"], places=15)
+                self.assertAlmostEqual(candidate["push_p"], incumbent["push_p"], places=15)
+                self.assertEqual(candidate["mc_paths"], incumbent["mc_paths"])
+                self.assertEqual(candidate["seed_policy"], incumbent["seed_policy"])
+                self.assertEqual(candidate["engine_version"], incumbent["engine_version"])
+
+    def test_registry_binds_all_three_markets_to_same_session(self):
+        registry = engine_registry()
+        self.assertIs(registry["MONEYLINE"], registry["RUN_LINE"])
+        self.assertIs(registry["RUN_LINE"], registry["TOTALS"])
+        self.assertIsNot(registry["TOTALS"], registry["NRFI"])
+
+
+if __name__ == "__main__":
+    unittest.main()
