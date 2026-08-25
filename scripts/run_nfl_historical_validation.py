@@ -15,7 +15,12 @@ from sportsedge.core.validation.football_evidence import (
     validate_real_history_bundle,
 )
 from sportsedge.sports.nfl.history import NFLVERSE_SCHEDULE_CSV, normalize_nfl_rows, parse_schedule_csv
-from sportsedge.sports.nfl.historical_validation import build_nfl_fold_rows, build_nfl_game_evaluations
+from sportsedge.sports.nfl.historical_validation import (
+    build_calibration_evidence,
+    build_nfl_fold_rows,
+    build_nfl_game_evaluations,
+    calibrate_nfl_evaluations,
+)
 
 
 def _fetch(url: str) -> bytes:
@@ -31,6 +36,10 @@ def main() -> int:
     parser.add_argument("--start-season", type=int, default=2006)
     parser.add_argument("--end-season", type=int, default=2025)
     parser.add_argument("--min-history-seasons", type=int, default=2)
+    parser.add_argument("--min-calibration-fit-seasons", type=int, default=2)
+    parser.add_argument("--calibration-bins", type=int, default=10)
+    parser.add_argument("--calibration-min-bin-n", type=int, default=25)
+    parser.add_argument("--calibration-threshold", type=float, default=0.05)
     parser.add_argument("--ewma-alpha", type=float, default=0.18)
     parser.add_argument("--home-field-points", type=float, default=1.7)
     parser.add_argument("--margin-sigma", type=float, default=13.5)
@@ -49,7 +58,7 @@ def main() -> int:
     text = raw.decode("utf-8-sig")
     seasons = range(args.start_season, args.end_season + 1)
     history_rows = normalize_nfl_rows(parse_schedule_csv(text), seasons)
-    evaluations = build_nfl_game_evaluations(
+    raw_evaluations = build_nfl_game_evaluations(
         history_rows,
         min_history_seasons=args.min_history_seasons,
         ewma_alpha=args.ewma_alpha,
@@ -57,7 +66,18 @@ def main() -> int:
         margin_sigma=args.margin_sigma,
         total_sigma=args.total_sigma,
     )
-    folds = build_nfl_fold_rows(evaluations)
+    evaluations = calibrate_nfl_evaluations(
+        raw_evaluations,
+        min_fit_seasons=args.min_calibration_fit_seasons,
+    )
+    folds = build_nfl_fold_rows(evaluations, require_calibrated=True)
+    calibration = build_calibration_evidence(
+        evaluations,
+        bins=args.calibration_bins,
+        min_bin_n=args.calibration_min_bin_n,
+        max_bin_deviation_threshold=args.calibration_threshold,
+    )
+
     validation_rows = [
         {
             "season": int(row["season"]),
@@ -84,10 +104,11 @@ def main() -> int:
             evidence.fold_total > 0 and evidence.fold_win_rate >= args.fold_win_threshold
         )
         record["required_fold_win_rate"] = args.fold_win_threshold
+        record["calibration"] = calibration.get(market)
         per_market[market] = record
 
     payload = {
-        "schema_version": 1,
+        "schema_version": 2,
         "model_id": "nfl_m2_rolling_score_v1",
         "provenance": "REAL_PUBLIC_HISTORY",
         "source_url": args.source_url,
@@ -95,20 +116,31 @@ def main() -> int:
         "source_transport": "FROZEN_LOCAL_BYTES" if args.source_file is not None else "LIVE_FETCH",
         "season_range": [args.start_season, args.end_season],
         "history_row_count": len(history_rows),
-        "evaluation_game_count": len(evaluations),
+        "raw_evaluation_game_count": len(raw_evaluations),
+        "calibrated_evaluation_game_count": sum(
+            row.get("m2_home_cover_calibrated_prob") is not None
+            or row.get("m2_over_calibrated_prob") is not None
+            for row in evaluations
+        ),
         "fold_count": len(folds),
         "parameters": {
             "min_history_seasons": args.min_history_seasons,
+            "min_calibration_fit_seasons": args.min_calibration_fit_seasons,
+            "calibration_bins": args.calibration_bins,
+            "calibration_min_bin_n": args.calibration_min_bin_n,
+            "calibration_threshold": args.calibration_threshold,
             "ewma_alpha": args.ewma_alpha,
             "home_field_points": args.home_field_points,
             "margin_sigma": args.margin_sigma,
             "total_sigma": args.total_sigma,
         },
         "folds": folds,
+        "calibration_evidence": calibration,
         "promotion_evidence": per_market,
         "promotion_note": (
-            "PRODUCTION_LOGIC_PASS is only the walk-forward fold gate. "
-            "VALIDATED_MATH, CI_ATTESTED calibration, and forward CLV gates remain independent."
+            "Fold losses use isotonic probabilities calibrated strictly on prior seasons. "
+            "PRODUCTION_LOGIC_PASS and calibration evidence are not CI or CLV attestation; "
+            "those gates remain independent."
         ),
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
