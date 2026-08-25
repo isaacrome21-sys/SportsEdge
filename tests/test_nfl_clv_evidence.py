@@ -38,7 +38,10 @@ class NFLCLVEvidenceTests(unittest.TestCase):
             "side": "AAA",
             "closing_line": -3.5,
             "closing_price": -110,
+            # This probability is an alternate closing quote at the original
+            # decision threshold, not the no-vig probability at -3.5.
             "closing_novig_prob": 0.52,
+            "probability_line": -3.0,
             "model_id": PRODUCTION_NFL_M2_MODEL_ID,
             "feature_contract": NFL_M2_FEATURE_CONTRACT,
             "code_git_sha": git_sha,
@@ -65,7 +68,7 @@ class NFLCLVEvidenceTests(unittest.TestCase):
         )
         return result, out
 
-    def test_exact_code_sha_is_persisted_in_clv_evidence(self):
+    def test_exact_code_sha_and_probability_reference_are_persisted_in_clv_evidence(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             sha = "1" * 40
@@ -75,6 +78,17 @@ class NFLCLVEvidenceTests(unittest.TestCase):
             self.assertEqual(payload["code_git_sha"], sha)
             self.assertEqual(payload["decision_count"], 1)
             self.assertEqual(payload["markets"]["spread"]["logged_plays"], 1)
+            self.assertEqual(payload["clv_probability_reference"], "DECISION_THRESHOLD")
+
+    def test_moved_line_without_decision_threshold_probability_fails_closed(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            sha = "1" * 40
+            close = self._close(sha)
+            close.pop("probability_line")
+            result, _ = self._run(root, self._decision(sha), close, sha)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("CLV_REFERENCE_LINE_MISMATCH", result.stdout + result.stderr)
 
     def test_mixed_code_sha_fails_closed(self):
         with TemporaryDirectory() as tmp:
