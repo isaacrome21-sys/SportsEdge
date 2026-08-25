@@ -1,4 +1,4 @@
-"""Derive coherent football game-level market probabilities from one joint score sample."""
+"""Derive coherent football market probabilities from one shared simulation sample."""
 
 from __future__ import annotations
 
@@ -23,10 +23,116 @@ def _over_under(values: Iterable[float]) -> dict[str, float]:
     return {"over": result["win"], "under": result["loss"], "push": result["push"]}
 
 
-def _require_scores(rows: list[Mapping[str, Any]], home_key: str, away_key: str, error: str) -> tuple[list[float], list[float]]:
+def _require_scores(
+    rows: list[Mapping[str, Any]],
+    home_key: str,
+    away_key: str,
+    error: str,
+) -> tuple[list[float], list[float]]:
     if any(home_key not in row or away_key not in row for row in rows):
         raise ValueError(error)
     return ([float(row[home_key]) for row in rows], [float(row[away_key]) for row in rows])
+
+
+def _moneyline(home: list[float], away: list[float]) -> dict[str, float]:
+    n = float(len(home))
+    margins = [h - a for h, a in zip(home, away)]
+    return {
+        "home_win": sum(m > 0 for m in margins) / n,
+        "away_win": sum(m < 0 for m in margins) / n,
+        "tie": sum(m == 0 for m in margins) / n,
+    }
+
+
+def _spread(home: list[float], away: list[float], line: float) -> dict[str, float]:
+    result = _three_way((h - a) + float(line) for h, a in zip(home, away))
+    return {
+        "home_cover": result["win"],
+        "away_cover": result["loss"],
+        "push": result["push"],
+    }
+
+
+def _period_score_keys(period: str, *, include_ot: bool | None) -> tuple[str, str, str]:
+    normalized = str(period).strip().lower()
+    if normalized == "first_half":
+        return "first_half_home_score", "first_half_away_score", "FIRST_HALF_SCORES_MISSING"
+    if normalized == "second_half":
+        if include_ot is None:
+            raise ValueError("SECOND_HALF_OT_RULE_REQUIRED")
+        if not isinstance(include_ot, bool):
+            raise ValueError("SECOND_HALF_OT_RULE_MUST_BE_BOOLEAN")
+        suffix = "with_ot" if include_ot else "regulation"
+        return (
+            f"second_half_{suffix}_home_score",
+            f"second_half_{suffix}_away_score",
+            "SECOND_HALF_SCORES_MISSING",
+        )
+    if normalized in {"q1", "q2", "q3", "q4"}:
+        return f"{normalized}_home_score", f"{normalized}_away_score", "QUARTER_SCORES_MISSING"
+    raise ValueError(f"UNSUPPORTED_FOOTBALL_PERIOD:{period}")
+
+
+def derive_period_markets(
+    simulation_rows: Iterable[Mapping[str, Any]],
+    *,
+    period: str,
+    spread_line: float = 0.0,
+    total_line: float | None = None,
+    include_ot: bool | None = None,
+) -> dict[str, dict[str, float]]:
+    """Price one half/quarter directly from the parent simulation rows.
+
+    No period is simulated independently. For ``second_half`` the caller must
+    explicitly state whether the sportsbook settlement rule includes overtime;
+    ambiguity fails closed instead of silently treating OT one way or the other.
+    """
+
+    rows = list(simulation_rows)
+    if not rows:
+        raise ValueError("SIMULATION_ROWS_EMPTY")
+    home_key, away_key, error = _period_score_keys(period, include_ot=include_ot)
+    home, away = _require_scores(rows, home_key, away_key, error)
+    result: dict[str, dict[str, float]] = {
+        "moneyline": _moneyline(home, away),
+        "spread": _spread(home, away, spread_line),
+    }
+    if total_line is not None:
+        result["total"] = _over_under((h + a) - float(total_line) for h, a in zip(home, away))
+    return result
+
+
+def derive_alternate_markets(
+    simulation_rows: Iterable[Mapping[str, Any]],
+    *,
+    spread_lines: Iterable[float] = (),
+    total_lines: Iterable[float] = (),
+) -> dict[str, dict[float, dict[str, float]]]:
+    """Price alternate lines as predicates over the same final-score rows."""
+
+    rows = list(simulation_rows)
+    if not rows:
+        raise ValueError("SIMULATION_ROWS_EMPTY")
+    home, away = _require_scores(rows, "home_score", "away_score", "FULL_GAME_SCORES_MISSING")
+
+    spread_results: dict[float, dict[str, float]] = {}
+    for raw_line in spread_lines:
+        line = float(raw_line)
+        if line in spread_results:
+            raise ValueError(f"DUPLICATE_ALTERNATE_SPREAD:{line}")
+        spread_results[line] = _spread(home, away, line)
+
+    total_results: dict[float, dict[str, float]] = {}
+    for raw_line in total_lines:
+        line = float(raw_line)
+        if line in total_results:
+            raise ValueError(f"DUPLICATE_ALTERNATE_TOTAL:{line}")
+        total_results[line] = _over_under((h + a) - line for h, a in zip(home, away))
+
+    return {
+        "alternate_spread": spread_results,
+        "alternate_total": total_results,
+    }
 
 
 def derive_game_markets(
@@ -46,31 +152,19 @@ def derive_game_markets(
     ``home_score - away_score + spread_line > 0``. At a zero spread, home-cover
     probability therefore exactly equals home moneyline win probability.
 
-    First-half markets are derived only when the joint sample actually carries
-    first-half scores. The function fails closed rather than inventing a first-
-    half split from full-game scores.
+    The legacy first-half arguments are preserved for compatibility. New
+    second-half and quarter callers should use :func:`derive_period_markets` so
+    settlement-rule choices remain explicit.
     """
 
     rows = list(simulation_rows)
     if not rows:
         raise ValueError("SIMULATION_ROWS_EMPTY")
     home, away = _require_scores(rows, "home_score", "away_score", "FULL_GAME_SCORES_MISSING")
-    n = float(len(rows))
-    margins = [h - a for h, a in zip(home, away)]
 
     markets: dict[str, dict[str, float]] = {
-        "moneyline": {
-            "home_win": sum(m > 0 for m in margins) / n,
-            "away_win": sum(m < 0 for m in margins) / n,
-            "tie": sum(m == 0 for m in margins) / n,
-        }
-    }
-
-    spread = _three_way(m + float(spread_line) for m in margins)
-    markets["spread"] = {
-        "home_cover": spread["win"],
-        "away_cover": spread["loss"],
-        "push": spread["push"],
+        "moneyline": _moneyline(home, away),
+        "spread": _spread(home, away, spread_line),
     }
 
     if total_line is not None:
@@ -83,27 +177,15 @@ def derive_game_markets(
         markets["team_total_away"] = _over_under(a - float(away_team_total_line) for a in away)
 
     if first_half_total_line is not None or first_half_spread_line != 0.0:
-        fh_home, fh_away = _require_scores(
+        fh = derive_period_markets(
             rows,
-            "first_half_home_score",
-            "first_half_away_score",
-            "FIRST_HALF_SCORES_MISSING",
+            period="first_half",
+            spread_line=first_half_spread_line,
+            total_line=first_half_total_line,
         )
-        fh_margins = [h - a for h, a in zip(fh_home, fh_away)]
-        markets["first_half_moneyline"] = {
-            "home_win": sum(m > 0 for m in fh_margins) / n,
-            "away_win": sum(m < 0 for m in fh_margins) / n,
-            "tie": sum(m == 0 for m in fh_margins) / n,
-        }
-        fh_spread = _three_way(m + float(first_half_spread_line) for m in fh_margins)
-        markets["first_half_spread"] = {
-            "home_cover": fh_spread["win"],
-            "away_cover": fh_spread["loss"],
-            "push": fh_spread["push"],
-        }
-        if first_half_total_line is not None:
-            markets["first_half_total"] = _over_under(
-                (h + a) - float(first_half_total_line) for h, a in zip(fh_home, fh_away)
-            )
+        markets["first_half_moneyline"] = fh["moneyline"]
+        markets["first_half_spread"] = fh["spread"]
+        if "total" in fh:
+            markets["first_half_total"] = fh["total"]
 
     return markets

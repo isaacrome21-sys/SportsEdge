@@ -107,10 +107,12 @@ class FootballGamePath:
 
         first_half_home = quarter_home[1] + quarter_home[2]
         first_half_away = quarter_away[1] + quarter_away[2]
-        second_half_home = quarter_home[3] + quarter_home[4] + ot_home
-        second_half_away = quarter_away[3] + quarter_away[4] + ot_away
-        home_score = first_half_home + second_half_home
-        away_score = first_half_away + second_half_away
+        second_half_reg_home = quarter_home[3] + quarter_home[4]
+        second_half_reg_away = quarter_away[3] + quarter_away[4]
+        second_half_with_ot_home = second_half_reg_home + ot_home
+        second_half_with_ot_away = second_half_reg_away + ot_away
+        home_score = first_half_home + second_half_with_ot_home
+        away_score = first_half_away + second_half_with_ot_away
 
         return {
             "game_id": self.game_id,
@@ -127,8 +129,15 @@ class FootballGamePath:
             "ot_away_score": ot_away,
             "first_half_home_score": first_half_home,
             "first_half_away_score": first_half_away,
-            "second_half_home_score": second_half_home,
-            "second_half_away_score": second_half_away,
+            "second_half_regulation_home_score": second_half_reg_home,
+            "second_half_regulation_away_score": second_half_reg_away,
+            "second_half_with_ot_home_score": second_half_with_ot_home,
+            "second_half_with_ot_away_score": second_half_with_ot_away,
+            # Compatibility aliases from the first Engine A slice. These mean
+            # Q3+Q4+OT; callers pricing a second-half market must instead use the
+            # explicit regulation/with-OT fields selected by settlement rules.
+            "second_half_home_score": second_half_with_ot_home,
+            "second_half_away_score": second_half_with_ot_away,
             "home_score": home_score,
             "away_score": away_score,
             "margin": home_score - away_score,
@@ -143,13 +152,21 @@ class FootballGamePath:
             raise ValueError("ENGINE_A_HOME_FIRST_HALF_RECONCILIATION_FAILED")
         if row["first_half_away_score"] != row["q1_away_score"] + row["q2_away_score"]:
             raise ValueError("ENGINE_A_AWAY_FIRST_HALF_RECONCILIATION_FAILED")
-        if row["second_half_home_score"] != row["q3_home_score"] + row["q4_home_score"] + row["ot_home_score"]:
-            raise ValueError("ENGINE_A_HOME_SECOND_HALF_RECONCILIATION_FAILED")
-        if row["second_half_away_score"] != row["q3_away_score"] + row["q4_away_score"] + row["ot_away_score"]:
-            raise ValueError("ENGINE_A_AWAY_SECOND_HALF_RECONCILIATION_FAILED")
-        if row["home_score"] != row["first_half_home_score"] + row["second_half_home_score"]:
+        if row["second_half_regulation_home_score"] != row["q3_home_score"] + row["q4_home_score"]:
+            raise ValueError("ENGINE_A_HOME_REGULATION_SECOND_HALF_RECONCILIATION_FAILED")
+        if row["second_half_regulation_away_score"] != row["q3_away_score"] + row["q4_away_score"]:
+            raise ValueError("ENGINE_A_AWAY_REGULATION_SECOND_HALF_RECONCILIATION_FAILED")
+        if row["second_half_with_ot_home_score"] != row["second_half_regulation_home_score"] + row["ot_home_score"]:
+            raise ValueError("ENGINE_A_HOME_SECOND_HALF_OT_RECONCILIATION_FAILED")
+        if row["second_half_with_ot_away_score"] != row["second_half_regulation_away_score"] + row["ot_away_score"]:
+            raise ValueError("ENGINE_A_AWAY_SECOND_HALF_OT_RECONCILIATION_FAILED")
+        if row["second_half_home_score"] != row["second_half_with_ot_home_score"]:
+            raise ValueError("ENGINE_A_HOME_SECOND_HALF_ALIAS_RECONCILIATION_FAILED")
+        if row["second_half_away_score"] != row["second_half_with_ot_away_score"]:
+            raise ValueError("ENGINE_A_AWAY_SECOND_HALF_ALIAS_RECONCILIATION_FAILED")
+        if row["home_score"] != row["first_half_home_score"] + row["second_half_with_ot_home_score"]:
             raise ValueError("ENGINE_A_HOME_FINAL_RECONCILIATION_FAILED")
-        if row["away_score"] != row["first_half_away_score"] + row["second_half_away_score"]:
+        if row["away_score"] != row["first_half_away_score"] + row["second_half_with_ot_away_score"]:
             raise ValueError("ENGINE_A_AWAY_FINAL_RECONCILIATION_FAILED")
         if row["total"] != row["home_score"] + row["away_score"]:
             raise ValueError("ENGINE_A_TOTAL_RECONCILIATION_FAILED")
@@ -168,7 +185,7 @@ class EngineAPathSimulator:
     """Seeded structural scoring-path challenger for Engine A.
 
     The generator creates ordered football scoring events rather than drawing a
-    final score and independently splitting it into market periods.  Touchdown
+    final score and independently splitting it into market periods. Touchdown
     and field-goal event rates are intentionally transparent candidate defaults;
     they require historical fit before any predictive/promotion claim.
     """
