@@ -177,6 +177,19 @@ class NFLPredictiveOvertimeSimulatorTests(unittest.TestCase):
         self.assertEqual(scoring_play.special_teams_points, 0)
         result.assert_reconciliation()
 
+    def test_defensive_return_td_opportunity_rejects_post_game_try_points(self):
+        from sportsedge.core.simulate.overtime import NFLRegularSeasonOTOpportunity
+
+        with self.assertRaisesRegex(ValueError, "OVERTIME_DEFENSIVE_RETURN_TD_POINTS_INVALID"):
+            NFLRegularSeasonOTOpportunity(
+                opportunity_index=1,
+                opportunity_team="HOME",
+                scoring_team="AWAY",
+                points=7,
+                clock_end_seconds_remaining=500,
+                outcome_type="DEFENSIVE_RETURN_TOUCHDOWN",
+            )
+
     def test_non_tied_regulation_is_rejected(self):
         from sportsedge.core.simulate.overtime_simulator import NFLRegularSeasonOTSimulator
 
