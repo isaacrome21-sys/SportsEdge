@@ -65,6 +65,7 @@ class NFLPromotionRegistryTests(unittest.TestCase):
             "sport": "nfl",
             "model_id": PRODUCTION_NFL_M2_MODEL_ID,
             "feature_contract": NFL_M2_FEATURE_CONTRACT,
+            "code_git_sha": "1" * 40,
             "decision_log_sha256": "c" * 64,
             "close_log_sha256": "d" * 64,
             "markets": {
@@ -160,6 +161,24 @@ class NFLPromotionRegistryTests(unittest.TestCase):
             build_nfl_promotion_registry(
                 self._math(), self._history(), declared_markets=["spread"],
                 ci_attested=True, ci_attestation=ci,
+            )
+
+    def test_clv_must_match_exact_code_sha(self):
+        clv = self._clv()
+        clv["code_git_sha"] = "2" * 40
+        with self.assertRaisesRegex(ValueError, "NFL_CLV_CODE_SHA_MISMATCH"):
+            build_nfl_promotion_registry(
+                self._math(), self._history(), declared_markets=["spread"],
+                ci_attested=True, ci_attestation=self._ci(), clv_evidence=clv,
+            )
+
+    def test_clv_requires_valid_code_sha_identity(self):
+        clv = self._clv()
+        del clv["code_git_sha"]
+        with self.assertRaisesRegex(ValueError, "NFL_CLV_CODE_SHA_INVALID"):
+            build_nfl_promotion_registry(
+                self._math(), self._history(), declared_markets=["spread"],
+                ci_attested=True, ci_attestation=self._ci(), clv_evidence=clv,
             )
 
     def test_schedule_only_challenger_cannot_promote_production_m2(self):
