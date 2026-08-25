@@ -1,8 +1,10 @@
 """Structural drive/play Engine A challenger for football.
 
-This is the next layer beneath the shared scoring path. Scores are consequences
-of ordered drive/play state transitions; halves, quarters and markets must still
-be read from the derived parent path rather than simulated independently.
+Engine A owns regulation possession, down/distance, field position, play type,
+yards, turnovers and raw offensive touchdown outcomes. Special-teams outcomes
+are deliberately unresolved here: field-goal attempts carry zero points until
+Engine C resolves them, and touchdowns contribute six raw points before Engine
+C resolves the post-TD try.
 
 The default parameters are transparent structural candidate defaults, not fitted
 NFL promotion parameters. No sportsbook line, price or implied probability is
@@ -28,6 +30,8 @@ class TeamDriveProfile:
     explosive_rate: float = 0.10
     turnover_rate: float = 0.018
     field_goal_attempt_rate: float = 0.82
+    # Deprecated structural field retained for source compatibility only.
+    # Engine A does not consume this value; Engine C owns kick resolution.
     field_goal_skill: float = 0.84
     pace_seconds_mean: float = 31.0
 
@@ -50,7 +54,7 @@ class TeamDriveProfile:
 
 @dataclass(frozen=True)
 class PlayEvent:
-    """One ordered regulation play with score state before and after the play."""
+    """One ordered regulation play with raw Engine A score state."""
 
     drive_id: int
     play_id: int
@@ -114,6 +118,16 @@ class PlayEvent:
             raise ValueError("PLAY_SCORE_TYPE_REQUIRED")
 
         play_type = str(self.play_type).upper()
+        if self.score_type == "TOUCHDOWN_CANDIDATE" and self.points != 6:
+            raise ValueError("ENGINE_A_TOUCHDOWN_MUST_BE_SIX_RAW_POINTS")
+        if play_type == "FIELD_GOAL":
+            if self.points != 0 or home_delta != 0 or away_delta != 0:
+                raise ValueError("ENGINE_A_FIELD_GOAL_MUST_BE_UNRESOLVED")
+            if self.score_type != "FIELD_GOAL_ATTEMPT_CANDIDATE":
+                raise ValueError("ENGINE_A_FIELD_GOAL_ATTEMPT_TAG_REQUIRED")
+            if self.kick_distance is None:
+                raise ValueError("FIELD_GOAL_DISTANCE_REQUIRED")
+
         if play_type == "PASS":
             if not isinstance(self.pass_complete, bool):
                 raise ValueError("PASS_COMPLETION_STATE_REQUIRED")
@@ -139,7 +153,7 @@ class PlayEvent:
 
 @dataclass(frozen=True)
 class FootballPlayPath:
-    """One immutable regulation play path for a simulated football game."""
+    """One immutable regulation Engine A play path for a simulated game."""
 
     game_id: str
     simulation_id: int
@@ -189,7 +203,12 @@ class FootballPlayPath:
             previous = play
 
     def to_scoring_path(self) -> FootballGamePath:
-        """Collapse scoring plays into the canonical shared scoring-event path."""
+        """Collapse raw Engine A scoring plays into the canonical score path.
+
+        The result intentionally excludes field goals, XPs and two-point tries;
+        Engine C owns those outcomes. A touchdown therefore appears as six raw
+        points here.
+        """
 
         events: list[ScoringEvent] = []
         for play in self.plays:
@@ -237,9 +256,10 @@ class FootballPlayPath:
 class EngineADrivePlaySimulator:
     """Seeded regulation drive/play state-machine challenger.
 
-    It deliberately does not implement NFL overtime, defensive-return scoring,
-    penalties, detailed punt/return state, or fitted special-teams behavior yet.
-    Those omissions are promotion blockers, not hidden approximations.
+    Engine A does not resolve field goals or post-TD tries. It deliberately does
+    not implement NFL overtime, defensive-return scoring, full penalties,
+    detailed punt/return state, or fitted special-teams behavior yet. Those
+    omissions remain promotion blockers rather than hidden approximations.
     """
 
     def __init__(
@@ -299,11 +319,6 @@ class EngineADrivePlaySimulator:
             yards += int(self.rng.integers(10, 26))
         return max(-12, min(45, yards))
 
-    @staticmethod
-    def _field_goal_make_probability(profile: TeamDriveProfile, kick_distance: int) -> float:
-        distance_penalty = max(0, kick_distance - 40) * 0.012
-        return max(0.20, min(0.99, profile.field_goal_skill - distance_penalty))
-
     def _simulate_one(self, simulation_id: int) -> FootballPlayPath:
         remaining = 3600
         home_score = 0
@@ -330,15 +345,6 @@ class EngineADrivePlaySimulator:
                     quarter, clock = self._period_clock(remaining)
                     before_home, before_away = home_score, away_score
                     kick_distance = int(yardline + 17)
-                    made = bool(
-                        self.rng.random()
-                        < self._field_goal_make_probability(profile, kick_distance)
-                    )
-                    points = 3 if made else 0
-                    if made and possession == self.home_team:
-                        home_score += 3
-                    elif made:
-                        away_score += 3
                     play_id += 1
                     plays.append(
                         PlayEvent(
@@ -356,8 +362,8 @@ class EngineADrivePlaySimulator:
                             yardline_100=yardline,
                             play_type="FIELD_GOAL",
                             yards=0,
-                            points=points,
-                            score_type="FIELD_GOAL_CANDIDATE" if made else "FIELD_GOAL_MISSED_CANDIDATE",
+                            points=0,
+                            score_type="FIELD_GOAL_ATTEMPT_CANDIDATE",
                             kick_distance=kick_distance,
                         )
                     )
@@ -432,11 +438,11 @@ class EngineADrivePlaySimulator:
 
                 new_yardline = max(0, min(99, yardline - yards))
                 touchdown = new_yardline == 0 and (play_type != "PASS" or pass_complete)
-                points = 7 if touchdown else 0
+                points = 6 if touchdown else 0
                 if touchdown and possession == self.home_team:
-                    home_score += 7
+                    home_score += 6
                 elif touchdown:
-                    away_score += 7
+                    away_score += 6
 
                 play_id += 1
                 plays.append(
