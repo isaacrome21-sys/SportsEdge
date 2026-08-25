@@ -1,5 +1,5 @@
 from sportsedge.ufc_engine import FighterSnapshot, FightContext
-from sportsedge.ufc_runtime import evaluate_h2h, _stable_seed
+from sportsedge.ufc_runtime import enforce_model_promotion, evaluate_h2h, _stable_seed
 from sportsedge.ufc_source import OddsQuote
 from sportsedge.ufc_training import LogisticArtifact
 
@@ -63,3 +63,25 @@ def test_monte_carlo_recenters_to_ensemble_probability():
 
 def test_monte_carlo_seed_is_cross_process_stable():
     assert _stable_seed("e1", "alpha", "beta", "draftkings") == 2031464258
+
+
+def test_unpromoted_model_cannot_emit_official_bet():
+    out = evaluate_h2h(
+        fighters=[fighter("Alpha", 1750), fighter("Beta", 1400)],
+        quotes=quotes(+150, -170), n_sims=1000,
+    )
+    gated = enforce_model_promotion(
+        out,
+        {"promoted": False, "status": "UNVERIFIED", "blockers": ["CLOSING_ODDS_PROVENANCE_UNVERIFIED"]},
+    )
+    assert not any(x.passed for x in gated)
+    assert all("MODEL_UNPROMOTED" in x.reason for x in gated)
+
+
+def test_promoted_model_preserves_truth_gate_decisions():
+    out = evaluate_h2h(
+        fighters=[fighter("Alpha", 1750), fighter("Beta", 1400)],
+        quotes=quotes(+150, -170), n_sims=1000,
+    )
+    gated = enforce_model_promotion(out, {"promoted": True, "status": "PROMOTED", "blockers": []})
+    assert gated == out

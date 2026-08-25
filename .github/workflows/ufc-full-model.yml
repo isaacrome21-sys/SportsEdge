@@ -6,18 +6,20 @@ on:
     paths:
       - 'sportsedge/ufc_*.py'
       - 'scripts/*ufc*.py'
+      - 'config/*ufc*.json'
+      - 'config/dwcs*.json'
       - '.github/workflows/ufc-full-model.yml'
   pull_request:
     paths:
       - 'sportsedge/ufc_*.py'
       - 'scripts/*ufc*.py'
+      - 'config/*ufc*.json'
+      - 'config/dwcs*.json'
       - '.github/workflows/ufc-full-model.yml'
   workflow_dispatch:
   schedule:
-    # DWCS Season 10 airs Tuesdays; run an early and late pre-card refresh.
     - cron: '0 16 * * 2'
     - cron: '0 21 * * 2'
-    # UFC Saturday refreshes retained for standard cards.
     - cron: '0 15 * * 6'
     - cron: '0 19 * * 6'
 
@@ -38,27 +40,42 @@ jobs:
       - name: Install test dependency
         run: python -m pip install --disable-pip-version-check pytest
       - name: Run UFC tests
-        run: python -m pytest -q tests/test_ufc_engine.py tests/test_ufc_training.py tests/test_ufc_runtime.py
-      - name: Train chronological UFC model from public historical snapshot
-        run: python scripts/build_ufc_training_artifact.py --output models/ufc_logistic_v1.json --metrics artifacts/ufc_training_metrics.json
+        run: python -m pytest -q tests/test_ufc_engine.py tests/test_ufc_training.py tests/test_ufc_runtime.py tests/test_ufc_source.py
+      - name: Train chronological UFC model and promotion evidence
+        run: >-
+          python scripts/build_ufc_training_artifact.py
+          --output models/ufc_logistic_v1.json
+          --metrics artifacts/ufc_training_metrics.json
+          --promotion-evidence artifacts/ufc_promotion_evidence.json
+          --promotion-contract config/ufc_promotion_contract_v1.json
       - name: Build current UFC fighter/context snapshots
-        run: python scripts/build_ufc_live_inputs.py --fighters data/ufc/fighters_today.json --contexts data/ufc/contexts_today.json
+        run: >-
+          python scripts/build_ufc_live_inputs.py
+          --fighters data/ufc/fighters_today.json
+          --contexts data/ufc/contexts_today.json
+          --override config/dwcs_s10w3_2026-08-25.json
       - name: Verify artifacts
         run: |
           test -s models/ufc_logistic_v1.json
+          test -s artifacts/ufc_training_metrics.json
+          test -s artifacts/ufc_promotion_evidence.json
           test -s data/ufc/fighters_today.json
           test -s data/ufc/contexts_today.json
           python - <<'PY'
           import json
           m=json.load(open('models/ufc_logistic_v1.json'))
+          p=json.load(open('artifacts/ufc_promotion_evidence.json'))
           f=json.load(open('data/ufc/fighters_today.json'))
           c=json.load(open('data/ufc/contexts_today.json'))
           assert m['training_rows'] >= 1000
           assert m['holdout_metrics']['n'] >= 100
+          assert p['status'] in {'PROMOTED','UNVERIFIED'}
+          assert isinstance(p.get('blockers'), list)
+          assert 'ufc_debut_any' in p['slices']
           assert len(c) >= 1
           assert len(f['fighters']) == 2 * len(c)
           assert all(int(x.get('rounds', 0)) in {3, 5} for x in c)
-          print('UFC_BOOTSTRAP_OK',m['training_rows'],m['holdout_metrics'],len(f['fighters']),len(c))
+          print('UFC_BOOTSTRAP_OK',m['training_rows'],m['holdout_metrics'],p['status'],p['blockers'],len(f['fighters']),len(c))
           PY
       - uses: actions/upload-artifact@v4
         with:
@@ -66,6 +83,7 @@ jobs:
           path: |
             models/ufc_logistic_v1.json
             artifacts/ufc_training_metrics.json
+            artifacts/ufc_promotion_evidence.json
             data/ufc/fighters_today.json
             data/ufc/contexts_today.json
           if-no-files-found: error
@@ -85,19 +103,29 @@ jobs:
         shell: bash
         run: |
           if [ -n "$ODDS_API_KEY" ]; then echo 'available=true' >> "$GITHUB_OUTPUT"; else echo 'available=false' >> "$GITHUB_OUTPUT"; fi
-      - name: Rebuild model and live inputs
+      - name: Rebuild model, evidence, and live inputs
         if: ${{ steps.odds.outputs.available == 'true' }}
         run: |
-          python scripts/build_ufc_training_artifact.py --output models/ufc_logistic_v1.json --metrics artifacts/ufc_training_metrics.json
-          python scripts/build_ufc_live_inputs.py --fighters data/ufc/fighters_today.json --contexts data/ufc/contexts_today.json
+          python scripts/build_ufc_training_artifact.py --output models/ufc_logistic_v1.json --metrics artifacts/ufc_training_metrics.json --promotion-evidence artifacts/ufc_promotion_evidence.json --promotion-contract config/ufc_promotion_contract_v1.json
+          python scripts/build_ufc_live_inputs.py --fighters data/ufc/fighters_today.json --contexts data/ufc/contexts_today.json --override config/dwcs_s10w3_2026-08-25.json
       - name: Run 250k UFC model
         if: ${{ steps.odds.outputs.available == 'true' }}
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
-        run: python scripts/run_ufc_full_model.py --fighters data/ufc/fighters_today.json --contexts data/ufc/contexts_today.json --model-artifact models/ufc_logistic_v1.json --sims 250000 --output artifacts/ufc_card.json
+        run: >-
+          python scripts/run_ufc_full_model.py
+          --fighters data/ufc/fighters_today.json
+          --contexts data/ufc/contexts_today.json
+          --model-artifact models/ufc_logistic_v1.json
+          --promotion-evidence artifacts/ufc_promotion_evidence.json
+          --sims 250000
+          --output artifacts/ufc_card.json
       - uses: actions/upload-artifact@v4
         if: ${{ steps.odds.outputs.available == 'true' }}
         with:
           name: ufc-full-model-${{ github.run_id }}
-          path: artifacts/ufc_card.json
+          path: |
+            artifacts/ufc_card.json
+            artifacts/ufc_promotion_evidence.json
+            artifacts/ufc_training_metrics.json
           if-no-files-found: error

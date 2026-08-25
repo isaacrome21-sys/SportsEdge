@@ -2,7 +2,8 @@
 
 Combines sportsbook-independent model probability with optional trained logistic
 artifact, then evaluates live prices. Market prices are used only after the model
-probability is produced.
+probability is produced. Model-level promotion is a separate hard gate: an
+unpromoted model may generate diagnostics but may not populate official bets.
 """
 from __future__ import annotations
 
@@ -87,12 +88,7 @@ def _lookup_snapshots(fighters: Iterable[FighterSnapshot]) -> dict[str, FighterS
 
 
 def _recenter_projection(proj: FightProjection, p_a_win: float) -> FightProjection:
-    """Reconcile method distribution to the ensemble ML probability.
-
-    Preserve each fighter's conditional KO/sub/decision mix while making the
-    Monte Carlo winner distribution agree with the ensemble probability used by
-    pricing and the Truth Gate.
-    """
+    """Reconcile method distribution to the ensemble ML probability."""
     p_a = min(1.0, max(0.0, float(p_a_win)))
     p_b = 1.0 - p_a
     a = [proj.p_a_ko, proj.p_a_sub, proj.p_a_dec]
@@ -170,13 +166,44 @@ def load_artifact(path: str | Path) -> LogisticArtifact:
     return LogisticArtifact.from_dict(value)
 
 
-def write_card(path: str | Path, candidates: Sequence[UFCCandidate], *, source: str = "SportsEdge UFC") -> None:
+def load_promotion_evidence(path: str | Path | None) -> Mapping[str, object]:
+    if not path:
+        return {"promoted": False, "status": "UNVERIFIED", "blockers": ["PROMOTION_EVIDENCE_MISSING"]}
+    p = Path(path)
+    if not p.exists():
+        return {"promoted": False, "status": "UNVERIFIED", "blockers": ["PROMOTION_EVIDENCE_MISSING"]}
+    value = json.loads(p.read_text(encoding="utf-8"))
+    if not isinstance(value, Mapping):
+        return {"promoted": False, "status": "UNVERIFIED", "blockers": ["PROMOTION_EVIDENCE_INVALID"]}
+    return value
+
+
+def model_is_promoted(evidence: Mapping[str, object]) -> bool:
+    return bool(evidence.get("promoted")) and str(evidence.get("status") or "").upper() == "PROMOTED"
+
+
+def enforce_model_promotion(candidates: Sequence[UFCCandidate], evidence: Mapping[str, object]) -> list[UFCCandidate]:
+    if model_is_promoted(evidence):
+        return list(candidates)
+    blockers = [str(x) for x in (evidence.get("blockers") or [])]
+    suffix = "MODEL_UNPROMOTED" + ((":" + ",".join(blockers)) if blockers else "")
+    return [replace(c, passed=False, reason=f"{c.reason}|{suffix}") for c in candidates]
+
+
+def write_card(path: str | Path, candidates: Sequence[UFCCandidate], *, source: str = "SportsEdge UFC",
+               promotion_evidence: Mapping[str, object] | None = None) -> None:
+    promotion_evidence = promotion_evidence or {
+        "promoted": False, "status": "UNVERIFIED", "blockers": ["PROMOTION_EVIDENCE_MISSING"]
+    }
     payload = {
         "meta": {
             "sport": "UFC",
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "source": source,
             "sportsbook_independent_model": True,
+            "model_promoted": model_is_promoted(promotion_evidence),
+            "promotion_status": str(promotion_evidence.get("status") or "UNVERIFIED"),
+            "promotion_blockers": [str(x) for x in (promotion_evidence.get("blockers") or [])],
         },
         "bets": [asdict(x) for x in candidates if x.passed],
         "candidates": [asdict(x) for x in candidates],
