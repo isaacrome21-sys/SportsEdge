@@ -39,10 +39,7 @@ def main() -> int:
     if not declared_markets:
         raise SystemExit("NFL_MARKET_SURFACE_EMPTY")
 
-    clv = None
-    if args.clv_evidence is not None:
-        clv_payload = _read(args.clv_evidence)
-        clv = clv_payload.get("markets", clv_payload)
+    clv = _read(args.clv_evidence) if args.clv_evidence is not None else None
 
     registry = build_nfl_promotion_registry(
         math_artifact,
