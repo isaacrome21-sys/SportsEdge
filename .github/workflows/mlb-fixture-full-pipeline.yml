@@ -53,6 +53,8 @@ jobs:
             tests.test_stage1_provenance_ledger \
             tests.test_stage1_auto_provenance \
             tests.test_prediction_journal \
+            tests.test_team_total_odds_source \
+            tests.test_mlb_settlement_evidence \
             tests.test_mlb_prediction_settlement \
             tests.test_mlb_catalog_prediction_settlement \
             tests.test_mlb_catalog_settlement_journal \
