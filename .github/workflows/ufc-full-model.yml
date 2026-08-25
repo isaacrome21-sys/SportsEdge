@@ -45,6 +45,7 @@ jobs:
           tests/test_ufc_engine.py
           tests/test_ufc_training.py
           tests/test_ufc_history.py
+          tests/test_ufc_closing_odds.py
           tests/test_ufc_promotion.py
           tests/test_ufc_runtime.py
           tests/test_ufc_source.py
@@ -82,6 +83,12 @@ jobs:
           assert isinstance(p.get('blockers'), list)
           assert p['training_source'] == 'Greco1899/scrape_ufc_stats UFCStats mirror'
           assert p['history_semantics']['feature_time'] == 'pre_fight_snapshot'
+          assert p['market_baseline']['closing_baseline_verified'] is False
+          assert p['market_baseline']['coverage'] == 0.0
+          assert p['market_baseline']['min_bookmakers'] == 2
+          assert p['market_baseline']['max_snapshot_lag_seconds'] == 900
+          assert 'CLOSING_ODDS_PROVENANCE_UNVERIFIED' in p['blockers']
+          assert 'CLOSING_MARKET_COVERAGE_INSUFFICIENT' in p['blockers']
           assert 'ufc_debut_any' in p['slices']
           assert p['dwcs_specific_validation']['status'] in {'PROMOTED','UNVERIFIED'}
           assert len(c) >= 1
