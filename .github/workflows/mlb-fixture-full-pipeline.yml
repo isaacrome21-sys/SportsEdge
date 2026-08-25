@@ -53,6 +53,8 @@ jobs:
             tests.test_mlb_f5_features \
             tests.test_f5_stage1_routing \
             tests.test_first_hr_order_engine \
+            tests.test_pitcher_record_win_game_state \
+            tests.test_rebuilt_binary_journal_provenance \
             tests.test_mlb_joint_mode_game_provenance \
             tests.test_stage1_provenance_ledger \
             tests.test_stage1_auto_provenance \
