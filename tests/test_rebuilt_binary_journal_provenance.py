@@ -26,22 +26,26 @@ def _row(market):
         "model_input_hash": "1" * 64,
         "distribution_sha256": "2" * 64,
         "readout_sha256": "3" * 64,
-        "readout_version": "v1",
+        "readout_version": "v2",
+        "engine_version": "state_engine_v2",
+        "seed_policy": "identity_sha256_256bit",
+        "mc_paths": 50000,
     }
 
 
 class RebuiltBinaryJournalProvenanceTests(unittest.TestCase):
-    def test_first_home_run_requires_distribution_identity(self):
-        row = _row("FIRST_HOME_RUN")
-        row.pop("distribution_sha256")
-        with self.assertRaises(PredictionJournalError):
-            build_prediction_journal_record({**BASE, "results": [row]})
-
-    def test_pitcher_record_win_requires_distribution_identity(self):
-        row = _row("PITCHER_RECORD_WIN")
-        row.pop("readout_sha256")
-        with self.assertRaises(PredictionJournalError):
-            build_prediction_journal_record({**BASE, "results": [row]})
+    def test_rebuilt_binary_requires_distribution_and_engine_identity(self):
+        required = (
+            "model_input_hash", "distribution_sha256", "readout_sha256",
+            "readout_version", "engine_version", "seed_policy", "mc_paths",
+        )
+        for market in ("FIRST_HOME_RUN", "PITCHER_RECORD_WIN"):
+            for field in required:
+                row = _row(market)
+                row.pop(field)
+                with self.subTest(market=market, field=field):
+                    with self.assertRaises(PredictionJournalError):
+                        build_prediction_journal_record({**BASE, "results": [row]})
 
     def test_complete_rebuilt_binary_provenance_is_persisted(self):
         rows = [_row("FIRST_HOME_RUN"), _row("PITCHER_RECORD_WIN")]
@@ -50,6 +54,9 @@ class RebuiltBinaryJournalProvenanceTests(unittest.TestCase):
         for row in record["predictions"]:
             self.assertEqual(row["distribution_sha256"], "2" * 64)
             self.assertEqual(row["readout_sha256"], "3" * 64)
+            self.assertEqual(row["engine_version"], "state_engine_v2")
+            self.assertEqual(row["seed_policy"], "identity_sha256_256bit")
+            self.assertEqual(row["mc_paths"], 50000)
 
 
 if __name__ == "__main__":
