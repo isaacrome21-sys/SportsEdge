@@ -11,6 +11,7 @@ import json
 from math import isfinite
 from typing import Any, Mapping
 
+from .either_pitcher_settlement import settle_either_pitcher
 from .mlb_acceptance_matrix import build_acceptance_matrix
 from .mlb_additional_pit_joiner import _derive_outcome as _derive_additional_outcome
 from .mlb_additional_pit_joiner import _policy_ambiguity
@@ -222,7 +223,11 @@ def _resolve_prediction(prediction: Mapping[str, Any], facts: Mapping[str, Any])
         if ambiguity: return "UNRESOLVED", str(ambiguity[0])
         try: return _derive_additional_outcome(facts, market, entity_id, line, side), "OFFICIAL_MARKET_FACTS_AND_NORMALIZED_BOOK_RULES"
         except Exception as exc: return "UNRESOLVED", f"ADDITIONAL_SETTLEMENT_ERROR:{exc}"
-    if market in EITHER_PITCHER_MARKETS: return "UNRESOLVED", "EITHER_PITCHER_SETTLEMENT_INTERPRETER_REQUIRED"
+    if market in EITHER_PITCHER_MARKETS:
+        try:
+            return settle_either_pitcher(facts, market=market, entity_id=entity_id, line=line, side=side), "OFFICIAL_TWO_PITCHER_FACTS_AND_NORMALIZED_BOOK_RULES"
+        except Exception as exc:
+            return "UNRESOLVED", f"EITHER_PITCHER_SETTLEMENT_ERROR:{exc}"
     value = _fact_value(facts, market, entity_id)
     if value is None: value = _pitcher_value(facts, entity_id, market)
     if value is None: return "UNRESOLVED", "OFFICIAL_ENTITY_FACT_VALUE_MISSING"
