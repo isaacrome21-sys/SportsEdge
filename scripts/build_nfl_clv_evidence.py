@@ -5,14 +5,20 @@ Every decision and close row must carry the same exact production code SHA.
 Promotion evidence therefore resets across code changes instead of silently
 combining forward CLV from different executable implementations.
 
-For spread/total markets, ``closing_novig_prob`` must be measured at the same
-threshold as ``line_at_decision``. A moved market close may therefore carry a
-separate ``probability_line`` identifying the alternate closing quote used to
-measure the original threshold. Incomparable thresholds fail closed.
+Promotion-grade CLV also has two non-negotiable comparability contracts:
+
+* closing no-vig probability for a line market is measured at the original
+  decision threshold, even when the market's headline closing line moved;
+* a close is from the same sportsbook, after the decision, and still pregame.
+
+Rows that cannot prove those contracts fail closed instead of being counted in
+``n``. Exact duplicate decision identities are rejected so one observation
+cannot be repeated to inflate the promotion sample.
 """
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
@@ -59,6 +65,86 @@ def _identity(row: dict, *, path: Path, number: int, expected_git_sha: str) -> N
         raise SystemExit(f"NFL_CLV_CODE_SHA_MISMATCH:{path}:{number}")
 
 
+def _timestamp(value, *, error: str) -> datetime:
+    raw = str(value or "").strip()
+    if not raw:
+        raise SystemExit(error)
+    try:
+        parsed = datetime.fromisoformat(raw[:-1] + "+00:00" if raw.endswith("Z") else raw)
+    except ValueError as exc:
+        raise SystemExit(error) from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise SystemExit(error)
+    return parsed.astimezone(timezone.utc)
+
+
+def _book(value, *, error: str) -> str:
+    book = str(value or "").strip().lower()
+    if not book:
+        raise SystemExit(error)
+    return book
+
+
+def _row_key(row: dict, *, book: str) -> tuple[str, str, str, str]:
+    game_id = str(row.get("game_id") or "").strip()
+    market = str(row.get("market") or "").strip().lower()
+    side = str(row.get("side") or "").strip()
+    if not game_id or not market or not side:
+        raise SystemExit("NFL_CLV_PAIR_IDENTITY_MISSING")
+    return game_id, market, side, book
+
+
+def _validate_forward_pairs(decision_rows: list[dict], close_rows: list[dict]):
+    decisions: dict[tuple[str, str, str, str], tuple[dict, datetime, datetime]] = {}
+    for number, row in enumerate(decision_rows, 1):
+        book = _book(row.get("book"), error=f"NFL_CLV_DECISION_BOOK_MISSING:{number}")
+        key = _row_key(row, book=book)
+        if key in decisions:
+            raise SystemExit(f"NFL_CLV_DUPLICATE_DECISION:{key}")
+        decision_ts = _timestamp(row.get("decision_ts"), error=f"NFL_CLV_DECISION_TS_INVALID:{number}")
+        game_start = _timestamp(row.get("game_start_ts"), error=f"NFL_CLV_GAME_START_TS_INVALID:{number}")
+        if decision_ts >= game_start:
+            raise SystemExit(f"NFL_CLV_DECISION_NOT_PREGAME:{key}")
+        decisions[key] = (row, decision_ts, game_start)
+
+    closes: dict[tuple[str, str, str, str], tuple[dict, datetime, datetime]] = {}
+    for number, row in enumerate(close_rows, 1):
+        book = _book(row.get("book"), error=f"NFL_CLV_CLOSE_BOOK_MISSING:{number}")
+        key = _row_key(row, book=book)
+        if key in closes:
+            raise SystemExit(f"NFL_CLV_DUPLICATE_CLOSE:{key}")
+        close_ts = _timestamp(row.get("close_ts"), error=f"NFL_CLV_CLOSE_TS_INVALID:{number}")
+        game_start = _timestamp(row.get("game_start_ts"), error=f"NFL_CLV_GAME_START_TS_INVALID:CLOSE:{number}")
+        closes[key] = (row, close_ts, game_start)
+
+    decision_identity_without_book = {(g, m, s): book for g, m, s, book in decisions}
+    close_identity_without_book = {(g, m, s): book for g, m, s, book in closes}
+    for identity, decision_book in decision_identity_without_book.items():
+        close_book = close_identity_without_book.get(identity)
+        if close_book is not None and close_book != decision_book:
+            raise SystemExit(f"NFL_CLV_CLOSE_BOOK_MISMATCH:{identity}:{decision_book}:{close_book}")
+
+    missing = sorted(set(decisions) - set(closes))
+    if missing:
+        raise SystemExit(f"NFL_CLV_CLOSE_MISSING:{missing[0]}")
+    orphan = sorted(set(closes) - set(decisions))
+    if orphan:
+        raise SystemExit(f"NFL_CLV_ORPHAN_CLOSE:{orphan[0]}")
+
+    for key, (_, decision_ts, decision_start) in decisions.items():
+        _, close_ts, close_start = closes[key]
+        if close_start != decision_start:
+            raise SystemExit(f"NFL_CLV_GAME_START_MISMATCH:{key}")
+        if close_ts <= decision_ts:
+            raise SystemExit(f"NFL_CLV_CLOSE_NOT_AFTER_DECISION:{key}")
+        if close_ts >= decision_start:
+            raise SystemExit(f"NFL_CLV_CLOSE_NOT_PREGAME:{key}")
+
+    first_decision = min(value[1] for value in decisions.values())
+    last_close = max(value[1] for value in closes.values())
+    return decisions, closes, first_decision, last_close
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--decisions", type=Path, required=True)
@@ -78,6 +164,8 @@ def main() -> int:
     for i, row in enumerate(close_rows, 1):
         _identity(row, path=args.closes, number=i, expected_git_sha=git_sha)
 
+    _, _, first_decision, last_close = _validate_forward_pairs(decision_rows, close_rows)
+
     decisions = [CLVDecision(
         decision_ts=str(row["decision_ts"]), game_id=str(row["game_id"]), sport="nfl",
         market=str(row["market"]).lower(), side=str(row["side"]), book=str(row["book"]),
@@ -91,6 +179,7 @@ def main() -> int:
         closing_line=None if row.get("closing_line") is None else float(row["closing_line"]),
         closing_price=float(row["closing_price"]), closing_novig_prob=float(row["closing_novig_prob"]),
         probability_line=None if row.get("probability_line") is None else float(row["probability_line"]),
+        book=str(row["book"]),
     ) for row in close_rows]
 
     summaries = summarize_clv(score_clv(decisions, closes))
@@ -108,7 +197,7 @@ def main() -> int:
         (official if bucket == "OFFICIAL" else rejected)[market] = row
 
     payload = {
-        "schema_version": 3,
+        "schema_version": 4,
         "sport": "nfl",
         "model_id": PRODUCTION_NFL_M2_MODEL_ID,
         "feature_contract": NFL_M2_FEATURE_CONTRACT,
@@ -117,12 +206,18 @@ def main() -> int:
         "close_log_sha256": _sha(args.closes),
         "decision_count": len(decisions),
         "close_count": len(closes),
+        "unique_observation_count": len(decisions),
+        "first_decision_ts": first_decision.isoformat(),
+        "last_close_ts": last_close.isoformat(),
         "clv_probability_reference": "DECISION_THRESHOLD",
+        "forward_time_contract": "PREGAME_DECISION_TO_PREGAME_CLOSE",
+        "close_book_contract": "SAME_BOOK_AS_DECISION",
         "markets": official,
         "rejected_markets": rejected,
         "promotion_note": (
             "Only OFFICIAL decisions from this exact code SHA populate promotion markets; "
-            "line-market closing probabilities must be measured at the original decision threshold. "
+            "line-market closing probabilities are measured at the original decision threshold, "
+            "and every close is from the same book after the decision but before game start. "
             "Rejected decisions are reported separately for gate diagnostics."
         ),
     }
