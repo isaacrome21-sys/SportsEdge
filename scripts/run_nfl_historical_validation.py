@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Produce hash-bound NFL walk-forward M1-vs-M2 evidence from nflverse history."""
+"""Produce hash-bound NFL schedule-score challenger evidence.
+
+This runner is intentionally not the production NFL M2. It evaluates a simple,
+diagnosable rolling score-state challenger from schedule/results data only. Its
+evidence is useful as a benchmark and pipeline exercise but is explicitly
+identity-incompatible with the production M2 promotion registry.
+"""
 from __future__ import annotations
 
 import argparse
@@ -21,6 +27,9 @@ from sportsedge.sports.nfl.historical_validation import (
     build_nfl_game_evaluations,
     calibrate_nfl_evaluations,
 )
+
+SCHEDULE_CHALLENGER_MODEL_ID = "nfl_schedule_score_challenger_v1"
+SCHEDULE_CHALLENGER_FEATURE_CONTRACT = "NFL_SCHEDULE_SCORE_CHALLENGER_V1"
 
 
 def _fetch(url: str) -> bytes:
@@ -45,7 +54,7 @@ def main() -> int:
     parser.add_argument("--margin-sigma", type=float, default=13.5)
     parser.add_argument("--total-sigma", type=float, default=13.0)
     parser.add_argument("--fold-win-threshold", type=float, default=0.65)
-    parser.add_argument("--out", type=Path, default=Path("artifacts/nfl_historical_validation.json"))
+    parser.add_argument("--out", type=Path, default=Path("artifacts/nfl_schedule_challenger_validation.json"))
     args = parser.parse_args()
 
     if args.end_season < args.start_season:
@@ -100,7 +109,7 @@ def main() -> int:
     per_market = {}
     for market, evidence in promotion.items():
         record = asdict(evidence)
-        record["production_logic_pass"] = bool(
+        record["challenger_fold_gate_pass"] = bool(
             evidence.fold_total > 0 and evidence.fold_win_rate >= args.fold_win_threshold
         )
         record["required_fold_win_rate"] = args.fold_win_threshold
@@ -108,8 +117,10 @@ def main() -> int:
         per_market[market] = record
 
     payload = {
-        "schema_version": 2,
-        "model_id": "nfl_m2_rolling_score_v1",
+        "schema_version": 3,
+        "model_id": SCHEDULE_CHALLENGER_MODEL_ID,
+        "feature_contract": SCHEDULE_CHALLENGER_FEATURE_CONTRACT,
+        "promotion_eligible_model": False,
         "provenance": "REAL_PUBLIC_HISTORY",
         "source_url": args.source_url,
         "source_sha256": source_hash,
@@ -138,9 +149,8 @@ def main() -> int:
         "calibration_evidence": calibration,
         "promotion_evidence": per_market,
         "promotion_note": (
-            "Fold losses use isotonic probabilities calibrated strictly on prior seasons. "
-            "PRODUCTION_LOGIC_PASS and calibration evidence are not CI or CLV attestation; "
-            "those gates remain independent."
+            "This is schedule-only challenger evidence and cannot promote the production NFL M2. "
+            "Fold losses use isotonic probabilities calibrated strictly on prior seasons."
         ),
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
