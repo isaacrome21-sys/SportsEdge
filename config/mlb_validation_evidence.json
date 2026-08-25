@@ -12,7 +12,20 @@
     "MONEYLINE": {}, "RUN_LINE": {}, "TOTALS": {},
     "NRFI": {}, "YRFI": {}, "F5_MONEYLINE": {}, "F5_RUN_LINE": {}, "F5_TOTALS": {},
 
-    "HITS": {}, "HOME_RUNS": {}, "TOTAL_BASES": {}, "RBI": {}, "RUNS": {},
+    "HITS": {
+      "evidence_count": 0,
+      "evidence_status": "RESET",
+      "evidence_reset_reason": "RNG_IDENTITY_QUOTE_SIDE_REMOVED",
+      "evidence_reset_at": "2026-08-25"
+    },
+    "HOME_RUNS": {},
+    "TOTAL_BASES": {
+      "evidence_count": 0,
+      "evidence_status": "RESET",
+      "evidence_reset_reason": "RNG_IDENTITY_QUOTE_SIDE_REMOVED",
+      "evidence_reset_at": "2026-08-25"
+    },
+    "RBI": {}, "RUNS": {},
     "STOLEN_BASES": {}, "BATTER_BB": {}, "EXTRA_BASE_HITS": {},
     "HITS_RUNS_RBIS": {}, "HITS_RUNS_STOLEN_BASES": {}, "RUNS_RBIS": {},
     "HITS_STOLEN_BASES": {}, "HITS_WALKS_STOLEN_BASES": {},
@@ -20,7 +33,14 @@
     "SINGLES": {}, "DOUBLES": {}, "TRIPLES": {}, "BATTER_K": {},
 
     "PITCHER_K": {}, "PITCHER_OUTS": {}, "PITCHER_ER": {},
-    "PITCHER_HITS_ALLOWED": {}, "PITCHER_BB": {}, "PITCHER_HITS_WALKS_ER": {},
+    "PITCHER_HITS_ALLOWED": {},
+    "PITCHER_BB": {
+      "evidence_count": 0,
+      "evidence_status": "RESET",
+      "evidence_reset_reason": "RNG_IDENTITY_QUOTE_SIDE_REMOVED",
+      "evidence_reset_at": "2026-08-25"
+    },
+    "PITCHER_HITS_WALKS_ER": {},
     "EITHER_PITCHER_HITS_ALLOWED": {}, "EITHER_PITCHER_BB": {}, "EITHER_PITCHER_ER": {},
 
     "PITCHER_RECORD_WIN": {}, "FIRST_HOME_RUN": {}
