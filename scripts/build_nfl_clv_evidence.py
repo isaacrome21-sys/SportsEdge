@@ -12,8 +12,8 @@ Promotion-grade CLV also has two non-negotiable comparability contracts:
 * a close is from the same sportsbook, after the decision, and still pregame.
 
 Rows that cannot prove those contracts fail closed instead of being counted in
-``n``. Exact duplicate decision identities are rejected so one observation
-cannot be repeated to inflate the promotion sample.
+``n``. A game/market/side observation can count only once even if the same model
+play was available at multiple books, preventing cross-book sample inflation.
 """
 from __future__ import annotations
 
@@ -96,9 +96,14 @@ def _row_key(row: dict, *, book: str) -> tuple[str, str, str, str]:
 
 def _validate_forward_pairs(decision_rows: list[dict], close_rows: list[dict]):
     decisions: dict[tuple[str, str, str, str], tuple[dict, datetime, datetime]] = {}
+    seen_observations: set[tuple[str, str, str]] = set()
     for number, row in enumerate(decision_rows, 1):
         book = _book(row.get("book"), error=f"NFL_CLV_DECISION_BOOK_MISSING:{number}")
         key = _row_key(row, book=book)
+        observation = key[:3]
+        if observation in seen_observations:
+            raise SystemExit(f"NFL_CLV_DUPLICATE_OBSERVATION:{observation}")
+        seen_observations.add(observation)
         if key in decisions:
             raise SystemExit(f"NFL_CLV_DUPLICATE_DECISION:{key}")
         decision_ts = _timestamp(row.get("decision_ts"), error=f"NFL_CLV_DECISION_TS_INVALID:{number}")
@@ -218,7 +223,8 @@ def main() -> int:
             "Only OFFICIAL decisions from this exact code SHA populate promotion markets; "
             "line-market closing probabilities are measured at the original decision threshold, "
             "and every close is from the same book after the decision but before game start. "
-            "Rejected decisions are reported separately for gate diagnostics."
+            "A game/market/side observation counts once across books. Rejected decisions are "
+            "reported separately for gate diagnostics."
         ),
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
