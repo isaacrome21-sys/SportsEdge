@@ -61,6 +61,10 @@ class AutoCardResult:
     implied_probability: float | None = None
     edge: float | None = None
     ev_per_dollar: float | None = None
+    model_input_hash: str | None = None
+    distribution_sha256: str | None = None
+    readout_sha256: str | None = None
+    readout_version: str | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -271,6 +275,8 @@ def _convert(index: int, result: UnifiedCardResult) -> AutoCardResult:
         index, result.game_id, result.market, result.entity_id, result.line, result.side,
         result.american_odds, result.model_p, result.bet_status, result.reason,
         result.shadow_status, result.implied_probability, result.edge, result.ev_per_dollar,
+        result.model_input_hash, result.distribution_sha256,
+        result.readout_sha256, result.readout_version,
     )
 
 
