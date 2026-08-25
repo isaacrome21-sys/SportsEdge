@@ -51,13 +51,13 @@ class NFLFieldPositionResolverTests(unittest.TestCase):
     def test_landing_zone_touchback_uses_own_20(self):
         from sportsedge.core.simulate.field_position import NFLFieldPositionProfile, NFLFieldPositionResolver
 
-        home = NFLFieldPositionProfile(
-            team="HOME", deep_touchback_rate=0.0, landing_touchback_rate=1.0,
+        home = NFLFieldPositionProfile(team="HOME")
+        away = NFLFieldPositionProfile(
+            team="AWAY", deep_touchback_rate=0.0, landing_touchback_rate=1.0,
             kickoff_return_yards_mean=25.0, kickoff_return_yards_sd=0.0,
             punt_net_yards_mean=40.0, punt_net_yards_sd=0.0,
             onside_attempt_rate_when_trailing=0.0, onside_recovery_rate=0.0,
         )
-        away = NFLFieldPositionProfile(team="AWAY")
         event = NFLFieldPositionResolver(home, away, seed=2).kickoff(
             transition_index=1, source_play_id=10, next_drive_id=4,
             kicking_team="AWAY", receiving_team="HOME", period=2,
