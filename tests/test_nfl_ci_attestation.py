@@ -30,11 +30,13 @@ class NFLCIAttestationTests(unittest.TestCase):
             "feature_contract": NFL_M2_FEATURE_CONTRACT,
             "ci_attestation_state": "UNATTESTED_IN_RUNNING_WORKFLOW",
         }
+        source_manifest = {"manifest_sha256": "a" * 64}
         paths = {}
         for name, payload in (
             ("nfl_simulator_profile.json", math),
             ("nfl_production_validation.json", history),
             ("nfl_promotion_registry.json", registry),
+            ("nfl_source_manifest.json", source_manifest),
         ):
             path = root / name
             path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
