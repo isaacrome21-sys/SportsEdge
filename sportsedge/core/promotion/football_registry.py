@@ -4,12 +4,15 @@ Structural implementation never implies promotion. Historical evidence must be
 produced by the exact production NFL M2 feature/model contract, share the same
 canonical multi-source manifest and exact code SHA as simulator math, and carry
 forward CLV from that same exact code contract. Missing market evidence never
-inherits a stage from another market, and a caller-supplied CI boolean can never
-self-attest execution.
+inherits a stage from another market, a caller-supplied CI boolean can never
+self-attest execution, and promotion-grade CLV must prove comparable threshold,
+pregame timing, same-sportsbook close identity, internally reconciled row counts,
+and finite numeric evidence before it can advance a market.
 """
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from math import isfinite
 import re
 from typing import Any
 
@@ -19,6 +22,10 @@ from sportsedge.sports.nfl.m2 import NFL_M2_FEATURE_CONTRACT, PRODUCTION_NFL_M2_
 
 _GIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 _EXPECTED_CI_WORKFLOW = "football-nfl-promotion-evidence"
+_EXPECTED_CLV_SCHEMA = 4
+_EXPECTED_CLV_REFERENCE = "DECISION_THRESHOLD"
+_EXPECTED_CLV_FORWARD_TIME = "PREGAME_DECISION_TO_PREGAME_CLOSE"
+_EXPECTED_CLV_BOOK = "SAME_BOOK_AS_DECISION"
 
 
 def _mapping(value: Any) -> Mapping[str, Any] | None:
@@ -45,6 +52,60 @@ def _git_sha(value: Any, error: str) -> str:
 
 def _source_hash(value: Mapping[str, Any], name: str) -> str:
     return _sha256(value.get("source_sha256"), f"{name}_SOURCE_SHA256_INVALID")
+
+
+def _count(value: Any, error: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(error)
+    return value
+
+
+def _finite_float(value: Any, error: str) -> float:
+    try:
+        out = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(error) from exc
+    if not isfinite(out):
+        raise ValueError(error)
+    return out
+
+
+def _clv_bucket(
+    value: Any,
+    *,
+    required_error: str,
+    row_error_prefix: str,
+) -> tuple[Mapping[str, Any], int]:
+    payload = _mapping(value)
+    if payload is None:
+        raise ValueError(required_error)
+    total = 0
+    for raw_market, raw_row in payload.items():
+        market = str(raw_market).strip().lower()
+        if not market:
+            raise ValueError(f"{row_error_prefix}_MARKET_INVALID")
+        row = _mapping(raw_row)
+        if row is None:
+            raise ValueError(f"{row_error_prefix}_ROW_INVALID:{market}")
+        total += _count(
+            row.get("logged_plays"),
+            f"{row_error_prefix}_LOGGED_PLAYS_INVALID:{market}",
+        )
+        _finite_float(
+            row.get("mean_clv"),
+            f"{row_error_prefix}_MEAN_CLV_INVALID:{market}",
+        )
+        _finite_float(
+            row.get("clv_t_stat"),
+            f"{row_error_prefix}_T_STAT_INVALID:{market}",
+        )
+        beat_close_rate = _finite_float(
+            row.get("beat_close_rate"),
+            f"{row_error_prefix}_BEAT_CLOSE_RATE_INVALID:{market}",
+        )
+        if not 0.0 <= beat_close_rate <= 1.0:
+            raise ValueError(f"{row_error_prefix}_BEAT_CLOSE_RATE_INVALID:{market}")
+    return payload, total
 
 
 def _verify_ci_attestation(
@@ -175,21 +236,71 @@ def build_nfl_promotion_registry(
     clv_raw: Mapping[str, Any] = {}
     clv_log_identity: dict[str, Any] | None = None
     if clv_evidence is not None:
+        try:
+            clv_schema = int(clv_evidence.get("schema_version", 0))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("NFL_CLV_SCHEMA_INVALID") from exc
+        if clv_schema != _EXPECTED_CLV_SCHEMA:
+            raise ValueError("NFL_CLV_SCHEMA_INVALID")
+        if str(clv_evidence.get("sport") or "").strip().lower() != "nfl":
+            raise ValueError("NFL_CLV_SPORT_MISMATCH")
         if clv_evidence.get("model_id") != PRODUCTION_NFL_M2_MODEL_ID:
             raise ValueError("NFL_CLV_MODEL_ID_MISMATCH")
         if clv_evidence.get("feature_contract") != NFL_M2_FEATURE_CONTRACT:
             raise ValueError("NFL_CLV_FEATURE_CONTRACT_MISMATCH")
+        if clv_evidence.get("clv_probability_reference") != _EXPECTED_CLV_REFERENCE:
+            raise ValueError("NFL_CLV_PROBABILITY_REFERENCE_INVALID")
+        if clv_evidence.get("forward_time_contract") != _EXPECTED_CLV_FORWARD_TIME:
+            raise ValueError("NFL_CLV_FORWARD_TIME_CONTRACT_INVALID")
+        if clv_evidence.get("close_book_contract") != _EXPECTED_CLV_BOOK:
+            raise ValueError("NFL_CLV_CLOSE_BOOK_CONTRACT_INVALID")
         clv_code_sha = _git_sha(clv_evidence.get("code_git_sha"), "NFL_CLV_CODE_SHA_INVALID")
         if clv_code_sha != math_code_sha:
             raise ValueError("NFL_CLV_CODE_SHA_MISMATCH")
-        markets_payload = _mapping(clv_evidence.get("markets"))
-        if markets_payload is None:
-            raise ValueError("NFL_CLV_MARKETS_REQUIRED")
+
+        markets_payload, official_logged = _clv_bucket(
+            clv_evidence.get("markets"),
+            required_error="NFL_CLV_MARKETS_REQUIRED",
+            row_error_prefix="NFL_CLV_OFFICIAL",
+        )
+        rejected_payload, rejected_logged = _clv_bucket(
+            clv_evidence.get("rejected_markets"),
+            required_error="NFL_CLV_REJECTED_MARKETS_REQUIRED",
+            row_error_prefix="NFL_CLV_REJECTED",
+        )
+        decision_count = _count(
+            clv_evidence.get("decision_count"), "NFL_CLV_DECISION_COUNT_INVALID"
+        )
+        close_count = _count(
+            clv_evidence.get("close_count"), "NFL_CLV_CLOSE_COUNT_INVALID"
+        )
+        unique_count = _count(
+            clv_evidence.get("unique_observation_count"),
+            "NFL_CLV_UNIQUE_OBSERVATION_COUNT_INVALID",
+        )
+        if decision_count != close_count:
+            raise ValueError("NFL_CLV_DECISION_CLOSE_COUNT_MISMATCH")
+        if unique_count != decision_count:
+            raise ValueError("NFL_CLV_UNIQUE_OBSERVATION_COUNT_MISMATCH")
+        summarized_count = official_logged + rejected_logged
+        if summarized_count != unique_count:
+            raise ValueError("NFL_CLV_MARKET_COUNT_MISMATCH")
+
         clv_raw = markets_payload
         clv_log_identity = {
+            "schema_version": _EXPECTED_CLV_SCHEMA,
+            "sport": "nfl",
             "model_id": PRODUCTION_NFL_M2_MODEL_ID,
             "feature_contract": NFL_M2_FEATURE_CONTRACT,
             "code_git_sha": clv_code_sha,
+            "clv_probability_reference": _EXPECTED_CLV_REFERENCE,
+            "forward_time_contract": _EXPECTED_CLV_FORWARD_TIME,
+            "close_book_contract": _EXPECTED_CLV_BOOK,
+            "decision_count": decision_count,
+            "close_count": close_count,
+            "unique_observation_count": unique_count,
+            "summarized_observation_count": summarized_count,
+            "rejected_observation_count": rejected_logged,
             "decision_log_sha256": _sha256(
                 clv_evidence.get("decision_log_sha256"), "NFL_CLV_DECISION_LOG_SHA256_INVALID"
             ),
@@ -221,18 +332,32 @@ def build_nfl_promotion_registry(
         if calibration is None:
             calibration_max, calibration_threshold = 1.0, 0.0
         else:
-            raw_max = calibration.get("max_bin_deviation")
-            raw_threshold = calibration.get("threshold")
-            calibration_max = float(raw_max) if raw_max is not None else 1.0
-            calibration_threshold = float(raw_threshold) if raw_threshold is not None else 0.0
+            calibration_pass = calibration.get("pass")
+            if not isinstance(calibration_pass, bool):
+                raise ValueError(f"NFL_CALIBRATION_EVIDENCE_INVALID:{market}")
+            calibration_max = _finite_float(
+                calibration.get("max_bin_deviation"),
+                f"NFL_CALIBRATION_EVIDENCE_INVALID:{market}",
+            )
+            calibration_threshold = _finite_float(
+                calibration.get("threshold"),
+                f"NFL_CALIBRATION_EVIDENCE_INVALID:{market}",
+            )
             if calibration_max < 0 or calibration_threshold < 0:
                 raise ValueError(f"NFL_CALIBRATION_EVIDENCE_INVALID:{market}")
-            if calibration.get("pass") is True and calibration_max > calibration_threshold:
+            computed_pass = calibration_max <= calibration_threshold
+            if calibration_pass is not computed_pass:
                 raise ValueError(f"NFL_CALIBRATION_PASS_CONTRADICTION:{market}")
 
         logged_plays = int(clv.get("logged_plays", 0)) if clv is not None else 0
-        mean_clv = float(clv.get("mean_clv", 0.0)) if clv is not None else 0.0
-        clv_t_stat = float(clv.get("clv_t_stat", 0.0)) if clv is not None else 0.0
+        mean_clv = _finite_float(
+            clv.get("mean_clv", 0.0) if clv is not None else 0.0,
+            f"NFL_CLV_EVIDENCE_INVALID:{market}",
+        )
+        clv_t_stat = _finite_float(
+            clv.get("clv_t_stat", 0.0) if clv is not None else 0.0,
+            f"NFL_CLV_EVIDENCE_INVALID:{market}",
+        )
         if logged_plays < 0:
             raise ValueError(f"NFL_CLV_EVIDENCE_INVALID:{market}")
 
@@ -264,7 +389,7 @@ def build_nfl_promotion_registry(
         }
 
     return {
-        "schema_version": 5,
+        "schema_version": 9,
         "sport": "nfl",
         "model_id": PRODUCTION_NFL_M2_MODEL_ID,
         "feature_contract": NFL_M2_FEATURE_CONTRACT,

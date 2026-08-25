@@ -58,7 +58,7 @@ jobs:
           --market-surface config/football_market_surface.json
           --out artifacts/football/nfl_ci_attested_registry.json
 
-      - name: Assert no forward-CLV promotion was invented
+      - name: Assert CI attestation cannot invent forward-CLV promotion
         run: |
           python - <<'PY'
           import json
@@ -66,8 +66,10 @@ jobs:
           payload = json.loads(Path('artifacts/football/nfl_ci_attested_registry.json').read_text())
           if payload.get('ci_attestation_state') != 'ATTESTED_BY_SEPARATE_WORKFLOW':
               raise SystemExit('NFL_EXTERNAL_CI_ATTESTATION_STATE_INVALID')
-          # This workflow receives no CLV log by design. A market cannot become
-          # DEPLOYED merely because CI recovered.
+          if payload.get('clv_attestation_state') != 'EXTERNAL_ATTESTATION_REQUIRED':
+              raise SystemExit('NFL_EXTERNAL_CLV_ATTESTATION_STATE_INVALID')
+          # This workflow receives no externally attested forward-CLV bundle by
+          # design. A market cannot become DEPLOYED merely because CI recovered.
           if payload.get('deployed_markets'):
               raise SystemExit(f"NFL_DEPLOYED_WITHOUT_FORWARD_CLV:{payload['deployed_markets']}")
           PY
