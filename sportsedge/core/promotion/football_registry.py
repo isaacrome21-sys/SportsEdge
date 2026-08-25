@@ -4,8 +4,9 @@ Structural implementation never implies promotion. Historical evidence must be
 produced by the exact production NFL M2 feature/model contract, share the same
 canonical multi-source manifest and exact code SHA as simulator math, and carry
 forward CLV from that same exact code contract. Missing market evidence never
-inherits a stage from another market, and a caller-supplied CI boolean can never
-self-attest execution.
+inherits a stage from another market, a caller-supplied CI boolean can never
+self-attest execution, and line-market CLV must be measured at the original
+decision threshold rather than at a moved closing threshold.
 """
 from __future__ import annotations
 
@@ -19,6 +20,8 @@ from sportsedge.sports.nfl.m2 import NFL_M2_FEATURE_CONTRACT, PRODUCTION_NFL_M2_
 
 _GIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 _EXPECTED_CI_WORKFLOW = "football-nfl-promotion-evidence"
+_EXPECTED_CLV_SCHEMA = 3
+_EXPECTED_CLV_REFERENCE = "DECISION_THRESHOLD"
 
 
 def _mapping(value: Any) -> Mapping[str, Any] | None:
@@ -175,10 +178,20 @@ def build_nfl_promotion_registry(
     clv_raw: Mapping[str, Any] = {}
     clv_log_identity: dict[str, Any] | None = None
     if clv_evidence is not None:
+        try:
+            clv_schema = int(clv_evidence.get("schema_version", 0))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("NFL_CLV_SCHEMA_INVALID") from exc
+        if clv_schema != _EXPECTED_CLV_SCHEMA:
+            raise ValueError("NFL_CLV_SCHEMA_INVALID")
+        if str(clv_evidence.get("sport") or "").strip().lower() != "nfl":
+            raise ValueError("NFL_CLV_SPORT_MISMATCH")
         if clv_evidence.get("model_id") != PRODUCTION_NFL_M2_MODEL_ID:
             raise ValueError("NFL_CLV_MODEL_ID_MISMATCH")
         if clv_evidence.get("feature_contract") != NFL_M2_FEATURE_CONTRACT:
             raise ValueError("NFL_CLV_FEATURE_CONTRACT_MISMATCH")
+        if clv_evidence.get("clv_probability_reference") != _EXPECTED_CLV_REFERENCE:
+            raise ValueError("NFL_CLV_PROBABILITY_REFERENCE_INVALID")
         clv_code_sha = _git_sha(clv_evidence.get("code_git_sha"), "NFL_CLV_CODE_SHA_INVALID")
         if clv_code_sha != math_code_sha:
             raise ValueError("NFL_CLV_CODE_SHA_MISMATCH")
@@ -187,9 +200,12 @@ def build_nfl_promotion_registry(
             raise ValueError("NFL_CLV_MARKETS_REQUIRED")
         clv_raw = markets_payload
         clv_log_identity = {
+            "schema_version": _EXPECTED_CLV_SCHEMA,
+            "sport": "nfl",
             "model_id": PRODUCTION_NFL_M2_MODEL_ID,
             "feature_contract": NFL_M2_FEATURE_CONTRACT,
             "code_git_sha": clv_code_sha,
+            "clv_probability_reference": _EXPECTED_CLV_REFERENCE,
             "decision_log_sha256": _sha256(
                 clv_evidence.get("decision_log_sha256"), "NFL_CLV_DECISION_LOG_SHA256_INVALID"
             ),
@@ -264,7 +280,7 @@ def build_nfl_promotion_registry(
         }
 
     return {
-        "schema_version": 5,
+        "schema_version": 6,
         "sport": "nfl",
         "model_id": PRODUCTION_NFL_M2_MODEL_ID,
         "feature_contract": NFL_M2_FEATURE_CONTRACT,
