@@ -20,9 +20,6 @@ import numpy as np
 @dataclass(frozen=True)
 class NFLFieldPositionProfile:
     team: str
-    # 2026 ordinary kickoff result mixture. A deep end-zone touchback is placed
-    # at the receiving 35; a kick that first touches the landing zone and is then
-    # downed in the end zone is placed at the receiving 20.
     deep_touchback_rate: float = 0.45
     landing_touchback_rate: float = 0.05
     kickoff_return_yards_mean: float = 25.0
@@ -80,6 +77,7 @@ class NFLPossessionTransition:
     next_yardline_100: int
     return_yards: int | None = None
     net_kick_yards: int | None = None
+    kicking_team_was_trailing: bool = False
 
     def __post_init__(self) -> None:
         if isinstance(self.transition_index, bool) or not isinstance(self.transition_index, int) or self.transition_index <= 0:
@@ -107,6 +105,10 @@ class NFLPossessionTransition:
             raise ValueError("FIELD_POSITION_RETURN_YARDS_INVALID")
         if self.net_kick_yards is not None and self.net_kick_yards < 0:
             raise ValueError("FIELD_POSITION_NET_KICK_YARDS_INVALID")
+        if not isinstance(self.kicking_team_was_trailing, bool):
+            raise ValueError("FIELD_POSITION_TRAILING_FLAG_INVALID")
+        if "ONSIDE" in self.transition_type and not self.kicking_team_was_trailing:
+            raise ValueError("ONSIDE_REQUIRES_TRAILING_KICKING_TEAM")
 
 
 class NFLFieldPositionResolver:
@@ -166,13 +168,11 @@ class NFLFieldPositionResolver:
             raise ValueError("KICKOFF_TEAM_COLLISION")
         kicking = self._profile(kicking_team)
         receiving = self._profile(receiving_team)
+        trailing = bool(kicking_team_trailing)
 
-        # 2026 Rule 6 permits a declared onside kick at any point in the game,
-        # but only while the kicking team is trailing. A model rate controls the
-        # strategic decision; the rule eligibility itself is deterministic.
         if (
             allow_onside
-            and bool(kicking_team_trailing)
+            and trailing
             and self.rng.random() < kicking.onside_attempt_rate_when_trailing
         ):
             kicking_recovers = bool(self.rng.random() < kicking.onside_recovery_rate)
@@ -195,6 +195,7 @@ class NFLFieldPositionResolver:
                     if kicking_recovers
                     else kicking.onside_receiving_recovery_yardline_100
                 ),
+                kicking_team_was_trailing=True,
             )
 
         draw = self.rng.random()
@@ -228,6 +229,7 @@ class NFLFieldPositionResolver:
             next_possession_team=receiving_team,
             next_yardline_100=yardline,
             return_yards=return_yards,
+            kicking_team_was_trailing=trailing,
         )
 
     def punt(
@@ -285,10 +287,6 @@ class NFLFieldPositionResolver:
         los = int(line_of_scrimmage_yardline_100)
         if not 1 <= los <= 99:
             raise ValueError("MISSED_FIELD_GOAL_YARDLINE_INVALID")
-        # Place kick is modeled seven yards behind the line of scrimmage. Under
-        # the missed-FG succeeding-spot rule, a kick spot inside the receiver 20
-        # yields the receiver's ball at its 20; otherwise the spot of kick is
-        # converted into the new offense's coordinate system.
         kick_spot_distance_to_receiving_goal = los + 7
         next_yardline = (
             80
