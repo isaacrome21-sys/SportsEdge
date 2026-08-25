@@ -5,6 +5,7 @@ import argparse
 import csv
 import json
 from collections import defaultdict
+from datetime import datetime, timezone
 from math import log
 from pathlib import Path
 from statistics import mean
@@ -72,10 +73,7 @@ def _slice_metrics(model, pairs):
     }
     market_probs = [_market_red_probability(raw) for _, raw in pairs]
     ys = [tr.y_a_win for tr, _ in pairs]
-    return {
-        'model': model_metrics,
-        'market_no_vig': _probability_metrics(market_probs, ys),
-    }
+    return {'model': model_metrics, 'market_no_vig': _probability_metrics(market_probs, ys)}
 
 
 def _experience(row, side):
@@ -115,6 +113,12 @@ def _promotion_evidence(model, holdout_pairs, contract, *, source_url, last_date
     if all_market.get('log_loss') is None or all_model.get('log_loss') is None or float(all_model['log_loss']) > float(all_market['log_loss']) + float(contract['max_log_loss_delta_vs_market']):
         blockers.append('LOG_LOSS_VS_MARKET_GATE')
 
+    last_training_day = datetime.strptime(last_date, '%Y-%m-%d').date()
+    evaluated_day = datetime.now(timezone.utc).date()
+    training_age_days = max(0, (evaluated_day - last_training_day).days)
+    if training_age_days > int(contract['training_data_max_age_days']):
+        blockers.append('TRAINING_DATA_STALE')
+
     # TidyTuesday documents these fields only as moneyline betting odds. It does not
     # establish that they are point-in-time closing prices, so this cannot satisfy
     # SportsEdge's closing-no-vig promotion requirement by itself.
@@ -137,6 +141,12 @@ def _promotion_evidence(model, holdout_pairs, contract, *, source_url, last_date
         'contract': contract,
         'training_source': source_url,
         'last_training_fight_date': last_date,
+        'training_freshness': {
+            'evaluated_at_utc_date': evaluated_day.isoformat(),
+            'age_days': training_age_days,
+            'max_age_days': int(contract['training_data_max_age_days']),
+            'fresh': training_age_days <= int(contract['training_data_max_age_days']),
+        },
         'market_baseline': {
             'source_fields': ['r_odds', 'b_odds'],
             'no_vig_normalization': True,
