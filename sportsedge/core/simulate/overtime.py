@@ -1,14 +1,15 @@
 """NFL regular-season overtime Rule 16 settlement contract.
 
 This module encodes rule/settlement state over already-resolved regulation paths.
-It intentionally does *not* generate overtime drives yet. Predictive overtime
+It intentionally does not generate hidden market outcomes. Predictive overtime
 play generation remains a separate Engine A+C task so rule correctness can be
 validated independently from model parameters.
 
-The current regular-season contract is one 10-minute period. Both teams are
-credited an opportunity to possess once regardless of the first opportunity's
-score, subject to the period clock, with the kickoff-safety exception. After
-both opportunities, a lead ends the game; if tied, the next score wins.
+The regular-season contract is one 10-minute period. Both teams receive an
+opportunity to possess once, subject to the kickoff-safety exception. A defense
+that intercepts or recovers a loose ball has possession; therefore a defensive
+return touchdown on the first credited opportunity also satisfies the scoring
+club's opportunity before the terminal score comparison is applied.
 """
 
 from __future__ import annotations
@@ -27,10 +28,10 @@ _OT_PERIOD_SECONDS = 600
 class NFLRegularSeasonOTOpportunity:
     """One completed Rule 16 possession-opportunity state.
 
-    ``opportunity_team`` is the team credited with its Rule 16 opportunity. It
-    is deliberately distinct from ``scoring_team`` so kickoff recoveries,
-    defensive scores and the opening-kickoff safety exception can be represented
-    without pretending the credited team necessarily ran an offensive drive.
+    ``opportunity_team`` is the team credited with the opportunity at the start
+    of this state. It is deliberately distinct from ``scoring_team`` so kickoff
+    recoveries, defensive scores and the opening-kickoff safety exception can be
+    represented without pretending the credited team necessarily scored.
     """
 
     opportunity_index: int
@@ -63,6 +64,10 @@ class NFLRegularSeasonOTOpportunity:
             raise ValueError("OVERTIME_POSITIVE_POINTS_SCORING_TEAM_REQUIRED")
         if self.outcome_type == "KICKOFF_SAFETY" and self.points != 2:
             raise ValueError("OVERTIME_KICKOFF_SAFETY_POINTS_INVALID")
+        if self.outcome_type == "DEFENSIVE_RETURN_TOUCHDOWN" and self.points != 6:
+            raise ValueError("OVERTIME_DEFENSIVE_RETURN_TD_POINTS_INVALID")
+        if self.outcome_type == "DEFENSIVE_RETURN_TOUCHDOWN" and self.scoring_team == self.opportunity_team:
+            raise ValueError("OVERTIME_DEFENSIVE_RETURN_TD_TEAM_INVALID")
 
 
 @dataclass(frozen=True)
@@ -144,12 +149,7 @@ def settle_nfl_regular_season_overtime(
     regulation_path: ResolvedFootballPath,
     opportunities: Iterable[NFLRegularSeasonOTOpportunity],
 ) -> NFLRegularSeasonOvertimeResult:
-    """Settle a terminal 2026 NFL regular-season overtime sequence.
-
-    This accepts *completed possession-opportunity states*, not hidden market
-    outcomes. If the supplied sequence has not reached a legal terminal state,
-    the function fails closed rather than inferring missing possessions or clock.
-    """
+    """Settle a terminal 2026 NFL regular-season overtime sequence."""
 
     if not isinstance(regulation_path, ResolvedFootballPath):
         raise TypeError("RESOLVED_REGULATION_PATH_REQUIRED")
@@ -187,12 +187,13 @@ def settle_nfl_regular_season_overtime(
 
     for position, item in enumerate(data):
         credited.add(item.opportunity_team)
+        if item.outcome_type == "DEFENSIVE_RETURN_TOUCHDOWN":
+            assert item.scoring_team is not None
+            credited.add(item.scoring_team)
         if item.points > 0:
             assert item.scoring_team is not None
             scores[item.scoring_team] += item.points
 
-        # Rule 16 opening-kickoff safety exception: the kicking team wins before
-        # the normal both-team opportunity guarantee is satisfied.
         if position == 0 and item.outcome_type == "KICKOFF_SAFETY":
             if item.scoring_team == item.opportunity_team:
                 raise ValueError("OVERTIME_KICKOFF_SAFETY_TEAM_INVALID")
@@ -206,9 +207,6 @@ def settle_nfl_regular_season_overtime(
                 final_clock_seconds_remaining=item.clock_end_seconds_remaining,
             )
 
-        # The 10-minute period is a hard cap even if the second team has not
-        # received its opportunity. At 0:00, score differential decides; tied
-        # score produces a regular-season tie.
         if item.clock_end_seconds_remaining == 0:
             leader = _score_leader(scores)
             _require_terminal_is_last(position, data)
@@ -232,7 +230,6 @@ def settle_nfl_regular_season_overtime(
                     tie=False,
                     final_clock_seconds_remaining=item.clock_end_seconds_remaining,
                 )
-            # Equal score after both opportunities transitions to sudden death.
             continue
 
         if both_opportunities_reached and item.points > 0:

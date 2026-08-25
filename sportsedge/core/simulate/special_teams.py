@@ -1,8 +1,8 @@
 """Structural Engine C special-teams resolver.
 
-Engine C consumes raw Engine A play paths. It resolves field-goal attempts and
-post-touchdown try decisions without creating an independent game simulation.
-All scoring remains traceable to the original play path.
+Engine C consumes raw Engine A play paths. It resolves field-goal attempts,
+post-touchdown try decisions, and transition-sourced special-teams return scores
+without creating an independent game simulation.
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ class SpecialTeamsProfile:
 
 @dataclass(frozen=True)
 class SpecialTeamsEvent:
-    source_play_id: int
+    source_play_id: int | None
     period: int
     clock_seconds_remaining: int
     team: str
@@ -61,10 +61,25 @@ class SpecialTeamsEvent:
     points: int
     kicker_id: str | None = None
     kick_distance: int | None = None
+    source_transition_index: int | None = None
 
     def __post_init__(self) -> None:
-        if isinstance(self.source_play_id, bool) or not isinstance(self.source_play_id, int) or self.source_play_id <= 0:
+        play_source = self.source_play_id is not None
+        transition_source = self.source_transition_index is not None
+        if play_source == transition_source:
+            raise ValueError("SPECIAL_TEAMS_EXACTLY_ONE_SOURCE_REQUIRED")
+        if self.source_play_id is not None and (
+            isinstance(self.source_play_id, bool)
+            or not isinstance(self.source_play_id, int)
+            or self.source_play_id <= 0
+        ):
             raise ValueError("SPECIAL_TEAMS_SOURCE_PLAY_ID_INVALID")
+        if self.source_transition_index is not None and (
+            isinstance(self.source_transition_index, bool)
+            or not isinstance(self.source_transition_index, int)
+            or self.source_transition_index <= 0
+        ):
+            raise ValueError("SPECIAL_TEAMS_SOURCE_TRANSITION_INDEX_INVALID")
         if self.period not in (1, 2, 3, 4):
             raise ValueError("SPECIAL_TEAMS_PERIOD_INVALID")
         if not 0 <= self.clock_seconds_remaining <= 900:
@@ -78,21 +93,25 @@ class SpecialTeamsEvent:
             "XP_MISSED": 0,
             "TWO_POINT_MADE": 2,
             "TWO_POINT_MISSED": 0,
+            "KICKOFF_RETURN_TD": 6,
+            "PUNT_RETURN_TD": 6,
         }
         if self.event_type not in allowed:
             raise ValueError(f"SPECIAL_TEAMS_EVENT_TYPE_INVALID:{self.event_type}")
         if self.points != allowed[self.event_type]:
             raise ValueError("SPECIAL_TEAMS_EVENT_POINTS_INVALID")
         if self.event_type.startswith("FG_"):
-            if self.kicker_id is None or self.kick_distance is None:
+            if self.source_play_id is None or self.kicker_id is None or self.kick_distance is None:
                 raise ValueError("FIELD_GOAL_EVENT_METADATA_REQUIRED")
         if self.event_type.startswith("XP_") and self.kicker_id is None:
             raise ValueError("XP_EVENT_KICKER_REQUIRED")
+        if self.event_type.endswith("RETURN_TD") and self.source_transition_index is None:
+            raise ValueError("RETURN_TD_TRANSITION_SOURCE_REQUIRED")
 
 
 @dataclass(frozen=True)
 class ResolvedFootballPath:
-    """Engine A path plus Engine C kick/try outcomes and profile identity."""
+    """Engine A path plus Engine C kick/try/return outcomes and profile identity."""
 
     base_path: FootballPlayPath
     special_teams_events: tuple[SpecialTeamsEvent, ...]
@@ -108,6 +127,13 @@ class ResolvedFootballPath:
             if self.away_profile.team != self.base_path.away_team:
                 raise ValueError("RESOLVED_AWAY_SPECIAL_TEAMS_TEAM_MISMATCH")
 
+    @staticmethod
+    def _event_source_label(event: SpecialTeamsEvent) -> str:
+        if event.source_play_id is not None:
+            return f"play:{event.source_play_id:05d}"
+        assert event.source_transition_index is not None
+        return f"transition:{event.source_transition_index:05d}"
+
     def to_scoring_path(self) -> FootballGamePath:
         base = list(self.base_path.to_scoring_path().events)
         for index, event in enumerate(self.special_teams_events):
@@ -116,8 +142,8 @@ class ResolvedFootballPath:
             base.append(
                 ScoringEvent(
                     event_id=(
-                        f"{self.base_path.simulation_id}:play:{event.source_play_id:05d}:"
-                        f"st:{index:03d}"
+                        f"{self.base_path.simulation_id}:"
+                        f"{self._event_source_label(event)}:st:{index:03d}"
                     ),
                     period=event.period,
                     clock_seconds_remaining=event.clock_seconds_remaining,
@@ -149,30 +175,18 @@ class ResolvedFootballPath:
     def assert_reconciliation(self) -> None:
         raw = self.base_path.to_scoring_path().to_market_row()
         resolved = self.to_scoring_path().to_market_row()
-        home_st = sum(
-            event.points
-            for event in self.special_teams_events
-            if event.team == self.base_path.home_team
-        )
-        away_st = sum(
-            event.points
-            for event in self.special_teams_events
-            if event.team == self.base_path.away_team
-        )
+        home_st = sum(event.points for event in self.special_teams_events if event.team == self.base_path.home_team)
+        away_st = sum(event.points for event in self.special_teams_events if event.team == self.base_path.away_team)
         if resolved["home_score"] != raw["home_score"] + home_st:
             raise ValueError("ENGINE_C_HOME_SCORE_RECONCILIATION_FAILED")
         if resolved["away_score"] != raw["away_score"] + away_st:
             raise ValueError("ENGINE_C_AWAY_SCORE_RECONCILIATION_FAILED")
 
-        fg_attempt_ids = [
-            play.play_id
-            for play in self.base_path.plays
-            if play.play_type.upper() == "FIELD_GOAL"
-        ]
+        fg_attempt_ids = [play.play_id for play in self.base_path.plays if play.play_type.upper() == "FIELD_GOAL"]
         fg_event_ids = [
             event.source_play_id
             for event in self.special_teams_events
-            if event.event_type.startswith("FG_")
+            if event.event_type.startswith("FG_") and event.source_play_id is not None
         ]
         if len(fg_event_ids) != len(fg_attempt_ids):
             raise ValueError("ENGINE_C_FIELD_GOAL_RESOLUTION_COUNT_INVALID")
@@ -182,17 +196,35 @@ class ResolvedFootballPath:
         td_play_ids = [
             play.play_id
             for play in self.base_path.plays
-            if play.score_type == "TOUCHDOWN_CANDIDATE" and play.points == 6
+            if play.points == 6
+            and play.score_type in {"TOUCHDOWN_CANDIDATE", "DEFENSIVE_RETURN_TOUCHDOWN_CANDIDATE"}
         ]
-        try_event_ids = [
+        play_try_ids = [
             event.source_play_id
             for event in self.special_teams_events
-            if event.event_type.startswith("XP_") or event.event_type.startswith("TWO_POINT_")
+            if (event.event_type.startswith("XP_") or event.event_type.startswith("TWO_POINT_"))
+            and event.source_play_id is not None
         ]
-        if len(try_event_ids) != len(td_play_ids):
+        if len(play_try_ids) != len(td_play_ids):
             raise ValueError("ENGINE_C_TD_TRY_RESOLUTION_COUNT_INVALID")
-        if sorted(try_event_ids) != sorted(td_play_ids):
+        if sorted(play_try_ids) != sorted(td_play_ids):
             raise ValueError("ENGINE_C_TD_TRY_RECONCILIATION_FAILED")
+
+        return_td_transition_ids = [
+            event.source_transition_index
+            for event in self.special_teams_events
+            if event.event_type in {"KICKOFF_RETURN_TD", "PUNT_RETURN_TD"}
+        ]
+        return_try_transition_ids = [
+            event.source_transition_index
+            for event in self.special_teams_events
+            if (event.event_type.startswith("XP_") or event.event_type.startswith("TWO_POINT_"))
+            and event.source_transition_index is not None
+        ]
+        if len(return_try_transition_ids) != len(return_td_transition_ids):
+            raise ValueError("ENGINE_C_RETURN_TD_TRY_RESOLUTION_COUNT_INVALID")
+        if sorted(return_try_transition_ids) != sorted(return_td_transition_ids):
+            raise ValueError("ENGINE_C_RETURN_TD_TRY_RECONCILIATION_FAILED")
 
 
 class EngineCSpecialTeamsResolver:
@@ -251,26 +283,36 @@ class EngineCSpecialTeamsResolver:
         if profile.kicker_active is not True:
             raise ValueError(f"KICKER_INACTIVE:{profile.kicker_id}")
 
+    @staticmethod
+    def _scoring_team(path: FootballPlayPath, play: PlayEvent) -> str:
+        home_delta = play.score_after_home - play.score_before_home
+        away_delta = play.score_after_away - play.score_before_away
+        if home_delta == 6 and away_delta == 0:
+            return path.home_team
+        if away_delta == 6 and home_delta == 0:
+            return path.away_team
+        raise ValueError("TOUCHDOWN_SCORING_TEAM_UNRESOLVED")
+
     def _resolve_td_try(self, path: FootballPlayPath, play: PlayEvent) -> SpecialTeamsEvent:
-        profile = self._profile(path, play.possession)
+        team = self._scoring_team(path, play)
+        profile = self._profile(path, team)
         if self.rng.random() < profile.two_point_attempt_rate:
             made = bool(self.rng.random() < profile.two_point_success_rate)
             return SpecialTeamsEvent(
                 source_play_id=play.play_id,
                 period=play.quarter,
                 clock_seconds_remaining=play.clock_seconds_remaining,
-                team=play.possession,
+                team=team,
                 event_type="TWO_POINT_MADE" if made else "TWO_POINT_MISSED",
                 points=2 if made else 0,
             )
-
         self._require_kicker(profile)
         made = bool(self.rng.random() < self._xp_probability(profile))
         return SpecialTeamsEvent(
             source_play_id=play.play_id,
             period=play.quarter,
             clock_seconds_remaining=play.clock_seconds_remaining,
-            team=play.possession,
+            team=team,
             event_type="XP_MADE" if made else "XP_MISSED",
             points=1 if made else 0,
             kicker_id=profile.kicker_id,
@@ -301,17 +343,12 @@ class EngineCSpecialTeamsResolver:
 
         events: list[SpecialTeamsEvent] = []
         for play in path.plays:
-            if play.score_type == "TOUCHDOWN_CANDIDATE" and play.points == 6:
+            if play.points == 6 and play.score_type in {"TOUCHDOWN_CANDIDATE", "DEFENSIVE_RETURN_TOUCHDOWN_CANDIDATE"}:
                 events.append(self._resolve_td_try(path, play))
             elif play.play_type.upper() == "FIELD_GOAL":
                 events.append(self._resolve_field_goal(path, play))
 
-        resolved = ResolvedFootballPath(
-            path,
-            tuple(events),
-            self.home_profile,
-            self.away_profile,
-        )
+        resolved = ResolvedFootballPath(path, tuple(events), self.home_profile, self.away_profile)
         resolved.assert_reconciliation()
         return resolved
 

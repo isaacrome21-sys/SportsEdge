@@ -47,6 +47,20 @@ class NFLPredictiveOvertimeSimulatorTests(unittest.TestCase):
             pace_seconds_mean=20.0,
         )
 
+    def _turnover_offense(self):
+        from sportsedge.core.simulate.drive_play import TeamDriveProfile
+
+        return TeamDriveProfile(
+            pass_rate=1.0,
+            completion_rate=1.0,
+            success_rate=0.5,
+            explosive_rate=0.0,
+            turnover_rate=1.0,
+            sack_rate=0.0,
+            field_goal_attempt_rate=0.0,
+            pace_seconds_mean=20.0,
+        )
+
     def test_seeded_predictive_overtime_is_reproducible_and_terminal(self):
         from sportsedge.core.simulate.overtime_simulator import NFLRegularSeasonOTSimulator
 
@@ -103,9 +117,6 @@ class NFLPredictiveOvertimeSimulatorTests(unittest.TestCase):
             away_profile=self._offense(),
             seed=7,
         ).simulate()
-        # With the deterministic high-success fixture the first opportunity is a
-        # TD and must include its C-owned XP because the other team is still owed
-        # an opportunity.
         self.assertEqual(result.opportunities[0].outcome_type, "TOUCHDOWN_WITH_TRY")
         self.assertEqual(result.opportunities[0].points, 7)
         first_plays = [play for play in result.plays if play.opportunity_index == 1]
@@ -125,6 +136,59 @@ class NFLPredictiveOvertimeSimulatorTests(unittest.TestCase):
         self.assertEqual(result.opportunities[1].points, 7)
         self.assertEqual(result.opportunities[2].outcome_type, "TOUCHDOWN_SUDDEN_DEATH")
         self.assertEqual(result.opportunities[2].points, 6)
+
+    def test_field_goal_resolver_returns_exact_two_value_contract(self):
+        from sportsedge.core.simulate.overtime_simulator import NFLRegularSeasonOTSimulator
+
+        simulator = NFLRegularSeasonOTSimulator(
+            regulation_path=self._regulation(),
+            home_profile=self._offense(),
+            away_profile=self._offense(),
+            seed=31,
+        )
+        points, event_type = simulator._resolve_fg("HOME", 40)
+        self.assertEqual((points, event_type), (3, "FG_MADE"))
+
+    def test_forced_turnover_return_td_is_terminal_six_without_try(self):
+        from sportsedge.core.simulate.overtime_simulator import NFLRegularSeasonOTSimulator
+        from sportsedge.core.simulate.return_scoring import NFLReturnScoringProfile
+
+        profile = self._turnover_offense()
+        result = NFLRegularSeasonOTSimulator(
+            regulation_path=self._regulation(),
+            home_profile=profile,
+            away_profile=profile,
+            home_return_scoring=NFLReturnScoringProfile(
+                "HOME", turnover_return_td_rate=1.0,
+            ),
+            away_return_scoring=NFLReturnScoringProfile(
+                "AWAY", turnover_return_td_rate=1.0,
+            ),
+            seed=41,
+        ).simulate()
+        self.assertEqual(len(result.opportunities), 1)
+        opportunity = result.opportunities[0]
+        self.assertEqual(opportunity.outcome_type, "DEFENSIVE_RETURN_TOUCHDOWN")
+        self.assertEqual(opportunity.points, 6)
+        self.assertNotEqual(opportunity.scoring_team, opportunity.opportunity_team)
+        self.assertEqual(result.settlement.winner, opportunity.scoring_team)
+        scoring_play = result.plays[-1]
+        self.assertEqual(scoring_play.defensive_points, 6)
+        self.assertEqual(scoring_play.special_teams_points, 0)
+        result.assert_reconciliation()
+
+    def test_defensive_return_td_opportunity_rejects_post_game_try_points(self):
+        from sportsedge.core.simulate.overtime import NFLRegularSeasonOTOpportunity
+
+        with self.assertRaisesRegex(ValueError, "OVERTIME_DEFENSIVE_RETURN_TD_POINTS_INVALID"):
+            NFLRegularSeasonOTOpportunity(
+                opportunity_index=1,
+                opportunity_team="HOME",
+                scoring_team="AWAY",
+                points=7,
+                clock_end_seconds_remaining=500,
+                outcome_type="DEFENSIVE_RETURN_TOUCHDOWN",
+            )
 
     def test_non_tied_regulation_is_rejected(self):
         from sportsedge.core.simulate.overtime_simulator import NFLRegularSeasonOTSimulator

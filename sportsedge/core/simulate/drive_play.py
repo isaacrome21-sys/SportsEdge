@@ -124,6 +124,17 @@ class PlayEvent:
         play_type = str(self.play_type).upper()
         if self.score_type == "TOUCHDOWN_CANDIDATE" and self.points != 6:
             raise ValueError("ENGINE_A_TOUCHDOWN_MUST_BE_SIX_RAW_POINTS")
+        if self.score_type == "DEFENSIVE_RETURN_TOUCHDOWN_CANDIDATE":
+            if self.points != 6:
+                raise ValueError("ENGINE_A_DEFENSIVE_RETURN_TD_MUST_BE_SIX_RAW_POINTS")
+            if self.turnover_type not in {"INTERCEPTION", "FUMBLE"}:
+                raise ValueError("DEFENSIVE_RETURN_TD_REQUIRES_TURNOVER")
+            if play_type == "PASS" and self.turnover_type != "INTERCEPTION":
+                raise ValueError("PASS_DEFENSIVE_RETURN_TD_REQUIRES_INTERCEPTION")
+            if play_type == "RUSH" and self.turnover_type != "FUMBLE":
+                raise ValueError("RUSH_DEFENSIVE_RETURN_TD_REQUIRES_FUMBLE")
+        if self.score_type == "SAFETY_CANDIDATE" and self.points != 2:
+            raise ValueError("ENGINE_A_SAFETY_MUST_BE_TWO_RAW_POINTS")
         if play_type == "FIELD_GOAL":
             if self.points != 0 or home_delta != 0 or away_delta != 0:
                 raise ValueError("ENGINE_A_FIELD_GOAL_MUST_BE_UNRESOLVED")
@@ -142,7 +153,14 @@ class PlayEvent:
                 raise ValueError("PASS_COMPLETION_STATE_REQUIRED")
             if self.turnover_type == "INTERCEPTION" and self.pass_complete:
                 raise ValueError("INTERCEPTION_CANNOT_BE_COMPLETE")
-            if not self.pass_complete and (self.yards != 0 or self.points != 0):
+            defensive_pick_six = (
+                self.score_type == "DEFENSIVE_RETURN_TOUCHDOWN_CANDIDATE"
+                and self.turnover_type == "INTERCEPTION"
+                and self.points == 6
+            )
+            if not self.pass_complete and (
+                self.yards != 0 or (self.points != 0 and not defensive_pick_six)
+            ):
                 raise ValueError("INCOMPLETE_PASS_STATE_INVALID")
         elif self.pass_complete is not None:
             raise ValueError("NON_PASS_COMPLETION_STATE_INVALID")
@@ -209,6 +227,22 @@ class FootballPlayPath:
                     or play.score_before_away != previous.score_after_away
                 ):
                     raise ValueError("PLAY_SCORE_CHAIN_BROKEN")
+
+            if play.points > 0:
+                home_delta = play.score_after_home - play.score_before_home
+                away_delta = play.score_after_away - play.score_before_away
+                if home_delta == play.points and away_delta == 0:
+                    scoring_team = self.home_team
+                elif away_delta == play.points and home_delta == 0:
+                    scoring_team = self.away_team
+                else:
+                    raise ValueError("PLAY_SCORING_TEAM_UNRESOLVED")
+                if play.score_type == "TOUCHDOWN_CANDIDATE" and scoring_team != play.possession:
+                    raise ValueError("OFFENSIVE_TD_SCORING_TEAM_MISMATCH")
+                if play.score_type == "DEFENSIVE_RETURN_TOUCHDOWN_CANDIDATE" and scoring_team == play.possession:
+                    raise ValueError("DEFENSIVE_RETURN_TD_SCORING_TEAM_MISMATCH")
+                if play.score_type == "SAFETY_CANDIDATE" and scoring_team == play.possession:
+                    raise ValueError("SAFETY_SCORING_TEAM_MISMATCH")
             previous = play
 
     def to_scoring_path(self) -> FootballGamePath:
