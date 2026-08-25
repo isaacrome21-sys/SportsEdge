@@ -51,12 +51,30 @@ def _simulation_count(value: Any) -> int:
     return out
 
 
+def score_distribution_sha256(distribution: GameDistribution) -> str:
+    """Hash only the reusable final-score distribution, not any sportsbook read-out.
+
+    V7's legacy ``result_sha256`` also binds total-line-specific over/under/push
+    summaries. Stage 1 needs a digest whose identity is invariant to proposition line
+    and side, because those are deterministic read-out semantics applied after the
+    score PMF has already been simulated.
+    """
+    if not isinstance(distribution, GameDistribution):
+        raise SharedGameEngineError("distribution must be GameDistribution")
+    return canonical_json_sha256({
+        "version": V7_DISTRIBUTION_VERSION,
+        "simulations": int(distribution.simulations),
+        "seed_policy": str(distribution.seed_policy),
+        "joint_score_pmf": distribution.joint_score_pmf,
+    })
+
+
 def build_shared_game_engine_session(
     *,
     simulator: Callable[..., GameDistribution] = simulate_game_distribution,
 ) -> Callable[[Mapping[str, Any]], dict[str, Any]]:
     """Return one per-card engine closure with an internal distribution cache."""
-    cache: dict[str, GameDistribution] = {}
+    cache: dict[str, tuple[GameDistribution, str]] = {}
 
     def engine(model_input: Mapping[str, Any]) -> dict[str, Any]:
         market = str(model_input.get("market", "")).upper()
@@ -79,13 +97,13 @@ def build_shared_game_engine_session(
             "feature_source_hash": feature_source_hash,
         }
         game_build_hash = canonical_json_sha256(stochastic_identity)
-        cache_key = canonical_json_sha256({
+        model_input_hash = canonical_json_sha256({
             **stochastic_identity,
             "simulations": simulations,
         })
 
-        distribution = cache.get(cache_key)
-        if distribution is None:
+        cached = cache.get(model_input_hash)
+        if cached is None:
             distribution = simulator(
                 away_mean_runs=away_mean,
                 home_mean_runs=home_mean,
@@ -96,10 +114,16 @@ def build_shared_game_engine_session(
                 first_inning_dispersion_r=DEFAULT_FIRST_INNING_DISPERSION_R,
                 extra_half_inning_mean=DEFAULT_EXTRA_HALF_INNING_MEAN,
             )
-            cache[cache_key] = distribution
+            distribution_sha256 = score_distribution_sha256(distribution)
+            cache[model_input_hash] = (distribution, distribution_sha256)
+        else:
+            distribution, distribution_sha256 = cached
 
         readout = read_game_probability(
-            distribution,
+            {
+                "joint_score_pmf": distribution.joint_score_pmf,
+                "result_sha256": distribution_sha256,
+            },
             market=market,
             line=model_input.get("line"),
             side=str(model_input.get("side", "")),
@@ -112,8 +136,8 @@ def build_shared_game_engine_session(
             "side": model_input.get("side"),
             "model_p": readout.probability,
             "push_p": readout.push_probability,
-            "model_input_hash": distribution.result_sha256,
-            "distribution_sha256": distribution.result_sha256,
+            "model_input_hash": model_input_hash,
+            "distribution_sha256": distribution_sha256,
             "readout_sha256": readout.readout_sha256,
             "readout_version": readout.readout_version,
             "engine_version": V7_DISTRIBUTION_VERSION,
