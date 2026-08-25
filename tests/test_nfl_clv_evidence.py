@@ -42,8 +42,6 @@ class NFLCLVEvidenceTests(unittest.TestCase):
             "book": "book",
             "closing_line": -3.5,
             "closing_price": -110,
-            # This probability is an alternate closing quote at the original
-            # decision threshold, not the no-vig probability at -3.5.
             "closing_novig_prob": 0.52,
             "probability_line": -3.0,
             "model_id": PRODUCTION_NFL_M2_MODEL_ID,
@@ -51,12 +49,14 @@ class NFLCLVEvidenceTests(unittest.TestCase):
             "code_git_sha": git_sha,
         }
 
-    def _run(self, root: Path, decision: dict, close: dict, expected_sha: str):
+    def _run(self, root: Path, decision, close, expected_sha: str):
         decisions = root / "decisions.jsonl"
         closes = root / "closes.jsonl"
         out = root / "out.json"
-        decisions.write_text(json.dumps(decision) + "\n", encoding="utf-8")
-        closes.write_text(json.dumps(close) + "\n", encoding="utf-8")
+        decision_rows = decision if isinstance(decision, list) else [decision]
+        close_rows = close if isinstance(close, list) else [close]
+        decisions.write_text("".join(json.dumps(row) + "\n" for row in decision_rows), encoding="utf-8")
+        closes.write_text("".join(json.dumps(row) + "\n" for row in close_rows), encoding="utf-8")
         result = subprocess.run(
             [
                 sys.executable,
@@ -125,6 +125,20 @@ class NFLCLVEvidenceTests(unittest.TestCase):
             result, _ = self._run(root, self._decision(sha), close, sha)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("NFL_CLV_CLOSE_BOOK_MISMATCH", result.stdout + result.stderr)
+
+    def test_same_observation_cannot_be_counted_again_at_another_book(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            sha = "1" * 40
+            decision_a = self._decision(sha)
+            decision_b = self._decision(sha)
+            decision_b["book"] = "other-book"
+            close_a = self._close(sha)
+            close_b = self._close(sha)
+            close_b["book"] = "other-book"
+            result, _ = self._run(root, [decision_a, decision_b], [close_a, close_b], sha)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("NFL_CLV_DUPLICATE_OBSERVATION", result.stdout + result.stderr)
 
     def test_game_start_identity_must_match_both_logs(self):
         with TemporaryDirectory() as tmp:
