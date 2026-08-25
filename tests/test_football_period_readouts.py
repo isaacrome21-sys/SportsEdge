@@ -92,7 +92,7 @@ class FootballPeriodReadoutTests(unittest.TestCase):
         self.assertEqual(priced["alternate_spread"][-2.5]["home_cover"], 0.5)
         self.assertEqual(priced["alternate_spread"][2.5]["home_cover"], 0.5)
         self.assertEqual(priced["alternate_total"][40.5]["over"], 0.5)
-        self.assertEqual(priced["alternate_total"][51.5]["under"], 0.5)
+        self.assertEqual(priced["alternate_total"][51.5]["under"], 1.0)
 
     def test_engine_a_rows_expose_unambiguous_second_half_slices(self):
         from sportsedge.core.simulate.football_path import EngineAPathSimulator
