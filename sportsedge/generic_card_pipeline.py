@@ -57,7 +57,11 @@ def _bind_entity(game,market,entity_id,feature):
         if ft is not None and int(ft)!=live: raise ValueError("PLAYER_TEAM_MISMATCH")
         return
     if market in PITCHER_GENERIC_MARKETS:
-        if market.startswith("EITHER_PITCHER_"):return
+        if market.startswith("EITHER_PITCHER_"):
+            if game.away_probable_pitcher_id is None or game.home_probable_pitcher_id is None:raise ValueError("BOTH_PROBABLE_PITCHERS_REQUIRED")
+            expected=f"{int(game.away_probable_pitcher_id)}|{int(game.home_probable_pitcher_id)}"
+            if entity_id!=expected:raise ValueError("EITHER_PITCHER_CANONICAL_PAIR_MISMATCH")
+            return
         try:pid=int(entity_id)
         except (TypeError,ValueError) as exc:raise ValueError("pitcher entity_id must be numeric MLB id") from exc
         if pid not in {game.away_probable_pitcher_id,game.home_probable_pitcher_id}:raise ValueError("NON_PROBABLE_PITCHER")
