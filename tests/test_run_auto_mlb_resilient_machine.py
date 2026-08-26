@@ -32,6 +32,17 @@ def machine_report(*, run_status="PASS", market="HITS"):
         implied_probability=0.50,
         edge=0.12,
         ev_per_dollar=0.13,
+        model_input_hash="a" * 64,
+        distribution_sha256="b" * 64,
+        readout_sha256="c" * 64,
+        readout_version="mlb_v7_game_readout_v1",
+        engine_version="mlb_hitter_joint_empirical_v3",
+        seed_policy="analytic_weighted_empirical_joint_game_rows",
+        mc_paths=0,
+        book_key="draftkings",
+        sportsbook="DraftKings",
+        quote_retrieved_at="2026-08-24T14:29:30+00:00",
+        offer_id="offer-123",
     )
     return MLBMachineReport(
         mode="AUTOMATIC",
@@ -50,9 +61,20 @@ def legacy_report(*, market="MONEYLINE"):
         "slate_date_ct": "2026-08-24",
         "generated_at_utc": "2026-08-24T14:30:00+00:00",
         "run_status": "PASS",
+        "card_status": "NO_BETS",
+        "market_surface_version": "test-surface-v1",
+        "coverage_slots": (),
         "results": (row,),
         "source_failures": (),
     })()
+
+
+def argv_for(td, output):
+    return [
+        str(SCRIPT),
+        "--output", str(output),
+        "--prediction-journal-dir", str(Path(td) / "journal"),
+    ]
 
 
 class ResilientMachineRoutingTests(unittest.TestCase):
@@ -67,7 +89,7 @@ class ResilientMachineRoutingTests(unittest.TestCase):
                 "SPORTSEDGE_FEATURES_URL": "https://legacy-features-should-not-route-native",
             }
             with patch.dict(os.environ, env, clear=True), \
-                 patch.object(sys, "argv", [str(SCRIPT), "--output", str(output)]), \
+                 patch.object(sys, "argv", argv_for(td, output)), \
                  patch.object(mod, "run_it_mlb", return_value=machine_report()) as run_it, \
                  patch.object(mod, "should_rotate_odds_key", return_value=False), \
                  patch.object(mod, "run_auto_mlb_espn_game_odds", side_effect=AssertionError("fallback should not run")):
@@ -78,6 +100,9 @@ class ResilientMachineRoutingTests(unittest.TestCase):
             payload = json.loads(output.read_text())
             self.assertEqual(payload["mode"], "AUTOMATIC")
             self.assertEqual(payload["funnel"]["odds_rows_fetched"], 1)
+            self.assertEqual(payload["prediction_journal"]["schema_version"], "mlb_prediction_journal_v2")
+            self.assertEqual(payload["prediction_journal"]["prediction_count"], 1)
+            self.assertEqual(len(list((Path(td) / "journal").rglob("*.json"))), 1)
             kwargs = run_it.call_args.kwargs
             self.assertEqual(kwargs["mode"], "AUTOMATIC")
             self.assertEqual(kwargs["odds_api_key"], "key-one")
@@ -89,7 +114,7 @@ class ResilientMachineRoutingTests(unittest.TestCase):
             output = Path(td) / "card.json"
             env = {"SPORTSEDGE_ODDS_API_KEY": "bad-key"}
             with patch.dict(os.environ, env, clear=True), \
-                 patch.object(sys, "argv", [str(SCRIPT), "--output", str(output)]), \
+                 patch.object(sys, "argv", argv_for(td, output)), \
                  patch.object(mod, "run_it_mlb", side_effect=RuntimeError("native down")), \
                  patch.object(mod, "run_auto_mlb_espn_game_odds", return_value=legacy_report()) as fallback:
                 code = mod.main()
@@ -101,13 +126,14 @@ class ResilientMachineRoutingTests(unittest.TestCase):
             reasons = [str(x.get("reason")) for x in payload["source_failures"]]
             self.assertTrue(any("native down" in reason for reason in reasons))
             self.assertIn("RuntimeError: native down", payload["funnel"]["gate_kill_counts"])
+            self.assertEqual(payload["prediction_journal"]["schema_version"], "mlb_prediction_journal_v2")
 
     def test_unusable_native_report_falls_back_once(self):
         with tempfile.TemporaryDirectory() as td:
             output = Path(td) / "card.json"
             env = {"SPORTSEDGE_ODDS_API_KEY": "key-one", "SPORTSEDGE_ODDS_API_KEY_2": "key-two"}
             with patch.dict(os.environ, env, clear=True), \
-                 patch.object(sys, "argv", [str(SCRIPT), "--output", str(output)]), \
+                 patch.object(sys, "argv", argv_for(td, output)), \
                  patch.object(mod, "run_it_mlb", return_value=machine_report(run_status="BLOCKED_NO_ODDS")) as run_it, \
                  patch.object(mod, "should_rotate_odds_key", return_value=True), \
                  patch.object(mod, "run_auto_mlb_espn_game_odds", return_value=legacy_report()) as fallback:
@@ -121,7 +147,7 @@ class ResilientMachineRoutingTests(unittest.TestCase):
             output = Path(td) / "card.json"
             env = {"SPORTSEDGE_FEATURES_URL": "https://legacy-features"}
             with patch.dict(os.environ, env, clear=True), \
-                 patch.object(sys, "argv", [str(SCRIPT), "--output", str(output)]), \
+                 patch.object(sys, "argv", argv_for(td, output)), \
                  patch.object(mod, "run_it_mlb", side_effect=AssertionError("no key should not call native")), \
                  patch.object(mod, "run_auto_mlb_espn_game_odds", return_value=legacy_report()) as fallback:
                 code = mod.main()
@@ -136,7 +162,7 @@ class ResilientMachineRoutingTests(unittest.TestCase):
                 "SPORTSEDGE_FEATURES_URL": "https://external-features",
             }
             with patch.dict(os.environ, env, clear=True), \
-                 patch.object(sys, "argv", [str(SCRIPT), "--output", str(output)]), \
+                 patch.object(sys, "argv", argv_for(td, output)), \
                  patch.object(mod, "run_auto_mlb", return_value=legacy_report()) as legacy_runner, \
                  patch.object(mod, "run_it_mlb", side_effect=AssertionError("canonical native path should not own explicit legacy URL lane")):
                 code = mod.main()

@@ -27,6 +27,7 @@ from .market_surface import (
     load_market_surface,
 )
 from .mlb_source import fetch_boxscore, fetch_schedule, parse_confirmed_lineup, parse_game_start
+from .prediction_journal import normalize_legacy_block_reason
 from .quote_bridge import QuoteBridgeError, validate_canonical_quote
 from .runtime import parse_timestamp
 from .unified_card import UnifiedCardResult, run_unified_card
@@ -393,6 +394,6 @@ def report_to_dict(report: AutoRunReport) -> dict[str, Any]:
         "card_status": report.card_status,
         "market_surface_version": report.market_surface_version,
         "coverage_slots": [asdict(x) for x in report.coverage_slots],
-        "results": [asdict(x) for x in report.results],
+        "results": [normalize_legacy_block_reason(asdict(x)) for x in report.results],
         "source_failures": list(report.source_failures),
     }
