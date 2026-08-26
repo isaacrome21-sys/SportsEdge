@@ -23,6 +23,25 @@ BANNED_MARKET_KEYS = {
     "novig_prob", "no_vig_prob", "book", "sportsbook", "closing_line",
     "closing_price",
 }
+BANNED_MARKET_ALIASES = {
+    "home_spread", "away_spread", "consensus_spread", "market_spread", "closing_spread",
+    "market_total", "consensus_total", "closing_total", "sportsbook_total", "game_total",
+    "market_implied_probability", "market_implied_prob", "consensus_implied_probability",
+    "consensus_implied_prob", "sportsbook_price", "book_price", "closing_odds",
+    "opening_odds", "market_odds", "consensus_odds", "sportsbook_odds",
+    "opening_spread", "opening_total", "book_spread", "book_total",
+}
+
+
+def _is_market_derived_key(key: Any) -> bool:
+    name = str(key).strip().lower()
+    if name in BANNED_MARKET_KEYS or name in BANNED_MARKET_ALIASES:
+        return True
+    if "implied_prob" in name or "implied_probability" in name:
+        return True
+    if "novig_prob" in name or "no_vig_prob" in name or "no_vig_probability" in name:
+        return True
+    return False
 
 
 def _dt(value: Any) -> datetime:
@@ -39,7 +58,7 @@ def _dt(value: Any) -> datetime:
 def _assert_market_blind(value: Any, path: str = "root") -> None:
     if isinstance(value, dict):
         for key, child in value.items():
-            if str(key).lower() in BANNED_MARKET_KEYS:
+            if _is_market_derived_key(key):
                 raise ValueError(f"M2_MARKET_DATA_PROHIBITED:{path}.{key}")
             _assert_market_blind(child, f"{path}.{key}")
     elif isinstance(value, (list, tuple)):
