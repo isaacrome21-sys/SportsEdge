@@ -32,6 +32,7 @@ from .auto_native_odds import run_auto_mlb_native_odds
 from .edge_floors import DEFAULT_EDGE_FLOOR_CONFIG
 from .live_slate import LiveGame
 from .manual_hybrid_joint_runner import run_manual_hybrid_joint_mlb
+from .prediction_journal import normalize_legacy_block_reason
 
 CHICAGO_TZ = ZoneInfo("America/Chicago")
 MEMORY_QUOTES_URL = "https://sportsedge.local/run-it-quotes"
@@ -368,5 +369,24 @@ def run_it_mlb(**kwargs: Any) -> MLBMachineReport:
     return run_mlb_machine(**kwargs)
 
 
+def machine_report_to_dict(report: MLBMachineReport) -> dict[str, Any]:
+    """Serialize the machine report without colliding with auto_runner.report_to_dict.
+
+    Durable result/source collections are lists. BLOCKED explanations are normalized
+    at this ingestion boundary so prediction_journal v2 receives canonical
+    ``block_reason`` and never has to interpret the legacy ``reason`` field.
+    """
+    return {
+        "mode": report.mode,
+        "slate_date_ct": report.slate_date_ct,
+        "generated_at_utc": report.generated_at_utc,
+        "run_status": report.run_status,
+        "results": [normalize_legacy_block_reason(asdict(x)) for x in report.results],
+        "source_failures": [dict(x) for x in report.source_failures],
+        "summary": dict(report.summary),
+    }
+
+
 def report_to_dict(report: MLBMachineReport) -> dict[str, Any]:
-    return asdict(report)
+    """Backward-compatible alias for callers that imported the old machine name."""
+    return machine_report_to_dict(report)
