@@ -5,7 +5,13 @@ import tempfile
 import unittest
 
 from sportsedge.mlb_run_machine import MLBMachineResult, _machine_result
-from sportsedge.prediction_journal import PredictionJournalError, write_prediction_journal
+from sportsedge.prediction_journal import (
+    JOURNAL_SCHEMA_VERSION,
+    LEGACY_JOURNAL_SCHEMA_VERSIONS,
+    PredictionJournalError,
+    read_prediction_journal,
+    write_prediction_journal,
+)
 
 
 class PredictionJournalTests(unittest.TestCase):
@@ -59,7 +65,7 @@ class PredictionJournalTests(unittest.TestCase):
                     "american_odds": 120,
                     "model_p": None,
                     "bet_status": "BLOCKED",
-                    "reason": "price missing",
+                    "block_reason": "price missing",
                 },
             ],
             "source_failures": [],
@@ -100,24 +106,30 @@ class PredictionJournalTests(unittest.TestCase):
             "source_failures": [],
         }
 
-    def test_modeled_rows_are_written_content_addressed_and_blocked_rows_excluded(self):
+    def test_modeled_and_blocked_rows_are_written_content_addressed(self):
         with tempfile.TemporaryDirectory() as tmp:
             result = write_prediction_journal(self.payload(), root=tmp)
             self.assertIsNotNone(result)
             self.assertTrue(result.created)
-            self.assertEqual(result.prediction_count, 2)
+            self.assertEqual(result.prediction_count, 3)
             path = Path(result.path)
             self.assertTrue(path.exists())
             self.assertEqual(path.parent.name, "2026-08-25")
             self.assertIn(result.journal_sha256, path.name)
 
             record = json.loads(path.read_text())
-            self.assertEqual(record["prediction_count"], 2)
-            self.assertEqual([row["bet_status"] for row in record["predictions"]], ["PASS", "OFFICIAL_BET"])
+            self.assertEqual(record["schema_version"], JOURNAL_SCHEMA_VERSION)
+            self.assertEqual(record["prediction_count"], 3)
             self.assertEqual(
-                {row["distribution_sha256"] for row in record["predictions"]},
-                {"b" * 64},
+                [row["bet_status"] for row in record["predictions"]],
+                ["PASS", "OFFICIAL_BET", "BLOCKED"],
             )
+            priced = [row for row in record["predictions"] if row.get("model_p") is not None]
+            self.assertEqual({row["distribution_sha256"] for row in priced}, {"b" * 64})
+            blocked = record["predictions"][2]
+            self.assertEqual(blocked["block_reason"], "price missing")
+            self.assertNotIn("reason", blocked)
+            self.assertEqual(record["decision_counts"]["BLOCKED"], 1)
             self.assertEqual(record["source_report_sha256"], result.source_report_sha256)
 
     def test_exact_duplicate_is_idempotent_and_never_replaced(self):
@@ -129,6 +141,7 @@ class PredictionJournalTests(unittest.TestCase):
             self.assertEqual(first.journal_sha256, second.journal_sha256)
             self.assertFalse(second.created)
             self.assertEqual(Path(first.path).read_bytes(), original)
+            self.assertEqual(len(list(Path(tmp).rglob("*.json"))), 1)
 
     def test_changed_prediction_creates_new_file_instead_of_overwriting(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -175,22 +188,67 @@ class PredictionJournalTests(unittest.TestCase):
             with self.assertRaisesRegex(PredictionJournalError, "mc_paths"):
                 write_prediction_journal(payload, root=tmp)
 
-    def test_modeled_blocked_row_is_rejected(self):
+    def test_priced_blocked_row_is_preserved_with_provenance(self):
         payload = self.payload()
-        payload["results"][0]["bet_status"] = "BLOCKED"
+        row = payload["results"][0]
+        row["bet_status"] = "BLOCKED"
+        row["block_reason"] = "promotion evidence required"
         with tempfile.TemporaryDirectory() as tmp:
-            with self.assertRaisesRegex(PredictionJournalError, "lacks BET/PASS decision"):
-                write_prediction_journal(payload, root=tmp)
+            result = write_prediction_journal(payload, root=tmp)
+            record = json.loads(Path(result.path).read_text())
+            blocked = record["predictions"][0]
+            self.assertEqual(blocked["bet_status"], "BLOCKED")
+            self.assertEqual(blocked["model_p"], 0.53)
+            self.assertEqual(blocked["model_input_hash"], "a" * 64)
+            self.assertEqual(blocked["block_reason"], "promotion evidence required")
 
-    def test_no_modeled_rows_do_not_create_a_journal(self):
+    def test_unpriced_blocked_rows_create_a_journal(self):
+        payload = self.payload()
+        for i, row in enumerate(payload["results"]):
+            row["model_p"] = None
+            row.pop("edge", None)
+            row["bet_status"] = "BLOCKED"
+            row["block_reason"] = f"blocked {i}"
+        with tempfile.TemporaryDirectory() as tmp:
+            result = write_prediction_journal(payload, root=tmp)
+            self.assertIsNotNone(result)
+            record = json.loads(Path(result.path).read_text())
+            self.assertEqual(record["prediction_count"], 3)
+            self.assertEqual(record["decision_counts"]["BLOCKED"], 3)
+            self.assertTrue(all(row["model_p"] is None for row in record["predictions"]))
+
+    def test_no_journalable_rows_do_not_create_a_journal(self):
         payload = self.payload()
         for row in payload["results"]:
             row["model_p"] = None
-            row["bet_status"] = "BLOCKED"
+            row.pop("edge", None)
+            row["bet_status"] = "NO_ENGINE"
         with tempfile.TemporaryDirectory() as tmp:
             result = write_prediction_journal(payload, root=tmp)
             self.assertIsNone(result)
             self.assertEqual(list(Path(tmp).iterdir()), [])
+
+    def test_no_engine_cannot_carry_probability_or_edge(self):
+        for field, value in (("model_p", 0.5), ("edge", 0.01)):
+            payload = self.payload()
+            row = payload["results"][0]
+            row["bet_status"] = "NO_ENGINE"
+            row["model_p"] = None
+            row.pop("edge", None)
+            row[field] = value
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as tmp:
+                with self.assertRaisesRegex(PredictionJournalError, "NO_ENGINE cannot carry"):
+                    write_prediction_journal(payload, root=tmp)
+
+    def test_v1_artifact_remains_readable_and_distinguishable(self):
+        self.assertEqual(JOURNAL_SCHEMA_VERSION, "mlb_prediction_journal_v2")
+        self.assertIn("mlb_prediction_journal_v1", LEGACY_JOURNAL_SCHEMA_VERSIONS)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "legacy.json"
+            path.write_text(json.dumps({"schema_version": "mlb_prediction_journal_v1", "predictions": []}))
+            record = read_prediction_journal(path)
+            self.assertEqual(record["schema_version"], "mlb_prediction_journal_v1")
+            self.assertNotIn("decision_counts", record)
 
     def test_canonical_machine_preserves_stage1_and_engine_provenance(self):
         row = SimpleNamespace(
