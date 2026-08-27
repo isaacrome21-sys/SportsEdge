@@ -9,25 +9,6 @@ from .live_slate import lineup_from_rows
 from .mlb_source import GameSnapshot, parse_confirmed_lineup
 
 
-def _roster_player_ids(boxscore: Mapping[str, Any], side: str) -> tuple[int, ...]:
-    team = ((boxscore.get("teams") or {}).get(side) or {})
-    players = team.get("players") or {}
-    out: set[int] = set()
-    if not isinstance(players, Mapping):
-        return ()
-    for raw in players.values():
-        if not isinstance(raw, Mapping):
-            continue
-        person = raw.get("person") or {}
-        try:
-            player_id = int(person.get("id"))
-        except (TypeError, ValueError):
-            continue
-        if player_id > 0:
-            out.add(player_id)
-    return tuple(sorted(out))
-
-
 def official_mlb_evidence(
     *,
     snapshot: GameSnapshot,
@@ -39,8 +20,12 @@ def official_mlb_evidence(
 
     Schedule probable pitchers are PRIMARY evidence because they may change before
     first pitch. A complete nine-slot batting order from MLB's boxscore is treated
-    as AUTHORITATIVE. Once a batting order is confirmed, rostered players outside
-    those nine are emitted as confirmed absent so player markets can fail closed.
+    as AUTHORITATIVE. The adapter records the confirmed nine as one team fact plus
+    positive member facts. It deliberately does not emit roster-wide negative
+    player facts because batting-lineup absence must never block pitcher markets for
+    the same player identity (including two-way players). Hitter absence is already
+    fail-closed in the canonical live-slate assembler and may also be supplied as a
+    market-scoped manual evidence gate.
     """
     packets: list[EvidencePacket] = []
     game_id = str(snapshot.game_pk)
@@ -61,8 +46,6 @@ def official_mlb_evidence(
             authority="PRIMARY",
             verified=True,
         )
-        # Preserve the fact that this is a probable-pitcher designation without
-        # weakening the normalized identity used by the resolver.
         packets.append(EvidencePacket(
             game_id=packet.game_id,
             fact_type=packet.fact_type,
@@ -90,17 +73,31 @@ def official_mlb_evidence(
             continue
         if not lineup.confirmed:
             continue
-        starting_ids = {
+        ordered_starting_ids = tuple(
             int(row["player_id"])
-            for row in rows
+            for row in sorted(rows, key=lambda item: int(item["slot"]))
             if int(row.get("sequence", 0)) == 0 and row.get("player_id") is not None
-        }
-        roster_ids = set(_roster_player_ids(boxscore, side))
-        for player_id in sorted(roster_ids | starting_ids):
+        )
+        if len(ordered_starting_ids) != 9:
+            continue
+        packets.append(EvidencePacket(
+            game_id=game_id,
+            fact_type="STARTING_LINEUP_IDS",
+            subject_id=str(team_id),
+            value=list(ordered_starting_ids),
+            source_name="MLB_STATSAPI_BOXSCORE",
+            observed_at_utc=observed_at_utc,
+            acquisition_mode=acquisition_mode,
+            authority="AUTHORITATIVE",
+            verified=True,
+            scope="GAME",
+            metadata={"side": side, "confirmed": True},
+        ))
+        for player_id in ordered_starting_ids:
             packets.append(lineup_status_evidence(
                 game_id=game_id,
                 player_id=str(player_id),
-                in_starting_lineup=player_id in starting_ids,
+                in_starting_lineup=True,
                 source_name="MLB_STATSAPI_BOXSCORE",
                 observed_at_utc=observed_at_utc,
                 acquisition_mode=acquisition_mode,
