@@ -1,9 +1,10 @@
 """Canonical evidence packets and fail-closed conflict resolution.
 
-Acquisition mode is provenance only.  It is deliberately excluded from evidence
+Acquisition mode is provenance only. It is deliberately excluded from evidence
 ranking so MANUAL, HYBRID and AUTOMATIC runs make the same decision from the same
-facts.  Source authority, verification state and event time determine which fact
-wins; equally authoritative verified contradictions fail closed.
+facts. Source authority, verification state and event time determine which fact
+wins. Simultaneous equally authoritative contradictions fail closed; a strictly
+newer official fact may supersede older official state such as a late scratch.
 """
 from __future__ import annotations
 
@@ -128,7 +129,6 @@ class EvidencePacket:
             if expires <= observed:
                 raise EvidenceError("expires_at_utc must be after observed_at_utc")
         metadata = dict(self.metadata or {})
-        # Validate before storing so all packet hashes are reproducible.
         _canonical_json(metadata)
         material = {
             "game_id": game_id,
@@ -264,7 +264,8 @@ def resolve_evidence(
     Rules:
     * stale packets never participate;
     * verified beats unverified, then authority rank, then recency/confidence;
-    * equal top-ranked verified AUTHORITATIVE contradictions fail closed;
+    * simultaneous top verified AUTHORITATIVE contradictions fail closed;
+    * a strictly newer authoritative fact supersedes older authoritative state;
     * lower-ranked contradictions are recorded, never averaged;
     * verified PRIMARY/AUTHORITATIVE winners may explicitly block matching rows.
     """
@@ -291,30 +292,44 @@ def resolve_evidence(
         group = sorted(grouped[fact_key], key=_sort_key, reverse=True)
         winner = group[0]
         top_priority = _priority(winner)
-        tied_top = [packet for packet in group if _priority(packet) == top_priority]
-        top_values = {_value_hash(packet) for packet in tied_top}
+        same_priority = [packet for packet in group if _priority(packet) == top_priority]
+        newest_time = max(_utc(packet.observed_at_utc, "observed_at_utc") for packet in same_priority)
+        newest_top = [
+            packet for packet in same_priority
+            if _utc(packet.observed_at_utc, "observed_at_utc") == newest_time
+        ]
+        newest_values = {_value_hash(packet) for packet in newest_top}
+        same_priority_values = {_value_hash(packet) for packet in same_priority}
         all_values = {_value_hash(packet) for packet in group}
 
-        if len(top_values) > 1 and winner.verified and winner.authority == "AUTHORITATIVE":
-            broadest = max(tied_top, key=lambda packet: SCOPE_RANK[packet.scope])
+        if (
+            len(newest_values) > 1
+            and winner.verified
+            and winner.authority == "AUTHORITATIVE"
+        ):
+            broadest = max(newest_top, key=lambda packet: SCOPE_RANK[packet.scope])
             reason = f"EVIDENCE_CONFLICT:{winner.fact_type}:{winner.subject_id}"
             blocks.append(_block_from_packet(broadest, reason))
             conflicts.append(EvidenceConflict(
                 fact_key=fact_key,
                 severity="BLOCK",
-                reason="EQUAL_AUTHORITATIVE_FACTS_DISAGREE",
+                reason="SIMULTANEOUS_AUTHORITATIVE_FACTS_DISAGREE",
                 winner_sha256=None,
-                competing_sha256=tuple(sorted(packet.content_sha256 for packet in tied_top)),
-                sources=tuple(sorted({packet.source_name for packet in tied_top})),
+                competing_sha256=tuple(sorted(packet.content_sha256 for packet in newest_top)),
+                sources=tuple(sorted({packet.source_name for packet in newest_top})),
             ))
-            # Keep a deterministic representative for journaling only; the block
-            # ensures it can never drive an official decision.
             winners.append(winner)
             continue
 
         winners.append(winner)
         if len(all_values) > 1:
-            if len(top_values) > 1:
+            older_same_priority_conflict = (
+                len(same_priority_values) > 1 and len(newest_values) == 1
+            )
+            if older_same_priority_conflict and winner.verified and winner.authority == "AUTHORITATIVE":
+                severity = "INFO"
+                reason = "NEWER_AUTHORITATIVE_FACT_SUPERSEDES_OLDER"
+            elif len(same_priority_values) > 1:
                 severity = "DOWNWEIGHT"
                 reason = "EQUAL_PRIORITY_FACTS_DISAGREE_NEWEST_SELECTED"
             else:
