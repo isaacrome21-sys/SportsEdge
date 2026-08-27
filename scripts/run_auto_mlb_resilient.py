@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 from sportsedge.auto_espn_odds import run_auto_mlb_espn_game_odds
 from sportsedge.auto_runner import AutoRunnerError, report_to_dict, run_auto_mlb
 from sportsedge.edge_floors import DEFAULT_EDGE_FLOOR_CONFIG
+from sportsedge.evidence_io import load_evidence_file
 from sportsedge.funnel import build_funnel
 from sportsedge.live_odds_failover import should_rotate_odds_key
 from sportsedge.mlb_run_machine import MLBMachineReport, machine_report_to_dict, run_it_mlb
@@ -47,6 +48,11 @@ def main() -> int:
     p.add_argument("--require-confirmed-lineup", action="store_true")
     p.add_argument("--edge-floor-config", default=DEFAULT_EDGE_FLOOR_CONFIG)
     p.add_argument("--kelly-multiplier", type=float, default=0.25)
+    p.add_argument(
+        "--evidence-file",
+        default=os.environ.get("SPORTSEDGE_EVIDENCE_FILE", "").strip() or None,
+        help="Optional sportsedge_evidence_v1 JSON merged with automatic official evidence.",
+    )
     args = p.parse_args()
     if args.edge_floor_config != DEFAULT_EDGE_FLOOR_CONFIG:
         p.error("production edge-floor config override is prohibited")
@@ -64,6 +70,7 @@ def main() -> int:
 
     infrastructure_blocked = False
     try:
+        evidence_packets = load_evidence_file(args.evidence_file) if args.evidence_file else None
         common = dict(
             projected_lineups_url=projected,
             provider_token=token,
@@ -77,6 +84,9 @@ def main() -> int:
         if quotes:
             # Explicit external quote+feature snapshots remain a legacy compatibility
             # lane. They are never selected by native automatic RUN IT acquisition.
+            # Canonical evidence must never be silently dropped in that lane.
+            if evidence_packets is not None:
+                raise AutoRunnerError("MANUAL_EVIDENCE_UNSUPPORTED_IN_LEGACY_EXTERNAL_LANE")
             if not features:
                 raise AutoRunnerError("FEATURE_PROVIDER_CONFIG_MISSING")
             report = run_auto_mlb(quote_url=quotes, feature_url=features, **common)
@@ -91,6 +101,7 @@ def main() -> int:
                         odds_api_keys=odds_api_keys[1:],
                         bookmakers=odds_books,
                         history_cache_dir=history_cache_dir,
+                        evidence_packets=evidence_packets,
                         **common,
                     )
                     native_unusable = should_rotate_odds_key(
@@ -116,9 +127,15 @@ def main() -> int:
                     "reason": "ODDS_API_KEY_MISSING",
                 })
 
-            # Native acquisition failure never skips the fallback. ESPN remains
-            # deliberately game-only and builds its own price-independent features;
-            # a configured legacy feature URL cannot hijack this native fallback.
+            # Manual evidence is an explicit safety constraint. If the canonical
+            # native lane cannot run, do not bypass that constraint via a game-only
+            # fallback that cannot consume the same evidence contract.
+            if report is None and evidence_packets is not None:
+                raise AutoRunnerError("EVIDENCE_GATED_NATIVE_RUN_UNAVAILABLE")
+
+            # Native acquisition failure otherwise proceeds to the deliberately
+            # game-only ESPN fallback. A configured legacy feature URL cannot hijack
+            # this native fallback.
             if report is None:
                 report = run_auto_mlb_espn_game_odds(
                     feature_url=None,
