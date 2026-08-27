@@ -14,7 +14,8 @@ from typing import Any, Mapping
 
 import numpy as np
 
-from .truth_gate import GateReport, TruthGate
+from sportsedge.validation.gate_report import GateReport
+from .truth_gate import CFBTruthGate
 
 
 class HoldoutRunnerError(ValueError):
@@ -32,7 +33,7 @@ def _canonical_bytes(value: Any) -> bytes:
 
 class HoldoutRunner:
     def __init__(self, policy_path: str | Path = "config/cfb_truth_gate_v1.json"):
-        self.gate = TruthGate(policy_path)
+        self.gate = CFBTruthGate(policy_path)
         self.edge_floor = float(self.gate.gates["edge_floor"])
 
     @staticmethod
@@ -128,13 +129,6 @@ class HoldoutRunner:
         paired_historical_price_evidence_complete: bool,
         recent_two_season_ok: bool,
     ) -> GateReport:
-        """
-        Evaluate one settled, non-push market vector.
-
-        clv_series and roi_series must be aligned one-for-one with the holdout rows.
-        CLV and ROI gate metrics are calculated only on the frozen promoted subset:
-        model probability - decision-time no-vig probability >= policy edge floor.
-        """
         truth = self._vector(y_true, "y_true", binary=True)
         model = self._vector(y_prob, "y_prob", probability=True)
         market_prob = self._vector(market_novig_prob, "market_novig_prob", probability=True)
@@ -187,8 +181,10 @@ class HoldoutRunner:
             if int(mask.sum()) > 0:
                 hit_rates[key] = float(np.mean(truth[mask]))
 
+        canonical = str(market or "").strip().upper()
         return self.gate.evaluate(
-            market=market,
+            market=canonical,
+            evidence_market=canonical,
             pit_reproducible=pit_reproducible,
             leakage_violations=leakage_violations,
             n_forward_seasons=n_forward_seasons,
@@ -208,10 +204,15 @@ class HoldoutRunner:
             paired_historical_price_evidence_complete=paired_historical_price_evidence_complete,
             evidence_policy_sha256=self.gate.policy_sha256,
             hit_rates=hit_rates or None,
+            model_prob=None,
+            no_vig_prob=None,
+            live_two_sided_quote=False,
+            data_fresh=False,
+            exposure_limits_ok=False,
         )
 
     def run_full_card(self, evidence: Mapping[str, Mapping[str, Any]]) -> dict[str, GateReport]:
-        expected = set(self.gate.markets)
+        expected = set(self.gate.allowed_markets)
         supplied = {str(key).strip().upper() for key in evidence}
         if supplied != expected:
             missing = sorted(expected - supplied)
@@ -235,7 +236,8 @@ class HoldoutRunner:
             payload = report.to_dict()
             raw = _canonical_bytes(payload)
             digest = sha256(raw).hexdigest()
-            target = root / f"{market.lower()}_{report.policy_id.lower()}_{digest}.json"
+            policy_id = str(self.gate.policy["policy_id"]).lower()
+            target = root / f"{market.lower()}_{policy_id}_{digest}.json"
             body = raw + b"\n"
             try:
                 with target.open("xb") as handle:

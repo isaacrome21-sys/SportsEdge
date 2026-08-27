@@ -7,15 +7,17 @@ import unittest
 import numpy as np
 
 from sportsedge.sports.cfb.holdout_runner import HoldoutRunner, HoldoutRunnerError
-from sportsedge.sports.cfb.truth_gate import TruthGate, TruthGateError
+from sportsedge.sports.cfb.truth_gate import CFBTruthGate
+from sportsedge.validation.truth_gate_core import CandidateDecision, MarketStatus
 
 ROOT = Path(__file__).resolve().parents[1]
 POLICY = ROOT / "config" / "cfb_truth_gate_v1.json"
 
 
-def passing_kwargs(gate: TruthGate):
+def passing_kwargs(gate: CFBTruthGate):
     return dict(
         market="MONEYLINE",
+        evidence_market="MONEYLINE",
         pit_reproducible=True,
         leakage_violations=0,
         n_forward_seasons=4,
@@ -34,80 +36,73 @@ def passing_kwargs(gate: TruthGate):
         recent_two_season_ok=True,
         paired_historical_price_evidence_complete=True,
         evidence_policy_sha256=gate.policy_sha256,
+        model_prob=0.58,
+        no_vig_prob=0.54,
+        live_two_sided_quote=True,
+        data_fresh=True,
+        exposure_limits_ok=True,
     )
 
 
 class TruthGatePolicyTests(unittest.TestCase):
     def test_policy_uses_canonical_runtime_markets(self):
-        gate = TruthGate(POLICY)
+        gate = CFBTruthGate(POLICY)
         self.assertEqual(gate.markets, {"MONEYLINE", "SPREAD", "TOTAL"})
         self.assertEqual(gate.policy["policy_id"], "CFB_TRUTH_GATE_V1")
         self.assertEqual(len(gate.policy_sha256), 64)
 
     def test_one_hard_failure_blocks_without_override(self):
-        gate = TruthGate(POLICY)
+        gate = CFBTruthGate(POLICY)
         kwargs = passing_kwargs(gate)
         kwargs["leakage_violations"] = 1
         out = gate.evaluate(**kwargs)
         self.assertFalse(out.hard_gate_pass)
-        self.assertFalse(out.promoted)
-        self.assertEqual(out.status, "EXPERIMENTAL")
-        self.assertIn("LEAKAGE_VIOLATIONS_EXCEEDED", out.failures)
+        self.assertEqual(out.candidate_decision, CandidateDecision.BLOCKED)
+        self.assertNotEqual(out.market_status, MarketStatus.OFFICIAL)
+        self.assertIn("LEAKAGE_VIOLATIONS_EXCEEDED", out.market_failures)
 
     def test_minimum_not_preferred_sample_is_sufficient_hard_gate(self):
-        gate = TruthGate(POLICY)
+        gate = CFBTruthGate(POLICY)
         out = gate.evaluate(**passing_kwargs(gate))
         self.assertTrue(out.hard_gate_pass)
-        self.assertTrue(out.promoted)
-        self.assertEqual(out.status, "OFFICIAL")
-        self.assertEqual(out.diagnostics["preferred_promoted_sample"], 800)
+        self.assertEqual(out.market_status, MarketStatus.OFFICIAL)
+        self.assertEqual(dict(out.diagnostics)["preferred_promoted_sample"], 800)
 
     def test_policy_hash_mismatch_fails_closed(self):
-        gate = TruthGate(POLICY)
+        gate = CFBTruthGate(POLICY)
         kwargs = passing_kwargs(gate)
         kwargs["evidence_policy_sha256"] = "0" * 64
         out = gate.evaluate(**kwargs)
         self.assertFalse(out.hard_gate_pass)
-        self.assertIn("FROZEN_POLICY_HASH_MISMATCH", out.failures)
+        self.assertIn("POLICY_SHA256_MISMATCH", out.market_failures)
 
     def test_unknown_market_is_rejected(self):
-        gate = TruthGate(POLICY)
+        gate = CFBTruthGate(POLICY)
         kwargs = passing_kwargs(gate)
         kwargs["market"] = "TEAM_TOTALS"
-        with self.assertRaisesRegex(TruthGateError, "MARKET_UNSUPPORTED"):
-            gate.evaluate(**kwargs)
+        kwargs["evidence_market"] = "TEAM_TOTALS"
+        out = gate.evaluate(**kwargs)
+        self.assertFalse(out.hard_gate_pass)
+        self.assertIn("INVALID_MARKET_OR_FAMILY", out.market_failures)
 
     def test_candidate_bet_requires_official_market_live_gates_and_edge(self):
-        gate = TruthGate(POLICY)
-        report = gate.evaluate(**passing_kwargs(gate))
-        low = gate.decide_candidate(
-            report,
-            model_prob=0.56,
-            no_vig_prob=0.54,
-            live_two_sided_quote=True,
-            data_fresh=True,
-            exposure_limits_ok=True,
-        )
-        self.assertEqual(low.bet_status, "NO_BET")
-        stale = gate.decide_candidate(
-            report,
-            model_prob=0.58,
-            no_vig_prob=0.54,
-            live_two_sided_quote=True,
-            data_fresh=False,
-            exposure_limits_ok=True,
-        )
-        self.assertEqual(stale.bet_status, "BLOCKED")
-        self.assertIn("DATA_NOT_FRESH", stale.failures)
-        bet = gate.decide_candidate(
-            report,
-            model_prob=0.58,
-            no_vig_prob=0.54,
-            live_two_sided_quote=True,
-            data_fresh=True,
-            exposure_limits_ok=True,
-        )
-        self.assertEqual(bet.bet_status, "OFFICIAL_BET")
+        gate = CFBTruthGate(POLICY)
+        low_kwargs = passing_kwargs(gate)
+        low_kwargs.update(model_prob=0.56, no_vig_prob=0.54)
+        low = gate.evaluate(**low_kwargs)
+        self.assertEqual(low.market_status, MarketStatus.OFFICIAL)
+        self.assertEqual(low.candidate_decision, CandidateDecision.NO_BET)
+
+        stale_kwargs = passing_kwargs(gate)
+        stale_kwargs.update(model_prob=0.58, no_vig_prob=0.54, data_fresh=False)
+        stale = gate.evaluate(**stale_kwargs)
+        self.assertEqual(stale.market_status, MarketStatus.OFFICIAL)
+        self.assertEqual(stale.candidate_decision, CandidateDecision.BLOCKED)
+        self.assertIn("DATA_NOT_FRESH", stale.candidate_failures)
+
+        bet = gate.evaluate(**passing_kwargs(gate))
+        self.assertEqual(bet.market_status, MarketStatus.OFFICIAL)
+        self.assertEqual(bet.candidate_decision, CandidateDecision.OFFICIAL_BET)
 
 
 class HoldoutRunnerTests(unittest.TestCase):
@@ -163,12 +158,13 @@ class HoldoutRunnerTests(unittest.TestCase):
             paired_historical_price_evidence_complete=True,
             recent_two_season_ok=True,
         )
-        self.assertGreater(out.metrics["mean_novig_clv"], 0.005)
-        self.assertGreater(out.metrics["roi_after_vig"], 0.0)
-        self.assertEqual(out.metrics["n_promoted"], int(promoted.sum()))
+        metrics = dict(out.metrics)
+        self.assertGreater(metrics["mean_novig_clv"], 0.005)
+        self.assertGreater(metrics["roi_after_vig"], 0.0)
+        self.assertEqual(metrics["n_promoted"], int(promoted.sum()))
 
     def test_content_addressed_report_is_idempotent(self):
-        gate = TruthGate(POLICY)
+        gate = CFBTruthGate(POLICY)
         report = gate.evaluate(**passing_kwargs(gate))
         runner = HoldoutRunner(POLICY)
         with tempfile.TemporaryDirectory() as tmp:
