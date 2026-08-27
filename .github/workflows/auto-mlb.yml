@@ -59,6 +59,9 @@ jobs:
           tests.test_additional_binary_quote_provenance
           tests.test_mlb_quote_source_coverage
           tests.test_mlb_run_machine
+          tests.test_evidence_resolution
+          tests.test_mlb_evidence
+          tests.test_evidence_io
           tests.test_run_auto_mlb_resilient_machine
           -v
       - name: Diagnose Odds API credentials safely
