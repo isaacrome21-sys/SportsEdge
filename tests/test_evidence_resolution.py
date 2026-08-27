@@ -92,7 +92,7 @@ class EvidenceResolutionTests(unittest.TestCase):
         self.assertEqual(resolution.conflicts[0].severity, "INFO")
         self.assertEqual(resolution.conflicts[0].reason, "LOWER_PRIORITY_FACT_OVERRIDDEN")
 
-    def test_equal_verified_authoritative_starter_conflict_fails_closed(self):
+    def test_simultaneous_verified_authoritative_starter_conflict_fails_closed(self):
         a = starter_evidence(
             game_id="823014",
             team_id="STL",
@@ -112,7 +112,37 @@ class EvidenceResolutionTests(unittest.TestCase):
         resolution = resolve_evidence([a, b], now=NOW)
         self.assertEqual(resolution.status, "BLOCKED")
         self.assertEqual(resolution.conflicts[0].severity, "BLOCK")
+        self.assertEqual(
+            resolution.conflicts[0].reason,
+            "SIMULTANEOUS_AUTHORITATIVE_FACTS_DISAGREE",
+        )
         self.assertEqual(resolution.blocks[0].scope, "GAME")
+
+    def test_newer_verified_authoritative_starter_supersedes_older_official_state(self):
+        older = starter_evidence(
+            game_id="823014",
+            team_id="STL",
+            starter_id="HJERPE",
+            source_name="MLB.com earlier snapshot",
+            observed_at_utc=NOW - timedelta(minutes=20),
+            acquisition_mode="MANUAL",
+        )
+        newer = starter_evidence(
+            game_id="823014",
+            team_id="STL",
+            starter_id="GRACEFFO",
+            source_name="MLB.com refreshed",
+            observed_at_utc=NOW,
+            acquisition_mode="AUTOMATIC",
+        )
+        resolution = resolve_evidence([older, newer], now=NOW)
+        self.assertEqual(resolution.status, "PASS")
+        self.assertEqual(resolution.winners[0].value, "GRACEFFO")
+        self.assertEqual(resolution.conflicts[0].severity, "INFO")
+        self.assertEqual(
+            resolution.conflicts[0].reason,
+            "NEWER_AUTHORITATIVE_FACT_SUPERSEDES_OLDER",
+        )
 
     def test_equal_priority_weather_disagreement_is_never_averaged(self):
         older = EvidencePacket(
