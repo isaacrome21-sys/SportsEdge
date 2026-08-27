@@ -25,6 +25,7 @@ from .auto_runner import (
     _snapshot_list,
 )
 from .edge_floors import DEFAULT_EDGE_FLOOR_CONFIG
+from .evidence import EvidencePacket
 from .market_surface import (
     DEFAULT_MARKET_SURFACE_PATH,
     build_market_grid,
@@ -32,6 +33,7 @@ from .market_surface import (
     compose_run_status,
     load_market_surface,
 )
+from .mlb_evidence import official_mlb_evidence
 from .mlb_generic_features import MLBGenericHistorySource
 from .mlb_joint_mode_bridge import build_feature_rows_for_quotes
 from .mlb_source import fetch_boxscore, fetch_schedule, parse_game_start
@@ -50,6 +52,7 @@ def run_auto_joint_mlb(
     edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG,
     kelly_multiplier: float = 0.25,
     market_surface_path: str = DEFAULT_MARKET_SURFACE_PATH,
+    evidence_sink: list[EvidencePacket] | None = None,
 ) -> AutoRunReport:
     current = _aware_utc(now or datetime.now(timezone.utc))
     slate_date = current.astimezone(CHICAGO_TZ).date()
@@ -76,6 +79,13 @@ def run_auto_joint_mlb(
             if current >= start:
                 raise RuntimeError("GAME_CLOCK_NOT_PREGAME")
             boxscore = fetch_boxscore(snap.game_pk, opener=opener)
+            if evidence_sink is not None:
+                evidence_sink.extend(official_mlb_evidence(
+                    snapshot=snap,
+                    boxscore=boxscore,
+                    observed_at_utc=current,
+                    acquisition_mode="AUTOMATIC",
+                ))
             games.append(_live_game(snap, boxscore=boxscore, projected=projected, now=current))
         except Exception as exc:
             game_failures[game_id] = f"{type(exc).__name__}: {exc}"
