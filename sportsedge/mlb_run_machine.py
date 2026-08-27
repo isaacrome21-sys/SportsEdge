@@ -236,6 +236,19 @@ def _machine_result(source_index: int, row: Any) -> MLBMachineResult:
     )
 
 
+def _resolve_packets(
+    supplied: Sequence[EvidencePacket],
+    automatic: Sequence[EvidencePacket],
+    *,
+    current: datetime,
+    requested: bool,
+) -> EvidenceResolution | None:
+    combined = tuple(supplied) + tuple(automatic)
+    if not combined and not requested:
+        return None
+    return resolve_evidence(combined, now=current)
+
+
 def _apply_evidence_gate(
     results: Sequence[MLBMachineResult],
     source_failures: Sequence[Mapping[str, Any]],
@@ -325,11 +338,8 @@ def run_mlb_machine(
     current = _aware_utc(now)
     selected = _resolve_mode(mode, quotes=quotes, games=games, feature_rows=feature_rows)
     slate_date = target_date or current.astimezone(CHICAGO_TZ).date()
-    evidence_resolution = (
-        resolve_evidence(tuple(evidence_packets), now=current)
-        if evidence_packets is not None
-        else None
-    )
+    supplied_evidence = tuple(evidence_packets or ())
+    evidence_requested = evidence_packets is not None
 
     if selected == "MANUAL":
         if quotes is None or games is None or feature_rows is None:
@@ -345,6 +355,9 @@ def run_mlb_machine(
             require_confirmed_lineup=require_confirmed_lineup,
             edge_floor_config_path=edge_floor_config_path,
             kelly_multiplier=kelly_multiplier,
+        )
+        evidence_resolution = _resolve_packets(
+            supplied_evidence, (), current=current, requested=evidence_requested
         )
         return _report(
             mode=selected,
@@ -365,6 +378,7 @@ def run_mlb_machine(
                 return _MemoryResponse(quote_payload)
             return opener(req, timeout=timeout)
 
+        automatic_evidence: list[EvidencePacket] = []
         report = run_auto_joint_mlb(
             quote_url=MEMORY_QUOTES_URL,
             projected_lineups_url=projected_lineups_url,
@@ -375,6 +389,13 @@ def run_mlb_machine(
             require_confirmed_lineup=require_confirmed_lineup,
             edge_floor_config_path=edge_floor_config_path,
             kelly_multiplier=kelly_multiplier,
+            evidence_sink=automatic_evidence,
+        )
+        evidence_resolution = _resolve_packets(
+            supplied_evidence,
+            automatic_evidence,
+            current=current,
+            requested=evidence_requested,
         )
         return _report(
             mode=selected,
@@ -394,6 +415,7 @@ def run_mlb_machine(
                 keys.append(key)
         if not keys:
             raise MLBRunMachineError("AUTOMATIC_REQUIRES_ODDS_API_KEY")
+        automatic_evidence: list[EvidencePacket] = []
         report = run_auto_mlb_native_odds(
             odds_api_key=keys[0],
             odds_api_keys=tuple(keys[1:]),
@@ -408,6 +430,13 @@ def run_mlb_machine(
             kelly_multiplier=kelly_multiplier,
             bookmakers=tuple(bookmakers),
             history_cache_dir=history_cache_dir,
+            evidence_sink=automatic_evidence,
+        )
+        evidence_resolution = _resolve_packets(
+            supplied_evidence,
+            automatic_evidence,
+            current=current,
+            requested=evidence_requested,
         )
         return _report(
             mode=selected,
