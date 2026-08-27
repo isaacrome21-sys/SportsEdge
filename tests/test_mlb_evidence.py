@@ -51,7 +51,7 @@ class MLBOfficialEvidenceTests(unittest.TestCase):
         self.assertEqual({packet.authority for packet in packets}, {"PRIMARY"})
         self.assertEqual({packet.source_name for packet in packets}, {"MLB_STATSAPI_SCHEDULE"})
 
-    def test_confirmed_nine_slot_lineup_marks_roster_bench_player_absent(self):
+    def test_confirmed_nine_slot_lineup_records_team_set_and_positive_members_only(self):
         boxscore = {
             "teams": {
                 "away": {"players": team_players(start=1, bench_id=1999)},
@@ -67,18 +67,19 @@ class MLBOfficialEvidenceTests(unittest.TestCase):
         lineup_packets = [
             packet for packet in packets if packet.fact_type == "STARTING_LINEUP_STATUS"
         ]
-        self.assertEqual(len(lineup_packets), 20)
-        away_bench = next(packet for packet in lineup_packets if packet.entity_id == "1999")
-        home_bench = next(packet for packet in lineup_packets if packet.entity_id == "2999")
-        self.assertFalse(away_bench.value)
-        self.assertFalse(home_bench.value)
-        self.assertEqual(away_bench.gate_action, "BLOCK_MATCHING")
-        self.assertEqual(away_bench.authority, "AUTHORITATIVE")
-        starter = next(packet for packet in lineup_packets if packet.entity_id == "1001")
-        self.assertTrue(starter.value)
-        self.assertEqual(starter.gate_action, "NONE")
+        lineup_sets = [
+            packet for packet in packets if packet.fact_type == "STARTING_LINEUP_IDS"
+        ]
+        self.assertEqual(len(lineup_packets), 18)
+        self.assertEqual(len(lineup_sets), 2)
+        self.assertFalse(any(packet.entity_id in {"1999", "2999"} for packet in lineup_packets))
+        self.assertTrue(all(packet.value is True for packet in lineup_packets))
+        self.assertTrue(all(packet.gate_action == "NONE" for packet in lineup_packets))
+        away = next(packet for packet in lineup_sets if packet.subject_id == "110")
+        self.assertEqual(away.value, list(range(1001, 1010)))
+        self.assertEqual(away.authority, "AUTHORITATIVE")
 
-    def test_incomplete_lineup_never_manufactures_absent_player_facts(self):
+    def test_incomplete_lineup_never_manufactures_confirmed_lineup_facts(self):
         players = team_players(start=1, bench_id=1999)
         del players["ID1009"]["battingOrder"]
         boxscore = {
@@ -94,7 +95,8 @@ class MLBOfficialEvidenceTests(unittest.TestCase):
             acquisition_mode="AUTOMATIC",
         )
         self.assertFalse(any(
-            packet.fact_type == "STARTING_LINEUP_STATUS" for packet in packets
+            packet.fact_type in {"STARTING_LINEUP_STATUS", "STARTING_LINEUP_IDS"}
+            for packet in packets
         ))
 
 
