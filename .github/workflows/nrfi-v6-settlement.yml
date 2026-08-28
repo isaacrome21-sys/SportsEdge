@@ -52,6 +52,26 @@ jobs:
           restore-keys: |
             nrfi-v6-settlement-${{ runner.os }}-
 
+      - name: Rehydrate durable scored state from data branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data
+          mkdir -p "$SPORTSEDGE_NRFI_V6_SCORE_OUT"
+          for name in nrfi_v6_settlements.json nrfi_v6_forward_shadow_report.json nrfi_v6_forward_shadow_manifest.json; do
+            target="$SPORTSEDGE_NRFI_V6_SCORE_OUT/$name"
+            if test -s "$target"; then
+              continue
+            fi
+            if git show "origin/data:runtime/model-validation/NRFI_YRFI/latest/$name" > "$target.tmp" 2>/dev/null; then
+              test -s "$target.tmp"
+              mv "$target.tmp" "$target"
+              echo "NRFI_DURABLE_REHYDRATE=$name"
+            else
+              rm -f "$target.tmp"
+            fi
+          done
+
       - name: Rehydrate every missing immutable NRFI capture artifact
         env:
           GH_TOKEN: ${{ github.token }}
@@ -103,14 +123,32 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          REQUIRED=(
+            nrfi_v6_settlements.json
+            nrfi_v6_forward_shadow_report.json
+            nrfi_v6_forward_shadow_manifest.json
+          )
+          for name in "${REQUIRED[@]}"; do
+            test -s "$SPORTSEDGE_NRFI_V6_SCORE_OUT/$name" || {
+              echo "NRFI_PERSIST_SKIPPED_MISSING=$name" >&2
+              exit 1
+            }
+          done
+
           git fetch --depth=1 origin data
           git worktree add --detach .data-branch FETCH_HEAD
           RUN_DIR=".data-branch/runtime/model-validation/NRFI_YRFI/runs/${GITHUB_RUN_ID}"
           LATEST_DIR=".data-branch/runtime/model-validation/NRFI_YRFI/latest"
-          mkdir -p "$RUN_DIR" "$LATEST_DIR"
-          cp -R "$SPORTSEDGE_NRFI_V6_SCORE_OUT"/. "$RUN_DIR"/ 2>/dev/null || true
-          rm -rf "$LATEST_DIR"/*
-          cp -R "$SPORTSEDGE_NRFI_V6_SCORE_OUT"/. "$LATEST_DIR"/ 2>/dev/null || true
+          STAGE_DIR=".data-branch/runtime/model-validation/NRFI_YRFI/.latest-${GITHUB_RUN_ID}"
+          mkdir -p "$RUN_DIR" "$STAGE_DIR"
+          cp -R "$SPORTSEDGE_NRFI_V6_SCORE_OUT"/. "$RUN_DIR"/
+          cp -R "$SPORTSEDGE_NRFI_V6_SCORE_OUT"/. "$STAGE_DIR"/
+          for name in "${REQUIRED[@]}"; do
+            test -s "$RUN_DIR/$name"
+            test -s "$STAGE_DIR/$name"
+          done
+          rm -rf "$LATEST_DIR"
+          mv "$STAGE_DIR" "$LATEST_DIR"
           printf '%s\n' "$GITHUB_RUN_ID" > .data-branch/runtime/model-validation/NRFI_YRFI/latest_run_id.txt
           cd .data-branch
           git config user.name sportsedge-data-bot
