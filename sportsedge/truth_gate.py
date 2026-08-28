@@ -40,6 +40,7 @@ def decide_bet(
     edge_floor: float,
     kelly_multiplier: float = 0.25,
     push_probability: float = 0.0,
+    max_kelly_fraction: float = 1.0,
 ) -> BetDecision:
     if any(type(v) is not bool for v in (bound, fresh, deployed)):
         raise TruthGateError("bound/fresh/deployed must be bool")
@@ -53,8 +54,10 @@ def decide_bet(
         raise TruthGateError("fair_market_probability must be finite in (0,1)")
     if not isinstance(edge_floor, (int, float)) or isinstance(edge_floor, bool) or not math.isfinite(float(edge_floor)) or float(edge_floor) <= 0:
         raise TruthGateError("edge_floor must be finite and > 0")
-    if not isinstance(kelly_multiplier, (int, float)) or not math.isfinite(float(kelly_multiplier)) or kelly_multiplier < 0:
-        raise TruthGateError("kelly_multiplier must be finite and >= 0")
+    if not isinstance(kelly_multiplier, (int, float)) or isinstance(kelly_multiplier, bool) or not math.isfinite(float(kelly_multiplier)) or float(kelly_multiplier) < 0:
+        raise TruthGateError("kelly_multiplier must be finite numeric and >= 0")
+    if not isinstance(max_kelly_fraction, (int, float)) or isinstance(max_kelly_fraction, bool) or not math.isfinite(float(max_kelly_fraction)) or not 0 <= float(max_kelly_fraction) <= 1:
+        raise TruthGateError("max_kelly_fraction must be finite numeric in [0,1]")
 
     dec = american_to_decimal(american_odds)
     fair_market = float(fair_market_probability)
@@ -72,7 +75,11 @@ def decide_bet(
     ev = p_win * (dec - 1.0) - p_loss
     b = dec - 1.0
     raw_kelly = max(0.0, (b * conditional_win - conditional_loss) / b) if b > 0 else 0.0
-    kelly = raw_kelly * float(kelly_multiplier)
+    # Fractional Kelly is a sizing recommendation, never permission to risk more
+    # than the configured bankroll cap. The default cap is behavior-preserving for
+    # normal quarter-Kelly operation while preventing unsafe >100% allocations if
+    # a caller supplies an aggressive multiplier.
+    kelly = min(raw_kelly * float(kelly_multiplier), float(max_kelly_fraction))
 
     if not (bound and fresh and deployed):
         status = "BLOCKED"

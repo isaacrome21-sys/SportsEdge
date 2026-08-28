@@ -25,16 +25,25 @@ def _raw_implied(odds: Any) -> float:
     return 1.0 / american_to_decimal(odds)
 
 
+def _strict_bool(value: Any, *, field: str) -> bool:
+    if type(value) is not bool:
+        raise DevigError(f"{field} must be bool")
+    return value
+
+
 def _identity(quote: Mapping[str, Any]) -> tuple[str, str, str, str, str, bool]:
     try:
+        alternate = _strict_bool(quote.get("is_alternate", False), field="is_alternate")
         return (
             str(quote["game_id"]),
             str(quote.get("period", "FG")),
             str(quote["market"]),
             str(quote["entity_id"]),
             str(quote.get("book_key", "")),
-            bool(quote.get("is_alternate", False)),
+            alternate,
         )
+    except DevigError:
+        raise
     except Exception as exc:
         raise DevigError("paired quote identity incomplete") from exc
 
