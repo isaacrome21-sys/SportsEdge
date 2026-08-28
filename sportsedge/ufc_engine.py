@@ -6,9 +6,11 @@ The engine is intentionally sportsbook-independent until the pricing layer.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import exp, log
+from math import exp, isfinite, log
 from random import Random
 from typing import Dict, Iterable, List, Mapping, Optional
+
+from .truth_gate import TruthGateError, american_to_decimal
 
 
 @dataclass(frozen=True)
@@ -73,6 +75,17 @@ def _logistic(x: float) -> float:
 
 def _safe(v: float, lo: float, hi: float) -> float:
     return min(hi, max(lo, v))
+
+
+def _probability(value: float, name: str, *, open_interval: bool = False) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not isfinite(float(value)):
+        raise ValueError(f"{name} must be finite numeric")
+    out = float(value)
+    valid = 0.0 < out < 1.0 if open_interval else 0.0 <= out <= 1.0
+    if not valid:
+        bounds = "(0,1)" if open_interval else "[0,1]"
+        raise ValueError(f"{name} must be in {bounds}")
+    return out
 
 
 def _feature_score(a: FighterSnapshot, b: FighterSnapshot, ctx: FightContext) -> float:
@@ -178,30 +191,38 @@ def project_fight(a: FighterSnapshot, b: FighterSnapshot, ctx: FightContext) -> 
 
 
 def american_to_implied(odds: int) -> float:
-    return 100.0 / (odds + 100.0) if odds > 0 else (-odds) / ((-odds) + 100.0)
+    try:
+        return 1.0 / american_to_decimal(odds)
+    except TruthGateError as exc:
+        raise ValueError(f"UFC_ODDS_INVALID:{exc}") from exc
 
 
 def no_vig_two_way(odds_a: int, odds_b: int) -> tuple[float, float]:
     pa = american_to_implied(odds_a)
     pb = american_to_implied(odds_b)
     s = pa + pb
+    if not isfinite(s) or s <= 0.0:
+        raise ValueError("UFC_DEVIG_INVALID")
     return pa / s, pb / s
 
 
 def expected_value(prob: float, american_odds: int) -> float:
-    profit = american_odds / 100.0 if american_odds > 0 else 100.0 / (-american_odds)
-    value = prob * profit - (1.0 - prob)
+    p = _probability(prob, "prob")
+    dec = american_to_decimal(american_odds)
+    value = p * (dec - 1.0) - (1.0 - p)
     return 0.0 if abs(value) < 1e-12 else value
 
 
 def fair_american(prob: float) -> int:
-    prob = _safe(prob, 1e-6, 1.0 - 1e-6)
-    if prob >= 0.5:
-        return round(-100.0 * prob / (1.0 - prob))
-    return round(100.0 * (1.0 - prob) / prob)
+    p = _probability(prob, "prob", open_interval=True)
+    if p >= 0.5:
+        return round(-100.0 * p / (1.0 - p))
+    return round(100.0 * (1.0 - p) / p)
 
 
 def monte_carlo(proj: FightProjection, n: int = 250_000, seed: int = 330) -> Dict[str, float]:
+    if isinstance(n, bool) or not isinstance(n, int) or n <= 0:
+        raise ValueError("UFC_MONTE_CARLO_N_POSITIVE_INTEGER_REQUIRED")
     rng = Random(seed)
     counts = {"a_win": 0, "b_win": 0, "gtd": 0, "a_ko": 0, "a_sub": 0, "a_dec": 0, "b_ko": 0, "b_sub": 0, "b_dec": 0}
     probs = [
@@ -209,6 +230,8 @@ def monte_carlo(proj: FightProjection, n: int = 250_000, seed: int = 330) -> Dic
         ("b_ko", proj.p_b_ko), ("b_sub", proj.p_b_sub), ("b_dec", proj.p_b_dec),
     ]
     total = sum(p for _, p in probs)
+    if not isfinite(total) or total <= 0.0:
+        raise ValueError("UFC_PROJECTION_PROBABILITY_MASS_INVALID")
     probs = [(k, p / total) for k, p in probs]
     for _ in range(n):
         u = rng.random()
@@ -231,8 +254,13 @@ def monte_carlo(proj: FightProjection, n: int = 250_000, seed: int = 330) -> Dic
 
 def truth_gate(*, prob: float, odds: int, market_novig: float, uncertainty: float,
                min_edge: float = 0.025, min_ev: float = 0.03, max_uncertainty: float = 0.20) -> Mapping[str, object]:
-    edge = prob - market_novig
-    ev = expected_value(prob, odds)
-    passed = edge >= min_edge and ev >= min_ev and uncertainty <= max_uncertainty
-    return {"pass": passed, "edge": edge, "ev": ev, "uncertainty": uncertainty,
-            "fair_odds": fair_american(prob)}
+    p = _probability(prob, "prob")
+    market_p = _probability(market_novig, "market_novig")
+    u = _probability(uncertainty, "uncertainty")
+    if any(isinstance(v, bool) or not isinstance(v, (int, float)) or not isfinite(float(v)) or float(v) < 0.0 for v in (min_edge, min_ev, max_uncertainty)):
+        raise ValueError("UFC_TRUTH_GATE_THRESHOLDS_INVALID")
+    edge = p - market_p
+    ev = expected_value(p, odds)
+    passed = edge >= float(min_edge) and ev >= float(min_ev) and u <= float(max_uncertainty)
+    return {"pass": passed, "edge": edge, "ev": ev, "uncertainty": u,
+            "fair_odds": fair_american(p)}
