@@ -25,6 +25,13 @@ class CFBSourceError(ValueError):
     pass
 
 
+def _classification(value: Any) -> str:
+    text = str(value or "").strip().upper()
+    if text not in {"FBS", "FCS"}:
+        raise CFBSourceError(f"CFB_CLASSIFICATION_UNSUPPORTED:{text or 'MISSING'}")
+    return text
+
+
 @dataclass(frozen=True)
 class CFBGame:
     game_id: str
@@ -36,6 +43,17 @@ class CFBGame:
     neutral_site: bool
     venue: str | None = None
     weather: Mapping[str, Any] | None = None
+    home_classification: str = "FBS"
+    away_classification: str = "FBS"
+
+    def matchup_classification(self) -> str:
+        home = _classification(self.home_classification)
+        away = _classification(self.away_classification)
+        if home == "FBS" and away == "FBS":
+            return "FBS_FBS"
+        if home == "FCS" and away == "FCS":
+            return "FCS_FCS"
+        return "FBS_FCS"
 
 
 @dataclass(frozen=True)
@@ -139,13 +157,16 @@ def _auth(token: str) -> dict[str, str]:
 
 
 def fetch_cfbd_teams(*, season: int, cfbd_api_key: str, opener: Callable = urlopen) -> list[dict[str, Any]]:
+    # This endpoint is used only as an alias catalog for currently modeled automatic
+    # FBS teams. FCS opponents are bound from the game schedule by exact canonical names
+    # until a versioned all-team alias registry is supplied to the automatic adapter.
     data = _json_get(_cfbd_url("/teams/fbs", {"year": int(season)}), headers=_auth(cfbd_api_key), opener=opener)
     if not isinstance(data, list):
         raise CFBSourceError("CFBD_TEAMS_NOT_LIST")
     return [dict(x) for x in data if isinstance(x, Mapping)]
 
 
-def build_team_alias_index(team_rows: Iterable[Mapping[str, Any]]) -> dict[str, str]:
+def build_team_alias_index(team_rows: Iterable[Mapping[str, Any]], *, games: Iterable[CFBGame] = ()) -> dict[str, str]:
     index: dict[str, str] = {}
     collisions: set[str] = set()
     for row in team_rows:
@@ -171,6 +192,15 @@ def build_team_alias_index(team_rows: Iterable[Mapping[str, Any]]) -> dict[str, 
                 index[key] = school
             elif prior != school:
                 collisions.add(key)
+    # Exact canonical schedule names allow FCS opponents to bind without fuzzy guessing.
+    for game in games:
+        for school in (game.home_team, game.away_team):
+            key = _norm_name(school)
+            prior = index.get(key)
+            if prior is None:
+                index[key] = school
+            elif prior != school:
+                collisions.add(key)
     for key in collisions:
         index.pop(key, None)
     return index
@@ -184,6 +214,9 @@ def bind_provider_team(name: str, alias_index: Mapping[str, str]) -> str:
 
 
 def fetch_cfbd_games(*, season: int, week: int, cfbd_api_key: str, opener: Callable = urlopen) -> list[CFBGame]:
+    # classification=fbs returns the FBS board, including FBS-vs-FCS games. The response
+    # itself carries homeClassification/awayClassification; preserve those labels rather
+    # than inferring them from conference or team name.
     data = _json_get(
         _cfbd_url("/games", {"year": int(season), "week": int(week), "seasonType": "regular", "classification": "fbs"}),
         headers=_auth(cfbd_api_key), opener=opener,
@@ -203,6 +236,8 @@ def fetch_cfbd_games(*, season: int, week: int, cfbd_api_key: str, opener: Calla
             game_id=str(row.get("id")), season=int(row.get("season", season)), week=int(row.get("week", week)),
             start_ts=start.isoformat(), home_team=home, away_team=away,
             neutral_site=bool(row.get("neutralSite", False)), venue=str(row.get("venue") or "").strip() or None,
+            home_classification=_classification(row.get("homeClassification")),
+            away_classification=_classification(row.get("awayClassification")),
         ))
     return out
 
@@ -439,5 +474,6 @@ def attach_weather(games: Iterable[CFBGame], weather_by_game: Mapping[str, Mappi
             game_id=game.game_id, season=game.season, week=game.week, start_ts=game.start_ts,
             home_team=game.home_team, away_team=game.away_team, neutral_site=game.neutral_site,
             venue=game.venue, weather=dict(weather),
+            home_classification=game.home_classification, away_classification=game.away_classification,
         ))
     return out
