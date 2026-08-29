@@ -3,7 +3,8 @@
 This is intentionally separate from CFB_TRUTH_GATE_V1. It does not weaken or silently
 change the frozen numerical gate. Instead, it proves that the evidence being handed to
 the gate was generated under the required PIT, calibration, benchmark and coverage
-contracts.
+contracts. Quote-sync policy identity is carried by the prediction policy bundle while
+this fold artifact attests that the quote-sync check actually passed.
 """
 from __future__ import annotations
 
@@ -52,7 +53,6 @@ class CFBValidationAttestation:
     evidence_ids: Mapping[str, str]
     validation_policy_sha: str
     feature_source_policy_sha: str
-    quote_sync_policy_sha: str
     entity_registry_sha: str
     benchmark_methodology_sha: str
     prior_decay_sha: str
@@ -82,9 +82,9 @@ class CFBValidationAttestation:
         if any(not str(value).strip() for value in self.evidence_ids.values()):
             raise CFBValidationAttestationError("ATTESTATION_EVIDENCE_ID_REQUIRED")
         for field in (
-            "validation_policy_sha", "feature_source_policy_sha", "quote_sync_policy_sha",
-            "entity_registry_sha", "benchmark_methodology_sha", "prior_decay_sha",
-            "model_artifact_sha", "calibrator_artifact_sha", "simulation_artifact_sha",
+            "validation_policy_sha", "feature_source_policy_sha", "entity_registry_sha",
+            "benchmark_methodology_sha", "prior_decay_sha", "model_artifact_sha",
+            "calibrator_artifact_sha", "simulation_artifact_sha",
         ):
             _sha(getattr(self, field), field)
         return self
