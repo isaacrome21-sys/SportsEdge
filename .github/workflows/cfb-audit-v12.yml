@@ -11,18 +11,22 @@ on:
       - "sportsedge/core/probability_contract.py"
       - "sportsedge/core/certification_lifecycle.py"
       - "sportsedge/core/decision_provenance.py"
+      - "sportsedge/core/manual_input_contract.py"
       - "sportsedge/mlb_evidence_invalidation.py"
       - "config/cfb_*.json"
       - "config/mlb_truth_gate_v1.json"
       - "config/mlb_market_benchmark_v1.json"
       - "config/mlb_validation_policy_v1.json"
       - "config/manual_hybrid_governance_v1.json"
+      - "config/manual_hybrid_evidence_gate_v1.json"
+      - "config/provider_degrade_matrix_v1.json"
       - "config/schemas/cfb_*.json"
       - "config/schemas/decision_provenance_v1.schema.json"
       - "tests/test_cfb_audit_v12.py"
       - "tests/test_cfb_audit_v12_residual.py"
       - "tests/test_cfb_run_machine_finish.py"
       - "tests/test_manual_hybrid_audit_governance.py"
+      - "tests/test_manual_input_contract.py"
       - ".github/workflows/cfb-audit-v12.yml"
   pull_request:
     branches: [main]
@@ -33,18 +37,22 @@ on:
       - "sportsedge/core/probability_contract.py"
       - "sportsedge/core/certification_lifecycle.py"
       - "sportsedge/core/decision_provenance.py"
+      - "sportsedge/core/manual_input_contract.py"
       - "sportsedge/mlb_evidence_invalidation.py"
       - "config/cfb_*.json"
       - "config/mlb_truth_gate_v1.json"
       - "config/mlb_market_benchmark_v1.json"
       - "config/mlb_validation_policy_v1.json"
       - "config/manual_hybrid_governance_v1.json"
+      - "config/manual_hybrid_evidence_gate_v1.json"
+      - "config/provider_degrade_matrix_v1.json"
       - "config/schemas/cfb_*.json"
       - "config/schemas/decision_provenance_v1.schema.json"
       - "tests/test_cfb_audit_v12.py"
       - "tests/test_cfb_audit_v12_residual.py"
       - "tests/test_cfb_run_machine_finish.py"
       - "tests/test_manual_hybrid_audit_governance.py"
+      - "tests/test_manual_input_contract.py"
       - ".github/workflows/cfb-audit-v12.yml"
   workflow_dispatch:
 
@@ -71,6 +79,7 @@ jobs:
           sportsedge/core/probability_contract.py
           sportsedge/core/certification_lifecycle.py
           sportsedge/core/decision_provenance.py
+          sportsedge/core/manual_input_contract.py
           sportsedge/mlb_evidence_invalidation.py
       - name: Run CFB audit acceptance tests
         run: python -m unittest tests.test_cfb_audit_v12 -v
@@ -78,5 +87,7 @@ jobs:
         run: python -m unittest tests.test_cfb_audit_v12_residual -v
       - name: Run Manual Hybrid governance tests
         run: python -m unittest tests.test_manual_hybrid_audit_governance -v
+      - name: Run Manual input contract tests
+        run: python -m unittest tests.test_manual_input_contract -v
       - name: Run existing CFB run-machine regression tests
         run: python -m unittest tests.test_cfb_run_machine_finish -v
