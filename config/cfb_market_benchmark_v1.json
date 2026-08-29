@@ -1,16 +1,26 @@
 {
   "benchmark_id": "CFB_MARKET_BENCHMARK_V1",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "sport": "CFB",
   "purpose": "Historical benchmark and CLV reference only; never a predictive Model_P input.",
   "predictive_model_input": false,
   "truth_gate_reference": true,
   "reference_space": "NO_VIG_PROBABILITY",
+  "quote_pairing": {
+    "canonical_spread_line": "HOME_TEAM_THRESHOLD_FOR_BOTH_SIDES",
+    "canonical_total_line": "TOTAL_THRESHOLD_FOR_BOTH_SIDES",
+    "moneyline_line": 0.0,
+    "max_pair_skew_seconds": 30,
+    "require_same_provider": true,
+    "require_same_book": true,
+    "require_exact_canonical_line": true
+  },
   "decision_reference": {
     "method": "BEST_AVAILABLE_PRIORITY_TIER_AT_OR_BEFORE_DECISION_TS",
     "require_two_sided_quote": true,
     "require_same_market_and_contract": true,
     "max_quote_age_seconds": 180,
+    "max_pair_skew_seconds": 30,
     "provider_priority_tiers": [
       ["PINNACLE", "CIRCA", "BOOKMAKER"],
       ["DRAFTKINGS", "FANDUEL", "BETMGM", "CAESARS"],
@@ -23,6 +33,7 @@
     "require_two_sided_quote": true,
     "require_same_original_contract": true,
     "max_seconds_before_game_start": 900,
+    "max_pair_skew_seconds": 30,
     "provider_priority_tiers": [
       ["PINNACLE", "CIRCA", "BOOKMAKER"],
       ["DRAFTKINGS", "FANDUEL", "BETMGM", "CAESARS"],
@@ -44,6 +55,7 @@
     "store_quote_ids_used": true,
     "store_provider_set_used": true,
     "store_fallback_reason": true,
+    "store_pair_skew_seconds": true,
     "post_hoc_provider_selection_forbidden": true
   }
 }
