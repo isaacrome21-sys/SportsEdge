@@ -1,0 +1,91 @@
+{
+  "policy_id": "SPORTSEDGE_MANUAL_HYBRID_GOVERNANCE_V1",
+  "version": "1.0.0",
+  "sports": ["CFB", "MLB"],
+  "canonical_sources": {
+    "CFB_TRUTH_GATE": "config/cfb_truth_gate_v1.json",
+    "CFB_VALIDATION": "config/cfb_validation_policy_v1.json",
+    "CFB_QUOTE_SYNC": "config/cfb_quote_sync_v1.json",
+    "CFB_BENCHMARK": "config/cfb_market_benchmark_v1.json",
+    "MLB_TRUTH_GATE": "config/mlb_truth_gate_v1.json",
+    "MLB_VALIDATION": "config/mlb_validation_policy_v1.json",
+    "MLB_BENCHMARK": "config/mlb_market_benchmark_v1.json"
+  },
+  "resolved_thresholds": {
+    "CFB": {
+      "live_edge_floor": 0.03,
+      "live_quote_max_age_seconds": 180,
+      "two_sided_pair_max_skew_seconds": 30,
+      "spread_key_number_absolute_mass_tolerance": 0.015,
+      "overall_ece_hard_max": 0.025,
+      "actionable_edge_ece_diagnostic_max": 0.035,
+      "actionable_edge_ece_status": "DIAGNOSTIC_ONLY_UNTIL_SEPARATELY_PROMOTED",
+      "notes": "The 0.025 overall ECE bound is the canonical hard gate. The previously discussed 0.035 actionable-edge ECE is retained as a segmented diagnostic and does not silently replace or weaken the hard gate."
+    },
+    "MLB": {
+      "live_edge_floor": 0.025,
+      "live_quote_max_age_seconds": 180,
+      "two_sided_pair_max_skew_seconds": 30,
+      "distribution_mass_absolute_tolerance": 0.015,
+      "overall_ece_hard_max": 0.025
+    }
+  },
+  "push_probability_basis": {
+    "push_capable_markets": "EDGE compares Model P(WIN|NON_PUSH) to paired sportsbook NoVig P(WIN|NON_PUSH).",
+    "model_nonpush_formula": "P_WIN / (1 - P_PUSH)",
+    "market_pair_interpretation": "Two-sided spread/total prices are treated as conditional on non-push for edge benchmarking.",
+    "ev_basis": "UNCONDITIONAL_P_WIN_P_PUSH_P_LOSS",
+    "silent_mixing_of_probability_bases_forbidden": true
+  },
+  "manual_hybrid_identity": {
+    "same_feature_schema_required": true,
+    "same_validators_required": true,
+    "same_model_artifacts_required": true,
+    "same_seed_policy_required": true,
+    "same_quotes_produce_same_math": true,
+    "allowed_differences": ["ACQUISITION_PROVENANCE", "MODE_LABEL"],
+    "mathematical_difference": "FAIL_CLOSED"
+  },
+  "decision_provenance_required": [
+    "MODEL_CODE_SHA",
+    "MODEL_ARTIFACT_SHA",
+    "FEATURE_SCHEMA_VERSION",
+    "FEATURE_SCHEMA_SHA",
+    "CALIBRATOR_SHA",
+    "SIMULATION_ARTIFACT_SHA",
+    "SEED_POLICY",
+    "POLICY_SHA",
+    "BENCHMARK_METHODOLOGY_SHA",
+    "EVIDENCE_GATE_SHA",
+    "DATA_CUTOFF",
+    "QUOTE_IDS"
+  ],
+  "structural_break_governance": {
+    "material_change_triggers": [
+      "SCORING_RULE_CHANGE",
+      "OVERTIME_FORMAT_CHANGE",
+      "ROSTER_ELIGIBILITY_OR_TRANSFER_REGIME_CHANGE",
+      "SCHEDULE_OR_SEASON_FORMAT_CHANGE",
+      "MARKET_SETTLEMENT_RULE_CHANGE",
+      "MATERIAL_DATA_DEFINITION_CHANGE"
+    ],
+    "material_change_action": "REVOKED",
+    "independent_of_rolling_statistics": true,
+    "automatic_repromotion_forbidden": true,
+    "repromotion_requires": [
+      "NEW_MODEL_OR_POLICY_ARTIFACT_VERSION",
+      "NEW_POLICY_BUNDLE_SHA",
+      "FULL_PIT_REPLAY_UNDER_NEW_REGIME_CONTRACT",
+      "ALL_SPORT_AND_MARKET_TRUTH_GATE_REQUIREMENTS",
+      "ALL_REQUIRED_ATTESTATIONS",
+      "NO_REUSE_OF_ROWS_DECLARED_INVALID_BY_STRUCTURAL_BREAK"
+    ]
+  },
+  "threshold_governance": {
+    "silent_migration_forbidden": true,
+    "change_requires_new_version_and_sha": true,
+    "final_holdout_may_not_tune_thresholds": true,
+    "threshold_freeze_must_precede_final_holdout_inspection": true
+  },
+  "notes": "This file resolves cross-document ambiguity without weakening sport-specific Truth Gates. Sport-specific machine-readable policies remain authoritative for their own gates."
+}
