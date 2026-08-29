@@ -1,6 +1,6 @@
 {
   "validation_policy_id": "CFB_VALIDATION_POLICY_V1",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "sport": "CFB",
   "main_markets": ["MONEYLINE", "SPREAD", "TOTAL"],
   "predictive_scoring_population": "ALL_PIT_SUPPORTABLE_NON_PUSH_ROWS",
@@ -23,12 +23,36 @@
     "required_per_outer_fold": true,
     "manual_probability_boosts_forbidden": true
   },
+  "probability_basis": {
+    "push_capable_edge_basis": "CONDITIONAL_ON_NON_PUSH",
+    "model_formula": "P_WIN/(1-P_PUSH)",
+    "market_formula": "PAIRED_NO_VIG_PROBABILITY_CONDITIONAL_ON_NON_PUSH",
+    "ev_basis": "UNCONDITIONAL_WIN_PUSH_LOSS",
+    "mixed_basis_forbidden": true
+  },
+  "monte_carlo_precision": {
+    "minimum_paths": 10000,
+    "max_standard_error_fraction_of_live_edge_floor": 0.20,
+    "increase_paths_until_precision_passes": true,
+    "store_seed_policy_and_path_count": true
+  },
+  "calibration": {
+    "overall_ece_hard_max": 0.025,
+    "actionable_edge_ece_diagnostic_max": 0.035,
+    "actionable_edge_ece_status": "DIAGNOSTIC_ONLY_UNTIL_SEPARATELY_PROMOTED",
+    "raw_and_calibrated_metrics_required": true
+  },
   "recent_two_season_deterioration": {
     "method_id": "CFB_RECENT_2SEASON_DETERIORATION_V1",
     "definition": "TRUE when, for either Brier or log loss, the model fails to beat the frozen no-vig benchmark in each of the two most recent completed outer seasons. One isolated weak season is reported but is not by itself a two-season deterioration.",
     "brier_failure": "brier_model >= brier_benchmark",
     "logloss_failure": "logloss_model >= logloss_benchmark",
     "requires_two_completed_outer_seasons": true
+  },
+  "structural_change": {
+    "material_change_revokes_independent_of_statistics": true,
+    "lifecycle_policy": "config/manual_hybrid_governance_v1.json",
+    "automatic_repromotion_forbidden": true
   },
   "segmented_reports": {
     "weeks": ["1", "2", "3", "4", "5_PLUS"],
@@ -52,11 +76,16 @@
     "OOF_RESIDUAL_FOLD_INTEGRITY",
     "KEY_NUMBER_CALIBRATION",
     "QUOTE_SYNC_POLICY",
+    "PROBABILITY_BASIS_PUSH_CONTRACT",
+    "MONTE_CARLO_PRECISION",
+    "DECISION_PROVENANCE",
+    "MANUAL_HYBRID_INPUT_CONTRACT",
     "MODE_IDENTITY",
     "GAME_COVERAGE_ACCOUNTING",
     "MARKET_COVERAGE_ACCOUNTING",
     "BENCHMARK_REPLAYABILITY",
     "HISTORICAL_DATA_READINESS",
-    "SHADOW_LIVE_FIREWALL"
+    "SHADOW_LIVE_FIREWALL",
+    "STRUCTURAL_CHANGE_CLEARANCE"
   ]
 }
