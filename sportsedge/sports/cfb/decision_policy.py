@@ -2,6 +2,11 @@
 
 Historical candidate formation cannot require prior certification; live execution must.
 This breaks circular promotion while preserving the frozen live edge semantics.
+
+The 3.0% CFB edge floor is a PER-CANDIDATE decision gate. Portfolio aggregation,
+parlay construction, correlation or exposure management cannot rescue an individual
+candidate whose edge is below the floor. Portfolio controls may only reduce or reject
+exposure after the candidate has independently qualified.
 """
 from __future__ import annotations
 
@@ -11,6 +16,10 @@ from math import isfinite
 
 class CFBDecisionPolicyError(ValueError):
     pass
+
+
+CFB_LIVE_EDGE_FLOOR = 0.03
+CFB_EDGE_FLOOR_SCOPE = "PER_CANDIDATE_DECISION"
 
 
 @dataclass(frozen=True)
@@ -43,9 +52,9 @@ def historical_candidate_policy(
     pit_ok: bool,
     coverage_ok: bool,
     policy_sha_ok: bool,
-    min_edge: float = 0.03,
+    min_edge: float = CFB_LIVE_EDGE_FLOOR,
 ) -> CFBPolicyDecision:
-    """Frozen selection policy used to construct the historical promotion sample."""
+    """Frozen PER-CANDIDATE selection policy for the historical promotion sample."""
 
     flags = (quote_fresh, two_sided, data_quality_ok, pit_ok, coverage_ok, policy_sha_ok)
     if any(type(x) is not bool for x in flags):
@@ -60,7 +69,7 @@ def historical_candidate_policy(
     if not quote_fresh or not two_sided:
         return CFBPolicyDecision("BLOCKED", "HISTORICAL_PRICE_GATE")
     if e < floor or ev <= 0.0:
-        return CFBPolicyDecision("NO_BET", "EDGE_OR_EV_BELOW_POLICY")
+        return CFBPolicyDecision("NO_BET", "EDGE_OR_EV_BELOW_PER_CANDIDATE_POLICY")
     return CFBPolicyDecision("SHADOW_QUALIFIED", "HISTORICAL_CANDIDATE_QUALIFIED")
 
 
@@ -76,9 +85,9 @@ def live_candidate_decision(
     override_log_complete: bool,
     policy_sha_ok: bool,
     historical_status: str,
-    min_edge: float = 0.03,
+    min_edge: float = CFB_LIVE_EDGE_FLOOR,
 ) -> CFBPolicyDecision:
-    """Live policy: historical certification is an additional hard prerequisite."""
+    """Live PER-CANDIDATE policy; historical certification is an additional prerequisite."""
 
     flags = (
         quote_fresh, two_sided, exposure_ok, data_quality_ok, coverage_ok,
@@ -96,5 +105,5 @@ def live_candidate_decision(
     if not quote_fresh or not two_sided or not exposure_ok:
         return CFBPolicyDecision("BLOCKED", "LIVE_EXECUTION_GATE")
     if e < floor or ev <= 0.0:
-        return CFBPolicyDecision("NO_BET", "EDGE_OR_EV_BELOW_POLICY")
+        return CFBPolicyDecision("NO_BET", "EDGE_OR_EV_BELOW_PER_CANDIDATE_POLICY")
     return CFBPolicyDecision("OFFICIAL_BET", "LIVE_CANDIDATE_QUALIFIED")
