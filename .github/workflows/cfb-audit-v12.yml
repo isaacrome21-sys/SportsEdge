@@ -1,4 +1,4 @@
-name: cfb-audit-v1.2
+name: cfb-mlb-manual-hybrid-audit-v1
 
 on:
   push:
@@ -14,6 +14,8 @@ on:
       - "sportsedge/core/manual_input_contract.py"
       - "sportsedge/core/policy_bundle.py"
       - "sportsedge/mlb_evidence_invalidation.py"
+      - "sportsedge/mlb_distribution_validation.py"
+      - "sportsedge/mlb_truth_gate_v1.py"
       - "config/cfb_*.json"
       - "config/mlb_truth_gate_v1.json"
       - "config/mlb_market_benchmark_v1.json"
@@ -30,6 +32,8 @@ on:
       - "tests/test_manual_hybrid_audit_governance.py"
       - "tests/test_manual_input_contract.py"
       - "tests/test_policy_bundle.py"
+      - "tests/test_mlb_distribution_validation.py"
+      - "tests/test_mlb_truth_gate_v1.py"
       - ".github/workflows/cfb-audit-v12.yml"
   pull_request:
     branches: [main]
@@ -43,6 +47,8 @@ on:
       - "sportsedge/core/manual_input_contract.py"
       - "sportsedge/core/policy_bundle.py"
       - "sportsedge/mlb_evidence_invalidation.py"
+      - "sportsedge/mlb_distribution_validation.py"
+      - "sportsedge/mlb_truth_gate_v1.py"
       - "config/cfb_*.json"
       - "config/mlb_truth_gate_v1.json"
       - "config/mlb_market_benchmark_v1.json"
@@ -59,6 +65,8 @@ on:
       - "tests/test_manual_hybrid_audit_governance.py"
       - "tests/test_manual_input_contract.py"
       - "tests/test_policy_bundle.py"
+      - "tests/test_mlb_distribution_validation.py"
+      - "tests/test_mlb_truth_gate_v1.py"
       - ".github/workflows/cfb-audit-v12.yml"
   workflow_dispatch:
 
@@ -66,7 +74,7 @@ permissions:
   contents: read
 
 jobs:
-  cfb-audit-contracts:
+  manual-hybrid-audit-contracts:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -88,6 +96,8 @@ jobs:
           sportsedge/core/manual_input_contract.py
           sportsedge/core/policy_bundle.py
           sportsedge/mlb_evidence_invalidation.py
+          sportsedge/mlb_distribution_validation.py
+          sportsedge/mlb_truth_gate_v1.py
       - name: Run CFB audit acceptance tests
         run: python -m unittest tests.test_cfb_audit_v12 -v
       - name: Run CFB residual-risk acceptance tests
@@ -98,5 +108,9 @@ jobs:
         run: python -m unittest tests.test_manual_input_contract -v
       - name: Run policy bundle tests
         run: python -m unittest tests.test_policy_bundle -v
+      - name: Run MLB distribution validation tests
+        run: python -m unittest tests.test_mlb_distribution_validation -v
+      - name: Run MLB Truth Gate tests
+        run: python -m unittest tests.test_mlb_truth_gate_v1 -v
       - name: Run existing CFB run-machine regression tests
         run: python -m unittest tests.test_cfb_run_machine_finish -v
