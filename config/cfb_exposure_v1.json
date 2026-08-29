@@ -1,0 +1,21 @@
+{
+  "exposure_policy_id": "CFB_EXPOSURE_V1",
+  "version": "1.0.0",
+  "sport": "CFB",
+  "kelly": {
+    "enabled_only_after_calibration_certified": true,
+    "fractional_multiplier": 0.25,
+    "max_single_bet_bankroll_fraction": 0.01
+  },
+  "caps": {
+    "max_market_bankroll_fraction": 0.02,
+    "max_game_bankroll_fraction": 0.025,
+    "max_slate_bankroll_fraction": 0.08
+  },
+  "correlation": {
+    "require_joint_exposure_check": true,
+    "public_or_sharp_context_may_increase_size": false
+  },
+  "fail_closed": true,
+  "notes": "Starting governance values. Changing exposure values requires a new exposure policy version/SHA and does not alter CFB_TRUTH_GATE_V1 certification thresholds."
+}
