@@ -12,7 +12,7 @@
     "book", "price", "quote_timestamp", "decision_timestamp", "model_p", "no_vig_market_p",
     "edge", "ev", "kelly", "historical_gate_status", "live_decision", "spec_sha", "policy_sha",
     "benchmark_methodology_sha", "exposure_sha", "market_context_sha", "feature_source_policy_sha",
-    "entity_registry_sha", "validation_attestation_sha"
+    "quote_sync_policy_sha", "model_promotion_policy_sha", "entity_registry_sha", "validation_attestation_sha"
   ],
   "properties": {
     "sport": {"const": "CFB"},
@@ -51,6 +51,8 @@
     "exposure_sha": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
     "market_context_sha": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
     "feature_source_policy_sha": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+    "quote_sync_policy_sha": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+    "model_promotion_policy_sha": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
     "entity_registry_sha": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
     "validation_attestation_sha": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
     "override_id": {"type": ["string", "null"]}
