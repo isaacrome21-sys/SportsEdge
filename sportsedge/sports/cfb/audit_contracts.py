@@ -271,6 +271,8 @@ class CFBAuditManifest:
     exposure_sha: str
     market_context_sha: str
     feature_source_policy_sha: str
+    quote_sync_policy_sha: str
+    model_promotion_policy_sha: str
     entity_registry_sha: str
     validation_attestation_sha: str
     override_id: str | None = None
@@ -298,8 +300,9 @@ class CFBAuditManifest:
             _finite(self.line, "line")
         sha_fields = (
             "spec_sha", "policy_sha", "benchmark_methodology_sha", "exposure_sha",
-            "market_context_sha", "feature_source_policy_sha", "entity_registry_sha",
-            "validation_attestation_sha", "decay_schedule_hash",
+            "market_context_sha", "feature_source_policy_sha", "quote_sync_policy_sha",
+            "model_promotion_policy_sha", "entity_registry_sha", "validation_attestation_sha",
+            "decay_schedule_hash",
         )
         for field in sha_fields:
             _sha256(getattr(self, field), field)
