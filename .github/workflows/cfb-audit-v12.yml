@@ -14,6 +14,8 @@ on:
       - "sportsedge/core/manual_input_contract.py"
       - "sportsedge/core/policy_bundle.py"
       - "sportsedge/core/promotion_record.py"
+      - "sportsedge/devig.py"
+      - "sportsedge/generic_card_pipeline.py"
       - "sportsedge/mlb_evidence_invalidation.py"
       - "sportsedge/mlb_distribution_validation.py"
       - "sportsedge/mlb_truth_gate_v1.py"
@@ -24,6 +26,7 @@ on:
       - "config/mlb_validation_policy_v1.json"
       - "config/manual_hybrid_governance_v1.json"
       - "config/manual_hybrid_evidence_gate_v1.json"
+      - "config/manual_hybrid_policy_freeze_v1.json"
       - "config/provider_degrade_matrix_v1.json"
       - "config/schemas/cfb_*.json"
       - "config/schemas/decision_provenance_v1.schema.json"
@@ -31,6 +34,7 @@ on:
       - "tests/test_cfb_audit_v12.py"
       - "tests/test_cfb_audit_v12_residual.py"
       - "tests/test_cfb_run_machine_finish.py"
+      - "tests/test_cfb_audit_manifest_provenance.py"
       - "tests/test_manual_hybrid_audit_governance.py"
       - "tests/test_manual_input_contract.py"
       - "tests/test_policy_bundle.py"
@@ -38,6 +42,7 @@ on:
       - "tests/test_mlb_distribution_validation.py"
       - "tests/test_mlb_truth_gate_v1.py"
       - "tests/test_mlb_coverage.py"
+      - "tests/test_devig_temporal_pair.py"
       - ".github/workflows/cfb-audit-v12.yml"
   pull_request:
     branches: [main]
@@ -51,6 +56,8 @@ on:
       - "sportsedge/core/manual_input_contract.py"
       - "sportsedge/core/policy_bundle.py"
       - "sportsedge/core/promotion_record.py"
+      - "sportsedge/devig.py"
+      - "sportsedge/generic_card_pipeline.py"
       - "sportsedge/mlb_evidence_invalidation.py"
       - "sportsedge/mlb_distribution_validation.py"
       - "sportsedge/mlb_truth_gate_v1.py"
@@ -61,6 +68,7 @@ on:
       - "config/mlb_validation_policy_v1.json"
       - "config/manual_hybrid_governance_v1.json"
       - "config/manual_hybrid_evidence_gate_v1.json"
+      - "config/manual_hybrid_policy_freeze_v1.json"
       - "config/provider_degrade_matrix_v1.json"
       - "config/schemas/cfb_*.json"
       - "config/schemas/decision_provenance_v1.schema.json"
@@ -68,6 +76,7 @@ on:
       - "tests/test_cfb_audit_v12.py"
       - "tests/test_cfb_audit_v12_residual.py"
       - "tests/test_cfb_run_machine_finish.py"
+      - "tests/test_cfb_audit_manifest_provenance.py"
       - "tests/test_manual_hybrid_audit_governance.py"
       - "tests/test_manual_input_contract.py"
       - "tests/test_policy_bundle.py"
@@ -75,6 +84,7 @@ on:
       - "tests/test_mlb_distribution_validation.py"
       - "tests/test_mlb_truth_gate_v1.py"
       - "tests/test_mlb_coverage.py"
+      - "tests/test_devig_temporal_pair.py"
       - ".github/workflows/cfb-audit-v12.yml"
   workflow_dispatch:
 
@@ -104,6 +114,8 @@ jobs:
           sportsedge/core/manual_input_contract.py
           sportsedge/core/policy_bundle.py
           sportsedge/core/promotion_record.py
+          sportsedge/devig.py
+          sportsedge/generic_card_pipeline.py
           sportsedge/mlb_evidence_invalidation.py
           sportsedge/mlb_distribution_validation.py
           sportsedge/mlb_truth_gate_v1.py
@@ -112,6 +124,8 @@ jobs:
         run: python -m unittest tests.test_cfb_audit_v12 -v
       - name: Run CFB residual-risk acceptance tests
         run: python -m unittest tests.test_cfb_audit_v12_residual -v
+      - name: Run CFB manifest provenance tests
+        run: python -m unittest tests.test_cfb_audit_manifest_provenance -v
       - name: Run Manual Hybrid governance tests
         run: python -m unittest tests.test_manual_hybrid_audit_governance -v
       - name: Run Manual input contract tests
@@ -120,6 +134,8 @@ jobs:
         run: python -m unittest tests.test_policy_bundle -v
       - name: Run promotion record tests
         run: python -m unittest tests.test_promotion_record -v
+      - name: Run temporal devig pair tests
+        run: python -m unittest tests.test_devig_temporal_pair -v
       - name: Run MLB distribution validation tests
         run: python -m unittest tests.test_mlb_distribution_validation -v
       - name: Run MLB Truth Gate tests
