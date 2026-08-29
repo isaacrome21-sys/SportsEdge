@@ -1,6 +1,8 @@
 """Versioned authoritative CFB entity registry.
 
 Provider aliases never become canonical IDs by inference. Ambiguity fails closed.
+FBS/FCS classification is season-scoped because teams can change divisions; a timeless
+classification on the entity would silently mislabel historical games.
 """
 from __future__ import annotations
 
@@ -22,16 +24,42 @@ def _norm(value: Any) -> str:
 class CFBEntity:
     sportsedge_team_id: str
     canonical_name: str
-    classification: str
     aliases: tuple[str, ...]
-    conference: str | None = None
+    classification_by_season: tuple[tuple[int, str], ...]
+    conference_by_season: tuple[tuple[int, str | None], ...] = ()
 
     def validate(self) -> "CFBEntity":
         if not self.sportsedge_team_id or not self.canonical_name:
             raise CFBEntityResolutionError("ENTITY_IDENTITY_REQUIRED")
-        if self.classification not in {"FBS", "FCS"}:
-            raise CFBEntityResolutionError("ENTITY_CLASSIFICATION_INVALID")
+        seasons: set[int] = set()
+        for season, classification in self.classification_by_season:
+            year = int(season)
+            value = str(classification).upper()
+            if year in seasons:
+                raise CFBEntityResolutionError("ENTITY_CLASSIFICATION_SEASON_DUPLICATE")
+            seasons.add(year)
+            if value not in {"FBS", "FCS"}:
+                raise CFBEntityResolutionError("ENTITY_CLASSIFICATION_INVALID")
+        if not seasons:
+            raise CFBEntityResolutionError("ENTITY_CLASSIFICATION_HISTORY_REQUIRED")
+        conference_seasons = [int(season) for season, _ in self.conference_by_season]
+        if len(conference_seasons) != len(set(conference_seasons)):
+            raise CFBEntityResolutionError("ENTITY_CONFERENCE_SEASON_DUPLICATE")
         return self
+
+    def classification_for(self, season: int) -> str:
+        target = int(season)
+        for year, value in self.classification_by_season:
+            if int(year) == target:
+                return str(value).upper()
+        raise CFBEntityResolutionError(f"ENTITY_CLASSIFICATION_MISSING:{self.sportsedge_team_id}:{target}")
+
+    def conference_for(self, season: int) -> str | None:
+        target = int(season)
+        for year, value in self.conference_by_season:
+            if int(year) == target:
+                return None if value is None else str(value)
+        return None
 
 
 class CFBEntityRegistry:
@@ -68,9 +96,12 @@ class CFBEntityRegistry:
             raise CFBEntityResolutionError(f"BLOCKED_ENTITY_RESOLUTION:{provider_name}")
         return self._rows[team_id]
 
-    def classify_matchup(self, home: str, away: str) -> str:
-        h = self.resolve(home).classification
-        a = self.resolve(away).classification
+    def resolve_id(self, provider_name: str) -> str:
+        return self.resolve(provider_name).sportsedge_team_id
+
+    def classify_matchup(self, home: str, away: str, *, season: int) -> str:
+        h = self.resolve(home).classification_for(season)
+        a = self.resolve(away).classification_for(season)
         if h == "FBS" and a == "FBS":
             return "FBS_FBS"
         if h == "FCS" and a == "FCS":
@@ -79,7 +110,7 @@ class CFBEntityRegistry:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "contract": "CFB_ENTITY_REGISTRY_V1",
+            "contract": "CFB_ENTITY_REGISTRY_V2",
             "version": self.version,
             "entities": [asdict(self._rows[key]) for key in sorted(self._rows)],
         }
@@ -90,17 +121,22 @@ class CFBEntityRegistry:
 
     @classmethod
     def from_mapping(cls, payload: Mapping[str, Any]) -> "CFBEntityRegistry":
-        if str(payload.get("contract") or "") != "CFB_ENTITY_REGISTRY_V1":
+        if str(payload.get("contract") or "") != "CFB_ENTITY_REGISTRY_V2":
             raise CFBEntityResolutionError("ENTITY_REGISTRY_CONTRACT_INVALID")
         rows = []
         for row in payload.get("entities") or []:
             if not isinstance(row, Mapping):
                 raise CFBEntityResolutionError("ENTITY_ROW_MAPPING_REQUIRED")
+            classes = tuple((int(x[0]), str(x[1]).upper()) for x in (row.get("classification_by_season") or []))
+            conferences = tuple(
+                (int(x[0]), None if x[1] is None else str(x[1]))
+                for x in (row.get("conference_by_season") or [])
+            )
             rows.append(CFBEntity(
                 sportsedge_team_id=str(row.get("sportsedge_team_id") or ""),
                 canonical_name=str(row.get("canonical_name") or ""),
-                classification=str(row.get("classification") or "").upper(),
                 aliases=tuple(str(x) for x in (row.get("aliases") or [])),
-                conference=str(row.get("conference") or "").strip() or None,
+                classification_by_season=classes,
+                conference_by_season=conferences,
             ))
         return cls(version=str(payload.get("version") or ""), entities=rows)
