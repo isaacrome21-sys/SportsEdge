@@ -1,7 +1,8 @@
 {
   "policy_id": "SPORTSEDGE_MANUAL_HYBRID_GOVERNANCE_V1",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "sports": ["CFB", "MLB"],
+  "canonical_document": "docs/SPORTSEDGE_MANUAL_HYBRID_AUDIT_CANONICAL_V1.md",
   "canonical_sources": {
     "CFB_TRUTH_GATE": "config/cfb_truth_gate_v1.json",
     "CFB_VALIDATION": "config/cfb_validation_policy_v1.json",
@@ -9,7 +10,10 @@
     "CFB_BENCHMARK": "config/cfb_market_benchmark_v1.json",
     "MLB_TRUTH_GATE": "config/mlb_truth_gate_v1.json",
     "MLB_VALIDATION": "config/mlb_validation_policy_v1.json",
-    "MLB_BENCHMARK": "config/mlb_market_benchmark_v1.json"
+    "MLB_BENCHMARK": "config/mlb_market_benchmark_v1.json",
+    "MANUAL_HYBRID_EVIDENCE_GATE": "config/manual_hybrid_evidence_gate_v1.json",
+    "PROVIDER_DEGRADE_MATRIX": "config/provider_degrade_matrix_v1.json",
+    "DECISION_PROVENANCE_SCHEMA": "config/schemas/decision_provenance_v1.schema.json"
   },
   "resolved_thresholds": {
     "CFB": {
@@ -36,6 +40,12 @@
     "market_pair_interpretation": "Two-sided spread/total prices are treated as conditional on non-push for edge benchmarking.",
     "ev_basis": "UNCONDITIONAL_P_WIN_P_PUSH_P_LOSS",
     "silent_mixing_of_probability_bases_forbidden": true
+  },
+  "monte_carlo_precision": {
+    "minimum_paths": 10000,
+    "max_standard_error_fraction_of_live_edge_floor": 0.20,
+    "increase_paths_until_precision_passes": true,
+    "seed_and_path_count_must_be_logged": true
   },
   "manual_hybrid_identity": {
     "same_feature_schema_required": true,
