@@ -275,6 +275,7 @@ class CFBAuditManifest:
     model_promotion_policy_sha: str
     entity_registry_sha: str
     validation_attestation_sha: str
+    decision_provenance_sha: str
     override_id: str | None = None
 
     def validate(self) -> "CFBAuditManifest":
@@ -302,7 +303,7 @@ class CFBAuditManifest:
             "spec_sha", "policy_sha", "benchmark_methodology_sha", "exposure_sha",
             "market_context_sha", "feature_source_policy_sha", "quote_sync_policy_sha",
             "model_promotion_policy_sha", "entity_registry_sha", "validation_attestation_sha",
-            "decay_schedule_hash",
+            "decision_provenance_sha", "decay_schedule_hash",
         )
         for field in sha_fields:
             _sha256(getattr(self, field), field)
