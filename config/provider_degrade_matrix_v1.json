@@ -1,0 +1,46 @@
+{
+  "policy_id": "SPORTSEDGE_PROVIDER_DEGRADE_MATRIX_V1",
+  "version": "1.0.0",
+  "sports": ["CFB", "MLB"],
+  "rules": [
+    {
+      "dependency": "PREDICTIVE_FEATURE_REQUIRED",
+      "failure": "MISSING_STALE_CONFLICTED_OR_UNVERSIONED",
+      "action": "BLOCK_AFFECTED_MODEL_OR_MARKET",
+      "fallback": "ONLY_IF_EXPLICITLY_DEFINED_BY_HASHED_FEATURE_POLICY"
+    },
+    {
+      "dependency": "PRIMARY_EXECUTABLE_ODDS_PROVIDER",
+      "failure": "UNAVAILABLE",
+      "action": "TRY_NEXT_CONFIGURED_EXECUTABLE_PROVIDER",
+      "fallback_requirement": "FRESH_EXACT_CONTRACT_SYNCHRONIZED_TWO_SIDED_PAIR",
+      "otherwise": "BLOCK_AFFECTED_MARKET"
+    },
+    {
+      "dependency": "SHARP_BENCHMARK_PROVIDER",
+      "failure": "UNAVAILABLE",
+      "action": "TRY_NEXT_FROZEN_BENCHMARK_TIER",
+      "otherwise": "BENCHMARK_UNAVAILABLE_AND_CERTIFICATION_ROW_INELIGIBLE"
+    },
+    {
+      "dependency": "PUBLIC_MARKET_CONTEXT_PROVIDER",
+      "failure": "UNAVAILABLE",
+      "action": "DEGRADED_CONTEXT_ONLY",
+      "model_p_affected": false,
+      "truth_gate_affected": false
+    },
+    {
+      "dependency": "OPTIONAL_NARRATIVE_CONTEXT",
+      "failure": "UNAVAILABLE",
+      "action": "NO_CONTEXT",
+      "model_p_affected": false,
+      "truth_gate_affected": false
+    }
+  ],
+  "global": {
+    "silent_provider_drop_forbidden": true,
+    "provider_health_state_logged": true,
+    "coverage_report_required": true,
+    "degraded_state_must_name_missing_dependency": true
+  }
+}
