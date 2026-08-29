@@ -2,9 +2,8 @@
 
 This is intentionally separate from CFB_TRUTH_GATE_V1. It does not weaken or silently
 change the frozen numerical gate. Instead, it proves that the evidence being handed to
-the gate was generated under the required PIT, calibration, benchmark and coverage
-contracts. Quote-sync policy identity is carried by the prediction policy bundle while
-this fold artifact attests that the quote-sync check actually passed.
+the gate was generated under the required PIT, calibration, benchmark, provenance,
+structural-change and coverage contracts.
 """
 from __future__ import annotations
 
@@ -14,7 +13,7 @@ import json
 from typing import Any, Mapping
 
 
-ATTESTATION_ID = "CFB_VALIDATION_ATTESTATION_V1_1"
+ATTESTATION_ID = "CFB_VALIDATION_ATTESTATION_V1_2"
 REQUIRED_CHECKS = (
     "pit_leakage",
     "market_blind_feature_scan",
@@ -25,12 +24,17 @@ REQUIRED_CHECKS = (
     "oof_residual_fold_integrity",
     "key_number_calibration",
     "quote_sync_policy",
+    "probability_basis_push_contract",
+    "monte_carlo_precision",
+    "decision_provenance",
+    "manual_hybrid_input_contract",
     "mode_identity",
     "game_coverage_accounting",
     "market_coverage_accounting",
     "benchmark_replayability",
     "historical_data_readiness",
     "shadow_live_firewall",
+    "structural_change_clearance",
 )
 
 
