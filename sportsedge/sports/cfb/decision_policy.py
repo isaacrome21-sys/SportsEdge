@@ -69,7 +69,7 @@ def historical_candidate_policy(
     if not quote_fresh or not two_sided:
         return CFBPolicyDecision("BLOCKED", "HISTORICAL_PRICE_GATE")
     if e < floor or ev <= 0.0:
-        return CFBPolicyDecision("NO_BET", "EDGE_OR_EV_BELOW_PER_CANDIDATE_POLICY")
+        return CFBPolicyDecision("NO_BET", "EDGE_OR_EV_BELOW_POLICY")
     return CFBPolicyDecision("SHADOW_QUALIFIED", "HISTORICAL_CANDIDATE_QUALIFIED")
 
 
@@ -105,5 +105,5 @@ def live_candidate_decision(
     if not quote_fresh or not two_sided or not exposure_ok:
         return CFBPolicyDecision("BLOCKED", "LIVE_EXECUTION_GATE")
     if e < floor or ev <= 0.0:
-        return CFBPolicyDecision("NO_BET", "EDGE_OR_EV_BELOW_PER_CANDIDATE_POLICY")
+        return CFBPolicyDecision("NO_BET", "EDGE_OR_EV_BELOW_POLICY")
     return CFBPolicyDecision("OFFICIAL_BET", "LIVE_CANDIDATE_QUALIFIED")
