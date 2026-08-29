@@ -78,6 +78,15 @@ class CFBMachineReport:
         return asdict(self)
 
 
+def expected_games_from_schedule(games: Sequence[CFBGame]) -> list[dict[str, str]]:
+    """Build the governed-run board contract directly from canonical schedule rows."""
+
+    return [
+        {"game_id": game.game_id, "classification": game.matchup_classification()}
+        for game in games
+    ]
+
+
 def _aware(value: datetime, name: str) -> datetime:
     if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
         raise CFBRunMachineError(f"{name} timezone required")
@@ -164,7 +173,8 @@ def _game_row(game: CFBGame, metrics: Mapping[str, CFBTeamMetrics]) -> dict[str,
     if not isinstance(game.weather, Mapping):
         raise CFBRunMachineError(f"CFB_WEATHER_MISSING:{game.game_id}")
     return {"game_id": game.game_id, "season": game.season, "week": game.week, "neutral_site": game.neutral_site,
-            "home_metrics": home.to_dict(), "away_metrics": away.to_dict(), "weather": dict(game.weather)}
+            "home_metrics": home.to_dict(), "away_metrics": away.to_dict(), "weather": dict(game.weather),
+            "classification": game.matchup_classification()}
 
 
 def _readout_probability(readouts: Mapping[str, Any], market: str, side: str) -> tuple[float, float]:
@@ -261,8 +271,9 @@ def run_cfb_machine(*, mode: str = "AUTO_SELECT", season: int, week: int, model:
                               quotes=list(quotes), root_seed=root_seed, n_paths=n_paths, quote_ttl_seconds=quote_ttl_seconds)
     key = str(cfbd_api_key or "").strip()
     if not key: raise CFBRunMachineError("CFBD_API_KEY_REQUIRED")
-    team_rows = team_fetcher(season=season, cfbd_api_key=key, opener=opener); alias_index = build_team_alias_index(team_rows)
+    team_rows = team_fetcher(season=season, cfbd_api_key=key, opener=opener)
     fetched_games = game_fetcher(season=season, week=week, cfbd_api_key=key, opener=opener)
+    alias_index = build_team_alias_index(team_rows, games=fetched_games)
     fetched_games = attach_weather(fetched_games, weather_fetcher(season=season, week=week, cfbd_api_key=key, opener=opener))
     fetched_metrics = metric_fetcher(season=season, week=week, cfbd_api_key=key, now=current, opener=opener)
     if selected == "HYBRID":
