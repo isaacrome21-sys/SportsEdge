@@ -1,0 +1,35 @@
+{
+  "policy_id": "CFB_QUOTE_SYNC_V1",
+  "version": "1.0.0",
+  "sport": "CFB",
+  "applies_to": ["MONEYLINE", "SPREAD", "TOTAL"],
+  "live": {
+    "max_quote_age_seconds": 180,
+    "max_pair_timestamp_skew_seconds": 30,
+    "future_quotes_forbidden": true,
+    "require_same_book": true,
+    "require_same_market": true,
+    "require_same_period": true,
+    "require_same_contract_line": true,
+    "require_complementary_sides": true,
+    "invalidate_both_sides_if_either_side_fails": true
+  },
+  "historical_decision_reference": {
+    "max_quote_age_seconds": 180,
+    "require_two_sided": true,
+    "require_exact_original_contract": true
+  },
+  "closing_reference": {
+    "max_seconds_before_game_start": 900,
+    "require_two_sided": true,
+    "require_exact_original_contract_or_frozen_repricing": true
+  },
+  "failure_semantics": {
+    "pair_skew": "BLOCKED",
+    "stale": "BLOCKED",
+    "future_timestamp": "BLOCKED",
+    "one_sided": "BLOCKED",
+    "contract_mismatch": "BLOCKED"
+  },
+  "notes": "Quote synchronization is downstream of Model_P. Changing this policy requires a new version/hash and historical/live replay where affected."
+}
