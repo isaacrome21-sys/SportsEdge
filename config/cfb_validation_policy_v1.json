@@ -1,6 +1,6 @@
 {
   "validation_policy_id": "CFB_VALIDATION_POLICY_V1",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "sport": "CFB",
   "main_markets": ["MONEYLINE", "SPREAD", "TOTAL"],
   "predictive_scoring_population": "ALL_PIT_SUPPORTABLE_NON_PUSH_ROWS",
@@ -15,6 +15,14 @@
     "calibration_requires_inner_oof_predictions": true,
     "residual_distribution_requires_inner_oof_predictions": true,
     "minimum_forward_seasons_for_truth_gate": 4
+  },
+  "prior_ablation": {
+    "required": true,
+    "population": "SAME_OUTER_FOLD_PIT_ROWS",
+    "compare": ["WITH_FROZEN_PRIOR", "NO_PRIOR"],
+    "metrics": ["BRIER", "LOGLOSS", "CLV", "ROI"],
+    "report_by_week": [1, 2, 3, 4],
+    "held_out_test_season_may_not_choose_prior_decay": true
   },
   "key_number_calibration": {
     "markets": ["SPREAD"],
@@ -71,6 +79,7 @@
     "MARKET_BLIND_FEATURE_SCAN",
     "ENTITY_REGISTRY",
     "PRIOR_DECAY_FOLD_INTEGRITY",
+    "PRIOR_ABLATION",
     "OPPONENT_ADJUST_FOLD_INTEGRITY",
     "CALIBRATION_FOLD_INTEGRITY",
     "OOF_RESIDUAL_FOLD_INTEGRITY",
