@@ -1,0 +1,43 @@
+{
+  "policy_id": "CFB_FEATURE_SOURCE_POLICY_V1",
+  "version": "1.0.0",
+  "sport": "CFB",
+  "principle": "Only point-in-time reproducible information may enter certifiable Model_P features.",
+  "requirements": {
+    "source_asof_ts": true,
+    "feature_asof_ts": true,
+    "ingested_ts": true,
+    "source_version": true,
+    "provenance_id": true,
+    "max_latency_seconds": true,
+    "feature_asof_strictly_before_kick": true
+  },
+  "source_rules": {
+    "CFBD_RAW_GAMES_PLAYS_ADVANCED": {
+      "allowed": true,
+      "condition": "The query/window must end strictly before the target game and the raw/cache artifact must be retained."
+    },
+    "CFBD_SP_PLUS": {
+      "allowed": true,
+      "condition": "Use only a prior-season value as a preseason prior unless an immutable historical PIT snapshot proves the exact in-season value was available then."
+    },
+    "CFBD_CORE": {
+      "allowed": false,
+      "condition": "Historical retrospective CORE results are not certification-grade PIT inputs unless SportsEdge previously archived the exact live snapshot/modelVersion at the relevant as-of time."
+    },
+    "FPI_OR_EXTERNAL_RATINGS": {
+      "allowed": false,
+      "condition": "Blocked from certification unless the exact historical PIT snapshot, source methodology/version and timestamp are archived."
+    },
+    "RETURNING_PRODUCTION_TALENT_PORTAL_QB_COACHING": {
+      "allowed": true,
+      "condition": "Each value must come from an approved, versioned PIT provider or a logged Manual/Hybrid source artifact. Missing values fail closed for feature contracts that require them."
+    },
+    "PUBLIC_BETTING_OR_MARKET_DATA": {
+      "allowed": false,
+      "condition": "Market context only. Never a predictive Model_P feature or Truth Gate certification feature."
+    }
+  },
+  "missing_required_feature_behavior": "BLOCKED_DATA_QUALITY",
+  "silent_imputation_for_certification": false
+}
