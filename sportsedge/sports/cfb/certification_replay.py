@@ -186,7 +186,7 @@ class CFBCertificationReplay:
 def _season_metrics(rows: list[CFBReplayRow]) -> tuple[CFBSeasonMetric, ...]:
     out: list[CFBSeasonMetric] = []
     for season in sorted({row.season for row in rows}):
-        sr = [row for row in rows if row.binary_outcome is not None]
+        sr = [row for row in rows if row.season == season and row.binary_outcome is not None]
         if not sr:
             raise CFBCertificationReplayError(f"REPLAY_SEASON_NO_NONPUSH_ROWS:{season}")
         outcomes = [int(row.binary_outcome) for row in sr]
@@ -204,12 +204,7 @@ def _season_metrics(rows: list[CFBReplayRow]) -> tuple[CFBSeasonMetric, ...]:
 
 
 def recent_two_season_deterioration(metrics: tuple[CFBSeasonMetric, ...]) -> bool:
-    """CFB_RECENT_2SEASON_DETERIORATION_V1.
-
-    True when either primary probability score fails to beat the frozen benchmark in
-    BOTH of the two most recent completed outer seasons. One isolated weak season is
-    reported but does not satisfy the two-season deterioration definition.
-    """
+    """CFB_RECENT_2SEASON_DETERIORATION_V1."""
 
     if len(metrics) < 2:
         raise CFBCertificationReplayError("RECENT_2SEASON_METRICS_REQUIRED")
@@ -223,8 +218,6 @@ def _clv_tstat(values: list[float]) -> float:
     if len(values) < 2:
         return 0.0
     sd = stdev(values)
-    # A zero-variance CLV sample does not get an artificial infinite t-stat. Treat it
-    # conservatively as unproven rather than allowing a degenerate sample to certify.
     if sd <= 1e-15:
         return 0.0
     return mean(values) / (sd / sqrt(len(values)))
@@ -277,7 +270,6 @@ def replay_cfb_truth_gate(
 
     season_metrics = _season_metrics(supportable)
     deterioration = recent_two_season_deterioration(season_metrics)
-    used_rows = list({id(row): row for row in [*supportable, *candidates]}.values())
     evidence = CFBTruthGateEvidence(
         market=target,
         forward_seasons=len(seasons),
@@ -295,9 +287,9 @@ def replay_cfb_truth_gate(
         recent_2season_deterioration=deterioration,
         leakage_violations=int(leakage_violations),
         paired_historical_prices_present=paired_prices,
-        pit_reproducible=all(row.pit_reproducible for row in used_rows),
-        policy_sha_valid=all(row.policy_sha_valid for row in used_rows),
-        benchmark_methodology_sha_valid=all(row.benchmark_methodology_sha_valid for row in used_rows),
+        pit_reproducible=all(row.pit_reproducible for row in supportable),
+        policy_sha_valid=all(row.policy_sha_valid for row in supportable),
+        benchmark_methodology_sha_valid=all(row.benchmark_methodology_sha_valid for row in supportable),
         all_promoted_rows_replayable=replayable_candidates,
     )
     gate = evaluate_cfb_truth_gate_v1(evidence)
