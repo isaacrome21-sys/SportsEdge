@@ -1,21 +1,30 @@
 """Governed wrapper over the canonical CFB run machine.
 
-The underlying run machine owns prediction/pricing. This wrapper adds full-board
-coverage accounting, historical-vs-live policy separation and narrative override
-controls without changing Model_P, fair price, edge or EV.
+The underlying run machine owns prediction/pricing. This wrapper adds full-board and
+per-market coverage accounting, historical-vs-live policy separation and narrative
+override controls without changing Model_P, fair price, edge or EV.
 """
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from typing import Any, Iterable, Mapping, Sequence
 
-from .audit_contracts import CFBOverride, CoverageItem, CoverageReport
+from .audit_contracts import (
+    CFBOverride,
+    CoverageItem,
+    CoverageReport,
+    MarketCoverageItem,
+    MarketCoverageReport,
+)
 from .decision_policy import historical_candidate_policy, live_candidate_decision
 from .run_machine import CFBMachineReport, CFBMachineResult
 
 
 class CFBGovernedRunError(ValueError):
     pass
+
+
+MAIN_MARKETS = ("MONEYLINE", "SPREAD", "TOTAL")
 
 
 @dataclass(frozen=True)
@@ -27,8 +36,7 @@ class GovernedCFBResult:
     override_id: str | None
 
     def to_dict(self) -> dict[str, Any]:
-        payload = asdict(self)
-        return payload
+        return asdict(self)
 
 
 @dataclass(frozen=True)
@@ -37,6 +45,7 @@ class GovernedCFBReport:
     decision_stage: str
     machine_report: CFBMachineReport
     coverage_report: CoverageReport
+    market_coverage_report: MarketCoverageReport
     results: tuple[GovernedCFBResult, ...]
 
     def to_dict(self) -> dict[str, Any]:
@@ -45,6 +54,7 @@ class GovernedCFBReport:
             "decision_stage": self.decision_stage,
             "machine_report": self.machine_report.to_dict(),
             "coverage_report": self.coverage_report.to_dict(),
+            "market_coverage_report": self.market_coverage_report.to_dict(),
             "results": [row.to_dict() for row in self.results],
         }
 
@@ -72,7 +82,7 @@ def build_coverage_report(
     items: list[CoverageItem] = []
     for game_id in expected_ids:
         rows = seen_results.get(game_id, [])
-        if rows and any(row.engine_status == "PRICED" for row in rows):
+        if rows and any(row.engine_status == "PRICED" and row.edge is not None for row in rows):
             items.append(CoverageItem(game_id, classification[game_id], "SCORED"))
         elif rows:
             reasons = sorted({row.reason for row in rows})
@@ -81,6 +91,38 @@ def build_coverage_report(
             reason = "SOURCE_FAILURE_NO_GAME_RESULT" if source_failures else "NO_MARKET_QUOTES_OR_RESULT"
             items.append(CoverageItem(game_id, classification[game_id], "UNAVAILABLE", reason))
     return CoverageReport(tuple(expected_ids), tuple(items)).validate()
+
+
+def build_market_coverage_report(
+    *,
+    expected_games: Sequence[Mapping[str, Any]],
+    machine_report: CFBMachineReport,
+) -> MarketCoverageReport:
+    """Account for ML/SPREAD/TOTAL independently for every in-scope game.
+
+    Unoffered or unpriceable markets remain explicit UNAVAILABLE/BLOCKED states; they do
+    not silently disappear and they do not invalidate a different market that is valid.
+    """
+
+    game_ids = [str(row.get("game_id") or "").strip() for row in expected_games]
+    if not game_ids or any(not game_id for game_id in game_ids):
+        raise CFBGovernedRunError("EXPECTED_GAME_ID_REQUIRED")
+    expected = tuple((game_id, market) for game_id in game_ids for market in MAIN_MARKETS)
+    by_contract: dict[tuple[str, str], list[CFBMachineResult]] = {}
+    for result in machine_report.results:
+        if result.market in MAIN_MARKETS:
+            by_contract.setdefault((result.game_id, result.market), []).append(result)
+    items: list[MarketCoverageItem] = []
+    for game_id, market in expected:
+        rows = by_contract.get((game_id, market), [])
+        if rows and any(row.engine_status == "PRICED" and row.edge is not None for row in rows):
+            items.append(MarketCoverageItem(game_id, market, "PRICED"))
+        elif rows:
+            reasons = sorted({row.reason for row in rows})
+            items.append(MarketCoverageItem(game_id, market, "BLOCKED", ";".join(reasons)))
+        else:
+            items.append(MarketCoverageItem(game_id, market, "UNAVAILABLE", "MARKET_NOT_OFFERED_OR_NOT_RETURNED"))
+    return MarketCoverageReport(expected, tuple(items)).validate()
 
 
 def _override_index(overrides: Iterable[CFBOverride]) -> dict[str, CFBOverride]:
@@ -113,7 +155,8 @@ def govern_cfb_report(
     if mode == "AUTOMATIC" and override_map:
         raise CFBGovernedRunError("AUTOMATIC_NARRATIVE_OVERRIDE_FORBIDDEN")
     coverage = build_coverage_report(expected_games=expected_games, machine_report=machine_report)
-    coverage_ok = coverage.coverage_ok
+    market_coverage = build_market_coverage_report(expected_games=expected_games, machine_report=machine_report)
+    accounting_ok = coverage.coverage_ok and market_coverage.accounting_ok
     governed: list[GovernedCFBResult] = []
     for result in machine_report.results:
         historical_status = str(historical_market_status.get(result.market, "UNRUN")).upper()
@@ -123,6 +166,8 @@ def govern_cfb_report(
                 result, "BLOCKED", result.reason, historical_status, override.override_id if override else None,
             ))
             continue
+        # A PRICED result with an edge necessarily came from a valid synchronized two-sided
+        # pair in the canonical engine. Stale rows have edge/fair probability nulled.
         quote_fresh = result.reason != "CFB_QUOTE_STALE"
         two_sided = result.fair_market_p is not None
         if stage == "HISTORICAL":
@@ -133,7 +178,7 @@ def govern_cfb_report(
                 two_sided=two_sided,
                 data_quality_ok=bool(data_quality_ok),
                 pit_ok=bool(data_quality_ok),
-                coverage_ok=coverage_ok,
+                coverage_ok=accounting_ok,
                 policy_sha_ok=bool(policy_sha_ok),
                 min_edge=min_edge,
             )
@@ -145,7 +190,7 @@ def govern_cfb_report(
                 two_sided=two_sided,
                 exposure_ok=bool(exposure_ok),
                 data_quality_ok=bool(data_quality_ok),
-                coverage_ok=coverage_ok,
+                coverage_ok=accounting_ok,
                 override_log_complete=True,
                 policy_sha_ok=bool(policy_sha_ok),
                 historical_status=historical_status,
@@ -158,7 +203,6 @@ def govern_cfb_report(
                 status, reason = "BLOCKED", f"NARRATIVE_OVERRIDE_BLOCK:{override.reason_code}"
             elif action == "DOWNGRADE" and status in {"OFFICIAL_BET", "SHADOW_QUALIFIED"}:
                 status, reason = "NO_BET", f"NARRATIVE_OVERRIDE_DOWNGRADE:{override.reason_code}"
-            # NO_CHANGE leaves mathematical decision untouched.
         governed.append(GovernedCFBResult(
             result, status, reason, historical_status, override.override_id if override else None,
         ))
@@ -167,5 +211,6 @@ def govern_cfb_report(
         decision_stage=stage,
         machine_report=machine_report,
         coverage_report=coverage,
+        market_coverage_report=market_coverage,
         results=tuple(governed),
     )
