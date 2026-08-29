@@ -1,0 +1,49 @@
+{
+  "policy_id": "CFB_MODEL_V2_PROMOTION_V1",
+  "version": "1.0.0",
+  "sport": "CFB",
+  "candidate_model_family": "CFB_JOINT_MODEL_V2",
+  "baseline_model_family": "CURRENT_CFB_PRODUCTION_SCORE_ENGINE",
+  "comparison_population": "SAME_CHRONOLOGICAL_OUTER_FOLDS_AND_SAME_PIT_ROWS",
+  "required_markets": ["MONEYLINE", "SPREAD", "TOTAL"],
+  "minimum_outer_forward_seasons": 4,
+  "minimum_predictive_rows_per_market": 500,
+  "minimum_economic_candidates_per_market": 200,
+  "primary_probability_metrics": {
+    "candidate_brier_must_be_no_worse_than_baseline": true,
+    "candidate_logloss_must_be_no_worse_than_baseline": true,
+    "require_statistically_supported_improvement_per_market": true,
+    "statistical_rule": "AT_LEAST_ONE_OF_BRIER_OR_LOGLOSS_PAIRED_DELTA_UPPER_95_CI_LT_0",
+    "paired_delta_definition": "candidate_loss - baseline_loss"
+  },
+  "calibration": {
+    "candidate_slope_min": 0.90,
+    "candidate_slope_max": 1.10,
+    "candidate_max_abs_intercept": 0.03,
+    "candidate_max_ece": 0.025,
+    "max_ece_regression_vs_baseline": 0.002
+  },
+  "spread_key_numbers": {
+    "required": true,
+    "margins": [-7, -3, 3, 7],
+    "candidate_max_absolute_mass_error": 0.015,
+    "max_mass_error_regression_vs_baseline": 0.002
+  },
+  "economic_noninferiority": {
+    "candidate_mean_clv_must_be_gte_baseline": true,
+    "candidate_roi_after_vig_must_be_gte_baseline": true,
+    "economic_rows_use_frozen_historical_candidate_policy_only": true
+  },
+  "season_stability": {
+    "candidate_may_not_be_worse_on_both_brier_and_logloss_in_each_of_two_most_recent_seasons": true,
+    "all_outer_fold_results_must_be_reported": true
+  },
+  "production_switch": {
+    "candidate_truth_gate_must_be_official_for_all_required_markets": true,
+    "all_required_attestations_must_pass": true,
+    "manual_discretionary_override_forbidden": true,
+    "silent_switch_forbidden": true,
+    "new_model_artifact_and_policy_bundle_sha_required": true
+  },
+  "notes": "This is a model-replacement gate, not a betting Truth Gate replacement. It may only make promotion harder; it never weakens CFB_TRUTH_GATE_V1."
+}
