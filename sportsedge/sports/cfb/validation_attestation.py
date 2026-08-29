@@ -13,12 +13,13 @@ import json
 from typing import Any, Mapping
 
 
-ATTESTATION_ID = "CFB_VALIDATION_ATTESTATION_V1_2"
+ATTESTATION_ID = "CFB_VALIDATION_ATTESTATION_V1_3"
 REQUIRED_CHECKS = (
     "pit_leakage",
     "market_blind_feature_scan",
     "entity_registry",
     "prior_decay_fold_integrity",
+    "prior_ablation",
     "opponent_adjust_fold_integrity",
     "calibration_fold_integrity",
     "oof_residual_fold_integrity",
