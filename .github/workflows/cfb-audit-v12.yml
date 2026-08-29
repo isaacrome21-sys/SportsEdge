@@ -35,6 +35,8 @@ on:
       - "tests/test_cfb_audit_v12_residual.py"
       - "tests/test_cfb_run_machine_finish.py"
       - "tests/test_cfb_audit_manifest_provenance.py"
+      - "tests/test_cfb_edge_floor_scope.py"
+      - "tests/test_certification_lifecycle_regime.py"
       - "tests/test_manual_hybrid_audit_governance.py"
       - "tests/test_manual_input_contract.py"
       - "tests/test_policy_bundle.py"
@@ -77,6 +79,8 @@ on:
       - "tests/test_cfb_audit_v12_residual.py"
       - "tests/test_cfb_run_machine_finish.py"
       - "tests/test_cfb_audit_manifest_provenance.py"
+      - "tests/test_cfb_edge_floor_scope.py"
+      - "tests/test_certification_lifecycle_regime.py"
       - "tests/test_manual_hybrid_audit_governance.py"
       - "tests/test_manual_input_contract.py"
       - "tests/test_policy_bundle.py"
@@ -126,6 +130,10 @@ jobs:
         run: python -m unittest tests.test_cfb_audit_v12_residual -v
       - name: Run CFB manifest provenance tests
         run: python -m unittest tests.test_cfb_audit_manifest_provenance -v
+      - name: Run CFB per-candidate edge-floor tests
+        run: python -m unittest tests.test_cfb_edge_floor_scope -v
+      - name: Run structural regime-boundary tests
+        run: python -m unittest tests.test_certification_lifecycle_regime -v
       - name: Run Manual Hybrid governance tests
         run: python -m unittest tests.test_manual_hybrid_audit_governance -v
       - name: Run Manual input contract tests
