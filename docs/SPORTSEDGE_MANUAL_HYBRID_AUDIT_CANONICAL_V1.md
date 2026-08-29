@@ -25,7 +25,7 @@ Authoritative files:
 
 Resolved numeric execution/validation values:
 
-- Live edge floor: **3.0%**.
+- Live edge floor: **3.0% per candidate wager**. It is not a portfolio-average or aggregate edge threshold. Portfolio construction, parlays, correlation, aggregate EV or exposure management may not rescue a candidate below 3.0%. Portfolio controls may only reduce/reject exposure after that candidate independently qualifies.
 - Pregame live quote maximum age: **180 seconds**.
 - Maximum two-sided pair timestamp skew: **30 seconds**.
 - CFB spread key-number mass absolute tolerance at -7/-3/+3/+7: **0.015 (1.5 percentage points)** per outer fold.
@@ -71,29 +71,38 @@ MLB_TRUTH_GATE_V1 numeric hard gates include:
 - Absolute calibration intercept: **<= 0.03**.
 - ECE: **<= 0.025**.
 - Minimum promoted sample: **200**; preferred **600**.
-- Live edge floor: **2.5%**.
+- Live edge floor: **2.5% per candidate wager**; portfolio aggregation cannot satisfy the floor for a sub-threshold candidate.
 - Fresh two-sided quote, exposure limits, coherent joint constraints, model-code SHA, feature-schema SHA and structural-change clearance required.
 
-MLB market families are independent. Engine existence does not imply OFFICIAL.
+MLB certification is **per canonical market ID**. A broader family status cannot promote a child market, and engine existence does not imply OFFICIAL.
 
 MLB benchmark initial frozen quote rules use a maximum age of **180 seconds** and maximum two-sided pair skew of **30 seconds**. Provider hierarchy and fallback are deterministic in `config/mlb_market_benchmark_v1.json`.
 
 MLB distribution validation requires outer-fold mass checks for total runs 7/8/9 and game margins -1/+1, with pre-registered absolute mass tolerance **0.015**. This threshold is a pre-replay governance choice, not a claim that it is empirically optimal.
 
-## Structural-break revocation
+## Structural-break revocation and regime-boundary discipline
 
 A material scoring/rules/overtime/roster-regime/schedule-format/market-settlement/material-data-definition change can revoke OFFICIAL immediately, independent of rolling statistics.
 
 `OFFICIAL -> REVOKED`
 
-There is no automatic re-promotion. Re-promotion requires:
+There is no automatic re-promotion. The regime boundary itself is frozen **before replay begins** and cannot be inferred from model performance. Each structural boundary must contain a dated external effective timestamp, named source authority, external evidence reference + SHA, and policy-bundle SHA.
+
+The frozen row rule is:
+
+`KEEP_EVENT_TS_ON_OR_AFTER_EFFECTIVE_AT`
+
+For a re-promotion replay, every otherwise-supportable post-effective row belongs to the new-regime population. A season or row may not be labeled a structural-regime exclusion merely because its performance is unfavorable. Excluding any event on/after the frozen effective timestamp as a regime row is a hard failure. Likewise, pre-effective rows may not be inserted into the new-regime replay.
+
+Re-promotion requires:
 
 1. new model or policy artifact version;
 2. new policy-bundle SHA;
-3. complete PIT replay under the new regime contract;
-4. all sport/market Truth Gate requirements;
-5. all required attestations;
-6. exclusion of rows declared invalid by the structural break.
+3. externally evidenced regime boundary frozen before replay start;
+4. complete PIT replay under that frozen new-regime contract;
+5. row inclusion/exclusion matching the frozen timestamp rule exactly;
+6. all sport/market Truth Gate requirements;
+7. all required attestations.
 
 The executable lifecycle contract lives in `sportsedge/core/certification_lifecycle.py`.
 
@@ -110,8 +119,9 @@ A newer authoritative starting-pitcher change, confirmed-lineup change for a lin
 - No Truth Gate threshold may be tuned after final holdout inspection.
 - Silent threshold migration is forbidden.
 - A threshold/config change creates a new version/hash and requires affected replay.
-- The final holdout cannot be used to tune model, prior decay, regularization, calibrator, residual distribution, benchmark methodology or gate threshold.
+- The final holdout cannot be used to tune model, prior decay, regularization, calibrator, residual distribution, benchmark methodology, regime boundary or gate threshold.
+- A structural regime boundary is never chosen because dropping a season/row improves Brier, log loss, CLV, ROI or calibration.
 
 ## Current claim ceiling
 
-This branch does not by itself prove any CFB or MLB market profitable, calibrated or OFFICIAL. Durable PIT replay and attested evidence remain required under the relevant market-specific gate.
+This branch does not by itself prove any CFB or MLB market profitable, calibrated or OFFICIAL. Durable PIT replay and attested evidence remain required under the relevant market-specific gate. The prospective freeze record remains provisional until explicitly re-frozen against the terminal policy-bundle state.
