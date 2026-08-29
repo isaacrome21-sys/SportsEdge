@@ -6,8 +6,9 @@ from dataclasses import replace
 from sportsedge.mlb_truth_gate_v1 import MLBTruthGateEvidence, MLBTruthGateError, evaluate_mlb_truth_gate_v1
 
 
-def passing(market_family="V7_GAME"):
+def passing(market_id="MONEYLINE", market_family="V7_GAME"):
     return MLBTruthGateEvidence(
+        market_id=market_id,
         market_family=market_family,
         forward_seasons=3,
         promoted_sample=250,
@@ -36,9 +37,10 @@ def passing(market_family="V7_GAME"):
 
 
 class MLBTruthGateTests(unittest.TestCase):
-    def test_complete_evidence_can_pass(self):
-        result = evaluate_mlb_truth_gate_v1(passing())
+    def test_complete_evidence_can_pass_one_market(self):
+        result = evaluate_mlb_truth_gate_v1(passing("MONEYLINE", "V7_GAME"))
         self.assertEqual(result.status, "OFFICIAL")
+        self.assertEqual(result.market_id, "MONEYLINE")
 
     def test_zero_roi_and_missing_hashes_fail(self):
         result = evaluate_mlb_truth_gate_v1(replace(
@@ -58,7 +60,20 @@ class MLBTruthGateTests(unittest.TestCase):
 
     def test_unknown_market_family_cannot_inherit_certification(self):
         with self.assertRaisesRegex(MLBTruthGateError, "MARKET_FAMILY"):
-            evaluate_mlb_truth_gate_v1(passing("CFB_SPREAD"))
+            evaluate_mlb_truth_gate_v1(passing("MONEYLINE", "CFB_SPREAD"))
+
+    def test_market_id_is_required_even_when_family_is_valid(self):
+        with self.assertRaisesRegex(MLBTruthGateError, "CANONICAL_MARKET_ID_REQUIRED"):
+            evaluate_mlb_truth_gate_v1(passing("", "V7_GAME"))
+
+    def test_sibling_market_requires_separate_evidence_object(self):
+        ml = evaluate_mlb_truth_gate_v1(passing("MONEYLINE", "V7_GAME"))
+        total = evaluate_mlb_truth_gate_v1(passing("TOTALS", "V7_GAME"))
+        self.assertEqual(ml.status, "OFFICIAL")
+        self.assertEqual(total.status, "OFFICIAL")
+        self.assertNotEqual(ml.market_id, total.market_id)
+        # The evaluator exposes no family-level OFFICIAL result that could be inherited.
+        self.assertFalse(hasattr(ml, "family_official"))
 
 
 if __name__ == "__main__":
