@@ -1,7 +1,10 @@
 {
   "policy_id": "MLB_TRUTH_GATE_V1",
-  "version": "1.0.0",
-  "description": "SportsEdge MLB Truth Gate. Fail-closed. Independent per market family (V7 game, Hitter joint, Pitcher joint, F5, Specialized).",
+  "version": "1.1.0",
+  "description": "SportsEdge MLB Truth Gate. Fail-closed. Certification is independent per canonical market ID; market family is grouping metadata only.",
+  "certification_unit": "CANONICAL_MARKET_ID_WITHIN_MARKET_FAMILY",
+  "cross_market_aggregation_for_certification_forbidden": true,
+  "cross_market_inheritance_forbidden": true,
   "hard_gates": {
     "pit_reproducibility_required": true,
     "max_leakage_violations": 0,
@@ -55,5 +58,18 @@
     "F5",
     "SPECIALIZED"
   ],
-  "notes": "Numeric MLB certification policy is explicit. Engine existence never implies OFFICIAL. Each market family must independently satisfy this policy and its market-specific settlement/data contracts."
+  "examples_of_independent_market_ids": [
+    "MONEYLINE",
+    "RUN_LINE",
+    "TOTALS",
+    "F5_MONEYLINE",
+    "F5_RUN_LINE",
+    "F5_TOTALS",
+    "NRFI",
+    "YRFI",
+    "TEAM_TOTALS",
+    "PITCHER_STRIKEOUTS",
+    "HITTER_HITS"
+  ],
+  "notes": "Numeric MLB policy is explicit. A V7_GAME family pass cannot certify MONEYLINE, RUN_LINE and TOTALS as one pooled unit. Each canonical market ID must independently satisfy the gate with its own sample/metrics/settlement contract. Engine existence never implies OFFICIAL."
 }
