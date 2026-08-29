@@ -3,7 +3,8 @@
 Predictive skill metrics are scored on ALL PIT-supportable held-out non-push forecasts,
 not only bets selected after prediction. Economic metrics (CLV/ROI) are scored only on
 rows selected by the frozen historical candidate policy. This prevents bet-selection
-from artificially improving Brier/log-loss/calibration.
+from artificially improving Brier/log-loss/calibration and prevents unsupported board
+rows from contaminating the scoring population.
 """
 from __future__ import annotations
 
@@ -41,6 +42,12 @@ def _f(value: Any, field: str) -> float:
     return out
 
 
+def _strict_bool(value: Any, field: str) -> bool:
+    if type(value) is not bool:
+        raise CFBCertificationReplayError(f"{field}:BOOL_REQUIRED")
+    return bool(value)
+
+
 def american_profit_per_unit(odds: float) -> float:
     value = _f(odds, "american_odds")
     if -100.0 < value < 100.0:
@@ -59,6 +66,7 @@ class CFBReplayRow:
     model_probability_nonpush: float
     benchmark_probability_nonpush: float
     settlement: str
+    predictive_supportable: bool
     candidate_status: str
     american_odds_at_decision: float | None
     clv_probability_points: float | None
@@ -80,14 +88,15 @@ class CFBReplayRow:
             model_probability_nonpush=_p(row.get("model_probability_nonpush"), "model_probability_nonpush"),
             benchmark_probability_nonpush=_p(row.get("benchmark_probability_nonpush"), "benchmark_probability_nonpush"),
             settlement=str(row.get("settlement") or "").strip().upper(),
+            predictive_supportable=_strict_bool(row.get("predictive_supportable"), "predictive_supportable"),
             candidate_status=str(row.get("candidate_status") or "").strip().upper(),
             american_odds_at_decision=None if row.get("american_odds_at_decision") is None else _f(row.get("american_odds_at_decision"), "american_odds_at_decision"),
             clv_probability_points=None if row.get("clv_probability_points") is None else _f(row.get("clv_probability_points"), "clv_probability_points"),
-            replayable=row.get("replayable") is True,
-            paired_prices_present=row.get("paired_prices_present") is True,
-            pit_reproducible=row.get("pit_reproducible") is True,
-            policy_sha_valid=row.get("policy_sha_valid") is True,
-            benchmark_methodology_sha_valid=row.get("benchmark_methodology_sha_valid") is True,
+            replayable=_strict_bool(row.get("replayable"), "replayable"),
+            paired_prices_present=_strict_bool(row.get("paired_prices_present"), "paired_prices_present"),
+            pit_reproducible=_strict_bool(row.get("pit_reproducible"), "pit_reproducible"),
+            policy_sha_valid=_strict_bool(row.get("policy_sha_valid"), "policy_sha_valid"),
+            benchmark_methodology_sha_valid=_strict_bool(row.get("benchmark_methodology_sha_valid"), "benchmark_methodology_sha_valid"),
         ).validate()
 
     def validate(self) -> "CFBReplayRow":
@@ -99,6 +108,11 @@ class CFBReplayRow:
             raise CFBCertificationReplayError("REPLAY_WEEK_INVALID")
         if self.classification not in {"FBS_FBS", "FBS_FCS", "FCS_FCS"}:
             raise CFBCertificationReplayError("REPLAY_CLASSIFICATION_INVALID")
+        for name in (
+            "predictive_supportable", "replayable", "paired_prices_present", "pit_reproducible",
+            "policy_sha_valid", "benchmark_methodology_sha_valid",
+        ):
+            _strict_bool(getattr(self, name), name)
         _p(self.model_probability_nonpush, "model_probability_nonpush")
         _p(self.benchmark_probability_nonpush, "benchmark_probability_nonpush")
         if self.settlement not in {"WIN", "LOSS", "PUSH"}:
@@ -106,6 +120,8 @@ class CFBReplayRow:
         if self.candidate_status not in {"SHADOW_QUALIFIED", "NO_BET", "BLOCKED"}:
             raise CFBCertificationReplayError("REPLAY_CANDIDATE_STATUS_INVALID")
         if self.candidate_status == "SHADOW_QUALIFIED":
+            if not self.predictive_supportable:
+                raise CFBCertificationReplayError("REPLAY_CANDIDATE_NOT_PREDICTIVE_SUPPORTABLE")
             if self.american_odds_at_decision is None:
                 raise CFBCertificationReplayError("REPLAY_CANDIDATE_PRICE_REQUIRED")
             american_profit_per_unit(self.american_odds_at_decision)
@@ -170,7 +186,7 @@ class CFBCertificationReplay:
 def _season_metrics(rows: list[CFBReplayRow]) -> tuple[CFBSeasonMetric, ...]:
     out: list[CFBSeasonMetric] = []
     for season in sorted({row.season for row in rows}):
-        sr = [row for row in rows if row.season == season and row.binary_outcome is not None]
+        sr = [row for row in rows if row.binary_outcome is not None]
         if not sr:
             raise CFBCertificationReplayError(f"REPLAY_SEASON_NO_NONPUSH_ROWS:{season}")
         outcomes = [int(row.binary_outcome) for row in sr]
@@ -207,8 +223,10 @@ def _clv_tstat(values: list[float]) -> float:
     if len(values) < 2:
         return 0.0
     sd = stdev(values)
+    # A zero-variance CLV sample does not get an artificial infinite t-stat. Treat it
+    # conservatively as unproven rather than allowing a degenerate sample to certify.
     if sd <= 1e-15:
-        return float("inf") if mean(values) > 0.0 else 0.0
+        return 0.0
     return mean(values) / (sd / sqrt(len(values)))
 
 
@@ -226,25 +244,26 @@ def replay_cfb_truth_gate(
     data = [row.validate() for row in normalized if row.market == target]
     if not data:
         raise CFBCertificationReplayError("REPLAY_ROWS_REQUIRED")
-    seasons = tuple(sorted({row.season for row in data}))
+
+    supportable = [row for row in data if row.predictive_supportable]
+    if not supportable:
+        raise CFBCertificationReplayError("REPLAY_NO_PREDICTIVE_SUPPORTABLE_ROWS")
+    seasons = tuple(sorted({row.season for row in supportable}))
     attestation_bundle_sha = assert_attestations_cover_forward_seasons(
         attestations,
         market=target,
         expected_test_seasons=list(seasons),
     )
 
-    # Predictive population is all supportable held-out rows; pushes are excluded only
-    # from the binary probability score, never from economic bet counts or ROI.
-    predictive = [row for row in data if row.binary_outcome is not None]
+    predictive = [row for row in supportable if row.binary_outcome is not None]
     if not predictive:
         raise CFBCertificationReplayError("REPLAY_PREDICTIVE_NONPUSH_ROWS_REQUIRED")
     outcomes = [int(row.binary_outcome) for row in predictive]
     model_probs = [row.model_probability_nonpush for row in predictive]
     benchmark_probs = [row.benchmark_probability_nonpush for row in predictive]
-    slope_intercept = calibration_intercept_slope(model_probs, outcomes)
-    calibration_intercept, calibration_slope = slope_intercept
+    calibration_intercept, calibration_slope = calibration_intercept_slope(model_probs, outcomes)
 
-    candidates = [row for row in data if row.candidate_status == "SHADOW_QUALIFIED"]
+    candidates = [row for row in supportable if row.candidate_status == "SHADOW_QUALIFIED"]
     clv_values = [float(row.clv_probability_points) for row in candidates if row.clv_probability_points is not None]
     paired_prices = bool(candidates) and len(clv_values) == len(candidates) and all(row.paired_prices_present for row in candidates)
     replayable_candidates = bool(candidates) and all(row.replayable for row in candidates)
@@ -256,8 +275,9 @@ def replay_cfb_truth_gate(
     clv_mean = mean(clv_values) if clv_values else 0.0
     clv_t = _clv_tstat(clv_values)
 
-    season_metrics = _season_metrics(data)
+    season_metrics = _season_metrics(supportable)
     deterioration = recent_two_season_deterioration(season_metrics)
+    used_rows = list({id(row): row for row in [*supportable, *candidates]}.values())
     evidence = CFBTruthGateEvidence(
         market=target,
         forward_seasons=len(seasons),
@@ -275,9 +295,9 @@ def replay_cfb_truth_gate(
         recent_2season_deterioration=deterioration,
         leakage_violations=int(leakage_violations),
         paired_historical_prices_present=paired_prices,
-        pit_reproducible=all(row.pit_reproducible for row in data),
-        policy_sha_valid=all(row.policy_sha_valid for row in data),
-        benchmark_methodology_sha_valid=all(row.benchmark_methodology_sha_valid for row in data),
+        pit_reproducible=all(row.pit_reproducible for row in used_rows),
+        policy_sha_valid=all(row.policy_sha_valid for row in used_rows),
+        benchmark_methodology_sha_valid=all(row.benchmark_methodology_sha_valid for row in used_rows),
         all_promoted_rows_replayable=replayable_candidates,
     )
     gate = evaluate_cfb_truth_gate_v1(evidence)
