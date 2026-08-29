@@ -1,8 +1,8 @@
 """Fit and freeze early-season prior weights from historical error.
 
 The schedule is estimated on training seasons only, constrained to decay monotonically,
-and serialized with a deterministic hash. Held-out seasons must never participate in
-selection of the schedule used to score them.
+and serialized with a deterministic hash. Held-out and future seasons must never
+participate in selection of the schedule used to score an outer fold.
 """
 from __future__ import annotations
 
@@ -115,9 +115,10 @@ def fit_prior_decay_artifact(
     data = [dict(r) for r in rows]
     if not data:
         raise ValueError("PRIOR_DECAY_ROWS_REQUIRED")
+    test = int(test_season)
     seasons = tuple(sorted({int(r["season"]) for r in data}))
-    if int(test_season) in seasons:
-        raise ValueError("PRIOR_DECAY_TEST_SEASON_IN_TRAINING")
+    if any(season >= test for season in seasons):
+        raise ValueError("PRIOR_DECAY_TEST_SEASON_IN_TRAINING_OR_FUTURE")
     requested_weeks = tuple(int(w) for w in weeks)
     schedule = fit_weekly_prior_decay(data, weeks=requested_weeks, grid_step=grid_step)
     return PriorDecayArtifact(
