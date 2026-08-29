@@ -13,18 +13,23 @@ import json
 from typing import Any, Mapping
 
 
-ATTESTATION_ID = "CFB_VALIDATION_ATTESTATION_V1"
+ATTESTATION_ID = "CFB_VALIDATION_ATTESTATION_V1_1"
 REQUIRED_CHECKS = (
     "pit_leakage",
     "market_blind_feature_scan",
     "entity_registry",
     "prior_decay_fold_integrity",
+    "opponent_adjust_fold_integrity",
     "calibration_fold_integrity",
+    "oof_residual_fold_integrity",
     "key_number_calibration",
+    "quote_sync_policy",
     "mode_identity",
     "game_coverage_accounting",
     "market_coverage_accounting",
     "benchmark_replayability",
+    "historical_data_readiness",
+    "shadow_live_firewall",
 )
 
 
@@ -47,6 +52,7 @@ class CFBValidationAttestation:
     evidence_ids: Mapping[str, str]
     validation_policy_sha: str
     feature_source_policy_sha: str
+    quote_sync_policy_sha: str
     entity_registry_sha: str
     benchmark_methodology_sha: str
     prior_decay_sha: str
@@ -76,9 +82,9 @@ class CFBValidationAttestation:
         if any(not str(value).strip() for value in self.evidence_ids.values()):
             raise CFBValidationAttestationError("ATTESTATION_EVIDENCE_ID_REQUIRED")
         for field in (
-            "validation_policy_sha", "feature_source_policy_sha", "entity_registry_sha",
-            "benchmark_methodology_sha", "prior_decay_sha", "model_artifact_sha",
-            "calibrator_artifact_sha", "simulation_artifact_sha",
+            "validation_policy_sha", "feature_source_policy_sha", "quote_sync_policy_sha",
+            "entity_registry_sha", "benchmark_methodology_sha", "prior_decay_sha",
+            "model_artifact_sha", "calibrator_artifact_sha", "simulation_artifact_sha",
         ):
             _sha(getattr(self, field), field)
         return self
