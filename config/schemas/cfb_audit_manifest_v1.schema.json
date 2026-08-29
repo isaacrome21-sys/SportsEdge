@@ -8,10 +8,11 @@
     "sport", "game_id", "market", "selection", "model_version", "feature_version",
     "calibrator_version", "simulation_version", "prior_version", "decay_schedule_hash",
     "variance_model_version", "key_number_method", "data_cutoff", "feature_asof_ts",
-    "odds_snapshot_id", "market_benchmark_id", "coverage_report_id", "book", "price",
-    "quote_timestamp", "decision_timestamp", "model_p", "no_vig_market_p", "edge", "ev",
-    "kelly", "historical_gate_status", "live_decision", "spec_sha", "policy_sha",
-    "benchmark_methodology_sha", "exposure_sha", "market_context_sha"
+    "odds_snapshot_id", "market_benchmark_id", "coverage_report_id", "market_coverage_report_id",
+    "book", "price", "quote_timestamp", "decision_timestamp", "model_p", "no_vig_market_p",
+    "edge", "ev", "kelly", "historical_gate_status", "live_decision", "spec_sha", "policy_sha",
+    "benchmark_methodology_sha", "exposure_sha", "market_context_sha", "feature_source_policy_sha",
+    "entity_registry_sha", "validation_attestation_sha"
   ],
   "properties": {
     "sport": {"const": "CFB"},
@@ -31,6 +32,7 @@
     "odds_snapshot_id": {"type": "string", "minLength": 1},
     "market_benchmark_id": {"type": "string", "minLength": 1},
     "coverage_report_id": {"type": "string", "minLength": 1},
+    "market_coverage_report_id": {"type": "string", "minLength": 1},
     "book": {"type": "string", "minLength": 1},
     "line": {"type": ["number", "null"]},
     "price": {"type": "number"},
@@ -48,6 +50,9 @@
     "benchmark_methodology_sha": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
     "exposure_sha": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
     "market_context_sha": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+    "feature_source_policy_sha": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+    "entity_registry_sha": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+    "validation_attestation_sha": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
     "override_id": {"type": ["string", "null"]}
   }
 }
