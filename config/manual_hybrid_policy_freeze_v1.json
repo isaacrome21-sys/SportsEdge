@@ -1,0 +1,30 @@
+{
+  "record_id": "SPORTSEDGE_MANUAL_HYBRID_POLICY_FREEZE_V1",
+  "frozen_at_utc": "2026-08-29T13:30:00Z",
+  "scope": ["CFB", "MLB"],
+  "canonical_governance": "config/manual_hybrid_governance_v1.json",
+  "canonical_document": "docs/SPORTSEDGE_MANUAL_HYBRID_AUDIT_CANONICAL_V1.md",
+  "CFB": {
+    "truth_gate": "config/cfb_truth_gate_v1.json",
+    "validation": "config/cfb_validation_policy_v1.json",
+    "quote_sync": "config/cfb_quote_sync_v1.json",
+    "benchmark": "config/cfb_market_benchmark_v1.json",
+    "final_certification_replay_after_this_freeze": "UNRUN",
+    "pre_freeze_exploratory_results_are_certifying": false
+  },
+  "MLB": {
+    "truth_gate": "config/mlb_truth_gate_v1.json",
+    "validation": "config/mlb_validation_policy_v1.json",
+    "benchmark": "config/mlb_market_benchmark_v1.json",
+    "final_certification_replay_after_this_freeze": "UNRUN",
+    "pre_freeze_exploratory_results_are_certifying": false
+  },
+  "rules": {
+    "final_holdout_results_may_not_modify_frozen_thresholds": true,
+    "any_threshold_change_requires_new_policy_version_and_new_freeze_record": true,
+    "changed_policy_requires_affected_historical_replay": true,
+    "exploratory_pre_freeze_results_cannot_be_relabelled_as_final_holdout": true,
+    "no_profitability_or_official_claim_from_this_freeze_record": true
+  },
+  "notes": "This record establishes a clean prospective certification boundary. It does not claim older exploratory work was unseen; therefore final certification evidence must be generated under this frozen bundle after the recorded boundary."
+}
