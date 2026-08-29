@@ -1,0 +1,51 @@
+{
+  "validation_policy_id": "MLB_VALIDATION_POLICY_V1",
+  "version": "1.0.0",
+  "sport": "MLB",
+  "outer_folds": {
+    "type": "SEASON_WALK_FORWARD",
+    "shuffle": false,
+    "require_train_period_strictly_before_test_period": true,
+    "calibration_requires_inner_oof_predictions": true,
+    "residual_distribution_requires_inner_oof_predictions": true
+  },
+  "distribution_calibration": {
+    "TOTALS": {
+      "total_run_values": [7, 8, 9],
+      "absolute_mass_tolerance": 0.015,
+      "required_per_outer_fold": true
+    },
+    "RUN_LINE": {
+      "game_margin_values": [-1, 1],
+      "absolute_mass_tolerance": 0.015,
+      "required_per_outer_fold": true,
+      "reason": "One-run game mass materially controls +/-1.5 run-line pricing."
+    }
+  },
+  "monte_carlo_precision": {
+    "minimum_paths": 10000,
+    "max_standard_error_fraction_of_live_edge_floor": 0.20,
+    "increase_paths_until_precision_passes": true,
+    "store_seed_policy": true,
+    "store_path_count": true
+  },
+  "calibration": {
+    "overall_max_ece": 0.025,
+    "report_raw_and_calibrated": true,
+    "full_supportable_population_required": true,
+    "selected_bets_only_for_calibration_forbidden": true
+  },
+  "evidence_invalidation": {
+    "authoritative_starting_pitcher_change_invalidates_prior_model_p": true,
+    "authoritative_confirmed_lineup_change_invalidates_lineup_dependent_model_p": true,
+    "doubleheader_game_identity_change_invalidates_prior_model_p": true,
+    "recompute_or_block_before_new_decision": true,
+    "narrative_probability_adjustment_forbidden": true
+  },
+  "coverage": {
+    "report_by_market_family": true,
+    "report_blocked_and_unavailable": true,
+    "silent_drop_forbidden": true
+  },
+  "notes": "The 1.5 percentage-point discrete-mass tolerance is pre-registered before the new replay. Passing it is required evidence, not proof the threshold is optimal. Changing it later requires a new version and replay."
+}
