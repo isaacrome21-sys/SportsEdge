@@ -1,0 +1,48 @@
+name: cfb-audit-v1.2
+
+on:
+  push:
+    branches:
+      - cfb-audit-v1-2-hardening
+    paths:
+      - "sportsedge/sports/cfb/**"
+      - "sportsedge/core/leakage.py"
+      - "sportsedge/core/prior_decay.py"
+      - "config/cfb_*.json"
+      - "config/schemas/cfb_*.json"
+      - "tests/test_cfb_audit_v12.py"
+      - "tests/test_cfb_run_machine_finish.py"
+      - ".github/workflows/cfb-audit-v12.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "sportsedge/sports/cfb/**"
+      - "sportsedge/core/leakage.py"
+      - "sportsedge/core/prior_decay.py"
+      - "config/cfb_*.json"
+      - "config/schemas/cfb_*.json"
+      - "tests/test_cfb_audit_v12.py"
+      - "tests/test_cfb_run_machine_finish.py"
+      - ".github/workflows/cfb-audit-v12.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cfb-audit-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependency
+        run: python -m pip install --disable-pip-version-check numpy
+      - name: Compile CFB modules
+        run: python -m compileall -q sportsedge/sports/cfb sportsedge/core/leakage.py sportsedge/core/prior_decay.py
+      - name: Run CFB audit acceptance tests
+        run: python -m unittest tests.test_cfb_audit_v12 -v
+      - name: Run existing CFB run-machine regression tests
+        run: python -m unittest tests.test_cfb_run_machine_finish -v
