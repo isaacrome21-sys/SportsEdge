@@ -1,6 +1,6 @@
 {
   "validation_policy_id": "CFB_VALIDATION_POLICY_V1",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "sport": "CFB",
   "main_markets": ["MONEYLINE", "SPREAD", "TOTAL"],
   "predictive_scoring_population": "ALL_PIT_SUPPORTABLE_NON_PUSH_ROWS",
@@ -10,7 +10,10 @@
     "type": "SEASON_WALK_FORWARD",
     "shuffle": false,
     "require_train_seasons_strictly_before_test_season": true,
+    "opponent_adjustment_fit_inside_each_outer_fold": true,
+    "regularization_fit_inside_each_outer_fold": true,
     "calibration_requires_inner_oof_predictions": true,
+    "residual_distribution_requires_inner_oof_predictions": true,
     "minimum_forward_seasons_for_truth_gate": 4
   },
   "key_number_calibration": {
@@ -33,16 +36,27 @@
     "conference_strength": true,
     "fbs_fcs_classification": true
   },
+  "shadow_firewall": {
+    "shadow_qualified_is_historical_research_state_only": true,
+    "shadow_qualified_cannot_be_live_official_bet": true,
+    "shadow_qualified_cannot_set_historical_market_status_official": true,
+    "live_official_requires_truth_gate_official": true
+  },
   "required_attestations": [
     "PIT_LEAKAGE",
     "MARKET_BLIND_FEATURE_SCAN",
     "ENTITY_REGISTRY",
     "PRIOR_DECAY_FOLD_INTEGRITY",
+    "OPPONENT_ADJUST_FOLD_INTEGRITY",
     "CALIBRATION_FOLD_INTEGRITY",
+    "OOF_RESIDUAL_FOLD_INTEGRITY",
     "KEY_NUMBER_CALIBRATION",
+    "QUOTE_SYNC_POLICY",
     "MODE_IDENTITY",
     "GAME_COVERAGE_ACCOUNTING",
     "MARKET_COVERAGE_ACCOUNTING",
-    "BENCHMARK_REPLAYABILITY"
+    "BENCHMARK_REPLAYABILITY",
+    "HISTORICAL_DATA_READINESS",
+    "SHADOW_LIVE_FIREWALL"
   ]
 }
