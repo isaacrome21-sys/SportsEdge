@@ -56,6 +56,8 @@ class CFBPolicyBundle:
     market_context_sha: str
     feature_source_policy_sha: str
     validation_policy_sha: str
+    quote_sync_policy_sha: str
+    model_promotion_policy_sha: str
     entity_registry_sha: str
 
     def validate(self) -> "CFBPolicyBundle":
@@ -82,5 +84,7 @@ def load_cfb_policy_bundle(repo_root: str | Path, *, entity_registry_sha: str) -
         market_context_sha=canonical_json_sha256(root / "config" / "cfb_market_context_v1.json"),
         feature_source_policy_sha=canonical_json_sha256(root / "config" / "cfb_feature_source_policy_v1.json"),
         validation_policy_sha=canonical_json_sha256(root / "config" / "cfb_validation_policy_v1.json"),
+        quote_sync_policy_sha=canonical_json_sha256(root / "config" / "cfb_quote_sync_v1.json"),
+        model_promotion_policy_sha=canonical_json_sha256(root / "config" / "cfb_model_v2_promotion_v1.json"),
         entity_registry_sha=_validate_sha(entity_registry_sha, "entity_registry_sha"),
     ).validate()
