@@ -1,6 +1,6 @@
 {
   "policy_id": "SPORTSEDGE_MANUAL_HYBRID_GOVERNANCE_V1",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "sports": ["CFB", "MLB"],
   "canonical_document": "docs/SPORTSEDGE_MANUAL_HYBRID_AUDIT_CANONICAL_V1.md",
   "canonical_sources": {
@@ -12,6 +12,7 @@
     "MLB_VALIDATION": "config/mlb_validation_policy_v1.json",
     "MLB_BENCHMARK": "config/mlb_market_benchmark_v1.json",
     "MANUAL_HYBRID_EVIDENCE_GATE": "config/manual_hybrid_evidence_gate_v1.json",
+    "POLICY_FREEZE_RECORD": "config/manual_hybrid_policy_freeze_v1.json",
     "PROVIDER_DEGRADE_MATRIX": "config/provider_degrade_matrix_v1.json",
     "DECISION_PROVENANCE_SCHEMA": "config/schemas/decision_provenance_v1.schema.json"
   },
@@ -70,6 +71,12 @@
     "DATA_CUTOFF",
     "QUOTE_IDS"
   ],
+  "market_family_certification": {
+    "independent_record_required": true,
+    "cross_market_inheritance_forbidden": true,
+    "engine_existence_is_certification": false,
+    "record_contract": "sportsedge/core/promotion_record.py"
+  },
   "structural_break_governance": {
     "material_change_triggers": [
       "SCORING_RULE_CHANGE",
@@ -95,7 +102,8 @@
     "silent_migration_forbidden": true,
     "change_requires_new_version_and_sha": true,
     "final_holdout_may_not_tune_thresholds": true,
-    "threshold_freeze_must_precede_final_holdout_inspection": true
+    "threshold_freeze_must_precede_final_holdout_inspection": true,
+    "prospective_freeze_record_required": true
   },
   "notes": "This file resolves cross-document ambiguity without weakening sport-specific Truth Gates. Sport-specific machine-readable policies remain authoritative for their own gates."
 }
