@@ -1,6 +1,6 @@
 {
   "policy_id": "CFB_MODEL_V2_PROMOTION_V1",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "sport": "CFB",
   "candidate_model_family": "CFB_JOINT_MODEL_V2",
   "baseline_model_family": "CURRENT_CFB_PRODUCTION_SCORE_ENGINE",
@@ -14,7 +14,15 @@
     "candidate_logloss_must_be_no_worse_than_baseline": true,
     "require_statistically_supported_improvement_per_market": true,
     "statistical_rule": "AT_LEAST_ONE_OF_BRIER_OR_LOGLOSS_PAIRED_DELTA_UPPER_95_CI_LT_0",
-    "paired_delta_definition": "candidate_loss - baseline_loss"
+    "paired_delta_definition": "candidate_loss - baseline_loss",
+    "confidence_interval": {
+      "method": "PAIRED_STRATIFIED_BOOTSTRAP_BY_OUTER_SEASON",
+      "resamples": 10000,
+      "seed": 20260829,
+      "one_sided_upper_quantile": 0.95,
+      "same_sample_indices_for_candidate_and_baseline": true,
+      "preserve_outer_season_sample_sizes": true
+    }
   },
   "calibration": {
     "candidate_slope_min": 0.90,
