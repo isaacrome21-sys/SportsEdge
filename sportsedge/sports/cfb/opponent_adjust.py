@@ -50,7 +50,6 @@ class OpponentAdjustedMetricModel:
         return float(self.offense_effects[self._index(team)])
 
     def defense_strength(self, team: str) -> float:
-        # Regression coefficient is defensive weakness because it adds to opponent offense.
         return -float(self.defense_weakness_effects[self._index(team)])
 
     def expected_metric(self, offense_team: str, defense_team: str) -> float:
@@ -75,17 +74,20 @@ def fit_schedule_adjusted_metric(
 ) -> OpponentAdjustedMetricModel:
     """Fit y = intercept + offense_team + opponent_defense_weakness.
 
-    The held-out test season is forbidden from the training rows. The two coefficient
-    families are centered after fitting to make the decomposition identifiable while
-    preserving predictions.
+    Every training season must be strictly earlier than ``test_season``. This is
+    stronger than merely excluding the held-out season: accidentally including a later
+    season is also leakage and fails closed. Hyperparameter selection must occur in an
+    inner chronological training process; this function treats ``ridge_alpha`` as an
+    already-frozen input for the fold.
     """
 
     data = [dict(row) for row in rows]
     if len(data) < 20:
         raise CFBOpponentAdjustError("OPPONENT_ADJUST_ROWS_INSUFFICIENT")
+    test = int(test_season)
     seasons = tuple(sorted({int(row["season"]) for row in data}))
-    if int(test_season) in seasons:
-        raise CFBOpponentAdjustError("OPPONENT_ADJUST_TEST_SEASON_IN_TRAINING")
+    if any(season >= test for season in seasons):
+        raise CFBOpponentAdjustError("OPPONENT_ADJUST_TEST_SEASON_IN_TRAINING_OR_FUTURE")
     alpha = _num(ridge_alpha, "ridge_alpha")
     if alpha < 0.0:
         raise CFBOpponentAdjustError("OPPONENT_ADJUST_ALPHA_NEGATIVE")
@@ -123,8 +125,6 @@ def fit_schedule_adjusted_metric(
     intercept = float(coef[0])
     offense = np.asarray(coef[1:1 + len(teams)], dtype=float)
     weakness = np.asarray(coef[1 + len(teams):], dtype=float)
-    # Center both effect families. Move their means into the intercept so predictions
-    # are unchanged but team ratings have a meaningful zero=average interpretation.
     off_mean = float(offense.mean())
     weak_mean = float(weakness.mean())
     offense = offense - off_mean
