@@ -1,0 +1,53 @@
+name: football-public-splits
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  capture-cfb-public-splits:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Restore prior split snapshot
+        uses: actions/cache@v4
+        with:
+          path: .cache/public_splits
+          key: public-splits-${{ github.run_id }}
+          restore-keys: |
+            public-splits-
+
+      - name: Capture CFB public money and ticket splits
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/market_context/public_splits .cache/public_splits
+          ARGS=(
+            --config config/football_public_splits_v1.json
+            --out-dir artifacts/market_context/public_splits
+            --write-latest .cache/public_splits/latest.json
+            --summary
+          )
+          if [[ -f .cache/public_splits/latest.json ]]; then
+            cp .cache/public_splits/latest.json .cache/public_splits/previous.json
+            ARGS+=(--previous .cache/public_splits/previous.json)
+          fi
+          python scripts/capture_football_public_splits.py "${ARGS[@]}"
+
+      - name: Upload immutable split snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: cfb-public-splits-${{ github.run_id }}
+          path: artifacts/market_context/public_splits/*.json
+          if-no-files-found: error
+          retention-days: 14
