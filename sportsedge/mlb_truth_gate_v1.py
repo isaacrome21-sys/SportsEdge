@@ -1,7 +1,7 @@
 """Normative historical evaluator for MLB_TRUTH_GATE_V1.
 
-This evaluator prevents market-specific MLB certification from becoming an ad-hoc
-label. Each market family is evaluated independently. Live quote/exposure checks are
+Certification is per canonical market ID. ``market_family`` is grouping metadata only;
+a pooled family result may not certify sibling markets. Live quote/exposure checks are
 separate from this historical certification state.
 """
 from __future__ import annotations
@@ -31,6 +31,7 @@ def _finite(value: Any, field: str) -> float:
 
 @dataclass(frozen=True)
 class MLBTruthGateEvidence:
+    market_id: str
     market_family: str
     forward_seasons: int
     promoted_sample: int
@@ -57,6 +58,8 @@ class MLBTruthGateEvidence:
     all_promoted_rows_replayable: bool
 
     def validate_types(self) -> "MLBTruthGateEvidence":
+        if not str(self.market_id).strip():
+            raise MLBTruthGateError("CANONICAL_MARKET_ID_REQUIRED")
         if str(self.market_family).upper() not in MLB_MARKET_FAMILIES:
             raise MLBTruthGateError("MARKET_FAMILY_NOT_MLB_TRUTH_GATE_V1")
         for name in (
@@ -76,12 +79,17 @@ class MLBTruthGateEvidence:
             "roi_after_vig", "calibration_slope", "calibration_intercept", "ece",
         ):
             _finite(getattr(self, name), name)
+        if not 0.0 <= self.season_fold_scoring_win_rate <= 1.0:
+            raise MLBTruthGateError("SEASON_FOLD_SCORING_WIN_RATE_RANGE")
+        if self.ece < 0.0:
+            raise MLBTruthGateError("ECE_NEGATIVE")
         return self
 
 
 @dataclass(frozen=True)
 class MLBTruthGateResult:
     policy: str
+    market_id: str
     market_family: str
     status: str
     failures: tuple[str, ...]
@@ -94,6 +102,7 @@ class MLBTruthGateResult:
     def to_dict(self) -> dict[str, Any]:
         return {
             "policy": self.policy,
+            "market_id": self.market_id,
             "market_family": self.market_family,
             "status": self.status,
             "failures": list(self.failures),
@@ -148,6 +157,7 @@ def evaluate_mlb_truth_gate_v1(evidence: MLBTruthGateEvidence) -> MLBTruthGateRe
         failures.append("PROMOTED_ROWS_NOT_REPLAYABLE")
     return MLBTruthGateResult(
         policy=MLB_TRUTH_GATE_POLICY,
+        market_id=str(e.market_id).strip().upper(),
         market_family=str(e.market_family).upper(),
         status="OFFICIAL" if not failures else "FAILED",
         failures=tuple(failures),
