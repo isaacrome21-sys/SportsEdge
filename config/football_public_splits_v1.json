@@ -1,0 +1,22 @@
+{
+  "policy_id": "FOOTBALL_PUBLIC_SPLITS_V1",
+  "version": "1.0.0",
+  "description": "Diagnostic-only football public betting split capture. Never a predictive model input and never a Truth Gate certification input.",
+  "diagnostics_only": true,
+  "predictive_model_input": false,
+  "truth_gate_input": false,
+  "sources": {
+    "VSIN_DK": {
+      "sport": "CFB",
+      "book": "DraftKings",
+      "url": "https://data.vsin.com/betting-splits/?source=DK&sport=CFB",
+      "freshness_minutes": 15
+    }
+  },
+  "alerts": {
+    "money_ticket_gap_pp": 15.0,
+    "public_ticket_pct": 70.0,
+    "minimum_point_move": 0.5,
+    "moneyline_implied_probability_move": 0.01
+  }
+}
