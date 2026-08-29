@@ -1,0 +1,46 @@
+{
+  "methodology_id": "MLB_MARKET_BENCHMARK_V1",
+  "version": "1.0.0",
+  "sport": "MLB",
+  "reference_space": "NO_VIG_PROBABILITY",
+  "provider_priority_tiers": [
+    ["PINNACLE", "CIRCA", "BOOKMAKER"],
+    ["DRAFTKINGS", "FANDUEL", "BETMGM", "CAESARS"]
+  ],
+  "selection_rule": "FIRST_PRIORITY_TIER_WITH_VALID_SYNCHRONIZED_EXACT_CONTRACT_PAIR_THEN_FRESHEST_PAIR",
+  "live": {
+    "max_quote_age_seconds": 180,
+    "max_pair_timestamp_skew_seconds": 30,
+    "future_quotes_forbidden": true,
+    "require_same_book": true,
+    "require_same_market": true,
+    "require_same_period": true,
+    "require_same_contract_line": true,
+    "require_complementary_sides": true,
+    "invalidate_both_sides_if_either_side_fails": true
+  },
+  "historical_decision_reference": {
+    "max_quote_age_seconds": 180,
+    "require_exact_original_contract": true,
+    "require_two_sided": true
+  },
+  "closing_reference": {
+    "max_seconds_before_game_start": 900,
+    "require_exact_original_contract": true,
+    "allow_repricing_only_if_methodology_hash_is_frozen": true,
+    "unrepriceable_contract_is_clv_ineligible": true
+  },
+  "clv": {
+    "definition": "closing_novig_probability_of_original_contract - decision_novig_probability_of_original_contract",
+    "model_vs_close_is_separate_diagnostic": true
+  },
+  "failure_semantics": {
+    "stale": "BLOCKED",
+    "pair_skew": "BLOCKED",
+    "future_timestamp": "BLOCKED",
+    "one_sided": "BLOCKED",
+    "contract_mismatch": "BLOCKED",
+    "provider_unavailable": "FALLBACK_TO_NEXT_FROZEN_TIER_OR_BLOCK"
+  },
+  "notes": "Provider tiers are benchmark roles, not predictive features. Any change requires a new methodology version/hash and replay of affected historical benchmark/CLV evidence."
+}
