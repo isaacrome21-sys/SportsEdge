@@ -2,6 +2,11 @@
 
 Market data in this module is downstream-only. Nothing here may be imported by the
 predictive feature builder to create Model_P.
+
+Spread lines follow the SportsEdge canonical quote convention already used by the live
+CFB source: the home-team spread threshold is stored on BOTH spread sides. Total lines
+store the shared total threshold on BOTH sides. This makes exact two-sided contract
+pairing deterministic and avoids sign ambiguity from provider-native away spreads.
 """
 from __future__ import annotations
 
@@ -108,6 +113,7 @@ class BenchmarkPair:
     sides: tuple[str, str]
     novig_probabilities: tuple[float, float]
     reference_ts: str
+    pair_skew_seconds: float
     tier_index: int
     fallback_used: bool
 
@@ -148,16 +154,21 @@ def select_reference_pair(
     cutoff_ts: datetime | str,
     provider_priority_tiers: Sequence[Sequence[str]],
     max_quote_age_seconds: int,
+    max_pair_skew_seconds: int = 30,
 ) -> BenchmarkPair:
-    """Select a deterministic two-sided reference with no post-hoc best-price shopping.
+    """Select a deterministic synchronized two-sided reference.
 
     The first priority tier with a valid exact-contract pair wins. Within the tier the
-    freshest pair wins; deterministic provider/book ordering breaks exact timestamp ties.
+    freshest synchronized pair wins; deterministic provider/book ordering breaks exact
+    timestamp ties. Pair skew is bounded so no-vig cannot be manufactured from two sides
+    observed at materially different market states.
     """
 
     cutoff = _utc(cutoff_ts, "cutoff_ts")
     if isinstance(max_quote_age_seconds, bool) or int(max_quote_age_seconds) < 0:
         raise CFBBenchmarkError("MAX_QUOTE_AGE_INVALID")
+    if isinstance(max_pair_skew_seconds, bool) or int(max_pair_skew_seconds) < 0:
+        raise CFBBenchmarkError("MAX_PAIR_SKEW_INVALID")
     normalized = [q if isinstance(q, BenchmarkQuote) else BenchmarkQuote.from_mapping(q) for q in quotes]
     candidates: list[tuple[BenchmarkQuote, BenchmarkQuote]] = []
     for left, right in _pairs(normalized):
@@ -165,11 +176,15 @@ def select_reference_pair(
             continue
         if not _same_line(left.line, line):
             continue
-        latest = max(_utc(left.captured_at, "captured_at"), _utc(right.captured_at, "captured_at"))
-        earliest = min(_utc(left.captured_at, "captured_at"), _utc(right.captured_at, "captured_at"))
+        left_ts = _utc(left.captured_at, "captured_at")
+        right_ts = _utc(right.captured_at, "captured_at")
+        latest = max(left_ts, right_ts)
+        earliest = min(left_ts, right_ts)
         if latest > cutoff:
             continue
         if (cutoff - earliest).total_seconds() > int(max_quote_age_seconds):
+            continue
+        if (latest - earliest).total_seconds() > int(max_pair_skew_seconds):
             continue
         candidates.append((left, right))
     for tier_index, tier in enumerate(provider_priority_tiers):
@@ -186,8 +201,10 @@ def select_reference_pair(
             reverse=True,
         )
         left, right = tier_rows[0]
+        left_ts = _utc(left.captured_at, "captured_at")
+        right_ts = _utc(right.captured_at, "captured_at")
         probs = devig_pair(left.american_odds, right.american_odds)
-        reference_ts = max(_utc(left.captured_at, "captured_at"), _utc(right.captured_at, "captured_at")).isoformat()
+        reference_ts = max(left_ts, right_ts).isoformat()
         return BenchmarkPair(
             game_id=left.game_id,
             market=left.market,
@@ -198,6 +215,7 @@ def select_reference_pair(
             sides=(left.side, right.side),
             novig_probabilities=(probs[0], probs[1]),
             reference_ts=reference_ts,
+            pair_skew_seconds=abs((left_ts - right_ts).total_seconds()),
             tier_index=tier_index,
             fallback_used=tier_index > 0,
         )
