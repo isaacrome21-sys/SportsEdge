@@ -11,6 +11,7 @@ on:
       - "config/cfb_*.json"
       - "config/schemas/cfb_*.json"
       - "tests/test_cfb_audit_v12.py"
+      - "tests/test_cfb_audit_v12_residual.py"
       - "tests/test_cfb_run_machine_finish.py"
       - ".github/workflows/cfb-audit-v12.yml"
   pull_request:
@@ -22,6 +23,7 @@ on:
       - "config/cfb_*.json"
       - "config/schemas/cfb_*.json"
       - "tests/test_cfb_audit_v12.py"
+      - "tests/test_cfb_audit_v12_residual.py"
       - "tests/test_cfb_run_machine_finish.py"
       - ".github/workflows/cfb-audit-v12.yml"
   workflow_dispatch:
@@ -44,5 +46,7 @@ jobs:
         run: python -m compileall -q sportsedge/sports/cfb sportsedge/core/leakage.py sportsedge/core/prior_decay.py
       - name: Run CFB audit acceptance tests
         run: python -m unittest tests.test_cfb_audit_v12 -v
+      - name: Run CFB residual-risk acceptance tests
+        run: python -m unittest tests.test_cfb_audit_v12_residual -v
       - name: Run existing CFB run-machine regression tests
         run: python -m unittest tests.test_cfb_run_machine_finish -v
