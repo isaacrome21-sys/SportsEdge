@@ -1,0 +1,48 @@
+{
+  "validation_policy_id": "CFB_VALIDATION_POLICY_V1",
+  "version": "1.0.0",
+  "sport": "CFB",
+  "main_markets": ["MONEYLINE", "SPREAD", "TOTAL"],
+  "predictive_scoring_population": "ALL_PIT_SUPPORTABLE_NON_PUSH_ROWS",
+  "economic_scoring_population": "SHADOW_QUALIFIED_CANDIDATES_ONLY",
+  "reason": "Brier/log-loss/calibration must not be improved by post-prediction bet selection; CLV and ROI measure the frozen candidate policy.",
+  "outer_folds": {
+    "type": "SEASON_WALK_FORWARD",
+    "shuffle": false,
+    "require_train_seasons_strictly_before_test_season": true,
+    "calibration_requires_inner_oof_predictions": true,
+    "minimum_forward_seasons_for_truth_gate": 4
+  },
+  "key_number_calibration": {
+    "markets": ["SPREAD"],
+    "margins": [-7, -3, 3, 7],
+    "absolute_mass_tolerance": 0.015,
+    "required_per_outer_fold": true,
+    "manual_probability_boosts_forbidden": true
+  },
+  "recent_two_season_deterioration": {
+    "method_id": "CFB_RECENT_2SEASON_DETERIORATION_V1",
+    "definition": "TRUE when, for either Brier or log loss, the model fails to beat the frozen no-vig benchmark in each of the two most recent completed outer seasons. One isolated weak season is reported but is not by itself a two-season deterioration.",
+    "brier_failure": "brier_model >= brier_benchmark",
+    "logloss_failure": "logloss_model >= logloss_benchmark",
+    "requires_two_completed_outer_seasons": true
+  },
+  "segmented_reports": {
+    "weeks": ["1", "2", "3", "4", "5_PLUS"],
+    "favorite_size": ["0_3", "3_7", "7_14", "14_PLUS"],
+    "conference_strength": true,
+    "fbs_fcs_classification": true
+  },
+  "required_attestations": [
+    "PIT_LEAKAGE",
+    "MARKET_BLIND_FEATURE_SCAN",
+    "ENTITY_REGISTRY",
+    "PRIOR_DECAY_FOLD_INTEGRITY",
+    "CALIBRATION_FOLD_INTEGRITY",
+    "KEY_NUMBER_CALIBRATION",
+    "MODE_IDENTITY",
+    "GAME_COVERAGE_ACCOUNTING",
+    "MARKET_COVERAGE_ACCOUNTING",
+    "BENCHMARK_REPLAYABILITY"
+  ]
+}
