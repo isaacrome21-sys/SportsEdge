@@ -8,6 +8,7 @@ __all__ = [
     "orchestrator",
     "live_acquisition",
     "live_adapters",
+    "live_archive",
     "live_dispatcher",
     "live_engine",
     "live_http_providers",
