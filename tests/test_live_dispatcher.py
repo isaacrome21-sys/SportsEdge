@@ -55,6 +55,7 @@ def test_pregame_without_runner_reports_gap():
 def test_odds_provider_normalizes_two_way_main_markets():
     payload = [
         {
+            "id": "provider-1",
             "home_team": "Chicago Bears",
             "away_team": "Green Bay Packers",
             "bookmakers": [
@@ -82,7 +83,7 @@ def test_odds_provider_normalizes_two_way_main_markets():
             ],
         }
     ]
-    provider = TheOddsAPILiveProvider(api_key="fixture", get_json=lambda _: payload)
+    provider = TheOddsAPILiveProvider(api_key="fixture", get_json=lambda _: payload, scan_additional_markets=False)
     quotes = tuple(provider.fetch_quotes(event(), ("MONEYLINE", "TOTAL")))
     assert {q.market for q in quotes} == {"MONEYLINE", "TOTAL"}
     assert all(q.paired for q in quotes)
@@ -92,6 +93,7 @@ def test_odds_provider_normalizes_two_way_main_markets():
 def test_three_way_market_is_not_silently_collapsed_to_two_way():
     payload = [
         {
+            "id": "provider-1",
             "home_team": "Chicago Bears",
             "away_team": "Green Bay Packers",
             "bookmakers": [
@@ -111,5 +113,54 @@ def test_three_way_market_is_not_silently_collapsed_to_two_way():
             ],
         }
     ]
-    provider = TheOddsAPILiveProvider(api_key="fixture", get_json=lambda _: payload)
+    provider = TheOddsAPILiveProvider(api_key="fixture", get_json=lambda _: payload, scan_additional_markets=False)
     assert tuple(provider.fetch_quotes(event(), ("MONEYLINE",))) == ()
+
+
+def test_provider_discovers_available_prop_markets_and_pairs_player_lines():
+    board = [
+        {
+            "id": "provider-1",
+            "home_team": "Chicago Bears",
+            "away_team": "Green Bay Packers",
+            "bookmakers": [],
+        }
+    ]
+    markets = {
+        "bookmakers": [
+            {"key": "draftkings", "markets": [{"key": "player_pass_yds"}]}
+        ]
+    }
+    event_odds = {
+        "id": "provider-1",
+        "home_team": "Chicago Bears",
+        "away_team": "Green Bay Packers",
+        "bookmakers": [
+            {
+                "key": "draftkings",
+                "markets": [
+                    {
+                        "key": "player_pass_yds",
+                        "outcomes": [
+                            {"name": "Over", "description": "QB A", "point": 245.5, "price": -115},
+                            {"name": "Under", "description": "QB A", "point": 245.5, "price": -105},
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+
+    def get_json(url):
+        if "/markets?" in url:
+            return markets
+        if "/events/provider-1/odds?" in url:
+            return event_odds
+        return board
+
+    provider = TheOddsAPILiveProvider(api_key="fixture", get_json=get_json)
+    quotes = tuple(provider.fetch_quotes(event(), ("PLAYER_PROP",)))
+    assert len(quotes) == 1
+    assert quotes[0].market == "PLAYER_PROP"
+    assert quotes[0].paired
+    assert "QB A" in quotes[0].focal_selection
