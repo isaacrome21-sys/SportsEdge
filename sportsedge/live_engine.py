@@ -1,7 +1,7 @@
 """Shared live betting decision engine for MLB, NFL, and CFB.
 
 LIVE_ENGINE_V1 intentionally separates predictive probability from downstream
-market context.  It will not manufacture Model_P.  A sport adapter/model must
+market context. It will not manufacture Model_P. A sport adapter/model must
 supply a validated live probability before Truth Gate can authorize a bet.
 """
 
@@ -12,19 +12,15 @@ from datetime import datetime, timezone
 from typing import Any, Mapping
 import math
 
+from .live_markets import SPORT_LIVE_MARKETS
+from .live_policy import LIVE_QUOTE_TTL_SECONDS, LIVE_STATE_TTL_SECONDS, assert_market_blind
 from .truth_gate import BetDecision, TruthGateError, decide_bet
 
 
 SUPPORTED_SPORTS = {"MLB", "NFL", "CFB"}
-SUPPORTED_MARKETS = {
-    "MONEYLINE",
-    "SPREAD",
-    "TOTAL",
-    "F5_MONEYLINE",
+SUPPORTED_MARKETS = set().union(*SPORT_LIVE_MARKETS.values()) | {
+    # Backward-compatible aliases used by earlier engine callers.
     "F5_SPREAD",
-    "F5_TOTAL",
-    "NRFI_YRFI",
-    "TEAM_TOTAL",
     "PROP",
 }
 
@@ -113,6 +109,12 @@ class LiveModelOutput:
                 raise LiveEngineError("live Model_P must be finite in [0,1]")
         if not 0 <= float(self.push_probability) < 1:
             raise LiveEngineError("push_probability must be in [0,1)")
+        features = self.diagnostics.get("model_features") if hasattr(self.diagnostics, "get") else None
+        if features is not None:
+            try:
+                assert_market_blind(features)
+            except ValueError as exc:
+                raise LiveEngineError(str(exc)) from exc
 
 
 @dataclass(frozen=True)
@@ -140,24 +142,25 @@ def run_live_engine(
     quote: PairedLiveQuote,
     model: LiveModelOutput,
     edge_floor: float,
-    max_state_age_seconds: int = 30,
-    max_quote_age_seconds: int = 20,
+    max_state_age_seconds: int = LIVE_STATE_TTL_SECONDS,
+    max_quote_age_seconds: int = LIVE_QUOTE_TTL_SECONDS,
     now: datetime | None = None,
     kelly_multiplier: float = 0.25,
     max_kelly_fraction: float = 0.05,
 ) -> LiveEngineDecision:
-    """Run a fail-closed live decision.
+    """Run a fail-closed live decision under frozen LIVE_POLICY_V1 TTLs.
 
-    The caller provides Model_P.  This function handles freshness, paired no-vig,
-    edge/EV/Kelly, and Truth Gate semantics.  If the live model is absent,
+    The caller provides Model_P. This function handles freshness, paired no-vig,
+    edge/EV/Kelly, and Truth Gate semantics. If the live model is absent,
     undeployed, or unvalidated, the result is BLOCKED rather than a synthetic bet.
     """
+
+    if max_state_age_seconds != LIVE_STATE_TTL_SECONDS or max_quote_age_seconds != LIVE_QUOTE_TTL_SECONDS:
+        raise LiveEngineError("LIVE_TTL_POLICY_V1_MISMATCH")
 
     game_state.validate()
     quote.validate()
     model.validate()
-    if game_state.sport not in SUPPORTED_SPORTS:
-        raise LiveEngineError("sport unsupported")
     if not quote.active:
         return _blocked(game_state, quote, model, "MARKET_INACTIVE")
 
@@ -168,9 +171,9 @@ def run_live_engine(
     quote_age = (current - quote.observed_at).total_seconds()
     if state_age < 0 or quote_age < 0:
         return _blocked(game_state, quote, model, "FUTURE_TIMESTAMP")
-    if state_age > max_state_age_seconds:
+    if state_age > LIVE_STATE_TTL_SECONDS:
         return _blocked(game_state, quote, model, "STALE_GAME_STATE")
-    if quote_age > max_quote_age_seconds:
+    if quote_age > LIVE_QUOTE_TTL_SECONDS:
         return _blocked(game_state, quote, model, "STALE_LIVE_QUOTE")
     if model.model_p is None:
         return _blocked(game_state, quote, model, "MODEL_P_MISSING")
