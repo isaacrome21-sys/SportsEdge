@@ -19,7 +19,6 @@ from .live_markets import LiveMarketQuote
 
 JsonGetter = Callable[[str], Any]
 
-
 SPORT_ODDS_KEYS = {
     "MLB": "baseball_mlb",
     "NFL": "americanfootball_nfl",
@@ -56,8 +55,38 @@ def _same_team(candidate: str, wanted: str) -> bool:
     return bool(a and b and (a == b or a.endswith(b) or b.endswith(a)))
 
 
+def _event_status(item: Mapping[str, Any]) -> str:
+    competition = (item.get("competitions") or [{}])[0]
+    status = competition.get("status") or item.get("status") or {}
+    status_type = status.get("type") or {}
+    name = str(status_type.get("name") or "").upper()
+    state = str(status_type.get("state") or "").lower()
+    if any(token in name for token in ("CANCELED", "CANCELLED", "POSTPONED", "SUSPENDED")):
+        return "SUSPENDED"
+    if bool(status_type.get("completed")) or state == "post":
+        return "FINAL"
+    if state == "in":
+        return "LIVE"
+    return "PREGAME"
+
+
+def _competitors(item: Mapping[str, Any]):
+    competition = (item.get("competitions") or [{}])[0]
+    competitors = competition.get("competitors") or []
+    home = next((c for c in competitors if c.get("homeAway") == "home"), None)
+    away = next((c for c in competitors if c.get("homeAway") == "away"), None)
+    return competition, home, away
+
+
+def _team_name(competitor: Mapping[str, Any] | None) -> str:
+    if not competitor:
+        return ""
+    team = competitor.get("team") or {}
+    return str(team.get("displayName") or team.get("shortDisplayName") or team.get("abbreviation") or "")
+
+
 class ESPNLiveStateProvider:
-    """Public ESPN scoreboard state relay with strict timestamp provenance.
+    """Public ESPN scoreboard discovery/state relay with strict provenance.
 
     Missing fields are left missing; sport adapters decide whether the state is
     sufficient for a governed model rather than this provider inventing values.
@@ -68,18 +97,35 @@ class ESPNLiveStateProvider:
     def __init__(self, *, get_json: JsonGetter = _default_get_json):
         self._get_json = get_json
 
+    def discover_events(self, sport: str) -> tuple[LiveEventRef, ...]:
+        now = datetime.now(timezone.utc)
+        data = self._get_json(ESPN_SCOREBOARD_URLS[sport])
+        events: list[LiveEventRef] = []
+        for item in data.get("events", []):
+            _, home, away = _competitors(item)
+            if not home or not away:
+                continue
+            start = _parse_dt(item.get("date"), now)
+            events.append(
+                LiveEventRef(
+                    sport=sport,
+                    event_id=str(item.get("id")),
+                    status=_event_status(item),
+                    scheduled_start=start,
+                    home_team=_team_name(home),
+                    away_team=_team_name(away),
+                )
+            )
+        return tuple(events)
+
     def fetch_quotes(self, event: LiveEventRef, markets: Sequence[str]) -> Iterable[LiveMarketQuote]:
         return ()
 
     def fetch_state(self, event: LiveEventRef) -> tuple[Mapping[str, object], datetime] | None:
-        url = ESPN_SCOREBOARD_URLS[event.sport]
-        data = self._get_json(url)
+        data = self._get_json(ESPN_SCOREBOARD_URLS[event.sport])
         now = datetime.now(timezone.utc)
         for item in data.get("events", []):
-            competition = (item.get("competitions") or [{}])[0]
-            competitors = competition.get("competitors") or []
-            home = next((c for c in competitors if c.get("homeAway") == "home"), None)
-            away = next((c for c in competitors if c.get("homeAway") == "away"), None)
+            competition, home, away = _competitors(item)
             if not home or not away:
                 continue
             home_names = [home.get("team", {}).get(k, "") for k in ("displayName", "shortDisplayName", "abbreviation")]
@@ -95,7 +141,10 @@ class ESPNLiveStateProvider:
             status = competition.get("status") or item.get("status") or {}
             state: dict[str, object] = {
                 "period": status.get("period"),
-                "clock_display": (status.get("displayClock") or status.get("type", {}).get("shortDetail")),
+                "clock_display": status.get("displayClock") or status.get("type", {}).get("shortDetail"),
+                "home_score": int(float(home.get("score") or 0)),
+                "away_score": int(float(away.get("score") or 0)),
+                "event_status": _event_status(item),
             }
             if event.sport in {"NFL", "CFB"}:
                 aliases = {
@@ -112,9 +161,15 @@ class ESPNLiveStateProvider:
                         if situation.get(key) is not None:
                             state[out_name] = situation[key]
                             break
-                possession = situation.get("possession") or situation.get("possessionText")
+                possession = situation.get("possession")
                 if possession is not None:
                     state["possession_raw"] = possession
+                    home_id = str(home.get("team", {}).get("id") or "")
+                    away_id = str(away.get("team", {}).get("id") or "")
+                    if str(possession) == home_id:
+                        state["possession"] = "HOME"
+                    elif str(possession) == away_id:
+                        state["possession"] = "AWAY"
             else:
                 aliases = {
                     "inning": ("inning", "period"),
