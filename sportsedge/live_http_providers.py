@@ -6,6 +6,7 @@ quotes and are never inserted into governed LIVE Model_P features.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from datetime import datetime, timezone
 import json
 import os
@@ -86,11 +87,7 @@ def _team_name(competitor: Mapping[str, Any] | None) -> str:
 
 
 class ESPNLiveStateProvider:
-    """Public ESPN scoreboard discovery/state relay with strict provenance.
-
-    Missing fields are left missing; sport adapters decide whether the state is
-    sufficient for a governed model rather than this provider inventing values.
-    """
+    """Public ESPN scoreboard discovery/state relay with strict provenance."""
 
     name = "ESPN_SCOREBOARD"
 
@@ -105,13 +102,12 @@ class ESPNLiveStateProvider:
             _, home, away = _competitors(item)
             if not home or not away:
                 continue
-            start = _parse_dt(item.get("date"), now)
             events.append(
                 LiveEventRef(
                     sport=sport,
                     event_id=str(item.get("id")),
                     status=_event_status(item),
-                    scheduled_start=start,
+                    scheduled_start=_parse_dt(item.get("date"), now),
                     home_team=_team_name(home),
                     away_team=_team_name(away),
                 )
@@ -196,10 +192,13 @@ class ESPNLiveStateProvider:
 
 
 class TheOddsAPILiveProvider:
-    """Automatic main-market live quote provider using The Odds API.
+    """Automatic live quote provider using featured + discovered event markets.
 
-    Main markets are pulled automatically. Provider-specific prop/derivative
-    markets can be added separately without weakening paired-quote governance.
+    The provider first retrieves the featured board to resolve the provider event
+    ID, then uses the event-markets endpoint to discover additional markets that
+    are actually being offered. Additional markets are requested in chunks and
+    normalized only when a complete two-way pair is present. Unknown or one-sided
+    contracts remain DATA_GAPs rather than being invented.
     """
 
     name = "THE_ODDS_API"
@@ -210,73 +209,214 @@ class TheOddsAPILiveProvider:
         *,
         bookmakers: str | None = None,
         get_json: JsonGetter = _default_get_json,
+        scan_additional_markets: bool = True,
     ):
         self.api_key = (api_key or os.getenv("SPORTSEDGE_ODDS_API_KEY", "")).strip()
         self.bookmakers = bookmakers or os.getenv("SPORTSEDGE_ODDS_BOOKMAKERS", "draftkings")
         self._get_json = get_json
+        self.scan_additional_markets = scan_additional_markets
 
     def fetch_state(self, event: LiveEventRef) -> tuple[Mapping[str, object], datetime] | None:
         return None
 
+    def _query(self, event: LiveEventRef, path: str, params: Mapping[str, object]) -> Any:
+        query = urlencode({"apiKey": self.api_key, **params})
+        return self._get_json(f"https://api.the-odds-api.com/v4/sports/{SPORT_ODDS_KEYS[event.sport]}/{path}?{query}")
+
     def _board(self, event: LiveEventRef) -> list[Mapping[str, Any]]:
         if not self.api_key:
             return []
-        query = urlencode({
-            "apiKey": self.api_key,
-            "regions": "us",
-            "markets": "h2h,spreads,totals",
-            "oddsFormat": "american",
-            "dateFormat": "iso",
-            "bookmakers": self.bookmakers,
-        })
-        url = f"https://api.the-odds-api.com/v4/sports/{SPORT_ODDS_KEYS[event.sport]}/odds?{query}"
-        data = self._get_json(url)
+        data = self._query(
+            event,
+            "odds",
+            {
+                "regions": "us",
+                "markets": "h2h,spreads,totals",
+                "oddsFormat": "american",
+                "dateFormat": "iso",
+                "bookmakers": self.bookmakers,
+            },
+        )
         return data if isinstance(data, list) else []
+
+    def _match_game(self, event: LiveEventRef, board: Sequence[Mapping[str, Any]]) -> Mapping[str, Any] | None:
+        for game in board:
+            if _same_team(str(game.get("home_team", "")), event.home_team) and _same_team(
+                str(game.get("away_team", "")), event.away_team
+            ):
+                return game
+        return None
+
+    def _available_market_keys(self, event: LiveEventRef, provider_event_id: str) -> tuple[str, ...]:
+        if not self.scan_additional_markets:
+            return ()
+        data = self._query(
+            event,
+            f"events/{provider_event_id}/markets",
+            {"regions": "us", "dateFormat": "iso"},
+        )
+        keys = set()
+        bookmakers = data.get("bookmakers", []) if isinstance(data, Mapping) else []
+        for book in bookmakers:
+            if self.bookmakers and str(book.get("key", "")) not in set(self.bookmakers.split(",")):
+                continue
+            for market in book.get("markets") or []:
+                key = market.get("key")
+                if key:
+                    keys.add(str(key))
+        return tuple(sorted(keys - {"h2h", "spreads", "totals"}))
+
+    def _event_odds(self, event: LiveEventRef, provider_event_id: str, keys: Sequence[str]) -> list[Mapping[str, Any]]:
+        if not keys:
+            return []
+        data = self._query(
+            event,
+            f"events/{provider_event_id}/odds",
+            {
+                "regions": "us",
+                "markets": ",".join(keys),
+                "oddsFormat": "american",
+                "dateFormat": "iso",
+                "bookmakers": self.bookmakers,
+            },
+        )
+        return [data] if isinstance(data, Mapping) else []
 
     def fetch_quotes(self, event: LiveEventRef, markets: Sequence[str]) -> Iterable[LiveMarketQuote]:
         wanted = set(markets)
         if not self.api_key:
             return ()
         retrieved = datetime.now(timezone.utc)
-        rows: list[LiveMarketQuote] = []
-        for game in self._board(event):
-            if not (_same_team(str(game.get("home_team", "")), event.home_team) and _same_team(str(game.get("away_team", "")), event.away_team)):
-                continue
-            for book in game.get("bookmakers") or []:
-                book_name = str(book.get("key") or book.get("title") or "UNKNOWN")
-                book_update = _parse_dt(book.get("last_update"), retrieved)
-                for market in book.get("markets") or []:
-                    key = market.get("key")
-                    outcomes = market.get("outcomes") or []
-                    source_as_of = _parse_dt(market.get("last_update"), book_update)
-                    if key == "h2h" and "MONEYLINE" in wanted:
-                        pair = self._two_way(outcomes)
-                        if pair:
-                            a, b = pair
-                            rows.append(self._quote(event, book_name, "MONEYLINE", "moneyline", a, b, source_as_of, retrieved))
-                    elif key == "spreads" and "SPREAD" in wanted:
-                        pair = self._two_way(outcomes)
-                        if pair:
-                            a, b = pair
-                            point = a.get("point")
-                            contract = f"spread:{a.get('name')}:{point}"
-                            rows.append(self._quote(event, book_name, "SPREAD", contract, a, b, source_as_of, retrieved))
-                    elif key == "totals" and "TOTAL" in wanted:
-                        pair = self._two_way(outcomes)
-                        if pair:
-                            a, b = pair
-                            point = a.get("point")
-                            contract = f"total:{point}"
-                            rows.append(self._quote(event, book_name, "TOTAL", contract, a, b, source_as_of, retrieved))
-            break
+        board = self._board(event)
+        game = self._match_game(event, board)
+        if game is None:
+            return ()
+
+        rows = self._normalize_game(event, game, wanted, retrieved)
+        provider_event_id = str(game.get("id") or "")
+        if provider_event_id and self.scan_additional_markets:
+            try:
+                keys = self._available_market_keys(event, provider_event_id)
+            except Exception:
+                keys = ()
+            for index in range(0, len(keys), 10):
+                chunk = keys[index:index + 10]
+                try:
+                    extra_games = self._event_odds(event, provider_event_id, chunk)
+                except Exception:
+                    continue
+                for extra in extra_games:
+                    rows.extend(self._normalize_game(event, extra, wanted, retrieved))
         return tuple(rows)
 
+    def _normalize_game(
+        self,
+        event: LiveEventRef,
+        game: Mapping[str, Any],
+        wanted: set[str],
+        retrieved: datetime,
+    ) -> list[LiveMarketQuote]:
+        rows: list[LiveMarketQuote] = []
+        for book in game.get("bookmakers") or []:
+            book_name = str(book.get("key") or book.get("title") or "UNKNOWN")
+            book_update = _parse_dt(book.get("last_update"), retrieved)
+            for market in book.get("markets") or []:
+                key = str(market.get("key") or "")
+                market_name = self._market_name(event.sport, key)
+                if market_name is None or market_name not in wanted:
+                    continue
+                source_as_of = _parse_dt(market.get("last_update"), book_update)
+                for focal, opposite, contract in self._pairs(key, market.get("outcomes") or []):
+                    rows.append(
+                        self._quote(
+                            event, book_name, market_name, contract,
+                            focal, opposite, source_as_of, retrieved,
+                        )
+                    )
+        return rows
+
     @staticmethod
-    def _two_way(outcomes: Sequence[Mapping[str, Any]]) -> tuple[Mapping[str, Any], Mapping[str, Any]] | None:
+    def _market_name(sport: str, key: str) -> str | None:
+        if key == "h2h":
+            return "MONEYLINE"
+        if key == "spreads":
+            return "SPREAD"
+        if key == "totals":
+            return "TOTAL"
+        if key == "team_totals" or key == "alternate_team_totals":
+            return "TEAM_TOTAL"
+        if key == "alternate_totals":
+            return "ALT_TOTAL"
+        if key == "alternate_spreads":
+            return "ALT_RUN_LINE" if sport == "MLB" else "ALT_SPREAD"
+        if key.startswith("batter_"):
+            return "BATTER_PROP" if sport == "MLB" else "PLAYER_PROP"
+        if key.startswith("pitcher_"):
+            return "PITCHER_PROP" if sport == "MLB" else "PLAYER_PROP"
+        if key.startswith("player_"):
+            return "PLAYER_PROP"
+        if sport == "MLB" and "1st_5_innings" in key:
+            if key.startswith("h2h"):
+                return "F5_MONEYLINE"
+            if key.startswith("spreads"):
+                return "F5_RUN_LINE"
+            if key.startswith("totals"):
+                return "F5_TOTAL"
+        if sport == "MLB" and "innings" in key:
+            return "INNING_MONEYLINE" if key.startswith("h2h") else "INNING_TOTAL"
+        if "_h1" in key or "1st_half" in key:
+            if key.startswith("h2h"):
+                return "1H_MONEYLINE"
+            if key.startswith("spreads"):
+                return "1H_SPREAD"
+            if key.startswith("totals"):
+                return "1H_TOTAL"
+        if "_h2" in key or "2nd_half" in key:
+            if key.startswith("h2h"):
+                return "2H_MONEYLINE"
+            if key.startswith("spreads"):
+                return "2H_SPREAD"
+            if key.startswith("totals"):
+                return "2H_TOTAL"
+        if any(token in key for token in ("_q1", "_q2", "_q3", "_q4")):
+            if key.startswith("h2h"):
+                return "QUARTER_MONEYLINE"
+            if key.startswith("spreads"):
+                return "QUARTER_SPREAD"
+            if key.startswith("totals"):
+                return "QUARTER_TOTAL"
+        return None
+
+    @staticmethod
+    def _pairs(
+        key: str, outcomes: Sequence[Mapping[str, Any]]
+    ) -> tuple[tuple[Mapping[str, Any], Mapping[str, Any], str], ...]:
         usable = [o for o in outcomes if o.get("name") and o.get("price") is not None]
-        if len(usable) != 2:
-            return None
-        return usable[0], usable[1]
+        if not usable:
+            return ()
+
+        names = {str(o.get("name")).lower() for o in usable}
+        groups: dict[tuple[object, ...], list[Mapping[str, Any]]] = defaultdict(list)
+        if names <= {"over", "under"} or names <= {"yes", "no"}:
+            for outcome in usable:
+                groups[(outcome.get("description"), outcome.get("point"))].append(outcome)
+        elif key.startswith("spreads") or key == "alternate_spreads":
+            for outcome in usable:
+                point = outcome.get("point")
+                groups[(abs(float(point)) if point is not None else None,)].append(outcome)
+        else:
+            groups[(None,)] = usable
+
+        pairs = []
+        for group_key, group in groups.items():
+            if len(group) != 2:
+                continue
+            a, b = group
+            descriptor = a.get("description") or b.get("description") or ""
+            point = a.get("point") if a.get("point") is not None else b.get("point")
+            contract = f"{key}:{descriptor}:{point}"
+            pairs.append((a, b, contract))
+        return tuple(pairs)
 
     def _quote(
         self,
@@ -289,14 +429,20 @@ class TheOddsAPILiveProvider:
         source_as_of: datetime,
         retrieved: datetime,
     ) -> LiveMarketQuote:
+        focal_name = str(focal.get("description") or focal.get("name"))
+        opposite_name = str(opposite.get("description") or opposite.get("name"))
+        if focal.get("description"):
+            focal_name = f"{focal.get('description')} {focal.get('name')} {focal.get('point', '')}".strip()
+        if opposite.get("description"):
+            opposite_name = f"{opposite.get('description')} {opposite.get('name')} {opposite.get('point', '')}".strip()
         return LiveMarketQuote(
             sport=event.sport,
             event_id=event.event_id,
             book=book,
             market=market,
             contract_key=contract,
-            focal_selection=str(focal.get("name")),
-            opposite_selection=str(opposite.get("name")),
+            focal_selection=focal_name,
+            opposite_selection=opposite_name,
             focal_odds=float(focal.get("price")),
             opposite_odds=float(opposite.get("price")),
             source_as_of=source_as_of,
