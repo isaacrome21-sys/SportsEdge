@@ -1,0 +1,26 @@
+name: live-engine-ci
+
+on:
+  pull_request:
+    paths:
+      - 'sportsedge/live_*.py'
+      - 'tests/test_live_*.py'
+      - 'docs/LIVE_ENGINE_V1.md'
+      - '.github/workflows/live-engine-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-engine-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependencies
+        run: python -m pip install --disable-pip-version-check pytest numpy
+      - name: Run LIVE_ENGINE_V1 tests
+        run: python -m pytest -q tests/test_live_engine.py tests/test_live_governance.py tests/test_live_dispatcher.py
