@@ -4,6 +4,11 @@ Modes differ only in ownership of inputs. Every mode converges on the same canon
 CFB game snapshot, the same joint full-game distribution, and the same market
 read-outs. Sportsbook prices are never model features.
 
+SportsEdge CFB currently admits FBS-vs-FBS games only. All modes must bind every
+team in every game to a frozen CFBD ``/teams/fbs`` membership snapshot before the
+joint model can run. FCS/unknown membership fails closed rather than inheriting
+FBS calibration or promotion state.
+
 This foundation prices full-game MONEYLINE / SPREAD / TOTAL only. Other declared
 football markets remain explicit NO_ENGINE until their required period/player state
 is actually modeled. New CFB pricing remains BLOCKED from official betting until
@@ -19,6 +24,7 @@ from math import isfinite
 from typing import Any, Callable, Mapping, Sequence
 from urllib.request import urlopen
 
+from .classification_policy import assert_fbs_only_games
 from .joint_model import CFBJointScoreModel, CFB_SEED_POLICY, price_cfb_game_markets, simulate_cfb_joint_distribution
 from .source import (
     CFBGame, CFBQuote, CFBTeamMetrics, SUPPORTED_GAME_MARKETS, attach_weather,
@@ -196,9 +202,11 @@ def _summary(results: Sequence[CFBMachineResult]) -> dict[str, Any]:
 
 def _run_canonical(*, mode: str, season: int, week: int, now: datetime, model: CFBJointScoreModel,
                    games: Sequence[CFBGame], metrics: Mapping[str, CFBTeamMetrics], quotes,
-                   root_seed: int, n_paths: int, quote_ttl_seconds: int, source_failures=()) -> CFBMachineReport:
+                   fbs_team_rows: Sequence[Mapping[str, Any]], root_seed: int, n_paths: int,
+                   quote_ttl_seconds: int, source_failures=()) -> CFBMachineReport:
     current = _aware(now, "now")
     if not games: raise CFBRunMachineError("CFB_GAMES_EMPTY")
+    assert_fbs_only_games(games, fbs_team_rows=fbs_team_rows)
     model_sha = model.artifact_sha256(); game_map = {g.game_id: g for g in games}; quote_rows = [_quote_dict(q) for q in quotes]
     distributions = {}; dist_hashes = {}; seeds = {}
     for gid in sorted({str(q.get("game_id") or "") for q in quote_rows if str(q.get("market") or "").upper() in SUPPORTED_GAME_MARKETS}):
@@ -249,20 +257,27 @@ def _run_canonical(*, mode: str, season: int, week: int, now: datetime, model: C
 
 def run_cfb_machine(*, mode: str = "AUTO_SELECT", season: int, week: int, model: CFBJointScoreModel, now: datetime,
                     games: Sequence[CFBGame] | None = None, metrics: Mapping[str, CFBTeamMetrics] | None = None,
-                    quotes: Sequence[CFBQuote | Mapping[str, Any]] | None = None, cfbd_api_key: str | None = None,
-                    odds_api_key: str | None = None, bookmakers: Sequence[str] = ("draftkings",), root_seed: int = 20260826,
+                    quotes: Sequence[CFBQuote | Mapping[str, Any]] | None = None,
+                    fbs_team_rows: Sequence[Mapping[str, Any]] | None = None,
+                    cfbd_api_key: str | None = None, odds_api_key: str | None = None,
+                    bookmakers: Sequence[str] = ("draftkings",), root_seed: int = 20260826,
                     n_paths: int = 20000, quote_ttl_seconds: int = DEFAULT_QUOTE_TTL_SECONDS, opener: Callable = urlopen,
                     team_fetcher=fetch_cfbd_teams, game_fetcher=fetch_cfbd_games, metric_fetcher=fetch_cfbd_team_metrics,
                     weather_fetcher=fetch_cfbd_weather, odds_fetcher=fetch_the_odds_api_quotes) -> CFBMachineReport:
     current = _aware(now, "now"); selected = _resolve_mode(mode, games=games, metrics=metrics, quotes=quotes)
     if selected == "MANUAL":
         if games is None or metrics is None or quotes is None: raise CFBRunMachineError("CFB_MANUAL_REQUIRES_GAMES_METRICS_QUOTES")
+        if fbs_team_rows is None: raise CFBRunMachineError("CFB_MANUAL_FBS_MEMBERSHIP_REQUIRED")
         return _run_canonical(mode=selected, season=season, week=week, now=current, model=model, games=list(games), metrics=metrics,
-                              quotes=list(quotes), root_seed=root_seed, n_paths=n_paths, quote_ttl_seconds=quote_ttl_seconds)
+                              quotes=list(quotes), fbs_team_rows=list(fbs_team_rows), root_seed=root_seed, n_paths=n_paths,
+                              quote_ttl_seconds=quote_ttl_seconds)
+    if fbs_team_rows is not None:
+        raise CFBRunMachineError("CFB_FETCHED_MODE_FBS_MEMBERSHIP_OWNED_BY_SOURCE")
     key = str(cfbd_api_key or "").strip()
     if not key: raise CFBRunMachineError("CFBD_API_KEY_REQUIRED")
     team_rows = team_fetcher(season=season, cfbd_api_key=key, opener=opener); alias_index = build_team_alias_index(team_rows)
     fetched_games = game_fetcher(season=season, week=week, cfbd_api_key=key, opener=opener)
+    assert_fbs_only_games(fetched_games, fbs_team_rows=team_rows)
     fetched_games = attach_weather(fetched_games, weather_fetcher(season=season, week=week, cfbd_api_key=key, opener=opener))
     fetched_metrics = metric_fetcher(season=season, week=week, cfbd_api_key=key, now=current, opener=opener)
     if selected == "HYBRID":
@@ -274,8 +289,8 @@ def run_cfb_machine(*, mode: str = "AUTO_SELECT", season: int, week: int, model:
         canonical_quotes = odds_fetcher(api_key=odds_key, games=fetched_games, alias_index=alias_index, bookmakers=bookmakers, opener=opener)
     else: raise CFBRunMachineError(f"CFB_RUN_MODE_UNREACHABLE:{selected}")
     return _run_canonical(mode=selected, season=season, week=week, now=current, model=model, games=fetched_games,
-                          metrics=fetched_metrics, quotes=canonical_quotes, root_seed=root_seed, n_paths=n_paths,
-                          quote_ttl_seconds=quote_ttl_seconds)
+                          metrics=fetched_metrics, quotes=canonical_quotes, fbs_team_rows=team_rows,
+                          root_seed=root_seed, n_paths=n_paths, quote_ttl_seconds=quote_ttl_seconds)
 
 
 def run_it_cfb(**kwargs: Any) -> CFBMachineReport:
