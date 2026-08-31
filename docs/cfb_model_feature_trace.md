@@ -79,11 +79,25 @@ The canonical runner now requires:
 
 `fetch_cfbd_team_metrics(...)` implements the same intended split: Week 2+ uses current-season metrics through `week - 1`; Week 1 switches to prior-season data.
 
-## Remaining provenance / historical gaps
+## Historical PIT materialization
+
+`sportsedge/sports/cfb/historical_features.py` now provides a deterministic materializer for already-frozen historical snapshots. It builds the exact row shape consumed by `CFB_JOINT_GAME_FEATURES_V1` while requiring:
+
+- season-specific frozen FBS membership;
+- Week 2+ current-season metrics from exactly `game.week - 1`;
+- Week 1 an explicit immediately-prior-season fallback snapshot;
+- metric `feature_asof_ts` strictly before kickoff;
+- no market/odds/closing-line fields in historical game rows;
+- paired realized-score targets and optional paired regulation-score targets;
+- deterministic ordering by season/week/game identity.
+
+This closes the row-materialization semantic gap, but **does not prove historical source availability by itself**. The materializer deliberately consumes already-frozen metric/weather snapshots. A source-freeze/manifest layer still must prove where those snapshots came from, when they were available, and that later corrections were not silently backfilled into earlier as-of states. Walk-forward/OOS validation must then consume those frozen rows rather than ex-post reconstructed data.
+
+## Remaining provenance gaps
 
 Weather values are currently normalized from CFBD and carry a source label, but the weather object does not yet carry a retrieval timestamp or independent as-of timestamp. That prevents a complete timestamp-level weather provenance proof and should remain an explicit gap rather than being inferred as solved.
 
-`sportsedge/sports/cfb/history.py` currently provides bulk season ingestion of `games` and `lines`; it is not a complete historical materializer for `CFB_JOINT_GAME_FEATURES_V1`. Therefore the repository does **not** yet contain a demonstrated historical feature pipeline proving the same live PIT contract across multiple seasons. A durable historical builder must be added before predictive/OOS promotion evidence can be considered complete.
+`sportsedge/sports/cfb/history.py` still only bulk-ingests season `games` and `lines`; it is not itself the snapshot-freeze/source-manifest layer for the new historical feature materializer. Durable multi-season source manifests, correction policy, and execution evidence remain required before predictive/OOS promotion evidence can be considered complete.
 
 ## Promotion status
 
