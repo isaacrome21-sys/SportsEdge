@@ -24,15 +24,17 @@ All three modes converge on `run_canonical_nfl_live(...)`; execution mode does n
 
 ## Parity contract now present
 
-`tests/test_nfl_mode_parity.py` now constructs one frozen canonical feature payload, one raw sportsbook snapshot, one exact M2 model/identity, and one capture time, then requires MANUAL/HYBRID/AUTOMATIC outputs to be byte-identical. It also requires the same three market rows, source-manifest hash, feature-as-of timestamp, code SHA, model-artifact SHA, and shadow-only governance state. Separate tests prove the mode ownership requirements fail closed and that a future feature snapshot is rejected in every mode.
+`tests/test_nfl_mode_parity.py` constructs one frozen canonical feature payload, one raw sportsbook snapshot, one exact M2 model/identity, and one capture time, then requires MANUAL/HYBRID/AUTOMATIC outputs to be byte-identical. It also requires the same three market rows, source-manifest hash, feature-as-of timestamp, code SHA, model-artifact SHA, and shadow-only governance state. Separate tests prove the mode ownership requirements fail closed and that a future feature snapshot is rejected in every mode.
 
 `tests/test_nfl_odds_source.py` separately covers the reusable provider URL/market contract, untouched payload behavior, and fail-closed response-shape validation.
 
-This is **implementation/code-inspection evidence only** until a real test runner executes the new tests. GitHub-hosted jobs on this branch continue to terminate before any steps execute, so no passing claim is made.
+This is **implementation/code-inspection evidence only** until a real test runner executes the new tests. GitHub-hosted jobs on this branch continue to terminate before any steps execute (`steps=null`), so no passing claim is made.
 
 ## Remaining production-binding gap
 
-The scheduled forward-evidence workflow still enters `scripts/update_nfl_forward_state.py::decision_mode()`, whose decision section predates `run_canonical_nfl_live(...)` and currently duplicates the same model/event/distribution/readout operations before persisting durable decisions. The next remediation is to route that state-machine decision path through the canonical runner while preserving its existing idempotency/partial-game guards and its exact error semantics. Until that binding is complete, the new mode surface is reusable and semantically aligned with production, but the scheduled durable-state path has not yet been proven to execute through the same function.
+The scheduled forward-evidence workflow still enters `scripts/update_nfl_forward_state.py::decision_mode()`. That durable-state function predates `run_canonical_nfl_live(...)` and still duplicates the same game/event/distribution/readout sequence before persisting rows. The duplicate path is the final orchestration gap: it must delegate new-game pricing to the canonical runner while preserving state idempotency, partial-game protection, release binding, and existing fail-closed behavior.
+
+Until that delegation lands, the new mode surface is reusable and semantically designed to match production, but the scheduled durable-state path is not yet claimed to execute through the same function.
 
 ## Acceptance before calling NFL parity closed
 
