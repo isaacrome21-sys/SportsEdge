@@ -6,13 +6,16 @@ from typing import Any, Iterable, Mapping
 from .context_autopull import ContextObservation, NFLContextError, run_context_mode
 from .context_providers import build_rest_travel_provider, build_workload_leash_provider
 from .context_source_adapters import official_injury_auto_adapter, weather_roof_auto_adapter
+from .defensive_context import build_defensive_matchup_provider
+from .personnel_coaching_context import build_coaching_provider, build_personnel_provider
 
 
 def build_default_auto_providers(*, game: Mapping[str, Any]) -> dict[str, Any]:
-    """Build provider closures for the four first-class NFL AUTO sources.
+    """Build provider closures for first-class NFL AUTO objective context.
 
-    Inputs are already-resolved objective snapshots supplied by the NFL runtime.
+    Inputs are already-resolved objective/PIT snapshots supplied by the NFL runtime.
     Missing snapshots return None so the shared collector emits explicit MISSING.
+    Social/public betting/sportsbook data is never accepted here.
     """
     def weather(game_id: str, pit: datetime):
         stadium_id = game.get("stadium_id")
@@ -109,11 +112,72 @@ def build_default_auto_providers(*, game: Mapping[str, Any]) -> dict[str, Any]:
             "observed_at": pit,
         }
 
+    def defensive(game_id: str, pit: datetime):
+        rows = list(game.get("defensive_matchup_inputs") or [])
+        if not rows:
+            return None
+        payload = []
+        hashes = []
+        source_uri = None
+        for raw in rows:
+            row = build_defensive_matchup_provider(
+                game_id=game_id,
+                offense_team_id=str(raw.get("offense_team_id") or ""),
+                defense_team_id=str(raw.get("defense_team_id") or ""),
+                as_of=pit,
+                source_uri=str(raw.get("source_uri") or ""),
+                source_sha256=str(raw.get("source_sha256") or ""),
+                splits=list(raw.get("splits") or []),
+            )
+            payload.append(row["payload"])
+            hashes.append(row["source_sha256"])
+            source_uri = row["source_uri"]
+        from ...source_lineage import canonical_json_sha256
+        return {
+            "status": "AVAILABLE",
+            "payload": payload,
+            "source_name": "PIT_DEFENSIVE_SPLITS",
+            "source_uri": str(source_uri),
+            "source_sha256": canonical_json_sha256(sorted(hashes)),
+            "observed_at": pit,
+        }
+
+    def personnel(game_id: str, pit: datetime):
+        rows = list(game.get("personnel_package_inputs") or [])
+        if not rows:
+            return None
+        source_uri = str(game.get("personnel_source_uri") or "")
+        source_sha256 = str(game.get("personnel_source_sha256") or "")
+        return build_personnel_provider(
+            game_id=game_id,
+            as_of=pit,
+            source_uri=source_uri,
+            source_sha256=source_sha256,
+            rows=rows,
+        )
+
+    def coaching(game_id: str, pit: datetime):
+        rows = list(game.get("coaching_tendency_inputs") or [])
+        if not rows:
+            return None
+        source_uri = str(game.get("coaching_source_uri") or "")
+        source_sha256 = str(game.get("coaching_source_sha256") or "")
+        return build_coaching_provider(
+            game_id=game_id,
+            as_of=pit,
+            source_uri=source_uri,
+            source_sha256=source_sha256,
+            rows=rows,
+        )
+
     return {
         "weather": weather,
         "injury_availability": injury,
         "rest_travel": rest_travel,
         "workload_leash": workload,
+        "defensive_matchup": defensive,
+        "personnel_packages": personnel,
+        "coaching_tendencies": coaching,
     }
 
 
