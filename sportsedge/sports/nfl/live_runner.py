@@ -148,10 +148,13 @@ def run_nfl_live(
     identical-input semantics without network access while production callers can
     bind the real feature builder/provider acquisition implementations.
     """
-    try:
-        resolved = NFLExecutionMode(str(mode).upper())
-    except ValueError as exc:
-        raise ValueError("NFL_EXECUTION_MODE_INVALID") from exc
+    if isinstance(mode, NFLExecutionMode):
+        resolved = mode
+    else:
+        try:
+            resolved = NFLExecutionMode(str(mode).upper())
+        except ValueError as exc:
+            raise ValueError("NFL_EXECUTION_MODE_INVALID") from exc
 
     if resolved is NFLExecutionMode.MANUAL:
         if live_features is None or odds_events is None:
