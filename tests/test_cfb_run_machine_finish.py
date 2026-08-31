@@ -23,7 +23,7 @@ START = datetime(2026, 8, 29, 16, 0, tzinfo=timezone.utc)
 
 def metric(team, bump=0.0):
     return CFBTeamMetrics(
-        team=team, season=2026, through_week=0, sample_source="PRIOR_SEASON_FALLBACK",
+        team=team, season=2025, through_week=99, sample_source="PRIOR_SEASON_FALLBACK",
         off_ppa_rush=.11+bump, off_ppa_dropback=.19+bump, def_ppa_rush_allowed=.05-bump,
         def_ppa_dropback_allowed=.08-bump, off_success_rate=.46+bump/10,
         def_success_rate_allowed=.42-bump/10, standard_down_ppa=.13+bump,
