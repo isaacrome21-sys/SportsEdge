@@ -9,7 +9,7 @@ from .context_source_adapters import official_injury_auto_adapter, weather_roof_
 from .defensive_context import build_defensive_matchup_provider
 from .personnel_coaching_context import build_coaching_provider, build_personnel_provider
 from .special_teams_context import build_special_teams_provider
-from .stadium_registry import load_default_stadium_registry, registry_sha256
+from .stadium_registry import load_stadium_registry
 
 
 def build_default_auto_providers(*, game: Mapping[str, Any]) -> dict[str, Any]:
@@ -22,8 +22,8 @@ def build_default_auto_providers(*, game: Mapping[str, Any]) -> dict[str, Any]:
         stadium_id = str(game.get("stadium_id") or "").strip()
         if not stadium_id:
             return None
-        registry = load_default_stadium_registry()
-        stadium = registry.get(stadium_id)
+        registry = load_stadium_registry()
+        stadium = (registry.get("stadiums") or {}).get(stadium_id)
         if stadium is None:
             return None
         payload = {
@@ -39,13 +39,14 @@ def build_default_auto_providers(*, game: Mapping[str, Any]) -> dict[str, Any]:
             "typical_home_kickoff_hour_local": stadium.typical_home_kickoff_hour_local,
             "surface_type": game.get("surface_type"),
             "altitude_ft": game.get("altitude_ft"),
+            "registry_version": registry.get("version"),
         }
         return {
             "status": "AVAILABLE",
             "payload": payload,
             "source_name": "SPORTSEDGE_STADIUM_REGISTRY",
             "source_uri": "https://github.com/isaacrome21-sys/SportsEdge",
-            "source_sha256": registry_sha256(registry),
+            "source_sha256": str(registry.get("registry_sha256") or ""),
             "observed_at": pit,
         }
 
