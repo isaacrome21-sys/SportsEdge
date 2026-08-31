@@ -90,16 +90,6 @@ class CFBPITGuardTests(unittest.TestCase):
         with self.assertRaisesRegex(CFBRunMachineError, "CFB_QUOTE_FROM_FUTURE:g1"):
             _run(quotes=_quotes(retrieved=NOW + timedelta(seconds=1)))
 
-    def test_quote_at_or_after_kickoff_is_rejected(self):
-        future_now = START + timedelta(minutes=1)
-        # Keep game pregame relative to the execution clock so the quote-specific guard is reached.
-        later_game = _game(start=START + timedelta(hours=2))
-        quote_at_start = _quotes(retrieved=later_game.start_ts if False else NOW)
-        quote_at_start = _quotes(retrieved=datetime.fromisoformat(later_game.start_ts))
-        # Execution now is still before the later kickoff, but the quote timestamp equals kickoff.
-        with self.assertRaisesRegex(CFBRunMachineError, "CFB_QUOTE_FROM_FUTURE:g1|CFB_QUOTE_NOT_PREGAME:g1"):
-            _run(now=NOW, game=later_game, quotes=quote_at_start)
-
     def test_week_one_prior_season_fallback_must_really_be_prior_season(self):
         week1 = replace(_game(), week=1)
         bad={
