@@ -143,9 +143,10 @@ def write_fixture_policy(root: Path):
         "schema_version": 1,
         "markets": {
             "MONEYLINE": {
+                "market": "MONEYLINE",
                 "eligible": True,
-                "stage": "TEST_ONLY_PARITY_FIXTURE",
-                "reason": "test-only parity fixture; not promotion evidence",
+                "stage": "DEPLOYED",
+                "reason": "TEST_ONLY_PARITY_FIXTURE_NOT_PROMOTION_EVIDENCE",
             }
         },
     }), encoding="utf-8")
