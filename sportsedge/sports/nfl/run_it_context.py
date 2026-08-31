@@ -8,6 +8,7 @@ from .context_providers import build_rest_travel_provider, build_workload_leash_
 from .context_source_adapters import official_injury_auto_adapter, weather_roof_auto_adapter
 from .defensive_context import build_defensive_matchup_provider
 from .personnel_coaching_context import build_coaching_provider, build_personnel_provider
+from .prop_opportunity_context import build_prop_opportunity_provider
 from .special_teams_context import build_special_teams_provider
 from .stadium_registry import load_stadium_registry
 
@@ -115,7 +116,31 @@ def build_default_auto_providers(*, game: Mapping[str, Any]) -> dict[str, Any]:
                 "source_uri":str(source_uri),"source_sha256":canonical_json_sha256(sorted(hashes)),"observed_at":pit}
 
     def snap_usage(game_id: str, pit: datetime):
-        return workload_rows(game_id, pit)
+        prop_rows = list(game.get("prop_opportunity_inputs") or [])
+        workload = workload_rows(game_id, pit)
+        if not prop_rows:
+            return workload
+        prop = build_prop_opportunity_provider(
+            game_id=game_id,
+            as_of=pit,
+            source_uri=str(game.get("prop_opportunity_source_uri") or ""),
+            source_sha256=str(game.get("prop_opportunity_source_sha256") or ""),
+            rows=prop_rows,
+        )
+        from ...source_lineage import canonical_json_sha256
+        if workload is None:
+            return prop
+        return {
+            "status": "AVAILABLE",
+            "payload": {
+                "workload": workload["payload"],
+                "prop_opportunity": prop["payload"],
+            },
+            "source_name": "PIT_SNAP_USAGE_WORKLOAD+PROP_OPPORTUNITY",
+            "source_uri": prop["source_uri"],
+            "source_sha256": canonical_json_sha256(sorted([workload["source_sha256"], prop["source_sha256"]])),
+            "observed_at": pit,
+        }
 
     def workload(game_id: str, pit: datetime):
         return workload_rows(game_id, pit)
