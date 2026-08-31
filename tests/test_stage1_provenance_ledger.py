@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -6,6 +7,19 @@ from sportsedge.generic_card_pipeline import GenericCardResult
 from sportsedge.orchestrator import RunResult, run_candidate
 from sportsedge.runtime import result_to_dict
 from sportsedge.unified_card import UnifiedCardResult, _convert, unified_result_to_dict
+
+
+QUOTE_TS = datetime(2026, 8, 24, 14, 0, tzinfo=timezone.utc)
+
+
+def _quote(american_odds):
+    return {
+        "american_odds": american_odds,
+        "book_key": "synthetic_test_book",
+        "sportsbook": "Synthetic Test Book",
+        "retrieved_at": QUOTE_TS,
+        "offer_id": "synthetic-offer",
+    }
 
 
 class Stage1ProvenanceLedgerTests(unittest.TestCase):
@@ -54,8 +68,8 @@ class Stage1ProvenanceLedgerTests(unittest.TestCase):
                 "game_id": "1", "market": "MONEYLINE", "entity_id": "10",
                 "line": 0.0, "side": "HOME",
             },
-            quote={"american_odds": -110},
-            paired_quote={"american_odds": 100},
+            quote=_quote(-110),
+            paired_quote=_quote(100),
             deployment={"eligible": True},
             engine_fn=lambda _: {
                 "game_id": "1", "market": "MONEYLINE", "entity_id": "10",
@@ -67,6 +81,8 @@ class Stage1ProvenanceLedgerTests(unittest.TestCase):
         )
 
         self.assertEqual(result.bet_status, "PASS")
+        self.assertEqual(result.book_key, "synthetic_test_book")
+        self.assertEqual(result.quote_retrieved_at, QUOTE_TS.isoformat())
         for key, value in provenance.items():
             with self.subTest(key=key):
                 self.assertEqual(getattr(result, key), value)
@@ -79,8 +95,8 @@ class Stage1ProvenanceLedgerTests(unittest.TestCase):
                 "game_id": "1", "market": "MONEYLINE", "entity_id": "10",
                 "line": 0.0, "side": "HOME",
             },
-            quote={"american_odds": -110},
-            paired_quote={"american_odds": 100},
+            quote=_quote(-110),
+            paired_quote=_quote(100),
             deployment={"eligible": True},
             engine_fn=lambda _: {
                 "game_id": "1", "market": "MONEYLINE", "entity_id": "10",
@@ -102,8 +118,8 @@ class Stage1ProvenanceLedgerTests(unittest.TestCase):
                 "game_id": "1", "market": "HITS", "entity_id": "10",
                 "line": 0.5, "side": "OVER",
             },
-            quote={"american_odds": -110},
-            paired_quote={"american_odds": -110},
+            quote=_quote(-110),
+            paired_quote=_quote(-110),
             deployment={"eligible": False},
             engine_fn=lambda _: {
                 "game_id": "1", "market": "HITS", "entity_id": "10",
