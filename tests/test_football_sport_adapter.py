@@ -34,7 +34,7 @@ class FootballSportAdapterContractTests(unittest.TestCase):
             cfb.margin_sigma({})
         with self.assertRaises(NotImplementedError):
             cfb.total_sigma({})
-        with self.assertRaises(NotImplementedError):
+        with self.assertRaisesRegex(ValueError, "HISTORICAL_KEY_NUMBERS_ARE_VALIDATION_ONLY"):
             cfb.key_numbers()
         with self.assertRaises(NotImplementedError):
             cfb.hfa_prior(None, {})

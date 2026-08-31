@@ -7,8 +7,14 @@ from sportsedge.engine_registry import EngineDispatchError, hits_engine_adapter
 from sportsedge.runtime import RuntimeInputError, result_to_dict, run_payload
 
 
-def model_input(side="OVER", line=0.5):
+def legacy_model_input(side="OVER", line=0.5):
     return {"build_hash":"a"*64,"game_id":"game-1","market":"HITS","entity_id":"batter-1","line":line,"side":side,"lineup_status":"CONFIRMED","require_confirmed_lineup":True,"features":{"b_rate":0.31,"p_rate":0.27,"pa_pool":[3,4,4,4,5]}}
+
+def joint_row(hits):
+    return {"plate_appearances":4,"hits":hits,"singles":hits,"doubles":0,"triples":0,"home_runs":0,"total_bases":hits,"rbi":0,"runs":0,"stolen_bases":0,"walks":0,"strikeouts":1,"extra_base_hits":0}
+
+def model_input(side="OVER", line=0.5):
+    return {"game_id":"game-1","market":"HITS","entity_id":"batter-1","line":line,"side":side,"feature_source_hash":"a"*64,"features":{"history_pool":[joint_row(1) for _ in range(7)]+[joint_row(0) for _ in range(3)]}}
 
 def quote(*,side="OVER",line=0.5,odds=100,retrieved="2026-08-10T20:00:00Z",ttl=300):
     return {"game_id":"game-1","market":"HITS","entity_id":"batter-1","line":line,"side":side,"american_odds":odds,"retrieved_at":retrieved,"ttl_seconds":ttl,"book_key":"draftkings"}
@@ -23,11 +29,11 @@ def floors(path:Path): path.write_text(json.dumps({"truth_gate":{"production":{"
 
 class RuntimeDispatchTests(unittest.TestCase):
     def test_hits_adapter_is_deterministic_and_common_schema(self):
-        a=hits_engine_adapter(model_input()); b=hits_engine_adapter(model_input()); self.assertEqual(a,b); self.assertEqual(a["market"],"HITS"); self.assertEqual(a["game_id"],"game-1"); self.assertTrue(0<=a["model_p"]<=1)
+        a=hits_engine_adapter(legacy_model_input()); b=hits_engine_adapter(legacy_model_input()); self.assertEqual(a,b); self.assertEqual(a["market"],"HITS"); self.assertEqual(a["game_id"],"game-1"); self.assertTrue(0<=a["model_p"]<=1)
     def test_hits_under_is_complement_of_same_over_paths(self):
-        self.assertAlmostEqual(hits_engine_adapter(model_input("OVER"))["model_p"]+hits_engine_adapter(model_input("UNDER"))["model_p"],1.0,places=12)
+        self.assertAlmostEqual(hits_engine_adapter(legacy_model_input("OVER"))["model_p"]+hits_engine_adapter(legacy_model_input("UNDER"))["model_p"],1.0,places=12)
     def test_unsupported_hits_line_rejected(self):
-        with self.assertRaises(EngineDispatchError): hits_engine_adapter(model_input(line=3.5))
+        with self.assertRaises(EngineDispatchError): hits_engine_adapter(legacy_model_input(line=3.5))
     def test_checked_in_registry_blocks_hits_even_with_positive_edge(self):
         result=run_payload(payload())[0]; self.assertEqual(result.bet_status,"BLOCKED"); self.assertIsNone(result.model_p); self.assertIn("deployment not eligible",result.reason)
     def test_deployed_test_registry_can_reach_truth_gate(self):
