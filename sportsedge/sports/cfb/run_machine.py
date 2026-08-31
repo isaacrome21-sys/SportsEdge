@@ -9,6 +9,10 @@ team in every game to a frozen CFBD ``/teams/fbs`` membership snapshot before th
 joint model can run. FCS/unknown membership fails closed rather than inheriting
 FBS calibration or promotion state.
 
+The canonical boundary also enforces point-in-time safety: the game must still be
+pregame, feature snapshots may not come from the future or from the target week,
+and sportsbook quotes must be observed before both ``now`` and kickoff.
+
 This foundation prices full-game MONEYLINE / SPREAD / TOTAL only. Other declared
 football markets remain explicit NO_ENGINE until their required period/player state
 is actually modeled. New CFB pricing remains BLOCKED from official betting until
@@ -90,6 +94,22 @@ def _aware(value: datetime, name: str) -> datetime:
     return value.astimezone(timezone.utc)
 
 
+def _timestamp(value: Any, error: str) -> datetime:
+    if isinstance(value, datetime):
+        out = value
+    else:
+        text = str(value or "").strip().replace("Z", "+00:00")
+        if not text:
+            raise CFBRunMachineError(error)
+        try:
+            out = datetime.fromisoformat(text)
+        except ValueError as exc:
+            raise CFBRunMachineError(error) from exc
+    if out.tzinfo is None or out.utcoffset() is None:
+        raise CFBRunMachineError(error)
+    return out.astimezone(timezone.utc)
+
+
 def _resolve_mode(mode: str, *, games, metrics, quotes) -> str:
     selected = str(mode or "AUTO_SELECT").strip().upper()
     if selected not in VALID_MODES:
@@ -118,16 +138,7 @@ def _quote_dict(value: CFBQuote | Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _quote_time(value: Any) -> datetime:
-    text = str(value or "").strip().replace("Z", "+00:00")
-    if not text:
-        raise CFBRunMachineError("CFB_QUOTE_RETRIEVED_AT_REQUIRED")
-    try:
-        dt = datetime.fromisoformat(text)
-    except ValueError as exc:
-        raise CFBRunMachineError("CFB_QUOTE_RETRIEVED_AT_INVALID") from exc
-    if dt.tzinfo is None or dt.utcoffset() is None:
-        raise CFBRunMachineError("CFB_QUOTE_RETRIEVED_AT_TIMEZONE_REQUIRED")
-    return dt.astimezone(timezone.utc)
+    return _timestamp(value, "CFB_QUOTE_RETRIEVED_AT_INVALID")
 
 
 def _american_decimal(odds: float) -> float:
@@ -159,6 +170,38 @@ def _identity_seed(*, root_seed: int, game_id: str, model_sha: str) -> int:
         raise CFBRunMachineError("CFB_ROOT_SEED_INTEGER_REQUIRED")
     payload = f"{root_seed}|{game_id}|{model_sha}|CFB_GAME_PATH_V1".encode()
     return int.from_bytes(sha256(payload).digest()[:8], "big", signed=False)
+
+
+def _validate_metric_pit(game: CFBGame, metric: CFBTeamMetrics, *, team: str, current: datetime, start: datetime) -> None:
+    if metric.team != team:
+        raise CFBRunMachineError(f"CFB_METRIC_TEAM_IDENTITY_MISMATCH:{team}")
+    asof = _timestamp(metric.feature_asof_ts, f"CFB_FEATURE_ASOF_INVALID:{team}")
+    if asof > current:
+        raise CFBRunMachineError(f"CFB_FEATURE_FROM_FUTURE:{team}")
+    if asof >= start:
+        raise CFBRunMachineError(f"CFB_FEATURE_NOT_PREGAME:{team}")
+    source = str(metric.sample_source or "").strip().upper()
+    if source == "CURRENT_SEASON_PRIOR_WEEKS":
+        if int(metric.season) != int(game.season):
+            raise CFBRunMachineError(f"CFB_FEATURE_SEASON_MISMATCH:{team}")
+        if int(metric.through_week) < 0 or int(metric.through_week) > int(game.week) - 1:
+            raise CFBRunMachineError(f"CFB_TARGET_WEEK_FEATURE_LEAKAGE:{team}")
+    elif source == "PRIOR_SEASON_FALLBACK":
+        if int(game.week) != 1 or int(metric.season) != int(game.season) - 1:
+            raise CFBRunMachineError(f"CFB_PRIOR_SEASON_FALLBACK_INVALID:{team}")
+    else:
+        raise CFBRunMachineError(f"CFB_FEATURE_SAMPLE_SOURCE_UNSUPPORTED:{team}:{source}")
+
+
+def _validate_game_pit(game: CFBGame, metrics: Mapping[str, CFBTeamMetrics], *, current: datetime) -> None:
+    start = _timestamp(game.start_ts, f"CFB_GAME_START_INVALID:{game.game_id}")
+    if current >= start:
+        raise CFBRunMachineError(f"CFB_GAME_NOT_PREGAME:{game.game_id}")
+    for team in (game.home_team, game.away_team):
+        metric = metrics.get(team)
+        if not isinstance(metric, CFBTeamMetrics):
+            raise CFBRunMachineError(f"CFB_METRICS_MISSING:{team}")
+        _validate_metric_pit(game, metric, team=team, current=current, start=start)
 
 
 def _game_row(game: CFBGame, metrics: Mapping[str, CFBTeamMetrics]) -> dict[str, Any]:
@@ -209,9 +252,20 @@ def _run_canonical(*, mode: str, season: int, week: int, now: datetime, model: C
     assert_fbs_only_games(games, fbs_team_rows=fbs_team_rows)
     model_sha = model.artifact_sha256(); game_map = {g.game_id: g for g in games}; quote_rows = [_quote_dict(q) for q in quotes]
     distributions = {}; dist_hashes = {}; seeds = {}
-    for gid in sorted({str(q.get("game_id") or "") for q in quote_rows if str(q.get("market") or "").upper() in SUPPORTED_GAME_MARKETS}):
+    supported_game_ids = sorted({str(q.get("game_id") or "") for q in quote_rows if str(q.get("market") or "").upper() in SUPPORTED_GAME_MARKETS})
+    for gid in supported_game_ids:
         game = game_map.get(gid)
         if game is None: raise CFBRunMachineError(f"CFB_QUOTE_GAME_UNRESOLVED:{gid}")
+        _validate_game_pit(game, metrics, current=current)
+        start = _timestamp(game.start_ts, f"CFB_GAME_START_INVALID:{gid}")
+        for q in quote_rows:
+            if str(q.get("game_id") or "") != gid or str(q.get("market") or "").upper() not in SUPPORTED_GAME_MARKETS:
+                continue
+            qt = _quote_time(q.get("retrieved_at"))
+            if qt > current:
+                raise CFBRunMachineError(f"CFB_QUOTE_FROM_FUTURE:{gid}")
+            if qt >= start:
+                raise CFBRunMachineError(f"CFB_QUOTE_NOT_PREGAME:{gid}")
         seed = _identity_seed(root_seed=root_seed, game_id=gid, model_sha=model_sha)
         path = simulate_cfb_joint_distribution(model, _game_row(game, metrics), seed=seed, n_paths=n_paths)
         distributions[gid] = path; dist_hashes[gid] = _distribution_hash(path); seeds[gid] = seed
