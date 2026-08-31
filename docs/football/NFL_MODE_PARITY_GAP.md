@@ -1,46 +1,48 @@
-# NFL Manual / Hybrid / Automatic parity — architecture gap
+# NFL Manual / Hybrid / Automatic parity — remediation status
 
-Status: **IMPLEMENTATION GAP — parity test intentionally not fabricated**
+Status: **PARITY SURFACE IMPLEMENTED / PRODUCTION STATE-MACHINE BINDING + EXECUTION EVIDENCE PENDING**
 
-This document records the repo trace performed during the 2026-08-30 audit remediation. The acceptance standard is the same one used for MLB and CFB: a mode-parity test is valid only when the compared modes are real production ingress paths that normalize into one shared execution boundary. A label or test-only wrapper is not a mode.
+This document records the 2026-08-30 audit-remediation trace. The acceptance standard remains the MLB/CFB standard: mode parity is valid only when real ingress ownership converges on one shared execution boundary. A label alone is not a mode.
 
-## What exists today
+## Reusable architecture now present
 
-The NFL M2 predictive core is real and market-blind. `sportsedge/sports/nfl/m2.py` builds the score distribution before sportsbook lines are applied. The model artifact contract in `sportsedge/sports/nfl/model_artifact.py` binds the production model to exact code/source identity.
+The NFL M2 predictive core remains unchanged and market-blind. `sportsedge/sports/nfl/m2.py` derives a joint score distribution before sportsbook thresholds are applied, while `sportsedge/sports/nfl/model_artifact.py` binds the production model to exact code/source identity.
 
-The current live/forward path is split across workflow and script boundaries:
+The split live path has now been factored into reusable components without changing M2 mathematics:
 
-1. `.github/workflows/football-nfl-forward-clv-collection.yml` freezes the schedule and strictly-prior public feature sources, resolves an exact production model release, builds live features, fetches DraftKings odds, and then invokes the durable forward-state script.
-2. `scripts/build_nfl_live_feature_rows.py` builds strictly-as-of, market-blind live M2 feature payloads from frozen schedule/PBP/participation/depth/stadium files.
-3. `scripts/fetch_nfl_forward_odds.py` acquires raw DraftKings h2h/spread/total provider snapshots.
-4. `scripts/update_nfl_forward_state.py::decision_mode()` loads the exact model artifact, validates live-feature chronology/source identity, binds the provider event to the NFL game, derives the M2 joint score distribution, and calls `build_forward_decision_rows(...)`.
-5. `sportsedge/core/clv/nfl_forward_capture.py::build_forward_decision_rows()` is the existing pure downstream game-market pricing/economics surface for moneyline, spread, and total.
+1. `sportsedge/sports/nfl/live_features.py::build_nfl_live_feature_payload()` is the reusable strictly-as-of feature builder. It consumes frozen schedule/PBP/participation/depth/stadium files, excludes target/in-progress PBP and participation, filters future depth rows, removes market/realized-score fields, binds provider team identities, and emits the same source-manifest/as-of provenance used by the production CLI.
+2. `scripts/build_nfl_live_feature_rows.py` is now a thin CLI wrapper over that reusable builder.
+3. `sportsedge/sports/nfl/odds_source.py::fetch_nfl_odds()` is the reusable DraftKings/The Odds API acquisition contract with key failover, fixed market coverage, untouched provider payload, and response-shape validation.
+4. `scripts/fetch_nfl_forward_odds.py` is now a thin CLI wrapper over the reusable odds source.
+5. `sportsedge/sports/nfl/live_runner.py::run_canonical_nfl_live()` is the shared normalized execution boundary: frozen feature payload + frozen odds snapshot + exact M2 model/identity -> game/event binding -> M2 score distribution -> `build_forward_decision_rows(...)` -> source/as-of provenance.
+6. `sportsedge/sports/nfl/live_runner.py::run_nfl_live()` owns explicit ingress modes:
+   - **MANUAL**: caller supplies frozen feature payload and frozen raw odds snapshot.
+   - **HYBRID**: caller supplies frozen feature payload while sportsbook acquisition is delegated to the reusable automatic odds ingress.
+   - **AUTOMATIC**: feature construction and sportsbook acquisition are both delegated to reusable automatic ingress callbacks.
 
-This is a legitimate AUTOMATIC scheduled forward-evidence path, but acquisition ownership is distributed across Actions shell steps and CLI scripts rather than one reusable NFL run-machine API.
+All three modes converge on `run_canonical_nfl_live(...)`; execution mode does not select predictive mathematics or downstream economic logic.
 
-## What does not exist
+## Parity contract now present
 
-At this branch head there is no `sportsedge/sports/nfl/run_machine.py` and no NFL source/ingress module analogous to CFB's `run_machine.py` + `source.py`.
+`tests/test_nfl_mode_parity.py` now constructs one frozen canonical feature payload, one raw sportsbook snapshot, one exact M2 model/identity, and one capture time, then requires MANUAL/HYBRID/AUTOMATIC outputs to be byte-identical. It also requires the same three market rows, source-manifest hash, feature-as-of timestamp, code SHA, model-artifact SHA, and shadow-only governance state. Separate tests prove the mode ownership requirements fail closed and that a future feature snapshot is rejected in every mode.
 
-More importantly, there are not yet three independently real NFL ingress contracts that can be truthfully named MANUAL, HYBRID, and AUTOMATIC and then compared byte-for-byte. The repository contains an automatic scheduled path and reusable predictive/downstream primitives, but it does not contain a canonical manual path plus a genuinely distinct partial-acquisition hybrid path converging on one explicit shared-core boundary.
+`tests/test_nfl_odds_source.py` separately covers the reusable provider URL/market contract, untouched payload behavior, and fail-closed response-shape validation.
 
-Therefore an NFL parity test written now by merely passing the same objects through three labels would be false evidence and is prohibited.
+This is **implementation/code-inspection evidence only** until a real test runner executes the new tests. GitHub-hosted jobs on this branch continue to terminate before any steps execute, so no passing claim is made.
 
-## Required remediation before a parity claim
+## Remaining production-binding gap
 
-The next implementation step is to factor the existing live path without changing predictive mathematics:
+The scheduled forward-evidence workflow still enters `scripts/update_nfl_forward_state.py::decision_mode()`, whose decision section predates `run_canonical_nfl_live(...)` and currently duplicates the same model/event/distribution/readout operations before persisting durable decisions. The next remediation is to route that state-machine decision path through the canonical runner while preserving its existing idempotency/partial-game guards and its exact error semantics. Until that binding is complete, the new mode surface is reusable and semantically aligned with production, but the scheduled durable-state path has not yet been proven to execute through the same function.
 
-- expose the strictly-as-of live feature builder as a reusable library function while preserving the current CLI as a thin wrapper;
-- expose NFL odds acquisition/normalization as a reusable ingress function while preserving secret-safe key handling;
-- define one canonical normalized NFL game-market execution function that owns artifact validation, game/event binding, M2 distribution construction, paired-price/no-vig economics, and output provenance;
-- wire real ingress ownership around that boundary:
-  - **MANUAL**: caller supplies the frozen normalized live feature payload and frozen odds snapshot;
-  - **HYBRID**: caller supplies one execution-sensitive frozen input while the other is acquired/built through the real reusable production ingress; which input is manual must be explicit in the contract, not inferred from a label;
-  - **AUTOMATIC**: both live feature payload and odds snapshot are produced through the real production acquisition/build path;
-- keep exact model-artifact identity, code/source hashes, feature as-of time, capture time, game/event identity, paired prices, and policy settings identical in the parity fixture.
+## Acceptance before calling NFL parity closed
 
-Only after those paths exist should `tests/test_nfl_mode_parity.py` assert the same post-normalization acceptance surface used elsewhere: canonical game/input object, normalized paired quotes, feature payload, timestamps, artifact/code/source identity, policy/Kelly settings, then exact downstream Model_P/readout/economic/status/provenance fields.
+Parity closes only when:
+
+- `decision_mode()` delegates new-game pricing to the canonical runner rather than reimplementing the core;
+- the production workflow continues to use the factored feature and odds CLI wrappers;
+- `tests/test_nfl_mode_parity.py`, `tests/test_nfl_odds_source.py`, existing forward-state tests, and the wider NFL contract suite execute successfully on a real runner;
+- no production predictive coefficient, eligibility flag, Truth Gate floor, PIT rule, or promotion requirement is changed by the refactor.
 
 ## Governance
 
-This architecture work does **not** install a Truth Gate floor, change deployment eligibility, alter M2 coefficients, loosen PIT chronology, or create promotion evidence. The checked-in football implementation status already distinguishes PRESENT from EXECUTED from EVIDENCE-PRODUCING; this parity gap remains an execution/orchestration problem until the real ingress paths are factored and behaviorally executed.
+This architecture work does **not** install a Truth Gate floor, change deployment eligibility, alter M2 coefficients, loosen PIT chronology, or create predictive/promotion evidence. NFL remains shadow/research only until independent OOS/CLV/calibration/promotion gates are actually satisfied.
