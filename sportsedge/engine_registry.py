@@ -34,7 +34,7 @@ def _detect_payload_shape(features,*,joint_keys,legacy_keys,label):
     if pj and pl: raise EngineDispatchError(f"AMBIGUOUS_PROP_PAYLOAD: {label} mixes joint keys={pj} with legacy keys={pl}")
     return "joint" if pj else "legacy"
 def _legacy_line_unsupported(market,line,allowed): return EngineDispatchError(f"LEGACY_LINE_UNSUPPORTED: {market} line={line}; legacy_allowed={allowed}; canonical joint payload supports arbitrary non-negative count thresholds")
-def _common_output(model_input,result,model_p,market): return {"game_id":model_input.get("game_id"),"market":market,"entity_id":model_input.get("entity_id"),"line":model_input.get("line"),"side":model_input.get("side"),"model_p":float(model_p),"model_input_hash":result.model_input_hash,"engine_version":result.engine_version,"seed_policy":result.seed_policy,"mc_paths":result.mc_paths}
+def _common_output(model_input,result,model_p,market): return {"game_id":model_input.get("game_id"),"market":market,"entity_id":model_input.get("entity_id"),"line":model_input.get("line"),"side":model_input.get("side"),"model_p":float(model_p),"model_input_hash":result.model_input_hash,"engine_version":result.engine_version,"seed_policy":result.seed_policy,"mc_paths":result.mc_paths,"runtime_path":"LEGACY_COMPAT"}
 def legacy_hits_engine_adapter(model_input):
     if model_input.get("market")!="HITS": raise EngineDispatchError("Hits adapter requires market=HITS")
     line=_finite_line(model_input.get("line")); side=model_input.get("side")
