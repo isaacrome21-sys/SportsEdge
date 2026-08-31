@@ -5,7 +5,7 @@ from datetime import datetime
 from math import isfinite
 from typing import Any, Mapping
 from .deployments import load_registry
-from .devig import multiplicative_devig, validate_pair
+from .devig import multiplicative_devig, validate_pair, validate_pair_temporal
 from .engine_registry import engine_registry
 from .f5_distribution import F5_MARKETS
 from .generic_market_engine import BINARY_MARKETS, GAME_MARKETS
@@ -15,7 +15,7 @@ from .orchestrator import run_candidate
 from .pitcher_joint_engine import PITCHER_MARKETS
 from .quote_bridge import validate_canonical_quote
 from .truth_gate import american_to_decimal
-GENERIC_MARKETS=frozenset(GAME_MARKETS|HITTER_MARKETS|PITCHER_MARKETS|BINARY_MARKETS); BATTER_GENERIC_MARKETS=frozenset(HITTER_MARKETS|{"FIRST_HOME_RUN"}); PITCHER_GENERIC_MARKETS=frozenset(PITCHER_MARKETS|{"PITCHER_RECORD_WIN"}); TEAM_TOTAL_MARKETS=frozenset({"TEAM_TOTALS","F5_TEAM_TOTALS"}); DECISION_STATUSES=frozenset({"BET","OFFICIAL_BET","PASS"})
+GENERIC_MARKETS=frozenset(GAME_MARKETS|HITTER_MARKETS|PITCHER_MARKETS|BINARY_MARKETS); BATTER_GENERIC_MARKETS=frozenset(HITTER_MARKETS|{"FIRST_HOME_RUN"}); PITCHER_GENERIC_MARKETS=frozenset(PITCHER_MARKETS|{"PITCHER_RECORD_WIN"}); TEAM_TOTAL_MARKETS=frozenset({"TEAM_TOTALS","F5_TEAM_TOTALS"}); DECISION_STATUSES=frozenset({"BET","OFFICIAL_BET","PASS"}); MLB_PAIR_MAX_AGE_SECONDS=180; MLB_PAIR_MAX_SKEW_SECONDS=30
 @dataclass(frozen=True)
 class GenericCardResult:
     game_id:str; market:str; entity_id:str; line:Any; side:str; american_odds:Any; model_p:float|None; bet_status:str; reason:str; shadow_status:str|None=None; implied_probability:float|None=None; edge:float|None=None; ev_per_dollar:float|None=None; model_input_hash:str|None=None; distribution_sha256:str|None=None; readout_sha256:str|None=None; readout_version:str|None=None; engine_version:str|None=None; seed_policy:str|None=None; mc_paths:int|None=None; book_key:str|None=None; sportsbook:str|None=None; quote_retrieved_at:str|None=None; offer_id:str|None=None
@@ -99,11 +99,14 @@ def _validated_quotes(quotes):
         try:out.append(validate_canonical_quote(raw))
         except Exception:pass
     return out
-def _paired_quote(candidate,quotes):
+def _paired_quote(candidate,quotes,*,cutoff,max_age_seconds,max_skew_seconds):
     matches=[]
     for quote in quotes:
         if quote is candidate or dict(quote)==dict(candidate):continue
-        try:validate_pair(candidate,quote);matches.append(quote)
+        try:
+            validate_pair(candidate,quote)
+            validate_pair_temporal(candidate,quote,cutoff=cutoff,max_age_seconds=max_age_seconds,max_skew_seconds=max_skew_seconds)
+            matches.append(quote)
         except Exception:pass
     if len(matches)!=1:raise ValueError(f"PAIRED_PRICE_REQUIRED_FOR_DEVIG: found={len(matches)}")
     return matches[0]
@@ -115,7 +118,7 @@ def _shadow(model_p,push_p,quote,opposite):
         if not isfinite(push) or not 0<=push<1 or p+push>1+1e-12:raise ValueError("invalid push probability")
         loss=max(0,1-p-push);cw=p/(1-push);edge=cw-fair;ev=p*(dec-1)-loss;return ("SHADOW_BET" if edge>0 and ev>0 else "SHADOW_PASS",fair,edge,ev)
     except Exception:return None,None,None,None
-def run_generic_card(*,games,feature_rows,quotes,ingestion_now,finalization_now,registry_path="config/deployments.json",edge_floor_config_path="config/truth_gate_floors.json",kelly_multiplier=0.25):
+def run_generic_card(*,games,feature_rows,quotes,ingestion_now,finalization_now,registry_path="config/deployments.json",edge_floor_config_path="config/truth_gate_floors.json",kelly_multiplier=0.25,pair_max_age_seconds=MLB_PAIR_MAX_AGE_SECONDS,pair_max_skew_seconds=MLB_PAIR_MAX_SKEW_SECONDS):
     games_by_id=_game_index(games);features=_feature_index(feature_rows);deployments=load_registry(registry_path)["markets"];engines=engine_registry();valid_quotes=_validated_quotes(quotes);results=[]
     for raw in quotes:
         try:
@@ -127,7 +130,7 @@ def run_generic_card(*,games,feature_rows,quotes,ingestion_now,finalization_now,
             if feature is None:raise ValueError("feature row missing")
             model_input=_model_input(game=game,quote=quote,feature=feature);engine=engines.get(market);deployment=deployments.get(market)
             if engine is None or deployment is None:raise ValueError("market missing engine/deployment registration")
-            try:opposite=_paired_quote(quote,valid_quotes)
+            try:opposite=_paired_quote(quote,valid_quotes,cutoff=finalization_now,max_age_seconds=pair_max_age_seconds,max_skew_seconds=pair_max_skew_seconds)
             except Exception as pair_exc:results.append(GenericCardResult(str(quote["game_id"]),market,str(quote["entity_id"]),quote["line"],str(quote["side"]),quote["american_odds"],None,"BLOCKED",str(pair_exc)));continue
             run=run_candidate(model_input=model_input,quote=quote,paired_quote=opposite,deployment=deployment,engine_fn=engine,ingestion_now=ingestion_now,finalization_now=finalization_now,edge_floor_config_path=edge_floor_config_path,kelly_multiplier=kelly_multiplier)
             if run.model_p is None or run.bet_status=="BLOCKED":results.append(GenericCardResult(str(quote["game_id"]),market,str(quote["entity_id"]),quote["line"],str(quote["side"]),quote["american_odds"],None,"BLOCKED",run.reason));continue

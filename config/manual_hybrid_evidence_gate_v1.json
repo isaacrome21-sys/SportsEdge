@@ -1,0 +1,31 @@
+{
+  "policy_id": "SPORTSEDGE_MANUAL_HYBRID_EVIDENCE_GATE_V1",
+  "version": "1.0.0",
+  "modes": ["MANUAL", "HYBRID"],
+  "shared_rules": {
+    "same_feature_schema_required": true,
+    "same_pit_validator_required": true,
+    "same_entity_validator_required": true,
+    "narrative_override_actions": ["BLOCK", "DOWNGRADE", "NO_CHANGE"],
+    "narrative_override_may_change_model_p": false,
+    "override_timestamp_required": true,
+    "override_reason_code_required": true,
+    "override_evidence_refs_required": true,
+    "contradictory_authoritative_evidence": "BLOCK_UNTIL_RESOLVED",
+    "newer_authoritative_evidence_may_supersede_older": true,
+    "all_resolution_events_logged": true
+  },
+  "CFB": {
+    "qb_injury_depth_weather_predictive_use": "ONLY_AS_VERSIONED_PIT_FEATURE_BEFORE_MODEL_P",
+    "post_model_review": "BLOCK_OR_DOWNGRADE_ONLY",
+    "public_betting_and_analyst_context": "DOWNSTREAM_ONLY"
+  },
+  "MLB": {
+    "starting_pitcher_change": "INVALIDATE_AND_RECOMPUTE_OR_BLOCK",
+    "confirmed_lineup_change": "INVALIDATE_LINEUP_DEPENDENT_MODEL_P_AND_RECOMPUTE_OR_BLOCK",
+    "doubleheader_game_identity_change": "INVALIDATE_AND_RECOMPUTE_OR_BLOCK",
+    "bullpen_availability_change": "RECOMPUTE_IF_FEATURE_DEPENDENT_ELSE_LOG_CONTEXT",
+    "public_betting_and_analyst_context": "DOWNSTREAM_ONLY"
+  },
+  "notes": "The same evidence policy applies in Manual and Hybrid. Acquisition path is provenance, not a reason for different mathematical treatment."
+}

@@ -1,11 +1,15 @@
-"""CFB promotion-attempt harness for the first real Week 1 evaluation."""
+"""CFB historical market certification under CFB_TRUTH_GATE_V1.
+
+Historical certification never selects or executes a live bet. The only accepted input
+is a completed, attestation-backed certification replay. Live OFFICIAL_BET decisions are
+made later by the governed live-decision engine using fresh executable quotes.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from typing import Iterable
 
-from sportsedge.core.promotion.football import FootballPromotionEvidence, evaluate_football_promotion, official_candidates
+from .certification_replay import CFBCertificationReplay
 
 
 @dataclass(frozen=True)
@@ -15,25 +19,31 @@ class CFBPromotionAttempt:
     stage: str
     official_plays: tuple[dict, ...]
     zero_is_valid: bool
+    failures: tuple[str, ...]
+    attestation_bundle_sha: str
 
 
 def run_cfb_promotion_attempt(
     *,
-    market: str,
-    evidence: FootballPromotionEvidence,
-    candidates: Iterable[dict],
+    replay: CFBCertificationReplay,
     as_of_date: str,
 ) -> CFBPromotionAttempt:
-    market_name = str(market).strip().lower()
-    if not market_name:
-        raise ValueError("MARKET_MISSING")
+    if not isinstance(replay, CFBCertificationReplay):
+        raise ValueError("CFB_PROMOTION_REPLAY_REQUIRED")
     parsed = date.fromisoformat(str(as_of_date))
-    stage = evaluate_football_promotion(evidence)
-    official = tuple(official_candidates(list(candidates), stage))
+    market_name = str(replay.market).upper()
+    if replay.gate_result.market != market_name or replay.evidence.market != market_name:
+        raise ValueError("CFB_PROMOTION_REPLAY_MARKET_MISMATCH")
+    if replay.attestation_bundle_sha == "" or len(replay.attestation_bundle_sha) != 64:
+        raise ValueError("CFB_PROMOTION_ATTESTATION_BUNDLE_REQUIRED")
+    # Historical certification creates a persistent MARKET state, not a list of bets.
+    # Live candidate selection remains downstream and quote-dependent.
     return CFBPromotionAttempt(
         market=market_name,
         as_of_date=parsed.isoformat(),
-        stage=stage,
-        official_plays=official,
+        stage=replay.gate_result.status,
+        official_plays=(),
         zero_is_valid=True,
+        failures=replay.gate_result.failures,
+        attestation_bundle_sha=replay.attestation_bundle_sha,
     )

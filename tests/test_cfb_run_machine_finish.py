@@ -99,6 +99,13 @@ class SourceTests(unittest.TestCase):
         with self.assertRaisesRegex(CFBSourceError,"CFB_WEATHER_MISSING"):
             attach_weather([replace(game(),weather=None)],{})
 
+    def test_exact_schedule_name_can_bind_fcs_without_fuzzy_guessing(self):
+        fcs = CFBGame("2002", 2026, 1, START.isoformat(), "Alpha State", "FCS Academy", False,
+                      "Test", {"game_indoor": True}, "FBS", "FCS")
+        idx = build_team_alias_index(self.teams, games=[fcs])
+        self.assertEqual(bind_provider_team("FCS Academy", idx), "FCS Academy")
+        self.assertEqual(fcs.matchup_classification(), "FBS_FCS")
+
 
 class JointModelTests(unittest.TestCase):
     def test_seed_is_explicit_and_deterministic(self):
@@ -166,11 +173,35 @@ class MachineTests(unittest.TestCase):
         r=run_cfb_machine(mode="MANUAL",season=2026,week=1,model=model(),now=NOW,games=self.games,metrics=self.metrics,quotes=[q],n_paths=10).results[0]
         self.assertEqual((r.engine_status,r.bet_status,r.reason),("NO_ENGINE","BLOCKED","NO_ENGINE")); self.assertIsNone(r.model_p)
 
-    def test_stale_quote_blocks_market_layer_not_engine(self):
+    def test_stale_quote_blocks_entire_two_sided_market_pair(self):
         stale=[replace(q,retrieved_at=(NOW-timedelta(hours=1)).isoformat()) for q in self.q]
         r=run_cfb_machine(mode="MANUAL",season=2026,week=1,model=model(),now=NOW,games=self.games,metrics=self.metrics,quotes=stale,n_paths=20)
-        self.assertTrue(all(x.engine_status=="PRICED" and x.reason=="CFB_QUOTE_STALE" for x in r.results))
-        self.assertTrue(all(x.fair_market_p is None for x in r.results))
+        self.assertTrue(all(x.engine_status=="BLOCKED" and x.reason=="CFB_QUOTE_STALE" for x in r.results))
+        self.assertTrue(all(x.fair_market_p is None and x.edge is None for x in r.results))
+
+    def test_future_quote_blocks_entire_pair(self):
+        future=[replace(q,retrieved_at=(NOW+timedelta(seconds=1)).isoformat()) for q in self.q]
+        r=run_cfb_machine(mode="MANUAL",season=2026,week=1,model=model(),now=NOW,games=self.games,metrics=self.metrics,quotes=future,n_paths=20)
+        self.assertTrue(all(x.engine_status=="BLOCKED" and x.reason=="CFB_QUOTE_FROM_FUTURE" for x in r.results))
+
+    def test_asynchronous_two_sided_pair_is_rejected(self):
+        qs=quotes()[:2]
+        qs[1]=replace(qs[1],retrieved_at=(NOW-timedelta(seconds=80)).isoformat())
+        r=run_cfb_machine(mode="MANUAL",season=2026,week=1,model=model(),now=NOW,games=self.games,metrics=self.metrics,quotes=qs,n_paths=20,quote_pair_skew_seconds=30)
+        self.assertTrue(all(x.engine_status=="BLOCKED" and x.reason=="CFB_QUOTE_PAIR_SKEW" for x in r.results))
+
+    def test_one_game_missing_metrics_does_not_abort_other_game(self):
+        g2=CFBGame("1002",2026,1,START.isoformat(),"Alpha State","Missing FCS",False,"Test",dict(game().weather),"FBS","FCS")
+        ts=(NOW-timedelta(seconds=20)).isoformat()
+        base=dict(game_id="1002",period="FG",entity_id="1002",book_key="draftkings",sportsbook="DraftKings",retrieved_at=ts,is_alternate=False)
+        q2=[CFBQuote(market="MONEYLINE",side="HOME",line=0,american_odds=-150,offer_id="x1",**base),
+            CFBQuote(market="MONEYLINE",side="AWAY",line=0,american_odds=130,offer_id="x2",**base)]
+        r=run_cfb_machine(mode="MANUAL",season=2026,week=1,model=model(),now=NOW,games=[game(),g2],metrics=self.metrics,quotes=[*self.q,*q2],n_paths=20)
+        good=[x for x in r.results if x.game_id=="1001"]
+        bad=[x for x in r.results if x.game_id=="1002"]
+        self.assertTrue(all(x.edge is not None for x in good))
+        self.assertTrue(all(x.engine_status=="BLOCKED" and x.reason.startswith("CFB_MODEL_INPUT_BLOCKED:") for x in bad))
+        self.assertEqual(r.run_status,"DEGRADED")
 
     def test_automatic_requires_real_credentials(self):
         with self.assertRaisesRegex(Exception,"CFBD_API_KEY_REQUIRED"):

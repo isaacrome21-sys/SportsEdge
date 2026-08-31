@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from math import isfinite
 from typing import Any, Iterable, Mapping
 
@@ -69,6 +70,22 @@ def _complementary_sides(a: str, b: str) -> bool:
     )
 
 
+def _aware_utc(value: Any, field: str) -> datetime:
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        text = str(value or "").strip().replace("Z", "+00:00")
+        if not text:
+            raise DevigError(f"{field} required")
+        try:
+            dt = datetime.fromisoformat(text)
+        except ValueError as exc:
+            raise DevigError(f"{field} invalid") from exc
+    if dt.tzinfo is None or dt.utcoffset() is None:
+        raise DevigError(f"{field} timezone required")
+    return dt.astimezone(timezone.utc)
+
+
 def validate_pair(candidate: Mapping[str, Any], opposite: Mapping[str, Any]) -> None:
     if _identity(candidate) != _identity(opposite):
         raise DevigError("paired quote identity mismatch")
@@ -76,6 +93,32 @@ def validate_pair(candidate: Mapping[str, Any], opposite: Mapping[str, Any]) -> 
         raise DevigError("paired quote line mismatch")
     if not _complementary_sides(str(candidate.get("side", "")), str(opposite.get("side", ""))):
         raise DevigError("paired quote sides are not complementary")
+
+
+def validate_pair_temporal(
+    candidate: Mapping[str, Any],
+    opposite: Mapping[str, Any],
+    *,
+    cutoff: datetime | str,
+    max_age_seconds: int = 180,
+    max_skew_seconds: int = 30,
+) -> None:
+    """Require an exact pair to represent one synchronized market state."""
+
+    validate_pair(candidate, opposite)
+    if isinstance(max_age_seconds, bool) or int(max_age_seconds) < 0:
+        raise DevigError("paired quote max age invalid")
+    if isinstance(max_skew_seconds, bool) or int(max_skew_seconds) < 0:
+        raise DevigError("paired quote max skew invalid")
+    now = _aware_utc(cutoff, "pair cutoff")
+    left = _aware_utc(candidate.get("retrieved_at"), "candidate retrieved_at")
+    right = _aware_utc(opposite.get("retrieved_at"), "opposite retrieved_at")
+    if left > now or right > now:
+        raise DevigError("PAIRED_QUOTE_FROM_FUTURE")
+    if (now - left).total_seconds() > int(max_age_seconds) or (now - right).total_seconds() > int(max_age_seconds):
+        raise DevigError("PAIRED_QUOTE_STALE")
+    if abs((left - right).total_seconds()) > int(max_skew_seconds):
+        raise DevigError("PAIRED_QUOTE_TIMESTAMP_SKEW")
 
 
 def find_paired_quote(candidate: Mapping[str, Any], quotes: Iterable[Mapping[str, Any]]) -> Mapping[str, Any]:

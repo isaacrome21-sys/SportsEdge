@@ -1,0 +1,27 @@
+{
+  "context_policy_id": "CFB_MARKET_CONTEXT_V1",
+  "version": "1.0.0",
+  "sport": "CFB",
+  "usage": "MARKET_CONTEXT_ONLY",
+  "predictive_model_input": false,
+  "truth_gate_certification_input": false,
+  "alerts": {
+    "money_ticket_gap_pp": 15.0,
+    "ticket_concentration_pct": 70.0,
+    "minimum_spread_or_total_move": 0.5,
+    "moneyline_implied_probability_move": 0.01,
+    "key_numbers": [3, 7],
+    "require_source_timestamp": true,
+    "require_no_inference_for_missing_splits": true
+  },
+  "source_classes": {
+    "public_splits": ["VSIN", "ACTION_NETWORK", "SCORES_AND_ODDS", "COVERS"],
+    "executable_books": ["DRAFTKINGS", "FANDUEL", "BETMGM", "CAESARS"],
+    "future_sharp_reference": ["PINNACLE", "CIRCA", "BOOKMAKER"]
+  },
+  "handicapper_opinions": {
+    "priority": "LOW",
+    "may_modify_model_p": false,
+    "allowed_use": "DISCOVERY_OF_INDEPENDENTLY_VERIFIABLE_INFORMATION"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "SPORTSEDGE_CFB_NORMALIZED_QUOTE_V1",
+  "title": "SportsEdge CFB Normalized Quote V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "sport", "event_id", "market_type", "selection_id", "side", "line",
+    "american_odds", "decimal_odds", "raw_implied_probability", "provider",
+    "book", "captured_at_utc", "provider_updated_at_utc", "period",
+    "is_live", "is_two_sided", "data_quality", "quote_id"
+  ],
+  "properties": {
+    "sport": {"const": "CFB"},
+    "event_id": {"type": "string", "minLength": 1},
+    "market_type": {"enum": ["MONEYLINE", "SPREAD", "TOTAL"]},
+    "selection_id": {"type": "string", "minLength": 1},
+    "opponent_id": {"type": ["string", "null"]},
+    "side": {"enum": ["HOME", "AWAY", "OVER", "UNDER"]},
+    "line": {"type": ["number", "null"]},
+    "american_odds": {"type": "number"},
+    "decimal_odds": {"type": "number", "exclusiveMinimum": 1.0},
+    "raw_implied_probability": {"type": "number", "exclusiveMinimum": 0.0, "exclusiveMaximum": 1.0},
+    "provider": {"type": "string", "minLength": 1},
+    "book": {"type": "string", "minLength": 1},
+    "captured_at_utc": {"type": "string", "format": "date-time"},
+    "provider_updated_at_utc": {"type": "string", "format": "date-time"},
+    "period": {"enum": ["FG"]},
+    "is_live": {"type": "boolean"},
+    "is_two_sided": {"type": "boolean"},
+    "data_quality": {"enum": ["VALID", "STALE", "DEGRADED", "INVALID"]},
+    "quote_id": {"type": "string", "minLength": 1}
+  }
+}
