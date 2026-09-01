@@ -1,0 +1,52 @@
+name: nrfi-v6-durable-health
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/nrfi-v6-durable-health.yml'
+      - 'scripts/check_nrfi_durable_health.py'
+      - 'tests/test_nrfi_durable_health.py'
+      - '.github/workflows/nrfi-v6-settlement.yml'
+      - '.github/workflows/props-v6-forward-shadow.yml'
+  schedule:
+    - cron: '37 * * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nrfi-v6-durable-health
+  cancel-in-progress: true
+
+jobs:
+  durable-health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout current code
+        uses: actions/checkout@v4
+        with:
+          path: code
+          fetch-depth: 1
+      - name: Checkout authoritative data branch
+        uses: actions/checkout@v4
+        with:
+          ref: data
+          path: durable
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile checker
+        run: python -m py_compile code/scripts/check_nrfi_durable_health.py
+      - name: Run checker unit tests
+        working-directory: code
+        run: python -m pytest -q tests/test_nrfi_durable_health.py
+      - name: Pull-based durable NRFI/YRFI health check
+        run: >-
+          python code/scripts/check_nrfi_durable_health.py
+          --data-root durable/runtime/model-validation/NRFI_YRFI
+          --max-capture-age-hours 36
+          --max-settlement-age-hours 36
