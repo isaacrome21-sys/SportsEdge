@@ -31,6 +31,14 @@ class CoachingSnapshot:
     fourth_down_go_rate: float | None
     two_minute_pass_rate: float | None
     red_zone_pass_rate: float | None
+    overall_pass_rate: float | None
+    overall_rush_rate: float | None
+    offensive_plays_per_game_proxy: float | None
+    pass_attempts_per_game: float | None
+    carries_per_game: float | None
+    sacks_suffered_per_game: float | None
+    penalties_per_play_proxy: float | None
+    sample_games: int | None
 
 
 def _utc(value: Any, field: str) -> datetime:
@@ -55,6 +63,15 @@ def _rate(value: Any, field: str) -> float | None:
     return x
 
 
+def _optional_float(value: Any, field: str, *, positive: bool = False) -> float | None:
+    if value in (None, ""):
+        return None
+    x = float(value)
+    if positive and x < 0:
+        raise NFLContextError(f"{field} invalid")
+    return x
+
+
 def build_personnel_snapshot(row: Mapping[str, Any]) -> PersonnelSnapshot:
     starts = row.get("ol_continuity_starts")
     return PersonnelSnapshot(
@@ -75,6 +92,9 @@ def build_coaching_snapshot(row: Mapping[str, Any]) -> CoachingSnapshot:
     pace = row.get("pace_seconds_per_play")
     if pace not in (None, "") and float(pace) <= 0:
         raise NFLContextError("pace_seconds_per_play invalid")
+    sample_games = row.get("sample_games")
+    if sample_games not in (None, "") and int(sample_games) < 0:
+        raise NFLContextError("sample_games invalid")
     return CoachingSnapshot(
         team_id=str(row.get("team_id") or "").upper(),
         neutral_pass_rate=_rate(row.get("neutral_pass_rate"), "neutral_pass_rate"),
@@ -84,6 +104,14 @@ def build_coaching_snapshot(row: Mapping[str, Any]) -> CoachingSnapshot:
         fourth_down_go_rate=_rate(row.get("fourth_down_go_rate"), "fourth_down_go_rate"),
         two_minute_pass_rate=_rate(row.get("two_minute_pass_rate"), "two_minute_pass_rate"),
         red_zone_pass_rate=_rate(row.get("red_zone_pass_rate"), "red_zone_pass_rate"),
+        overall_pass_rate=_rate(row.get("overall_pass_rate"), "overall_pass_rate"),
+        overall_rush_rate=_rate(row.get("overall_rush_rate"), "overall_rush_rate"),
+        offensive_plays_per_game_proxy=_optional_float(row.get("offensive_plays_per_game_proxy"), "offensive_plays_per_game_proxy", positive=True),
+        pass_attempts_per_game=_optional_float(row.get("pass_attempts_per_game"), "pass_attempts_per_game", positive=True),
+        carries_per_game=_optional_float(row.get("carries_per_game"), "carries_per_game", positive=True),
+        sacks_suffered_per_game=_optional_float(row.get("sacks_suffered_per_game"), "sacks_suffered_per_game", positive=True),
+        penalties_per_play_proxy=_rate(row.get("penalties_per_play_proxy"), "penalties_per_play_proxy"),
+        sample_games=None if sample_games in (None, "") else int(sample_games),
     )
 
 

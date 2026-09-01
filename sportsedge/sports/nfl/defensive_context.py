@@ -23,6 +23,9 @@ class DefensiveSplit:
     blitz_rate: float | None
     two_high_rate: float | None
     single_high_rate: float | None
+    interceptions_per_game: float | None
+    pass_yards_allowed_per_game: float | None
+    rush_yards_allowed_per_game: float | None
 
 
 def _utc(value: Any, field: str) -> datetime:
@@ -56,6 +59,15 @@ def _epa(value: Any) -> float | None:
     return x
 
 
+def _optional_nonnegative(value: Any, field: str) -> float | None:
+    if value in (None, ""):
+        return None
+    x = float(value)
+    if x < 0:
+        raise NFLContextError(f"{field} invalid")
+    return x
+
+
 def build_defensive_split(row: Mapping[str, Any]) -> DefensiveSplit:
     sample = int(row.get("sample_plays") or 0)
     if sample < 0:
@@ -78,6 +90,9 @@ def build_defensive_split(row: Mapping[str, Any]) -> DefensiveSplit:
         blitz_rate=_rate(row.get("blitz_rate"), "blitz_rate"),
         two_high_rate=_rate(row.get("two_high_rate"), "two_high_rate"),
         single_high_rate=_rate(row.get("single_high_rate"), "single_high_rate"),
+        interceptions_per_game=_optional_nonnegative(row.get("interceptions_per_game"), "interceptions_per_game"),
+        pass_yards_allowed_per_game=_optional_nonnegative(row.get("pass_yards_allowed_per_game"), "pass_yards_allowed_per_game"),
+        rush_yards_allowed_per_game=_optional_nonnegative(row.get("rush_yards_allowed_per_game"), "rush_yards_allowed_per_game"),
     )
 
 
