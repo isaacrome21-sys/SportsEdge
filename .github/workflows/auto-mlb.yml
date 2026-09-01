@@ -11,6 +11,7 @@ on:
       - 'scripts/probe_odds_http.py'
       - 'config/**'
       - 'tests/test_auto_native_odds.py'
+      - 'tests/test_auto_mlb_workflow_key_conservation.py'
       - 'tests/test_mlb_run_machine.py'
       - '.github/workflows/auto-mlb.yml'
   schedule:
@@ -51,6 +52,7 @@ jobs:
           tests.test_auto_runner
           tests.test_odds_api_source
           tests.test_auto_native_odds
+          tests.test_auto_mlb_workflow_key_conservation
           tests.test_mlb_hits_features
           tests.test_mlb_total_bases_features
           tests.test_mlb_history_cache
@@ -64,7 +66,7 @@ jobs:
           tests.test_run_auto_mlb_resilient_machine
           -v
       - name: Diagnose Odds API credentials safely
-        if: always()
+        if: github.event_name == 'workflow_dispatch'
         env:
           SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
           SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
@@ -72,6 +74,7 @@ jobs:
           SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
         run: python scripts/probe_odds_http.py
       - name: Acquire featured MLB game lines
+        if: github.event_name == 'workflow_dispatch'
         continue-on-error: true
         env:
           SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
@@ -80,7 +83,16 @@ jobs:
           SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
           SPORTSEDGE_ODDS_BOOKMAKERS: draftkings
         run: python scripts/probe_game_odds.py
-      - name: Run canonical automated MLB machine
+      - name: Run scheduled MLB machine without Odds API credits
+        if: github.event_name != 'workflow_dispatch'
+        env:
+          SPORTSEDGE_ODDS_BOOKMAKERS: draftkings
+          SPORTSEDGE_PROJECTED_LINEUPS_URL: ${{ secrets.SPORTSEDGE_PROJECTED_LINEUPS_URL }}
+          SPORTSEDGE_PROVIDER_TOKEN: ${{ secrets.SPORTSEDGE_PROVIDER_TOKEN }}
+          SPORTSEDGE_HISTORY_CACHE_DIR: .cache/sportsedge/mlb-history
+        run: python scripts/run_auto_mlb_resilient.py --output artifacts/live_mlb_card.json
+      - name: Run requested canonical automated MLB machine
+        if: github.event_name == 'workflow_dispatch'
         env:
           SPORTSEDGE_QUOTES_URL: ${{ secrets.SPORTSEDGE_QUOTES_URL }}
           SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
