@@ -6,6 +6,7 @@ import hashlib, json
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 from urllib.request import urlopen
+from zoneinfo import ZoneInfo
 
 from .engine_registry import resolve_manual_market_type
 from .generic_card_pipeline import run_generic_card
@@ -18,14 +19,22 @@ from .quote_bridge import validate_canonical_quote
 
 class CanonicalManualMLBError(ValueError): pass
 
+CHICAGO_TZ = ZoneInfo("America/Chicago")
+
 def _sha(v: Any) -> str:
     return hashlib.sha256(json.dumps(v, sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest()
 
 def _norm_team(value: str) -> str:
     return " ".join(str(value or "").strip().lower().replace(".", "").split())
 
+def _schedule_date_for_quote(row: ManualQuote) -> str:
+    # validate_manual_quote normalizes timestamps to UTC. Resolve the schedule
+    # using the same Chicago-local slate date enforced by the live workflow so
+    # late-evening games do not roll into the following UTC calendar date.
+    return row.first_pitch_at.astimezone(CHICAGO_TZ).date().isoformat()
+
 def _resolve_game(row: ManualQuote, opener=urlopen):
-    rows = fetch_schedule(row.first_pitch_at.date().isoformat(), opener=opener, now=row.observed_at)
+    rows = fetch_schedule(_schedule_date_for_quote(row), opener=opener, now=row.observed_at)
     game_key = str(row.game_id).strip()
     matches = [g for g in rows if str(g.game_pk) == game_key]
     if not matches and "@" in game_key:
