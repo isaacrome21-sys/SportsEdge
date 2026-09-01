@@ -51,6 +51,8 @@ jobs:
             sportsedge/core/promotion/football_registry.py \
             sportsedge/core/validation/nfl_ci_attestation.py \
             sportsedge/sports/nfl/m2.py \
+            sportsedge/sports/nfl/m2_v2_candidate.py \
+            sportsedge/sports/nfl/m2_v2_validation.py \
             sportsedge/sports/nfl/model_artifact.py \
             sportsedge/sports/nfl/m2_history_features.py \
             sportsedge/sports/nfl/m2_history_policy.py \
@@ -59,6 +61,8 @@ jobs:
             sportsedge/sports/nfl/source_manifest.py \
             sportsedge/sports/nfl/simulator_profile.py \
             scripts/run_nfl_production_validation.py \
+            scripts/run_nfl_v2_candidate_validation.py \
+            scripts/validate_nfl_v2_candidate.py \
             scripts/bind_nfl_math_to_source_manifest.py \
             scripts/validate_nfl_simulator_profile.py \
             scripts/build_nfl_promotion_registry.py \
@@ -122,6 +126,20 @@ jobs:
           --manifest-out artifacts/football/nfl_source_manifest.json
           --model-out artifacts/football/nfl_m2_model.json
 
+      - name: Build isolated V2 discrete-score candidate diagnostic
+        run: >-
+          python scripts/run_nfl_v2_candidate_validation.py
+          --schedule-file artifacts/football/sources/games.csv
+          --pbp-dir artifacts/football/sources/pbp
+          --participation-dir artifacts/football/sources/participation
+          --depth-dir artifacts/football/sources/depth
+          --stadium-file artifacts/football/sources/team_stadiums.csv
+          --source-manifest artifacts/football/nfl_source_manifest.json
+          --git-sha "$EVIDENCE_GIT_SHA"
+          --start-season 2016 --end-season 2025
+          --neutral-site-policy exclude_from_evaluation
+          --out artifacts/football/nfl_m2_v2_candidate_validation.json
+
       - name: Assert fitted M2 artifact exists and is exact-head bound
         run: |
           python - <<'PY'
@@ -160,6 +178,14 @@ jobs:
           --production-evidence artifacts/football/nfl_production_validation.json
           --version nfl-m2-oos-key-emergent-v1
           --out artifacts/football/nfl_simulator_profile_schedule.json
+
+      - name: Compare V2 candidate to frozen key-number tolerance
+        run: >-
+          python scripts/validate_nfl_v2_candidate.py
+          artifacts/football/nfl_real_history_audit.json
+          artifacts/football/nfl_m2_v2_candidate_validation.json
+          --max-abs-error 0.005
+          --out artifacts/football/nfl_m2_v2_candidate_key_math.json
 
       - name: Bind math evidence to canonical multi-source manifest and code SHA
         run: >-
