@@ -5,8 +5,12 @@ on:
   push:
     paths:
       - 'scripts/audit_mlb_validation_state.py'
+      - 'scripts/enforce_mlb_replay_policy.py'
       - 'scripts/probe_mlb_settlement_semantics.py'
+      - 'sportsedge/sports/mlb/replay_policy.py'
+      - 'tests/test_mlb_replay_policy_enforcement.py'
       - 'config/mlb_validation_evidence.json'
+      - 'config/mlb_replay_policy_v1.json'
       - '.github/workflows/mlb-settlement-semantics.yml'
       - '.github/workflows/mlb-validation-audit.yml'
   schedule:
@@ -30,6 +34,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12.13'
+      - name: Verify frozen replay policy contract
+        run: python -m unittest tests.test_mlb_replay_policy_enforcement -v
       - name: Prepare durable data worktree
         shell: bash
         run: |
@@ -38,6 +44,11 @@ jobs:
           git worktree add --detach .data-branch FETCH_HEAD
       - name: Derive validation state from durable evidence
         run: python scripts/audit_mlb_validation_state.py
+      - name: Enforce frozen replay policy identity
+        run: >-
+          python scripts/enforce_mlb_replay_policy.py
+          --policy config/mlb_replay_policy_v1.json
+          --input artifacts/mlb-validation/derived_status.json
       - name: Persist immutable validation audit
         shell: bash
         run: |
