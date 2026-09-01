@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "sport": "nfl",
+  "contract": "PINNED_PREGAME_OFFICIAL_STARTER_OVERRIDE_V1",
+  "overrides": [
+    {
+      "game_id": "2018_01_TB_NO",
+      "season": 2018,
+      "week": 1,
+      "team": "TB",
+      "gsis_id": "00-0023682",
+      "source_uri": "https://www.buccaneers.com/news/ryan-fitzpatrick-takes-over-first-team-offense",
+      "source_published_ts": "2018-07-26T13:52:00-04:00",
+      "source_statement": "Ryan Fitzpatrick will take the reins while Jameis Winston is serving a three-game suspension.",
+      "identity_source_uri": "https://nflreadr.nflverse.com/",
+      "reason": "NFLVERSE_WEEKLY_DEPTH_RANK_ONE_GAP"
+    }
+  ]
+}
