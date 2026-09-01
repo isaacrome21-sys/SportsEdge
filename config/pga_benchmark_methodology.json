@@ -1,0 +1,50 @@
+{
+  "schema_version": "PGA_BENCHMARK_V1",
+  "sport": "PGA",
+  "principle": "Benchmark and de-vig methodology is determined by settlement market shape; two-way normalization must never be applied to an N-way or non-exhaustive cross-player surface.",
+  "markets": {
+    "OUTRIGHT": {
+      "shape": "EXHAUSTIVE_N_WAY_MUTUALLY_EXCLUSIVE",
+      "devig_method": "MULTIPLICATIVE_NWAY_V1",
+      "require_complete_field": true,
+      "partial_field_policy": "BLOCK_BENCHMARK",
+      "settlement": "WINNER_WITH_BOOK_DEAD_HEAT_RULES"
+    },
+    "FIRST_ROUND_LEADER": {
+      "shape": "EXHAUSTIVE_N_WAY_MUTUALLY_EXCLUSIVE",
+      "devig_method": "MULTIPLICATIVE_NWAY_V1",
+      "require_complete_field": true,
+      "partial_field_policy": "BLOCK_BENCHMARK",
+      "settlement": "ROUND_LEADER_WITH_BOOK_DEAD_HEAT_RULES"
+    },
+    "TOP_K": {
+      "shape": "PER_SELECTION_BINARY_NONEXHAUSTIVE_ACROSS_PLAYERS",
+      "devig_method": "MULTIPLICATIVE_2WAY_V1",
+      "require_paired_yes_no": true,
+      "one_sided_quote_policy": "BLOCK_BENCHMARK",
+      "cross_player_normalization": "FORBIDDEN",
+      "settlement": "EXPECTED_PAID_FRACTION_WITH_DEAD_HEAT"
+    },
+    "MAKE_CUT": {
+      "shape": "PER_SELECTION_BINARY_NONEXHAUSTIVE_ACROSS_PLAYERS",
+      "devig_method": "MULTIPLICATIVE_2WAY_V1",
+      "require_paired_yes_no": true,
+      "one_sided_quote_policy": "BLOCK_BENCHMARK",
+      "cross_player_normalization": "FORBIDDEN",
+      "settlement": "BINARY_PER_PLAYER_WITH_VERIFIED_CUT_RULE"
+    },
+    "H2H": {
+      "shape": "TWO_WAY_MATCHUP_WITH_PUSH_POSSIBLE",
+      "devig_method": "MULTIPLICATIVE_2WAY_V1",
+      "require_paired_sides": true,
+      "push_policy": "EXCLUDE_PUSH_FROM_BINARY_SCORING_AND_TRACK_SEPARATELY",
+      "settlement": "BOOK_MATCHUP_RULES_REQUIRED"
+    }
+  },
+  "validation": {
+    "market_probability_must_record_methodology": true,
+    "market_probability_must_record_quote_set_hash": true,
+    "methodology_mismatch_policy": "FAIL_CLOSED",
+    "promotion_may_not_inherit_across_market_shapes": true
+  }
+}
