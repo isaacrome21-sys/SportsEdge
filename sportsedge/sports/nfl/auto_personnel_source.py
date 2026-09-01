@@ -69,20 +69,16 @@ def _latest_team_snapshot(
     as_of: datetime,
 ) -> tuple[datetime | None, list[dict[str, Any]]]:
     eligible: list[tuple[datetime, dict[str, Any]]] = []
-    missing_timestamp = False
     for raw in rows:
         row = dict(raw)
         if _team(row.get("team") or row.get("club_code")) != team_id:
             continue
         if row.get("dt") in (None, ""):
-            missing_timestamp = True
             continue
         stamp = _utc(row.get("dt"), "depth dt")
         if stamp <= as_of:
             eligible.append((stamp, row))
     if not eligible:
-        if missing_timestamp:
-            return None, []
         return None, []
     latest = max(stamp for stamp, _ in eligible)
     snapshot = [row for stamp, row in eligible if stamp == latest]
@@ -121,9 +117,11 @@ def build_depth_chart_personnel_provider(
 
     provider_rows: list[dict[str, Any]] = []
     snapshot_times: dict[str, str] = {}
+    missing_team_ids: list[str] = []
     for team_id in targets:
         stamp, snapshot = _latest_team_snapshot(rows=materialized, team_id=team_id, as_of=pit)
         if stamp is None or not snapshot:
+            missing_team_ids.append(team_id)
             continue
         snapshot_times[team_id] = stamp.isoformat()
         provider_rows.append(
@@ -153,6 +151,7 @@ def build_depth_chart_personnel_provider(
     )
     payload = dict(row.get("payload") or {})
     payload["depth_snapshot_asof_by_team"] = snapshot_times
+    payload["missing_team_ids"] = missing_team_ids
     payload["derived_fields"] = [
         "projected_ol_starters_known",
         "starting_secondary_known",
@@ -167,5 +166,6 @@ def build_depth_chart_personnel_provider(
         "ol_continuity_starts",
     ]
     row["payload"] = payload
+    row["status"] = "PARTIAL" if missing_team_ids else "AVAILABLE"
     row["source_name"] = "PIT_NFLVERSE_DEPTH_CHARTS"
     return row
