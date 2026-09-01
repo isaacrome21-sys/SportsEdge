@@ -17,6 +17,15 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import sys
+
+# Direct execution (``python scripts/...``) sets sys.path[0] to ``scripts``.
+# Add only the repository root so the CLI behaves the same on clean runners as
+# it does when invoked with an explicit PYTHONPATH. This changes no model or
+# attestation semantics.
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 from sportsedge.core.promotion.football_registry import build_nfl_promotion_registry
 from sportsedge.core.validation.nfl_ci_attestation import verify_nfl_pre_ci_bundle
