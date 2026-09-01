@@ -1,8 +1,11 @@
+import time
 import unittest
 
 from sportsedge.provider_resilience import (
     ProviderSpec,
+    acquire_domains_concurrently,
     build_provider_plans,
+    execute_provider_plan,
     forbid_negative_live_cache,
     model_p_provider_allowed,
     provider_manifest_sha,
@@ -49,6 +52,81 @@ class ProviderResilienceTests(unittest.TestCase):
     def test_invalid_priority_fails_closed(self):
         with self.assertRaises(ValueError):
             build_provider_plans([ProviderSpec("MLB", "x", "weather", -1, TrustClass.CONTEXT_ONLY, 30)])
+
+    def test_execute_plan_falls_back_after_transport_failure(self):
+        specs = [
+            ProviderSpec("NFL", "official", "injuries", 1, TrustClass.MODEL_P_OBJECTIVE, 300, ("team", "player_id")),
+            ProviderSpec("NFL", "backup", "injuries", 2, TrustClass.MODEL_P_OBJECTIVE, 600, ("team", "player_id")),
+        ]
+        plan = build_provider_plans(specs)["INJURIES"]
+
+        def broken():
+            raise RuntimeError("provider down")
+
+        outcome = execute_provider_plan(
+            plan,
+            {"official": broken, "backup": lambda: {"team": "BUF", "player_id": "00-1"}},
+            require_model_p_objective=True,
+        )
+        self.assertEqual(outcome.status, "AVAILABLE")
+        self.assertEqual(outcome.provider_name, "backup")
+        self.assertEqual([x.status for x in outcome.attempts], ["SOURCE_FAILED", "AVAILABLE"])
+
+    def test_context_fallback_cannot_satisfy_model_p_domain(self):
+        specs = [
+            ProviderSpec("NFL", "official", "injuries", 1, TrustClass.MODEL_P_OBJECTIVE, 300),
+            ProviderSpec("NFL", "reported", "injuries", 2, TrustClass.CONTEXT_ONLY, 300),
+        ]
+        plan = build_provider_plans(specs)["INJURIES"]
+        outcome = execute_provider_plan(
+            plan,
+            {"official": lambda: None, "reported": lambda: {"status": "questionable"}},
+            require_model_p_objective=True,
+        )
+        self.assertEqual(outcome.status, "MISSING")
+        self.assertIsNone(outcome.provider_name)
+        self.assertEqual([x.status for x in outcome.attempts], ["MISSING", "REJECTED_TRUST"])
+
+    def test_schema_failure_falls_through_to_next_provider(self):
+        specs = [
+            ProviderSpec("MLB", "primary", "weather", 1, TrustClass.MODEL_P_OBJECTIVE, 300, ("wind", "temp")),
+            ProviderSpec("MLB", "backup", "weather", 2, TrustClass.MODEL_P_OBJECTIVE, 300, ("wind", "temp")),
+        ]
+        outcome = execute_provider_plan(
+            build_provider_plans(specs)["WEATHER"],
+            {"primary": lambda: {"wind": 12}, "backup": lambda: {"wind": 10, "temp": 81}},
+            require_model_p_objective=True,
+        )
+        self.assertEqual(outcome.provider_name, "backup")
+        self.assertEqual(outcome.attempts[0].status, "SCHEMA_FAILED")
+
+    def test_independent_domains_execute_concurrently(self):
+        specs = [
+            ProviderSpec("NFL", "weather", "weather", 1, TrustClass.MODEL_P_OBJECTIVE, 300),
+            ProviderSpec("NFL", "injury", "injuries", 1, TrustClass.MODEL_P_OBJECTIVE, 300),
+        ]
+        plans = build_provider_plans(specs)
+
+        def slow(value):
+            def inner():
+                time.sleep(0.08)
+                return value
+            return inner
+
+        started = time.monotonic()
+        outcomes = acquire_domains_concurrently(
+            plans,
+            {
+                "WEATHER": {"weather": slow({"wind": 5})},
+                "INJURIES": {"injury": slow({"count": 0})},
+            },
+            model_p_domains=("WEATHER", "INJURIES"),
+            max_workers=2,
+        )
+        elapsed = time.monotonic() - started
+        self.assertEqual(set(outcomes), {"INJURIES", "WEATHER"})
+        self.assertTrue(all(row.status == "AVAILABLE" for row in outcomes.values()))
+        self.assertLess(elapsed, 0.14)
 
 
 if __name__ == "__main__":
