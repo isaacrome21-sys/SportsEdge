@@ -14,54 +14,20 @@ jobs:
   verify-auto-mlb-heartbeat:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify auto-mlb has completed recently
+      - uses: actions/checkout@v4
+
+      - name: Verify auto-mlb has completed successfully and recently
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           MAX_AGE_MINUTES: '45'
-        shell: bash
-        run: |
-          python - <<'PY'
-          import json, os, subprocess, sys
-          from datetime import datetime, timezone
-
-          repo = os.environ['REPO']
-          max_age = float(os.environ.get('MAX_AGE_MINUTES', '45'))
-          try:
-              raw = subprocess.check_output([
-                  'gh','api',f'repos/{repo}/actions/workflows/auto-mlb.yml/runs',
-                  '-f','branch=main','-f','per_page=10'
-              ], text=True)
-              runs = json.loads(raw).get('workflow_runs') or []
-          except Exception as exc:
-              print(f'DEADMAN_HEARTBEAT_API_UNAVAILABLE:{type(exc).__name__}:{exc}')
-              sys.exit(0)
-          completed = [r for r in runs if r.get('status') == 'completed']
-          if not completed:
-              print('DEADMAN_NO_COMPLETED_AUTO_MLB_RUNS')
-              sys.exit(0)
-          latest = max(completed, key=lambda r: r.get('updated_at') or '')
-          stamp = latest.get('updated_at') or latest.get('run_started_at')
-          if not stamp:
-              print('DEADMAN_LATEST_RUN_TIMESTAMP_MISSING')
-              sys.exit(0)
-          then = datetime.fromisoformat(stamp.replace('Z','+00:00')).astimezone(timezone.utc)
-          now = datetime.now(timezone.utc)
-          age = (now - then).total_seconds()/60.0
-          print(json.dumps({
-              'latest_run_id': latest.get('id'),
-              'latest_conclusion': latest.get('conclusion'),
-              'age_minutes': age,
-              'max_age_minutes': max_age,
-          }, indent=2, sort_keys=True))
-          if age > max_age:
-              print('DEADMAN_STALE')
-          PY
+        run: python scripts/check_mlb_auto_heartbeat.py
 
   archive-rescue-dispatch:
-    # This job is intentionally unconditional. The archive workflow itself is
-    # fail-closed outside T-180/T-90/T0 and has a durable dedupe/budget ledger,
-    # so an extra dispatch is cheap while a missed point-in-time snapshot is not recoverable.
+    # This job is intentionally independent from heartbeat verification. The
+    # archive workflow itself is fail-closed outside T-180/T-90/T0 and has a
+    # durable dedupe/budget ledger, so an extra dispatch is cheap while a missed
+    # point-in-time snapshot is not recoverable.
     runs-on: ubuntu-latest
     steps:
       - name: Dispatch archive failover workflow
