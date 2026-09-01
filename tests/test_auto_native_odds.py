@@ -136,7 +136,7 @@ class AutoNativeOddsTests(unittest.TestCase):
         def op(req, timeout=15): return self.opener(req, timeout, player="Someone Else")
         report = run_auto_mlb_native_odds(odds_api_key="secret", feature_url="https://features", now=NOW, opener=op)
         self.assertEqual(report.results, ())
-        self.assertEqual(report.run_status, "NO_QUOTES")
+        self.assertEqual(report.run_status, "DEGRADED")
         self.assertTrue(any("ODDS_PLAYER_ID_UNRESOLVED" in str(x) for x in report.source_failures))
 
     def test_no_feature_url_builds_hits_features_from_official_history(self):
