@@ -31,7 +31,7 @@ class MLBReplayPolicyEnforcementTests(unittest.TestCase):
     def test_fold_gap_or_overlap_is_rejected(self):
         payload = json.loads(POLICY.read_text(encoding="utf-8"))
         broken = deepcopy(payload)
-        broken["walk_forward"]["folds"][1]["validation_start"] = "2026-04-30"
+        broken["walk_forward"]["folds"][1]["validation_start"] = "2026-05-02"
         raw = (json.dumps(broken, sort_keys=True) + "\n").encode()
         with self.assertRaisesRegex(MLBReplayPolicyError, "FOLD_GAP_OR_OVERLAP"):
             validate_replay_policy(broken, raw_bytes=raw)
