@@ -22,6 +22,14 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import sys
+
+# Direct execution (``python scripts/...``) sets sys.path[0] to ``scripts``.
+# Add only the repository root so this evidence CLI is portable on clean
+# runners without changing any CLV or promotion semantics.
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 from sportsedge.core.clv.football import CLVClose, CLVDecision, score_clv, summarize_clv
 from sportsedge.sports.nfl.m2 import NFL_M2_FEATURE_CONTRACT, PRODUCTION_NFL_M2_MODEL_ID
