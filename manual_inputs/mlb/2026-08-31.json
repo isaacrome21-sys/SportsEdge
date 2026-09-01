@@ -1,0 +1,56 @@
+{
+  "rows": [
+    {
+      "game_id": "New York Yankees@Los Angeles Angels",
+      "market_type": "MONEYLINE",
+      "side": "AWAY",
+      "line": 0.0,
+      "price": -119,
+      "paired_side": "HOME",
+      "paired_price": 111,
+      "book": "draftkings",
+      "observed_at": "2026-08-31T20:14:03-05:00",
+      "first_pitch_at": "2026-08-31T20:38:00-05:00",
+      "source": "MANUAL"
+    },
+    {
+      "game_id": "New York Yankees@Los Angeles Angels",
+      "market_type": "GAME_TOTAL",
+      "side": "OVER",
+      "line": 8.0,
+      "price": -114,
+      "paired_side": "UNDER",
+      "paired_price": -105,
+      "book": "draftkings",
+      "observed_at": "2026-08-31T20:14:03-05:00",
+      "first_pitch_at": "2026-08-31T20:38:00-05:00",
+      "source": "MANUAL"
+    },
+    {
+      "game_id": "Philadelphia Phillies@Arizona Diamondbacks",
+      "market_type": "MONEYLINE",
+      "side": "AWAY",
+      "line": 0.0,
+      "price": -118,
+      "paired_side": "HOME",
+      "paired_price": 110,
+      "book": "draftkings",
+      "observed_at": "2026-08-31T20:14:03-05:00",
+      "first_pitch_at": "2026-08-31T20:40:00-05:00",
+      "source": "MANUAL"
+    },
+    {
+      "game_id": "Philadelphia Phillies@Arizona Diamondbacks",
+      "market_type": "GAME_TOTAL",
+      "side": "OVER",
+      "line": 8.5,
+      "price": -102,
+      "paired_side": "UNDER",
+      "paired_price": -119,
+      "book": "draftkings",
+      "observed_at": "2026-08-31T20:14:03-05:00",
+      "first_pitch_at": "2026-08-31T20:40:00-05:00",
+      "source": "MANUAL"
+    }
+  ]
+}
