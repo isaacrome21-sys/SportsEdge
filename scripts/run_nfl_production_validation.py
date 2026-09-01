@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+from datetime import date, timedelta
 import gzip
 import hashlib
 import json
@@ -32,6 +33,7 @@ _PBP_FIELDS = {"game_id", "play_id", "posteam", "defteam", "epa", "qb_epa", "pas
 _PARTICIPATION_FIELDS = {"nflverse_game_id", "game_id", "play_id", "was_pressure"}
 _DEPTH_FIELDS = {"season", "club_code", "team", "week", "game_type", "depth_team", "position", "depth_position", "gsis_id", "dt", "pos_abb", "pos_rank"}
 _STADIUM_FIELDS = {"team_fastr", "team", "stadium", "first_game_date", "last_game_date", "lat", "lon", "tz_offset"}
+_MAX_PREOPENING_AWAY_ORIGIN_GAP_DAYS = 28
 
 
 def _sha(path: Path) -> str:
@@ -73,6 +75,111 @@ def _files(directory: Path, pattern: str, start: int, end: int) -> list[Path]:
 def _extend(target: list[dict[str, str]], paths: Iterable[Path], fields: set[str]) -> None:
     for path in paths:
         target.extend(_read_projected(path, fields))
+
+
+def _date_value(value) -> date | None:
+    if value in (None, ""):
+        return None
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
+
+
+def _stadium_team(row: dict[str, str]) -> str:
+    return str(row.get("team_fastr") or row.get("team") or "").strip()
+
+
+def _stadium_geo_complete(row: dict[str, str]) -> bool:
+    try:
+        float(row.get("lat") or "")
+        float(row.get("lon") or "")
+        float(row.get("tz_offset") or "")
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
+def _stadium_active(row: dict[str, str], *, team: str, gameday: date) -> bool:
+    if _stadium_team(row) != team or not _stadium_geo_complete(row):
+        return False
+    first = _date_value(row.get("first_game_date")) or date.min
+    last = _date_value(row.get("last_game_date")) or date.max
+    return first <= gameday <= last
+
+
+def bridge_preopening_away_origins(
+    schedule_rows: Iterable[dict],
+    stadium_rows: Iterable[dict[str, str]],
+    *,
+    max_gap_days: int = _MAX_PREOPENING_AWAY_ORIGIN_GAP_DAYS,
+) -> tuple[list[dict[str, str]], list[dict[str, object]]]:
+    """Bridge only bounded pre-opening *away-team origin* gaps.
+
+    The stadium source dates a new venue from the first NFL game played there.
+    A relocated/new-stadium team can therefore have an away game a few days
+    before its first home game with no active stadium row. For travel features,
+    that is an origin-proxy gap, not an unknown game venue.
+
+    We bridge only that narrow case: an away team with no active origin may use
+    one unique future stadium row whose first-game date is at most ``max_gap``
+    days away. The synthetic row ends the day before the source row begins, so
+    it can never override the source interval. Home venues are never bridged.
+    Missing, distant, or ambiguous mappings remain fail-closed in the canonical
+    history builder.
+    """
+    if max_gap_days < 0:
+        raise ValueError("NFL_STADIUM_BRIDGE_GAP_INVALID")
+
+    base = [dict(row) for row in stadium_rows]
+    resolved = [dict(row) for row in base]
+    bridges: list[dict[str, object]] = []
+    games = [dict(row) for row in schedule_rows if str(row.get("game_type") or "REG").upper() == "REG"]
+    games.sort(key=lambda row: (str(row.get("gameday") or row.get("game_date") or ""), str(row.get("game_id") or "")))
+
+    for game in games:
+        gameday = _date_value(game.get("gameday") or game.get("game_date"))
+        team = str(game.get("away_team") or "").strip()
+        if gameday is None or not team:
+            continue
+        if any(_stadium_active(row, team=team, gameday=gameday) for row in resolved):
+            continue
+
+        future: list[tuple[date, dict[str, str]]] = []
+        for row in base:
+            if _stadium_team(row) != team or not _stadium_geo_complete(row):
+                continue
+            first = _date_value(row.get("first_game_date"))
+            if first is None:
+                continue
+            gap = (first - gameday).days
+            if 0 < gap <= max_gap_days:
+                future.append((first, row))
+        if not future:
+            continue
+
+        earliest = min(first for first, _ in future)
+        selected = [row for first, row in future if first == earliest]
+        if len(selected) != 1:
+            raise ValueError(f"NFL_STADIUM_BRIDGE_AMBIGUOUS:{team}:{gameday.isoformat()}:{earliest.isoformat()}")
+
+        source_row = selected[0]
+        bridge = dict(source_row)
+        bridge["first_game_date"] = gameday.isoformat()
+        bridge["last_game_date"] = (earliest - timedelta(days=1)).isoformat()
+        resolved.append(bridge)
+        bridges.append({
+            "team": team,
+            "game_id": str(game.get("game_id") or ""),
+            "away_game_date": gameday.isoformat(),
+            "stadium": str(source_row.get("stadium") or ""),
+            "source_first_game_date": earliest.isoformat(),
+            "bridge_last_date": bridge["last_game_date"],
+            "gap_days": (earliest - gameday).days,
+            "reason": "PRE_OPENING_AWAY_TEAM_HOME_ORIGIN_PROXY",
+        })
+
+    return resolved, bridges
 
 
 def main() -> int:
@@ -127,7 +234,8 @@ def main() -> int:
     schedule = normalize_nfl_rows(parse_schedule_csv(args.schedule_file.read_text(encoding="utf-8-sig")), range(args.start_season, args.end_season + 1))
     pbp: list[dict[str, str]] = []; participation: list[dict[str, str]] = []; depth: list[dict[str, str]] = []
     _extend(pbp, pbp_files, _PBP_FIELDS); _extend(participation, participation_files, _PARTICIPATION_FIELDS); _extend(depth, depth_files, _DEPTH_FIELDS)
-    stadiums = _read_projected(args.stadium_file, _STADIUM_FIELDS)
+    raw_stadiums = _read_projected(args.stadium_file, _STADIUM_FIELDS)
+    stadiums, stadium_bridges = bridge_preopening_away_origins(schedule, raw_stadiums)
     prior_curves = fit_nfl_prior_decay_curves(schedule, pbp, min_train_seasons=args.min_train_seasons, weeks=range(1, 7))
     history_rows = build_nfl_m2_history_rows(
         schedule, pbp, participation, depth, stadiums,
@@ -144,6 +252,8 @@ def main() -> int:
         "code_git_sha": git_sha, "source_manifest_sha256": manifest_hash, "schedule_anchor_sha256": schedule_sha,
         "source_manifest_path": str(args.manifest_out), "season_range": [args.start_season, args.end_season],
         "point_in_time_history_row_count": len(history_rows), "neutral_site_policy": args.neutral_site_policy,
+        "stadium_home_origin_bridge_contract": "AWAY_TEAM_ONLY_UNIQUE_FUTURE_STADIUM_MAX_28_DAYS",
+        "stadium_home_origin_bridges": stadium_bridges,
     })
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -157,6 +267,7 @@ def main() -> int:
         "code_git_sha": git_sha, "model_id": evidence["model_id"], "feature_contract": evidence["feature_contract"],
         "source_manifest_sha256": manifest_hash, "history_rows": len(history_rows), "fold_count": evidence["fold_count"],
         "trained_through_season": model_artifact["trained_through_season"], "promotion_evidence": evidence["promotion_evidence"],
+        "stadium_home_origin_bridge_count": len(stadium_bridges),
     }, sort_keys=True))
     return 0
 
