@@ -53,6 +53,8 @@ jobs:
             sportsedge/sports/nfl/m2.py \
             sportsedge/sports/nfl/m2_v2_candidate.py \
             sportsedge/sports/nfl/m2_v2_validation.py \
+            sportsedge/sports/nfl/m2_v2b_candidate.py \
+            sportsedge/sports/nfl/m2_v2b_validation.py \
             sportsedge/sports/nfl/model_artifact.py \
             sportsedge/sports/nfl/m2_history_features.py \
             sportsedge/sports/nfl/m2_history_policy.py \
@@ -126,7 +128,7 @@ jobs:
           --manifest-out artifacts/football/nfl_source_manifest.json
           --model-out artifacts/football/nfl_m2_model.json
 
-      - name: Build isolated V2 discrete-score candidate diagnostic
+      - name: Build isolated V2A and V2B candidate diagnostics
         run: >-
           python scripts/run_nfl_v2_candidate_validation.py
           --schedule-file artifacts/football/sources/games.csv
@@ -139,6 +141,7 @@ jobs:
           --start-season 2016 --end-season 2025
           --neutral-site-policy exclude_from_evaluation
           --out artifacts/football/nfl_m2_v2_candidate_validation.json
+          --v2b-out artifacts/football/nfl_m2_v2b_candidate_validation.json
 
       - name: Assert fitted M2 artifact exists and is exact-head bound
         run: |
@@ -179,13 +182,21 @@ jobs:
           --version nfl-m2-oos-key-emergent-v1
           --out artifacts/football/nfl_simulator_profile_schedule.json
 
-      - name: Compare V2 candidate to frozen key-number tolerance
+      - name: Compare V2A candidate to frozen key-number tolerance
         run: >-
           python scripts/validate_nfl_v2_candidate.py
           artifacts/football/nfl_real_history_audit.json
           artifacts/football/nfl_m2_v2_candidate_validation.json
           --max-abs-error 0.005
           --out artifacts/football/nfl_m2_v2_candidate_key_math.json
+
+      - name: Compare V2B candidate to frozen key-number tolerance
+        run: >-
+          python scripts/validate_nfl_v2_candidate.py
+          artifacts/football/nfl_real_history_audit.json
+          artifacts/football/nfl_m2_v2b_candidate_validation.json
+          --max-abs-error 0.005
+          --out artifacts/football/nfl_m2_v2b_candidate_key_math.json
 
       - name: Bind math evidence to canonical multi-source manifest and code SHA
         run: >-
