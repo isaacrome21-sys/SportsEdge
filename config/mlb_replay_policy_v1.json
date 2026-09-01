@@ -2,5 +2,195 @@
   "schema_version": 1,
   "policy_id": "MLB_REPLAY_POLICY_V1",
   "status": "FROZEN_PRE_REPLAY",
-  "sport": "MLB"
+  "sport": "MLB",
+  "scope": "promotion-grade historical and forward replay evidence",
+  "effective_date": "2026-08-31",
+  "governance": {
+    "freeze_rule": "This policy must be committed before promotion-grade replay results are inspected. Any material change to folds, benchmark hierarchy, timestamp rules, freshness, pairing, de-vig method, clustering, or market eligibility requires a new policy_id and resets affected promotion evidence.",
+    "no_post_result_substitution": true,
+    "synthetic_or_ci_waiver_counts_as_evidence": false,
+    "missing_or_ambiguous_rows": "EXCLUDE_WITH_REASON",
+    "policy_identity_binding": "Exact committed file bytes plus Git commit/blob identity must be attached to replay evidence."
+  },
+  "season_calendar": {
+    "regular_season_replay_start": "2026-03-25",
+    "walk_forward_replay_end": "2026-08-31",
+    "untouched_forward_holdout_start": "2026-09-01",
+    "untouched_forward_holdout_end": "2026-09-27",
+    "calendar_basis": "2026 MLB regular season schedule: Opening Night 2026-03-25; scheduled final regular-season day 2026-09-27.",
+    "source": "MLB official schedule"
+  },
+  "walk_forward": {
+    "method": "EXPANDING_CHRONOLOGICAL_MONTHLY",
+    "heldout_outcomes_may_not_change_same_fold_model_or_calibration": true,
+    "calibration_fit_contract": "Any calibrator used for a fold may use only information whose as-of and outcome dates are on or before that fold's train_end. Validation and untouched-holdout outcomes are never calibration inputs for that same fold.",
+    "folds": [
+      {
+        "name": "fold_1_opening_april",
+        "train_end": "2025-12-31",
+        "validation_start": "2026-03-25",
+        "validation_end": "2026-04-30"
+      },
+      {
+        "name": "fold_2_may",
+        "train_end": "2026-04-30",
+        "validation_start": "2026-05-01",
+        "validation_end": "2026-05-31"
+      },
+      {
+        "name": "fold_3_june",
+        "train_end": "2026-05-31",
+        "validation_start": "2026-06-01",
+        "validation_end": "2026-06-30"
+      },
+      {
+        "name": "fold_4_july",
+        "train_end": "2026-06-30",
+        "validation_start": "2026-07-01",
+        "validation_end": "2026-07-31"
+      },
+      {
+        "name": "fold_5_august",
+        "train_end": "2026-07-31",
+        "validation_start": "2026-08-01",
+        "validation_end": "2026-08-31"
+      }
+    ],
+    "untouched_forward_holdout": {
+      "start": "2026-09-01",
+      "end": "2026-09-27",
+      "fit_max_date_must_be_before_start": true,
+      "may_accumulate_only_after_policy_freeze": true
+    }
+  },
+  "benchmark": {
+    "provider_contract": "Bookmaker identity is explicit and immutable per observation; a hierarchy chooses a book before model performance is known.",
+    "decision_observation_rule": "For each decision, use the latest admissible paired quote at or before decision_ts from the first book in the market tier hierarchy that supplies a valid pair.",
+    "close_observation_rule": "For CLV, use the same selected decision book. The close must be after decision_ts and strictly before first pitch, and closing probability for line markets must be evaluated at the exact original decision threshold. If the same-book comparable close is unavailable, exclude CLV for that observation; never switch books after the decision.",
+    "quote_max_age_seconds": 180,
+    "paired_side_max_timestamp_skew_seconds": 30,
+    "freshness_rationale": "Quote freshness and paired-side skew are properties of sportsbook-feed/data-plumbing latency rather than MLB statistical behavior, so the shared cross-sport 180-second freshness and 30-second pair-skew limits are reused by design rather than copied as sport-behavioral parameters.",
+    "runtime_ttl_note": "These are replay-benchmark admission limits. They do not silently overwrite a different live acquisition/runtime quote TTL; replay evidence must satisfy this stricter frozen benchmark contract independently.",
+    "pair_contract": {
+      "same_sportsbook": true,
+      "same_game_identity": true,
+      "same_period": true,
+      "same_market": true,
+      "same_entity_identity": true,
+      "same_alternate_flag": true,
+      "same_line_or_exact_complementary_threshold": true,
+      "complementary_sides_required": true,
+      "single_sided_inference_forbidden": true,
+      "multiple_candidate_pairs": "AMBIGUOUS_EXCLUDE"
+    },
+    "devig": {
+      "method": "MULTIPLICATIVE_V1",
+      "two_sided_only": true,
+      "formula": "raw implied probabilities normalized to sum to one",
+      "n_way_devig_not_authorized_by_this_policy": true
+    },
+    "market_tiers": {
+      "FEATURED_CORE": {
+        "markets": [
+          "MONEYLINE",
+          "RUN_LINE",
+          "TOTALS"
+        ],
+        "book_hierarchy": [
+          "pinnacle",
+          "draftkings",
+          "fanduel",
+          "betmgm",
+          "williamhill_us"
+        ]
+      },
+      "PERIOD_TEAM_BINARY": {
+        "markets": [
+          "TEAM_TOTALS",
+          "F5_MONEYLINE",
+          "F5_RUN_LINE",
+          "F5_TOTALS",
+          "F5_TEAM_TOTALS",
+          "NRFI",
+          "YRFI",
+          "PITCHER_RECORD_WIN"
+        ],
+        "book_hierarchy": [
+          "draftkings",
+          "fanduel",
+          "betmgm",
+          "williamhill_us"
+        ]
+      },
+      "PLAYER_PROPS": {
+        "markets": [
+          "HOME_RUNS",
+          "HITS",
+          "TOTAL_BASES",
+          "RBI",
+          "RUNS",
+          "HITS_RUNS_RBIS",
+          "EXTRA_BASE_HITS",
+          "HITS_RUNS_STOLEN_BASES",
+          "RUNS_RBIS",
+          "HITS_STOLEN_BASES",
+          "HITS_WALKS_STOLEN_BASES",
+          "SINGLES",
+          "DOUBLES",
+          "TRIPLES",
+          "BATTER_BB",
+          "BATTER_K",
+          "STOLEN_BASES",
+          "PITCHER_K",
+          "PITCHER_HITS_ALLOWED",
+          "PITCHER_BB",
+          "PITCHER_ER",
+          "PITCHER_OUTS",
+          "PITCHER_HITS_WALKS_ER",
+          "EITHER_PITCHER_HITS_ALLOWED",
+          "EITHER_PITCHER_BB",
+          "EITHER_PITCHER_ER"
+        ],
+        "book_hierarchy": [
+          "draftkings",
+          "fanduel",
+          "betmgm",
+          "williamhill_us"
+        ]
+      },
+      "N_WAY_UNAUTHORIZED_V1": {
+        "markets": [
+          "FIRST_HOME_RUN"
+        ],
+        "book_hierarchy": [],
+        "rule": "FIRST_HOME_RUN cannot accumulate V1 benchmark/no-vig promotion evidence until a separately frozen N-way de-vig and no-home-run settlement policy exists. It remains non-OFFICIAL under this replay policy regardless of apparent edge."
+      }
+    },
+    "hierarchy_starvation_rule": "A market is not allowed to add books, reorder books, use a consensus, or infer an opposite side after replay coverage is observed. If no pre-registered book yields a valid synchronized pair, the observation is MISSING/EXCLUDED. A market may therefore legitimately fail to accumulate enough evidence for OFFICIAL promotion.",
+    "book_key_basis": "The Odds API bookmaker keys current at freeze time: draftkings, fanduel, betmgm, williamhill_us (Caesars), and pinnacle where applicable to featured core markets."
+  },
+  "statistics": {
+    "unit_of_evidence": "one uniquely identified promotion-eligible decision observation; duplicate game/market/side/book observations are forbidden",
+    "clv_definition": "closing no-vig probability for the selected side at the original decision threshold minus decision no-vig probability",
+    "roi_definition": "realized net return divided by risked stake under the validated sportsbook settlement contract",
+    "iid_assumption_for_within_slate_decisions": false,
+    "primary_standard_error": {
+      "estimator": "ONE_WAY_CLUSTER_ROBUST_CR1",
+      "cluster_key": "slate_date_ct",
+      "interpretation": "All decisions on the same MLB calendar slate are allowed to be correlated, including multiple markets and player props from the same game. Different slate dates are the primary independent clusters.",
+      "iid_fallback_allowed": false
+    },
+    "weekly_dependence": "Week-level aggregation may be reported as a sensitivity diagnostic, but promotion CLV/ROI t-stat gates use the frozen slate-date clustered estimator and may not switch estimators after results are seen.",
+    "t_stat_targets": [
+      "CLV",
+      "ROI"
+    ],
+    "push_void_ambiguous": "Excluded from win/loss scoring according to validated settlement rules; never coerced to losses or wins."
+  },
+  "coverage_and_promotion": {
+    "coverage_is_not_quality": true,
+    "thin_market_policy": "Insufficient paired benchmark coverage is an evidence insufficiency, not a model failure and not permission to relax the benchmark contract.",
+    "official_promotion_requires_existing_truth_gate_plus_this_policy": true,
+    "replay_before_policy_freeze_counts_toward_official": false
+  }
 }
