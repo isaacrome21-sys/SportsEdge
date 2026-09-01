@@ -51,6 +51,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12.13'
+      - name: Install runtime dependencies
+        run: python -m pip install --disable-pip-version-check numpy
       - name: Compile repaired orchestration and PIT modules
         run: >-
           python -m py_compile
