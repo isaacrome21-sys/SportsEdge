@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "sport": "UFC",
+  "supported_markets": [
+    {"market": "MONEYLINE_H2H", "engine": "UFC_FIGHT_SIM", "automatic_odds": true, "automatic_model_inputs": false}
+  ],
+  "unsupported_without_new_engine": [
+    "METHOD_OF_VICTORY",
+    "ROUND_OF_VICTORY",
+    "TOTAL_ROUNDS",
+    "FIGHT_GOES_DISTANCE",
+    "WIN_BY_KO_TKO",
+    "WIN_BY_SUBMISSION",
+    "WIN_BY_DECISION"
+  ],
+  "governance": {
+    "paired_prices_required": true,
+    "fighter_snapshot_required": true,
+    "dwcs_requires_event_specific_validation": true,
+    "promotion_inherited_from_code_presence": false
+  }
+}
