@@ -1,0 +1,40 @@
+name: integration-source-export
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Record exact source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/source-export
+          git rev-parse HEAD | tee artifacts/source-export/SOURCE_SHA.txt
+          git status --porcelain=v1 | tee artifacts/source-export/WORKTREE_STATUS.txt
+          test ! -s artifacts/source-export/WORKTREE_STATUS.txt
+      - name: Build source-only archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha=$(cat artifacts/source-export/SOURCE_SHA.txt)
+          git archive --format=zip --prefix="SportsEdge-${sha}/" --output="artifacts/source-export/SportsEdge-${sha}.zip" HEAD
+          sha256sum "artifacts/source-export/SportsEdge-${sha}.zip" | tee artifacts/source-export/SOURCE_ARCHIVE_SHA256.txt
+      - name: Upload exact integration source
+        uses: actions/upload-artifact@v4
+        with:
+          name: sportsedge-integration-source
+          path: artifacts/source-export
+          if-no-files-found: error
+          retention-days: 30
