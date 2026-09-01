@@ -23,6 +23,7 @@ class MLBArchiveLaneContractTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn('"required_persistence_without_raw": "PASS"', result.stdout)
         self.assertIn('"optional_raw_persistence": "PASS"', result.stdout)
+        self.assertIn('"capture_failure_heartbeat": "PASS"', result.stdout)
 
     def test_dense_archive_schedulers_are_retired(self):
         for path in (PRIMARY, FAILOVER, BACKUP):
@@ -41,7 +42,10 @@ class MLBArchiveLaneContractTests(unittest.TestCase):
         for path in (PRIMARY, FAILOVER):
             text = path.read_text()
             self.assertIn("scripts/run_mlb_archive_lane.py", text, path.name)
-            self.assertNotIn("git add runtime/odds-budget/ledger.json runtime/archive-status archive/raw_odds || true", text)
+            self.assertNotIn(
+                "git add runtime/odds-budget/ledger.json runtime/archive-status archive/raw_odds || true",
+                text,
+            )
 
 
 if __name__ == "__main__":
