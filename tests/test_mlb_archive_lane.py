@@ -33,14 +33,34 @@ class MLBArchiveLaneContractTests(unittest.TestCase):
             self.assertNotIn("schedule:", text, path.name)
             self.assertNotIn("workflow_run:", text, path.name)
 
-    def test_archive_rides_existing_auto_mlb_schedule(self):
+    def test_archive_rides_budget_bounded_auto_mlb_schedule(self):
         text = AUTO.read_text()
-        self.assertIn("cron: '7,22,37,52 * * * *'", text)
+        self.assertIn("cron: '2,22,42 13-23,0-3 * 3-11 *'", text)
+        self.assertNotIn("cron: '7,22,37,52 * * * *'", text)
         self.assertIn("contents: write", text)
         self.assertIn("scripts/run_mlb_archive_lane.py", text)
         self.assertIn("Propagate archive lane failure after card evidence", text)
         self.assertIn("group: auto-mlb", text)
         self.assertIn("cancel-in-progress: false", text)
+
+        # 15 active UTC hours * 3 runs/hour * 31 days. This leaves material
+        # headroom under GitHub Free's 2,000 included private-repo minutes before
+        # accounting for actual job duration and other workflows.
+        self.assertEqual(15 * 3 * 31, 1395)
+        self.assertLess(15 * 3 * 31, 2000)
+
+    def test_schedule_offsets_cover_five_minute_first_pitch_grid(self):
+        offsets = (2, 22, 42)
+        for minute in range(0, 60, 5):
+            distances = []
+            for offset in offsets:
+                raw = abs(minute - offset)
+                distances.append(min(raw, 60 - raw))
+            self.assertLessEqual(
+                min(distances),
+                8,
+                f"minute={minute} is outside the +/-8 minute capture window",
+            )
 
     def test_manual_archive_wrappers_use_same_canonical_lane(self):
         for path in (PRIMARY, FAILOVER):
