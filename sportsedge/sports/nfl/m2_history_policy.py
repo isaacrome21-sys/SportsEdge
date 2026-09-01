@@ -1,35 +1,29 @@
-"""Neutral-site policy wrapper for the NFL production-M2 history builder.
+"""Neutral-site and historical-stadium policy wrapper for NFL production M2.
 
 Neutral-site games are valuable prior-state observations but cannot be priced
-with home-team stadium geography when the exact venue is unresolved.  The
-production evidence policy therefore supports two explicit modes:
+with home-team stadium geography when the exact venue is unresolved. The
+production evidence policy therefore supports explicit neutral-site handling.
 
-``error``
-    Preserve the underlying fail-closed behavior and reject an unresolved
-    neutral venue.
+The wrapper also repairs one narrow source-interval artifact for travel features:
+a team can play away after its final home game at a stadium, so a stadium table
+whose ``last_game_date`` is the last *home* game can stop before the franchise's
+season actually ends. In that bounded away-only case, the last known home origin
+is carried forward for at most 28 days. The game venue is never inferred, home
+games are never bridged, and distant or ambiguous gaps remain fail-closed.
 
-``exclude_from_evaluation``
-    Let the game update future EPA/QB/pressure state, but remove its own
-    evaluation row.  The underlying builder is called with a temporary
-    home-location marker only so it can advance state; any geography calculated
-    for that discarded row is never emitted or used by later state updates.
-
-The wrapper also projects historical depth-chart input to rows that the exact
-production starter selector could ever accept.  This is a semantics-preserving
-performance boundary: non-QBs and non-rank-one rows are rejected by that
-selector in every schema, so copying them for every historical game only adds
-quadratic work and cannot change starter identity.
-
-This wrapper exists rather than weakening the core builder's default contract.
+Depth-chart input is projected to rows that the exact production starter selector
+could ever accept. This is a semantics-preserving performance boundary.
 """
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from datetime import date
 from typing import Any
 
 from .m2_history_features import build_nfl_m2_history_rows as _build_core_history_rows
 
 _ALLOWED_POLICIES = {"error", "exclude_from_evaluation"}
+_MAX_POSTCLOSING_AWAY_ORIGIN_GAP_DAYS = 28
 
 
 def _rank_one(value: Any) -> bool:
@@ -39,17 +33,101 @@ def _rank_one(value: Any) -> bool:
         return False
 
 
+def _date_value(value: Any) -> date | None:
+    if value in (None, ""):
+        return None
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
+
+
+def _stadium_team(row: Mapping[str, Any]) -> str:
+    return str(row.get("team_fastr") or row.get("team") or "").strip()
+
+
+def _stadium_geo_complete(row: Mapping[str, Any]) -> bool:
+    try:
+        float(row.get("lat") or "")
+        float(row.get("lon") or "")
+        float(row.get("tz_offset") or "")
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
+def _stadium_active(row: Mapping[str, Any], *, team: str, gameday: date) -> bool:
+    if _stadium_team(row) != team or not _stadium_geo_complete(row):
+        return False
+    first = _date_value(row.get("first_game_date")) or date.min
+    last = _date_value(row.get("last_game_date")) or date.max
+    return first <= gameday <= last
+
+
+def bridge_postclosing_away_origins(
+    schedule_rows: Iterable[Mapping[str, Any]],
+    stadium_rows: Iterable[Mapping[str, Any]],
+    *,
+    max_gap_days: int = _MAX_POSTCLOSING_AWAY_ORIGIN_GAP_DAYS,
+) -> list[dict[str, Any]]:
+    """Carry the last known home origin through a short away-only season tail.
+
+    The source interval is extended only when an away team has no active stadium
+    on that date and there is one unique most-recent same-team stadium whose
+    source ``last_game_date`` is within ``max_gap_days``. The distance is always
+    measured from the original source boundary, so repeated away games cannot
+    chain an unbounded extension. A future relocated stadium is never used.
+    """
+    if max_gap_days < 0:
+        raise ValueError("NFL_POSTCLOSING_STADIUM_BRIDGE_GAP_INVALID")
+
+    source = [dict(row) for row in stadium_rows]
+    resolved = [dict(row) for row in source]
+    games = [dict(row) for row in schedule_rows if str(row.get("game_type") or "REG").upper() == "REG"]
+    games.sort(key=lambda row: (str(row.get("gameday") or row.get("game_date") or ""), str(row.get("game_id") or "")))
+
+    for game in games:
+        gameday = _date_value(game.get("gameday") or game.get("game_date"))
+        team = str(game.get("away_team") or "").strip()
+        if gameday is None or not team:
+            continue
+        if any(_stadium_active(row, team=team, gameday=gameday) for row in resolved):
+            continue
+
+        past: list[tuple[date, int]] = []
+        for index, row in enumerate(source):
+            if _stadium_team(row) != team or not _stadium_geo_complete(row):
+                continue
+            last = _date_value(row.get("last_game_date"))
+            if last is None:
+                continue
+            gap = (gameday - last).days
+            if 0 < gap <= max_gap_days:
+                past.append((last, index))
+        if not past:
+            continue
+
+        latest = max(last for last, _ in past)
+        selected = [index for last, index in past if last == latest]
+        if len(selected) != 1:
+            raise ValueError(
+                f"NFL_POSTCLOSING_STADIUM_BRIDGE_AMBIGUOUS:{team}:{gameday.isoformat()}:{latest.isoformat()}"
+            )
+        index = selected[0]
+        resolved[index]["last_game_date"] = max(
+            gameday,
+            _date_value(resolved[index].get("last_game_date")) or gameday,
+        ).isoformat()
+        resolved[index]["sportsedge_origin_bridge"] = "POST_CLOSING_AWAY_TEAM_HOME_ORIGIN_PROXY"
+        resolved[index]["sportsedge_source_last_game_date"] = latest.isoformat()
+
+    return resolved
+
+
 def _project_starter_depth_rows(
     depth_rows: Iterable[Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Keep exactly the union of rows the production starter selector can use.
-
-    Timestamped charts require ``dt``, QB position under their accepted aliases,
-    and ``pos_rank == 1``.  Historical weekly charts require QB under the exact
-    weekly position aliases and ``depth_team`` (falling back to ``pos_rank``
-    only when that key is absent) equal to 1.  A row is retained if either
-    production branch could accept it; no date/week filtering happens here.
-    """
+    """Keep exactly the union of rows the production starter selector can use."""
     projected: list[dict[str, Any]] = []
     for raw in depth_rows:
         row = dict(raw)
@@ -81,20 +159,21 @@ def build_nfl_m2_history_rows(
     prior_decay_curves: Mapping[int, Mapping[int, float]],
     neutral_site_policy: str = "error",
 ) -> list[dict[str, Any]]:
-    """Build production-M2 rows under an explicit neutral-site policy."""
+    """Build production-M2 rows under explicit neutral-site/stadium policies."""
     policy = str(neutral_site_policy).strip().lower()
     if policy not in _ALLOWED_POLICIES:
         raise ValueError(f"NFL_NEUTRAL_SITE_POLICY_INVALID:{neutral_site_policy}")
 
     schedule = [dict(row) for row in schedule_rows]
     depth = _project_starter_depth_rows(depth_rows)
+    stadiums = bridge_postclosing_away_origins(schedule, stadium_rows)
     if policy == "error":
         return _build_core_history_rows(
             schedule,
             pbp_rows,
             participation_rows,
             depth,
-            stadium_rows,
+            stadiums,
             prior_decay_curves=prior_decay_curves,
         )
 
@@ -119,7 +198,7 @@ def build_nfl_m2_history_rows(
         pbp_rows,
         participation_rows,
         depth,
-        stadium_rows,
+        stadiums,
         prior_decay_curves=prior_decay_curves,
     )
     return [row for row in built if str(row.get("game_id") or "") not in excluded_ids]
