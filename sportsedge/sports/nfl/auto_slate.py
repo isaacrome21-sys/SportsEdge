@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Iterable, Mapping
 from urllib.request import urlopen
 
+from ...source_lineage import canonical_json_sha256
 from .auto_context_source import (
     _fetch_schedule,
     _kickoff,
@@ -11,7 +13,7 @@ from .auto_context_source import (
     build_nfl_auto_game_context,
 )
 from .auto_personnel_source import build_depth_chart_personnel_provider
-from .context_autopull import ContextObservation, NFLContextError
+from .context_autopull import ContextObservation, NFLContextError, make_observation
 from .injury_report_source import build_pit_injury_inputs
 from .run_it_context import build_run_it_context
 from .snap_workload_source import build_prior_snap_workload_inputs
@@ -99,6 +101,49 @@ def discover_nfl_auto_games(
     }
 
 
+def _bind_near_official_injuries(
+    bundle: dict[str, Any], *, game_id: str, as_of: Any, rows: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """Fill only a missing injury observation with explicitly non-official fallback data.
+
+    An official-host observation always wins. This keeps the approved official NFL
+    contract intact while making nflverse/NFL-API-derived reports useful when the
+    direct official acquisition lane has not been populated.
+    """
+    if not rows:
+        return bundle
+    existing = dict((bundle.get("observations") or {}).get("injury_availability") or {})
+    if str(existing.get("status") or "").upper() == "AVAILABLE":
+        return bundle
+    payload = [dict(row.get("source_payload") or {}) for row in rows]
+    latest_ts = max(str(row.get("report_ts") or "") for row in payload)
+    source_uri = str(rows[0].get("source_uri") or "")
+    source_sha = str(rows[0].get("source_sha256") or "")
+    observation = make_observation(
+        context_class="injury_availability",
+        status="AVAILABLE",
+        payload={
+            "reports": payload,
+            "confirmation_level": "NFLVERSE_NFLAPI_DERIVED",
+            "official_host_confirmed": False,
+            "official_source_precedence": True,
+        },
+        source_name="NFLVERSE_NFLAPI_INJURY_REPORTS_NEAR_OFFICIAL",
+        source_uri=source_uri,
+        source_sha256=source_sha,
+        source_type="AUTO",
+        collection_mode=str(bundle.get("collection_mode") or "AUTO"),
+        observed_at=latest_ts,
+        pit_as_of=as_of,
+    )
+    bundle = dict(bundle)
+    observations = dict(bundle.get("observations") or {})
+    observations["injury_availability"] = asdict(observation)
+    bundle["observations"] = observations
+    bundle["payload_sha256"] = canonical_json_sha256({key: value for key, value in bundle.items() if key != "payload_sha256"})
+    return bundle
+
+
 def build_nfl_auto_context_slate(
     *,
     as_of: Any,
@@ -175,10 +220,11 @@ def build_nfl_auto_context_slate(
                 source_uri=str(snap_count_source_uri),
                 source_sha256=str(snap_count_source_sha256),
             )
+        injury_inputs: list[dict[str, Any]] = []
         if injuries is not None:
             if season is None or week is None:
                 raise NFLContextError(f"injury schedule season/week missing:{game_id}")
-            game["reported_injury_rows"] = build_pit_injury_inputs(
+            injury_inputs = build_pit_injury_inputs(
                 rows=injuries,
                 season=int(season),
                 target_week=int(week),
@@ -187,15 +233,15 @@ def build_nfl_auto_context_slate(
                 source_uri=str(injury_source_uri),
                 source_sha256=str(injury_source_sha256),
             )
-        bundles.append(
-            build_run_it_context(
-                mode=requested,
-                game=game,
-                as_of=as_of,
-                manual_observations=list(manual.get(game_id, ())),
-                opener=opener,
-            )
+        bundle = build_run_it_context(
+            mode=requested,
+            game=game,
+            as_of=as_of,
+            manual_observations=list(manual.get(game_id, ())),
+            opener=opener,
         )
+        bundle = _bind_near_official_injuries(bundle, game_id=game_id, as_of=as_of, rows=injury_inputs)
+        bundles.append(bundle)
     return {
         "schema_version": 1,
         "sport": "NFL",
