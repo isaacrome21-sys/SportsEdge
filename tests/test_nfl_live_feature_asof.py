@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 import unittest
 
-from scripts.build_nfl_live_feature_rows import _depth_asof, _start
+from sportsedge.sports.nfl.live_features import _depth_asof, _start
 
 
 class NFLLiveFeatureAsofTests(unittest.TestCase):
@@ -19,7 +19,7 @@ class NFLLiveFeatureAsofTests(unittest.TestCase):
         self.assertEqual([r["gsis_id"] for r in out],["old","weekly"])
 
     def test_naive_explicit_start_fails_closed(self):
-        with self.assertRaisesRegex(SystemExit,"NFL_LIVE_GAME_START_INVALID"):
+        with self.assertRaisesRegex(ValueError,"NFL_LIVE_GAME_START_INVALID"):
             _start({"game_id":"g1","game_start_ts":"2026-09-10T20:20:00"})
 
 

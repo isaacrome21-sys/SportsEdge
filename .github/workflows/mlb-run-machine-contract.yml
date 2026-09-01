@@ -4,12 +4,22 @@ on:
   pull_request:
     paths:
       - 'sportsedge/mlb_run_machine.py'
+      - 'sportsedge/auto_joint_runner.py'
+      - 'sportsedge/manual_hybrid_joint_runner.py'
+      - 'sportsedge/mlb_joint_mode_bridge.py'
+      - 'sportsedge/unified_card.py'
       - 'tests/test_mlb_run_machine.py'
+      - 'tests/test_mlb_mode_parity.py'
       - '.github/workflows/mlb-run-machine-contract.yml'
   push:
     paths:
       - 'sportsedge/mlb_run_machine.py'
+      - 'sportsedge/auto_joint_runner.py'
+      - 'sportsedge/manual_hybrid_joint_runner.py'
+      - 'sportsedge/mlb_joint_mode_bridge.py'
+      - 'sportsedge/unified_card.py'
       - 'tests/test_mlb_run_machine.py'
+      - 'tests/test_mlb_mode_parity.py'
       - '.github/workflows/mlb-run-machine-contract.yml'
   workflow_dispatch:
 
@@ -33,5 +43,7 @@ jobs:
         run: python -m py_compile sportsedge/mlb_run_machine.py
       - name: Run canonical machine contract
         run: python -m unittest tests.test_mlb_run_machine -v
+      - name: Prove MANUAL/HYBRID/AUTOMATIC parity
+        run: python -m unittest tests.test_mlb_mode_parity -v
       - name: Recheck unified market surface
         run: python -m unittest tests.test_full_mlb_market_surface tests.test_joint_market_engines -v

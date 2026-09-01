@@ -158,13 +158,30 @@ class NFLM2ProductionModelTests(unittest.TestCase):
         rows = self._rows()
         model = fit_nfl_m2_score_model(rows[:15], ridge_alpha=1.0)
         distribution = derive_nfl_m2_score_distribution(model, rows[15])
-        first = price_nfl_m2_game_markets(distribution, spread_line=-3.5, total_line=45.5)
-        second = price_nfl_m2_game_markets(distribution, spread_line=10.5, total_line=70.5)
+
+        # Choose thresholds from the realized support of the already-built,
+        # market-blind distribution.  The old hard-coded lines could both sit
+        # on the same saturated side of every simulated outcome, producing
+        # identical 1.0/0.0 readouts without implying any market leakage.
+        margins = [float(row["margin"]) for row in distribution]
+        totals = [float(row["total"]) for row in distribution]
+        first = price_nfl_m2_game_markets(
+            distribution,
+            spread_line=-max(margins) - 0.5,
+            total_line=min(totals) - 0.5,
+        )
+        second = price_nfl_m2_game_markets(
+            distribution,
+            spread_line=-min(margins) + 0.5,
+            total_line=max(totals) + 0.5,
+        )
+
         self.assertAlmostEqual(sum(first["spread"].values()), 1.0)
         self.assertAlmostEqual(sum(first["total"].values()), 1.0)
         self.assertNotEqual(first["spread"], second["spread"])
         self.assertNotEqual(first["total"], second["total"])
         self.assertAlmostEqual(first["moneyline"]["home"] + first["moneyline"]["away"] + first["moneyline"]["tie"], 1.0)
+        self.assertEqual(first["moneyline"], second["moneyline"])
 
     def test_fit_is_deterministic(self):
         rows = self._rows()[:15]

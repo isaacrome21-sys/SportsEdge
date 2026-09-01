@@ -21,6 +21,8 @@ from sportsedge.sports.nfl.m2 import (
 )
 
 _EPS = 1e-9
+_PRODUCTION_KEY_NUMBERS = (-7, -3, 3, 7)
+_PRODUCTION_KEY_PROFILE_CONTRACT = "NFL_M2_OOS_EMERGENT_SIGNED_KEY_PMF_V1"
 
 
 def _float(value: Any) -> float | None:
@@ -88,6 +90,10 @@ def build_production_nfl_raw_evaluations(
             raise ValueError("NFL_PRODUCTION_VALIDATION_TEST_SEASON_IN_TRAINING")
         for raw in fold.test_rows:
             row = dict(raw); distribution = derive_nfl_m2_score_distribution(model, row); n = len(distribution)
+            key_probabilities = {
+                str(key): sum(int(score["margin"]) == key for score in distribution) / float(n)
+                for key in _PRODUCTION_KEY_NUMBERS
+            }
             # Source contract: nflverse spread_line is favorite-positive for the
             # home team. Shared pricer contract: spread_line is the home handicap.
             # Keep both values in evidence so the conversion is auditable.
@@ -137,6 +143,7 @@ def build_production_nfl_raw_evaluations(
                 "total_push": bool(total_push), "home_cover_outcome": home_cover, "over_outcome": over,
                 "m1_home_cover_prob": m1_home, "m1_over_prob": m1_over,
                 "m2_home_cover_prob": m2_home, "m2_over_prob": m2_over,
+                "m2_signed_key_probability": key_probabilities,
             })
     return out
 
@@ -185,6 +192,39 @@ def _folds_with_brier(evaluations: Iterable[dict[str, Any]]) -> list[dict[str, A
     return folds
 
 
+def _production_distribution_profile(evaluations: Iterable[dict[str, Any]]) -> dict[str, Any]:
+    """Aggregate held-out production-M2 signed key mass before market pricing.
+
+    Each held-out game contributes equal weight; within a game, probability is
+    the exact fraction of the deterministic paired-residual score distribution
+    landing on the signed final margin. Historical key frequencies are not
+    consumed here and therefore cannot leak into the simulator.
+    """
+    data = [dict(row) for row in evaluations]
+    if not data:
+        raise ValueError("NFL_PRODUCTION_KEY_PROFILE_EMPTY")
+    totals = {key: 0.0 for key in _PRODUCTION_KEY_NUMBERS}
+    for row in data:
+        payload = row.get("m2_signed_key_probability")
+        if not isinstance(payload, dict):
+            raise ValueError("NFL_PRODUCTION_KEY_PROFILE_ROW_MISSING")
+        for key in _PRODUCTION_KEY_NUMBERS:
+            value = float(payload.get(str(key)))
+            if not 0.0 <= value <= 1.0:
+                raise ValueError(f"NFL_PRODUCTION_KEY_PROFILE_VALUE_INVALID:{key}")
+            totals[key] += value
+    n = float(len(data))
+    return {
+        "contract": _PRODUCTION_KEY_PROFILE_CONTRACT,
+        "model_id": PRODUCTION_NFL_M2_MODEL_ID,
+        "feature_contract": NFL_M2_FEATURE_CONTRACT,
+        "probability_source": "OOS_PRODUCTION_M2_PAIRED_RESIDUAL_SCORE_DISTRIBUTIONS",
+        "heldout_game_count": len(data),
+        "test_seasons": sorted({int(row["season"]) for row in data}),
+        "signed_key_probability": {str(key): totals[key] / n for key in _PRODUCTION_KEY_NUMBERS},
+    }
+
+
 def build_production_nfl_validation_evidence(
     rows: Iterable[dict[str, Any]], *, source_uri: str, source_sha256: str, source_manifest_sha256: str,
     min_train_seasons: int = 2, min_calibration_fit_seasons: int = 2,
@@ -197,6 +237,7 @@ def build_production_nfl_validation_evidence(
     raw = build_production_nfl_raw_evaluations(rows, min_train_seasons=min_train_seasons, ridge_alpha=ridge_alpha)
     calibrated = calibrate_nfl_evaluations(raw, min_fit_seasons=min_calibration_fit_seasons)
     folds = _folds_with_brier(calibrated)
+    production_distribution_profile = _production_distribution_profile(raw)
     calibration = build_calibration_evidence(
         calibrated, bins=calibration_bins, min_bin_n=calibration_min_bin_n,
         max_bin_deviation_threshold=calibration_threshold,
@@ -225,6 +266,7 @@ def build_production_nfl_validation_evidence(
             for row in calibrated
         ),
         "fold_count": len(folds), "folds": folds, "calibration_evidence": calibration,
+        "production_distribution_profile": production_distribution_profile,
         "promotion_evidence": per_market,
         "parameters": {
             "min_train_seasons": int(min_train_seasons), "min_calibration_fit_seasons": int(min_calibration_fit_seasons),
@@ -237,6 +279,7 @@ def build_production_nfl_validation_evidence(
             "residuals generate the joint score distribution; nflverse favorite-positive spreads are converted to the "
             "shared home-handicap convention only at the pricing boundary; spread/total evidence coverage remains "
             "independent; closing lines enter only after the distribution exists; isotonic calibration is fit only on "
-            "prior OOS seasons."
+            "prior OOS seasons. The production_distribution_profile is measured directly from held-out production-M2 "
+            "score distributions before any sportsbook threshold is applied."
         ),
     }

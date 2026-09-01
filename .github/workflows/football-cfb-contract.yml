@@ -1,0 +1,45 @@
+name: football-cfb-contract
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'sportsedge/sports/cfb/**'
+      - 'scripts/*cfb*.py'
+      - 'tests/test_cfb*.py'
+      - 'docs/cfb_model_feature_trace.md'
+      - '.github/workflows/football-cfb-contract.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'sportsedge/sports/cfb/**'
+      - 'scripts/*cfb*.py'
+      - 'tests/test_cfb*.py'
+      - 'docs/cfb_model_feature_trace.md'
+      - '.github/workflows/football-cfb-contract.yml'
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime test dependencies
+        run: python -m pip install --disable-pip-version-check numpy pytest
+      - name: Compile CFB execution surface
+        run: |
+          python -m py_compile \
+            sportsedge/sports/cfb/source.py \
+            sportsedge/sports/cfb/classification_policy.py \
+            sportsedge/sports/cfb/joint_model.py \
+            sportsedge/sports/cfb/run_machine.py \
+            sportsedge/sports/cfb/historical_features.py \
+            sportsedge/sports/cfb/model_artifact.py \
+            sportsedge/sports/cfb/training_artifact.py \
+            scripts/build_cfb_model_artifact.py \
+            scripts/run_cfb_auto.py
+      - name: Run CFB contract tests
+        run: python -m unittest discover -s tests -p 'test_cfb*.py' -v

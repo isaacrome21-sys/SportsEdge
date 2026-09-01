@@ -1,0 +1,31 @@
+{
+  "fixture_purpose": "CI regression for the canonical manual MLB runner using only markets with active engine bindings",
+  "rows": [
+    {
+      "game_id": "San Diego Padres@New York Mets",
+      "market_type": "MONEYLINE",
+      "side": "AWAY",
+      "line": 0.0,
+      "price": -130,
+      "paired_side": "HOME",
+      "paired_price": 122,
+      "book": "draftkings",
+      "observed_at": "2026-08-19T10:54:31-05:00",
+      "first_pitch_at": "2026-08-19T12:10:00-05:00",
+      "source": "MANUAL"
+    },
+    {
+      "game_id": "San Diego Padres@New York Mets",
+      "market_type": "GAME_TOTAL",
+      "side": "OVER",
+      "line": 8.5,
+      "price": -114,
+      "paired_side": "UNDER",
+      "paired_price": -106,
+      "book": "draftkings",
+      "observed_at": "2026-08-19T10:54:31-05:00",
+      "first_pitch_at": "2026-08-19T12:10:00-05:00",
+      "source": "MANUAL"
+    }
+  ]
+}

@@ -7,21 +7,37 @@ class FootballSportAdapterContractTests(unittest.TestCase):
         from sportsedge.sports.nfl.adapter import NFLAdapter
         from sportsedge.sports.cfb.adapter import CFBAdapter
 
-        for adapter_cls, sport in ((NFLAdapter, "nfl"), (CFBAdapter, "cfb")):
-            adapter = adapter_cls()
-            self.assertEqual(adapter.sport, sport)
-            with self.assertRaises(NotImplementedError):
-                adapter.load_schedule([2025])
-            with self.assertRaises(NotImplementedError):
-                adapter.load_lines_history([2025])
-            with self.assertRaises(NotImplementedError):
-                adapter.margin_sigma({})
-            with self.assertRaises(NotImplementedError):
-                adapter.total_sigma({})
-            with self.assertRaises(NotImplementedError):
-                adapter.key_numbers()
-            with self.assertRaises(NotImplementedError):
-                adapter.hfa_prior(None, {})
+        nfl = NFLAdapter()
+        self.assertEqual(nfl.sport, "nfl")
+        with self.assertRaises(NotImplementedError):
+            nfl.load_schedule([2025])
+        with self.assertRaises(NotImplementedError):
+            nfl.load_lines_history([2025])
+        # NFL dispersion/HFA methods are implemented, but intentionally fail
+        # closed unless their hash-bound environment profile is supplied.
+        with self.assertRaisesRegex(ValueError, "NFL_ENVIRONMENT_PROFILE_REQUIRED"):
+            nfl.margin_sigma({})
+        with self.assertRaisesRegex(ValueError, "NFL_ENVIRONMENT_PROFILE_REQUIRED"):
+            nfl.total_sigma({})
+        with self.assertRaisesRegex(ValueError, "HISTORICAL_KEY_NUMBERS_ARE_VALIDATION_ONLY"):
+            nfl.key_numbers()
+        with self.assertRaisesRegex(ValueError, "NFL_ENVIRONMENT_PROFILE_REQUIRED"):
+            nfl.hfa_prior(None, {})
+
+        cfb = CFBAdapter()
+        self.assertEqual(cfb.sport, "cfb")
+        with self.assertRaises(NotImplementedError):
+            cfb.load_schedule([2025])
+        with self.assertRaises(NotImplementedError):
+            cfb.load_lines_history([2025])
+        with self.assertRaises(NotImplementedError):
+            cfb.margin_sigma({})
+        with self.assertRaises(NotImplementedError):
+            cfb.total_sigma({})
+        with self.assertRaisesRegex(ValueError, "HISTORICAL_KEY_NUMBERS_ARE_VALIDATION_ONLY"):
+            cfb.key_numbers()
+        with self.assertRaises(NotImplementedError):
+            cfb.hfa_prior(None, {})
 
     def test_cfb_build_features_delegates_to_existing_m2_builder(self):
         from sportsedge.sports.cfb.adapter import CFBAdapter

@@ -1,0 +1,7 @@
+{
+  "schema_version": "RUN_IT_REQUEST_V1",
+  "request_id": "TEMPLATE",
+  "requested_at_utc": null,
+  "action": "RUN",
+  "scope": "ALL"
+}

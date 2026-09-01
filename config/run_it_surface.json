@@ -1,0 +1,55 @@
+{
+  "schema_version": "RUN_IT_CONTROL_V1",
+  "sports": {
+    "MLB": {
+      "lane": "PREGAME_MODEL",
+      "automatic_command": ["python", "scripts/run_auto_mlb_resilient.py", "--output", "artifacts/run_it/mlb_card.json"],
+      "market_surface": "config/mlb_market_catalog.json",
+      "governance_source": "config/deployments.json",
+      "automatic_completeness": "FULL_FAIL_CLOSED",
+      "notes": "Native automatic MLB acquisition with resilient odds failover; promotion remains deployment/evidence gated."
+    },
+    "NFL": {
+      "lane": "HYBRID_CONTEXT",
+      "automatic_command": ["python", "scripts/build_nfl_auto_context.py", "--out", "artifacts/run_it/nfl_auto_context.json"],
+      "market_surface": "config/football_market_surface.json",
+      "automatic_completeness": "CONTEXT_ONLY",
+      "notes": "Automatic objective context acquisition is runnable; predictive NFL model execution remains separately evidence and input gated."
+    },
+    "CFB": {
+      "lane": "PREGAME_MODEL",
+      "automatic_command": ["python", "scripts/run_cfb_auto.py", "--output", "artifacts/run_it/cfb_card.json"],
+      "library_entrypoint": "sportsedge.sports.cfb.run_machine:run_it_cfb",
+      "market_surface": "config/football_market_surface.json",
+      "automatic_completeness": "EXECUTABLE_FAIL_CLOSED",
+      "blocker": "CFB_FROZEN_MODEL_ARTIFACT_AND_CREDENTIALS_REQUIRED",
+      "notes": "Automatic CFB execution is runnable through the canonical run machine. It never fits on the fly and fails closed unless a hash-bound frozen model artifact plus CFBD/Odds credentials are available; promotion remains evidence gated."
+    },
+    "PGA": {
+      "lane": "PREGAME_AND_LIVE_MODEL",
+      "automatic_command": null,
+      "library_entrypoint": "sportsedge.pga.runner",
+      "market_surface": "config/pga_market_surface.json",
+      "automatic_completeness": "INPUT_PROVIDER_REQUIRED",
+      "blocker": "PGA_AUTOMATIC_FIELD_AND_LIVE_INPUT_PROVIDER_REQUIRED",
+      "notes": "Governed PGA model/runner exists; autonomous leaderboard, tee-time, weather, field-stat and market acquisition is not yet wired end to end."
+    },
+    "UFC": {
+      "lane": "PREGAME_MODEL",
+      "automatic_command": null,
+      "library_entrypoint": "scripts/run_ufc_full_model.py",
+      "market_surface": "config/ufc_market_surface.json",
+      "automatic_completeness": "FIGHTER_SNAPSHOT_REQUIRED",
+      "blocker": "UFC_AUTOMATIC_FIGHTER_SNAPSHOT_PROVIDER_REQUIRED",
+      "notes": "Odds can be fetched automatically, but deterministic fighter snapshots remain an explicit required input."
+    },
+    "LIVE": {
+      "lane": "LIVE_ENGINE_V1",
+      "automatic_command": ["python", "scripts/run_live_run_it.py", "--sports", "MLB,NFL,CFB", "--output", "artifacts/run_it/live_run_it.json"],
+      "market_surface": "sportsedge/live_markets.py",
+      "automatic_completeness": "SHADOW_ACQUISITION",
+      "blocker": "LIVE_MODEL_P_FORWARD_VALIDATION_REQUIRED_FOR_OFFICIAL_BETS",
+      "notes": "Automatic live event/state/quote acquisition is runnable. Official live betting remains blocked until PIT replay and forward validation pass."
+    }
+  }
+}

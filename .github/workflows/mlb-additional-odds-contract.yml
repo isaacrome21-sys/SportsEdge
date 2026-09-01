@@ -31,13 +31,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12.13'
+      - name: Install runtime dependencies
+        run: python -m pip install --disable-pip-version-check numpy
       - name: Compile additional acquisition modules
         run: python -m py_compile sportsedge/additional_mlb_odds_source.py sportsedge/auto_native_odds.py
       - name: Test seven additional MLB market mappings
         run: python -m unittest discover -s tests -p 'test_additional_mlb_odds_source.py'
       - name: Test native auto additional acquisition wiring
         run: python -m unittest discover -s tests -p 'test_auto_native_additional_odds.py'
-      - name: Test 36-market quote-source capability
+      - name: Test 38-market quote-source capability
         run: python -m unittest discover -s tests -p 'test_mlb_quote_source_coverage.py'
       - name: Recheck existing native odds tests
         run: python -m unittest discover -s tests -p 'test_auto_native_odds.py'

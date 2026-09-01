@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "sport": "PGA",
+  "source_model": "single_joint_field_simulation",
+  "supported_markets": [
+    {"market": "OUTRIGHT", "engine": "FIELD_SIM", "pregame": true, "live": true},
+    {"market": "FIRST_ROUND_LEADER", "engine": "FIELD_SIM", "pregame": true, "live": false},
+    {"market": "TOP_K", "engine": "FIELD_SIM", "pregame": true, "live": true},
+    {"market": "MAKE_CUT", "engine": "FIELD_SIM", "pregame": true, "live": true},
+    {"market": "H2H", "engine": "FIELD_SIM", "pregame": true, "live": true}
+  ],
+  "unsupported_without_new_engine": [
+    "ROUND_SCORE_PROP",
+    "BIRDIE_PROP",
+    "BOGEY_PROP",
+    "HOLE_PROP",
+    "GROUP_WINNER"
+  ],
+  "governance": {
+    "dead_heat_required_where_applicable": true,
+    "full_field_devig_required_for_outright": true,
+    "automatic_input_acquisition_complete": false,
+    "promotion_inherited_from_code_presence": false
+  }
+}

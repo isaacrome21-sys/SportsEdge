@@ -35,9 +35,9 @@ class PitcherLiveTests(unittest.TestCase):
         out=run_pitcher_bb_card(games=[game()],feature_rows=[feature()],quotes=[quote()],ingestion_now=NOW,finalization_now=NOW); self.assertEqual(out[0].bet_status,"BLOCKED")
     def test_direct_quote_missing_taxonomy_blocks(self):
         q=quote(); del q["raw_market_name"]; out=run_pitcher_bb_card(games=[game()],feature_rows=[feature()],quotes=[q],ingestion_now=NOW,finalization_now=NOW); self.assertEqual(out[0].bet_status,"BLOCKED"); self.assertIn("QUOTE_IDENTITY_INCOMPLETE",out[0].reason)
-    def test_temp_deployed_registry_reaches_actual_engine_with_pair(self):
+    def test_temp_deployed_registry_cannot_promote_legacy_compat_payload(self):
         with tempfile.TemporaryDirectory() as td:
             p=Path(td)/"deployments.json"; f=Path(td)/"floors.json"; deployed_registry(p); floor_registry(f); out=run_pitcher_bb_card(games=[game()],feature_rows=[feature()],quotes=pair(),ingestion_now=NOW,finalization_now=NOW,registry_path=str(p),edge_floor_config_path=str(f))
-        self.assertIn(out[0].bet_status,("OFFICIAL_BET","PASS")); self.assertIsNotNone(out[0].model_p)
+        self.assertEqual(out[0].bet_status,"BLOCKED"); self.assertIsNone(out[0].model_p); self.assertIn("LEGACY_COMPAT_PATH_NOT_PROMOTABLE",out[0].reason)
 
 if __name__=="__main__": unittest.main()

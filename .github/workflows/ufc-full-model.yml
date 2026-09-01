@@ -32,6 +32,8 @@ env:
 jobs:
   test-and-build:
     runs-on: ubuntu-latest
+    outputs:
+      live_inputs_status: ${{ steps.live_inputs.outputs.status }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
@@ -49,31 +51,62 @@ jobs:
           tests/test_ufc_runtime.py
           tests/test_ufc_source.py
       - name: Train chronological UFC model and promotion evidence
-        run: >-
-          python scripts/build_ufc_training_artifact.py
-          --output models/ufc_logistic_v1.json
-          --metrics artifacts/ufc_training_metrics.json
-          --promotion-evidence artifacts/ufc_promotion_evidence.json
-          --promotion-contract config/ufc_promotion_contract_v1.json
-      - name: Build current UFC fighter/context snapshots
-        run: >-
-          python scripts/build_ufc_live_inputs.py
-          --fighters data/ufc/fighters_today.json
-          --contexts data/ufc/contexts_today.json
-          --override config/dwcs_s10w3_2026-08-25.json
-      - name: Verify artifacts
+        shell: bash
         run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if python scripts/build_ufc_training_artifact.py \
+              --output models/ufc_logistic_v1.json \
+              --metrics artifacts/ufc_training_metrics.json \
+              --promotion-evidence artifacts/ufc_promotion_evidence.json \
+              --promotion-contract config/ufc_promotion_contract_v1.json; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "UFC history acquisition failed after $attempt attempts" >&2
+              exit 1
+            fi
+            sleep $((attempt * 5))
+          done
+      - name: Build current UFC fighter/context snapshots
+        id: live_inputs
+        shell: bash
+        run: |
+          set +e
+          output=$(python scripts/build_ufc_live_inputs.py \
+            --fighters data/ufc/fighters_today.json \
+            --contexts data/ufc/contexts_today.json \
+            --override config/dwcs_s10w3_2026-08-25.json 2>&1)
+          rc=$?
+          set -e
+          printf '%s\n' "$output"
+          mkdir -p artifacts
+          if [ "$rc" -eq 0 ]; then
+            echo 'status=READY' >> "$GITHUB_OUTPUT"
+            printf '%s\n' '{"schema_version":1,"status":"READY","blocker":null}' > artifacts/ufc_live_input_status.json
+            exit 0
+          fi
+          if printf '%s\n' "$output" | grep -q 'UFC_LIVE_INPUTS_UNAVAILABLE'; then
+            echo 'status=BLOCKED' >> "$GITHUB_OUTPUT"
+            printf '%s\n' '{"schema_version":1,"status":"BLOCKED","blocker":"UFC_AUTOMATIC_FIGHTER_SNAPSHOT_PROVIDER_REQUIRED"}' > artifacts/ufc_live_input_status.json
+            echo 'UFC live card execution is BLOCKED: automatic fighter/context snapshots are unavailable.'
+            exit 0
+          fi
+          echo "Unexpected UFC live-input failure (exit=$rc)" >&2
+          exit "$rc"
+      - name: Verify artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
           test -s models/ufc_logistic_v1.json
           test -s artifacts/ufc_training_metrics.json
           test -s artifacts/ufc_promotion_evidence.json
-          test -s data/ufc/fighters_today.json
-          test -s data/ufc/contexts_today.json
+          test -s artifacts/ufc_live_input_status.json
           python - <<'PY'
           import json
           m=json.load(open('models/ufc_logistic_v1.json'))
           p=json.load(open('artifacts/ufc_promotion_evidence.json'))
-          f=json.load(open('data/ufc/fighters_today.json'))
-          c=json.load(open('data/ufc/contexts_today.json'))
+          s=json.load(open('artifacts/ufc_live_input_status.json'))
           assert m['training_rows'] >= 1000
           assert m['holdout_metrics']['n'] >= 100
           assert m['last_training_fight_date'] >= '2026-08-22'
@@ -84,23 +117,26 @@ jobs:
           assert p['history_semantics']['feature_time'] == 'pre_fight_snapshot'
           assert 'ufc_debut_any' in p['slices']
           assert p['dwcs_specific_validation']['status'] in {'PROMOTED','UNVERIFIED'}
+          assert s['status'] in {'READY','BLOCKED'}
+          if s['status'] == 'BLOCKED':
+              assert s['blocker'] == 'UFC_AUTOMATIC_FIGHTER_SNAPSHOT_PROVIDER_REQUIRED'
+          print('UFC_BOOTSTRAP_MODEL_OK', m['training_rows'], m['last_training_fight_date'], m['holdout_metrics'], p['status'], p['blockers'], p['dwcs_specific_validation']['status'], s)
+          PY
+          if [ "${{ steps.live_inputs.outputs.status }}" = 'READY' ]; then
+            test -s data/ufc/fighters_today.json
+            test -s data/ufc/contexts_today.json
+            python - <<'PY'
+          import json
+          m=json.load(open('models/ufc_logistic_v1.json'))
+          f=json.load(open('data/ufc/fighters_today.json'))
+          c=json.load(open('data/ufc/contexts_today.json'))
           assert len(c) >= 1
           assert len(f['fighters']) == 2 * len(c)
           assert f['history_last_fight_date'] == m['last_training_fight_date']
           assert all(int(x.get('rounds', 0)) in {3, 5} for x in c)
-          print(
-              'UFC_BOOTSTRAP_OK',
-              m['training_rows'],
-              m['last_training_fight_date'],
-              m['holdout_metrics'],
-              p['status'],
-              p['blockers'],
-              p['dwcs_specific_validation']['status'],
-              f.get('card_source'),
-              len(f['fighters']),
-              len(c),
-          )
+          print('UFC_LIVE_INPUTS_READY', f.get('card_source'), len(f['fighters']), len(c))
           PY
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: ufc-bootstrap-${{ github.run_id }}
@@ -108,12 +144,14 @@ jobs:
             models/ufc_logistic_v1.json
             artifacts/ufc_training_metrics.json
             artifacts/ufc_promotion_evidence.json
+            artifacts/ufc_live_input_status.json
             data/ufc/fighters_today.json
             data/ufc/contexts_today.json
           if-no-files-found: error
 
   run-card:
     needs: test-and-build
+    if: ${{ needs.test-and-build.outputs.live_inputs_status == 'READY' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -129,8 +167,16 @@ jobs:
           if [ -n "$ODDS_API_KEY" ]; then echo 'available=true' >> "$GITHUB_OUTPUT"; else echo 'available=false' >> "$GITHUB_OUTPUT"; fi
       - name: Rebuild model, evidence, and live inputs
         if: ${{ steps.odds.outputs.available == 'true' }}
+        shell: bash
         run: |
-          python scripts/build_ufc_training_artifact.py --output models/ufc_logistic_v1.json --metrics artifacts/ufc_training_metrics.json --promotion-evidence artifacts/ufc_promotion_evidence.json --promotion-contract config/ufc_promotion_contract_v1.json
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if python scripts/build_ufc_training_artifact.py --output models/ufc_logistic_v1.json --metrics artifacts/ufc_training_metrics.json --promotion-evidence artifacts/ufc_promotion_evidence.json --promotion-contract config/ufc_promotion_contract_v1.json; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep $((attempt * 5))
+          done
           python scripts/build_ufc_live_inputs.py --fighters data/ufc/fighters_today.json --contexts data/ufc/contexts_today.json --override config/dwcs_s10w3_2026-08-25.json
       - name: Run 250k UFC model
         if: ${{ steps.odds.outputs.available == 'true' }}

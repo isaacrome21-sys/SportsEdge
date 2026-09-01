@@ -51,6 +51,11 @@ jobs:
             sportsedge/core/promotion/football_registry.py \
             sportsedge/core/validation/nfl_ci_attestation.py \
             sportsedge/sports/nfl/m2.py \
+            sportsedge/sports/nfl/m2_v2_candidate.py \
+            sportsedge/sports/nfl/m2_v2_validation.py \
+            sportsedge/sports/nfl/m2_v2b_candidate.py \
+            sportsedge/sports/nfl/m2_v2b_validation.py \
+            sportsedge/sports/nfl/model_artifact.py \
             sportsedge/sports/nfl/m2_history_features.py \
             sportsedge/sports/nfl/m2_history_policy.py \
             sportsedge/sports/nfl/historical_validation.py \
@@ -58,6 +63,8 @@ jobs:
             sportsedge/sports/nfl/source_manifest.py \
             sportsedge/sports/nfl/simulator_profile.py \
             scripts/run_nfl_production_validation.py \
+            scripts/run_nfl_v2_candidate_validation.py \
+            scripts/validate_nfl_v2_candidate.py \
             scripts/bind_nfl_math_to_source_manifest.py \
             scripts/validate_nfl_simulator_profile.py \
             scripts/build_nfl_promotion_registry.py \
@@ -75,22 +82,35 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/football/sources/{pbp,participation,depth}
-          curl --fail --location --retry 3 \
+
+          # These are immutable/frozen evidence inputs. Retry only transport
+          # failures; the URL, returned bytes, and downstream hashes remain
+          # unchanged, and the workflow still fails closed after bounded tries.
+          fetch_source() {
+            local url="$1"
+            local output="$2"
+            curl --fail --location --silent --show-error \
+              --retry 5 --retry-delay 2 --retry-all-errors \
+              --connect-timeout 30 \
+              "$url" -o "$output"
+          }
+
+          fetch_source \
             'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv' \
-            -o artifacts/football/sources/games.csv
-          curl --fail --location --retry 3 \
+            artifacts/football/sources/games.csv
+          fetch_source \
             'https://raw.githubusercontent.com/greerreNFL/Stadiums/efa9543af50b01424754219fa0e4f3c7044ff198/data/team_stadiums.csv' \
-            -o artifacts/football/sources/team_stadiums.csv
+            artifacts/football/sources/team_stadiums.csv
           for season in $(seq 2016 2025); do
-            curl --fail --location --retry 3 \
+            fetch_source \
               "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_${season}.csv.gz" \
-              -o "artifacts/football/sources/pbp/play_by_play_${season}.csv.gz"
-            curl --fail --location --retry 3 \
+              "artifacts/football/sources/pbp/play_by_play_${season}.csv.gz"
+            fetch_source \
               "https://github.com/nflverse/nflverse-data/releases/download/pbp_participation/pbp_participation_${season}.csv" \
-              -o "artifacts/football/sources/participation/pbp_participation_${season}.csv"
-            curl --fail --location --retry 3 \
+              "artifacts/football/sources/participation/pbp_participation_${season}.csv"
+            fetch_source \
               "https://github.com/nflverse/nflverse-data/releases/download/depth_charts/depth_charts_${season}.csv" \
-              -o "artifacts/football/sources/depth/depth_charts_${season}.csv"
+              "artifacts/football/sources/depth/depth_charts_${season}.csv"
           done
 
       - name: Build exact production-M2 walk-forward evidence
@@ -106,6 +126,46 @@ jobs:
           --neutral-site-policy exclude_from_evaluation
           --out artifacts/football/nfl_production_validation.json
           --manifest-out artifacts/football/nfl_source_manifest.json
+          --model-out artifacts/football/nfl_m2_model.json
+
+      - name: Build isolated V2A and V2B candidate diagnostics
+        run: >-
+          python scripts/run_nfl_v2_candidate_validation.py
+          --schedule-file artifacts/football/sources/games.csv
+          --pbp-dir artifacts/football/sources/pbp
+          --participation-dir artifacts/football/sources/participation
+          --depth-dir artifacts/football/sources/depth
+          --stadium-file artifacts/football/sources/team_stadiums.csv
+          --source-manifest artifacts/football/nfl_source_manifest.json
+          --git-sha "$EVIDENCE_GIT_SHA"
+          --start-season 2016 --end-season 2025
+          --neutral-site-policy exclude_from_evaluation
+          --out artifacts/football/nfl_m2_v2_candidate_validation.json
+          --v2b-out artifacts/football/nfl_m2_v2b_candidate_validation.json
+
+      - name: Assert fitted M2 artifact exists and is exact-head bound
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          from sportsedge.sports.nfl.model_artifact import load_nfl_m2_model_artifact
+
+          model_path = Path('artifacts/football/nfl_m2_model.json')
+          manifest_path = Path('artifacts/football/nfl_source_manifest.json')
+          if not model_path.is_file():
+              raise SystemExit('NFL_M2_MODEL_ARTIFACT_MISSING_AFTER_FIT')
+          if not manifest_path.is_file():
+              raise SystemExit('NFL_SOURCE_MANIFEST_MISSING_AFTER_FIT')
+          manifest = json.loads(manifest_path.read_text())
+          payload = json.loads(model_path.read_text())
+          model = load_nfl_m2_model_artifact(
+              payload,
+              expected_code_git_sha=os.environ['EVIDENCE_GIT_SHA'].lower(),
+              expected_source_manifest_sha256=manifest['manifest_sha256'],
+          )
+          if not model.train_seasons:
+              raise SystemExit('NFL_M2_MODEL_ARTIFACT_TRAIN_SEASONS_EMPTY')
+          PY
 
       - name: Build schedule audit from the same frozen schedule bytes
         run: >-
@@ -114,11 +174,29 @@ jobs:
           --min-season 1999 --max-season 2025
           --output artifacts/football/nfl_real_history_audit.json
 
-      - name: Build emergent key-number math evidence
+      - name: Build production-M2 emergent key-number math evidence
         run: >-
           python scripts/validate_nfl_simulator_profile.py
           artifacts/football/nfl_real_history_audit.json
+          --production-evidence artifacts/football/nfl_production_validation.json
+          --version nfl-m2-oos-key-emergent-v1
           --out artifacts/football/nfl_simulator_profile_schedule.json
+
+      - name: Compare V2A candidate to frozen key-number tolerance
+        run: >-
+          python scripts/validate_nfl_v2_candidate.py
+          artifacts/football/nfl_real_history_audit.json
+          artifacts/football/nfl_m2_v2_candidate_validation.json
+          --max-abs-error 0.005
+          --out artifacts/football/nfl_m2_v2_candidate_key_math.json
+
+      - name: Compare V2B candidate to frozen key-number tolerance
+        run: >-
+          python scripts/validate_nfl_v2_candidate.py
+          artifacts/football/nfl_real_history_audit.json
+          artifacts/football/nfl_m2_v2b_candidate_validation.json
+          --max-abs-error 0.005
+          --out artifacts/football/nfl_m2_v2b_candidate_key_math.json
 
       - name: Bind math evidence to canonical multi-source manifest and code SHA
         run: >-
@@ -174,6 +252,9 @@ jobs:
                   for p in paths
               ],
           }
+          names = {row['path'] for row in payload['artifacts']}
+          if 'nfl_m2_model.json' not in names:
+              raise SystemExit('NFL_M2_MODEL_ARTIFACT_NOT_MANIFESTED')
           Path('artifacts/football/nfl_promotion_evidence_manifest.json').write_text(
               json.dumps(payload, indent=2, sort_keys=True) + '\n'
           )

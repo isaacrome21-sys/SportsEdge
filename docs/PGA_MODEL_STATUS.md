@@ -35,6 +35,18 @@ Live readouts from `sportsedge/pga/`:
 - A market is blocked unless its quote is bound and that PGA market family is explicitly promoted.
 - Code availability is not promotion evidence.
 
+## Frozen benchmark methodology
+
+`config/pga_benchmark_methodology.json` is the validation benchmark contract and is enforced by the cross-sport market-coverage CI gate.
+
+- `OUTRIGHT` and `FIRST_ROUND_LEADER` are exhaustive mutually-exclusive N-way fields and use `MULTIPLICATIVE_NWAY_V1`. The complete field is mandatory; partial-field normalization is blocked.
+- `TOP_K` is **not** an N-way winner market because multiple golfers can cash simultaneously. It is benchmarked as a binary proposition per golfer and requires paired YES/NO prices. Cross-player normalization is forbidden. Settlement evaluation uses dead-heat-adjusted expected paid fraction.
+- `MAKE_CUT` is likewise binary per golfer, requires paired YES/NO prices, and cannot be normalized across golfers.
+- `H2H` uses paired two-way de-vig; pushes are tracked separately rather than coerced into a binary win/loss outcome.
+- Every benchmark observation produced by `sportsedge.pga.benchmark` records the methodology and an SHA-256 of the quote set. A methodology mismatch is fail-closed and promotion does not transfer across market shapes.
+
+This contract is frozen before PGA predictive replay/forward evidence exists. No historical evidence collected under a different market-shape methodology can be used for promotion without an explicit versioned migration/re-run.
+
 ## Intentionally blocked / not claimed
 
 - Live cut-event continuation is blocked until the live snapshot carries explicit cut state/rules. The runner will not guess them.
