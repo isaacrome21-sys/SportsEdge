@@ -10,6 +10,8 @@ on:
       - 'scripts/probe_game_odds.py'
       - 'scripts/probe_odds_http.py'
       - 'config/**'
+      - 'tests/test_auto_native_odds.py'
+      - 'tests/test_mlb_run_machine.py'
       - '.github/workflows/auto-mlb.yml'
   schedule:
     - cron: '*/15 * * * *'
