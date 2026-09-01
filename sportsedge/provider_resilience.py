@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from hashlib import sha256
 from json import dumps
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from .shared_acquisition_contract import TrustClass
 
@@ -51,6 +52,23 @@ class ProviderPlan:
     domain: str
     primary: ProviderSpec | None
     fallbacks: tuple[ProviderSpec, ...]
+
+
+@dataclass(frozen=True)
+class ProviderAttempt:
+    provider_name: str
+    status: str
+    detail: str | None = None
+    schema_fingerprint: str | None = None
+
+
+@dataclass(frozen=True)
+class ProviderOutcome:
+    domain: str
+    status: str
+    provider_name: str | None
+    payload: Any
+    attempts: tuple[ProviderAttempt, ...]
 
 
 def schema_fingerprint(fields: Iterable[str]) -> str:
@@ -102,13 +120,6 @@ def build_provider_plans(specs: Iterable[ProviderSpec]) -> dict[str, ProviderPla
 
 
 def domains_safe_for_parallel_fetch(specs: Iterable[ProviderSpec]) -> tuple[tuple[str, ...], ...]:
-    """Return independent domains that can be fetched concurrently.
-
-    This is deliberately a planning primitive rather than a network executor so
-    callers retain their existing opener/retry/fail-closed semantics. Providers
-    inside the same domain remain ordered primary -> fallback; independent
-    domains can fan out in parallel.
-    """
     domains = sorted({s.normalized().domain for s in specs})
     return tuple((domain,) for domain in domains)
 
@@ -118,14 +129,93 @@ def model_p_provider_allowed(spec: ProviderSpec) -> bool:
 
 
 def forbid_negative_live_cache(*, event_has_started: bool, payload_is_empty: bool) -> bool:
-    """True when an empty live/current payload must not be persisted as evidence.
-
-    Public sports-data packages have documented stale-cache failure modes when an
-    empty future/current response is cached. SportsEdge should preserve the
-    source failure/missing state, but not promote an empty payload to a durable
-    successful cache entry.
-    """
     return bool(payload_is_empty and not event_has_started)
+
+
+def _ordered_specs(plan: ProviderPlan) -> tuple[ProviderSpec, ...]:
+    return tuple(x for x in ((plan.primary,) + plan.fallbacks) if x is not None)
+
+
+def execute_provider_plan(
+    plan: ProviderPlan,
+    fetchers: Mapping[str, Callable[[], Any]],
+    *,
+    require_model_p_objective: bool = False,
+) -> ProviderOutcome:
+    """Execute one domain primary -> fallback without weakening trust or schema rules."""
+    attempts: list[ProviderAttempt] = []
+    saw_transport_failure = False
+    for spec in _ordered_specs(plan):
+        if require_model_p_objective and not model_p_provider_allowed(spec):
+            attempts.append(ProviderAttempt(spec.provider_name, "REJECTED_TRUST"))
+            continue
+        fetcher = fetchers.get(spec.provider_name)
+        if fetcher is None:
+            attempts.append(ProviderAttempt(spec.provider_name, "MISSING_FETCHER"))
+            continue
+        try:
+            payload = fetcher()
+        except Exception as exc:
+            saw_transport_failure = True
+            attempts.append(ProviderAttempt(spec.provider_name, "SOURCE_FAILED", type(exc).__name__))
+            continue
+        if payload is None:
+            attempts.append(ProviderAttempt(spec.provider_name, "MISSING"))
+            continue
+        if spec.required_fields:
+            if not isinstance(payload, Mapping):
+                attempts.append(ProviderAttempt(spec.provider_name, "SCHEMA_FAILED", "payload-not-mapping"))
+                continue
+            check = validate_schema(payload, required_fields=spec.required_fields)
+            if not check.ok:
+                attempts.append(ProviderAttempt(
+                    spec.provider_name,
+                    "SCHEMA_FAILED",
+                    ",".join(check.missing_fields),
+                    check.fingerprint,
+                ))
+                continue
+            attempts.append(ProviderAttempt(spec.provider_name, "AVAILABLE", schema_fingerprint=check.fingerprint))
+        else:
+            attempts.append(ProviderAttempt(spec.provider_name, "AVAILABLE"))
+        return ProviderOutcome(plan.domain, "AVAILABLE", spec.provider_name, payload, tuple(attempts))
+
+    status = "SOURCE_FAILED" if saw_transport_failure else "MISSING"
+    return ProviderOutcome(plan.domain, status, None, None, tuple(attempts))
+
+
+def acquire_domains_concurrently(
+    plans: Mapping[str, ProviderPlan],
+    fetchers_by_domain: Mapping[str, Mapping[str, Callable[[], Any]]],
+    *,
+    model_p_domains: Iterable[str] = (),
+    max_workers: int = 8,
+) -> dict[str, ProviderOutcome]:
+    """Fan out independent domains concurrently; preserve ordered fallbacks inside each domain."""
+    if isinstance(max_workers, bool) or int(max_workers) < 1:
+        raise ValueError("max_workers must be positive")
+    required = {str(x).upper().strip() for x in model_p_domains}
+    unknown = required - set(plans)
+    if unknown:
+        raise ValueError(f"unknown model_p_domains: {sorted(unknown)}")
+    if not plans:
+        return {}
+    workers = min(int(max_workers), len(plans))
+    outcomes: dict[str, ProviderOutcome] = {}
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {
+            pool.submit(
+                execute_provider_plan,
+                plan,
+                fetchers_by_domain.get(domain, {}),
+                require_model_p_objective=domain in required,
+            ): domain
+            for domain, plan in plans.items()
+        }
+        for future in as_completed(futures):
+            domain = futures[future]
+            outcomes[domain] = future.result()
+    return {domain: outcomes[domain] for domain in sorted(outcomes)}
 
 
 def provider_manifest_sha(specs: Iterable[ProviderSpec]) -> str:
