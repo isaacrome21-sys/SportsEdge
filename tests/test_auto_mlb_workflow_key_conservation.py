@@ -5,6 +5,14 @@ import unittest
 WORKFLOW = Path('.github/workflows/auto-mlb.yml')
 
 
+def _step(text: str, name: str) -> str:
+    marker = f'- name: {name}'
+    if marker not in text:
+        raise AssertionError(f'missing workflow step: {name}')
+    tail = text.split(marker, 1)[1]
+    return tail.split('\n      - name:', 1)[0]
+
+
 class AutoMlbWorkflowKeyConservationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -14,24 +22,24 @@ class AutoMlbWorkflowKeyConservationTests(unittest.TestCase):
         self.assertIn("cron: '*/15 * * * *'", self.text)
 
     def test_odds_diagnostic_is_dispatch_only(self):
-        block = self.text.split('- name: Diagnose Odds API credentials safely', 1)[1].split('- name:', 1)[0]
+        block = _step(self.text, 'Diagnose Odds API credentials safely')
         self.assertIn("if: github.event_name == 'workflow_dispatch'", block)
         self.assertIn('SPORTSEDGE_ODDS_API_KEY:', block)
 
     def test_featured_odds_probe_is_dispatch_only(self):
-        block = self.text.split('- name: Acquire featured MLB game lines', 1)[1].split('- name:', 1)[0]
+        block = _step(self.text, 'Acquire featured MLB game lines')
         self.assertIn("if: github.event_name == 'workflow_dispatch'", block)
         self.assertIn('SPORTSEDGE_ODDS_API_KEY:', block)
 
     def test_scheduled_machine_has_no_odds_api_secrets(self):
-        block = self.text.split('- name: Run scheduled MLB machine without Odds API credits', 1)[1].split('- name:', 1)[0]
+        block = _step(self.text, 'Run scheduled MLB machine without Odds API credits')
         self.assertIn("if: github.event_name != 'workflow_dispatch'", block)
         self.assertNotIn('SPORTSEDGE_ODDS_API_KEY', block)
         self.assertNotIn('SPORTSEDGE_QUOTES_URL', block)
         self.assertIn('run_auto_mlb_resilient.py', block)
 
     def test_requested_run_owns_full_keyring(self):
-        block = self.text.split('- name: Run requested canonical automated MLB machine', 1)[1].split('- name:', 1)[0]
+        block = _step(self.text, 'Run requested canonical automated MLB machine')
         self.assertIn("if: github.event_name == 'workflow_dispatch'", block)
         for name in (
             'SPORTSEDGE_ODDS_API_KEY:',
