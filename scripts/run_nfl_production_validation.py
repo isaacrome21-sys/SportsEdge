@@ -9,7 +9,15 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import sys
 from typing import Iterable
+
+# Direct execution (``python scripts/...``) places only ``scripts`` at the
+# front of sys.path. Add the repository root so this CLI works identically on a
+# clean hosted runner without changing any validation or model semantics.
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 from sportsedge.sports.nfl.history import normalize_nfl_rows, parse_schedule_csv
 from sportsedge.sports.nfl.m2 import fit_nfl_m2_score_model
