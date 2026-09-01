@@ -2,17 +2,23 @@ name: archive-mlb-game-odds
 
 on:
   workflow_dispatch:
+  schedule:
+    # Lightweight forward-evidence lane only. MLB start times are normally on a
+    # five-minute grid; :02/:22/:42 is always within the archive's +/-8 minute
+    # T-180/T-90/T0 acceptance window. Limit automatic runs to MLB season hours
+    # rather than burning private-repo Actions minutes around the clock.
+    - cron: '2,22,42 13-23,0-3 * 3-11 *'
 
 permissions:
   contents: write
 
 concurrency:
-  group: auto-mlb
+  group: archive-mlb-game-odds
   cancel-in-progress: false
 
 jobs:
   capture:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 8
     env:
       SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
@@ -22,14 +28,14 @@ jobs:
       SPORTSEDGE_ODDS_BOOKMAKERS: draftkings
       SPORTSEDGE_ODDS_DAILY_BUDGET_CREDITS: '12'
       SPORTSEDGE_ODDS_BUDGET_LEDGER: .cache/sportsedge/odds-budget/ledger.json
-      SPORTSEDGE_ARCHIVE_SOURCE: manual-primary
+      SPORTSEDGE_ARCHIVE_SOURCE: scheduled-primary
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12.13'
+          python-version: '3.12'
       - name: Run canonical durable MLB archive lane
         run: python -I scripts/run_mlb_archive_lane.py
       - name: Upload archive execution evidence
