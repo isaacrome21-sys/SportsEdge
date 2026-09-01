@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 import csv
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 import gzip
 import hashlib
 import json
@@ -34,6 +34,7 @@ _PARTICIPATION_FIELDS = {"nflverse_game_id", "game_id", "play_id", "was_pressure
 _DEPTH_FIELDS = {"season", "club_code", "team", "week", "game_type", "depth_team", "position", "depth_position", "gsis_id", "dt", "pos_abb", "pos_rank"}
 _STADIUM_FIELDS = {"team_fastr", "team", "stadium", "first_game_date", "last_game_date", "lat", "lon", "tz_offset"}
 _MAX_PREOPENING_AWAY_ORIGIN_GAP_DAYS = 28
+_STARTER_OVERRIDE_CONTRACT = "PINNED_PREGAME_OFFICIAL_STARTER_OVERRIDE_V1"
 
 
 def _sha(path: Path) -> str:
@@ -192,6 +193,136 @@ def _depth_row_season(row: dict[str, str]) -> int | None:
         return None
 
 
+def _depth_scope(rows: Iterable[dict[str, str]], *, team: str, season: int) -> list[dict[str, str]]:
+    scope: list[dict[str, str]] = []
+    for raw in rows:
+        row = dict(raw)
+        row_team = str(row.get("team") or row.get("club_code") or "").strip()
+        if row_team != team:
+            continue
+        if row.get("dt") not in (None, "") or _depth_row_season(row) == int(season):
+            scope.append(row)
+    return scope
+
+
+def _aware_datetime(value: object, *, error_code: str) -> datetime:
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        raise ValueError(error_code) from None
+    if parsed.tzinfo is None:
+        raise ValueError(error_code)
+    return parsed
+
+
+def apply_pinned_starting_qb_overrides(
+    schedule_rows: Iterable[dict],
+    depth_rows: Iterable[dict[str, str]],
+    payload: dict,
+) -> tuple[list[dict[str, str]], list[dict[str, object]]]:
+    """Apply only exact, pregame, source-pinned overrides to true depth gaps.
+
+    Overrides are a last-mile source repair, not a model fallback. An override is
+    legal only when the canonical selector currently reports a missing starter,
+    the row matches one exact scheduled team/game/week, and the cited source was
+    published before kickoff. Existing or ambiguous upstream starter evidence is
+    never overwritten.
+    """
+    if not isinstance(payload, dict) or payload.get("schema_version") != 1:
+        raise ValueError("NFL_STARTER_OVERRIDE_SCHEMA_INVALID")
+    if payload.get("sport") != "nfl" or payload.get("contract") != _STARTER_OVERRIDE_CONTRACT:
+        raise ValueError("NFL_STARTER_OVERRIDE_CONTRACT_INVALID")
+    overrides = payload.get("overrides")
+    if not isinstance(overrides, list):
+        raise ValueError("NFL_STARTER_OVERRIDE_ROWS_INVALID")
+
+    schedule = [dict(row) for row in schedule_rows]
+    by_game = {str(row.get("game_id") or "").strip(): row for row in schedule if str(row.get("game_id") or "").strip()}
+    resolved = [dict(row) for row in depth_rows]
+    applied: list[dict[str, object]] = []
+    seen: set[tuple[str, str]] = set()
+
+    for raw in overrides:
+        if not isinstance(raw, dict):
+            raise ValueError("NFL_STARTER_OVERRIDE_ROW_INVALID")
+        game_id = str(raw.get("game_id") or "").strip()
+        team = str(raw.get("team") or "").strip()
+        gsis_id = str(raw.get("gsis_id") or "").strip()
+        source_uri = str(raw.get("source_uri") or "").strip()
+        reason = str(raw.get("reason") or "").strip()
+        try:
+            season = int(raw.get("season"))
+            week = int(raw.get("week"))
+        except (TypeError, ValueError):
+            raise ValueError("NFL_STARTER_OVERRIDE_IDENTITY_INVALID") from None
+        key = (game_id, team)
+        if not all((game_id, team, gsis_id, source_uri, reason)) or key in seen:
+            raise ValueError("NFL_STARTER_OVERRIDE_IDENTITY_INVALID")
+        seen.add(key)
+
+        game = by_game.get(game_id)
+        if game is None:
+            raise ValueError(f"NFL_STARTER_OVERRIDE_GAME_MISSING:{game_id}")
+        if int(game.get("season") or -1) != season or int(game.get("week") or -1) != week:
+            raise ValueError(f"NFL_STARTER_OVERRIDE_SCHEDULE_MISMATCH:{game_id}:{team}")
+        if team not in {str(game.get("home_team") or "").strip(), str(game.get("away_team") or "").strip()}:
+            raise ValueError(f"NFL_STARTER_OVERRIDE_TEAM_MISMATCH:{game_id}:{team}")
+
+        start = _game_start(game)
+        published = _aware_datetime(raw.get("source_published_ts"), error_code="NFL_STARTER_OVERRIDE_SOURCE_TIME_INVALID")
+        if published >= start:
+            raise ValueError(f"NFL_STARTER_OVERRIDE_NOT_PREGAME:{game_id}:{team}")
+
+        scope = _depth_scope(resolved, team=team, season=season)
+        try:
+            existing = select_starting_qb(scope, team=team, season=season, week=week, game_start_ts=start)
+        except ValueError as exc:
+            error = str(exc)
+            if not error.startswith("NFL_STARTING_QB_MISSING:"):
+                raise ValueError(f"NFL_STARTER_OVERRIDE_REQUIRES_MISSING:{game_id}:{team}:{error}") from exc
+        else:
+            raise ValueError(f"NFL_STARTER_OVERRIDE_NOT_NEEDED:{game_id}:{team}:{existing}")
+
+        synthetic = {
+            "season": str(season),
+            "club_code": team,
+            "team": team,
+            "week": str(week),
+            "game_type": "REG",
+            "depth_team": "1",
+            "position": "QB",
+            "depth_position": "QB",
+            "gsis_id": gsis_id,
+            "dt": "",
+            "pos_abb": "",
+            "pos_rank": "",
+        }
+        resolved.append(synthetic)
+        selected = select_starting_qb(
+            _depth_scope(resolved, team=team, season=season),
+            team=team,
+            season=season,
+            week=week,
+            game_start_ts=start,
+        )
+        if selected != gsis_id:
+            raise ValueError(f"NFL_STARTER_OVERRIDE_RESOLUTION_MISMATCH:{game_id}:{team}:{selected}")
+
+        applied.append({
+            "game_id": game_id,
+            "season": season,
+            "week": week,
+            "team": team,
+            "gsis_id": gsis_id,
+            "source_uri": source_uri,
+            "source_published_ts": published.isoformat(),
+            "identity_source_uri": str(raw.get("identity_source_uri") or "").strip(),
+            "reason": reason,
+        })
+
+    return resolved, applied
+
+
 def audit_starting_qb_coverage(
     schedule_rows: Iterable[dict],
     depth_rows: Iterable[dict[str, str]],
@@ -263,6 +394,7 @@ def main() -> int:
     parser.add_argument("--participation-dir", type=Path, required=True)
     parser.add_argument("--depth-dir", type=Path, required=True)
     parser.add_argument("--stadium-file", type=Path, required=True)
+    parser.add_argument("--starter-override-file", type=Path, default=Path("config/nfl_historical_starter_overrides.json"))
     parser.add_argument("--git-sha", required=True)
     parser.add_argument("--start-season", type=int, default=2016)
     parser.add_argument("--end-season", type=int, default=2025)
@@ -282,14 +414,18 @@ def main() -> int:
         raise SystemExit("END_SEASON_BEFORE_START_SEASON")
     if args.start_season < 2016:
         raise SystemExit("NFL_PRODUCTION_PRESSURE_HISTORY_STARTS_2016")
+    if not args.starter_override_file.exists():
+        raise SystemExit("NFL_STARTER_OVERRIDE_FILE_MISSING")
 
     pbp_files = _files(args.pbp_dir, "play_by_play_{season}.{ext}", args.start_season, args.end_season)
     participation_files = _files(args.participation_dir, "pbp_participation_{season}.{ext}", args.start_season, args.end_season)
     depth_files = _files(args.depth_dir, "depth_charts_{season}.{ext}", args.start_season, args.end_season)
     schedule_sha = _sha(args.schedule_file)
+    starter_override_sha = _sha(args.starter_override_file)
     sources = [
         {"name": "schedule", "uri": "frozen://nflverse/games.csv", "sha256": schedule_sha},
         {"name": "stadiums", "uri": "frozen://greerreNFL/Stadiums/team_stadiums.csv", "sha256": _sha(args.stadium_file)},
+        {"name": "starter_overrides", "uri": f"repo://{args.starter_override_file.as_posix()}", "sha256": starter_override_sha},
     ]
     for prefix, paths in (("pbp", pbp_files), ("participation", participation_files), ("depth", depth_files)):
         for path in paths:
@@ -313,14 +449,25 @@ def main() -> int:
     stadiums, stadium_bridges = bridge_preopening_away_origins(schedule, raw_stadiums)
     prior_curves = fit_nfl_prior_decay_curves(schedule, pbp, min_train_seasons=args.min_train_seasons, weeks=range(1, 7))
 
+    qb_coverage_before = audit_starting_qb_coverage(schedule, depth, eligible_seasons=prior_curves)
+    try:
+        starter_override_payload = json.loads(args.starter_override_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"NFL_STARTER_OVERRIDE_FILE_INVALID:{exc}") from exc
+    depth, starter_overrides = apply_pinned_starting_qb_overrides(schedule, depth, starter_override_payload)
     qb_coverage_issues = audit_starting_qb_coverage(schedule, depth, eligible_seasons=prior_curves)
     qb_coverage_payload = {
-        "schema_version": 1,
+        "schema_version": 2,
         "sport": "nfl",
         "code_git_sha": git_sha,
         "source_manifest_sha256": manifest_hash,
         "contract": "EXACT_PRODUCTION_SELECT_STARTING_QB_REQUIRED_FOR_EVALUATION_ROWS",
         "eligible_seasons": sorted(int(season) for season in prior_curves),
+        "issue_count_before_override": len(qb_coverage_before),
+        "issues_before_override": qb_coverage_before,
+        "starter_override_contract": starter_override_payload.get("contract"),
+        "starter_override_sha256": starter_override_sha,
+        "starter_overrides_applied": starter_overrides,
         "issue_count": len(qb_coverage_issues),
         "status": "PASS" if not qb_coverage_issues else "BLOCKED",
         "issues": qb_coverage_issues,
@@ -341,6 +488,16 @@ def main() -> int:
     if not history_rows:
         raise SystemExit("NFL_PRODUCTION_HISTORY_ROWS_EMPTY")
 
+    override_affected_games = {str(row["game_id"]) for row in qb_coverage_before}
+    for row in history_rows:
+        if str(row.get("game_id") or "") not in override_affected_games:
+            continue
+        provenance = row.get("feature_provenance")
+        if not isinstance(provenance, dict):
+            raise SystemExit("NFL_STARTER_OVERRIDE_PROVENANCE_MISSING")
+        provenance["starter_qb"] = "NFLVERSE_DEPTH_CHART_OR_PINNED_PREGAME_OFFICIAL_OVERRIDE"
+        provenance["starter_qb_override_manifest_sha256"] = starter_override_sha
+
     evidence = build_production_nfl_validation_evidence(
         history_rows, source_uri=f"manifest://sha256/{manifest_hash}", source_sha256=manifest_hash,
         source_manifest_sha256=manifest_hash, min_train_seasons=args.min_train_seasons, ridge_alpha=args.ridge_alpha,
@@ -353,7 +510,12 @@ def main() -> int:
         "stadium_home_origin_bridges": stadium_bridges,
         "starting_qb_coverage_contract": qb_coverage_payload["contract"],
         "starting_qb_coverage_status": qb_coverage_payload["status"],
+        "starting_qb_coverage_issue_count_before_override": len(qb_coverage_before),
         "starting_qb_coverage_issue_count": 0,
+        "starting_qb_override_contract": starter_override_payload.get("contract"),
+        "starting_qb_override_sha256": starter_override_sha,
+        "starting_qb_overrides_applied": starter_overrides,
+        "starting_qb_override_affected_games": sorted(override_affected_games),
     })
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -368,6 +530,7 @@ def main() -> int:
         "source_manifest_sha256": manifest_hash, "history_rows": len(history_rows), "fold_count": evidence["fold_count"],
         "trained_through_season": model_artifact["trained_through_season"], "promotion_evidence": evidence["promotion_evidence"],
         "stadium_home_origin_bridge_count": len(stadium_bridges), "starting_qb_coverage_issue_count": 0,
+        "starting_qb_override_count": len(starter_overrides),
     }, sort_keys=True))
     return 0
 
