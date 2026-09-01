@@ -211,9 +211,25 @@ def build_nfl_auto_context_slate(
                 source_sha256=str(team_stat_source_sha256),
             )
             if coaching is not None:
-                game["auto_coaching_provider"] = coaching
+                game["coaching_tendency_inputs"] = list((coaching.get("payload") or {}).get("teams") or [])
+                game["coaching_source_uri"] = coaching.get("source_uri")
+                game["coaching_source_sha256"] = coaching.get("source_sha256")
             if defensive is not None:
-                game["auto_defensive_provider"] = defensive
+                splits = {str(row.get("team_id") or "").upper(): dict(row) for row in ((defensive.get("payload") or {}).get("teams") or [])}
+                matchup_inputs: list[dict[str, Any]] = []
+                for offense, defense in ((home_team, away_team), (away_team, home_team)):
+                    split = splits.get(str(defense).upper())
+                    if split is None:
+                        continue
+                    matchup_inputs.append({
+                        "offense_team_id": offense,
+                        "defense_team_id": defense,
+                        "source_uri": defensive.get("source_uri"),
+                        "source_sha256": defensive.get("source_sha256"),
+                        "splits": [split],
+                    })
+                if matchup_inputs:
+                    game["defensive_matchup_inputs"] = matchup_inputs
         bundles.append(
             build_run_it_context(
                 mode=requested,
