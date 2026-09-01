@@ -25,8 +25,12 @@ permissions:
   contents: write
 
 concurrency:
+  # The archive writes irreplaceable forward evidence to the data branch. Never
+  # cancel an in-flight archive/persistence operation just because a newer
+  # scheduled AUTO run arrived. The shared group serializes manual failover and
+  # AUTO archive writes; the wrapper's 5-minute dedupe prevents double capture.
   group: auto-mlb
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   run-card:
