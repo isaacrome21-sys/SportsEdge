@@ -29,6 +29,7 @@
       "lane": "PREGAME_AND_LIVE_MODEL",
       "automatic_command": null,
       "library_entrypoint": "sportsedge.pga.runner",
+      "market_surface": "config/pga_market_surface.json",
       "automatic_completeness": "INPUT_PROVIDER_REQUIRED",
       "blocker": "PGA_AUTOMATIC_FIELD_AND_LIVE_INPUT_PROVIDER_REQUIRED",
       "notes": "Governed PGA model/runner exists; autonomous leaderboard, tee-time, weather, field-stat and market acquisition is not yet wired end to end."
@@ -37,6 +38,7 @@
       "lane": "PREGAME_MODEL",
       "automatic_command": null,
       "library_entrypoint": "scripts/run_ufc_full_model.py",
+      "market_surface": "config/ufc_market_surface.json",
       "automatic_completeness": "FIGHTER_SNAPSHOT_REQUIRED",
       "blocker": "UFC_AUTOMATIC_FIGHTER_SNAPSHOT_PROVIDER_REQUIRED",
       "notes": "Odds can be fetched automatically, but deterministic fighter snapshots remain an explicit required input."
