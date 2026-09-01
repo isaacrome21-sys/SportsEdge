@@ -9,33 +9,22 @@ on:
       - 'scripts/run_auto_mlb*.py'
       - 'scripts/probe_game_odds.py'
       - 'scripts/probe_odds_http.py'
-      - 'scripts/archive_raw_game_odds.py'
-      - 'scripts/run_mlb_archive_lane.py'
-      - 'tests/test_mlb_archive_lane.py'
       - 'config/**'
       - 'tests/test_auto_native_odds.py'
       - 'tests/test_mlb_run_machine.py'
       - '.github/workflows/auto-mlb.yml'
   schedule:
-    # Three runs/hour are sufficient for MLB's five-minute first-pitch grid:
-    # :02/:22/:42 is always within the archive's +/-8 minute window for any
-    # scheduled minute ending in 0 or 5, and T-180/T-90 preserve that minute.
-    # Limit the automatic lane to the MLB-season game window instead of burning
-    # private-repo Actions minutes 24/7. 13-03 UTC covers 08:00-22:59 CDT and
-    # 07:00-21:59 CST; March-November covers the MLB season/postseason.
-    # Upper bound: 45 scheduled jobs/day, 1,395 in a 31-day active month.
-    - cron: '2,22,42 13-23,0-3 * 3-11 *'
+    # Heavy full-card automation is intentionally sparse. The irreplaceable raw
+    # odds archive has its own lightweight scheduler; running this full model at
+    # archive cadence would exhaust private-repo Actions minutes again.
+    - cron: '12 17,22 * 3-11 *'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  # The archive writes irreplaceable forward evidence to the data branch. Never
-  # cancel an in-flight archive/persistence operation just because a newer
-  # scheduled AUTO run arrived. The shared group serializes manual failover and
-  # AUTO archive writes; the wrapper's 5-minute dedupe prevents double capture.
   group: auto-mlb
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   run-card:
@@ -47,24 +36,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Run durable MLB odds archive lane
-        id: archive_lane
-        shell: bash
-        env:
-          SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
-          SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
-          SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
-          SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
-          SPORTSEDGE_ODDS_BOOKMAKERS: draftkings
-          SPORTSEDGE_ODDS_DAILY_BUDGET_CREDITS: '12'
-          SPORTSEDGE_ODDS_BUDGET_LEDGER: .cache/sportsedge/odds-budget/ledger.json
-          SPORTSEDGE_ARCHIVE_SOURCE: auto-mlb
-        run: |
-          set +e
-          python -I scripts/run_mlb_archive_lane.py
-          code=$?
-          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
-          exit 0
       - name: Install runtime dependencies
         run: python -m pip install --disable-pip-version-check numpy
       - name: Resolve Chicago slate date
@@ -125,16 +96,6 @@ jobs:
           SPORTSEDGE_PROVIDER_TOKEN: ${{ secrets.SPORTSEDGE_PROVIDER_TOKEN }}
           SPORTSEDGE_HISTORY_CACHE_DIR: .cache/sportsedge/mlb-history
         run: python scripts/run_auto_mlb_resilient.py --output artifacts/live_mlb_card.json
-      - name: Upload durable MLB archive lane evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: mlb-raw-game-odds-auto-${{ github.run_id }}
-          path: |
-            artifacts/raw_odds/**
-            .cache/sportsedge/odds-budget/ledger.json
-          if-no-files-found: warn
-          retention-days: 90
       - name: Upload automated card evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -146,13 +107,3 @@ jobs:
             artifacts/odds_http_diagnostics.json
           if-no-files-found: error
           retention-days: 14
-      - name: Propagate archive lane failure after card evidence
-        if: always()
-        shell: bash
-        run: |
-          code='${{ steps.archive_lane.outputs.exit_code }}'
-          if [ -z "$code" ]; then
-            echo 'Archive lane did not emit an exit code.' >&2
-            exit 99
-          fi
-          exit "$code"
