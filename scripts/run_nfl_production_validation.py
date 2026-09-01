@@ -182,6 +182,16 @@ def bridge_preopening_away_origins(
     return resolved, bridges
 
 
+def _depth_row_season(row: dict[str, str]) -> int | None:
+    value = row.get("season")
+    if value in (None, ""):
+        return None
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return None
+
+
 def audit_starting_qb_coverage(
     schedule_rows: Iterable[dict],
     depth_rows: Iterable[dict[str, str]],
@@ -191,18 +201,25 @@ def audit_starting_qb_coverage(
     """Return every missing/ambiguous required PIT starter in one deterministic pass.
 
     This is diagnostic only. It calls the exact production ``select_starting_qb``
-    contract and never supplies a replacement starter. Rows are losslessly
-    pre-indexed by team because rows from other teams are rejected by that exact
-    selector anyway. Initial burn-in seasons without a fitted prior-decay curve
-    are intentionally excluded because no evaluation row is emitted for them.
+    contract and never supplies a replacement starter. Its narrowed per-game
+    input is lossless for that selector: every timestamped row for the team is
+    retained because timestamped selection is date-based, while weekly rows are
+    retained only for the requested team/season because all other weekly rows
+    are rejected by the production selector's exact season/team predicates.
     """
     eligible = {int(season) for season in eligible_seasons}
-    depth_by_team: dict[str, list[dict[str, str]]] = {}
+    timestamped_by_team: dict[str, list[dict[str, str]]] = {}
+    weekly_by_team_season: dict[tuple[str, int], list[dict[str, str]]] = {}
     for raw in depth_rows:
         row = dict(raw)
         team = str(row.get("team") or row.get("club_code") or "").strip()
-        if team:
-            depth_by_team.setdefault(team, []).append(row)
+        if not team:
+            continue
+        if row.get("dt") not in (None, ""):
+            timestamped_by_team.setdefault(team, []).append(row)
+        row_season = _depth_row_season(row)
+        if row_season is not None:
+            weekly_by_team_season.setdefault((team, row_season), []).append(row)
 
     games = [
         dict(row) for row in schedule_rows
@@ -217,14 +234,12 @@ def audit_starting_qb_coverage(
         start = _game_start(game)
         for side in ("home", "away"):
             team = str(game.get(f"{side}_team") or "").strip()
+            scope = [
+                *timestamped_by_team.get(team, ()),
+                *weekly_by_team_season.get((team, season), ()),
+            ]
             try:
-                select_starting_qb(
-                    depth_by_team.get(team, ()),
-                    team=team,
-                    season=season,
-                    week=week,
-                    game_start_ts=start,
-                )
+                select_starting_qb(scope, team=team, season=season, week=week, game_start_ts=start)
             except ValueError as exc:
                 error = str(exc)
                 if not error.startswith(("NFL_STARTING_QB_MISSING:", "NFL_STARTING_QB_AMBIGUOUS:")):
