@@ -54,11 +54,11 @@ def auto_report(rows=None):
 
 
 class MLBRunMachineTests(unittest.TestCase):
-    def test_full_36_market_surface_is_one_registry(self):
+    def test_full_38_market_surface_is_one_registry(self):
         catalog = json.loads(Path("config/mlb_market_catalog.json").read_text())
         flat = [market for group in CATALOG_GROUPS for market in catalog[group]]
-        self.assertEqual(len(flat), 36)
-        self.assertEqual(len(set(flat)), 36)
+        self.assertEqual(len(flat), 38)
+        self.assertEqual(len(set(flat)), 38)
         markets = set(flat)
         self.assertEqual(markets, set(SUPPORTED_MARKETS))
         self.assertEqual(markets, set(engine_registry()))
