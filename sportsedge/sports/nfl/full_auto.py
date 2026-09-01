@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 import csv
 from datetime import datetime, timezone
 from hashlib import sha256
@@ -9,6 +10,7 @@ from urllib.request import Request, urlopen
 
 from .auto_slate import build_nfl_auto_context_slate
 from .context_autopull import ContextObservation, NFLContextError
+from .snap_workload_source import fetch_nflverse_snap_counts
 
 DEPTH_CHART_URL = "https://github.com/nflverse/nflverse-data/releases/download/depth_charts/depth_charts_{season}.csv"
 
@@ -49,6 +51,16 @@ def fetch_nflverse_depth_charts(*, season: int, opener: Callable = urlopen) -> t
     return rows, uri, sha256(raw).hexdigest()
 
 
+def _source_result(future, label: str):
+    try:
+        rows, uri, digest = future.result()
+        return rows, uri, digest, "AVAILABLE"
+    except NFLContextError as exc:
+        return None, None, None, f"MISSING:{exc}"
+    except Exception as exc:
+        return None, None, None, f"SOURCE_FAILED:{label}:{type(exc).__name__}"
+
+
 def build_nfl_full_auto_slate(
     *,
     as_of: Any,
@@ -62,22 +74,19 @@ def build_nfl_full_auto_slate(
 ) -> dict[str, Any]:
     """Canonical zero-game-list NFL AUTO/HYBRID context entry point.
 
-    Schedule/venue/weather/rest are source-driven by the existing AUTO slate.
-    This wrapper additionally acquires nflverse depth charts automatically.
-    If that objective source is unavailable, collection continues fail-closed and
-    personnel remains explicitly missing rather than being inferred or zero-filled.
+    Independent depth-chart and strictly-prior snap-workload sources are acquired
+    concurrently. Either can fail without fabricating values or blocking unrelated
+    context classes. Same-week snap rows are excluded because the source lacks an
+    authoritative event timestamp suitable for intra-week PIT ordering.
     """
     pit = _utc(as_of)
     resolved_season = int(season if season is not None else pit.year)
-    depth_rows = None
-    depth_uri = None
-    depth_sha = None
-    depth_status = "AVAILABLE"
-    try:
-        depth_rows, depth_uri, depth_sha = fetch_nflverse_depth_charts(
-            season=resolved_season, opener=opener)
-    except NFLContextError as exc:
-        depth_status = f"MISSING:{exc}"
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        depth_future = pool.submit(fetch_nflverse_depth_charts, season=resolved_season, opener=opener)
+        snap_future = pool.submit(fetch_nflverse_snap_counts, season=resolved_season, opener=opener)
+        depth_rows, depth_uri, depth_sha, depth_status = _source_result(depth_future, "DEPTH_CHART")
+        snap_rows, snap_uri, snap_sha, snap_status = _source_result(snap_future, "SNAP_COUNTS")
 
     slate = build_nfl_auto_context_slate(
         as_of=pit,
@@ -89,6 +98,9 @@ def build_nfl_full_auto_slate(
         depth_chart_rows=depth_rows,
         depth_chart_source_uri=depth_uri,
         depth_chart_source_sha256=depth_sha,
+        snap_count_rows=snap_rows,
+        snap_count_source_uri=snap_uri,
+        snap_count_source_sha256=snap_sha,
         opener=opener,
     )
     slate["automation"] = {
@@ -96,6 +108,9 @@ def build_nfl_full_auto_slate(
         "operator_game_list_required": False,
         "depth_chart_status": depth_status,
         "depth_chart_source_uri": depth_uri,
+        "snap_count_status": snap_status,
+        "snap_count_source_uri": snap_uri,
+        "snap_workload_pit_policy": "STRICTLY_PRIOR_WEEK_ONLY",
         "market_context_ingested": False,
         "social_context_ingested": False,
     }

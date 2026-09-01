@@ -33,13 +33,18 @@ def test_depth_chart_schema_fails_closed():
         fetch_nflverse_depth_charts(season=2026, opener=lambda req, timeout=20: Response(raw))
 
 
-def test_full_auto_passes_depth_rows_and_provenance(monkeypatch):
+def _snap_success(**kwargs):
+    return ([{"season": "2026", "week": "1", "team": "CHI"}], "https://example.test/snaps.csv", "b" * 64)
+
+
+def test_full_auto_passes_depth_and_snap_rows_with_provenance(monkeypatch):
     captured = {}
     monkeypatch.setattr(
         full_auto,
         "fetch_nflverse_depth_charts",
         lambda **kwargs: ([{"dt": "2026-09-01", "team": "CHI"}], "https://example.test/depth.csv", "a" * 64),
     )
+    monkeypatch.setattr(full_auto, "fetch_nflverse_snap_counts", _snap_success)
 
     def fake_slate(**kwargs):
         captured.update(kwargs)
@@ -49,6 +54,7 @@ def test_full_auto_passes_depth_rows_and_provenance(monkeypatch):
             "game_count": 0,
             "games": [],
             "depth_chart_source_sha256": kwargs.get("depth_chart_source_sha256"),
+            "snap_count_source_sha256": kwargs.get("snap_count_source_sha256"),
             "model_p_eligible": False,
             "truth_gate_eligible": False,
         }
@@ -58,16 +64,22 @@ def test_full_auto_passes_depth_rows_and_provenance(monkeypatch):
     assert captured["depth_chart_rows"][0]["team"] == "CHI"
     assert captured["depth_chart_source_uri"] == "https://example.test/depth.csv"
     assert captured["depth_chart_source_sha256"] == "a" * 64
+    assert captured["snap_count_rows"][0]["team"] == "CHI"
+    assert captured["snap_count_source_uri"] == "https://example.test/snaps.csv"
+    assert captured["snap_count_source_sha256"] == "b" * 64
     assert payload["automation"]["depth_chart_status"] == "AVAILABLE"
+    assert payload["automation"]["snap_count_status"] == "AVAILABLE"
+    assert payload["automation"]["snap_workload_pit_policy"] == "STRICTLY_PRIOR_WEEK_ONLY"
     assert payload["automation"]["operator_game_list_required"] is False
 
 
-def test_full_auto_depth_failure_is_scoped_and_does_not_infer(monkeypatch):
+def test_depth_failure_is_scoped_while_snap_source_survives(monkeypatch):
     def broken(**kwargs):
         raise NFLContextError("provider unavailable")
 
     captured = {}
     monkeypatch.setattr(full_auto, "fetch_nflverse_depth_charts", broken)
+    monkeypatch.setattr(full_auto, "fetch_nflverse_snap_counts", _snap_success)
 
     def fake_slate(**kwargs):
         captured.update(kwargs)
@@ -77,6 +89,7 @@ def test_full_auto_depth_failure_is_scoped_and_does_not_infer(monkeypatch):
             "game_count": 0,
             "games": [],
             "depth_chart_source_sha256": None,
+            "snap_count_source_sha256": kwargs.get("snap_count_source_sha256"),
             "model_p_eligible": False,
             "truth_gate_eligible": False,
         }
@@ -84,6 +97,40 @@ def test_full_auto_depth_failure_is_scoped_and_does_not_infer(monkeypatch):
     monkeypatch.setattr(full_auto, "build_nfl_auto_context_slate", fake_slate)
     payload = full_auto.build_nfl_full_auto_slate(as_of="2026-09-01T13:00:00+00:00", season=2026)
     assert captured["depth_chart_rows"] is None
-    assert captured["depth_chart_source_uri"] is None
-    assert captured["depth_chart_source_sha256"] is None
+    assert captured["snap_count_rows"] is not None
     assert payload["automation"]["depth_chart_status"].startswith("MISSING:")
+    assert payload["automation"]["snap_count_status"] == "AVAILABLE"
+
+
+def test_snap_failure_is_scoped_while_depth_source_survives(monkeypatch):
+    monkeypatch.setattr(
+        full_auto,
+        "fetch_nflverse_depth_charts",
+        lambda **kwargs: ([{"dt": "2026-09-01", "team": "CHI"}], "https://example.test/depth.csv", "a" * 64),
+    )
+    monkeypatch.setattr(
+        full_auto,
+        "fetch_nflverse_snap_counts",
+        lambda **kwargs: (_ for _ in ()).throw(NFLContextError("snap unavailable")),
+    )
+    captured = {}
+
+    def fake_slate(**kwargs):
+        captured.update(kwargs)
+        return {
+            "as_of_utc": "2026-09-01T13:00:00+00:00",
+            "collection_mode": "AUTO",
+            "game_count": 0,
+            "games": [],
+            "depth_chart_source_sha256": kwargs.get("depth_chart_source_sha256"),
+            "snap_count_source_sha256": None,
+            "model_p_eligible": False,
+            "truth_gate_eligible": False,
+        }
+
+    monkeypatch.setattr(full_auto, "build_nfl_auto_context_slate", fake_slate)
+    payload = full_auto.build_nfl_full_auto_slate(as_of="2026-09-01T13:00:00+00:00", season=2026)
+    assert captured["depth_chart_rows"] is not None
+    assert captured["snap_count_rows"] is None
+    assert payload["automation"]["depth_chart_status"] == "AVAILABLE"
+    assert payload["automation"]["snap_count_status"].startswith("MISSING:")
