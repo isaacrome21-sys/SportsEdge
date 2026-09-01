@@ -47,6 +47,7 @@ class AcquisitionDatum:
     source_sha256: str | None = None
     ttl_seconds: int | None = None
     manual_fill: bool = False
+    required_for_evaluation: bool = True
     note: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -104,6 +105,7 @@ def build_datum(*, sport: str, scope_type: str, scope_id: str, field_name: str,
                 confirmation_status: ConfirmationStatus = ConfirmationStatus.NOT_APPLICABLE,
                 trust_class: TrustClass = TrustClass.CONTEXT_ONLY,
                 source_sha256: str | None = None, manual_fill: bool = False,
+                required_for_evaluation: bool = True,
                 source_failed: bool = False, missing: bool = False,
                 note: str | None = None) -> AcquisitionDatum:
     retrieved = _utc(retrieved_at, required=True)
@@ -142,6 +144,7 @@ def build_datum(*, sport: str, scope_type: str, scope_id: str, field_name: str,
         source_sha256=source_sha256,
         ttl_seconds=ttl_seconds,
         manual_fill=bool(manual_fill),
+        required_for_evaluation=bool(required_for_evaluation),
         note=note,
     )
 
@@ -149,12 +152,16 @@ def build_datum(*, sport: str, scope_type: str, scope_id: str, field_name: str,
 def scoped_blockers(rows: list[AcquisitionDatum]) -> dict[tuple[str, str], list[str]]:
     """Return blockers keyed to the narrowest affected scope.
 
+    Only evidence explicitly required for evaluation can block. Optional context may
+    be stale/missing and remain visible in provenance without suppressing a market.
     A missing player-prop quote blocks that player/market scope, not an unrelated
     game or the full slate. Shared dependencies should be emitted with a shared
     scope_id by the caller when they truly affect multiple markets.
     """
     blocked: dict[tuple[str, str], list[str]] = {}
     for row in rows:
+        if not row.required_for_evaluation:
+            continue
         if row.freshness_status in {
             FreshnessStatus.STALE,
             FreshnessStatus.MISSING,
