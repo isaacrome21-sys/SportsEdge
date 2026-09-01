@@ -16,14 +16,13 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 1
-      - name: Record exact source identity
+      - name: Verify clean source and record identity
         shell: bash
         run: |
           set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
           mkdir -p artifacts/source-export
           git rev-parse HEAD | tee artifacts/source-export/SOURCE_SHA.txt
-          git status --porcelain=v1 | tee artifacts/source-export/WORKTREE_STATUS.txt
-          test ! -s artifacts/source-export/WORKTREE_STATUS.txt
       - name: Build source-only archive
         shell: bash
         run: |
