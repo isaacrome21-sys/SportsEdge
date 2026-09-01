@@ -14,7 +14,16 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import sys
 from typing import Callable, Sequence
+
+# Direct execution via ``python scripts/run_cfb_auto.py`` places ``scripts/`` at
+# sys.path[0]. Add the repository root before importing the package so the CLI and
+# imported-module paths exercise the same code. This is path bootstrapping only;
+# no model, promotion, or evidence semantics are changed.
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 from sportsedge.sports.cfb.model_artifact import (
     CFBModelArtifactError,
@@ -124,7 +133,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path, default=Path("artifacts/run_it/cfb_card.json"))
     args = parser.parse_args()
 
-    root = Path(__file__).resolve().parents[1]
+    root = _REPO_ROOT
     current = _utc(args.asof)
     try:
         cfbd_key, odds_key = _credentials()
