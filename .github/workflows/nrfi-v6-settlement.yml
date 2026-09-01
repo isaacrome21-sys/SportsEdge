@@ -72,6 +72,45 @@ jobs:
             fi
           done
 
+      - name: Rehydrate every durable NRFI capture from data branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data
+          mkdir -p "$SPORTSEDGE_NRFI_V6_INPUT"
+          git ls-tree -r --name-only origin/data -- runtime/model-validation/NRFI_YRFI/captures \
+            | grep '/nrfi_v6_predictions.json$' \
+            | sort -u > /tmp/nrfi_durable_prediction_paths.txt || true
+          total=0
+          restored=0
+          while read -r prediction_path; do
+            test -n "$prediction_path" || continue
+            total=$((total+1))
+            root="${prediction_path%/nrfi_v6_predictions.json}"
+            capture_id="${root##*/}"
+            dest="$SPORTSEDGE_NRFI_V6_INPUT/durable-${capture_id}"
+            if test -f "$dest/.complete"; then continue; fi
+            rm -rf "$dest"; mkdir -p "$dest"
+            ok=1
+            for name in nrfi_v6_predictions.json nrfi_v6_manifest.json nrfi_v6_status.json; do
+              if ! git show "origin/data:${root}/${name}" > "$dest/${name}.tmp" 2>/dev/null; then
+                ok=0; break
+              fi
+              test -s "$dest/${name}.tmp" || { ok=0; break; }
+              mv "$dest/${name}.tmp" "$dest/$name"
+            done
+            if test "$ok" -eq 1; then
+              touch "$dest/.complete"
+              restored=$((restored+1))
+            else
+              rm -rf "$dest"
+              echo "NRFI_DURABLE_CAPTURE_INCOMPLETE=$capture_id" >&2
+              exit 1
+            fi
+          done < /tmp/nrfi_durable_prediction_paths.txt
+          echo "NRFI_DURABLE_CAPTURES_DISCOVERED=$total"
+          echo "NRFI_DURABLE_CAPTURES_RESTORED=$restored"
+
       - name: Rehydrate every missing immutable NRFI capture artifact
         env:
           GH_TOKEN: ${{ github.token }}
@@ -119,7 +158,7 @@ jobs:
           PY
 
       - name: Persist immutable NRFI YRFI validation evidence to data branch
-        if: always()
+        if: success()
         shell: bash
         run: |
           set -euo pipefail
