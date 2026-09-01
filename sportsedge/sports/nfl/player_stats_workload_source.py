@@ -67,7 +67,8 @@ def build_prior_player_workload_inputs(
 
     Same-week rows are excluded even if present. Weekly stats are objective box/PBP
     derivatives and provide carries, targets, air yards and shares; they do not
-    claim routes or snap participation that this source does not contain.
+    claim routes or snap participation that this source does not contain. The
+    player-id namespace is preserved explicitly and never fuzzily joined to PFR.
     """
     teams = {str(team or "").strip().upper() for team in team_ids if str(team or "").strip()}
     if not teams:
@@ -94,10 +95,11 @@ def build_prior_player_workload_inputs(
         history.sort(key=lambda item: item[0])
         selected = history[-int(max_games):]
         source_payload = {
-            "player_id": player_id,
+            "identity_namespace": "GSIS",
+            "gsis_player_id": player_id,
             "player_name": str(selected[-1][1].get("player_name") or "").strip() or None,
             "team_id": team,
-            "weeks": [week for week, _ in selected],
+            "sample_weeks": [week for week, _ in selected],
             "pass_attempts": [_number(row.get("attempts")) for _, row in selected],
             "carries": [_number(row.get("carries")) for _, row in selected],
             "targets": [_number(row.get("targets")) for _, row in selected],
@@ -108,14 +110,14 @@ def build_prior_player_workload_inputs(
             "routes": [],
             "snaps": [],
             "snap_share": [],
-            "pit_policy": "STRICTLY_PRIOR_WEEK_ONLY",
+            "strictly_prior_week_only": True,
             "source_scope": "NFLVERSE_WEEKLY_PLAYER_STATS",
+            "source_file_sha256": str(source_sha256),
         }
         out.append({
-            "player_id": player_id,
+            "player_id": f"GSIS:{player_id}",
             "team_id": team,
             "source_uri": str(source_uri),
-            "source_sha256": str(source_sha256),
             "source_payload": source_payload,
             "injury_ramp_state": None,
             "short_week": None,
