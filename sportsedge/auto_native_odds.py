@@ -18,6 +18,7 @@ from .auto_joint_runner import run_auto_joint_mlb
 from .auto_runner import AutoRunReport, run_auto_mlb
 from .edge_floors import DEFAULT_EDGE_FLOOR_CONFIG
 from .game_odds_source import fetch_mlb_game_quotes
+from .live_odds_failover import should_rotate_odds_key
 from .market_surface import DEFAULT_MARKET_SURFACE_PATH
 from .mlb_history_cache import MLBHistoryCachedOpener
 from .mlb_source import fetch_boxscore, fetch_schedule
@@ -112,18 +113,33 @@ def run_auto_mlb_native_odds(
             api_key=key, schedule=schedule, participant_index=participant_index,
             opener=opener, bookmakers=bookmakers,
         )
-        return {
-            "quotes": (
-                tuple(player.quotes) + tuple(game.quotes) + tuple(team_total.quotes)
-                + tuple(additional.quotes)
-            ),
-            "failures": (
-                tuple({"surface": "PLAYER", **dict(x)} for x in player.failures)
-                + tuple({"surface": "GAME", **dict(x)} for x in game.failures)
-                + tuple({"surface": "TEAM_TOTAL", **dict(x)} for x in team_total.failures)
-                + tuple({"surface": "ADDITIONAL", **dict(x)} for x in additional.failures)
-            ),
-        }
+        quotes = (
+            tuple(player.quotes) + tuple(game.quotes) + tuple(team_total.quotes)
+            + tuple(additional.quotes)
+        )
+        failures = (
+            tuple({"surface": "PLAYER", **dict(x)} for x in player.failures)
+            + tuple({"surface": "GAME", **dict(x)} for x in game.failures)
+            + tuple({"surface": "TEAM_TOTAL", **dict(x)} for x in team_total.failures)
+            + tuple({"surface": "ADDITIONAL", **dict(x)} for x in additional.failures)
+        )
+        # Native adapters intentionally retain event-level failures instead of
+        # raising.  Translate only the established provider-fetch failure class
+        # into an exception so the outer ordered keyring can try the next key.
+        # Identity/shape/model failures must not be hidden by credential rotation.
+        rotation_failures = tuple(
+            {"stage": "ODDS_API", "reason": str(item.get("reason") or "")}
+            for item in failures
+        )
+        if should_rotate_odds_key(
+            run_status="NO_QUOTES",
+            results=quotes,
+            source_failures=rotation_failures,
+        ):
+            raise RuntimeError(
+                f"NATIVE_ODDS_EMPTY_WITH_PROVIDER_FETCH_FAILURES:count={len(failures)}"
+            )
+        return {"quotes": quotes, "failures": failures}
 
     keyring = fetch_with_key_failover((odds_api_key, *odds_api_keys), fetch_all)
     odds = keyring.value
