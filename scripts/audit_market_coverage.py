@@ -75,6 +75,46 @@ def main() -> int:
             "overlap": overlap,
         }
 
+    # PGA validation must be market-shape aware.  Outright/FRL are exhaustive
+    # N-way markets; top-K and make-cut are binary per player but non-exhaustive
+    # across players; H2H is paired two-way with push semantics.  A missing or
+    # mismatched methodology row is a CI failure so evidence cannot silently use
+    # a two-sided benchmark for an incompatible market surface.
+    pga_supported = set(report["PGA"]["supported_markets"])
+    pga_benchmark = _json("config/pga_benchmark_methodology.json")
+    benchmark_rows = pga_benchmark.get("markets", {})
+    benchmark_markets = set(benchmark_rows)
+    if pga_benchmark.get("schema_version") != "PGA_BENCHMARK_V1":
+        failures.append("PGA_BENCHMARK_SCHEMA_INVALID")
+    if benchmark_markets != pga_supported:
+        failures.append("PGA_BENCHMARK_SURFACE_MISMATCH")
+    allowed = {
+        "OUTRIGHT": ("EXHAUSTIVE_N_WAY_MUTUALLY_EXCLUSIVE", "MULTIPLICATIVE_NWAY_V1"),
+        "FIRST_ROUND_LEADER": ("EXHAUSTIVE_N_WAY_MUTUALLY_EXCLUSIVE", "MULTIPLICATIVE_NWAY_V1"),
+        "TOP_K": ("PER_SELECTION_BINARY_NONEXHAUSTIVE_ACROSS_PLAYERS", "MULTIPLICATIVE_2WAY_V1"),
+        "MAKE_CUT": ("PER_SELECTION_BINARY_NONEXHAUSTIVE_ACROSS_PLAYERS", "MULTIPLICATIVE_2WAY_V1"),
+        "H2H": ("TWO_WAY_MATCHUP_WITH_PUSH_POSSIBLE", "MULTIPLICATIVE_2WAY_V1"),
+    }
+    invalid_benchmark_rows = []
+    for market, expected in allowed.items():
+        row = benchmark_rows.get(market, {})
+        actual = (row.get("shape"), row.get("devig_method"))
+        if actual != expected:
+            invalid_benchmark_rows.append(market)
+    if invalid_benchmark_rows:
+        failures.append("PGA_BENCHMARK_MARKET_SHAPE_INVALID")
+    if benchmark_rows.get("OUTRIGHT", {}).get("require_complete_field") is not True:
+        failures.append("PGA_OUTRIGHT_COMPLETE_FIELD_NOT_REQUIRED")
+    if benchmark_rows.get("FIRST_ROUND_LEADER", {}).get("require_complete_field") is not True:
+        failures.append("PGA_FRL_COMPLETE_FIELD_NOT_REQUIRED")
+    for market in ("TOP_K", "MAKE_CUT"):
+        row = benchmark_rows.get(market, {})
+        if row.get("require_paired_yes_no") is not True or row.get("cross_player_normalization") != "FORBIDDEN":
+            failures.append(f"PGA_{market}_BINARY_BENCHMARK_INVALID")
+    report["PGA"]["benchmark_schema_version"] = pga_benchmark.get("schema_version")
+    report["PGA"]["benchmark_markets"] = sorted(benchmark_markets)
+    report["PGA"]["invalid_benchmark_rows"] = invalid_benchmark_rows
+
     report["LIVE"] = {
         "registry_present": (ROOT / "sportsedge/live_markets.py").is_file(),
         "status": "SHADOW_UNVALIDATED",
