@@ -57,10 +57,25 @@ def test_depth_chart_personnel_uses_latest_snapshot_at_or_before_pit_only():
         "BUF": "2026-09-10T15:00:00+00:00",
         "PIT": "2026-09-10T15:00:00+00:00",
     }
+    assert payload["missing_team_ids"] == []
     for row in payload["teams"]:
         assert row["eleven_personnel_rate"] is None
         assert row["nickel_rate"] is None
         assert row["ol_continuity_starts"] is None
+
+
+def test_depth_chart_personnel_marks_partial_when_opponent_snapshot_missing():
+    provider = build_depth_chart_personnel_provider(
+        game_id="2026_01_PIT_BUF",
+        team_ids=("BUF", "PIT"),
+        as_of=datetime(2026, 9, 10, 16, 0, tzinfo=timezone.utc),
+        source_uri=_SOURCE_URI,
+        source_sha256=_SOURCE_SHA,
+        rows=_complete_snapshot("BUF"),
+    )
+    assert provider is not None
+    assert provider["status"] == "PARTIAL"
+    assert provider["payload"]["missing_team_ids"] == ["PIT"]
 
 
 def test_depth_chart_personnel_refuses_untimestamped_rows_for_auto_pit():
