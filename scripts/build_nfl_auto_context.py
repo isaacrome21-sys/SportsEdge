@@ -13,6 +13,7 @@ import re
 from urllib.request import urlopen
 
 from sportsedge.sports.nfl.auto_slate import build_nfl_auto_context_slate
+from sportsedge.sports.nfl.full_auto import build_nfl_full_auto_slate
 from sportsedge.sports.nfl.history import NFLVERSE_SCHEDULE_CSV
 
 
@@ -113,18 +114,26 @@ def main() -> int:
         default=Path("artifacts/football/nfl_auto_context.json"),
     )
     args = parser.parse_args()
+    pit = _asof(args.asof)
+    opener = _opener(args.schedule_file)
     depth_rows, depth_uri, depth_sha = _depth_source(args.depth_file, args.depth_source_uri)
-    payload = build_nfl_auto_context_slate(
-        as_of=_asof(args.asof),
+    common = dict(
+        as_of=pit,
         mode="AUTO",
         min_lead_minutes=args.min_lead_minutes,
         horizon_minutes=args.horizon_minutes,
         game_types=tuple(args.game_types or ["REG"]),
-        depth_chart_rows=depth_rows,
-        depth_chart_source_uri=depth_uri,
-        depth_chart_source_sha256=depth_sha,
-        opener=_opener(args.schedule_file),
+        opener=opener,
     )
+    if depth_rows is None:
+        payload = build_nfl_full_auto_slate(**common)
+    else:
+        payload = build_nfl_auto_context_slate(
+            **common,
+            depth_chart_rows=depth_rows,
+            depth_chart_source_uri=depth_uri,
+            depth_chart_source_sha256=depth_sha,
+        )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
@@ -138,6 +147,7 @@ def main() -> int:
                 "game_count": payload["game_count"],
                 "out": str(args.out),
                 "depth_chart_source_sha256": payload["depth_chart_source_sha256"],
+                "depth_chart_status": (payload.get("automation") or {}).get("depth_chart_status"),
                 "model_p_eligible": payload["model_p_eligible"],
                 "truth_gate_eligible": payload["truth_gate_eligible"],
             },
