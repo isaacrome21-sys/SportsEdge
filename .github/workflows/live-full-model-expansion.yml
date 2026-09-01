@@ -1,11 +1,6 @@
 name: live-full-model-expansion
 
 on:
-  push:
-    branches:
-      - sportsedge/market-engine-expansion-v1
-    paths:
-      - '.github/workflows/live-full-model-expansion.yml'
   workflow_dispatch:
 
 permissions:
@@ -26,6 +21,20 @@ jobs:
         run: python -m pip install --disable-pip-version-check numpy
       - name: Prepare output
         run: mkdir -p artifacts .cache/mlb-history
+
+      - name: Run unified automatic LIVE RUN IT acquisition
+        continue-on-error: true
+        env:
+          SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+          SPORTSEDGE_ODDS_BOOKMAKERS: draftkings
+        shell: bash
+        run: |
+          set +e
+          python scripts/run_live_run_it.py --sports MLB,NFL,CFB --output artifacts/live_run_it.json 2>&1 | tee artifacts/live_acquisition.log
+          code=${PIPESTATUS[0]}
+          echo "$code" > artifacts/live_acquisition_exit_code.txt
+          exit 0
+
       - name: Diagnose Odds API key slots
         continue-on-error: true
         env:
@@ -75,7 +84,8 @@ jobs:
           with open('artifacts/odds_diagnostic.json','w') as f: json.dump(out,f,indent=2,sort_keys=True)
           print(json.dumps(out,indent=2,sort_keys=True))
           PY
-      - name: Run live MLB full model
+
+      - name: Run existing live MLB full model path
         continue-on-error: true
         env:
           SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
@@ -87,10 +97,11 @@ jobs:
         shell: bash
         run: |
           set +e
-          python scripts/run_auto_mlb.py --output artifacts/live_mlb_card.json 2>&1 | tee artifacts/live_run.log
+          python scripts/run_auto_mlb.py --output artifacts/live_mlb_card.json 2>&1 | tee artifacts/live_mlb_model.log
           code=${PIPESTATUS[0]}
-          echo "$code" > artifacts/exit_code.txt
+          echo "$code" > artifacts/live_mlb_exit_code.txt
           exit 0
+
       - name: Upload live card
         uses: actions/upload-artifact@v4
         with:
