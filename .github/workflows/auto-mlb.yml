@@ -83,10 +83,11 @@ jobs:
           SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
           SPORTSEDGE_ODDS_BOOKMAKERS: draftkings
         run: python scripts/probe_game_odds.py
-      # Scheduled/push runs deliberately receive no Odds API or external quote secrets.
-      # The resilient runner therefore uses the no-key ESPN game-market fallback while
-      # continuing schedule/context/history/model/journal automation without spending
-      # the four free Odds API credentials.
+      # Scheduled and push runs deliberately receive no Odds API or external quote
+      # secrets. They continue the free schedule/context/history/model/journal lane
+      # and let the resilient runner use its ESPN game-market fallback. The four
+      # free Odds API credentials are reserved for an explicit workflow_dispatch,
+      # which is the repository equivalent of a user-requested RUN IT.
       - name: Run scheduled MLB machine without Odds API credits
         if: github.event_name != 'workflow_dispatch'
         env:
@@ -95,8 +96,6 @@ jobs:
           SPORTSEDGE_PROVIDER_TOKEN: ${{ secrets.SPORTSEDGE_PROVIDER_TOKEN }}
           SPORTSEDGE_HISTORY_CACHE_DIR: .cache/sportsedge/mlb-history
         run: python scripts/run_auto_mlb_resilient.py --output artifacts/live_mlb_card.json
-      # Explicit dispatch is the only GitHub event allowed to spend the configured
-      # Odds API keyring. This is the repository equivalent of an explicit RUN IT.
       - name: Run requested canonical automated MLB machine
         if: github.event_name == 'workflow_dispatch'
         env:
