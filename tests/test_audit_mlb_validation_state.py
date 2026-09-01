@@ -6,34 +6,30 @@ import unittest
 from scripts.audit_mlb_validation_state import bb_state, nrfi_state, settlement_state
 
 
-SETTLEMENT_INVARIANTS = {
-    "batter_hits_reconciled": True,
-    "f5_reconciled": True,
-    "facts_present": True,
-    "final_status": True,
-    "first_inning_reconciled": True,
-    "home_run_order_reconciled": True,
-    "winning_pitcher_decision_present": True,
-}
-
-
 def write_json(path: Path, payload):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
 
 
-def settlement_report():
+def settlement_report(*, rules=False):
+    rows = []
+    for market in ("HITS", "MONEYLINE"):
+        rows.append({
+            "market": market,
+            "official_fact_state": "OFFICIAL_FACTS_PROVEN",
+            "book_rules_validated": bool(rules),
+            "missing_book_rules": [] if rules else ["PLAYER_PROP_PARTICIPATION_VOID_PUSH_RULES" if market == "HITS" else "FULL_GAME_FINAL_SCORE_SETTLEMENT"],
+            "settlement_semantics_state": "SETTLEMENT_ELIGIBLE" if rules else "BOOK_SETTLEMENT_UNVALIDATED",
+        })
     return {
-        "schema_version": "mlb_settlement_semantics_v2",
-        "state": "SETTLEMENT_SEMANTICS_PASS",
+        "schema_version": "mlb_settlement_evidence_v3",
+        "evidence_class": "LIVE_OFFICIAL_FACT_PROBE",
         "source": "MLB_STATSAPI_BOX_SCORE_AND_LIVE_FEED",
-        "sportsbook_data_used": False,
-        "game_pk": "822696",
+        "sportsbook_data_used": bool(rules),
         "generated_at_utc": "2026-08-31T12:00:00+00:00",
         "facts_sha256": "a" * 64,
-        "invariants": dict(SETTLEMENT_INVARIANTS),
-        "proven_markets": ["HITS", "MONEYLINE"],
-        "excluded_markets": [],
+        "market_count": len(rows),
+        "markets": rows,
     }
 
 
@@ -61,33 +57,59 @@ def nrfi_report(nrfi=True, yrfi=True):
 
 
 class AuditMLBValidationStateTests(unittest.TestCase):
-    def test_settlement_pass_is_schema_hash_and_invariant_bound(self):
+    def test_v3_settlement_pass_requires_official_facts_and_book_rules(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
-            write_json(root / "SETTLEMENT/latest/report.json", settlement_report())
+            write_json(root / "SETTLEMENT_OFFICIAL_FACTS/latest/report.json", settlement_report(rules=True))
             out = settlement_state(root)
         self.assertEqual(set(out), {"HITS", "MONEYLINE"})
         evidence = out["MONEYLINE"]["settlement_semantics"]
         self.assertEqual(evidence["status"], "PASS")
+        self.assertTrue(evidence["sportsbook_rule_evidence"])
         self.assertRegex(evidence["evidence_sha256"], r"^[0-9a-f]{64}$")
         self.assertEqual(evidence["facts_sha256"], "a" * 64)
 
-    def test_settlement_never_passes_malformed_or_ambiguous_report(self):
+    def test_v3_official_facts_without_book_rules_remain_pending(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_json(root / "SETTLEMENT_OFFICIAL_FACTS/latest/report.json", settlement_report(rules=False))
+            out = settlement_state(root)
+        self.assertEqual(out["MONEYLINE"]["settlement_semantics"]["status"], "PENDING")
+        self.assertEqual(out["MONEYLINE"]["settlement_semantics"]["reason"], "BOOK_SETTLEMENT_RULE_EVIDENCE_REQUIRED")
+
+    def test_obsolete_v2_facts_only_report_cannot_pass_v3_settlement_gate(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_json(root / "SETTLEMENT/latest/report.json", {
+                "schema_version": "mlb_settlement_semantics_v2",
+                "state": "SETTLEMENT_SEMANTICS_PASS",
+                "source": "MLB_STATSAPI_BOX_SCORE_AND_LIVE_FEED",
+                "sportsbook_data_used": False,
+                "game_pk": "822696",
+                "generated_at_utc": "2026-08-31T12:00:00+00:00",
+                "facts_sha256": "a" * 64,
+                "invariants": {"facts_present": True},
+                "proven_markets": ["MONEYLINE"],
+                "excluded_markets": [],
+            })
+            self.assertEqual(settlement_state(root), {})
+
+    def test_settlement_never_passes_malformed_or_duplicate_v3_rows(self):
         mutations = (
             lambda row: row.update(facts_sha256="not-a-hash"),
-            lambda row: row["invariants"].pop("f5_reconciled"),
-            lambda row: row.update(proven_markets=["MONEYLINE", "MONEYLINE"]),
-            lambda row: row.update(excluded_markets=["MONEYLINE"]),
+            lambda row: row.update(market_count=3),
+            lambda row: row["markets"].append(dict(row["markets"][0])),
+            lambda row: row["markets"][0].update(missing_book_rules="not-a-list"),
         )
         for mutate in mutations:
             with self.subTest(mutation=mutate), TemporaryDirectory() as tmp:
                 root = Path(tmp)
-                report = settlement_report()
+                report = settlement_report(rules=True)
                 mutate(report)
-                write_json(root / "SETTLEMENT/latest/report.json", report)
+                write_json(root / "SETTLEMENT_OFFICIAL_FACTS/latest/report.json", report)
                 self.assertEqual(settlement_state(root), {})
 
-    def test_bb_requires_real_boolean_eligibility_and_all_gates(self):
+    def test_bb_forward_evidence_is_independent_of_book_rule_gate(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             report_path = root / "PITCHER_BB/latest/bb_v6_forward_shadow_report.json"
@@ -95,7 +117,8 @@ class AuditMLBValidationStateTests(unittest.TestCase):
             write_json(report_path, bb_report())
             write_json(settlement_path, [{"source": "MLB_STATSAPI_BOX_SCORE"}])
             passing = bb_state(root)
-            self.assertEqual(passing["settlement_semantics"]["status"], "PASS")
+            self.assertEqual(passing["settlement_semantics"]["status"], "PENDING")
+            self.assertEqual(passing["settlement_semantics"]["reason"], "BOOK_SETTLEMENT_RULE_EVIDENCE_REQUIRED")
             self.assertEqual(passing["forward_evidence"]["status"], "PASS")
 
             truthy = bb_report("true")
@@ -115,26 +138,21 @@ class AuditMLBValidationStateTests(unittest.TestCase):
             write_json(report_path, wrong_schema)
             self.assertEqual(bb_state(root)["forward_evidence"]["status"], "FAIL")
 
-    def test_bb_rejects_non_object_settlement_rows(self):
+    def test_bb_rejects_non_object_official_fact_rows(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             write_json(root / "PITCHER_BB/latest/bb_v6_forward_shadow_report.json", bb_report())
-            write_json(
-                root / "PITCHER_BB/latest/bb_v6_settlements.json",
-                [{"source": "MLB_STATSAPI_BOX_SCORE"}, "ignored-before-fix"],
-            )
-            self.assertEqual(bb_state(root)["settlement_semantics"]["status"], "FAIL")
+            write_json(root / "PITCHER_BB/latest/bb_v6_settlements.json", [{"source": "MLB_STATSAPI_BOX_SCORE"}, "bad"])
+            self.assertEqual(bb_state(root)["settlement_semantics"]["reason"], "OFFICIAL_SETTLEMENT_FACTS_INCOMPLETE")
 
-    def test_nrfi_and_yrfi_require_exact_boolean_market_attestations(self):
+    def test_nrfi_and_yrfi_forward_attestations_stay_exact_boolean(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             report_path = root / "NRFI_YRFI/latest/nrfi_v6_forward_shadow_report.json"
             write_json(report_path, nrfi_report())
-            write_json(
-                root / "NRFI_YRFI/latest/nrfi_v6_settlements.json",
-                [{"source": "MLB_STATSAPI_LIVE_FEED_LINESCORE_V2"}],
-            )
+            write_json(root / "NRFI_YRFI/latest/nrfi_v6_settlements.json", [{"source": "MLB_STATSAPI_LIVE_FEED_LINESCORE_V2"}])
             passing = nrfi_state(root)
+            self.assertEqual(passing["NRFI"]["settlement_semantics"]["status"], "PENDING")
             self.assertEqual(passing["NRFI"]["forward_evidence"]["status"], "PASS")
             self.assertEqual(passing["YRFI"]["forward_evidence"]["status"], "PASS")
 

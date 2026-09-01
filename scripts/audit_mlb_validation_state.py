@@ -19,17 +19,9 @@ REQUIRED_GATES = (
 )
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-_SETTLEMENT_SCHEMA = "mlb_settlement_semantics_v2"
+_SETTLEMENT_SCHEMA = "mlb_settlement_evidence_v3"
 _SETTLEMENT_SOURCE = "MLB_STATSAPI_BOX_SCORE_AND_LIVE_FEED"
-_SETTLEMENT_INVARIANTS = frozenset({
-    "batter_hits_reconciled",
-    "f5_reconciled",
-    "facts_present",
-    "final_status",
-    "first_inning_reconciled",
-    "home_run_order_reconciled",
-    "winning_pitcher_decision_present",
-})
+_SETTLEMENT_EVIDENCE_CLASS = "LIVE_OFFICIAL_FACT_PROBE"
 _BB_SCHEMA = "bb_v6_forward_shadow_evaluation_v1"
 _BB_SETTLEMENT_SOURCE = "MLB_STATSAPI_BOX_SCORE"
 _NRFI_SCHEMA = "nrfi_v6_forward_shadow_evaluation_v1"
@@ -72,141 +64,199 @@ def settlement_rows_valid(value: Any, *, source: str) -> bool:
 
 
 def settlement_state(root: Path) -> dict[str, dict[str, Any]]:
-    p=root/"SETTLEMENT"/"latest"/"report.json"
-    if not p.is_file(): return {}
-    r=load(p)
-    if not isinstance(r, dict): return {}
-    invariants=r.get("invariants") or {}
-    proven=r.get("proven_markets")
-    excluded=r.get("excluded_markets")
-    valid=(
-        r.get("schema_version")==_SETTLEMENT_SCHEMA
-        and r.get("state")=="SETTLEMENT_SEMANTICS_PASS"
-        and r.get("sportsbook_data_used") is False
-        and r.get("source")==_SETTLEMENT_SOURCE
+    """Read the current v3 settlement contract market by market.
+
+    Official MLB facts are necessary but are not sportsbook settlement evidence.
+    A market passes only when the v3 row proves official facts AND validated book
+    rules and classifies the observation as SETTLEMENT_ELIGIBLE. The obsolete v2
+    facts-only report is intentionally ignored.
+    """
+    p = root / "SETTLEMENT_OFFICIAL_FACTS" / "latest" / "report.json"
+    if not p.is_file():
+        return {}
+    r = load(p)
+    if not isinstance(r, dict):
+        return {}
+    rows = r.get("markets")
+    valid = (
+        r.get("schema_version") == _SETTLEMENT_SCHEMA
+        and r.get("evidence_class") == _SETTLEMENT_EVIDENCE_CLASS
+        and r.get("source") == _SETTLEMENT_SOURCE
+        and r.get("sportsbook_data_used") in {False, True}
         and valid_sha256(r.get("facts_sha256"))
-        and isinstance(invariants, dict)
-        and _SETTLEMENT_INVARIANTS.issubset(invariants)
-        and all(v is True for v in invariants.values())
-        and isinstance(proven, list) and bool(proven)
-        and all(isinstance(m, str) and m for m in proven)
-        and len(proven)==len(set(proven))
-        and isinstance(excluded, list)
-        and all(isinstance(m, str) and m for m in excluded)
-        and not set(proven).intersection(excluded)
-        and str(r.get("game_pk") or "").strip()!=""
-        and str(r.get("generated_at_utc") or "").strip()!=""
+        and isinstance(rows, list)
+        and bool(rows)
+        and int(r.get("market_count", -1)) == len(rows)
+        and str(r.get("generated_at_utc") or "").strip() != ""
     )
-    if not valid: return {}
-    evidence={
-        "evidence":str(p),
-        "evidence_sha256":sha256_file(p),
-        "game_pk":r.get("game_pk"),
-        "facts_sha256":r.get("facts_sha256"),
-        "schema_version":r.get("schema_version"),
-        "source":r.get("source"),
-        "generated_at_utc":r.get("generated_at_utc"),
+    if not valid:
+        return {}
+
+    evidence = {
+        "evidence": str(p),
+        "evidence_sha256": sha256_file(p),
+        "facts_sha256": r.get("facts_sha256"),
+        "schema_version": r.get("schema_version"),
+        "source": r.get("source"),
+        "generated_at_utc": r.get("generated_at_utc"),
     }
-    out={}
-    for market in proven:
-        out[market]={"settlement_semantics":status("PASS",**evidence)}
-    for market in excluded:
-        out[market]={"settlement_semantics":status("PENDING",**evidence,reason="SPECIAL_SETTLEMENT_SEMANTICS_NOT_YET_PROVEN")}
+    out: dict[str, dict[str, Any]] = {}
+    seen: set[str] = set()
+    for raw in rows:
+        if not isinstance(raw, dict):
+            return {}
+        market = str(raw.get("market") or "").strip()
+        if not market or market in seen:
+            return {}
+        seen.add(market)
+        fact_state = str(raw.get("official_fact_state") or "")
+        book_valid = raw.get("book_rules_validated") is True
+        settlement = str(raw.get("settlement_semantics_state") or "")
+        missing_rules = raw.get("missing_book_rules")
+        if not isinstance(missing_rules, list) or not all(isinstance(x, str) and x for x in missing_rules):
+            if missing_rules != []:
+                return {}
+        if fact_state == "OFFICIAL_FACTS_PROVEN" and book_valid and settlement == "SETTLEMENT_ELIGIBLE" and not missing_rules:
+            gate = status("PASS", **evidence, sportsbook_rule_evidence=True)
+        else:
+            reason = (
+                "OFFICIAL_FACTS_NOT_PROVEN"
+                if fact_state != "OFFICIAL_FACTS_PROVEN"
+                else "BOOK_SETTLEMENT_RULE_EVIDENCE_REQUIRED"
+                if not book_valid
+                else "SETTLEMENT_OBSERVATION_NOT_ELIGIBLE"
+            )
+            gate = status(
+                "PENDING",
+                **evidence,
+                reason=reason,
+                missing_book_rules=list(missing_rules or []),
+                official_fact_state=fact_state,
+                settlement_semantics_state=settlement or None,
+            )
+        out[market] = {"settlement_semantics": gate}
     return out
 
 
 def bb_state(root: Path) -> dict[str, Any] | None:
-    p=root/"PITCHER_BB"/"latest"/"bb_v6_forward_shadow_report.json"
-    s=root/"PITCHER_BB"/"latest"/"bb_v6_settlements.json"
-    if not p.is_file(): return None
-    r=load(p)
-    if not isinstance(r, dict): return None
-    settlements=load(s) if s.is_file() else []
-    report_contract_ok=(
-        r.get("schema_version")==_BB_SCHEMA
+    p = root / "PITCHER_BB" / "latest" / "bb_v6_forward_shadow_report.json"
+    s = root / "PITCHER_BB" / "latest" / "bb_v6_settlements.json"
+    if not p.is_file():
+        return None
+    r = load(p)
+    if not isinstance(r, dict):
+        return None
+    settlements = load(s) if s.is_file() else []
+    report_contract_ok = (
+        r.get("schema_version") == _BB_SCHEMA
         and r.get("sportsbook_data_used") is False
     )
-    settlement_ok=(
+    official_fact_rows_ok = (
         report_contract_ok
         and ((r.get("gates") or {}).get("integrity") or {}).get("pass") is True
-        and settlement_rows_valid(settlements,source=_BB_SETTLEMENT_SOURCE)
+        and settlement_rows_valid(settlements, source=_BB_SETTLEMENT_SOURCE)
     )
-    failed=failed_gate_names(r)
-    eligible=((r.get("market") or {}).get("PITCHER_BB") or {}).get("eligible") is True
-    forward_ok=report_contract_ok and eligible and r.get("state")=="MODEL_ELIGIBLE" and not failed
-    evidence={"evidence":str(p),"evidence_sha256":sha256_file(p)}
-    if s.is_file(): evidence["settlement_sha256"]=sha256_file(s)
+    failed = failed_gate_names(r)
+    eligible = ((r.get("market") or {}).get("PITCHER_BB") or {}).get("eligible") is True
+    forward_ok = report_contract_ok and eligible and r.get("state") == "MODEL_ELIGIBLE" and not failed
+    evidence = {"evidence": str(p), "evidence_sha256": sha256_file(p)}
+    if s.is_file():
+        evidence["settlement_sha256"] = sha256_file(s)
+    settlement_gate = status(
+        "PENDING",
+        **evidence,
+        reason="BOOK_SETTLEMENT_RULE_EVIDENCE_REQUIRED" if official_fact_rows_ok else "OFFICIAL_SETTLEMENT_FACTS_INCOMPLETE",
+    )
     return {
-        "settlement_semantics": status("PASS" if settlement_ok else "FAIL", **evidence),
+        "settlement_semantics": settlement_gate,
         "forward_evidence": status("PASS" if forward_ok else "FAIL", **evidence, failed_gates=failed, state=r.get("state"), settled=r.get("settled_unique_pitchers")),
     }
 
 
 def nrfi_state(root: Path) -> dict[str, Any] | None:
-    p=root/"NRFI_YRFI"/"latest"/"nrfi_v6_forward_shadow_report.json"
-    s=root/"NRFI_YRFI"/"latest"/"nrfi_v6_settlements.json"
-    if not p.is_file(): return None
-    r=load(p)
-    if not isinstance(r, dict): return None
-    settlements=load(s) if s.is_file() else []
-    report_contract_ok=(
-        r.get("schema_version")==_NRFI_SCHEMA
+    p = root / "NRFI_YRFI" / "latest" / "nrfi_v6_forward_shadow_report.json"
+    s = root / "NRFI_YRFI" / "latest" / "nrfi_v6_settlements.json"
+    if not p.is_file():
+        return None
+    r = load(p)
+    if not isinstance(r, dict):
+        return None
+    settlements = load(s) if s.is_file() else []
+    report_contract_ok = (
+        r.get("schema_version") == _NRFI_SCHEMA
         and r.get("sportsbook_data_used") is False
     )
-    settlement_ok=(
+    official_fact_rows_ok = (
         report_contract_ok
         and ((r.get("gates") or {}).get("integrity") or {}).get("pass") is True
-        and settlement_rows_valid(settlements,source=_NRFI_SETTLEMENT_SOURCE)
+        and settlement_rows_valid(settlements, source=_NRFI_SETTLEMENT_SOURCE)
     )
-    failed=failed_gate_names(r)
-    evidence={"evidence":str(p),"evidence_sha256":sha256_file(p)}
-    if s.is_file(): evidence["settlement_sha256"]=sha256_file(s)
-    result={}
-    for market in ("NRFI","YRFI"):
-        eligible=((r.get("markets") or {}).get(market) or {}).get("eligible") is True
-        forward_ok=report_contract_ok and eligible and r.get("state")=="MODEL_ELIGIBLE" and not failed
-        result[market]={
-            "settlement_semantics": status("PASS" if settlement_ok else "FAIL", **evidence),
+    failed = failed_gate_names(r)
+    evidence = {"evidence": str(p), "evidence_sha256": sha256_file(p)}
+    if s.is_file():
+        evidence["settlement_sha256"] = sha256_file(s)
+    result = {}
+    for market in ("NRFI", "YRFI"):
+        eligible = ((r.get("markets") or {}).get(market) or {}).get("eligible") is True
+        forward_ok = report_contract_ok and eligible and r.get("state") == "MODEL_ELIGIBLE" and not failed
+        result[market] = {
+            "settlement_semantics": status(
+                "PENDING",
+                **evidence,
+                reason="BOOK_SETTLEMENT_RULE_EVIDENCE_REQUIRED" if official_fact_rows_ok else "OFFICIAL_SETTLEMENT_FACTS_INCOMPLETE",
+            ),
             "forward_evidence": status("PASS" if forward_ok else "FAIL", **evidence, failed_gates=failed, state=r.get("state"), settled=r.get("settled_unique_games")),
         }
     return result
 
 
 def main() -> int:
-    ap=argparse.ArgumentParser()
+    ap = argparse.ArgumentParser()
     ap.add_argument("--registry", default="config/mlb_validation_evidence.json")
     ap.add_argument("--data-root", default=".data-branch/runtime/model-validation")
     ap.add_argument("--output", default="artifacts/mlb-validation/derived_status.json")
-    args=ap.parse_args()
+    args = ap.parse_args()
 
-    reg=load(Path(args.registry)); markets=reg.get("markets") or {}
+    reg = load(Path(args.registry)); markets = reg.get("markets") or {}
     if tuple(reg.get("required_gates") or ()) != REQUIRED_GATES:
         raise SystemExit("VALIDATION_GATE_CONTRACT_MISMATCH")
-    root=Path(args.data_root)
-    derived={m:{g:status("PENDING") for g in REQUIRED_GATES} for m in sorted(markets)}
+    root = Path(args.data_root)
+    derived = {m: {g: status("PENDING") for g in REQUIRED_GATES} for m in sorted(markets)}
 
-    generic_settlement=settlement_state(root)
-    for m,evidence in generic_settlement.items():
-        if m in derived: derived[m].update(evidence)
+    generic_settlement = settlement_state(root)
+    for m, evidence in generic_settlement.items():
+        if m in derived:
+            derived[m].update(evidence)
 
-    bb=bb_state(root)
+    bb = bb_state(root)
     if bb and "PITCHER_BB" in derived:
+        settlement = derived["PITCHER_BB"].get("settlement_semantics")
         derived["PITCHER_BB"].update(bb)
-    n=nrfi_state(root)
+        if settlement and settlement.get("status") != "PENDING":
+            derived["PITCHER_BB"]["settlement_semantics"] = settlement
+        elif settlement and settlement.get("reason") == "BOOK_SETTLEMENT_RULE_EVIDENCE_REQUIRED":
+            derived["PITCHER_BB"]["settlement_semantics"] = settlement
+    n = nrfi_state(root)
     if n:
         for m, evidence in n.items():
-            if m in derived: derived[m].update(evidence)
+            if m in derived:
+                settlement = derived[m].get("settlement_semantics")
+                derived[m].update(evidence)
+                if settlement and (settlement.get("status") == "PASS" or settlement.get("reason") == "BOOK_SETTLEMENT_RULE_EVIDENCE_REQUIRED"):
+                    derived[m]["settlement_semantics"] = settlement
 
-    summary={
-        "markets":len(derived),
-        "gate_passes":sum(v["status"]=="PASS" for row in derived.values() for v in row.values()),
-        "gate_failures":sum(v["status"]=="FAIL" for row in derived.values() for v in row.values()),
-        "gate_pending":sum(v["status"]=="PENDING" for row in derived.values() for v in row.values()),
-        "fully_validated_markets":sum(all(row[g]["status"]=="PASS" for g in REQUIRED_GATES) for row in derived.values()),
+    summary = {
+        "markets": len(derived),
+        "gate_passes": sum(v["status"] == "PASS" for row in derived.values() for v in row.values()),
+        "gate_failures": sum(v["status"] == "FAIL" for row in derived.values() for v in row.values()),
+        "gate_pending": sum(v["status"] == "PENDING" for row in derived.values() for v in row.values()),
+        "fully_validated_markets": sum(all(row[g]["status"] == "PASS" for g in REQUIRED_GATES) for row in derived.values()),
     }
-    payload={"schema_version":1,"required_gates":list(REQUIRED_GATES),"markets":derived,"summary":summary}
-    out=Path(args.output); out.parent.mkdir(parents=True,exist_ok=True); out.write_text(json.dumps(payload,indent=2,sort_keys=True)+"\n")
-    print(json.dumps(summary,indent=2,sort_keys=True))
+    payload = {"schema_version": 2, "required_gates": list(REQUIRED_GATES), "markets": derived, "summary": summary}
+    out = Path(args.output); out.parent.mkdir(parents=True, exist_ok=True); out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    print(json.dumps(summary, indent=2, sort_keys=True))
     return 0
 
-if __name__=="__main__": raise SystemExit(main())
+
+if __name__ == "__main__":
+    raise SystemExit(main())
