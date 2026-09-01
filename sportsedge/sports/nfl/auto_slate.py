@@ -12,6 +12,7 @@ from .auto_context_source import (
 )
 from .auto_personnel_source import build_depth_chart_personnel_provider
 from .context_autopull import ContextObservation, NFLContextError
+from .injury_report_source import build_pit_injury_inputs
 from .run_it_context import build_run_it_context
 from .snap_workload_source import build_prior_snap_workload_inputs
 
@@ -112,13 +113,17 @@ def build_nfl_auto_context_slate(
     snap_count_rows: Iterable[Mapping[str, Any]] | None = None,
     snap_count_source_uri: str | None = None,
     snap_count_source_sha256: str | None = None,
+    injury_rows: Iterable[Mapping[str, Any]] | None = None,
+    injury_source_uri: str | None = None,
+    injury_source_sha256: str | None = None,
     opener: Callable = urlopen,
 ) -> dict[str, Any]:
     """Discover an upcoming slate and collect canonical objective context.
 
-    Optional depth and snap-count inputs must carry source provenance. Snap workload
-    is constructed strictly from prior weeks because the snap file does not carry
-    authoritative kickoff timestamps; same-week rows are excluded fail-closed.
+    Optional depth, snap-count, and injury inputs must carry exact source
+    provenance. Snap workload is strictly prior-week. Injury rows are current-week
+    only and must have `date_modified <= as_of`; rows with unverifiable freshness
+    are excluded rather than guessed.
     """
     requested = str(mode or "").strip().upper()
     if requested not in {"AUTO", "HYBRID"}:
@@ -137,6 +142,9 @@ def build_nfl_auto_context_slate(
     snaps = None if snap_count_rows is None else [dict(row) for row in snap_count_rows]
     if snaps is not None and (not snap_count_source_uri or not snap_count_source_sha256):
         raise NFLContextError("snap count provenance required")
+    injuries = None if injury_rows is None else [dict(row) for row in injury_rows]
+    if injuries is not None and (not injury_source_uri or not injury_source_sha256):
+        raise NFLContextError("injury provenance required")
 
     bundles: list[dict[str, Any]] = []
     for discovered in plan["games"]:
@@ -154,9 +162,9 @@ def build_nfl_auto_context_slate(
             )
             if personnel is not None:
                 game["auto_personnel_provider"] = personnel
+        season = discovered.get("season")
+        week = discovered.get("week")
         if snaps is not None:
-            season = discovered.get("season")
-            week = discovered.get("week")
             if season is None or week is None:
                 raise NFLContextError(f"snap workload schedule season/week missing:{game_id}")
             game["workload_inputs"] = build_prior_snap_workload_inputs(
@@ -166,6 +174,18 @@ def build_nfl_auto_context_slate(
                 team_ids=team_ids,
                 source_uri=str(snap_count_source_uri),
                 source_sha256=str(snap_count_source_sha256),
+            )
+        if injuries is not None:
+            if season is None or week is None:
+                raise NFLContextError(f"injury schedule season/week missing:{game_id}")
+            game["reported_injury_rows"] = build_pit_injury_inputs(
+                rows=injuries,
+                season=int(season),
+                target_week=int(week),
+                team_ids=team_ids,
+                as_of=as_of,
+                source_uri=str(injury_source_uri),
+                source_sha256=str(injury_source_sha256),
             )
         bundles.append(
             build_run_it_context(
@@ -184,6 +204,7 @@ def build_nfl_auto_context_slate(
         "schedule_source_sha256": plan["schedule_source_sha256"],
         "depth_chart_source_sha256": depth_chart_source_sha256 if depth is not None else None,
         "snap_count_source_sha256": snap_count_source_sha256 if snaps is not None else None,
+        "injury_source_sha256": injury_source_sha256 if injuries is not None else None,
         "game_count": len(bundles),
         "games": bundles,
         "model_p_eligible": False,
