@@ -4,7 +4,12 @@ on:
   pull_request:
     paths:
       - 'scripts/archive_raw_game_odds.py'
+      - 'scripts/run_mlb_archive_lane.py'
+      - 'tests/test_mlb_archive_lane.py'
       - '.github/workflows/archive-mlb-game-odds.yml'
+      - '.github/workflows/archive-mlb-game-odds-failover.yml'
+      - '.github/workflows/archive-mlb-game-odds-backup-dispatch.yml'
+      - '.github/workflows/auto-mlb.yml'
       - '.github/workflows/archive-smoke.yml'
   workflow_dispatch:
 
@@ -13,58 +18,47 @@ permissions:
 
 jobs:
   bare-stdlib:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 3
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12.13'
-      - name: Verify no sportsedge imports
+          python-version: '3.12'
+      - name: Verify archive scripts stay stdlib-only
         shell: bash
         run: |
           python - <<'PY'
           import ast
           from pathlib import Path
-          tree = ast.parse(Path('scripts/archive_raw_game_odds.py').read_text())
-          bad = []
-          for node in ast.walk(tree):
-              if isinstance(node, ast.Import):
-                  for alias in node.names:
-                      if alias.name == 'sportsedge' or alias.name.startswith('sportsedge.'):
-                          bad.append(alias.name)
-              elif isinstance(node, ast.ImportFrom):
-                  module = node.module or ''
-                  if module == 'sportsedge' or module.startswith('sportsedge.'):
-                      bad.append(module)
-          if bad:
-              raise SystemExit(f'Archive must not import sportsedge/*: {sorted(set(bad))}')
-          print('No sportsedge imports found')
+
+          for filename in (
+              'scripts/archive_raw_game_odds.py',
+              'scripts/run_mlb_archive_lane.py',
+          ):
+              tree = ast.parse(Path(filename).read_text())
+              bad = []
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Import):
+                      for alias in node.names:
+                          if alias.name == 'sportsedge' or alias.name.startswith('sportsedge.'):
+                              bad.append(alias.name)
+                  elif isinstance(node, ast.ImportFrom):
+                      module = node.module or ''
+                      if module == 'sportsedge' or module.startswith('sportsedge.'):
+                          bad.append(module)
+              if bad:
+                  raise SystemExit(f'{filename} must not import sportsedge/*: {sorted(set(bad))}')
+          print('Archive scripts are stdlib-only')
           PY
-      - name: Verify durable ledger workflow contract
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          text = Path('.github/workflows/archive-mlb-game-odds.yml').read_text()
-          required = [
-              'permissions:\n  contents: write',
-              'git fetch --depth=1 origin data:data',
-              'git worktree add .data-branch data',
-              'runtime/odds-budget/ledger.json',
-              'runtime/archive-status/',
-              'git push origin HEAD:data',
-          ]
-          missing = [item for item in required if item not in text]
-          if missing:
-              raise SystemExit(f'Missing durable archive contract: {missing}')
-          forbidden = ['actions/cache@', 'save-always:']
-          found = [item for item in forbidden if item in text]
-          if found:
-              raise SystemExit(f'Archive workflow must not depend on ephemeral Actions cache: {found}')
-          print('Durable data-branch ledger contract verified')
-          PY
-      - name: Compile in isolated mode
-        run: python -I -m py_compile scripts/archive_raw_game_odds.py
-      - name: Run bare stdlib self-test
+      - name: Compile archive lane in isolated mode
+        run: >-
+          python -I -m py_compile
+          scripts/archive_raw_game_odds.py
+          scripts/run_mlb_archive_lane.py
+      - name: Run raw archive helper self-test
         run: python -I scripts/archive_raw_game_odds.py --self-test
+      - name: Run durable archive lane self-test
+        run: python -I scripts/run_mlb_archive_lane.py --self-test
+      - name: Run archive durability contract tests
+        run: python -m unittest tests.test_mlb_archive_lane -v
