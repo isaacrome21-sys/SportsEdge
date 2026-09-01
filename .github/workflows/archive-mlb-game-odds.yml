@@ -2,17 +2,12 @@ name: archive-mlb-game-odds
 
 on:
   workflow_dispatch:
-  schedule:
-    # Six staggered chances per hour. Avoid minute 0, where GitHub documents
-    # higher schedule load/delay risk, while keeping each target within the
-    # archive script's +/-8 minute acceptance window when runs are punctual.
-    - cron: '7,17,27,37,47,57 * * * *'
 
 permissions:
   contents: write
 
 concurrency:
-  group: archive-mlb-game-odds
+  group: auto-mlb
   cancel-in-progress: false
 
 jobs:
@@ -27,6 +22,7 @@ jobs:
       SPORTSEDGE_ODDS_BOOKMAKERS: draftkings
       SPORTSEDGE_ODDS_DAILY_BUDGET_CREDITS: '12'
       SPORTSEDGE_ODDS_BUDGET_LEDGER: .cache/sportsedge/odds-budget/ledger.json
+      SPORTSEDGE_ARCHIVE_SOURCE: manual-primary
     steps:
       - uses: actions/checkout@v4
         with:
@@ -34,129 +30,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12.13'
-      - name: Bare-environment archive smoke test
-        run: python -I scripts/archive_raw_game_odds.py --self-test
-      - name: Resolve UTC day
-        id: day
-        run: echo "date=$(date -u +%F)" >> "$GITHUB_OUTPUT"
-      - name: Restore durable budget ledger from data branch
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch --depth=1 origin data:data
-          git worktree add .data-branch data
-          mkdir -p .cache/sportsedge/odds-budget
-          if [ -f .data-branch/runtime/odds-budget/ledger.json ]; then
-            cp .data-branch/runtime/odds-budget/ledger.json "$SPORTSEDGE_ODDS_BUDGET_LEDGER"
-          fi
-      - name: Deduplicate near-simultaneous successful capture
-        id: dedupe
-        shell: bash
-        run: |
-          python - <<'PY'
-          from datetime import datetime, timezone
-          import json
-          import os
-          from pathlib import Path
-
-          ledger_path = Path(os.environ['SPORTSEDGE_ODDS_BUDGET_LEDGER'])
-          now = datetime.now(timezone.utc)
-          skip = False
-          source = None
-          ledger = {}
-          try:
-              ledger = json.loads(ledger_path.read_text())
-          except Exception:
-              ledger = {}
-
-          # This is intentionally short: it is only a collision guard for the
-          # primary/failover paths. A longer horizon could suppress a distinct
-          # T-180/T-90/T0 opportunity for another game cluster.
-          for row in reversed(ledger.get('runs', [])):
-              if row.get('status') != 'CAPTURED':
-                  continue
-              try:
-                  stamp = str(row['run_at_utc']).replace('Z', '+00:00')
-                  captured_at = datetime.fromisoformat(stamp).astimezone(timezone.utc)
-              except Exception:
-                  continue
-              age = (now - captured_at).total_seconds()
-              if 0 <= age <= 5 * 60:
-                  skip = True
-                  source = row
-              break
-
-          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as out:
-              out.write(f"skip={'true' if skip else 'false'}\n")
-
-          if skip and source is not None:
-              day = now.date().isoformat()
-              status_dir = Path('artifacts/raw_odds/status') / day
-              status_dir.mkdir(parents=True, exist_ok=True)
-              stamp = now.strftime('%Y%m%dT%H%M%S.%fZ')
-              row = {
-                  'run_at_utc': now.isoformat(),
-                  'status': 'SKIP_RECENT_CAPTURE_DEDUP',
-                  'credits_consumed_actual': 0,
-                  'source_run_at_utc': source.get('run_at_utc'),
-                  'source_capture_window': source.get('capture_window'),
-                  'source_raw_file': source.get('raw_file'),
-                  'dedupe_horizon_seconds': 300,
-              }
-              (status_dir / f'run_{stamp}.json').write_text(json.dumps(row, indent=2, sort_keys=True) + '\n')
-              runs = ledger.setdefault('runs', [])
-              runs.append(row)
-              if len(runs) > 500:
-                  del runs[:-500]
-              ledger['last_status'] = row['status']
-              ledger['last_run_at_utc'] = row['run_at_utc']
-              ledger_path.parent.mkdir(parents=True, exist_ok=True)
-              ledger_path.write_text(json.dumps(ledger, indent=2, sort_keys=True) + '\n')
-              print(json.dumps(row))
-          PY
-      - name: Capture raw game-market snapshot when inside target window
-        id: capture
-        shell: bash
-        run: |
-          if [ '${{ steps.dedupe.outputs.skip }}' = 'true' ]; then
-            echo 'exit_code=0' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          set +e
-          python -I scripts/archive_raw_game_odds.py
-          code=$?
-          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
-          exit 0
-      - name: Persist ledger, status, and replayable raw odds to data branch
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ ! -d .data-branch/.git ] && [ ! -f .data-branch/.git ]; then
-            echo 'data branch worktree is unavailable' >&2
-            exit 98
-          fi
-          mkdir -p .data-branch/runtime/odds-budget
-          mkdir -p ".data-branch/runtime/archive-status/${{ steps.day.outputs.date }}"
-          if [ -f "$SPORTSEDGE_ODDS_BUDGET_LEDGER" ]; then
-            cp "$SPORTSEDGE_ODDS_BUDGET_LEDGER" .data-branch/runtime/odds-budget/ledger.json
-          fi
-          if [ -d "artifacts/raw_odds/status/${{ steps.day.outputs.date }}" ]; then
-            cp artifacts/raw_odds/status/${{ steps.day.outputs.date }}/*.json ".data-branch/runtime/archive-status/${{ steps.day.outputs.date }}/" 2>/dev/null || true
-          fi
-          if [ -d "artifacts/raw_odds/${{ steps.day.outputs.date }}" ]; then
-            mkdir -p ".data-branch/archive/raw_odds/${{ steps.day.outputs.date }}"
-            cp -R "artifacts/raw_odds/${{ steps.day.outputs.date }}/." ".data-branch/archive/raw_odds/${{ steps.day.outputs.date }}/"
-          fi
-          cd .data-branch
-          git config user.name 'sportsedge-archive-bot'
-          git config user.email 'sportsedge-archive-bot@users.noreply.github.com'
-          git add runtime/odds-budget/ledger.json runtime/archive-status archive/raw_odds || true
-          if ! git diff --cached --quiet; then
-            git commit -m "archive: persist MLB odds run ${{ github.run_id }}"
-            git push origin HEAD:data
-          fi
-      - name: Upload execution status, budget ledger, and raw capture
+      - name: Run canonical durable MLB archive lane
+        run: python -I scripts/run_mlb_archive_lane.py
+      - name: Upload archive execution evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -166,13 +42,3 @@ jobs:
             .cache/sportsedge/odds-budget/ledger.json
           if-no-files-found: error
           retention-days: 90
-      - name: Propagate capture failure after evidence upload
-        if: always()
-        shell: bash
-        run: |
-          code='${{ steps.capture.outputs.exit_code }}'
-          if [ -z "$code" ]; then
-            echo 'Capture step did not emit an exit code.' >&2
-            exit 99
-          fi
-          exit "$code"
