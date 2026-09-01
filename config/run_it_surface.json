@@ -18,12 +18,12 @@
     },
     "CFB": {
       "lane": "PREGAME_MODEL",
-      "automatic_command": null,
+      "automatic_command": ["python", "scripts/run_cfb_auto.py", "--output", "artifacts/run_it/cfb_card.json"],
       "library_entrypoint": "sportsedge.sports.cfb.run_machine:run_it_cfb",
       "market_surface": "config/football_market_surface.json",
-      "automatic_completeness": "LIBRARY_ONLY",
-      "blocker": "CFB_AUTO_CLI_AND_FROZEN_MODEL_ARTIFACT_REQUIRED",
-      "notes": "The canonical CFB machine supports AUTOMATIC acquisition with CFBD/Odds credentials, but the repo does not yet expose a frozen-model CLI artifact path."
+      "automatic_completeness": "EXECUTABLE_FAIL_CLOSED",
+      "blocker": "CFB_FROZEN_MODEL_ARTIFACT_AND_CREDENTIALS_REQUIRED",
+      "notes": "Automatic CFB execution is runnable through the canonical run machine. It never fits on the fly and fails closed unless a hash-bound frozen model artifact plus CFBD/Odds credentials are available; promotion remains evidence gated."
     },
     "PGA": {
       "lane": "PREGAME_AND_LIVE_MODEL",
