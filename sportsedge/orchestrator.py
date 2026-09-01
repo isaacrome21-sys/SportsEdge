@@ -32,6 +32,7 @@ class RunResult:
     readout_sha256: str | None = None
     readout_version: str | None = None
     engine_version: str | None = None
+    runtime_path: str | None = None
     seed_policy: str | None = None
     mc_paths: int | None = None
     book_key: str | None = None
@@ -112,6 +113,9 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], p
         for key in ("game_id", "market", "entity_id", "line", "side"):
             if key not in output and key in model_input:
                 output[key] = model_input[key]
+        runtime_path = _optional_text(output, "runtime_path")
+        if deployment.get("eligible") is True and runtime_path == "LEGACY_COMPAT":
+            raise OrchestrationError("LEGACY_COMPAT_PATH_NOT_PROMOTABLE")
         bind_candidate(output, quote, deployment)
         model_input_hash = _optional_sha256(output, "model_input_hash")
         distribution_sha256 = _optional_sha256(output, "distribution_sha256")
@@ -141,6 +145,7 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], p
             readout_sha256=readout_sha256,
             readout_version=readout_version,
             engine_version=engine_version,
+            runtime_path=runtime_path,
             seed_policy=seed_policy,
             mc_paths=mc_paths,
             book_key=book_key,

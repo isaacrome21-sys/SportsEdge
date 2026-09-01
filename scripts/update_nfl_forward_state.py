@@ -17,12 +17,9 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from zoneinfo import ZoneInfo
 
-from sportsedge.core.clv.nfl_forward_capture import (
-    build_forward_close_rows,
-    build_forward_decision_rows,
-)
+from sportsedge.core.clv.nfl_forward_capture import build_forward_close_rows
 from sportsedge.sports.nfl.history import normalize_nfl_rows, parse_schedule_csv
-from sportsedge.sports.nfl.m2 import derive_nfl_m2_score_distribution
+from sportsedge.sports.nfl.live_runner import run_canonical_nfl_live
 from sportsedge.sports.nfl.model_artifact import load_nfl_m2_model_artifact
 
 _EASTERN = ZoneInfo("America/New_York")
@@ -159,17 +156,23 @@ def _events(payload: Any) -> list[dict[str,Any]]:
     return rows
 
 
-def _event_for_game(game: Mapping[str,Any], events: list[dict[str,Any]]) -> dict[str,Any]:
-    home=str(game.get("provider_home_team") or "").strip(); away=str(game.get("provider_away_team") or "").strip()
-    start=_dt(game.get("game_start_ts"),"NFL_FORWARD_GAME_START_INVALID")
-    matches=[]
-    for event in events:
-        if str(event.get("home_team") or "").strip()!=home or str(event.get("away_team") or "").strip()!=away: continue
-        try: event_start=_dt(event.get("commence_time"),"NFL_FORWARD_EVENT_START_INVALID")
-        except SystemExit: continue
-        if event_start==start: matches.append(event)
-    if len(matches)!=1: raise SystemExit("NFL_FORWARD_PROVIDER_EVENT_NOT_FOUND" if not matches else "NFL_FORWARD_PROVIDER_EVENT_AMBIGUOUS")
-    return matches[0]
+def _canonical_live_error(exc: ValueError) -> SystemExit:
+    message=str(exc)
+    aliases={
+        "NFL_LIVE_FEATURE_PAYLOAD_INVALID":"NFL_FORWARD_LIVE_FEATURE_PAYLOAD_INVALID",
+        "NFL_LIVE_FEATURE_SOURCE_HASH_INVALID":"NFL_FORWARD_LIVE_FEATURE_SOURCE_HASH_INVALID",
+        "NFL_LIVE_FEATURE_ASOF_INVALID":"NFL_FORWARD_LIVE_FEATURE_ASOF_INVALID",
+        "NFL_LIVE_FEATURE_FROM_FUTURE":"NFL_FORWARD_LIVE_FEATURE_FROM_FUTURE",
+        "NFL_LIVE_FEATURE_GAMES_EMPTY":"NFL_FORWARD_LIVE_FEATURE_GAMES_EMPTY",
+        "NFL_LIVE_FEATURE_GAME_INVALID":"NFL_FORWARD_LIVE_FEATURE_GAME_INVALID",
+        "NFL_LIVE_FEATURE_GAME_ID_MISSING":"NFL_FORWARD_LIVE_FEATURE_GAME_ID_MISSING",
+        "NFL_LIVE_PROVIDER_TEAM_IDENTITY_MISSING":"NFL_FORWARD_PROVIDER_TEAM_IDENTITY_MISSING",
+        "NFL_LIVE_GAME_START_INVALID":"NFL_FORWARD_GAME_START_INVALID",
+        "NFL_LIVE_PROVIDER_EVENT_NOT_FOUND":"NFL_FORWARD_PROVIDER_EVENT_NOT_FOUND",
+        "NFL_LIVE_PROVIDER_EVENT_AMBIGUOUS":"NFL_FORWARD_PROVIDER_EVENT_AMBIGUOUS",
+        "NFL_LIVE_DECISION_MARKET_COUNT_INVALID":"NFL_FORWARD_DECISION_MARKET_COUNT_INVALID",
+    }
+    return SystemExit(aliases.get(message,message))
 
 
 def decision_mode(state_dir: Path, model_path: Path, features_path: Path, odds_path: Path, captured: datetime) -> dict[str,Any]:
@@ -186,8 +189,7 @@ def decision_mode(state_dir: Path, model_path: Path, features_path: Path, odds_p
     games=features.get("games")
     if not isinstance(games,list) or not games: raise SystemExit("NFL_FORWARD_LIVE_FEATURE_GAMES_EMPTY")
     events=_events(_json(odds_path)); existing_games={str(x.get("game_id") or "") for x in decisions}
-    added=[]
-    identity={"code_git_sha":model_sha,"model_id":artifact.get("model_id"),"feature_contract":artifact.get("feature_contract"),"model_artifact_sha256":model_hash}
+    pending_games=[]
     for raw in games:
         if not isinstance(raw,dict): raise SystemExit("NFL_FORWARD_LIVE_FEATURE_GAME_INVALID")
         gid=str(raw.get("game_id") or "").strip()
@@ -196,14 +198,25 @@ def decision_mode(state_dir: Path, model_path: Path, features_path: Path, odds_p
             prior=[x for x in decisions if str(x.get("game_id") or "")==gid]
             if len(prior)!=3: raise SystemExit(f"NFL_FORWARD_STATE_PARTIAL_GAME_DECISION:{gid}")
             continue
-        event=_event_for_game(raw,events)
-        distribution=derive_nfl_m2_score_distribution(model,raw)
-        rows=build_forward_decision_rows(raw,event,distribution,captured_at=captured,identity=identity)
-        if len(rows)!=3: raise SystemExit("NFL_FORWARD_DECISION_MARKET_COUNT_INVALID")
-        for row in rows:
-            row["live_feature_source_manifest_sha256"]=source_hash
-            row["live_feature_asof_ts"]=feature_asof.isoformat()
-        decisions.extend(rows); added.extend(rows); existing_games.add(gid)
+        pending_games.append(raw)
+
+    added=[]
+    if pending_games:
+        identity={"code_git_sha":model_sha,"model_id":artifact.get("model_id"),"feature_contract":artifact.get("feature_contract"),"model_artifact_sha256":model_hash}
+        canonical_features=dict(features)
+        canonical_features["games"]=pending_games
+        try:
+            added=run_canonical_nfl_live(
+                model=model,
+                live_features=canonical_features,
+                odds_events=events,
+                captured_at=captured,
+                identity=identity,
+            )
+        except ValueError as exc:
+            raise _canonical_live_error(exc) from exc
+        decisions.extend(added)
+
     _assert_unique(decisions,"DECISION"); _write_jsonl(decisions_path,decisions)
     return {"schema_version":1,"added_decisions":len(added),"qualifying_added":sum(str(x.get("gate_result")) in _PROMOTION_GATES for x in added),"decision_row_count":len(decisions),"model_code_git_sha":model_sha,"model_artifact_sha256":model_hash}
 

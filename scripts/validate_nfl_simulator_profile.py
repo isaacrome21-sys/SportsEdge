@@ -11,6 +11,11 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import sys
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 from sportsedge.core.simulate.football import KeyNumberMarginModel
 from sportsedge.core.validation.math_attestation import attest_validated_math

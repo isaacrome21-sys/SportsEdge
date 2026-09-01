@@ -8,7 +8,12 @@ import hashlib
 import io
 import json
 from pathlib import Path
+import sys
 from urllib.request import Request, urlopen
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 from sportsedge.sports.nfl.history import NFLVERSE_SCHEDULE_CSV
 from sportsedge.sports.nfl.real_history_audit import audit_nfl_history_rows

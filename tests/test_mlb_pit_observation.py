@@ -80,7 +80,7 @@ class MLBPITObservationTests(unittest.TestCase):
     def test_supported_market_surface_matches_acceptance_matrix(self):
         catalog = {row["market"] for row in build_acceptance_matrix()["markets"]}
         self.assertEqual(set(SUPPORTED_MARKETS), catalog)
-        self.assertEqual(len(catalog), 36)
+        self.assertEqual(len(catalog), 38)
 
     def test_provider_event_binds_only_unique_exact_team_time_match(self):
         quote = _archived_quote()

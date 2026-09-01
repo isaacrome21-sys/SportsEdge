@@ -40,7 +40,7 @@ class SharedGameEngineStage1Tests(unittest.TestCase):
         self.assertEqual(len({row["readout_sha256"] for row in outputs}), 3)
         self.assertNotEqual(outputs[0]["model_input_hash"], outputs[0]["distribution_sha256"])
 
-    def test_line_and_side_change_readout_not_stochastic_identity(self):
+    def test_line_and_side_are_post_distribution_readout_only(self):
         calls = []
 
         def counting_simulator(**kwargs):
@@ -52,10 +52,20 @@ class SharedGameEngineStage1Tests(unittest.TestCase):
         over_85 = engine({**base, "market": "TOTALS", "line": 8.5, "side": "OVER"})
         under_95 = engine({**base, "market": "TOTALS", "line": 9.5, "side": "UNDER"})
 
+        # The stochastic build happens once and receives none of the sportsbook
+        # proposition identity. The legacy simulator still requires total_line,
+        # so the shared engine supplies a neutral constant rather than the book line.
         self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0]["total_line"], 0.0)
+        for forbidden in ("market", "line", "side", "team_side", "american_odds", "sportsbook_price"):
+            self.assertNotIn(forbidden, calls[0])
+
+        # The proposition changes only the downstream readout. Stochastic identity
+        # and the frozen score distribution remain byte-identical.
         self.assertEqual(over_85["distribution_sha256"], under_95["distribution_sha256"])
         self.assertEqual(over_85["model_input_hash"], under_95["model_input_hash"])
         self.assertNotEqual(over_85["readout_sha256"], under_95["readout_sha256"])
+        self.assertNotEqual(over_85["model_p"], under_95["model_p"])
 
     def test_score_distribution_digest_excludes_total_line_readout_semantics(self):
         kwargs = {
