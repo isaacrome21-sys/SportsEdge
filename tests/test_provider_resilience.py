@@ -1,4 +1,4 @@
-import time
+import threading
 import unittest
 
 from sportsedge.provider_resilience import (
@@ -106,27 +106,25 @@ class ProviderResilienceTests(unittest.TestCase):
             ProviderSpec("NFL", "injury", "injuries", 1, TrustClass.MODEL_P_OBJECTIVE, 300),
         ]
         plans = build_provider_plans(specs)
+        barrier = threading.Barrier(2, timeout=1.0)
 
-        def slow(value):
+        def synchronized(value):
             def inner():
-                time.sleep(0.08)
+                barrier.wait()
                 return value
             return inner
 
-        started = time.monotonic()
         outcomes = acquire_domains_concurrently(
             plans,
             {
-                "WEATHER": {"weather": slow({"wind": 5})},
-                "INJURIES": {"injury": slow({"count": 0})},
+                "WEATHER": {"weather": synchronized({"wind": 5})},
+                "INJURIES": {"injury": synchronized({"count": 0})},
             },
             model_p_domains=("WEATHER", "INJURIES"),
             max_workers=2,
         )
-        elapsed = time.monotonic() - started
         self.assertEqual(set(outcomes), {"INJURIES", "WEATHER"})
         self.assertTrue(all(row.status == "AVAILABLE" for row in outcomes.values()))
-        self.assertLess(elapsed, 0.14)
 
 
 if __name__ == "__main__":
