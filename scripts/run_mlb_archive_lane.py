@@ -3,8 +3,9 @@
 
 This wrapper is intentionally standard-library only. It is designed to run inside
 an already-scheduled SportsEdge job so the archive does not require its own dense
-GitHub Actions scheduler. Every execution persists the budget ledger and status
-heartbeat to the ``data`` branch; raw snapshots are staged only when they exist.
+GitHub Actions scheduler. Every execution persists the budget ledger and a unique
+lane heartbeat to the ``data`` branch; raw snapshots are staged only when they
+exist.
 """
 from __future__ import annotations
 
@@ -24,13 +25,19 @@ LEDGER_ENV = "SPORTSEDGE_ODDS_BUDGET_LEDGER"
 DEFAULT_LEDGER = Path(".cache/sportsedge/odds-budget/ledger.json")
 RAW_ROOT = Path("artifacts/raw_odds")
 DEDUPE_SECONDS = 5 * 60
+DEFAULT_CAP = 12
 
 
 class ArchiveLaneError(RuntimeError):
     pass
 
 
-def _run(args: list[str], *, cwd: Path | None = None, check: bool = True) -> subprocess.CompletedProcess[str]:
+def _run(
+    args: list[str],
+    *,
+    cwd: Path | None = None,
+    check: bool = True,
+) -> subprocess.CompletedProcess[str]:
     result = subprocess.run(
         args,
         cwd=None if cwd is None else str(cwd),
@@ -52,6 +59,17 @@ def _ledger_path() -> Path:
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _daily_cap() -> int:
+    raw = os.environ.get("SPORTSEDGE_ODDS_DAILY_BUDGET_CREDITS", str(DEFAULT_CAP))
+    try:
+        cap = int(raw)
+    except Exception as exc:
+        raise ArchiveLaneError(f"invalid daily budget cap: {raw!r}") from exc
+    if cap < 0:
+        raise ArchiveLaneError(f"invalid negative daily budget cap: {cap}")
+    return cap
 
 
 def _prepare_data_worktree() -> None:
@@ -85,8 +103,61 @@ def _write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
-def _dedupe_recent_capture(*, ledger_path: Path, now: datetime) -> bool:
+def _normalized_ledger(*, ledger_path: Path, now: datetime) -> dict:
+    day = now.date().isoformat()
     ledger = _load_json(ledger_path)
+    if ledger.get("utc_date") != day:
+        ledger = {
+            "utc_date": day,
+            "cap_credits": _daily_cap(),
+            "credits_consumed_actual": 0,
+            "runs": [],
+        }
+    else:
+        ledger["utc_date"] = day
+        ledger["cap_credits"] = _daily_cap()
+        ledger.setdefault("credits_consumed_actual", 0)
+        ledger.setdefault("runs", [])
+    return ledger
+
+
+def _append_lane_heartbeat(
+    *,
+    ledger_path: Path,
+    now: datetime,
+    source: str,
+    run_id: str,
+    capture_exit_code: int,
+    status_root: Path = RAW_ROOT,
+) -> dict:
+    """Write an execution-level heartbeat even when the capture helper cannot."""
+    ledger = _normalized_ledger(ledger_path=ledger_path, now=now)
+    stamp = now.strftime("%Y%m%dT%H%M%S.%fZ")
+    row = {
+        "run_at_utc": now.isoformat(),
+        "status": "ARCHIVE_LANE_HEARTBEAT",
+        "archive_source": source,
+        "github_run_id": run_id,
+        "capture_exit_code": int(capture_exit_code),
+        "capture_succeeded": capture_exit_code == 0,
+    }
+    _write_json(
+        status_root / "status" / now.date().isoformat() / f"lane_{stamp}.json",
+        row,
+    )
+    runs = ledger.setdefault("runs", [])
+    runs.append(row)
+    if len(runs) > 500:
+        del runs[:-500]
+    ledger["last_status"] = row["status"]
+    ledger["last_run_at_utc"] = row["run_at_utc"]
+    _write_json(ledger_path, ledger)
+    print(json.dumps(row, sort_keys=True))
+    return row
+
+
+def _dedupe_recent_capture(*, ledger_path: Path, now: datetime) -> bool:
+    ledger = _normalized_ledger(ledger_path=ledger_path, now=now)
     source = None
     for row in reversed(list(ledger.get("runs") or [])):
         if not isinstance(row, dict) or row.get("status") != "CAPTURED":
@@ -127,10 +198,16 @@ def _dedupe_recent_capture(*, ledger_path: Path, now: datetime) -> bool:
 
 
 def _run_capture() -> int:
-    self_test = _run([sys.executable, "-I", "scripts/archive_raw_game_odds.py", "--self-test"], check=False)
+    self_test = _run(
+        [sys.executable, "-I", "scripts/archive_raw_game_odds.py", "--self-test"],
+        check=False,
+    )
     if self_test.returncode != 0:
         return self_test.returncode
-    return _run([sys.executable, "-I", "scripts/archive_raw_game_odds.py"], check=False).returncode
+    return _run(
+        [sys.executable, "-I", "scripts/archive_raw_game_odds.py"],
+        check=False,
+    ).returncode
 
 
 def _copy_tree_contents(source: Path, destination: Path) -> None:
@@ -147,6 +224,12 @@ def _copy_tree_contents(source: Path, destination: Path) -> None:
 
 def _stage_persistence_paths(repo: Path) -> None:
     """Stage required heartbeat paths and optional raw snapshots fail-closed."""
+    ledger = repo / "runtime/odds-budget/ledger.json"
+    status_root = repo / "runtime/archive-status"
+    if not ledger.is_file():
+        raise ArchiveLaneError("required durable archive ledger is missing")
+    if not status_root.is_dir() or not any(status_root.rglob("*.json")):
+        raise ArchiveLaneError("required durable archive status heartbeat is missing")
     _run(
         ["git", "add", "runtime/odds-budget/ledger.json", "runtime/archive-status"],
         cwd=repo,
@@ -167,27 +250,53 @@ def _persist(*, ledger_path: Path, day: str, run_id: str, source: str) -> None:
     status_destination.mkdir(parents=True, exist_ok=True)
     if status_source.is_dir():
         _copy_tree_contents(status_source, status_destination)
+    if not any(status_destination.glob("*.json")):
+        raise ArchiveLaneError("archive execution produced no status heartbeat")
 
     raw_source = RAW_ROOT / day
     if raw_source.is_dir():
         _copy_tree_contents(raw_source, WORKTREE / "archive/raw_odds" / day)
 
     _run(["git", "config", "user.name", "sportsedge-archive-bot"], cwd=WORKTREE)
-    _run(["git", "config", "user.email", "sportsedge-archive-bot@users.noreply.github.com"], cwd=WORKTREE)
+    _run(
+        [
+            "git",
+            "config",
+            "user.email",
+            "sportsedge-archive-bot@users.noreply.github.com",
+        ],
+        cwd=WORKTREE,
+    )
     _stage_persistence_paths(WORKTREE)
     staged = _run(["git", "diff", "--cached", "--quiet"], cwd=WORKTREE, check=False)
     if staged.returncode == 0:
-        return
+        raise ArchiveLaneError("archive execution produced no durable data-branch change")
     if staged.returncode != 1:
         raise ArchiveLaneError("unable to inspect staged archive persistence diff")
 
-    _run(["git", "commit", "-m", f"archive: persist MLB odds {source} run {run_id}"], cwd=WORKTREE)
+    _run(
+        [
+            "git",
+            "commit",
+            "-m",
+            f"archive: persist MLB odds {source} run {run_id}",
+        ],
+        cwd=WORKTREE,
+    )
     for attempt in range(1, 6):
-        pushed = _run(["git", "push", "origin", f"HEAD:{DATA_BRANCH}"], cwd=WORKTREE, check=False)
+        pushed = _run(
+            ["git", "push", "origin", f"HEAD:{DATA_BRANCH}"],
+            cwd=WORKTREE,
+            check=False,
+        )
         if pushed.returncode == 0:
             return
         _run(["git", "fetch", "origin", DATA_BRANCH], cwd=WORKTREE)
-        rebased = _run(["git", "rebase", f"origin/{DATA_BRANCH}"], cwd=WORKTREE, check=False)
+        rebased = _run(
+            ["git", "rebase", f"origin/{DATA_BRANCH}"],
+            cwd=WORKTREE,
+            check=False,
+        )
         if rebased.returncode != 0:
             _run(["git", "rebase", "--abort"], cwd=WORKTREE, check=False)
             raise ArchiveLaneError("data-branch archive persistence rebase conflict")
@@ -210,7 +319,9 @@ def _self_test() -> int:
         # still stage successfully; the old combined git-add returned 128 and
         # staged nothing in this exact state.
         _stage_persistence_paths(root)
-        names = set(_run(["git", "diff", "--cached", "--name-only"], cwd=root).stdout.splitlines())
+        names = set(
+            _run(["git", "diff", "--cached", "--name-only"], cwd=root).stdout.splitlines()
+        )
         assert "runtime/odds-budget/ledger.json" in names
         assert "runtime/archive-status/2026-09-01/run.json" in names
         assert not any(name.startswith("archive/raw_odds/") for name in names)
@@ -219,14 +330,44 @@ def _self_test() -> int:
         (root / "archive/raw_odds/2026-09-01/T0").mkdir(parents=True)
         (root / "archive/raw_odds/2026-09-01/T0/raw.json").write_text("[]\n")
         _stage_persistence_paths(root)
-        names = set(_run(["git", "diff", "--cached", "--name-only"], cwd=root).stdout.splitlines())
+        names = set(
+            _run(["git", "diff", "--cached", "--name-only"], cwd=root).stdout.splitlines()
+        )
         assert "archive/raw_odds/2026-09-01/T0/raw.json" in names
 
-    print(json.dumps({
-        "status": "SELF_TEST_OK",
-        "required_persistence_without_raw": "PASS",
-        "optional_raw_persistence": "PASS",
-    }, sort_keys=True))
+        # Regression: if the capture helper itself cannot run, the wrapper still
+        # creates a current-day ledger/status heartbeat that can be persisted.
+        heartbeat_root = root / "heartbeat"
+        heartbeat_ledger = heartbeat_root / "ledger.json"
+        heartbeat_now = datetime(2026, 9, 1, 14, 0, tzinfo=timezone.utc)
+        _append_lane_heartbeat(
+            ledger_path=heartbeat_ledger,
+            now=heartbeat_now,
+            source="self-test",
+            run_id="123",
+            capture_exit_code=17,
+            status_root=heartbeat_root / "artifacts/raw_odds",
+        )
+        heartbeat = _load_json(heartbeat_ledger)
+        assert heartbeat["utc_date"] == "2026-09-01"
+        assert heartbeat["last_status"] == "ARCHIVE_LANE_HEARTBEAT"
+        assert heartbeat["runs"][-1]["capture_exit_code"] == 17
+        status_files = list(
+            (heartbeat_root / "artifacts/raw_odds/status/2026-09-01").glob("lane_*.json")
+        )
+        assert len(status_files) == 1
+
+    print(
+        json.dumps(
+            {
+                "status": "SELF_TEST_OK",
+                "required_persistence_without_raw": "PASS",
+                "optional_raw_persistence": "PASS",
+                "capture_failure_heartbeat": "PASS",
+            },
+            sort_keys=True,
+        )
+    )
     return 0
 
 
@@ -235,9 +376,11 @@ def main() -> int:
         return _self_test()
 
     run_id = os.environ.get("GITHUB_RUN_ID", "local")
-    source = os.environ.get("SPORTSEDGE_ARCHIVE_SOURCE", "archive-lane").strip() or "archive-lane"
+    source = (
+        os.environ.get("SPORTSEDGE_ARCHIVE_SOURCE", "archive-lane").strip()
+        or "archive-lane"
+    )
     now = _utcnow()
-    day = now.date().isoformat()
     try:
         _prepare_data_worktree()
         ledger = _restore_ledger()
@@ -245,12 +388,35 @@ def main() -> int:
             capture_code = 0
         else:
             capture_code = _run_capture()
-        _persist(ledger_path=ledger, day=day, run_id=run_id, source=source)
+
+        # This wrapper-level heartbeat is intentionally independent of the
+        # capture helper's own status writer. It closes the failure mode where
+        # the helper's self-test or startup fails before creating a status row.
+        heartbeat_now = _utcnow()
+        _append_lane_heartbeat(
+            ledger_path=ledger,
+            now=heartbeat_now,
+            source=source,
+            run_id=run_id,
+            capture_exit_code=capture_code,
+        )
+        _persist(
+            ledger_path=ledger,
+            day=heartbeat_now.date().isoformat(),
+            run_id=run_id,
+            source=source,
+        )
     except Exception as exc:
-        print(json.dumps({
-            "status": "ARCHIVE_PERSISTENCE_FAILED",
-            "error": f"{type(exc).__name__}:{exc}",
-        }, sort_keys=True), file=sys.stderr)
+        print(
+            json.dumps(
+                {
+                    "status": "ARCHIVE_PERSISTENCE_FAILED",
+                    "error": f"{type(exc).__name__}:{exc}",
+                },
+                sort_keys=True,
+            ),
+            file=sys.stderr,
+        )
         return 98
     return capture_code
 
