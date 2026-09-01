@@ -6,6 +6,7 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 
+from sportsedge.sports.cfb.classification_policy import CFBClassificationError
 from sportsedge.sports.cfb.joint_model import (
     CFBJointScoreModel, CFBModelError, CFB_FEATURE_CONTRACT, CFB_JOINT_MODEL_ID,
     _feature_names, price_cfb_game_markets, simulate_cfb_joint_distribution,
@@ -22,7 +23,7 @@ START = datetime(2026, 8, 29, 16, 0, tzinfo=timezone.utc)
 
 def metric(team, bump=0.0):
     return CFBTeamMetrics(
-        team=team, season=2026, through_week=0, sample_source="PRIOR_SEASON_FALLBACK",
+        team=team, season=2025, through_week=99, sample_source="PRIOR_SEASON_FALLBACK",
         off_ppa_rush=.11+bump, off_ppa_dropback=.19+bump, def_ppa_rush_allowed=.05-bump,
         def_ppa_dropback_allowed=.08-bump, off_success_rate=.46+bump/10,
         def_success_rate_allowed=.42-bump/10, standard_down_ppa=.13+bump,
@@ -139,21 +140,23 @@ class MachineTests(unittest.TestCase):
     def fm(self,**k): return dict(self.metrics)
     def fw(self,**k): return {"1001":dict(game().weather)}
     def fo(self,**k): return list(self.q)
+    def manual(self, **kwargs):
+        return run_cfb_machine(fbs_team_rows=self.teams, **kwargs)
 
     def test_manual_hybrid_auto_results_are_byte_identical(self):
         common=dict(season=2026,week=1,model=model(),now=NOW,n_paths=500,root_seed=44)
-        m=run_cfb_machine(mode="MANUAL",games=self.games,metrics=self.metrics,quotes=self.q,**common)
+        m=self.manual(mode="MANUAL",games=self.games,metrics=self.metrics,quotes=self.q,**common)
         h=run_cfb_machine(mode="HYBRID",quotes=self.q,cfbd_api_key="cfbd",team_fetcher=self.ft,game_fetcher=self.fg,metric_fetcher=self.fm,weather_fetcher=self.fw,**common)
         a=run_cfb_machine(mode="AUTOMATIC",cfbd_api_key="cfbd",odds_api_key="odds",team_fetcher=self.ft,game_fetcher=self.fg,metric_fetcher=self.fm,weather_fetcher=self.fw,odds_fetcher=self.fo,**common)
         self.assertEqual(m.results,h.results); self.assertEqual(m.results,a.results); self.assertEqual(m.summary,a.summary)
 
     def test_all_three_readouts_share_one_distribution_and_seed(self):
-        r=run_cfb_machine(mode="MANUAL",season=2026,week=1,model=model(),now=NOW,games=self.games,metrics=self.metrics,quotes=self.q,n_paths=500,root_seed=44)
+        r=self.manual(mode="MANUAL",season=2026,week=1,model=model(),now=NOW,games=self.games,metrics=self.metrics,quotes=self.q,n_paths=500,root_seed=44)
         self.assertEqual({x.market for x in r.results},{"MONEYLINE","SPREAD","TOTAL"})
         self.assertEqual(len({x.distribution_sha256 for x in r.results}),1); self.assertEqual(len({x.seed for x in r.results}),1)
 
     def test_devig_both_sides_hold_and_promotion_block(self):
-        r=run_cfb_machine(mode="MANUAL",season=2026,week=1,model=model(),now=NOW,games=self.games,metrics=self.metrics,quotes=self.q,n_paths=100)
+        r=self.manual(mode="MANUAL",season=2026,week=1,model=model(),now=NOW,games=self.games,metrics=self.metrics,quotes=self.q,n_paths=100)
         for market in ("MONEYLINE","SPREAD","TOTAL"):
             xs=[x for x in r.results if x.market==market]
             self.assertAlmostEqual(sum(x.fair_market_p for x in xs),1.0,places=12)
@@ -163,14 +166,40 @@ class MachineTests(unittest.TestCase):
 
     def test_no_engine_never_becomes_pass(self):
         q=self.q[0].to_dict(); q.update(market="FIRST_HALF_TOTAL",side="OVER",line=24.5)
-        r=run_cfb_machine(mode="MANUAL",season=2026,week=1,model=model(),now=NOW,games=self.games,metrics=self.metrics,quotes=[q],n_paths=10).results[0]
+        r=self.manual(mode="MANUAL",season=2026,week=1,model=model(),now=NOW,games=self.games,metrics=self.metrics,quotes=[q],n_paths=10).results[0]
         self.assertEqual((r.engine_status,r.bet_status,r.reason),("NO_ENGINE","BLOCKED","NO_ENGINE")); self.assertIsNone(r.model_p)
 
     def test_stale_quote_blocks_market_layer_not_engine(self):
         stale=[replace(q,retrieved_at=(NOW-timedelta(hours=1)).isoformat()) for q in self.q]
-        r=run_cfb_machine(mode="MANUAL",season=2026,week=1,model=model(),now=NOW,games=self.games,metrics=self.metrics,quotes=stale,n_paths=20)
+        r=self.manual(mode="MANUAL",season=2026,week=1,model=model(),now=NOW,games=self.games,metrics=self.metrics,quotes=stale,n_paths=20)
         self.assertTrue(all(x.engine_status=="PRICED" and x.reason=="CFB_QUOTE_STALE" for x in r.results))
         self.assertTrue(all(x.fair_market_p is None for x in r.results))
+
+    def test_manual_requires_frozen_fbs_membership(self):
+        with self.assertRaisesRegex(Exception,"CFB_MANUAL_FBS_MEMBERSHIP_REQUIRED"):
+            run_cfb_machine(mode="MANUAL",season=2026,week=1,model=model(),now=NOW,
+                            games=self.games,metrics=self.metrics,quotes=self.q,n_paths=10)
+
+    def test_manual_fcs_or_unknown_opponent_fails_before_model(self):
+        fbs_only=[self.teams[0]]
+        with self.assertRaisesRegex(CFBClassificationError,"CFB_FBS_ONLY_POLICY:1001:Beta Tech"):
+            run_cfb_machine(mode="MANUAL",season=2026,week=1,model=model(),now=NOW,
+                            games=self.games,metrics=self.metrics,quotes=self.q,
+                            fbs_team_rows=fbs_only,n_paths=10)
+
+    def test_fetched_modes_reject_non_fbs_game_before_weather_metrics_or_odds(self):
+        bad_game=replace(game(),weather=None,away_team="FCS College")
+        calls={"weather":0,"metrics":0,"odds":0}
+        def fg_bad(**k): return [bad_game]
+        def should_not_weather(**k): calls["weather"]+=1; return {}
+        def should_not_metrics(**k): calls["metrics"]+=1; return {}
+        def should_not_odds(**k): calls["odds"]+=1; return []
+        with self.assertRaisesRegex(CFBClassificationError,"CFB_FBS_ONLY_POLICY:1001:FCS College"):
+            run_cfb_machine(mode="AUTOMATIC",season=2026,week=1,model=model(),now=NOW,
+                            cfbd_api_key="cfbd",odds_api_key="odds",team_fetcher=self.ft,
+                            game_fetcher=fg_bad,weather_fetcher=should_not_weather,
+                            metric_fetcher=should_not_metrics,odds_fetcher=should_not_odds,n_paths=10)
+        self.assertEqual(calls,{"weather":0,"metrics":0,"odds":0})
 
     def test_automatic_requires_real_credentials(self):
         with self.assertRaisesRegex(Exception,"CFBD_API_KEY_REQUIRED"):

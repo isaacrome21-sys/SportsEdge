@@ -51,6 +51,7 @@ jobs:
             sportsedge/core/promotion/football_registry.py \
             sportsedge/core/validation/nfl_ci_attestation.py \
             sportsedge/sports/nfl/m2.py \
+            sportsedge/sports/nfl/model_artifact.py \
             sportsedge/sports/nfl/m2_history_features.py \
             sportsedge/sports/nfl/m2_history_policy.py \
             sportsedge/sports/nfl/historical_validation.py \
@@ -106,6 +107,31 @@ jobs:
           --neutral-site-policy exclude_from_evaluation
           --out artifacts/football/nfl_production_validation.json
           --manifest-out artifacts/football/nfl_source_manifest.json
+          --model-out artifacts/football/nfl_m2_model.json
+
+      - name: Assert fitted M2 artifact exists and is exact-head bound
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          from sportsedge.sports.nfl.model_artifact import load_nfl_m2_model_artifact
+
+          model_path = Path('artifacts/football/nfl_m2_model.json')
+          manifest_path = Path('artifacts/football/nfl_source_manifest.json')
+          if not model_path.is_file():
+              raise SystemExit('NFL_M2_MODEL_ARTIFACT_MISSING_AFTER_FIT')
+          if not manifest_path.is_file():
+              raise SystemExit('NFL_SOURCE_MANIFEST_MISSING_AFTER_FIT')
+          manifest = json.loads(manifest_path.read_text())
+          payload = json.loads(model_path.read_text())
+          model = load_nfl_m2_model_artifact(
+              payload,
+              expected_code_git_sha=os.environ['EVIDENCE_GIT_SHA'].lower(),
+              expected_source_manifest_sha256=manifest['manifest_sha256'],
+          )
+          if not model.train_seasons:
+              raise SystemExit('NFL_M2_MODEL_ARTIFACT_TRAIN_SEASONS_EMPTY')
+          PY
 
       - name: Build schedule audit from the same frozen schedule bytes
         run: >-
@@ -174,6 +200,9 @@ jobs:
                   for p in paths
               ],
           }
+          names = {row['path'] for row in payload['artifacts']}
+          if 'nfl_m2_model.json' not in names:
+              raise SystemExit('NFL_M2_MODEL_ARTIFACT_NOT_MANIFESTED')
           Path('artifacts/football/nfl_promotion_evidence_manifest.json').write_text(
               json.dumps(payload, indent=2, sort_keys=True) + '\n'
           )

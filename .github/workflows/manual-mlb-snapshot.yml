@@ -13,6 +13,7 @@ on:
       - scripts/run_manual_mlb_snapshot.py
       - tests/test_manual_quote_contract.py
       - tests/test_manual_mlb_live_guards.py
+      - tests/fixtures/manual_mlb_snapshot_supported.json
       - manual_inputs/mlb/**
       - .github/workflows/manual-mlb-snapshot.yml
   pull_request:
@@ -26,6 +27,7 @@ on:
       - scripts/run_manual_mlb_snapshot.py
       - tests/test_manual_quote_contract.py
       - tests/test_manual_mlb_live_guards.py
+      - tests/fixtures/manual_mlb_snapshot_supported.json
       - manual_inputs/mlb/**
       - .github/workflows/manual-mlb-snapshot.yml
   workflow_dispatch:
@@ -64,9 +66,9 @@ jobs:
           RUN_DATE="$(TZ=America/Chicago date +%F)"
 
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            mapfile -t FIXTURES < <(find manual_inputs/mlb -maxdepth 1 -type f -name '*.json' | sort)
-            [[ ${#FIXTURES[@]} -gt 0 ]] || { echo "NO_REGRESSION_FIXTURE" >&2; exit 1; }
-            echo "path=${FIXTURES[-1]}" >> "$GITHUB_OUTPUT"
+            REGRESSION_FIXTURE="tests/fixtures/manual_mlb_snapshot_supported.json"
+            [[ -f "$REGRESSION_FIXTURE" ]] || { echo "NO_REGRESSION_FIXTURE: $REGRESSION_FIXTURE" >&2; exit 1; }
+            echo "path=$REGRESSION_FIXTURE" >> "$GITHUB_OUTPUT"
             echo "run_date=$RUN_DATE" >> "$GITHUB_OUTPUT"
             echo "live=false" >> "$GITHUB_OUTPUT"
             exit 0

@@ -140,10 +140,12 @@ class NFLIntegratedRegulationTests(unittest.TestCase):
             field_goal_attempt_rate=1.0, pace_seconds_mean=20.0,
         )
         home_field = NFLFieldPositionProfile(
-            team="HOME", deep_touchback_rate=1.0,
+            team="HOME", deep_touchback_rate=1.0, landing_touchback_rate=0.0,
             onside_attempt_rate_when_trailing=1.0, onside_recovery_rate=1.0,
         )
-        away_field = NFLFieldPositionProfile(team="AWAY", deep_touchback_rate=1.0)
+        away_field = NFLFieldPositionProfile(
+            team="AWAY", deep_touchback_rate=1.0, landing_touchback_rate=0.0,
+        )
         result = NFLIntegratedRegulationSimulator(
             game_id="NFL_ONSIDE_TEST", home_team="HOME", away_team="AWAY",
             home_profile=drive, away_profile=drive,

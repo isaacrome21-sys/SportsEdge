@@ -69,8 +69,11 @@ class AutoNativeAdditionalOddsTests(unittest.TestCase):
                 slate_date_ct="2026-08-11",
                 generated_at_utc=NOW.isoformat(),
                 run_status="NO_QUOTES",
+                card_status="NO_BETS",
                 results=(),
+                coverage_slots=(),
                 source_failures=(),
+                market_surface_version="test-surface-v1",
             )
 
         with patch("sportsedge.auto_native_odds.fetch_schedule", return_value=[self._game()]), patch(
@@ -80,6 +83,9 @@ class AutoNativeAdditionalOddsTests(unittest.TestCase):
         ) as player_fetch, patch(
             "sportsedge.auto_native_odds.fetch_mlb_game_quotes", return_value=game
         ) as game_fetch, patch(
+            "sportsedge.auto_native_odds.fetch_mlb_team_total_quotes",
+            return_value=SimpleNamespace(quotes=(), failures=()),
+        ) as team_total_fetch, patch(
             "sportsedge.auto_native_odds.fetch_mlb_additional_quotes", return_value=additional
         ) as additional_fetch, patch(
             "sportsedge.auto_native_odds.run_auto_joint_mlb", side_effect=fake_runner
@@ -97,6 +103,7 @@ class AutoNativeAdditionalOddsTests(unittest.TestCase):
         )
         player_fetch.assert_called_once()
         game_fetch.assert_called_once()
+        team_total_fetch.assert_called_once()
         additional_fetch.assert_called_once()
         self.assertTrue(
             any(

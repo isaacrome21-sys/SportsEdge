@@ -11,17 +11,20 @@ class FootballRoadmapTenToTwelveTests(unittest.TestCase):
             CLVDecision("2025-09-01T12:00:00Z", "g1", "cfb", "spread", "home", "book", -3.0, -110, 0.56, 0.52, 0.04, 0.02, 0.5, "OFFICIAL"),
             CLVDecision("2025-09-01T12:05:00Z", "g2", "cfb", "spread", "away", "book", 7.0, -105, 0.51, 0.50, 0.01, 0.005, 0.0, "REJECTED_EDGE"),
         ]
+        # CLV probability must be measured at the original decision threshold.
+        # The market itself may close at a different line, but probability_line
+        # binds the quoted no-vig probability to the exact wager contract.
         closes = [
-            CLVClose("g1", "spread", "home", -3.5, -115, 0.55),
-            CLVClose("g2", "spread", "away", 6.5, -110, 0.49),
+            CLVClose("g1", "spread", "home", -3.5, -115, 0.55, probability_line=-3.0),
+            CLVClose("g2", "spread", "away", 6.5, -110, 0.49, probability_line=7.0),
         ]
         scored = score_clv(decisions, closes)
         self.assertAlmostEqual(scored[0].clv, 0.03)
         self.assertAlmostEqual(scored[1].clv, -0.01)
         report = replay_clv_week(decisions, closes)
-        self.assertIn(("cfb", "spread", "OFFICIAL"), report)
+        self.assertIn(("cfb", "spread", "PROMOTION"), report)
         self.assertIn(("cfb", "spread", "REJECTED"), report)
-        self.assertEqual(report[("cfb", "spread", "OFFICIAL")].n, 1)
+        self.assertEqual(report[("cfb", "spread", "PROMOTION")].n, 1)
         self.assertEqual(report, summarize_clv(scored))
 
     def test_task_11_promotion_uses_clv_not_roi_and_can_emit_zero(self):

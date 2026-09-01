@@ -87,8 +87,14 @@ def run_auto_joint_mlb(
     ]
     feature_rows: list[dict[str, Any]] = []
     feature_failures: dict[tuple[str, str, str], str] = {}
+    resolved_feature_identities: set[tuple[str, str, str]] = set()
     for q in usable_quotes:
         identity = (str(q["game_id"]), str(q["entity_id"]), str(q["market"]))
+        # Paired prices are two sportsbook propositions for one predictive
+        # state. Normalize them to one canonical feature row before entering
+        # the shared card core, matching manual/hybrid semantics exactly.
+        if identity in resolved_feature_identities:
+            continue
         game = next((g for g in games if str(g.game_pk) == identity[0]), None)
         if game is None:
             continue
@@ -97,6 +103,7 @@ def run_auto_joint_mlb(
                 games=[game], quotes=[q], source=source, target_date=slate_date
             )
             feature_rows.extend(rows)
+            resolved_feature_identities.add(identity)
         except Exception as exc:
             feature_failures[identity] = f"{type(exc).__name__}: {exc}"
 
