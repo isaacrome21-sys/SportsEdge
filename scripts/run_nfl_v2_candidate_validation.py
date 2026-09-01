@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run isolated NFL M2 V2 candidate validation on exact production history inputs."""
+"""Run isolated NFL V2 candidate validation on exact production history inputs."""
 from __future__ import annotations
 
 import argparse
@@ -29,6 +29,7 @@ from sportsedge.sports.nfl.history import normalize_nfl_rows, parse_schedule_csv
 from sportsedge.sports.nfl.m2_history_features import fit_nfl_prior_decay_curves
 from sportsedge.sports.nfl.m2_history_policy import build_nfl_m2_history_rows
 from sportsedge.sports.nfl.m2_v2_validation import build_nfl_m2_v2_candidate_evidence
+from sportsedge.sports.nfl.m2_v2b_validation import build_nfl_m2_v2b_candidate_evidence
 from sportsedge.sports.nfl.source_manifest import manifest_sha256
 
 _GIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -69,6 +70,36 @@ def _assert_source(path: Path, expected: str, label: str) -> None:
         raise SystemExit(f"NFL_M2_V2_SOURCE_FILE_HASH_MISMATCH:{label}")
 
 
+def _attach_run_provenance(
+    evidence: dict,
+    *,
+    git_sha: str,
+    args: argparse.Namespace,
+    history_row_count: int,
+    issue_count_before: int,
+    override_count: int,
+    stadium_bridge_count: int,
+) -> dict:
+    evidence.update({
+        "code_git_sha": git_sha,
+        "season_range": [args.start_season, args.end_season],
+        "point_in_time_history_row_count": history_row_count,
+        "neutral_site_policy": args.neutral_site_policy,
+        "source_manifest_path": str(args.source_manifest),
+        "starting_qb_coverage_issue_count_before_override": issue_count_before,
+        "starting_qb_coverage_issue_count": 0,
+        "starting_qb_override_count": override_count,
+        "stadium_home_origin_bridge_count": stadium_bridge_count,
+        "production_registry_consumes_this_artifact": False,
+    })
+    return evidence
+
+
+def _write(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--schedule-file", type=Path, required=True)
@@ -86,6 +117,7 @@ def main() -> int:
     parser.add_argument("--kernel-scale", type=float, default=1.0)
     parser.add_argument("--neutral-site-policy", choices=("error", "exclude_from_evaluation"), default="exclude_from_evaluation")
     parser.add_argument("--out", type=Path, default=Path("artifacts/football/nfl_m2_v2_candidate_validation.json"))
+    parser.add_argument("--v2b-out", type=Path, default=Path("artifacts/football/nfl_m2_v2b_candidate_validation.json"))
     args = parser.parse_args()
 
     git_sha = str(args.git_sha).strip().lower()
@@ -158,35 +190,51 @@ def main() -> int:
     if not history_rows:
         raise SystemExit("NFL_M2_V2_HISTORY_ROWS_EMPTY")
 
-    evidence = build_nfl_m2_v2_candidate_evidence(
-        history_rows,
-        source_manifest_sha256=manifest_hash,
-        min_train_seasons=args.min_train_seasons,
-        ridge_alpha=args.ridge_alpha,
-        kernel_scale=args.kernel_scale,
+    common = {
+        "git_sha": git_sha,
+        "args": args,
+        "history_row_count": len(history_rows),
+        "issue_count_before": len(before),
+        "override_count": len(applied),
+        "stadium_bridge_count": len(stadium_bridges),
+    }
+    v2a = _attach_run_provenance(
+        build_nfl_m2_v2_candidate_evidence(
+            history_rows,
+            source_manifest_sha256=manifest_hash,
+            min_train_seasons=args.min_train_seasons,
+            ridge_alpha=args.ridge_alpha,
+            kernel_scale=args.kernel_scale,
+        ),
+        **common,
     )
-    evidence.update({
-        "code_git_sha": git_sha,
-        "season_range": [args.start_season, args.end_season],
-        "point_in_time_history_row_count": len(history_rows),
-        "neutral_site_policy": args.neutral_site_policy,
-        "source_manifest_path": str(args.source_manifest),
-        "starting_qb_coverage_issue_count_before_override": len(before),
-        "starting_qb_coverage_issue_count": 0,
-        "starting_qb_override_count": len(applied),
-        "stadium_home_origin_bridge_count": len(stadium_bridges),
-        "production_registry_consumes_this_artifact": False,
-    })
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    v2b = _attach_run_provenance(
+        build_nfl_m2_v2b_candidate_evidence(
+            history_rows,
+            source_manifest_sha256=manifest_hash,
+            min_train_seasons=args.min_train_seasons,
+            ridge_alpha=args.ridge_alpha,
+            kernel_scale=args.kernel_scale,
+        ),
+        **common,
+    )
+    _write(args.out, v2a)
+    _write(args.v2b_out, v2b)
+
     print(json.dumps({
-        "status": evidence["status"],
-        "model_id": evidence["model_id"],
+        "status": "V2_CANDIDATE_DIAGNOSTICS_COMPLETE",
         "history_rows": len(history_rows),
-        "fold_count": evidence["fold_count"],
-        "candidate_historical_evidence": evidence["candidate_historical_evidence"],
-        "signed_key_probability": evidence["candidate_distribution_profile"]["signed_key_probability"],
-        "production_registry_consumes_this_artifact": False,
+        "production_registry_consumes_these_artifacts": False,
+        "v2a": {
+            "model_id": v2a["model_id"],
+            "candidate_historical_evidence": v2a["candidate_historical_evidence"],
+            "signed_key_probability": v2a["candidate_distribution_profile"]["signed_key_probability"],
+        },
+        "v2b": {
+            "model_id": v2b["model_id"],
+            "candidate_historical_evidence": v2b["candidate_historical_evidence"],
+            "signed_key_probability": v2b["candidate_distribution_profile"]["signed_key_probability"],
+        },
     }, sort_keys=True))
     return 0
 
