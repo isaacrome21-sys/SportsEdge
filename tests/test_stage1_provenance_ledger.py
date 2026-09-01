@@ -9,16 +9,16 @@ from sportsedge.runtime import result_to_dict
 from sportsedge.unified_card import UnifiedCardResult, _convert, unified_result_to_dict
 
 
-QUOTE_TS = datetime(2026, 8, 24, 14, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 8, 31, 12, 0, tzinfo=timezone.utc)
 
 
-def _quote(american_odds):
+def _quote(odds: int) -> dict:
     return {
-        "american_odds": american_odds,
-        "book_key": "synthetic_test_book",
-        "sportsbook": "Synthetic Test Book",
-        "retrieved_at": QUOTE_TS,
-        "offer_id": "synthetic-offer",
+        "american_odds": odds,
+        "book_key": "fixture-book",
+        "sportsbook": "FIXTURE",
+        "retrieved_at": NOW,
+        "offer_id": f"fixture-{odds}",
     }
 
 
@@ -76,13 +76,14 @@ class Stage1ProvenanceLedgerTests(unittest.TestCase):
                 "line": 0.0, "side": "HOME", "model_p": 0.51, "push_p": 0.0,
                 **provenance,
             },
-            ingestion_now=SimpleNamespace(),
-            finalization_now=SimpleNamespace(),
+            ingestion_now=NOW,
+            finalization_now=NOW,
         )
 
         self.assertEqual(result.bet_status, "PASS")
-        self.assertEqual(result.book_key, "synthetic_test_book")
-        self.assertEqual(result.quote_retrieved_at, QUOTE_TS.isoformat())
+        self.assertEqual(result.book_key, "fixture-book")
+        self.assertEqual(result.sportsbook, "FIXTURE")
+        self.assertEqual(result.quote_retrieved_at, NOW.isoformat())
         for key, value in provenance.items():
             with self.subTest(key=key):
                 self.assertEqual(getattr(result, key), value)
@@ -103,8 +104,8 @@ class Stage1ProvenanceLedgerTests(unittest.TestCase):
                 "line": 0.0, "side": "HOME", "model_p": 0.51,
                 "distribution_sha256": "not-a-sha",
             },
-            ingestion_now=SimpleNamespace(),
-            finalization_now=SimpleNamespace(),
+            ingestion_now=NOW,
+            finalization_now=NOW,
         )
         self.assertEqual(result.bet_status, "BLOCKED")
         self.assertIsNone(result.model_p)
@@ -129,8 +130,8 @@ class Stage1ProvenanceLedgerTests(unittest.TestCase):
                 "seed_policy": "analytic_weighted_empirical_joint_game_rows",
                 "mc_paths": -1,
             },
-            ingestion_now=SimpleNamespace(),
-            finalization_now=SimpleNamespace(),
+            ingestion_now=NOW,
+            finalization_now=NOW,
         )
         self.assertEqual(result.bet_status, "BLOCKED")
         self.assertIsNone(result.model_p)
