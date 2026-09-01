@@ -10,8 +10,15 @@ on:
   pull_request:
     paths:
       - config/run_it_surface.json
+      - config/mlb_market_catalog.json
+      - config/football_market_surface.json
+      - config/pga_market_surface.json
+      - config/ufc_market_surface.json
+      - config/deployments.json
       - sportsedge/run_it_control.py
+      - sportsedge/live_markets.py
       - scripts/run_it_all.py
+      - scripts/audit_market_coverage.py
       - ops/run_it_request.json
       - tests/test_run_it_control.py
       - .github/workflows/run-it-control-plane.yml
@@ -33,11 +40,13 @@ jobs:
         run: python -m pytest -q tests/test_run_it_control.py
       - name: Audit every declared RUN IT lane
         run: python scripts/run_it_all.py --audit --output artifacts/run_it/audit.json
+      - name: Audit cross-sport market coverage
+        run: python scripts/audit_market_coverage.py
       - name: Upload RUN IT audit
         uses: actions/upload-artifact@v4
         with:
           name: run-it-audit
-          path: artifacts/run_it/audit.json
+          path: artifacts/run_it
 
   execute:
     if: github.event_name != 'pull_request'
