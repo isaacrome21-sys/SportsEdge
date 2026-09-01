@@ -15,6 +15,7 @@ from .context_autopull import ContextObservation, NFLContextError
 from .player_stats_workload_source import build_prior_player_workload_inputs
 from .run_it_context import build_run_it_context
 from .snap_workload_source import build_prior_snap_workload_inputs
+from .team_tendency_source import build_prior_team_tendency_providers
 
 
 def _utc(value: Any, field: str) -> datetime:
@@ -116,14 +117,17 @@ def build_nfl_auto_context_slate(
     player_stat_rows: Iterable[Mapping[str, Any]] | None = None,
     player_stat_source_uri: str | None = None,
     player_stat_source_sha256: str | None = None,
+    team_stat_rows: Iterable[Mapping[str, Any]] | None = None,
+    team_stat_source_uri: str | None = None,
+    team_stat_source_sha256: str | None = None,
     opener: Callable = urlopen,
 ) -> dict[str, Any]:
     """Discover an upcoming slate and collect canonical objective context.
 
-    Optional depth, snap-count and player-stat inputs must carry source provenance.
-    Both workload sources are strictly prior-week because neither file exposes an
-    authoritative per-row event timestamp safe for same-week ordering. PFR and GSIS
-    identities stay separate; no fuzzy crosswalk is performed here.
+    Optional depth, snap-count, player-stat and team-stat inputs must carry source
+    provenance. Workload and tendency sources are strictly prior-week because the
+    release rows expose week but not authoritative per-row event timestamps safe
+    for same-week ordering. PFR and GSIS identities remain separate.
     """
     requested = str(mode or "").strip().upper()
     if requested not in {"AUTO", "HYBRID"}:
@@ -145,12 +149,17 @@ def build_nfl_auto_context_slate(
     stats = None if player_stat_rows is None else [dict(row) for row in player_stat_rows]
     if stats is not None and (not player_stat_source_uri or not player_stat_source_sha256):
         raise NFLContextError("player stat provenance required")
+    team_stats = None if team_stat_rows is None else [dict(row) for row in team_stat_rows]
+    if team_stats is not None and (not team_stat_source_uri or not team_stat_source_sha256):
+        raise NFLContextError("team stat provenance required")
 
     bundles: list[dict[str, Any]] = []
     for discovered in plan["games"]:
         game_id = str(discovered["game_id"])
         game = build_nfl_auto_game_context(game_id=game_id, as_of=as_of, opener=opener)
-        team_ids = (str(game.get("home_team_id") or ""), str(game.get("away_team_id") or ""))
+        home_team = str(game.get("home_team_id") or "")
+        away_team = str(game.get("away_team_id") or "")
+        team_ids = (home_team, away_team)
         if depth is not None:
             personnel = build_depth_chart_personnel_provider(
                 game_id=game_id,
@@ -189,6 +198,22 @@ def build_nfl_auto_context_slate(
             ))
         if workload_inputs:
             game["workload_inputs"] = workload_inputs
+        if team_stats is not None:
+            if season is None or week is None:
+                raise NFLContextError(f"team stats schedule season/week missing:{game_id}")
+            coaching, defensive = build_prior_team_tendency_providers(
+                rows=team_stats,
+                season=int(season),
+                target_week=int(week),
+                home_team=home_team,
+                away_team=away_team,
+                source_uri=str(team_stat_source_uri),
+                source_sha256=str(team_stat_source_sha256),
+            )
+            if coaching is not None:
+                game["auto_coaching_provider"] = coaching
+            if defensive is not None:
+                game["auto_defensive_provider"] = defensive
         bundles.append(
             build_run_it_context(
                 mode=requested,
@@ -207,6 +232,7 @@ def build_nfl_auto_context_slate(
         "depth_chart_source_sha256": depth_chart_source_sha256 if depth is not None else None,
         "snap_count_source_sha256": snap_count_source_sha256 if snaps is not None else None,
         "player_stat_source_sha256": player_stat_source_sha256 if stats is not None else None,
+        "team_stat_source_sha256": team_stat_source_sha256 if team_stats is not None else None,
         "game_count": len(bundles),
         "games": bundles,
         "model_p_eligible": False,
