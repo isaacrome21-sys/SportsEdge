@@ -5,6 +5,14 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import sys
+
+# Running this file as `python scripts/run_it_all.py` puts only `scripts/` on
+# sys.path. Add the repository root explicitly so the canonical `sportsedge`
+# package resolves identically in local shells and GitHub Actions.
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from sportsedge.run_it_control import audit_surface, execute_surface, scope_from_request
 
