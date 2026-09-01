@@ -12,6 +12,7 @@ from .auto_context_source import (
 )
 from .auto_personnel_source import build_depth_chart_personnel_provider
 from .context_autopull import ContextObservation, NFLContextError
+from .player_stats_workload_source import build_prior_player_workload_inputs
 from .run_it_context import build_run_it_context
 from .snap_workload_source import build_prior_snap_workload_inputs
 
@@ -112,13 +113,17 @@ def build_nfl_auto_context_slate(
     snap_count_rows: Iterable[Mapping[str, Any]] | None = None,
     snap_count_source_uri: str | None = None,
     snap_count_source_sha256: str | None = None,
+    player_stat_rows: Iterable[Mapping[str, Any]] | None = None,
+    player_stat_source_uri: str | None = None,
+    player_stat_source_sha256: str | None = None,
     opener: Callable = urlopen,
 ) -> dict[str, Any]:
     """Discover an upcoming slate and collect canonical objective context.
 
-    Optional depth and snap-count inputs must carry source provenance. Snap workload
-    is constructed strictly from prior weeks because the snap file does not carry
-    authoritative kickoff timestamps; same-week rows are excluded fail-closed.
+    Optional depth, snap-count and player-stat inputs must carry source provenance.
+    Both workload sources are strictly prior-week because neither file exposes an
+    authoritative per-row event timestamp safe for same-week ordering. PFR and GSIS
+    identities stay separate; no fuzzy crosswalk is performed here.
     """
     requested = str(mode or "").strip().upper()
     if requested not in {"AUTO", "HYBRID"}:
@@ -137,6 +142,9 @@ def build_nfl_auto_context_slate(
     snaps = None if snap_count_rows is None else [dict(row) for row in snap_count_rows]
     if snaps is not None and (not snap_count_source_uri or not snap_count_source_sha256):
         raise NFLContextError("snap count provenance required")
+    stats = None if player_stat_rows is None else [dict(row) for row in player_stat_rows]
+    if stats is not None and (not player_stat_source_uri or not player_stat_source_sha256):
+        raise NFLContextError("player stat provenance required")
 
     bundles: list[dict[str, Any]] = []
     for discovered in plan["games"]:
@@ -154,19 +162,33 @@ def build_nfl_auto_context_slate(
             )
             if personnel is not None:
                 game["auto_personnel_provider"] = personnel
+        season = discovered.get("season")
+        week = discovered.get("week")
+        workload_inputs: list[dict[str, Any]] = []
         if snaps is not None:
-            season = discovered.get("season")
-            week = discovered.get("week")
             if season is None or week is None:
                 raise NFLContextError(f"snap workload schedule season/week missing:{game_id}")
-            game["workload_inputs"] = build_prior_snap_workload_inputs(
+            workload_inputs.extend(build_prior_snap_workload_inputs(
                 rows=snaps,
                 season=int(season),
                 target_week=int(week),
                 team_ids=team_ids,
                 source_uri=str(snap_count_source_uri),
                 source_sha256=str(snap_count_source_sha256),
-            )
+            ))
+        if stats is not None:
+            if season is None or week is None:
+                raise NFLContextError(f"player stats schedule season/week missing:{game_id}")
+            workload_inputs.extend(build_prior_player_workload_inputs(
+                rows=stats,
+                season=int(season),
+                target_week=int(week),
+                team_ids=team_ids,
+                source_uri=str(player_stat_source_uri),
+                source_sha256=str(player_stat_source_sha256),
+            ))
+        if workload_inputs:
+            game["workload_inputs"] = workload_inputs
         bundles.append(
             build_run_it_context(
                 mode=requested,
@@ -184,6 +206,7 @@ def build_nfl_auto_context_slate(
         "schedule_source_sha256": plan["schedule_source_sha256"],
         "depth_chart_source_sha256": depth_chart_source_sha256 if depth is not None else None,
         "snap_count_source_sha256": snap_count_source_sha256 if snaps is not None else None,
+        "player_stat_source_sha256": player_stat_source_sha256 if stats is not None else None,
         "game_count": len(bundles),
         "games": bundles,
         "model_p_eligible": False,
