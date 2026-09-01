@@ -7,12 +7,12 @@ permissions:
   contents: write
 
 concurrency:
-  group: auto-mlb
+  group: archive-mlb-game-odds
   cancel-in-progress: false
 
 jobs:
   capture:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 8
     env:
       SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
@@ -30,7 +30,7 @@ jobs:
           fetch-depth: 1
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12.13'
+          python-version: '3.12'
       - name: Run canonical durable MLB archive lane
         run: python -I scripts/run_mlb_archive_lane.py
       - name: Upload failover archive execution evidence
