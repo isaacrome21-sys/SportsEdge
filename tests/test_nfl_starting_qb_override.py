@@ -29,6 +29,28 @@ class NFLStartingQBOverrideTests(unittest.TestCase):
             },
         ]
 
+    def _opponent_depth(self):
+        return [
+            {
+                "season": "2018",
+                "club_code": "NO",
+                "week": "1",
+                "game_type": "REG",
+                "depth_team": "1",
+                "position": "QB",
+                "gsis_id": "00-TEST-NO",
+            },
+            {
+                "season": "2018",
+                "club_code": "PHI",
+                "week": "1",
+                "game_type": "REG",
+                "depth_team": "1",
+                "position": "QB",
+                "gsis_id": "00-TEST-PHI",
+            },
+        ]
+
     def _payload(self, **changes):
         row = {
             "game_id": "2018_01_TB_NO",
@@ -50,13 +72,14 @@ class NFLStartingQBOverrideTests(unittest.TestCase):
         }
 
     def test_one_pregame_week_one_override_resolves_week_one_and_week_two(self):
-        before = audit_starting_qb_coverage(self._schedule(), [], eligible_seasons=[2018])
-        self.assertEqual([row["week"] for row in before], [1, 2])
+        base_depth = self._opponent_depth()
+        before = audit_starting_qb_coverage(self._schedule(), base_depth, eligible_seasons=[2018])
+        self.assertEqual([(row["team"], row["week"]) for row in before], [("TB", 1), ("TB", 2)])
 
-        depth, applied = apply_pinned_starting_qb_overrides(self._schedule(), [], self._payload())
+        depth, applied = apply_pinned_starting_qb_overrides(self._schedule(), base_depth, self._payload())
         self.assertEqual(len(applied), 1)
         self.assertEqual(applied[0]["gsis_id"], "00-0023682")
-        self.assertEqual(depth[0]["depth_team"], "1")
+        self.assertEqual(depth[-1]["depth_team"], "1")
 
         after = audit_starting_qb_coverage(self._schedule(), depth, eligible_seasons=[2018])
         self.assertEqual(after, [])
