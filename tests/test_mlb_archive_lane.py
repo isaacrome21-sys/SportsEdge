@@ -24,6 +24,8 @@ class MLBArchiveLaneContractTests(unittest.TestCase):
         self.assertIn('"required_persistence_without_raw": "PASS"', result.stdout)
         self.assertIn('"optional_raw_persistence": "PASS"', result.stdout)
         self.assertIn('"capture_failure_heartbeat": "PASS"', result.stdout)
+        self.assertIn('"capture_status_preserved": "PASS"', result.stdout)
+        self.assertIn('"success_without_status_fails_closed": "PASS"', result.stdout)
 
     def test_dense_archive_schedulers_are_retired(self):
         for path in (PRIMARY, FAILOVER, BACKUP):
