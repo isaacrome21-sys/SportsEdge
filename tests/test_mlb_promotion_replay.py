@@ -64,7 +64,7 @@ class MLBPromotionReplayTests(unittest.TestCase):
         self.assertGreater(row["clv_probability"], 0.0)
         self.assertTrue(row["settlement_compatible"])
         self.assertAlmostEqual(row["roi_per_dollar"], 100 / 110)
-        self.assertEqual(row["fold_name"], "AUGUST")
+        self.assertEqual(row["fold_name"], "fold_5_august")
         self.assertEqual(row["replay_policy_id"], "MLB_REPLAY_POLICY_V1")
 
     def test_higher_book_stale_pair_falls_through_to_registered_lower_book(self):
