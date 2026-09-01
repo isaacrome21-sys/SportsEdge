@@ -56,6 +56,8 @@ class NFLProductionValidationTests(unittest.TestCase):
         self.assertTrue(all(row["home_handicap"] == -row["spread_line"] for row in evaluations))
         self.assertTrue(all(0.0 < row["m2_home_cover_prob"] < 1.0 for row in evaluations))
         self.assertTrue(all(0.0 < row["m2_over_prob"] < 1.0 for row in evaluations))
+        self.assertTrue(all(set(row["m2_signed_key_probability"]) == {"-7", "-3", "3", "7"} for row in evaluations))
+        self.assertTrue(all(0.0 <= value <= 1.0 for row in evaluations for value in row["m2_signed_key_probability"].values()))
 
     def test_mutating_heldout_results_does_not_change_same_fold_model_probabilities(self):
         rows = self._rows(); baseline = build_production_nfl_raw_evaluations(rows, min_train_seasons=2, ridge_alpha=1.0)
@@ -67,6 +69,8 @@ class NFLProductionValidationTests(unittest.TestCase):
         left = [row for row in baseline if row["season"] == first_test]; right = [row for row in changed if row["season"] == first_test]
         self.assertEqual([(r["game_id"], r["m2_home_cover_prob"], r["m2_over_prob"]) for r in left],
                          [(r["game_id"], r["m2_home_cover_prob"], r["m2_over_prob"]) for r in right])
+        self.assertEqual([(r["game_id"], r["m2_signed_key_probability"]) for r in left],
+                         [(r["game_id"], r["m2_signed_key_probability"]) for r in right])
 
     def test_evidence_payload_is_exact_production_identity_and_reports_brier_and_log_loss(self):
         payload = build_production_nfl_validation_evidence(
@@ -79,6 +83,12 @@ class NFLProductionValidationTests(unittest.TestCase):
         self.assertEqual(payload["source_manifest_sha256"], "b" * 64)
         self.assertEqual(payload["provenance"], "REAL_PUBLIC_HISTORY")
         self.assertTrue(payload["folds"]); self.assertIn("spread", payload["promotion_evidence"]); self.assertIn("total", payload["promotion_evidence"])
+        profile = payload["production_distribution_profile"]
+        self.assertEqual(profile["contract"], "NFL_M2_OOS_EMERGENT_SIGNED_KEY_PMF_V1")
+        self.assertEqual(profile["model_id"], PRODUCTION_NFL_M2_MODEL_ID)
+        self.assertEqual(profile["feature_contract"], NFL_M2_FEATURE_CONTRACT)
+        self.assertEqual(profile["heldout_game_count"], payload["raw_evaluation_count"])
+        self.assertEqual(set(profile["signed_key_probability"]), {"-7", "-3", "3", "7"})
         for fold in payload["folds"]:
             self.assertIn("m1_log_loss", fold); self.assertIn("m2_log_loss", fold); self.assertIn("m1_brier", fold); self.assertIn("m2_brier", fold)
 

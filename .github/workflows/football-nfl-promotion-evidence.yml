@@ -153,10 +153,12 @@ jobs:
           --min-season 1999 --max-season 2025
           --output artifacts/football/nfl_real_history_audit.json
 
-      - name: Build emergent key-number math evidence
+      - name: Build production-M2 emergent key-number math evidence
         run: >-
           python scripts/validate_nfl_simulator_profile.py
           artifacts/football/nfl_real_history_audit.json
+          --production-evidence artifacts/football/nfl_production_validation.json
+          --version nfl-m2-oos-key-emergent-v1
           --out artifacts/football/nfl_simulator_profile_schedule.json
 
       - name: Bind math evidence to canonical multi-source manifest and code SHA
