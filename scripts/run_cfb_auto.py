@@ -4,12 +4,12 @@
 The script never trains a model. It requires a prebuilt, hash-bound CFB joint-model
 artifact and the existing CFBD/Odds credentials, discovers the next FBS regular-
 season week when one is not explicitly supplied, then calls the same AUTOMATIC
-library path used by MANUAL/HYBRID parity tests.
+library path used by MANUAL/HYBRID parity tests. Objective context is acquired as a
+separate sidecar and never substituted for Model_P inputs or promotion evidence.
 """
 from __future__ import annotations
 
 import argparse
-from dataclasses import asdict
 from datetime import datetime, timezone
 import json
 import os
@@ -17,14 +17,11 @@ from pathlib import Path
 import sys
 from typing import Callable, Sequence
 
-# Direct execution via ``python scripts/run_cfb_auto.py`` places ``scripts/`` at
-# sys.path[0]. Add the repository root before importing the package so the CLI and
-# imported-module paths exercise the same code. This is path bootstrapping only;
-# no model, promotion, or evidence semantics are changed.
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from sportsedge.sports.cfb.full_auto import build_cfb_full_auto_slate
 from sportsedge.sports.cfb.model_artifact import (
     CFBModelArtifactError,
     cfb_model_code_surface_sha256,
@@ -116,6 +113,22 @@ def _model(path: Path, *, repo_root: Path):
     return model, payload
 
 
+def _objective_context(*, current: datetime, season: int, cfbd_key: str) -> tuple[str, dict | None, str | None]:
+    """Acquire optional objective context without turning a sidecar failure into a slate-wide model failure."""
+    try:
+        payload = build_cfb_full_auto_slate(
+            as_of=current,
+            cfbd_api_key=cfbd_key,
+            season=season,
+            mode="AUTO",
+            min_lead_minutes=0,
+            horizon_minutes=7 * 24 * 60,
+        )
+        return "AVAILABLE", payload, None
+    except Exception as exc:
+        return "SOURCE_FAILED", None, f"{type(exc).__name__}:{exc}"
+
+
 def _write(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -144,6 +157,11 @@ def main() -> int:
             now=current,
             cfbd_api_key=cfbd_key,
         )
+        context_status, objective_context, context_error = _objective_context(
+            current=current,
+            season=season,
+            cfbd_key=cfbd_key,
+        )
         report = run_it_cfb(
             mode="AUTOMATIC",
             season=season,
@@ -164,16 +182,28 @@ def main() -> int:
             "model_artifact_sha256": artifact["artifact_sha256"],
             "model_code_sha256": artifact["model_code_sha256"],
             "training_source_sha256": artifact["training_source_sha256"],
+            "objective_context_status": context_status,
+            "objective_context_error": context_error,
+            "objective_context": objective_context,
             "report": report.to_dict(),
             "governance": {
                 "model_fit_performed": False,
+                "objective_context_is_model_p": False,
                 "promotion_changed": False,
                 "truth_gate_changed": False,
                 "fail_closed": True,
+                "context_failure_is_scoped": True,
             },
         }
         _write(args.output, payload)
-        print(json.dumps({"status": "SUCCESS", "season": season, "week": week, "run_status": report.run_status, "output": str(args.output)}, sort_keys=True))
+        print(json.dumps({
+            "status": "SUCCESS",
+            "season": season,
+            "week": week,
+            "run_status": report.run_status,
+            "objective_context_status": context_status,
+            "output": str(args.output),
+        }, sort_keys=True))
         return 0
     except (CFBAutoError, ValueError) as exc:
         payload = {
