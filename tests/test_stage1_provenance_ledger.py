@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -6,6 +7,19 @@ from sportsedge.generic_card_pipeline import GenericCardResult
 from sportsedge.orchestrator import RunResult, run_candidate
 from sportsedge.runtime import result_to_dict
 from sportsedge.unified_card import UnifiedCardResult, _convert, unified_result_to_dict
+
+
+NOW = datetime(2026, 8, 31, 12, 0, tzinfo=timezone.utc)
+
+
+def _quote(odds: int) -> dict:
+    return {
+        "american_odds": odds,
+        "book_key": "fixture-book",
+        "sportsbook": "FIXTURE",
+        "retrieved_at": NOW,
+        "offer_id": f"fixture-{odds}",
+    }
 
 
 class Stage1ProvenanceLedgerTests(unittest.TestCase):
@@ -54,19 +68,22 @@ class Stage1ProvenanceLedgerTests(unittest.TestCase):
                 "game_id": "1", "market": "MONEYLINE", "entity_id": "10",
                 "line": 0.0, "side": "HOME",
             },
-            quote={"american_odds": -110},
-            paired_quote={"american_odds": 100},
+            quote=_quote(-110),
+            paired_quote=_quote(100),
             deployment={"eligible": True},
             engine_fn=lambda _: {
                 "game_id": "1", "market": "MONEYLINE", "entity_id": "10",
                 "line": 0.0, "side": "HOME", "model_p": 0.51, "push_p": 0.0,
                 **provenance,
             },
-            ingestion_now=SimpleNamespace(),
-            finalization_now=SimpleNamespace(),
+            ingestion_now=NOW,
+            finalization_now=NOW,
         )
 
         self.assertEqual(result.bet_status, "PASS")
+        self.assertEqual(result.book_key, "fixture-book")
+        self.assertEqual(result.sportsbook, "FIXTURE")
+        self.assertEqual(result.quote_retrieved_at, NOW.isoformat())
         for key, value in provenance.items():
             with self.subTest(key=key):
                 self.assertEqual(getattr(result, key), value)
@@ -79,16 +96,16 @@ class Stage1ProvenanceLedgerTests(unittest.TestCase):
                 "game_id": "1", "market": "MONEYLINE", "entity_id": "10",
                 "line": 0.0, "side": "HOME",
             },
-            quote={"american_odds": -110},
-            paired_quote={"american_odds": 100},
+            quote=_quote(-110),
+            paired_quote=_quote(100),
             deployment={"eligible": True},
             engine_fn=lambda _: {
                 "game_id": "1", "market": "MONEYLINE", "entity_id": "10",
                 "line": 0.0, "side": "HOME", "model_p": 0.51,
                 "distribution_sha256": "not-a-sha",
             },
-            ingestion_now=SimpleNamespace(),
-            finalization_now=SimpleNamespace(),
+            ingestion_now=NOW,
+            finalization_now=NOW,
         )
         self.assertEqual(result.bet_status, "BLOCKED")
         self.assertIsNone(result.model_p)
@@ -102,8 +119,8 @@ class Stage1ProvenanceLedgerTests(unittest.TestCase):
                 "game_id": "1", "market": "HITS", "entity_id": "10",
                 "line": 0.5, "side": "OVER",
             },
-            quote={"american_odds": -110},
-            paired_quote={"american_odds": -110},
+            quote=_quote(-110),
+            paired_quote=_quote(-110),
             deployment={"eligible": False},
             engine_fn=lambda _: {
                 "game_id": "1", "market": "HITS", "entity_id": "10",
@@ -113,8 +130,8 @@ class Stage1ProvenanceLedgerTests(unittest.TestCase):
                 "seed_policy": "analytic_weighted_empirical_joint_game_rows",
                 "mc_paths": -1,
             },
-            ingestion_now=SimpleNamespace(),
-            finalization_now=SimpleNamespace(),
+            ingestion_now=NOW,
+            finalization_now=NOW,
         )
         self.assertEqual(result.bet_status, "BLOCKED")
         self.assertIsNone(result.model_p)
