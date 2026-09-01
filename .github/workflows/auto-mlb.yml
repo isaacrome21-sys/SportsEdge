@@ -9,15 +9,20 @@ on:
       - 'scripts/run_auto_mlb*.py'
       - 'scripts/probe_game_odds.py'
       - 'scripts/probe_odds_http.py'
+      - 'scripts/archive_raw_game_odds.py'
+      - 'scripts/run_mlb_archive_lane.py'
+      - 'tests/test_mlb_archive_lane.py'
       - 'config/**'
       - 'tests/test_auto_native_odds.py'
       - 'tests/test_mlb_run_machine.py'
       - '.github/workflows/auto-mlb.yml'
   schedule:
-    - cron: '*/15 * * * *'
+    # Fifteen-minute cadence remains sufficient for the archive's +/-8 minute
+    # capture windows while avoiding the heavily loaded top-of-hour minute.
+    - cron: '7,22,37,52 * * * *'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: auto-mlb
@@ -33,6 +38,24 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Run durable MLB odds archive lane
+        id: archive_lane
+        shell: bash
+        env:
+          SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+          SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
+          SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
+          SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
+          SPORTSEDGE_ODDS_BOOKMAKERS: draftkings
+          SPORTSEDGE_ODDS_DAILY_BUDGET_CREDITS: '12'
+          SPORTSEDGE_ODDS_BUDGET_LEDGER: .cache/sportsedge/odds-budget/ledger.json
+          SPORTSEDGE_ARCHIVE_SOURCE: auto-mlb
+        run: |
+          set +e
+          python -I scripts/run_mlb_archive_lane.py
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
       - name: Install runtime dependencies
         run: python -m pip install --disable-pip-version-check numpy
       - name: Resolve Chicago slate date
@@ -93,6 +116,16 @@ jobs:
           SPORTSEDGE_PROVIDER_TOKEN: ${{ secrets.SPORTSEDGE_PROVIDER_TOKEN }}
           SPORTSEDGE_HISTORY_CACHE_DIR: .cache/sportsedge/mlb-history
         run: python scripts/run_auto_mlb_resilient.py --output artifacts/live_mlb_card.json
+      - name: Upload durable MLB archive lane evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlb-raw-game-odds-auto-${{ github.run_id }}
+          path: |
+            artifacts/raw_odds/**
+            .cache/sportsedge/odds-budget/ledger.json
+          if-no-files-found: warn
+          retention-days: 90
       - name: Upload automated card evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -104,3 +137,13 @@ jobs:
             artifacts/odds_http_diagnostics.json
           if-no-files-found: error
           retention-days: 14
+      - name: Propagate archive lane failure after card evidence
+        if: always()
+        shell: bash
+        run: |
+          code='${{ steps.archive_lane.outputs.exit_code }}'
+          if [ -z "$code" ]; then
+            echo 'Archive lane did not emit an exit code.' >&2
+            exit 99
+          fi
+          exit "$code"
