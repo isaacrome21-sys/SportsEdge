@@ -37,11 +37,15 @@ class MLBArchiveLaneContractTests(unittest.TestCase):
         self.assertIn("contents: write", text)
         self.assertIn("scripts/run_mlb_archive_lane.py", text)
         self.assertIn("Propagate archive lane failure after card evidence", text)
+        self.assertIn("group: auto-mlb", text)
+        self.assertIn("cancel-in-progress: false", text)
 
     def test_manual_archive_wrappers_use_same_canonical_lane(self):
         for path in (PRIMARY, FAILOVER):
             text = path.read_text()
             self.assertIn("scripts/run_mlb_archive_lane.py", text, path.name)
+            self.assertIn("group: auto-mlb", text, path.name)
+            self.assertIn("cancel-in-progress: false", text, path.name)
             self.assertNotIn(
                 "git add runtime/odds-budget/ledger.json runtime/archive-status archive/raw_odds || true",
                 text,
