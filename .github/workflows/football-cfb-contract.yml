@@ -5,6 +5,7 @@ on:
   pull_request:
     paths:
       - 'sportsedge/sports/cfb/**'
+      - 'scripts/*cfb*.py'
       - 'tests/test_cfb*.py'
       - 'docs/cfb_model_feature_trace.md'
       - '.github/workflows/football-cfb-contract.yml'
@@ -12,6 +13,7 @@ on:
     branches: [main]
     paths:
       - 'sportsedge/sports/cfb/**'
+      - 'scripts/*cfb*.py'
       - 'tests/test_cfb*.py'
       - 'docs/cfb_model_feature_trace.md'
       - '.github/workflows/football-cfb-contract.yml'
@@ -34,6 +36,10 @@ jobs:
             sportsedge/sports/cfb/classification_policy.py \
             sportsedge/sports/cfb/joint_model.py \
             sportsedge/sports/cfb/run_machine.py \
-            sportsedge/sports/cfb/historical_features.py
+            sportsedge/sports/cfb/historical_features.py \
+            sportsedge/sports/cfb/model_artifact.py \
+            sportsedge/sports/cfb/training_artifact.py \
+            scripts/build_cfb_model_artifact.py \
+            scripts/run_cfb_auto.py
       - name: Run CFB contract tests
         run: python -m unittest discover -s tests -p 'test_cfb*.py' -v
