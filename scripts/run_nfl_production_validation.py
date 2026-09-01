@@ -22,7 +22,7 @@ if str(_REPO_ROOT) not in sys.path:
 
 from sportsedge.sports.nfl.history import normalize_nfl_rows, parse_schedule_csv
 from sportsedge.sports.nfl.m2 import fit_nfl_m2_score_model
-from sportsedge.sports.nfl.m2_history_features import fit_nfl_prior_decay_curves
+from sportsedge.sports.nfl.m2_history_features import _game_start, fit_nfl_prior_decay_curves, select_starting_qb
 from sportsedge.sports.nfl.m2_history_policy import build_nfl_m2_history_rows
 from sportsedge.sports.nfl.model_artifact import build_nfl_m2_model_artifact
 from sportsedge.sports.nfl.production_validation import build_production_nfl_validation_evidence
@@ -182,6 +182,52 @@ def bridge_preopening_away_origins(
     return resolved, bridges
 
 
+def audit_starting_qb_coverage(
+    schedule_rows: Iterable[dict],
+    depth_rows: Iterable[dict[str, str]],
+    *,
+    eligible_seasons: Iterable[int],
+) -> list[dict[str, object]]:
+    """Return every missing/ambiguous required PIT starter in one deterministic pass.
+
+    This is diagnostic only. It calls the exact production ``select_starting_qb``
+    contract and never supplies a replacement starter. Initial burn-in seasons
+    without a fitted prior-decay curve are intentionally excluded because the
+    production history builder does not emit evaluation rows for them.
+    """
+    eligible = {int(season) for season in eligible_seasons}
+    depth = [dict(row) for row in depth_rows]
+    games = [
+        dict(row) for row in schedule_rows
+        if str(row.get("game_type") or "REG").upper() == "REG" and int(row.get("season") or -1) in eligible
+    ]
+    games.sort(key=lambda row: (_game_start(row), str(row.get("game_id") or "")))
+    issues: list[dict[str, object]] = []
+    for game in games:
+        season = int(game["season"])
+        week = int(game["week"])
+        game_id = str(game.get("game_id") or "").strip()
+        start = _game_start(game)
+        for side in ("home", "away"):
+            team = str(game.get(f"{side}_team") or "").strip()
+            try:
+                select_starting_qb(depth, team=team, season=season, week=week, game_start_ts=start)
+            except ValueError as exc:
+                error = str(exc)
+                if not error.startswith(("NFL_STARTING_QB_MISSING:", "NFL_STARTING_QB_AMBIGUOUS:")):
+                    raise
+                issues.append({
+                    "game_id": game_id,
+                    "season": season,
+                    "week": week,
+                    "side": side,
+                    "team": team,
+                    "game_start_ts": start.isoformat(),
+                    "error": error,
+                })
+    return issues
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--schedule-file", type=Path, required=True)
@@ -198,6 +244,7 @@ def main() -> int:
     parser.add_argument("--out", type=Path, default=Path("artifacts/football/nfl_production_validation.json"))
     parser.add_argument("--manifest-out", type=Path, default=Path("artifacts/football/nfl_source_manifest.json"))
     parser.add_argument("--model-out", type=Path, default=Path("artifacts/football/nfl_m2_model.json"))
+    parser.add_argument("--qb-coverage-out", type=Path, default=Path("artifacts/football/nfl_starting_qb_coverage.json"))
     args = parser.parse_args()
 
     git_sha = str(args.git_sha).strip().lower()
@@ -237,6 +284,28 @@ def main() -> int:
     raw_stadiums = _read_projected(args.stadium_file, _STADIUM_FIELDS)
     stadiums, stadium_bridges = bridge_preopening_away_origins(schedule, raw_stadiums)
     prior_curves = fit_nfl_prior_decay_curves(schedule, pbp, min_train_seasons=args.min_train_seasons, weeks=range(1, 7))
+
+    qb_coverage_issues = audit_starting_qb_coverage(schedule, depth, eligible_seasons=prior_curves)
+    qb_coverage_payload = {
+        "schema_version": 1,
+        "sport": "nfl",
+        "code_git_sha": git_sha,
+        "source_manifest_sha256": manifest_hash,
+        "contract": "EXACT_PRODUCTION_SELECT_STARTING_QB_REQUIRED_FOR_EVALUATION_ROWS",
+        "eligible_seasons": sorted(int(season) for season in prior_curves),
+        "issue_count": len(qb_coverage_issues),
+        "status": "PASS" if not qb_coverage_issues else "BLOCKED",
+        "issues": qb_coverage_issues,
+    }
+    args.qb_coverage_out.parent.mkdir(parents=True, exist_ok=True)
+    args.qb_coverage_out.write_text(json.dumps(qb_coverage_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    if qb_coverage_issues:
+        compact = ";".join(
+            f"{row['game_id']}:{row['side']}:{row['error']}" for row in qb_coverage_issues
+        )
+        print(json.dumps(qb_coverage_payload, sort_keys=True))
+        raise SystemExit(f"NFL_STARTING_QB_COVERAGE_GAPS:{len(qb_coverage_issues)}:{compact}")
+
     history_rows = build_nfl_m2_history_rows(
         schedule, pbp, participation, depth, stadiums,
         prior_decay_curves=prior_curves, neutral_site_policy=args.neutral_site_policy,
@@ -254,6 +323,9 @@ def main() -> int:
         "point_in_time_history_row_count": len(history_rows), "neutral_site_policy": args.neutral_site_policy,
         "stadium_home_origin_bridge_contract": "AWAY_TEAM_ONLY_UNIQUE_FUTURE_STADIUM_MAX_28_DAYS",
         "stadium_home_origin_bridges": stadium_bridges,
+        "starting_qb_coverage_contract": qb_coverage_payload["contract"],
+        "starting_qb_coverage_status": qb_coverage_payload["status"],
+        "starting_qb_coverage_issue_count": 0,
     })
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -267,7 +339,7 @@ def main() -> int:
         "code_git_sha": git_sha, "model_id": evidence["model_id"], "feature_contract": evidence["feature_contract"],
         "source_manifest_sha256": manifest_hash, "history_rows": len(history_rows), "fold_count": evidence["fold_count"],
         "trained_through_season": model_artifact["trained_through_season"], "promotion_evidence": evidence["promotion_evidence"],
-        "stadium_home_origin_bridge_count": len(stadium_bridges),
+        "stadium_home_origin_bridge_count": len(stadium_bridges), "starting_qb_coverage_issue_count": 0,
     }, sort_keys=True))
     return 0
 
