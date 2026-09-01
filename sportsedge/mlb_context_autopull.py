@@ -13,6 +13,7 @@ from .v7_sources import (
     extract_starting_catcher_ids,
     source_manifest,
 )
+from .mlb_objective_depth_sources import build_mlb_objective_depth_providers
 
 MLB_HYBRID_CONTEXT_SCHEMA_VERSION = "mlb_hybrid_context_autopull_v1"
 
@@ -92,11 +93,7 @@ def _observation(*, context_class: str, source: str, observed_at: datetime, payl
 
 
 def build_autopull_plan() -> dict[str, dict[str, Any]]:
-    """Describe the fail-closed source strategy for Carty-style MLB context.
-
-    Social/public-betting feeds are intentionally absent. This lane is for
-    baseball/environment context only and is never a Truth Gate input by itself.
-    """
+    """Describe the fail-closed source strategy for objective MLB context."""
     return {
         "park": {"primary": "SPORTSEDGE_PIT_PARK_FACTORS", "auto_pull": True, "fallback": None},
         "weather": {"primary": "NWS_HOURLY", "auto_pull": True, "fallback": None},
@@ -116,19 +113,22 @@ def collect_mlb_hybrid_context(
     providers: Mapping[str, Callable[[int, datetime, Mapping[str, Any]], Any]] | None = None,
     opener: Callable | None = None,
 ) -> dict[str, Any]:
-    """Collect a provenance-preserving MLB context sidecar.
+    """Collect a provenance-preserving MLB objective-context sidecar.
 
-    Core current-game identity, umpire/catcher assignments and weather are pulled
-    from public MLB/NWS sources. Historical/PIT transforms (park, bullpen,
-    defense, framing, platoon and workload) are supplied through named providers.
-    Missing providers remain explicit MISSING rows; no values are inferred.
+    With no provider override, SportsEdge now attempts objective bullpen/workload,
+    bounded prior-day Statcast skill/catcher context and official fielding fallback
+    automatically. Explicit caller providers replace only matching classes. Missing
+    classes remain explicit; no social/public betting or market price is requested.
     """
     asof = _utc(as_of, "as_of")
     kwargs = {} if opener is None else {"opener": opener}
     live = fetch_mlb_live_feed(int(game_pk), retrieved_at=asof, **kwargs)
     live_payload = live.payload if isinstance(live.payload, Mapping) else {}
 
+    auto_providers = build_mlb_objective_depth_providers(**kwargs)
+    provider_map = {**auto_providers, **dict(providers or {})}
     observations: dict[str, ContextObservation] = {}
+
     umpire = extract_home_plate_umpire(live_payload)
     observations["umpire"] = _observation(
         context_class="umpire",
@@ -137,13 +137,26 @@ def collect_mlb_hybrid_context(
         payload=umpire,
         status="AVAILABLE" if umpire else "MISSING",
     )
+
+    # Preserve the official current catcher assignment and enrich it with a
+    # strictly-prior Statcast receiving/throwing proxy when that source succeeds.
     catchers = extract_starting_catcher_ids(live_payload)
+    catcher_provider = provider_map.pop("catcher_framing", None)
+    catcher_payload: Any = {"starting_catcher_ids": catchers}
+    catcher_source = "MLB_STATSAPI_STARTING_CATCHER"
+    catcher_status = "AVAILABLE" if any(catchers.values()) else "MISSING"
+    if catcher_provider is not None:
+        try:
+            historical = catcher_provider(int(game_pk), asof, live_payload)
+        except Exception:
+            historical = None
+        if historical is not None:
+            catcher_payload = {"starting_catcher_ids": catchers, "historical_receiving_context": historical}
+            catcher_source += "+BASEBALL_SAVANT_STATCAST_PRIOR_ONLY"
+            catcher_status = "AVAILABLE" if any(catchers.values()) else "PARTIAL_HISTORY_NO_STARTER"
     observations["catcher_framing"] = _observation(
-        context_class="catcher_framing",
-        source="MLB_STATSAPI_STARTING_CATCHER",
-        observed_at=asof,
-        payload=catchers,
-        status="AVAILABLE" if any(catchers.values()) else "MISSING",
+        context_class="catcher_framing", source=catcher_source, observed_at=asof,
+        payload=catcher_payload, status=catcher_status,
     )
 
     weather_manifests: list[dict[str, Any]] = []
@@ -161,7 +174,6 @@ def collect_mlb_hybrid_context(
             payload=forecast.payload, status="AVAILABLE",
         )
 
-    provider_map = dict(providers or {})
     for context_class in CONTEXT_CLASSES:
         if context_class in observations:
             continue
@@ -177,8 +189,17 @@ def collect_mlb_hybrid_context(
             continue
         try:
             payload = provider(int(game_pk), asof, live_payload)
-        except Exception as exc:
-            raise MLBContextAutopullError(f"{context_class} provider failed") from exc
+        except Exception:
+            # One source failure stays scoped to this context class. The live run
+            # continues and reports the exact missing class rather than failing the slate.
+            observations[context_class] = _observation(
+                context_class=context_class,
+                source=build_autopull_plan()[context_class]["primary"],
+                observed_at=asof,
+                payload=None,
+                status="SOURCE_FAILED",
+            )
+            continue
         observations[context_class] = _observation(
             context_class=context_class,
             source=build_autopull_plan()[context_class]["primary"],
