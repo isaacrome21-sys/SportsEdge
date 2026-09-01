@@ -12,6 +12,7 @@ from .auto_slate import build_nfl_auto_context_slate
 from .context_autopull import ContextObservation, NFLContextError
 from .player_stats_workload_source import fetch_nflverse_player_stats
 from .snap_workload_source import fetch_nflverse_snap_counts
+from .team_tendency_source import fetch_nflverse_team_stats
 
 DEPTH_CHART_URL = "https://github.com/nflverse/nflverse-data/releases/download/depth_charts/depth_charts_{season}.csv"
 
@@ -75,21 +76,23 @@ def build_nfl_full_auto_slate(
 ) -> dict[str, Any]:
     """Canonical zero-game-list NFL AUTO/HYBRID context entry point.
 
-    Independent depth-chart, snap-count and weekly player-usage sources are
-    acquired concurrently. Any one can fail without fabricating values or blocking
-    unrelated context. Both workload sources exclude the target week because they
-    do not carry authoritative event timestamps suitable for safe intra-week PIT.
+    Independent depth-chart, snap-count, weekly player-usage and weekly team-stat
+    sources are acquired concurrently. Any one can fail without fabricating values
+    or blocking unrelated context. Workload/tendency sources exclude the target week
+    because they do not expose authoritative event timestamps for safe intra-week PIT.
     """
     pit = _utc(as_of)
     resolved_season = int(season if season is not None else pit.year)
 
-    with ThreadPoolExecutor(max_workers=3) as pool:
+    with ThreadPoolExecutor(max_workers=4) as pool:
         depth_future = pool.submit(fetch_nflverse_depth_charts, season=resolved_season, opener=opener)
         snap_future = pool.submit(fetch_nflverse_snap_counts, season=resolved_season, opener=opener)
         stats_future = pool.submit(fetch_nflverse_player_stats, season=resolved_season, opener=opener)
+        team_future = pool.submit(fetch_nflverse_team_stats, season=resolved_season, opener=opener)
         depth_rows, depth_uri, depth_sha, depth_status = _source_result(depth_future, "DEPTH_CHART")
         snap_rows, snap_uri, snap_sha, snap_status = _source_result(snap_future, "SNAP_COUNTS")
         stats_rows, stats_uri, stats_sha, stats_status = _source_result(stats_future, "PLAYER_STATS")
+        team_rows, team_uri, team_sha, team_status = _source_result(team_future, "TEAM_STATS")
 
     slate = build_nfl_auto_context_slate(
         as_of=pit,
@@ -107,6 +110,9 @@ def build_nfl_full_auto_slate(
         player_stat_rows=stats_rows,
         player_stat_source_uri=stats_uri,
         player_stat_source_sha256=stats_sha,
+        team_stat_rows=team_rows,
+        team_stat_source_uri=team_uri,
+        team_stat_source_sha256=team_sha,
         opener=opener,
     )
     slate["automation"] = {
@@ -120,9 +126,14 @@ def build_nfl_full_auto_slate(
         "player_stats_status": stats_status,
         "player_stats_source_uri": stats_uri,
         "player_stats_pit_policy": "STRICTLY_PRIOR_WEEK_ONLY",
+        "team_stats_status": team_status,
+        "team_stats_source_uri": team_uri,
+        "team_tendency_pit_policy": "STRICTLY_PRIOR_WEEK_ONLY",
         "player_stats_identity_namespace": "GSIS",
         "snap_counts_identity_namespace": "PFR",
         "cross_namespace_fuzzy_join": False,
+        "coverage_shell_inferred": False,
+        "situational_coaching_inferred": False,
         "market_context_ingested": False,
         "social_context_ingested": False,
     }
