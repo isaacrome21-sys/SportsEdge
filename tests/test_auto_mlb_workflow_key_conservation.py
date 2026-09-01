@@ -31,7 +31,7 @@ class AutoMlbWorkflowKeyConservationTests(unittest.TestCase):
         self.assertIn("if: github.event_name == 'workflow_dispatch'", block)
         self.assertIn('SPORTSEDGE_ODDS_API_KEY:', block)
 
-    def test_scheduled_machine_has_no_odds_api_secrets(self):
+    def test_scheduled_machine_has_no_odds_or_external_quote_secrets(self):
         block = _step(self.text, 'Run scheduled MLB machine without Odds API credits')
         self.assertIn("if: github.event_name != 'workflow_dispatch'", block)
         self.assertNotIn('SPORTSEDGE_ODDS_API_KEY', block)
@@ -49,6 +49,20 @@ class AutoMlbWorkflowKeyConservationTests(unittest.TestCase):
         ):
             self.assertIn(name, block)
         self.assertIn('run_auto_mlb_resilient.py', block)
+
+    def test_only_dispatch_steps_reference_odds_api_secrets(self):
+        # Guard against a later scheduled step accidentally reintroducing free-key burn.
+        lines = self.text.splitlines()
+        secret_refs = [i for i, line in enumerate(lines) if 'secrets.SPORTSEDGE_ODDS_API_KEY' in line]
+        self.assertGreaterEqual(len(secret_refs), 8)
+        for index in secret_refs:
+            prior = '\n'.join(lines[max(0, index - 12):index + 1])
+            self.assertTrue(
+                'Diagnose Odds API credentials safely' in prior
+                or 'Acquire featured MLB game lines' in prior
+                or 'Run requested canonical automated MLB machine' in prior,
+                prior,
+            )
 
 
 if __name__ == '__main__':
