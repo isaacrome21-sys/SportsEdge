@@ -13,6 +13,7 @@ from .auto_context_source import (
 from .auto_personnel_source import build_depth_chart_personnel_provider
 from .context_autopull import ContextObservation, NFLContextError
 from .run_it_context import build_run_it_context
+from .snap_workload_source import build_prior_snap_workload_inputs
 
 
 def _utc(value: Any, field: str) -> datetime:
@@ -39,11 +40,6 @@ def discover_nfl_auto_games(
     game_types: Iterable[str] = ("REG",),
     opener: Callable = urlopen,
 ) -> dict[str, Any]:
-    """Discover upcoming NFL games from the same nflverse schedule used by M2.
-
-    Only identity/schedule metadata is returned. Betting columns that happen to
-    coexist in the upstream CSV are never copied into the AUTO context lane.
-    """
     pit = _utc(as_of, "as_of")
     if isinstance(min_lead_minutes, bool) or not isinstance(min_lead_minutes, int):
         raise NFLContextError("min_lead_minutes must be integer")
@@ -113,14 +109,16 @@ def build_nfl_auto_context_slate(
     depth_chart_rows: Iterable[Mapping[str, Any]] | None = None,
     depth_chart_source_uri: str | None = None,
     depth_chart_source_sha256: str | None = None,
+    snap_count_rows: Iterable[Mapping[str, Any]] | None = None,
+    snap_count_source_uri: str | None = None,
+    snap_count_source_sha256: str | None = None,
     opener: Callable = urlopen,
 ) -> dict[str, Any]:
-    """Discover an upcoming slate then collect each game's canonical context.
+    """Discover an upcoming slate and collect canonical objective context.
 
-    AUTO needs no operator game list. HYBRID may supply optional manual class
-    overrides keyed by game_id. Optional frozen PIT depth-chart rows enrich the
-    personnel-known flags without synthesizing personnel rates. MANUAL is
-    intentionally excluded because slate discovery itself is automatic.
+    Optional depth and snap-count inputs must carry source provenance. Snap workload
+    is constructed strictly from prior weeks because the snap file does not carry
+    authoritative kickoff timestamps; same-week rows are excluded fail-closed.
     """
     requested = str(mode or "").strip().upper()
     if requested not in {"AUTO", "HYBRID"}:
@@ -136,19 +134,19 @@ def build_nfl_auto_context_slate(
     depth = None if depth_chart_rows is None else [dict(row) for row in depth_chart_rows]
     if depth is not None and (not depth_chart_source_uri or not depth_chart_source_sha256):
         raise NFLContextError("depth chart provenance required")
+    snaps = None if snap_count_rows is None else [dict(row) for row in snap_count_rows]
+    if snaps is not None and (not snap_count_source_uri or not snap_count_source_sha256):
+        raise NFLContextError("snap count provenance required")
 
     bundles: list[dict[str, Any]] = []
     for discovered in plan["games"]:
         game_id = str(discovered["game_id"])
-        game = build_nfl_auto_game_context(
-            game_id=game_id,
-            as_of=as_of,
-            opener=opener,
-        )
+        game = build_nfl_auto_game_context(game_id=game_id, as_of=as_of, opener=opener)
+        team_ids = (str(game.get("home_team_id") or ""), str(game.get("away_team_id") or ""))
         if depth is not None:
             personnel = build_depth_chart_personnel_provider(
                 game_id=game_id,
-                team_ids=(str(game.get("home_team_id") or ""), str(game.get("away_team_id") or "")),
+                team_ids=team_ids,
                 as_of=as_of,
                 source_uri=str(depth_chart_source_uri),
                 source_sha256=str(depth_chart_source_sha256),
@@ -156,6 +154,19 @@ def build_nfl_auto_context_slate(
             )
             if personnel is not None:
                 game["auto_personnel_provider"] = personnel
+        if snaps is not None:
+            season = discovered.get("season")
+            week = discovered.get("week")
+            if season is None or week is None:
+                raise NFLContextError(f"snap workload schedule season/week missing:{game_id}")
+            game["workload_inputs"] = build_prior_snap_workload_inputs(
+                rows=snaps,
+                season=int(season),
+                target_week=int(week),
+                team_ids=team_ids,
+                source_uri=str(snap_count_source_uri),
+                source_sha256=str(snap_count_source_sha256),
+            )
         bundles.append(
             build_run_it_context(
                 mode=requested,
@@ -172,6 +183,7 @@ def build_nfl_auto_context_slate(
         "as_of_utc": plan["as_of_utc"],
         "schedule_source_sha256": plan["schedule_source_sha256"],
         "depth_chart_source_sha256": depth_chart_source_sha256 if depth is not None else None,
+        "snap_count_source_sha256": snap_count_source_sha256 if snaps is not None else None,
         "game_count": len(bundles),
         "games": bundles,
         "model_p_eligible": False,
