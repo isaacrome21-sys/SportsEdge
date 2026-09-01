@@ -1,0 +1,80 @@
+name: run-it-control-plane
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - run-it-requests
+    paths:
+      - ops/run_it_request.json
+  pull_request:
+    paths:
+      - config/run_it_surface.json
+      - config/mlb_market_catalog.json
+      - config/football_market_surface.json
+      - config/pga_market_surface.json
+      - config/ufc_market_surface.json
+      - config/deployments.json
+      - sportsedge/run_it_control.py
+      - sportsedge/live_markets.py
+      - scripts/run_it_all.py
+      - scripts/audit_market_coverage.py
+      - ops/run_it_request.json
+      - tests/test_run_it_control.py
+      - .github/workflows/run-it-control-plane.yml
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install control-plane test dependencies
+        run: python -m pip install --disable-pip-version-check pytest numpy
+      - name: Run control-plane tests
+        run: python -m pytest -q tests/test_run_it_control.py
+      - name: Audit every declared RUN IT lane
+        run: python scripts/run_it_all.py --audit --output artifacts/run_it/audit.json
+      - name: Audit cross-sport market coverage
+        run: python scripts/audit_market_coverage.py
+      - name: Upload RUN IT audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: run-it-audit
+          path: artifacts/run_it
+
+  execute:
+    if: github.event_name != 'pull_request'
+    needs: audit
+    runs-on: ubuntu-latest
+    env:
+      SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+      SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
+      SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
+      SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
+      SPORTSEDGE_ODDS_BOOKMAKERS: draftkings
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime dependencies
+        run: python -m pip install --disable-pip-version-check numpy
+      - name: Execute unified RUN IT request
+        shell: bash
+        run: |
+          if [ -f ops/run_it_request.json ]; then
+            python scripts/run_it_all.py --execute --request ops/run_it_request.json --output artifacts/run_it/control_plane.json
+          else
+            python scripts/run_it_all.py --execute --scope ALL --output artifacts/run_it/control_plane.json
+          fi
+      - name: Upload unified RUN IT output
+        uses: actions/upload-artifact@v4
+        with:
+          name: run-it-output
+          path: artifacts/run_it
