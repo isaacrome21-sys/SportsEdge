@@ -49,12 +49,23 @@ jobs:
           tests/test_ufc_runtime.py
           tests/test_ufc_source.py
       - name: Train chronological UFC model and promotion evidence
-        run: >-
-          python scripts/build_ufc_training_artifact.py
-          --output models/ufc_logistic_v1.json
-          --metrics artifacts/ufc_training_metrics.json
-          --promotion-evidence artifacts/ufc_promotion_evidence.json
-          --promotion-contract config/ufc_promotion_contract_v1.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if python scripts/build_ufc_training_artifact.py \
+              --output models/ufc_logistic_v1.json \
+              --metrics artifacts/ufc_training_metrics.json \
+              --promotion-evidence artifacts/ufc_promotion_evidence.json \
+              --promotion-contract config/ufc_promotion_contract_v1.json; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "UFC history acquisition failed after $attempt attempts" >&2
+              exit 1
+            fi
+            sleep $((attempt * 5))
+          done
       - name: Build current UFC fighter/context snapshots
         run: >-
           python scripts/build_ufc_live_inputs.py
@@ -129,8 +140,16 @@ jobs:
           if [ -n "$ODDS_API_KEY" ]; then echo 'available=true' >> "$GITHUB_OUTPUT"; else echo 'available=false' >> "$GITHUB_OUTPUT"; fi
       - name: Rebuild model, evidence, and live inputs
         if: ${{ steps.odds.outputs.available == 'true' }}
+        shell: bash
         run: |
-          python scripts/build_ufc_training_artifact.py --output models/ufc_logistic_v1.json --metrics artifacts/ufc_training_metrics.json --promotion-evidence artifacts/ufc_promotion_evidence.json --promotion-contract config/ufc_promotion_contract_v1.json
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if python scripts/build_ufc_training_artifact.py --output models/ufc_logistic_v1.json --metrics artifacts/ufc_training_metrics.json --promotion-evidence artifacts/ufc_promotion_evidence.json --promotion-contract config/ufc_promotion_contract_v1.json; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep $((attempt * 5))
+          done
           python scripts/build_ufc_live_inputs.py --fighters data/ufc/fighters_today.json --contexts data/ufc/contexts_today.json --override config/dwcs_s10w3_2026-08-25.json
       - name: Run 250k UFC model
         if: ${{ steps.odds.outputs.available == 'true' }}
