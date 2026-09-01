@@ -3,6 +3,9 @@ import unittest
 from datetime import datetime
 from pathlib import Path
 
+from sportsedge.canonical_manual_mlb import _schedule_date_for_quote
+from sportsedge.manual_quote import validate_manual_quote
+
 
 SPEC = importlib.util.spec_from_file_location(
     "run_manual_mlb_snapshot", Path("scripts/run_manual_mlb_snapshot.py")
@@ -54,6 +57,16 @@ class ManualMlbLiveGuardTests(unittest.TestCase):
             [BASE], run_date="2026-08-19", max_age_minutes=30,
             as_of=datetime.fromisoformat("2026-08-19T10:15:00-05:00"),
         )
+
+    def test_canonical_schedule_date_uses_chicago_date_after_utc_rollover(self):
+        row = dict(
+            BASE,
+            observed_at="2026-08-31T20:14:00-05:00",
+            first_pitch_at="2026-08-31T20:38:00-05:00",
+        )
+        quote = validate_manual_quote(row)
+        self.assertEqual(quote.first_pitch_at.date().isoformat(), "2026-09-01")
+        self.assertEqual(_schedule_date_for_quote(quote), "2026-08-31")
 
 
 if __name__ == "__main__":
