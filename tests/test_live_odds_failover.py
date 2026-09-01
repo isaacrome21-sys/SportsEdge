@@ -11,6 +11,12 @@ class LiveOddsFailoverTests(unittest.TestCase):
         ]
         self.assertTrue(should_rotate_odds_key(run_status="NO_QUOTES", results=(), source_failures=failures))
 
+    def test_wrapped_game_market_fetch_failure_rotates(self):
+        failures = [
+            {"stage": "ODDS_API", "reason": "OddsApiSourceError: ODDS_API_FETCH_FAILED:game-markets"},
+        ]
+        self.assertTrue(should_rotate_odds_key(run_status="NO_QUOTES", results=(), source_failures=failures))
+
     def test_model_or_identity_failure_does_not_rotate(self):
         failures = [{"stage": "ODDS_API", "reason": "ODDS_EVENT_GAME_AMBIGUOUS"}]
         self.assertFalse(should_rotate_odds_key(run_status="NO_QUOTES", results=(), source_failures=failures))
