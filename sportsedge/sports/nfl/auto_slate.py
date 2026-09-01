@@ -4,9 +4,15 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Iterable, Mapping
 from urllib.request import urlopen
 
-from .auto_context_source import _fetch_schedule, _kickoff, _team
+from .auto_context_source import (
+    _fetch_schedule,
+    _kickoff,
+    _team,
+    build_nfl_auto_game_context,
+)
+from .auto_personnel_source import build_depth_chart_personnel_provider
 from .context_autopull import ContextObservation, NFLContextError
-from .run_it_context import build_run_it_context_from_sources
+from .run_it_context import build_run_it_context
 
 
 def _utc(value: Any, field: str) -> datetime:
@@ -104,13 +110,17 @@ def build_nfl_auto_context_slate(
     horizon_minutes: int = 24 * 60,
     game_types: Iterable[str] = ("REG",),
     manual_observations_by_game: Mapping[str, Iterable[ContextObservation]] | None = None,
+    depth_chart_rows: Iterable[Mapping[str, Any]] | None = None,
+    depth_chart_source_uri: str | None = None,
+    depth_chart_source_sha256: str | None = None,
     opener: Callable = urlopen,
 ) -> dict[str, Any]:
     """Discover an upcoming slate then collect each game's canonical context.
 
     AUTO needs no operator game list. HYBRID may supply optional manual class
-    overrides keyed by game_id. MANUAL is intentionally excluded because slate
-    discovery itself is an automatic acquisition operation.
+    overrides keyed by game_id. Optional frozen PIT depth-chart rows enrich the
+    personnel-known flags without synthesizing personnel rates. MANUAL is
+    intentionally excluded because slate discovery itself is automatic.
     """
     requested = str(mode or "").strip().upper()
     if requested not in {"AUTO", "HYBRID"}:
@@ -123,13 +133,33 @@ def build_nfl_auto_context_slate(
         opener=opener,
     )
     manual = dict(manual_observations_by_game or {})
+    depth = None if depth_chart_rows is None else [dict(row) for row in depth_chart_rows]
+    if depth is not None and (not depth_chart_source_uri or not depth_chart_source_sha256):
+        raise NFLContextError("depth chart provenance required")
+
     bundles: list[dict[str, Any]] = []
-    for game in plan["games"]:
-        game_id = str(game["game_id"])
-        bundles.append(
-            build_run_it_context_from_sources(
-                mode=requested,
+    for discovered in plan["games"]:
+        game_id = str(discovered["game_id"])
+        game = build_nfl_auto_game_context(
+            game_id=game_id,
+            as_of=as_of,
+            opener=opener,
+        )
+        if depth is not None:
+            personnel = build_depth_chart_personnel_provider(
                 game_id=game_id,
+                team_ids=(str(game.get("home_team_id") or ""), str(game.get("away_team_id") or "")),
+                as_of=as_of,
+                source_uri=str(depth_chart_source_uri),
+                source_sha256=str(depth_chart_source_sha256),
+                rows=depth,
+            )
+            if personnel is not None:
+                game["auto_personnel_provider"] = personnel
+        bundles.append(
+            build_run_it_context(
+                mode=requested,
+                game=game,
                 as_of=as_of,
                 manual_observations=list(manual.get(game_id, ())),
                 opener=opener,
@@ -141,6 +171,7 @@ def build_nfl_auto_context_slate(
         "collection_mode": requested,
         "as_of_utc": plan["as_of_utc"],
         "schedule_source_sha256": plan["schedule_source_sha256"],
+        "depth_chart_source_sha256": depth_chart_source_sha256 if depth is not None else None,
         "game_count": len(bundles),
         "games": bundles,
         "model_p_eligible": False,
