@@ -253,6 +253,11 @@ def build_default_auto_providers(
         }
 
     def personnel(game_id: str, pit: datetime):
+        auto_row = game.get("auto_personnel_provider")
+        if isinstance(auto_row, Mapping) and auto_row:
+            row = dict(auto_row)
+            row["observed_at"] = pit
+            return row
         rows = list(game.get("personnel_package_inputs") or [])
         if not rows:
             return None
