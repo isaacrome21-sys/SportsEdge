@@ -1,5 +1,7 @@
 import json
 from pathlib import Path
+import subprocess
+import sys
 
 import pytest
 
@@ -9,6 +11,8 @@ from sportsedge.run_it_control import (
     execute_surface,
     scope_from_request,
 )
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def _surface(root: Path, sports: dict) -> Path:
@@ -24,6 +28,26 @@ def test_repo_surface_declares_all_active_sports_and_live_lane():
     assert {row["sport"] for row in report["sports"]} == {
         "MLB", "NFL", "CFB", "PGA", "UFC", "LIVE"
     }
+
+
+def test_run_it_cli_executes_by_path_from_repo_root(tmp_path):
+    output = tmp_path / "audit.json"
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "run_it_all.py"),
+            "--audit",
+            "--output",
+            str(output),
+        ],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr or proc.stdout
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["status"] == "PASS"
 
 
 def test_execute_never_silently_skips_library_only_lane(tmp_path):
