@@ -1,3 +1,10 @@
+"""Regression contract for conserving the four free MLB Odds API keys.
+
+Scheduled and push automation must never receive Odds API or external quote
+credentials. Explicit workflow_dispatch is the only repository event allowed to
+use the keyring; scheduled automation continues through the resilient no-key
+ESPN fallback path.
+"""
 from pathlib import Path
 import unittest
 
