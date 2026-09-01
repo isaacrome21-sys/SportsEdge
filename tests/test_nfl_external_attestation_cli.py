@@ -12,7 +12,7 @@ from sportsedge.sports.nfl.model_artifact import build_nfl_m2_model_artifact
 class NFLExternalAttestationCLITests(unittest.TestCase):
     SHA = "1" * 40
 
-    def _model_artifact(self, git_sha=None):
+    def _model_artifact(self, git_sha: str):
         # Mirrors tests/test_nfl_ci_attestation.py::_model_artifact -- both the
         # CI bundle and the forward bundle are now required to carry
         # nfl_m2_model.json (sportsedge/core/validation/nfl_ci_attestation.py
@@ -27,7 +27,7 @@ class NFLExternalAttestationCLITests(unittest.TestCase):
             train_seasons=(2024, 2025), ridge_alpha=10.0, margin_sigma=13.0, total_sigma=10.0,
             residual_correlation=0.0, residual_pairs=((1.0, 1.0), (-1.0, -1.0)),
         )
-        return build_nfl_m2_model_artifact(model, code_git_sha=git_sha or self.SHA, source_manifest_sha256="a" * 64)
+        return build_nfl_m2_model_artifact(model, code_git_sha=git_sha, source_manifest_sha256="a" * 64)
 
     def _ci_bundle(self, root: Path):
         math = {"math_artifact": {"provenance": "REAL_PUBLIC_HISTORY", "source_sha256": "a" * 64,
@@ -55,35 +55,34 @@ class NFLExternalAttestationCLITests(unittest.TestCase):
                     "artifacts": [{"path": n, "sha256": h} for n, h in sorted(hashes.items())]}
         (root / "nfl_promotion_evidence_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
 
-    def _forward_bundle(self, root: Path, *, model_sha=None, collector_sha=None):
+    def _forward_bundle(self, root: Path, *, model_code_sha: str | None = None):
         # model_code_sha lets a caller simulate a forward bundle bound to a
         # DIFFERENT model release than the collector workflow head
         # (collector_git_sha stays self.SHA either way -- it identifies which
         # scheduled run captured the bytes, not which model they're bound to).
-        model_sha = model_sha or self.SHA
-        collector_sha = collector_sha or self.SHA
+        code_sha = model_code_sha or self.SHA
 
         # Must byte-match the CI bundle's copy when code_sha == self.SHA (same
         # model, same git_sha). Written first so its hash can be embedded in
         # the decision row, evidence, and manifest below, matching what
         # schema v2 requires.
         m = root / "nfl_m2_model.json"
-        m.write_text(json.dumps(self._model_artifact(model_sha), sort_keys=True), encoding="utf-8")
+        m.write_text(json.dumps(self._model_artifact(code_sha), sort_keys=True), encoding="utf-8")
         model_artifact_sha256 = hashlib.sha256(m.read_bytes()).hexdigest()
 
         identity = {"game_id": "2026_01_AAA_BBB", "sport": "nfl", "market": "spread", "side": "AAA",
                     "book": "draftkings", "model_id": PRODUCTION_NFL_M2_MODEL_ID,
-                    "feature_contract": NFL_M2_FEATURE_CONTRACT, "code_git_sha": model_sha,
-                    "model_artifact_sha256": model_artifact_sha256}
+                    "feature_contract": NFL_M2_FEATURE_CONTRACT, "code_git_sha": code_sha}
         decision = dict(identity, decision_ts="2026-09-10T23:00:00+00:00", game_start_ts="2026-09-11T00:20:00+00:00",
                         line_at_decision=-3.0, price_at_decision=-110, model_prob=.56, novig_prob=.50,
-                        ev=.06, kelly_frac=.02, stake_units=.5, gate_result="OFFICIAL")
+                        ev=.06, kelly_frac=.02, stake_units=.5, gate_result="OFFICIAL",
+                        model_artifact_sha256=model_artifact_sha256)
         close = dict(identity, close_ts="2026-09-11T00:15:00+00:00", game_start_ts="2026-09-11T00:20:00+00:00",
                      closing_line=-3.5, closing_price=-110, closing_novig_prob=.52, probability_line=-3.0)
         d = root / "nfl_forward_decisions.jsonl"; d.write_text(json.dumps(decision) + "\n", encoding="utf-8")
         c = root / "nfl_forward_closes.jsonl"; c.write_text(json.dumps(close) + "\n", encoding="utf-8")
         evidence = {"schema_version": 4, "sport": "nfl", "model_id": PRODUCTION_NFL_M2_MODEL_ID,
-                    "feature_contract": NFL_M2_FEATURE_CONTRACT, "code_git_sha": model_sha,
+                    "feature_contract": NFL_M2_FEATURE_CONTRACT, "code_git_sha": code_sha,
                     "model_artifact_sha256": model_artifact_sha256,
                     "decision_log_sha256": hashlib.sha256(d.read_bytes()).hexdigest(),
                     "close_log_sha256": hashlib.sha256(c.read_bytes()).hexdigest(),
@@ -108,7 +107,7 @@ class NFLExternalAttestationCLITests(unittest.TestCase):
         # mismatch against the CI bundle) and actually reads
         # model_artifact_sha256 from the manifest.
         manifest = {"schema_version": 2, "collector_contract": "NFL_FORWARD_CLV_COLLECTION_V2",
-                    "collector_git_sha": collector_sha, "model_code_git_sha": model_sha,
+                    "collector_git_sha": self.SHA, "model_code_git_sha": code_sha,
                     "model_id": PRODUCTION_NFL_M2_MODEL_ID,
                     "feature_contract": NFL_M2_FEATURE_CONTRACT,
                     "model_artifact_sha256": model_artifact_sha256,
@@ -150,7 +149,7 @@ class NFLExternalAttestationCLITests(unittest.TestCase):
             # code identity), the collector/workflow head must stay consistent
             # (self.SHA) while the model_code_git_sha itself differs from the
             # CI bundle's.
-            self._forward_bundle(forward, model_sha="2" * 40, collector_sha=self.SHA)
+            self._forward_bundle(forward, model_code_sha="2" * 40)
             with self.assertRaisesRegex(ValueError, "NFL_EXTERNAL_ATTESTATION_CODE_SHA_MISMATCH"):
                 build_registry_from_bundles(
                     ci_bundle_dir=ci, ci_workflow_name="football-nfl-promotion-evidence", ci_workflow_conclusion="success",
