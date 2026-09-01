@@ -19,6 +19,11 @@ def _reason(row: Mapping[str, Any]) -> str:
     return str(row.get("reason") or "")
 
 
+def _is_provider_fetch_failure(row: Mapping[str, Any]) -> bool:
+    reason = _reason(row)
+    return reason.startswith(_FETCH_PREFIX) or f": {_FETCH_PREFIX}" in reason
+
+
 def should_rotate_odds_key(*, run_status: str, results: Iterable[Any], source_failures: Iterable[Mapping[str, Any]]) -> bool:
     """Return True only for an all-event provider-fetch failure with no output.
 
@@ -34,13 +39,13 @@ def should_rotate_odds_key(*, run_status: str, results: Iterable[Any], source_fa
         return False
     odds_fetches = [
         row for row in failures
-        if str(row.get("stage") or "") == "ODDS_API" and _reason(row).startswith(_FETCH_PREFIX)
+        if str(row.get("stage") or "") == "ODDS_API" and _is_provider_fetch_failure(row)
     ]
     if not odds_fetches:
         return False
     non_fetch = [
         row for row in failures
-        if not (str(row.get("stage") or "") == "ODDS_API" and _reason(row).startswith(_FETCH_PREFIX))
+        if not (str(row.get("stage") or "") == "ODDS_API" and _is_provider_fetch_failure(row))
     ]
     # Roster/feature diagnostics may coexist with an exhausted key, but any
     # other odds-provider failure means the request itself reached the provider
