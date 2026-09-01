@@ -17,9 +17,14 @@ on:
       - 'tests/test_mlb_run_machine.py'
       - '.github/workflows/auto-mlb.yml'
   schedule:
-    # Fifteen-minute cadence remains sufficient for the archive's +/-8 minute
-    # capture windows while avoiding the heavily loaded top-of-hour minute.
-    - cron: '7,22,37,52 * * * *'
+    # Three runs/hour are sufficient for MLB's five-minute first-pitch grid:
+    # :02/:22/:42 is always within the archive's +/-8 minute window for any
+    # scheduled minute ending in 0 or 5, and T-180/T-90 preserve that minute.
+    # Limit the automatic lane to the MLB-season game window instead of burning
+    # private-repo Actions minutes 24/7. 13-03 UTC covers 08:00-22:59 CDT and
+    # 07:00-21:59 CST; March-November covers the MLB season/postseason.
+    # Upper bound: 45 scheduled jobs/day, 1,395 in a 31-day active month.
+    - cron: '2,22,42 13-23,0-3 * 3-11 *'
 
 permissions:
   contents: write
