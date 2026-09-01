@@ -2,8 +2,8 @@ from sportsedge.ufc_history import build_history_from_text
 
 
 EVENTS = """EVENT,URL,DATE,LOCATION
-E1,,January 01, 2025,Las Vegas
-E2,,February 01, 2025,Las Vegas
+E1,,"January 01, 2025",Las Vegas
+E2,,"February 01, 2025",Las Vegas
 """
 
 RESULTS = """EVENT,BOUT,OUTCOME,WEIGHTCLASS,METHOD,ROUND,TIME,TIME FORMAT,REFEREE,DETAILS,URL
