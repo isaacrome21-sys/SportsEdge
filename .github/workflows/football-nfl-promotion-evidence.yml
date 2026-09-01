@@ -76,22 +76,35 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/football/sources/{pbp,participation,depth}
-          curl --fail --location --retry 3 \
+
+          # These are immutable/frozen evidence inputs. Retry only transport
+          # failures; the URL, returned bytes, and downstream hashes remain
+          # unchanged, and the workflow still fails closed after bounded tries.
+          fetch_source() {
+            local url="$1"
+            local output="$2"
+            curl --fail --location --silent --show-error \
+              --retry 5 --retry-delay 2 --retry-all-errors \
+              --connect-timeout 30 \
+              "$url" -o "$output"
+          }
+
+          fetch_source \
             'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv' \
-            -o artifacts/football/sources/games.csv
-          curl --fail --location --retry 3 \
+            artifacts/football/sources/games.csv
+          fetch_source \
             'https://raw.githubusercontent.com/greerreNFL/Stadiums/efa9543af50b01424754219fa0e4f3c7044ff198/data/team_stadiums.csv' \
-            -o artifacts/football/sources/team_stadiums.csv
+            artifacts/football/sources/team_stadiums.csv
           for season in $(seq 2016 2025); do
-            curl --fail --location --retry 3 \
+            fetch_source \
               "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_${season}.csv.gz" \
-              -o "artifacts/football/sources/pbp/play_by_play_${season}.csv.gz"
-            curl --fail --location --retry 3 \
+              "artifacts/football/sources/pbp/play_by_play_${season}.csv.gz"
+            fetch_source \
               "https://github.com/nflverse/nflverse-data/releases/download/pbp_participation/pbp_participation_${season}.csv" \
-              -o "artifacts/football/sources/participation/pbp_participation_${season}.csv"
-            curl --fail --location --retry 3 \
+              "artifacts/football/sources/participation/pbp_participation_${season}.csv"
+            fetch_source \
               "https://github.com/nflverse/nflverse-data/releases/download/depth_charts/depth_charts_${season}.csv" \
-              -o "artifacts/football/sources/depth/depth_charts_${season}.csv"
+              "artifacts/football/sources/depth/depth_charts_${season}.csv"
           done
 
       - name: Build exact production-M2 walk-forward evidence
