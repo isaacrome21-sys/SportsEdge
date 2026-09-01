@@ -68,6 +68,32 @@ def test_blockers_are_scoped_not_slate_wide():
     assert blockers[("PLAYER_PROP", "game-b:player-x:targets")] == ["quote"]
 
 
+def test_optional_missing_context_is_visible_but_not_a_pricing_blocker():
+    now = datetime(2026, 9, 1, 13, 0, tzinfo=timezone.utc)
+    optional = build_datum(
+        sport="CFB", scope_type="GAME", scope_id="game-c",
+        field_name="secondary_weather_commentary", value=None,
+        source_name="MYSPORTSWEATHER", source_uri="https://mysportsweather.com/",
+        retrieved_at=now, missing=True, trust_class=TrustClass.CONTEXT_ONLY,
+        required_for_evaluation=False,
+    )
+    assert optional.freshness_status == FreshnessStatus.MISSING
+    assert scoped_blockers([optional]) == {}
+
+
+def test_required_unverified_manual_quote_blocks_only_its_scope():
+    now = datetime(2026, 9, 1, 13, 0, tzinfo=timezone.utc)
+    quote = build_datum(
+        sport="MLB", scope_type="PLAYER_PROP", scope_id="g:p:ks",
+        field_name="quote", value={"line": 5.5, "price": -110},
+        source_name="MANUAL_SCREENSHOT", source_uri="manual://screenshot",
+        retrieved_at=now, observed_at=None, ttl_seconds=120,
+        trust_class=TrustClass.MARKET_ONLY, manual_fill=True,
+        required_for_evaluation=True,
+    )
+    assert scoped_blockers([quote]) == {("PLAYER_PROP", "g:p:ks"): ["quote"]}
+
+
 def test_delta_changed_returns_only_changed_fields():
     assert delta_changed({"wind": 5, "roof": "OPEN"}, {"wind": 12, "roof": "OPEN"}) == {
         "wind": (5, 12)
