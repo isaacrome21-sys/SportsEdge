@@ -191,12 +191,19 @@ def audit_starting_qb_coverage(
     """Return every missing/ambiguous required PIT starter in one deterministic pass.
 
     This is diagnostic only. It calls the exact production ``select_starting_qb``
-    contract and never supplies a replacement starter. Initial burn-in seasons
-    without a fitted prior-decay curve are intentionally excluded because the
-    production history builder does not emit evaluation rows for them.
+    contract and never supplies a replacement starter. Rows are losslessly
+    pre-indexed by team because rows from other teams are rejected by that exact
+    selector anyway. Initial burn-in seasons without a fitted prior-decay curve
+    are intentionally excluded because no evaluation row is emitted for them.
     """
     eligible = {int(season) for season in eligible_seasons}
-    depth = [dict(row) for row in depth_rows]
+    depth_by_team: dict[str, list[dict[str, str]]] = {}
+    for raw in depth_rows:
+        row = dict(raw)
+        team = str(row.get("team") or row.get("club_code") or "").strip()
+        if team:
+            depth_by_team.setdefault(team, []).append(row)
+
     games = [
         dict(row) for row in schedule_rows
         if str(row.get("game_type") or "REG").upper() == "REG" and int(row.get("season") or -1) in eligible
@@ -211,7 +218,13 @@ def audit_starting_qb_coverage(
         for side in ("home", "away"):
             team = str(game.get(f"{side}_team") or "").strip()
             try:
-                select_starting_qb(depth, team=team, season=season, week=week, game_start_ts=start)
+                select_starting_qb(
+                    depth_by_team.get(team, ()),
+                    team=team,
+                    season=season,
+                    week=week,
+                    game_start_ts=start,
+                )
             except ValueError as exc:
                 error = str(exc)
                 if not error.startswith(("NFL_STARTING_QB_MISSING:", "NFL_STARTING_QB_AMBIGUOUS:")):
