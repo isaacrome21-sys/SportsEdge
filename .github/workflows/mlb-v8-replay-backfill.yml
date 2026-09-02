@@ -1,0 +1,89 @@
+name: mlb-v8-replay-backfill
+
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: Historical source adapter
+        required: true
+        default: the-odds-api
+        type: choice
+        options:
+          - the-odds-api
+          - sportsgameodds
+          - propline
+      start:
+        description: Inclusive replay start date
+        required: true
+        default: '2026-03-01'
+        type: string
+      end:
+        description: Inclusive replay end date
+        required: true
+        default: '2026-08-31'
+        type: string
+      max_credits:
+        description: The Odds API estimated-credit ceiling for this run
+        required: true
+        default: '30'
+        type: string
+      max_pages:
+        description: SportsGameOdds page ceiling for this run
+        required: true
+        default: '20'
+        type: string
+      max_months:
+        description: PropLine month-export ceiling for this run
+        required: true
+        default: '1'
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mlb-v8-replay-backfill
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+      SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
+      SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
+      SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
+      SPORTSEDGE_SGO_API_KEY: ${{ secrets.SPORTSEDGE_SGO_API_KEY }}
+      SPORTSEDGE_PROPLINE_API_KEY: ${{ secrets.SPORTSEDGE_PROPLINE_API_KEY }}
+      SPORTSEDGE_REPLAY_BOOKMAKERS: draftkings
+      SPORTSEDGE_REPLAY_MARKETS: h2h,spreads,totals
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Verify V8 replay contracts
+        run: |
+          python3 -I scripts/mlb_v8_evidence.py --self-test
+          python3 -I scripts/persist_mlb_v8_evidence.py --self-test
+          python3 -I scripts/backfill_mlb_v8_replay.py --self-test
+      - name: Run bounded replay tranche
+        run: >-
+          python3 -I scripts/backfill_mlb_v8_replay.py
+          --provider "${{ inputs.provider }}"
+          --start "${{ inputs.start }}"
+          --end "${{ inputs.end }}"
+          --max-credits "${{ inputs.max_credits }}"
+          --max-pages "${{ inputs.max_pages }}"
+          --max-months "${{ inputs.max_months }}"
+      - name: Persist replay evidence and resume ledger
+        if: always()
+        run: python3 -I scripts/persist_mlb_v8_evidence.py
+      - name: Upload replay execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlb-v8-replay-${{ inputs.provider }}-${{ github.run_id }}
+          path: artifacts/mlb_v8/**
+          if-no-files-found: warn
+          retention-days: 90
