@@ -121,10 +121,18 @@ def verify_pit_snapshot(
         if returned >= commence:
             continue
         minutes_before = (commence - returned).total_seconds() / 60.0
-        target = min(targets, key=lambda x: abs(minutes_before - x))
-        delta = abs(minutes_before - target)
+
+        # A canonical target is a latest-acceptable decision moment, not the center
+        # of a symmetric window. Only snapshots at or BEFORE a target are eligible.
+        # In minutes-before-first-pitch coordinates that means minutes_before >= target.
+        safe_targets = [target for target in targets if minutes_before >= target]
+        if not safe_targets:
+            continue
+        target = min(safe_targets, key=lambda x: minutes_before - x)
+        delta = minutes_before - target
         if delta > PIT_TARGET_TOLERANCE_MINUTES:
             continue
+
         matches.append({
             "provider_event_id": event_id,
             "home_team": event.get("home_team"),
@@ -204,6 +212,7 @@ def build(input_root: Path, output_root: Path) -> dict[str, Any]:
         "policy_sha256": sha256_bytes(POLICY.read_bytes()),
         "window": window,
         "pit_target_tolerance_minutes": PIT_TARGET_TOLERANCE_MINUTES,
+        "pit_target_tolerance_direction": "EARLY_ONLY_AT_OR_BEFORE_TARGET",
         "files": files,
         "file_count": len(files),
         "verified_pit_decision_days": len(verified_pit_days),
@@ -254,22 +263,50 @@ def self_test() -> int:
         c.mkdir(parents=True)
         (c / "raw.json").write_text("{}\n")
 
+        # Regression: 24.1 minutes before first pitch is 5.9 minutes AFTER T-30.
+        # It must never be admitted by the six-minute tolerance.
+        late = inp / "THE_ODDS_API_HISTORICAL" / "2026-03-04" / "featured"
+        late.mkdir(parents=True)
+        late_payload = {
+            "timestamp": "2026-03-04T18:30:00Z",
+            "data": [{
+                "id": "event-late",
+                "commence_time": "2026-03-04T18:54:06Z",
+                "home_team": "Home",
+                "away_team": "Away",
+                "bookmakers": [],
+            }],
+        }
+        late_path = late / "snapshot_20260304T183000Z.json"
+        late_bytes = (json.dumps(late_payload, sort_keys=True) + "\n").encode()
+        late_path.write_bytes(late_bytes)
+        (late / "snapshot_20260304T183000Z.meta.json").write_text(json.dumps({
+            "source": "THE_ODDS_API_HISTORICAL",
+            "request_params_secret_free": {"date": "2026-03-04T18:30:00Z"},
+            "payload_sha256": sha256_bytes(late_bytes),
+        }))
+
         manifest = build(inp, out)
         rows = json.loads((out / "gap_report.json").read_text())
         raw_rows = [x for x in manifest["files"] if x["record_role"] == "raw_source"]
         proved = next(x for x in raw_rows if x["observed_date"] == "2026-03-01")
         missing_meta = next(x for x in raw_rows if x["observed_date"] == "2026-03-02")
         open_close = next(x for x in raw_rows if x["observed_date"] == "2026-03-03")
+        late_row = next(x for x in raw_rows if x["observed_date"] == "2026-03-04")
         assert manifest["promotion_eligible"] is False
         assert manifest["verified_pit_decision_days"] == 1
+        assert manifest["pit_target_tolerance_direction"] == "EARLY_ONLY_AT_OR_BEFORE_TARGET"
         assert rows[0]["status"] == "PIT_DECISION_SNAPSHOT_VERIFIED"
         assert rows[1]["status"] == "PIT_SOURCE_PRESENT_BUT_DECISION_SNAPSHOT_UNVERIFIED"
         assert rows[2]["status"] == "PIT_SOURCE_MISSING"
+        assert rows[3]["status"] == "PIT_SOURCE_PRESENT_BUT_DECISION_SNAPSHOT_UNVERIFIED"
         assert proved["truth_gate_eligible_as_decision_snapshot"] is True
         assert proved["pit_target_matches"][0]["canonical_target_minutes"] == 30
         assert missing_meta["truth_gate_eligible_as_decision_snapshot"] is False
         assert missing_meta["pit_verification_reason"] == "PIT_SIDECAR_MISSING"
         assert open_close["truth_gate_eligible_as_decision_snapshot"] is False
+        assert late_row["truth_gate_eligible_as_decision_snapshot"] is False
+        assert late_row["pit_verification_reason"] == "PIT_NO_CANONICAL_GAME_TARGET_MATCH"
     print(json.dumps({"status": "SELF_TEST_OK"}))
     return 0
 
