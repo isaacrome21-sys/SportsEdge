@@ -8,6 +8,9 @@ on:
       - 'scripts/backfill_mlb_v8_the_odds_api.py'
       - 'scripts/capture_mlb_v8_forward_evidence.py'
       - 'scripts/run_mlb_v8_forward_lane.py'
+      - 'sportsedge/mlb_context_autopull.py'
+      - 'sportsedge/mlb_objective_depth_sources.py'
+      - 'tests/test_mlb_objective_depth_sources.py'
       - '.github/workflows/mlb-v8-contract.yml'
       - '.github/workflows/mlb-v8-evidence.yml'
       - '.github/workflows/mlb-v8-replay-backfill.yml'
@@ -19,6 +22,9 @@ on:
       - 'scripts/backfill_mlb_v8_the_odds_api.py'
       - 'scripts/capture_mlb_v8_forward_evidence.py'
       - 'scripts/run_mlb_v8_forward_lane.py'
+      - 'sportsedge/mlb_context_autopull.py'
+      - 'sportsedge/mlb_objective_depth_sources.py'
+      - 'tests/test_mlb_objective_depth_sources.py'
       - '.github/workflows/mlb-v8-contract.yml'
       - '.github/workflows/mlb-v8-evidence.yml'
       - '.github/workflows/mlb-v8-replay-backfill.yml'
@@ -34,19 +40,24 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Compile V8 evidence scripts
+      - name: Compile V8 evidence and objective-depth code
         run: |
           python -m py_compile \
             scripts/build_mlb_v8_replay_archive.py \
             scripts/backfill_mlb_v8_the_odds_api.py \
             scripts/capture_mlb_v8_forward_evidence.py \
-            scripts/run_mlb_v8_forward_lane.py
+            scripts/run_mlb_v8_forward_lane.py \
+            sportsedge/mlb_context_autopull.py \
+            sportsedge/mlb_objective_depth_sources.py \
+            tests/test_mlb_objective_depth_sources.py
       - name: Run isolated V8 evidence self-tests
         run: |
           python scripts/build_mlb_v8_replay_archive.py --self-test
           python scripts/backfill_mlb_v8_the_odds_api.py --self-test
           python scripts/capture_mlb_v8_forward_evidence.py --self-test
           python scripts/run_mlb_v8_forward_lane.py --self-test
+      - name: Run composed Statcast objective-depth regression tests
+        run: python -m unittest -v tests.test_mlb_objective_depth_sources
       - name: Enforce frozen V8 governance
         run: |
           python - <<'PY'
