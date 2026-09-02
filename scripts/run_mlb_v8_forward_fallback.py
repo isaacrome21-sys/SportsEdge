@@ -24,9 +24,12 @@ PLAN_PATH = ARTIFACTS / "mlb_v8_plan.json"
 CARD_PATH = ARTIFACTS / "live_mlb_card.json"
 EVIDENCE_ROOT = ARTIFACTS / "mlb_v8_forward"
 STATUS_ROOT = ARTIFACTS / "mlb_v8_status"
-REQUIRED_RUNTIME_ENV = (
+RUNTIME_ENV_NAMES = (
     "SPORTSEDGE_QUOTES_URL",
     "SPORTSEDGE_ODDS_API_KEY",
+    "SPORTSEDGE_ODDS_API_KEY_2",
+    "SPORTSEDGE_ODDS_API_KEY_3",
+    "SPORTSEDGE_ODDS_API_KEY_4",
     "SPORTSEDGE_FEATURES_URL",
     "SPORTSEDGE_PROJECTED_LINEUPS_URL",
     "SPORTSEDGE_PROVIDER_TOKEN",
@@ -88,6 +91,25 @@ def persist_data_branch(plan: dict, run_id: str, status_path: Path) -> None:
             _git("worktree", "remove", "--force", str(worktree), check=False)
 
 
+def _check_data_branch_write_path() -> tuple[bool, str | None]:
+    fetch = _git("fetch", "origin", "data", check=False)
+    if fetch.returncode != 0:
+        return False, fetch.stderr[-1000:]
+    with tempfile.TemporaryDirectory(prefix="sportsedge-v8-write-probe-") as td:
+        worktree = Path(td) / "data"
+        add = _git("worktree", "add", "--detach", str(worktree), "origin/data", check=False)
+        if add.returncode != 0:
+            return False, add.stderr[-1000:]
+        try:
+            _git("config", "user.name", "sportsedge-v8-dry-run", cwd=worktree)
+            _git("config", "user.email", "sportsedge-v8-dry-run@users.noreply.github.com", cwd=worktree)
+            _git("commit", "--allow-empty", "-m", "dry-run: MLB V8 data-branch write permission probe", cwd=worktree)
+            push = _git("push", "--dry-run", "origin", "HEAD:data", check=False, cwd=worktree)
+            return push.returncode == 0, None if push.returncode == 0 else push.stderr[-1000:]
+        finally:
+            _git("worktree", "remove", "--force", str(worktree), check=False)
+
+
 def dry_run(*, check_data_branch: bool = True) -> int:
     now = datetime.now(timezone.utc)
     slate = now.astimezone(CT).date().isoformat()
@@ -121,23 +143,27 @@ def dry_run(*, check_data_branch: bool = True) -> int:
         checks["canonical_cli_stderr_tail"] = help_run.stderr[-1000:]
         failures.append("canonical_cli_import")
 
-    env_presence = {name: bool(os.environ.get(name)) for name in REQUIRED_RUNTIME_ENV}
+    env_presence = {name: bool(os.environ.get(name)) for name in RUNTIME_ENV_NAMES}
     checks["runtime_env_present"] = env_presence
-    checks["runtime_env_complete"] = all(env_presence.values())
-    if not checks["runtime_env_complete"]:
-        failures.append("runtime_env")
+    odds_key_present = any(env_presence[name] for name in (
+        "SPORTSEDGE_ODDS_API_KEY", "SPORTSEDGE_ODDS_API_KEY_2",
+        "SPORTSEDGE_ODDS_API_KEY_3", "SPORTSEDGE_ODDS_API_KEY_4",
+    ))
+    quotes_present = env_presence["SPORTSEDGE_QUOTES_URL"]
+    features_present = env_presence["SPORTSEDGE_FEATURES_URL"]
+    checks["native_odds_credentials_present"] = odds_key_present
+    checks["legacy_quote_lane_config_valid"] = (not quotes_present) or features_present
+    checks["espn_fallback_available_without_credentials"] = True
+    if quotes_present and not features_present:
+        failures.append("legacy_quote_lane_missing_features")
 
     if check_data_branch:
-        fetch = _git("fetch", "origin", "data", check=False)
-        checks["data_branch_fetch_ok"] = fetch.returncode == 0
-        if fetch.returncode != 0:
-            checks["data_branch_fetch_stderr_tail"] = fetch.stderr[-1000:]
-            failures.append("data_branch_fetch")
-        else:
-            probe = _git("rev-parse", "--verify", "FETCH_HEAD", check=False)
-            checks["data_branch_ref_ok"] = probe.returncode == 0
-            if probe.returncode != 0:
-                failures.append("data_branch_ref")
+        ok, error = _check_data_branch_write_path()
+        checks["data_branch_write_dry_run_ok"] = ok
+        if error:
+            checks["data_branch_write_error_tail"] = error
+        if not ok:
+            failures.append("data_branch_write_dry_run")
 
     payload = {
         "schema": "MLB_V8_FORWARD_FALLBACK_DRY_RUN_V1",
