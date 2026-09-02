@@ -1,0 +1,70 @@
+{
+  "policy_id": "MLB_V8_EVIDENCE_V1",
+  "effective_forward_date_ct": "2026-09-03",
+  "replay_window": {
+    "start_date": "2026-03-01",
+    "end_date": "2026-08-31"
+  },
+  "fail_closed": true,
+  "rules": {
+    "never_invent_observation_timestamp": true,
+    "never_relabel_open_or_close_as_decision_snapshot": true,
+    "never_use_postgame_data_as_pregame_model_input": true,
+    "preserve_raw_provider_bytes": true,
+    "sha256_bind_raw_and_normalized_records": true,
+    "paired_decision_close_required_for_clv": true,
+    "untouched_forward_holdout_starts": "2026-09-03"
+  },
+  "evidence_tiers": {
+    "A_PIT_SNAPSHOT": "Provider supplies a timestamped point-in-time sportsbook snapshot at or before the requested decision time.",
+    "B_LINE_MOVEMENT": "Provider supplies timestamped opening-to-closing movement but not an exact requested PIT snapshot.",
+    "C_OPEN_CLOSE": "Provider supplies sportsbook-specific opening and closing observations only.",
+    "D_RESULTS_CONTEXT": "Authoritative results/context only; never sufficient for market PIT calibration by itself."
+  },
+  "source_registry": [
+    {
+      "source": "THE_ODDS_API_HISTORICAL",
+      "tier": "A_PIT_SNAPSHOT",
+      "use": ["moneyline", "spread", "total", "additional_markets_when_available"],
+      "notes": "Historical snapshots; preserve returned timestamp/previous_timestamp/next_timestamp and exact raw bytes."
+    },
+    {
+      "source": "SPORTSDATAIO_BETTING_ARCHIVE",
+      "tier": "B_LINE_MOVEMENT",
+      "use": ["game_lines", "period_lines", "props_when_entitled"],
+      "notes": "Preserve every provider movement timestamp and sportsbook identity; do not treat overwritten non-odds historical fields as PIT revisions."
+    },
+    {
+      "source": "OPTICODDS_HISTORICAL",
+      "tier": "B_LINE_MOVEMENT",
+      "use": ["rolling_window_recovery"],
+      "notes": "Rolling retention means August recovery should be attempted immediately; retain detected movement timestamps."
+    },
+    {
+      "source": "SPORTSGAMEODDS_OPEN_CLOSE",
+      "tier": "C_OPEN_CLOSE",
+      "use": ["open_close_clv_support", "settlement_crosscheck"],
+      "notes": "Opening/closing lines are useful for CLV support but are not a substitute for an exact decision-time snapshot."
+    },
+    {
+      "source": "MLB_STATSAPI",
+      "tier": "D_RESULTS_CONTEXT",
+      "use": ["schedule", "game_identity", "start_time", "final_score", "official_game_state"],
+      "notes": "Authoritative game identity/results lane; never market evidence."
+    }
+  ],
+  "canonical_capture_targets_minutes_before_first_pitch": [180, 90, 30, 10, 0],
+  "decision_capture": {
+    "required": true,
+    "definition": "Exact quote set used by the V8 decision engine, captured before recommendation/execution with run_id, model/distribution SHA, quote timestamps and source provenance."
+  },
+  "close_capture": {
+    "required": true,
+    "definition": "Last verifiable pre-first-pitch quote snapshot per sportsbook/market, stored separately from decision evidence."
+  },
+  "promotion": {
+    "replay_may_inform_development": true,
+    "replay_alone_may_promote_v8": false,
+    "forward_holdout_required": true
+  }
+}

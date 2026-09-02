@@ -1,0 +1,155 @@
+name: mlb-v8-replay-backfill
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_requests:
+        description: Maximum paid historical provider requests this run
+        required: false
+        default: '25'
+      include_additional:
+        description: Also attempt event-level props/additional markets (high credit cost)
+        required: false
+        type: boolean
+        default: false
+  schedule:
+    # Small bounded daily recovery. This also archives all free StatsAPI replay rows.
+    - cron: '17 10 * 9-11 *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mlb-v8-replay-backfill
+  cancel-in-progress: false
+
+jobs:
+  replay-backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Restore durable replay progress from data branch
+        run: |
+          set -euo pipefail
+          git fetch origin data
+          git worktree add --detach .data-v8-replay FETCH_HEAD
+          if [ -d .data-v8-replay/evidence/mlb_v8_replay_sources ]; then
+            mkdir -p artifacts/mlb_v8_replay_sources
+            cp -R .data-v8-replay/evidence/mlb_v8_replay_sources/. artifacts/mlb_v8_replay_sources/
+          fi
+          if [ -d .data-v8-replay/runtime/mlb-v8-replay-control ]; then
+            mkdir -p artifacts/mlb_v8_replay_control
+            cp -R .data-v8-replay/runtime/mlb-v8-replay-control/. artifacts/mlb_v8_replay_control/
+          fi
+
+      - name: Verify replay collector contracts
+        run: |
+          python scripts/backfill_mlb_v8_the_odds_api.py --self-test
+          python scripts/build_mlb_v8_replay_archive.py --self-test
+
+      - name: Resolve paid request cap
+        id: budget
+        env:
+          DISPATCH_CAP: ${{ inputs.max_requests }}
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_ADDITIONAL: ${{ inputs.include_additional }}
+        run: |
+          python - <<'PY'
+          import os
+          cap = os.environ.get('DISPATCH_CAP') if os.environ.get('EVENT_NAME') == 'workflow_dispatch' else '2'
+          cap = cap or '2'
+          additional = 'true' if os.environ.get('EVENT_NAME') == 'workflow_dispatch' and os.environ.get('DISPATCH_ADDITIONAL') == 'true' else 'false'
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'max_requests={int(cap)}\n')
+              f.write(f'include_additional={additional}\n')
+          PY
+
+      - name: Collect March-August replay sources
+        id: collect
+        continue-on-error: true
+        env:
+          SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+          SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
+          SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
+          SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
+          SPORTSEDGE_ODDS_BOOKMAKERS: draftkings
+          SPORTSEDGE_V8_BACKFILL_MIN_REMAINING: '100'
+          INCLUDE_ADDITIONAL: ${{ steps.budget.outputs.include_additional }}
+          MAX_REQUESTS: ${{ steps.budget.outputs.max_requests }}
+        run: |
+          set -euo pipefail
+          extra=()
+          if [ "$INCLUDE_ADDITIONAL" = "true" ]; then
+            extra+=(--include-additional)
+          fi
+          python scripts/backfill_mlb_v8_the_odds_api.py \
+            --max-requests "$MAX_REQUESTS" \
+            "${extra[@]}" \
+            | tee artifacts/mlb_v8_backfill_result.json
+
+      - name: Build deterministic replay manifest and PIT gap report
+        if: always() && steps.collect.outcome != 'skipped'
+        run: python scripts/build_mlb_v8_replay_archive.py
+
+      - name: Upload exact backfill evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlb-v8-replay-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts/mlb_v8_replay_sources
+            artifacts/mlb_v8_replay_control
+            artifacts/mlb_v8_replay_archive
+            artifacts/mlb_v8_backfill_result.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Persist replay archive and progress to data branch
+        if: always() && steps.collect.outcome != 'skipped'
+        env:
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          COLLECT_OUTCOME: ${{ steps.collect.outcome }}
+        run: |
+          set -euo pipefail
+          mkdir -p .data-v8-replay/evidence/mlb_v8_replay_sources
+          mkdir -p .data-v8-replay/evidence/mlb_v8_replay_archive
+          mkdir -p .data-v8-replay/runtime/mlb-v8-replay-control
+          if [ -d artifacts/mlb_v8_replay_sources ]; then
+            cp -R artifacts/mlb_v8_replay_sources/. .data-v8-replay/evidence/mlb_v8_replay_sources/
+          fi
+          if [ -d artifacts/mlb_v8_replay_archive ]; then
+            cp -R artifacts/mlb_v8_replay_archive/. .data-v8-replay/evidence/mlb_v8_replay_archive/
+          fi
+          if [ -d artifacts/mlb_v8_replay_control ]; then
+            cp -R artifacts/mlb_v8_replay_control/. .data-v8-replay/runtime/mlb-v8-replay-control/
+          fi
+          if [ -f artifacts/mlb_v8_backfill_result.json ]; then
+            cp artifacts/mlb_v8_backfill_result.json ".data-v8-replay/runtime/mlb-v8-replay-control/run_${RUN_ID}_${RUN_ATTEMPT}.json"
+          else
+            printf '{"status":"BACKFILL_STEP_NO_RESULT","collect_outcome":"%s"}\n' "$COLLECT_OUTCOME" > ".data-v8-replay/runtime/mlb-v8-replay-control/run_${RUN_ID}_${RUN_ATTEMPT}.json"
+          fi
+          cd .data-v8-replay
+          git config user.name sportsedge-v8-replay-bot
+          git config user.email sportsedge-v8-replay-bot@users.noreply.github.com
+          git add evidence/mlb_v8_replay_sources evidence/mlb_v8_replay_archive runtime/mlb-v8-replay-control
+          if git diff --cached --quiet; then
+            echo 'No new replay evidence in this run'
+            exit 0
+          fi
+          git commit -m "evidence: advance MLB V8 replay backfill ${RUN_ID}:${RUN_ATTEMPT}"
+          for attempt in 1 2 3 4 5; do
+            if git push origin HEAD:data; then
+              exit 0
+            fi
+            git fetch origin data
+            git rebase origin/data
+            sleep $((attempt * 2))
+          done
+          echo 'MLB V8 replay persistence failed after retries'
+          exit 98
