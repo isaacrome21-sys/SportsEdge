@@ -13,7 +13,8 @@
     "preserve_raw_provider_bytes": true,
     "sha256_bind_raw_and_normalized_records": true,
     "paired_decision_close_required_for_clv": true,
-    "untouched_forward_holdout_starts": "2026-09-03"
+    "untouched_forward_holdout_starts": "2026-09-03",
+    "never_grandfather_pre_guard_evidence_qualification": true
   },
   "evidence_tiers": {
     "A_PIT_SNAPSHOT": "Provider supplies a timestamped point-in-time sportsbook snapshot at or before the requested decision time.",
@@ -56,7 +57,11 @@
   "canonical_capture_targets_minutes_before_first_pitch": [180, 90, 30, 10, 0],
   "decision_capture": {
     "required": true,
-    "definition": "Exact quote set used by the V8 decision engine, captured before recommendation/execution with run_id, model/distribution SHA, quote timestamps and source provenance."
+    "definition": "Exact quote set used by the V8 decision engine, captured before recommendation/execution with run_id, model/distribution SHA, quote timestamps and source provenance.",
+    "target_minutes_before_first_pitch": 30,
+    "tolerance_minutes": 6,
+    "tolerance_direction": "EARLY_ONLY_AT_OR_BEFORE_TARGET",
+    "late_capture_handling": "PRESERVE_AS_LATE_CAPTURE_NEVER_QUALIFY_AS_DECISION"
   },
   "close_capture": {
     "required": true,
