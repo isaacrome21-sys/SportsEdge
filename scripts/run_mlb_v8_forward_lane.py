@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Plan and materialize clean MLB V8 forward decision/close evidence.
-
-This lane is cheap outside capture windows: it calls only MLB StatsAPI. When a game
-is near the standardized V8 decision or close window, the workflow runs the canonical
-MLB machine once and this script converts that exact card into immutable evidence.
-"""
+"""Plan and materialize clean MLB V8 forward decision/close evidence."""
 from __future__ import annotations
 
 import argparse
@@ -17,7 +12,10 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo
 
-from capture_mlb_v8_forward_evidence import persist
+from capture_mlb_v8_forward_evidence import (
+    DECISION_TOLERANCE_DIRECTION,
+    persist,
+)
 
 CT = ZoneInfo("America/Chicago")
 MLB_SCHEDULE = "https://statsapi.mlb.com/api/v1/schedule"
@@ -96,21 +94,39 @@ def build_plan(now: datetime, games: Iterable[dict[str, Any]]) -> dict[str, Any]
         minutes_to = seconds_to / 60.0
         phases: list[str] = []
         labels: list[str] = []
-        if abs(minutes_to - DECISION_TARGET_MIN) <= DECISION_TOLERANCE_MIN:
+        decision_status: str | None = None
+
+        # Frozen protocol is one-sided: the T-30 decision snapshot must be at or
+        # before the requested decision time. Early tolerance is permitted only
+        # toward earlier observations. A T-24 capture is preserved as LATE_CAPTURE,
+        # never relabeled as T-30 decision evidence.
+        if minutes_to >= DECISION_TARGET_MIN and (minutes_to - DECISION_TARGET_MIN) <= DECISION_TOLERANCE_MIN:
             phases.append("decision")
             labels.append("T-30")
+            decision_status = "QUALIFIED_AT_OR_BEFORE_TARGET"
+        elif minutes_to < DECISION_TARGET_MIN and (DECISION_TARGET_MIN - minutes_to) <= DECISION_TOLERANCE_MIN:
+            decision_status = "LATE_CAPTURE"
+
         for target in CLOSE_TARGETS_MIN:
             if abs(minutes_to - target) <= CLOSE_TOLERANCE_MIN:
                 phases.append("close")
                 labels.append("T0" if target == 0 else f"T-{int(target)}")
                 break
-        if not phases:
+
+        # Keep late decision-window observations in the plan/status even though
+        # they do not trigger model execution or decision evidence materialization.
+        if not phases and decision_status != "LATE_CAPTURE":
             continue
         selected.append({
             **dict(game),
-            "minutes_to_first_pitch": round(minutes_to, 3),
+            "minutes_before_first_pitch": round(minutes_to, 3),
             "phases": phases,
             "capture_labels": labels,
+            "decision_target_minutes": DECISION_TARGET_MIN,
+            "decision_tolerance_minutes": DECISION_TOLERANCE_MIN,
+            "decision_tolerance_direction": DECISION_TOLERANCE_DIRECTION,
+            "decision_timing_status": decision_status,
+            "decision_target_qualified": decision_status == "QUALIFIED_AT_OR_BEFORE_TARGET",
         })
 
     return {
@@ -118,9 +134,11 @@ def build_plan(now: datetime, games: Iterable[dict[str, Any]]) -> dict[str, Any]
         "planned_at_utc": current.isoformat(),
         "slate_date_ct": slate_ct,
         "effective": True,
-        "needs_model": bool(selected),
+        "needs_model": any(bool(g.get("phases")) for g in selected),
         "games": selected,
         "decision_target_minutes": DECISION_TARGET_MIN,
+        "decision_tolerance_minutes": DECISION_TOLERANCE_MIN,
+        "decision_tolerance_direction": DECISION_TOLERANCE_DIRECTION,
         "close_targets_minutes": list(CLOSE_TARGETS_MIN),
     }
 
@@ -145,16 +163,10 @@ def _quote_rows(results: list[dict[str, Any]], game_id: str) -> list[dict[str, A
             continue
         seen.add(key)
         out.append({
-            "book_key": str(book),
-            "sportsbook": row.get("sportsbook"),
-            "market": str(market),
-            "entity_id": str(row.get("entity_id") or ""),
-            "side": str(row.get("side") or ""),
-            "line": row.get("line"),
-            "price": price,
-            "retrieved_at": str(retrieved),
-            "offer_id": row.get("offer_id"),
-            "source_index": row.get("source_index"),
+            "book_key": str(book), "sportsbook": row.get("sportsbook"), "market": str(market),
+            "entity_id": str(row.get("entity_id") or ""), "side": str(row.get("side") or ""),
+            "line": row.get("line"), "price": price, "retrieved_at": str(retrieved),
+            "offer_id": row.get("offer_id"), "source_index": row.get("source_index"),
         })
     out.sort(key=lambda r: (r["market"], r["entity_id"], r["book_key"], r["side"], str(r["line"]), str(r["price"])))
     return out
@@ -168,27 +180,15 @@ def _decision_rows(results: list[dict[str, Any]], game_id: str) -> list[dict[str
         if row.get("model_p") is None or not row.get("distribution_sha256") or not row.get("model_input_hash"):
             continue
         out.append({
-            "source_index": row.get("source_index"),
-            "market": row.get("market"),
-            "entity_id": row.get("entity_id"),
-            "line": row.get("line"),
-            "side": row.get("side"),
-            "american_odds": row.get("american_odds"),
-            "book_key": row.get("book_key"),
-            "quote_retrieved_at": row.get("quote_retrieved_at"),
-            "model_p": row.get("model_p"),
-            "implied_probability": row.get("implied_probability"),
-            "edge": row.get("edge"),
-            "ev_per_dollar": row.get("ev_per_dollar"),
-            "bet_status": row.get("bet_status"),
-            "reason": row.get("block_reason", row.get("reason")),
-            "model_input_hash": row.get("model_input_hash"),
-            "distribution_sha256": row.get("distribution_sha256"),
-            "readout_sha256": row.get("readout_sha256"),
-            "readout_version": row.get("readout_version"),
-            "engine_version": row.get("engine_version"),
-            "seed_policy": row.get("seed_policy"),
-            "mc_paths": row.get("mc_paths"),
+            "source_index": row.get("source_index"), "market": row.get("market"), "entity_id": row.get("entity_id"),
+            "line": row.get("line"), "side": row.get("side"), "american_odds": row.get("american_odds"),
+            "book_key": row.get("book_key"), "quote_retrieved_at": row.get("quote_retrieved_at"),
+            "model_p": row.get("model_p"), "implied_probability": row.get("implied_probability"),
+            "edge": row.get("edge"), "ev_per_dollar": row.get("ev_per_dollar"), "bet_status": row.get("bet_status"),
+            "reason": row.get("block_reason", row.get("reason")), "model_input_hash": row.get("model_input_hash"),
+            "distribution_sha256": row.get("distribution_sha256"), "readout_sha256": row.get("readout_sha256"),
+            "readout_version": row.get("readout_version"), "engine_version": row.get("engine_version"),
+            "seed_policy": row.get("seed_policy"), "mc_paths": row.get("mc_paths"),
         })
     out.sort(key=lambda r: (str(r.get("market")), str(r.get("entity_id")), int(r.get("source_index") or 0)))
     return out
@@ -209,6 +209,9 @@ def materialize(
     written: list[Path] = []
 
     for game in plan.get("games") or []:
+        phases = list(game.get("phases") or [])
+        if not phases:
+            continue
         game_id = str(game["game_id"])
         quotes = _quote_rows(results, game_id)
         if not quotes:
@@ -216,60 +219,56 @@ def materialize(
         first_pitch = _parse_ts(game["first_pitch_at"])
         if current >= first_pitch:
             raise RuntimeError(f"V8 target game passed first pitch before evidence write:{game_id}")
+        actual_minutes = (first_pitch - current).total_seconds() / 60.0
         provenance = {
-            "provider": "SPORTSEDGE_CANONICAL_MLB_MACHINE",
-            "card_sha256": card_sha,
-            "card_generated_at_utc": card.get("generated_at_utc"),
-            "machine_mode": card.get("mode"),
-            "run_status": card.get("run_status"),
-            "runner": "scripts/run_auto_mlb_resilient.py",
-            "model_release_identity": "EXACT_GIT_COMMIT_SHA",
-            "model_release_sha": model_sha,
+            "provider": "SPORTSEDGE_CANONICAL_MLB_MACHINE", "card_sha256": card_sha,
+            "card_generated_at_utc": card.get("generated_at_utc"), "machine_mode": card.get("mode"),
+            "run_status": card.get("run_status"), "runner": "scripts/run_auto_mlb_resilient.py",
+            "model_release_identity": "EXACT_GIT_COMMIT_SHA", "model_release_sha": model_sha,
             "books": sorted({str(q["book_key"]) for q in quotes}),
         }
         common = {
-            "game_id": game_id,
-            "first_pitch_at": first_pitch.isoformat(),
-            "captured_at": current.isoformat(),
-            "quotes": quotes,
-            "source_provenance": provenance,
-            "capture_labels": list(game.get("capture_labels") or []),
-            "slate_date_ct": plan.get("slate_date_ct"),
+            "game_id": game_id, "first_pitch_at": first_pitch.isoformat(), "captured_at": current.isoformat(),
+            "minutes_before_first_pitch": round(actual_minutes, 3), "quotes": quotes, "source_provenance": provenance,
+            "capture_labels": list(game.get("capture_labels") or []), "slate_date_ct": plan.get("slate_date_ct"),
         }
-
-        for phase in game.get("phases") or []:
+        for phase in phases:
             payload = dict(common)
             if phase == "decision":
+                timing_ok = actual_minutes >= DECISION_TARGET_MIN and (actual_minutes - DECISION_TARGET_MIN) <= DECISION_TOLERANCE_MIN
+                if not timing_ok:
+                    raise RuntimeError(f"V8 decision write attempted outside one-sided T-30 window:{game_id}:{actual_minutes:.3f}")
                 decisions = _decision_rows(results, game_id)
                 if not decisions:
                     raise RuntimeError(f"V8 decision target has no model/distribution evidence:{game_id}")
                 dist_binding = [
-                    {
-                        "source_index": row.get("source_index"),
-                        "market": row.get("market"),
-                        "entity_id": row.get("entity_id"),
-                        "distribution_sha256": row.get("distribution_sha256"),
-                    }
+                    {"source_index": row.get("source_index"), "market": row.get("market"), "entity_id": row.get("entity_id"), "distribution_sha256": row.get("distribution_sha256")}
                     for row in decisions
                 ]
                 payload.update({
-                    "run_id": run_id,
-                    "model_sha": model_sha,
-                    "distribution_sha": _canonical_sha(dist_binding),
-                    "decision_rows": decisions,
+                    "run_id": run_id, "model_sha": model_sha, "distribution_sha": _canonical_sha(dist_binding),
+                    "decision_rows": decisions, "decision_target_minutes": DECISION_TARGET_MIN,
+                    "decision_target_qualified": True, "decision_tolerance_direction": DECISION_TOLERANCE_DIRECTION,
                 })
-            destination = persist(payload, phase, root=root or Path("artifacts/mlb_v8_forward"))
-            written.append(destination)
+            written.append(persist(payload, phase, root=root or Path("artifacts/mlb_v8_forward")))
     return written
 
 
 def self_test() -> int:
     import tempfile
-    now = datetime(2026, 9, 3, 22, 30, tzinfo=timezone.utc)
     games = [{"game_id": "123", "first_pitch_at": "2026-09-03T23:00:00+00:00", "abstract_game_state": "Preview", "home_team": "Home", "away_team": "Away"}]
+    early = build_plan(datetime(2026, 9, 3, 22, 24, tzinfo=timezone.utc), games)  # T-36
+    assert early["needs_model"] is True
+    assert early["games"][0]["phases"] == ["decision"]
+    assert early["games"][0]["decision_target_qualified"] is True
+    late = build_plan(datetime(2026, 9, 3, 22, 36, tzinfo=timezone.utc), games)  # T-24
+    assert late["needs_model"] is False
+    assert late["games"][0]["phases"] == []
+    assert late["games"][0]["decision_timing_status"] == "LATE_CAPTURE"
+    assert late["games"][0]["decision_target_qualified"] is False
+
+    now = datetime(2026, 9, 3, 22, 30, tzinfo=timezone.utc)
     plan = build_plan(now, games)
-    assert plan["needs_model"] is True
-    assert plan["games"][0]["phases"] == ["decision"]
     card = {
         "mode": "AUTOMATIC", "generated_at_utc": now.isoformat(), "run_status": "PASS",
         "results": [{
@@ -285,11 +284,12 @@ def self_test() -> int:
     }
     raw = (json.dumps(card, sort_keys=True) + "\n").encode()
     with tempfile.TemporaryDirectory() as td:
-        paths = materialize(plan=plan, card_raw=raw, model_sha="a" * 40, run_id="run-1", captured_at=datetime(2026, 9, 3, 22, 31, tzinfo=timezone.utc), root=Path(td))
+        paths = materialize(plan=plan, card_raw=raw, model_sha="a" * 40, run_id="run-1", captured_at=datetime(2026, 9, 3, 22, 30, tzinfo=timezone.utc), root=Path(td))
         assert len(paths) == 1 and paths[0].is_file()
-    close_plan = build_plan(datetime(2026, 9, 3, 22, 50, tzinfo=timezone.utc), games)
-    assert close_plan["games"][0]["phases"] == ["close"]
-    print(json.dumps({"status": "SELF_TEST_OK", "decision_window": "PASS", "close_window": "PASS", "canonical_card_binding": "PASS"}))
+        record = json.loads(paths[0].read_text())
+        assert record["payload"]["minutes_before_first_pitch"] == 30.0
+        assert record["payload"]["decision_target_qualified"] is True
+    print(json.dumps({"status": "SELF_TEST_OK", "t36_accepted": True, "t24_late_not_decision": True, "exact_timing_recorded": True}))
     return 0
 
 
@@ -304,7 +304,6 @@ def main() -> int:
     args = parser.parse_args()
     if args.self_test:
         return self_test()
-
     if args.plan_output:
         now = _now()
         slate = now.astimezone(CT).date().isoformat()
@@ -313,15 +312,11 @@ def main() -> int:
         args.plan_output.write_text(json.dumps(plan, indent=2, sort_keys=True) + "\n")
         print(json.dumps(plan, sort_keys=True))
         return 0
-
     if not all((args.plan, args.card, args.model_sha, args.run_id)):
         parser.error("materialization requires --plan --card --model-sha --run-id")
-    plan = json.loads(args.plan.read_text())
     written = materialize(
-        plan=plan,
-        card_raw=args.card.read_bytes(),
-        model_sha=str(args.model_sha),
-        run_id=str(args.run_id),
+        plan=json.loads(args.plan.read_text()), card_raw=args.card.read_bytes(),
+        model_sha=str(args.model_sha), run_id=str(args.run_id),
     )
     print(json.dumps({"status": "V8_FORWARD_CAPTURE_COMPLETE", "records_written": len(written), "paths": [str(p) for p in written]}, sort_keys=True))
     return 0

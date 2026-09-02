@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   schedule:
     # Every ten minutes during broad MLB game hours. The stdlib precheck is cheap;
-    # the full canonical model runs only when a game is in a V8 capture window.
+    # the full canonical model runs only when a qualified V8 capture phase exists.
     - cron: '4,14,24,34,44,54 16-23,0-5 * 9-11 *'
 
 permissions:
@@ -47,10 +47,12 @@ jobs:
           python - <<'PY'
           import json, os
           p=json.load(open('artifacts/mlb_v8_plan.json'))
+          games=p.get('games') or []
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               f.write('needs_model=' + ('true' if p.get('needs_model') else 'false') + '\n')
+              f.write('has_target_event=' + ('true' if games else 'false') + '\n')
               f.write('slate_date_ct=' + str(p.get('slate_date_ct') or 'unknown') + '\n')
-              f.write('target_games=' + str(len(p.get('games') or [])) + '\n')
+              f.write('target_games=' + str(len(games)) + '\n')
           PY
 
       - name: Restore MLB history cache
@@ -93,38 +95,19 @@ jobs:
           --model-sha "$GITHUB_SHA"
           --run-id "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT"
 
-      - name: Write target-window terminal status
-        if: always() && steps.plan.outputs.needs_model == 'true'
+      - name: Write target-window terminal status through shared recorder
+        if: always() && steps.plan.outputs.has_target_event == 'true'
         env:
           MODEL_OUTCOME: ${{ steps.model.outcome }}
           CAPTURE_OUTCOME: ${{ steps.capture.outcome }}
-          RUN_ID: ${{ github.run_id }}
-          RUN_ATTEMPT: ${{ github.run_attempt }}
-          GIT_SHA: ${{ github.sha }}
-        run: |
-          mkdir -p artifacts/mlb_v8_status
-          python - <<'PY'
-          import json, os
-          from datetime import datetime, timezone
-          plan=json.load(open('artifacts/mlb_v8_plan.json'))
-          model=os.environ.get('MODEL_OUTCOME') or 'not-run'
-          capture=os.environ.get('CAPTURE_OUTCOME') or 'not-run'
-          status='CAPTURED' if model == 'success' and capture == 'success' else 'MISSED_OR_BLOCKED'
-          payload={
-              'schema':'MLB_V8_FORWARD_STATUS_V1',
-              'run_id':f"{os.environ['RUN_ID']}:{os.environ['RUN_ATTEMPT']}",
-              'recorded_at_utc':datetime.now(timezone.utc).isoformat(),
-              'git_sha':os.environ['GIT_SHA'],
-              'slate_date_ct':plan.get('slate_date_ct'),
-              'target_games':plan.get('games') or [],
-              'model_outcome':model,
-              'capture_outcome':capture,
-              'status':status,
-          }
-          path=f"artifacts/mlb_v8_status/status_{os.environ['RUN_ID']}_{os.environ['RUN_ATTEMPT']}.json"
-          with open(path,'w') as f: json.dump(payload,f,indent=2,sort_keys=True); f.write('\n')
-          print(json.dumps(payload,sort_keys=True))
-          PY
+        run: >-
+          python scripts/capture_mlb_v8_forward_evidence.py
+          --write-status
+          --plan artifacts/mlb_v8_plan.json
+          --run-id "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT"
+          --git-sha "$GITHUB_SHA"
+          --model-outcome "${MODEL_OUTCOME:-not-run}"
+          --capture-outcome "${CAPTURE_OUTCOME:-not-run}"
 
       - name: Upload exact-run V8 evidence
         if: always()
@@ -140,7 +123,7 @@ jobs:
           retention-days: 30
 
       - name: Persist target-window evidence or miss to durable data branch
-        if: always() && steps.plan.outputs.needs_model == 'true'
+        if: always() && steps.plan.outputs.has_target_event == 'true'
         env:
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
