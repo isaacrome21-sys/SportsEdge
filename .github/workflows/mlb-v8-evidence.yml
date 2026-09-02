@@ -31,6 +31,7 @@ jobs:
           python scripts/build_mlb_v8_replay_archive.py --self-test
           python scripts/capture_mlb_v8_forward_evidence.py --self-test
           python scripts/run_mlb_v8_forward_lane.py --self-test
+          python scripts/run_mlb_v8_forward_fallback.py --self-test
           python - <<'PY'
           import json
           p=json.load(open('config/mlb_v8_evidence_policy.json'))
