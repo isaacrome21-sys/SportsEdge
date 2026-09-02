@@ -1,0 +1,66 @@
+{
+  "schema_version": "SPORTSEDGE_MLB_V8_ODDS_API_EVENT_MARKETS_V1",
+  "purpose": "Provider-native historical event-market coverage. This is an acquisition catalog, not a claim that every key maps 1:1 to a SportsEdge canonical market.",
+  "groups": {
+    "period_core": [
+      "h2h_1st_1_innings",
+      "h2h_1st_3_innings",
+      "h2h_1st_5_innings",
+      "h2h_1st_7_innings",
+      "spreads_1st_1_innings",
+      "spreads_1st_3_innings",
+      "spreads_1st_5_innings",
+      "spreads_1st_7_innings",
+      "totals_1st_1_innings",
+      "totals_1st_3_innings",
+      "totals_1st_5_innings",
+      "totals_1st_7_innings",
+      "team_totals"
+    ],
+    "batter_core": [
+      "batter_home_runs",
+      "batter_first_home_run",
+      "batter_hits",
+      "batter_total_bases",
+      "batter_rbis",
+      "batter_runs_scored",
+      "batter_hits_runs_rbis",
+      "batter_singles",
+      "batter_doubles",
+      "batter_triples",
+      "batter_walks",
+      "batter_strikeouts",
+      "batter_stolen_bases"
+    ],
+    "pitcher_core": [
+      "pitcher_strikeouts",
+      "pitcher_record_a_win",
+      "pitcher_hits_allowed",
+      "pitcher_walks",
+      "pitcher_earned_runs",
+      "pitcher_outs"
+    ],
+    "alternate_core": [
+      "batter_total_bases_alternate",
+      "batter_home_runs_alternate",
+      "batter_hits_alternate",
+      "batter_rbis_alternate",
+      "batter_walks_alternate",
+      "batter_strikeouts_alternate",
+      "batter_runs_scored_alternate",
+      "batter_hits_runs_rbis_alternate",
+      "pitcher_hits_allowed_alternate",
+      "pitcher_walks_alternate",
+      "pitcher_earned_runs_alternate",
+      "pitcher_strikeouts_alternate",
+      "pitcher_outs_alternate"
+    ]
+  },
+  "rules": {
+    "query_one_event_at_a_time": true,
+    "historical_snapshot_must_be_at_or_before_requested_time": true,
+    "empty_provider_market_is_not_fabricated": true,
+    "provider_market_key_does_not_imply_sportsedge_market_equivalence": true,
+    "historical_cost_is_bounded_before_requests": true
+  }
+}
