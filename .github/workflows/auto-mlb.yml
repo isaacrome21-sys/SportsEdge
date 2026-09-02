@@ -7,20 +7,22 @@ on:
     paths:
       - 'sportsedge/**'
       - 'scripts/run_auto_mlb*.py'
+      - 'scripts/persist_mlb_v8_decision.py'
       - 'scripts/probe_game_odds.py'
       - 'scripts/probe_odds_http.py'
       - 'config/**'
       - 'tests/test_auto_native_odds.py'
       - 'tests/test_mlb_run_machine.py'
+      - 'tests/test_mlb_evidence_archive_v8.py'
       - '.github/workflows/auto-mlb.yml'
   schedule:
-    # Heavy full-card automation is intentionally sparse. The irreplaceable raw
-    # odds archive has its own lightweight scheduler; running this full model at
-    # archive cadence would exhaust private-repo Actions minutes again.
+    # Heavy full-card automation stays sparse; lightweight archive jobs own dense
+    # price collection and the actual prediction journal is persisted whenever
+    # this canonical machine does run.
     - cron: '12 17,22 * 3-11 *'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: auto-mlb
@@ -65,6 +67,7 @@ jobs:
           tests.test_mlb_quote_source_coverage
           tests.test_mlb_run_machine
           tests.test_run_auto_mlb_resilient_machine
+          tests.test_mlb_evidence_archive_v8
           -v
       - name: Diagnose Odds API credentials safely
         if: always()
@@ -81,7 +84,7 @@ jobs:
           SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
           SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
           SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
-          SPORTSEDGE_ODDS_BOOKMAKERS: draftkings
+          SPORTSEDGE_ODDS_BOOKMAKERS: draftkings,fanduel,betmgm,williamhill_us,pinnacle
         run: python scripts/probe_game_odds.py
       - name: Run canonical automated MLB machine
         env:
@@ -90,12 +93,15 @@ jobs:
           SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
           SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
           SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
-          SPORTSEDGE_ODDS_BOOKMAKERS: draftkings
+          SPORTSEDGE_ODDS_BOOKMAKERS: draftkings,fanduel,betmgm,williamhill_us,pinnacle
           SPORTSEDGE_FEATURES_URL: ${{ secrets.SPORTSEDGE_FEATURES_URL }}
           SPORTSEDGE_PROJECTED_LINEUPS_URL: ${{ secrets.SPORTSEDGE_PROJECTED_LINEUPS_URL }}
           SPORTSEDGE_PROVIDER_TOKEN: ${{ secrets.SPORTSEDGE_PROVIDER_TOKEN }}
           SPORTSEDGE_HISTORY_CACHE_DIR: .cache/sportsedge/mlb-history
         run: python scripts/run_auto_mlb_resilient.py --output artifacts/live_mlb_card.json
+      - name: Persist V8 decision journal and card
+        if: always() && hashFiles('artifacts/live_mlb_card.json') != ''
+        run: python scripts/persist_mlb_v8_decision.py --card artifacts/live_mlb_card.json
       - name: Upload automated card evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -105,5 +111,6 @@ jobs:
             artifacts/live_mlb_card.json
             artifacts/live_game_odds.json
             artifacts/odds_http_diagnostics.json
+            artifacts/prediction_journal/**
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 90
