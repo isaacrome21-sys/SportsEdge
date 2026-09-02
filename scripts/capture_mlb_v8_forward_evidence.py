@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Persist immutable MLB V8 decision/close evidence and terminal capture status.
-
-Decision evidence is the exact canonical-machine quote/model state used at the
-standardized forward decision time. Close evidence is separately captured. Terminal
-status generation lives here too so Actions and local/manual execution share one
-record shape and one fail-closed implementation.
-"""
+"""Persist immutable MLB V8 decision/close evidence and terminal capture status."""
 from __future__ import annotations
 
 import argparse
@@ -52,7 +46,19 @@ def _actual_minutes_before_first_pitch(payload: dict[str, Any]) -> float:
     return (first_pitch - captured).total_seconds() / 60.0
 
 
+def _assert_policy_binding() -> None:
+    policy = json.loads(POLICY.read_text())
+    decision = policy.get("decision_capture") or {}
+    if float(decision.get("target_minutes_before_first_pitch", -1)) != DECISION_TARGET_MIN:
+        raise RuntimeError("code/policy decision target drift")
+    if float(decision.get("tolerance_minutes", -1)) != DECISION_TOLERANCE_MIN:
+        raise RuntimeError("code/policy decision tolerance drift")
+    if decision.get("tolerance_direction") != DECISION_TOLERANCE_DIRECTION:
+        raise RuntimeError("code/policy decision tolerance direction drift")
+
+
 def validate(payload: dict[str, Any], phase: str) -> None:
+    _assert_policy_binding()
     if phase not in {"decision", "close"}:
         raise ValueError("unsupported V8 evidence phase")
     required = ["game_id", "first_pitch_at", "captured_at", "quotes", "source_provenance", "minutes_before_first_pitch"]
@@ -69,16 +75,13 @@ def validate(payload: dict[str, Any], phase: str) -> None:
     captured = parse_ts(str(payload["captured_at"]))
     if captured >= first_pitch:
         raise ValueError("V8 pregame evidence must be captured before first pitch")
-
     actual_minutes = _actual_minutes_before_first_pitch(payload)
-    recorded_minutes = float(payload["minutes_before_first_pitch"])
-    if abs(actual_minutes - recorded_minutes) > 0.02:
+    if abs(actual_minutes - float(payload["minutes_before_first_pitch"])) > 0.02:
         raise ValueError("minutes_before_first_pitch does not match exact timestamps")
 
     provenance = payload.get("source_provenance")
     if not isinstance(provenance, dict) or not provenance:
         raise ValueError("source_provenance must be a non-empty object")
-
     quotes = payload.get("quotes")
     if not isinstance(quotes, list) or not quotes:
         raise ValueError("quotes must be a non-empty list")
@@ -100,9 +103,8 @@ def validate(payload: dict[str, Any], phase: str) -> None:
             raise ValueError("unexpected V8 decision target")
         if payload.get("decision_tolerance_direction") != DECISION_TOLERANCE_DIRECTION:
             raise ValueError("decision tolerance direction must be one-sided at-or-before")
-        qualified = bool(payload.get("decision_target_qualified"))
         timing_ok = actual_minutes >= target and (actual_minutes - target) <= DECISION_TOLERANCE_MIN
-        if not qualified or not timing_ok:
+        if not bool(payload.get("decision_target_qualified")) or not timing_ok:
             raise ValueError("late/out-of-window capture cannot be persisted as T-30 decision evidence")
         if not _hex(payload["model_sha"], lengths=(40, 64)):
             raise ValueError("model_sha must be an exact git/model SHA")
@@ -149,18 +151,39 @@ def write_terminal_status(
     *, plan: dict[str, Any], run_id: str, git_sha: str, model_outcome: str,
     capture_outcome: str, root: Path = STATUS_ROOT, recorded_at: datetime | None = None,
 ) -> Path:
+    _assert_policy_binding()
     now = (recorded_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
     games = plan.get("games") or []
-    late_only = bool(games) and all(
-        str(g.get("decision_timing_status") or "") == "LATE_CAPTURE" and not (g.get("phases") or [])
-        for g in games
-    )
-    if late_only:
-        status = "LATE_CAPTURE"
-    elif model_outcome == "success" and capture_outcome == "success":
+    game_statuses: list[dict[str, Any]] = []
+    for game in games:
+        phases = list(game.get("phases") or [])
+        late = str(game.get("decision_timing_status") or "") == "LATE_CAPTURE"
+        if late and "decision" not in phases:
+            capture_status = "LATE_CAPTURE"
+        elif model_outcome == "success" and capture_outcome == "success" and phases:
+            capture_status = "CAPTURED"
+        else:
+            capture_status = "MISSED_OR_BLOCKED"
+        game_statuses.append({
+            "game_id": str(game.get("game_id") or ""),
+            "minutes_before_first_pitch": game.get("minutes_before_first_pitch"),
+            "phases": phases,
+            "decision_target_qualified": bool(game.get("decision_target_qualified")),
+            "capture_status": capture_status,
+        })
+
+    noncaptured = [g for g in game_statuses if g["capture_status"] != "CAPTURED"]
+    if noncaptured:
+        status = "MISSED_OR_BLOCKED"
+        details = sorted({str(g["capture_status"]) for g in noncaptured})
+        status_detail = "+".join(details)
+    elif game_statuses and model_outcome == "success" and capture_outcome == "success":
         status = "CAPTURED"
+        status_detail = "ALL_TARGET_EVENTS_CAPTURED"
     else:
         status = "MISSED_OR_BLOCKED"
+        status_detail = "NO_SUCCESSFUL_TARGET_CAPTURE"
+
     payload = {
         "schema": "MLB_V8_FORWARD_STATUS_V1",
         "run_id": run_id,
@@ -168,9 +191,11 @@ def write_terminal_status(
         "git_sha": git_sha,
         "slate_date_ct": plan.get("slate_date_ct"),
         "target_games": games,
+        "target_game_statuses": game_statuses,
         "model_outcome": model_outcome,
         "capture_outcome": capture_outcome,
         "status": status,
+        "status_detail": status_detail,
     }
     root.mkdir(parents=True, exist_ok=True)
     safe_run = run_id.replace("/", "_").replace(":", "_")
@@ -185,26 +210,21 @@ def write_terminal_status(
 
 def self_test() -> int:
     import tempfile
+    _assert_policy_binding()
     dsha = "d" * 64
     base = {
-        "game_id": "123",
-        "first_pitch_at": "2026-09-03T23:05:00Z",
-        "captured_at": "2026-09-03T22:35:00Z",
+        "game_id": "123", "first_pitch_at": "2026-09-03T23:05:00Z", "captured_at": "2026-09-03T22:35:00Z",
         "minutes_before_first_pitch": 30.0,
         "quotes": [{"book_key": "draftkings", "market": "MONEYLINE", "price": -120, "retrieved_at": "2026-09-03T22:34:50Z"}],
         "source_provenance": {"provider": "SPORTSEDGE_CANONICAL_MLB_MACHINE", "card_sha256": "c" * 64},
-        "run_id": "run-1",
-        "model_sha": "a" * 40,
-        "distribution_sha": dsha,
-        "decision_target_minutes": 30.0,
-        "decision_target_qualified": True,
+        "run_id": "run-1", "model_sha": "a" * 40, "distribution_sha": dsha,
+        "decision_target_minutes": 30.0, "decision_target_qualified": True,
         "decision_tolerance_direction": DECISION_TOLERANCE_DIRECTION,
         "decision_rows": [{"market": "MONEYLINE", "model_p": 0.55, "distribution_sha256": dsha, "model_input_hash": "input"}],
     }
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
-        path = persist(base, "decision", root / "evidence")
-        assert path.is_file()
+        assert persist(base, "decision", root / "evidence").is_file()
         close = dict(base)
         for key in ("run_id", "model_sha", "distribution_sha", "decision_rows", "decision_target_minutes", "decision_target_qualified", "decision_tolerance_direction"):
             close.pop(key)
@@ -224,14 +244,16 @@ def self_test() -> int:
         else:
             raise AssertionError("late T-24 capture was persisted as T-30 decision evidence")
 
-        late_plan = {"slate_date_ct": "2026-09-03", "games": [{"game_id": "123", "phases": [], "minutes_before_first_pitch": 24.0, "decision_timing_status": "LATE_CAPTURE"}]}
+        late_plan = {"slate_date_ct": "2026-09-03", "games": [{"game_id": "123", "phases": [], "minutes_before_first_pitch": 24.0, "decision_timing_status": "LATE_CAPTURE", "decision_target_qualified": False}]}
         status_path = write_terminal_status(
-            plan=late_plan, run_id="local:1", git_sha="a" * 40,
-            model_outcome="not-run", capture_outcome="not-run", root=root / "status",
-            recorded_at=datetime(2026, 9, 3, 22, 41, tzinfo=timezone.utc),
+            plan=late_plan, run_id="local:1", git_sha="a" * 40, model_outcome="not-run", capture_outcome="not-run",
+            root=root / "status", recorded_at=datetime(2026, 9, 3, 22, 41, tzinfo=timezone.utc),
         )
-        assert json.loads(status_path.read_text())["status"] == "LATE_CAPTURE"
-    print(json.dumps({"status": "SELF_TEST_OK", "late_decision_rejected": True, "status_parity": True}))
+        status = json.loads(status_path.read_text())
+        assert status["status"] == "MISSED_OR_BLOCKED"
+        assert status["status_detail"] == "LATE_CAPTURE"
+        assert status["target_game_statuses"][0]["capture_status"] == "LATE_CAPTURE"
+    print(json.dumps({"status": "SELF_TEST_OK", "late_decision_rejected": True, "status_parity": True, "policy_binding": True}))
     return 0
 
 
