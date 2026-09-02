@@ -9,6 +9,8 @@ on:
       - 'scripts/run_auto_mlb*.py'
       - 'scripts/probe_game_odds.py'
       - 'scripts/probe_odds_http.py'
+      - 'scripts/mlb_v8_evidence.py'
+      - 'scripts/persist_mlb_v8_evidence.py'
       - 'config/**'
       - 'tests/test_auto_native_odds.py'
       - 'tests/test_mlb_run_machine.py'
@@ -19,8 +21,10 @@ on:
     # archive cadence would exhaust private-repo Actions minutes again.
     - cron: '12 17,22 * 3-11 *'
 
+# V8 decision artifacts are written only to the immutable data-branch evidence
+# namespace by a fail-closed persistence script.
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: auto-mlb
@@ -66,6 +70,10 @@ jobs:
           tests.test_mlb_run_machine
           tests.test_run_auto_mlb_resilient_machine
           -v
+      - name: Verify V8 evidence contracts
+        run: |
+          python -I scripts/mlb_v8_evidence.py --self-test
+          python -I scripts/persist_mlb_v8_evidence.py --self-test
       - name: Diagnose Odds API credentials safely
         if: always()
         env:
@@ -96,6 +104,12 @@ jobs:
           SPORTSEDGE_PROVIDER_TOKEN: ${{ secrets.SPORTSEDGE_PROVIDER_TOKEN }}
           SPORTSEDGE_HISTORY_CACHE_DIR: .cache/sportsedge/mlb-history
         run: python scripts/run_auto_mlb_resilient.py --output artifacts/live_mlb_card.json
+      - name: Package clean V8 model decision evidence
+        if: always()
+        run: python -I scripts/mlb_v8_evidence.py --decision
+      - name: Persist clean V8 model decision evidence
+        if: always()
+        run: python -I scripts/persist_mlb_v8_evidence.py
       - name: Upload automated card evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -105,5 +119,6 @@ jobs:
             artifacts/live_mlb_card.json
             artifacts/live_game_odds.json
             artifacts/odds_http_diagnostics.json
+            artifacts/mlb_v8/**
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 90
