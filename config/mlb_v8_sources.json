@@ -1,0 +1,103 @@
+{
+  "schema_version": "SPORTSEDGE_MLB_V8_SOURCE_REGISTRY_V1",
+  "effective_date": "2026-09-02",
+  "rules": {
+    "historical_backfill_never_becomes_forward_evidence": true,
+    "missing_source_timestamps_never_inferred": true,
+    "open_close_only_not_valid_for_decision_time_replay": true,
+    "exchange_prices_never_substitute_for_sportsbook_execution_prices": true,
+    "public_dataset_requires_origin_and_timestamp_provenance_before_pit_use": true
+  },
+  "sources": [
+    {
+      "id": "mlb_statsapi",
+      "source_class": "OFFICIAL_RESULT_CONTEXT",
+      "coverage": "schedule, game identity, start time, official result",
+      "access": "public",
+      "decision_pit_eligible": false,
+      "clv_eligible": false,
+      "role": "labels_and_identity_only",
+      "docs": "https://statsapi.mlb.com/"
+    },
+    {
+      "id": "the_odds_api_v4_historical",
+      "source_class": "PIT_SNAPSHOT",
+      "coverage": "featured game markets; additional/event markets including props where supported",
+      "access": "paid_historical_plan_required",
+      "decision_pit_eligible": true,
+      "clv_eligible": true,
+      "implemented": true,
+      "notes": "Provider returns closest historical snapshot equal to or earlier than requested timestamp; 5-minute snapshots for 2026."
+    },
+    {
+      "id": "sportsgameodds_v2",
+      "source_class": "OPEN_CLOSE_ONLY",
+      "coverage": "finalized MLB events with per-book open/close and result",
+      "access": "api_key_required",
+      "decision_pit_eligible": false,
+      "clv_eligible": true,
+      "implemented": true,
+      "notes": "Useful for closing benchmark and realized grading; open/close alone cannot recreate a model decision-time quote."
+    },
+    {
+      "id": "propline_v1",
+      "source_class": "PIT_TIMESERIES",
+      "coverage": "game lines and player props; recorded price-change archive from April 2026",
+      "access": "historical_subscription_or_backfill_pass_required",
+      "decision_pit_eligible": true,
+      "clv_eligible": true,
+      "implemented": true,
+      "notes": "Bulk historical export is plan-gated; exact raw export is retained."
+    },
+    {
+      "id": "opticodds_v3",
+      "source_class": "PIT_TIMESERIES",
+      "coverage": "fixture odds history with timestamps",
+      "access": "license_and_timeseries_permission_required",
+      "decision_pit_eligible": true,
+      "clv_eligible": true,
+      "implemented": false,
+      "notes": "Rolling two-month retention; on 2026-09-02 this can only help the recent July-August window. Import raw licensed exports if obtained."
+    },
+    {
+      "id": "sportsdataio_historical",
+      "source_class": "PIT_TIMESERIES",
+      "coverage": "MLB game and prop line movement with opening, changes, closing, and optional resulting",
+      "access": "historical_betting_access_required",
+      "decision_pit_eligible": true,
+      "clv_eligible": true,
+      "implemented": false,
+      "notes": "Historical warehouse uses betting-market line-movement shape; import raw licensed exports if access is enabled."
+    },
+    {
+      "id": "betfair_historical",
+      "source_class": "EXCHANGE_PIT",
+      "coverage": "timestamped exchange market prices and settlements",
+      "access": "historical_data_purchase_or_api_access_required",
+      "decision_pit_eligible": false,
+      "clv_eligible": true,
+      "implemented": false,
+      "notes": "Sharp/exchange reference only; never a substitute for the sportsbook price a SportsEdge bet could execute."
+    },
+    {
+      "id": "the_odds_gap",
+      "source_class": "PIT_SNAPSHOT",
+      "coverage": "minute-level MLB game lines from early August 2026; rolling retention",
+      "access": "research_export_terms_apply",
+      "decision_pit_eligible": true,
+      "clv_eligible": true,
+      "implemented": false,
+      "notes": "Bulk reuse must follow provider terms; do not scrape beyond documented export access."
+    },
+    {
+      "id": "public_timestamped_datasets",
+      "source_class": "PIT_UNVERIFIED",
+      "coverage": "varies",
+      "access": "dataset_specific",
+      "decision_pit_eligible": false,
+      "clv_eligible": false,
+      "implemented": false,
+      "notes": "Quarantine until original sportsbook source, collection timestamp semantics, license, and no-lookahead provenance are all verified."
+    }
+  ]
+}
