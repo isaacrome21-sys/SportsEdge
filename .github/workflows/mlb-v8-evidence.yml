@@ -1,0 +1,43 @@
+name: mlb-v8-evidence
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Beginning Sep 3 CT: frequent lightweight evidence checks during MLB game hours.
+    # Capture code itself must select only valid pregame target/close windows.
+    - cron: '4,14,24,34,44,54 16-23,0-5 * 9-11 *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mlb-v8-evidence
+  cancel-in-progress: false
+
+jobs:
+  evidence-contract:
+    if: github.event_name == 'workflow_dispatch' || github.run_started_at >= '2026-09-03T05:00:00Z'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify replay builder and immutable forward contract
+        run: |
+          python scripts/build_mlb_v8_replay_archive.py --self-test
+          python scripts/capture_mlb_v8_forward_evidence.py --self-test
+      - name: Verify V8 policy is fail closed
+        run: |
+          python - <<'PY'
+          import json
+          p=json.load(open('config/mlb_v8_evidence_policy.json'))
+          assert p['fail_closed'] is True
+          assert p['effective_forward_date_ct'] == '2026-09-03'
+          assert p['promotion']['forward_holdout_required'] is True
+          print('V8_EVIDENCE_POLICY_OK')
+          PY
+
+  # This workflow is intentionally a watchdog/contract until the live quote runner
+  # writes decision/close payloads through capture_mlb_v8_forward_evidence.py.
+  # It must never synthesize missing quotes or silently mark a missed capture green.
