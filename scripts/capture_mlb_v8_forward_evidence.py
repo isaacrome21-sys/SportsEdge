@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Persist immutable MLB V8 decision/close evidence records.
+"""Persist immutable MLB V8 decision/close evidence and terminal capture status.
 
 Decision evidence is the exact canonical-machine quote/model state used at the
-standardized forward decision time. Close evidence is a separately captured quote
-state. Neither phase can overwrite or relabel the other.
+standardized forward decision time. Close evidence is separately captured. Terminal
+status generation lives here too so Actions and local/manual execution share one
+record shape and one fail-closed implementation.
 """
 from __future__ import annotations
 
@@ -15,7 +16,11 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path("artifacts/mlb_v8_forward")
+STATUS_ROOT = Path("artifacts/mlb_v8_status")
 POLICY = Path("config/mlb_v8_evidence_policy.json")
+DECISION_TARGET_MIN = 30.0
+DECISION_TOLERANCE_MIN = 6.0
+DECISION_TOLERANCE_DIRECTION = "EARLY_ONLY_AT_OR_BEFORE_TARGET"
 
 
 def sha(raw: bytes) -> str:
@@ -41,13 +46,22 @@ def _hex(value: Any, *, lengths: tuple[int, ...]) -> bool:
     return True
 
 
+def _actual_minutes_before_first_pitch(payload: dict[str, Any]) -> float:
+    first_pitch = parse_ts(str(payload["first_pitch_at"]))
+    captured = parse_ts(str(payload["captured_at"]))
+    return (first_pitch - captured).total_seconds() / 60.0
+
+
 def validate(payload: dict[str, Any], phase: str) -> None:
     if phase not in {"decision", "close"}:
         raise ValueError("unsupported V8 evidence phase")
-    required = ["game_id", "first_pitch_at", "captured_at", "quotes", "source_provenance"]
+    required = ["game_id", "first_pitch_at", "captured_at", "quotes", "source_provenance", "minutes_before_first_pitch"]
     if phase == "decision":
-        required += ["run_id", "model_sha", "distribution_sha", "decision_rows"]
-    missing = [key for key in required if payload.get(key) in (None, "", [], {})]
+        required += [
+            "run_id", "model_sha", "distribution_sha", "decision_rows",
+            "decision_target_minutes", "decision_target_qualified", "decision_tolerance_direction",
+        ]
+    missing = [key for key in required if payload.get(key) in (None, "", [], {}) and payload.get(key) is not False]
     if missing:
         raise ValueError("missing required V8 evidence fields: " + ",".join(missing))
 
@@ -55,6 +69,11 @@ def validate(payload: dict[str, Any], phase: str) -> None:
     captured = parse_ts(str(payload["captured_at"]))
     if captured >= first_pitch:
         raise ValueError("V8 pregame evidence must be captured before first pitch")
+
+    actual_minutes = _actual_minutes_before_first_pitch(payload)
+    recorded_minutes = float(payload["minutes_before_first_pitch"])
+    if abs(actual_minutes - recorded_minutes) > 0.02:
+        raise ValueError("minutes_before_first_pitch does not match exact timestamps")
 
     provenance = payload.get("source_provenance")
     if not isinstance(provenance, dict) or not provenance:
@@ -76,6 +95,15 @@ def validate(payload: dict[str, Any], phase: str) -> None:
             raise ValueError("post-first-pitch quote cannot enter pregame V8 evidence")
 
     if phase == "decision":
+        target = float(payload["decision_target_minutes"])
+        if target != DECISION_TARGET_MIN:
+            raise ValueError("unexpected V8 decision target")
+        if payload.get("decision_tolerance_direction") != DECISION_TOLERANCE_DIRECTION:
+            raise ValueError("decision tolerance direction must be one-sided at-or-before")
+        qualified = bool(payload.get("decision_target_qualified"))
+        timing_ok = actual_minutes >= target and (actual_minutes - target) <= DECISION_TOLERANCE_MIN
+        if not qualified or not timing_ok:
+            raise ValueError("late/out-of-window capture cannot be persisted as T-30 decision evidence")
         if not _hex(payload["model_sha"], lengths=(40, 64)):
             raise ValueError("model_sha must be an exact git/model SHA")
         if not _hex(payload["distribution_sha"], lengths=(64,)):
@@ -117,38 +145,93 @@ def persist(payload: dict[str, Any], phase: str, root: Path = ROOT) -> Path:
     return destination
 
 
+def write_terminal_status(
+    *, plan: dict[str, Any], run_id: str, git_sha: str, model_outcome: str,
+    capture_outcome: str, root: Path = STATUS_ROOT, recorded_at: datetime | None = None,
+) -> Path:
+    now = (recorded_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    games = plan.get("games") or []
+    late_only = bool(games) and all(
+        str(g.get("decision_timing_status") or "") == "LATE_CAPTURE" and not (g.get("phases") or [])
+        for g in games
+    )
+    if late_only:
+        status = "LATE_CAPTURE"
+    elif model_outcome == "success" and capture_outcome == "success":
+        status = "CAPTURED"
+    else:
+        status = "MISSED_OR_BLOCKED"
+    payload = {
+        "schema": "MLB_V8_FORWARD_STATUS_V1",
+        "run_id": run_id,
+        "recorded_at_utc": now.isoformat(),
+        "git_sha": git_sha,
+        "slate_date_ct": plan.get("slate_date_ct"),
+        "target_games": games,
+        "model_outcome": model_outcome,
+        "capture_outcome": capture_outcome,
+        "status": status,
+    }
+    root.mkdir(parents=True, exist_ok=True)
+    safe_run = run_id.replace("/", "_").replace(":", "_")
+    destination = root / f"status_{safe_run}.json"
+    encoded = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode()
+    if destination.exists() and destination.read_bytes() != encoded:
+        raise RuntimeError("immutable V8 status collision")
+    destination.write_bytes(encoded)
+    print(json.dumps(payload, sort_keys=True))
+    return destination
+
+
 def self_test() -> int:
     import tempfile
     dsha = "d" * 64
     base = {
         "game_id": "123",
         "first_pitch_at": "2026-09-03T23:05:00Z",
-        "captured_at": "2026-09-03T22:00:00Z",
-        "quotes": [{"book_key": "draftkings", "market": "MONEYLINE", "price": -120, "retrieved_at": "2026-09-03T21:59:50Z"}],
+        "captured_at": "2026-09-03T22:35:00Z",
+        "minutes_before_first_pitch": 30.0,
+        "quotes": [{"book_key": "draftkings", "market": "MONEYLINE", "price": -120, "retrieved_at": "2026-09-03T22:34:50Z"}],
         "source_provenance": {"provider": "SPORTSEDGE_CANONICAL_MLB_MACHINE", "card_sha256": "c" * 64},
         "run_id": "run-1",
         "model_sha": "a" * 40,
         "distribution_sha": dsha,
+        "decision_target_minutes": 30.0,
+        "decision_target_qualified": True,
+        "decision_tolerance_direction": DECISION_TOLERANCE_DIRECTION,
         "decision_rows": [{"market": "MONEYLINE", "model_p": 0.55, "distribution_sha256": dsha, "model_input_hash": "input"}],
     }
     with tempfile.TemporaryDirectory() as td:
-        path = persist(base, "decision", Path(td))
+        root = Path(td)
+        path = persist(base, "decision", root / "evidence")
         assert path.is_file()
         close = dict(base)
-        for key in ("run_id", "model_sha", "distribution_sha", "decision_rows"):
+        for key in ("run_id", "model_sha", "distribution_sha", "decision_rows", "decision_target_minutes", "decision_target_qualified", "decision_tolerance_direction"):
             close.pop(key)
         close["captured_at"] = "2026-09-03T23:04:00Z"
+        close["minutes_before_first_pitch"] = 1.0
         close["quotes"] = [{"book_key": "draftkings", "market": "MONEYLINE", "price": -115, "retrieved_at": "2026-09-03T23:03:50Z"}]
-        persist(close, "close", Path(td))
-        bad = dict(base)
-        bad["captured_at"] = bad["first_pitch_at"]
+        persist(close, "close", root / "evidence")
+
+        late = dict(base)
+        late["captured_at"] = "2026-09-03T22:41:00Z"
+        late["minutes_before_first_pitch"] = 24.0
+        late["decision_target_qualified"] = False
         try:
-            persist(bad, "decision", Path(td))
+            persist(late, "decision", root / "evidence")
         except ValueError:
             pass
         else:
-            raise AssertionError("post-start decision was not rejected")
-    print(json.dumps({"status": "SELF_TEST_OK"}))
+            raise AssertionError("late T-24 capture was persisted as T-30 decision evidence")
+
+        late_plan = {"slate_date_ct": "2026-09-03", "games": [{"game_id": "123", "phases": [], "minutes_before_first_pitch": 24.0, "decision_timing_status": "LATE_CAPTURE"}]}
+        status_path = write_terminal_status(
+            plan=late_plan, run_id="local:1", git_sha="a" * 40,
+            model_outcome="not-run", capture_outcome="not-run", root=root / "status",
+            recorded_at=datetime(2026, 9, 3, 22, 41, tzinfo=timezone.utc),
+        )
+        assert json.loads(status_path.read_text())["status"] == "LATE_CAPTURE"
+    print(json.dumps({"status": "SELF_TEST_OK", "late_decision_rejected": True, "status_parity": True}))
     return 0
 
 
@@ -156,10 +239,25 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--phase", choices=("decision", "close"))
     parser.add_argument("--input", type=Path)
+    parser.add_argument("--write-status", action="store_true")
+    parser.add_argument("--plan", type=Path)
+    parser.add_argument("--run-id")
+    parser.add_argument("--git-sha")
+    parser.add_argument("--model-outcome", default="not-run")
+    parser.add_argument("--capture-outcome", default="not-run")
+    parser.add_argument("--status-root", type=Path, default=STATUS_ROOT)
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
     if args.self_test:
         return self_test()
+    if args.write_status:
+        if not all((args.plan, args.run_id, args.git_sha)):
+            parser.error("--write-status requires --plan --run-id --git-sha")
+        write_terminal_status(
+            plan=json.loads(args.plan.read_text()), run_id=str(args.run_id), git_sha=str(args.git_sha),
+            model_outcome=str(args.model_outcome), capture_outcome=str(args.capture_outcome), root=args.status_root,
+        )
+        return 0
     if not args.phase or not args.input:
         parser.error("--phase and --input are required")
     persist(json.loads(args.input.read_text()), args.phase)
