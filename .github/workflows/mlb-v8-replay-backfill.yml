@@ -70,6 +70,8 @@ jobs:
           PY
 
       - name: Collect March-August replay sources
+        id: collect
+        continue-on-error: true
         env:
           SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
           SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
@@ -91,6 +93,7 @@ jobs:
             | tee artifacts/mlb_v8_backfill_result.json
 
       - name: Build deterministic replay manifest and PIT gap report
+        if: always() && steps.collect.outcome != 'skipped'
         run: python scripts/build_mlb_v8_replay_archive.py
 
       - name: Upload exact backfill evidence
@@ -107,21 +110,30 @@ jobs:
           retention-days: 30
 
       - name: Persist replay archive and progress to data branch
-        if: success()
+        if: always() && steps.collect.outcome != 'skipped'
         env:
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
+          COLLECT_OUTCOME: ${{ steps.collect.outcome }}
         run: |
           set -euo pipefail
           mkdir -p .data-v8-replay/evidence/mlb_v8_replay_sources
           mkdir -p .data-v8-replay/evidence/mlb_v8_replay_archive
           mkdir -p .data-v8-replay/runtime/mlb-v8-replay-control
-          cp -R artifacts/mlb_v8_replay_sources/. .data-v8-replay/evidence/mlb_v8_replay_sources/
-          cp -R artifacts/mlb_v8_replay_archive/. .data-v8-replay/evidence/mlb_v8_replay_archive/
+          if [ -d artifacts/mlb_v8_replay_sources ]; then
+            cp -R artifacts/mlb_v8_replay_sources/. .data-v8-replay/evidence/mlb_v8_replay_sources/
+          fi
+          if [ -d artifacts/mlb_v8_replay_archive ]; then
+            cp -R artifacts/mlb_v8_replay_archive/. .data-v8-replay/evidence/mlb_v8_replay_archive/
+          fi
           if [ -d artifacts/mlb_v8_replay_control ]; then
             cp -R artifacts/mlb_v8_replay_control/. .data-v8-replay/runtime/mlb-v8-replay-control/
           fi
-          cp artifacts/mlb_v8_backfill_result.json ".data-v8-replay/runtime/mlb-v8-replay-control/run_${RUN_ID}_${RUN_ATTEMPT}.json"
+          if [ -f artifacts/mlb_v8_backfill_result.json ]; then
+            cp artifacts/mlb_v8_backfill_result.json ".data-v8-replay/runtime/mlb-v8-replay-control/run_${RUN_ID}_${RUN_ATTEMPT}.json"
+          else
+            printf '{"status":"BACKFILL_STEP_NO_RESULT","collect_outcome":"%s"}\n' "$COLLECT_OUTCOME" > ".data-v8-replay/runtime/mlb-v8-replay-control/run_${RUN_ID}_${RUN_ATTEMPT}.json"
+          fi
           cd .data-v8-replay
           git config user.name sportsedge-v8-replay-bot
           git config user.email sportsedge-v8-replay-bot@users.noreply.github.com
