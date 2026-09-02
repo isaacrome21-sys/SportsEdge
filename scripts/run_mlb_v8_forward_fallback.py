@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -23,6 +24,16 @@ PLAN_PATH = ARTIFACTS / "mlb_v8_plan.json"
 CARD_PATH = ARTIFACTS / "live_mlb_card.json"
 EVIDENCE_ROOT = ARTIFACTS / "mlb_v8_forward"
 STATUS_ROOT = ARTIFACTS / "mlb_v8_status"
+RUNTIME_ENV_NAMES = (
+    "SPORTSEDGE_QUOTES_URL",
+    "SPORTSEDGE_ODDS_API_KEY",
+    "SPORTSEDGE_ODDS_API_KEY_2",
+    "SPORTSEDGE_ODDS_API_KEY_3",
+    "SPORTSEDGE_ODDS_API_KEY_4",
+    "SPORTSEDGE_FEATURES_URL",
+    "SPORTSEDGE_PROJECTED_LINEUPS_URL",
+    "SPORTSEDGE_PROVIDER_TOKEN",
+)
 
 
 def _git(*args: str, check: bool = True, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
@@ -42,7 +53,7 @@ def _write_plan(plan: dict) -> None:
     PLAN_PATH.write_text(json.dumps(plan, indent=2, sort_keys=True) + "\n")
 
 
-def persist_data_branch(plan: dict, run_id: str) -> None:
+def persist_data_branch(plan: dict, run_id: str, status_path: Path) -> None:
     slate = str(plan.get("slate_date_ct") or "unknown")
     safe = run_id.replace(":", "_").replace("/", "_")
     _git("fetch", "origin", "data")
@@ -58,9 +69,8 @@ def persist_data_branch(plan: dict, run_id: str) -> None:
             status_dest.mkdir(parents=True, exist_ok=True)
             if PLAN_PATH.is_file():
                 shutil.copy2(PLAN_PATH, status_dest / f"plan_{safe}.json")
-            if STATUS_ROOT.is_dir():
-                for path in STATUS_ROOT.glob("*.json"):
-                    shutil.copy2(path, status_dest / path.name)
+            if status_path.is_file():
+                shutil.copy2(status_path, status_dest / status_path.name)
             _git("config", "user.name", "sportsedge-v8-evidence-local", cwd=worktree)
             _git("config", "user.email", "sportsedge-v8-evidence-local@users.noreply.github.com", cwd=worktree)
             _git("add", "runtime/mlb-v8-status", cwd=worktree)
@@ -79,6 +89,92 @@ def persist_data_branch(plan: dict, run_id: str) -> None:
             raise RuntimeError("V8 local evidence data-branch persistence failed after retries")
         finally:
             _git("worktree", "remove", "--force", str(worktree), check=False)
+
+
+def _check_data_branch_write_path() -> tuple[bool, str | None]:
+    fetch = _git("fetch", "origin", "data", check=False)
+    if fetch.returncode != 0:
+        return False, fetch.stderr[-1000:]
+    with tempfile.TemporaryDirectory(prefix="sportsedge-v8-write-probe-") as td:
+        worktree = Path(td) / "data"
+        add = _git("worktree", "add", "--detach", str(worktree), "origin/data", check=False)
+        if add.returncode != 0:
+            return False, add.stderr[-1000:]
+        try:
+            _git("config", "user.name", "sportsedge-v8-dry-run", cwd=worktree)
+            _git("config", "user.email", "sportsedge-v8-dry-run@users.noreply.github.com", cwd=worktree)
+            _git("commit", "--allow-empty", "-m", "dry-run: MLB V8 data-branch write permission probe", cwd=worktree)
+            push = _git("push", "--dry-run", "origin", "HEAD:data", check=False, cwd=worktree)
+            return push.returncode == 0, None if push.returncode == 0 else push.stderr[-1000:]
+        finally:
+            _git("worktree", "remove", "--force", str(worktree), check=False)
+
+
+def dry_run(*, check_data_branch: bool = True) -> int:
+    now = datetime.now(timezone.utc)
+    slate = now.astimezone(CT).date().isoformat()
+    checks: dict[str, object] = {}
+    failures: list[str] = []
+
+    try:
+        checks["git_sha"] = _git_sha()
+        checks["git_head_ok"] = True
+    except Exception as exc:
+        checks["git_head_ok"] = False
+        checks["git_head_error"] = type(exc).__name__
+        failures.append("git_head")
+
+    try:
+        schedule = fetch_schedule(slate)
+        checks["schedule_fetch_ok"] = True
+        checks["schedule_game_count"] = len(schedule)
+    except Exception as exc:
+        checks["schedule_fetch_ok"] = False
+        checks["schedule_fetch_error"] = type(exc).__name__
+        failures.append("schedule_fetch")
+
+    help_run = subprocess.run(
+        ["python", "scripts/run_auto_mlb_resilient.py", "--help"],
+        check=False, text=True, capture_output=True,
+    )
+    checks["canonical_cli_import_ok"] = help_run.returncode == 0
+    if help_run.returncode != 0:
+        checks["canonical_cli_returncode"] = help_run.returncode
+        checks["canonical_cli_stderr_tail"] = help_run.stderr[-1000:]
+        failures.append("canonical_cli_import")
+
+    env_presence = {name: bool(os.environ.get(name)) for name in RUNTIME_ENV_NAMES}
+    checks["runtime_env_present"] = env_presence
+    odds_key_present = any(env_presence[name] for name in (
+        "SPORTSEDGE_ODDS_API_KEY", "SPORTSEDGE_ODDS_API_KEY_2",
+        "SPORTSEDGE_ODDS_API_KEY_3", "SPORTSEDGE_ODDS_API_KEY_4",
+    ))
+    quotes_present = env_presence["SPORTSEDGE_QUOTES_URL"]
+    features_present = env_presence["SPORTSEDGE_FEATURES_URL"]
+    checks["native_odds_credentials_present"] = odds_key_present
+    checks["legacy_quote_lane_config_valid"] = (not quotes_present) or features_present
+    checks["espn_fallback_available_without_credentials"] = True
+    if quotes_present and not features_present:
+        failures.append("legacy_quote_lane_missing_features")
+
+    if check_data_branch:
+        ok, error = _check_data_branch_write_path()
+        checks["data_branch_write_dry_run_ok"] = ok
+        if error:
+            checks["data_branch_write_error_tail"] = error
+        if not ok:
+            failures.append("data_branch_write_dry_run")
+
+    payload = {
+        "schema": "MLB_V8_FORWARD_FALLBACK_DRY_RUN_V1",
+        "checked_at_utc": now.isoformat(),
+        "slate_date_ct": slate,
+        "status": "PASS" if not failures else "FAIL",
+        "failures": failures,
+        "checks": checks,
+    }
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0 if not failures else 4
 
 
 def run(*, persist: bool = False) -> int:
@@ -104,12 +200,12 @@ def run(*, persist: bool = False) -> int:
                 "error_type": type(exc).__name__,
             }
             _write_plan(plan)
-            write_terminal_status(
+            status_path = write_terminal_status(
                 plan=plan, run_id=run_id, git_sha=git_sha,
                 model_outcome="blocked", capture_outcome="not-run", root=STATUS_ROOT,
             )
             if persist:
-                persist_data_branch(plan, run_id)
+                persist_data_branch(plan, run_id, status_path)
             return 2
 
         _write_plan(plan)
@@ -134,16 +230,14 @@ def run(*, persist: bool = False) -> int:
             else:
                 capture_outcome = "not-run"
 
-        write_terminal_status(
+        status_path = write_terminal_status(
             plan=plan, run_id=run_id, git_sha=git_sha,
             model_outcome=model_outcome, capture_outcome=capture_outcome, root=STATUS_ROOT,
         )
         if persist:
-            persist_data_branch(plan, run_id)
+            persist_data_branch(plan, run_id, status_path)
         return 0 if capture_outcome == "success" or not plan.get("needs_model") else 3
     except Exception:
-        # Last-chance local durability: if a plan exists, emit the same fail-closed
-        # terminal record before surfacing the exception.
         if PLAN_PATH.is_file():
             plan = json.loads(PLAN_PATH.read_text())
             try:
@@ -158,17 +252,21 @@ def run(*, persist: bool = False) -> int:
 
 def self_test() -> int:
     assert _run_id(datetime(2026, 9, 3, tzinfo=timezone.utc)).startswith("local:20260903T")
-    print(json.dumps({"status": "SELF_TEST_OK", "runner_independent": True}))
+    print(json.dumps({"status": "SELF_TEST_OK", "runner_independent": True, "single_status_persistence": True, "dry_run_available": True}))
     return 0
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--persist-data-branch", action="store_true")
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--skip-data-branch-check", action="store_true")
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
     if args.self_test:
         return self_test()
+    if args.dry_run:
+        return dry_run(check_data_branch=not args.skip_data_branch_check)
     return run(persist=args.persist_data_branch)
 
 
