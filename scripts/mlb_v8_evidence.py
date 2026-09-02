@@ -289,7 +289,9 @@ def build_decision_bundle(
         raise EvidenceError(f"invalid decision artifact {card}: {exc}") from exc
 
     decision_at, decision_key = _artifact_time(payload)
-    observed = decision_at or now
+    workflow_observed = bool(os.environ.get("GITHUB_RUN_ID") and os.environ.get("GITHUB_SHA"))
+    effective_decision_at = decision_at or (now if workflow_observed else None)
+    observed = effective_decision_at or now
     slate = observed.astimezone(CT).date().isoformat()
     if date.fromisoformat(slate) < FORWARD_START:
         return None
@@ -304,16 +306,27 @@ def build_decision_bundle(
         "bytes": len(raw),
     }]
     for path in associated:
-        if not path.is_file():
+        if path.is_file():
+            dest = bundle / path.name
+            _copy_immutable(path, dest)
+            files.append({
+                "role": "associated_input_or_diagnostic",
+                "path": path.name,
+                "sha256": _sha256_file(path),
+                "bytes": path.stat().st_size,
+            })
             continue
-        dest = bundle / path.name
-        _copy_immutable(path, dest)
-        files.append({
-            "role": "associated_input_or_diagnostic",
-            "path": path.name,
-            "sha256": _sha256_file(path),
-            "bytes": path.stat().st_size,
-        })
+        if path.is_dir():
+            for child in sorted(p for p in path.rglob("*") if p.is_file()):
+                rel = Path(path.name) / child.relative_to(path)
+                dest = bundle / rel
+                _copy_immutable(child, dest)
+                files.append({
+                    "role": "associated_directory_file",
+                    "path": rel.as_posix(),
+                    "sha256": _sha256_file(child),
+                    "bytes": child.stat().st_size,
+                })
 
     manifest = {
         "schema_version": SCHEMA_VERSION,
@@ -321,8 +334,12 @@ def build_decision_bundle(
         "collection_mode": "FORWARD",
         "forward_start_date_ct": FORWARD_START.isoformat(),
         "slate_date_ct": slate,
-        "decision_at_utc": _iso(decision_at) if decision_at else None,
-        "decision_at_basis": f"artifact:{decision_key}" if decision_at else "UNVERIFIED_NO_ARTIFACT_TIMESTAMP",
+        "decision_at_utc": _iso(effective_decision_at) if effective_decision_at else None,
+        "decision_at_basis": (
+            f"artifact:{decision_key}"
+            if decision_at
+            else ("workflow_observation_after_model_step" if workflow_observed else "UNVERIFIED_NO_ARTIFACT_TIMESTAMP")
+        ),
         "workflow_packaged_at_utc": _iso(now),
         "git_sha": os.environ.get("GITHUB_SHA"),
         "github_run_id": os.environ.get("GITHUB_RUN_ID"),
@@ -330,8 +347,8 @@ def build_decision_bundle(
         "governance": {
             "promotion_effect": "NONE",
             "truth_gate_status": "UNCHANGED",
-            "decision_evidence_usable": decision_at is not None,
-            "rule": "an artifact without its own PIT decision timestamp is retained but cannot satisfy chronological calibration",
+            "decision_evidence_usable": effective_decision_at is not None,
+            "rule": "artifact-native time is preferred; on GitHub Actions the immediate post-model workflow observation is a valid forward upper-bound decision timestamp",
         },
     }
     _atomic_json(bundle / "manifest.json", manifest)
@@ -460,6 +477,7 @@ def main() -> int:
         for candidate in (
             Path("artifacts/live_game_odds.json"),
             Path("artifacts/odds_http_diagnostics.json"),
+            Path("artifacts/prediction_journal"),
         ):
             if candidate not in assoc:
                 assoc.append(candidate)
