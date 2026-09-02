@@ -10,7 +10,9 @@ on:
       - 'scripts/run_mlb_v8_forward_lane.py'
       - 'sportsedge/mlb_context_autopull.py'
       - 'sportsedge/mlb_objective_depth_sources.py'
+      - 'sportsedge/statcast_daily_source.py'
       - 'tests/test_mlb_objective_depth_sources.py'
+      - 'tests/test_mlb_v8_temporal_guards.py'
       - '.github/workflows/mlb-v8-contract.yml'
       - '.github/workflows/mlb-v8-evidence.yml'
       - '.github/workflows/mlb-v8-replay-backfill.yml'
@@ -24,7 +26,9 @@ on:
       - 'scripts/run_mlb_v8_forward_lane.py'
       - 'sportsedge/mlb_context_autopull.py'
       - 'sportsedge/mlb_objective_depth_sources.py'
+      - 'sportsedge/statcast_daily_source.py'
       - 'tests/test_mlb_objective_depth_sources.py'
+      - 'tests/test_mlb_v8_temporal_guards.py'
       - '.github/workflows/mlb-v8-contract.yml'
       - '.github/workflows/mlb-v8-evidence.yml'
       - '.github/workflows/mlb-v8-replay-backfill.yml'
@@ -49,7 +53,9 @@ jobs:
             scripts/run_mlb_v8_forward_lane.py \
             sportsedge/mlb_context_autopull.py \
             sportsedge/mlb_objective_depth_sources.py \
-            tests/test_mlb_objective_depth_sources.py
+            sportsedge/statcast_daily_source.py \
+            tests/test_mlb_objective_depth_sources.py \
+            tests/test_mlb_v8_temporal_guards.py
       - name: Run isolated V8 evidence self-tests
         run: |
           python scripts/build_mlb_v8_replay_archive.py --self-test
@@ -58,6 +64,8 @@ jobs:
           python scripts/run_mlb_v8_forward_lane.py --self-test
       - name: Run composed Statcast objective-depth regression tests
         run: python -m unittest -v tests.test_mlb_objective_depth_sources
+      - name: Run V8 temporal leakage regression tests
+        run: python -m unittest -v tests.test_mlb_v8_temporal_guards
       - name: Enforce frozen V8 governance
         run: |
           python - <<'PY'
