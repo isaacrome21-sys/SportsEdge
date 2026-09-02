@@ -17,11 +17,16 @@ import math
 from typing import Any, Callable, Iterable
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+from zoneinfo import ZoneInfo
 
 BASE = "https://baseballsavant.mlb.com/statcast_search/csv"
 SOURCE = "BASEBALL_SAVANT_STATCAST"
 DEFAULT_TTL_SECONDS = 36 * 60 * 60
 HARD_HIT_MPH = 95.0
+# Baseball Savant game_date is a local MLB game date, not a UTC date. Pacific time
+# is the latest regular MLB venue timezone, so using its current calendar date as
+# the exclusive upper bound fail-closes current-day games across all MLB venues.
+MLB_LATEST_VENUE_TZ = ZoneInfo("America/Los_Angeles")
 
 
 class StatcastSourceError(RuntimeError):
@@ -260,11 +265,20 @@ def aggregate_statcast(rows: Iterable[dict[str, str]], *, start_date: date, end_
     return batter_rows, pitcher_rows
 
 
+def _strict_prior_day_end(current_utc: datetime) -> date:
+    """Return an exclusive Statcast game_date upper bound that excludes today's MLB games.
+
+    Statcast's game_date is local to the game. Using the latest MLB venue timezone
+    prevents UTC rollover from turning an in-progress U.S. game into a prior date.
+    """
+    return current_utc.astimezone(MLB_LATEST_VENUE_TZ).date()
+
+
 def fetch_daily_statcast(*, end_date: date | None = None, days: int = 30, opener: Callable = urlopen, now: datetime | None = None) -> StatcastSnapshot:
     if days <= 0 or days > 90:
         raise ValueError("days must be between 1 and 90")
     current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    end = end_date or current.date()
+    end = end_date or _strict_prior_day_end(current)
     start = end - timedelta(days=days - 1)
     rows = _request_csv(build_statcast_url(start, end), opener=opener)
     batter_rows, pitcher_rows = aggregate_statcast(rows, start_date=start, end_date=end, retrieved_at=current)
