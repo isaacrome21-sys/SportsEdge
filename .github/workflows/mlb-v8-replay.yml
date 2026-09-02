@@ -1,0 +1,145 @@
+name: mlb-v8-replay
+
+on:
+  workflow_dispatch:
+    inputs:
+      start:
+        description: Replay start date
+        required: true
+        default: '2026-03-01'
+        type: string
+      end:
+        description: Replay end date
+        required: true
+        default: '2026-08-31'
+        type: string
+      markets:
+        description: Featured markets for first pass
+        required: true
+        default: 'h2h,spreads,totals'
+        type: string
+      checkpoints:
+        description: Checkpoints
+        required: true
+        default: 'T-90,CLOSE_PRESTART'
+        type: string
+      max_estimated_credits:
+        description: Hard provider-credit preflight cap (must cover full plan)
+        required: true
+        default: '0'
+        type: string
+      limit_snapshots:
+        description: Optional deterministic snapshot limit (0 = all)
+        required: true
+        default: '0'
+        type: string
+      execute:
+        description: Actually call paid historical API after plan
+        required: true
+        default: false
+        type: boolean
+  pull_request:
+    paths:
+      - 'sportsedge/mlb_evidence_archive.py'
+      - 'scripts/build_mlb_replay_archive.py'
+      - 'scripts/capture_mlb_v8_forward.py'
+      - 'scripts/archive_mlb_v8_additional_close.py'
+      - 'scripts/persist_mlb_v8_*.py'
+      - 'config/mlb_replay_source_map_v8.json'
+      - 'tests/test_mlb_*v8*.py'
+      - '.github/workflows/mlb-v8-replay.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'sportsedge/mlb_evidence_archive.py'
+      - 'scripts/build_mlb_replay_archive.py'
+      - 'scripts/capture_mlb_v8_forward.py'
+      - 'scripts/archive_mlb_v8_additional_close.py'
+      - 'scripts/persist_mlb_v8_*.py'
+      - 'config/mlb_replay_source_map_v8.json'
+      - 'tests/test_mlb_*v8*.py'
+      - '.github/workflows/mlb-v8-replay.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mlb-v8-replay
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify V8 replay and forward evidence contracts
+        run: >-
+          python -m unittest
+          tests.test_mlb_evidence_archive_v8
+          tests.test_mlb_replay_archive_v8
+          tests.test_mlb_v8_forward_capture
+          -v
+      - name: Compile evidence scripts
+        run: >-
+          python -m py_compile
+          sportsedge/mlb_evidence_archive.py
+          scripts/build_mlb_replay_archive.py
+          scripts/capture_mlb_v8_forward.py
+          scripts/archive_mlb_v8_additional_close.py
+          scripts/persist_mlb_v8_decision.py
+          scripts/persist_mlb_v8_market_snapshots.py
+          scripts/persist_mlb_replay_archive.py
+
+  backfill:
+    if: github.event_name == 'workflow_dispatch'
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+      SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
+      SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
+      SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build replay plan without spending provider credits
+        run: >-
+          python scripts/build_mlb_replay_archive.py
+          --start '${{ inputs.start }}'
+          --end '${{ inputs.end }}'
+          --markets '${{ inputs.markets }}'
+          --checkpoints '${{ inputs.checkpoints }}'
+          --output-root artifacts/mlb_replay_2026_mar_aug
+          --plan-only
+      - name: Execute bounded The Odds API historical first pass
+        if: inputs.execute == true
+        run: >-
+          python scripts/build_mlb_replay_archive.py
+          --start '${{ inputs.start }}'
+          --end '${{ inputs.end }}'
+          --markets '${{ inputs.markets }}'
+          --checkpoints '${{ inputs.checkpoints }}'
+          --output-root artifacts/mlb_replay_2026_mar_aug
+          --max-estimated-credits '${{ inputs.max_estimated_credits }}'
+          --limit-snapshots '${{ inputs.limit_snapshots }}'
+          --execute
+      - name: Persist executed replay to data branch
+        if: inputs.execute == true
+        run: python -I scripts/persist_mlb_replay_archive.py --source artifacts/mlb_replay_2026_mar_aug
+      - name: Upload replay plan/data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlb-v8-replay-${{ github.run_id }}
+          path: artifacts/mlb_replay_2026_mar_aug/**
+          if-no-files-found: error
+          retention-days: 90
