@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Persist immutable V8 decision/close evidence records.
+"""Persist immutable MLB V8 decision/close evidence records.
 
-The runner that produces a recommendation writes a JSON payload and calls this tool
-with phase=decision before exposure. A pre-first-pitch close collector calls it with
-phase=close. Records are content-addressed and append-only; conflicting rewrites fail.
+Decision evidence is the exact canonical-machine quote/model state used at the
+standardized forward decision time. Close evidence is a separately captured quote
+state. Neither phase can overwrite or relabel the other.
 """
 from __future__ import annotations
 
@@ -23,33 +23,74 @@ def sha(raw: bytes) -> str:
 
 
 def parse_ts(value: str) -> datetime:
-    text = value.replace("Z", "+00:00")
+    text = str(value).strip().replace("Z", "+00:00")
     dt = datetime.fromisoformat(text)
-    if dt.tzinfo is None:
+    if dt.tzinfo is None or dt.utcoffset() is None:
         raise ValueError("timestamp must be timezone-aware")
     return dt.astimezone(timezone.utc)
 
 
+def _hex(value: Any, *, lengths: tuple[int, ...]) -> bool:
+    text = str(value or "").strip().lower()
+    if len(text) not in lengths:
+        return False
+    try:
+        int(text, 16)
+    except ValueError:
+        return False
+    return True
+
+
 def validate(payload: dict[str, Any], phase: str) -> None:
+    if phase not in {"decision", "close"}:
+        raise ValueError("unsupported V8 evidence phase")
     required = ["game_id", "first_pitch_at", "captured_at", "quotes", "source_provenance"]
     if phase == "decision":
-        required += ["run_id", "model_sha", "distribution_sha"]
+        required += ["run_id", "model_sha", "distribution_sha", "decision_rows"]
     missing = [key for key in required if payload.get(key) in (None, "", [], {})]
     if missing:
         raise ValueError("missing required V8 evidence fields: " + ",".join(missing))
+
     first_pitch = parse_ts(str(payload["first_pitch_at"]))
     captured = parse_ts(str(payload["captured_at"]))
     if captured >= first_pitch:
         raise ValueError("V8 pregame evidence must be captured before first pitch")
-    if not isinstance(payload["quotes"], list) or not payload["quotes"]:
+
+    provenance = payload.get("source_provenance")
+    if not isinstance(provenance, dict) or not provenance:
+        raise ValueError("source_provenance must be a non-empty object")
+
+    quotes = payload.get("quotes")
+    if not isinstance(quotes, list) or not quotes:
         raise ValueError("quotes must be a non-empty list")
-    for quote in payload["quotes"]:
+    for quote in quotes:
+        if not isinstance(quote, dict):
+            raise ValueError("quote must be an object")
         for key in ("book_key", "market", "price", "retrieved_at"):
             if quote.get(key) in (None, ""):
                 raise ValueError(f"quote missing {key}")
         retrieved = parse_ts(str(quote["retrieved_at"]))
         if retrieved > captured:
             raise ValueError("quote retrieved_at cannot be after captured_at")
+        if retrieved >= first_pitch:
+            raise ValueError("post-first-pitch quote cannot enter pregame V8 evidence")
+
+    if phase == "decision":
+        if not _hex(payload["model_sha"], lengths=(40, 64)):
+            raise ValueError("model_sha must be an exact git/model SHA")
+        if not _hex(payload["distribution_sha"], lengths=(64,)):
+            raise ValueError("distribution_sha must be sha256")
+        rows = payload.get("decision_rows")
+        if not isinstance(rows, list) or not rows:
+            raise ValueError("decision_rows must be non-empty")
+        for row in rows:
+            if not isinstance(row, dict):
+                raise ValueError("decision row must be an object")
+            for key in ("market", "model_p", "distribution_sha256", "model_input_hash"):
+                if row.get(key) in (None, ""):
+                    raise ValueError(f"decision row missing {key}")
+            if not _hex(row["distribution_sha256"], lengths=(64,)):
+                raise ValueError("decision row distribution_sha256 invalid")
 
 
 def persist(payload: dict[str, Any], phase: str, root: Path = ROOT) -> Path:
@@ -78,24 +119,35 @@ def persist(payload: dict[str, Any], phase: str, root: Path = ROOT) -> Path:
 
 def self_test() -> int:
     import tempfile
+    dsha = "d" * 64
     base = {
         "game_id": "123",
         "first_pitch_at": "2026-09-03T23:05:00Z",
         "captured_at": "2026-09-03T22:00:00Z",
-        "quotes": [{"book_key": "draftkings", "market": "h2h", "price": -120, "retrieved_at": "2026-09-03T21:59:50Z"}],
-        "source_provenance": {"provider": "THE_ODDS_API", "raw_sha256": "abc"},
+        "quotes": [{"book_key": "draftkings", "market": "MONEYLINE", "price": -120, "retrieved_at": "2026-09-03T21:59:50Z"}],
+        "source_provenance": {"provider": "SPORTSEDGE_CANONICAL_MLB_MACHINE", "card_sha256": "c" * 64},
         "run_id": "run-1",
-        "model_sha": "model",
-        "distribution_sha": "dist"
+        "model_sha": "a" * 40,
+        "distribution_sha": dsha,
+        "decision_rows": [{"market": "MONEYLINE", "model_p": 0.55, "distribution_sha256": dsha, "model_input_hash": "input"}],
     }
     with tempfile.TemporaryDirectory() as td:
         path = persist(base, "decision", Path(td))
         assert path.is_file()
         close = dict(base)
-        close.pop("run_id"); close.pop("model_sha"); close.pop("distribution_sha")
+        for key in ("run_id", "model_sha", "distribution_sha", "decision_rows"):
+            close.pop(key)
         close["captured_at"] = "2026-09-03T23:04:00Z"
-        close["quotes"] = [{"book_key": "draftkings", "market": "h2h", "price": -115, "retrieved_at": "2026-09-03T23:03:50Z"}]
+        close["quotes"] = [{"book_key": "draftkings", "market": "MONEYLINE", "price": -115, "retrieved_at": "2026-09-03T23:03:50Z"}]
         persist(close, "close", Path(td))
+        bad = dict(base)
+        bad["captured_at"] = bad["first_pitch_at"]
+        try:
+            persist(bad, "decision", Path(td))
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("post-start decision was not rejected")
     print(json.dumps({"status": "SELF_TEST_OK"}))
     return 0
 
