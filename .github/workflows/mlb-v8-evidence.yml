@@ -68,6 +68,7 @@ jobs:
         run: python -m pip install --disable-pip-version-check numpy
 
       - name: Run canonical MLB machine for target window
+        id: model
         if: steps.plan.outputs.needs_model == 'true'
         env:
           SPORTSEDGE_QUOTES_URL: ${{ secrets.SPORTSEDGE_QUOTES_URL }}
@@ -83,13 +84,47 @@ jobs:
         run: python scripts/run_auto_mlb_resilient.py --output artifacts/live_mlb_card.json
 
       - name: Materialize immutable V8 decision and close evidence
-        if: steps.plan.outputs.needs_model == 'true'
+        id: capture
+        if: steps.plan.outputs.needs_model == 'true' && steps.model.outcome == 'success'
         run: >-
           python scripts/run_mlb_v8_forward_lane.py
           --plan artifacts/mlb_v8_plan.json
           --card artifacts/live_mlb_card.json
           --model-sha "$GITHUB_SHA"
           --run-id "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT"
+
+      - name: Write target-window terminal status
+        if: always() && steps.plan.outputs.needs_model == 'true'
+        env:
+          MODEL_OUTCOME: ${{ steps.model.outcome }}
+          CAPTURE_OUTCOME: ${{ steps.capture.outcome }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          GIT_SHA: ${{ github.sha }}
+        run: |
+          mkdir -p artifacts/mlb_v8_status
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          plan=json.load(open('artifacts/mlb_v8_plan.json'))
+          model=os.environ.get('MODEL_OUTCOME') or 'not-run'
+          capture=os.environ.get('CAPTURE_OUTCOME') or 'not-run'
+          status='CAPTURED' if model == 'success' and capture == 'success' else 'MISSED_OR_BLOCKED'
+          payload={
+              'schema':'MLB_V8_FORWARD_STATUS_V1',
+              'run_id':f"{os.environ['RUN_ID']}:{os.environ['RUN_ATTEMPT']}",
+              'recorded_at_utc':datetime.now(timezone.utc).isoformat(),
+              'git_sha':os.environ['GIT_SHA'],
+              'slate_date_ct':plan.get('slate_date_ct'),
+              'target_games':plan.get('games') or [],
+              'model_outcome':model,
+              'capture_outcome':capture,
+              'status':status,
+          }
+          path=f"artifacts/mlb_v8_status/status_{os.environ['RUN_ID']}_{os.environ['RUN_ATTEMPT']}.json"
+          with open(path,'w') as f: json.dump(payload,f,indent=2,sort_keys=True); f.write('\n')
+          print(json.dumps(payload,sort_keys=True))
+          PY
 
       - name: Upload exact-run V8 evidence
         if: always()
@@ -100,11 +135,12 @@ jobs:
             artifacts/mlb_v8_plan.json
             artifacts/live_mlb_card.json
             artifacts/mlb_v8_forward
+            artifacts/mlb_v8_status
           if-no-files-found: warn
           retention-days: 30
 
-      - name: Persist V8 evidence to durable data branch
-        if: steps.plan.outputs.needs_model == 'true' && success()
+      - name: Persist target-window evidence or miss to durable data branch
+        if: always() && steps.plan.outputs.needs_model == 'true'
         env:
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
@@ -112,16 +148,22 @@ jobs:
           set -euo pipefail
           git fetch origin data
           git worktree add --detach .data-v8 FETCH_HEAD
-          mkdir -p .data-v8/evidence/mlb_v8_forward
-          cp -R artifacts/mlb_v8_forward/. .data-v8/evidence/mlb_v8_forward/
+          if [ -d artifacts/mlb_v8_forward ]; then
+            mkdir -p .data-v8/evidence/mlb_v8_forward
+            cp -R artifacts/mlb_v8_forward/. .data-v8/evidence/mlb_v8_forward/
+          fi
           mkdir -p ".data-v8/runtime/mlb-v8-status/${{ steps.plan.outputs.slate_date_ct }}"
           cp artifacts/mlb_v8_plan.json ".data-v8/runtime/mlb-v8-status/${{ steps.plan.outputs.slate_date_ct }}/plan_${RUN_ID}_${RUN_ATTEMPT}.json"
+          cp artifacts/mlb_v8_status/*.json ".data-v8/runtime/mlb-v8-status/${{ steps.plan.outputs.slate_date_ct }}/"
           cd .data-v8
           git config user.name sportsedge-v8-evidence-bot
           git config user.email sportsedge-v8-evidence-bot@users.noreply.github.com
-          git add evidence/mlb_v8_forward runtime/mlb-v8-status
-          git diff --cached --quiet && { echo 'V8 evidence produced no durable change'; exit 97; }
-          git commit -m "evidence: persist MLB V8 forward run ${RUN_ID}:${RUN_ATTEMPT}"
+          git add runtime/mlb-v8-status
+          if [ -d evidence/mlb_v8_forward ]; then
+            git add evidence/mlb_v8_forward
+          fi
+          git diff --cached --quiet && { echo 'V8 target window produced no durable change'; exit 97; }
+          git commit -m "evidence: persist MLB V8 target window ${RUN_ID}:${RUN_ATTEMPT}"
           for attempt in 1 2 3 4 5; do
             if git push origin HEAD:data; then
               exit 0
