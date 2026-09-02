@@ -3,10 +3,8 @@ name: archive-mlb-game-odds
 on:
   workflow_dispatch:
   schedule:
-    # Lightweight forward-evidence lane only. MLB start times are normally on a
-    # five-minute grid; :02/:22/:42 is always within the archive's +/-8 minute
-    # T-180/T-90/T0 acceptance window. Limit automatic runs to MLB season hours
-    # rather than burning private-repo Actions minutes around the clock.
+    # Lightweight forward-evidence lane. V8 canonical evidence begins 2026-09-03;
+    # the canonicalizer rejects every pre-epoch row and every post-first-pitch T0.
     - cron: '2,22,42 13-23,0-3 * 3-11 *'
 
 permissions:
@@ -19,16 +17,20 @@ concurrency:
 jobs:
   capture:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 12
     env:
       SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
       SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
       SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
       SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
-      SPORTSEDGE_ODDS_BOOKMAKERS: draftkings
-      SPORTSEDGE_ODDS_DAILY_BUDGET_CREDITS: '12'
+      # Preserve retail decision books plus one sharp anchor in every raw snapshot.
+      SPORTSEDGE_ODDS_BOOKMAKERS: draftkings,fanduel,betmgm,williamhill_us,pinnacle
+      # T-180/T-90/T0 clusters can exceed four captures on staggered MLB slates.
+      # 60 credits/day remains bounded while avoiding the old evidence-loss cap.
+      SPORTSEDGE_ODDS_DAILY_BUDGET_CREDITS: '60'
       SPORTSEDGE_ODDS_BUDGET_LEDGER: .cache/sportsedge/odds-budget/ledger.json
       SPORTSEDGE_ARCHIVE_SOURCE: scheduled-primary
+      SPORTSEDGE_V8_ADDITIONAL_CLOSE_DAILY_CAP: '500'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,6 +39,19 @@ jobs:
         run: python3 --version
       - name: Run canonical durable MLB archive lane
         run: python3 -I scripts/run_mlb_archive_lane.py
+      - name: Canonicalize V8 featured-market forward evidence
+        if: always()
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: python3 scripts/capture_mlb_v8_forward.py
+      - name: Capture V8 additional-market prestart closes
+        if: always()
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: python3 scripts/archive_mlb_v8_additional_close.py
+      - name: Persist V8 market evidence to data branch
+        if: always()
+        run: python3 -I scripts/persist_mlb_v8_market_snapshots.py
       - name: Upload archive execution evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -44,6 +59,7 @@ jobs:
           name: mlb-raw-game-odds-${{ github.run_id }}
           path: |
             artifacts/raw_odds/**
+            artifacts/v8_forward/**
             .cache/sportsedge/odds-budget/ledger.json
           if-no-files-found: error
           retention-days: 90
