@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sportsedge://mlb/v8/run-it/2026-09-03",
+  "title": "SportsEdge MLB V8 RUN IT Record",
+  "type": "object",
+  "required": [
+    "blueprint_version",
+    "technical_spec_version",
+    "event",
+    "decision",
+    "market",
+    "governance",
+    "evidence"
+  ],
+  "properties": {
+    "blueprint_version": {"const": "2026-09-03"},
+    "technical_spec_version": {"const": "2026-09-03"},
+    "event": {
+      "type": "object",
+      "required": ["event_id", "away", "home", "start_time"],
+      "properties": {
+        "event_id": {"type": "string", "minLength": 1},
+        "provider_game_id": {"type": ["string", "null"]},
+        "away": {"type": "string", "minLength": 1},
+        "home": {"type": "string", "minLength": 1},
+        "start_time": {"type": "string", "format": "date-time"}
+      },
+      "additionalProperties": false
+    },
+    "decision": {
+      "type": "object",
+      "required": ["decision_time", "execution_book"],
+      "properties": {
+        "decision_time": {"type": "string", "format": "date-time"},
+        "execution_book": {"type": "string", "minLength": 1},
+        "screenshot_or_quote_ref": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "market": {
+      "type": "object",
+      "required": ["family", "selection", "price_american"],
+      "properties": {
+        "family": {"type": "string", "minLength": 1},
+        "selection": {"type": "string", "minLength": 1},
+        "line": {"type": ["number", "string", "null"]},
+        "price_american": {"type": "integer"},
+        "opposite_price_american": {"type": ["integer", "null"]},
+        "no_vig_method": {"type": ["string", "null"]},
+        "no_vig_probability": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "model_p": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "fair_price_american": {"type": ["integer", "null"]},
+        "edge_probability_points": {"type": ["number", "null"]},
+        "ev": {"type": ["number", "null"]},
+        "push_probability": {"type": ["number", "null"], "minimum": 0, "maximum": 1}
+      },
+      "additionalProperties": false
+    },
+    "risk": {
+      "type": "object",
+      "properties": {
+        "kelly_fraction_full": {"type": ["number", "null"]},
+        "kelly_fraction_used": {"type": ["number", "null"]},
+        "stake_bankroll_fraction": {"type": ["number", "null"], "minimum": 0},
+        "stake_amount": {"type": ["number", "null"], "minimum": 0},
+        "correlation_cluster": {"type": ["string", "null"]},
+        "drawdown_multiplier": {"type": ["number", "null"], "minimum": 0, "maximum": 1}
+      },
+      "additionalProperties": false
+    },
+    "governance": {
+      "type": "object",
+      "required": ["label", "model_available", "model_validated", "deployment_eligible", "bet_qualified"],
+      "properties": {
+        "label": {
+          "enum": [
+            "SPORTSEDGE OFFICIAL",
+            "MODEL LEAN — NOT PROMOTED",
+            "STRONG CONTEXT LEAN — NOT Model_P",
+            "CONTEXT LEAN — NOT Model_P",
+            "PASS",
+            "DATA_GAP"
+          ]
+        },
+        "model_available": {"type": "boolean"},
+        "model_validated": {"type": "boolean"},
+        "deployment_eligible": {"type": "boolean"},
+        "bet_qualified": {"type": "boolean"},
+        "eligible": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "context": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["signal_type", "underlying_source", "observed_at", "summary"],
+        "properties": {
+          "signal_type": {"enum": ["HARD_MARKET_SIGNAL", "SOFT_MARKET_SIGNAL", "NEWS_SIGNAL", "STATISTICAL_MATCHUP"]},
+          "publisher": {"type": ["string", "null"]},
+          "underlying_source": {"type": "string", "minLength": 1},
+          "market": {"type": ["string", "null"]},
+          "observed_at": {"type": "string", "format": "date-time"},
+          "summary": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": false
+      }
+    },
+    "versioning": {
+      "type": "object",
+      "properties": {
+        "model_sha": {"type": ["string", "null"]},
+        "feature_contract_sha": {"type": ["string", "null"]},
+        "policy_sha": {"type": ["string", "null"]},
+        "execution_sha": {"type": ["string", "null"]},
+        "simulation_seed": {"type": ["integer", "string", "null"]},
+        "simulation_count": {"type": ["integer", "null"], "minimum": 1}
+      },
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {"enum": ["DECISION_CAPTURED", "CLOSE_CAPTURED", "PAIRED", "MISSED_OR_BLOCKED"]},
+        "decision_quote_time": {"type": ["string", "null"], "format": "date-time"},
+        "decision_price_american": {"type": ["integer", "null"]},
+        "close_quote_time": {"type": ["string", "null"], "format": "date-time"},
+        "close_price_american": {"type": ["integer", "null"]},
+        "clv": {"type": ["number", "null"]},
+        "blocked_reason": {"type": ["string", "null"]},
+        "pit_policy": {"type": ["string", "null"]},
+        "tier_a_pit": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"governance": {"properties": {"label": {"const": "SPORTSEDGE OFFICIAL"}}}}},
+      "then": {
+        "properties": {
+          "governance": {
+            "properties": {
+              "model_available": {"const": true},
+              "model_validated": {"const": true},
+              "deployment_eligible": {"const": true},
+              "bet_qualified": {"const": true},
+              "eligible": {"const": true}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"governance": {"properties": {"label": {"enum": ["STRONG CONTEXT LEAN — NOT Model_P", "CONTEXT LEAN — NOT Model_P"]}}}}},
+      "then": {
+        "properties": {
+          "market": {"properties": {"model_p": {"type": "null"}}},
+          "governance": {"properties": {"bet_qualified": {"const": false}, "eligible": {"const": false}}}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"evidence": {"properties": {"status": {"const": "PAIRED"}}}},
+      "then": {
+        "properties": {
+          "evidence": {
+            "required": ["decision_quote_time", "decision_price_american", "close_quote_time", "close_price_american"]
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"evidence": {"properties": {"status": {"const": "MISSED_OR_BLOCKED"}}}},
+      "then": {
+        "properties": {"evidence": {"required": ["blocked_reason"]}}
+      }
+    }
+  ],
+  "additionalProperties": false
+}
