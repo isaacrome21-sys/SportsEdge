@@ -32,6 +32,11 @@ CONTEXT_CLASSES = (
 # the objective-context completeness gate and never becomes a Model_P input.
 SUPPLEMENTAL_CONTEXT_CLASSES = (
     "starter_bullpen_projection",
+    "ballparkpal_stadium_weather",
+    "ballparkpal_home_run_zone",
+    "ballparkpal_batter_pitcher",
+    "ballparkpal_most_likely",
+    "ballparkpal_pitcher_report",
 )
 ALL_CONTEXT_CLASSES = CONTEXT_CLASSES + SUPPLEMENTAL_CONTEXT_CLASSES
 
@@ -100,7 +105,7 @@ def _observation(*, context_class: str, source: str, observed_at: datetime, payl
 
 
 def build_autopull_plan() -> dict[str, dict[str, Any]]:
-    """Describe the fail-closed source strategy for objective MLB context."""
+    """Describe the fail-closed source strategy for objective and supplemental MLB context."""
     return {
         "park": {"primary": "SPORTSEDGE_PIT_PARK_FACTORS", "auto_pull": True, "fallback": None},
         "weather": {"primary": "NWS_HOURLY", "auto_pull": True, "fallback": None},
@@ -112,6 +117,41 @@ def build_autopull_plan() -> dict[str, dict[str, Any]]:
         "workload": {"primary": "MLB_STATSAPI_GAME_LOGS", "auto_pull": True, "fallback": None},
         "starter_bullpen_projection": {
             "primary": "BALLPARKPAL_STARTER_BULLPEN_REPORT",
+            "auto_pull": False,
+            "fallback": "MANUAL_OR_CONFIGURED_PROVIDER",
+            "role": "CONTEXT_ONLY",
+            "model_p_eligible": False,
+        },
+        "ballparkpal_stadium_weather": {
+            "primary": "BALLPARKPAL_DAILY_STADIUM_REPORT",
+            "auto_pull": False,
+            "fallback": "MANUAL_OR_CONFIGURED_PROVIDER",
+            "role": "CONTEXT_ONLY",
+            "model_p_eligible": False,
+        },
+        "ballparkpal_home_run_zone": {
+            "primary": "BALLPARKPAL_HOME_RUN_ZONE",
+            "auto_pull": False,
+            "fallback": "MANUAL_OR_CONFIGURED_PROVIDER",
+            "role": "CONTEXT_ONLY",
+            "model_p_eligible": False,
+        },
+        "ballparkpal_batter_pitcher": {
+            "primary": "BALLPARKPAL_BATTER_V_PITCHER_MATCHUPS",
+            "auto_pull": False,
+            "fallback": "MANUAL_OR_CONFIGURED_PROVIDER",
+            "role": "CONTEXT_ONLY",
+            "model_p_eligible": False,
+        },
+        "ballparkpal_most_likely": {
+            "primary": "BALLPARKPAL_MOST_LIKELY_REPORT",
+            "auto_pull": False,
+            "fallback": "MANUAL_OR_CONFIGURED_PROVIDER",
+            "role": "CONTEXT_ONLY",
+            "model_p_eligible": False,
+        },
+        "ballparkpal_pitcher_report": {
+            "primary": "BALLPARKPAL_PITCHING_PREVIEW",
             "auto_pull": False,
             "fallback": "MANUAL_OR_CONFIGURED_PROVIDER",
             "role": "CONTEXT_ONLY",
@@ -135,9 +175,10 @@ def collect_mlb_hybrid_context(
     required classes remain explicit; no social/public betting or market price is
     requested.
 
-    BallparkPal starter x bullpen projections are accepted as supplemental,
-    context-only evidence when a provider is supplied. Their absence does not make
-    the required objective context incomplete and they never vote in Model_P.
+    BallparkPal starter/bullpen, stadium/weather, HR-zone, batter-v-pitcher,
+    Most-Likely and pitching-preview reports are accepted as supplemental,
+    context-only evidence when providers are supplied. Their absence does not make
+    required objective context incomplete and they never vote in Model_P.
     """
     asof = _utc(as_of, "as_of")
     kwargs = {} if opener is None else {"opener": opener}
