@@ -1,0 +1,64 @@
+{
+  "contract_id": "MLB_V8_ODDSPAPI_EVIDENCE_V1",
+  "status": "FROZEN_PRE_COLLECTION",
+  "source": "ODDSPAPI_HISTORICAL",
+  "provider": "OddsPapi",
+  "provider_api_version": "v4",
+  "sport_id": 13,
+  "tournament_id": 109,
+  "replay_window": {
+    "start_date": "2026-03-01",
+    "end_date": "2026-08-31"
+  },
+  "bookmakers": [
+    "pinnacle",
+    "draftkings",
+    "fanduel"
+  ],
+  "raw_evidence": {
+    "historical_endpoint": "/v4/historical-odds",
+    "fixture_endpoint": "/v4/fixtures",
+    "market_catalog_endpoint": "/v4/markets",
+    "preserve_exact_response_bytes": true,
+    "sha256_sidecar_required": true,
+    "provider_created_at_is_quote_observation_time": true,
+    "retrieval_time_never_substitutes_for_observation_time": true
+  },
+  "decision_pair": {
+    "target_minutes_before_first_pitch": 30,
+    "target_tolerance_seconds": 360,
+    "tolerance_direction": "EARLY_ONLY_AT_OR_BEFORE_TARGET",
+    "latest_state_at_target_only": true,
+    "active_true_required": true,
+    "deactivated_quote_fallback_forbidden": true,
+    "complementary_sides_required": true,
+    "single_side_inference_forbidden": true,
+    "max_pair_timestamp_skew_seconds": 30,
+    "strict_replay_quote_max_age_seconds": 180
+  },
+  "close_pair": {
+    "same_bookmaker_required": true,
+    "same_fixture_required": true,
+    "same_market_id_required": true,
+    "same_player_id_required": true,
+    "complementary_sides_required": true,
+    "max_pair_timestamp_skew_seconds": 30,
+    "strictly_before_first_pitch": true,
+    "must_be_after_decision_pair": true,
+    "book_switching_for_clv_forbidden": true,
+    "line_switching_for_clv_forbidden": true
+  },
+  "market_rules": {
+    "binary_markets_only_for_two_side_devig": true,
+    "n_way_markets_excluded_without_separate_frozen_policy": true,
+    "market_id_and_handicap_resolved_from_frozen_raw_catalog": true,
+    "player_identity_must_match_on_both_sides": true
+  },
+  "governance": {
+    "replay_evidence_may_inform_development": true,
+    "replay_evidence_alone_may_promote_v8": false,
+    "untouched_forward_holdout_remains_required": true,
+    "missing_or_ambiguous_evidence_is_excluded_not_imputed": true,
+    "rules_may_not_be_relaxed_after_results_are_observed_under_this_contract_id": true
+  }
+}
