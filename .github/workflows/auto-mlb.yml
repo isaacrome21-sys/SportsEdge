@@ -14,7 +14,10 @@ on:
       - 'tests/test_mlb_run_machine.py'
       - '.github/workflows/auto-mlb.yml'
   schedule:
-    - cron: '*/15 * * * *'
+    # Heavy full-card automation is intentionally sparse. The irreplaceable raw
+    # odds archive has its own lightweight scheduler; running this full model at
+    # archive cadence would exhaust private-repo Actions minutes again.
+    - cron: '12 17,22 * 3-11 *'
 
 permissions:
   contents: read
