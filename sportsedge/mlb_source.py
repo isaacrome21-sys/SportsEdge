@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 from .source_lineage import canonical_game_identity
 
 BASE = "https://statsapi.mlb.com"
+SAVANT_PREVIEW_BASE = "https://baseballsavant.mlb.com/preview"
 CHICAGO_TZ = ZoneInfo("America/Chicago")
 
 
@@ -69,6 +70,21 @@ def parse_game_start(value: Any) -> datetime:
 def game_time_chicago(value: str | GameSnapshot) -> str:
     raw = value.game_date if isinstance(value, GameSnapshot) else value
     return parse_game_start(raw).astimezone(CHICAGO_TZ).isoformat()
+
+
+def savant_preview_url(snapshot: GameSnapshot) -> str:
+    """Return the canonical Baseball Savant Statcast Game Preview URL for a game."""
+    if snapshot.official_date:
+        try:
+            game_day = datetime.fromisoformat(snapshot.official_date).date()
+        except ValueError as exc:
+            raise MLBSourceError(f"invalid MLB officialDate: {snapshot.official_date}") from exc
+    else:
+        game_day = parse_game_start(snapshot.game_date).astimezone(CHICAGO_TZ).date()
+    return (
+        f"{SAVANT_PREVIEW_BASE}?game_pk={snapshot.game_pk}"
+        f"&game_date={game_day.strftime('%m/%d/%Y')}"
+    )
 
 
 def _optional_positive_int(name: str, value: Any) -> int | None:
@@ -191,4 +207,5 @@ def snapshot_to_dict(snapshot: GameSnapshot) -> dict[str, Any]:
     out["game_time_ct"] = game_time_chicago(snapshot)
     out["sportsedge_game_id"] = identity.sportsedge_game_id
     out["mlb_game_pk"] = identity.mlb_game_pk
+    out["savant_preview_url"] = savant_preview_url(snapshot)
     return out
