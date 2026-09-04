@@ -1,0 +1,188 @@
+name: mlb-v8-oddspapi-replay-backfill
+
+on:
+  workflow_dispatch:
+    inputs:
+      bookmakers:
+        description: OddsPapi bookmaker slugs (max 3 per history call)
+        required: false
+        default: 'pinnacle,draftkings,fanduel'
+      batch_size:
+        description: Historical fixture calls per checkpoint batch
+        required: false
+        default: '120'
+      max_batches:
+        description: Maximum checkpoint batches this run
+        required: false
+        default: '30'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mlb-v8-oddspapi-replay-backfill
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      SPORTSEDGE_ODDSPAPI_KEY: ${{ secrets.SPORTSEDGE_ODDSPAPI_KEY }}
+      BOOKMAKERS: ${{ inputs.bookmakers }}
+      BATCH_SIZE: ${{ inputs.batch_size }}
+      MAX_BATCHES: ${{ inputs.max_batches }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify collector and PIT contracts
+        run: |
+          set -euo pipefail
+          python scripts/backfill_mlb_v8_oddspapi.py --self-test
+          python scripts/build_mlb_v8_oddspapi_pit.py --self-test
+
+      - name: Require authorized OddsPapi credential
+        run: |
+          set -euo pipefail
+          if [ -z "${SPORTSEDGE_ODDSPAPI_KEY:-}" ]; then
+            echo 'SPORTSEDGE_ODDSPAPI_KEY is not configured' >&2
+            exit 78
+          fi
+
+      - name: Restore durable progress from data branch
+        run: |
+          set -euo pipefail
+          git fetch origin data
+          git worktree add --detach .data-oddspapi FETCH_HEAD
+          if [ -d .data-oddspapi/evidence/mlb_v8_replay_sources/ODDSPAPI_HISTORICAL ]; then
+            mkdir -p artifacts/mlb_v8_replay_sources/ODDSPAPI_HISTORICAL
+            cp -R .data-oddspapi/evidence/mlb_v8_replay_sources/ODDSPAPI_HISTORICAL/. artifacts/mlb_v8_replay_sources/ODDSPAPI_HISTORICAL/
+          fi
+          if [ -d .data-oddspapi/evidence/mlb_v8_replay_archive/oddspapi_pit ]; then
+            mkdir -p artifacts/mlb_v8_replay_archive/oddspapi_pit
+            cp -R .data-oddspapi/evidence/mlb_v8_replay_archive/oddspapi_pit/. artifacts/mlb_v8_replay_archive/oddspapi_pit/
+          fi
+          if [ -f .data-oddspapi/runtime/mlb-v8-replay-control/oddspapi_state.json ]; then
+            mkdir -p artifacts/mlb_v8_replay_control
+            cp .data-oddspapi/runtime/mlb-v8-replay-control/oddspapi_state.json artifacts/mlb_v8_replay_control/oddspapi_state.json
+          fi
+
+      - name: Archive market catalogue
+        run: |
+          set -euo pipefail
+          if [ ! -f artifacts/mlb_v8_replay_sources/ODDSPAPI_HISTORICAL/catalog/markets.json ]; then
+            python scripts/archive_oddspapi_market_catalog.py
+          fi
+
+      - name: Collect March-August MLB fixture identities
+        run: |
+          set -euo pipefail
+          python - <<'PY' > /tmp/mlb_v8_windows.txt
+          from datetime import date, timedelta
+          cur=date(2026,3,1); stop=date(2026,8,31)
+          while cur <= stop:
+              last=min(stop, cur+timedelta(days=8))
+              print(cur.isoformat(), last.isoformat())
+              cur=last+timedelta(days=1)
+          PY
+          while read -r start end; do
+            python scripts/backfill_mlb_v8_oddspapi.py \
+              --start-date "$start" --end-date "$end" \
+              --bookmakers "$BOOKMAKERS" \
+              --max-history-requests 0 \
+              --cooldown-seconds 0
+            sleep 1.1
+          done < /tmp/mlb_v8_windows.txt
+
+      - name: Collect histories with durable checkpoints
+        run: |
+          set -euo pipefail
+
+          persist_checkpoint() {
+            mkdir -p .data-oddspapi/evidence/mlb_v8_replay_sources/ODDSPAPI_HISTORICAL
+            mkdir -p .data-oddspapi/evidence/mlb_v8_replay_archive/oddspapi_pit
+            mkdir -p .data-oddspapi/runtime/mlb-v8-replay-control
+            cp -R artifacts/mlb_v8_replay_sources/ODDSPAPI_HISTORICAL/. .data-oddspapi/evidence/mlb_v8_replay_sources/ODDSPAPI_HISTORICAL/
+            if [ -d artifacts/mlb_v8_replay_archive/oddspapi_pit ]; then
+              cp -R artifacts/mlb_v8_replay_archive/oddspapi_pit/. .data-oddspapi/evidence/mlb_v8_replay_archive/oddspapi_pit/
+            fi
+            if [ -f artifacts/mlb_v8_replay_control/oddspapi_state.json ]; then
+              cp artifacts/mlb_v8_replay_control/oddspapi_state.json .data-oddspapi/runtime/mlb-v8-replay-control/oddspapi_state.json
+            fi
+            (
+              cd .data-oddspapi
+              git config user.name sportsedge-v8-oddspapi-bot
+              git config user.email sportsedge-v8-oddspapi-bot@users.noreply.github.com
+              git add evidence/mlb_v8_replay_sources/ODDSPAPI_HISTORICAL evidence/mlb_v8_replay_archive/oddspapi_pit runtime/mlb-v8-replay-control/oddspapi_state.json
+              if git diff --cached --quiet; then
+                exit 0
+              fi
+              git commit -m "evidence: checkpoint MLB V8 OddsPapi PIT replay ${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}"
+              for attempt in 1 2 3 4 5; do
+                if git push origin HEAD:data; then
+                  exit 0
+                fi
+                git fetch origin data
+                git rebase origin/data
+                sleep $((attempt * 2))
+              done
+              exit 98
+            )
+          }
+
+          completed=false
+          for batch in $(seq 1 "$MAX_BATCHES"); do
+            echo "=== OddsPapi history checkpoint batch $batch/$MAX_BATCHES ==="
+            result_file="/tmp/oddspapi_batch_${batch}.json"
+            python scripts/backfill_mlb_v8_oddspapi.py \
+              --bookmakers "$BOOKMAKERS" \
+              --max-history-requests "$BATCH_SIZE" \
+              | tee "$result_file"
+
+            python scripts/build_mlb_v8_oddspapi_pit.py
+            persist_checkpoint
+
+            status=$(python - "$result_file" <<'PY'
+          import json,sys
+          lines=[x.strip() for x in open(sys.argv[1], encoding='utf-8') if x.strip()]
+          print(json.loads(lines[-1])['status'])
+          PY
+            )
+            echo "batch_status=$status"
+            if [ "$status" = "COMPLETE_RANGE" ]; then
+              completed=true
+              break
+            fi
+            if [ "$status" != "HISTORY_REQUEST_CAP_REACHED" ]; then
+              echo "Unexpected provider/collector status: $status" >&2
+              exit 2
+            fi
+          done
+
+          if [ "$completed" != "true" ]; then
+            echo 'ODDSPAPI_BACKFILL_NOT_COMPLETE_WITHIN_MAX_BATCHES' >&2
+            exit 88
+          fi
+
+      - name: Final PIT evidence summary
+        if: always()
+        run: |
+          if [ -f artifacts/mlb_v8_replay_archive/oddspapi_pit/summary.json ]; then
+            cat artifacts/mlb_v8_replay_archive/oddspapi_pit/summary.json
+          fi
+
+      - name: Upload checkpoint artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlb-v8-oddspapi-replay-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts/mlb_v8_replay_sources/ODDSPAPI_HISTORICAL
+            artifacts/mlb_v8_replay_control/oddspapi_state.json
+            artifacts/mlb_v8_replay_archive/oddspapi_pit
+          if-no-files-found: warn
+          retention-days: 30
