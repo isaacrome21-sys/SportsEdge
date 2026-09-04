@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "market": "HOME_RUNS",
+  "evidence_lane": "RESEARCH_V02_FORWARD_HOLDOUT",
+  "declared_at_utc": "2026-09-04T04:07:19Z",
+  "declared_at_ct": "2026-09-03T23:07:19-05:00",
+  "status": "ARMED_AWAITING_FIRST_LIVE_PIT_ROW",
+  "candidate": {
+    "engine_version": "home_runs_research_v0.2",
+    "feature_contract": "hr_batter_pitcher_park_pa_statcast_v2",
+    "engine_blob_sha": "362e60c2b95945ec2673ae99f715ec0fddf9039a",
+    "label": "SURGE_HAIRCUT_V02"
+  },
+  "incumbent": {
+    "label": "STABLE_BASELINE_V01",
+    "implementation": "same frozen v0.2 module baseline probability before recent-contact uplift"
+  },
+  "v03_isolated_arms": [
+    "PLATOON_V03",
+    "PARK_WEATHER_V03",
+    "GEOMETRY_V03"
+  ],
+  "v03_arm_blob_sha": "2480782feb806037f589e49c1bdd9316f7d3c09a",
+  "pit_row_builder_blob_sha": "c8450effe2ae4dea328c8dd5ba9a1bc523c6a04e",
+  "evaluation_blob_sha": "ceca3556b0eadd2aaa3b15f85fc3c956f734a81c",
+  "rules": {
+    "forward_holdout_backfill_allowed": false,
+    "postgame_feature_backfill_allowed": false,
+    "random_shuffle_allowed": false,
+    "combined_v03_arm_allowed": false,
+    "external_model_probability_in_model_p_allowed": false,
+    "promotion_from_this_declaration_alone": false,
+    "standard_anytime_hr_line": 0.5
+  },
+  "source_state_at_declaration": {
+    "mlb_prop_pit_data_branch_path": "runtime/mlb-prop-pit",
+    "mlb_prop_pit_present": false,
+    "statcast_latest_visible_date": "2026-08-17",
+    "note": "Declaration starts a prospective lane. Missing/stale source capture is a blocker, never evidence and never silently backfilled."
+  }
+}
