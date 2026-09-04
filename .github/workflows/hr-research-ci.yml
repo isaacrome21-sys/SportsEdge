@@ -1,0 +1,30 @@
+name: hr-research-ci
+
+on:
+  push:
+    branches:
+      - 'research/hr-surge-haircut-v02'
+    paths:
+      - 'sportsedge/research/home_runs_engine.py'
+      - 'tests/test_research_home_runs_engine.py'
+      - '.github/workflows/hr-research-ci.yml'
+  pull_request:
+    paths:
+      - 'sportsedge/research/home_runs_engine.py'
+      - 'tests/test_research_home_runs_engine.py'
+      - '.github/workflows/hr-research-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.13'
+      - name: HR research challenger tests
+        run: python -m unittest tests.test_research_home_runs_engine -v
