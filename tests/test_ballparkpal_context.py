@@ -7,8 +7,14 @@ from sportsedge.ballparkpal_context import (
     BallparkPalContextError,
     normalize_ballparkpal_report,
 )
+from sportsedge.ballparkpal_daily_context import (
+    REPORT_SPECS,
+    BallparkPalDailyContextError,
+    normalize_ballparkpal_daily_report,
+)
 from sportsedge.mlb_context_autopull import (
     CONTEXT_CLASSES,
+    SUPPLEMENTAL_CONTEXT_CLASSES,
     missing_context_classes,
     missing_supplemental_context_classes,
 )
@@ -89,15 +95,55 @@ def test_ballparkpal_game_identity_mismatch_fails_closed():
         normalize_ballparkpal_report(_det_cle_report(), expected_game_pk=999999)
 
 
+def test_ballparkpal_daily_report_families_are_context_only():
+    for report_type, spec in REPORT_SPECS.items():
+        row = normalize_ballparkpal_daily_report(
+            report_type,
+            {
+                "game_pk": 824424,
+                "observed_at_utc": "2026-09-04T15:45:00Z",
+                "source_url": "https://example.invalid/ballparkpal",
+                "payload": {"sample": report_type},
+            },
+            expected_game_pk=824424,
+        )
+        assert row["context_class"] == spec["context_class"]
+        assert row["source_role"] == "CONTEXT_ONLY"
+        assert row["model_p_eligible"] is False
+        assert row["truth_gate_eligible"] is False
+        assert "model_p_vote" in row["prohibited_uses"]
+        assert "market_price_substitution" in row["prohibited_uses"]
+
+
+def test_most_likely_is_not_allowed_to_masquerade_as_market_price():
+    row = normalize_ballparkpal_daily_report(
+        "most_likely",
+        {
+            "game_pk": 824424,
+            "payload": {"to_hit_hr": [{"player": "C. Jensen", "sim_american": 306}]},
+        },
+    )
+    assert row["source"] == "BALLPARKPAL_MOST_LIKELY_REPORT"
+    assert "no_vig_input" in row["prohibited_uses"]
+    assert "market_price_substitution" in row["prohibited_uses"]
+
+
+def test_ballparkpal_daily_game_identity_mismatch_fails_closed():
+    with pytest.raises(BallparkPalDailyContextError, match="game identity mismatch"):
+        normalize_ballparkpal_daily_report(
+            "stadium_weather",
+            {"game_pk": 824424, "payload": {"runs": 0.0}},
+            expected_game_pk=999999,
+        )
+
+
 def test_missing_ballparkpal_does_not_block_required_context_completeness():
     bundle = {
         "observations": {
             **{key: {"status": "AVAILABLE"} for key in CONTEXT_CLASSES},
-            "starter_bullpen_projection": {"status": "MISSING_PROVIDER"},
+            **{key: {"status": "MISSING_PROVIDER"} for key in SUPPLEMENTAL_CONTEXT_CLASSES},
         }
     }
 
     assert missing_context_classes(bundle) == ()
-    assert missing_supplemental_context_classes(bundle) == (
-        "starter_bullpen_projection",
-    )
+    assert missing_supplemental_context_classes(bundle) == SUPPLEMENTAL_CONTEXT_CLASSES
