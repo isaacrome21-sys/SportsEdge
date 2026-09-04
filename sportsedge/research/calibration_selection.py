@@ -76,22 +76,34 @@ def _isotonic_fit(pairs: Sequence[tuple[float, int]]) -> tuple[tuple[float, ...]
     if len(pairs) < 20:
         raise ResearchBacktestError("ISOTONIC_ROWS_INSUFFICIENT")
     ordered = sorted((float(p), int(y)) for p, y in pairs)
+    # Equal raw probabilities must first collapse into one empirical block.
+    # Otherwise PAV can leave multiple blocks with the same threshold and a
+    # step lookup may return the wrong one for that exact probability.
     blocks: list[dict[str, float]] = []
     for p, y in ordered:
+        if blocks and abs(blocks[-1]["hi"] - p) <= 1e-15:
+            blocks[-1]["sum"] += float(y)
+            blocks[-1]["n"] += 1.0
+            continue
         blocks.append({"lo": p, "hi": p, "sum": float(y), "n": 1.0})
-        while len(blocks) >= 2:
-            left = blocks[-2]["sum"] / blocks[-2]["n"]
-            right = blocks[-1]["sum"] / blocks[-1]["n"]
-            if left <= right + 1e-15:
-                break
-            b = blocks.pop()
-            a = blocks.pop()
-            blocks.append({
-                "lo": a["lo"],
-                "hi": b["hi"],
-                "sum": a["sum"] + b["sum"],
-                "n": a["n"] + b["n"],
-            })
+
+    i = 0
+    while i < len(blocks) - 1:
+        left = blocks[i]["sum"] / blocks[i]["n"]
+        right = blocks[i + 1]["sum"] / blocks[i + 1]["n"]
+        if left <= right + 1e-15:
+            i += 1
+            continue
+        a, b = blocks[i], blocks[i + 1]
+        blocks[i:i + 2] = [{
+            "lo": a["lo"],
+            "hi": b["hi"],
+            "sum": a["sum"] + b["sum"],
+            "n": a["n"] + b["n"],
+        }]
+        if i > 0:
+            i -= 1
+
     thresholds = tuple(float(block["hi"]) for block in blocks)
     values = tuple(_clip(block["sum"] / block["n"]) for block in blocks)
     return thresholds, values
