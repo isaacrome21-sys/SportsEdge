@@ -28,6 +28,13 @@ CONTEXT_CLASSES = (
     "workload",
 )
 
+# Supplemental context is tracked and provenance-preserved, but it never blocks
+# the objective-context completeness gate and never becomes a Model_P input.
+SUPPLEMENTAL_CONTEXT_CLASSES = (
+    "starter_bullpen_projection",
+)
+ALL_CONTEXT_CLASSES = CONTEXT_CLASSES + SUPPLEMENTAL_CONTEXT_CLASSES
+
 PROHIBITED_CONTEXT_CLASSES = frozenset({
     "social_pick",
     "handicapper_pick",
@@ -81,7 +88,7 @@ def _observation(*, context_class: str, source: str, observed_at: datetime, payl
     key = str(context_class).strip().lower()
     if key in PROHIBITED_CONTEXT_CLASSES:
         raise MLBContextAutopullError(f"prohibited hybrid context class: {key}")
-    if key not in CONTEXT_CLASSES:
+    if key not in ALL_CONTEXT_CLASSES:
         raise MLBContextAutopullError(f"unknown hybrid context class: {key}")
     return ContextObservation(
         context_class=key,
@@ -103,6 +110,13 @@ def build_autopull_plan() -> dict[str, dict[str, Any]]:
         "catcher_framing": {"primary": "MLB_STATSAPI_STARTER+PIT_FRAMING_HISTORY", "auto_pull": True, "fallback": None},
         "platoon": {"primary": "PIT_STATCAST_PLATOON", "auto_pull": True, "fallback": None},
         "workload": {"primary": "MLB_STATSAPI_GAME_LOGS", "auto_pull": True, "fallback": None},
+        "starter_bullpen_projection": {
+            "primary": "BALLPARKPAL_STARTER_BULLPEN_REPORT",
+            "auto_pull": False,
+            "fallback": "MANUAL_OR_CONFIGURED_PROVIDER",
+            "role": "CONTEXT_ONLY",
+            "model_p_eligible": False,
+        },
     }
 
 
@@ -118,7 +132,12 @@ def collect_mlb_hybrid_context(
     With no provider override, SportsEdge now attempts objective bullpen/workload,
     bounded prior-day Statcast skill/catcher context and official fielding fallback
     automatically. Explicit caller providers replace only matching classes. Missing
-    classes remain explicit; no social/public betting or market price is requested.
+    required classes remain explicit; no social/public betting or market price is
+    requested.
+
+    BallparkPal starter x bullpen projections are accepted as supplemental,
+    context-only evidence when a provider is supplied. Their absence does not make
+    the required objective context incomplete and they never vote in Model_P.
     """
     asof = _utc(as_of, "as_of")
     kwargs = {} if opener is None else {"opener": opener}
@@ -174,6 +193,7 @@ def collect_mlb_hybrid_context(
             payload=forecast.payload, status="AVAILABLE",
         )
 
+    plan = build_autopull_plan()
     for context_class in CONTEXT_CLASSES:
         if context_class in observations:
             continue
@@ -181,7 +201,7 @@ def collect_mlb_hybrid_context(
         if provider is None:
             observations[context_class] = _observation(
                 context_class=context_class,
-                source=build_autopull_plan()[context_class]["primary"],
+                source=plan[context_class]["primary"],
                 observed_at=asof,
                 payload=None,
                 status="MISSING_PROVIDER",
@@ -194,7 +214,7 @@ def collect_mlb_hybrid_context(
             # continues and reports the exact missing class rather than failing the slate.
             observations[context_class] = _observation(
                 context_class=context_class,
-                source=build_autopull_plan()[context_class]["primary"],
+                source=plan[context_class]["primary"],
                 observed_at=asof,
                 payload=None,
                 status="SOURCE_FAILED",
@@ -202,7 +222,39 @@ def collect_mlb_hybrid_context(
             continue
         observations[context_class] = _observation(
             context_class=context_class,
-            source=build_autopull_plan()[context_class]["primary"],
+            source=plan[context_class]["primary"],
+            observed_at=asof,
+            payload=payload,
+            status="AVAILABLE" if payload is not None else "MISSING",
+        )
+
+    # Supplemental providers are deliberately outside CONTEXT_CLASSES so a missing
+    # third-party report cannot fail the objective-context completeness gate.
+    for context_class in SUPPLEMENTAL_CONTEXT_CLASSES:
+        provider = provider_map.get(context_class)
+        if provider is None:
+            observations[context_class] = _observation(
+                context_class=context_class,
+                source=plan[context_class]["primary"],
+                observed_at=asof,
+                payload=None,
+                status="MISSING_PROVIDER",
+            )
+            continue
+        try:
+            payload = provider(int(game_pk), asof, live_payload)
+        except Exception:
+            observations[context_class] = _observation(
+                context_class=context_class,
+                source=plan[context_class]["primary"],
+                observed_at=asof,
+                payload=None,
+                status="SOURCE_FAILED",
+            )
+            continue
+        observations[context_class] = _observation(
+            context_class=context_class,
+            source=plan[context_class]["primary"],
             observed_at=asof,
             payload=payload,
             status="AVAILABLE" if payload is not None else "MISSING",
@@ -215,9 +267,14 @@ def collect_mlb_hybrid_context(
         "lane": "HYBRID_CONTEXT",
         "truth_gate_eligible": False,
         "model_p_eligible": False,
+        "required_context_classes": list(CONTEXT_CLASSES),
+        "supplemental_context_classes": list(SUPPLEMENTAL_CONTEXT_CLASSES),
         "source_manifests": [source_manifest(live), *weather_manifests],
         "observations": {k: asdict(v) for k, v in observations.items()},
     }
+    payload["missing_supplemental_context_classes"] = list(
+        missing_supplemental_context_classes(payload)
+    )
     payload["payload_sha256"] = canonical_json_sha256(payload)
     return payload
 
@@ -226,6 +283,16 @@ def missing_context_classes(bundle: Mapping[str, Any]) -> tuple[str, ...]:
     observations = bundle.get("observations") or {}
     missing = []
     for key in CONTEXT_CLASSES:
+        row = observations.get(key) or {}
+        if str(row.get("status") or "").upper() != "AVAILABLE":
+            missing.append(key)
+    return tuple(missing)
+
+
+def missing_supplemental_context_classes(bundle: Mapping[str, Any]) -> tuple[str, ...]:
+    observations = bundle.get("observations") or {}
+    missing = []
+    for key in SUPPLEMENTAL_CONTEXT_CLASSES:
         row = observations.get(key) or {}
         if str(row.get("status") or "").upper() != "AVAILABLE":
             missing.append(key)
