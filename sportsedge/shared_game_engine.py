@@ -22,6 +22,7 @@ from .v7_distribution import (
 )
 
 STAGE1_GAME_MARKETS = frozenset({"MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS"})
+V8_PRIMARY_GAME_DEFAULT_SIMULATIONS = 100000
 
 
 class SharedGameEngineError(ValueError):
@@ -81,7 +82,9 @@ def build_shared_game_engine_session(
             raise SharedGameEngineError("game_id required")
         away_mean = _finite_positive(model_input.get("away_mean_runs"), "away_mean_runs")
         home_mean = _finite_positive(model_input.get("home_mean_runs"), "home_mean_runs")
-        simulations = _simulation_count(model_input.get("simulations", 50000))
+        simulations = _simulation_count(
+            model_input.get("simulations", V8_PRIMARY_GAME_DEFAULT_SIMULATIONS)
+        )
         feature_source_hash = model_input.get("feature_source_hash")
 
         stochastic_identity = {
