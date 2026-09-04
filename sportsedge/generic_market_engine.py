@@ -13,6 +13,7 @@ from typing import Any, Mapping
 
 GENERIC_ENGINE_VERSION = "mlb_full_market_runtime_v2"
 PA_BOUNDED_ENGINE_VERSION = "mlb_pa_bounded_count_v1"
+V8_PRIMARY_GAME_DEFAULT_SIMULATIONS = 100000
 
 GAME_MARKETS = {
     "MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS", "NRFI", "YRFI",
@@ -252,7 +253,7 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
         return out
 
     total_line = line if market == "TOTALS" else _finite(model_input.get("total_line", 0.0), "total_line", lower=0.0)
-    simulations = int(model_input.get("simulations", 50000))
+    simulations = int(model_input.get("simulations", V8_PRIMARY_GAME_DEFAULT_SIMULATIONS))
     game_build_hash = _canonical_json_sha256({
         "engine": V7_DISTRIBUTION_VERSION, "game_id": model_input.get("game_id"),
         "away_mean_runs": away_mean, "home_mean_runs": home_mean,
