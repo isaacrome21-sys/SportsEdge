@@ -302,8 +302,18 @@ def _run_canonical(*, mode: str, season: int, week: int, now: datetime, model: C
                 distribution_sha256=dist_hashes[gid], seed=seeds[gid], seed_policy=CFB_SEED_POLICY,
                 book_key=str(q.get("book_key") or "") or None, sportsbook=str(q.get("sportsbook") or "") or None,
                 quote_retrieved_at=qt.isoformat(), offer_id=str(q.get("offer_id") or "") or None))
-    status = "READY" if results and not source_failures else "DEGRADED" if results else "BLOCKED"
     ordered = tuple(sorted(results, key=lambda r: (r.game_id, r.market, r.book_key or "", r.line or 0.0, r.side)))
+    if not ordered:
+        status = "BLOCKED"
+    elif source_failures:
+        status = "DEGRADED"
+    elif all(r.bet_status == "BLOCKED" for r in ordered):
+        # Run health is not decision status. A priced model may be healthy while the
+        # betting decision layer is intentionally fail-closed, but an all-BLOCKED
+        # card must never be advertised as READY/healthy.
+        status = "BLOCKED"
+    else:
+        status = "READY"
     return CFBMachineReport(mode=mode, season=int(season), week=int(week), generated_at_utc=current.isoformat(), run_status=status,
                             machine_version=CFB_MACHINE_VERSION, results=ordered,
                             source_failures=tuple(dict(x) for x in source_failures), summary=_summary(ordered))
