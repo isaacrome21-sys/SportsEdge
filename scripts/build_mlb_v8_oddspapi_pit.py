@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Normalize OddsPapi histories into hash-bound MLB V8 PIT quote pairs.
 
-This is an evidence normalizer, not a model backtest.  It admits only genuine
-provider timestamps and synchronized complementary prices.  It never infers a
-missing side, changes a line, or treats a post-first-pitch quote as pregame.
+This is an evidence normalizer, not a model backtest. It admits only genuine
+provider timestamps and synchronized complementary prices. It never infers a
+missing side, resurrects a deactivated quote, changes a line, or treats a
+post-first-pitch quote as pregame.
 """
 from __future__ import annotations
 
@@ -13,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 DEFAULT_ROOT = Path("artifacts/mlb_v8_replay_sources/ODDSPAPI_HISTORICAL")
 DEFAULT_OUT = Path("artifacts/mlb_v8_replay_archive/oddspapi_pit")
@@ -60,61 +61,75 @@ def _load_catalog(root: Path) -> tuple[dict[str, dict[str, Any]], str]:
     payload = json.loads(raw.decode("utf-8"))
     if not isinstance(payload, list):
         raise RuntimeError("ODDSPAPI_MARKET_CATALOG_INVALID")
-    return {str(x.get("marketId")): dict(x) for x in payload if isinstance(x, dict) and x.get("marketId") is not None}, _sha(raw)
+    return {
+        str(x.get("marketId")): dict(x)
+        for x in payload if isinstance(x, dict) and x.get("marketId") is not None
+    }, _sha(raw)
 
 
 def _catalog_outcomes(info: dict[str, Any]) -> dict[str, str]:
     return {
         str(x.get("outcomeId")): str(x.get("outcomeName") or "")
-        for x in info.get("outcomes", []) if isinstance(x, dict) and x.get("outcomeId") is not None
+        for x in info.get("outcomes", [])
+        if isinstance(x, dict) and x.get("outcomeId") is not None
     }
 
 
-def _snapshots(outcome: dict[str, Any], player_id: str) -> list[dict[str, Any]]:
+def _timeline(outcome: dict[str, Any], player_id: str) -> list[dict[str, Any]]:
     rows = ((outcome.get("players") or {}).get(player_id)) or []
     if not isinstance(rows, list):
         return []
     out: list[dict[str, Any]] = []
     for row in rows:
-        if not isinstance(row, dict) or row.get("active") is not True:
+        if not isinstance(row, dict):
             continue
         try:
-            price = float(row.get("price"))
             ts = _parse_ts(row.get("createdAt"))
         except Exception:
             continue
-        if price <= 1.0:
-            continue
-        out.append({**row, "_ts": ts, "_price": price})
+        price = None
+        try:
+            if row.get("price") is not None:
+                price = float(row.get("price"))
+        except (TypeError, ValueError):
+            price = None
+        out.append({**row, "_ts": ts, "_price": price, "_active": row.get("active") is True})
     out.sort(key=lambda x: x["_ts"])
     return out
 
 
-def _candidate_pairs(
-    a: list[dict[str, Any]], b: list[dict[str, Any]], *, cutoff: datetime,
-    max_age_seconds: float | None,
-) -> Iterable[tuple[dict[str, Any], dict[str, Any]]]:
-    aa = [x for x in a if x["_ts"] <= cutoff and (max_age_seconds is None or (cutoff - x["_ts"]).total_seconds() <= max_age_seconds)]
-    bb = [x for x in b if x["_ts"] <= cutoff and (max_age_seconds is None or (cutoff - x["_ts"]).total_seconds() <= max_age_seconds)]
-    # Histories are normally short.  Bound pathological ladders while keeping
-    # the most recent observations, which are the only candidates that can win.
-    aa = aa[-100:]
-    bb = bb[-100:]
-    for x in aa:
-        for y in bb:
-            if abs((x["_ts"] - y["_ts"]).total_seconds()) <= PAIR_MAX_SKEW_SECONDS:
-                yield x, y
+def _state_at(timeline: list[dict[str, Any]], cutoff: datetime) -> dict[str, Any] | None:
+    eligible = [x for x in timeline if x["_ts"] <= cutoff]
+    if not eligible:
+        return None
+    state = eligible[-1]
+    # A later active=false record explicitly means the quote was no longer
+    # executable. Never skip backward to resurrect an earlier active quote.
+    if state.get("_active") is not True:
+        return None
+    price = state.get("_price")
+    if price is None or price <= 1.0:
+        return None
+    return state
 
 
-def _best_pair(
-    a: list[dict[str, Any]], b: list[dict[str, Any]], *, cutoff: datetime,
+def _state_pair(
+    left: list[dict[str, Any]], right: list[dict[str, Any]], *, cutoff: datetime,
     max_age_seconds: float | None,
 ) -> tuple[dict[str, Any], dict[str, Any]] | None:
-    pairs = list(_candidate_pairs(a, b, cutoff=cutoff, max_age_seconds=max_age_seconds))
-    if not pairs:
+    a = _state_at(left, cutoff)
+    b = _state_at(right, cutoff)
+    if a is None or b is None:
         return None
-    # Latest synchronized pair at/before cutoff; deterministic tie-break.
-    return max(pairs, key=lambda xy: (max(xy[0]["_ts"], xy[1]["_ts"]), min(xy[0]["_ts"], xy[1]["_ts"])))
+    age_a = (cutoff - a["_ts"]).total_seconds()
+    age_b = (cutoff - b["_ts"]).total_seconds()
+    if age_a < 0 or age_b < 0:
+        return None
+    if max_age_seconds is not None and (age_a > max_age_seconds or age_b > max_age_seconds):
+        return None
+    if abs((a["_ts"] - b["_ts"]).total_seconds()) > PAIR_MAX_SKEW_SECONDS:
+        return None
+    return a, b
 
 
 def _player_ids(outcomes: list[dict[str, Any]]) -> list[str]:
@@ -134,10 +149,9 @@ def _pair_row(
     first_pitch = _parse_ts(fixture["startTime"])
     target = first_pitch - timedelta(minutes=DECISION_MINUTES)
     a, b = decision
-    close_a, close_b = close if close else (None, None)
     names = _catalog_outcomes(info)
-    latest_decision_ts = max(a["_ts"], b["_ts"])
-    age = (target - latest_decision_ts).total_seconds()
+    age_a = (target - a["_ts"]).total_seconds()
+    age_b = (target - b["_ts"]).total_seconds()
     skew = abs((a["_ts"] - b["_ts"]).total_seconds())
     row = {
         "schema": "MLB_V8_ODDSPAPI_PIT_PAIR_V1",
@@ -166,15 +180,18 @@ def _pair_row(
         "outcome_b_decimal": b["_price"],
         "outcome_b_quote_utc": b["_ts"].isoformat(),
         "decision_pair_skew_seconds": round(skew, 3),
-        "decision_pair_age_seconds": round(age, 3),
-        "canonical_t30_within_6m": 0 <= age <= CANONICAL_TOLERANCE_SECONDS,
-        "replay_quote_fresh_180s": 0 <= age <= REPLAY_QUOTE_MAX_AGE_SECONDS,
+        "decision_outcome_a_age_seconds": round(age_a, 3),
+        "decision_outcome_b_age_seconds": round(age_b, 3),
+        "canonical_t30_within_6m": max(age_a, age_b) <= CANONICAL_TOLERANCE_SECONDS,
+        "replay_quote_fresh_180s": max(age_a, age_b) <= REPLAY_QUOTE_MAX_AGE_SECONDS,
         "history_path": history_path.as_posix(),
         "history_sha256": history_sha,
         "market_catalog_sha256": catalog_sha,
     }
-    if close_a is not None and close_b is not None:
+    if close is not None:
+        close_a, close_b = close
         row.update({
+            "close_available": True,
             "close_outcome_a_decimal": close_a["_price"],
             "close_outcome_a_quote_utc": close_a["_ts"].isoformat(),
             "close_outcome_b_decimal": close_b["_price"],
@@ -229,30 +246,40 @@ def build(root: Path, out: Path) -> dict[str, Any]:
                     outcome_ids = tuple(sorted(str(x) for x in outcomes_map.keys()))
                     outcome_rows = [outcomes_map[outcome_ids[0]], outcomes_map[outcome_ids[1]]]
                     for player_id in _player_ids(outcome_rows):
-                        a = _snapshots(outcome_rows[0], player_id)
-                        b = _snapshots(outcome_rows[1], player_id)
-                        # Evidence-policy canonical admission: latest synchronized pair
-                        # at or before T-30, no more than six minutes old.
-                        decision = _best_pair(a, b, cutoff=target, max_age_seconds=CANONICAL_TOLERANCE_SECONDS)
+                        left = _timeline(outcome_rows[0], player_id)
+                        right = _timeline(outcome_rows[1], player_id)
+                        decision = _state_pair(
+                            left, right, cutoff=target,
+                            max_age_seconds=CANONICAL_TOLERANCE_SECONDS,
+                        )
                         if decision is None:
                             counts["no_canonical_t30_pair"] += 1
                             continue
-                        # Same market/book/player threshold.  Close must remain pregame
-                        # and be synchronized; no book switching and no inferred side.
-                        close = _best_pair(a, b, cutoff=first_pitch - timedelta(microseconds=1), max_age_seconds=None)
-                        if close and min(close[0]["_ts"], close[1]["_ts"]) <= max(decision[0]["_ts"], decision[1]["_ts"]):
+                        close = _state_pair(
+                            left, right,
+                            cutoff=first_pitch - timedelta(microseconds=1),
+                            max_age_seconds=None,
+                        )
+                        if close is not None and min(close[0]["_ts"], close[1]["_ts"]) <= max(decision[0]["_ts"], decision[1]["_ts"]):
                             close = None
                         row = _pair_row(
-                            fixture=fixture, history_path=history_path, history_sha=history_sha,
-                            book=str(book), market_id=str(market_id), info=info,
-                            outcome_ids=(outcome_ids[0], outcome_ids[1]), player_id=player_id,
-                            decision=decision, close=close, catalog_sha=catalog_sha,
+                            fixture=fixture,
+                            history_path=history_path,
+                            history_sha=history_sha,
+                            book=str(book),
+                            market_id=str(market_id),
+                            info=info,
+                            outcome_ids=(outcome_ids[0], outcome_ids[1]),
+                            player_id=player_id,
+                            decision=decision,
+                            close=close,
+                            catalog_sha=catalog_sha,
                         )
                         rows.append(row)
                         counts["canonical_t30_pairs"] += 1
                         if row["replay_quote_fresh_180s"]:
                             counts["strict_replay_fresh_pairs"] += 1
-                        if close:
+                        if close is not None:
                             counts["paired_closes"] += 1
 
     out.mkdir(parents=True, exist_ok=True)
@@ -278,29 +305,44 @@ def build(root: Path, out: Path) -> dict[str, Any]:
 
 
 def self_test() -> int:
-    target = _parse_ts("2026-06-05T23:05:00Z") - timedelta(minutes=30)
-    left = [
+    cutoff = _parse_ts("2026-06-05T22:35:00Z")
+    left = _timeline({"players": {"0": [
         {"createdAt": "2026-06-05T22:34:20Z", "price": 1.80, "active": True},
-        {"createdAt": "2026-06-05T22:35:10Z", "price": 1.82, "active": True},
-    ]
-    right = [
+        {"createdAt": "2026-06-05T22:34:50Z", "price": 1.82, "active": True},
+    ]}}, "0")
+    right = _timeline({"players": {"0": [
         {"createdAt": "2026-06-05T22:34:28Z", "price": 2.05, "active": True},
-        {"createdAt": "2026-06-05T22:35:50Z", "price": 2.02, "active": True},
-    ]
-    a = _snapshots({"players": {"0": left}}, "0")
-    b = _snapshots({"players": {"0": right}}, "0")
-    pair = _best_pair(a, b, cutoff=target, max_age_seconds=CANONICAL_TOLERANCE_SECONDS)
+        {"createdAt": "2026-06-05T22:34:55Z", "price": 2.02, "active": True},
+    ]}}, "0")
+    pair = _state_pair(left, right, cutoff=cutoff, max_age_seconds=CANONICAL_TOLERANCE_SECONDS)
     assert pair is not None
-    # The 22:35:10/22:35:50 pair is too skewed (40s), so the synchronized
-    # 22:34:20/22:34:28 pair is the admissible T-30 evidence.
-    assert pair[0]["_ts"] == _parse_ts("2026-06-05T22:34:20Z")
-    assert pair[1]["_ts"] == _parse_ts("2026-06-05T22:34:28Z")
-    assert _best_pair(a, b, cutoff=target, max_age_seconds=30) is None
+    assert pair[0]["_ts"] == _parse_ts("2026-06-05T22:34:50Z")
+    assert pair[1]["_ts"] == _parse_ts("2026-06-05T22:34:55Z")
+
+    deactivated = _timeline({"players": {"0": [
+        {"createdAt": "2026-06-05T22:34:20Z", "price": 1.80, "active": True},
+        {"createdAt": "2026-06-05T22:34:58Z", "price": 1.80, "active": False},
+    ]}}, "0")
+    assert _state_at(deactivated, cutoff) is None
+    assert _state_pair(deactivated, right, cutoff=cutoff, max_age_seconds=CANONICAL_TOLERANCE_SECONDS) is None
+
+    stale = _timeline({"players": {"0": [
+        {"createdAt": "2026-06-05T22:20:00Z", "price": 1.80, "active": True},
+    ]}}, "0")
+    assert _state_pair(stale, right, cutoff=cutoff, max_age_seconds=CANONICAL_TOLERANCE_SECONDS) is None
+
+    skewed = _timeline({"players": {"0": [
+        {"createdAt": "2026-06-05T22:34:10Z", "price": 1.80, "active": True},
+    ]}}, "0")
+    assert _state_pair(skewed, right, cutoff=cutoff, max_age_seconds=CANONICAL_TOLERANCE_SECONDS) is None
     assert _player_ids([
-        {"players": {"0": [], "44": []}}, {"players": {"0": [], "44": [], "55": []}}
+        {"players": {"0": [], "44": []}},
+        {"players": {"0": [], "44": [], "55": []}},
     ]) == ["0", "44"]
     print(json.dumps({
         "status": "SELF_TEST_OK",
+        "latest_state_only": "PASS",
+        "deactivation_guard": "PASS",
         "early_only_t30": "PASS",
         "paired_side_skew_30s": "PASS",
         "no_single_side_inference": "PASS",
