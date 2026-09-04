@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "status": "RESEARCH_ONLY",
+  "production_eligibility_changed": false,
+  "MLB": {
+    "GAME_SCORE_DISTRIBUTION": ["MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS"],
+    "INNING_STATE_DISTRIBUTION": ["F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS", "F5_TEAM_TOTALS"],
+    "FIRST_INNING_HAZARD": ["NRFI", "YRFI"],
+    "BATTER_HR_HAZARD": ["HOME_RUNS"],
+    "BATTER_PA_BOUNDED_EVENT": ["HITS", "SINGLES", "DOUBLES", "BATTER_BB", "BATTER_K"],
+    "BATTER_RARE_EVENT": ["TRIPLES", "STOLEN_BASES"],
+    "BATTER_RUN_CREATION_EVENT": ["RBI", "RUNS"],
+    "BATTER_JOINT_PA_PATH": ["TOTAL_BASES", "HITS_RUNS_RBIS", "EXTRA_BASE_HITS", "HITS_RUNS_STOLEN_BASES", "RUNS_RBIS", "HITS_STOLEN_BASES", "HITS_WALKS_STOLEN_BASES"],
+    "PITCHER_WORKLOAD_EVENT": ["PITCHER_K", "PITCHER_HITS_ALLOWED", "PITCHER_BB", "PITCHER_ER", "PITCHER_OUTS"],
+    "PITCHER_JOINT_EVENT": ["PITCHER_HITS_WALKS_ER", "EITHER_PITCHER_HITS_ALLOWED", "EITHER_PITCHER_BB", "EITHER_PITCHER_ER"],
+    "STARTER_DECISION_PATH": ["PITCHER_RECORD_WIN"],
+    "ORDERED_PA_FIRST_EVENT": ["FIRST_HOME_RUN"]
+  },
+  "FOOTBALL": {
+    "ENGINE_A_SHARED_GAME_PATH": ["moneyline", "spread", "total", "team_total", "first_half_moneyline", "first_half_spread", "first_half_total", "second_half_moneyline", "second_half_spread", "second_half_total", "quarter_moneyline", "quarter_spread", "quarter_total", "alternate_spread", "alternate_total", "race_to_n_points", "largest_lead", "winning_margin_band", "both_teams_to_score_n", "team_sacks", "team_turnovers"],
+    "ENGINE_A_B_PLAYER_USAGE_PATH": ["passing_yards", "completions", "attempts", "passing_tds", "interceptions", "rush_yards", "longest_completion", "pass_plus_rush_yards", "rushing_yards", "receiving_yards", "receptions", "rush_attempts", "targets", "rush_plus_rec_yards", "longest_reception", "longest_rush", "player_sacks", "tackles_assists", "player_interceptions"],
+    "ENGINE_A_B_C_SCORING_PATH": ["first_score", "total_touchdowns", "anytime_td", "first_td", "two_plus_td"],
+    "ENGINE_A_C_SPECIAL_TEAMS_PATH": ["longest_fg_made", "defensive_special_teams_td", "safety", "fg_made", "kicking_points", "xp_made"]
+  },
+  "required_research_layers": [
+    "POINT_IN_TIME_FEATURE_PROVENANCE",
+    "CHRONOLOGICAL_FIT",
+    "SEPARATE_CALIBRATION_FOLD",
+    "MARKET_OR_FROZEN_INCUMBENT_BENCHMARK",
+    "UNCERTAINTY_INTERVALS",
+    "SETTLEMENT_AWARE_ROI",
+    "CLV_WHEN_DECISION_AND_CLOSE_QUOTES_EXIST",
+    "FEATURE_ABLATION",
+    "PRODUCTION_PARITY_BEFORE_PROMOTION"
+  ]
+}
