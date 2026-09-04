@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "policy_id": "SPORTSEDGE_CROSS_SPORT_BACKTEST_V1",
+  "status": "RESEARCH_ONLY_FAIL_CLOSED",
+  "completed_season_cutoff": 2025,
+  "production_mutation_allowed": false,
+  "sports": {
+    "MLB": {
+      "minimum_training_seasons": 3,
+      "preferred_heldout_seasons": [2021, 2022, 2023, 2024, 2025],
+      "stress_test_excluded_seasons": [2020],
+      "notes": "Use only PIT-safe snapshots. Statcast-era feature families must preserve source revision/hash lineage."
+    },
+    "NFL": {
+      "minimum_training_seasons": 3,
+      "preferred_heldout_seasons": [2021, 2022, 2023, 2024, 2025],
+      "stress_test_excluded_seasons": [2020],
+      "notes": "Use season-ordered features, QB identity/availability, participation and injury state available before kickoff."
+    },
+    "CFB": {
+      "minimum_training_seasons": 3,
+      "preferred_heldout_seasons": [2021, 2022, 2023, 2024, 2025],
+      "stress_test_excluded_seasons": [2020],
+      "notes": "FBS only. Week-1/offseason priors must be frozen before kickoff and transfer/recruiting/QB state must be PIT-safe."
+    }
+  },
+  "fold_discipline": {
+    "type": "EXPANDING_WINDOW_BY_SEASON",
+    "fit_order": ["TRAIN", "CALIBRATE", "TEST"],
+    "test_fold_may_tune_model": false,
+    "test_fold_may_tune_edge_floor": false,
+    "active_2026_forward_data_may_refit_historical_candidate": false
+  },
+  "required_probability_metrics": [
+    "BRIER",
+    "LOG_LOSS",
+    "ECE",
+    "CALIBRATION_SLOPE",
+    "CALIBRATION_INTERCEPT"
+  ],
+  "required_betting_metrics_when_priced": [
+    "AFTER_VIG_ROI",
+    "PROFIT_UNITS",
+    "MAX_DRAWDOWN_UNITS",
+    "CLV"
+  ],
+  "benchmarking": {
+    "paired_same_event_market_identity_required": true,
+    "preferred_benchmark": "CONTEMPORANEOUS_NO_VIG_MARKET_OR_FROZEN_INCUMBENT",
+    "bootstrap_cluster": "SEASON",
+    "bootstrap_reps": 2000,
+    "bootstrap_seed": 20260903,
+    "brier_and_logloss_candidate_delta_must_be_negative": true,
+    "confidence_rule": "95_PERCENT_CI_UPPER_BOUND_BELOW_ZERO"
+  },
+  "calibration_research_bar": {
+    "minimum_binary_rows": 200,
+    "minimum_test_seasons": 3,
+    "maximum_ece": 0.025,
+    "calibration_slope_min": 0.90,
+    "calibration_slope_max": 1.10,
+    "maximum_absolute_calibration_intercept": 0.03
+  },
+  "model_search_rules": {
+    "baseline_first": true,
+    "candidate_families": [
+      "REGULARIZED_LINEAR_OR_LOGIT",
+      "NONLINEAR_TREE_OR_BOOSTING_WHEN_DEPENDENCY_APPROVED",
+      "EMPIRICAL_OR_PARAMETRIC_DISTRIBUTION",
+      "HIERARCHICAL_OR_SHRINKAGE_MODEL",
+      "SEED_OR_MODEL_ENSEMBLE"
+    ],
+    "feature_ablation_required": true,
+    "seed_stability_required_for_stochastic_training": true,
+    "hyperparameter_search_must_be_nested_inside_training_or_calibration": true,
+    "headline_hit_rate_is_not_a_selection_metric": true
+  },
+  "market_rules": {
+    "binary": "USE_CANONICAL_BINARY_EVALUATOR",
+    "push_void_capable": "EXCLUDE_PUSH_VOID_FROM_PROBABILITY_SCORING_AND_INCLUDE_ZERO_PNL_IN_SETTLEMENT_ROI",
+    "n_way": "REQUIRES_N_WAY_LOG_LOSS_BRIER_OR_PROPER_SCORING_RULE; DO_NOT_FORCE_BINARY",
+    "count_prop": "EVALUATE_FULL_DISTRIBUTION_WHEN_AVAILABLE_PLUS_LINE_SPECIFIC_PROBABILITY",
+    "continuous_prop": "EVALUATE_DISTRIBUTION_AND_THRESHOLD_PROBABILITY; PRESERVE EXACT_SETTLEMENT_LINE",
+    "live": "REQUIRES_GAME_STATE_ASOF_AND_DECISION_LATENCY_PROVENANCE"
+  }
+}
