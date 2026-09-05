@@ -4,8 +4,9 @@ The runtime AUTO path never fits a model. This module is the only packaging
 bridge from an already-materialized PIT training bundle to the hash-bound model
 artifact consumed by AUTO. It does not fetch data or promote markets.
 
-A build requires both the training bundle and the exact source-manifest bytes
-whose SHA-256 is declared by that bundle. A naked manifest hash is insufficient.
+A build requires the training bundle, the exact source-manifest bytes whose
+SHA-256 is declared by that bundle, and preserved source snapshots whose bytes
+match every content hash declared by the manifest.
 """
 from __future__ import annotations
 
@@ -18,7 +19,11 @@ from typing import Any, Mapping
 from .historical_features import CFB_HISTORICAL_MATERIALIZER_VERSION
 from .joint_model import fit_cfb_joint_score_model
 from .model_artifact import build_cfb_model_artifact, cfb_model_code_surface_sha256
-from .source_manifest import CFBSourceManifestError, validate_cfb_pit_source_manifest
+from .source_manifest import (
+    CFBSourceManifestError,
+    validate_cfb_pit_source_manifest,
+    verify_cfb_source_snapshots,
+)
 
 CFB_PIT_TRAINING_BUNDLE_SCHEMA = "CFB_PIT_TRAINING_BUNDLE_V1"
 CFB_TRAINING_CODE_SURFACE = (
@@ -146,6 +151,7 @@ def build_cfb_artifact_from_pit_bundle(
     raw_bytes: bytes,
     source_manifest: Mapping[str, Any],
     source_manifest_raw_bytes: bytes,
+    source_evidence_root: str | Path,
     repo_root: str | Path,
     fit_max_season: int,
     ridge_alpha: float = 10.0,
@@ -157,6 +163,7 @@ def build_cfb_artifact_from_pit_bundle(
             raw_bytes=source_manifest_raw_bytes,
             fit_max_season=fit_max_season,
         )
+        source_verification = verify_cfb_source_snapshots(manifest, evidence_root=source_evidence_root)
     except CFBSourceManifestError as exc:
         raise CFBTrainingArtifactError(str(exc)) from exc
     if manifest["manifest_sha256"] != validated["source_manifest_sha256"]:
@@ -194,6 +201,9 @@ def build_cfb_artifact_from_pit_bundle(
         "source_manifest_schema": manifest["schema_version"],
         "source_count": manifest["source_count"],
         "source_ids": manifest["source_ids"],
+        "source_snapshot_verified": source_verification["source_snapshot_verified"],
+        "source_content_root_sha256": source_verification["source_content_root_sha256"],
+        "verified_source_count": source_verification["verified_source_count"],
         "game_ids_sha256": validated["game_ids_sha256"],
         "materializer_version": validated["materializer_version"],
         "generated_at_utc": validated["generated_at_utc"],
