@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from sportsedge.sports.cfb.paths import DEFAULT_CFB_MODEL_ARTIFACT_PATH  # noqa: E402
 from sportsedge.sports.cfb.training_artifact import (  # noqa: E402
     CFBTrainingArtifactError,
     build_cfb_artifact_from_pit_bundle,
@@ -22,7 +23,7 @@ def main() -> int:
     ap.add_argument("--training-bundle", type=Path, required=True)
     ap.add_argument("--fit-max-season", type=int, required=True)
     ap.add_argument("--ridge-alpha", type=float, default=10.0)
-    ap.add_argument("--output", type=Path, default=Path("models/cfb_joint_v1.json"))
+    ap.add_argument("--output", type=Path, default=DEFAULT_CFB_MODEL_ARTIFACT_PATH)
     ap.add_argument("--provenance-output", type=Path, default=Path("artifacts/cfb/cfb_model_training_provenance.json"))
     args = ap.parse_args()
 
