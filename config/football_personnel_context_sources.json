@@ -1,0 +1,50 @@
+{
+  "schema_version": "FOOTBALL_PERSONNEL_CONTEXT_SOURCES_V1",
+  "governance": {
+    "external_sources_are_model_p": false,
+    "external_source_agreement_is_vote": false,
+    "external_source_agreement_boosts_confidence": false,
+    "official_availability_priority": true,
+    "stale_data_fail_closed": true
+  },
+  "cfb": {
+    "qb_status": ["official_team", "pff", "sports_info_solutions", "sic_score", "next_gen_stats", "cbs_returning_snaps"],
+    "ol_dl_depth": ["official_team", "pff", "cfbdepth", "two_deep", "sports_info_solutions", "espn_analytics"],
+    "snap_usage": ["pff", "sports_info_solutions", "rotowire", "cbs_returning_snaps"],
+    "secondary": ["official_team", "pff", "cfbdepth", "two_deep", "sports_info_solutions", "sic_score"],
+    "unit_mismatch": ["pff", "sports_info_solutions", "cfbdepth", "two_deep"]
+  },
+  "nfl": {
+    "qb_status": ["official_team", "pff", "sports_info_solutions", "sic_score", "next_gen_stats"],
+    "ol_dl_depth": ["official_team", "pff", "two_deep", "sports_info_solutions", "espn_analytics"],
+    "snap_usage": ["pff", "sports_info_solutions", "lineups", "rotowire", "next_gen_stats"],
+    "secondary": ["official_team", "pff", "two_deep", "sports_info_solutions", "sic_score", "next_gen_stats"],
+    "unit_mismatch": ["pff", "sports_info_solutions", "two_deep", "next_gen_stats"]
+  },
+  "review_thresholds": {
+    "qb_change": "always",
+    "qb_expected_snap_limitation": "always",
+    "ol_starter_changes": 2,
+    "secondary_starters_unavailable": 2,
+    "skill_snap_share_delta_pp": 15,
+    "route_participation_delta_pp": 10,
+    "target_share_delta_pp": 10,
+    "unit_grade_conflict_tiers": 1
+  },
+  "materiality_flags": [
+    "QB_CHANGE",
+    "QB_LIMITATION",
+    "OL_STARTER_OUT",
+    "OL_CONTINUITY_BREAK",
+    "DL_PASS_RUSH_LOSS",
+    "SECONDARY_STARTER_OUT",
+    "USAGE_SPIKE",
+    "USAGE_DROP",
+    "PORTAL_DEPTH_CHANGE",
+    "TRENCH_MISMATCH",
+    "COVERAGE_MISMATCH",
+    "DATA_CONFLICT",
+    "DATA_STALE",
+    "DATA_GAP"
+  ]
+}
