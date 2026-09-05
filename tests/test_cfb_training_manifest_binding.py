@@ -25,7 +25,8 @@ def _manifest() -> dict:
             "role": role,
             "provider": "fixture-provider",
             "dataset": source_id,
-            "locator": f"fixtures/{source_id}.json",
+            "locator": f"fixture://{source_id}",
+            "snapshot_path": f"{source_id}.json",
             "retrieved_at_utc": "2026-09-05T18:00:00+00:00",
             "content_sha256": sha256(source_id.encode()).hexdigest(),
             "availability_mode": mode,
@@ -70,6 +71,10 @@ def test_build_rejects_naked_or_wrong_manifest_hash(tmp_path: Path) -> None:
     manifest_raw = _raw(manifest)
     bundle = _bundle("0" * 64)
     bundle_raw = _raw(bundle)
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "features.json").write_bytes(b"features")
+    (evidence / "labels.json").write_bytes(b"labels")
 
     with pytest.raises(CFBTrainingArtifactError, match="SOURCE_MANIFEST_SHA256_MISMATCH"):
         build_cfb_artifact_from_pit_bundle(
@@ -77,12 +82,15 @@ def test_build_rejects_naked_or_wrong_manifest_hash(tmp_path: Path) -> None:
             raw_bytes=bundle_raw,
             source_manifest=manifest,
             source_manifest_raw_bytes=manifest_raw,
+            source_evidence_root=evidence,
             repo_root=tmp_path,
             fit_max_season=2025,
         )
 
 
-def test_builder_cli_requires_source_manifest_argument() -> None:
+def test_builder_cli_requires_manifest_and_evidence_root() -> None:
     text = Path("scripts/build_cfb_model_artifact.py").read_text(encoding="utf-8")
     assert 'ap.add_argument("--source-manifest", type=Path, required=True)' in text
+    assert 'ap.add_argument("--source-evidence-root", type=Path, required=True)' in text
     assert "source_manifest_raw_bytes=manifest_raw" in text
+    assert "source_evidence_root=args.source_evidence_root" in text
