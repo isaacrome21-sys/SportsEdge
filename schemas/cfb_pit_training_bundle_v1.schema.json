@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sportsedge.local/schemas/cfb_pit_training_bundle_v1.schema.json",
+  "title": "SportsEdge CFB PIT Training Bundle V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "materializer_version",
+    "generated_at_utc",
+    "source_manifest_sha256",
+    "rows"
+  ],
+  "properties": {
+    "schema_version": {"const": "CFB_PIT_TRAINING_BUNDLE_V1"},
+    "materializer_version": {"const": "CFB_JOINT_HISTORY_PIT_V1"},
+    "generated_at_utc": {"type": "string", "format": "date-time"},
+    "source_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "rows": {
+      "type": "array",
+      "minItems": 20,
+      "items": {"$ref": "#/$defs/game_row"}
+    }
+  },
+  "$defs": {
+    "team_metrics": {
+      "type": "object",
+      "required": [
+        "off_ppa_rush",
+        "off_ppa_dropback",
+        "def_ppa_rush_allowed",
+        "def_ppa_dropback_allowed",
+        "off_success_rate",
+        "def_success_rate_allowed",
+        "standard_down_ppa",
+        "passing_down_success_rate",
+        "eckel_rate",
+        "points_per_eckel",
+        "points_per_drive",
+        "net_field_position",
+        "explosive_rate"
+      ],
+      "properties": {
+        "off_ppa_rush": {"type": "number"},
+        "off_ppa_dropback": {"type": "number"},
+        "def_ppa_rush_allowed": {"type": "number"},
+        "def_ppa_dropback_allowed": {"type": "number"},
+        "off_success_rate": {"type": "number"},
+        "def_success_rate_allowed": {"type": "number"},
+        "standard_down_ppa": {"type": "number"},
+        "passing_down_success_rate": {"type": "number"},
+        "eckel_rate": {"type": "number"},
+        "points_per_eckel": {"type": "number"},
+        "points_per_drive": {"type": "number"},
+        "net_field_position": {"type": "number"},
+        "explosive_rate": {"type": "number"}
+      },
+      "additionalProperties": true
+    },
+    "weather": {
+      "type": "object",
+      "required": ["game_indoor"],
+      "properties": {
+        "game_indoor": {"type": "boolean"},
+        "gameIndoors": {"type": "boolean"},
+        "wind_speed": {"type": "number"},
+        "windSpeed": {"type": "number"},
+        "temperature": {"type": "number"}
+      },
+      "additionalProperties": true
+    },
+    "game_row": {
+      "type": "object",
+      "required": [
+        "game_id",
+        "season",
+        "week",
+        "neutral_site",
+        "home_metrics",
+        "away_metrics",
+        "weather",
+        "home_score",
+        "away_score"
+      ],
+      "properties": {
+        "game_id": {"type": "string", "minLength": 1},
+        "season": {"type": "integer", "minimum": 2000, "maximum": 2100},
+        "week": {"type": "integer", "minimum": 1},
+        "neutral_site": {"type": "boolean"},
+        "home_metrics": {"$ref": "#/$defs/team_metrics"},
+        "away_metrics": {"$ref": "#/$defs/team_metrics"},
+        "weather": {"$ref": "#/$defs/weather"},
+        "home_score": {"type": "number", "minimum": 0},
+        "away_score": {"type": "number", "minimum": 0},
+        "regulation_home_score": {"type": "number", "minimum": 0},
+        "regulation_away_score": {"type": "number", "minimum": 0}
+      },
+      "additionalProperties": true,
+      "dependentRequired": {
+        "regulation_home_score": ["regulation_away_score"],
+        "regulation_away_score": ["regulation_home_score"]
+      }
+    }
+  }
+}
