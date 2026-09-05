@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sportsedge.local/schemas/cfb_pit_source_manifest_v1.schema.json",
+  "title": "SportsEdge CFB PIT Source Manifest V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generated_at_utc",
+    "fit_max_season",
+    "training_window",
+    "materializer_version",
+    "feature_contract",
+    "post_cutoff_information_excluded",
+    "market_data_used_as_model_feature",
+    "sources"
+  ],
+  "properties": {
+    "schema_version": {"const": "CFB_PIT_SOURCE_MANIFEST_V1"},
+    "generated_at_utc": {"type": "string", "format": "date-time"},
+    "fit_max_season": {"type": "integer", "minimum": 2000, "maximum": 2100},
+    "training_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min_season", "max_season"],
+      "properties": {
+        "min_season": {"type": "integer", "minimum": 2000, "maximum": 2100},
+        "max_season": {"type": "integer", "minimum": 2000, "maximum": 2100}
+      }
+    },
+    "materializer_version": {"const": "CFB_JOINT_HISTORY_PIT_V1"},
+    "feature_contract": {"const": "CFB_JOINT_GAME_FEATURES_V1"},
+    "post_cutoff_information_excluded": {"const": true},
+    "market_data_used_as_model_feature": {"const": false},
+    "sources": {
+      "type": "array",
+      "minItems": 2,
+      "items": {"$ref": "#/$defs/source"}
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "role",
+        "provider",
+        "dataset",
+        "locator",
+        "retrieved_at_utc",
+        "content_sha256",
+        "availability_mode",
+        "availability_rule",
+        "market_data",
+        "post_cutoff_excluded",
+        "seasons"
+      ],
+      "properties": {
+        "source_id": {"type": "string", "minLength": 1},
+        "role": {"enum": ["FEATURE_INPUT", "LABEL", "UNIVERSE"]},
+        "provider": {"type": "string", "minLength": 1},
+        "dataset": {"type": "string", "minLength": 1},
+        "locator": {"type": "string", "minLength": 1},
+        "retrieved_at_utc": {"type": "string", "format": "date-time"},
+        "content_sha256": {"$ref": "#/$defs/sha256"},
+        "availability_mode": {
+          "enum": ["PRE_EVENT_ARCHIVE", "EVENT_TIMESTAMPED_REPLAY", "POST_EVENT_LABEL"]
+        },
+        "availability_rule": {"type": "string", "minLength": 1},
+        "market_data": {"const": false},
+        "post_cutoff_excluded": {"const": true},
+        "seasons": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "integer", "minimum": 2000, "maximum": 2100}
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"role": {"const": "LABEL"}}, "required": ["role"]},
+          "then": {"properties": {"availability_mode": {"const": "POST_EVENT_LABEL"}}},
+          "else": {
+            "properties": {
+              "availability_mode": {"enum": ["PRE_EVENT_ARCHIVE", "EVENT_TIMESTAMPED_REPLAY"]}
+            }
+          }
+        }
+      ]
+    }
+  }
+}
