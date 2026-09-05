@@ -1,7 +1,7 @@
 """Strict source-manifest validation for frozen CFB training artifacts.
 
-The manifest is evidence metadata, not a data fetcher.  Its exact bytes are hashed
-and bound to the training bundle before a model may be fit.  Feature inputs must be
+The manifest is evidence metadata, not a data fetcher. Its exact bytes are hashed
+and bound to the training bundle before a model may be fit. Feature inputs must be
 market-blind and must have an availability mode that can be replayed point in time.
 Post-event values are allowed only when they are explicitly label sources.
 """
@@ -114,11 +114,13 @@ def validate_cfb_pit_source_manifest(
         mode = _text(item.get("availability_mode"), f"CFB_SOURCE_MANIFEST_AVAILABILITY_MODE_REQUIRED:{source_id}").upper()
         if mode not in _ALLOWED_AVAILABILITY_MODES:
             raise CFBSourceManifestError(f"CFB_SOURCE_MANIFEST_AVAILABILITY_MODE_INVALID:{source_id}")
-        if role == "FEATURE_INPUT" and mode == "POST_EVENT_LABEL":
+        if role == "LABEL" and mode != "POST_EVENT_LABEL":
+            raise CFBSourceManifestError(f"CFB_SOURCE_MANIFEST_LABEL_MODE_INVALID:{source_id}")
+        if role != "LABEL" and mode == "POST_EVENT_LABEL":
             raise CFBSourceManifestError(f"CFB_SOURCE_MANIFEST_POST_EVENT_FEATURE_PROHIBITED:{source_id}")
-        if role != "LABEL" and item.get("market_data") is not False:
+        if item.get("market_data") is not False:
             raise CFBSourceManifestError(f"CFB_SOURCE_MANIFEST_MARKET_DATA_FLAG_REQUIRED_FALSE:{source_id}")
-        if role == "FEATURE_INPUT" and item.get("post_cutoff_excluded") is not True:
+        if item.get("post_cutoff_excluded") is not True:
             raise CFBSourceManifestError(f"CFB_SOURCE_MANIFEST_SOURCE_POST_CUTOFF_EXCLUSION_REQUIRED:{source_id}")
 
         provider = _text(item.get("provider"), f"CFB_SOURCE_MANIFEST_PROVIDER_REQUIRED:{source_id}")
@@ -153,8 +155,8 @@ def validate_cfb_pit_source_manifest(
             "content_sha256": content_sha,
             "availability_mode": mode,
             "availability_rule": availability_rule,
-            "market_data": bool(item.get("market_data")),
-            "post_cutoff_excluded": item.get("post_cutoff_excluded") is True,
+            "market_data": False,
+            "post_cutoff_excluded": True,
             "seasons": clean_seasons,
         })
 
