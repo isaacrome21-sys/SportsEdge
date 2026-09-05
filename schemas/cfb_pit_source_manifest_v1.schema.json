@@ -52,6 +52,7 @@
         "provider",
         "dataset",
         "locator",
+        "snapshot_path",
         "retrieved_at_utc",
         "content_sha256",
         "availability_mode",
@@ -66,6 +67,11 @@
         "provider": {"type": "string", "minLength": 1},
         "dataset": {"type": "string", "minLength": 1},
         "locator": {"type": "string", "minLength": 1},
+        "snapshot_path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+        },
         "retrieved_at_utc": {"type": "string", "format": "date-time"},
         "content_sha256": {"$ref": "#/$defs/sha256"},
         "availability_mode": {
