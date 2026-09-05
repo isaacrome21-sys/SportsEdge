@@ -1,8 +1,11 @@
 """PIT-bound construction of frozen CFB joint-model artifacts.
 
-The runtime AUTO path never fits a model.  This module is the only packaging
+The runtime AUTO path never fits a model. This module is the only packaging
 bridge from an already-materialized PIT training bundle to the hash-bound model
-artifact consumed by AUTO.  It does not fetch data or promote markets.
+artifact consumed by AUTO. It does not fetch data or promote markets.
+
+A build requires both the training bundle and the exact source-manifest bytes
+whose SHA-256 is declared by that bundle. A naked manifest hash is insufficient.
 """
 from __future__ import annotations
 
@@ -15,8 +18,16 @@ from typing import Any, Mapping
 from .historical_features import CFB_HISTORICAL_MATERIALIZER_VERSION
 from .joint_model import fit_cfb_joint_score_model
 from .model_artifact import build_cfb_model_artifact, cfb_model_code_surface_sha256
+from .source_manifest import CFBSourceManifestError, validate_cfb_pit_source_manifest
 
 CFB_PIT_TRAINING_BUNDLE_SCHEMA = "CFB_PIT_TRAINING_BUNDLE_V1"
+CFB_TRAINING_CODE_SURFACE = (
+    "sportsedge/sports/cfb/historical_features.py",
+    "sportsedge/sports/cfb/training_artifact.py",
+    "sportsedge/sports/cfb/source_manifest.py",
+    "scripts/build_cfb_model_artifact.py",
+)
+CFB_TRAINING_SEED_POLICY = "NONE_DETERMINISTIC_RIDGE_V1"
 
 
 class CFBTrainingArtifactError(ValueError):
@@ -39,6 +50,35 @@ def _aware_timestamp(value: Any) -> str:
     if stamp.tzinfo is None or stamp.utcoffset() is None:
         raise CFBTrainingArtifactError("CFB_TRAINING_BUNDLE_GENERATED_AT_TIMEZONE_REQUIRED")
     return stamp.isoformat()
+
+
+def _surface_sha256(repo_root: str | Path, paths: tuple[str, ...]) -> str:
+    root = Path(repo_root).resolve()
+    digest = sha256()
+    for relative in paths:
+        path = root / relative
+        try:
+            raw = path.read_bytes()
+        except OSError as exc:
+            raise CFBTrainingArtifactError(f"CFB_TRAINING_CODE_SURFACE_UNREADABLE:{relative}") from exc
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(raw)
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def cfb_training_code_surface_sha256(repo_root: str | Path) -> str:
+    """Hash the code that materializes, validates, and packages training evidence."""
+    return _surface_sha256(repo_root, CFB_TRAINING_CODE_SURFACE)
+
+
+def _game_ids_sha256(game_ids: list[str]) -> str:
+    digest = sha256()
+    for game_id in sorted(game_ids):
+        digest.update(game_id.encode("utf-8"))
+        digest.update(b"\0")
+    return digest.hexdigest()
 
 
 def validate_cfb_pit_training_bundle(
@@ -90,6 +130,7 @@ def validate_cfb_pit_training_bundle(
     return {
         "rows": clean_rows,
         "row_count": len(clean_rows),
+        "game_ids_sha256": _game_ids_sha256(list(game_ids)),
         "train_seasons": sorted(seasons),
         "fit_max_season": fit_max,
         "generated_at_utc": generated_at,
@@ -103,11 +144,24 @@ def build_cfb_artifact_from_pit_bundle(
     payload: Mapping[str, Any],
     *,
     raw_bytes: bytes,
+    source_manifest: Mapping[str, Any],
+    source_manifest_raw_bytes: bytes,
     repo_root: str | Path,
     fit_max_season: int,
     ridge_alpha: float = 10.0,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     validated = validate_cfb_pit_training_bundle(payload, raw_bytes=raw_bytes, fit_max_season=fit_max_season)
+    try:
+        manifest = validate_cfb_pit_source_manifest(
+            source_manifest,
+            raw_bytes=source_manifest_raw_bytes,
+            fit_max_season=fit_max_season,
+        )
+    except CFBSourceManifestError as exc:
+        raise CFBTrainingArtifactError(str(exc)) from exc
+    if manifest["manifest_sha256"] != validated["source_manifest_sha256"]:
+        raise CFBTrainingArtifactError("CFB_TRAINING_SOURCE_MANIFEST_SHA256_MISMATCH")
+
     try:
         alpha = float(ridge_alpha)
     except (TypeError, ValueError) as exc:
@@ -120,7 +174,9 @@ def build_cfb_artifact_from_pit_bundle(
         raise CFBTrainingArtifactError(str(exc)) from exc
     if tuple(model.train_seasons) != tuple(validated["train_seasons"]):
         raise CFBTrainingArtifactError("CFB_TRAINING_MODEL_SEASON_IDENTITY_MISMATCH")
+
     code_sha = cfb_model_code_surface_sha256(repo_root)
+    training_code_sha = cfb_training_code_surface_sha256(repo_root)
     artifact = build_cfb_model_artifact(
         model,
         model_code_sha256=code_sha,
@@ -132,14 +188,32 @@ def build_cfb_artifact_from_pit_bundle(
         "feature_contract": artifact["feature_contract"],
         "artifact_sha256": artifact["artifact_sha256"],
         "model_code_sha256": code_sha,
+        "training_code_sha256": training_code_sha,
         "training_bundle_sha256": validated["training_bundle_sha256"],
-        "upstream_source_manifest_sha256": validated["source_manifest_sha256"],
+        "upstream_source_manifest_sha256": manifest["manifest_sha256"],
+        "source_manifest_schema": manifest["schema_version"],
+        "source_count": manifest["source_count"],
+        "source_ids": manifest["source_ids"],
+        "game_ids_sha256": validated["game_ids_sha256"],
         "materializer_version": validated["materializer_version"],
         "generated_at_utc": validated["generated_at_utc"],
         "fit_max_season": validated["fit_max_season"],
         "train_seasons": validated["train_seasons"],
+        "training_window": manifest["training_window"],
         "row_count": validated["row_count"],
         "ridge_alpha": alpha,
+        "training_seed_policy": CFB_TRAINING_SEED_POLICY,
         "promotion_changed": False,
     }
     return artifact, provenance
+
+
+__all__ = [
+    "CFB_PIT_TRAINING_BUNDLE_SCHEMA",
+    "CFB_TRAINING_CODE_SURFACE",
+    "CFB_TRAINING_SEED_POLICY",
+    "CFBTrainingArtifactError",
+    "build_cfb_artifact_from_pit_bundle",
+    "cfb_training_code_surface_sha256",
+    "validate_cfb_pit_training_bundle",
+]
