@@ -1,5 +1,6 @@
 import json
 from hashlib import sha256
+from pathlib import Path
 
 import pytest
 
@@ -9,6 +10,7 @@ from sportsedge.sports.cfb.source_manifest import (
     CFBSourceManifestError,
     CFB_PIT_SOURCE_MANIFEST_SCHEMA,
     validate_cfb_pit_source_manifest,
+    verify_cfb_source_snapshots,
 )
 
 
@@ -18,7 +20,8 @@ def _source(source_id: str, role: str, mode: str) -> dict:
         "role": role,
         "provider": "fixture-provider",
         "dataset": f"fixture-{source_id}",
-        "locator": f"fixtures/{source_id}.json",
+        "locator": f"fixture://{source_id}",
+        "snapshot_path": f"{source_id}.json",
         "retrieved_at_utc": "2026-09-05T18:00:00+00:00",
         "content_sha256": sha256(source_id.encode("utf-8")).hexdigest(),
         "availability_mode": mode,
@@ -90,4 +93,25 @@ def test_each_source_must_explicitly_exclude_post_cutoff_data() -> None:
     payload = _manifest()
     payload["sources"][0]["post_cutoff_excluded"] = False
     with pytest.raises(CFBSourceManifestError, match="SOURCE_POST_CUTOFF_EXCLUSION_REQUIRED"):
+        validate_cfb_pit_source_manifest(payload, raw_bytes=_raw(payload), fit_max_season=2025)
+
+
+def test_preserved_snapshot_bytes_must_match_manifest_hashes(tmp_path: Path) -> None:
+    payload = _manifest()
+    validated = validate_cfb_pit_source_manifest(payload, raw_bytes=_raw(payload), fit_max_season=2025)
+    (tmp_path / "features.json").write_bytes(b"features")
+    (tmp_path / "labels.json").write_bytes(b"labels")
+    result = verify_cfb_source_snapshots(validated, evidence_root=tmp_path)
+    assert result["source_snapshot_verified"] is True
+    assert result["verified_source_count"] == 2
+
+    (tmp_path / "features.json").write_bytes(b"tampered")
+    with pytest.raises(CFBSourceManifestError, match="SNAPSHOT_SHA256_MISMATCH:features"):
+        verify_cfb_source_snapshots(validated, evidence_root=tmp_path)
+
+
+def test_snapshot_path_cannot_escape_evidence_root() -> None:
+    payload = _manifest()
+    payload["sources"][0]["snapshot_path"] = "../features.json"
+    with pytest.raises(CFBSourceManifestError, match="SNAPSHOT_PATH_INVALID"):
         validate_cfb_pit_source_manifest(payload, raw_bytes=_raw(payload), fit_max_season=2025)
