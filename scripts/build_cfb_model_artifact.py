@@ -22,7 +22,7 @@ def main() -> int:
     ap.add_argument("--training-bundle", type=Path, required=True)
     ap.add_argument("--fit-max-season", type=int, required=True)
     ap.add_argument("--ridge-alpha", type=float, default=10.0)
-    ap.add_argument("--output", type=Path, default=Path("config/cfb_model_artifact.json"))
+    ap.add_argument("--output", type=Path, default=Path("models/cfb_joint_v1.json"))
     ap.add_argument("--provenance-output", type=Path, default=Path("artifacts/cfb/cfb_model_training_provenance.json"))
     args = ap.parse_args()
 
