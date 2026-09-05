@@ -1,14 +1,14 @@
 """Strict source-manifest validation for frozen CFB training artifacts.
 
 The manifest is evidence metadata, not a data fetcher. Its exact bytes are hashed
-and bound to the training bundle before a model may be fit. Feature inputs must be
-market-blind and must have an availability mode that can be replayed point in time.
-Post-event values are allowed only when they are explicitly label sources.
+and bound to the training bundle before a model may be fit. Each declared source
+also points at a preserved snapshot whose exact bytes must match its SHA-256.
 """
 from __future__ import annotations
 
 from datetime import datetime
 from hashlib import sha256
+from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
 
 from .historical_features import CFB_HISTORICAL_MATERIALIZER_VERSION
@@ -51,6 +51,27 @@ def _aware_timestamp(value: Any, error: str) -> str:
     if stamp.tzinfo is None or stamp.utcoffset() is None:
         raise CFBSourceManifestError(error)
     return stamp.isoformat()
+
+
+def _snapshot_path(value: Any, source_id: str) -> str:
+    text = _text(value, f"CFB_SOURCE_MANIFEST_SNAPSHOT_PATH_REQUIRED:{source_id}")
+    path = PurePosixPath(text)
+    if path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
+        raise CFBSourceManifestError(f"CFB_SOURCE_MANIFEST_SNAPSHOT_PATH_INVALID:{source_id}")
+    return path.as_posix()
+
+
+def _file_sha256(path: Path) -> tuple[str, int]:
+    digest = sha256()
+    size = 0
+    with path.open("rb") as handle:
+        while True:
+            chunk = handle.read(1024 * 1024)
+            if not chunk:
+                break
+            size += len(chunk)
+            digest.update(chunk)
+    return digest.hexdigest(), size
 
 
 def validate_cfb_pit_source_manifest(
@@ -126,6 +147,7 @@ def validate_cfb_pit_source_manifest(
         provider = _text(item.get("provider"), f"CFB_SOURCE_MANIFEST_PROVIDER_REQUIRED:{source_id}")
         dataset = _text(item.get("dataset"), f"CFB_SOURCE_MANIFEST_DATASET_REQUIRED:{source_id}")
         locator = _text(item.get("locator"), f"CFB_SOURCE_MANIFEST_LOCATOR_REQUIRED:{source_id}")
+        snapshot_path = _snapshot_path(item.get("snapshot_path"), source_id)
         retrieved_at = _aware_timestamp(
             item.get("retrieved_at_utc"),
             f"CFB_SOURCE_MANIFEST_RETRIEVED_AT_INVALID:{source_id}",
@@ -151,6 +173,7 @@ def validate_cfb_pit_source_manifest(
             "provider": provider,
             "dataset": dataset,
             "locator": locator,
+            "snapshot_path": snapshot_path,
             "retrieved_at_utc": retrieved_at,
             "content_sha256": content_sha,
             "availability_mode": mode,
@@ -176,8 +199,52 @@ def validate_cfb_pit_source_manifest(
     }
 
 
+def verify_cfb_source_snapshots(manifest: Mapping[str, Any], *, evidence_root: str | Path) -> dict[str, Any]:
+    """Verify every manifest content hash against preserved snapshot bytes."""
+    root = Path(evidence_root).resolve()
+    if not root.is_dir():
+        raise CFBSourceManifestError("CFB_SOURCE_EVIDENCE_ROOT_REQUIRED")
+    sources = manifest.get("sources")
+    if not isinstance(sources, list) or not sources:
+        raise CFBSourceManifestError("CFB_SOURCE_MANIFEST_SOURCES_REQUIRED")
+
+    verified: list[dict[str, Any]] = []
+    root_digest = sha256()
+    for source in sorted((dict(item) for item in sources), key=lambda item: str(item.get("source_id"))):
+        source_id = str(source.get("source_id") or "").strip()
+        relative = _snapshot_path(source.get("snapshot_path"), source_id)
+        candidate = (root / PurePosixPath(relative)).resolve()
+        try:
+            candidate.relative_to(root)
+        except ValueError as exc:
+            raise CFBSourceManifestError(f"CFB_SOURCE_SNAPSHOT_PATH_ESCAPE:{source_id}") from exc
+        if not candidate.is_file():
+            raise CFBSourceManifestError(f"CFB_SOURCE_SNAPSHOT_MISSING:{source_id}")
+        actual_sha, byte_count = _file_sha256(candidate)
+        expected_sha = _hex64(source.get("content_sha256"), f"CFB_SOURCE_MANIFEST_CONTENT_SHA256_INVALID:{source_id}")
+        if actual_sha != expected_sha:
+            raise CFBSourceManifestError(f"CFB_SOURCE_SNAPSHOT_SHA256_MISMATCH:{source_id}")
+        root_digest.update(source_id.encode("utf-8"))
+        root_digest.update(b"\0")
+        root_digest.update(actual_sha.encode("ascii"))
+        root_digest.update(b"\0")
+        verified.append({
+            "source_id": source_id,
+            "snapshot_path": relative,
+            "content_sha256": actual_sha,
+            "byte_count": byte_count,
+        })
+    return {
+        "source_snapshot_verified": True,
+        "source_content_root_sha256": root_digest.hexdigest(),
+        "verified_source_count": len(verified),
+        "verified_sources": verified,
+    }
+
+
 __all__ = [
     "CFB_PIT_SOURCE_MANIFEST_SCHEMA",
     "CFBSourceManifestError",
     "validate_cfb_pit_source_manifest",
+    "verify_cfb_source_snapshots",
 ]
