@@ -2,16 +2,17 @@
 
 Status: **TIER-0 REQUIRED INPUT CONTRACT**
 
-This is the front-door evidence contract for building `models/cfb_joint_v1.json`. A frozen CFB model may not be built from a training bundle that merely contains a claimed source-manifest hash. The exact source-manifest file must be supplied to the builder and its SHA-256 must match the hash embedded in the training bundle.
+This is the front-door evidence contract for building `models/cfb_joint_v1.json`. A frozen CFB model may not be built from a training bundle that merely contains a claimed source-manifest hash. The exact source-manifest file and the exact preserved source snapshots must be supplied to the builder and verified before fitting.
 
-## 1. Required files
+## 1. Required evidence objects
 
-A candidate build requires both immutable JSON inputs:
+A candidate build requires:
 
 1. `cfb_pit_training_bundle.json`
 2. `cfb_pit_source_manifest.json`
+3. a source-evidence directory containing every immutable snapshot named by the manifest
 
-The exact bytes of both files are hashed. Reformatting either JSON file changes its identity and therefore creates a different evidence object.
+The exact bytes of the bundle, manifest, and every source snapshot are hashed. Reformatting a JSON evidence file changes its identity.
 
 The builder invocation is:
 
@@ -19,6 +20,7 @@ The builder invocation is:
 python3 scripts/build_cfb_model_artifact.py \
   --training-bundle path/to/cfb_pit_training_bundle.json \
   --source-manifest path/to/cfb_pit_source_manifest.json \
+  --source-evidence-root path/to/cfb_source_evidence \
   --fit-max-season 2025 \
   --ridge-alpha 10.0 \
   --output models/cfb_joint_v1.json \
@@ -51,9 +53,10 @@ Every source entry requires:
 - `role` — one of `FEATURE_INPUT`, `LABEL`, `UNIVERSE`
 - `provider` — source/provider identity
 - `dataset` — dataset or endpoint identity
-- `locator` — auditable storage locator; never a secret/token
+- `locator` — original provider/query/storage identity; never a secret/token
+- `snapshot_path` — relative path to the preserved bytes under `--source-evidence-root`; absolute paths and `..` traversal are rejected
 - `retrieved_at_utc` — timezone-aware retrieval/materialization timestamp
-- `content_sha256` — SHA-256 of the frozen source payload represented by the entry
+- `content_sha256` — SHA-256 of the exact preserved snapshot bytes
 - `availability_mode` — one of `PRE_EVENT_ARCHIVE`, `EVENT_TIMESTAMPED_REPLAY`, `POST_EVENT_LABEL`
 - `availability_rule` — human-auditable rule stating exactly what information was eligible at each game cutoff
 - `market_data` — must be `false`
@@ -61,6 +64,11 @@ Every source entry requires:
 - `seasons` — explicit seasons covered by that frozen source object
 
 A source with `role=LABEL` must use `availability_mode=POST_EVENT_LABEL`. A non-label source may not use `POST_EVENT_LABEL`.
+
+The machine-readable contracts live at:
+
+- `schemas/cfb_pit_source_manifest_v1.schema.json`
+- `schemas/cfb_pit_training_bundle_v1.schema.json`
 
 ### Interpretation of availability modes
 
@@ -108,12 +116,12 @@ The model surface rejects market fields such as spread, total, line, price, impl
 For every raw source used to construct the bundle, verify:
 
 - exact provider/dataset identity is named
-- immutable source bytes or a reproducible content-addressed snapshot exist
-- SHA-256 is recorded
+- immutable source bytes are preserved under the evidence root
+- preserved bytes reproduce the declared SHA-256
 - seasons covered are explicit and do not exceed 2025 for the 2026 base candidate
 - source role is explicit: feature, label, or universe
 - pregame feature availability is demonstrable, not inferred from a current endpoint
-- market/odds data are absent from feature sources
+- market/odds data are absent from all training sources
 - final scores are label-only
 - FBS membership is season-specific
 - weather has an availability basis appropriate to the target kickoff; do not silently substitute realized postgame weather for a pregame forecast feature
@@ -123,7 +131,7 @@ If any item is unknown, status is `DATA_GAP`; the source is not silently upgrade
 
 ## 5. Provenance emitted alongside the artifact
 
-`artifacts/cfb/cfb_model_training_provenance.json` now records:
+`artifacts/cfb/cfb_model_training_provenance.json` records:
 
 - model id
 - feature contract
@@ -134,6 +142,9 @@ If any item is unknown, status is `DATA_GAP`; the source is not silently upgrade
 - exact upstream source-manifest SHA-256
 - source-manifest schema
 - source count and source ids
+- `source_snapshot_verified=true`
+- source-content root SHA-256 derived from the verified source-id/content-hash set
+- verified source count
 - game-id set SHA-256
 - historical materializer version
 - bundle generation timestamp
@@ -155,17 +166,20 @@ The builder must fail before fitting if any of the following is false:
 2. source manifest parses and has the expected schema/materializer/feature contract
 3. manifest cutoff equals the requested `fit_max_season`
 4. exact source-manifest bytes hash to the value embedded in the bundle
-5. feature and label source roles are both present
-6. all sources explicitly exclude post-cutoff data
-7. all training sources explicitly set `market_data=false`
-8. no non-label source is post-event label data
-9. the latest represented row season equals `fit_max_season`
-10. no row season exceeds the cutoff
+5. each source has a safe relative `snapshot_path`
+6. every named source snapshot exists under the evidence root
+7. every preserved snapshot hashes exactly to its manifest `content_sha256`
+8. feature and label source roles are both present
+9. all sources explicitly exclude post-cutoff data
+10. all training sources explicitly set `market_data=false`
+11. no non-label source is post-event label data
+12. the latest represented row season equals `fit_max_season`
+13. no row season exceeds the cutoff
 
 Only then may the joint model fit and artifact packaging occur.
 
 ## 7. What this contract does not prove
 
-A syntactically valid manifest does not prove that a provider's historical endpoint was genuinely available at an earlier date. The evidence still has to support the declared `availability_rule`. The historical materializer itself explicitly does not make that provenance claim.
+Byte verification proves that the build used exactly the evidence objects named by the manifest; it does not by itself prove that a provider's historical endpoint was genuinely available at an earlier date. The evidence still has to support the declared `availability_rule`. The historical materializer itself explicitly does not make that provenance claim.
 
 Likewise, successful artifact construction is not model validation and does not promote any CFB market. The frozen artifact still must pass the predeclared chronological OOS and untouched forward evidence gates in `CFB_BASE_ARTIFACT_AND_VALIDATION_GATE_V1.md` before any `SPORTSEDGE OFFICIAL` status is possible.
