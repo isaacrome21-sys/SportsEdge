@@ -27,6 +27,7 @@ from sportsedge.sports.cfb.model_artifact import (
     cfb_model_code_surface_sha256,
     load_cfb_model_artifact,
 )
+from sportsedge.sports.cfb.paths import DEFAULT_CFB_MODEL_ARTIFACT_PATH
 from sportsedge.sports.cfb.run_machine import run_it_cfb
 from sportsedge.sports.cfb.source import CFBGame, fetch_cfbd_games
 
@@ -139,7 +140,7 @@ def main() -> int:
     parser.add_argument("--season", type=int)
     parser.add_argument("--week", type=int)
     parser.add_argument("--asof")
-    parser.add_argument("--model-artifact", type=Path, default=Path("models/cfb_joint_v1.json"))
+    parser.add_argument("--model-artifact", type=Path, default=DEFAULT_CFB_MODEL_ARTIFACT_PATH)
     parser.add_argument("--bookmaker", action="append", dest="bookmakers")
     parser.add_argument("--n-paths", type=int, default=20000)
     parser.add_argument("--root-seed", type=int, default=20260826)
