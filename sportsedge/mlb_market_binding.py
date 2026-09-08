@@ -25,9 +25,16 @@ REQUIRED_PROBABILITY_IDENTITY=("probability_event_id","probability_market_id","p
 _LEGAL_INCREMENTS=(0.0,0.5)
 _DOMAIN_CEILING={"GAME_TOTAL":40.0,"TEAM_TOTAL":30.0,"BATTER_PROP":20.0,"PITCHER_PROP":40.0}
 
-# Code wiring is not production evidence. Markets enter this set only after a real
-# acquisition/export proves the source-bound identity fields arrive from upstream.
-VERIFIED_SOURCE_WIRING=frozenset()
+# Code wiring alone is not production evidence. Markets enter this mapping only
+# after a real external acquisition/export crosses the production normalization
+# and quote-binding boundary. The referenced data-branch artifact contains 30
+# independently bound DraftKings quotes for each promoted family (90/90 total).
+SOURCE_WIRING_EVIDENCE={
+    "MONEYLINE":"data:runtime/mlb-binding-acceptance/2026-09-08/binding_20260908T193412.285152Z.json#attestation_sha256=9f952563489b920e9095b324523262dd9315ae3f81e6c1eb8634cd1190cbcbea",
+    "RUN_LINE":"data:runtime/mlb-binding-acceptance/2026-09-08/binding_20260908T193412.285152Z.json#attestation_sha256=9f952563489b920e9095b324523262dd9315ae3f81e6c1eb8634cd1190cbcbea",
+    "TOTALS":"data:runtime/mlb-binding-acceptance/2026-09-08/binding_20260908T193412.285152Z.json#attestation_sha256=9f952563489b920e9095b324523262dd9315ae3f81e6c1eb8634cd1190cbcbea",
+}
+VERIFIED_SOURCE_WIRING=frozenset(SOURCE_WIRING_EVIDENCE)
 
 class BindingError(ValueError): pass
 
