@@ -1,0 +1,36 @@
+name: pin-action-shas
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/pin_github_actions.py'
+      - '.github/workflows/pin-action-shas.yml'
+permissions:
+  contents: write
+jobs:
+  pin:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone repository without marketplace actions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" repo
+      - name: Pin action references
+        run: |
+          cd repo
+          python scripts/pin_github_actions.py
+      - name: Commit complete workflow files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd repo
+          git config user.name "sportsedge-automation"
+          git config user.email "actions@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "NO_CHANGES"
+            exit 0
+          fi
+          git add .github/workflows
+          git commit -m "Supply chain: pin GitHub Actions to immutable SHAs"
+          git push origin HEAD:main
