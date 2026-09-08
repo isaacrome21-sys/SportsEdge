@@ -14,7 +14,8 @@ on:
       - 'tests/test_mlb_run_machine.py'
       - '.github/workflows/auto-mlb.yml'
   schedule:
-    - cron: '*/15 * * * *'
+    # Fifteen-minute cadence only across broad MLB slate hours (UTC).
+    - cron: '*/15 15-23,0-5 * * *'
 
 permissions:
   contents: read
@@ -63,23 +64,6 @@ jobs:
           tests.test_mlb_run_machine
           tests.test_run_auto_mlb_resilient_machine
           -v
-      - name: Diagnose Odds API credentials safely
-        if: always()
-        env:
-          SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
-          SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
-          SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
-          SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
-        run: python scripts/probe_odds_http.py
-      - name: Acquire featured MLB game lines
-        continue-on-error: true
-        env:
-          SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
-          SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
-          SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
-          SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
-          SPORTSEDGE_ODDS_BOOKMAKERS: draftkings
-        run: python scripts/probe_game_odds.py
       - name: Run canonical automated MLB machine
         env:
           SPORTSEDGE_QUOTES_URL: ${{ secrets.SPORTSEDGE_QUOTES_URL }}
