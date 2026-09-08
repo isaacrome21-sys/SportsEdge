@@ -1,0 +1,375 @@
+{
+  "status": "DIAGNOSTIC_ONLY",
+  "attempt": "ATTEMPT_001",
+  "frozen_code_git_sha": "7863d13a9b0353ff95706b1bd0566408b2e7ae62",
+  "source_manifest_sha256": "89539179bc8dca74cd3a6e1b2dd5dd6e8e5c02bccf1022f79a49a580c482b720",
+  "original_attempt_changed": false,
+  "promotion_eligible": false,
+  "exclusions_by_season": {
+    "2016": {
+      "NFL_WIND_MISSING_OPEN_OR_OUTDOORS": 2
+    },
+    "2017": {
+      "NFL_WIND_MISSING_OPEN_OR_OUTDOORS": 5
+    },
+    "2018": {
+      "NFL_WIND_MISSING_OPEN_OR_OUTDOORS": 5
+    },
+    "2019": {
+      "NFL_WIND_MISSING_OPEN_OR_OUTDOORS": 7
+    },
+    "2021": {
+      "NFL_WIND_MISSING_OPEN_OR_OUTDOORS": 11
+    },
+    "2022": {
+      "NFL_WIND_MISSING_OPEN_OR_OUTDOORS": 91
+    },
+    "2023": {
+      "NFL_WIND_MISSING_OPEN_OR_OUTDOORS": 41
+    },
+    "2024": {
+      "NFL_WIND_MISSING_OPEN_OR_OUTDOORS": 5
+    },
+    "2025": {
+      "NFL_WIND_MISSING_OPEN_OR_OUTDOORS": 4
+    }
+  },
+  "folds": [
+    {
+      "season": 2020,
+      "train_seasons": [
+        2018,
+        2019
+      ],
+      "train_residual_total_sigma": 13.632153184354271,
+      "realized_total_bucket_cutoffs": [
+        43.0,
+        55.0
+      ],
+      "aggregate": {
+        "n": 253,
+        "actual_mean": 49.59288537549407,
+        "predicted_mean": 46.30917538858979,
+        "mean_residual": 3.2837099869042796,
+        "residual_rmse": 14.147454232961849,
+        "actual_variance": 187.44295333468733,
+        "predicted_variance": 19.70420987930878
+      },
+      "buckets": [
+        {
+          "bucket": "low",
+          "n": 89,
+          "actual_mean": 35.48314606741573,
+          "predicted_mean": 46.037371116769606,
+          "mean_residual": -10.554225049353875,
+          "residual_rmse": 12.63779371649431,
+          "actual_variance": 37.82274965282162,
+          "predicted_variance": 17.198737390496582
+        },
+        {
+          "bucket": "middle",
+          "n": 81,
+          "actual_mean": 48.98765432098765,
+          "predicted_mean": 45.89927099382055,
+          "mean_residual": 3.0883833271671,
+          "residual_rmse": 6.164730743608895,
+          "actual_variance": 13.172687090382565,
+          "predicted_variance": 24.05910106923976
+        },
+        {
+          "bucket": "high",
+          "n": 83,
+          "actual_mean": 65.3132530120482,
+          "predicted_mean": 47.000655342424785,
+          "mean_residual": 18.312597669623404,
+          "residual_rmse": 20.04369309031119,
+          "actual_variance": 56.98620989984033,
+          "predicted_variance": 17.419511273776518
+        }
+      ]
+    },
+    {
+      "season": 2021,
+      "train_seasons": [
+        2018,
+        2019,
+        2020
+      ],
+      "train_residual_total_sigma": 13.578161076445689,
+      "realized_total_bucket_cutoffs": [
+        39.0,
+        51.0
+      ],
+      "aggregate": {
+        "n": 258,
+        "actual_mean": 45.84496124031008,
+        "predicted_mean": 47.9132778609761,
+        "mean_residual": -2.068316620666027,
+        "residual_rmse": 13.616858660814971,
+        "actual_variance": 190.13875368066823,
+        "predicted_variance": 15.302007749894685
+      },
+      "buckets": [
+        {
+          "bucket": "low",
+          "n": 90,
+          "actual_mean": 31.211111111111112,
+          "predicted_mean": 46.75292622145005,
+          "mean_residual": -15.541815110338945,
+          "residual_rmse": 16.968495669201218,
+          "actual_variance": 36.388765432098765,
+          "predicted_variance": 15.233892604050657
+        },
+        {
+          "bucket": "middle",
+          "n": 85,
+          "actual_mean": 45.78823529411765,
+          "predicted_mean": 48.305464035300304,
+          "mean_residual": -2.5172287411826524,
+          "residual_rmse": 5.9453460616710965,
+          "actual_variance": 11.319861591695501,
+          "predicted_variance": 16.25103661430755
+        },
+        {
+          "bucket": "high",
+          "n": 83,
+          "actual_mean": 61.7710843373494,
+          "predicted_mean": 48.769854038563906,
+          "mean_residual": 13.001230298785485,
+          "residual_rmse": 15.098020179888021,
+          "actual_variance": 54.12832051095949,
+          "predicted_variance": 12.052762430632644
+        }
+      ]
+    },
+    {
+      "season": 2022,
+      "train_seasons": [
+        2018,
+        2019,
+        2020,
+        2021
+      ],
+      "train_residual_total_sigma": 13.532926786342141,
+      "realized_total_bucket_cutoffs": [
+        37.0,
+        51.0
+      ],
+      "aggregate": {
+        "n": 179,
+        "actual_mean": 44.597765363128495,
+        "predicted_mean": 46.45564797417705,
+        "mean_residual": -1.8578826110485565,
+        "residual_rmse": 14.345417251337636,
+        "actual_variance": 204.24044193377236,
+        "predicted_variance": 12.111244932756
+      },
+      "buckets": [
+        {
+          "bucket": "low",
+          "n": 62,
+          "actual_mean": 29.85483870967742,
+          "predicted_mean": 45.799771986184524,
+          "mean_residual": -15.944933276507095,
+          "residual_rmse": 17.52535152877697,
+          "actual_variance": 40.70473465140478,
+          "predicted_variance": 11.979915734553614
+        },
+        {
+          "bucket": "middle",
+          "n": 63,
+          "actual_mean": 44.34920634920635,
+          "predicted_mean": 46.4331928045055,
+          "mean_residual": -2.0839864552991587,
+          "residual_rmse": 5.720368939505126,
+          "actual_variance": 16.830435878054928,
+          "predicted_variance": 12.22340769465587
+        },
+        {
+          "bucket": "high",
+          "n": 54,
+          "actual_mean": 61.81481481481482,
+          "predicted_mean": 47.23488847315563,
+          "mean_residual": 14.579926341659174,
+          "residual_rmse": 17.0687664339145,
+          "actual_variance": 64.59533607681756,
+          "predicted_variance": 11.029467032793905
+        }
+      ]
+    },
+    {
+      "season": 2023,
+      "train_seasons": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022
+      ],
+      "train_residual_total_sigma": 13.623153812724324,
+      "realized_total_bucket_cutoffs": [
+        37.0,
+        48.0
+      ],
+      "aggregate": {
+        "n": 231,
+        "actual_mean": 43.32034632034632,
+        "predicted_mean": 45.350309230466394,
+        "mean_residual": -2.0299629101200662,
+        "residual_rmse": 13.297234425130066,
+        "actual_variance": 189.96664230430466,
+        "predicted_variance": 13.650682455822228
+      },
+      "buckets": [
+        {
+          "bucket": "low",
+          "n": 84,
+          "actual_mean": 29.80952380952381,
+          "predicted_mean": 44.25472896132654,
+          "mean_residual": -14.445205151802735,
+          "residual_rmse": 15.840781072992945,
+          "actual_variance": 47.939909297052154,
+          "predicted_variance": 14.869683597649017
+        },
+        {
+          "bucket": "middle",
+          "n": 76,
+          "actual_mean": 43.13157894736842,
+          "predicted_mean": 45.850404712850775,
+          "mean_residual": -2.718825765482353,
+          "residual_rmse": 5.244388527948036,
+          "actual_variance": 9.61426592797784,
+          "predicted_variance": 9.839045429698952
+        },
+        {
+          "bucket": "high",
+          "n": 71,
+          "actual_mean": 59.50704225352113,
+          "predicted_mean": 46.111175229713325,
+          "mean_residual": 13.395867023807792,
+          "residual_rmse": 15.778473032026172,
+          "actual_variance": 73.03868280103154,
+          "predicted_variance": 14.021852515505493
+        }
+      ]
+    },
+    {
+      "season": 2024,
+      "train_seasons": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023
+      ],
+      "train_residual_total_sigma": 13.545296832214273,
+      "realized_total_bucket_cutoffs": [
+        40.0,
+        50.0
+      ],
+      "aggregate": {
+        "n": 264,
+        "actual_mean": 45.64772727272727,
+        "predicted_mean": 45.15777434516405,
+        "mean_residual": 0.4899529275632258,
+        "residual_rmse": 13.020465978536274,
+        "actual_variance": 171.30393422865015,
+        "predicted_variance": 15.542760451636974
+      },
+      "buckets": [
+        {
+          "bucket": "low",
+          "n": 90,
+          "actual_mean": 32.144444444444446,
+          "predicted_mean": 44.28415656679854,
+          "mean_residual": -12.139712122354098,
+          "residual_rmse": 14.29091708204915,
+          "actual_variance": 40.96802469135802,
+          "predicted_variance": 18.996949715111924
+        },
+        {
+          "bucket": "middle",
+          "n": 89,
+          "actual_mean": 45.51685393258427,
+          "predicted_mean": 45.25676165193791,
+          "mean_residual": 0.2600922806463651,
+          "residual_rmse": 4.545353512854913,
+          "actual_variance": 7.283423810124984,
+          "predicted_variance": 14.706230578497934
+        },
+        {
+          "bucket": "high",
+          "n": 85,
+          "actual_mean": 60.082352941176474,
+          "predicted_mean": 45.979135871634895,
+          "mean_residual": 14.103217069541579,
+          "residual_rmse": 16.990343218855287,
+          "actual_variance": 79.60498269896195,
+          "predicted_variance": 11.268282607664048
+        }
+      ]
+    },
+    {
+      "season": 2025,
+      "train_seasons": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024
+      ],
+      "train_residual_total_sigma": 13.448473364406375,
+      "realized_total_bucket_cutoffs": [
+        40.0,
+        51.0
+      ],
+      "aggregate": {
+        "n": 262,
+        "actual_mean": 46.30534351145038,
+        "predicted_mean": 46.16131777175555,
+        "mean_residual": 0.14402573969484136,
+        "residual_rmse": 13.708795005167046,
+        "actual_variance": 191.85333022551134,
+        "predicted_variance": 13.399661785092153
+      },
+      "buckets": [
+        {
+          "bucket": "low",
+          "n": 90,
+          "actual_mean": 31.622222222222224,
+          "predicted_mean": 45.33965037734764,
+          "mean_residual": -13.717428155125418,
+          "residual_rmse": 15.180490293963446,
+          "actual_variance": 36.035061728395064,
+          "predicted_variance": 15.331884593950281
+        },
+        {
+          "bucket": "middle",
+          "n": 89,
+          "actual_mean": 46.17977528089887,
+          "predicted_mean": 46.54992945231739,
+          "mean_residual": -0.37015417141851004,
+          "residual_rmse": 4.560519372954651,
+          "actual_variance": 9.653074106804699,
+          "predicted_variance": 9.89131048587983
+        },
+        {
+          "bucket": "high",
+          "n": 83,
+          "actual_mean": 62.36144578313253,
+          "predicted_mean": 46.635578325089355,
+          "mean_residual": 15.725867458043174,
+          "residual_rmse": 17.917693402487266,
+          "actual_variance": 64.59224851212076,
+          "predicted_variance": 13.947511734254972
+        }
+      ]
+    }
+  ],
+  "limitation": "Conditioning on realized outcomes creates residual patterns even for valid conditional-mean forecasts. These retrospective buckets alone do not prove shrinkage or noisy features and must not select a new model on this holdout.",
+  "complete_diagnostic_sha256": "924bcbe19fa1dfccdcefc8f9d7359ccd0e13a4d868710e24dc1b35a054416785",
+  "heldout_prediction_count": 1447
+}
