@@ -11,12 +11,8 @@ from .f5_distribution import F5_MARKETS
 from .generic_market_engine import BINARY_MARKETS, GAME_MARKETS
 from .hitter_joint_engine import HITTER_MARKETS
 from .live_slate import LiveGame
-from .mlb_market_binding_v13 import (
-    attach_runtime_binding_context,
-    runtime_quote_binding_row,
-    validate_quote_binding,
-    validate_quote_pair,
-)
+from .mlb_binding_runtime import verify_runtime_binding_context
+from .mlb_market_binding_v13 import runtime_quote_binding_row,validate_quote_binding,validate_quote_pair
 from .orchestrator import run_candidate
 from .pitcher_joint_engine import PITCHER_MARKETS
 from .quote_bridge import validate_canonical_quote
@@ -105,7 +101,7 @@ def _validated_quotes(quotes,games_by_id):
         try:
             quote=validate_canonical_quote(raw); game=games_by_id.get(str(quote["game_id"]))
             if game is None: continue
-            quote=attach_runtime_binding_context(quote,game)
+            quote=verify_runtime_binding_context(quote,game)
             validate_quote_binding(runtime_quote_binding_row(quote))
             out.append(quote)
         except Exception:pass
@@ -135,10 +131,10 @@ def run_generic_card(*,games,feature_rows,quotes,ingestion_now,finalization_now,
             if market not in GENERIC_MARKETS:raise ValueError(f"unsupported canonical market: {market}")
             game=games_by_id.get(str(quote["game_id"]));
             if game is None:raise ValueError("MLB_GAME_ID_NOT_FOUND")
-            # This is the acquisition/orchestration trust boundary. Every
-            # normalized priced row is bound to canonical MLB event/team
-            # identity before feature/model work. A failure blocks only this row.
-            quote=attach_runtime_binding_context(quote,game)
+            # Acquisition already stamped event/team identity. This boundary only
+            # verifies those values against the resolved MLB game; it never fills
+            # a missing identity field.
+            quote=verify_runtime_binding_context(quote,game)
             validate_quote_binding(runtime_quote_binding_row(quote))
             feature=features.get((str(quote["game_id"]),str(quote["entity_id"]),market))
             if feature is None:raise ValueError("feature row missing")
