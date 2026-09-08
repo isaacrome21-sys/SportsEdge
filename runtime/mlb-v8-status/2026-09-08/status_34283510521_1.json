@@ -1,0 +1,43 @@
+{
+  "capture_outcome": "skipped",
+  "git_sha": "244d9782a53a721c4252d4a3e8d2f03de82c112f",
+  "model_outcome": "failure",
+  "recorded_at_utc": "2026-09-08T21:59:16.265775+00:00",
+  "run_id": "34283510521:1",
+  "schema": "MLB_V8_FORWARD_STATUS_V1",
+  "slate_date_ct": "2026-09-08",
+  "status": "MISSED_OR_BLOCKED",
+  "status_detail": "MISSED_OR_BLOCKED",
+  "target_game_statuses": [
+    {
+      "capture_status": "MISSED_OR_BLOCKED",
+      "decision_target_qualified": true,
+      "game_id": "824792",
+      "minutes_before_first_pitch": 35.88,
+      "phases": [
+        "decision"
+      ]
+    }
+  ],
+  "target_games": [
+    {
+      "abstract_game_state": "Preview",
+      "away_team": "Cleveland Guardians",
+      "capture_labels": [
+        "T-30"
+      ],
+      "decision_target_minutes": 30.0,
+      "decision_target_qualified": true,
+      "decision_timing_status": "QUALIFIED_AT_OR_BEFORE_TARGET",
+      "decision_tolerance_direction": "EARLY_ONLY_AT_OR_BEFORE_TARGET",
+      "decision_tolerance_minutes": 6.0,
+      "first_pitch_at": "2026-09-08T22:35:00+00:00",
+      "game_id": "824792",
+      "home_team": "Baltimore Orioles",
+      "minutes_before_first_pitch": 35.88,
+      "phases": [
+        "decision"
+      ]
+    }
+  ]
+}
