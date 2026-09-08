@@ -31,16 +31,18 @@ def _strict_bool(value: Any, *, field: str) -> bool:
     return value
 
 
-def _identity(quote: Mapping[str, Any]) -> tuple[str, str, str, str, str, bool]:
+def _legacy_identity(quote: Mapping[str, Any]) -> tuple[str, str, str, str, str, bool]:
+    """Compatibility only for older non-production fixtures/paths.
+
+    Production MLB card quotes carry event/game/team binding context and are
+    validated by the hardened market-specific path below.
+    """
     try:
         alternate = _strict_bool(quote.get("is_alternate", False), field="is_alternate")
         return (
-            str(quote["game_id"]),
-            str(quote.get("period", "FG")),
-            str(quote["market"]),
-            str(quote["entity_id"]),
-            str(quote.get("book_key", "")),
-            alternate,
+            str(quote["game_id"]), str(quote.get("period", "FG")),
+            str(quote["market"]), str(quote["entity_id"]),
+            str(quote.get("book_key", "")), alternate,
         )
     except DevigError:
         raise
@@ -48,7 +50,7 @@ def _identity(quote: Mapping[str, Any]) -> tuple[str, str, str, str, str, bool]:
         raise DevigError("paired quote identity incomplete") from exc
 
 
-def _line_key(quote: Mapping[str, Any]) -> float:
+def _legacy_line_key(quote: Mapping[str, Any]) -> float:
     try:
         line = float(quote["line"])
     except Exception as exc:
@@ -56,12 +58,10 @@ def _line_key(quote: Mapping[str, Any]) -> float:
     if not isfinite(line):
         raise DevigError("paired quote line must be finite")
     market = str(quote.get("market", ""))
-    if market in {"RUN_LINE", "F5_RUN_LINE"}:
-        return abs(line)
-    return line
+    return abs(line) if market in {"RUN_LINE", "F5_RUN_LINE"} else line
 
 
-def _complementary_sides(a: str, b: str) -> bool:
+def _legacy_complementary_sides(a: str, b: str) -> bool:
     pair = {a.upper(), b.upper()}
     return pair in (
         {"OVER", "UNDER"}, {"HOME", "AWAY"}, {"HOME_ML", "AWAY_ML"},
@@ -69,12 +69,36 @@ def _complementary_sides(a: str, b: str) -> bool:
     )
 
 
+def _has_hardened_binding_context(quote: Mapping[str, Any]) -> bool:
+    return "event_id" in quote or "game_number" in quote or "event_home_team_id" in quote
+
+
 def validate_pair(candidate: Mapping[str, Any], opposite: Mapping[str, Any]) -> None:
-    if _identity(candidate) != _identity(opposite):
+    """Validate a two-way pair.
+
+    Hardened production quotes use market-aware semantics: ML/RL pair opposing
+    team entities and run lines require opposite signs. Legacy fixture-only
+    quotes keep their old identity contract so this change does not silently
+    rewrite unrelated historical test inputs.
+    """
+    if _has_hardened_binding_context(candidate) or _has_hardened_binding_context(opposite):
+        if not (_has_hardened_binding_context(candidate) and _has_hardened_binding_context(opposite)):
+            raise DevigError("paired quote binding context mismatch")
+        try:
+            from .mlb_market_binding_v13 import runtime_quote_binding_row, validate_quote_pair
+            validate_quote_pair(
+                runtime_quote_binding_row(candidate),
+                runtime_quote_binding_row(opposite),
+            )
+        except Exception as exc:
+            raise DevigError(f"paired quote binding invalid: {exc}") from exc
+        return
+
+    if _legacy_identity(candidate) != _legacy_identity(opposite):
         raise DevigError("paired quote identity mismatch")
-    if _line_key(candidate) != _line_key(opposite):
+    if _legacy_line_key(candidate) != _legacy_line_key(opposite):
         raise DevigError("paired quote line mismatch")
-    if not _complementary_sides(str(candidate.get("side", "")), str(opposite.get("side", ""))):
+    if not _legacy_complementary_sides(str(candidate.get("side", "")), str(opposite.get("side", ""))):
         raise DevigError("paired quote sides are not complementary")
 
 
@@ -94,7 +118,7 @@ def find_paired_quote(candidate: Mapping[str, Any], quotes: Iterable[Mapping[str
 
 
 def multiplicative_devig(candidate: Mapping[str, Any], opposite: Mapping[str, Any]) -> DevigResult:
-    """Remove two-sided margin by normalizing raw implied probabilities to sum to one."""
+    """Remove two-sided margin by normalizing raw implied probabilities to one."""
     validate_pair(candidate, opposite)
     q1 = _raw_implied(candidate.get("american_odds"))
     q2 = _raw_implied(opposite.get("american_odds"))
