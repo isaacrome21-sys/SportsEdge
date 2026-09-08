@@ -6,7 +6,12 @@ from typing import Any, Callable, Mapping
 from .candidate_binding import bind_candidate
 from .devig import multiplicative_devig
 from .edge_floors import DEFAULT_EDGE_FLOOR_CONFIG, require_production_edge_floor
-from .mlb_market_binding import validate_probability_binding, validate_quote_binding_identity
+from .mlb_market_binding_v13 import (
+    runtime_full_binding_row,
+    runtime_quote_binding_row,
+    validate_binding,
+    validate_quote_binding,
+)
 from .price_ttl import double_ttl_gate
 from .truth_gate import BetDecision, decide_bet
 
@@ -49,44 +54,29 @@ def _quote_identity(quote):
     offer_raw=quote.get("offer_id");offer_id=str(offer_raw).strip() if offer_raw not in (None,"") else None
     return book_key,sportsbook,retrieved.isoformat(),offer_id
 
-def _probability_binding_envelope(output:Mapping[str,Any],model_input:Mapping[str,Any],quote:Mapping[str,Any])->dict[str,Any]:
-    """Assemble model-owned probability identity only; never invent quote-owned identity."""
-    market=str(output.get("market",model_input.get("market","")))
-    envelope={
-        "probability_market_id":output.get("probability_market_id",market),
-        "probability_source_market":output.get("probability_source_market",market),
-        "game_id":output.get("game_id",model_input.get("game_id")),
-        "entity_id":output.get("entity_id",model_input.get("entity_id")),
-        "side":output.get("side",model_input.get("side")),
-        "period":output.get("period",model_input.get("period")),
-    }
-    # Threshold/team identities must be explicit in the probability/model envelope when applicable.
-    if "probability_threshold" in output: envelope["probability_threshold"]=output["probability_threshold"]
-    elif "probability_threshold" in model_input: envelope["probability_threshold"]=model_input["probability_threshold"]
-    if "probability_team_id" in output: envelope["probability_team_id"]=output["probability_team_id"]
-    elif "probability_team_id" in model_input: envelope["probability_team_id"]=model_input["probability_team_id"]
-    return envelope
-
 def run_candidate(*,model_input:Mapping[str,Any],quote:Mapping[str,Any],paired_quote:Mapping[str,Any]|None=None,deployment:Mapping[str,Any],engine_fn:Callable[[Mapping[str,Any]],Mapping[str,Any]],ingestion_now:datetime,finalization_now:datetime,edge_floor_config_path:str=DEFAULT_EDGE_FLOOR_CONFIG,kelly_multiplier:float=0.25)->RunResult:
     market=str(model_input.get("market","UNKNOWN"))
     try:
         _reject_market_leakage(model_input)
-        # Boundary validation happens before engine execution so every priced row is accounted for.
-        validate_quote_binding_identity(quote)
+        # Quote/event identity is checked before engine execution. These fields
+        # were attached from the canonical MLB game object in the card pipeline,
+        # never synthesized by the model.
+        validate_quote_binding(runtime_quote_binding_row(quote))
         double_ttl_gate(quote,ingestion_now,finalization_now)
         book_key,sportsbook,quote_retrieved_at,offer_id=_quote_identity(quote)
         output=dict(engine_fn(model_input))
         if "model_p" not in output:raise OrchestrationError("engine output missing model_p")
-        for key in ("game_id","market","entity_id","line","side","period"):
+        for key in ("game_id","market","entity_id","line","side"):
             if key not in output and key in model_input:output[key]=model_input[key]
         runtime_path=_optional_text(output,"runtime_path")
         if deployment.get("eligible") is True and runtime_path=="LEGACY_COMPAT":raise OrchestrationError("LEGACY_COMPAT_PATH_NOT_PROMOTABLE")
-        validate_probability_binding(_probability_binding_envelope(output,model_input,quote),quote)
+        # Full price-to-probability binding. A failure blocks only this row.
+        validate_binding(runtime_full_binding_row(quote,output))
         bind_candidate(output,quote,deployment)
         model_input_hash=_optional_sha256(output,"model_input_hash");distribution_sha256=_optional_sha256(output,"distribution_sha256");readout_sha256=_optional_sha256(output,"readout_sha256");readout_version=_optional_text(output,"readout_version");engine_version=_optional_text(output,"engine_version");seed_policy=_optional_text(output,"seed_policy");mc_paths=_optional_nonnegative_int(output,"mc_paths")
         floor=require_production_edge_floor(market=market,path=edge_floor_config_path)
         if not isinstance(paired_quote,Mapping):raise OrchestrationError("PAIRED_PRICE_REQUIRED_FOR_DEVIG")
-        validate_quote_binding_identity(paired_quote)
+        validate_quote_binding(runtime_quote_binding_row(paired_quote))
         double_ttl_gate(paired_quote,ingestion_now,finalization_now)
         devig=multiplicative_devig(quote,paired_quote)
         decision=decide_bet(output["model_p"],quote["american_odds"],fair_market_probability=devig.candidate_fair_probability,bound=True,fresh=True,deployed=deployment.get("eligible") is True,edge_floor=float(floor.value_probability_points),kelly_multiplier=kelly_multiplier,push_probability=float(output.get("push_p",0.0)))
