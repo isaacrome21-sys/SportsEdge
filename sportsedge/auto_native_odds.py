@@ -22,6 +22,7 @@ from .market_surface import DEFAULT_MARKET_SURFACE_PATH
 from .mlb_history_cache import MLBHistoryCachedOpener
 from .mlb_source import fetch_boxscore, fetch_schedule
 from .odds_api_source import build_participant_index, fetch_mlb_player_prop_quotes
+from .odds_event_snapshot import acquire_mlb_event_snapshot
 from .odds_keyring import fetch_with_key_failover
 from .team_total_odds_source import fetch_mlb_team_total_quotes
 
@@ -98,19 +99,22 @@ def run_auto_mlb_native_odds(
     participant_index = build_participant_index(schedule=schedule, confirmed_names_by_game=roster_names)
 
     def fetch_all(key: str) -> dict[str, Any]:
+        event_snapshot = acquire_mlb_event_snapshot(api_key=key, opener=opener, acquired_at=current)
         player = fetch_mlb_player_prop_quotes(
             api_key=key, schedule=schedule, participant_index=participant_index,
-            opener=opener, bookmakers=bookmakers,
+            opener=opener, bookmakers=bookmakers, event_snapshot=event_snapshot,
         )
         game = fetch_mlb_game_quotes(
             api_key=key, schedule=schedule, opener=opener, bookmakers=bookmakers,
+            event_snapshot=event_snapshot,
         )
         team_total = fetch_mlb_team_total_quotes(
             api_key=key, schedule=schedule, opener=opener, bookmakers=bookmakers,
+            event_snapshot=event_snapshot,
         )
         additional = fetch_mlb_additional_quotes(
             api_key=key, schedule=schedule, participant_index=participant_index,
-            opener=opener, bookmakers=bookmakers,
+            opener=opener, bookmakers=bookmakers, event_snapshot=event_snapshot,
         )
         return {
             "quotes": (
