@@ -7,6 +7,7 @@ from .candidate_binding import bind_candidate
 from .devig import multiplicative_devig
 from .edge_floors import DEFAULT_EDGE_FLOOR_CONFIG, require_production_edge_floor
 from .mlb_market_binding_v13 import (
+    PRODUCTION_WIRED_MARKETS,
     runtime_full_binding_row,
     runtime_quote_binding_row,
     validate_binding,
@@ -54,20 +55,35 @@ def _quote_identity(quote):
     offer_raw=quote.get("offer_id");offer_id=str(offer_raw).strip() if offer_raw not in (None,"") else None
     return book_key,sportsbook,retrieved.isoformat(),offer_id
 
+def _bind_readout_identity(output:dict[str,Any],model_input:Mapping[str,Any],market:str)->None:
+    """Require explicit engine/readout identity on wired markets.
+
+    Legacy/ineligible paths may still inherit the request identity for compatibility,
+    but a market declared production-wired cannot be made self-validating by filling
+    identity fields after the engine returns.
+    """
+    fields=("game_id","market","entity_id","line","side")
+    if market in PRODUCTION_WIRED_MARKETS:
+        missing=[key for key in fields if key not in output or output[key] in (None,"")]
+        if missing:
+            raise OrchestrationError(f"ENGINE_READOUT_IDENTITY_MISSING:{market}:{','.join(missing)}")
+        return
+    for key in fields:
+        if key not in output and key in model_input:
+            output[key]=model_input[key]
+
 def run_candidate(*,model_input:Mapping[str,Any],quote:Mapping[str,Any],paired_quote:Mapping[str,Any]|None=None,deployment:Mapping[str,Any],engine_fn:Callable[[Mapping[str,Any]],Mapping[str,Any]],ingestion_now:datetime,finalization_now:datetime,edge_floor_config_path:str=DEFAULT_EDGE_FLOOR_CONFIG,kelly_multiplier:float=0.25)->RunResult:
     market=str(model_input.get("market","UNKNOWN"))
     try:
         _reject_market_leakage(model_input)
-        # Quote/event identity is checked before engine execution. These fields
-        # were attached from the canonical MLB game object in the card pipeline,
-        # never synthesized by the model.
+        # Quote/event identity was stamped at acquisition and is checked before
+        # engine execution. Missing identity blocks this row.
         validate_quote_binding(runtime_quote_binding_row(quote))
         double_ttl_gate(quote,ingestion_now,finalization_now)
         book_key,sportsbook,quote_retrieved_at,offer_id=_quote_identity(quote)
         output=dict(engine_fn(model_input))
         if "model_p" not in output:raise OrchestrationError("engine output missing model_p")
-        for key in ("game_id","market","entity_id","line","side"):
-            if key not in output and key in model_input:output[key]=model_input[key]
+        _bind_readout_identity(output,model_input,market)
         runtime_path=_optional_text(output,"runtime_path")
         if deployment.get("eligible") is True and runtime_path=="LEGACY_COMPAT":raise OrchestrationError("LEGACY_COMPAT_PATH_NOT_PROMOTABLE")
         # Full price-to-probability binding. A failure blocks only this row.
