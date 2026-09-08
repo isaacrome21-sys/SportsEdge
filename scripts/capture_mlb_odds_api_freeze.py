@@ -12,6 +12,7 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -82,7 +83,11 @@ def _manifest_sha256(payload: dict) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--api-key", required=True)
+    ap.add_argument(
+        "--api-key",
+        default=os.environ.get("ODDS_API_KEY", ""),
+        help="Provider key; prefer ODDS_API_KEY environment variable so it never appears in the command line.",
+    )
     ap.add_argument("--private-root", type=Path, required=True)
     ap.add_argument("--capture-id", required=True)
     ap.add_argument("--manifest-out", type=Path, required=True)
