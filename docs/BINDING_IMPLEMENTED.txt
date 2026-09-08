@@ -1,0 +1,6 @@
+threshold_domain_explicit=true
+pre_engine_orchestration_gate=true
+per_row_blocked=true
+quote_identity_preserved=true
+paired_identity_hardened=true
+promotion_changed=false
