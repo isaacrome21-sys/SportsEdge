@@ -34,4 +34,5 @@ jobs:
           fi
           git add .github/workflows
           git commit -m "Supply chain: pin GitHub Actions to immutable SHAs"
+          git pull --rebase origin main
           git push origin HEAD:main
