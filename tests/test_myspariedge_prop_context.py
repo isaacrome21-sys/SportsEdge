@@ -11,6 +11,7 @@ from sportsedge.market_context.myspariedge_props import (
     parse_myspariedge_records,
     research_sidecar,
 )
+from sportsedge.sports.nfl.prop_context_contract import validate_context_payload
 
 
 NOW = datetime(2026, 9, 8, 14, 0, tzinfo=timezone.utc)
@@ -186,6 +187,19 @@ def test_research_sidecar_cannot_enter_model_or_truth_gate():
         "attempts": 10,
         "hit_rate_pct": 90.0,
     }
+
+
+def test_myspariedge_sidecar_is_rejected_by_objective_hybrid_context():
+    sidecar = dict(research_sidecar(_match(_snapshot())))
+    with pytest.raises(ValueError, match="research source cannot enter NFL hybrid context"):
+        validate_context_payload(sidecar)
+
+
+def test_myspariedge_lane_is_rejected_even_if_source_label_is_removed():
+    sidecar = dict(research_sidecar(_match(_snapshot())))
+    sidecar.pop("source")
+    with pytest.raises(ValueError, match="research lane cannot enter NFL hybrid context"):
+        validate_context_payload(sidecar)
 
 
 def test_snapshot_content_hash_is_deterministic():
