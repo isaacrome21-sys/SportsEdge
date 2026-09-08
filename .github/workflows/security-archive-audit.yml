@@ -1,0 +1,144 @@
+name: security-archive-audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/security-archive-audit.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Audit archive and binary blobs across reachable history
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import io, json, re, subprocess, tarfile, zipfile
+          from pathlib import PurePosixPath
+
+          RISKY_EXT = {
+              '.zip','.tar','.tgz','.gz','.bz2','.xz','.7z','.rar','.jar','.whl',
+              '.pyc','.pkl','.pickle','.joblib','.bin','.db','.sqlite','.sqlite3'
+          }
+          RISKY_NAME = re.compile(
+              r'(^|/)(\.env($|\.)|.*credential.*|.*secret.*|.*token.*|.*service.?account.*|'
+              r'.*api.?key.*|.*bankroll.*|.*balance.*|.*account.*|.*ledger.*|.*stake.*|.*wager.*)',
+              re.I,
+          )
+          PATTERNS = {
+              'credential_assignment': re.compile(rb'(?i)(api[_-]?key|token|secret|password)\s*[:=]\s*["\'][^"\'\s]{8,}["\']'),
+              'bearer': re.compile(rb'(?i)Bearer\s+[A-Za-z0-9._~+/=-]{12,}'),
+              'embedded_url_credentials': re.compile(rb'https?://[^/\s:@]+:[^/\s@]+@'),
+              'token_shape': re.compile(rb'(sk-|ghp_|github_pat_|AKIA)[A-Za-z0-9_-]{12,}'),
+              'email': re.compile(rb'(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}'),
+              'account_finance_field': re.compile(rb'(?i)(account[_ -]?id|bankroll|balance|stake[_ -]?amount|wager[_ -]?amount)\s*[:=]'),
+          }
+
+          def strings_scan(data: bytes):
+              findings=[]
+              for kind, rx in PATTERNS.items():
+                  n=len(rx.findall(data))
+                  if n:
+                      findings.append({'kind':kind,'count':n})
+              return findings
+
+          def inspect_zip(data: bytes, label: str):
+              out=[]
+              try:
+                  z=zipfile.ZipFile(io.BytesIO(data))
+              except Exception as exc:
+                  return [{'container':label,'error':f'ZIP_OPEN:{type(exc).__name__}:{exc}'}]
+              for info in z.infolist():
+                  row={'container':label,'member':info.filename,'size':info.file_size}
+                  if RISKY_NAME.search(info.filename):
+                      row['risky_filename']=True
+                  try:
+                      payload=z.read(info)
+                      hits=strings_scan(payload)
+                      if hits:
+                          row['content_findings']=hits
+                      suffix=PurePosixPath(info.filename).suffix.lower()
+                      if suffix=='.zip' and info.file_size < 20_000_000:
+                          row['nested_zip']=inspect_zip(payload,label+'!'+info.filename)
+                  except Exception as exc:
+                      row['read_error']=f'{type(exc).__name__}:{exc}'
+                  out.append(row)
+              return out
+
+          def inspect_tar(data: bytes, label: str):
+              out=[]
+              try:
+                  t=tarfile.open(fileobj=io.BytesIO(data),mode='r:*')
+              except Exception as exc:
+                  return [{'container':label,'error':f'TAR_OPEN:{type(exc).__name__}:{exc}'}]
+              for info in t.getmembers():
+                  if not info.isfile():
+                      continue
+                  row={'container':label,'member':info.name,'size':info.size}
+                  if RISKY_NAME.search(info.name):
+                      row['risky_filename']=True
+                  try:
+                      fh=t.extractfile(info)
+                      payload=fh.read() if fh else b''
+                      hits=strings_scan(payload)
+                      if hits:
+                          row['content_findings']=hits
+                  except Exception as exc:
+                      row['read_error']=f'{type(exc).__name__}:{exc}'
+                  out.append(row)
+              return out
+
+          raw=subprocess.check_output(['git','rev-list','--objects','--all'],text=True)
+          objects=[]
+          for line in raw.splitlines():
+              parts=line.split(' ',1)
+              if len(parts)!=2:
+                  continue
+              sha,path=parts
+              suffix=PurePosixPath(path).suffix.lower()
+              if suffix in RISKY_EXT or RISKY_NAME.search(path):
+                  objects.append((sha,path,suffix))
+
+          report={'objects_scanned':len(objects),'objects':[]}
+          seen=set()
+          for sha,path,suffix in objects:
+              key=(sha,path)
+              if key in seen:
+                  continue
+              seen.add(key)
+              try:
+                  data=subprocess.check_output(['git','cat-file','blob',sha])
+              except Exception as exc:
+                  report['objects'].append({'sha':sha,'path':path,'error':str(exc)})
+                  continue
+              row={'sha':sha,'path':path,'size':len(data),'blob_findings':strings_scan(data)}
+              if suffix=='.zip':
+                  row['archive_members']=inspect_zip(data,path)
+              elif suffix in {'.tar','.tgz','.gz','.bz2','.xz'}:
+                  row['archive_members']=inspect_tar(data,path)
+              report['objects'].append(row)
+
+          with open('security-archive-audit.json','w',encoding='utf-8') as fh:
+              json.dump(report,fh,indent=2,sort_keys=True)
+          print(json.dumps(report,indent=2,sort_keys=True))
+          PY
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-archive-audit
+          path: security-archive-audit.json
+          if-no-files-found: error
+          retention-days: 7
