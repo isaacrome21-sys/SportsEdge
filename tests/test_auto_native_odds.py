@@ -132,6 +132,24 @@ class AutoNativeOddsTests(unittest.TestCase):
         self.assertEqual({r.market for r in report.results}, {"HITS"})
         self.assertTrue(all(r.bet_status != "OFFICIAL_BET" for r in report.results))
 
+    def test_native_auto_fetches_provider_event_list_once_per_key_attempt(self):
+        calls = {"events": 0}
+
+        def op(req, timeout=15):
+            url = req if isinstance(req, str) else req.full_url
+            if "api.the-odds-api.com/v4/sports/baseball_mlb/events?" in url:
+                calls["events"] += 1
+            return self.opener(req, timeout)
+
+        run_auto_mlb_native_odds(
+            odds_api_key="secret",
+            feature_url="https://features",
+            now=NOW,
+            opener=op,
+        )
+        self.assertEqual(calls["events"], 1)
+
+
     def test_unknown_provider_player_is_not_guessed(self):
         def op(req, timeout=15): return self.opener(req, timeout, player="Someone Else")
         report = run_auto_mlb_native_odds(odds_api_key="secret", feature_url="https://features", now=NOW, opener=op)
