@@ -13,6 +13,10 @@ games are never bridged, and distant or ambiguous gaps remain fail-closed.
 
 Depth-chart input is projected to rows that the exact production starter selector
 could ever accept. This is a semantics-preserving performance boundary.
+
+Production history rows are additionally routed through the availability guard,
+which prevents unavailable pregame history from being represented as neutral
+numeric zeros.
 """
 from __future__ import annotations
 
@@ -20,7 +24,7 @@ from collections.abc import Iterable, Mapping
 from datetime import date
 from typing import Any
 
-from .m2_history_features import build_nfl_m2_history_rows as _build_core_history_rows
+from .m2_history_guard import build_nfl_m2_history_rows as _build_core_history_rows
 
 _ALLOWED_POLICIES = {"error", "exclude_from_evaluation"}
 _MAX_POSTCLOSING_AWAY_ORIGIN_GAP_DAYS = 28
