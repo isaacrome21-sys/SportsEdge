@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from concurrent.futures import ThreadPoolExecutor
 import argparse
 import csv
 import io
@@ -100,6 +101,13 @@ def _failed_error(run: dict[str, Any], *, token: str, repo: str) -> str:
         return prefix + " — ERROR STRING NO DATA"
     matches = [m.group(0).strip() for m in _ERROR_RE.finditer(raw)]
     return prefix + (" — " + matches[-1][:350] if matches else " — ERROR STRING NO DATA")
+
+
+def _failure_details(failures: list[dict[str, Any]], *, token: str, repo: str) -> dict[int, str]:
+    def one(run: dict[str, Any]) -> tuple[int, str]:
+        return int(run["id"]), _failed_error(run, token=token, repo=repo)
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        return dict(pool.map(one, failures))
 
 
 def _field_values(field: str, lo: int, hi: int) -> set[int]:
@@ -312,11 +320,12 @@ def build_digest(*, repo_root: Path, data_root: Path, token: str, repo: str, now
 
     lines += ["","## Workflow failures — last 24h"]
     failures = [r for r in runs if r.get("conclusion") == "failure"]
+    failure_details = _failure_details(failures, token=token, repo=repo) if failures else {}
     if not failures:
         lines.append("- None observed among runs returned by GitHub.")
     else:
         for run in sorted(failures, key=lambda x: x.get("created_at") or ""):
-            lines.append(f"- {run.get('name')} run {run.get('id')} — {_failed_error(run,token=token,repo=repo)}")
+            lines.append(f"- {run.get('name')} run {run.get('id')} — {failure_details.get(int(run['id']),'ERROR STRING NO DATA')}")
 
     lines += ["","## BLOCKED markets"]
     blocked = _blocked_rows(data_rows)
@@ -333,7 +342,7 @@ def build_digest(*, repo_root: Path, data_root: Path, token: str, repo: str, now
 
     needs = []
     for run in failures:
-        err = _failed_error(run,token=token,repo=repo)
+        err = failure_details.get(int(run["id"]), "ERROR STRING NO DATA")
         if _NEEDS_ISAAC_RE.search(err):
             needs.append(f"{run.get('name')} run {run.get('id')}: {err}")
     needs.extend(usage_needs)
