@@ -60,7 +60,7 @@ jobs:
         with:
           python-version: '3.12.13'
       - name: Install runtime dependencies
-        run: python -m pip install --disable-pip-version-check numpy
+        run: python -m pip install --disable-pip-version-check numpy==2.5.3
       - name: Compile repaired orchestration, PIT, and promotion-replay modules
         run: >-
           python -m py_compile
