@@ -2,6 +2,20 @@ name: archive-mlb-game-odds
 
 on:
   workflow_dispatch:
+    inputs:
+      repair_budget_ledger:
+        description: 'Repair same-day UNKNOWN budget ledger without making a paid request'
+        required: false
+        default: false
+        type: boolean
+      known_consumed_actual:
+        description: 'Known same-day credits consumed; required when repairing'
+        required: false
+        type: string
+      repair_reason:
+        description: 'Audit reason/source for the known consumed count'
+        required: false
+        type: string
   schedule:
     # Four staggered chances per hour. A 15-minute cadence is sufficient for
     # the archive script's +/-8 minute target-window acceptance.
@@ -48,8 +62,21 @@ jobs:
           if [ -f .data-branch/runtime/odds-budget/ledger.json ]; then
             cp .data-branch/runtime/odds-budget/ledger.json "$SPORTSEDGE_ODDS_BUDGET_LEDGER"
           fi
+      - name: Explicitly repair UNKNOWN daily budget ledger
+        id: repair
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.repair_budget_ledger }}
+        env:
+          SPORTSEDGE_ODDS_BUDGET_REPAIR_KNOWN_CONSUMED: ${{ inputs.known_consumed_actual }}
+          SPORTSEDGE_ODDS_BUDGET_REPAIR_REASON: ${{ inputs.repair_reason }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -I scripts/archive_raw_game_odds.py --repair-ledger
+          echo 'repaired=true' >> "$GITHUB_OUTPUT"
+
       - name: Deduplicate near-simultaneous successful capture
         id: dedupe
+        if: ${{ steps.repair.outputs.repaired != 'true' }}
         shell: bash
         run: |
           python - <<'PY'
@@ -117,6 +144,10 @@ jobs:
         id: capture
         shell: bash
         run: |
+          if [ '${{ steps.repair.outputs.repaired }}' = 'true' ]; then
+            echo 'exit_code=0' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [ '${{ steps.dedupe.outputs.skip }}' = 'true' ]; then
             echo 'exit_code=0' >> "$GITHUB_OUTPUT"
             exit 0
