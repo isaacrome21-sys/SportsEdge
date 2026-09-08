@@ -31,6 +31,7 @@ class MarketSpec:
     terminal_if_absent: str
     opens_minutes_before_first_pitch: float
     expected_by_minutes_before_first_pitch: float
+    declared_availability: str = "AVAILABLE"
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,7 @@ class CoverageSlot:
     decision_status: str | None
     retry_eligible: bool
     reason: str
+    declared_availability: str = "AVAILABLE"
 
 
 def load_market_surface(path: str | Path = DEFAULT_MARKET_SURFACE_PATH) -> tuple[str, tuple[MarketSpec, ...]]:
@@ -73,6 +75,11 @@ def load_market_surface(path: str | Path = DEFAULT_MARKET_SURFACE_PATH) -> tuple
         terminal = str(row.get("terminal_if_absent") or "")
         if terminal not in {"ACQUISITION_MISSING", "PROVIDER_UNSUPPORTED", "NOT_OFFERED"}:
             raise MarketSurfaceError("MARKET_SURFACE_TERMINAL_INVALID")
+        declared_availability = str(row.get("declared_availability") or ("AVAILABLE" if bool(row.get("provider_expected")) else "UNAVAILABLE"))
+        if declared_availability not in {"AVAILABLE", "UNAVAILABLE"}:
+            raise MarketSurfaceError("MARKET_SURFACE_DECLARED_AVAILABILITY_INVALID")
+        if declared_availability == "UNAVAILABLE" and bool(row.get("provider_expected")):
+            raise MarketSurfaceError("MARKET_SURFACE_AVAILABILITY_PROVIDER_CONTRADICTION")
         out.append(MarketSpec(
             market=market,
             scope=scope,
@@ -81,6 +88,7 @@ def load_market_surface(path: str | Path = DEFAULT_MARKET_SURFACE_PATH) -> tuple
             terminal_if_absent=terminal,
             opens_minutes_before_first_pitch=opens,
             expected_by_minutes_before_first_pitch=expected_by,
+            declared_availability=declared_availability,
         ))
     return version, tuple(out)
 
@@ -143,28 +151,28 @@ def build_market_grid(
             offered = offered_by_game_market.get((str(game_id), spec.market), [])
             if not offered:
                 acquisition, retry, reason = classify_absent_market(spec, now=now, first_pitch=first_pitch)
-                out.append(CoverageSlot(str(game_id), spec.market, spec.scope, acquisition, "NO_ENGINE", None, retry, reason))
+                out.append(CoverageSlot(str(game_id), spec.market, spec.scope, acquisition, "NO_ENGINE", None, retry, reason, spec.declared_availability))
                 continue
 
             if spec.market not in engine_capable_markets:
-                out.append(CoverageSlot(str(game_id), spec.market, spec.scope, "OFFERED", "NO_ENGINE", None, False, "MARKET_ENGINE_UNREGISTERED"))
+                out.append(CoverageSlot(str(game_id), spec.market, spec.scope, "OFFERED", "NO_ENGINE", None, False, "MARKET_ENGINE_UNREGISTERED", spec.declared_availability))
                 continue
 
             identities = [(str(q.get("game_id")), str(q.get("entity_id")), str(q.get("market"))) for q in offered]
             missing = [feature_failures[i] for i in identities if i in feature_failures]
             if missing:
-                out.append(CoverageSlot(str(game_id), spec.market, spec.scope, "OFFERED", "INPUT_MISSING", None, False, missing[0]))
+                out.append(CoverageSlot(str(game_id), spec.market, spec.scope, "OFFERED", "INPUT_MISSING", None, False, missing[0], spec.declared_availability))
                 continue
 
             rows = result_by_game_market.get((str(game_id), spec.market), [])
             if rows and all(str(getattr(r, "bet_status", "")) == "BLOCKED" for r in rows):
-                out.append(CoverageSlot(str(game_id), spec.market, spec.scope, "OFFERED", "ENGINE_BLOCKED", None, False, str(getattr(rows[0], "reason", "ENGINE_BLOCKED"))))
+                out.append(CoverageSlot(str(game_id), spec.market, spec.scope, "OFFERED", "ENGINE_BLOCKED", None, False, str(getattr(rows[0], "reason", "ENGINE_BLOCKED")), spec.declared_availability))
                 continue
 
             if not rows:
-                out.append(CoverageSlot(str(game_id), spec.market, spec.scope, "OFFERED", "NO_ENGINE", None, False, "OFFERED_MARKET_NOT_PRICED"))
+                out.append(CoverageSlot(str(game_id), spec.market, spec.scope, "OFFERED", "NO_ENGINE", None, False, "OFFERED_MARKET_NOT_PRICED", spec.declared_availability))
                 continue
 
             decision = "BET" if any(str(getattr(r, "bet_status", "")) in {"BET", "OFFICIAL_BET"} for r in rows) else "PASS"
-            out.append(CoverageSlot(str(game_id), spec.market, spec.scope, "OFFERED", "PRICED", decision, False, "PRICED"))
+            out.append(CoverageSlot(str(game_id), spec.market, spec.scope, "OFFERED", "PRICED", decision, False, "PRICED", spec.declared_availability))
     return tuple(out)
