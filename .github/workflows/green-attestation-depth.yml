@@ -22,6 +22,7 @@ jobs:
         run: grep -RIn "CoverageSlot\|declared_availability.*UNAVAILABLE\|UNAVAILABLE.*declared_availability" tests sportsedge || true
       - name: Run named critical tests verbosely
         run: |
-          python -m pytest -vv -rs             tests/test_espn_game_odds_source.py             tests/test_cfb_run_machine_finish.py             tests/test_football_nfl_field_position.py             tests/test_schedule_consolidation_contract.py             tests/test_mlb_acceptance_matrix.py             tests/test_full_auto_native_acceptance.py             tests/test_mlb_market_surface_catalog.py
+          python -m pytest -vv -rs             tests/test_espn_game_odds_source.py             tests/test_cfb_run_machine_finish.py             tests/test_football_nfl_field_position.py             tests/test_schedule_consolidation_contract.py             tests/test_mlb_acceptance_matrix.py             tests/test_full_auto_native_acceptance.py             tests/test_mlb_market_surface_catalog.py \
+            tests/test_market_surface.py
       - name: Run full suite with skip reasons
         run: python -m pytest -q -rs tests
