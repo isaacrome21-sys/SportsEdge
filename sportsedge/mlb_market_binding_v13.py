@@ -219,15 +219,18 @@ def validate_quote_binding(row: Mapping[str, Any]) -> None:
     spec = MARKET_BINDINGS.get(mid)
     if spec is None:
         raise BindingError(f"UNKNOWN_MARKET_ID:{mid!r}")
-    for f in ("event_id", "game_number", "book_key", "retrieved_at", "period", "side", "american_odds", "is_alternate"):
+    # event_id is the immutable MLB event-instance identity. game_number is
+    # additional doubleheader metadata and is not fabricated for ordinary games.
+    for f in ("event_id", "book_key", "retrieved_at", "period", "side", "american_odds", "is_alternate"):
         _required(row, f, mid)
     if type(row["is_alternate"]) is not bool:
         raise BindingError(f"ALTERNATE_FLAG_NOT_BOOL:{mid}")
     _american(row["american_odds"], mid)
     _aware(row["retrieved_at"], "retrieved_at", mid)
-    gn = row["game_number"]
-    if isinstance(gn, bool) or not isinstance(gn, int) or gn not in (1, 2):
-        raise BindingError(f"ILLEGAL_GAME_NUMBER:{mid}:{gn!r}")
+    gn = row.get("game_number")
+    if gn is not None:
+        if isinstance(gn, bool) or not isinstance(gn, int) or gn not in (1, 2):
+            raise BindingError(f"ILLEGAL_GAME_NUMBER:{mid}:{gn!r}")
     if _period(row["period"]) != spec.period:
         raise BindingError(f"PERIOD_MISMATCH:{mid}:{row['period']}!={spec.period}")
     side = _side(row["side"])
@@ -317,9 +320,14 @@ def validate_quote_pair(a: Mapping[str, Any], b: Mapping[str, Any], *, max_skew_
     mb = str(b.get("market_id") or b.get("market") or "").upper()
     if ma != mb:
         raise BindingError(f"PAIRED_QUOTE_MARKET_MISMATCH:{ma}!={mb}")
-    for f in ("event_id", "game_number", "book_key"):
+    for f in ("event_id", "book_key"):
         if a.get(f) != b.get(f):
             raise BindingError(f"PAIRED_QUOTE_MISMATCH:{f}")
+    # event_id is sufficient for ordinary games. If either quote carries
+    # game_number metadata, both must carry the same value.
+    ga, gb = a.get("game_number"), b.get("game_number")
+    if ga != gb:
+        raise BindingError("PAIRED_QUOTE_MISMATCH:game_number")
     if _period(a.get("period")) != _period(b.get("period")):
         raise BindingError("PAIRED_QUOTE_MISMATCH:period")
     if a.get("is_alternate") != b.get("is_alternate"):
@@ -388,11 +396,18 @@ def attach_runtime_binding_context(quote: Mapping[str, Any], game: Any) -> dict[
     spec = MARKET_BINDINGS.get(mid)
     if spec is None:
         raise BindingError(f"UNKNOWN_MARKET_ID:{out.get('market')!r}")
-    for field in ("event_id", "game_number", "event_home_team_id", "event_away_team_id"):
+    for field in ("event_id", "event_home_team_id", "event_away_team_id"):
         _required(out, field, mid)
     if str(out["event_id"]) != str(game.game_pk):
         raise BindingError(f"RUNTIME_EVENT_ID_MISMATCH:{mid}")
-    if out["game_number"] != game.game_number:
+    canonical_gn = getattr(game, "game_number", None)
+    quote_gn = out.get("game_number")
+    if canonical_gn is not None:
+        if quote_gn is None:
+            raise BindingError(f"RUNTIME_GAME_NUMBER_MISSING:{mid}")
+        if quote_gn != canonical_gn:
+            raise BindingError(f"RUNTIME_GAME_NUMBER_MISMATCH:{mid}")
+    elif quote_gn not in (None, 1):
         raise BindingError(f"RUNTIME_GAME_NUMBER_MISMATCH:{mid}")
     if str(out["event_home_team_id"]) != str(game.home_team_id):
         raise BindingError(f"RUNTIME_HOME_TEAM_MISMATCH:{mid}")
