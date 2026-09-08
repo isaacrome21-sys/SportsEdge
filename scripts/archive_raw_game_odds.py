@@ -167,7 +167,8 @@ def _load_ledger(path: Path, *, cap: int, now: datetime) -> dict[str, Any]:
         pass
     state["utc_date"] = day
     state["cap_credits"] = cap
-    state.setdefault("credits_consumed_actual", 0)
+    if "credits_consumed_actual" not in state:
+        state["credits_consumed_actual"] = 0
     state.setdefault("runs", [])
     return state
 
@@ -203,6 +204,36 @@ def _http_error_code(exc: HTTPError) -> tuple[str | None, str | None]:
 
 def _final_block_status(*, exhausted_keys: int, key_count: int) -> str:
     return "BLOCKED_NO_CREDITS" if key_count > 0 and exhausted_keys == key_count else "BLOCKED_NO_ODDS"
+
+
+def _known_consumed(ledger: dict[str, Any]) -> int | None:
+    value = ledger.get("credits_consumed_actual")
+    if value is None or type(value) is bool:
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed >= 0 else None
+
+
+def _repair_ledger(*, ledger_path: Path, now: datetime, cap: int, known_consumed: int, reason: str) -> dict[str, Any]:
+    if known_consumed < 0:
+        raise ValueError("ODDS_BUDGET_REPAIR_NEGATIVE_USAGE")
+    reason = str(reason).strip()
+    if not reason:
+        raise ValueError("ODDS_BUDGET_REPAIR_REASON_REQUIRED")
+    ledger = _load_ledger(ledger_path, cap=cap, now=now)
+    ledger["credits_consumed_actual"] = known_consumed
+    ledger["budget_state"] = "KNOWN"
+    ledger["budget_repair"] = {
+        "repaired_at_utc": now.isoformat(),
+        "known_consumed_actual": known_consumed,
+        "reason": reason,
+        "contract": "EXPLICIT_OPERATOR_REPAIR_NO_PAID_REQUEST",
+    }
+    _atomic_json(ledger_path, ledger)
+    return ledger
 
 
 def _self_test() -> int:
@@ -242,6 +273,22 @@ def _self_test() -> int:
         assert persisted["last_status"] == "BLOCKED_NO_CREDITS"
         assert json.loads(status_path.read_text())["status"] == "BLOCKED_NO_CREDITS"
 
+        # Unknown same-day usage must fail closed and can only be repaired by
+        # an explicit known consumed count with an audit reason.
+        unknown = _load_ledger(ledger_path, cap=12, now=now)
+        unknown["credits_consumed_actual"] = None
+        _atomic_json(ledger_path, unknown)
+        assert _known_consumed(_load_ledger(ledger_path, cap=12, now=now)) is None
+        repaired = _repair_ledger(
+            ledger_path=ledger_path,
+            now=now,
+            cap=12,
+            known_consumed=5,
+            reason="self-test known provider/account reconciliation",
+        )
+        assert _known_consumed(repaired) == 5
+        assert repaired["budget_repair"]["contract"] == "EXPLICIT_OPERATOR_REPAIR_NO_PAID_REQUEST"
+
     print(json.dumps({
         "status": "SELF_TEST_OK",
         "stdlib_only": True,
@@ -261,6 +308,31 @@ def main() -> int:
     cap = int(os.environ.get("SPORTSEDGE_ODDS_DAILY_BUDGET_CREDITS", str(DEFAULT_CAP)))
     estimated_cost = len(MARKETS)
     ledger_path = _ledger_path()
+
+    if "--repair-ledger" in sys.argv:
+        known_raw = os.environ.get("SPORTSEDGE_ODDS_BUDGET_REPAIR_KNOWN_CONSUMED", "").strip()
+        reason = os.environ.get("SPORTSEDGE_ODDS_BUDGET_REPAIR_REASON", "").strip()
+        if not known_raw:
+            raise SystemExit("ODDS_BUDGET_REPAIR_KNOWN_CONSUMED_REQUIRED")
+        try:
+            known = int(known_raw)
+        except ValueError:
+            raise SystemExit("ODDS_BUDGET_REPAIR_KNOWN_CONSUMED_INVALID") from None
+        repaired = _repair_ledger(
+            ledger_path=ledger_path,
+            now=now,
+            cap=cap,
+            known_consumed=known,
+            reason=reason,
+        )
+        print(json.dumps({
+            "status": "ODDS_BUDGET_LEDGER_REPAIRED",
+            "utc_date": repaired["utc_date"],
+            "credits_consumed_actual": repaired["credits_consumed_actual"],
+            "reason": repaired["budget_repair"]["reason"],
+        }, sort_keys=True))
+        return 0
+
     ledger = _load_ledger(ledger_path, cap=cap, now=now)
     status_path = _status_path(now)
     execution_mode = os.environ.get("SPORTSEDGE_EXECUTION_MODE", "UNSPECIFIED").strip() or "UNSPECIFIED"
@@ -307,7 +379,18 @@ def main() -> int:
         print(json.dumps(row))
         return 2
 
-    consumed = int(ledger.get("credits_consumed_actual", 0) or 0)
+    consumed = _known_consumed(ledger)
+    if consumed is None:
+        row = {
+            **base,
+            "status": "BLOCKED_BUDGET_UNKNOWN",
+            "daily_cap_credits": cap,
+            "daily_credits_consumed": None,
+            "reason": "PERSISTED_DAILY_USAGE_UNKNOWN_REPAIR_REQUIRED",
+        }
+        _write_status(status_path, ledger_path, ledger, row)
+        print(json.dumps(row))
+        return 3
     if consumed + estimated_cost > cap:
         row = {
             **base,
@@ -329,7 +412,10 @@ def main() -> int:
             actual = _int_or_none(headers.get("x-requests-last"))
             if actual is None:
                 actual = estimated_cost
-            ledger["credits_consumed_actual"] = int(ledger.get("credits_consumed_actual", 0) or 0) + actual
+            current_consumed = _known_consumed(ledger)
+            if current_consumed is None:
+                raise RuntimeError("ODDS_BUDGET_BECAME_UNKNOWN_DURING_CAPTURE")
+            ledger["credits_consumed_actual"] = current_consumed + actual
             captured = _provider_events_in_window(raw, now=now, target=target)
             eligible_count = len(eligible)
             completeness = (captured / eligible_count) if eligible_count else None
