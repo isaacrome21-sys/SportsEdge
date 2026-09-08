@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from typing import Any, Callable, Sequence
+from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -17,14 +18,50 @@ _BASE = "https://api.the-odds-api.com/v4"
 _SPORT = "americanfootball_nfl"
 
 
+class NFLOddsProviderError(RuntimeError):
+    """Secret-safe provider failure carrying machine-readable classification."""
+
+    def __init__(self, *, http_status: int, provider_code: str | None, provider_message: str | None):
+        self.http_status = int(http_status)
+        self.provider_code = str(provider_code).strip().upper() if provider_code else None
+        self.provider_message = str(provider_message).strip() if provider_message else None
+        parts = [f"HTTP_{self.http_status}"]
+        if self.provider_code:
+            parts.append(self.provider_code)
+        if self.provider_message:
+            parts.append(self.provider_message)
+        super().__init__("NFL_FORWARD_ODDS_FETCH_FAILED:" + ":".join(parts))
+
+
+def _provider_error(exc: HTTPError) -> NFLOddsProviderError:
+    provider_code = None
+    provider_message = None
+    try:
+        raw = exc.read()
+        payload = json.loads(raw.decode("utf-8", errors="replace"))
+        if isinstance(payload, dict):
+            provider_code = payload.get("error_code") or payload.get("code")
+            provider_message = payload.get("message")
+    except Exception:
+        pass
+    return NFLOddsProviderError(
+        http_status=exc.code,
+        provider_code=provider_code,
+        provider_message=provider_message,
+    )
+
+
 def _http_fetch(url_without_key: str, key: str) -> Any:
     sep = "&" if "?" in url_without_key else "?"
     url = f"{url_without_key}{sep}{urlencode({'apiKey': key})}"
-    with urlopen(
-        Request(url, headers={"Accept": "application/json", "User-Agent": "SportsEdge-NFL-Forward/1"}),
-        timeout=20,
-    ) as response:
-        raw = response.read()
+    try:
+        with urlopen(
+            Request(url, headers={"Accept": "application/json", "User-Agent": "SportsEdge-NFL-Forward/1"}),
+            timeout=20,
+        ) as response:
+            raw = response.read()
+    except HTTPError as exc:
+        raise _provider_error(exc) from exc
     try:
         return json.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
