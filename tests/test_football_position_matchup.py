@@ -1,3 +1,4 @@
+import pytest
 from sportsedge.core.position_matchup import (
     build_positional_matchup_features,
     continuity_weight,
@@ -12,7 +13,7 @@ def test_target_share_over_expected_math():
         {"WR": 0.60, "TE": 0.24, "RB": 0.16},
         {"WR": 0.56, "TE": 0.20, "RB": 0.24},
     )
-    assert out == {"WR": 0.04, "TE": 0.04, "RB": -0.08}
+    assert out == pytest.approx({"WR": 0.04, "TE": 0.04, "RB": -0.08}, abs=1e-12)
 
 
 def test_new_dc_discount_is_lower_than_same_dc():
