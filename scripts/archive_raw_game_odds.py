@@ -34,6 +34,7 @@ TARGETS_MIN = (180, 90, 0)
 WINDOW_SEC = 8 * 60
 MARKETS = ("h2h", "spreads", "totals")
 DEFAULT_CAP = 12
+ACCOUNT_TERMINAL_PROVIDER_CODES = frozenset({"OUT_OF_USAGE_CREDITS"})
 
 
 def _utcnow() -> datetime:
@@ -180,6 +181,14 @@ def _write_status(status_path: Path, ledger_path: Path, ledger: dict[str, Any], 
         del runs[:-500]
     ledger["last_status"] = row.get("status")
     ledger["last_run_at_utc"] = row.get("run_at_utc")
+    provider_state = row.get("provider_state")
+    if provider_state:
+        ledger["last_provider_state"] = provider_state
+        ledger["last_provider_error_code"] = row.get("provider_error_code")
+        ledger["last_provider_http_status"] = row.get("provider_http_status")
+    for key in ("provider_credits_remaining", "provider_credits_used"):
+        if row.get(key) is not None:
+            ledger[key] = row.get(key)
     _atomic_json(ledger_path, ledger)
 
 
@@ -201,8 +210,15 @@ def _http_error_code(exc: HTTPError) -> tuple[str | None, str | None]:
     return provider_code, provider_message
 
 
-def _final_block_status(*, exhausted_keys: int, key_count: int) -> str:
-    return "BLOCKED_NO_CREDITS" if key_count > 0 and exhausted_keys == key_count else "BLOCKED_NO_ODDS"
+def _http_error_headers(exc: HTTPError) -> dict[str, str]:
+    try:
+        return {str(k).lower(): str(v) for k, v in exc.headers.items()}
+    except Exception:
+        return {}
+
+
+def _is_account_terminal(provider_code: Any) -> bool:
+    return str(provider_code or "").strip().upper() in ACCOUNT_TERMINAL_PROVIDER_CODES
 
 
 def _self_test() -> int:
@@ -222,32 +238,46 @@ def _self_test() -> int:
     assert target == "T-180m", (target, eligible)
     assert len(eligible) == 2, eligible
 
-    # Provider exhaustion must classify distinctly from generic no-odds failure.
-    assert _final_block_status(exhausted_keys=4, key_count=4) == "BLOCKED_NO_CREDITS"
-    assert _final_block_status(exhausted_keys=3, key_count=4) == "BLOCKED_NO_ODDS"
-    assert _final_block_status(exhausted_keys=0, key_count=0) == "BLOCKED_NO_ODDS"
+    # Account-level exhaustion is terminal for all keys; other auth errors are not.
+    assert _is_account_terminal("OUT_OF_USAGE_CREDITS")
+    assert not _is_account_terminal("INVALID_API_KEY")
+    assert not _is_account_terminal(None)
 
-    # Every execution must leave both a pre-acquisition and final ledger record.
+    # Every execution must leave both a pre-acquisition and final ledger record,
+    # and terminal provider state must be visible at the durable ledger root.
     with TemporaryDirectory() as td:
         root = Path(td)
         ledger_path = root / "ledger.json"
         status_path = root / "status.json"
         ledger = _load_ledger(ledger_path, cap=12, now=now)
         started = {"run_at_utc": now.isoformat(), "status": "EXECUTED_STARTED"}
-        final = {"run_at_utc": now.isoformat(), "status": "BLOCKED_NO_CREDITS"}
+        final = {
+            "run_at_utc": now.isoformat(),
+            "status": "BLOCKED_NO_CREDITS",
+            "provider_state": "ACCOUNT_TERMINAL",
+            "provider_error_code": "OUT_OF_USAGE_CREDITS",
+            "provider_http_status": 401,
+            "provider_credits_remaining": 0,
+            "provider_credits_used": 500,
+        }
         _write_status(status_path, ledger_path, ledger, started)
         _write_status(status_path, ledger_path, ledger, final)
         persisted = json.loads(ledger_path.read_text())
         assert [row["status"] for row in persisted["runs"]] == ["EXECUTED_STARTED", "BLOCKED_NO_CREDITS"]
         assert persisted["last_status"] == "BLOCKED_NO_CREDITS"
+        assert persisted["last_provider_state"] == "ACCOUNT_TERMINAL"
+        assert persisted["last_provider_error_code"] == "OUT_OF_USAGE_CREDITS"
+        assert persisted["provider_credits_remaining"] == 0
+        assert persisted["provider_credits_used"] == 500
         assert json.loads(status_path.read_text())["status"] == "BLOCKED_NO_CREDITS"
 
     print(json.dumps({
         "status": "SELF_TEST_OK",
         "stdlib_only": True,
         "window_math": "PASS",
-        "blocked_no_credits": "PASS",
+        "account_terminal_short_circuit": "PASS",
         "ledger_pre_post": "PASS",
+        "terminal_provider_state": "PASS",
     }))
     return 0
 
@@ -272,6 +302,9 @@ def main() -> int:
         "markets_requested": list(MARKETS),
         "request_cost_estimate": estimated_cost,
         "credits_consumed_actual": 0,
+        "provider_state": None,
+        "provider_error_code": None,
+        "provider_http_status": None,
         "provider_credits_remaining": None,
         "provider_credits_used": None,
         "capture_window": None,
@@ -322,7 +355,6 @@ def main() -> int:
 
     books = os.environ.get("SPORTSEDGE_ODDS_BOOKMAKERS", "draftkings").strip() or "draftkings"
     attempts: list[dict[str, Any]] = []
-    exhausted = 0
     for slot, key in enumerate(keys, start=1):
         try:
             raw, headers = _fetch_odds_raw(key, books)
@@ -347,6 +379,7 @@ def main() -> int:
                 "key_slot": slot,
                 "credits_consumed_actual": actual,
                 "daily_credits_consumed": ledger["credits_consumed_actual"],
+                "provider_state": "AVAILABLE",
                 "provider_credits_remaining": _int_or_none(headers.get("x-requests-remaining")),
                 "provider_credits_used": _int_or_none(headers.get("x-requests-used")),
                 "games_captured": captured,
@@ -358,21 +391,42 @@ def main() -> int:
             return 0 if row["status"] == "CAPTURED" else 5
         except HTTPError as exc:
             provider_code, provider_message = _http_error_code(exc)
-            if exc.code == 401 and provider_code == "OUT_OF_USAGE_CREDITS":
-                exhausted += 1
-            attempts.append({
+            headers = _http_error_headers(exc)
+            attempt = {
                 "key_slot": slot,
                 "http_status": exc.code,
                 "provider_code": provider_code,
                 "provider_message": provider_message,
-            })
+            }
+            attempts.append(attempt)
+            if _is_account_terminal(provider_code):
+                row = {
+                    **base,
+                    "status": "BLOCKED_NO_CREDITS",
+                    "reason": "ACCOUNT_LEVEL_USAGE_CREDITS_EXHAUSTED",
+                    "key_slot": slot,
+                    "provider_state": "ACCOUNT_TERMINAL",
+                    "provider_error_code": str(provider_code),
+                    "provider_http_status": int(exc.code),
+                    "provider_credits_remaining": _int_or_none(headers.get("x-requests-remaining")),
+                    "provider_credits_used": _int_or_none(headers.get("x-requests-used")),
+                    "daily_credits_consumed": int(ledger.get("credits_consumed_actual", 0) or 0),
+                    "attempts": attempts,
+                }
+                _write_status(status_path, ledger_path, ledger, row)
+                print(json.dumps(row))
+                return 2
         except URLError as exc:
             attempts.append({"key_slot": slot, "reason": f"URLError:{exc.reason}"})
         except Exception as exc:
             attempts.append({"key_slot": slot, "reason": f"{type(exc).__name__}:{exc}"})
 
-    status = _final_block_status(exhausted_keys=exhausted, key_count=len(keys))
-    row = {**base, "status": status, "attempts": attempts}
+    row = {
+        **base,
+        "status": "BLOCKED_NO_ODDS",
+        "provider_state": "KEYRING_FAILED",
+        "attempts": attempts,
+    }
     _write_status(status_path, ledger_path, ledger, row)
     print(json.dumps(row))
     return 2
