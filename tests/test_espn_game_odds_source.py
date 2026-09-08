@@ -65,7 +65,7 @@ class ESPNGameOddsSourceTests(unittest.TestCase):
             self.assertEqual(quote["source_updated_at"], datetime(2026, 8, 17, 14, 58, tzinfo=timezone.utc))
 
     def test_missing_market_is_failure_not_fabricated_quote(self):
-        event = {"competitions": [{"odds": [{"provider": {"displayName": "DraftKings"}}]}]}
+        event = {"competitions": [{"odds": [{"provider": {"displayName": "DraftKings"}, "lastUpdated": "2026-08-17T14:58:00Z"}]}]}
         snap = _parse_event(
             event,
             game=self._game(),
