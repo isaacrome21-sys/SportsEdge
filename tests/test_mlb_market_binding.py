@@ -30,9 +30,11 @@ class BindingContractTests(unittest.TestCase):
         self.assertEqual(len(DECLARED),38);self.assertEqual(set(MARKET_BINDINGS),DECLARED)
     def test_threshold_domain_is_explicit_on_every_market(self):
         for mid,s in MARKET_BINDINGS.items():self.assertIn(s.threshold_domain,M.VALID_THRESHOLD_DOMAINS,mid)
-    def test_only_first_four_are_production_wired(self):
-        wired={m for m in DECLARED if audit_status(m)=="PASS"}
-        self.assertEqual(wired,{"MONEYLINE","RUN_LINE","TOTALS","TEAM_TOTALS"});self.assertEqual(len(DECLARED-wired),34)
+    def test_code_wired_markets_are_not_audit_pass_without_source_evidence(self):
+        code_wired={m for m,s in MARKET_BINDINGS.items() if s.production_wired}
+        self.assertEqual(code_wired,{"MONEYLINE","RUN_LINE","TOTALS","TEAM_TOTALS"})
+        self.assertEqual({m for m in DECLARED if audit_status(m)=="PASS"},set())
+        for mid in code_wired:self.assertEqual(audit_status(mid),"BLOCKED_SOURCE_IDENTITY_UNVERIFIED")
     def test_all_quote_identity_fields_are_mandatory(self):
         for mid in MARKET_BINDINGS:
             for f in M.REQUIRED_QUOTE_IDENTITY:
