@@ -1,19 +1,12 @@
 name: auto-mlb
 
+# Full-market MLB execution is intentionally invocation-driven. Do not put this
+# workflow back on a polling schedule: a single slate run can fan out across
+# dozens of event-level player/additional/team-total markets and consume a large
+# share of the provider's monthly usage allowance. Scheduled forward evidence
+# belongs in the bounded PIT archive workflows instead.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'sportsedge/**'
-      - 'scripts/run_auto_mlb*.py'
-      - 'config/**'
-      - 'tests/test_auto_native_odds.py'
-      - 'tests/test_mlb_run_machine.py'
-      - '.github/workflows/auto-mlb.yml'
-  schedule:
-    # Fifteen-minute cadence only across broad MLB slate hours (UTC).
-    - cron: '*/15 15-23,0-5 * * *'
 
 permissions:
   contents: read
