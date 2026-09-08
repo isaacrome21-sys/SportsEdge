@@ -7,8 +7,6 @@ on:
     paths:
       - 'sportsedge/**'
       - 'scripts/run_auto_mlb*.py'
-      - 'scripts/probe_game_odds.py'
-      - 'scripts/probe_odds_http.py'
       - 'config/**'
       - 'tests/test_auto_native_odds.py'
       - 'tests/test_mlb_run_machine.py'
@@ -35,7 +33,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install runtime dependencies
-        run: python -m pip install --disable-pip-version-check numpy==2.5.3==2.5.3
+        run: python -m pip install --disable-pip-version-check numpy==2.5.3
       - name: Resolve Chicago slate date
         id: slate
         run: echo "date=$(TZ=America/Chicago date +%F)" >> "$GITHUB_OUTPUT"
