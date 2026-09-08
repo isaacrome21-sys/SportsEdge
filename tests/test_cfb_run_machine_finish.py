@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import unittest
+from pathlib import Path
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
@@ -165,9 +166,15 @@ class MachineTests(unittest.TestCase):
         self.assertTrue(all(x.reason=="CFB_PROMOTION_EVIDENCE_REQUIRED" for x in r.results))
 
     def test_no_engine_never_becomes_pass(self):
+        surface=json.loads(Path("config/football_market_surface.json").read_text())
+        declared=next(row for row in surface["markets"] if row["market"]=="first_half_total")
+        self.assertEqual(declared["engine_state_by_sport"]["CFB"],"NO_ENGINE")
         q=self.q[0].to_dict(); q.update(market="FIRST_HALF_TOTAL",side="OVER",line=24.5)
-        r=self.manual(mode="MANUAL",season=2026,week=1,model=model(),now=NOW,games=self.games,metrics=self.metrics,quotes=[q],n_paths=10).results[0]
-        self.assertEqual((r.engine_status,r.bet_status,r.reason),("NO_ENGINE","BLOCKED","NO_ENGINE")); self.assertIsNone(r.model_p)
+        report=self.manual(mode="MANUAL",season=2026,week=1,model=model(),now=NOW,games=self.games,metrics=self.metrics,quotes=[q],n_paths=10)
+        r=report.results[0]
+        self.assertEqual((r.engine_status,r.bet_status,r.reason),("NO_ENGINE","BLOCKED","NO_ENGINE"))
+        self.assertIsNone(r.model_p)
+        self.assertEqual(report.summary["official_bets"],0)
 
     def test_stale_quote_blocks_market_layer_not_engine(self):
         stale=[replace(q,retrieved_at=(NOW-timedelta(hours=1)).isoformat()) for q in self.q]
