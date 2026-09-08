@@ -1,9 +1,13 @@
 """Runtime verification of acquisition-stamped MLB wager identity.
 
-This module is deliberately verification-only.  It must never create event,
+This module is deliberately verification-only. It must never create event,
 game-number, team, player, multi-entity, or N-way outcome identity from the
-canonical schedule or from model inputs.  Those identities must already exist on
+canonical schedule or from model inputs. Those identities must already exist on
 the normalized quote because they were stamped by the acquisition adapter.
+
+The immutable MLB event id is sufficient to identify an ordinary single game.
+`game_number` is required only when the canonical schedule supplies doubleheader
+metadata; it is never fabricated as 1 merely to satisfy a validator.
 """
 from __future__ import annotations
 
@@ -32,7 +36,7 @@ def _required_text(row: Mapping[str, Any], field: str, market: str) -> str:
 def verify_runtime_binding_context(quote: Mapping[str, Any], game: Any) -> dict[str, Any]:
     """Verify quote-origin identity against the already-resolved canonical MLB game.
 
-    Returns a shallow copy only after all checks pass.  No missing field is filled.
+    Returns a shallow copy only after all checks pass. No missing field is filled.
     """
     if not isinstance(quote, Mapping):
         raise BindingError("RUNTIME_QUOTE_NOT_MAPPING")
@@ -46,11 +50,19 @@ def verify_runtime_binding_context(quote: Mapping[str, Any], game: Any) -> dict[
     if event_id != str(game.game_pk):
         raise BindingError(f"RUNTIME_EVENT_ID_MISMATCH:{market}:{event_id}!={game.game_pk}")
 
-    if "game_number" not in out or out.get("game_number") is None:
-        raise BindingError(f"RUNTIME_SOURCE_IDENTITY_MISSING:{market}:game_number")
-    if out.get("game_number") != game.game_number:
+    canonical_game_number = getattr(game, "game_number", None)
+    quote_game_number = out.get("game_number")
+    if canonical_game_number is not None:
+        if quote_game_number is None:
+            raise BindingError(f"RUNTIME_SOURCE_IDENTITY_MISSING:{market}:game_number")
+        if quote_game_number != canonical_game_number:
+            raise BindingError(
+                f"RUNTIME_GAME_NUMBER_MISMATCH:{market}:"
+                f"{quote_game_number!r}!={canonical_game_number!r}"
+            )
+    elif quote_game_number not in (None, 1):
         raise BindingError(
-            f"RUNTIME_GAME_NUMBER_MISMATCH:{market}:{out.get('game_number')!r}!={game.game_number!r}"
+            f"RUNTIME_GAME_NUMBER_MISMATCH:{market}:{quote_game_number!r}!=ordinary"
         )
 
     home = _required_text(out, "event_home_team_id", market)
@@ -67,10 +79,10 @@ def verify_runtime_binding_context(quote: Mapping[str, Any], game: Any) -> dict[
             raise BindingError(f"RUNTIME_TEAM_ENTITY_MISMATCH:{market}:{team_id}!={entity_id}")
     elif spec.entity_type in {BATTER, PITCHER}:
         _required_text(out, "entity_id", market)
-        # Player identity is useful source evidence when the acquisition adapter
-        # resolved a provider participant.  Do not fabricate it if absent; the
-        # canonical binding contract still governs entity_id.
-        if out.get("player_id") not in (None, "") and str(out["player_id"]).strip() != str(out["entity_id"]).strip():
+        if (
+            out.get("player_id") not in (None, "")
+            and str(out["player_id"]).strip() != str(out["entity_id"]).strip()
+        ):
             raise BindingError(f"RUNTIME_PLAYER_ENTITY_MISMATCH:{market}")
     elif spec.entity_type == MULTI_PITCHER:
         ids = out.get("entity_ids")
