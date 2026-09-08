@@ -1,70 +1,633 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "description": "Source-of-truth market surface for SportsEdge football full-model runs. Availability is an acquisition state, never inferred from provider response.",
-  "sports": ["NFL", "CFB"],
+  "sports": [
+    "NFL",
+    "CFB"
+  ],
   "markets": [
-    {"family":"game","market":"moneyline","engines":["A"]},
-    {"family":"game","market":"spread","engines":["A"]},
-    {"family":"game","market":"total","engines":["A"]},
-    {"family":"game","market":"team_total","engines":["A"]},
-    {"family":"game","market":"first_half_moneyline","engines":["A"]},
-    {"family":"game","market":"first_half_spread","engines":["A"]},
-    {"family":"game","market":"first_half_total","engines":["A"]},
-    {"family":"game","market":"second_half_moneyline","engines":["A"]},
-    {"family":"game","market":"second_half_spread","engines":["A"]},
-    {"family":"game","market":"second_half_total","engines":["A"]},
-    {"family":"game","market":"quarter_moneyline","engines":["A"]},
-    {"family":"game","market":"quarter_spread","engines":["A"]},
-    {"family":"game","market":"quarter_total","engines":["A"]},
-    {"family":"game","market":"alternate_spread","engines":["A"]},
-    {"family":"game","market":"alternate_total","engines":["A"]},
-    {"family":"game","market":"race_to_n_points","engines":["A"]},
-
-    {"family":"team_situational","market":"first_score","engines":["A","B","C"]},
-    {"family":"team_situational","market":"largest_lead","engines":["A"]},
-    {"family":"team_situational","market":"winning_margin_band","engines":["A"]},
-    {"family":"team_situational","market":"both_teams_to_score_n","engines":["A"]},
-    {"family":"team_situational","market":"total_touchdowns","engines":["A","B"]},
-    {"family":"team_situational","market":"longest_fg_made","engines":["A","C"]},
-    {"family":"team_situational","market":"defensive_special_teams_td","engines":["A","C"]},
-    {"family":"team_situational","market":"safety","engines":["A","C"]},
-
-    {"family":"qb","market":"passing_yards","engines":["A","B"]},
-    {"family":"qb","market":"completions","engines":["A","B"]},
-    {"family":"qb","market":"attempts","engines":["A","B"]},
-    {"family":"qb","market":"passing_tds","engines":["A","B"]},
-    {"family":"qb","market":"interceptions","engines":["A","B"]},
-    {"family":"qb","market":"rush_yards","engines":["A","B"]},
-    {"family":"qb","market":"longest_completion","engines":["A","B"]},
-    {"family":"qb","market":"pass_plus_rush_yards","engines":["A","B"]},
-
-    {"family":"skill","market":"rushing_yards","engines":["A","B"]},
-    {"family":"skill","market":"receiving_yards","engines":["A","B"]},
-    {"family":"skill","market":"receptions","engines":["A","B"]},
-    {"family":"skill","market":"rush_attempts","engines":["A","B"]},
-    {"family":"skill","market":"targets","engines":["A","B"]},
-    {"family":"skill","market":"rush_plus_rec_yards","engines":["A","B"]},
-    {"family":"skill","market":"longest_reception","engines":["A","B"]},
-    {"family":"skill","market":"longest_rush","engines":["A","B"]},
-    {"family":"skill","market":"anytime_td","engines":["A","B","C"]},
-    {"family":"skill","market":"first_td","engines":["A","B","C"]},
-    {"family":"skill","market":"two_plus_td","engines":["A","B","C"]},
-
-    {"family":"kicker","market":"fg_made","engines":["A","C"]},
-    {"family":"kicker","market":"kicking_points","engines":["A","C"]},
-    {"family":"kicker","market":"xp_made","engines":["A","C"]},
-
-    {"family":"defense","market":"player_sacks","engines":["A","B"]},
-    {"family":"defense","market":"tackles_assists","engines":["A","B"]},
-    {"family":"defense","market":"player_interceptions","engines":["A","B"]},
-    {"family":"defense","market":"team_sacks","engines":["A"]},
-    {"family":"defense","market":"team_turnovers","engines":["A"]}
+    {
+      "family": "game",
+      "market": "moneyline",
+      "engines": [
+        "A"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "IMPLEMENTED",
+        "CFB": "IMPLEMENTED"
+      }
+    },
+    {
+      "family": "game",
+      "market": "spread",
+      "engines": [
+        "A"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "IMPLEMENTED",
+        "CFB": "IMPLEMENTED"
+      }
+    },
+    {
+      "family": "game",
+      "market": "total",
+      "engines": [
+        "A"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "IMPLEMENTED",
+        "CFB": "IMPLEMENTED"
+      }
+    },
+    {
+      "family": "game",
+      "market": "team_total",
+      "engines": [
+        "A"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "game",
+      "market": "first_half_moneyline",
+      "engines": [
+        "A"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "game",
+      "market": "first_half_spread",
+      "engines": [
+        "A"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "game",
+      "market": "first_half_total",
+      "engines": [
+        "A"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "game",
+      "market": "second_half_moneyline",
+      "engines": [
+        "A"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "game",
+      "market": "second_half_spread",
+      "engines": [
+        "A"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "game",
+      "market": "second_half_total",
+      "engines": [
+        "A"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "game",
+      "market": "quarter_moneyline",
+      "engines": [
+        "A"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "game",
+      "market": "quarter_spread",
+      "engines": [
+        "A"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "game",
+      "market": "quarter_total",
+      "engines": [
+        "A"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "game",
+      "market": "alternate_spread",
+      "engines": [
+        "A"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "game",
+      "market": "alternate_total",
+      "engines": [
+        "A"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "game",
+      "market": "race_to_n_points",
+      "engines": [
+        "A"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "team_situational",
+      "market": "first_score",
+      "engines": [
+        "A",
+        "B",
+        "C"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "team_situational",
+      "market": "largest_lead",
+      "engines": [
+        "A"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "team_situational",
+      "market": "winning_margin_band",
+      "engines": [
+        "A"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "team_situational",
+      "market": "both_teams_to_score_n",
+      "engines": [
+        "A"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "team_situational",
+      "market": "total_touchdowns",
+      "engines": [
+        "A",
+        "B"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "team_situational",
+      "market": "longest_fg_made",
+      "engines": [
+        "A",
+        "C"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "team_situational",
+      "market": "defensive_special_teams_td",
+      "engines": [
+        "A",
+        "C"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "team_situational",
+      "market": "safety",
+      "engines": [
+        "A",
+        "C"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "qb",
+      "market": "passing_yards",
+      "engines": [
+        "A",
+        "B"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "qb",
+      "market": "completions",
+      "engines": [
+        "A",
+        "B"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "qb",
+      "market": "attempts",
+      "engines": [
+        "A",
+        "B"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "qb",
+      "market": "passing_tds",
+      "engines": [
+        "A",
+        "B"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "qb",
+      "market": "interceptions",
+      "engines": [
+        "A",
+        "B"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "qb",
+      "market": "rush_yards",
+      "engines": [
+        "A",
+        "B"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "qb",
+      "market": "longest_completion",
+      "engines": [
+        "A",
+        "B"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "qb",
+      "market": "pass_plus_rush_yards",
+      "engines": [
+        "A",
+        "B"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "skill",
+      "market": "rushing_yards",
+      "engines": [
+        "A",
+        "B"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "skill",
+      "market": "receiving_yards",
+      "engines": [
+        "A",
+        "B"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "skill",
+      "market": "receptions",
+      "engines": [
+        "A",
+        "B"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "skill",
+      "market": "rush_attempts",
+      "engines": [
+        "A",
+        "B"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "skill",
+      "market": "targets",
+      "engines": [
+        "A",
+        "B"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "skill",
+      "market": "rush_plus_rec_yards",
+      "engines": [
+        "A",
+        "B"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "skill",
+      "market": "longest_reception",
+      "engines": [
+        "A",
+        "B"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "skill",
+      "market": "longest_rush",
+      "engines": [
+        "A",
+        "B"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "skill",
+      "market": "anytime_td",
+      "engines": [
+        "A",
+        "B",
+        "C"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "skill",
+      "market": "first_td",
+      "engines": [
+        "A",
+        "B",
+        "C"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "skill",
+      "market": "two_plus_td",
+      "engines": [
+        "A",
+        "B",
+        "C"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "kicker",
+      "market": "fg_made",
+      "engines": [
+        "A",
+        "C"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "kicker",
+      "market": "kicking_points",
+      "engines": [
+        "A",
+        "C"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "kicker",
+      "market": "xp_made",
+      "engines": [
+        "A",
+        "C"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "defense",
+      "market": "player_sacks",
+      "engines": [
+        "A",
+        "B"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "defense",
+      "market": "tackles_assists",
+      "engines": [
+        "A",
+        "B"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "defense",
+      "market": "player_interceptions",
+      "engines": [
+        "A",
+        "B"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "defense",
+      "market": "team_sacks",
+      "engines": [
+        "A"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    },
+    {
+      "family": "defense",
+      "market": "team_turnovers",
+      "engines": [
+        "A"
+      ],
+      "engine_state_by_sport": {
+        "NFL": "NO_ENGINE",
+        "CFB": "NO_ENGINE"
+      }
+    }
   ],
   "state_layers": {
-    "run": ["READY", "DEGRADED", "BLOCKED"],
-    "acquisition": ["OFFERED", "NOT_OFFERED", "ACQUISITION_MISSING", "PROVIDER_UNSUPPORTED"],
-    "engine": ["PRICED", "NO_ENGINE", "INPUT_MISSING", "ENGINE_BLOCKED"],
-    "decision": ["BET", "PASS"],
-    "card_status": ["BETS_FOUND", "NO_BETS"]
-  }
+    "run": [
+      "READY",
+      "DEGRADED",
+      "BLOCKED"
+    ],
+    "acquisition": [
+      "OFFERED",
+      "NOT_OFFERED",
+      "ACQUISITION_MISSING",
+      "PROVIDER_UNSUPPORTED"
+    ],
+    "engine": [
+      "PRICED",
+      "NO_ENGINE",
+      "INPUT_MISSING",
+      "ENGINE_BLOCKED"
+    ],
+    "decision": [
+      "BET",
+      "PASS"
+    ],
+    "card_status": [
+      "BETS_FOUND",
+      "NO_BETS"
+    ]
+  },
+  "capability_contract": "DECLARATION_DOES_NOT_IMPLY_ENGINE_CAPABILITY_V1"
 }
