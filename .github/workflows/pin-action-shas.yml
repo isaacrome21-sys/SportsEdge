@@ -1,4 +1,5 @@
 name: pin-action-shas
+# Pins all marketplace actions to immutable commits.
 on:
   push:
     branches: [main]
