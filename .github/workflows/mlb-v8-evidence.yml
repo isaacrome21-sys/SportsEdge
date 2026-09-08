@@ -68,7 +68,7 @@ jobs:
 
       - name: Install canonical MLB runtime dependency
         if: steps.plan.outputs.needs_model == 'true'
-        run: python -m pip install --disable-pip-version-check numpy
+        run: python -m pip install --disable-pip-version-check numpy==2.5.3
 
       - name: Run canonical MLB machine for target window
         id: model
