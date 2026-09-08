@@ -3,10 +3,9 @@ name: archive-mlb-game-odds
 on:
   workflow_dispatch:
   schedule:
-    # Six staggered chances per hour. Avoid minute 0, where GitHub documents
-    # higher schedule load/delay risk, while keeping each target within the
-    # archive script's +/-8 minute acceptance window when runs are punctual.
-    - cron: '7,17,27,37,47,57 * * * *'
+    # Four staggered chances per hour. A 15-minute cadence is sufficient for
+    # the archive script's +/-8 minute target-window acceptance.
+    - cron: '7,22,37,52 * * * *'
 
 permissions:
   contents: write
