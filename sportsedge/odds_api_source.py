@@ -13,6 +13,7 @@ import unicodedata
 from typing import Any, Callable, Iterable, Mapping
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+from urllib.error import HTTPError, URLError
 
 from .mlb_source import GameSnapshot, parse_game_start
 from .runtime import parse_timestamp
@@ -82,8 +83,30 @@ def _get_json(url: str, *, opener: Callable = urlopen, label: str) -> Any:
     try:
         with opener(Request(url, headers={"Accept": "application/json"}), timeout=15) as response:
             return json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        # Preserve only status + provider error code/message. Never include URL
+        # because the Odds API key is carried in its query string.
+        provider_code = ""
+        provider_message = ""
+        try:
+            raw = exc.read().decode("utf-8", errors="replace")
+            payload = json.loads(raw)
+            if isinstance(payload, Mapping):
+                provider_code = str(payload.get("error_code") or payload.get("code") or "").strip()
+                provider_message = str(payload.get("message") or "").strip()
+        except Exception:
+            pass
+        detail = f":HTTP_{int(exc.code)}"
+        if provider_code:
+            detail += f":{provider_code}"
+        if provider_message:
+            safe = provider_message.replace("\n", " ").replace("\r", " ")[:160]
+            detail += f":{safe}"
+        raise OddsApiSourceError(f"ODDS_API_FETCH_FAILED:{label}{detail}") from exc
+    except URLError as exc:
+        raise OddsApiSourceError(f"ODDS_API_FETCH_FAILED:{label}:NETWORK") from exc
     except Exception as exc:
-        raise OddsApiSourceError(f"ODDS_API_FETCH_FAILED:{label}") from exc
+        raise OddsApiSourceError(f"ODDS_API_FETCH_FAILED:{label}:{type(exc).__name__}") from exc
 
 
 def _event_url(path: str, *, api_key: str, params: Mapping[str, Any] | None = None) -> str:
