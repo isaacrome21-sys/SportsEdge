@@ -1,47 +1,500 @@
 {
-  "version": "mlb_market_surface_v2",
+  "version": "mlb_market_surface_v3",
   "markets": [
-    {"market":"MONEYLINE","scope":"game","provider_expected":true,"retry_eligible":false,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"game_odds_source:h2h","availability_window":{"opens_minutes_before_first_pitch":2880,"expected_by_minutes_before_first_pitch":720}},
-    {"market":"RUN_LINE","scope":"game","provider_expected":true,"retry_eligible":false,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"game_odds_source:spreads","availability_window":{"opens_minutes_before_first_pitch":2880,"expected_by_minutes_before_first_pitch":720}},
-    {"market":"TOTALS","scope":"game","provider_expected":true,"retry_eligible":false,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"game_odds_source:totals","availability_window":{"opens_minutes_before_first_pitch":2880,"expected_by_minutes_before_first_pitch":720}},
-    {"market":"TEAM_TOTALS","scope":"team","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"team_total_odds_source:team_totals","availability_window":{"opens_minutes_before_first_pitch":1440,"expected_by_minutes_before_first_pitch":180}},
-
-    {"market":"F5_MONEYLINE","scope":"game","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"additional_mlb_odds_source:h2h_1st_5_innings","availability_window":{"opens_minutes_before_first_pitch":1440,"expected_by_minutes_before_first_pitch":180}},
-    {"market":"F5_RUN_LINE","scope":"game","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"additional_mlb_odds_source:spreads_1st_5_innings","availability_window":{"opens_minutes_before_first_pitch":1440,"expected_by_minutes_before_first_pitch":180}},
-    {"market":"F5_TOTALS","scope":"game","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"additional_mlb_odds_source:totals_1st_5_innings","availability_window":{"opens_minutes_before_first_pitch":1440,"expected_by_minutes_before_first_pitch":180}},
-    {"market":"F5_TEAM_TOTALS","scope":"team","provider_expected":false,"retry_eligible":false,"terminal_if_absent":"PROVIDER_UNSUPPORTED","acquisition_route":"UNMAPPED_PROVIDER_MARKET","availability_window":{"opens_minutes_before_first_pitch":0,"expected_by_minutes_before_first_pitch":0}},
-    {"market":"NRFI","scope":"game","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"additional_mlb_odds_source:h2h_1st_1_innings","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":120}},
-    {"market":"YRFI","scope":"game","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"additional_mlb_odds_source:h2h_1st_1_innings","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":120}},
-
-    {"market":"HOME_RUNS","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"odds_api_source:batter_home_runs","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}},
-    {"market":"HITS","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"odds_api_source:batter_hits","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}},
-    {"market":"TOTAL_BASES","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"odds_api_source:batter_total_bases","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}},
-    {"market":"RBI","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"odds_api_source:batter_rbis","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}},
-    {"market":"RUNS","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"odds_api_source:batter_runs_scored","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}},
-    {"market":"HITS_RUNS_RBIS","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"odds_api_source:batter_hits_runs_rbis","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}},
-    {"market":"EXTRA_BASE_HITS","scope":"player","provider_expected":false,"retry_eligible":false,"terminal_if_absent":"PROVIDER_UNSUPPORTED","acquisition_route":"UNMAPPED_PROVIDER_MARKET","availability_window":{"opens_minutes_before_first_pitch":0,"expected_by_minutes_before_first_pitch":0}},
-    {"market":"HITS_RUNS_STOLEN_BASES","scope":"player","provider_expected":false,"retry_eligible":false,"terminal_if_absent":"PROVIDER_UNSUPPORTED","acquisition_route":"UNMAPPED_PROVIDER_MARKET","availability_window":{"opens_minutes_before_first_pitch":0,"expected_by_minutes_before_first_pitch":0}},
-    {"market":"RUNS_RBIS","scope":"player","provider_expected":false,"retry_eligible":false,"terminal_if_absent":"PROVIDER_UNSUPPORTED","acquisition_route":"UNMAPPED_PROVIDER_MARKET","availability_window":{"opens_minutes_before_first_pitch":0,"expected_by_minutes_before_first_pitch":0}},
-    {"market":"HITS_STOLEN_BASES","scope":"player","provider_expected":false,"retry_eligible":false,"terminal_if_absent":"PROVIDER_UNSUPPORTED","acquisition_route":"UNMAPPED_PROVIDER_MARKET","availability_window":{"opens_minutes_before_first_pitch":0,"expected_by_minutes_before_first_pitch":0}},
-    {"market":"HITS_WALKS_STOLEN_BASES","scope":"player","provider_expected":false,"retry_eligible":false,"terminal_if_absent":"PROVIDER_UNSUPPORTED","acquisition_route":"UNMAPPED_PROVIDER_MARKET","availability_window":{"opens_minutes_before_first_pitch":0,"expected_by_minutes_before_first_pitch":0}},
-    {"market":"SINGLES","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"odds_api_source:batter_singles","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}},
-    {"market":"DOUBLES","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"odds_api_source:batter_doubles","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}},
-    {"market":"TRIPLES","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"odds_api_source:batter_triples","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}},
-    {"market":"BATTER_BB","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"odds_api_source:batter_walks","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}},
-    {"market":"BATTER_K","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"odds_api_source:batter_strikeouts","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}},
-    {"market":"STOLEN_BASES","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"odds_api_source:batter_stolen_bases","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":60}},
-
-    {"market":"PITCHER_K","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"odds_api_source:pitcher_strikeouts","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}},
-    {"market":"PITCHER_HITS_ALLOWED","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"odds_api_source:pitcher_hits_allowed","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}},
-    {"market":"PITCHER_BB","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"odds_api_source:pitcher_walks","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}},
-    {"market":"PITCHER_ER","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"odds_api_source:pitcher_earned_runs","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}},
-    {"market":"PITCHER_OUTS","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"odds_api_source:pitcher_outs","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}},
-    {"market":"PITCHER_HITS_WALKS_ER","scope":"player","provider_expected":false,"retry_eligible":false,"terminal_if_absent":"PROVIDER_UNSUPPORTED","acquisition_route":"UNMAPPED_PROVIDER_MARKET","availability_window":{"opens_minutes_before_first_pitch":0,"expected_by_minutes_before_first_pitch":0}},
-    {"market":"EITHER_PITCHER_HITS_ALLOWED","scope":"game","provider_expected":false,"retry_eligible":false,"terminal_if_absent":"PROVIDER_UNSUPPORTED","acquisition_route":"UNMAPPED_PROVIDER_MARKET","availability_window":{"opens_minutes_before_first_pitch":0,"expected_by_minutes_before_first_pitch":0}},
-    {"market":"EITHER_PITCHER_BB","scope":"game","provider_expected":false,"retry_eligible":false,"terminal_if_absent":"PROVIDER_UNSUPPORTED","acquisition_route":"UNMAPPED_PROVIDER_MARKET","availability_window":{"opens_minutes_before_first_pitch":0,"expected_by_minutes_before_first_pitch":0}},
-    {"market":"EITHER_PITCHER_ER","scope":"game","provider_expected":false,"retry_eligible":false,"terminal_if_absent":"PROVIDER_UNSUPPORTED","acquisition_route":"UNMAPPED_PROVIDER_MARKET","availability_window":{"opens_minutes_before_first_pitch":0,"expected_by_minutes_before_first_pitch":0}},
-
-    {"market":"PITCHER_RECORD_WIN","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"additional_mlb_odds_source:pitcher_record_a_win","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}},
-    {"market":"FIRST_HOME_RUN","scope":"player","provider_expected":true,"retry_eligible":true,"terminal_if_absent":"ACQUISITION_MISSING","acquisition_route":"additional_mlb_odds_source:first_home_run","availability_window":{"opens_minutes_before_first_pitch":720,"expected_by_minutes_before_first_pitch":90}}
-  ]
+    {
+      "market": "MONEYLINE",
+      "scope": "game",
+      "provider_expected": true,
+      "retry_eligible": false,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "game_odds_source:h2h",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 2880,
+        "expected_by_minutes_before_first_pitch": 720
+      },
+      "declared_availability": "AVAILABLE"
+    },
+    {
+      "market": "RUN_LINE",
+      "scope": "game",
+      "provider_expected": true,
+      "retry_eligible": false,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "game_odds_source:spreads",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 2880,
+        "expected_by_minutes_before_first_pitch": 720
+      },
+      "declared_availability": "AVAILABLE"
+    },
+    {
+      "market": "TOTALS",
+      "scope": "game",
+      "provider_expected": true,
+      "retry_eligible": false,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "game_odds_source:totals",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 2880,
+        "expected_by_minutes_before_first_pitch": 720
+      },
+      "declared_availability": "AVAILABLE"
+    },
+    {
+      "market": "TEAM_TOTALS",
+      "scope": "team",
+      "provider_expected": true,
+      "retry_eligible": true,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "team_total_odds_source:team_totals",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 1440,
+        "expected_by_minutes_before_first_pitch": 180
+      },
+      "declared_availability": "AVAILABLE"
+    },
+    {
+      "market": "F5_MONEYLINE",
+      "scope": "game",
+      "provider_expected": true,
+      "retry_eligible": true,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "additional_mlb_odds_source:h2h_1st_5_innings",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 1440,
+        "expected_by_minutes_before_first_pitch": 180
+      },
+      "declared_availability": "AVAILABLE"
+    },
+    {
+      "market": "F5_RUN_LINE",
+      "scope": "game",
+      "provider_expected": true,
+      "retry_eligible": true,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "additional_mlb_odds_source:spreads_1st_5_innings",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 1440,
+        "expected_by_minutes_before_first_pitch": 180
+      },
+      "declared_availability": "AVAILABLE"
+    },
+    {
+      "market": "F5_TOTALS",
+      "scope": "game",
+      "provider_expected": true,
+      "retry_eligible": true,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "additional_mlb_odds_source:totals_1st_5_innings",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 1440,
+        "expected_by_minutes_before_first_pitch": 180
+      },
+      "declared_availability": "AVAILABLE"
+    },
+    {
+      "market": "F5_TEAM_TOTALS",
+      "scope": "team",
+      "provider_expected": false,
+      "retry_eligible": false,
+      "terminal_if_absent": "PROVIDER_UNSUPPORTED",
+      "acquisition_route": "UNMAPPED_PROVIDER_MARKET",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 0,
+        "expected_by_minutes_before_first_pitch": 0
+      },
+      "declared_availability": "UNAVAILABLE"
+    },
+    {
+      "market": "NRFI",
+      "scope": "game",
+      "provider_expected": true,
+      "retry_eligible": true,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "additional_mlb_odds_source:h2h_1st_1_innings",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 720,
+        "expected_by_minutes_before_first_pitch": 120
+      },
+      "declared_availability": "AVAILABLE"
+    },
+    {
+      "market": "YRFI",
+      "scope": "game",
+      "provider_expected": true,
+      "retry_eligible": true,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "additional_mlb_odds_source:h2h_1st_1_innings",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 720,
+        "expected_by_minutes_before_first_pitch": 120
+      },
+      "declared_availability": "AVAILABLE"
+    },
+    {
+      "market": "HOME_RUNS",
+      "scope": "player",
+      "provider_expected": true,
+      "retry_eligible": true,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "odds_api_source:batter_home_runs",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 720,
+        "expected_by_minutes_before_first_pitch": 90
+      },
+      "declared_availability": "AVAILABLE"
+    },
+    {
+      "market": "HITS",
+      "scope": "player",
+      "provider_expected": true,
+      "retry_eligible": true,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "odds_api_source:batter_hits",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 720,
+        "expected_by_minutes_before_first_pitch": 90
+      },
+      "declared_availability": "AVAILABLE"
+    },
+    {
+      "market": "TOTAL_BASES",
+      "scope": "player",
+      "provider_expected": true,
+      "retry_eligible": true,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "odds_api_source:batter_total_bases",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 720,
+        "expected_by_minutes_before_first_pitch": 90
+      },
+      "declared_availability": "AVAILABLE"
+    },
+    {
+      "market": "RBI",
+      "scope": "player",
+      "provider_expected": true,
+      "retry_eligible": true,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "odds_api_source:batter_rbis",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 720,
+        "expected_by_minutes_before_first_pitch": 90
+      },
+      "declared_availability": "AVAILABLE"
+    },
+    {
+      "market": "RUNS",
+      "scope": "player",
+      "provider_expected": true,
+      "retry_eligible": true,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "odds_api_source:batter_runs_scored",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 720,
+        "expected_by_minutes_before_first_pitch": 90
+      },
+      "declared_availability": "AVAILABLE"
+    },
+    {
+      "market": "HITS_RUNS_RBIS",
+      "scope": "player",
+      "provider_expected": true,
+      "retry_eligible": true,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "odds_api_source:batter_hits_runs_rbis",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 720,
+        "expected_by_minutes_before_first_pitch": 90
+      },
+      "declared_availability": "AVAILABLE"
+    },
+    {
+      "market": "EXTRA_BASE_HITS",
+      "scope": "player",
+      "provider_expected": false,
+      "retry_eligible": false,
+      "terminal_if_absent": "PROVIDER_UNSUPPORTED",
+      "acquisition_route": "UNMAPPED_PROVIDER_MARKET",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 0,
+        "expected_by_minutes_before_first_pitch": 0
+      },
+      "declared_availability": "UNAVAILABLE"
+    },
+    {
+      "market": "HITS_RUNS_STOLEN_BASES",
+      "scope": "player",
+      "provider_expected": false,
+      "retry_eligible": false,
+      "terminal_if_absent": "PROVIDER_UNSUPPORTED",
+      "acquisition_route": "UNMAPPED_PROVIDER_MARKET",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 0,
+        "expected_by_minutes_before_first_pitch": 0
+      },
+      "declared_availability": "UNAVAILABLE"
+    },
+    {
+      "market": "RUNS_RBIS",
+      "scope": "player",
+      "provider_expected": false,
+      "retry_eligible": false,
+      "terminal_if_absent": "PROVIDER_UNSUPPORTED",
+      "acquisition_route": "UNMAPPED_PROVIDER_MARKET",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 0,
+        "expected_by_minutes_before_first_pitch": 0
+      },
+      "declared_availability": "UNAVAILABLE"
+    },
+    {
+      "market": "HITS_STOLEN_BASES",
+      "scope": "player",
+      "provider_expected": false,
+      "retry_eligible": false,
+      "terminal_if_absent": "PROVIDER_UNSUPPORTED",
+      "acquisition_route": "UNMAPPED_PROVIDER_MARKET",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 0,
+        "expected_by_minutes_before_first_pitch": 0
+      },
+      "declared_availability": "UNAVAILABLE"
+    },
+    {
+      "market": "HITS_WALKS_STOLEN_BASES",
+      "scope": "player",
+      "provider_expected": false,
+      "retry_eligible": false,
+      "terminal_if_absent": "PROVIDER_UNSUPPORTED",
+      "acquisition_route": "UNMAPPED_PROVIDER_MARKET",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 0,
+        "expected_by_minutes_before_first_pitch": 0
+      },
+      "declared_availability": "UNAVAILABLE"
+    },
+    {
+      "market": "SINGLES",
+      "scope": "player",
+      "provider_expected": true,
+      "retry_eligible": true,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "odds_api_source:batter_singles",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 720,
+        "expected_by_minutes_before_first_pitch": 90
+      },
+      "declared_availability": "AVAILABLE"
+    },
+    {
+      "market": "DOUBLES",
+      "scope": "player",
+      "provider_expected": true,
+      "retry_eligible": true,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "odds_api_source:batter_doubles",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 720,
+        "expected_by_minutes_before_first_pitch": 90
+      },
+      "declared_availability": "AVAILABLE"
+    },
+    {
+      "market": "TRIPLES",
+      "scope": "player",
+      "provider_expected": true,
+      "retry_eligible": true,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "odds_api_source:batter_triples",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 720,
+        "expected_by_minutes_before_first_pitch": 90
+      },
+      "declared_availability": "AVAILABLE"
+    },
+    {
+      "market": "BATTER_BB",
+      "scope": "player",
+      "provider_expected": true,
+      "retry_eligible": true,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "odds_api_source:batter_walks",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 720,
+        "expected_by_minutes_before_first_pitch": 90
+      },
+      "declared_availability": "AVAILABLE"
+    },
+    {
+      "market": "BATTER_K",
+      "scope": "player",
+      "provider_expected": true,
+      "retry_eligible": true,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "odds_api_source:batter_strikeouts",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 720,
+        "expected_by_minutes_before_first_pitch": 90
+      },
+      "declared_availability": "AVAILABLE"
+    },
+    {
+      "market": "STOLEN_BASES",
+      "scope": "player",
+      "provider_expected": true,
+      "retry_eligible": true,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "odds_api_source:batter_stolen_bases",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 720,
+        "expected_by_minutes_before_first_pitch": 60
+      },
+      "declared_availability": "AVAILABLE"
+    },
+    {
+      "market": "PITCHER_K",
+      "scope": "player",
+      "provider_expected": true,
+      "retry_eligible": true,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "odds_api_source:pitcher_strikeouts",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 720,
+        "expected_by_minutes_before_first_pitch": 90
+      },
+      "declared_availability": "AVAILABLE"
+    },
+    {
+      "market": "PITCHER_HITS_ALLOWED",
+      "scope": "player",
+      "provider_expected": true,
+      "retry_eligible": true,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "odds_api_source:pitcher_hits_allowed",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 720,
+        "expected_by_minutes_before_first_pitch": 90
+      },
+      "declared_availability": "AVAILABLE"
+    },
+    {
+      "market": "PITCHER_BB",
+      "scope": "player",
+      "provider_expected": true,
+      "retry_eligible": true,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "odds_api_source:pitcher_walks",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 720,
+        "expected_by_minutes_before_first_pitch": 90
+      },
+      "declared_availability": "AVAILABLE"
+    },
+    {
+      "market": "PITCHER_ER",
+      "scope": "player",
+      "provider_expected": true,
+      "retry_eligible": true,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "odds_api_source:pitcher_earned_runs",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 720,
+        "expected_by_minutes_before_first_pitch": 90
+      },
+      "declared_availability": "AVAILABLE"
+    },
+    {
+      "market": "PITCHER_OUTS",
+      "scope": "player",
+      "provider_expected": true,
+      "retry_eligible": true,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "odds_api_source:pitcher_outs",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 720,
+        "expected_by_minutes_before_first_pitch": 90
+      },
+      "declared_availability": "AVAILABLE"
+    },
+    {
+      "market": "PITCHER_HITS_WALKS_ER",
+      "scope": "player",
+      "provider_expected": false,
+      "retry_eligible": false,
+      "terminal_if_absent": "PROVIDER_UNSUPPORTED",
+      "acquisition_route": "UNMAPPED_PROVIDER_MARKET",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 0,
+        "expected_by_minutes_before_first_pitch": 0
+      },
+      "declared_availability": "UNAVAILABLE"
+    },
+    {
+      "market": "EITHER_PITCHER_HITS_ALLOWED",
+      "scope": "game",
+      "provider_expected": false,
+      "retry_eligible": false,
+      "terminal_if_absent": "PROVIDER_UNSUPPORTED",
+      "acquisition_route": "UNMAPPED_PROVIDER_MARKET",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 0,
+        "expected_by_minutes_before_first_pitch": 0
+      },
+      "declared_availability": "UNAVAILABLE"
+    },
+    {
+      "market": "EITHER_PITCHER_BB",
+      "scope": "game",
+      "provider_expected": false,
+      "retry_eligible": false,
+      "terminal_if_absent": "PROVIDER_UNSUPPORTED",
+      "acquisition_route": "UNMAPPED_PROVIDER_MARKET",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 0,
+        "expected_by_minutes_before_first_pitch": 0
+      },
+      "declared_availability": "UNAVAILABLE"
+    },
+    {
+      "market": "EITHER_PITCHER_ER",
+      "scope": "game",
+      "provider_expected": false,
+      "retry_eligible": false,
+      "terminal_if_absent": "PROVIDER_UNSUPPORTED",
+      "acquisition_route": "UNMAPPED_PROVIDER_MARKET",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 0,
+        "expected_by_minutes_before_first_pitch": 0
+      },
+      "declared_availability": "UNAVAILABLE"
+    },
+    {
+      "market": "PITCHER_RECORD_WIN",
+      "scope": "player",
+      "provider_expected": true,
+      "retry_eligible": true,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "additional_mlb_odds_source:pitcher_record_a_win",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 720,
+        "expected_by_minutes_before_first_pitch": 90
+      },
+      "declared_availability": "AVAILABLE"
+    },
+    {
+      "market": "FIRST_HOME_RUN",
+      "scope": "player",
+      "provider_expected": true,
+      "retry_eligible": true,
+      "terminal_if_absent": "ACQUISITION_MISSING",
+      "acquisition_route": "additional_mlb_odds_source:first_home_run",
+      "availability_window": {
+        "opens_minutes_before_first_pitch": 720,
+        "expected_by_minutes_before_first_pitch": 90
+      },
+      "declared_availability": "AVAILABLE"
+    }
+  ],
+  "availability_contract": "DECLARED_UNAVAILABLE_ROWS_MUST_REMAIN_VISIBLE_V1"
 }
