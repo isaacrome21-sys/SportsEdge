@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Callable, Iterable, Mapping
+from typing import Any, Callable, Iterable, Mapping, TYPE_CHECKING
 from urllib.request import urlopen
 
 from .mlb_source import GameSnapshot
@@ -22,6 +22,9 @@ from .odds_api_source import (
     normalize_name,
 )
 from .runtime import parse_timestamp
+
+if TYPE_CHECKING:
+    from .odds_event_snapshot import OddsEventSnapshot
 
 GAME_MARKETS = ("h2h", "spreads", "totals")
 
@@ -108,7 +111,7 @@ def parse_game_event_odds(payload: Mapping[str, Any], *, game: GameSnapshot, ttl
     return GameOddsSnapshot(tuple(quotes), tuple(failures))
 
 
-def fetch_mlb_game_quotes(*, api_key: str, schedule: Iterable[GameSnapshot], opener: Callable = urlopen, bookmakers: Iterable[str] = DEFAULT_BOOKMAKERS, ttl_seconds: int = DEFAULT_TTL_SECONDS) -> GameOddsSnapshot:
+def fetch_mlb_game_quotes(*, api_key: str, schedule: Iterable[GameSnapshot], opener: Callable = urlopen, bookmakers: Iterable[str] = DEFAULT_BOOKMAKERS, ttl_seconds: int = DEFAULT_TTL_SECONDS, event_snapshot: "OddsEventSnapshot | None" = None) -> GameOddsSnapshot:
     games = list(schedule)
     requested_books = ",".join(str(x).strip() for x in bookmakers if str(x).strip())
     if not requested_books:
@@ -126,11 +129,17 @@ def fetch_mlb_game_quotes(*, api_key: str, schedule: Iterable[GameSnapshot], ope
         return GameOddsSnapshot((), ({"reason": "ODDS_GAME_MARKETS_RESPONSE_NOT_LIST", "stage": "GAME_MARKET_PROVIDER"},))
     quotes: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
+    snapshot_fields = event_snapshot.provenance_fields() if event_snapshot is not None else {}
     for event in payload:
         try:
+            if event_snapshot is not None:
+                provider_event_id = str(event.get("id") or "").strip() if isinstance(event, Mapping) else ""
+                if not provider_event_id:
+                    raise OddsApiSourceError("ODDS_EVENT_ID_MISSING")
+                event_snapshot.event_by_id(provider_event_id)
             game = bind_provider_event(event, games)
             snap = parse_game_event_odds(event, game=game, ttl_seconds=ttl_seconds)
-            quotes.extend(snap.quotes)
+            quotes.extend({**q, **snapshot_fields} for q in snap.quotes)
             failures.extend(snap.failures)
         except Exception as exc:
             failures.append({"reason": str(exc), "provider_event_id": str(event.get("id") if isinstance(event, Mapping) else "")})
