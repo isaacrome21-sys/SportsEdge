@@ -1,8 +1,8 @@
 """Fail-closed byte determinism checks for promotion evidence.
 
 The verifier is intentionally sport-agnostic. Promotion evidence is only
-reproducible when the same code SHA and the same frozen source-manifest identity
-produce byte-identical requested artifacts.
+reproducible when the same code SHA and the same frozen input identity produce
+byte-identical requested artifacts.
 
 Byte identity is the sole output pass/fail gate. JSON semantic comparison exists
 only as a post-mismatch diagnostic and can never turn byte-different artifacts
@@ -13,7 +13,7 @@ Status contract:
 * FAIL: code/source identity matches, but at least one requested artifact differs
   at the byte level.
 * BLOCKED: the comparison cannot prove like-for-like replay (missing artifact,
-  malformed JSON, bad SHA, source-manifest mismatch, or invalid configuration).
+  malformed JSON, bad SHA, input-identity mismatch, or invalid configuration).
 """
 from __future__ import annotations
 
@@ -26,6 +26,7 @@ from typing import Any, Iterable
 SUPPORTED_SPORTS = frozenset({"mlb", "cfb", "nfl"})
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _GIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+_IDENTITY_FIELD_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def canonical_json_bytes(value: Any) -> bytes:
@@ -84,10 +85,10 @@ def _code_git_sha(payload: Any) -> str | None:
     return next(iter(normalized))
 
 
-def _source_manifest_sha256(payload: Any) -> str | None:
+def _source_identity_sha256(payload: Any, field: str) -> str | None:
     if not isinstance(payload, dict):
         return None
-    return _normalize_sha256(payload.get("source_manifest_sha256"))
+    return _normalize_sha256(payload.get(field))
 
 
 def _pointer_token(value: Any) -> str:
@@ -169,6 +170,7 @@ def _base_report(
     *, sport: str, baseline_label: str, candidate_label: str,
     expected_git_sha: str, artifacts: list[str], identity_artifact: str,
     determinism_class: str, replay_scope: str, clock_perturbation: str | None,
+    source_identity_field: str,
 ) -> dict[str, Any]:
     return {
         "schema_version": 2,
@@ -183,10 +185,12 @@ def _base_report(
         "expected_git_sha": expected_git_sha,
         "identity_artifact": identity_artifact,
         "artifacts_requested": artifacts,
+        "source_identity_field": source_identity_field,
+        "source_identity_sha256": None,
+        "source_manifest_sha256": None,
         "status": "BLOCKED",
         "failure_class": None,
         "reason": None,
-        "source_manifest_sha256": None,
         "all_bytes_equal": False,
         "artifact_comparisons": [],
         "differences": [],
@@ -207,6 +211,7 @@ def compare_evidence_directories(
     clock_perturbation: str | None = None,
     baseline_label: str = "ATTEMPT_001",
     candidate_label: str = "REPLAY",
+    source_identity_field: str = "source_manifest_sha256",
     require_source_manifest: bool = True,
     max_differences: int = 100,
 ) -> dict[str, Any]:
@@ -217,6 +222,7 @@ def compare_evidence_directories(
     expected = _normalize_git_sha(expected_git_sha)
     determinism_class_value = str(determinism_class or "").strip()
     replay_scope_value = str(replay_scope or "").strip()
+    source_identity_field_value = str(source_identity_field or "").strip()
     clock_perturbation_value = str(clock_perturbation).strip() if clock_perturbation is not None else None
     report = _base_report(
         sport=normalized_sport,
@@ -228,6 +234,7 @@ def compare_evidence_directories(
         determinism_class=determinism_class_value,
         replay_scope=replay_scope_value,
         clock_perturbation=clock_perturbation_value,
+        source_identity_field=source_identity_field_value,
     )
 
     def blocked(reason: str, failure_class: str = "COMPARISON_NOT_PROVABLE") -> dict[str, Any]:
@@ -245,6 +252,8 @@ def compare_evidence_directories(
         return blocked("DETERMINISM_CLASS_REQUIRED", "INVALID_CONFIGURATION")
     if not replay_scope_value:
         return blocked("REPLAY_SCOPE_REQUIRED", "INVALID_CONFIGURATION")
+    if not _IDENTITY_FIELD_RE.fullmatch(source_identity_field_value):
+        return blocked("SOURCE_IDENTITY_FIELD_INVALID", "INVALID_CONFIGURATION")
     if not names or len(names) != len(set(names)):
         return blocked("ARTIFACT_LIST_EMPTY_OR_DUPLICATE", "INVALID_CONFIGURATION")
     if any(not _valid_artifact_name(name) for name in names):
@@ -295,20 +304,45 @@ def compare_evidence_directories(
         if code_sha != expected:
             return blocked(f"{label}_CODE_GIT_SHA_MISMATCH:{code_sha}", "IDENTITY_MISMATCH")
 
-    baseline_source = _source_manifest_sha256(baseline_identity)
-    candidate_source = _source_manifest_sha256(candidate_identity)
-    if require_source_manifest:
+    baseline_source = _source_identity_sha256(baseline_identity, source_identity_field_value)
+    candidate_source = _source_identity_sha256(candidate_identity, source_identity_field_value)
+    require_source_identity = require_source_manifest
+    if require_source_identity:
         if baseline_source is None:
-            return blocked("BASELINE_SOURCE_MANIFEST_SHA256_MISSING_OR_INVALID", "SOURCE_IDENTITY_MISSING")
+            if source_identity_field_value == "source_manifest_sha256":
+                return blocked("BASELINE_SOURCE_MANIFEST_SHA256_MISSING_OR_INVALID", "SOURCE_IDENTITY_MISSING")
+            return blocked(
+                f"BASELINE_SOURCE_IDENTITY_MISSING_OR_INVALID:{source_identity_field_value}",
+                "SOURCE_IDENTITY_MISSING",
+            )
         if candidate_source is None:
-            return blocked("CANDIDATE_SOURCE_MANIFEST_SHA256_MISSING_OR_INVALID", "SOURCE_IDENTITY_MISSING")
+            if source_identity_field_value == "source_manifest_sha256":
+                return blocked("CANDIDATE_SOURCE_MANIFEST_SHA256_MISSING_OR_INVALID", "SOURCE_IDENTITY_MISSING")
+            return blocked(
+                f"CANDIDATE_SOURCE_IDENTITY_MISSING_OR_INVALID:{source_identity_field_value}",
+                "SOURCE_IDENTITY_MISSING",
+            )
         if baseline_source != candidate_source:
-            return blocked("SOURCE_MANIFEST_SHA256_MISMATCH", "SOURCE_IDENTITY_MISMATCH")
-        report["source_manifest_sha256"] = baseline_source
+            if source_identity_field_value == "source_manifest_sha256":
+                return blocked("SOURCE_MANIFEST_SHA256_MISMATCH", "SOURCE_IDENTITY_MISMATCH")
+            return blocked(
+                f"SOURCE_IDENTITY_SHA256_MISMATCH:{source_identity_field_value}",
+                "SOURCE_IDENTITY_MISMATCH",
+            )
+        report["source_identity_sha256"] = baseline_source
+        if source_identity_field_value == "source_manifest_sha256":
+            report["source_manifest_sha256"] = baseline_source
     elif baseline_source is not None and candidate_source is not None:
         if baseline_source != candidate_source:
-            return blocked("SOURCE_MANIFEST_SHA256_MISMATCH", "SOURCE_IDENTITY_MISMATCH")
-        report["source_manifest_sha256"] = baseline_source
+            if source_identity_field_value == "source_manifest_sha256":
+                return blocked("SOURCE_MANIFEST_SHA256_MISMATCH", "SOURCE_IDENTITY_MISMATCH")
+            return blocked(
+                f"SOURCE_IDENTITY_SHA256_MISMATCH:{source_identity_field_value}",
+                "SOURCE_IDENTITY_MISMATCH",
+            )
+        report["source_identity_sha256"] = baseline_source
+        if source_identity_field_value == "source_manifest_sha256":
+            report["source_manifest_sha256"] = baseline_source
 
     all_differences: list[dict[str, Any]] = []
     truncated = False
