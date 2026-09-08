@@ -333,3 +333,24 @@ def test_nflverse_fetcher_fails_closed_on_schema_without_game_identity():
 
     with pytest.raises(ComputedPropTrendError, match="NFLVERSE_PLAYER_STATS_SCHEMA_UNSUPPORTED"):
         fetch_nflverse_weekly_player_stats(seasons=[2025], opener=opener)
+
+@pytest.mark.parametrize('side', ['OVER', 'UNDER'])
+def test_all_push_windows_have_no_hit_rate(side):
+    rows, schedule = _history()
+    for row in rows:
+        row['receptions'] = '4'
+    snapshot = _snapshot(rows=rows, schedule=schedule, line=4.0, side=side)
+    for window in snapshot.windows:
+        assert window.attempts == window.pushes
+        assert window.decisions == window.wins == window.losses == 0
+        assert window.hit_rate_pct is None
+
+@pytest.mark.parametrize('side', ['OVER', 'UNDER'])
+def test_integer_and_half_line_have_distinct_denominators(side):
+    half = _windows(_snapshot(line=3.5, side=side))['L10']
+    whole = _windows(_snapshot(line=4.0, side=side))['L10']
+    assert (half.attempts, half.decisions, half.pushes) == (10, 10, 0)
+    assert (whole.attempts, whole.decisions, whole.pushes) == (10, 1, 9)
+    assert half.hit_rate_pct == (90.0 if side == 'OVER' else 10.0)
+    assert whole.hit_rate_pct == (0.0 if side == 'OVER' else 100.0)
+    assert whole.wins + whole.losses + whole.pushes == whole.attempts
