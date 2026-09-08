@@ -5,13 +5,14 @@ from datetime import datetime
 from math import isfinite
 from typing import Any, Mapping
 from .deployments import load_registry
-from .devig import multiplicative_devig
+from .devig import multiplicative_devig, validate_pair
 from .engine_registry import engine_registry
 from .f5_distribution import F5_MARKETS
 from .generic_market_engine import BINARY_MARKETS, GAME_MARKETS
 from .hitter_joint_engine import HITTER_MARKETS
 from .live_slate import LiveGame
 from .mlb_market_binding_v13 import (
+    PRODUCTION_WIRED_MARKETS,
     attach_runtime_binding_context,
     runtime_quote_binding_row,
     validate_quote_binding,
@@ -99,23 +100,28 @@ def _model_input(*,game,quote,feature):
     source_hash=feature.get("feature_source_hash",feature.get("source_subset_hash"))
     if source_hash is not None:out["feature_source_hash"]=source_hash
     return out
+def _prepare_quote(raw,games_by_id):
+    quote=validate_canonical_quote(raw); market=str(quote["market"])
+    if market not in PRODUCTION_WIRED_MARKETS:return quote
+    game=games_by_id.get(str(quote["game_id"]))
+    if game is None:raise ValueError("MLB_GAME_ID_NOT_FOUND")
+    bound=attach_runtime_binding_context(quote,game)
+    validate_quote_binding(runtime_quote_binding_row(bound))
+    return bound
 def _validated_quotes(quotes,games_by_id):
     out=[]
     for raw in quotes:
-        try:
-            quote=validate_canonical_quote(raw); game=games_by_id.get(str(quote["game_id"]))
-            if game is None: continue
-            quote=attach_runtime_binding_context(quote,game)
-            validate_quote_binding(runtime_quote_binding_row(quote))
-            out.append(quote)
+        try:out.append(_prepare_quote(raw,games_by_id))
         except Exception:pass
     return out
 def _paired_quote(candidate,quotes):
-    matches=[]
+    matches=[]; strict=str(candidate.get("market")) in PRODUCTION_WIRED_MARKETS
     for quote in quotes:
         if quote is candidate or dict(quote)==dict(candidate):continue
         try:
-            validate_quote_pair(runtime_quote_binding_row(candidate),runtime_quote_binding_row(quote)); matches.append(quote)
+            if strict:validate_quote_pair(runtime_quote_binding_row(candidate),runtime_quote_binding_row(quote))
+            else:validate_pair(candidate,quote)
+            matches.append(quote)
         except Exception:pass
     if len(matches)!=1:raise ValueError(f"PAIRED_PRICE_REQUIRED_FOR_DEVIG: found={len(matches)}")
     return matches[0]
@@ -131,12 +137,10 @@ def run_generic_card(*,games,feature_rows,quotes,ingestion_now,finalization_now,
     games_by_id=_game_index(games);features=_feature_index(feature_rows);deployments=load_registry(registry_path)["markets"];engines=engine_registry();valid_quotes=_validated_quotes(quotes,games_by_id);results=[]
     for raw in quotes:
         try:
-            quote=validate_canonical_quote(raw);market=str(quote["market"])
+            quote=_prepare_quote(raw,games_by_id);market=str(quote["market"])
             if market not in GENERIC_MARKETS:raise ValueError(f"unsupported canonical market: {market}")
             game=games_by_id.get(str(quote["game_id"]));
             if game is None:raise ValueError("MLB_GAME_ID_NOT_FOUND")
-            quote=attach_runtime_binding_context(quote,game)
-            validate_quote_binding(runtime_quote_binding_row(quote))
             feature=features.get((str(quote["game_id"]),str(quote["entity_id"]),market))
             if feature is None:raise ValueError("feature row missing")
             model_input=_model_input(game=game,quote=quote,feature=feature);engine=engines.get(market);deployment=deployments.get(market)
