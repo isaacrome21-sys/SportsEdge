@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+# Keep this mapping centralized so the sweep is deterministic and reviewable.
 PINS = {
     "actions/checkout@v4": "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
     "actions/checkout@v6": "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
