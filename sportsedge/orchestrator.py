@@ -6,6 +6,8 @@ from typing import Any, Callable, Mapping
 from .candidate_binding import bind_candidate
 from .devig import multiplicative_devig
 from .edge_floors import DEFAULT_EDGE_FLOOR_CONFIG, require_production_edge_floor
+from .mlb_binding_runtime import WIRED_MARKETS, quote_binding_row
+from .mlb_market_binding import validate_quote_binding
 from .price_ttl import double_ttl_gate
 from .truth_gate import BetDecision, decide_bet
 
@@ -18,6 +20,11 @@ BANNED_MODEL_INPUT_KEYS = {
     "sportsbook_probability", "implied_probability", "market_probability",
     "american_odds", "decimal_odds", "sportsbook_price", "dk_probability",
 }
+BANNED_ENGINE_SOURCE_IDENTITY_KEYS = {
+    "event_id", "game_number", "book_key", "event_home_team_id", "event_away_team_id",
+}
+LEGACY_BINDING_MODE = "LEGACY"
+MLB_EXTERNAL_BINDING_MODE = "MLB_V1_2_2"
 
 
 @dataclass(frozen=True)
@@ -45,6 +52,18 @@ def _reject_market_leakage(model_input: Mapping[str, Any]) -> None:
     present = BANNED_MODEL_INPUT_KEYS.intersection(model_input.keys())
     if present:
         raise OrchestrationError(f"sportsbook/market data prohibited in Model_Input: {sorted(present)}")
+
+
+def validate_normalized_mlb_quote_binding(*, game: Any, quote: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate source-bound quote identity at the orchestration boundary.
+
+    This must be called immediately after quote normalization, before feature lookup,
+    pairing, engine execution, or card assembly can drop the row. The returned row is
+    only a validated binding view; no identity is manufactured from model output.
+    """
+    row = quote_binding_row(game=game, quote=quote)
+    validate_quote_binding(row)
+    return row
 
 
 def _optional_sha256(output: Mapping[str, Any], key: str) -> str | None:
@@ -100,8 +119,27 @@ def _quote_identity(quote: Mapping[str, Any]) -> tuple[str, str | None, str, str
     return book_key, sportsbook, retrieved.isoformat(), offer_id
 
 
-def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], paired_quote: Mapping[str, Any] | None = None, deployment: Mapping[str, Any], engine_fn: Callable[[Mapping[str, Any]], Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG, kelly_multiplier: float = 0.25) -> RunResult:
-    """Run one candidate end-to-end. Any integrity failure returns BLOCKED, never a guessed bet."""
+def _validate_binding_mode(*, market: str, output: Mapping[str, Any], mode: str) -> None:
+    if mode == LEGACY_BINDING_MODE:
+        return
+    if mode != MLB_EXTERNAL_BINDING_MODE:
+        raise OrchestrationError(f"unknown candidate binding mode: {mode}")
+    if market not in WIRED_MARKETS:
+        raise OrchestrationError(f"external MLB binding mode not wired for {market}")
+    leaked = BANNED_ENGINE_SOURCE_IDENTITY_KEYS.intersection(output.keys())
+    if leaked:
+        raise OrchestrationError(
+            f"engine output contains quote/orchestration source identity: {sorted(leaked)}"
+        )
+
+
+def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], paired_quote: Mapping[str, Any] | None = None, deployment: Mapping[str, Any], engine_fn: Callable[[Mapping[str, Any]], Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG, kelly_multiplier: float = 0.25, candidate_binding_mode: str = LEGACY_BINDING_MODE) -> RunResult:
+    """Run one candidate end-to-end. Any integrity failure returns BLOCKED, never a guessed bet.
+
+    Wired MLB markets use the external V1.2.2 binding path. In that mode this function
+    never copies quote identity into model output and never calls the legacy candidate
+    binder; quote identity was already validated from its real source at the boundary.
+    """
     market = str(model_input.get("market", "UNKNOWN"))
     try:
         _reject_market_leakage(model_input)
@@ -110,13 +148,16 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], p
         output = dict(engine_fn(model_input))
         if "model_p" not in output:
             raise OrchestrationError("engine output missing model_p")
-        for key in ("game_id", "market", "entity_id", "line", "side"):
-            if key not in output and key in model_input:
-                output[key] = model_input[key]
+        _validate_binding_mode(market=market, output=output, mode=candidate_binding_mode)
+        if candidate_binding_mode == LEGACY_BINDING_MODE:
+            for key in ("game_id", "market", "entity_id", "line", "side"):
+                if key not in output and key in model_input:
+                    output[key] = model_input[key]
         runtime_path = _optional_text(output, "runtime_path")
         if deployment.get("eligible") is True and runtime_path == "LEGACY_COMPAT":
             raise OrchestrationError("LEGACY_COMPAT_PATH_NOT_PROMOTABLE")
-        bind_candidate(output, quote, deployment)
+        if candidate_binding_mode == LEGACY_BINDING_MODE:
+            bind_candidate(output, quote, deployment)
         model_input_hash = _optional_sha256(output, "model_input_hash")
         distribution_sha256 = _optional_sha256(output, "distribution_sha256")
         readout_sha256 = _optional_sha256(output, "readout_sha256")
