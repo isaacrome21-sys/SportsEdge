@@ -1,8 +1,9 @@
 """Formal NFL prop-context contract layered on PIT opportunity features.
 
 This contract defines which objective concepts RUN IT should request by prop
-family and the mandatory evaluation ordering. It does not ingest markets or
-social/public betting into NFL_HYBRID_CONTEXT and is not Model_P/Truth Gate data.
+family and the mandatory evaluation ordering. It does not ingest markets,
+social/public betting, or descriptive historical hit-rate research into
+NFL_HYBRID_CONTEXT and is not Model_P/Truth Gate data.
 """
 from __future__ import annotations
 
@@ -52,6 +53,9 @@ PROHIBITED_HYBRID_CONTEXT_FIELDS = frozenset({
     "social_pick", "handicapper_pick", "public_betting", "ticket_pct", "handle_pct",
     "sportsbook", "sportsbook_price", "odds", "market_probability", "closing_line",
     "closing_price", "consensus_line",
+    # Descriptive prop-trend research is intentionally downstream of Model_P.
+    "computed_prop_trends", "prop_trend_context", "trend_hit_rate", "historical_hit_rate",
+    "l5_hit_rate", "l10_hit_rate", "l20_hit_rate", "season_hit_rate", "h2h_hit_rate",
 })
 
 
