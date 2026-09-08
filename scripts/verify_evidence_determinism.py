@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+"""Verify exact semantic replay of promotion evidence."""
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+import sys
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from sportsedge.core.validation.evidence_determinism import compare_evidence_directories
+
+_EXIT_CODE = {"PASS": 0, "FAIL": 2, "BLOCKED": 3}
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Compare two evidence directories at identical code/source identity. "
+            "PASS is exact semantic JSON equality; FAIL is a same-identity output "
+            "mismatch; BLOCKED means like-for-like replay was not provable."
+        )
+    )
+    parser.add_argument("--sport", choices=("mlb", "cfb", "nfl"), required=True)
+    parser.add_argument("--baseline-dir", type=Path, required=True)
+    parser.add_argument("--candidate-dir", type=Path, required=True)
+    parser.add_argument("--artifact", action="append", required=True, help="Relative JSON artifact path; repeatable")
+    parser.add_argument("--identity-artifact", help="Artifact carrying code_git_sha and source_manifest_sha256")
+    parser.add_argument("--expected-git-sha", required=True)
+    parser.add_argument("--baseline-label", default="ATTEMPT_001")
+    parser.add_argument("--candidate-label", default="REPLAY")
+    parser.add_argument("--max-differences", type=int, default=100)
+    parser.add_argument(
+        "--allow-missing-source-manifest",
+        action="store_true",
+        help=(
+            "Diagnostic-only escape hatch. Promotion workflows must not use this; "
+            "the default requires source_manifest_sha256 on both identity artifacts."
+        ),
+    )
+    parser.add_argument("--out", type=Path, required=True)
+    args = parser.parse_args()
+
+    identity = args.identity_artifact or args.artifact[0]
+    report = compare_evidence_directories(
+        sport=args.sport,
+        baseline_dir=args.baseline_dir,
+        candidate_dir=args.candidate_dir,
+        artifacts=args.artifact,
+        identity_artifact=identity,
+        expected_git_sha=args.expected_git_sha,
+        baseline_label=args.baseline_label,
+        candidate_label=args.candidate_label,
+        require_source_manifest=not args.allow_missing_source_manifest,
+        max_differences=args.max_differences,
+    )
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    print(json.dumps(report, sort_keys=True))
+    return _EXIT_CODE[report["status"]]
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
