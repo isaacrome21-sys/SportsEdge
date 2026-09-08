@@ -163,7 +163,8 @@ def _require_matching_attestation(*, quote: Mapping[str, Any], attestation: Quot
         raise OrchestrationError("MLB_EXTERNAL_BINDING_ATTESTATION_MISMATCH")
 
 
-def _validate_binding_mode(*, market: str, quote: Mapping[str, Any], output: Mapping[str, Any], mode: str, binding_attestation: QuoteBindingAttestation | None) -> None:
+def _validate_binding_entry(*, market: str, quote: Mapping[str, Any], mode: str, binding_attestation: QuoteBindingAttestation | None) -> None:
+    """Gate candidate entry before the engine can execute."""
     if mode == LEGACY_BINDING_MODE:
         return
     if mode != MLB_EXTERNAL_BINDING_MODE:
@@ -171,6 +172,11 @@ def _validate_binding_mode(*, market: str, quote: Mapping[str, Any], output: Map
     if market not in WIRED_MARKETS:
         raise OrchestrationError(f"external MLB binding mode not wired for {market}")
     _require_matching_attestation(quote=quote, attestation=binding_attestation)
+
+
+def _reject_engine_source_identity(*, output: Mapping[str, Any], mode: str) -> None:
+    if mode != MLB_EXTERNAL_BINDING_MODE:
+        return
     leaked = BANNED_ENGINE_SOURCE_IDENTITY_KEYS.intersection(output.keys())
     if leaked:
         raise OrchestrationError(
@@ -182,24 +188,24 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], p
     """Run one candidate end-to-end. Any integrity failure returns BLOCKED, never a guessed bet.
 
     Wired MLB markets use the external V1.2.2 binding path. In that mode this function
-    requires an attestation from the quote/orchestration boundary, never copies quote
-    identity into model output, and never calls the legacy candidate binder.
+    requires an attestation before model execution, never copies quote identity into
+    model output, and never calls the legacy candidate binder.
     """
     market = str(model_input.get("market", "UNKNOWN"))
     try:
         _reject_market_leakage(model_input)
         double_ttl_gate(quote, ingestion_now, finalization_now)
         book_key, sportsbook, quote_retrieved_at, offer_id = _quote_identity(quote)
-        output = dict(engine_fn(model_input))
-        if "model_p" not in output:
-            raise OrchestrationError("engine output missing model_p")
-        _validate_binding_mode(
+        _validate_binding_entry(
             market=market,
             quote=quote,
-            output=output,
             mode=candidate_binding_mode,
             binding_attestation=binding_attestation,
         )
+        output = dict(engine_fn(model_input))
+        if "model_p" not in output:
+            raise OrchestrationError("engine output missing model_p")
+        _reject_engine_source_identity(output=output, mode=candidate_binding_mode)
         if candidate_binding_mode == LEGACY_BINDING_MODE:
             for key in ("game_id", "market", "entity_id", "line", "side"):
                 if key not in output and key in model_input:
