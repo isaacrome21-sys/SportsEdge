@@ -4,6 +4,7 @@ import pytest
 
 from sportsedge.mlb_context_autopull import (
     CONTEXT_CLASSES,
+    SUPPLEMENTAL_CONTEXT_CLASSES,
     MLBContextAutopullError,
     _observation,
     build_autopull_plan,
@@ -11,10 +12,12 @@ from sportsedge.mlb_context_autopull import (
 )
 
 
-def test_autopull_plan_covers_all_carty_context_classes_without_social():
+def test_autopull_plan_separates_required_auto_context_from_supplemental_context():
     plan = build_autopull_plan()
-    assert set(plan) == set(CONTEXT_CLASSES)
-    assert all(row["auto_pull"] is True for row in plan.values())
+    assert set(plan) == set(CONTEXT_CLASSES) | set(SUPPLEMENTAL_CONTEXT_CLASSES)
+    assert all(plan[key]["auto_pull"] is True for key in CONTEXT_CLASSES)
+    assert all(plan[key]["auto_pull"] is False for key in SUPPLEMENTAL_CONTEXT_CLASSES)
+    assert all(plan[key]["model_p_eligible"] is False for key in SUPPLEMENTAL_CONTEXT_CLASSES)
     assert "social_pick" not in plan
     assert "public_betting" not in plan
 
