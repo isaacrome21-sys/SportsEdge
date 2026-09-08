@@ -77,7 +77,6 @@ def raw_quotes():
         "game_id": "777",
         "period": "FG",
         "market": "MONEYLINE",
-        "entity_id": "777",
         "line": 0.0,
         "book_key": "dk",
         "sportsbook": "DraftKings",
@@ -85,10 +84,14 @@ def raw_quotes():
         "raw_market_name": "Moneyline",
         "retrieved_at": "2026-08-11T14:59:00Z",
         "ttl_seconds": 300,
+        "event_id": "777",
+        "game_number": 1,
+        "event_away_team_id": "1",
+        "event_home_team_id": "2",
     }
     return [
-        {**common, "side": "HOME", "american_odds": -110, "offer_id": "home-ml"},
-        {**common, "side": "AWAY", "american_odds": 100, "offer_id": "away-ml"},
+        {**common, "entity_id": "2", "side": "HOME", "american_odds": -110, "offer_id": "home-ml"},
+        {**common, "entity_id": "1", "side": "AWAY", "american_odds": 100, "offer_id": "away-ml"},
     ]
 
 
@@ -207,7 +210,7 @@ class MLBModeParityTests(unittest.TestCase):
         game = live_game()
         quotes = canonical_quotes()
         frozen = frozen_features(game, quotes)
-        self.assertEqual(len(frozen), 1, "paired prices must normalize to one predictive feature identity")
+        self.assertEqual(len(frozen), 2, "team-bound moneyline sides require distinct canonical feature identities")
 
         with tempfile.TemporaryDirectory() as td:
             registry, floors = write_fixture_policy(Path(td))
