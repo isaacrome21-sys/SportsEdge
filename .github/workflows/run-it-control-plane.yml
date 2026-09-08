@@ -64,7 +64,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install runtime dependencies
-        run: python -m pip install --disable-pip-version-check numpy==2.5.3
+        run: python -m pip install --disable-pip-version-check numpy==2.5.3==2.5.3
       - name: Execute unified RUN IT request
         shell: bash
         run: |
