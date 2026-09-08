@@ -3,6 +3,11 @@
 The Odds API exposes ``team_totals`` through the per-event odds endpoint. Team
 identity is resolved exactly against the MLB StatsAPI game; no fuzzy team matching
 or player-style participant mapping is used.
+
+After provider-event binding, quotes carry both the provider event id and the
+independently acquired official MLB event/team/game-number identity required by
+the downstream binding boundary. These fields are emitted here, not synthesized
+by model or orchestration code.
 """
 from __future__ import annotations
 
@@ -53,6 +58,17 @@ def _team(name: Any, game: GameSnapshot) -> tuple[str, int, str]:
     raise TeamTotalOddsSourceError("ODDS_GAME_TEAM_UNRESOLVED")
 
 
+def _official_binding_identity(game: GameSnapshot) -> dict[str, Any]:
+    out: dict[str, Any] = {
+        "event_id": str(game.game_pk),
+        "event_home_team_id": str(game.home_id),
+        "event_away_team_id": str(game.away_id),
+    }
+    if game.game_number is not None:
+        out["game_number"] = int(game.game_number)
+    return out
+
+
 def parse_team_total_event_odds(
     payload: Mapping[str, Any],
     *,
@@ -68,6 +84,9 @@ def parse_team_total_event_odds(
     provider_event_id = ""
     if isinstance(provider_event, Mapping):
         provider_event_id = str(provider_event.get("id") or "").strip()
+    if not provider_event_id:
+        provider_event_id = str(payload.get("id") or "").strip()
+    official_identity = _official_binding_identity(game)
 
     for bookmaker in payload.get("bookmakers") or []:
         if not isinstance(bookmaker, Mapping):
@@ -121,6 +140,7 @@ def parse_team_total_event_odds(
                         "provider_team_name": team_name,
                         "away_team": str(game.away_name),
                         "home_team": str(game.home_name),
+                        **official_identity,
                     }
                     if provider_event_id:
                         quote["provider_event_id"] = provider_event_id
