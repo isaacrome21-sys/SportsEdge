@@ -34,5 +34,12 @@ jobs:
           fi
           git add .github/workflows
           git commit -m "Supply chain: pin GitHub Actions to immutable SHAs"
-          git pull --rebase origin main
-          git push origin HEAD:main
+          for attempt in 1 2 3 4 5; do
+            git pull --rebase origin main
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "PIN_PUSH_RETRY_EXHAUSTED" >&2
+          exit 1
