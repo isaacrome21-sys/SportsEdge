@@ -1,0 +1,34 @@
+name: archive-history-security-audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/audit_repo_archives.py'
+      - '.github/workflows/archive-history-security-audit.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fetch every branch and tag
+        run: |
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*' '+refs/tags/*:refs/tags/*' --force --prune
+      - name: Scan every reachable archive blob
+        run: python scripts/audit_repo_archives.py
+      - name: Upload security audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: archive-history-security-audit-${{ github.run_id }}
+          path: artifacts/security/archive-history-scan.json
+          if-no-files-found: error
+          retention-days: 30
