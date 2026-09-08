@@ -1,12 +1,12 @@
 """Acquisition-origin integrity binding for MLB sportsbook quotes.
 
 The sportsbook/provider identity in this module is created only at the provider
-normalization boundary.  Canonical MLB identity remains an independent StatsAPI
-binding.  In particular, a The Odds API event id is never rewritten to an MLB
-``gamePk`` and an MLB ``game_number`` is never represented as provider-origin data.
+normalization boundary. Canonical MLB identity remains an independent StatsAPI
+binding. A The Odds API event id is never rewritten to an MLB ``gamePk`` and an
+MLB ``game_number`` is never represented as provider-origin data.
 
 The SHA-256 is an integrity binding, not a cryptographic statement that the
-provider is authentic.  Authenticity comes from the acquisition path that created
+provider is authentic. Authenticity comes from the acquisition path that created
 this object (real provider response + independent MLB schedule binding).
 """
 from __future__ import annotations
@@ -68,8 +68,18 @@ def _finite_number(value: Any, field: str) -> int | float:
     return int(number) if number.is_integer() else number
 
 
+def _team_id(game: Any, side: str) -> Any:
+    primary = f"{side}_id"
+    live = f"{side}_team_id"
+    value = getattr(game, primary, None)
+    return value if value is not None else getattr(game, live, None)
+
+
+def _team_name(game: Any, side: str) -> str:
+    return str(getattr(game, f"{side}_name", "") or "").strip()
+
+
 def _canonical_payload(quote: Mapping[str, Any]) -> dict[str, Any]:
-    """Return the exact normalized fields bound by the acquisition hash."""
     line = quote.get("line")
     return {
         "source_provider": _required_text(quote, "source_provider"),
@@ -103,33 +113,23 @@ def acquisition_quote_sha256(quote: Mapping[str, Any]) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-def stamp_the_odds_api_quote(
-    quote: Mapping[str, Any],
-    *,
-    provider_event: Mapping[str, Any],
-    game: Any,
-) -> dict[str, Any]:
-    """Stamp provider-origin identity while the raw provider event is still in hand.
-
-    ``provider_event`` must be the object returned by The Odds API event/odds
-    acquisition.  ``game`` is the independently acquired MLB StatsAPI schedule row
-    to which the provider event has already been uniquely bound.
-    """
+def stamp_the_odds_api_quote(quote: Mapping[str, Any], *, provider_event: Mapping[str, Any], game: Any) -> dict[str, Any]:
+    """Stamp source identity while the raw provider event is still in hand."""
     if not isinstance(provider_event, Mapping):
         raise QuoteAttestationError("ACQUISITION_PROVIDER_EVENT_MALFORMED")
     source_event_id = _required_text(provider_event, "id")
     source_home = _required_text(provider_event, "home_team")
     source_away = _required_text(provider_event, "away_team")
-    game_home = str(getattr(game, "home_name", "") or "").strip()
-    game_away = str(getattr(game, "away_name", "") or "").strip()
+    game_home = _team_name(game, "home")
+    game_away = _team_name(game, "away")
     if not game_home or not game_away:
         raise QuoteAttestationError("CANONICAL_GAME_TEAM_IDENTITY_MISSING")
     if _norm_name(source_home) != _norm_name(game_home) or _norm_name(source_away) != _norm_name(game_away):
         raise QuoteAttestationError("ACQUISITION_PROVIDER_TEAM_BINDING_MISMATCH")
 
     game_pk = getattr(game, "game_pk", None)
-    home_id = getattr(game, "home_id", None)
-    away_id = getattr(game, "away_id", None)
+    home_id = _team_id(game, "home")
+    away_id = _team_id(game, "away")
     if game_pk is None or home_id is None or away_id is None:
         raise QuoteAttestationError("CANONICAL_GAME_IDENTITY_MISSING")
 
@@ -147,7 +147,6 @@ def stamp_the_odds_api_quote(
         quote_hash_algorithm=QUOTE_HASH_ALGORITHM,
         quote_hash_schema_version=QUOTE_HASH_SCHEMA_VERSION,
     )
-    # The canonical routing id is independent MLB identity, not provider identity.
     if str(out.get("game_id") or "") != str(game_pk):
         raise QuoteAttestationError("ACQUISITION_CANONICAL_GAME_BINDING_MISMATCH")
     out["acquisition_quote_sha256"] = acquisition_quote_sha256(out)
@@ -155,7 +154,12 @@ def stamp_the_odds_api_quote(
 
 
 def validate_acquisition_quote(quote: Mapping[str, Any], *, game: Any) -> None:
-    """Validate source identity + exact quote hash before model/feature execution."""
+    """Validate exact source/hash binding before feature or model execution.
+
+    LiveGame does not retain provider-facing team names, so the downstream check
+    binds the already-hashed source names to the independent canonical game/team
+    IDs. When names are available (GameSnapshot), they are checked again too.
+    """
     if _required_text(quote, "source_provider") != SOURCE_PROVIDER:
         raise QuoteAttestationError("ACQUISITION_PROVIDER_UNSUPPORTED")
     if _required_text(quote, "source_identity_version") != SOURCE_IDENTITY_VERSION:
@@ -165,11 +169,13 @@ def validate_acquisition_quote(quote: Mapping[str, Any], *, game: Any) -> None:
     if _required_text(quote, "quote_hash_schema_version") != QUOTE_HASH_SCHEMA_VERSION:
         raise QuoteAttestationError("ACQUISITION_QUOTE_HASH_SCHEMA_MISMATCH")
 
-    game_pk = str(getattr(game, "game_pk", ""))
-    home_id = str(getattr(game, "home_id", ""))
-    away_id = str(getattr(game, "away_id", ""))
-    if not game_pk or not home_id or not away_id:
+    game_pk = str(getattr(game, "game_pk", "") or "")
+    home_raw = _team_id(game, "home")
+    away_raw = _team_id(game, "away")
+    if not game_pk or home_raw is None or away_raw is None:
         raise QuoteAttestationError("CANONICAL_GAME_IDENTITY_MISSING")
+    home_id = str(home_raw)
+    away_id = str(away_raw)
     if _required_text(quote, "canonical_game_id") != game_pk or _required_text(quote, "game_id") != game_pk:
         raise QuoteAttestationError("ACQUISITION_CANONICAL_GAME_BINDING_MISMATCH")
     if _required_text(quote, "canonical_home_team_id") != home_id or _required_text(quote, "canonical_away_team_id") != away_id:
@@ -180,11 +186,11 @@ def validate_acquisition_quote(quote: Mapping[str, Any], *, game: Any) -> None:
     if official_number is not None and attested_number != official_number:
         raise QuoteAttestationError("ACQUISITION_CANONICAL_GAME_NUMBER_MISMATCH")
 
-    game_home = str(getattr(game, "home_name", "") or "")
-    game_away = str(getattr(game, "away_name", "") or "")
-    if _norm_name(_required_text(quote, "source_home_team_name")) != _norm_name(game_home):
+    game_home = _team_name(game, "home")
+    game_away = _team_name(game, "away")
+    if game_home and _norm_name(_required_text(quote, "source_home_team_name")) != _norm_name(game_home):
         raise QuoteAttestationError("ACQUISITION_SOURCE_HOME_TEAM_MISMATCH")
-    if _norm_name(_required_text(quote, "source_away_team_name")) != _norm_name(game_away):
+    if game_away and _norm_name(_required_text(quote, "source_away_team_name")) != _norm_name(game_away):
         raise QuoteAttestationError("ACQUISITION_SOURCE_AWAY_TEAM_MISMATCH")
 
     attested = _required_text(quote, "acquisition_quote_sha256").lower()
