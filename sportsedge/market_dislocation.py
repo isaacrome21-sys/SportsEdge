@@ -33,9 +33,6 @@ PROHIBITED_MODEL_KEYS = frozenset({
     "model_p", "model_probability", "sportsedge_probability", "model_edge",
     "model_ev", "fair_model_probability", "model_input", "model_output",
 })
-# These canonical IDs still have unresolved settlement/market-shape semantics for
-# this scanner. They remain visible but fail closed rather than being priced with
-# a convenient two-way assumption.
 DISLOCATION_BLOCKED_MARKETS = frozenset({"F5_MONEYLINE", "FIRST_HOME_RUN"})
 
 
@@ -107,8 +104,9 @@ def _outcome_key(row: Mapping[str, Any]) -> tuple[Any, ...]:
         "GAME"
     )
     line = None if spec.threshold_semantics == NO_THRESHOLD else float(b["line"])
+    game_number = None if b.get("game_number") is None else int(b["game_number"])
     return (
-        str(b["event_id"]), int(b["game_number"]), str(b["period"]), market,
+        str(b["event_id"]), game_number, str(b["period"]), market,
         str(b["side"]), subject, line, bool(b["is_alternate"]),
     )
 
