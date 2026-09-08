@@ -158,17 +158,16 @@ def _ledger_path() -> Path:
 
 def _load_ledger(path: Path, *, cap: int, now: datetime) -> dict[str, Any]:
     day = now.date().isoformat()
-    state: dict[str, Any] = {"utc_date": day, "cap_credits": cap, "credits_consumed_actual": 0, "runs": []}
+    state: dict[str, Any] = {"utc_date": day, "cap_credits": cap, "credits_consumed_actual": None, "runs": []}
     try:
         current = json.loads(path.read_text())
-        if current.get("utc_date") == day:
+        if isinstance(current, dict) and current.get("utc_date") == day:
             state.update(current)
-    except Exception:
+    except (OSError, ValueError):
         pass
+    # No local ledger is not proof that no paid caller ran today.
     state["utc_date"] = day
     state["cap_credits"] = cap
-    if "credits_consumed_actual" not in state:
-        state["credits_consumed_actual"] = 0
     state.setdefault("runs", [])
     return state
 
@@ -210,11 +209,9 @@ def _known_consumed(ledger: dict[str, Any]) -> int | None:
     value = ledger.get("credits_consumed_actual")
     if value is None or type(value) is bool:
         return None
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError):
+    if type(value) is not int or value < 0:
         return None
-    return parsed if parsed >= 0 else None
+    return value
 
 
 def _repair_ledger(*, ledger_path: Path, now: datetime, cap: int, known_consumed: int, reason: str) -> dict[str, Any]:

@@ -55,7 +55,7 @@ def fetch_pitcher_walks(game_id:str,pitcher_id:str)->dict[str,Any]|None:
         p=((((box.get("teams") or {}).get(side) or {}).get("players") or {}).get(key) or {})
         stats=((p.get("stats") or {}).get("pitching") or {})
         if stats:
-            try: walks=int(stats.get("baseOnBalls") or 0)
+            try: walks=int(stats.get("baseOnBalls"))
             except Exception: return None
             return {"game_id":str(game_id),"pitcher_id":str(pitcher_id),"walks":walks,"over_1_5":int(walks>1.5),"source":"MLB_STATSAPI_BOX_SCORE","settled_at_utc":datetime.now(timezone.utc).isoformat()}
     return None

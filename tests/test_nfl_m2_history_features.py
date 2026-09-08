@@ -195,30 +195,28 @@ class NFLM2HistoryFeatureTests(unittest.TestCase):
                 prior_decay_curves=curves,
             )
 
-    def test_closed_roof_missing_wind_is_explicitly_derived_zero(self):
-        schedule = self._schedule()
-        target = schedule[-1]
-        target["roof"] = "closed"
-        target["wind"] = ""
-        curves = fit_nfl_prior_decay_curves(schedule, self._pbp(), min_train_seasons=2, weeks=(1, 2, 3))
-        report = {}
-        rows = build_policy_rows(
-            schedule, self._pbp(), self._participation(), self._depth(), self._stadiums(),
-            prior_decay_curves=curves, exclusion_report=report,
-        )
-        row = next(r for r in rows if r["game_id"] == target["game_id"])
-        self.assertEqual(row["home_features"]["wind_mph"], 0.0)
-        self.assertEqual(
-            row["feature_provenance"]["weather"],
-            "DERIVED_ZERO_FROM_EXPLICIT_CLOSED_OR_DOME_ROOF",
-        )
-        self.assertEqual(report, {})
+    def test_invalid_environment_is_excluded_and_counted(self):
+        for field in ("home_rest", "away_rest", "wind", "wind_mph", "roof"):
+            for value in (None, "", "invalid", float("nan"), float("inf"), -float("inf")):
+                with self.subTest(field=field, value=value):
+                    schedule = self._schedule()
+                    target = schedule[-1]
+                    target[field] = value
+                    if field == "wind_mph":
+                        target["wind"] = None
+                    curves = fit_nfl_prior_decay_curves(schedule, self._pbp(), min_train_seasons=2, weeks=(1, 2, 3))
+                    report = {}
+                    rows = build_policy_rows(
+                        schedule, self._pbp(), self._participation(), self._depth(), self._stadiums(),
+                        prior_decay_curves=curves, exclusion_report=report,
+                    )
+                    self.assertNotIn(target["game_id"], {r["game_id"] for r in rows})
+                    self.assertEqual(sum(report[target["season"]].values()), 1)
 
-    def test_open_or_outdoor_missing_wind_is_excluded_and_counted(self):
+    def test_closed_roof_does_not_manufacture_missing_wind(self):
         schedule = self._schedule()
         target = schedule[-1]
-        target["roof"] = "outdoors"
-        target["wind"] = ""
+        target.update(roof="closed", wind=None)
         curves = fit_nfl_prior_decay_curves(schedule, self._pbp(), min_train_seasons=2, weeks=(1, 2, 3))
         report = {}
         rows = build_policy_rows(
@@ -226,11 +224,7 @@ class NFLM2HistoryFeatureTests(unittest.TestCase):
             prior_decay_curves=curves, exclusion_report=report,
         )
         self.assertNotIn(target["game_id"], {r["game_id"] for r in rows})
-        self.assertEqual(
-            report,
-            {target["season"]: {"NFL_WIND_MISSING_OPEN_OR_OUTDOORS": 1}},
-        )
-
+        self.assertEqual(report, {target["season"]: {"NFL_WIND_INVALID": 1}})
 
     def test_neutral_site_without_explicit_venue_fails_closed(self):
         schedule = self._schedule()

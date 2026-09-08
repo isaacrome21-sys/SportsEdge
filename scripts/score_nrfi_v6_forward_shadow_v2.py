@@ -30,8 +30,8 @@ def fetch_first_inning(game_id: str):
     if int(first.get("num") or 0) != 1:
         return None
     try:
-        away = int(((first.get("away") or {}).get("runs")) or 0)
-        home = int(((first.get("home") or {}).get("runs")) or 0)
+        away = int((first.get("away") or {}).get("runs"))
+        home = int((first.get("home") or {}).get("runs"))
     except (TypeError, ValueError):
         return None
     return {

@@ -72,8 +72,8 @@ def fetch_first_inning(game_id: str) -> dict[str, Any] | None:
         return None
     teams = first.get("teams") or {}
     try:
-        away = int(((teams.get("away") or {}).get("runs")) or 0)
-        home = int(((teams.get("home") or {}).get("runs")) or 0)
+        away = int((teams.get("away") or {}).get("runs"))
+        home = int((teams.get("home") or {}).get("runs"))
     except (TypeError, ValueError):
         return None
     return {

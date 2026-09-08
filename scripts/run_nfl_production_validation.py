@@ -23,7 +23,7 @@ if str(_REPO_ROOT) not in sys.path:
 from sportsedge.sports.nfl.history import normalize_nfl_rows, parse_schedule_csv
 from sportsedge.sports.nfl.m2 import fit_nfl_m2_score_model
 from sportsedge.sports.nfl.m2_history_features import _game_start, fit_nfl_prior_decay_curves, select_starting_qb
-from sportsedge.sports.nfl.m2_history_policy import build_nfl_m2_history_rows
+from sportsedge.sports.nfl.m2_history_policy import build_nfl_m2_history_rows, environment_exclusion_reasons
 from sportsedge.sports.nfl.model_artifact import build_nfl_m2_model_artifact
 from sportsedge.sports.nfl.production_validation import build_production_nfl_validation_evidence
 from sportsedge.sports.nfl.source_manifest import build_nfl_source_manifest, manifest_sha256
@@ -416,6 +416,29 @@ def main() -> int:
         raise SystemExit("NFL_PRODUCTION_PRESSURE_HISTORY_STARTS_2016")
     if not args.starter_override_file.exists():
         raise SystemExit("NFL_STARTER_OVERRIDE_FILE_MISSING")
+
+    # Persist preflight even if another required source later blocks the build.
+    from collections import Counter, defaultdict
+    season_counts = defaultdict(Counter)
+    for row in csv.DictReader(args.schedule_file.open(encoding="utf-8")):
+        if row.get("game_type") != "REG" or not args.start_season <= int(row["season"]) <= args.end_season:
+            continue
+        counts = season_counts[row["season"]]
+        counts["schedule_rows"] += 1
+        reasons = environment_exclusion_reasons(row)
+        if reasons:
+            counts["excluded_rows"] += 1
+            counts["|".join(sorted(reasons))] += 1
+        else:
+            counts["environment_usable_rows"] += 1
+    preflight = {
+        "policy": "EXCLUDE_INVALID_ENVIRONMENT_NO_ZERO_IMPUTATION_V1",
+        "code_git_sha": git_sha, "schedule_sha256": _sha(args.schedule_file),
+        "seasons": dict(season_counts), "promotion_evidence": False,
+    }
+    preflight_path = args.out.with_name("nfl_environment_coverage.json")
+    preflight_path.parent.mkdir(parents=True, exist_ok=True)
+    preflight_path.write_text(json.dumps(preflight, indent=2, sort_keys=True) + "\n")
 
     pbp_files = _files(args.pbp_dir, "play_by_play_{season}.{ext}", args.start_season, args.end_season)
     participation_files = _files(args.participation_dir, "pbp_participation_{season}.{ext}", args.start_season, args.end_season)

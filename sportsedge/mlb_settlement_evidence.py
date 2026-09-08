@@ -49,20 +49,22 @@ def canonical_bytes(value: Any) -> bytes:
 
 
 def as_int(value: Any) -> int:
-    try:
-        return int(value or 0)
-    except (TypeError, ValueError):
-        return 0
+    if isinstance(value, bool) or value is None:
+        raise MLBSettlementEvidenceError("INTEGER_FACT_MISSING_OR_INVALID")
+    text = str(value).strip()
+    if not re.fullmatch(r"[0-9]+", text):
+        raise MLBSettlementEvidenceError("INTEGER_FACT_MISSING_OR_INVALID")
+    return int(text)
 
 
 def outs_from_ip(value: Any) -> int:
-    text = str(value or "0.0")
-    whole, sep, frac = text.partition(".")
-    if not sep:
-        return int(whole) * 3
-    if frac not in {"0", "1", "2"}:
+    if value is None or isinstance(value, bool):
+        raise MLBSettlementEvidenceError("INNINGS_PITCHED_MISSING")
+    text = str(value).strip()
+    if not re.fullmatch(r"[0-9]+(?:\.[012])?", text):
         raise MLBSettlementEvidenceError(f"BAD_INNINGS_PITCHED:{text}")
-    return int(whole) * 3 + int(frac)
+    whole, sep, frac = text.partition(".")
+    return int(whole) * 3 + (int(frac) if sep else 0)
 
 
 def batter_fact(player_id: str, stats: Mapping[str, Any]) -> dict[str, Any]:

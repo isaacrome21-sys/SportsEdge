@@ -19,6 +19,9 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from datetime import date
 from typing import Any
+import warnings
+
+from .m2_history_features import _float
 
 from .m2_history_features import build_nfl_m2_history_rows as _build_core_history_rows
 
@@ -149,6 +152,24 @@ def _project_starter_depth_rows(
     return projected
 
 
+
+def environment_exclusion_reasons(row: Mapping[str, Any]) -> list[str]:
+    reasons = []
+    for field in ("home_rest", "away_rest"):
+        value = _float(row.get(field))
+        if isinstance(row.get(field), bool) or value is None or value < 0:
+            reasons.append(f"NFL_{field.upper()}_INVALID")
+    roof = str(row.get("roof") or "").strip().lower()
+    if roof not in {"outdoors", "open", "closed", "dome"}:
+        reasons.append("NFL_ROOF_INVALID")
+    # wind_mph is an optional provider alias. Only an absent alias may
+    # fall back to wind; a supplied malformed value must not be hidden.
+    field = "wind_mph" if row.get("wind_mph") not in (None, "") else "wind"
+    wind = _float(row.get(field))
+    if isinstance(row.get(field), bool) or wind is None or wind < 0:
+        reasons.append("NFL_WIND_INVALID")
+    return reasons
+
 def build_nfl_m2_history_rows(
     schedule_rows: Iterable[Mapping[str, Any]],
     pbp_rows: Iterable[Mapping[str, Any]],
@@ -174,29 +195,17 @@ def build_nfl_m2_history_rows(
         if not game_id:
             raise ValueError("NFL_HISTORY_GAME_IDENTITY_MISSING")
         season = int(row.get("season"))
-        home_rest = row.get("home_rest")
-        away_rest = row.get("away_rest")
-        if home_rest in (None, ""):
-            raise ValueError(f"NFL_HOME_REST_MISSING:{game_id}")
-        if away_rest in (None, ""):
-            raise ValueError(f"NFL_AWAY_REST_MISSING:{game_id}")
-        roof = str(row.get("roof") or "").strip().lower()
-        if not roof:
-            raise ValueError(f"NFL_ROOF_MISSING:{game_id}")
-        if roof not in {"outdoors", "open", "closed", "dome"}:
-            raise ValueError(f"NFL_ROOF_UNSUPPORTED:{game_id}:{roof}")
-        wind = row.get("wind_mph")
-        if wind in (None, ""):
-            wind = row.get("wind")
-        if wind in (None, ""):
-            if roof in {"closed", "dome"}:
-                row["wind"] = 0.0
-                row["sportsedge_wind_provenance"] = "DERIVED_ZERO_FROM_EXPLICIT_CLOSED_OR_DOME_ROOF"
+        reasons = environment_exclusion_reasons(row)
+        if reasons:
+            weather_excluded_ids.add(game_id)
+            if exclusion_report is None:
+                warnings.warn(f"NFL_HISTORY_ROW_EXCLUDED:{season}:{game_id}:{','.join(reasons)}", RuntimeWarning)
             else:
-                weather_excluded_ids.add(game_id)
-                if exclusion_report is not None:
-                    by_reason = exclusion_report.setdefault(season, {})
-                    by_reason["NFL_WIND_MISSING_OPEN_OR_OUTDOORS"] = by_reason.get("NFL_WIND_MISSING_OPEN_OR_OUTDOORS", 0) + 1
+                by_reason = exclusion_report.setdefault(season, {})
+                # One count per excluded row; composite reasons avoid counting
+                # a row twice in the evidence's exclusion total.
+                reason = "|".join(sorted(reasons))
+                by_reason[reason] = by_reason.get(reason, 0) + 1
     depth = _project_starter_depth_rows(depth_rows)
     stadiums = bridge_postclosing_away_origins(schedule, stadium_rows)
     if policy == "error":
