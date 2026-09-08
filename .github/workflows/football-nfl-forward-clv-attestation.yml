@@ -55,7 +55,7 @@ jobs:
 
       - name: Install runtime dependency
         if: steps.bundle.outputs.available == 'true'
-        run: python -m pip install --disable-pip-version-check numpy
+        run: python -m pip install --disable-pip-version-check numpy==2.5.3
 
       - name: Download exact scheduled forward bundle
         if: steps.bundle.outputs.available == 'true'
