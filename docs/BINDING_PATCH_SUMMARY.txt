@@ -1,0 +1,5 @@
+branch=chatgpt/binding-value-scanner-v1
+core=threshold_domain+quote_identity+orchestration_gate+pair_hardening+scanner
+runtime_failure=per_row_BLOCKED
+eligibility_change=none
+claim=STRUCTURALLY_HARDENED_END_TO_END_EVIDENCE_PENDING
