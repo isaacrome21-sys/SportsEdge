@@ -19,4 +19,10 @@ jobs:
       - name: Enumerate action references
         run: |
           cd repo
+          echo '=== ALL ACTION REFS ==='
           grep -RInE '^[[:space:]]*-[[:space:]]+uses:|^[[:space:]]+uses:' .github/workflows | sort
+          echo '=== MUTABLE ACTION REFS ==='
+          if grep -RInE '^[[:space:]]*-[[:space:]]+uses:[[:space:]]+[^#[:space:]]+@(v[0-9]+|main|master|latest)([[:space:]#]|$)|^[[:space:]]+uses:[[:space:]]+[^#[:space:]]+@(v[0-9]+|main|master|latest)([[:space:]#]|$)' .github/workflows; then
+            exit 2
+          fi
+          echo 'NONE'
