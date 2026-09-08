@@ -35,7 +35,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install control-plane test dependencies
-        run: python -m pip install --disable-pip-version-check pytest numpy
+        run: python -m pip install --disable-pip-version-check pytest==9.1.1 numpy==2.5.3
       - name: Run control-plane tests
         run: python -m pytest -q tests/test_run_it_control.py
       - name: Audit every declared RUN IT lane
@@ -64,7 +64,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install runtime dependencies
-        run: python -m pip install --disable-pip-version-check numpy
+        run: python -m pip install --disable-pip-version-check numpy==2.5.3
       - name: Execute unified RUN IT request
         shell: bash
         run: |
