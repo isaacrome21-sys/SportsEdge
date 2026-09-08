@@ -5,12 +5,18 @@ from datetime import datetime
 from math import isfinite
 from typing import Any, Mapping
 from .deployments import load_registry
-from .devig import multiplicative_devig, validate_pair
+from .devig import multiplicative_devig
 from .engine_registry import engine_registry
 from .f5_distribution import F5_MARKETS
 from .generic_market_engine import BINARY_MARKETS, GAME_MARKETS
 from .hitter_joint_engine import HITTER_MARKETS
 from .live_slate import LiveGame
+from .mlb_market_binding_v13 import (
+    attach_runtime_binding_context,
+    runtime_quote_binding_row,
+    validate_quote_binding,
+    validate_quote_pair,
+)
 from .orchestrator import run_candidate
 from .pitcher_joint_engine import PITCHER_MARKETS
 from .quote_bridge import validate_canonical_quote
@@ -93,17 +99,23 @@ def _model_input(*,game,quote,feature):
     source_hash=feature.get("feature_source_hash",feature.get("source_subset_hash"))
     if source_hash is not None:out["feature_source_hash"]=source_hash
     return out
-def _validated_quotes(quotes):
+def _validated_quotes(quotes,games_by_id):
     out=[]
     for raw in quotes:
-        try:out.append(validate_canonical_quote(raw))
+        try:
+            quote=validate_canonical_quote(raw); game=games_by_id.get(str(quote["game_id"]))
+            if game is None: continue
+            quote=attach_runtime_binding_context(quote,game)
+            validate_quote_binding(runtime_quote_binding_row(quote))
+            out.append(quote)
         except Exception:pass
     return out
 def _paired_quote(candidate,quotes):
     matches=[]
     for quote in quotes:
         if quote is candidate or dict(quote)==dict(candidate):continue
-        try:validate_pair(candidate,quote);matches.append(quote)
+        try:
+            validate_quote_pair(runtime_quote_binding_row(candidate),runtime_quote_binding_row(quote)); matches.append(quote)
         except Exception:pass
     if len(matches)!=1:raise ValueError(f"PAIRED_PRICE_REQUIRED_FOR_DEVIG: found={len(matches)}")
     return matches[0]
@@ -116,13 +128,18 @@ def _shadow(model_p,push_p,quote,opposite):
         loss=max(0,1-p-push);cw=p/(1-push);edge=cw-fair;ev=p*(dec-1)-loss;return ("SHADOW_BET" if edge>0 and ev>0 else "SHADOW_PASS",fair,edge,ev)
     except Exception:return None,None,None,None
 def run_generic_card(*,games,feature_rows,quotes,ingestion_now,finalization_now,registry_path="config/deployments.json",edge_floor_config_path="config/truth_gate_floors.json",kelly_multiplier=0.25):
-    games_by_id=_game_index(games);features=_feature_index(feature_rows);deployments=load_registry(registry_path)["markets"];engines=engine_registry();valid_quotes=_validated_quotes(quotes);results=[]
+    games_by_id=_game_index(games);features=_feature_index(feature_rows);deployments=load_registry(registry_path)["markets"];engines=engine_registry();valid_quotes=_validated_quotes(quotes,games_by_id);results=[]
     for raw in quotes:
         try:
             quote=validate_canonical_quote(raw);market=str(quote["market"])
             if market not in GENERIC_MARKETS:raise ValueError(f"unsupported canonical market: {market}")
             game=games_by_id.get(str(quote["game_id"]));
             if game is None:raise ValueError("MLB_GAME_ID_NOT_FOUND")
+            # This is the acquisition/orchestration trust boundary. Every
+            # normalized priced row is bound to canonical MLB event/team
+            # identity before feature/model work. A failure blocks only this row.
+            quote=attach_runtime_binding_context(quote,game)
+            validate_quote_binding(runtime_quote_binding_row(quote))
             feature=features.get((str(quote["game_id"]),str(quote["entity_id"]),market))
             if feature is None:raise ValueError("feature row missing")
             model_input=_model_input(game=game,quote=quote,feature=feature);engine=engines.get(market);deployment=deployments.get(market)
