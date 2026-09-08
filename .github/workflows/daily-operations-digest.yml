@@ -2,6 +2,12 @@ name: daily-operations-digest
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/build_daily_digest.py'
+      - 'tests/test_daily_digest.py'
+      - '.github/workflows/daily-operations-digest.yml'
   schedule:
     # 08:17 America/Chicago during daylight time; avoid minute 0 scheduler load.
     - cron: '17 13 * * *'
