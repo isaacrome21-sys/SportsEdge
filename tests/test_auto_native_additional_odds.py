@@ -76,9 +76,13 @@ class AutoNativeAdditionalOddsTests(unittest.TestCase):
                 market_surface_version="test-surface-v1",
             )
 
+        shared_snapshot = SimpleNamespace(events=(), provenance_fields=lambda: {}, event_by_id=lambda event_id: None)
+
         with patch("sportsedge.auto_native_odds.fetch_schedule", return_value=[self._game()]), patch(
             "sportsedge.auto_native_odds.fetch_boxscore", return_value={"teams": {"away": {"players": {}}, "home": {"players": {}}}}
         ), patch(
+            "sportsedge.auto_native_odds.acquire_mlb_event_snapshot", return_value=shared_snapshot
+        ) as snapshot_fetch, patch(
             "sportsedge.auto_native_odds.fetch_mlb_player_prop_quotes", return_value=player
         ) as player_fetch, patch(
             "sportsedge.auto_native_odds.fetch_mlb_game_quotes", return_value=game
@@ -101,6 +105,7 @@ class AutoNativeAdditionalOddsTests(unittest.TestCase):
             {q["market"] for q in captured["quotes"]},
             {"HITS", "MONEYLINE", "NRFI"},
         )
+        snapshot_fetch.assert_called_once()
         player_fetch.assert_called_once()
         game_fetch.assert_called_once()
         team_total_fetch.assert_called_once()
