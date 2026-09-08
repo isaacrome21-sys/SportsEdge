@@ -282,22 +282,61 @@ def _mlb_windows(now: datetime) -> tuple[list[str], str | None]:
 
 
 def _odds_usage(data_rows: list[tuple[Path, dict[str, Any]]]) -> tuple[str, list[str]]:
-    relevant = [(p,r) for p,r in data_rows if "archive-status" in str(p)]
+    relevant = [(p, r) for p, r in data_rows if "archive-status" in str(p)]
     if not relevant:
         return "NO DATA", []
-    credits, latest_used, needs = 0, None, []
+
+    credits = 0
+    latest_used: tuple[datetime, Any] | None = None
+    latest_provider: tuple[datetime, dict[str, Any]] | None = None
+    last_success: datetime | None = None
+    needs: list[str] = []
+
     for _, row in relevant:
         try:
-            credits += int(row.get("credits_consumed_actual") or 0)
+            consumed = row.get("credits_consumed_actual")
+            if consumed is not None:
+                credits += int(consumed)
         except Exception:
             pass
-        ts, used = _row_time(row), row.get("provider_credits_used")
+
+        ts = _row_time(row)
+        used = row.get("provider_credits_used")
         if ts is not None and used is not None and (latest_used is None or ts > latest_used[0]):
             latest_used = (ts, used)
+
+        provider_state = str(row.get("provider_state") or "").strip().upper()
+        provider_code = str(row.get("provider_error_code") or "").strip().upper()
+        provider_relevant = bool(provider_state or provider_code)
+        if ts is not None and provider_relevant and (latest_provider is None or ts > latest_provider[0]):
+            latest_provider = (ts, row)
+        if ts is not None and provider_state == "AVAILABLE" and (last_success is None or ts > last_success):
+            last_success = ts
+
         if _NEEDS_ISAAC_RE.search(json.dumps(row, sort_keys=True)):
             needs.append(str(row.get("reason") or row.get("status") or "Odds API credential/quota issue"))
-    counter = f"; latest provider cumulative used={latest_used[1]}" if latest_used else "; provider cumulative counter NO DATA"
-    return f"observed durable archive credits last 24h={credits}{counter}; projected total provider requests NO DATA", needs
+
+    counter = f"provider cumulative used={latest_used[1]}" if latest_used else "provider cumulative counter NO DATA"
+    if latest_provider is not None:
+        _, latest = latest_provider
+        state = str(latest.get("provider_state") or "").strip().upper()
+        code = str(latest.get("provider_error_code") or "").strip().upper()
+        if state == "ACCOUNT_TERMINAL" or code == "OUT_OF_USAGE_CREDITS":
+            success_text = last_success.isoformat() if last_success is not None else "NO DATA"
+            reason = str(latest.get("reason") or "ACCOUNT_LEVEL_USAGE_CREDITS_EXHAUSTED")
+            needs.append(reason)
+            return (
+                "HARD OUTAGE — Odds API account terminal: "
+                f"{code or state}; last provider success={success_text}; "
+                f"observed durable archive credits last 24h={credits}; {counter}. "
+                "Zero observed consumption does not imply provider availability.",
+                list(dict.fromkeys(needs)),
+            )
+
+    return (
+        f"observed durable archive credits last 24h={credits}; {counter}; projected total provider requests NO DATA",
+        list(dict.fromkeys(needs)),
+    )
 
 
 def build_digest(*, repo_root: Path, data_root: Path, token: str, repo: str, now: datetime) -> str:
