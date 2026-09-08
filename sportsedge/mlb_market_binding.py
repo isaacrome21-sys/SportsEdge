@@ -25,6 +25,10 @@ REQUIRED_PROBABILITY_IDENTITY=("probability_event_id","probability_market_id","p
 _LEGAL_INCREMENTS=(0.0,0.5)
 _DOMAIN_CEILING={"GAME_TOTAL":40.0,"TEAM_TOTAL":30.0,"BATTER_PROP":20.0,"PITCHER_PROP":40.0}
 
+# Code wiring is not production evidence. Markets enter this set only after a real
+# acquisition/export proves the source-bound identity fields arrive from upstream.
+VERIFIED_SOURCE_WIRING=frozenset()
+
 class BindingError(ValueError): pass
 
 @dataclass(frozen=True)
@@ -203,4 +207,6 @@ def settlement_pl(settlement,american_odds,stake):
 def audit_status(market_id):
     spec=MARKET_BINDINGS.get(market_id)
     if spec is None:return "SPEC_MISSING"
-    return "PASS" if spec.production_wired else "UNAUDITABLE_IMPLICIT"
+    if not spec.production_wired:return "UNAUDITABLE_IMPLICIT"
+    if market_id not in VERIFIED_SOURCE_WIRING:return "BLOCKED_SOURCE_IDENTITY_UNVERIFIED"
+    return "PASS"
