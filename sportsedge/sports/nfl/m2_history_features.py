@@ -462,6 +462,7 @@ def build_nfl_m2_history_rows(
     stadium_rows: Iterable[Mapping[str, Any]],
     *,
     prior_decay_curves: Mapping[int, Mapping[int, float]],
+    evaluation_excluded_ids: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Build exact production-M2 historical rows from strictly prior state."""
     schedule = [dict(row) for row in schedule_rows if str(row.get("game_type") or "REG").upper() == "REG"]
@@ -476,6 +477,7 @@ def build_nfl_m2_history_rows(
     league_qb = _QBStats()
     out: list[dict[str, Any]] = []
 
+    excluded_ids = set(evaluation_excluded_ids or ())
     active_season: int | None = None
     for game in schedule:
         season = int(game["season"])
@@ -506,7 +508,7 @@ def build_nfl_m2_history_rows(
         # Curves do not exist for initial burn-in seasons. Those games still
         # update all states but are not eligible production-M2 evaluation rows.
         curve_available = season in prior_decay_curves
-        if curve_available:
+        if curve_available and gid not in excluded_ids:
             weight = _prior_weight(prior_decay_curves, season=season, week=week)
             home_qb = select_starting_qb(depth, team=home, season=season, week=week, game_start_ts=start)
             away_qb = select_starting_qb(depth, team=away, season=season, week=week, game_start_ts=start)
@@ -514,12 +516,22 @@ def build_nfl_m2_history_rows(
             home_stats = _season_stats_mean(season_state, season, home)
             away_stats = _season_stats_mean(season_state, season, away)
             cutoff = (start - timedelta(microseconds=1)).isoformat()
-            home_rest = _float(game.get("home_rest")) or 0.0
-            away_rest = _float(game.get("away_rest")) or 0.0
+            home_rest = _float(game.get("home_rest"))
+            away_rest = _float(game.get("away_rest"))
+            if home_rest is None:
+                raise ValueError(f"NFL_HOME_REST_MISSING:{gid}")
+            if away_rest is None:
+                raise ValueError(f"NFL_AWAY_REST_MISSING:{gid}")
+            roof = str(game.get("roof") or "").strip().lower()
+            if not roof:
+                raise ValueError(f"NFL_ROOF_MISSING:{gid}")
+            if roof not in {"outdoors", "open", "closed", "dome"}:
+                raise ValueError(f"NFL_ROOF_UNSUPPORTED:{gid}:{roof}")
             wind = _float(game.get("wind_mph"))
             if wind is None:
-                wind = _float(game.get("wind")) or 0.0
-            roof = str(game.get("roof") or "").strip().lower()
+                wind = _float(game.get("wind"))
+            if wind is None:
+                raise ValueError(f"NFL_WIND_MISSING:{gid}:{roof}")
             roof_closed = 1.0 if roof in {"closed", "dome"} else 0.0
             away_miles = _haversine_miles(away_origin, home_venue)
             away_tz = abs(float(away_origin["tz_offset"]) - float(home_venue["tz_offset"]))
