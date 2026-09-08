@@ -3,6 +3,11 @@
 This contract defines which objective concepts RUN IT should request by prop
 family and the mandatory evaluation ordering. It does not ingest markets or
 social/public betting into NFL_HYBRID_CONTEXT and is not Model_P/Truth Gate data.
+
+Market/research sidecars (including MySpariEdge historical prop trends) are
+allowed for reporting and conflict awareness only.  They are explicitly barred
+from this objective hybrid-context payload so they cannot become hidden model
+features.
 """
 from __future__ import annotations
 
@@ -51,7 +56,17 @@ RUN_IT_SEQUENCE = (
 PROHIBITED_HYBRID_CONTEXT_FIELDS = frozenset({
     "social_pick", "handicapper_pick", "public_betting", "ticket_pct", "handle_pct",
     "sportsbook", "sportsbook_price", "odds", "market_probability", "closing_line",
-    "closing_price", "consensus_line",
+    "closing_price", "consensus_line", "historical_hit_rate", "trend_hit_rate",
+    "trend_windows", "myspariedge_trends",
+})
+
+PROHIBITED_HYBRID_CONTEXT_SOURCES = frozenset({
+    "MYSPARIEDGE",
+    "SPORTS_BETTING_SIMPLIFIED",
+})
+
+PROHIBITED_HYBRID_CONTEXT_LANES = frozenset({
+    "NFL_PROP_TREND_RESEARCH",
 })
 
 
@@ -59,6 +74,12 @@ def validate_context_payload(payload: dict) -> None:
     contaminated = PROHIBITED_HYBRID_CONTEXT_FIELDS.intersection(payload)
     if contaminated:
         raise ValueError(f"prohibited NFL hybrid-context fields: {sorted(contaminated)}")
+    source = str(payload.get("source") or payload.get("source_name") or "").strip().upper()
+    if source in PROHIBITED_HYBRID_CONTEXT_SOURCES:
+        raise ValueError(f"research source cannot enter NFL hybrid context: {source}")
+    lane = str(payload.get("context_lane") or payload.get("lane") or "").strip().upper()
+    if lane in PROHIBITED_HYBRID_CONTEXT_LANES:
+        raise ValueError(f"research lane cannot enter NFL hybrid context: {lane}")
     if payload.get("model_p_eligible") not in (None, False):
         raise ValueError("NFL prop context must start outside Model_P")
     if payload.get("truth_gate_eligible") not in (None, False):
