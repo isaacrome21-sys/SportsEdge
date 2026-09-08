@@ -104,6 +104,26 @@ class FootballPlayerMarketReadoutTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "ATTRIBUTED_PATHS_EMPTY"):
             derive_player_stat_market([], player_id="H_QB", stat="passing_yards", line=250.5)
 
+    def test_duplicate_simulation_path_cannot_reweight_probability(self):
+        from sportsedge.core.simulate.player_markets import derive_player_stat_market
+        path = self._attributed(12, 5, 1)
+        with self.assertRaisesRegex(ValueError, "DUPLICATE_SIMULATION_PATH"):
+            derive_player_stat_market([path, path], player_id="H_QB", stat="passing_yards", line=17)
+
+    def test_boolean_threshold_is_not_a_one_reception_line(self):
+        from sportsedge.core.simulate.player_markets import derive_player_stat_market
+        with self.assertRaisesRegex(ValueError, "LINE_BOOLEAN"):
+            derive_player_stat_market([self._attributed(12, 5, 1)], player_id="H_WR", stat="receptions", line=True)
+
+    def test_readout_subset_does_not_mutate_common_market(self):
+        from sportsedge.core.simulate.player_markets import derive_player_stat_market
+        paths = [self._attributed(12, 5, 1), self._attributed(22, 3, 2)]
+        before = repr(paths)
+        common = derive_player_stat_market(paths, player_id="H_QB", stat="passing_yards", line=17)
+        derive_player_stat_market(paths, player_id="H_WR", stat="receptions", line=1)
+        assert derive_player_stat_market(paths, player_id="H_QB", stat="passing_yards", line=17) == common
+        assert repr(paths) == before
+
 
 if __name__ == "__main__":
     unittest.main()

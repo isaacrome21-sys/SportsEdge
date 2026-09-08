@@ -46,6 +46,12 @@ def _paths(paths: Iterable[AttributedFootballPath]) -> list[AttributedFootballPa
     game_ids = {path.base_path.game_id for path in materialized}
     if len(game_ids) != 1:
         raise ValueError("PLAYER_MARKET_GAME_ID_MISMATCH")
+    identities = {(path.base_path.home_team, path.base_path.away_team) for path in materialized}
+    if len(identities) != 1:
+        raise ValueError("PLAYER_MARKET_TEAM_IDENTITY_MISMATCH")
+    simulation_ids = [path.base_path.simulation_id for path in materialized]
+    if len(set(simulation_ids)) != len(simulation_ids):
+        raise ValueError("PLAYER_MARKET_DUPLICATE_SIMULATION_PATH")
     return materialized
 
 
@@ -88,6 +94,8 @@ def derive_player_stat_market(
     if not player:
         raise ValueError("PLAYER_ID_REQUIRED")
     stat_key = _normalize_stat(stat)
+    if isinstance(line, bool):
+        raise ValueError("PLAYER_MARKET_LINE_BOOLEAN")
     threshold = float(line)
     if not isfinite(threshold):
         raise ValueError("PLAYER_MARKET_LINE_NONFINITE")
@@ -110,7 +118,10 @@ def derive_player_stat_market(
             raise ValueError(f"PLAYER_STATS_MISSING:{player}")
         if stat_key not in stats[player]:
             raise ValueError(f"PLAYER_STAT_MISSING:{stat_key}")
-        values.append(float(stats[player][stat_key]))
+        value = float(stats[player][stat_key])
+        if not isfinite(value):
+            raise ValueError(f"PLAYER_STAT_NONFINITE:{stat_key}")
+        values.append(value)
 
     denominator = float(len(values))
     return {
