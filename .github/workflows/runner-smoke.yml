@@ -1,0 +1,16 @@
+name: runner-smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/runner-smoke.yml'
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Prove hosted runner assignment
+        run: echo "runner-assigned"
