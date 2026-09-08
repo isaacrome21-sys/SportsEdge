@@ -159,7 +159,7 @@ def validate_canonical_quote(raw: Mapping[str, Any], *, default_ttl_seconds: int
         "american_odds": int(odds), "ttl_seconds": ttl,
     }
     _preserve_source_binding_identity(raw, out)
-    for key in ("sportsbook", "offer_id", "source_url", "selection"):
+    for key in ("sportsbook", "offer_id", "source_url", "selection", "provider_event_id", "source"):
         if raw.get(key) not in (None, ""):
             out[key] = str(raw[key])
     return out
