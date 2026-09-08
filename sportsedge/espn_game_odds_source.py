@@ -78,20 +78,59 @@ def _close(node: Mapping[str, Any], side: str) -> Mapping[str, Any]:
     return close
 
 
-def _base(*, game: GameSnapshot, book: str, fetched_at: datetime, ttl_seconds: int, raw_market: str) -> dict[str, Any]:
+def _parse_source_timestamp(value: Any) -> datetime:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("ESPN_SOURCE_TIMESTAMP_MISSING")
+    text = value.strip().replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError as exc:
+        raise ValueError("ESPN_SOURCE_TIMESTAMP_INVALID") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError("ESPN_SOURCE_TIMESTAMP_TIMEZONE_REQUIRED")
+    return parsed.astimezone(timezone.utc)
+
+
+def _source_updated_at(odds: Mapping[str, Any], *, fetched_at: datetime) -> datetime:
+    provider = odds.get("provider") or {}
+    candidates = [
+        odds.get("lastUpdated"),
+        odds.get("lastUpdatedDate"),
+        odds.get("updated"),
+        odds.get("updatedAt"),
+    ]
+    if isinstance(provider, Mapping):
+        candidates.extend([
+            provider.get("lastUpdated"),
+            provider.get("lastUpdatedDate"),
+            provider.get("updated"),
+            provider.get("updatedAt"),
+        ])
+    for value in candidates:
+        if value not in (None, ""):
+            updated = _parse_source_timestamp(value)
+            if updated > fetched_at:
+                raise ValueError("ESPN_SOURCE_TIMESTAMP_AFTER_FETCH")
+            return updated
+    raise ValueError("ESPN_SOURCE_TIMESTAMP_UNVERIFIED")
+
+
+def _base(*, game: GameSnapshot, book: str, fetched_at: datetime, source_updated_at: datetime, ttl_seconds: int, raw_market: str) -> dict[str, Any]:
     return {
         "game_id": str(game.game_pk),
         "period": "FG",
         "book_key": normalize_name(book) or "espn_partner",
         "sportsbook": book or "ESPN partner",
         "retrieved_at": fetched_at,
+        "source_updated_at": source_updated_at,
+        "provider_last_update": source_updated_at.isoformat(),
         "ttl_seconds": ttl_seconds,
         "raw_market_name": raw_market,
         "away_team": str(game.away_name),
         "home_team": str(game.home_name),
         "is_alternate": False,
         "quote_provider": "ESPN_SCOREBOARD",
-        "provider_timestamp_semantics": "FETCH_TIME",
+        "provider_timestamp_semantics": "SOURCE_NATIVE",
     }
 
 
@@ -111,6 +150,15 @@ def _parse_event(event: Mapping[str, Any], *, game: GameSnapshot, fetched_at: da
         provider = odds.get("provider") or {}
         book = str(provider.get("displayName") or "ESPN partner") if isinstance(provider, Mapping) else "ESPN partner"
         try:
+            source_updated_at = _source_updated_at(odds, fetched_at=fetched_at)
+        except Exception as exc:
+            failures.append({
+                "reason": f"ESPN_SOURCE_TIMESTAMP:{type(exc).__name__}:{exc}",
+                "game_id": str(game.game_pk),
+                "sportsbook": book,
+            })
+            continue
+        try:
             ml = odds.get("moneyline") or {}
             for side, team_id, selection in (
                 ("home", game.home_id, game.home_name),
@@ -118,7 +166,7 @@ def _parse_event(event: Mapping[str, Any], *, game: GameSnapshot, fetched_at: da
             ):
                 close = _close(ml, side)
                 quotes.append({
-                    **_base(game=game, book=book, fetched_at=fetched_at, ttl_seconds=ttl_seconds, raw_market="moneyline"),
+                    **_base(game=game, book=book, fetched_at=fetched_at, source_updated_at=source_updated_at, ttl_seconds=ttl_seconds, raw_market="moneyline"),
                     "market": "MONEYLINE", "entity_id": str(team_id), "side": side.upper(),
                     "selection": str(selection), "line": 0.0, "american_odds": int(_num(close.get("odds"))),
                 })
@@ -132,7 +180,7 @@ def _parse_event(event: Mapping[str, Any], *, game: GameSnapshot, fetched_at: da
             ):
                 close = _close(spread, side)
                 quotes.append({
-                    **_base(game=game, book=book, fetched_at=fetched_at, ttl_seconds=ttl_seconds, raw_market="pointSpread"),
+                    **_base(game=game, book=book, fetched_at=fetched_at, source_updated_at=source_updated_at, ttl_seconds=ttl_seconds, raw_market="pointSpread"),
                     "market": "RUN_LINE", "entity_id": str(team_id), "side": side.upper(),
                     "selection": str(selection), "line": _num(close.get("line")), "american_odds": int(_num(close.get("odds"))),
                 })
@@ -143,7 +191,7 @@ def _parse_event(event: Mapping[str, Any], *, game: GameSnapshot, fetched_at: da
             for side in ("over", "under"):
                 close = _close(total, side)
                 quotes.append({
-                    **_base(game=game, book=book, fetched_at=fetched_at, ttl_seconds=ttl_seconds, raw_market="total"),
+                    **_base(game=game, book=book, fetched_at=fetched_at, source_updated_at=source_updated_at, ttl_seconds=ttl_seconds, raw_market="total"),
                     "market": "TOTALS", "entity_id": str(game.game_pk), "side": side.upper(),
                     "selection": side.title(), "line": _num(close.get("line")), "american_odds": int(_num(close.get("odds"))),
                 })
