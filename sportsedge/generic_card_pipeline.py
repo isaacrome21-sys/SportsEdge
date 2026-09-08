@@ -161,14 +161,14 @@ def run_generic_card(*,games,feature_rows,quotes,ingestion_now,finalization_now,
             game=games_by_id.get(str(quote["game_id"]));
             if game is None:raise ValueError("MLB_GAME_ID_NOT_FOUND")
             # Every wired priced row traverses binding immediately after normalization.
-            if market in WIRED_MARKETS:validate_normalized_mlb_quote_binding(game=game,quote=quote)
+            binding_attestation=validate_normalized_mlb_quote_binding(game=game,quote=quote) if market in WIRED_MARKETS else None
             feature=features.get((str(quote["game_id"]),str(quote["entity_id"]),market))
             if feature is None:raise ValueError("feature row missing")
             model_input=_model_input(game=game,quote=quote,feature=feature);readout_request=_readout_request(model_input);engine=engines.get(market);deployment=deployments.get(market)
             if engine is None or deployment is None:raise ValueError("market missing engine/deployment registration")
             try:opposite=_binding_paired_quote(quote,valid_quotes,game) if market in WIRED_MARKETS else _paired_quote(quote,valid_quotes)
             except Exception as pair_exc:results.append(GenericCardResult(str(quote["game_id"]),market,str(quote["entity_id"]),quote["line"],str(quote["side"]),quote["american_odds"],None,"BLOCKED",f"{type(pair_exc).__name__}: {pair_exc}"));continue
-            run=run_candidate(model_input=model_input,quote=quote,paired_quote=opposite,deployment=deployment,engine_fn=engine,ingestion_now=ingestion_now,finalization_now=finalization_now,edge_floor_config_path=edge_floor_config_path,kelly_multiplier=kelly_multiplier,candidate_binding_mode=MLB_EXTERNAL_BINDING_MODE if market in WIRED_MARKETS else LEGACY_BINDING_MODE)
+            run=run_candidate(model_input=model_input,quote=quote,paired_quote=opposite,deployment=deployment,engine_fn=engine,ingestion_now=ingestion_now,finalization_now=finalization_now,edge_floor_config_path=edge_floor_config_path,kelly_multiplier=kelly_multiplier,candidate_binding_mode=MLB_EXTERNAL_BINDING_MODE if market in WIRED_MARKETS else LEGACY_BINDING_MODE,binding_attestation=binding_attestation)
             if run.model_p is None or run.bet_status=="BLOCKED":results.append(GenericCardResult(str(quote["game_id"]),market,str(quote["entity_id"]),quote["line"],str(quote["side"]),quote["american_odds"],None,"BLOCKED",run.reason));continue
             if run.bet_status not in DECISION_STATUSES:raise RuntimeError(f"MODELED_ROW_WITHOUT_BET_PASS_DECISION: {run.bet_status}")
             p=float(run.model_p);push=float(run.decision.push_probability) if run.decision is not None else 0.0
