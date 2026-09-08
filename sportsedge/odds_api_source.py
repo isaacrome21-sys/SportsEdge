@@ -2,7 +2,8 @@
 
 Provider event IDs and player names are never trusted as MLB identity: every
 event must bind uniquely to a StatsAPI schedule game and every player description
-must bind uniquely to an MLB player id for that exact game.
+must bind uniquely to an MLB player id for that exact game. Provider source
+identity is stamped while the raw event object is still present.
 """
 from __future__ import annotations
 
@@ -15,6 +16,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
+from .mlb_quote_attestation import stamp_the_odds_api_quote
 from .mlb_source import GameSnapshot, parse_game_start
 from .runtime import parse_timestamp
 
@@ -27,8 +29,6 @@ DEFAULT_BOOKMAKERS = ("draftkings",)
 DEFAULT_TTL_SECONDS = 300
 EVENT_TIME_TOLERANCE_SECONDS = 90 * 60
 
-# Canonical SportsEdge market names. These are acquisition mappings only;
-# downstream deployment/model eligibility remains fail-closed market-by-market.
 MARKETS = {
     "batter_home_runs": ("HOME_RUNS", False),
     "batter_home_runs_alternate": ("HOME_RUNS", True),
@@ -87,8 +87,6 @@ def _get_json(url: str, *, opener: Callable = urlopen, label: str) -> Any:
         with opener(Request(url, headers={"Accept": "application/json"}), timeout=15) as response:
             return json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
-        # Preserve only status + provider error code/message. Never include URL
-        # because the Odds API key is carried in its query string.
         provider_code = ""
         provider_message = ""
         try:
@@ -142,22 +140,14 @@ def bind_provider_event(event: Mapping[str, Any], schedule: Iterable[GameSnapsho
     return timed[0]
 
 
-def build_participant_index(
-    *,
-    schedule: Iterable[GameSnapshot],
-    confirmed_names_by_game: Mapping[int, Iterable[tuple[int, str]]],
-    projected_names_by_game: Mapping[int, Iterable[tuple[int, str]]] | None = None,
-) -> dict[int, dict[str, int]]:
+def build_participant_index(*, schedule: Iterable[GameSnapshot], confirmed_names_by_game: Mapping[int, Iterable[tuple[int, str]]], projected_names_by_game: Mapping[int, Iterable[tuple[int, str]]] | None = None) -> dict[int, dict[str, int]]:
     projected_names_by_game = projected_names_by_game or {}
     out: dict[int, dict[str, int]] = {}
     for game in schedule:
         candidates: list[tuple[int, str]] = []
         candidates.extend(list(confirmed_names_by_game.get(game.game_pk, ())))
         candidates.extend(list(projected_names_by_game.get(game.game_pk, ())))
-        for pid, name in (
-            (game.away_probable_pitcher_id, game.away_probable_pitcher_name),
-            (game.home_probable_pitcher_id, game.home_probable_pitcher_name),
-        ):
+        for pid, name in ((game.away_probable_pitcher_id, game.away_probable_pitcher_name), (game.home_probable_pitcher_id, game.home_probable_pitcher_name)):
             if pid is not None and name:
                 candidates.append((int(pid), str(name)))
         idx: dict[str, int] = {}
@@ -187,13 +177,7 @@ def _participant_id(description: Any, *, game_pk: int, participant_index: Mappin
     return player_id
 
 
-def parse_event_odds(
-    payload: Mapping[str, Any],
-    *,
-    game: GameSnapshot,
-    participant_index: Mapping[int, Mapping[str, int]],
-    ttl_seconds: int = DEFAULT_TTL_SECONDS,
-) -> OddsApiSnapshot:
+def parse_event_odds(payload: Mapping[str, Any], *, game: GameSnapshot, participant_index: Mapping[int, Mapping[str, int]], ttl_seconds: int = DEFAULT_TTL_SECONDS) -> OddsApiSnapshot:
     quotes: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
     if not isinstance(payload, Mapping):
@@ -232,44 +216,20 @@ def parse_event_odds(
                     if point is None or price is None:
                         raise OddsApiSourceError("ODDS_OUTCOME_PRICE_IDENTITY_MISSING")
                     quote = {
-                        "game_id": str(game.game_pk),
-                        "period": "FG",
-                        "market": sportsedge_market,
-                        "entity_id": str(player_id),
-                        "side": side,
-                        "line": point,
-                        "book_key": book_key,
-                        "retrieved_at": retrieved_at,
-                        "is_alternate": alternate,
-                        "raw_market_name": market_key,
-                        "american_odds": price,
-                        "ttl_seconds": ttl_seconds,
-                        "sportsbook": book_title,
+                        "game_id": str(game.game_pk), "period": "FG", "market": sportsedge_market,
+                        "entity_id": str(player_id), "side": side, "line": point, "book_key": book_key,
+                        "retrieved_at": retrieved_at, "is_alternate": alternate, "raw_market_name": market_key,
+                        "american_odds": price, "ttl_seconds": ttl_seconds, "sportsbook": book_title,
                     }
                     if outcome.get("sid") not in (None, ""):
                         quote["offer_id"] = str(outcome["sid"])
                     quotes.append(quote)
                 except Exception as exc:
-                    failures.append({
-                        "reason": str(exc),
-                        "game_id": str(game.game_pk),
-                        "book_key": book_key,
-                        "raw_market_name": market_key,
-                        "player_name": str(outcome.get("description") if isinstance(outcome, Mapping) else ""),
-                    })
+                    failures.append({"reason": str(exc), "game_id": str(game.game_pk), "book_key": book_key, "raw_market_name": market_key, "player_name": str(outcome.get("description") if isinstance(outcome, Mapping) else "")})
     return OddsApiSnapshot(tuple(quotes), tuple(failures))
 
 
-def fetch_mlb_player_prop_quotes(
-    *,
-    api_key: str,
-    schedule: Iterable[GameSnapshot],
-    participant_index: Mapping[int, Mapping[str, int]],
-    opener: Callable = urlopen,
-    bookmakers: Iterable[str] = DEFAULT_BOOKMAKERS,
-    ttl_seconds: int = DEFAULT_TTL_SECONDS,
-    event_snapshot: "OddsEventSnapshot | None" = None,
-) -> OddsApiSnapshot:
+def fetch_mlb_player_prop_quotes(*, api_key: str, schedule: Iterable[GameSnapshot], participant_index: Mapping[int, Mapping[str, int]], opener: Callable = urlopen, bookmakers: Iterable[str] = DEFAULT_BOOKMAKERS, ttl_seconds: int = DEFAULT_TTL_SECONDS, event_snapshot: "OddsEventSnapshot | None" = None) -> OddsApiSnapshot:
     games = list(schedule)
     if event_snapshot is None:
         events_url = _event_url(f"/sports/{SPORT_KEY}/events", api_key=api_key)
@@ -292,24 +252,12 @@ def fetch_mlb_player_prop_quotes(
             event_id = str(event.get("id") or "").strip()
             if not event_id:
                 raise OddsApiSourceError("ODDS_EVENT_ID_MISSING")
-            url = _event_url(
-                f"/sports/{SPORT_KEY}/events/{event_id}/odds",
-                api_key=api_key,
-                params={
-                    "bookmakers": requested_books,
-                    "markets": requested_markets,
-                    "oddsFormat": "american",
-                    "dateFormat": "iso",
-                    "includeSids": "true",
-                },
-            )
-            snapshot = parse_event_odds(
-                _get_json(url, opener=opener, label=f"event:{event_id}"),
-                game=game,
-                participant_index=participant_index,
-                ttl_seconds=ttl_seconds,
-            )
-            quotes.extend({**q, **snapshot_fields} for q in snapshot.quotes)
+            url = _event_url(f"/sports/{SPORT_KEY}/events/{event_id}/odds", api_key=api_key, params={"bookmakers": requested_books, "markets": requested_markets, "oddsFormat": "american", "dateFormat": "iso", "includeSids": "true"})
+            raw_event_odds = _get_json(url, opener=opener, label=f"event:{event_id}")
+            snapshot = parse_event_odds(raw_event_odds, game=game, participant_index=participant_index, ttl_seconds=ttl_seconds)
+            for quote in snapshot.quotes:
+                attested = stamp_the_odds_api_quote(quote, provider_event=event, game=game)
+                quotes.append({**attested, **snapshot_fields})
             failures.extend(snapshot.failures)
         except Exception as exc:
             failures.append({"reason": str(exc), "provider_event_id": str(event.get("id") if isinstance(event, Mapping) else "")})
