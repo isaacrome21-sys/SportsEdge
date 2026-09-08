@@ -5,33 +5,47 @@ on:
   pull_request:
     paths:
       - 'sportsedge/sports/cfb/**'
+      - 'sportsedge/core/validation/evidence_determinism.py'
       - 'scripts/*cfb*.py'
+      - 'scripts/verify_evidence_determinism.py'
       - 'tests/test_cfb*.py'
+      - 'tests/test_nfl_evidence_determinism.py'
       - 'docs/cfb_model_feature_trace.md'
       - '.github/workflows/football-cfb-contract.yml'
   push:
     branches: [main]
     paths:
       - 'sportsedge/sports/cfb/**'
+      - 'sportsedge/core/validation/evidence_determinism.py'
       - 'scripts/*cfb*.py'
+      - 'scripts/verify_evidence_determinism.py'
       - 'tests/test_cfb*.py'
+      - 'tests/test_nfl_evidence_determinism.py'
       - 'docs/cfb_model_feature_trace.md'
       - '.github/workflows/football-cfb-contract.yml'
 
 jobs:
   contract:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    env:
+      EVIDENCE_GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EVIDENCE_GIT_SHA }}
+
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
+
       - name: Install runtime test dependencies
         run: python -m pip install --disable-pip-version-check numpy==2.5.3 pytest==9.1.1
+
       - name: Compile CFB execution surface
         run: |
           python -m py_compile \
+            sportsedge/core/validation/evidence_determinism.py \
             sportsedge/sports/cfb/source.py \
             sportsedge/sports/cfb/classification_policy.py \
             sportsedge/sports/cfb/joint_model.py \
@@ -40,6 +54,147 @@ jobs:
             sportsedge/sports/cfb/model_artifact.py \
             sportsedge/sports/cfb/training_artifact.py \
             scripts/build_cfb_model_artifact.py \
+            scripts/verify_evidence_determinism.py \
             scripts/run_cfb_auto.py
+
       - name: Run CFB contract tests
         run: python -m unittest discover -s tests -p 'test_cfb*.py' -v
+
+      - name: Build frozen CFB determinism fixture
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          from sportsedge.sports.cfb.historical_features import CFB_HISTORICAL_MATERIALIZER_VERSION
+          from sportsedge.sports.cfb.training_artifact import CFB_PIT_TRAINING_BUNDLE_SCHEMA
+
+          team_keys = (
+              'off_ppa_rush', 'off_ppa_dropback', 'def_ppa_rush_allowed',
+              'def_ppa_dropback_allowed', 'off_success_rate',
+              'def_success_rate_allowed', 'standard_down_ppa',
+              'passing_down_success_rate', 'eckel_rate', 'points_per_eckel',
+              'points_per_drive', 'net_field_position', 'explosive_rate',
+          )
+
+          def metrics(offset: float) -> dict[str, float]:
+              return {
+                  key: round((index + 1) / 10.0 + offset, 8)
+                  for index, key in enumerate(team_keys)
+              }
+
+          rows = []
+          for i in range(24):
+              season = 2022 if i < 12 else 2023
+              rows.append({
+                  'game_id': f'fixture_{season}_{i:02d}_AWAY_HOME',
+                  'season': season,
+                  'week': (i % 12) + 1,
+                  'neutral_site': bool(i % 7 == 0),
+                  'home_metrics': metrics(i / 100.0),
+                  'away_metrics': metrics((24 - i) / 120.0),
+                  'weather': {
+                      'game_indoor': bool(i % 9 == 0),
+                      'wind_speed': float(4 + (i % 7)),
+                      'temperature': float(58 + (i % 18)),
+                  },
+                  'home_score': 17 + ((i * 5) % 24),
+                  'away_score': 10 + ((i * 7) % 27),
+              })
+
+          bundle = {
+              'schema_version': CFB_PIT_TRAINING_BUNDLE_SCHEMA,
+              'materializer_version': CFB_HISTORICAL_MATERIALIZER_VERSION,
+              'source_manifest_sha256': 'c' * 64,
+              'rows': rows,
+          }
+          path = Path('artifacts/cfb/determinism/cfb_pit_training_bundle.json')
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(json.dumps(bundle, sort_keys=True, separators=(',', ':')) + '\n', encoding='utf-8')
+          PY
+
+      - name: Build CFB replay attempt A from frozen training bundle
+        env:
+          TZ: UTC
+        run: >-
+          python scripts/build_cfb_model_artifact.py
+          --training-bundle artifacts/cfb/determinism/cfb_pit_training_bundle.json
+          --fit-max-season 2023
+          --git-sha "$EVIDENCE_GIT_SHA"
+          --output artifacts/cfb/determinism/ci_attempt_001/model.json
+          --provenance-output artifacts/cfb/determinism/ci_attempt_001/provenance.json
+
+      - name: Build CFB replay B from same bundle with shifted timezone
+        env:
+          TZ: Pacific/Kiritimati
+        run: >-
+          python scripts/build_cfb_model_artifact.py
+          --training-bundle artifacts/cfb/determinism/cfb_pit_training_bundle.json
+          --fit-max-season 2023
+          --git-sha "$EVIDENCE_GIT_SHA"
+          --output artifacts/cfb/determinism/ci_replay_001/model.json
+          --provenance-output artifacts/cfb/determinism/ci_replay_001/provenance.json
+
+      - name: Verify CFB training-bundle-to-artifact byte determinism
+        id: cfb_determinism
+        continue-on-error: true
+        run: >-
+          python scripts/verify_evidence_determinism.py
+          --sport cfb
+          --baseline-dir artifacts/cfb/determinism/ci_attempt_001
+          --candidate-dir artifacts/cfb/determinism/ci_replay_001
+          --expected-git-sha "$EVIDENCE_GIT_SHA"
+          --determinism-class SAME_ENV_SAME_SHA
+          --replay-scope TRAINING_BUNDLE_TO_ARTIFACT
+          --clock-perturbation "BASELINE_TZ=UTC;REPLAY_TZ=Pacific/Kiritimati"
+          --source-identity-field training_bundle_sha256
+          --baseline-label CI_ATTEMPT_001
+          --candidate-label CI_REPLAY_001
+          --identity-artifact provenance.json
+          --artifact provenance.json
+          --artifact model.json
+          --out artifacts/cfb/cfb_determinism_report.json
+
+      - name: Upload CFB determinism diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cfb-training-bundle-determinism-${{ env.EVIDENCE_GIT_SHA }}
+          path: |
+            artifacts/cfb/cfb_determinism_report.json
+            artifacts/cfb/determinism/cfb_pit_training_bundle.json
+            artifacts/cfb/determinism/ci_attempt_001/*.json
+            artifacts/cfb/determinism/ci_replay_001/*.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Enforce exact CFB replay claim
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('artifacts/cfb/cfb_determinism_report.json')
+          if not path.is_file():
+              raise SystemExit('CFB_DETERMINISM_REPORT_MISSING')
+          report = json.loads(path.read_text(encoding='utf-8'))
+          required = {
+              'status': 'PASS',
+              'gate_basis': 'BYTE_IDENTITY',
+              'determinism_class': 'SAME_ENV_SAME_SHA',
+              'replay_scope': 'TRAINING_BUNDLE_TO_ARTIFACT',
+              'clock_perturbation': 'BASELINE_TZ=UTC;REPLAY_TZ=Pacific/Kiritimati',
+              'source_identity_field': 'training_bundle_sha256',
+              'all_bytes_equal': True,
+          }
+          for field, expected in required.items():
+              if report.get(field) != expected:
+                  raise SystemExit(
+                      f"CFB_DETERMINISM_CONTRACT_MISMATCH:{field}:"
+                      f"expected={expected!r}:actual={report.get(field)!r}:"
+                      f"status={report.get('status')}:"
+                      f"failure_class={report.get('failure_class')}:"
+                      f"reason={report.get('reason')}"
+                  )
+          PY
