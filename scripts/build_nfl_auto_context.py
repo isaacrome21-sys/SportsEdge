@@ -10,7 +10,12 @@ import io
 import json
 from pathlib import Path
 import re
+import sys
 from urllib.request import urlopen
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 from sportsedge.sports.nfl.auto_slate import build_nfl_auto_context_slate
 from sportsedge.sports.nfl.full_auto import build_nfl_full_auto_slate

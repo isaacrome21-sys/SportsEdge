@@ -6,8 +6,13 @@ import argparse
 from datetime import datetime, timezone
 import json
 import os
+import sys
 from pathlib import Path
 from zoneinfo import ZoneInfo
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 from sportsedge.auto_espn_odds import run_auto_mlb_espn_game_odds
 from sportsedge.auto_runner import AutoRunnerError, report_to_dict, run_auto_mlb

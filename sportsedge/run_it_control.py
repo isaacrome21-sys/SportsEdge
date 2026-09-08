@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 from typing import Any, Iterable, Mapping
 
 CONTROL_SCHEMA = "RUN_IT_CONTROL_V1"
@@ -159,7 +160,7 @@ def execute_surface(
             continue
         try:
             proc = subprocess.run(
-                command,
+                (sys.executable, *command[1:]),
                 cwd=root,
                 env=run_env,
                 text=True,
@@ -167,14 +168,22 @@ def execute_surface(
                 timeout=int(timeout_seconds),
                 check=False,
             )
-            status = "SUCCESS" if proc.returncode == 0 else "BLOCKED_OR_FAILED"
+            status = "SUCCESS" if proc.returncode == 0 else "BROKEN"
+            blocker = None if proc.returncode == 0 else "ENTRYPOINT_NONZERO"
+            try:
+                output = json.loads(proc.stdout)
+            except (ValueError, TypeError):
+                output = None
+            if isinstance(output, dict) and str(output.get("run_status") or output.get("status") or "").startswith("BLOCKED"):
+                status = "BLOCKED"
+                blocker = str(output.get("reason") or output.get("error") or output.get("blocker") or output.get("run_status") or "ENTRYPOINT_REPORTED_BLOCKED")
             results.append(LaneResult(
                 sport=sport,
                 lane=lane,
                 status=status,
                 automatic_completeness=completeness,
                 exit_code=int(proc.returncode),
-                blocker=None if proc.returncode == 0 else "ENTRYPOINT_NONZERO",
+                blocker=blocker,
                 command=command,
                 stdout_tail=_tail(proc.stdout),
                 stderr_tail=_tail(proc.stderr),

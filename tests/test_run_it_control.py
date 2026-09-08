@@ -101,3 +101,23 @@ def test_request_scope_all_and_subset():
     assert scope_from_request({"scope": "ALL"}) is None
     assert scope_from_request({"scope": "MLB,NFL"}) == ("MLB", "NFL")
     assert scope_from_request({"scope": ["PGA", "UFC"]}) == ("PGA", "UFC")
+
+
+@pytest.mark.parametrize("script", ["run_auto_mlb_resilient.py", "build_nfl_auto_context.py", "run_cfb_auto.py"])
+def test_sport_entrypoint_needs_no_pythonpath(script):
+    import os
+    env = dict(os.environ)
+    env.pop("PYTHONPATH", None)
+    proc = subprocess.run([sys.executable, "scripts/" + script, "--help"], cwd=ROOT, env=env, capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr
+
+
+@pytest.mark.parametrize("exit_code", [0, 2])
+def test_structured_block_never_becomes_success(tmp_path, exit_code):
+    script = tmp_path / "scripts" / "blocked.py"
+    script.parent.mkdir(parents=True)
+    script.write_text('import json\nprint(json.dumps({"status":"BLOCKED","reason":"SOURCE_UNAVAILABLE"}))\nraise SystemExit(' + str(exit_code) + ')\n')
+    _surface(tmp_path, {"MLB": {"automatic_command": ["python", "scripts/blocked.py"]}})
+    result = execute_surface(repo_root=tmp_path)["results"][0]
+    assert result["status"] == "BLOCKED"
+    assert result["blocker"] == "SOURCE_UNAVAILABLE"
