@@ -1,0 +1,27 @@
+name: green-attestation-depth
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/green-attestation-depth.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Install exact test runtime
+        run: python -m pip install --disable-pip-version-check numpy==2.5.3 pytest==9.1.1
+      - name: Locate CoverageSlot tests
+        run: grep -RIn "CoverageSlot\|declared_availability.*UNAVAILABLE\|UNAVAILABLE.*declared_availability" tests sportsedge || true
+      - name: Run named critical tests verbosely
+        run: |
+          python -m pytest -vv -rs             tests/test_espn_game_odds_source.py             tests/test_cfb_run_machine_finish.py             tests/test_football_nfl_field_position.py             tests/test_schedule_consolidation_contract.py             tests/test_mlb_acceptance_matrix.py             tests/test_full_auto_native_acceptance.py             tests/test_mlb_market_surface_catalog.py
+      - name: Run full suite with skip reasons
+        run: python -m pytest -q -rs tests
