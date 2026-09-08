@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify exact semantic replay of promotion evidence."""
+"""Verify byte-exact replay of promotion evidence."""
 from __future__ import annotations
 
 import argparse
@@ -20,8 +20,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
             "Compare two evidence directories at identical code/source identity. "
-            "PASS is exact semantic JSON equality; FAIL is a same-identity output "
-            "mismatch; BLOCKED means like-for-like replay was not provable."
+            "PASS requires byte-identical requested artifacts; semantic JSON "
+            "comparison is diagnostic-only after a byte mismatch. FAIL is a "
+            "same-identity byte mismatch; BLOCKED means like-for-like replay "
+            "was not provable."
         )
     )
     parser.add_argument("--sport", choices=("mlb", "cfb", "nfl"), required=True)
@@ -30,6 +32,20 @@ def main() -> int:
     parser.add_argument("--artifact", action="append", required=True, help="Relative JSON artifact path; repeatable")
     parser.add_argument("--identity-artifact", help="Artifact carrying code_git_sha and source_manifest_sha256")
     parser.add_argument("--expected-git-sha", required=True)
+    parser.add_argument(
+        "--determinism-class",
+        required=True,
+        help="Explicit certification class, e.g. SAME_ENV_SAME_SHA",
+    )
+    parser.add_argument(
+        "--replay-scope",
+        required=True,
+        help="Exact pipeline boundary certified by this replay",
+    )
+    parser.add_argument(
+        "--clock-perturbation",
+        help="Declared clock/timezone perturbation applied to replay B, if any",
+    )
     parser.add_argument("--baseline-label", default="ATTEMPT_001")
     parser.add_argument("--candidate-label", default="REPLAY")
     parser.add_argument("--max-differences", type=int, default=100)
@@ -52,6 +68,9 @@ def main() -> int:
         artifacts=args.artifact,
         identity_artifact=identity,
         expected_git_sha=args.expected_git_sha,
+        determinism_class=args.determinism_class,
+        replay_scope=args.replay_scope,
+        clock_perturbation=args.clock_perturbation,
         baseline_label=args.baseline_label,
         candidate_label=args.candidate_label,
         require_source_manifest=not args.allow_missing_source_manifest,
