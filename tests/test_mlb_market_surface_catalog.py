@@ -23,7 +23,7 @@ def _catalog_markets():
 class MLBMarketSurfaceCatalogTests(unittest.TestCase):
     def test_surface_is_exactly_catalog_complete(self):
         version, specs = load_market_surface(SURFACE)
-        self.assertEqual(version, "mlb_market_surface_v2")
+        self.assertEqual(version, "mlb_market_surface_v3")
         self.assertEqual(len(specs), 38)
         self.assertEqual({spec.market for spec in specs}, _catalog_markets())
 
@@ -55,6 +55,7 @@ class MLBMarketSurfaceCatalogTests(unittest.TestCase):
                 self.assertEqual(row["terminal_if_absent"], "PROVIDER_UNSUPPORTED")
                 self.assertFalse(row["retry_eligible"])
                 self.assertEqual(row["acquisition_route"], "UNMAPPED_PROVIDER_MARKET")
+                self.assertEqual(row["declared_availability"], "UNAVAILABLE")
 
     def test_every_provider_expected_market_has_named_acquisition_route(self):
         raw = json.loads(SURFACE.read_text())
