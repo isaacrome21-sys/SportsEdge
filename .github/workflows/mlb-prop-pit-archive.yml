@@ -26,6 +26,8 @@ concurrency:
 
 jobs:
   contract:
+    env:
+      PYTHONPATH: ${{ github.workspace }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
