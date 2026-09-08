@@ -7,7 +7,7 @@ from sportsedge.generic_card_pipeline import run_generic_card
 from sportsedge.live_slate import LiveGame,TeamLineup
 from sportsedge.mlb_market_binding import MARKET_BINDINGS,audit_status,validate_binding as real_validate_binding
 from sportsedge.mlb_binding_runtime import probability_binding_row as real_probability_binding_row
-from sportsedge.orchestrator import MLB_EXTERNAL_BINDING_MODE,run_candidate
+from sportsedge.orchestrator import MLB_EXTERNAL_BINDING_MODE,run_candidate,validate_normalized_mlb_quote_binding
 
 NOW=datetime(2026,9,8,1,0,tzinfo=timezone.utc)
 
@@ -131,21 +131,41 @@ class ProductionWiringTests(unittest.TestCase):
         self.assertTrue(all(r.bet_status=="BLOCKED" for r in out))
         self.assertTrue(all("PROBABILITY_SIDE_MISMATCH" in r.reason for r in out))
 
+    def test_external_binding_mode_requires_boundary_attestation(self):
+        q=quote("TOTALS",777,"OVER",line=8.5)
+        opposite=quote("TOTALS",777,"UNDER",line=8.5)
+        model_input={"game_id":"777","market":"TOTALS","entity_id":"777","line":8.5,"side":"OVER","away_mean_runs":4.0,"home_mean_runs":4.5}
+        result=run_candidate(model_input=model_input,quote=q,paired_quote=opposite,deployment={},engine_fn=lambda _: {"model_p":0.55},ingestion_now=NOW,finalization_now=NOW,candidate_binding_mode=MLB_EXTERNAL_BINDING_MODE)
+        self.assertEqual(result.bet_status,"BLOCKED")
+        self.assertIn("MLB_EXTERNAL_BINDING_ATTESTATION_REQUIRED",result.reason)
+
     def test_external_binding_mode_never_calls_legacy_candidate_binder(self):
         q=quote("TOTALS",777,"OVER",line=8.5)
         opposite=quote("TOTALS",777,"UNDER",line=8.5)
         model_input={"game_id":"777","market":"TOTALS","entity_id":"777","line":8.5,"side":"OVER","away_mean_runs":4.0,"home_mean_runs":4.5}
+        attestation=validate_normalized_mlb_quote_binding(game=game(),quote=q)
         with patch("sportsedge.orchestrator.bind_candidate",side_effect=AssertionError("legacy binder must not run")),patch("sportsedge.orchestrator.require_production_edge_floor",side_effect=RuntimeError("AFTER_BINDING_SENTINEL")):
-            result=run_candidate(model_input=model_input,quote=q,paired_quote=opposite,deployment={},engine_fn=lambda _: {"model_p":0.55},ingestion_now=NOW,finalization_now=NOW,candidate_binding_mode=MLB_EXTERNAL_BINDING_MODE)
+            result=run_candidate(model_input=model_input,quote=q,paired_quote=opposite,deployment={},engine_fn=lambda _: {"model_p":0.55},ingestion_now=NOW,finalization_now=NOW,candidate_binding_mode=MLB_EXTERNAL_BINDING_MODE,binding_attestation=attestation)
         self.assertEqual(result.bet_status,"BLOCKED")
         self.assertIn("AFTER_BINDING_SENTINEL",result.reason)
         self.assertNotIn("legacy binder",result.reason)
+
+    def test_attestation_cannot_be_reused_for_mutated_quote(self):
+        q=quote("TOTALS",777,"OVER",line=8.5)
+        attestation=validate_normalized_mlb_quote_binding(game=game(),quote=q)
+        mutated=dict(q);mutated["book_key"]="otherbook"
+        opposite=quote("TOTALS",777,"UNDER",line=8.5,book="otherbook")
+        model_input={"game_id":"777","market":"TOTALS","entity_id":"777","line":8.5,"side":"OVER","away_mean_runs":4.0,"home_mean_runs":4.5}
+        result=run_candidate(model_input=model_input,quote=mutated,paired_quote=opposite,deployment={},engine_fn=lambda _: {"model_p":0.55},ingestion_now=NOW,finalization_now=NOW,candidate_binding_mode=MLB_EXTERNAL_BINDING_MODE,binding_attestation=attestation)
+        self.assertEqual(result.bet_status,"BLOCKED")
+        self.assertIn("MLB_EXTERNAL_BINDING_ATTESTATION_MISMATCH",result.reason)
 
     def test_engine_cannot_smuggle_source_binding_identity(self):
         q=quote("TOTALS",777,"OVER",line=8.5)
         opposite=quote("TOTALS",777,"UNDER",line=8.5)
         model_input={"game_id":"777","market":"TOTALS","entity_id":"777","line":8.5,"side":"OVER","away_mean_runs":4.0,"home_mean_runs":4.5}
-        result=run_candidate(model_input=model_input,quote=q,paired_quote=opposite,deployment={},engine_fn=lambda _: {"model_p":0.55,"event_id":"777"},ingestion_now=NOW,finalization_now=NOW,candidate_binding_mode=MLB_EXTERNAL_BINDING_MODE)
+        attestation=validate_normalized_mlb_quote_binding(game=game(),quote=q)
+        result=run_candidate(model_input=model_input,quote=q,paired_quote=opposite,deployment={},engine_fn=lambda _: {"model_p":0.55,"event_id":"777"},ingestion_now=NOW,finalization_now=NOW,candidate_binding_mode=MLB_EXTERNAL_BINDING_MODE,binding_attestation=attestation)
         self.assertEqual(result.bet_status,"BLOCKED")
         self.assertIn("engine output contains quote/orchestration source identity",result.reason)
 
