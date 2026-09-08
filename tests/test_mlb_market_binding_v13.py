@@ -20,15 +20,17 @@ from sportsedge.orchestrator import run_candidate
 NOW = datetime(2026, 9, 8, 2, 0, tzinfo=timezone.utc)
 
 
-def q(market, side, entity, line, odds=-110):
+def q(market, side, entity, line, odds=-110, *, game_number=1):
     raw = {
-        "game_id": "777", "event_id": "777", "game_number": 1,
+        "game_id": "777", "event_id": "777", "game_number": game_number,
         "event_home_team_id": "20", "event_away_team_id": "10",
         "period": "FG", "market": market, "entity_id": str(entity),
         "line": line, "side": side, "american_odds": odds,
         "book_key": "draftkings", "retrieved_at": NOW, "ttl_seconds": 300,
         "is_alternate": False, "raw_market_name": market.lower(),
     }
+    if game_number is None:
+        raw.pop("game_number")
     if MARKET_BINDINGS[market].entity_type == "TEAM":
         raw["team_id"] = str(entity)
     return raw
@@ -72,6 +74,21 @@ class QuoteBindingTests(unittest.TestCase):
         away_rl = q("RUN_LINE", "AWAY", 10, +1.5, -125)
         validate_quote_pair(runtime_quote_binding_row(home_rl), runtime_quote_binding_row(away_rl))
 
+    def test_ordinary_game_pair_needs_event_id_not_fake_game_number(self):
+        home = q("MONEYLINE", "HOME", 20, 0.0, -120, game_number=None)
+        away = q("MONEYLINE", "AWAY", 10, 0.0, +110, game_number=None)
+        validate_quote_pair(runtime_quote_binding_row(home), runtime_quote_binding_row(away))
+        broken = dict(home)
+        broken.pop("event_id")
+        with self.assertRaisesRegex(BindingError, "event_id"):
+            validate_quote_binding(runtime_quote_binding_row(broken))
+
+    def test_invalid_supplied_game_number_fails(self):
+        bad = q("TOTALS", "OVER", 777, 8.5)
+        bad["game_number"] = 3
+        with self.assertRaisesRegex(BindingError, "ILLEGAL_GAME_NUMBER"):
+            validate_quote_binding(runtime_quote_binding_row(bad))
+
     def test_home_side_bound_to_away_team_fails(self):
         bad = q("MONEYLINE", "HOME", 10, 0.0)
         with self.assertRaisesRegex(BindingError, "SIDE_TEAM_MISMATCH"):
@@ -93,11 +110,7 @@ class QuoteBindingTests(unittest.TestCase):
                 runtime_quote_binding_row(q("TEAM_TOTALS", "UNDER", 10, 4.5)),
             )
 
-    def test_missing_event_instance_and_bad_threshold_fail(self):
-        row = runtime_quote_binding_row(q("TOTALS", "OVER", 777, 8.5))
-        row.pop("game_number")
-        with self.assertRaisesRegex(BindingError, "game_number"):
-            validate_quote_binding(row)
+    def test_bad_threshold_fails(self):
         bad = runtime_quote_binding_row(q("TOTALS", "OVER", 777, -8.5))
         with self.assertRaisesRegex(BindingError, "OUT_OF_DOMAIN"):
             validate_quote_binding(bad)
