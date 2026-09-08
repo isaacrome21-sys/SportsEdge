@@ -30,7 +30,7 @@ def main() -> int:
     parser.add_argument("--baseline-dir", type=Path, required=True)
     parser.add_argument("--candidate-dir", type=Path, required=True)
     parser.add_argument("--artifact", action="append", required=True, help="Relative JSON artifact path; repeatable")
-    parser.add_argument("--identity-artifact", help="Artifact carrying code_git_sha and source_manifest_sha256")
+    parser.add_argument("--identity-artifact", help="Artifact carrying code_git_sha and the configured source identity SHA")
     parser.add_argument("--expected-git-sha", required=True)
     parser.add_argument(
         "--determinism-class",
@@ -46,6 +46,14 @@ def main() -> int:
         "--clock-perturbation",
         help="Declared clock/timezone perturbation applied to replay B, if any",
     )
+    parser.add_argument(
+        "--source-identity-field",
+        default="source_manifest_sha256",
+        help=(
+            "SHA-256 field in the identity artifact that binds frozen inputs. "
+            "Use training_bundle_sha256 for CFB bundle-to-artifact replay."
+        ),
+    )
     parser.add_argument("--baseline-label", default="ATTEMPT_001")
     parser.add_argument("--candidate-label", default="REPLAY")
     parser.add_argument("--max-differences", type=int, default=100)
@@ -54,7 +62,7 @@ def main() -> int:
         action="store_true",
         help=(
             "Diagnostic-only escape hatch. Promotion workflows must not use this; "
-            "the default requires source_manifest_sha256 on both identity artifacts."
+            "the default requires the configured source identity SHA on both identity artifacts."
         ),
     )
     parser.add_argument("--out", type=Path, required=True)
@@ -73,6 +81,7 @@ def main() -> int:
         clock_perturbation=args.clock_perturbation,
         baseline_label=args.baseline_label,
         candidate_label=args.candidate_label,
+        source_identity_field=args.source_identity_field,
         require_source_manifest=not args.allow_missing_source_manifest,
         max_differences=args.max_differences,
     )
