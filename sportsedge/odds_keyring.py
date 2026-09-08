@@ -50,13 +50,8 @@ def _clean_keys(keys: Iterable[str]) -> tuple[str, ...]:
     return tuple(out)
 
 
-def _account_terminal_provider_code(exc: Exception) -> str | None:
-    """Return a provider code only when rotating keys cannot change the outcome.
-
-    The native Odds API source already preserves the provider error code in the
-    exception text. The attribute check also supports structured provider errors
-    without coupling this generic keyring to a specific source module.
-    """
+def account_terminal_provider_code(exc: Exception) -> str | None:
+    """Return the provider code when rotating credentials cannot change outcome."""
     value = getattr(exc, "provider_code", None)
     if value is not None:
         code = str(value).strip().upper()
@@ -78,7 +73,7 @@ def fetch_with_key_failover(keys: Iterable[str], fetcher: Callable[[str], T]) ->
         except Exception as exc:
             # Never include the credential itself in diagnostics.
             failures.append(OddsKeyFailure(slot, f"{type(exc).__name__}: {exc}"))
-            account_terminal = _account_terminal_provider_code(exc)
+            account_terminal = account_terminal_provider_code(exc)
             if account_terminal is not None:
                 summary = "; ".join(f"slot={x.key_slot}:{x.reason}" for x in failures)
                 raise OddsKeyringError(
