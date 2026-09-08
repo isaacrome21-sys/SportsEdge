@@ -10,6 +10,7 @@ on:
       - 'tests/**'
       - 'config/**'
       - 'scripts/run_auto_mlb*.py'
+      - 'scripts/*mlb*odds*freeze*.py'
       - '.github/workflows/mlb-fixture-full-pipeline.yml'
   pull_request:
     branches:
@@ -34,6 +35,13 @@ jobs:
           python-version: '3.12.13'
       - name: Install runtime dependencies
         run: python -m pip install --disable-pip-version-check numpy==2.5.3
+      - name: Compile paid-provider freeze and replay surface
+        run: |
+          python -m py_compile \
+            sportsedge/odds_api_frozen.py \
+            sportsedge/mlb_frozen_quotes.py \
+            scripts/capture_mlb_odds_api_freeze.py \
+            scripts/verify_mlb_odds_api_freeze.py
       - name: Prove frozen MLB pipeline on current SHA
         env:
           PYTHONPATH: ${{ github.workspace }}
@@ -67,6 +75,9 @@ jobs:
             tests.test_mlb_catalog_prediction_settlement \
             tests.test_mlb_catalog_settlement_journal \
             tests.test_mlb_sportsbook_provenance \
+            tests.test_game_odds_source_unittest \
+            tests.test_mlb_acquisition_quote_attestation \
+            tests.test_odds_api_frozen \
             -v
       - name: Assert no provider secrets are required
         shell: bash
