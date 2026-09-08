@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout exact source head
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 1
@@ -31,7 +31,7 @@ jobs:
           git archive --format=zip --prefix="SportsEdge-${sha}/" --output="artifacts/source-export/SportsEdge-${sha}.zip" HEAD
           sha256sum "artifacts/source-export/SportsEdge-${sha}.zip" | tee artifacts/source-export/SOURCE_ARCHIVE_SHA256.txt
       - name: Upload exact integration source
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: sportsedge-integration-source
           path: artifacts/source-export

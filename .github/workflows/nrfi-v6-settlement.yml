@@ -34,10 +34,10 @@ jobs:
       SPORTSEDGE_NRFI_V6_INPUT: artifacts/forward-shadow-state/captures
       SPORTSEDGE_NRFI_V6_SCORE_OUT: artifacts/forward-shadow-state/scored
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 1
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
 
@@ -45,7 +45,7 @@ jobs:
         run: python -m py_compile scripts/score_nrfi_v6_forward_shadow.py scripts/score_nrfi_v6_forward_shadow_v2.py
 
       - name: Restore rolling evidence state
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: artifacts/forward-shadow-state
           key: nrfi-v6-settlement-${{ runner.os }}-${{ github.run_id }}
@@ -206,7 +206,7 @@ jobs:
 
       - name: Upload cumulative scored evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: nrfi-v6-cumulative-evidence-${{ github.run_id }}
           path: |

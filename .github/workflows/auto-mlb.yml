@@ -49,6 +49,7 @@ jobs:
           python -m unittest
           tests.test_auto_runner
           tests.test_odds_api_source
+          tests.test_odds_event_snapshot
           tests.test_auto_native_odds
           tests.test_mlb_hits_features
           tests.test_mlb_total_bases_features

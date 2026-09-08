@@ -158,6 +158,7 @@ def build_nfl_m2_history_rows(
     *,
     prior_decay_curves: Mapping[int, Mapping[int, float]],
     neutral_site_policy: str = "error",
+    exclusion_report: dict[int, dict[str, int]] | None = None,
 ) -> list[dict[str, Any]]:
     """Build production-M2 rows under explicit neutral-site/stadium policies."""
     policy = str(neutral_site_policy).strip().lower()
@@ -165,6 +166,37 @@ def build_nfl_m2_history_rows(
         raise ValueError(f"NFL_NEUTRAL_SITE_POLICY_INVALID:{neutral_site_policy}")
 
     schedule = [dict(row) for row in schedule_rows]
+    weather_excluded_ids: set[str] = set()
+    for row in schedule:
+        if str(row.get("game_type") or "REG").upper() != "REG":
+            continue
+        game_id = str(row.get("game_id") or "").strip()
+        if not game_id:
+            raise ValueError("NFL_HISTORY_GAME_IDENTITY_MISSING")
+        season = int(row.get("season"))
+        home_rest = row.get("home_rest")
+        away_rest = row.get("away_rest")
+        if home_rest in (None, ""):
+            raise ValueError(f"NFL_HOME_REST_MISSING:{game_id}")
+        if away_rest in (None, ""):
+            raise ValueError(f"NFL_AWAY_REST_MISSING:{game_id}")
+        roof = str(row.get("roof") or "").strip().lower()
+        if not roof:
+            raise ValueError(f"NFL_ROOF_MISSING:{game_id}")
+        if roof not in {"outdoors", "open", "closed", "dome"}:
+            raise ValueError(f"NFL_ROOF_UNSUPPORTED:{game_id}:{roof}")
+        wind = row.get("wind_mph")
+        if wind in (None, ""):
+            wind = row.get("wind")
+        if wind in (None, ""):
+            if roof in {"closed", "dome"}:
+                row["wind"] = 0.0
+                row["sportsedge_wind_provenance"] = "DERIVED_ZERO_FROM_EXPLICIT_CLOSED_OR_DOME_ROOF"
+            else:
+                weather_excluded_ids.add(game_id)
+                if exclusion_report is not None:
+                    by_reason = exclusion_report.setdefault(season, {})
+                    by_reason["NFL_WIND_MISSING_OPEN_OR_OUTDOORS"] = by_reason.get("NFL_WIND_MISSING_OPEN_OR_OUTDOORS", 0) + 1
     depth = _project_starter_depth_rows(depth_rows)
     stadiums = bridge_postclosing_away_origins(schedule, stadium_rows)
     if policy == "error":
@@ -175,6 +207,7 @@ def build_nfl_m2_history_rows(
             depth,
             stadiums,
             prior_decay_curves=prior_decay_curves,
+            evaluation_excluded_ids=weather_excluded_ids,
         )
 
     excluded_ids: set[str] = set()
@@ -200,5 +233,6 @@ def build_nfl_m2_history_rows(
         depth,
         stadiums,
         prior_decay_curves=prior_decay_curves,
+        evaluation_excluded_ids=weather_excluded_ids | excluded_ids,
     )
     return [row for row in built if str(row.get("game_id") or "") not in excluded_ids]

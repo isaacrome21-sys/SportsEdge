@@ -481,9 +481,11 @@ def main() -> int:
         print(json.dumps(qb_coverage_payload, sort_keys=True))
         raise SystemExit(f"NFL_STARTING_QB_COVERAGE_GAPS:{len(qb_coverage_issues)}:{compact}")
 
+    weather_exclusions: dict[int, dict[str, int]] = {}
     history_rows = build_nfl_m2_history_rows(
         schedule, pbp, participation, depth, stadiums,
         prior_decay_curves=prior_curves, neutral_site_policy=args.neutral_site_policy,
+        exclusion_report=weather_exclusions,
     )
     if not history_rows:
         raise SystemExit("NFL_PRODUCTION_HISTORY_ROWS_EMPTY")
@@ -516,6 +518,14 @@ def main() -> int:
         "starting_qb_override_sha256": starter_override_sha,
         "starting_qb_overrides_applied": starter_overrides,
         "starting_qb_override_affected_games": sorted(override_affected_games),
+        "environment_exclusion_contract": "COUNTED_BY_SEASON_REASON_NO_SILENT_ZERO_FILL",
+        "environment_exclusions_by_season": {
+            str(season): dict(sorted(reasons.items()))
+            for season, reasons in sorted(weather_exclusions.items())
+        },
+        "environment_exclusion_count": sum(
+            sum(reasons.values()) for reasons in weather_exclusions.values()
+        ),
     })
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -531,6 +541,11 @@ def main() -> int:
         "trained_through_season": model_artifact["trained_through_season"], "promotion_evidence": evidence["promotion_evidence"],
         "stadium_home_origin_bridge_count": len(stadium_bridges), "starting_qb_coverage_issue_count": 0,
         "starting_qb_override_count": len(starter_overrides),
+        "environment_exclusion_count": sum(sum(reasons.values()) for reasons in weather_exclusions.values()),
+        "environment_exclusions_by_season": {
+            str(season): dict(sorted(reasons.items()))
+            for season, reasons in sorted(weather_exclusions.items())
+        },
     }, sort_keys=True))
     return 0
 

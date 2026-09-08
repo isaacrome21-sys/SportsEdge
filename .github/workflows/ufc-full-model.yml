@@ -35,8 +35,8 @@ jobs:
     outputs:
       live_inputs_status: ${{ steps.live_inputs.outputs.status }}
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.11'
       - name: Install test dependency
@@ -137,7 +137,7 @@ jobs:
           print('UFC_LIVE_INPUTS_READY', f.get('card_source'), len(f['fighters']), len(c))
           PY
           fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: ufc-bootstrap-${{ github.run_id }}
           path: |
@@ -154,8 +154,8 @@ jobs:
     if: ${{ needs.test-and-build.outputs.live_inputs_status == 'READY' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.11'
       - name: Check live odds credential
@@ -190,7 +190,7 @@ jobs:
           --promotion-evidence artifacts/ufc_promotion_evidence.json
           --sims 250000
           --output artifacts/ufc_card.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: ${{ steps.odds.outputs.available == 'true' }}
         with:
           name: ufc-full-model-${{ github.run_id }}

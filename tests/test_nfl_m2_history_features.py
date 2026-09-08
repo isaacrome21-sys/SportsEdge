@@ -7,6 +7,7 @@ from sportsedge.sports.nfl.m2_history_features import (
     fit_nfl_prior_decay_curves,
     select_starting_qb,
 )
+from sportsedge.sports.nfl.m2_history_policy import build_nfl_m2_history_rows as build_policy_rows
 
 
 class NFLM2HistoryFeatureTests(unittest.TestCase):
@@ -173,6 +174,63 @@ class NFLM2HistoryFeatureTests(unittest.TestCase):
         # defense always pressures AWY on its tracked dropback.
         self.assertEqual(row["home_features"]["pressure_allowed"], 0.0)
         self.assertEqual(row["home_features"]["pressure_for"], 1.0)
+
+    def test_missing_rest_fails_closed_in_core_builder(self):
+        schedule = self._schedule()
+        schedule[-1]["home_rest"] = ""
+        curves = fit_nfl_prior_decay_curves(schedule, self._pbp(), min_train_seasons=2, weeks=(1, 2, 3))
+        with self.assertRaisesRegex(ValueError, "NFL_HOME_REST_MISSING"):
+            build_nfl_m2_history_rows(
+                schedule, self._pbp(), self._participation(), self._depth(), self._stadiums(),
+                prior_decay_curves=curves,
+            )
+
+    def test_missing_roof_fails_closed_in_core_builder(self):
+        schedule = self._schedule()
+        schedule[-1]["roof"] = ""
+        curves = fit_nfl_prior_decay_curves(schedule, self._pbp(), min_train_seasons=2, weeks=(1, 2, 3))
+        with self.assertRaisesRegex(ValueError, "NFL_ROOF_MISSING"):
+            build_nfl_m2_history_rows(
+                schedule, self._pbp(), self._participation(), self._depth(), self._stadiums(),
+                prior_decay_curves=curves,
+            )
+
+    def test_closed_roof_missing_wind_is_explicitly_derived_zero(self):
+        schedule = self._schedule()
+        target = schedule[-1]
+        target["roof"] = "closed"
+        target["wind"] = ""
+        curves = fit_nfl_prior_decay_curves(schedule, self._pbp(), min_train_seasons=2, weeks=(1, 2, 3))
+        report = {}
+        rows = build_policy_rows(
+            schedule, self._pbp(), self._participation(), self._depth(), self._stadiums(),
+            prior_decay_curves=curves, exclusion_report=report,
+        )
+        row = next(r for r in rows if r["game_id"] == target["game_id"])
+        self.assertEqual(row["home_features"]["wind_mph"], 0.0)
+        self.assertEqual(
+            row["feature_provenance"]["weather"],
+            "DERIVED_ZERO_FROM_EXPLICIT_CLOSED_OR_DOME_ROOF",
+        )
+        self.assertEqual(report, {})
+
+    def test_open_or_outdoor_missing_wind_is_excluded_and_counted(self):
+        schedule = self._schedule()
+        target = schedule[-1]
+        target["roof"] = "outdoors"
+        target["wind"] = ""
+        curves = fit_nfl_prior_decay_curves(schedule, self._pbp(), min_train_seasons=2, weeks=(1, 2, 3))
+        report = {}
+        rows = build_policy_rows(
+            schedule, self._pbp(), self._participation(), self._depth(), self._stadiums(),
+            prior_decay_curves=curves, exclusion_report=report,
+        )
+        self.assertNotIn(target["game_id"], {r["game_id"] for r in rows})
+        self.assertEqual(
+            report,
+            {target["season"]: {"NFL_WIND_MISSING_OPEN_OR_OUTDOORS": 1}},
+        )
+
 
     def test_neutral_site_without_explicit_venue_fails_closed(self):
         schedule = self._schedule()

@@ -31,10 +31,10 @@ jobs:
       SPORTSEDGE_PROVIDER_TOKEN: ${{ secrets.SPORTSEDGE_PROVIDER_TOKEN }}
     steps:
       - name: Checkout vetted V5 runtime with risk guard
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: game-risk-guard-20260813
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
       - name: Install V5 runtime
@@ -66,7 +66,7 @@ jobs:
           echo "$SPORTSEDGE_EXPECTED_V5_GAME_SHA256  artifacts/statcast-v5-game/sportsedge_game_score_v5_statcast.joblib" | sha256sum -c -
           echo "$SPORTSEDGE_EXPECTED_V5_TRANSFORMER_SHA256  artifacts/statcast-v5-game/sportsedge_contact_transformer_v1.joblib" | sha256sum -c -
       - name: Restore prior-only Statcast and game-history caches
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: |
             .cache/sportsedge/statcast-v5-live
@@ -75,7 +75,7 @@ jobs:
           restore-keys: |
             v5-production-live-${{ runner.os }}-
       - name: Restore immutable daily pregame archive
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: .cache/sportsedge/v5-pregame
           key: v5-pregame-archive-${{ runner.os }}-${{ github.run_id }}
@@ -104,7 +104,7 @@ jobs:
           PY
       - name: Upload current and full-day pregame cards
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: v5-full-slate-${{ github.run_id }}
           path: |

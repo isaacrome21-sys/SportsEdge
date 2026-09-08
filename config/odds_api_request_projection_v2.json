@@ -1,0 +1,90 @@
+{
+  "version": "odds_api_request_projection_v2",
+  "status": "STRUCTURAL_REQUEST_SHAPE_ONLY_PROVIDER_QUOTA_UNKNOWN",
+  "generated_from": {
+    "auto_workflow": ".github/workflows/auto-mlb.yml",
+    "archive_workflow": ".github/workflows/archive-mlb-game-odds.yml",
+    "auto_entrypoint": "sportsedge/auto_native_odds.py",
+    "player_surface": "sportsedge/odds_api_source.py",
+    "game_surface": "sportsedge/game_odds_source.py",
+    "team_total_surface": "sportsedge/team_total_odds_source.py",
+    "additional_surface": "sportsedge/additional_mlb_odds_source.py"
+  },
+  "invariants": {
+    "provider_credit_cost_not_inferred": true,
+    "billing_plan_allowance_reset_unknown": true,
+    "actual_vs_projected_blocked_when_counter_coverage_incomplete": true
+  },
+  "auto_mlb": {
+    "schedule_cron": "*/15 15-23,0-5 * * *",
+    "scheduled_executions_per_day": 60,
+    "shared_event_snapshot": {
+      "http_requests_per_execution": 1,
+      "provider_markets_requested": 0,
+      "purpose": "single immutable provider event identity snapshot shared by all quote families",
+      "provenance_required": [
+        "provider",
+        "source_path",
+        "acquired_at_utc",
+        "payload_sha256"
+      ]
+    },
+    "surfaces": {
+      "game": {
+        "scope": "slate",
+        "http_requests_formula": "1",
+        "provider_markets": [
+          "h2h",
+          "spreads",
+          "totals"
+        ],
+        "provider_market_count": 3
+      },
+      "player_props": {
+        "scope": "per_event",
+        "http_requests_formula": "games",
+        "provider_market_count": 33,
+        "note": "all declared regular/alternate player-prop provider keys in MARKETS"
+      },
+      "team_totals": {
+        "scope": "per_event",
+        "http_requests_formula": "games",
+        "provider_markets": [
+          "team_totals"
+        ],
+        "provider_market_count": 1
+      },
+      "additional_derivatives": {
+        "scope": "per_event",
+        "http_requests_formula": "games",
+        "provider_markets": [
+          "h2h_1st_5_innings",
+          "spreads_1st_5_innings",
+          "totals_1st_5_innings",
+          "totals_1st_1_innings",
+          "batter_first_home_run",
+          "pitcher_record_a_win"
+        ],
+        "provider_market_count": 6
+      }
+    },
+    "total_http_requests_formula": "2 + 3*games",
+    "paid_market_units_shape_formula": "3 + 40*games",
+    "paid_market_units_warning": "This is request-shape exposure, NOT provider credits. Do not convert to quota usage until actual provider billing semantics and account plan are verified."
+  },
+  "archive_mlb_game_odds": {
+    "schedule_cron": "7,22,37,52 * * * *",
+    "scheduled_executions_per_day": 96,
+    "paid_call_condition": "only inside T-180/T-90/T0 +/-8 minute capture window and after daily-budget gate",
+    "paid_http_requests_per_capture_attempt": 1,
+    "provider_markets": [
+      "h2h",
+      "spreads",
+      "totals"
+    ],
+    "provider_market_count": 3,
+    "bookmakers": [
+      "draftkings"
+    ]
+  }
+}
