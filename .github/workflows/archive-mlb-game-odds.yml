@@ -2,9 +2,21 @@ name: archive-mlb-game-odds
 
 on:
   workflow_dispatch:
+    inputs:
+      repair_budget_ledger:
+        description: 'Repair same-day UNKNOWN budget ledger without making a paid request'
+        required: false
+        default: false
+        type: boolean
+      known_consumed_actual:
+        description: 'Known same-day credits consumed; required when repairing'
+        required: false
+        type: string
+      repair_reason:
+        description: 'Audit reason/source for the known consumed count'
+        required: false
+        type: string
   schedule:
-    # Four staggered chances per hour. A 15-minute cadence is sufficient for
-    # the archive script's +/-8 minute target-window acceptance.
     - cron: '7,22,37,52 * * * *'
 
 permissions:
@@ -48,8 +60,20 @@ jobs:
           if [ -f .data-branch/runtime/odds-budget/ledger.json ]; then
             cp .data-branch/runtime/odds-budget/ledger.json "$SPORTSEDGE_ODDS_BUDGET_LEDGER"
           fi
+      - name: Explicitly repair UNKNOWN daily budget ledger
+        id: repair
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.repair_budget_ledger }}
+        env:
+          SPORTSEDGE_ODDS_BUDGET_REPAIR_KNOWN_CONSUMED: ${{ inputs.known_consumed_actual }}
+          SPORTSEDGE_ODDS_BUDGET_REPAIR_REASON: ${{ inputs.repair_reason }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -I scripts/archive_raw_game_odds.py --repair-ledger
+          echo 'repaired=true' >> "$GITHUB_OUTPUT"
       - name: Deduplicate near-simultaneous successful capture
         id: dedupe
+        if: ${{ steps.repair.outputs.repaired != 'true' }}
         shell: bash
         run: |
           python - <<'PY'
@@ -57,7 +81,6 @@ jobs:
           import json
           import os
           from pathlib import Path
-
           ledger_path = Path(os.environ['SPORTSEDGE_ODDS_BUDGET_LEDGER'])
           now = datetime.now(timezone.utc)
           skip = False
@@ -67,10 +90,6 @@ jobs:
               ledger = json.loads(ledger_path.read_text())
           except Exception:
               ledger = {}
-
-          # This is intentionally short: it is only a collision guard for the
-          # primary/failover paths. A longer horizon could suppress a distinct
-          # T-180/T-90/T0 opportunity for another game cluster.
           for row in reversed(ledger.get('runs', [])):
               if row.get('status') != 'CAPTURED':
                   continue
@@ -84,10 +103,8 @@ jobs:
                   skip = True
                   source = row
               break
-
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as out:
               out.write(f"skip={'true' if skip else 'false'}\n")
-
           if skip and source is not None:
               day = now.date().isoformat()
               status_dir = Path('artifacts/raw_odds/status') / day
@@ -117,6 +134,10 @@ jobs:
         id: capture
         shell: bash
         run: |
+          if [ '${{ steps.repair.outputs.repaired }}' = 'true' ]; then
+            echo 'exit_code=0' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [ '${{ steps.dedupe.outputs.skip }}' = 'true' ]; then
             echo 'exit_code=0' >> "$GITHUB_OUTPUT"
             exit 0
