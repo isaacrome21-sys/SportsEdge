@@ -10,13 +10,16 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
 import unicodedata
-from typing import Any, Callable, Iterable, Mapping
+from typing import Any, Callable, Iterable, Mapping, TYPE_CHECKING
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
 from .mlb_source import GameSnapshot, parse_game_start
 from .runtime import parse_timestamp
+
+if TYPE_CHECKING:
+    from .odds_event_snapshot import OddsEventSnapshot
 
 BASE = "https://api.the-odds-api.com/v4"
 SPORT_KEY = "baseball_mlb"
@@ -265,12 +268,18 @@ def fetch_mlb_player_prop_quotes(
     opener: Callable = urlopen,
     bookmakers: Iterable[str] = DEFAULT_BOOKMAKERS,
     ttl_seconds: int = DEFAULT_TTL_SECONDS,
+    event_snapshot: "OddsEventSnapshot | None" = None,
 ) -> OddsApiSnapshot:
     games = list(schedule)
-    events_url = _event_url(f"/sports/{SPORT_KEY}/events", api_key=api_key)
-    events = _get_json(events_url, opener=opener, label="events")
-    if not isinstance(events, list):
-        raise OddsApiSourceError("ODDS_EVENTS_RESPONSE_NOT_LIST")
+    if event_snapshot is None:
+        events_url = _event_url(f"/sports/{SPORT_KEY}/events", api_key=api_key)
+        events = _get_json(events_url, opener=opener, label="events")
+        if not isinstance(events, list):
+            raise OddsApiSourceError("ODDS_EVENTS_RESPONSE_NOT_LIST")
+        snapshot_fields: dict[str, Any] = {}
+    else:
+        events = list(event_snapshot.events)
+        snapshot_fields = event_snapshot.provenance_fields()
     quotes: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
     requested_markets = ",".join(MARKETS)
@@ -300,7 +309,7 @@ def fetch_mlb_player_prop_quotes(
                 participant_index=participant_index,
                 ttl_seconds=ttl_seconds,
             )
-            quotes.extend(snapshot.quotes)
+            quotes.extend({**q, **snapshot_fields} for q in snapshot.quotes)
             failures.extend(snapshot.failures)
         except Exception as exc:
             failures.append({"reason": str(exc), "provider_event_id": str(event.get("id") if isinstance(event, Mapping) else "")})
