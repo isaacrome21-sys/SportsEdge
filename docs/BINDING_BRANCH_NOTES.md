@@ -1,0 +1,1 @@
+Branch `chatgpt/binding-value-scanner-v1` is an implementation branch, not a promotion artifact. It intentionally leaves market eligibility unchanged. The branch should be reviewed and CI-tested before merge. Passing unit tests alone does not establish 38-market production binding coverage.
