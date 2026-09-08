@@ -38,7 +38,7 @@ jobs:
         with:
           python-version: '3.12.13'
       - name: Install runtime dependency
-        run: python -m pip install --disable-pip-version-check numpy
+        run: python -m pip install --disable-pip-version-check numpy==2.5.3
       - name: Compile canonical machine
         run: python -m py_compile sportsedge/mlb_run_machine.py
       - name: Run canonical machine contract
