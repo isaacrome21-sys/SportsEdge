@@ -1,13 +1,17 @@
-"""Fail-closed semantic determinism checks for promotion evidence.
+"""Fail-closed byte determinism checks for promotion evidence.
 
 The verifier is intentionally sport-agnostic. Promotion evidence is only
 reproducible when the same code SHA and the same frozen source-manifest identity
-produce exactly the same JSON semantics. Dictionary key order and whitespace are
-irrelevant; list order, numeric values, strings, booleans, and nulls are exact.
+produce byte-identical requested artifacts.
+
+Byte identity is the sole output pass/fail gate. JSON semantic comparison exists
+only as a post-mismatch diagnostic and can never turn byte-different artifacts
+into PASS.
 
 Status contract:
-* PASS: every requested artifact is an exact semantic match.
-* FAIL: code/source identity matches, but at least one semantic output differs.
+* PASS: every requested artifact is byte-identical and identity preconditions hold.
+* FAIL: code/source identity matches, but at least one requested artifact differs
+  at the byte level.
 * BLOCKED: the comparison cannot prove like-for-like replay (missing artifact,
   malformed JSON, bad SHA, source-manifest mismatch, or invalid configuration).
 """
@@ -25,7 +29,7 @@ _GIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
 def canonical_json_bytes(value: Any) -> bytes:
-    """Return the canonical semantic representation used for replay hashing."""
+    """Return a canonical JSON representation for mismatch diagnostics only."""
     return json.dumps(
         value,
         sort_keys=True,
@@ -36,15 +40,20 @@ def canonical_json_bytes(value: Any) -> bytes:
 
 
 def semantic_sha256(value: Any) -> str:
+    """Hash canonical JSON semantics for mismatch diagnostics only."""
     return hashlib.sha256(canonical_json_bytes(value)).hexdigest()
+
+
+def _bytes_sha256(value: bytes) -> str:
+    return hashlib.sha256(value).hexdigest()
 
 
 def _reject_nonfinite(value: str) -> None:
     raise ValueError(f"NON_FINITE_JSON_NUMBER:{value}")
 
 
-def _load_json(path: Path) -> Any:
-    return json.loads(path.read_text(encoding="utf-8"), parse_constant=_reject_nonfinite)
+def _load_json_bytes(value: bytes) -> Any:
+    return json.loads(value.decode("utf-8"), parse_constant=_reject_nonfinite)
 
 
 def _valid_artifact_name(name: str) -> bool:
@@ -101,7 +110,7 @@ def _diff_json(
     differences: list[dict[str, Any]],
     max_differences: int,
 ) -> bool:
-    """Append deterministic JSON-pointer differences; return True if truncated."""
+    """Append deterministic JSON-pointer diagnostics; return True if truncated."""
     if len(differences) >= max_differences:
         return True
     if type(baseline) is not type(candidate):
@@ -159,13 +168,18 @@ def _diff_json(
 def _base_report(
     *, sport: str, baseline_label: str, candidate_label: str,
     expected_git_sha: str, artifacts: list[str], identity_artifact: str,
+    determinism_class: str, replay_scope: str, clock_perturbation: str | None,
 ) -> dict[str, Any]:
     return {
-        "schema_version": 1,
-        "contract": "SPORTSEDGE_EXACT_EVIDENCE_REPLAY_V1",
+        "schema_version": 2,
+        "contract": "SPORTSEDGE_BYTE_EXACT_EVIDENCE_REPLAY_V2",
+        "gate_basis": "BYTE_IDENTITY",
         "sport": sport,
         "baseline_label": baseline_label,
         "candidate_label": candidate_label,
+        "determinism_class": determinism_class,
+        "replay_scope": replay_scope,
+        "clock_perturbation": clock_perturbation,
         "expected_git_sha": expected_git_sha,
         "identity_artifact": identity_artifact,
         "artifacts_requested": artifacts,
@@ -173,6 +187,7 @@ def _base_report(
         "failure_class": None,
         "reason": None,
         "source_manifest_sha256": None,
+        "all_bytes_equal": False,
         "artifact_comparisons": [],
         "differences": [],
         "differences_truncated": False,
@@ -187,16 +202,22 @@ def compare_evidence_directories(
     artifacts: Iterable[str],
     identity_artifact: str,
     expected_git_sha: str,
+    determinism_class: str,
+    replay_scope: str,
+    clock_perturbation: str | None = None,
     baseline_label: str = "ATTEMPT_001",
     candidate_label: str = "REPLAY",
     require_source_manifest: bool = True,
     max_differences: int = 100,
 ) -> dict[str, Any]:
-    """Compare two evidence directories under a strict like-for-like contract."""
+    """Compare evidence directories with byte identity as the only output gate."""
     normalized_sport = str(sport or "").strip().lower()
     names = [str(name).strip() for name in artifacts]
     identity_name = str(identity_artifact or "").strip()
     expected = _normalize_git_sha(expected_git_sha)
+    determinism_class_value = str(determinism_class or "").strip()
+    replay_scope_value = str(replay_scope or "").strip()
+    clock_perturbation_value = str(clock_perturbation).strip() if clock_perturbation is not None else None
     report = _base_report(
         sport=normalized_sport,
         baseline_label=str(baseline_label),
@@ -204,6 +225,9 @@ def compare_evidence_directories(
         expected_git_sha=str(expected_git_sha or "").strip().lower(),
         artifacts=names,
         identity_artifact=identity_name,
+        determinism_class=determinism_class_value,
+        replay_scope=replay_scope_value,
+        clock_perturbation=clock_perturbation_value,
     )
 
     def blocked(reason: str, failure_class: str = "COMPARISON_NOT_PROVABLE") -> dict[str, Any]:
@@ -217,6 +241,10 @@ def compare_evidence_directories(
     if expected is None:
         return blocked("EXPECTED_GIT_SHA_INVALID", "INVALID_CONFIGURATION")
     report["expected_git_sha"] = expected
+    if not determinism_class_value:
+        return blocked("DETERMINISM_CLASS_REQUIRED", "INVALID_CONFIGURATION")
+    if not replay_scope_value:
+        return blocked("REPLAY_SCOPE_REQUIRED", "INVALID_CONFIGURATION")
     if not names or len(names) != len(set(names)):
         return blocked("ARTIFACT_LIST_EMPTY_OR_DUPLICATE", "INVALID_CONFIGURATION")
     if any(not _valid_artifact_name(name) for name in names):
@@ -228,7 +256,7 @@ def compare_evidence_directories(
 
     baseline_root = Path(baseline_dir)
     candidate_root = Path(candidate_dir)
-    loaded: dict[str, tuple[Any, Any]] = {}
+    loaded: dict[str, tuple[Any, Any, bytes, bytes]] = {}
     for name in names:
         baseline_path = baseline_root / name
         candidate_path = candidate_root / name
@@ -237,16 +265,24 @@ def compare_evidence_directories(
         if not candidate_path.is_file():
             return blocked(f"CANDIDATE_ARTIFACT_MISSING:{name}", "MISSING_EVIDENCE")
         try:
-            baseline_payload = _load_json(baseline_path)
-        except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
+            baseline_bytes = baseline_path.read_bytes()
+        except OSError as exc:
+            return blocked(f"BASELINE_ARTIFACT_READ_FAILED:{name}:{type(exc).__name__}", "MALFORMED_EVIDENCE")
+        try:
+            candidate_bytes = candidate_path.read_bytes()
+        except OSError as exc:
+            return blocked(f"CANDIDATE_ARTIFACT_READ_FAILED:{name}:{type(exc).__name__}", "MALFORMED_EVIDENCE")
+        try:
+            baseline_payload = _load_json_bytes(baseline_bytes)
+        except (UnicodeError, json.JSONDecodeError, ValueError) as exc:
             return blocked(f"BASELINE_ARTIFACT_INVALID_JSON:{name}:{type(exc).__name__}", "MALFORMED_EVIDENCE")
         try:
-            candidate_payload = _load_json(candidate_path)
-        except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
+            candidate_payload = _load_json_bytes(candidate_bytes)
+        except (UnicodeError, json.JSONDecodeError, ValueError) as exc:
             return blocked(f"CANDIDATE_ARTIFACT_INVALID_JSON:{name}:{type(exc).__name__}", "MALFORMED_EVIDENCE")
-        loaded[name] = (baseline_payload, candidate_payload)
+        loaded[name] = (baseline_payload, candidate_payload, baseline_bytes, candidate_bytes)
 
-    baseline_identity, candidate_identity = loaded[identity_name]
+    baseline_identity, candidate_identity, _, _ = loaded[identity_name]
     for label, payload in (("BASELINE", baseline_identity), ("CANDIDATE", candidate_identity)):
         if not isinstance(payload, dict):
             return blocked(f"{label}_IDENTITY_ARTIFACT_NOT_OBJECT", "MALFORMED_EVIDENCE")
@@ -278,39 +314,58 @@ def compare_evidence_directories(
     truncated = False
     comparisons: list[dict[str, Any]] = []
     for name in names:
-        baseline_payload, candidate_payload = loaded[name]
-        baseline_hash = semantic_sha256(baseline_payload)
-        candidate_hash = semantic_sha256(candidate_payload)
-        equal = baseline_hash == candidate_hash
-        comparisons.append({
+        baseline_payload, candidate_payload, baseline_bytes, candidate_bytes = loaded[name]
+        byte_equal = baseline_bytes == candidate_bytes
+        comparison: dict[str, Any] = {
             "artifact": name,
-            "baseline_semantic_sha256": baseline_hash,
-            "candidate_semantic_sha256": candidate_hash,
-            "semantic_equal": equal,
-        })
-        if not equal and len(all_differences) < max_differences:
+            "baseline_byte_sha256": _bytes_sha256(baseline_bytes),
+            "candidate_byte_sha256": _bytes_sha256(candidate_bytes),
+            "byte_equal": byte_equal,
+            "semantic_diagnostic": None,
+        }
+
+        # Semantics are diagnostic-only and are deliberately not evaluated on
+        # byte-equal artifacts. They can explain a mismatch, never waive it.
+        if not byte_equal:
+            baseline_semantic_hash = semantic_sha256(baseline_payload)
+            candidate_semantic_hash = semantic_sha256(candidate_payload)
+            semantic_equal = baseline_semantic_hash == candidate_semantic_hash
             artifact_differences: list[dict[str, Any]] = []
-            artifact_truncated = _diff_json(
-                baseline_payload, candidate_payload, path="",
-                differences=artifact_differences,
-                max_differences=max_differences - len(all_differences),
-            )
-            for row in artifact_differences:
-                row["artifact"] = name
-            all_differences.extend(artifact_differences)
+            artifact_truncated = False
+            if not semantic_equal and len(all_differences) < max_differences:
+                artifact_truncated = _diff_json(
+                    baseline_payload,
+                    candidate_payload,
+                    path="",
+                    differences=artifact_differences,
+                    max_differences=max_differences - len(all_differences),
+                )
+                for row in artifact_differences:
+                    row["artifact"] = name
+                all_differences.extend(artifact_differences)
+            elif not semantic_equal:
+                artifact_truncated = True
+            comparison["semantic_diagnostic"] = {
+                "baseline_semantic_sha256": baseline_semantic_hash,
+                "candidate_semantic_sha256": candidate_semantic_hash,
+                "semantic_equal": semantic_equal,
+                "differences": artifact_differences,
+                "differences_truncated": artifact_truncated,
+            }
             truncated = truncated or artifact_truncated
-        elif not equal:
-            truncated = True
+        comparisons.append(comparison)
 
     report["artifact_comparisons"] = comparisons
     report["differences"] = all_differences
     report["differences_truncated"] = truncated
-    if all(row["semantic_equal"] for row in comparisons):
+    all_bytes_equal = all(row["byte_equal"] for row in comparisons)
+    report["all_bytes_equal"] = all_bytes_equal
+    if all_bytes_equal:
         report["status"] = "PASS"
         report["failure_class"] = None
-        report["reason"] = None
+        report["reason"] = "EXACT_BYTE_OUTPUT_MATCH_AT_IDENTICAL_CODE_AND_SOURCE_IDENTITY"
     else:
         report["status"] = "FAIL"
         report["failure_class"] = "NON_DETERMINISTIC_EVIDENCE"
-        report["reason"] = "SEMANTIC_OUTPUT_MISMATCH_AT_IDENTICAL_CODE_AND_SOURCE_IDENTITY"
+        report["reason"] = "BYTE_OUTPUT_MISMATCH_AT_IDENTICAL_CODE_AND_SOURCE_IDENTITY"
     return report
