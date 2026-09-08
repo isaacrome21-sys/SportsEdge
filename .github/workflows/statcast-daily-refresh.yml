@@ -40,7 +40,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          python -m pip install --disable-pip-version-check 'pybaseball>=2.2.7,<3'
+          python -m pip install --disable-pip-version-check 'pybaseball==2.2.7'
           code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           exit 0
