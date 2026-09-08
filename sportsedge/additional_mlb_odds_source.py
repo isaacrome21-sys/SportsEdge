@@ -10,6 +10,8 @@ The Odds API market keys:
 
 Provider event/player identity is resolved with the same exact binders used by
 existing SportsEdge Odds API acquisition. No fuzzy matching is introduced.
+Canonical event/team/player binding identity is stamped here at acquisition,
+not invented later by the model layer.
 """
 from __future__ import annotations
 
@@ -90,8 +92,19 @@ def _base_quote(
     raw_market_name: str,
     provider_event: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
-    out: dict[str, Any] = {
+    provider_event_id = ""
+    if isinstance(provider_event, Mapping):
+        provider_event_id = str(provider_event.get("id") or "").strip()
+    if not provider_event_id:
+        raise AdditionalMLBOddsSourceError("ODDS_EVENT_ID_MISSING")
+
+    return {
         "game_id": str(game.game_pk),
+        "event_id": str(game.game_pk),
+        "provider_event_id": provider_event_id,
+        "game_number": game.game_number,
+        "event_home_team_id": str(game.home_id),
+        "event_away_team_id": str(game.away_id),
         "book_key": book_key,
         "sportsbook": book_title,
         "retrieved_at": retrieved_at,
@@ -101,11 +114,6 @@ def _base_quote(
         "away_team": str(game.away_name),
         "home_team": str(game.home_name),
     }
-    if isinstance(provider_event, Mapping):
-        event_id = str(provider_event.get("id") or "").strip()
-        if event_id:
-            out["provider_event_id"] = event_id
-    return out
 
 
 def _binary_side(value: Any) -> str:
@@ -163,15 +171,26 @@ def parse_additional_event_odds(
                 )
                 continue
 
-            base = _base_quote(
-                game=game,
-                book_key=book_key,
-                book_title=book_title,
-                retrieved_at=retrieved_at,
-                ttl_seconds=ttl_seconds,
-                raw_market_name=market_key,
-                provider_event=provider_event,
-            )
+            try:
+                base = _base_quote(
+                    game=game,
+                    book_key=book_key,
+                    book_title=book_title,
+                    retrieved_at=retrieved_at,
+                    ttl_seconds=ttl_seconds,
+                    raw_market_name=market_key,
+                    provider_event=provider_event,
+                )
+            except Exception as exc:
+                failures.append(
+                    {
+                        "reason": f"{type(exc).__name__}:{exc}",
+                        "game_id": str(game.game_pk),
+                        "book_key": book_key,
+                        "raw_market_name": market_key,
+                    }
+                )
+                continue
 
             for outcome in market.get("outcomes") or []:
                 try:
@@ -180,20 +199,27 @@ def parse_additional_event_odds(
                     price = outcome.get("price")
                     if price is None:
                         raise AdditionalMLBOddsSourceError("ODDS_OUTCOME_PRICE_MISSING")
+                    offer_id = outcome.get("sid")
+                    offer_identity = {}
+                    if offer_id not in (None, ""):
+                        offer_identity["offer_id"] = str(offer_id)
 
                     if market_key == "h2h_1st_5_innings":
                         side, team_id = _team_side(outcome.get("name"), game)
-                        quote = {
-                            **base,
-                            "period": "F5",
-                            "market": "F5_MONEYLINE",
-                            "entity_id": str(team_id),
-                            "side": side,
-                            "selection": str(outcome.get("name") or "").strip(),
-                            "line": 0.0,
-                            "american_odds": price,
-                        }
-                        quotes.append(quote)
+                        quotes.append(
+                            {
+                                **base,
+                                **offer_identity,
+                                "period": "F5",
+                                "market": "F5_MONEYLINE",
+                                "entity_id": str(team_id),
+                                "team_id": str(team_id),
+                                "side": side,
+                                "selection": str(outcome.get("name") or "").strip(),
+                                "line": 0.0,
+                                "american_odds": price,
+                            }
+                        )
 
                     elif market_key == "spreads_1st_5_innings":
                         side, team_id = _team_side(outcome.get("name"), game)
@@ -203,9 +229,11 @@ def parse_additional_event_odds(
                         quotes.append(
                             {
                                 **base,
+                                **offer_identity,
                                 "period": "F5",
                                 "market": "F5_RUN_LINE",
                                 "entity_id": str(team_id),
+                                "team_id": str(team_id),
                                 "side": side,
                                 "selection": str(outcome.get("name") or "").strip(),
                                 "line": point,
@@ -223,6 +251,7 @@ def parse_additional_event_odds(
                         quotes.append(
                             {
                                 **base,
+                                **offer_identity,
                                 "period": "F5",
                                 "market": "F5_TOTALS",
                                 "entity_id": str(game.game_pk),
@@ -252,6 +281,7 @@ def parse_additional_event_odds(
                             quotes.append(
                                 {
                                     **base,
+                                    **offer_identity,
                                     "period": "1ST",
                                     "market": canonical_market,
                                     "entity_id": str(game.game_pk),
@@ -281,9 +311,11 @@ def parse_additional_event_odds(
                         )
                         quote = {
                             **base,
+                            **offer_identity,
                             "period": "FG",
                             "market": canonical_market,
                             "entity_id": str(player_id),
+                            "player_id": str(player_id),
                             "provider_participant_name": provider_participant_name,
                             "provider_participant_name_normalized": normalize_name(provider_participant_name),
                             "side": side,
@@ -291,8 +323,6 @@ def parse_additional_event_odds(
                             "line": 0.0,
                             "american_odds": price,
                         }
-                        if outcome.get("sid") not in (None, ""):
-                            quote["offer_id"] = str(outcome["sid"])
                         quotes.append(quote)
 
                 except Exception as exc:
@@ -320,7 +350,7 @@ def fetch_mlb_additional_quotes(
     ttl_seconds: int = DEFAULT_TTL_SECONDS,
 ) -> AdditionalMLBOddsSnapshot:
     games = list(schedule)
-    events_url = _event_url(f"/sports/baseball_mlb/events", api_key=api_key)
+    events_url = _event_url("/sports/baseball_mlb/events", api_key=api_key)
     events = _get_json(events_url, opener=opener, label="events:additional")
     if not isinstance(events, list):
         raise OddsApiSourceError("ODDS_EVENTS_RESPONSE_NOT_LIST")
