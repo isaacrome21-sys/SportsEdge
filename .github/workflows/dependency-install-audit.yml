@@ -1,0 +1,26 @@
+name: dependency-install-audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/dependency-install-audit.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enumerate workflow dependency installs
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== PIP/APT INSTALL COMMANDS ==='
+          grep -RInE '(^|[[:space:]])(python3?|pip3?)([[:space:]]+-m)?[[:space:]]+pip[[:space:]]+install|(^|[[:space:]])pip3?[[:space:]]+install|apt-get[[:space:]]+install' .github/workflows || true
+          echo '=== SETUP-PYTHON VERSIONS ==='
+          grep -RInA3 'uses: actions/setup-python@' .github/workflows || true
