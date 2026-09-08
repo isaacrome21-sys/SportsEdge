@@ -118,6 +118,8 @@ jobs:
           done
 
       - name: Build exact production-M2 walk-forward evidence
+        env:
+          TZ: UTC
         run: >-
           python scripts/run_nfl_production_validation.py
           --schedule-file artifacts/football/sources/games.csv
@@ -172,7 +174,9 @@ jobs:
             cp "artifacts/football/${artifact}" "${baseline}/${artifact}"
           done
 
-      - name: Replay exact production-M2 at identical SHA and frozen inputs
+      - name: Replay exact production-M2 at identical SHA and frozen inputs with shifted timezone
+        env:
+          TZ: Pacific/Kiritimati
         run: >-
           python scripts/run_nfl_production_validation.py
           --schedule-file artifacts/football/sources/games.csv
@@ -196,6 +200,9 @@ jobs:
           --baseline-dir artifacts/football/determinism/ci_attempt_001
           --candidate-dir artifacts/football
           --expected-git-sha "$EVIDENCE_GIT_SHA"
+          --determinism-class SAME_ENV_SAME_SHA
+          --replay-scope FROZEN_SOURCE_MANIFEST_TO_ARTIFACT
+          --clock-perturbation "BASELINE_TZ=UTC;REPLAY_TZ=Pacific/Kiritimati"
           --baseline-label CI_ATTEMPT_001
           --candidate-label CI_REPLAY_001
           --identity-artifact nfl_production_validation.json
@@ -222,7 +229,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
-      - name: Enforce M2 determinism before any promotion evidence proceeds
+      - name: Enforce M2 byte determinism before any promotion evidence proceeds
         if: always()
         run: |
           python - <<'PY'
@@ -233,11 +240,23 @@ jobs:
           if not path.is_file():
               raise SystemExit('NFL_M2_DETERMINISM_REPORT_MISSING')
           report = json.loads(path.read_text(encoding='utf-8'))
-          if report.get('status') != 'PASS':
-              raise SystemExit(
-                  'NFL_M2_DETERMINISM_NOT_PASS:'
-                  f"{report.get('status')}:{report.get('failure_class')}:{report.get('reason')}"
-              )
+          required = {
+              'status': 'PASS',
+              'gate_basis': 'BYTE_IDENTITY',
+              'determinism_class': 'SAME_ENV_SAME_SHA',
+              'replay_scope': 'FROZEN_SOURCE_MANIFEST_TO_ARTIFACT',
+              'clock_perturbation': 'BASELINE_TZ=UTC;REPLAY_TZ=Pacific/Kiritimati',
+              'all_bytes_equal': True,
+          }
+          for field, expected in required.items():
+              if report.get(field) != expected:
+                  raise SystemExit(
+                      f"NFL_M2_DETERMINISM_CONTRACT_MISMATCH:{field}:"
+                      f"expected={expected!r}:actual={report.get(field)!r}:"
+                      f"status={report.get('status')}:"
+                      f"failure_class={report.get('failure_class')}:"
+                      f"reason={report.get('reason')}"
+                  )
           PY
 
       - name: Build isolated V2A and V2B candidate diagnostics
