@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Callable, Iterable, Mapping
+from typing import Any, Callable, Iterable, Mapping, TYPE_CHECKING
 from urllib.request import urlopen
 
 from .mlb_source import GameSnapshot
@@ -30,6 +30,9 @@ from .odds_api_source import (
     normalize_name,
 )
 from .runtime import parse_timestamp
+
+if TYPE_CHECKING:
+    from .odds_event_snapshot import OddsEventSnapshot
 
 PROVIDER_MARKETS = (
     "h2h_1st_5_innings",
@@ -318,12 +321,18 @@ def fetch_mlb_additional_quotes(
     opener: Callable = urlopen,
     bookmakers: Iterable[str] = DEFAULT_BOOKMAKERS,
     ttl_seconds: int = DEFAULT_TTL_SECONDS,
+    event_snapshot: "OddsEventSnapshot | None" = None,
 ) -> AdditionalMLBOddsSnapshot:
     games = list(schedule)
-    events_url = _event_url(f"/sports/baseball_mlb/events", api_key=api_key)
-    events = _get_json(events_url, opener=opener, label="events:additional")
-    if not isinstance(events, list):
-        raise OddsApiSourceError("ODDS_EVENTS_RESPONSE_NOT_LIST")
+    if event_snapshot is None:
+        events_url = _event_url(f"/sports/baseball_mlb/events", api_key=api_key)
+        events = _get_json(events_url, opener=opener, label="events:additional")
+        if not isinstance(events, list):
+            raise OddsApiSourceError("ODDS_EVENTS_RESPONSE_NOT_LIST")
+        snapshot_fields: dict[str, Any] = {}
+    else:
+        events = list(event_snapshot.events)
+        snapshot_fields = event_snapshot.provenance_fields()
 
     requested_books = ",".join(str(x).strip() for x in bookmakers if str(x).strip())
     if not requested_books:
@@ -356,7 +365,7 @@ def fetch_mlb_additional_quotes(
                 ttl_seconds=ttl_seconds,
                 provider_event=event,
             )
-            quotes.extend(snap.quotes)
+            quotes.extend({**q, **snapshot_fields} for q in snap.quotes)
             failures.extend(snap.failures)
         except Exception as exc:
             failures.append(
