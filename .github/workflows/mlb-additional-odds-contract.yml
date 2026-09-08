@@ -32,7 +32,7 @@ jobs:
         with:
           python-version: '3.12.13'
       - name: Install runtime dependencies
-        run: python -m pip install --disable-pip-version-check numpy
+        run: python -m pip install --disable-pip-version-check numpy==2.5.3
       - name: Compile additional acquisition modules
         run: python -m py_compile sportsedge/additional_mlb_odds_source.py sportsedge/auto_native_odds.py
       - name: Test seven additional MLB market mappings
