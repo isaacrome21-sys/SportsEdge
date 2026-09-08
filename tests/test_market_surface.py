@@ -80,3 +80,28 @@ class MarketSurfaceStage0Tests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+    def test_declared_unavailable_market_is_visible_in_coverage_accounting(self):
+        unavailable = spec("UNSUPPORTED_PROP", provider_expected=False, terminal="PROVIDER_UNSUPPORTED")
+        unavailable = MarketSpec(
+            market=unavailable.market,
+            scope=unavailable.scope,
+            provider_expected=unavailable.provider_expected,
+            retry_eligible=unavailable.retry_eligible,
+            terminal_if_absent=unavailable.terminal_if_absent,
+            opens_minutes_before_first_pitch=unavailable.opens_minutes_before_first_pitch,
+            expected_by_minutes_before_first_pitch=unavailable.expected_by_minutes_before_first_pitch,
+            declared_availability="UNAVAILABLE",
+        )
+        rows = build_market_grid(
+            games=(("777", FIRST_PITCH),),
+            specs=(unavailable,),
+            quotes=(),
+            engine_capable_markets=frozenset(),
+            now=NOW,
+        )
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].declared_availability, "UNAVAILABLE")
+        self.assertEqual(rows[0].acquisition_status, "PROVIDER_UNSUPPORTED")
+        self.assertEqual(rows[0].engine_status, "NO_ENGINE")
