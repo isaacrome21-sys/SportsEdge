@@ -2,6 +2,10 @@
 
 Admission validates quote identity only. It never implies model promotion or betting
 eligibility. All canonical prop labels route through the shared joint engines.
+
+Source binding identity is preserved exactly when supplied. It is deliberately not
+inferred from ``game_id`` or any model field; the binding layer decides whether the
+source identity is complete and agrees with official MLB event context.
 """
 from __future__ import annotations
 
@@ -48,6 +52,7 @@ SIDE_BY_MARKET = {
 }
 
 LINE_OPTIONAL_MARKETS = {"MONEYLINE", "F5_MONEYLINE", "NRFI", "YRFI"} | BINARY_MARKETS
+SOURCE_BINDING_TEXT_FIELDS = ("event_id", "event_home_team_id", "event_away_team_id")
 
 
 def _finite(name: str, value: Any) -> float:
@@ -70,6 +75,33 @@ def _required_text(raw: Mapping[str, Any], key: str) -> str:
     if not out:
         raise QuoteBridgeError("QUOTE_IDENTITY_INCOMPLETE")
     return out
+
+
+def _preserve_source_binding_identity(raw: Mapping[str, Any], out: dict[str, Any]) -> None:
+    """Copy source-bound identity without manufacturing defaults.
+
+    Missing values are intentionally left missing so the orchestrator's binding
+    validator can produce a per-market BLOCKED result instead of quote admission
+    silently inventing an identity.
+    """
+    for key in SOURCE_BINDING_TEXT_FIELDS:
+        if key not in raw or raw.get(key) in (None, ""):
+            continue
+        value = str(raw[key]).strip()
+        if not value:
+            raise QuoteBridgeError("QUOTE_SOURCE_IDENTITY_INVALID")
+        out[key] = value
+    if "game_number" in raw and raw.get("game_number") not in (None, ""):
+        value = raw["game_number"]
+        if isinstance(value, bool):
+            raise QuoteBridgeError("QUOTE_SOURCE_GAME_NUMBER_INVALID")
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError) as exc:
+            raise QuoteBridgeError("QUOTE_SOURCE_GAME_NUMBER_INVALID") from exc
+        if str(value).strip() not in {str(parsed), f"{parsed}.0"}:
+            raise QuoteBridgeError("QUOTE_SOURCE_GAME_NUMBER_INVALID")
+        out["game_number"] = parsed
 
 
 def validate_canonical_quote(raw: Mapping[str, Any], *, default_ttl_seconds: int = 300) -> dict[str, Any]:
@@ -126,6 +158,7 @@ def validate_canonical_quote(raw: Mapping[str, Any], *, default_ttl_seconds: int
         "is_alternate": is_alternate, "raw_market_name": raw_market_name,
         "american_odds": int(odds), "ttl_seconds": ttl,
     }
+    _preserve_source_binding_identity(raw, out)
     for key in ("sportsbook", "offer_id", "source_url", "selection"):
         if raw.get(key) not in (None, ""):
             out[key] = str(raw[key])
