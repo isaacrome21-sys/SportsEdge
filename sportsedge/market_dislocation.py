@@ -1,7 +1,7 @@
 """Market-only stale-price / value scanner.
 
-This module never creates Model_P.  It compares an executable quote with a
-same-instant, same-contract, de-vigged reference market.  Reference prices are
+This module never creates Model_P. It compares an executable quote with a
+same-instant, same-contract, de-vigged reference market. Reference prices are
 MARKET data and are prohibited from entering predictive model features.
 """
 from __future__ import annotations
@@ -17,6 +17,7 @@ from .mlb_market_binding_v13 import (
     INTEGER_PUSHABLE,
     MARKET_BINDINGS,
     NO_THRESHOLD,
+    N_WAY,
     runtime_quote_binding_row,
     validate_quote_binding,
     validate_quote_pair,
@@ -30,8 +31,12 @@ class MarketDislocationError(ValueError):
 
 PROHIBITED_MODEL_KEYS = frozenset({
     "model_p", "model_probability", "sportsedge_probability", "model_edge",
-    "model_ev", "fair_model_probability",
+    "model_ev", "fair_model_probability", "model_input", "model_output",
 })
+# These canonical IDs still have unresolved settlement/market-shape semantics for
+# this scanner. They remain visible but fail closed rather than being priced with
+# a convenient two-way assumption.
+DISLOCATION_BLOCKED_MARKETS = frozenset({"F5_MONEYLINE", "FIRST_HOME_RUN"})
 
 
 @dataclass(frozen=True)
@@ -48,6 +53,7 @@ class MarketDislocation:
     reference_fair_probability: float | None
     reference_books: tuple[str, ...]
     reference_count: int
+    reference_probability_spread: float | None
     probability_edge: float | None
     conditional_ev_per_decision: float | None
     exact_market_ev_per_dollar: float | None
@@ -60,8 +66,18 @@ def _aware(value: datetime, field: str) -> datetime:
     return value.astimezone(timezone.utc)
 
 
+def _walk_keys(value: Any):
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            yield str(key).lower()
+            yield from _walk_keys(item)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            yield from _walk_keys(item)
+
+
 def _reject_model_contamination(row: Mapping[str, Any]) -> None:
-    bad = PROHIBITED_MODEL_KEYS.intersection(map(str, row.keys()))
+    bad = PROHIBITED_MODEL_KEYS.intersection(_walk_keys(row))
     if bad:
         raise MarketDislocationError(f"MODEL_DATA_PROHIBITED_IN_MARKET_SCANNER:{sorted(bad)}")
 
@@ -122,25 +138,58 @@ def scan_market_dislocation(
     min_reference_books: int = 2,
     max_age_seconds: float = 120.0,
     max_cross_book_skew_seconds: float = 60.0,
+    max_reference_probability_spread: float = 0.04,
     min_probability_edge: float = 0.01,
     min_conditional_ev: float = 0.01,
 ) -> MarketDislocation:
     """Compare one executable price with de-vigged reference books.
 
-    `conditional_ev_per_decision` is exact when the wager cannot push.  For an
+    `conditional_ev_per_decision` is exact when the wager cannot push. For an
     integer pushable line it is the EV conditional on the wager being decided;
-    the sign is still informative, but exact per-dollar EV needs independent
-    push mass and is intentionally not fabricated here.
+    exact per-dollar EV needs independent push mass and is not fabricated here.
+
+    Reference books are kept separate first. If their no-vig fair probabilities
+    materially conflict, the scan BLOCKS instead of silently averaging them.
     """
     now = _aware(as_of, "as_of")
     if min_reference_books < 1:
         raise MarketDislocationError("MIN_REFERENCE_BOOKS_INVALID")
-    if not isfinite(float(min_probability_edge)) or not isfinite(float(min_conditional_ev)):
-        raise MarketDislocationError("EDGE_THRESHOLD_INVALID")
+    numeric_guards = (
+        min_probability_edge,
+        min_conditional_ev,
+        max_reference_probability_spread,
+        max_age_seconds,
+        max_cross_book_skew_seconds,
+    )
+    if any(not isfinite(float(x)) for x in numeric_guards):
+        raise MarketDislocationError("SCANNER_THRESHOLD_INVALID")
+    if max_reference_probability_spread < 0 or max_age_seconds <= 0 or max_cross_book_skew_seconds < 0:
+        raise MarketDislocationError("SCANNER_THRESHOLD_INVALID")
 
     cand = _validated(candidate, as_of=now, max_age_seconds=max_age_seconds)
-    cand_key = _outcome_key(cand)
+    market = str(cand["market"])
+    side = str(cand["side"])
+    spec = MARKET_BINDINGS[market]
+    line = None if spec.threshold_semantics == NO_THRESHOLD else float(cand["line"])
+    odds = int(cand["american_odds"])
+    raw_implied = 1.0 / american_to_decimal(odds)
     candidate_book = str(cand["book_key"])
+
+    empty_base = dict(
+        event_id=str(cand["event_id"]), market=market, side=side, line=line,
+        candidate_book=candidate_book, candidate_odds=odds,
+        candidate_raw_implied=raw_implied, reference_books=(), reference_count=0,
+        reference_probability_spread=None,
+    )
+    if market in DISLOCATION_BLOCKED_MARKETS or spec.ways == N_WAY:
+        return MarketDislocation(
+            "BLOCKED", "MARKET_SEMANTICS_NOT_APPROVED_FOR_DISLOCATION",
+            reference_fair_probability=None, probability_edge=None,
+            conditional_ev_per_decision=None, exact_market_ev_per_dollar=None,
+            push_mass_required_for_exact_ev=False, **empty_base,
+        )
+
+    cand_key = _outcome_key(cand)
     allowed_books = None if reference_books is None else {str(x) for x in reference_books if str(x)}
 
     pool: list[dict[str, Any]] = []
@@ -181,21 +230,23 @@ def scan_market_dislocation(
         fair_ps.append(p)
         used_books.append(book)
 
-    market = str(cand["market"])
-    side = str(cand["side"])
-    spec = MARKET_BINDINGS[market]
-    line = None if spec.threshold_semantics == NO_THRESHOLD else float(cand["line"])
-    odds = int(cand["american_odds"])
-    raw_implied = 1.0 / american_to_decimal(odds)
+    spread = (max(fair_ps) - min(fair_ps)) if len(fair_ps) >= 2 else None
     base = dict(
         event_id=str(cand["event_id"]), market=market, side=side, line=line,
         candidate_book=candidate_book, candidate_odds=odds,
         candidate_raw_implied=raw_implied, reference_books=tuple(used_books),
-        reference_count=len(fair_ps),
+        reference_count=len(fair_ps), reference_probability_spread=spread,
     )
     if len(fair_ps) < min_reference_books:
         return MarketDislocation(
             "BLOCKED", "REFERENCE_BOOKS_INSUFFICIENT", reference_fair_probability=None,
+            probability_edge=None, conditional_ev_per_decision=None,
+            exact_market_ev_per_dollar=None, push_mass_required_for_exact_ev=False,
+            **base,
+        )
+    if spread is not None and spread > max_reference_probability_spread:
+        return MarketDislocation(
+            "BLOCKED", "REFERENCE_MARKET_CONFLICT", reference_fair_probability=None,
             probability_edge=None, conditional_ev_per_decision=None,
             exact_market_ev_per_dollar=None, push_mass_required_for_exact_ev=False,
             **base,
