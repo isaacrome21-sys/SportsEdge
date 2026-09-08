@@ -8,10 +8,10 @@ from sportsedge.mlb_market_binding_v13 import BindingError
 from sportsedge.quote_bridge import validate_canonical_quote
 
 
-def game():
+def game(game_number=1):
     return SimpleNamespace(
         game_pk=123,
-        game_number=1,
+        game_number=game_number,
         home_id=10,
         away_id=20,
         home_team_id=10,
@@ -79,6 +79,22 @@ class RuntimeSourceIdentityTests(unittest.TestCase):
         self.assertNotIn("team_id", q)
         with self.assertRaises(BindingError):
             verify_runtime_binding_context(q, game())
+
+    def test_ordinary_game_uses_event_id_without_fabricating_game_number(self):
+        row = raw_quote()
+        row.pop("game_number")
+        q = validate_canonical_quote(row)
+        self.assertNotIn("game_number", q)
+        verified = verify_runtime_binding_context(q, game(game_number=None))
+        self.assertNotIn("game_number", verified)
+        self.assertEqual(verified["event_id"], "123")
+
+    def test_doubleheader_game_number_is_required_when_schedule_supplies_it(self):
+        row = raw_quote()
+        row.pop("game_number")
+        q = validate_canonical_quote(row)
+        with self.assertRaisesRegex(BindingError, "game_number"):
+            verify_runtime_binding_context(q, game(game_number=1))
 
     def test_acquisition_stamps_main_line_identity(self):
         payload = {
