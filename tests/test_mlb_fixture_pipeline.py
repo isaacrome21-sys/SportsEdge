@@ -17,12 +17,12 @@ NOW = datetime(2026, 8, 10, 20, 0, tzinfo=UTC)
 def lineup_rows(start): return [{"player_id": start+i, "slot": i+1, "sequence": 0} for i in range(9)]
 
 def frozen_game():
-    snap=GameSnapshot(game_pk=777,game_date="2026-08-10T23:00:00Z",status="Preview",away_id=1,away_name="Away",home_id=2,home_name="Home",away_probable_pitcher_id=11,away_probable_pitcher_name="Away SP",home_probable_pitcher_id=22,home_probable_pitcher_name="Home SP",retrieved_at="2026-08-10T19:59:00+00:00")
+    snap=GameSnapshot(game_pk=777,game_date="2026-08-10T23:00:00Z",status="Preview",away_id=1,away_name="Away",home_id=2,home_name="Home",away_probable_pitcher_id=11,away_probable_pitcher_name="Away SP",home_probable_pitcher_id=22,home_probable_pitcher_name="Home SP",retrieved_at="2026-08-10T19:59:00+00:00",game_number=1)
     return make_live_game(snap,lineup_rows(100),lineup_rows(200))
 
 def frozen_feature(): return {"game_pk":777,"entity_id":"777","market":"TOTALS","away_mean_runs":4.1,"home_mean_runs":4.6,"source_subset_hash":"fixture-v1"}
 
-def frozen_quote(side,odds): return {"game_id":"777","period":"FG","market":"TOTALS","entity_id":"777","line":8.5,"side":side,"american_odds":odds,"book_key":"draftkings","is_alternate":False,"raw_market_name":"Game Total","retrieved_at":"2026-08-10T19:59:00Z","ttl_seconds":300}
+def frozen_quote(side,odds): return {"game_id":"777","period":"FG","market":"TOTALS","entity_id":"777","line":8.5,"side":side,"american_odds":odds,"book_key":"draftkings","is_alternate":False,"raw_market_name":"Game Total","retrieved_at":"2026-08-10T19:59:00Z","ttl_seconds":300,"event_id":"777","game_number":1,"event_away_team_id":"1","event_home_team_id":"2"}
 
 def write_registry(path): path.write_text(json.dumps({"schema_version":1,"markets":{"TOTALS":{"market":"TOTALS","eligible":True,"stage":"DEPLOYED","reason":"frozen-fixture-ci"}}}))
 
@@ -62,7 +62,7 @@ class MLBFixtureFullPipelineTests(unittest.TestCase):
             registry=Path(td)/"deployments.json"; floors=Path(td)/"floors.json"; write_registry(registry); write_floors(floors)
             out=run_generic_card(games=[frozen_game()],feature_rows=[frozen_feature()],quotes=[frozen_quote("OVER",-113)],ingestion_now=NOW,finalization_now=NOW,registry_path=str(registry),edge_floor_config_path=str(floors))
         self.assertEqual(out[0].bet_status,"BLOCKED")
-        self.assertIn("PAIRED_PRICE_REQUIRED_FOR_DEVIG",out[0].reason)
+        self.assertIn("PAIRED_PRICE_REQUIRED_FOR_BINDING",out[0].reason)
 
 
 if __name__ == "__main__": unittest.main()
