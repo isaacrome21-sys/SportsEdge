@@ -7,6 +7,7 @@ from .candidate_binding import bind_candidate
 from .devig import multiplicative_devig
 from .edge_floors import DEFAULT_EDGE_FLOOR_CONFIG, require_production_edge_floor
 from .mlb_market_binding_v13 import (
+    PRODUCTION_WIRED_MARKETS,
     runtime_full_binding_row,
     runtime_quote_binding_row,
     validate_binding,
@@ -100,32 +101,44 @@ def _quote_identity(quote: Mapping[str, Any]) -> tuple[str, str | None, str, str
     return book_key, sportsbook, retrieved.isoformat(), offer_id
 
 
+def _require_explicit_readout_identity(output: Mapping[str, Any], market: str) -> None:
+    # Do not back-fill these from the quote/model request for a binding-audited
+    # market. The engine readout must identify the probability it actually
+    # produced, or the binding proof is circular.
+    for field in ("game_id", "market", "entity_id", "line", "side"):
+        if field not in output or output[field] in (None, ""):
+            raise OrchestrationError(f"BINDING_READOUT_IDENTITY_MISSING:{market}:{field}")
+
+
 def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], paired_quote: Mapping[str, Any] | None = None, deployment: Mapping[str, Any], engine_fn: Callable[[Mapping[str, Any]], Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG, kelly_multiplier: float = 0.25) -> RunResult:
     """Run one candidate end-to-end. Any integrity failure is a row-level BLOCKED."""
     market = str(model_input.get("market", "UNKNOWN"))
+    binding_required = market in PRODUCTION_WIRED_MARKETS
     try:
         _reject_market_leakage(model_input)
 
-        # Production quote/event identity is checked BEFORE model execution.
-        # The fields are attached by the card/orchestration boundary from the
-        # canonical MLB game object; the model never creates them.
-        validate_quote_binding(runtime_quote_binding_row(quote))
+        if binding_required:
+            validate_quote_binding(runtime_quote_binding_row(quote))
         double_ttl_gate(quote, ingestion_now, finalization_now)
         book_key, sportsbook, quote_retrieved_at, offer_id = _quote_identity(quote)
 
         output = dict(engine_fn(model_input))
         if "model_p" not in output:
             raise OrchestrationError("engine output missing model_p")
-        for key in ("game_id", "market", "entity_id", "line", "side"):
-            if key not in output and key in model_input:
-                output[key] = model_input[key]
+
+        if binding_required:
+            _require_explicit_readout_identity(output, market)
+            validate_binding(runtime_full_binding_row(quote, output))
+        else:
+            # Existing non-audited markets retain their compatibility behavior
+            # until their own binding migration is completed.
+            for key in ("game_id", "market", "entity_id", "line", "side"):
+                if key not in output and key in model_input:
+                    output[key] = model_input[key]
+
         runtime_path = _optional_text(output, "runtime_path")
         if deployment.get("eligible") is True and runtime_path == "LEGACY_COMPAT":
             raise OrchestrationError("LEGACY_COMPAT_PATH_NOT_PROMOTABLE")
-
-        # Bind the actual model readout to the exact executable offer before
-        # candidate/deployment binding, no-vig, EV or Truth Gate.
-        validate_binding(runtime_full_binding_row(quote, output))
         bind_candidate(output, quote, deployment)
 
         model_input_hash = _optional_sha256(output, "model_input_hash")
@@ -139,7 +152,8 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], p
 
         if not isinstance(paired_quote, Mapping):
             raise OrchestrationError("PAIRED_PRICE_REQUIRED_FOR_DEVIG")
-        validate_quote_binding(runtime_quote_binding_row(paired_quote))
+        if binding_required:
+            validate_quote_binding(runtime_quote_binding_row(paired_quote))
         double_ttl_gate(paired_quote, ingestion_now, finalization_now)
         devig = multiplicative_devig(quote, paired_quote)
 
