@@ -1,7 +1,7 @@
 from pathlib import Path
 import re
 
-USES = re.compile(r"\buses:\s*([^\s#]+)")
+USES = re.compile(r"^[ \t]*(?:-[ \t]+)?uses:[ \t]*([^\s#]+)", re.MULTILINE)
 IMMUTABLE = re.compile(r"^[^/@\s]+/[^@\s]+@[0-9a-fA-F]{40}$")
 
 
