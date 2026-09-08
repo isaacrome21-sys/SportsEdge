@@ -616,6 +616,11 @@ def build_nfl_m2_history_rows(
                     "pressure": "NFLVERSE_PARTICIPATION_WAS_PRESSURE",
                     "starter_qb": "NFLVERSE_DEPTH_CHART",
                     "travel": "DATE_BOUND_TEAM_STADIUM_METADATA",
+                    "weather": (
+                        str(game["sportsedge_wind_provenance"])
+                        if game.get("sportsedge_wind_provenance") not in (None, "")
+                        else "NFLVERSE_SCHEDULE_EXPLICIT"
+                    ),
                     "prior_decay": "EARLIER_SEASONS_ONLY_FIT",
                     "explosive_yards_threshold": _EXPLOSIVE_YARDS,
                 },
