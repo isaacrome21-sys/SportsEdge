@@ -63,6 +63,45 @@ class NFLForwardStateTests(unittest.TestCase):
             p=plan(schedule,state,__import__('datetime').datetime.fromisoformat("2026-09-10T23:10:00+00:00"),decision_min=45,decision_max=120,close_min=2,close_max=20)
             self.assertFalse(p["decision_due"])
 
+    def test_plan_ignores_historical_rows_before_start_parsing(self):
+        with TemporaryDirectory() as tmp:
+            root=Path(tmp); state=root/"state"; state.mkdir()
+            schedule=root/"games.csv"
+            schedule.write_text(
+                "season,week,game_type,game_id,gameday,gametime,home_team,away_team\n"
+                "1999,1,REG,1999_01_MIN_ATL,,,MIN,ATL\n"
+                "2026,1,REG,2026_01_BET_ALP,2026-09-10,20:20,ALP,BET\n",
+                encoding="utf-8",
+            )
+            p=plan(schedule,state,__import__('datetime').datetime.fromisoformat("2026-09-10T23:10:00+00:00"),decision_min=45,decision_max=120,close_min=2,close_max=20)
+            self.assertEqual(p["current_season"],2026)
+            self.assertEqual(p["decision_game_ids"],["2026_01_BET_ALP"])
+
+    def test_current_near_term_row_missing_start_fails_closed(self):
+        with TemporaryDirectory() as tmp:
+            root=Path(tmp); state=root/"state"; state.mkdir()
+            schedule=root/"games.csv"
+            schedule.write_text(
+                "season,week,game_type,game_id,gameday,gametime,home_team,away_team\n"
+                "2026,1,REG,2026_01_BET_ALP,2026-09-10,,ALP,BET\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(SystemExit,"NFL_FORWARD_PLAN_GAME_START_MISSING:2026_01_BET_ALP"):
+                plan(schedule,state,__import__('datetime').datetime.fromisoformat("2026-09-10T23:10:00+00:00"),decision_min=45,decision_max=120,close_min=2,close_max=20)
+
+    def test_far_future_current_season_row_is_not_considered(self):
+        with TemporaryDirectory() as tmp:
+            root=Path(tmp); state=root/"state"; state.mkdir()
+            schedule=root/"games.csv"
+            schedule.write_text(
+                "season,week,game_type,game_id,gameday,gametime,home_team,away_team\n"
+                "2026,15,REG,2026_15_FAR_ROW,2026-12-20,,AAA,BBB\n"
+                "2026,1,REG,2026_01_BET_ALP,2026-09-10,20:20,ALP,BET\n",
+                encoding="utf-8",
+            )
+            p=plan(schedule,state,__import__('datetime').datetime.fromisoformat("2026-09-10T23:10:00+00:00"),decision_min=45,decision_max=120,close_min=2,close_max=20)
+            self.assertEqual(p["decision_game_ids"],["2026_01_BET_ALP"])
+
     def test_close_is_partial_and_original_threshold_failures_stay_unpublished(self):
         with TemporaryDirectory() as tmp:
             root=Path(tmp); state=root/"state"; state.mkdir(); model=root/"model.json"; model_hash=self._model_artifact(model)
