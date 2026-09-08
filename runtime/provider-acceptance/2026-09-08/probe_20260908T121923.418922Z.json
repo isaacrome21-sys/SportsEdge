@@ -1,0 +1,29 @@
+{
+  "acceptance_scope": "PROVIDER_PATH_ONLY_NOT_TIMEPOINT_CAPTURE",
+  "attempts": [
+    {
+      "http_status": 401,
+      "key_slot": 1,
+      "provider_body": "{\"message\":\"Usage quota has been reached. See usage plans at https://the-odds-api.com\",\"error_code\":\"OUT_OF_USAGE_CREDITS\",\"details_url\":\"https://the-odds-api.com/liveapi/guides/v4/api-error-codes.html#out-of-usage-credits\"}\n",
+      "provider_code": "OUT_OF_USAGE_CREDITS"
+    },
+    {
+      "http_status": 401,
+      "key_slot": 2,
+      "provider_body": "{\"message\":\"Usage quota has been reached. See usage plans at https://the-odds-api.com\",\"error_code\":\"OUT_OF_USAGE_CREDITS\",\"details_url\":\"https://the-odds-api.com/liveapi/guides/v4/api-error-codes.html#out-of-usage-credits\"}\n",
+      "provider_code": "OUT_OF_USAGE_CREDITS"
+    }
+  ],
+  "bookmaker": "draftkings",
+  "credits_consumed_actual": "1",
+  "events_returned": 15,
+  "http_status": 200,
+  "key_slot": 3,
+  "key_slots_present": 4,
+  "market": "h2h",
+  "provider_credits_remaining": "458",
+  "provider_credits_used": "42",
+  "raw_file": "artifacts/provider-probe/2026-09-08/raw_20260908T121923Z.json",
+  "run_at_utc": "2026-09-08T12:19:23.418922+00:00",
+  "status": "PROVIDER_PATH_PASS"
+}
