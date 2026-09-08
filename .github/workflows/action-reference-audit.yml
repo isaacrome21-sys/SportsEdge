@@ -1,0 +1,22 @@
+name: action-reference-audit
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/action-reference-audit.yml'
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone repository without marketplace actions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git clone --depth=1 "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" repo
+      - name: Enumerate action references
+        run: |
+          cd repo
+          grep -RInE '^[[:space:]]*-[[:space:]]+uses:|^[[:space:]]+uses:' .github/workflows | sort
