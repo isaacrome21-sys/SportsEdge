@@ -3,6 +3,12 @@
 Acquires h2h, spreads and totals and binds every provider event to exactly one
 MLB StatsAPI game before emitting SportsEdge quotes. Sportsbook prices are
 price/execution inputs only and never Model_P features.
+
+The quote carries two distinct upstream identities after the provider event is
+bound: ``provider_event_id`` is the sportsbook-feed event identifier and
+``event_id``/team ids/game number are the independently acquired official MLB
+identity used by the binding boundary. No downstream model layer manufactures
+those fields.
 """
 from __future__ import annotations
 
@@ -49,11 +55,25 @@ def _updated(market: Mapping[str, Any], bookmaker: Mapping[str, Any]) -> datetim
         raise OddsApiSourceError("ODDS_MARKET_TIMESTAMP_INVALID") from exc
 
 
+def _official_binding_identity(game: GameSnapshot) -> dict[str, Any]:
+    """Return only identity fields acquired from the bound MLB schedule row."""
+    out: dict[str, Any] = {
+        "event_id": str(game.game_pk),
+        "event_home_team_id": str(game.home_id),
+        "event_away_team_id": str(game.away_id),
+    }
+    if game.game_number is not None:
+        out["game_number"] = int(game.game_number)
+    return out
+
+
 def parse_game_event_odds(payload: Mapping[str, Any], *, game: GameSnapshot, ttl_seconds: int = DEFAULT_TTL_SECONDS) -> GameOddsSnapshot:
     quotes: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
     if not isinstance(payload, Mapping):
         return GameOddsSnapshot((), ({"reason": "ODDS_EVENT_ODDS_MALFORMED", "game_id": str(game.game_pk)},))
+    provider_event_id = str(payload.get("id") or "").strip()
+    official_identity = _official_binding_identity(game)
     for bookmaker in payload.get("bookmakers") or []:
         if not isinstance(bookmaker, Mapping):
             failures.append({"reason": "ODDS_BOOKMAKER_MALFORMED", "game_id": str(game.game_pk)})
@@ -85,7 +105,12 @@ def parse_game_event_odds(payload: Mapping[str, Any], *, game: GameSnapshot, ttl
                         "american_odds": price, "raw_market_name": market_key,
                         "away_team": str(game.away_name), "home_team": str(game.home_name),
                         "is_alternate": False,
+                        **official_identity,
                     }
+                    if provider_event_id:
+                        base["provider_event_id"] = provider_event_id
+                    if outcome.get("sid") not in (None, ""):
+                        base["offer_id"] = str(outcome["sid"])
                     if market_key == "h2h":
                         side, team_id = _team_side(outcome.get("name"), game)
                         quotes.append({**base, "market": "MONEYLINE", "entity_id": str(team_id), "side": side, "selection": str(outcome.get("name") or "").strip(), "line": 0.0})
