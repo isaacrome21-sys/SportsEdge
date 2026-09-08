@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Callable, Iterable, Mapping
+from typing import Any, Callable, Iterable, Mapping, TYPE_CHECKING
 from urllib.request import urlopen
 
 from .mlb_source import GameSnapshot
@@ -22,6 +22,9 @@ from .odds_api_source import (
     normalize_name,
 )
 from .runtime import parse_timestamp
+
+if TYPE_CHECKING:
+    from .odds_event_snapshot import OddsEventSnapshot
 
 TEAM_TOTAL_PROVIDER_MARKET = "team_totals"
 
@@ -146,11 +149,17 @@ def fetch_mlb_team_total_quotes(
     opener: Callable = urlopen,
     bookmakers: Iterable[str] = DEFAULT_BOOKMAKERS,
     ttl_seconds: int = DEFAULT_TTL_SECONDS,
+    event_snapshot: "OddsEventSnapshot | None" = None,
 ) -> TeamTotalOddsSnapshot:
     games = list(schedule)
-    events = _get_json(_event_url("/sports/baseball_mlb/events", api_key=api_key), opener=opener, label="events:team-totals")
-    if not isinstance(events, list):
-        raise OddsApiSourceError("ODDS_EVENTS_RESPONSE_NOT_LIST")
+    if event_snapshot is None:
+        events = _get_json(_event_url("/sports/baseball_mlb/events", api_key=api_key), opener=opener, label="events:team-totals")
+        if not isinstance(events, list):
+            raise OddsApiSourceError("ODDS_EVENTS_RESPONSE_NOT_LIST")
+        snapshot_fields: dict[str, Any] = {}
+    else:
+        events = list(event_snapshot.events)
+        snapshot_fields = event_snapshot.provenance_fields()
     requested_books = ",".join(str(x).strip() for x in bookmakers if str(x).strip())
     if not requested_books:
         raise OddsApiSourceError("ODDS_BOOKMAKERS_MISSING")
@@ -180,7 +189,7 @@ def fetch_mlb_team_total_quotes(
                 ttl_seconds=ttl_seconds,
                 provider_event=event,
             )
-            quotes.extend(snap.quotes)
+            quotes.extend({**q, **snapshot_fields} for q in snap.quotes)
             failures.extend(snap.failures)
         except Exception as exc:
             failures.append({
