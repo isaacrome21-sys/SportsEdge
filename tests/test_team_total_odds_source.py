@@ -21,6 +21,7 @@ class TeamTotalOddsSourceTests(unittest.TestCase):
             home_probable_pitcher_name="Home SP",
             retrieved_at="2026-08-11T23:30:00Z",
             official_date="2026-08-11",
+            game_number=1,
         )
 
     def _payload(self, outcomes):
@@ -58,9 +59,28 @@ class TeamTotalOddsSourceTests(unittest.TestCase):
         self.assertEqual({q["book_key"] for q in snap.quotes}, {"draftkings"})
         self.assertEqual({q["sportsbook"] for q in snap.quotes}, {"DraftKings"})
         self.assertEqual({q["provider_event_id"] for q in snap.quotes}, {"provider-event"})
+        self.assertEqual({q["event_id"] for q in snap.quotes}, {"123"})
+        self.assertEqual({q["game_number"] for q in snap.quotes}, {1})
+        self.assertEqual({q["event_away_team_id"] for q in snap.quotes}, {"10"})
+        self.assertEqual({q["event_home_team_id"] for q in snap.quotes}, {"20"})
         self.assertEqual({q["offer_id"] for q in snap.quotes}, {"a1", "a2", "h1", "h2"})
         for quote in snap.quotes:
-            validate_canonical_quote(quote)
+            normalized = validate_canonical_quote(quote)
+            self.assertEqual(normalized["event_id"], "123")
+            self.assertEqual(normalized["game_number"], 1)
+            self.assertEqual(normalized["provider_event_id"], "provider-event")
+
+    def test_missing_game_number_is_not_manufactured(self):
+        game = self._game()
+        game = GameSnapshot(**{**game.__dict__, "game_number": None})
+        snap = parse_team_total_event_odds(
+            self._payload([
+                {"name": "Over", "description": "Texas Rangers", "point": 4.5, "price": -110},
+            ]),
+            game=game,
+        )
+        self.assertEqual(len(snap.quotes), 1)
+        self.assertNotIn("game_number", snap.quotes[0])
 
     def test_unknown_team_fails_closed_instead_of_guessing_side(self):
         snap = parse_team_total_event_odds(
