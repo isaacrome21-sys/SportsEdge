@@ -1,0 +1,88 @@
+{
+  "version": "odds_api_request_projection_v1",
+  "provider": "the_odds_api_v4",
+  "purpose": "Machine-readable upper-bound projection for detecting paid-endpoint usage that cannot be explained by declared scheduled callers.",
+  "comparison_unit": "provider_usage_credits",
+  "counter_headers": [
+    "x-requests-used",
+    "x-requests-remaining",
+    "x-requests-last"
+  ],
+  "material_excess": {
+    "absolute_credits": 5,
+    "fraction_of_projected_upper_bound": 0.1,
+    "rule": "flag only when actual counter delta is known and exceeds projected upper bound by more than max(absolute_credits, fraction * projected_upper_bound)"
+  },
+  "scheduled_callers": [
+    {
+      "workflow": "archive-mlb-game-odds.yml",
+      "workflow_name": "archive-mlb-game-odds",
+      "cron": ["7,22,37,52 * * * *"],
+      "scheduled_runs_per_day": 96,
+      "scheduled_runs_per_30_days": 2880,
+      "paid_when": "At least one MLB game falls inside the script's +/-8 minute T-180, T-90, or T0 capture window; outside those windows the run exits before calling The Odds API.",
+      "http_request_upper_bound_per_paid_run": {
+        "base": 1,
+        "per_bound_mlb_game": 0
+      },
+      "provider_credit_upper_bound_per_paid_run": {
+        "base": 3,
+        "per_bound_mlb_game": 0,
+        "derivation": "One /sports/baseball_mlb/odds request for h2h, spreads, totals in one bookmaker/US region; provider cost is at most 3 usage credits when data is returned."
+      }
+    },
+    {
+      "workflow": "auto-mlb.yml",
+      "workflow_name": "auto-mlb",
+      "cron": ["*/15 15-23,0-5 * * *"],
+      "scheduled_runs_per_day": 60,
+      "scheduled_runs_per_30_days": 1800,
+      "paid_when": "Every scheduled AUTOMATIC run that reaches native Odds API acquisition with a usable key; failed key slots may add zero-credit HTTP attempts before a usable slot succeeds.",
+      "http_request_upper_bound_per_paid_run": {
+        "base": 4,
+        "per_bound_mlb_game": 3,
+        "derivation": "Three free /events catalog calls + one featured-game /odds call + three per-event odds calls for each MLB game that binds to the current StatsAPI slate."
+      },
+      "provider_credit_upper_bound_per_paid_run": {
+        "base": 3,
+        "per_bound_mlb_game": 40,
+        "derivation": "Featured game markets cost <=3 credits. Per bound event: 33 player-prop market keys + 1 team-total key + 6 additional-market keys, one US region. The provider charges unique markets actually returned, so this is a conservative upper bound. /events catalog calls are quota-free."
+      }
+    }
+  ],
+  "manual_or_conditional_callers": [
+    {
+      "workflow": "archive-mlb-game-odds-failover.yml",
+      "schedule": "manual/rescue only",
+      "expected_scheduled_requests": 0,
+      "accounting_rule": "Any rescue dispatch must be represented by a GitHub workflow run and is added to the declared projection at digest time rather than silently treated as scheduled baseline."
+    },
+    {
+      "workflow": "archive-mlb-game-odds-backup-dispatch.yml",
+      "schedule": "manual only",
+      "expected_scheduled_requests": 0
+    },
+    {
+      "workflow": "archive-provider-acceptance-probe.yml",
+      "schedule": "manual only after schedule consolidation",
+      "expected_scheduled_requests": 0
+    }
+  ],
+  "derivation_sources": [
+    ".github/workflows/archive-mlb-game-odds.yml",
+    ".github/workflows/auto-mlb.yml",
+    "scripts/archive_raw_game_odds.py",
+    "sportsedge/auto_native_odds.py",
+    "sportsedge/odds_api_source.py",
+    "sportsedge/game_odds_source.py",
+    "sportsedge/team_total_odds_source.py",
+    "sportsedge/additional_mlb_odds_source.py"
+  ],
+  "fail_closed_rules": [
+    "Cron drift between this artifact and the live workflow makes the projection UNKNOWN.",
+    "Missing provider cumulative counters makes actual usage UNKNOWN.",
+    "Counter reset/non-monotonicity makes actual usage UNKNOWN for that key slot.",
+    "UNKNOWN actual usage blocks an actual-vs-projected anomaly judgment; UNKNOWN never renders as zero.",
+    "Manual/rescue paid callers are not allowed to disappear into baseline; their workflow run IDs must be surfaced separately."
+  ]
+}
