@@ -325,7 +325,7 @@ def self_test() -> int:
         "fixtureId": "id130001",
         "bookmakers": {"draftkings": {"markets": {"131": {"outcomes": {"131": {"players": {"0": [
             {"createdAt": "2026-06-05T09:57:12.731Z", "price": 1.613, "active": True}
-        ]}}}}}}}},
+        ]}}}}}}},
     }).encode()
     assert _history_payload_valid(raw, "id130001")
     print(json.dumps({
