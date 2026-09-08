@@ -38,7 +38,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install pinned runtime dependency
-        run: python -m pip install --disable-pip-version-check numpy
+        run: python -m pip install --disable-pip-version-check numpy==2.5.3
 
       - name: Freeze current NFL schedule before any decision
         shell: bash
