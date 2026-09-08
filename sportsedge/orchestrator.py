@@ -6,6 +6,12 @@ from typing import Any, Callable, Mapping
 from .candidate_binding import bind_candidate
 from .devig import multiplicative_devig
 from .edge_floors import DEFAULT_EDGE_FLOOR_CONFIG, require_production_edge_floor
+from .mlb_market_binding_v13 import (
+    runtime_full_binding_row,
+    runtime_quote_binding_row,
+    validate_binding,
+    validate_quote_binding,
+)
 from .price_ttl import double_ttl_gate
 from .truth_gate import BetDecision, decide_bet
 
@@ -13,12 +19,10 @@ from .truth_gate import BetDecision, decide_bet
 class OrchestrationError(ValueError):
     pass
 
-
 BANNED_MODEL_INPUT_KEYS = {
     "sportsbook_probability", "implied_probability", "market_probability",
     "american_odds", "decimal_odds", "sportsbook_price", "dk_probability",
 }
-
 
 @dataclass(frozen=True)
 class RunResult:
@@ -74,11 +78,7 @@ def _optional_nonnegative_int(output: Mapping[str, Any], key: str) -> int | None
     if isinstance(value, bool):
         raise OrchestrationError(f"engine output malformed {key}")
     try:
-        parsed = int(value)
-    except (TypeError, ValueError) as exc:
-        raise OrchestrationError(f"engine output malformed {key}") from exc
-    try:
-        numeric = float(value)
+        parsed = int(value); numeric = float(value)
     except (TypeError, ValueError) as exc:
         raise OrchestrationError(f"engine output malformed {key}") from exc
     if parsed < 0 or numeric != parsed:
@@ -101,12 +101,18 @@ def _quote_identity(quote: Mapping[str, Any]) -> tuple[str, str | None, str, str
 
 
 def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], paired_quote: Mapping[str, Any] | None = None, deployment: Mapping[str, Any], engine_fn: Callable[[Mapping[str, Any]], Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG, kelly_multiplier: float = 0.25) -> RunResult:
-    """Run one candidate end-to-end. Any integrity failure returns BLOCKED, never a guessed bet."""
+    """Run one candidate end-to-end. Any integrity failure is a row-level BLOCKED."""
     market = str(model_input.get("market", "UNKNOWN"))
     try:
         _reject_market_leakage(model_input)
+
+        # Production quote/event identity is checked BEFORE model execution.
+        # The fields are attached by the card/orchestration boundary from the
+        # canonical MLB game object; the model never creates them.
+        validate_quote_binding(runtime_quote_binding_row(quote))
         double_ttl_gate(quote, ingestion_now, finalization_now)
         book_key, sportsbook, quote_retrieved_at, offer_id = _quote_identity(quote)
+
         output = dict(engine_fn(model_input))
         if "model_p" not in output:
             raise OrchestrationError("engine output missing model_p")
@@ -116,7 +122,12 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], p
         runtime_path = _optional_text(output, "runtime_path")
         if deployment.get("eligible") is True and runtime_path == "LEGACY_COMPAT":
             raise OrchestrationError("LEGACY_COMPAT_PATH_NOT_PROMOTABLE")
+
+        # Bind the actual model readout to the exact executable offer before
+        # candidate/deployment binding, no-vig, EV or Truth Gate.
+        validate_binding(runtime_full_binding_row(quote, output))
         bind_candidate(output, quote, deployment)
+
         model_input_hash = _optional_sha256(output, "model_input_hash")
         distribution_sha256 = _optional_sha256(output, "distribution_sha256")
         readout_sha256 = _optional_sha256(output, "readout_sha256")
@@ -128,6 +139,7 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], p
 
         if not isinstance(paired_quote, Mapping):
             raise OrchestrationError("PAIRED_PRICE_REQUIRED_FOR_DEVIG")
+        validate_quote_binding(runtime_quote_binding_row(paired_quote))
         double_ttl_gate(paired_quote, ingestion_now, finalization_now)
         devig = multiplicative_devig(quote, paired_quote)
 
@@ -140,17 +152,11 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], p
         )
         return RunResult(
             market, float(output["model_p"]), decision.bet_status, decision, "ok",
-            model_input_hash=model_input_hash,
-            distribution_sha256=distribution_sha256,
-            readout_sha256=readout_sha256,
-            readout_version=readout_version,
-            engine_version=engine_version,
-            runtime_path=runtime_path,
-            seed_policy=seed_policy,
-            mc_paths=mc_paths,
-            book_key=book_key,
-            sportsbook=sportsbook,
-            quote_retrieved_at=quote_retrieved_at,
+            model_input_hash=model_input_hash, distribution_sha256=distribution_sha256,
+            readout_sha256=readout_sha256, readout_version=readout_version,
+            engine_version=engine_version, runtime_path=runtime_path,
+            seed_policy=seed_policy, mc_paths=mc_paths, book_key=book_key,
+            sportsbook=sportsbook, quote_retrieved_at=quote_retrieved_at,
             offer_id=offer_id,
         )
     except Exception as exc:
@@ -160,22 +166,16 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], p
 def run_slate(candidates: list[Mapping[str, Any]], *, engines: Mapping[str, Callable[[Mapping[str, Any]], Mapping[str, Any]]], deployments: Mapping[str, Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG, kelly_multiplier: float = 0.25) -> list[RunResult]:
     results: list[RunResult] = []
     for item in candidates:
-        model_input = item.get("model_input")
-        quote = item.get("quote")
-        paired_quote = item.get("paired_quote")
+        model_input = item.get("model_input"); quote = item.get("quote"); paired_quote = item.get("paired_quote")
         if not isinstance(model_input, Mapping) or not isinstance(quote, Mapping):
-            results.append(RunResult("UNKNOWN", None, "BLOCKED", None, "candidate missing model_input/quote"))
-            continue
-        market = model_input.get("market")
-        engine = engines.get(market)
-        deployment = deployments.get(market)
+            results.append(RunResult("UNKNOWN", None, "BLOCKED", None, "candidate missing model_input/quote")); continue
+        market = model_input.get("market"); engine = engines.get(market); deployment = deployments.get(market)
         if engine is None or deployment is None:
-            results.append(RunResult(str(market), None, "BLOCKED", None, "unsupported or undeployed market"))
-            continue
+            results.append(RunResult(str(market), None, "BLOCKED", None, "unsupported or undeployed market")); continue
         results.append(run_candidate(
             model_input=model_input, quote=quote, paired_quote=paired_quote,
-            deployment=deployment, engine_fn=engine,
-            ingestion_now=ingestion_now, finalization_now=finalization_now,
-            edge_floor_config_path=edge_floor_config_path, kelly_multiplier=kelly_multiplier,
+            deployment=deployment, engine_fn=engine, ingestion_now=ingestion_now,
+            finalization_now=finalization_now, edge_floor_config_path=edge_floor_config_path,
+            kelly_multiplier=kelly_multiplier,
         ))
     return results
