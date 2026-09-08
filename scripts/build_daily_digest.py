@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a fail-closed, phone-readable SportsEdge daily operations digest."""
+"""Build a fail-closed, phone-readable SportsEdge daily operations digest.\n\nWrite-scope diagnostic only.\n"""
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
