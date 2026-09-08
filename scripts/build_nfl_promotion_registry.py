@@ -40,9 +40,22 @@ def main() -> int:
     surface = _read(args.market_surface)
     if "NFL" not in {str(s).upper() for s in surface.get("sports", [])}:
         raise SystemExit("NFL_MARKET_SURFACE_NOT_DECLARED")
-    declared_markets = [str(row["market"]) for row in surface.get("markets", []) if isinstance(row, dict) and row.get("market")]
-    if not declared_markets:
+    rows = [row for row in surface.get("markets", []) if isinstance(row, dict) and row.get("market")]
+    if not rows:
         raise SystemExit("NFL_MARKET_SURFACE_EMPTY")
+    declared_markets = []
+    no_engine_markets = []
+    for row in rows:
+        market = str(row["market"])
+        states = row.get("engine_state_by_sport")
+        if not isinstance(states, dict) or states.get("NFL") not in {"IMPLEMENTED", "NO_ENGINE"}:
+            raise SystemExit(f"NFL_MARKET_ENGINE_STATE_REQUIRED:{market}")
+        if states["NFL"] == "IMPLEMENTED":
+            declared_markets.append(market)
+        else:
+            no_engine_markets.append(market)
+    if not declared_markets:
+        raise SystemExit("NFL_IMPLEMENTED_MARKET_SURFACE_EMPTY")
 
     clv = _read(args.clv_evidence) if args.clv_evidence is not None else None
 
@@ -55,6 +68,9 @@ def main() -> int:
     )
     registry["ci_attestation_state"] = "UNATTESTED_IN_RUNNING_WORKFLOW"
     registry["historical_model_id"] = history.get("model_id")
+    registry["no_engine_markets"] = sorted(no_engine_markets)
+    registry["declared_market_count"] = len(rows)
+    registry["implemented_market_count"] = len(declared_markets)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(registry, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps(registry, sort_keys=True))
