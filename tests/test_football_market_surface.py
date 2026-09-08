@@ -60,3 +60,24 @@ def test_player_markets_require_engine_b():
     for row in data["markets"]:
         if row["family"] in {"qb", "skill"}:
             assert "B" in row["engines"]
+
+
+def test_registry_engine_capability_is_explicit_per_sport():
+    data = _load()
+    assert data["schema_version"] == 2
+    assert data["capability_contract"] == "DECLARATION_DOES_NOT_IMPLY_ENGINE_CAPABILITY_V1"
+    implemented = {"moneyline", "spread", "total"}
+    for row in data["markets"]:
+        states = row["engine_state_by_sport"]
+        assert set(states) == {"NFL", "CFB"}
+        expected = "IMPLEMENTED" if row["market"] in implemented else "NO_ENGINE"
+        assert states["NFL"] == expected
+        assert states["CFB"] == expected
+
+
+def test_declared_no_engine_market_cannot_be_interpreted_as_implemented():
+    data = _load()
+    row = next(row for row in data["markets"] if row["market"] == "first_half_total")
+    assert row["engines"] == ["A"]
+    assert row["engine_state_by_sport"]["CFB"] == "NO_ENGINE"
+    assert row["engine_state_by_sport"]["NFL"] == "NO_ENGINE"
