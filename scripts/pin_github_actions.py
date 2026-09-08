@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
+
 import re
 from pathlib import Path
 
@@ -11,7 +12,7 @@ PINS = {
     "actions/cache@v4": "actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830",
     "actions/upload-artifact@v4": "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
 }
-USES = re.compile(r"(?P<prefix>\buses:\s*)(?P<ref>[^\s#]+)")
+USES = re.compile(r"^[ \t]*(?:-[ \t]+)?uses:[ \t]*(?P<ref>[^\s#]+)", re.MULTILINE)
 SHA_REF = re.compile(r"^[^/@\s]+/[^@\s]+@[0-9a-fA-F]{40}$")
 
 
