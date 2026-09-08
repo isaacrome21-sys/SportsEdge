@@ -1,0 +1,25 @@
+name: open-pr-inventory
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/inventory_open_prs.py'
+      - '.github/workflows/open-pr-inventory.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone repo and fetch main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: git clone "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" repo
+      - name: Inventory all open PRs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd repo
+          python scripts/inventory_open_prs.py
