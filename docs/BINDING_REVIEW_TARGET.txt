@@ -1,0 +1,1 @@
+TARGET: verify no quote-origin identity is manufactured downstream and no priced row bypasses pre-engine binding validation.
