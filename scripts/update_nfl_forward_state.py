@@ -118,17 +118,61 @@ def _schedule(path: Path) -> list[dict[str,Any]]:
     return normalize_nfl_rows(raw,seasons)
 
 
+def _forward_schedule_scope(schedule: list[dict[str,Any]], now: datetime, *, decision_max: int) -> tuple[int,list[dict[str,Any]]]:
+    regular=[row for row in schedule if str(row.get("game_type") or "").upper()=="REG"]
+    seasons=[]
+    for row in regular:
+        try:
+            season=int(row.get("season") or 0)
+        except (TypeError,ValueError):
+            continue
+        if 0 < season <= now.year:
+            seasons.append(season)
+    if not seasons:
+        return 0,[]
+    current=max(seasons)
+    horizon_days=max(1,int(decision_max//1440)+1)
+    floor=now.date()-timedelta(days=1)
+    ceiling=now.date()+timedelta(days=horizon_days)
+    scoped=[]
+    for row in regular:
+        try:
+            season=int(row.get("season") or 0)
+        except (TypeError,ValueError):
+            continue
+        if season!=current:
+            continue
+        explicit=str(row.get("game_start_ts") or row.get("start_time") or "").strip()
+        day=str(row.get("gameday") or row.get("game_date") or "").strip()
+        coarse=(explicit or day)[:10]
+        if coarse:
+            try:
+                game_day=date.fromisoformat(coarse)
+            except ValueError:
+                # A current-season row with invalid date identity is not safe to
+                # silently discard; allow _start() to fail closed below.
+                scoped.append(row)
+                continue
+            if game_day < floor or game_day > ceiling:
+                continue
+        else:
+            # Current-season rows with no date cannot be proven out of scope.
+            # They must reach _start() and fail closed rather than disappear.
+            scoped.append(row)
+            continue
+        scoped.append(row)
+    return current,scoped
+
+
 def plan(schedule_file: Path, state_dir: Path, now: datetime, *, decision_min: int, decision_max: int, close_min: int, close_max: int) -> dict[str,Any]:
     decisions_path,closes_path,_=_state_paths(state_dir)
     decisions=_jsonl(decisions_path); closes=_jsonl(closes_path); _assert_unique(decisions,"DECISION"); _assert_unique(closes,"CLOSE")
     decided_games={str(x.get("game_id") or "") for x in decisions}
     closed={_key(x) for x in closes}
     schedule=_schedule(schedule_file)
+    current_season,forward_rows=_forward_schedule_scope(schedule,now,decision_max=decision_max)
     due=[]
-    current_season=0
-    for row in schedule:
-        if str(row.get("game_type") or "").upper()!="REG": continue
-        current_season=max(current_season,int(row.get("season") or 0))
+    for row in forward_rows:
         gid=str(row.get("game_id") or "").strip()
         if not gid or gid in decided_games: continue
         lead=(_start(row)-now).total_seconds()/60.0
