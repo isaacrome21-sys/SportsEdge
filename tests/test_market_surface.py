@@ -78,10 +78,6 @@ class MarketSurfaceStage0Tests(unittest.TestCase):
         self.assertEqual(compose_run_status(rows), "READY")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
     def test_declared_unavailable_market_is_visible_in_coverage_accounting(self):
         unavailable = spec("UNSUPPORTED_PROP", provider_expected=False, terminal="PROVIDER_UNSUPPORTED")
         unavailable = MarketSpec(
@@ -105,3 +101,7 @@ if __name__ == "__main__":
         self.assertEqual(rows[0].declared_availability, "UNAVAILABLE")
         self.assertEqual(rows[0].acquisition_status, "PROVIDER_UNSUPPORTED")
         self.assertEqual(rows[0].engine_status, "NO_ENGINE")
+
+
+if __name__ == "__main__":
+    unittest.main()
