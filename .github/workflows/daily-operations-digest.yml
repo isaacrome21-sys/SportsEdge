@@ -1,0 +1,48 @@
+name: daily-operations-digest
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 08:17 America/Chicago during daylight time; avoid minute 0 scheduler load.
+    - cron: '17 13 * * *'
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: daily-operations-digest
+  cancel-in-progress: true
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Restore durable data branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data:data
+          git worktree add .data-branch data
+      - name: Build one phone-readable digest
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          python scripts/build_daily_digest.py
+          --repo-root .
+          --data-root .data-branch
+          --out artifacts/daily/sportsedge-daily-digest.md
+      - name: Upload daily digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: sportsedge-daily-digest-${{ github.run_id }}
+          path: artifacts/daily/sportsedge-daily-digest.md
+          if-no-files-found: error
+          retention-days: 30
