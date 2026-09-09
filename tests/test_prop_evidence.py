@@ -15,6 +15,7 @@ from sportsedge.prop_evidence import (
     assess_prop_evidence,
     dependent_hitter_markets,
     dependent_pitcher_markets,
+    group_state_from_registry,
 )
 
 
@@ -22,7 +23,30 @@ def _all_ready() -> dict[str, bool]:
     return {group: True for group in EVIDENCE_GROUPS}
 
 
+def _registry(status: str = "PASS") -> dict:
+    rows = {}
+    for group in EVIDENCE_GROUPS:
+        row = {"status": status}
+        if status == "PASS":
+            row["evidence_sha256"] = "a" * 64
+        rows[group] = row
+    return {"schema_version": 1, "groups": rows}
+
+
 class PropEvidenceTests(unittest.TestCase):
+    def test_registry_pass_requires_evidence_hash(self):
+        payload = _registry()
+        payload["groups"][HITTER_PA] = {"status": "PASS"}
+        with self.assertRaisesRegex(PropEvidenceError, "HITTER_PA PASS requires evidence_sha256"):
+            group_state_from_registry(payload)
+
+    def test_registry_missing_group_resolves_false(self):
+        payload = _registry()
+        payload["groups"][HITTER_PA] = {"status": "MISSING"}
+        state = group_state_from_registry(payload)
+        self.assertFalse(state[HITTER_PA])
+        self.assertTrue(state[HITTER_EVENT_TYPE])
+
     def test_hitter_pa_failure_blocks_every_dependent_hitter_market(self):
         state = _all_ready()
         state[HITTER_PA] = False
