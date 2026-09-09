@@ -60,6 +60,24 @@ def _config() -> dict[str, object]:
     }
 
 
+def _config_with_fixture_floor(market: str) -> dict[str, object]:
+    # Synthetic metadata exists only inside this logic test. It is deliberately
+    # not written to production config and is not evidence of a real promoted floor.
+    config = _config()
+    config["truth_gate"]["edge_floors"][market] = {
+        "status": "FROZEN",
+        "value_probability_points": 0.03,
+        "method_version": "FIXTURE_ONLY_V1",
+        "evidence": {
+            "evidence_sha256": "a" * 64,
+            "derivation_code_sha256": "b" * 64,
+            "oos_cutoff_utc": "2026-01-01T00:00:00Z",
+        },
+        "frozen": {"frozen_by_commit": "c" * 40},
+    }
+    return config
+
+
 class FloorProductionPathTests(unittest.TestCase):
     def test_eligible_markets_without_floor_block_before_engine_with_market_specific_reason(self):
         # These are real deployment-registry market codes spanning a hitter prop,
@@ -105,6 +123,46 @@ class FloorProductionPathTests(unittest.TestCase):
                     f"EdgeFloorError: ELIGIBLE_MARKET_MISSING_OR_UNFROZEN_EDGE_FLOOR:{market}",
                 )
                 self.assertEqual(calls, [])
+
+    def test_valid_fixture_floor_opens_real_orchestrator_path_and_is_applied(self):
+        market = "HITS"
+        entity_id = "fixture-batter"
+        with tempfile.TemporaryDirectory() as td:
+            floor_path = Path(td) / "floors.json"
+            floor_path.write_text(
+                json.dumps(_config_with_fixture_floor(market)), encoding="utf-8"
+            )
+            calls: list[bool] = []
+
+            def engine(_model_input):
+                calls.append(True)
+                # Fixed fixture probability proves control flow only; it is not
+                # persisted or claimed as SportsEdge evidence/Model_P.
+                return {"model_p": 0.70}
+
+            result = run_candidate(
+                model_input={
+                    "game_id": "fixture-game",
+                    "market": market,
+                    "entity_id": entity_id,
+                    "line": 0.5,
+                    "side": "OVER",
+                },
+                quote=_quote(market, entity_id, "OVER", 100),
+                paired_quote=_quote(market, entity_id, "UNDER", -120),
+                deployment={"eligible": True, "stage": "DEPLOYED", "market": market},
+                engine_fn=engine,
+                ingestion_now=NOW,
+                finalization_now=NOW,
+                edge_floor_config_path=str(floor_path),
+            )
+
+            self.assertEqual(calls, [True])
+            self.assertEqual(result.reason, "ok")
+            self.assertEqual(result.model_p, 0.70)
+            self.assertIsNotNone(result.decision)
+            self.assertGreater(result.decision.edge, 0.03)
+            self.assertEqual(result.bet_status, "OFFICIAL_BET")
 
 
 if __name__ == "__main__":
