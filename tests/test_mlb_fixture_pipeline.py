@@ -26,7 +26,9 @@ def frozen_quote(side,odds): return {"game_id":"777","period":"FG","market":"TOT
 
 def write_registry(path): path.write_text(json.dumps({"schema_version":1,"markets":{"TOTALS":{"market":"TOTALS","eligible":True,"stage":"DEPLOYED","reason":"frozen-fixture-ci"}}}))
 
-def write_floors(path): path.write_text(json.dumps({"truth_gate":{"schema_version":1,"production":{"fail_closed":True,"allow_cli_floor_override":False,"require_frozen_floor_for_eligible_market":True},"edge_floors":{"TOTALS":{"status":"FROZEN","value_probability_points":0.01,"method_version":"fixture-ci-v1","evidence":{"evidence_sha256":"fixture-evidence-sha256","derivation_code_sha256":"fixture-derivation-sha256","oos_cutoff_utc":"2026-08-09T00:00:00Z"},"frozen":{"frozen_by_commit":"fixture-ci"}}}}}))
+def write_floors(path):
+    devig={"policy_id":"EDGE_FLOOR_DEVIG_V1","status":"FROZEN_PRE_DERIVATION","longshot_trigger_american_odds":400,"longshot_trigger_rule":"EITHER_SIDE_AT_OR_ABOVE_POSITIVE_400","sensitivity_methods":["MULTIPLICATIVE_V1","POWER_V1","SHIN_V1"],"sensitivity_limit_absolute_probability_points":0.01,"stable_candidate_estimator":"MULTIPLICATIVE_V1","longshot_candidate_estimator":"POWER_V1","haircut_probability_points":0.0,"aggregation_rule":"ESTIMATOR_ONLY_NO_MINIMUM_ACROSS_METHODS","sensitivity_failure":"BLOCK"}
+    path.write_text(json.dumps({"truth_gate":{"schema_version":2,"production":{"fail_closed":True,"allow_cli_floor_override":False,"require_frozen_floor_for_eligible_market":True},"devig_policy":devig,"edge_floors":{"TOTALS":{"status":"FROZEN","value_probability_points":0.01,"method_version":"fixture-ci-v1","evidence":{"evidence_sha256":"fixture-evidence-sha256","derivation_code_sha256":"fixture-derivation-sha256","oos_cutoff_utc":"2026-08-09T00:00:00Z"},"frozen":{"frozen_by_commit":"fixture-ci"}}}}}))
 
 
 class MLBFixtureFullPipelineTests(unittest.TestCase):
