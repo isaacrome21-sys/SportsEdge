@@ -5,6 +5,7 @@ on:
     branches: ["chatgpt/mlb-2025-sbr-recovery"]
     paths:
       - "scripts/recover_mlb_2025_dk_openings_fullseason.py"
+      - "scripts/finalize_mlb_2025_dk_acquisition_accounting.py"
       - ".github/workflows/mlb-2025-fullseason-dk-open-recovery.yml"
   workflow_dispatch:
 
@@ -33,7 +34,9 @@ jobs:
           printf '%s\n' '4f9e571b0b7c5ba735c18682563e28adf873418e40b5fcf747918680be4e6cc7' > frozen_prereg_expected_sha256.txt
           printf '%s\n' 'ACQUISITION_ONLY_NO_CONFIRMATORY_EXECUTION' > lane.txt
 
-      - name: Recover all 2025 DraftKings opening moneylines
+      - name: Recover 2025 DraftKings opening moneylines from primary source
+        id: primary_recovery
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -42,6 +45,17 @@ jobs:
             --end 2025-09-28 \
             --workers 4 \
             --outdir artifacts/mlb_2025_dk_opening_recovery
+
+      - name: Apply frozen-prereg acquisition accounting gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/finalize_mlb_2025_dk_acquisition_accounting.py \
+            --recovery-report artifacts/mlb_2025_dk_opening_recovery/recovery_report.json \
+            --openings-csv artifacts/mlb_2025_dk_opening_recovery/dk_openings_2025_gamepk.csv \
+            --schedule-json artifacts/mlb_2025_dk_opening_recovery/mlb_statsapi_schedule_raw.json \
+            --expected-prereg-sha-file frozen_prereg_expected_sha256.txt \
+            --outdir artifacts/mlb_2025_dk_opening_recovery/accounting
 
       - name: Upload private raw acquisition bundle
         if: always()
