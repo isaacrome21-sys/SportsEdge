@@ -7,6 +7,12 @@
     "PLAYER_USAGE": {"status": "MISSING", "evidence_sha256": null, "model_artifact_sha256": null},
     "OFFENSIVE_EVENT_RATE": {"status": "MISSING", "evidence_sha256": null, "model_artifact_sha256": null},
     "YARDAGE_TAIL": {"status": "MISSING", "evidence_sha256": null, "model_artifact_sha256": null},
-    "TOUCHDOWN_RATE": {"status": "MISSING", "evidence_sha256": null, "model_artifact_sha256": null}
+    "TOUCHDOWN_RATE": {"status": "MISSING", "evidence_sha256": null, "model_artifact_sha256": null},
+    "SPECIAL_TEAMS_OPPORTUNITY": {"status": "MISSING", "evidence_sha256": null, "model_artifact_sha256": null},
+    "KICKER_PARTICIPATION": {"status": "MISSING", "evidence_sha256": null, "model_artifact_sha256": null},
+    "KICKER_RATE": {"status": "MISSING", "evidence_sha256": null, "model_artifact_sha256": null},
+    "DEFENSIVE_PARTICIPATION": {"status": "MISSING", "evidence_sha256": null, "model_artifact_sha256": null},
+    "DEFENSIVE_USAGE": {"status": "MISSING", "evidence_sha256": null, "model_artifact_sha256": null},
+    "DEFENSIVE_EVENT_RATE": {"status": "MISSING", "evidence_sha256": null, "model_artifact_sha256": null}
   }
 }
