@@ -5,18 +5,28 @@ on:
   pull_request:
     paths:
       - 'sportsedge/football_prop_run_machine.py'
+      - 'sportsedge/football_prop_extended_run_machine.py'
       - 'sportsedge/football_prop_odds_source.py'
       - 'sportsedge/football_prop_surface.py'
+      - 'sportsedge/football_prop_evidence.py'
+      - 'sportsedge/football_prop_readiness.py'
       - 'sportsedge/core/simulate/drive_play.py'
       - 'sportsedge/core/simulate/usage.py'
       - 'sportsedge/core/simulate/player_markets.py'
+      - 'sportsedge/core/simulate/special_teams.py'
+      - 'sportsedge/core/simulate/kicker_markets.py'
+      - 'sportsedge/core/simulate/defense_usage.py'
+      - 'sportsedge/core/simulate/defense_markets.py'
       - 'scripts/run_football_props_auto.py'
       - 'scripts/run_football_auto_bundle.py'
       - 'config/football_prop_engine_surface.json'
       - 'config/nfl_prop_model_freeze.json'
       - 'config/cfb_prop_model_freeze.json'
+      - 'config/nfl_prop_evidence.json'
+      - 'config/cfb_prop_evidence.json'
       - 'config/run_it_surface.json'
       - 'tests/test_football_prop_run_machine.py'
+      - 'tests/test_football_prop_extended_run_machine.py'
       - 'tests/test_football_prop_odds_source.py'
       - 'tests/test_football_prop_surface.py'
       - '.github/workflows/football-prop-run-machine-contract.yml'
@@ -24,18 +34,28 @@ on:
     branches: [main]
     paths:
       - 'sportsedge/football_prop_run_machine.py'
+      - 'sportsedge/football_prop_extended_run_machine.py'
       - 'sportsedge/football_prop_odds_source.py'
       - 'sportsedge/football_prop_surface.py'
+      - 'sportsedge/football_prop_evidence.py'
+      - 'sportsedge/football_prop_readiness.py'
       - 'sportsedge/core/simulate/drive_play.py'
       - 'sportsedge/core/simulate/usage.py'
       - 'sportsedge/core/simulate/player_markets.py'
+      - 'sportsedge/core/simulate/special_teams.py'
+      - 'sportsedge/core/simulate/kicker_markets.py'
+      - 'sportsedge/core/simulate/defense_usage.py'
+      - 'sportsedge/core/simulate/defense_markets.py'
       - 'scripts/run_football_props_auto.py'
       - 'scripts/run_football_auto_bundle.py'
       - 'config/football_prop_engine_surface.json'
       - 'config/nfl_prop_model_freeze.json'
       - 'config/cfb_prop_model_freeze.json'
+      - 'config/nfl_prop_evidence.json'
+      - 'config/cfb_prop_evidence.json'
       - 'config/run_it_surface.json'
       - 'tests/test_football_prop_run_machine.py'
+      - 'tests/test_football_prop_extended_run_machine.py'
       - 'tests/test_football_prop_odds_source.py'
       - 'tests/test_football_prop_surface.py'
       - '.github/workflows/football-prop-run-machine-contract.yml'
@@ -60,17 +80,22 @@ jobs:
         run: >-
           python -m py_compile
           sportsedge/football_prop_run_machine.py
+          sportsedge/football_prop_extended_run_machine.py
           sportsedge/football_prop_odds_source.py
           sportsedge/football_prop_surface.py
+          sportsedge/football_prop_evidence.py
+          sportsedge/football_prop_readiness.py
           scripts/run_football_props_auto.py
           scripts/run_football_auto_bundle.py
           tests/test_football_prop_run_machine.py
+          tests/test_football_prop_extended_run_machine.py
           tests/test_football_prop_odds_source.py
           tests/test_football_prop_surface.py
       - name: Run football prop contract tests
         run: >-
           python -m unittest
           tests.test_football_prop_run_machine
+          tests.test_football_prop_extended_run_machine
           tests.test_football_prop_odds_source
           tests.test_football_prop_surface -v
       - name: Assert A+B market surface and explicit exclusions
