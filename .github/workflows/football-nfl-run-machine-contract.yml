@@ -117,9 +117,10 @@ jobs:
           from sportsedge.football_prop_surface import require_executable_prop_surface
           prop = require_executable_prop_surface('NFL')
           assert prop['engine_state'] == 'IMPLEMENTED_FAIL_CLOSED'
-          assert prop['promotion_state'] == 'BLOCKED_EVIDENCE_REQUIRED'
+          assert prop['promotion_state'] == 'AUTOMATIC_TRUTH_GATE_GATED'
+          assert prop['current_state'] == 'EVIDENCE_PENDING'
           PY
-      - name: Assert real NFL game and prop artifacts remain unfrozen
+      - name: Assert checked-in NFL game and prop artifact claims remain truthful
         run: |
           python - <<'PY'
           import json
@@ -131,7 +132,7 @@ jobs:
               assert freeze['hash_algorithm'] == 'CANONICAL_JSON_SHA256_V1'
               assert freeze['artifact_sha256'] is None
               assert not Path(freeze['artifact_path']).exists()
-          print('NFL_FREEZE_STATES_OK game=UNFROZEN prop=UNFROZEN')
+          print('NFL_CHECKED_IN_FREEZE_STATES_OK game=UNFROZEN prop=UNFROZEN')
           PY
       - name: Assert missing frozen game artifact fails closed
         shell: bash
