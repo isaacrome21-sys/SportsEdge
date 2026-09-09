@@ -104,6 +104,31 @@ class AutomationCoreTests(unittest.TestCase):
         self.assertEqual(result.reason, "EdgeFloorError: FROZEN_FLOOR_POLICY_REQUIRED")
         self.assertEqual(calls, [])
 
+    def test_eligible_market_without_floor_hits_specific_production_blocker(self):
+        cfg = json.loads(Path(self.floor_path).read_text())
+        cfg["truth_gate"]["edge_floors"] = {}
+        Path(self.floor_path).write_text(json.dumps(cfg))
+        calls = []
+        def engine(_):
+            calls.append(True)
+            return dict(self.key, model_p=.60)
+        result = run_candidate(
+            model_input=dict(self.key, build_hash="a"*64),
+            quote=self.quote,
+            paired_quote=self.paired_quote,
+            deployment=self.deploy,
+            engine_fn=engine,
+            ingestion_now=self.now,
+            finalization_now=self.now,
+            edge_floor_config_path=self.floor_path,
+        )
+        self.assertEqual(result.bet_status, "BLOCKED")
+        self.assertEqual(
+            result.reason,
+            "EdgeFloorError: ELIGIBLE_MARKET_MISSING_OR_UNFROZEN_EDGE_FLOOR:HITS",
+        )
+        self.assertEqual(calls, [])
+
     def test_missing_floor_fails_closed(self):
         missing=str(Path(self.tmp.name)/"missing.json")
         result=run_candidate(model_input=dict(self.key,build_hash="a"*64),quote=self.quote,paired_quote=self.paired_quote,deployment=self.deploy,engine_fn=lambda x:dict(self.key,model_p=.60),ingestion_now=self.now,finalization_now=self.now,edge_floor_config_path=missing)
