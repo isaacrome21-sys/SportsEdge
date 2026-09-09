@@ -1,9 +1,9 @@
 """Deterministic player-market read-outs over shared Engine A+B paths.
 
 This module prices only statistics already produced by ``AttributedFootballPath``.
-It does not resimulate attempts, carries, targets, yards or touchdowns. Markets
-that require Engine C participation (for example full anytime-TD semantics with
-return touchdowns) are intentionally outside this structural v1 surface.
+It does not resimulate attempts, carries, targets, yards or touchdowns. Offensive
+TD read-outs are sourced from the same attributed play path as yardage and volume.
+Return-score identity and first/last scorer ordering are separate full-path layers.
 """
 
 from __future__ import annotations
@@ -30,6 +30,13 @@ _STAT_ALIASES = {
     "receiving_yards": "receiving_yards",
     "receptions": "receptions",
     "targets": "targets",
+    "rushing_tds": "rushing_tds",
+    "rush_tds": "rushing_tds",
+    "receiving_tds": "receiving_tds",
+    "reception_tds": "receiving_tds",
+    "touchdowns": "touchdowns",
+    "rush_plus_receiving_tds": "touchdowns",
+    "rush_plus_rec_tds": "touchdowns",
     "longest_completion": "longest_completion",
     "longest_reception": "longest_reception",
     "longest_rush": "longest_rush",
