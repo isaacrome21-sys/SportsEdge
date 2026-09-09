@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime, timezone
+from hashlib import sha256
+import json
 import unittest
 
 from sportsedge.sports.nfl.m2 import (
@@ -69,6 +71,17 @@ def _artifact() -> dict:
     )
 
 
+def _artifact_hash(artifact: dict) -> str:
+    raw = json.dumps(
+        artifact,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    return sha256(raw).hexdigest()
+
+
 def _live() -> dict:
     return {
         "sport": "nfl",
@@ -124,13 +137,23 @@ def _odds(*, observed: str = "2026-09-10T11:59:00+00:00", spread: float = -2.5, 
     }
 
 
+def _run(*, artifact: dict | None = None, **kwargs):
+    bound = _artifact() if artifact is None else artifact
+    return run_nfl_machine(
+        model_artifact=bound,
+        expected_model_artifact_sha256=_artifact_hash(bound),
+        runtime_code_git_sha=CODE_SHA,
+        now=NOW,
+        **kwargs,
+    )
+
+
 class NFLRunMachineTests(unittest.TestCase):
     def test_manual_converges_on_six_priced_but_blocked_game_market_rows(self):
-        report = run_nfl_machine(
+        artifact = _artifact()
+        report = _run(
+            artifact=artifact,
             mode="MANUAL",
-            model_artifact=_artifact(),
-            runtime_code_git_sha=CODE_SHA,
-            now=NOW,
             live_features=_live(),
             odds_snapshot=_odds(),
         )
@@ -145,14 +168,25 @@ class NFLRunMachineTests(unittest.TestCase):
         self.assertTrue(all(row.training_source_manifest_sha256 == TRAINING_SHA for row in report.results))
         self.assertTrue(all(row.live_feature_source_manifest_sha256 == LIVE_SHA for row in report.results))
         self.assertNotEqual(report.training_source_manifest_sha256, report.live_feature_source_manifest_sha256)
+        self.assertEqual(report.model_artifact_sha256, _artifact_hash(artifact))
         self.assertEqual(len({row.distribution_sha256 for row in report.results}), 1)
 
+    def test_frozen_artifact_hash_is_required_and_mismatch_blocks_before_model_use(self):
+        artifact = _artifact()
+        with self.assertRaisesRegex(NFLRunMachineError, "NFL_MODEL_ARTIFACT_SHA256_MISMATCH"):
+            run_nfl_machine(
+                mode="MANUAL",
+                model_artifact=artifact,
+                expected_model_artifact_sha256="d" * 64,
+                runtime_code_git_sha=CODE_SHA,
+                now=NOW,
+                live_features=_live(),
+                odds_snapshot=_odds(),
+            )
+
     def test_quote_older_than_180_seconds_fails_closed_without_market_economics(self):
-        report = run_nfl_machine(
+        report = _run(
             mode="MANUAL",
-            model_artifact=_artifact(),
-            runtime_code_git_sha=CODE_SHA,
-            now=NOW,
             live_features=_live(),
             odds_snapshot=_odds(observed="2026-09-10T11:56:00+00:00"),
         )
@@ -166,67 +200,79 @@ class NFLRunMachineTests(unittest.TestCase):
             self.assertEqual(row.bet_status, "BLOCKED")
 
     def test_runtime_code_sha_must_match_frozen_model_artifact(self):
+        artifact = _artifact()
         with self.assertRaisesRegex(NFLRunMachineError, "NFL_M2_MODEL_ARTIFACT_CODE_SHA_MISMATCH"):
             run_nfl_machine(
                 mode="MANUAL",
-                model_artifact=_artifact(),
+                model_artifact=artifact,
+                expected_model_artifact_sha256=_artifact_hash(artifact),
                 runtime_code_git_sha="d" * 40,
                 now=NOW,
                 live_features=_live(),
                 odds_snapshot=_odds(),
             )
 
+    def test_execution_at_or_after_kickoff_is_rejected(self):
+        artifact = _artifact()
+        for now in (
+            datetime(2026, 9, 10, 13, 0, tzinfo=timezone.utc),
+            datetime(2026, 9, 10, 13, 0, 1, tzinfo=timezone.utc),
+        ):
+            with self.subTest(now=now.isoformat()):
+                with self.assertRaisesRegex(NFLRunMachineError, "NFL_GAME_NOT_PREGAME:nfl-2026-01-gb-chi"):
+                    run_nfl_machine(
+                        mode="MANUAL",
+                        model_artifact=artifact,
+                        expected_model_artifact_sha256=_artifact_hash(artifact),
+                        runtime_code_git_sha=CODE_SHA,
+                        now=now,
+                        live_features=_live(),
+                        odds_snapshot=_odds(),
+                    )
+
     def test_feature_snapshot_and_side_features_are_pit_bound(self):
         live = _live()
         live["games"][0]["home_features"]["feature_asof_ts"] = "2026-09-10T11:59:00+00:00"
         with self.assertRaisesRegex(NFLRunMachineError, "NFL_M2_HOME_FEATURE_AFTER_SNAPSHOT"):
-            run_nfl_machine(
-                mode="MANUAL",
-                model_artifact=_artifact(),
-                runtime_code_git_sha=CODE_SHA,
-                now=NOW,
-                live_features=live,
-                odds_snapshot=_odds(),
-            )
+            _run(mode="MANUAL", live_features=live, odds_snapshot=_odds())
 
     def test_stale_feature_snapshot_is_rejected_before_model_execution(self):
         live = _live()
         live["asof_ts"] = "2026-09-10T09:59:00+00:00"
         with self.assertRaisesRegex(NFLRunMachineError, "NFL_LIVE_FEATURE_SNAPSHOT_STALE"):
-            run_nfl_machine(
-                mode="MANUAL",
-                model_artifact=_artifact(),
-                runtime_code_git_sha=CODE_SHA,
-                now=NOW,
-                live_features=live,
-                odds_snapshot=_odds(),
-            )
+            _run(mode="MANUAL", live_features=live, odds_snapshot=_odds())
 
     def test_future_quote_observation_is_rejected(self):
         with self.assertRaisesRegex(NFLRunMachineError, "NFL_ODDS_OBSERVED_FROM_FUTURE"):
-            run_nfl_machine(
+            _run(
                 mode="MANUAL",
-                model_artifact=_artifact(),
-                runtime_code_git_sha=CODE_SHA,
-                now=NOW,
                 live_features=_live(),
                 odds_snapshot=_odds(observed="2026-09-10T12:01:00+00:00"),
             )
 
-    def test_market_line_changes_do_not_change_underlying_distribution(self):
-        left = run_nfl_machine(
+    def test_accepted_quote_is_strictly_observed_before_kickoff(self):
+        artifact = _artifact()
+        now = datetime(2026, 9, 10, 12, 59, 59, tzinfo=timezone.utc)
+        report = run_nfl_machine(
             mode="MANUAL",
-            model_artifact=_artifact(),
+            model_artifact=artifact,
+            expected_model_artifact_sha256=_artifact_hash(artifact),
             runtime_code_git_sha=CODE_SHA,
-            now=NOW,
+            now=now,
+            live_features=_live(),
+            odds_snapshot=_odds(observed=now.isoformat()),
+        )
+        kickoff = datetime.fromisoformat(START)
+        self.assertTrue(all(datetime.fromisoformat(row.quote_observed_at) < kickoff for row in report.results))
+
+    def test_market_line_changes_do_not_change_underlying_distribution(self):
+        left = _run(
+            mode="MANUAL",
             live_features=_live(),
             odds_snapshot=_odds(spread=-2.5, total=44.5),
         )
-        right = run_nfl_machine(
+        right = _run(
             mode="MANUAL",
-            model_artifact=_artifact(),
-            runtime_code_git_sha=CODE_SHA,
-            now=NOW,
             live_features=_live(),
             odds_snapshot=_odds(spread=-6.5, total=51.5),
         )
@@ -242,22 +288,12 @@ class NFLRunMachineTests(unittest.TestCase):
         live = _live()
         live["games"][0]["home_features"]["spread"] = -2.5
         with self.assertRaisesRegex(NFLRunMachineError, "M2_MARKET_DATA_PROHIBITED"):
-            run_nfl_machine(
-                mode="MANUAL",
-                model_artifact=_artifact(),
-                runtime_code_git_sha=CODE_SHA,
-                now=NOW,
-                live_features=live,
-                odds_snapshot=_odds(),
-            )
+            _run(mode="MANUAL", live_features=live, odds_snapshot=_odds())
 
     def test_hybrid_supports_operator_odds_with_automatic_features(self):
         calls = []
-        report = run_nfl_machine(
+        report = _run(
             mode="HYBRID",
-            model_artifact=_artifact(),
-            runtime_code_git_sha=CODE_SHA,
-            now=NOW,
             odds_snapshot=_odds(),
             feature_builder=lambda: calls.append("features") or _live(),
         )
@@ -267,19 +303,13 @@ class NFLRunMachineTests(unittest.TestCase):
 
     def test_automatic_acquires_both_inputs_then_uses_same_canonical_path(self):
         calls = []
-        automatic = run_nfl_machine(
+        automatic = _run(
             mode="AUTOMATIC",
-            model_artifact=_artifact(),
-            runtime_code_git_sha=CODE_SHA,
-            now=NOW,
             feature_builder=lambda: calls.append("features") or _live(),
             odds_fetcher=lambda: calls.append("odds") or _odds(),
         )
-        manual = run_nfl_machine(
+        manual = _run(
             mode="MANUAL",
-            model_artifact=_artifact(),
-            runtime_code_git_sha=CODE_SHA,
-            now=NOW,
             live_features=_live(),
             odds_snapshot=_odds(),
         )
@@ -291,11 +321,8 @@ class NFLRunMachineTests(unittest.TestCase):
 
     def test_hybrid_requires_exactly_one_operator_snapshot(self):
         with self.assertRaisesRegex(NFLRunMachineError, "NFL_HYBRID_REQUIRES_EXACTLY_ONE_OPERATOR_SNAPSHOT"):
-            run_nfl_machine(
+            _run(
                 mode="HYBRID",
-                model_artifact=_artifact(),
-                runtime_code_git_sha=CODE_SHA,
-                now=NOW,
                 live_features=_live(),
                 odds_snapshot=_odds(),
             )
