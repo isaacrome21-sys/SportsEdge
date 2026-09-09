@@ -1,0 +1,259 @@
+name: mlb-authentic-provider-freeze
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  capture-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PRIVATE_REPO: ${{ secrets.SPORTSEDGE_MLB_EVIDENCE_REPO }}
+      PRIVATE_TOKEN: ${{ secrets.SPORTSEDGE_MLB_EVIDENCE_TOKEN }}
+      SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+      SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
+      SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
+      SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
+    steps:
+      - name: Checkout SportsEdge
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Fail closed unless private evidence destination exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${PRIVATE_REPO:-}" || -z "${PRIVATE_TOKEN:-}" ]]; then
+            echo 'BLOCKED_PRIVATE_EVIDENCE_DESTINATION_UNAVAILABLE' >&2
+            exit 1
+          fi
+          if [[ "$PRIVATE_REPO" == "$GITHUB_REPOSITORY" ]]; then
+            echo 'MLB_EVIDENCE_DESTINATION_MUST_BE_SEPARATE_REPOSITORY' >&2
+            exit 1
+          fi
+          if [[ -z "${SPORTSEDGE_ODDS_API_KEY:-}" && -z "${SPORTSEDGE_ODDS_API_KEY_2:-}" && -z "${SPORTSEDGE_ODDS_API_KEY_3:-}" && -z "${SPORTSEDGE_ODDS_API_KEY_4:-}" ]]; then
+            echo 'ODDS_FREEZE_API_KEY_MISSING' >&2
+            exit 1
+          fi
+
+      - name: Prove configured evidence repository is private
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from urllib.error import HTTPError, URLError
+          from urllib.request import Request, urlopen
+
+          repo = os.environ['PRIVATE_REPO'].strip()
+          token = os.environ['PRIVATE_TOKEN'].strip()
+          request = Request(
+              f'https://api.github.com/repos/{repo}',
+              headers={
+                  'Accept': 'application/vnd.github+json',
+                  'Authorization': f'Bearer {token}',
+                  'X-GitHub-Api-Version': '2022-11-28',
+                  'User-Agent': 'SportsEdge-private-evidence-preflight/1',
+              },
+          )
+          try:
+              with urlopen(request, timeout=20) as response:
+                  payload = json.loads(response.read().decode('utf-8'))
+          except HTTPError as exc:
+              raise SystemExit(f'MLB_PRIVATE_EVIDENCE_REPO_HTTP_{exc.code}') from exc
+          except URLError as exc:
+              raise SystemExit('MLB_PRIVATE_EVIDENCE_REPO_NETWORK') from exc
+          if payload.get('full_name') != repo:
+              raise SystemExit('MLB_PRIVATE_EVIDENCE_REPO_IDENTITY_MISMATCH')
+          if payload.get('private') is not True:
+              raise SystemExit('MLB_EVIDENCE_REPOSITORY_NOT_PRIVATE')
+          print('MLB_PRIVATE_EVIDENCE_REPOSITORY_VERIFIED')
+          PY
+
+      - name: Checkout private evidence repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ${{ secrets.SPORTSEDGE_MLB_EVIDENCE_REPO }}
+          token: ${{ secrets.SPORTSEDGE_MLB_EVIDENCE_TOKEN }}
+          path: .private/mlb-evidence
+          fetch-depth: 0
+
+      - name: Define unique capture identity
+        id: capture
+        shell: bash
+        run: |
+          set -euo pipefail
+          capture_id="mlb-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-$(date -u +%Y%m%dT%H%M%SZ)"
+          echo "capture_id=$capture_id" >> "$GITHUB_OUTPUT"
+          mkdir -p "artifacts/mlb-provider-freeze/$capture_id"
+
+      - name: Capture complete authentic provider request set
+        id: provider
+        shell: bash
+        env:
+          CAPTURE_ID: ${{ steps.capture.outputs.capture_id }}
+        run: |
+          set -euo pipefail
+          manifest="artifacts/mlb-provider-freeze/$CAPTURE_ID/manifest.json"
+          key_names=(SPORTSEDGE_ODDS_API_KEY SPORTSEDGE_ODDS_API_KEY_2 SPORTSEDGE_ODDS_API_KEY_3 SPORTSEDGE_ODDS_API_KEY_4)
+          captured=0
+          slot=0
+          for key_name in "${key_names[@]}"; do
+            slot=$((slot + 1))
+            key="${!key_name:-}"
+            [[ -z "$key" ]] && continue
+            if ODDS_API_KEY="$key" python scripts/capture_mlb_odds_api_freeze.py \
+              --private-root .private/mlb-evidence \
+              --capture-id "$CAPTURE_ID" \
+              --manifest-out "$manifest"; then
+              captured=1
+              echo "selected_key_slot=$slot" >> "$GITHUB_OUTPUT"
+              break
+            fi
+          done
+          if [[ "$captured" != 1 ]]; then
+            echo 'MLB_AUTHENTIC_PROVIDER_CAPTURE_FAILED' >&2
+            exit 1
+          fi
+
+      - name: Verify every captured raw byte against public manifest
+        shell: bash
+        env:
+          CAPTURE_ID: ${{ steps.capture.outputs.capture_id }}
+        run: |
+          set -euo pipefail
+          python scripts/verify_mlb_odds_api_freeze.py \
+            --manifest "artifacts/mlb-provider-freeze/$CAPTURE_ID/manifest.json" \
+            --private-root .private/mlb-evidence \
+            --out "artifacts/mlb-provider-freeze/$CAPTURE_ID/verification.json"
+
+      - name: Commit exact raw bytes only to private repository
+        id: private_commit
+        shell: bash
+        env:
+          CAPTURE_ID: ${{ steps.capture.outputs.capture_id }}
+        run: |
+          set -euo pipefail
+          cd .private/mlb-evidence
+          test -d "captures/$CAPTURE_ID/responses"
+          if find "captures/$CAPTURE_ID" -type f ! -name '*.bin' -print -quit | grep -q .; then
+            echo 'MLB_PRIVATE_CAPTURE_UNEXPECTED_FILE_TYPE' >&2
+            exit 1
+          fi
+          git config user.name sportsedge-evidence-bot
+          git config user.email sportsedge-evidence-bot@users.noreply.github.com
+          git add -- "captures/$CAPTURE_ID"
+          if git diff --cached --quiet; then
+            echo 'MLB_PRIVATE_CAPTURE_EMPTY' >&2
+            exit 1
+          fi
+          git commit -m "mlb provider freeze: $CAPTURE_ID"
+          git push origin HEAD
+          private_commit_sha="$(git rev-parse HEAD)"
+          echo "private_commit_sha=$private_commit_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Bind public manifest to exact private Git commit
+        shell: bash
+        env:
+          CAPTURE_ID: ${{ steps.capture.outputs.capture_id }}
+          PRIVATE_COMMIT_SHA: ${{ steps.private_commit.outputs.private_commit_sha }}
+          SELECTED_KEY_SLOT: ${{ steps.provider.outputs.selected_key_slot }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          capture_id = os.environ['CAPTURE_ID']
+          base = Path('artifacts/mlb-provider-freeze') / capture_id
+          manifest_path = base / 'manifest.json'
+          verification_path = base / 'verification.json'
+          manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+          verification = json.loads(verification_path.read_text(encoding='utf-8'))
+          binding = {
+              'schema_version': 1,
+              'provider': 'THE_ODDS_API',
+              'sport': 'mlb',
+              'capture_id': capture_id,
+              'evidence_scope': 'AUTHENTIC_PROVIDER_RAW_FREEZE_AND_BYTE_VERIFICATION_ONLY',
+              'manifest_sha256': manifest['manifest_sha256'],
+              'verification_report_sha256': hashlib.sha256(verification_path.read_bytes()).hexdigest(),
+              'private_repository_identity_sha256': hashlib.sha256(os.environ['PRIVATE_REPO'].encode('utf-8')).hexdigest(),
+              'private_git_commit_sha': os.environ['PRIVATE_COMMIT_SHA'],
+              'sportsedge_source_commit_sha': os.environ['GITHUB_SHA'],
+              'selected_provider_key_slot': int(os.environ['SELECTED_KEY_SLOT']),
+              'raw_bytes_location': 'PRIVATE_REPOSITORY_ONLY',
+              'network_fallback': False,
+              'byte_verification': verification.get('status'),
+              'truth_gate_promotion': False,
+              'official_evidence': False,
+              'eligibility_change': False,
+          }
+          (base / 'binding.json').write_text(json.dumps(binding, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          PY
+
+      - name: Reject raw provider bodies from public workspace
+        shell: bash
+        env:
+          CAPTURE_ID: ${{ steps.capture.outputs.capture_id }}
+        run: |
+          set -euo pipefail
+          public_dir="artifacts/mlb-provider-freeze/$CAPTURE_ID"
+          if find "$public_dir" -type f ! \( -name 'manifest.json' -o -name 'verification.json' -o -name 'binding.json' \) -print -quit | grep -q .; then
+            echo 'PUBLIC_MLB_FREEZE_UNEXPECTED_FILE' >&2
+            exit 1
+          fi
+          if find "$public_dir" -type f -name '*.bin' -print -quit | grep -q .; then
+            echo 'PUBLIC_MLB_FREEZE_RAW_BYTES_PRESENT' >&2
+            exit 1
+          fi
+
+      - name: Persist safe freeze metadata to data branch
+        shell: bash
+        env:
+          CAPTURE_ID: ${{ steps.capture.outputs.capture_id }}
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data:data
+          git worktree add .data-branch data
+          destination=".data-branch/runtime/mlb-provider-freezes/$CAPTURE_ID"
+          mkdir -p "$destination"
+          install -m 0644 "artifacts/mlb-provider-freeze/$CAPTURE_ID/manifest.json" "$destination/manifest.json"
+          install -m 0644 "artifacts/mlb-provider-freeze/$CAPTURE_ID/verification.json" "$destination/verification.json"
+          install -m 0644 "artifacts/mlb-provider-freeze/$CAPTURE_ID/binding.json" "$destination/binding.json"
+          cd .data-branch
+          git config user.name sportsedge-archive-bot
+          git config user.email sportsedge-archive-bot@users.noreply.github.com
+          git add "runtime/mlb-provider-freezes/$CAPTURE_ID"
+          if git diff --cached --quiet; then
+            echo 'MLB_PUBLIC_FREEZE_METADATA_EMPTY' >&2
+            exit 1
+          fi
+          git commit -m "archive: bind authentic MLB provider freeze $CAPTURE_ID"
+          git push origin HEAD:data
+
+      - name: Assert deployment eligibility remains untouched
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          payload = json.loads(Path('config/deployments.json').read_text(encoding='utf-8'))
+          markets = payload.get('markets') or {}
+          if not markets or any(bool(row.get('eligible')) for row in markets.values()):
+              raise SystemExit('MLB_FREEZE_WORKFLOW_ELIGIBILITY_GUARD_FAILED')
+          print(f'MLB_ELIGIBILITY_LOCKED_FALSE:{len(markets)}')
+          PY
