@@ -56,13 +56,15 @@ jobs:
                   })
 
           team_appearances = Counter()
+          date_counts = Counter()
           for game in games:
               team_appearances[game['away']] += 1
               team_appearances[game['home']] += 1
+              date_counts[game['date']] += 1
 
           athletics = [g for g in games if g['away'] in {'Athletics', 'Oakland Athletics'} or g['home'] in {'Athletics', 'Oakland Athletics'}]
           summary = {
-              'schema_version': 1,
+              'schema_version': 2,
               'source': 'MLB StatsAPI schedule',
               'requested_start': '2025-08-17',
               'requested_end': '2025-09-28',
@@ -72,11 +74,14 @@ jobs:
               'last_date': max((g['date'] for g in games), default=None),
               'athletics_games': len(athletics),
               'athletics_game_keys': [f"{g['date']}:{g['away']}@{g['home']}" for g in athletics],
+              'date_game_counts': dict(sorted(date_counts.items())),
+              'game_keys': [f"{g['date']}:{g['away']}@{g['home']}" for g in games],
+              'games': games,
               'team_appearances': dict(sorted(team_appearances.items())),
               'confirmatory_holdout_touched': False,
           }
           Path('mlb_2025_schedule_reconcile.json').write_text(json.dumps(summary, indent=2, sort_keys=True) + '\n')
-          print(json.dumps(summary, indent=2, sort_keys=True))
+          print(json.dumps({k: v for k, v in summary.items() if k not in {'game_keys', 'games'}}, indent=2, sort_keys=True))
 
           if not games:
               raise SystemExit('MLB_SCHEDULE_EMPTY')
