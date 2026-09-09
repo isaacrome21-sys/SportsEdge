@@ -113,6 +113,29 @@ def _norm_name(value: Any) -> str:
     return " ".join(str(value or "").strip().lower().split())
 
 
+def _price_economics(
+    *, model_p: float, push_p: float, american_odds: float, fair_market_p: float,
+) -> tuple[float, float, float]:
+    """Price shared-path probabilities with pushes returning the original stake."""
+    win = _finite(model_p, "FOOTBALL_PROP_WIN_PROBABILITY_INVALID")
+    push = _finite(push_p, "FOOTBALL_PROP_PUSH_PROBABILITY_INVALID")
+    fair = _finite(fair_market_p, "FOOTBALL_PROP_FAIR_PROBABILITY_INVALID")
+    if not 0 <= win <= 1 or not 0 <= push <= 1 or win + push > 1 + 1e-12:
+        raise FootballPropRunError("FOOTBALL_PROP_PROBABILITY_MASS_INVALID")
+    if not 0 <= fair <= 1:
+        raise FootballPropRunError("FOOTBALL_PROP_FAIR_PROBABILITY_INVALID")
+    settled = 1.0 - push
+    if settled <= 0:
+        raise FootballPropRunError("FOOTBALL_PROP_SETTLED_SAMPLE_SPACE_EMPTY")
+    odds = _finite(american_odds, "FOOTBALL_PROP_ODDS_INVALID")
+    if abs(odds) < 100:
+        raise FootballPropRunError("FOOTBALL_PROP_ODDS_INVALID")
+    profit = american_to_decimal(odds) - 1.0
+    loss = max(0.0, 1.0 - win - push)
+    ev = win * profit - loss
+    return win / settled - fair, ev, max(0.0, min(1.0, ev / (profit * settled)))
+
+
 def _seed(root_seed: int, game_id: str, label: str, simulation_id: int = 0) -> int:
     if isinstance(root_seed, bool) or not isinstance(root_seed, int):
         raise FootballPropRunError("FOOTBALL_PROP_ROOT_SEED_INVALID")

@@ -7,12 +7,29 @@ import unittest
 from sportsedge.football_prop_run_machine import (
     FootballPropRunError,
     _paired_offers,
+    _price_economics,
     canonical_hash,
     run_football_props,
 )
 
 
 class FootballPropRunMachineTests(unittest.TestCase):
+    def test_push_economics_uses_settled_probability_and_refunds_pushes(self):
+        edge, ev, kelly = _price_economics(
+            model_p=0.45, push_p=0.25, american_odds=100, fair_market_p=0.5,
+        )
+        self.assertAlmostEqual(edge, 0.1)
+        self.assertAlmostEqual(ev, 0.15)
+        self.assertAlmostEqual(kelly, 0.2)
+
+    def test_all_push_and_invalid_mass_are_rejected(self):
+        for win, push in ((0, 1), (0.8, 0.3), (-0.1, 0), (float('nan'), 0)):
+            with self.subTest(win=win, push=push):
+                with self.assertRaises(FootballPropRunError):
+                    _price_economics(
+                        model_p=win, push_p=push, american_odds=-110, fair_market_p=0.5,
+                    )
+
     def setUp(self):
         self.now = datetime(2026, 9, 9, 16, 0, tzinfo=timezone.utc)
         self.start = self.now + timedelta(hours=2)

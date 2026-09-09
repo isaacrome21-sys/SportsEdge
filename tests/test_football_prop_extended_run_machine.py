@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from tempfile import TemporaryDirectory
+from pathlib import Path
+import json
 from datetime import datetime, timedelta, timezone
 import unittest
 
@@ -196,6 +199,22 @@ class FootballPropExtendedRunMachineTests(unittest.TestCase):
         self.assertTrue(report["governance"]["single_shared_engine_a_path_per_game"])
         self.assertTrue(report["governance"]["kicker_engine_c_on_shared_path"])
         self.assertTrue(report["governance"]["defense_engine_b_on_shared_path"])
+
+    def test_frozen_policy_changes_prices_without_changing_model_distribution(self):
+        baseline = self._run()
+        policy = json.loads(Path('config/truth_gate_floors.json').read_text())
+        policy['truth_gate']['devig_policy']['haircut_probability_points'] = '0.01'
+        with TemporaryDirectory() as temp:
+            path = Path(temp) / 'floors.json'
+            path.write_text(json.dumps(policy))
+            changed = self._run(floor_path=str(path))
+        self.assertEqual(baseline['game_distribution_sha256'], changed['game_distribution_sha256'])
+        for before, after in zip(baseline['results'], changed['results']):
+            self.assertEqual(before['model_p'], after['model_p'])
+            if before['fair_market_p'] is not None:
+                self.assertAlmostEqual(after['fair_market_p'] - before['fair_market_p'], 0.01)
+                self.assertAlmostEqual(before['edge'] - after['edge'], 0.01)
+            self.assertFalse(after['official_eligible'])
 
     def test_one_sided_anytime_td_never_invents_opposite_price_or_edge(self):
         report = self._run()

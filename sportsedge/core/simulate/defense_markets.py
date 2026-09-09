@@ -14,7 +14,9 @@ _PLAYER_ALIASES = {
     "tackles_assists": "tackles_assists",
     "tackles+assists": "tackles_assists",
     "sacks": "sacks",
+    "player_sacks": "sacks",
     "interceptions": "interceptions",
+    "player_interceptions": "interceptions",
 }
 _TEAM_ALIASES = {
     "team_sacks": "team_sacks",
@@ -33,7 +35,7 @@ def _paths(
     if any(not isinstance(path, (AttributedDefensivePath, FullGameDefensivePath)) for path in materialized):
         raise TypeError("ATTRIBUTED_DEFENSIVE_PATH_REQUIRED")
     game_ids = {
-        path.game_id if isinstance(path, FullGameDefensivePath) else path.base_path.game_id
+        path.base_path.game_id
         for path in materialized
     }
     if len(game_ids) != 1:
@@ -124,6 +126,8 @@ def derive_team_defense_stat_market(
 
     values = []
     for path in materialized:
+        if team_id not in {path.base_path.home_team, path.base_path.away_team}:
+            raise ValueError(f"DEFENSE_TEAM_NOT_IN_GAME:{team_id}")
         stats = path.team_stats()
         if team_id not in stats or stat_key not in stats[team_id]:
             raise ValueError(f"TEAM_DEFENSE_STAT_MISSING:{team_id}:{stat_key}")

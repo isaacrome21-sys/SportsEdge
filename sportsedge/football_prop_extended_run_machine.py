@@ -29,6 +29,7 @@ from sportsedge.core.simulate.special_teams import EngineCSpecialTeamsResolver, 
 from sportsedge.core.simulate.usage import EngineBUsageAllocator
 from sportsedge.core.simulate.drive_play import EngineADrivePlaySimulator
 from sportsedge.devig import DevigError, devig_with_policy
+from sportsedge.edge_floors import FrozenDevigPolicy, load_edge_floor_config, require_frozen_devig_policy
 from sportsedge.truth_gate import american_to_decimal
 
 from sportsedge.football_prop_run_machine import (
@@ -46,7 +47,6 @@ from sportsedge.football_prop_run_machine import (
     _price_economics,
     _seed,
     _team_usage,
-    _validate_devig_policy,
     _validate_features,
     canonical_hash,
 )
@@ -392,22 +392,26 @@ def _defense_usage(
     return profiles[0], profiles[1], names, settlement_provider
 
 
-def _devig_pair(over_price: float, under_price: float) -> tuple[float, float, dict[str, Any]]:
+def _devig_pair(
+    over_price: float, under_price: float, *, policy: FrozenDevigPolicy,
+    game_id: str, book_key: str, offer: Mapping[str, Any],
+) -> tuple[float, float, dict[str, Any]]:
+    identity = {
+        "game_id": game_id, "book_key": book_key, "period": "FG",
+        "market": offer["provider_market"], "entity_id": offer["player_id"],
+        "line": offer["line"],
+    }
+    over = {**identity, "side": "OVER", "american_odds": float(over_price)}
+    under = {**identity, "side": "UNDER", "american_odds": float(under_price)}
     try:
-        result = devig_with_policy(
-            [float(over_price), float(under_price)],
-            method="POWER_V1",
-            sensitivity_methods=("MULTIPLICATIVE_V1", "POWER_V1", "SHIN_V1"),
-            sensitivity_trigger_odds=400.0,
-            sensitivity_max_spread_pp=1.0,
-            sensitivity_haircut_pp=0.0,
-        )
+        result = devig_with_policy(over, under, policy=policy)
+        opposite = devig_with_policy(under, over, policy=policy)
     except DevigError as exc:
         raise FootballPropRunError(f"FOOTBALL_PROP_DEVIG_FAILED:{exc}") from exc
-    return float(result.probabilities[0]), float(result.probabilities[1]), {
-        "primary_method": result.primary_method,
-        "sensitivity_triggered": bool(result.sensitivity_triggered),
-        "sensitivity_max_spread_pp": result.sensitivity_max_spread_pp,
+    return result.fair_probability_for_decision, opposite.fair_probability_for_decision, {
+        "primary_method": result.selected.method,
+        "sensitivity_triggered": result.longshot_triggered,
+        "sensitivity_max_spread_pp": result.sensitivity_spread_probability_points,
     }
 
 
@@ -460,7 +464,7 @@ def run_football_extended_props(
     if not isinstance(events, list):
         raise FootballPropRunError("FOOTBALL_PROP_ODDS_EVENTS_REQUIRED")
     event_rows = [row for row in events if isinstance(row, Mapping)]
-    devig_policy = _validate_devig_policy(floor_path)
+    devig_policy = require_frozen_devig_policy(config=load_edge_floor_config(floor_path))
 
     results: list[dict[str, Any]] = []
     distribution_hashes: dict[str, str] = {}
@@ -597,7 +601,8 @@ def run_football_extended_props(
                     f"FOOTBALL_PROP_MARKET_DERIVATION_FAILED:{offer['provider_market']}:{offer['player_id']}:{exc}"
                 ) from exc
             fair_over, fair_under, sensitivity = _devig_pair(
-                offer["over_price"], offer["under_price"]
+                offer["over_price"], offer["under_price"], policy=devig_policy,
+                game_id=game_id, book_key=book_key, offer=offer,
             )
             for side, price, model_p, fair_p in (
                 ("OVER", offer["over_price"], market["over"], fair_over),
@@ -655,7 +660,8 @@ def run_football_extended_props(
                 reason = f"{resolved}_PROP_QUOTE_STALE"
             elif offer["paired"]:
                 fair_primary, _, sensitivity = _devig_pair(
-                    offer["primary_price"], offer["opposite_price"]
+                    offer["primary_price"], offer["opposite_price"], policy=devig_policy,
+                    game_id=game_id, book_key=book_key, offer=offer,
                 )
                 fair_market_p = fair_primary
                 edge, ev, kelly = _price_economics(
@@ -730,6 +736,6 @@ def run_football_extended_props(
             "promotion_changed": False,
             "eligible_changed": False,
             "official_bets_allowed": False,
-            "devig_primary_method": devig_policy["primary_method"],
+            "devig_primary_method": devig_policy.stable_candidate_estimator,
         },
     }
