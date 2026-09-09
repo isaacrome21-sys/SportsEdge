@@ -6,6 +6,7 @@ import unittest
 
 from sportsedge.football_prop_run_machine import (
     FootballPropRunError,
+    _paired_offers,
     canonical_hash,
     run_football_props,
 )
@@ -159,12 +160,24 @@ class FootballPropRunMachineTests(unittest.TestCase):
         with self.assertRaisesRegex(FootballPropRunError, "FOOTBALL_PROP_LIVE_FEATURE_SNAPSHOT_STALE"):
             self._run(live_features=features)
 
-    def test_quote_must_be_strictly_before_kickoff(self):
+    def test_quote_from_future_is_rejected(self):
         odds = self._odds(line=100.5, update=self.start)
         with self.assertRaisesRegex(FootballPropRunError, "FOOTBALL_PROP_QUOTE_FROM_FUTURE"):
             self._run(odds_snapshot=odds)
+
+    def test_quote_observed_at_or_after_kickoff_is_rejected_by_quote_boundary(self):
+        odds = self._odds(line=100.5, update=self.start)
+        game = self.features["games"][0]
+        event = odds["events"][0]
         with self.assertRaisesRegex(FootballPropRunError, "FOOTBALL_PROP_QUOTE_NOT_PREGAME:g1"):
-            self._run(odds_snapshot=odds, now=self.start + timedelta(seconds=1))
+            _paired_offers(
+                game=game,
+                event=event,
+                player_names={"home quarterback": "H-QB"},
+                book_key="draftkings",
+                current=self.start + timedelta(seconds=1),
+                quote_ttl_seconds=180,
+            )
 
     def test_stale_quote_retains_model_but_no_market_economics(self):
         odds = self._odds(line=100.5, update=self.now - timedelta(minutes=10))
