@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Executable fail-closed NFL M2 RUN IT lane.
 
-No model fitting occurs here. A frozen, Git-SHA-bound NFL M2 artifact is required,
-and its canonical JSON SHA-256 must be independently pinned in
-``config/nfl_m2_freeze.json``. The operator may supply both live features and an
-observed odds snapshot (MANUAL), one of them (HYBRID), or neither (AUTOMATIC).
-Every mode then enters ``sportsedge.sports.nfl.run_machine``.
+No model fitting occurs here. A frozen, Git-SHA-bound NFL M2 artifact, its exact
+promotion registry, and the frozen Truth Gate floor registry are external inputs
+to production resolution. Hosted exact-SHA bundles may be materialized outside
+the repository and supplied by CLI/environment; checked-in state never needs to
+claim bytes that are absent.
 
 Manual odds snapshots must already contain their real ``observed_at`` timestamp;
 this script never rewrites an old quote timestamp to make the 180-second TTL pass.
@@ -27,11 +27,11 @@ if str(_REPO_ROOT) not in sys.path:
 
 from sportsedge.sports.nfl.live_features import build_nfl_live_feature_payload
 from sportsedge.sports.nfl.odds_source import fetch_nfl_odds
+from sportsedge.sports.nfl.readiness import load_nfl_promotion_registry, run_nfl_ready
 from sportsedge.sports.nfl.run_machine import (
     DEFAULT_FEATURE_TTL_SECONDS,
     DEFAULT_QUOTE_TTL_SECONDS,
     NFLRunMachineError,
-    run_it_nfl,
 )
 
 _KEYS = (
@@ -40,7 +40,9 @@ _KEYS = (
     "SPORTSEDGE_ODDS_API_KEY_3",
     "SPORTSEDGE_ODDS_API_KEY_4",
 )
-_FREEZE_REGISTRY = _REPO_ROOT / "config" / "nfl_m2_freeze.json"
+_DEFAULT_FREEZE_REGISTRY = _REPO_ROOT / "config" / "nfl_m2_freeze.json"
+_DEFAULT_PROMOTION_REGISTRY = _REPO_ROOT / "artifacts" / "football" / "nfl_promotion_registry.json"
+_DEFAULT_FLOOR_REGISTRY = _REPO_ROOT / "config" / "truth_gate_floors.json"
 
 
 class NFLAutoError(ValueError):
@@ -77,11 +79,8 @@ def _runtime_git_sha(override: str | None) -> str:
         value = str(override).strip().lower()
     else:
         completed = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=_REPO_ROOT,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            ["git", "rev-parse", "HEAD"], cwd=_REPO_ROOT, text=True,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         )
         if completed.returncode != 0:
             raise NFLAutoError("NFL_AUTO_RUNTIME_GIT_SHA_UNAVAILABLE")
@@ -108,12 +107,17 @@ def _odds_keys() -> list[str]:
     return keys
 
 
+def _env_path(name: str) -> Path | None:
+    raw = str(os.environ.get(name) or "").strip()
+    return Path(raw) if raw else None
+
+
 def _artifact_path(path: Path) -> Path:
     return path.resolve() if path.is_absolute() else (_REPO_ROOT / path).resolve()
 
 
-def _frozen_artifact_hash(candidate_path: Path) -> str:
-    freeze = _json(_FREEZE_REGISTRY, "NFL_AUTO_FROZEN_MODEL_BINDING_REQUIRED")
+def _frozen_artifact_hash(candidate_path: Path, freeze_registry: Path, runtime_sha: str) -> str:
+    freeze = _json(freeze_registry, "NFL_AUTO_FROZEN_MODEL_BINDING_REQUIRED")
     if freeze.get("schema_version") != 1:
         raise NFLAutoError("NFL_AUTO_FROZEN_MODEL_BINDING_SCHEMA_INVALID")
     if freeze.get("hash_algorithm") != "CANONICAL_JSON_SHA256_V1":
@@ -123,12 +127,19 @@ def _frozen_artifact_hash(candidate_path: Path) -> str:
     declared_path = str(freeze.get("artifact_path") or "").strip()
     if not declared_path:
         raise NFLAutoError("NFL_AUTO_FROZEN_MODEL_ARTIFACT_PATH_REQUIRED")
-    frozen_path = (_REPO_ROOT / declared_path).resolve()
-    if candidate_path != frozen_path:
-        raise NFLAutoError("NFL_AUTO_MODEL_ARTIFACT_PATH_NOT_FROZEN")
+
+    # Checked-in binding remains path-exact. Externally materialized exact-SHA
+    # bundles may relocate bytes, but never their hash or code identity.
+    if freeze_registry.resolve() == _DEFAULT_FREEZE_REGISTRY.resolve():
+        frozen_path = (_REPO_ROOT / declared_path).resolve()
+        if candidate_path != frozen_path:
+            raise NFLAutoError("NFL_AUTO_MODEL_ARTIFACT_PATH_NOT_FROZEN")
     digest = str(freeze.get("artifact_sha256") or "").strip().lower()
     if len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
         raise NFLAutoError("NFL_AUTO_FROZEN_MODEL_SHA256_INVALID")
+    freeze_code = str(freeze.get("code_git_sha") or "").strip().lower()
+    if freeze_code and freeze_code != runtime_sha:
+        raise NFLAutoError("NFL_AUTO_FROZEN_MODEL_CODE_SHA_MISMATCH")
     return digest
 
 
@@ -136,14 +147,16 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", default="AUTO_SELECT", choices=("AUTO_SELECT", "MANUAL", "HYBRID", "AUTOMATIC"))
     parser.add_argument("--asof")
-    parser.add_argument("--model-artifact", type=Path, default=Path("artifacts/football/nfl_m2_model.json"))
+    parser.add_argument("--model-artifact", type=Path)
+    parser.add_argument("--freeze-registry", type=Path)
+    parser.add_argument("--promotion-registry", type=Path)
+    parser.add_argument("--floor-registry", type=Path)
     parser.add_argument("--runtime-code-git-sha")
     parser.add_argument("--live-features", type=Path)
     parser.add_argument("--odds-snapshot", type=Path)
     parser.add_argument("--book-key", default="draftkings")
     parser.add_argument("--quote-ttl-seconds", type=int, default=DEFAULT_QUOTE_TTL_SECONDS)
     parser.add_argument("--feature-ttl-seconds", type=int, default=DEFAULT_FEATURE_TTL_SECONDS)
-
     parser.add_argument("--schedule-file", type=Path, default=Path("artifacts/football/sources/games.csv"))
     parser.add_argument("--pbp-dir", type=Path, default=Path("artifacts/football/sources/pbp"))
     parser.add_argument("--participation-dir", type=Path, default=Path("artifacts/football/sources/participation"))
@@ -158,36 +171,34 @@ def main() -> int:
 
     current = _utc(args.asof)
     try:
-        model_path = _artifact_path(args.model_artifact)
-        # Missing artifact remains the first and most specific blocker. Only an
-        # actual artifact proceeds to the independent freeze-registry check.
-        artifact = _json(model_path, "NFL_AUTO_FROZEN_MODEL_ARTIFACT_REQUIRED")
-        expected_artifact_sha = _frozen_artifact_hash(model_path)
         runtime_sha = _runtime_git_sha(args.runtime_code_git_sha)
+        model_arg = args.model_artifact or _env_path("SPORTSEDGE_NFL_M2_MODEL_ARTIFACT_PATH") or Path("artifacts/football/nfl_m2_model.json")
+        freeze_registry = args.freeze_registry or _env_path("SPORTSEDGE_NFL_M2_FREEZE_REGISTRY_PATH") or _DEFAULT_FREEZE_REGISTRY
+        promotion_registry_path = args.promotion_registry or _env_path("SPORTSEDGE_NFL_PROMOTION_REGISTRY_PATH") or _DEFAULT_PROMOTION_REGISTRY
+        floor_registry = args.floor_registry or _env_path("SPORTSEDGE_TRUTH_GATE_FLOOR_PATH") or _DEFAULT_FLOOR_REGISTRY
+        model_path = _artifact_path(model_arg)
+
+        artifact = _json(model_path, "NFL_AUTO_FROZEN_MODEL_ARTIFACT_REQUIRED")
+        expected_artifact_sha = _frozen_artifact_hash(model_path, freeze_registry, runtime_sha)
+        promotion_registry = load_nfl_promotion_registry(promotion_registry_path)
+        if not floor_registry.is_file():
+            raise NFLAutoError("NFL_AUTO_TRUTH_GATE_FLOOR_REGISTRY_REQUIRED")
         supplied_features = _operator_payload(args.live_features, "NFL_AUTO_LIVE_FEATURES_UNREADABLE")
         supplied_odds = _operator_payload(args.odds_snapshot, "NFL_AUTO_ODDS_SNAPSHOT_UNREADABLE")
 
         needs_network_odds = supplied_odds is None and str(args.mode).upper() in ("AUTO_SELECT", "HYBRID", "AUTOMATIC")
         if needs_network_odds and args.asof is not None:
             raise NFLAutoError("NFL_AUTO_NETWORK_ODDS_WITH_EXPLICIT_ASOF_PROHIBITED")
-
-        # One execution clock owns live acquisition and all subsequent PIT/TTL
-        # comparisons. Automatic quote observation is the acquisition-request
-        # timestamp, never a later timestamp that would appear to be from the future.
         execution_now = datetime.now(timezone.utc) if args.asof is None else current
 
         def build_features() -> dict[str, Any]:
             return build_nfl_live_feature_payload(
-                schedule_file=args.schedule_file,
-                pbp_dir=args.pbp_dir,
-                participation_dir=args.participation_dir,
-                depth_dir=args.depth_dir,
-                stadium_file=args.stadium_file,
-                asof=execution_now,
+                schedule_file=args.schedule_file, pbp_dir=args.pbp_dir,
+                participation_dir=args.participation_dir, depth_dir=args.depth_dir,
+                stadium_file=args.stadium_file, asof=execution_now,
                 start_season=int(args.start_season),
                 current_season=int(args.current_season if args.current_season is not None else execution_now.year),
-                horizon_minutes=int(args.horizon_minutes),
-                min_lead_minutes=int(args.min_lead_minutes),
+                horizon_minutes=int(args.horizon_minutes), min_lead_minutes=int(args.min_lead_minutes),
             )
 
         def fetch_odds() -> dict[str, Any]:
@@ -196,16 +207,14 @@ def main() -> int:
             if not isinstance(payload, list):
                 raise NFLAutoError("NFL_AUTO_ODDS_PROVIDER_PAYLOAD_INVALID")
             return {
-                "schema_version": 1,
-                "sport": "nfl",
-                "source": "the-odds-api",
-                "observed_at": execution_now.isoformat(),
-                "events": payload,
-                "key_slot": result.key_slot,
-                "prior_key_failures": len(result.failures),
+                "schema_version": 1, "sport": "nfl", "source": "the-odds-api",
+                "observed_at": execution_now.isoformat(), "events": payload,
+                "key_slot": result.key_slot, "prior_key_failures": len(result.failures),
             }
 
-        report = run_it_nfl(
+        report = run_nfl_ready(
+            promotion_registry=promotion_registry,
+            floor_path=floor_registry,
             mode=str(args.mode).upper(),
             model_artifact=artifact,
             expected_model_artifact_sha256=expected_artifact_sha,
@@ -220,38 +229,34 @@ def main() -> int:
             feature_ttl_seconds=int(args.feature_ttl_seconds),
         )
         payload = {
-            "schema_version": "NFL_AUTO_RUN_V1",
+            "schema_version": "NFL_AUTO_RUN_V2",
             "status": "SUCCESS",
             "report": report.to_dict(),
             "governance": {
                 "model_fit_performed": False,
                 "market_prices_are_model_features": False,
-                "props_promoted": False,
-                "promotion_changed": False,
-                "truth_gate_changed": False,
+                "promotion_registry_resolved": True,
+                "truth_gate_resolution_performed": True,
+                "manual_eligible_toggle_required": False,
                 "fail_closed": True,
             },
         }
         _write(args.output, payload)
         print(json.dumps({
-            "status": "SUCCESS",
-            "mode": report.mode,
-            "run_status": report.run_status,
-            "priced": report.summary["priced"],
-            "official_bets": report.summary["official_bets"],
+            "status": "SUCCESS", "mode": report.mode, "run_status": report.run_status,
+            "priced": report.summary["priced"], "official_bets": report.summary["official_bets"],
             "output": str(args.output),
         }, sort_keys=True))
         return 0
     except (NFLAutoError, NFLRunMachineError, ValueError) as exc:
         payload = {
-            "schema_version": "NFL_AUTO_RUN_V1",
-            "status": "BLOCKED",
-            "blocker": str(exc),
-            "generated_at_utc": current.isoformat(),
+            "schema_version": "NFL_AUTO_RUN_V2", "status": "BLOCKED",
+            "blocker": str(exc), "generated_at_utc": current.isoformat(),
             "governance": {
                 "model_fit_performed": False,
-                "promotion_changed": False,
-                "truth_gate_changed": False,
+                "promotion_registry_resolved": True,
+                "truth_gate_resolution_performed": True,
+                "manual_eligible_toggle_required": False,
                 "fail_closed": True,
             },
         }
