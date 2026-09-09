@@ -56,6 +56,7 @@ jobs:
       - name: Build exact-SHA artifact attempt A
         env:
           TZ: UTC
+          PYTHONHASHSEED: '1'
         run: >-
           python scripts/build_nfl_prop_model_artifact.py
           --pbp artifacts/football/nfl_prop_sources/play_by_play_2022.csv.gz
@@ -66,11 +67,13 @@ jobs:
           --artifact-version NFL_PROP_SHARED_PATH_2022_2025_V1
           --seasons 2022 2023 2024 2025
           --output artifacts/football/nfl_prop_freeze_a/model.json
+          --artifact-path artifacts/football/nfl_offensive_prop_ab_model.json
           --diagnostics-output artifacts/football/nfl_prop_freeze_a/fit_diagnostics.json
           --freeze-output artifacts/football/nfl_prop_freeze_a/freeze.json
       - name: Build exact-SHA artifact replay B under shifted timezone
         env:
           TZ: Pacific/Kiritimati
+          PYTHONHASHSEED: '8675309'
         run: >-
           python scripts/build_nfl_prop_model_artifact.py
           --pbp artifacts/football/nfl_prop_sources/play_by_play_2022.csv.gz
@@ -81,6 +84,7 @@ jobs:
           --artifact-version NFL_PROP_SHARED_PATH_2022_2025_V1
           --seasons 2022 2023 2024 2025
           --output artifacts/football/nfl_prop_freeze_b/model.json
+          --artifact-path artifacts/football/nfl_offensive_prop_ab_model.json
           --diagnostics-output artifacts/football/nfl_prop_freeze_b/fit_diagnostics.json
           --freeze-output artifacts/football/nfl_prop_freeze_b/freeze.json
       - name: Enforce byte-identical deterministic freeze
@@ -106,6 +110,7 @@ jobs:
           assert freeze['status'] == 'FROZEN'
           assert freeze['promotion_authority'] is False
           assert freeze['artifact_sha256'] == expected
+          assert freeze['artifact_path'] == 'artifacts/football/nfl_offensive_prop_ab_model.json'
           profiles, actual, source_sha = _load_artifact(
               model,
               sport='NFL',
@@ -116,6 +121,24 @@ jobs:
           assert source_sha == model['source_manifest_sha256']
           assert len(profiles) == 32
           assert set(model['team_special_teams_rates']) == set(profiles)
+          # Exercise the actual runtime path and freeze registry contract, then
+          # prove altered fitted parameters still fail the production hash gate.
+          from scripts.run_football_props_auto import _freeze
+          from sportsedge.football_prop_run_machine import FootballPropRunError
+          runtime_path = Path(freeze['artifact_path'])
+          runtime_path.parent.mkdir(parents=True, exist_ok=True)
+          runtime_path.write_bytes(Path('artifacts/football/nfl_prop_freeze_a/model.json').read_bytes())
+          loaded, bound_sha = _freeze(Path('artifacts/football/nfl_prop_freeze_a/freeze.json'), runtime_path, 'NFL')
+          assert canonical_hash(loaded) == bound_sha == expected
+          first_team = sorted(loaded['team_drive_profiles'])[0]
+          loaded['team_drive_profiles'][first_team]['pass_rate'] += 0.001
+          try:
+              _load_artifact(loaded, sport='NFL', expected_artifact_sha256=bound_sha,
+                             runtime_code_git_sha=os.environ['EVIDENCE_GIT_SHA'])
+          except FootballPropRunError as exc:
+              assert 'SHA256_MISMATCH' in str(exc), str(exc)
+          else:
+              raise AssertionError('TAMPERED_ARTIFACT_ACCEPTED')
           print(
               'NFL_PROP_REAL_FREEZE_OK '
               f"artifact_sha256={expected} "

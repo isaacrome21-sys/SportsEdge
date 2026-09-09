@@ -16,8 +16,11 @@ from sportsedge.sports.nfl.prop_artifact_training import fit_nfl_prop_artifact
 
 
 def _write(path: Path, payload: dict) -> None:
+    # Validate with the same JSON domain used by the production hash function.
+    # In particular, never persist NaN/Infinity as apparently valid JSON.
+    canonical_hash(payload)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_bytes((json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False, allow_nan=False) + "\n").encode("utf-8"))
 
 
 def main() -> int:
@@ -27,6 +30,10 @@ def main() -> int:
     ap.add_argument("--artifact-version", required=True)
     ap.add_argument("--seasons", nargs="+", type=int, default=[2022, 2023, 2024, 2025])
     ap.add_argument("--output", type=Path, required=True)
+    ap.add_argument(
+        "--artifact-path", type=Path,
+        help="Declared runtime artifact path; defaults to --output. Use the same runtime path for independent replay staging directories.",
+    )
     ap.add_argument("--diagnostics-output", type=Path, required=True)
     ap.add_argument("--freeze-output", type=Path, required=True)
     args = ap.parse_args()
@@ -43,7 +50,7 @@ def main() -> int:
         "sport": "NFL",
         "status": "FROZEN",
         "hash_algorithm": "CANONICAL_JSON_SHA256_V1",
-        "artifact_path": str(args.output),
+        "artifact_path": str(args.artifact_path if args.artifact_path is not None else args.output),
         "artifact_sha256": artifact_sha,
         "code_git_sha": str(args.git_sha).lower(),
         "source_manifest_sha256": artifact["source_manifest_sha256"],
