@@ -22,7 +22,7 @@ if str(ROOT) not in sys.path:
 
 from sportsedge.football_prop_odds_source import build_odds_snapshot, fetch_event_prop_odds
 from sportsedge.football_prop_run_machine import FootballPropRunError
-from sportsedge.football_prop_readiness import FootballPropReadinessError, run_football_props_ready
+from sportsedge.football_prop_readiness import run_football_props_ready
 
 
 class FootballPropAutoError(ValueError):
@@ -209,7 +209,7 @@ def main() -> int:
         _write(output, payload)
         print(json.dumps({"status": "SUCCESS", "sport": sport, "output": str(output)}, sort_keys=True))
         return 0
-    except (FootballPropAutoError, FootballPropReadinessError, FootballPropRunError, ValueError) as exc:
+    except (FootballPropAutoError, FootballPropRunError, ValueError) as exc:
         payload = {
             "schema_version": "FOOTBALL_PROP_AUTO_RUN_V2",
             "status": "BLOCKED",

@@ -4,6 +4,8 @@ from copy import deepcopy
 from tempfile import TemporaryDirectory
 from pathlib import Path
 import json
+import subprocess
+import sys
 from datetime import datetime, timedelta, timezone
 import unittest
 
@@ -215,6 +217,27 @@ class FootballPropExtendedRunMachineTests(unittest.TestCase):
                 self.assertAlmostEqual(after['fair_market_p'] - before['fair_market_p'], 0.01)
                 self.assertAlmostEqual(before['edge'] - after['edge'], 0.01)
             self.assertFalse(after['official_eligible'])
+
+    def test_cli_writes_blocked_cards_for_missing_and_unbound_artifacts(self):
+        with TemporaryDirectory() as temp:
+            for sport in ('NFL', 'CFB'):
+                artifact = Path(temp) / sport
+                output = Path(temp) / (sport + '.json')
+                for present in (False, True):
+                    with self.subTest(sport=sport, present=present):
+                        if present:
+                            artifact.write_text('{}')
+                        result = subprocess.run([
+                            sys.executable, 'scripts/run_football_props_auto.py',
+                            '--sport', sport, '--model-artifact', str(artifact),
+                            '--output', str(output),
+                        ], capture_output=True, text=True)
+                        self.assertEqual(result.returncode, 2, result.stderr)
+                        card = json.loads(output.read_text())
+                        suffix = 'BINDING_REQUIRED' if present else 'ARTIFACT_REQUIRED'
+                        self.assertEqual(card['blocker'], f'{sport}_PROP_FROZEN_MODEL_{suffix}')
+                        self.assertEqual(card['status'], 'BLOCKED')
+                        self.assertIsNone(card['report']['results'][0]['model_p'])
 
     def test_one_sided_anytime_td_never_invents_opposite_price_or_edge(self):
         report = self._run()
