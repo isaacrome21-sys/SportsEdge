@@ -1,15 +1,17 @@
 {
   "schema_version": "FOOTBALL_PROP_ENGINE_SURFACE_V1",
   "authority": "This file is the runtime authority for football player-prop engine availability. It supersedes legacy NO_ENGINE labels for the A+B offensive stat markets listed as IMPLEMENTED_FAIL_CLOSED below; unlisted football markets retain config/football_market_surface.json state.",
-  "library_entrypoint": "sportsedge.football_prop_run_machine:run_football_props",
+  "library_entrypoint": "sportsedge.football_prop_readiness:run_football_props_ready",
   "sports": {
     "NFL": {
       "freeze_registry": "config/nfl_prop_model_freeze.json",
+      "evidence_registry": "config/nfl_prop_evidence.json",
       "engine_state": "IMPLEMENTED_FAIL_CLOSED",
       "promotion_state": "BLOCKED_EVIDENCE_REQUIRED"
     },
     "CFB": {
       "freeze_registry": "config/cfb_prop_model_freeze.json",
+      "evidence_registry": "config/cfb_prop_evidence.json",
       "engine_state": "IMPLEMENTED_FAIL_CLOSED",
       "promotion_state": "BLOCKED_EVIDENCE_REQUIRED"
     }
@@ -33,11 +35,11 @@
   },
   "explicit_no_engine": {
     "targets": "No standard paired player_targets provider market is in the bound event-odds surface.",
-    "anytime_td": "Full TD participation/scoring semantics require the promoted A+B+C path.",
-    "first_td": "First scorer requires complete offensive, defensive-return and special-teams scoring order.",
-    "two_plus_td": "TD participation/scoring remains outside the A+B offensive-stat surface.",
-    "kicker_props": "Outside this offensive A+B engine.",
-    "defensive_player_props": "Outside this offensive A+B engine."
+    "anytime_td": "Full TD participation/scoring semantics require complete return-scoring attribution in addition to offensive A+B paths.",
+    "first_td": "First scorer requires complete offensive, defensive-return and special-teams scoring order plus scorer identity.",
+    "two_plus_td": "Generic touchdowns include return scoring and remain outside the current offensive-stat surface.",
+    "kicker_props": "Engine C readouts exist but production PIT kicker-profile acquisition is not yet bound to this runner.",
+    "defensive_player_props": "Defensive readouts exist but production PIT defender-usage acquisition is not yet bound to this runner."
   },
   "governance": {
     "official_bets_allowed": false,
@@ -49,6 +51,7 @@
     "requires_paired_price": true,
     "requires_pregame_quote": true,
     "requires_quote_ttl": true,
-    "requires_forward_evidence_for_promotion": true
+    "requires_forward_evidence_for_promotion": true,
+    "evidence_resolution_time_enforced": true
   }
 }
