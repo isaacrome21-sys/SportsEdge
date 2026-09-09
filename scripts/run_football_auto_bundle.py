@@ -9,6 +9,10 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from sportsedge.football_prop_surface import require_executable_prop_surface
 
 
 def _load(path: Path, lane: str, code: int) -> tuple[list[dict], dict]:
@@ -41,6 +45,11 @@ def main() -> int:
     args = ap.parse_args()
 
     sport = args.sport.upper()
+    # This is an actual runtime read, not a decorative config flag. If the
+    # authoritative prop surface stops declaring this sport executable, RUN IT
+    # fails before trying either child lane.
+    require_executable_prop_surface(sport, path=ROOT / "config/football_prop_engine_surface.json")
+
     lower = sport.lower()
     game_out = ROOT / f"artifacts/run_it/{lower}_game_card.json"
     prop_out = ROOT / f"artifacts/run_it/{lower}_prop_card.json"
@@ -82,8 +91,6 @@ def main() -> int:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps({"status": status, "sport": sport, "output": str(args.output)}, sort_keys=True))
-    # The bundle itself executed correctly even when one governed lane is BLOCKED.
-    # The card carries that blocker and the control plane evaluates it.
     return 0
 
 
