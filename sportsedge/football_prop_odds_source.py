@@ -1,4 +1,4 @@
-"""Event-level two-way football player-prop acquisition with key failover."""
+"""Event-level football player-prop acquisition with key failover."""
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -7,7 +7,7 @@ from typing import Any, Callable, Iterable, Sequence
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from sportsedge.football_prop_run_machine import PROVIDER_MARKET_TO_STAT
+from sportsedge.football_prop_extended_run_machine import PROVIDER_MARKETS
 from sportsedge.odds_keyring import fetch_with_key_failover
 
 _BASE = "https://api.the-odds-api.com/v4"
@@ -32,8 +32,8 @@ def build_event_prop_odds_url(
     event = str(event_id or "").strip()
     if not event or "/" in event:
         raise FootballPropOddsError("FOOTBALL_PROP_ODDS_EVENT_ID_INVALID")
-    requested = tuple(markets or PROVIDER_MARKET_TO_STAT.keys())
-    unknown = sorted(set(requested).difference(PROVIDER_MARKET_TO_STAT))
+    requested = tuple(markets or sorted(PROVIDER_MARKETS))
+    unknown = sorted(set(requested).difference(PROVIDER_MARKETS))
     if unknown:
         raise FootballPropOddsError("FOOTBALL_PROP_ODDS_MARKET_UNSUPPORTED:" + ",".join(unknown))
     books = tuple(str(x).strip().lower() for x in bookmakers if str(x).strip())
@@ -53,7 +53,7 @@ def _http_fetch(url_without_key: str, key: str) -> Any:
     sep = "&" if "?" in url_without_key else "?"
     url = f"{url_without_key}{sep}{urlencode({'apiKey': key})}"
     with urlopen(
-        Request(url, headers={"Accept": "application/json", "User-Agent": "SportsEdge-Football-Props/1"}),
+        Request(url, headers={"Accept": "application/json", "User-Agent": "SportsEdge-Football-Props/2"}),
         timeout=20,
     ) as response:
         raw = response.read()
