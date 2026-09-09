@@ -53,6 +53,7 @@ def _certification(*, market=MARKET):
 
 
 def _floor_config(*, market=MARKET):
+    floor_key = f"NFL_{market}"
     return {
         "truth_gate": {
             "schema_version": 2,
@@ -75,7 +76,7 @@ def _floor_config(*, market=MARKET):
                 "sensitivity_failure": "BLOCK",
             },
             "edge_floors": {
-                market: {
+                floor_key: {
                     "status": "FROZEN",
                     "value_probability_points": 0.03,
                     "method_version": "FIXTURE_ONLY_V1",
@@ -175,6 +176,7 @@ class FootballPropCertificationTests(unittest.TestCase):
             engine.assert_called_once()
             row = result["results"][0]
             self.assertTrue(row["official_eligible"])
+            self.assertEqual(row["truth_gate_floor_key"], f"NFL_{MARKET}")
             self.assertEqual(row["bet_status"], "OFFICIAL_BET")
             self.assertEqual(result["summary"]["official_bets"], 1)
             self.assertTrue(result["evidence_resolution"]["can_promote"])
@@ -194,7 +196,7 @@ class FootballPropCertificationTests(unittest.TestCase):
             ) as engine:
                 with self.assertRaisesRegex(
                     EdgeFloorError,
-                    f"ELIGIBLE_MARKET_MISSING_OR_UNFROZEN_EDGE_FLOOR:{MARKET}",
+                    f"ELIGIBLE_MARKET_MISSING_OR_UNFROZEN_EDGE_FLOOR:NFL_{MARKET}",
                 ):
                     run_football_props_ready(
                         sport="NFL",
