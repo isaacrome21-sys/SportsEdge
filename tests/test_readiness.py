@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from sportsedge.prop_evidence import EVIDENCE_GROUPS, HITTER_PA, dependent_hitter_markets
 from sportsedge.readiness import audit_readiness, _frozen_floor_markets
 from tests.test_edge_floors import _cfg, _frozen
 
@@ -11,6 +12,17 @@ def _hits_floor_config():
     cfg = _cfg()
     cfg["truth_gate"]["edge_floors"] = {"HITS": _frozen()}
     return cfg
+
+
+def _prop_registry(*, missing: set[str] | None = None) -> dict:
+    missing = missing or set()
+    rows = {}
+    for group in EVIDENCE_GROUPS:
+        if group in missing:
+            rows[group] = {"status": "MISSING"}
+        else:
+            rows[group] = {"status": "PASS", "evidence_sha256": "a" * 64}
+    return {"schema_version": 1, "groups": rows}
 
 
 class ReadinessTests(unittest.TestCase):
@@ -43,12 +55,29 @@ class ReadinessTests(unittest.TestCase):
             self.assertFalse(rows[market]["behavioral_complete"])
             self.assertEqual(rows[market]["behavioral_status"], "FIX")
             self.assertTrue(rows[market]["runnable_live"])
+            self.assertFalse(rows[market]["prop_evidence_ready"])
+            self.assertIn("EVIDENCE_GROUP_MISSING:HITTER_PA", rows[market]["blockers"])
             self.assertFalse(rows[market]["official_bet_enabled"])
             self.assertFalse(rows[market]["validation_complete"])
             self.assertTrue(expected_validation_blockers <= set(rows[market]["blockers"]))
             self.assertNotIn("FIXTURE_CI_PENDING", rows[market]["blockers"])
             self.assertIn("BEHAVIORAL_FIX", rows[market]["blockers"])
             self.assertIn("historical_point_in_time", rows[market]["validation_missing"])
+
+    def test_hitter_pa_group_is_live_in_resolution_for_every_dependent_market(self):
+        with tempfile.TemporaryDirectory() as td:
+            prop_evidence = Path(td) / "prop_evidence.json"
+            prop_evidence.write_text(json.dumps(_prop_registry(missing={HITTER_PA})))
+            out = audit_readiness(prop_evidence_path=prop_evidence)
+        rows = {x["market"]: x for x in out["markets"]}
+        for market in dependent_hitter_markets():
+            with self.subTest(market=market):
+                row = rows[market]
+                self.assertFalse(row["prop_evidence_ready"])
+                self.assertIn(HITTER_PA, row["prop_evidence_missing_groups"])
+                self.assertIn("EVIDENCE_GROUP_MISSING:HITTER_PA", row["prop_evidence_blockers"])
+                self.assertIn("EVIDENCE_GROUP_MISSING:HITTER_PA", row["blockers"])
+                self.assertFalse(row["official_bet_enabled"])
 
     def test_every_checked_in_market_has_declared_contract_but_realization_is_separate(self):
         out = audit_readiness()
@@ -153,7 +182,7 @@ class ReadinessTests(unittest.TestCase):
         self.assertFalse(row["official_bet_enabled"])
         self.assertIn("BEHAVIORAL_FIX", row["blockers"])
 
-    def test_official_enablement_requires_validation_realization_and_measured_behavior(self):
+    def test_official_enablement_requires_grouped_prop_evidence_too(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             registry = root / "deployments.json"
@@ -161,28 +190,33 @@ class ReadinessTests(unittest.TestCase):
             validation = root / "validation.json"
             realization = root / "realization.json"
             behavioral = root / "behavioral.json"
+            prop_evidence = root / "prop_evidence.json"
             registry.write_text(json.dumps({
                 "schema_version": 1,
                 "markets": {"HITS": {"eligible": True, "stage": "DEPLOYED", "reason": "test"}},
             }))
             floors.write_text(json.dumps(_hits_floor_config()))
             validation.write_text(json.dumps({
-                "required_gates": ["historical_point_in_time", "untouched_holdout"],
+                "required_gates": ["historical_point_in_time", "untouched_holdout", "calibration"],
                 "markets": {"HITS": {
                     "historical_point_in_time": {"status": "PASS", "evidence": "fixture"},
-                    "untouched_holdout": {"status": "PASS", "evidence": "fixture"}
+                    "untouched_holdout": {"status": "PASS", "evidence": "fixture"},
+                    "calibration": {"status": "PASS", "evidence": "fixture"}
                 }},
             }))
             realization.write_text(json.dumps({"schema_version": 1, "markets": {"HITS": {"status": "COMPLETE", "gaps": []}}}))
             behavioral.write_text(json.dumps({"schema_version": 1, "markets": {"HITS": {"status": "KEEP_MEASURED", "root_cause": None}}}))
+            prop_evidence.write_text(json.dumps(_prop_registry()))
             out = audit_readiness(
                 registry, floors_path=floors, validation_path=validation,
                 feature_realization_path=realization, behavioral_path=behavioral,
+                prop_evidence_path=prop_evidence,
             )
         row = out["markets"][0]
         self.assertTrue(row["validation_complete"])
         self.assertTrue(row["feature_realization_complete"])
         self.assertTrue(row["behavioral_complete"])
+        self.assertTrue(row["prop_evidence_ready"])
         self.assertTrue(row["official_bet_enabled"])
 
 
