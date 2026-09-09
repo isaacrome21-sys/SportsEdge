@@ -42,6 +42,14 @@ def _present_provider_markets(odds_snapshot: Mapping[str, Any]) -> set[str]:
     return out
 
 
+def _floor_key(sport: str, provider_market: str) -> str:
+    resolved = str(sport or "").strip().upper()
+    market = str(provider_market or "").strip()
+    if resolved not in {"NFL", "CFB"} or not market:
+        raise ValueError("FOOTBALL_PROP_FLOOR_IDENTITY_INVALID")
+    return f"{resolved}_{market}"
+
+
 def run_football_props_ready(
     *,
     evidence_registry: Mapping[str, Any] | None = None,
@@ -50,20 +58,16 @@ def run_football_props_ready(
 ) -> dict[str, Any]:
     """Run the shared-path prop model and resolve all OFFICIAL gates.
 
-    There is no manual deployment boolean.  For every provider market present on
-    the board, artifact-bound evidence and certification are resolved first.  If
-    both are PASS, its frozen edge floor must resolve *before* predictive
-    inference.  After inference, a fresh paired quote is required and the normal
-    SportsEdge Truth Gate makes the PASS/OFFICIAL_BET decision.
-
-    Missing evidence/certification remains a truthful shadow state and may still
-    produce Model_P for research.  It can never produce an OFFICIAL bet.
+    There is no manual deployment boolean. For every provider market present on
+    the board, artifact-bound evidence and certification are resolved first. If
+    both are PASS, its *sport-namespaced* frozen edge floor must resolve before
+    predictive inference. After inference, a fresh paired quote is required and
+    the normal SportsEdge Truth Gate makes the PASS/OFFICIAL_BET decision.
     """
     sport = str(kwargs.get("sport") or "").strip().upper()
     artifact_sha = str(kwargs.get("expected_artifact_sha256") or "").strip().lower()
     odds_snapshot = kwargs.get("odds_snapshot")
     if not isinstance(odds_snapshot, Mapping):
-        # Let the canonical runner emit its more specific contract error.
         odds_snapshot = {}
     floor_path = str(kwargs.get("floor_path") or "config/truth_gate_floors.json")
 
@@ -78,11 +82,7 @@ def run_football_props_ready(
         else load_certification_registry(sport)
     )
 
-    # Promotion-grade gates are intentionally resolved before the model.  This
-    # preserves the global invariant that a promotable market can never invoke a
-    # predictive engine while its frozen floor is absent/unfrozen.
     preflight_floors: dict[str, FrozenEdgeFloor] = {}
-    preflight: dict[str, dict[str, Any]] = {}
     for provider_market in sorted(_present_provider_markets(odds_snapshot)):
         evidence_state = assess_market_evidence(
             sport=sport,
@@ -96,15 +96,9 @@ def run_football_props_ready(
             model_artifact_sha256=artifact_sha,
             registry=certification,
         )
-        promotion_grade = bool(evidence_state["ready"] and certification_state["ready"])
-        preflight[provider_market] = {
-            "evidence_ready": bool(evidence_state["ready"]),
-            "certification_ready": bool(certification_state["ready"]),
-            "promotion_grade": promotion_grade,
-        }
-        if promotion_grade:
+        if evidence_state["ready"] and certification_state["ready"]:
             preflight_floors[provider_market] = require_production_edge_floor(
-                market=provider_market,
+                market=_floor_key(sport, provider_market),
                 path=floor_path,
             )
 
@@ -118,6 +112,7 @@ def run_football_props_ready(
     for row in report["results"]:
         provider_market = str(row["provider_market"])
         row_artifact_sha = str(row["model_artifact_sha256"])
+        floor_key = _floor_key(sport, provider_market)
         evidence_state = assess_market_evidence(
             sport=sport,
             provider_market=provider_market,
@@ -140,6 +135,7 @@ def run_football_props_ready(
         row["certification_ready"] = certification_state["ready"]
         row["certification_status"] = certification_state["status"]
         row["certification_blockers"] = certification_state["blockers"]
+        row["truth_gate_floor_key"] = floor_key
         row["official_eligible"] = False
 
         if evidence_state["ready"]:
@@ -158,11 +154,8 @@ def run_football_props_ready(
 
         floor = preflight_floors.get(provider_market)
         if floor is None:
-            # Defensive invariant: a promotion-grade row must have resolved its
-            # floor before the model ran.  This branch should only be reachable
-            # if caller inputs mutated between preflight and result resolution.
             row["bet_status"] = "BLOCKED"
-            row["reason"] = f"PROP_FROZEN_FLOOR_PREFLIGHT_MISSING:{provider_market}"
+            row["reason"] = f"PROP_FROZEN_FLOOR_PREFLIGHT_MISSING:{floor_key}"
             continue
 
         if row.get("quote_fresh") is not True:
@@ -190,6 +183,7 @@ def run_football_props_ready(
         row["bet_status"] = decision.bet_status
         row["reason"] = "TRUTH_GATE_RESOLVED"
         row["truth_gate"] = {
+            "floor_key": floor_key,
             "edge_floor": float(floor.value_probability_points),
             "floor_method_version": floor.method_version,
             "floor_evidence_sha256": floor.evidence_sha256,
@@ -218,8 +212,11 @@ def run_football_props_ready(
         "schema_version": certification.get("schema_version"),
         "sport": sport,
         "registry_override_used": certification_registry is not None,
-        "deployment_derivation": "EVIDENCE_AND_CERTIFICATION_AND_FROZEN_FLOOR",
+        "deployment_derivation": "EVIDENCE_AND_CERTIFICATION_AND_SPORT_NAMESPACED_FROZEN_FLOOR",
         "manual_eligible_toggle_required": False,
         "promotion_grade_markets": sorted(preflight_floors),
+        "promotion_grade_floor_keys": sorted(
+            _floor_key(sport, market) for market in preflight_floors
+        ),
     }
     return report
