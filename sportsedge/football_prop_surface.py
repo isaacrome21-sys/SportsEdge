@@ -44,14 +44,15 @@ def require_executable_prop_surface(
     spec = sports[resolved]
     if spec.get("engine_state") != "IMPLEMENTED_FAIL_CLOSED":
         raise FootballPropSurfaceError(f"FOOTBALL_PROP_ENGINE_NOT_IMPLEMENTED:{resolved}")
-    if spec.get("promotion_state") != "BLOCKED_EVIDENCE_REQUIRED":
+    if spec.get("promotion_state") != "AUTOMATIC_TRUTH_GATE_GATED":
         raise FootballPropSurfaceError(f"FOOTBALL_PROP_PROMOTION_STATE_INVALID:{resolved}")
-    freeze_registry = str(spec.get("freeze_registry") or "").strip()
-    if not freeze_registry:
-        raise FootballPropSurfaceError(f"FOOTBALL_PROP_FREEZE_REGISTRY_UNBOUND:{resolved}")
-    evidence_registry = str(spec.get("evidence_registry") or "").strip()
-    if not evidence_registry:
-        raise FootballPropSurfaceError(f"FOOTBALL_PROP_EVIDENCE_REGISTRY_UNBOUND:{resolved}")
+    for field, error in (
+        ("freeze_registry", "FREEZE_REGISTRY_UNBOUND"),
+        ("evidence_registry", "EVIDENCE_REGISTRY_UNBOUND"),
+        ("certification_registry", "CERTIFICATION_REGISTRY_UNBOUND"),
+    ):
+        if not str(spec.get(field) or "").strip():
+            raise FootballPropSurfaceError(f"FOOTBALL_PROP_{error}:{resolved}")
 
     declared = payload.get("implemented_provider_markets")
     if not isinstance(declared, Mapping) or not declared:
@@ -66,15 +67,21 @@ def require_executable_prop_surface(
 
     governance = payload.get("governance")
     required_true = (
-        "requires_frozen_artifact", "requires_pregame_feature_snapshot",
-        "requires_paired_price_for_market_economics", "requires_pregame_quote",
-        "requires_quote_ttl", "requires_forward_evidence_for_promotion",
+        "official_bets_allowed_when_all_gates_pass",
+        "requires_frozen_artifact",
+        "requires_pregame_feature_snapshot",
+        "requires_paired_price_for_market_economics",
+        "requires_pregame_quote",
+        "requires_quote_ttl",
+        "requires_forward_evidence_for_promotion",
+        "requires_artifact_bound_certification",
+        "requires_frozen_edge_floor_before_promotable_inference",
         "evidence_resolution_time_enforced",
     )
     if not isinstance(governance, Mapping) or any(governance.get(k) is not True for k in required_true):
         raise FootballPropSurfaceError("FOOTBALL_PROP_GOVERNANCE_CONTRACT_INVALID")
-    if governance.get("official_bets_allowed") is not False:
-        raise FootballPropSurfaceError("FOOTBALL_PROP_OFFICIAL_MUST_REMAIN_DISABLED")
+    if governance.get("manual_eligible_toggle_required") is not False:
+        raise FootballPropSurfaceError("FOOTBALL_PROP_MANUAL_PROMOTION_TOGGLE_PROHIBITED")
     if governance.get("one_sided_market_can_create_fair_market_p") is not False:
         raise FootballPropSurfaceError("FOOTBALL_PROP_ONE_SIDED_FAIR_PRICE_MUST_REMAIN_DISABLED")
     return spec
