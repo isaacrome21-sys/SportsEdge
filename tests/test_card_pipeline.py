@@ -22,7 +22,8 @@ def pair(market="HITS"): return [quote(market=market,side="OVER",odds=100),quote
 def deployed_registry(path,deploy_tb=False): path.write_text(json.dumps({"schema_version":1,"markets":{"HITS":{"eligible":True,"stage":"DEPLOYED","reason":"test"},"TOTAL_BASES":{"eligible":bool(deploy_tb),"stage":"DEPLOYED" if deploy_tb else "PRODUCTION_LOGIC_PASS","reason":"test"}}}))
 def floor_registry(path,markets):
     record={"status":"FROZEN","value_probability_points":0.01,"method_version":"test_fixture_v1","evidence":{"evidence_sha256":"e"*64,"derivation_code_sha256":"d"*64,"oos_cutoff_utc":"2026-08-01T00:00:00Z"},"frozen":{"frozen_by_commit":"a"*40}}
-    path.write_text(json.dumps({"truth_gate":{"production":{"fail_closed":True,"allow_cli_floor_override":False,"require_frozen_floor_for_eligible_market":True},"edge_floors":{m:dict(record) for m in markets}}}))
+    devig={"policy_id":"EDGE_FLOOR_DEVIG_V1","status":"FROZEN_PRE_DERIVATION","longshot_trigger_american_odds":400,"longshot_trigger_rule":"EITHER_SIDE_AT_OR_ABOVE_POSITIVE_400","sensitivity_methods":["MULTIPLICATIVE_V1","POWER_V1","SHIN_V1"],"sensitivity_limit_absolute_probability_points":0.01,"stable_candidate_estimator":"MULTIPLICATIVE_V1","longshot_candidate_estimator":"POWER_V1","haircut_probability_points":0.0,"aggregation_rule":"ESTIMATOR_ONLY_NO_MINIMUM_ACROSS_METHODS","sensitivity_failure":"BLOCK"}
+    path.write_text(json.dumps({"truth_gate":{"schema_version":2,"production":{"fail_closed":True,"allow_cli_floor_override":False,"require_frozen_floor_for_eligible_market":True},"devig_policy":devig,"edge_floors":{m:dict(record) for m in markets}}}))
 
 class CardPipelineTests(unittest.TestCase):
     def test_checked_in_registry_keeps_hits_blocked(self):
