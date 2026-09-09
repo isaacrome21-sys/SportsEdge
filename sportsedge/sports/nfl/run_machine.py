@@ -1,12 +1,13 @@
 """Canonical SportsEdge NFL MANUAL / HYBRID / AUTOMATIC run machine.
 
-This module is the production convergence boundary above NFL M2.  Input ownership
-may differ by mode, but every mode converges on the same frozen model artifact,
-strictly-as-of live feature payload, observed sportsbook snapshot, one M2 score
-distribution per game, and downstream market read-outs.
+This module is the production convergence boundary above NFL M2. Input ownership
+may differ by mode, but every mode converges on the same externally hash-pinned
+frozen model artifact, strictly-as-of live feature payload, observed sportsbook
+snapshot, one M2 score distribution per game, and downstream market read-outs.
 
 Safety invariants owned here:
-* the frozen M2 artifact is bound to the runtime code Git SHA;
+* the frozen M2 artifact is bound to an independently supplied artifact SHA-256;
+* the frozen M2 artifact is also bound to the runtime code Git SHA;
 * training-source and live-feature source hashes are retained separately;
 * execution and feature snapshots are strictly pregame and never from the future;
 * live feature snapshots must be recent enough for the existing 120-minute live
@@ -14,7 +15,7 @@ Safety invariants owned here:
 * sportsbook snapshots must have an explicit observation timestamp, must be
   observed before execution and kickoff, and expire after 180 seconds by default;
 * sportsbook lines/prices are applied only after the M2 score distribution exists;
-* MONEYLINE / SPREAD / TOTAL are the only modeled NFL markets.  Nothing here
+* MONEYLINE / SPREAD / TOTAL are the only modeled NFL markets. Nothing here
   promotes player props or turns context/trends into Model_P;
 * all priced NFL rows remain betting-BLOCKED until independent promotion evidence
   and a frozen Truth Gate floor permit deployment.
@@ -40,7 +41,7 @@ VALID_MODES = frozenset({"AUTO_SELECT", "MANUAL", "HYBRID", "AUTOMATIC"})
 SUPPORTED_GAME_MARKETS = frozenset({"MONEYLINE", "SPREAD", "TOTAL"})
 NFL_MACHINE_VERSION = "NFL_RUN_MACHINE_V1"
 DEFAULT_QUOTE_TTL_SECONDS = 180
-# The canonical live-feature builder targets games in a 120-minute horizon.  A
+# The canonical live-feature builder targets games in a 120-minute horizon. A
 # snapshot older than that horizon is not treated as current production input.
 DEFAULT_FEATURE_TTL_SECONDS = 120 * 60
 DEFAULT_BOOK_KEY = "draftkings"
@@ -119,7 +120,13 @@ def _aware(value: datetime | str, error: str) -> datetime:
 
 def _canonical_hash(value: Any) -> str:
     try:
-        raw = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")
+        raw = json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
     except (TypeError, ValueError) as exc:
         raise NFLRunMachineError("NFL_CANONICAL_HASH_INPUT_INVALID") from exc
     return sha256(raw).hexdigest()
@@ -187,17 +194,24 @@ def _resolve_mode(
 def _load_bound_model(
     artifact_payload: Mapping[str, Any],
     *,
+    expected_model_artifact_sha256: str,
     runtime_code_git_sha: str,
 ) -> tuple[Any, str, str, str]:
     if not isinstance(artifact_payload, Mapping):
         raise NFLRunMachineError("NFL_MODEL_ARTIFACT_REQUIRED")
+    expected_artifact_sha = _sha256_text(
+        expected_model_artifact_sha256,
+        "NFL_MODEL_ARTIFACT_EXPECTED_SHA256_INVALID",
+    )
     runtime_sha = _git_sha(runtime_code_git_sha, "NFL_RUNTIME_CODE_GIT_SHA_INVALID")
     artifact = dict(artifact_payload)
+    artifact_sha = _canonical_hash(artifact)
+    if artifact_sha != expected_artifact_sha:
+        raise NFLRunMachineError("NFL_MODEL_ARTIFACT_SHA256_MISMATCH")
     try:
         model = load_nfl_m2_model_artifact(artifact, expected_code_git_sha=runtime_sha)
     except ValueError as exc:
         raise NFLRunMachineError(str(exc)) from exc
-    artifact_sha = _canonical_hash(artifact)
     training_sha = _sha256_text(
         artifact.get("source_manifest_sha256"),
         "NFL_MODEL_ARTIFACT_SOURCE_SHA256_INVALID",
@@ -486,6 +500,7 @@ def _run_canonical(
     mode: str,
     now: datetime,
     artifact_payload: Mapping[str, Any],
+    expected_model_artifact_sha256: str,
     runtime_code_git_sha: str,
     live_features: Mapping[str, Any],
     odds_snapshot: Mapping[str, Any],
@@ -498,6 +513,7 @@ def _run_canonical(
     feature_ttl = _positive_int(feature_ttl_seconds, "NFL_FEATURE_TTL_INVALID")
     model, artifact_sha, code_sha, training_sha = _load_bound_model(
         artifact_payload,
+        expected_model_artifact_sha256=expected_model_artifact_sha256,
         runtime_code_git_sha=runtime_code_git_sha,
     )
     live_sha, live_asof, games = _validate_live_features(
@@ -517,7 +533,7 @@ def _run_canonical(
             raise NFLRunMachineError(f"NFL_QUOTE_NOT_PREGAME:{game_id}")
         event = _event_for_game(game, events)
 
-        # This is the model/market firewall.  M2 consumes the market-blind game
+        # This is the model/market firewall. M2 consumes the market-blind game
         # row first; no sportsbook line or price exists in this call.
         try:
             distribution = tuple(derive_nfl_m2_score_distribution(model, dict(game)))
@@ -528,7 +544,10 @@ def _run_canonical(
         distribution_sha = _distribution_hash(distribution)
 
         quotes, sportsbook = _event_quotes(game, event, book_key=book_key)
-        by_market = {market: [row for row in quotes if row["market"] == market] for market in SUPPORTED_GAME_MARKETS}
+        by_market = {
+            market: [row for row in quotes if row["market"] == market]
+            for market in SUPPORTED_GAME_MARKETS
+        }
         home_spread = next(row["line"] for row in by_market["SPREAD"] if row["side"] == "HOME")
         total_line = next(row["line"] for row in by_market["TOTAL"] if row["side"] == "OVER")
         try:
@@ -581,11 +600,10 @@ def _run_canonical(
         raise NFLRunMachineError("NFL_RUN_RESULTS_EMPTY")
     # Even a technically healthy M2/quote run remains blocked at the wager layer
     # until promotion evidence and a frozen floor exist.
-    run_status = "BLOCKED"
     return NFLMachineReport(
         mode=mode,
         generated_at_utc=current.isoformat(),
-        run_status=run_status,
+        run_status="BLOCKED",
         machine_version=NFL_MACHINE_VERSION,
         results=ordered,
         summary=_summary(ordered),
@@ -602,6 +620,7 @@ def run_nfl_machine(
     *,
     mode: str = "AUTO_SELECT",
     model_artifact: Mapping[str, Any],
+    expected_model_artifact_sha256: str,
     runtime_code_git_sha: str,
     now: datetime,
     live_features: Mapping[str, Any] | None = None,
@@ -614,9 +633,13 @@ def run_nfl_machine(
 ) -> NFLMachineReport:
     """Resolve mode-owned inputs, then execute the single canonical NFL path.
 
+    The caller must supply the independently frozen artifact SHA-256. The machine
+    recomputes the canonical artifact hash before model deserialization and fails
+    closed on any mismatch.
+
     MANUAL owns both frozen feature and odds snapshots.
     HYBRID owns exactly one snapshot and acquires the other through an injected
-    production source callback.  This supports both operator-supplied prices and
+    production source callback. This supports both operator-supplied prices and
     operator-supplied features without creating a second model path.
     AUTOMATIC acquires both snapshots through injected production callbacks.
     """
@@ -667,6 +690,7 @@ def run_nfl_machine(
         mode=selected,
         now=current,
         artifact_payload=model_artifact,
+        expected_model_artifact_sha256=expected_model_artifact_sha256,
         runtime_code_git_sha=runtime_code_git_sha,
         live_features=features,
         odds_snapshot=odds,
