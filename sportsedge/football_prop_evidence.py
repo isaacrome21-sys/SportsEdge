@@ -11,7 +11,12 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
-from sportsedge.football_prop_run_machine import PROVIDER_MARKET_TO_STAT
+from sportsedge.football_prop_extended_run_machine import (
+    DEFENDER_OU_MARKETS,
+    KICKER_OU_MARKETS,
+    OFFENSIVE_OU_MARKETS,
+    SCORER_MARKETS,
+)
 
 EVIDENCE_SCHEMA = "FOOTBALL_PROP_EVIDENCE_V1"
 EVIDENCE_GROUPS = (
@@ -21,9 +26,15 @@ EVIDENCE_GROUPS = (
     "OFFENSIVE_EVENT_RATE",
     "YARDAGE_TAIL",
     "TOUCHDOWN_RATE",
+    "SPECIAL_TEAMS_OPPORTUNITY",
+    "KICKER_PARTICIPATION",
+    "KICKER_RATE",
+    "DEFENSIVE_PARTICIPATION",
+    "DEFENSIVE_USAGE",
+    "DEFENSIVE_EVENT_RATE",
 )
 
-_BASE = (
+_OFFENSE_BASE = (
     "TEAM_PLAY_OPPORTUNITY",
     "PLAYER_PARTICIPATION",
     "PLAYER_USAGE",
@@ -41,14 +52,36 @@ _YARDAGE = frozenset({
 })
 _TOUCHDOWN = frozenset({
     "player_pass_tds",
+    "player_reception_tds",
+    "player_rush_reception_tds",
+    "player_rush_tds",
+    "player_anytime_td",
+    "player_tds_over",
 })
 
-MARKET_EVIDENCE_DEPENDENCIES = {
-    market: _BASE
-    + (("YARDAGE_TAIL",) if market in _YARDAGE else ())
-    + (("TOUCHDOWN_RATE",) if market in _TOUCHDOWN else ())
-    for market in PROVIDER_MARKET_TO_STAT
-}
+MARKET_EVIDENCE_DEPENDENCIES: dict[str, tuple[str, ...]] = {}
+for market in OFFENSIVE_OU_MARKETS:
+    MARKET_EVIDENCE_DEPENDENCIES[market] = (
+        _OFFENSE_BASE
+        + (("YARDAGE_TAIL",) if market in _YARDAGE else ())
+        + (("TOUCHDOWN_RATE",) if market in _TOUCHDOWN else ())
+    )
+for market in SCORER_MARKETS:
+    MARKET_EVIDENCE_DEPENDENCIES[market] = _OFFENSE_BASE + ("TOUCHDOWN_RATE",)
+for market in KICKER_OU_MARKETS:
+    MARKET_EVIDENCE_DEPENDENCIES[market] = (
+        "TEAM_PLAY_OPPORTUNITY",
+        "SPECIAL_TEAMS_OPPORTUNITY",
+        "KICKER_PARTICIPATION",
+        "KICKER_RATE",
+    )
+for market in DEFENDER_OU_MARKETS:
+    MARKET_EVIDENCE_DEPENDENCIES[market] = (
+        "TEAM_PLAY_OPPORTUNITY",
+        "DEFENSIVE_PARTICIPATION",
+        "DEFENSIVE_USAGE",
+        "DEFENSIVE_EVENT_RATE",
+    )
 
 
 class FootballPropEvidenceError(ValueError):
@@ -106,7 +139,7 @@ def assess_market_evidence(
     if payload.get("sport") != str(sport).strip().upper():
         raise FootballPropEvidenceError("FOOTBALL_PROP_EVIDENCE_REGISTRY_SPORT_MISMATCH")
     groups = payload.get("groups")
-    if not isinstance(groups, Mapping):
+    if not isinstance(groups, Mapping) or set(groups) != set(EVIDENCE_GROUPS):
         raise FootballPropEvidenceError("FOOTBALL_PROP_EVIDENCE_GROUP_SET_INVALID")
 
     missing: list[str] = []
@@ -136,9 +169,6 @@ def assess_market_evidence(
         if bound_artifact != artifact_sha:
             blocked.append(group)
             continue
-        # Parsing evidence_sha is intentional even though the value is only
-        # reported here: a PASS row without a concrete evidence object hash
-        # must never satisfy readiness.
         assert evidence_sha
         passed.append(group)
 
