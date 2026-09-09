@@ -1,0 +1,53 @@
+name: mlb-2025-dk-recovery
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/recover_mlb_2025_dk_window.py'
+      - '.github/workflows/mlb-2025-dk-recovery.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recover-dk-window:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Prove parser excludes outcomes
+        run: python scripts/recover_mlb_2025_dk_window.py --self-test
+
+      - name: Recover Aug 17 through Sep 28 DraftKings window
+        run: >-
+          python scripts/recover_mlb_2025_dk_window.py
+          --start-date 2025-08-17
+          --end-date 2025-09-28
+          --delay-seconds 1.0
+
+      - name: Show immutable manifest
+        if: always()
+        run: |
+          if [ -f artifacts/evidence/mlb_2025_dk_recovery_manifest.json ]; then
+            cat artifacts/evidence/mlb_2025_dk_recovery_manifest.json
+          fi
+
+      - name: Upload sealed recovery bundle
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mlb-2025-dk-recovery-${{ github.sha }}
+          path: artifacts/evidence/
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 9
