@@ -13,6 +13,7 @@ on:
       - 'tests/test_nfl_special_teams_context.py'
       - 'tests/test_nfl_run_machine.py'
       - 'scripts/run_nfl_auto.py'
+      - 'config/nfl_m2_freeze.json'
       - 'config/run_it_surface.json'
       - '.github/workflows/football-nfl-run-machine-contract.yml'
   push:
@@ -27,6 +28,7 @@ on:
       - 'tests/test_nfl_special_teams_context.py'
       - 'tests/test_nfl_run_machine.py'
       - 'scripts/run_nfl_auto.py'
+      - 'config/nfl_m2_freeze.json'
       - 'config/run_it_surface.json'
       - '.github/workflows/football-nfl-run-machine-contract.yml'
 
@@ -95,6 +97,19 @@ jobs:
           module_name, attr = nfl['library_entrypoint'].split(':', 1)
           assert hasattr(importlib.import_module(module_name), attr)
           PY
+      - name: Assert real NFL artifact remains unfrozen
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          freeze = json.loads(Path('config/nfl_m2_freeze.json').read_text())
+          assert freeze['schema_version'] == 1
+          assert freeze['status'] == 'UNFROZEN'
+          assert freeze['hash_algorithm'] == 'CANONICAL_JSON_SHA256_V1'
+          assert freeze['artifact_sha256'] is None
+          assert not Path(freeze['artifact_path']).exists()
+          print('NFL_M2_FREEZE_STATE_OK status=UNFROZEN artifact_sha256=null')
+          PY
       - name: Assert missing frozen artifact fails closed
         shell: bash
         run: |
@@ -111,5 +126,24 @@ jobs:
           payload = json.loads(Path('/tmp/nfl-card.json').read_text())
           assert payload['status'] == 'BLOCKED'
           assert payload['blocker'] == 'NFL_AUTO_FROZEN_MODEL_ARTIFACT_REQUIRED'
+          assert payload['governance']['fail_closed'] is True
+          PY
+      - name: Assert unfrozen binding blocks even when bytes exist
+        shell: bash
+        run: |
+          printf '{}\n' > /tmp/nfl-model-present.json
+          set +e
+          python scripts/run_nfl_auto.py \
+            --model-artifact /tmp/nfl-model-present.json \
+            --output /tmp/nfl-unfrozen-card.json
+          rc=$?
+          set -e
+          test "$rc" -eq 2
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          payload = json.loads(Path('/tmp/nfl-unfrozen-card.json').read_text())
+          assert payload['status'] == 'BLOCKED'
+          assert payload['blocker'] == 'NFL_AUTO_FROZEN_MODEL_BINDING_REQUIRED'
           assert payload['governance']['fail_closed'] is True
           PY
