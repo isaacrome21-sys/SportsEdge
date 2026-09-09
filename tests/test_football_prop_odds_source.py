@@ -8,7 +8,7 @@ from sportsedge.football_prop_odds_source import (
     build_event_prop_odds_url,
     fetch_event_prop_odds,
 )
-from sportsedge.football_prop_run_machine import PROVIDER_MARKET_TO_STAT
+from sportsedge.football_prop_extended_run_machine import PROVIDER_MARKETS
 
 
 class FootballPropOddsSourceTests(unittest.TestCase):
@@ -18,8 +18,12 @@ class FootballPropOddsSourceTests(unittest.TestCase):
         self.assertIn("/sports/americanfootball_nfl/events/evt-1/odds", parsed.path)
         query = parse_qs(parsed.query)
         self.assertEqual(query["bookmakers"], ["draftkings"])
-        self.assertEqual(set(query["markets"][0].split(",")), set(PROVIDER_MARKET_TO_STAT))
+        self.assertEqual(set(query["markets"][0].split(",")), set(PROVIDER_MARKETS))
+        self.assertIn("player_anytime_td", query["markets"][0])
+        self.assertIn("player_field_goals", query["markets"][0])
+        self.assertIn("player_sacks", query["markets"][0])
         self.assertNotIn("player_targets", query["markets"][0])
+        self.assertNotIn("player_1st_td", query["markets"][0])
 
     def test_cfb_uses_ncaaf_event_endpoint(self):
         url = build_event_prop_odds_url(sport="CFB", event_id="abc")
@@ -28,6 +32,10 @@ class FootballPropOddsSourceTests(unittest.TestCase):
     def test_unknown_market_fails_closed(self):
         with self.assertRaisesRegex(FootballPropOddsError, "FOOTBALL_PROP_ODDS_MARKET_UNSUPPORTED"):
             build_event_prop_odds_url(sport="NFL", event_id="abc", markets=["player_targets"])
+
+    def test_unfinished_scorer_order_market_fails_closed_at_acquisition_contract(self):
+        with self.assertRaisesRegex(FootballPropOddsError, "FOOTBALL_PROP_ODDS_MARKET_UNSUPPORTED"):
+            build_event_prop_odds_url(sport="NFL", event_id="abc", markets=["player_1st_td"])
 
     def test_keyring_fetch_keeps_raw_event_payload(self):
         raw = {
