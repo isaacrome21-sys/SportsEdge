@@ -1,0 +1,12 @@
+{
+  "schema_version": "FOOTBALL_PROP_EVIDENCE_V1",
+  "sport": "CFB",
+  "groups": {
+    "TEAM_PLAY_OPPORTUNITY": {"status": "MISSING", "evidence_sha256": null, "model_artifact_sha256": null},
+    "PLAYER_PARTICIPATION": {"status": "MISSING", "evidence_sha256": null, "model_artifact_sha256": null},
+    "PLAYER_USAGE": {"status": "MISSING", "evidence_sha256": null, "model_artifact_sha256": null},
+    "OFFENSIVE_EVENT_RATE": {"status": "MISSING", "evidence_sha256": null, "model_artifact_sha256": null},
+    "YARDAGE_TAIL": {"status": "MISSING", "evidence_sha256": null, "model_artifact_sha256": null},
+    "TOUCHDOWN_RATE": {"status": "MISSING", "evidence_sha256": null, "model_artifact_sha256": null}
+  }
+}
