@@ -1,0 +1,73 @@
+{
+  "close_targets_minutes": [
+    10.0,
+    0.0
+  ],
+  "decision_target_minutes": 30.0,
+  "decision_tolerance_direction": "EARLY_ONLY_AT_OR_BEFORE_TARGET",
+  "decision_tolerance_minutes": 6.0,
+  "effective": true,
+  "games": [
+    {
+      "abstract_game_state": "Preview",
+      "away_team": "Arizona Diamondbacks",
+      "capture_labels": [
+        "T-10"
+      ],
+      "decision_target_minutes": 30.0,
+      "decision_target_qualified": false,
+      "decision_timing_status": null,
+      "decision_tolerance_direction": "EARLY_ONLY_AT_OR_BEFORE_TARGET",
+      "decision_tolerance_minutes": 6.0,
+      "first_pitch_at": "2026-09-09T23:40:00+00:00",
+      "game_id": "824064",
+      "home_team": "Kansas City Royals",
+      "minutes_before_first_pitch": 8.079,
+      "phases": [
+        "close"
+      ]
+    },
+    {
+      "abstract_game_state": "Live",
+      "away_team": "Pittsburgh Pirates",
+      "capture_labels": [
+        "T-10"
+      ],
+      "decision_target_minutes": 30.0,
+      "decision_target_qualified": false,
+      "decision_timing_status": null,
+      "decision_tolerance_direction": "EARLY_ONLY_AT_OR_BEFORE_TARGET",
+      "decision_tolerance_minutes": 6.0,
+      "first_pitch_at": "2026-09-09T23:40:00+00:00",
+      "game_id": "824549",
+      "home_team": "Chicago White Sox",
+      "minutes_before_first_pitch": 8.079,
+      "phases": [
+        "close"
+      ]
+    },
+    {
+      "abstract_game_state": "Live",
+      "away_team": "Chicago Cubs",
+      "capture_labels": [
+        "T-10"
+      ],
+      "decision_target_minutes": 30.0,
+      "decision_target_qualified": false,
+      "decision_timing_status": null,
+      "decision_tolerance_direction": "EARLY_ONLY_AT_OR_BEFORE_TARGET",
+      "decision_tolerance_minutes": 6.0,
+      "first_pitch_at": "2026-09-09T23:40:00+00:00",
+      "game_id": "823739",
+      "home_team": "Milwaukee Brewers",
+      "minutes_before_first_pitch": 8.079,
+      "phases": [
+        "close"
+      ]
+    }
+  ],
+  "needs_model": true,
+  "planned_at_utc": "2026-09-09T23:31:55.285324+00:00",
+  "schema": "MLB_V8_FORWARD_PLAN_V1",
+  "slate_date_ct": "2026-09-09"
+}
