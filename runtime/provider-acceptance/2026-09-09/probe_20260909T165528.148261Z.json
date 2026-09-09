@@ -1,0 +1,32 @@
+{
+  "acceptance_scope": "PROVIDER_PATH_ONLY_NOT_TIMEPOINT_CAPTURE",
+  "attempts": [
+    {
+      "http_status": 401,
+      "key_slot": 1,
+      "provider_code": "OUT_OF_USAGE_CREDITS"
+    },
+    {
+      "http_status": 401,
+      "key_slot": 2,
+      "provider_code": "OUT_OF_USAGE_CREDITS"
+    }
+  ],
+  "bookmaker": "draftkings",
+  "credits_consumed_actual": "1",
+  "events_returned": 15,
+  "http_status": 200,
+  "key_slot": 3,
+  "key_slots_present": 4,
+  "market": "h2h",
+  "provider_credits_remaining": "453",
+  "provider_credits_used": "47",
+  "raw_byte_length": 6627,
+  "raw_bytes_persisted": false,
+  "raw_capture_eligible": false,
+  "raw_evidence_eligible": false,
+  "raw_response_sha256": "3df370839a6e291b5a93ff3d4cf6465925ccdae3e6f078a0f97c2c85e5bfbddb",
+  "raw_retention": "DISCARDED_AFTER_HASH_ACCEPTANCE_ONLY",
+  "run_at_utc": "2026-09-09T16:55:28.148261+00:00",
+  "status": "PROVIDER_PATH_PASS"
+}
