@@ -4,8 +4,13 @@ from datetime import datetime
 from typing import Any, Callable, Mapping
 
 from .candidate_binding import bind_candidate
-from .devig import multiplicative_devig
-from .edge_floors import DEFAULT_EDGE_FLOOR_CONFIG, require_production_edge_floor
+from .devig import devig_with_policy
+from .edge_floors import (
+    DEFAULT_EDGE_FLOOR_CONFIG,
+    load_edge_floor_config,
+    require_frozen_devig_policy,
+    require_frozen_edge_floor,
+)
 from .price_ttl import double_ttl_gate
 from .truth_gate import BetDecision, decide_bet
 
@@ -107,8 +112,16 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], p
         _reject_market_leakage(model_input)
         double_ttl_gate(quote, ingestion_now, finalization_now)
         book_key, sportsbook, quote_retrieved_at, offer_id = _quote_identity(quote)
-        floor = (require_production_edge_floor(market=market, path=edge_floor_config_path)
-                 if deployment.get("eligible") is True else None)
+
+        floor_config = load_edge_floor_config(edge_floor_config_path)
+        floor = None
+        devig_policy = None
+        if deployment.get("eligible") is True:
+            # This is the same production path exercised by the ordering tests.
+            # Floor and devig governance must resolve before model execution.
+            floor = require_frozen_edge_floor(market=market, config=floor_config)
+            devig_policy = require_frozen_devig_policy(config=floor_config)
+
         output = dict(engine_fn(model_input))
         if "model_p" not in output:
             raise OrchestrationError("engine output missing model_p")
@@ -126,17 +139,20 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], p
         engine_version = _optional_text(output, "engine_version")
         seed_policy = _optional_text(output, "seed_policy")
         mc_paths = _optional_nonnegative_int(output, "mc_paths")
+
         if floor is None:
-            floor = require_production_edge_floor(market=market, path=edge_floor_config_path)
+            floor = require_frozen_edge_floor(market=market, config=floor_config)
+        if devig_policy is None:
+            devig_policy = require_frozen_devig_policy(config=floor_config)
 
         if not isinstance(paired_quote, Mapping):
             raise OrchestrationError("PAIRED_PRICE_REQUIRED_FOR_DEVIG")
         double_ttl_gate(paired_quote, ingestion_now, finalization_now)
-        devig = multiplicative_devig(quote, paired_quote)
+        priced = devig_with_policy(quote, paired_quote, policy=devig_policy)
 
         decision = decide_bet(
             output["model_p"], quote["american_odds"],
-            fair_market_probability=devig.candidate_fair_probability,
+            fair_market_probability=priced.fair_probability_for_decision,
             bound=True, fresh=True, deployed=deployment.get("eligible") is True,
             edge_floor=float(floor.value_probability_points), kelly_multiplier=kelly_multiplier,
             push_probability=float(output.get("push_p", 0.0)),
