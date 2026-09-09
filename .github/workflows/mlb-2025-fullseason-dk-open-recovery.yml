@@ -1,0 +1,56 @@
+name: mlb-2025-fullseason-dk-open-recovery
+
+on:
+  push:
+    branches: ["chatgpt/mlb-2025-sbr-recovery"]
+    paths:
+      - "scripts/recover_mlb_2025_dk_openings_fullseason.py"
+      - ".github/workflows/mlb-2025-fullseason-dk-open-recovery.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recover:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Checkout recovery revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+
+      - name: Set up contracted Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: '.python-version'
+
+      - name: Verify frozen prereg identity without reading 2025 test outcomes
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' '4f9e571b0b7c5ba735c18682563e28adf873418e40b5fcf747918680be4e6cc7' > frozen_prereg_expected_sha256.txt
+          printf '%s\n' 'ACQUISITION_ONLY_NO_CONFIRMATORY_EXECUTION' > lane.txt
+
+      - name: Recover all 2025 DraftKings opening moneylines
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/recover_mlb_2025_dk_openings_fullseason.py \
+            --start 2025-03-18 \
+            --end 2025-09-28 \
+            --workers 4 \
+            --outdir artifacts/mlb_2025_dk_opening_recovery
+
+      - name: Upload private raw acquisition bundle
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mlb-2025-fullseason-dk-open-recovery
+          path: |
+            artifacts/mlb_2025_dk_opening_recovery/
+            frozen_prereg_expected_sha256.txt
+            lane.txt
+          if-no-files-found: warn
+          retention-days: 30
