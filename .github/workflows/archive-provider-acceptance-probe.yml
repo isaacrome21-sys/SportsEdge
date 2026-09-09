@@ -1,4 +1,4 @@
-# manual refresh trigger 2026-09-03
+# public acceptance probe only; raw provider bytes must never be retained here
 name: archive-provider-acceptance-probe
 on:
   workflow_dispatch:
@@ -24,11 +24,12 @@ jobs:
           set +e
           python - <<'PY'
           from datetime import datetime, timezone
-          import json, os
+          import hashlib, json, os
           from pathlib import Path
           from urllib.parse import urlencode
           from urllib.request import Request, urlopen
           from urllib.error import HTTPError
+
           now=datetime.now(timezone.utc)
           out=Path('artifacts/provider-probe')/now.date().isoformat(); out.mkdir(parents=True,exist_ok=True)
           p=out/f"probe_{now.strftime('%Y%m%dT%H%M%S.%fZ')}.json"
@@ -36,17 +37,37 @@ jobs:
           for name in ('SPORTSEDGE_ODDS_API_KEY','SPORTSEDGE_ODDS_API_KEY_2','SPORTSEDGE_ODDS_API_KEY_3','SPORTSEDGE_ODDS_API_KEY_4'):
               v=os.environ.get(name,'').strip()
               if v and v not in keys: keys.append(v)
-          row={'run_at_utc':now.isoformat(),'acceptance_scope':'PROVIDER_PATH_ONLY_NOT_TIMEPOINT_CAPTURE','market':'h2h','bookmaker':'draftkings','key_slots_present':len(keys),'attempts':[]}
+          row={
+              'run_at_utc':now.isoformat(),
+              'acceptance_scope':'PROVIDER_PATH_ONLY_NOT_TIMEPOINT_CAPTURE',
+              'market':'h2h',
+              'bookmaker':'draftkings',
+              'key_slots_present':len(keys),
+              'attempts':[],
+              'raw_capture_eligible':False,
+              'raw_evidence_eligible':False,
+              'raw_bytes_persisted':False,
+          }
           if not keys:
               row['status']='BLOCKED_NO_ODDS_KEY'; p.write_text(json.dumps(row,indent=2)+'\n'); print(json.dumps(row)); raise SystemExit(2)
           exhausted=0
           for slot,key in enumerate(keys,1):
               q=urlencode({'apiKey':key,'bookmakers':'draftkings','markets':'h2h','oddsFormat':'american','dateFormat':'iso'})
               try:
-                  with urlopen(Request('https://api.the-odds-api.com/v4/sports/baseball_mlb/odds?'+q,headers={'Accept':'application/json','User-Agent':'SportsEdge-provider-probe/2'}),timeout=20) as r:
+                  with urlopen(Request('https://api.the-odds-api.com/v4/sports/baseball_mlb/odds?'+q,headers={'Accept':'application/json','User-Agent':'SportsEdge-provider-probe/3'}),timeout=20) as r:
                       raw=r.read(); payload=json.loads(raw)
-                      row.update({'status':'PROVIDER_PATH_PASS','key_slot':slot,'http_status':getattr(r,'status',200),'events_returned':len(payload) if isinstance(payload,list) else None,'credits_consumed_actual':r.headers.get('x-requests-last'),'provider_credits_remaining':r.headers.get('x-requests-remaining'),'provider_credits_used':r.headers.get('x-requests-used')})
-                      rp=out/f"raw_{now.strftime('%Y%m%dT%H%M%SZ')}.json"; rp.write_bytes(raw); row['raw_file']=str(rp)
+                      row.update({
+                          'status':'PROVIDER_PATH_PASS',
+                          'key_slot':slot,
+                          'http_status':getattr(r,'status',200),
+                          'events_returned':len(payload) if isinstance(payload,list) else None,
+                          'credits_consumed_actual':r.headers.get('x-requests-last'),
+                          'provider_credits_remaining':r.headers.get('x-requests-remaining'),
+                          'provider_credits_used':r.headers.get('x-requests-used'),
+                          'raw_response_sha256':hashlib.sha256(raw).hexdigest(),
+                          'raw_byte_length':len(raw),
+                          'raw_retention':'DISCARDED_AFTER_HASH_ACCEPTANCE_ONLY',
+                      })
                       break
               except HTTPError as e:
                   body=e.read().decode('utf-8',errors='replace')[:1000]
@@ -54,7 +75,7 @@ jobs:
                   try: code=json.loads(body).get('error_code')
                   except Exception: pass
                   if e.code==401 and code=='OUT_OF_USAGE_CREDITS': exhausted+=1
-                  row['attempts'].append({'key_slot':slot,'http_status':e.code,'provider_code':code,'provider_body':body})
+                  row['attempts'].append({'key_slot':slot,'http_status':e.code,'provider_code':code})
               except Exception as e:
                   row['attempts'].append({'key_slot':slot,'reason':f'{type(e).__name__}:{e}'})
           if row.get('status')!='PROVIDER_PATH_PASS':
@@ -62,19 +83,31 @@ jobs:
           p.write_text(json.dumps(row,indent=2,sort_keys=True)+'\n'); print(json.dumps(row)); raise SystemExit(0 if row['status']=='PROVIDER_PATH_PASS' else 3)
           PY
           code=$?; echo "exit_code=$code" >> "$GITHUB_OUTPUT"; exit 0
-      - name: Persist evidence
+      - name: Enforce public probe storage boundary
         if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if find artifacts/provider-probe -type f ! -name 'probe_*.json' -print -quit | grep -q .; then
+            echo 'PUBLIC_PROVIDER_PROBE_RAW_BYTES_PRESENT' >&2
+            exit 1
+          fi
+      - name: Persist acceptance metadata only
+        if: always()
+        shell: bash
         run: |
           set -euo pipefail
           git fetch --depth=1 origin data:data
           git worktree add .data-branch data
-          mkdir -p .data-branch/runtime/provider-acceptance
-          cp -R artifacts/provider-probe/. .data-branch/runtime/provider-acceptance/ 2>/dev/null || true
+          while IFS= read -r probe; do
+            rel="${probe#artifacts/provider-probe/}"
+            install -D -m 0644 "$probe" ".data-branch/runtime/provider-acceptance/$rel"
+          done < <(find artifacts/provider-probe -type f -name 'probe_*.json' -print)
           cd .data-branch
           git config user.name sportsedge-archive-bot
           git config user.email sportsedge-archive-bot@users.noreply.github.com
           git add runtime/provider-acceptance
-          if ! git diff --cached --quiet; then git commit -m "archive: persist provider probe ${{ github.run_id }}"; git push origin HEAD:data; fi
+          if ! git diff --cached --quiet; then git commit -m "archive: persist provider probe metadata ${{ github.run_id }}"; git push origin HEAD:data; fi
       - name: Propagate result
         if: always()
         run: exit '${{ steps.probe.outputs.exit_code }}'
