@@ -1,15 +1,19 @@
-"""Grouped MLB prop-evidence dependency contract.
+"""Grouped MLB prop-evidence dependency and resolution contract.
 
 This module does not manufacture observations, replay depth, calibration, or
 promotion state. Callers must supply explicit readiness for each primary evidence
 group from independently captured evidence. Per-market calibration is a separate
 consistency check: it may veto readiness but can never satisfy a missing evidence
 group.
+
+A group marked PASS is accepted only when it is bound to an evidence SHA-256.
+That prevents a configuration-only status flip from satisfying the dependency.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Mapping
+import re
+from typing import Any, Mapping
 
 
 HITTER_PA = "HITTER_PA"
@@ -30,7 +34,7 @@ EVIDENCE_GROUPS = frozenset({
 
 # Dependencies mirror the current production-candidate engines in
 # hitter_joint_engine.py, pitcher_joint_engine.py, first_hr_order_engine.py, and
-# pitcher_record_win_engine.py.  All hitter lanes depend on realized PA support.
+# pitcher_record_win_engine.py. All hitter lanes depend on realized PA support.
 # Event-count lanes additionally depend on event-type evidence; run/RBI/stolen
 # and combination lanes additionally require run-sequence evidence. FIRST_HOME_RUN
 # adds the dedicated ordering group. Pitcher outs/record-win are workload lanes;
@@ -66,6 +70,9 @@ MARKET_EVIDENCE_DEPENDENCIES: dict[str, frozenset[str]] = {
     "PITCHER_RECORD_WIN": frozenset({PITCHER_WORKLOAD}),
 }
 
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+_ALLOWED_GROUP_STATUS = frozenset({"PASS", "MISSING", "BLOCKED"})
+
 
 class PropEvidenceError(ValueError):
     pass
@@ -79,6 +86,45 @@ class PropEvidenceReadiness:
     calibration_consistency: str
     blockers: tuple[str, ...]
     ready_for_forward_capture: bool
+
+
+def group_state_from_registry(payload: Mapping[str, Any]) -> dict[str, bool]:
+    """Resolve primary group readiness from the persisted evidence registry.
+
+    PASS is fail-closed unless the row includes a syntactically valid evidence
+    SHA-256. MISSING/BLOCKED are both unresolved. The function never derives
+    readiness from per-market hit rates, calibration, market prices, or counts.
+    """
+    if not isinstance(payload, Mapping):
+        raise PropEvidenceError("prop evidence registry must be a mapping")
+    if payload.get("schema_version") != 1:
+        raise PropEvidenceError("prop evidence registry schema_version must be 1")
+    rows = payload.get("groups")
+    if not isinstance(rows, Mapping):
+        raise PropEvidenceError("prop evidence registry requires groups object")
+    unknown = sorted(set(rows) - EVIDENCE_GROUPS)
+    if unknown:
+        raise PropEvidenceError(f"unknown evidence groups: {','.join(unknown)}")
+
+    resolved: dict[str, bool] = {}
+    for group in EVIDENCE_GROUPS:
+        row = rows.get(group)
+        if row is None:
+            resolved[group] = False
+            continue
+        if not isinstance(row, Mapping):
+            raise PropEvidenceError(f"evidence group {group} row must be an object")
+        status = str(row.get("status", "MISSING")).upper()
+        if status not in _ALLOWED_GROUP_STATUS:
+            raise PropEvidenceError(f"evidence group {group} invalid status {status}")
+        if status == "PASS":
+            digest = str(row.get("evidence_sha256", "")).lower()
+            if not _SHA256_RE.fullmatch(digest):
+                raise PropEvidenceError(f"evidence group {group} PASS requires evidence_sha256")
+            resolved[group] = True
+        else:
+            resolved[group] = False
+    return resolved
 
 
 def _normalize_group_state(group_state: Mapping[str, bool]) -> dict[str, bool]:
@@ -102,9 +148,9 @@ def assess_prop_evidence(
     group_state: Mapping[str, bool],
     calibration_consistent: bool | None,
 ) -> PropEvidenceReadiness:
-    """Assess evidence readiness without inferring or counting evidence.
+    """Resolve evidence readiness without inferring or counting evidence.
 
-    `calibration_consistent=True` is never evidence.  It only means the separate
+    `calibration_consistent=True` is never evidence. It only means the separate
     family-level calibration consistency veto did not fail. `None` is fail-closed
     because the consistency check has not been established; False is an explicit
     failure. Missing primary evidence groups always remain blockers regardless of
@@ -142,7 +188,7 @@ def assess_prop_evidence(
 
 
 def dependent_hitter_markets() -> tuple[str, ...]:
-    """Return every market whose dependency graph includes HITTER_PA."""
+    """Return every market whose live dependency graph includes HITTER_PA."""
     return tuple(sorted(
         market for market, groups in MARKET_EVIDENCE_DEPENDENCIES.items()
         if HITTER_PA in groups
@@ -150,7 +196,7 @@ def dependent_hitter_markets() -> tuple[str, ...]:
 
 
 def dependent_pitcher_markets() -> tuple[str, ...]:
-    """Return every market whose dependency graph includes PITCHER_WORKLOAD."""
+    """Return every market whose live dependency graph includes PITCHER_WORKLOAD."""
     return tuple(sorted(
         market for market, groups in MARKET_EVIDENCE_DEPENDENCIES.items()
         if PITCHER_WORKLOAD in groups
