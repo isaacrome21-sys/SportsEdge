@@ -1,0 +1,90 @@
+name: mlb-2025-schedule-reconcile
+
+on:
+  push:
+    branches: ["chatgpt/mlb-2025-sbr-recovery"]
+    paths: [".github/workflows/mlb-2025-schedule-reconcile.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout audited revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Set up contracted Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: '.python-version'
+      - name: Count official MLB schedule independently
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import urllib.parse
+          import urllib.request
+          from collections import Counter
+          from pathlib import Path
+
+          params = urllib.parse.urlencode({
+              'sportId': 1,
+              'startDate': '2025-08-17',
+              'endDate': '2025-09-28',
+          })
+          url = 'https://statsapi.mlb.com/api/v1/schedule?' + params
+          with urllib.request.urlopen(url, timeout=30) as response:
+              raw = response.read()
+          payload = json.loads(raw)
+
+          games = []
+          for date_block in payload.get('dates', []):
+              for game in date_block.get('games', []):
+                  if game.get('gameType') != 'R':
+                      continue
+                  away = game['teams']['away']['team']['name']
+                  home = game['teams']['home']['team']['name']
+                  games.append({
+                      'date': date_block['date'],
+                      'gamePk': game['gamePk'],
+                      'away': away,
+                      'home': home,
+                  })
+
+          team_appearances = Counter()
+          for game in games:
+              team_appearances[game['away']] += 1
+              team_appearances[game['home']] += 1
+
+          athletics = [g for g in games if g['away'] in {'Athletics', 'Oakland Athletics'} or g['home'] in {'Athletics', 'Oakland Athletics'}]
+          summary = {
+              'schema_version': 1,
+              'source': 'MLB StatsAPI schedule',
+              'requested_start': '2025-08-17',
+              'requested_end': '2025-09-28',
+              'regular_season_games': len(games),
+              'dates_with_regular_season_games': len({g['date'] for g in games}),
+              'first_date': min((g['date'] for g in games), default=None),
+              'last_date': max((g['date'] for g in games), default=None),
+              'athletics_games': len(athletics),
+              'athletics_game_keys': [f"{g['date']}:{g['away']}@{g['home']}" for g in athletics],
+              'team_appearances': dict(sorted(team_appearances.items())),
+              'confirmatory_holdout_touched': False,
+          }
+          Path('mlb_2025_schedule_reconcile.json').write_text(json.dumps(summary, indent=2, sort_keys=True) + '\n')
+          print(json.dumps(summary, indent=2, sort_keys=True))
+
+          if not games:
+              raise SystemExit('MLB_SCHEDULE_EMPTY')
+          PY
+      - name: Upload independent schedule audit
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mlb-2025-schedule-reconcile
+          path: mlb_2025_schedule_reconcile.json
+          if-no-files-found: error
+          retention-days: 30
