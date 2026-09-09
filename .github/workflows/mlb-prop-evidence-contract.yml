@@ -5,21 +5,27 @@ on:
   pull_request:
     paths:
       - 'sportsedge/prop_evidence.py'
+      - 'sportsedge/readiness.py'
       - 'sportsedge/hitter_joint_engine.py'
       - 'sportsedge/pitcher_joint_engine.py'
       - 'sportsedge/first_hr_order_engine.py'
       - 'config/deployments.json'
+      - 'config/mlb_prop_evidence_groups.json'
       - 'tests/test_prop_evidence.py'
+      - 'tests/test_readiness.py'
       - '.github/workflows/mlb-prop-evidence-contract.yml'
   push:
     branches: [main]
     paths:
       - 'sportsedge/prop_evidence.py'
+      - 'sportsedge/readiness.py'
       - 'sportsedge/hitter_joint_engine.py'
       - 'sportsedge/pitcher_joint_engine.py'
       - 'sportsedge/first_hr_order_engine.py'
       - 'config/deployments.json'
+      - 'config/mlb_prop_evidence_groups.json'
       - 'tests/test_prop_evidence.py'
+      - 'tests/test_readiness.py'
       - '.github/workflows/mlb-prop-evidence-contract.yml'
 
 permissions:
@@ -38,8 +44,8 @@ jobs:
           python-version-file: '.python-version'
       - name: Install contracted test dependencies
         run: python -m pip install --disable-pip-version-check -r requirements-test.txt
-      - name: Run grouped prop-evidence contract
-        run: python -m unittest tests.test_prop_evidence -v
+      - name: Run grouped prop-evidence unit and production-resolution contracts
+        run: python -m unittest tests.test_prop_evidence tests.test_readiness -v
       - name: Assert governance remains unpromoted
         run: |
           python - <<'PY'
@@ -49,5 +55,9 @@ jobs:
           promoted = [m for m, row in payload['markets'].items() if row.get('eligible') is True]
           if promoted:
               raise SystemExit(f'eligible markets unexpectedly present: {promoted}')
-          print(f'PROP_EVIDENCE_CONTRACT_OK eligible=0/{len(payload["markets"])}')
+          groups = json.loads(Path('config/mlb_prop_evidence_groups.json').read_text())['groups']
+          passed = [g for g, row in groups.items() if row.get('status') == 'PASS']
+          if passed:
+              raise SystemExit(f'checked-in prop evidence unexpectedly passed: {passed}')
+          print(f'PROP_EVIDENCE_CONTRACT_OK eligible=0/{len(payload["markets"])} passed_groups=0/{len(groups)}')
           PY
