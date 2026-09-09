@@ -1,0 +1,35 @@
+{
+  "close_targets_minutes": [
+    10.0,
+    0.0
+  ],
+  "decision_target_minutes": 30.0,
+  "decision_tolerance_direction": "EARLY_ONLY_AT_OR_BEFORE_TARGET",
+  "decision_tolerance_minutes": 6.0,
+  "effective": true,
+  "games": [
+    {
+      "abstract_game_state": "Preview",
+      "away_team": "St. Louis Cardinals",
+      "capture_labels": [
+        "T-30"
+      ],
+      "decision_target_minutes": 30.0,
+      "decision_target_qualified": true,
+      "decision_timing_status": "QUALIFIED_AT_OR_BEFORE_TARGET",
+      "decision_tolerance_direction": "EARLY_ONLY_AT_OR_BEFORE_TARGET",
+      "decision_tolerance_minutes": 6.0,
+      "first_pitch_at": "2026-09-09T19:45:00+00:00",
+      "game_id": "823172",
+      "home_team": "San Francisco Giants",
+      "minutes_before_first_pitch": 31.446,
+      "phases": [
+        "decision"
+      ]
+    }
+  ],
+  "needs_model": true,
+  "planned_at_utc": "2026-09-09T19:13:33.212907+00:00",
+  "schema": "MLB_V8_FORWARD_PLAN_V1",
+  "slate_date_ct": "2026-09-09"
+}

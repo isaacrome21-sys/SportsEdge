@@ -1,0 +1,43 @@
+{
+  "capture_outcome": "skipped",
+  "git_sha": "41f2cf1f5cd67583c366774b4d470fcd81777e73",
+  "model_outcome": "failure",
+  "recorded_at_utc": "2026-09-09T19:13:45.940770+00:00",
+  "run_id": "34393769539:1",
+  "schema": "MLB_V8_FORWARD_STATUS_V1",
+  "slate_date_ct": "2026-09-09",
+  "status": "MISSED_OR_BLOCKED",
+  "status_detail": "MISSED_OR_BLOCKED",
+  "target_game_statuses": [
+    {
+      "capture_status": "MISSED_OR_BLOCKED",
+      "decision_target_qualified": true,
+      "game_id": "823172",
+      "minutes_before_first_pitch": 31.446,
+      "phases": [
+        "decision"
+      ]
+    }
+  ],
+  "target_games": [
+    {
+      "abstract_game_state": "Preview",
+      "away_team": "St. Louis Cardinals",
+      "capture_labels": [
+        "T-30"
+      ],
+      "decision_target_minutes": 30.0,
+      "decision_target_qualified": true,
+      "decision_timing_status": "QUALIFIED_AT_OR_BEFORE_TARGET",
+      "decision_tolerance_direction": "EARLY_ONLY_AT_OR_BEFORE_TARGET",
+      "decision_tolerance_minutes": 6.0,
+      "first_pitch_at": "2026-09-09T19:45:00+00:00",
+      "game_id": "823172",
+      "home_team": "San Francisco Giants",
+      "minutes_before_first_pitch": 31.446,
+      "phases": [
+        "decision"
+      ]
+    }
+  ]
+}
