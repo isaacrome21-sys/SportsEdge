@@ -1,6 +1,6 @@
 {
   "schema_version": "FOOTBALL_PROP_ENGINE_SURFACE_V1",
-  "authority": "This file is the runtime authority for football player-prop engine availability. It supersedes legacy NO_ENGINE labels for the A+B offensive stat markets listed as IMPLEMENTED_FAIL_CLOSED below; unlisted football markets retain config/football_market_surface.json state.",
+  "authority": "This file is the runtime authority for football player-prop engine availability. It supersedes legacy NO_ENGINE labels only for provider markets explicitly listed under implemented_provider_markets. Unlisted markets retain config/football_market_surface.json state.",
   "library_entrypoint": "sportsedge.football_prop_readiness:run_football_props_ready",
   "sports": {
     "NFL": {
@@ -16,30 +16,48 @@
       "promotion_state": "BLOCKED_EVIDENCE_REQUIRED"
     }
   },
-  "implemented_ab_markets": {
-    "passing_yards": "player_pass_yds",
-    "completions": "player_pass_completions",
-    "attempts": "player_pass_attempts",
-    "passing_tds": "player_pass_tds",
-    "interceptions": "player_pass_interceptions",
-    "rush_yards": "player_rush_yds",
-    "longest_completion": "player_pass_longest_completion",
-    "pass_plus_rush_yards": "player_pass_rush_yds",
-    "rushing_yards": "player_rush_yds",
-    "receiving_yards": "player_reception_yds",
-    "receptions": "player_receptions",
-    "rush_attempts": "player_rush_attempts",
-    "rush_plus_rec_yards": "player_rush_reception_yds",
-    "longest_reception": "player_reception_longest",
-    "longest_rush": "player_rush_longest"
+  "implemented_provider_markets": {
+    "offensive_volume_yardage_and_td_ou": [
+      "player_pass_attempts",
+      "player_pass_completions",
+      "player_pass_interceptions",
+      "player_pass_longest_completion",
+      "player_pass_rush_yds",
+      "player_pass_tds",
+      "player_pass_yds",
+      "player_receptions",
+      "player_reception_longest",
+      "player_reception_tds",
+      "player_reception_yds",
+      "player_rush_attempts",
+      "player_rush_longest",
+      "player_rush_reception_tds",
+      "player_rush_reception_yds",
+      "player_rush_tds",
+      "player_rush_yds"
+    ],
+    "offensive_td_scorer": [
+      "player_anytime_td",
+      "player_tds_over"
+    ],
+    "kicker": [
+      "player_field_goals",
+      "player_kicking_points",
+      "player_pats"
+    ],
+    "defender": [
+      "player_sacks",
+      "player_solo_tackles",
+      "player_tackles_assists",
+      "player_defensive_interceptions"
+    ]
   },
   "explicit_no_engine": {
-    "targets": "No standard paired player_targets provider market is in the bound event-odds surface.",
-    "anytime_td": "Full TD participation/scoring semantics require complete return-scoring attribution in addition to offensive A+B paths.",
-    "first_td": "First scorer requires complete offensive, defensive-return and special-teams scoring order plus scorer identity.",
-    "two_plus_td": "Generic touchdowns include return scoring and remain outside the current offensive-stat surface.",
-    "kicker_props": "Engine C readouts exist but production PIT kicker-profile acquisition is not yet bound to this runner.",
-    "defensive_player_props": "Defensive readouts exist but production PIT defender-usage acquisition is not yet bound to this runner."
+    "targets": "No standard bound provider player-targets settlement market is on this acquisition surface.",
+    "first_td": "First scorer remains blocked until complete sport-specific return-score and overtime scorer ordering is bound.",
+    "last_td": "Last scorer remains blocked until complete sport-specific return-score and overtime scorer ordering is bound.",
+    "returner_td_identity": "Kickoff/punt return scoring exists structurally but returner identity is not yet a production player-prop identity surface.",
+    "team_defensive_props": "Team sacks/turnovers are derivable from the defensive path but no bound provider market/acquisition key is declared."
   },
   "governance": {
     "official_bets_allowed": false,
@@ -48,7 +66,9 @@
     "capper_or_consensus_can_create_model_p": false,
     "requires_frozen_artifact": true,
     "requires_pregame_feature_snapshot": true,
-    "requires_paired_price": true,
+    "requires_paired_price_for_market_economics": true,
+    "one_sided_market_can_create_model_p": true,
+    "one_sided_market_can_create_fair_market_p": false,
     "requires_pregame_quote": true,
     "requires_quote_ttl": true,
     "requires_forward_evidence_for_promotion": true,
