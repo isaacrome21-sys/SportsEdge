@@ -298,6 +298,8 @@ def build_nfl_auto_game_context(
         raise NFLContextError(f"NFLVERSE game_id resolution failed:{target}:{len(matches)}")
     row = matches[0]
     kickoff = _kickoff(row)
+    if pit >= kickoff:
+        raise NFLContextError(f"NFL_AUTO_CONTEXT_NOT_PREGAME:{target}")
     home = _team(row.get("home_team"))
     away = _team(row.get("away_team"))
     if not home or not away or home == away:
