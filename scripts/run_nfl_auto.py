@@ -138,12 +138,14 @@ def main() -> int:
         supplied_features = _operator_payload(args.live_features, "NFL_AUTO_LIVE_FEATURES_UNREADABLE")
         supplied_odds = _operator_payload(args.odds_snapshot, "NFL_AUTO_ODDS_SNAPSHOT_UNREADABLE")
 
-        # A real network quote cannot be replayed at a caller-selected historical
-        # timestamp.  If odds are not supplied, an explicit --asof would make the
-        # observation time ambiguous, so fail closed rather than fabricate it.
         needs_network_odds = supplied_odds is None and str(args.mode).upper() in ("AUTO_SELECT", "HYBRID", "AUTOMATIC")
         if needs_network_odds and args.asof is not None:
             raise NFLAutoError("NFL_AUTO_NETWORK_ODDS_WITH_EXPLICIT_ASOF_PROHIBITED")
+
+        # One execution clock owns live acquisition and all subsequent PIT/TTL
+        # comparisons.  Automatic quote observation is the acquisition-request
+        # timestamp, never a later timestamp that would appear to be from the future.
+        execution_now = datetime.now(timezone.utc) if args.asof is None else current
 
         def build_features() -> dict[str, Any]:
             return build_nfl_live_feature_payload(
@@ -152,17 +154,14 @@ def main() -> int:
                 participation_dir=args.participation_dir,
                 depth_dir=args.depth_dir,
                 stadium_file=args.stadium_file,
-                asof=current,
+                asof=execution_now,
                 start_season=int(args.start_season),
-                current_season=int(args.current_season if args.current_season is not None else current.year),
+                current_season=int(args.current_season if args.current_season is not None else execution_now.year),
                 horizon_minutes=int(args.horizon_minutes),
                 min_lead_minutes=int(args.min_lead_minutes),
             )
 
         def fetch_odds() -> dict[str, Any]:
-            # ``observed_at`` is the acquisition-request timestamp, captured before
-            # bytes are requested.  It is never synthesized for operator snapshots.
-            observed_at = datetime.now(timezone.utc)
             result = fetch_nfl_odds(_odds_keys())
             payload = result.value
             if not isinstance(payload, list):
@@ -171,15 +170,12 @@ def main() -> int:
                 "schema_version": 1,
                 "sport": "nfl",
                 "source": "the-odds-api",
-                "observed_at": observed_at.isoformat(),
+                "observed_at": execution_now.isoformat(),
                 "events": payload,
                 "key_slot": result.key_slot,
                 "prior_key_failures": len(result.failures),
             }
 
-        # For live automatic acquisition, refresh execution time immediately
-        # before the canonical call.  Operator/replay runs keep their requested asof.
-        execution_now = datetime.now(timezone.utc) if args.asof is None else current
         report = run_it_nfl(
             mode=str(args.mode).upper(),
             model_artifact=artifact,
