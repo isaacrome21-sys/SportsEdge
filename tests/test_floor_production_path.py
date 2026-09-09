@@ -13,12 +13,12 @@ UTC = timezone.utc
 NOW = datetime(2026, 9, 9, 15, 0, tzinfo=UTC)
 
 
-def _quote(side: str, odds: int) -> dict[str, object]:
+def _quote(market: str, entity_id: str, side: str, odds: int) -> dict[str, object]:
     return {
         "game_id": "fixture-game",
         "period": "FG",
-        "market": "HITS",
-        "entity_id": "fixture-batter",
+        "market": market,
+        "entity_id": entity_id,
         "line": 0.5,
         "side": side,
         "american_odds": odds,
@@ -61,39 +61,50 @@ def _config() -> dict[str, object]:
 
 
 class FloorProductionPathTests(unittest.TestCase):
-    def test_eligible_market_without_floor_blocks_before_engine_with_specific_reason(self):
-        with tempfile.TemporaryDirectory() as td:
-            floor_path = Path(td) / "floors.json"
-            floor_path.write_text(json.dumps(_config()), encoding="utf-8")
-            calls: list[bool] = []
-
-            def engine(_model_input):
-                calls.append(True)
-                return {"model_p": 0.60}
-
-            result = run_candidate(
-                model_input={
-                    "game_id": "fixture-game",
-                    "market": "HITS",
-                    "entity_id": "fixture-batter",
-                    "line": 0.5,
-                    "side": "OVER",
-                },
-                quote=_quote("OVER", 100),
-                paired_quote=_quote("UNDER", -120),
-                deployment={"eligible": True, "stage": "DEPLOYED"},
-                engine_fn=engine,
-                ingestion_now=NOW,
-                finalization_now=NOW,
-                edge_floor_config_path=str(floor_path),
-            )
-
-        self.assertEqual(result.bet_status, "BLOCKED")
-        self.assertEqual(
-            result.reason,
-            "EdgeFloorError: ELIGIBLE_MARKET_MISSING_OR_UNFROZEN_EDGE_FLOOR:HITS",
+    def test_eligible_markets_without_floor_block_before_engine_with_market_specific_reason(self):
+        # These are real deployment-registry market codes spanning a hitter prop,
+        # a pitcher prop, and a game market. The resolver must be market-agnostic:
+        # every eligible market reaches the same fail-closed floor branch before
+        # predictive inference, with only the market name varying in the blocker.
+        cases = (
+            ("HITS", "fixture-batter"),
+            ("PITCHER_K", "fixture-pitcher"),
+            ("MONEYLINE", "fixture-team"),
         )
-        self.assertEqual(calls, [])
+
+        for market, entity_id in cases:
+            with self.subTest(market=market), tempfile.TemporaryDirectory() as td:
+                floor_path = Path(td) / "floors.json"
+                floor_path.write_text(json.dumps(_config()), encoding="utf-8")
+                calls: list[bool] = []
+
+                def engine(_model_input):
+                    calls.append(True)
+                    return {"model_p": 0.60}
+
+                result = run_candidate(
+                    model_input={
+                        "game_id": "fixture-game",
+                        "market": market,
+                        "entity_id": entity_id,
+                        "line": 0.5,
+                        "side": "OVER",
+                    },
+                    quote=_quote(market, entity_id, "OVER", 100),
+                    paired_quote=_quote(market, entity_id, "UNDER", -120),
+                    deployment={"eligible": True, "stage": "DEPLOYED"},
+                    engine_fn=engine,
+                    ingestion_now=NOW,
+                    finalization_now=NOW,
+                    edge_floor_config_path=str(floor_path),
+                )
+
+                self.assertEqual(result.bet_status, "BLOCKED")
+                self.assertEqual(
+                    result.reason,
+                    f"EdgeFloorError: ELIGIBLE_MARKET_MISSING_OR_UNFROZEN_EDGE_FLOOR:{market}",
+                )
+                self.assertEqual(calls, [])
 
 
 if __name__ == "__main__":
