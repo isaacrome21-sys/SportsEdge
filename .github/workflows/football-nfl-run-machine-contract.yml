@@ -7,6 +7,7 @@ on:
       - 'sportsedge/sports/nfl/auto_context_source.py'
       - 'sportsedge/sports/nfl/special_teams_context.py'
       - 'sportsedge/sports/nfl/run_machine.py'
+      - 'sportsedge/sports/nfl/readiness.py'
       - 'sportsedge/sports/nfl/m2.py'
       - 'sportsedge/sports/nfl/model_artifact.py'
       - 'sportsedge/football_prop_run_machine.py'
@@ -14,6 +15,7 @@ on:
       - 'tests/test_nfl_auto_context_source.py'
       - 'tests/test_nfl_special_teams_context.py'
       - 'tests/test_nfl_run_machine.py'
+      - 'tests/test_nfl_readiness.py'
       - 'tests/test_football_prop_surface.py'
       - 'scripts/run_nfl_auto.py'
       - 'scripts/run_football_auto_bundle.py'
@@ -28,6 +30,7 @@ on:
       - 'sportsedge/sports/nfl/auto_context_source.py'
       - 'sportsedge/sports/nfl/special_teams_context.py'
       - 'sportsedge/sports/nfl/run_machine.py'
+      - 'sportsedge/sports/nfl/readiness.py'
       - 'sportsedge/sports/nfl/m2.py'
       - 'sportsedge/sports/nfl/model_artifact.py'
       - 'sportsedge/football_prop_run_machine.py'
@@ -35,6 +38,7 @@ on:
       - 'tests/test_nfl_auto_context_source.py'
       - 'tests/test_nfl_special_teams_context.py'
       - 'tests/test_nfl_run_machine.py'
+      - 'tests/test_nfl_readiness.py'
       - 'tests/test_football_prop_surface.py'
       - 'scripts/run_nfl_auto.py'
       - 'scripts/run_football_auto_bundle.py'
@@ -87,15 +91,21 @@ jobs:
         run: >-
           python -m py_compile
           sportsedge/sports/nfl/run_machine.py
+          sportsedge/sports/nfl/readiness.py
           sportsedge/sports/nfl/m2.py
           sportsedge/sports/nfl/model_artifact.py
           sportsedge/football_prop_surface.py
           scripts/run_nfl_auto.py
           scripts/run_football_auto_bundle.py
           tests/test_nfl_run_machine.py
+          tests/test_nfl_readiness.py
           tests/test_football_prop_surface.py
-      - name: Run NFL run-machine contract tests
-        run: python -m unittest tests.test_nfl_run_machine tests.test_football_prop_surface -v
+      - name: Run NFL run-machine and OFFICIAL readiness contracts
+        run: >-
+          python -m unittest
+          tests.test_nfl_run_machine
+          tests.test_nfl_readiness
+          tests.test_football_prop_surface -v
       - name: Assert RUN IT registry resolves executable NFL game-plus-prop bundle
         run: |
           python - <<'PY'
