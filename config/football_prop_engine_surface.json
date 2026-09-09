@@ -6,14 +6,18 @@
     "NFL": {
       "freeze_registry": "config/nfl_prop_model_freeze.json",
       "evidence_registry": "config/nfl_prop_evidence.json",
+      "certification_registry": "config/nfl_prop_certification.json",
       "engine_state": "IMPLEMENTED_FAIL_CLOSED",
-      "promotion_state": "BLOCKED_EVIDENCE_REQUIRED"
+      "promotion_state": "AUTOMATIC_TRUTH_GATE_GATED",
+      "current_state": "EVIDENCE_PENDING"
     },
     "CFB": {
       "freeze_registry": "config/cfb_prop_model_freeze.json",
       "evidence_registry": "config/cfb_prop_evidence.json",
+      "certification_registry": "config/cfb_prop_certification.json",
       "engine_state": "IMPLEMENTED_FAIL_CLOSED",
-      "promotion_state": "BLOCKED_EVIDENCE_REQUIRED"
+      "promotion_state": "AUTOMATIC_TRUTH_GATE_GATED",
+      "current_state": "EVIDENCE_PENDING"
     }
   },
   "implemented_provider_markets": {
@@ -54,13 +58,14 @@
   },
   "explicit_no_engine": {
     "targets": "No standard bound provider player-targets settlement market is on this acquisition surface.",
-    "first_td": "First scorer remains blocked until complete sport-specific return-score and overtime scorer ordering is bound.",
-    "last_td": "Last scorer remains blocked until complete sport-specific return-score and overtime scorer ordering is bound.",
+    "first_td": "First scorer requires complete sport-specific return-score and overtime scorer ordering plus player identity before it can join the provider surface.",
+    "last_td": "Last scorer requires complete sport-specific return-score and overtime scorer ordering plus player identity before it can join the provider surface.",
     "returner_td_identity": "Kickoff/punt return scoring exists structurally but returner identity is not yet a production player-prop identity surface.",
     "team_defensive_props": "Team sacks/turnovers are derivable from the defensive path but no bound provider market/acquisition key is declared."
   },
   "governance": {
-    "official_bets_allowed": false,
+    "official_bets_allowed_when_all_gates_pass": true,
+    "manual_eligible_toggle_required": false,
     "market_prices_can_create_model_p": false,
     "hit_rates_can_create_model_p": false,
     "capper_or_consensus_can_create_model_p": false,
@@ -72,6 +77,8 @@
     "requires_pregame_quote": true,
     "requires_quote_ttl": true,
     "requires_forward_evidence_for_promotion": true,
+    "requires_artifact_bound_certification": true,
+    "requires_frozen_edge_floor_before_promotable_inference": true,
     "evidence_resolution_time_enforced": true
   }
 }
