@@ -1,17 +1,39 @@
 import unittest
 
-from sportsedge.edge_floors import EdgeFloorError, require_frozen_edge_floor
+from sportsedge.edge_floors import (
+    EdgeFloorError,
+    require_frozen_devig_policy,
+    require_frozen_edge_floor,
+)
+
+
+def _devig_policy():
+    return {
+        "policy_id": "EDGE_FLOOR_DEVIG_V1",
+        "status": "FROZEN_PRE_DERIVATION",
+        "longshot_trigger_american_odds": 400,
+        "longshot_trigger_rule": "EITHER_SIDE_AT_OR_ABOVE_POSITIVE_400",
+        "sensitivity_methods": ["MULTIPLICATIVE_V1", "POWER_V1", "SHIN_V1"],
+        "sensitivity_limit_absolute_probability_points": 0.01,
+        "stable_candidate_estimator": "MULTIPLICATIVE_V1",
+        "longshot_candidate_estimator": "POWER_V1",
+        "haircut_probability_points": 0.0,
+        "aggregation_rule": "ESTIMATOR_ONLY_NO_MINIMUM_ACROSS_METHODS",
+        "sensitivity_failure": "BLOCK",
+    }
 
 
 def _cfg(record=None):
     floors = {} if record is None else {"MLB_MONEYLINE": record}
     return {
         "truth_gate": {
+            "schema_version": 2,
             "production": {
                 "fail_closed": True,
                 "allow_cli_floor_override": False,
                 "require_frozen_floor_for_eligible_market": True,
             },
+            "devig_policy": _devig_policy(),
             "edge_floors": floors,
         }
     }
@@ -32,12 +54,18 @@ def _frozen(value="0.02"):
 
 
 class EdgeFloorTests(unittest.TestCase):
-    def test_missing_market_fails_closed(self):
-        with self.assertRaises(EdgeFloorError):
+    def test_missing_market_fails_closed_with_specific_code(self):
+        with self.assertRaisesRegex(
+            EdgeFloorError,
+            "^ELIGIBLE_MARKET_MISSING_OR_UNFROZEN_EDGE_FLOOR:MLB_MONEYLINE$",
+        ):
             require_frozen_edge_floor(market="MLB_MONEYLINE", config=_cfg())
 
-    def test_unproven_market_fails_closed(self):
-        with self.assertRaises(EdgeFloorError):
+    def test_unproven_market_fails_closed_with_specific_code(self):
+        with self.assertRaisesRegex(
+            EdgeFloorError,
+            "^ELIGIBLE_MARKET_MISSING_OR_UNFROZEN_EDGE_FLOOR:MLB_MONEYLINE$",
+        ):
             require_frozen_edge_floor(
                 market="MLB_MONEYLINE",
                 config=_cfg({"status": "UNPROVEN", "value_probability_points": None}),
@@ -81,6 +109,27 @@ class EdgeFloorTests(unittest.TestCase):
     def test_valid_frozen_floor_resolves_positive_value(self):
         floor = require_frozen_edge_floor(market="MLB_MONEYLINE", config=_cfg(_frozen("0.021")))
         self.assertEqual(str(floor.value_probability_points), "0.021")
+
+    def test_devig_policy_freezes_requested_values(self):
+        policy = require_frozen_devig_policy(config=_cfg())
+        self.assertEqual(policy.longshot_trigger_american_odds, 400)
+        self.assertEqual(str(policy.sensitivity_limit_absolute_probability_points), "0.01")
+        self.assertEqual(policy.stable_candidate_estimator, "MULTIPLICATIVE_V1")
+        self.assertEqual(policy.longshot_candidate_estimator, "POWER_V1")
+        self.assertEqual(str(policy.haircut_probability_points), "0.0")
+        self.assertEqual(policy.aggregation_rule, "ESTIMATOR_ONLY_NO_MINIMUM_ACROSS_METHODS")
+
+    def test_devig_policy_rejects_minimum_across_methods_rule(self):
+        cfg = _cfg()
+        cfg["truth_gate"]["devig_policy"]["aggregation_rule"] = "MINIMUM_ACROSS_METHODS"
+        with self.assertRaisesRegex(EdgeFloorError, "^DEVIG_AGGREGATION_RULE_INVALID$"):
+            require_frozen_devig_policy(config=cfg)
+
+    def test_devig_policy_requires_schema_v2(self):
+        cfg = _cfg()
+        cfg["truth_gate"]["schema_version"] = 1
+        with self.assertRaisesRegex(EdgeFloorError, "^EDGE_FLOOR_SCHEMA_VERSION_MISMATCH$"):
+            require_frozen_devig_policy(config=cfg)
 
 
 if __name__ == "__main__":
