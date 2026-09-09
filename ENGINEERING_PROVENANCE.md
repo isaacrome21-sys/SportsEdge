@@ -27,3 +27,15 @@ The repository now defines:
 This entry does not invent the missing 33 stack traces, does not claim they were individually reconstructed, and does not attribute individual errors to code without retained evidence. It records the surviving causal evidence and adds the missing invariant so a future environment mismatch fails explicitly and attribution remains auditable.
 
 No pre-analysis manifest is committed by this change. Governance remains unchanged; this record authorizes no market promotion and creates no fitted-model or replay evidence.
+
+## 2026-09-09 — pre-derivation devig policy freeze
+
+Status: policy decision frozen before any production edge-floor derivation; `truth_gate.edge_floors` remains empty.
+
+The existing schema-v2 `truth_gate.devig_policy` remains the single floor/devig policy surface. The authoritative fair-probability estimator is `POWER_V1` for both below-trigger and longshot candidates. This choice is made before deriving any floor because favorite-longshot bias is continuous rather than appearing only at a single American-odds boundary; `MULTIPLICATIVE_V1` therefore remains a sensitivity/reference method rather than the decision estimator.
+
+The +400 trigger remains frozen as the escalation boundary for three-method sensitivity (`MULTIPLICATIVE_V1`, `POWER_V1`, `SHIN_V1`). At or above that boundary on either side, an absolute fair-probability spread above 0.01 (1.0 percentage point) blocks. Below the trigger, the authoritative estimator is still `POWER_V1`; the three-method sensitivity spread is not promoted into a vote or implicit minimum rule.
+
+The explicit probability haircut remains 0.0 points. The aggregation rule remains `ESTIMATOR_ONLY_NO_MINIMUM_ACROSS_METHODS`. These values are policy inputs, not results selected after observing floor, replay, calibration, hit-rate, market-consensus, or handicapper outcomes.
+
+No edge floor is created by this freeze. No market becomes eligible. No Model_P, calibration result, replay depth, hit rate, or evidence record is added or inferred.

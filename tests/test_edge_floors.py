@@ -15,7 +15,7 @@ def _devig_policy():
         "longshot_trigger_rule": "EITHER_SIDE_AT_OR_ABOVE_POSITIVE_400",
         "sensitivity_methods": ["MULTIPLICATIVE_V1", "POWER_V1", "SHIN_V1"],
         "sensitivity_limit_absolute_probability_points": 0.01,
-        "stable_candidate_estimator": "MULTIPLICATIVE_V1",
+        "stable_candidate_estimator": "POWER_V1",
         "longshot_candidate_estimator": "POWER_V1",
         "haircut_probability_points": 0.0,
         "aggregation_rule": "ESTIMATOR_ONLY_NO_MINIMUM_ACROSS_METHODS",
@@ -114,7 +114,7 @@ class EdgeFloorTests(unittest.TestCase):
         policy = require_frozen_devig_policy(config=_cfg())
         self.assertEqual(policy.longshot_trigger_american_odds, 400)
         self.assertEqual(str(policy.sensitivity_limit_absolute_probability_points), "0.01")
-        self.assertEqual(policy.stable_candidate_estimator, "MULTIPLICATIVE_V1")
+        self.assertEqual(policy.stable_candidate_estimator, "POWER_V1")
         self.assertEqual(policy.longshot_candidate_estimator, "POWER_V1")
         self.assertEqual(str(policy.haircut_probability_points), "0.0")
         self.assertEqual(policy.aggregation_rule, "ESTIMATOR_ONLY_NO_MINIMUM_ACROSS_METHODS")

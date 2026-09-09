@@ -32,7 +32,7 @@ def policy():
         longshot_trigger_rule="EITHER_SIDE_AT_OR_ABOVE_POSITIVE_400",
         sensitivity_methods=("MULTIPLICATIVE_V1", "POWER_V1", "SHIN_V1"),
         sensitivity_limit_absolute_probability_points=Decimal("0.01"),
-        stable_candidate_estimator="MULTIPLICATIVE_V1",
+        stable_candidate_estimator="POWER_V1",
         longshot_candidate_estimator="POWER_V1",
         haircut_probability_points=Decimal("0.0"),
         aggregation_rule="ESTIMATOR_ONLY_NO_MINIMUM_ACROSS_METHODS",
@@ -72,11 +72,26 @@ class DevigTests(unittest.TestCase):
                     d.candidate_fair_probability + d.opposite_fair_probability, 1.0, places=12
                 )
 
-    def test_stable_candidate_uses_frozen_multiplicative_estimator(self):
-        priced = devig_with_policy(quote("OVER", 150), quote("UNDER", -175), policy=policy())
+    def test_below_trigger_candidate_uses_frozen_power_estimator(self):
+        candidate = quote("OVER", 250)
+        opposite = quote("UNDER", -310)
+        priced = devig_with_policy(candidate, opposite, policy=policy())
+        direct_power = power_devig(candidate, opposite)
+        direct_multiplicative = multiplicative_devig(candidate, opposite)
+
         self.assertFalse(priced.longshot_triggered)
-        self.assertEqual(priced.selected.method, "MULTIPLICATIVE_V1")
+        self.assertEqual(priced.selected.method, "POWER_V1")
         self.assertEqual(priced.sensitivity_spread_probability_points, 0.0)
+        self.assertAlmostEqual(
+            priced.fair_probability_for_decision,
+            direct_power.candidate_fair_probability,
+            places=15,
+        )
+        self.assertNotAlmostEqual(
+            priced.fair_probability_for_decision,
+            direct_multiplicative.candidate_fair_probability,
+            places=12,
+        )
 
     def test_plus_400_on_either_side_triggers_longshot_sensitivity(self):
         priced = devig_with_policy(quote("OVER", 400), quote("UNDER", -450), policy=policy())

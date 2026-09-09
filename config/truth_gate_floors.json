@@ -17,7 +17,7 @@
         "SHIN_V1"
       ],
       "sensitivity_limit_absolute_probability_points": 0.01,
-      "stable_candidate_estimator": "MULTIPLICATIVE_V1",
+      "stable_candidate_estimator": "POWER_V1",
       "longshot_candidate_estimator": "POWER_V1",
       "haircut_probability_points": 0.0,
       "aggregation_rule": "ESTIMATOR_ONLY_NO_MINIMUM_ACROSS_METHODS",
