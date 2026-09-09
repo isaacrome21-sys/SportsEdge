@@ -1,8 +1,6 @@
 name: mlb-2025-sbr-recovery
 
 on:
-  push:
-    branches: ["chatgpt/mlb-2025-sbr-recovery"]
   workflow_dispatch:
 
 permissions:
@@ -60,7 +58,10 @@ jobs:
           data = json.loads(raw_bytes)
 
           total_r = 0
+          total_all = 0
+          unknown = []
           dk_open = 0
+          dk_open_all = 0
           dk_current = 0
           malformed_open = []
           missing_dk = []
@@ -72,13 +73,16 @@ jobs:
               if games:
                   dates_with_games.append(date)
               for game in games:
+                  total_all += 1
                   view = game.get('gameView') or {}
-                  if view.get('gameType') != 'R':
-                      continue
-                  total_r += 1
                   away = (view.get('awayTeam') or {}).get('shortName') or (view.get('awayTeam') or {}).get('fullName')
                   home = (view.get('homeTeam') or {}).get('shortName') or (view.get('homeTeam') or {}).get('fullName')
                   key = f'{date}:{away}@{home}'
+                  game_type = view.get('gameType')
+                  if game_type != 'R':
+                      unknown.append({'game': key, 'gameType': game_type})
+                  else:
+                      total_r += 1
                   markets = game.get('odds') or {}
 
                   ml = markets.get('moneyline') or []
@@ -89,11 +93,14 @@ jobs:
                       op = dk_ml.get('openingLine') or {}
                       cur = dk_ml.get('currentLine') or {}
                       ho, ao = op.get('homeOdds'), op.get('awayOdds')
-                      if isinstance(ho, (int,float)) and isinstance(ao, (int,float)) and ho != 0 and ao != 0:
-                          dk_open += 1
+                      valid_open = isinstance(ho, (int,float)) and isinstance(ao, (int,float)) and ho != 0 and ao != 0
+                      if valid_open:
+                          dk_open_all += 1
+                          if game_type == 'R':
+                              dk_open += 1
                       else:
                           malformed_open.append({'game': key, 'openingLine': op})
-                      if isinstance(cur.get('homeOdds'), (int,float)) and isinstance(cur.get('awayOdds'), (int,float)):
+                      if game_type == 'R' and isinstance(cur.get('homeOdds'), (int,float)) and isinstance(cur.get('awayOdds'), (int,float)):
                           dk_current += 1
 
                   ps = markets.get('pointspread') or []
@@ -104,7 +111,7 @@ jobs:
                           contaminated_current.append({'game': key, 'homeSpread': spread})
 
           summary = {
-              'schema_version': 1,
+              'schema_version': 2,
               'source': 'SportsBookReview via ArnavSaraogi/mlb-odds-scraper',
               'upstream_scraper_sha256_git_commit': Path('upstream_scraper_sha.txt').read_text().strip(),
               'requested_start': '2025-08-17',
@@ -114,11 +121,14 @@ jobs:
               'dates_with_games': len(dates_with_games),
               'first_date_with_games': dates_with_games[0] if dates_with_games else None,
               'last_date_with_games': dates_with_games[-1] if dates_with_games else None,
-              'regular_season_games_scraped': total_r,
-              'draftkings_valid_opening_moneyline_games': dk_open,
-              'draftkings_current_moneyline_games': dk_current,
-              'draftkings_missing_games': missing_dk,
-              'draftkings_malformed_opening_games': malformed_open,
+              'source_games_all_types': total_all,
+              'regular_season_games_labeled_r': total_r,
+              'non_r_rows': unknown,
+              'draftkings_valid_opening_moneyline_labeled_r': dk_open,
+              'draftkings_valid_opening_moneyline_all_source_games': dk_open_all,
+              'draftkings_current_moneyline_labeled_r': dk_current,
+              'draftkings_missing_games_all_source_games': missing_dk,
+              'draftkings_malformed_opening_games_all_source_games': malformed_open,
               'current_spread_contamination_gt_2_5': contaminated_current,
               'confirmatory_holdout_touched': False,
               'promotion_claimed': False,
@@ -127,9 +137,9 @@ jobs:
           Path('mlb_2025_sbr_recovery_summary.json').write_text(json.dumps(summary, indent=2, sort_keys=True) + '\n')
           print(json.dumps(summary, indent=2, sort_keys=True))
 
-          if total_r == 0:
-              raise SystemExit('RECOVERY_NO_REGULAR_SEASON_GAMES')
-          if dk_open == 0:
+          if total_all == 0:
+              raise SystemExit('RECOVERY_NO_SOURCE_GAMES')
+          if dk_open_all == 0:
               raise SystemExit('RECOVERY_NO_VALID_DK_OPENINGS')
           PY
 
