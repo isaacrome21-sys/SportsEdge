@@ -44,6 +44,41 @@ jobs:
           sportsedge/sports/nfl/run_machine.py
           sportsedge/sports/nfl/m2.py
           sportsedge/sports/nfl/model_artifact.py
+          scripts/run_nfl_auto.py
           tests/test_nfl_run_machine.py
       - name: Run NFL run-machine contract tests
         run: python -m unittest tests.test_nfl_run_machine -v
+      - name: Assert RUN IT registry resolves executable NFL lane
+        run: |
+          python - <<'PY'
+          import importlib
+          import json
+          from pathlib import Path
+
+          config = json.loads(Path('config/run_it_surface.json').read_text())
+          nfl = config['sports']['NFL']
+          assert nfl['lane'] == 'PREGAME_MODEL'
+          assert nfl['automatic_completeness'] == 'EXECUTABLE_FAIL_CLOSED'
+          assert nfl['automatic_command'] == ['python', 'scripts/run_nfl_auto.py', '--output', 'artifacts/run_it/nfl_card.json']
+          assert Path(nfl['automatic_command'][1]).is_file()
+          module_name, attr = nfl['library_entrypoint'].split(':', 1)
+          assert hasattr(importlib.import_module(module_name), attr)
+          PY
+      - name: Assert missing frozen artifact fails closed
+        shell: bash
+        run: |
+          set +e
+          python scripts/run_nfl_auto.py \
+            --model-artifact /tmp/definitely-missing-nfl-model.json \
+            --output /tmp/nfl-card.json
+          rc=$?
+          set -e
+          test "$rc" -eq 2
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          payload = json.loads(Path('/tmp/nfl-card.json').read_text())
+          assert payload['status'] == 'BLOCKED'
+          assert payload['blocker'] == 'NFL_AUTO_FROZEN_MODEL_ARTIFACT_REQUIRED'
+          assert payload['governance']['fail_closed'] is True
+          PY
