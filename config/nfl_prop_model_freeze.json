@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "sport": "NFL",
+  "status": "UNFROZEN",
+  "hash_algorithm": "CANONICAL_JSON_SHA256_V1",
+  "artifact_path": "artifacts/football/nfl_offensive_prop_ab_model.json",
+  "artifact_sha256": null,
+  "reason": "No genuine fitted NFL offensive A+B prop artifact has been frozen. The prop runner must fail closed until a real fitted artifact is independently frozen and hash-bound."
+}
