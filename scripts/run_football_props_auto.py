@@ -3,8 +3,10 @@
 
 A real fitted artifact and a fresh PIT opportunity/usage snapshot are mandatory.
 Market prices can be supplied as a captured snapshot or acquired event-by-event
-from The Odds API. Resolution always passes through the artifact-bound evidence
-readiness layer. This script never fits, promotes, or changes Truth Gate state.
+from The Odds API. Resolution always passes through artifact-bound evidence,
+certification and the frozen-floor Truth Gate.  Exact-SHA hosted freeze bundles
+may be materialized outside the repository and supplied by CLI/environment; the
+checked-in registries therefore never need to claim bytes that are not present.
 """
 from __future__ import annotations
 
@@ -74,15 +76,22 @@ def _runtime_git_sha() -> str:
     return value
 
 
-def _defaults(sport: str) -> tuple[Path, Path, Path, Path, Path]:
+def _defaults(sport: str) -> tuple[Path, Path, Path, Path, Path, Path, Path]:
     lower = sport.lower()
     return (
         Path(f"config/{lower}_prop_model_freeze.json"),
         Path(f"config/{lower}_prop_evidence.json"),
+        Path(f"config/{lower}_prop_certification.json"),
+        Path("config/truth_gate_floors.json"),
         Path(f"artifacts/football/{lower}_offensive_prop_ab_model.json"),
         Path(f"artifacts/football/{lower}_prop_live_features.json"),
         Path(f"artifacts/football/{lower}_prop_odds_snapshot.json"),
     )
+
+
+def _env_path(name: str) -> Path | None:
+    raw = str(os.environ.get(name) or "").strip()
+    return Path(raw) if raw else None
 
 
 def _freeze(registry_path: Path, artifact_path: Path, sport: str) -> tuple[dict, str]:
@@ -100,10 +109,21 @@ def _freeze(registry_path: Path, artifact_path: Path, sport: str) -> tuple[dict,
     expected = str(registry.get("artifact_sha256") or "").strip().lower()
     if len(expected) != 64 or any(ch not in "0123456789abcdef" for ch in expected):
         raise FootballPropAutoError(f"{sport}_PROP_FROZEN_MODEL_SHA256_INVALID")
-    declared = ROOT / str(registry.get("artifact_path") or "")
-    if declared.resolve() != artifact_path.resolve():
-        raise FootballPropAutoError(f"{sport}_PROP_FROZEN_MODEL_PATH_MISMATCH")
-    return _json(artifact_path, f"{sport}_PROP_MODEL_ARTIFACT_INVALID"), expected
+
+    # A hosted freeze bundle may be materialized at a different filesystem path
+    # than the canonical production destination.  Path relocation is permitted
+    # only when the freeze itself is externally supplied; the artifact bytes and
+    # exact runtime Git SHA are still independently verified downstream.
+    checked_in_registry = (ROOT / f"config/{sport.lower()}_prop_model_freeze.json").resolve()
+    if registry_path.resolve() == checked_in_registry:
+        declared = ROOT / str(registry.get("artifact_path") or "")
+        if declared.resolve() != artifact_path.resolve():
+            raise FootballPropAutoError(f"{sport}_PROP_FROZEN_MODEL_PATH_MISMATCH")
+    artifact = _json(artifact_path, f"{sport}_PROP_MODEL_ARTIFACT_INVALID")
+    freeze_code_sha = str(registry.get("code_git_sha") or artifact.get("code_git_sha") or "").strip().lower()
+    if freeze_code_sha and freeze_code_sha != _runtime_git_sha():
+        raise FootballPropAutoError(f"{sport}_PROP_FROZEN_MODEL_CODE_SHA_MISMATCH")
+    return artifact, expected
 
 
 def _odds_from_network(*, sport: str, features: dict, current: datetime) -> dict:
@@ -145,6 +165,8 @@ def main() -> int:
     ap.add_argument("--asof")
     ap.add_argument("--registry", type=Path)
     ap.add_argument("--evidence-registry", type=Path)
+    ap.add_argument("--certification-registry", type=Path)
+    ap.add_argument("--floor-registry", type=Path)
     ap.add_argument("--model-artifact", type=Path)
     ap.add_argument("--live-features", type=Path)
     ap.add_argument("--odds-snapshot", type=Path)
@@ -155,14 +177,22 @@ def main() -> int:
     args = ap.parse_args()
 
     sport = args.sport.upper()
-    default_registry, default_evidence, default_artifact, default_features, default_odds = _defaults(sport)
-    registry_path = args.registry or default_registry
-    evidence_path = args.evidence_registry or default_evidence
-    artifact_path = args.model_artifact or default_artifact
-    feature_env = os.environ.get(f"SPORTSEDGE_{sport}_PROP_LIVE_FEATURES_PATH")
-    odds_env = os.environ.get(f"SPORTSEDGE_{sport}_PROP_ODDS_SNAPSHOT_PATH")
-    feature_path = args.live_features or (Path(feature_env) if feature_env else default_features)
-    odds_path = args.odds_snapshot or (Path(odds_env) if odds_env else default_odds)
+    (
+        default_registry,
+        default_evidence,
+        default_certification,
+        default_floors,
+        default_artifact,
+        default_features,
+        default_odds,
+    ) = _defaults(sport)
+    registry_path = args.registry or _env_path(f"SPORTSEDGE_{sport}_PROP_FREEZE_REGISTRY_PATH") or default_registry
+    evidence_path = args.evidence_registry or _env_path(f"SPORTSEDGE_{sport}_PROP_EVIDENCE_REGISTRY_PATH") or default_evidence
+    certification_path = args.certification_registry or _env_path(f"SPORTSEDGE_{sport}_PROP_CERTIFICATION_REGISTRY_PATH") or default_certification
+    floor_path = args.floor_registry or _env_path("SPORTSEDGE_TRUTH_GATE_FLOOR_PATH") or default_floors
+    artifact_path = args.model_artifact or _env_path(f"SPORTSEDGE_{sport}_PROP_MODEL_ARTIFACT_PATH") or default_artifact
+    feature_path = args.live_features or _env_path(f"SPORTSEDGE_{sport}_PROP_LIVE_FEATURES_PATH") or default_features
+    odds_path = args.odds_snapshot or _env_path(f"SPORTSEDGE_{sport}_PROP_ODDS_SNAPSHOT_PATH") or default_odds
     output = args.output or Path(f"artifacts/run_it/{sport.lower()}_prop_card.json")
     current = _utc(args.asof)
 
@@ -170,7 +200,14 @@ def main() -> int:
         artifact, expected_sha = _freeze(registry_path, artifact_path, sport)
         if not evidence_path.is_file():
             raise FootballPropAutoError(f"{sport}_PROP_EVIDENCE_REGISTRY_REQUIRED")
+        if not certification_path.is_file():
+            raise FootballPropAutoError(f"{sport}_PROP_CERTIFICATION_REGISTRY_REQUIRED")
+        if not floor_path.is_file():
+            raise FootballPropAutoError(f"{sport}_PROP_TRUTH_GATE_FLOOR_REGISTRY_REQUIRED")
         evidence_registry = _json(evidence_path, f"{sport}_PROP_EVIDENCE_REGISTRY_INVALID")
+        certification_registry = _json(
+            certification_path, f"{sport}_PROP_CERTIFICATION_REGISTRY_INVALID"
+        )
         if not feature_path.is_file():
             raise FootballPropAutoError(f"{sport}_PROP_PIT_LIVE_FEATURE_SNAPSHOT_REQUIRED")
         features = _json(feature_path, f"{sport}_PROP_PIT_LIVE_FEATURE_SNAPSHOT_INVALID")
@@ -182,6 +219,8 @@ def main() -> int:
         report = run_football_props_ready(
             sport=sport,
             evidence_registry=evidence_registry,
+            certification_registry=certification_registry,
+            floor_path=str(floor_path),
             now=current,
             artifact_payload=artifact,
             expected_artifact_sha256=expected_sha,
@@ -193,16 +232,16 @@ def main() -> int:
             book_key=str(args.bookmaker),
         )
         payload = {
-            "schema_version": "FOOTBALL_PROP_AUTO_RUN_V2",
+            "schema_version": "FOOTBALL_PROP_AUTO_RUN_V3",
             "status": "SUCCESS",
             "sport": sport,
             "report": report,
             "governance": {
                 "model_fit_performed": False,
                 "evidence_resolution_performed": True,
-                "promotion_changed": False,
-                "truth_gate_changed": False,
-                "eligible_changed": False,
+                "certification_resolution_performed": True,
+                "truth_gate_resolution_performed": True,
+                "manual_promotion_toggle_required": False,
                 "fail_closed": True,
             },
         }
@@ -211,7 +250,7 @@ def main() -> int:
         return 0
     except (FootballPropAutoError, FootballPropRunError, ValueError) as exc:
         payload = {
-            "schema_version": "FOOTBALL_PROP_AUTO_RUN_V2",
+            "schema_version": "FOOTBALL_PROP_AUTO_RUN_V3",
             "status": "BLOCKED",
             "sport": sport,
             "blocker": str(exc),
@@ -229,9 +268,9 @@ def main() -> int:
             "governance": {
                 "model_fit_performed": False,
                 "evidence_resolution_performed": True,
-                "promotion_changed": False,
-                "truth_gate_changed": False,
-                "eligible_changed": False,
+                "certification_resolution_performed": True,
+                "truth_gate_resolution_performed": True,
+                "manual_promotion_toggle_required": False,
                 "fail_closed": True,
             },
         }
