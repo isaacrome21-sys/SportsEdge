@@ -10,11 +10,13 @@
       "notes": "Native automatic MLB acquisition with resilient odds failover; promotion remains deployment/evidence gated."
     },
     "NFL": {
-      "lane": "HYBRID_CONTEXT",
-      "automatic_command": ["python", "scripts/build_nfl_auto_context.py", "--out", "artifacts/run_it/nfl_auto_context.json"],
+      "lane": "PREGAME_MODEL",
+      "automatic_command": ["python", "scripts/run_nfl_auto.py", "--output", "artifacts/run_it/nfl_card.json"],
+      "library_entrypoint": "sportsedge.sports.nfl.run_machine:run_it_nfl",
       "market_surface": "config/football_market_surface.json",
-      "automatic_completeness": "CONTEXT_ONLY",
-      "notes": "Automatic objective context acquisition is runnable; predictive NFL model execution remains separately evidence and input gated."
+      "automatic_completeness": "EXECUTABLE_FAIL_CLOSED",
+      "blocker": "NFL_FROZEN_M2_ARTIFACT_AND_LIVE_SOURCES_REQUIRED",
+      "notes": "NFL M2 now executes through the canonical MANUAL/HYBRID/AUTOMATIC run machine with frozen-artifact binding, PIT feature checks, observed-quote binding and TTL enforcement. Game MONEYLINE/SPREAD/TOTAL are priced but remain wager-blocked until promotion evidence and frozen Truth Gate floors permit deployment; player props remain NO_ENGINE."
     },
     "CFB": {
       "lane": "PREGAME_MODEL",
