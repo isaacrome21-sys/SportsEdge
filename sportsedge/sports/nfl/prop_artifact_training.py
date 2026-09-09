@@ -9,11 +9,11 @@ from __future__ import annotations
 
 from collections import defaultdict
 import csv
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import gzip
 from hashlib import sha256
 import json
-from math import isfinite, sqrt
+from math import isfinite
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -58,10 +58,6 @@ def _game_id(row: Mapping[str, Any]) -> str:
 
 def _team(row: Mapping[str, Any]) -> str:
     return str(row.get("posteam") or row.get("possession_team") or "").strip()
-
-
-def _defteam(row: Mapping[str, Any]) -> str:
-    return str(row.get("defteam") or "").strip()
 
 
 def _play_type(row: Mapping[str, Any]) -> str:
@@ -118,7 +114,7 @@ class _TeamFit:
             "pace_seconds_mean": pace,
         }
 
-    def special_teams_profile(self, team: str) -> dict[str, float]:
+    def special_teams_profile(self, team: str, *, league_two_point_success_rate: float) -> dict[str, float]:
         if self.fg_attempts < 20:
             raise ValueError(f"NFL_PROP_FIT_FG_DEPTH_INSUFFICIENT:{team}:{self.fg_attempts}")
         if self.xp_attempts < 20:
@@ -126,23 +122,19 @@ class _TeamFit:
         tries = self.xp_attempts + self.two_attempts
         if tries <= 0:
             raise ValueError(f"NFL_PROP_FIT_TRY_DEPTH_INSUFFICIENT:{team}")
-        two_success = self.two_made / self.two_attempts if self.two_attempts else 0.48
-        # The 0.48 fallback is not empirical evidence. It is used only when the
-        # team had zero observed 2-point attempts in the fit window, and the
-        # artifact records that fallback count so promotion evidence can veto it.
+        if not 0.0 <= float(league_two_point_success_rate) <= 1.0:
+            raise ValueError("NFL_PROP_FIT_LEAGUE_TWO_POINT_RATE_INVALID")
+        two_success = (
+            self.two_made / self.two_attempts
+            if self.two_attempts
+            else float(league_two_point_success_rate)
+        )
         return {
             "fg_base_skill": self.fg_made / self.fg_attempts,
             "xp_make_rate": self.xp_made / self.xp_attempts,
             "two_point_attempt_rate": self.two_attempts / tries,
             "two_point_success_rate": two_success,
         }
-
-
-@dataclass
-class FitDiagnostics:
-    source_files: list[dict[str, Any]] = field(default_factory=list)
-    team_rows: dict[str, dict[str, int]] = field(default_factory=dict)
-    two_point_zero_attempt_teams: list[str] = field(default_factory=list)
 
 
 def fit_nfl_prop_artifact(
@@ -241,7 +233,7 @@ def fit_nfl_prop_artifact(
             if _flag(row.get("extra_point_attempt")):
                 fit.xp_attempts += 1
                 result = str(row.get("extra_point_result") or "").strip().lower()
-                fit.xp_made += int(result == "good" or result == "made")
+                fit.xp_made += int(result in {"good", "made"})
             if _flag(row.get("two_point_attempt")):
                 fit.two_attempts += 1
                 result = str(row.get("two_point_conv_result") or "").strip().lower()
@@ -251,16 +243,25 @@ def fit_nfl_prop_artifact(
     if len(teams) != 32:
         raise ValueError(f"NFL_PROP_FIT_TEAM_COUNT_INVALID:{len(teams)}:{','.join(teams)}")
 
+    league_two_attempts = sum(stats[team].two_attempts for team in teams)
+    league_two_made = sum(stats[team].two_made for team in teams)
+    if league_two_attempts <= 0:
+        raise ValueError("NFL_PROP_FIT_LEAGUE_TWO_POINT_DEPTH_ZERO")
+    league_two_success = league_two_made / league_two_attempts
+
     drive_profiles: dict[str, dict[str, float]] = {}
     special_profiles: dict[str, dict[str, float]] = {}
-    zero_two: list[str] = []
+    empirical_fallback_teams: list[str] = []
     diagnostics_rows: dict[str, dict[str, int]] = {}
     for team in teams:
         fit = stats[team]
         drive_profiles[team] = fit.drive_profile(team)
-        special_profiles[team] = fit.special_teams_profile(team)
+        special_profiles[team] = fit.special_teams_profile(
+            team,
+            league_two_point_success_rate=league_two_success,
+        )
         if fit.two_attempts == 0:
-            zero_two.append(team)
+            empirical_fallback_teams.append(team)
         diagnostics_rows[team] = {
             "source_rows": row_counts[team],
             "scrimmage": fit.scrimmage,
@@ -295,7 +296,10 @@ def fit_nfl_prop_artifact(
         "source_manifest_sha256": manifest_sha,
         "team_count": len(teams),
         "team_rows": diagnostics_rows,
-        "two_point_zero_attempt_teams": zero_two,
-        "note": "A zero two-point-attempt team uses the structural 0.48 fallback and remains evidence-gated; this diagnostic does not certify promotion.",
+        "league_two_point_attempts": league_two_attempts,
+        "league_two_point_made": league_two_made,
+        "league_two_point_success_rate": league_two_success,
+        "two_point_empirical_fallback_teams": empirical_fallback_teams,
+        "note": "Teams with zero two-point attempts use the empirical league success rate from these exact frozen source bytes; no hardcoded rate is used.",
     }
     return artifact, diagnostics
