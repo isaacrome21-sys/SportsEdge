@@ -78,11 +78,15 @@ class FootballPropRunMachineTests(unittest.TestCase):
         }
         self.odds = self._odds(line=100.5)
 
-    def _odds(self, *, line: float, update: datetime | None = None):
+    def _odds(
+        self, *, line: float, update: datetime | None = None,
+        snapshot_observed: datetime | None = None,
+    ):
         observed = update or (self.now - timedelta(seconds=20))
+        snapshot_stamp = snapshot_observed or observed
         return {
             "schema_version": "FOOTBALL_PROP_ODDS_SNAPSHOT_V1",
-            "observed_at": observed.isoformat(),
+            "observed_at": snapshot_stamp.isoformat(),
             "events": [{
                 "id": "evt1",
                 "home_team": "Home Team", "away_team": "Away Team",
@@ -146,12 +150,14 @@ class FootballPropRunMachineTests(unittest.TestCase):
 
     def test_game_must_still_be_pregame(self):
         with self.assertRaisesRegex(FootballPropRunError, "FOOTBALL_PROP_GAME_NOT_PREGAME:g1"):
-            self._run(now=self.start)
+            self._run(now=self.start, feature_ttl_seconds=3 * 60 * 60)
 
-    def test_feature_snapshot_must_be_pregame(self):
+    def test_feature_snapshot_at_kickoff_cannot_reach_model(self):
         features = deepcopy(self.features)
         features["asof_ts"] = self.start.isoformat()
-        with self.assertRaisesRegex(FootballPropRunError, "FOOTBALL_PROP_FEATURE_SNAPSHOT_NOT_PREGAME:g1"):
+        # During a valid pregame execution a kickoff-time snapshot is necessarily
+        # future data, so it must fail before model execution.
+        with self.assertRaisesRegex(FootballPropRunError, "FOOTBALL_PROP_LIVE_FEATURE_FROM_FUTURE"):
             self._run(live_features=features, now=self.start - timedelta(minutes=1))
 
     def test_feature_snapshot_must_be_fresh(self):
@@ -160,8 +166,12 @@ class FootballPropRunMachineTests(unittest.TestCase):
         with self.assertRaisesRegex(FootballPropRunError, "FOOTBALL_PROP_LIVE_FEATURE_SNAPSHOT_STALE"):
             self._run(live_features=features)
 
-    def test_quote_from_future_is_rejected(self):
-        odds = self._odds(line=100.5, update=self.start)
+    def test_market_quote_from_future_is_rejected(self):
+        odds = self._odds(
+            line=100.5,
+            update=self.start,
+            snapshot_observed=self.now - timedelta(seconds=1),
+        )
         with self.assertRaisesRegex(FootballPropRunError, "FOOTBALL_PROP_QUOTE_FROM_FUTURE"):
             self._run(odds_snapshot=odds)
 
