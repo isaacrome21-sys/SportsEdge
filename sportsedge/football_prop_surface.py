@@ -1,6 +1,7 @@
 """Runtime resolver for the authoritative football player-prop engine surface."""
 from __future__ import annotations
 
+import importlib
 import json
 from pathlib import Path
 from typing import Any, Mapping
@@ -9,6 +10,7 @@ from sportsedge.football_prop_run_machine import PROVIDER_MARKET_TO_STAT
 
 DEFAULT_PROP_SURFACE = Path("config/football_prop_engine_surface.json")
 EXPECTED_SCHEMA = "FOOTBALL_PROP_ENGINE_SURFACE_V1"
+EXPECTED_LIBRARY_ENTRYPOINT = "sportsedge.football_prop_readiness:run_football_props_ready"
 
 
 class FootballPropSurfaceError(ValueError):
@@ -29,6 +31,12 @@ def require_executable_prop_surface(
     sport: str, *, path: str | Path = DEFAULT_PROP_SURFACE
 ) -> Mapping[str, Any]:
     payload = load_prop_surface(path)
+    if payload.get("library_entrypoint") != EXPECTED_LIBRARY_ENTRYPOINT:
+        raise FootballPropSurfaceError("FOOTBALL_PROP_LIBRARY_ENTRYPOINT_NOT_EVIDENCE_BOUND")
+    module_name, attr = EXPECTED_LIBRARY_ENTRYPOINT.split(":", 1)
+    if not hasattr(importlib.import_module(module_name), attr):
+        raise FootballPropSurfaceError("FOOTBALL_PROP_LIBRARY_ENTRYPOINT_UNRESOLVABLE")
+
     resolved = str(sport or "").strip().upper()
     sports = payload.get("sports")
     if not isinstance(sports, Mapping) or not isinstance(sports.get(resolved), Mapping):
@@ -38,9 +46,13 @@ def require_executable_prop_surface(
         raise FootballPropSurfaceError(f"FOOTBALL_PROP_ENGINE_NOT_IMPLEMENTED:{resolved}")
     if spec.get("promotion_state") != "BLOCKED_EVIDENCE_REQUIRED":
         raise FootballPropSurfaceError(f"FOOTBALL_PROP_PROMOTION_STATE_INVALID:{resolved}")
-    registry = str(spec.get("freeze_registry") or "").strip()
-    if not registry:
+    freeze_registry = str(spec.get("freeze_registry") or "").strip()
+    if not freeze_registry:
         raise FootballPropSurfaceError(f"FOOTBALL_PROP_FREEZE_REGISTRY_UNBOUND:{resolved}")
+    evidence_registry = str(spec.get("evidence_registry") or "").strip()
+    if not evidence_registry:
+        raise FootballPropSurfaceError(f"FOOTBALL_PROP_EVIDENCE_REGISTRY_UNBOUND:{resolved}")
+
     declared = payload.get("implemented_ab_markets")
     if not isinstance(declared, Mapping) or not declared:
         raise FootballPropSurfaceError("FOOTBALL_PROP_IMPLEMENTED_MARKETS_REQUIRED")
@@ -51,7 +63,7 @@ def require_executable_prop_surface(
     required_true = (
         "requires_frozen_artifact", "requires_pregame_feature_snapshot",
         "requires_paired_price", "requires_pregame_quote", "requires_quote_ttl",
-        "requires_forward_evidence_for_promotion",
+        "requires_forward_evidence_for_promotion", "evidence_resolution_time_enforced",
     )
     if not isinstance(governance, Mapping) or any(governance.get(k) is not True for k in required_true):
         raise FootballPropSurfaceError("FOOTBALL_PROP_GOVERNANCE_CONTRACT_INVALID")
