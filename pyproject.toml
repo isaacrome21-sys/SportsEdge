@@ -1,0 +1,16 @@
+# Repository-level interpreter and development dependency contract.
+# SportsEdge is not published as a Python package. A package version is therefore
+# intentionally not fabricated here; it remains dynamic until a real release/version
+# source exists.
+
+[project]
+name = "sportsedge"
+dynamic = ["version"]
+requires-python = ">=3.12,<3.13"
+
+[dependency-groups]
+dev = [
+  "numpy==2.5.3",
+  "pytest==9.1.1",
+  "PyYAML==6.0.2",
+]

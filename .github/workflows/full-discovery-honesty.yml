@@ -18,10 +18,52 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 0
-      - name: Set up Python
+      - name: Set up contracted Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
-          python-version: '3.12.13'
+          python-version-file: '.python-version'
+      - name: Assert interpreter and dev-dependency contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import platform
+          import sys
+          import tomllib
+
+          expected = Path('.python-version').read_text(encoding='utf-8').strip()
+          actual = platform.python_version()
+          if actual != expected:
+              raise SystemExit(f'PYTHON_VERSION_MISMATCH expected={expected} actual={actual}')
+
+          config = tomllib.loads(Path('pyproject.toml').read_text(encoding='utf-8'))
+          requires_python = config['project']['requires-python']
+          if requires_python != '>=3.12,<3.13':
+              raise SystemExit(f'PYTHON_RANGE_CONTRACT_CHANGED unexpected={requires_python}')
+          if sys.version_info[:2] != (3, 12):
+              raise SystemExit(
+                  f'PYTHON_RANGE_VIOLATION actual={sys.version_info.major}.{sys.version_info.minor}'
+              )
+
+          declared_dev = set(config['dependency-groups']['dev'])
+          requirements = {
+              line.strip()
+              for line in Path('requirements-test.txt').read_text(encoding='utf-8').splitlines()
+              if line.strip() and not line.lstrip().startswith('#')
+          }
+          if declared_dev != requirements:
+              raise SystemExit(
+                  'DEV_DEPENDENCY_SURFACE_MISMATCH '
+                  f'pyproject_only={sorted(declared_dev - requirements)} '
+                  f'requirements_only={sorted(requirements - declared_dev)}'
+              )
+          if not any(item.lower().startswith('pytest==') for item in declared_dev):
+              raise SystemExit('PYTEST_NOT_DECLARED_IN_DEV_DEPENDENCIES')
+
+          print(f'PYTHON_CONTRACT_OK exact={actual} range={requires_python}')
+          print(f'DEV_DEPENDENCY_CONTRACT_OK count={len(declared_dev)}')
+          PY
       - name: Install frozen test dependencies
         run: python -m pip install --disable-pip-version-check -r requirements-test.txt
       - name: Compile repository Python
@@ -29,7 +71,7 @@ jobs:
       - name: Run full pytest discovery
         run: python -m pytest -q tests
 
-  historical-import-classification:
+  resolver-reorder-regression-check:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -37,13 +79,24 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 0
-      - name: Set up Python
+      - name: Set up contracted Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
-          python-version: '3.12.13'
-      - name: Install pre-fix discovery dependencies
-        run: python -m pip install --disable-pip-version-check numpy==2.5.3 pytest==9.1.1
-      - name: Compare collection before and after floor resolver reorder
+          python-version-file: '.python-version'
+      - name: Assert contracted interpreter
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="$(tr -d '[:space:]' < .python-version)"
+          actual="$(python -c 'import platform; print(platform.python_version())')"
+          if [ "$actual" != "$expected" ]; then
+            echo "PYTHON_VERSION_MISMATCH expected=$expected actual=$actual"
+            exit 1
+          fi
+          echo "PYTHON_CONTRACT_OK exact=$actual"
+      - name: Install contracted discovery dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-test.txt
+      - name: Verify collection before and after floor resolver reorder
         shell: bash
         run: |
           set -euo pipefail
@@ -51,22 +104,26 @@ jobs:
           POST=4cecf9ca59a5a04613ed97b30945a2d2f9753aea
           git worktree add --detach /tmp/pre "$PRE"
           git worktree add --detach /tmp/post "$POST"
+
           set +e
           (cd /tmp/pre && python -m pytest --collect-only -q tests) >/tmp/pre.log 2>&1
           pre_rc=$?
           (cd /tmp/post && python -m pytest --collect-only -q tests) >/tmp/post.log 2>&1
           post_rc=$?
           set -e
+
           pre_errors=$(grep -c '^ERROR collecting ' /tmp/pre.log || true)
           post_errors=$(grep -c '^ERROR collecting ' /tmp/post.log || true)
           printf 'PRE_COMMIT=%s RC=%s COLLECTION_ERRORS=%s\n' "$PRE" "$pre_rc" "$pre_errors"
           printf 'POST_COMMIT=%s RC=%s COLLECTION_ERRORS=%s\n' "$POST" "$post_rc" "$post_errors"
-          echo '--- PRE collection error headers ---'
-          grep '^ERROR collecting ' /tmp/pre.log || true
-          echo '--- POST collection error headers ---'
-          grep '^ERROR collecting ' /tmp/post.log || true
-          if [ "$pre_errors" -ne "$post_errors" ]; then
-            echo 'COLLECTION_ERROR_SET_CHANGED_BY_REORDER_COMMIT'
-          else
-            echo 'COLLECTION_ERROR_COUNT_UNCHANGED_BY_REORDER_COMMIT'
+
+          if [ "$pre_rc" -ne 0 ] || [ "$post_rc" -ne 0 ] || [ "$pre_errors" -ne 0 ] || [ "$post_errors" -ne 0 ]; then
+            echo 'CONTRACTED_ENV_COLLECTION_FAILED'
+            echo '--- PRE tail ---'
+            tail -80 /tmp/pre.log || true
+            echo '--- POST tail ---'
+            tail -80 /tmp/post.log || true
+            exit 1
           fi
+
+          echo 'RESOLVER_REORDER_IMPORT_REGRESSION_NOT_REPRODUCED_UNDER_CONTRACT'
