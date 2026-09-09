@@ -1,0 +1,42 @@
+name: workflow-script-ref-audit
+
+# Invariant: every repository-local script referenced by a workflow must exist.
+#
+# This job deliberately installs nothing. The guard is stdlib-only so that a
+# dependency failure can never be the reason a missing-reference defect goes
+# unreported.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: workflow-script-ref-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Audit workflow script references
+        run: |
+          python3 scripts/audit_workflow_script_refs.py \
+            --repo-root . \
+            --json artifacts/audit/workflow_script_refs.json
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: workflow-script-ref-audit
+          path: artifacts/audit/workflow_script_refs.json
+          if-no-files-found: ignore

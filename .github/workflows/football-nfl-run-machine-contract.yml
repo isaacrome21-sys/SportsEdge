@@ -1,0 +1,183 @@
+name: football-nfl-run-machine-contract
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'sportsedge/sports/nfl/auto_context_source.py'
+      - 'sportsedge/sports/nfl/special_teams_context.py'
+      - 'sportsedge/sports/nfl/run_machine.py'
+      - 'sportsedge/sports/nfl/readiness.py'
+      - 'sportsedge/sports/nfl/m2.py'
+      - 'sportsedge/sports/nfl/model_artifact.py'
+      - 'sportsedge/football_prop_run_machine.py'
+      - 'sportsedge/football_prop_surface.py'
+      - 'tests/test_nfl_auto_context_source.py'
+      - 'tests/test_nfl_special_teams_context.py'
+      - 'tests/test_nfl_run_machine.py'
+      - 'tests/test_nfl_readiness.py'
+      - 'tests/test_football_prop_surface.py'
+      - 'scripts/run_nfl_auto.py'
+      - 'scripts/run_football_auto_bundle.py'
+      - 'config/nfl_m2_freeze.json'
+      - 'config/nfl_prop_model_freeze.json'
+      - 'config/football_prop_engine_surface.json'
+      - 'config/run_it_surface.json'
+      - '.github/workflows/football-nfl-run-machine-contract.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'sportsedge/sports/nfl/auto_context_source.py'
+      - 'sportsedge/sports/nfl/special_teams_context.py'
+      - 'sportsedge/sports/nfl/run_machine.py'
+      - 'sportsedge/sports/nfl/readiness.py'
+      - 'sportsedge/sports/nfl/m2.py'
+      - 'sportsedge/sports/nfl/model_artifact.py'
+      - 'sportsedge/football_prop_run_machine.py'
+      - 'sportsedge/football_prop_surface.py'
+      - 'tests/test_nfl_auto_context_source.py'
+      - 'tests/test_nfl_special_teams_context.py'
+      - 'tests/test_nfl_run_machine.py'
+      - 'tests/test_nfl_readiness.py'
+      - 'tests/test_football_prop_surface.py'
+      - 'scripts/run_nfl_auto.py'
+      - 'scripts/run_football_auto_bundle.py'
+      - 'config/nfl_m2_freeze.json'
+      - 'config/nfl_prop_model_freeze.json'
+      - 'config/football_prop_engine_surface.json'
+      - 'config/run_it_surface.json'
+      - '.github/workflows/football-nfl-run-machine-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  context-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout audited revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Set up contracted Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: '.python-version'
+      - name: Install contracted test dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-test.txt
+      - name: Compile NFL context boundary
+        run: >-
+          python -m py_compile
+          sportsedge/sports/nfl/auto_context_source.py
+          sportsedge/sports/nfl/special_teams_context.py
+          tests/test_nfl_auto_context_source.py
+          tests/test_nfl_special_teams_context.py
+      - name: Run context PIT and provenance contracts
+        run: python -m unittest tests.test_nfl_auto_context_source tests.test_nfl_special_teams_context -v
+
+  run-machine-contract:
+    needs: context-contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout audited revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Set up contracted Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: '.python-version'
+      - name: Install contracted test dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-test.txt
+      - name: Compile NFL production boundary
+        run: >-
+          python -m py_compile
+          sportsedge/sports/nfl/run_machine.py
+          sportsedge/sports/nfl/readiness.py
+          sportsedge/sports/nfl/m2.py
+          sportsedge/sports/nfl/model_artifact.py
+          sportsedge/football_prop_surface.py
+          scripts/run_nfl_auto.py
+          scripts/run_football_auto_bundle.py
+          tests/test_nfl_run_machine.py
+          tests/test_nfl_readiness.py
+          tests/test_football_prop_surface.py
+      - name: Run NFL run-machine and OFFICIAL readiness contracts
+        run: >-
+          python -m unittest
+          tests.test_nfl_run_machine
+          tests.test_nfl_readiness
+          tests.test_football_prop_surface -v
+      - name: Assert RUN IT registry resolves executable NFL game-plus-prop bundle
+        run: |
+          python - <<'PY'
+          import importlib
+          import json
+          from pathlib import Path
+
+          config = json.loads(Path('config/run_it_surface.json').read_text())
+          nfl = config['sports']['NFL']
+          assert nfl['lane'] == 'PREGAME_MODEL_AND_PLAYER_PROPS'
+          assert nfl['automatic_completeness'] == 'EXECUTABLE_FAIL_CLOSED'
+          assert nfl['automatic_command'] == [
+              'python', 'scripts/run_football_auto_bundle.py', '--sport', 'NFL',
+              '--output', 'artifacts/run_it/nfl_card.json'
+          ]
+          assert Path(nfl['automatic_command'][1]).is_file()
+          module_name, attr = nfl['library_entrypoint'].split(':', 1)
+          assert hasattr(importlib.import_module(module_name), attr)
+          from sportsedge.football_prop_surface import require_executable_prop_surface
+          prop = require_executable_prop_surface('NFL')
+          assert prop['engine_state'] == 'IMPLEMENTED_FAIL_CLOSED'
+          assert prop['promotion_state'] == 'AUTOMATIC_TRUTH_GATE_GATED'
+          assert prop['current_state'] == 'EVIDENCE_PENDING'
+          PY
+      - name: Assert checked-in NFL game and prop artifact claims remain truthful
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for path in ('config/nfl_m2_freeze.json', 'config/nfl_prop_model_freeze.json'):
+              freeze = json.loads(Path(path).read_text())
+              assert freeze['schema_version'] == 1
+              assert freeze['status'] == 'UNFROZEN'
+              assert freeze['hash_algorithm'] == 'CANONICAL_JSON_SHA256_V1'
+              assert freeze['artifact_sha256'] is None
+              assert not Path(freeze['artifact_path']).exists()
+          print('NFL_CHECKED_IN_FREEZE_STATES_OK game=UNFROZEN prop=UNFROZEN')
+          PY
+      - name: Assert missing frozen game artifact fails closed
+        shell: bash
+        run: |
+          set +e
+          python scripts/run_nfl_auto.py \
+            --model-artifact /tmp/definitely-missing-nfl-model.json \
+            --output /tmp/nfl-card.json
+          rc=$?
+          set -e
+          test "$rc" -eq 2
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          payload = json.loads(Path('/tmp/nfl-card.json').read_text())
+          assert payload['status'] == 'BLOCKED'
+          assert payload['blocker'] == 'NFL_AUTO_FROZEN_MODEL_ARTIFACT_REQUIRED'
+          assert payload['governance']['fail_closed'] is True
+          PY
+      - name: Assert unfrozen game binding blocks even when bytes exist
+        shell: bash
+        run: |
+          printf '{}\n' > /tmp/nfl-model-present.json
+          set +e
+          python scripts/run_nfl_auto.py \
+            --model-artifact /tmp/nfl-model-present.json \
+            --output /tmp/nfl-unfrozen-card.json
+          rc=$?
+          set -e
+          test "$rc" -eq 2
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          payload = json.loads(Path('/tmp/nfl-unfrozen-card.json').read_text())
+          assert payload['status'] == 'BLOCKED'
+          assert payload['blocker'] == 'NFL_AUTO_FROZEN_MODEL_BINDING_REQUIRED'
+          assert payload['governance']['fail_closed'] is True
+          PY

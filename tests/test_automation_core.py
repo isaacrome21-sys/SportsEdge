@@ -11,6 +11,21 @@ from sportsedge.truth_gate import decide_bet, TruthGateError
 from sportsedge.orchestrator import run_candidate
 
 
+DEVIG_POLICY = {
+    "policy_id": "EDGE_FLOOR_DEVIG_V1",
+    "status": "FROZEN_PRE_DERIVATION",
+    "longshot_trigger_american_odds": 400,
+    "longshot_trigger_rule": "EITHER_SIDE_AT_OR_ABOVE_POSITIVE_400",
+    "sensitivity_methods": ["MULTIPLICATIVE_V1", "POWER_V1", "SHIN_V1"],
+    "sensitivity_limit_absolute_probability_points": 0.01,
+    "stable_candidate_estimator": "MULTIPLICATIVE_V1",
+    "longshot_candidate_estimator": "POWER_V1",
+    "haircut_probability_points": 0.0,
+    "aggregation_rule": "ESTIMATOR_ONLY_NO_MINIMUM_ACROSS_METHODS",
+    "sensitivity_failure": "BLOCK",
+}
+
+
 class AutomationCoreTests(unittest.TestCase):
     def setUp(self):
         self.now = datetime(2026, 8, 10, 20, 0, tzinfo=timezone.utc)
@@ -21,7 +36,9 @@ class AutomationCoreTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.floor_path = str(Path(self.tmp.name) / "floors.json")
         Path(self.floor_path).write_text(json.dumps({
-            "truth_gate": {"production": {"fail_closed": True,"allow_cli_floor_override": False,"require_frozen_floor_for_eligible_market": True},
+            "truth_gate": {"schema_version": 2,
+            "production": {"fail_closed": True,"allow_cli_floor_override": False,"require_frozen_floor_for_eligible_market": True},
+            "devig_policy": DEVIG_POLICY,
             "edge_floors": {"HITS": {"status": "FROZEN","value_probability_points": 0.01,"method_version": "test_fixture_v1",
             "evidence": {"evidence_sha256": "e" * 64,"derivation_code_sha256": "d" * 64,"oos_cutoff_utc": "2026-08-01T00:00:00Z"},
             "frozen": {"frozen_by_commit": "a" * 40}}}}
@@ -71,6 +88,46 @@ class AutomationCoreTests(unittest.TestCase):
         stale=dict(self.quote,retrieved_at=self.now-timedelta(seconds=301))
         result2=run_candidate(model_input=mi,quote=stale,paired_quote=self.paired_quote,deployment=self.deploy,engine_fn=engine,ingestion_now=self.now,finalization_now=self.now,edge_floor_config_path=self.floor_path)
         self.assertEqual(result2.bet_status,"BLOCKED")
+
+    def test_floor_policy_precedes_engine_and_legacy_in_production(self):
+        cfg = json.loads(Path(self.floor_path).read_text())
+        cfg["truth_gate"]["production"]["require_frozen_floor_for_eligible_market"] = False
+        Path(self.floor_path).write_text(json.dumps(cfg))
+        calls = []
+        def engine(_):
+            calls.append(True)
+            return dict(self.key, runtime_path="LEGACY_COMPAT")
+        result = run_candidate(model_input=dict(self.key, build_hash="a"*64),
+            quote=self.quote, paired_quote=self.paired_quote, deployment=self.deploy,
+            engine_fn=engine, ingestion_now=self.now, finalization_now=self.now,
+            edge_floor_config_path=self.floor_path)
+        self.assertEqual(result.reason, "EdgeFloorError: FROZEN_FLOOR_POLICY_REQUIRED")
+        self.assertEqual(calls, [])
+
+    def test_eligible_market_without_floor_hits_specific_production_blocker(self):
+        cfg = json.loads(Path(self.floor_path).read_text())
+        cfg["truth_gate"]["edge_floors"] = {}
+        Path(self.floor_path).write_text(json.dumps(cfg))
+        calls = []
+        def engine(_):
+            calls.append(True)
+            return dict(self.key, model_p=.60)
+        result = run_candidate(
+            model_input=dict(self.key, build_hash="a"*64),
+            quote=self.quote,
+            paired_quote=self.paired_quote,
+            deployment=self.deploy,
+            engine_fn=engine,
+            ingestion_now=self.now,
+            finalization_now=self.now,
+            edge_floor_config_path=self.floor_path,
+        )
+        self.assertEqual(result.bet_status, "BLOCKED")
+        self.assertEqual(
+            result.reason,
+            "EdgeFloorError: ELIGIBLE_MARKET_MISSING_OR_UNFROZEN_EDGE_FLOOR:HITS",
+        )
+        self.assertEqual(calls, [])
 
     def test_missing_floor_fails_closed(self):
         missing=str(Path(self.tmp.name)/"missing.json")

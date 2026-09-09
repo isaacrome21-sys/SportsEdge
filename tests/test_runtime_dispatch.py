@@ -25,7 +25,9 @@ def payload(q=None,mi=None):
     return {"ingestion_now":"2026-08-10T20:01:00Z","finalization_now":"2026-08-10T20:01:10Z","kelly_multiplier":0.25,"candidates":[{"model_input":mi or model_input(),"quote":candidate_quote,"paired_quote":pair_quote}]}
 
 def registry(path:Path,*,eligible:bool,stage:str): path.write_text(json.dumps({"schema_version":1,"markets":{"HITS":{"eligible":eligible,"stage":stage,"reason":"test"}}}),encoding="utf-8")
-def floors(path:Path): path.write_text(json.dumps({"truth_gate":{"production":{"fail_closed":True,"allow_cli_floor_override":False,"require_frozen_floor_for_eligible_market":True},"edge_floors":{"HITS":{"status":"FROZEN","value_probability_points":0.01,"method_version":"test_fixture_v1","evidence":{"evidence_sha256":"e"*64,"derivation_code_sha256":"d"*64,"oos_cutoff_utc":"2026-08-01T00:00:00Z"},"frozen":{"frozen_by_commit":"a"*40}}}}}),encoding="utf-8")
+def floors(path:Path):
+    devig={"policy_id":"EDGE_FLOOR_DEVIG_V1","status":"FROZEN_PRE_DERIVATION","longshot_trigger_american_odds":400,"longshot_trigger_rule":"EITHER_SIDE_AT_OR_ABOVE_POSITIVE_400","sensitivity_methods":["MULTIPLICATIVE_V1","POWER_V1","SHIN_V1"],"sensitivity_limit_absolute_probability_points":0.01,"stable_candidate_estimator":"MULTIPLICATIVE_V1","longshot_candidate_estimator":"POWER_V1","haircut_probability_points":0.0,"aggregation_rule":"ESTIMATOR_ONLY_NO_MINIMUM_ACROSS_METHODS","sensitivity_failure":"BLOCK"}
+    path.write_text(json.dumps({"truth_gate":{"schema_version":2,"production":{"fail_closed":True,"allow_cli_floor_override":False,"require_frozen_floor_for_eligible_market":True},"devig_policy":devig,"edge_floors":{"HITS":{"status":"FROZEN","value_probability_points":0.01,"method_version":"test_fixture_v1","evidence":{"evidence_sha256":"e"*64,"derivation_code_sha256":"d"*64,"oos_cutoff_utc":"2026-08-01T00:00:00Z"},"frozen":{"frozen_by_commit":"a"*40}}}}}),encoding="utf-8")
 
 class RuntimeDispatchTests(unittest.TestCase):
     def test_hits_adapter_is_deterministic_and_common_schema(self):

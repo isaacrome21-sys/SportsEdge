@@ -78,7 +78,7 @@ def main() -> int:
     broken = any(
         row.get("status") == "BROKEN" for row in payload.get("results", [])
     )
-    return 2 if broken else 0
+    return 2 if broken or payload.get("overall_status") == "BLOCKED" else 0
 
 
 if __name__ == "__main__":

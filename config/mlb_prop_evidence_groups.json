@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "groups": {
+    "HITTER_PA": {"status": "MISSING"},
+    "HITTER_EVENT_TYPE": {"status": "MISSING"},
+    "HITTER_RUN_SEQUENCE": {"status": "MISSING"},
+    "FIRST_HR_ORDERING": {"status": "MISSING"},
+    "PITCHER_WORKLOAD": {"status": "MISSING"},
+    "PITCHER_EVENT_ALLOWED": {"status": "MISSING"}
+  }
+}

@@ -1,115 +1,23 @@
 name: v5-full-slate-production
 
+# QUARANTINED: the historical production recipe referenced three scripts that are
+# not present in the repository. Keep manual dispatch for audit visibility, but do
+# not schedule or execute a partial/stubbed production lane.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/v5-full-slate-production.yml'
-  schedule:
-    - cron: '*/15 * * * *'
 
 permissions:
   contents: read
-  actions: read
-
-concurrency:
-  group: v5-full-slate-production
-  cancel-in-progress: true
 
 jobs:
-  full-slate:
+  quarantined:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
-    env:
-      PYTHONPATH: ${{ github.workspace }}
-      SPORTSEDGE_STATCAST_V5_OUT: artifacts/statcast-v5-game
-      SPORTSEDGE_V5_LIVE_SIMS: '250000'
-      SPORTSEDGE_EXPECTED_V5_GAME_SHA256: d467b1221898fdb84562ea2b72a06287bfae3e58603e3b15a28fba40c9cc668e
-      SPORTSEDGE_EXPECTED_V5_TRANSFORMER_SHA256: bf61487279ac9a506318e9dfa078a866450dd4e363b1d06356e58852954133b2
-      SPORTSEDGE_PROJECTED_LINEUPS_URL: ${{ secrets.SPORTSEDGE_PROJECTED_LINEUPS_URL }}
-      SPORTSEDGE_PROVIDER_TOKEN: ${{ secrets.SPORTSEDGE_PROVIDER_TOKEN }}
+    timeout-minutes: 5
     steps:
-      - name: Checkout vetted V5 runtime with risk guard
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          ref: game-risk-guard-20260813
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
-        with:
-          python-version: '3.12'
-      - name: Install V5 runtime
-        run: python -m pip install --disable-pip-version-check numpy==2.5.2 pandas==3.0.5 scikit-learn==1.9.0 joblib==1.5.3
-      - name: Resolve deployed promotion run
-        id: deployment
+      - name: Fail closed with quarantine status
+        shell: bash
         run: |
-          python - <<'PY' >> "$GITHUB_OUTPUT"
-          import json
-          d=json.load(open('config/statcast_v5_deployments.json'))
-          for market in ('MONEYLINE','RUN_LINE','TOTALS'):
-              row=d['markets'][market]
-              assert row['eligible'] is True and row['stage']=='LIVE_ATTESTED', 'GAME_MARKET_NOT_LIVE_ATTESTED:'+market
-          run=d.get('promotion_run_id')
-          assert isinstance(run,int) and run>0, 'PROMOTION_RUN_ID_MISSING'
-          print('run_id='+str(run))
-          PY
-      - name: Download exact promotion evidence
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RUN_ID: ${{ steps.deployment.outputs.run_id }}
-        run: |
-          set -euo pipefail
-          mkdir -p artifacts/statcast-v5-game artifacts/promotion
-          name=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts" --jq '.artifacts[] | select(.name | startswith("statcast-v5-game-evidence-")) | .name' | head -1)
-          test -n "$name"
-          gh run download "$RUN_ID" -n "$name" -D artifacts/promotion
-          cp artifacts/promotion/statcast-v5-game/* artifacts/statcast-v5-game/
-          echo "$SPORTSEDGE_EXPECTED_V5_GAME_SHA256  artifacts/statcast-v5-game/sportsedge_game_score_v5_statcast.joblib" | sha256sum -c -
-          echo "$SPORTSEDGE_EXPECTED_V5_TRANSFORMER_SHA256  artifacts/statcast-v5-game/sportsedge_contact_transformer_v1.joblib" | sha256sum -c -
-      - name: Restore prior-only Statcast and game-history caches
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-        with:
-          path: |
-            .cache/sportsedge/statcast-v5-live
-            .cache/sportsedge/mlb-history/game-v5
-          key: v5-production-live-${{ runner.os }}-${{ github.run_id }}
-          restore-keys: |
-            v5-production-live-${{ runner.os }}-
-      - name: Restore immutable daily pregame archive
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-        with:
-          path: .cache/sportsedge/v5-pregame
-          key: v5-pregame-archive-${{ runner.os }}-${{ github.run_id }}
-          restore-keys: |
-            v5-pregame-archive-${{ runner.os }}-
-      - name: Run fresh V5 slate inference and 250k Monte Carlo
-        run: python scripts/attest_live_statcast_v5_game.py
-      - name: Apply Truth Gate, risk guard, and eight-market accounting
-        run: python scripts/finalize_statcast_v5_game_card.py
-      - name: Freeze last valid pregame evidence for every scored game
-        run: python scripts/update_v5_pregame_archive.py
-      - name: Verify whole-slate accounting and risk guard are explicit
-        run: |
-          python - <<'PY'
-          import json
-          card=json.load(open('artifacts/live_statcast_v5_full_model_card.json'))
-          status=card['required_market_status']
-          assert status['complete_accounting'] is True
-          assert len(status['markets'])==8
-          risk=card.get('risk_gate') or {}
-          assert risk.get('version')=='GAME_RISK_GUARD_V1_20260813'
-          assert risk.get('model_p_modified') is False
-          archive=json.load(open('artifacts/v5_pregame_archive.json'))
-          assert archive['policy']=='pregame_only_updates_started_games_immutable'
-          print({'current_candidates':len(card.get('game_candidates') or []),'archived_games':len(archive.get('games') or {}),'risk_gate':risk['version']})
-          PY
-      - name: Upload current and full-day pregame cards
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: v5-full-slate-${{ github.run_id }}
-          path: |
-            artifacts/live_statcast_v5_game_attestation.json
-            artifacts/live_statcast_v5_full_model_card.json
-            artifacts/v5_pregame_archive.json
-          if-no-files-found: warn
-          retention-days: 14
+          echo 'SPORTSEDGE_WORKFLOW_QUARANTINED=v5-full-slate-production'
+          echo 'BLOCKER=MISSING_PRODUCTION_RUNTIME_SCRIPTS'
+          echo 'Historical missing paths: attest_live_statcast_v5_game.py, finalize_statcast_v5_game_card.py, update_v5_pregame_archive.py'
+          exit 1

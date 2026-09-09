@@ -43,15 +43,15 @@ class Stage1ProvenanceLedgerTests(unittest.TestCase):
         self.assertIsNone(unified.seed_policy)
 
     @patch("sportsedge.orchestrator.decide_bet")
-    @patch("sportsedge.orchestrator.multiplicative_devig")
+    @patch("sportsedge.orchestrator.devig_with_policy")
     @patch("sportsedge.orchestrator.require_production_edge_floor")
     @patch("sportsedge.orchestrator.bind_candidate")
     @patch("sportsedge.orchestrator.double_ttl_gate")
     def test_run_candidate_captures_engine_provenance(
-        self, _ttl, _bind, floor, devig, decide,
+        self, _ttl, _bind, floor, priced, decide,
     ):
         floor.return_value = SimpleNamespace(value_probability_points=0.0)
-        devig.return_value = SimpleNamespace(candidate_fair_probability=0.5)
+        priced.return_value = SimpleNamespace(fair_probability_for_decision=0.5)
         decide.return_value = SimpleNamespace(bet_status="PASS", push_probability=0.0)
         provenance = {
             "model_input_hash": "a" * 64,
@@ -90,7 +90,8 @@ class Stage1ProvenanceLedgerTests(unittest.TestCase):
 
     @patch("sportsedge.orchestrator.bind_candidate")
     @patch("sportsedge.orchestrator.double_ttl_gate")
-    def test_malformed_engine_provenance_fails_closed(self, _ttl, _bind):
+    @patch("sportsedge.orchestrator.require_production_edge_floor")
+    def test_malformed_engine_provenance_fails_closed(self, _floor, _ttl, _bind):
         result = run_candidate(
             model_input={
                 "game_id": "1", "market": "MONEYLINE", "entity_id": "10",

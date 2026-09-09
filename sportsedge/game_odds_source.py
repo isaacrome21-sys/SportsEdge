@@ -1,8 +1,10 @@
 """Fail-closed MLB featured-game odds acquisition from The Odds API.
 
 Acquires h2h, spreads and totals and binds every provider event to exactly one
-MLB StatsAPI game before emitting SportsEdge quotes. Sportsbook prices are
-price/execution inputs only and never Model_P features.
+MLB StatsAPI game before emitting SportsEdge quotes. Provider identity is stamped
+while the raw provider event is still present and is kept separate from canonical
+MLB identity. Sportsbook prices are price/execution inputs only and never Model_P
+features.
 """
 from __future__ import annotations
 
@@ -11,6 +13,7 @@ from datetime import datetime
 from typing import Any, Callable, Iterable, Mapping, TYPE_CHECKING
 from urllib.request import urlopen
 
+from .mlb_quote_attestation import stamp_the_odds_api_quote
 from .mlb_source import GameSnapshot
 from .odds_api_source import (
     DEFAULT_BOOKMAKERS,
@@ -52,7 +55,18 @@ def _updated(market: Mapping[str, Any], bookmaker: Mapping[str, Any]) -> datetim
         raise OddsApiSourceError("ODDS_MARKET_TIMESTAMP_INVALID") from exc
 
 
-def parse_game_event_odds(payload: Mapping[str, Any], *, game: GameSnapshot, ttl_seconds: int = DEFAULT_TTL_SECONDS) -> GameOddsSnapshot:
+def parse_game_event_odds(
+    payload: Mapping[str, Any],
+    *,
+    game: GameSnapshot,
+    ttl_seconds: int = DEFAULT_TTL_SECONDS,
+) -> GameOddsSnapshot:
+    """Normalize one raw provider event/odds payload into attested quotes.
+
+    This function is itself the provider-normalization boundary. The top-level
+    provider event id/team strings are required and are stamped into every quote;
+    they are never reconstructed from ``game`` after this point.
+    """
     quotes: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
     if not isinstance(payload, Mapping):
@@ -83,21 +97,41 @@ def parse_game_event_odds(payload: Mapping[str, Any], *, game: GameSnapshot, ttl
                     if price is None:
                         raise OddsApiSourceError("ODDS_OUTCOME_PRICE_MISSING")
                     base = {
-                        "game_id": str(game.game_pk), "period": "FG", "book_key": book_key,
-                        "sportsbook": book_title, "retrieved_at": retrieved_at, "ttl_seconds": ttl_seconds,
-                        "american_odds": price, "raw_market_name": market_key,
-                        "away_team": str(game.away_name), "home_team": str(game.home_name),
+                        "game_id": str(game.game_pk),
+                        "period": "FG",
+                        "book_key": book_key,
+                        "sportsbook": book_title,
+                        "retrieved_at": retrieved_at,
+                        "ttl_seconds": ttl_seconds,
+                        "american_odds": price,
+                        "raw_market_name": market_key,
+                        "away_team": str(game.away_name),
+                        "home_team": str(game.home_name),
                         "is_alternate": False,
                     }
                     if market_key == "h2h":
                         side, team_id = _team_side(outcome.get("name"), game)
-                        quotes.append({**base, "market": "MONEYLINE", "entity_id": str(team_id), "side": side, "selection": str(outcome.get("name") or "").strip(), "line": 0.0})
+                        quote = {
+                            **base,
+                            "market": "MONEYLINE",
+                            "entity_id": str(team_id),
+                            "side": side,
+                            "selection": str(outcome.get("name") or "").strip(),
+                            "line": 0.0,
+                        }
                     elif market_key == "spreads":
                         side, team_id = _team_side(outcome.get("name"), game)
                         point = outcome.get("point")
                         if point is None:
                             raise OddsApiSourceError("ODDS_OUTCOME_LINE_MISSING")
-                        quotes.append({**base, "market": "RUN_LINE", "entity_id": str(team_id), "side": side, "selection": str(outcome.get("name") or "").strip(), "line": point})
+                        quote = {
+                            **base,
+                            "market": "RUN_LINE",
+                            "entity_id": str(team_id),
+                            "side": side,
+                            "selection": str(outcome.get("name") or "").strip(),
+                            "line": point,
+                        }
                     else:
                         side = str(outcome.get("name") or "").upper()
                         if side not in {"OVER", "UNDER"}:
@@ -105,13 +139,29 @@ def parse_game_event_odds(payload: Mapping[str, Any], *, game: GameSnapshot, ttl
                         point = outcome.get("point")
                         if point is None:
                             raise OddsApiSourceError("ODDS_OUTCOME_LINE_MISSING")
-                        quotes.append({**base, "market": "TOTALS", "entity_id": str(game.game_pk), "side": side, "selection": side.title(), "line": point})
+                        quote = {
+                            **base,
+                            "market": "TOTALS",
+                            "entity_id": str(game.game_pk),
+                            "side": side,
+                            "selection": side.title(),
+                            "line": point,
+                        }
+                    quotes.append(stamp_the_odds_api_quote(quote, provider_event=payload, game=game))
                 except Exception as exc:
                     failures.append({"reason": str(exc), "game_id": str(game.game_pk), "book_key": book_key, "raw_market_name": market_key})
     return GameOddsSnapshot(tuple(quotes), tuple(failures))
 
 
-def fetch_mlb_game_quotes(*, api_key: str, schedule: Iterable[GameSnapshot], opener: Callable = urlopen, bookmakers: Iterable[str] = DEFAULT_BOOKMAKERS, ttl_seconds: int = DEFAULT_TTL_SECONDS, event_snapshot: "OddsEventSnapshot | None" = None) -> GameOddsSnapshot:
+def fetch_mlb_game_quotes(
+    *,
+    api_key: str,
+    schedule: Iterable[GameSnapshot],
+    opener: Callable = urlopen,
+    bookmakers: Iterable[str] = DEFAULT_BOOKMAKERS,
+    ttl_seconds: int = DEFAULT_TTL_SECONDS,
+    event_snapshot: "OddsEventSnapshot | None" = None,
+) -> GameOddsSnapshot:
     games = list(schedule)
     requested_books = ",".join(str(x).strip() for x in bookmakers if str(x).strip())
     if not requested_books:
@@ -119,7 +169,14 @@ def fetch_mlb_game_quotes(*, api_key: str, schedule: Iterable[GameSnapshot], ope
     url = _event_url(
         "/sports/baseball_mlb/odds",
         api_key=api_key,
-        params={"regions": "us", "bookmakers": requested_books, "markets": ",".join(GAME_MARKETS), "oddsFormat": "american", "dateFormat": "iso", "includeSids": "true"},
+        params={
+            "regions": "us",
+            "bookmakers": requested_books,
+            "markets": ",".join(GAME_MARKETS),
+            "oddsFormat": "american",
+            "dateFormat": "iso",
+            "includeSids": "true",
+        },
     )
     try:
         payload = _get_json(url, opener=opener, label="game-markets")

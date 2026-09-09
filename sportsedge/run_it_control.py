@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 from typing import Any, Iterable, Mapping
 
 CONTROL_SCHEMA = "RUN_IT_CONTROL_V1"
@@ -28,6 +29,9 @@ class LaneResult:
     lane: str
     status: str
     automatic_completeness: str
+    execution_status: str = "NOT_RUN"
+    model_rows: int = 0
+    official_bets: int = 0
     exit_code: int | None = None
     blocker: str | None = None
     command: tuple[str, ...] = ()
@@ -107,6 +111,56 @@ def audit_surface(*, repo_root: str | Path | None = None, surface_path: str | Pa
     }
 
 
+def _output_path(command: tuple[str, ...], root: Path) -> Path | None:
+    if "--output" not in command:
+        return None
+    index = command.index("--output") + 1
+    if index >= len(command):
+        return None
+    path = Path(command[index])
+    return path if path.is_absolute() else root / path
+
+
+def _output_stamp(path: Path | None):
+    if path is None or not path.is_file():
+        return None
+    stat = path.stat()
+    return stat.st_ino, stat.st_mtime_ns, stat.st_ctime_ns, stat.st_size
+
+
+def _card_state(path: Path | None, previous_stamp) -> tuple[str, str | None, int, int]:
+    if path is None or not path.is_file():
+        return "BLOCKED", "RUN_OUTPUT_MISSING", 0, 0
+    if _output_stamp(path) == previous_stamp:
+        return "BLOCKED", "RUN_OUTPUT_NOT_REFRESHED", 0, 0
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        report = payload.get("report", payload)
+        rows = report.get("results")
+        if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+            raise ValueError("results required")
+    except (OSError, ValueError, AttributeError):
+        return "BLOCKED", "RUN_OUTPUT_INVALID", 0, 0
+    def has_model(row):
+        value = row.get("model_p")
+        return isinstance(value, (int, float)) and not isinstance(value, bool) and 0 <= value <= 1
+    models = sum(has_model(row) for row in rows)
+    official = sum(row.get("bet_status") == "OFFICIAL_BET" for row in rows)
+    if not rows:
+        return "BLOCKED", "RUN_RESULTS_EMPTY", models, official
+    if all(row.get("bet_status") == "BLOCKED" for row in rows):
+        return "BLOCKED", "ALL_MARKETS_BLOCKED", models, official
+    if payload.get("status") in {"BLOCKED", "FAILED", "ERROR"} or str(report.get("run_status", "")).startswith("BLOCKED"):
+        return "BLOCKED", "RUN_REPORTED_BLOCKED", models, official
+    if any(row.get("bet_status") not in {"PASS", "OFFICIAL_BET", "BLOCKED"} for row in rows):
+        return "BLOCKED", "RUN_DECISION_STATUS_INVALID", models, official
+    if models == 0 or any(row.get("bet_status") != "BLOCKED" and not has_model(row) for row in rows):
+        return "BLOCKED", "RUN_MODEL_PROBABILITIES_MISSING", models, official
+    if any(row.get("bet_status") == "BLOCKED" for row in rows) or report.get("run_status") == "DEGRADED":
+        return "PARTIAL", "SOME_MARKETS_BLOCKED_OR_DEGRADED", models, official
+    return "SUCCESS", None, models, official
+
+
 def _tail(value: str, limit: int = 5000) -> str:
     text = str(value or "")
     return text[-limit:]
@@ -157,9 +211,12 @@ def execute_surface(
                 command=command,
             ))
             continue
+        output_path = _output_path(command, root)
+        previous_stamp = _output_stamp(output_path)
+        runtime_command = (sys.executable, *command[1:])
         try:
             proc = subprocess.run(
-                command,
+                runtime_command,
                 cwd=root,
                 env=run_env,
                 text=True,
@@ -167,14 +224,20 @@ def execute_surface(
                 timeout=int(timeout_seconds),
                 check=False,
             )
-            status = "SUCCESS" if proc.returncode == 0 else "BLOCKED_OR_FAILED"
+            status, blocker, model_rows, official_bets = (
+                _card_state(output_path, previous_stamp) if proc.returncode == 0
+                else ("BLOCKED_OR_FAILED", "ENTRYPOINT_NONZERO", 0, 0)
+            )
             results.append(LaneResult(
                 sport=sport,
                 lane=lane,
                 status=status,
                 automatic_completeness=completeness,
+                execution_status="COMPLETED" if proc.returncode == 0 else "FAILED",
+                model_rows=model_rows,
+                official_bets=official_bets,
                 exit_code=int(proc.returncode),
-                blocker=None if proc.returncode == 0 else "ENTRYPOINT_NONZERO",
+                blocker=blocker,
                 command=command,
                 stdout_tail=_tail(proc.stdout),
                 stderr_tail=_tail(proc.stderr),
@@ -194,7 +257,7 @@ def execute_surface(
     executable = [row for row in results if row.command]
     failed = [row for row in executable if row.status != "SUCCESS"]
     blocked = [row for row in results if not row.command]
-    overall = "SUCCESS" if not failed and not blocked else "PARTIAL" if any(row.status == "SUCCESS" for row in results) else "BLOCKED"
+    overall = "SUCCESS" if not failed and not blocked else "PARTIAL" if any(row.status in {"SUCCESS", "PARTIAL"} for row in results) else "BLOCKED"
     return {
         "schema_version": CONTROL_SCHEMA,
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),

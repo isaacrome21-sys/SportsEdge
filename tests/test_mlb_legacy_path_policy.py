@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 import unittest
+from unittest.mock import patch
 
 from sportsedge.engine_registry import EngineDispatchError, hitter_joint_adapter
 from sportsedge.orchestrator import run_candidate
@@ -33,7 +34,8 @@ class MLBLegacyPathPolicyTests(unittest.TestCase):
         self.assertEqual(output["market"],"HITS")
         self.assertEqual(output["engine_version"],"hits_engine_v1.3")
 
-    def test_eligible_market_cannot_promote_through_legacy_payload_shape(self):
+    @patch("sportsedge.orchestrator.require_production_edge_floor")
+    def test_eligible_market_cannot_promote_through_legacy_payload_shape(self, _floor):
         result=run_candidate(
             model_input=legacy_hits_input(),quote=quote(),paired_quote=None,
             deployment={"market":"HITS","eligible":True,"stage":"DEPLOYED"},

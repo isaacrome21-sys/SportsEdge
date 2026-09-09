@@ -1,0 +1,158 @@
+name: football-nfl-prop-artifact-freeze
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'sportsedge/sports/nfl/prop_artifact_training.py'
+      - 'sportsedge/football_prop_run_machine.py'
+      - 'sportsedge/football_prop_extended_run_machine.py'
+      - 'scripts/build_nfl_prop_model_artifact.py'
+      - '.github/workflows/football-nfl-prop-artifact-freeze.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'sportsedge/sports/nfl/prop_artifact_training.py'
+      - 'sportsedge/football_prop_run_machine.py'
+      - 'sportsedge/football_prop_extended_run_machine.py'
+      - 'scripts/build_nfl_prop_model_artifact.py'
+      - '.github/workflows/football-nfl-prop-artifact-freeze.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  freeze:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      EVIDENCE_GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact audited code SHA
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EVIDENCE_GIT_SHA }}
+      - name: Set up contracted Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: '.python-version'
+      - name: Install contracted dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-test.txt
+      - name: Download frozen public nflverse PBP inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/football/nfl_prop_sources
+          fetch() {
+            curl --fail --location --silent --show-error \
+              --retry 5 --retry-delay 2 --retry-all-errors \
+              --connect-timeout 30 "$1" -o "$2"
+          }
+          for season in 2022 2023 2024 2025; do
+            fetch \
+              "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_${season}.csv.gz" \
+              "artifacts/football/nfl_prop_sources/play_by_play_${season}.csv.gz"
+          done
+      - name: Build exact-SHA artifact attempt A
+        env:
+          TZ: UTC
+          PYTHONHASHSEED: '1'
+        run: >-
+          python scripts/build_nfl_prop_model_artifact.py
+          --pbp artifacts/football/nfl_prop_sources/play_by_play_2022.csv.gz
+          artifacts/football/nfl_prop_sources/play_by_play_2023.csv.gz
+          artifacts/football/nfl_prop_sources/play_by_play_2024.csv.gz
+          artifacts/football/nfl_prop_sources/play_by_play_2025.csv.gz
+          --git-sha "$EVIDENCE_GIT_SHA"
+          --artifact-version NFL_PROP_SHARED_PATH_2022_2025_V1
+          --seasons 2022 2023 2024 2025
+          --output artifacts/football/nfl_prop_freeze_a/model.json
+          --artifact-path artifacts/football/nfl_offensive_prop_ab_model.json
+          --diagnostics-output artifacts/football/nfl_prop_freeze_a/fit_diagnostics.json
+          --freeze-output artifacts/football/nfl_prop_freeze_a/freeze.json
+      - name: Build exact-SHA artifact replay B under shifted timezone
+        env:
+          TZ: Pacific/Kiritimati
+          PYTHONHASHSEED: '8675309'
+        run: >-
+          python scripts/build_nfl_prop_model_artifact.py
+          --pbp artifacts/football/nfl_prop_sources/play_by_play_2022.csv.gz
+          artifacts/football/nfl_prop_sources/play_by_play_2023.csv.gz
+          artifacts/football/nfl_prop_sources/play_by_play_2024.csv.gz
+          artifacts/football/nfl_prop_sources/play_by_play_2025.csv.gz
+          --git-sha "$EVIDENCE_GIT_SHA"
+          --artifact-version NFL_PROP_SHARED_PATH_2022_2025_V1
+          --seasons 2022 2023 2024 2025
+          --output artifacts/football/nfl_prop_freeze_b/model.json
+          --artifact-path artifacts/football/nfl_offensive_prop_ab_model.json
+          --diagnostics-output artifacts/football/nfl_prop_freeze_b/fit_diagnostics.json
+          --freeze-output artifacts/football/nfl_prop_freeze_b/freeze.json
+      - name: Enforce byte-identical deterministic freeze
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmp artifacts/football/nfl_prop_freeze_a/model.json artifacts/football/nfl_prop_freeze_b/model.json
+          cmp artifacts/football/nfl_prop_freeze_a/fit_diagnostics.json artifacts/football/nfl_prop_freeze_b/fit_diagnostics.json
+          cmp artifacts/football/nfl_prop_freeze_a/freeze.json artifacts/football/nfl_prop_freeze_b/freeze.json
+      - name: Validate artifact through production SHA binding
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          from sportsedge.football_prop_run_machine import _load_artifact, canonical_hash
+
+          model = json.loads(Path('artifacts/football/nfl_prop_freeze_a/model.json').read_text())
+          freeze = json.loads(Path('artifacts/football/nfl_prop_freeze_a/freeze.json').read_text())
+          diagnostics = json.loads(Path('artifacts/football/nfl_prop_freeze_a/fit_diagnostics.json').read_text())
+          expected = canonical_hash(model)
+          assert diagnostics['status'] == 'PASS'
+          assert diagnostics['team_count'] == 32
+          assert freeze['status'] == 'FROZEN'
+          assert freeze['promotion_authority'] is False
+          assert freeze['artifact_sha256'] == expected
+          assert freeze['artifact_path'] == 'artifacts/football/nfl_offensive_prop_ab_model.json'
+          profiles, actual, source_sha = _load_artifact(
+              model,
+              sport='NFL',
+              expected_artifact_sha256=expected,
+              runtime_code_git_sha=os.environ['EVIDENCE_GIT_SHA'],
+          )
+          assert actual == expected
+          assert source_sha == model['source_manifest_sha256']
+          assert len(profiles) == 32
+          assert set(model['team_special_teams_rates']) == set(profiles)
+          # Exercise the actual runtime path and freeze registry contract, then
+          # prove altered fitted parameters still fail the production hash gate.
+          from scripts.run_football_props_auto import _freeze
+          from sportsedge.football_prop_run_machine import FootballPropRunError
+          runtime_path = Path(freeze['artifact_path'])
+          runtime_path.parent.mkdir(parents=True, exist_ok=True)
+          runtime_path.write_bytes(Path('artifacts/football/nfl_prop_freeze_a/model.json').read_bytes())
+          loaded, bound_sha = _freeze(Path('artifacts/football/nfl_prop_freeze_a/freeze.json'), runtime_path, 'NFL')
+          assert canonical_hash(loaded) == bound_sha == expected
+          first_team = sorted(loaded['team_drive_profiles'])[0]
+          loaded['team_drive_profiles'][first_team]['pass_rate'] += 0.001
+          try:
+              _load_artifact(loaded, sport='NFL', expected_artifact_sha256=bound_sha,
+                             runtime_code_git_sha=os.environ['EVIDENCE_GIT_SHA'])
+          except FootballPropRunError as exc:
+              assert 'SHA256_MISMATCH' in str(exc), str(exc)
+          else:
+              raise AssertionError('TAMPERED_ARTIFACT_ACCEPTED')
+          print(
+              'NFL_PROP_REAL_FREEZE_OK '
+              f"artifact_sha256={expected} "
+              f"source_manifest_sha256={source_sha} "
+              f"teams={len(profiles)}"
+          )
+          PY
+      - name: Upload immutable exact-SHA freeze bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nfl-prop-frozen-bundle-${{ env.EVIDENCE_GIT_SHA }}
+          path: |
+            artifacts/football/nfl_prop_freeze_a/model.json
+            artifacts/football/nfl_prop_freeze_a/fit_diagnostics.json
+            artifacts/football/nfl_prop_freeze_a/freeze.json
+          if-no-files-found: error
+          retention-days: 90

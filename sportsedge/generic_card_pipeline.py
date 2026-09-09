@@ -11,6 +11,7 @@ from .f5_distribution import F5_MARKETS
 from .generic_market_engine import BINARY_MARKETS, GAME_MARKETS
 from .hitter_joint_engine import HITTER_MARKETS
 from .live_slate import LiveGame
+from .mlb_quote_attestation import SOURCE_PROVIDER, validate_acquisition_quote
 from .orchestrator import run_candidate
 from .pitcher_joint_engine import PITCHER_MARKETS
 from .quote_bridge import validate_canonical_quote
@@ -93,10 +94,16 @@ def _model_input(*,game,quote,feature):
     source_hash=feature.get("feature_source_hash",feature.get("source_subset_hash"))
     if source_hash is not None:out["feature_source_hash"]=source_hash
     return out
-def _validated_quotes(quotes):
+def _require_acquisition_binding(quote,game):
+    if quote.get("source_provider")==SOURCE_PROVIDER:
+        validate_acquisition_quote(quote,game=game)
+def _validated_quotes(quotes,games_by_id):
     out=[]
     for raw in quotes:
-        try:out.append(validate_canonical_quote(raw))
+        try:
+            quote=validate_canonical_quote(raw);game=games_by_id.get(str(quote["game_id"]))
+            if game is None:continue
+            _require_acquisition_binding(quote,game);out.append(quote)
         except Exception:pass
     return out
 def _paired_quote(candidate,quotes):
@@ -116,13 +123,15 @@ def _shadow(model_p,push_p,quote,opposite):
         loss=max(0,1-p-push);cw=p/(1-push);edge=cw-fair;ev=p*(dec-1)-loss;return ("SHADOW_BET" if edge>0 and ev>0 else "SHADOW_PASS",fair,edge,ev)
     except Exception:return None,None,None,None
 def run_generic_card(*,games,feature_rows,quotes,ingestion_now,finalization_now,registry_path="config/deployments.json",edge_floor_config_path="config/truth_gate_floors.json",kelly_multiplier=0.25):
-    games_by_id=_game_index(games);features=_feature_index(feature_rows);deployments=load_registry(registry_path)["markets"];engines=engine_registry();valid_quotes=_validated_quotes(quotes);results=[]
+    games_by_id=_game_index(games);features=_feature_index(feature_rows);deployments=load_registry(registry_path)["markets"];engines=engine_registry();valid_quotes=_validated_quotes(quotes,games_by_id);results=[]
     for raw in quotes:
         try:
             quote=validate_canonical_quote(raw);market=str(quote["market"])
             if market not in GENERIC_MARKETS:raise ValueError(f"unsupported canonical market: {market}")
             game=games_by_id.get(str(quote["game_id"]));
             if game is None:raise ValueError("MLB_GAME_ID_NOT_FOUND")
+            # Source/hash binding is a pre-feature, pre-pair, pre-model gate.
+            _require_acquisition_binding(quote,game)
             feature=features.get((str(quote["game_id"]),str(quote["entity_id"]),market))
             if feature is None:raise ValueError("feature row missing")
             model_input=_model_input(game=game,quote=quote,feature=feature);engine=engines.get(market);deployment=deployments.get(market)

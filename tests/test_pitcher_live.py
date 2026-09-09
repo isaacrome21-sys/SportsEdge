@@ -18,7 +18,9 @@ def feature(pid=11,team=1): return {"game_pk":777,"player_id":pid,"team_id":team
 def quote(pid=11,side="OVER",odds=100,line=1.5): return {"game_id":"777","period":"FG","market":"PITCHER_BB","entity_id":str(pid),"line":line,"side":side,"book_key":"draftkings","is_alternate":False,"raw_market_name":"Pitcher Walks","american_odds":odds,"retrieved_at":NOW,"ttl_seconds":300}
 def pair(): return [quote(side="OVER",odds=100),quote(side="UNDER",odds=-120)]
 def deployed_registry(path): path.write_text(json.dumps({"schema_version":1,"markets":{"PITCHER_BB":{"eligible":True,"stage":"DEPLOYED","reason":"test"}}}))
-def floor_registry(path): path.write_text(json.dumps({"truth_gate":{"production":{"fail_closed":True,"allow_cli_floor_override":False,"require_frozen_floor_for_eligible_market":True},"edge_floors":{"PITCHER_BB":{"status":"FROZEN","value_probability_points":0.01,"method_version":"test_fixture_v1","evidence":{"evidence_sha256":"e"*64,"derivation_code_sha256":"d"*64,"oos_cutoff_utc":"2026-08-01T00:00:00Z"},"frozen":{"frozen_by_commit":"a"*40}}}}}))
+def floor_registry(path):
+    devig={"policy_id":"EDGE_FLOOR_DEVIG_V1","status":"FROZEN_PRE_DERIVATION","longshot_trigger_american_odds":400,"longshot_trigger_rule":"EITHER_SIDE_AT_OR_ABOVE_POSITIVE_400","sensitivity_methods":["MULTIPLICATIVE_V1","POWER_V1","SHIN_V1"],"sensitivity_limit_absolute_probability_points":0.01,"stable_candidate_estimator":"MULTIPLICATIVE_V1","longshot_candidate_estimator":"POWER_V1","haircut_probability_points":0.0,"aggregation_rule":"ESTIMATOR_ONLY_NO_MINIMUM_ACROSS_METHODS","sensitivity_failure":"BLOCK"}
+    path.write_text(json.dumps({"truth_gate":{"schema_version":2,"production":{"fail_closed":True,"allow_cli_floor_override":False,"require_frozen_floor_for_eligible_market":True},"devig_policy":devig,"edge_floors":{"PITCHER_BB":{"status":"FROZEN","value_probability_points":0.01,"method_version":"test_fixture_v1","evidence":{"evidence_sha256":"e"*64,"derivation_code_sha256":"d"*64,"oos_cutoff_utc":"2026-08-01T00:00:00Z"},"frozen":{"frozen_by_commit":"a"*40}}}}}))
 
 class PitcherLiveTests(unittest.TestCase):
     def test_probable_pitcher_identity_is_bound(self):

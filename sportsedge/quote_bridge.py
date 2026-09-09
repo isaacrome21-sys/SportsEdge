@@ -1,7 +1,9 @@
 """Normalize timestamped sportsbook offers into canonical SportsEdge quotes.
 
 Admission validates quote identity only. It never implies model promotion or betting
-eligibility. All canonical prop labels route through the shared joint engines.
+eligibility. Acquisition-origin identity/hash fields, when present, are preserved
+without inference so downstream binding can validate the exact provider-normalized
+offer rather than identity reconstructed by the model layer.
 """
 from __future__ import annotations
 
@@ -48,6 +50,20 @@ SIDE_BY_MARKET = {
 }
 
 LINE_OPTIONAL_MARKETS = {"MONEYLINE", "F5_MONEYLINE", "NRFI", "YRFI"} | BINARY_MARKETS
+
+ACQUISITION_TEXT_FIELDS = (
+    "source_provider",
+    "source_event_id",
+    "source_home_team_name",
+    "source_away_team_name",
+    "source_identity_version",
+    "canonical_game_id",
+    "canonical_home_team_id",
+    "canonical_away_team_id",
+    "quote_hash_algorithm",
+    "quote_hash_schema_version",
+    "acquisition_quote_sha256",
+)
 
 
 def _finite(name: str, value: Any) -> float:
@@ -126,9 +142,26 @@ def validate_canonical_quote(raw: Mapping[str, Any], *, default_ttl_seconds: int
         "is_alternate": is_alternate, "raw_market_name": raw_market_name,
         "american_odds": int(odds), "ttl_seconds": ttl,
     }
-    for key in ("sportsbook", "offer_id", "source_url", "selection"):
+    for key in ("sportsbook", "offer_id", "source_url", "selection", "source"):
         if raw.get(key) not in (None, ""):
             out[key] = str(raw[key])
+
+    # Preserve acquisition-origin fields exactly. Absence is not repaired here.
+    for key in ACQUISITION_TEXT_FIELDS:
+        if key in raw:
+            value = raw.get(key)
+            out[key] = None if value is None else str(value).strip()
+    if "canonical_game_number" in raw:
+        value = raw.get("canonical_game_number")
+        if value is None:
+            out["canonical_game_number"] = None
+        elif isinstance(value, bool):
+            raise QuoteBridgeError("canonical_game_number invalid")
+        else:
+            try:
+                out["canonical_game_number"] = int(value)
+            except (TypeError, ValueError) as exc:
+                raise QuoteBridgeError("canonical_game_number invalid") from exc
     return out
 
 
@@ -139,7 +172,8 @@ def normalize_offer(raw: Mapping[str, Any], *, default_ttl_seconds: int = 300) -
 def normalize_offer_snapshot(data: Any, *, default_ttl_seconds: int = 300) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     if not isinstance(data, list):
         raise QuoteBridgeError("offer snapshot must be a JSON list")
-    quotes: list[dict[str, Any]] = []; failures: list[dict[str, Any]] = []
+    quotes: list[dict[str, Any]] = []
+    failures: list[dict[str, Any]] = []
     seen: set[tuple[str, str, str, str, str, str, str, bool, int]] = set()
     for i, raw in enumerate(data):
         try:
@@ -147,7 +181,8 @@ def normalize_offer_snapshot(data: Any, *, default_ttl_seconds: int = 300) -> tu
             key = (q["game_id"], q["period"], q["market"], q["entity_id"], repr(q["line"]), q["side"], q["book_key"], q["is_alternate"], q["american_odds"])
             if key in seen:
                 raise QuoteBridgeError("duplicate sportsbook offer")
-            seen.add(key); quotes.append(q)
+            seen.add(key)
+            quotes.append(q)
         except Exception as exc:
             failures.append({"index": i, "reason": f"{type(exc).__name__}: {exc}"})
     return quotes, failures

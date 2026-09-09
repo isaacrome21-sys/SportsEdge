@@ -1,0 +1,74 @@
+name: mlb-provider-freeze-capture
+
+on:
+  workflow_dispatch:
+    inputs:
+      capture_id:
+        description: 'Immutable capture id, e.g. 2026-09-08-window-a'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CAPTURE_ID: ${{ inputs.capture_id }}
+      FREEZE_REPOSITORY: ${{ vars.MLB_FREEZE_REPOSITORY }}
+    steps:
+      - name: Require private fixture repository configuration
+        env:
+          FREEZE_PAT: ${{ secrets.MLB_FREEZE_PAT }}
+          PROVIDER_KEY: ${{ secrets.ODDS_API_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -n "${FREEZE_REPOSITORY:-}" ]] || { echo 'MLB_FREEZE_REPOSITORY_VAR_MISSING' >&2; exit 1; }
+          [[ -n "${FREEZE_PAT:-}" ]] || { echo 'MLB_FREEZE_PAT_SECRET_MISSING' >&2; exit 1; }
+          [[ -n "${PROVIDER_KEY:-}" ]] || { echo 'ODDS_API_KEY_SECRET_MISSING' >&2; exit 1; }
+
+      - name: Checkout public SportsEdge code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: sportsedge-public
+
+      - name: Checkout private paid-provider fixture repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ${{ vars.MLB_FREEZE_REPOSITORY }}
+          token: ${{ secrets.MLB_FREEZE_PAT }}
+          path: _private/mlb-freeze
+
+      - name: Capture exact provider response bytes into private checkout
+        working-directory: sportsedge-public
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+        run: >-
+          python scripts/capture_mlb_odds_api_freeze.py
+          --private-root ../_private/mlb-freeze
+          --capture-id "$CAPTURE_ID"
+          --manifest-out "artifacts/mlb/odds_api_freeze/${CAPTURE_ID}.manifest.json"
+
+      - name: Commit raw bytes only to private fixture repository
+        working-directory: _private/mlb-freeze
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -- "captures/${CAPTURE_ID}"
+          git diff --cached --quiet && { echo 'MLB_FREEZE_PRIVATE_CAPTURE_EMPTY' >&2; exit 1; }
+          git commit -m "Freeze MLB paid-provider raw bytes ${CAPTURE_ID}"
+          git push
+
+      - name: Upload public-safe hash manifest only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mlb-odds-api-public-manifest-${{ inputs.capture_id }}
+          path: sportsedge-public/artifacts/mlb/odds_api_freeze/${{ inputs.capture_id }}.manifest.json
+          if-no-files-found: warn
+          retention-days: 30

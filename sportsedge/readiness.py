@@ -7,6 +7,12 @@ from typing import Any
 
 from .deployments import load_registry
 from .engine_registry import engine_registry
+from .edge_floors import EdgeFloorError, require_frozen_edge_floor
+from .prop_evidence import (
+    MARKET_EVIDENCE_DEPENDENCIES,
+    assess_prop_evidence,
+    group_state_from_registry,
+)
 
 DEFAULT_REGISTRY = Path("config/deployments.json")
 DEFAULT_CATALOG = Path("config/mlb_market_catalog.json")
@@ -16,6 +22,7 @@ DEFAULT_FEATURES = Path("config/mlb_market_feature_requirements.json")
 DEFAULT_COLLECTORS = Path("config/mlb_collector_validation.json")
 DEFAULT_FEATURE_REALIZATION = Path("config/mlb_feature_realization.json")
 DEFAULT_BEHAVIORAL = Path("config/mlb_behavioral_disposition.json")
+DEFAULT_PROP_EVIDENCE = Path("config/mlb_prop_evidence_groups.json")
 REQUIRED_DYNAMIC_COLLECTORS = ("mlb-game-context-refresh", "statcast-daily-refresh")
 
 
@@ -55,16 +62,18 @@ def _catalog_markets(catalog: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 
 def _frozen_floor_markets(floors: dict[str, Any]) -> set[str]:
-    records = (((floors.get("truth_gate") or {}).get("edge_floors")) or {})
-    return {
-        str(market)
-        for market, meta in records.items()
-        if isinstance(meta, dict)
-        and str(meta.get("status", "")).upper() == "FROZEN"
-        and isinstance(meta.get("value"), (int, float))
-        and not isinstance(meta.get("value"), bool)
-        and float(meta["value"]) > 0.0
-    }
+    truth_gate = floors.get("truth_gate")
+    records = truth_gate.get("edge_floors") if isinstance(truth_gate, dict) else None
+    if not isinstance(records, dict):
+        return set()
+    resolved = set()
+    for market in records:
+        try:
+            require_frozen_edge_floor(market=market, config=floors)
+        except EdgeFloorError:
+            continue
+        resolved.add(market)
+    return resolved
 
 
 def _validation_state(validation: dict[str, Any], market: str) -> tuple[bool, list[str], dict[str, str]]:
@@ -156,6 +165,15 @@ def _collector_validation_state(collectors: dict[str, Any]) -> tuple[bool, list[
     return not missing, missing, statuses
 
 
+def _calibration_consistency(validation_status: dict[str, str]) -> bool | None:
+    status = str(validation_status.get("calibration", "MISSING")).upper()
+    if status == "PASS":
+        return True
+    if status in {"FAIL", "FAILED", "INCONSISTENT"}:
+        return False
+    return None
+
+
 def audit_readiness(
     registry_path: str | Path = DEFAULT_REGISTRY,
     catalog_path: str | Path = DEFAULT_CATALOG,
@@ -165,6 +183,7 @@ def audit_readiness(
     collectors_path: str | Path = DEFAULT_COLLECTORS,
     feature_realization_path: str | Path = DEFAULT_FEATURE_REALIZATION,
     behavioral_path: str | Path = DEFAULT_BEHAVIORAL,
+    prop_evidence_path: str | Path = DEFAULT_PROP_EVIDENCE,
 ) -> dict[str, Any]:
     registry = load_registry(registry_path)
     engines = engine_registry()
@@ -174,6 +193,7 @@ def audit_readiness(
     features = _load_json(features_path)
     realization = _load_optional_json(feature_realization_path)
     behavioral = _load_optional_json(behavioral_path)
+    prop_group_state = group_state_from_registry(_load_json(prop_evidence_path))
     collector_complete, collector_missing, collector_status = _collector_validation_state(_load_json(collectors_path))
 
     if Path(registry_path) == DEFAULT_REGISTRY:
@@ -196,6 +216,24 @@ def audit_readiness(
         feature_contract_declared, missing_feature_definitions = _feature_contract_state(features, market)
         feature_realization_complete, feature_realization_status, feature_realization_gaps = _feature_realization_state(realization, market)
         behavioral_complete, behavioral_status, behavioral_root_cause = _behavioral_state(behavioral, market)
+
+        if market in MARKET_EVIDENCE_DEPENDENCIES:
+            prop_evidence = assess_prop_evidence(
+                market=market,
+                group_state=prop_group_state,
+                calibration_consistent=_calibration_consistency(validation_status),
+            )
+            prop_evidence_ready = prop_evidence.ready_for_forward_capture
+            prop_evidence_required_groups = list(prop_evidence.required_groups)
+            prop_evidence_missing_groups = list(prop_evidence.missing_groups)
+            prop_evidence_blockers = list(prop_evidence.blockers)
+            prop_calibration_consistency = prop_evidence.calibration_consistency
+        else:
+            prop_evidence_ready = True
+            prop_evidence_required_groups = []
+            prop_evidence_missing_groups = []
+            prop_evidence_blockers = []
+            prop_calibration_consistency = "NOT_APPLICABLE"
 
         blockers: list[str] = []
         classes: list[str] = []
@@ -221,6 +259,9 @@ def audit_readiness(
         if not collector_complete:
             blockers.extend(f"COLLECTOR_{x.upper().replace('-', '_')}_NOT_VALIDATED" for x in collector_missing)
             classes.append("EVIDENCE")
+        if not prop_evidence_ready:
+            blockers.extend(prop_evidence_blockers)
+            classes.append("EVIDENCE")
         if not eligible:
             blockers.append("NOT_DEPLOYED"); classes.append("EVIDENCE" if has_engine else "ENGINEERING")
         if not has_floor:
@@ -238,7 +279,7 @@ def audit_readiness(
         runnable_live = shadow_runnable and collector_complete
         official = (
             runnable_live and feature_realization_complete and behavioral_complete and eligible
-            and has_floor and validation_complete
+            and has_floor and validation_complete and prop_evidence_ready
         )
         rows.append({
             "market": market,
@@ -258,6 +299,11 @@ def audit_readiness(
             "collector_validation_complete": collector_complete,
             "collector_validation_status": collector_status,
             "collector_validation_missing": collector_missing,
+            "prop_evidence_ready": prop_evidence_ready,
+            "prop_evidence_required_groups": prop_evidence_required_groups,
+            "prop_evidence_missing_groups": prop_evidence_missing_groups,
+            "prop_evidence_blockers": prop_evidence_blockers,
+            "prop_calibration_consistency": prop_calibration_consistency,
             "eligible": eligible,
             "frozen_edge_floor": has_floor,
             "validation_complete": validation_complete,
@@ -273,7 +319,7 @@ def audit_readiness(
         })
 
     return {
-        "schema_version": 7,
+        "schema_version": 8,
         "collector_validation": {
             "complete": collector_complete,
             "status": collector_status,
@@ -289,6 +335,7 @@ def audit_readiness(
             "feature_realization_complete": sum(x["feature_realization_complete"] for x in rows),
             "behavioral_complete": sum(x["behavioral_complete"] for x in rows),
             "collector_validation_complete": sum(x["collector_validation_complete"] for x in rows),
+            "prop_evidence_ready": sum(x["prop_evidence_ready"] for x in rows),
             "shadow_runnable": sum(x["shadow_runnable"] for x in rows),
             "runnable_live": sum(x["runnable_live"] for x in rows),
             "frozen_edge_floors": sum(x["frozen_edge_floor"] for x in rows),

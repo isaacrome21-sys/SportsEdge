@@ -7,6 +7,7 @@ import pytest
 
 from sportsedge.run_it_control import (
     RunItControlError,
+    _card_state,
     audit_surface,
     execute_surface,
     scope_from_request,
@@ -70,11 +71,11 @@ def test_execute_never_silently_skips_library_only_lane(tmp_path):
 def test_execute_runs_declared_entrypoint_and_preserves_governance(tmp_path):
     script = tmp_path / "scripts" / "ok.py"
     script.parent.mkdir(parents=True)
-    script.write_text("print('ok')\n")
+    script.write_text("import json, sys\nfrom pathlib import Path\nPath(sys.argv[2]).write_text(json.dumps({'results': [{'bet_status': 'PASS', 'model_p': 0.4}]}))\n")
     _surface(tmp_path, {
         "MLB": {
             "lane": "PREGAME_MODEL",
-            "automatic_command": ["python", "scripts/ok.py"],
+            "automatic_command": ["python", "scripts/ok.py", "--output", "card.json"],
             "automatic_completeness": "FULL_FAIL_CLOSED",
         }
     })
@@ -101,3 +102,41 @@ def test_request_scope_all_and_subset():
     assert scope_from_request({"scope": "ALL"}) is None
     assert scope_from_request({"scope": "MLB,NFL"}) == ("MLB", "NFL")
     assert scope_from_request({"scope": ["PGA", "UFC"]}) == ("PGA", "UFC")
+
+
+@pytest.mark.parametrize("rows,expected", [
+    ([{"bet_status": "BLOCKED", "model_p": 0.6}], "ALL_MARKETS_BLOCKED"),
+    ([], "RUN_RESULTS_EMPTY"),
+    ([{"bet_status": "PASS", "model_p": None}], "RUN_MODEL_PROBABILITIES_MISSING"),
+])
+def test_exit_zero_does_not_imply_model_ready(tmp_path, rows, expected):
+    script = tmp_path / "scripts" / "card.py"
+    script.parent.mkdir()
+    script.write_text("from pathlib import Path\nPath('card.json').write_text(" + repr(json.dumps({"results": rows})) + ")\n")
+    _surface(tmp_path, {"NFL": {"automatic_command": ["python", "scripts/card.py", "--output", "card.json"]}})
+    result = execute_surface(repo_root=tmp_path)["results"][0]
+    assert result["execution_status"] == "COMPLETED"
+    assert result["status"] == "BLOCKED"
+    assert result["blocker"] == expected
+
+
+def test_existing_card_cannot_masquerade_as_current_output(tmp_path):
+    script = tmp_path / "scripts" / "noop.py"
+    script.parent.mkdir()
+    script.write_text("pass\n")
+    (tmp_path / "card.json").write_text(json.dumps({"results": [{"bet_status": "PASS", "model_p": .5}]}))
+    _surface(tmp_path, {"MLB": {"automatic_command": ["python", "scripts/noop.py", "--output", "card.json"]}})
+    result = execute_surface(repo_root=tmp_path)["results"][0]
+    assert result["blocker"] == "RUN_OUTPUT_NOT_REFRESHED"
+
+
+@pytest.mark.parametrize("payload,status,blocker", [
+    ({"status": "SUCCESS", "report": {"run_status": "BLOCKED", "results": [{"bet_status": "BLOCKED", "model_p": .6}]}}, "BLOCKED", "ALL_MARKETS_BLOCKED"),
+    ({"results": [{"bet_status": "PASS", "model_p": .4}, {"bet_status": "PASS", "model_p": None}]}, "BLOCKED", "RUN_MODEL_PROBABILITIES_MISSING"),
+    ({"results": [{"bet_status": "PASS", "model_p": .4}, {"bet_status": "BLOCKED", "model_p": None}]}, "PARTIAL", "SOME_MARKETS_BLOCKED_OR_DEGRADED"),
+])
+def test_card_health_uses_nested_report_and_each_decision(tmp_path, payload, status, blocker):
+    path = tmp_path / "card.json"
+    path.write_text(json.dumps(payload))
+    actual = _card_state(path, None)
+    assert actual[:2] == (status, blocker)

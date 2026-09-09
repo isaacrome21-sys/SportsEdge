@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "status": "UNFROZEN",
+  "hash_algorithm": "CANONICAL_JSON_SHA256_V1",
+  "artifact_path": "artifacts/football/nfl_m2_model.json",
+  "artifact_sha256": null,
+  "reason": "No genuine fitted NFL M2 artifact has been frozen. RUN IT must remain fail-closed until a real fitted artifact is independently frozen and its canonical SHA-256 is recorded here."
+}

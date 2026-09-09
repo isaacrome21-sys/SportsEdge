@@ -10,6 +10,7 @@ on:
       - 'sportsedge/core/promotion/**'
       - 'sportsedge/sports/nfl/**'
       - 'scripts/*nfl*.py'
+      - 'scripts/verify_evidence_determinism.py'
       - 'tests/test_football*.py'
       - 'tests/test_nfl*.py'
       - '.github/workflows/football-nfl-promotion-evidence.yml'
@@ -22,6 +23,7 @@ on:
       - 'sportsedge/core/promotion/**'
       - 'sportsedge/sports/nfl/**'
       - 'scripts/*nfl*.py'
+      - 'scripts/verify_evidence_determinism.py'
       - 'tests/test_football*.py'
       - 'tests/test_nfl*.py'
       - '.github/workflows/football-nfl-promotion-evidence.yml'
@@ -29,7 +31,7 @@ on:
 jobs:
   evidence:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       EVIDENCE_GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
@@ -49,6 +51,7 @@ jobs:
           python -m py_compile \
             sportsedge/core/clv/football.py \
             sportsedge/core/promotion/football_registry.py \
+            sportsedge/core/validation/evidence_determinism.py \
             sportsedge/core/validation/nfl_ci_attestation.py \
             sportsedge/sports/nfl/m2.py \
             sportsedge/sports/nfl/m2_v2_candidate.py \
@@ -69,7 +72,8 @@ jobs:
             scripts/validate_nfl_simulator_profile.py \
             scripts/build_nfl_promotion_registry.py \
             scripts/build_nfl_clv_evidence.py \
-            scripts/attest_nfl_ci_and_build_registry.py
+            scripts/attest_nfl_ci_and_build_registry.py \
+            scripts/verify_evidence_determinism.py
 
       - name: Run football contract tests
         run: python -m unittest discover -s tests -p 'test_football*.py' -v
@@ -114,6 +118,8 @@ jobs:
           done
 
       - name: Build exact production-M2 walk-forward evidence
+        env:
+          TZ: UTC
         run: >-
           python scripts/run_nfl_production_validation.py
           --schedule-file artifacts/football/sources/games.csv
@@ -127,21 +133,6 @@ jobs:
           --out artifacts/football/nfl_production_validation.json
           --manifest-out artifacts/football/nfl_source_manifest.json
           --model-out artifacts/football/nfl_m2_model.json
-
-      - name: Build isolated V2A and V2B candidate diagnostics
-        run: >-
-          python scripts/run_nfl_v2_candidate_validation.py
-          --schedule-file artifacts/football/sources/games.csv
-          --pbp-dir artifacts/football/sources/pbp
-          --participation-dir artifacts/football/sources/participation
-          --depth-dir artifacts/football/sources/depth
-          --stadium-file artifacts/football/sources/team_stadiums.csv
-          --source-manifest artifacts/football/nfl_source_manifest.json
-          --git-sha "$EVIDENCE_GIT_SHA"
-          --start-season 2016 --end-season 2025
-          --neutral-site-policy exclude_from_evaluation
-          --out artifacts/football/nfl_m2_v2_candidate_validation.json
-          --v2b-out artifacts/football/nfl_m2_v2b_candidate_validation.json
 
       - name: Assert fitted M2 artifact exists and is exact-head bound
         run: |
@@ -166,6 +157,122 @@ jobs:
           if not model.train_seasons:
               raise SystemExit('NFL_M2_MODEL_ARTIFACT_TRAIN_SEASONS_EMPTY')
           PY
+
+      - name: Snapshot first exact-SHA M2 attempt
+        shell: bash
+        run: |
+          set -euo pipefail
+          baseline='artifacts/football/determinism/ci_attempt_001'
+          mkdir -p "$baseline"
+          for artifact in \
+            nfl_production_validation.json \
+            nfl_source_manifest.json \
+            nfl_m2_model.json \
+            nfl_environment_coverage.json \
+            nfl_starting_qb_coverage.json; do
+            test -f "artifacts/football/${artifact}"
+            cp "artifacts/football/${artifact}" "${baseline}/${artifact}"
+          done
+
+      - name: Replay exact production-M2 at identical SHA and frozen inputs with shifted timezone
+        env:
+          TZ: Pacific/Kiritimati
+        run: >-
+          python scripts/run_nfl_production_validation.py
+          --schedule-file artifacts/football/sources/games.csv
+          --pbp-dir artifacts/football/sources/pbp
+          --participation-dir artifacts/football/sources/participation
+          --depth-dir artifacts/football/sources/depth
+          --stadium-file artifacts/football/sources/team_stadiums.csv
+          --git-sha "$EVIDENCE_GIT_SHA"
+          --start-season 2016 --end-season 2025
+          --neutral-site-policy exclude_from_evaluation
+          --out artifacts/football/nfl_production_validation.json
+          --manifest-out artifacts/football/nfl_source_manifest.json
+          --model-out artifacts/football/nfl_m2_model.json
+
+      - name: Verify exact M2 replay determinism
+        id: m2_determinism
+        continue-on-error: true
+        run: >-
+          python scripts/verify_evidence_determinism.py
+          --sport nfl
+          --baseline-dir artifacts/football/determinism/ci_attempt_001
+          --candidate-dir artifacts/football
+          --expected-git-sha "$EVIDENCE_GIT_SHA"
+          --determinism-class SAME_ENV_SAME_SHA
+          --replay-scope FROZEN_SOURCE_MANIFEST_TO_ARTIFACT
+          --clock-perturbation "BASELINE_TZ=UTC;REPLAY_TZ=Pacific/Kiritimati"
+          --baseline-label CI_ATTEMPT_001
+          --candidate-label CI_REPLAY_001
+          --identity-artifact nfl_production_validation.json
+          --artifact nfl_production_validation.json
+          --artifact nfl_source_manifest.json
+          --artifact nfl_m2_model.json
+          --artifact nfl_environment_coverage.json
+          --artifact nfl_starting_qb_coverage.json
+          --out artifacts/football/nfl_m2_determinism_report.json
+
+      - name: Upload M2 determinism diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nfl-m2-determinism-${{ env.EVIDENCE_GIT_SHA }}
+          path: |
+            artifacts/football/nfl_m2_determinism_report.json
+            artifacts/football/determinism/ci_attempt_001/*.json
+            artifacts/football/nfl_production_validation.json
+            artifacts/football/nfl_source_manifest.json
+            artifacts/football/nfl_m2_model.json
+            artifacts/football/nfl_environment_coverage.json
+            artifacts/football/nfl_starting_qb_coverage.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Enforce M2 byte determinism before any promotion evidence proceeds
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('artifacts/football/nfl_m2_determinism_report.json')
+          if not path.is_file():
+              raise SystemExit('NFL_M2_DETERMINISM_REPORT_MISSING')
+          report = json.loads(path.read_text(encoding='utf-8'))
+          required = {
+              'status': 'PASS',
+              'gate_basis': 'BYTE_IDENTITY',
+              'determinism_class': 'SAME_ENV_SAME_SHA',
+              'replay_scope': 'FROZEN_SOURCE_MANIFEST_TO_ARTIFACT',
+              'clock_perturbation': 'BASELINE_TZ=UTC;REPLAY_TZ=Pacific/Kiritimati',
+              'all_bytes_equal': True,
+          }
+          for field, expected in required.items():
+              if report.get(field) != expected:
+                  raise SystemExit(
+                      f"NFL_M2_DETERMINISM_CONTRACT_MISMATCH:{field}:"
+                      f"expected={expected!r}:actual={report.get(field)!r}:"
+                      f"status={report.get('status')}:"
+                      f"failure_class={report.get('failure_class')}:"
+                      f"reason={report.get('reason')}"
+                  )
+          PY
+
+      - name: Build isolated V2A and V2B candidate diagnostics
+        run: >-
+          python scripts/run_nfl_v2_candidate_validation.py
+          --schedule-file artifacts/football/sources/games.csv
+          --pbp-dir artifacts/football/sources/pbp
+          --participation-dir artifacts/football/sources/participation
+          --depth-dir artifacts/football/sources/depth
+          --stadium-file artifacts/football/sources/team_stadiums.csv
+          --source-manifest artifacts/football/nfl_source_manifest.json
+          --git-sha "$EVIDENCE_GIT_SHA"
+          --start-season 2016 --end-season 2025
+          --neutral-site-policy exclude_from_evaluation
+          --out artifacts/football/nfl_m2_v2_candidate_validation.json
+          --v2b-out artifacts/football/nfl_m2_v2b_candidate_validation.json
 
       - name: Build schedule audit from the same frozen schedule bytes
         run: >-
@@ -255,6 +362,8 @@ jobs:
           names = {row['path'] for row in payload['artifacts']}
           if 'nfl_m2_model.json' not in names:
               raise SystemExit('NFL_M2_MODEL_ARTIFACT_NOT_MANIFESTED')
+          if 'nfl_m2_determinism_report.json' not in names:
+              raise SystemExit('NFL_M2_DETERMINISM_REPORT_NOT_MANIFESTED')
           Path('artifacts/football/nfl_promotion_evidence_manifest.json').write_text(
               json.dumps(payload, indent=2, sort_keys=True) + '\n'
           )

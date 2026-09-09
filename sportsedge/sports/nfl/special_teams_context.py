@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
+import re
 from typing import Any, Mapping, Sequence
 
 from .context_autopull import NFLContextError
+
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 @dataclass(frozen=True)
@@ -43,8 +46,11 @@ def _rate(value: Any, field: str) -> float | None:
 
 
 def build_special_teams_snapshot(row: Mapping[str, Any]) -> SpecialTeamsSnapshot:
+    team_id = str(row.get("team_id") or "").strip().upper()
+    if not team_id:
+        raise NFLContextError("special teams team_id required")
     return SpecialTeamsSnapshot(
-        team_id=str(row.get("team_id") or "").strip().upper(),
+        team_id=team_id,
         kicker_active=None if row.get("kicker_active") is None else bool(row.get("kicker_active")),
         returner_active=None if row.get("returner_active") is None else bool(row.get("returner_active")),
         field_goal_pct_40_49=_rate(row.get("field_goal_pct_40_49"), "field_goal_pct_40_49"),
@@ -56,16 +62,38 @@ def build_special_teams_snapshot(row: Mapping[str, Any]) -> SpecialTeamsSnapshot
     )
 
 
-def build_special_teams_provider(*, game_id: str, as_of: Any, source_uri: str, source_sha256: str, rows: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
+def build_special_teams_provider(
+    *,
+    game_id: str,
+    as_of: Any,
+    kickoff_ts: Any,
+    source_uri: str,
+    source_sha256: str,
+    rows: Sequence[Mapping[str, Any]],
+) -> Mapping[str, Any]:
+    game = str(game_id or "").strip()
+    if not game:
+        raise NFLContextError("special teams game_id required")
     if not str(source_uri).startswith("https://"):
         raise NFLContextError("special teams source_uri must be https")
+    digest = str(source_sha256 or "").strip().lower()
+    if not _SHA256_RE.fullmatch(digest):
+        raise NFLContextError("special teams source_sha256 invalid")
     pit = _utc(as_of, "as_of")
-    payload = {"game_id": str(game_id), "teams": [asdict(build_special_teams_snapshot(r)) for r in rows]}
+    kickoff = _utc(kickoff_ts, "kickoff_ts")
+    if pit >= kickoff:
+        raise NFLContextError(f"NFL_SPECIAL_TEAMS_NOT_PREGAME:{game}")
+    snapshots = [asdict(build_special_teams_snapshot(r)) for r in rows]
+    team_ids = [row["team_id"] for row in snapshots]
+    if len(team_ids) != len(set(team_ids)):
+        raise NFLContextError("special teams duplicate team_id")
+    payload = {"game_id": game, "teams": snapshots}
     return {
         "status": "AVAILABLE" if rows else "MISSING",
         "payload": payload,
         "source_name": "OFFICIAL_ROSTERS+PIT_SPECIAL_TEAMS_HISTORY",
         "source_uri": source_uri,
-        "source_sha256": source_sha256,
+        "source_sha256": digest,
         "observed_at": pit,
+        "kickoff_ts": kickoff.isoformat(),
     }
