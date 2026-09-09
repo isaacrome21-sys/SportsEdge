@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Executable fail-closed NFL M2 RUN IT lane.
 
-No model fitting occurs here.  A frozen, Git-SHA-bound NFL M2 artifact is required.
-The operator may supply both live features and an observed odds snapshot (MANUAL),
-one of them (HYBRID), or neither (AUTOMATIC).  Missing inputs are acquired through
-the same reusable feature-builder and odds-source contracts used by evidence/CLV
-workflows.  Every mode then enters ``sportsedge.sports.nfl.run_machine``.
+No model fitting occurs here. A frozen, Git-SHA-bound NFL M2 artifact is required,
+and its canonical JSON SHA-256 must be independently pinned in
+``config/nfl_m2_freeze.json``. The operator may supply both live features and an
+observed odds snapshot (MANUAL), one of them (HYBRID), or neither (AUTOMATIC).
+Every mode then enters ``sportsedge.sports.nfl.run_machine``.
 
 Manual odds snapshots must already contain their real ``observed_at`` timestamp;
 this script never rewrites an old quote timestamp to make the 180-second TTL pass.
@@ -40,6 +40,7 @@ _KEYS = (
     "SPORTSEDGE_ODDS_API_KEY_3",
     "SPORTSEDGE_ODDS_API_KEY_4",
 )
+_FREEZE_REGISTRY = _REPO_ROOT / "config" / "nfl_m2_freeze.json"
 
 
 class NFLAutoError(ValueError):
@@ -107,6 +108,30 @@ def _odds_keys() -> list[str]:
     return keys
 
 
+def _artifact_path(path: Path) -> Path:
+    return path.resolve() if path.is_absolute() else (_REPO_ROOT / path).resolve()
+
+
+def _frozen_artifact_hash(candidate_path: Path) -> str:
+    freeze = _json(_FREEZE_REGISTRY, "NFL_AUTO_FROZEN_MODEL_BINDING_REQUIRED")
+    if freeze.get("schema_version") != 1:
+        raise NFLAutoError("NFL_AUTO_FROZEN_MODEL_BINDING_SCHEMA_INVALID")
+    if freeze.get("hash_algorithm") != "CANONICAL_JSON_SHA256_V1":
+        raise NFLAutoError("NFL_AUTO_FROZEN_MODEL_HASH_ALGORITHM_INVALID")
+    if str(freeze.get("status") or "").upper() != "FROZEN":
+        raise NFLAutoError("NFL_AUTO_FROZEN_MODEL_BINDING_REQUIRED")
+    declared_path = str(freeze.get("artifact_path") or "").strip()
+    if not declared_path:
+        raise NFLAutoError("NFL_AUTO_FROZEN_MODEL_ARTIFACT_PATH_REQUIRED")
+    frozen_path = (_REPO_ROOT / declared_path).resolve()
+    if candidate_path != frozen_path:
+        raise NFLAutoError("NFL_AUTO_MODEL_ARTIFACT_PATH_NOT_FROZEN")
+    digest = str(freeze.get("artifact_sha256") or "").strip().lower()
+    if len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
+        raise NFLAutoError("NFL_AUTO_FROZEN_MODEL_SHA256_INVALID")
+    return digest
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", default="AUTO_SELECT", choices=("AUTO_SELECT", "MANUAL", "HYBRID", "AUTOMATIC"))
@@ -133,7 +158,11 @@ def main() -> int:
 
     current = _utc(args.asof)
     try:
-        artifact = _json(args.model_artifact, "NFL_AUTO_FROZEN_MODEL_ARTIFACT_REQUIRED")
+        model_path = _artifact_path(args.model_artifact)
+        # Missing artifact remains the first and most specific blocker. Only an
+        # actual artifact proceeds to the independent freeze-registry check.
+        artifact = _json(model_path, "NFL_AUTO_FROZEN_MODEL_ARTIFACT_REQUIRED")
+        expected_artifact_sha = _frozen_artifact_hash(model_path)
         runtime_sha = _runtime_git_sha(args.runtime_code_git_sha)
         supplied_features = _operator_payload(args.live_features, "NFL_AUTO_LIVE_FEATURES_UNREADABLE")
         supplied_odds = _operator_payload(args.odds_snapshot, "NFL_AUTO_ODDS_SNAPSHOT_UNREADABLE")
@@ -143,7 +172,7 @@ def main() -> int:
             raise NFLAutoError("NFL_AUTO_NETWORK_ODDS_WITH_EXPLICIT_ASOF_PROHIBITED")
 
         # One execution clock owns live acquisition and all subsequent PIT/TTL
-        # comparisons.  Automatic quote observation is the acquisition-request
+        # comparisons. Automatic quote observation is the acquisition-request
         # timestamp, never a later timestamp that would appear to be from the future.
         execution_now = datetime.now(timezone.utc) if args.asof is None else current
 
@@ -179,6 +208,7 @@ def main() -> int:
         report = run_it_nfl(
             mode=str(args.mode).upper(),
             model_artifact=artifact,
+            expected_model_artifact_sha256=expected_artifact_sha,
             runtime_code_git_sha=runtime_sha,
             now=execution_now,
             live_features=supplied_features,
