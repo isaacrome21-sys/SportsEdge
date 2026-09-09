@@ -114,7 +114,11 @@ def audit() -> tuple[list[str], list[str]]:
         for job_name, job in jobs.items():
             if not isinstance(job, dict):
                 continue
-            checkouts: dict[str, str] = {}
+            # HEAD is the conservative source for workflows that self-clone the
+            # repository with shell/git rather than actions/checkout. Any explicit
+            # checkout at workspace root replaces it; side-by-side checkouts add
+            # more-specific roots below it.
+            checkouts: dict[str, str] = {".": "HEAD"}
             job_defaults = ((job.get("defaults") or {}).get("run") or {}) if isinstance(job.get("defaults"), dict) else {}
             job_workdir = _norm(str(job_defaults.get("working-directory") or "."))
 
