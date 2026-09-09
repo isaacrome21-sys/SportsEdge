@@ -107,6 +107,8 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], p
         _reject_market_leakage(model_input)
         double_ttl_gate(quote, ingestion_now, finalization_now)
         book_key, sportsbook, quote_retrieved_at, offer_id = _quote_identity(quote)
+        floor = (require_production_edge_floor(market=market, path=edge_floor_config_path)
+                 if deployment.get("eligible") is True else None)
         output = dict(engine_fn(model_input))
         if "model_p" not in output:
             raise OrchestrationError("engine output missing model_p")
@@ -124,7 +126,8 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], p
         engine_version = _optional_text(output, "engine_version")
         seed_policy = _optional_text(output, "seed_policy")
         mc_paths = _optional_nonnegative_int(output, "mc_paths")
-        floor = require_production_edge_floor(market=market, path=edge_floor_config_path)
+        if floor is None:
+            floor = require_production_edge_floor(market=market, path=edge_floor_config_path)
 
         if not isinstance(paired_quote, Mapping):
             raise OrchestrationError("PAIRED_PRICE_REQUIRED_FOR_DEVIG")

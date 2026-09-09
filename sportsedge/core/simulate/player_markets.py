@@ -25,6 +25,7 @@ _STAT_ALIASES = {
     "interceptions": "interceptions",
     "qb_interceptions": "interceptions",
     "rushing_yards": "rushing_yards",
+    "rush_yards": "rushing_yards",
     "rush_attempts": "rush_attempts",
     "receiving_yards": "receiving_yards",
     "receptions": "receptions",
@@ -34,6 +35,7 @@ _STAT_ALIASES = {
     "longest_rush": "longest_rush",
     "pass_plus_rush_yards": "pass_plus_rush_yards",
     "rush_plus_receiving_yards": "rush_plus_receiving_yards",
+    "rush_plus_rec_yards": "rush_plus_receiving_yards",
 }
 
 

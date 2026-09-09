@@ -65,6 +65,9 @@ def require_frozen_edge_floor(*, market: str, config: Mapping[str, Any]) -> Froz
     if production.get("allow_cli_floor_override") is not False:
         raise EdgeFloorError("production CLI floor overrides must be disabled")
 
+    if production.get("require_frozen_floor_for_eligible_market") is not True:
+        raise EdgeFloorError("FROZEN_FLOOR_POLICY_REQUIRED")
+
     floors = truth_gate.get("edge_floors")
     if not isinstance(floors, Mapping):
         raise EdgeFloorError("missing truth_gate.edge_floors config")

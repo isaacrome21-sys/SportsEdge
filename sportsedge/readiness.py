@@ -7,6 +7,7 @@ from typing import Any
 
 from .deployments import load_registry
 from .engine_registry import engine_registry
+from .edge_floors import EdgeFloorError, require_frozen_edge_floor
 
 DEFAULT_REGISTRY = Path("config/deployments.json")
 DEFAULT_CATALOG = Path("config/mlb_market_catalog.json")
@@ -55,16 +56,18 @@ def _catalog_markets(catalog: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 
 def _frozen_floor_markets(floors: dict[str, Any]) -> set[str]:
-    records = (((floors.get("truth_gate") or {}).get("edge_floors")) or {})
-    return {
-        str(market)
-        for market, meta in records.items()
-        if isinstance(meta, dict)
-        and str(meta.get("status", "")).upper() == "FROZEN"
-        and isinstance(meta.get("value"), (int, float))
-        and not isinstance(meta.get("value"), bool)
-        and float(meta["value"]) > 0.0
-    }
+    truth_gate = floors.get("truth_gate")
+    records = truth_gate.get("edge_floors") if isinstance(truth_gate, dict) else None
+    if not isinstance(records, dict):
+        return set()
+    resolved = set()
+    for market in records:
+        try:
+            require_frozen_edge_floor(market=market, config=floors)
+        except EdgeFloorError:
+            continue
+        resolved.add(market)
+    return resolved
 
 
 def _validation_state(validation: dict[str, Any], market: str) -> tuple[bool, list[str], dict[str, str]]:

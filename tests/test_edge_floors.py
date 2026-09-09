@@ -66,6 +66,18 @@ class EdgeFloorTests(unittest.TestCase):
         with self.assertRaises(EdgeFloorError):
             require_frozen_edge_floor(market="MLB_MONEYLINE", config=cfg)
 
+    def test_frozen_requirement_cannot_be_disabled_or_omitted(self):
+        for value in (None, False, 0, 1, "true"):
+            with self.subTest(value=value):
+                cfg = _cfg(_frozen())
+                policy = cfg["truth_gate"]["production"]
+                if value is None:
+                    del policy["require_frozen_floor_for_eligible_market"]
+                else:
+                    policy["require_frozen_floor_for_eligible_market"] = value
+                with self.assertRaisesRegex(EdgeFloorError, "^FROZEN_FLOOR_POLICY_REQUIRED$"):
+                    require_frozen_edge_floor(market="MLB_MONEYLINE", config=cfg)
+
     def test_valid_frozen_floor_resolves_positive_value(self):
         floor = require_frozen_edge_floor(market="MLB_MONEYLINE", config=_cfg(_frozen("0.021")))
         self.assertEqual(str(floor.value_probability_points), "0.021")

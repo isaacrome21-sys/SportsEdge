@@ -3,10 +3,27 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from sportsedge.readiness import audit_readiness
+from sportsedge.readiness import audit_readiness, _frozen_floor_markets
+from tests.test_edge_floors import _cfg, _frozen
+
+
+def _hits_floor_config():
+    cfg = _cfg()
+    cfg["truth_gate"]["edge_floors"] = {"HITS": _frozen()}
+    return cfg
 
 
 class ReadinessTests(unittest.TestCase):
+    def test_readiness_floor_uses_production_contract(self):
+        cfg = _cfg(_frozen())
+        self.assertEqual(_frozen_floor_markets(cfg), {"MLB_MONEYLINE"})
+        for key in ("fail_closed", "require_frozen_floor_for_eligible_market"):
+            bad = _cfg(_frozen())
+            bad["truth_gate"]["production"][key] = False
+            self.assertEqual(_frozen_floor_markets(bad), set())
+        self.assertEqual(_frozen_floor_markets({"truth_gate": {"edge_floors": {
+            "MLB_MONEYLINE": {"status": "FROZEN", "value": 0.02}}}}), set())
+
     def test_checked_in_registry_reports_hits_tb_runnable_but_not_deployed(self):
         out = audit_readiness()
         rows = {x["market"]: x for x in out["markets"]}
@@ -67,9 +84,7 @@ class ReadinessTests(unittest.TestCase):
                 "schema_version": 1,
                 "markets": {"HITS": {"eligible": True, "stage": "DEPLOYED", "reason": "test"}},
             }))
-            floors.write_text(json.dumps({
-                "truth_gate": {"edge_floors": {"HITS": {"status": "FROZEN", "value": 0.02}}}
-            }))
+            floors.write_text(json.dumps(_hits_floor_config()))
             validation.write_text(json.dumps({
                 "required_gates": ["historical_point_in_time", "untouched_holdout"],
                 "markets": {"HITS": {"historical_point_in_time": "PASS"}},
@@ -92,9 +107,7 @@ class ReadinessTests(unittest.TestCase):
                 "schema_version": 1,
                 "markets": {"HITS": {"eligible": True, "stage": "DEPLOYED", "reason": "test"}},
             }))
-            floors.write_text(json.dumps({
-                "truth_gate": {"edge_floors": {"HITS": {"status": "FROZEN", "value": 0.02}}}
-            }))
+            floors.write_text(json.dumps(_hits_floor_config()))
             validation.write_text(json.dumps({
                 "required_gates": ["historical_point_in_time", "untouched_holdout"],
                 "markets": {"HITS": {
@@ -122,7 +135,7 @@ class ReadinessTests(unittest.TestCase):
             realization = root / "realization.json"
             behavioral = root / "behavioral.json"
             registry.write_text(json.dumps({"schema_version": 1, "markets": {"HITS": {"eligible": True, "stage": "DEPLOYED", "reason": "test"}}}))
-            floors.write_text(json.dumps({"truth_gate": {"edge_floors": {"HITS": {"status": "FROZEN", "value": 0.02}}}}))
+            floors.write_text(json.dumps(_hits_floor_config()))
             validation.write_text(json.dumps({
                 "required_gates": ["historical_point_in_time", "untouched_holdout"],
                 "markets": {"HITS": {"historical_point_in_time": "PASS", "untouched_holdout": "PASS"}},
@@ -152,9 +165,7 @@ class ReadinessTests(unittest.TestCase):
                 "schema_version": 1,
                 "markets": {"HITS": {"eligible": True, "stage": "DEPLOYED", "reason": "test"}},
             }))
-            floors.write_text(json.dumps({
-                "truth_gate": {"edge_floors": {"HITS": {"status": "FROZEN", "value": 0.02}}}
-            }))
+            floors.write_text(json.dumps(_hits_floor_config()))
             validation.write_text(json.dumps({
                 "required_gates": ["historical_point_in_time", "untouched_holdout"],
                 "markets": {"HITS": {

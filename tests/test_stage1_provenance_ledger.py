@@ -90,7 +90,8 @@ class Stage1ProvenanceLedgerTests(unittest.TestCase):
 
     @patch("sportsedge.orchestrator.bind_candidate")
     @patch("sportsedge.orchestrator.double_ttl_gate")
-    def test_malformed_engine_provenance_fails_closed(self, _ttl, _bind):
+    @patch("sportsedge.orchestrator.require_production_edge_floor")
+    def test_malformed_engine_provenance_fails_closed(self, _floor, _ttl, _bind):
         result = run_candidate(
             model_input={
                 "game_id": "1", "market": "MONEYLINE", "entity_id": "10",

@@ -72,6 +72,21 @@ class AutomationCoreTests(unittest.TestCase):
         result2=run_candidate(model_input=mi,quote=stale,paired_quote=self.paired_quote,deployment=self.deploy,engine_fn=engine,ingestion_now=self.now,finalization_now=self.now,edge_floor_config_path=self.floor_path)
         self.assertEqual(result2.bet_status,"BLOCKED")
 
+    def test_floor_policy_precedes_engine_and_legacy_in_production(self):
+        cfg = json.loads(Path(self.floor_path).read_text())
+        cfg["truth_gate"]["production"]["require_frozen_floor_for_eligible_market"] = False
+        Path(self.floor_path).write_text(json.dumps(cfg))
+        calls = []
+        def engine(_):
+            calls.append(True)
+            return dict(self.key, runtime_path="LEGACY_COMPAT")
+        result = run_candidate(model_input=dict(self.key, build_hash="a"*64),
+            quote=self.quote, paired_quote=self.paired_quote, deployment=self.deploy,
+            engine_fn=engine, ingestion_now=self.now, finalization_now=self.now,
+            edge_floor_config_path=self.floor_path)
+        self.assertEqual(result.reason, "EdgeFloorError: FROZEN_FLOOR_POLICY_REQUIRED")
+        self.assertEqual(calls, [])
+
     def test_missing_floor_fails_closed(self):
         missing=str(Path(self.tmp.name)/"missing.json")
         result=run_candidate(model_input=dict(self.key,build_hash="a"*64),quote=self.quote,paired_quote=self.paired_quote,deployment=self.deploy,engine_fn=lambda x:dict(self.key,model_p=.60),ingestion_now=self.now,finalization_now=self.now,edge_floor_config_path=missing)

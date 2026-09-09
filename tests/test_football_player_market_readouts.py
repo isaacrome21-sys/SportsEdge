@@ -91,6 +91,17 @@ class FootballPlayerMarketReadoutTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "PLAYER_NOT_IN_USAGE_TREE"):
             derive_player_stat_market(paths, player_id="NOPE", stat="rushing_yards", line=1.5)
 
+    def test_declared_surface_aliases_use_same_shared_path_statistics(self):
+        from sportsedge.core.simulate.player_markets import derive_player_stat_market
+        paths = [self._attributed(12, 5, 1), self._attributed(22, 3, 2)]
+        for alias, canonical in (("rush_yards", "rushing_yards"),
+                                 ("rush_plus_rec_yards", "rush_plus_receiving_yards")):
+            with self.subTest(alias=alias):
+                actual = derive_player_stat_market(paths, player_id="H_QB", stat=alias, line=4)
+                expected = derive_player_stat_market(paths, player_id="H_QB", stat=canonical, line=4)
+                self.assertEqual(actual, expected)
+                self.assertEqual(sum(actual.values()), 1.0)
+
     def test_unsupported_stat_fails_closed(self):
         from sportsedge.core.simulate.player_markets import derive_player_stat_market
 
