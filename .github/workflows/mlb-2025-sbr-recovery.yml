@@ -1,0 +1,145 @@
+name: mlb-2025-sbr-recovery
+
+on:
+  push:
+    branches: ["chatgpt/mlb-2025-sbr-recovery"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recover:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout SportsEdge recovery branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+
+      - name: Set up contracted Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: '.python-version'
+
+      - name: Fetch pinned upstream scraper
+        shell: bash
+        run: |
+          set -euo pipefail
+          UPSTREAM_SHA=48ad82bb4ae21fe7af622762aa8ed2e81d64c0b7
+          git clone --filter=blob:none https://github.com/ArnavSaraogi/mlb-odds-scraper.git /tmp/mlb-odds-scraper
+          git -C /tmp/mlb-odds-scraper checkout --detach "$UPSTREAM_SHA"
+          actual="$(git -C /tmp/mlb-odds-scraper rev-parse HEAD)"
+          test "$actual" = "$UPSTREAM_SHA"
+          printf '%s\n' "$UPSTREAM_SHA" > upstream_scraper_sha.txt
+          python -m pip install --disable-pip-version-check -r /tmp/mlb-odds-scraper/requirements.txt
+
+      - name: Recover missing 2025 regular-season window
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /tmp/mlb-odds-scraper
+          python scraper.py 2025-08-17 2025-09-28 \
+            -t moneyline pointspread \
+            -c 2 \
+            -o "$GITHUB_WORKSPACE/mlb_2025_sbr_20250817_20250928.json"
+
+      - name: Audit DraftKings opening coverage and raw provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          raw_path = Path('mlb_2025_sbr_20250817_20250928.json')
+          raw_bytes = raw_path.read_bytes()
+          raw_sha = hashlib.sha256(raw_bytes).hexdigest()
+          data = json.loads(raw_bytes)
+
+          total_r = 0
+          dk_open = 0
+          dk_current = 0
+          malformed_open = []
+          missing_dk = []
+          contaminated_current = []
+          dates_with_games = []
+
+          for date in sorted(data):
+              games = data[date]
+              if games:
+                  dates_with_games.append(date)
+              for game in games:
+                  view = game.get('gameView') or {}
+                  if view.get('gameType') != 'R':
+                      continue
+                  total_r += 1
+                  away = (view.get('awayTeam') or {}).get('shortName') or (view.get('awayTeam') or {}).get('fullName')
+                  home = (view.get('homeTeam') or {}).get('shortName') or (view.get('homeTeam') or {}).get('fullName')
+                  key = f'{date}:{away}@{home}'
+                  markets = game.get('odds') or {}
+
+                  ml = markets.get('moneyline') or []
+                  dk_ml = next((x for x in ml if str(x.get('sportsbook','')).lower() == 'draftkings'), None)
+                  if dk_ml is None:
+                      missing_dk.append(key)
+                  else:
+                      op = dk_ml.get('openingLine') or {}
+                      cur = dk_ml.get('currentLine') or {}
+                      ho, ao = op.get('homeOdds'), op.get('awayOdds')
+                      if isinstance(ho, (int,float)) and isinstance(ao, (int,float)) and ho != 0 and ao != 0:
+                          dk_open += 1
+                      else:
+                          malformed_open.append({'game': key, 'openingLine': op})
+                      if isinstance(cur.get('homeOdds'), (int,float)) and isinstance(cur.get('awayOdds'), (int,float)):
+                          dk_current += 1
+
+                  ps = markets.get('pointspread') or []
+                  dk_ps = next((x for x in ps if str(x.get('sportsbook','')).lower() == 'draftkings'), None)
+                  if dk_ps is not None:
+                      spread = (dk_ps.get('currentLine') or {}).get('homeSpread')
+                      if isinstance(spread, (int,float)) and abs(float(spread)) > 2.5:
+                          contaminated_current.append({'game': key, 'homeSpread': spread})
+
+          summary = {
+              'schema_version': 1,
+              'source': 'SportsBookReview via ArnavSaraogi/mlb-odds-scraper',
+              'upstream_scraper_sha256_git_commit': Path('upstream_scraper_sha.txt').read_text().strip(),
+              'requested_start': '2025-08-17',
+              'requested_end': '2025-09-28',
+              'raw_sha256': raw_sha,
+              'raw_bytes': len(raw_bytes),
+              'dates_with_games': len(dates_with_games),
+              'first_date_with_games': dates_with_games[0] if dates_with_games else None,
+              'last_date_with_games': dates_with_games[-1] if dates_with_games else None,
+              'regular_season_games_scraped': total_r,
+              'draftkings_valid_opening_moneyline_games': dk_open,
+              'draftkings_current_moneyline_games': dk_current,
+              'draftkings_missing_games': missing_dk,
+              'draftkings_malformed_opening_games': malformed_open,
+              'current_spread_contamination_gt_2_5': contaminated_current,
+              'confirmatory_holdout_touched': False,
+              'promotion_claimed': False,
+              'eligible_changed': False,
+          }
+          Path('mlb_2025_sbr_recovery_summary.json').write_text(json.dumps(summary, indent=2, sort_keys=True) + '\n')
+          print(json.dumps(summary, indent=2, sort_keys=True))
+
+          if total_r == 0:
+              raise SystemExit('RECOVERY_NO_REGULAR_SEASON_GAMES')
+          if dk_open == 0:
+              raise SystemExit('RECOVERY_NO_VALID_DK_OPENINGS')
+          PY
+
+      - name: Upload raw recovery and audit summary
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mlb-2025-sbr-recovery
+          path: |
+            mlb_2025_sbr_20250817_20250928.json
+            mlb_2025_sbr_recovery_summary.json
+            upstream_scraper_sha.txt
+          if-no-files-found: error
+          retention-days: 30
