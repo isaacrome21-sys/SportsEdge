@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from sportsedge.football_prop_evidence import assess_market_evidence, load_evidence_registry
-from sportsedge.football_prop_run_machine import run_football_props
+from sportsedge.football_prop_extended_run_machine import run_football_extended_props
 
 
 def run_football_props_ready(
@@ -12,14 +12,14 @@ def run_football_props_ready(
     evidence_registry: Mapping[str, Any] | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    """Run the canonical prop model, then resolve real evidence dependencies.
+    """Run the canonical extended prop model, then resolve evidence dependencies.
 
     This wrapper is the production/library entry point. Passing a registry is
     useful for deterministic tests; production callers omit it and load the
     checked-in sport registry. Evidence can only add blockers here. It never
     creates Model_P and never promotes a candidate.
     """
-    report = run_football_props(**kwargs)
+    report = run_football_extended_props(**kwargs)
     sport = str(report["sport"])
     registry = dict(evidence_registry) if evidence_registry is not None else load_evidence_registry(sport)
     ready_rows = 0
