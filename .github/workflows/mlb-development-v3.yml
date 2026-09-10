@@ -1,0 +1,95 @@
+name: mlb-development-v3
+
+# Free, development-only MLB listed-starter experiment.
+# HARD BOUNDARY: exact 2021-2024 window; 2025 is rejected before HTTP.
+# Historical probablePitcher metadata is not treated as archived PIT evidence.
+# This workflow cannot create Model_P, Truth Gate evidence, eligibility, or OFFICIAL plays.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/fit_mlb_baseline.py'
+      - 'scripts/fit_mlb_development.py'
+      - 'scripts/fit_mlb_development_v3.py'
+      - 'tests/test_mlb_development.py'
+      - 'tests/test_mlb_development_v3.py'
+      - '.github/workflows/mlb-development-v3.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  development-v3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: '.python-version'
+
+      - name: Install pinned numpy
+        run: python -m pip install --disable-pip-version-check numpy==2.5.3
+
+      - name: Compile and test starter-development guards
+        run: |
+          python -m py_compile \
+            scripts/fit_mlb_baseline.py \
+            scripts/fit_mlb_development.py \
+            scripts/fit_mlb_development_v3.py \
+            tests/test_mlb_development.py \
+            tests/test_mlb_development_v3.py
+          python -m unittest tests.test_mlb_development tests.test_mlb_development_v3 -v
+
+      - name: Run preregistered 2021-2024 starter-context experiment
+        run: |
+          python scripts/fit_mlb_development_v3.py \
+            --seasons '2021,2022,2023,2024' \
+            --validation-season 2024 \
+            --out artifacts/mlb_development_v3_report.json
+
+      - name: Enforce development-only evidence boundary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path('artifacts/mlb_development_v3_report.json').read_text(encoding='utf-8'))
+          if report.get('status') != 'RESEARCH_ONLY_NOT_MODEL_P':
+              raise SystemExit('MLB_DEV_V3_STATUS_INVALID')
+          if report.get('sacred_2025_accessed') is not False:
+              raise SystemExit('MLB_DEV_V3_SACRED_2025_ACCESS_FORBIDDEN')
+          if report.get('max_allowed_season') != 2024:
+              raise SystemExit('MLB_DEV_V3_MAX_SEASON_INVALID')
+          if sorted(int(year) for year in report.get('seasons', {})) != [2021, 2022, 2023, 2024]:
+              raise SystemExit('MLB_DEV_V3_SEASON_WINDOW_INVALID')
+          if report.get('validation_season') != 2024:
+              raise SystemExit('MLB_DEV_V3_VALIDATION_SEASON_INVALID')
+          if report.get('promotion_changed') is not False:
+              raise SystemExit('MLB_DEV_V3_PROMOTION_CHANGE_FORBIDDEN')
+          if report.get('truth_gate_evidence') is not False or report.get('official_evidence') is not False:
+              raise SystemExit('MLB_DEV_V3_PROMOTION_EVIDENCE_FORBIDDEN')
+          if report.get('holdout_class') != 'DEVELOPMENT_VALIDATION_NOT_FINAL':
+              raise SystemExit('MLB_DEV_V3_HOLDOUT_CLASS_INVALID')
+          hypothesis = report.get('hypothesis') or {}
+          if hypothesis.get('predeclared_new_family') != 'pit_starter_v3':
+              raise SystemExit('MLB_DEV_V3_HYPOTHESIS_ID_INVALID')
+          if hypothesis.get('combinatorial_feature_search') is not False:
+              raise SystemExit('MLB_DEV_V3_FEATURE_SEARCH_POLICY_INVALID')
+          limitation = str(report.get('starter_metadata_limitation') or '')
+          if 'not an archived pregame snapshot' not in limitation:
+              raise SystemExit('MLB_DEV_V3_STARTER_METADATA_LIMITATION_MISSING')
+          PY
+
+      - name: Upload V3 development report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mlb-development-v3-report-${{ github.run_id }}
+          path: artifacts/mlb_development_v3_report.json
+          if-no-files-found: error
+          retention-days: 30
