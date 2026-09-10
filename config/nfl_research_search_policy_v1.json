@@ -1,7 +1,7 @@
 {
   "schema": "NFL_RESEARCH_SEARCH_POLICY_V1",
   "status": "FROZEN_BEFORE_FEATURE_SEARCH",
-  "immediate_holdout_season": 2019,
+  "immediate_holdout_season": null,
   "immediate_holdout_use": "feature_selection_validation_only",
   "future_forward_holdout_season": 2026,
   "future_forward_holdout_use": "final_forward_validation_after_feature_freeze",
@@ -21,8 +21,17 @@
   "enforcement": "fitter_excludes_games_after_selected_holdout_season",
   "control_calibration": {
     "feature_set": "baseline",
-    "holdout_season": 2019,
+    "holdout_range": [
+      2017,
+      2019
+    ],
     "counts_against_feature_search_budget": false,
-    "reason": "same-season control required to interpret Attempt 1"
-  }
+    "reason": "pre_registered_same_window_control"
+  },
+  "immediate_holdout_range": [
+    2017,
+    2019
+  ],
+  "training_seasons_for_immediate_holdout": "2010-2016",
+  "redesign_before_attempt_2": true
 }
