@@ -1,0 +1,54 @@
+{
+  "schema": "NFL_FEATURE_SEARCH_POLICY_V1",
+  "status": "FROZEN_BEFORE_FEATURE_SEARCH",
+  "created_date": "2026-09-10",
+  "purpose": "Prevent adaptive feature search against the final NFL evaluation set.",
+  "lane": "NFL_MARGIN_AND_TOTAL_RESEARCH_BASELINE",
+  "cfb_lane": "PAUSED_STRUCTURAL_FAILURE_CLOSE_GAME_R2",
+  "development_data": {
+    "seasons": [2021, 2022, 2023],
+    "allowed_use": ["fit", "feature_engineering", "hyperparameter_selection", "internal_cross_validation"]
+  },
+  "validation_data": {
+    "season": 2024,
+    "allowed_use": ["feature_attempt_evaluation", "attempt_ranking"],
+    "note": "This season may be inspected during the bounded feature search and is therefore not the final holdout."
+  },
+  "final_holdout": {
+    "season": 2025,
+    "allowed_use": ["one_final_locked_model_evaluation"],
+    "embargo_until": "FEATURE_SET_AND_HYPERPARAMETERS_LOCKED",
+    "prohibited_during_search": true,
+    "note": "2026 is incomplete and is not used as a validation or final holdout season."
+  },
+  "attempt_budget": {
+    "maximum_validation_attempts": 8,
+    "unit": "distinct_feature_or_model_specification_evaluated_on_2024",
+    "pre_registered": true,
+    "after_exhaustion": "STOP_AND_REDESIGN_WITHOUT_READING_2025",
+    "no_attempt_reset_for_cosmetic_or_minor_spec_changes": true
+  },
+  "required_attempt_log_fields": [
+    "attempt_number",
+    "hypothesis_before_run",
+    "feature_set",
+    "model_specification",
+    "2024_margin_rmse",
+    "2024_total_rmse",
+    "2024_closing_spread_rmse",
+    "2024_closing_total_rmse",
+    "decision"
+  ],
+  "final_holdout_rule": {
+    "evaluate_2025_once": true,
+    "no_feature_changes_after_2025_result": true,
+    "failure_action": "REJECT_LOCKED_MODEL_AND_START_NEW_RESEARCH_GENERATION_WITH_NEW_UNTOUCHED_FINAL_HOLDOUT"
+  },
+  "governance": {
+    "research_only": true,
+    "promotion_changed": false,
+    "truth_gate_changed": false,
+    "eligible_changed": false,
+    "model_p_created": false
+  }
+}
