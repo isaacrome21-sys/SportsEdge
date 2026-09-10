@@ -11,6 +11,9 @@ env:
 
 jobs:
   live-card:
+    concurrency:
+      group: sportsedge-paid-odds-api
+      cancel-in-progress: false
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -23,6 +26,7 @@ jobs:
         run: mkdir -p artifacts .cache/mlb-history
 
       - name: Run unified automatic LIVE RUN IT acquisition
+        id: unified
         continue-on-error: true
         env:
           SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
@@ -33,9 +37,16 @@ jobs:
           python scripts/run_live_run_it.py --sports MLB,NFL,CFB --output artifacts/live_run_it.json 2>&1 | tee artifacts/live_acquisition.log
           code=${PIPESTATUS[0]}
           echo "$code" > artifacts/live_acquisition_exit_code.txt
+          if grep -q 'OUT_OF_USAGE_CREDITS' artifacts/live_acquisition.log artifacts/live_run_it.json 2>/dev/null; then
+            echo 'terminal_exhaustion=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'terminal_exhaustion=false' >> "$GITHUB_OUTPUT"
+          fi
           exit 0
 
       - name: Diagnose Odds API key slots
+        id: diagnostic
+        if: steps.unified.outputs.terminal_exhaustion != 'true'
         continue-on-error: true
         env:
           SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
@@ -80,12 +91,22 @@ jobs:
                   return {'slot': slot, 'ok': False, 'error_code':'URL_ERROR', 'message':str(e.reason)}
               except Exception as e:
                   return {'slot': slot, 'ok': False, 'error_code':type(e).__name__, 'message':str(e)}
-          for i, key in enumerate(keys, 1): out.append(test(i, key))
+          for i, key in enumerate(keys, 1):
+              result = test(i, key)
+              out.append(result)
+              if result.get('error_code') == 'OUT_OF_USAGE_CREDITS':
+                  break
           with open('artifacts/odds_diagnostic.json','w') as f: json.dump(out,f,indent=2,sort_keys=True)
           print(json.dumps(out,indent=2,sort_keys=True))
           PY
+          if grep -q 'OUT_OF_USAGE_CREDITS' artifacts/odds_diagnostic.json; then
+            echo 'terminal_exhaustion=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'terminal_exhaustion=false' >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Run existing live MLB full model path
+        if: steps.unified.outputs.terminal_exhaustion != 'true' && steps.diagnostic.outputs.terminal_exhaustion != 'true'
         continue-on-error: true
         env:
           SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
@@ -103,6 +124,7 @@ jobs:
           exit 0
 
       - name: Upload live card
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: live-full-model-expansion
