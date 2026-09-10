@@ -34,7 +34,7 @@ def nfl(seasons):
             def optional_float(key):
                 try: return float(r[key]) if r.get(key) not in (None, "") else None
                 except (TypeError, ValueError): return None
-            rows.append({"date":r.get("gameday") or f"{season}-01-01","id":r.get("game_id",""),"home":r["home_team"],"away":r["away_team"],"hs":hs,"as":aas,"spread_line":optional_float("spread_line"),"total_line":optional_float("total_line")})
+            rows.append({"date":r.get("gameday") or f"{season}-01-01","id":r.get("game_id",""),"home":r["home_team"],"away":r["away_team"],"hs":hs,"as":aas,"spread_line":optional_float("spread_line"),"total_line":optional_float("total_line"),"home_qb_id":r.get("home_qb_id"),"away_qb_id":r.get("away_qb_id")})
     return rows, hashlib.sha256(raw).hexdigest(), NFL_URL
 
 def cfb(seasons):
@@ -61,9 +61,10 @@ def cfb(seasons):
     return rows, hashlib.sha256(b"".join(blobs)).hexdigest(), CFB_URL
 
 def features(games, feature_set="baseline"):
-    games=sorted(games,key=lambda x:(x["date"],x["id"])); hist=defaultdict(list); X=[]; ym=[]; yt=[]; dates=[]
+    games=sorted(games,key=lambda x:(x["date"],x["id"])); hist=defaultdict(list); qbhist=defaultdict(list); X=[]; ym=[]; yt=[]; dates=[]
     names=["home_points_for","home_points_against","away_points_for","away_points_against","home_net","away_net"]
     if feature_set == "opponent_strength": names += ["home_opponent_strength","away_opponent_strength"]
+    if feature_set == "quarterback": names += ["home_qb_prior_margin","away_qb_prior_margin","home_qb_prior_total","away_qb_prior_total","home_qb_prior_starts","away_qb_prior_starts"]
     for date, grp in groupby(games,key=lambda x:x["date"]):
         batch=list(grp)
         for g in batch:
@@ -71,6 +72,15 @@ def features(games, feature_set="baseline"):
             if len(hist[h])>=5 and len(hist[a])>=5:
                 mh=np.mean([x[:2] for x in hist[h][-10:]],axis=0); ma=np.mean([x[:2] for x in hist[a][-10:]],axis=0)
                 row=[mh[0],mh[1],ma[0],ma[1],mh[0]-mh[1],ma[0]-ma[1]]
+                if feature_set == "quarterback":
+                    hq,aq=g.get("home_qb_id"),g.get("away_qb_id")
+                    if not hq or not aq: continue
+                    def qb_stats(qb):
+                        prior=qbhist[qb][-10:]
+                        if not prior: return (0.0,0.0,0.0)
+                        return (float(np.mean([v[0] for v in prior])),float(np.mean([v[1] for v in prior])),float(len(prior)))
+                    hqs,aqs=qb_stats(hq),qb_stats(aq)
+                    row += [hqs[0],aqs[0],hqs[1],aqs[1],hqs[2],aqs[2]]
                 if feature_set == "opponent_strength":
                     def strength(team):
                         vals=[np.mean([x[:2] for x in hist[opp][-10:]],axis=0)[0]-np.mean([x[:2] for x in hist[opp][-10:]],axis=0)[1] for _,_,opp in hist[team] if hist[opp]]
@@ -80,6 +90,9 @@ def features(games, feature_set="baseline"):
                 ym.append(g["hs"]-g["as"]); yt.append(g["hs"]+g["as"]); dates.append(date)
         for g in batch:
             hist[g["home"]].append((g["hs"],g["as"],g["away"])); hist[g["away"]].append((g["as"],g["hs"],g["home"]))
+            if feature_set == "quarterback" and g.get("home_qb_id") and g.get("away_qb_id"):
+                qbhist[g["home_qb_id"]].append((g["hs"]-g["as"],g["hs"],g["hs"]+g["as"]))
+                qbhist[g["away_qb_id"]].append((g["as"]-g["hs"],g["as"],g["hs"]+g["as"]))
     return np.asarray(X,float),np.asarray(ym,float),np.asarray(yt,float),names,dates
 
 def scale(a,b):
@@ -127,7 +140,7 @@ def run_target(x,y,hold_start,hold_end,close_split=False):
     return result
 
 def main():
-    ap=argparse.ArgumentParser(); ap.add_argument("--seasons",default="2021,2022,2023,2024,2025"); ap.add_argument("--holdout",type=int); ap.add_argument("--holdout-start",type=int); ap.add_argument("--holdout-end",type=int); ap.add_argument("--policy",default="config/nfl_research_search_policy_v1.json"); ap.add_argument("--feature-set",choices=("baseline","opponent_strength"),default="baseline"); ap.add_argument("--out",default="artifacts/football_baselines.json"); args=ap.parse_args()
+    ap=argparse.ArgumentParser(); ap.add_argument("--seasons",default="2021,2022,2023,2024,2025"); ap.add_argument("--holdout",type=int); ap.add_argument("--holdout-start",type=int); ap.add_argument("--holdout-end",type=int); ap.add_argument("--policy",default="config/nfl_research_search_policy_v1.json"); ap.add_argument("--feature-set",choices=("baseline","opponent_strength","quarterback"),default="baseline"); ap.add_argument("--out",default="artifacts/football_baselines.json"); args=ap.parse_args()
     policy_path=Path(args.policy)
     try: policy=json.loads(policy_path.read_text())
     except (OSError, json.JSONDecodeError) as exc: raise RuntimeError(f"POLICY_READ_FAILED:{policy_path}:{exc}") from exc
@@ -156,7 +169,7 @@ def main():
         global hold_dates,feature_names
         X,ym,yt,feature_names,hold_dates=features(games,args.feature_set)
         reports[sport]={"source":source,"source_sha256":sha,"policy_path":str(policy_path),"policy_sha256":hashlib.sha256(policy_path.read_bytes()).hexdigest(),"training_years":[train_start,train_end],"feature_set":args.feature_set,"holdout_years":[hold_start,hold_end],"games_fetched":len(games),"usable_rows":len(X),"status":"RESEARCH_ONLY_NOT_MODEL_P","targets":{"margin":run_target(X,ym,hold_start,hold_end,close_split=(sport=="CFB")),"total":run_target(X,yt,hold_start,hold_end)}}
-        if args.feature_set=="opponent_strength":
+        if args.feature_set!="baseline":
             # Same-data control calibration, preregistered and excluded from
             # the feature-attempt budget. It establishes the baseline on 2019.
             X0,_,_,names0,dates0=features(games,"baseline")
