@@ -125,11 +125,14 @@ class CFBTrainingArtifactTests(unittest.TestCase):
                 source_evidence_root=evidence_root,
                 repo_root=ROOT,
                 fit_max_season=2025,
+                ridge_alpha=10.0,
             )
             self.assertEqual(provenance["row_count"], 20)
             self.assertEqual(provenance["train_seasons"], [2025])
             self.assertTrue(provenance["source_snapshot_verified"])
             self.assertEqual(provenance["verified_source_count"], 2)
+            self.assertEqual(provenance["ridge_fit_policy"]["mode"], "FIXED_MANUAL")
+            self.assertEqual(len(provenance["derivation_code_sha256"]), 64)
             self.assertFalse(provenance["promotion_changed"])
             model = load_cfb_model_artifact(
                 artifact,
@@ -174,6 +177,7 @@ class CFBTrainingArtifactTests(unittest.TestCase):
                     source_evidence_root=evidence_root,
                     repo_root=ROOT,
                     fit_max_season=2025,
+                    ridge_alpha=10.0,
                 )
 
 
