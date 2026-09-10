@@ -6,7 +6,6 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from sportsedge.edge_floors import EdgeFloorError
 from sportsedge.football_prop_certification import (
     FootballPropCertificationError,
     assess_market_certification,
@@ -176,6 +175,7 @@ class FootballPropCertificationTests(unittest.TestCase):
             engine.assert_called_once()
             row = result["results"][0]
             self.assertTrue(row["official_eligible"])
+            self.assertEqual(row["official_gate_status"], "PASS")
             self.assertEqual(row["truth_gate_floor_key"], f"NFL_{MARKET}")
             self.assertEqual(row["bet_status"], "OFFICIAL_BET")
             self.assertEqual(result["summary"]["official_bets"], 1)
@@ -184,7 +184,7 @@ class FootballPropCertificationTests(unittest.TestCase):
                 result["certification_resolution"]["manual_eligible_toggle_required"]
             )
 
-    def test_promotion_grade_missing_floor_blocks_before_model(self):
+    def test_promotion_grade_missing_floor_keeps_candidate_but_blocks_official(self):
         empty = _floor_config()
         empty["truth_gate"]["edge_floors"] = {}
         with tempfile.TemporaryDirectory() as td:
@@ -194,21 +194,26 @@ class FootballPropCertificationTests(unittest.TestCase):
                 "sportsedge.football_prop_readiness.run_football_extended_props",
                 return_value=_report(),
             ) as engine:
-                with self.assertRaisesRegex(
-                    EdgeFloorError,
-                    f"ELIGIBLE_MARKET_MISSING_OR_UNFROZEN_EDGE_FLOOR:NFL_{MARKET}",
-                ):
-                    run_football_props_ready(
-                        sport="NFL",
-                        expected_artifact_sha256=ARTIFACT_SHA,
-                        odds_snapshot=_odds(),
-                        evidence_registry=_evidence(),
-                        certification_registry=_certification(),
-                        floor_path=str(floor_path),
-                    )
-            engine.assert_not_called()
+                result = run_football_props_ready(
+                    sport="NFL",
+                    expected_artifact_sha256=ARTIFACT_SHA,
+                    odds_snapshot=_odds(),
+                    evidence_registry=_evidence(),
+                    certification_registry=_certification(),
+                    floor_path=str(floor_path),
+                )
+            engine.assert_called_once()
+            row = result["results"][0]
+            self.assertEqual(row["model_status"], "MODEL_CANDIDATE")
+            self.assertEqual(row["bet_status"], "MODEL_CANDIDATE")
+            self.assertFalse(row["official_eligible"])
+            self.assertEqual(row["official_gate_status"], "BLOCKED")
+            self.assertEqual(
+                row["official_gate_reason"],
+                f"PROP_FROZEN_FLOOR_PREFLIGHT_MISSING:NFL_{MARKET}",
+            )
 
-    def test_one_sided_scorer_can_never_become_official(self):
+    def test_one_sided_scorer_is_candidate_but_never_official_without_frozen_policy(self):
         market = "player_anytime_td"
         with tempfile.TemporaryDirectory() as td:
             floor_path = Path(td) / "floors.json"
@@ -228,9 +233,14 @@ class FootballPropCertificationTests(unittest.TestCase):
                     floor_path=str(floor_path),
                 )
         row = result["results"][0]
+        self.assertEqual(row["model_status"], "MODEL_CANDIDATE")
+        self.assertEqual(row["bet_status"], "MODEL_CANDIDATE")
         self.assertFalse(row["official_eligible"])
-        self.assertEqual(row["bet_status"], "BLOCKED")
-        self.assertEqual(row["reason"], "NFL_PROP_PAIRED_PRICE_REQUIRED")
+        self.assertEqual(row["official_gate_status"], "BLOCKED")
+        self.assertEqual(
+            row["official_gate_reason"],
+            "NFL_PROP_ONE_SIDED_OFFICIAL_FLOOR_POLICY_NOT_FROZEN",
+        )
 
 
 if __name__ == "__main__":
