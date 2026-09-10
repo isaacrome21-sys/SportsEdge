@@ -1,0 +1,20 @@
+{
+  "acceptance_scope": "PROVIDER_PATH_ONLY_NOT_TIMEPOINT_CAPTURE",
+  "attempts": [
+    {
+      "http_status": 401,
+      "key_slot": 1,
+      "provider_code": "OUT_OF_USAGE_CREDITS"
+    }
+  ],
+  "bookmaker": "draftkings",
+  "key_slots_present": 4,
+  "market": "h2h",
+  "raw_bytes_persisted": false,
+  "raw_capture_eligible": false,
+  "raw_evidence_eligible": false,
+  "run_at_utc": "2026-09-10T04:15:18.861629+00:00",
+  "status": "BLOCKED_NO_CREDITS",
+  "terminal_key_slot": 1,
+  "terminal_reason": "OUT_OF_USAGE_CREDITS"
+}
