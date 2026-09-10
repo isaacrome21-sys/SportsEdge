@@ -52,3 +52,16 @@ The widened-window rerun completed under commit 1835c63. The close-game diagnost
 - CFB baseline margin, absolute actual margin <=14: n=1,367, model RMSE 12.1302 versus mean-baseline RMSE 9.3337, R2 -0.6890. This reinforces the prior close-game failure; CFB still has no closing-price benchmark and no feature attempts are allowed.
 
 The NFL QB candidate therefore remains FAILS_BAR. The NFL next candidate is EPA-based efficiency (Attempt 3), subject to the same frozen window and benchmark criterion.
+
+
+## NFL Attempt 3 implementation (2026-09-10)
+
+Attempt 3 is registered as a deliberate, dispatch-only research run:
+- Feature family: EPA-based offensive/defensive efficiency, split pass/rush.
+- Source: nflverse play-by-play parquet, fetched on the runner; no odds fields are used as features.
+- Point-in-time rule: each game's EPA is appended to team history only after all games on that date emit features. Defensive EPA is the opponent's offensive EPA for that prior game.
+- Window: training 2010-2016; immediate validation 2017-2019 from the frozen NFL policy.
+- Control: matched raw-points baseline on the same window; budget-neutral.
+- Benchmark: raw nflverse `spread_line` and `total_line`, with the required paired-bootstrap 95% CI of model-minus-close RMSE.
+- Workflow: `.github/workflows/nfl-epa-attempt3.yml`; report: `artifacts/football_baselines_attempt3.json`.
+- Status before execution: implementation complete; no attempt is counted and no result is claimed until the workflow produces a report.
