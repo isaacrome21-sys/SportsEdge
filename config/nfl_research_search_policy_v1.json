@@ -6,12 +6,12 @@
   "future_forward_holdout_season": 2026,
   "future_forward_holdout_use": "final_forward_validation_after_feature_freeze",
   "feature_search_attempt_budget": 10,
-  "attempts_already_spent": 8,
-  "attempts_remaining_before_attempt_2": 2,
-  "next_feature_attempt": "recency_weighting",
+  "attempts_already_spent": 9,
+  "attempts_remaining_before_attempt_2": 1,
+  "next_feature_attempt": "fitted_home_field",
   "attempt_2_specification": "Add point-in-time quarterback availability/performance features without using closing-market fields.",
   "attempt_2_result": "FAILS_BAR: both NFL target paired-bootstrap 95% CIs remain above zero versus closing lines.",
-  "next_feature_attempt_specification": "Add exponential recency weighting to point-in-time rolling features.",
+  "next_feature_attempt_specification": "Add point-in-time fitted per-team home-field parameters.",
   "success_criterion": "On the frozen 2017-2019 holdout, the paired-bootstrap 95% CI for candidate model RMSE minus closing-market RMSE must include zero.",
   "rejection_rule": "If all 10 feature specifications fail the success criterion, conclude that this box-score feature-search family did not beat NFL closing lines and stop the search.",
   "attempt_counting_rule": "Every distinct feature specification evaluated against the frozen immediate holdout range consumes one attempt, including failed or discarded candidates. The matched control is budget-neutral.",
@@ -78,5 +78,9 @@
   "attempt_8_specification": "Add point-in-time offensive giveaway, defensive takeaway, and net turnover rates.",
   "attempt_8_result": "FAILS_BAR: margin model-minus-close RMSE +0.702304 (95% CI +0.405401 to +0.978991); total +0.477766 (95% CI +0.237347 to +0.709845).",
   "attempt_8_report_sha256": "sha256:a5f818c0b750c341c74eacd8907935a5c8696c5e23b819731c92ba2c4252689c",
-  "attempt_8_run_url": "https://github.com/isaacrome21-sys/SportsEdge/actions/runs/34491996548"
+  "attempt_8_run_url": "https://github.com/isaacrome21-sys/SportsEdge/actions/runs/34491996548",
+  "attempt_9_specification": "Apply fixed exponential recency weighting (decay 0.85) to point-in-time rolling baseline features.",
+  "attempt_9_result": "FAILS_BAR: margin model-minus-close RMSE +0.592854 (95% CI +0.331647 to +0.844068); total +0.356766 (95% CI +0.121105 to +0.580444).",
+  "attempt_9_report_sha256": "sha256:9c95c0cbefc2f99f6dec37fda01f58d2fcac0ad6770de2c9311fbf5ce40ea996",
+  "attempt_9_run_url": "https://github.com/isaacrome21-sys/SportsEdge/actions/runs/34492360674"
 }
