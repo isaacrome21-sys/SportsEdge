@@ -140,3 +140,15 @@ Status: DONE for the attempt; FAILS_BAR for both NFL targets.
 - Total: model-minus-close RMSE delta +0.4778; paired-bootstrap 95% CI [+0.2373, +0.7098].
 - Decision: turnover-adjusted efficiency did not clear the frozen criterion. No artifact freeze, eligibility change, or Model_P promotion. Attempt 8 is consumed; next registered NFL family is recency weighting.
 - Evidence: report artifact digest `sha256:a5f818c0b750c341c74eacd8907935a5c8696c5e23b819731c92ba2c4252689c`.
+
+
+## NFL Attempt 9 result (run 34492360674)
+
+Status: DONE for the attempt; FAILS_BAR for both NFL targets.
+
+- Feature family: fixed exponential recency weighting with decay 0.85 over prior rolling results.
+- Window: train 2010-2016; validate 2017-2019; 779 games with closing lines.
+- Margin: model-minus-close RMSE delta +0.5929; paired-bootstrap 95% CI [+0.3316, +0.8441]. Close-game R² was -0.6754 versus the mean.
+- Total: model-minus-close RMSE delta +0.3568; paired-bootstrap 95% CI [+0.1211, +0.5804].
+- Decision: recency weighting did not clear the frozen criterion. No artifact freeze, eligibility change, or Model_P promotion. Attempt 9 is consumed; one attempt remains, with fitted home-field parameters registered next.
+- Evidence: report artifact digest `sha256:9c95c0cbefc2f99f6dec37fda01f58d2fcac0ad6770de2c9311fbf5ce40ea996`.
