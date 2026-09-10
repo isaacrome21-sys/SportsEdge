@@ -11,6 +11,13 @@ class LiveOddsFailoverTests(unittest.TestCase):
         ]
         self.assertTrue(should_rotate_odds_key(run_status="NO_QUOTES", results=(), source_failures=failures))
 
+    def test_account_exhaustion_is_terminal(self):
+        failures = [
+            {"stage": "ODDS_API", "reason": "ODDS_API_FETCH_FAILED:event:a:HTTP_401:OUT_OF_USAGE_CREDITS"},
+            {"stage": "ODDS_API", "reason": "ODDS_API_FETCH_FAILED:event:b:HTTP_401:OUT_OF_USAGE_CREDITS"},
+        ]
+        self.assertFalse(should_rotate_odds_key(run_status="NO_QUOTES", results=(), source_failures=failures))
+
     def test_model_or_identity_failure_does_not_rotate(self):
         failures = [{"stage": "ODDS_API", "reason": "ODDS_EVENT_GAME_AMBIGUOUS"}]
         self.assertFalse(should_rotate_odds_key(run_status="NO_QUOTES", results=(), source_failures=failures))
