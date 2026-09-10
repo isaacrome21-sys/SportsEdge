@@ -6,12 +6,12 @@
   "future_forward_holdout_season": 2026,
   "future_forward_holdout_use": "final_forward_validation_after_feature_freeze",
   "feature_search_attempt_budget": 10,
-  "attempts_already_spent": 3,
-  "attempts_remaining_before_attempt_2": 7,
-  "next_feature_attempt": "situational",
+  "attempts_already_spent": 4,
+  "attempts_remaining_before_attempt_2": 6,
+  "next_feature_attempt": "line_play",
   "attempt_2_specification": "Add point-in-time quarterback availability/performance features without using closing-market fields.",
   "attempt_2_result": "FAILS_BAR: both NFL target paired-bootstrap 95% CIs remain above zero versus closing lines.",
-  "next_feature_attempt_specification": "Add point-in-time situational features: rest differential, travel distance, time-zone crossings, short week, bye, and primetime.",
+  "next_feature_attempt_specification": "Add point-in-time line-play features: pressure rate, sack rate, and adjusted line efficiency where source-complete.",
   "success_criterion": "On the frozen 2017-2019 holdout, the paired-bootstrap 95% CI for candidate model RMSE minus closing-market RMSE must include zero.",
   "rejection_rule": "If all 10 feature specifications fail the success criterion, conclude that this box-score feature-search family did not beat NFL closing lines and stop the search.",
   "attempt_counting_rule": "Every distinct feature specification evaluated against the frozen immediate holdout range consumes one attempt, including failed or discarded candidates. The matched control is budget-neutral.",
@@ -58,5 +58,9 @@
   "attempt_3_specification": "Replace rolling points with point-in-time EPA-based offensive/defensive efficiency, split pass/rush.",
   "attempt_3_result": "FAILS_BAR: margin model-minus-close RMSE +0.735897 (95% CI +0.422462 to +1.052209); total +0.477121 (95% CI +0.241903 to +0.698314).",
   "attempt_3_report_sha256": "sha256:196513ef937aefd20225664ece27f930e608618e85a31334d9f9d02601f95534",
-  "attempt_3_run_url": "https://github.com/isaacrome21-sys/SportsEdge/actions/runs/34486772747"
+  "attempt_3_run_url": "https://github.com/isaacrome21-sys/SportsEdge/actions/runs/34486772747",
+  "attempt_4_specification": "Add point-in-time situational features: rest differential, short-week flags, and extended-rest flags.",
+  "attempt_4_result": "FAILS_BAR: margin model-minus-close RMSE +0.652449 (95% CI +0.387588 to +0.915669); total +0.468171 (95% CI +0.222358 to +0.712791).",
+  "attempt_4_report_sha256": "sha256:451da815cda1dfbecf08f1c2b05ad67c47f0f3f7433f79ecfa9c1d920f445956",
+  "attempt_4_run_url": "https://github.com/isaacrome21-sys/SportsEdge/actions/runs/34489425960"
 }
