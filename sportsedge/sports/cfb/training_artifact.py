@@ -1,8 +1,13 @@
 """PIT-bound construction of frozen CFB joint-model artifacts.
 
-The runtime AUTO path never fits a model.  This module is the only packaging
-bridge from an already-materialized PIT training bundle to the hash-bound model
-artifact consumed by AUTO.  It does not fetch data or promote markets.
+The runtime AUTO path never fits a model. This module is the packaging bridge
+from an already-materialized PIT training bundle to the hash-bound model
+artifact consumed by AUTO. It does not fetch data or promote markets.
+
+By default, ridge alpha is selected only from season-ordered prior-season folds.
+A fixed alpha remains available only when explicitly supplied, primarily for
+controlled compatibility/diagnostic use. The complete training derivation
+surface is separately hash-bound in provenance.
 """
 from __future__ import annotations
 
@@ -12,11 +17,23 @@ from math import isfinite
 from pathlib import Path
 from typing import Any, Mapping
 
+from .fit_policy import (
+    CFB_FIXED_RIDGE_POLICY_VERSION,
+    CFB_RIDGE_POLICY_VERSION,
+    CFBFitPolicyError,
+    fit_cfb_with_temporal_ridge_selection,
+)
 from .historical_features import CFB_HISTORICAL_MATERIALIZER_VERSION
 from .joint_model import fit_cfb_joint_score_model
 from .model_artifact import build_cfb_model_artifact, cfb_model_code_surface_sha256
 
 CFB_PIT_TRAINING_BUNDLE_SCHEMA = "CFB_PIT_TRAINING_BUNDLE_V1"
+CFB_TRAINING_DERIVATION_SURFACE = (
+    "sportsedge/sports/cfb/joint_model.py",
+    "sportsedge/sports/cfb/historical_features.py",
+    "sportsedge/sports/cfb/fit_policy.py",
+    "sportsedge/sports/cfb/training_artifact.py",
+)
 
 
 class CFBTrainingArtifactError(ValueError):
@@ -39,6 +56,22 @@ def _aware_timestamp(value: Any) -> str:
     if stamp.tzinfo is None or stamp.utcoffset() is None:
         raise CFBTrainingArtifactError("CFB_TRAINING_BUNDLE_GENERATED_AT_TIMEZONE_REQUIRED")
     return stamp.isoformat()
+
+
+def cfb_training_derivation_code_sha256(repo_root: str | Path) -> str:
+    root = Path(repo_root).resolve()
+    digest = sha256()
+    for relative in CFB_TRAINING_DERIVATION_SURFACE:
+        path = root / relative
+        try:
+            raw = path.read_bytes()
+        except OSError as exc:
+            raise CFBTrainingArtifactError(f"CFB_TRAINING_DERIVATION_SURFACE_UNREADABLE:{relative}") from exc
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(raw)
+        digest.update(b"\0")
+    return digest.hexdigest()
 
 
 def validate_cfb_pit_training_bundle(
@@ -105,33 +138,54 @@ def build_cfb_artifact_from_pit_bundle(
     raw_bytes: bytes,
     repo_root: str | Path,
     fit_max_season: int,
-    ridge_alpha: float = 10.0,
+    ridge_alpha: float | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     validated = validate_cfb_pit_training_bundle(payload, raw_bytes=raw_bytes, fit_max_season=fit_max_season)
-    try:
-        alpha = float(ridge_alpha)
-    except (TypeError, ValueError) as exc:
-        raise CFBTrainingArtifactError("CFB_TRAINING_RIDGE_ALPHA_INVALID") from exc
-    if not isfinite(alpha) or alpha < 0:
-        raise CFBTrainingArtifactError("CFB_TRAINING_RIDGE_ALPHA_INVALID")
-    try:
-        model = fit_cfb_joint_score_model(validated["rows"], ridge_alpha=alpha)
-    except ValueError as exc:
-        raise CFBTrainingArtifactError(str(exc)) from exc
+
+    if ridge_alpha is None:
+        try:
+            model, ridge_diagnostics = fit_cfb_with_temporal_ridge_selection(validated["rows"])
+        except (CFBFitPolicyError, ValueError) as exc:
+            raise CFBTrainingArtifactError(str(exc)) from exc
+        alpha = float(model.ridge_alpha)
+        ridge_policy = CFB_RIDGE_POLICY_VERSION
+    else:
+        try:
+            alpha = float(ridge_alpha)
+        except (TypeError, ValueError) as exc:
+            raise CFBTrainingArtifactError("CFB_TRAINING_RIDGE_ALPHA_INVALID") from exc
+        if not isfinite(alpha) or alpha < 0:
+            raise CFBTrainingArtifactError("CFB_TRAINING_RIDGE_ALPHA_INVALID")
+        try:
+            model = fit_cfb_joint_score_model(validated["rows"], ridge_alpha=alpha)
+        except ValueError as exc:
+            raise CFBTrainingArtifactError(str(exc)) from exc
+        ridge_policy = CFB_FIXED_RIDGE_POLICY_VERSION
+        ridge_diagnostics = {
+            "policy_version": ridge_policy,
+            "selected_alpha": alpha,
+            "candidate_alphas": [alpha],
+            "fold_count": 0,
+            "selection_metric": "EXPLICIT_FIXED_ALPHA",
+            "coefficient_sign_stability": None,
+        }
+
     if tuple(model.train_seasons) != tuple(validated["train_seasons"]):
         raise CFBTrainingArtifactError("CFB_TRAINING_MODEL_SEASON_IDENTITY_MISMATCH")
     code_sha = cfb_model_code_surface_sha256(repo_root)
+    derivation_sha = cfb_training_derivation_code_sha256(repo_root)
     artifact = build_cfb_model_artifact(
         model,
         model_code_sha256=code_sha,
         training_source_sha256=validated["training_bundle_sha256"],
     )
     provenance = {
-        "schema_version": "CFB_MODEL_TRAINING_PROVENANCE_V1",
+        "schema_version": "CFB_MODEL_TRAINING_PROVENANCE_V2",
         "model_id": artifact["model_id"],
         "feature_contract": artifact["feature_contract"],
         "artifact_sha256": artifact["artifact_sha256"],
         "model_code_sha256": code_sha,
+        "derivation_code_sha256": derivation_sha,
         "training_bundle_sha256": validated["training_bundle_sha256"],
         "upstream_source_manifest_sha256": validated["source_manifest_sha256"],
         "materializer_version": validated["materializer_version"],
@@ -139,7 +193,9 @@ def build_cfb_artifact_from_pit_bundle(
         "fit_max_season": validated["fit_max_season"],
         "train_seasons": validated["train_seasons"],
         "row_count": validated["row_count"],
+        "ridge_policy_version": ridge_policy,
         "ridge_alpha": alpha,
+        "ridge_selection": ridge_diagnostics,
         "promotion_changed": False,
     }
     return artifact, provenance
