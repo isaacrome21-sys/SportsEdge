@@ -186,3 +186,17 @@ The NFL close-game diagnostic in Attempts 2-10 selected games by realized final 
 The post-search segment list is now predeclared as five families—closing-spread bucket, closing-total bucket, season-week bucket, wind bucket, and roof bucket—with Bonferroni correction across the full slice list. Any positive slice remains a hypothesis until confirmed on untouched data.
 
 Timing analysis is not predeclared yet because a verified, timestamped free opener source has not been established in the current record. If that source is found, the target will be opener-to-close movement/CLV, not simply opener RMSE.
+
+
+## NFL 2026 confirmation policy
+
+The ten-attempt feature search is closed. Before Week 2 capture begins, the following are frozen:
+
+- Confirmation model: Attempt 9, exponential recency-weighted baseline with decay 0.85, selected because it had the smallest combined 2017-2019 margin/total gap among the ten candidates. It remains research-only.
+- Confirmation season: 2026. The full model-versus-close RMSE test will not be repeated on this season.
+- Non-inferiority margin for any tested segment: upper bound of the paired-bootstrap 95% model-minus-close RMSE interval must be <= 0.25; negative point estimates also qualify.
+- Segment list: operational-opener absolute spread <=7 and >7 only. Bonferroni correction is across both predeclared buckets. Any positive result is hypothesis-generating until later confirmation.
+- Timing hypothesis: model disagreement with the operational opener predicts the direction of movement to the final pre-kick capture. The primary metric is model-directed opener-to-final-capture movement, with a bootstrap lower bound above zero required.
+- Capture protocol: opener capture at 09:00 America/Chicago on each game date starting Week 2; final capture 30 minutes before kickoff; missing captures are recorded as missing and never backfilled.
+
+Season audit: 2020 is diagnostic only; 2021-2025 were touched by the initial baseline; 2026 is the only reserved clean forward season. No confirmation result exists yet.
