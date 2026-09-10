@@ -89,7 +89,7 @@
   "attempt_10_run_url": "https://github.com/isaacrome21-sys/SportsEdge/actions/runs/34492932580",
   "feature_search_status": "EXHAUSTED_FAILS_BAR",
   "final_feature_search_verdict": "FAILS_BAR: ten pre-registered NFL feature specifications failed to produce a paired-bootstrap 95% CI including zero versus closing prices on the 2017-2019 validation window.",
-  "post_search_status": "SEGMENT_AND_TIMING_PREDECLARATION_REQUIRED",
+  "post_search_status": "CONFIRMATION_POLICY_FROZEN",
   "close_game_split_definition": "absolute_final_margin",
   "close_game_split_use": "diagnostic_only_not_a_pregame_segment",
   "close_game_split_warning": "Selecting on the realized outcome shrinks target variance; close-game R2 values must not be interpreted as evidence of a pregame market segment.",
@@ -110,5 +110,75 @@
     "status": "BLOCKED_PENDING_VERIFIED_TIMESTAMPED_OPENERS",
     "target": "Predict movement from opener to close / CLV, not merely RMSE against the opener.",
     "no_search_until_source_verified": true
+  },
+  "confirmation_set_audit": {
+    "touched_seasons": [
+      2010,
+      2011,
+      2012,
+      2013,
+      2014,
+      2015,
+      2016,
+      2017,
+      2018,
+      2019,
+      2021,
+      2022,
+      2023,
+      2024,
+      2025
+    ],
+    "diagnostic_only_seasons": [
+      2020
+    ],
+    "reserved_confirmation_season": 2026,
+    "reason": "2021-2025 were used by the initial baseline; 2020 is retained only as an unusual-season diagnostic."
+  },
+  "confirmation_policy": {
+    "status": "FROZEN_BEFORE_WEEK_2_CAPTURE",
+    "model_artifact": {
+      "selected_attempt": 9,
+      "feature_set": "exponential_recency_weighted_baseline",
+      "decay": 0.85,
+      "report_artifact_sha256": "sha256:9c95c0cbefc2f99f6dec37fda01f58d2fcac0ad6770de2c9311fbf5ce40ea996",
+      "derivation_commit": "e2c07f484976f6e9f3d9b0a3c17099c2bb22cef7",
+      "training_years": [
+        2010,
+        2016
+      ],
+      "selection_reason": "smallest combined 2017-2019 model-minus-close RMSE across margin and total among the ten attempts"
+    },
+    "season": 2026,
+    "start_week": 2,
+    "full_model_close_rmse_retest": false,
+    "non_inferiority_margin_rmse": 0.25,
+    "non_inferiority_rule": "For any predeclared segment evaluated against close, the upper bound of the paired-bootstrap 95% CI for model-minus-close RMSE must be <= 0.25; a negative point estimate also qualifies.",
+    "segment_families": [
+      {
+        "name": "operational_opener_absolute_spread",
+        "buckets": [
+          "<=7",
+          " >7"
+        ],
+        "count": 2,
+        "pregame_definition": "absolute spread from the first fixed-time SportsEdge capture"
+      }
+    ],
+    "multiple_comparison_correction": "Bonferroni across the two predeclared spread buckets",
+    "timing_hypothesis": "The frozen model's disagreement with the operational opener predicts the direction of the move to the final pre-kick capture.",
+    "timing_primary_metric": "model-directed opener-to-final-capture line movement",
+    "timing_success_rule": "paired-bootstrap 95% CI lower bound for mean model-directed movement > 0, with no unrecorded or backfilled lines",
+    "capture_protocol": {
+      "opener_time": "09:00 America/Chicago on each game date beginning Week 2",
+      "opener_definition": "first timestamped SportsEdge line capture at or after the fixed opener time; if absent, mark missing",
+      "final_time": "30 minutes before scheduled kickoff in America/Chicago",
+      "final_definition": "timestamped SportsEdge line capture at the fixed pre-kick time",
+      "no_backfill": true,
+      "closing_line_benchmark_only": true,
+      "market_prices_as_model_features": false
+    },
+    "confirmation_rule": "2026 is a one-time forward confirmation after the frozen candidate and capture protocol; do not change the model, segments, capture times, or thresholds after Week 2 capture begins.",
+    "confirmation_outcome": "CLEARS_CONFIRMATION if the predeclared timing rule and any tested segment rules pass; otherwise FAILS_CONFIRMATION or INCONCLUSIVE_MISSING_CAPTURE."
   }
 }
