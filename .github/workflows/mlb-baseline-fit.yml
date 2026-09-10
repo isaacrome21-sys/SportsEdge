@@ -1,10 +1,10 @@
 name: mlb-baseline-fit
 
-# Fits the MLB baseline from free MLB StatsAPI data on GitHub's runner.
+# FINAL research evaluation path for the sacred MLB holdout.
 #
-# Uses NO paid provider. Odds are needed for market readout, not for fitting a
-# score model, so the Odds API quota is untouched. Manual dispatch remains
-# available; relevant pull requests also execute the exact hosted baseline path.
+# Uses NO paid provider.  This workflow is deliberately MANUAL ONLY because
+# the 2025 holdout has already been exposed once.  Ordinary PR/model-development
+# activity must use mlb-development-fit.yml, which is hard-capped at 2024.
 #
 # Promotes nothing. Writes a report artifact and stops.
 
@@ -17,10 +17,6 @@ on:
       holdout_season:
         description: "Sacred holdout season (carved before fitting)"
         default: "2025"
-  pull_request:
-    paths:
-      - 'scripts/fit_mlb_baseline.py'
-      - '.github/workflows/mlb-baseline-fit.yml'
 
 permissions:
   contents: read
@@ -44,7 +40,7 @@ jobs:
       - name: Install pinned numpy only
         run: python -m pip install --disable-pip-version-check numpy==2.5.3
 
-      - name: Fit baseline
+      - name: Fit final research baseline
         run: |
           python scripts/fit_mlb_baseline.py \
             --seasons "$BASELINE_SEASONS" \
