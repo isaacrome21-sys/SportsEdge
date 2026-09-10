@@ -123,7 +123,7 @@ def cv_null(x,y,alpha,shuffles=200):
         values.append(float(1-mse/bmse) if bmse else 0.0)
     return {"n":shuffles,"q05":float(np.quantile(values,.05)),"q50":float(np.quantile(values,.50)),"q95":float(np.quantile(values,.95)),"max":float(max(values))}
 
-def run_target(x,y,hold_start,hold_end,close_split=False):
+def run_target(x,y,hold_start,hold_end,close_threshold=None):
     mask=np.array([hold_start <= int(d[:4]) <= hold_end for d in hold_dates]); tr=x[~mask]; yt=y[~mask]; te=x[mask]; ye=y[mask]
     if len(tr)<100 or len(te)<20: raise RuntimeError("INSUFFICIENT_DATE_SPLIT")
     ms={a:[] for a in ALPHAS}; n=len(tr)
@@ -134,9 +134,9 @@ def run_target(x,y,hold_start,hold_end,close_split=False):
     placebo=score(tr,shuffled,te,ye,alpha); real=score(tr,yt,te,ye,alpha); a,b=scale(tr,te); beta,i=fit(a,yt,alpha)
     holdout_pred=b@beta+i
     result={"cv_selected_alpha":alpha,"cv_grid_mse":{str(k):float(np.mean(v)) for k,v in ms.items()},"training_cv_placebo_null":null,"placebo":placebo,"holdout":real,"holdout_predictions":[float(v) for v in holdout_pred],"coefficients":dict(zip(feature_names,map(float,beta))),"signal_verdict":"NO_SIGNAL" if real["r2_vs_mean"]<=0 else "WEAK_SIGNAL" if real["r2_vs_mean"]<.03 else "LEAKAGE_SUSPECTED" if placebo["r2_vs_mean"]>.05 else "SIGNAL_PRESENT"}
-    if close_split:
-        close=np.abs(ye)<14
-        result["holdout_games_under_14_margin"]={"n":int(close.sum()),"metrics":score(tr,yt,te[close],ye[close],alpha) if close.any() else None}
+    if close_threshold is not None:
+        close=np.abs(ye)<=close_threshold
+        result["close_game_split"]={"absolute_margin_threshold":close_threshold,"n":int(close.sum()),"metrics":score(tr,yt,te[close],ye[close],alpha) if close.any() else None}
     return result
 
 def main():
@@ -172,13 +172,13 @@ def main():
             qb_ready=sum(bool(g.get("home_qb_id")) and bool(g.get("away_qb_id")) for g in games)
             if qb_ready < 120: raise RuntimeError(f"NFL_QUARTERBACK_STARTERS_UNRESOLVED:{qb_ready}")
         X,ym,yt,feature_names,hold_dates=features(games,feature_in_use)
-        reports[sport]={"source":source,"source_sha256":sha,"policy_path":str(policy_path),"policy_sha256":hashlib.sha256(policy_path.read_bytes()).hexdigest(),"training_years":[train_start,train_end],"feature_set":feature_in_use,"holdout_years":[hold_start,hold_end],"games_fetched":len(games),"usable_rows":len(X),"status":"RESEARCH_ONLY_NOT_MODEL_P","targets":{"margin":run_target(X,ym,hold_start,hold_end,close_split=(sport=="CFB")),"total":run_target(X,yt,hold_start,hold_end)}}
+        reports[sport]={"source":source,"source_sha256":sha,"policy_path":str(policy_path),"policy_sha256":hashlib.sha256(policy_path.read_bytes()).hexdigest(),"training_years":[train_start,train_end],"feature_set":feature_in_use,"holdout_years":[hold_start,hold_end],"games_fetched":len(games),"usable_rows":len(X),"status":"RESEARCH_ONLY_NOT_MODEL_P","targets":{"margin":run_target(X,ym,hold_start,hold_end,close_threshold=7 if sport=="NFL" else 14),"total":run_target(X,yt,hold_start,hold_end)}}
         if feature_in_use!="baseline":
             # Same-data control calibration, preregistered and excluded from
             # the feature-attempt budget. It establishes the baseline on 2019.
             X0,_,_,names0,dates0=features(games,"baseline")
             feature_names,hold_dates=names0,dates0
-            reports[sport]["control_baseline_same_holdout"]={"budget_counted":False,"reason":"pre_registered_control_calibration","targets":{"margin":run_target(X0,ym,hold_start,hold_end,close_split=(sport=="CFB")),"total":run_target(X0,yt,hold_start,hold_end)}}
+            reports[sport]["control_baseline_same_holdout"]={"budget_counted":False,"reason":"pre_registered_control_calibration","targets":{"margin":run_target(X0,ym,hold_start,hold_end,close_threshold=7 if sport=="NFL" else 14),"total":run_target(X0,yt,hold_start,hold_end)}}
             feature_names,hold_dates=features(games,feature_in_use)[3:]
         if sport=="NFL":
             hold=np.array([hold_start <= int(d[:4]) <= hold_end for d in hold_dates])
