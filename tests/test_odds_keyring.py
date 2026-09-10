@@ -28,6 +28,31 @@ class OddsKeyringTests(unittest.TestCase):
         self.assertNotIn("k2", rendered)
         self.assertNotIn("k3", rendered)
 
+    def test_quota_exhaustion_is_terminal_by_default(self):
+        calls = []
+        def fetcher(key):
+            calls.append(key)
+            raise RuntimeError("HTTP_401: OUT_OF_USAGE_CREDITS")
+        with self.assertRaises(OddsKeyringError) as ctx:
+            fetch_with_key_failover(("k1", "k2", "k3"), fetcher)
+        self.assertEqual(calls, ["k1"])
+        self.assertIn("ODDS_API_QUOTA_EXHAUSTED_TERMINAL", str(ctx.exception))
+        self.assertNotIn("k1", str(ctx.exception))
+
+    def test_quota_failover_requires_explicit_independent_account_opt_in(self):
+        calls = []
+        def fetcher(key):
+            calls.append(key)
+            if key == "k1":
+                raise RuntimeError("HTTP_401: OUT_OF_USAGE_CREDITS")
+            return "snapshot"
+        result = fetch_with_key_failover(
+            ("k1", "k2"), fetcher, allow_quota_failover=True
+        )
+        self.assertEqual(result.value, "snapshot")
+        self.assertEqual(result.key_slot, 2)
+        self.assertEqual(calls, ["k1", "k2"])
+
     def test_duplicate_and_blank_keys_are_ignored(self):
         calls = []
         def fetcher(key):
