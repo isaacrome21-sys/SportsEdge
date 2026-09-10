@@ -1,0 +1,17 @@
+{
+  "capture_config_version": "nfl_2026_capture_v1",
+  "policy_path": "config/nfl_research_search_policy_v1.json",
+  "opener_weekday": "Tuesday",
+  "opener_local_time": "09:00",
+  "opener_window_minutes": 60,
+  "final_minutes_before_kickoff": 30,
+  "final_window_minutes": 15,
+  "timezone": "America/Chicago",
+  "week1_tuesday_local_date": "2026-09-08",
+  "first_week": 2,
+  "sport_key": "americanfootball_nfl",
+  "bookmaker": "draftkings",
+  "markets": ["spreads", "totals"],
+  "output_dir": "data/nfl_2026_confirmation/captures",
+  "predictions_dir": "data/nfl_2026_confirmation/predictions"
+}
