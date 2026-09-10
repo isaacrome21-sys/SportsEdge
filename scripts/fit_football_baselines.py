@@ -167,15 +167,16 @@ def main():
         games=[g for g in games if g["date"][:4].isdigit() and int(g["date"][:4]) <= hold_end]
         if not games: raise RuntimeError(f"{sport}: NO_PRE_HOLDOUT_GAMES")
         global hold_dates,feature_names
-        X,ym,yt,feature_names,hold_dates=features(games,args.feature_set)
-        reports[sport]={"source":source,"source_sha256":sha,"policy_path":str(policy_path),"policy_sha256":hashlib.sha256(policy_path.read_bytes()).hexdigest(),"training_years":[train_start,train_end],"feature_set":args.feature_set,"holdout_years":[hold_start,hold_end],"games_fetched":len(games),"usable_rows":len(X),"status":"RESEARCH_ONLY_NOT_MODEL_P","targets":{"margin":run_target(X,ym,hold_start,hold_end,close_split=(sport=="CFB")),"total":run_target(X,yt,hold_start,hold_end)}}
-        if args.feature_set!="baseline":
+        feature_in_use=args.feature_set if sport=="NFL" else "baseline"
+        X,ym,yt,feature_names,hold_dates=features(games,feature_in_use)
+        reports[sport]={"source":source,"source_sha256":sha,"policy_path":str(policy_path),"policy_sha256":hashlib.sha256(policy_path.read_bytes()).hexdigest(),"training_years":[train_start,train_end],"feature_set":feature_in_use,"holdout_years":[hold_start,hold_end],"games_fetched":len(games),"usable_rows":len(X),"status":"RESEARCH_ONLY_NOT_MODEL_P","targets":{"margin":run_target(X,ym,hold_start,hold_end,close_split=(sport=="CFB")),"total":run_target(X,yt,hold_start,hold_end)}}
+        if feature_in_use!="baseline":
             # Same-data control calibration, preregistered and excluded from
             # the feature-attempt budget. It establishes the baseline on 2019.
             X0,_,_,names0,dates0=features(games,"baseline")
             feature_names,hold_dates=names0,dates0
             reports[sport]["control_baseline_same_holdout"]={"budget_counted":False,"reason":"pre_registered_control_calibration","targets":{"margin":run_target(X0,ym,hold_start,hold_end,close_split=(sport=="CFB")),"total":run_target(X0,yt,hold_start,hold_end)}}
-            feature_names,hold_dates=features(games,args.feature_set)[3:]
+            feature_names,hold_dates=features(games,feature_in_use)[3:]
         if sport=="NFL":
             hold=np.array([hold_start <= int(d[:4]) <= hold_end for d in hold_dates])
             # The feature rows are emitted only after five prior games, so
@@ -186,7 +187,7 @@ def main():
             for d,grp in groupby(usable,key=lambda z:z["date"]):
                 batch=list(grp)
                 for g in batch:
-                    if prior[g["home"]]>=5 and prior[g["away"]]>=5: keys.append((d,g["id"],g))
+                    if prior[g["home"]]>=5 and prior[g["away"]]>=5 and (feature_in_use!="quarterback" or (g.get("home_qb_id") and g.get("away_qb_id"))): keys.append((d,g["id"],g))
                 for g in batch: prior[g["home"]]+=1; prior[g["away"]]+=1
             keyed=[g for _,_,g in keys]
             mh=np.array([g.get("spread_line") is not None for g in keyed])
