@@ -38,7 +38,12 @@ def main() -> int:
     ap.add_argument("--source-manifest", type=Path, required=True)
     ap.add_argument("--source-evidence-root", type=Path, required=True)
     ap.add_argument("--fit-max-season", type=int, required=True)
-    ap.add_argument("--ridge-alpha", type=float, default=10.0)
+    ap.add_argument(
+        "--ridge-alpha",
+        type=float,
+        default=None,
+        help="Explicit fixed ridge alpha. Omit to select alpha with season-ordered temporal CV.",
+    )
     ap.add_argument("--git-sha", required=True)
     ap.add_argument("--output", type=Path, default=DEFAULT_CFB_MODEL_ARTIFACT_PATH)
     ap.add_argument("--provenance-output", type=Path, default=Path("artifacts/cfb/cfb_model_training_provenance.json"))
@@ -64,9 +69,6 @@ def main() -> int:
     except CFBTrainingArtifactError as exc:
         raise SystemExit(str(exc)) from exc
 
-    # Bind the artifact provenance to the exact repository code identity. The
-    # deterministic boundary begins at the verified source snapshot + PIT bundle;
-    # it does not claim upstream provider availability beyond that evidence.
     provenance = dict(provenance)
     provenance.update({
         "sport": "cfb",
@@ -85,8 +87,11 @@ def main() -> int:
         "source_manifest_sha256": provenance["upstream_source_manifest_sha256"],
         "source_content_root_sha256": provenance["source_content_root_sha256"],
         "training_code_sha256": provenance["training_code_sha256"],
+        "derivation_code_sha256": provenance["derivation_code_sha256"],
         "fit_max_season": provenance["fit_max_season"],
         "row_count": provenance["row_count"],
+        "ridge_policy_version": provenance["ridge_policy_version"],
+        "ridge_alpha": provenance["ridge_alpha"],
         "promotion_changed": False,
         "determinism_class": provenance["determinism_class"],
         "replay_scope": provenance["replay_scope"],
