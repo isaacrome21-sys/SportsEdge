@@ -17,7 +17,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: nfl-2026-line-capture
+  group: sportsedge-paid-odds-api
   cancel-in-progress: false
 
 jobs:
