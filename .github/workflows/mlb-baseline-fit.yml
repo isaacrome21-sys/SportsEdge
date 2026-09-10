@@ -1,0 +1,54 @@
+name: mlb-baseline-fit
+
+# Fits the MLB baseline from free MLB StatsAPI data on GitHub's runner.
+#
+# Uses NO paid provider. Odds are needed for market readout, not for fitting a
+# score model, so the Odds API quota is untouched. Manual dispatch only — this
+# is research, not a scheduled production lane.
+#
+# Promotes nothing. Writes a report artifact and stops.
+
+on:
+  workflow_dispatch:
+    inputs:
+      seasons:
+        description: "Comma-separated seasons to pull"
+        default: "2021,2022,2023,2024,2025"
+      holdout_season:
+        description: "Sacred holdout season (carved before fitting)"
+        default: "2025"
+
+permissions:
+  contents: read
+
+jobs:
+  fit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install numpy only
+        run: python -m pip install --quiet numpy
+
+      - name: Fit baseline
+        run: |
+          python scripts/fit_mlb_baseline.py \
+            --seasons "${{ inputs.seasons }}" \
+            --holdout-season "${{ inputs.holdout_season }}" \
+            --out artifacts/mlb_baseline_report.json
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mlb-baseline-report
+          path: artifacts/mlb_baseline_report.json
+          if-no-files-found: error
+
