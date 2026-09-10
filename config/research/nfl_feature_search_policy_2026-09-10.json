@@ -1,0 +1,44 @@
+{
+  "schema": "NFL_FEATURE_SEARCH_POLICY_V2",
+  "created_at_utc": "2026-09-10T12:00:00Z",
+  "amended_at_utc": "2026-09-10T12:16:00Z",
+  "status": "FROZEN_BEFORE_FEATURE_EVALUATION",
+  "lane": "NFL",
+  "holdout_season": 2019,
+  "holdout_rationale": "Use an untouched completed historical season so candidate feature work can be evaluated immediately without consuming the four-day-old 2026 season. The 2019 holdout must remain sealed from model and feature selection until evaluation.",
+  "training_seasons": [2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018],
+  "training_cutoff_rule": "Every fit, transform, feature statistic, hyperparameter selection step, and candidate-ranking computation must use only games with season <= 2018. No 2019 or later outcomes, closing lines, injuries, roster knowledge, or derived labels may enter training or selection.",
+  "training_window_policy": "The 2010-2018 training range is frozen before attempt one. Window-length variants are prohibited from being searched inside the ten-attempt budget unless explicitly preregistered as a new candidate attempt before inspecting its 2019 result.",
+  "candidate_attempt_budget": 10,
+  "attempts_consumed": 0,
+  "attempt_definition": "One attempt is consumed whenever a materially distinct feature set, model specification, training-window specification, or hyperparameter-policy candidate is evaluated on the sealed 2019 holdout. Re-runs that reproduce identical code, features, data, and frozen hyperparameters do not consume another attempt.",
+  "selection_data_rule": "All feature engineering, hyperparameter selection, and candidate ranking before the final check must use only 2010-2018 training evidence or nested folds wholly contained inside 2010-2018 and must not inspect 2019 outcomes or 2019 closing-market performance.",
+  "holdout_use_rule": "The 2019 holdout is for candidate evaluation only and may not be used to revise that candidate after its result is known. Any revision creates a new attempt and consumes budget.",
+  "primary_market_relative_metric": "margin_rmse_vs_closing_spread",
+  "required_sign_check": "Compute correlation(spread_line, home_score_minus_away_score) before applying any orientation transform. Reject a benchmark implementation whose sign convention is not empirically verified.",
+  "placebo_policy": {
+    "shuffle_count": 200,
+    "seed_policy": "deterministic_versioned_rng",
+    "threshold": "95th_percentile_of_null_r2_distribution",
+    "interpretation": "A single positive placebo R2 is not a leakage failure unless it exceeds the frozen null threshold."
+  },
+  "baseline_reference": {
+    "nfl_margin_model_rmse": 13.2120,
+    "nfl_closing_spread_rmse": 12.3595,
+    "nfl_margin_gap_rmse": 0.8525,
+    "market_relative_verdict": "WORSE_THAN_CLOSING_LINE"
+  },
+  "candidate_families_predeclared": [
+    "opponent_adjustment",
+    "quarterback",
+    "rest_travel"
+  ],
+  "cfb_priority": "DEFER_FEATURE_WORK",
+  "cfb_reason": "Current CFB margin baseline is disqualified by the close-game diagnostic (negative R2 where spread betting lives), so feature-search effort is prioritized to NFL first.",
+  "governance": {
+    "promotion_changed": false,
+    "eligibility_changed": false,
+    "model_p_created": false,
+    "official_bet_authorized": false
+  }
+}
