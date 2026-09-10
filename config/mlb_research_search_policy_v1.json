@@ -1,0 +1,24 @@
+{
+  "schema": "MLB_RESEARCH_SEARCH_POLICY_V1",
+  "status": "FROZEN_PHASE_A_BENCHMARK_BLOCKED",
+  "training_range": [2010, 2016],
+  "validation_range": [2017, 2019],
+  "future_forward_holdout_season": 2026,
+  "training_must_end_before_validation": true,
+  "feature_search_attempt_budget": 10,
+  "attempt_counting_rule": "Every distinct feature specification evaluated against the frozen 2017-2019 validation range consumes one attempt, including failed or discarded candidates. The matched control is budget-neutral only as a denominator.",
+  "placebo_null_shuffles": 200,
+  "placebo_scope": "training_cv_only_before_any_feature_evaluation",
+  "bootstrap_replicates": 2000,
+  "bootstrap_interval": "percentile_2.5_to_97.5",
+  "success_criterion": "On the frozen 2017-2019 validation range, the paired-bootstrap 95% CI for model RMSE minus closing-market RMSE must include zero.",
+  "close_game_definition": "one_run_game",
+  "benchmark": {
+    "required": true,
+    "status": "BLOCKED_NO_CLOSING_BENCHMARK",
+    "free_sources_checked": ["Retrosheet provides game results and play-by-play, not closing prices", "MLB StatsAPI provides results and game metadata, not historical closing prices"],
+    "closing_lines_are_features": false
+  },
+  "feature_search_allowed": false,
+  "block_reason": "A lane without a historical closing benchmark cannot be validated against price."
+}
