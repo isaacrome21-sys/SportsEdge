@@ -90,6 +90,12 @@ def fit(x,y,alpha):
 def score(xtr,ytr,xte,yte,alpha):
     a,b=scale(xtr,xte); beta,i=fit(a,ytr,alpha); pred=b@beta+i; mse=np.mean((pred-yte)**2); base=np.mean((ytr.mean()-yte)**2)
     return {"rmse":float(np.sqrt(mse)),"baseline_rmse":float(np.sqrt(base)),"r2_vs_mean":float(1-mse/base) if base else 0.0,"mae":float(np.mean(abs(pred-yte)))}
+def bootstrap_rmse_delta(model, market, actual, reps=2000):
+    rng=np.random.default_rng(1); n=len(actual); deltas=[]
+    for _ in range(reps):
+        idx=rng.integers(0,n,n); y=actual[idx]
+        deltas.append(float(np.sqrt(np.mean((model[idx]-y)**2))-np.sqrt(np.mean((market[idx]-y)**2))))
+    return {"reps":reps,"delta_model_minus_market":float(np.sqrt(np.mean((model-actual)**2))-np.sqrt(np.mean((market-actual)**2))),"q05":float(np.quantile(deltas,.05)),"q50":float(np.quantile(deltas,.50)),"q95":float(np.quantile(deltas,.95))}
 def cv_null(x,y,alpha,shuffles=200):
     """Training-only null; never evaluates the already-used holdout."""
     n=len(y); values=[]; rng=np.random.default_rng(0)
@@ -111,7 +117,7 @@ def run_target(x,y,hold,close_split=False):
         for alpha in ALPHAS: ms[alpha].append(float(np.mean((b@fit(a,yt[:cut],alpha)[0]+fit(a,yt[:cut],alpha)[1]-yt[cut:end])**2)))
     alpha=min(ms,key=lambda z:np.mean(ms[z])); null=cv_null(tr,yt,alpha); rng=np.random.default_rng(0); shuffled=yt.copy(); rng.shuffle(shuffled)
     placebo=score(tr,shuffled,te,ye,alpha); real=score(tr,yt,te,ye,alpha); a,_=scale(tr,tr); beta,_=fit(a,yt,alpha)
-    result={"cv_selected_alpha":alpha,"cv_grid_mse":{str(k):float(np.mean(v)) for k,v in ms.items()},"training_cv_placebo_null":null,"placebo":placebo,"holdout":real,"coefficients":dict(zip(feature_names,map(float,beta))),"signal_verdict":"NO_SIGNAL" if real["r2_vs_mean"]<=0 else "WEAK_SIGNAL" if real["r2_vs_mean"]<.03 else "LEAKAGE_SUSPECTED" if placebo["r2_vs_mean"]>.05 else "SIGNAL_PRESENT"}
+    result={"cv_selected_alpha":alpha,"cv_grid_mse":{str(k):float(np.mean(v)) for k,v in ms.items()},"training_cv_placebo_null":null,"placebo":placebo,"holdout":real,"holdout_predictions":[float(v) for v in (scale(tr,te)[1]@beta+i)],"coefficients":dict(zip(feature_names,map(float,beta))),"signal_verdict":"NO_SIGNAL" if real["r2_vs_mean"]<=0 else "WEAK_SIGNAL" if real["r2_vs_mean"]<.03 else "LEAKAGE_SUSPECTED" if placebo["r2_vs_mean"]>.05 else "SIGNAL_PRESENT"}
     if close_split:
         close=np.abs(ye)<14
         result["holdout_games_under_14_margin"]={"n":int(close.sum()),"metrics":score(tr,yt,te[close],ye[close],alpha) if close.any() else None}
@@ -158,6 +164,8 @@ def main():
                     benchmark={"n_holdout":int(ok.sum()),"rmse":float(np.sqrt(np.mean((estimate-actual)**2))),"source_field":"spread_line" if label=="margin" else "total_line","comparison":"MODEL_VS_CLOSING_LINE_REPORTED_ONLY"}
                     if label=="margin":
                         benchmark["spread_line_home_margin_correlation"]=float(np.corrcoef(estimate,actual)[0,1])
+                    model_pred=np.asarray(reports[sport]["targets"][label]["holdout_predictions"])[ok]
+                    benchmark["paired_rmse_bootstrap"]=bootstrap_rmse_delta(model_pred,estimate,actual)
                     reports[sport].setdefault("closing_line_benchmark",{})[label]=benchmark
     out=Path(args.out); out.parent.mkdir(parents=True,exist_ok=True); out.write_text(json.dumps({"schema":"FOOTBALL_BASELINES_V1","reports":reports},indent=2)+"\n"); print(json.dumps(reports,indent=2)); return 0
 if __name__=="__main__": raise SystemExit(main())
