@@ -18,6 +18,7 @@ from sportsedge.sports.cfb.training_artifact import (  # noqa: E402
 )
 
 _GIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+DEFAULT_CFB_MODEL_ARTIFACT_PATH = Path("models/cfb_joint_v1.json")
 
 
 def main() -> int:
@@ -26,7 +27,7 @@ def main() -> int:
     ap.add_argument("--fit-max-season", type=int, required=True)
     ap.add_argument("--ridge-alpha", type=float, default=10.0)
     ap.add_argument("--git-sha", required=True)
-    ap.add_argument("--output", type=Path, default=Path("config/cfb_model_artifact.json"))
+    ap.add_argument("--output", type=Path, default=DEFAULT_CFB_MODEL_ARTIFACT_PATH)
     ap.add_argument("--provenance-output", type=Path, default=Path("artifacts/cfb/cfb_model_training_provenance.json"))
     args = ap.parse_args()
 
