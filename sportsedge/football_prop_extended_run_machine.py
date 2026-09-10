@@ -193,23 +193,31 @@ def _ou_offers(
                 "american_odds": price,
             }
         for (player_id, line), pair in grouped.items():
-            if set(pair) != {"OVER", "UNDER"}:
-                raise FootballPropRunError(f"FOOTBALL_PROP_PAIRED_PRICE_REQUIRED:{key}:{player_id}:{line}")
-            offers.append({
-                "family": family,
-                "provider_market": key,
-                "stat": (
-                    OFFENSIVE_OU_MARKETS.get(key)
-                    or KICKER_OU_MARKETS.get(key)
-                    or DEFENDER_OU_MARKETS.get(key)
-                ),
-                "player_id": player_id,
-                "player_name": pair["OVER"]["player_name"],
-                "line": line,
-                "over_price": pair["OVER"]["american_odds"],
-                "under_price": pair["UNDER"]["american_odds"],
-                "stale": bool(stale),
-            })
+            for side in ("OVER", "UNDER"):
+                selected = pair.get(side)
+                if selected is None:
+                    continue
+                opposite = "UNDER" if side == "OVER" else "OVER"
+                opposite_row = pair.get(opposite)
+                offers.append({
+                    "family": family,
+                    "provider_market": key,
+                    "stat": (
+                        OFFENSIVE_OU_MARKETS.get(key)
+                        or KICKER_OU_MARKETS.get(key)
+                        or DEFENDER_OU_MARKETS.get(key)
+                    ),
+                    "player_id": player_id,
+                    "player_name": selected["player_name"],
+                    "line": line,
+                    "side": side,
+                    "american_odds": selected["american_odds"],
+                    "opposite_price": None if opposite_row is None else opposite_row["american_odds"],
+                    "over_price": None if pair.get("OVER") is None else pair["OVER"]["american_odds"],
+                    "under_price": None if pair.get("UNDER") is None else pair["UNDER"]["american_odds"],
+                    "paired": opposite_row is not None,
+                    "stale": bool(stale),
+                })
     return offers
 
 
@@ -252,6 +260,10 @@ def _scorer_offers(
                     continue
                 side = raw_side
                 line = _finite(raw.get("point"), f"FOOTBALL_PROP_LINE_INVALID:{key}")
+                if line > 0.5:
+                    # 2+ TD stays blocked until the football TD-count distribution
+                    # is separately validated; do not manufacture a promoted readout.
+                    continue
             player_id, player_name = _player_id(offensive_names, raw)
             price = _finite(raw.get("price"), f"FOOTBALL_PROP_PRICE_INVALID:{key}")
             american_to_decimal(price)
@@ -413,6 +425,28 @@ def _devig_pair(
         "sensitivity_triggered": result.longshot_triggered,
         "sensitivity_max_spread_pp": result.sensitivity_spread_probability_points,
     }
+
+
+def _raw_price_economics(
+    *, model_p: float, push_p: float, american_odds: float,
+) -> tuple[float, float, float]:
+    win = _finite(model_p, "FOOTBALL_PROP_WIN_PROBABILITY_INVALID")
+    push = _finite(push_p, "FOOTBALL_PROP_PUSH_PROBABILITY_INVALID")
+    if not 0 <= win <= 1 or not 0 <= push <= 1 or win + push > 1 + 1e-12:
+        raise FootballPropRunError("FOOTBALL_PROP_PROBABILITY_MASS_INVALID")
+    settled = 1.0 - push
+    if settled <= 0:
+        raise FootballPropRunError("FOOTBALL_PROP_SETTLED_SAMPLE_SPACE_EMPTY")
+    odds = _finite(american_odds, "FOOTBALL_PROP_ODDS_INVALID")
+    if abs(odds) < 100:
+        raise FootballPropRunError("FOOTBALL_PROP_ODDS_INVALID")
+    decimal = american_to_decimal(odds)
+    profit = decimal - 1.0
+    loss = max(0.0, 1.0 - win - push)
+    ev = win * profit - loss
+    break_even = 1.0 / decimal
+    kelly = max(0.0, min(1.0, ev / (profit * settled)))
+    return break_even, ev, kelly
 
 
 def _scorer_market(paths, *, player_id: str, line: float) -> dict[str, float]:
@@ -600,49 +634,65 @@ def run_football_extended_props(
                 raise FootballPropRunError(
                     f"FOOTBALL_PROP_MARKET_DERIVATION_FAILED:{offer['provider_market']}:{offer['player_id']}:{exc}"
                 ) from exc
-            fair_over, fair_under, sensitivity = _devig_pair(
-                offer["over_price"], offer["under_price"], policy=devig_policy,
-                game_id=game_id, book_key=book_key, offer=offer,
-            )
-            for side, price, model_p, fair_p in (
-                ("OVER", offer["over_price"], market["over"], fair_over),
-                ("UNDER", offer["under_price"], market["under"], fair_under),
-            ):
-                stale = bool(offer["stale"])
-                edge, ev, kelly = _price_economics(
-                    model_p=float(model_p), push_p=float(market["push"]),
-                    american_odds=float(price), fair_market_p=float(fair_p),
-                ) if not stale else (None, None, None)
-                results.append({
-                    "sport": resolved,
-                    "game_id": game_id,
-                    "provider_event_id": event_id,
-                    "bookmaker": book_key,
-                    "family": family,
-                    "provider_market": offer["provider_market"],
-                    "market": offer["stat"],
-                    "player_id": offer["player_id"],
-                    "player_name": offer["player_name"],
-                    "side": side,
-                    "line": offer["line"],
-                    "american_odds": price,
-                    "model_p": float(model_p),
-                    "push_p": float(market["push"]),
-                    "fair_market_p": None if stale else float(fair_p),
-                    "edge": edge,
-                    "ev_per_dollar": ev,
-                    "kelly_fraction": kelly,
-                    "quote_fresh": not stale,
-                    "bet_status": "BLOCKED",
-                    "official_eligible": False,
-                    "reason": f"{resolved}_PROP_QUOTE_STALE" if stale else f"{resolved}_PROP_PROMOTION_EVIDENCE_REQUIRED",
-                    "distribution_sha256": dist_hash,
-                    "model_artifact_sha256": artifact_sha,
-                    "model_training_source_sha256": training_sha,
-                    "live_feature_source_sha256": feature_sha,
-                    "live_feature_asof": feature_asof.isoformat(),
-                    "devig": sensitivity,
-                })
+            side = str(offer["side"])
+            price = float(offer["american_odds"])
+            model_p = float(market["over"] if side == "OVER" else market["under"])
+            push_p = float(market["push"])
+            stale = bool(offer["stale"])
+            fair_market_p = edge = ev = kelly = break_even_p = None
+            market_no_vig_p: float | str | None = None
+            sensitivity = None
+            if not stale:
+                break_even_p, ev, kelly = _raw_price_economics(
+                    model_p=model_p, push_p=push_p, american_odds=price,
+                )
+                if offer["paired"]:
+                    fair_over, fair_under, sensitivity = _devig_pair(
+                        float(offer["over_price"]), float(offer["under_price"]),
+                        policy=devig_policy, game_id=game_id, book_key=book_key, offer=offer,
+                    )
+                    fair_market_p = fair_over if side == "OVER" else fair_under
+                    market_no_vig_p = float(fair_market_p)
+                    edge, ev, kelly = _price_economics(
+                        model_p=model_p, push_p=push_p,
+                        american_odds=price, fair_market_p=float(fair_market_p),
+                    )
+                else:
+                    market_no_vig_p = "UNAVAILABLE_ONE_SIDED"
+            results.append({
+                "sport": resolved,
+                "game_id": game_id,
+                "provider_event_id": event_id,
+                "bookmaker": book_key,
+                "family": family,
+                "provider_market": offer["provider_market"],
+                "market": offer["stat"],
+                "player_id": offer["player_id"],
+                "player_name": offer["player_name"],
+                "side": side,
+                "line": offer["line"],
+                "american_odds": price,
+                "model_p": model_p,
+                "push_p": push_p,
+                "fair_market_p": fair_market_p,
+                "market_no_vig_p": market_no_vig_p,
+                "break_even_p": break_even_p,
+                "edge": edge,
+                "ev_per_dollar": ev,
+                "kelly_fraction": kelly,
+                "quote_fresh": not stale,
+                "paired_price_available": bool(offer["paired"]),
+                "model_status": "MODEL_OUTPUT_QUOTE_STALE" if stale else "MODEL_CANDIDATE",
+                "bet_status": "BLOCKED",
+                "official_eligible": False,
+                "reason": f"{resolved}_PROP_QUOTE_STALE" if stale else f"{resolved}_PROP_PROMOTION_EVIDENCE_REQUIRED",
+                "distribution_sha256": dist_hash,
+                "model_artifact_sha256": artifact_sha,
+                "model_training_source_sha256": training_sha,
+                "live_feature_source_sha256": feature_sha,
+                "live_feature_asof": feature_asof.isoformat(),
+                "devig": sensitivity,
+            })
 
         for offer in scorer_offers:
             market = _scorer_market(
@@ -653,25 +703,33 @@ def run_football_extended_props(
             model_p = float(market["over"])
             push_p = float(market["push"])
             stale = bool(offer["stale"])
-            fair_market_p = edge = ev = kelly = None
+            fair_market_p = edge = ev = kelly = break_even_p = None
+            market_no_vig_p: float | str | None = None
             sensitivity = None
             reason = f"{resolved}_PROP_PROMOTION_EVIDENCE_REQUIRED"
             if stale:
                 reason = f"{resolved}_PROP_QUOTE_STALE"
-            elif offer["paired"]:
-                fair_primary, _, sensitivity = _devig_pair(
-                    offer["primary_price"], offer["opposite_price"], policy=devig_policy,
-                    game_id=game_id, book_key=book_key, offer=offer,
-                )
-                fair_market_p = fair_primary
-                edge, ev, kelly = _price_economics(
+            else:
+                break_even_p, ev, kelly = _raw_price_economics(
                     model_p=model_p,
                     push_p=push_p,
                     american_odds=float(offer["primary_price"]),
-                    fair_market_p=float(fair_primary),
                 )
-            else:
-                reason = f"{resolved}_PROP_PAIRED_PRICE_REQUIRED"
+                if offer["paired"]:
+                    fair_primary, _, sensitivity = _devig_pair(
+                        offer["primary_price"], offer["opposite_price"], policy=devig_policy,
+                        game_id=game_id, book_key=book_key, offer=offer,
+                    )
+                    fair_market_p = fair_primary
+                    market_no_vig_p = float(fair_primary)
+                    edge, ev, kelly = _price_economics(
+                        model_p=model_p,
+                        push_p=push_p,
+                        american_odds=float(offer["primary_price"]),
+                        fair_market_p=float(fair_primary),
+                    )
+                else:
+                    market_no_vig_p = "UNAVAILABLE_ONE_SIDED"
             results.append({
                 "sport": resolved,
                 "game_id": game_id,
@@ -688,11 +746,14 @@ def run_football_extended_props(
                 "model_p": model_p,
                 "push_p": push_p,
                 "fair_market_p": fair_market_p,
+                "market_no_vig_p": market_no_vig_p,
+                "break_even_p": break_even_p,
                 "edge": edge,
                 "ev_per_dollar": ev,
                 "kelly_fraction": kelly,
                 "quote_fresh": not stale,
                 "paired_price_available": bool(offer["paired"]),
+                "model_status": "MODEL_OUTPUT_QUOTE_STALE" if stale else "MODEL_CANDIDATE",
                 "bet_status": "BLOCKED",
                 "official_eligible": False,
                 "reason": reason,
@@ -723,6 +784,7 @@ def run_football_extended_props(
         "summary": {
             "games_modeled": len(distribution_hashes),
             "decisions": len(results),
+            "model_candidates": sum(row.get("model_status") == "MODEL_CANDIDATE" for row in results),
             "official_bets": 0,
         },
         "governance": {

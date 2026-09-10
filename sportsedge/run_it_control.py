@@ -149,8 +149,12 @@ def _card_state(path: Path | None, previous_stamp) -> tuple[str, str | None, int
     if not rows:
         return "BLOCKED", "RUN_RESULTS_EMPTY", models, official
     if all(row.get("bet_status") == "BLOCKED" for row in rows):
+        if models > 0:
+            return "PARTIAL", "MODEL_OUTPUT_PRESENT_OFFICIAL_GATES_BLOCKED", models, official
         return "BLOCKED", "ALL_MARKETS_BLOCKED", models, official
     if payload.get("status") in {"BLOCKED", "FAILED", "ERROR"} or str(report.get("run_status", "")).startswith("BLOCKED"):
+        if models > 0:
+            return "PARTIAL", "MODEL_OUTPUT_PRESENT_RUN_REPORTED_OFFICIAL_BLOCK", models, official
         return "BLOCKED", "RUN_REPORTED_BLOCKED", models, official
     if any(row.get("bet_status") not in {"PASS", "OFFICIAL_BET", "BLOCKED"} for row in rows):
         return "BLOCKED", "RUN_DECISION_STATUS_INVALID", models, official
