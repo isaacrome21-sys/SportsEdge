@@ -2,12 +2,13 @@
 
 This module turns already-frozen historical game/metric/weather snapshots into the
 same market-blind row shape consumed by ``CFB_JOINT_GAME_FEATURES_V1``. It does not
-fetch data and it does not claim that an ex-post source was available historically;
-source acquisition/provenance must establish that separately.
+fetch data. Historical source acquisition/provenance must establish that each
+snapshot was genuinely available at its declared retrieval time.
 
 Week 2+ requires an exact current-season snapshot through ``game.week - 1``.
-Week 1 requires an explicit immediately-prior-season fallback snapshot. Target-week
-or post-kickoff metric snapshots fail closed. FBS membership is checked per season.
+Week 1 requires an explicit immediately-prior-season fallback snapshot. Target-week,
+post-kickoff metric snapshots, and weather snapshots not retrieved before kickoff
+fail closed. FBS membership is checked per season.
 """
 from __future__ import annotations
 
@@ -121,6 +122,31 @@ def _select_metric(index: Mapping[tuple[str, int, int, str], CFBTeamMetrics], *,
     return metric
 
 
+def _validated_weather(game: CFBGame, weather: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate weather snapshot timing without claiming historical availability.
+
+    ``retrieved_at_utc`` is the acquisition/PIT boundary. It must be an explicit,
+    timezone-aware instant strictly before kickoff. ``source`` identifies the
+    preserved weather provider/snapshot family. The materializer preserves both
+    fields in the training row so downstream source manifests can bind the exact
+    bytes that substantiated them.
+    """
+    source = str(weather.get("source") or "").strip()
+    if not source:
+        raise CFBHistoricalFeatureError(f"CFB_HISTORICAL_WEATHER_SOURCE_MISSING:{game.game_id}")
+    retrieved = _dt(
+        weather.get("retrieved_at_utc"),
+        f"CFB_HISTORICAL_WEATHER_RETRIEVED_AT_INVALID:{game.game_id}",
+    )
+    start = _dt(game.start_ts, f"CFB_HISTORICAL_GAME_START_INVALID:{game.game_id}")
+    if retrieved >= start:
+        raise CFBHistoricalFeatureError(f"CFB_HISTORICAL_WEATHER_NOT_PREGAME:{game.game_id}")
+    out = dict(weather)
+    out["source"] = source
+    out["retrieved_at_utc"] = retrieved.isoformat()
+    return out
+
+
 def materialize_cfb_joint_history(
     *,
     games: Sequence[Mapping[str, Any]],
@@ -140,12 +166,13 @@ def materialize_cfb_joint_history(
         weather=weather_by_game.get(game.game_id)
         if not isinstance(weather, Mapping):
             raise CFBHistoricalFeatureError(f"CFB_HISTORICAL_WEATHER_MISSING:{game.game_id}")
+        weather_snapshot = _validated_weather(game, weather)
         home=_select_metric(index, game=game, team=game.home_team)
         away=_select_metric(index, game=game, team=game.away_team)
         row={
             "game_id":game.game_id, "season":game.season, "week":game.week,
             "neutral_site":game.neutral_site, "home_metrics":home.to_dict(),
-            "away_metrics":away.to_dict(), "weather":dict(weather),
+            "away_metrics":away.to_dict(), "weather":weather_snapshot,
             "home_score":_score(raw.get("home_score"), "home_score"),
             "away_score":_score(raw.get("away_score"), "away_score"),
         }
