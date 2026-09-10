@@ -46,12 +46,22 @@ class FootballPropSurfaceTests(unittest.TestCase):
         self.assertTrue(governance["requires_artifact_bound_certification"])
         self.assertTrue(governance["requires_frozen_edge_floor_before_promotable_inference"])
 
-    def test_one_sided_scorer_market_cannot_create_fair_market_probability(self):
+    def test_one_sided_scorer_market_cannot_create_model_or_fair_market_probability(self):
         payload = json.loads(Path("config/football_prop_engine_surface.json").read_text())
         governance = payload["governance"]
-        self.assertTrue(governance["one_sided_market_can_create_model_p"])
+        self.assertFalse(governance["one_sided_market_can_create_model_p"])
         self.assertFalse(governance["one_sided_market_can_create_fair_market_p"])
-        self.assertTrue(governance["requires_paired_price_for_market_economics"])
+        self.assertTrue(governance["one_sided_offer_can_consume_existing_model_p"])
+        self.assertTrue(governance["requires_paired_price_for_devig"])
+        self.assertTrue(governance["one_sided_anytime_td_ev_exception"])
+        self.assertEqual(
+            governance["one_sided_anytime_td_market_no_vig_p"],
+            "UNAVAILABLE_ONE_SIDED",
+        )
+        self.assertEqual(
+            governance["one_sided_anytime_td_promotion_lane"],
+            "EXPERIMENTAL_ONE_SIDED_ANYTIME_TD",
+        )
 
     def test_checked_in_freeze_registries_remain_truthful(self):
         # Hosted exact-SHA freeze bundles are separate immutable CI artifacts;

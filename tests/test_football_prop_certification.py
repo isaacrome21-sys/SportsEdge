@@ -230,7 +230,9 @@ class FootballPropCertificationTests(unittest.TestCase):
         row = result["results"][0]
         self.assertFalse(row["official_eligible"])
         self.assertEqual(row["bet_status"], "BLOCKED")
-        self.assertEqual(row["reason"], "NFL_PROP_PAIRED_PRICE_REQUIRED")
+        self.assertEqual(row["reason"], "NFL_PROP_ONE_SIDED_ANYTIME_TD_EXPERIMENTAL")
+        self.assertEqual(row["market_no_vig_p"], "UNAVAILABLE_ONE_SIDED")
+        self.assertEqual(row["promotion_lane"], "EXPERIMENTAL_ONE_SIDED_ANYTIME_TD")
 
 
 if __name__ == "__main__":
