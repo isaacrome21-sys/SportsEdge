@@ -31,7 +31,10 @@ def nfl(seasons):
         try: season=int(r["season"]); hs=int(float(r["home_score"])); aas=int(float(r["away_score"]))
         except (KeyError,TypeError,ValueError): continue
         if season in seasons and r.get("game_type","REG") in ("REG","POST"):
-            rows.append({"date":r.get("gameday") or f"{season}-01-01","id":r.get("game_id",""),"home":r["home_team"],"away":r["away_team"],"hs":hs,"as":aas})
+            def optional_float(key):
+                try: return float(r[key]) if r.get(key) not in (None, "") else None
+                except (TypeError, ValueError): return None
+            rows.append({"date":r.get("gameday") or f"{season}-01-01","id":r.get("game_id",""),"home":r["home_team"],"away":r["away_team"],"hs":hs,"as":aas,"spread_line":optional_float("spread_line"),"total_line":optional_float("total_line")})
     return rows, hashlib.sha256(raw).hexdigest(), NFL_URL
 
 def cfb(seasons):
@@ -80,7 +83,7 @@ def fit(x,y,alpha):
 def score(xtr,ytr,xte,yte,alpha):
     a,b=scale(xtr,xte); beta,i=fit(a,ytr,alpha); pred=b@beta+i; mse=np.mean((pred-yte)**2); base=np.mean((ytr.mean()-yte)**2)
     return {"rmse":float(np.sqrt(mse)),"baseline_rmse":float(np.sqrt(base)),"r2_vs_mean":float(1-mse/base) if base else 0.0,"mae":float(np.mean(abs(pred-yte)))}
-def run_target(x,y,hold):
+def run_target(x,y,hold,close_split=False):
     mask=np.array([d.startswith(str(hold)) for d in hold_dates]); tr=x[~mask]; yt=y[~mask]; te=x[mask]; ye=y[mask]
     if len(tr)<100 or len(te)<20: raise RuntimeError("INSUFFICIENT_DATE_SPLIT")
     ms={a:[] for a in ALPHAS}; n=len(tr)
@@ -89,7 +92,11 @@ def run_target(x,y,hold):
         for alpha in ALPHAS: ms[alpha].append(float(np.mean((b@fit(a,yt[:cut],alpha)[0]+fit(a,yt[:cut],alpha)[1]-yt[cut:end])**2)))
     alpha=min(ms,key=lambda z:np.mean(ms[z])); rng=np.random.default_rng(0); shuffled=yt.copy(); rng.shuffle(shuffled)
     placebo=score(tr,shuffled,te,ye,alpha); real=score(tr,yt,te,ye,alpha); a,_=scale(tr,tr); beta,_=fit(a,yt,alpha)
-    return {"cv_selected_alpha":alpha,"cv_grid_mse":{str(k):float(np.mean(v)) for k,v in ms.items()},"placebo":placebo,"holdout":real,"coefficients":dict(zip(feature_names,map(float,beta))),"signal_verdict":"NO_SIGNAL" if real["r2_vs_mean"]<=0 else "WEAK_SIGNAL" if real["r2_vs_mean"]<.03 else "LEAKAGE_SUSPECTED" if placebo["r2_vs_mean"]>.05 else "SIGNAL_PRESENT"}
+    result={"cv_selected_alpha":alpha,"cv_grid_mse":{str(k):float(np.mean(v)) for k,v in ms.items()},"placebo":placebo,"holdout":real,"coefficients":dict(zip(feature_names,map(float,beta))),"signal_verdict":"NO_SIGNAL" if real["r2_vs_mean"]<=0 else "WEAK_SIGNAL" if real["r2_vs_mean"]<.03 else "LEAKAGE_SUSPECTED" if placebo["r2_vs_mean"]>.05 else "SIGNAL_PRESENT"}
+    if close_split:
+        close=np.abs(ye)<14
+        result["holdout_games_under_14_margin"]={"n":int(close.sum()),"metrics":score(tr,yt,te[close],ye[close],alpha) if close.any() else None}
+    return result
 
 def main():
     ap=argparse.ArgumentParser(); ap.add_argument("--seasons",default="2021,2022,2023,2024,2025"); ap.add_argument("--holdout",type=int,default=2025); ap.add_argument("--out",default="artifacts/football_baselines.json"); args=ap.parse_args()
@@ -99,7 +106,29 @@ def main():
         if not games: raise RuntimeError(f"{sport}: NO_COMPLETED_GAMES")
         global hold_dates,feature_names
         X,ym,yt,feature_names,hold_dates=features(games)
-        reports[sport]={"source":source,"source_sha256":sha,"games_fetched":len(games),"usable_rows":len(X),"status":"RESEARCH_ONLY_NOT_MODEL_P","targets":{"margin":run_target(X,ym,args.holdout),"total":run_target(X,yt,args.holdout)}}
+        reports[sport]={"source":source,"source_sha256":sha,"games_fetched":len(games),"usable_rows":len(X),"status":"RESEARCH_ONLY_NOT_MODEL_P","targets":{"margin":run_target(X,ym,args.holdout,close_split=(sport=="CFB")),"total":run_target(X,yt,args.holdout)}}
+        if sport=="NFL":
+            hold=np.array([d.startswith(str(args.holdout)) for d in hold_dates])
+            # The feature rows are emitted only after five prior games, so
+            # align market rows by the same sorted/usable game order.
+            usable=sorted(games,key=lambda z:(z["date"],z["id"]))
+            # Rebuild the exact usable keys from the feature pass.
+            keys=[]; prior=defaultdict(int)
+            for d,grp in groupby(usable,key=lambda z:z["date"]):
+                batch=list(grp)
+                for g in batch:
+                    if prior[g["home"]]>=5 and prior[g["away"]]>=5: keys.append((d,g["id"],g))
+                for g in batch: prior[g["home"]]+=1; prior[g["away"]]+=1
+            keyed=[g for _,_,g in keys]
+            mh=np.array([g.get("spread_line") is not None for g in keyed])
+            is_hold=np.array([g["date"].startswith(str(args.holdout)) for g in keyed])
+            if mh[is_hold].any():
+                spread_pred=np.array([-g["spread_line"] if g.get("spread_line") is not None else np.nan for g in keyed])
+                total_pred=np.array([g["total_line"] if g.get("total_line") is not None else np.nan for g in keyed])
+                for label,pred,yv in (("margin",spread_pred,ym),("total",total_pred,yt)):
+                    ok=is_hold & np.isfinite(pred)
+                    actual=yv[ok]; estimate=pred[ok]
+                    reports[sport].setdefault("closing_line_benchmark",{})[label]={"n_holdout":int(ok.sum()),"rmse":float(np.sqrt(np.mean((estimate-actual)**2))),"source_field":"spread_line" if label=="margin" else "total_line","comparison":"MODEL_VS_CLOSING_LINE_REPORTED_ONLY"}
     out=Path(args.out); out.parent.mkdir(parents=True,exist_ok=True); out.write_text(json.dumps({"schema":"FOOTBALL_BASELINES_V1","reports":reports},indent=2)+"\n"); print(json.dumps(reports,indent=2)); return 0
 if __name__=="__main__": raise SystemExit(main())
 
