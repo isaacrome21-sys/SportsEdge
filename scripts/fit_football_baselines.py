@@ -7,6 +7,7 @@ same-date games are emitted before their results are appended.
 """
 from __future__ import annotations
 import argparse, csv, hashlib, io, json, sys
+from datetime import date, timedelta
 from collections import defaultdict
 from itertools import groupby
 from pathlib import Path
@@ -18,8 +19,11 @@ CFB_URL = "https://site.api.espn.com/apis/site/v2/sports/football/college-footba
 ALPHAS = (0.1, 1.0, 10.0, 100.0, 300.0)
 
 def get(url):
-    with urlopen(Request(url, headers={"User-Agent":"SportsEdge-research-fit/1.0"}), timeout=90) as r:
-        return r.read()
+    try:
+        with urlopen(Request(url, headers={"Accept":"application/json", "User-Agent":"SportsEdge-research-fit/1.0"}), timeout=90) as r:
+            return r.read()
+    except Exception as exc:
+        raise RuntimeError(f"SOURCE_FETCH_FAILED:{url}:{type(exc).__name__}:{exc}") from exc
 
 def nfl(seasons):
     raw = get(NFL_URL); rows=[]
@@ -33,17 +37,24 @@ def nfl(seasons):
 def cfb(seasons):
     rows=[]; blobs=[]
     for season in seasons:
-        # ESPN accepts a season year and returns the season scoreboard.
-        raw=get(f"{CFB_URL}?dates={season}&limit=1000"); blobs.append(raw)
-        data=json.loads(raw)
-        for e in data.get("events",[]):
-            comp=(e.get("competitions") or [{}])[0]; teams=comp.get("competitors") or []
-            if len(teams)!=2 or e.get("status",{}).get("type",{}).get("completed") is not True: continue
-            home=next((x for x in teams if x.get("homeAway")=="home"),None); away=next((x for x in teams if x.get("homeAway")=="away"),None)
-            if not home or not away: continue
-            try: hs=int(home["score"]); aas=int(away["score"])
-            except (KeyError,TypeError,ValueError): continue
-            rows.append({"date":e.get("date","")[:10],"id":e.get("id",""),"home":home["team"]["id"],"away":away["team"]["id"],"hs":hs,"as":aas})
+        # A bare season (for example dates=2025) is rejected by ESPN. Query
+        # weekly date ranges instead; groups=80 keeps this to the FBS feed.
+        cursor=date(season, 8, 15)
+        end=date(season + 1, 1, 20)
+        while cursor <= end:
+            week_end=min(cursor + timedelta(days=6), end)
+            start=cursor.strftime("%Y%m%d"); finish=week_end.strftime("%Y%m%d")
+            raw=get(f"{CFB_URL}?dates={start}-{finish}&limit=1000&groups=80"); blobs.append(raw)
+            data=json.loads(raw)
+            for e in data.get("events",[]):
+                comp=(e.get("competitions") or [{}])[0]; teams=comp.get("competitors") or []
+                if len(teams)!=2 or e.get("status",{}).get("type",{}).get("completed") is not True: continue
+                home=next((x for x in teams if x.get("homeAway")=="home"),None); away=next((x for x in teams if x.get("homeAway")=="away"),None)
+                if not home or not away: continue
+                try: hs=int(home["score"]); aas=int(away["score"])
+                except (KeyError,TypeError,ValueError): continue
+                rows.append({"date":e.get("date","")[:10],"id":e.get("id",""),"home":home["team"]["id"],"away":away["team"]["id"],"hs":hs,"as":aas})
+            cursor=week_end + timedelta(days=1)
     return rows, hashlib.sha256(b"".join(blobs)).hexdigest(), CFB_URL
 
 def features(games):
