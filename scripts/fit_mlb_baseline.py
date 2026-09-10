@@ -265,8 +265,20 @@ def main() -> int:
         return 2
 
     canonical_games = sorted(games, key=lambda r: (r["date"], int(r["game_pk"])))
-    if len({int(row["game_pk"]) for row in canonical_games}) != len(canonical_games):
+    grouped_by_pk: dict[int, list[dict[str, Any]]] = defaultdict(list)
+    for row in canonical_games:
+        grouped_by_pk[int(row["game_pk"])].append(row)
+    duplicate_rows = {pk: rows for pk, rows in grouped_by_pk.items() if len(rows) > 1}
+    if duplicate_rows:
+        diagnostic = {
+            "duplicate_game_pk_count": len(duplicate_rows),
+            "duplicates": [
+                {"game_pk": pk, "rows": rows}
+                for pk, rows in sorted(duplicate_rows.items())
+            ],
+        }
         print("duplicate game_pk in StatsAPI source rows", file=sys.stderr)
+        print(json.dumps(diagnostic, sort_keys=True), file=sys.stderr)
         return 2
 
     X, y_margin, y_total, names, dates, game_pks = build_rows(canonical_games)
