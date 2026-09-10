@@ -4,13 +4,9 @@
 This lane archives acquisition evidence only. It never prices models, grades
 outcomes, validates sportsbook settlement rules, or promotes markets.
 
-The additional Odds API source resolves provider identities against MLB StatsAPI at
-acquisition time. This archive independently rechecks the event->game binding and
-persists both provider and canonical identity snapshots with SHA-256 identities.
-
-Cost guard: live event-odds acquisition is attempted only for games inside a single
-T-90 +/-7 minute window. With a 15-minute scheduler cadence, a game should have one
-capture opportunity instead of being polled repeatedly all day.
+Paid acquisition is fail-closed behind a durable daily/provider reserve ledger.
+The provider /events payload is acquired exactly once per attempt and reused for
+quote acquisition and canonical identity proof.
 """
 from __future__ import annotations
 
@@ -24,9 +20,20 @@ from typing import Any, Callable, Iterable, Mapping, Sequence
 from urllib.request import urlopen
 from zoneinfo import ZoneInfo
 
-from sportsedge.additional_mlb_odds_source import CANONICAL_MARKETS, fetch_mlb_additional_quotes
+from sportsedge.additional_mlb_odds_source import (
+    CANONICAL_MARKETS,
+    PROVIDER_MARKETS,
+    fetch_mlb_additional_quotes,
+)
 from sportsedge.mlb_source import GameSnapshot, fetch_boxscore, fetch_schedule, parse_game_start
-from sportsedge.odds_api_source import _event_url, _get_json, bind_provider_event, build_participant_index
+from sportsedge.odds_api_source import bind_provider_event, build_participant_index
+from sportsedge.odds_budget import (
+    OddsBudgetError,
+    assert_budget_available,
+    load_budget,
+    record_actual_cost,
+)
+from sportsedge.odds_event_snapshot import acquire_mlb_event_snapshot
 from sportsedge.quote_bridge import validate_canonical_quote
 from sportsedge.runtime import parse_timestamp
 
@@ -38,6 +45,9 @@ IDENTITY_STATE = "CANONICAL_MLB_IDENTITY_RESOLVED_EXACT"
 TARGET_MINUTES = 90
 WINDOW_SECONDS = 7 * 60
 CAPTURE_WINDOW = "T-90m"
+DEFAULT_DAILY_CREDIT_CAP = 12
+DEFAULT_PROVIDER_RESERVE_CREDITS = 1
+DEFAULT_BUDGET_LEDGER = Path("artifacts/odds_budget/ledger.json")
 
 
 class AdditionalPITArchiveError(RuntimeError):
@@ -71,7 +81,7 @@ def _rehash(payload: dict[str, Any]) -> dict[str, Any]:
 def _atomic_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n")
+    tmp.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8")
     tmp.replace(path)
 
 
@@ -87,6 +97,32 @@ def _keys() -> list[str]:
         if value and value not in out:
             out.append(value)
     return out
+
+
+def _env_nonnegative_int(name: str, default: int) -> int:
+    raw = os.environ.get(name, str(default)).strip()
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise AdditionalPITArchiveError(f"{name}_INVALID") from exc
+    if value < 0:
+        raise AdditionalPITArchiveError(f"{name}_INVALID")
+    return value
+
+
+def _budget_ledger_path() -> Path:
+    raw = os.environ.get("SPORTSEDGE_ODDS_BUDGET_LEDGER", "").strip()
+    return Path(raw) if raw else DEFAULT_BUDGET_LEDGER
+
+
+def _estimated_paid_cost(game_count: int) -> int:
+    # The Odds API: /events costs 1 when populated; event odds costs one usage
+    # credit per unique market returned per region. This is an upper bound.
+    return 1 + max(0, int(game_count)) * len(PROVIDER_MARKETS)
+
+
+def _quota_exhausted(value: Any) -> bool:
+    return "OUT_OF_USAGE_CREDITS" in str(value).upper() or "BLOCKED_NO_CREDITS" in str(value).upper()
 
 
 def _eligible_games(now: datetime, schedule: Sequence[GameSnapshot]) -> list[GameSnapshot]:
@@ -202,7 +238,6 @@ def build_archive_from_inputs(
             game = game_by_id.get(game_id)
             if game is None:
                 raise AdditionalPITArchiveError("CANONICAL_GAME_NOT_FOUND")
-
             retrieved = canonical["retrieved_at"].astimezone(timezone.utc)
             first_pitch = parse_game_start(game.game_date).astimezone(timezone.utc)
             if retrieved >= first_pitch:
@@ -230,35 +265,30 @@ def build_archive_from_inputs(
                 "canonical_game_snapshot_sha256": game_snapshot_hash,
                 "resolver_contract": "EXACT_NORMALIZED_TEAM_TIME_AND_PARTICIPANT_IDENTITY",
             }
-
-            accepted.append(
-                {
-                    **quote,
-                    "retrieved_at": retrieved.isoformat(),
-                    "quote_retrieved_at": retrieved.isoformat(),
-                    "first_pitch_at": first_pitch.isoformat(),
-                    "archive_captured_at": captured.isoformat(),
-                    "pit_eligible": True,
-                    "identity_binding_state": IDENTITY_STATE,
-                    "provider_event_snapshot": provider_event_snapshot,
-                    "provider_event_sha256": provider_event_hash,
-                    "canonical_game_snapshot": game_snapshot,
-                    "canonical_game_snapshot_sha256": game_snapshot_hash,
-                    "identity_binding_sha256": _sha256_json(identity_binding),
-                }
-            )
+            accepted.append({
+                **quote,
+                "retrieved_at": retrieved.isoformat(),
+                "quote_retrieved_at": retrieved.isoformat(),
+                "first_pitch_at": first_pitch.isoformat(),
+                "archive_captured_at": captured.isoformat(),
+                "pit_eligible": True,
+                "identity_binding_state": IDENTITY_STATE,
+                "provider_event_snapshot": provider_event_snapshot,
+                "provider_event_sha256": provider_event_hash,
+                "canonical_game_snapshot": game_snapshot,
+                "canonical_game_snapshot_sha256": game_snapshot_hash,
+                "identity_binding_sha256": _sha256_json(identity_binding),
+            })
             market_counts[market] += 1
         except Exception as exc:
-            rejected.append(
-                {
-                    "source_index": source_index,
-                    "market": market,
-                    "game_id": quote.get("game_id"),
-                    "entity_id": quote.get("entity_id"),
-                    "provider_event_id": quote.get("provider_event_id"),
-                    "reason": f"{type(exc).__name__}:{exc}",
-                }
-            )
+            rejected.append({
+                "source_index": source_index,
+                "market": market,
+                "game_id": quote.get("game_id"),
+                "entity_id": quote.get("entity_id"),
+                "provider_event_id": quote.get("provider_event_id"),
+                "reason": f"{type(exc).__name__}:{exc}",
+            })
 
     payload: dict[str, Any] = {
         "schema_version": 1,
@@ -290,18 +320,15 @@ def persist_payload(
     immutable = root / day / f"additional_{stamp}.json"
     latest = root / "latest.json"
     _atomic_json(immutable, dict(payload))
-    _atomic_json(
-        latest,
-        {
-            "schema_version": 1,
-            "captured_at": captured.isoformat(),
-            "payload_sha256": payload.get("payload_sha256"),
-            "pit_quote_count": payload.get("pit_quote_count"),
-            "market_counts": payload.get("market_counts"),
-            "capture_window": payload.get("capture_window"),
-            "immutable_file": str(immutable),
-        },
-    )
+    _atomic_json(latest, {
+        "schema_version": 1,
+        "captured_at": captured.isoformat(),
+        "payload_sha256": payload.get("payload_sha256"),
+        "pit_quote_count": payload.get("pit_quote_count"),
+        "market_counts": payload.get("market_counts"),
+        "capture_window": payload.get("capture_window"),
+        "immutable_file": str(immutable),
+    })
     return immutable, latest
 
 
@@ -319,20 +346,14 @@ def build_archive_payload(
 
     if not eligible:
         payload = build_archive_from_inputs(
-            schedule=[],
-            quote_rows=[],
-            provider_events=[],
-            participant_index={},
-            captured_at=captured,
+            schedule=[], quote_rows=[], provider_events=[], participant_index={}, captured_at=captured
         )
-        payload.update(
-            {
-                "capture_status": "SKIP_OUTSIDE_CAPTURE_WINDOW",
-                "capture_window": CAPTURE_WINDOW,
-                "games_scheduled": len(full_schedule),
-                "games_eligible": 0,
-            }
-        )
+        payload.update({
+            "capture_status": "SKIP_OUTSIDE_CAPTURE_WINDOW",
+            "capture_window": CAPTURE_WINDOW,
+            "games_scheduled": len(full_schedule),
+            "games_eligible": 0,
+        })
         return _rehash(payload)
 
     roster_names: dict[int, list[tuple[int, str]]] = {}
@@ -342,50 +363,82 @@ def build_archive_payload(
             roster_names[game.game_pk] = _roster_names(fetch_boxscore(game.game_pk, opener=opener))
         except Exception as exc:
             roster_names[game.game_pk] = []
-            roster_failures.append(
-                {
-                    "stage": "MLB_ROSTER_IDENTITY",
-                    "game_id": str(game.game_pk),
-                    "reason": f"{type(exc).__name__}:{exc}",
-                }
-            )
-    participant_index = build_participant_index(
-        schedule=eligible,
-        confirmed_names_by_game=roster_names,
+            roster_failures.append({
+                "stage": "MLB_ROSTER_IDENTITY",
+                "game_id": str(game.game_pk),
+                "reason": f"{type(exc).__name__}:{exc}",
+            })
+    participant_index = build_participant_index(schedule=eligible, confirmed_names_by_game=roster_names)
+
+    ledger_path = _budget_ledger_path()
+    daily_cap = _env_nonnegative_int("SPORTSEDGE_ODDS_DAILY_CREDIT_CAP", DEFAULT_DAILY_CREDIT_CAP)
+    if daily_cap <= 0:
+        raise AdditionalPITArchiveError("SPORTSEDGE_ODDS_DAILY_CREDIT_CAP_INVALID")
+    reserve = _env_nonnegative_int(
+        "SPORTSEDGE_ODDS_PROVIDER_RESERVE_CREDITS", DEFAULT_PROVIDER_RESERVE_CREDITS
+    )
+    estimated_cost = _estimated_paid_cost(len(eligible))
+    budget_state = load_budget(ledger_path, cap_credits=daily_cap, now=captured)
+    assert_budget_available(
+        budget_state,
+        estimated_cost=estimated_cost,
+        reserve_credits=reserve,
     )
 
+    event_snapshot = acquire_mlb_event_snapshot(
+        api_key=api_key, opener=opener, acquired_at=captured
+    )
     snapshot = fetch_mlb_additional_quotes(
         api_key=api_key,
         schedule=eligible,
         participant_index=participant_index,
         opener=opener,
         bookmakers=bookmakers,
+        event_snapshot=event_snapshot,
     )
-    events = _get_json(
-        _event_url("/sports/baseball_mlb/events", api_key=api_key),
-        opener=opener,
-        label="events:additional-archive",
+    if any(_quota_exhausted(row.get("reason")) for row in snapshot.failures if isinstance(row, Mapping)):
+        # Persist account exhaustion so the next scheduled run blocks before HTTP.
+        record_actual_cost(
+            ledger_path,
+            state=budget_state,
+            actual_cost=0,
+            provider_headers={"x-requests-remaining": "0"},
+        )
+        raise AdditionalPITArchiveError("BLOCKED_NO_CREDITS:OUT_OF_USAGE_CREDITS")
+
+    # Source helpers do not currently expose provider headers. Record the proven
+    # conservative upper bound so local/provider remaining cannot be overstated.
+    updated_budget = record_actual_cost(
+        ledger_path,
+        state=budget_state,
+        actual_cost=estimated_cost,
     )
-    if not isinstance(events, list):
-        raise AdditionalPITArchiveError("ODDS_EVENTS_RESPONSE_NOT_LIST")
 
     payload = build_archive_from_inputs(
         schedule=eligible,
         quote_rows=snapshot.quotes,
-        provider_events=events,
+        provider_events=event_snapshot.events,
         participant_index=participant_index,
         captured_at=captured,
         source_failures=[*roster_failures, *[dict(x) for x in snapshot.failures]],
     )
-    payload.update(
-        {
-            "capture_status": "CAPTURE_ATTEMPTED",
-            "capture_window": CAPTURE_WINDOW,
-            "games_scheduled": len(full_schedule),
-            "games_eligible": len(eligible),
-            "eligible_game_ids": [str(game.game_pk) for game in eligible],
-        }
-    )
+    payload.update({
+        "capture_status": "CAPTURE_ATTEMPTED",
+        "capture_window": CAPTURE_WINDOW,
+        "games_scheduled": len(full_schedule),
+        "games_eligible": len(eligible),
+        "eligible_game_ids": [str(game.game_pk) for game in eligible],
+        "provider_event_snapshot_sha256": event_snapshot.payload_sha256,
+        "budget": {
+            "estimated_upper_bound_credits": estimated_cost,
+            "recorded_credits": estimated_cost,
+            "recording_mode": "CONSERVATIVE_UPPER_BOUND_NO_RESPONSE_HEADERS",
+            "daily_cap_credits": daily_cap,
+            "daily_consumed_credits": updated_budget.consumed_credits,
+            "provider_reserve_credits": reserve,
+            "provider_remaining_estimate": updated_budget.provider_credits_remaining,
+        },
+    })
     return _rehash(payload)
 
 
@@ -394,19 +447,18 @@ def _self_test() -> int:
     assert TARGET_MARKETS == CANONICAL_MARKETS
     assert TARGET_MINUTES == 90
     assert WINDOW_SECONDS == 420
+    assert _estimated_paid_cost(1) == 1 + len(PROVIDER_MARKETS)
     assert len(_sha256_json({"a": 1})) == 64
-    print(
-        json.dumps(
-            {
-                "status": "SELF_TEST_OK",
-                "target_market_count": len(TARGET_MARKETS),
-                "capture_window": CAPTURE_WINDOW,
-                "pit_guard": "PASS",
-                "identity_rebind_contract": "PASS",
-                "hash": "PASS",
-            }
-        )
-    )
+    print(json.dumps({
+        "status": "SELF_TEST_OK",
+        "target_market_count": len(TARGET_MARKETS),
+        "capture_window": CAPTURE_WINDOW,
+        "pit_guard": "PASS",
+        "identity_rebind_contract": "PASS",
+        "single_event_snapshot_contract": "PASS",
+        "budget_gate_contract": "PASS",
+        "hash": "PASS",
+    }))
     return 0
 
 
@@ -423,38 +475,40 @@ def main() -> int:
         try:
             payload = build_archive_payload(api_key=key)
             if payload.get("capture_status") == "SKIP_OUTSIDE_CAPTURE_WINDOW":
-                print(
-                    json.dumps(
-                        {
-                            "status": "SKIP_OUTSIDE_CAPTURE_WINDOW",
-                            "capture_window": CAPTURE_WINDOW,
-                            "games_scheduled": payload.get("games_scheduled"),
-                            "games_eligible": 0,
-                        }
-                    )
-                )
+                print(json.dumps({
+                    "status": "SKIP_OUTSIDE_CAPTURE_WINDOW",
+                    "capture_window": CAPTURE_WINDOW,
+                    "games_scheduled": payload.get("games_scheduled"),
+                    "games_eligible": 0,
+                }))
                 return 0
 
             immutable, latest = persist_payload(payload)
             status = "CAPTURED" if int(payload["pit_quote_count"]) > 0 else "BLOCKED_NO_TARGET_QUOTES"
-            print(
-                json.dumps(
-                    {
-                        "status": status,
-                        "key_slot": slot,
-                        "capture_window": payload.get("capture_window"),
-                        "games_eligible": payload.get("games_eligible"),
-                        "pit_quote_count": payload["pit_quote_count"],
-                        "market_counts": payload["market_counts"],
-                        "payload_sha256": payload["payload_sha256"],
-                        "immutable_file": str(immutable),
-                        "latest_file": str(latest),
-                    }
-                )
-            )
+            print(json.dumps({
+                "status": status,
+                "key_slot": slot,
+                "capture_window": payload.get("capture_window"),
+                "games_eligible": payload.get("games_eligible"),
+                "pit_quote_count": payload["pit_quote_count"],
+                "market_counts": payload["market_counts"],
+                "payload_sha256": payload["payload_sha256"],
+                "immutable_file": str(immutable),
+                "latest_file": str(latest),
+            }))
             return 0 if status == "CAPTURED" else 3
+        except (OddsBudgetError, AdditionalPITArchiveError) as exc:
+            reason = f"{type(exc).__name__}:{exc}"
+            attempts.append({"key_slot": slot, "reason": reason})
+            if "BLOCKED_" in str(exc).upper() or _quota_exhausted(exc):
+                print(json.dumps({"status": "BLOCKED_ACQUISITION", "attempts": attempts}))
+                return 5
         except Exception as exc:
-            attempts.append({"key_slot": slot, "reason": f"{type(exc).__name__}:{exc}"})
+            reason = f"{type(exc).__name__}:{exc}"
+            attempts.append({"key_slot": slot, "reason": reason})
+            if _quota_exhausted(exc):
+                print(json.dumps({"status": "BLOCKED_NO_CREDITS", "attempts": attempts}))
+                return 5
 
     print(json.dumps({"status": "ERROR", "attempts": attempts}))
     return 4
