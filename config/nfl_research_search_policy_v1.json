@@ -33,5 +33,16 @@
     2019
   ],
   "training_seasons_for_immediate_holdout": "2010-2016",
-  "redesign_before_attempt_2": true
+  "redesign_before_attempt_2": true,
+  "comparison_rule": "Do not compare metrics across holdout definitions; compare control versus candidate within the same window.",
+  "other_sports": {
+    "CFB": {
+      "feature_attempts_allowed": false,
+      "required_before_search": "freeze a widened chronological holdout and matched control"
+    },
+    "MLB": {
+      "feature_attempts_allowed": false,
+      "required_before_search": "freeze a widened chronological holdout and matched control"
+    }
+  }
 }
