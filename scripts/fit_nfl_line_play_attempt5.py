@@ -37,13 +37,13 @@ def features(games,stats):
             h,a=g["home"],g["away"]; hs=stats.get((str(g["id"]),str(h))); aas=stats.get((str(g["id"]),str(a)))
             if len(hist[h])<5 or len(hist[a])<5 or not hs or not aas: continue
             hp=np.mean(np.asarray(hist[h][-10:],float),axis=0); ap=np.mean(np.asarray(hist[a][-10:],float),axis=0)
-            X.append([hp[0],hp[1],ap[0],ap[1],hp[0]-hp[1],ap[0]-ap[1],hp[2],hp[3],ap[2],ap[3],ap[2],ap[3],hp[2],hp[3]])
+            X.append([hp[0],hp[1],ap[0],ap[1],hp[0]-hp[1],ap[0]-ap[1],hp[2],hp[3],hp[4],hp[5],ap[2],ap[3],ap[4],ap[5]])
             ym.append(g["hs"]-g["as"]);yt.append(g["hs"]+g["as"]);dates.append(d);keys.append((d,str(g["id"]),g))
         for g in batch:
             h,a=g["home"],g["away"]; hs=stats.get((str(g["id"]),str(h))); aas=stats.get((str(g["id"]),str(a)))
             if hs and aas:
-                hist[h].append([g["hs"],g["as"],hs["pressure"],hs["sack"]])
-                hist[a].append([g["as"],g["hs"],aas["pressure"],aas["sack"]])
+                hist[h].append([g["hs"],g["as"],hs["pressure"],hs["sack"],aas["pressure"],aas["sack"]])
+                hist[a].append([g["as"],g["hs"],aas["pressure"],aas["sack"],hs["pressure"],hs["sack"]])
     return np.asarray(X,float),np.asarray(ym,float),np.asarray(yt,float),names,dates,keys
 def bench(report,games,keys,start,end,target):
     rows={(str(g["date"]),str(g["id"])):g for g in games}
