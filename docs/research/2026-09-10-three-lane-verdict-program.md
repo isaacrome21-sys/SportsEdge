@@ -79,3 +79,16 @@ Status: DONE for the attempt; FAILS_BAR for both NFL targets.
 - Placebo status: training-only placebo R² was negative for both targets (margin -0.0604; total -0.0031), with no placebo-based leakage indication.
 - Decision: EPA efficiency did not clear the frozen criterion. Do not freeze an artifact, change eligibility, or promote Model_P. Attempt 3 is consumed; next registered NFL family is situational features.
 - Evidence: report artifact digest `sha256:196513ef937aefd20225664ece27f930e608618e85a31334d9f9d02601f95534`.
+
+
+## NFL Attempt 4 result (run 34489425960)
+
+Status: DONE for the attempt; FAILS_BAR for both NFL targets.
+
+- Feature family: point-in-time rest differential, short-week flags, and extended-rest flags added to the rolling baseline.
+- Window: train 2010-2016; validate 2017-2019; 779 games with closing lines.
+- Margin: model RMSE 13.8473 versus closing spread RMSE 13.1949; delta +0.6524; paired-bootstrap 95% CI [+0.3876, +0.9157]. Close-game (absolute margin <=7) R² was -0.7243 versus the mean.
+- Total: model RMSE 14.1088 versus closing total RMSE 13.6406; delta +0.4682; paired-bootstrap 95% CI [+0.2224, +0.7128].
+- CV alphas: margin 100.0; total 100.0.
+- Decision: situational features did not clear the frozen criterion. No artifact freeze, eligibility change, or Model_P promotion. Attempt 4 is consumed; next registered NFL family is line play.
+- Evidence: report artifact digest `sha256:451da815cda1dfbecf08f1c2b05ad67c47f0f3f7433f79ecfa9c1d920f445956`.
