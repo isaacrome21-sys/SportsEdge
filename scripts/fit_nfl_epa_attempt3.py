@@ -106,7 +106,7 @@ def benchmark(reports, games, dates, keys, hold_start, hold_end, target):
     target_keys = {(d, k) for d, k, _ in keys if hold_start <= int(d[:4]) <= hold_end}
     rows = {(str(g["date"]), str(g["id"])): g for g in games}
     selected = [rows[k] for k in sorted(target_keys) if k in rows]
-    model = np.asarray(reports[target]["holdout_predictions"], float)
+    model = np.asarray(reports["holdout_predictions"], float)
     if len(model) != len(selected):
         raise RuntimeError(f"EPA_BENCHMARK_ALIGNMENT_FAILED:{target}:model={len(model)}:rows={len(selected)}")
     field = "spread_line" if target == "margin" else "total_line"
