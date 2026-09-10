@@ -6,9 +6,9 @@
   "future_forward_holdout_season": 2026,
   "future_forward_holdout_use": "final_forward_validation_after_feature_freeze",
   "feature_search_attempt_budget": 10,
-  "attempts_already_spent": 9,
-  "attempts_remaining_before_attempt_2": 1,
-  "next_feature_attempt": "fitted_home_field",
+  "attempts_already_spent": 10,
+  "attempts_remaining_before_attempt_2": 0,
+  "next_feature_attempt": null,
   "attempt_2_specification": "Add point-in-time quarterback availability/performance features without using closing-market fields.",
   "attempt_2_result": "FAILS_BAR: both NFL target paired-bootstrap 95% CIs remain above zero versus closing lines.",
   "next_feature_attempt_specification": "Add point-in-time fitted per-team home-field parameters.",
@@ -82,5 +82,12 @@
   "attempt_9_specification": "Apply fixed exponential recency weighting (decay 0.85) to point-in-time rolling baseline features.",
   "attempt_9_result": "FAILS_BAR: margin model-minus-close RMSE +0.592854 (95% CI +0.331647 to +0.844068); total +0.356766 (95% CI +0.121105 to +0.580444).",
   "attempt_9_report_sha256": "sha256:9c95c0cbefc2f99f6dec37fda01f58d2fcac0ad6770de2c9311fbf5ce40ea996",
-  "attempt_9_run_url": "https://github.com/isaacrome21-sys/SportsEdge/actions/runs/34492360674"
+  "attempt_9_run_url": "https://github.com/isaacrome21-sys/SportsEdge/actions/runs/34492360674",
+  "attempt_10_specification": "Add point-in-time team-specific home-field effects from each team's prior home or away results.",
+  "attempt_10_result": "FAILS_BAR: margin model-minus-close RMSE +0.615743 (95% CI +0.352377 to +0.877986); total +0.401987 (95% CI +0.172602 to +0.626003).",
+  "attempt_10_report_sha256": "sha256:9f28430792a1efc4807642d033d0e85bc56d6b8bb3bb3df1dcefe7382cfa8e35",
+  "attempt_10_run_url": "https://github.com/isaacrome21-sys/SportsEdge/actions/runs/34492932580",
+  "feature_search_status": "EXHAUSTED_FAILS_BAR",
+  "final_feature_search_verdict": "FAILS_BAR: ten pre-registered NFL feature specifications failed to produce a paired-bootstrap 95% CI including zero versus closing prices on the 2017-2019 validation window.",
+  "post_search_status": "SEGMENT_AND_TIMING_PENDING"
 }
