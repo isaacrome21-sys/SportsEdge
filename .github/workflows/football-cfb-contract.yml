@@ -52,6 +52,8 @@ jobs:
             sportsedge/sports/cfb/run_machine.py \
             sportsedge/sports/cfb/historical_features.py \
             sportsedge/sports/cfb/model_artifact.py \
+            sportsedge/sports/cfb/paths.py \
+            sportsedge/sports/cfb/source_manifest.py \
             sportsedge/sports/cfb/training_artifact.py \
             scripts/build_cfb_model_artifact.py \
             scripts/verify_evidence_determinism.py \
@@ -64,9 +66,12 @@ jobs:
         run: |
           python - <<'PY'
           import json
+          from hashlib import sha256
           from pathlib import Path
 
           from sportsedge.sports.cfb.historical_features import CFB_HISTORICAL_MATERIALIZER_VERSION
+          from sportsedge.sports.cfb.joint_model import CFB_FEATURE_CONTRACT
+          from sportsedge.sports.cfb.source_manifest import CFB_PIT_SOURCE_MANIFEST_SCHEMA
           from sportsedge.sports.cfb.training_artifact import CFB_PIT_TRAINING_BUNDLE_SCHEMA
 
           team_keys = (
@@ -78,10 +83,7 @@ jobs:
           )
 
           def metrics(offset: float) -> dict[str, float]:
-              return {
-                  key: round((index + 1) / 10.0 + offset, 8)
-                  for index, key in enumerate(team_keys)
-              }
+              return {key: round((index + 1) / 10.0 + offset, 8) for index, key in enumerate(team_keys)}
 
           rows = []
           for i in range(24):
@@ -102,10 +104,51 @@ jobs:
                   'away_score': 10 + ((i * 7) % 27),
               })
 
+          root = Path('artifacts/cfb/determinism/source_evidence')
+          root.mkdir(parents=True, exist_ok=True)
+          feature_bytes = b'cfb-determinism-feature-snapshot-v1\n'
+          label_bytes = b'cfb-determinism-label-snapshot-v1\n'
+          (root / 'features.json').write_bytes(feature_bytes)
+          (root / 'labels.json').write_bytes(label_bytes)
+
+          manifest = {
+              'schema_version': CFB_PIT_SOURCE_MANIFEST_SCHEMA,
+              'generated_at_utc': '2026-01-15T11:00:00+00:00',
+              'fit_max_season': 2023,
+              'training_window': {'min_season': 2022, 'max_season': 2023},
+              'materializer_version': CFB_HISTORICAL_MATERIALIZER_VERSION,
+              'feature_contract': CFB_FEATURE_CONTRACT,
+              'post_cutoff_information_excluded': True,
+              'market_data_used_as_model_feature': False,
+              'sources': [
+                  {
+                      'source_id': 'features', 'role': 'FEATURE_INPUT', 'provider': 'ci-fixture',
+                      'dataset': 'determinism-features', 'locator': 'fixture://features',
+                      'snapshot_path': 'features.json', 'retrieved_at_utc': '2026-01-15T10:00:00+00:00',
+                      'content_sha256': sha256(feature_bytes).hexdigest(),
+                      'availability_mode': 'EVENT_TIMESTAMPED_REPLAY',
+                      'availability_rule': 'CI fixture PIT feature snapshot only.', 'market_data': False,
+                      'post_cutoff_excluded': True, 'seasons': [2022, 2023],
+                  },
+                  {
+                      'source_id': 'labels', 'role': 'LABEL', 'provider': 'ci-fixture',
+                      'dataset': 'determinism-labels', 'locator': 'fixture://labels',
+                      'snapshot_path': 'labels.json', 'retrieved_at_utc': '2026-01-15T10:00:00+00:00',
+                      'content_sha256': sha256(label_bytes).hexdigest(),
+                      'availability_mode': 'POST_EVENT_LABEL',
+                      'availability_rule': 'CI fixture final labels only.', 'market_data': False,
+                      'post_cutoff_excluded': True, 'seasons': [2022, 2023],
+                  },
+              ],
+          }
+          manifest_raw = (json.dumps(manifest, sort_keys=True, separators=(',', ':')) + '\n').encode()
+          manifest_path = Path('artifacts/cfb/determinism/cfb_pit_source_manifest.json')
+          manifest_path.write_bytes(manifest_raw)
+
           bundle = {
               'schema_version': CFB_PIT_TRAINING_BUNDLE_SCHEMA,
               'materializer_version': CFB_HISTORICAL_MATERIALIZER_VERSION,
-              'source_manifest_sha256': 'c' * 64,
+              'source_manifest_sha256': sha256(manifest_raw).hexdigest(),
               'generated_at_utc': '2026-01-15T12:00:00+00:00',
               'rows': rows,
           }
@@ -114,29 +157,33 @@ jobs:
           path.write_text(json.dumps(bundle, sort_keys=True, separators=(',', ':')) + '\n', encoding='utf-8')
           PY
 
-      - name: Build CFB replay attempt A from frozen training bundle
+      - name: Build CFB replay attempt A from verified frozen evidence
         env:
           TZ: UTC
         run: >-
           python scripts/build_cfb_model_artifact.py
           --training-bundle artifacts/cfb/determinism/cfb_pit_training_bundle.json
+          --source-manifest artifacts/cfb/determinism/cfb_pit_source_manifest.json
+          --source-evidence-root artifacts/cfb/determinism/source_evidence
           --fit-max-season 2023
           --git-sha "$EVIDENCE_GIT_SHA"
           --output artifacts/cfb/determinism/ci_attempt_001/model.json
           --provenance-output artifacts/cfb/determinism/ci_attempt_001/provenance.json
 
-      - name: Build CFB replay B from same bundle with shifted timezone
+      - name: Build CFB replay B from same verified evidence with shifted timezone
         env:
           TZ: Pacific/Kiritimati
         run: >-
           python scripts/build_cfb_model_artifact.py
           --training-bundle artifacts/cfb/determinism/cfb_pit_training_bundle.json
+          --source-manifest artifacts/cfb/determinism/cfb_pit_source_manifest.json
+          --source-evidence-root artifacts/cfb/determinism/source_evidence
           --fit-max-season 2023
           --git-sha "$EVIDENCE_GIT_SHA"
           --output artifacts/cfb/determinism/ci_replay_001/model.json
           --provenance-output artifacts/cfb/determinism/ci_replay_001/provenance.json
 
-      - name: Verify CFB training-bundle-to-artifact byte determinism
+      - name: Verify CFB verified-source-to-artifact byte determinism
         id: cfb_determinism
         continue-on-error: true
         run: >-
@@ -146,7 +193,7 @@ jobs:
           --candidate-dir artifacts/cfb/determinism/ci_replay_001
           --expected-git-sha "$EVIDENCE_GIT_SHA"
           --determinism-class SAME_ENV_SAME_SHA
-          --replay-scope TRAINING_BUNDLE_TO_ARTIFACT
+          --replay-scope VERIFIED_SOURCE_SNAPSHOT_TO_ARTIFACT
           --clock-perturbation "BASELINE_TZ=UTC;REPLAY_TZ=Pacific/Kiritimati"
           --source-identity-field training_bundle_sha256
           --baseline-label CI_ATTEMPT_001
@@ -160,10 +207,12 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: cfb-training-bundle-determinism-${{ env.EVIDENCE_GIT_SHA }}
+          name: cfb-verified-source-determinism-${{ env.EVIDENCE_GIT_SHA }}
           path: |
             artifacts/cfb/cfb_determinism_report.json
             artifacts/cfb/determinism/cfb_pit_training_bundle.json
+            artifacts/cfb/determinism/cfb_pit_source_manifest.json
+            artifacts/cfb/determinism/source_evidence/*
             artifacts/cfb/determinism/ci_attempt_001/*.json
             artifacts/cfb/determinism/ci_replay_001/*.json
           if-no-files-found: warn
@@ -184,7 +233,7 @@ jobs:
               'status': 'PASS',
               'gate_basis': 'BYTE_IDENTITY',
               'determinism_class': 'SAME_ENV_SAME_SHA',
-              'replay_scope': 'TRAINING_BUNDLE_TO_ARTIFACT',
+              'replay_scope': 'VERIFIED_SOURCE_SNAPSHOT_TO_ARTIFACT',
               'clock_perturbation': 'BASELINE_TZ=UTC;REPLAY_TZ=Pacific/Kiritimati',
               'source_identity_field': 'training_bundle_sha256',
               'all_bytes_equal': True,
