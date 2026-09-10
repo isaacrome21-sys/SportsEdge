@@ -3,28 +3,41 @@ name: mlb-additional-pit-archive
 on:
   workflow_dispatch:
   schedule:
-    # One T-90 +/-7 minute opportunity per game cluster without polling every few minutes.
     - cron: '7,22,37,52 * * * *'
   pull_request:
     paths:
       - 'scripts/archive_mlb_additional_odds.py'
       - 'sportsedge/additional_mlb_odds_source.py'
+      - 'sportsedge/odds_budget.py'
+      - 'sportsedge/odds_event_snapshot.py'
+      - 'sportsedge/odds_keyring.py'
+      - 'sportsedge/runtime.py'
       - 'tests/test_archive_mlb_additional_odds.py'
+      - 'tests/test_odds_budget.py'
+      - 'tests/test_odds_keyring.py'
       - 'tests/test_additional_binary_quote_provenance.py'
       - '.github/workflows/mlb-additional-pit-archive.yml'
   push:
     paths:
       - 'scripts/archive_mlb_additional_odds.py'
       - 'sportsedge/additional_mlb_odds_source.py'
+      - 'sportsedge/odds_budget.py'
+      - 'sportsedge/odds_event_snapshot.py'
+      - 'sportsedge/odds_keyring.py'
+      - 'sportsedge/runtime.py'
       - 'tests/test_archive_mlb_additional_odds.py'
+      - 'tests/test_odds_budget.py'
+      - 'tests/test_odds_keyring.py'
       - 'tests/test_additional_binary_quote_provenance.py'
       - '.github/workflows/mlb-additional-pit-archive.yml'
 
 permissions:
   contents: write
 
+# Shared paid-provider lock: two scheduled lanes must never spend from the same
+# durable ledger concurrently.
 concurrency:
-  group: mlb-additional-pit-archive-${{ github.ref }}
+  group: sportsedge-odds-api-paid-acquisition
   cancel-in-progress: false
 
 jobs:
@@ -38,14 +51,18 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12.13'
-      - name: Install runtime dependencies
-        run: python -m pip install --disable-pip-version-check numpy==2.5.3
-      - name: Compile additional PIT lane
-        run: python -m py_compile scripts/archive_mlb_additional_odds.py sportsedge/additional_mlb_odds_source.py
+      - name: Compile additional PIT lane without model dependencies
+        run: python -m py_compile scripts/archive_mlb_additional_odds.py sportsedge/additional_mlb_odds_source.py sportsedge/odds_budget.py sportsedge/odds_event_snapshot.py sportsedge/runtime.py
+      - name: Prove acquisition import does not require NumPy
+        run: python -I -c "import sys; sys.path.insert(0, '.'); import sportsedge.quote_bridge; import sportsedge.runtime; assert 'numpy' not in sys.modules"
       - name: Self-test additional PIT lane
         run: python scripts/archive_mlb_additional_odds.py --self-test
       - name: Run additional PIT archive tests
         run: python -m unittest discover -s tests -p 'test_archive_mlb_additional_odds.py'
+      - name: Run odds budget tests
+        run: python -m unittest discover -s tests -p 'test_odds_budget.py'
+      - name: Run keyring quota-stop tests
+        run: python -m unittest discover -s tests -p 'test_odds_keyring.py'
       - name: Verify binary participant provenance survives source to archive
         run: python -m unittest discover -s tests -p 'test_additional_binary_quote_provenance.py'
       - name: Recheck additional quote mappings
@@ -64,6 +81,9 @@ jobs:
       SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
       SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
       SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
+      SPORTSEDGE_ODDS_BUDGET_LEDGER: artifacts/odds_budget/ledger.json
+      SPORTSEDGE_ODDS_DAILY_CREDIT_CAP: '12'
+      SPORTSEDGE_ODDS_PROVIDER_RESERVE_CREDITS: '1'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -71,6 +91,15 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12.13'
+      - name: Restore durable provider budget state
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/odds_budget
+          git fetch --depth=1 origin data:data
+          if git cat-file -e data:runtime/odds-budget/ledger.json 2>/dev/null; then
+            git show data:runtime/odds-budget/ledger.json > artifacts/odds_budget/ledger.json
+          fi
       - name: Capture T-90 additional-market PIT quotes
         id: capture
         shell: bash
@@ -82,21 +111,24 @@ jobs:
           code=${PIPESTATUS[0]}
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           exit 0
-      - name: Persist immutable archive and execution status to data branch
+      - name: Persist immutable archive, execution status, and budget to data branch
         if: always()
         shell: bash
         run: |
           set -euo pipefail
-          git fetch --depth=1 origin data:data
+          git fetch origin data:data
           git worktree add .data-branch data
-          mkdir -p .data-branch/runtime/mlb-additional-pit
+          mkdir -p .data-branch/runtime/mlb-additional-pit .data-branch/runtime/odds-budget
           if [ -d artifacts/additional_odds ]; then
             cp -R artifacts/additional_odds/. .data-branch/runtime/mlb-additional-pit/
+          fi
+          if [ -f artifacts/odds_budget/ledger.json ]; then
+            cp artifacts/odds_budget/ledger.json .data-branch/runtime/odds-budget/ledger.json
           fi
           cd .data-branch
           git config user.name sportsedge-archive-bot
           git config user.email sportsedge-archive-bot@users.noreply.github.com
-          git add runtime/mlb-additional-pit
+          git add runtime/mlb-additional-pit runtime/odds-budget
           if git diff --cached --quiet; then
             exit 0
           fi
@@ -117,7 +149,9 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: mlb-additional-pit-${{ github.run_id }}
-          path: artifacts/additional_odds/
+          path: |
+            artifacts/additional_odds/
+            artifacts/odds_budget/
           if-no-files-found: warn
           retention-days: 90
       - name: Propagate capture result after persistence
