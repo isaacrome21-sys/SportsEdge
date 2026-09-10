@@ -95,7 +95,9 @@ def bootstrap_rmse_delta(model, market, actual, reps=2000):
     for _ in range(reps):
         idx=rng.integers(0,n,n); y=actual[idx]
         deltas.append(float(np.sqrt(np.mean((model[idx]-y)**2))-np.sqrt(np.mean((market[idx]-y)**2))))
-    return {"reps":reps,"delta_model_minus_market":float(np.sqrt(np.mean((model-actual)**2))-np.sqrt(np.mean((market-actual)**2))),"q05":float(np.quantile(deltas,.05)),"q50":float(np.quantile(deltas,.50)),"q95":float(np.quantile(deltas,.95))}
+    sq_delta=(model-actual)**2-(market-actual)**2
+    detectable=1.96*float(np.std(sq_delta,ddof=1))/(2*float(np.sqrt(np.mean((market-actual)**2)))*np.sqrt(n))
+    return {"reps":reps,"delta_model_minus_market":float(np.sqrt(np.mean((model-actual)**2))-np.sqrt(np.mean((market-actual)**2))),"q05":float(np.quantile(deltas,.05)),"q50":float(np.quantile(deltas,.50)),"q95":float(np.quantile(deltas,.95)),"approx_95pct_detectable_rmse_gap":detectable}
 def cv_null(x,y,alpha,shuffles=200):
     """Training-only null; never evaluates the already-used holdout."""
     n=len(y); values=[]; rng=np.random.default_rng(0)
@@ -137,6 +139,13 @@ def main():
         global hold_dates,feature_names
         X,ym,yt,feature_names,hold_dates=features(games,args.feature_set)
         reports[sport]={"source":source,"source_sha256":sha,"feature_set":args.feature_set,"games_fetched":len(games),"usable_rows":len(X),"status":"RESEARCH_ONLY_NOT_MODEL_P","targets":{"margin":run_target(X,ym,args.holdout,close_split=(sport=="CFB")),"total":run_target(X,yt,args.holdout)}}
+        if args.feature_set=="opponent_strength":
+            # Same-data control calibration, preregistered and excluded from
+            # the feature-attempt budget. It establishes the baseline on 2019.
+            X0,_,_,names0,dates0=features(games,"baseline")
+            feature_names,hold_dates=names0,dates0
+            reports[sport]["control_baseline_same_holdout"]={"budget_counted":False,"reason":"pre_registered_control_calibration","targets":{"margin":run_target(X0,ym,args.holdout,close_split=(sport=="CFB")),"total":run_target(X0,yt,args.holdout)}}
+            feature_names,hold_dates=features(games,args.feature_set)[3:]
         if sport=="NFL":
             hold=np.array([d.startswith(str(args.holdout)) for d in hold_dates])
             # The feature rows are emitted only after five prior games, so
