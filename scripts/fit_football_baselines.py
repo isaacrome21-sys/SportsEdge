@@ -60,19 +60,26 @@ def cfb(seasons):
             cursor=week_end + timedelta(days=1)
     return rows, hashlib.sha256(b"".join(blobs)).hexdigest(), CFB_URL
 
-def features(games):
+def features(games, feature_set="baseline"):
     games=sorted(games,key=lambda x:(x["date"],x["id"])); hist=defaultdict(list); X=[]; ym=[]; yt=[]; dates=[]
     names=["home_points_for","home_points_against","away_points_for","away_points_against","home_net","away_net"]
+    if feature_set == "opponent_strength": names += ["home_opponent_strength","away_opponent_strength"]
     for date, grp in groupby(games,key=lambda x:x["date"]):
         batch=list(grp)
         for g in batch:
             h,a=g["home"],g["away"]
             if len(hist[h])>=5 and len(hist[a])>=5:
-                mh=np.mean(hist[h][-10:],axis=0); ma=np.mean(hist[a][-10:],axis=0)
-                X.append([mh[0],mh[1],ma[0],ma[1],mh[0]-mh[1],ma[0]-ma[1]])
+                mh=np.mean([x[:2] for x in hist[h][-10:]],axis=0); ma=np.mean([x[:2] for x in hist[a][-10:]],axis=0)
+                row=[mh[0],mh[1],ma[0],ma[1],mh[0]-mh[1],ma[0]-ma[1]]
+                if feature_set == "opponent_strength":
+                    def strength(team):
+                        vals=[np.mean([x[:2] for x in hist[opp][-10:]],axis=0)[0]-np.mean([x[:2] for x in hist[opp][-10:]],axis=0)[1] for _,_,opp in hist[team] if hist[opp]]
+                        return float(np.mean(vals)) if vals else 0.0
+                    row += [strength(h), strength(a)]
+                X.append(row)
                 ym.append(g["hs"]-g["as"]); yt.append(g["hs"]+g["as"]); dates.append(date)
         for g in batch:
-            hist[g["home"]].append((g["hs"],g["as"])); hist[g["away"]].append((g["as"],g["hs"]))
+            hist[g["home"]].append((g["hs"],g["as"],g["away"])); hist[g["away"]].append((g["as"],g["hs"],g["home"]))
     return np.asarray(X,float),np.asarray(ym,float),np.asarray(yt,float),names,dates
 
 def scale(a,b):
@@ -83,6 +90,18 @@ def fit(x,y,alpha):
 def score(xtr,ytr,xte,yte,alpha):
     a,b=scale(xtr,xte); beta,i=fit(a,ytr,alpha); pred=b@beta+i; mse=np.mean((pred-yte)**2); base=np.mean((ytr.mean()-yte)**2)
     return {"rmse":float(np.sqrt(mse)),"baseline_rmse":float(np.sqrt(base)),"r2_vs_mean":float(1-mse/base) if base else 0.0,"mae":float(np.mean(abs(pred-yte)))}
+def cv_null(x,y,alpha,shuffles=200):
+    """Training-only null; never evaluates the already-used holdout."""
+    n=len(y); values=[]; rng=np.random.default_rng(0)
+    for _ in range(shuffles):
+        z=y.copy(); rng.shuffle(z); pred=[]; actual=[]; base=[]
+        for k in range(1,5):
+            cut=max(20,int(n*k/5)); end=max(cut+1,int(n*(k+1)/5)); a,b=scale(x[:cut],x[cut:end]); beta,i=fit(a,z[:cut],alpha)
+            pred.extend(b@beta+i); actual.extend(y[cut:end]); base.extend([z[:cut].mean()]*(end-cut))
+        mse=np.mean((np.asarray(pred)-actual)**2); bmse=np.mean((np.asarray(base)-actual)**2)
+        values.append(float(1-mse/bmse) if bmse else 0.0)
+    return {"n":shuffles,"q05":float(np.quantile(values,.05)),"q50":float(np.quantile(values,.50)),"q95":float(np.quantile(values,.95)),"max":float(max(values))}
+
 def run_target(x,y,hold,close_split=False):
     mask=np.array([d.startswith(str(hold)) for d in hold_dates]); tr=x[~mask]; yt=y[~mask]; te=x[mask]; ye=y[mask]
     if len(tr)<100 or len(te)<20: raise RuntimeError("INSUFFICIENT_DATE_SPLIT")
@@ -90,16 +109,16 @@ def run_target(x,y,hold,close_split=False):
     for k in range(1,5):
         cut=max(20,int(n*k/5)); end=max(cut+1,int(n*(k+1)/5)); a,b=scale(tr[:cut],tr[cut:end])
         for alpha in ALPHAS: ms[alpha].append(float(np.mean((b@fit(a,yt[:cut],alpha)[0]+fit(a,yt[:cut],alpha)[1]-yt[cut:end])**2)))
-    alpha=min(ms,key=lambda z:np.mean(ms[z])); rng=np.random.default_rng(0); shuffled=yt.copy(); rng.shuffle(shuffled)
+    alpha=min(ms,key=lambda z:np.mean(ms[z])); null=cv_null(tr,yt,alpha); rng=np.random.default_rng(0); shuffled=yt.copy(); rng.shuffle(shuffled)
     placebo=score(tr,shuffled,te,ye,alpha); real=score(tr,yt,te,ye,alpha); a,_=scale(tr,tr); beta,_=fit(a,yt,alpha)
-    result={"cv_selected_alpha":alpha,"cv_grid_mse":{str(k):float(np.mean(v)) for k,v in ms.items()},"placebo":placebo,"holdout":real,"coefficients":dict(zip(feature_names,map(float,beta))),"signal_verdict":"NO_SIGNAL" if real["r2_vs_mean"]<=0 else "WEAK_SIGNAL" if real["r2_vs_mean"]<.03 else "LEAKAGE_SUSPECTED" if placebo["r2_vs_mean"]>.05 else "SIGNAL_PRESENT"}
+    result={"cv_selected_alpha":alpha,"cv_grid_mse":{str(k):float(np.mean(v)) for k,v in ms.items()},"training_cv_placebo_null":null,"placebo":placebo,"holdout":real,"coefficients":dict(zip(feature_names,map(float,beta))),"signal_verdict":"NO_SIGNAL" if real["r2_vs_mean"]<=0 else "WEAK_SIGNAL" if real["r2_vs_mean"]<.03 else "LEAKAGE_SUSPECTED" if placebo["r2_vs_mean"]>.05 else "SIGNAL_PRESENT"}
     if close_split:
         close=np.abs(ye)<14
         result["holdout_games_under_14_margin"]={"n":int(close.sum()),"metrics":score(tr,yt,te[close],ye[close],alpha) if close.any() else None}
     return result
 
 def main():
-    ap=argparse.ArgumentParser(); ap.add_argument("--seasons",default="2021,2022,2023,2024,2025"); ap.add_argument("--holdout",type=int,default=2025); ap.add_argument("--out",default="artifacts/football_baselines.json"); args=ap.parse_args()
+    ap=argparse.ArgumentParser(); ap.add_argument("--seasons",default="2021,2022,2023,2024,2025"); ap.add_argument("--holdout",type=int,default=2025); ap.add_argument("--feature-set",choices=("baseline","opponent_strength"),default="baseline"); ap.add_argument("--out",default="artifacts/football_baselines.json"); args=ap.parse_args()
     seasons={int(x) for x in args.seasons.split(",")}; reports={}
     for sport,loader in (("NFL",nfl),("CFB",cfb)):
         games,sha,source=loader(seasons)
@@ -110,8 +129,8 @@ def main():
         games=[g for g in games if g["date"][:4].isdigit() and int(g["date"][:4]) <= args.holdout]
         if not games: raise RuntimeError(f"{sport}: NO_PRE_HOLDOUT_GAMES")
         global hold_dates,feature_names
-        X,ym,yt,feature_names,hold_dates=features(games)
-        reports[sport]={"source":source,"source_sha256":sha,"games_fetched":len(games),"usable_rows":len(X),"status":"RESEARCH_ONLY_NOT_MODEL_P","targets":{"margin":run_target(X,ym,args.holdout,close_split=(sport=="CFB")),"total":run_target(X,yt,args.holdout)}}
+        X,ym,yt,feature_names,hold_dates=features(games,args.feature_set)
+        reports[sport]={"source":source,"source_sha256":sha,"feature_set":args.feature_set,"games_fetched":len(games),"usable_rows":len(X),"status":"RESEARCH_ONLY_NOT_MODEL_P","targets":{"margin":run_target(X,ym,args.holdout,close_split=(sport=="CFB")),"total":run_target(X,yt,args.holdout)}}
         if sport=="NFL":
             hold=np.array([d.startswith(str(args.holdout)) for d in hold_dates])
             # The feature rows are emitted only after five prior games, so
