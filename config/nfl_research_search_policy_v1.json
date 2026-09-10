@@ -73,6 +73,6 @@
   "attempt_6_run_url": "https://github.com/isaacrome21-sys/SportsEdge/actions/runs/34490950906",
   "attempt_7_specification": "Add point-in-time success and explosive-play rates, with opponent-derived defensive rates, to the rolling baseline.",
   "attempt_7_result": "FAILS_BAR: margin model-minus-close RMSE +0.615487 (95% CI +0.304000 to +0.906254); total +0.457492 (95% CI +0.243757 to +0.661267).",
-  "attempt_7_report_sha256": "sha256:REPLACE_WITH_ARTIFACT_DIGEST",
+  "attempt_7_report_sha256": "sha256:7c5bfadf762690e823f6fbccdc566929aff8c3e44db04b6b2e3548a278090c81",
   "attempt_7_run_url": "https://github.com/isaacrome21-sys/SportsEdge/actions/runs/34491651736"
 }
