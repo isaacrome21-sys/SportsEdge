@@ -3,8 +3,8 @@ name: mlb-baseline-fit
 # Fits the MLB baseline from free MLB StatsAPI data on GitHub's runner.
 #
 # Uses NO paid provider. Odds are needed for market readout, not for fitting a
-# score model, so the Odds API quota is untouched. Manual dispatch only — this
-# is research, not a scheduled production lane.
+# score model, so the Odds API quota is untouched. Manual dispatch remains
+# available; relevant pull requests also execute the exact hosted baseline path.
 #
 # Promotes nothing. Writes a report artifact and stops.
 
@@ -17,6 +17,10 @@ on:
       holdout_season:
         description: "Sacred holdout season (carved before fitting)"
         default: "2025"
+  pull_request:
+    paths:
+      - 'scripts/fit_mlb_baseline.py'
+      - '.github/workflows/mlb-baseline-fit.yml'
 
 permissions:
   contents: read
@@ -25,6 +29,9 @@ jobs:
   fit:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      BASELINE_SEASONS: ${{ inputs.seasons || '2021,2022,2023,2024,2025' }}
+      BASELINE_HOLDOUT_SEASON: ${{ inputs.holdout_season || '2025' }}
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -34,21 +41,20 @@ jobs:
         with:
           python-version-file: ".python-version"
 
-      - name: Install numpy only
-        run: python -m pip install --quiet numpy
+      - name: Install pinned numpy only
+        run: python -m pip install --disable-pip-version-check numpy==2.5.3
 
       - name: Fit baseline
         run: |
           python scripts/fit_mlb_baseline.py \
-            --seasons "${{ inputs.seasons }}" \
-            --holdout-season "${{ inputs.holdout_season }}" \
+            --seasons "$BASELINE_SEASONS" \
+            --holdout-season "$BASELINE_HOLDOUT_SEASON" \
             --out artifacts/mlb_baseline_report.json
 
       - name: Upload report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: mlb-baseline-report
+          name: mlb-baseline-report-${{ github.run_id }}
           path: artifacts/mlb_baseline_report.json
           if-no-files-found: error
-
