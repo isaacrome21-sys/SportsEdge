@@ -22,7 +22,6 @@ from typing import Any
 import warnings
 
 from .m2_history_features import _float
-
 from .m2_history_features import build_nfl_m2_history_rows as _build_core_history_rows
 
 _ALLOWED_POLICIES = {"error", "exclude_from_evaluation"}
@@ -165,11 +164,6 @@ def environment_exclusion_reasons(row: Mapping[str, Any]) -> list[str]:
     if roof not in _KNOWN_ROOF:
         reasons.append("NFL_ROOF_INVALID")
 
-    # The downstream historical feature builder already defines game-level
-    # wind exposure as 0 for sealed indoor games. Preserve that same contract
-    # here, but only when the provider wind value is genuinely absent/blank.
-    # A supplied malformed, non-finite, boolean, or negative value still fails
-    # closed, and missing wind for open/outdoor games remains invalid.
     field = "wind_mph" if row.get("wind_mph") not in (None, "") else "wind"
     raw_wind = row.get(field)
     if roof in _SEALED_ROOF and raw_wind in (None, ""):
@@ -179,6 +173,20 @@ def environment_exclusion_reasons(row: Mapping[str, Any]) -> list[str]:
     if isinstance(raw_wind, bool) or wind is None or wind < 0:
         reasons.append("NFL_WIND_INVALID")
     return reasons
+
+
+def _normalize_policy_environment(row: dict[str, Any]) -> None:
+    """Apply policy-owned structural environment values before strict core use.
+
+    The core history builder intentionally never manufactures missing weather.
+    This wrapper owns the narrower venue policy: for exact dome/closed rows only,
+    an absent/blank provider wind value means no game-level wind exposure and is
+    materialized as 0.0. Supplied malformed values are never overwritten.
+    """
+    roof = str(row.get("roof") or "").strip().lower()
+    field = "wind_mph" if row.get("wind_mph") not in (None, "") else "wind"
+    if roof in _SEALED_ROOF and row.get(field) in (None, ""):
+        row["wind"] = 0.0
 
 
 def build_nfl_m2_history_rows(
@@ -213,10 +221,10 @@ def build_nfl_m2_history_rows(
                 warnings.warn(f"NFL_HISTORY_ROW_EXCLUDED:{season}:{game_id}:{','.join(reasons)}", RuntimeWarning)
             else:
                 by_reason = exclusion_report.setdefault(season, {})
-                # One count per excluded row; composite reasons avoid counting
-                # a row twice in the evidence's exclusion total.
                 reason = "|".join(sorted(reasons))
                 by_reason[reason] = by_reason.get(reason, 0) + 1
+        else:
+            _normalize_policy_environment(row)
     depth = _project_starter_depth_rows(depth_rows)
     stadiums = bridge_postclosing_away_origins(schedule, stadium_rows)
     if policy == "error":
@@ -240,9 +248,6 @@ def build_nfl_m2_history_rows(
             if not game_id:
                 raise ValueError("NFL_HISTORY_GAME_IDENTITY_MISSING")
             excluded_ids.add(game_id)
-            # The core builder requires a resolvable venue to construct a row.
-            # This row is discarded below; state updates are PBP/QB based and do
-            # not depend on the temporary venue marker.
             row["location"] = "Home"
         state_schedule.append(row)
 
