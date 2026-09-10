@@ -87,3 +87,8 @@ Decision: use 2019 as the immediate untouched development holdout so feature wor
 - Placebo control: deterministic 200-shuffle training/CV null before the first feature evaluation.
 - 2025 is validation only and is excluded from feature search.
 - Policy file: config/nfl_research_search_policy_v1.json
+
+
+## Chronology correction
+
+The 2019 development holdout is valid only with pre-2019 training data. The required split is 2010-2018 training followed by 2019 validation. The fitter now excludes games after the selected holdout season, and the policy records this boundary. No feature search has been run.
