@@ -1,0 +1,33 @@
+name: NFL feature attempt one comparison
+
+on:
+  push:
+    branches: [research/nfl-attempt1-comparison]
+    paths:
+      - 'scripts/compare_nfl_feature_attempt1.py'
+      - '.github/workflows/nfl-feature-attempt1-compare.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Install runtime dependency
+        run: python -m pip install --disable-pip-version-check numpy==2.5.3
+      - name: Compile comparison surface
+        run: python -m py_compile scripts/fit_football_baselines.py scripts/compare_nfl_feature_attempt1.py
+      - name: Reproduce frozen 2019 baseline and attempt one
+        run: python scripts/compare_nfl_feature_attempt1.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nfl-feature-attempt1-comparison-${{ github.sha }}
+          path: artifacts/research/nfl_feature_attempt1_comparison.json
+          if-no-files-found: error
+          retention-days: 90
