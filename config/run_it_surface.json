@@ -3,7 +3,12 @@
   "sports": {
     "MLB": {
       "lane": "PREGAME_MODEL",
-      "automatic_command": ["python", "scripts/run_auto_mlb_resilient.py", "--output", "artifacts/run_it/mlb_card.json"],
+      "automatic_command": [
+        "python",
+        "scripts/run_auto_mlb_resilient.py",
+        "--output",
+        "artifacts/run_it/mlb_card.json"
+      ],
       "market_surface": "config/mlb_market_catalog.json",
       "governance_source": "config/deployments.json",
       "automatic_completeness": "FULL_FAIL_CLOSED",
@@ -11,21 +16,35 @@
     },
     "NFL": {
       "lane": "PREGAME_MODEL_AND_PLAYER_PROPS",
-      "automatic_command": ["python", "scripts/run_football_auto_bundle.py", "--sport", "NFL", "--output", "artifacts/run_it/nfl_card.json"],
+      "automatic_command": [
+        "python",
+        "scripts/run_football_auto_bundle.py",
+        "--sport",
+        "NFL",
+        "--output",
+        "artifacts/run_it/nfl_card.json"
+      ],
       "library_entrypoint": "sportsedge.sports.nfl.run_machine:run_it_nfl",
       "market_surface": "config/football_market_surface.json",
       "automatic_completeness": "EXECUTABLE_FAIL_CLOSED",
       "blocker": "NFL_FROZEN_M2_AND_PROP_ARTIFACTS_PLUS_LIVE_SOURCES_REQUIRED",
-      "notes": "RUN IT now executes both the canonical NFL game lane and the offensive A+B player-prop lane. Game and prop artifacts are independently frozen/hash-bound; PIT feature, quote-before-kickoff and quote-TTL rules fail closed. Offensive pass/rush/receiving stat props are executable but promotion-blocked; TD scorer, kicker and defensive player props remain NO_ENGINE until their required fuller engines exist."
+      "notes": "RUN IT executes the canonical NFL game lane plus the shared-path extended player-prop lane. Implemented pass/rush/receiving, 1+ TD scorer, kicker and supported defender markets may emit MODEL_CANDIDATE rows while OFFICIAL remains artifact/evidence/certification/frozen-floor gated. First/last TD and 2+ TD remain NO_ENGINE/blocked pending their required ordering/distribution validation."
     },
     "CFB": {
       "lane": "PREGAME_MODEL_AND_PLAYER_PROPS",
-      "automatic_command": ["python", "scripts/run_football_auto_bundle.py", "--sport", "CFB", "--output", "artifacts/run_it/cfb_card.json"],
+      "automatic_command": [
+        "python",
+        "scripts/run_football_auto_bundle.py",
+        "--sport",
+        "CFB",
+        "--output",
+        "artifacts/run_it/cfb_card.json"
+      ],
       "library_entrypoint": "sportsedge.sports.cfb.run_machine:run_it_cfb",
       "market_surface": "config/football_market_surface.json",
       "automatic_completeness": "EXECUTABLE_FAIL_CLOSED",
       "blocker": "CFB_FROZEN_GAME_AND_PROP_ARTIFACTS_PLUS_LIVE_SOURCES_REQUIRED",
-      "notes": "RUN IT now executes both the canonical CFB game lane and the offensive A+B player-prop lane. The prop lane consumes a separately frozen artifact, PIT opportunity snapshot and paired event-level price. Offensive pass/rush/receiving stat props are executable but promotion-blocked; TD scorer, kicker and defensive player props remain NO_ENGINE."
+      "notes": "RUN IT executes the canonical CFB game lane plus the shared-path extended player-prop lane. Implemented pass/rush/receiving, 1+ TD scorer, kicker and supported defender markets may emit MODEL_CANDIDATE rows while OFFICIAL remains artifact/evidence/certification/frozen-floor gated. First/last TD and 2+ TD remain NO_ENGINE/blocked pending their required ordering/distribution validation."
     },
     "PGA": {
       "lane": "PREGAME_AND_LIVE_MODEL",
@@ -47,7 +66,14 @@
     },
     "LIVE": {
       "lane": "LIVE_ENGINE_V1",
-      "automatic_command": ["python", "scripts/run_live_run_it.py", "--sports", "MLB,NFL,CFB", "--output", "artifacts/run_it/live_run_it.json"],
+      "automatic_command": [
+        "python",
+        "scripts/run_live_run_it.py",
+        "--sports",
+        "MLB,NFL,CFB",
+        "--output",
+        "artifacts/run_it/live_run_it.json"
+      ],
       "market_surface": "sportsedge/live_markets.py",
       "automatic_completeness": "SHADOW_ACQUISITION",
       "blocker": "LIVE_MODEL_P_FORWARD_VALIDATION_REQUIRED_FOR_OFFICIAL_BETS",

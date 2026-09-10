@@ -108,6 +108,7 @@ def run_football_props_ready(
     certified_rows = 0
     truth_gate_rows = 0
     official_bets = 0
+    model_candidate_rows = 0
 
     for row in report["results"]:
         provider_market = str(row["provider_market"])
@@ -137,6 +138,21 @@ def run_football_props_ready(
         row["certification_blockers"] = certification_state["blockers"]
         row["truth_gate_floor_key"] = floor_key
         row["official_eligible"] = False
+        raw_model_p = row.get("model_p")
+        has_model_p = (
+            isinstance(raw_model_p, (int, float))
+            and not isinstance(raw_model_p, bool)
+            and 0.0 <= float(raw_model_p) <= 1.0
+        )
+        if has_model_p:
+            row.setdefault(
+                "model_status",
+                "MODEL_CANDIDATE" if row.get("quote_fresh") is True else "MODEL_OUTPUT_QUOTE_STALE",
+            )
+            if row.get("fair_market_p") is None and row.get("quote_fresh") is True:
+                row.setdefault("market_no_vig_p", "UNAVAILABLE_ONE_SIDED")
+            if row.get("model_status") == "MODEL_CANDIDATE":
+                model_candidate_rows += 1
 
         if evidence_state["ready"]:
             ready_rows += 1
@@ -165,7 +181,7 @@ def run_football_props_ready(
         fair_market_p = row.get("fair_market_p")
         if fair_market_p is None:
             row["bet_status"] = "BLOCKED"
-            row["reason"] = f"{sport}_PROP_PAIRED_PRICE_REQUIRED"
+            row["reason"] = f"{sport}_PROP_OFFICIAL_FAIR_MARKET_PROBABILITY_REQUIRED"
             continue
 
         decision = decide_bet(
@@ -200,6 +216,7 @@ def run_football_props_ready(
     report["summary"]["certified_rows"] = certified_rows
     report["summary"]["truth_gate_rows"] = truth_gate_rows
     report["summary"]["official_bets"] = official_bets
+    report["summary"]["model_candidate_rows"] = model_candidate_rows
     report["evidence_resolution"] = {
         "schema_version": evidence.get("schema_version"),
         "sport": sport,
