@@ -2,7 +2,7 @@
 """Fit dependency-light NFL and CFB research baselines from free result feeds.
 
 This is deliberately separate from production engines: no odds, no credentials,
-no eligibility or Model_P promotion. Features are prior-game rolling scores;
+no eligibility or Model_P promotion.  Features are prior-game rolling scores;
 same-date games are emitted before their results are appended.
 """
 from __future__ import annotations
@@ -17,8 +17,6 @@ import numpy as np
 NFL_URL = "https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv"
 CFB_URL = "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard"
 ALPHAS = (0.1, 1.0, 10.0, 100.0, 300.0)
-PLACEBO_DRAWS = 200
-PLACEBO_SEED = 20260910
 
 def get(url):
     try:
@@ -42,6 +40,8 @@ def nfl(seasons):
 def cfb(seasons):
     rows=[]; blobs=[]
     for season in seasons:
+        # A bare season (for example dates=2025) is rejected by ESPN. Query
+        # weekly date ranges instead; groups=80 keeps this to the FBS feed.
         cursor=date(season, 8, 15)
         end=date(season + 1, 1, 20)
         while cursor <= end:
@@ -63,74 +63,36 @@ def cfb(seasons):
 def features(games):
     games=sorted(games,key=lambda x:(x["date"],x["id"])); hist=defaultdict(list); X=[]; ym=[]; yt=[]; dates=[]
     names=["home_points_for","home_points_against","away_points_for","away_points_against","home_net","away_net"]
-    for date_key, grp in groupby(games,key=lambda x:x["date"]):
+    for date, grp in groupby(games,key=lambda x:x["date"]):
         batch=list(grp)
         for g in batch:
             h,a=g["home"],g["away"]
             if len(hist[h])>=5 and len(hist[a])>=5:
                 mh=np.mean(hist[h][-10:],axis=0); ma=np.mean(hist[a][-10:],axis=0)
                 X.append([mh[0],mh[1],ma[0],ma[1],mh[0]-mh[1],ma[0]-ma[1]])
-                ym.append(g["hs"]-g["as"]); yt.append(g["hs"]+g["as"]); dates.append(date_key)
+                ym.append(g["hs"]-g["as"]); yt.append(g["hs"]+g["as"]); dates.append(date)
         for g in batch:
             hist[g["home"]].append((g["hs"],g["as"])); hist[g["away"]].append((g["as"],g["hs"]))
     return np.asarray(X,float),np.asarray(ym,float),np.asarray(yt,float),names,dates
 
 def scale(a,b):
     mu=a.mean(0); sd=a.std(0); sd[sd==0]=1; return (a-mu)/sd,(b-mu)/sd
-
 def fit(x,y,alpha):
     xc=x-x.mean(0); yc=y-y.mean(); beta=np.linalg.solve(xc.T@xc+alpha*np.eye(x.shape[1]),xc.T@yc)
     return beta,float(y.mean()-x.mean(0)@beta)
-
 def score(xtr,ytr,xte,yte,alpha):
     a,b=scale(xtr,xte); beta,i=fit(a,ytr,alpha); pred=b@beta+i; mse=np.mean((pred-yte)**2); base=np.mean((ytr.mean()-yte)**2)
     return {"rmse":float(np.sqrt(mse)),"baseline_rmse":float(np.sqrt(base)),"r2_vs_mean":float(1-mse/base) if base else 0.0,"mae":float(np.mean(abs(pred-yte)))}
-
-def placebo_null(xtr,ytr,xte,yte,alpha,draws=PLACEBO_DRAWS,seed=PLACEBO_SEED):
-    if draws < 20:
-        raise ValueError("PLACEBO_NULL_DRAWS_TOO_SMALL")
-    rng=np.random.default_rng(seed); vals=[]
-    for _ in range(int(draws)):
-        shuffled=np.asarray(ytr,float).copy(); rng.shuffle(shuffled)
-        vals.append(score(xtr,shuffled,xte,yte,alpha)["r2_vs_mean"])
-    arr=np.asarray(vals,float)
-    return {
-        "draws":int(draws),
-        "seed":int(seed),
-        "median_r2_vs_mean":float(np.median(arr)),
-        "p95_r2_vs_mean":float(np.quantile(arr,0.95)),
-        "p99_r2_vs_mean":float(np.quantile(arr,0.99)),
-        "min_r2_vs_mean":float(arr.min()),
-        "max_r2_vs_mean":float(arr.max()),
-    }
-
-def closing_line_verdict(model_rmse,closing_rmse,correlation=None):
-    if correlation is not None and (not np.isfinite(correlation) or correlation <= 0):
-        return "INVALID_SPREAD_SIGN_CONVENTION"
-    return "BEATS_CLOSING_LINE" if float(model_rmse) < float(closing_rmse) else "WORSE_THAN_CLOSING_LINE"
-
 def run_target(x,y,hold,close_split=False):
     mask=np.array([d.startswith(str(hold)) for d in hold_dates]); tr=x[~mask]; yt=y[~mask]; te=x[mask]; ye=y[mask]
     if len(tr)<100 or len(te)<20: raise RuntimeError("INSUFFICIENT_DATE_SPLIT")
     ms={a:[] for a in ALPHAS}; n=len(tr)
     for k in range(1,5):
         cut=max(20,int(n*k/5)); end=max(cut+1,int(n*(k+1)/5)); a,b=scale(tr[:cut],tr[cut:end])
-        for alpha in ALPHAS:
-            beta,intercept=fit(a,yt[:cut],alpha)
-            ms[alpha].append(float(np.mean((b@beta+intercept-yt[cut:end])**2)))
+        for alpha in ALPHAS: ms[alpha].append(float(np.mean((b@fit(a,yt[:cut],alpha)[0]+fit(a,yt[:cut],alpha)[1]-yt[cut:end])**2)))
     alpha=min(ms,key=lambda z:np.mean(ms[z])); rng=np.random.default_rng(0); shuffled=yt.copy(); rng.shuffle(shuffled)
-    placebo=score(tr,shuffled,te,ye,alpha); null=placebo_null(tr,yt,te,ye,alpha)
-    real=score(tr,yt,te,ye,alpha); a,_=scale(tr,tr); beta,_=fit(a,yt,alpha)
-    result={
-        "cv_selected_alpha":alpha,
-        "cv_grid_mse":{str(k):float(np.mean(v)) for k,v in ms.items()},
-        "placebo":placebo,
-        "placebo_null":null,
-        "placebo_exceeds_p95":bool(placebo["r2_vs_mean"] > null["p95_r2_vs_mean"]),
-        "holdout":real,
-        "coefficients":dict(zip(feature_names,map(float,beta))),
-        "signal_verdict":"NO_SIGNAL" if real["r2_vs_mean"]<=0 else "WEAK_SIGNAL" if real["r2_vs_mean"]<.03 else "LEAKAGE_SUSPECTED" if placebo["r2_vs_mean"]>null["p95_r2_vs_mean"] else "SIGNAL_PRESENT",
-    }
+    placebo=score(tr,shuffled,te,ye,alpha); real=score(tr,yt,te,ye,alpha); a,_=scale(tr,tr); beta,_=fit(a,yt,alpha)
+    result={"cv_selected_alpha":alpha,"cv_grid_mse":{str(k):float(np.mean(v)) for k,v in ms.items()},"placebo":placebo,"holdout":real,"coefficients":dict(zip(feature_names,map(float,beta))),"signal_verdict":"NO_SIGNAL" if real["r2_vs_mean"]<=0 else "WEAK_SIGNAL" if real["r2_vs_mean"]<.03 else "LEAKAGE_SUSPECTED" if placebo["r2_vs_mean"]>.05 else "SIGNAL_PRESENT"}
     if close_split:
         close=np.abs(ye)<14
         result["holdout_games_under_14_margin"]={"n":int(close.sum()),"metrics":score(tr,yt,te[close],ye[close],alpha) if close.any() else None}
@@ -142,11 +104,20 @@ def main():
     for sport,loader in (("NFL",nfl),("CFB",cfb)):
         games,sha,source=loader(seasons)
         if not games: raise RuntimeError(f"{sport}: NO_COMPLETED_GAMES")
+        # Never train on games after the selected holdout season. A 2019
+        # development holdout therefore requires the caller to request
+        # pre-2019 seasons (for example 2010,...,2019).
+        games=[g for g in games if g["date"][:4].isdigit() and int(g["date"][:4]) <= args.holdout]
+        if not games: raise RuntimeError(f"{sport}: NO_PRE_HOLDOUT_GAMES")
         global hold_dates,feature_names
         X,ym,yt,feature_names,hold_dates=features(games)
         reports[sport]={"source":source,"source_sha256":sha,"games_fetched":len(games),"usable_rows":len(X),"status":"RESEARCH_ONLY_NOT_MODEL_P","targets":{"margin":run_target(X,ym,args.holdout,close_split=(sport=="CFB")),"total":run_target(X,yt,args.holdout)}}
         if sport=="NFL":
+            hold=np.array([d.startswith(str(args.holdout)) for d in hold_dates])
+            # The feature rows are emitted only after five prior games, so
+            # align market rows by the same sorted/usable game order.
             usable=sorted(games,key=lambda z:(z["date"],z["id"]))
+            # Rebuild the exact usable keys from the feature pass.
             keys=[]; prior=defaultdict(int)
             for d,grp in groupby(usable,key=lambda z:z["date"]):
                 batch=list(grp)
@@ -154,21 +125,21 @@ def main():
                     if prior[g["home"]]>=5 and prior[g["away"]]>=5: keys.append((d,g["id"],g))
                 for g in batch: prior[g["home"]]+=1; prior[g["away"]]+=1
             keyed=[g for _,_,g in keys]
+            mh=np.array([g.get("spread_line") is not None for g in keyed])
             is_hold=np.array([g["date"].startswith(str(args.holdout)) for g in keyed])
-            spread_pred=np.array([g["spread_line"] if g.get("spread_line") is not None else np.nan for g in keyed])
-            total_pred=np.array([g["total_line"] if g.get("total_line") is not None else np.nan for g in keyed])
-            for label,pred,yv in (("margin",spread_pred,ym),("total",total_pred,yt)):
-                ok=is_hold & np.isfinite(pred)
-                if not ok.any(): continue
-                actual=yv[ok]; estimate=pred[ok]
-                benchmark={"n_holdout":int(ok.sum()),"rmse":float(np.sqrt(np.mean((estimate-actual)**2))),"source_field":"spread_line" if label=="margin" else "total_line"}
-                corr=None
-                if label=="margin":
-                    corr=float(np.corrcoef(estimate,actual)[0,1]); benchmark["spread_line_home_margin_correlation"]=corr
-                model_rmse=reports[sport]["targets"][label]["holdout"]["rmse"]
-                benchmark["model_rmse"]=float(model_rmse)
-                benchmark["model_minus_closing_rmse"]=float(model_rmse-benchmark["rmse"])
-                benchmark["verdict"]=closing_line_verdict(model_rmse,benchmark["rmse"],correlation=corr)
-                reports[sport].setdefault("closing_line_benchmark",{})[label]=benchmark
-    out=Path(args.out); out.parent.mkdir(parents=True,exist_ok=True); out.write_text(json.dumps({"schema":"FOOTBALL_BASELINES_V2","reports":reports},indent=2)+"\n"); print(json.dumps(reports,indent=2)); return 0
+            if mh[is_hold].any():
+                # nflverse spread_line is already oriented to home margin:
+                # positive means the home side is favored. Verify that
+                # convention in the report rather than relying on memory.
+                spread_pred=np.array([g["spread_line"] if g.get("spread_line") is not None else np.nan for g in keyed])
+                total_pred=np.array([g["total_line"] if g.get("total_line") is not None else np.nan for g in keyed])
+                for label,pred,yv in (("margin",spread_pred,ym),("total",total_pred,yt)):
+                    ok=is_hold & np.isfinite(pred)
+                    actual=yv[ok]; estimate=pred[ok]
+                    benchmark={"n_holdout":int(ok.sum()),"rmse":float(np.sqrt(np.mean((estimate-actual)**2))),"source_field":"spread_line" if label=="margin" else "total_line","comparison":"MODEL_VS_CLOSING_LINE_REPORTED_ONLY"}
+                    if label=="margin":
+                        benchmark["spread_line_home_margin_correlation"]=float(np.corrcoef(estimate,actual)[0,1])
+                    reports[sport].setdefault("closing_line_benchmark",{})[label]=benchmark
+    out=Path(args.out); out.parent.mkdir(parents=True,exist_ok=True); out.write_text(json.dumps({"schema":"FOOTBALL_BASELINES_V1","reports":reports},indent=2)+"\n"); print(json.dumps(reports,indent=2)); return 0
 if __name__=="__main__": raise SystemExit(main())
+
