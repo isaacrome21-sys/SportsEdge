@@ -17,6 +17,8 @@ import numpy as np
 NFL_URL = "https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv"
 CFB_URL = "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard"
 ALPHAS = (0.1, 1.0, 10.0, 100.0, 300.0)
+PLACEBO_DRAWS = 200
+PLACEBO_SEED = 20260910
 
 def get(url):
     try:
@@ -103,6 +105,30 @@ def fit(x,y,alpha):
 def score(xtr,ytr,xte,yte,alpha):
     a,b=scale(xtr,xte); beta,i=fit(a,ytr,alpha); pred=b@beta+i; mse=np.mean((pred-yte)**2); base=np.mean((ytr.mean()-yte)**2)
     return {"rmse":float(np.sqrt(mse)),"baseline_rmse":float(np.sqrt(base)),"r2_vs_mean":float(1-mse/base) if base else 0.0,"mae":float(np.mean(abs(pred-yte)))}
+
+def placebo_null(xtr,ytr,xte,yte,alpha,draws=PLACEBO_DRAWS,seed=PLACEBO_SEED):
+    if draws < 20:
+        raise ValueError("PLACEBO_NULL_DRAWS_TOO_SMALL")
+    rng=np.random.default_rng(seed); vals=[]
+    for _ in range(int(draws)):
+        shuffled=np.asarray(ytr,float).copy(); rng.shuffle(shuffled)
+        vals.append(score(xtr,shuffled,xte,yte,alpha)["r2_vs_mean"])
+    arr=np.asarray(vals,float)
+    return {
+        "draws":int(draws),
+        "seed":int(seed),
+        "median_r2_vs_mean":float(np.median(arr)),
+        "p95_r2_vs_mean":float(np.quantile(arr,0.95)),
+        "p99_r2_vs_mean":float(np.quantile(arr,0.99)),
+        "min_r2_vs_mean":float(arr.min()),
+        "max_r2_vs_mean":float(arr.max()),
+    }
+
+def closing_line_verdict(model_rmse,closing_rmse,correlation=None):
+    if correlation is not None and (not np.isfinite(correlation) or correlation <= 0):
+        return "INVALID_SPREAD_SIGN_CONVENTION"
+    return "BEATS_CLOSING_LINE" if float(model_rmse) < float(closing_rmse) else "WORSE_THAN_CLOSING_LINE"
+
 def bootstrap_rmse_delta(model, market, actual, reps=2000):
     rng=np.random.default_rng(1); n=len(actual); deltas=[]
     for _ in range(reps):
@@ -216,4 +242,3 @@ def main():
                     reports[sport].setdefault("closing_line_benchmark",{})[label]=benchmark
     out=Path(args.out); out.parent.mkdir(parents=True,exist_ok=True); out.write_text(json.dumps({"schema":"FOOTBALL_BASELINES_V1","reports":reports},indent=2)+"\n"); print(json.dumps(reports,indent=2)); return 0
 if __name__=="__main__": raise SystemExit(main())
-
