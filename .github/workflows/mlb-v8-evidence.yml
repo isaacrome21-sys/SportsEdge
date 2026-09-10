@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: mlb-v8-evidence
+  group: sportsedge-paid-odds-api
   cancel-in-progress: false
 
 jobs:
