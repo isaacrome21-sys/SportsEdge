@@ -28,6 +28,19 @@ class OddsKeyringTests(unittest.TestCase):
         self.assertNotIn("k2", rendered)
         self.assertNotIn("k3", rendered)
 
+    def test_terminal_account_exhaustion_does_not_rotate(self):
+        calls = []
+        def fetcher(key):
+            calls.append(key)
+            raise RuntimeError("ODDS_API_FETCH_FAILED:HTTP_401:OUT_OF_USAGE_CREDITS")
+        with self.assertRaises(OddsKeyringError) as ctx:
+            fetch_with_key_failover(("k1", "k2", "k3"), fetcher)
+        self.assertEqual(calls, ["k1"])
+        self.assertIn("ODDS_API_TERMINAL_FAILURE", str(ctx.exception))
+        self.assertIn("OUT_OF_USAGE_CREDITS", str(ctx.exception))
+        self.assertNotIn("slot=2", str(ctx.exception))
+        self.assertNotIn("slot=3", str(ctx.exception))
+
     def test_duplicate_and_blank_keys_are_ignored(self):
         calls = []
         def fetcher(key):

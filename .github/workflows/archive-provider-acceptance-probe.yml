@@ -8,6 +8,9 @@ permissions:
   contents: write
 jobs:
   probe:
+    concurrency:
+      group: sportsedge-paid-odds-api
+      cancel-in-progress: false
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     env:
@@ -50,11 +53,11 @@ jobs:
           }
           if not keys:
               row['status']='BLOCKED_NO_ODDS_KEY'; p.write_text(json.dumps(row,indent=2)+'\n'); print(json.dumps(row)); raise SystemExit(2)
-          exhausted=0
+          terminal_exhaustion=False
           for slot,key in enumerate(keys,1):
               q=urlencode({'apiKey':key,'bookmakers':'draftkings','markets':'h2h','oddsFormat':'american','dateFormat':'iso'})
               try:
-                  with urlopen(Request('https://api.the-odds-api.com/v4/sports/baseball_mlb/odds?'+q,headers={'Accept':'application/json','User-Agent':'SportsEdge-provider-probe/3'}),timeout=20) as r:
+                  with urlopen(Request('https://api.the-odds-api.com/v4/sports/baseball_mlb/odds?'+q,headers={'Accept':'application/json','User-Agent':'SportsEdge-provider-probe/4'}),timeout=20) as r:
                       raw=r.read(); payload=json.loads(raw)
                       row.update({
                           'status':'PROVIDER_PATH_PASS',
@@ -74,12 +77,16 @@ jobs:
                   code=None
                   try: code=json.loads(body).get('error_code')
                   except Exception: pass
-                  if e.code==401 and code=='OUT_OF_USAGE_CREDITS': exhausted+=1
                   row['attempts'].append({'key_slot':slot,'http_status':e.code,'provider_code':code})
+                  if e.code==401 and code=='OUT_OF_USAGE_CREDITS':
+                      terminal_exhaustion=True
+                      row['terminal_key_slot']=slot
+                      row['terminal_reason']='OUT_OF_USAGE_CREDITS'
+                      break
               except Exception as e:
                   row['attempts'].append({'key_slot':slot,'reason':f'{type(e).__name__}:{e}'})
           if row.get('status')!='PROVIDER_PATH_PASS':
-              row['status']='BLOCKED_NO_CREDITS' if exhausted==len(keys) else 'BLOCKED_NO_ODDS'
+              row['status']='BLOCKED_NO_CREDITS' if terminal_exhaustion else 'BLOCKED_NO_ODDS'
           p.write_text(json.dumps(row,indent=2,sort_keys=True)+'\n'); print(json.dumps(row)); raise SystemExit(0 if row['status']=='PROVIDER_PATH_PASS' else 3)
           PY
           code=$?; echo "exit_code=$code" >> "$GITHUB_OUTPUT"; exit 0

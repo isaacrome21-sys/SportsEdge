@@ -10,10 +10,16 @@ Deliberate properties:
     for market readout, not for fitting a score model, so none are used here.
   * Point-in-time by construction. Every feature for a game is built only from
     games that finished strictly before that game's date.
-  * The sacred holdout is carved before anything is fitted, by date, and is
-    touched exactly once at the end.
+  * StatsAPI can list one final gamePk on multiple schedule dates after a
+    reschedule/resumption. Identical duplicate outcomes are conservatively
+    assigned to the latest listed date so a final score is never pulled backward;
+    conflicting duplicate rows fail closed.
+  * The sacred holdout is carved before fitting or alpha selection and is used
+    only for final research diagnostics.
   * Ridge alpha is cross-validated on the training fold only. It is not assumed.
   * A shuffled-label placebo runs before the real evaluation is reported.
+  * The report hashes the exact raw source rows, normalized rows, and exact
+    usable model rows so a result cannot be mistaken for another input set.
 
 It promotes nothing. It writes a JSON report and exits.
 """
@@ -36,6 +42,73 @@ STATSAPI = "https://statsapi.mlb.com/api/v1/schedule"
 ALPHAS = (0.1, 0.3, 1.0, 3.0, 10.0, 30.0, 100.0, 300.0)
 ROLL = 30          # rolling window of prior games per team
 MIN_PRIOR = 20     # a team needs this many prior games before it is usable
+
+
+def _canonical_sha256(value: Any) -> str:
+    raw = json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _normalize_schedule_duplicates(
+    raw_games: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Collapse duplicate gamePk rows without moving outcomes earlier in time.
+
+    StatsAPI season schedule responses can expose the same final gamePk on an
+    original and later rescheduled/resumed date. We permit normalization only
+    when teams and final scores are identical. The latest listed date is the
+    conservative chronology: it may delay information, but cannot introduce a
+    final score before the last date on which the source associates the game.
+    """
+    grouped: dict[int, list[dict[str, Any]]] = defaultdict(list)
+    for row in raw_games:
+        grouped[int(row["game_pk"])].append(row)
+
+    normalized: list[dict[str, Any]] = []
+    duplicate_game_pks = 0
+    duplicate_rows_removed = 0
+    examples: list[dict[str, Any]] = []
+    for game_pk, rows in sorted(grouped.items()):
+        signatures = {
+            (
+                int(row["home_id"]),
+                int(row["away_id"]),
+                int(row["home_score"]),
+                int(row["away_score"]),
+            )
+            for row in rows
+        }
+        if len(signatures) != 1:
+            raise ValueError(
+                "STATSAPI_DUPLICATE_GAME_PK_CONFLICT:"
+                + json.dumps({"game_pk": game_pk, "rows": rows}, sort_keys=True)
+            )
+        chosen = max(rows, key=lambda row: str(row["date"]))
+        normalized.append(dict(chosen))
+        if len(rows) > 1:
+            duplicate_game_pks += 1
+            duplicate_rows_removed += len(rows) - 1
+            if len(examples) < 25:
+                examples.append({
+                    "game_pk": game_pk,
+                    "listed_dates": sorted(str(row["date"]) for row in rows),
+                    "chosen_date": str(chosen["date"]),
+                })
+
+    normalized.sort(key=lambda row: (str(row["date"]), int(row["game_pk"])))
+    return normalized, {
+        "rule": "IDENTICAL_OUTCOME_DUPLICATE_GAME_PK_USE_LATEST_LISTED_DATE_V1",
+        "duplicate_game_pk_count": duplicate_game_pks,
+        "duplicate_rows_removed": duplicate_rows_removed,
+        "conflicting_duplicates_allowed": False,
+        "examples": examples,
+    }
 
 
 # --------------------------------------------------------------------------
@@ -82,8 +155,8 @@ def fetch_season(year: int, *, retries: int = 3) -> list[dict[str, Any]]:
 # --------------------------------------------------------------------------
 # point-in-time features
 # --------------------------------------------------------------------------
-def build_rows(games: list[dict[str, Any]]) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[str], list[str]]:
-    """Return X, y_margin, y_total, feature_names, dates.
+def build_rows(games: list[dict[str, Any]]) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[str], list[str], list[int]]:
+    """Return X, y_margin, y_total, feature_names, dates, game_pks.
 
     Every feature uses only games strictly before the current game's date.
     Games are processed in date order; all rows for a date are emitted before
@@ -101,7 +174,7 @@ def build_rows(games: list[dict[str, Any]]) -> tuple[np.ndarray, np.ndarray, np.
         "home_rs_home_split", "away_rs_away_split",
         "home_rest_proxy", "away_rest_proxy",
     ]
-    X, ym, yt, dates = [], [], [], []
+    X, ym, yt, dates, game_pks = [], [], [], [], []
     last_played: dict[int, str] = {}
 
     def mean_tail(seq: list[float], n: int = ROLL) -> float:
@@ -137,6 +210,7 @@ def build_rows(games: list[dict[str, Any]]) -> tuple[np.ndarray, np.ndarray, np.
                 ym.append(g["home_score"] - g["away_score"])
                 yt.append(g["home_score"] + g["away_score"])
                 dates.append(d)
+                game_pks.append(int(g["game_pk"]))
 
         for g in date_games:
             h, a = g["home_id"], g["away_id"]
@@ -146,7 +220,7 @@ def build_rows(games: list[dict[str, Any]]) -> tuple[np.ndarray, np.ndarray, np.
             away_scored[a].append(g["away_score"])
             last_played[h] = last_played[a] = d
 
-    return np.array(X, float), np.array(ym, float), np.array(yt, float), names, dates
+    return np.array(X, float), np.array(ym, float), np.array(yt, float), names, dates, game_pks
 
 
 # --------------------------------------------------------------------------
@@ -209,6 +283,19 @@ def evaluate(Xtr, ytr, Xte, yte, alpha) -> dict[str, float]:
     }
 
 
+def _model_rows(X: np.ndarray, y_margin: np.ndarray, y_total: np.ndarray, dates: list[str], game_pks: list[int]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for i, (date_value, game_pk) in enumerate(zip(dates, game_pks)):
+        rows.append({
+            "date": date_value,
+            "game_pk": int(game_pk),
+            "features": [float(x) for x in X[i]],
+            "margin": float(y_margin[i]),
+            "total": float(y_total[i]),
+        })
+    return rows
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--seasons", default="2021,2022,2023,2024,2025")
@@ -219,6 +306,12 @@ def main() -> int:
 
     seasons = [int(s) for s in args.seasons.split(",")]
     hold = int(args.holdout_season)
+    if hold not in seasons:
+        print("holdout season must be present in --seasons", file=sys.stderr)
+        return 2
+    if any(year > hold for year in seasons):
+        print("post-holdout seasons are prohibited in this research baseline", file=sys.stderr)
+        return 2
 
     games: list[dict[str, Any]] = []
     per_season = {}
@@ -226,12 +319,27 @@ def main() -> int:
         rows = fetch_season(yr)
         per_season[yr] = len(rows)
         games.extend(rows)
-        print(f"  {yr}: {len(rows)} final games", flush=True)
+        print(f"  {yr}: {len(rows)} final rows", flush=True)
     if not games:
         print("NO DATA RETURNED", file=sys.stderr)
         return 2
 
-    X, y_margin, y_total, names, dates = build_rows(games)
+    raw_games = sorted(games, key=lambda row: (str(row["date"]), int(row["game_pk"])))
+    raw_source_rows_sha = _canonical_sha256(raw_games)
+    try:
+        canonical_games, duplicate_normalization = _normalize_schedule_duplicates(raw_games)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    normalized_source_rows_sha = _canonical_sha256(canonical_games)
+    print(
+        "normalized StatsAPI rows: "
+        f"{len(raw_games)} raw -> {len(canonical_games)} unique gamePk; "
+        f"duplicates={duplicate_normalization['duplicate_game_pk_count']}",
+        flush=True,
+    )
+
+    X, y_margin, y_total, names, dates, game_pks = build_rows(canonical_games)
     print(f"usable rows: {len(X)} (min {MIN_PRIOR} prior games per team)", flush=True)
 
     # Sacred holdout carved by date, before any fitting touches the data.
@@ -239,21 +347,42 @@ def main() -> int:
     if is_hold.sum() < 200 or (~is_hold).sum() < 500:
         print("insufficient split", file=sys.stderr)
         return 2
+
+    model_rows = _model_rows(X, y_margin, y_total, dates, game_pks)
+    train_rows = [row for row, flag in zip(model_rows, is_hold) if not bool(flag)]
+    holdout_rows = [row for row, flag in zip(model_rows, is_hold) if bool(flag)]
+    model_rows_sha = _canonical_sha256(model_rows)
+    train_rows_sha = _canonical_sha256(train_rows)
+    holdout_rows_sha = _canonical_sha256(holdout_rows)
+
     holdout_def = {
-        "rule": f"all rows with date starting {hold}",
+        "rule": f"all normalized model rows with date starting {hold}",
         "n_holdout": int(is_hold.sum()),
         "n_train": int((~is_hold).sum()),
-        "sha256": hashlib.sha256(
-            json.dumps(sorted(d for d, h in zip(dates, is_hold) if h)).encode()
-        ).hexdigest(),
+        "row_identity_sha256": _canonical_sha256([
+            {"date": row["date"], "game_pk": row["game_pk"]} for row in holdout_rows
+        ]),
+        "model_rows_sha256": holdout_rows_sha,
     }
 
     report: dict[str, Any] = {
-        "schema": "MLB_BASELINE_REPORT_V1",
+        "schema": "MLB_BASELINE_REPORT_V2",
         "status": "RESEARCH_ONLY_NOT_MODEL_P",
         "source": "MLB StatsAPI (free, unauthenticated). No odds provider used.",
         "seasons": per_season,
         "feature_names": names,
+        "input_provenance": {
+            "canonicalization": "CANONICAL_JSON_SORT_KEYS_COMPACT_UTF8_V1",
+            "raw_statsapi_final_row_count": len(raw_games),
+            "raw_statsapi_final_rows_sha256": raw_source_rows_sha,
+            "normalized_unique_game_count": len(canonical_games),
+            "normalized_unique_games_sha256": normalized_source_rows_sha,
+            "duplicate_normalization": duplicate_normalization,
+            "usable_model_row_count": len(model_rows),
+            "usable_model_rows_sha256": model_rows_sha,
+            "train_model_rows_sha256": train_rows_sha,
+            "holdout_model_rows_sha256": holdout_rows_sha,
+        },
         "sacred_holdout": holdout_def,
         "targets": {},
     }
@@ -303,6 +432,9 @@ def main() -> int:
     out.write_text(json.dumps(report, indent=2) + "\n")
 
     print("\n" + "=" * 60)
+    print(f"raw source rows sha256: {raw_source_rows_sha}")
+    print(f"normalized rows sha256: {normalized_source_rows_sha}")
+    print(f"usable rows sha256: {model_rows_sha}")
     for label, r in report["targets"].items():
         print(f"\n{label.upper()}  alpha={r['cv_selected_alpha']} (config assumed 10.0)")
         print(f"  holdout RMSE {r['holdout']['rmse']:.3f} vs mean-baseline "
@@ -322,4 +454,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

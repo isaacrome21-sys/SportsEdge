@@ -38,6 +38,14 @@ from sportsedge.odds_api_source import (  # noqa: E402
 )
 
 _CAPTURE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+TERMINAL_EXHAUSTION_EXIT = 75
+
+
+class OddsFreezeFetchError(RuntimeError):
+    def __init__(self, message: str, *, http_status: int | None = None, provider_code: str | None = None):
+        super().__init__(message)
+        self.http_status = http_status
+        self.provider_code = provider_code
 
 
 def _fetch_raw(url: str) -> bytes:
@@ -46,11 +54,25 @@ def _fetch_raw(url: str) -> bytes:
         with urlopen(request, timeout=30) as response:
             raw = response.read()
     except HTTPError as exc:
-        raise RuntimeError(f"ODDS_FREEZE_FETCH_HTTP_{int(exc.code)}") from exc
+        provider_code = None
+        try:
+            payload = json.loads(exc.read().decode("utf-8", errors="replace"))
+            if isinstance(payload, dict):
+                provider_code = str(payload.get("error_code") or payload.get("code") or "").strip() or None
+        except Exception:
+            provider_code = None
+        message = f"ODDS_FREEZE_FETCH_HTTP_{int(exc.code)}"
+        if provider_code:
+            message += f":{provider_code}"
+        raise OddsFreezeFetchError(
+            message,
+            http_status=int(exc.code),
+            provider_code=provider_code,
+        ) from exc
     except URLError as exc:
-        raise RuntimeError("ODDS_FREEZE_FETCH_NETWORK") from exc
+        raise OddsFreezeFetchError("ODDS_FREEZE_FETCH_NETWORK") from exc
     if not isinstance(raw, bytes) or not raw:
-        raise RuntimeError("ODDS_FREEZE_EMPTY_RESPONSE")
+        raise OddsFreezeFetchError("ODDS_FREEZE_EMPTY_RESPONSE")
     return raw
 
 
@@ -198,4 +220,10 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except OddsFreezeFetchError as exc:
+        print(str(exc), file=sys.stderr)
+        if exc.http_status == 401 and exc.provider_code == "OUT_OF_USAGE_CREDITS":
+            raise SystemExit(TERMINAL_EXHAUSTION_EXIT)
+        raise SystemExit(1)

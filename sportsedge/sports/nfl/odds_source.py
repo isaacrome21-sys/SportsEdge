@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from typing import Any, Callable, Sequence
+from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -20,11 +21,24 @@ _SPORT = "americanfootball_nfl"
 def _http_fetch(url_without_key: str, key: str) -> Any:
     sep = "&" if "?" in url_without_key else "?"
     url = f"{url_without_key}{sep}{urlencode({'apiKey': key})}"
-    with urlopen(
-        Request(url, headers={"Accept": "application/json", "User-Agent": "SportsEdge-NFL-Forward/1"}),
-        timeout=20,
-    ) as response:
-        raw = response.read()
+    try:
+        with urlopen(
+            Request(url, headers={"Accept": "application/json", "User-Agent": "SportsEdge-NFL-Forward/2"}),
+            timeout=20,
+        ) as response:
+            raw = response.read()
+    except HTTPError as exc:
+        provider_code = ""
+        try:
+            payload = json.loads(exc.read().decode("utf-8", errors="replace"))
+            if isinstance(payload, dict):
+                provider_code = str(payload.get("error_code") or payload.get("code") or "").strip()
+        except Exception:
+            provider_code = ""
+        detail = f"HTTP_{int(exc.code)}"
+        if provider_code:
+            detail += f":{provider_code}"
+        raise RuntimeError(f"NFL_FORWARD_ODDS_FETCH_FAILED:{detail}") from exc
     try:
         return json.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:

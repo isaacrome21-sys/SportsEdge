@@ -19,8 +19,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: auto-mlb
-  cancel-in-progress: true
+  group: sportsedge-paid-odds-api
+  cancel-in-progress: false
 
 jobs:
   run-card:

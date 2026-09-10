@@ -23,7 +23,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: archive-mlb-game-odds
+  group: sportsedge-paid-odds-api
   cancel-in-progress: false
 
 jobs:
