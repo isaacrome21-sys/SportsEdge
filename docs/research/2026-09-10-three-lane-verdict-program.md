@@ -165,3 +165,15 @@ Status: DONE for the attempt; FAILS_BAR for both NFL targets. The ten-attempt fe
 - Final NFL feature-search decision: FAILS_BAR. Across ten pre-registered feature specifications, neither target produced a paired-bootstrap 95% CI including zero versus the closing market. No artifact freeze, eligibility change, or Model_P promotion.
 - Post-search work: segment and timing analyses remain separate from the exhausted feature budget and are pending. CFB and MLB remain BLOCKED_NO_CLOSING_BENCHMARK.
 - Evidence: report artifact digest `sha256:9f28430792a1efc4807642d033d0e85bc56d6b8bb3bb3df1dcefe7382cfa8e35`.
+
+
+## Confirmation-set audit
+
+The ten NFL feature attempts used training seasons 2010-2016 and validation seasons 2017-2019 only. They did not touch 2020-2025.
+
+The project-wide record is broader: the initial baseline fit used NFL seasons 2021-2025, including the 2025 closing-line benchmark. Therefore:
+- 2020 is untouched by the recorded NFL work and is a possible one-season confirmation candidate.
+- 2021-2025 are not untouched and cannot be presented as a clean confirmation set.
+- 2026 remains the reserved forward holdout, to be evaluated once after the feature set is frozen and the season is complete.
+
+No confirmation evaluation is being claimed or run from this audit. Any use of 2020 or 2026 must be predeclared with its own one-time evaluation rule.
