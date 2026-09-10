@@ -7,12 +7,24 @@ on:
       - '.github/workflows/**'
       - 'scripts/audit_workflow_script_refs.py'
       - 'scripts/audit_paid_odds_api_concurrency.py'
+      - 'sportsedge/odds_keyring.py'
+      - 'sportsedge/live_odds_failover.py'
+      - 'sportsedge/sports/nfl/odds_source.py'
+      - 'tests/test_odds_keyring.py'
+      - 'tests/test_live_odds_failover.py'
+      - 'tests/test_nfl_odds_source.py'
   push:
     branches: [main]
     paths:
       - '.github/workflows/**'
       - 'scripts/audit_workflow_script_refs.py'
       - 'scripts/audit_paid_odds_api_concurrency.py'
+      - 'sportsedge/odds_keyring.py'
+      - 'sportsedge/live_odds_failover.py'
+      - 'sportsedge/sports/nfl/odds_source.py'
+      - 'tests/test_odds_keyring.py'
+      - 'tests/test_live_odds_failover.py'
+      - 'tests/test_nfl_odds_source.py'
 
 permissions:
   contents: read
@@ -36,3 +48,9 @@ jobs:
         run: python scripts/audit_workflow_script_refs.py
       - name: Validate paid Odds API jobs use the repo-wide lock
         run: python scripts/audit_paid_odds_api_concurrency.py
+      - name: Verify terminal provider exhaustion stops failover
+        run: >-
+          python -m unittest -v
+          tests.test_odds_keyring
+          tests.test_live_odds_failover
+          tests.test_nfl_odds_source
