@@ -51,6 +51,7 @@ jobs:
             sportsedge/sports/cfb/joint_model.py \
             sportsedge/sports/cfb/run_machine.py \
             sportsedge/sports/cfb/historical_features.py \
+            sportsedge/sports/cfb/fit_policy.py \
             sportsedge/sports/cfb/model_artifact.py \
             sportsedge/sports/cfb/paths.py \
             sportsedge/sports/cfb/source_manifest.py \
@@ -86,23 +87,25 @@ jobs:
               return {key: round((index + 1) / 10.0 + offset, 8) for index, key in enumerate(team_keys)}
 
           rows = []
-          for i in range(24):
-              season = 2022 if i < 12 else 2023
-              rows.append({
-                  'game_id': f'fixture_{season}_{i:02d}_AWAY_HOME',
-                  'season': season,
-                  'week': (i % 12) + 1,
-                  'neutral_site': bool(i % 7 == 0),
-                  'home_metrics': metrics(i / 100.0),
-                  'away_metrics': metrics((24 - i) / 120.0),
-                  'weather': {
-                      'game_indoor': bool(i % 9 == 0),
-                      'wind_speed': float(4 + (i % 7)),
-                      'temperature': float(58 + (i % 18)),
-                  },
-                  'home_score': 17 + ((i * 5) % 24),
-                  'away_score': 10 + ((i * 7) % 27),
-              })
+          seasons = (2023, 2024, 2025)
+          for season_index, season in enumerate(seasons):
+              for i in range(20):
+                  offset = season_index * 20 + i
+                  rows.append({
+                      'game_id': f'fixture_{season}_{i:02d}_AWAY_HOME',
+                      'season': season,
+                      'week': (i % 12) + 1,
+                      'neutral_site': bool(i % 7 == 0),
+                      'home_metrics': metrics(offset / 100.0),
+                      'away_metrics': metrics((60 - offset) / 120.0),
+                      'weather': {
+                          'game_indoor': bool(i % 9 == 0),
+                          'wind_speed': float(4 + (i % 7)),
+                          'temperature': float(58 + (i % 18)),
+                      },
+                      'home_score': 17 + ((offset * 5) % 24),
+                      'away_score': 10 + ((offset * 7) % 27),
+                  })
 
           root = Path('artifacts/cfb/determinism/source_evidence')
           root.mkdir(parents=True, exist_ok=True)
@@ -114,8 +117,8 @@ jobs:
           manifest = {
               'schema_version': CFB_PIT_SOURCE_MANIFEST_SCHEMA,
               'generated_at_utc': '2026-01-15T11:00:00+00:00',
-              'fit_max_season': 2023,
-              'training_window': {'min_season': 2022, 'max_season': 2023},
+              'fit_max_season': 2025,
+              'training_window': {'min_season': 2023, 'max_season': 2025},
               'materializer_version': CFB_HISTORICAL_MATERIALIZER_VERSION,
               'feature_contract': CFB_FEATURE_CONTRACT,
               'post_cutoff_information_excluded': True,
@@ -128,7 +131,7 @@ jobs:
                       'content_sha256': sha256(feature_bytes).hexdigest(),
                       'availability_mode': 'EVENT_TIMESTAMPED_REPLAY',
                       'availability_rule': 'CI fixture PIT feature snapshot only.', 'market_data': False,
-                      'post_cutoff_excluded': True, 'seasons': [2022, 2023],
+                      'post_cutoff_excluded': True, 'seasons': list(seasons),
                   },
                   {
                       'source_id': 'labels', 'role': 'LABEL', 'provider': 'ci-fixture',
@@ -137,7 +140,7 @@ jobs:
                       'content_sha256': sha256(label_bytes).hexdigest(),
                       'availability_mode': 'POST_EVENT_LABEL',
                       'availability_rule': 'CI fixture final labels only.', 'market_data': False,
-                      'post_cutoff_excluded': True, 'seasons': [2022, 2023],
+                      'post_cutoff_excluded': True, 'seasons': list(seasons),
                   },
               ],
           }
@@ -165,7 +168,7 @@ jobs:
           --training-bundle artifacts/cfb/determinism/cfb_pit_training_bundle.json
           --source-manifest artifacts/cfb/determinism/cfb_pit_source_manifest.json
           --source-evidence-root artifacts/cfb/determinism/source_evidence
-          --fit-max-season 2023
+          --fit-max-season 2025
           --git-sha "$EVIDENCE_GIT_SHA"
           --output artifacts/cfb/determinism/ci_attempt_001/model.json
           --provenance-output artifacts/cfb/determinism/ci_attempt_001/provenance.json
@@ -178,7 +181,7 @@ jobs:
           --training-bundle artifacts/cfb/determinism/cfb_pit_training_bundle.json
           --source-manifest artifacts/cfb/determinism/cfb_pit_source_manifest.json
           --source-evidence-root artifacts/cfb/determinism/source_evidence
-          --fit-max-season 2023
+          --fit-max-season 2025
           --git-sha "$EVIDENCE_GIT_SHA"
           --output artifacts/cfb/determinism/ci_replay_001/model.json
           --provenance-output artifacts/cfb/determinism/ci_replay_001/provenance.json
