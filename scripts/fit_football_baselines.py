@@ -97,7 +97,7 @@ def bootstrap_rmse_delta(model, market, actual, reps=2000):
         deltas.append(float(np.sqrt(np.mean((model[idx]-y)**2))-np.sqrt(np.mean((market[idx]-y)**2))))
     sq_delta=(model-actual)**2-(market-actual)**2
     detectable=1.96*float(np.std(sq_delta,ddof=1))/(2*float(np.sqrt(np.mean((market-actual)**2)))*np.sqrt(n))
-    return {"reps":reps,"delta_model_minus_market":float(np.sqrt(np.mean((model-actual)**2))-np.sqrt(np.mean((market-actual)**2))),"q05":float(np.quantile(deltas,.05)),"q50":float(np.quantile(deltas,.50)),"q95":float(np.quantile(deltas,.95)),"approx_95pct_detectable_rmse_gap":detectable}
+    return {"reps":reps,"delta_model_minus_market":float(np.sqrt(np.mean((model-actual)**2))-np.sqrt(np.mean((market-actual)**2))),"ci95_q025":float(np.quantile(deltas,.025)),"median":float(np.quantile(deltas,.50)),"ci95_q975":float(np.quantile(deltas,.975)),"approx_95pct_detectable_rmse_gap":detectable}
 def cv_null(x,y,alpha,shuffles=200):
     """Training-only null; never evaluates the already-used holdout."""
     n=len(y); values=[]; rng=np.random.default_rng(0)
