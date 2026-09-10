@@ -1,0 +1,41 @@
+{
+  "schema": "NFL_FEATURE_SEARCH_LEDGER_V1",
+  "policy": {
+    "training_seasons": [2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018],
+    "holdout_season": 2019,
+    "attempt_budget": 10,
+    "attempts_consumed": 1,
+    "attempts_remaining": 9
+  },
+  "attempts": [
+    {
+      "attempt_number": 1,
+      "family": "opponent_adjustment",
+      "feature_set": "opponent_strength",
+      "status": "EVALUATED_FAILED_MARKET_RELATIVE_SCREEN",
+      "source_sha256": "4ad6a8649b7a14f8eea760377cc78bfecf495eb473add894647e741889e264e6",
+      "training_selected_alpha_margin": 100.0,
+      "baseline_2019_margin_rmse": 13.651625669684048,
+      "candidate_2019_margin_rmse": 13.712589414386631,
+      "closing_spread_2019_rmse": 13.127455127518052,
+      "spread_line_home_margin_correlation": 0.4810567776774902,
+      "candidate_minus_baseline_rmse": 0.060963744702583256,
+      "candidate_minus_closing_rmse": 0.5851342868685787,
+      "candidate_beats_baseline": false,
+      "candidate_beats_closing_spread": false,
+      "training_cv_placebo_null_q95": 0.026269017738007005,
+      "candidate_holdout_placebo_r2": 0.00620081342229184,
+      "placebo_exceeds_training_null_q95": false,
+      "verdict": "REJECT_OPPONENT_ADJUSTMENT_ATTEMPT_1",
+      "revision_rule": "Any modification to this opponent-adjustment candidate after viewing these 2019 results is a new attempt."
+    }
+  ],
+  "next_attempt": null,
+  "governance": {
+    "status": "RESEARCH_ONLY_NOT_MODEL_P",
+    "promotion_changed": false,
+    "eligibility_changed": false,
+    "model_p_created": false,
+    "official_bet_authorized": false
+  }
+}
