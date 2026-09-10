@@ -51,6 +51,9 @@ jobs:
   execute:
     if: github.event_name != 'pull_request'
     needs: audit
+    concurrency:
+      group: sportsedge-paid-odds-api
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     env:
       SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
