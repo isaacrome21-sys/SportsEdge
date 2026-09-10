@@ -16,6 +16,7 @@ from math import isfinite
 from pathlib import Path
 from typing import Any, Mapping
 
+from .fit_policy import CFBFitPolicyError, fit_cfb_joint_score_model_temporal
 from .historical_features import CFB_HISTORICAL_MATERIALIZER_VERSION
 from .joint_model import fit_cfb_joint_score_model
 from .model_artifact import build_cfb_model_artifact, cfb_model_code_surface_sha256
@@ -24,9 +25,17 @@ from .source_manifest import CFBSourceManifestError, validate_cfb_pit_source_man
 CFB_PIT_TRAINING_BUNDLE_SCHEMA = "CFB_PIT_TRAINING_BUNDLE_V1"
 CFB_TRAINING_CODE_SURFACE = (
     "sportsedge/sports/cfb/historical_features.py",
+    "sportsedge/sports/cfb/joint_model.py",
+    "sportsedge/sports/cfb/fit_policy.py",
     "sportsedge/sports/cfb/training_artifact.py",
     "sportsedge/sports/cfb/source_manifest.py",
     "scripts/build_cfb_model_artifact.py",
+)
+CFB_DERIVATION_CODE_SURFACE = (
+    "sportsedge/sports/cfb/historical_features.py",
+    "sportsedge/sports/cfb/joint_model.py",
+    "sportsedge/sports/cfb/fit_policy.py",
+    "sportsedge/sports/cfb/training_artifact.py",
 )
 CFB_TRAINING_SEED_POLICY = "NONE_DETERMINISTIC_RIDGE_V1"
 
@@ -67,6 +76,10 @@ def _surface_sha256(repo_root: str | Path, paths: tuple[str, ...]) -> str:
 
 def cfb_training_code_surface_sha256(repo_root: str | Path) -> str:
     return _surface_sha256(repo_root, CFB_TRAINING_CODE_SURFACE)
+
+
+def cfb_derivation_code_surface_sha256(repo_root: str | Path) -> str:
+    return _surface_sha256(repo_root, CFB_DERIVATION_CODE_SURFACE)
 
 
 def _game_ids_sha256(game_ids: list[str]) -> str:
@@ -120,7 +133,7 @@ def validate_cfb_pit_training_bundle(payload: Mapping[str, Any], *, raw_bytes: b
 def build_cfb_artifact_from_pit_bundle(
     payload: Mapping[str, Any], *, raw_bytes: bytes, source_manifest: Mapping[str, Any],
     source_manifest_raw_bytes: bytes, source_evidence_root: str | Path, repo_root: str | Path,
-    fit_max_season: int, ridge_alpha: float = 10.0,
+    fit_max_season: int, ridge_alpha: float | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     validated = validate_cfb_pit_training_bundle(payload, raw_bytes=raw_bytes, fit_max_season=fit_max_season)
     try:
@@ -130,24 +143,42 @@ def build_cfb_artifact_from_pit_bundle(
         raise CFBTrainingArtifactError(str(exc)) from exc
     if manifest["manifest_sha256"] != validated["source_manifest_sha256"]:
         raise CFBTrainingArtifactError("CFB_TRAINING_SOURCE_MANIFEST_SHA256_MISMATCH")
-    try:
-        alpha = float(ridge_alpha)
-    except (TypeError, ValueError) as exc:
-        raise CFBTrainingArtifactError("CFB_TRAINING_RIDGE_ALPHA_INVALID") from exc
-    if not isfinite(alpha) or alpha < 0:
-        raise CFBTrainingArtifactError("CFB_TRAINING_RIDGE_ALPHA_INVALID")
-    try:
-        model = fit_cfb_joint_score_model(validated["rows"], ridge_alpha=alpha)
-    except ValueError as exc:
-        raise CFBTrainingArtifactError(str(exc)) from exc
+
+    if ridge_alpha is None:
+        try:
+            model, fit_policy = fit_cfb_joint_score_model_temporal(validated["rows"])
+        except (CFBFitPolicyError, ValueError) as exc:
+            raise CFBTrainingArtifactError(str(exc)) from exc
+        alpha = float(model.ridge_alpha)
+    else:
+        try:
+            alpha = float(ridge_alpha)
+        except (TypeError, ValueError) as exc:
+            raise CFBTrainingArtifactError("CFB_TRAINING_RIDGE_ALPHA_INVALID") from exc
+        if not isfinite(alpha) or alpha < 0:
+            raise CFBTrainingArtifactError("CFB_TRAINING_RIDGE_ALPHA_INVALID")
+        try:
+            model = fit_cfb_joint_score_model(validated["rows"], ridge_alpha=alpha)
+        except ValueError as exc:
+            raise CFBTrainingArtifactError(str(exc)) from exc
+        fit_policy = {
+            "policy_version": "CFB_FIXED_RIDGE_MANUAL_V1",
+            "mode": "FIXED_MANUAL",
+            "selected_alpha": alpha,
+            "promotion_evidence": False,
+        }
+
     if tuple(model.train_seasons) != tuple(validated["train_seasons"]):
         raise CFBTrainingArtifactError("CFB_TRAINING_MODEL_SEASON_IDENTITY_MISMATCH")
-    code_sha = cfb_model_code_surface_sha256(repo_root); training_code_sha = cfb_training_code_surface_sha256(repo_root)
+    code_sha = cfb_model_code_surface_sha256(repo_root)
+    training_code_sha = cfb_training_code_surface_sha256(repo_root)
+    derivation_code_sha = cfb_derivation_code_surface_sha256(repo_root)
     artifact = build_cfb_model_artifact(model, model_code_sha256=code_sha, training_source_sha256=validated["training_bundle_sha256"])
     provenance = {
         "schema_version": "CFB_MODEL_TRAINING_PROVENANCE_V1", "model_id": artifact["model_id"],
         "feature_contract": artifact["feature_contract"], "artifact_sha256": artifact["artifact_sha256"],
         "model_code_sha256": code_sha, "training_code_sha256": training_code_sha,
+        "derivation_code_sha256": derivation_code_sha,
         "training_bundle_sha256": validated["training_bundle_sha256"],
         "upstream_source_manifest_sha256": manifest["manifest_sha256"], "source_manifest_schema": manifest["schema_version"],
         "source_count": manifest["source_count"], "source_ids": manifest["source_ids"],
@@ -157,11 +188,12 @@ def build_cfb_artifact_from_pit_bundle(
         "materializer_version": validated["materializer_version"], "generated_at_utc": validated["generated_at_utc"],
         "fit_max_season": validated["fit_max_season"], "train_seasons": validated["train_seasons"],
         "training_window": manifest["training_window"], "row_count": validated["row_count"], "ridge_alpha": alpha,
+        "ridge_fit_policy": fit_policy,
         "training_seed_policy": CFB_TRAINING_SEED_POLICY, "promotion_changed": False,
     }
     return artifact, provenance
 
 
-__all__ = ["CFB_PIT_TRAINING_BUNDLE_SCHEMA", "CFB_TRAINING_CODE_SURFACE", "CFB_TRAINING_SEED_POLICY",
-    "CFBTrainingArtifactError", "build_cfb_artifact_from_pit_bundle", "cfb_training_code_surface_sha256",
-    "validate_cfb_pit_training_bundle"]
+__all__ = ["CFB_PIT_TRAINING_BUNDLE_SCHEMA", "CFB_TRAINING_CODE_SURFACE", "CFB_DERIVATION_CODE_SURFACE",
+    "CFB_TRAINING_SEED_POLICY", "CFBTrainingArtifactError", "build_cfb_artifact_from_pit_bundle",
+    "cfb_derivation_code_surface_sha256", "cfb_training_code_surface_sha256", "validate_cfb_pit_training_bundle"]
