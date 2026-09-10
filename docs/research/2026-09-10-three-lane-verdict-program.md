@@ -92,3 +92,15 @@ Status: DONE for the attempt; FAILS_BAR for both NFL targets.
 - CV alphas: margin 100.0; total 100.0.
 - Decision: situational features did not clear the frozen criterion. No artifact freeze, eligibility change, or Model_P promotion. Attempt 4 is consumed; next registered NFL family is line play.
 - Evidence: report artifact digest `sha256:451da815cda1dfbecf08f1c2b05ad67c47f0f3f7433f79ecfa9c1d920f445956`.
+
+
+## NFL Attempt 5 result (run 34490578939)
+
+Status: DONE for the attempt; FAILS_BAR for both NFL targets.
+
+- Feature family: point-in-time offensive and defensive pressure and sack rates added to the rolling baseline.
+- Window: train 2010-2016; validate 2017-2019; 729 games with closing lines.
+- Margin: model RMSE 13.9428 versus closing spread RMSE 13.2219; delta +0.7209; paired-bootstrap 95% CI [+0.4217, +1.0088]. Close-game R² was -0.5826 versus the mean.
+- Total: model RMSE 14.3425 versus closing total RMSE 13.6744; delta +0.6681; paired-bootstrap 95% CI [+0.4239, +0.9050].
+- Decision: line-play features did not clear the frozen criterion. No artifact freeze, eligibility change, or Model_P promotion. Attempt 5 is consumed; next registered NFL family is weather and venue.
+- Evidence: report artifact digest `sha256:17285166fe8719834e6a38abe916c8d165327d468f2c1ef57a3f41fce0355c06`.
