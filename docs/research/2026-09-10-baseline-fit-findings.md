@@ -33,14 +33,15 @@ The small positive football placebo values are not by themselves proof of leakag
 
 ### NFL closing-market benchmark
 
-Using the same nflverse source, on 272 holdout games:
+The corrected report uses raw nflverse spread_line values. Across 272 holdout games:
 
 - Margin model RMSE: 13.2120
-- Closing spread RMSE: 18.3098
+- Closing spread RMSE: 12.3595
+- Spread-line correlation with actual home margin: +0.4921
 - Total model RMSE: 13.3600
 - Closing total RMSE: 13.1325
 
-The total baseline is worse than the closing total by about 0.228 points RMSE. The margin comparison is reported under the conventional home-margin interpretation of nflverse spread_line and still requires source-convention review before any certification decision.
+The positive correlation confirms the raw spread_line orientation. The model loses to the closing spread by about 0.853 RMSE and loses to the closing total by about 0.228 RMSE. NFL does not pass the first market-relative screen.
 
 ### CFB close-game split
 
@@ -51,16 +52,15 @@ For 415 CFB holdout games decided by under 14 points:
 - Under-14 model RMSE: 10.2777
 - Under-14 mean-baseline RMSE: 8.0628
 
-The strong full-sample CFB margin result does not survive the close-game filter. This supports the talent-gap/blowout explanation and makes CFB margin unsuitable for certification without opponent-strength and market-relative testing.
+The strong full-sample CFB margin result does not survive the close-game filter. This supports the talent-gap/blowout explanation and disqualifies this baseline from betting-model certification.
 
-## Decision order
+## Decision
 
-1. Keep all three fitted outputs research-only.
-2. Do not freeze alpha 10.0 or any replacement alpha yet.
-3. Verify the nflverse spread sign convention and add a same-sample market comparison to the production evidence format.
-4. Treat NFL total as failing the first market-relative screen.
-5. Treat CFB margin as failing the close-game diagnostic until redesigned.
-6. Treat CFB total alpha 0.1 as a noise-sensitive CV result pending robustness checks.
-7. Consider only a lane that survives relevant market-relative diagnostics and full calibration/provenance requirements.
+- Keep all three fitted outputs research-only.
+- Do not freeze alpha 10.0 or any replacement alpha yet.
+- Do not certify NFL margin or total; both lose to the closing market in this baseline test.
+- Do not certify CFB margin; it is worse than the mean on close games.
+- Treat CFB total alpha 0.1 as a noise-sensitive CV result pending robustness checks.
+- Treat MLB as research-only pending its own market-relative and calibration evidence.
 
-The baseline report remains research-only until those checks are complete.
+The baseline report remains research-only until the full calibration, provenance, and Truth Gate requirements are complete.
