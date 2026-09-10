@@ -75,3 +75,15 @@ The 2025 NFL measurements are now validation results and must not be reused for 
 - Required before feature work: resolve the existing Phase 3 multiple-testing policy and record its exact attempt budget.
 - Required placebo control: compute a deterministic 200-shuffle null on training/CV data only, before evaluating any new feature set.
 - NFL closing-market comparison remains the primary decision metric; mean-baseline improvement alone is insufficient.
+
+
+## Frozen NFL search policy
+
+Decision: use 2019 as the immediate untouched development holdout so feature work can be evaluated now. Reserve the completed 2026 season as the later forward holdout; it is not used during feature selection.
+
+- Feature-search budget: 10 distinct feature specifications.
+- Every candidate evaluated against 2019 counts, including discarded or failed candidates.
+- Primary metric: closing-market RMSE.
+- Placebo control: deterministic 200-shuffle training/CV null before the first feature evaluation.
+- 2025 is validation only and is excluded from feature search.
+- Policy file: config/nfl_research_search_policy_v1.json
