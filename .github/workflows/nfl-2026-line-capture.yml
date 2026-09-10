@@ -1,0 +1,62 @@
+name: NFL 2026 line capture
+
+on:
+  schedule:
+    # Every 5 minutes, offset from :00 to avoid peak scheduler load. The script
+    # decides whether a capture window is open; idle runs make no paid API calls.
+    - cron: "2,7,12,17,22,27,32,37,42,47,52,57 * * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "check = validate setup only; capture = capture if a window is open"
+        type: choice
+        options: [check, capture]
+        default: check
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nfl-2026-line-capture
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Run capture
+        id: run
+        env:
+          ODDS_API_KEY_1: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+          ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
+          ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
+          ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
+          WORKFLOW_PATH: .github/workflows/nfl-2026-line-capture.yml
+        run: |
+          set +e
+          python3 scripts/nfl_2026_line_capture.py "${{ inputs.mode || 'capture' }}"
+          echo "rc=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Commit captures
+        if: always() && (inputs.mode || 'capture') == 'capture'
+        run: |
+          DIR=data/nfl_2026_confirmation/captures
+          [ -d "$DIR" ] || { echo "No capture directory yet"; exit 0; }
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$DIR"
+          if git diff --cached --quiet; then echo "Nothing to commit"; exit 0; fi
+          git commit -m "NFL 2026 line capture (run $GITHUB_RUN_ID)"
+          for i in 1 2 3; do
+            if git pull --rebase --quiet && git push --quiet; then exit 0; fi
+            sleep $((i * 5))
+          done
+          echo "PUSH_FAILED"
+          exit 1
+
+      - name: Fail job if capture or check failed
+        if: steps.run.outputs.rc != '0'
+        run: exit 1
