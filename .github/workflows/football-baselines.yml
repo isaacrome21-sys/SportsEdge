@@ -1,10 +1,6 @@
 name: NFL and CFB baseline fits
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - 'scripts/fit_football_baselines.py'
-      - '.github/workflows/football-baselines.yml'
 jobs:
   fit:
     runs-on: ubuntu-latest
@@ -18,5 +14,5 @@ jobs:
         run: python scripts/fit_football_baselines.py --seasons 2010,2011,2012,2013,2014,2015,2016,2017,2018,2019 --holdout 2019 --feature-set opponent_strength
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: football-baseline-report
-          path: artifacts/football_baselines.json
+          name: football-baseline-attempt1
+          path: artifacts/football_baselines_attempt1.json
