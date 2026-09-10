@@ -6,7 +6,7 @@ no eligibility or Model_P promotion.  Features are prior-game rolling scores;
 same-date games are emitted before their results are appended.
 """
 from __future__ import annotations
-import argparse, csv, hashlib, io, json, sys
+import argparse, csv, hashlib, io, json, re, sys
 from datetime import date, timedelta
 from collections import defaultdict
 from itertools import groupby
@@ -126,10 +126,24 @@ def run_target(x,y,hold_start,hold_end,close_split=False):
     return result
 
 def main():
-    ap=argparse.ArgumentParser(); ap.add_argument("--seasons",default="2021,2022,2023,2024,2025"); ap.add_argument("--holdout",type=int,default=2025); ap.add_argument("--holdout-start",type=int); ap.add_argument("--holdout-end",type=int); ap.add_argument("--feature-set",choices=("baseline","opponent_strength"),default="baseline"); ap.add_argument("--out",default="artifacts/football_baselines.json"); args=ap.parse_args()
-    hold_start=args.holdout_start if args.holdout_start is not None else args.holdout; hold_end=args.holdout_end if args.holdout_end is not None else args.holdout
-    if hold_start>hold_end: raise RuntimeError("INVALID_HOLDOUT_RANGE")
-    seasons={int(x) for x in args.seasons.split(",")}; reports={}
+    ap=argparse.ArgumentParser(); ap.add_argument("--seasons",default="2021,2022,2023,2024,2025"); ap.add_argument("--holdout",type=int); ap.add_argument("--holdout-start",type=int); ap.add_argument("--holdout-end",type=int); ap.add_argument("--policy",default="config/nfl_research_search_policy_v1.json"); ap.add_argument("--feature-set",choices=("baseline","opponent_strength"),default="baseline"); ap.add_argument("--out",default="artifacts/football_baselines.json"); args=ap.parse_args()
+    policy_path=Path(args.policy)
+    try: policy=json.loads(policy_path.read_text())
+    except (OSError, json.JSONDecodeError) as exc: raise RuntimeError(f"POLICY_READ_FAILED:{policy_path}:{exc}") from exc
+    window=policy.get("immediate_holdout_range")
+    if not isinstance(window,list) or len(window)!=2 or not all(isinstance(v,int) for v in window) or window[0]>window[1]: raise RuntimeError("INVALID_POLICY_HOLDOUT_RANGE")
+    hold_start,hold_end=window
+    supplied=(args.holdout_start,args.holdout_end)
+    if args.holdout is not None: supplied=(args.holdout,args.holdout)
+    if any(v is not None for v in supplied) and supplied != (hold_start,hold_end): raise RuntimeError(f"HOLDOUT_ARGUMENT_DISAGREES_WITH_POLICY:{supplied}!={(hold_start,hold_end)}")
+    training=policy.get("training_seasons_for_immediate_holdout","")
+    match=re.fullmatch(r"(\d{4})-(\d{4})",str(training))
+    if not match: raise RuntimeError("INVALID_POLICY_TRAINING_WINDOW")
+    train_start,train_end=map(int,match.groups())
+    if train_end >= hold_start: raise RuntimeError("TRAINING_OVERLAPS_HOLDOUT")
+    seasons={int(x) for x in args.seasons.split(",") if x.strip()}; required=set(range(train_start,hold_end+1))
+    if not required.issubset(seasons): raise RuntimeError(f"SEASONS_OMIT_POLICY_WINDOW:{sorted(required-seasons)}")
+    reports={}
     for sport,loader in (("NFL",nfl),("CFB",cfb)):
         games,sha,source=loader(seasons)
         if not games: raise RuntimeError(f"{sport}: NO_COMPLETED_GAMES")
@@ -140,7 +154,7 @@ def main():
         if not games: raise RuntimeError(f"{sport}: NO_PRE_HOLDOUT_GAMES")
         global hold_dates,feature_names
         X,ym,yt,feature_names,hold_dates=features(games,args.feature_set)
-        reports[sport]={"source":source,"source_sha256":sha,"feature_set":args.feature_set,"holdout_years":[hold_start,hold_end],"games_fetched":len(games),"usable_rows":len(X),"status":"RESEARCH_ONLY_NOT_MODEL_P","targets":{"margin":run_target(X,ym,hold_start,hold_end,close_split=(sport=="CFB")),"total":run_target(X,yt,hold_start,hold_end)}}
+        reports[sport]={"source":source,"source_sha256":sha,"policy_path":str(policy_path),"policy_sha256":hashlib.sha256(policy_path.read_bytes()).hexdigest(),"training_years":[train_start,train_end],"feature_set":args.feature_set,"holdout_years":[hold_start,hold_end],"games_fetched":len(games),"usable_rows":len(X),"status":"RESEARCH_ONLY_NOT_MODEL_P","targets":{"margin":run_target(X,ym,hold_start,hold_end,close_split=(sport=="CFB")),"total":run_target(X,yt,hold_start,hold_end)}}
         if args.feature_set=="opponent_strength":
             # Same-data control calibration, preregistered and excluded from
             # the feature-attempt budget. It establishes the baseline on 2019.
