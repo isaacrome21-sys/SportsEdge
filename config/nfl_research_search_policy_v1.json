@@ -69,6 +69,6 @@
   "attempt_5_run_url": "https://github.com/isaacrome21-sys/SportsEdge/actions/runs/34490578939",
   "attempt_6_specification": "Add pregame weather and venue features from nflverse: temperature, wind, dome, and field surface.",
   "attempt_6_result": "FAILS_BAR: margin model-minus-close RMSE +0.664723 (95% CI +0.398664 to +0.929663); total +0.350359 (95% CI +0.122434 to +0.570744).",
-  "attempt_6_report_sha256": "sha256:451da815cda1dfbecf08f1c2b05ad67c47f0f3f7433f79ecfa9c1d920f445956",
+  "attempt_6_report_sha256": "sha256:0a0a14fb8fd3f4596a869efe7056e9e4f817d6732bb5767e40a1e67d117bc046",
   "attempt_6_run_url": "https://github.com/isaacrome21-sys/SportsEdge/actions/runs/34490950906"
 }
