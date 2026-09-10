@@ -24,7 +24,12 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--training-bundle", type=Path, required=True)
     ap.add_argument("--fit-max-season", type=int, required=True)
-    ap.add_argument("--ridge-alpha", type=float, default=10.0)
+    ap.add_argument(
+        "--ridge-alpha",
+        type=float,
+        default=None,
+        help="Explicit fixed ridge alpha. Omit to select alpha with season-ordered temporal CV.",
+    )
     ap.add_argument("--git-sha", required=True)
     ap.add_argument("--output", type=Path, default=Path("config/cfb_model_artifact.json"))
     ap.add_argument("--provenance-output", type=Path, default=Path("artifacts/cfb/cfb_model_training_provenance.json"))
@@ -69,8 +74,11 @@ def main() -> int:
         "artifact_sha256": artifact["artifact_sha256"],
         "training_bundle_sha256": provenance["training_bundle_sha256"],
         "source_manifest_sha256": provenance["upstream_source_manifest_sha256"],
+        "derivation_code_sha256": provenance["derivation_code_sha256"],
         "fit_max_season": provenance["fit_max_season"],
         "row_count": provenance["row_count"],
+        "ridge_policy_version": provenance["ridge_policy_version"],
+        "ridge_alpha": provenance["ridge_alpha"],
         "promotion_changed": False,
         "determinism_class": provenance["determinism_class"],
         "replay_scope": provenance["replay_scope"],
