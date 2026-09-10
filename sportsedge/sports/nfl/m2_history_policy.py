@@ -26,6 +26,8 @@ from .m2_history_features import _float
 from .m2_history_features import build_nfl_m2_history_rows as _build_core_history_rows
 
 _ALLOWED_POLICIES = {"error", "exclude_from_evaluation"}
+_KNOWN_ROOF = {"outdoors", "open", "dome", "closed"}
+_SEALED_ROOF = {"dome", "closed"}
 _MAX_POSTCLOSING_AWAY_ORIGIN_GAP_DAYS = 28
 
 
@@ -152,23 +154,32 @@ def _project_starter_depth_rows(
     return projected
 
 
-
 def environment_exclusion_reasons(row: Mapping[str, Any]) -> list[str]:
     reasons = []
     for field in ("home_rest", "away_rest"):
         value = _float(row.get(field))
         if isinstance(row.get(field), bool) or value is None or value < 0:
             reasons.append(f"NFL_{field.upper()}_INVALID")
+
     roof = str(row.get("roof") or "").strip().lower()
-    if roof not in {"outdoors", "open", "closed", "dome"}:
+    if roof not in _KNOWN_ROOF:
         reasons.append("NFL_ROOF_INVALID")
-    # wind_mph is an optional provider alias. Only an absent alias may
-    # fall back to wind; a supplied malformed value must not be hidden.
+
+    # The downstream historical feature builder already defines game-level
+    # wind exposure as 0 for sealed indoor games. Preserve that same contract
+    # here, but only when the provider wind value is genuinely absent/blank.
+    # A supplied malformed, non-finite, boolean, or negative value still fails
+    # closed, and missing wind for open/outdoor games remains invalid.
     field = "wind_mph" if row.get("wind_mph") not in (None, "") else "wind"
-    wind = _float(row.get(field))
-    if isinstance(row.get(field), bool) or wind is None or wind < 0:
+    raw_wind = row.get(field)
+    if roof in _SEALED_ROOF and raw_wind in (None, ""):
+        wind = 0.0
+    else:
+        wind = _float(raw_wind)
+    if isinstance(raw_wind, bool) or wind is None or wind < 0:
         reasons.append("NFL_WIND_INVALID")
     return reasons
+
 
 def build_nfl_m2_history_rows(
     schedule_rows: Iterable[Mapping[str, Any]],
