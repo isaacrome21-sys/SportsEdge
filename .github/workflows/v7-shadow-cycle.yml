@@ -10,6 +10,7 @@ permissions:
 
 env:
   PYTHONUNBUFFERED: '1'
+  PYTHONPATH: ${{ github.workspace }}
 
 jobs:
   capture:
