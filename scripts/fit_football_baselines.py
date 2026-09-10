@@ -123,6 +123,36 @@ def cv_null(x,y,alpha,shuffles=200):
         values.append(float(1-mse/bmse) if bmse else 0.0)
     return {"n":shuffles,"q05":float(np.quantile(values,.05)),"q50":float(np.quantile(values,.50)),"q95":float(np.quantile(values,.95)),"max":float(max(values))}
 
+def placebo_null(xtr,ytr,xte,yte,alpha,draws=200,seed=20260910):
+    """Deterministic shuffled-label diagnostic for an already-defined split.
+
+    This routine is diagnostic only. It must not be used to select, revise, or
+    rank a candidate after holdout outcomes are visible; candidate selection
+    uses ``cv_null`` on training data only.
+    """
+    if int(draws) <= 0:
+        raise ValueError("PLACEBO_DRAWS_MUST_BE_POSITIVE")
+    xtr=np.asarray(xtr,float); ytr=np.asarray(ytr,float); xte=np.asarray(xte,float); yte=np.asarray(yte,float)
+    if len(xtr) != len(ytr) or len(xte) != len(yte) or len(xtr) == 0 or len(xte) == 0:
+        raise ValueError("PLACEBO_ARRAY_SHAPE_MISMATCH")
+    a,b=scale(xtr,xte); rng=np.random.default_rng(int(seed)); values=[]
+    baseline=np.mean((float(ytr.mean())-yte)**2)
+    for _ in range(int(draws)):
+        shuffled=ytr.copy(); rng.shuffle(shuffled); beta,i=fit(a,shuffled,alpha); pred=b@beta+i
+        mse=np.mean((pred-yte)**2)
+        values.append(float(1-mse/baseline) if baseline else 0.0)
+    return {"draws":int(draws),"seed":int(seed),"median_r2_vs_mean":float(np.quantile(values,.50)),"p95_r2_vs_mean":float(np.quantile(values,.95)),"max_r2_vs_mean":float(max(values))}
+
+def closing_line_verdict(model_rmse, closing_rmse, correlation):
+    """Classify a model-vs-closing-line RMSE comparison after sign validation."""
+    values=(float(model_rmse),float(closing_rmse),float(correlation))
+    if not all(np.isfinite(v) for v in values):
+        return "INVALID_BENCHMARK_INPUT"
+    model_value, closing_value, corr=values
+    if corr <= 0.0:
+        return "INVALID_SPREAD_SIGN_CONVENTION"
+    return "BEATS_CLOSING_LINE" if model_value < closing_value else "WORSE_THAN_CLOSING_LINE"
+
 def run_target(x,y,hold_start,hold_end,close_threshold=None):
     mask=np.array([hold_start <= int(d[:4]) <= hold_end for d in hold_dates]); tr=x[~mask]; yt=y[~mask]; te=x[mask]; ye=y[mask]
     if len(tr)<100 or len(te)<20: raise RuntimeError("INSUFFICIENT_DATE_SPLIT")
@@ -216,4 +246,3 @@ def main():
                     reports[sport].setdefault("closing_line_benchmark",{})[label]=benchmark
     out=Path(args.out); out.parent.mkdir(parents=True,exist_ok=True); out.write_text(json.dumps({"schema":"FOOTBALL_BASELINES_V1","reports":reports},indent=2)+"\n"); print(json.dumps(reports,indent=2)); return 0
 if __name__=="__main__": raise SystemExit(main())
-
