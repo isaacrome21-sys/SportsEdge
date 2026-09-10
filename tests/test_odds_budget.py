@@ -56,7 +56,7 @@ class OddsBudgetTests(unittest.TestCase):
             self.assertEqual(raw["provider_credits_remaining"], 450)
             self.assertFalse(path.with_name("ledger.json.tmp").exists())
 
-    def test_next_utc_day_does_not_reuse_stale_provider_balance(self):
+    def test_next_utc_day_resets_daily_spend_but_keeps_provider_balance(self):
         with tempfile.TemporaryDirectory() as td:
             path = Path(td) / "ledger.json"
             path.write_text(json.dumps({
@@ -66,7 +66,19 @@ class OddsBudgetTests(unittest.TestCase):
             }))
             state = load_budget(path, cap_credits=12, now=datetime(2026, 9, 9, tzinfo=timezone.utc))
             self.assertEqual(state.consumed_credits, 0)
-            self.assertIsNone(state.provider_credits_remaining)
+            self.assertEqual(state.provider_credits_remaining, 453)
+
+    def test_missing_headers_decrement_last_known_provider_balance_conservatively(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "ledger.json"
+            path.write_text(json.dumps({
+                "date_utc": "2026-09-09",
+                "consumed_credits": 0,
+                "provider_credits_remaining": 453,
+            }))
+            state = load_budget(path, cap_credits=12, now=datetime(2026, 9, 9, tzinfo=timezone.utc))
+            updated = record_actual_cost(path, state=state, actual_cost=3)
+            self.assertEqual(updated.provider_credits_remaining, 450)
 
 
 if __name__ == "__main__":
