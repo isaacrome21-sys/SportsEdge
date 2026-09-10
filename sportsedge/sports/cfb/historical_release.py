@@ -32,6 +32,10 @@ ASSET_PREFIX_BY_DATASET = {
     "betting": "betting",
     "play_by_play": "play_by_play",
 }
+# Published releases commonly contain both representations for one season.  The
+# representation preference is part of the acquisition contract so selection is
+# deterministic and does not depend on API asset ordering.
+ASSET_FORMAT_PREFERENCE = (".csv.gz", ".csv")
 PREDICTIVE_DATASETS = frozenset({"schedules", "adv_team", "adv_situational", "adv_drives", "play_by_play"})
 MATERIALIZABLE_DATASETS = frozenset({"schedules", "adv_team", "adv_situational", "adv_drives", "betting"})
 BENCHMARK_ONLY_DATASETS = frozenset({"betting"})
@@ -125,23 +129,27 @@ def select_release_asset(
         raise CFBHistoricalReleaseError("CFB_HISTORICAL_RELEASE_ID_REQUIRED") from exc
 
     prefix = ASSET_PREFIX_BY_DATASET[name]
-    candidates: list[Mapping[str, Any]] = []
-    wanted = {f"{prefix}_{year}.csv", f"{prefix}_{year}.csv.gz"}
     assets = release_payload.get("assets")
     if not isinstance(assets, list):
         raise CFBHistoricalReleaseError("CFB_HISTORICAL_ASSETS_NOT_LIST")
-    for raw in assets:
-        if isinstance(raw, Mapping) and str(raw.get("name") or "") in wanted:
-            candidates.append(raw)
-    if len(candidates) != 1:
-        if not candidates:
+
+    raw: Mapping[str, Any] | None = None
+    for suffix in ASSET_FORMAT_PREFERENCE:
+        wanted = f"{prefix}_{year}{suffix}"
+        candidates = [
+            item for item in assets
+            if isinstance(item, Mapping) and str(item.get("name") or "") == wanted
+        ]
+        if len(candidates) > 1:
             raise CFBHistoricalReleaseError(
-                f"CFB_HISTORICAL_ASSET_MISSING:{name}:{year}"
+                f"CFB_HISTORICAL_ASSET_AMBIGUOUS:{name}:{year}:{suffix}"
             )
-        raise CFBHistoricalReleaseError(
-            f"CFB_HISTORICAL_ASSET_AMBIGUOUS:{name}:{year}"
-        )
-    raw = candidates[0]
+        if candidates:
+            raw = candidates[0]
+            break
+    if raw is None:
+        raise CFBHistoricalReleaseError(f"CFB_HISTORICAL_ASSET_MISSING:{name}:{year}")
+
     state = str(raw.get("state") or "").strip().lower()
     if state and state != "uploaded":
         raise CFBHistoricalReleaseError("CFB_HISTORICAL_ASSET_NOT_UPLOADED")
