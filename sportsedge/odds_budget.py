@@ -1,8 +1,10 @@
-"""Hard daily spend controls for paid sportsbook acquisition.
+"""Hard spend and reserve controls for paid sportsbook acquisition.
 
-The ledger is deliberately tiny and append-safe. It records actual provider cost
-from response headers, not estimated cost, and refuses further paid calls once the
-daily cap would be exceeded.
+The ledger records actual provider cost when headers are available and is written
+atomically. Callers can enforce both a local daily cap and a provider-account
+reserve. Unknown provider balance fails closed whenever a positive reserve is
+required; this prevents scheduled jobs from silently draining a quota that has
+not been reconciled.
 """
 from __future__ import annotations
 
@@ -22,6 +24,8 @@ class BudgetState:
     date_utc: str
     cap_credits: int
     consumed_credits: int
+    provider_credits_remaining: int | None = None
+    provider_credits_used: int | None = None
 
     @property
     def remaining_credits(self) -> int:
@@ -40,20 +44,56 @@ def load_budget(path: str | Path, *, cap_credits: int, now: datetime | None = No
     if not p.exists():
         return BudgetState(date_utc=date_utc, cap_credits=int(cap_credits), consumed_credits=0)
     try:
-        raw = json.loads(p.read_text())
+        raw = json.loads(p.read_text(encoding="utf-8"))
     except Exception as exc:
         raise OddsBudgetError("ODDS_BUDGET_LEDGER_INVALID") from exc
+    if not isinstance(raw, Mapping):
+        raise OddsBudgetError("ODDS_BUDGET_LEDGER_INVALID")
     if str(raw.get("date_utc")) != date_utc:
         return BudgetState(date_utc=date_utc, cap_credits=int(cap_credits), consumed_credits=0)
-    consumed = int(raw.get("consumed_credits", 0))
-    return BudgetState(date_utc=date_utc, cap_credits=int(cap_credits), consumed_credits=max(0, consumed))
+    try:
+        consumed = int(raw.get("consumed_credits", 0))
+    except (TypeError, ValueError) as exc:
+        raise OddsBudgetError("ODDS_BUDGET_LEDGER_INVALID") from exc
+    if consumed < 0:
+        raise OddsBudgetError("ODDS_BUDGET_LEDGER_INVALID")
+    return BudgetState(
+        date_utc=date_utc,
+        cap_credits=int(cap_credits),
+        consumed_credits=consumed,
+        provider_credits_remaining=_optional_nonnegative_int(raw.get("provider_credits_remaining")),
+        provider_credits_used=_optional_nonnegative_int(raw.get("provider_credits_used")),
+    )
 
 
-def assert_budget_available(state: BudgetState, *, estimated_cost: int) -> None:
+def assert_budget_available(
+    state: BudgetState,
+    *,
+    estimated_cost: int,
+    reserve_credits: int = 0,
+    provider_credits_remaining: int | None = None,
+) -> None:
     cost = max(0, int(estimated_cost))
+    reserve = int(reserve_credits)
+    if reserve < 0:
+        raise OddsBudgetError("ODDS_PROVIDER_RESERVE_INVALID")
     if state.consumed_credits + cost > state.cap_credits:
         raise OddsBudgetError(
             f"BLOCKED_BUDGET:consumed={state.consumed_credits}:estimated={cost}:cap={state.cap_credits}"
+        )
+    provider_remaining = (
+        state.provider_credits_remaining
+        if provider_credits_remaining is None
+        else _optional_nonnegative_int(provider_credits_remaining)
+    )
+    if reserve > 0 and provider_remaining is None:
+        raise OddsBudgetError(
+            f"BLOCKED_PROVIDER_BALANCE_UNKNOWN:estimated={cost}:reserve={reserve}"
+        )
+    if provider_remaining is not None and provider_remaining - cost < reserve:
+        raise OddsBudgetError(
+            "BLOCKED_PROVIDER_RESERVE:"
+            f"remaining={provider_remaining}:estimated={cost}:reserve={reserve}"
         )
 
 
@@ -65,10 +105,14 @@ def record_actual_cost(
     provider_headers: Mapping[str, Any] | None = None,
 ) -> BudgetState:
     actual = max(0, int(actual_cost))
+    header_remaining = _header_int(provider_headers, "x-requests-remaining")
+    header_used = _header_int(provider_headers, "x-requests-used")
     updated = BudgetState(
         date_utc=state.date_utc,
         cap_credits=state.cap_credits,
         consumed_credits=state.consumed_credits + actual,
+        provider_credits_remaining=(header_remaining if header_remaining is not None else state.provider_credits_remaining),
+        provider_credits_used=header_used if header_used is not None else state.provider_credits_used,
     )
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -77,12 +121,19 @@ def record_actual_cost(
         "cap_credits": updated.cap_credits,
         "consumed_credits": updated.consumed_credits,
         "remaining_credits": updated.remaining_credits,
-        "provider_credits_remaining": _header_int(provider_headers, "x-requests-remaining"),
-        "provider_credits_used": _header_int(provider_headers, "x-requests-used"),
+        "provider_credits_remaining": updated.provider_credits_remaining,
+        "provider_credits_used": updated.provider_credits_used,
         "last_call_cost": actual,
     }
-    p.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    tmp = p.with_name(p.name + ".tmp")
+    tmp.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    tmp.replace(p)
     return updated
+
+
+def provider_last_call_cost(headers: Mapping[str, Any] | None, *, fallback: int) -> int:
+    value = _header_int(headers, "x-requests-last")
+    return max(0, int(fallback if value is None else value))
 
 
 def _header_int(headers: Mapping[str, Any] | None, key: str) -> int | None:
@@ -95,10 +146,17 @@ def _header_int(headers: Mapping[str, Any] | None, key: str) -> int | None:
             break
     if value is None:
         try:
-            value = headers.get(key)  # type: ignore[attr-defined]
+            value = headers.get(key)
         except Exception:
             value = None
+    return _optional_nonnegative_int(value)
+
+
+def _optional_nonnegative_int(value: Any) -> int | None:
+    if value is None:
+        return None
     try:
-        return int(str(value)) if value is not None else None
+        out = int(str(value))
     except Exception:
         return None
+    return out if out >= 0 else None
