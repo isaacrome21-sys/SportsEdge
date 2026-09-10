@@ -38,7 +38,12 @@ def main() -> int:
     ap.add_argument("--source-manifest", type=Path, required=True)
     ap.add_argument("--source-evidence-root", type=Path, required=True)
     ap.add_argument("--fit-max-season", type=int, required=True)
-    ap.add_argument("--ridge-alpha", type=float, default=10.0)
+    ap.add_argument(
+        "--ridge-alpha",
+        type=float,
+        default=None,
+        help="Manual/dev fixed ridge alpha override. Omit for deterministic expanding-season temporal selection.",
+    )
     ap.add_argument("--git-sha", required=True)
     ap.add_argument("--output", type=Path, default=DEFAULT_CFB_MODEL_ARTIFACT_PATH)
     ap.add_argument("--provenance-output", type=Path, default=Path("artifacts/cfb/cfb_model_training_provenance.json"))
@@ -85,6 +90,9 @@ def main() -> int:
         "source_manifest_sha256": provenance["upstream_source_manifest_sha256"],
         "source_content_root_sha256": provenance["source_content_root_sha256"],
         "training_code_sha256": provenance["training_code_sha256"],
+        "derivation_code_sha256": provenance["derivation_code_sha256"],
+        "ridge_alpha": provenance["ridge_alpha"],
+        "ridge_fit_mode": provenance["ridge_fit_policy"]["mode"],
         "fit_max_season": provenance["fit_max_season"],
         "row_count": provenance["row_count"],
         "promotion_changed": False,
