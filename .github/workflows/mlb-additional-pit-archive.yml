@@ -56,6 +56,9 @@ jobs:
   archive:
     if: github.event_name != 'pull_request'
     needs: contract
+    concurrency:
+      group: sportsedge-paid-odds-api
+      cancel-in-progress: false
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
