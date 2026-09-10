@@ -6,7 +6,7 @@
   "future_forward_holdout_season": 2026,
   "future_forward_holdout_use": "final_forward_validation_after_feature_freeze",
   "feature_search_attempt_budget": 10,
-  "attempt_counting_rule": "Every distinct feature specification evaluated against the 2019 holdout consumes one attempt, including failed or discarded candidates.",
+  "attempt_counting_rule": "Every distinct feature specification evaluated against the frozen immediate holdout range consumes one attempt, including failed or discarded candidates.",
   "primary_metric": "closing_market_rmse",
   "secondary_metric": "mean_baseline_rmse",
   "placebo_null_shuffles": 200,
@@ -16,8 +16,8 @@
     "Do not use 2026 before its season is complete and the feature set is frozen.",
     "Do not promote or enable OFFICIAL betting from this research lane."
   ],
-  "training_seasons_for_2019_development": "2010-2018",
-  "holdout_order": "train_2010_2018_then_validate_2019",
+  "training_seasons_for_immediate_holdout": "2010-2016",
+  "holdout_order": "train_2010_2016_then_validate_2017_2019",
   "enforcement": "fitter_excludes_games_after_selected_holdout_season",
   "control_calibration": {
     "feature_set": "baseline",
