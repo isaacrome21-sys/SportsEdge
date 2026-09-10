@@ -40,8 +40,48 @@
       "reason": "RuntimeError:all historical Odds API key slots failed",
       "requested_at": "2026-03-25T21:05:00+00:00",
       "source": "THE_ODDS_API_HISTORICAL"
+    },
+    {
+      "at": "2026-09-10T14:25:47.248053+00:00",
+      "attempts": [
+        {
+          "body_sha256": "baaa10cb5138c0c4a4cc33387b61c6b01708e314faa2c6d42ed27250fa9f4215",
+          "http_status": 401,
+          "key_slot": 1
+        },
+        {
+          "body_sha256": "baaa10cb5138c0c4a4cc33387b61c6b01708e314faa2c6d42ed27250fa9f4215",
+          "http_status": 401,
+          "key_slot": 2
+        },
+        {
+          "body_sha256": "baaa10cb5138c0c4a4cc33387b61c6b01708e314faa2c6d42ed27250fa9f4215",
+          "http_status": 401,
+          "key_slot": 3
+        },
+        {
+          "body_sha256": "baaa10cb5138c0c4a4cc33387b61c6b01708e314faa2c6d42ed27250fa9f4215",
+          "http_status": 401,
+          "key_slot": 4
+        }
+      ],
+      "params": {
+        "bookmakers": "draftkings",
+        "date": "2026-03-25T21:05:00Z",
+        "dateFormat": "iso",
+        "markets": "h2h,spreads,totals",
+        "oddsFormat": "american",
+        "regions": "us"
+      },
+      "path": "/historical/sports/baseball_mlb/odds"
+    },
+    {
+      "date": "2026-03-25",
+      "reason": "RuntimeError:all historical Odds API key slots failed",
+      "requested_at": "2026-03-25T21:05:00+00:00",
+      "source": "THE_ODDS_API_HISTORICAL"
     }
   ],
   "schema": "MLB_V8_THE_ODDS_API_BACKFILL_STATE_V1",
-  "updated_at_utc": "2026-09-09T14:35:31.348362+00:00"
+  "updated_at_utc": "2026-09-10T14:25:47.248079+00:00"
 }
