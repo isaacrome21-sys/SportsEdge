@@ -7,6 +7,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from sportsedge.sports.cfb.fit_policy import CFB_FIXED_RIDGE_POLICY_VERSION, CFB_RIDGE_POLICY_VERSION
 from sportsedge.sports.cfb.historical_features import CFB_HISTORICAL_MATERIALIZER_VERSION
 from sportsedge.sports.cfb.joint_model import CFB_FEATURE_CONTRACT
 from sportsedge.sports.cfb.model_artifact import cfb_model_code_surface_sha256, load_cfb_model_artifact
@@ -19,6 +20,7 @@ from sportsedge.sports.cfb.training_artifact import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
+SEASONS = (2022, 2023, 2024, 2025)
 
 TEAM_KEYS = (
     "off_ppa_rush", "off_ppa_dropback", "def_ppa_rush_allowed", "def_ppa_dropback_allowed",
@@ -34,18 +36,20 @@ def _metrics(offset: float) -> dict:
 
 def _bundle() -> dict:
     rows = []
-    for i in range(20):
-        rows.append({
-            "game_id": f"2025_{i:02d}_AWAY_HOME",
-            "season": 2025,
-            "week": (i % 12) + 1,
-            "neutral_site": False,
-            "home_metrics": _metrics(i / 100.0),
-            "away_metrics": _metrics((20 - i) / 120.0),
-            "weather": {"game_indoor": False, "wind_speed": 5.0 + (i % 4), "temperature": 65.0 + (i % 9)},
-            "home_score": 17 + (i % 18),
-            "away_score": 13 + ((i * 3) % 20),
-        })
+    for season_index, season in enumerate(SEASONS):
+        for i in range(20):
+            offset = season_index * 20 + i
+            rows.append({
+                "game_id": f"{season}_{i:02d}_AWAY_HOME",
+                "season": season,
+                "week": (i % 12) + 1,
+                "neutral_site": bool(i % 11 == 0),
+                "home_metrics": _metrics(offset / 100.0),
+                "away_metrics": _metrics((80 - offset) / 120.0),
+                "weather": {"game_indoor": False, "wind_speed": 5.0 + (i % 4), "temperature": 65.0 + (i % 9)},
+                "home_score": 17 + ((offset * 5) % 24),
+                "away_score": 13 + ((offset * 3) % 20),
+            })
     return {
         "schema_version": CFB_PIT_TRAINING_BUNDLE_SCHEMA,
         "materializer_version": CFB_HISTORICAL_MATERIALIZER_VERSION,
@@ -68,7 +72,7 @@ def _bound_source_evidence(root: Path) -> tuple[dict, bytes]:
         "schema_version": CFB_PIT_SOURCE_MANIFEST_SCHEMA,
         "generated_at_utc": "2026-01-15T11:00:00+00:00",
         "fit_max_season": 2025,
-        "training_window": {"min_season": 2025, "max_season": 2025},
+        "training_window": {"min_season": min(SEASONS), "max_season": max(SEASONS)},
         "materializer_version": CFB_HISTORICAL_MATERIALIZER_VERSION,
         "feature_contract": CFB_FEATURE_CONTRACT,
         "post_cutoff_information_excluded": True,
@@ -87,7 +91,7 @@ def _bound_source_evidence(root: Path) -> tuple[dict, bytes]:
                 "availability_rule": "Fixture PIT features only.",
                 "market_data": False,
                 "post_cutoff_excluded": True,
-                "seasons": [2025],
+                "seasons": list(SEASONS),
             },
             {
                 "source_id": "labels",
@@ -102,7 +106,7 @@ def _bound_source_evidence(root: Path) -> tuple[dict, bytes]:
                 "availability_rule": "Final-score labels only.",
                 "market_data": False,
                 "post_cutoff_excluded": True,
-                "seasons": [2025],
+                "seasons": list(SEASONS),
             },
         ],
     }
@@ -110,7 +114,7 @@ def _bound_source_evidence(root: Path) -> tuple[dict, bytes]:
 
 
 class CFBTrainingArtifactTests(unittest.TestCase):
-    def test_valid_pit_bundle_builds_runtime_loadable_artifact(self):
+    def test_valid_pit_bundle_selects_alpha_temporally_and_builds_runtime_loadable_artifact(self):
         with tempfile.TemporaryDirectory() as temp:
             evidence_root = Path(temp)
             manifest, manifest_raw = _bound_source_evidence(evidence_root)
@@ -126,18 +130,45 @@ class CFBTrainingArtifactTests(unittest.TestCase):
                 repo_root=ROOT,
                 fit_max_season=2025,
             )
-            self.assertEqual(provenance["row_count"], 20)
-            self.assertEqual(provenance["train_seasons"], [2025])
+            self.assertEqual(provenance["row_count"], 80)
+            self.assertEqual(provenance["train_seasons"], list(SEASONS))
             self.assertTrue(provenance["source_snapshot_verified"])
             self.assertEqual(provenance["verified_source_count"], 2)
+            self.assertEqual(provenance["ridge_policy_version"], CFB_RIDGE_POLICY_VERSION)
+            self.assertGreaterEqual(provenance["ridge_selection"]["fold_count"], 2)
+            self.assertEqual(provenance["ridge_alpha"], provenance["ridge_selection"]["selected_alpha"])
+            self.assertEqual(provenance["ridge_selection"]["tie_break"], "LOWEST_ALPHA")
+            self.assertRegex(provenance["derivation_code_sha256"], r"^[0-9a-f]{64}$")
             self.assertFalse(provenance["promotion_changed"])
             model = load_cfb_model_artifact(
                 artifact,
                 expected_model_code_sha256=cfb_model_code_surface_sha256(ROOT),
                 expected_training_source_sha256=provenance["training_bundle_sha256"],
             )
-            self.assertEqual(model.train_seasons, (2025,))
-            self.assertEqual(len(model.residual_pairs), 20)
+            self.assertEqual(model.train_seasons, SEASONS)
+            self.assertEqual(len(model.residual_pairs), 80)
+            self.assertEqual(model.ridge_alpha, provenance["ridge_alpha"])
+
+    def test_explicit_fixed_alpha_remains_labeled(self):
+        with tempfile.TemporaryDirectory() as temp:
+            evidence_root = Path(temp)
+            manifest, manifest_raw = _bound_source_evidence(evidence_root)
+            bundle = _bundle()
+            bundle["source_manifest_sha256"] = sha256(manifest_raw).hexdigest()
+            artifact, provenance = build_cfb_artifact_from_pit_bundle(
+                bundle,
+                raw_bytes=_raw(bundle),
+                source_manifest=manifest,
+                source_manifest_raw_bytes=manifest_raw,
+                source_evidence_root=evidence_root,
+                repo_root=ROOT,
+                fit_max_season=2025,
+                ridge_alpha=7.5,
+            )
+            self.assertEqual(provenance["ridge_policy_version"], CFB_FIXED_RIDGE_POLICY_VERSION)
+            self.assertEqual(provenance["ridge_alpha"], 7.5)
+            self.assertEqual(provenance["ridge_selection"]["fold_count"], 0)
+            self.assertEqual(artifact["model"]["ridge_alpha"], 7.5)
 
     def test_wrong_materializer_identity_is_rejected(self):
         bundle = _bundle()
