@@ -5,7 +5,7 @@ reads market data and never evaluates forward-season betting performance.
 """
 from __future__ import annotations
 
-from math import sqrt
+from math import isfinite, sqrt
 from statistics import fmean, median, pstdev
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -102,7 +102,7 @@ def fit_cfb_joint_score_model_temporal(
         grid = tuple(sorted({float(value) for value in alpha_grid}))
     except (TypeError, ValueError) as exc:
         raise CFBFitPolicyError("CFB_TEMPORAL_FIT_ALPHA_GRID_INVALID") from exc
-    if not grid or any(value < 0 for value in grid):
+    if not grid or any(not isfinite(value) or value < 0 for value in grid):
         raise CFBFitPolicyError("CFB_TEMPORAL_FIT_ALPHA_GRID_INVALID")
 
     fold_specs: list[tuple[int, list[dict[str, Any]], list[dict[str, Any]], tuple[int, ...]]] = []
