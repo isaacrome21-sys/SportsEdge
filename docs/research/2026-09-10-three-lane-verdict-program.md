@@ -177,3 +177,12 @@ The project-wide record is broader: the initial baseline fit used NFL seasons 20
 - 2026 remains the reserved forward holdout, to be evaluated once after the feature set is frozen and the season is complete.
 
 No confirmation evaluation is being claimed or run from this audit. Any use of 2020 or 2026 must be predeclared with its own one-time evaluation rule.
+
+
+## Post-search correction
+
+The NFL close-game diagnostic in Attempts 2-10 selected games by realized final margin (`abs(actual margin) <= 7`), not by the pregame closing spread. Its negative R² values are therefore diagnostic only: outcome selection reduces target variance and the result must not be interpreted as a pregame market segment.
+
+The post-search segment list is now predeclared as five families—closing-spread bucket, closing-total bucket, season-week bucket, wind bucket, and roof bucket—with Bonferroni correction across the full slice list. Any positive slice remains a hypothesis until confirmed on untouched data.
+
+Timing analysis is not predeclared yet because a verified, timestamped free opener source has not been established in the current record. If that source is found, the target will be opener-to-close movement/CLV, not simply opener RMSE.
