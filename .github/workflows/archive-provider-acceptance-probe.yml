@@ -6,6 +6,9 @@ on:
     paths: ['.github/workflows/archive-provider-acceptance-probe.yml']
 permissions:
   contents: write
+concurrency:
+  group: sportsedge-paid-odds-api
+  cancel-in-progress: false
 jobs:
   probe:
     runs-on: ubuntu-24.04
@@ -17,7 +20,7 @@ jobs:
       SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      - name: Probe provider key slots
+      - name: Probe first configured provider key without rotation
         id: probe
         shell: bash
         run: |
@@ -47,39 +50,40 @@ jobs:
               'raw_capture_eligible':False,
               'raw_evidence_eligible':False,
               'raw_bytes_persisted':False,
+              'key_rotation_after_provider_failure':False,
           }
           if not keys:
               row['status']='BLOCKED_NO_ODDS_KEY'; p.write_text(json.dumps(row,indent=2)+'\n'); print(json.dumps(row)); raise SystemExit(2)
-          exhausted=0
-          for slot,key in enumerate(keys,1):
-              q=urlencode({'apiKey':key,'bookmakers':'draftkings','markets':'h2h','oddsFormat':'american','dateFormat':'iso'})
-              try:
-                  with urlopen(Request('https://api.the-odds-api.com/v4/sports/baseball_mlb/odds?'+q,headers={'Accept':'application/json','User-Agent':'SportsEdge-provider-probe/3'}),timeout=20) as r:
-                      raw=r.read(); payload=json.loads(raw)
-                      row.update({
-                          'status':'PROVIDER_PATH_PASS',
-                          'key_slot':slot,
-                          'http_status':getattr(r,'status',200),
-                          'events_returned':len(payload) if isinstance(payload,list) else None,
-                          'credits_consumed_actual':r.headers.get('x-requests-last'),
-                          'provider_credits_remaining':r.headers.get('x-requests-remaining'),
-                          'provider_credits_used':r.headers.get('x-requests-used'),
-                          'raw_response_sha256':hashlib.sha256(raw).hexdigest(),
-                          'raw_byte_length':len(raw),
-                          'raw_retention':'DISCARDED_AFTER_HASH_ACCEPTANCE_ONLY',
-                      })
-                      break
-              except HTTPError as e:
-                  body=e.read().decode('utf-8',errors='replace')[:1000]
-                  code=None
-                  try: code=json.loads(body).get('error_code')
-                  except Exception: pass
-                  if e.code==401 and code=='OUT_OF_USAGE_CREDITS': exhausted+=1
-                  row['attempts'].append({'key_slot':slot,'http_status':e.code,'provider_code':code})
-              except Exception as e:
-                  row['attempts'].append({'key_slot':slot,'reason':f'{type(e).__name__}:{e}'})
-          if row.get('status')!='PROVIDER_PATH_PASS':
-              row['status']='BLOCKED_NO_CREDITS' if exhausted==len(keys) else 'BLOCKED_NO_ODDS'
+
+          slot=1
+          key=keys[0]
+          q=urlencode({'apiKey':key,'bookmakers':'draftkings','markets':'h2h','oddsFormat':'american','dateFormat':'iso'})
+          try:
+              with urlopen(Request('https://api.the-odds-api.com/v4/sports/baseball_mlb/odds?'+q,headers={'Accept':'application/json','User-Agent':'SportsEdge-provider-probe/4'}),timeout=20) as r:
+                  raw=r.read(); payload=json.loads(raw)
+                  row.update({
+                      'status':'PROVIDER_PATH_PASS',
+                      'key_slot':slot,
+                      'http_status':getattr(r,'status',200),
+                      'events_returned':len(payload) if isinstance(payload,list) else None,
+                      'credits_consumed_actual':r.headers.get('x-requests-last'),
+                      'provider_credits_remaining':r.headers.get('x-requests-remaining'),
+                      'provider_credits_used':r.headers.get('x-requests-used'),
+                      'raw_response_sha256':hashlib.sha256(raw).hexdigest(),
+                      'raw_byte_length':len(raw),
+                      'raw_retention':'DISCARDED_AFTER_HASH_ACCEPTANCE_ONLY',
+                  })
+          except HTTPError as e:
+              body=e.read().decode('utf-8',errors='replace')[:1000]
+              code=None
+              try: code=json.loads(body).get('error_code')
+              except Exception: pass
+              row['attempts'].append({'key_slot':slot,'http_status':e.code,'provider_code':code})
+              row['status']='BLOCKED_NO_CREDITS' if e.code==401 and code=='OUT_OF_USAGE_CREDITS' else 'BLOCKED_NO_ODDS'
+          except Exception as e:
+              row['attempts'].append({'key_slot':slot,'reason':f'{type(e).__name__}:{e}'})
+              row['status']='BLOCKED_NO_ODDS'
+
           p.write_text(json.dumps(row,indent=2,sort_keys=True)+'\n'); print(json.dumps(row)); raise SystemExit(0 if row['status']=='PROVIDER_PATH_PASS' else 3)
           PY
           code=$?; echo "exit_code=$code" >> "$GITHUB_OUTPUT"; exit 0
