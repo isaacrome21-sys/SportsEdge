@@ -12,18 +12,31 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from sportsedge.sports.cfb.paths import DEFAULT_CFB_MODEL_ARTIFACT_PATH  # noqa: E402
 from sportsedge.sports.cfb.training_artifact import (  # noqa: E402
     CFBTrainingArtifactError,
     build_cfb_artifact_from_pit_bundle,
 )
 
 _GIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
-DEFAULT_CFB_MODEL_ARTIFACT_PATH = Path("models/cfb_joint_v1.json")
+
+
+def _read_json(path: Path, error: str) -> tuple[bytes, dict]:
+    try:
+        raw = path.read_bytes()
+        payload = json.loads(raw.decode("utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise SystemExit(error) from exc
+    if not isinstance(payload, dict):
+        raise SystemExit(error)
+    return raw, payload
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--training-bundle", type=Path, required=True)
+    ap.add_argument("--source-manifest", type=Path, required=True)
+    ap.add_argument("--source-evidence-root", type=Path, required=True)
     ap.add_argument("--fit-max-season", type=int, required=True)
     ap.add_argument("--ridge-alpha", type=float, default=10.0)
     ap.add_argument("--git-sha", required=True)
@@ -35,15 +48,15 @@ def main() -> int:
     if not _GIT_SHA_RE.fullmatch(git_sha):
         raise SystemExit("CFB_CODE_GIT_SHA_INVALID")
 
-    try:
-        raw = args.training_bundle.read_bytes()
-        payload = json.loads(raw.decode("utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise SystemExit("CFB_TRAINING_BUNDLE_UNREADABLE") from exc
+    raw, payload = _read_json(args.training_bundle, "CFB_TRAINING_BUNDLE_UNREADABLE")
+    manifest_raw, manifest_payload = _read_json(args.source_manifest, "CFB_SOURCE_MANIFEST_UNREADABLE")
     try:
         artifact, provenance = build_cfb_artifact_from_pit_bundle(
             payload,
             raw_bytes=raw,
+            source_manifest=manifest_payload,
+            source_manifest_raw_bytes=manifest_raw,
+            source_evidence_root=args.source_evidence_root,
             repo_root=ROOT,
             fit_max_season=args.fit_max_season,
             ridge_alpha=args.ridge_alpha,
@@ -51,15 +64,15 @@ def main() -> int:
     except CFBTrainingArtifactError as exc:
         raise SystemExit(str(exc)) from exc
 
-    # These labels bind the provenance artifact to the exact claim being made.
-    # The deterministic boundary begins at the already-materialized PIT bundle;
-    # it does not certify upstream feature acquisition/materialization.
+    # Bind the artifact provenance to the exact repository code identity. The
+    # deterministic boundary begins at the verified source snapshot + PIT bundle;
+    # it does not claim upstream provider availability beyond that evidence.
     provenance = dict(provenance)
     provenance.update({
         "sport": "cfb",
         "code_git_sha": git_sha,
         "determinism_class": "SAME_ENV_SAME_SHA",
-        "replay_scope": "TRAINING_BUNDLE_TO_ARTIFACT",
+        "replay_scope": "VERIFIED_SOURCE_SNAPSHOT_TO_ARTIFACT",
     })
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -70,6 +83,8 @@ def main() -> int:
         "artifact_sha256": artifact["artifact_sha256"],
         "training_bundle_sha256": provenance["training_bundle_sha256"],
         "source_manifest_sha256": provenance["upstream_source_manifest_sha256"],
+        "source_content_root_sha256": provenance["source_content_root_sha256"],
+        "training_code_sha256": provenance["training_code_sha256"],
         "fit_max_season": provenance["fit_max_season"],
         "row_count": provenance["row_count"],
         "promotion_changed": False,
