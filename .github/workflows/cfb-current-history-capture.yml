@@ -21,6 +21,7 @@ on:
       - 'tests/test_cfb_historical_release.py'
       - 'tests/test_cfb_history_cache.py'
       - 'tests/test_cfb_history_cache_cli.py'
+      - 'tests/test_cfb_release_format_selection.py'
       - '.github/workflows/cfb-current-history-capture.yml'
   push:
     branches: [main]
@@ -45,7 +46,7 @@ jobs:
       - name: Compile acquisition surface
         run: python -m py_compile sportsedge/sports/cfb/historical_release.py sportsedge/sports/cfb/history_cache.py scripts/cache_cfb_history.py
       - name: Run acquisition contract tests
-        run: python -m unittest tests.test_cfb_historical_release tests.test_cfb_history_cache tests.test_cfb_history_cache_cli
+        run: python -m unittest tests.test_cfb_historical_release tests.test_cfb_history_cache tests.test_cfb_history_cache_cli tests.test_cfb_release_format_selection
       - name: Prove predictive alias excludes market data
         run: python scripts/cache_cfb_history.py --self-test
 
@@ -70,18 +71,22 @@ jobs:
           set -euo pipefail
           mkdir -p artifacts/cfb_history_capture
           for dataset in schedules adv_team adv_situational adv_drives; do
+            echo "CFB_CAPTURE_DATASET_BEGIN:${dataset}:${CFB_CAPTURE_SEASONS}"
             python scripts/cache_cfb_history.py \
               --dataset "$dataset" \
               --seasons "$CFB_CAPTURE_SEASONS" \
               --cache-root artifacts/cfb_history \
-              > "artifacts/cfb_history_capture/${dataset}.json"
+              | tee "artifacts/cfb_history_capture/${dataset}.json"
+            echo "CFB_CAPTURE_DATASET_END:${dataset}"
           done
           if [ "${{ github.event_name == 'workflow_dispatch' && inputs.include_play_by_play || false }}" = "true" ]; then
+            echo "CFB_CAPTURE_DATASET_BEGIN:play_by_play:${CFB_CAPTURE_SEASONS}"
             python scripts/cache_cfb_history.py \
               --dataset play_by_play \
               --seasons "$CFB_CAPTURE_SEASONS" \
               --cache-root artifacts/cfb_history \
-              > artifacts/cfb_history_capture/play_by_play.json
+              | tee artifacts/cfb_history_capture/play_by_play.json
+            echo "CFB_CAPTURE_DATASET_END:play_by_play"
           fi
 
       - name: Build explicit non-PIT capture classification
