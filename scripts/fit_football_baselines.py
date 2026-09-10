@@ -110,8 +110,8 @@ def cv_null(x,y,alpha,shuffles=200):
         values.append(float(1-mse/bmse) if bmse else 0.0)
     return {"n":shuffles,"q05":float(np.quantile(values,.05)),"q50":float(np.quantile(values,.50)),"q95":float(np.quantile(values,.95)),"max":float(max(values))}
 
-def run_target(x,y,hold,close_split=False):
-    mask=np.array([d.startswith(str(hold)) for d in hold_dates]); tr=x[~mask]; yt=y[~mask]; te=x[mask]; ye=y[mask]
+def run_target(x,y,hold_start,hold_end,close_split=False):
+    mask=np.array([hold_start <= int(d[:4]) <= hold_end for d in hold_dates]); tr=x[~mask]; yt=y[~mask]; te=x[mask]; ye=y[mask]
     if len(tr)<100 or len(te)<20: raise RuntimeError("INSUFFICIENT_DATE_SPLIT")
     ms={a:[] for a in ALPHAS}; n=len(tr)
     for k in range(1,5):
@@ -126,7 +126,9 @@ def run_target(x,y,hold,close_split=False):
     return result
 
 def main():
-    ap=argparse.ArgumentParser(); ap.add_argument("--seasons",default="2021,2022,2023,2024,2025"); ap.add_argument("--holdout",type=int,default=2025); ap.add_argument("--feature-set",choices=("baseline","opponent_strength"),default="baseline"); ap.add_argument("--out",default="artifacts/football_baselines.json"); args=ap.parse_args()
+    ap=argparse.ArgumentParser(); ap.add_argument("--seasons",default="2021,2022,2023,2024,2025"); ap.add_argument("--holdout",type=int,default=2025); ap.add_argument("--holdout-start",type=int); ap.add_argument("--holdout-end",type=int); ap.add_argument("--feature-set",choices=("baseline","opponent_strength"),default="baseline"); ap.add_argument("--out",default="artifacts/football_baselines.json"); args=ap.parse_args()
+    hold_start=args.holdout_start if args.holdout_start is not None else args.holdout; hold_end=args.holdout_end if args.holdout_end is not None else args.holdout
+    if hold_start>hold_end: raise RuntimeError("INVALID_HOLDOUT_RANGE")
     seasons={int(x) for x in args.seasons.split(",")}; reports={}
     for sport,loader in (("NFL",nfl),("CFB",cfb)):
         games,sha,source=loader(seasons)
@@ -134,20 +136,20 @@ def main():
         # Never train on games after the selected holdout season. A 2019
         # development holdout therefore requires the caller to request
         # pre-2019 seasons (for example 2010,...,2019).
-        games=[g for g in games if g["date"][:4].isdigit() and int(g["date"][:4]) <= args.holdout]
+        games=[g for g in games if g["date"][:4].isdigit() and int(g["date"][:4]) <= hold_end]
         if not games: raise RuntimeError(f"{sport}: NO_PRE_HOLDOUT_GAMES")
         global hold_dates,feature_names
         X,ym,yt,feature_names,hold_dates=features(games,args.feature_set)
-        reports[sport]={"source":source,"source_sha256":sha,"feature_set":args.feature_set,"games_fetched":len(games),"usable_rows":len(X),"status":"RESEARCH_ONLY_NOT_MODEL_P","targets":{"margin":run_target(X,ym,args.holdout,close_split=(sport=="CFB")),"total":run_target(X,yt,args.holdout)}}
+        reports[sport]={"source":source,"source_sha256":sha,"feature_set":args.feature_set,"holdout_years":[hold_start,hold_end],"games_fetched":len(games),"usable_rows":len(X),"status":"RESEARCH_ONLY_NOT_MODEL_P","targets":{"margin":run_target(X,ym,hold_start,hold_end,close_split=(sport=="CFB")),"total":run_target(X,yt,hold_start,hold_end)}}
         if args.feature_set=="opponent_strength":
             # Same-data control calibration, preregistered and excluded from
             # the feature-attempt budget. It establishes the baseline on 2019.
             X0,_,_,names0,dates0=features(games,"baseline")
             feature_names,hold_dates=names0,dates0
-            reports[sport]["control_baseline_same_holdout"]={"budget_counted":False,"reason":"pre_registered_control_calibration","targets":{"margin":run_target(X0,ym,args.holdout,close_split=(sport=="CFB")),"total":run_target(X0,yt,args.holdout)}}
+            reports[sport]["control_baseline_same_holdout"]={"budget_counted":False,"reason":"pre_registered_control_calibration","targets":{"margin":run_target(X0,ym,hold_start,hold_end,close_split=(sport=="CFB")),"total":run_target(X0,yt,hold_start,hold_end)}}
             feature_names,hold_dates=features(games,args.feature_set)[3:]
         if sport=="NFL":
-            hold=np.array([d.startswith(str(args.holdout)) for d in hold_dates])
+            hold=np.array([hold_start <= int(d[:4]) <= hold_end for d in hold_dates])
             # The feature rows are emitted only after five prior games, so
             # align market rows by the same sorted/usable game order.
             usable=sorted(games,key=lambda z:(z["date"],z["id"]))
@@ -160,7 +162,7 @@ def main():
                 for g in batch: prior[g["home"]]+=1; prior[g["away"]]+=1
             keyed=[g for _,_,g in keys]
             mh=np.array([g.get("spread_line") is not None for g in keyed])
-            is_hold=np.array([g["date"].startswith(str(args.holdout)) for g in keyed])
+            is_hold=np.array([hold_start <= int(g["date"][:4]) <= hold_end for g in keyed])
             if mh[is_hold].any():
                 # nflverse spread_line is already oriented to home margin:
                 # positive means the home side is favored. Verify that
