@@ -89,5 +89,26 @@
   "attempt_10_run_url": "https://github.com/isaacrome21-sys/SportsEdge/actions/runs/34492932580",
   "feature_search_status": "EXHAUSTED_FAILS_BAR",
   "final_feature_search_verdict": "FAILS_BAR: ten pre-registered NFL feature specifications failed to produce a paired-bootstrap 95% CI including zero versus closing prices on the 2017-2019 validation window.",
-  "post_search_status": "SEGMENT_AND_TIMING_PENDING"
+  "post_search_status": "SEGMENT_AND_TIMING_PREDECLARATION_REQUIRED",
+  "close_game_split_definition": "absolute_final_margin",
+  "close_game_split_use": "diagnostic_only_not_a_pregame_segment",
+  "close_game_split_warning": "Selecting on the realized outcome shrinks target variance; close-game R2 values must not be interpreted as evidence of a pregame market segment.",
+  "post_search_segment_policy": {
+    "status": "NOT_RUN",
+    "segment_families": [
+      "closing_spread_bucket",
+      "closing_total_bucket",
+      "season_week_bucket",
+      "wind_bucket",
+      "roof_bucket"
+    ],
+    "multiple_comparison_correction": "Bonferroni across the full predeclared slice list",
+    "interpretation": "Any positive slice is hypothesis-generating only and requires confirmation on untouched data.",
+    "pregame_information_only": true
+  },
+  "timing_policy": {
+    "status": "BLOCKED_PENDING_VERIFIED_TIMESTAMPED_OPENERS",
+    "target": "Predict movement from opener to close / CLV, not merely RMSE against the opener.",
+    "no_search_until_source_verified": true
+  }
 }
