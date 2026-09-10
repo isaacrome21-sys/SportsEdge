@@ -92,6 +92,16 @@ Decision: use the widened 2017-2019 window for immediate development, with 2010-
 - 2025 and the original 2019-only result are historical validation records, not search denominators.
 - Policy file: \`config/nfl_research_search_policy_v1.json\`
 
+## Attempt 2 pre-registration
+
+Before seeing the widened-window result, the next candidate is fixed as quarterback features. The candidate must remain point-in-time and cannot use closing-market fields.
+
+- Total feature-search budget: 10.
+- Attempt 1 is already counted; 9 attempts remain.
+- A candidate succeeds only if the paired-bootstrap 95% percentile CI, from the 2.5th to 97.5th percentile, for model RMSE minus closing-market RMSE includes zero on 2017-2019.
+- The matched control remains budget-neutral because it calibrates the denominator; any candidate selection or tuning consumes an attempt.
+- After 10 failed candidates, stop and record that this box-score feature family did not beat NFL closing lines. Do not extend the budget retroactively.
+
 ## Chronology correction
 
 The earlier 2010-2018 → 2019 design was superseded because a single-season holdout could not resolve a prospective improvement reliably. The active design is 2010-2016 training followed by 2017-2019 validation, approximately three seasons of holdout data. The fitter fails closed if the policy window is invalid, if training overlaps the holdout, or if the workflow omits a required season.
