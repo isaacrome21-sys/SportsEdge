@@ -10,8 +10,8 @@ joint model can run. FCS/unknown membership fails closed rather than inheriting
 FBS calibration or promotion state.
 
 The canonical boundary also enforces point-in-time safety: the game must still be
-pregame, feature snapshots may not come from the future or from the target week,
-and sportsbook quotes must be observed before both ``now`` and kickoff.
+pregame, feature and weather snapshots may not come from the future or from/after
+kickoff, and sportsbook quotes must be observed before both ``now`` and kickoff.
 
 This foundation prices full-game MONEYLINE / SPREAD / TOTAL only. Other declared
 football markets remain explicit NO_ENGINE until their required period/player state
@@ -193,10 +193,21 @@ def _validate_metric_pit(game: CFBGame, metric: CFBTeamMetrics, *, team: str, cu
         raise CFBRunMachineError(f"CFB_FEATURE_SAMPLE_SOURCE_UNSUPPORTED:{team}:{source}")
 
 
+def _validate_weather_pit(game: CFBGame, *, current: datetime, start: datetime) -> None:
+    if not isinstance(game.weather, Mapping):
+        raise CFBRunMachineError(f"CFB_WEATHER_MISSING:{game.game_id}")
+    retrieved = _timestamp(game.weather.get("retrieved_at"), f"CFB_WEATHER_RETRIEVED_AT_INVALID:{game.game_id}")
+    if retrieved > current:
+        raise CFBRunMachineError(f"CFB_WEATHER_FROM_FUTURE:{game.game_id}")
+    if retrieved >= start:
+        raise CFBRunMachineError(f"CFB_WEATHER_NOT_PREGAME:{game.game_id}")
+
+
 def _validate_game_pit(game: CFBGame, metrics: Mapping[str, CFBTeamMetrics], *, current: datetime) -> None:
     start = _timestamp(game.start_ts, f"CFB_GAME_START_INVALID:{game.game_id}")
     if current >= start:
         raise CFBRunMachineError(f"CFB_GAME_NOT_PREGAME:{game.game_id}")
+    _validate_weather_pit(game, current=current, start=start)
     for team in (game.home_team, game.away_team):
         metric = metrics.get(team)
         if not isinstance(metric, CFBTeamMetrics):
@@ -342,7 +353,7 @@ def run_cfb_machine(*, mode: str = "AUTO_SELECT", season: int, week: int, model:
     team_rows = team_fetcher(season=season, cfbd_api_key=key, opener=opener); alias_index = build_team_alias_index(team_rows)
     fetched_games = game_fetcher(season=season, week=week, cfbd_api_key=key, opener=opener)
     assert_fbs_only_games(fetched_games, fbs_team_rows=team_rows)
-    fetched_games = attach_weather(fetched_games, weather_fetcher(season=season, week=week, cfbd_api_key=key, opener=opener))
+    fetched_games = attach_weather(fetched_games, weather_fetcher(season=season, week=week, cfbd_api_key=key, now=current, opener=opener))
     fetched_metrics = metric_fetcher(season=season, week=week, cfbd_api_key=key, now=current, opener=opener)
     if selected == "HYBRID":
         if quotes is None or games is not None or metrics is not None: raise CFBRunMachineError("CFB_HYBRID_REQUIRES_QUOTES_ONLY")
