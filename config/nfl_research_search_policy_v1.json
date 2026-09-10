@@ -6,12 +6,12 @@
   "future_forward_holdout_season": 2026,
   "future_forward_holdout_use": "final_forward_validation_after_feature_freeze",
   "feature_search_attempt_budget": 10,
-  "attempts_already_spent": 6,
-  "attempts_remaining_before_attempt_2": 4,
-  "next_feature_attempt": "success_explosive_rates",
+  "attempts_already_spent": 7,
+  "attempts_remaining_before_attempt_2": 3,
+  "next_feature_attempt": "turnover_adjusted_efficiency",
   "attempt_2_specification": "Add point-in-time quarterback availability/performance features without using closing-market fields.",
   "attempt_2_result": "FAILS_BAR: both NFL target paired-bootstrap 95% CIs remain above zero versus closing lines.",
-  "next_feature_attempt_specification": "Add point-in-time success and explosive play rates with garbage-time handling where source-complete.",
+  "next_feature_attempt_specification": "Add point-in-time turnover-adjusted efficiency features from prior games.",
   "success_criterion": "On the frozen 2017-2019 holdout, the paired-bootstrap 95% CI for candidate model RMSE minus closing-market RMSE must include zero.",
   "rejection_rule": "If all 10 feature specifications fail the success criterion, conclude that this box-score feature-search family did not beat NFL closing lines and stop the search.",
   "attempt_counting_rule": "Every distinct feature specification evaluated against the frozen immediate holdout range consumes one attempt, including failed or discarded candidates. The matched control is budget-neutral.",
@@ -70,5 +70,9 @@
   "attempt_6_specification": "Add pregame weather and venue features from nflverse: temperature, wind, dome, and field surface.",
   "attempt_6_result": "FAILS_BAR: margin model-minus-close RMSE +0.664723 (95% CI +0.398664 to +0.929663); total +0.350359 (95% CI +0.122434 to +0.570744).",
   "attempt_6_report_sha256": "sha256:0a0a14fb8fd3f4596a869efe7056e9e4f817d6732bb5767e40a1e67d117bc046",
-  "attempt_6_run_url": "https://github.com/isaacrome21-sys/SportsEdge/actions/runs/34490950906"
+  "attempt_6_run_url": "https://github.com/isaacrome21-sys/SportsEdge/actions/runs/34490950906",
+  "attempt_7_specification": "Add point-in-time success and explosive-play rates, with opponent-derived defensive rates, to the rolling baseline.",
+  "attempt_7_result": "FAILS_BAR: margin model-minus-close RMSE +0.615487 (95% CI +0.304000 to +0.906254); total +0.457492 (95% CI +0.243757 to +0.661267).",
+  "attempt_7_report_sha256": "sha256:REPLACE_WITH_ARTIFACT_DIGEST",
+  "attempt_7_run_url": "https://github.com/isaacrome21-sys/SportsEdge/actions/runs/34491651736"
 }
