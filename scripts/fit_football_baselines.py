@@ -123,12 +123,18 @@ def main():
             mh=np.array([g.get("spread_line") is not None for g in keyed])
             is_hold=np.array([g["date"].startswith(str(args.holdout)) for g in keyed])
             if mh[is_hold].any():
-                spread_pred=np.array([-g["spread_line"] if g.get("spread_line") is not None else np.nan for g in keyed])
+                # nflverse spread_line is already oriented to home margin:
+                # positive means the home side is favored. Verify that
+                # convention in the report rather than relying on memory.
+                spread_pred=np.array([g["spread_line"] if g.get("spread_line") is not None else np.nan for g in keyed])
                 total_pred=np.array([g["total_line"] if g.get("total_line") is not None else np.nan for g in keyed])
                 for label,pred,yv in (("margin",spread_pred,ym),("total",total_pred,yt)):
                     ok=is_hold & np.isfinite(pred)
                     actual=yv[ok]; estimate=pred[ok]
-                    reports[sport].setdefault("closing_line_benchmark",{})[label]={"n_holdout":int(ok.sum()),"rmse":float(np.sqrt(np.mean((estimate-actual)**2))),"source_field":"spread_line" if label=="margin" else "total_line","comparison":"MODEL_VS_CLOSING_LINE_REPORTED_ONLY"}
+                    benchmark={"n_holdout":int(ok.sum()),"rmse":float(np.sqrt(np.mean((estimate-actual)**2))),"source_field":"spread_line" if label=="margin" else "total_line","comparison":"MODEL_VS_CLOSING_LINE_REPORTED_ONLY"}
+                    if label=="margin":
+                        benchmark["spread_line_home_margin_correlation"]=float(np.corrcoef(estimate,actual)[0,1])
+                    reports[sport].setdefault("closing_line_benchmark",{})[label]=benchmark
     out=Path(args.out); out.parent.mkdir(parents=True,exist_ok=True); out.write_text(json.dumps({"schema":"FOOTBALL_BASELINES_V1","reports":reports},indent=2)+"\n"); print(json.dumps(reports,indent=2)); return 0
 if __name__=="__main__": raise SystemExit(main())
 
