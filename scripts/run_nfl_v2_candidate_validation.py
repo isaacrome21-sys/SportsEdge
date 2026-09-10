@@ -28,6 +28,7 @@ from scripts.run_nfl_production_validation import (
 from sportsedge.sports.nfl.history import normalize_nfl_rows, parse_schedule_csv
 from sportsedge.sports.nfl.m2_history_features import fit_nfl_prior_decay_curves
 from sportsedge.sports.nfl.m2_history_policy import build_nfl_m2_history_rows
+from sportsedge.sports.nfl.m2_v2_nested_validation import build_nfl_m2_v2_nested_candidate_evidence
 from sportsedge.sports.nfl.m2_v2_validation import build_nfl_m2_v2_candidate_evidence
 from sportsedge.sports.nfl.m2_v2b_validation import build_nfl_m2_v2b_candidate_evidence
 from sportsedge.sports.nfl.source_manifest import manifest_sha256
@@ -117,6 +118,7 @@ def main() -> int:
     parser.add_argument("--kernel-scale", type=float, default=1.0)
     parser.add_argument("--neutral-site-policy", choices=("error", "exclude_from_evaluation"), default="exclude_from_evaluation")
     parser.add_argument("--out", type=Path, default=Path("artifacts/football/nfl_m2_v2_candidate_validation.json"))
+    parser.add_argument("--nested-out", type=Path, default=Path("artifacts/football/nfl_m2_v2_nested_candidate_validation.json"))
     parser.add_argument("--v2b-out", type=Path, default=Path("artifacts/football/nfl_m2_v2b_candidate_validation.json"))
     args = parser.parse_args()
 
@@ -208,6 +210,15 @@ def main() -> int:
         ),
         **common,
     )
+    nested = _attach_run_provenance(
+        build_nfl_m2_v2_nested_candidate_evidence(
+            history_rows,
+            source_manifest_sha256=manifest_hash,
+            min_train_seasons=args.min_train_seasons,
+            ridge_alpha=args.ridge_alpha,
+        ),
+        **common,
+    )
     v2b = _attach_run_provenance(
         build_nfl_m2_v2b_candidate_evidence(
             history_rows,
@@ -219,6 +230,7 @@ def main() -> int:
         **common,
     )
     _write(args.out, v2a)
+    _write(args.nested_out, nested)
     _write(args.v2b_out, v2b)
 
     print(json.dumps({
@@ -229,6 +241,13 @@ def main() -> int:
             "model_id": v2a["model_id"],
             "candidate_historical_evidence": v2a["candidate_historical_evidence"],
             "signed_key_probability": v2a["candidate_distribution_profile"]["signed_key_probability"],
+        },
+        "v2a_nested": {
+            "model_id": nested["model_id"],
+            "selection_contract": nested["selection_contract"],
+            "candidate_historical_evidence": nested["candidate_historical_evidence"],
+            "signed_key_probability": nested["candidate_distribution_profile"]["signed_key_probability"],
+            "outer_fold_kernel_selection": nested["outer_fold_kernel_selection"],
         },
         "v2b": {
             "model_id": v2b["model_id"],
