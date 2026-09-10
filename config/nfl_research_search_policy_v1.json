@@ -6,12 +6,12 @@
   "future_forward_holdout_season": 2026,
   "future_forward_holdout_use": "final_forward_validation_after_feature_freeze",
   "feature_search_attempt_budget": 10,
-  "attempts_already_spent": 2,
-  "attempts_remaining_before_attempt_2": 8,
-  "next_feature_attempt": "epa_based_efficiency",
+  "attempts_already_spent": 3,
+  "attempts_remaining_before_attempt_2": 7,
+  "next_feature_attempt": "situational",
   "attempt_2_specification": "Add point-in-time quarterback availability/performance features without using closing-market fields.",
   "attempt_2_result": "FAILS_BAR: both NFL target paired-bootstrap 95% CIs remain above zero versus closing lines.",
-  "next_feature_attempt_specification": "Replace raw points scored/allowed with point-in-time EPA-based efficiency features, split pass/rush.",
+  "next_feature_attempt_specification": "Add point-in-time situational features: rest differential, travel distance, time-zone crossings, short week, bye, and primetime.",
   "success_criterion": "On the frozen 2017-2019 holdout, the paired-bootstrap 95% CI for candidate model RMSE minus closing-market RMSE must include zero.",
   "rejection_rule": "If all 10 feature specifications fail the success criterion, conclude that this box-score feature-search family did not beat NFL closing lines and stop the search.",
   "attempt_counting_rule": "Every distinct feature specification evaluated against the frozen immediate holdout range consumes one attempt, including failed or discarded candidates. The matched control is budget-neutral.",
@@ -43,7 +43,6 @@
     2017,
     2019
   ],
-  "training_seasons_for_immediate_holdout": "2010-2016",
   "redesign_before_attempt_2": true,
   "comparison_rule": "Do not compare metrics across holdout definitions; compare control versus candidate within the same window.",
   "other_sports": {
@@ -55,5 +54,9 @@
       "feature_attempts_allowed": false,
       "required_before_search": "freeze a widened chronological holdout and matched control"
     }
-  }
+  },
+  "attempt_3_specification": "Replace rolling points with point-in-time EPA-based offensive/defensive efficiency, split pass/rush.",
+  "attempt_3_result": "FAILS_BAR: margin model-minus-close RMSE +0.735897 (95% CI +0.422462 to +1.052209); total +0.477121 (95% CI +0.241903 to +0.698314).",
+  "attempt_3_report_sha256": "sha256:196513ef937aefd20225664ece27f930e608618e85a31334d9f9d02601f95534",
+  "attempt_3_run_url": "https://github.com/isaacrome21-sys/SportsEdge/actions/runs/34486772747"
 }
