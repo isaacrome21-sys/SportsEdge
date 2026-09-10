@@ -1,0 +1,43 @@
+{
+  "capture_outcome": "skipped",
+  "git_sha": "2b21c6144a9b633d51f7ddd2d55d516dbd5b7808",
+  "model_outcome": "failure",
+  "recorded_at_utc": "2026-09-10T23:24:11.053805+00:00",
+  "run_id": "34541971292:1",
+  "schema": "MLB_V8_FORWARD_STATUS_V1",
+  "slate_date_ct": "2026-09-10",
+  "status": "MISSED_OR_BLOCKED",
+  "status_detail": "MISSED_OR_BLOCKED",
+  "target_game_statuses": [
+    {
+      "capture_status": "MISSED_OR_BLOCKED",
+      "decision_target_qualified": false,
+      "game_id": "824550",
+      "minutes_before_first_pitch": 15.907,
+      "phases": [
+        "close"
+      ]
+    }
+  ],
+  "target_games": [
+    {
+      "abstract_game_state": "Preview",
+      "away_team": "Pittsburgh Pirates",
+      "capture_labels": [
+        "T-10"
+      ],
+      "decision_target_minutes": 30.0,
+      "decision_target_qualified": false,
+      "decision_timing_status": null,
+      "decision_tolerance_direction": "EARLY_ONLY_AT_OR_BEFORE_TARGET",
+      "decision_tolerance_minutes": 6.0,
+      "first_pitch_at": "2026-09-10T23:40:00+00:00",
+      "game_id": "824550",
+      "home_team": "Chicago White Sox",
+      "minutes_before_first_pitch": 15.907,
+      "phases": [
+        "close"
+      ]
+    }
+  ]
+}
