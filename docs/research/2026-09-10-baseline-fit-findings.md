@@ -64,3 +64,14 @@ The strong full-sample CFB margin result does not survive the close-game filter.
 - Treat MLB as research-only pending its own market-relative and calibration evidence.
 
 The baseline report remains research-only until the full calibration, provenance, and Truth Gate requirements are complete.
+
+
+## Post-holdout protocol
+
+The 2025 NFL measurements are now validation results and must not be reused for feature selection. No feature iteration has been evaluated against a replacement holdout.
+
+- Reserved future holdout: the completed 2026 NFL season, evaluated only after the feature set is frozen.
+- Current feature-search attempts allowed: NOT LOCATED IN REPOSITORY; do not invent a value or silently substitute one.
+- Required before feature work: resolve the existing Phase 3 multiple-testing policy and record its exact attempt budget.
+- Required placebo control: compute a deterministic 200-shuffle null on training/CV data only, before evaluating any new feature set.
+- NFL closing-market comparison remains the primary decision metric; mean-baseline improvement alone is insufficient.
