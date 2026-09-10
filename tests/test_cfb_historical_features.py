@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import copy
 import unittest
 
 from sportsedge.sports.cfb.historical_features import CFBHistoricalFeatureError, materialize_cfb_joint_history
@@ -8,7 +9,10 @@ from sportsedge.sports.cfb.source import CFBTeamMetrics
 
 UTC=timezone.utc
 FBS={2025:[{"school":"Alpha State"},{"school":"Beta Tech"}],2026:[{"school":"Alpha State"},{"school":"Beta Tech"}]}
-WEATHER={"w1":{"game_indoor":True},"w2":{"game_indoor":False,"wind_speed":5.0,"temperature":72.0}}
+WEATHER={
+    "w1":{"game_indoor":True,"source":"fixture-weather","retrieved_at_utc":"2026-08-29T12:00:00+00:00"},
+    "w2":{"game_indoor":False,"wind_speed":5.0,"temperature":72.0,"source":"fixture-weather","retrieved_at_utc":"2026-09-12T15:00:00+00:00"},
+}
 
 
 def metric(team, *, season, through_week, source, asof):
@@ -25,6 +29,13 @@ def game(gid,week,start):
     return {"game_id":gid,"season":2026,"week":week,"start_ts":start,"home_team":"Alpha State","away_team":"Beta Tech","neutral_site":False,"home_score":27,"away_score":20}
 
 
+def week2_metrics():
+    return [
+        metric("Alpha State",season=2026,through_week=1,source="CURRENT_SEASON_PRIOR_WEEKS",asof="2026-09-05T00:00:00+00:00"),
+        metric("Beta Tech",season=2026,through_week=1,source="CURRENT_SEASON_PRIOR_WEEKS",asof="2026-09-05T00:00:00+00:00"),
+    ]
+
+
 class CFBHistoricalMaterializerTests(unittest.TestCase):
     def test_week1_prior_season_and_week2_prior_week_are_selected_exactly(self):
         metrics=[
@@ -32,7 +43,6 @@ class CFBHistoricalMaterializerTests(unittest.TestCase):
             metric("Beta Tech",season=2025,through_week=99,source="PRIOR_SEASON_FALLBACK",asof="2026-08-01T00:00:00+00:00"),
             metric("Alpha State",season=2026,through_week=1,source="CURRENT_SEASON_PRIOR_WEEKS",asof="2026-09-05T00:00:00+00:00"),
             metric("Beta Tech",season=2026,through_week=1,source="CURRENT_SEASON_PRIOR_WEEKS",asof="2026-09-05T00:00:00+00:00"),
-            # Target-week rows may exist in the frozen store but must never be selected for Week 2.
             metric("Alpha State",season=2026,through_week=2,source="CURRENT_SEASON_PRIOR_WEEKS",asof="2026-09-12T00:00:00+00:00"),
             metric("Beta Tech",season=2026,through_week=2,source="CURRENT_SEASON_PRIOR_WEEKS",asof="2026-09-12T00:00:00+00:00"),
         ]
@@ -45,6 +55,8 @@ class CFBHistoricalMaterializerTests(unittest.TestCase):
         self.assertEqual(rows[0]["home_metrics"]["sample_source"],"PRIOR_SEASON_FALLBACK")
         self.assertEqual(rows[1]["home_metrics"]["through_week"],1)
         self.assertEqual(rows[1]["away_metrics"]["through_week"],1)
+        self.assertEqual(rows[1]["weather"]["source"],"fixture-weather")
+        self.assertEqual(rows[1]["weather"]["retrieved_at_utc"],"2026-09-12T15:00:00+00:00")
 
     def test_week2_fails_if_only_target_week_metric_exists(self):
         metrics=[
@@ -62,14 +74,41 @@ class CFBHistoricalMaterializerTests(unittest.TestCase):
         with self.assertRaisesRegex(CFBHistoricalFeatureError,"CFB_HISTORICAL_FEATURE_NOT_PREGAME:Alpha State"):
             materialize_cfb_joint_history(games=[game("w2",2,"2026-09-12T19:30:00+00:00")],metrics=metrics,weather_by_game=WEATHER,fbs_membership_by_season=FBS)
 
+    def test_weather_source_is_required(self):
+        weather=copy.deepcopy(WEATHER)
+        weather["w2"].pop("source")
+        with self.assertRaisesRegex(CFBHistoricalFeatureError,"CFB_HISTORICAL_WEATHER_SOURCE_MISSING:w2"):
+            materialize_cfb_joint_history(
+                games=[game("w2",2,"2026-09-12T19:30:00+00:00")],metrics=week2_metrics(),
+                weather_by_game=weather,fbs_membership_by_season=FBS,
+            )
+
+    def test_weather_retrieval_timestamp_is_required_and_timezone_aware(self):
+        for value in (None,"","2026-09-12T15:00:00"):
+            with self.subTest(value=value):
+                weather=copy.deepcopy(WEATHER)
+                weather["w2"]["retrieved_at_utc"]=value
+                with self.assertRaisesRegex(CFBHistoricalFeatureError,"CFB_HISTORICAL_WEATHER_RETRIEVED_AT_INVALID:w2"):
+                    materialize_cfb_joint_history(
+                        games=[game("w2",2,"2026-09-12T19:30:00+00:00")],metrics=week2_metrics(),
+                        weather_by_game=weather,fbs_membership_by_season=FBS,
+                    )
+
+    def test_weather_retrieved_at_or_after_kickoff_fails_closed(self):
+        for value in ("2026-09-12T19:30:00+00:00","2026-09-12T19:31:00+00:00"):
+            with self.subTest(value=value):
+                weather=copy.deepcopy(WEATHER)
+                weather["w2"]["retrieved_at_utc"]=value
+                with self.assertRaisesRegex(CFBHistoricalFeatureError,"CFB_HISTORICAL_WEATHER_NOT_PREGAME:w2"):
+                    materialize_cfb_joint_history(
+                        games=[game("w2",2,"2026-09-12T19:30:00+00:00")],metrics=week2_metrics(),
+                        weather_by_game=weather,fbs_membership_by_season=FBS,
+                    )
+
     def test_market_data_in_historical_game_row_is_rejected(self):
         bad=game("w2",2,"2026-09-12T19:30:00+00:00"); bad["closing_line"]=-3.5
-        metrics=[
-            metric("Alpha State",season=2026,through_week=1,source="CURRENT_SEASON_PRIOR_WEEKS",asof="2026-09-05T00:00:00+00:00"),
-            metric("Beta Tech",season=2026,through_week=1,source="CURRENT_SEASON_PRIOR_WEEKS",asof="2026-09-05T00:00:00+00:00"),
-        ]
         with self.assertRaisesRegex(CFBHistoricalFeatureError,"CFB_HISTORICAL_MARKET_DATA_PROHIBITED:closing_line"):
-            materialize_cfb_joint_history(games=[bad],metrics=metrics,weather_by_game=WEATHER,fbs_membership_by_season=FBS)
+            materialize_cfb_joint_history(games=[bad],metrics=week2_metrics(),weather_by_game=WEATHER,fbs_membership_by_season=FBS)
 
 
 if __name__=="__main__": unittest.main()
