@@ -22,6 +22,13 @@ on:
       - 'tests/test_cfb_history_cache.py'
       - 'tests/test_cfb_history_cache_cli.py'
       - '.github/workflows/cfb-current-history-capture.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'sportsedge/sports/cfb/historical_release.py'
+      - 'sportsedge/sports/cfb/history_cache.py'
+      - 'scripts/cache_cfb_history.py'
+      - '.github/workflows/cfb-current-history-capture.yml'
 
 permissions:
   contents: read
@@ -43,13 +50,13 @@ jobs:
         run: python scripts/cache_cfb_history.py --self-test
 
   capture:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name != 'pull_request'
     needs: contract
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
       CAPTURE_GIT_SHA: ${{ github.sha }}
-      CFB_CAPTURE_SEASONS: ${{ inputs.seasons }}
+      CFB_CAPTURE_SEASONS: ${{ github.event_name == 'workflow_dispatch' && inputs.seasons || '2021:2025' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -69,7 +76,7 @@ jobs:
               --cache-root artifacts/cfb_history \
               > "artifacts/cfb_history_capture/${dataset}.json"
           done
-          if [ "${{ inputs.include_play_by_play }}" = "true" ]; then
+          if [ "${{ github.event_name == 'workflow_dispatch' && inputs.include_play_by_play || false }}" = "true" ]; then
             python scripts/cache_cfb_history.py \
               --dataset play_by_play \
               --seasons "$CFB_CAPTURE_SEASONS" \
