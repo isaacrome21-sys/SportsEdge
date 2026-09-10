@@ -118,8 +118,9 @@ def run_target(x,y,hold_start,hold_end,close_split=False):
         cut=max(20,int(n*k/5)); end=max(cut+1,int(n*(k+1)/5)); a,b=scale(tr[:cut],tr[cut:end])
         for alpha in ALPHAS: ms[alpha].append(float(np.mean((b@fit(a,yt[:cut],alpha)[0]+fit(a,yt[:cut],alpha)[1]-yt[cut:end])**2)))
     alpha=min(ms,key=lambda z:np.mean(ms[z])); null=cv_null(tr,yt,alpha); rng=np.random.default_rng(0); shuffled=yt.copy(); rng.shuffle(shuffled)
-    placebo=score(tr,shuffled,te,ye,alpha); real=score(tr,yt,te,ye,alpha); a,_=scale(tr,tr); beta,_=fit(a,yt,alpha)
-    result={"cv_selected_alpha":alpha,"cv_grid_mse":{str(k):float(np.mean(v)) for k,v in ms.items()},"training_cv_placebo_null":null,"placebo":placebo,"holdout":real,"holdout_predictions":[float(v) for v in (scale(tr,te)[1]@beta+i)],"coefficients":dict(zip(feature_names,map(float,beta))),"signal_verdict":"NO_SIGNAL" if real["r2_vs_mean"]<=0 else "WEAK_SIGNAL" if real["r2_vs_mean"]<.03 else "LEAKAGE_SUSPECTED" if placebo["r2_vs_mean"]>.05 else "SIGNAL_PRESENT"}
+    placebo=score(tr,shuffled,te,ye,alpha); real=score(tr,yt,te,ye,alpha); a,b=scale(tr,te); beta,i=fit(a,yt,alpha)
+    holdout_pred=b@beta+i
+    result={"cv_selected_alpha":alpha,"cv_grid_mse":{str(k):float(np.mean(v)) for k,v in ms.items()},"training_cv_placebo_null":null,"placebo":placebo,"holdout":real,"holdout_predictions":[float(v) for v in holdout_pred],"coefficients":dict(zip(feature_names,map(float,beta))),"signal_verdict":"NO_SIGNAL" if real["r2_vs_mean"]<=0 else "WEAK_SIGNAL" if real["r2_vs_mean"]<.03 else "LEAKAGE_SUSPECTED" if placebo["r2_vs_mean"]>.05 else "SIGNAL_PRESENT"}
     if close_split:
         close=np.abs(ye)<14
         result["holdout_games_under_14_margin"]={"n":int(close.sum()),"metrics":score(tr,yt,te[close],ye[close],alpha) if close.any() else None}
