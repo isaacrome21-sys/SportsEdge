@@ -68,27 +68,32 @@ The baseline report remains research-only until the full calibration, provenance
 
 ## Post-holdout protocol
 
-The 2025 NFL measurements are now validation results and must not be reused for feature selection. No feature iteration has been evaluated against a replacement holdout.
+The 2025 NFL measurements are validation results and must not be reused for feature selection. The initial 2019-only development result is historical evidence from a superseded design, not the active search window.
+
+The frozen immediate search window is now 2017-2019, with training restricted to 2010-2016. The fitter reads and validates this window from \`config/nfl_research_search_policy_v1.json\`; the workflow no longer supplies a competing holdout range.
 
 - Reserved future holdout: the completed 2026 NFL season, evaluated only after the feature set is frozen.
-- Current feature-search attempts allowed: NOT LOCATED IN REPOSITORY; do not invent a value or silently substitute one.
-- Required before feature work: resolve the existing Phase 3 multiple-testing policy and record its exact attempt budget.
-- Required placebo control: compute a deterministic 200-shuffle null on training/CV data only, before evaluating any new feature set.
-- NFL closing-market comparison remains the primary decision metric; mean-baseline improvement alone is insufficient.
-
+- Current feature-search attempts allowed: 10 distinct feature specifications.
+- A same-window baseline control is pre-registered and budget-neutral because it calibrates the denominator; any feature selection or tuning consumes an attempt.
+- Primary metric: closing-market RMSE.
+- Placebo control: deterministic 200-shuffle training/CV null before feature evaluation.
+- Do not compare metrics across holdout definitions; compare control versus candidate within 2017-2019.
+- No widened-window rerun has been interpreted yet.
 
 ## Frozen NFL search policy
 
-Decision: use 2019 as the immediate untouched development holdout so feature work can be evaluated now. Reserve the completed 2026 season as the later forward holdout; it is not used during feature selection.
+Decision: use the widened 2017-2019 window for immediate development, with 2010-2016 training. Reserve the completed 2026 season as the later forward holdout; it is not used during feature selection.
 
 - Feature-search budget: 10 distinct feature specifications.
-- Every candidate evaluated against 2019 counts, including discarded or failed candidates.
+- Every candidate evaluated against the frozen 2017-2019 window counts, including discarded or failed candidates.
+- The matched baseline control is budget-neutral and was declared as calibration, not a feature search.
 - Primary metric: closing-market RMSE.
-- Placebo control: deterministic 200-shuffle training/CV null before the first feature evaluation.
-- 2025 is validation only and is excluded from feature search.
-- Policy file: config/nfl_research_search_policy_v1.json
-
+- Placebo control: deterministic 200-shuffle training/CV null before each new feature evaluation.
+- 2025 and the original 2019-only result are historical validation records, not search denominators.
+- Policy file: \`config/nfl_research_search_policy_v1.json\`
 
 ## Chronology correction
 
-The 2019 development holdout is valid only with pre-2019 training data. The required split is 2010-2018 training followed by 2019 validation. The fitter now excludes games after the selected holdout season, and the policy records this boundary. No feature search has been run.
+The earlier 2010-2018 → 2019 design was superseded because a single-season holdout could not resolve a prospective improvement reliably. The active design is 2010-2016 training followed by 2017-2019 validation, approximately three seasons of holdout data. The fitter fails closed if the policy window is invalid, if training overlaps the holdout, or if the workflow omits a required season.
+
+CFB and MLB feature searches are blocked until each has its own widened chronological holdout and matched control. All outputs remain research-only: no production artifact, Model_P, Truth Gate pass, or OFFICIAL betting eligibility.
