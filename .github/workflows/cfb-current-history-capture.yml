@@ -1,0 +1,161 @@
+name: cfb-current-history-capture
+
+on:
+  workflow_dispatch:
+    inputs:
+      seasons:
+        description: 'Historical seasons to capture (for example 2021:2025)'
+        required: true
+        default: '2021:2025'
+        type: string
+      include_play_by_play:
+        description: 'Also capture the much larger play-by-play release assets'
+        required: true
+        default: false
+        type: boolean
+  pull_request:
+    paths:
+      - 'sportsedge/sports/cfb/historical_release.py'
+      - 'sportsedge/sports/cfb/history_cache.py'
+      - 'scripts/cache_cfb_history.py'
+      - 'tests/test_cfb_historical_release.py'
+      - 'tests/test_cfb_history_cache.py'
+      - 'tests/test_cfb_history_cache_cli.py'
+      - '.github/workflows/cfb-current-history-capture.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Compile acquisition surface
+        run: python -m py_compile sportsedge/sports/cfb/historical_release.py sportsedge/sports/cfb/history_cache.py scripts/cache_cfb_history.py
+      - name: Run acquisition contract tests
+        run: python -m unittest tests.test_cfb_historical_release tests.test_cfb_history_cache tests.test_cfb_history_cache_cli
+      - name: Prove predictive alias excludes market data
+        run: python scripts/cache_cfb_history.py --self-test
+
+  capture:
+    if: github.event_name == 'workflow_dispatch'
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CAPTURE_GIT_SHA: ${{ github.sha }}
+      CFB_CAPTURE_SEASONS: ${{ inputs.seasons }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.CAPTURE_GIT_SHA }}
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Capture checksum-bound current historical releases
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/cfb_history_capture
+          for dataset in schedules adv_team adv_situational adv_drives; do
+            python scripts/cache_cfb_history.py \
+              --dataset "$dataset" \
+              --seasons "$CFB_CAPTURE_SEASONS" \
+              --cache-root artifacts/cfb_history \
+              > "artifacts/cfb_history_capture/${dataset}.json"
+          done
+          if [ "${{ inputs.include_play_by_play }}" = "true" ]; then
+            python scripts/cache_cfb_history.py \
+              --dataset play_by_play \
+              --seasons "$CFB_CAPTURE_SEASONS" \
+              --cache-root artifacts/cfb_history \
+              > artifacts/cfb_history_capture/play_by_play.json
+          fi
+
+      - name: Build explicit non-PIT capture classification
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path('artifacts/cfb_history')
+          manifests = sorted(root.glob('*/*/manifest.json'))
+          if not manifests:
+              raise SystemExit('CFB_CURRENT_HISTORY_CAPTURE_EMPTY')
+
+          rows = []
+          for manifest_path in manifests:
+              payload = json.loads(manifest_path.read_text(encoding='utf-8'))
+              asset = payload.get('asset') or {}
+              if payload.get('market_role') != 'PREDICTIVE_INPUT':
+                  raise SystemExit(f'CFB_CURRENT_HISTORY_MARKET_ROLE_INVALID:{manifest_path}')
+              if asset.get('dataset') == 'betting':
+                  raise SystemExit('CFB_CURRENT_HISTORY_BETTING_DATA_PROHIBITED')
+              cache_rel = payload.get('cache_relative_path')
+              if not cache_rel:
+                  raise SystemExit(f'CFB_CURRENT_HISTORY_CACHE_PATH_MISSING:{manifest_path}')
+              cache_path = root / cache_rel
+              if not cache_path.is_file():
+                  raise SystemExit(f'CFB_CURRENT_HISTORY_ASSET_MISSING:{cache_rel}')
+              actual = hashlib.sha256(cache_path.read_bytes()).hexdigest()
+              expected = str(payload.get('content_sha256') or '').lower()
+              if actual != expected:
+                  raise SystemExit(f'CFB_CURRENT_HISTORY_ASSET_HASH_MISMATCH:{cache_rel}')
+              rows.append({
+                  'dataset': asset.get('dataset'),
+                  'season': asset.get('season'),
+                  'release_tag': asset.get('release_tag'),
+                  'release_id': asset.get('release_id'),
+                  'asset_id': asset.get('asset_id'),
+                  'asset_name': asset.get('asset_name'),
+                  'content_sha256': expected,
+                  'retrieved_at': payload.get('retrieved_at'),
+                  'manifest_sha256': payload.get('manifest_sha256'),
+                  'cache_relative_path': cache_rel,
+              })
+
+          out = {
+              'schema_version': 1,
+              'sport': 'CFB',
+              'capture_git_sha': os.environ['CAPTURE_GIT_SHA'].lower(),
+              'requested_seasons': os.environ['CFB_CAPTURE_SEASONS'],
+              'capture_classification': 'CURRENT_HISTORICAL_RELEASE_NOT_POINT_IN_TIME',
+              'point_in_time_as_of_game_proven': False,
+              'promotion_evidence': False,
+              'model_p_created': False,
+              'eligibility_changed': False,
+              'market_data_in_predictive_capture': False,
+              'warning': (
+                  'These bytes are checksum-bound current historical release assets. '
+                  'They may contain later corrections/restatements and MUST NOT be treated '
+                  'as as-of-game PIT evidence without an independent historical availability proof.'
+              ),
+              'asset_count': len(rows),
+              'assets': rows,
+          }
+          target = Path('artifacts/cfb_history_capture/current_release_classification.json')
+          target.write_text(json.dumps(out, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print(json.dumps({
+              'status': 'CURRENT_RELEASE_CAPTURED_NOT_PIT',
+              'asset_count': len(rows),
+              'promotion_evidence': False,
+          }, sort_keys=True))
+          PY
+
+      - name: Upload current-release capture
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cfb-current-history-${{ env.CAPTURE_GIT_SHA }}
+          path: |
+            artifacts/cfb_history/**
+            artifacts/cfb_history_capture/**
+          if-no-files-found: error
+          retention-days: 30
