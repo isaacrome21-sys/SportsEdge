@@ -1,6 +1,10 @@
 name: NFL and CFB baseline fits
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/fit_football_baselines.py'
+      - '.github/workflows/football-baselines.yml'
 jobs:
   fit:
     runs-on: ubuntu-latest
