@@ -170,8 +170,6 @@ class NFLM2HistoryFeatureTests(unittest.TestCase):
             prior_decay_curves=curves,
         )
         row = next(row for row in rows if row["game_id"] == "2022_02_AWY_HME")
-        # In all completed prior games, HME offense is never pressured and HME
-        # defense always pressures AWY on its tracked dropback.
         self.assertEqual(row["home_features"]["pressure_allowed"], 0.0)
         self.assertEqual(row["home_features"]["pressure_for"], 1.0)
 
@@ -213,18 +211,28 @@ class NFLM2HistoryFeatureTests(unittest.TestCase):
                     self.assertNotIn(target["game_id"], {r["game_id"] for r in rows})
                     self.assertEqual(sum(report[target["season"]].values()), 1)
 
-    def test_closed_roof_does_not_manufacture_missing_wind(self):
+    def test_policy_normalizes_closed_roof_missing_wind_but_core_remains_strict(self):
         schedule = self._schedule()
         target = schedule[-1]
         target.update(roof="closed", wind=None)
         curves = fit_nfl_prior_decay_curves(schedule, self._pbp(), min_train_seasons=2, weeks=(1, 2, 3))
+
+        with self.assertRaisesRegex(ValueError, "NFL_WIND_MISSING"):
+            build_nfl_m2_history_rows(
+                schedule, self._pbp(), self._participation(), self._depth(), self._stadiums(),
+                prior_decay_curves=curves,
+            )
+
         report = {}
         rows = build_policy_rows(
             schedule, self._pbp(), self._participation(), self._depth(), self._stadiums(),
             prior_decay_curves=curves, exclusion_report=report,
         )
-        self.assertNotIn(target["game_id"], {r["game_id"] for r in rows})
-        self.assertEqual(report, {target["season"]: {"NFL_WIND_INVALID": 1}})
+        self.assertIn(target["game_id"], {r["game_id"] for r in rows})
+        self.assertEqual(report, {})
+        row = next(r for r in rows if r["game_id"] == target["game_id"])
+        self.assertEqual(row["home_features"]["wind_mph"], 0.0)
+        self.assertEqual(row["away_features"]["wind_mph"], 0.0)
 
     def test_neutral_site_without_explicit_venue_fails_closed(self):
         schedule = self._schedule()
