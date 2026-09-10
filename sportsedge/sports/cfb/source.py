@@ -403,7 +403,11 @@ def fetch_the_odds_api_quotes(
     return parse_the_odds_api_quotes(payload, games=list(games), alias_index=alias_index, bookmakers=bookmakers)
 
 
-def fetch_cfbd_weather(*, season: int, week: int, cfbd_api_key: str, opener: Callable = urlopen) -> dict[str, dict[str, Any]]:
+def fetch_cfbd_weather(
+    *, season: int, week: int, cfbd_api_key: str, now: datetime,
+    opener: Callable = urlopen,
+) -> dict[str, dict[str, Any]]:
+    current = _dt(now, "now")
     data = _json_get(
         _cfbd_url("/games/weather", {"year": int(season), "week": int(week), "seasonType": "regular", "classification": "fbs"}),
         headers=_auth(cfbd_api_key), opener=opener,
@@ -420,7 +424,11 @@ def fetch_cfbd_weather(*, season: int, week: int, cfbd_api_key: str, opener: Cal
         indoors = row.get("gameIndoors")
         if type(indoors) is not bool:
             raise CFBSourceError("CFBD_WEATHER_INDOOR_FLAG_MISSING")
-        weather: dict[str, Any] = {"game_indoor": indoors, "source": "CFBD_GAMES_WEATHER"}
+        weather: dict[str, Any] = {
+            "game_indoor": indoors,
+            "source": "CFBD_GAMES_WEATHER",
+            "retrieved_at": current.isoformat(),
+        }
         if not indoors:
             weather["wind_speed"] = _num(row.get("windSpeed"), "weather.windSpeed")
             weather["temperature"] = _num(row.get("temperature"), "weather.temperature")
