@@ -15,5 +15,8 @@
     "Do not evaluate feature candidates against 2025.",
     "Do not use 2026 before its season is complete and the feature set is frozen.",
     "Do not promote or enable OFFICIAL betting from this research lane."
-  ]
+  ],
+  "training_seasons_for_2019_development": "2010-2018",
+  "holdout_order": "train_2010_2018_then_validate_2019",
+  "enforcement": "fitter_excludes_games_after_selected_holdout_season"
 }
