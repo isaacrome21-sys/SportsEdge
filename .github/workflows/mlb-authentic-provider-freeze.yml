@@ -8,6 +8,9 @@ permissions:
 
 jobs:
   capture-verify:
+    concurrency:
+      group: sportsedge-paid-odds-api
+      cancel-in-progress: false
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
@@ -112,13 +115,21 @@ jobs:
             slot=$((slot + 1))
             key="${!key_name:-}"
             [[ -z "$key" ]] && continue
-            if ODDS_API_KEY="$key" python scripts/capture_mlb_odds_api_freeze.py \
+            set +e
+            ODDS_API_KEY="$key" python scripts/capture_mlb_odds_api_freeze.py \
               --private-root .private/mlb-evidence \
               --capture-id "$CAPTURE_ID" \
-              --manifest-out "$manifest"; then
+              --manifest-out "$manifest"
+            code=$?
+            set -e
+            if [[ "$code" -eq 0 ]]; then
               captured=1
               echo "selected_key_slot=$slot" >> "$GITHUB_OUTPUT"
               break
+            fi
+            if [[ "$code" -eq 75 ]]; then
+              echo "MLB_AUTHENTIC_PROVIDER_ACCOUNT_EXHAUSTED:key_slot=$slot" >&2
+              exit 75
             fi
           done
           if [[ "$captured" != 1 ]]; then
