@@ -152,3 +152,16 @@ Status: DONE for the attempt; FAILS_BAR for both NFL targets.
 - Total: model-minus-close RMSE delta +0.3568; paired-bootstrap 95% CI [+0.1211, +0.5804].
 - Decision: recency weighting did not clear the frozen criterion. No artifact freeze, eligibility change, or Model_P promotion. Attempt 9 is consumed; one attempt remains, with fitted home-field parameters registered next.
 - Evidence: report artifact digest `sha256:9c95c0cbefc2f99f6dec37fda01f58d2fcac0ad6770de2c9311fbf5ce40ea996`.
+
+
+## NFL Attempt 10 and final feature-search verdict (run 34492932580)
+
+Status: DONE for the attempt; FAILS_BAR for both NFL targets. The ten-attempt feature budget is exhausted.
+
+- Feature family: point-in-time team-specific home-field effects from prior home/away results.
+- Window: train 2010-2016; validate 2017-2019; 779 games with closing lines.
+- Margin: model-minus-close RMSE delta +0.6157; paired-bootstrap 95% CI [+0.3524, +0.8780]. Close-game R² was -0.7130 versus the mean.
+- Total: model-minus-close RMSE delta +0.4020; paired-bootstrap 95% CI [+0.1726, +0.6260].
+- Final NFL feature-search decision: FAILS_BAR. Across ten pre-registered feature specifications, neither target produced a paired-bootstrap 95% CI including zero versus the closing market. No artifact freeze, eligibility change, or Model_P promotion.
+- Post-search work: segment and timing analyses remain separate from the exhausted feature budget and are pending. CFB and MLB remain BLOCKED_NO_CLOSING_BENCHMARK.
+- Evidence: report artifact digest `sha256:9f28430792a1efc4807642d033d0e85bc56d6b8bb3bb3df1dcefe7382cfa8e35`.
