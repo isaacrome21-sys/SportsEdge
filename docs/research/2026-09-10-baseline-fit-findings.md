@@ -29,11 +29,38 @@ Shuffled-label holdout R2 values were:
 
 The small positive football placebo values are not by themselves proof of leakage, but they require review. The CFB margin result is especially sensitive to talent-gap effects because the baseline uses rolling points for/against and has no opponent-strength control.
 
+## Requested diagnostics
+
+### NFL closing-market benchmark
+
+Using the same nflverse source, on 272 holdout games:
+
+- Margin model RMSE: 13.2120
+- Closing spread RMSE: 18.3098
+- Total model RMSE: 13.3600
+- Closing total RMSE: 13.1325
+
+The total baseline is worse than the closing total by about 0.228 points RMSE. The margin comparison is reported under the conventional home-margin interpretation of nflverse spread_line and still requires source-convention review before any certification decision.
+
+### CFB close-game split
+
+For 415 CFB holdout games decided by under 14 points:
+
+- Full margin model R2: 0.3587
+- Under-14 margin model R2: -0.6249
+- Under-14 model RMSE: 10.2777
+- Under-14 mean-baseline RMSE: 8.0628
+
+The strong full-sample CFB margin result does not survive the close-game filter. This supports the talent-gap/blowout explanation and makes CFB margin unsuitable for certification without opponent-strength and market-relative testing.
+
 ## Decision order
 
-1. Add and inspect the NFL closing spread/total RMSE benchmark from the same nflverse rows.
-2. Split CFB holdout margin performance for games decided by under 14 points.
-3. Add opponent-strength controls only if the close-game result supports that work.
-4. Freeze only a lane that survives its relevant diagnostics and full calibration/provenance requirements.
+1. Keep all three fitted outputs research-only.
+2. Do not freeze alpha 10.0 or any replacement alpha yet.
+3. Verify the nflverse spread sign convention and add a same-sample market comparison to the production evidence format.
+4. Treat NFL total as failing the first market-relative screen.
+5. Treat CFB margin as failing the close-game diagnostic until redesigned.
+6. Treat CFB total alpha 0.1 as a noise-sensitive CV result pending robustness checks.
+7. Consider only a lane that survives relevant market-relative diagnostics and full calibration/provenance requirements.
 
 The baseline report remains research-only until those checks are complete.
