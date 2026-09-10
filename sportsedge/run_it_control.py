@@ -141,22 +141,36 @@ def _card_state(path: Path | None, previous_stamp) -> tuple[str, str | None, int
             raise ValueError("results required")
     except (OSError, ValueError, AttributeError):
         return "BLOCKED", "RUN_OUTPUT_INVALID", 0, 0
+
     def has_model(row):
         value = row.get("model_p")
         return isinstance(value, (int, float)) and not isinstance(value, bool) and 0 <= value <= 1
+
+    allowed_statuses = {"MODEL_CANDIDATE", "PASS", "OFFICIAL_BET", "BLOCKED"}
     models = sum(has_model(row) for row in rows)
     official = sum(row.get("bet_status") == "OFFICIAL_BET" for row in rows)
     if not rows:
         return "BLOCKED", "RUN_RESULTS_EMPTY", models, official
-    if all(row.get("bet_status") == "BLOCKED" for row in rows):
-        return "BLOCKED", "ALL_MARKETS_BLOCKED", models, official
-    if payload.get("status") in {"BLOCKED", "FAILED", "ERROR"} or str(report.get("run_status", "")).startswith("BLOCKED"):
-        return "BLOCKED", "RUN_REPORTED_BLOCKED", models, official
-    if any(row.get("bet_status") not in {"PASS", "OFFICIAL_BET", "BLOCKED"} for row in rows):
+    if any(row.get("bet_status") not in allowed_statuses for row in rows):
         return "BLOCKED", "RUN_DECISION_STATUS_INVALID", models, official
-    if models == 0 or any(row.get("bet_status") != "BLOCKED" and not has_model(row) for row in rows):
+
+    model_candidates = [
+        row for row in rows
+        if row.get("bet_status") in {"MODEL_CANDIDATE", "PASS", "OFFICIAL_BET"}
+    ]
+    true_blockers = [row for row in rows if row.get("bet_status") == "BLOCKED"]
+
+    # A governance block on OFFICIAL promotion is not a failed model run. A row
+    # explicitly surfaced as MODEL_CANDIDATE already carries that distinction.
+    if not model_candidates:
+        return "BLOCKED", "ALL_MARKETS_BLOCKED", models, official
+    if payload.get("status") in {"FAILED", "ERROR"}:
+        return "BLOCKED", "RUN_REPORTED_BLOCKED", models, official
+    if str(report.get("run_status", "")).startswith("BLOCKED") and not model_candidates:
+        return "BLOCKED", "RUN_REPORTED_BLOCKED", models, official
+    if models == 0 or any(not has_model(row) for row in model_candidates):
         return "BLOCKED", "RUN_MODEL_PROBABILITIES_MISSING", models, official
-    if any(row.get("bet_status") == "BLOCKED" for row in rows) or report.get("run_status") == "DEGRADED":
+    if true_blockers or report.get("run_status") == "DEGRADED":
         return "PARTIAL", "SOME_MARKETS_BLOCKED_OR_DEGRADED", models, official
     return "SUCCESS", None, models, official
 
