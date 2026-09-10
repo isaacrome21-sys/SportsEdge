@@ -34,7 +34,7 @@ def nfl(seasons):
             def optional_float(key):
                 try: return float(r[key]) if r.get(key) not in (None, "") else None
                 except (TypeError, ValueError): return None
-            rows.append({"date":r.get("gameday") or f"{season}-01-01","id":r.get("game_id",""),"home":r["home_team"],"away":r["away_team"],"hs":hs,"as":aas,"spread_line":optional_float("spread_line"),"total_line":optional_float("total_line"),"home_qb_id":r.get("home_qb_id"),"away_qb_id":r.get("away_qb_id")})
+            rows.append({"date":r.get("gameday") or f"{season}-01-01","id":r.get("game_id",""),"home":r["home_team"],"away":r["away_team"],"hs":hs,"as":aas,"spread_line":optional_float("spread_line"),"total_line":optional_float("total_line"),"home_qb_id":(r.get("home_qb_id") or r.get("home_qb_name") or "").strip(),"away_qb_id":(r.get("away_qb_id") or r.get("away_qb_name") or "").strip()})
     return rows, hashlib.sha256(raw).hexdigest(), NFL_URL
 
 def cfb(seasons):
@@ -168,6 +168,9 @@ def main():
         if not games: raise RuntimeError(f"{sport}: NO_PRE_HOLDOUT_GAMES")
         global hold_dates,feature_names
         feature_in_use=args.feature_set if sport=="NFL" else "baseline"
+        if feature_in_use=="quarterback":
+            qb_ready=sum(bool(g.get("home_qb_id")) and bool(g.get("away_qb_id")) for g in games)
+            if qb_ready < 120: raise RuntimeError(f"NFL_QUARTERBACK_STARTERS_UNRESOLVED:{qb_ready}")
         X,ym,yt,feature_names,hold_dates=features(games,feature_in_use)
         reports[sport]={"source":source,"source_sha256":sha,"policy_path":str(policy_path),"policy_sha256":hashlib.sha256(policy_path.read_bytes()).hexdigest(),"training_years":[train_start,train_end],"feature_set":feature_in_use,"holdout_years":[hold_start,hold_end],"games_fetched":len(games),"usable_rows":len(X),"status":"RESEARCH_ONLY_NOT_MODEL_P","targets":{"margin":run_target(X,ym,hold_start,hold_end,close_split=(sport=="CFB")),"total":run_target(X,yt,hold_start,hold_end)}}
         if feature_in_use!="baseline":
