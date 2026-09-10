@@ -159,7 +159,7 @@
         "name": "operational_opener_absolute_spread",
         "buckets": [
           "<=7",
-          " >7"
+          ">7"
         ],
         "count": 2,
         "pregame_definition": "absolute spread from the first fixed-time SportsEdge capture"
