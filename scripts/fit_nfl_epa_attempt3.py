@@ -94,8 +94,11 @@ def epa_features(games: list[dict]) -> tuple[np.ndarray, np.ndarray, np.ndarray,
             keys.append((game_date, str(g["id"]), g))
         for g in batch:
             home, away = g["home_epa"], g["away_epa"]
-            history[g["home"]].append([home["off_epa"], home["off_epa"], home["pass_epa"], home["rush_epa"]])
-            history[g["away"]].append([away["off_epa"], away["off_epa"], away["pass_epa"], away["rush_epa"]])
+            # Defensive EPA is the opponent's offensive EPA in this game:
+            # lower allowed EPA is better. Append only after all same-date
+            # rows were emitted so no game can see its own result.
+            history[g["home"]].append([home["off_epa"], away["off_epa"], home["pass_epa"], home["rush_epa"]])
+            history[g["away"]].append([away["off_epa"], home["off_epa"], away["pass_epa"], away["rush_epa"]])
     return np.asarray(X, float), np.asarray(ym, float), np.asarray(yt, float), names, dates, keys
 
 
