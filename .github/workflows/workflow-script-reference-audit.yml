@@ -6,11 +6,13 @@ on:
     paths:
       - '.github/workflows/**'
       - 'scripts/audit_workflow_script_refs.py'
+      - 'scripts/audit_paid_odds_api_concurrency.py'
   push:
     branches: [main]
     paths:
       - '.github/workflows/**'
       - 'scripts/audit_workflow_script_refs.py'
+      - 'scripts/audit_paid_odds_api_concurrency.py'
 
 permissions:
   contents: read
@@ -32,3 +34,5 @@ jobs:
         run: python -m pip install --disable-pip-version-check PyYAML==6.0.2
       - name: Validate repository-local workflow script references
         run: python scripts/audit_workflow_script_refs.py
+      - name: Validate paid Odds API jobs use the repo-wide lock
+        run: python scripts/audit_paid_odds_api_concurrency.py
