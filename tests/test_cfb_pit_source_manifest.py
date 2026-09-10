@@ -1,8 +1,8 @@
 import json
 from hashlib import sha256
 from pathlib import Path
-
-import pytest
+import tempfile
+import unittest
 
 from sportsedge.sports.cfb.historical_features import CFB_HISTORICAL_MATERIALIZER_VERSION
 from sportsedge.sports.cfb.joint_model import CFB_FEATURE_CONTRACT
@@ -34,32 +34,38 @@ def _raw(payload: dict) -> bytes:
     return (json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n").encode()
 
 
-def test_valid_manifest_binds_exact_bytes() -> None:
-    payload = _manifest(); raw = _raw(payload)
-    validated = validate_cfb_pit_source_manifest(payload, raw_bytes=raw, fit_max_season=2025)
-    assert validated["manifest_sha256"] == sha256(raw).hexdigest()
-    assert validated["source_ids"] == ["features", "labels"]
+class CFBPITSourceManifestTests(unittest.TestCase):
+    def test_valid_manifest_binds_exact_bytes(self) -> None:
+        payload = _manifest(); raw = _raw(payload)
+        validated = validate_cfb_pit_source_manifest(payload, raw_bytes=raw, fit_max_season=2025)
+        self.assertEqual(validated["manifest_sha256"], sha256(raw).hexdigest())
+        self.assertEqual(validated["source_ids"], ["features", "labels"])
+
+    def test_market_data_and_post_event_features_are_forbidden(self) -> None:
+        payload = _manifest(); payload["sources"][0]["market_data"] = True
+        with self.assertRaisesRegex(CFBSourceManifestError, "MARKET_DATA_FLAG_REQUIRED_FALSE"):
+            validate_cfb_pit_source_manifest(payload, raw_bytes=_raw(payload), fit_max_season=2025)
+        payload = _manifest(); payload["sources"][0]["availability_mode"] = "POST_EVENT_LABEL"
+        with self.assertRaisesRegex(CFBSourceManifestError, "POST_EVENT_FEATURE_PROHIBITED"):
+            validate_cfb_pit_source_manifest(payload, raw_bytes=_raw(payload), fit_max_season=2025)
+
+    def test_preserved_snapshot_bytes_must_match_manifest_hashes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            payload = _manifest()
+            validated = validate_cfb_pit_source_manifest(payload, raw_bytes=_raw(payload), fit_max_season=2025)
+            (root / "features.json").write_bytes(b"features")
+            (root / "labels.json").write_bytes(b"labels")
+            self.assertEqual(verify_cfb_source_snapshots(validated, evidence_root=root)["verified_source_count"], 2)
+            (root / "features.json").write_bytes(b"tampered")
+            with self.assertRaisesRegex(CFBSourceManifestError, "SNAPSHOT_SHA256_MISMATCH:features"):
+                verify_cfb_source_snapshots(validated, evidence_root=root)
+
+    def test_snapshot_path_cannot_escape_evidence_root(self) -> None:
+        payload = _manifest(); payload["sources"][0]["snapshot_path"] = "../features.json"
+        with self.assertRaisesRegex(CFBSourceManifestError, "SNAPSHOT_PATH_INVALID"):
+            validate_cfb_pit_source_manifest(payload, raw_bytes=_raw(payload), fit_max_season=2025)
 
 
-def test_market_data_and_post_event_features_are_forbidden() -> None:
-    payload = _manifest(); payload["sources"][0]["market_data"] = True
-    with pytest.raises(CFBSourceManifestError, match="MARKET_DATA_FLAG_REQUIRED_FALSE"):
-        validate_cfb_pit_source_manifest(payload, raw_bytes=_raw(payload), fit_max_season=2025)
-    payload = _manifest(); payload["sources"][0]["availability_mode"] = "POST_EVENT_LABEL"
-    with pytest.raises(CFBSourceManifestError, match="POST_EVENT_FEATURE_PROHIBITED"):
-        validate_cfb_pit_source_manifest(payload, raw_bytes=_raw(payload), fit_max_season=2025)
-
-
-def test_preserved_snapshot_bytes_must_match_manifest_hashes(tmp_path: Path) -> None:
-    payload = _manifest(); validated = validate_cfb_pit_source_manifest(payload, raw_bytes=_raw(payload), fit_max_season=2025)
-    (tmp_path / "features.json").write_bytes(b"features"); (tmp_path / "labels.json").write_bytes(b"labels")
-    assert verify_cfb_source_snapshots(validated, evidence_root=tmp_path)["verified_source_count"] == 2
-    (tmp_path / "features.json").write_bytes(b"tampered")
-    with pytest.raises(CFBSourceManifestError, match="SNAPSHOT_SHA256_MISMATCH:features"):
-        verify_cfb_source_snapshots(validated, evidence_root=tmp_path)
-
-
-def test_snapshot_path_cannot_escape_evidence_root() -> None:
-    payload = _manifest(); payload["sources"][0]["snapshot_path"] = "../features.json"
-    with pytest.raises(CFBSourceManifestError, match="SNAPSHOT_PATH_INVALID"):
-        validate_cfb_pit_source_manifest(payload, raw_bytes=_raw(payload), fit_max_season=2025)
+if __name__ == "__main__":
+    unittest.main()
