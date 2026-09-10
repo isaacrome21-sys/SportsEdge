@@ -45,7 +45,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install test dependency
-        run: python -m pip install --disable-pip-version-check pytest
+        run: python -m pip install --disable-pip-version-check pytest==9.1.1
       - name: Compile checker
         run: python -m py_compile code/scripts/check_nrfi_durable_health.py
       - name: Run checker unit tests
