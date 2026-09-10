@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from sportsedge.edge_floors import FrozenEdgeFloor, require_production_edge_floor
+from sportsedge.edge_floors import EdgeFloorError, FrozenEdgeFloor, require_production_edge_floor
 from sportsedge.football_prop_certification import (
     assess_market_certification,
     load_certification_registry,
@@ -56,13 +56,12 @@ def run_football_props_ready(
     certification_registry: Mapping[str, Any] | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    """Run the shared-path prop model and resolve all OFFICIAL gates.
+    """Run shared-path props, then resolve the separate OFFICIAL promotion gate.
 
-    There is no manual deployment boolean. For every provider market present on
-    the board, artifact-bound evidence and certification are resolved first. If
-    both are PASS, its *sport-namespaced* frozen edge floor must resolve before
-    predictive inference. After inference, a fresh paired quote is required and
-    the normal SportsEdge Truth Gate makes the PASS/OFFICIAL_BET decision.
+    Valid Model_P rows remain visible as MODEL_CANDIDATE even when artifact-bound
+    evidence, certification or a frozen production floor is not ready. Those
+    promotion requirements still fail closed for OFFICIAL_BET. A candidate label
+    never changes Model_P, creates evidence, or grants deployment eligibility.
     """
     sport = str(kwargs.get("sport") or "").strip().upper()
     artifact_sha = str(kwargs.get("expected_artifact_sha256") or "").strip().lower()
@@ -83,6 +82,7 @@ def run_football_props_ready(
     )
 
     preflight_floors: dict[str, FrozenEdgeFloor] = {}
+    floor_blockers: dict[str, str] = {}
     for provider_market in sorted(_present_provider_markets(odds_snapshot)):
         evidence_state = assess_market_evidence(
             sport=sport,
@@ -97,15 +97,21 @@ def run_football_props_ready(
             registry=certification,
         )
         if evidence_state["ready"] and certification_state["ready"]:
-            preflight_floors[provider_market] = require_production_edge_floor(
-                market=_floor_key(sport, provider_market),
-                path=floor_path,
-            )
+            floor_key = _floor_key(sport, provider_market)
+            try:
+                preflight_floors[provider_market] = require_production_edge_floor(
+                    market=floor_key,
+                    path=floor_path,
+                )
+            except EdgeFloorError:
+                floor_blockers[provider_market] = f"PROP_FROZEN_FLOOR_PREFLIGHT_MISSING:{floor_key}"
 
     report = run_football_extended_props(**kwargs)
     sport = str(report["sport"])
     ready_rows = 0
     certified_rows = 0
+    candidate_rows = 0
+    official_gate_blocked_rows = 0
     truth_gate_rows = 0
     official_bets = 0
 
@@ -137,35 +143,51 @@ def run_football_props_ready(
         row["certification_blockers"] = certification_state["blockers"]
         row["truth_gate_floor_key"] = floor_key
         row["official_eligible"] = False
+        row["model_status"] = "MODEL_CANDIDATE"
+        row["bet_status"] = "MODEL_CANDIDATE"
+        row["reason"] = "MODEL_P_AND_PRICE_AVAILABLE"
+        row["official_gate_status"] = "BLOCKED"
+        row["official_gate_reason"] = None
+        candidate_rows += 1
 
         if evidence_state["ready"]:
             ready_rows += 1
         if certification_state["ready"]:
             certified_rows += 1
 
-        if not evidence_state["ready"]:
+        if row.get("quote_fresh") is not True:
+            row["model_status"] = "BLOCKED"
             row["bet_status"] = "BLOCKED"
-            row["reason"] = evidence_state["blockers"][0]
+            row["reason"] = f"{sport}_PROP_QUOTE_STALE"
+            row["official_gate_reason"] = row["reason"]
+            candidate_rows -= 1
+            official_gate_blocked_rows += 1
+            continue
+        if not evidence_state["ready"]:
+            row["official_gate_reason"] = evidence_state["blockers"][0]
+            official_gate_blocked_rows += 1
             continue
         if not certification_state["ready"]:
-            row["bet_status"] = "BLOCKED"
-            row["reason"] = certification_state["blockers"][0]
+            row["official_gate_reason"] = certification_state["blockers"][0]
+            official_gate_blocked_rows += 1
             continue
 
         floor = preflight_floors.get(provider_market)
         if floor is None:
-            row["bet_status"] = "BLOCKED"
-            row["reason"] = f"PROP_FROZEN_FLOOR_PREFLIGHT_MISSING:{floor_key}"
+            row["official_gate_reason"] = floor_blockers.get(
+                provider_market,
+                f"PROP_FROZEN_FLOOR_PREFLIGHT_MISSING:{floor_key}",
+            )
+            official_gate_blocked_rows += 1
             continue
 
-        if row.get("quote_fresh") is not True:
-            row["bet_status"] = "BLOCKED"
-            row["reason"] = f"{sport}_PROP_QUOTE_STALE"
-            continue
         fair_market_p = row.get("fair_market_p")
         if fair_market_p is None:
-            row["bet_status"] = "BLOCKED"
-            row["reason"] = f"{sport}_PROP_PAIRED_PRICE_REQUIRED"
+            # Model_P + one offered price is sufficient for candidate EV, but the
+            # current production floor was derived against a no-vig comparator.
+            # Do not invent a missing opposite side or silently reuse that floor.
+            row["official_gate_reason"] = f"{sport}_PROP_ONE_SIDED_OFFICIAL_FLOOR_POLICY_NOT_FROZEN"
+            official_gate_blocked_rows += 1
             continue
 
         decision = decide_bet(
@@ -180,6 +202,8 @@ def run_football_props_ready(
         )
         truth_gate_rows += 1
         row["official_eligible"] = True
+        row["official_gate_status"] = "PASS"
+        row["official_gate_reason"] = "TRUTH_GATE_RESOLVED"
         row["bet_status"] = decision.bet_status
         row["reason"] = "TRUTH_GATE_RESOLVED"
         row["truth_gate"] = {
@@ -195,9 +219,11 @@ def run_football_props_ready(
         if decision.bet_status == "OFFICIAL_BET":
             official_bets += 1
 
+    report["summary"]["model_candidate_rows"] = candidate_rows
     report["summary"]["evidence_ready_rows"] = ready_rows
     report["summary"]["evidence_blocked_rows"] = len(report["results"]) - ready_rows
     report["summary"]["certified_rows"] = certified_rows
+    report["summary"]["official_gate_blocked_rows"] = official_gate_blocked_rows
     report["summary"]["truth_gate_rows"] = truth_gate_rows
     report["summary"]["official_bets"] = official_bets
     report["evidence_resolution"] = {
