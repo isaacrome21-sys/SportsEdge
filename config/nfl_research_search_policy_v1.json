@@ -18,5 +18,11 @@
   ],
   "training_seasons_for_2019_development": "2010-2018",
   "holdout_order": "train_2010_2018_then_validate_2019",
-  "enforcement": "fitter_excludes_games_after_selected_holdout_season"
+  "enforcement": "fitter_excludes_games_after_selected_holdout_season",
+  "control_calibration": {
+    "feature_set": "baseline",
+    "holdout_season": 2019,
+    "counts_against_feature_search_budget": false,
+    "reason": "same-season control required to interpret Attempt 1"
+  }
 }
