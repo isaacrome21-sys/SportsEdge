@@ -202,12 +202,16 @@ def main():
                 spread_pred=np.array([g["spread_line"] if g.get("spread_line") is not None else np.nan for g in keyed])
                 total_pred=np.array([g["total_line"] if g.get("total_line") is not None else np.nan for g in keyed])
                 for label,pred,yv in (("margin",spread_pred,ym),("total",total_pred,yt)):
-                    ok=is_hold & np.isfinite(pred)
-                    actual=yv[ok]; estimate=pred[ok]
-                    benchmark={"n_holdout":int(ok.sum()),"rmse":float(np.sqrt(np.mean((estimate-actual)**2))),"source_field":"spread_line" if label=="margin" else "total_line","comparison":"MODEL_VS_CLOSING_LINE_REPORTED_ONLY"}
+                    hold_market=pred[is_hold]
+                    hold_actual=yv[is_hold]
+                    model_pred=np.asarray(reports[sport]["targets"][label]["holdout_predictions"])
+                    if len(model_pred) != len(hold_market):
+                        raise RuntimeError(f"BENCHMARK_ALIGNMENT_FAILED:{label}:model={len(model_pred)}:holdout={len(hold_market)}")
+                    valid=np.isfinite(hold_market)
+                    actual=hold_actual[valid]; estimate=hold_market[valid]; model_pred=model_pred[valid]
+                    benchmark={"n_holdout":int(valid.sum()),"rmse":float(np.sqrt(np.mean((estimate-actual)**2))),"source_field":"spread_line" if label=="margin" else "total_line","comparison":"MODEL_VS_CLOSING_LINE_REPORTED_ONLY"}
                     if label=="margin":
                         benchmark["spread_line_home_margin_correlation"]=float(np.corrcoef(estimate,actual)[0,1])
-                    model_pred=np.asarray(reports[sport]["targets"][label]["holdout_predictions"])[ok]
                     benchmark["paired_rmse_bootstrap"]=bootstrap_rmse_delta(model_pred,estimate,actual)
                     reports[sport].setdefault("closing_line_benchmark",{})[label]=benchmark
     out=Path(args.out); out.parent.mkdir(parents=True,exist_ok=True); out.write_text(json.dumps({"schema":"FOOTBALL_BASELINES_V1","reports":reports},indent=2)+"\n"); print(json.dumps(reports,indent=2)); return 0
