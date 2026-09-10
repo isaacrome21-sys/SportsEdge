@@ -6,6 +6,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: sportsedge-paid-odds-api
+  cancel-in-progress: false
+
 jobs:
   capture-verify:
     runs-on: ubuntu-24.04
@@ -106,25 +110,30 @@ jobs:
           set -euo pipefail
           manifest="artifacts/mlb-provider-freeze/$CAPTURE_ID/manifest.json"
           key_names=(SPORTSEDGE_ODDS_API_KEY SPORTSEDGE_ODDS_API_KEY_2 SPORTSEDGE_ODDS_API_KEY_3 SPORTSEDGE_ODDS_API_KEY_4)
-          captured=0
+          selected_key=''
+          selected_slot=0
           slot=0
           for key_name in "${key_names[@]}"; do
             slot=$((slot + 1))
             key="${!key_name:-}"
-            [[ -z "$key" ]] && continue
-            if ODDS_API_KEY="$key" python scripts/capture_mlb_odds_api_freeze.py \
-              --private-root .private/mlb-evidence \
-              --capture-id "$CAPTURE_ID" \
-              --manifest-out "$manifest"; then
-              captured=1
-              echo "selected_key_slot=$slot" >> "$GITHUB_OUTPUT"
+            if [[ -n "$key" ]]; then
+              selected_key="$key"
+              selected_slot="$slot"
               break
             fi
           done
-          if [[ "$captured" != 1 ]]; then
-            echo 'MLB_AUTHENTIC_PROVIDER_CAPTURE_FAILED' >&2
+          if [[ -z "$selected_key" ]]; then
+            echo 'ODDS_FREEZE_API_KEY_MISSING' >&2
             exit 1
           fi
+          if ! ODDS_API_KEY="$selected_key" python scripts/capture_mlb_odds_api_freeze.py \
+            --private-root .private/mlb-evidence \
+            --capture-id "$CAPTURE_ID" \
+            --manifest-out "$manifest"; then
+            echo 'MLB_AUTHENTIC_PROVIDER_CAPTURE_FAILED_TERMINAL_NO_KEY_ROTATION' >&2
+            exit 1
+          fi
+          echo "selected_key_slot=$selected_slot" >> "$GITHUB_OUTPUT"
 
       - name: Verify every captured raw byte against public manifest
         shell: bash
