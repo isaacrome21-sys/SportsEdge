@@ -12,7 +12,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: football-nfl-forward-clv-collection
+  group: sportsedge-paid-odds-api
   cancel-in-progress: false
 
 jobs:
