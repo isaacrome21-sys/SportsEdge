@@ -104,3 +104,15 @@ Status: DONE for the attempt; FAILS_BAR for both NFL targets.
 - Total: model RMSE 14.3425 versus closing total RMSE 13.6744; delta +0.6681; paired-bootstrap 95% CI [+0.4239, +0.9050].
 - Decision: line-play features did not clear the frozen criterion. No artifact freeze, eligibility change, or Model_P promotion. Attempt 5 is consumed; next registered NFL family is weather and venue.
 - Evidence: report artifact digest `sha256:17285166fe8719834e6a38abe916c8d165327d468f2c1ef57a3f41fce0355c06`.
+
+
+## NFL Attempt 6 result (run 34490950906)
+
+Status: DONE for the attempt; FAILS_BAR for both NFL targets.
+
+- Feature family: pregame temperature, wind, dome, and field-surface features added to the rolling baseline.
+- Window: train 2010-2016; validate 2017-2019; 779 games with closing lines.
+- Margin: model-minus-close RMSE delta +0.6647; paired-bootstrap 95% CI [+0.3987, +0.9297]. Close-game R² was -0.7119 versus the mean.
+- Total: model-minus-close RMSE delta +0.3504; paired-bootstrap 95% CI [+0.1224, +0.5707].
+- Decision: weather and venue did not clear the frozen criterion. No artifact freeze, eligibility change, or Model_P promotion. Attempt 6 is consumed; next registered NFL family is success and explosive rates.
+- Evidence: report artifact digest `sha256:0a0a14fb8fd3f4596a869efe7056e9e4f817d6732bb5767e40a1e67d117bc046`.
