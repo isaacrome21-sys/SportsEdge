@@ -24,7 +24,10 @@ SECRET_RE = re.compile(
 
 
 def _uses_paid_secret(value: Any) -> bool:
-    return bool(SECRET_RE.search(json.dumps(value, sort_keys=True, default=str)))
+    # PyYAML 6 still applies YAML 1.1 scalar rules and can decode keys such as
+    # ``on`` as booleans. Do not sort mapping keys here: mixed bool/string keys
+    # are valid parser output and their order is irrelevant to secret detection.
+    return bool(SECRET_RE.search(json.dumps(value, default=str)))
 
 
 def _lock_ok(value: Any) -> bool:
