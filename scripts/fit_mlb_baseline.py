@@ -10,12 +10,16 @@ Deliberate properties:
     for market readout, not for fitting a score model, so none are used here.
   * Point-in-time by construction. Every feature for a game is built only from
     games that finished strictly before that game's date.
+  * StatsAPI can list one final gamePk on multiple schedule dates after a
+    reschedule/resumption. Identical duplicate outcomes are conservatively
+    assigned to the latest listed date so a final score is never pulled backward;
+    conflicting duplicate rows fail closed.
   * The sacred holdout is carved before fitting or alpha selection and is used
     only for final research diagnostics.
   * Ridge alpha is cross-validated on the training fold only. It is not assumed.
   * A shuffled-label placebo runs before the real evaluation is reported.
-  * The report hashes the exact final-game source rows and exact usable model
-    rows so a result cannot be mistaken for evidence from a different input set.
+  * The report hashes the exact raw source rows, normalized rows, and exact
+    usable model rows so a result cannot be mistaken for another input set.
 
 It promotes nothing. It writes a JSON report and exits.
 """
@@ -49,6 +53,62 @@ def _canonical_sha256(value: Any) -> str:
         allow_nan=False,
     ).encode("utf-8")
     return hashlib.sha256(raw).hexdigest()
+
+
+def _normalize_schedule_duplicates(
+    raw_games: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Collapse duplicate gamePk rows without moving outcomes earlier in time.
+
+    StatsAPI season schedule responses can expose the same final gamePk on an
+    original and later rescheduled/resumed date. We permit normalization only
+    when teams and final scores are identical. The latest listed date is the
+    conservative chronology: it may delay information, but cannot introduce a
+    final score before the last date on which the source associates the game.
+    """
+    grouped: dict[int, list[dict[str, Any]]] = defaultdict(list)
+    for row in raw_games:
+        grouped[int(row["game_pk"])].append(row)
+
+    normalized: list[dict[str, Any]] = []
+    duplicate_game_pks = 0
+    duplicate_rows_removed = 0
+    examples: list[dict[str, Any]] = []
+    for game_pk, rows in sorted(grouped.items()):
+        signatures = {
+            (
+                int(row["home_id"]),
+                int(row["away_id"]),
+                int(row["home_score"]),
+                int(row["away_score"]),
+            )
+            for row in rows
+        }
+        if len(signatures) != 1:
+            raise ValueError(
+                "STATSAPI_DUPLICATE_GAME_PK_CONFLICT:"
+                + json.dumps({"game_pk": game_pk, "rows": rows}, sort_keys=True)
+            )
+        chosen = max(rows, key=lambda row: str(row["date"]))
+        normalized.append(dict(chosen))
+        if len(rows) > 1:
+            duplicate_game_pks += 1
+            duplicate_rows_removed += len(rows) - 1
+            if len(examples) < 25:
+                examples.append({
+                    "game_pk": game_pk,
+                    "listed_dates": sorted(str(row["date"]) for row in rows),
+                    "chosen_date": str(chosen["date"]),
+                })
+
+    normalized.sort(key=lambda row: (str(row["date"]), int(row["game_pk"])))
+    return normalized, {
+        "rule": "IDENTICAL_OUTCOME_DUPLICATE_GAME_PK_USE_LATEST_LISTED_DATE_V1",
+        "duplicate_game_pk_count": duplicate_game_pks,
+        "duplicate_rows_removed": duplicate_rows_removed,
+        "conflicting_duplicates_allowed": False,
+        "examples": examples,
+    }
 
 
 # --------------------------------------------------------------------------
@@ -259,27 +319,25 @@ def main() -> int:
         rows = fetch_season(yr)
         per_season[yr] = len(rows)
         games.extend(rows)
-        print(f"  {yr}: {len(rows)} final games", flush=True)
+        print(f"  {yr}: {len(rows)} final rows", flush=True)
     if not games:
         print("NO DATA RETURNED", file=sys.stderr)
         return 2
 
-    canonical_games = sorted(games, key=lambda r: (r["date"], int(r["game_pk"])))
-    grouped_by_pk: dict[int, list[dict[str, Any]]] = defaultdict(list)
-    for row in canonical_games:
-        grouped_by_pk[int(row["game_pk"])].append(row)
-    duplicate_rows = {pk: rows for pk, rows in grouped_by_pk.items() if len(rows) > 1}
-    if duplicate_rows:
-        diagnostic = {
-            "duplicate_game_pk_count": len(duplicate_rows),
-            "duplicates": [
-                {"game_pk": pk, "rows": rows}
-                for pk, rows in sorted(duplicate_rows.items())
-            ],
-        }
-        print("duplicate game_pk in StatsAPI source rows", file=sys.stderr)
-        print(json.dumps(diagnostic, sort_keys=True), file=sys.stderr)
+    raw_games = sorted(games, key=lambda row: (str(row["date"]), int(row["game_pk"])))
+    raw_source_rows_sha = _canonical_sha256(raw_games)
+    try:
+        canonical_games, duplicate_normalization = _normalize_schedule_duplicates(raw_games)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
         return 2
+    normalized_source_rows_sha = _canonical_sha256(canonical_games)
+    print(
+        "normalized StatsAPI rows: "
+        f"{len(raw_games)} raw -> {len(canonical_games)} unique gamePk; "
+        f"duplicates={duplicate_normalization['duplicate_game_pk_count']}",
+        flush=True,
+    )
 
     X, y_margin, y_total, names, dates, game_pks = build_rows(canonical_games)
     print(f"usable rows: {len(X)} (min {MIN_PRIOR} prior games per team)", flush=True)
@@ -293,13 +351,12 @@ def main() -> int:
     model_rows = _model_rows(X, y_margin, y_total, dates, game_pks)
     train_rows = [row for row, flag in zip(model_rows, is_hold) if not bool(flag)]
     holdout_rows = [row for row, flag in zip(model_rows, is_hold) if bool(flag)]
-    source_rows_sha = _canonical_sha256(canonical_games)
     model_rows_sha = _canonical_sha256(model_rows)
     train_rows_sha = _canonical_sha256(train_rows)
     holdout_rows_sha = _canonical_sha256(holdout_rows)
 
     holdout_def = {
-        "rule": f"all rows with date starting {hold}",
+        "rule": f"all normalized model rows with date starting {hold}",
         "n_holdout": int(is_hold.sum()),
         "n_train": int((~is_hold).sum()),
         "row_identity_sha256": _canonical_sha256([
@@ -316,8 +373,11 @@ def main() -> int:
         "feature_names": names,
         "input_provenance": {
             "canonicalization": "CANONICAL_JSON_SORT_KEYS_COMPACT_UTF8_V1",
-            "source_final_game_count": len(canonical_games),
-            "source_final_game_rows_sha256": source_rows_sha,
+            "raw_statsapi_final_row_count": len(raw_games),
+            "raw_statsapi_final_rows_sha256": raw_source_rows_sha,
+            "normalized_unique_game_count": len(canonical_games),
+            "normalized_unique_games_sha256": normalized_source_rows_sha,
+            "duplicate_normalization": duplicate_normalization,
             "usable_model_row_count": len(model_rows),
             "usable_model_rows_sha256": model_rows_sha,
             "train_model_rows_sha256": train_rows_sha,
@@ -372,7 +432,8 @@ def main() -> int:
     out.write_text(json.dumps(report, indent=2) + "\n")
 
     print("\n" + "=" * 60)
-    print(f"source rows sha256: {source_rows_sha}")
+    print(f"raw source rows sha256: {raw_source_rows_sha}")
+    print(f"normalized rows sha256: {normalized_source_rows_sha}")
     print(f"usable rows sha256: {model_rows_sha}")
     for label, r in report["targets"].items():
         print(f"\n{label.upper()}  alpha={r['cv_selected_alpha']} (config assumed 10.0)")
