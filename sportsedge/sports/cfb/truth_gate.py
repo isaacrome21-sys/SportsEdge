@@ -1,65 +1,47 @@
-"""CFB-specific promotion evidence gate.
+"""Fail-closed CFB Truth Gate bound to the frozen CFB policy bytes.
 
-This gate evaluates already-produced, artifact-bound evidence.  It never creates
-Model_P, never derives evidence from market prices, and never mutates deployment
-eligibility.  Missing or malformed evidence fails closed.
+This module evaluates evidence; it never creates Model_P, never converts market
+prices into model probabilities, and never mutates deployment eligibility.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import sha256
+import json
 from math import isfinite
+from pathlib import Path
 from typing import Any, Mapping
 
 CFB_TRUTH_GATE_ID = "CFB_TRUTH_GATE_V1"
-CFB_MIN_PROMOTED_ROWS = 200
-CFB_MAX_ECE = 0.025
-CFB_CALIBRATION_SLOPE_MIN = 0.90
-CFB_CALIBRATION_SLOPE_MAX = 1.10
-CFB_MAX_ABS_CALIBRATION_INTERCEPT = 0.03
-CFB_MIN_CLV = 0.005
-CFB_MIN_AFTER_VIG_ROI = 0.02
-CFB_MIN_EDGE = 0.03
+CFB_TRUTH_GATE_POLICY_PATH = Path("config/cfb_truth_gate_v1.json")
+CFB_TRUTH_GATE_POLICY_SHA256 = "9174bafd1e134cc30f3ac4afaf95692de15946617b9e69b545dfd264ab271702"
 
 
 class CFBTruthGateError(ValueError):
-    """Raised when evidence cannot be evaluated safely."""
+    """Raised when policy or evidence cannot be evaluated safely."""
 
 
 @dataclass(frozen=True)
 class CFBTruthGateResult:
     gate_id: str
+    policy_sha256: str
+    market: str
     status: str
     passes: bool
     failures: tuple[str, ...]
-    evidence_rows: int
-    calibration_slope: float
-    calibration_intercept: float
-    ece: float
-    mean_clv: float
-    after_vig_roi: float
+    metrics: tuple[tuple[str, float | int], ...]
+    diagnostics: tuple[tuple[str, float | int], ...]
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "gate_id": self.gate_id,
+            "policy_sha256": self.policy_sha256,
+            "market": self.market,
             "status": self.status,
             "passes": self.passes,
             "failures": list(self.failures),
-            "evidence_rows": self.evidence_rows,
-            "calibration_slope": self.calibration_slope,
-            "calibration_intercept": self.calibration_intercept,
-            "ece": self.ece,
-            "mean_clv": self.mean_clv,
-            "after_vig_roi": self.after_vig_roi,
-            "thresholds": {
-                "minimum_rows": CFB_MIN_PROMOTED_ROWS,
-                "maximum_ece": CFB_MAX_ECE,
-                "calibration_slope_min": CFB_CALIBRATION_SLOPE_MIN,
-                "calibration_slope_max": CFB_CALIBRATION_SLOPE_MAX,
-                "maximum_absolute_calibration_intercept": CFB_MAX_ABS_CALIBRATION_INTERCEPT,
-                "minimum_clv": CFB_MIN_CLV,
-                "minimum_after_vig_roi": CFB_MIN_AFTER_VIG_ROI,
-                "minimum_live_edge": CFB_MIN_EDGE,
-            },
+            "metrics": dict(self.metrics),
+            "diagnostics": dict(self.diagnostics),
             "governance": {
                 "eligible_changed": False,
                 "model_p_created": False,
@@ -69,125 +51,189 @@ class CFBTruthGateResult:
         }
 
 
-def _required_bool(evidence: Mapping[str, Any], field: str) -> bool:
-    value = evidence.get(field)
-    if type(value) is not bool:
-        raise CFBTruthGateError(f"CFB_TRUTH_GATE_BOOLEAN_REQUIRED:{field}")
-    return value
+class CFBTruthGate:
+    """Evaluator for the immutable CFB_TRUTH_GATE_V1 judge."""
+
+    EXPECTED_MARKETS = frozenset({"MONEYLINE", "SPREAD", "TOTAL"})
+
+    def __init__(self, policy_path: str | Path = CFB_TRUTH_GATE_POLICY_PATH):
+        path = Path(policy_path)
+        try:
+            raw = path.read_bytes()
+        except OSError as exc:
+            raise CFBTruthGateError(f"CFB_TRUTH_GATE_POLICY_UNREADABLE:{path}") from exc
+        digest = sha256(raw).hexdigest()
+        if digest != CFB_TRUTH_GATE_POLICY_SHA256:
+            raise CFBTruthGateError(
+                f"CFB_TRUTH_GATE_POLICY_SHA256_MISMATCH:expected={CFB_TRUTH_GATE_POLICY_SHA256}:actual={digest}"
+            )
+        try:
+            policy = json.loads(raw)
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            raise CFBTruthGateError("CFB_TRUTH_GATE_POLICY_JSON_INVALID") from exc
+        if not isinstance(policy, dict) or policy.get("policy_id") != CFB_TRUTH_GATE_ID:
+            raise CFBTruthGateError("CFB_TRUTH_GATE_POLICY_ID_INVALID")
+        markets = policy.get("markets")
+        if not isinstance(markets, list) or frozenset(str(x).upper() for x in markets) != self.EXPECTED_MARKETS:
+            raise CFBTruthGateError("CFB_TRUTH_GATE_MARKET_SURFACE_INVALID")
+        gates = policy.get("hard_gates")
+        if not isinstance(gates, dict):
+            raise CFBTruthGateError("CFB_TRUTH_GATE_HARD_GATES_MISSING")
+        self.policy = policy
+        self.gates = gates
+        self.policy_sha256 = digest
+
+    @staticmethod
+    def _bool(evidence: Mapping[str, Any], field: str) -> bool:
+        value = evidence.get(field)
+        if type(value) is not bool:
+            raise CFBTruthGateError(f"CFB_TRUTH_GATE_BOOLEAN_REQUIRED:{field}")
+        return value
+
+    @staticmethod
+    def _int(evidence: Mapping[str, Any], field: str) -> int:
+        value = evidence.get(field)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise CFBTruthGateError(f"CFB_TRUTH_GATE_NONNEGATIVE_INTEGER_REQUIRED:{field}")
+        return value
+
+    @staticmethod
+    def _float(evidence: Mapping[str, Any], field: str) -> float:
+        value = evidence.get(field)
+        if isinstance(value, bool):
+            raise CFBTruthGateError(f"CFB_TRUTH_GATE_NUMBER_REQUIRED:{field}")
+        try:
+            number = float(value)
+        except (TypeError, ValueError) as exc:
+            raise CFBTruthGateError(f"CFB_TRUTH_GATE_NUMBER_REQUIRED:{field}") from exc
+        if not isfinite(number):
+            raise CFBTruthGateError(f"CFB_TRUTH_GATE_FINITE_REQUIRED:{field}")
+        return number
+
+    @staticmethod
+    def _digest(evidence: Mapping[str, Any], field: str) -> str:
+        value = evidence.get(field)
+        if not isinstance(value, str) or len(value) != 64:
+            raise CFBTruthGateError(f"CFB_TRUTH_GATE_SHA256_REQUIRED:{field}")
+        try:
+            int(value, 16)
+        except ValueError as exc:
+            raise CFBTruthGateError(f"CFB_TRUTH_GATE_SHA256_REQUIRED:{field}") from exc
+        return value.lower()
+
+    def evaluate(self, evidence: Mapping[str, Any]) -> CFBTruthGateResult:
+        if not isinstance(evidence, Mapping):
+            raise CFBTruthGateError("CFB_TRUTH_GATE_MAPPING_REQUIRED")
+        market = str(evidence.get("market") or "").strip().upper()
+        if market not in self.EXPECTED_MARKETS:
+            raise CFBTruthGateError("CFB_TRUTH_GATE_MARKET_INVALID")
+        if str(evidence.get("evidence_market") or "").strip().upper() != market:
+            raise CFBTruthGateError("CFB_TRUTH_GATE_EVIDENCE_MARKET_MISMATCH")
+        if evidence.get("evidence_policy_sha256") != self.policy_sha256:
+            raise CFBTruthGateError("CFB_TRUTH_GATE_POLICY_SHA256_EVIDENCE_MISMATCH")
+
+        pit = self._bool(evidence, "pit_reproducible")
+        paired_prices = self._bool(evidence, "paired_historical_price_evidence_complete")
+        recent_ok = self._bool(evidence, "recent_two_season_ok")
+        model_bound = self._bool(evidence, "model_artifact_bound")
+        source_bound = self._bool(evidence, "source_evidence_bound")
+        settlement_complete = self._bool(evidence, "settlement_evidence_complete")
+        self._digest(evidence, "model_artifact_sha256")
+        self._digest(evidence, "source_manifest_sha256")
+        self._digest(evidence, "validation_report_sha256")
+        self._digest(evidence, "market_evidence_sha256")
+
+        metrics: dict[str, float | int] = {
+            "leakage_violations": self._int(evidence, "leakage_violations"),
+            "n_forward_seasons": self._int(evidence, "n_forward_seasons"),
+            "n_promoted": self._int(evidence, "n_promoted"),
+            "brier_model": self._float(evidence, "brier_model"),
+            "brier_market": self._float(evidence, "brier_market"),
+            "logloss_model": self._float(evidence, "logloss_model"),
+            "logloss_market": self._float(evidence, "logloss_market"),
+            "season_fold_scoring_win_rate": self._float(evidence, "season_fold_scoring_win_rate"),
+            "mean_novig_clv": self._float(evidence, "mean_novig_clv"),
+            "clv_t_stat": self._float(evidence, "clv_t_stat"),
+            "roi_after_vig": self._float(evidence, "roi_after_vig"),
+            "calibration_slope": self._float(evidence, "calibration_slope"),
+            "calibration_intercept": self._float(evidence, "calibration_intercept"),
+            "ece": self._float(evidence, "ece"),
+        }
+        g = self.gates
+        failures: list[str] = []
+        if g["pit_reproducibility_required"] and not pit:
+            failures.append("PIT_REPRODUCIBILITY_FAILED")
+        if metrics["leakage_violations"] > g["max_leakage_violations"]:
+            failures.append("LEAKAGE_VIOLATIONS_EXCEEDED")
+        if metrics["n_forward_seasons"] < g["min_forward_seasons"]:
+            failures.append("FORWARD_SEASONS_BELOW_FLOOR")
+        if g["brier_must_beat_market"] and metrics["brier_model"] >= metrics["brier_market"]:
+            failures.append("BRIER_DOES_NOT_BEAT_MARKET")
+        if g["logloss_must_beat_market"] and metrics["logloss_model"] >= metrics["logloss_market"]:
+            failures.append("LOGLOSS_DOES_NOT_BEAT_MARKET")
+        fold_rate = float(metrics["season_fold_scoring_win_rate"])
+        if not 0.0 <= fold_rate <= 1.0 or fold_rate < g["min_season_fold_scoring_win_rate"]:
+            failures.append("SEASON_FOLD_SCORING_WIN_RATE_BELOW_FLOOR")
+        if metrics["mean_novig_clv"] < g["min_mean_novig_clv"]:
+            failures.append("MEAN_NOVIG_CLV_BELOW_FLOOR")
+        if metrics["clv_t_stat"] < g["min_clv_t_stat"]:
+            failures.append("CLV_T_STAT_BELOW_FLOOR")
+        # Frozen judge requires positive after-vig ROI; 2% is a target diagnostic,
+        # not the hard minimum. Preserve that distinction exactly.
+        if metrics["roi_after_vig"] <= g["min_roi_after_vig"]:
+            failures.append("ROI_AFTER_VIG_NOT_POSITIVE")
+        if not g["calibration_slope_min"] <= metrics["calibration_slope"] <= g["calibration_slope_max"]:
+            failures.append("CALIBRATION_SLOPE_OUT_OF_RANGE")
+        if abs(float(metrics["calibration_intercept"])) > g["calibration_intercept_abs_max"]:
+            failures.append("CALIBRATION_INTERCEPT_OUT_OF_RANGE")
+        ece = float(metrics["ece"])
+        if not 0.0 <= ece <= g["max_ece"]:
+            failures.append("ECE_ABOVE_MAX")
+        if metrics["n_promoted"] < g["min_promoted_sample_absolute"]:
+            failures.append("PROMOTED_SAMPLE_BELOW_ABSOLUTE_FLOOR")
+        if not recent_ok and not g["recent_two_season_deterioration_allowed"]:
+            failures.append("RECENT_TWO_SEASON_DETERIORATION")
+        if g["require_paired_historical_price_evidence"] and not paired_prices:
+            failures.append("PAIRED_HISTORICAL_PRICE_EVIDENCE_REQUIRED")
+        if not model_bound:
+            failures.append("MODEL_ARTIFACT_UNBOUND")
+        if not source_bound:
+            failures.append("SOURCE_EVIDENCE_UNBOUND")
+        if not settlement_complete:
+            failures.append("SETTLEMENT_EVIDENCE_INCOMPLETE")
+
+        diagnostics = {
+            "target_forward_seasons": int(g["target_forward_seasons"]),
+            "preferred_promoted_sample": int(g["preferred_promoted_sample"]),
+            "target_roi_after_vig": float(g["target_roi_after_vig"]),
+            "edge_floor": float(g["edge_floor"]),
+        }
+        return CFBTruthGateResult(
+            gate_id=CFB_TRUTH_GATE_ID,
+            policy_sha256=self.policy_sha256,
+            market=market,
+            status="PASS" if not failures else "BLOCKED",
+            passes=not failures,
+            failures=tuple(failures),
+            metrics=tuple(sorted(metrics.items())),
+            diagnostics=tuple(sorted(diagnostics.items())),
+        )
 
 
-def _required_int(evidence: Mapping[str, Any], field: str) -> int:
-    value = evidence.get(field)
-    if isinstance(value, bool) or not isinstance(value, int):
-        raise CFBTruthGateError(f"CFB_TRUTH_GATE_INTEGER_REQUIRED:{field}")
-    if value < 0:
-        raise CFBTruthGateError(f"CFB_TRUTH_GATE_NONNEGATIVE_REQUIRED:{field}")
-    return value
+def evaluate_cfb_truth_gate(evidence: Mapping[str, Any], *, policy_path: str | Path = CFB_TRUTH_GATE_POLICY_PATH) -> CFBTruthGateResult:
+    return CFBTruthGate(policy_path).evaluate(evidence)
 
 
-def _required_float(evidence: Mapping[str, Any], field: str) -> float:
-    value = evidence.get(field)
-    if isinstance(value, bool):
-        raise CFBTruthGateError(f"CFB_TRUTH_GATE_NUMBER_REQUIRED:{field}")
-    try:
-        number = float(value)
-    except (TypeError, ValueError) as exc:
-        raise CFBTruthGateError(f"CFB_TRUTH_GATE_NUMBER_REQUIRED:{field}") from exc
-    if not isfinite(number):
-        raise CFBTruthGateError(f"CFB_TRUTH_GATE_FINITE_REQUIRED:{field}")
-    return number
-
-
-def _required_digest(evidence: Mapping[str, Any], field: str) -> str:
-    value = evidence.get(field)
-    if not isinstance(value, str) or len(value) != 64:
-        raise CFBTruthGateError(f"CFB_TRUTH_GATE_SHA256_REQUIRED:{field}")
-    try:
-        int(value, 16)
-    except ValueError as exc:
-        raise CFBTruthGateError(f"CFB_TRUTH_GATE_SHA256_REQUIRED:{field}") from exc
-    return value.lower()
-
-
-def evaluate_cfb_truth_gate(evidence: Mapping[str, Any]) -> CFBTruthGateResult:
-    """Evaluate frozen CFB evidence without creating or promoting evidence.
-
-    Required booleans force the caller to prove PIT holdout discipline, exact
-    model/evidence binding, and paired market settlement evidence.  The SHA fields
-    make accidental use of detached summary metrics fail closed.
-    """
-    if not isinstance(evidence, Mapping):
-        raise CFBTruthGateError("CFB_TRUTH_GATE_MAPPING_REQUIRED")
-
-    pit_holdout_valid = _required_bool(evidence, "pit_holdout_valid")
-    temporal_leakage_check_passed = _required_bool(evidence, "temporal_leakage_check_passed")
-    model_artifact_bound = _required_bool(evidence, "model_artifact_bound")
-    source_evidence_bound = _required_bool(evidence, "source_evidence_bound")
-    paired_market_evidence_bound = _required_bool(evidence, "paired_market_evidence_bound")
-    settlement_evidence_complete = _required_bool(evidence, "settlement_evidence_complete")
-
-    _required_digest(evidence, "model_artifact_sha256")
-    _required_digest(evidence, "source_manifest_sha256")
-    _required_digest(evidence, "validation_report_sha256")
-    _required_digest(evidence, "market_evidence_sha256")
-
-    rows = _required_int(evidence, "evidence_rows")
-    slope = _required_float(evidence, "calibration_slope")
-    intercept = _required_float(evidence, "calibration_intercept")
-    ece = _required_float(evidence, "ece")
-    clv = _required_float(evidence, "mean_clv")
-    roi = _required_float(evidence, "after_vig_roi")
-
-    failures: list[str] = []
-    if not pit_holdout_valid:
-        failures.append("PIT_HOLDOUT_INVALID")
-    if not temporal_leakage_check_passed:
-        failures.append("TEMPORAL_LEAKAGE_CHECK_FAILED")
-    if not model_artifact_bound:
-        failures.append("MODEL_ARTIFACT_UNBOUND")
-    if not source_evidence_bound:
-        failures.append("SOURCE_EVIDENCE_UNBOUND")
-    if not paired_market_evidence_bound:
-        failures.append("PAIRED_MARKET_EVIDENCE_UNBOUND")
-    if not settlement_evidence_complete:
-        failures.append("SETTLEMENT_EVIDENCE_INCOMPLETE")
-    if rows < CFB_MIN_PROMOTED_ROWS:
-        failures.append("SAMPLE_DEPTH_BELOW_MINIMUM")
-    if not (CFB_CALIBRATION_SLOPE_MIN <= slope <= CFB_CALIBRATION_SLOPE_MAX):
-        failures.append("CALIBRATION_SLOPE_OUT_OF_RANGE")
-    if abs(intercept) > CFB_MAX_ABS_CALIBRATION_INTERCEPT:
-        failures.append("CALIBRATION_INTERCEPT_OUT_OF_RANGE")
-    if ece > CFB_MAX_ECE or ece < 0.0:
-        failures.append("ECE_OUT_OF_RANGE")
-    if clv < CFB_MIN_CLV:
-        failures.append("CLV_BELOW_MINIMUM")
-    if roi < CFB_MIN_AFTER_VIG_ROI:
-        failures.append("AFTER_VIG_ROI_BELOW_MINIMUM")
-
-    return CFBTruthGateResult(
-        gate_id=CFB_TRUTH_GATE_ID,
-        status="PASS" if not failures else "BLOCKED",
-        passes=not failures,
-        failures=tuple(failures),
-        evidence_rows=rows,
-        calibration_slope=slope,
-        calibration_intercept=intercept,
-        ece=ece,
-        mean_clv=clv,
-        after_vig_roi=roi,
-    )
-
-
-def cfb_candidate_meets_edge_floor(*, model_probability: float, no_vig_market_probability: float) -> bool:
-    """Apply the frozen live candidate edge floor after Model_P exists.
-
-    This is deliberately separate from historical model promotion.  It cannot
-    rescue a blocked model and must never be used to synthesize Model_P.
-    """
+def cfb_candidate_meets_edge_floor(*, model_probability: float, no_vig_market_probability: float, live_two_sided_quote: bool = True, data_fresh: bool = True, exposure_limits_ok: bool = True) -> bool:
+    """Apply the frozen 3% live edge gate after the historical market gate passes."""
+    if type(live_two_sided_quote) is not bool or type(data_fresh) is not bool or type(exposure_limits_ok) is not bool:
+        raise CFBTruthGateError("CFB_LIVE_GUARD_BOOLEAN_REQUIRED")
+    if not (live_two_sided_quote and data_fresh and exposure_limits_ok):
+        return False
     model_p = float(model_probability)
     market_p = float(no_vig_market_probability)
     if not (isfinite(model_p) and isfinite(market_p)):
         raise CFBTruthGateError("CFB_EDGE_FINITE_PROBABILITIES_REQUIRED")
     if not (0.0 <= model_p <= 1.0 and 0.0 <= market_p <= 1.0):
         raise CFBTruthGateError("CFB_EDGE_PROBABILITY_RANGE_INVALID")
-    return model_p - market_p >= CFB_MIN_EDGE
+    return model_p - market_p >= float(CFBTruthGate().gates["edge_floor"])
