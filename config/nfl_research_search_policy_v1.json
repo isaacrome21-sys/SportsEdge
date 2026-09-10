@@ -1,0 +1,19 @@
+{
+  "schema": "NFL_RESEARCH_SEARCH_POLICY_V1",
+  "status": "FROZEN_BEFORE_FEATURE_SEARCH",
+  "immediate_holdout_season": 2019,
+  "immediate_holdout_use": "feature_selection_validation_only",
+  "future_forward_holdout_season": 2026,
+  "future_forward_holdout_use": "final_forward_validation_after_feature_freeze",
+  "feature_search_attempt_budget": 10,
+  "attempt_counting_rule": "Every distinct feature specification evaluated against the 2019 holdout consumes one attempt, including failed or discarded candidates.",
+  "primary_metric": "closing_market_rmse",
+  "secondary_metric": "mean_baseline_rmse",
+  "placebo_null_shuffles": 200,
+  "placebo_scope": "training_cv_only_before_any_feature_evaluation",
+  "prohibitions": [
+    "Do not evaluate feature candidates against 2025.",
+    "Do not use 2026 before its season is complete and the feature set is frozen.",
+    "Do not promote or enable OFFICIAL betting from this research lane."
+  ]
+}
