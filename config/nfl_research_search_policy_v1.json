@@ -32,17 +32,11 @@
   "enforcement": "fitter_excludes_games_after_selected_holdout_season",
   "control_calibration": {
     "feature_set": "baseline",
-    "holdout_range": [
-      2017,
-      2019
-    ],
+    "holdout_range": [2017, 2019],
     "counts_against_feature_search_budget": false,
     "reason": "pre_registered_same_window_control"
   },
-  "immediate_holdout_range": [
-    2017,
-    2019
-  ],
+  "immediate_holdout_range": [2017, 2019],
   "redesign_before_attempt_2": true,
   "comparison_rule": "Do not compare metrics across holdout definitions; compare control versus candidate within the same window.",
   "other_sports": {
@@ -95,13 +89,7 @@
   "close_game_split_warning": "Selecting on the realized outcome shrinks target variance; close-game R2 values must not be interpreted as evidence of a pregame market segment.",
   "post_search_segment_policy": {
     "status": "NOT_RUN",
-    "segment_families": [
-      "closing_spread_bucket",
-      "closing_total_bucket",
-      "season_week_bucket",
-      "wind_bucket",
-      "roof_bucket"
-    ],
+    "segment_families": ["closing_spread_bucket", "closing_total_bucket", "season_week_bucket", "wind_bucket", "roof_bucket"],
     "multiple_comparison_correction": "Bonferroni across the full predeclared slice list",
     "interpretation": "Any positive slice is hypothesis-generating only and requires confirmation on untouched data.",
     "pregame_information_only": true
@@ -112,26 +100,8 @@
     "no_search_until_source_verified": true
   },
   "confirmation_set_audit": {
-    "touched_seasons": [
-      2010,
-      2011,
-      2012,
-      2013,
-      2014,
-      2015,
-      2016,
-      2017,
-      2018,
-      2019,
-      2021,
-      2022,
-      2023,
-      2024,
-      2025
-    ],
-    "diagnostic_only_seasons": [
-      2020
-    ],
+    "touched_seasons": [2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2021, 2022, 2023, 2024, 2025],
+    "diagnostic_only_seasons": [2020],
     "reserved_confirmation_season": 2026,
     "reason": "2021-2025 were used by the initial baseline; 2020 is retained only as an unusual-season diagnostic."
   },
@@ -143,10 +113,7 @@
       "decay": 0.85,
       "report_artifact_sha256": "sha256:9c95c0cbefc2f99f6dec37fda01f58d2fcac0ad6770de2c9311fbf5ce40ea996",
       "derivation_commit": "e2c07f484976f6e9f3d9b0a3c17099c2bb22cef7",
-      "training_years": [
-        2010,
-        2016
-      ],
+      "training_years": [2010, 2016],
       "selection_reason": "smallest combined 2017-2019 model-minus-close RMSE across margin and total among the ten attempts"
     },
     "season": 2026,
@@ -157,10 +124,7 @@
     "segment_families": [
       {
         "name": "operational_opener_absolute_spread",
-        "buckets": [
-          "<=7",
-          ">7"
-        ],
+        "buckets": ["<=7", ">7"],
         "count": 2,
         "pregame_definition": "absolute spread from the first fixed-time SportsEdge capture"
       }
@@ -170,13 +134,22 @@
     "timing_primary_metric": "model-directed opener-to-final-capture line movement",
     "timing_success_rule": "paired-bootstrap 95% CI lower bound for mean model-directed movement > 0, with no unrecorded or backfilled lines",
     "capture_protocol": {
-      "opener_time": "09:00 America/Chicago on each game date beginning Week 2",
-      "opener_definition": "first timestamped SportsEdge line capture at or after the fixed opener time; if absent, mark missing",
+      "opener_weekday": "Tuesday",
+      "opener_time": "09:00 America/Chicago on Tuesday for each target week beginning Week 2",
+      "opener_acceptance_window": "09:00:00 through 09:59:59 America/Chicago",
+      "opener_definition": "first successful timestamped SportsEdge DraftKings capture at or after the 09:00 target within the opener acceptance window; if absent, mark missing and do not backfill",
       "final_time": "30 minutes before scheduled kickoff in America/Chicago",
-      "final_definition": "timestamped SportsEdge line capture at the fixed pre-kick time",
+      "final_acceptance_window": "from 30 minutes before kickoff until 15 minutes before kickoff in America/Chicago",
+      "final_definition": "first successful timestamped SportsEdge DraftKings capture at or after the 30-minute-before-kickoff target within the final acceptance window; if absent, mark missing and do not backfill",
+      "first_successful_capture_at_or_after_target_counts": true,
+      "bookmaker": "draftkings",
+      "markets": ["spreads", "totals"],
+      "require_two_sided_prices": true,
       "no_backfill": true,
       "closing_line_benchmark_only": true,
-      "market_prices_as_model_features": false
+      "market_prices_as_model_features": false,
+      "capture_immutability": "At the first successful capture, hash-lock this policy, config/nfl_2026_capture.json, scripts/nfl_2026_line_capture.py, and .github/workflows/nfl-2026-line-capture.yml. Later mismatches remain captured with MISMATCH status and the run fails visibly.",
+      "policy_completion_note": "Operational opener weekday, acceptance windows, first-success semantics, DraftKings market scope, and two-sided-price requirement completed before any Week 2 capture file existed."
     },
     "confirmation_rule": "2026 is a one-time forward confirmation after the frozen candidate and capture protocol; do not change the model, segments, capture times, or thresholds after Week 2 capture begins.",
     "confirmation_outcome": "CLEARS_CONFIRMATION if the predeclared timing rule and any tested segment rules pass; otherwise FAILS_CONFIRMATION or INCONCLUSIVE_MISSING_CAPTURE."
