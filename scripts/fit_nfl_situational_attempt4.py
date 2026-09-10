@@ -39,7 +39,7 @@ def situational_features(games):
 
 def benchmark(report,games,keys,start,end,target):
     rows={(str(g["date"]),str(g["id"])):g for g in games}
-    selected=[rows[k] for d,k,_ in keys if start<=int(d[:4])<=end and (d,k) in rows]
+    selected=[rows[(d,k)] for d,k,_ in keys if start<=int(d[:4])<=end and (d,k) in rows]
     model=np.asarray(report["holdout_predictions"],float)
     if len(model)!=len(selected):
         raise RuntimeError(f"SITUATIONAL_BENCHMARK_ALIGNMENT_FAILED:{target}:model={len(model)}:rows={len(selected)}")
