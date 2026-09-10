@@ -1,15 +1,20 @@
-"""Deployment-aware SportsEdge runtime assembly."""
+"""Deployment-aware SportsEdge runtime assembly.
+
+Lightweight input helpers intentionally do not import model engines. Acquisition
+and quote-normalization code can use ``parse_timestamp`` without pulling NumPy or
+the production engine registry into the process.
+"""
 from __future__ import annotations
 
 from datetime import datetime, timezone
 from math import isfinite
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, TYPE_CHECKING
 
-from .deployments import load_registry
 from .edge_floors import DEFAULT_EDGE_FLOOR_CONFIG
-from .engine_registry import engine_registry
-from .orchestrator import RunResult, run_slate
+
+if TYPE_CHECKING:
+    from .orchestrator import RunResult
 
 
 class RuntimeInputError(ValueError):
@@ -32,6 +37,8 @@ def parse_timestamp(value: str) -> datetime:
 
 
 def runtime_deployments(path: str | Path = "config/deployments.json") -> dict[str, dict[str, Any]]:
+    from .deployments import load_registry
+
     reg = load_registry(path)
     return {market: {"market": market, **meta} for market, meta in reg["markets"].items()}
 
@@ -59,7 +66,17 @@ def _normalize_candidates(candidates: list[Any]) -> list[dict[str, Any]]:
     return normalized
 
 
-def run_payload(payload: Mapping[str, Any], *, registry_path: str | Path = "config/deployments.json", edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG) -> list[RunResult]:
+def run_payload(
+    payload: Mapping[str, Any],
+    *,
+    registry_path: str | Path = "config/deployments.json",
+    edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG,
+) -> list[RunResult]:
+    # Import production/model dependencies only when a model run is actually
+    # requested. Acquisition modules importing parse_timestamp remain stdlib-light.
+    from .engine_registry import engine_registry
+    from .orchestrator import run_slate
+
     if not isinstance(payload, Mapping):
         raise RuntimeInputError("payload must be an object")
     candidates = payload.get("candidates")
@@ -87,9 +104,12 @@ def run_payload(payload: Mapping[str, Any], *, registry_path: str | Path = "conf
 
     return run_slate(
         _normalize_candidates(candidates),
-        engines=engine_registry(), deployments=runtime_deployments(registry_path),
-        ingestion_now=ingestion_now, finalization_now=finalization_now,
-        edge_floor_config_path=edge_floor_config_path, kelly_multiplier=kelly_multiplier,
+        engines=engine_registry(),
+        deployments=runtime_deployments(registry_path),
+        ingestion_now=ingestion_now,
+        finalization_now=finalization_now,
+        edge_floor_config_path=edge_floor_config_path,
+        kelly_multiplier=kelly_multiplier,
     )
 
 
