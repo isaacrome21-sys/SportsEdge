@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from hashlib import sha256
 import json
 from pathlib import Path
+import tempfile
 import unittest
 
 from sportsedge.sports.cfb.historical_features import CFB_HISTORICAL_MATERIALIZER_VERSION
+from sportsedge.sports.cfb.joint_model import CFB_FEATURE_CONTRACT
 from sportsedge.sports.cfb.model_artifact import cfb_model_code_surface_sha256, load_cfb_model_artifact
+from sportsedge.sports.cfb.source_manifest import CFB_PIT_SOURCE_MANIFEST_SCHEMA
 from sportsedge.sports.cfb.training_artifact import (
     CFB_PIT_TRAINING_BUNDLE_SCHEMA,
     CFBTrainingArtifactError,
@@ -55,26 +59,85 @@ def _raw(payload: dict) -> bytes:
     return (json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n").encode()
 
 
+def _bound_source_evidence(root: Path) -> tuple[dict, bytes]:
+    feature_bytes = b"features"
+    label_bytes = b"labels"
+    (root / "features.json").write_bytes(feature_bytes)
+    (root / "labels.json").write_bytes(label_bytes)
+    manifest = {
+        "schema_version": CFB_PIT_SOURCE_MANIFEST_SCHEMA,
+        "generated_at_utc": "2026-01-15T11:00:00+00:00",
+        "fit_max_season": 2025,
+        "training_window": {"min_season": 2025, "max_season": 2025},
+        "materializer_version": CFB_HISTORICAL_MATERIALIZER_VERSION,
+        "feature_contract": CFB_FEATURE_CONTRACT,
+        "post_cutoff_information_excluded": True,
+        "market_data_used_as_model_feature": False,
+        "sources": [
+            {
+                "source_id": "features",
+                "role": "FEATURE_INPUT",
+                "provider": "fixture-provider",
+                "dataset": "fixture-features",
+                "locator": "fixture://features",
+                "snapshot_path": "features.json",
+                "retrieved_at_utc": "2026-01-15T10:00:00+00:00",
+                "content_sha256": sha256(feature_bytes).hexdigest(),
+                "availability_mode": "EVENT_TIMESTAMPED_REPLAY",
+                "availability_rule": "Fixture PIT features only.",
+                "market_data": False,
+                "post_cutoff_excluded": True,
+                "seasons": [2025],
+            },
+            {
+                "source_id": "labels",
+                "role": "LABEL",
+                "provider": "fixture-provider",
+                "dataset": "fixture-labels",
+                "locator": "fixture://labels",
+                "snapshot_path": "labels.json",
+                "retrieved_at_utc": "2026-01-15T10:00:00+00:00",
+                "content_sha256": sha256(label_bytes).hexdigest(),
+                "availability_mode": "POST_EVENT_LABEL",
+                "availability_rule": "Final-score labels only.",
+                "market_data": False,
+                "post_cutoff_excluded": True,
+                "seasons": [2025],
+            },
+        ],
+    }
+    return manifest, _raw(manifest)
+
+
 class CFBTrainingArtifactTests(unittest.TestCase):
     def test_valid_pit_bundle_builds_runtime_loadable_artifact(self):
-        bundle = _bundle()
-        raw = _raw(bundle)
-        artifact, provenance = build_cfb_artifact_from_pit_bundle(
-            bundle,
-            raw_bytes=raw,
-            repo_root=ROOT,
-            fit_max_season=2025,
-        )
-        self.assertEqual(provenance["row_count"], 20)
-        self.assertEqual(provenance["train_seasons"], [2025])
-        self.assertFalse(provenance["promotion_changed"])
-        model = load_cfb_model_artifact(
-            artifact,
-            expected_model_code_sha256=cfb_model_code_surface_sha256(ROOT),
-            expected_training_source_sha256=provenance["training_bundle_sha256"],
-        )
-        self.assertEqual(model.train_seasons, (2025,))
-        self.assertEqual(len(model.residual_pairs), 20)
+        with tempfile.TemporaryDirectory() as temp:
+            evidence_root = Path(temp)
+            manifest, manifest_raw = _bound_source_evidence(evidence_root)
+            bundle = _bundle()
+            bundle["source_manifest_sha256"] = sha256(manifest_raw).hexdigest()
+            raw = _raw(bundle)
+            artifact, provenance = build_cfb_artifact_from_pit_bundle(
+                bundle,
+                raw_bytes=raw,
+                source_manifest=manifest,
+                source_manifest_raw_bytes=manifest_raw,
+                source_evidence_root=evidence_root,
+                repo_root=ROOT,
+                fit_max_season=2025,
+            )
+            self.assertEqual(provenance["row_count"], 20)
+            self.assertEqual(provenance["train_seasons"], [2025])
+            self.assertTrue(provenance["source_snapshot_verified"])
+            self.assertEqual(provenance["verified_source_count"], 2)
+            self.assertFalse(provenance["promotion_changed"])
+            model = load_cfb_model_artifact(
+                artifact,
+                expected_model_code_sha256=cfb_model_code_surface_sha256(ROOT),
+                expected_training_source_sha256=provenance["training_bundle_sha256"],
+            )
+            self.assertEqual(model.train_seasons, (2025,))
+            self.assertEqual(len(model.residual_pairs), 20)
 
     def test_wrong_materializer_identity_is_rejected(self):
         bundle = _bundle()
@@ -95,16 +158,23 @@ class CFBTrainingArtifactTests(unittest.TestCase):
             validate_cfb_pit_training_bundle(bundle, raw_bytes=_raw(bundle), fit_max_season=2025)
 
     def test_market_contamination_cannot_enter_fitted_artifact(self):
-        bundle = _bundle()
-        contaminated = deepcopy(bundle)
-        contaminated["rows"][0]["home_metrics"]["spread_line"] = -3.5
-        with self.assertRaisesRegex(CFBTrainingArtifactError, "CFB_MARKET_DATA_PROHIBITED"):
-            build_cfb_artifact_from_pit_bundle(
-                contaminated,
-                raw_bytes=_raw(contaminated),
-                repo_root=ROOT,
-                fit_max_season=2025,
-            )
+        with tempfile.TemporaryDirectory() as temp:
+            evidence_root = Path(temp)
+            manifest, manifest_raw = _bound_source_evidence(evidence_root)
+            bundle = _bundle()
+            bundle["source_manifest_sha256"] = sha256(manifest_raw).hexdigest()
+            contaminated = deepcopy(bundle)
+            contaminated["rows"][0]["home_metrics"]["spread_line"] = -3.5
+            with self.assertRaisesRegex(CFBTrainingArtifactError, "CFB_MARKET_DATA_PROHIBITED"):
+                build_cfb_artifact_from_pit_bundle(
+                    contaminated,
+                    raw_bytes=_raw(contaminated),
+                    source_manifest=manifest,
+                    source_manifest_raw_bytes=manifest_raw,
+                    source_evidence_root=evidence_root,
+                    repo_root=ROOT,
+                    fit_max_season=2025,
+                )
 
 
 if __name__ == "__main__":
