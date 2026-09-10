@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Reproduce the frozen NFL 2019 baseline and attempt-one opponent adjustment.
+"""Reproduce the frozen NFL baseline and attempt-one opponent adjustment.
 
 This wrapper does not define a new candidate. It calls the already-evaluated
-feature implementations with the frozen 2010-2018 training / 2019 holdout and
-writes a side-by-side research artifact. Reproducing attempt one does not
-consume another feature-search attempt.
+feature implementations with the training / holdout window owned by the frozen
+NFL feature-search policy and writes a side-by-side research artifact.
+Reproducing attempt one does not consume another feature-search attempt.
 """
 from __future__ import annotations
 
@@ -18,9 +18,34 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 FIT_PATH = ROOT / "scripts" / "fit_football_baselines.py"
-TRAINING = tuple(range(2010, 2019))
-HOLDOUT = 2019
-SEASONS = set(TRAINING + (HOLDOUT,))
+POLICY_PATH = ROOT / "config" / "research" / "nfl_feature_search_policy_2026-09-10.json"
+
+
+def load_policy():
+    if not POLICY_PATH.exists():
+        raise RuntimeError("NFL_FEATURE_SEARCH_POLICY_MISSING")
+    try:
+        policy = json.loads(POLICY_PATH.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError("NFL_FEATURE_SEARCH_POLICY_UNREADABLE") from exc
+
+    if policy.get("schema") != "NFL_FEATURE_SEARCH_POLICY_V2":
+        raise RuntimeError("NFL_FEATURE_SEARCH_POLICY_SCHEMA_MISMATCH")
+    if policy.get("status") != "FROZEN_BEFORE_FEATURE_EVALUATION":
+        raise RuntimeError("NFL_FEATURE_SEARCH_POLICY_NOT_FROZEN")
+
+    training = tuple(policy.get("training_seasons", ()))
+    holdout = policy.get("holdout_season")
+    if not training or not all(isinstance(season, int) for season in training):
+        raise RuntimeError("NFL_FEATURE_SEARCH_POLICY_TRAINING_INVALID")
+    if not isinstance(holdout, int):
+        raise RuntimeError("NFL_FEATURE_SEARCH_POLICY_HOLDOUT_INVALID")
+    if tuple(sorted(set(training))) != training:
+        raise RuntimeError("NFL_FEATURE_SEARCH_POLICY_TRAINING_NOT_STRICTLY_ORDERED")
+    if max(training) >= holdout:
+        raise RuntimeError("NFL_FEATURE_SEARCH_POLICY_WINDOW_OVERLAP")
+
+    return policy, training, holdout
 
 
 def load_fitter():
@@ -47,8 +72,8 @@ def align_market_rows(games):
     return keys
 
 
-def market_benchmark(keyed, actual_margin):
-    is_hold = np.array([g["date"].startswith(str(HOLDOUT)) for g in keyed])
+def market_benchmark(keyed, actual_margin, holdout):
+    is_hold = np.array([g["date"].startswith(str(holdout)) for g in keyed])
     spread = np.array([
         g["spread_line"] if g.get("spread_line") is not None else np.nan
         for g in keyed
@@ -67,28 +92,30 @@ def market_benchmark(keyed, actual_margin):
     }
 
 
-def evaluate_feature_set(mod, games, feature_set):
+def evaluate_feature_set(mod, games, feature_set, holdout):
     x, ym, _yt, names, dates = mod.features(games, feature_set)
     mod.hold_dates = dates
     mod.feature_names = names
-    result = mod.run_target(x, ym, HOLDOUT)
+    result = mod.run_target(x, ym, holdout)
     return result, ym
 
 
 def main():
+    policy, training, holdout = load_policy()
+    seasons = set(training + (holdout,))
     mod = load_fitter()
-    games, source_sha, source = mod.nfl(SEASONS)
+    games, source_sha, source = mod.nfl(seasons)
     games = [
         g for g in games
-        if g["date"][:4].isdigit() and int(g["date"][:4]) <= HOLDOUT
+        if g["date"][:4].isdigit() and int(g["date"][:4]) <= holdout
     ]
     keyed = align_market_rows(games)
 
-    baseline, baseline_ym = evaluate_feature_set(mod, games, "baseline")
-    attempt1, attempt_ym = evaluate_feature_set(mod, games, "opponent_strength")
+    baseline, baseline_ym = evaluate_feature_set(mod, games, "baseline", holdout)
+    attempt1, attempt_ym = evaluate_feature_set(mod, games, "opponent_strength", holdout)
     if len(baseline_ym) != len(attempt_ym):
         raise RuntimeError("NFL_ATTEMPT1_ROW_ALIGNMENT_MISMATCH")
-    market = market_benchmark(keyed, attempt_ym)
+    market = market_benchmark(keyed, attempt_ym, holdout)
 
     base_rmse = float(baseline["holdout"]["rmse"])
     cand_rmse = float(attempt1["holdout"]["rmse"])
@@ -99,8 +126,10 @@ def main():
         "attempt_number": 1,
         "candidate_family": "opponent_adjustment",
         "candidate_feature_set": "opponent_strength",
-        "training_seasons": list(TRAINING),
-        "holdout_season": HOLDOUT,
+        "training_seasons": list(training),
+        "holdout_season": holdout,
+        "policy_path": str(POLICY_PATH.relative_to(ROOT)),
+        "policy_schema": policy["schema"],
         "source": source,
         "source_sha256": source_sha,
         "baseline": baseline,
