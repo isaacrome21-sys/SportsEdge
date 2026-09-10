@@ -65,3 +65,17 @@ Attempt 3 is registered as a deliberate, dispatch-only research run:
 - Benchmark: raw nflverse `spread_line` and `total_line`, with the required paired-bootstrap 95% CI of model-minus-close RMSE.
 - Workflow: `.github/workflows/nfl-epa-attempt3.yml`; report: `artifacts/football_baselines_attempt3.json`.
 - Status before execution: implementation complete; no attempt is counted and no result is claimed until the workflow produces a report.
+
+
+## NFL Attempt 3 result (run 34486772747)
+
+Status: DONE for the attempt; FAILS_BAR for both NFL targets.
+
+- Source coverage: 2,210 EPA-enriched games; 2,157 usable point-in-time rows.
+- Window: train 2010-2016; validate 2017-2019; 731 games with closing lines.
+- Margin: model RMSE 13.9436 versus closing spread RMSE 13.2077; delta +0.7359; paired-bootstrap 95% CI [+0.4225, +1.0522]. Close-game (absolute margin <=7) R² was -0.6489 versus the mean.
+- Total: model RMSE 14.1336 versus closing total RMSE 13.6565; delta +0.4771; paired-bootstrap 95% CI [+0.2419, +0.6983].
+- CV alphas: margin 10.0; total 300.0.
+- Placebo status: training-only placebo R² was negative for both targets (margin -0.0604; total -0.0031), with no placebo-based leakage indication.
+- Decision: EPA efficiency did not clear the frozen criterion. Do not freeze an artifact, change eligibility, or promote Model_P. Attempt 3 is consumed; next registered NFL family is situational features.
+- Evidence: report artifact digest `sha256:196513ef937aefd20225664ece27f930e608618e85a31334d9f9d02601f95534`.
