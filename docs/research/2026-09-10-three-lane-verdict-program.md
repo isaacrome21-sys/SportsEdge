@@ -43,3 +43,12 @@ Attempt 2 used pregame nflverse quarterback identity and prior-quarterback histo
 - Training-only placebo null used 200 shuffles. NFL margin holdout placebo R2 +0.0295 was at the null 95th percentile +0.0295; NFL total holdout placebo R2 -0.0139 was inside its null p95 +0.0162.
 
 Attempt 2 result: FAILS_BAR. Eight NFL feature attempts remain. No certification or eligibility change is permitted.
+
+## Close-game diagnostic readout
+
+The widened-window rerun completed under commit 1835c63. The close-game diagnostic is now present for candidate and matched control.
+
+- NFL QB margin, absolute actual margin <=7: n=362, candidate RMSE 6.6080 versus mean-baseline RMSE 5.1090, R2 -0.6729. Matched control RMSE 6.7686, R2 -0.7552. The candidate improves over control but remains worse than the mean in close games.
+- CFB baseline margin, absolute actual margin <=14: n=1,367, model RMSE 12.1302 versus mean-baseline RMSE 9.3337, R2 -0.6890. This reinforces the prior close-game failure; CFB still has no closing-price benchmark and no feature attempts are allowed.
+
+The NFL QB candidate therefore remains FAILS_BAR. The NFL next candidate is EPA-based efficiency (Attempt 3), subject to the same frozen window and benchmark criterion.
