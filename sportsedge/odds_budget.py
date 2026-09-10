@@ -49,8 +49,18 @@ def load_budget(path: str | Path, *, cap_credits: int, now: datetime | None = No
         raise OddsBudgetError("ODDS_BUDGET_LEDGER_INVALID") from exc
     if not isinstance(raw, Mapping):
         raise OddsBudgetError("ODDS_BUDGET_LEDGER_INVALID")
+    provider_remaining = _optional_nonnegative_int(raw.get("provider_credits_remaining"))
+    provider_used = _optional_nonnegative_int(raw.get("provider_credits_used"))
     if str(raw.get("date_utc")) != date_utc:
-        return BudgetState(date_utc=date_utc, cap_credits=int(cap_credits), consumed_credits=0)
+        # Reset only the SportsEdge daily spend counter. Provider quota usually
+        # spans a longer billing period, so retain the last observed account truth.
+        return BudgetState(
+            date_utc=date_utc,
+            cap_credits=int(cap_credits),
+            consumed_credits=0,
+            provider_credits_remaining=provider_remaining,
+            provider_credits_used=provider_used,
+        )
     try:
         consumed = int(raw.get("consumed_credits", 0))
     except (TypeError, ValueError) as exc:
@@ -61,8 +71,8 @@ def load_budget(path: str | Path, *, cap_credits: int, now: datetime | None = No
         date_utc=date_utc,
         cap_credits=int(cap_credits),
         consumed_credits=consumed,
-        provider_credits_remaining=_optional_nonnegative_int(raw.get("provider_credits_remaining")),
-        provider_credits_used=_optional_nonnegative_int(raw.get("provider_credits_used")),
+        provider_credits_remaining=provider_remaining,
+        provider_credits_used=provider_used,
     )
 
 
@@ -87,9 +97,7 @@ def assert_budget_available(
         else _optional_nonnegative_int(provider_credits_remaining)
     )
     if reserve > 0 and provider_remaining is None:
-        raise OddsBudgetError(
-            f"BLOCKED_PROVIDER_BALANCE_UNKNOWN:estimated={cost}:reserve={reserve}"
-        )
+        raise OddsBudgetError(f"BLOCKED_PROVIDER_BALANCE_UNKNOWN:estimated={cost}:reserve={reserve}")
     if provider_remaining is not None and provider_remaining - cost < reserve:
         raise OddsBudgetError(
             "BLOCKED_PROVIDER_RESERVE:"
@@ -107,12 +115,20 @@ def record_actual_cost(
     actual = max(0, int(actual_cost))
     header_remaining = _header_int(provider_headers, "x-requests-remaining")
     header_used = _header_int(provider_headers, "x-requests-used")
+    inferred_remaining = (
+        max(0, state.provider_credits_remaining - actual)
+        if state.provider_credits_remaining is not None
+        else None
+    )
+    inferred_used = (
+        state.provider_credits_used + actual if state.provider_credits_used is not None else None
+    )
     updated = BudgetState(
         date_utc=state.date_utc,
         cap_credits=state.cap_credits,
         consumed_credits=state.consumed_credits + actual,
-        provider_credits_remaining=(header_remaining if header_remaining is not None else state.provider_credits_remaining),
-        provider_credits_used=header_used if header_used is not None else state.provider_credits_used,
+        provider_credits_remaining=header_remaining if header_remaining is not None else inferred_remaining,
+        provider_credits_used=header_used if header_used is not None else inferred_used,
     )
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
