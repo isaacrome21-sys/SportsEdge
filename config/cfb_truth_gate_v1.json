@@ -1,0 +1,52 @@
+{
+  "policy_id": "CFB_TRUTH_GATE_V1",
+  "version": "1.0.0",
+  "description": "SportsEdge CFB Truth Gate – full-game markets (Moneyline, Spread, Total). Fail-closed. Independent per market. Numbers owned by this file; semantics owned by Python.",
+  "hard_gates": {
+    "pit_reproducibility_required": true,
+    "max_leakage_violations": 0,
+    "min_forward_seasons": 4,
+    "target_forward_seasons": 5,
+    "brier_must_beat_market": true,
+    "logloss_must_beat_market": true,
+    "min_season_fold_scoring_win_rate": 0.65,
+    "min_mean_novig_clv": 0.005,
+    "min_clv_t_stat": 2.0,
+    "min_roi_after_vig": 0.0,
+    "target_roi_after_vig": 0.02,
+    "calibration_slope_min": 0.9,
+    "calibration_slope_max": 1.1,
+    "calibration_intercept_abs_max": 0.03,
+    "max_ece": 0.025,
+    "min_promoted_sample_absolute": 200,
+    "preferred_promoted_sample": 800,
+    "recent_two_season_deterioration_allowed": false,
+    "require_paired_historical_price_evidence": true,
+    "require_live_two_sided_quote": true,
+    "require_data_freshness": true,
+    "require_frozen_policy_hash": true,
+    "edge_floor": 0.03,
+    "require_exposure_limits": true
+  },
+  "diagnostics_only": {
+    "hit_rate_buckets": {
+      "edge_3_to_5": 0.535,
+      "edge_5_to_7": 0.55,
+      "edge_7_plus": 0.57
+    }
+  },
+  "promotion_states": [
+    "NO_ENGINE",
+    "EXPERIMENTAL",
+    "EVIDENCE_INCOMPLETE",
+    "VALIDATED_MODEL",
+    "READY_FOR_POLICY",
+    "OFFICIAL",
+    "REVOKED"
+  ],
+  "markets": [
+    "MONEYLINE",
+    "SPREAD",
+    "TOTAL"
+  ]
+}
