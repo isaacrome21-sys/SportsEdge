@@ -1,7 +1,7 @@
 {
   "schema": "NFL_FEATURE_SEARCH_POLICY_V2",
   "created_at_utc": "2026-09-10T12:00:00Z",
-  "amended_at_utc": "2026-09-10T12:16:00Z",
+  "amended_at_utc": "2026-09-10T12:35:00Z",
   "status": "FROZEN_BEFORE_FEATURE_EVALUATION",
   "lane": "NFL",
   "holdout_season": 2019,
@@ -14,6 +14,14 @@
   "attempt_definition": "One attempt is consumed whenever a materially distinct feature set, model specification, training-window specification, or hyperparameter-policy candidate is evaluated on the sealed 2019 holdout. Re-runs that reproduce identical code, features, data, and frozen hyperparameters do not consume another attempt.",
   "selection_data_rule": "All feature engineering, hyperparameter selection, and candidate ranking before the final check must use only 2010-2018 training evidence or nested folds wholly contained inside 2010-2018 and must not inspect 2019 outcomes or 2019 closing-market performance.",
   "holdout_use_rule": "The 2019 holdout is for candidate evaluation only and may not be used to revise that candidate after its result is known. Any revision creates a new attempt and consumes budget.",
+  "control_budget_policy": "A widened control or denominator-only uncertainty calculation is budget-neutral only when it evaluates measurement resolution or reference uncertainty and cannot select, tune, rank, add, remove, or revise any candidate feature set, model specification, training-window specification, or hyperparameter policy. If a control result is used to make or revise any candidate specification, that use is candidate search and must consume the applicable attempt budget. This rule is frozen before the widened control is evaluated.",
+  "attempt2_gate_order": [
+    "estimate_detectable_market_gap",
+    "record_resolution_verdict",
+    "decide_attempt_2"
+  ],
+  "attempt2_gate_rule": "Attempt 2 may not be evaluated or revised before the detectable-gap estimate and its resolution verdict are recorded. If the available widened control cannot resolve a 0.5 RMSE-point market-relative gap at the frozen uncertainty criterion, do not respond by adding or searching more features; record the measurement-resolution blocker first.",
+  "detectable_gap_target_rmse_points": 0.5,
   "primary_market_relative_metric": "margin_rmse_vs_closing_spread",
   "required_sign_check": "Compute correlation(spread_line, home_score_minus_away_score) before applying any orientation transform. Reject a benchmark implementation whose sign convention is not empirically verified.",
   "placebo_policy": {
