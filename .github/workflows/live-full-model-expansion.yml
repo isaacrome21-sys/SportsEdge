@@ -6,6 +6,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: sportsedge-paid-odds-api
+  cancel-in-progress: false
+
 env:
   PYTHONPATH: ${{ github.workspace }}
 
@@ -23,6 +27,7 @@ jobs:
         run: mkdir -p artifacts .cache/mlb-history
 
       - name: Run unified automatic LIVE RUN IT acquisition
+        id: acquisition
         continue-on-error: true
         env:
           SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
@@ -33,9 +38,12 @@ jobs:
           python scripts/run_live_run_it.py --sports MLB,NFL,CFB --output artifacts/live_run_it.json 2>&1 | tee artifacts/live_acquisition.log
           code=${PIPESTATUS[0]}
           echo "$code" > artifacts/live_acquisition_exit_code.txt
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Diagnose Odds API key slots
+      - name: Diagnose first configured Odds API key only
+        id: diagnostic
+        if: steps.acquisition.outputs.exit_code == '0'
         continue-on-error: true
         env:
           SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
@@ -44,48 +52,59 @@ jobs:
           SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
         shell: bash
         run: |
+          set +e
           python - <<'PY'
           import json, os
           from urllib.error import HTTPError, URLError
           from urllib.parse import urlencode
           from urllib.request import Request, urlopen
 
-          keys = [os.environ.get('SPORTSEDGE_ODDS_API_KEY', '').strip(),
-                  os.environ.get('SPORTSEDGE_ODDS_API_KEY_2', '').strip(),
-                  os.environ.get('SPORTSEDGE_ODDS_API_KEY_3', '').strip(),
-                  os.environ.get('SPORTSEDGE_ODDS_API_KEY_4', '').strip()]
-          out = []
-          def test(slot, key):
-              if not key:
-                  return {'slot': slot, 'ok': False, 'error_code': 'KEY_MISSING'}
+          configured = []
+          for name in ('SPORTSEDGE_ODDS_API_KEY','SPORTSEDGE_ODDS_API_KEY_2','SPORTSEDGE_ODDS_API_KEY_3','SPORTSEDGE_ODDS_API_KEY_4'):
+              key = os.environ.get(name, '').strip()
+              if key and key not in [v for _, v in configured]:
+                  configured.append((name, key))
+          if not configured:
+              out = {'ok': False, 'error_code': 'KEY_MISSING', 'rotation_attempted': False}
+          else:
+              name, key = configured[0]
+              slot = ('SPORTSEDGE_ODDS_API_KEY','SPORTSEDGE_ODDS_API_KEY_2','SPORTSEDGE_ODDS_API_KEY_3','SPORTSEDGE_ODDS_API_KEY_4').index(name) + 1
               url = 'https://api.the-odds-api.com/v4/sports/baseball_mlb/odds?' + urlencode({
                   'apiKey': key, 'bookmakers': 'draftkings', 'markets': 'h2h',
                   'oddsFormat': 'american', 'dateFormat': 'iso'})
               try:
                   with urlopen(Request(url, headers={'Accept':'application/json'}), timeout=15) as r:
                       data = json.loads(r.read().decode('utf-8'))
-                      return {'slot': slot, 'ok': True, 'http_status': getattr(r,'status',200),
-                              'quota_remaining': r.headers.get('x-requests-remaining'),
-                              'quota_used': r.headers.get('x-requests-used'),
-                              'result_count': len(data) if isinstance(data,list) else None}
+                      out = {'slot': slot, 'ok': True, 'http_status': getattr(r,'status',200),
+                             'quota_remaining': r.headers.get('x-requests-remaining'),
+                             'quota_used': r.headers.get('x-requests-used'),
+                             'result_count': len(data) if isinstance(data,list) else None,
+                             'rotation_attempted': False}
               except HTTPError as e:
                   body = e.read().decode('utf-8','replace')
                   try: parsed = json.loads(body)
                   except Exception: parsed = {}
-                  return {'slot': slot, 'ok': False, 'http_status': e.code,
-                          'error_code': parsed.get('error_code'), 'message': parsed.get('message'),
-                          'quota_remaining': e.headers.get('x-requests-remaining') if e.headers else None,
-                          'quota_used': e.headers.get('x-requests-used') if e.headers else None}
+                  out = {'slot': slot, 'ok': False, 'http_status': e.code,
+                         'error_code': parsed.get('error_code'), 'message': parsed.get('message'),
+                         'quota_remaining': e.headers.get('x-requests-remaining') if e.headers else None,
+                         'quota_used': e.headers.get('x-requests-used') if e.headers else None,
+                         'rotation_attempted': False}
               except URLError as e:
-                  return {'slot': slot, 'ok': False, 'error_code':'URL_ERROR', 'message':str(e.reason)}
+                  out = {'slot': slot, 'ok': False, 'error_code':'URL_ERROR', 'message':str(e.reason),
+                         'rotation_attempted': False}
               except Exception as e:
-                  return {'slot': slot, 'ok': False, 'error_code':type(e).__name__, 'message':str(e)}
-          for i, key in enumerate(keys, 1): out.append(test(i, key))
+                  out = {'slot': slot, 'ok': False, 'error_code':type(e).__name__, 'message':str(e),
+                         'rotation_attempted': False}
           with open('artifacts/odds_diagnostic.json','w') as f: json.dump(out,f,indent=2,sort_keys=True)
           print(json.dumps(out,indent=2,sort_keys=True))
+          raise SystemExit(0 if out.get('ok') else 3)
           PY
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
 
       - name: Run existing live MLB full model path
+        if: steps.acquisition.outputs.exit_code == '0' && steps.diagnostic.outputs.exit_code == '0'
         continue-on-error: true
         env:
           SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
