@@ -6,8 +6,9 @@ fetch data and it does not claim that an ex-post source was available historical
 source acquisition/provenance must establish that separately.
 
 Week 2+ requires an exact current-season snapshot through ``game.week - 1``.
-Week 1 requires an explicit immediately-prior-season fallback snapshot. Target-week
-or post-kickoff metric snapshots fail closed. FBS membership is checked per season.
+Week 1 requires an explicit immediately-prior-season fallback snapshot. Target-week,
+post-kickoff metric snapshots, and weather without a pre-kickoff retrieval timestamp
+fail closed. FBS membership is checked per season.
 """
 from __future__ import annotations
 
@@ -18,7 +19,7 @@ from typing import Any, Iterable, Mapping, Sequence
 from .classification_policy import assert_fbs_only_games
 from .source import CFBGame, CFBTeamMetrics
 
-CFB_HISTORICAL_MATERIALIZER_VERSION = "CFB_JOINT_HISTORY_PIT_V1"
+CFB_HISTORICAL_MATERIALIZER_VERSION = "CFB_JOINT_HISTORY_PIT_V2"
 
 _BANNED_GAME_KEYS = {
     "spread", "spread_line", "total", "total_line", "line", "price", "american_odds",
@@ -121,6 +122,16 @@ def _select_metric(index: Mapping[tuple[str, int, int, str], CFBTeamMetrics], *,
     return metric
 
 
+def _validate_weather(game: CFBGame, weather: Mapping[str, Any]) -> dict[str, Any]:
+    clean = dict(weather)
+    retrieved = _dt(clean.get("retrieved_at"), f"CFB_HISTORICAL_WEATHER_RETRIEVED_AT_INVALID:{game.game_id}")
+    start = _dt(game.start_ts, f"CFB_HISTORICAL_GAME_START_INVALID:{game.game_id}")
+    if retrieved >= start:
+        raise CFBHistoricalFeatureError(f"CFB_HISTORICAL_WEATHER_NOT_PREGAME:{game.game_id}")
+    clean["retrieved_at"] = retrieved.isoformat()
+    return clean
+
+
 def materialize_cfb_joint_history(
     *,
     games: Sequence[Mapping[str, Any]],
@@ -140,12 +151,13 @@ def materialize_cfb_joint_history(
         weather=weather_by_game.get(game.game_id)
         if not isinstance(weather, Mapping):
             raise CFBHistoricalFeatureError(f"CFB_HISTORICAL_WEATHER_MISSING:{game.game_id}")
+        weather = _validate_weather(game, weather)
         home=_select_metric(index, game=game, team=game.home_team)
         away=_select_metric(index, game=game, team=game.away_team)
         row={
             "game_id":game.game_id, "season":game.season, "week":game.week,
             "neutral_site":game.neutral_site, "home_metrics":home.to_dict(),
-            "away_metrics":away.to_dict(), "weather":dict(weather),
+            "away_metrics":away.to_dict(), "weather":weather,
             "home_score":_score(raw.get("home_score"), "home_score"),
             "away_score":_score(raw.get("away_score"), "away_score"),
         }
