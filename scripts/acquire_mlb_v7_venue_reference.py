@@ -9,9 +9,11 @@ from pathlib import Path
 
 from sportsedge.mlb_v7_travel_history import _get_json, schedule_url, venue_url, write_json, write_jsonl
 from sportsedge.mlb_v7_venue_reference import (
+    COORDINATE_FALLBACKS,
     REQUIRED_FIELDS,
     REQUIRED_SEMANTICS,
     SOURCE_CLASS,
+    build_attestation,
     build_venue_reference_report,
     build_venue_reference_rows,
     venue_ids_from_schedule_payloads,
@@ -29,7 +31,7 @@ def _months(start: date, end: date):
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Acquire official MLB fixed venue facts for the frozen V7 travel source contract.")
+    parser = argparse.ArgumentParser(description="Acquire fixed MLB venue-reference facts with explicit source provenance.")
     parser.add_argument("--start", default="2023-01-01")
     parser.add_argument("--end", default="2025-12-31")
     parser.add_argument("--output-root", default="artifacts/mlb-v7-venue-reference")
@@ -41,8 +43,6 @@ def main() -> int:
         raise SystemExit("VENUE_REFERENCE_COVERAGE_INVALID")
 
     root = Path(args.output_root)
-    raw_root = root / "raw"
-    discovery_root = raw_root / "discovery"
     schedule_payloads = []
     schedule_sources = []
     for month_start, month_end in _months(start, end):
@@ -62,12 +62,34 @@ def main() -> int:
         venue_payloads[venue_id] = payload
         rel = Path("raw") / "discovery" / f"venue-{venue_id}.json"
         sha = write_json(root / rel, payload)
-        venue_sources.append({"venue_id": venue_id, "url": url, "path": rel.as_posix(), "sha256": sha})
+        venue_sources.append({"venue_id": venue_id, "provider": "MLB_STATSAPI", "url": url, "path": rel.as_posix(), "sha256": sha})
+
+    fallback_payloads: dict[int, object] = {}
+    fallback_sources = []
+
+    def _fetch_fallback(venue_id: int, fallback: dict[str, str]):
+        if venue_id in fallback_payloads:
+            return fallback_payloads[venue_id]
+        url = fallback["url"]
+        payload = _get_json(url)
+        fallback_payloads[venue_id] = payload
+        rel = Path("raw") / "discovery" / f"venue-coordinate-fallback-{venue_id}-{fallback['entity_id']}.json"
+        sha = write_json(root / rel, payload)
+        fallback_sources.append({
+            "venue_id": venue_id,
+            "provider": fallback["provider"],
+            "entity_id": fallback["entity_id"],
+            "url": url,
+            "path": rel.as_posix(),
+            "sha256": sha,
+        })
+        return payload
 
     rows, failures = build_venue_reference_rows(
         venue_ids,
         fetch_venue_payload=lambda venue_id: venue_payloads[venue_id],
         source_url_for_venue=venue_url,
+        fetch_coordinate_fallback=_fetch_fallback,
     )
     report = build_venue_reference_report(
         coverage_start=start.isoformat(),
@@ -79,6 +101,7 @@ def main() -> int:
     report["retrieved_at"] = datetime.now(timezone.utc).isoformat()
     report["schedule_sources"] = schedule_sources
     report["venue_sources"] = venue_sources
+    report["fallback_sources"] = fallback_sources
     write_json(root / "acquisition_report.json", report)
 
     if report["state"] != "READY_TO_ATTEST":
@@ -89,28 +112,31 @@ def main() -> int:
     evidence_sha = write_jsonl(root / evidence_rel, rows)
     provenance_rel = Path("raw") / "VENUE_REFERENCE_PROVENANCE.json"
     provenance_sha = write_json(root / provenance_rel, {
-        "source": "MLB_STATSAPI",
+        "source_class": SOURCE_CLASS,
         "retrieved_at": report["retrieved_at"],
         "coverage_start": start.isoformat(),
         "coverage_end": end.isoformat(),
         "schedule_sources": schedule_sources,
         "venue_sources": venue_sources,
+        "fallback_sources": fallback_sources,
+        "fallback_policy": COORDINATE_FALLBACKS,
     })
-    attestation = {
-        "source_class": SOURCE_CLASS,
-        "coverage_start": start.isoformat(),
-        "coverage_end": end.isoformat(),
-        "fields": REQUIRED_FIELDS,
-        "semantics": REQUIRED_SEMANTICS,
-        "evidence_files": [
-            {"path": evidence_rel.as_posix(), "sha256": evidence_sha},
-            {"path": provenance_rel.as_posix(), "sha256": provenance_sha},
-        ],
-    }
+    evidence_files = [
+        {"path": evidence_rel.as_posix(), "sha256": evidence_sha},
+        {"path": provenance_rel.as_posix(), "sha256": provenance_sha},
+    ]
+    for item in fallback_sources:
+        evidence_files.append({"path": item["path"], "sha256": item["sha256"]})
+    attestation = build_attestation(
+        coverage_start=start.isoformat(),
+        coverage_end=end.isoformat(),
+        evidence_files=evidence_files,
+    )
     write_json(root / "attestations" / "VENUE_REFERENCE.json", attestation)
     report["attestation_written"] = True
     report["evidence_sha256"] = evidence_sha
     report["provenance_sha256"] = provenance_sha
+    report["attestation_evidence_file_count"] = len(evidence_files)
     write_json(root / "acquisition_report.json", report)
     print(json.dumps(report, sort_keys=True))
     return 0
