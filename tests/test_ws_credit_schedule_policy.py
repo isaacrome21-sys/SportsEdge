@@ -10,6 +10,7 @@ PARKED = {
     ".github/workflows/archive-mlb-game-odds.yml",
     ".github/workflows/auto-mlb.yml",
     ".github/workflows/mlb-additional-pit-archive.yml",
+    ".github/workflows/mlb-deadman.yml",
     ".github/workflows/mlb-v8-evidence.yml",
     ".github/workflows/mlb-v8-replay-backfill.yml",
     ".github/workflows/nfl-2026-line-capture.yml",
