@@ -9,6 +9,7 @@ from .first_hr_order_engine import build_shared_first_hr_engine_session
 from .generic_market_engine import BINARY_MARKETS, GAME_MARKETS, generic_market_engine_adapter
 from .hits_engine import simulate_hits
 from .hitter_joint_engine import HITTER_MARKETS, price_hitter_market
+from .mlb_model_artifact import build_mlb_model_artifact
 from .pitcher_joint_engine import PITCHER_MARKETS, price_pitcher_market
 from .pitcher_record_win_engine import build_shared_pitcher_record_win_engine_session
 from .shared_f5_engine import STAGE1_F5_MARKETS, build_shared_f5_engine_session
@@ -67,6 +68,20 @@ def resolve_manual_market_type(market_type):
     key=str(market_type or "").strip().upper(); market=MANUAL_MARKET_TYPE_TO_ENGINE_MARKET.get(key)
     if market is None or market not in engine_registry(): raise EngineDispatchError(f"NO_ENGINE_FOR_MARKET: {key}")
     return market
+
+def _artifact_bound_engine(market: str, engine: Callable[[Mapping[str, Any]], Mapping[str, Any]]):
+    """Attach model-code identity to canonical output; legacy compat stays artifact-less."""
+    def bound(model_input):
+        output=dict(engine(model_input))
+        if str(output.get("runtime_path") or "").strip().upper()=="LEGACY_COMPAT":
+            return output
+        artifact=build_mlb_model_artifact(market=market,engine_output=output)
+        output["model_artifact_sha256"]=artifact["model_artifact_sha256"]
+        output["model_artifact_family"]=artifact["family_id"]
+        output["model_artifact_policy_sha256"]=artifact["policy_sha256"]
+        return output
+    return bound
+
 def engine_registry():
     registry={}; shared_game=build_shared_game_engine_session(); shared_f5=build_shared_f5_engine_session(); shared_first_hr=build_shared_first_hr_engine_session(); shared_pitcher_win=build_shared_pitcher_record_win_engine_session()
     for market in sorted(GAME_MARKETS|BINARY_MARKETS):
@@ -78,4 +93,4 @@ def engine_registry():
     for market in sorted(HITTER_MARKETS): registry[market]=hitter_joint_adapter
     for market in sorted(PITCHER_MARKETS): registry[market]=pitcher_joint_adapter
     registry["HOME_RUNS"]=generic_market_engine_adapter
-    return registry
+    return {market:_artifact_bound_engine(market,engine) for market,engine in registry.items()}
