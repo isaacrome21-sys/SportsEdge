@@ -11,15 +11,28 @@ class LiveOddsFailoverTests(unittest.TestCase):
         ]
         self.assertTrue(should_rotate_odds_key(run_status="NO_QUOTES", results=(), source_failures=failures))
 
-    def test_account_exhaustion_is_terminal(self):
+    def test_account_exhaustion_rotates_to_later_configured_key(self):
         failures = [
             {"stage": "ODDS_API", "reason": "ODDS_API_FETCH_FAILED:event:a:HTTP_401:OUT_OF_USAGE_CREDITS"},
             {"stage": "ODDS_API", "reason": "ODDS_API_FETCH_FAILED:event:b:HTTP_401:OUT_OF_USAGE_CREDITS"},
         ]
-        self.assertFalse(should_rotate_odds_key(run_status="NO_QUOTES", results=(), source_failures=failures))
+        self.assertTrue(should_rotate_odds_key(run_status="NO_QUOTES", results=(), source_failures=failures))
+
+    def test_wrapped_game_market_fetch_failure_rotates(self):
+        failures = [
+            {"stage": "ODDS_API", "reason": "OddsApiSourceError: ODDS_API_FETCH_FAILED:game-markets"},
+        ]
+        self.assertTrue(should_rotate_odds_key(run_status="NO_QUOTES", results=(), source_failures=failures))
 
     def test_model_or_identity_failure_does_not_rotate(self):
         failures = [{"stage": "ODDS_API", "reason": "ODDS_EVENT_GAME_AMBIGUOUS"}]
+        self.assertFalse(should_rotate_odds_key(run_status="NO_QUOTES", results=(), source_failures=failures))
+
+    def test_mixed_fetch_and_identity_failure_does_not_rotate(self):
+        failures = [
+            {"stage": "ODDS_API", "reason": "ODDS_API_FETCH_FAILED:event:a"},
+            {"stage": "ODDS_API", "reason": "ODDS_EVENT_GAME_AMBIGUOUS"},
+        ]
         self.assertFalse(should_rotate_odds_key(run_status="NO_QUOTES", results=(), source_failures=failures))
 
     def test_any_output_never_rotates(self):
