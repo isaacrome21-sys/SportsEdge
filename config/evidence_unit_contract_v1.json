@@ -1,0 +1,77 @@
+{
+  "contract_id": "SPORTSEDGE_EVIDENCE_UNIT_V1",
+  "status": "FROZEN_SCHEMA_ONLY",
+  "promotion_authority": false,
+  "purpose": "Shared immutable identity and forward-evidence record contract for SportsEdge Promotion Evidence V2 lanes.",
+  "evidence_unit_manifest_required_fields": [
+    "artifact_sha256",
+    "feature_schema_sha256",
+    "predictive_code_manifest_sha256",
+    "acquisition_code_manifest_sha256",
+    "policy_sha256",
+    "close_definition_id"
+  ],
+  "decision_required_fields": [
+    "decision_id",
+    "evidence_unit_id",
+    "sport",
+    "lane",
+    "game_id",
+    "game_start_ts",
+    "input_manifest_sha256",
+    "model_p",
+    "model_p_computed_at",
+    "price_observed_at",
+    "book",
+    "price_source",
+    "candidate_label",
+    "certification_status",
+    "qualifying_threshold_id",
+    "qualifies_for_evidence",
+    "actual_bet_placed",
+    "kelly_fraction_information_only"
+  ],
+  "candidate_labels": ["LOVE", "LIKE", "WATCH", "NO_PLAY"],
+  "certification_statuses": ["CANDIDATE", "PROBATION", "OFFICIAL", "BLOCKED"],
+  "price_source_values": ["API", "MANUAL_SCREENSHOT", "MANUAL_FILE"],
+  "v2_price_rule": {
+    "two_sided_required": true,
+    "one_sided_candidate_allowed": true,
+    "one_sided_evidence_status": "V2_INELIGIBLE_ONE_SIDED",
+    "price_must_not_be_model_input": true,
+    "price_observation_may_precede_model_computation_if_dependency_separation_is_proven": true
+  },
+  "stake_rule": {
+    "kelly_field": "kelly_fraction_information_only",
+    "kelly_may_size_candidate_stake": false,
+    "stake_authority": "PAPER_OR_PROBATION_POLICY"
+  },
+  "qualifying_rule": {
+    "record_every_threshold_qualified_candidate": true,
+    "record_regardless_of_actual_bet": true,
+    "thresholds_must_be_frozen_outside_this_shared_schema": true
+  },
+  "close_rule": {
+    "append_only_separate_record": true,
+    "must_bind_to_decision_id": true,
+    "must_not_mutate_pregame_decision": true
+  },
+  "dependency_separation": {
+    "feature_schema_forbidden_tokens": [
+      "odds",
+      "price",
+      "bookmaker",
+      "market_price",
+      "ticket_pct",
+      "money_pct",
+      "handle_pct",
+      "vig"
+    ],
+    "model_stage_forbidden_import_fragments": [
+      "odds_source",
+      "price_adapter",
+      "market_adapter",
+      "bookmaker"
+    ]
+  }
+}
