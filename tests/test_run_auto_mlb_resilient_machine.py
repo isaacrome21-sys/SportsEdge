@@ -69,12 +69,31 @@ def legacy_report(*, market="MONEYLINE"):
     })()
 
 
-def argv_for(td, output):
+def argv_for(td, output, *extra):
     return [
         str(SCRIPT),
         "--output", str(output),
         "--prediction-journal-dir", str(Path(td) / "journal"),
+        *extra,
     ]
+
+
+def write_evidence(td):
+    path = Path(td) / "evidence.json"
+    path.write_text(json.dumps({
+        "schema_version": "sportsedge_evidence_v1",
+        "packets": [{
+            "game_id": "123",
+            "fact_type": "STARTER_ID",
+            "subject_id": "HOME",
+            "value": "999",
+            "source_name": "MLB.com screenshot",
+            "observed_at_utc": "2026-08-24T14:29:00+00:00",
+            "authority": "AUTHORITATIVE",
+            "verified": True,
+        }],
+    }))
+    return path
 
 
 class ResilientMachineRoutingTests(unittest.TestCase):
@@ -107,7 +126,43 @@ class ResilientMachineRoutingTests(unittest.TestCase):
             self.assertEqual(kwargs["mode"], "AUTOMATIC")
             self.assertEqual(kwargs["odds_api_key"], "key-one")
             self.assertEqual(kwargs["odds_api_keys"], ("key-two", "key-three"))
+            self.assertIsNone(kwargs["evidence_packets"])
             self.assertNotIn("feature_url", kwargs)
+
+    def test_manual_evidence_file_is_passed_to_canonical_native_machine(self):
+        with tempfile.TemporaryDirectory() as td:
+            output = Path(td) / "card.json"
+            evidence = write_evidence(td)
+            env = {"SPORTSEDGE_ODDS_API_KEY": "key-one"}
+            with patch.dict(os.environ, env, clear=True), \
+                 patch.object(sys, "argv", argv_for(td, output, "--evidence-file", str(evidence))), \
+                 patch.object(mod, "run_it_mlb", return_value=machine_report()) as run_it, \
+                 patch.object(mod, "should_rotate_odds_key", return_value=False), \
+                 patch.object(mod, "run_auto_mlb_espn_game_odds", side_effect=AssertionError("fallback should not run")):
+                code = mod.main()
+
+            self.assertEqual(code, 0)
+            packets = run_it.call_args.kwargs["evidence_packets"]
+            self.assertEqual(len(packets), 1)
+            self.assertEqual(packets[0].acquisition_mode, "MANUAL")
+            self.assertEqual(packets[0].fact_type, "STARTER_ID")
+            self.assertEqual(packets[0].value, "999")
+
+    def test_manual_evidence_never_bypasses_gate_through_espn_fallback(self):
+        with tempfile.TemporaryDirectory() as td:
+            output = Path(td) / "card.json"
+            evidence = write_evidence(td)
+            env = {"SPORTSEDGE_ODDS_API_KEY": "bad-key"}
+            with patch.dict(os.environ, env, clear=True), \
+                 patch.object(sys, "argv", argv_for(td, output, "--evidence-file", str(evidence))), \
+                 patch.object(mod, "run_it_mlb", side_effect=RuntimeError("native down")), \
+                 patch.object(mod, "run_auto_mlb_espn_game_odds", side_effect=AssertionError("evidence must not be bypassed")):
+                code = mod.main()
+
+            self.assertEqual(code, 2)
+            payload = json.loads(output.read_text())
+            reasons = [str(item.get("reason")) for item in payload["source_failures"]]
+            self.assertTrue(any("EVIDENCE_GATED_NATIVE_RUN_UNAVAILABLE" in reason for reason in reasons))
 
     def test_native_exception_falls_back_to_espn_and_records_failure(self):
         with tempfile.TemporaryDirectory() as td:

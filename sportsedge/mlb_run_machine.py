@@ -19,7 +19,7 @@ AUTO_SELECT
 """
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
@@ -30,6 +30,12 @@ import json
 from .auto_joint_runner import run_auto_joint_mlb
 from .auto_native_odds import run_auto_mlb_native_odds
 from .edge_floors import DEFAULT_EDGE_FLOOR_CONFIG
+from .evidence import (
+    EvidencePacket,
+    EvidenceResolution,
+    evidence_resolution_to_dict,
+    resolve_evidence,
+)
 from .live_slate import LiveGame
 from .manual_hybrid_joint_runner import run_manual_hybrid_joint_mlb
 from .prediction_journal import normalize_legacy_block_reason
@@ -230,6 +236,52 @@ def _machine_result(source_index: int, row: Any) -> MLBMachineResult:
     )
 
 
+def _resolve_packets(
+    supplied: Sequence[EvidencePacket],
+    automatic: Sequence[EvidencePacket],
+    *,
+    current: datetime,
+    requested: bool,
+) -> EvidenceResolution | None:
+    combined = tuple(supplied) + tuple(automatic)
+    if not combined and not requested:
+        return None
+    return resolve_evidence(combined, now=current)
+
+
+def _apply_evidence_gate(
+    results: Sequence[MLBMachineResult],
+    source_failures: Sequence[Mapping[str, Any]],
+    resolution: EvidenceResolution | None,
+) -> tuple[tuple[MLBMachineResult, ...], tuple[dict[str, Any], ...]]:
+    if resolution is None:
+        return tuple(results), tuple(dict(x) for x in source_failures)
+
+    gated: list[MLBMachineResult] = []
+    failures = [dict(x) for x in source_failures]
+    seen_failures = {
+        (str(item.get("source_index")), str(item.get("reason")))
+        for item in failures
+    }
+    for row in results:
+        block = resolution.block_for(
+            game_id=row.game_id,
+            market=row.market,
+            entity_id=row.entity_id,
+        )
+        if block is None:
+            gated.append(row)
+            continue
+        blocked_row = replace(row, bet_status="BLOCKED", reason=block.reason)
+        gated.append(blocked_row)
+        failure = {"source_index": row.source_index, "reason": block.reason}
+        failure_key = (str(row.source_index), block.reason)
+        if failure_key not in seen_failures:
+            failures.append(failure)
+            seen_failures.add(failure_key)
+    return tuple(gated), tuple(failures)
+
+
 def _report(
     *,
     mode: str,
@@ -238,16 +290,26 @@ def _report(
     run_status: str,
     rows: Sequence[Any],
     source_failures: Sequence[Mapping[str, Any]] = (),
+    evidence_resolution: EvidenceResolution | None = None,
 ) -> MLBMachineReport:
     results = tuple(_machine_result(i, row) for i, row in enumerate(rows))
+    results, failures = _apply_evidence_gate(results, source_failures, evidence_resolution)
+    resolved_status = str(run_status)
+    if results and all(row.bet_status == "BLOCKED" for row in results):
+        resolved_status = "BLOCKED"
+    elif evidence_resolution is not None and evidence_resolution.blocks and not results:
+        resolved_status = "BLOCKED"
+    summary = _summary(results)
+    if evidence_resolution is not None:
+        summary["evidence"] = evidence_resolution_to_dict(evidence_resolution)
     return MLBMachineReport(
         mode=mode,
         slate_date_ct=slate_date_ct,
         generated_at_utc=current.isoformat(),
-        run_status=str(run_status),
+        run_status=resolved_status,
         results=results,
-        source_failures=tuple(dict(x) for x in source_failures),
-        summary=_summary(results),
+        source_failures=failures,
+        summary=summary,
     )
 
 
@@ -257,6 +319,7 @@ def run_mlb_machine(
     quotes: Sequence[Mapping[str, Any]] | None = None,
     games: Sequence[LiveGame] | None = None,
     feature_rows: Sequence[Mapping[str, Any]] | None = None,
+    evidence_packets: Sequence[EvidencePacket] | None = None,
     target_date: date | None = None,
     odds_api_key: str | None = None,
     odds_api_keys: tuple[str, ...] = (),
@@ -275,6 +338,8 @@ def run_mlb_machine(
     current = _aware_utc(now)
     selected = _resolve_mode(mode, quotes=quotes, games=games, feature_rows=feature_rows)
     slate_date = target_date or current.astimezone(CHICAGO_TZ).date()
+    supplied_evidence = tuple(evidence_packets or ())
+    evidence_requested = evidence_packets is not None
 
     if selected == "MANUAL":
         if quotes is None or games is None or feature_rows is None:
@@ -291,12 +356,16 @@ def run_mlb_machine(
             edge_floor_config_path=edge_floor_config_path,
             kelly_multiplier=kelly_multiplier,
         )
+        evidence_resolution = _resolve_packets(
+            supplied_evidence, (), current=current, requested=evidence_requested
+        )
         return _report(
             mode=selected,
             current=current,
             slate_date_ct=slate_date.isoformat(),
             run_status="PASS" if rows else "NO_QUOTES",
             rows=rows,
+            evidence_resolution=evidence_resolution,
         )
 
     if selected == "HYBRID":
@@ -309,6 +378,7 @@ def run_mlb_machine(
                 return _MemoryResponse(quote_payload)
             return opener(req, timeout=timeout)
 
+        automatic_evidence: list[EvidencePacket] = []
         report = run_auto_joint_mlb(
             quote_url=MEMORY_QUOTES_URL,
             projected_lineups_url=projected_lineups_url,
@@ -319,6 +389,13 @@ def run_mlb_machine(
             require_confirmed_lineup=require_confirmed_lineup,
             edge_floor_config_path=edge_floor_config_path,
             kelly_multiplier=kelly_multiplier,
+            evidence_sink=automatic_evidence,
+        )
+        evidence_resolution = _resolve_packets(
+            supplied_evidence,
+            automatic_evidence,
+            current=current,
+            requested=evidence_requested,
         )
         return _report(
             mode=selected,
@@ -327,6 +404,7 @@ def run_mlb_machine(
             run_status=report.run_status,
             rows=report.results,
             source_failures=report.source_failures,
+            evidence_resolution=evidence_resolution,
         )
 
     if selected == "AUTOMATIC":
@@ -337,6 +415,7 @@ def run_mlb_machine(
                 keys.append(key)
         if not keys:
             raise MLBRunMachineError("AUTOMATIC_REQUIRES_ODDS_API_KEY")
+        automatic_evidence: list[EvidencePacket] = []
         report = run_auto_mlb_native_odds(
             odds_api_key=keys[0],
             odds_api_keys=tuple(keys[1:]),
@@ -351,6 +430,13 @@ def run_mlb_machine(
             kelly_multiplier=kelly_multiplier,
             bookmakers=tuple(bookmakers),
             history_cache_dir=history_cache_dir,
+            evidence_sink=automatic_evidence,
+        )
+        evidence_resolution = _resolve_packets(
+            supplied_evidence,
+            automatic_evidence,
+            current=current,
+            requested=evidence_requested,
         )
         return _report(
             mode=selected,
@@ -359,6 +445,7 @@ def run_mlb_machine(
             run_status=report.run_status,
             rows=report.results,
             source_failures=report.source_failures,
+            evidence_resolution=evidence_resolution,
         )
 
     raise MLBRunMachineError(f"RUN_MODE_UNREACHABLE:{selected}")

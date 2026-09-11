@@ -17,8 +17,10 @@ from .additional_mlb_odds_source import fetch_mlb_additional_quotes
 from .auto_joint_runner import run_auto_joint_mlb
 from .auto_runner import AutoRunReport, run_auto_mlb
 from .edge_floors import DEFAULT_EDGE_FLOOR_CONFIG
+from .evidence import EvidencePacket
 from .game_odds_source import fetch_mlb_game_quotes
 from .market_surface import DEFAULT_MARKET_SURFACE_PATH
+from .mlb_evidence import official_mlb_evidence
 from .mlb_history_cache import MLBHistoryCachedOpener
 from .mlb_source import fetch_boxscore, fetch_schedule
 from .odds_api_source import build_participant_index, fetch_mlb_player_prop_quotes
@@ -76,6 +78,7 @@ def run_auto_mlb_native_odds(
     bookmakers: tuple[str, ...] = ("draftkings",),
     history_cache_dir: str | Path | None = None,
     market_surface_path: str = DEFAULT_MARKET_SURFACE_PATH,
+    evidence_sink: list[EvidencePacket] | None = None,
 ) -> AutoRunReport:
     current = now or datetime.now(timezone.utc)
     if not isinstance(current, datetime) or current.tzinfo is None or current.utcoffset() is None:
@@ -90,8 +93,22 @@ def run_auto_mlb_native_odds(
         try:
             box = fetch_boxscore(game.game_pk, opener=opener)
             roster_names[game.game_pk] = _roster_names(box)
+            if evidence_sink is not None:
+                evidence_sink.extend(official_mlb_evidence(
+                    snapshot=game,
+                    boxscore=box,
+                    observed_at_utc=current,
+                    acquisition_mode="AUTOMATIC",
+                ))
         except Exception as exc:
             roster_names[game.game_pk] = []
+            if evidence_sink is not None:
+                evidence_sink.extend(official_mlb_evidence(
+                    snapshot=game,
+                    boxscore=None,
+                    observed_at_utc=current,
+                    acquisition_mode="AUTOMATIC",
+                ))
             roster_failures.append({
                 "stage": "MLB_ROSTER_IDENTITY", "game_id": str(game.game_pk),
                 "reason": f"{type(exc).__name__}: {exc}",
