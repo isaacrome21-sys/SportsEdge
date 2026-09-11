@@ -9,6 +9,12 @@ on:
 
 permissions: {}
 
+# Every run can mutate immutable EV-ledger state on main. Serialize the entire
+# workflow so manual closes cannot race log-bet or scheduled close writers.
+concurrency:
+  group: sportsedge-ev-tracker-ledger
+  cancel-in-progress: false
+
 jobs:
   log-bet:
     if: github.event_name == 'issues' && startsWith(github.event.issue.title, '[BET]') && github.event.issue.user.login == github.repository_owner
