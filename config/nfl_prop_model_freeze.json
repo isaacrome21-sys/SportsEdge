@@ -1,6 +1,6 @@
 {
   "activation_policy": "FIT_SHA_OR_CERTIFIED_CODE_SURFACE_V1",
-  "artifact_path": "artifacts/football/nfl_offensive_prop_ab_model.json",
+  "artifact_path": "artifacts/football/nfl_prop_artifact_bundle_v1.json",
   "artifact_sha256": "3efa5cc92b5ed1bf53a99cbe0d6e7792d01791a77c8f684874d66213b73d9570",
   "artifact_version": "NFL_PROP_SHARED_PATH_2022_2025_V1",
   "code_git_sha": "5dfa29347bed608771e6a2395ce8e894dbfdd881",
