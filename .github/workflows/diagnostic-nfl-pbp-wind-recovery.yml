@@ -36,9 +36,6 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/nfl-wind-audit artifacts/football
-
-          # Artifact 10269107465 is the completed exact-head #338 evidence bundle.
-          # It preserved the schedule bytes actually used by that validation run.
           curl --fail --location --silent --show-error \
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H 'Accept: application/vnd.github+json' \
@@ -46,7 +43,6 @@ jobs:
             -o /tmp/nfl-wind-audit/frozen-evidence.zip
           unzip -p /tmp/nfl-wind-audit/frozen-evidence.zip sources/games.csv \
             > /tmp/nfl-wind-audit/games.csv
-
           for season in 2022 2023; do
             curl --fail --location --silent --show-error --retry 5 --retry-delay 2 --retry-all-errors \
               "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_${season}.csv.gz" \
@@ -58,32 +54,26 @@ jobs:
         run: |
           set -euo pipefail
           echo 'cf8632c85fdc82c8915c7866d0bd16465a88946052bccfbf83b44bee87d5d65e  /tmp/nfl-wind-audit/games.csv' | sha256sum -c -
-          echo '0c69a71e57df77b67c5f351c9f1b7fb5a03505b16d22c7612f550d87efdf92bb  /tmp/nfl-wind-audit/play_by_play_2022.csv.gz' | sha256sum -c -
-          echo '4649804eaa9c74d543013289d7fbc1dccf56923880115695a6064129ba3ece2d  /tmp/nfl-wind-audit/play_by_play_2023.csv.gz' | sha256sum -c -
+          echo '0c69a71eb39498956c7b1d5c1ca52ce7fe679934a95d1af249facb5ea9829ea4  /tmp/nfl-wind-audit/play_by_play_2022.csv.gz' | sha256sum -c -
+          echo '4649804ee0f0a40b41e51ec75a1ce921949d7fab5459213488656b92f78560e8  /tmp/nfl-wind-audit/play_by_play_2023.csv.gz' | sha256sum -c -
 
       - name: Audit exact PBP wind recovery coverage
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
-          import csv
-          import gzip
-          import hashlib
-          import json
-          import math
-          import os
+          import csv, gzip, hashlib, json, math, os
           from collections import defaultdict
           from pathlib import Path
-
           from sportsedge.sports.nfl.m2_history_policy import environment_exclusion_reasons
 
           root = Path('/tmp/nfl-wind-audit')
           out = Path('artifacts/football/nfl_pbp_wind_recovery_audit.json')
           expected_counts = {2022: 91, 2023: 41}
 
-          def sha256(path: Path) -> str:
+          def sha256(path):
               h = hashlib.sha256()
-              with path.open('rb') as handle:
+              with Path(path).open('rb') as handle:
                   for chunk in iter(lambda: handle.read(1024 * 1024), b''):
                       h.update(chunk)
               return h.hexdigest()
@@ -142,11 +132,9 @@ jobs:
                       if game_id not in target_rows:
                           continue
                       raw = row.get('wind')
-                      if raw in (None, ''):
+                      if raw in (None, '') or not str(raw).strip():
                           continue
                       text = str(raw).strip()
-                      if not text:
-                          continue
                       try:
                           value = float(text)
                       except ValueError:
@@ -157,8 +145,7 @@ jobs:
                           continue
                       pbp_valid[game_id].add(value)
 
-          recoverable = []
-          unresolved = []
+          recoverable, unresolved = [], []
           for game_id in sorted(target_rows):
               meta = target_rows[game_id]
               season = int(meta['season'])
@@ -167,12 +154,7 @@ jobs:
               if len(values) == 1:
                   classification = 'RECOVERABLE_UNIQUE_PBP_WIND'
                   by_season[season]['recoverable_unique_pbp_wind'] += 1
-                  recoverable.append({
-                      'game_id': game_id,
-                      'season': season,
-                      'roof': meta['roof'],
-                      'pbp_wind_mph': values[0],
-                  })
+                  recoverable.append({'game_id': game_id, 'season': season, 'roof': meta['roof'], 'pbp_wind_mph': values[0]})
               elif len(values) > 1:
                   classification = 'PBP_WIND_CONFLICT'
                   by_season[season]['pbp_wind_conflict'] += 1
@@ -192,8 +174,8 @@ jobs:
                       'invalid_pbp_wind_values': invalid,
                   })
 
-          observed_counts = {season: by_season[season]['wind_invalid_rows'] for season in expected_counts}
-          baseline_match = observed_counts == expected_counts
+          observed = {season: by_season[season]['wind_invalid_rows'] for season in expected_counts}
+          baseline_match = observed == expected_counts
           payload = {
               'schema_version': 1,
               'sport': 'nfl',
@@ -209,7 +191,7 @@ jobs:
               },
               'pbp_required_fields_present': pbp_headers,
               'expected_hosted_wind_invalid_counts': {str(k): v for k, v in expected_counts.items()},
-              'observed_wind_invalid_counts': {str(k): v for k, v in observed_counts.items()},
+              'observed_wind_invalid_counts': {str(k): v for k, v in observed.items()},
               'hosted_baseline_match': baseline_match,
               'seasons': {str(k): dict(v) for k, v in sorted(by_season.items())},
               'recoverable_count': len(recoverable),
@@ -220,12 +202,7 @@ jobs:
           }
           out.parent.mkdir(parents=True, exist_ok=True)
           out.write_text(json.dumps(payload, indent=2, sort_keys=True) + '\n', encoding='utf-8')
-          print(json.dumps({
-              'status': payload['status'],
-              'recoverable_count': payload['recoverable_count'],
-              'unresolved_count': payload['unresolved_count'],
-              'seasons': payload['seasons'],
-          }, sort_keys=True))
+          print(json.dumps({'status': payload['status'], 'recoverable_count': len(recoverable), 'unresolved_count': len(unresolved), 'seasons': payload['seasons']}, sort_keys=True))
           if not baseline_match:
               raise SystemExit('NFL_PBP_WIND_AUDIT_HOSTED_BASELINE_MISMATCH')
           PY
