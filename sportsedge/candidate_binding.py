@@ -28,12 +28,17 @@ def _key(m: Mapping[str, Any]) -> CandidateKey:
 
 
 def bind_model_to_quote(model_output: Mapping[str, Any], sportsbook_quote: Mapping[str, Any]) -> CandidateKey:
-    """Bind genuine model output to the offered quote without asserting promotion.
+    """Bind genuine model output to an offered quote without asserting promotion.
 
     Identity binding and deployment eligibility are separate concerns. This helper
     allows an unpromoted lane to retain an auditable MODEL_CANDIDATE while the
-    OFFICIAL gate remains fail-closed.
+    OFFICIAL gate remains fail-closed. Legacy-compat payloads are explicitly not
+    candidate-grade model output: they are migration shims that lack the current
+    canonical artifact/readout contract and must remain BLOCKED until replaced by
+    the real production model path.
     """
+    if str(model_output.get("runtime_path") or "").strip().upper() == "LEGACY_COMPAT":
+        raise BindingError("LEGACY_COMPAT_PATH_NOT_CANDIDATE")
     model_key = _key(model_output)
     quote_key = _key(sportsbook_quote)
     for field in CandidateKey.__dataclass_fields__:
