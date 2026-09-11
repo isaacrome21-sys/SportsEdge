@@ -5,6 +5,7 @@
   "purpose": "WS-CREDIT: reserve scheduled paid Odds API capacity for football forward evidence while MLB is parked for 2026.",
   "invariants": {
     "mlb_scheduled_paid_workflows": 0,
+    "mlb_scheduled_rescue_dispatchers": 0,
     "legacy_nfl_2026_line_capture_scheduled": false,
     "allowed_scheduled_paid_consumers": [
       ".github/workflows/football-nfl-forward-clv-collection.yml",
@@ -17,6 +18,7 @@
     ".github/workflows/archive-mlb-game-odds.yml",
     ".github/workflows/auto-mlb.yml",
     ".github/workflows/mlb-additional-pit-archive.yml",
+    ".github/workflows/mlb-deadman.yml",
     ".github/workflows/mlb-v8-evidence.yml",
     ".github/workflows/mlb-v8-replay-backfill.yml",
     ".github/workflows/nfl-2026-line-capture.yml"
