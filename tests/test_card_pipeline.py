@@ -32,12 +32,12 @@ class CardPipelineTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             p=Path(td)/"d.json"; f=Path(td)/"floors.json"; deployed_registry(p); floor_registry(f,["HITS"])
             out=run_hitter_card(games=[game()],feature_rows=[feature()],quotes=pair(),ingestion_now=NOW,finalization_now=NOW,registry_path=str(p),edge_floor_config_path=str(f))
-        self.assertEqual(out[0].bet_status,"BLOCKED"); self.assertIsNone(out[0].model_p); self.assertIn("LEGACY_COMPAT_PATH_NOT_PROMOTABLE",out[0].reason)
+        self.assertEqual(out[0].bet_status,"BLOCKED"); self.assertIsNone(out[0].model_p); self.assertIn("LEGACY_COMPAT_PATH_NOT_CANDIDATE",out[0].reason)
     def test_deployed_tb_cannot_promote_legacy_compat_payload(self):
         with tempfile.TemporaryDirectory() as td:
             p=Path(td)/"d.json"; f=Path(td)/"floors.json"; deployed_registry(p,True); floor_registry(f,["TOTAL_BASES"])
             out=run_hitter_card(games=[game()],feature_rows=[tb_feature()],quotes=pair("TOTAL_BASES"),ingestion_now=NOW,finalization_now=NOW,registry_path=str(p),edge_floor_config_path=str(f))
-        self.assertEqual(out[0].bet_status,"BLOCKED"); self.assertIsNone(out[0].model_p); self.assertIn("LEGACY_COMPAT_PATH_NOT_PROMOTABLE",out[0].reason)
+        self.assertEqual(out[0].bet_status,"BLOCKED"); self.assertIsNone(out[0].model_p); self.assertIn("LEGACY_COMPAT_PATH_NOT_CANDIDATE",out[0].reason)
     def test_hits_and_tb_can_coexist(self):
         out=run_hitter_card(games=[game()],feature_rows=[feature(),tb_feature()],quotes=[quote(),quote(market="TOTAL_BASES")],ingestion_now=NOW,finalization_now=NOW); self.assertEqual(len(out),2)
     def test_direct_quote_missing_taxonomy_blocks(self):
