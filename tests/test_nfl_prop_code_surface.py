@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from hashlib import sha1, sha256
 import json
 from pathlib import Path
 
@@ -7,8 +8,10 @@ import pytest
 
 from sportsedge.football_prop_run_machine import canonical_hash
 from sportsedge.sports.nfl.prop_code_surface import (
+    CFBPropCodeSurfaceError,
     NFLPropCodeSurfaceError,
     load_nfl_prop_artifact_bundle,
+    verify_cfb_prop_code_surface,
     verify_nfl_prop_code_surface,
 )
 
@@ -28,6 +31,15 @@ def _load(path: Path) -> dict:
 
 def _artifact(freeze: dict) -> dict:
     return load_nfl_prop_artifact_bundle(root=ROOT, bundle_path=ROOT / freeze["artifact_path"])
+
+
+def _canonical_sha(value: dict) -> str:
+    raw = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")
+    return sha256(raw).hexdigest()
+
+
+def _blob_sha(data: bytes) -> str:
+    return sha1(f"blob {len(data)}\0".encode("ascii") + data).hexdigest()
 
 
 def test_checked_in_nfl_artifact_is_exact_certified_bundle() -> None:
@@ -89,6 +101,44 @@ def test_predictive_code_mutation_fails_closed(tmp_path: Path) -> None:
     target.write_bytes(target.read_bytes() + b"\n# predictive mutation\n")
     with pytest.raises(NFLPropCodeSurfaceError, match="NFL_PROP_CODE_SURFACE_BLOB_MISMATCH"):
         verify_nfl_prop_code_surface(root=tmp_path, registry=freeze, artifact=artifact)
+
+
+def test_cfb_code_surface_can_attest_without_promoting(tmp_path: Path) -> None:
+    predictive = tmp_path / "sportsedge/football_prop_run_machine.py"
+    predictive.parent.mkdir(parents=True, exist_ok=True)
+    predictive.write_text("# frozen predictive bytes\n", encoding="utf-8")
+    artifact = {
+        "code_git_sha": "4ce88ba49bef9ffd9de0709e775cf1edd92aec1a",
+        "sport": "CFB",
+    }
+    artifact_sha = "55d6a1b3fc3443473f3733955e804cfcb94a5da478c21c25ecfd3771e20c6ed7"
+    manifest = {
+        "schema_version": "CFB_PROP_CODE_SURFACE_V1",
+        "sport": "CFB",
+        "fit_git_sha": artifact["code_git_sha"],
+        "artifact_sha256": artifact_sha,
+        "promotion_authority": False,
+        "files": [{"path": "sportsedge/football_prop_run_machine.py", "git_blob_sha1": _blob_sha(predictive.read_bytes())}],
+    }
+    manifest_rel = "config/cfb_prop_code_surface_v1.json"
+    manifest_path = tmp_path / manifest_rel
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    registry = {
+        "sport": "CFB",
+        "code_git_sha": artifact["code_git_sha"],
+        "artifact_sha256": artifact_sha,
+        "code_surface_manifest_path": manifest_rel,
+        "code_surface_manifest_sha256": _canonical_sha(manifest),
+    }
+    result = verify_cfb_prop_code_surface(root=tmp_path, registry=registry, artifact=artifact)
+    assert result["status"] == "COMPATIBLE"
+    assert result["sport"] == "CFB"
+    assert result["promotion_authority"] is False
+
+    predictive.write_text("# mutated predictive bytes\n", encoding="utf-8")
+    with pytest.raises(CFBPropCodeSurfaceError, match="CFB_PROP_CODE_SURFACE_BLOB_MISMATCH"):
+        verify_cfb_prop_code_surface(root=tmp_path, registry=registry, artifact=artifact)
 
 
 def test_cfb_prop_registry_remains_unfrozen() -> None:
