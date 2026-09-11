@@ -5,6 +5,12 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .v7_reduced_feature_contract import (
+    DEFAULT_REDUCED_CONTRACT_PATH,
+    V7ReducedFeatureContractError,
+    load_reduced_feature_contract,
+)
+
 
 class SourceReadinessError(RuntimeError):
     """Raised when the readiness contract itself is invalid or unverifiable."""
@@ -144,6 +150,7 @@ def audit_v7_backfill_source_readiness(
     requirements_path: Path,
     source_root: Path,
     data_ref: str,
+    reduced_contract_path: Path = DEFAULT_REDUCED_CONTRACT_PATH,
 ) -> dict[str, Any]:
     if not source_root.is_dir():
         raise SourceReadinessError(f"SOURCE_ROOT_MISSING:{source_root}")
@@ -173,6 +180,20 @@ def audit_v7_backfill_source_readiness(
         raise SourceReadinessError("DUPLICATE_FEATURE_PATH_IN_REQUIREMENTS")
     if set(required_paths) != set(approved):
         raise SourceReadinessError("POLICY_REQUIREMENTS_FEATURE_SET_MISMATCH")
+
+    reduced_contract_ready = False
+    reduced_contract: dict[str, Any] | None = None
+    reduced_path = Path(reduced_contract_path)
+    if reduced_path.is_file():
+        try:
+            reduced_contract = load_reduced_feature_contract(
+                reduced_path,
+                policy_path=policy_path,
+                requirements_path=requirements_path,
+            )
+        except V7ReducedFeatureContractError as exc:
+            raise SourceReadinessError(f"REDUCED_FEATURE_CONTRACT_INVALID:{exc}") from exc
+        reduced_contract_ready = True
 
     coverage = requirements.get("coverage", {})
     coverage_start = coverage.get("start")
@@ -206,9 +227,8 @@ def audit_v7_backfill_source_readiness(
     blockers: list[str] = []
     if not source_ready:
         blockers.append("SOURCE_COVERAGE")
-    # The existing trainer stamps the full 46-feature contract even when passed a subset.
-    # Source readiness alone therefore cannot authorize a reduced 12-feature artifact.
-    blockers.append("REDUCED_FEATURE_CONTRACT_NOT_FROZEN")
+    if not reduced_contract_ready:
+        blockers.append("REDUCED_FEATURE_CONTRACT_NOT_FROZEN")
 
     discovered = sorted(p.name for p in source_root.iterdir() if p.is_dir())
     return {
@@ -224,8 +244,11 @@ def audit_v7_backfill_source_readiness(
         "source_ready_feature_paths": ready_paths,
         "source_readiness_state": "READY_SOURCE_COVERAGE" if source_ready else "BLOCKED_SOURCE_COVERAGE",
         "groups": group_reports,
-        "reduced_feature_contract_ready": False,
-        "candidate_training_allowed": False,
+        "reduced_feature_contract_ready": reduced_contract_ready,
+        "reduced_feature_contract_file_sha256": None if reduced_contract is None else reduced_contract["contract_file_sha256"],
+        "reduced_feature_contract_sha256": None if reduced_contract is None else reduced_contract["feature_contract_sha256"],
+        "reduced_feature_paths": [] if reduced_contract is None else list(reduced_contract["feature_paths"]),
+        "candidate_training_allowed": source_ready and reduced_contract_ready,
         "candidate_training_blockers": blockers,
         "promotion_authority": False,
     }
