@@ -130,10 +130,21 @@ class CardStatus(unittest.TestCase):
         with self.assertRaises(ValueError):
             cs.assert_card_integrity(bad)
 
+    def test_official_integrity_requires_model_p(self):
+        with self.assertRaises(ValueError):
+            cs.assert_card_integrity([{"status": "OFFICIAL", "model_p": None}])
+
 
 TRIAL_POLICY = cs.load_trial_policy(ROOT / "config/trial_policy_v1.json")
 QUOTE = {"book": "fanduel", "price_american": -108, "retrieved_at": "2027-09-10T23:00:00Z",
          "model_artifact_sha": "abc123"}
+
+
+def ledger(base=1.0, slates=40, per=5, model_sha="abc123", policy_sha=None):
+    policy_sha = policy_sha or TRIAL_POLICY["_sha256"]
+    return [{"slate_date": f"d{g}", "clv_pp": base + (0.5 if g % 2 == 0 else -0.5),
+             "model_artifact_sha": model_sha, "trial_policy_sha256": policy_sha}
+            for g in range(slates) for _ in range(per)]
 
 
 def trial(**over):
@@ -152,6 +163,7 @@ class TrialTier(unittest.TestCase):
         self.assertFalse(row["confidence_allowed"])
         self.assertEqual(row["trial_policy_sha256"], TRIAL_POLICY["_sha256"])
         self.assertEqual(row["model_artifact_sha"], QUOTE["model_artifact_sha"])
+        self.assertEqual(row["trial_stage_evidence"]["settled"], 0)
 
     def test_below_threshold_blocked(self):
         row = trial(edge=0.029)
@@ -180,8 +192,16 @@ class TrialTier(unittest.TestCase):
         self.assertEqual(row["status"], cs.BLOCKED)
         self.assertEqual(row["reasons"], ["NO_FROZEN_EDGE_FLOOR"])
 
-    def test_micro_stage_stake(self):
-        self.assertEqual(trial(trial_stage=cs.MICRO)["stake_units"], 0.25)
+    def test_micro_stage_is_derived_from_settled_ledger(self):
+        row = trial(settled_trial_rows=ledger(1.0))
+        self.assertEqual(row["trial_stage"], cs.MICRO)
+        self.assertEqual(row["stake_units"], 0.25)
+        self.assertGreaterEqual(row["trial_stage_evidence"]["settled"], 200)
+        self.assertGreaterEqual(row["trial_stage_evidence"]["slate_clusters"], 20)
+
+    def test_insufficient_or_stale_evidence_stays_paper(self):
+        self.assertEqual(trial(settled_trial_rows=ledger(1.0, slates=10))["trial_stage"], cs.PAPER)
+        self.assertEqual(trial(settled_trial_rows=ledger(1.0, model_sha="old"))["trial_stage"], cs.PAPER)
 
     def test_cap_keeps_top_edges_per_sport(self):
         rows = []
@@ -210,11 +230,6 @@ class TrialTier(unittest.TestCase):
         self.assertEqual(sum("TRIAL_CAP_EXCEEDED" in r["reasons"] for r in capped), 2)
 
     def test_stage_needs_sample_and_clv(self):
-        def ledger(base, slates=40, per=5, model_sha="abc123", policy_sha=None):
-            policy_sha = policy_sha or TRIAL_POLICY["_sha256"]
-            return [{"slate_date": f"d{g}", "clv_pp": base + (0.5 if g % 2 == 0 else -0.5),
-                     "model_artifact_sha": model_sha, "trial_policy_sha256": policy_sha}
-                    for g in range(slates) for _ in range(per)]
         good = cs.trial_stage_for_market(ledger(1.0), TRIAL_POLICY, model_artifact_sha="abc123")
         self.assertEqual(good["stage"], cs.MICRO)
         self.assertAlmostEqual(good["clv_t_stat"], 1.0 / ((40 / 39) * 250 / 40000) ** 0.5, places=6)
@@ -223,17 +238,7 @@ class TrialTier(unittest.TestCase):
         self.assertEqual(cs.trial_stage_for_market([], TRIAL_POLICY, model_artifact_sha="abc123")["stage"], cs.PAPER)
 
     def test_stage_evidence_clock_rejects_stale_model_and_policy(self):
-        rows = []
-        for g in range(40):
-            for _ in range(5):
-                rows.append({"slate_date": f"d{g}", "clv_pp": 2.0,
-                             "model_artifact_sha": "old-model",
-                             "trial_policy_sha256": TRIAL_POLICY["_sha256"]})
-        for g in range(40):
-            for _ in range(5):
-                rows.append({"slate_date": f"n{g}", "clv_pp": 2.0,
-                             "model_artifact_sha": "abc123",
-                             "trial_policy_sha256": "old-policy"})
+        rows = ledger(2.0, model_sha="old-model") + ledger(2.0, model_sha="abc123", policy_sha="old-policy")
         result = cs.trial_stage_for_market(rows, TRIAL_POLICY, model_artifact_sha="abc123")
         self.assertEqual(result["stage"], cs.PAPER)
         self.assertEqual(result["settled"], 0)
@@ -243,18 +248,30 @@ class TrialTier(unittest.TestCase):
             cs.trial_stage_for_market([], TRIAL_POLICY, model_artifact_sha="")
 
     def test_integrity_checks_trial_rows(self):
-        row = dict(trial(), model_p=0.56)
+        row = dict(trial(), model_p=0.56, edge=0.035)
         cs.assert_card_integrity([row], TRIAL_POLICY)
         with self.assertRaises(ValueError):
             cs.assert_card_integrity([dict(row, stake_units=1.0)], TRIAL_POLICY)
         with self.assertRaises(ValueError):
             cs.assert_card_integrity([dict(row, confidence="70%")], TRIAL_POLICY)
         with self.assertRaises(ValueError):
-            cs.assert_card_integrity([dict(row, trial_stage=cs.MICRO, stake_units=0.0)], TRIAL_POLICY)
-        with self.assertRaises(ValueError):
             cs.assert_card_integrity([dict(row, trial_policy_sha256="stale")], TRIAL_POLICY)
         with self.assertRaises(ValueError):
+            cs.assert_card_integrity([dict(row, reasons=["VENUE_SENSITIVITY", "NOT_PROMOTED"])], TRIAL_POLICY)
+        with self.assertRaises(ValueError):
+            cs.assert_card_integrity([dict(row, edge=0.01)], TRIAL_POLICY)
+        with self.assertRaises(ValueError):
+            cs.assert_card_integrity([dict(row, kelly_fraction=0.25)], TRIAL_POLICY)
+        with self.assertRaises(ValueError):
             cs.assert_card_integrity([{"status": "BLOCKED", "reasons": ["X"], "stake_units": 0.25}])
+
+    def test_integrity_checks_micro_evidence_snapshot(self):
+        micro = trial(settled_trial_rows=ledger(1.0))
+        row = dict(micro, model_p=0.56, edge=0.035)
+        cs.assert_card_integrity([row], TRIAL_POLICY)
+        bad_evidence = dict(row["trial_stage_evidence"], settled=199)
+        with self.assertRaises(ValueError):
+            cs.assert_card_integrity([dict(row, trial_stage_evidence=bad_evidence)], TRIAL_POLICY)
 
 
 if __name__ == "__main__":
