@@ -36,8 +36,12 @@ class RuntimeDispatchTests(unittest.TestCase):
         self.assertAlmostEqual(hits_engine_adapter(legacy_model_input("OVER"))["model_p"]+hits_engine_adapter(legacy_model_input("UNDER"))["model_p"],1.0,places=12)
     def test_unsupported_hits_line_rejected(self):
         with self.assertRaises(EngineDispatchError): hits_engine_adapter(legacy_model_input(line=3.5))
-    def test_checked_in_registry_blocks_hits_even_with_positive_edge(self):
-        result=run_payload(payload())[0]; self.assertEqual(result.bet_status,"BLOCKED"); self.assertIsNone(result.model_p); self.assertIn("deployment not eligible",result.reason)
+    def test_checked_in_registry_retains_model_candidate_but_not_official(self):
+        result=run_payload(payload())[0]
+        self.assertEqual(result.bet_status,"MODEL_CANDIDATE")
+        self.assertIsNotNone(result.model_p)
+        self.assertIn("OFFICIAL_BLOCKED",result.reason)
+        self.assertIn("eligible",result.reason.lower())
     def test_deployed_test_registry_can_reach_truth_gate(self):
         with tempfile.TemporaryDirectory() as td:
             p=Path(td)/"registry.json"; f=Path(td)/"floors.json"; registry(p,eligible=True,stage="DEPLOYED"); floors(f); result=run_payload(payload(),registry_path=p,edge_floor_config_path=str(f))[0]
