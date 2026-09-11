@@ -95,7 +95,7 @@ jobs:
               git rebase --abort 2>/dev/null || true
               sleep 5
             done
-            if [ "$pushed" != "1" ]; then echo "PUSH_FAILED: manual observation was not persisted"; exit 1; fi
+            if [ "$pushed" != "1" ]; then echo "MANUAL_PUSH_FAILED: manual observation was not persisted"; exit 1; fi
           fi
       - name: Fail on rejected manual close
         if: steps.manual.outputs.code != '0'
