@@ -10,6 +10,7 @@ from urllib.request import Request, urlopen
 
 from .auto_slate import build_nfl_auto_context_slate
 from .context_autopull import ContextObservation, NFLContextError
+from .injury_report_source import fetch_nflverse_injuries
 from .snap_workload_source import fetch_nflverse_snap_counts
 
 DEPTH_CHART_URL = "https://github.com/nflverse/nflverse-data/releases/download/depth_charts/depth_charts_{season}.csv"
@@ -74,19 +75,21 @@ def build_nfl_full_auto_slate(
 ) -> dict[str, Any]:
     """Canonical zero-game-list NFL AUTO/HYBRID context entry point.
 
-    Independent depth-chart and strictly-prior snap-workload sources are acquired
-    concurrently. Either can fail without fabricating values or blocking unrelated
-    context classes. Same-week snap rows are excluded because the source lacks an
-    authoritative event timestamp suitable for intra-week PIT ordering.
+    Depth charts, strictly-prior snap workload, and near-official nflverse
+    injury/practice reports are acquired concurrently. Each source fails at its
+    own context scope. Injury rows are later filtered by `date_modified <= as_of`;
+    nflverse is kept explicitly distinct from official-host-confirmed NFL reports.
     """
     pit = _utc(as_of)
     resolved_season = int(season if season is not None else pit.year)
 
-    with ThreadPoolExecutor(max_workers=2) as pool:
+    with ThreadPoolExecutor(max_workers=3) as pool:
         depth_future = pool.submit(fetch_nflverse_depth_charts, season=resolved_season, opener=opener)
         snap_future = pool.submit(fetch_nflverse_snap_counts, season=resolved_season, opener=opener)
+        injury_future = pool.submit(fetch_nflverse_injuries, season=resolved_season, opener=opener)
         depth_rows, depth_uri, depth_sha, depth_status = _source_result(depth_future, "DEPTH_CHART")
         snap_rows, snap_uri, snap_sha, snap_status = _source_result(snap_future, "SNAP_COUNTS")
+        injury_rows, injury_uri, injury_sha, injury_status = _source_result(injury_future, "INJURIES")
 
     slate = build_nfl_auto_context_slate(
         as_of=pit,
@@ -101,6 +104,9 @@ def build_nfl_full_auto_slate(
         snap_count_rows=snap_rows,
         snap_count_source_uri=snap_uri,
         snap_count_source_sha256=snap_sha,
+        injury_rows=injury_rows,
+        injury_source_uri=injury_uri,
+        injury_source_sha256=injury_sha,
         opener=opener,
     )
     slate["automation"] = {
@@ -111,6 +117,10 @@ def build_nfl_full_auto_slate(
         "snap_count_status": snap_status,
         "snap_count_source_uri": snap_uri,
         "snap_workload_pit_policy": "STRICTLY_PRIOR_WEEK_ONLY",
+        "injury_status": injury_status,
+        "injury_source_uri": injury_uri,
+        "injury_pit_policy": "LATEST_DATE_MODIFIED_NOT_AFTER_AS_OF",
+        "injury_confirmation_level": "NFLVERSE_NFLAPI_DERIVED_NOT_OFFICIAL_HOST_CONFIRMED",
         "market_context_ingested": False,
         "social_context_ingested": False,
     }
