@@ -1,0 +1,213 @@
+{
+  "artifact_version": "NFL_PROP_SHARED_PATH_2022_2025_V1",
+  "code_git_sha": "5dfa29347bed608771e6a2395ce8e894dbfdd881",
+  "fit_scope": {
+    "season_type": "REG",
+    "seasons": [
+      2022,
+      2023,
+      2024,
+      2025
+    ],
+    "team_count": 32
+  },
+  "schema_version": "FOOTBALL_PROP_MODEL_ARTIFACT_V1",
+  "source_manifest_sha256": "71b6a1ed010e963dd0e8bb0b8a18d2a3a9cdef1914084631fe5adb9ed2c278da",
+  "sport": "NFL",
+  "team_drive_profiles": {
+    "ARI": {
+      "completion_rate": 0.6566115702479339,
+      "explosive_rate": 0.05257063455303381,
+      "field_goal_attempt_rate": 0.6711409395973155,
+      "field_goal_skill": 0.8455882352941176,
+      "pace_seconds_mean": 31.248265460030165,
+      "pass_rate": 0.6014358499305233,
+      "sack_rate": 0.06815556411243742,
+      "success_rate": 0.42797591477535896,
+      "turnover_rate": 0.018527095877721167
+    },
+    "ATL": {
+      "completion_rate": 0.6262230919765166,
+      "explosive_rate": 0.05510496183206107,
+      "field_goal_attempt_rate": 0.7078651685393258,
+      "field_goal_skill": 0.8116883116883117,
+      "pace_seconds_mean": 32.00212701306594,
+      "pass_rate": 0.5197996183206107,
+      "sack_rate": 0.06195502524093621,
+      "success_rate": 0.4458492366412214,
+      "turnover_rate": 0.02051526717557252
+    },
+    "BAL": {
+      "completion_rate": 0.6534970635344367,
+      "explosive_rate": 0.06749816581071166,
+      "field_goal_attempt_rate": 0.756578947368421,
+      "field_goal_skill": 0.8402777777777778,
+      "pace_seconds_mean": 33.2600561272217,
+      "pass_rate": 0.4942528735632184,
+      "sack_rate": 0.07323107372587828,
+      "success_rate": 0.46881878209831257,
+      "turnover_rate": 0.01785277573978968
+    },
+    "BUF": {
+      "completion_rate": 0.6518144235186036,
+      "explosive_rate": 0.06575801052128169,
+      "field_goal_attempt_rate": 0.6346153846153846,
+      "field_goal_skill": 0.8545454545454545,
+      "pace_seconds_mean": 32.83004552352048,
+      "pass_rate": 0.5471066475370636,
+      "sack_rate": 0.048513986013986016,
+      "success_rate": 0.4851745576279292,
+      "turnover_rate": 0.018890483022477284
+    },
+    "CAR": {
+      "completion_rate": 0.6111111111111112,
+      "explosive_rate": 0.05237154150197629,
+      "field_goal_attempt_rate": 0.6226415094339622,
+      "field_goal_skill": 0.8666666666666667,
+      "pace_seconds_mean": 32.31342324983944,
+      "pass_rate": 0.5627470355731226,
+      "sack_rate": 0.07550482879719052,
+      "success_rate": 0.4058794466403162,
+      "turnover_rate": 0.020256916996047432
+    },
+    "CHI": {
+      "completion_rate": 0.6019559902200489,
+      "explosive_rate": 0.056041617403641525,
+      "field_goal_attempt_rate": 0.653179190751445,
+      "field_goal_skill": 0.8837209302325582,
+      "pace_seconds_mean": 32.04457831325301,
+      "pass_rate": 0.5308583589501064,
+      "sack_rate": 0.08908685968819599,
+      "success_rate": 0.42043036178765664,
+      "turnover_rate": 0.01702530148971388
+    },
+    "CIN": {
+      "completion_rate": 0.6777645659928656,
+      "explosive_rate": 0.054254302103250475,
+      "field_goal_attempt_rate": 0.6870748299319728,
+      "field_goal_skill": 0.8264462809917356,
+      "pace_seconds_mean": 33.472658705216844,
+       "pass_rate": 0.6455544933078394,
+      "sack_rate": 0.06590151795631248,
+      "success_rate": 0.4600860420650096,
+      "turnover_rate": 0.018164435946462717
+    },
+    "CLE": {
+      "completion_rate": 0.5906040268456376,
+      "explosive_rate": 0.04831790471889817,
+      "field_goal_attempt_rate": 0.6123595505617978,
+      "field_goal_skill": 0.8130081300813008,
+      "pace_seconds_mean": 31.347387173396676,
+      "pass_rate": 0.584782117859562,
+      "sack_rate": 0.07953667953667953,
+      "success_rate": 0.3867690223526756,
+      "turnover_rate": 0.025287875366899977
+    },
+    "DAL": {
+      "completion_rate": 0.657354149548069,
+      "explosive_rate": 0.059491371480472295,
+      "field_goal_attempt_rate": 0.7142857142857143,
+      "field_goal_skill": 0.8867924528301887,
+      "pace_seconds_mean": 30.8984126984127,
+      "pass_rate": 0.5835603996366939,
+      "sack_rate": 0.05291828793774319,
+      "success_rate": 0.4482288828337875,
+      "turnover_rate": 0.01907356948228883
+    },
+    "DEN": {
+      "completion_rate": 0.6383259911894273,
+      "explosive_rate": 0.0560993077106708,
+      "field_goal_attempt_rate": 0.6875,
+      "field_goal_skill": 0.8602941176470589,
+      "pace_seconds_mean": 31.768968720966242,
+      "pass_rate": 0.580568154690857,
+      "sack_rate": 0.06661184210526316,
+      "success_rate": 0.41776080210074,
+      "turnover_rate": 0.017904034375746003
+    },
+    "DET": {
+      "completion_rate": 0.6815834767641996,
+      "explosive_rate": 0.07129714811407543,
+      "field_goal_attempt_rate": 0.4918918918918919,
+      "field_goal_skill": 0.8421052631578947,
+      "pace_seconds_mean": 32.57699115044248,
+      "pass_rate": 0.5637074517019319,
+      "sack_rate": 0.0518155854753162,
+      "success_rate": 0.46803127874885003,
+      "turnover_rate": 0.01517939282428703
+    },
+    "GB": {
+      "completion_rate": 0.6487252124645893,
+      "explosive_rate": 0.06647116324535679,
+      "field_goal_attempt_rate": 0.6790123456790124,
+      "field_goal_skill": 0.835820895522388,
+      "pace_seconds_mean": 33.774656679151065,
+      "pass_rate": 0.5452101661779081,
+      "sack_rate": 0.05064993276557597,
+      "success_rate": 0.4572336265884653,
+      "turnover_rate": 0.016373411534701857
+    },
+    "HOU": {
+      "completion_rate": 0.6217728055077453,
+      "explosive_rate": 0.05887939221272555,
+      "field_goal_attempt_rate": 0.7388888888888889,
+      "field_goal_skill": 0.901840490797546,
+      "pace_seconds_mean": 32.25545851528384,
+      "pass_rate": 0.5921177587844254,
+      "sack_rate": 0.0681635926222935,
+      "success_rate": 0.3950617283950617,
+      "turnover_rate": 0.016619183285849954
+    },
+    "IND": {
+      "completion_rate": 0.6231111111111111,
+      "explosive_rate": 0.054820415879017016,
+      "field_goal_attempt_rate": 0.6649746192893401,
+      "field_goal_skill": 0.8496732026143791,
+      "pace_seconds_mean": 31.38668295662798,
+      "pass_rate": 0.5699432892249527,
+      "sack_rate": 0.06716417910447761,
+      "success_rate": 0.417296786389414,
+      "turnover_rate": 0.02386578449905482
+    },
+    "JAX": {
+      "completion_rate": 0.6385799828913601,
+      "explosive_rate": 0.06094968107725018,
+      "field_goal_attempt_rate": 0.6863905325443787,
+      "field_goal_skill": 0.866666666666667,
+      "pace_seconds_mean": 32.108008591592515,
+      "pass_rate": 0.5858729033782187,
+      "sack_rate": 0.05725806451612903,
+      "success_rate": 0.43609733049846444,
+      "turnover_rate": 0.021733994802740374
+    },
+    "KC": {
+      "completion_rate": 0.6568191015783084,
+      "explosive_rate": 0.058491895701198025,
+      "field_goal_attempt_rate": 0.7483870967741936,
+      "field_goal_skill": 0.8591549295774648,
+      "pace_seconds_mean": 31.934323922734027,
+      "pass_rate": 0.6138125440451022,
+      "sack_rate": 0.05434366628396479,
+      "success_rate": 0.46582100070472165,
+      "turnover_rate": 0.017148226450552032
+    },
+    "LA": {
+      "completion_rate": 0.6447774349933891,
+      "explosive_rate": 0.06222969726093224,
+      "field_goal_attempt_rate": 0.6705882352941176,
+      "field_goal_skill": 0.8222222222222222,
+      "pace_seconds_mean": 32.458667489204196,
+      "pass_rate": 0.5804901489668428,
+      "sack_rate": 0.06084437086092715,
+      "success_rate": 0.4697528876668247,
+      "turnover_rate": 0.017811704834605598
+    },
+    "LAC": {
+      "completion_rate": 0.6443468685239764,
+      "explosive_rate": 0.05094675642100791,
+      "field_goal_attempt_rate": 0.6274509804313726,
+      "field_goal_skill": 0.9328859060402684,
+      "pace_seconds_mean": 32.04950166112957,
+      "pass_rate": 0.6046476021131069,
+      "sack_rate": 0.07402265886493424,
+      "success_rate": 0.4536842105263158,4ÑPÐ€L@
