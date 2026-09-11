@@ -10,14 +10,24 @@ from sportsedge.football_prop_surface import require_executable_prop_surface
 
 class FootballPropSurfaceTests(unittest.TestCase):
     def test_nfl_and_cfb_surface_is_runtime_bound_and_registry_derived(self):
-        for sport in ("NFL", "CFB"):
-            spec = require_executable_prop_surface(sport)
-            self.assertEqual(spec["engine_state"], "IMPLEMENTED_FAIL_CLOSED")
-            self.assertEqual(spec["promotion_state"], "AUTOMATIC_TRUTH_GATE_GATED")
-            self.assertEqual(spec["readiness_state"], "REGISTRY_DERIVED")
-            self.assertEqual(spec["runtime_state"], "MODEL_ARTIFACT_BLOCKED")
-            self.assertIsNone(spec["frozen_artifact_sha256"])
-            self.assertTrue(spec["certification_registry"].endswith("_prop_certification.json"))
+        nfl = require_executable_prop_surface("NFL")
+        self.assertEqual(nfl["engine_state"], "IMPLEMENTED_FAIL_CLOSED")
+        self.assertEqual(nfl["promotion_state"], "AUTOMATIC_TRUTH_GATE_GATED")
+        self.assertEqual(nfl["readiness_state"], "REGISTRY_DERIVED")
+        self.assertEqual(nfl["runtime_state"], "ARTIFACT_FROZEN_EVIDENCE_GATED")
+        self.assertEqual(
+            nfl["frozen_artifact_sha256"],
+            "3efa5cc92b5ed1bf53a99cbe0d6e7792d01791a77c8f684874d66213b73d9570",
+        )
+        self.assertTrue(nfl["certification_registry"].endswith("_prop_certification.json"))
+
+        cfb = require_executable_prop_surface("CFB")
+        self.assertEqual(cfb["engine_state"], "IMPLEMENTED_FAIL_CLOSED")
+        self.assertEqual(cfb["promotion_state"], "AUTOMATIC_TRUTH_GATE_GATED")
+        self.assertEqual(cfb["readiness_state"], "REGISTRY_DERIVED")
+        self.assertEqual(cfb["runtime_state"], "MODEL_ARTIFACT_BLOCKED")
+        self.assertIsNone(cfb["frozen_artifact_sha256"])
+        self.assertTrue(cfb["certification_registry"].endswith("_prop_certification.json"))
 
     def test_declared_provider_surface_matches_extended_run_machine_exactly(self):
         payload = json.loads(Path("config/football_prop_engine_surface.json").read_text())
@@ -54,11 +64,19 @@ class FootballPropSurfaceTests(unittest.TestCase):
         self.assertNotIn("requires_paired_price_for_market_economics", governance)
 
     def test_checked_in_freeze_registries_remain_truthful(self):
-        for sport in ("nfl", "cfb"):
-            row = json.loads(Path(f"config/{sport}_prop_model_freeze.json").read_text())
-            self.assertEqual(row["status"], "UNFROZEN")
-            self.assertIsNone(row["artifact_sha256"])
-            self.assertFalse((Path(row["artifact_path"])).is_file())
+        nfl = json.loads(Path("config/nfl_prop_model_freeze.json").read_text())
+        self.assertEqual(nfl["status"], "FROZEN")
+        self.assertEqual(
+            nfl["artifact_sha256"],
+            "3efa5cc92b5ed1bf53a99cbe0d6e7792d01791a77c8f684874d66213b73d9570",
+        )
+        self.assertTrue(Path(nfl["artifact_path"]).is_file())
+        self.assertFalse(nfl["promotion_authority"])
+
+        cfb = json.loads(Path("config/cfb_prop_model_freeze.json").read_text())
+        self.assertEqual(cfb["status"], "UNFROZEN")
+        self.assertIsNone(cfb["artifact_sha256"])
+        self.assertFalse(Path(cfb["artifact_path"]).is_file())
 
 
 if __name__ == "__main__":
