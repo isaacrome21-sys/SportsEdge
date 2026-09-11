@@ -8,8 +8,13 @@ from unittest.mock import patch
 
 from sportsedge.edge_floors import EdgeFloorError
 from sportsedge.football_prop_certification import (
+    EVIDENCE_UNIT_ALGORITHM,
+    PROMOTION_ATTESTATION_SCHEMA,
     FootballPropCertificationError,
+    active_promotion_policy_binding,
     assess_market_certification,
+    promotion_attestation_sha256,
+    promotion_evidence_unit_sha256,
 )
 from sportsedge.football_prop_evidence import EVIDENCE_GROUPS
 from sportsedge.football_prop_readiness import run_football_props_ready
@@ -35,18 +40,41 @@ def _evidence():
 
 
 def _certification(*, market=MARKET):
+    binding = active_promotion_policy_binding()
+    lane_id = f"NFL:{market}:V2_TEST_LANE"
+    market_definition_sha = "d" * 64
+    attestation = {
+        "schema_version": PROMOTION_ATTESTATION_SCHEMA,
+        "sport": "NFL",
+        "provider_market": market,
+        "lane_id": lane_id,
+        "model_artifact_sha256": ARTIFACT_SHA,
+        "market_definition_sha256": market_definition_sha,
+        "policy_id": binding["policy_id"],
+        "policy_sha256": binding["policy_sha256"],
+        "evidence_ref": binding["evidence_ref"],
+        "evidence_sha256": "c" * 64,
+        "evidence_unit_algorithm": EVIDENCE_UNIT_ALGORITHM,
+        "evidence_unit_sha256": promotion_evidence_unit_sha256(
+            lane_id=lane_id,
+            model_artifact_sha256=ARTIFACT_SHA,
+            market_definition_sha256=market_definition_sha,
+            policy_sha256=binding["policy_sha256"],
+        ),
+        "graded_bets": binding["official_checkpoint_graded_bets"],
+        "promotion_result": {
+            "state": "OFFICIAL",
+            "decision": "PROMOTE_OFFICIAL",
+        },
+    }
+    attestation["attestation_sha256"] = promotion_attestation_sha256(attestation)
     return {
-        "schema_version": "FOOTBALL_PROP_CERTIFICATION_V1",
+        "schema_version": "FOOTBALL_PROP_CERTIFICATION_V2",
         "sport": "NFL",
         "markets": {
             market: {
                 "status": "PASS",
-                "evidence_sha256": "c" * 64,
-                "model_artifact_sha256": ARTIFACT_SHA,
-                "observations": 250,
-                "calibration": {"slope": 1.0, "intercept": 0.0, "ece": 0.01},
-                "mean_clv": 0.01,
-                "after_vig_roi": 0.03,
+                "promotion_attestation": attestation,
             }
         },
     }
@@ -123,21 +151,44 @@ def _report(*, market=MARKET, fair_market_p=0.50):
 
 
 class FootballPropCertificationTests(unittest.TestCase):
-    def test_numeric_pass_is_exact_artifact_bound(self):
+    def test_v2_pass_is_exact_artifact_and_policy_bound(self):
         state = assess_market_certification(
             sport="NFL", provider_market=MARKET,
             model_artifact_sha256=ARTIFACT_SHA,
             registry=_certification(),
         )
+        binding = active_promotion_policy_binding()
         self.assertTrue(state["ready"])
-        self.assertGreaterEqual(state["observations"], 200)
+        self.assertEqual(state["promotion"]["graded_bets"], 150)
+        self.assertEqual(state["promotion"]["policy_id"], "PROMOTION_EVIDENCE_POLICY_V2")
+        self.assertEqual(state["promotion"]["policy_sha256"], binding["policy_sha256"])
+        self.assertNotIn("after_vig_roi", state)
+        self.assertNotIn("mean_clv", state)
 
-    def test_claimed_pass_cannot_hide_failed_calibration(self):
-        registry = _certification()
-        registry["markets"][MARKET]["calibration"]["ece"] = 0.04
+    def test_legacy_v1_registry_cannot_use_shadow_thresholds(self):
+        legacy = {
+            "schema_version": "FOOTBALL_PROP_CERTIFICATION_V1",
+            "sport": "NFL",
+            "markets": {},
+        }
         with self.assertRaisesRegex(
             FootballPropCertificationError,
-            "FOOTBALL_PROP_CERTIFICATION_PASS_CONTRADICTION",
+            "FOOTBALL_PROP_CERTIFICATION_REGISTRY_SCHEMA_INVALID",
+        ):
+            assess_market_certification(
+                sport="NFL", provider_market=MARKET,
+                model_artifact_sha256=ARTIFACT_SHA,
+                registry=legacy,
+            )
+
+    def test_claimed_pass_cannot_hide_nonofficial_v2_result(self):
+        registry = _certification()
+        att = registry["markets"][MARKET]["promotion_attestation"]
+        att["promotion_result"] = {"state": "PROBATION", "decision": "CONTINUE_PROBATION"}
+        att["attestation_sha256"] = promotion_attestation_sha256(att)
+        with self.assertRaisesRegex(
+            FootballPropCertificationError,
+            "FOOTBALL_PROP_CERTIFICATION_PASS_CONTRADICTION:.*PROMOTION_RESULT_NOT_OFFICIAL",
         ):
             assess_market_certification(
                 sport="NFL", provider_market=MARKET,
@@ -156,6 +207,36 @@ class FootballPropCertificationTests(unittest.TestCase):
             state["blockers"],
             [f"PROP_CERTIFICATION_ARTIFACT_MISMATCH:{MARKET}"],
         )
+
+    def test_policy_hash_tamper_fails_closed(self):
+        registry = _certification()
+        att = registry["markets"][MARKET]["promotion_attestation"]
+        att["policy_sha256"] = "9" * 64
+        att["attestation_sha256"] = promotion_attestation_sha256(att)
+        with self.assertRaisesRegex(
+            FootballPropCertificationError,
+            "PROMOTION_POLICY_SHA256_MISMATCH",
+        ):
+            assess_market_certification(
+                sport="NFL", provider_market=MARKET,
+                model_artifact_sha256=ARTIFACT_SHA,
+                registry=registry,
+            )
+
+    def test_evidence_unit_tamper_fails_closed(self):
+        registry = _certification()
+        att = registry["markets"][MARKET]["promotion_attestation"]
+        att["evidence_unit_sha256"] = "9" * 64
+        att["attestation_sha256"] = promotion_attestation_sha256(att)
+        with self.assertRaisesRegex(
+            FootballPropCertificationError,
+            "PROMOTION_EVIDENCE_UNIT_MISMATCH",
+        ):
+            assess_market_certification(
+                sport="NFL", provider_market=MARKET,
+                model_artifact_sha256=ARTIFACT_SHA,
+                registry=registry,
+            )
 
     def test_all_real_gates_have_an_official_open_path(self):
         with tempfile.TemporaryDirectory() as td:
