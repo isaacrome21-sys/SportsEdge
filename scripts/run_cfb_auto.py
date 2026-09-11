@@ -100,6 +100,10 @@ def _credentials() -> tuple[str, str]:
 
 def _model(path: Path, *, repo_root: Path):
     """Load only an artifact authorized by the committed freeze registry."""
+    # Preserve the most local blocker first: if the canonical artifact does not
+    # exist, no registry lookup can make the runtime usable.
+    if not path.is_file():
+        raise CFBAutoError("CFB_AUTO_FROZEN_MODEL_ARTIFACT_REQUIRED")
     try:
         registry = load_cfb_game_freeze(repo_root / "config/cfb_game_model_freeze.json")
     except CFBGameFreezeError as exc:
@@ -107,8 +111,6 @@ def _model(path: Path, *, repo_root: Path):
     expected_path = repo_root / str(registry["artifact_path"])
     if path.resolve() != expected_path.resolve():
         raise CFBAutoError("CFB_AUTO_MODEL_ARTIFACT_PATH_NOT_FROZEN")
-    if not path.is_file():
-        raise CFBAutoError("CFB_AUTO_FROZEN_MODEL_ARTIFACT_REQUIRED")
     try:
         raw = path.read_bytes()
         payload = json.loads(raw.decode("utf-8"))
