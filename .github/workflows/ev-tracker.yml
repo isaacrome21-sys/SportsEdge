@@ -17,7 +17,7 @@ jobs:
       contents: write
       issues: write
     concurrency:
-      group: ev-tracker-issue-${{ github.event.issue.number }}
+      group: sportsedge-paid-odds-api
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # repo-standard pin
@@ -62,7 +62,7 @@ jobs:
     permissions:
       contents: write
     concurrency:
-      group: ev-tracker-close
+      group: sportsedge-paid-odds-api
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # repo-standard pin
