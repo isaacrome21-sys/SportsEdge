@@ -14,10 +14,12 @@ Venue support gets a price. Promotion evidence decides whether that price may be
 
 - Max 5 TRIAL plays per sport per slate, highest edge first.
 - **PAPER** (0 units) by default.
-- **MICRO** (0.25 units) for a market only after 200+ settled TRIAL plays across 20+ slates with mean CLV of at least +0.5pp and a cluster-robust t-stat of at least 2.0. Rechecked before every slate; failing drops it back to PAPER.
+- **MICRO** (0.25 units) for a market only after 200+ settled TRIAL plays across 20+ slates with mean CLV of at least +0.5pp and a cluster-robust t-stat of at least 2.0. Rechecked from the settled ledger before every slate; failing drops it back to PAPER.
+- MICRO cannot be selected by a caller or renderer. The status layer derives it from the current settled TRIAL ledger under the current model-artifact SHA and TRIAL-policy SHA.
 - TRIAL rows count as forward evidence only while the model artifact and this policy are unchanged. Any change restarts the clock.
 - Market info, splits, and context leans never create a TRIAL play.
 - A promoted market with no frozen edge floor is **BLOCKED**, not TRIAL.
+- TRIAL never uses Kelly sizing or a bankroll fraction; stake is exactly 0u in PAPER and 0.25u in MICRO.
 
 Retracted cards stay in the RUN IT ledger as process-correctness failures, with the time issued and retracted.
 
@@ -30,7 +32,8 @@ CARD STATUS RULES (mandatory)
 - OFFICIAL: promoted + frozen floor + edge >= floor. Only status with confidence.
 - PASS: promoted + frozen floor + edge < floor. Never for a market the model did not price.
 - TRIAL: real engine Model_P from the pipeline, blocked only by NOT_PROMOTED, edge >= 3.0% vs paired no-vig at the logged price. Max 5 per sport per slate.
-- TRIAL stake: PAPER 0u by default. MICRO 0.25u only if the market's TRIAL ledger shows 200+ settled, 20+ slates, mean CLV >= +0.5pp, cluster-robust t >= 2.0.
+- TRIAL stake: PAPER 0u by default. MICRO 0.25u only when recomputation from the current settled ledger shows 200+ settled, 20+ slates, mean CLV >= +0.5pp, cluster-robust t >= 2.0 under the same model-artifact SHA and TRIAL-policy SHA. MICRO is never caller-selected and falls back to PAPER if the rule is no longer met.
+- TRIAL never shows confidence and never uses Kelly/bankroll-fraction sizing.
 - I cannot create TRIAL plays from market info, splits, news, or leans. If no pipeline Model_P was provided, TRIAL count is 0.
 - Log every TRIAL play at the price taken; add close price separately for CLV.
 - If a card breaks these rules, retract it and log the retraction; do not delete it.
