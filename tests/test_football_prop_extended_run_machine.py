@@ -165,8 +165,8 @@ class FootballPropExtendedRunMachineTests(unittest.TestCase):
                             {"name": "Over", "description": "Home Defender", "price": -110, "point": 5.5},
                             {"name": "Under", "description": "Home Defender", "price": -110, "point": 5.5},
                         ]),
-                        # Deliberately YES-only: model probability is allowed,
-                        # but no-vig fair probability/edge may not be invented.
+                        # Deliberately YES-only: model probability + offered price
+                        # can support EV, but no-vig fair probability/edge may not be invented.
                         self._market("player_anytime_td", [
                             {"name": "Yes", "description": "Home Runner", "price": 140},
                         ]),
@@ -239,15 +239,18 @@ class FootballPropExtendedRunMachineTests(unittest.TestCase):
                         self.assertEqual(card['status'], 'BLOCKED')
                         self.assertIsNone(card['report']['results'][0]['model_p'])
 
-    def test_one_sided_anytime_td_never_invents_opposite_price_or_edge(self):
+    def test_one_sided_anytime_td_supports_offered_price_ev_without_inventing_no_vig_or_edge(self):
         report = self._run()
         row = next(row for row in report["results"] if row["provider_market"] == "player_anytime_td")
         self.assertIsInstance(row["model_p"], float)
         self.assertFalse(row["paired_price_available"])
+        self.assertEqual(row["market_no_vig_p_status"], "UNAVAILABLE_ONE_SIDED")
         self.assertIsNone(row["fair_market_p"])
         self.assertIsNone(row["edge"])
-        self.assertIsNone(row["ev_per_dollar"])
-        self.assertEqual(row["reason"], "NFL_PROP_PAIRED_PRICE_REQUIRED")
+        self.assertIsInstance(row["ev_per_dollar"], float)
+        self.assertIsInstance(row["break_even_probability"], float)
+        self.assertFalse(row["official_eligible"])
+        self.assertEqual(row["reason"], "NFL_PROP_PROMOTION_EVIDENCE_REQUIRED")
         self.assertFalse(report["governance"]["one_sided_market_opposite_price_invented"])
 
     def test_td_market_line_change_cannot_change_underlying_distribution(self):

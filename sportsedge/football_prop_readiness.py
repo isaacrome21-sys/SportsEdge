@@ -1,6 +1,13 @@
-"""Production readiness and Truth Gate resolution for football player props."""
+"""Production readiness and Truth Gate resolution for football player props.
+
+Model inference and OFFICIAL promotion are intentionally separate states. A row
+with a genuine model probability and a fresh offered price remains visible as a
+MODEL_CANDIDATE even when evidence, certification, or an OFFICIAL-only market
+policy is not yet satisfied.
+"""
 from __future__ import annotations
 
+from math import isfinite
 from typing import Any, Mapping
 
 from sportsedge.edge_floors import FrozenEdgeFloor, require_production_edge_floor
@@ -50,19 +57,45 @@ def _floor_key(sport: str, provider_market: str) -> str:
     return f"{resolved}_{market}"
 
 
+def _finite_probability(value: Any) -> bool:
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and isfinite(float(value))
+        and 0.0 <= float(value) <= 1.0
+    )
+
+
+def _finite_number(value: Any) -> bool:
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and isfinite(float(value))
+    )
+
+
+def _candidate_ready(row: Mapping[str, Any]) -> bool:
+    return (
+        _finite_probability(row.get("model_p"))
+        and _finite_number(row.get("american_odds"))
+        and row.get("quote_fresh") is True
+        and _finite_number(row.get("ev_per_dollar"))
+    )
+
+
 def run_football_props_ready(
     *,
     evidence_registry: Mapping[str, Any] | None = None,
     certification_registry: Mapping[str, Any] | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    """Run the shared-path prop model and resolve all OFFICIAL gates.
+    """Run the shared-path prop model and resolve OFFICIAL gates separately.
 
-    There is no manual deployment boolean. For every provider market present on
-    the board, artifact-bound evidence and certification are resolved first. If
-    both are PASS, its *sport-namespaced* frozen edge floor must resolve before
-    predictive inference. After inference, a fresh paired quote is required and
-    the normal SportsEdge Truth Gate makes the PASS/OFFICIAL_BET decision.
+    There is no manual deployment boolean. Genuine model rows with fresh prices
+    remain MODEL_CANDIDATE rows even when promotion evidence is absent. OFFICIAL
+    still requires artifact-bound evidence, certification, the sport-namespaced
+    frozen edge floor, quote freshness, and a market-comparison policy supported
+    by the current Truth Gate.
     """
     sport = str(kwargs.get("sport") or "").strip().upper()
     artifact_sha = str(kwargs.get("expected_artifact_sha256") or "").strip().lower()
@@ -108,6 +141,7 @@ def run_football_props_ready(
     certified_rows = 0
     truth_gate_rows = 0
     official_bets = 0
+    candidate_rows = 0
 
     for row in report["results"]:
         provider_market = str(row["provider_market"])
@@ -125,6 +159,13 @@ def run_football_props_ready(
             model_artifact_sha256=row_artifact_sha,
             registry=certification,
         )
+
+        candidate = _candidate_ready(row)
+        row["model_candidate_status"] = "READY" if candidate else "BLOCKED"
+        row["decision_tier"] = "MODEL_CANDIDATE" if candidate else "NO_ACTIONABLE_CANDIDATE"
+        row["official_gate_status"] = "BLOCKED"
+        if candidate:
+            candidate_rows += 1
 
         row["evidence_ready"] = evidence_state["ready"]
         row["evidence_required_groups"] = evidence_state["required_groups"]
@@ -162,10 +203,15 @@ def run_football_props_ready(
             row["bet_status"] = "BLOCKED"
             row["reason"] = f"{sport}_PROP_QUOTE_STALE"
             continue
+
         fair_market_p = row.get("fair_market_p")
         if fair_market_p is None:
-            row["bet_status"] = "BLOCKED"
-            row["reason"] = f"{sport}_PROP_PAIRED_PRICE_REQUIRED"
+            if row.get("market_no_vig_p_status") == "UNAVAILABLE_ONE_SIDED":
+                row["bet_status"] = "BLOCKED"
+                row["reason"] = f"{sport}_PROP_ONE_SIDED_OFFICIAL_FLOOR_POLICY_REQUIRED"
+            else:
+                row["bet_status"] = "BLOCKED"
+                row["reason"] = f"{sport}_PROP_PAIRED_PRICE_REQUIRED"
             continue
 
         decision = decide_bet(
@@ -180,6 +226,7 @@ def run_football_props_ready(
         )
         truth_gate_rows += 1
         row["official_eligible"] = True
+        row["official_gate_status"] = "RESOLVED"
         row["bet_status"] = decision.bet_status
         row["reason"] = "TRUTH_GATE_RESOLVED"
         row["truth_gate"] = {
@@ -195,11 +242,14 @@ def run_football_props_ready(
         if decision.bet_status == "OFFICIAL_BET":
             official_bets += 1
 
+    report["summary"]["model_candidate_rows"] = candidate_rows
     report["summary"]["evidence_ready_rows"] = ready_rows
     report["summary"]["evidence_blocked_rows"] = len(report["results"]) - ready_rows
     report["summary"]["certified_rows"] = certified_rows
     report["summary"]["truth_gate_rows"] = truth_gate_rows
     report["summary"]["official_bets"] = official_bets
+    if candidate_rows and official_bets == 0:
+        report["run_status"] = "MODEL_CANDIDATES_AVAILABLE_OFFICIAL_BLOCKED"
     report["evidence_resolution"] = {
         "schema_version": evidence.get("schema_version"),
         "sport": sport,

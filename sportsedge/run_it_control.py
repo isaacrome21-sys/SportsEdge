@@ -2,7 +2,8 @@
 
 This module is orchestration only. It never changes Model_P, Truth Gate thresholds,
 promotion evidence, or deployment eligibility. Missing autonomous lanes are emitted
-as explicit blockers rather than silently skipped.
+as explicit blockers rather than silently skipped. A lane with genuine model
+candidates but no promoted OFFICIAL bet is PARTIAL, not a failed model run.
 """
 from __future__ import annotations
 
@@ -31,6 +32,7 @@ class LaneResult:
     automatic_completeness: str
     execution_status: str = "NOT_RUN"
     model_rows: int = 0
+    model_candidates: int = 0
     official_bets: int = 0
     exit_code: int | None = None
     blocker: str | None = None
@@ -128,11 +130,11 @@ def _output_stamp(path: Path | None):
     return stat.st_ino, stat.st_mtime_ns, stat.st_ctime_ns, stat.st_size
 
 
-def _card_state(path: Path | None, previous_stamp) -> tuple[str, str | None, int, int]:
+def _card_state(path: Path | None, previous_stamp) -> tuple[str, str | None, int, int, int]:
     if path is None or not path.is_file():
-        return "BLOCKED", "RUN_OUTPUT_MISSING", 0, 0
+        return "BLOCKED", "RUN_OUTPUT_MISSING", 0, 0, 0
     if _output_stamp(path) == previous_stamp:
-        return "BLOCKED", "RUN_OUTPUT_NOT_REFRESHED", 0, 0
+        return "BLOCKED", "RUN_OUTPUT_NOT_REFRESHED", 0, 0, 0
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
         report = payload.get("report", payload)
@@ -140,25 +142,48 @@ def _card_state(path: Path | None, previous_stamp) -> tuple[str, str | None, int
         if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
             raise ValueError("results required")
     except (OSError, ValueError, AttributeError):
-        return "BLOCKED", "RUN_OUTPUT_INVALID", 0, 0
+        return "BLOCKED", "RUN_OUTPUT_INVALID", 0, 0, 0
+
     def has_model(row):
         value = row.get("model_p")
         return isinstance(value, (int, float)) and not isinstance(value, bool) and 0 <= value <= 1
+
     models = sum(has_model(row) for row in rows)
+    candidates = sum(
+        row.get("model_candidate_status") == "READY"
+        or row.get("decision_tier") == "MODEL_CANDIDATE"
+        for row in rows
+    )
     official = sum(row.get("bet_status") == "OFFICIAL_BET" for row in rows)
     if not rows:
-        return "BLOCKED", "RUN_RESULTS_EMPTY", models, official
-    if all(row.get("bet_status") == "BLOCKED" for row in rows):
-        return "BLOCKED", "ALL_MARKETS_BLOCKED", models, official
-    if payload.get("status") in {"BLOCKED", "FAILED", "ERROR"} or str(report.get("run_status", "")).startswith("BLOCKED"):
-        return "BLOCKED", "RUN_REPORTED_BLOCKED", models, official
+        return "BLOCKED", "RUN_RESULTS_EMPTY", models, candidates, official
+    if models == 0:
+        return "BLOCKED", "RUN_MODEL_PROBABILITIES_MISSING", models, candidates, official
     if any(row.get("bet_status") not in {"PASS", "OFFICIAL_BET", "BLOCKED"} for row in rows):
-        return "BLOCKED", "RUN_DECISION_STATUS_INVALID", models, official
-    if models == 0 or any(row.get("bet_status") != "BLOCKED" and not has_model(row) for row in rows):
-        return "BLOCKED", "RUN_MODEL_PROBABILITIES_MISSING", models, official
+        return "BLOCKED", "RUN_DECISION_STATUS_INVALID", models, candidates, official
+    if any(row.get("bet_status") != "BLOCKED" and not has_model(row) for row in rows):
+        return "BLOCKED", "RUN_MODEL_PROBABILITIES_MISSING", models, candidates, official
+
+    reported_blocked = (
+        payload.get("status") in {"BLOCKED", "FAILED", "ERROR"}
+        or str(report.get("run_status", "")).startswith("BLOCKED")
+    )
+    all_official_blocked = all(row.get("bet_status") == "BLOCKED" for row in rows)
+
+    # A valid model run with visible model candidates is not a model failure just
+    # because promotion/evidence gates keep every row from becoming OFFICIAL.
+    if candidates > 0:
+        if official > 0 and not any(row.get("bet_status") == "BLOCKED" for row in rows):
+            return "SUCCESS", None, models, candidates, official
+        return "PARTIAL", "OFFICIAL_GATES_BLOCK_MODEL_CANDIDATES", models, candidates, official
+
+    if all_official_blocked:
+        return "BLOCKED", "ALL_MARKETS_BLOCKED", models, candidates, official
+    if reported_blocked:
+        return "BLOCKED", "RUN_REPORTED_BLOCKED", models, candidates, official
     if any(row.get("bet_status") == "BLOCKED" for row in rows) or report.get("run_status") == "DEGRADED":
-        return "PARTIAL", "SOME_MARKETS_BLOCKED_OR_DEGRADED", models, official
-    return "SUCCESS", None, models, official
+        return "PARTIAL", "SOME_MARKETS_BLOCKED_OR_DEGRADED", models, candidates, official
+    return "SUCCESS", None, models, candidates, official
 
 
 def _tail(value: str, limit: int = 5000) -> str:
@@ -224,9 +249,9 @@ def execute_surface(
                 timeout=int(timeout_seconds),
                 check=False,
             )
-            status, blocker, model_rows, official_bets = (
+            status, blocker, model_rows, model_candidates, official_bets = (
                 _card_state(output_path, previous_stamp) if proc.returncode == 0
-                else ("BLOCKED_OR_FAILED", "ENTRYPOINT_NONZERO", 0, 0)
+                else ("BLOCKED_OR_FAILED", "ENTRYPOINT_NONZERO", 0, 0, 0)
             )
             results.append(LaneResult(
                 sport=sport,
@@ -235,6 +260,7 @@ def execute_surface(
                 automatic_completeness=completeness,
                 execution_status="COMPLETED" if proc.returncode == 0 else "FAILED",
                 model_rows=model_rows,
+                model_candidates=model_candidates,
                 official_bets=official_bets,
                 exit_code=int(proc.returncode),
                 blocker=blocker,
@@ -255,9 +281,9 @@ def execute_surface(
             ))
     rows = [asdict(row) for row in results]
     executable = [row for row in results if row.command]
-    failed = [row for row in executable if row.status != "SUCCESS"]
+    failed = [row for row in executable if row.status not in {"SUCCESS", "PARTIAL"}]
     blocked = [row for row in results if not row.command]
-    overall = "SUCCESS" if not failed and not blocked else "PARTIAL" if any(row.status in {"SUCCESS", "PARTIAL"} for row in results) else "BLOCKED"
+    overall = "SUCCESS" if not failed and not blocked and all(row.status == "SUCCESS" for row in executable) else "PARTIAL" if any(row.status in {"SUCCESS", "PARTIAL"} for row in results) else "BLOCKED"
     return {
         "schema_version": CONTROL_SCHEMA,
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -268,6 +294,7 @@ def execute_surface(
             "truth_gate_changed": False,
             "promotion_changed": False,
             "silent_skip_allowed": False,
+            "model_candidate_and_official_status_separated": True,
         },
         "results": rows,
     }
