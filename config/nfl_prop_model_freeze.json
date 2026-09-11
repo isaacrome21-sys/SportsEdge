@@ -5,7 +5,7 @@
   "artifact_version": "NFL_PROP_SHARED_PATH_2022_2025_V1",
   "code_git_sha": "5dfa29347bed608771e6a2395ce8e894dbfdd881",
   "code_surface_manifest_path": "config/nfl_prop_code_surface_v1.json",
-  "code_surface_manifest_sha256": "def58a534298de9c5cad14755f6930652a72ca35549c158af0447f9e551d0122",
+  "code_surface_manifest_sha256": "8760f0133fcfd3a7ca2324f757c86bc6181918d4bee5f2a84da84517f505ea0a",
   "hash_algorithm": "CANONICAL_JSON_SHA256_V1",
   "promotion_authority": false,
   "schema_version": 1,
