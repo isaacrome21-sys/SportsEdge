@@ -1,0 +1,45 @@
+{
+  "policy_id": "MLB_MODEL_ARTIFACT_POLICY_V1",
+  "schema_version": 1,
+  "artifact_schema": "SPORTSEDGE_MLB_ALGORITHMIC_MODEL_ARTIFACT_V1",
+  "doctrine": "MLB empirical/algorithmic engines are identified by their frozen runtime family, engine version, and exact model-code bytes. Live feature hashes and sportsbook prices are never model-artifact identity.",
+  "promotion_evidence": false,
+  "eligibility_changed": false,
+  "universal_source_files": [
+    "sportsedge/engine_registry.py"
+  ],
+  "families": {
+    "GAME_V7": {
+      "markets": ["MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS"],
+      "source_files": ["sportsedge/shared_game_engine.py", "sportsedge/v7_distribution.py", "sportsedge/game_distribution_readout.py"]
+    },
+    "FIRST_INNING": {
+      "markets": ["NRFI", "YRFI"],
+      "source_files": ["sportsedge/generic_market_engine.py", "sportsedge/v7_distribution.py"]
+    },
+    "F5": {
+      "markets": ["F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS", "F5_TEAM_TOTALS"],
+      "source_files": ["sportsedge/shared_f5_engine.py", "sportsedge/f5_distribution.py"]
+    },
+    "HITTER_JOINT": {
+      "markets": ["HITS", "TOTAL_BASES", "RBI", "RUNS", "STOLEN_BASES", "BATTER_BB", "EXTRA_BASE_HITS", "SINGLES", "DOUBLES", "TRIPLES", "BATTER_K", "HITS_RUNS_RBIS", "HITS_RUNS_STOLEN_BASES", "RUNS_RBIS", "HITS_STOLEN_BASES", "HITS_WALKS_STOLEN_BASES"],
+      "source_files": ["sportsedge/hitter_joint_engine.py"]
+    },
+    "HOME_RUN_COUNT": {
+      "markets": ["HOME_RUNS"],
+      "source_files": ["sportsedge/generic_market_engine.py"]
+    },
+    "PITCHER_JOINT": {
+      "markets": ["PITCHER_K", "PITCHER_OUTS", "PITCHER_ER", "PITCHER_HITS_ALLOWED", "PITCHER_BB", "PITCHER_HITS_WALKS_ER", "EITHER_PITCHER_HITS_ALLOWED", "EITHER_PITCHER_BB", "EITHER_PITCHER_ER"],
+      "source_files": ["sportsedge/pitcher_joint_engine.py"]
+    },
+    "FIRST_HOME_RUN": {
+      "markets": ["FIRST_HOME_RUN"],
+      "source_files": ["sportsedge/first_hr_order_engine.py"]
+    },
+    "PITCHER_RECORD_WIN": {
+      "markets": ["PITCHER_RECORD_WIN"],
+      "source_files": ["sportsedge/pitcher_record_win_engine.py"]
+    }
+  }
+}
