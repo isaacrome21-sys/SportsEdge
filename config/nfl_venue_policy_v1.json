@@ -1,7 +1,9 @@
 {
   "policy_id": "NFL_VENUE_POLICY_V1",
   "doctrine": "Venue support produces a price. Promotion evidence decides whether that price may be bet. This policy never changes Truth Gate status.",
-  "freeze_record": "The git commit that adds this file is the freeze record. Any edit requires NFL_VENUE_POLICY_V2.",
+  "freeze_record": "The freeze record is the first commit on refs/heads/main that contains these exact policy bytes. Feature-branch commits do not activate this policy or start any evidence clock. Any post-activation policy change requires NFL_VENUE_POLICY_V2.",
+  "evidence_ref": "refs/heads/main",
+  "activation_rule": "ACTIVE_ONLY_WHEN_EXACT_POLICY_BYTES_EXIST_ON_EVIDENCE_REF",
   "effective_from_kickoff_utc": "2026-09-12T00:00:00Z",
   "not_retroactive": "SF at LA, Melbourne Cricket Ground, kickoff 2026-09-11T00:35:00Z, stays VENUE_EXCLUDED under the prior behavior.",
   "neutral_hfa_points": 0.0,
