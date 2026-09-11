@@ -86,7 +86,7 @@ def main() -> int:
         "state": report["state"], "coverage_start": report["coverage_start"],
         "coverage_end": report["coverage_end"], "scheduled_final_game_count": report["scheduled_final_game_count"],
         "normalized_final_game_count": report["normalized_final_game_count"], "failures": len(report["failures"]),
-        "blockers": report["blockers"],
+        "failure_details": report["failures"], "blockers": report["blockers"],
     }, sort_keys=True))
     return 0 if report["state"] == "SHARD_READY" else 3
 
