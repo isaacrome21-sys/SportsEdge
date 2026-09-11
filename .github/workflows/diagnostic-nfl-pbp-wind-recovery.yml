@@ -7,6 +7,10 @@ on:
       - '.github/workflows/diagnostic-nfl-pbp-wind-recovery.yml'
       - 'sportsedge/sports/nfl/m2_history_policy.py'
 
+permissions:
+  actions: read
+  contents: read
+
 jobs:
   audit:
     runs-on: ubuntu-latest
@@ -25,14 +29,24 @@ jobs:
       - name: Install exact runtime dependency
         run: python -m pip install --disable-pip-version-check numpy==2.5.3
 
-      - name: Fetch exact diagnostic inputs
+      - name: Fetch immutable hosted schedule and exact PBP inputs
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mkdir -p /tmp/nfl-wind-audit artifacts/football
-          curl --fail --location --silent --show-error --retry 5 --retry-delay 2 --retry-all-errors \
-            'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv' \
-            -o /tmp/nfl-wind-audit/games.csv
+
+          # Artifact 10269107465 is the completed exact-head #338 evidence bundle.
+          # It preserved the schedule bytes actually used by that validation run.
+          curl --fail --location --silent --show-error \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/10269107465/zip" \
+            -o /tmp/nfl-wind-audit/frozen-evidence.zip
+          unzip -p /tmp/nfl-wind-audit/frozen-evidence.zip sources/games.csv \
+            > /tmp/nfl-wind-audit/games.csv
+
           for season in 2022 2023; do
             curl --fail --location --silent --show-error --retry 5 --retry-delay 2 --retry-all-errors \
               "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_${season}.csv.gz" \
@@ -104,8 +118,6 @@ jobs:
                   target_rows[game_id] = {
                       'season': season,
                       'roof': str(row.get('roof') or '').strip().lower(),
-                      'schedule_wind': row.get('wind'),
-                      'schedule_wind_mph': row.get('wind_mph'),
                       'schedule_reasons': sorted(reasons),
                   }
 
@@ -189,6 +201,7 @@ jobs:
               'promotion_evidence': False,
               'changes_model_behavior': False,
               'code_git_sha': os.environ['EVIDENCE_GIT_SHA'].lower(),
+              'hosted_evidence_artifact_id': 10269107465,
               'source_sha256': {
                   'games.csv': sha256(root / 'games.csv'),
                   'play_by_play_2022.csv.gz': sha256(root / 'play_by_play_2022.csv.gz'),
