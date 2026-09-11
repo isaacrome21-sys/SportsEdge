@@ -4,9 +4,9 @@
 A real fitted artifact and a fresh PIT opportunity/usage snapshot are mandatory.
 Market prices can be supplied as a captured snapshot or acquired event-by-event
 from The Odds API. Resolution always passes through artifact-bound evidence,
-certification and the frozen-floor Truth Gate.  Exact-SHA hosted freeze bundles
-may be materialized outside the repository and supplied by CLI/environment; the
-checked-in registries therefore never need to claim bytes that are not present.
+certification and the frozen-floor Truth Gate. NFL frozen artifacts may remain
+runtime-compatible across unrelated repository commits only when an independently
+hash-bound code-surface manifest proves every declared Model_P file is unchanged.
 """
 from __future__ import annotations
 
@@ -22,6 +22,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from sportsedge.football_prop_code_surface import (
+    NFLPropCodeSurfaceError,
+    nfl_prop_runtime_code_status,
+)
 from sportsedge.football_prop_odds_source import build_odds_snapshot, fetch_event_prop_odds
 from sportsedge.football_prop_run_machine import FootballPropRunError
 from sportsedge.football_prop_readiness import run_football_props_ready
@@ -76,6 +80,13 @@ def _runtime_git_sha() -> str:
     return value
 
 
+def _git_sha(value: object, error: str) -> str:
+    raw = str(value or "").strip().lower()
+    if len(raw) != 40 or any(ch not in "0123456789abcdef" for ch in raw):
+        raise FootballPropAutoError(error)
+    return raw
+
+
 def _defaults(sport: str) -> tuple[Path, Path, Path, Path, Path, Path, Path]:
     lower = sport.lower()
     return (
@@ -94,9 +105,14 @@ def _env_path(name: str) -> Path | None:
     return Path(raw) if raw else None
 
 
-def _freeze(registry_path: Path, artifact_path: Path, sport: str) -> tuple[dict, str]:
-    # Missing fitted bytes are the first blocker. Merely placing arbitrary bytes
-    # at the path still cannot bypass the independent freeze registry below.
+def _freeze(registry_path: Path, artifact_path: Path, sport: str) -> tuple[dict, str, str]:
+    """Load frozen bytes and return artifact hash plus immutable fit Git SHA.
+
+    NFL current-checkout compatibility is proved separately from fit provenance.
+    The downstream model loader still receives the original fit SHA, so the
+    artifact's embedded code identity is never rewritten to a later repository
+    commit. CFB retains the legacy exact-whole-repository SHA contract.
+    """
     if not artifact_path.is_file():
         raise FootballPropAutoError(f"{sport}_PROP_FROZEN_MODEL_ARTIFACT_REQUIRED")
     if not registry_path.is_file():
@@ -110,20 +126,28 @@ def _freeze(registry_path: Path, artifact_path: Path, sport: str) -> tuple[dict,
     if len(expected) != 64 or any(ch not in "0123456789abcdef" for ch in expected):
         raise FootballPropAutoError(f"{sport}_PROP_FROZEN_MODEL_SHA256_INVALID")
 
-    # A hosted freeze bundle may be materialized at a different filesystem path
-    # than the canonical production destination.  Path relocation is permitted
-    # only when the freeze itself is externally supplied; the artifact bytes and
-    # exact runtime Git SHA are still independently verified downstream.
     checked_in_registry = (ROOT / f"config/{sport.lower()}_prop_model_freeze.json").resolve()
     if registry_path.resolve() == checked_in_registry:
         declared = ROOT / str(registry.get("artifact_path") or "")
         if declared.resolve() != artifact_path.resolve():
             raise FootballPropAutoError(f"{sport}_PROP_FROZEN_MODEL_PATH_MISMATCH")
+
     artifact = _json(artifact_path, f"{sport}_PROP_MODEL_ARTIFACT_INVALID")
-    freeze_code_sha = str(registry.get("code_git_sha") or artifact.get("code_git_sha") or "").strip().lower()
-    if freeze_code_sha and freeze_code_sha != _runtime_git_sha():
+    fit_code_sha = _git_sha(
+        registry.get("code_git_sha") or artifact.get("code_git_sha"),
+        f"{sport}_PROP_FROZEN_MODEL_CODE_SHA_INVALID",
+    )
+    runtime_sha = _runtime_git_sha()
+    if sport == "NFL":
+        try:
+            nfl_prop_runtime_code_status(runtime_sha, registry, repo_root=ROOT)
+        except NFLPropCodeSurfaceError as exc:
+            raise FootballPropAutoError(
+                f"NFL_PROP_FROZEN_MODEL_CODE_SURFACE_INVALID:{exc}"
+            ) from exc
+    elif fit_code_sha != runtime_sha:
         raise FootballPropAutoError(f"{sport}_PROP_FROZEN_MODEL_CODE_SHA_MISMATCH")
-    return artifact, expected
+    return artifact, expected, fit_code_sha
 
 
 def _odds_from_network(*, sport: str, features: dict, current: datetime) -> dict:
@@ -197,7 +221,7 @@ def main() -> int:
     current = _utc(args.asof)
 
     try:
-        artifact, expected_sha = _freeze(registry_path, artifact_path, sport)
+        artifact, expected_sha, fit_code_sha = _freeze(registry_path, artifact_path, sport)
         if not evidence_path.is_file():
             raise FootballPropAutoError(f"{sport}_PROP_EVIDENCE_REGISTRY_REQUIRED")
         if not certification_path.is_file():
@@ -224,7 +248,7 @@ def main() -> int:
             now=current,
             artifact_payload=artifact,
             expected_artifact_sha256=expected_sha,
-            runtime_code_git_sha=_runtime_git_sha(),
+            runtime_code_git_sha=fit_code_sha,
             live_features=features,
             odds_snapshot=odds,
             root_seed=int(args.root_seed),
