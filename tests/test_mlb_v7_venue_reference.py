@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import copy
+import pytest
+
 from sportsedge.mlb_v7_venue_reference import (
+    MLBV7VenueReferenceError,
     build_venue_reference_report,
     build_venue_reference_rows,
     venue_ids_from_schedule_payloads,
@@ -36,17 +40,27 @@ def _schedule():
 
 
 def _venue(venue_id: int):
-    return {
-        "venues": [{
-            "id": venue_id,
-            "location": {"defaultCoordinates": {"latitude": 41.0, "longitude": -87.0}},
-            "timeZone": {"id": "America/Chicago"},
-        }]
-    }
+    return {"venues": [{"id": venue_id, "location": {"defaultCoordinates": {"latitude": 41.0, "longitude": -87.0}}, "timeZone": {"id": "America/Chicago"}}]}
 
 
 def test_discovers_only_final_modeled_game_venues() -> None:
     assert venue_ids_from_schedule_payloads([_schedule()]) == [10]
+
+
+def test_exact_duplicate_game_row_is_tolerated() -> None:
+    payload = _schedule()
+    duplicate = copy.deepcopy(payload["dates"][0]["games"][0])
+    payload["dates"].append({"date": "2025-04-02", "games": [duplicate]})
+    assert venue_ids_from_schedule_payloads([payload]) == [10]
+
+
+def test_conflicting_duplicate_game_row_fails_closed() -> None:
+    payload = _schedule()
+    duplicate = copy.deepcopy(payload["dates"][0]["games"][0])
+    duplicate["venue"] = {"id": 11}
+    payload["dates"].append({"date": "2025-04-02", "games": [duplicate]})
+    with pytest.raises(MLBV7VenueReferenceError, match="SCHEDULE_GAME_DUPLICATE_CONFLICT"):
+        venue_ids_from_schedule_payloads([payload])
 
 
 def test_complete_fixed_facts_are_ready_to_attest() -> None:
