@@ -1,0 +1,177 @@
+name: MLB V7 StatsAPI history persist
+
+on:
+  workflow_dispatch:
+    inputs:
+      year:
+        description: "Historical season year (2023-2025)"
+        required: true
+        type: choice
+        options: ["2023", "2024", "2025"]
+      month:
+        description: "Month to acquire"
+        required: true
+        type: choice
+        options: ["01","02","03","04","05","06","07","08","09","10","11","12"]
+
+concurrency:
+  group: sportsedge-mlb-v7-statsapi-history-persist
+  cancel-in-progress: false
+
+jobs:
+  acquire-and-persist:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout exact main code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+      - name: Resolve exact calendar month
+        id: window
+        shell: bash
+        env:
+          YEAR: ${{ inputs.year }}
+          MONTH: ${{ inputs.month }}
+        run: |
+          set -euo pipefail
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import calendar, os
+          year=int(os.environ["YEAR"]); month=int(os.environ["MONTH"])
+          if year not in {2023,2024,2025} or not 1 <= month <= 12:
+              raise SystemExit("HISTORY_MONTH_OUTSIDE_FROZEN_WINDOW")
+          last=calendar.monthrange(year,month)[1]
+          print(f"label={year:04d}-{month:02d}")
+          print(f"start={year:04d}-{month:02d}-01")
+          print(f"end={year:04d}-{month:02d}-{last:02d}")
+          PY
+      - name: Acquire complete month shard
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=. python scripts/acquire_mlb_v7_statsapi_history_shard.py \
+            --start "${{ steps.window.outputs.start }}" \
+            --end "${{ steps.window.outputs.end }}" \
+            --output-root "artifacts/mlb-v7-statsapi-history/${{ steps.window.outputs.label }}"
+      - name: Verify shard has no authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          root=Path("artifacts/mlb-v7-statsapi-history/${{ steps.window.outputs.label }}")
+          r=json.loads((root/"shard_report.json").read_text())
+          assert r["state"]=="SHARD_READY"
+          assert r["attestation_authority"] is False
+          assert r["candidate_training_allowed"] is False
+          assert r["promotion_authority"] is False
+          for item in r["evidence_files"]:
+              p=root/item["path"]
+              assert p.is_file(), item["path"]
+              assert hashlib.sha256(p.read_bytes()).hexdigest()==item["sha256"]
+          PY
+      - name: Checkout durable data branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: data
+          path: data-branch
+          persist-credentials: true
+      - name: Persist verified shard append-safely
+        shell: bash
+        env:
+          LABEL: ${{ steps.window.outputs.label }}
+          CODE_HEAD_SHA: ${{ github.sha }}
+          WORKFLOW_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          SRC="$GITHUB_WORKSPACE/artifacts/mlb-v7-statsapi-history/$LABEL"
+          BASE="$GITHUB_WORKSPACE/data-branch/evidence/mlb_v8_replay_sources"
+          DST="$BASE/staging/MLB_STATSAPI_HISTORY/shards/$LABEL"
+          rm -rf "$DST"
+          mkdir -p "$(dirname "$DST")" "$BASE/receipts"
+          cp -R "$SRC" "$DST"
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          base=Path("data-branch/evidence/mlb_v8_replay_sources")
+          label=os.environ["LABEL"]
+          report_path=base/"staging/MLB_STATSAPI_HISTORY/shards"/label/"shard_report.json"
+          receipt={"schema_version":1,"source_class":"MLB_STATSAPI_HISTORY_SHARD","label":label,"code_head_sha":os.environ["CODE_HEAD_SHA"],"workflow_run_id":int(os.environ["WORKFLOW_RUN_ID"]),"shard_report_sha256":hashlib.sha256(report_path.read_bytes()).hexdigest(),"promotion_authority":False,"candidate_training_allowed":False}
+          out=base/"receipts"/f"MLB_STATSAPI_HISTORY_SHARD_{label}.json"
+          out.write_text(json.dumps(receipt,sort_keys=True,separators=(",",":"))+"\n")
+          PY
+          cd data-branch
+          git config user.name "sportsedge-data-bot"
+          git config user.email "sportsedge-data-bot@users.noreply.github.com"
+          git add "evidence/mlb_v8_replay_sources/staging/MLB_STATSAPI_HISTORY/shards/$LABEL" "evidence/mlb_v8_replay_sources/receipts/MLB_STATSAPI_HISTORY_SHARD_$LABEL.json"
+          if ! git diff --cached --quiet; then
+            git commit -m "evidence: persist MLB V7 StatsAPI history shard $LABEL"
+            for attempt in 1 2 3; do
+              if git pull --rebase origin data && git push origin HEAD:data; then break; fi
+              git rebase --abort >/dev/null 2>&1 || true
+              if [ "$attempt" -eq 3 ]; then exit 1; fi
+              sleep $((attempt * 2))
+            done
+          fi
+      - name: Refresh data branch and finalize only if all 36 shards verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C data-branch pull --rebase origin data
+          set +e
+          PYTHONPATH=. python scripts/finalize_mlb_v7_statsapi_history.py \
+            --shard-root data-branch/evidence/mlb_v8_replay_sources/staging/MLB_STATSAPI_HISTORY/shards \
+            --start 2023-01-01 --end 2025-12-31 \
+            --output-root artifacts/mlb-v7-statsapi-history-final
+          rc=$?
+          set -e
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 3 ]; then exit "$rc"; fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path("artifacts/mlb-v7-statsapi-history-final/finalize_report.json").read_text())
+          print(json.dumps({"state":r["state"],"verified_shards":r["verified_shard_count"],"required_shards":r["required_shard_count"],"attestation_written":r["attestation_written"]},sort_keys=True))
+          PY
+      - name: Persist full attestation only when complete
+        shell: bash
+        env:
+          CODE_HEAD_SHA: ${{ github.sha }}
+          WORKFLOW_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          REPORT="artifacts/mlb-v7-statsapi-history-final/finalize_report.json"
+          READY="$(python -c 'import json; print(json.load(open("'"$REPORT"'"))["state"])')"
+          if [ "$READY" != "READY_TO_ATTEST" ]; then
+            echo "History remains partial; no source attestation emitted."
+            exit 0
+          fi
+          BASE="$GITHUB_WORKSPACE/data-branch/evidence/mlb_v8_replay_sources"
+          SRC="$GITHUB_WORKSPACE/artifacts/mlb-v7-statsapi-history-final"
+          mkdir -p "$BASE/attestations" "$BASE/raw" "$BASE/receipts"
+          cp "$SRC/attestations/MLB_STATSAPI_HISTORY.json" "$BASE/attestations/MLB_STATSAPI_HISTORY.json"
+          cp "$SRC/raw/MLB_STATSAPI_HISTORY.jsonl" "$BASE/raw/MLB_STATSAPI_HISTORY.jsonl"
+          cp "$SRC/raw/MLB_STATSAPI_HISTORY_SHARDS.json" "$BASE/raw/MLB_STATSAPI_HISTORY_SHARDS.json"
+          python - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          base=Path("data-branch/evidence/mlb_v8_replay_sources")
+          att=base/"attestations/MLB_STATSAPI_HISTORY.json"
+          receipt={"schema_version":1,"source_class":"MLB_STATSAPI_HISTORY","code_head_sha":os.environ["CODE_HEAD_SHA"],"workflow_run_id":int(os.environ["WORKFLOW_RUN_ID"]),"attestation_sha256":hashlib.sha256(att.read_bytes()).hexdigest(),"promotion_authority":False}
+          (base/"receipts/MLB_STATSAPI_HISTORY.json").write_text(json.dumps(receipt,sort_keys=True,separators=(",",":"))+"\n")
+          PY
+          cd data-branch
+          git add evidence/mlb_v8_replay_sources/attestations/MLB_STATSAPI_HISTORY.json evidence/mlb_v8_replay_sources/raw/MLB_STATSAPI_HISTORY.jsonl evidence/mlb_v8_replay_sources/raw/MLB_STATSAPI_HISTORY_SHARDS.json evidence/mlb_v8_replay_sources/receipts/MLB_STATSAPI_HISTORY.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "evidence: attest complete MLB V7 StatsAPI history"
+          for attempt in 1 2 3; do
+            if git pull --rebase origin data && git push origin HEAD:data; then exit 0; fi
+            git rebase --abort >/dev/null 2>&1 || true
+            sleep $((attempt * 2))
+          done
+          exit 1
