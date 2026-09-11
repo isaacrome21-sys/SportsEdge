@@ -1,4 +1,4 @@
-"""Fail-closed artifact and predictive code-surface binding for NFL props."""
+"""Fail-closed artifact and predictive code-surface binding for football props."""
 from __future__ import annotations
 
 import base64
@@ -10,6 +10,10 @@ from typing import Any, Mapping
 
 
 class NFLPropCodeSurfaceError(ValueError):
+    pass
+
+
+class CFBPropCodeSurfaceError(ValueError):
     pass
 
 
@@ -26,12 +30,12 @@ def _git_blob_sha(data: bytes) -> str:
     return sha1(header + data).hexdigest()
 
 
-def _under_root(root: Path, rel: str, error: str) -> Path:
+def _under_root(root: Path, rel: str, error: str, *, error_cls: type[ValueError] = NFLPropCodeSurfaceError) -> Path:
     path = (root / rel).resolve()
     try:
         path.relative_to(root.resolve())
     except ValueError as exc:
-        raise NFLPropCodeSurfaceError(error) from exc
+        raise error_cls(error) from exc
     return path
 
 
@@ -86,56 +90,81 @@ def load_nfl_prop_artifact_bundle(*, root: Path, bundle_path: Path) -> dict[str,
     return artifact
 
 
-def verify_nfl_prop_code_surface(*, root: Path, registry: Mapping[str, Any], artifact: Mapping[str, Any]) -> dict[str, Any]:
-    if str(registry.get("sport") or "").upper() != "NFL":
-        raise NFLPropCodeSurfaceError("NFL_PROP_CODE_SURFACE_SPORT_MISMATCH")
+def _verify_prop_code_surface(
+    *, root: Path, registry: Mapping[str, Any], artifact: Mapping[str, Any],
+    sport: str, schema_version: str, error_cls: type[ValueError],
+) -> dict[str, Any]:
+    prefix = f"{sport}_PROP_CODE_SURFACE"
+    if str(registry.get("sport") or "").upper() != sport:
+        raise error_cls(f"{prefix}_SPORT_MISMATCH")
     fit_sha = str(artifact.get("code_git_sha") or "").strip().lower()
     if len(fit_sha) != 40 or any(ch not in "0123456789abcdef" for ch in fit_sha):
-        raise NFLPropCodeSurfaceError("NFL_PROP_CODE_SURFACE_FIT_SHA_INVALID")
+        raise error_cls(f"{prefix}_FIT_SHA_INVALID")
     if str(registry.get("code_git_sha") or "").strip().lower() != fit_sha:
-        raise NFLPropCodeSurfaceError("NFL_PROP_CODE_SURFACE_FREEZE_FIT_SHA_MISMATCH")
+        raise error_cls(f"{prefix}_FREEZE_FIT_SHA_MISMATCH")
     rel = str(registry.get("code_surface_manifest_path") or "").strip()
     if not rel:
-        raise NFLPropCodeSurfaceError("NFL_PROP_CODE_SURFACE_MANIFEST_PATH_REQUIRED")
-    manifest_path = _under_root(root, rel, "NFL_PROP_CODE_SURFACE_MANIFEST_PATH_INVALID")
+        raise error_cls(f"{prefix}_MANIFEST_PATH_REQUIRED")
+    manifest_path = _under_root(root, rel, f"{prefix}_MANIFEST_PATH_INVALID", error_cls=error_cls)
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except Exception as exc:
-        raise NFLPropCodeSurfaceError("NFL_PROP_CODE_SURFACE_MANIFEST_INVALID") from exc
+        raise error_cls(f"{prefix}_MANIFEST_INVALID") from exc
     if not isinstance(manifest, dict):
-        raise NFLPropCodeSurfaceError("NFL_PROP_CODE_SURFACE_MANIFEST_INVALID")
+        raise error_cls(f"{prefix}_MANIFEST_INVALID")
     expected_manifest_sha = str(registry.get("code_surface_manifest_sha256") or "").strip().lower()
     actual_manifest_sha = _canonical_sha256(manifest)
     if expected_manifest_sha != actual_manifest_sha:
-        raise NFLPropCodeSurfaceError("NFL_PROP_CODE_SURFACE_MANIFEST_SHA256_MISMATCH")
-    if manifest.get("schema_version") != "NFL_PROP_CODE_SURFACE_V1":
-        raise NFLPropCodeSurfaceError("NFL_PROP_CODE_SURFACE_SCHEMA_MISMATCH")
-    if str(manifest.get("sport") or "").upper() != "NFL":
-        raise NFLPropCodeSurfaceError("NFL_PROP_CODE_SURFACE_SPORT_MISMATCH")
+        raise error_cls(f"{prefix}_MANIFEST_SHA256_MISMATCH")
+    if manifest.get("schema_version") != schema_version:
+        raise error_cls(f"{prefix}_SCHEMA_MISMATCH")
+    if str(manifest.get("sport") or "").upper() != sport:
+        raise error_cls(f"{prefix}_SPORT_MISMATCH")
     if str(manifest.get("fit_git_sha") or "").lower() != fit_sha:
-        raise NFLPropCodeSurfaceError("NFL_PROP_CODE_SURFACE_FIT_SHA_MISMATCH")
+        raise error_cls(f"{prefix}_FIT_SHA_MISMATCH")
     if str(manifest.get("artifact_sha256") or "").lower() != str(registry.get("artifact_sha256") or "").lower():
-        raise NFLPropCodeSurfaceError("NFL_PROP_CODE_SURFACE_ARTIFACT_SHA_MISMATCH")
+        raise error_cls(f"{prefix}_ARTIFACT_SHA_MISMATCH")
+    if manifest.get("promotion_authority") is not False:
+        raise error_cls(f"{prefix}_PROMOTION_AUTHORITY_INVALID")
     files = manifest.get("files")
     if not isinstance(files, list) or not files:
-        raise NFLPropCodeSurfaceError("NFL_PROP_CODE_SURFACE_FILES_REQUIRED")
+        raise error_cls(f"{prefix}_FILES_REQUIRED")
     checked: list[dict[str, str]] = []
     seen: set[str] = set()
     for row in files:
         if not isinstance(row, dict):
-            raise NFLPropCodeSurfaceError("NFL_PROP_CODE_SURFACE_FILE_ENTRY_INVALID")
+            raise error_cls(f"{prefix}_FILE_ENTRY_INVALID")
         path = str(row.get("path") or "").strip()
         expected_blob = str(row.get("git_blob_sha1") or "").strip().lower()
         if not path or path in seen:
-            raise NFLPropCodeSurfaceError("NFL_PROP_CODE_SURFACE_FILE_PATH_INVALID")
+            raise error_cls(f"{prefix}_FILE_PATH_INVALID")
         seen.add(path)
         if len(expected_blob) != 40 or any(ch not in "0123456789abcdef" for ch in expected_blob):
-            raise NFLPropCodeSurfaceError(f"NFL_PROP_CODE_SURFACE_BLOB_SHA_INVALID:{path}")
-        absolute = _under_root(root, path, f"NFL_PROP_CODE_SURFACE_FILE_PATH_INVALID:{path}")
+            raise error_cls(f"{prefix}_BLOB_SHA_INVALID:{path}")
+        absolute = _under_root(root, path, f"{prefix}_FILE_PATH_INVALID:{path}", error_cls=error_cls)
         if not absolute.is_file():
-            raise NFLPropCodeSurfaceError(f"NFL_PROP_CODE_SURFACE_FILE_MISSING:{path}")
+            raise error_cls(f"{prefix}_FILE_MISSING:{path}")
         actual_blob = _git_blob_sha(absolute.read_bytes())
         if actual_blob != expected_blob:
-            raise NFLPropCodeSurfaceError(f"NFL_PROP_CODE_SURFACE_BLOB_MISMATCH:{path}")
+            raise error_cls(f"{prefix}_BLOB_MISMATCH:{path}")
         checked.append({"path": path, "git_blob_sha1": actual_blob})
-    return {"status": "COMPATIBLE", "sport": "NFL", "fit_git_sha": fit_sha, "artifact_sha256": str(registry.get("artifact_sha256")), "manifest_sha256": actual_manifest_sha, "files_checked": len(checked), "promotion_authority": False}
+    return {
+        "status": "COMPATIBLE", "sport": sport, "fit_git_sha": fit_sha,
+        "artifact_sha256": str(registry.get("artifact_sha256")),
+        "manifest_sha256": actual_manifest_sha, "files_checked": len(checked),
+        "promotion_authority": False,
+    }
+
+
+def verify_nfl_prop_code_surface(*, root: Path, registry: Mapping[str, Any], artifact: Mapping[str, Any]) -> dict[str, Any]:
+    return _verify_prop_code_surface(
+        root=root, registry=registry, artifact=artifact, sport="NFL",
+        schema_version="NFL_PROP_CODE_SURFACE_V1", error_cls=NFLPropCodeSurfaceError,
+    )
+
+
+def verify_cfb_prop_code_surface(*, root: Path, registry: Mapping[str, Any], artifact: Mapping[str, Any]) -> dict[str, Any]:
+    return _verify_prop_code_surface(
+        root=root, registry=registry, artifact=artifact, sport="CFB",
+        schema_version="CFB_PROP_CODE_SURFACE_V1", error_cls=CFBPropCodeSurfaceError,
+    )
