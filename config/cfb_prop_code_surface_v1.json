@@ -1,0 +1,19 @@
+{
+  "artifact_sha256": "923cfd1be42d31a87d9f31ddffce406d44bfc1bb003d1c625f5a4258f7773f23",
+  "files": [
+    {"git_blob_sha1": "b75cbd7a524b1c1a4083f447aba2aee3ad7c3e63", "path": "sportsedge/football_prop_run_machine.py"},
+    {"git_blob_sha1": "e1fb52f19610df8c44496c89f93e8433eb820862", "path": "sportsedge/football_prop_extended_run_machine.py"},
+    {"git_blob_sha1": "72a9586d06f663b249230544669f367bcaef2eb1", "path": "sportsedge/core/simulate/drive_play.py"},
+    {"git_blob_sha1": "242a6951fac174493b1ad6c725a91461af2f9593", "path": "sportsedge/core/simulate/player_markets.py"},
+    {"git_blob_sha1": "06ea6ece807e719a101b8496fd5a453bd73aa3f0", "path": "sportsedge/core/simulate/usage.py"},
+    {"git_blob_sha1": "d7e96f41cb8fdb1c347b4fb6d958707a73c0b08e", "path": "sportsedge/core/simulate/special_teams.py"},
+    {"git_blob_sha1": "75a8ddc8bc9b555601356d831994e7c179d361c3", "path": "sportsedge/core/simulate/kicker_markets.py"},
+    {"git_blob_sha1": "86504f6368efeb006d9e1e56c14647b015ddbd0a", "path": "sportsedge/core/simulate/defense_markets.py"},
+    {"git_blob_sha1": "af8c66d2b5948e7f76c042ea5123b48cff0bd5ed", "path": "sportsedge/core/simulate/defense_usage.py"},
+    {"git_blob_sha1": "cc4749dfefc7cd010a3ffa20792cd70843d26add", "path": "sportsedge/sports/cfb/prop_artifact_training.py"}
+  ],
+  "fit_git_sha": "67184a5a120a2bc868531c7827783f562f82ee0b",
+  "promotion_authority": false,
+  "schema_version": "CFB_PROP_CODE_SURFACE_V1",
+  "sport": "CFB"
+}
