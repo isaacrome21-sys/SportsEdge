@@ -9,21 +9,19 @@ from sportsedge.football_prop_surface import require_executable_prop_surface
 
 
 class FootballPropSurfaceTests(unittest.TestCase):
-    def test_nfl_and_cfb_surface_is_runtime_bound_and_truth_gate_promotable(self):
+    def test_nfl_and_cfb_surface_is_runtime_bound_and_registry_derived(self):
         for sport in ("NFL", "CFB"):
             spec = require_executable_prop_surface(sport)
             self.assertEqual(spec["engine_state"], "IMPLEMENTED_FAIL_CLOSED")
             self.assertEqual(spec["promotion_state"], "AUTOMATIC_TRUTH_GATE_GATED")
-            self.assertEqual(spec["current_state"], "EVIDENCE_PENDING")
+            self.assertEqual(spec["readiness_state"], "REGISTRY_DERIVED")
+            self.assertEqual(spec["runtime_state"], "MODEL_ARTIFACT_BLOCKED")
+            self.assertIsNone(spec["frozen_artifact_sha256"])
             self.assertTrue(spec["certification_registry"].endswith("_prop_certification.json"))
 
     def test_declared_provider_surface_matches_extended_run_machine_exactly(self):
         payload = json.loads(Path("config/football_prop_engine_surface.json").read_text())
-        declared = {
-            market
-            for values in payload["implemented_provider_markets"].values()
-            for market in values
-        }
+        declared = {market for values in payload["implemented_provider_markets"].values() for market in values}
         self.assertEqual(declared, set(PROVIDER_MARKETS))
         self.assertIn("player_anytime_td", declared)
         self.assertIn("player_tds_over", declared)
@@ -46,16 +44,16 @@ class FootballPropSurfaceTests(unittest.TestCase):
         self.assertTrue(governance["requires_artifact_bound_certification"])
         self.assertTrue(governance["requires_frozen_edge_floor_before_promotable_inference"])
 
-    def test_one_sided_scorer_market_cannot_create_fair_market_probability(self):
+    def test_one_sided_scorer_market_consumes_model_p_but_cannot_create_it(self):
         payload = json.loads(Path("config/football_prop_engine_surface.json").read_text())
         governance = payload["governance"]
-        self.assertTrue(governance["one_sided_market_can_create_model_p"])
+        self.assertFalse(governance["one_sided_market_can_create_model_p"])
         self.assertFalse(governance["one_sided_market_can_create_fair_market_p"])
-        self.assertTrue(governance["requires_paired_price_for_market_economics"])
+        self.assertTrue(governance["one_sided_offer_ev_allowed_with_model_p"])
+        self.assertTrue(governance["paired_price_required_for_devig"])
+        self.assertNotIn("requires_paired_price_for_market_economics", governance)
 
     def test_checked_in_freeze_registries_remain_truthful(self):
-        # Hosted exact-SHA freeze bundles are separate immutable CI artifacts;
-        # checked-in registries must not claim a local artifact that is absent.
         for sport in ("nfl", "cfb"):
             row = json.loads(Path(f"config/{sport}_prop_model_freeze.json").read_text())
             self.assertEqual(row["status"], "UNFROZEN")

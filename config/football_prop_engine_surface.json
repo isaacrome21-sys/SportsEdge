@@ -1,6 +1,6 @@
 {
   "schema_version": "FOOTBALL_PROP_ENGINE_SURFACE_V1",
-  "authority": "This file is the runtime authority for football player-prop engine availability. It supersedes legacy NO_ENGINE labels only for provider markets explicitly listed under implemented_provider_markets. Unlisted markets retain config/football_market_surface.json state.",
+  "authority": "This file is the runtime authority for football player-prop engine availability. It declares implemented code paths only. Artifact/evidence readiness is derived at runtime from the bound registries and is never hard-coded here. It supersedes legacy NO_ENGINE labels only for provider markets explicitly listed under implemented_provider_markets. Unlisted markets retain config/football_market_surface.json state.",
   "library_entrypoint": "sportsedge.football_prop_readiness:run_football_props_ready",
   "sports": {
     "NFL": {
@@ -9,7 +9,7 @@
       "certification_registry": "config/nfl_prop_certification.json",
       "engine_state": "IMPLEMENTED_FAIL_CLOSED",
       "promotion_state": "AUTOMATIC_TRUTH_GATE_GATED",
-      "current_state": "EVIDENCE_PENDING"
+      "readiness_state": "REGISTRY_DERIVED"
     },
     "CFB": {
       "freeze_registry": "config/cfb_prop_model_freeze.json",
@@ -17,7 +17,7 @@
       "certification_registry": "config/cfb_prop_certification.json",
       "engine_state": "IMPLEMENTED_FAIL_CLOSED",
       "promotion_state": "AUTOMATIC_TRUTH_GATE_GATED",
-      "current_state": "EVIDENCE_PENDING"
+      "readiness_state": "REGISTRY_DERIVED"
     }
   },
   "implemented_provider_markets": {
@@ -71,8 +71,9 @@
     "capper_or_consensus_can_create_model_p": false,
     "requires_frozen_artifact": true,
     "requires_pregame_feature_snapshot": true,
-    "requires_paired_price_for_market_economics": true,
-    "one_sided_market_can_create_model_p": true,
+    "paired_price_required_for_devig": true,
+    "one_sided_offer_ev_allowed_with_model_p": true,
+    "one_sided_market_can_create_model_p": false,
     "one_sided_market_can_create_fair_market_p": false,
     "requires_pregame_quote": true,
     "requires_quote_ttl": true,
