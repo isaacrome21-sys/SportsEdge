@@ -1,0 +1,17 @@
+{
+  "artifact_sha256": "3efa5cc92b5ed1bf53a99cbe0d6e7792d01791a77c8f684874d66213b73d9570",
+  "encoding": "BASE64_CONCAT_V1",
+  "parts": [
+    {"path": "artifacts/football/nfl_prop_bundle_parts/part_00.b64", "text_sha256": "6bf3d73e72e8c58956f8884b0e5a49f3bdd94dd673940bb1e8bf516c50af4a92"},
+    {"path": "artifacts/football/nfl_prop_bundle_parts/part_01.b64", "text_sha256": "c566c8f0cb4f49f6c7bdb6518757d43648567ed5701f773412951e9f7c9cf049"},
+    {"path": "artifacts/football/nfl_prop_bundle_parts/part_02.b64", "text_sha256": "e4a69894873b37d1374d310dc4918e2f14604d8e8e5453d3e2c646d4a1e2c28e"},
+    {"path": "artifacts/football/nfl_prop_bundle_parts/part_03.b64", "text_sha256": "e8b3f9b240b52f712a92e1befd305224a5ce434cc2cc26861b9a39e2e0d2aeeb"},
+    {"path": "artifacts/football/nfl_prop_bundle_parts/part_04.b64", "text_sha256": "70cc589301ed51565a398e9da768d08b532585e4a8baa5cb677b936ca27a42a1"},
+    {"path": "artifacts/football/nfl_prop_bundle_parts/part_05.b64", "text_sha256": "1e1b9f09aa81c94eb39336baec01bae1d21f1ca882cf43658516eff5b69adc7d"},
+    {"path": "artifacts/football/nfl_prop_bundle_parts/part_06.b64", "text_sha256": "b2e9e23bd0e23afc126ff0558a326020ef3a9ed5e0903f3d52519fec11dfb98d"},
+    {"path": "artifacts/football/nfl_prop_bundle_parts/part_07.b64", "text_sha256": "5ea5dfe210b03ea610045bb9417279f152f81443893ae7abd3f3babcb1eec84e"}
+  ],
+  "promotion_authority": false,
+  "schema_version": "FOOTBALL_PROP_ARTIFACT_BUNDLE_V1",
+  "sport": "NFL"
+}
