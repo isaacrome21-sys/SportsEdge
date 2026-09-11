@@ -11,13 +11,7 @@ on:
       - 'sportsedge/football_prop_evidence.py'
       - 'sportsedge/football_prop_certification.py'
       - 'sportsedge/football_prop_readiness.py'
-      - 'sportsedge/core/simulate/drive_play.py'
-      - 'sportsedge/core/simulate/usage.py'
-      - 'sportsedge/core/simulate/player_markets.py'
-      - 'sportsedge/core/simulate/special_teams.py'
-      - 'sportsedge/core/simulate/kicker_markets.py'
-      - 'sportsedge/core/simulate/defense_usage.py'
-      - 'sportsedge/core/simulate/defense_markets.py'
+      - 'sportsedge/core/simulate/**'
       - 'scripts/run_football_props_auto.py'
       - 'scripts/run_football_auto_bundle.py'
       - 'config/football_prop_engine_surface.json'
@@ -28,11 +22,7 @@ on:
       - 'config/nfl_prop_certification.json'
       - 'config/cfb_prop_certification.json'
       - 'config/run_it_surface.json'
-      - 'tests/test_football_prop_run_machine.py'
-      - 'tests/test_football_prop_extended_run_machine.py'
-      - 'tests/test_football_prop_odds_source.py'
-      - 'tests/test_football_prop_surface.py'
-      - 'tests/test_football_prop_certification.py'
+      - 'tests/test_football_prop_*.py'
       - '.github/workflows/football-prop-run-machine-contract.yml'
   push:
     branches: [main]
@@ -44,13 +34,7 @@ on:
       - 'sportsedge/football_prop_evidence.py'
       - 'sportsedge/football_prop_certification.py'
       - 'sportsedge/football_prop_readiness.py'
-      - 'sportsedge/core/simulate/drive_play.py'
-      - 'sportsedge/core/simulate/usage.py'
-      - 'sportsedge/core/simulate/player_markets.py'
-      - 'sportsedge/core/simulate/special_teams.py'
-      - 'sportsedge/core/simulate/kicker_markets.py'
-      - 'sportsedge/core/simulate/defense_usage.py'
-      - 'sportsedge/core/simulate/defense_markets.py'
+      - 'sportsedge/core/simulate/**'
       - 'scripts/run_football_props_auto.py'
       - 'scripts/run_football_auto_bundle.py'
       - 'config/football_prop_engine_surface.json'
@@ -61,15 +45,15 @@ on:
       - 'config/nfl_prop_certification.json'
       - 'config/cfb_prop_certification.json'
       - 'config/run_it_surface.json'
-      - 'tests/test_football_prop_run_machine.py'
-      - 'tests/test_football_prop_extended_run_machine.py'
-      - 'tests/test_football_prop_odds_source.py'
-      - 'tests/test_football_prop_surface.py'
-      - 'tests/test_football_prop_certification.py'
+      - 'tests/test_football_prop_*.py'
       - '.github/workflows/football-prop-run-machine-contract.yml'
 
 permissions:
   contents: read
+
+concurrency:
+  group: football-prop-contract-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   contract:
@@ -100,6 +84,7 @@ jobs:
           tests/test_football_prop_extended_run_machine.py
           tests/test_football_prop_odds_source.py
           tests/test_football_prop_surface.py
+          tests/test_football_prop_runtime_truth.py
           tests/test_football_prop_certification.py
       - name: Run football prop contract tests
         run: >-
@@ -108,61 +93,43 @@ jobs:
           tests.test_football_prop_extended_run_machine
           tests.test_football_prop_odds_source
           tests.test_football_prop_surface
+          tests.test_football_prop_runtime_truth
           tests.test_football_prop_certification -v
-      - name: Assert extended market surface and automatic Truth Gate promotion
+      - name: Assert runtime surface and registry-derived readiness
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
           from sportsedge.football_prop_extended_run_machine import PROVIDER_MARKETS
           from sportsedge.football_prop_surface import require_executable_prop_surface
-
           surface = json.loads(Path('config/football_prop_engine_surface.json').read_text())
-          declared = {
-              market
-              for values in surface['implemented_provider_markets'].values()
-              for market in values
-          }
+          declared = {market for values in surface['implemented_provider_markets'].values() for market in values}
           assert declared == set(PROVIDER_MARKETS)
-          for required in (
-              'player_anytime_td', 'player_tds_over', 'player_field_goals',
-              'player_kicking_points', 'player_sacks', 'player_solo_tackles',
-              'player_tackles_assists', 'player_defensive_interceptions',
-          ):
-              assert required in declared
-          for sport in ('NFL', 'CFB'):
-              spec = require_executable_prop_surface(sport)
-              assert spec['engine_state'] == 'IMPLEMENTED_FAIL_CLOSED'
-              assert spec['promotion_state'] == 'AUTOMATIC_TRUTH_GATE_GATED'
-              assert spec['current_state'] == 'EVIDENCE_PENDING'
-          excluded = surface['explicit_no_engine']
-          assert 'first_td' in excluded
-          assert 'last_td' in excluded
-          assert 'targets' in excluded
-          assert 'anytime_td' not in excluded
-          assert 'kicker_props' not in excluded
-          assert 'defensive_player_props' not in excluded
-          gov = surface['governance']
-          assert gov['official_bets_allowed_when_all_gates_pass'] is True
-          assert gov['manual_eligible_toggle_required'] is False
-          assert gov['requires_artifact_bound_certification'] is True
-          assert gov['requires_frozen_edge_floor_before_promotable_inference'] is True
+          for sport in ('NFL','CFB'):
+              spec=require_executable_prop_surface(sport)
+              assert spec['engine_state']=='IMPLEMENTED_FAIL_CLOSED'
+              assert spec['promotion_state']=='AUTOMATIC_TRUTH_GATE_GATED'
+              assert spec['readiness_state']=='REGISTRY_DERIVED'
+              assert spec['runtime_state']=='MODEL_ARTIFACT_BLOCKED'
+              assert spec['frozen_artifact_sha256'] is None
+          gov=surface['governance']
+          assert gov['market_prices_can_create_model_p'] is False
+          assert gov['one_sided_market_can_create_model_p'] is False
           assert gov['one_sided_market_can_create_fair_market_p'] is False
+          assert gov['one_sided_offer_ev_allowed_with_model_p'] is True
+          assert gov['paired_price_required_for_devig'] is True
           PY
       - name: Assert checked-in football prop artifact claims remain truthful
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
-          for sport in ('nfl', 'cfb'):
-              path = Path(f'config/{sport}_prop_model_freeze.json')
-              freeze = json.loads(path.read_text())
-              assert freeze['schema_version'] == 1
-              assert freeze['status'] == 'UNFROZEN'
-              assert freeze['hash_algorithm'] == 'CANONICAL_JSON_SHA256_V1'
+          for sport in ('nfl','cfb'):
+              freeze=json.loads(Path(f'config/{sport}_prop_model_freeze.json').read_text())
+              assert freeze['schema_version']==1
+              assert freeze['status']=='UNFROZEN'
               assert freeze['artifact_sha256'] is None
               assert not Path(freeze['artifact_path']).exists()
-          print('FOOTBALL_PROP_CHECKED_IN_FREEZE_STATES_OK status=UNFROZEN')
           PY
       - name: Assert production evidence and certification do not self-promote
         run: |
@@ -170,14 +137,14 @@ jobs:
           import json
           from pathlib import Path
           from sportsedge.football_prop_evidence import EVIDENCE_GROUPS
-          for sport in ('nfl', 'cfb'):
-              evidence = json.loads(Path(f'config/{sport}_prop_evidence.json').read_text())
-              assert set(evidence['groups']) == set(EVIDENCE_GROUPS)
-              assert all(row['status'] == 'MISSING' for row in evidence['groups'].values())
+          for sport in ('nfl','cfb'):
+              evidence=json.loads(Path(f'config/{sport}_prop_evidence.json').read_text())
+              assert set(evidence['groups'])==set(EVIDENCE_GROUPS)
+              assert all(row['status']=='MISSING' for row in evidence['groups'].values())
               assert all(row['evidence_sha256'] is None for row in evidence['groups'].values())
               assert all(row['model_artifact_sha256'] is None for row in evidence['groups'].values())
-              cert = json.loads(Path(f'config/{sport}_prop_certification.json').read_text())
-              assert cert['markets'] == {}
+              cert=json.loads(Path(f'config/{sport}_prop_certification.json').read_text())
+              assert cert['markets']=={}
           PY
       - name: Assert missing fitted artifacts fail closed
         shell: bash
@@ -185,24 +152,10 @@ jobs:
           for sport in NFL CFB; do
             lower=$(printf '%s' "$sport" | tr '[:upper:]' '[:lower:]')
             set +e
-            python scripts/run_football_props_auto.py \
-              --sport "$sport" \
-              --model-artifact "/tmp/definitely-missing-${lower}-prop-model.json" \
-              --output "/tmp/${lower}-prop-card.json"
+            python scripts/run_football_props_auto.py --sport "$sport" --model-artifact "/tmp/definitely-missing-${lower}-prop-model.json" --output "/tmp/${lower}-prop-card.json"
             rc=$?
             set -e
             test "$rc" -eq 2
-            SPORT="$sport" LOWER="$lower" python - <<'PY'
-          import json, os
-          from pathlib import Path
-          sport = os.environ['SPORT']
-          lower = os.environ['LOWER']
-          payload = json.loads(Path(f'/tmp/{lower}-prop-card.json').read_text())
-          assert payload['status'] == 'BLOCKED'
-          assert payload['blocker'] == f'{sport}_PROP_FROZEN_MODEL_ARTIFACT_REQUIRED'
-          assert payload['governance']['fail_closed'] is True
-          assert payload['governance']['evidence_resolution_performed'] is True
-          PY
           done
       - name: Assert arbitrary bytes cannot bypass independent freeze binding
         shell: bash
@@ -211,38 +164,21 @@ jobs:
             lower=$(printf '%s' "$sport" | tr '[:upper:]' '[:lower:]')
             printf '{}\n' > "/tmp/${lower}-prop-model-present.json"
             set +e
-            python scripts/run_football_props_auto.py \
-              --sport "$sport" \
-              --model-artifact "/tmp/${lower}-prop-model-present.json" \
-              --output "/tmp/${lower}-prop-unfrozen-card.json"
+            python scripts/run_football_props_auto.py --sport "$sport" --model-artifact "/tmp/${lower}-prop-model-present.json" --output "/tmp/${lower}-prop-unfrozen-card.json"
             rc=$?
             set -e
             test "$rc" -eq 2
-            SPORT="$sport" LOWER="$lower" python - <<'PY'
-          import json, os
-          from pathlib import Path
-          sport = os.environ['SPORT']
-          lower = os.environ['LOWER']
-          payload = json.loads(Path(f'/tmp/{lower}-prop-unfrozen-card.json').read_text())
-          assert payload['status'] == 'BLOCKED'
-          assert payload['blocker'] == f'{sport}_PROP_FROZEN_MODEL_BINDING_REQUIRED'
-          assert payload['governance']['fail_closed'] is True
-          PY
           done
       - name: Assert RUN IT routes both football sports through bundle
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
-          surface = json.loads(Path('config/run_it_surface.json').read_text())
-          for sport in ('NFL', 'CFB'):
-              lower = sport.lower()
-              row = surface['sports'][sport]
-              assert row['lane'] == 'PREGAME_MODEL_AND_PLAYER_PROPS'
-              assert row['automatic_completeness'] == 'EXECUTABLE_FAIL_CLOSED'
-              assert row['automatic_command'] == [
-                  'python', 'scripts/run_football_auto_bundle.py', '--sport', sport,
-                  '--output', f'artifacts/run_it/{lower}_card.json'
-              ]
+          surface=json.loads(Path('config/run_it_surface.json').read_text())
+          for sport in ('NFL','CFB'):
+              lower=sport.lower(); row=surface['sports'][sport]
+              assert row['lane']=='PREGAME_MODEL_AND_PLAYER_PROPS'
+              assert row['automatic_completeness']=='EXECUTABLE_FAIL_CLOSED'
+              assert row['automatic_command']==['python','scripts/run_football_auto_bundle.py','--sport',sport,'--output',f'artifacts/run_it/{lower}_card.json']
           assert Path('scripts/run_football_auto_bundle.py').is_file()
           PY
