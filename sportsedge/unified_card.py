@@ -119,6 +119,7 @@ def run_unified_card(
             ingestion_now=ingestion_now,
             finalization_now=finalization_now,
             registry_path=registry_path,
+            require_confirmed_lineup=require_confirmed_lineup,
             edge_floor_config_path=edge_floor_config_path,
             kelly_multiplier=kelly_multiplier,
         )
