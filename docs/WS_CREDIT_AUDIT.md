@@ -12,6 +12,7 @@ Effective scope: 2026-09-11. This is operational-only and does not change any mo
 - `archive-mlb-game-odds.yml`
 - `auto-mlb.yml` paid live-machine step (push remains test-only)
 - `mlb-additional-pit-archive.yml` paid archive job (push/PR remain contract-test only)
+- `mlb-deadman.yml`; this must also be parked because a stale auto-MLB heartbeat would dispatch the paid archive failover
 - `mlb-v8-evidence.yml`
 - `mlb-v8-replay-backfill.yml`
 - `nfl-2026-line-capture.yml`
