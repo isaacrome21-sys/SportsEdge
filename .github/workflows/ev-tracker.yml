@@ -56,6 +56,51 @@ jobs:
         if: steps.tracker.outputs.code != '0'
         run: exit 1
 
+  manual-close:
+    if: github.event_name == 'issues' && startsWith(github.event.issue.title, '[CLOSE]') && github.event.issue.user.login == github.repository_owner
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+    concurrency:
+      group: ev-tracker-manual-close-${{ github.event.issue.number }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # repo-standard pin
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12.13"
+      - name: Record manual sharp close observation
+        id: manual
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          python scripts/ev_tracker_manual_close.py
+          echo "code=$?" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Commit manual observation
+        if: steps.manual.outputs.code == '0'
+        run: |
+          git config user.name "sportsedge-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A ledger/ev_manual_close_observations
+          changed="$(git diff --cached --name-only --diff-filter=MDR -- ledger/)"
+          if [ -n "$changed" ]; then echo "Refusing to modify existing ledger records: $changed"; exit 1; fi
+          if ! git diff --cached --quiet; then
+            git commit -m "ev-tracker: manual close issue #${{ github.event.issue.number }}"
+            pushed=0
+            for i in 1 2 3; do
+              if git pull --rebase && git push; then pushed=1; break; fi
+              git rebase --abort 2>/dev/null || true
+              sleep 5
+            done
+            if [ "$pushed" != "1" ]; then echo "MANUAL_PUSH_FAILED: manual observation was not persisted"; exit 1; fi
+          fi
+      - name: Fail on rejected manual close
+        if: steps.manual.outputs.code != '0'
+        run: exit 1
+
   close:
     if: github.event_name != 'issues'
     runs-on: ubuntu-latest

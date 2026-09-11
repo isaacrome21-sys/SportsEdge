@@ -1,0 +1,68 @@
+name: Log a manual sharp close
+description: Record a pre-start sharp-market observation when the automated odds provider is unavailable.
+title: "[CLOSE] "
+body:
+  - type: input
+    id: bet_issue
+    attributes:
+      label: Bet issue number
+      description: "The original [BET] issue number that SportsEdge already logged."
+      placeholder: "123"
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence reference
+      description: "Required. Paste a screenshot/image link or other durable reference showing the sharp quotes you observed."
+      placeholder: "Paste screenshot or evidence link here"
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: "Enter at least one complete paired sharp quote below. For moneyline, leave line blank. For spreads/totals, enter the line for your original pick/side."
+  - type: input
+    id: pinnacle_pick
+    attributes:
+      label: Pinnacle pick price
+      placeholder: "-110"
+  - type: input
+    id: pinnacle_other
+    attributes:
+      label: Pinnacle opposite price
+      placeholder: "+100"
+  - type: input
+    id: pinnacle_line
+    attributes:
+      label: Pinnacle line
+      placeholder: "+3.5 or 47.5; blank for moneyline"
+  - type: input
+    id: novig_pick
+    attributes:
+      label: Novig pick price
+      placeholder: "-108"
+  - type: input
+    id: novig_other
+    attributes:
+      label: Novig opposite price
+      placeholder: "-102"
+  - type: input
+    id: novig_line
+    attributes:
+      label: Novig line
+      placeholder: "+3.5 or 47.5; blank for moneyline"
+  - type: input
+    id: prophetx_pick
+    attributes:
+      label: ProphetX pick price
+      placeholder: "-105"
+  - type: input
+    id: prophetx_other
+    attributes:
+      label: ProphetX opposite price
+      placeholder: "-105"
+  - type: input
+    id: prophetx_line
+    attributes:
+      label: ProphetX line
+      placeholder: "+3.5 or 47.5; blank for moneyline"
