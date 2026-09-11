@@ -2,6 +2,8 @@ name: auto-mlb
 
 on:
   workflow_dispatch:
+  # MLB is parked for the remainder of 2026. Keep manual dispatch and CI/push
+  # coverage, but do not spend Odds API credits on a timer or ordinary push.
   push:
     branches: [main]
     paths:
@@ -11,9 +13,6 @@ on:
       - 'tests/test_auto_native_odds.py'
       - 'tests/test_mlb_run_machine.py'
       - '.github/workflows/auto-mlb.yml'
-  schedule:
-    # Fifteen-minute cadence only across broad MLB slate hours (UTC).
-    - cron: '*/15 15-23,0-5 * * *'
 
 permissions:
   contents: read
@@ -64,6 +63,7 @@ jobs:
           tests.test_run_auto_mlb_resilient_machine
           -v
       - name: Run canonical automated MLB machine
+        if: github.event_name == 'workflow_dispatch'
         env:
           SPORTSEDGE_QUOTES_URL: ${{ secrets.SPORTSEDGE_QUOTES_URL }}
           SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
@@ -77,7 +77,7 @@ jobs:
           SPORTSEDGE_HISTORY_CACHE_DIR: .cache/sportsedge/mlb-history
         run: python scripts/run_auto_mlb_resilient.py --output artifacts/live_mlb_card.json
       - name: Upload automated card evidence
-        if: always()
+        if: always() && github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: live-mlb-card

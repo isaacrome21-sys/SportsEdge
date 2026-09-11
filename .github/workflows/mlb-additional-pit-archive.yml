@@ -1,10 +1,9 @@
 name: mlb-additional-pit-archive
 
 on:
+  # MLB is parked for the remainder of 2026. Keep manual dispatch and code-change
+  # contract coverage; do not schedule paid quote acquisition.
   workflow_dispatch:
-  schedule:
-    # One T-90 +/-7 minute opportunity per game cluster without polling every few minutes.
-    - cron: '7,22,37,52 * * * *'
   pull_request:
     paths:
       - 'scripts/archive_mlb_additional_odds.py'
@@ -54,7 +53,7 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_mlb_quote_source_coverage.py'
 
   archive:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'workflow_dispatch'
     needs: contract
     concurrency:
       group: sportsedge-paid-odds-api

@@ -1,11 +1,9 @@
 name: mlb-v8-evidence
 
 on:
+  # MLB is parked for the remainder of 2026. Preserve manual evidence runs,
+  # but do not consume Odds API credits on a timer.
   workflow_dispatch:
-  schedule:
-    # Every ten minutes during broad MLB game hours. The stdlib precheck is cheap;
-    # the full canonical model runs only when a qualified V8 capture phase exists.
-    - cron: '4,14,24,34,44,54 16-23,0-5 * 9-11 *'
 
 permissions:
   contents: write

@@ -1,6 +1,8 @@
 name: mlb-v8-replay-backfill
 
 on:
+  # MLB is parked for the remainder of 2026. Historical paid recovery is
+  # dispatch-only so football evidence collection owns the scheduled budget.
   workflow_dispatch:
     inputs:
       max_requests:
@@ -12,9 +14,6 @@ on:
         required: false
         type: boolean
         default: false
-  schedule:
-    # Small bounded daily recovery. This also archives all free StatsAPI replay rows.
-    - cron: '17 10 * 9-11 *'
 
 permissions:
   contents: write
@@ -151,5 +150,5 @@ jobs:
             git rebase origin/data
             sleep $((attempt * 2))
           done
-          echo 'MLB V8 replay persistence failed after retries'
+          echo 'V8 evidence data-branch persistence failed after retries'
           exit 98
