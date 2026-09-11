@@ -1,0 +1,67 @@
+name: football-game-close-capture
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Offset from top-of-hour to reduce scheduler delay risk.
+    - cron: '7,22,37,52 * * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sportsedge-paid-odds-api
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Dedicated close-capture credential. Do not silently consume the EV tracker
+      # key when this reserve is absent.
+      SPORTSEDGE_FOOTBALL_CLOSE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_FOOTBALL_CLOSE_ODDS_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Restore durable promotion candidate and close state
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data:data
+          git worktree add .data-branch data
+
+      - name: Capture only when an evidence-qualified game is inside the frozen window
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/capture_football_game_closes.py \
+            --candidates .data-branch/runtime/promotion_candidates/football_game_candidates.json \
+            --ledger .data-branch/runtime/promotion-closes/football-game-v1
+
+      - name: Persist append-only observations and create-only final closes
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd .data-branch
+          git config user.name 'sportsedge-football-close-bot'
+          git config user.email 'sportsedge-football-close-bot@users.noreply.github.com'
+          git add runtime/promotion-closes/football-game-v1 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo 'No close state changes'
+            exit 0
+          fi
+          git commit -m "Football game close capture (run $GITHUB_RUN_ID)"
+          for i in 1 2 3; do
+            if git pull --rebase --quiet origin data && git push --quiet origin HEAD:data; then
+              exit 0
+            fi
+            sleep $((i * 5))
+          done
+          echo 'FOOTBALL_CLOSE_DATA_PUSH_FAILED' >&2
+          exit 1
