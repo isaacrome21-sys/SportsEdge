@@ -7,60 +7,107 @@ on:
     - cron: "*/30 * * * *"
   workflow_dispatch:
 
-permissions:
-  contents: write
-  issues: write
+permissions: {}
 
 jobs:
   log-bet:
     if: github.event_name == 'issues' && startsWith(github.event.issue.title, '[BET]') && github.event.issue.user.login == github.repository_owner
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
     concurrency:
       group: sportsedge-paid-odds-api
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # repo-standard pin
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
-          python-version: "3.12"
+          python-version: "3.12.13"
       - name: Log bet
+        id: tracker
         env:
           ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python scripts/ev_tracker.py log
-      - name: Commit
-        if: always()
+        run: |
+          set +e
+          python scripts/ev_tracker.py log
+          echo "code=$?" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Commit new play
+        if: steps.tracker.outputs.code == '0'
         run: |
           git config user.name "sportsedge-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A ledger/ev_plays 2>/dev/null || true
+          git add -A ledger/ev_plays
+          changed="$(git diff --cached --name-only --diff-filter=MDR -- ledger/)"
+          if [ -n "$changed" ]; then echo "Refusing to modify existing ledger records: $changed"; exit 1; fi
           if ! git diff --cached --quiet; then
             git commit -m "ev-tracker: log issue #${{ github.event.issue.number }}"
-            for i in 1 2 3; do git pull --rebase && git push && break; sleep 5; done
+            pushed=0
+            for i in 1 2 3; do
+              if git pull --rebase && git push; then pushed=1; break; fi
+              git rebase --abort 2>/dev/null || true
+              sleep 5
+            done
+            if [ "$pushed" != "1" ]; then echo "PUSH_FAILED: evidence was not persisted"; exit 1; fi
           fi
+      - name: Fail on non-OK result
+        if: steps.tracker.outputs.code != '0'
+        run: exit 1
 
   close:
     if: github.event_name != 'issues'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
     concurrency:
       group: sportsedge-paid-odds-api
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # repo-standard pin
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
-          python-version: "3.12"
-      - name: Capture sharp prices and refresh summary
+          python-version: "3.12.13"
+      - name: Sweep missed bets, close attempts, summary
+        id: tracker
         env:
           ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
-        run: python scripts/ev_tracker.py close
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          python scripts/ev_tracker.py close
+          code=$?
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" != "0" ] && [ "$code" != "3" ]; then
+            mkdir -p output/ev_tracker
+            printf '# EV Tracker health\n\nStatus: CRASH (exit %s) at %s\nNo evidence was committed from this run.\n' "$code" "$(date -u +%FT%TZ)" > output/ev_tracker/health.md
+          fi
+          exit 0
       - name: Commit
-        if: always()
+        env:
+          CODE: ${{ steps.tracker.outputs.code }}
         run: |
           git config user.name "sportsedge-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A ledger/ev_closes output/ev_tracker 2>/dev/null || true
-          if ! git diff --cached --quiet; then
-            git commit -m "ev-tracker: close capture"
-            for i in 1 2 3; do git pull --rebase && git push && break; sleep 5; done
+          if [ "$CODE" = "0" ] || [ "$CODE" = "3" ]; then
+            git add -A ledger/ev_plays ledger/ev_close_attempts ledger/ev_closes output/ev_tracker
+          else
+            git add output/ev_tracker/health.md
           fi
+          changed="$(git diff --cached --name-only --diff-filter=MDR -- ledger/)"
+          if [ -n "$changed" ]; then echo "Refusing to modify existing ledger records: $changed"; exit 1; fi
+          if ! git diff --cached --quiet; then
+            git commit -m "ev-tracker: close update"
+            pushed=0
+            for i in 1 2 3; do
+              if git pull --rebase && git push; then pushed=1; break; fi
+              git rebase --abort 2>/dev/null || true
+              sleep 5
+            done
+            if [ "$pushed" != "1" ]; then echo "PUSH_FAILED: evidence was not persisted"; exit 1; fi
+          fi
+      - name: Fail on non-OK result
+        if: steps.tracker.outputs.code != '0'
+        run: exit 1
