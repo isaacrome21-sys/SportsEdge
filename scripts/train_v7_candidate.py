@@ -6,11 +6,17 @@ import hashlib
 import json
 from pathlib import Path
 
+from sportsedge.v7_reduced_feature_contract import (
+    DEFAULT_REDUCED_CONTRACT_PATH,
+    load_reduced_feature_contract,
+    project_full_payload_to_reduced,
+)
 from sportsedge.v7_training import train_chronological_candidate
 
 
 POLICY_PATH = Path("config/v7_feature_backfill_policy_v1.json")
 REQUIREMENTS_PATH = Path("config/v7_backfill_source_requirements_v1.json")
+REDUCED_CONTRACT_PATH = DEFAULT_REDUCED_CONTRACT_PATH
 
 
 def _load(path: Path):
@@ -27,7 +33,7 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _require_source_readiness(path: Path) -> dict:
+def _require_source_readiness(path: Path, reduced_contract: dict) -> dict:
     try:
         report = json.loads(path.read_text())
     except Exception as exc:
@@ -48,9 +54,29 @@ def _require_source_readiness(path: Path) -> dict:
         raise SystemExit("V7_SOURCE_READINESS_NOT_READY")
     if report.get("reduced_feature_contract_ready") is not True:
         raise SystemExit("V7_REDUCED_FEATURE_CONTRACT_NOT_FROZEN")
+    if report.get("reduced_feature_contract_file_sha256") != reduced_contract["contract_file_sha256"]:
+        raise SystemExit("V7_REDUCED_FEATURE_CONTRACT_FILE_SHA256_MISMATCH")
+    if report.get("reduced_feature_contract_sha256") != reduced_contract["feature_contract_sha256"]:
+        raise SystemExit("V7_REDUCED_FEATURE_CONTRACT_SHA256_MISMATCH")
+    if report.get("reduced_feature_paths") != list(reduced_contract["feature_paths"]):
+        raise SystemExit("V7_REDUCED_FEATURE_PATHS_MISMATCH")
     if report.get("candidate_training_allowed") is not True:
         raise SystemExit("V7_CANDIDATE_TRAINING_NOT_AUTHORIZED")
     return report
+
+
+def _project_rows(rows: list, reduced_contract: dict) -> list[dict]:
+    projected: list[dict] = []
+    for index, raw in enumerate(rows):
+        if not isinstance(raw, dict):
+            raise SystemExit(f"V7_TRAINING_ROW_INVALID:{index}")
+        payload = raw.get("feature_payload")
+        if not isinstance(payload, dict):
+            raise SystemExit(f"V7_TRAINING_FEATURE_PAYLOAD_MISSING:{index}")
+        row = dict(raw)
+        row["feature_payload"] = project_full_payload_to_reduced(payload, contract=reduced_contract)
+        projected.append(row)
+    return projected
 
 
 def main() -> int:
@@ -69,8 +95,13 @@ def main() -> int:
     parser.add_argument("--learning-rate", type=float, default=0.05)
     args = parser.parse_args()
 
-    readiness = _require_source_readiness(Path(args.source_readiness_report))
-    rows = _load(Path(args.input))
+    reduced_contract = load_reduced_feature_contract(
+        REDUCED_CONTRACT_PATH,
+        policy_path=POLICY_PATH,
+        requirements_path=REQUIREMENTS_PATH,
+    )
+    readiness = _require_source_readiness(Path(args.source_readiness_report), reduced_contract)
+    rows = _project_rows(_load(Path(args.input)), reduced_contract)
     candidate, report = train_chronological_candidate(
         rows,
         model_name=args.model_name,
@@ -78,6 +109,8 @@ def main() -> int:
         calibration_start=args.calibration_start,
         calibration_end=args.calibration_end,
         holdout_start=args.holdout_start,
+        feature_paths=reduced_contract["feature_paths"],
+        feature_contract_sha256=reduced_contract["feature_contract_sha256"],
         l2=args.l2,
         iterations=args.iterations,
         learning_rate=args.learning_rate,
@@ -87,6 +120,8 @@ def main() -> int:
         "policy_sha256": readiness["policy_sha256"],
         "requirements_sha256": readiness["requirements_sha256"],
         "source_ready_feature_count": readiness["source_ready_feature_count"],
+        "reduced_feature_contract_file_sha256": readiness["reduced_feature_contract_file_sha256"],
+        "reduced_feature_contract_sha256": readiness["reduced_feature_contract_sha256"],
     }
 
     candidate_path = Path(args.candidate_output)
