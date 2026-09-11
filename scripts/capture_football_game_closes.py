@@ -92,6 +92,16 @@ def _dirs(root: Path, row: dict[str, Any]) -> tuple[Path, Path]:
     return base / "observations", base / "final.json"
 
 
+def _close_api_key() -> str:
+    """Return only the dedicated close-capture key.
+
+    The general SportsEdge odds key is intentionally not a fallback because close
+    collection has its own credit budget and must never silently consume the EV
+    tracker reserve.
+    """
+    return str(os.environ.get("SPORTSEDGE_FOOTBALL_CLOSE_ODDS_API_KEY") or "").strip()
+
+
 def _fetch_bulk(*, key: str, sport_key: str, bookmaker: str, markets: list[str]) -> list[dict[str, Any]]:
     params = {
         "apiKey": key,
@@ -229,7 +239,7 @@ def main() -> int:
             due_by_sport[row["sport"]].append(row)
 
     captured = 0
-    api_key = str(os.environ.get("SPORTSEDGE_FOOTBALL_CLOSE_ODDS_API_KEY") or os.environ.get("SPORTSEDGE_ODDS_API_KEY") or "").strip()
+    api_key = _close_api_key()
     for sport, rows in due_by_sport.items():
         if not rows:
             continue
