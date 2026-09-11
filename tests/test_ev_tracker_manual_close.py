@@ -138,7 +138,7 @@ class ManualCloseTests(unittest.TestCase):
         self.assertNotIn("ODDS_API_KEY", manual_job)
         self.assertIn("group: ev-tracker-manual-close-${{ github.event.issue.number }}", manual_job)
         self.assertIn("git add -A ledger/ev_manual_close_observations", manual_job)
-        self.assertIn("--diff-filter=MDR -- ledger/", manual_job)
+        self.assertIn("--diff-filter=MDRT -- ledger/", manual_job)
         self.assertIn("MANUAL_PUSH_FAILED: manual observation was not persisted", manual_job)
 
 
