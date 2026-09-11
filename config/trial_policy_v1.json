@@ -1,0 +1,24 @@
+{
+  "policy_id": "TRIAL_POLICY_V1",
+  "doctrine": "TRIAL plays come only from a real engine's Model_P. Market info, splits, and context leans never create a TRIAL play. TRIAL is not OFFICIAL and carries no confidence.",
+  "freeze_record": "The git commit that adds this file is the freeze record. Any edit requires TRIAL_POLICY_V2 and restarts every evidence clock.",
+  "min_trial_edge": 0.03,
+  "edge_definition": "Model_P minus two-sided paired no-vig probability at the logged price, same non-push basis.",
+  "max_trial_plays_per_sport_per_slate": 5,
+  "cap_ranking": "Highest edge first; ties broken by market_id ascending.",
+  "promotion_blockers": ["NOT_PROMOTED", "NO_FROZEN_EDGE_FLOOR"],
+  "required_row_fields": ["book", "price_american", "retrieved_at", "model_artifact_sha"],
+  "stages": {
+    "PAPER": {"stake_units": 0.0},
+    "MICRO": {
+      "stake_units": 0.25,
+      "min_settled": 200,
+      "min_slate_clusters": 20,
+      "min_mean_clv_pp": 0.5,
+      "min_clv_t_stat": 2.0,
+      "standard_error": "CR1_CLUSTER_BY_SLATE_DATE"
+    }
+  },
+  "stage_recompute": "Each market's stage is recomputed from its full settled TRIAL ledger before every slate. Failing MICRO conditions returns it to PAPER.",
+  "evidence_clock": "TRIAL rows count as forward evidence only while model_artifact_sha and this policy's hash are unchanged. Any change starts a new clock."
+}
