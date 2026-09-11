@@ -74,8 +74,13 @@ def load_cfb_prop_artifact_bundle(*, root: Path, bundle_path: Path) -> dict[str,
         compressed = base64.b64decode("".join(encoded), validate=True)
     except Exception as exc:
         raise CFBPropBundleError("CFB_PROP_ARTIFACT_BUNDLE_BASE64_INVALID") from exc
-    if sha256(compressed).hexdigest() != str(bundle.get("compressed_sha256") or "").lower():
-        raise CFBPropBundleError("CFB_PROP_ARTIFACT_BUNDLE_COMPRESSED_SHA256_MISMATCH")
+    actual_compressed = sha256(compressed).hexdigest()
+    expected_compressed = str(bundle.get("compressed_sha256") or "").lower()
+    if actual_compressed != expected_compressed:
+        raise CFBPropBundleError(
+            "CFB_PROP_ARTIFACT_BUNDLE_COMPRESSED_SHA256_MISMATCH:"
+            f"expected={expected_compressed}:actual={actual_compressed}"
+        )
 
     try:
         artifact = json.loads(gzip.decompress(compressed).decode("utf-8"))
