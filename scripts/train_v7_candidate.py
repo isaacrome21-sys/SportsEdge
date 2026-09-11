@@ -2,10 +2,15 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 
 from sportsedge.v7_training import train_chronological_candidate
+
+
+POLICY_PATH = Path("config/v7_feature_backfill_policy_v1.json")
+REQUIREMENTS_PATH = Path("config/v7_backfill_source_requirements_v1.json")
 
 
 def _load(path: Path):
@@ -18,9 +23,40 @@ def _load(path: Path):
     return value
 
 
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _require_source_readiness(path: Path) -> dict:
+    try:
+        report = json.loads(path.read_text())
+    except Exception as exc:
+        raise SystemExit(f"V7_SOURCE_READINESS_REPORT_INVALID:{path}") from exc
+    if not isinstance(report, dict):
+        raise SystemExit("V7_SOURCE_READINESS_REPORT_MUST_BE_OBJECT")
+    if report.get("contract") != "SPORTSEDGE_MLB_V7_BACKFILL_SOURCE_READINESS_V1":
+        raise SystemExit("V7_SOURCE_READINESS_CONTRACT_MISMATCH")
+    if report.get("policy_sha256") != _sha256(POLICY_PATH):
+        raise SystemExit("V7_SOURCE_READINESS_POLICY_SHA256_MISMATCH")
+    if report.get("requirements_sha256") != _sha256(REQUIREMENTS_PATH):
+        raise SystemExit("V7_SOURCE_READINESS_REQUIREMENTS_SHA256_MISMATCH")
+    if report.get("admitted_feature_count") != 12:
+        raise SystemExit("V7_SOURCE_READINESS_ADMITTED_COUNT_MISMATCH")
+    if report.get("source_ready_feature_count") != 12:
+        raise SystemExit("V7_SOURCE_READINESS_INCOMPLETE")
+    if report.get("source_readiness_state") != "READY_SOURCE_COVERAGE":
+        raise SystemExit("V7_SOURCE_READINESS_NOT_READY")
+    if report.get("reduced_feature_contract_ready") is not True:
+        raise SystemExit("V7_REDUCED_FEATURE_CONTRACT_NOT_FROZEN")
+    if report.get("candidate_training_allowed") is not True:
+        raise SystemExit("V7_CANDIDATE_TRAINING_NOT_AUTHORIZED")
+    return report
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Train and freeze a chronological V7 candidate from predeclared historical feature rows.")
     parser.add_argument("--input", required=True)
+    parser.add_argument("--source-readiness-report", required=True)
     parser.add_argument("--model-name", required=True)
     parser.add_argument("--train-end", required=True)
     parser.add_argument("--calibration-start", required=True)
@@ -33,6 +69,7 @@ def main() -> int:
     parser.add_argument("--learning-rate", type=float, default=0.05)
     args = parser.parse_args()
 
+    readiness = _require_source_readiness(Path(args.source_readiness_report))
     rows = _load(Path(args.input))
     candidate, report = train_chronological_candidate(
         rows,
@@ -45,6 +82,12 @@ def main() -> int:
         iterations=args.iterations,
         learning_rate=args.learning_rate,
     )
+    report["source_readiness_report"] = {
+        "data_ref": readiness.get("data_ref"),
+        "policy_sha256": readiness["policy_sha256"],
+        "requirements_sha256": readiness["requirements_sha256"],
+        "source_ready_feature_count": readiness["source_ready_feature_count"],
+    }
 
     candidate_path = Path(args.candidate_output)
     report_path = Path(args.report_output)
