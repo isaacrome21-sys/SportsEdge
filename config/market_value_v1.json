@@ -1,0 +1,22 @@
+{
+  "policy_id": "TOP_DOWN_MARKET_VALUE_V1",
+  "lane_status": "PAPER",
+  "devig_method": "SHIN",
+  "min_ev": 0.02,
+  "american_odds_min": -400,
+  "american_odds_max": 165,
+  "reference_modes": {
+    "PINNACLE_ONLY_V1": {
+      "books": ["Pinnacle"],
+      "min_books": 1,
+      "aggregation": "single"
+    },
+    "SHARP_CONSENSUS_V1": {
+      "books": ["Pinnacle", "Circa", "Bookmaker"],
+      "min_books": 2,
+      "aggregation": "median"
+    }
+  },
+  "eligible_for_official": false,
+  "external_performance_claims_allowed": false
+}
