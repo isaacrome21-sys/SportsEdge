@@ -89,7 +89,7 @@ class AutomationCoreTests(unittest.TestCase):
         result2=run_candidate(model_input=mi,quote=stale,paired_quote=self.paired_quote,deployment=self.deploy,engine_fn=engine,ingestion_now=self.now,finalization_now=self.now,edge_floor_config_path=self.floor_path)
         self.assertEqual(result2.bet_status,"BLOCKED")
 
-    def test_floor_policy_precedes_engine_and_legacy_in_production(self):
+    def test_malformed_engine_output_blocks_before_official_floor_can_matter(self):
         cfg = json.loads(Path(self.floor_path).read_text())
         cfg["truth_gate"]["production"]["require_frozen_floor_for_eligible_market"] = False
         Path(self.floor_path).write_text(json.dumps(cfg))
@@ -101,10 +101,12 @@ class AutomationCoreTests(unittest.TestCase):
             quote=self.quote, paired_quote=self.paired_quote, deployment=self.deploy,
             engine_fn=engine, ingestion_now=self.now, finalization_now=self.now,
             edge_floor_config_path=self.floor_path)
-        self.assertEqual(result.reason, "EdgeFloorError: FROZEN_FLOOR_POLICY_REQUIRED")
-        self.assertEqual(calls, [])
+        self.assertEqual(result.bet_status, "BLOCKED")
+        self.assertIsNone(result.model_p)
+        self.assertIn("engine output missing model_p", result.reason)
+        self.assertEqual(calls, [True])
 
-    def test_eligible_market_without_floor_hits_specific_production_blocker(self):
+    def test_eligible_market_without_floor_retains_candidate_but_blocks_official(self):
         cfg = json.loads(Path(self.floor_path).read_text())
         cfg["truth_gate"]["edge_floors"] = {}
         Path(self.floor_path).write_text(json.dumps(cfg))
@@ -122,17 +124,17 @@ class AutomationCoreTests(unittest.TestCase):
             finalization_now=self.now,
             edge_floor_config_path=self.floor_path,
         )
-        self.assertEqual(result.bet_status, "BLOCKED")
-        self.assertEqual(
-            result.reason,
-            "EdgeFloorError: ELIGIBLE_MARKET_MISSING_OR_UNFROZEN_EDGE_FLOOR:HITS",
-        )
-        self.assertEqual(calls, [])
+        self.assertEqual(result.bet_status, "MODEL_CANDIDATE")
+        self.assertEqual(result.model_p, .60)
+        self.assertIn("ELIGIBLE_MARKET_MISSING_OR_UNFROZEN_EDGE_FLOOR:HITS", result.reason)
+        self.assertEqual(calls, [True])
 
-    def test_missing_floor_fails_closed(self):
+    def test_missing_floor_registry_retains_candidate_but_blocks_official(self):
         missing=str(Path(self.tmp.name)/"missing.json")
         result=run_candidate(model_input=dict(self.key,build_hash="a"*64),quote=self.quote,paired_quote=self.paired_quote,deployment=self.deploy,engine_fn=lambda x:dict(self.key,model_p=.60),ingestion_now=self.now,finalization_now=self.now,edge_floor_config_path=missing)
-        self.assertEqual(result.bet_status,"BLOCKED"); self.assertIn("EdgeFloorError",result.reason)
+        self.assertEqual(result.bet_status,"MODEL_CANDIDATE")
+        self.assertEqual(result.model_p,.60)
+        self.assertIn("OFFICIAL_BLOCKED",result.reason)
 
 
 if __name__ == "__main__": unittest.main()
