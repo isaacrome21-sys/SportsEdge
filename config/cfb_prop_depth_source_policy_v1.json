@@ -22,11 +22,20 @@
   "corroboration": {
     "required_for_prop_dependency": true,
     "source_id": "OURLADS_CFB_DEPTH_CHART",
+    "automated_acquisition": false,
+    "automation_blocker": "SOURCE_TERMS_FOR_AUTOMATED_ACQUISITION_UNVERIFIED",
     "conflict_blocker": "STARTER_CONFLICT"
   },
   "freshness": {
     "rule": "SOURCE_UPDATED_AFTER_PREVIOUS_GAME",
     "stale_blocker": "DEPTH_CHART_STALE"
+  },
+  "point_in_time": {
+    "source_update_must_not_follow_retrieval": true,
+    "retrieval_must_not_follow_decision": true,
+    "decision_must_precede_target_game": true,
+    "expected_team_id_required": true,
+    "expected_content_sha256_required": true
   },
   "availability": {
     "unavailable_blocker": "PLAYER_UNAVAILABLE"
@@ -41,6 +50,6 @@
     "Depth ordering is contextual input only and never creates Model_P.",
     "The primary source is a maintained projected two-deep, not an official participation report.",
     "No historical backfill is permitted from current pages; only decision-time snapshots may be used.",
-    "Automated scraping remains disabled until source terms and access policy are explicitly verified."
+    "Automated acquisition remains disabled for both primary and corroboration sources until source terms and access policy are explicitly verified."
   ]
 }
