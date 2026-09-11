@@ -1,0 +1,165 @@
+name: MLB V7 venue reference persist
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "sportsedge/mlb_v7_venue_reference.py"
+      - "scripts/acquire_mlb_v7_venue_reference.py"
+      - ".github/workflows/mlb-v7-venue-reference-persist.yml"
+  push:
+    branches: [main]
+    paths:
+      - "sportsedge/mlb_v7_venue_reference.py"
+      - "scripts/acquire_mlb_v7_venue_reference.py"
+      - ".github/workflows/mlb-v7-venue-reference-persist.yml"
+
+concurrency:
+  group: sportsedge-mlb-v7-venue-reference-persist
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact code head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+
+      - name: Acquire and verify full venue bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=. python scripts/acquire_mlb_v7_venue_reference.py \
+            --start 2023-01-01 \
+            --end 2025-12-31 \
+            --output-root artifacts/mlb-v7-venue-reference
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          root = Path("artifacts/mlb-v7-venue-reference")
+          report = json.loads((root / "acquisition_report.json").read_text())
+          assert report["state"] == "READY_TO_ATTEST"
+          assert report["coverage_start"] == "2023-01-01"
+          assert report["coverage_end"] == "2025-12-31"
+          assert report["resolved_venue_count"] == report["discovered_venue_count"] == 39
+          assert report["missing_venue_ids"] == []
+          assert report["failures"] == []
+          assert report["attestation_written"] is True
+          assert report["promotion_authority"] is False
+          assert report["candidate_training_allowed"] is False
+          att = json.loads((root / "attestations/VENUE_REFERENCE.json").read_text())
+          assert att["source_class"] == "VENUE_REFERENCE"
+          assert att["semantics"] == {"fixed_facts_only": True}
+          assert set(att["fields"]) == {"venue_id", "latitude", "longitude", "timezone"}
+          for item in att["evidence_files"]:
+              p = root / item["path"]
+              assert p.is_file(), item["path"]
+              assert hashlib.sha256(p.read_bytes()).hexdigest() == item["sha256"]
+          print(json.dumps({"state": report["state"], "venues": report["resolved_venue_count"], "evidence_files": len(att["evidence_files"])}, sort_keys=True))
+          PY
+
+  persist:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout exact code head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+
+      - name: Re-acquire exact evidence for persistence
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=. python scripts/acquire_mlb_v7_venue_reference.py \
+            --start 2023-01-01 \
+            --end 2025-12-31 \
+            --output-root artifacts/mlb-v7-venue-reference
+
+      - name: Checkout durable data branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: data
+          path: data-branch
+          persist-credentials: true
+
+      - name: Copy only attested durable evidence
+        shell: bash
+        env:
+          CODE_HEAD_SHA: ${{ github.sha }}
+          WORKFLOW_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          SRC="$GITHUB_WORKSPACE/artifacts/mlb-v7-venue-reference"
+          DST="$GITHUB_WORKSPACE/data-branch/evidence/mlb_v8_replay_sources"
+          mkdir -p "$DST/attestations" "$DST/raw/discovery" "$DST/receipts"
+          cp "$SRC/attestations/VENUE_REFERENCE.json" "$DST/attestations/VENUE_REFERENCE.json"
+          cp "$SRC/raw/VENUE_REFERENCE.jsonl" "$DST/raw/VENUE_REFERENCE.jsonl"
+          cp "$SRC/raw/VENUE_REFERENCE_PROVENANCE.json" "$DST/raw/VENUE_REFERENCE_PROVENANCE.json"
+          cp "$SRC/raw/discovery/venue-coordinate-fallback-5340-Q60830511.json" "$DST/raw/discovery/venue-coordinate-fallback-5340-Q60830511.json"
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          dst = Path("data-branch/evidence/mlb_v8_replay_sources")
+          att_path = dst / "attestations/VENUE_REFERENCE.json"
+          att = json.loads(att_path.read_text())
+          for item in att["evidence_files"]:
+              p = dst / item["path"]
+              assert p.is_file(), item["path"]
+              actual = hashlib.sha256(p.read_bytes()).hexdigest()
+              assert actual == item["sha256"], (item["path"], actual, item["sha256"])
+          receipt = {
+              "schema_version": 1,
+              "source_class": "VENUE_REFERENCE",
+              "code_head_sha": os.environ["CODE_HEAD_SHA"],
+              "workflow_run_id": int(os.environ["WORKFLOW_RUN_ID"]),
+              "attestation_sha256": hashlib.sha256(att_path.read_bytes()).hexdigest(),
+              "promotion_authority": False,
+          }
+          (dst / "receipts/VENUE_REFERENCE.json").write_text(json.dumps(receipt, sort_keys=True, separators=(",", ":")) + "\n")
+          PY
+
+      - name: Commit append-safe evidence update
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd data-branch
+          git config user.name "sportsedge-data-bot"
+          git config user.email "sportsedge-data-bot@users.noreply.github.com"
+          git add \
+            evidence/mlb_v8_replay_sources/attestations/VENUE_REFERENCE.json \
+            evidence/mlb_v8_replay_sources/raw/VENUE_REFERENCE.jsonl \
+            evidence/mlb_v8_replay_sources/raw/VENUE_REFERENCE_PROVENANCE.json \
+            evidence/mlb_v8_replay_sources/raw/discovery/venue-coordinate-fallback-5340-Q60830511.json \
+            evidence/mlb_v8_replay_sources/receipts/VENUE_REFERENCE.json
+          if git diff --cached --quiet; then
+            echo "No venue-reference evidence change"
+            exit 0
+          fi
+          git commit -m "evidence: persist MLB V7 venue reference ${GITHUB_SHA}"
+          for attempt in 1 2 3; do
+            if git pull --rebase origin data && git push origin HEAD:data; then
+              exit 0
+            fi
+            git rebase --abort >/dev/null 2>&1 || true
+            sleep $((attempt * 2))
+          done
+          echo "DATA_BRANCH_PERSIST_FAILED" >&2
+          exit 1
