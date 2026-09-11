@@ -6,6 +6,7 @@ from typing import Any, Callable
 from urllib.request import urlopen
 
 from .mlb_v7_travel_history import (
+    BASE,
     HistoricalGameRow,
     MLBV7TravelHistoryError,
     VenueReferenceRow,
@@ -16,6 +17,7 @@ from .mlb_v7_travel_history import (
     parse_venue_reference,
     schedule_games,
     schedule_url,
+    snapshot_status,
     timestamps_url,
     venue_url,
     write_json,
@@ -78,7 +80,18 @@ def collect_history_slice(
         try:
             timecodes_payload = _get_json(timestamps_url(game["game_id"]), opener)
             timecodes = extract_timecodes(timecodes_payload)
-            final_snapshot = _get_json(historical_snapshot_url(game["game_id"], timecodes[-1]), opener)
+            final_timecode = timecodes[-1]
+            final_snapshot = _get_json(historical_snapshot_url(game["game_id"], final_timecode), opener)
+            projected_status = snapshot_status(final_snapshot)
+            if projected_status != "Final":
+                full_url = f"{BASE}/api/v1.1/game/{int(game['game_id'])}/feed/live?timecode={final_timecode}"
+                full_snapshot = _get_json(full_url, opener)
+                full_status = snapshot_status(full_snapshot)
+                if full_status != "Final":
+                    raise MLBV7TravelHistoryError(
+                        f"LAST_TIMECODE_NOT_FINAL:projected={projected_status}:full={full_status}"
+                    )
+                final_snapshot = full_snapshot
             history_rows.extend(normalize_final_game(game, timecodes_payload, final_snapshot))
             venue_id = int(game["venue_id"])
             if venue_id not in venues:

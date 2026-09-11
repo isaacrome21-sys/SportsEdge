@@ -92,3 +92,58 @@ def test_nonfinal_historical_schedule_row_blocks_slice(tmp_path) -> None:
 def test_range_is_hard_bounded(tmp_path) -> None:
     with pytest.raises(MLBV7TravelHistoryError, match="DATE_RANGE_EXCEEDS_MAX_DAYS"):
         collect_history_slice("2025-01-01", "2025-03-01", Path(tmp_path), opener=_opener)
+
+
+def test_full_snapshot_recheck_can_resolve_projection_only_status_mismatch(tmp_path) -> None:
+    calls = []
+
+    def opener(url, timeout=30):
+        calls.append(url)
+        parsed = urlparse(url)
+        if parsed.path.endswith("/api/v1/schedule"):
+            payload = _schedule()
+        elif parsed.path.endswith("/feed/live/timestamps"):
+            payload = ["20250401_231000", "20250402_031500"]
+        elif parsed.path.endswith("/feed/live"):
+            query = parse_qs(parsed.query)
+            payload = {"gameData": {"status": {"abstractGameState": "Live" if "fields" in query else "Final"}}}
+        elif "/api/v1/venues/30" in parsed.path:
+            payload = {"venues": [{
+                "id": 30,
+                "location": {"defaultCoordinates": {"latitude": 41.0, "longitude": -87.0}},
+                "timeZone": {"id": "America/Chicago"},
+            }]}
+        else:
+            raise AssertionError(url)
+        return _Response(json.dumps(payload).encode("utf-8"))
+
+    report = collect_history_slice(
+        "2025-04-01", "2025-04-01", Path(tmp_path), opener=opener,
+        retrieved_at=datetime(2026, 9, 11, tzinfo=timezone.utc),
+    )
+    assert report["state"] == "PASS_SOURCE_SLICE"
+    live_calls = [url for url in calls if "/feed/live?" in url and not url.endswith("/timestamps")]
+    assert len(live_calls) == 2
+    assert "fields=" in live_calls[0]
+    assert "fields=" not in live_calls[1]
+
+
+def test_full_snapshot_recheck_still_blocks_nonfinal_terminal_state(tmp_path) -> None:
+    def opener(url, timeout=30):
+        parsed = urlparse(url)
+        if parsed.path.endswith("/api/v1/schedule"):
+            payload = _schedule()
+        elif parsed.path.endswith("/feed/live/timestamps"):
+            payload = ["20250401_231000", "20250402_031500"]
+        elif parsed.path.endswith("/feed/live"):
+            payload = {"gameData": {"status": {"abstractGameState": "Live"}}}
+        else:
+            raise AssertionError(url)
+        return _Response(json.dumps(payload).encode("utf-8"))
+
+    report = collect_history_slice(
+        "2025-04-01", "2025-04-01", Path(tmp_path), opener=opener,
+        retrieved_at=datetime(2026, 9, 11, tzinfo=timezone.utc),
+    )
+    assert report["state"] == "BLOCKED_SOURCE_SLICE"
+    assert report["failures"][0]["reason"] == "LAST_TIMECODE_NOT_FINAL:projected=Live:full=Live"
