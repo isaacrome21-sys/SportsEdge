@@ -1,9 +1,15 @@
 {
   "schema_version": 1,
   "sport": "NFL",
-  "status": "UNFROZEN",
+  "status": "FROZEN",
   "hash_algorithm": "CANONICAL_JSON_SHA256_V1",
   "artifact_path": "artifacts/football/nfl_offensive_prop_ab_model.json",
-  "artifact_sha256": null,
-  "reason": "No genuine fitted NFL offensive A+B prop artifact has been frozen. The prop runner must fail closed until a real fitted artifact is independently frozen and hash-bound."
+  "artifact_sha256": "3efa5cc92b5ed1bf53a99cbe0d6e7792d01791a77c8f684874d66213b73d9570",
+  "artifact_version": "NFL_PROP_SHARED_PATH_2022_2025_V1",
+  "code_git_sha": "5dfa29347bed608771e6a2395ce8e894dbfdd881",
+  "source_manifest_sha256": "71b6a1ed010e963dd0e8bb0b8a18d2a3a9cdef1914084631fe5adb9ed2c278da",
+  "code_surface_manifest_path": "config/nfl_prop_code_surface_v1.json",
+  "code_surface_sha256": "6d59edd86845a63625fd0c55be311891622f315034bc06274fb38a30aa92f280",
+  "promotion_authority": false,
+  "reason": "Exact hosted artifact bytes and their fitted code identity are frozen. Runtime use across later unrelated commits requires exact verification of the independently hash-bound NFL prop code surface. This freeze supplies Model_P provenance only and does not certify or promote any betting market."
 }
