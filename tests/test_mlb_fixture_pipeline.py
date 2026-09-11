@@ -59,11 +59,14 @@ class MLBFixtureFullPipelineTests(unittest.TestCase):
         self.assertTrue(all(r.decision is not None for r in captured),[r.reason for r in captured])
         self.assertTrue(all(r.bet_status in {"PASS","OFFICIAL_BET"} for r in captured))
 
-    def test_missing_opposite_side_blocks(self):
+    def test_missing_opposite_side_retains_model_candidate_but_cannot_devig(self):
         with tempfile.TemporaryDirectory() as td:
             registry=Path(td)/"deployments.json"; floors=Path(td)/"floors.json"; write_registry(registry); write_floors(floors)
             out=run_generic_card(games=[frozen_game()],feature_rows=[frozen_feature()],quotes=[frozen_quote("OVER",-113)],ingestion_now=NOW,finalization_now=NOW,registry_path=str(registry),edge_floor_config_path=str(floors))
-        self.assertEqual(out[0].bet_status,"BLOCKED")
+        self.assertEqual(out[0].bet_status,"MODEL_CANDIDATE")
+        self.assertIsNotNone(out[0].model_p)
+        self.assertEqual(out[0].market_no_vig_p_status,"UNAVAILABLE_ONE_SIDED")
+        self.assertIsNotNone(out[0].ev_per_dollar)
         self.assertIn("PAIRED_PRICE_REQUIRED_FOR_DEVIG",out[0].reason)
 
 
