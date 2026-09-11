@@ -44,7 +44,13 @@ jobs:
           if [ -n "$changed" ]; then echo "Refusing to modify existing ledger records: $changed"; exit 1; fi
           if ! git diff --cached --quiet; then
             git commit -m "ev-tracker: log issue #${{ github.event.issue.number }}"
-            for i in 1 2 3; do git pull --rebase && git push && break; sleep 5; done
+            pushed=0
+            for i in 1 2 3; do
+              if git pull --rebase && git push; then pushed=1; break; fi
+              git rebase --abort 2>/dev/null || true
+              sleep 5
+            done
+            if [ "$pushed" != "1" ]; then echo "PUSH_FAILED: evidence was not persisted"; exit 1; fi
           fi
       - name: Fail on non-OK result
         if: steps.tracker.outputs.code != '0'
@@ -92,7 +98,13 @@ jobs:
           if [ -n "$changed" ]; then echo "Refusing to modify existing ledger records: $changed"; exit 1; fi
           if ! git diff --cached --quiet; then
             git commit -m "ev-tracker: close update"
-            for i in 1 2 3; do git pull --rebase && git push && break; sleep 5; done
+            pushed=0
+            for i in 1 2 3; do
+              if git pull --rebase && git push; then pushed=1; break; fi
+              git rebase --abort 2>/dev/null || true
+              sleep 5
+            done
+            if [ "$pushed" != "1" ]; then echo "PUSH_FAILED: evidence was not persisted"; exit 1; fi
           fi
       - name: Fail on non-OK result
         if: steps.tracker.outputs.code != '0'

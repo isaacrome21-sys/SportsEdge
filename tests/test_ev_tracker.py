@@ -57,6 +57,11 @@ class Policy(unittest.TestCase):
         for ref in uses:
             self.assertRegex(ref, r"^[\w.-]+/[\w.-]+@[0-9a-f]{40}$")
 
+    def test_workflow_push_failure_is_not_silent(self):
+        text = (ROOT / ".github/workflows/ev-tracker.yml").read_text()
+        self.assertNotIn("&& break; sleep 5; done", text)
+        self.assertEqual(text.count('if [ "$pushed" != "1" ]; then echo "PUSH_FAILED'), 2)
+
 
 class Math(unittest.TestCase):
     def test_conversions_and_devig(self):
