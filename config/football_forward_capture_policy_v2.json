@@ -3,6 +3,7 @@
   "status": "PROSPECTIVE_UNACTIVATED",
   "promotion_authority": false,
   "evidence_clock_authority": false,
+  "shared_evidence_contract": "SPORTSEDGE_EVIDENCE_UNIT_V1",
   "sports": {
     "NFL": {
       "provider_sport_key": "americanfootball_nfl"
@@ -21,16 +22,19 @@
     "min": 2,
     "max": 20
   },
-  "close_definition_id": "DK_MAINLINE_LAST_PRESTART_T20_T2_POWER_V1",
+  "close_definition_id": "DK_SAME_THRESHOLD_T20_T2_POWER_V1",
   "devig_method": "POWER_V1",
   "provider_request_shape": "SPORT_BULK_V1",
+  "same_threshold_required_for_spreads_totals": true,
   "persistence": {
     "branch": "data",
     "decisions_append_only": true,
     "closes_append_only": true,
+    "one_close_per_decision": true,
     "missing_close_counts_in_coverage_denominator": true
   },
   "candidate_contract": {
+    "requires_ws0_decision_validation": true,
     "requires_evidence_unit_id": true,
     "requires_two_sided_decision_price": true,
     "record_every_threshold_qualified_candidate": true,
@@ -38,8 +42,9 @@
   },
   "activation_notes": [
     "This policy is prospective and does not reinterpret NFL_FORWARD_SHADOW_EV_V1 rows.",
-    "CFB cannot activate until a genuine frozen CFB game model/evidence unit exists.",
+    "CFB cannot activate until a genuine frozen CFB game model/evidence unit and frozen lane threshold identity exist.",
     "NFL cannot activate under this policy until its durable model freeze and V2 evidence unit are bound.",
-    "The legacy NFL forward collector remains historical/legacy until adapters are migrated explicitly."
+    "The legacy NFL forward collector remains historical/legacy until adapters are migrated explicitly.",
+    "For spread and total evidence, the close must price the original decision threshold; a moved headline/main line is not a substitute."
   ]
 }
