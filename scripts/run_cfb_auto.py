@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Fail-closed automatic CFB entrypoint for the canonical SportsEdge run machine.
 
-The script never trains a model. It requires a prebuilt, hash-bound CFB joint-model
+The script never trains a model. It requires a registry-bound frozen CFB joint-model
 artifact and the existing CFBD/Odds credentials, discovers the next FBS regular-
-season week when one is not explicitly supplied, then calls the same AUTOMATIC
-library path used by MANUAL/HYBRID parity tests. Objective context is acquired as a
-separate sidecar and never substituted for Model_P inputs or promotion evidence.
+season week when one is not explicitly supplied, then calls the canonical runtime.
+Objective context is a sidecar and never substitutes for Model_P or evidence.
 """
 from __future__ import annotations
 
@@ -22,6 +21,11 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from sportsedge.sports.cfb.full_auto import build_cfb_full_auto_slate
+from sportsedge.sports.cfb.game_freeze import (
+    CFBGameFreezeError,
+    load_cfb_game_freeze,
+    verify_frozen_cfb_game_artifact,
+)
 from sportsedge.sports.cfb.model_artifact import (
     CFBModelArtifactError,
     cfb_model_code_surface_sha256,
@@ -95,23 +99,36 @@ def _credentials() -> tuple[str, str]:
 
 
 def _model(path: Path, *, repo_root: Path):
+    """Load only an artifact authorized by the committed freeze registry."""
+    # Preserve the most local blocker first: if the canonical artifact does not
+    # exist, no registry lookup can make the runtime usable.
     if not path.is_file():
         raise CFBAutoError("CFB_AUTO_FROZEN_MODEL_ARTIFACT_REQUIRED")
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        registry = load_cfb_game_freeze(repo_root / "config/cfb_game_model_freeze.json")
+    except CFBGameFreezeError as exc:
+        raise CFBAutoError(str(exc)) from exc
+    expected_path = repo_root / str(registry["artifact_path"])
+    if path.resolve() != expected_path.resolve():
+        raise CFBAutoError("CFB_AUTO_MODEL_ARTIFACT_PATH_NOT_FROZEN")
+    try:
+        raw = path.read_bytes()
+        payload = json.loads(raw.decode("utf-8"))
     except Exception as exc:
         raise CFBAutoError("CFB_AUTO_MODEL_ARTIFACT_UNREADABLE") from exc
     code_sha = cfb_model_code_surface_sha256(repo_root)
-    expected_source = str(os.environ.get("SPORTSEDGE_CFB_TRAINING_SOURCE_SHA256") or "").strip() or None
+    if code_sha != registry["model_code_sha256"]:
+        raise CFBAutoError("CFB_AUTO_MODEL_CODE_SHA256_REGISTRY_MISMATCH")
     try:
+        verify_frozen_cfb_game_artifact(payload, artifact_bytes=raw, registry=registry)
         model = load_cfb_model_artifact(
             payload,
-            expected_model_code_sha256=code_sha,
-            expected_training_source_sha256=expected_source,
+            expected_model_code_sha256=registry["model_code_sha256"],
+            expected_training_source_sha256=registry["training_source_sha256"],
         )
-    except CFBModelArtifactError as exc:
+    except (CFBModelArtifactError, CFBGameFreezeError) as exc:
         raise CFBAutoError(str(exc)) from exc
-    return model, payload
+    return model, payload, registry
 
 
 def _objective_context(*, current: datetime, season: int, cfbd_key: str) -> tuple[str, dict | None, str | None]:
@@ -151,7 +168,7 @@ def main() -> int:
     current = _utc(args.asof)
     try:
         cfbd_key, odds_key = _credentials()
-        model, artifact = _model(args.model_artifact, repo_root=root)
+        model, artifact, registry = _model(args.model_artifact, repo_root=root)
         season = int(args.season if args.season is not None else current.year)
         week = int(args.week) if args.week is not None else discover_cfb_week(
             season=season,
@@ -183,6 +200,7 @@ def main() -> int:
             "model_artifact_sha256": artifact["artifact_sha256"],
             "model_code_sha256": artifact["model_code_sha256"],
             "training_source_sha256": artifact["training_source_sha256"],
+            "game_freeze_registry_sha256": registry["registry_sha256"],
             "objective_context_status": context_status,
             "objective_context_error": context_error,
             "objective_context": objective_context,
@@ -194,6 +212,7 @@ def main() -> int:
                 "truth_gate_changed": False,
                 "fail_closed": True,
                 "context_failure_is_scoped": True,
+                "training_source_env_override_allowed": False,
             },
         }
         _write(args.output, payload)
