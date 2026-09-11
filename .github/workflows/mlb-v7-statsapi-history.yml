@@ -62,6 +62,7 @@ jobs:
           print(json.dumps({"state": r["state"], "final_games": r["normalized_final_game_count"], "team_rows": r["normalized_team_row_count"]}, sort_keys=True))
           PY
       - name: Upload probe shard
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: mlb-v7-statsapi-history-probe-${{ github.sha }}
