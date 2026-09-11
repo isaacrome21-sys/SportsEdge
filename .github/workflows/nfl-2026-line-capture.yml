@@ -1,10 +1,9 @@
 name: NFL 2026 line capture
 
 on:
-  schedule:
-    # Every 5 minutes, offset from :00 to avoid peak scheduler load. The script
-    # decides whether a capture window is open; idle runs make no paid API calls.
-    - cron: "2,7,12,17,22,27,32,37,42,47,52,57 * * * *"
+  # Dispatch-only legacy confirmation capture. The scheduled authority is
+  # football-nfl-forward-clv-collection.yml; keeping this workflow scheduled
+  # would duplicate DraftKings game-line spend.
   workflow_dispatch:
     inputs:
       mode:
