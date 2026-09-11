@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run isolated NFL V2 candidate validation on exact production history inputs."""
+"""Run isolated NFL successor-candidate validation on exact production history inputs."""
 from __future__ import annotations
 
 import argparse
@@ -28,6 +28,7 @@ from scripts.run_nfl_production_validation import (
 from sportsedge.sports.nfl.history import normalize_nfl_rows, parse_schedule_csv
 from sportsedge.sports.nfl.m2_history_features import fit_nfl_prior_decay_curves
 from sportsedge.sports.nfl.m2_history_policy import build_nfl_m2_history_rows
+from sportsedge.sports.nfl.m2_nonlinear_validation import build_nfl_m2_nonlinear_candidate_evidence
 from sportsedge.sports.nfl.m2_v2_nested_validation import build_nfl_m2_v2_nested_candidate_evidence
 from sportsedge.sports.nfl.m2_v2_validation import build_nfl_m2_v2_candidate_evidence
 from sportsedge.sports.nfl.m2_v2b_validation import build_nfl_m2_v2b_candidate_evidence
@@ -116,10 +117,13 @@ def main() -> int:
     parser.add_argument("--min-train-seasons", type=int, default=2)
     parser.add_argument("--ridge-alpha", type=float, default=10.0)
     parser.add_argument("--kernel-scale", type=float, default=1.0)
+    parser.add_argument("--nonlinear-ridge-alpha", type=float, default=50.0)
+    parser.add_argument("--nonlinear-min-rows", type=int, default=200)
     parser.add_argument("--neutral-site-policy", choices=("error", "exclude_from_evaluation"), default="exclude_from_evaluation")
     parser.add_argument("--out", type=Path, default=Path("artifacts/football/nfl_m2_v2_candidate_validation.json"))
     parser.add_argument("--nested-out", type=Path, default=Path("artifacts/football/nfl_m2_v2_nested_candidate_validation.json"))
     parser.add_argument("--v2b-out", type=Path, default=Path("artifacts/football/nfl_m2_v2b_candidate_validation.json"))
+    parser.add_argument("--nonlinear-out", type=Path, default=Path("artifacts/football/nfl_m2_nonlinear_candidate_validation.json"))
     args = parser.parse_args()
 
     git_sha = str(args.git_sha).strip().lower()
@@ -229,12 +233,23 @@ def main() -> int:
         ),
         **common,
     )
+    nonlinear = _attach_run_provenance(
+        build_nfl_m2_nonlinear_candidate_evidence(
+            history_rows,
+            source_manifest_sha256=manifest_hash,
+            min_train_seasons=args.min_train_seasons,
+            ridge_alpha=args.nonlinear_ridge_alpha,
+            min_rows=args.nonlinear_min_rows,
+        ),
+        **common,
+    )
     _write(args.out, v2a)
     _write(args.nested_out, nested)
     _write(args.v2b_out, v2b)
+    _write(args.nonlinear_out, nonlinear)
 
     print(json.dumps({
-        "status": "V2_CANDIDATE_DIAGNOSTICS_COMPLETE",
+        "status": "NFL_SUCCESSOR_CANDIDATE_DIAGNOSTICS_COMPLETE",
         "history_rows": len(history_rows),
         "production_registry_consumes_these_artifacts": False,
         "v2a": {
@@ -253,6 +268,12 @@ def main() -> int:
             "model_id": v2b["model_id"],
             "candidate_historical_evidence": v2b["candidate_historical_evidence"],
             "signed_key_probability": v2b["candidate_distribution_profile"]["signed_key_probability"],
+        },
+        "nonlinear": {
+            "model_id": nonlinear["model_id"],
+            "basis_version": nonlinear["basis_version"],
+            "candidate_historical_evidence": nonlinear["candidate_historical_evidence"],
+            "signed_key_probability": nonlinear["candidate_distribution_profile"]["signed_key_probability"],
         },
     }, sort_keys=True))
     return 0
