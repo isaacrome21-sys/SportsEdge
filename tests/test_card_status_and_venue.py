@@ -175,9 +175,9 @@ class TrialTier(unittest.TestCase):
         row = trial(quote=q)
         self.assertIn("TRIAL_ROW_INCOMPLETE", row["reasons"])
 
-    def test_promoted_without_floor_can_trial(self):
+    def test_promoted_without_floor_stays_blocked(self):
         row = trial(promoted=True, edge_floor=None)
-        self.assertEqual(row["status"], cs.TRIAL)
+        self.assertEqual(row["status"], cs.BLOCKED)
         self.assertEqual(row["reasons"], ["NO_FROZEN_EDGE_FLOOR"])
 
     def test_micro_stage_stake(self):
