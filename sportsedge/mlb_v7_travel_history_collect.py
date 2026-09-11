@@ -12,6 +12,7 @@ from .mlb_v7_travel_history import (
     VenueReferenceRow,
     _get_json,
     extract_timecodes,
+    historical_snapshot_url,
     normalize_final_game,
     parse_venue_reference,
     schedule_games,
@@ -31,34 +32,6 @@ def _date(value: str, field: str) -> date:
         return date.fromisoformat(str(value))
     except ValueError as exc:
         raise MLBV7TravelHistoryError(f"{field}_INVALID") from exc
-
-
-def _latest_confirmed_final_snapshot(
-    game_id: int,
-    timecodes: list[str],
-    opener: Callable,
-) -> tuple[list[str], Any]:
-    """Return history ending at the latest timecode whose full snapshot is Final.
-
-    MLB can append historical timecodes after a game has already reached Final and
-    those later snapshots can report a non-Final abstract state. For travel/rest
-    chronology the defensible bound is therefore the latest *observed historical*
-    timecode that itself proves Final, not blindly the terminal timecode.
-
-    The returned timecode list is truncated through that confirmed Final point so
-    normalize_final_game() derives final_at from the exact proven snapshot.
-    """
-    if not timecodes:
-        raise MLBV7TravelHistoryError("FINAL_GAME_TIMESTAMPS_MISSING")
-    for idx in range(len(timecodes) - 1, -1, -1):
-        timecode = timecodes[idx]
-        # Use the full historical payload here. A prior hosted probe showed that a
-        # fields-projected payload can differ from the full payload for status.
-        url = f"{BASE}/api/v1.1/game/{int(game_id)}/feed/live?timecode={timecode}"
-        snapshot = _get_json(url, opener)
-        if snapshot_status(snapshot) == "Final":
-            return timecodes[: idx + 1], snapshot
-    raise MLBV7TravelHistoryError("NO_FINAL_HISTORICAL_TIMECODE")
 
 
 def collect_history_slice(
@@ -107,10 +80,19 @@ def collect_history_slice(
         try:
             timecodes_payload = _get_json(timestamps_url(game["game_id"]), opener)
             timecodes = extract_timecodes(timecodes_payload)
-            final_timecodes, final_snapshot = _latest_confirmed_final_snapshot(
-                game["game_id"], timecodes, opener
-            )
-            history_rows.extend(normalize_final_game(game, final_timecodes, final_snapshot))
+            final_timecode = timecodes[-1]
+            final_snapshot = _get_json(historical_snapshot_url(game["game_id"], final_timecode), opener)
+            projected_status = snapshot_status(final_snapshot)
+            if projected_status != "Final":
+                full_url = f"{BASE}/api/v1.1/game/{int(game['game_id'])}/feed/live?timecode={final_timecode}"
+                full_snapshot = _get_json(full_url, opener)
+                full_status = snapshot_status(full_snapshot)
+                if full_status != "Final":
+                    raise MLBV7TravelHistoryError(
+                        f"LAST_TIMECODE_NOT_FINAL:projected={projected_status}:full={full_status}"
+                    )
+                final_snapshot = full_snapshot
+            history_rows.extend(normalize_final_game(game, timecodes_payload, final_snapshot))
             venue_id = int(game["venue_id"])
             if venue_id not in venues:
                 venues[venue_id] = parse_venue_reference(_get_json(venue_url(venue_id), opener), venue_id)
@@ -144,7 +126,7 @@ def collect_history_slice(
             "mlb_statsapi_history": {"path": history_path.name, "sha256": history_sha},
             "venue_reference": {"path": venue_path.name, "sha256": venue_sha},
         },
-        "final_at_semantics": "LATEST_HISTORICAL_TIMECODE_CONFIRMED_FINAL_UPPER_BOUND",
+        "final_at_semantics": "LAST_HISTORICAL_TIMECODE_CONFIRMED_FINAL_UPPER_BOUND",
         "promotion_authority": False,
         "candidate_training_allowed": False,
         "attestation_written": False,

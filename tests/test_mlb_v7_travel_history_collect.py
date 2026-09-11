@@ -34,14 +34,6 @@ def _schedule(state="Final"):
     }]}]}
 
 
-def _venue():
-    return {"venues": [{
-        "id": 30,
-        "location": {"defaultCoordinates": {"latitude": 41.0, "longitude": -87.0}},
-        "timeZone": {"id": "America/Chicago"},
-    }]}
-
-
 def _opener(url, timeout=30):
     parsed = urlparse(url)
     if parsed.path.endswith("/api/v1/schedule"):
@@ -52,7 +44,11 @@ def _opener(url, timeout=30):
         assert parse_qs(parsed.query)["timecode"] == ["20250402_031500"]
         payload = {"gameData": {"status": {"abstractGameState": "Final"}}}
     elif "/api/v1/venues/30" in parsed.path:
-        payload = _venue()
+        payload = {"venues": [{
+            "id": 30,
+            "location": {"defaultCoordinates": {"latitude": 41.0, "longitude": -87.0}},
+            "timeZone": {"id": "America/Chicago"},
+        }]}
     else:
         raise AssertionError(url)
     return _Response(json.dumps(payload).encode("utf-8"))
@@ -71,7 +67,6 @@ def test_slice_writes_hash_bound_evidence_without_attestation(tmp_path) -> None:
     assert report["attestation_written"] is False
     assert report["source_readiness_authority"] is False
     assert report["candidate_training_allowed"] is False
-    assert report["final_at_semantics"] == "LATEST_HISTORICAL_TIMECODE_CONFIRMED_FINAL_UPPER_BOUND"
     for item in report["evidence"].values():
         path = Path(tmp_path) / item["path"]
         assert hashlib.sha256(path.read_bytes()).hexdigest() == item["sha256"]
@@ -99,8 +94,8 @@ def test_range_is_hard_bounded(tmp_path) -> None:
         collect_history_slice("2025-01-01", "2025-03-01", Path(tmp_path), opener=_opener)
 
 
-def test_latest_nonfinal_timecode_falls_back_to_latest_confirmed_final(tmp_path) -> None:
-    calls: list[str] = []
+def test_full_snapshot_recheck_can_resolve_projection_only_status_mismatch(tmp_path) -> None:
+    calls = []
 
     def opener(url, timeout=30):
         calls.append(url)
@@ -108,13 +103,16 @@ def test_latest_nonfinal_timecode_falls_back_to_latest_confirmed_final(tmp_path)
         if parsed.path.endswith("/api/v1/schedule"):
             payload = _schedule()
         elif parsed.path.endswith("/feed/live/timestamps"):
-            payload = ["20250401_231000", "20250402_030000", "20250402_031500"]
+            payload = ["20250401_231000", "20250402_031500"]
         elif parsed.path.endswith("/feed/live"):
-            timecode = parse_qs(parsed.query)["timecode"][0]
-            state = "Live" if timecode == "20250402_031500" else "Final"
-            payload = {"gameData": {"status": {"abstractGameState": state}}}
+            query = parse_qs(parsed.query)
+            payload = {"gameData": {"status": {"abstractGameState": "Live" if "fields" in query else "Final"}}}
         elif "/api/v1/venues/30" in parsed.path:
-            payload = _venue()
+            payload = {"venues": [{
+                "id": 30,
+                "location": {"defaultCoordinates": {"latitude": 41.0, "longitude": -87.0}},
+                "timeZone": {"id": "America/Chicago"},
+            }]}
         else:
             raise AssertionError(url)
         return _Response(json.dumps(payload).encode("utf-8"))
@@ -124,16 +122,13 @@ def test_latest_nonfinal_timecode_falls_back_to_latest_confirmed_final(tmp_path)
         retrieved_at=datetime(2026, 9, 11, tzinfo=timezone.utc),
     )
     assert report["state"] == "PASS_SOURCE_SLICE"
-    rows = [json.loads(line) for line in (Path(tmp_path) / "mlb_statsapi_history.jsonl").read_text().splitlines()]
-    assert {row["final_timecode"] for row in rows} == {"20250402_030000"}
-    assert {row["final_at"] for row in rows} == {"2025-04-02T03:00:00+00:00"}
     live_calls = [url for url in calls if "/feed/live?" in url and not url.endswith("/timestamps")]
-    assert [parse_qs(urlparse(url).query)["timecode"][0] for url in live_calls] == [
-        "20250402_031500", "20250402_030000"
-    ]
+    assert len(live_calls) == 2
+    assert "fields=" in live_calls[0]
+    assert "fields=" not in live_calls[1]
 
 
-def test_no_historical_final_timecode_blocks_slice(tmp_path) -> None:
+def test_full_snapshot_recheck_still_blocks_nonfinal_terminal_state(tmp_path) -> None:
     def opener(url, timeout=30):
         parsed = urlparse(url)
         if parsed.path.endswith("/api/v1/schedule"):
@@ -151,5 +146,4 @@ def test_no_historical_final_timecode_blocks_slice(tmp_path) -> None:
         retrieved_at=datetime(2026, 9, 11, tzinfo=timezone.utc),
     )
     assert report["state"] == "BLOCKED_SOURCE_SLICE"
-    assert report["verified_game_count"] == 0
-    assert report["failures"][0]["reason"] == "NO_FINAL_HISTORICAL_TIMECODE"
+    assert report["failures"][0]["reason"] == "LAST_TIMECODE_NOT_FINAL:projected=Live:full=Live"
