@@ -1,9 +1,15 @@
 {
   "schema_version": 1,
   "sport": "CFB",
-  "status": "UNFROZEN",
+  "status": "FROZEN",
   "hash_algorithm": "CANONICAL_JSON_SHA256_V1",
-  "artifact_path": "artifacts/football/cfb_offensive_prop_ab_model.json",
-  "artifact_sha256": null,
-  "reason": "No genuine fitted CFB offensive A+B prop artifact has been frozen. The prop runner must fail closed until a real fitted artifact is independently frozen and hash-bound."
+  "artifact_path": "artifacts/football/cfb_prop_artifact_bundle_v1.json",
+  "artifact_sha256": "923cfd1be42d31a87d9f31ddffce406d44bfc1bb003d1c625f5a4258f7773f23",
+  "code_git_sha": "67184a5a120a2bc868531c7827783f562f82ee0b",
+  "source_manifest_sha256": "f25faa32ad8f1ddde16573a5919eeb108d267a04768a3b088d7db34b7682aa25",
+  "artifact_version": "CFB_PROP_ESPN_2025_V1",
+  "code_surface_manifest_path": "config/cfb_prop_code_surface_v1.json",
+  "code_surface_manifest_sha256": "8abfd4b5ff1de138004e3f7b73bb0e5dcab123333e4f853ba4d427b1e808832e",
+  "promotion_authority": false,
+  "activation_note": "Exact artifact bytes were produced by the successful hosted freeze run for git SHA 67184a5a120a2bc868531c7827783f562f82ee0b. This registry freezes only that canonical artifact and predictive code surface; promotion remains independently governed."
 }
