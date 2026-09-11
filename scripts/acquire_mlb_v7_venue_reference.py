@@ -6,12 +6,11 @@ import calendar
 from datetime import date, datetime, timezone
 import json
 from pathlib import Path
+from urllib.request import Request, urlopen
 
 from sportsedge.mlb_v7_travel_history import _get_json, schedule_url, venue_url, write_json, write_jsonl
 from sportsedge.mlb_v7_venue_reference import (
     COORDINATE_FALLBACKS,
-    REQUIRED_FIELDS,
-    REQUIRED_SEMANTICS,
     SOURCE_CLASS,
     build_attestation,
     build_venue_reference_report,
@@ -28,6 +27,21 @@ def _months(start: date, end: date):
         month_end = min(end, date(cursor.year, cursor.month, last))
         yield month_start, month_end
         cursor = date(cursor.year + (cursor.month == 12), 1 if cursor.month == 12 else cursor.month + 1, 1)
+
+
+def _get_secondary_json(url: str):
+    request = Request(
+        url,
+        headers={
+            "User-Agent": "SportsEdge/1.0 (source-verification; GitHub Actions)",
+            "Accept": "application/json",
+        },
+    )
+    try:
+        with urlopen(request, timeout=30) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except Exception as exc:
+        raise RuntimeError(f"SECONDARY_SOURCE_FETCH_FAILED:{url}:{type(exc).__name__}") from exc
 
 
 def main() -> int:
@@ -71,7 +85,11 @@ def main() -> int:
         if venue_id in fallback_payloads:
             return fallback_payloads[venue_id]
         url = fallback["url"]
-        payload = _get_json(url)
+        try:
+            payload = _get_secondary_json(url)
+        except RuntimeError as exc:
+            from sportsedge.mlb_v7_venue_reference import MLBV7VenueReferenceError
+            raise MLBV7VenueReferenceError(str(exc)) from exc
         fallback_payloads[venue_id] = payload
         rel = Path("raw") / "discovery" / f"venue-coordinate-fallback-{venue_id}-{fallback['entity_id']}.json"
         sha = write_json(root / rel, payload)
