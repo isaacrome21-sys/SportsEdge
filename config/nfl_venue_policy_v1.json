@@ -1,0 +1,34 @@
+{
+  "policy_id": "NFL_VENUE_POLICY_V1",
+  "doctrine": "Venue support produces a price. Promotion evidence decides whether that price may be bet. This policy never changes Truth Gate status.",
+  "freeze_record": "The git commit that adds this file is the freeze record. Any edit requires NFL_VENUE_POLICY_V2.",
+  "effective_from_kickoff_utc": "2026-09-12T00:00:00Z",
+  "not_retroactive": "SF at LA, Melbourne Cricket Ground, kickoff 2026-09-11T00:35:00Z, stays VENUE_EXCLUDED under the prior behavior.",
+  "neutral_hfa_points": 0.0,
+  "sensitivity": {
+    "designated_home_residual_share": 0.5,
+    "residual_share_status": "PROVISIONAL_GOVERNANCE_PLACEHOLDER_PENDING_EVIDENCE",
+    "rule": "Price each side at hfa=neutral_hfa_points and at hfa=residual_share*M2_HFA_PRIOR. If the sign of (Model_P - no-vig P) differs between the two, block VENUE_SENSITIVITY."
+  },
+  "travel": {
+    "mode": "DIFFERENTIAL_ONLY",
+    "tz_shift_wrap_hours": 12,
+    "m2_consumption": "Only fields already in the frozen M2 feature schema may enter Model_P. Everything else is CONTEXT_ONLY.",
+    "arrival_strategy": "CONTEXT_ONLY"
+  },
+  "ledger_segments": {
+    "HOME": "HOME",
+    "NEUTRAL_DOMESTIC": "NEUTRAL_DOMESTIC",
+    "NEUTRAL_INTERNATIONAL": "NEUTRAL_INTL"
+  },
+  "primary_confirmation_test_segments": ["HOME"],
+  "venues": {
+    "MCG": {
+      "name": "Melbourne Cricket Ground",
+      "country": "AU",
+      "tz": "Australia/Melbourne",
+      "roof": "outdoors",
+      "surface": "grass"
+    }
+  }
+}
