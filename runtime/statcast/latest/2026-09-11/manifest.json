@@ -1,0 +1,9 @@
+{
+  "provider_tier": "PRIMARY_STATS",
+  "reason": "ParserError:Error tokenizing data. C error: Expected 1 fields in line 12, saw 2\n",
+  "retrieved_at": "2026-09-11T16:41:38.177494+00:00",
+  "source": "BASEBALL_SAVANT_STATCAST_VIA_PYBASEBALL",
+  "status": "ERROR",
+  "window_end": "2026-09-11",
+  "window_start": "2026-08-13"
+}
