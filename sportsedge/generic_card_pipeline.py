@@ -12,10 +12,11 @@ from .engine_registry import engine_registry
 from .f5_distribution import F5_MARKETS
 from .generic_market_engine import BINARY_MARKETS, GAME_MARKETS
 from .hitter_joint_engine import HITTER_MARKETS
-from .live_slate import LiveGame
+from .live_slate import LiveGame, assemble_hitter_candidate
 from .mlb_quote_attestation import SOURCE_PROVIDER, validate_acquisition_quote
 from .orchestrator import run_candidate
 from .pitcher_joint_engine import PITCHER_MARKETS
+from .pitcher_live import assemble_pitcher_bb_candidate
 from .quote_bridge import validate_canonical_quote
 from .truth_gate import american_to_decimal
 
@@ -144,7 +145,7 @@ def _bind_entity(game, market, entity_id, feature):
             raise ValueError("NON_PROBABLE_PITCHER")
 
 
-def _model_input(*, game, quote, feature):
+def _model_input(*, game, quote, feature, require_confirmed_lineup: bool):
     market = str(quote["market"])
     entity_id = str(quote["entity_id"])
     _bind_entity(game, market, entity_id, feature)
@@ -154,6 +155,22 @@ def _model_input(*, game, quote, feature):
         raise ValueError("feature entity identity mismatch")
     if str(feature.get("market")) != market:
         raise ValueError("feature market mismatch")
+
+    # Reuse the canonical validated assemblers for the legacy single-market engines.
+    # This prevents the unified path from constructing a weaker/shadow Model_Input
+    # than the standalone path. Rows without those explicit feature contracts stay
+    # on the joint/generic path and are governed by that engine's own validation.
+    if market in {"HITS", "TOTAL_BASES"} and feature.get("feature_version") is not None:
+        return dict(assemble_hitter_candidate(
+            game=game,
+            market=market,
+            feature_row=feature,
+            quote=quote,
+            require_confirmed_lineup=require_confirmed_lineup,
+        )["model_input"])
+    if market == "PITCHER_BB" and feature.get("feature_version") is not None:
+        return dict(assemble_pitcher_bb_candidate(game=game, feature_row=feature, quote=quote)["model_input"])
+
     out = {"game_id": str(game.game_pk), "market": market, "entity_id": entity_id, "line": quote.get("line"), "side": quote.get("side")}
     if market in TEAM_TOTAL_MARKETS:
         out["team_side"] = _team_side(game, entity_id)
@@ -250,7 +267,9 @@ def _candidate_economics(model_p: float, push_p: float, quote, opposite):
     return shadow, fair, raw, "AVAILABLE_PAIRED", edge, ev
 
 
-def run_generic_card(*, games, feature_rows, quotes, ingestion_now, finalization_now, registry_path="config/deployments.json", edge_floor_config_path="config/truth_gate_floors.json", kelly_multiplier=0.25):
+def run_generic_card(*, games, feature_rows, quotes, ingestion_now, finalization_now, registry_path="config/deployments.json", require_confirmed_lineup: bool = True, edge_floor_config_path="config/truth_gate_floors.json", kelly_multiplier=0.25):
+    if type(require_confirmed_lineup) is not bool:
+        raise ValueError("require_confirmed_lineup must be boolean")
     games_by_id = _game_index(games)
     features = _feature_index(feature_rows)
     deployments = load_registry(registry_path)["markets"]
@@ -275,7 +294,12 @@ def run_generic_card(*, games, feature_rows, quotes, ingestion_now, finalization
             feature = features.get((str(quote["game_id"]), str(quote["entity_id"]), market))
             if feature is None:
                 raise ValueError("feature row missing")
-            model_input = _model_input(game=game, quote=quote, feature=feature)
+            model_input = _model_input(
+                game=game,
+                quote=quote,
+                feature=feature,
+                require_confirmed_lineup=require_confirmed_lineup,
+            )
             engine = engines.get(market)
             deployment = deployments.get(market)
             if engine is None or deployment is None:
