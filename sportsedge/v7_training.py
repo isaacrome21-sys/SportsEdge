@@ -7,8 +7,13 @@ from statistics import mean
 from typing import Any, Iterable, Mapping, Sequence
 
 from .source_lineage import canonical_json_sha256
+from .v7_baseball_features import assert_no_market_contamination
 from .v7_candidate import build_candidate_artifact, load_candidate, score_candidate
-from .v7_feature_bundle import V7_COMBINED_FEATURE_CONTRACT_SHA256, V7_MODEL_FEATURE_PATHS, model_vector
+from .v7_feature_bundle import (
+    V7_COMBINED_FEATURE_CONTRACT_SHA256,
+    V7_MODEL_FEATURE_PATHS,
+    get_numeric_path,
+)
 from .v7_validation import score_fold
 
 V7_TRAINING_VERSION = "mlb_v7_training_v1"
@@ -62,14 +67,36 @@ def _label(row: Mapping[str, Any], key: str) -> int:
     return y
 
 
-def _matrix(rows: Sequence[Mapping[str, Any]], feature_paths: Sequence[str], label_key: str) -> tuple[list[list[float]], list[int]]:
+def _vector_for_contract(
+    payload: Mapping[str, Any],
+    *,
+    feature_paths: Sequence[str],
+    feature_contract_sha256: str,
+) -> dict[str, float]:
+    if str(payload.get("feature_contract_sha256") or "") != str(feature_contract_sha256):
+        raise V7TrainingError("feature payload contract hash mismatch")
+    assert_no_market_contamination(payload)
+    return {path: get_numeric_path(payload, path) for path in feature_paths}
+
+
+def _matrix(
+    rows: Sequence[Mapping[str, Any]],
+    feature_paths: Sequence[str],
+    label_key: str,
+    *,
+    feature_contract_sha256: str,
+) -> tuple[list[list[float]], list[int]]:
     x: list[list[float]] = []
     y: list[int] = []
     for row in rows:
         payload = row.get("feature_payload")
         if not isinstance(payload, Mapping):
             raise V7TrainingError("feature_payload required")
-        vector = model_vector(payload, feature_paths=feature_paths)
+        vector = _vector_for_contract(
+            payload,
+            feature_paths=feature_paths,
+            feature_contract_sha256=feature_contract_sha256,
+        )
         x.append([vector[p] for p in feature_paths])
         y.append(_label(row, label_key))
     return x, y
@@ -137,6 +164,7 @@ def train_chronological_candidate(
     train_end: Any, calibration_start: Any, calibration_end: Any, holdout_start: Any,
     date_key: str = "game_date", label_key: str = "outcome",
     feature_paths: Sequence[str] = V7_MODEL_FEATURE_PATHS,
+    feature_contract_sha256: str = V7_COMBINED_FEATURE_CONTRACT_SHA256,
     l2: float = 1.0, iterations: int = 1200, learning_rate: float = 0.05,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     train_end_d = _date(train_end, "train_end")
@@ -145,6 +173,10 @@ def train_chronological_candidate(
     holdout_start_d = _date(holdout_start, "holdout_start")
     if not (train_end_d < cal_start_d <= cal_end_d < holdout_start_d):
         raise V7TrainingError("chronology contract violation")
+    if not feature_paths or len(feature_paths) != len(set(feature_paths)):
+        raise V7TrainingError("feature_paths must be non-empty and unique")
+    if not isinstance(feature_contract_sha256, str) or len(feature_contract_sha256) != 64:
+        raise V7TrainingError("feature_contract_sha256 must be a 64-character hash")
 
     ordered = sorted(list(rows), key=lambda r: _date(r.get(date_key), date_key))
     train_rows = [r for r in ordered if _date(r.get(date_key), date_key) <= train_end_d]
@@ -154,12 +186,17 @@ def train_chronological_candidate(
     if len(cal_rows) < 2:
         raise V7TrainingError("at least two calibration rows required")
 
-    x, y = _matrix(train_rows, feature_paths, label_key)
+    x, y = _matrix(
+        train_rows,
+        feature_paths,
+        label_key,
+        feature_contract_sha256=feature_contract_sha256,
+    )
     intercept, betas = _fit_standardized_logit(x, y, l2=l2, iterations=iterations, learning_rate=learning_rate)
     coefficients = {path: beta for path, beta in zip(feature_paths, betas)}
     provisional = build_candidate_artifact(
         model_name=model_name,
-        feature_contract_sha256=V7_COMBINED_FEATURE_CONTRACT_SHA256,
+        feature_contract_sha256=feature_contract_sha256,
         intercept=intercept,
         coefficients=coefficients,
     )
@@ -169,7 +206,11 @@ def train_chronological_candidate(
     cal_y: list[int] = []
     for row in cal_rows:
         payload = row["feature_payload"]
-        vector = model_vector(payload, feature_paths=feature_paths)
+        vector = _vector_for_contract(
+            payload,
+            feature_paths=feature_paths,
+            feature_contract_sha256=feature_contract_sha256,
+        )
         logit = loaded.intercept + sum(loaded.coefficients[p] * vector[p] for p in feature_paths)
         cal_logits.append(logit)
         cal_y.append(_label(row, label_key))
@@ -177,7 +218,7 @@ def train_chronological_candidate(
 
     artifact = build_candidate_artifact(
         model_name=model_name,
-        feature_contract_sha256=V7_COMBINED_FEATURE_CONTRACT_SHA256,
+        feature_contract_sha256=feature_contract_sha256,
         intercept=intercept + delta,
         coefficients=coefficients,
     )
@@ -200,6 +241,7 @@ def train_chronological_candidate(
         "calibration_intercept_delta": delta,
         "candidate_sha256": candidate.candidate_sha256,
         "feature_contract_sha256": candidate.feature_contract_sha256,
+        "feature_paths": list(feature_paths),
         "calibration_metrics": asdict(metrics),
         "fit_max_date": max(_date(r.get(date_key), date_key) for r in train_rows + cal_rows).isoformat(),
         "sportsbook_data_used": False,
