@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "status": "RESEARCH_ONLY",
+  "notes": "Initial conservative thresholds for research evaluation only. They do not modify production deployments, Truth Gate floors, or V6 eligibility.",
+  "minimums": {
+    "market_specific_calibrator_fit_n": 300,
+    "elite_tier_eligibility_n": 500,
+    "feature_ablation_paired_n": 200,
+    "edge_threshold_change_n": 500,
+    "calibration_slope_fit_n": 300,
+    "truth_gate_quality_n": 300,
+    "tier_monotonicity_n_per_tier": 150,
+    "external_disagreement_eval_n": 200,
+    "portfolio_correlation_estimation_n": 500
+  },
+  "small_sample": {
+    "shrinkage_required_below_n": 300,
+    "no_elite_tier_below_n": 500,
+    "no_market_specific_threshold_change_below_n": 500
+  },
+  "ablation": {
+    "remove_only_if_brier_and_logloss_improve": true,
+    "single_metric_improvement_action": "RETEST",
+    "insufficient_sample_action": "INSUFFICIENT_EVIDENCE"
+  },
+  "quarantine": {
+    "require_sufficient_sample": true,
+    "material_recent_deterioration_action": "QUARANTINE_RESEARCH",
+    "monotonicity_failure_action": "QUARANTINE_RESEARCH"
+  }
+}
