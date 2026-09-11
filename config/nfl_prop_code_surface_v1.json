@@ -1,0 +1,26 @@
+{
+  "files": {
+    "scripts/build_nfl_prop_model_artifact.py": "90a91a7d476549cb6fe50c6f52dee8fa539b643e",
+    "sportsedge/core/simulate/defense_full_game.py": "38e25007e6e216fcb92d7697461bddd2e7690ed9",
+    "sportsedge/core/simulate/defense_markets.py": "86504f6368efeb006d9e1e56c14647b015ddbd0a",
+    "sportsedge/core/simulate/defense_usage.py": "af8c66d2b5948e7f76c042ea5123b48cff0bd5ed",
+    "sportsedge/core/simulate/drive_play.py": "72a9586d06f663b249230544669f367bcaef2eb1",
+    "sportsedge/core/simulate/field_position.py": "b6d0a2397a5bb6f3eaa7621a9c35320e1494d7e7",
+    "sportsedge/core/simulate/football_path.py": "07aca6d658b826a2bfd488c12c2aaabda3a0aba0",
+    "sportsedge/core/simulate/kicker_markets.py": "75a8ddc8bc9b555601356d831994e7c179d361c3",
+    "sportsedge/core/simulate/player_markets.py": "242a6951fac174493b1ad6c725a91461af2f9593",
+    "sportsedge/core/simulate/special_teams.py": "d7e96f41cb8fdb1c347b4fb6d958707a73c0b08e",
+    "sportsedge/core/simulate/usage.py": "06ea6ece807e719a101b8496fd5a453bd73aa3f0",
+    "sportsedge/devig.py": "4475a2cff297146ab155f13080862a094ec31088",
+    "sportsedge/edge_floors.py": "d5e59104d2466d18b980196b7b84753677d1263f",
+    "sportsedge/football_prop_certification.py": "bc4b012968f0a1d26dce424ecb13dc0482390f3b",
+    "sportsedge/football_prop_evidence.py": "78180826e59ad4cadff245423663cb64711a20d8",
+    "sportsedge/football_prop_extended_run_machine.py": "e1fb52f19610df8c44496c89f93e8433eb820862",
+    "sportsedge/football_prop_readiness.py": "48aa100a3d3d218e061adccd42ff742adfd524b2",
+    "sportsedge/football_prop_run_machine.py": "b75cbd7a524b1c1a4083f447aba2aee3ad7c3e63",
+    "sportsedge/sports/nfl/prop_artifact_training.py": "4afd9ce0ed8da95ec2cc626e50510c3444aefd1d",
+    "sportsedge/truth_gate.py": "66d9295cb732a47420b72c42a3a7522ce0ad46e6"
+  },
+  "fit_git_sha": "5dfa29347bed608771e6a2395ce8e894dbfdd881",
+  "schema_version": "NFL_PROP_CODE_SURFACE_V1"
+}
