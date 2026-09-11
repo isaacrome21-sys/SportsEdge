@@ -1,0 +1,187 @@
+name: MLB V7 StatsAPI history bootstrap
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/mlb-v7-statsapi-history-bootstrap.yml
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/mlb-v7-statsapi-history-bootstrap.yml
+  workflow_dispatch:
+
+concurrency:
+  group: sportsedge-mlb-v7-statsapi-history-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact code head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+      - name: Install pinned test dependency
+        run: python -m pip install --disable-pip-version-check pytest==9.1.1
+      - name: Run exact collector and finalizer contract tests
+        run: >-
+          python -m pytest -q
+          tests/test_mlb_v7_statsapi_history.py
+          tests/test_mlb_v7_final_timecode.py
+          tests/test_mlb_v7_travel_history.py
+
+  backfill:
+    if: github.event_name != 'pull_request'
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout exact main code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+      - name: Acquire and verify all 36 frozen monthly shards
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$GITHUB_WORKSPACE/artifacts/mlb-v7-statsapi-history-bootstrap"
+          rm -rf "$ROOT"
+          mkdir -p "$ROOT/shards"
+          python - <<'PY' > /tmp/mlb_v7_months.tsv
+          import calendar
+          for year in (2023, 2024, 2025):
+              for month in range(1, 13):
+                  last = calendar.monthrange(year, month)[1]
+                  print(f"{year:04d}-{month:02d}\t{year:04d}-{month:02d}-01\t{year:04d}-{month:02d}-{last:02d}")
+          PY
+          while IFS=$'\t' read -r label start end; do
+            echo "=== acquiring $label ($start .. $end) ==="
+            PYTHONPATH=. python scripts/acquire_mlb_v7_statsapi_history_shard.py \
+              --start "$start" --end "$end" --output-root "$ROOT/shards/$label"
+            LABEL="$label" ROOT="$ROOT" python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          root = Path(os.environ["ROOT"]) / "shards" / os.environ["LABEL"]
+          report = json.loads((root / "shard_report.json").read_text())
+          assert report["state"] == "SHARD_READY", report
+          assert report["failures"] == [], report
+          assert report["attestation_authority"] is False
+          assert report["candidate_training_allowed"] is False
+          assert report["promotion_authority"] is False
+          assert report["scheduled_final_game_count"] == report["normalized_final_game_count"]
+          assert report["normalized_team_row_count"] == 2 * report["normalized_final_game_count"]
+          for item in report["evidence_files"]:
+              path = root / item["path"]
+              assert path.is_file(), item["path"]
+              assert hashlib.sha256(path.read_bytes()).hexdigest() == item["sha256"]
+          PY
+          done < /tmp/mlb_v7_months.tsv
+      - name: Finalize complete 2023-2025 source history
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$GITHUB_WORKSPACE/artifacts/mlb-v7-statsapi-history-bootstrap"
+          PYTHONPATH=. python scripts/finalize_mlb_v7_statsapi_history.py \
+            --shard-root "$ROOT/shards" \
+            --start 2023-01-01 --end 2025-12-31 \
+            --output-root "$ROOT/final"
+          ROOT="$ROOT" python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          root = Path(os.environ["ROOT"])
+          report = json.loads((root / "final/finalize_report.json").read_text())
+          assert report["state"] == "READY_TO_ATTEST", report
+          assert report["required_shard_count"] == 36, report
+          assert report["verified_shard_count"] == 36, report
+          assert report["attestation_written"] is True, report
+          assert report["candidate_training_allowed"] is False
+          assert report["promotion_authority"] is False
+          att = root / "final/attestations/MLB_STATSAPI_HISTORY.json"
+          assert att.is_file()
+          assert hashlib.sha256(att.read_bytes()).hexdigest() == report["attestation_sha256"]
+          print(json.dumps({
+              "state": report["state"],
+              "verified_shards": report["verified_shard_count"],
+              "final_games": report["final_game_count"],
+              "team_rows": report["team_row_count"],
+              "promotion_authority": report["promotion_authority"],
+          }, sort_keys=True))
+          PY
+      - name: Checkout durable data branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: data
+          path: data-branch
+          persist-credentials: true
+      - name: Persist complete verified history atomically
+        shell: bash
+        env:
+          CODE_HEAD_SHA: ${{ github.sha }}
+          WORKFLOW_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          ROOT="$GITHUB_WORKSPACE/artifacts/mlb-v7-statsapi-history-bootstrap"
+          BASE="$GITHUB_WORKSPACE/data-branch/evidence/mlb_v8_replay_sources"
+          STAGING="$BASE/staging/MLB_STATSAPI_HISTORY/shards"
+          rm -rf "$STAGING"
+          mkdir -p "$STAGING" "$BASE/attestations" "$BASE/raw" "$BASE/receipts"
+          cp -R "$ROOT/shards/." "$STAGING/"
+          cp "$ROOT/final/attestations/MLB_STATSAPI_HISTORY.json" "$BASE/attestations/MLB_STATSAPI_HISTORY.json"
+          cp "$ROOT/final/raw/MLB_STATSAPI_HISTORY.jsonl" "$BASE/raw/MLB_STATSAPI_HISTORY.jsonl"
+          cp "$ROOT/final/raw/MLB_STATSAPI_HISTORY_SHARDS.json" "$BASE/raw/MLB_STATSAPI_HISTORY_SHARDS.json"
+          CODE_HEAD_SHA="$CODE_HEAD_SHA" WORKFLOW_RUN_ID="$WORKFLOW_RUN_ID" BASE="$BASE" python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          base = Path(os.environ["BASE"])
+          att = base / "attestations/MLB_STATSAPI_HISTORY.json"
+          receipt = {
+              "schema_version": 1,
+              "source_class": "MLB_STATSAPI_HISTORY",
+              "coverage_start": "2023-01-01",
+              "coverage_end": "2025-12-31",
+              "required_shard_count": 36,
+              "code_head_sha": os.environ["CODE_HEAD_SHA"],
+              "workflow_run_id": int(os.environ["WORKFLOW_RUN_ID"]),
+              "attestation_sha256": hashlib.sha256(att.read_bytes()).hexdigest(),
+              "candidate_training_allowed": False,
+              "promotion_authority": False,
+          }
+          (base / "receipts/MLB_STATSAPI_HISTORY.json").write_text(
+              json.dumps(receipt, sort_keys=True, separators=(",", ":")) + "\n"
+          )
+          PY
+          cd data-branch
+          git config user.name "sportsedge-data-bot"
+          git config user.email "sportsedge-data-bot@users.noreply.github.com"
+          git add evidence/mlb_v8_replay_sources/staging/MLB_STATSAPI_HISTORY \
+                  evidence/mlb_v8_replay_sources/attestations/MLB_STATSAPI_HISTORY.json \
+                  evidence/mlb_v8_replay_sources/raw/MLB_STATSAPI_HISTORY.jsonl \
+                  evidence/mlb_v8_replay_sources/raw/MLB_STATSAPI_HISTORY_SHARDS.json \
+                  evidence/mlb_v8_replay_sources/receipts/MLB_STATSAPI_HISTORY.json
+          if git diff --cached --quiet; then
+            echo "Verified history already durable; no data commit required."
+            exit 0
+          fi
+          git commit -m "evidence: persist complete MLB V7 StatsAPI history"
+          for attempt in 1 2 3; do
+            if git pull --rebase origin data && git push origin HEAD:data; then
+              exit 0
+            fi
+            git rebase --abort >/dev/null 2>&1 || true
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep $((attempt * 3))
+          done
