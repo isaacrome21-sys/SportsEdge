@@ -39,20 +39,38 @@ class UnifiedCardResult:
     sportsbook: str | None = None
     quote_retrieved_at: str | None = None
     offer_id: str | None = None
+    raw_implied_probability: float | None = None
+    market_no_vig_p_status: str | None = None
 
 
 def _convert(result) -> UnifiedCardResult:
     return UnifiedCardResult(
-        result.game_id, result.market, result.entity_id, result.line, result.side,
-        result.american_odds, result.model_p, result.bet_status, result.reason,
-        getattr(result, "shadow_status", None), getattr(result, "implied_probability", None),
-        getattr(result, "edge", None), getattr(result, "ev_per_dollar", None),
-        getattr(result, "model_input_hash", None), getattr(result, "distribution_sha256", None),
-        getattr(result, "readout_sha256", None), getattr(result, "readout_version", None),
-        getattr(result, "engine_version", None), getattr(result, "seed_policy", None),
-        getattr(result, "mc_paths", None),
-        getattr(result, "book_key", None), getattr(result, "sportsbook", None),
-        getattr(result, "quote_retrieved_at", None), getattr(result, "offer_id", None),
+        game_id=result.game_id,
+        market=result.market,
+        entity_id=result.entity_id,
+        line=result.line,
+        side=result.side,
+        american_odds=result.american_odds,
+        model_p=result.model_p,
+        bet_status=result.bet_status,
+        reason=result.reason,
+        shadow_status=getattr(result, "shadow_status", None),
+        implied_probability=getattr(result, "implied_probability", None),
+        edge=getattr(result, "edge", None),
+        ev_per_dollar=getattr(result, "ev_per_dollar", None),
+        model_input_hash=getattr(result, "model_input_hash", None),
+        distribution_sha256=getattr(result, "distribution_sha256", None),
+        readout_sha256=getattr(result, "readout_sha256", None),
+        readout_version=getattr(result, "readout_version", None),
+        engine_version=getattr(result, "engine_version", None),
+        seed_policy=getattr(result, "seed_policy", None),
+        mc_paths=getattr(result, "mc_paths", None),
+        book_key=getattr(result, "book_key", None),
+        sportsbook=getattr(result, "sportsbook", None),
+        quote_retrieved_at=getattr(result, "quote_retrieved_at", None),
+        offer_id=getattr(result, "offer_id", None),
+        raw_implied_probability=getattr(result, "raw_implied_probability", None),
+        market_no_vig_p_status=getattr(result, "market_no_vig_p_status", None),
     )
 
 
@@ -101,6 +119,7 @@ def run_unified_card(
             ingestion_now=ingestion_now,
             finalization_now=finalization_now,
             registry_path=registry_path,
+            require_confirmed_lineup=require_confirmed_lineup,
             edge_floor_config_path=edge_floor_config_path,
             kelly_multiplier=kelly_multiplier,
         )

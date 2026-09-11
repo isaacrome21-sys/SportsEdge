@@ -27,18 +27,33 @@ def _key(m: Mapping[str, Any]) -> CandidateKey:
     return CandidateKey(*(m[k] for k in required))
 
 
+def bind_model_to_quote(model_output: Mapping[str, Any], sportsbook_quote: Mapping[str, Any]) -> CandidateKey:
+    """Bind genuine model output to an offered quote without asserting promotion.
+
+    Identity binding and deployment eligibility are separate concerns. This helper
+    allows an unpromoted lane to retain an auditable MODEL_CANDIDATE while the
+    OFFICIAL gate remains fail-closed. Legacy-compat payloads are explicitly not
+    candidate-grade model output: they are migration shims that lack the current
+    canonical artifact/readout contract and must remain BLOCKED until replaced by
+    the real production model path.
+    """
+    if str(model_output.get("runtime_path") or "").strip().upper() == "LEGACY_COMPAT":
+        raise BindingError("LEGACY_COMPAT_PATH_NOT_CANDIDATE")
+    model_key = _key(model_output)
+    quote_key = _key(sportsbook_quote)
+    for field in CandidateKey.__dataclass_fields__:
+        if not _strict_equal(getattr(model_key, field), getattr(quote_key, field)):
+            raise BindingError(f"candidate mismatch: {field}")
+    return model_key
+
+
 def bind_candidate(model_output: Mapping[str, Any], sportsbook_quote: Mapping[str, Any], deployment_attestation: Mapping[str, Any] | None) -> CandidateKey:
     if deployment_attestation is None or not isinstance(deployment_attestation, Mapping):
         raise BindingError("deployment attestation missing or malformed")
     if deployment_attestation.get("eligible") is not True:
         raise BindingError("deployment not eligible")
 
-    model_key = _key(model_output)
-    quote_key = _key(sportsbook_quote)
-    for field in CandidateKey.__dataclass_fields__:
-        if not _strict_equal(getattr(model_key, field), getattr(quote_key, field)):
-            raise BindingError(f"candidate mismatch: {field}")
-
+    model_key = bind_model_to_quote(model_output, sportsbook_quote)
     deployed_market = deployment_attestation.get("market")
     if not _strict_equal(deployed_market, model_key.market):
         raise BindingError("deployment market mismatch")

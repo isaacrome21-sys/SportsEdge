@@ -35,7 +35,7 @@ class MLBLegacyPathPolicyTests(unittest.TestCase):
         self.assertEqual(output["engine_version"],"hits_engine_v1.3")
 
     @patch("sportsedge.orchestrator.require_production_edge_floor")
-    def test_eligible_market_cannot_promote_through_legacy_payload_shape(self, _floor):
+    def test_eligible_market_cannot_become_candidate_through_legacy_payload_shape(self, _floor):
         result=run_candidate(
             model_input=legacy_hits_input(),quote=quote(),paired_quote=None,
             deployment={"market":"HITS","eligible":True,"stage":"DEPLOYED"},
@@ -43,7 +43,7 @@ class MLBLegacyPathPolicyTests(unittest.TestCase):
         )
         self.assertEqual(result.bet_status,"BLOCKED")
         self.assertIsNone(result.model_p)
-        self.assertIn("LEGACY_COMPAT_PATH_NOT_PROMOTABLE",result.reason)
+        self.assertIn("LEGACY_COMPAT_PATH_NOT_CANDIDATE",result.reason)
 
     def test_mixed_legacy_and_joint_payload_fails_before_engine_selection(self):
         mixed=legacy_hits_input()

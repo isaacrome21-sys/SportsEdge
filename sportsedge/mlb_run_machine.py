@@ -57,6 +57,8 @@ class MLBMachineResult:
     reason: str
     shadow_status: str | None = None
     implied_probability: float | None = None
+    raw_implied_probability: float | None = None
+    market_no_vig_p_status: str | None = None
     edge: float | None = None
     ev_per_dollar: float | None = None
     model_input_hash: str | None = None
@@ -108,19 +110,12 @@ def _aware_utc(value: datetime | None) -> datetime:
     return current.astimezone(timezone.utc)
 
 
-def _resolve_mode(
-    mode: str,
-    *,
-    quotes: Sequence[Mapping[str, Any]] | None,
-    games: Sequence[LiveGame] | None,
-    feature_rows: Sequence[Mapping[str, Any]] | None,
-) -> str:
+def _resolve_mode(mode: str, *, quotes, games, feature_rows) -> str:
     selected = str(mode or "AUTO_SELECT").strip().upper()
     if selected not in VALID_MODES:
         raise MLBRunMachineError(f"RUN_MODE_UNSUPPORTED:{selected}")
     if selected != "AUTO_SELECT":
         return selected
-
     has_snapshot_quotes = quotes is not None
     has_nonempty_quotes = bool(quotes)
     has_games = games is not None
@@ -143,17 +138,7 @@ def _hybrid_period(market: str) -> str:
     return "FG"
 
 
-def _prepare_hybrid_quotes(
-    quotes: Sequence[Mapping[str, Any]],
-    *,
-    current: datetime,
-) -> list[dict[str, Any]]:
-    """Add only canonical transport/provenance fields to supplied market prices.
-
-    Market, entity, side, line and odds are never inferred or changed here. Missing
-    provider-specific metadata is labeled as manual input rather than pretending it
-    came from a sportsbook API.
-    """
+def _prepare_hybrid_quotes(quotes: Sequence[Mapping[str, Any]], *, current: datetime) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for raw in quotes:
         if not isinstance(raw, Mapping):
@@ -188,6 +173,7 @@ def _summary(results: Sequence[MLBMachineResult]) -> dict[str, Any]:
         "markets_seen": sorted(markets),
         "market_count_seen": len(markets),
         "model_priced": model_priced,
+        "model_candidates": statuses.get("MODEL_CANDIDATE", 0),
         "bet_status_counts": statuses,
         "official_bets": statuses.get("OFFICIAL_BET", 0),
         "blocked": statuses.get("BLOCKED", 0),
@@ -214,6 +200,8 @@ def _machine_result(source_index: int, row: Any) -> MLBMachineResult:
         reason=str(_row_value(row, "reason", "UNKNOWN")),
         shadow_status=_row_value(row, "shadow_status"),
         implied_probability=_row_value(row, "implied_probability"),
+        raw_implied_probability=_row_value(row, "raw_implied_probability"),
+        market_no_vig_p_status=_row_value(row, "market_no_vig_p_status"),
         edge=_row_value(row, "edge"),
         ev_per_dollar=_row_value(row, "ev_per_dollar"),
         model_input_hash=_row_value(row, "model_input_hash"),
@@ -230,105 +218,61 @@ def _machine_result(source_index: int, row: Any) -> MLBMachineResult:
     )
 
 
-def _report(
-    *,
-    mode: str,
-    current: datetime,
-    slate_date_ct: str,
-    run_status: str,
-    rows: Sequence[Any],
-    source_failures: Sequence[Mapping[str, Any]] = (),
-) -> MLBMachineReport:
+def _report(*, mode: str, current: datetime, slate_date_ct: str, run_status: str, rows: Sequence[Any], source_failures: Sequence[Mapping[str, Any]] = ()) -> MLBMachineReport:
     results = tuple(_machine_result(i, row) for i, row in enumerate(rows))
+    status = str(run_status)
+    summary = _summary(results)
+    if summary["model_candidates"] and summary["official_bets"] == 0:
+        status = "MODEL_CANDIDATES_AVAILABLE_OFFICIAL_BLOCKED"
     return MLBMachineReport(
         mode=mode,
         slate_date_ct=slate_date_ct,
         generated_at_utc=current.isoformat(),
-        run_status=str(run_status),
+        run_status=status,
         results=results,
         source_failures=tuple(dict(x) for x in source_failures),
-        summary=_summary(results),
+        summary=summary,
     )
 
 
 def run_mlb_machine(
-    *,
-    mode: str = "AUTO_SELECT",
-    quotes: Sequence[Mapping[str, Any]] | None = None,
-    games: Sequence[LiveGame] | None = None,
-    feature_rows: Sequence[Mapping[str, Any]] | None = None,
-    target_date: date | None = None,
-    odds_api_key: str | None = None,
-    odds_api_keys: tuple[str, ...] = (),
-    projected_lineups_url: str | None = None,
-    provider_token: str | None = None,
-    now: datetime | None = None,
-    opener: Callable = urlopen,
-    registry_path: str = "config/deployments.json",
-    require_confirmed_lineup: bool = False,
-    edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG,
-    kelly_multiplier: float = 0.25,
-    bookmakers: tuple[str, ...] = ("draftkings",),
-    history_cache_dir: str | Path | None = None,
+    *, mode: str = "AUTO_SELECT", quotes: Sequence[Mapping[str, Any]] | None = None,
+    games: Sequence[LiveGame] | None = None, feature_rows: Sequence[Mapping[str, Any]] | None = None,
+    target_date: date | None = None, odds_api_key: str | None = None, odds_api_keys: tuple[str, ...] = (),
+    projected_lineups_url: str | None = None, provider_token: str | None = None,
+    now: datetime | None = None, opener: Callable = urlopen,
+    registry_path: str = "config/deployments.json", require_confirmed_lineup: bool = False,
+    edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG, kelly_multiplier: float = 0.25,
+    bookmakers: tuple[str, ...] = ("draftkings",), history_cache_dir: str | Path | None = None,
 ) -> MLBMachineReport:
-    """Run the canonical MLB machine without overriding deployment/evidence gates."""
     current = _aware_utc(now)
     selected = _resolve_mode(mode, quotes=quotes, games=games, feature_rows=feature_rows)
     slate_date = target_date or current.astimezone(CHICAGO_TZ).date()
-
     if selected == "MANUAL":
         if quotes is None or games is None or feature_rows is None:
             raise MLBRunMachineError("MANUAL_REQUIRES_GAMES_QUOTES_FEATURE_ROWS")
         rows = run_manual_hybrid_joint_mlb(
-            games=list(games),
-            quotes=list(quotes),
-            target_date=slate_date,
-            feature_rows=list(feature_rows),
-            now=current,
-            opener=opener,
-            registry_path=registry_path,
+            games=list(games), quotes=list(quotes), target_date=slate_date, feature_rows=list(feature_rows),
+            now=current, opener=opener, registry_path=registry_path,
             require_confirmed_lineup=require_confirmed_lineup,
-            edge_floor_config_path=edge_floor_config_path,
-            kelly_multiplier=kelly_multiplier,
+            edge_floor_config_path=edge_floor_config_path, kelly_multiplier=kelly_multiplier,
         )
-        return _report(
-            mode=selected,
-            current=current,
-            slate_date_ct=slate_date.isoformat(),
-            run_status="PASS" if rows else "NO_QUOTES",
-            rows=rows,
-        )
-
+        return _report(mode=selected, current=current, slate_date_ct=slate_date.isoformat(), run_status="PASS" if rows else "NO_QUOTES", rows=rows)
     if selected == "HYBRID":
         if quotes is None or games is not None or feature_rows is not None:
             raise MLBRunMachineError("HYBRID_REQUIRES_QUOTES_ONLY")
         quote_payload = _prepare_hybrid_quotes(quotes, current=current)
-
         def wrapped(req: Any, timeout: int = 15):
             if _url(req) == MEMORY_QUOTES_URL:
                 return _MemoryResponse(quote_payload)
             return opener(req, timeout=timeout)
-
         report = run_auto_joint_mlb(
-            quote_url=MEMORY_QUOTES_URL,
-            projected_lineups_url=projected_lineups_url,
-            provider_token=provider_token,
-            now=current,
-            opener=wrapped,
-            registry_path=registry_path,
+            quote_url=MEMORY_QUOTES_URL, projected_lineups_url=projected_lineups_url,
+            provider_token=provider_token, now=current, opener=wrapped, registry_path=registry_path,
             require_confirmed_lineup=require_confirmed_lineup,
-            edge_floor_config_path=edge_floor_config_path,
-            kelly_multiplier=kelly_multiplier,
+            edge_floor_config_path=edge_floor_config_path, kelly_multiplier=kelly_multiplier,
         )
-        return _report(
-            mode=selected,
-            current=current,
-            slate_date_ct=report.slate_date_ct,
-            run_status=report.run_status,
-            rows=report.results,
-            source_failures=report.source_failures,
-        )
-
+        return _report(mode=selected, current=current, slate_date_ct=report.slate_date_ct, run_status=report.run_status, rows=report.results, source_failures=report.source_failures)
     if selected == "AUTOMATIC":
         keys: list[str] = []
         for raw in (odds_api_key, *odds_api_keys):
@@ -338,44 +282,22 @@ def run_mlb_machine(
         if not keys:
             raise MLBRunMachineError("AUTOMATIC_REQUIRES_ODDS_API_KEY")
         report = run_auto_mlb_native_odds(
-            odds_api_key=keys[0],
-            odds_api_keys=tuple(keys[1:]),
-            feature_url=None,
-            projected_lineups_url=projected_lineups_url,
-            provider_token=provider_token,
-            now=current,
-            opener=opener,
-            registry_path=registry_path,
+            odds_api_key=keys[0], odds_api_keys=tuple(keys[1:]), feature_url=None,
+            projected_lineups_url=projected_lineups_url, provider_token=provider_token,
+            now=current, opener=opener, registry_path=registry_path,
             require_confirmed_lineup=require_confirmed_lineup,
-            edge_floor_config_path=edge_floor_config_path,
-            kelly_multiplier=kelly_multiplier,
-            bookmakers=tuple(bookmakers),
-            history_cache_dir=history_cache_dir,
+            edge_floor_config_path=edge_floor_config_path, kelly_multiplier=kelly_multiplier,
+            bookmakers=tuple(bookmakers), history_cache_dir=history_cache_dir,
         )
-        return _report(
-            mode=selected,
-            current=current,
-            slate_date_ct=report.slate_date_ct,
-            run_status=report.run_status,
-            rows=report.results,
-            source_failures=report.source_failures,
-        )
-
+        return _report(mode=selected, current=current, slate_date_ct=report.slate_date_ct, run_status=report.run_status, rows=report.results, source_failures=report.source_failures)
     raise MLBRunMachineError(f"RUN_MODE_UNREACHABLE:{selected}")
 
 
 def run_it_mlb(**kwargs: Any) -> MLBMachineReport:
-    """Conversation-facing alias for the canonical SportsEdge MLB machine."""
     return run_mlb_machine(**kwargs)
 
 
 def machine_report_to_dict(report: MLBMachineReport) -> dict[str, Any]:
-    """Serialize the machine report without colliding with auto_runner.report_to_dict.
-
-    Durable result/source collections are lists. BLOCKED explanations are normalized
-    at this ingestion boundary so prediction_journal v2 receives canonical
-    ``block_reason`` and never has to interpret the legacy ``reason`` field.
-    """
     return {
         "mode": report.mode,
         "slate_date_ct": report.slate_date_ct,
@@ -388,5 +310,4 @@ def machine_report_to_dict(report: MLBMachineReport) -> dict[str, Any]:
 
 
 def report_to_dict(report: MLBMachineReport) -> dict[str, Any]:
-    """Backward-compatible alias for callers that imported the old machine name."""
     return machine_report_to_dict(report)
