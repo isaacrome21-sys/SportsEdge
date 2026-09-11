@@ -2,9 +2,9 @@
 """Fail-closed NFL/CFB player-prop entrypoint.
 
 A real fitted artifact and fresh PIT opportunity/usage snapshot are mandatory.
-Market prices enter only after Model_P exists. The certified NFL artifact is
-stored as a hashed transport bundle and reconstructed in memory; promotion
-remains independently evidence/Truth-Gate gated.
+Market prices enter only after Model_P exists. Frozen artifacts may execute only
+at their exact fit commit or through an independently hash-bound predictive code
+surface; promotion remains independently evidence/Truth-Gate gated.
 """
 from __future__ import annotations
 
@@ -24,8 +24,10 @@ from sportsedge.football_prop_odds_source import build_odds_snapshot, fetch_even
 from sportsedge.football_prop_run_machine import FootballPropRunError
 from sportsedge.football_prop_readiness import run_football_props_ready
 from sportsedge.sports.nfl.prop_code_surface import (
+    CFBPropCodeSurfaceError,
     NFLPropCodeSurfaceError,
     load_nfl_prop_artifact_bundle,
+    verify_cfb_prop_code_surface,
     verify_nfl_prop_code_surface,
 )
 
@@ -135,10 +137,7 @@ def _freeze(registry_path: Path, artifact_path: Path, sport: str) -> tuple[dict,
         declared = (ROOT / str(registry.get("artifact_path") or "")).resolve()
         if declared != artifact_path.resolve():
             raise FootballPropAutoError(f"{sport}_PROP_FROZEN_MODEL_BINDING_REQUIRED")
-    try:
-        artifact = _load_artifact_file(artifact_path, sport)
-    except NFLPropCodeSurfaceError as exc:
-        raise FootballPropAutoError(str(exc)) from exc
+    artifact = _load_artifact_file(artifact_path, sport)
     artifact_code = str(artifact.get("code_git_sha") or "").strip().lower()
     freeze_code = str(registry.get("code_git_sha") or "").strip().lower()
     if not artifact_code or freeze_code != artifact_code:
@@ -151,11 +150,14 @@ def _runtime_model_code_sha(*, sport: str, registry: dict, artifact: dict) -> tu
     runtime_sha = _runtime_git_sha()
     if fit_sha == runtime_sha:
         return fit_sha, {"status": "EXACT_FIT_COMMIT", "fit_git_sha": fit_sha, "promotion_authority": False}
-    if sport != "NFL":
-        raise FootballPropAutoError(f"{sport}_PROP_FROZEN_MODEL_CODE_SHA_MISMATCH")
     try:
-        attestation = verify_nfl_prop_code_surface(root=ROOT, registry=registry, artifact=artifact)
-    except NFLPropCodeSurfaceError as exc:
+        if sport == "NFL":
+            attestation = verify_nfl_prop_code_surface(root=ROOT, registry=registry, artifact=artifact)
+        elif sport == "CFB":
+            attestation = verify_cfb_prop_code_surface(root=ROOT, registry=registry, artifact=artifact)
+        else:
+            raise FootballPropAutoError(f"{sport}_PROP_FROZEN_MODEL_CODE_SHA_MISMATCH")
+    except (NFLPropCodeSurfaceError, CFBPropCodeSurfaceError) as exc:
         raise FootballPropAutoError(str(exc)) from exc
     return fit_sha, attestation
 
