@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Build a deterministic NFL football-prop model artifact from frozen PBP files."""
+"""Build a deterministic NFL football-prop model artifact from frozen PBP files.
+
+This file is intentionally touched on current main so the hosted exact-SHA freeze
+workflow re-runs against the current production loader before any checked-in
+freeze registry is allowed to change. The builder itself has no promotion authority.
+"""
 from __future__ import annotations
 
 import argparse
