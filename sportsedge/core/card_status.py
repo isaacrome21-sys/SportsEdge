@@ -32,7 +32,8 @@ def load_trial_policy(path) -> dict:
 
 
 def _row(status: str, reasons: list[str], *, stake_units=None, trial_stage=None,
-         policy_sha=None, quote: Mapping[str, Any] | None = None) -> dict[str, Any]:
+         policy_sha=None, quote: Mapping[str, Any] | None = None,
+         stage_evidence: Mapping[str, Any] | None = None) -> dict[str, Any]:
     out = {
         "status": status,
         "reasons": list(dict.fromkeys(reasons)),
@@ -40,6 +41,7 @@ def _row(status: str, reasons: list[str], *, stake_units=None, trial_stage=None,
         "stake_units": stake_units,
         "trial_stage": trial_stage,
         "trial_policy_sha256": policy_sha,
+        "trial_stage_evidence": dict(stage_evidence) if stage_evidence is not None else None,
     }
     if status == TRIAL and quote is not None:
         for field in ("book", "price_american", "retrieved_at", "model_artifact_sha"):
@@ -49,11 +51,15 @@ def _row(status: str, reasons: list[str], *, stake_units=None, trial_stage=None,
 
 def resolve_row_status(*, engine_exists: bool, model_p, blockers, promoted: bool,
                        edge=None, edge_floor=None, trial_policy=None,
-                       quote=None, trial_stage=PAPER) -> dict:
+                       quote=None, settled_trial_rows=None) -> dict:
     """Resolve one already-priced decision row.
 
     ``edge`` must already be on the paired two-sided no-vig, non-push basis used
     by TRIAL_POLICY_V1. This function never derives Model_P or devigs a market.
+
+    MICRO is never caller-selected. When a TRIAL qualifies, its stage is
+    recomputed from ``settled_trial_rows`` under the current model/policy clock;
+    absent or insufficient evidence therefore resolves to PAPER.
     """
     reasons = list(dict.fromkeys(blockers or []))
     if not engine_exists:
@@ -64,7 +70,11 @@ def resolve_row_status(*, engine_exists: bool, model_p, blockers, promoted: bool
         if not promoted:
             reasons.append("NOT_PROMOTED")
         return _row(BLOCKED, reasons)
-    if not 0.0 < float(model_p) < 1.0:
+    try:
+        p = float(model_p)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("MODEL_P_OUT_OF_RANGE") from exc
+    if not math.isfinite(p) or not 0.0 < p < 1.0:
         raise ValueError("MODEL_P_OUT_OF_RANGE")
 
     if not promoted:
@@ -91,18 +101,27 @@ def resolve_row_status(*, engine_exists: bool, model_p, blockers, promoted: bool
         return _row(BLOCKED, reasons + ["TRIAL_ROW_INCOMPLETE"])
     if edge is None:
         raise ValueError("EDGE_MISSING_FOR_PRICED_ROW")
-    if float(edge) < float(trial_policy["min_trial_edge"]):
+    trial_edge = float(edge)
+    if not math.isfinite(trial_edge):
+        raise ValueError("EDGE_INVALID_FOR_PRICED_ROW")
+    if trial_edge < float(trial_policy["min_trial_edge"]):
         return _row(BLOCKED, reasons + ["BELOW_TRIAL_THRESHOLD"])
-    if trial_stage not in trial_policy["stages"]:
-        raise ValueError("TRIAL_STAGE_UNKNOWN")
-    stake = float(trial_policy["stages"][trial_stage]["stake_units"])
+
+    stage_evidence = trial_stage_for_market(
+        list(settled_trial_rows or []),
+        trial_policy,
+        model_artifact_sha=str(quote_row["model_artifact_sha"]),
+    )
+    stage = stage_evidence["stage"]
+    stake = float(trial_policy["stages"][stage]["stake_units"])
     return _row(
         TRIAL,
         reasons,
         stake_units=stake,
-        trial_stage=trial_stage,
+        trial_stage=stage,
         policy_sha=trial_policy.get("_sha256"),
         quote=quote_row,
+        stage_evidence=stage_evidence,
     )
 
 
@@ -139,6 +158,7 @@ def apply_trial_cap(rows: list, trial_policy: dict) -> list:
                 stake_units=None,
                 trial_stage=None,
                 trial_policy_sha256=None,
+                trial_stage_evidence=None,
                 reasons=reasons,
             )
     return out
@@ -167,6 +187,13 @@ def trial_stage_for_market(settled: list, trial_policy: dict, *, model_artifact_
             continue
         if row.get("slate_date") in (None, "") or row.get("clv_pp") is None:
             continue
+        try:
+            clv = float(row["clv_pp"])
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(clv):
+            continue
+        row["clv_pp"] = clv
         eligible.append(row)
 
     rule = trial_policy["stages"][MICRO]
@@ -211,6 +238,14 @@ def _nonzero(value: Any) -> bool:
         return True
 
 
+def _valid_probability(value: Any) -> bool:
+    try:
+        p = float(value)
+    except (TypeError, ValueError):
+        return False
+    return math.isfinite(p) and 0.0 < p < 1.0
+
+
 def assert_card_integrity(rows: list, trial_policy: dict | None = None) -> None:
     """Raise on any rendered row that violates the frozen status contract."""
     for i, row in enumerate(rows):
@@ -219,8 +254,12 @@ def assert_card_integrity(rows: list, trial_policy: dict | None = None) -> None:
             raise ValueError(f"ROW_{i}_UNKNOWN_STATUS")
         if status != OFFICIAL and row.get("confidence") not in (None, "", "—"):
             raise ValueError(f"ROW_{i}_CONFIDENCE_ON_NON_OFFICIAL")
-        if status in (PASS, TRIAL) and row.get("model_p") is None:
-            raise ValueError(f"ROW_{i}_{status}_WITHOUT_MODEL_P")
+        if status != OFFICIAL and row.get("confidence_allowed") not in (None, False):
+            raise ValueError(f"ROW_{i}_CONFIDENCE_FLAG_ON_NON_OFFICIAL")
+        if status in (OFFICIAL, PASS, TRIAL) and not _valid_probability(row.get("model_p")):
+            raise ValueError(f"ROW_{i}_{status}_WITHOUT_VALID_MODEL_P")
+        if status == NO_ENGINE and row.get("model_p") not in (None, "", "—"):
+            raise ValueError(f"ROW_{i}_NO_ENGINE_WITH_MODEL_P")
         if status == BLOCKED and not row.get("reasons"):
             raise ValueError(f"ROW_{i}_BLOCKED_WITHOUT_REASON")
 
@@ -232,6 +271,15 @@ def assert_card_integrity(rows: list, trial_policy: dict | None = None) -> None:
         if status == TRIAL:
             if trial_policy is None:
                 raise ValueError(f"ROW_{i}_TRIAL_WITHOUT_POLICY")
+            reasons = list(row.get("reasons") or [])
+            if set(reasons) != set(trial_policy["promotion_blockers"]):
+                raise ValueError(f"ROW_{i}_TRIAL_BLOCKER_INVALID")
+            try:
+                trial_edge = float(row.get("edge"))
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"ROW_{i}_TRIAL_EDGE_INVALID") from exc
+            if not math.isfinite(trial_edge) or trial_edge < float(trial_policy["min_trial_edge"]):
+                raise ValueError(f"ROW_{i}_TRIAL_EDGE_INVALID")
             stage = row.get("trial_stage")
             if stage not in trial_policy["stages"]:
                 raise ValueError(f"ROW_{i}_TRIAL_STAGE_INVALID")
@@ -241,8 +289,31 @@ def assert_card_integrity(rows: list, trial_policy: dict | None = None) -> None:
             for alias in ("stake", "units"):
                 if row.get(alias) not in (None, "", "—") and float(row[alias]) != expected_stake:
                     raise ValueError(f"ROW_{i}_TRIAL_STAKE_ALIAS_INVALID")
+            for forbidden in ("kelly", "kelly_fraction", "bankroll_fraction"):
+                if row.get(forbidden) not in (None, "", "—"):
+                    raise ValueError(f"ROW_{i}_TRIAL_{forbidden.upper()}_PROHIBITED")
             if row.get("trial_policy_sha256") != trial_policy.get("_sha256"):
                 raise ValueError(f"ROW_{i}_TRIAL_POLICY_HASH_MISMATCH")
             for field in trial_policy["required_row_fields"]:
                 if row.get(field) in (None, ""):
                     raise ValueError(f"ROW_{i}_TRIAL_MISSING_{field.upper()}")
+
+            evidence = row.get("trial_stage_evidence")
+            if not isinstance(evidence, Mapping):
+                raise ValueError(f"ROW_{i}_TRIAL_STAGE_EVIDENCE_MISSING")
+            if evidence.get("stage") != stage:
+                raise ValueError(f"ROW_{i}_TRIAL_STAGE_EVIDENCE_MISMATCH")
+            if evidence.get("model_artifact_sha") != row.get("model_artifact_sha"):
+                raise ValueError(f"ROW_{i}_TRIAL_MODEL_CLOCK_MISMATCH")
+            if evidence.get("trial_policy_sha256") != trial_policy.get("_sha256"):
+                raise ValueError(f"ROW_{i}_TRIAL_POLICY_CLOCK_MISMATCH")
+            if stage == MICRO:
+                rule = trial_policy["stages"][MICRO]
+                if int(evidence.get("settled", -1)) < int(rule["min_settled"]):
+                    raise ValueError(f"ROW_{i}_MICRO_SETTLED_INSUFFICIENT")
+                if int(evidence.get("slate_clusters", -1)) < int(rule["min_slate_clusters"]):
+                    raise ValueError(f"ROW_{i}_MICRO_SLATES_INSUFFICIENT")
+                if evidence.get("mean_clv_pp") is None or float(evidence["mean_clv_pp"]) < float(rule["min_mean_clv_pp"]):
+                    raise ValueError(f"ROW_{i}_MICRO_CLV_INSUFFICIENT")
+                if evidence.get("clv_t_stat") is None or float(evidence["clv_t_stat"]) < float(rule["min_clv_t_stat"]):
+                    raise ValueError(f"ROW_{i}_MICRO_TSTAT_INSUFFICIENT")
