@@ -1,0 +1,8 @@
+{
+  "active_policy_id": "PROMOTION_EVIDENCE_POLICY_V2",
+  "active_policy_path": "config/promotion_evidence_policy_v2.json",
+  "evidence_ref": "refs/heads/main",
+  "activation_rule": "Only the active policy selected by this manifest on evidence_ref can start or extend a promotion evidence clock.",
+  "legacy_state_aliases": {"TRIAL": "PROBATION"},
+  "non_retroactive": true
+}
