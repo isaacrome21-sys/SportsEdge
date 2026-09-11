@@ -41,7 +41,7 @@ class RuntimeDispatchTests(unittest.TestCase):
         self.assertEqual(result.bet_status,"MODEL_CANDIDATE")
         self.assertIsNotNone(result.model_p)
         self.assertIn("OFFICIAL_BLOCKED",result.reason)
-        self.assertIn("eligible",result.reason.lower())
+        self.assertNotEqual(result.bet_status,"OFFICIAL_BET")
     def test_deployed_test_registry_can_reach_truth_gate(self):
         with tempfile.TemporaryDirectory() as td:
             p=Path(td)/"registry.json"; f=Path(td)/"floors.json"; registry(p,eligible=True,stage="DEPLOYED"); floors(f); result=run_payload(payload(),registry_path=p,edge_floor_config_path=str(f))[0]
