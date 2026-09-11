@@ -139,7 +139,7 @@ class ManualCloseTests(unittest.TestCase):
         self.assertIn("group: ev-tracker-manual-close-${{ github.event.issue.number }}", manual_job)
         self.assertIn("git add -A ledger/ev_manual_close_observations", manual_job)
         self.assertIn("--diff-filter=MDR -- ledger/", manual_job)
-        self.assertIn("PUSH_FAILED: manual observation was not persisted", manual_job)
+        self.assertIn("MANUAL_PUSH_FAILED: manual observation was not persisted", manual_job)
 
 
 if __name__ == "__main__":
