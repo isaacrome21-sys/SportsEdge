@@ -15,26 +15,68 @@ if str(ROOT) not in sys.path:
 from sportsedge.football_prop_surface import require_executable_prop_surface
 
 
-def _load(path: Path, lane: str, code: int) -> tuple[list[dict], dict]:
+def _stamp(path: Path):
+    """Return an identity/freshness stamp for a child artifact, or ``None``."""
+    if not path.is_file():
+        return None
+    stat = path.stat()
+    return (stat.st_ino, stat.st_mtime_ns, stat.st_ctime_ns, stat.st_size)
+
+
+def _blocked_row(lane: str, reason: str) -> list[dict]:
+    return [{
+        "market": lane,
+        "model_p": None,
+        "bet_status": "BLOCKED",
+        "reason": reason,
+        "run_it_lane": lane,
+    }]
+
+
+def _load(path: Path, lane: str, code: int, previous_stamp) -> tuple[list[dict], dict]:
+    """Consume only output proven to have been produced by this child invocation.
+
+    A previous RUN IT card may exist on disk.  If the current child process fails
+    before replacing it, that old card must never be re-used as current Model_P.
+    Non-zero child exits are also fail-closed even when the child managed to write
+    a JSON payload; only its blocker text is retained.
+    """
+    current_stamp = _stamp(path)
+    if current_stamp is None:
+        return _blocked_row(lane, f"{lane}_OUTPUT_MISSING"), {}
+    if current_stamp == previous_stamp:
+        return _blocked_row(lane, f"{lane}_OUTPUT_NOT_REFRESHED"), {}
+
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         payload = {}
+
+    if code != 0:
+        blocker = payload.get("blocker") if isinstance(payload, dict) else None
+        if not blocker and isinstance(payload, dict):
+            report = payload.get("report")
+            if isinstance(report, dict):
+                blocker = report.get("blocker") or report.get("run_status")
+        return _blocked_row(lane, str(blocker or f"{lane}_CHILD_EXIT_{code}")), (
+            payload if isinstance(payload, dict) else {}
+        )
+
     report = payload.get("report") if isinstance(payload, dict) else None
     rows = report.get("results") if isinstance(report, dict) else None
     if not isinstance(rows, list):
         blocker = payload.get("blocker") if isinstance(payload, dict) else None
-        rows = [{
-            "market": lane,
-            "model_p": None,
-            "bet_status": "BLOCKED",
-            "reason": str(blocker or f"{lane}_OUTPUT_INVALID"),
-        }]
+        return _blocked_row(lane, str(blocker or f"{lane}_OUTPUT_INVALID")), (
+            payload if isinstance(payload, dict) else {}
+        )
+
     tagged = []
     for raw in rows:
         if isinstance(raw, dict):
             tagged.append({**raw, "run_it_lane": lane})
-    return tagged, payload if isinstance(payload, dict) else {}
+    if not tagged:
+        return _blocked_row(lane, f"{lane}_RESULTS_EMPTY"), payload
+    return tagged, payload
 
 
 def main() -> int:
@@ -62,14 +104,22 @@ def main() -> int:
         game_cmd.extend(["--asof", args.asof])
         prop_cmd.extend(["--asof", args.asof])
 
+    game_before = _stamp(game_out)
+    prop_before = _stamp(prop_out)
     game = subprocess.run(game_cmd, cwd=ROOT, text=True, capture_output=True, check=False)
     prop = subprocess.run(prop_cmd, cwd=ROOT, text=True, capture_output=True, check=False)
-    game_rows, game_payload = _load(game_out, "GAME", game.returncode)
-    prop_rows, prop_payload = _load(prop_out, "PLAYER_PROPS", prop.returncode)
+    game_rows, game_payload = _load(game_out, "GAME", game.returncode, game_before)
+    prop_rows, prop_payload = _load(prop_out, "PLAYER_PROPS", prop.returncode, prop_before)
     rows = game_rows + prop_rows
-    status = "SUCCESS" if game.returncode == 0 and prop.returncode == 0 else "PARTIAL" if game.returncode == 0 or prop.returncode == 0 else "BLOCKED"
+    status = (
+        "SUCCESS"
+        if game.returncode == 0 and prop.returncode == 0
+        else "PARTIAL"
+        if game.returncode == 0 or prop.returncode == 0
+        else "BLOCKED"
+    )
     payload = {
-        "schema_version": "FOOTBALL_AUTO_BUNDLE_V1",
+        "schema_version": "FOOTBALL_AUTO_BUNDLE_V2",
         "status": status,
         "sport": sport,
         "report": {
@@ -79,6 +129,10 @@ def main() -> int:
                 "GAME": game_payload.get("status", "BLOCKED"),
                 "PLAYER_PROPS": prop_payload.get("status", "BLOCKED"),
             },
+            "lane_exit_code": {
+                "GAME": int(game.returncode),
+                "PLAYER_PROPS": int(prop.returncode),
+            },
         },
         "governance": {
             "model_p_changed": False,
@@ -86,12 +140,13 @@ def main() -> int:
             "promotion_changed": False,
             "eligible_changed": False,
             "prop_failures_are_not_silently_skipped": True,
+            "stale_child_output_reuse_prohibited": True,
         },
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps({"status": status, "sport": sport, "output": str(args.output)}, sort_keys=True))
-    return 0
+    return 2 if status == "BLOCKED" else 0
 
 
 if __name__ == "__main__":
