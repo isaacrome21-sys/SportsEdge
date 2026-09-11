@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Executable fail-closed NFL M2 RUN IT lane.
 
-No model fitting occurs here. A frozen, Git-SHA-bound NFL M2 artifact, its exact
+No model fitting occurs here. A frozen, hash-bound NFL M2 artifact, its exact
 promotion registry, and the frozen Truth Gate floor registry are external inputs
-to production resolution. Hosted exact-SHA bundles may be materialized outside
-the repository and supplied by CLI/environment; checked-in state never needs to
-claim bytes that are absent.
+to production resolution. The preferred binding is the exact runtime Git SHA.
+A frozen artifact may survive unrelated repository commits only when its freeze
+registry also pins a byte-exact NFL M2 code-surface manifest and that manifest
+verifies against the current checkout. The original fit SHA remains artifact
+provenance; compatibility never upgrades promotion evidence.
 
 Manual odds snapshots must already contain their real ``observed_at`` timestamp;
 this script never rewrites an old quote timestamp to make the 180-second TTL pass.
@@ -25,6 +27,10 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from sportsedge.sports.nfl.code_surface import (
+    NFLCodeSurfaceError,
+    load_and_verify_nfl_m2_code_surface,
+)
 from sportsedge.sports.nfl.live_features import build_nfl_live_feature_payload
 from sportsedge.sports.nfl.odds_source import fetch_nfl_odds
 from sportsedge.sports.nfl.readiness import load_nfl_promotion_registry, run_nfl_ready
@@ -116,7 +122,33 @@ def _artifact_path(path: Path) -> Path:
     return path.resolve() if path.is_absolute() else (_REPO_ROOT / path).resolve()
 
 
-def _frozen_artifact_hash(candidate_path: Path, freeze_registry: Path, runtime_sha: str) -> str:
+def _sha256(value: Any, error: str) -> str:
+    raw = str(value or "").strip().lower()
+    if len(raw) != 64 or any(ch not in "0123456789abcdef" for ch in raw):
+        raise NFLAutoError(error)
+    return raw
+
+
+def _git_sha(value: Any, error: str) -> str:
+    raw = str(value or "").strip().lower()
+    if len(raw) != 40 or any(ch not in "0123456789abcdef" for ch in raw):
+        raise NFLAutoError(error)
+    return raw
+
+
+def _frozen_artifact_hash(
+    candidate_path: Path,
+    freeze_registry: Path,
+    runtime_sha: str,
+) -> tuple[str, str, dict[str, Any] | None]:
+    """Resolve artifact hash + model binding SHA without laundering provenance.
+
+    Exact-head binding remains the normal path. If the fitted artifact predates
+    unrelated repository commits, compatibility is accepted only when the FROZEN
+    registry pins a code-surface manifest by SHA-256 and every file in that
+    manifest is byte-identical in the current checkout. The returned binding SHA
+    is always the artifact's original fit SHA, never a fabricated refit identity.
+    """
     freeze = _json(freeze_registry, "NFL_AUTO_FROZEN_MODEL_BINDING_REQUIRED")
     if freeze.get("schema_version") != 1:
         raise NFLAutoError("NFL_AUTO_FROZEN_MODEL_BINDING_SCHEMA_INVALID")
@@ -128,19 +160,42 @@ def _frozen_artifact_hash(candidate_path: Path, freeze_registry: Path, runtime_s
     if not declared_path:
         raise NFLAutoError("NFL_AUTO_FROZEN_MODEL_ARTIFACT_PATH_REQUIRED")
 
-    # Checked-in binding remains path-exact. Externally materialized exact-SHA
-    # bundles may relocate bytes, but never their hash or code identity.
     if freeze_registry.resolve() == _DEFAULT_FREEZE_REGISTRY.resolve():
         frozen_path = (_REPO_ROOT / declared_path).resolve()
         if candidate_path != frozen_path:
             raise NFLAutoError("NFL_AUTO_MODEL_ARTIFACT_PATH_NOT_FROZEN")
-    digest = str(freeze.get("artifact_sha256") or "").strip().lower()
-    if len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
-        raise NFLAutoError("NFL_AUTO_FROZEN_MODEL_SHA256_INVALID")
-    freeze_code = str(freeze.get("code_git_sha") or "").strip().lower()
-    if freeze_code and freeze_code != runtime_sha:
+    digest = _sha256(
+        freeze.get("artifact_sha256"), "NFL_AUTO_FROZEN_MODEL_SHA256_INVALID"
+    )
+    fit_sha = _git_sha(
+        freeze.get("code_git_sha") or runtime_sha,
+        "NFL_AUTO_FROZEN_MODEL_CODE_SHA_INVALID",
+    )
+    if fit_sha == runtime_sha:
+        return digest, fit_sha, None
+
+    compatibility = freeze.get("compatible_runtime")
+    if not isinstance(compatibility, Mapping):
         raise NFLAutoError("NFL_AUTO_FROZEN_MODEL_CODE_SHA_MISMATCH")
-    return digest
+    if compatibility.get("mode") != "NFL_M2_CODE_SURFACE_V1":
+        raise NFLAutoError("NFL_AUTO_CODE_SURFACE_MODE_INVALID")
+    manifest_path = str(compatibility.get("manifest_path") or "").strip()
+    if not manifest_path:
+        raise NFLAutoError("NFL_AUTO_CODE_SURFACE_MANIFEST_REQUIRED")
+    manifest_sha = _sha256(
+        compatibility.get("manifest_sha256"),
+        "NFL_AUTO_CODE_SURFACE_MANIFEST_SHA256_INVALID",
+    )
+    try:
+        verified = load_and_verify_nfl_m2_code_surface(
+            manifest_path,
+            repo_root=_REPO_ROOT,
+            expected_sha256=manifest_sha,
+            expected_fit_git_sha=fit_sha,
+        )
+    except NFLCodeSurfaceError as exc:
+        raise NFLAutoError(str(exc)) from exc
+    return digest, fit_sha, verified
 
 
 def main() -> int:
@@ -171,7 +226,7 @@ def main() -> int:
 
     current = _utc(args.asof)
     try:
-        runtime_sha = _runtime_git_sha(args.runtime_code_git_sha)
+        actual_runtime_sha = _runtime_git_sha(args.runtime_code_git_sha)
         model_arg = args.model_artifact or _env_path("SPORTSEDGE_NFL_M2_MODEL_ARTIFACT_PATH") or Path("artifacts/football/nfl_m2_model.json")
         freeze_registry = args.freeze_registry or _env_path("SPORTSEDGE_NFL_M2_FREEZE_REGISTRY_PATH") or _DEFAULT_FREEZE_REGISTRY
         promotion_registry_path = args.promotion_registry or _env_path("SPORTSEDGE_NFL_PROMOTION_REGISTRY_PATH") or _DEFAULT_PROMOTION_REGISTRY
@@ -179,7 +234,9 @@ def main() -> int:
         model_path = _artifact_path(model_arg)
 
         artifact = _json(model_path, "NFL_AUTO_FROZEN_MODEL_ARTIFACT_REQUIRED")
-        expected_artifact_sha = _frozen_artifact_hash(model_path, freeze_registry, runtime_sha)
+        expected_artifact_sha, model_binding_sha, compatibility = _frozen_artifact_hash(
+            model_path, freeze_registry, actual_runtime_sha
+        )
         promotion_registry = load_nfl_promotion_registry(promotion_registry_path)
         if not floor_registry.is_file():
             raise NFLAutoError("NFL_AUTO_TRUTH_GATE_FLOOR_REGISTRY_REQUIRED")
@@ -218,7 +275,7 @@ def main() -> int:
             mode=str(args.mode).upper(),
             model_artifact=artifact,
             expected_model_artifact_sha256=expected_artifact_sha,
-            runtime_code_git_sha=runtime_sha,
+            runtime_code_git_sha=model_binding_sha,
             now=execution_now,
             live_features=supplied_features,
             odds_snapshot=supplied_odds,
@@ -232,12 +289,17 @@ def main() -> int:
             "schema_version": "NFL_AUTO_RUN_V2",
             "status": "SUCCESS",
             "report": report.to_dict(),
+            "runtime_code_git_sha": actual_runtime_sha,
+            "model_binding_git_sha": model_binding_sha,
+            "compatible_code_surface": compatibility,
             "governance": {
                 "model_fit_performed": False,
+                "model_fit_identity_rewritten": False,
                 "market_prices_are_model_features": False,
                 "promotion_registry_resolved": True,
                 "truth_gate_resolution_performed": True,
                 "manual_eligible_toggle_required": False,
+                "code_surface_compatibility_may_upgrade_promotion": False,
                 "fail_closed": True,
             },
         }

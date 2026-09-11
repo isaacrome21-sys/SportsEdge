@@ -1,0 +1,17 @@
+{
+  "schema_version": "NFL_M2_CODE_SURFACE_V1",
+  "fit_git_sha": "d0609a44cb3c379fcb4d09afc9249dd8f9b54ef9",
+  "files": {
+    "scripts/run_nfl_auto.py": "9f5cade8f871160e24c1596173b6320cd1158e64",
+    "sportsedge/core/position_matchup.py": "7ec98a2460795c6e90afc9051978d96cf8ce3dac",
+    "sportsedge/core/walkforward/season.py": "e352828e626cd16c5b932c9f3eda6ff3903a7325",
+    "sportsedge/sports/nfl/code_surface.py": "e598ecfe5c3be72608781976aa15cfe49a0d6cd5",
+    "sportsedge/sports/nfl/history.py": "6123dc4a3ef1702910ddff4a3deb3fe1d99c2ce7",
+    "sportsedge/sports/nfl/live_features.py": "2903b86cdefc02197ac2dd134851e119911d30a3",
+    "sportsedge/sports/nfl/m2.py": "e042a310ee760ed5c0654b755af8895a8e861895",
+    "sportsedge/sports/nfl/m2_history_features.py": "aef283cf951ee2276674dd21d778346010582ef1",
+    "sportsedge/sports/nfl/m2_history_policy.py": "1014b4c85772e5c7c4483554a5eebd3b5438ba8c",
+    "sportsedge/sports/nfl/model_artifact.py": "467ce742631e3451f630e0abf5cead262676a745",
+    "sportsedge/sports/nfl/run_machine.py": "5c0d2c066df0f922e5d30820576b6003ae5ae8de"
+  }
+}
