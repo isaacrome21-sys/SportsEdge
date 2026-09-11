@@ -6,14 +6,18 @@ on:
     paths:
       - 'sportsedge/sports/cfb/prop_artifact_training.py'
       - 'scripts/build_cfb_prop_model_artifact.py'
+      - 'scripts/build_cfb_prop_source_attestation.py'
       - 'tests/test_cfb_prop_artifact_training.py'
+      - 'tests/test_cfb_prop_source_attestation.py'
       - '.github/workflows/football-cfb-prop-artifact-freeze.yml'
   push:
     branches: [main]
     paths:
       - 'sportsedge/sports/cfb/prop_artifact_training.py'
       - 'scripts/build_cfb_prop_model_artifact.py'
+      - 'scripts/build_cfb_prop_source_attestation.py'
       - 'tests/test_cfb_prop_artifact_training.py'
+      - 'tests/test_cfb_prop_source_attestation.py'
       - '.github/workflows/football-cfb-prop-artifact-freeze.yml'
 
 permissions:
@@ -30,6 +34,7 @@ jobs:
     env:
       EVIDENCE_GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       CFB_2025_PARQUET_SHA256: aa037920e980acf17317747f2010a031b3b7e1013a44a7b15db18b1dd9df0e63
+      CFB_2025_UPSTREAM_URL: https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_cfb_pbp/play_by_play_2025.parquet
     steps:
       - name: Checkout exact audited code SHA
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -44,19 +49,21 @@ jobs:
           python -m pip install --disable-pip-version-check -r requirements-test.txt
           python -m pip install --disable-pip-version-check pyarrow==25.0.1
       - name: Run CFB prop fitter contract tests
-        run: python -m pytest -q tests/test_cfb_prop_artifact_training.py
+        run: python -m pytest -q tests/test_cfb_prop_artifact_training.py tests/test_cfb_prop_source_attestation.py
       - name: Download and normalize frozen completed 2025 ESPN CFB play-by-play
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p artifacts/football/cfb_prop_sources
+          mkdir -p artifacts/football/cfb_prop_sources artifacts/football/cfb_prop_freeze_a
           parquet='artifacts/football/cfb_prop_sources/play_by_play_2025.parquet'
           csv='artifacts/football/cfb_prop_sources/play_by_play_2025.csv'
           source='artifacts/football/cfb_prop_sources/play_by_play_2025__upstream-aa037920e980acf17317747f2010a031b3b7e1013a44a7b15db18b1dd9df0e63.csv.gz'
+          retrieved_at="$(date -u +%FT%TZ)"
+          echo "CFB_SOURCE_RETRIEVED_AT_UTC=${retrieved_at}" >> "$GITHUB_ENV"
           curl --fail --location --silent --show-error \
             --retry 5 --retry-delay 2 --retry-all-errors --connect-timeout 30 \
             --output "$parquet" \
-            'https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_cfb_pbp/play_by_play_2025.parquet'
+            "$CFB_2025_UPSTREAM_URL"
           echo "${CFB_2025_PARQUET_SHA256}  ${parquet}" | sha256sum --check --strict
           python - <<'PY'
           import pyarrow.csv as csv
@@ -67,6 +74,13 @@ jobs:
           gzip -n -c "$csv" > "$source"
           test -s "$source"
           sha256sum "$source"
+          python scripts/build_cfb_prop_source_attestation.py \
+            --source "$source" \
+            --retrieved-at "$retrieved_at" \
+            --upstream-url "$CFB_2025_UPSTREAM_URL" \
+            --upstream-sha256 "$CFB_2025_PARQUET_SHA256" \
+            --normalized-from parquet \
+            --output artifacts/football/cfb_prop_freeze_a/training_input_attestation.json
           rm -f "$parquet" "$csv"
       - name: Build exact-SHA artifact attempt A
         env:
@@ -103,7 +117,7 @@ jobs:
           cmp artifacts/football/cfb_prop_freeze_a/model.json artifacts/football/cfb_prop_freeze_b/model.json
           cmp artifacts/football/cfb_prop_freeze_a/fit_diagnostics.json artifacts/football/cfb_prop_freeze_b/fit_diagnostics.json
           cmp artifacts/football/cfb_prop_freeze_a/freeze.json artifacts/football/cfb_prop_freeze_b/freeze.json
-      - name: Validate fitted artifact through shared production loader
+      - name: Validate fitted artifact and pinned training input
         run: |
           python - <<'PY'
           import json, os
@@ -112,19 +126,32 @@ jobs:
           model=json.loads(Path('artifacts/football/cfb_prop_freeze_a/model.json').read_text())
           freeze=json.loads(Path('artifacts/football/cfb_prop_freeze_a/freeze.json').read_text())
           diagnostics=json.loads(Path('artifacts/football/cfb_prop_freeze_a/fit_diagnostics.json').read_text())
+          source_attestation=json.loads(Path('artifacts/football/cfb_prop_freeze_a/training_input_attestation.json').read_text())
           expected=canonical_hash(model)
           assert diagnostics['status']=='PASS'
           assert diagnostics['team_count'] >= 100
           assert diagnostics['governance']['sportsbook_fields_consumed'] is False
           assert freeze['sport']=='CFB' and freeze['promotion_authority'] is False
           assert freeze['artifact_sha256']==expected
+          asserted=source_attestation['normalized_training_input']
+          fitted=diagnostics['source_manifest']['files'][0]
+          assert asserted['sha256'] == fitted['sha256']
+          assert asserted['bytes'] == fitted['bytes']
+          assert asserted['row_count'] >= sum(row['source_rows'] for row in diagnostics['team_rows'].values())
+          assert asserted['distinct_team_count'] >= diagnostics['team_count']
+          assert source_attestation['upstream']['sha256'] == os.environ['CFB_2025_PARQUET_SHA256']
+          assert source_attestation['sportsbook_data_used_for_fit'] is False
+          assert source_attestation['promotion_authority'] is False
           profiles, actual, source_sha = _load_artifact(
               model, sport='CFB', expected_artifact_sha256=expected,
               runtime_code_git_sha=os.environ['EVIDENCE_GIT_SHA'])
           assert actual == expected
           assert source_sha == model['source_manifest_sha256']
           assert len(profiles) == diagnostics['team_count']
-          print(f"CFB_PROP_REAL_FREEZE_OK artifact_sha256={expected} teams={len(profiles)}")
+          print(
+              f"CFB_PROP_REAL_FREEZE_OK artifact_sha256={expected} teams={len(profiles)} "
+              f"rows={asserted['row_count']} input_attestation={source_attestation['attestation_sha256']}"
+          )
           PY
       - name: Upload immutable exact-SHA freeze bundle
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -134,5 +161,6 @@ jobs:
             artifacts/football/cfb_prop_freeze_a/model.json
             artifacts/football/cfb_prop_freeze_a/fit_diagnostics.json
             artifacts/football/cfb_prop_freeze_a/freeze.json
+            artifacts/football/cfb_prop_freeze_a/training_input_attestation.json
           if-no-files-found: error
           retention-days: 90
