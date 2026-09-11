@@ -205,14 +205,28 @@ class FakeClient:
 
 
 class FakeGH:
-    def __init__(self):
-        self.comments, self.closed = [], []
+    BOT_LOGIN = "github-actions[bot]"
+
+    def __init__(self, issues=None):
+        self.comments, self.closed, self.issues = [], [], list(issues or [])
+        self.thread = {}
 
     def comment(self, n, text):
         self.comments.append(text)
+        self.thread.setdefault(n, []).append({"user": {"login": self.BOT_LOGIN}, "body": text})
+        for i in self.issues:
+            if i["number"] == n:
+                i["comments"] = len(self.thread[n])
 
     def close(self, n):
         self.closed.append(n)
+        self.issues = [i for i in self.issues if i["number"] != n]
+
+    def list_open_bet_issues(self, owner):
+        return [dict(i) for i in self.issues]
+
+    def issue_comments(self, n):
+        return self.thread.get(n, [])
 
 
 class Base(unittest.TestCase):
@@ -323,6 +337,66 @@ class Closing(Base):
         text = tr.render_summary(POLICY, at(61))
         self.assertIn("| Odds Assist Pinnacle +EV | MLB | PROBATION | 0.25u | 3 |", text)
         self.assertIn("| Odds Assist Pinnacle +EV | NFL | PROBATION | 0.25u | 1 |", text)
+
+
+class Sweep(Base):
+    OWNER = "isaacrome21-sys"
+
+    def issue(self, number=11, created=at(-20), updated=None, user=None, **body):
+        return {"number": number, "title": "[BET] x", "user": {"login": user or self.OWNER}, "comments": 0,
+                "created_at": iso(created), "updated_at": iso(updated or created), "body": issue_body(**body)}
+
+    def test_logs_dropped_issue_with_original_time(self):
+        gh = FakeGH([self.issue()])
+        out = tr.run_sweep(POLICY, FakeClient(), gh, self.OWNER, MAIN)
+        self.assertEqual(out["logged"], 1)
+        rec = json.loads((tr.PLAYS_DIR / "issue-11.json").read_text())
+        self.assertEqual((rec["accepted_action"], rec["accepted_at"]), ("sweep", iso(at(-20))))
+        self.assertEqual(gh.closed, [11])
+        self.assertIn("scheduled sweep", gh.comments[0])
+
+    def test_rejection_not_repeated_until_body_changes(self):
+        gh = FakeGH([self.issue(Line="banana")])
+        self.assertEqual(tr.run_sweep(POLICY, FakeClient(), gh, self.OWNER, MAIN)["rejected"], 1)
+        again = tr.run_sweep(POLICY, FakeClient(), gh, self.OWNER, MAIN)
+        self.assertEqual((again["skipped"], len(gh.comments)), (1, 1))
+        gh.issues[0]["body"] = issue_body()
+        gh.issues[0]["updated_at"] = iso(at(-10))
+        fixed = tr.run_sweep(POLICY, FakeClient(), gh, self.OWNER, MAIN)
+        self.assertEqual(fixed["logged"], 1)
+
+    def test_degraded_retries_silently(self):
+        gh = FakeGH([self.issue()])
+        out = tr.run_sweep(POLICY, FakeClient(fail="ODDS_API_TIMEOUT"), gh, self.OWNER, MAIN)
+        self.assertEqual((out["degraded"], out["errors"], gh.comments), (1, ["ODDS_API_TIMEOUT"], []))
+        self.assertEqual(tr.run_sweep(POLICY, FakeClient(), gh, self.OWNER, MAIN)["logged"], 1)
+
+    def test_marker_from_non_bot_does_not_count(self):
+        iss = self.issue()
+        gh = FakeGH([iss])
+        gh.thread[11] = [{"user": {"login": self.OWNER}, "body": tr.body_marker(iss)}]
+        gh.issues[0]["comments"] = 1
+        self.assertEqual(tr.run_sweep(POLICY, FakeClient(), gh, self.OWNER, MAIN)["logged"], 1)
+
+    def test_closes_open_issue_already_logged_and_ignores_others(self):
+        tr.write_new(tr.PLAYS_DIR, "issue-11", {"play_id": "issue-11"})
+        gh = FakeGH([self.issue(), self.issue(number=12, user="stranger")])
+        out = tr.run_sweep(POLICY, FakeClient(), gh, self.OWNER, MAIN)
+        self.assertEqual((out["closed_existing"], out["logged"], gh.closed), (1, 0, [11]))
+        self.assertFalse((tr.PLAYS_DIR / "issue-12.json").exists())
+
+    def test_sweep_uses_last_update_as_decision_time(self):
+        gh = FakeGH([self.issue(created=at(-20), updated=at(62))])
+        self.assertEqual(tr.run_sweep(POLICY, FakeClient(), gh, self.OWNER, MAIN)["rejected"], 1)
+        self.assertIn("LOGGED_AFTER_START", gh.comments[0])
+
+    def test_workflow_lock_and_sweep_permissions(self):
+        text = (ROOT / ".github/workflows/ev-tracker.yml").read_text()
+        self.assertEqual(text.count("group: sportsedge-paid-odds-api"), 2)
+        close_job = text.split("\n  close:")[1]
+        self.assertIn("issues: write", close_job)
+        self.assertIn("GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}", close_job)
+        self.assertIn("ledger/ev_plays", close_job)
 
 
 class Client(unittest.TestCase):

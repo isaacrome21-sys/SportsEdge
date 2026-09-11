@@ -1,7 +1,7 @@
 """SportsEdge EV tracker (EV_TRACKER_POLICY_V2).
 
   python scripts/ev_tracker.py log     # from a "[BET]" issue (GitHub Actions)
-  python scripts/ev_tracker.py close   # sharp price attempts before start, finalize after start
+  python scripts/ev_tracker.py close   # sweep missed [BET] issues, sharp price attempts, finalize after start
 
 Exit codes: 0 OK, 3 DEGRADED (handled: key, budget, provider errors), anything else is a crash.
 Ledger files are create-only and sealed with a content hash. The API key is never printed.
@@ -132,22 +132,41 @@ class OddsApiClient:
 # ---------- GitHub ----------
 
 class GitHub:
+    BOT_LOGIN = "github-actions[bot]"
+
     def __init__(self, token, repo):
         self.token, self.repo = token, repo
 
-    def _call(self, method, path, body):
-        req = urllib.request.Request(
-            f"https://api.github.com/repos/{self.repo}{path}", method=method, data=json.dumps(body).encode(),
-            headers={"Authorization": f"Bearer {self.token}", "Accept": "application/vnd.github+json",
-                     "Content-Type": "application/json", "User-Agent": "SportsEdge-EV-Tracker"})
+    def _call(self, method, path, body=None):
+        headers = {"Authorization": f"Bearer {self.token}", "Accept": "application/vnd.github+json",
+                   "User-Agent": "SportsEdge-EV-Tracker"}
+        data = None
+        if body is not None:
+            data, headers["Content-Type"] = json.dumps(body).encode(), "application/json"
+        req = urllib.request.Request(f"https://api.github.com/repos/{self.repo}{path}", method=method,
+                                     data=data, headers=headers)
         with urllib.request.urlopen(req, timeout=30) as resp:
-            return resp.status
+            raw = resp.read()
+        return json.loads(raw) if raw else None
 
     def comment(self, number, text):
         self._call("POST", f"/issues/{number}/comments", {"body": text})
 
     def close(self, number):
         self._call("PATCH", f"/issues/{number}", {"state": "closed"})
+
+    def list_open_bet_issues(self, owner):
+        out = []
+        for page in range(1, 6):
+            batch = self._call("GET", f"/issues?state=open&creator={urllib.parse.quote(owner)}"
+                                      f"&per_page=100&page={page}") or []
+            out += [i for i in batch if "pull_request" not in i and i.get("title", "").startswith("[BET]")]
+            if len(batch) < 100:
+                break
+        return out
+
+    def issue_comments(self, number):
+        return self._call("GET", f"/issues/{number}/comments?per_page=100") or []
 
 
 # ---------- ledger ----------
@@ -211,7 +230,8 @@ def build_play(payload: dict, policy: dict, client, env=None) -> dict:
 
     created = ev.parse_utc(issue["created_at"])
     action = payload.get("action", "opened")
-    accepted = ev.parse_utc(issue.get("updated_at") or issue["created_at"]) if action == "edited" else created
+    accepted = (ev.parse_utc(issue.get("updated_at") or issue["created_at"])
+                if action in ("edited", "sweep") else created)
     events = client.events(sport)
     away_in, home_in, game_date = f.get("Away team", ""), f.get("Home team", ""), f.get("Game date") or None
     try:
@@ -272,6 +292,11 @@ def bet_label(p: dict) -> str:
     return f"{p['pick']} {p['line']:g} ({p['away_team']} at {p['home_team']})"
 
 
+def body_marker(issue: dict) -> str:
+    sha = hashlib.sha256((issue.get("body") or "").encode()).hexdigest()
+    return f"<!-- sportsedge-ev-tracker body-sha256:{sha} -->"
+
+
 def run_log(payload: dict, policy: dict, client, gh, owner: str, env=None) -> str:
     issue = payload.get("issue") or {}
     if not issue.get("title", "").startswith("[BET]"):
@@ -281,23 +306,58 @@ def run_log(payload: dict, policy: dict, client, gh, owner: str, env=None) -> st
     play_id = f"issue-{issue['number']}"
     if (PLAYS_DIR / f"{play_id}.json").exists():
         return "SKIP_ALREADY_LOGGED"
+    marker = body_marker(issue)
+    quiet = payload.get("action") == "sweep"
     try:
         play = build_play(payload, policy, client, env)
     except EVError as exc:
         if exc.code.startswith("ODDS_API") or exc.code == "BUDGET_RESERVE_REACHED":
-            gh.comment(issue["number"], f"Not logged yet: `{exc.code}` (data provider problem). Edit the issue to retry.")
+            if not quiet:
+                gh.comment(issue["number"], f"Not logged yet: `{exc.code}` (data provider problem). "
+                                            "It will retry automatically within 30 minutes.")
             return f"DEGRADED_{exc.code}"
-        gh.comment(issue["number"], f"Not logged: `{exc}`. Edit the issue to fix it and it will retry.")
+        gh.comment(issue["number"], f"Not logged: `{exc}`. Edit the issue to fix it and it will retry.\n{marker}")
         return f"REJECTED_{exc.code}"
     write_new(PLAYS_DIR, play_id, play)
     start_ct = ev.parse_utc(play["commence_time"]).astimezone(ev.CT).strftime("%a %b %-d, %-I:%M %p CT")
     swapped = "\nNote: the book lists these teams the other way around; logged with the book's home/away." if play["teams_entered_swapped"] else ""
+    late = "\nLogged by the scheduled sweep; the decision time is the issue's last update." if quiet else ""
     gh.comment(issue["number"],
                f"Logged: **{bet_label(play)}** ({play['away_team']} at {play['home_team']}) at {play['book']} "
                f"{play['price_american']:+d}, {play['stake_units']:g}u. Starts {start_ct}. "
-               f"Edits to this issue no longer change the record.{swapped}")
+               f"Edits to this issue no longer change the record.{swapped}{late}\n{marker}")
     gh.close(issue["number"])
     return "LOGGED"
+
+
+def run_sweep(policy: dict, client, gh, owner: str, env=None) -> dict:
+    """Logs open [BET] issues whose event-triggered log job never ran or was cancelled.
+    An issue is skipped when the bot already answered its current body."""
+    out = {"logged": 0, "rejected": 0, "degraded": 0, "skipped": 0, "closed_existing": 0, "errors": []}
+    for issue in gh.list_open_bet_issues(owner):
+        if (issue.get("user") or {}).get("login") != owner:
+            continue
+        if (PLAYS_DIR / f"issue-{issue['number']}.json").exists():
+            gh.close(issue["number"])
+            out["closed_existing"] += 1
+            continue
+        if issue.get("comments", 0):
+            marker = body_marker(issue)
+            if any((c.get("user") or {}).get("login") == gh.BOT_LOGIN and marker in (c.get("body") or "")
+                   for c in gh.issue_comments(issue["number"])):
+                out["skipped"] += 1
+                continue
+        outcome = run_log({"action": "sweep", "issue": issue}, policy, client, gh, owner, env)
+        if outcome == "LOGGED":
+            out["logged"] += 1
+        elif outcome.startswith("REJECTED_"):
+            out["rejected"] += 1
+        elif outcome.startswith("DEGRADED_"):
+            out["degraded"] += 1
+            out["errors"].append(outcome[len("DEGRADED_"):])
+            if outcome.endswith(("ODDS_API_UNAUTHORIZED", "BUDGET_RESERVE_REACHED")):
+                break
+    return out
 
 
 # ---------- close ----------
@@ -494,12 +554,18 @@ def main(argv=None) -> int:
         except EVError as exc:
             write_health(now, "DEGRADED", exc.code)
             return DEGRADED
+        token, repo = os.environ.get("GITHUB_TOKEN"), os.environ.get("GITHUB_REPOSITORY")
+        if token and repo:
+            sweep = run_sweep(policy, client, GitHub(token, repo), os.environ.get("GITHUB_REPOSITORY_OWNER", ""))
+        else:
+            sweep = {"errors": ["SWEEP_SKIPPED_NO_GITHUB_TOKEN"]}
         result = run_close(policy, client)
-        write_health(utcnow(), "DEGRADED" if result["degraded"] else "OK",
-                     json.dumps(result, sort_keys=True), client.remaining)
+        result["sweep"] = sweep
+        degraded = result["degraded"] or bool(sweep["errors"])
+        write_health(utcnow(), "DEGRADED" if degraded else "OK", json.dumps(result, sort_keys=True), client.remaining)
         write_if_changed(SUMMARY, render_summary(policy, utcnow()))
         print(json.dumps(result, sort_keys=True))
-        return DEGRADED if result["degraded"] else OK
+        return DEGRADED if degraded else OK
 
     print(f"unknown mode {mode}")
     return 2
