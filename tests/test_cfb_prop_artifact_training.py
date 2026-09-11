@@ -62,7 +62,8 @@ def _fixture(path: Path, *, market_variant: bool = False) -> None:
                 game=game, team_id=team_id, team=team, opponent_id=opp_id, opponent=opp,
                 clock=clock, kind=kind, yards=25 if play == 0 else 6,
                 completion=(kind == "pass"), down=4 if play == 6 else 1,
-                yte=30 if play == 6 else 70, fg_attempt=(play == 6), fg_made=(play == 6),
+                yte=30 if play == 6 else 70, fg_attempt=(play == 6),
+                fg_made=(play == 6 and idx == 0),
                 spread="99" if market_variant else "-3.5", total="1" if market_variant else "55.5",
             ))
         # PAT metadata lives on ESPN's scoring play. value means points added,
@@ -100,6 +101,7 @@ class CFBPropArtifactTrainingTests(unittest.TestCase):
         self.assertEqual(set(artifact["team_drive_profiles"]), {"Alpha", "Beta"})
         self.assertEqual(set(artifact["team_special_teams_rates"]), {"Alpha", "Beta"})
         self.assertEqual(diagnostics["status"], "PASS")
+        self.assertEqual(diagnostics["league_special_teams"]["fg_make_rate"], 0.5)
         self.assertEqual(diagnostics["league_special_teams"]["xp_make_rate"], 1.0)
         self.assertEqual(diagnostics["league_special_teams"]["two_point_success_rate"], 0.5)
         self.assertFalse(diagnostics["governance"]["sportsbook_fields_consumed"])
