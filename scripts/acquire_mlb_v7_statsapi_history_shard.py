@@ -6,8 +6,9 @@ from datetime import date, datetime, timezone
 import json
 from pathlib import Path
 
+from sportsedge.mlb_v7_final_timecode import latest_confirmed_final_rows
 from sportsedge.mlb_v7_statsapi_history import build_shard_report, detailed_status_by_game, write_json, write_jsonl
-from sportsedge.mlb_v7_travel_history import _get_json, extract_timecodes, historical_snapshot_url, normalize_final_game, schedule_games, schedule_url, timestamps_url
+from sportsedge.mlb_v7_travel_history import _get_json, extract_timecodes, historical_snapshot_url, schedule_games, schedule_url, timestamps_url
 
 
 def main() -> int:
@@ -43,9 +44,12 @@ def main() -> int:
         try:
             timestamps_payload = _get_json(timestamps_url(game_id))
             timecodes = extract_timecodes(timestamps_payload)
-            final_timecode = timecodes[-1]
-            final_snapshot = _get_json(historical_snapshot_url(game_id, final_timecode))
-            normalized_rows.extend(normalize_final_game(game, timestamps_payload, final_snapshot))
+            rows, final_timecode, final_snapshot = latest_confirmed_final_rows(
+                game,
+                timecodes,
+                lambda timecode: _get_json(historical_snapshot_url(game_id, timecode)),
+            )
+            normalized_rows.extend(rows)
             ts_rel = Path("raw/games") / f"{game_id}-timestamps.json"
             snap_rel = Path("raw/games") / f"{game_id}-final-{final_timecode}.json"
             ts_sha = write_json(root / ts_rel, timestamps_payload)
@@ -70,8 +74,8 @@ def main() -> int:
         "game_source_count": sum(1 for g in games if g["status"] == "Final"),
         "source_policy": {
             "timestamps": "official MLB StatsAPI historical timestamps",
-            "final_snapshot": "official MLB StatsAPI feed/live at last timestamp",
-            "final_at": "LAST_HISTORICAL_TIMECODE_CONFIRMED_FINAL_UPPER_BOUND",
+            "final_snapshot": "latest official MLB historical snapshot scanning backward that explicitly confirms Final",
+            "final_at": "LATEST_HISTORICAL_TIMECODE_CONFIRMED_FINAL",
         },
     })
     evidence_files.append({"path": provenance_rel.as_posix(), "sha256": provenance_sha})
