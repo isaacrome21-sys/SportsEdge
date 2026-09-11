@@ -55,6 +55,8 @@ jobs:
     needs: contract
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: write
     env:
       CAPTURE_GIT_SHA: ${{ github.sha }}
       CFB_CAPTURE_SEASONS: ${{ github.event_name == 'workflow_dispatch' && inputs.seasons || '2021:2025' }}
@@ -161,6 +163,43 @@ jobs:
               'promotion_evidence': False,
           }, sort_keys=True))
           PY
+
+      - name: Persist immutable capture on data branch
+        env:
+          DATA_BRANCH: data
+        run: |
+          set -euo pipefail
+
+          git fetch --no-tags origin "${DATA_BRANCH}:${DATA_BRANCH}"
+          worktree_dir="$(mktemp -d)"
+          trap 'git worktree remove --force "$worktree_dir" >/dev/null 2>&1 || true; rm -rf "$worktree_dir"' EXIT
+          git worktree add "$worktree_dir" "${DATA_BRANCH}"
+
+          dest="$worktree_dir/history/cfb/current-release/${CAPTURE_GIT_SHA}"
+          staged="$(mktemp -d)"
+          mkdir -p "$staged"
+          cp -a artifacts/cfb_history "$staged/cfb_history"
+          cp -a artifacts/cfb_history_capture "$staged/cfb_history_capture"
+
+          if [ -e "$dest" ]; then
+            if diff -qr "$staged" "$dest" >/dev/null; then
+              echo "CFB_HISTORY_CAPTURE_ALREADY_PERSISTED:${CAPTURE_GIT_SHA}"
+              exit 0
+            fi
+            echo "CFB_HISTORY_CAPTURE_SHA_COLLISION:${CAPTURE_GIT_SHA}" >&2
+            diff -qr "$staged" "$dest" || true
+            exit 1
+          fi
+
+          mkdir -p "$(dirname "$dest")"
+          mv "$staged" "$dest"
+
+          cd "$worktree_dir"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "history/cfb/current-release/${CAPTURE_GIT_SHA}"
+          git commit -m "data(cfb): persist current history ${CAPTURE_GIT_SHA}"
+          git push origin "HEAD:${DATA_BRANCH}"
 
       - name: Upload current-release capture
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
