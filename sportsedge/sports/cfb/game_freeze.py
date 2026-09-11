@@ -48,6 +48,7 @@ def load_cfb_game_freeze(path: str | Path = CFB_GAME_FREEZE_PATH) -> dict[str, A
         raise CFBGameFreezeError(blocker)
     for key, code in (
         ("artifact_sha256", "CFB_GAME_FREEZE_ARTIFACT_SHA_INVALID"),
+        ("artifact_file_sha256", "CFB_GAME_FREEZE_ARTIFACT_FILE_SHA_INVALID"),
         ("model_code_sha256", "CFB_GAME_FREEZE_MODEL_CODE_SHA_INVALID"),
         ("training_source_sha256", "CFB_GAME_FREEZE_TRAINING_SOURCE_SHA_INVALID"),
         ("source_manifest_sha256", "CFB_GAME_FREEZE_SOURCE_MANIFEST_SHA_INVALID"),
@@ -77,10 +78,10 @@ def verify_frozen_cfb_game_artifact(
     registry: Mapping[str, Any],
 ) -> None:
     actual_file_sha = sha256(artifact_bytes).hexdigest()
-    # Registry artifact hash binds exact committed bytes. The model payload also has
-    # its own canonical internal artifact_sha256 checked by model_artifact.py.
-    if actual_file_sha != str(registry.get("artifact_sha256") or "").lower():
+    if actual_file_sha != str(registry.get("artifact_file_sha256") or "").lower():
         raise CFBGameFreezeError("CFB_GAME_FREEZE_ARTIFACT_FILE_SHA_MISMATCH")
+    if str(artifact_payload.get("artifact_sha256") or "").lower() != str(registry.get("artifact_sha256") or "").lower():
+        raise CFBGameFreezeError("CFB_GAME_FREEZE_ARTIFACT_SHA_MISMATCH")
     if str(artifact_payload.get("model_code_sha256") or "").lower() != str(registry.get("model_code_sha256") or "").lower():
         raise CFBGameFreezeError("CFB_GAME_FREEZE_MODEL_CODE_SHA_MISMATCH")
     if str(artifact_payload.get("training_source_sha256") or "").lower() != str(registry.get("training_source_sha256") or "").lower():
