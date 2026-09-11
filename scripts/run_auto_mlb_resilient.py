@@ -14,6 +14,7 @@ from sportsedge.auto_runner import AutoRunnerError, report_to_dict, run_auto_mlb
 from sportsedge.edge_floors import DEFAULT_EDGE_FLOOR_CONFIG
 from sportsedge.funnel import build_funnel
 from sportsedge.live_odds_failover import should_rotate_odds_key
+from sportsedge.mlb_model_artifact import mlb_model_artifact_sha256
 from sportsedge.mlb_run_machine import MLBMachineReport, machine_report_to_dict, run_it_mlb
 from sportsedge.prediction_journal import journal_reference, write_prediction_journal
 
@@ -35,9 +36,20 @@ def _keys_from_env() -> tuple[str, ...]:
 
 
 def _serialize_report(report):
-    if isinstance(report, MLBMachineReport):
-        return machine_report_to_dict(report)
-    return report_to_dict(report)
+    payload = machine_report_to_dict(report) if isinstance(report, MLBMachineReport) else report_to_dict(report)
+    artifact_sha = mlb_model_artifact_sha256()
+    rows = payload.get("results")
+    if isinstance(rows, list):
+        for row in rows:
+            if isinstance(row, dict) and row.get("model_p") is not None:
+                row["model_artifact_sha256"] = artifact_sha
+    payload["model_artifact"] = {
+        "schema_version": "MLB_CODE_MODEL_ARTIFACT_V1",
+        "model_artifact_sha256": artifact_sha,
+        "artifact_kind": "CODE_DEFINED_MODEL_SURFACE",
+        "promotion_eligible_by_artifact_alone": False,
+    }
+    return payload
 
 
 def main() -> int:
