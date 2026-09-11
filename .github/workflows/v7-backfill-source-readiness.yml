@@ -57,7 +57,7 @@ jobs:
         run: |
           set -euo pipefail
           DATA_REF="$(git -C data-branch rev-parse HEAD)"
-          python scripts/audit_v7_backfill_source_readiness.py \
+          PYTHONPATH=. python scripts/audit_v7_backfill_source_readiness.py \
             --source-root data-branch/evidence/mlb_v8_replay_sources \
             --data-ref "$DATA_REF" \
             --output artifacts/v7-backfill-source-readiness/report.json
