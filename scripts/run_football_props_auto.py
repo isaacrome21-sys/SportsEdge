@@ -23,6 +23,7 @@ if str(ROOT) not in sys.path:
 from sportsedge.football_prop_odds_source import build_odds_snapshot, fetch_event_prop_odds
 from sportsedge.football_prop_run_machine import FootballPropRunError
 from sportsedge.football_prop_readiness import run_football_props_ready
+from sportsedge.sports.cfb.prop_bundle import CFBPropBundleError, load_cfb_prop_artifact_bundle
 from sportsedge.sports.nfl.prop_code_surface import (
     CFBPropCodeSurfaceError,
     NFLPropCodeSurfaceError,
@@ -83,11 +84,7 @@ def _runtime_git_sha() -> str:
 
 def _defaults(sport: str) -> tuple[Path, Path, Path, Path, Path, Path, Path]:
     lower = sport.lower()
-    artifact = (
-        Path("artifacts/football/nfl_prop_artifact_bundle_v1.json")
-        if sport == "NFL"
-        else Path(f"artifacts/football/{lower}_offensive_prop_ab_model.json")
-    )
+    artifact = Path(f"artifacts/football/{lower}_prop_artifact_bundle_v1.json")
     return (
         Path(f"config/{lower}_prop_model_freeze.json"),
         Path(f"config/{lower}_prop_evidence.json"),
@@ -113,6 +110,15 @@ def _load_artifact_file(path: Path, sport: str) -> dict:
         except FootballPropAutoError:
             raise
         except NFLPropCodeSurfaceError as exc:
+            raise FootballPropAutoError(str(exc)) from exc
+    if sport == "CFB":
+        try:
+            maybe_bundle = _json(path, f"{sport}_PROP_MODEL_ARTIFACT_INVALID")
+            if maybe_bundle.get("schema_version") == "FOOTBALL_PROP_ARTIFACT_BUNDLE_V1":
+                return load_cfb_prop_artifact_bundle(root=ROOT, bundle_path=path)
+        except FootballPropAutoError:
+            raise
+        except CFBPropBundleError as exc:
             raise FootballPropAutoError(str(exc)) from exc
     return _json(path, f"{sport}_PROP_MODEL_ARTIFACT_INVALID")
 
