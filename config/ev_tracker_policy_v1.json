@@ -1,0 +1,41 @@
+{
+  "policy_id": "EV_TRACKER_POLICY_V1",
+  "lane": "EXTERNAL_EV",
+  "doctrine": "Plays come from outside +EV scanners. Each is graded by CLV against the devigged sharp price shortly before start (MARKET_FAIR_P). Nothing here is Model_P or enters the Truth Gate.",
+  "freeze_record": "The git commit that adds this file is the freeze record. Any edit requires EV_TRACKER_POLICY_V2.",
+  "sharp_weights": {"pinnacle": 0.5, "novig": 0.25, "prophetx": 0.25},
+  "min_sharp_weight": 0.5,
+  "max_sharp_dispersion_pp": 2.5,
+  "devig": {"primary": "POWER_V1", "sensitivity_trigger_american": 400, "max_method_spread_pp": 1.0},
+  "max_quote_age_s": 300,
+  "close": {"window_minutes": 45, "close_type": "PRE_START_SNAPSHOT"},
+  "budget": {"reserve_credits": 40},
+  "sports": {
+    "NFL": "americanfootball_nfl",
+    "NCAAF": "americanfootball_ncaaf",
+    "MLB": "baseball_mlb",
+    "NBA": "basketball_nba",
+    "NHL": "icehockey_nhl"
+  },
+  "markets": {"Moneyline": "h2h", "Spread": "spreads", "Total": "totals"},
+  "books": {
+    "FanDuel": "fanduel", "DraftKings": "draftkings", "BetMGM": "betmgm", "BetRivers": "betrivers",
+    "theScore Bet": "espnbet", "Fliff": "fliff", "Hard Rock Bet": "hardrockbet", "Caesars": "williamhill_us",
+    "Fanatics": "fanatics", "Novig": "novig", "ProphetX": "prophetx", "Other": "other"
+  },
+  "staging": {
+    "scope": "per source",
+    "start": "MICRO",
+    "units": {"PAPER": 0.0, "MICRO": 0.25, "STANDARD": 0.5},
+    "demote_to_paper": {"min_graded": 50, "mean_clv_pp_below": 0.0},
+    "promote_to_standard": {"min_graded": 200, "min_slate_clusters": 20, "min_mean_clv_pp": 0.5, "min_clv_t_stat": 2.0, "standard_error": "CR1_CLUSTER_BY_SLATE_DATE"},
+    "recompute": "Every summary run recomputes each source's stage from all graded plays."
+  },
+  "take_rules": [
+    "Fair price comes from Pinnacle or a sharp exchange, not a soft-book average.",
+    "Tool EV is at least 2%.",
+    "Price is no longer than +400.",
+    "The line and price are still live at your book when you bet.",
+    "Log it before the game starts."
+  ]
+}
