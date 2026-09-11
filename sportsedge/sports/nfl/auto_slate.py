@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Iterable, Mapping
 from urllib.request import urlopen
 
+from ...source_lineage import canonical_json_sha256
 from .auto_context_source import (
     _fetch_schedule,
     _kickoff,
@@ -11,7 +13,8 @@ from .auto_context_source import (
     build_nfl_auto_game_context,
 )
 from .auto_personnel_source import build_depth_chart_personnel_provider
-from .context_autopull import ContextObservation, NFLContextError
+from .context_autopull import ContextObservation, NFLContextError, make_observation
+from .injury_report_source import build_pit_injury_inputs
 from .run_it_context import build_run_it_context
 from .snap_workload_source import build_prior_snap_workload_inputs
 
@@ -98,6 +101,44 @@ def discover_nfl_auto_games(
     }
 
 
+def _bind_near_official_injuries(
+    bundle: dict[str, Any], *, game_id: str, as_of: Any, rows: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """Fill only a missing injury observation with explicitly non-official fallback data."""
+    if not rows:
+        return bundle
+    existing = dict((bundle.get("observations") or {}).get("injury_availability") or {})
+    if str(existing.get("status") or "").upper() == "AVAILABLE":
+        return bundle
+    payload = [dict(row.get("source_payload") or {}) for row in rows]
+    latest_ts = max(str(row.get("report_ts") or "") for row in payload)
+    source_uri = str(rows[0].get("source_uri") or "")
+    source_sha = str(rows[0].get("source_sha256") or "")
+    observation = make_observation(
+        context_class="injury_availability",
+        status="AVAILABLE",
+        payload={
+            "reports": payload,
+            "confirmation_level": "NFLVERSE_NFLAPI_DERIVED",
+            "official_host_confirmed": False,
+            "official_source_precedence": True,
+        },
+        source_name="NFLVERSE_NFLAPI_INJURY_REPORTS_NEAR_OFFICIAL",
+        source_uri=source_uri,
+        source_sha256=source_sha,
+        source_type="AUTO",
+        collection_mode=str(bundle.get("collection_mode") or "AUTO"),
+        observed_at=latest_ts,
+        pit_as_of=as_of,
+    )
+    bundle = dict(bundle)
+    observations = dict(bundle.get("observations") or {})
+    observations["injury_availability"] = asdict(observation)
+    bundle["observations"] = observations
+    bundle["payload_sha256"] = canonical_json_sha256({key: value for key, value in bundle.items() if key != "payload_sha256"})
+    return bundle
+
+
 def build_nfl_auto_context_slate(
     *,
     as_of: Any,
@@ -112,13 +153,16 @@ def build_nfl_auto_context_slate(
     snap_count_rows: Iterable[Mapping[str, Any]] | None = None,
     snap_count_source_uri: str | None = None,
     snap_count_source_sha256: str | None = None,
+    injury_rows: Iterable[Mapping[str, Any]] | None = None,
+    injury_source_uri: str | None = None,
+    injury_source_sha256: str | None = None,
     opener: Callable = urlopen,
 ) -> dict[str, Any]:
     """Discover an upcoming slate and collect canonical objective context.
 
-    Optional depth and snap-count inputs must carry source provenance. Snap workload
-    is constructed strictly from prior weeks because the snap file does not carry
-    authoritative kickoff timestamps; same-week rows are excluded fail-closed.
+    Optional depth, snap-count, and injury inputs must carry exact source
+    provenance. Snap workload is strictly prior-week. Injury rows are current-week
+    only and must have `date_modified <= as_of`; unverifiable freshness is excluded.
     """
     requested = str(mode or "").strip().upper()
     if requested not in {"AUTO", "HYBRID"}:
@@ -137,6 +181,9 @@ def build_nfl_auto_context_slate(
     snaps = None if snap_count_rows is None else [dict(row) for row in snap_count_rows]
     if snaps is not None and (not snap_count_source_uri or not snap_count_source_sha256):
         raise NFLContextError("snap count provenance required")
+    injuries = None if injury_rows is None else [dict(row) for row in injury_rows]
+    if injuries is not None and (not injury_source_uri or not injury_source_sha256):
+        raise NFLContextError("injury provenance required")
 
     bundles: list[dict[str, Any]] = []
     for discovered in plan["games"]:
@@ -145,37 +192,34 @@ def build_nfl_auto_context_slate(
         team_ids = (str(game.get("home_team_id") or ""), str(game.get("away_team_id") or ""))
         if depth is not None:
             personnel = build_depth_chart_personnel_provider(
-                game_id=game_id,
-                team_ids=team_ids,
-                as_of=as_of,
-                source_uri=str(depth_chart_source_uri),
-                source_sha256=str(depth_chart_source_sha256),
-                rows=depth,
+                game_id=game_id, team_ids=team_ids, as_of=as_of,
+                source_uri=str(depth_chart_source_uri), source_sha256=str(depth_chart_source_sha256), rows=depth,
             )
             if personnel is not None:
                 game["auto_personnel_provider"] = personnel
+        season = discovered.get("season")
+        week = discovered.get("week")
         if snaps is not None:
-            season = discovered.get("season")
-            week = discovered.get("week")
             if season is None or week is None:
                 raise NFLContextError(f"snap workload schedule season/week missing:{game_id}")
             game["workload_inputs"] = build_prior_snap_workload_inputs(
-                rows=snaps,
-                season=int(season),
-                target_week=int(week),
-                team_ids=team_ids,
-                source_uri=str(snap_count_source_uri),
-                source_sha256=str(snap_count_source_sha256),
+                rows=snaps, season=int(season), target_week=int(week), team_ids=team_ids,
+                source_uri=str(snap_count_source_uri), source_sha256=str(snap_count_source_sha256),
             )
-        bundles.append(
-            build_run_it_context(
-                mode=requested,
-                game=game,
-                as_of=as_of,
-                manual_observations=list(manual.get(game_id, ())),
-                opener=opener,
+        injury_inputs: list[dict[str, Any]] = []
+        if injuries is not None:
+            if season is None or week is None:
+                raise NFLContextError(f"injury schedule season/week missing:{game_id}")
+            injury_inputs = build_pit_injury_inputs(
+                rows=injuries, season=int(season), target_week=int(week), team_ids=team_ids,
+                as_of=as_of, source_uri=str(injury_source_uri), source_sha256=str(injury_source_sha256),
             )
+        bundle = build_run_it_context(
+            mode=requested, game=game, as_of=as_of,
+            manual_observations=list(manual.get(game_id, ())), opener=opener,
         )
+        bundle = _bind_near_official_injuries(bundle, game_id=game_id, as_of=as_of, rows=injury_inputs)
+        bundles.append(bundle)
     return {
         "schema_version": 1,
         "sport": "NFL",
@@ -184,6 +228,7 @@ def build_nfl_auto_context_slate(
         "schedule_source_sha256": plan["schedule_source_sha256"],
         "depth_chart_source_sha256": depth_chart_source_sha256 if depth is not None else None,
         "snap_count_source_sha256": snap_count_source_sha256 if snaps is not None else None,
+        "injury_source_sha256": injury_source_sha256 if injuries is not None else None,
         "game_count": len(bundles),
         "games": bundles,
         "model_p_eligible": False,
