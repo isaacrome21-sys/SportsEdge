@@ -43,11 +43,7 @@ def _config() -> dict[str, object]:
                 "status": "FROZEN_PRE_DERIVATION",
                 "longshot_trigger_american_odds": 400,
                 "longshot_trigger_rule": "EITHER_SIDE_AT_OR_ABOVE_POSITIVE_400",
-                "sensitivity_methods": [
-                    "MULTIPLICATIVE_V1",
-                    "POWER_V1",
-                    "SHIN_V1",
-                ],
+                "sensitivity_methods": ["MULTIPLICATIVE_V1", "POWER_V1", "SHIN_V1"],
                 "sensitivity_limit_absolute_probability_points": 0.01,
                 "stable_candidate_estimator": "POWER_V1",
                 "longshot_candidate_estimator": "POWER_V1",
@@ -61,8 +57,6 @@ def _config() -> dict[str, object]:
 
 
 def _config_with_fixture_floor(market: str) -> dict[str, object]:
-    # Synthetic metadata exists only inside this logic test. It is deliberately
-    # not written to production config and is not evidence of a real promoted floor.
     config = _config()
     config["truth_gate"]["edge_floors"][market] = {
         "status": "FROZEN",
@@ -79,17 +73,12 @@ def _config_with_fixture_floor(market: str) -> dict[str, object]:
 
 
 class FloorProductionPathTests(unittest.TestCase):
-    def test_eligible_markets_without_floor_block_before_engine_with_market_specific_reason(self):
-        # These are real deployment-registry market codes spanning a hitter prop,
-        # a pitcher prop, and a game market. The resolver must be market-agnostic:
-        # every eligible market reaches the same fail-closed floor branch before
-        # predictive inference, with only the market name varying in the blocker.
+    def test_missing_floor_blocks_official_but_preserves_identity_bound_model_candidate(self):
         cases = (
             ("HITS", "fixture-batter"),
             ("PITCHER_K", "fixture-pitcher"),
             ("MONEYLINE", "fixture-team"),
         )
-
         for market, entity_id in cases:
             with self.subTest(market=market), tempfile.TemporaryDirectory() as td:
                 floor_path = Path(td) / "floors.json"
@@ -102,51 +91,39 @@ class FloorProductionPathTests(unittest.TestCase):
 
                 result = run_candidate(
                     model_input={
-                        "game_id": "fixture-game",
-                        "market": market,
-                        "entity_id": entity_id,
-                        "line": 0.5,
-                        "side": "OVER",
+                        "game_id": "fixture-game", "market": market, "entity_id": entity_id,
+                        "line": 0.5, "side": "OVER",
                     },
                     quote=_quote(market, entity_id, "OVER", 100),
                     paired_quote=_quote(market, entity_id, "UNDER", -120),
-                    deployment={"eligible": True, "stage": "DEPLOYED"},
+                    deployment={"eligible": True, "stage": "DEPLOYED", "market": market},
                     engine_fn=engine,
                     ingestion_now=NOW,
                     finalization_now=NOW,
                     edge_floor_config_path=str(floor_path),
                 )
-
-                self.assertEqual(result.bet_status, "BLOCKED")
-                self.assertEqual(
-                    result.reason,
-                    f"EdgeFloorError: ELIGIBLE_MARKET_MISSING_OR_UNFROZEN_EDGE_FLOOR:{market}",
-                )
-                self.assertEqual(calls, [])
+                self.assertEqual(result.bet_status, "MODEL_CANDIDATE")
+                self.assertEqual(result.model_p, 0.60)
+                self.assertIn(f"ELIGIBLE_MARKET_MISSING_OR_UNFROZEN_EDGE_FLOOR:{market}", result.reason)
+                self.assertIsNone(result.decision)
+                self.assertEqual(calls, [True])
 
     def test_valid_fixture_floor_opens_real_orchestrator_path_and_is_applied(self):
         market = "HITS"
         entity_id = "fixture-batter"
         with tempfile.TemporaryDirectory() as td:
             floor_path = Path(td) / "floors.json"
-            floor_path.write_text(
-                json.dumps(_config_with_fixture_floor(market)), encoding="utf-8"
-            )
+            floor_path.write_text(json.dumps(_config_with_fixture_floor(market)), encoding="utf-8")
             calls: list[bool] = []
 
             def engine(_model_input):
                 calls.append(True)
-                # Fixed fixture probability proves control flow only; it is not
-                # persisted or claimed as SportsEdge evidence/Model_P.
                 return {"model_p": 0.70}
 
             result = run_candidate(
                 model_input={
-                    "game_id": "fixture-game",
-                    "market": market,
-                    "entity_id": entity_id,
-                    "line": 0.5,
-                    "side": "OVER",
+                    "game_id": "fixture-game", "market": market, "entity_id": entity_id,
+                    "line": 0.5, "side": "OVER",
                 },
                 quote=_quote(market, entity_id, "OVER", 100),
                 paired_quote=_quote(market, entity_id, "UNDER", -120),
@@ -156,7 +133,6 @@ class FloorProductionPathTests(unittest.TestCase):
                 finalization_now=NOW,
                 edge_floor_config_path=str(floor_path),
             )
-
             self.assertEqual(calls, [True])
             self.assertEqual(result.reason, "ok")
             self.assertEqual(result.model_p, 0.70)

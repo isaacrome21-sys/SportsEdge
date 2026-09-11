@@ -1,9 +1,10 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
+from math import isfinite
 from typing import Any, Callable, Mapping
 
-from .candidate_binding import bind_candidate
+from .candidate_binding import bind_candidate, bind_model_to_quote
 from .devig import devig_with_policy
 from .edge_floors import (
     DEFAULT_EDGE_FLOOR_CONFIG,
@@ -40,6 +41,7 @@ class RunResult:
     runtime_path: str | None = None
     seed_policy: str | None = None
     mc_paths: int | None = None
+    push_probability: float = 0.0
     book_key: str | None = None
     sportsbook: str | None = None
     quote_retrieved_at: str | None = None
@@ -80,15 +82,22 @@ def _optional_nonnegative_int(output: Mapping[str, Any], key: str) -> int | None
         raise OrchestrationError(f"engine output malformed {key}")
     try:
         parsed = int(value)
-    except (TypeError, ValueError) as exc:
-        raise OrchestrationError(f"engine output malformed {key}") from exc
-    try:
         numeric = float(value)
     except (TypeError, ValueError) as exc:
         raise OrchestrationError(f"engine output malformed {key}") from exc
     if parsed < 0 or numeric != parsed:
         raise OrchestrationError(f"engine output malformed {key}")
     return parsed
+
+
+def _probability(value: Any, *, field: str) -> float:
+    try:
+        out = float(value)
+    except (TypeError, ValueError) as exc:
+        raise OrchestrationError(f"engine output malformed {field}") from exc
+    if not isfinite(out) or not 0.0 <= out <= 1.0:
+        raise OrchestrationError(f"engine output malformed {field}")
+    return out
 
 
 def _quote_identity(quote: Mapping[str, Any]) -> tuple[str, str | None, str, str | None]:
@@ -105,26 +114,25 @@ def _quote_identity(quote: Mapping[str, Any]) -> tuple[str, str | None, str, str
     return book_key, sportsbook, retrieved.isoformat(), offer_id
 
 
+def _candidate(market: str, model_p: float, reason: str, common: Mapping[str, Any]) -> RunResult:
+    return RunResult(market, model_p, "MODEL_CANDIDATE", None, f"OFFICIAL_BLOCKED:{reason}", **dict(common))
+
+
 def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], paired_quote: Mapping[str, Any] | None = None, deployment: Mapping[str, Any], engine_fn: Callable[[Mapping[str, Any]], Mapping[str, Any]], ingestion_now: datetime, finalization_now: datetime, edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG, kelly_multiplier: float = 0.25) -> RunResult:
-    """Run one candidate end-to-end. Any integrity failure returns BLOCKED, never a guessed bet."""
+    """Run market-blind inference first, then resolve OFFICIAL-only gates.
+
+    Hard integrity failures erase the candidate and return BLOCKED. Promotion-only
+    failures retain a genuine identity-bound Model_P as MODEL_CANDIDATE. A missing
+    opposite price therefore blocks devig/OFFICIAL but does not invent a no-vig
+    probability or destroy valid model inference.
+    """
     market = str(model_input.get("market", "UNKNOWN"))
     try:
         _reject_market_leakage(model_input)
         double_ttl_gate(quote, ingestion_now, finalization_now)
         book_key, sportsbook, quote_retrieved_at, offer_id = _quote_identity(quote)
-
-        floor = None
-        floor_config = None
-        devig_policy = None
-        if deployment.get("eligible") is True:
-            # Production ordering invariant: an eligible market must resolve its
-            # frozen floor and frozen pricing policy before the predictive engine
-            # is invoked. This is the public production path, not a test branch.
-            floor = require_production_edge_floor(
-                market=market, path=edge_floor_config_path
-            )
-            floor_config = load_edge_floor_config(edge_floor_config_path)
-            devig_policy = require_frozen_devig_policy(config=floor_config)
+        if not isinstance(deployment, Mapping):
+            raise OrchestrationError("deployment attestation missing or malformed")
 
         output = dict(engine_fn(model_input))
         if "model_p" not in output:
@@ -132,10 +140,12 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], p
         for key in ("game_id", "market", "entity_id", "line", "side"):
             if key not in output and key in model_input:
                 output[key] = model_input[key]
+
+        model_p = _probability(output["model_p"], field="model_p")
+        push_probability = _probability(output.get("push_p", 0.0), field="push_p")
+        if model_p + push_probability > 1.0 + 1e-12:
+            raise OrchestrationError("engine output model_p + push_p exceeds 1")
         runtime_path = _optional_text(output, "runtime_path")
-        if deployment.get("eligible") is True and runtime_path == "LEGACY_COMPAT":
-            raise OrchestrationError("LEGACY_COMPAT_PATH_NOT_PROMOTABLE")
-        bind_candidate(output, quote, deployment)
         model_input_hash = _optional_sha256(output, "model_input_hash")
         distribution_sha256 = _optional_sha256(output, "distribution_sha256")
         readout_sha256 = _optional_sha256(output, "readout_sha256")
@@ -144,29 +154,7 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], p
         seed_policy = _optional_text(output, "seed_policy")
         mc_paths = _optional_nonnegative_int(output, "mc_paths")
 
-        if floor is None:
-            floor = require_production_edge_floor(
-                market=market, path=edge_floor_config_path
-            )
-        if floor_config is None:
-            floor_config = load_edge_floor_config(edge_floor_config_path)
-        if devig_policy is None:
-            devig_policy = require_frozen_devig_policy(config=floor_config)
-
-        if not isinstance(paired_quote, Mapping):
-            raise OrchestrationError("PAIRED_PRICE_REQUIRED_FOR_DEVIG")
-        double_ttl_gate(paired_quote, ingestion_now, finalization_now)
-        priced = devig_with_policy(quote, paired_quote, policy=devig_policy)
-
-        decision = decide_bet(
-            output["model_p"], quote["american_odds"],
-            fair_market_probability=priced.fair_probability_for_decision,
-            bound=True, fresh=True, deployed=deployment.get("eligible") is True,
-            edge_floor=float(floor.value_probability_points), kelly_multiplier=kelly_multiplier,
-            push_probability=float(output.get("push_p", 0.0)),
-        )
-        return RunResult(
-            market, float(output["model_p"]), decision.bet_status, decision, "ok",
+        common = dict(
             model_input_hash=model_input_hash,
             distribution_sha256=distribution_sha256,
             readout_sha256=readout_sha256,
@@ -175,11 +163,50 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], p
             runtime_path=runtime_path,
             seed_policy=seed_policy,
             mc_paths=mc_paths,
+            push_probability=push_probability,
             book_key=book_key,
             sportsbook=sportsbook,
             quote_retrieved_at=quote_retrieved_at,
             offer_id=offer_id,
         )
+
+        if deployment.get("eligible") is not True:
+            bind_model_to_quote(output, quote)
+            return _candidate(
+                market,
+                model_p,
+                str(deployment.get("reason") or "DEPLOYMENT_NOT_ELIGIBLE"),
+                common,
+            )
+
+        deployed = {"market": market, **dict(deployment)}
+        bind_candidate(output, quote, deployed)
+        if runtime_path == "LEGACY_COMPAT":
+            return _candidate(market, model_p, "LEGACY_COMPAT_PATH_NOT_PROMOTABLE", common)
+
+        try:
+            floor = require_production_edge_floor(market=market, path=edge_floor_config_path)
+            floor_config = load_edge_floor_config(edge_floor_config_path)
+            devig_policy = require_frozen_devig_policy(config=floor_config)
+        except Exception as exc:
+            return _candidate(market, model_p, f"{type(exc).__name__}:{exc}", common)
+
+        if not isinstance(paired_quote, Mapping):
+            return _candidate(market, model_p, "PAIRED_PRICE_REQUIRED_FOR_DEVIG", common)
+        try:
+            double_ttl_gate(paired_quote, ingestion_now, finalization_now)
+            priced = devig_with_policy(quote, paired_quote, policy=devig_policy)
+        except Exception as exc:
+            return _candidate(market, model_p, f"{type(exc).__name__}:{exc}", common)
+
+        decision = decide_bet(
+            model_p, quote["american_odds"],
+            fair_market_probability=priced.fair_probability_for_decision,
+            bound=True, fresh=True, deployed=True,
+            edge_floor=float(floor.value_probability_points), kelly_multiplier=kelly_multiplier,
+            push_probability=push_probability,
+        )
+        return RunResult(market, model_p, decision.bet_status, decision, "ok", **common)
     except Exception as exc:
         return RunResult(market, None, "BLOCKED", None, f"{type(exc).__name__}: {exc}")
 
