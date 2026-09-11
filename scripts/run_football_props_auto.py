@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """Fail-closed NFL/CFB player-prop entrypoint.
 
-A real fitted artifact and a fresh PIT opportunity/usage snapshot are mandatory.
-Market prices can be supplied as a captured snapshot or acquired event-by-event
-from The Odds API. Resolution always passes through artifact-bound evidence,
-certification and the frozen-floor Truth Gate.  Exact-SHA hosted freeze bundles
-may be materialized outside the repository and supplied by CLI/environment; the
-checked-in registries therefore never need to claim bytes that are not present.
+A real fitted artifact and fresh PIT opportunity/usage snapshot are mandatory.
+Market prices enter only after Model_P exists. Certified NFL artifacts may run on
+later repository commits only when the complete predictive code surface is
+byte-identical to the frozen fitting surface.
 """
 from __future__ import annotations
 
@@ -25,6 +23,7 @@ if str(ROOT) not in sys.path:
 from sportsedge.football_prop_odds_source import build_odds_snapshot, fetch_event_prop_odds
 from sportsedge.football_prop_run_machine import FootballPropRunError
 from sportsedge.football_prop_readiness import run_football_props_ready
+from sportsedge.sports.nfl.prop_code_surface import NFLPropCodeSurfaceError, verify_nfl_prop_code_surface
 
 
 class FootballPropAutoError(ValueError):
@@ -66,9 +65,7 @@ def _runtime_git_sha() -> str:
             raise FootballPropAutoError("FOOTBALL_PROP_RUNTIME_CODE_GIT_SHA_INVALID")
         return override
     try:
-        value = subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True, stderr=subprocess.DEVNULL
-        ).strip().lower()
+        value = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True, stderr=subprocess.DEVNULL).strip().lower()
     except Exception as exc:
         raise FootballPropAutoError("FOOTBALL_PROP_RUNTIME_CODE_GIT_SHA_REQUIRED") from exc
     if len(value) != 40 or any(ch not in "0123456789abcdef" for ch in value):
@@ -78,15 +75,7 @@ def _runtime_git_sha() -> str:
 
 def _defaults(sport: str) -> tuple[Path, Path, Path, Path, Path, Path, Path]:
     lower = sport.lower()
-    return (
-        Path(f"config/{lower}_prop_model_freeze.json"),
-        Path(f"config/{lower}_prop_evidence.json"),
-        Path(f"config/{lower}_prop_certification.json"),
-        Path("config/truth_gate_floors.json"),
-        Path(f"artifacts/football/{lower}_offensive_prop_ab_model.json"),
-        Path(f"artifacts/football/{lower}_prop_live_features.json"),
-        Path(f"artifacts/football/{lower}_prop_odds_snapshot.json"),
-    )
+    return (Path(f"config/{lower}_prop_model_freeze.json"), Path(f"config/{lower}_prop_evidence.json"), Path(f"config/{lower}_prop_certification.json"), Path("config/truth_gate_floors.json"), Path(f"artifacts/football/{lower}_offensive_prop_ab_model.json"), Path(f"artifacts/football/{lower}_prop_live_features.json"), Path(f"artifacts/football/{lower}_prop_odds_snapshot.json"))
 
 
 def _env_path(name: str) -> Path | None:
@@ -94,11 +83,7 @@ def _env_path(name: str) -> Path | None:
     return Path(raw) if raw else None
 
 
-def _freeze(registry_path: Path, artifact_path: Path, sport: str) -> tuple[dict, str]:
-    # Missing fitted bytes are the first blocker. Merely placing arbitrary bytes
-    # at the path still cannot bypass the independent freeze registry below.
-    if not artifact_path.is_file():
-        raise FootballPropAutoError(f"{sport}_PROP_FROZEN_MODEL_ARTIFACT_REQUIRED")
+def _freeze(registry_path: Path, artifact_path: Path, sport: str) -> tuple[dict, str, dict]:
     if not registry_path.is_file():
         raise FootballPropAutoError(f"{sport}_PROP_FROZEN_MODEL_BINDING_REQUIRED")
     registry = _json(registry_path, f"{sport}_PROP_FREEZE_REGISTRY_INVALID")
@@ -106,45 +91,49 @@ def _freeze(registry_path: Path, artifact_path: Path, sport: str) -> tuple[dict,
         raise FootballPropAutoError(f"{sport}_PROP_FROZEN_MODEL_BINDING_REQUIRED")
     if registry.get("hash_algorithm") != "CANONICAL_JSON_SHA256_V1":
         raise FootballPropAutoError(f"{sport}_PROP_FREEZE_HASH_ALGORITHM_INVALID")
+    if registry.get("promotion_authority") is not False:
+        raise FootballPropAutoError(f"{sport}_PROP_FREEZE_PROMOTION_AUTHORITY_INVALID")
     expected = str(registry.get("artifact_sha256") or "").strip().lower()
     if len(expected) != 64 or any(ch not in "0123456789abcdef" for ch in expected):
         raise FootballPropAutoError(f"{sport}_PROP_FROZEN_MODEL_SHA256_INVALID")
-
-    # A hosted freeze bundle may be materialized at a different filesystem path
-    # than the canonical production destination.  Path relocation is permitted
-    # only when the freeze itself is externally supplied; the artifact bytes and
-    # exact runtime Git SHA are still independently verified downstream.
     checked_in_registry = (ROOT / f"config/{sport.lower()}_prop_model_freeze.json").resolve()
     if registry_path.resolve() == checked_in_registry:
         declared = ROOT / str(registry.get("artifact_path") or "")
         if declared.resolve() != artifact_path.resolve():
             raise FootballPropAutoError(f"{sport}_PROP_FROZEN_MODEL_PATH_MISMATCH")
+    if not artifact_path.is_file():
+        raise FootballPropAutoError(f"{sport}_PROP_FROZEN_MODEL_ARTIFACT_REQUIRED")
     artifact = _json(artifact_path, f"{sport}_PROP_MODEL_ARTIFACT_INVALID")
-    freeze_code_sha = str(registry.get("code_git_sha") or artifact.get("code_git_sha") or "").strip().lower()
-    if freeze_code_sha and freeze_code_sha != _runtime_git_sha():
+    artifact_code = str(artifact.get("code_git_sha") or "").strip().lower()
+    freeze_code = str(registry.get("code_git_sha") or "").strip().lower()
+    if not artifact_code or freeze_code != artifact_code:
         raise FootballPropAutoError(f"{sport}_PROP_FROZEN_MODEL_CODE_SHA_MISMATCH")
-    return artifact, expected
+    return artifact, expected, registry
+
+
+def _runtime_model_code_sha(*, sport: str, registry: dict, artifact: dict) -> tuple[str, dict]:
+    fit_sha = str(artifact.get("code_git_sha") or "").strip().lower()
+    runtime_sha = _runtime_git_sha()
+    if fit_sha == runtime_sha:
+        return fit_sha, {"status": "EXACT_FIT_COMMIT", "fit_git_sha": fit_sha, "promotion_authority": False}
+    if sport != "NFL":
+        raise FootballPropAutoError(f"{sport}_PROP_FROZEN_MODEL_CODE_SHA_MISMATCH")
+    try:
+        attestation = verify_nfl_prop_code_surface(root=ROOT, registry=registry, artifact=artifact)
+    except NFLPropCodeSurfaceError as exc:
+        raise FootballPropAutoError(str(exc)) from exc
+    return fit_sha, attestation
 
 
 def _odds_from_network(*, sport: str, features: dict, current: datetime) -> dict:
-    keys = [
-        str(os.environ.get(name) or "").strip()
-        for name in (
-            "SPORTSEDGE_ODDS_API_KEY",
-            "SPORTSEDGE_ODDS_API_KEY_2",
-            "SPORTSEDGE_ODDS_API_KEY_3",
-            "SPORTSEDGE_ODDS_API_KEY_4",
-            "ODDS_API_KEY",
-        )
-    ]
+    keys = [str(os.environ.get(name) or "").strip() for name in ("SPORTSEDGE_ODDS_API_KEY", "SPORTSEDGE_ODDS_API_KEY_2", "SPORTSEDGE_ODDS_API_KEY_3", "SPORTSEDGE_ODDS_API_KEY_4", "ODDS_API_KEY")]
     keys = [key for key in keys if key]
     if not keys:
         raise FootballPropAutoError(f"{sport}_PROP_ODDS_API_KEY_REQUIRED")
     games = features.get("games")
     if not isinstance(games, list) or not games:
         raise FootballPropAutoError(f"{sport}_PROP_LIVE_FEATURE_GAMES_EMPTY")
-    events = []
-    seen = set()
+    events, seen = [], set()
     for game in games:
         if not isinstance(game, dict):
             raise FootballPropAutoError(f"{sport}_PROP_LIVE_FEATURE_GAME_INVALID")
@@ -154,8 +143,7 @@ def _odds_from_network(*, sport: str, features: dict, current: datetime) -> dict
         if event_id in seen:
             continue
         seen.add(event_id)
-        result = fetch_event_prop_odds(keys, sport=sport, event_id=event_id)
-        events.append(dict(result.value))
+        events.append(dict(fetch_event_prop_odds(keys, sport=sport, event_id=event_id).value))
     return build_odds_snapshot(events, observed_at=current)
 
 
@@ -175,17 +163,8 @@ def main() -> int:
     ap.add_argument("--root-seed", type=int, default=20260909)
     ap.add_argument("--output", type=Path)
     args = ap.parse_args()
-
     sport = args.sport.upper()
-    (
-        default_registry,
-        default_evidence,
-        default_certification,
-        default_floors,
-        default_artifact,
-        default_features,
-        default_odds,
-    ) = _defaults(sport)
+    default_registry, default_evidence, default_certification, default_floors, default_artifact, default_features, default_odds = _defaults(sport)
     registry_path = args.registry or _env_path(f"SPORTSEDGE_{sport}_PROP_FREEZE_REGISTRY_PATH") or default_registry
     evidence_path = args.evidence_registry or _env_path(f"SPORTSEDGE_{sport}_PROP_EVIDENCE_REGISTRY_PATH") or default_evidence
     certification_path = args.certification_registry or _env_path(f"SPORTSEDGE_{sport}_PROP_CERTIFICATION_REGISTRY_PATH") or default_certification
@@ -195,9 +174,9 @@ def main() -> int:
     odds_path = args.odds_snapshot or _env_path(f"SPORTSEDGE_{sport}_PROP_ODDS_SNAPSHOT_PATH") or default_odds
     output = args.output or Path(f"artifacts/run_it/{sport.lower()}_prop_card.json")
     current = _utc(args.asof)
-
     try:
-        artifact, expected_sha = _freeze(registry_path, artifact_path, sport)
+        artifact, expected_sha, registry = _freeze(registry_path, artifact_path, sport)
+        runtime_model_sha, code_attestation = _runtime_model_code_sha(sport=sport, registry=registry, artifact=artifact)
         if not evidence_path.is_file():
             raise FootballPropAutoError(f"{sport}_PROP_EVIDENCE_REGISTRY_REQUIRED")
         if not certification_path.is_file():
@@ -205,75 +184,18 @@ def main() -> int:
         if not floor_path.is_file():
             raise FootballPropAutoError(f"{sport}_PROP_TRUTH_GATE_FLOOR_REGISTRY_REQUIRED")
         evidence_registry = _json(evidence_path, f"{sport}_PROP_EVIDENCE_REGISTRY_INVALID")
-        certification_registry = _json(
-            certification_path, f"{sport}_PROP_CERTIFICATION_REGISTRY_INVALID"
-        )
+        certification_registry = _json(certification_path, f"{sport}_PROP_CERTIFICATION_REGISTRY_INVALID")
         if not feature_path.is_file():
             raise FootballPropAutoError(f"{sport}_PROP_PIT_LIVE_FEATURE_SNAPSHOT_REQUIRED")
         features = _json(feature_path, f"{sport}_PROP_PIT_LIVE_FEATURE_SNAPSHOT_INVALID")
-        odds = (
-            _json(odds_path, f"{sport}_PROP_ODDS_SNAPSHOT_INVALID")
-            if odds_path.is_file()
-            else _odds_from_network(sport=sport, features=features, current=current)
-        )
-        report = run_football_props_ready(
-            sport=sport,
-            evidence_registry=evidence_registry,
-            certification_registry=certification_registry,
-            floor_path=str(floor_path),
-            now=current,
-            artifact_payload=artifact,
-            expected_artifact_sha256=expected_sha,
-            runtime_code_git_sha=_runtime_git_sha(),
-            live_features=features,
-            odds_snapshot=odds,
-            root_seed=int(args.root_seed),
-            n_paths=int(args.n_paths),
-            book_key=str(args.bookmaker),
-        )
-        payload = {
-            "schema_version": "FOOTBALL_PROP_AUTO_RUN_V3",
-            "status": "SUCCESS",
-            "sport": sport,
-            "report": report,
-            "governance": {
-                "model_fit_performed": False,
-                "evidence_resolution_performed": True,
-                "certification_resolution_performed": True,
-                "truth_gate_resolution_performed": True,
-                "manual_promotion_toggle_required": False,
-                "fail_closed": True,
-            },
-        }
+        odds = _json(odds_path, f"{sport}_PROP_ODDS_SNAPSHOT_INVALID") if odds_path.is_file() else _odds_from_network(sport=sport, features=features, current=current)
+        report = run_football_props_ready(sport=sport, evidence_registry=evidence_registry, certification_registry=certification_registry, floor_path=str(floor_path), now=current, artifact_payload=artifact, expected_artifact_sha256=expected_sha, runtime_code_git_sha=runtime_model_sha, live_features=features, odds_snapshot=odds, root_seed=int(args.root_seed), n_paths=int(args.n_paths), book_key=str(args.bookmaker))
+        payload = {"schema_version": "FOOTBALL_PROP_AUTO_RUN_V4", "status": "SUCCESS", "sport": sport, "report": report, "model_code_attestation": code_attestation, "governance": {"model_fit_performed": False, "evidence_resolution_performed": True, "certification_resolution_performed": True, "truth_gate_resolution_performed": True, "manual_promotion_toggle_required": False, "fail_closed": True, "code_surface_compatibility_can_promote": False}}
         _write(output, payload)
         print(json.dumps({"status": "SUCCESS", "sport": sport, "output": str(output)}, sort_keys=True))
         return 0
     except (FootballPropAutoError, FootballPropRunError, ValueError) as exc:
-        payload = {
-            "schema_version": "FOOTBALL_PROP_AUTO_RUN_V3",
-            "status": "BLOCKED",
-            "sport": sport,
-            "blocker": str(exc),
-            "generated_at_utc": current.isoformat(),
-            "report": {
-                "run_status": "BLOCKED",
-                "results": [{
-                    "sport": sport,
-                    "market": "FOOTBALL_PLAYER_PROPS",
-                    "model_p": None,
-                    "bet_status": "BLOCKED",
-                    "reason": str(exc),
-                }],
-            },
-            "governance": {
-                "model_fit_performed": False,
-                "evidence_resolution_performed": True,
-                "certification_resolution_performed": True,
-                "truth_gate_resolution_performed": True,
-                "manual_promotion_toggle_required": False,
-                "fail_closed": True,
-            },
-        }
+        payload = {"schema_version": "FOOTBALL_PROP_AUTO_RUN_V4", "status": "BLOCKED", "sport": sport, "blocker": str(exc), "generated_at_utc": current.isoformat(), "report": {"run_status": "BLOCKED", "results": [{"sport": sport, "market": "FOOTBALL_PLAYER_PROPS", "model_p": None, "bet_status": "BLOCKED", "reason": str(exc)}]}, "governance": {"model_fit_performed": False, "evidence_resolution_performed": True, "certification_resolution_performed": True, "truth_gate_resolution_performed": True, "manual_promotion_toggle_required": False, "fail_closed": True, "code_surface_compatibility_can_promote": False}}
         _write(output, payload)
         print(json.dumps(payload, sort_keys=True))
         return 2
