@@ -1,16 +1,21 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from hashlib import sha256
 import json
 from pathlib import Path
+import tempfile
 import unittest
 
 from sportsedge.core.clv.football_forward_v2 import (
     CLOSE_DEFINITION_ID,
+    POLICY_PATH,
+    POLICY_SHA256,
     FootballForwardV2Error,
     SPORT_KEYS,
     build_close_record,
     coverage,
+    load_forward_policy,
     plan_due_bulk_sports,
     power_fair_pair,
     validate_candidate,
@@ -129,6 +134,7 @@ class FootballForwardV2Tests(unittest.TestCase):
         self.assertEqual(plan["provider_request_count"], 2)
         self.assertEqual(plan["due_sports"], ["CFB", "NFL"])
         self.assertEqual(plan["due_decision_ids"]["CFB"], ["c1", "c2"])
+        self.assertEqual(plan["policy_sha256"], POLICY_SHA256)
 
     def test_power_devig_is_not_proportional_when_prices_are_asymmetric(self):
         p1, p2 = power_fair_pair(-150, +125)
@@ -145,6 +151,7 @@ class FootballForwardV2Tests(unittest.TestCase):
         self.assertEqual(close["close_definition_id"], CLOSE_DEFINITION_ID)
         self.assertEqual(close["selected_line"], -3.5)
         self.assertEqual(close["opposite_line"], 3.5)
+        self.assertEqual(close["policy_sha256"], POLICY_SHA256)
 
         with self.assertRaisesRegex(FootballForwardV2Error, "ORIGINAL_THRESHOLD_MISMATCH"):
             build_close_record(
@@ -194,6 +201,7 @@ class FootballForwardV2Tests(unittest.TestCase):
         self.assertEqual(report["captured_closes"], 1)
         self.assertEqual(report["missed_closes"], 1)
         self.assertEqual(report["coverage"], 0.5)
+        self.assertEqual(report["policy_sha256"], POLICY_SHA256)
         with self.assertRaisesRegex(FootballForwardV2Error, "DUPLICATE_CLOSE"):
             coverage([d1, d2], [close, close])
 
@@ -204,11 +212,54 @@ class FootballForwardV2Tests(unittest.TestCase):
         with self.assertRaisesRegex(FootballForwardV2Error, "ORPHAN_CLOSE"):
             coverage([row], [close])
 
+    def test_close_policy_hash_tamper_fails_closed(self):
+        row = self.candidate(decision_id="d1")
+        close = self.close(row)
+        close["policy_sha256"] = "0" * 64
+        with self.assertRaisesRegex(FootballForwardV2Error, "POLICY_SHA_MISMATCH"):
+            coverage([row], [close])
+
     def test_one_sided_candidate_is_rejected_from_v2_capture(self):
         row = self.candidate()
         row["opposite_price"] = None
         with self.assertRaisesRegex(FootballForwardV2Error, "V2_INELIGIBLE_ONE_SIDED"):
             validate_candidate(row)
+
+
+class FootballForwardV2PolicyAuthorityTests(unittest.TestCase):
+    def test_exported_policy_sha_binds_exact_committed_bytes(self):
+        self.assertEqual(POLICY_SHA256, sha256(POLICY_PATH.read_bytes()).hexdigest())
+
+    def test_loader_derives_runtime_windows_from_policy_bytes(self):
+        payload = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
+        payload["decision_window_minutes_before_start"]["min"] = 46
+        payload["close_window_minutes_before_start"]["max"] = 19
+        encoded = json.dumps(payload, sort_keys=True) + "\n"
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "policy.json"
+            path.write_text(encoded, encoding="utf-8")
+            loaded = load_forward_policy(path)
+        self.assertEqual(loaded["_decision_min"], 46)
+        self.assertEqual(loaded["_close_max"], 19)
+        self.assertEqual(loaded["_sha256"], sha256(encoded.encode()).hexdigest())
+
+    def test_policy_activation_cannot_happen_by_config_only(self):
+        payload = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
+        payload["status"] = "ACTIVE"
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "policy.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaisesRegex(FootballForwardV2Error, "ACTIVATION_REQUIRES_CODE_REVIEW"):
+                load_forward_policy(path)
+
+    def test_policy_rejects_unsupported_market_surface(self):
+        payload = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
+        payload["markets"].append("player_props")
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "policy.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaisesRegex(FootballForwardV2Error, "POLICY_MARKETS_UNSUPPORTED"):
+                load_forward_policy(path)
 
 
 if __name__ == "__main__":
