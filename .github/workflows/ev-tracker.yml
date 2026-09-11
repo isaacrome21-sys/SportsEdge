@@ -61,6 +61,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      issues: write
     concurrency:
       group: sportsedge-paid-odds-api
       cancel-in-progress: false
@@ -73,6 +74,7 @@ jobs:
         id: tracker
         env:
           ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set +e
           python scripts/ev_tracker.py close
@@ -90,7 +92,7 @@ jobs:
           git config user.name "sportsedge-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if [ "$CODE" = "0" ] || [ "$CODE" = "3" ]; then
-            git add -A ledger/ev_close_attempts ledger/ev_closes output/ev_tracker
+            git add -A ledger/ev_plays ledger/ev_close_attempts ledger/ev_closes output/ev_tracker
           else
             git add output/ev_tracker/health.md
           fi
