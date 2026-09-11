@@ -4,8 +4,8 @@
   "encoding": "GZIP_BASE64_CONCAT_V1",
   "parts": [
     {
-      "path": "artifacts/football/cfb_prop_bundle_parts/part-0001.b64",
-      "text_sha256": "b37e1f7eea5f7155ba37295347ada59f6707db6a6448cefc2e722995a2170ed9"
+      "git_blob_sha1": "78d39dc4dc2ceda608fefd630ce9ce6228b47d70",
+      "path": "artifacts/football/cfb_prop_bundle_parts/part-0001.b64"
     }
   ],
   "promotion_authority": false,
