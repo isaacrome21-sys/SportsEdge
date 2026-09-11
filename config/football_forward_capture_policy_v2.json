@@ -1,0 +1,45 @@
+{
+  "policy_id": "FOOTBALL_FORWARD_CAPTURE_V2",
+  "status": "PROSPECTIVE_UNACTIVATED",
+  "promotion_authority": false,
+  "evidence_clock_authority": false,
+  "sports": {
+    "NFL": {
+      "provider_sport_key": "americanfootball_nfl"
+    },
+    "CFB": {
+      "provider_sport_key": "americanfootball_ncaaf"
+    }
+  },
+  "book": "draftkings",
+  "markets": ["h2h", "spreads", "totals"],
+  "decision_window_minutes_before_start": {
+    "min": 45,
+    "max": 120
+  },
+  "close_window_minutes_before_start": {
+    "min": 2,
+    "max": 20
+  },
+  "close_definition_id": "DK_MAINLINE_LAST_PRESTART_T20_T2_POWER_V1",
+  "devig_method": "POWER_V1",
+  "provider_request_shape": "SPORT_BULK_V1",
+  "persistence": {
+    "branch": "data",
+    "decisions_append_only": true,
+    "closes_append_only": true,
+    "missing_close_counts_in_coverage_denominator": true
+  },
+  "candidate_contract": {
+    "requires_evidence_unit_id": true,
+    "requires_two_sided_decision_price": true,
+    "record_every_threshold_qualified_candidate": true,
+    "actual_bet_required": false
+  },
+  "activation_notes": [
+    "This policy is prospective and does not reinterpret NFL_FORWARD_SHADOW_EV_V1 rows.",
+    "CFB cannot activate until a genuine frozen CFB game model/evidence unit exists.",
+    "NFL cannot activate under this policy until its durable model freeze and V2 evidence unit are bound.",
+    "The legacy NFL forward collector remains historical/legacy until adapters are migrated explicitly."
+  ]
+}
