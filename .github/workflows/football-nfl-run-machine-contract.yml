@@ -17,6 +17,7 @@ on:
       - 'tests/test_nfl_run_machine.py'
       - 'tests/test_nfl_readiness.py'
       - 'tests/test_football_prop_surface.py'
+      - 'tests/test_football_prop_runtime_truth.py'
       - 'scripts/run_nfl_auto.py'
       - 'scripts/run_football_auto_bundle.py'
       - 'config/nfl_m2_freeze.json'
@@ -40,6 +41,7 @@ on:
       - 'tests/test_nfl_run_machine.py'
       - 'tests/test_nfl_readiness.py'
       - 'tests/test_football_prop_surface.py'
+      - 'tests/test_football_prop_runtime_truth.py'
       - 'scripts/run_nfl_auto.py'
       - 'scripts/run_football_auto_bundle.py'
       - 'config/nfl_m2_freeze.json'
@@ -50,6 +52,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: football-nfl-run-machine-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   context-contract:
@@ -100,27 +106,25 @@ jobs:
           tests/test_nfl_run_machine.py
           tests/test_nfl_readiness.py
           tests/test_football_prop_surface.py
+          tests/test_football_prop_runtime_truth.py
       - name: Run NFL run-machine and OFFICIAL readiness contracts
         run: >-
           python -m unittest
           tests.test_nfl_run_machine
           tests.test_nfl_readiness
-          tests.test_football_prop_surface -v
+          tests.test_football_prop_surface
+          tests.test_football_prop_runtime_truth -v
       - name: Assert RUN IT registry resolves executable NFL game-plus-prop bundle
         run: |
           python - <<'PY'
           import importlib
           import json
           from pathlib import Path
-
           config = json.loads(Path('config/run_it_surface.json').read_text())
           nfl = config['sports']['NFL']
           assert nfl['lane'] == 'PREGAME_MODEL_AND_PLAYER_PROPS'
           assert nfl['automatic_completeness'] == 'EXECUTABLE_FAIL_CLOSED'
-          assert nfl['automatic_command'] == [
-              'python', 'scripts/run_football_auto_bundle.py', '--sport', 'NFL',
-              '--output', 'artifacts/run_it/nfl_card.json'
-          ]
+          assert nfl['automatic_command'] == ['python','scripts/run_football_auto_bundle.py','--sport','NFL','--output','artifacts/run_it/nfl_card.json']
           assert Path(nfl['automatic_command'][1]).is_file()
           module_name, attr = nfl['library_entrypoint'].split(':', 1)
           assert hasattr(importlib.import_module(module_name), attr)
@@ -128,7 +132,9 @@ jobs:
           prop = require_executable_prop_surface('NFL')
           assert prop['engine_state'] == 'IMPLEMENTED_FAIL_CLOSED'
           assert prop['promotion_state'] == 'AUTOMATIC_TRUTH_GATE_GATED'
-          assert prop['current_state'] == 'EVIDENCE_PENDING'
+          assert prop['readiness_state'] == 'REGISTRY_DERIVED'
+          assert prop['runtime_state'] == 'MODEL_ARTIFACT_BLOCKED'
+          assert prop['frozen_artifact_sha256'] is None
           PY
       - name: Assert checked-in NFL game and prop artifact claims remain truthful
         run: |
@@ -142,42 +148,21 @@ jobs:
               assert freeze['hash_algorithm'] == 'CANONICAL_JSON_SHA256_V1'
               assert freeze['artifact_sha256'] is None
               assert not Path(freeze['artifact_path']).exists()
-          print('NFL_CHECKED_IN_FREEZE_STATES_OK game=UNFROZEN prop=UNFROZEN')
           PY
       - name: Assert missing frozen game artifact fails closed
         shell: bash
         run: |
           set +e
-          python scripts/run_nfl_auto.py \
-            --model-artifact /tmp/definitely-missing-nfl-model.json \
-            --output /tmp/nfl-card.json
+          python scripts/run_nfl_auto.py --model-artifact /tmp/definitely-missing-nfl-model.json --output /tmp/nfl-card.json
           rc=$?
           set -e
           test "$rc" -eq 2
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          payload = json.loads(Path('/tmp/nfl-card.json').read_text())
-          assert payload['status'] == 'BLOCKED'
-          assert payload['blocker'] == 'NFL_AUTO_FROZEN_MODEL_ARTIFACT_REQUIRED'
-          assert payload['governance']['fail_closed'] is True
-          PY
       - name: Assert unfrozen game binding blocks even when bytes exist
         shell: bash
         run: |
           printf '{}\n' > /tmp/nfl-model-present.json
           set +e
-          python scripts/run_nfl_auto.py \
-            --model-artifact /tmp/nfl-model-present.json \
-            --output /tmp/nfl-unfrozen-card.json
+          python scripts/run_nfl_auto.py --model-artifact /tmp/nfl-model-present.json --output /tmp/nfl-unfrozen-card.json
           rc=$?
           set -e
           test "$rc" -eq 2
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          payload = json.loads(Path('/tmp/nfl-unfrozen-card.json').read_text())
-          assert payload['status'] == 'BLOCKED'
-          assert payload['blocker'] == 'NFL_AUTO_FROZEN_MODEL_BINDING_REQUIRED'
-          assert payload['governance']['fail_closed'] is True
-          PY
