@@ -2,6 +2,8 @@ name: auto-mlb
 
 on:
   workflow_dispatch:
+  # MLB is parked for the remainder of 2026. Keep manual dispatch and CI/push
+  # coverage, but do not spend Odds API credits on a timer.
   push:
     branches: [main]
     paths:
@@ -11,9 +13,6 @@ on:
       - 'tests/test_auto_native_odds.py'
       - 'tests/test_mlb_run_machine.py'
       - '.github/workflows/auto-mlb.yml'
-  schedule:
-    # Fifteen-minute cadence only across broad MLB slate hours (UTC).
-    - cron: '*/15 15-23,0-5 * * *'
 
 permissions:
   contents: read
