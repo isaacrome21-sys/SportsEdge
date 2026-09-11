@@ -165,8 +165,6 @@ class FootballPropExtendedRunMachineTests(unittest.TestCase):
                             {"name": "Over", "description": "Home Defender", "price": -110, "point": 5.5},
                             {"name": "Under", "description": "Home Defender", "price": -110, "point": 5.5},
                         ]),
-                        # Deliberately YES-only: model probability + offered price
-                        # can support EV, but no-vig fair probability/edge may not be invented.
                         self._market("player_anytime_td", [
                             {"name": "Yes", "description": "Home Runner", "price": 140},
                         ]),
@@ -234,11 +232,8 @@ class FootballPropExtendedRunMachineTests(unittest.TestCase):
                         ], capture_output=True, text=True)
                         self.assertEqual(result.returncode, 2, result.stderr)
                         card = json.loads(output.read_text())
-                        if sport == 'CFB':
-                            expected = 'CFB_PROP_FROZEN_MODEL_BINDING_REQUIRED'
-                        else:
-                            suffix = 'BINDING_REQUIRED' if present else 'ARTIFACT_REQUIRED'
-                            expected = f'NFL_PROP_FROZEN_MODEL_{suffix}'
+                        suffix = 'BINDING_REQUIRED' if present else 'ARTIFACT_REQUIRED'
+                        expected = f'{sport}_PROP_FROZEN_MODEL_{suffix}'
                         self.assertEqual(card['blocker'], expected)
                         self.assertEqual(card['status'], 'BLOCKED')
                         self.assertIsNone(card['report']['results'][0]['model_p'])

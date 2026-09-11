@@ -8,18 +8,19 @@ from sportsedge.football_prop_surface import FootballPropSurfaceError, require_e
 ROOT = Path(__file__).resolve().parents[1]
 SURFACE = ROOT / "config/football_prop_engine_surface.json"
 NFL_CERTIFIED_SHA = "3efa5cc92b5ed1bf53a99cbe0d6e7792d01791a77c8f684874d66213b73d9570"
+CFB_CERTIFIED_SHA = "923cfd1be42d31a87d9f31ddffce406d44bfc1bb003d1c625f5a4258f7773f23"
 
 
 class FootballPropRuntimeTruthTests(unittest.TestCase):
-    def test_checked_in_nfl_is_frozen_while_cfb_remains_artifact_blocked(self):
+    def test_checked_in_football_prop_artifacts_are_frozen_and_evidence_gated(self):
         nfl = require_executable_prop_surface("NFL", path=SURFACE)
         self.assertEqual(nfl["runtime_state"], "ARTIFACT_FROZEN_EVIDENCE_GATED")
         self.assertEqual(nfl["frozen_artifact_sha256"], NFL_CERTIFIED_SHA)
         self.assertEqual(nfl["readiness_state"], "REGISTRY_DERIVED")
 
         cfb = require_executable_prop_surface("CFB", path=SURFACE)
-        self.assertEqual(cfb["runtime_state"], "MODEL_ARTIFACT_BLOCKED")
-        self.assertIsNone(cfb["frozen_artifact_sha256"])
+        self.assertEqual(cfb["runtime_state"], "ARTIFACT_FROZEN_EVIDENCE_GATED")
+        self.assertEqual(cfb["frozen_artifact_sha256"], CFB_CERTIFIED_SHA)
         self.assertEqual(cfb["readiness_state"], "REGISTRY_DERIVED")
 
     def test_surface_does_not_claim_market_price_can_create_model_p(self):

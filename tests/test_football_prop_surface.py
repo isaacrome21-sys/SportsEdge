@@ -7,6 +7,8 @@ import unittest
 from sportsedge.football_prop_extended_run_machine import PROVIDER_MARKETS
 from sportsedge.football_prop_surface import require_executable_prop_surface
 
+CFB_ARTIFACT_SHA = "923cfd1be42d31a87d9f31ddffce406d44bfc1bb003d1c625f5a4258f7773f23"
+
 
 class FootballPropSurfaceTests(unittest.TestCase):
     def test_nfl_and_cfb_surface_is_runtime_bound_and_registry_derived(self):
@@ -25,8 +27,8 @@ class FootballPropSurfaceTests(unittest.TestCase):
         self.assertEqual(cfb["engine_state"], "IMPLEMENTED_FAIL_CLOSED")
         self.assertEqual(cfb["promotion_state"], "AUTOMATIC_TRUTH_GATE_GATED")
         self.assertEqual(cfb["readiness_state"], "REGISTRY_DERIVED")
-        self.assertEqual(cfb["runtime_state"], "MODEL_ARTIFACT_BLOCKED")
-        self.assertIsNone(cfb["frozen_artifact_sha256"])
+        self.assertEqual(cfb["runtime_state"], "ARTIFACT_FROZEN_EVIDENCE_GATED")
+        self.assertEqual(cfb["frozen_artifact_sha256"], CFB_ARTIFACT_SHA)
         self.assertTrue(cfb["certification_registry"].endswith("_prop_certification.json"))
 
     def test_declared_provider_surface_matches_extended_run_machine_exactly(self):
@@ -74,9 +76,10 @@ class FootballPropSurfaceTests(unittest.TestCase):
         self.assertFalse(nfl["promotion_authority"])
 
         cfb = json.loads(Path("config/cfb_prop_model_freeze.json").read_text())
-        self.assertEqual(cfb["status"], "UNFROZEN")
-        self.assertIsNone(cfb["artifact_sha256"])
-        self.assertFalse(Path(cfb["artifact_path"]).is_file())
+        self.assertEqual(cfb["status"], "FROZEN")
+        self.assertEqual(cfb["artifact_sha256"], CFB_ARTIFACT_SHA)
+        self.assertTrue(Path(cfb["artifact_path"]).is_file())
+        self.assertFalse(cfb["promotion_authority"])
 
 
 if __name__ == "__main__":

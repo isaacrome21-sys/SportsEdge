@@ -21,6 +21,10 @@ CFB_FREEZE = ROOT / "config/cfb_prop_model_freeze.json"
 CERTIFIED_SHA = "3efa5cc92b5ed1bf53a99cbe0d6e7792d01791a77c8f684874d66213b73d9570"
 FIT_SHA = "5dfa29347bed608771e6a2395ce8e894dbfdd881"
 SOURCE_SHA = "71b6a1ed010e963dd0e8bb0b8a18d2a3a9cdef1914084631fe5adb9ed2c278da"
+CFB_CERTIFIED_SHA = "923cfd1be42d31a87d9f31ddffce406d44bfc1bb003d1c625f5a4258f7773f23"
+CFB_FIT_SHA = "67184a5a120a2bc868531c7827783f562f82ee0b"
+CFB_SOURCE_SHA = "f25faa32ad8f1ddde16573a5919eeb108d267a04768a3b088d7db34b7682aa25"
+CFB_CODE_SURFACE_SHA = "8abfd4b5ff1de138004e3f7b73bb0e5dcab123333e4f853ba4d427b1e808832e"
 
 
 def _load(path: Path) -> dict:
@@ -141,8 +145,13 @@ def test_cfb_code_surface_can_attest_without_promoting(tmp_path: Path) -> None:
         verify_cfb_prop_code_surface(root=tmp_path, registry=registry, artifact=artifact)
 
 
-def test_cfb_prop_registry_remains_unfrozen() -> None:
+def test_cfb_prop_registry_is_bound_to_validated_artifact() -> None:
     freeze = _load(CFB_FREEZE)
     assert freeze["sport"] == "CFB"
-    assert freeze["status"] == "UNFROZEN"
-    assert freeze["artifact_sha256"] is None
+    assert freeze["status"] == "FROZEN"
+    assert freeze["artifact_sha256"] == CFB_CERTIFIED_SHA
+    assert freeze["code_git_sha"] == CFB_FIT_SHA
+    assert freeze["source_manifest_sha256"] == CFB_SOURCE_SHA
+    assert freeze["code_surface_manifest_sha256"] == CFB_CODE_SURFACE_SHA
+    assert freeze["promotion_authority"] is False
+    assert (ROOT / freeze["artifact_path"]).is_file()
