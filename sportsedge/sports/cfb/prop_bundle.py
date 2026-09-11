@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import base64
 import gzip
-from hashlib import sha256
+from hashlib import sha1, sha256
 import json
 from pathlib import Path
 from typing import Any
@@ -18,6 +18,10 @@ def _canonical_sha256(value: Any) -> str:
         value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
     ).encode("utf-8")
     return sha256(raw).hexdigest()
+
+
+def _git_blob_sha(data: bytes) -> str:
+    return sha1(f"blob {len(data)}\0".encode("ascii") + data).hexdigest()
 
 
 def _under_root(root: Path, rel: str) -> Path:
@@ -50,17 +54,20 @@ def load_cfb_prop_artifact_bundle(*, root: Path, bundle_path: Path) -> dict[str,
         if not isinstance(row, dict):
             raise CFBPropBundleError("CFB_PROP_ARTIFACT_BUNDLE_PART_INVALID")
         rel = str(row.get("path") or "").strip()
-        expected = str(row.get("text_sha256") or "").strip().lower()
+        expected_blob = str(row.get("git_blob_sha1") or "").strip().lower()
         if not rel or rel in seen:
             raise CFBPropBundleError("CFB_PROP_ARTIFACT_BUNDLE_PART_PATH_INVALID")
+        if len(expected_blob) != 40 or any(ch not in "0123456789abcdef" for ch in expected_blob):
+            raise CFBPropBundleError(f"CFB_PROP_ARTIFACT_BUNDLE_PART_BLOB_SHA_INVALID:{rel}")
         seen.add(rel)
         path = _under_root(root, rel)
         try:
-            text = path.read_text(encoding="ascii").strip()
+            raw = path.read_bytes()
+            text = raw.decode("ascii").strip()
         except Exception as exc:
             raise CFBPropBundleError(f"CFB_PROP_ARTIFACT_BUNDLE_PART_MISSING:{rel}") from exc
-        if sha256(text.encode("ascii")).hexdigest() != expected:
-            raise CFBPropBundleError(f"CFB_PROP_ARTIFACT_BUNDLE_PART_SHA256_MISMATCH:{rel}")
+        if _git_blob_sha(raw) != expected_blob:
+            raise CFBPropBundleError(f"CFB_PROP_ARTIFACT_BUNDLE_PART_BLOB_MISMATCH:{rel}")
         encoded.append(text)
 
     try:
