@@ -90,6 +90,16 @@ def _decision_run(**kwargs):
     )
 
 
+def _one_sided_candidate(**kwargs):
+    return RunResult(
+        market="HITS",
+        model_p=0.60,
+        bet_status="MODEL_CANDIDATE",
+        decision=None,
+        reason="OFFICIAL_BLOCKED:PAIRED_PRICE_REQUIRED_FOR_DEVIG",
+    )
+
+
 class PricedRowLedgerTests(unittest.TestCase):
     def _run(self, quotes):
         with tempfile.TemporaryDirectory() as td:
@@ -124,11 +134,11 @@ class PricedRowLedgerTests(unittest.TestCase):
         self.assertEqual(worse_price[0].bet_status, "PASS")
         self.assertIsNotNone(worse_price[0].model_p)
 
-    def test_unpaired_price_blocks_before_model_probability_exists(self):
+    def test_unpaired_price_still_runs_model_but_cannot_create_novig_probability(self):
         with tempfile.TemporaryDirectory() as td:
             registry_path = Path(td) / "deployments.json"
             _registry(registry_path)
-            with patch("sportsedge.generic_card_pipeline.run_candidate") as run_candidate:
+            with patch("sportsedge.generic_card_pipeline.run_candidate", side_effect=_one_sided_candidate) as run_candidate:
                 out = run_unified_card(
                     games=[_game()],
                     feature_rows=[_feature()],
@@ -137,10 +147,14 @@ class PricedRowLedgerTests(unittest.TestCase):
                     finalization_now=NOW,
                     registry_path=str(registry_path),
                 )
-        run_candidate.assert_not_called()
+        run_candidate.assert_called_once()
         self.assertEqual(len(out), 1)
-        self.assertEqual(out[0].bet_status, "BLOCKED")
-        self.assertIsNone(out[0].model_p)
+        self.assertEqual(out[0].bet_status, "MODEL_CANDIDATE")
+        self.assertEqual(out[0].model_p, 0.60)
+        self.assertEqual(out[0].market_no_vig_p_status, "UNAVAILABLE_ONE_SIDED")
+        self.assertIsNone(out[0].implied_probability)
+        self.assertIsNotNone(out[0].raw_implied_probability)
+        self.assertIsNotNone(out[0].ev_per_dollar)
         self.assertIn("PAIRED_PRICE_REQUIRED_FOR_DEVIG", out[0].reason)
 
     def test_unified_boundary_rejects_modeled_blocked_row(self):
