@@ -83,6 +83,13 @@ def _feature_index(rows):
     return out
 
 
+def _quote_key(quote: Mapping[str, Any]) -> tuple[str, str, str, str, str, str, bool]:
+    return (
+        str(quote["game_id"]), str(quote["market"]), str(quote["entity_id"]),
+        repr(quote["line"]), str(quote["side"]), str(quote["book_key"]), bool(quote["is_alternate"]),
+    )
+
+
 def _lineup_team(game, entity_id):
     try:
         pid = int(entity_id)
@@ -190,6 +197,7 @@ def _require_acquisition_binding(quote, game):
 
 def _validated_quotes(quotes, games_by_id):
     out = []
+    seen = set()
     for raw in quotes:
         try:
             quote = validate_canonical_quote(raw)
@@ -197,6 +205,10 @@ def _validated_quotes(quotes, games_by_id):
             if game is None:
                 continue
             _require_acquisition_binding(quote, game)
+            key = _quote_key(quote)
+            if key in seen:
+                continue
+            seen.add(key)
             out.append(quote)
         except Exception:
             pass
@@ -206,7 +218,7 @@ def _validated_quotes(quotes, games_by_id):
 def _paired_quote(candidate, quotes):
     matches = []
     for quote in quotes:
-        if quote is candidate or dict(quote) == dict(candidate):
+        if _quote_key(quote) == _quote_key(candidate):
             continue
         try:
             validate_pair(candidate, quote)
@@ -245,9 +257,14 @@ def run_generic_card(*, games, feature_rows, quotes, ingestion_now, finalization
     engines = engine_registry()
     valid_quotes = _validated_quotes(quotes, games_by_id)
     results = []
+    seen_quotes = set()
     for raw in quotes:
         try:
             quote = validate_canonical_quote(raw)
+            quote_key = _quote_key(quote)
+            if quote_key in seen_quotes:
+                raise ValueError("DUPLICATE_SPORTSBOOK_QUOTE_CANDIDATE")
+            seen_quotes.add(quote_key)
             market = str(quote["market"])
             if market not in GENERIC_MARKETS:
                 raise ValueError(f"unsupported canonical market: {market}")
