@@ -6,9 +6,9 @@ from datetime import date, datetime, timezone
 import json
 from pathlib import Path
 
-from sportsedge.mlb_v7_final_timecode import latest_confirmed_final_rows
+from sportsedge.mlb_v7_final_timecode import archived_final_feed_rows, latest_confirmed_final_rows
 from sportsedge.mlb_v7_statsapi_history import build_shard_report, detailed_status_by_game, write_json, write_jsonl
-from sportsedge.mlb_v7_travel_history import _get_json, extract_timecodes, historical_snapshot_url, schedule_games, schedule_url, timestamps_url
+from sportsedge.mlb_v7_travel_history import BASE, _get_json, extract_timecodes, historical_snapshot_url, schedule_games, schedule_url, snapshot_status, timestamps_url
 
 
 def main() -> int:
@@ -37,6 +37,7 @@ def main() -> int:
         game["detailed_status"] = detailed.get(int(game["game_id"]), "")
 
     normalized_rows = []
+    final_source_counts = {"historical_timecode": 0, "archived_full_feed": 0}
     for game in games:
         if game["status"] != "Final":
             continue
@@ -44,14 +45,32 @@ def main() -> int:
         try:
             timestamps_payload = _get_json(timestamps_url(game_id))
             timecodes = extract_timecodes(timestamps_payload)
-            rows, final_timecode, final_snapshot = latest_confirmed_final_rows(
-                game,
-                timecodes,
-                lambda timecode: _get_json(historical_snapshot_url(game_id, timecode)),
-            )
+            last_timecode = timecodes[-1]
+            last_snapshot = _get_json(historical_snapshot_url(game_id, last_timecode))
+            if snapshot_status(last_snapshot) == "Final":
+                rows, final_timecode, final_snapshot = latest_confirmed_final_rows(
+                    game, [last_timecode], lambda _: last_snapshot,
+                )
+                source_kind = "historical_timecode"
+                snap_rel = Path("raw/games") / f"{game_id}-final-{final_timecode}.json"
+            else:
+                archived_feed = _get_json(f"{BASE}/api/v1.1/game/{game_id}/feed/live")
+                try:
+                    rows, final_timecode = archived_final_feed_rows(game, archived_feed)
+                    final_snapshot = archived_feed
+                    source_kind = "archived_full_feed"
+                    snap_rel = Path("raw/games") / f"{game_id}-archived-final-feed.json"
+                except Exception:
+                    rows, final_timecode, final_snapshot = latest_confirmed_final_rows(
+                        game,
+                        timecodes,
+                        lambda timecode: _get_json(historical_snapshot_url(game_id, timecode)),
+                    )
+                    source_kind = "historical_timecode"
+                    snap_rel = Path("raw/games") / f"{game_id}-final-{final_timecode}.json"
             normalized_rows.extend(rows)
+            final_source_counts[source_kind] += 1
             ts_rel = Path("raw/games") / f"{game_id}-timestamps.json"
-            snap_rel = Path("raw/games") / f"{game_id}-final-{final_timecode}.json"
             ts_sha = write_json(root / ts_rel, timestamps_payload)
             snap_sha = write_json(root / snap_rel, final_snapshot)
             evidence_files.extend([
@@ -72,10 +91,12 @@ def main() -> int:
         "coverage_end": end.isoformat(),
         "schedule_url": sched_url,
         "game_source_count": sum(1 for g in games if g["status"] == "Final"),
+        "final_source_counts": final_source_counts,
         "source_policy": {
             "timestamps": "official MLB StatsAPI historical timestamps",
-            "final_snapshot": "latest official MLB historical snapshot scanning backward that explicitly confirms Final",
-            "final_at": "LATEST_HISTORICAL_TIMECODE_CONFIRMED_FINAL",
+            "primary_final_at": "latest historical timecode when its historical snapshot explicitly confirms Final",
+            "fallback_final_at": "archived full v1.1 feed metaData.timeStamp only when status=Final, gameEvents includes game_finished, and logicalEvents includes gameStateChangeToGameOver",
+            "fallback_is_not_retrieval_time": True,
         },
     })
     evidence_files.append({"path": provenance_rel.as_posix(), "sha256": provenance_sha})
@@ -85,12 +106,14 @@ def main() -> int:
     )
     report["retrieved_at"] = datetime.now(timezone.utc).isoformat()
     report["schedule_url"] = sched_url
+    report["final_source_counts"] = final_source_counts
     write_json(root / "shard_report.json", report)
     print(json.dumps({
         "state": report["state"], "coverage_start": report["coverage_start"],
         "coverage_end": report["coverage_end"], "scheduled_final_game_count": report["scheduled_final_game_count"],
         "normalized_final_game_count": report["normalized_final_game_count"], "failures": len(report["failures"]),
-        "failure_details": report["failures"], "blockers": report["blockers"],
+        "failure_details": report["failures"], "final_source_counts": final_source_counts,
+        "blockers": report["blockers"],
     }, sort_keys=True))
     return 0 if report["state"] == "SHARD_READY" else 3
 
