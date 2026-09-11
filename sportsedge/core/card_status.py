@@ -31,6 +31,11 @@ def load_trial_policy(path) -> dict:
     return policy
 
 
+def _is_sha256(value: Any) -> bool:
+    text = str(value or "").strip().lower()
+    return len(text) == 64 and all(ch in "0123456789abcdef" for ch in text)
+
+
 def _row(status: str, reasons: list[str], *, stake_units=None, trial_stage=None,
          policy_sha=None, quote: Mapping[str, Any] | None = None,
          stage_evidence: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -99,6 +104,9 @@ def resolve_row_status(*, engine_exists: bool, model_p, blockers, promoted: bool
     missing = [field for field in trial_policy["required_row_fields"] if quote_row.get(field) in (None, "")]
     if missing:
         return _row(BLOCKED, reasons + ["TRIAL_ROW_INCOMPLETE"])
+    if not _is_sha256(quote_row.get("model_artifact_sha")):
+        return _row(BLOCKED, reasons + ["TRIAL_MODEL_ARTIFACT_SHA_INVALID"])
+    quote_row["model_artifact_sha"] = str(quote_row["model_artifact_sha"]).lower()
     if edge is None:
         raise ValueError("EDGE_MISSING_FOR_PRICED_ROW")
     trial_edge = float(edge)
@@ -110,7 +118,7 @@ def resolve_row_status(*, engine_exists: bool, model_p, blockers, promoted: bool
     stage_evidence = trial_stage_for_market(
         list(settled_trial_rows or []),
         trial_policy,
-        model_artifact_sha=str(quote_row["model_artifact_sha"]),
+        model_artifact_sha=quote_row["model_artifact_sha"],
     )
     stage = stage_evidence["stage"]
     stake = float(trial_policy["stages"][stage]["stake_units"])
@@ -131,10 +139,11 @@ def _slate_key(row: Mapping[str, Any]) -> str:
         value = row.get(key)
         if value not in (None, ""):
             return f"{key}:{value}"
-    # A one-slate caller need not add redundant metadata. This fallback keeps
-    # backward compatibility while preventing cross-slate pooling when a slate
-    # identifier is present.
     return "__CALLER_SLATE__"
+
+
+def _has_explicit_slate(row: Mapping[str, Any]) -> bool:
+    return any(row.get(key) not in (None, "") for key in ("slate_id", "slate_date", "slate_date_ct", "slate"))
 
 
 def apply_trial_cap(rows: list, trial_policy: dict) -> list:
@@ -171,19 +180,19 @@ def trial_stage_for_market(settled: list, trial_policy: dict, *, model_artifact_
     Remaining rows are clustered by ``slate_date`` using the intercept-only CR1
     cluster-robust standard error specified by TRIAL_POLICY_V1.
     """
-    current_model_sha = str(model_artifact_sha or "").strip()
-    current_policy_sha = str(trial_policy.get("_sha256") or "").strip()
-    if not current_model_sha:
+    current_model_sha = str(model_artifact_sha or "").strip().lower()
+    current_policy_sha = str(trial_policy.get("_sha256") or "").strip().lower()
+    if not _is_sha256(current_model_sha):
         raise ValueError("TRIAL_MODEL_ARTIFACT_SHA_REQUIRED")
-    if not current_policy_sha:
+    if not _is_sha256(current_policy_sha):
         raise ValueError("TRIAL_POLICY_SHA_REQUIRED")
 
     eligible = []
     for raw in settled:
         row = dict(raw)
-        if str(row.get("model_artifact_sha") or "").strip() != current_model_sha:
+        if str(row.get("model_artifact_sha") or "").strip().lower() != current_model_sha:
             continue
-        if str(row.get("trial_policy_sha256") or "").strip() != current_policy_sha:
+        if str(row.get("trial_policy_sha256") or "").strip().lower() != current_policy_sha:
             continue
         if row.get("slate_date") in (None, "") or row.get("clv_pp") is None:
             continue
@@ -248,6 +257,7 @@ def _valid_probability(value: Any) -> bool:
 
 def assert_card_integrity(rows: list, trial_policy: dict | None = None) -> None:
     """Raise on any rendered row that violates the frozen status contract."""
+    trial_groups: dict[tuple[str, str], int] = {}
     for i, row in enumerate(rows):
         status = row.get("status")
         if status not in STATUSES:
@@ -297,15 +307,25 @@ def assert_card_integrity(rows: list, trial_policy: dict | None = None) -> None:
             for field in trial_policy["required_row_fields"]:
                 if row.get(field) in (None, ""):
                     raise ValueError(f"ROW_{i}_TRIAL_MISSING_{field.upper()}")
+            if not _is_sha256(row.get("model_artifact_sha")):
+                raise ValueError(f"ROW_{i}_TRIAL_MODEL_ARTIFACT_SHA_INVALID")
+
+            sport = str(row.get("sport") or "").strip().upper()
+            if not sport:
+                raise ValueError(f"ROW_{i}_TRIAL_SPORT_MISSING")
+            if not _has_explicit_slate(row):
+                raise ValueError(f"ROW_{i}_TRIAL_SLATE_MISSING")
+            group_key = (sport, _slate_key(row))
+            trial_groups[group_key] = trial_groups.get(group_key, 0) + 1
 
             evidence = row.get("trial_stage_evidence")
             if not isinstance(evidence, Mapping):
                 raise ValueError(f"ROW_{i}_TRIAL_STAGE_EVIDENCE_MISSING")
             if evidence.get("stage") != stage:
                 raise ValueError(f"ROW_{i}_TRIAL_STAGE_EVIDENCE_MISMATCH")
-            if evidence.get("model_artifact_sha") != row.get("model_artifact_sha"):
+            if str(evidence.get("model_artifact_sha") or "").lower() != str(row.get("model_artifact_sha") or "").lower():
                 raise ValueError(f"ROW_{i}_TRIAL_MODEL_CLOCK_MISMATCH")
-            if evidence.get("trial_policy_sha256") != trial_policy.get("_sha256"):
+            if str(evidence.get("trial_policy_sha256") or "").lower() != str(trial_policy.get("_sha256") or "").lower():
                 raise ValueError(f"ROW_{i}_TRIAL_POLICY_CLOCK_MISMATCH")
             if stage == MICRO:
                 rule = trial_policy["stages"][MICRO]
@@ -317,3 +337,9 @@ def assert_card_integrity(rows: list, trial_policy: dict | None = None) -> None:
                     raise ValueError(f"ROW_{i}_MICRO_CLV_INSUFFICIENT")
                 if evidence.get("clv_t_stat") is None or float(evidence["clv_t_stat"]) < float(rule["min_clv_t_stat"]):
                     raise ValueError(f"ROW_{i}_MICRO_TSTAT_INSUFFICIENT")
+
+    if trial_policy is not None:
+        cap = int(trial_policy["max_trial_plays_per_sport_per_slate"])
+        for (sport, slate), count in trial_groups.items():
+            if count > cap:
+                raise ValueError(f"TRIAL_CAP_EXCEEDED:{sport}:{slate}:{count}>{cap}")
