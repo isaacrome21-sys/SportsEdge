@@ -1,0 +1,46 @@
+{
+  "schema_version": "CFB_PROP_DEPTH_SOURCE_POLICY_V1",
+  "sport": "CFB",
+  "status": "CANDIDATE_INPUT_ONLY",
+  "promotion_authority": false,
+  "model_p_authority": false,
+  "primary_source": {
+    "source_id": "TWO_DEEP_PROJECTED_TWO_DEEP",
+    "base_url": "https://www.thetwodeep.com/college/depth-charts",
+    "source_kind": "PROJECTED_TWO_DEEP",
+    "automated_acquisition": false,
+    "automation_blocker": "SOURCE_TERMS_FOR_AUTOMATED_ACQUISITION_UNVERIFIED",
+    "required_snapshot_fields": [
+      "retrieved_at",
+      "source_updated_at",
+      "source_url",
+      "content_sha256",
+      "team_id",
+      "players"
+    ]
+  },
+  "corroboration": {
+    "required_for_prop_dependency": true,
+    "source_id": "OURLADS_CFB_DEPTH_CHART",
+    "conflict_blocker": "STARTER_CONFLICT"
+  },
+  "freshness": {
+    "rule": "SOURCE_UPDATED_AFTER_PREVIOUS_GAME",
+    "stale_blocker": "DEPTH_CHART_STALE"
+  },
+  "availability": {
+    "unavailable_blocker": "PLAYER_UNAVAILABLE"
+  },
+  "provenance": {
+    "snapshot_hash_algorithm": "SHA256_BYTES_V1",
+    "persist_branch": "data",
+    "append_only": true,
+    "parser_code_hash_required_before_runtime_wiring": true
+  },
+  "notes": [
+    "Depth ordering is contextual input only and never creates Model_P.",
+    "The primary source is a maintained projected two-deep, not an official participation report.",
+    "No historical backfill is permitted from current pages; only decision-time snapshots may be used.",
+    "Automated scraping remains disabled until source terms and access policy are explicitly verified."
+  ]
+}
