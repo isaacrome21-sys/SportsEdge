@@ -1,11 +1,27 @@
 {
   "artifact_canonical_sha256": "923cfd1be42d31a87d9f31ddffce406d44bfc1bb003d1c625f5a4258f7773f23",
-  "compressed_sha256": "3e2b5523a74fcdce0fbe55ce8751e30bee7e50ec62f13fbb7440e9302af49b18",
+  "compressed_sha256": "847fcc55111f4b4a5e70eae39ca5e5f3bb6380d0dd1d0c59367bda4211c5d4e7",
   "encoding": "GZIP_BASE64_CONCAT_V1",
   "parts": [
     {
-      "git_blob_sha1": "78d39dc4dc2ceda608fefd630ce9ce6228b47d70",
-      "path": "artifacts/football/cfb_prop_bundle_parts/part-0001.b64"
+      "git_blob_sha1": "a77c97aa0c0a88670d5f57f2de613e6362b7e38b",
+      "path": "artifacts/football/cfb_prop_bundle_parts/rebuild-0001.b64"
+    },
+    {
+      "git_blob_sha1": "e210343c3083b984ff35fb7db558d9da53a370c2",
+      "path": "artifacts/football/cfb_prop_bundle_parts/rebuild-0002.b64"
+    },
+    {
+      "git_blob_sha1": "91d3f28fb2a48da0b8e50f80afb77859f4705a1d",
+      "path": "artifacts/football/cfb_prop_bundle_parts/rebuild-0003.b64"
+    },
+    {
+      "git_blob_sha1": "9c81419fee064019ba5d6e77ff429addd983b897",
+      "path": "artifacts/football/cfb_prop_bundle_parts/rebuild-0004.b64"
+    },
+    {
+      "git_blob_sha1": "cb5e4fed6158efc4efe9625e605803988fccbf43",
+      "path": "artifacts/football/cfb_prop_bundle_parts/rebuild-0005.b64"
     }
   ],
   "promotion_authority": false,
