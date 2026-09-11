@@ -34,6 +34,9 @@ class RunResult:
     decision: BetDecision | None
     reason: str
     model_input_hash: str | None = None
+    model_artifact_sha256: str | None = None
+    model_artifact_family: str | None = None
+    model_artifact_policy_sha256: str | None = None
     distribution_sha256: str | None = None
     readout_sha256: str | None = None
     readout_version: str | None = None
@@ -147,6 +150,9 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], p
             raise OrchestrationError("engine output model_p + push_p exceeds 1")
         runtime_path = _optional_text(output, "runtime_path")
         model_input_hash = _optional_sha256(output, "model_input_hash")
+        model_artifact_sha256 = _optional_sha256(output, "model_artifact_sha256")
+        model_artifact_family = _optional_text(output, "model_artifact_family")
+        model_artifact_policy_sha256 = _optional_sha256(output, "model_artifact_policy_sha256")
         distribution_sha256 = _optional_sha256(output, "distribution_sha256")
         readout_sha256 = _optional_sha256(output, "readout_sha256")
         readout_version = _optional_text(output, "readout_version")
@@ -156,6 +162,9 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], p
 
         common = dict(
             model_input_hash=model_input_hash,
+            model_artifact_sha256=model_artifact_sha256,
+            model_artifact_family=model_artifact_family,
+            model_artifact_policy_sha256=model_artifact_policy_sha256,
             distribution_sha256=distribution_sha256,
             readout_sha256=readout_sha256,
             readout_version=readout_version,
@@ -183,6 +192,8 @@ def run_candidate(*, model_input: Mapping[str, Any], quote: Mapping[str, Any], p
         bind_candidate(output, quote, deployed)
         if runtime_path == "LEGACY_COMPAT":
             return _candidate(market, model_p, "LEGACY_COMPAT_PATH_NOT_PROMOTABLE", common)
+        if model_artifact_sha256 is None:
+            return _candidate(market, model_p, "MODEL_ARTIFACT_REQUIRED_FOR_OFFICIAL", common)
 
         try:
             floor = require_production_edge_floor(market=market, path=edge_floor_config_path)
