@@ -5,18 +5,22 @@ on:
   pull_request:
     paths:
       - "sportsedge/mlb_v7_statsapi_history.py"
+      - "sportsedge/mlb_v7_final_timecode.py"
       - "scripts/acquire_mlb_v7_statsapi_history_shard.py"
       - "scripts/finalize_mlb_v7_statsapi_history.py"
       - "tests/test_mlb_v7_statsapi_history.py"
+      - "tests/test_mlb_v7_final_timecode.py"
       - ".github/workflows/mlb-v7-statsapi-history.yml"
       - ".github/workflows/mlb-v7-statsapi-history-persist.yml"
   push:
     branches: [main]
     paths:
       - "sportsedge/mlb_v7_statsapi_history.py"
+      - "sportsedge/mlb_v7_final_timecode.py"
       - "scripts/acquire_mlb_v7_statsapi_history_shard.py"
       - "scripts/finalize_mlb_v7_statsapi_history.py"
       - "tests/test_mlb_v7_statsapi_history.py"
+      - "tests/test_mlb_v7_final_timecode.py"
       - ".github/workflows/mlb-v7-statsapi-history.yml"
       - ".github/workflows/mlb-v7-statsapi-history-persist.yml"
 
@@ -38,7 +42,7 @@ jobs:
       - name: Install pinned test dependency
         run: python -m pip install --disable-pip-version-check pytest==9.1.1
       - name: Run focused contract tests
-        run: python -m pytest -q tests/test_mlb_v7_statsapi_history.py tests/test_mlb_v7_travel_history.py
+        run: python -m pytest -q tests/test_mlb_v7_statsapi_history.py tests/test_mlb_v7_final_timecode.py tests/test_mlb_v7_travel_history.py
       - name: Prove real one-day shard without attestation authority
         shell: bash
         run: |
