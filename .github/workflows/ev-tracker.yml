@@ -16,7 +16,7 @@ jobs:
     if: github.event_name == 'issues' && startsWith(github.event.issue.title, '[BET]') && github.event.issue.user.login == github.repository_owner
     runs-on: ubuntu-latest
     concurrency:
-      group: ev-tracker-issue-${{ github.event.issue.number }}
+      group: sportsedge-paid-odds-api
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
@@ -43,7 +43,7 @@ jobs:
     if: github.event_name != 'issues'
     runs-on: ubuntu-latest
     concurrency:
-      group: ev-tracker-close
+      group: sportsedge-paid-odds-api
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
