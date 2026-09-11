@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
+      - 'sportsedge/football_prop_code_surface.py'
       - 'sportsedge/football_prop_run_machine.py'
       - 'sportsedge/football_prop_extended_run_machine.py'
       - 'sportsedge/football_prop_odds_source.py'
@@ -15,6 +16,7 @@ on:
       - 'scripts/run_football_props_auto.py'
       - 'scripts/run_football_auto_bundle.py'
       - 'config/football_prop_engine_surface.json'
+      - 'config/nfl_prop_code_surface_v1.json'
       - 'config/nfl_prop_model_freeze.json'
       - 'config/cfb_prop_model_freeze.json'
       - 'config/nfl_prop_evidence.json'
@@ -22,11 +24,14 @@ on:
       - 'config/nfl_prop_certification.json'
       - 'config/cfb_prop_certification.json'
       - 'config/run_it_surface.json'
+      - 'artifacts/football/nfl_offensive_prop_ab_model.json'
       - 'tests/test_football_prop_*.py'
+      - 'tests/test_nfl_prop_code_surface.py'
       - '.github/workflows/football-prop-run-machine-contract.yml'
   push:
     branches: [main]
     paths:
+      - 'sportsedge/football_prop_code_surface.py'
       - 'sportsedge/football_prop_run_machine.py'
       - 'sportsedge/football_prop_extended_run_machine.py'
       - 'sportsedge/football_prop_odds_source.py'
@@ -38,6 +43,7 @@ on:
       - 'scripts/run_football_props_auto.py'
       - 'scripts/run_football_auto_bundle.py'
       - 'config/football_prop_engine_surface.json'
+      - 'config/nfl_prop_code_surface_v1.json'
       - 'config/nfl_prop_model_freeze.json'
       - 'config/cfb_prop_model_freeze.json'
       - 'config/nfl_prop_evidence.json'
@@ -45,7 +51,9 @@ on:
       - 'config/nfl_prop_certification.json'
       - 'config/cfb_prop_certification.json'
       - 'config/run_it_surface.json'
+      - 'artifacts/football/nfl_offensive_prop_ab_model.json'
       - 'tests/test_football_prop_*.py'
+      - 'tests/test_nfl_prop_code_surface.py'
       - '.github/workflows/football-prop-run-machine-contract.yml'
 
 permissions:
@@ -71,6 +79,7 @@ jobs:
       - name: Compile football prop production boundary
         run: >-
           python -m py_compile
+          sportsedge/football_prop_code_surface.py
           sportsedge/football_prop_run_machine.py
           sportsedge/football_prop_extended_run_machine.py
           sportsedge/football_prop_odds_source.py
@@ -86,6 +95,7 @@ jobs:
           tests/test_football_prop_surface.py
           tests/test_football_prop_runtime_truth.py
           tests/test_football_prop_certification.py
+          tests/test_nfl_prop_code_surface.py
       - name: Run football prop contract tests
         run: >-
           python -m unittest
@@ -94,7 +104,8 @@ jobs:
           tests.test_football_prop_odds_source
           tests.test_football_prop_surface
           tests.test_football_prop_runtime_truth
-          tests.test_football_prop_certification -v
+          tests.test_football_prop_certification
+          tests.test_nfl_prop_code_surface -v
       - name: Assert runtime surface and registry-derived readiness
         run: |
           python - <<'PY'
@@ -105,13 +116,18 @@ jobs:
           surface = json.loads(Path('config/football_prop_engine_surface.json').read_text())
           declared = {market for values in surface['implemented_provider_markets'].values() for market in values}
           assert declared == set(PROVIDER_MARKETS)
-          for sport in ('NFL','CFB'):
-              spec=require_executable_prop_surface(sport)
-              assert spec['engine_state']=='IMPLEMENTED_FAIL_CLOSED'
-              assert spec['promotion_state']=='AUTOMATIC_TRUTH_GATE_GATED'
-              assert spec['readiness_state']=='REGISTRY_DERIVED'
-              assert spec['runtime_state']=='MODEL_ARTIFACT_BLOCKED'
-              assert spec['frozen_artifact_sha256'] is None
+          nfl=require_executable_prop_surface('NFL')
+          assert nfl['engine_state']=='IMPLEMENTED_FAIL_CLOSED'
+          assert nfl['promotion_state']=='AUTOMATIC_TRUTH_GATE_GATED'
+          assert nfl['readiness_state']=='REGISTRY_DERIVED'
+          assert nfl['runtime_state']=='ARTIFACT_FROZEN_EVIDENCE_GATED'
+          assert nfl['frozen_artifact_sha256']=='3efa5cc92b5ed1bf53a99cbe0d6e7792d01791a77c8f684874d66213b73d9570'
+          cfb=require_executable_prop_surface('CFB')
+          assert cfb['engine_state']=='IMPLEMENTED_FAIL_CLOSED'
+          assert cfb['promotion_state']=='AUTOMATIC_TRUTH_GATE_GATED'
+          assert cfb['readiness_state']=='REGISTRY_DERIVED'
+          assert cfb['runtime_state']=='MODEL_ARTIFACT_BLOCKED'
+          assert cfb['frozen_artifact_sha256'] is None
           gov=surface['governance']
           assert gov['market_prices_can_create_model_p'] is False
           assert gov['one_sided_market_can_create_model_p'] is False
@@ -124,12 +140,17 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-          for sport in ('nfl','cfb'):
-              freeze=json.loads(Path(f'config/{sport}_prop_model_freeze.json').read_text())
-              assert freeze['schema_version']==1
-              assert freeze['status']=='UNFROZEN'
-              assert freeze['artifact_sha256'] is None
-              assert not Path(freeze['artifact_path']).exists()
+          nfl=json.loads(Path('config/nfl_prop_model_freeze.json').read_text())
+          assert nfl['schema_version']==1
+          assert nfl['status']=='FROZEN'
+          assert nfl['artifact_sha256']=='3efa5cc92b5ed1bf53a99cbe0d6e7792d01791a77c8f684874d66213b73d9570'
+          assert nfl['promotion_authority'] is False
+          assert Path(nfl['artifact_path']).is_file()
+          cfb=json.loads(Path('config/cfb_prop_model_freeze.json').read_text())
+          assert cfb['schema_version']==1
+          assert cfb['status']=='UNFROZEN'
+          assert cfb['artifact_sha256'] is None
+          assert not Path(cfb['artifact_path']).exists()
           PY
       - name: Assert production evidence and certification do not self-promote
         run: |
