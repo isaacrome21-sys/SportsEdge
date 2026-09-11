@@ -1,0 +1,82 @@
+name: Log a bet
+description: Record a bet so SportsEdge grades it against the sharp price before start.
+title: "[BET] "
+body:
+  - type: dropdown
+    id: source
+    attributes:
+      label: Source
+      options: ["Odds Assist Pinnacle +EV", "Odds Assist +EV", "Pick The Odds", "Sharp Lines", "SportsEdge", "Other"]
+    validations:
+      required: true
+  - type: dropdown
+    id: sport
+    attributes:
+      label: Sport
+      options: ["NFL", "NCAAF", "MLB", "NBA", "NHL"]
+    validations:
+      required: true
+  - type: input
+    id: away
+    attributes:
+      label: Away team
+      placeholder: "Denver Broncos or Broncos"
+    validations:
+      required: true
+  - type: input
+    id: home
+    attributes:
+      label: Home team
+      placeholder: "Kansas City Chiefs or Chiefs"
+    validations:
+      required: true
+  - type: input
+    id: date
+    attributes:
+      label: Game date
+      description: "Optional. YYYY-MM-DD, Central time. Blank = next game between these teams."
+  - type: dropdown
+    id: market
+    attributes:
+      label: Market
+      options: ["Moneyline", "Spread", "Total"]
+    validations:
+      required: true
+  - type: input
+    id: pick
+    attributes:
+      label: Pick
+      placeholder: "Team for moneyline/spread, Over or Under for totals"
+    validations:
+      required: true
+  - type: input
+    id: line
+    attributes:
+      label: Line
+      placeholder: "+3.5 for a spread, 47.5 for a total, blank for moneyline"
+  - type: dropdown
+    id: book
+    attributes:
+      label: Book
+      options: ["FanDuel", "DraftKings", "BetMGM", "BetRivers", "theScore Bet", "Fliff", "Hard Rock Bet", "Caesars", "Fanatics", "Novig", "ProphetX", "Other"]
+    validations:
+      required: true
+  - type: input
+    id: price
+    attributes:
+      label: Price
+      placeholder: "-110"
+    validations:
+      required: true
+  - type: input
+    id: stake
+    attributes:
+      label: Stake (units)
+      placeholder: "0.25"
+    validations:
+      required: true
+  - type: input
+    id: tool_ev
+    attributes:
+      label: Tool EV %
+      placeholder: "Optional, e.g. 2.4"
