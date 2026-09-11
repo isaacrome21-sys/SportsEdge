@@ -136,11 +136,13 @@ class CardStatus(unittest.TestCase):
 
 
 TRIAL_POLICY = cs.load_trial_policy(ROOT / "config/trial_policy_v1.json")
+MODEL_SHA = "a" * 64
+OLD_MODEL_SHA = "b" * 64
 QUOTE = {"book": "fanduel", "price_american": -108, "retrieved_at": "2027-09-10T23:00:00Z",
-         "model_artifact_sha": "abc123"}
+         "model_artifact_sha": MODEL_SHA}
 
 
-def ledger(base=1.0, slates=40, per=5, model_sha="abc123", policy_sha=None):
+def ledger(base=1.0, slates=40, per=5, model_sha=MODEL_SHA, policy_sha=None):
     policy_sha = policy_sha or TRIAL_POLICY["_sha256"]
     return [{"slate_date": f"d{g}", "clv_pp": base + (0.5 if g % 2 == 0 else -0.5),
              "model_artifact_sha": model_sha, "trial_policy_sha256": policy_sha}
@@ -152,6 +154,13 @@ def trial(**over):
               edge=0.035, trial_policy=TRIAL_POLICY, quote=QUOTE)
     kw.update(over)
     return cs.resolve_row_status(**kw)
+
+
+def rendered_trial(**over):
+    row = dict(trial(), model_p=0.56, edge=0.035, sport="NFL",
+               slate_date="2026-09-13", market_id="m0")
+    row.update(over)
+    return row
 
 
 class TrialTier(unittest.TestCase):
@@ -187,6 +196,12 @@ class TrialTier(unittest.TestCase):
         row = trial(quote=q)
         self.assertIn("TRIAL_ROW_INCOMPLETE", row["reasons"])
 
+    def test_invalid_model_artifact_sha_blocks(self):
+        q = dict(QUOTE, model_artifact_sha="abc123")
+        row = trial(quote=q)
+        self.assertEqual(row["status"], cs.BLOCKED)
+        self.assertIn("TRIAL_MODEL_ARTIFACT_SHA_INVALID", row["reasons"])
+
     def test_promoted_without_floor_stays_blocked(self):
         row = trial(promoted=True, edge_floor=None)
         self.assertEqual(row["status"], cs.BLOCKED)
@@ -201,7 +216,7 @@ class TrialTier(unittest.TestCase):
 
     def test_insufficient_or_stale_evidence_stays_paper(self):
         self.assertEqual(trial(settled_trial_rows=ledger(1.0, slates=10))["trial_stage"], cs.PAPER)
-        self.assertEqual(trial(settled_trial_rows=ledger(1.0, model_sha="old"))["trial_stage"], cs.PAPER)
+        self.assertEqual(trial(settled_trial_rows=ledger(1.0, model_sha=OLD_MODEL_SHA))["trial_stage"], cs.PAPER)
 
     def test_cap_keeps_top_edges_per_sport(self):
         rows = []
@@ -230,25 +245,27 @@ class TrialTier(unittest.TestCase):
         self.assertEqual(sum("TRIAL_CAP_EXCEEDED" in r["reasons"] for r in capped), 2)
 
     def test_stage_needs_sample_and_clv(self):
-        good = cs.trial_stage_for_market(ledger(1.0), TRIAL_POLICY, model_artifact_sha="abc123")
+        good = cs.trial_stage_for_market(ledger(1.0), TRIAL_POLICY, model_artifact_sha=MODEL_SHA)
         self.assertEqual(good["stage"], cs.MICRO)
         self.assertAlmostEqual(good["clv_t_stat"], 1.0 / ((40 / 39) * 250 / 40000) ** 0.5, places=6)
-        self.assertEqual(cs.trial_stage_for_market(ledger(0.3), TRIAL_POLICY, model_artifact_sha="abc123")["stage"], cs.PAPER)
-        self.assertEqual(cs.trial_stage_for_market(ledger(1.0, slates=39), TRIAL_POLICY, model_artifact_sha="abc123")["stage"], cs.PAPER)
-        self.assertEqual(cs.trial_stage_for_market([], TRIAL_POLICY, model_artifact_sha="abc123")["stage"], cs.PAPER)
+        self.assertEqual(cs.trial_stage_for_market(ledger(0.3), TRIAL_POLICY, model_artifact_sha=MODEL_SHA)["stage"], cs.PAPER)
+        self.assertEqual(cs.trial_stage_for_market(ledger(1.0, slates=39), TRIAL_POLICY, model_artifact_sha=MODEL_SHA)["stage"], cs.PAPER)
+        self.assertEqual(cs.trial_stage_for_market([], TRIAL_POLICY, model_artifact_sha=MODEL_SHA)["stage"], cs.PAPER)
 
     def test_stage_evidence_clock_rejects_stale_model_and_policy(self):
-        rows = ledger(2.0, model_sha="old-model") + ledger(2.0, model_sha="abc123", policy_sha="old-policy")
-        result = cs.trial_stage_for_market(rows, TRIAL_POLICY, model_artifact_sha="abc123")
+        rows = ledger(2.0, model_sha=OLD_MODEL_SHA) + ledger(2.0, model_sha=MODEL_SHA, policy_sha="c" * 64)
+        result = cs.trial_stage_for_market(rows, TRIAL_POLICY, model_artifact_sha=MODEL_SHA)
         self.assertEqual(result["stage"], cs.PAPER)
         self.assertEqual(result["settled"], 0)
 
     def test_stage_requires_current_model_hash(self):
         with self.assertRaises(ValueError):
             cs.trial_stage_for_market([], TRIAL_POLICY, model_artifact_sha="")
+        with self.assertRaises(ValueError):
+            cs.trial_stage_for_market([], TRIAL_POLICY, model_artifact_sha="abc123")
 
     def test_integrity_checks_trial_rows(self):
-        row = dict(trial(), model_p=0.56, edge=0.035)
+        row = rendered_trial()
         cs.assert_card_integrity([row], TRIAL_POLICY)
         with self.assertRaises(ValueError):
             cs.assert_card_integrity([dict(row, stake_units=1.0)], TRIAL_POLICY)
@@ -263,15 +280,29 @@ class TrialTier(unittest.TestCase):
         with self.assertRaises(ValueError):
             cs.assert_card_integrity([dict(row, kelly_fraction=0.25)], TRIAL_POLICY)
         with self.assertRaises(ValueError):
+            cs.assert_card_integrity([dict(row, sport="")], TRIAL_POLICY)
+        missing_slate = dict(row)
+        missing_slate.pop("slate_date")
+        with self.assertRaises(ValueError):
+            cs.assert_card_integrity([missing_slate], TRIAL_POLICY)
+        with self.assertRaises(ValueError):
             cs.assert_card_integrity([{"status": "BLOCKED", "reasons": ["X"], "stake_units": 0.25}])
 
     def test_integrity_checks_micro_evidence_snapshot(self):
         micro = trial(settled_trial_rows=ledger(1.0))
-        row = dict(micro, model_p=0.56, edge=0.035)
+        row = dict(micro, model_p=0.56, edge=0.035, sport="NFL",
+                   slate_date="2026-09-13", market_id="m0")
         cs.assert_card_integrity([row], TRIAL_POLICY)
         bad_evidence = dict(row["trial_stage_evidence"], settled=199)
         with self.assertRaises(ValueError):
             cs.assert_card_integrity([dict(row, trial_stage_evidence=bad_evidence)], TRIAL_POLICY)
+
+    def test_integrity_enforces_rendered_trial_cap(self):
+        rows = []
+        for k in range(6):
+            rows.append(rendered_trial(market_id=f"m{k}"))
+        with self.assertRaises(ValueError):
+            cs.assert_card_integrity(rows, TRIAL_POLICY)
 
 
 if __name__ == "__main__":
