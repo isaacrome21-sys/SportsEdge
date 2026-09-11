@@ -1,0 +1,23 @@
+{
+  "asset": {
+    "asset_id": 549456006,
+    "asset_name": "adv_drives_2023.csv",
+    "browser_download_url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_cfb_adv_drives/adv_drives_2023.csv",
+    "dataset": "adv_drives",
+    "release_id": 334089439,
+    "release_tag": "espn_cfb_adv_drives",
+    "release_updated_at": "2026-09-11T15:00:53Z",
+    "season": 2023,
+    "sha256": "55a569663acc259221b9e83675abb1df419a30f2042c04f9a975b341c7fb6464",
+    "size": 205210,
+    "usage": "PREDICTIVE_INPUT"
+  },
+  "cache_relative_path": "adv_drives/2023/adv_drives_2023.csv",
+  "cache_reused": false,
+  "content_sha256": "55a569663acc259221b9e83675abb1df419a30f2042c04f9a975b341c7fb6464",
+  "contract": "CFB_SPORTSDATAVERSE_RELEASE_V1",
+  "manifest_sha256": "6ca4778b60c10a521dfb1eedc6cd6b01384f1a4f2567bde3c82474af7e1ceaf5",
+  "market_role": "PREDICTIVE_INPUT",
+  "retrieved_at": "2026-09-11T22:22:59.670284+00:00",
+  "row_count": 1806
+}

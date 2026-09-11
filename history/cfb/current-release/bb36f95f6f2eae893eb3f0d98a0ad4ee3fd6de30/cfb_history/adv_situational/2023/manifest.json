@@ -1,0 +1,23 @@
+{
+  "asset": {
+    "asset_id": 549456697,
+    "asset_name": "adv_situational_2023.csv",
+    "browser_download_url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_cfb_adv_situational/adv_situational_2023.csv",
+    "dataset": "adv_situational",
+    "release_id": 334089566,
+    "release_tag": "espn_cfb_adv_situational",
+    "release_updated_at": "2026-09-11T15:01:06Z",
+    "season": 2023,
+    "sha256": "c335fab9213d4e449a2b52c3dc67ecc34591be41310858a1e73f55ce36be5f83",
+    "size": 1000135,
+    "usage": "PREDICTIVE_INPUT"
+  },
+  "cache_relative_path": "adv_situational/2023/adv_situational_2023.csv",
+  "cache_reused": false,
+  "content_sha256": "c335fab9213d4e449a2b52c3dc67ecc34591be41310858a1e73f55ce36be5f83",
+  "contract": "CFB_SPORTSDATAVERSE_RELEASE_V1",
+  "manifest_sha256": "121e86400d53834567ed5221daf533490ffd3c23f2f72656a2e2ae62ecaf46d4",
+  "market_role": "PREDICTIVE_INPUT",
+  "retrieved_at": "2026-09-11T22:22:57.889836+00:00",
+  "row_count": 1806
+}

@@ -1,0 +1,23 @@
+{
+  "asset": {
+    "asset_id": 474295999,
+    "asset_name": "cfb_schedule_2022.csv.gz",
+    "browser_download_url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_cfb_schedules/cfb_schedule_2022.csv.gz",
+    "dataset": "schedules",
+    "release_id": 101941072,
+    "release_tag": "espn_cfb_schedules",
+    "release_updated_at": "2026-09-11T14:58:47Z",
+    "season": 2022,
+    "sha256": "1053ceb10a0d73b5e04bc234cef449262db7ade8e622d389db2756675c7cb3c5",
+    "size": 31466,
+    "usage": "PREDICTIVE_INPUT"
+  },
+  "cache_relative_path": "schedules/2022/cfb_schedule_2022.csv.gz",
+  "cache_reused": false,
+  "content_sha256": "1053ceb10a0d73b5e04bc234cef449262db7ade8e622d389db2756675c7cb3c5",
+  "contract": "CFB_SPORTSDATAVERSE_RELEASE_V1",
+  "manifest_sha256": "488b8cf5c60c3761d9fa4de6abfc23703658d10b3ed92aaf1dcbaf031b908821",
+  "market_role": "PREDICTIVE_INPUT",
+  "retrieved_at": "2026-09-11T22:22:53.909037+00:00",
+  "row_count": 904
+}
