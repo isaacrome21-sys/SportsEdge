@@ -26,12 +26,15 @@ on:
       - "config/v7_backfill_source_requirements_v1.json"
       - "config/v7_reduced_feature_contract_v1.json"
 
-permissions:
-  contents: write
+concurrency:
+  group: sportsedge-mlb-v7-venue-reference-persist
+  cancel-in-progress: false
 
 jobs:
   validate:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout exact code head
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -56,6 +59,7 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
+          import hashlib
           import json
           from pathlib import Path
           root = Path("artifacts/mlb-v7-venue-reference-persist")
@@ -73,6 +77,10 @@ jobs:
           assert att["coverage_start"] == "2023-01-01"
           assert att["coverage_end"] == "2025-12-31"
           assert att["semantics"] == {"fixed_facts_only": True}
+          for item in att["evidence_files"]:
+              path = root / item["path"]
+              assert path.is_file(), item["path"]
+              assert hashlib.sha256(path.read_bytes()).hexdigest() == item["sha256"]
           PY
           PYTHONPATH=. python scripts/audit_v7_backfill_source_readiness.py \
             --source-root artifacts/mlb-v7-venue-reference-persist \
@@ -92,6 +100,8 @@ jobs:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     needs: validate
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout exact code head
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -104,6 +114,7 @@ jobs:
           ref: data
           path: data-branch
           fetch-depth: 1
+          persist-credentials: true
 
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
@@ -111,28 +122,51 @@ jobs:
           python-version: "3.12"
 
       - name: Re-acquire complete bundle directly into durable source root
+        env:
+          CODE_HEAD_SHA: ${{ github.sha }}
+          WORKFLOW_RUN_ID: ${{ github.run_id }}
         run: |
           set -euo pipefail
+          ROOT="data-branch/evidence/mlb_v8_replay_sources"
           PYTHONPATH=. python scripts/acquire_mlb_v7_venue_reference.py \
             --start 2023-01-01 \
             --end 2025-12-31 \
-            --output-root data-branch/evidence/mlb_v8_replay_sources
+            --output-root "$ROOT"
           DATA_REF="$(git -C data-branch rev-parse HEAD)"
           PYTHONPATH=. python scripts/audit_v7_backfill_source_readiness.py \
-            --source-root data-branch/evidence/mlb_v8_replay_sources \
+            --source-root "$ROOT" \
             --data-ref "$DATA_REF" \
             --output artifacts/mlb-v7-venue-reference-persist-readiness.json
           python - <<'PY'
+          import hashlib
           import json
+          import os
           from pathlib import Path
+          root = Path("data-branch/evidence/mlb_v8_replay_sources")
           r = json.loads(Path("artifacts/mlb-v7-venue-reference-persist-readiness.json").read_text())
           venue = r["groups"]["travel"]["sources"]["VENUE_REFERENCE"]
           assert venue["ready"] is True
           assert r["candidate_training_allowed"] is False
           assert r["promotion_authority"] is False
+          att = root / "attestations" / "VENUE_REFERENCE.json"
+          receipt = {
+              "schema_version": 1,
+              "source_class": "VENUE_REFERENCE",
+              "code_head_sha": os.environ["CODE_HEAD_SHA"],
+              "workflow_run_id": int(os.environ["WORKFLOW_RUN_ID"]),
+              "attestation_sha256": hashlib.sha256(att.read_bytes()).hexdigest(),
+              "source_ready": True,
+              "candidate_training_allowed": False,
+              "promotion_authority": False,
+          }
+          receipts = root / "receipts"
+          receipts.mkdir(parents=True, exist_ok=True)
+          (receipts / "VENUE_REFERENCE.json").write_text(
+              json.dumps(receipt, sort_keys=True, separators=(",", ":")) + "\n"
+          )
           PY
 
-      - name: Commit exact generated evidence to data branch
+      - name: Commit complete generated evidence tree to data branch
         run: |
           set -euo pipefail
           git -C data-branch config user.name "sportsedge-data-bot"
@@ -140,7 +174,15 @@ jobs:
           git -C data-branch add evidence/mlb_v8_replay_sources
           if git -C data-branch diff --cached --quiet; then
             echo "Venue evidence already durable; no commit required."
-          else
-            git -C data-branch commit -m "mlb-v7: persist verified venue reference evidence ${GITHUB_RUN_ID}"
-            git -C data-branch push origin HEAD:data
+            exit 0
           fi
+          git -C data-branch commit -m "mlb-v7: persist verified venue reference evidence ${GITHUB_RUN_ID}"
+          for attempt in 1 2 3; do
+            if git -C data-branch pull --rebase origin data && git -C data-branch push origin HEAD:data; then
+              exit 0
+            fi
+            git -C data-branch rebase --abort >/dev/null 2>&1 || true
+            sleep $((attempt * 2))
+          done
+          echo "DATA_BRANCH_PERSIST_FAILED" >&2
+          exit 1
