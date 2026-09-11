@@ -255,6 +255,28 @@ class Logging(Base):
         self.assertEqual(tr.run_log(self.payload(action="edited"), POLICY, FakeClient(), gh, "isaacrome21-sys", MAIN),
                          "SKIP_ALREADY_LOGGED")
 
+    def test_logged_confirmation_waits_for_push(self):
+        gh, box = FakeGH(), tr.Outbox()
+        tr.run_log(self.payload(number=21), POLICY, FakeClient(), gh, "isaacrome21-sys", MAIN, box)
+        self.assertEqual((gh.comments, gh.closed, len(box.items)), ([], [], 1))
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "outbox.json"
+            box.path = path
+            box.save()
+            loaded = tr.Outbox.load(path)
+            self.assertEqual(loaded.flush(gh), [])
+            self.assertFalse(path.exists())
+        self.assertEqual(gh.closed, [21])
+        self.assertIn("status:LOGGED", gh.comments[0])
+
+    def test_outbox_reports_github_failures(self):
+        class Broken(FakeGH):
+            def comment(self, n, text):
+                raise urllib.error.URLError("down")
+        box = tr.Outbox()
+        box.add(5, "Logged")
+        self.assertEqual(box.flush(Broken()), [5])
+
     def test_edit_after_start_rejected(self):
         gh = FakeGH()
         out = tr.run_log(self.payload(action="edited", updated=at(65)), POLICY, FakeClient(), gh, "isaacrome21-sys", MAIN)
@@ -306,6 +328,15 @@ class Closing(Base):
         final = json.loads((tr.CLOSES_DIR / "issue-1.json").read_text())
         self.assertEqual((final["status"], final["attempt_count"], final["last_reason"]), ("CLOSE_MISSED", 5, "NO_FRESH_SHARP_QUOTE"))
 
+    def test_non_evidence_plays_spend_no_credits(self):
+        self.seed(play_id="old-1", policy_id="EV_TRACKER_POLICY_V1")
+        self.seed(play_id="branch-1", git_ref="refs/heads/feature")
+        client = FakeClient({"bookmakers": []})
+        result = self.tick(30, client)
+        self.assertEqual((client.calls, result["attempted"]), ([], 0))
+        self.tick(61, FakeClient())
+        self.assertFalse(tr.CLOSES_DIR.exists() and any(tr.CLOSES_DIR.iterdir()))
+
     def test_fatal_stops_calls(self):
         self.seed()
         self.seed(play_id="issue-2", event_id="e9")
@@ -347,11 +378,13 @@ class Sweep(Base):
                 "created_at": iso(created), "updated_at": iso(updated or created), "body": issue_body(**body)}
 
     def test_logs_dropped_issue_with_original_time(self):
-        gh = FakeGH([self.issue()])
-        out = tr.run_sweep(POLICY, FakeClient(), gh, self.OWNER, MAIN)
+        gh, box = FakeGH([self.issue()]), tr.Outbox()
+        out = tr.run_sweep(POLICY, FakeClient(), gh, self.OWNER, MAIN, box)
         self.assertEqual(out["logged"], 1)
         rec = json.loads((tr.PLAYS_DIR / "issue-11.json").read_text())
         self.assertEqual((rec["accepted_action"], rec["accepted_at"]), ("sweep", iso(at(-20))))
+        self.assertEqual((gh.closed, gh.comments), ([], []))
+        self.assertEqual(box.flush(gh), [])
         self.assertEqual(gh.closed, [11])
         self.assertIn("scheduled sweep", gh.comments[0])
 
@@ -374,7 +407,7 @@ class Sweep(Base):
     def test_marker_from_non_bot_does_not_count(self):
         iss = self.issue()
         gh = FakeGH([iss])
-        gh.thread[11] = [{"user": {"login": self.OWNER}, "body": tr.body_marker(iss)}]
+        gh.thread[11] = [{"user": {"login": self.OWNER}, "body": tr.body_marker(iss, "REJECTED")}]
         gh.issues[0]["comments"] = 1
         self.assertEqual(tr.run_sweep(POLICY, FakeClient(), gh, self.OWNER, MAIN)["logged"], 1)
 
@@ -390,6 +423,28 @@ class Sweep(Base):
         self.assertEqual(tr.run_sweep(POLICY, FakeClient(), gh, self.OWNER, MAIN)["rejected"], 1)
         self.assertIn("LOGGED_AFTER_START", gh.comments[0])
 
+    def test_logged_marker_without_record_is_retried(self):
+        iss = self.issue()
+        gh = FakeGH([iss])
+        gh.thread[11] = [{"user": {"login": gh.BOT_LOGIN}, "body": "Logged ... " + tr.body_marker(iss, "LOGGED")}]
+        gh.issues[0]["comments"] = 1
+        self.assertEqual(tr.run_sweep(POLICY, FakeClient(), gh, self.OWNER, MAIN, tr.Outbox())["logged"], 1)
+
+    def test_github_failures_do_not_stop_close_run(self):
+        class ListDown(FakeGH):
+            def list_open_bet_issues(self, owner):
+                raise urllib.error.URLError("down")
+        self.assertEqual(tr.run_sweep(POLICY, FakeClient(), ListDown(), self.OWNER, MAIN)["errors"], ["GITHUB_API_ERROR"])
+
+        class CommentsDown(FakeGH):
+            def issue_comments(self, n):
+                raise urllib.error.URLError("down")
+        busy = self.issue(number=31)
+        busy["comments"] = 2
+        gh = CommentsDown([busy, self.issue(number=32)])
+        out = tr.run_sweep(POLICY, FakeClient(), gh, self.OWNER, MAIN, tr.Outbox())
+        self.assertEqual((out["errors"], out["logged"]), (["GITHUB_API_ERROR"], 1))
+
     def test_workflow_lock_and_sweep_permissions(self):
         text = (ROOT / ".github/workflows/ev-tracker.yml").read_text()
         self.assertEqual(text.count("group: sportsedge-paid-odds-api"), 2)
@@ -397,6 +452,10 @@ class Sweep(Base):
         self.assertIn("issues: write", close_job)
         self.assertIn("GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}", close_job)
         self.assertIn("ledger/ev_plays", close_job)
+        for job in (text.split("\n  close:")[0], close_job):
+            commit, notify = job.index("git commit"), job.index("ev_tracker.py notify")
+            self.assertLess(commit, notify, "confirmations must be posted after the ledger push")
+            self.assertIn("--diff-filter=MDRT", job)
 
 
 class Client(unittest.TestCase):

@@ -40,7 +40,7 @@ jobs:
           git config user.name "sportsedge-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A ledger/ev_plays
-          changed="$(git diff --cached --name-only --diff-filter=MDR -- ledger/)"
+          changed="$(git diff --cached --name-only --diff-filter=MDRT -- ledger/)"
           if [ -n "$changed" ]; then echo "Refusing to modify existing ledger records: $changed"; exit 1; fi
           if ! git diff --cached --quiet; then
             git commit -m "ev-tracker: log issue #${{ github.event.issue.number }}"
@@ -52,6 +52,11 @@ jobs:
             done
             if [ "$pushed" != "1" ]; then echo "PUSH_FAILED: evidence was not persisted"; exit 1; fi
           fi
+      - name: Post confirmation after push
+        if: steps.tracker.outputs.code == '0'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/ev_tracker.py notify
       - name: Fail on non-OK result
         if: steps.tracker.outputs.code != '0'
         run: exit 1
@@ -85,7 +90,7 @@ jobs:
           git config user.name "sportsedge-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A ledger/ev_manual_close_observations
-          changed="$(git diff --cached --name-only --diff-filter=MDR -- ledger/)"
+          changed="$(git diff --cached --name-only --diff-filter=MDRT -- ledger/)"
           if [ -n "$changed" ]; then echo "Refusing to modify existing ledger records: $changed"; exit 1; fi
           if ! git diff --cached --quiet; then
             git commit -m "ev-tracker: manual close issue #${{ github.event.issue.number }}"
@@ -141,7 +146,7 @@ jobs:
           else
             git add output/ev_tracker/health.md
           fi
-          changed="$(git diff --cached --name-only --diff-filter=MDR -- ledger/)"
+          changed="$(git diff --cached --name-only --diff-filter=MDRT -- ledger/)"
           if [ -n "$changed" ]; then echo "Refusing to modify existing ledger records: $changed"; exit 1; fi
           if ! git diff --cached --quiet; then
             git commit -m "ev-tracker: close update"
@@ -153,6 +158,11 @@ jobs:
             done
             if [ "$pushed" != "1" ]; then echo "PUSH_FAILED: evidence was not persisted"; exit 1; fi
           fi
+      - name: Post confirmations after push
+        if: steps.tracker.outputs.code == '0' || steps.tracker.outputs.code == '3'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/ev_tracker.py notify
       - name: Fail on non-OK result
         if: steps.tracker.outputs.code != '0'
         run: exit 1

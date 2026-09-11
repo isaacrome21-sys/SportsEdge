@@ -2,6 +2,7 @@
 
   python scripts/ev_tracker.py log     # from a "[BET]" issue (GitHub Actions)
   python scripts/ev_tracker.py close   # sweep missed [BET] issues, sharp price attempts, finalize after start
+  python scripts/ev_tracker.py notify  # post "Logged" confirmations, only after the ledger commit was pushed
 
 Exit codes: 0 OK, 3 DEGRADED (handled: key, budget, provider errors), anything else is a crash.
 Ledger files are create-only and sealed with a content hash. The API key is never printed.
@@ -16,6 +17,7 @@ import os
 import random
 import socket
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -169,6 +171,9 @@ class GitHub:
         return self._call("GET", f"/issues/{number}/comments?per_page=100") or []
 
 
+GITHUB_ERRORS = (urllib.error.URLError, TimeoutError, socket.timeout, json.JSONDecodeError, ValueError)
+
+
 # ---------- ledger ----------
 
 def read_dir(path: Path) -> list:
@@ -187,6 +192,51 @@ def write_new(directory: Path, name: str, record: dict) -> dict:
     except FileExistsError:
         raise EVError("LEDGER_RECORD_EXISTS", name) from None
     return sealed
+
+
+# ---------- outbox ----------
+
+class Outbox:
+    """'Logged' confirmations wait here until the ledger commit is pushed.
+    Lives outside the repo so it is never committed."""
+
+    def __init__(self, path=None):
+        self.path = Path(path) if path else None
+        self.items = []
+
+    @staticmethod
+    def default_path() -> Path:
+        base = os.environ.get("EV_TRACKER_OUTBOX")
+        if base:
+            return Path(base)
+        return Path(os.environ.get("RUNNER_TEMP") or tempfile.gettempdir()) / "ev_tracker_outbox.json"
+
+    def add(self, number, text, close=True):
+        self.items.append({"issue": number, "comment": text, "close": close})
+
+    def save(self):
+        if self.path and self.items:
+            self.path.write_text(json.dumps(self.items))
+
+    @classmethod
+    def load(cls, path):
+        box = cls(path)
+        if box.path.exists():
+            box.items = json.loads(box.path.read_text())
+        return box
+
+    def flush(self, gh) -> list:
+        failed = []
+        for item in self.items:
+            try:
+                gh.comment(item["issue"], item["comment"])
+                if item["close"]:
+                    gh.close(item["issue"])
+            except GITHUB_ERRORS:
+                failed.append(item["issue"])
+        if self.path and self.path.exists():
+            self.path.unlink()
+        return failed
 
 
 # ---------- log ----------
@@ -292,12 +342,14 @@ def bet_label(p: dict) -> str:
     return f"{p['pick']} {p['line']:g} ({p['away_team']} at {p['home_team']})"
 
 
-def body_marker(issue: dict) -> str:
+def body_marker(issue: dict, status: str) -> str:
     sha = hashlib.sha256((issue.get("body") or "").encode()).hexdigest()
-    return f"<!-- sportsedge-ev-tracker body-sha256:{sha} -->"
+    return f"<!-- sportsedge-ev-tracker status:{status} body-sha256:{sha} -->"
 
 
-def run_log(payload: dict, policy: dict, client, gh, owner: str, env=None) -> str:
+def run_log(payload: dict, policy: dict, client, gh, owner: str, env=None, outbox=None) -> str:
+    """Rejections and provider notices are posted now. The 'Logged' confirmation and
+    issue close go to the outbox and are posted only after the ledger commit is pushed."""
     issue = payload.get("issue") or {}
     if not issue.get("title", "").startswith("[BET]"):
         return "SKIP_NOT_BET"
@@ -306,7 +358,6 @@ def run_log(payload: dict, policy: dict, client, gh, owner: str, env=None) -> st
     play_id = f"issue-{issue['number']}"
     if (PLAYS_DIR / f"{play_id}.json").exists():
         return "SKIP_ALREADY_LOGGED"
-    marker = body_marker(issue)
     quiet = payload.get("action") == "sweep"
     try:
         play = build_play(payload, policy, client, env)
@@ -316,38 +367,50 @@ def run_log(payload: dict, policy: dict, client, gh, owner: str, env=None) -> st
                 gh.comment(issue["number"], f"Not logged yet: `{exc.code}` (data provider problem). "
                                             "It will retry automatically within 30 minutes.")
             return f"DEGRADED_{exc.code}"
-        gh.comment(issue["number"], f"Not logged: `{exc}`. Edit the issue to fix it and it will retry.\n{marker}")
+        gh.comment(issue["number"], f"Not logged: `{exc}`. Edit the issue to fix it and it will retry.\n"
+                                    f"{body_marker(issue, 'REJECTED')}")
         return f"REJECTED_{exc.code}"
     write_new(PLAYS_DIR, play_id, play)
     start_ct = ev.parse_utc(play["commence_time"]).astimezone(ev.CT).strftime("%a %b %-d, %-I:%M %p CT")
     swapped = "\nNote: the book lists these teams the other way around; logged with the book's home/away." if play["teams_entered_swapped"] else ""
     late = "\nLogged by the scheduled sweep; the decision time is the issue's last update." if quiet else ""
-    gh.comment(issue["number"],
-               f"Logged: **{bet_label(play)}** ({play['away_team']} at {play['home_team']}) at {play['book']} "
-               f"{play['price_american']:+d}, {play['stake_units']:g}u. Starts {start_ct}. "
-               f"Edits to this issue no longer change the record.{swapped}{late}\n{marker}")
-    gh.close(issue["number"])
+    (outbox if outbox is not None else Outbox()).add(
+        issue["number"],
+        f"Logged: **{bet_label(play)}** ({play['away_team']} at {play['home_team']}) at {play['book']} "
+        f"{play['price_american']:+d}, {play['stake_units']:g}u. Starts {start_ct}. "
+        f"Edits to this issue no longer change the record.{swapped}{late}\n{body_marker(issue, 'LOGGED')}")
     return "LOGGED"
 
 
-def run_sweep(policy: dict, client, gh, owner: str, env=None) -> dict:
-    """Logs open [BET] issues whose event-triggered log job never ran or was cancelled.
-    An issue is skipped when the bot already answered its current body."""
+def run_sweep(policy: dict, client, gh, owner: str, env=None, outbox=None) -> dict:
+    """Logs open [BET] issues whose event-triggered log job never ran, was cancelled, or failed to push.
+    Skipped only when the bot already rejected the issue's current body. GitHub API
+    failures are recorded and never stop the close run."""
     out = {"logged": 0, "rejected": 0, "degraded": 0, "skipped": 0, "closed_existing": 0, "errors": []}
-    for issue in gh.list_open_bet_issues(owner):
-        if (issue.get("user") or {}).get("login") != owner:
-            continue
-        if (PLAYS_DIR / f"issue-{issue['number']}.json").exists():
-            gh.close(issue["number"])
-            out["closed_existing"] += 1
-            continue
-        if issue.get("comments", 0):
-            marker = body_marker(issue)
-            if any((c.get("user") or {}).get("login") == gh.BOT_LOGIN and marker in (c.get("body") or "")
-                   for c in gh.issue_comments(issue["number"])):
-                out["skipped"] += 1
+    try:
+        issues = gh.list_open_bet_issues(owner)
+    except GITHUB_ERRORS:
+        out["errors"].append("GITHUB_API_ERROR")
+        return out
+    for issue in issues:
+        try:
+            if (issue.get("user") or {}).get("login") != owner:
                 continue
-        outcome = run_log({"action": "sweep", "issue": issue}, policy, client, gh, owner, env)
+            if (PLAYS_DIR / f"issue-{issue['number']}.json").exists():
+                gh.comment(issue["number"], "Already in the ledger; closing.")
+                gh.close(issue["number"])
+                out["closed_existing"] += 1
+                continue
+            if issue.get("comments", 0):
+                rejected = body_marker(issue, "REJECTED")
+                if any((c.get("user") or {}).get("login") == gh.BOT_LOGIN and rejected in (c.get("body") or "")
+                       for c in gh.issue_comments(issue["number"])):
+                    out["skipped"] += 1
+                    continue
+            outcome = run_log({"action": "sweep", "issue": issue}, policy, client, gh, owner, env, outbox)
+        except GITHUB_ERRORS:
+            out["errors"].append("GITHUB_API_ERROR")
+            continue
         if outcome == "LOGGED":
             out["logged"] += 1
         elif outcome.startswith("REJECTED_"):
@@ -382,6 +445,8 @@ def run_close(policy: dict, client, now_fn=utcnow, env=None) -> dict:
     for p in plays:
         if p["play_id"] in finals:
             continue
+        if p.get("policy_id") != policy["policy_id"] or p.get("git_ref") != policy["evidence_ref"]:
+            continue  # older-policy or non-main plays never spend credits
         start = ev.parse_utc(p["commence_time"])
         mine = sorted(attempts.get(p["play_id"], []), key=lambda a: a["captured_at"])
         if now >= start:
@@ -434,6 +499,7 @@ def run_close(policy: dict, client, now_fn=utcnow, env=None) -> dict:
         write_new(CLOSES_DIR, f["play_id"], f)
         result["finalized"] += 1
     result["degraded"] = bool(result["errors"])
+    result["as_of"] = iso(now)
     return result
 
 
@@ -527,8 +593,16 @@ def write_health(now, status, detail, credits=None):
 def main(argv=None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     mode = argv[0] if argv else "close"
-    policy = ev.load_active_policy(ROOT)
     key = os.environ.get("ODDS_API_KEY", "")
+
+    if mode == "notify":
+        box = Outbox.load(Outbox.default_path())
+        failed = box.flush(GitHub(os.environ["GITHUB_TOKEN"], os.environ["GITHUB_REPOSITORY"]))
+        print(json.dumps({"sent": len(box.items) - len(failed), "failed": failed}))
+        return DEGRADED if failed else OK
+
+    policy = ev.load_active_policy(ROOT)
+    outbox = Outbox(Outbox.default_path())
 
     if mode == "log":
         payload = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
@@ -538,7 +612,8 @@ def main(argv=None) -> int:
                 gh.comment(payload["issue"]["number"], "Not logged yet: the `SPORTSEDGE_ODDS_API_KEY` secret is missing.")
             return DEGRADED
         outcome = run_log(payload, policy, OddsApiClient(key, policy["budget"]["reserve_credits"]),
-                          gh, os.environ.get("GITHUB_REPOSITORY_OWNER", ""))
+                          gh, os.environ.get("GITHUB_REPOSITORY_OWNER", ""), outbox=outbox)
+        outbox.save()
         print(outcome)
         return DEGRADED if outcome.startswith("DEGRADED_") else OK
 
@@ -556,14 +631,17 @@ def main(argv=None) -> int:
             return DEGRADED
         token, repo = os.environ.get("GITHUB_TOKEN"), os.environ.get("GITHUB_REPOSITORY")
         if token and repo:
-            sweep = run_sweep(policy, client, GitHub(token, repo), os.environ.get("GITHUB_REPOSITORY_OWNER", ""))
+            sweep = run_sweep(policy, client, GitHub(token, repo), os.environ.get("GITHUB_REPOSITORY_OWNER", ""),
+                              outbox=outbox)
         else:
             sweep = {"errors": ["SWEEP_SKIPPED_NO_GITHUB_TOKEN"]}
         result = run_close(policy, client)
         result["sweep"] = sweep
         degraded = result["degraded"] or bool(sweep["errors"])
-        write_health(utcnow(), "DEGRADED" if degraded else "OK", json.dumps(result, sort_keys=True), client.remaining)
-        write_if_changed(SUMMARY, render_summary(policy, utcnow()))
+        as_of = ev.parse_utc(result["as_of"])
+        write_health(as_of, "DEGRADED" if degraded else "OK", json.dumps(result, sort_keys=True), client.remaining)
+        write_if_changed(SUMMARY, render_summary(policy, as_of))
+        outbox.save()
         print(json.dumps(result, sort_keys=True))
         return DEGRADED if degraded else OK
 
