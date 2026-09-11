@@ -5,6 +5,7 @@
   "status": "UNFROZEN",
   "artifact_path": "models/cfb_joint_v1.json",
   "artifact_sha256": null,
+  "artifact_file_sha256": null,
   "model_code_sha256": null,
   "training_source_sha256": null,
   "source_manifest_sha256": null,
@@ -16,6 +17,7 @@
   "blocker": "CFB_PIT_TRAINING_BUNDLE_UNAVAILABLE",
   "activation_rule": "Only a refs/heads/main commit containing the exact genuine fitted artifact bytes, verified source manifest/snapshots, predictive/acquisition code manifests, and matching non-null hashes may change status to FROZEN. Feature branches never activate a freeze or evidence clock.",
   "notes": [
+    "artifact_sha256 is the model artifact's canonical internal identity; artifact_file_sha256 separately binds exact committed JSON bytes.",
     "The current historical-release capture is explicitly NOT point-in-time and cannot satisfy this registry.",
     "Synthetic fixture artifacts and CI determinism fixtures are prohibited as freeze evidence.",
     "Runtime must fail closed while status is UNFROZEN."
