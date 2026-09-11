@@ -234,8 +234,12 @@ class FootballPropExtendedRunMachineTests(unittest.TestCase):
                         ], capture_output=True, text=True)
                         self.assertEqual(result.returncode, 2, result.stderr)
                         card = json.loads(output.read_text())
-                        suffix = 'BINDING_REQUIRED' if present else 'ARTIFACT_REQUIRED'
-                        self.assertEqual(card['blocker'], f'{sport}_PROP_FROZEN_MODEL_{suffix}')
+                        if sport == 'CFB':
+                            expected = 'CFB_PROP_FROZEN_MODEL_BINDING_REQUIRED'
+                        else:
+                            suffix = 'BINDING_REQUIRED' if present else 'ARTIFACT_REQUIRED'
+                            expected = f'NFL_PROP_FROZEN_MODEL_{suffix}'
+                        self.assertEqual(card['blocker'], expected)
                         self.assertEqual(card['status'], 'BLOCKED')
                         self.assertIsNone(card['report']['results'][0]['model_p'])
 

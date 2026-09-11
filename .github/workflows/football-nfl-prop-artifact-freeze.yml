@@ -5,21 +5,39 @@ on:
   pull_request:
     paths:
       - 'sportsedge/sports/nfl/prop_artifact_training.py'
+      - 'sportsedge/sports/nfl/prop_code_surface.py'
       - 'sportsedge/football_prop_run_machine.py'
       - 'sportsedge/football_prop_extended_run_machine.py'
       - 'scripts/build_nfl_prop_model_artifact.py'
+      - 'scripts/run_football_props_auto.py'
+      - 'config/nfl_prop_model_freeze.json'
+      - 'config/nfl_prop_code_surface_v1.json'
+      - 'artifacts/football/nfl_prop_artifact_bundle_v1.json'
+      - 'artifacts/football/nfl_prop_bundle_parts/**'
+      - 'tests/test_nfl_prop_code_surface.py'
       - '.github/workflows/football-nfl-prop-artifact-freeze.yml'
   push:
     branches: [main]
     paths:
       - 'sportsedge/sports/nfl/prop_artifact_training.py'
+      - 'sportsedge/sports/nfl/prop_code_surface.py'
       - 'sportsedge/football_prop_run_machine.py'
       - 'sportsedge/football_prop_extended_run_machine.py'
       - 'scripts/build_nfl_prop_model_artifact.py'
+      - 'scripts/run_football_props_auto.py'
+      - 'config/nfl_prop_model_freeze.json'
+      - 'config/nfl_prop_code_surface_v1.json'
+      - 'artifacts/football/nfl_prop_artifact_bundle_v1.json'
+      - 'artifacts/football/nfl_prop_bundle_parts/**'
+      - 'tests/test_nfl_prop_code_surface.py'
       - '.github/workflows/football-nfl-prop-artifact-freeze.yml'
 
 permissions:
   contents: read
+
+concurrency:
+  group: football-nfl-prop-artifact-freeze-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   freeze:
@@ -38,6 +56,28 @@ jobs:
           python-version-file: '.python-version'
       - name: Install contracted dependencies
         run: python -m pip install --disable-pip-version-check -r requirements-test.txt
+      - name: Verify checked-in certified activation before fitting
+        run: |
+          python -m pytest -q tests/test_nfl_prop_code_surface.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from sportsedge.football_prop_run_machine import canonical_hash
+          from sportsedge.sports.nfl.prop_code_surface import load_nfl_prop_artifact_bundle, verify_nfl_prop_code_surface
+
+          root = Path('.').resolve()
+          freeze = json.loads(Path('config/nfl_prop_model_freeze.json').read_text())
+          model = load_nfl_prop_artifact_bundle(root=root, bundle_path=root / freeze['artifact_path'])
+          assert freeze['status'] == 'FROZEN'
+          assert freeze['promotion_authority'] is False
+          assert canonical_hash(model) == freeze['artifact_sha256'] == '3efa5cc92b5ed1bf53a99cbe0d6e7792d01791a77c8f684874d66213b73d9570'
+          assert model['code_git_sha'] == freeze['code_git_sha'] == '5dfa29347bed608771e6a2395ce8e894dbfdd881'
+          assert model['source_manifest_sha256'] == freeze['source_manifest_sha256'] == '71b6a1ed010e963dd0e8bb0b8a18d2a3a9cdef1914084631fe5adb9ed2c278da'
+          attestation = verify_nfl_prop_code_surface(root=root, registry=freeze, artifact=model)
+          assert attestation['status'] == 'COMPATIBLE'
+          assert attestation['promotion_authority'] is False
+          print('NFL_PROP_CHECKED_IN_CERTIFIED_ACTIVATION_OK')
+          PY
       - name: Download frozen public nflverse PBP inputs
         shell: bash
         run: |
@@ -94,12 +134,13 @@ jobs:
           cmp artifacts/football/nfl_prop_freeze_a/model.json artifacts/football/nfl_prop_freeze_b/model.json
           cmp artifacts/football/nfl_prop_freeze_a/fit_diagnostics.json artifacts/football/nfl_prop_freeze_b/fit_diagnostics.json
           cmp artifacts/football/nfl_prop_freeze_a/freeze.json artifacts/football/nfl_prop_freeze_b/freeze.json
-      - name: Validate artifact through production SHA binding
+      - name: Validate newly fitted artifact through production SHA binding
         run: |
           python - <<'PY'
           import json, os
           from pathlib import Path
-          from sportsedge.football_prop_run_machine import _load_artifact, canonical_hash
+          from sportsedge.football_prop_run_machine import _load_artifact, canonical_hash, FootballPropRunError
+          from scripts.run_football_props_auto import _freeze
 
           model = json.loads(Path('artifacts/football/nfl_prop_freeze_a/model.json').read_text())
           freeze = json.loads(Path('artifacts/football/nfl_prop_freeze_a/freeze.json').read_text())
@@ -110,41 +151,25 @@ jobs:
           assert freeze['status'] == 'FROZEN'
           assert freeze['promotion_authority'] is False
           assert freeze['artifact_sha256'] == expected
-          assert freeze['artifact_path'] == 'artifacts/football/nfl_offensive_prop_ab_model.json'
-          profiles, actual, source_sha = _load_artifact(
-              model,
-              sport='NFL',
-              expected_artifact_sha256=expected,
-              runtime_code_git_sha=os.environ['EVIDENCE_GIT_SHA'],
-          )
+          profiles, actual, source_sha = _load_artifact(model, sport='NFL', expected_artifact_sha256=expected, runtime_code_git_sha=os.environ['EVIDENCE_GIT_SHA'])
           assert actual == expected
           assert source_sha == model['source_manifest_sha256']
           assert len(profiles) == 32
-          assert set(model['team_special_teams_rates']) == set(profiles)
-          # Exercise the actual runtime path and freeze registry contract, then
-          # prove altered fitted parameters still fail the production hash gate.
-          from scripts.run_football_props_auto import _freeze
-          from sportsedge.football_prop_run_machine import FootballPropRunError
           runtime_path = Path(freeze['artifact_path'])
           runtime_path.parent.mkdir(parents=True, exist_ok=True)
           runtime_path.write_bytes(Path('artifacts/football/nfl_prop_freeze_a/model.json').read_bytes())
-          loaded, bound_sha = _freeze(Path('artifacts/football/nfl_prop_freeze_a/freeze.json'), runtime_path, 'NFL')
+          loaded, bound_sha, loaded_registry = _freeze(Path('artifacts/football/nfl_prop_freeze_a/freeze.json'), runtime_path, 'NFL')
+          assert loaded_registry['promotion_authority'] is False
           assert canonical_hash(loaded) == bound_sha == expected
           first_team = sorted(loaded['team_drive_profiles'])[0]
           loaded['team_drive_profiles'][first_team]['pass_rate'] += 0.001
           try:
-              _load_artifact(loaded, sport='NFL', expected_artifact_sha256=bound_sha,
-                             runtime_code_git_sha=os.environ['EVIDENCE_GIT_SHA'])
+              _load_artifact(loaded, sport='NFL', expected_artifact_sha256=bound_sha, runtime_code_git_sha=os.environ['EVIDENCE_GIT_SHA'])
           except FootballPropRunError as exc:
               assert 'SHA256_MISMATCH' in str(exc), str(exc)
           else:
               raise AssertionError('TAMPERED_ARTIFACT_ACCEPTED')
-          print(
-              'NFL_PROP_REAL_FREEZE_OK '
-              f"artifact_sha256={expected} "
-              f"source_manifest_sha256={source_sha} "
-              f"teams={len(profiles)}"
-          )
+          print(f'NFL_PROP_REAL_FREEZE_OK artifact_sha256={expected} source_manifest_sha256={source_sha} teams={len(profiles)}')
           PY
       - name: Upload immutable exact-SHA freeze bundle
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

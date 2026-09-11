@@ -1,0 +1,12 @@
+{
+  "artifact_canonical_sha256": "3efa5cc92b5ed1bf53a99cbe0d6e7792d01791a77c8f684874d66213b73d9570",
+  "compressed_sha256": "36e276cb0c58c9e118719136daf6596194324823857052cef0f463074f1de578",
+  "encoding": "GZIP_BASE64_CONCAT_V1",
+  "parts": [
+    {"path": "artifacts/football/nfl_prop_bundle_parts/model_gzip_00.b64", "text_sha256": "34a69bdd886e90ab0f4c7a0a2aa5a25d5323e67e31fb08c81a9a1fab673dc423"},
+    {"path": "artifacts/football/nfl_prop_bundle_parts/model_gzip_01.b64", "text_sha256": "1ce25d736765e697253bdfca0bc9b666e411116a32cf6043129f93e58b324741"}
+  ],
+  "promotion_authority": false,
+  "schema_version": "FOOTBALL_PROP_ARTIFACT_BUNDLE_V1",
+  "sport": "NFL"
+}
