@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "contract": "SPORTSEDGE_MLB_V7_BACKFILL_SOURCE_READINESS_V1",
+  "policy_path": "config/v7_feature_backfill_policy_v1.json",
+  "coverage": {
+    "start": "2023-01-01",
+    "end": "2025-12-31"
+  },
+  "groups": {
+    "bullpen": {
+      "feature_paths": [
+        "baseball.bullpen.relief_pitches_1d",
+        "baseball.bullpen.relief_pitches_3d",
+        "baseball.bullpen.relief_pitches_7d",
+        "baseball.bullpen.relievers_used_1d",
+        "baseball.bullpen.relievers_back_to_back"
+      ],
+      "sources": {
+        "BULLPEN_USAGE": {
+          "manifest_path": "attestations/BULLPEN_USAGE.json",
+          "required_fields": ["game_id", "team_id", "pitcher_id", "pitches", "game_start_time", "final_at"],
+          "required_semantics": {
+            "point_in_time": true,
+            "final_before_decision": true
+          }
+        }
+      }
+    },
+    "park": {
+      "feature_paths": [
+        "context.park.run_factor",
+        "context.park.hr_factor_lhb",
+        "context.park.hr_factor_rhb"
+      ],
+      "sources": {
+        "PARK_RAW": {
+          "manifest_path": "attestations/PARK_RAW.json",
+          "required_fields": ["season", "venue_id", "runs", "plate_appearances", "home_runs", "batter_stand"],
+          "required_semantics": {
+            "point_in_time": true,
+            "recompute_from_prior_season_raw": true,
+            "later_revised_values_forbidden": true
+          }
+        }
+      }
+    },
+    "travel": {
+      "feature_paths": [
+        "context.travel.travel_km",
+        "context.travel.timezone_shift_hours",
+        "context.travel.days_rest",
+        "context.travel.consecutive_game_days"
+      ],
+      "sources": {
+        "MLB_STATSAPI_HISTORY": {
+          "manifest_path": "attestations/MLB_STATSAPI_HISTORY.json",
+          "required_fields": ["game_id", "team_id", "venue_id", "game_start_time", "status", "final_at"],
+          "required_semantics": {
+            "point_in_time": true,
+            "final_before_decision": true,
+            "complete_schedule_chain": true
+          }
+        },
+        "VENUE_REFERENCE": {
+          "manifest_path": "attestations/VENUE_REFERENCE.json",
+          "required_fields": ["venue_id", "latitude", "longitude", "timezone"],
+          "required_semantics": {
+            "fixed_facts_only": true
+          }
+        }
+      }
+    }
+  },
+  "notes": [
+    "Policy admission is necessary but does not establish source readiness.",
+    "A source counts only when its manifest coverage, semantics, and referenced evidence-file hashes verify.",
+    "This contract does not promote a model or authorize Model_P."
+  ]
+}
