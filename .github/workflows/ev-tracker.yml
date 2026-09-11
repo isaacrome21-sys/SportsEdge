@@ -1,0 +1,66 @@
+name: ev-tracker
+
+on:
+  issues:
+    types: [opened, edited]
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  log-bet:
+    if: github.event_name == 'issues' && startsWith(github.event.issue.title, '[BET]') && github.event.issue.user.login == github.repository_owner
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ev-tracker-issue-${{ github.event.issue.number }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Log bet
+        env:
+          ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/ev_tracker.py log
+      - name: Commit
+        if: always()
+        run: |
+          git config user.name "sportsedge-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A ledger/ev_plays 2>/dev/null || true
+          if ! git diff --cached --quiet; then
+            git commit -m "ev-tracker: log issue #${{ github.event.issue.number }}"
+            for i in 1 2 3; do git pull --rebase && git push && break; sleep 5; done
+          fi
+
+  close:
+    if: github.event_name != 'issues'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ev-tracker-close
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Capture sharp prices and refresh summary
+        env:
+          ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+        run: python scripts/ev_tracker.py close
+      - name: Commit
+        if: always()
+        run: |
+          git config user.name "sportsedge-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A ledger/ev_closes output/ev_tracker 2>/dev/null || true
+          if ! git diff --cached --quiet; then
+            git commit -m "ev-tracker: close capture"
+            for i in 1 2 3; do git pull --rebase && git push && break; sleep 5; done
+          fi
