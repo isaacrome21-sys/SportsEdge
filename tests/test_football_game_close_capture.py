@@ -38,6 +38,14 @@ def test_policy_freezes_named_book_and_devig() -> None:
     assert policy["capture"]["missing_rule"] == "CLOSE_MISSED"
 
 
+def test_close_key_never_falls_back_to_shared_odds_key(monkeypatch) -> None:
+    monkeypatch.delenv("SPORTSEDGE_FOOTBALL_CLOSE_ODDS_API_KEY", raising=False)
+    monkeypatch.setenv("SPORTSEDGE_ODDS_API_KEY", "shared-reserve-key")
+    assert mod._close_api_key() == ""
+    monkeypatch.setenv("SPORTSEDGE_FOOTBALL_CLOSE_ODDS_API_KEY", "dedicated-close-key")
+    assert mod._close_api_key() == "dedicated-close-key"
+
+
 def test_finalizer_selects_last_valid_prestart_observation(tmp_path: Path) -> None:
     row = _row()
     obs_dir, final_path = mod._dirs(tmp_path, row)
