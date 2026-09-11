@@ -1,0 +1,146 @@
+name: MLB V7 venue reference persistence
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/mlb-v7-venue-reference-persist.yml"
+      - "scripts/acquire_mlb_v7_venue_reference.py"
+      - "scripts/audit_v7_backfill_source_readiness.py"
+      - "sportsedge/mlb_v7_venue_reference.py"
+      - "sportsedge/mlb_v7_travel_history.py"
+      - "sportsedge/v7_backfill_source_readiness.py"
+      - "config/v7_feature_backfill_policy_v1.json"
+      - "config/v7_backfill_source_requirements_v1.json"
+      - "config/v7_reduced_feature_contract_v1.json"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/mlb-v7-venue-reference-persist.yml"
+      - "scripts/acquire_mlb_v7_venue_reference.py"
+      - "scripts/audit_v7_backfill_source_readiness.py"
+      - "sportsedge/mlb_v7_venue_reference.py"
+      - "sportsedge/mlb_v7_travel_history.py"
+      - "sportsedge/v7_backfill_source_readiness.py"
+      - "config/v7_feature_backfill_policy_v1.json"
+      - "config/v7_backfill_source_requirements_v1.json"
+      - "config/v7_reduced_feature_contract_v1.json"
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact code head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+
+      - name: Acquire complete venue bundle in scratch space
+        run: |
+          set -euo pipefail
+          rm -rf artifacts/mlb-v7-venue-reference-persist
+          PYTHONPATH=. python scripts/acquire_mlb_v7_venue_reference.py \
+            --start 2023-01-01 \
+            --end 2025-12-31 \
+            --output-root artifacts/mlb-v7-venue-reference-persist
+
+      - name: Verify acquisition and source-readiness binding
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path("artifacts/mlb-v7-venue-reference-persist")
+          report = json.loads((root / "acquisition_report.json").read_text())
+          assert report["state"] == "READY_TO_ATTEST"
+          assert report["discovered_venue_count"] == 39
+          assert report["resolved_venue_count"] == 39
+          assert report["missing_venue_ids"] == []
+          assert report["failures"] == []
+          assert report["attestation_written"] is True
+          assert report["promotion_authority"] is False
+          assert report["candidate_training_allowed"] is False
+          att = json.loads((root / "attestations" / "VENUE_REFERENCE.json").read_text())
+          assert att["source_class"] == "VENUE_REFERENCE"
+          assert att["coverage_start"] == "2023-01-01"
+          assert att["coverage_end"] == "2025-12-31"
+          assert att["semantics"] == {"fixed_facts_only": True}
+          PY
+          PYTHONPATH=. python scripts/audit_v7_backfill_source_readiness.py \
+            --source-root artifacts/mlb-v7-venue-reference-persist \
+            --data-ref "validation-${GITHUB_SHA}" \
+            --output artifacts/mlb-v7-venue-reference-persist/readiness.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          r = json.loads(Path("artifacts/mlb-v7-venue-reference-persist/readiness.json").read_text())
+          venue = r["groups"]["travel"]["sources"]["VENUE_REFERENCE"]
+          assert venue["ready"] is True
+          assert r["candidate_training_allowed"] is False
+          assert r["promotion_authority"] is False
+          PY
+
+  persist:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact code head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Checkout durable data branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: data
+          path: data-branch
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+
+      - name: Re-acquire complete bundle directly into durable source root
+        run: |
+          set -euo pipefail
+          PYTHONPATH=. python scripts/acquire_mlb_v7_venue_reference.py \
+            --start 2023-01-01 \
+            --end 2025-12-31 \
+            --output-root data-branch/evidence/mlb_v8_replay_sources
+          DATA_REF="$(git -C data-branch rev-parse HEAD)"
+          PYTHONPATH=. python scripts/audit_v7_backfill_source_readiness.py \
+            --source-root data-branch/evidence/mlb_v8_replay_sources \
+            --data-ref "$DATA_REF" \
+            --output artifacts/mlb-v7-venue-reference-persist-readiness.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          r = json.loads(Path("artifacts/mlb-v7-venue-reference-persist-readiness.json").read_text())
+          venue = r["groups"]["travel"]["sources"]["VENUE_REFERENCE"]
+          assert venue["ready"] is True
+          assert r["candidate_training_allowed"] is False
+          assert r["promotion_authority"] is False
+          PY
+
+      - name: Commit exact generated evidence to data branch
+        run: |
+          set -euo pipefail
+          git -C data-branch config user.name "sportsedge-data-bot"
+          git -C data-branch config user.email "sportsedge-data-bot@users.noreply.github.com"
+          git -C data-branch add evidence/mlb_v8_replay_sources
+          if git -C data-branch diff --cached --quiet; then
+            echo "Venue evidence already durable; no commit required."
+          else
+            git -C data-branch commit -m "mlb-v7: persist verified venue reference evidence ${GITHUB_RUN_ID}"
+            git -C data-branch push origin HEAD:data
+          fi
