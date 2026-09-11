@@ -1,8 +1,9 @@
 """Strict manual CFB game-market quote ingestion for HYBRID RUN IT.
 
 Manual quote files are market inputs only. They never create Model_P. The parser
-requires paired DraftKings prices and an aware pregame observation timestamp; the
-canonical run machine separately proves the timestamp precedes the fetched kickoff.
+requires paired DraftKings prices, aware observation time, and a source-evidence
+reference. The canonical run machine separately proves the observation precedes
+kickoff.
 """
 from __future__ import annotations
 
@@ -51,16 +52,20 @@ def _offer(game_id: str, market: str, side: str, line: float, odds: float, obser
     return sha256(raw).hexdigest()
 
 
-def load_manual_cfb_quotes(path: str | Path) -> list[CFBQuote]:
+def load_manual_cfb_quote_bundle(path: str | Path) -> dict[str, Any]:
     p = Path(path)
     try:
-        payload = json.loads(p.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+        raw_bytes = p.read_bytes()
+        payload = json.loads(raw_bytes.decode("utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise CFBManualQuoteError("CFB_MANUAL_QUOTES_FILE_INVALID") from exc
     if not isinstance(payload, Mapping) or payload.get("schema_version") != SCHEMA:
         raise CFBManualQuoteError("CFB_MANUAL_QUOTES_SCHEMA_INVALID")
     if str(payload.get("book_key") or "").strip().lower() != BOOK_KEY:
         raise CFBManualQuoteError("CFB_MANUAL_QUOTES_BOOK_MUST_BE_DRAFTKINGS")
+    evidence_ref = str(payload.get("source_evidence_ref") or "").strip()
+    if not evidence_ref:
+        raise CFBManualQuoteError("CFB_MANUAL_QUOTES_SOURCE_EVIDENCE_REF_REQUIRED")
     observed = _aware(payload.get("observed_at"))
     rows = payload.get("quotes")
     if not isinstance(rows, list) or not rows:
@@ -91,7 +96,17 @@ def load_manual_cfb_quotes(path: str | Path) -> list[CFBQuote]:
         sides = [side for side, _ in pair]
         if len(pair) != 2 or set(sides) != _SIDES[market] or len(set(sides)) != 2:
             raise CFBManualQuoteError(f"CFB_MANUAL_QUOTES_TWO_SIDED_PAIR_REQUIRED:{game_id}:{market}:{line}")
-    return quotes
+    return {
+        "quotes": quotes,
+        "book_key": BOOK_KEY,
+        "observed_at": observed,
+        "source_evidence_ref": evidence_ref,
+        "quote_file_sha256": sha256(raw_bytes).hexdigest(),
+    }
 
 
-__all__ = ["BOOK_KEY", "CFBManualQuoteError", "SCHEMA", "load_manual_cfb_quotes"]
+def load_manual_cfb_quotes(path: str | Path) -> list[CFBQuote]:
+    return list(load_manual_cfb_quote_bundle(path)["quotes"])
+
+
+__all__ = ["BOOK_KEY", "CFBManualQuoteError", "SCHEMA", "load_manual_cfb_quote_bundle", "load_manual_cfb_quotes"]
