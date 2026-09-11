@@ -13,19 +13,21 @@
       "lane": "PREGAME_MODEL_AND_PLAYER_PROPS",
       "automatic_command": ["python", "scripts/run_football_auto_bundle.py", "--sport", "NFL", "--output", "artifacts/run_it/nfl_card.json"],
       "library_entrypoint": "sportsedge.sports.nfl.run_machine:run_it_nfl",
-      "market_surface": "config/football_market_surface.json",
+      "market_surface": "config/football_runtime_capabilities.json",
+      "planning_market_catalog": "config/football_market_surface.json",
       "automatic_completeness": "EXECUTABLE_FAIL_CLOSED",
-      "blocker": "NFL_FROZEN_M2_AND_PROP_ARTIFACTS_PLUS_LIVE_SOURCES_REQUIRED",
-      "notes": "RUN IT now executes both the canonical NFL game lane and the offensive A+B player-prop lane. Game and prop artifacts are independently frozen/hash-bound; PIT feature, quote-before-kickoff and quote-TTL rules fail closed. Offensive pass/rush/receiving stat props are executable but promotion-blocked; TD scorer, kicker and defensive player props remain NO_ENGINE until their required fuller engines exist."
+      "blocker": "NFL_FROZEN_M2_AND_PROP_ARTIFACTS_PLUS_LIVE_SOURCES_REQUIRED_FOR_OFFICIAL",
+      "notes": "RUN IT executes the canonical NFL game lane plus shared-path offensive, TD scorer, kicker, and defensive player-prop model lanes where required PIT/live inputs exist. Genuine Model_P + fresh offered price can surface MODEL_CANDIDATE rows before promotion. OFFICIAL remains independently blocked until artifact-bound evidence, certification, frozen edge-floor policy, and Truth Gate requirements pass."
     },
     "CFB": {
       "lane": "PREGAME_MODEL_AND_PLAYER_PROPS",
       "automatic_command": ["python", "scripts/run_football_auto_bundle.py", "--sport", "CFB", "--output", "artifacts/run_it/cfb_card.json"],
       "library_entrypoint": "sportsedge.sports.cfb.run_machine:run_it_cfb",
-      "market_surface": "config/football_market_surface.json",
+      "market_surface": "config/football_runtime_capabilities.json",
+      "planning_market_catalog": "config/football_market_surface.json",
       "automatic_completeness": "EXECUTABLE_FAIL_CLOSED",
-      "blocker": "CFB_FROZEN_GAME_AND_PROP_ARTIFACTS_PLUS_LIVE_SOURCES_REQUIRED",
-      "notes": "RUN IT now executes both the canonical CFB game lane and the offensive A+B player-prop lane. The prop lane consumes a separately frozen artifact, PIT opportunity snapshot and paired event-level price. Offensive pass/rush/receiving stat props are executable but promotion-blocked; TD scorer, kicker and defensive player props remain NO_ENGINE."
+      "blocker": "CFB_FROZEN_GAME_AND_PROP_ARTIFACTS_PLUS_LIVE_SOURCES_REQUIRED_FOR_OFFICIAL",
+      "notes": "RUN IT executes the canonical CFB game lane plus shared-path offensive, TD scorer, kicker, and defensive player-prop model lanes where required PIT/live inputs exist. Genuine Model_P + fresh offered price can surface MODEL_CANDIDATE rows before promotion. OFFICIAL remains independently blocked until artifact-bound evidence, certification, frozen edge-floor policy, and Truth Gate requirements pass."
     },
     "PGA": {
       "lane": "PREGAME_AND_LIVE_MODEL",

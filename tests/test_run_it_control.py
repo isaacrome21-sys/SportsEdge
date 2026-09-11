@@ -87,6 +87,7 @@ def test_execute_runs_declared_entrypoint_and_preserves_governance(tmp_path):
         "truth_gate_changed": False,
         "promotion_changed": False,
         "silent_skip_allowed": False,
+        "model_candidate_and_official_status_separated": True,
     }
 
 

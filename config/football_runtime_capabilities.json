@@ -1,0 +1,52 @@
+{
+  "schema_version": "FOOTBALL_RUNTIME_CAPABILITIES_V1",
+  "description": "Authoritative executable runtime capability surface. This is separate from the broader planning catalog in football_market_surface.json. IMPLEMENTED_EXPERIMENTAL means a genuine SportsEdge Model_P path exists, but OFFICIAL promotion still depends on frozen artifacts, evidence, certification, and Truth Gate policy.",
+  "sports": ["NFL", "CFB"],
+  "game_markets": {
+    "moneyline": "IMPLEMENTED",
+    "spread": "IMPLEMENTED",
+    "total": "IMPLEMENTED"
+  },
+  "prop_provider_markets": {
+    "player_pass_attempts": "IMPLEMENTED_EXPERIMENTAL",
+    "player_pass_completions": "IMPLEMENTED_EXPERIMENTAL",
+    "player_pass_interceptions": "IMPLEMENTED_EXPERIMENTAL",
+    "player_pass_longest_completion": "IMPLEMENTED_EXPERIMENTAL",
+    "player_pass_rush_yds": "IMPLEMENTED_EXPERIMENTAL",
+    "player_pass_tds": "IMPLEMENTED_EXPERIMENTAL",
+    "player_pass_yds": "IMPLEMENTED_EXPERIMENTAL",
+    "player_receptions": "IMPLEMENTED_EXPERIMENTAL",
+    "player_reception_longest": "IMPLEMENTED_EXPERIMENTAL",
+    "player_reception_tds": "IMPLEMENTED_EXPERIMENTAL",
+    "player_reception_yds": "IMPLEMENTED_EXPERIMENTAL",
+    "player_rush_attempts": "IMPLEMENTED_EXPERIMENTAL",
+    "player_rush_longest": "IMPLEMENTED_EXPERIMENTAL",
+    "player_rush_reception_tds": "IMPLEMENTED_EXPERIMENTAL",
+    "player_rush_reception_yds": "IMPLEMENTED_EXPERIMENTAL",
+    "player_rush_tds": "IMPLEMENTED_EXPERIMENTAL",
+    "player_rush_yds": "IMPLEMENTED_EXPERIMENTAL",
+    "player_field_goals": "IMPLEMENTED_EXPERIMENTAL",
+    "player_kicking_points": "IMPLEMENTED_EXPERIMENTAL",
+    "player_pats": "IMPLEMENTED_EXPERIMENTAL",
+    "player_sacks": "IMPLEMENTED_EXPERIMENTAL",
+    "player_solo_tackles": "IMPLEMENTED_EXPERIMENTAL",
+    "player_tackles_assists": "IMPLEMENTED_EXPERIMENTAL",
+    "player_defensive_interceptions": "IMPLEMENTED_EXPERIMENTAL",
+    "player_anytime_td": "IMPLEMENTED_EXPERIMENTAL",
+    "player_tds_over": "IMPLEMENTED_EXPERIMENTAL"
+  },
+  "unsupported_or_unresolved": [
+    "first_td",
+    "last_td",
+    "returner_td",
+    "defensive_td_scorer",
+    "markets requiring complete return-score/overtime ordering not represented by the shared-path runtime"
+  ],
+  "governance": {
+    "runtime_capability_creates_official_eligibility": false,
+    "model_candidate_may_exist_before_promotion": true,
+    "one_sided_price_may_create_ev_when_model_p_exists": true,
+    "one_sided_market_no_vig_probability": "UNAVAILABLE_ONE_SIDED",
+    "opposite_price_may_be_invented": false
+  }
+}
