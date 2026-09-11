@@ -15,18 +15,20 @@ from sportsedge.v7_backfill_source_readiness import (
 ROOT = Path(__file__).resolve().parents[1]
 POLICY = ROOT / "config" / "v7_feature_backfill_policy_v1.json"
 REQUIREMENTS = ROOT / "config" / "v7_backfill_source_requirements_v1.json"
+REDUCED = ROOT / "config" / "v7_reduced_feature_contract_v1.json"
 
 
 def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _audit(source_root: Path, requirements: Path = REQUIREMENTS):
+def _audit(source_root: Path, requirements: Path = REQUIREMENTS, reduced: Path = REDUCED):
     return audit_v7_backfill_source_readiness(
         policy_path=POLICY,
         requirements_path=requirements,
         source_root=source_root,
         data_ref="test-data-ref",
+        reduced_contract_path=reduced,
     )
 
 
@@ -62,9 +64,10 @@ def test_schedule_only_archive_is_zero_of_twelve(tmp_path: Path) -> None:
     assert report["admitted_feature_count"] == 12
     assert report["source_ready_feature_count"] == 0
     assert report["source_readiness_state"] == "BLOCKED_SOURCE_COVERAGE"
+    assert report["reduced_feature_contract_ready"] is True
+    assert len(report["reduced_feature_contract_sha256"]) == 64
     assert report["candidate_training_allowed"] is False
-    assert "SOURCE_COVERAGE" in report["candidate_training_blockers"]
-    assert "REDUCED_FEATURE_CONTRACT_NOT_FROZEN" in report["candidate_training_blockers"]
+    assert report["candidate_training_blockers"] == ["SOURCE_COVERAGE"]
 
 
 def test_missing_source_root_fails_hard(tmp_path: Path) -> None:
@@ -84,7 +87,7 @@ def test_policy_requirement_feature_set_mismatch_fails_hard(tmp_path: Path) -> N
         _audit(source_root, altered)
 
 
-def test_complete_hash_bound_source_attestations_make_all_twelve_source_ready(tmp_path: Path) -> None:
+def test_complete_hash_bound_sources_and_frozen_reduced_contract_authorize_candidate_training(tmp_path: Path) -> None:
     source_root = tmp_path / "sources"
     source_root.mkdir()
     _write_complete_attestations(source_root)
@@ -94,10 +97,35 @@ def test_complete_hash_bound_source_attestations_make_all_twelve_source_ready(tm
     assert report["source_ready_feature_count"] == 12
     assert report["source_readiness_state"] == "READY_SOURCE_COVERAGE"
     assert all(group["ready"] for group in report["groups"].values())
-    # Source recovery is necessary but not sufficient: the reduced feature contract is not frozen yet.
+    assert report["reduced_feature_contract_ready"] is True
+    assert report["candidate_training_allowed"] is True
+    assert report["candidate_training_blockers"] == []
+    assert report["promotion_authority"] is False
+
+
+def test_missing_reduced_contract_keeps_training_blocked(tmp_path: Path) -> None:
+    source_root = tmp_path / "sources"
+    source_root.mkdir()
+    _write_complete_attestations(source_root)
+
+    report = _audit(source_root, reduced=tmp_path / "missing-contract.json")
+
+    assert report["source_ready_feature_count"] == 12
+    assert report["reduced_feature_contract_ready"] is False
     assert report["candidate_training_allowed"] is False
     assert report["candidate_training_blockers"] == ["REDUCED_FEATURE_CONTRACT_NOT_FROZEN"]
-    assert report["promotion_authority"] is False
+
+
+def test_tampered_reduced_contract_fails_hard(tmp_path: Path) -> None:
+    source_root = tmp_path / "sources"
+    source_root.mkdir()
+    contract = json.loads(REDUCED.read_text())
+    contract["feature_paths"] = contract["feature_paths"][:-1]
+    altered = tmp_path / REDUCED.name
+    altered.write_text(json.dumps(contract))
+
+    with pytest.raises(SourceReadinessError, match="REDUCED_FEATURE_CONTRACT_INVALID"):
+        _audit(source_root, reduced=altered)
 
 
 def test_missing_final_before_decision_semantics_blocks_bullpen(tmp_path: Path) -> None:
