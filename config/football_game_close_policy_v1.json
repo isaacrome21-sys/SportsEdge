@@ -1,0 +1,40 @@
+{
+  "policy_id": "FOOTBALL_GAME_CLOSE_POLICY_V1",
+  "sports": {
+    "CFB": {
+      "provider_sport_key": "americanfootball_ncaaf",
+      "bookmaker": "draftkings",
+      "markets": ["h2h", "spreads", "totals"]
+    },
+    "NFL": {
+      "provider_sport_key": "americanfootball_nfl",
+      "bookmaker": "draftkings",
+      "markets": ["h2h", "spreads", "totals"]
+    }
+  },
+  "capture": {
+    "schedule_minutes": [7, 22, 37, 52],
+    "max_minutes_before_start": 15,
+    "post_start_allowed": false,
+    "selection_rule": "LAST_PRESTART_SNAPSHOT_WITHIN_WINDOW",
+    "missing_rule": "CLOSE_MISSED",
+    "append_only_observations": true,
+    "create_only_final_close": true
+  },
+  "pricing": {
+    "devig_method": "POWER_V1",
+    "book_switching_allowed_within_evidence_unit": false
+  },
+  "evidence": {
+    "promotion_authority": false,
+    "candidate_required": true,
+    "every_qualifying_candidate_required": true,
+    "placed_bet_is_separate_tag": true
+  },
+  "credit_budget": {
+    "shared_key_reserve_required": true,
+    "cfb_monthly_soft_reserve_credits": 140,
+    "nfl_monthly_soft_reserve_credits": 110,
+    "note": "Soft reserves prevent close capture from draining the shared EV-tracker provider budget."
+  }
+}
