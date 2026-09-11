@@ -31,6 +31,7 @@ from sportsedge.sports.nfl.m2_history_policy import build_nfl_m2_history_rows
 from sportsedge.sports.nfl.m2_v2_nested_validation import build_nfl_m2_v2_nested_candidate_evidence
 from sportsedge.sports.nfl.m2_v2_validation import build_nfl_m2_v2_candidate_evidence
 from sportsedge.sports.nfl.m2_v2b_validation import build_nfl_m2_v2b_candidate_evidence
+from sportsedge.sports.nfl.m2_v2c_validation import build_nfl_m2_v2c_candidate_evidence
 from sportsedge.sports.nfl.source_manifest import manifest_sha256
 
 _GIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -120,6 +121,7 @@ def main() -> int:
     parser.add_argument("--out", type=Path, default=Path("artifacts/football/nfl_m2_v2_candidate_validation.json"))
     parser.add_argument("--nested-out", type=Path, default=Path("artifacts/football/nfl_m2_v2_nested_candidate_validation.json"))
     parser.add_argument("--v2b-out", type=Path, default=Path("artifacts/football/nfl_m2_v2b_candidate_validation.json"))
+    parser.add_argument("--v2c-out", type=Path, default=Path("artifacts/football/nfl_m2_v2c_candidate_validation.json"))
     args = parser.parse_args()
 
     git_sha = str(args.git_sha).strip().lower()
@@ -229,9 +231,19 @@ def main() -> int:
         ),
         **common,
     )
+    v2c = _attach_run_provenance(
+        build_nfl_m2_v2c_candidate_evidence(
+            history_rows,
+            source_manifest_sha256=manifest_hash,
+            min_train_seasons=args.min_train_seasons,
+            ridge_alpha=args.ridge_alpha,
+        ),
+        **common,
+    )
     _write(args.out, v2a)
     _write(args.nested_out, nested)
     _write(args.v2b_out, v2b)
+    _write(args.v2c_out, v2c)
 
     print(json.dumps({
         "status": "V2_CANDIDATE_DIAGNOSTICS_COMPLETE",
@@ -253,6 +265,11 @@ def main() -> int:
             "model_id": v2b["model_id"],
             "candidate_historical_evidence": v2b["candidate_historical_evidence"],
             "signed_key_probability": v2b["candidate_distribution_profile"]["signed_key_probability"],
+        },
+        "v2c": {
+            "model_id": v2c["model_id"],
+            "candidate_historical_evidence": v2c["candidate_historical_evidence"],
+            "signed_key_probability": v2c["candidate_distribution_profile"]["signed_key_probability"],
         },
     }, sort_keys=True))
     return 0
