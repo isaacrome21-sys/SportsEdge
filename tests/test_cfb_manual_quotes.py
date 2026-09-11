@@ -7,6 +7,8 @@ import unittest
 
 from sportsedge.sports.cfb.manual_quotes import CFBManualQuoteError, load_manual_cfb_quote_bundle
 
+ROOT = Path(__file__).resolve().parents[1]
+
 
 class CFBManualQuoteTests(unittest.TestCase):
     def write(self, payload):
@@ -58,6 +60,14 @@ class CFBManualQuoteTests(unittest.TestCase):
             if row["market"]=="SPREAD" and row["side"]=="AWAY": row["line"]=3.5
         with self.assertRaisesRegex(CFBManualQuoteError,"TWO_SIDED_PAIR_REQUIRED"):
             load_manual_cfb_quote_bundle(self.write(payload))
+
+    def test_hybrid_runner_has_no_odds_api_credential_path(self):
+        source = (ROOT / "scripts/run_cfb_hybrid.py").read_text(encoding="utf-8")
+        self.assertNotIn("SPORTSEDGE_ODDS_API_KEY", source)
+        self.assertNotIn("ODDS_API_KEY", source)
+        self.assertIn('mode="HYBRID"', source)
+        self.assertIn("quotes=bundle[\"quotes\"]", source)
+        self.assertIn('"odds_api_used": False', source)
 
 
 if __name__ == "__main__": unittest.main()
