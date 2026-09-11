@@ -6,7 +6,7 @@ body:
     id: source
     attributes:
       label: Source
-      options: ["Odds Assist Pinnacle +EV", "Odds Assist +EV", "Gambly Best Bets", "Gambly Optimizer", "Gambly feed (tailed)", "Pick The Odds", "Sharp Lines", "SportsEdge", "Other"]
+      options: ["Odds Assist Pinnacle +EV", "Odds Assist +EV", "Gambly Best Bets", "Gambly Optimizer", "Gambly feed (tailed)", "Arcline", "MatchWiz", "Pick The Odds", "Sharp Lines", "SportsEdge", "Other"]
     validations:
       required: true
   - type: dropdown
