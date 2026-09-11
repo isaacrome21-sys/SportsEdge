@@ -67,8 +67,10 @@ jobs:
     permissions:
       contents: write
       issues: write
+    # Serialize every EV-ledger writer on one lock. Manual closes previously used
+    # an issue-scoped group and could race log/close jobs while all three push to main.
     concurrency:
-      group: ev-tracker-manual-close-${{ github.event.issue.number }}
+      group: sportsedge-paid-odds-api
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # repo-standard pin
