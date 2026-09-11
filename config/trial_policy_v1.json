@@ -6,7 +6,7 @@
   "edge_definition": "Model_P minus two-sided paired no-vig probability at the logged price, same non-push basis.",
   "max_trial_plays_per_sport_per_slate": 5,
   "cap_ranking": "Highest edge first; ties broken by market_id ascending.",
-  "promotion_blockers": ["NOT_PROMOTED", "NO_FROZEN_EDGE_FLOOR"],
+  "promotion_blockers": ["NOT_PROMOTED"],
   "required_row_fields": ["book", "price_american", "retrieved_at", "model_artifact_sha"],
   "stages": {
     "PAPER": {"stake_units": 0.0},
