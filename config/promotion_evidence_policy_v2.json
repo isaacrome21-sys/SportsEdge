@@ -1,0 +1,47 @@
+{
+  "policy_id": "PROMOTION_EVIDENCE_POLICY_V2",
+  "doctrine": "Learn faster without weakening integrity. Forward-only CLV is the primary promotion evidence when free historical closes are unavailable. PAPER and BLOCKED are distinct: PAPER means valid evidence that is insufficient or underperforming; BLOCKED means contaminated evidence that is excluded from the evidence set.",
+  "activation": {
+    "manifest": "config/promotion_evidence_policy_manifest.json",
+    "evidence_ref": "refs/heads/main",
+    "rule": "V2 activates only when this policy is selected by the manifest on evidence_ref. Feature-branch commits never activate an evidence clock.",
+    "clock_start": "First valid evidence row captured after the active manifest and policy are present on refs/heads/main and bound to the active policy SHA256.",
+    "policy_path": "config/promotion_evidence_policy_v2.json"
+  },
+  "non_retroactive": {
+    "rule": "Never reinterpret evidence captured before V2 activation under V2.",
+    "legacy_2026_nfl_confirmation_run": "REMAINS_UNDER_PRIOR_POLICY_AND_CANNOT_BE_RECLASSIFIED_BY_V2",
+    "historical_evidence": "May be retained as context or adverse prior evidence, but never substituted for V2 forward evidence. Adverse historical evidence is not erased by the new policy."
+  },
+  "scope": {
+    "sports": ["NFL", "NCAAF", "MLB"],
+    "unit_of_evaluation": "lane_id + model_artifact_sha + market_definition_sha + policy_sha256",
+    "reset_clock_on": ["model_artifact_sha_change", "market_definition_sha_change", "policy_version_change", "feature_semantics_change"]
+  },
+  "state_aliases": {"TRIAL": "PROBATION"},
+  "states": {
+    "PAPER": {"stake_units": 0.0, "meaning": "Valid forward evidence is collected, but the lane is not approved for real-money betting or has been demoted for performance/risk reasons.", "evidence_counts": true},
+    "PROBATION": {"stake_units_per_bet": 0.25, "meaning": "Small real-money evidence collection after the fixed 50-bet checkpoint only.", "evidence_counts": true},
+    "OFFICIAL": {"meaning": "Promotion requirements have been met at a fixed checkpoint and every warning is cleared or explicitly signed off.", "evidence_counts": true},
+    "BLOCKED": {"stake_units": 0.0, "meaning": "Integrity failure or contaminated evidence. A BLOCKED row is excluded from CLV, ROI, checkpoint counts, and promotion decisions.", "evidence_counts": false}
+  },
+  "hard_integrity_blocks": ["MODEL_P_NOT_GENUINE_OR_NOT_BOUND_TO_FROZEN_ARTIFACT", "LANE_DEFINITION_NOT_FROZEN_BEFORE_OBSERVATION", "PREGAME_PRICE_CAPTURED_AFTER_START", "CLOSE_CAPTURED_AFTER_START", "OUTCOME_OR_POSTGAME_DATA_VISIBLE_BEFORE_DECISION_FREEZE", "PRICE_OR_CLOSE_SOURCE_TIMESTAMP_UNVERIFIABLE", "POLICY_OR_LANE_RULE_CHANGED_AFTER_EVIDENCE_WAS_OBSERVED", "EVIDENCE_ROW_NOT_BOUND_TO_POLICY_SHA256", "DUPLICATE_OR_MUTATED_EVIDENCE_ROW"],
+  "warning_only_on_probation": ["CALIBRATION_BAND_MISS", "KEY_NUMBER_TOLERANCE_MISS", "NONCRITICAL_PROVENANCE_HASH_MISSING", "THREE_MODE_PARITY_MISS", "NONCRITICAL_DIAGNOSTIC_MISSING"],
+  "forward_capture": {
+    "pregame_price": {"required": true, "two_sided_required": true, "must_be_before_start": true, "lock_once_recorded": true},
+    "close": {"required_for_clv": true, "two_sided_required": true, "must_be_before_start": true, "missing_close_policy": "Exclude the row from CLV calculation but keep it in the checkpoint denominator and close-coverage denominator.", "min_close_coverage_for_probation_or_official": 0.9},
+    "clv_inference": {"metric": "probability-point CLV on the same non-push basis used at entry", "confidence_level": 0.95, "standard_error": "CR1_CLUSTER_BY_SLATE_DATE", "cluster_key": "slate_date", "reference_distribution": "STUDENT_T_G_MINUS_1", "minimum_clusters_for_interval": 5, "continuous_peeking_for_promotion": false}
+  },
+  "checkpoints": {
+    "evaluate_only_at_graded_counts": [50, 100, 150],
+    "graded_count_definition": "All valid non-BLOCKED bets under the current evidence clock, including rows missing a valid close.",
+    "checkpoint_50": {"target_state": "PROBATION", "min_graded_bets": 50, "min_distinct_games": 20, "min_slate_clusters": 5, "min_close_coverage": 0.9, "min_mean_clv_pp": 0.0, "max_roi_loss_fraction": 0.075, "required_before_entry": ["frozen_lane_definition", "genuine_model_p_from_frozen_artifact", "working_two_sided_pregame_capture", "working_two_sided_close_capture"]},
+    "checkpoint_100": {"target_state": "PROBATION_CONTINUE", "min_graded_bets": 100, "min_distinct_games": 30, "min_slate_clusters": 8, "min_close_coverage": 0.9, "max_roi_loss_fraction": 0.075, "rule": "Remain PROBATION unless a kill rule fires. Do not promote OFFICIAL at 100 under V2."},
+    "checkpoint_150": {"target_state": "OFFICIAL_CANDIDATE", "min_graded_bets": 150, "min_distinct_games": 40, "min_slate_clusters": 10, "min_close_coverage": 0.9, "clv_ci_lower_pp_must_be_above": 0.0, "max_roi_loss_fraction": 0.075, "warnings_requirement": "Every warning must be CLEARED or SIGNED_OFF before OFFICIAL."}
+  },
+  "kill_and_demotion_rules": {"performance_evaluated_only_at_checkpoints": true, "demote_to_paper_at_checkpoint_if": ["clv_95_ci_upper_pp < 0.0", "roi_fraction < -0.075", "close_coverage < 0.90"], "risk_demote_immediately_if": ["lane_drawdown_from_peak_units >= 5.0"], "blocked_immediately_if": "Any hard_integrity_blocks condition is true. Contaminated rows are excluded rather than treated as losses or PAPER evidence."},
+  "exposure_caps": {"probation": {"stake_units_per_bet": 0.25, "max_lane_exposure_units_per_slate": 2.0, "max_all_probation_exposure_units_per_slate": 4.0, "max_lane_drawdown_from_peak_units": 5.0}, "paper": {"stake_units_per_bet": 0.0}},
+  "historical_adverse_evidence": {"rule": "A lane with genuine historical evidence showing it lost to closing lines starts V2 in PAPER with HISTORICAL_ADVERSE_EVIDENCE warning. V2 does not erase or relabel the old result.", "nfl_box_score_model_2026": "PAPER", "warning_clears_only_if": "The lane independently satisfies V2 forward evidence requirements under a new evidence clock."},
+  "official_warning_signoff": {"allowed_statuses": ["CLEARED", "SIGNED_OFF"], "signed_off_requires": ["actor", "timestamp_utc", "reason", "evidence_reference"], "expires_on": ["model_artifact_sha_change", "market_definition_sha_change", "policy_version_change"], "rule": "A warning that is merely logged is not sufficient for OFFICIAL."},
+  "roi_role": {"primary_promotion_metric": false, "purpose": "sanity and kill check only", "promotion_does_not_require_positive_roi_significance": true}
+}
