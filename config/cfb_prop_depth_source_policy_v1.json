@@ -27,11 +27,12 @@
     "conflict_blocker": "STARTER_CONFLICT"
   },
   "freshness": {
-    "rule": "SOURCE_UPDATED_AFTER_PREVIOUS_GAME",
+    "rule": "SOURCE_UPDATE_DATE_STRICTLY_AFTER_PREVIOUS_GAME_UTC_DATE",
+    "source_update_precision": "DATE_ONLY",
     "stale_blocker": "DEPTH_CHART_STALE"
   },
   "point_in_time": {
-    "source_update_must_not_follow_retrieval": true,
+    "source_update_date_must_not_follow_retrieval_utc_date": true,
     "retrieval_must_not_follow_decision": true,
     "decision_must_precede_target_game": true,
     "expected_team_id_required": true,
@@ -49,6 +50,8 @@
   "notes": [
     "Depth ordering is contextual input only and never creates Model_P.",
     "The primary source is a maintained projected two-deep, not an official participation report.",
+    "The source update value is date-only and must never be promoted to an invented clock time.",
+    "Freshness is conservative: the printed update date must be strictly after the previous game's UTC calendar date.",
     "No historical backfill is permitted from current pages; only decision-time snapshots may be used.",
     "Automated acquisition remains disabled for both primary and corroboration sources until source terms and access policy are explicitly verified."
   ]
