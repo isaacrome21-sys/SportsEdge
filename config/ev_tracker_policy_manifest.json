@@ -1,0 +1,8 @@
+{
+  "manifest_id": "EV_TRACKER_POLICY_MANIFEST",
+  "active": {"policy_id": "EV_TRACKER_POLICY_V2", "path": "config/ev_tracker_policy_v2.json"},
+  "superseded": [
+    {"policy_id": "EV_TRACKER_POLICY_V1", "path": "config/ev_tracker_policy_v1.json",
+     "reason": "Exact-line-only closes, single close attempt, graded-only denominator. V1 records stay in the ledger and never count as V2 evidence."}
+  ]
+}

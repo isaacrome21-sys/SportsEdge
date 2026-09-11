@@ -1,0 +1,114 @@
+{
+  "policy_id": "EV_TRACKER_POLICY_V2",
+  "supersedes": "EV_TRACKER_POLICY_V1",
+  "lane": "EXTERNAL_EV",
+  "doctrine": "Plays are the user's picks from outside +EV scanners. Each is graded by CLV against devigged sharp prices captured before start (MARKET_FAIR_P). A source's record measures the user's selections from it, not the scanner's full output. Nothing here is Model_P or enters the Truth Gate.",
+  "activation": "Evidence counts only for records written by the tracker running on evidence_ref with this policy_id. Feature-branch commits never activate this policy. The clock starts at the first such record.",
+  "evidence_ref": "refs/heads/main",
+  "sharp_weights": {
+    "pinnacle": 0.5,
+    "novig": 0.25,
+    "prophetx": 0.25
+  },
+  "min_sharp_weight": 0.5,
+  "min_books_for_consensus_label": 2,
+  "max_sharp_dispersion_pp": 2.5,
+  "devig": {
+    "primary": "POWER_V1",
+    "sensitivity_trigger_american": 400,
+    "max_method_spread_pp": 1.0
+  },
+  "max_quote_age_s": 300,
+  "line_conversion": {
+    "method": "NORMAL_APPROX_V1",
+    "status": "PROVISIONAL: no key-number adjustment, so moves across 3 and 7 are understated",
+    "max_line_move_pts": 3.0,
+    "sigma": {
+      "americanfootball_nfl": {
+        "spreads": 13.5,
+        "totals": 13.5
+      },
+      "americanfootball_ncaaf": {
+        "spreads": 16.0,
+        "totals": 16.0
+      }
+    }
+  },
+  "close": {
+    "window_minutes": 75,
+    "max_attempts": 3,
+    "selection": "LAST_USABLE_PRE_START_ATTEMPT"
+  },
+  "budget": {
+    "reserve_credits": 40
+  },
+  "sports": {
+    "NFL": "americanfootball_nfl",
+    "NCAAF": "americanfootball_ncaaf",
+    "MLB": "baseball_mlb",
+    "NBA": "basketball_nba",
+    "NHL": "icehockey_nhl"
+  },
+  "markets": {
+    "Moneyline": "h2h",
+    "Spread": "spreads",
+    "Total": "totals"
+  },
+  "books": {
+    "FanDuel": "fanduel",
+    "DraftKings": "draftkings",
+    "BetMGM": "betmgm",
+    "BetRivers": "betrivers",
+    "theScore Bet": "espnbet",
+    "Fliff": "fliff",
+    "Hard Rock Bet": "hardrockbet",
+    "Caesars": "williamhill_us",
+    "Fanatics": "fanatics",
+    "Novig": "novig",
+    "ProphetX": "prophetx",
+    "Other": "other"
+  },
+  "staging": {
+    "scope": "per source, sport_key, policy_id, and evidence_ref",
+    "start": "PROBATION",
+    "units": {
+      "PAPER": 0.0,
+      "PROBATION": 0.25,
+      "STANDARD": 0.5
+    },
+    "demote_to_paper": {
+      "min_graded": 50,
+      "mean_clv_pp_below": 0.0
+    },
+    "promote_to_standard": {
+      "min_graded": 200,
+      "min_slate_clusters": 20,
+      "min_close_coverage": 0.8,
+      "min_mean_clv_pp": 0.5,
+      "lower_bound": {
+        "standard_error": "CR1_CLUSTER_BY_SLATE_DATE",
+        "distribution": "STUDENT_T_G_MINUS_1",
+        "one_sided_confidence": 0.975,
+        "must_exceed_pp": 0.0
+      }
+    },
+    "coverage_definition": "graded / eligible, where eligible = plays whose game has started. Missed and ungradeable closes stay in the denominator.",
+    "max_stage_by_sport": {
+      "americanfootball_nfl": "PROBATION",
+      "americanfootball_ncaaf": "PROBATION"
+    },
+    "max_stage_reason": "NFL and NCAAF cannot reach STANDARD under EV_TRACKER_POLICY_V2, even if the numerical thresholds pass. STANDARD requires EV_TRACKER_POLICY_V3 with a key-number-aware spread/total conversion fitted on historical lines and final margins, frozen before use, and compared against NORMAL_APPROX_V1 on the accumulated V2 forward bets.",
+    "stage_order": [
+      "PAPER",
+      "PROBATION",
+      "STANDARD"
+    ]
+  },
+  "take_rules": [
+    "Fair price comes from Pinnacle or a sharp exchange, not a soft-book average.",
+    "Tool EV is at least 2%.",
+    "Price is no longer than +400.",
+    "The line and price are still live at your book when you bet.",
+    "Log it before the game starts, and log every play you take from a source, not just the ones you like."
+  ]
+}
