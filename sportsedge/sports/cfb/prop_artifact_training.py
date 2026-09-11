@@ -19,6 +19,9 @@ ARTIFACT_SCHEMA = "FOOTBALL_PROP_MODEL_ARTIFACT_V1"
 TRAINING_VERSION = "CFB_ESPN_PBP_FIT_V1"
 MIN_SCRIMMAGE_PLAYS = 200
 MIN_TEAM_COUNT = 100
+MIN_FG_SANITY_ATTEMPTS = 100
+MIN_XP_SANITY_ATTEMPTS = 100
+MIN_TWO_POINT_SANITY_ATTEMPTS = 20
 
 
 def _f(value: Any) -> float | None:
@@ -162,13 +165,14 @@ def _special_team_league_rates(stats: Mapping[str, _TeamFit]) -> tuple[float, fl
     fg = sum(stats[t].fg_made for t in teams) / fg_a
     xp = sum(stats[t].xp_made for t in teams) / xp_a
     two = sum(stats[t].two_made for t in teams) / two_a
-    # Semantic guardrails, not promotion/calibration thresholds. A source-schema
-    # mapping that says ~0% XP or ~100% 2PT is broken and must fail closed.
-    if not 0.45 <= fg <= 0.95:
+    # These are semantic guards, not model/promotion thresholds. Apply them only
+    # once the source has enough observations for an extreme rate to indicate a
+    # mapping/schema defect rather than tiny-fixture noise.
+    if fg_a >= MIN_FG_SANITY_ATTEMPTS and not 0.45 <= fg <= 0.95:
         raise ValueError(f"CFB_PROP_FIT_LEAGUE_FG_RATE_IMPLAUSIBLE:{fg}")
-    if not 0.75 <= xp <= 1.0:
+    if xp_a >= MIN_XP_SANITY_ATTEMPTS and not 0.75 <= xp <= 1.0:
         raise ValueError(f"CFB_PROP_FIT_LEAGUE_XP_RATE_IMPLAUSIBLE:{xp}")
-    if not 0.20 <= two <= 0.80:
+    if two_a >= MIN_TWO_POINT_SANITY_ATTEMPTS and not 0.20 <= two <= 0.80:
         raise ValueError(f"CFB_PROP_FIT_LEAGUE_TWO_POINT_RATE_IMPLAUSIBLE:{two}")
     return fg, xp, two, {
         "fg_attempts": fg_a, "fg_make_rate": fg,
