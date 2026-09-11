@@ -1,11 +1,10 @@
 name: mlb-deadman
 
 on:
+  # MLB is parked for the remainder of 2026. Keep the health/rescue mechanism
+  # available for explicit manual use, but do not schedule it because a stale
+  # auto-MLB heartbeat would otherwise dispatch the paid archive failover.
   workflow_dispatch:
-  schedule:
-    # Thirty-minute safety cadence. Rescue is dispatched only when the
-    # canonical auto-mlb heartbeat is demonstrably stale or missing.
-    - cron: '5,35 * * * *'
 
 permissions:
   actions: write
@@ -69,7 +68,7 @@ jobs:
               out.write(f"dispatch_rescue={'true' if stale else 'false'}\n")
           PY
 
-      - name: Dispatch archive failover only for stale or missing heartbeat
+      - name: Dispatch archive failover only for explicit manual rescue
         if: steps.heartbeat.outputs.dispatch_rescue == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
