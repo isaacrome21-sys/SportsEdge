@@ -1,0 +1,227 @@
+name: diagnostic-nfl-pbp-wind-recovery
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/diagnostic-nfl-pbp-wind-recovery.yml'
+      - 'sportsedge/sports/nfl/m2_history_policy.py'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      EVIDENCE_GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EVIDENCE_GIT_SHA }}
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Install exact runtime dependency
+        run: python -m pip install --disable-pip-version-check numpy==2.5.3
+
+      - name: Fetch exact diagnostic inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/nfl-wind-audit artifacts/football
+          curl --fail --location --silent --show-error --retry 5 --retry-delay 2 --retry-all-errors \
+            'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv' \
+            -o /tmp/nfl-wind-audit/games.csv
+          for season in 2022 2023; do
+            curl --fail --location --silent --show-error --retry 5 --retry-delay 2 --retry-all-errors \
+              "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_${season}.csv.gz" \
+              -o "/tmp/nfl-wind-audit/play_by_play_${season}.csv.gz"
+          done
+
+      - name: Verify bytes match hosted frozen evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'cf8632c85fdc82c8915c7866d0bd16465a88946052bccfbf83b44bee87d5d65e  /tmp/nfl-wind-audit/games.csv' | sha256sum -c -
+          echo '0c69a71e57df77b67c5f351c9f1b7fb5a03505b16d22c7612f550d87efdf92bb  /tmp/nfl-wind-audit/play_by_play_2022.csv.gz' | sha256sum -c -
+          echo '4649804eaa9c74d543013289d7fbc1dccf56923880115695a6064129ba3ece2d  /tmp/nfl-wind-audit/play_by_play_2023.csv.gz' | sha256sum -c -
+
+      - name: Audit exact PBP wind recovery coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import csv
+          import gzip
+          import hashlib
+          import json
+          import math
+          import os
+          from collections import defaultdict
+          from pathlib import Path
+
+          from sportsedge.sports.nfl.m2_history_policy import environment_exclusion_reasons
+
+          root = Path('/tmp/nfl-wind-audit')
+          out = Path('artifacts/football/nfl_pbp_wind_recovery_audit.json')
+          expected_counts = {2022: 91, 2023: 41}
+
+          def sha256(path: Path) -> str:
+              h = hashlib.sha256()
+              with path.open('rb') as handle:
+                  for chunk in iter(lambda: handle.read(1024 * 1024), b''):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          target_rows = {}
+          by_season = defaultdict(lambda: {
+              'schedule_reg_rows': 0,
+              'wind_invalid_rows': 0,
+              'recoverable_unique_pbp_wind': 0,
+              'pbp_wind_missing': 0,
+              'pbp_wind_invalid_only': 0,
+              'pbp_wind_conflict': 0,
+          })
+          with (root / 'games.csv').open('r', encoding='utf-8-sig', newline='') as handle:
+              for row in csv.DictReader(handle):
+                  if row.get('game_type') != 'REG':
+                      continue
+                  try:
+                      season = int(row.get('season') or -1)
+                  except ValueError:
+                      continue
+                  if season not in expected_counts:
+                      continue
+                  by_season[season]['schedule_reg_rows'] += 1
+                  reasons = environment_exclusion_reasons(row)
+                  if 'NFL_WIND_INVALID' not in reasons:
+                      continue
+                  game_id = str(row.get('game_id') or '').strip()
+                  if not game_id:
+                      raise SystemExit('NFL_PBP_WIND_AUDIT_GAME_ID_MISSING')
+                  by_season[season]['wind_invalid_rows'] += 1
+                  target_rows[game_id] = {
+                      'season': season,
+                      'roof': str(row.get('roof') or '').strip().lower(),
+                      'schedule_wind': row.get('wind'),
+                      'schedule_wind_mph': row.get('wind_mph'),
+                      'schedule_reasons': sorted(reasons),
+                  }
+
+          pbp_valid = defaultdict(set)
+          pbp_nonblank_invalid = defaultdict(set)
+          pbp_headers = {}
+          for season in sorted(expected_counts):
+              path = root / f'play_by_play_{season}.csv.gz'
+              with gzip.open(path, 'rt', encoding='utf-8-sig', newline='') as handle:
+                  reader = csv.DictReader(handle)
+                  fields = set(reader.fieldnames or ())
+                  pbp_headers[str(season)] = {
+                      'game_id': 'game_id' in fields,
+                      'wind': 'wind' in fields,
+                      'temp': 'temp' in fields,
+                      'weather': 'weather' in fields,
+                  }
+                  if 'game_id' not in fields or 'wind' not in fields:
+                      raise SystemExit(f'NFL_PBP_WIND_AUDIT_REQUIRED_FIELD_MISSING:{season}')
+                  for row in reader:
+                      game_id = str(row.get('game_id') or '').strip()
+                      if game_id not in target_rows:
+                          continue
+                      raw = row.get('wind')
+                      if raw in (None, ''):
+                          continue
+                      text = str(raw).strip()
+                      if not text:
+                          continue
+                      try:
+                          value = float(text)
+                      except ValueError:
+                          pbp_nonblank_invalid[game_id].add(text)
+                          continue
+                      if not math.isfinite(value) or value < 0:
+                          pbp_nonblank_invalid[game_id].add(text)
+                          continue
+                      pbp_valid[game_id].add(value)
+
+          recoverable = []
+          unresolved = []
+          for game_id in sorted(target_rows):
+              meta = target_rows[game_id]
+              season = int(meta['season'])
+              values = sorted(pbp_valid.get(game_id, set()))
+              invalid = sorted(pbp_nonblank_invalid.get(game_id, set()))
+              if len(values) == 1:
+                  classification = 'RECOVERABLE_UNIQUE_PBP_WIND'
+                  by_season[season]['recoverable_unique_pbp_wind'] += 1
+                  recoverable.append({
+                      'game_id': game_id,
+                      'season': season,
+                      'roof': meta['roof'],
+                      'pbp_wind_mph': values[0],
+                  })
+              elif len(values) > 1:
+                  classification = 'PBP_WIND_CONFLICT'
+                  by_season[season]['pbp_wind_conflict'] += 1
+              elif invalid:
+                  classification = 'PBP_WIND_INVALID_ONLY'
+                  by_season[season]['pbp_wind_invalid_only'] += 1
+              else:
+                  classification = 'PBP_WIND_MISSING'
+                  by_season[season]['pbp_wind_missing'] += 1
+              if classification != 'RECOVERABLE_UNIQUE_PBP_WIND':
+                  unresolved.append({
+                      'game_id': game_id,
+                      'season': season,
+                      'roof': meta['roof'],
+                      'classification': classification,
+                      'valid_pbp_wind_values': values,
+                      'invalid_pbp_wind_values': invalid,
+                  })
+
+          observed_counts = {season: by_season[season]['wind_invalid_rows'] for season in expected_counts}
+          baseline_match = observed_counts == expected_counts
+          payload = {
+              'schema_version': 1,
+              'sport': 'nfl',
+              'diagnostic_only': True,
+              'promotion_evidence': False,
+              'changes_model_behavior': False,
+              'code_git_sha': os.environ['EVIDENCE_GIT_SHA'].lower(),
+              'source_sha256': {
+                  'games.csv': sha256(root / 'games.csv'),
+                  'play_by_play_2022.csv.gz': sha256(root / 'play_by_play_2022.csv.gz'),
+                  'play_by_play_2023.csv.gz': sha256(root / 'play_by_play_2023.csv.gz'),
+              },
+              'pbp_required_fields_present': pbp_headers,
+              'expected_hosted_wind_invalid_counts': {str(k): v for k, v in expected_counts.items()},
+              'observed_wind_invalid_counts': {str(k): v for k, v in observed_counts.items()},
+              'hosted_baseline_match': baseline_match,
+              'seasons': {str(k): dict(v) for k, v in sorted(by_season.items())},
+              'recoverable_count': len(recoverable),
+              'unresolved_count': len(unresolved),
+              'recoverable_games': recoverable,
+              'unresolved_games': unresolved,
+              'status': 'PASS_DIAGNOSTIC' if baseline_match else 'BLOCKED_BASELINE_MISMATCH',
+          }
+          out.parent.mkdir(parents=True, exist_ok=True)
+          out.write_text(json.dumps(payload, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print(json.dumps({
+              'status': payload['status'],
+              'recoverable_count': payload['recoverable_count'],
+              'unresolved_count': payload['unresolved_count'],
+              'seasons': payload['seasons'],
+          }, sort_keys=True))
+          if not baseline_match:
+              raise SystemExit('NFL_PBP_WIND_AUDIT_HOSTED_BASELINE_MISMATCH')
+          PY
+
+      - name: Upload wind recovery diagnostic
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nfl-pbp-wind-recovery-${{ env.EVIDENCE_GIT_SHA }}
+          path: artifacts/football/nfl_pbp_wind_recovery_audit.json
+          if-no-files-found: error
+          retention-days: 30
