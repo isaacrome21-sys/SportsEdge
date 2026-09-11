@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "contract": "SPORTSEDGE_MLB_V7_REDUCED_FEATURE_CONTRACT_V1",
+  "status": "FROZEN",
+  "base_feature_contract_version": "mlb_v7_combined_feature_contract_v1",
+  "base_feature_contract_sha256": "d0d691716467d464258c73d67484f671ef71b50a06cfc281535c701dff817d39",
+  "policy_path": "config/v7_feature_backfill_policy_v1.json",
+  "requirements_path": "config/v7_backfill_source_requirements_v1.json",
+  "feature_paths": [
+    "baseball.bullpen.relief_pitches_1d",
+    "baseball.bullpen.relief_pitches_3d",
+    "baseball.bullpen.relief_pitches_7d",
+    "baseball.bullpen.relievers_used_1d",
+    "baseball.bullpen.relievers_back_to_back",
+    "context.park.run_factor",
+    "context.park.hr_factor_lhb",
+    "context.park.hr_factor_rhb",
+    "context.travel.travel_km",
+    "context.travel.timezone_shift_hours",
+    "context.travel.days_rest",
+    "context.travel.consecutive_game_days"
+  ],
+  "missing_value_policy": "No zero-fill. A training or scoring row is invalid if any frozen reduced-contract feature is absent or non-numeric.",
+  "projection_rule": "Project only these 12 numeric paths from a payload already valid under the frozen full V7 combined feature contract. Extra full-contract features are discarded from the projected scoring payload.",
+  "promotion_authority": false,
+  "notes": [
+    "This freezes model input identity only; it does not establish historical source readiness.",
+    "Candidate fitting remains blocked until all source-readiness attestations verify against durable evidence.",
+    "Changing this feature set requires a new contract version and new evidence."
+  ]
+}
