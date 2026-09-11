@@ -9,6 +9,7 @@ shares from depth order and never sends a paid odds request.
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 import subprocess
@@ -44,6 +45,35 @@ def _write(path: Path, value: dict) -> None:
     path.write_text(json.dumps(value, sort_keys=True, indent=2) + "\n", encoding="utf-8")
 
 
+def _aware(value: object, code: str) -> datetime:
+    text = str(value or "").strip().replace("Z", "+00:00")
+    if not text:
+        raise CFBPropManualRunError(code)
+    try:
+        out = datetime.fromisoformat(text)
+    except ValueError as exc:
+        raise CFBPropManualRunError(code) from exc
+    if out.tzinfo is None or out.utcoffset() is None:
+        raise CFBPropManualRunError(code)
+    return out.astimezone(timezone.utc)
+
+
+def _runtime_asof(value: str | None) -> datetime:
+    if value is None or not str(value).strip():
+        return datetime.now(timezone.utc)
+    return _aware(value, "CFB_PROP_MANUAL_RUNTIME_ASOF_INVALID")
+
+
+def _require_manual_decision_not_after_runtime(manual: dict, runtime_asof: datetime) -> datetime:
+    decision_time = _aware(
+        manual.get("decision_time"),
+        "CFB_PROP_MANUAL_DEPTH_DECISION_TIME_INVALID",
+    )
+    if decision_time > runtime_asof:
+        raise CFBPropManualRunError("CFB_PROP_MANUAL_DEPTH_AFTER_RUNTIME_ASOF")
+    return decision_time
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--depth-input", type=Path, required=True)
@@ -57,10 +87,12 @@ def main() -> int:
 
     bound_path = ROOT / "artifacts/run_it/cfb_prop_live_features_depth_bound.json"
     try:
+        runtime_asof = _runtime_asof(args.asof)
         if not args.odds_snapshot.is_file():
             raise CFBPropManualRunError("CFB_PROP_MANUAL_ODDS_SNAPSHOT_REQUIRED")
         live = _json(args.live_features, "CFB_PROP_MANUAL_LIVE_FEATURES_INVALID")
         manual, manual_sha = load_manual_depth_input(args.depth_input)
+        _require_manual_decision_not_after_runtime(manual, runtime_asof)
         bound = bind_manual_depth_to_live_features(
             live_features=live,
             manual_input=manual,
@@ -95,12 +127,11 @@ def main() -> int:
         "--sport", "CFB",
         "--live-features", str(bound_path),
         "--odds-snapshot", str(args.odds_snapshot),
+        "--asof", runtime_asof.isoformat(),
         "--n-paths", str(int(args.n_paths)),
         "--root-seed", str(int(args.root_seed)),
         "--output", str(args.output),
     ]
-    if args.asof:
-        cmd.extend(["--asof", args.asof])
     proc = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True, check=False)
     if proc.stdout:
         print(proc.stdout, end="")
