@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 300
     env:
-      SPORTSEDGE_ODDSPAPI_KEY: ${{ secrets.SPORTSEDGE_ODDSPAPI_KEY }}
+      SPORTSEDGE_ODDSPAPI_KEY: ${{ secrets.SPORTSEDGE_ODDSAPI_KEY }}
       BOOKMAKERS: ${{ inputs.bookmakers }}
       BATCH_SIZE: ${{ inputs.batch_size }}
       MAX_BATCHES: ${{ inputs.max_batches }}
@@ -49,7 +49,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${SPORTSEDGE_ODDSPAPI_KEY:-}" ]; then
-            echo 'SPORTSEDGE_ODDSPAPI_KEY is not configured' >&2
+            echo 'SPORTSEDGE_ODDSAPI_KEY is not configured' >&2
             exit 78
           fi
 
