@@ -128,6 +128,19 @@ def test_late_source_retrieval_fails_closed(tmp_path):
     assert any("RETRIEVAL_AFTER_CAPTURE" in error for error in report["asset_errors"])
 
 
+def test_same_second_subsecond_retrieval_before_capture_is_valid(tmp_path):
+    report = audit_cfb_forward_pit_snapshot(
+        _classification(
+            tmp_path,
+            retrieved_at="2026-09-12T11:01:28.125000+00:00",
+            captured_at_utc="2026-09-12T11:01:28.900000Z",
+        )
+    )
+    assert report["source_asof_ready"] is True
+    assert not any("RETRIEVAL_AFTER_CAPTURE" in error for error in report["asset_errors"])
+    assert report["truth_gate_ready"] is False
+
+
 def test_predictive_market_contamination_fails_closed_and_is_not_paired_evidence(tmp_path):
     report = audit_cfb_forward_pit_snapshot(
         _classification(tmp_path, market_data_in_predictive_capture=True)
