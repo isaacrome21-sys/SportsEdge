@@ -10,8 +10,14 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
+from .participation_source_capture import (
+    PARTICIPATION_CAPTURE_CONTRACT,
+    PARTICIPATION_DATASETS,
+)
+
 DEFAULT_POLICY = Path("config/cfb_prop_participation_model_v1.json")
 EXPECTED_SCHEMA = "CFB_PROP_PARTICIPATION_MODEL_V1"
+EXPECTED_READINESS_CONTRACT = "CFB_PARTICIPATION_PIT_READINESS_V1"
 
 
 class CFBParticipationModelError(ValueError):
@@ -42,6 +48,27 @@ def load_cfb_participation_policy(path: str | Path = DEFAULT_POLICY) -> dict[str
     blockers = out.get("structural_blockers")
     if not isinstance(blockers, list) or not blockers:
         raise CFBParticipationModelError("CFB_PROP_PARTICIPATION_BLOCKERS_REQUIRED")
+
+    sources = out.get("training_source_requirements")
+    if not isinstance(sources, Mapping):
+        raise CFBParticipationModelError("CFB_PROP_PARTICIPATION_SOURCE_REQUIREMENTS_MISSING")
+    if sources.get("point_in_time_mode") != "FORWARD_CAPTURE_ONLY":
+        raise CFBParticipationModelError("CFB_PROP_PARTICIPATION_PIT_MODE_INVALID")
+    if sources.get("retroactive_backfill_allowed") is not False:
+        raise CFBParticipationModelError("CFB_PROP_PARTICIPATION_RETROACTIVE_BACKFILL_FORBIDDEN")
+    if sources.get("market_data_allowed") is not False:
+        raise CFBParticipationModelError("CFB_PROP_PARTICIPATION_MARKET_SOURCE_FORBIDDEN")
+    declared_datasets = sources.get("required_datasets")
+    if not isinstance(declared_datasets, list) or set(map(str, declared_datasets)) != set(PARTICIPATION_DATASETS):
+        raise CFBParticipationModelError("CFB_PROP_PARTICIPATION_SOURCE_DATASETS_INVALID")
+    if sources.get("capture_contract") != PARTICIPATION_CAPTURE_CONTRACT:
+        raise CFBParticipationModelError("CFB_PROP_PARTICIPATION_CAPTURE_CONTRACT_INVALID")
+    if sources.get("readiness_contract") != EXPECTED_READINESS_CONTRACT:
+        raise CFBParticipationModelError("CFB_PROP_PARTICIPATION_READINESS_CONTRACT_INVALID")
+    if sources.get("persist_branch") != "data":
+        raise CFBParticipationModelError("CFB_PROP_PARTICIPATION_PERSIST_BRANCH_INVALID")
+    if sources.get("persist_path_prefix") != "history/cfb/forward-participation":
+        raise CFBParticipationModelError("CFB_PROP_PARTICIPATION_PERSIST_PATH_INVALID")
     return out
 
 
