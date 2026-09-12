@@ -112,6 +112,7 @@ jobs:
           python - <<'PY'
           import json, os
           from pathlib import Path
+          from sportsedge.sports.nfl.m2_v2e_candidate import NFL_M2_V2E_PIT_STATE_FIELDS
           evidence = json.loads(Path('artifacts/football/nfl_m2_v2e_candidate_validation.json').read_text())
           math = json.loads(Path('artifacts/football/nfl_m2_v2e_candidate_key_math.json').read_text())
           expected = os.environ['EVIDENCE_GIT_SHA'].lower()
@@ -121,8 +122,12 @@ jobs:
               raise SystemExit('NFL_M2_V2E_DRIVE_STATE_CONDITIONING_REQUIRED')
           if evidence.get('pit_state_conditions_scoring_event_mix') is not True:
               raise SystemExit('NFL_M2_V2E_SCORING_STATE_CONDITIONING_REQUIRED')
-          if not evidence.get('state_feature_names'):
-              raise SystemExit('NFL_M2_V2E_STATE_SCHEMA_REQUIRED')
+          expected_state_fields = sorted(NFL_M2_V2E_PIT_STATE_FIELDS)
+          observed_state_fields = sorted(evidence.get('state_feature_names') or [])
+          if observed_state_fields != expected_state_fields:
+              raise SystemExit('NFL_M2_V2E_FROZEN_STATE_SCHEMA_MISMATCH')
+          if len(observed_state_fields) != 11:
+              raise SystemExit('NFL_M2_V2E_FROZEN_STATE_FIELD_COUNT_MISMATCH')
           if evidence.get('outer_history_status') != 'DEVELOPMENT_FALSIFICATION_ONLY_ALREADY_OBSERVED_FOLDS':
               raise SystemExit('NFL_M2_V2E_HISTORY_STATUS_INVALID')
           if evidence.get('prospective_confirmation_required_for_promotion') is not True:
