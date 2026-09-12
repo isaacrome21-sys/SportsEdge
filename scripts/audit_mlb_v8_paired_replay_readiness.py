@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Audit normalized MLB V8 OddsPapi PIT rows for replay-ready decision/close evidence.
 
-The audit is deliberately readiness-only.  It does not run a model, set an edge
+The audit is deliberately readiness-only. It does not run a model, set an edge
 floor, change eligibility, or grant promotion authority.
 """
 from __future__ import annotations
@@ -63,6 +63,7 @@ def normalized_pairs(rows: Iterable[dict[str, Any]]) -> tuple[list[dict[str, Any
             "event_id": str(row.get("fixture_id") or ""),
             "market": str(row.get("market_id") or ""),
             "book": str(row.get("bookmaker") or ""),
+            "threshold": row.get("handicap"),
             "provenance": "oddspapi_historical_provider_snapshot",
             "source_sha256": history_sha,
         }
