@@ -9,6 +9,7 @@ from scripts.cfb_signal_quality import (
     funnel_counts,
     material_line_move,
 )
+from scripts.run_cfb_signal_quality import build_card
 
 
 POLICY = json.loads(Path("config/cfb_signal_quality_policy_v1.json").read_text())
@@ -197,3 +198,26 @@ def test_funnel_never_invents_official_rows():
     assert counts["scanned"] == 3
     assert counts["official"] == 0
     assert counts["model_candidates"] == 0
+
+
+def test_card_runner_exposes_funnel_and_reason_coded_rows():
+    card = build_card(
+        [
+            base_row(game_id="g1", market_id="m1", selection="TEAM_A", underlying_candidate=True),
+            base_row(
+                game_id="g2",
+                market_id="m2",
+                selection="TEAM_B",
+                underlying_candidate=True,
+                promo={"boost_pct": 50},
+            ),
+        ],
+        POLICY,
+    )
+    assert card["schema_version"] == "CFB_SIGNAL_QUALITY_CARD_V1"
+    assert card["funnel"]["scanned"] == 2
+    assert card["funnel"]["official"] == 0
+    assert {row["lane"] for row in card["rows"]} == {"HYBRID_CONTEXT", "PROMO_VALUE"}
+    for row in card["rows"]:
+        assert "reason_codes" in row
+        assert row["model_authorized"] is False
