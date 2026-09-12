@@ -167,10 +167,12 @@ def main() -> int:
         "production_registry_consumes_this_artifact": False,
         "frozen_gate_changes": False,
         "market_inputs_used_in_feature_state": False,
+        "historical_evidence_integrity": "REUSED_RESEARCH_HISTORY_NOT_FINAL_HOLDOUT",
+        "prospective_confirmation_required_for_promotion": True,
         "diagnostic_question": (
             "Does blending strictly previous-season completed football state with current-season-to-date "
-            "PIT state using the already-frozen weekly prior-decay weight improve untouched-fold NFL "
-            "game-market probability evidence when downstream V2D geometry and all frozen gates stay fixed?"
+            "PIT state using the already-frozen weekly prior-decay weight improve fixed-fold historical NFL "
+            "game-market probability diagnostics when downstream V2D geometry and all frozen gates stay fixed?"
         ),
     })
     _write(args.out, evidence)
@@ -180,6 +182,8 @@ def main() -> int:
         "code_git_sha": git_sha,
         "source_manifest_sha256": manifest_hash,
         "experiment_id": _EXPERIMENT_ID,
+        "historical_evidence_integrity": "REUSED_RESEARCH_HISTORY_NOT_FINAL_HOLDOUT",
+        "prospective_confirmation_required_for_promotion": True,
         "promotion_eligible": False,
         "production_registry_consumes_this_artifact": False,
         "candidate_historical_evidence": evidence["candidate_historical_evidence"],
