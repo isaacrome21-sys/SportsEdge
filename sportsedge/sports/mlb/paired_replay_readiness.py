@@ -1,6 +1,6 @@
 """Fail-closed readiness checks for MLB historical decision/close market evidence.
 
-This module validates evidence availability only.  It cannot create Model_P,
+This module validates evidence availability only. It cannot create Model_P,
 promotion evidence, Truth Gate PASS, edge floors, or market eligibility.
 """
 from __future__ import annotations
@@ -43,10 +43,22 @@ def _price(value: Any, field: str) -> float:
     return number
 
 
-def _identity(row: Mapping[str, Any]) -> tuple[str, str, str, str]:
-    values = tuple(str(row.get(k) or "").strip() for k in ("event_id", "market", "selection", "book"))
-    _require(all(values), "MLB_PAIRED_REPLAY_IDENTITY_REQUIRED")
-    return values
+def _threshold(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return str(value).lower()
+    if isinstance(value, (int, float)):
+        number = float(value)
+        _require(isfinite(number), "MLB_PAIRED_REPLAY_THRESHOLD_INVALID")
+        return format(number, ".15g")
+    return str(value).strip()
+
+
+def _identity(row: Mapping[str, Any]) -> tuple[str, str, str, str, str]:
+    base = tuple(str(row.get(k) or "").strip() for k in ("event_id", "market", "selection", "book"))
+    _require(all(base), "MLB_PAIRED_REPLAY_IDENTITY_REQUIRED")
+    return (*base, _threshold(row.get("threshold")))
 
 
 def _validate_quote(row: Mapping[str, Any], *, stage: str, event_start: datetime) -> dict[str, Any]:
@@ -81,6 +93,7 @@ def validate_decision_close_pair(pair: Mapping[str, Any]) -> dict[str, Any]:
         "market": decision["identity"][1],
         "selection": decision["identity"][2],
         "book": decision["identity"][3],
+        "threshold": decision["identity"][4],
         "event_start": event_start.isoformat(),
         "decision_observed_at": decision["observed_at"].isoformat(),
         "close_observed_at": close["observed_at"].isoformat(),
