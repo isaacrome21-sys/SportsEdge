@@ -85,7 +85,7 @@ jobs:
           SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
           SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
         run: |
-          python scripts/run_nfl_v2g_forward_clv.py \
+          PYTHONPATH=. python scripts/run_nfl_v2g_forward_clv.py \
             --prediction-dir .data-v2g/evidence/nfl_v2g/prospective/predictions/2026 \
             --capture-root data/nfl_2026_confirmation/captures \
             --state-root .data-v2g/evidence/nfl_v2g/prospective/forward_clv/2026 \
