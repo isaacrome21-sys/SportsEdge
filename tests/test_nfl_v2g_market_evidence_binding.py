@@ -37,13 +37,16 @@ class NFLV2GMarketEvidenceBindingTests(unittest.TestCase):
             "market_eligibility_changed": False,
             "official_status_granted": False,
         }), encoding="utf-8")
-        self.opener.write_text(json.dumps(self.capture("OPENER", "2026-09-15T14:03:00+00:00")), encoding="utf-8")
+        self.opener.write_text(
+            json.dumps(self.capture("OPENER", "2026-09-15T14:03:00+00:00")),
+            encoding="utf-8",
+        )
 
     def tearDown(self):
         self.tmp.cleanup()
 
     @staticmethod
-    def game():
+    def game(*, spread_status="OK", total_status="OK"):
         return {
             "event_id": "evt-1",
             "away_team": "Pittsburgh Steelers",
@@ -51,11 +54,22 @@ class NFLV2GMarketEvidenceBindingTests(unittest.TestCase):
             "commence_time": "2026-09-20T17:00:00Z",
             "book": "draftkings",
             "book_last_update": "2026-09-15T14:02:30Z",
-            "spread": {"status": "OK", "home_point": -2.5, "home_price": -110, "away_point": 2.5, "away_price": -110},
-            "total": {"status": "OK", "point": 43.5, "over_price": -110, "under_price": -110},
+            "spread": {
+                "status": spread_status,
+                "home_point": -2.5,
+                "home_price": -110,
+                "away_point": 2.5,
+                "away_price": -110,
+            },
+            "total": {
+                "status": total_status,
+                "point": 43.5,
+                "over_price": -110,
+                "under_price": -110,
+            },
         }
 
-    def capture(self, kind, retrieved):
+    def capture(self, kind, retrieved, *, game=None):
         return {
             "capture_kind": kind,
             "week": 2,
@@ -63,17 +77,24 @@ class NFLV2GMarketEvidenceBindingTests(unittest.TestCase):
             "markets": ["spreads", "totals"],
             "retrieved_at_utc": retrieved,
             "lock_status": "MATCH",
-            "games": [self.game()],
+            "games": [game or self.game()],
         }
 
-    def test_ready_only_after_valid_final_capture(self):
-        (self.final / "final.json").write_text(
-            json.dumps(self.capture("FINAL", "2026-09-20T16:31:00+00:00")), encoding="utf-8"
-        )
+    def write_final(self, *, game=None, retrieved="2026-09-20T16:31:00+00:00", name="final.json"):
+        path = self.final / name
+        path.write_text(json.dumps(self.capture("FINAL", retrieved, game=game)), encoding="utf-8")
+        return path
+
+    def test_ready_requires_paired_opener_and_final_for_both_markets(self):
+        self.write_final()
         result = mod.bind(self.pred, self.opener, list(self.final.glob("*.json")))
-        self.assertEqual("READY_FOR_PROSPECTIVE_EVALUATION", result["status"])
+        self.assertEqual(mod.READY, result["status"])
+        self.assertEqual(mod.READY, result["market_status"]["spread"]["status"])
+        self.assertEqual(mod.READY, result["market_status"]["total"]["status"])
+        self.assertEqual([], result["missing_components"])
         self.assertEqual("evt-1", result["opener"]["market"]["event_id"])
         self.assertEqual("evt-1", result["final"]["market"]["event_id"])
+        self.assertEqual(40, len(result["binding_code_git_blob_sha1"]))
         self.assertFalse(result["market_prices_consumed_by_model"])
         self.assertFalse(result["promotion_authority"])
         self.assertFalse(result["truth_gate_pass_granted"])
@@ -81,8 +102,27 @@ class NFLV2GMarketEvidenceBindingTests(unittest.TestCase):
 
     def test_missing_final_is_inconclusive_not_backfilled(self):
         result = mod.bind(self.pred, self.opener, [])
-        self.assertEqual("INCONCLUSIVE_MISSING_CAPTURE", result["status"])
+        self.assertEqual(mod.INCONCLUSIVE, result["status"])
+        self.assertEqual(mod.INCONCLUSIVE, result["market_status"]["spread"]["status"])
+        self.assertEqual(mod.INCONCLUSIVE, result["market_status"]["total"]["status"])
+        self.assertIn("final_spread", result["missing_components"])
+        self.assertIn("final_total", result["missing_components"])
         self.assertIsNone(result["final"]["market"])
+
+    def test_missing_opener_cannot_be_ready_even_with_valid_final(self):
+        self.write_final()
+        result = mod.bind(self.pred, None, list(self.final.glob("*.json")))
+        self.assertEqual(mod.INCONCLUSIVE, result["status"])
+        self.assertIn("opener_spread", result["missing_components"])
+        self.assertIn("opener_total", result["missing_components"])
+
+    def test_one_market_can_be_partial_without_promoting_the_other(self):
+        self.write_final(game=self.game(total_status="MISSING"))
+        result = mod.bind(self.pred, self.opener, list(self.final.glob("*.json")))
+        self.assertEqual(mod.PARTIAL, result["status"])
+        self.assertEqual(mod.READY, result["market_status"]["spread"]["status"])
+        self.assertEqual(mod.INCONCLUSIVE, result["market_status"]["total"]["status"])
+        self.assertEqual(["final_total"], result["market_status"]["total"]["missing_components"])
 
     def test_rejects_market_contaminated_prediction(self):
         payload = json.loads(self.pred.read_text())
@@ -93,12 +133,17 @@ class NFLV2GMarketEvidenceBindingTests(unittest.TestCase):
         self.assertIn("NFL_V2G_PREDICTION_MARKET_LEAKAGE", str(ctx.exception))
 
     def test_rejects_final_at_or_after_kickoff(self):
-        (self.final / "late.json").write_text(
-            json.dumps(self.capture("FINAL", "2026-09-20T17:00:00+00:00")), encoding="utf-8"
-        )
+        self.write_final(retrieved="2026-09-20T17:00:00+00:00", name="late.json")
         with self.assertRaises(SystemExit) as ctx:
             mod.bind(self.pred, self.opener, list(self.final.glob("*.json")))
         self.assertIn("NFL_V2G_FINAL_AFTER_KICKOFF", str(ctx.exception))
+
+    def test_rejects_multiple_final_matches(self):
+        self.write_final(name="a.json")
+        self.write_final(name="b.json")
+        with self.assertRaises(SystemExit) as ctx:
+            mod.bind(self.pred, self.opener, list(self.final.glob("*.json")))
+        self.assertIn("NFL_V2G_MULTIPLE_FINAL_MATCHES", str(ctx.exception))
 
 
 if __name__ == "__main__":
