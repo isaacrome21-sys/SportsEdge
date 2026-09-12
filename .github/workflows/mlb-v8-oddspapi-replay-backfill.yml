@@ -20,7 +20,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: mlb-v8-oddspapi-replay-backfill
+  group: sportsedge-paid-odds-api
   cancel-in-progress: false
 
 jobs:
