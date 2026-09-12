@@ -1,0 +1,85 @@
+name: nfl-prop-forward-snapshot
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      EVIDENCE_GIT_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EVIDENCE_GIT_SHA }}
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Install pinned runtime dependency
+        run: python -m pip install --disable-pip-version-check numpy==2.5.3
+      - name: Capture raw DraftKings NFL prop snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from datetime import datetime, timezone
+          import hashlib, json, os
+          from pathlib import Path
+          from sportsedge.sports.nfl.draftkings_prop_source import fetch_nfl_prop_quotes
+
+          now = datetime.now(timezone.utc)
+          snap = fetch_nfl_prop_quotes()
+          quotes = [dict(q) for q in snap.quotes]
+          payload = {
+              'contract': 'NFL_PROP_FORWARD_RAW_SNAPSHOT_V1',
+              'captured_at': now.isoformat(),
+              'code_git_sha': os.environ['EVIDENCE_GIT_SHA'].lower(),
+              'provider': 'DRAFTKINGS_WEB_RESEARCH',
+              'sport': 'NFL',
+              'quotes': quotes,
+              'quote_count': len(quotes),
+              'failures': list(snap.failures),
+              'promotion_authority': False,
+              'model_p_created': False,
+              'reconstructed': False,
+              'backfilled': False,
+          }
+          canonical = json.dumps(quotes, sort_keys=True, separators=(',', ':')).encode()
+          payload['quotes_sha256'] = hashlib.sha256(canonical).hexdigest()
+          if not quotes:
+              raise SystemExit('NFL_PROP_FORWARD_NO_QUOTES')
+          out = Path('artifacts/football/nfl-prop-forward') / now.date().isoformat()
+          out.mkdir(parents=True, exist_ok=True)
+          path = out / f"snapshot_{now.strftime('%Y%m%dT%H%M%S.%fZ')}.json"
+          path.write_text(json.dumps(payload, indent=2, sort_keys=True) + '\n')
+          print(path)
+          PY
+      - name: Persist immutable raw snapshot to data branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data:data
+          git worktree add .data-branch data
+          mkdir -p .data-branch/runtime/nfl-prop-forward/raw
+          cp -R artifacts/football/nfl-prop-forward/. .data-branch/runtime/nfl-prop-forward/raw/
+          cd .data-branch
+          git config user.name sportsedge-archive-bot
+          git config user.email sportsedge-archive-bot@users.noreply.github.com
+          git add runtime/nfl-prop-forward/raw
+          if git diff --cached --quiet; then
+            echo 'NFL_PROP_FORWARD_NO_NEW_BYTES' >&2
+            exit 1
+          fi
+          git commit -m "nfl props: persist forward raw snapshot ${{ github.run_id }}"
+          git push origin HEAD:data
+      - name: Upload run artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nfl-prop-forward-snapshot-${{ env.EVIDENCE_GIT_SHA }}
+          path: artifacts/football/nfl-prop-forward/**
+          if-no-files-found: error
+          retention-days: 30
