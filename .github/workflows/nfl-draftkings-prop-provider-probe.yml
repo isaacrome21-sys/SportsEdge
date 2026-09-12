@@ -26,7 +26,7 @@ jobs:
           python-version: '3.12'
       - name: Test NFL DraftKings prop parser
         run: |
-          python -m pip install --disable-pip-version-check pytest==9.1.1
+          python -m pip install --disable-pip-version-check pytest==9.1.1 numpy==2.5.3
           python -m pytest tests/test_nfl_draftkings_prop_source.py -q
       - name: Probe DraftKings NFL prop surface
         id: probe
@@ -103,4 +103,11 @@ jobs:
           fi
       - name: Propagate provider result
         if: always()
-        run: exit '${{ steps.probe.outputs.exit_code }}'
+        shell: bash
+        run: |
+          code='${{ steps.probe.outputs.exit_code }}'
+          if [[ -z "$code" ]]; then
+            echo 'NFL_PROP_PROVIDER_PROBE_DID_NOT_RUN' >&2
+            exit 4
+          fi
+          exit "$code"
