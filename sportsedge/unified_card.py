@@ -96,6 +96,9 @@ def run_unified_card(
     edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG,
     kelly_multiplier: float = 0.25,
 ) -> list[UnifiedCardResult]:
+    if require_confirmed_lineup is not True:
+        raise ValueError("CONFIRMED_LINEUP_REQUIRED_FOR_PRODUCTION")
+
     indexed: list[tuple[int, Mapping[str, Any]]] = []
     output: dict[int, UnifiedCardResult] = {}
     for i, raw_quote in enumerate(quotes):
@@ -119,7 +122,7 @@ def run_unified_card(
             ingestion_now=ingestion_now,
             finalization_now=finalization_now,
             registry_path=registry_path,
-            require_confirmed_lineup=require_confirmed_lineup,
+            require_confirmed_lineup=True,
             edge_floor_config_path=edge_floor_config_path,
             kelly_multiplier=kelly_multiplier,
         )
