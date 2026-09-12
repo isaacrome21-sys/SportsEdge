@@ -1,0 +1,33 @@
+{
+  "schema_version": "SPORTSEDGE_NFL_V2G_ARTIFACT_CONTRACT_V1",
+  "status": "FROZEN_BUILD_CONTRACT_NO_ARTIFACT_YET",
+  "candidate_id": "nfl_m2_scoring_event_v2g_candidate",
+  "implementation_freeze": "config/research/nfl_v2g_implementation_freeze_2026-09-12.json",
+  "required_inputs": {
+    "training_event_rows_sha256": "REQUIRED_64_HEX_FROM_IMMUTABLE_TRAINING_BYTES",
+    "source_manifest_sha256": "REQUIRED_64_HEX_FROM_IMMUTABLE_SOURCE_MANIFEST",
+    "implementation_commit_sha": "4dc37c4e445325c77737ec646fa37dbdbe3bfa6d",
+    "candidate_source_git_blob_sha1": "4d8a3e19033b70962bec6d93d46d92a58305778e"
+  },
+  "serialization": {
+    "schema": "NFL_M2_V2G_RESEARCH_ARTIFACT_V1",
+    "canonical_json": "sort_keys=true,separators=(comma,colon),ascii=true,trailing_newline=true",
+    "hash": "SHA256_OF_CANONICAL_ARTIFACT_BYTES",
+    "team_state_order": "LEXICOGRAPHIC_TEAM_KEY"
+  },
+  "build_rules": {
+    "unbound_training_bytes_allowed": false,
+    "unbound_source_manifest_allowed": false,
+    "synthetic_or_reconstructed_provenance_allowed": false,
+    "historical_2016_2025_role": "REUSED_RESEARCH_HISTORY_NOT_FINAL_HOLDOUT",
+    "artifact_creation_alone_may_promote": false,
+    "artifact_creation_alone_may_create_model_p": false,
+    "artifact_creation_alone_may_change_eligibility": false,
+    "prospective_prediction_requires_artifact_freeze_after_successful_determinism_check": true
+  },
+  "current_artifact_status": "BLOCKED_MISSING_SOURCE_BOUND_V2G_MODEL_ARTIFACT",
+  "promotion_authority": false,
+  "production_model_changed": false,
+  "market_eligibility_changed": false,
+  "official_status_granted": false
+}
