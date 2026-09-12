@@ -10,7 +10,7 @@
   "prop_engine_authority": "config/football_prop_engine_surface.json",
   "prop_engine_state": {
     "NFL": "NO_ENGINE",
-    "CFB": "IMPLEMENTED_FAIL_CLOSED"
+    "CFB": "NO_ENGINE"
   },
   "prop_provider_markets": {
     "player_pass_attempts": "IMPLEMENTED_EXPERIMENTAL",
