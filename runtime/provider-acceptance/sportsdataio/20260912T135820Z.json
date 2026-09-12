@@ -1,0 +1,14 @@
+{
+  "endpoint": "/v3/mlb/odds/json/GameOddsByDate/2026-09-12",
+  "historical_archive_access_proven": false,
+  "historical_bytes_persisted": false,
+  "may_change_market_eligibility": false,
+  "probe_scope": "PRODUCTION_MLB_ODDS_PATH_ONLY",
+  "promotion_authority": false,
+  "provider": "SPORTSDATAIO",
+  "raw_bytes_persisted": false,
+  "run_at_utc": "2026-09-12T13:58:18.612144+00:00",
+  "schema": "SPORTSEDGE_MLB_SPORTSDATAIO_ACCEPTANCE_V1",
+  "sport": "MLB",
+  "status": "BLOCKED_NO_SPORTSDATAIO_API_KEY"
+}
