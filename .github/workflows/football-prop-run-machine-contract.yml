@@ -134,17 +134,28 @@ jobs:
           surface = json.loads(Path('config/football_prop_engine_surface.json').read_text())
           declared = {market for values in surface['implemented_provider_markets'].values() for market in values}
           assert declared == set(PROVIDER_MARKETS)
-          for sport in ('NFL', 'CFB'):
-              assert surface['sports'][sport]['engine_state'] == 'NO_ENGINE'
-              assert surface['sports'][sport]['promotion_state'] == 'BLOCKED_NO_VALIDATED_PROBABILITY_ENGINE'
-              assert surface['sports'][sport]['readiness_state'] == 'NO_ENGINE'
-              assert sport in surface['explicit_no_engine']
-              try:
-                  require_executable_prop_surface(sport)
-              except FootballPropSurfaceError as exc:
-                  assert str(exc) == f'FOOTBALL_PROP_ENGINE_NOT_IMPLEMENTED:{sport}'
-              else:
-                  raise AssertionError(f'{sport} prop surface unexpectedly executable')
+
+          nfl = surface['sports']['NFL']
+          assert nfl['engine_state'] == 'NO_ENGINE'
+          assert nfl['promotion_state'] == 'BLOCKED_NO_VALIDATED_PROBABILITY_ENGINE'
+          assert nfl['readiness_state'] == 'NO_ENGINE'
+          assert 'NFL' in surface['explicit_no_engine']
+          try:
+              require_executable_prop_surface('NFL')
+          except FootballPropSurfaceError as exc:
+              assert str(exc) == 'FOOTBALL_PROP_ENGINE_NOT_IMPLEMENTED:NFL'
+          else:
+              raise AssertionError('NFL prop surface unexpectedly executable')
+
+          cfb = surface['sports']['CFB']
+          assert cfb['engine_state'] == 'IMPLEMENTED_FAIL_CLOSED'
+          assert cfb['promotion_state'] == 'AUTOMATIC_TRUTH_GATE_GATED'
+          assert cfb['readiness_state'] == 'REGISTRY_DERIVED'
+          assert 'CFB' not in surface['explicit_no_engine']
+          resolved = require_executable_prop_surface('CFB')
+          assert resolved['runtime_state'] == 'ARTIFACT_FROZEN_EVIDENCE_GATED'
+          assert resolved['frozen_artifact_sha256'] == '923cfd1be42d31a87d9f31ddffce406d44bfc1bb003d1c625f5a4258f7773f23'
+
           gov=surface['governance']
           assert gov['market_prices_can_create_model_p'] is False
           assert gov['one_sided_market_can_create_model_p'] is False
@@ -230,20 +241,29 @@ jobs:
             set -e
             test "$rc" -eq 2
           done
-      - name: Assert RUN IT keeps both football prop lanes NO_ENGINE
+      - name: Assert RUN IT routes NFL no-engine and CFB executable props correctly
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
           run_it=json.loads(Path('config/run_it_surface.json').read_text())
           prop=json.loads(Path('config/football_prop_engine_surface.json').read_text())
-          for sport in ('NFL','CFB'):
-              lower=sport.lower(); row=run_it['sports'][sport]
-              assert row['lane']=='PREGAME_GAME_MODEL_WITH_PROPS_NO_ENGINE'
-              assert row['automatic_completeness']=='EXECUTABLE_FAIL_CLOSED'
-              assert row['automatic_command']==['python','scripts/run_football_auto_bundle.py','--sport',sport,'--output',f'artifacts/run_it/{lower}_card.json']
-              assert row['governance_source']=='config/football_prop_engine_surface.json'
-              assert f'{sport}_PROPS_NO_ENGINE' in row['blocker']
-              assert prop['sports'][sport]['engine_state']=='NO_ENGINE'
+
+          nfl=run_it['sports']['NFL']
+          assert nfl['lane']=='PREGAME_GAME_MODEL_WITH_PROPS_NO_ENGINE'
+          assert nfl['automatic_completeness']=='EXECUTABLE_FAIL_CLOSED'
+          assert nfl['automatic_command']==['python','scripts/run_football_auto_bundle.py','--sport','NFL','--output','artifacts/run_it/nfl_card.json']
+          assert nfl['governance_source']=='config/football_prop_engine_surface.json'
+          assert 'NFL_PROPS_NO_ENGINE' in nfl['blocker']
+          assert prop['sports']['NFL']['engine_state']=='NO_ENGINE'
+
+          cfb=run_it['sports']['CFB']
+          assert cfb['lane']=='PREGAME_GAME_MODEL_WITH_PROP_ENGINE_FAIL_CLOSED'
+          assert cfb['automatic_completeness']=='EXECUTABLE_FAIL_CLOSED'
+          assert cfb['automatic_command']==['python','scripts/run_football_auto_bundle.py','--sport','CFB','--output','artifacts/run_it/cfb_card.json']
+          assert cfb['governance_source']=='config/football_prop_engine_surface.json'
+          assert 'CFB_PROP_PIT_LIVE_FEATURE_SNAPSHOT_REQUIRED' in cfb['blocker']
+          assert 'CFB_PROP_FORWARD_EVIDENCE_CERTIFICATION_AND_FROZEN_EDGE_FLOOR_REQUIRED_FOR_OFFICIAL' in cfb['blocker']
+          assert prop['sports']['CFB']['engine_state']=='IMPLEMENTED_FAIL_CLOSED'
           assert Path('scripts/run_football_auto_bundle.py').is_file()
           PY
