@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """Bind immutable NFL V2G prospective predictions to independent market captures.
 
-This script is deliberately downstream of the model. It never creates or alters
-Model_P and never feeds sportsbook prices back into V2G. It only joins already
-frozen prospective predictions to DraftKings confirmation captures so later
-CLV/validation work can prove which prices were actually available.
+This is downstream evidence plumbing only. It never creates or alters Model_P and
+never feeds sportsbook prices back into V2G.
 
 Fail-closed rules:
 - prediction must be NFL_M2_V2G_PROSPECTIVE_PREDICTION_V1 and market-blind;
 - opener/final captures must be DraftKings spreads+totals and lock MATCH/CREATED;
 - matching is explicit by canonical team code plus kickoff time, never fuzzy;
-- opener must precede kickoff and final must be before kickoff;
-- no missing close is invented: final absence => INCONCLUSIVE_MISSING_CAPTURE;
+- opener and final must both be pre-kickoff;
+- spread and total readiness are evaluated independently and each requires a
+  valid paired opener + final market row;
+- missing evidence is never invented or backfilled;
 - output grants no promotion, Model_P, Truth Gate PASS, staking, or OFFICIAL.
 """
 from __future__ import annotations
@@ -24,6 +24,9 @@ from pathlib import Path
 
 SCHEMA = "SPORTSEDGE_NFL_V2G_MARKET_EVIDENCE_BINDING_V1"
 PRED_SCHEMA = "NFL_M2_V2G_PROSPECTIVE_PREDICTION_V1"
+READY = "READY_FOR_PROSPECTIVE_EVALUATION"
+PARTIAL = "PARTIAL_MARKET_EVIDENCE"
+INCONCLUSIVE = "INCONCLUSIVE_MISSING_CAPTURE"
 
 TEAM_CODE_BY_NAME = {
     "Arizona Cardinals": "ARI", "Atlanta Falcons": "ATL", "Baltimore Ravens": "BAL",
@@ -42,6 +45,10 @@ TEAM_CODE_BY_NAME = {
 
 def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def git_blob_sha1(data: bytes) -> str:
+    return hashlib.sha1(f"blob {len(data)}\0".encode("ascii") + data).hexdigest()
 
 
 def load_json(path: Path):
@@ -83,7 +90,7 @@ def capture_is_eligible(capture: dict, kind: str) -> None:
     if set(capture.get("markets") or []) != {"spreads", "totals"}:
         raise SystemExit("NFL_V2G_CAPTURE_MARKETS_INVALID")
     lock = str(capture.get("lock_status") or "")
-    if not (lock == "MATCH" or lock == "LOCK_CREATED"):
+    if lock not in {"MATCH", "LOCK_CREATED"}:
         raise SystemExit(f"NFL_V2G_CAPTURE_LOCK_INVALID:{lock}")
 
 
@@ -117,6 +124,22 @@ def market_payload(row: dict | None) -> dict | None:
     }
 
 
+def market_ready(row: dict | None, key: str) -> bool:
+    return bool(row and isinstance(row.get(key), dict) and row[key].get("status") == "OK")
+
+
+def paired_market_status(opener_row: dict | None, final_row: dict | None, key: str) -> dict:
+    missing = []
+    if not market_ready(opener_row, key):
+        missing.append(f"opener_{key}")
+    if not market_ready(final_row, key):
+        missing.append(f"final_{key}")
+    return {
+        "status": READY if not missing else INCONCLUSIVE,
+        "missing_components": missing,
+    }
+
+
 def bind(pred_path: Path, opener_path: Path | None, final_paths: list[Path]) -> dict:
     pred, pred_file_sha = load_json(pred_path)
     validate_prediction(pred)
@@ -124,6 +147,7 @@ def bind(pred_path: Path, opener_path: Path | None, final_paths: list[Path]) -> 
 
     opener_capture = opener_row = None
     opener_file_sha = None
+    opener_source = None
     if opener_path and opener_path.exists():
         opener_capture, opener_file_sha = load_json(opener_path)
         capture_is_eligible(opener_capture, "OPENER")
@@ -131,10 +155,12 @@ def bind(pred_path: Path, opener_path: Path | None, final_paths: list[Path]) -> 
         if retrieved >= kickoff:
             raise SystemExit("NFL_V2G_OPENER_NOT_PREGAME")
         opener_row = match_game(pred, opener_capture)
+        opener_source = str(opener_path)
 
     final_match = None
     final_file_sha = None
     final_retrieved = None
+    final_source = None
     for path in sorted(final_paths):
         capture, file_sha = load_json(path)
         capture_is_eligible(capture, "FINAL")
@@ -149,16 +175,37 @@ def bind(pred_path: Path, opener_path: Path | None, final_paths: list[Path]) -> 
         final_match = row
         final_file_sha = file_sha
         final_retrieved = capture["retrieved_at_utc"]
+        final_source = str(path)
 
-    status = "READY_FOR_PROSPECTIVE_EVALUATION" if final_match is not None else "INCONCLUSIVE_MISSING_CAPTURE"
+    market_status = {
+        "spread": paired_market_status(opener_row, final_match, "spread"),
+        "total": paired_market_status(opener_row, final_match, "total"),
+    }
+    ready_count = sum(v["status"] == READY for v in market_status.values())
+    if ready_count == 2:
+        status = READY
+    elif ready_count == 1:
+        status = PARTIAL
+    else:
+        status = INCONCLUSIVE
+
+    missing_components = sorted({
+        item
+        for details in market_status.values()
+        for item in details["missing_components"]
+    })
+    script_bytes = Path(__file__).read_bytes()
     return {
         "schema_version": SCHEMA,
         "status": status,
+        "market_status": market_status,
+        "missing_components": missing_components,
         "game_id": pred["game_id"],
         "candidate_id": pred["candidate_id"],
         "away_team": pred["away_team"],
         "home_team": pred["home_team"],
         "kickoff_utc": pred["kickoff_utc"],
+        "binding_code_git_blob_sha1": git_blob_sha1(script_bytes),
         "prediction": {
             "path": str(pred_path),
             "file_sha256": pred_file_sha,
@@ -170,11 +217,13 @@ def bind(pred_path: Path, opener_path: Path | None, final_paths: list[Path]) -> 
             "captured_at_utc": pred.get("captured_at_utc"),
         },
         "opener": {
+            "path": opener_source,
             "capture_file_sha256": opener_file_sha,
             "retrieved_at_utc": opener_capture.get("retrieved_at_utc") if opener_capture else None,
             "market": market_payload(opener_row),
         },
         "final": {
+            "path": final_source,
             "capture_file_sha256": final_file_sha,
             "retrieved_at_utc": final_retrieved,
             "market": market_payload(final_match),
@@ -196,13 +245,18 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
-    result = bind(args.prediction, args.opener, list(args.final_dir.glob("*.json")) if args.final_dir.exists() else [])
+    finals = list(args.final_dir.glob("*.json")) if args.final_dir.exists() else []
+    result = bind(args.prediction, args.opener, finals)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     encoded = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.output.exists() and args.output.read_text(encoding="utf-8") != encoded:
         raise SystemExit(f"NFL_V2G_REFUSING_EVIDENCE_OVERWRITE:{args.output}")
     args.output.write_text(encoded, encoding="utf-8")
-    print(json.dumps({"game_id": result["game_id"], "status": result["status"]}, sort_keys=True))
+    print(json.dumps({
+        "game_id": result["game_id"],
+        "status": result["status"],
+        "market_status": result["market_status"],
+    }, sort_keys=True))
     return 0
 
 
