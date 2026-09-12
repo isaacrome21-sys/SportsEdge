@@ -15,7 +15,9 @@ on:
       - 'tests/test_nfl*.py'
       - '.github/workflows/football-nfl-promotion-evidence.yml'
   push:
-    branches: [main]
+    branches:
+      - main
+      - fix/nfl-v2-model-quality
     paths:
       - 'sportsedge/core/simulate/**'
       - 'sportsedge/core/clv/**'
@@ -86,10 +88,6 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/football/sources/{pbp,participation,depth}
-
-          # These are immutable/frozen evidence inputs. Retry only transport
-          # failures; the URL, returned bytes, and downstream hashes remain
-          # unchanged, and the workflow still fails closed after bounded tries.
           fetch_source() {
             local url="$1"
             local output="$2"
@@ -98,7 +96,6 @@ jobs:
               --connect-timeout 30 \
               "$url" -o "$output"
           }
-
           fetch_source \
             'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv' \
             artifacts/football/sources/games.csv
@@ -140,7 +137,6 @@ jobs:
           import json, os
           from pathlib import Path
           from sportsedge.sports.nfl.model_artifact import load_nfl_m2_model_artifact
-
           model_path = Path('artifacts/football/nfl_m2_model.json')
           manifest_path = Path('artifacts/football/nfl_source_manifest.json')
           if not model_path.is_file():
@@ -235,7 +231,6 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-
           path = Path('artifacts/football/nfl_m2_determinism_report.json')
           if not path.is_file():
               raise SystemExit('NFL_M2_DETERMINISM_REPORT_MISSING')
@@ -369,7 +364,9 @@ jobs:
           )
           PY
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - name: Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: nfl-promotion-evidence-${{ env.EVIDENCE_GIT_SHA }}
           path: |
