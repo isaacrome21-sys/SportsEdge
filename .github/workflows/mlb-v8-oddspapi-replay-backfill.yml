@@ -15,6 +15,10 @@ on:
         description: Maximum checkpoint batches this run
         required: false
         default: '30'
+  push:
+    branches: [main]
+    paths:
+      - '.github/trigger-mlb-v8-oddspapi'
 
 permissions:
   contents: write
@@ -29,9 +33,9 @@ jobs:
     timeout-minutes: 300
     env:
       SPORTSEDGE_ODDSPAPI_KEY: ${{ secrets.SPORTSEDGE_ODDSPAPI_KEY }}
-      BOOKMAKERS: ${{ inputs.bookmakers }}
-      BATCH_SIZE: ${{ inputs.batch_size }}
-      MAX_BATCHES: ${{ inputs.max_batches }}
+      BOOKMAKERS: ${{ inputs.bookmakers || 'pinnacle,draftkings,fanduel' }}
+      BATCH_SIZE: ${{ inputs.batch_size || '120' }}
+      MAX_BATCHES: ${{ inputs.max_batches || '30' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
