@@ -135,8 +135,7 @@ jobs:
           declared = {market for values in surface['implemented_provider_markets'].values() for market in values}
           assert declared == set(PROVIDER_MARKETS)
 
-          # NFL may have frozen research/code artifacts without having an
-          # independently validated bettor-facing probability engine.
+          # Frozen research/code artifacts do not make NFL props executable.
           assert surface['sports']['NFL']['engine_state'] == 'NO_ENGINE'
           assert 'NFL' in surface['explicit_no_engine']
           try:
@@ -244,16 +243,20 @@ jobs:
             set -e
             test "$rc" -eq 2
           done
-      - name: Assert RUN IT routes both football sports through bundle
+      - name: Assert RUN IT labels NFL game-only and CFB prop-capable
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
           surface=json.loads(Path('config/run_it_surface.json').read_text())
-          for sport in ('NFL','CFB'):
-              lower=sport.lower(); row=surface['sports'][sport]
-              assert row['lane']=='PREGAME_MODEL_AND_PLAYER_PROPS'
-              assert row['automatic_completeness']=='EXECUTABLE_FAIL_CLOSED'
-              assert row['automatic_command']==['python','scripts/run_football_auto_bundle.py','--sport',sport,'--output',f'artifacts/run_it/{lower}_card.json']
+          nfl=surface['sports']['NFL']
+          assert nfl['lane']=='PREGAME_MODEL'
+          assert nfl['automatic_completeness']=='EXECUTABLE_FAIL_CLOSED'
+          assert nfl['automatic_command']==['python','scripts/run_football_auto_bundle.py','--sport','NFL','--output','artifacts/run_it/nfl_card.json']
+          assert 'NFL_PLAYER_PROPS_NO_ENGINE' in nfl['blocker']
+          cfb=surface['sports']['CFB']
+          assert cfb['lane']=='PREGAME_MODEL_AND_PLAYER_PROPS'
+          assert cfb['automatic_completeness']=='EXECUTABLE_FAIL_CLOSED'
+          assert cfb['automatic_command']==['python','scripts/run_football_auto_bundle.py','--sport','CFB','--output','artifacts/run_it/cfb_card.json']
           assert Path('scripts/run_football_auto_bundle.py').is_file()
           PY
