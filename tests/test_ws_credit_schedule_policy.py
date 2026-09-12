@@ -13,12 +13,12 @@ PARKED = {
     ".github/workflows/mlb-deadman.yml",
     ".github/workflows/mlb-v8-evidence.yml",
     ".github/workflows/mlb-v8-replay-backfill.yml",
-    ".github/workflows/nfl-2026-line-capture.yml",
 }
 
 SCHEDULED_PAID = {
     ".github/workflows/football-nfl-forward-clv-collection.yml",
     ".github/workflows/ev-tracker.yml",
+    ".github/workflows/nfl-2026-line-capture.yml",
 }
 
 
@@ -53,7 +53,12 @@ def test_projection_matches_workflow_authority() -> None:
     assert set(policy["parked_dispatch_only_workflows"]) == PARKED
     assert set(policy["invariants"]["allowed_scheduled_paid_consumers"]) == SCHEDULED_PAID
     assert policy["invariants"]["mlb_scheduled_paid_workflows"] == 0
-    assert policy["invariants"]["legacy_nfl_2026_line_capture_scheduled"] is False
+    assert policy["invariants"]["legacy_nfl_2026_line_capture_scheduled"] is True
+    capture = policy["scheduled_consumers"]["nfl_2026_confirmation_capture"]
+    assert capture["workflow"] == ".github/workflows/nfl-2026-line-capture.yml"
+    assert capture["idle_paid_requests"] == 0
+    assert capture["worst_case_weekly_credits"] is None
+    assert capture["bound_status"] == "NOT_INFERRED_PROVIDER_CREDIT_CONTRACT_NOT_ENCODED"
     assert policy["credential_slots"]["provider_terms_status"].startswith("UNVERIFIED")
 
 
