@@ -1,0 +1,4 @@
+provider=sportsdataio
+target=all
+collect_network_sample=true
+promotion_authority=false
