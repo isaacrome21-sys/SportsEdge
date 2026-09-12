@@ -7,8 +7,12 @@ on:
       - 'sportsedge/sports/cfb/**'
       - 'sportsedge/core/validation/evidence_determinism.py'
       - 'scripts/*cfb*.py'
+      - 'scripts/run_football_auto_bundle.py'
       - 'scripts/verify_evidence_determinism.py'
+      - 'config/football_prop_engine_surface.json'
       - 'tests/test_cfb*.py'
+      - 'tests/test_football_auto_bundle_freshness.py'
+      - 'tests/test_football_prop_surface.py'
       - 'tests/test_nfl_evidence_determinism.py'
       - 'docs/cfb_model_feature_trace.md'
       - '.github/workflows/football-cfb-contract.yml'
@@ -18,8 +22,12 @@ on:
       - 'sportsedge/sports/cfb/**'
       - 'sportsedge/core/validation/evidence_determinism.py'
       - 'scripts/*cfb*.py'
+      - 'scripts/run_football_auto_bundle.py'
       - 'scripts/verify_evidence_determinism.py'
+      - 'config/football_prop_engine_surface.json'
       - 'tests/test_cfb*.py'
+      - 'tests/test_football_auto_bundle_freshness.py'
+      - 'tests/test_football_prop_surface.py'
       - 'tests/test_nfl_evidence_determinism.py'
       - 'docs/cfb_model_feature_trace.md'
       - '.github/workflows/football-cfb-contract.yml'
@@ -57,11 +65,18 @@ jobs:
             sportsedge/sports/cfb/source_manifest.py \
             sportsedge/sports/cfb/training_artifact.py \
             scripts/build_cfb_model_artifact.py \
+            scripts/run_football_auto_bundle.py \
             scripts/verify_evidence_determinism.py \
             scripts/run_cfb_auto.py
 
       - name: Run CFB contract tests
         run: python -m unittest discover -s tests -p 'test_cfb*.py' -v
+
+      - name: Run shared CFB-sensitive RUN IT governance tests
+        run: >-
+          python -m unittest -v
+          tests.test_football_auto_bundle_freshness
+          tests.test_football_prop_surface
 
       - name: Build frozen CFB determinism fixture
         run: |
