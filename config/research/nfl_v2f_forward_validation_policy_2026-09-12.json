@@ -1,0 +1,28 @@
+{
+  "schema": "NFL_V2F_FORWARD_VALIDATION_POLICY_V1",
+  "status": "FROZEN_BEFORE_PROSPECTIVE_EVALUATION",
+  "candidate_id": "nfl_m2_native_score_crossfit_support_v2f_candidate",
+  "preregistration_commit_sha": "5385eaa7d7f78d6fcf945df913ce8deb74c8e4a7",
+  "preregistration_timestamp_utc": "2026-09-12T03:14:30Z",
+  "evidence_clock_rule": "Only events with event_start_utc strictly after preregistration_timestamp_utc may contribute prospective evidence.",
+  "prediction_capture_rule": "prediction_captured_at_utc must be strictly after preregistration_timestamp_utc and strictly before event_start_utc.",
+  "decision_market_rule": "decision_quote_captured_at_utc must be strictly after preregistration_timestamp_utc and strictly before event_start_utc. Decision and close must refer to the same event, market, selection, threshold, and book.",
+  "close_market_rule": "close_quote_captured_at_utc must be strictly after decision_quote_captured_at_utc and strictly before event_start_utc.",
+  "outcome_rule": "final_outcome_observed_at_utc must be at or after event_start_utc and may never alter a previously frozen prediction or market quote.",
+  "provenance_rule": "Prediction, decision quote, close quote, and final result must each carry immutable SHA-256 provenance. Synthetic, reconstructed, inferred, or retroactively backfilled pregame evidence is forbidden.",
+  "identity_rule": "Every row must bind exact candidate_id, preregistration_commit_sha, candidate_code_git_sha, event_id, market, selection, threshold, and book.",
+  "allowed_markets": ["MONEYLINE", "SPREAD", "TOTAL"],
+  "candidate_model_parameters": {
+    "ridge_alpha": 10.0,
+    "home_kernel_scale": 1.0,
+    "away_kernel_scale": 1.0,
+    "hyperparameter_search_allowed": false
+  },
+  "historical_data_role": "Historical 2016-2025 evidence may be used only as diagnostic/development evidence and may not be represented as a pristine final holdout.",
+  "prospective_checkpoints": [50, 100, 150],
+  "promotion_authority": false,
+  "may_change_market_eligibility": false,
+  "may_create_model_p": false,
+  "official_bet_authorized": false,
+  "notes": "This policy exists because 2019 had already been contacted before a later policy described it as untouched. V2F final validation must therefore be prospective-only."
+}
