@@ -33,11 +33,23 @@ def _utc(value: Any, code: str) -> datetime:
     return out.astimezone(timezone.utc)
 
 
-def _hex64(value: Any, code: str) -> str:
+def _hex(value: Any, length: int, code: str) -> str:
     text = str(value or "").strip().lower()
-    if len(text) != 64 or any(ch not in "0123456789abcdef" for ch in text):
+    if len(text) != length or any(ch not in "0123456789abcdef" for ch in text):
         raise CFBParticipationPITError(code)
     return text
+
+
+def _season(value: Any, code: str) -> int:
+    if isinstance(value, bool):
+        raise CFBParticipationPITError(code)
+    try:
+        out = int(value)
+    except (TypeError, ValueError) as exc:
+        raise CFBParticipationPITError(code) from exc
+    if out < 2000 or out > 2100:
+        raise CFBParticipationPITError(code)
+    return out
 
 
 def _load_json(path: Path, code: str) -> dict[str, Any]:
@@ -60,12 +72,30 @@ def audit_cfb_participation_snapshot(
         blockers.append("CFB_PARTICIPATION_CLASSIFICATION_SCHEMA_INVALID")
     if str(classification.get("sport") or "").upper() != "CFB":
         blockers.append("CFB_PARTICIPATION_CLASSIFICATION_SPORT_INVALID")
+    try:
+        _hex(
+            classification.get("capture_git_sha"),
+            40,
+            "CFB_PARTICIPATION_CAPTURE_GIT_SHA_INVALID",
+        )
+    except CFBParticipationPITError as exc:
+        blockers.append(str(exc))
+    try:
+        capture_season = _season(
+            classification.get("season"),
+            "CFB_PARTICIPATION_CAPTURE_SEASON_INVALID",
+        )
+    except CFBParticipationPITError as exc:
+        blockers.append(str(exc))
+        capture_season = None
     if classification.get("point_in_time_from_capture_forward") is not True:
         blockers.append("CFB_PARTICIPATION_FORWARD_PIT_FLAG_MISSING")
     if classification.get("retroactive_point_in_time_claim") is not False:
         blockers.append("CFB_PARTICIPATION_RETROACTIVE_PIT_FORBIDDEN")
     if classification.get("market_data_in_predictive_capture") is not False:
         blockers.append("CFB_PARTICIPATION_MARKET_CONTAMINATION")
+    if classification.get("participation_model_fit_performed") is not False:
+        blockers.append("CFB_PARTICIPATION_CAPTURE_CANNOT_FIT_MODEL")
     for field, code in (
         ("promotion_evidence", "CFB_PARTICIPATION_PROMOTION_AUTHORITY_FORBIDDEN"),
         ("model_p_created", "CFB_PARTICIPATION_MODEL_P_AUTHORITY_FORBIDDEN"),
@@ -87,6 +117,10 @@ def audit_cfb_participation_snapshot(
     if not isinstance(assets, list):
         blockers.append("CFB_PARTICIPATION_ASSETS_INVALID")
         assets = []
+    declared_count = classification.get("asset_count")
+    if isinstance(declared_count, bool) or not isinstance(declared_count, int) or declared_count != len(assets):
+        blockers.append("CFB_PARTICIPATION_ASSET_COUNT_MISMATCH")
+
     datasets: list[str] = []
     verified_assets = 0
     source_root = path.parent.parent / "source"
@@ -100,12 +134,18 @@ def audit_cfb_participation_snapshot(
             blockers.append(f"CFB_PARTICIPATION_DATASET_UNEXPECTED:{dataset or 'MISSING'}")
             continue
         try:
-            content_sha = _hex64(
+            row_season = _season(
+                row.get("season"),
+                f"CFB_PARTICIPATION_ASSET_SEASON_INVALID:{dataset}",
+            )
+            content_sha = _hex(
                 row.get("content_sha256"),
+                64,
                 f"CFB_PARTICIPATION_CONTENT_SHA_INVALID:{dataset}",
             )
-            declared_manifest_sha = _hex64(
+            declared_manifest_sha = _hex(
                 row.get("manifest_sha256"),
+                64,
                 f"CFB_PARTICIPATION_MANIFEST_SHA_INVALID:{dataset}",
             )
             retrieved = _utc(
@@ -114,6 +154,9 @@ def audit_cfb_participation_snapshot(
             )
         except CFBParticipationPITError as exc:
             blockers.append(str(exc))
+            continue
+        if capture_season is not None and row_season != capture_season:
+            blockers.append(f"CFB_PARTICIPATION_ASSET_SEASON_MISMATCH:{dataset}")
             continue
         if captured_at is not None and retrieved > captured_at:
             blockers.append(f"CFB_PARTICIPATION_RETRIEVAL_AFTER_CAPTURE:{dataset}")
@@ -151,26 +194,71 @@ def audit_cfb_participation_snapshot(
         if embedded_sha != declared_manifest_sha or actual_manifest_sha != declared_manifest_sha:
             blockers.append(f"CFB_PARTICIPATION_MANIFEST_HASH_MISMATCH:{dataset}")
             continue
-        asset = manifest.get("asset") or {}
+        asset = manifest.get("asset")
+        if not isinstance(asset, Mapping):
+            blockers.append(f"CFB_PARTICIPATION_MANIFEST_ASSET_INVALID:{dataset}")
+            continue
         if str(asset.get("dataset") or "").lower() != dataset:
             blockers.append(f"CFB_PARTICIPATION_MANIFEST_DATASET_MISMATCH:{dataset}")
             continue
-        if manifest.get("contract") != PARTICIPATION_CAPTURE_CONTRACT:
-            blockers.append(f"CFB_PARTICIPATION_MANIFEST_CONTRACT_INVALID:{dataset}")
+        try:
+            manifest_season = _season(
+                asset.get("season"),
+                f"CFB_PARTICIPATION_MANIFEST_SEASON_INVALID:{dataset}",
+            )
+            release_updated = _utc(
+                asset.get("release_updated_at"),
+                f"CFB_PARTICIPATION_RELEASE_UPDATED_AT_INVALID:{dataset}",
+            )
+            manifest_retrieved = _utc(
+                manifest.get("retrieved_at"),
+                f"CFB_PARTICIPATION_MANIFEST_RETRIEVED_AT_INVALID:{dataset}",
+            )
+        except CFBParticipationPITError as exc:
+            blockers.append(str(exc))
             continue
-        if manifest.get("market_data") is not False:
-            blockers.append(f"CFB_PARTICIPATION_MARKET_DATA_FORBIDDEN:{dataset}")
+        if manifest_season != row_season:
+            blockers.append(f"CFB_PARTICIPATION_MANIFEST_SEASON_MISMATCH:{dataset}")
             continue
-        if manifest.get("point_in_time_from_retrieval_forward") is not True:
-            blockers.append(f"CFB_PARTICIPATION_MANIFEST_FORWARD_PIT_MISSING:{dataset}")
+        if release_updated > manifest_retrieved:
+            blockers.append(f"CFB_PARTICIPATION_RELEASE_UPDATE_AFTER_RETRIEVAL:{dataset}")
             continue
-        if manifest.get("retroactive_point_in_time_claim") is not False:
-            blockers.append(f"CFB_PARTICIPATION_MANIFEST_RETROACTIVE_PIT_FORBIDDEN:{dataset}")
+        if manifest_retrieved != retrieved:
+            blockers.append(f"CFB_PARTICIPATION_RETRIEVAL_TIME_MISMATCH:{dataset}")
             continue
-        if manifest.get("model_p_created") is not False or manifest.get("promotion_authority") is not False:
-            blockers.append(f"CFB_PARTICIPATION_MANIFEST_AUTHORITY_FORBIDDEN:{dataset}")
+        if captured_at is not None and manifest_retrieved > captured_at:
+            blockers.append(f"CFB_PARTICIPATION_MANIFEST_RETRIEVAL_AFTER_CAPTURE:{dataset}")
             continue
-        verified_assets += 1
+        if str(manifest.get("content_sha256") or "").lower() != content_sha:
+            blockers.append(f"CFB_PARTICIPATION_MANIFEST_CONTENT_SHA_MISMATCH:{dataset}")
+            continue
+        if str(manifest.get("cache_relative_path") or "") != cache_rel:
+            blockers.append(f"CFB_PARTICIPATION_MANIFEST_CACHE_PATH_MISMATCH:{dataset}")
+            continue
+        if str(asset.get("asset_name") or "") != str(row.get("asset_name") or ""):
+            blockers.append(f"CFB_PARTICIPATION_ASSET_NAME_MISMATCH:{dataset}")
+            continue
+        for field in ("release_tag", "release_id", "asset_id"):
+            if asset.get(field) != row.get(field):
+                blockers.append(f"CFB_PARTICIPATION_ASSET_IDENTITY_MISMATCH:{dataset}:{field}")
+                break
+        else:
+            if manifest.get("contract") != PARTICIPATION_CAPTURE_CONTRACT:
+                blockers.append(f"CFB_PARTICIPATION_MANIFEST_CONTRACT_INVALID:{dataset}")
+                continue
+            if manifest.get("market_data") is not False:
+                blockers.append(f"CFB_PARTICIPATION_MARKET_DATA_FORBIDDEN:{dataset}")
+                continue
+            if manifest.get("point_in_time_from_retrieval_forward") is not True:
+                blockers.append(f"CFB_PARTICIPATION_MANIFEST_FORWARD_PIT_MISSING:{dataset}")
+                continue
+            if manifest.get("retroactive_point_in_time_claim") is not False:
+                blockers.append(f"CFB_PARTICIPATION_MANIFEST_RETROACTIVE_PIT_FORBIDDEN:{dataset}")
+                continue
+            if manifest.get("model_p_created") is not False or manifest.get("promotion_authority") is not False:
+                blockers.append(f"CFB_PARTICIPATION_MANIFEST_AUTHORITY_FORBIDDEN:{dataset}")
+                continue
+            verified_assets += 1
 
     seen = set(datasets)
     missing = sorted(REQUIRED_DATASETS - seen)
