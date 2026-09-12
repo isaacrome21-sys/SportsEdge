@@ -63,16 +63,27 @@ jobs:
         with:
           python-version: '3.12'
       - name: Restore immutable prospective evidence state
+        id: restore
         shell: bash
         run: |
           set -euo pipefail
           git fetch origin data
           git worktree add --detach .data-v2g origin/data
-          test -d .data-v2g/evidence/nfl_v2g/prospective/forward_clv/2026 || { echo NFL_V2G_FORWARD_CLV_STATE_MISSING >&2; exit 78; }
-          test -d .data-v2g/evidence/nfl_v2g/prospective/market_bindings/2026 || { echo NFL_V2G_MARKET_BINDINGS_MISSING >&2; exit 78; }
+          if [ ! -d .data-v2g/evidence/nfl_v2g/prospective/forward_clv/2026 ]; then
+            echo "NFL_V2G_FORWARD_CLV_STATE_NOT_YET_AVAILABLE"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ ! -d .data-v2g/evidence/nfl_v2g/prospective/market_bindings/2026 ]; then
+            echo "NFL_V2G_MARKET_BINDINGS_NOT_YET_AVAILABLE"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           mkdir -p .data-v2g/evidence/nfl_v2g/prospective/outcomes/2026
           mkdir -p .data-v2g/evidence/nfl_v2g/prospective/evaluation/2026
+          echo "ready=true" >> "$GITHUB_OUTPUT"
       - name: Evaluate canonical outcomes and fixed checkpoints
+        if: steps.restore.outputs.ready == 'true'
         run: |
           python scripts/run_nfl_v2g_prospective_evaluation.py \
             --policy config/research/nfl_v2g_prospective_evaluation_policy_2026-09-12.json \
@@ -81,6 +92,7 @@ jobs:
             --canonical-outcome-dir .data-v2g/evidence/nfl_v2g/prospective/outcomes/2026 \
             --evaluation-root .data-v2g/evidence/nfl_v2g/prospective/evaluation/2026
       - name: Assert evaluator did not mutate canonical outcomes
+        if: steps.restore.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -89,6 +101,7 @@ jobs:
             exit 97
           fi
       - name: Persist first-write evaluation and checkpoint evidence
+        if: steps.restore.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail
