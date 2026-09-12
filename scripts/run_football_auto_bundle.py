@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from sportsedge.football_prop_surface import require_executable_prop_surface
+from sportsedge.football_prop_surface import FootballPropSurfaceError, require_executable_prop_surface
 
 
 def _stamp(path: Path):
@@ -87,10 +87,17 @@ def main() -> int:
     args = ap.parse_args()
 
     sport = args.sport.upper()
-    # This is an actual runtime read, not a decorative config flag. If the
-    # authoritative prop surface stops declaring this sport executable, RUN IT
-    # fails before trying either child lane.
-    require_executable_prop_surface(sport, path=ROOT / "config/football_prop_engine_surface.json")
+    prop_surface_reason = None
+    try:
+        require_executable_prop_surface(sport, path=ROOT / "config/football_prop_engine_surface.json")
+    except FootballPropSurfaceError as exc:
+        # Game Model_P availability is independent of the prop research surface.
+        # An explicit NO_ENGINE prop declaration must block only the prop lane,
+        # never force RUN IT to discard a valid game-market model result.
+        if sport == "NFL" and str(exc) == "FOOTBALL_PROP_ENGINE_NOT_IMPLEMENTED:NFL":
+            prop_surface_reason = "NFL_PROPS_NO_ENGINE"
+        else:
+            raise
 
     lower = sport.lower()
     game_out = ROOT / f"artifacts/run_it/{lower}_game_card.json"
@@ -105,17 +112,30 @@ def main() -> int:
         prop_cmd.extend(["--asof", args.asof])
 
     game_before = _stamp(game_out)
-    prop_before = _stamp(prop_out)
     game = subprocess.run(game_cmd, cwd=ROOT, text=True, capture_output=True, check=False)
-    prop = subprocess.run(prop_cmd, cwd=ROOT, text=True, capture_output=True, check=False)
     game_rows, game_payload = _load(game_out, "GAME", game.returncode, game_before)
-    prop_rows, prop_payload = _load(prop_out, "PLAYER_PROPS", prop.returncode, prop_before)
+
+    if prop_surface_reason:
+        prop_rows = _blocked_row("PLAYER_PROPS", prop_surface_reason)
+        prop_payload = {
+            "status": "NO_ENGINE",
+            "blocker": prop_surface_reason,
+            "sport": sport,
+            "model_p": None,
+        }
+        prop_returncode = 2
+    else:
+        prop_before = _stamp(prop_out)
+        prop = subprocess.run(prop_cmd, cwd=ROOT, text=True, capture_output=True, check=False)
+        prop_returncode = int(prop.returncode)
+        prop_rows, prop_payload = _load(prop_out, "PLAYER_PROPS", prop_returncode, prop_before)
+
     rows = game_rows + prop_rows
     status = (
         "SUCCESS"
-        if game.returncode == 0 and prop.returncode == 0
+        if game.returncode == 0 and prop_returncode == 0
         else "PARTIAL"
-        if game.returncode == 0 or prop.returncode == 0
+        if game.returncode == 0 or prop_returncode == 0
         else "BLOCKED"
     )
     payload = {
@@ -131,7 +151,7 @@ def main() -> int:
             },
             "lane_exit_code": {
                 "GAME": int(game.returncode),
-                "PLAYER_PROPS": int(prop.returncode),
+                "PLAYER_PROPS": prop_returncode,
             },
         },
         "governance": {
@@ -140,6 +160,7 @@ def main() -> int:
             "promotion_changed": False,
             "eligible_changed": False,
             "prop_failures_are_not_silently_skipped": True,
+            "prop_no_engine_does_not_block_game_lane": True,
             "stale_child_output_reuse_prohibited": True,
         },
     }
