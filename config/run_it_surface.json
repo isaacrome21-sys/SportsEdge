@@ -10,14 +10,14 @@
       "notes": "Native automatic MLB acquisition with resilient odds failover; promotion remains deployment/evidence gated."
     },
     "NFL": {
-      "lane": "PREGAME_MODEL_AND_PLAYER_PROPS",
+      "lane": "PREGAME_MODEL",
       "automatic_command": ["python", "scripts/run_football_auto_bundle.py", "--sport", "NFL", "--output", "artifacts/run_it/nfl_card.json"],
       "library_entrypoint": "sportsedge.sports.nfl.run_machine:run_it_nfl",
       "market_surface": "config/football_runtime_capabilities.json",
       "planning_market_catalog": "config/football_market_surface.json",
       "automatic_completeness": "EXECUTABLE_FAIL_CLOSED",
-      "blocker": "NFL_FROZEN_M2_AND_PROP_ARTIFACTS_PLUS_LIVE_SOURCES_REQUIRED_FOR_OFFICIAL",
-      "notes": "RUN IT executes the canonical NFL game lane plus shared-path offensive, TD scorer, kicker, and defensive player-prop model lanes where required PIT/live inputs exist. Genuine Model_P + fresh offered price can surface MODEL_CANDIDATE rows before promotion. OFFICIAL remains independently blocked until artifact-bound evidence, certification, frozen edge-floor policy, and Truth Gate requirements pass."
+      "blocker": "NFL_FROZEN_M2_ARTIFACT_PLUS_LIVE_SOURCES_REQUIRED_FOR_GAME_MARKETS;NFL_PLAYER_PROPS_NO_ENGINE",
+      "notes": "RUN IT executes only the canonical NFL game-market Model_P lane. NFL player props are NO_ENGINE until a genuine sport-specific probability engine independently validates under frozen prospective evidence; research artifacts, provider mappings, hit rates, market prices, and acquisition machinery cannot create bettor-facing prop Model_P, leans, candidates, or OFFICIAL rows. Game-market OFFICIAL remains independently blocked until artifact-bound evidence, certification, frozen edge-floor policy, forward evidence, and Truth Gate requirements pass."
     },
     "CFB": {
       "lane": "PREGAME_MODEL_AND_PLAYER_PROPS",
