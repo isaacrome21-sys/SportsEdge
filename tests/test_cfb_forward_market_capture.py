@@ -1,5 +1,4 @@
 import json
-from datetime import datetime, timezone
 import unittest
 
 from sportsedge.sports.cfb.forward_market_capture import (
@@ -64,6 +63,15 @@ class CFBForwardMarketCaptureTests(unittest.TestCase):
         payload[0]["bookmakers"][0]["markets"][0]["outcomes"] = [{"name": "Home", "price": -120}]
         with self.assertRaisesRegex(CFBForwardMarketError, "TWO_SIDED_OUTCOMES_REQUIRED"):
             validate_draftkings_snapshot(payload)
+
+    def test_snapshot_without_draftkings_markets_is_not_usable(self):
+        payload = _odds_payload()
+        payload[0]["bookmakers"] = [{"key": "otherbook", "markets": payload[0]["bookmakers"][0]["markets"]}]
+        report = validate_draftkings_snapshot(payload)
+        self.assertFalse(report["snapshot_usable"])
+        self.assertEqual(report["draftkings_event_count"], 0)
+        self.assertEqual(report["two_sided_market_count"], 0)
+        self.assertFalse(report["paired_market_evidence"])
 
     def test_odds_url_is_cfb_draftkings_featured_markets_only(self):
         url = build_cfb_odds_url()
