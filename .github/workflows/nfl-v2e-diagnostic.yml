@@ -6,11 +6,14 @@ on:
     paths:
       - 'sportsedge/sports/nfl/m2_v2e_candidate.py'
       - 'sportsedge/sports/nfl/m2_v2e_drives.py'
+      - 'sportsedge/sports/nfl/m2_v2e_drive_rate.py'
       - 'sportsedge/sports/nfl/m2_v2e_validation.py'
       - 'scripts/run_nfl_v2e_candidate_validation.py'
+      - 'scripts/run_nfl_v2e_drive_rate_validation.py'
       - 'scripts/validate_nfl_v2e_candidate.py'
       - 'tests/test_nfl_m2_v2e_candidate.py'
       - 'tests/test_nfl_m2_v2e_drives.py'
+      - 'tests/test_nfl_m2_v2e_drive_rate.py'
       - '.github/workflows/nfl-v2e-diagnostic.yml'
 
 # Only the newest exact PR head may produce authoritative V2E evidence. Older
@@ -43,12 +46,19 @@ jobs:
           python -m py_compile \
             sportsedge/sports/nfl/m2_v2e_candidate.py \
             sportsedge/sports/nfl/m2_v2e_drives.py \
+            sportsedge/sports/nfl/m2_v2e_drive_rate.py \
             sportsedge/sports/nfl/m2_v2e_validation.py \
             scripts/run_nfl_v2e_candidate_validation.py \
+            scripts/run_nfl_v2e_drive_rate_validation.py \
             scripts/validate_nfl_v2e_candidate.py
 
       - name: Run V2E contract tests
-        run: python -m pytest tests/test_nfl_m2_v2e_candidate.py tests/test_nfl_m2_v2e_drives.py -q
+        run: >-
+          python -m pytest
+          tests/test_nfl_m2_v2e_candidate.py
+          tests/test_nfl_m2_v2e_drives.py
+          tests/test_nfl_m2_v2e_drive_rate.py
+          -q
 
       - name: Freeze exact public NFL sources
         shell: bash
@@ -87,7 +97,7 @@ jobs:
 
       - name: Build isolated V2E historical diagnostic
         run: >-
-          python scripts/run_nfl_v2e_candidate_validation.py
+          python scripts/run_nfl_v2e_drive_rate_validation.py
           --schedule-file artifacts/football/sources/games.csv
           --pbp-dir artifacts/football/sources/pbp
           --participation-dir artifacts/football/sources/participation
@@ -120,7 +130,13 @@ jobs:
           import json, os
           from pathlib import Path
           from sportsedge.sports.nfl.m2_v2e_candidate import NFL_M2_V2E_PIT_STATE_FIELDS
+          from sportsedge.sports.nfl.m2_v2e_drive_rate import (
+              V2E_DRIVE_RATE_CONTRACT,
+              V2E_DRIVE_RATE_FIELD,
+              V2E_DRIVE_RATE_SCOPE,
+          )
           from sportsedge.sports.nfl.m2_v2e_drives import V2E_TEAM_ALIAS_POLICY
+
           evidence = json.loads(Path('artifacts/football/nfl_m2_v2e_candidate_validation.json').read_text())
           math = json.loads(Path('artifacts/football/nfl_m2_v2e_candidate_key_math.json').read_text())
           expected = os.environ['EVIDENCE_GIT_SHA'].lower()
@@ -130,12 +146,28 @@ jobs:
               raise SystemExit('NFL_M2_V2E_DRIVE_STATE_CONDITIONING_REQUIRED')
           if evidence.get('pit_state_conditions_scoring_event_mix') is not True:
               raise SystemExit('NFL_M2_V2E_SCORING_STATE_CONDITIONING_REQUIRED')
-          expected_state_fields = sorted(NFL_M2_V2E_PIT_STATE_FIELDS)
+
+          expected_state_fields = sorted(tuple(NFL_M2_V2E_PIT_STATE_FIELDS) + (V2E_DRIVE_RATE_FIELD,))
           observed_state_fields = sorted(evidence.get('state_feature_names') or [])
-          if observed_state_fields != expected_state_fields:
+          artifact_state_fields = sorted(evidence.get('pit_state_fields') or [])
+          if observed_state_fields != expected_state_fields or artifact_state_fields != expected_state_fields:
               raise SystemExit('NFL_M2_V2E_FROZEN_STATE_SCHEMA_MISMATCH')
-          if len(observed_state_fields) != 11:
+          if len(observed_state_fields) != 12:
               raise SystemExit('NFL_M2_V2E_FROZEN_STATE_FIELD_COUNT_MISMATCH')
+
+          if evidence.get('drive_rate_feature_name') != V2E_DRIVE_RATE_FIELD:
+              raise SystemExit('NFL_M2_V2E_DRIVE_RATE_FIELD_MISMATCH')
+          if evidence.get('drive_rate_feature_contract') != V2E_DRIVE_RATE_CONTRACT:
+              raise SystemExit('NFL_M2_V2E_DRIVE_RATE_CONTRACT_MISMATCH')
+          if evidence.get('drive_rate_history_scope') != V2E_DRIVE_RATE_SCOPE:
+              raise SystemExit('NFL_M2_V2E_DRIVE_RATE_SCOPE_MISMATCH')
+          if evidence.get('drive_rate_point_in_time_proven') is not True:
+              raise SystemExit('NFL_M2_V2E_DRIVE_RATE_PIT_REQUIRED')
+          if evidence.get('drive_rate_current_game_excluded') is not True:
+              raise SystemExit('NFL_M2_V2E_DRIVE_RATE_CURRENT_GAME_LEAKAGE')
+          if evidence.get('drive_rate_same_day_updates_deferred') is not True:
+              raise SystemExit('NFL_M2_V2E_DRIVE_RATE_SAME_DAY_LEAKAGE')
+
           if evidence.get('drive_team_alias_policy') != V2E_TEAM_ALIAS_POLICY:
               raise SystemExit('NFL_M2_V2E_TEAM_ALIAS_POLICY_MISMATCH')
           alias_count = evidence.get('drive_team_alias_application_count')
