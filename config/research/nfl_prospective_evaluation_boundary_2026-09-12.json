@@ -1,0 +1,37 @@
+{
+  "schema_version": "SPORTSEDGE_NFL_PROSPECTIVE_EVALUATION_BOUNDARY_V1",
+  "created_at_utc": "2026-09-12T03:38:00Z",
+  "status": "FROZEN_PROSPECTIVE_ONLY",
+  "purpose": "Replace the invalid pristine-2019 premise with a genuinely prospective evaluation boundary for NFL model research and promotion evidence.",
+  "audit_predecessor": "config/research/nfl_feature_search_policy_2026-09-10.json",
+  "historical_holdout_correction": {
+    "season": 2019,
+    "status": "INVALID_AS_PRISTINE_HOLDOUT_PREEXISTING_CONTACT",
+    "reason": "Candidate evidence using the 2016-2025 historical range existed before the prior policy freeze. Historical results remain diagnostic only."
+  },
+  "prospective_boundary": {
+    "preregistration_base_sha": "7dd1275e08c97e98a3ece7d48ad3483bcd20be56",
+    "eligible_outcomes": "NFL games whose final outcomes were not available at this boundary creation time and whose prediction artifacts were frozen before the applicable game/market observation window.",
+    "historical_2016_2025_role": "REUSED_RESEARCH_HISTORY_NOT_FINAL_HOLDOUT",
+    "backfill_allowed": false,
+    "retroactive_prediction_allowed": false,
+    "candidate_selection_on_prospective_outcomes_allowed": false
+  },
+  "promotion_constraints": {
+    "historical_gate_thresholds_unchanged": true,
+    "market_price_as_model_feature_allowed": false,
+    "prospective_clv_required": true,
+    "deterministic_replay_required": true,
+    "exact_source_manifest_required": true,
+    "exact_code_sha_binding_required": true,
+    "truth_gate_unchanged": true,
+    "automatic_promotion": false
+  },
+  "fail_closed": {
+    "missing_pregame_prediction_artifact": "BLOCKED_MISSING_PROSPECTIVE_PREDICTION",
+    "late_or_backfilled_artifact": "BLOCKED_TEMPORAL_INTEGRITY",
+    "missing_close_capture": "INCONCLUSIVE_MISSING_CAPTURE",
+    "candidate_changed_after_outcome_contact": "BLOCKED_PROSPECTIVE_CONTAMINATION"
+  },
+  "governance_note": "This file creates no Model_P, changes no market eligibility, changes no edge floor, and grants no OFFICIAL status."
+}
