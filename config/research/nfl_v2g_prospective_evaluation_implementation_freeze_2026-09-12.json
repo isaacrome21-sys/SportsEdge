@@ -6,19 +6,23 @@
   "files": [
     {
       "path": "config/research/nfl_v2g_prospective_evaluation_policy_2026-09-12.json",
-      "git_blob_sha1": "8f70c94cbfa439e30c1e931d516233ca77fb05b0"
+      "git_blob_sha1": "ed1cf28c4bbfdf04f68b39c18b53593896e90107"
     },
     {
       "path": "sportsedge/sports/nfl/v2g_prospective_evaluation.py",
-      "git_blob_sha1": "88dedf380c2a7e40a7ba6eb481aa5c5bec92f186"
+      "git_blob_sha1": "bec73f9f08db42a51f538280e6466a3bb080207e"
     },
     {
       "path": "scripts/run_nfl_v2g_prospective_evaluation.py",
-      "git_blob_sha1": "af898a9de71c1a70340ff7c6cbef946f220438d0"
+      "git_blob_sha1": "718af5db5a61a0b936dbec79ccbd51891222d95b"
     },
     {
       "path": ".github/workflows/nfl-v2g-prospective-evaluation.yml",
       "git_blob_sha1": "96781add4620bcc1815f3aadef18d62288ddbe34"
+    },
+    {
+      "path": "tests/test_nfl_v2g_prospective_evaluation.py",
+      "git_blob_sha1": "3681d0c2744fd362b92381b603645ea196490b38"
     }
   ],
   "promotion_authority": false,
