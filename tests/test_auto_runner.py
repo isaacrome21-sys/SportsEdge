@@ -52,30 +52,29 @@ class AutoRunnerTests(unittest.TestCase):
         raise AssertionError(url)
 
     def test_confirmed_lineup_full_auto_preserves_ct_date_and_no_forced_bet(self):
-        report = run_auto_mlb(quote_url="https://quotes", feature_url="https://features", now=NOW, opener=self.opener)
+        report = run_auto_mlb(quote_url="https://quotes", feature_url="https://features", now=NOW, opener=self.opener, require_confirmed_lineup=True)
         self.assertEqual(report.slate_date_ct, "2026-08-11")
         self.assertEqual(len(report.results), 1)
         self.assertNotEqual(report.results[0].bet_status, "OFFICIAL_BET")
 
-    def test_projected_lineup_is_usable_but_not_relabelled_confirmed(self):
+    def test_projected_lineup_cannot_opt_out_of_confirmed_requirement(self):
         def op(req, timeout=15): return self.opener(req, timeout, confirmed=False)
-        report = run_auto_mlb(quote_url="https://quotes", feature_url="https://features", projected_lineups_url="https://projected", now=NOW, opener=op, require_confirmed_lineup=False)
-        self.assertEqual(len(report.results), 1)
-        self.assertNotIn("confirmed MLB batting order required", report.results[0].reason)
+        with self.assertRaisesRegex(ValueError, "CONFIRMED_LINEUP_REQUIRED_FOR_PRODUCTION"):
+            run_auto_mlb(quote_url="https://quotes", feature_url="https://features", projected_lineups_url="https://projected", now=NOW, opener=op, require_confirmed_lineup=False)
 
     def test_stale_projected_lineup_blocks(self):
         def op(req, timeout=15): return self.opener(req, timeout, confirmed=False, projected_rows=projected(stale=True))
-        report = run_auto_mlb(quote_url="https://quotes", feature_url="https://features", projected_lineups_url="https://projected", now=NOW, opener=op)
+        report = run_auto_mlb(quote_url="https://quotes", feature_url="https://features", projected_lineups_url="https://projected", now=NOW, opener=op, require_confirmed_lineup=True)
         self.assertIn("PROJECTED_LINEUP_STALE", report.results[0].reason)
 
     def test_impossible_feature_chronology_blocks(self):
         def op(req, timeout=15): return self.opener(req, timeout, impossible=True)
-        report = run_auto_mlb(quote_url="https://quotes", feature_url="https://features", now=NOW, opener=op)
+        report = run_auto_mlb(quote_url="https://quotes", feature_url="https://features", now=NOW, opener=op, require_confirmed_lineup=True)
         self.assertIn("IMPOSSIBLE_SOURCE_CHRONOLOGY", report.results[0].reason)
 
     def test_live_game_blocks_before_model(self):
         def op(req, timeout=15): return self.opener(req, timeout, status="Live")
-        report = run_auto_mlb(quote_url="https://quotes", feature_url="https://features", now=NOW, opener=op)
+        report = run_auto_mlb(quote_url="https://quotes", feature_url="https://features", now=NOW, opener=op, require_confirmed_lineup=True)
         self.assertIn("GAME_NOT_PREGAME", report.results[0].reason)
 
     def test_malformed_quote_preserves_cardinality_as_block(self):
@@ -84,7 +83,7 @@ class AutoRunnerTests(unittest.TestCase):
             if url == "https://quotes":
                 bad = quote(); del bad[0]["book_key"]; return Resp(bad)
             return self.opener(req, timeout)
-        report = run_auto_mlb(quote_url="https://quotes", feature_url="https://features", now=NOW, opener=op)
+        report = run_auto_mlb(quote_url="https://quotes", feature_url="https://features", now=NOW, opener=op, require_confirmed_lineup=True)
         self.assertEqual(len(report.results), 1)
         self.assertIn("QUOTE_IDENTITY_INCOMPLETE", report.results[0].reason)
         self.assertTrue(all(row.bet_status == "BLOCKED" for row in report.results))
