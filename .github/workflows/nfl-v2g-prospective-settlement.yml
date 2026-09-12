@@ -1,0 +1,206 @@
+name: nfl-v2g-prospective-settlement
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '41 10 * * *'
+  pull_request:
+    paths:
+      - 'config/research/nfl_v2g_prospective_paper_evaluation_policy_2026-09-12.json'
+      - 'scripts/build_nfl_v2g_paper_decisions.py'
+      - 'scripts/settle_nfl_v2g_prospective.py'
+      - 'scripts/evaluate_nfl_v2g_prospective.py'
+      - 'tests/test_nfl_v2g_paper_decisions.py'
+      - 'tests/test_nfl_v2g_prospective_settlement.py'
+      - 'tests/test_nfl_v2g_prospective_evaluator.py'
+      - '.github/workflows/nfl-v2g-prospective-settlement.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nfl-v2g-prospective-settlement
+  cancel-in-progress: false
+
+jobs:
+  contract-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Compile prospective evaluation surface
+        run: |
+          python -m py_compile scripts/build_nfl_v2g_paper_decisions.py
+          python -m py_compile scripts/settle_nfl_v2g_prospective.py
+          python -m py_compile scripts/evaluate_nfl_v2g_prospective.py
+      - name: Freeze prospective evidence semantics
+        run: |
+          python -m unittest -q \
+            tests.test_nfl_v2g_paper_decisions \
+            tests.test_nfl_v2g_prospective_settlement \
+            tests.test_nfl_v2g_prospective_evaluator
+
+  settle:
+    if: github.event_name != 'pull_request'
+    needs: contract-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Restore immutable prospective evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin data
+          git worktree add --detach .data-v2g origin/data
+          test -d .data-v2g/evidence/nfl_v2g/prospective/predictions/2026 || {
+            echo 'NFL_V2G_PROSPECTIVE_PREDICTIONS_MISSING' >&2
+            exit 78
+          }
+
+      - name: Fetch exact NFL outcome source snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/football/v2g/settlement
+          curl --fail --location --silent --show-error \
+            --retry 5 --retry-delay 2 --retry-all-errors --connect-timeout 30 \
+            'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv' \
+            -o artifacts/football/v2g/settlement/games.csv
+          sha256sum artifacts/football/v2g/settlement/games.csv
+
+      - name: Settle only frozen pregame evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          POLICY=config/research/nfl_v2g_prospective_paper_evaluation_policy_2026-09-12.json
+          ROOT=.data-v2g/evidence/nfl_v2g/prospective
+          OUT=artifacts/football/v2g/settlement
+          SETTLED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          SOURCE_SHA="$(sha256sum "$OUT/games.csv" | awk '{print $1}')"
+          SNAP="$ROOT/outcome_snapshots/${SOURCE_SHA}.csv"
+          mkdir -p "$ROOT/outcome_snapshots" "$ROOT/settlements/2026"
+          if [ -f "$SNAP" ]; then
+            cmp "$SNAP" "$OUT/games.csv"
+          else
+            cp "$OUT/games.csv" "$SNAP"
+          fi
+
+          created=0
+          pending=0
+          existing=0
+          decisions=("$ROOT"/paper_decisions/2026/*.json)
+          for paper in "${decisions[@]}"; do
+            [ -e "$paper" ] || continue
+            base="$(basename "$paper")"
+            prediction="$ROOT/predictions/2026/$base"
+            binding="$ROOT/market_bindings/2026/$base"
+            dest="$ROOT/settlements/2026/$base"
+            test -f "$prediction" || { echo "NFL_V2G_SETTLEMENT_PREDICTION_MISSING:$base" >&2; exit 79; }
+            if [ -f "$dest" ]; then
+              existing=$((existing + 1))
+              continue
+            fi
+            tmp="$OUT/$base"
+            args=(
+              --prediction "$prediction"
+              --paper-decision "$paper"
+              --games-csv "$OUT/games.csv"
+              --policy "$POLICY"
+              --settled-at-utc "$SETTLED_AT"
+              --output "$tmp"
+            )
+            if [ -f "$binding" ]; then
+              args+=(--market-binding "$binding")
+            fi
+            python scripts/settle_nfl_v2g_prospective.py "${args[@]}"
+            status="$(python - "$tmp" <<'PY'
+          import json, sys
+          print(json.load(open(sys.argv[1], encoding='utf-8'))['status'])
+          PY
+          )"
+            if [ "$status" = "OUTCOME_NOT_FINAL" ]; then
+              pending=$((pending + 1))
+              rm -f "$tmp"
+              continue
+            fi
+            case "$status" in
+              SETTLED_PROSPECTIVE_EVIDENCE|SETTLED_INCONCLUSIVE_MISSING_CAPTURE) ;;
+              *) echo "NFL_V2G_SETTLEMENT_STATUS_INVALID:$status" >&2; exit 80 ;;
+            esac
+            cp "$tmp" "$dest"
+            created=$((created + 1))
+          done
+
+          printf '{"created":%d,"pending":%d,"existing":%d,"outcome_source_sha256":"%s","settled_at_utc":"%s"}\n' \
+            "$created" "$pending" "$existing" "$SOURCE_SHA" "$SETTLED_AT" | tee "$OUT/settlement_summary.json"
+
+      - name: Evaluate only frozen checkpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          POLICY=config/research/nfl_v2g_prospective_paper_evaluation_policy_2026-09-12.json
+          ROOT=.data-v2g/evidence/nfl_v2g/prospective
+          OUT=artifacts/football/v2g/settlement
+          mkdir -p "$ROOT/evaluation/checkpoints"
+          python scripts/evaluate_nfl_v2g_prospective.py \
+            --settlement-dir "$ROOT/settlements/2026" \
+            --policy "$POLICY" \
+            --output "$OUT/evaluation.json"
+          cp "$OUT/evaluation.json" "$ROOT/evaluation/latest.json"
+          checkpoint="$(python - "$OUT/evaluation.json" <<'PY'
+          import json, sys
+          value=json.load(open(sys.argv[1], encoding='utf-8')).get('checkpoint_evaluated')
+          print('' if value is None else value)
+          PY
+          )"
+          if [ -n "$checkpoint" ]; then
+            snap="$ROOT/evaluation/checkpoints/checkpoint_${checkpoint}.json"
+            if [ ! -f "$snap" ]; then
+              cp "$OUT/evaluation.json" "$snap"
+            fi
+          fi
+
+      - name: Persist first-write settlements and evaluation state
+        shell: bash
+        run: |
+          set -euo pipefail
+          (
+            cd .data-v2g
+            git config user.name sportsedge-v2g-settlement-bot
+            git config user.email sportsedge-v2g-settlement-bot@users.noreply.github.com
+            git add evidence/nfl_v2g/prospective/outcome_snapshots \
+                    evidence/nfl_v2g/prospective/settlements \
+                    evidence/nfl_v2g/prospective/evaluation
+            if git diff --cached --quiet; then
+              echo 'NFL_V2G_NO_NEW_SETTLEMENT_EVIDENCE'
+              exit 0
+            fi
+            git commit -m "evidence: settle NFL V2G prospective cohort ${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}"
+            for attempt in 1 2 3 4 5; do
+              if git push origin HEAD:data; then
+                exit 0
+              fi
+              git fetch origin data
+              git rebase origin/data
+              sleep $((attempt * 2))
+            done
+            exit 98
+          )
+
+      - name: Upload settlement diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nfl-v2g-settlement-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/football/v2g/settlement
+          if-no-files-found: warn
+          retention-days: 30
