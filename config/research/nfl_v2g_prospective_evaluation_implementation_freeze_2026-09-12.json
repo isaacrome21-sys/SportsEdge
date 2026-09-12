@@ -1,0 +1,33 @@
+{
+  "schema_version": "SPORTSEDGE_NFL_V2G_PROSPECTIVE_EVALUATION_IMPLEMENTATION_FREEZE_V1",
+  "status": "FROZEN_BEFORE_FIRST_WEEK2_OUTCOME",
+  "candidate_id": "nfl_m2_scoring_event_v2g_candidate",
+  "frozen_research_artifact_sha256": "e7e591bf1ee7fbf6332cc6795aa1d7126fce9c6a43ac69c164b1f54433457977",
+  "files": [
+    {
+      "path": "config/research/nfl_v2g_prospective_evaluation_policy_2026-09-12.json",
+      "git_blob_sha1": "ed1cf28c4bbfdf04f68b39c18b53593896e90107"
+    },
+    {
+      "path": "sportsedge/sports/nfl/v2g_prospective_evaluation.py",
+      "git_blob_sha1": "bec73f9f08db42a51f538280e6466a3bb080207e"
+    },
+    {
+      "path": "scripts/run_nfl_v2g_prospective_evaluation.py",
+      "git_blob_sha1": "718af5db5a61a0b936dbec79ccbd51891222d95b"
+    },
+    {
+      "path": ".github/workflows/nfl-v2g-prospective-evaluation.yml",
+      "git_blob_sha1": "96781add4620bcc1815f3aadef18d62288ddbe34"
+    },
+    {
+      "path": "tests/test_nfl_v2g_prospective_evaluation.py",
+      "git_blob_sha1": "3681d0c2744fd362b92381b603645ea196490b38"
+    }
+  ],
+  "promotion_authority": false,
+  "may_create_model_p": false,
+  "market_eligibility_changed": false,
+  "truth_gate_pass_granted": false,
+  "official_status_granted": false
+}
