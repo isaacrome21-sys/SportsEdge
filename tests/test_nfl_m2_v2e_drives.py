@@ -1,5 +1,6 @@
 import pytest
 
+from scripts.run_nfl_v2e_candidate_validation import _identity_schedule
 from sportsedge.sports.nfl.m2_v2e_drives import build_v2e_drive_training_rows
 
 
@@ -7,6 +8,7 @@ def _schedule():
     return [{
         "game_id": "2024_01_A_B",
         "season": 2024,
+        "game_type": "REG",
         "home_team": "B",
         "away_team": "A",
     }]
@@ -51,3 +53,20 @@ def test_v2e_drive_extractor_fails_closed_if_one_side_missing():
     pbp = [{"game_id": "2024_01_A_B", "posteam": "A", "drive": 1, "play_type": "punt"}]
     with pytest.raises(ValueError, match="NFL_V2E_DRIVE_SIDE_EVIDENCE_MISSING"):
         build_v2e_drive_training_rows(_schedule(), pbp)
+
+
+def test_v2e_identity_schedule_only_requires_retained_history_games():
+    schedule = _schedule() + [{
+        "game_id": "2024_01_C_D",
+        "season": 2024,
+        "game_type": "REG",
+        "home_team": "D",
+        "away_team": "C",
+    }]
+    retained = _identity_schedule(schedule, allowed_game_ids={"2024_01_A_B"})
+    assert [row["game_id"] for row in retained] == ["2024_01_A_B"]
+
+
+def test_v2e_identity_schedule_fails_if_retained_game_is_not_in_schedule():
+    with pytest.raises(SystemExit, match="NFL_M2_V2E_RETAINED_SCHEDULE_IDENTITY_MISSING"):
+        _identity_schedule(_schedule(), allowed_game_ids={"2024_01_A_B", "2024_01_X_Y"})
