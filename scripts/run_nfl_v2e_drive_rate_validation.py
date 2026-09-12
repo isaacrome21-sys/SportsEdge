@@ -3,7 +3,13 @@
 from __future__ import annotations
 
 from math import isfinite
+from pathlib import Path
+import sys
 from typing import Any
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 import scripts.run_nfl_v2e_candidate_validation as base
 from sportsedge.sports.nfl.m2_v2e_candidate import (
