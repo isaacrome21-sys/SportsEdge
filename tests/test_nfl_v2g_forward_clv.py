@@ -13,6 +13,7 @@ class NFLV2GForwardCLVTests(unittest.TestCase):
             "candidate_id":"nfl_m2_scoring_event_v2g_candidate",
             "frozen_research_artifact_sha256":"b"*64,
             "decision_source":{"required_lock_status":["MATCH","LOCK_CREATED"]},
+            "clv":{"metric":"CLOSING_NOVIG_MINUS_DECISION_NOVIG","probability_reference":"ORIGINAL_DECISION_THRESHOLD","same_book_required":True,"model_probability_is_not_clv_reference":True},
             "promotion_authority":False,"may_create_model_p":False,"official_status_granted":False,
         }
 
@@ -54,49 +55,44 @@ class NFLV2GForwardCLVTests(unittest.TestCase):
 
     def test_weighted_probability_not_row_count(self):
         win,push,loss=weighted_probs(self.prediction()["score_distribution"],"spread","home",-3.0)
-        self.assertAlmostEqual(0.10,win)
-        self.assertAlmostEqual(0.70,push)
-        self.assertAlmostEqual(0.20,loss)
-        self.assertNotAlmostEqual(1/3,win)
+        self.assertAlmostEqual(0.10,win); self.assertAlmostEqual(0.70,push); self.assertAlmostEqual(0.20,loss); self.assertNotAlmostEqual(1/3,win)
 
     def test_decision_uses_active_nonpush_probability_but_ev_keeps_push_refund(self):
         rows=build_decisions(self.prediction(),self.opener(),self.policy(),code_git_sha="d"*40)
-        self.assertEqual(2,len(rows))
-        spread=next(r for r in rows if r["market"]=="spread")
-        self.assertEqual(DECISION_SCHEMA,spread["schema_version"])
-        self.assertAlmostEqual(2/3,spread["model_prob"])
-        self.assertAlmostEqual(0.20,spread["model_win_prob"])
-        self.assertAlmostEqual(0.70,spread["model_push_prob"])
-        self.assertAlmostEqual(0.10,spread["model_loss_prob"])
-        self.assertEqual("PIT",spread["side"])
-        self.assertEqual(0.0,spread["stake_units"])
-        self.assertFalse(spread["promotion_authority"])
+        self.assertEqual(2,len(rows)); spread=next(r for r in rows if r["market"]=="spread")
+        self.assertEqual(DECISION_SCHEMA,spread["schema_version"]); self.assertAlmostEqual(2/3,spread["model_prob"])
+        self.assertAlmostEqual(0.20,spread["model_win_prob"]); self.assertAlmostEqual(0.70,spread["model_push_prob"]); self.assertAlmostEqual(0.10,spread["model_loss_prob"])
+        self.assertEqual("PIT",spread["side"]); self.assertEqual(0.0,spread["stake_units"]); self.assertFalse(spread["promotion_authority"])
 
-    def test_close_resolves_original_threshold_from_alternates(self):
+    def test_close_resolves_original_threshold_and_uses_novig_to_novig_clv(self):
         decisions=build_decisions(self.prediction(),self.opener(),self.policy(),code_git_sha="d"*40)
         rows=grade_close(decisions,self.close_event(),captured_at="2026-09-20T16:45:00+00:00")
-        self.assertEqual(2,len(rows))
-        self.assertTrue(all(r["schema_version"]==CLV_SCHEMA for r in rows))
-        spread=next(r for r in rows if r["market"]=="spread")
-        total=next(r for r in rows if r["market"]=="total")
-        self.assertEqual(3.0,spread["probability_line"])
-        self.assertEqual(41.5,total["probability_line"])
-        expected_under_novig=0.5/(0.5+(120/220))
-        self.assertAlmostEqual(expected_under_novig,total["closing_novig_prob"])
+        self.assertEqual(2,len(rows)); self.assertTrue(all(r["schema_version"]==CLV_SCHEMA for r in rows))
+        spread=next(r for r in rows if r["market"]=="spread"); total=next(r for r in rows if r["market"]=="total")
+        self.assertEqual(3.0,spread["probability_line"]); self.assertEqual(41.5,total["probability_line"])
+        expected_under_novig=0.5/(0.5+(120/220)); self.assertAlmostEqual(expected_under_novig,total["closing_novig_prob"])
+        decision_by_market={r["market"]:r for r in decisions}
+        for row in rows:
+            decision=decision_by_market[row["market"]]
+            self.assertAlmostEqual(decision["novig_prob"],row["decision_novig_prob"])
+            self.assertAlmostEqual(row["closing_novig_prob"]-row["decision_novig_prob"],row["clv"])
+            self.assertNotAlmostEqual(row["decision_model_prob"]-row["closing_novig_prob"],row["clv"])
         self.assertFalse(spread["promotion_authority"])
 
+    def test_policy_rejects_model_probability_as_clv_reference(self):
+        policy=self.policy(); policy["clv"]["metric"]="MODEL_PROB_MINUS_CLOSING_NOVIG"
+        with self.assertRaisesRegex(ValueError,"CLV_POLICY_INVALID"):
+            build_decisions(self.prediction(),self.opener(),policy,code_git_sha="d"*40)
+
     def test_missing_original_threshold_is_inconclusive(self):
-        decisions=build_decisions(self.prediction(),self.opener(),self.policy(),code_git_sha="d"*40)
-        event=self.close_event()
+        decisions=build_decisions(self.prediction(),self.opener(),self.policy(),code_git_sha="d"*40); event=self.close_event()
         event["bookmakers"][0]["markets"]=[m for m in event["bookmakers"][0]["markets"] if m["key"] not in {"alternate_spreads","alternate_totals"}]
         rows=grade_close(decisions,event,captured_at="2026-09-20T16:45:00+00:00")
         self.assertTrue(all(r["status"]=="INCONCLUSIVE_CLV_REFERENCE_LINE_MISMATCH" for r in rows))
 
     def test_market_contaminated_prediction_rejected(self):
         pred=self.prediction(); pred["market_prices_consumed"]=True
-        with self.assertRaisesRegex(ValueError,"MARKET_LEAKAGE"):
-            build_decisions(pred,self.opener(),self.policy(),code_git_sha="d"*40)
+        with self.assertRaisesRegex(ValueError,"MARKET_LEAKAGE"): build_decisions(pred,self.opener(),self.policy(),code_git_sha="d"*40)
 
 
-if __name__ == "__main__":
-    unittest.main()
+if __name__ == "__main__": unittest.main()
