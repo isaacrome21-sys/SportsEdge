@@ -1,15 +1,16 @@
 {
   "version": "odds_api_request_projection_v3",
   "supersedes": "odds_api_request_projection_v2",
-  "as_of_utc": "2026-09-11T15:00:00Z",
-  "purpose": "WS-CREDIT: reserve scheduled paid Odds API capacity for football forward evidence while MLB is parked for 2026.",
+  "as_of_utc": "2026-09-12T02:20:00Z",
+  "purpose": "WS-CREDIT: reserve scheduled paid Odds API capacity for football forward evidence while MLB is parked for 2026, including the frozen NFL confirmation-capture windows.",
   "invariants": {
     "mlb_scheduled_paid_workflows": 0,
     "mlb_scheduled_rescue_dispatchers": 0,
-    "legacy_nfl_2026_line_capture_scheduled": false,
+    "legacy_nfl_2026_line_capture_scheduled": true,
     "allowed_scheduled_paid_consumers": [
       ".github/workflows/football-nfl-forward-clv-collection.yml",
-      ".github/workflows/ev-tracker.yml"
+      ".github/workflows/ev-tracker.yml",
+      ".github/workflows/nfl-2026-line-capture.yml"
     ],
     "provider_credit_math_is_not_inferred_when_the_provider_contract_is_not_encoded": true,
     "credential_values_are_never_logged": true
@@ -20,8 +21,7 @@
     ".github/workflows/mlb-additional-pit-archive.yml",
     ".github/workflows/mlb-deadman.yml",
     ".github/workflows/mlb-v8-evidence.yml",
-    ".github/workflows/mlb-v8-replay-backfill.yml",
-    ".github/workflows/nfl-2026-line-capture.yml"
+    ".github/workflows/mlb-v8-replay-backfill.yml"
   ],
   "scheduled_consumers": {
     "football_nfl_forward_clv": {
@@ -46,6 +46,15 @@
         "reserve_plan_credits": 120
       },
       "note": "WS2 is expected to reduce close acquisition to the shared bulk football path. This 98-credit bound describes the current NFL collector shape, not the future CFB adapter."
+    },
+    "nfl_2026_confirmation_capture": {
+      "workflow": ".github/workflows/nfl-2026-line-capture.yml",
+      "cron": "3,13,23,33,43,53 * * * *",
+      "idle_paid_requests": 0,
+      "schedule_gate": "Free nflverse schedule data must place the run inside the frozen Tuesday opener or pre-kickoff final capture window before the paid capture step can execute.",
+      "worst_case_weekly_credits": null,
+      "bound_status": "NOT_INFERRED_PROVIDER_CREDIT_CONTRACT_NOT_ENCODED",
+      "required_follow_up": "Preserve the frozen two-sided capture policy and account-level reserve; do not substitute forward-CLV windows or fabricate a static credit bound."
     },
     "ev_tracker": {
       "workflow": ".github/workflows/ev-tracker.yml",
@@ -76,7 +85,7 @@
     "feature_schema": "NONE",
     "predictive_code": "NONE",
     "acquisition_code": "NONE",
-    "policy": "NONE",
+    "policy": "OPERATIONAL_SCHEDULE_BOOKKEEPING_ONLY",
     "close_definition": "NONE",
     "operational_only": true
   }
