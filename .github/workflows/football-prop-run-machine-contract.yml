@@ -130,21 +130,30 @@ jobs:
           import json
           from pathlib import Path
           from sportsedge.football_prop_extended_run_machine import PROVIDER_MARKETS
-          from sportsedge.football_prop_surface import require_executable_prop_surface
+          from sportsedge.football_prop_surface import FootballPropSurfaceError, require_executable_prop_surface
           surface = json.loads(Path('config/football_prop_engine_surface.json').read_text())
           declared = {market for values in surface['implemented_provider_markets'].values() for market in values}
           assert declared == set(PROVIDER_MARKETS)
-          expected = {
-              'NFL': '3efa5cc92b5ed1bf53a99cbe0d6e7792d01791a77c8f684874d66213b73d9570',
-              'CFB': '923cfd1be42d31a87d9f31ddffce406d44bfc1bb003d1c625f5a4258f7773f23',
-          }
-          for sport, digest in expected.items():
-              row=require_executable_prop_surface(sport)
-              assert row['engine_state']=='IMPLEMENTED_FAIL_CLOSED'
-              assert row['promotion_state']=='AUTOMATIC_TRUTH_GATE_GATED'
-              assert row['readiness_state']=='REGISTRY_DERIVED'
-              assert row['runtime_state']=='ARTIFACT_FROZEN_EVIDENCE_GATED'
-              assert row['frozen_artifact_sha256']==digest
+
+          # NFL may have frozen research/code artifacts without having an
+          # independently validated bettor-facing probability engine.
+          assert surface['sports']['NFL']['engine_state'] == 'NO_ENGINE'
+          assert 'NFL' in surface['explicit_no_engine']
+          try:
+              require_executable_prop_surface('NFL')
+          except FootballPropSurfaceError as exc:
+              assert str(exc) == 'FOOTBALL_PROP_ENGINE_NOT_IMPLEMENTED:NFL'
+          else:
+              raise AssertionError('NFL prop surface unexpectedly executable')
+
+          # CFB retains the previously implemented fail-closed runtime surface.
+          cfb = require_executable_prop_surface('CFB')
+          assert cfb['engine_state'] == 'IMPLEMENTED_FAIL_CLOSED'
+          assert cfb['promotion_state'] == 'AUTOMATIC_TRUTH_GATE_GATED'
+          assert cfb['readiness_state'] == 'REGISTRY_DERIVED'
+          assert cfb['runtime_state'] == 'ARTIFACT_FROZEN_EVIDENCE_GATED'
+          assert cfb['frozen_artifact_sha256'] == '923cfd1be42d31a87d9f31ddffce406d44bfc1bb003d1c625f5a4258f7773f23'
+
           gov=surface['governance']
           assert gov['market_prices_can_create_model_p'] is False
           assert gov['one_sided_market_can_create_model_p'] is False
