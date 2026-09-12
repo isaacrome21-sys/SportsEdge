@@ -1,0 +1,143 @@
+name: nfl-v2g-prospective-prediction-capture
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 11 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nfl-v2g-prospective-prediction-capture
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Run prospective capture contract tests
+        run: python -m unittest -q tests.test_nfl_m2_v2g_forward
+
+      - name: Restore frozen artifact and prior first-write captures from data branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin data
+          git worktree add --detach .data-v2g origin/data
+          ARTIFACT=.data-v2g/evidence/nfl_v2g/source_bound/nfl_m2_v2g_research_artifact.json
+          PROVENANCE=.data-v2g/evidence/nfl_v2g/source_bound/provenance.json
+          test -f "$ARTIFACT" || { echo 'NFL_V2G_FROZEN_ARTIFACT_MISSING' >&2; exit 78; }
+          test -f "$PROVENANCE" || { echo 'NFL_V2G_FROZEN_PROVENANCE_MISSING' >&2; exit 78; }
+          mkdir -p artifacts/football/v2g/forward/predictions
+          cp "$ARTIFACT" artifacts/football/v2g/frozen_research_artifact.json
+          if [ -d .data-v2g/evidence/nfl_v2g/prospective/predictions/2026 ]; then
+            cp -R .data-v2g/evidence/nfl_v2g/prospective/predictions/2026/. artifacts/football/v2g/forward/predictions/
+          fi
+
+      - name: Verify exact frozen artifact identity
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from sportsedge.sports.nfl.m2_v2g_artifact import validate_v2g_research_artifact
+          correction = json.loads(Path('config/research/nfl_v2g_artifact_freeze_correction_2026-09-12.json').read_text())
+          freeze = json.loads(Path('config/research/nfl_v2g_implementation_freeze_2026-09-12.json').read_text())
+          artifact = json.loads(Path('artifacts/football/v2g/frozen_research_artifact.json').read_text())
+          actual = validate_v2g_research_artifact(artifact, implementation_freeze=freeze)
+          expected = correction['source_bound_research_artifact']['artifact_sha256']
+          if actual != expected:
+              raise SystemExit(f'NFL_V2G_FROZEN_ARTIFACT_SHA_MISMATCH:{actual}:{expected}')
+          if artifact.get('candidate_id') != correction.get('candidate_id'):
+              raise SystemExit('NFL_V2G_FROZEN_CANDIDATE_ID_MISMATCH')
+          print(actual)
+          PY
+
+      - name: Fetch exact current NFL schedule bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/football/v2g/forward
+          curl --fail --location --silent --show-error \
+            --retry 5 --retry-delay 2 --retry-all-errors --connect-timeout 30 \
+            'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv' \
+            -o artifacts/football/v2g/forward/games.csv
+          sha256sum artifacts/football/v2g/forward/games.csv
+
+      - name: Capture first-write future-game predictions
+        shell: bash
+        run: |
+          set -euo pipefail
+          CAPTURED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          python scripts/capture_nfl_v2g_prospective_predictions.py \
+            --artifact artifacts/football/v2g/frozen_research_artifact.json \
+            --implementation-freeze config/research/nfl_v2g_implementation_freeze_2026-09-12.json \
+            --freeze-correction config/research/nfl_v2g_artifact_freeze_correction_2026-09-12.json \
+            --schedule artifacts/football/v2g/forward/games.csv \
+            --output-dir artifacts/football/v2g/forward/predictions \
+            --capture-code-git-sha "$GITHUB_SHA" \
+            --captured-at-utc "$CAPTURED_AT" \
+            --horizon-days 9 \
+            | tee artifacts/football/v2g/forward/capture_summary.json
+
+      - name: Persist immutable schedule snapshot and first-write predictions
+        shell: bash
+        run: |
+          set -euo pipefail
+          SCHEDULE_SHA="$(sha256sum artifacts/football/v2g/forward/games.csv | awk '{print $1}')"
+          SNAPSHOT_DIR=.data-v2g/evidence/nfl_v2g/prospective/schedule_snapshots
+          PRED_DIR=.data-v2g/evidence/nfl_v2g/prospective/predictions/2026
+          mkdir -p "$SNAPSHOT_DIR" "$PRED_DIR"
+          SNAPSHOT="$SNAPSHOT_DIR/${SCHEDULE_SHA}.csv"
+          if [ -f "$SNAPSHOT" ]; then
+            cmp "$SNAPSHOT" artifacts/football/v2g/forward/games.csv
+          else
+            cp artifacts/football/v2g/forward/games.csv "$SNAPSHOT"
+          fi
+          for src in artifacts/football/v2g/forward/predictions/*.json; do
+            [ -e "$src" ] || continue
+            dst="$PRED_DIR/$(basename "$src")"
+            if [ -f "$dst" ]; then
+              cmp "$dst" "$src"
+            else
+              cp "$src" "$dst"
+            fi
+          done
+          (
+            cd .data-v2g
+            git config user.name sportsedge-v2g-capture-bot
+            git config user.email sportsedge-v2g-capture-bot@users.noreply.github.com
+            git add evidence/nfl_v2g/prospective
+            if git diff --cached --quiet; then
+              echo 'NFL_V2G_NO_NEW_PROSPECTIVE_BYTES'
+              exit 0
+            fi
+            git commit -m "evidence: capture prospective NFL V2G predictions ${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}"
+            for attempt in 1 2 3 4 5; do
+              if git push origin HEAD:data; then
+                exit 0
+              fi
+              git fetch origin data
+              git rebase origin/data
+              sleep $((attempt * 2))
+            done
+            exit 98
+          )
+
+      - name: Upload capture diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nfl-v2g-prospective-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts/football/v2g/forward/capture_summary.json
+            artifacts/football/v2g/forward/predictions
+          if-no-files-found: warn
+          retention-days: 30
