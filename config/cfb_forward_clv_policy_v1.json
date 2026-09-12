@@ -1,0 +1,198 @@
+{
+  "policy_id": "CFB_FORWARD_CLV_POLICY_V1",
+  "version": "1.0.1",
+  "sport": "CFB",
+  "status": "FROZEN",
+  "frozen_at_ct": "2026-09-12T10:55:31-05:00",
+  "first_admissible_slate_ct": "2026-09-19",
+  "activation": {
+    "branch": "main",
+    "single_active_manifest": true,
+    "policy_blob_sha256": "COMPUTED_BY_CI_AT_ACTIVATION",
+    "note": "CI computes sha256 over this file at activation and writes it to the activation record. Every evidence row must carry that SHA. Changing any field requires a new version_id and invalidates all prior evidence collected under this definition."
+  },
+  "governance_scope": {
+    "authority": "CFB_TRUTH_GATE_V1 remains authoritative. This policy defines HOW forward evidence is collected, not WHETHER a market promotes.",
+    "does_not_change": [
+      "minimum live edge floor (>= 3.0%)",
+      "mean no-vig CLV requirement (>= +0.5pp)",
+      "CLV t-stat requirement (>= 2.0)",
+      "calibration slope 0.90-1.10, intercept +/-0.03, ECE <= 2.5%",
+      "key-number mass tolerance 1.5pp absolute at +/-3 and +/-7",
+      "independent promotion per canonical market; no inheritance"
+    ],
+    "rationale": "No verified free historical CFB closing-line source exists, so multi-season paired-price replay cannot be run. Forward capture is the only admissible route to promotion-grade CLV and calibration evidence. This is a change of evidence SOURCE, not a relaxation of the gate."
+  },
+  "row_admissibility": {
+    "model_p_required": true,
+    "model_p_source": "run_cfb_auto.py under the hash-bound model-artifact contract",
+    "artifact_sha_binding_required": true,
+    "layer_b_rows_prohibited": true,
+    "layer_b_note": "HYBRID / RUN IT / market-context cards are Layer B and are PERMANENTLY INADMISSIBLE to this ledger regardless of outcome, price, or apparent quality. They accumulate in the separate RUN IT results ledger.",
+    "backfill_prohibited": true,
+    "backfill_note": "No row with a capture timestamp earlier than frozen_at_ct is admissible. Missing capture = row EXCLUDED, never reconstructed.",
+    "wager_not_required": true,
+    "wager_note": "Every game the engine prices generates a forward decision row (BET or NO_BET at the frozen edge floor). Evidence accrues from model decisions, not from the user's wagering."
+  },
+  "capture_schedule": {
+    "opener": {
+      "timing_ct": "Monday 09:00:00",
+      "scope": "all FBS games on the upcoming Saturday-through-Monday slate window",
+      "book": "DraftKings",
+      "purpose": "model-directed opener-to-close movement test"
+    },
+    "decision": {
+      "timing": "at engine run time",
+      "create_only": true,
+      "overwrite_prohibited": true,
+      "note": "The decision price is sealed on write. It is never replaced by a later or closing price. ROI, if computed, uses the decision price only."
+    },
+    "close": {
+      "target_ct": "T-60s before scheduled kickoff",
+      "retry_window_ct": "T-15m through T-60s",
+      "retry_interval_seconds": 60,
+      "missed_close_handling": "CLV_MISSING, row RETAINED IN DENOMINATOR",
+      "note": "A missed close is a failure of the capture lane, not a reason to drop the row. Dropping missed closes would bias the CLV estimate."
+    }
+  },
+  "quote_hygiene": {
+    "max_quote_age_seconds": 180,
+    "max_two_sided_skew_seconds": 30,
+    "two_sided_synchronized_required": true,
+    "single_sided_inference_prohibited": true,
+    "book_limit_status_required": true,
+    "low_liquidity_handling": "REDUCED_LIMITS quotes are flagged LOW_LIQUIDITY_QUOTE and excluded from promotion-grade CLV; retained as diagnostic."
+  },
+  "devig": {
+    "authoritative_estimator": "POWER_V1",
+    "longshot_escalation_threshold_american": 400,
+    "escalation_behavior": "run MULTIPLICATIVE, POWER, SHIN",
+    "sensitivity_block_pp": 1.0,
+    "sensitivity_block_code": "DEVIG_METHOD_SENSITIVITY",
+    "haircut_pp": 0.0,
+    "minimum_across_methods_rule": false
+  },
+  "clv_definition": {
+    "basis": "EXACT_ORIGINAL_CONTRACT",
+    "rule": "CLV is measured on the same book, market, side, and exact line number as the decision row. A decision at +3 is compared to the closing price at +3, never to a closing main line of +2.5.",
+    "alternate_line_capture_required": true,
+    "alternate_line_note": "At close, capture the alternate-line ladder so the original contract number is priced even after the main line moves off it. This is the primary mechanism that makes exact-contract CLV recoverable in CFB.",
+    "unavailable_handling": "CLV_MISSING, retained in denominator",
+    "substitution_prohibited": true,
+    "normal_approx_v1": {
+      "permitted_for_promotion_evidence": false,
+      "permitted_as_diagnostic": true,
+      "reason": "NORMAL_APPROX_V1 ignores discrete mass at 3 and 7. CFB is the sport where that error is largest. It must never silently become the promotion methodology."
+    },
+    "model_vs_close": {
+      "tracked_separately": true,
+      "note": "Model_P minus closing no-vig probability is MODEL_VS_CLOSE, a diagnostic. It is not CLV and does not satisfy the CLV gate."
+    }
+  },
+  "benchmark": {
+    "book_hierarchy_core_markets": [
+      "Pinnacle",
+      "DraftKings",
+      "FanDuel",
+      "BetMGM",
+      "Caesars"
+    ],
+    "hierarchy_frozen": true,
+    "post_hoc_book_shopping_prohibited": true,
+    "starvation_rule": "Once collection begins, books may not be added, removed, or reordered; consensus pricing may not be substituted; a missing side may not be inferred; the close book may not be switched due to poor coverage. A market may finish INSUFFICIENT_EVIDENCE. That is the correct failure mode, not a problem to engineer around."
+  },
+  "markets": {
+    "independent_ledgers": [
+      "CFB_MONEYLINE",
+      "CFB_SPREAD",
+      "CFB_TOTAL"
+    ],
+    "inheritance_prohibited": true,
+    "props": "NO_ENGINE",
+    "periods_and_team_totals": "NO_ENGINE"
+  },
+  "evidence_requirements_per_market": {
+    "minimum_decisions": 200,
+    "preferred_decisions": 800,
+    "checkpoint_review_at": 150,
+    "minimum_slate_clusters": 12,
+    "few_cluster_rule": "OFFICIAL inference is prohibited below minimum_slate_clusters regardless of decision count. CFB slates are weekly, so decision count grows far faster than cluster count; cluster count is the binding constraint.",
+    "standard_errors": {
+      "method": "CR1_ONE_WAY_CLUSTER_ROBUST",
+      "cluster_unit": "slate_date_ct",
+      "iid_fallback_prohibited": true,
+      "small_sample_reference": "STUDENT_T_DF_G_MINUS_1",
+      "two_sided_95_critical_rule": "MAX_OF_T_STAT_MIN_AND_T_0.975_DF_G_MINUS_1",
+      "note": "The 12-slate requirement is a hard floor, not a claim that 12 clusters is asymptotically sufficient. At G clusters, inference uses the larger of the frozen t_stat_min and the two-sided 95% Student-t critical value with G-1 degrees of freedom."
+    },
+    "clv": {
+      "mean_no_vig_clv_pp_min": 0.5,
+      "t_stat_min": 2.0
+    },
+    "calibration": {
+      "required": true,
+      "note": "Forward CLV validates the decision policy. Proper scoring validates the probability model. Neither substitutes for the other. Brier and log-loss versus the synchronized no-vig benchmark accumulate from the same forward rows and must independently clear CFB_TRUTH_GATE_V1.",
+      "pooling_prohibited": true
+    },
+    "roi": {
+      "role": "SANITY_AND_FAILURE_CHECK_ONLY",
+      "note": "Positive ROI cannot rescue failed calibration or failed CLV."
+    }
+  },
+  "stages": {
+    "PAPER": {
+      "unit_size": 0.0,
+      "entry": "default state for any market with no cleared evidence"
+    },
+    "PROBATION": {
+      "unit_size": 0.25,
+      "entry": "checkpoint review passed at >= 150 decisions with positive CLV trend and no hard block"
+    },
+    "STANDARD": {
+      "unit_size": 0.5,
+      "entry": "all CFB_TRUTH_GATE_V1 gates cleared on that market's independent ledger"
+    },
+    "BLOCKED": {
+      "unit_size": 0.0,
+      "entry": "hard block triggered, or persistent negative CLV versus the close"
+    }
+  },
+  "hard_blocks": [
+    "post-outcome information present in any feature or decision path",
+    "unfrozen or mutated rule applied to a collected row",
+    "missing or incorrect pregame price on a decision row",
+    "missing genuine Model_P on a model-claimed row",
+    "Layer B / market-context row present in this ledger",
+    "evidence mixed across sources or lane definitions",
+    "backfilled capture timestamp"
+  ],
+  "warnings_not_blocks": [
+    "MC standard error above target",
+    "key-number mass drift within tolerance band",
+    "single missed close within retry policy",
+    "parity diagnostic variance below failure threshold"
+  ],
+  "monte_carlo_precision": {
+    "minimum_paths": 10000,
+    "default_paths": 20000,
+    "mc_se_max_fraction_of_edge_floor": 0.2,
+    "note": "MC precision is a reporting and attestation control only. It can never raise confidence or promotion status."
+  },
+  "structural_break": {
+    "enabled": true,
+    "triggers": [
+      "scoring or rules change",
+      "overtime format change",
+      "transfer or eligibility regime change",
+      "schedule or postseason format change",
+      "settlement or data-definition change"
+    ],
+    "effect": "OFFICIAL -> REVOKED immediately, without waiting for rolling calibration decay. Rows from the invalid regime are excluded from any future promotion attempt.",
+    "re_promotion": "requires a new version and SHA, full PIT replay of the admissible window, a fresh Truth Gate pass, and new attestations. No automatic reinstatement."
+  },
+  "season_touch_status": {
+    "2026_pre_freeze": "TOUCHED_BY_BASELINE_WORK",
+    "2026_post_freeze": "FORWARD_HOLDOUT_UNTOUCHED",
+    "note": "The forward holdout begins at frozen_at_ct. Any model iteration after this timestamp that is informed by post-freeze results restarts the clock under a new policy version."
+  }
+}
