@@ -133,7 +133,10 @@
     "standard_errors": {
       "method": "CR1_ONE_WAY_CLUSTER_ROBUST",
       "cluster_unit": "slate_date_ct",
-      "iid_fallback_prohibited": true
+      "iid_fallback_prohibited": true,
+      "small_sample_reference": "STUDENT_T_DF_G_MINUS_1",
+      "two_sided_95_critical_rule": "MAX_OF_T_STAT_MIN_AND_T_0.975_DF_G_MINUS_1",
+      "note": "The 12-slate requirement is a hard floor, not a claim that 12 clusters is asymptotically sufficient. At G clusters, inference uses the larger of the frozen t_stat_min and the two-sided 95% Student-t critical value with G-1 degrees of freedom."
     },
     "clv": {
       "mean_no_vig_clv_pp_min": 0.5,
