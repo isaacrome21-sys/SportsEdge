@@ -247,7 +247,6 @@ class NFLIntegratedRegulationSimulator:
             self._seconds_to_period_boundary(remaining),
             self._a_kernel._duration(profile, low=low, high=high),
         )
-
     def _short_duration(self, remaining: int, low: int, high: int) -> int:
         return min(
             remaining,
