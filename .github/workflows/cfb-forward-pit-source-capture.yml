@@ -39,7 +39,12 @@ jobs:
           python-version: '3.12'
 
       - name: Compile acquisition surface
-        run: python -m py_compile sportsedge/sports/cfb/historical_release.py sportsedge/sports/cfb/history_cache.py scripts/cache_cfb_history.py
+        run: >-
+          python -m py_compile
+          sportsedge/sports/cfb/historical_release.py
+          sportsedge/sports/cfb/history_cache.py
+          sportsedge/sports/cfb/forward_pit_readiness.py
+          scripts/cache_cfb_history.py
 
       - name: Snapshot predictive source bytes
         run: |
@@ -131,6 +136,39 @@ jobs:
               'asset_count': len(rows),
               'promotion_evidence': False,
           }, sort_keys=True))
+          PY
+
+      - name: Validate complete forward snapshot binding before persistence
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          from sportsedge.sports.cfb.forward_pit_readiness import audit_cfb_forward_pit_snapshot
+
+          report = audit_cfb_forward_pit_snapshot(
+              Path('artifacts/cfb_forward_pit/capture/classification.json')
+          )
+          if report.get('source_asof_ready') is not True:
+              raise SystemExit(
+                  'CFB_FORWARD_PIT_SOURCE_BINDING_INVALID:'
+                  + json.dumps(report, sort_keys=True)
+              )
+          if report.get('truth_gate_ready') is not False:
+              raise SystemExit('CFB_FORWARD_PIT_TRUTH_GATE_AUTHORITY_FORBIDDEN')
+          if report.get('promotion_authority') is not False:
+              raise SystemExit('CFB_FORWARD_PIT_PROMOTION_AUTHORITY_FORBIDDEN')
+          if report.get('eligibility_changed') is not False:
+              raise SystemExit('CFB_FORWARD_PIT_ELIGIBILITY_CHANGE_FORBIDDEN')
+          if report.get('paired_market_evidence_present') is not False:
+              raise SystemExit('CFB_FORWARD_PIT_PAIRED_MARKET_EVIDENCE_FORBIDDEN')
+          required_blockers = {
+              'PAIRED_MARKET_EVIDENCE_MISSING',
+              'PROMOTION_EVIDENCE_NOT_ESTABLISHED',
+          }
+          if not required_blockers.issubset(set(report.get('blockers') or [])):
+              raise SystemExit('CFB_FORWARD_PIT_GOVERNANCE_BLOCKERS_MISSING')
+          print(json.dumps(report, sort_keys=True))
           PY
 
       - name: Persist immutable forward snapshot on data branch
