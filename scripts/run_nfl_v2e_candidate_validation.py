@@ -45,8 +45,16 @@ _V2E_PBP_FIELDS = set(_PBP_FIELDS) | {
 }
 
 
-def _identity_schedule(schedule: list[dict]) -> list[dict]:
-    return [
+def _identity_schedule(schedule: list[dict], *, allowed_game_ids: set[str] | None = None) -> list[dict]:
+    """Return market-blind game identities, optionally restricted to retained history rows.
+
+    V2E drive targets are training/evaluation targets for the exact PIT-safe
+    production-history cohort. Requiring drive evidence for schedule games that
+    the production history builder already excluded would make an unrelated
+    source-quality exclusion block the diagnostic. Retained games still fail
+    closed in ``build_v2e_drive_training_rows`` if either side lacks drive data.
+    """
+    rows = [
         {
             "game_id": row.get("game_id"),
             "season": row.get("season"),
@@ -55,7 +63,14 @@ def _identity_schedule(schedule: list[dict]) -> list[dict]:
         }
         for row in schedule
         if str(row.get("game_type") or "REG").upper() == "REG"
+        and (allowed_game_ids is None or str(row.get("game_id") or "") in allowed_game_ids)
     ]
+    if allowed_game_ids is not None:
+        observed = {str(row.get("game_id") or "") for row in rows}
+        missing = sorted(allowed_game_ids - observed)
+        if missing:
+            raise SystemExit(f"NFL_M2_V2E_RETAINED_SCHEDULE_IDENTITY_MISSING:{missing[0]}")
+    return rows
 
 
 def _pit_state(features: object, *, side: str, game_id: str) -> dict[str, float]:
@@ -186,7 +201,11 @@ def main() -> int:
     if not history_rows:
         raise SystemExit("NFL_M2_V2E_HISTORY_ROWS_EMPTY")
 
-    drive_rows = build_v2e_drive_training_rows(_identity_schedule(schedule), pbp)
+    retained_game_ids = {str(row.get("game_id") or "") for row in history_rows}
+    if "" in retained_game_ids or len(retained_game_ids) != len(history_rows):
+        raise SystemExit("NFL_M2_V2E_HISTORY_GAME_IDENTITY_INVALID")
+    drive_schedule = _identity_schedule(schedule, allowed_game_ids=retained_game_ids)
+    drive_rows = build_v2e_drive_training_rows(drive_schedule, pbp)
     combined_rows = _join_drive_targets(history_rows, drive_rows)
     evidence = build_nfl_m2_v2e_candidate_evidence(
         combined_rows,
@@ -200,6 +219,7 @@ def main() -> int:
         "point_in_time_history_row_count": len(history_rows),
         "drive_target_row_count": len(drive_rows),
         "combined_row_count": len(combined_rows),
+        "drive_target_scope": "EXACT_RETAINED_PRODUCTION_HISTORY_GAME_IDS",
         "pit_state_fields": list(NFL_M2_V2E_PIT_STATE_FIELDS),
         "pit_state_conditions_drive_volume": True,
         "pit_state_conditions_scoring_event_mix": True,
