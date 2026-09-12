@@ -1,0 +1,142 @@
+name: CFB forward CLV capture
+
+# Raw market transport for CFB_FORWARD_CLV_POLICY_V1. Captures are not evidence
+# by themselves and cannot create Model_P or admit Layer B rows.
+
+on:
+  workflow_dispatch:
+    inputs:
+      phase:
+        description: "check = validate only; opener/close = run that capture phase"
+        type: choice
+        options: [check, opener, close]
+        default: check
+      dry_run:
+        description: "Free-gate only; do not write paid captures"
+        type: boolean
+        default: true
+  schedule:
+    # Five-minute scheduler. The script free-gates close capture to T-15m..T-60s.
+    # Monday opener is additionally gated to the 09:00 America/Chicago hour.
+    - cron: '2,7,12,17,22,27,32,37,42,47,52,57 * * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sportsedge-paid-odds-api
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+      SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
+      SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
+      SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Verify frozen capture contract
+        run: python -m unittest tests.test_cfb_forward_clv_capture -v
+
+      - name: Attach append-only data branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin data >/dev/null 2>&1; then
+            git fetch --depth=1 origin data:data
+            git worktree add .data-branch data
+          else
+            echo "DATA_BRANCH_REQUIRED" >&2
+            exit 1
+          fi
+
+      - name: Manual check
+        if: github.event_name == 'workflow_dispatch' && inputs.phase == 'check'
+        run: |
+          python scripts/cfb_forward_clv_capture.py check \
+            --policy config/cfb_forward_clv_policy_v1.json \
+            --status-out artifacts/cfb-forward-clv/check.json
+
+      - name: Manual opener
+        if: github.event_name == 'workflow_dispatch' && inputs.phase == 'opener'
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXTRA=""
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then EXTRA="--dry-run"; fi
+          python scripts/cfb_forward_clv_capture.py opener \
+            --policy config/cfb_forward_clv_policy_v1.json \
+            --out-dir .data-branch \
+            --status-out artifacts/cfb-forward-clv/opener.json \
+            $EXTRA
+
+      - name: Manual close
+        if: github.event_name == 'workflow_dispatch' && inputs.phase == 'close'
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXTRA=""
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then EXTRA="--dry-run"; fi
+          python scripts/cfb_forward_clv_capture.py close \
+            --policy config/cfb_forward_clv_policy_v1.json \
+            --out-dir .data-branch \
+            --status-out artifacts/cfb-forward-clv/close.json \
+            $EXTRA
+
+      - name: Scheduled opener target
+        if: github.event_name == 'schedule'
+        run: |
+          python scripts/cfb_forward_clv_capture.py opener \
+            --policy config/cfb_forward_clv_policy_v1.json \
+            --out-dir .data-branch \
+            --status-out artifacts/cfb-forward-clv/opener.json
+
+      - name: Scheduled close target
+        if: github.event_name == 'schedule'
+        run: |
+          python scripts/cfb_forward_clv_capture.py close \
+            --policy config/cfb_forward_clv_policy_v1.json \
+            --out-dir .data-branch \
+            --status-out artifacts/cfb-forward-clv/close.json
+
+      - name: Commit append-only captures
+        if: ${{ always() && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.phase != 'check' && inputs.dry_run == false)) }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd .data-branch
+          git config user.name 'sportsedge-cfb-forward-clv[bot]'
+          git config user.email 'sportsedge-cfb-forward-clv@users.noreply.github.com'
+          git add -A cfb_forward_clv/captures
+          if git diff --cached --quiet; then
+            echo "nothing to commit"
+            exit 0
+          fi
+          git commit -m "cfb-forward-clv: prospective market capture $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          for attempt in 1 2 3; do
+            git fetch origin data || true
+            git rebase origin/data || { git rebase --abort || true; }
+            if git push origin HEAD:data; then exit 0; fi
+            sleep $((attempt * 5))
+          done
+          echo "CFB_FORWARD_CAPTURE_PUSH_FAILED" >&2
+          exit 1
+
+      - name: Upload capture status
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cfb-forward-clv-status-${{ github.run_id }}
+          path: artifacts/cfb-forward-clv/*.json
+          if-no-files-found: warn
