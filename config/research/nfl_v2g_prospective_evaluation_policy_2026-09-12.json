@@ -5,10 +5,19 @@
   "candidate_id": "nfl_m2_scoring_event_v2g_candidate",
   "frozen_research_artifact_sha256": "e7e591bf1ee7fbf6332cc6795aa1d7126fce9c6a43ac69c164b1f54433457977",
   "outcome_source": {
-    "uri": "https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv",
-    "minimum_hours_after_kickoff": 6,
-    "exact_snapshot_sha256_required": true,
+    "contract": "NFL_M2_V2G_PROSPECTIVE_OUTCOME_V1",
+    "canonical_namespace": "evidence/nfl_v2g/prospective/outcomes/2026",
+    "sole_writer_workflow": "nfl-v2g-prospective-outcome-capture",
+    "minimum_hours_after_kickoff": 8,
+    "exact_outcome_sha256_required": true,
+    "prediction_and_artifact_binding_required": true,
+    "direct_schedule_refetch_for_evaluation": false,
     "no_backfill_prediction_or_market_capture": true
+  },
+  "evaluation_persistence": {
+    "namespace": "evidence/nfl_v2g/prospective/evaluation/2026",
+    "first_write_wins": true,
+    "canonical_outcomes_are_read_only": true
   },
   "eligible_bet": {
     "markets": ["spread", "total"],
@@ -16,6 +25,7 @@
     "minimum_decision_edge": 0.03,
     "market_binding_status": "READY_FOR_PROSPECTIVE_EVALUATION",
     "clv_status": "CLV_ELIGIBLE",
+    "clv_metric": "CLOSING_NOVIG_MINUS_DECISION_NOVIG",
     "same_original_threshold_required": true
   },
   "checkpoints": {
