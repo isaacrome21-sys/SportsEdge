@@ -17,8 +17,8 @@ from .m2_v2_candidate import (
     fit_nfl_m2_v2_candidate,
 )
 
-NFL_M2_V2_SELECTOR_CONTRACT = "NFL_M2_V2_NESTED_TRAINING_KERNEL_SELECTOR_V1"
-DEFAULT_KERNEL_SCALE_GRID = (0.50, 0.75, 1.00, 1.25, 1.50, 2.00)
+NFL_M2_V2_SELECTOR_CONTRACT = "NFL_M2_V2_NESTED_TRAINING_KERNEL_SELECTOR_V2"
+DEFAULT_KERNEL_SCALE_GRID = (0.25, 0.35, 0.50, 0.75, 1.00, 1.25, 1.50, 2.00)
 
 
 def _positive_scale(value: Any, field: str) -> float:
