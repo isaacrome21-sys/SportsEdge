@@ -8,6 +8,7 @@ from sportsedge.sports.nfl.m2_v2c_candidate import (
     fit_nfl_m2_v2c_candidate,
 )
 from sportsedge.sports.nfl.m2_v2c_selector import select_nfl_m2_v2c_alphas
+from sportsedge.sports.nfl.m2_v2c_validation import build_nfl_m2_v2c_raw_evaluations
 
 
 class NFLM2V2CTests(unittest.TestCase):
@@ -97,6 +98,54 @@ class NFLM2V2CTests(unittest.TestCase):
         self.assertEqual(baseline, observed)
         self.assertNotIn(2024, baseline["inner_test_seasons"])
         self.assertNotIn(2024, baseline["outer_training_seasons"])
+
+    def test_outer_heldout_outcomes_cannot_change_same_fold_probabilities_or_alphas(self):
+        rows = self._rows()
+        kwargs = {"min_train_seasons": 2, "alpha_grid": (1.0, 10.0, 30.0)}
+        baseline = build_nfl_m2_v2c_raw_evaluations(rows, **kwargs)
+        first_test_season = min(int(row["season"]) for row in baseline)
+        changed = copy.deepcopy(rows)
+        for row in changed:
+            if int(row["season"]) == first_test_season:
+                row["home_score"] = 70
+                row["away_score"] = 0
+        observed = build_nfl_m2_v2c_raw_evaluations(changed, **kwargs)
+        keys = (
+            "game_id",
+            "margin_ridge_alpha",
+            "total_ridge_alpha",
+            "m2_home_cover_prob",
+            "m2_over_prob",
+            "candidate_signed_key_probability",
+        )
+        left = [tuple(row[key] for key in keys) for row in baseline if int(row["season"]) == first_test_season]
+        right = [tuple(row[key] for key in keys) for row in observed if int(row["season"]) == first_test_season]
+        self.assertEqual(left, right)
+
+    def test_market_mutation_cannot_change_selected_alphas_or_score_distribution_readouts(self):
+        rows = self._rows()
+        kwargs = {"min_train_seasons": 2, "alpha_grid": (1.0, 10.0, 30.0)}
+        baseline = build_nfl_m2_v2c_raw_evaluations(rows, **kwargs)
+        changed = copy.deepcopy(rows)
+        for row in changed:
+            row["spread_line"] = 88.5
+            row["total_line"] = 999.5
+            row["home_spread_odds"] = -10000
+            row["away_spread_odds"] = 9000
+            row["over_odds"] = -10000
+            row["under_odds"] = 9000
+            row["sportsbook"] = "FORBIDDEN_INPUT"
+        observed = build_nfl_m2_v2c_raw_evaluations(changed, **kwargs)
+        invariant_keys = (
+            "game_id",
+            "margin_ridge_alpha",
+            "total_ridge_alpha",
+            "candidate_signed_key_probability",
+        )
+        self.assertEqual(
+            [tuple(row[key] for key in invariant_keys) for row in baseline],
+            [tuple(row[key] for key in invariant_keys) for row in observed],
+        )
 
 
 if __name__ == "__main__":
