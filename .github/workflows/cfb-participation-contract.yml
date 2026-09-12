@@ -1,0 +1,77 @@
+name: cfb-participation-contract
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'config/cfb_prop_participation_model_v1.json'
+      - 'config/football_prop_engine_surface.json'
+      - 'sportsedge/sports/cfb/participation_model.py'
+      - 'sportsedge/football_prop_surface.py'
+      - 'tests/test_cfb_participation_model.py'
+      - 'tests/test_football_prop_runtime_truth.py'
+      - '.github/workflows/cfb-participation-contract.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'config/cfb_prop_participation_model_v1.json'
+      - 'config/football_prop_engine_surface.json'
+      - 'sportsedge/sports/cfb/participation_model.py'
+      - 'sportsedge/football_prop_surface.py'
+      - 'tests/test_cfb_participation_model.py'
+      - 'tests/test_football_prop_runtime_truth.py'
+      - '.github/workflows/cfb-participation-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: '.python-version'
+      - name: Install contracted test dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-test.txt
+      - name: Compile CFB participation activation boundary
+        run: >-
+          python -m py_compile
+          sportsedge/sports/cfb/participation_model.py
+          sportsedge/football_prop_surface.py
+          tests/test_cfb_participation_model.py
+          tests/test_football_prop_runtime_truth.py
+      - name: Run CFB participation activation tests
+        run: >-
+          python -m pytest -q
+          tests/test_cfb_participation_model.py
+          tests/test_football_prop_runtime_truth.py
+      - name: Assert checked-in CFB prop state remains NO_ENGINE for the structural reason
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from sportsedge.football_prop_surface import FootballPropSurfaceError, require_executable_prop_surface
+
+          surface=json.loads(Path('config/football_prop_engine_surface.json').read_text())
+          cfb=surface['sports']['CFB']
+          assert cfb['engine_state']=='NO_ENGINE'
+          assert cfb['readiness_state']=='NO_ENGINE'
+          assert cfb['promotion_state']=='BLOCKED_NO_VALIDATED_PROBABILITY_ENGINE'
+          assert cfb['participation_model_registry']=='config/cfb_prop_participation_model_v1.json'
+          assert 'blowout' in cfb['reason'].lower()
+          participation=json.loads(Path(cfb['participation_model_registry']).read_text())
+          assert participation['status']=='UNFITTED_RESEARCH_ONLY'
+          assert participation['engine_validation_status']=='NOT_RUN'
+          assert participation['market_data_used_as_feature'] is False
+          assert participation['promotion_authority'] is False
+          assert participation['activation_authority'] is False
+          try:
+              require_executable_prop_surface('CFB')
+          except FootballPropSurfaceError as exc:
+              assert str(exc)=='FOOTBALL_PROP_ENGINE_NOT_IMPLEMENTED:CFB'
+          else:
+              raise AssertionError('CFB prop surface unexpectedly executable')
+          PY
