@@ -95,6 +95,8 @@ def build_rows(
         as_of = _parse_ts(capture.get("as_of"))
     if as_of is None:
         raise ValueError("capture needs timezone-aware as_of")
+    if as_of.tzinfo is None:
+        raise ValueError("as_of must include timezone")
     as_of = as_of.astimezone(timezone.utc)
 
     games = _context_index(capture)
