@@ -110,6 +110,26 @@ def test_valid_forward_source_snapshot_stays_blocked_from_truth_gate(tmp_path):
     assert "PROMOTION_EVIDENCE_NOT_ESTABLISHED" in report["blockers"]
 
 
+def test_legacy_second_precision_accepts_retrieval_within_same_second(tmp_path):
+    report = audit_cfb_forward_pit_snapshot(
+        _classification(tmp_path, retrieved_at="2026-09-12T11:01:28.944880+00:00")
+    )
+    assert report["source_asof_ready"] is True
+    assert not any("RETRIEVAL_AFTER_CAPTURE" in error for error in report["asset_errors"])
+
+
+def test_fractional_capture_precision_is_enforced_exactly(tmp_path):
+    report = audit_cfb_forward_pit_snapshot(
+        _classification(
+            tmp_path,
+            retrieved_at="2026-09-12T11:01:28.944880+00:00",
+            captured_at_utc="2026-09-12T11:01:28.500000Z",
+        )
+    )
+    assert report["source_asof_ready"] is False
+    assert any("RETRIEVAL_AFTER_CAPTURE" in error for error in report["asset_errors"])
+
+
 def test_retroactive_claim_fails_closed(tmp_path):
     report = audit_cfb_forward_pit_snapshot(
         _classification(tmp_path, retroactive_point_in_time_claim=True)
