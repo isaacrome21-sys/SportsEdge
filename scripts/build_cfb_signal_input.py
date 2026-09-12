@@ -141,6 +141,7 @@ def build_rows(
 
         weather = ctx.get("weather") or {}
         row["outdoor_game"] = bool(weather.get("outdoor_game", ctx.get("outdoor_game", False)))
+        row["severe_weather"] = bool(weather.get("severe_weather", False))
         if row["outdoor_game"]:
             row["weather_available"] = bool(weather.get("available", False))
             row["weather_age_minutes"] = _age_minutes(weather.get("captured_at"), as_of)
