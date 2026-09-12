@@ -4,7 +4,13 @@ import unittest
 from pathlib import Path
 
 from sportsedge.sports.nfl.m2_v2f_candidate import NFL_M2_V2F_CANDIDATE_MODEL_ID
-from sportsedge.sports.nfl.m2_v2f_forward import audit_forward_rows, validate_forward_row, NFLV2FForwardEvidenceError
+from sportsedge.sports.nfl.m2_v2f_forward import (
+    EXPECTED_CANDIDATE_CODE_GIT_SHA,
+    EXPECTED_CANDIDATE_SOURCE_BLOB_SHA1,
+    NFLV2FForwardEvidenceError,
+    audit_forward_rows,
+    validate_forward_row,
+)
 
 POLICY = json.loads(Path("config/research/nfl_v2f_forward_validation_policy_2026-09-12.json").read_text())
 
@@ -13,7 +19,8 @@ def row():
     return {
         "candidate_id": NFL_M2_V2F_CANDIDATE_MODEL_ID,
         "preregistration_commit_sha": "5385eaa7d7f78d6fcf945df913ce8deb74c8e4a7",
-        "candidate_code_git_sha": "f" * 40,
+        "candidate_code_git_sha": EXPECTED_CANDIDATE_CODE_GIT_SHA,
+        "candidate_source_blob_sha1": EXPECTED_CANDIDATE_SOURCE_BLOB_SHA1,
         "event_id": "2026_02_X_Y",
         "market": "SPREAD",
         "selection": "HOME",
@@ -70,6 +77,18 @@ class NFLV2FForwardEvidenceTests(unittest.TestCase):
         bad_policy["candidate_id"] = "wrong"
         with self.assertRaisesRegex(NFLV2FForwardEvidenceError, "POLICY_CANDIDATE_ID_MISMATCH"):
             audit_forward_rows([row()], bad_policy)
+
+    def test_wrong_candidate_code_sha_is_rejected(self):
+        bad = row()
+        bad["candidate_code_git_sha"] = "f" * 40
+        with self.assertRaisesRegex(NFLV2FForwardEvidenceError, "CANDIDATE_CODE_SHA_MISMATCH"):
+            validate_forward_row(bad, POLICY)
+
+    def test_wrong_candidate_source_blob_is_rejected(self):
+        bad = row()
+        bad["candidate_source_blob_sha1"] = "e" * 40
+        with self.assertRaisesRegex(NFLV2FForwardEvidenceError, "CANDIDATE_SOURCE_BLOB_MISMATCH"):
+            validate_forward_row(bad, POLICY)
 
     def test_duplicate_same_market_observation_blocks_audit(self):
         out = audit_forward_rows([row(), row()], POLICY)
