@@ -1,0 +1,4 @@
+trigger: cfb-forward-pit
+reason: establish first genuine forward-only predictive source snapshot after scheduled capture produced no durable data-branch bytes
+backfill: false
+promotion_authority: false
