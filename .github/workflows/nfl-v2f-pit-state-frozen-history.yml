@@ -1,0 +1,137 @@
+name: nfl-v2f-pit-state-frozen-history
+
+on:
+  push:
+    branches:
+      - 'research/nfl-v2f-pit-state-blend'
+    paths:
+      - 'sportsedge/sports/nfl/m2_v2f_pit_state.py'
+      - 'scripts/run_nfl_v2f_pit_state_validation.py'
+      - 'tests/test_nfl_m2_v2f_pit_state.py'
+      - '.github/workflows/nfl-v2f-pit-state-frozen-history.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      EVIDENCE_GIT_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EVIDENCE_GIT_SHA }}
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Install runtime dependencies
+        run: python -m pip install --disable-pip-version-check numpy==2.5.3 pytest==9.1.1
+      - name: Compile exact V2F diagnostic surface
+        run: >-
+          python -m py_compile
+          sportsedge/sports/nfl/m2_v2f_pit_state.py
+          sportsedge/sports/nfl/m2_v2d_candidate.py
+          sportsedge/sports/nfl/m2_v2d_validation.py
+          scripts/run_nfl_v2f_pit_state_validation.py
+          scripts/validate_nfl_v2_candidate.py
+      - name: Run V2F state-blend contract tests
+        run: python -m unittest tests.test_nfl_m2_v2f_pit_state -v
+      - name: Run inherited V2D probability-contract tests
+        run: python -m unittest discover -s tests -p 'test_nfl_m2_v2d*.py' -v
+      - name: Freeze exact public NFL source bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/football/sources/{pbp,participation,depth}
+          fetch_source() {
+            local url="$1" output="$2"
+            curl --fail --location --silent --show-error --retry 5 --retry-delay 2 --retry-all-errors --connect-timeout 30 "$url" -o "$output"
+          }
+          fetch_source 'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv' artifacts/football/sources/games.csv
+          fetch_source 'https://raw.githubusercontent.com/greerreNFL/Stadiums/efa9543af50b01424754219fa0e4f3c7044ff198/data/team_stadiums.csv' artifacts/football/sources/team_stadiums.csv
+          for season in $(seq 2016 2025); do
+            fetch_source "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_${season}.csv.gz" "artifacts/football/sources/pbp/play_by_play_${season}.csv.gz"
+            fetch_source "https://github.com/nflverse/nflverse-data/releases/download/pbp_participation/pbp_participation_${season}.csv" "artifacts/football/sources/participation/pbp_participation_${season}.csv"
+            fetch_source "https://github.com/nflverse/nflverse-data/releases/download/depth_charts/depth_charts_${season}.csv" "artifacts/football/sources/depth/depth_charts_${season}.csv"
+          done
+      - name: Build canonical source manifest from production history path
+        env:
+          TZ: UTC
+        run: >-
+          python scripts/run_nfl_production_validation.py
+          --schedule-file artifacts/football/sources/games.csv
+          --pbp-dir artifacts/football/sources/pbp
+          --participation-dir artifacts/football/sources/participation
+          --depth-dir artifacts/football/sources/depth
+          --stadium-file artifacts/football/sources/team_stadiums.csv
+          --git-sha "$EVIDENCE_GIT_SHA"
+          --start-season 2016 --end-season 2025
+          --neutral-site-policy exclude_from_evaluation
+          --out artifacts/football/nfl_production_validation.json
+          --manifest-out artifacts/football/nfl_source_manifest.json
+          --model-out artifacts/football/nfl_m2_model.json
+      - name: Run V2F PIT-state untouched-fold diagnostic
+        run: >-
+          python scripts/run_nfl_v2f_pit_state_validation.py
+          --schedule-file artifacts/football/sources/games.csv
+          --pbp-dir artifacts/football/sources/pbp
+          --participation-dir artifacts/football/sources/participation
+          --depth-dir artifacts/football/sources/depth
+          --stadium-file artifacts/football/sources/team_stadiums.csv
+          --source-manifest artifacts/football/nfl_source_manifest.json
+          --git-sha "$EVIDENCE_GIT_SHA"
+          --start-season 2016 --end-season 2025
+          --neutral-site-policy exclude_from_evaluation
+          --out artifacts/football/nfl_m2_v2f_pit_state_validation.json
+      - name: Audit real NFL score history from identical schedule bytes
+        run: >-
+          python scripts/audit_nfl_real_history.py
+          --source-file artifacts/football/sources/games.csv
+          --min-season 1999 --max-season 2025
+          --output artifacts/football/nfl_real_history_audit.json
+      - name: Compare V2F to frozen signed key-number tolerance
+        run: >-
+          python scripts/validate_nfl_v2_candidate.py
+          artifacts/football/nfl_real_history_audit.json
+          artifacts/football/nfl_m2_v2f_pit_state_validation.json
+          --max-abs-error 0.005
+          --out artifacts/football/nfl_m2_v2f_pit_state_key_math.json
+      - name: Assert diagnostic-only identity and unchanged gates
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          from sportsedge.sports.nfl.m2_v2f_pit_state import NFL_M2_V2F_PIT_STATE_CONTRACT
+          e=json.loads(Path('artifacts/football/nfl_m2_v2f_pit_state_validation.json').read_text())
+          k=json.loads(Path('artifacts/football/nfl_m2_v2f_pit_state_key_math.json').read_text())
+          m=json.loads(Path('artifacts/football/nfl_source_manifest.json').read_text())
+          sha=os.environ['EVIDENCE_GIT_SHA'].lower()
+          if e['code_git_sha'] != sha: raise SystemExit('NFL_M2_V2F_CODE_SHA_MISMATCH')
+          if e['source_manifest_sha256'] != m['manifest_sha256']: raise SystemExit('NFL_M2_V2F_SOURCE_MANIFEST_MISMATCH')
+          if e.get('history_feature_variant') != NFL_M2_V2F_PIT_STATE_CONTRACT: raise SystemExit('NFL_M2_V2F_STATE_CONTRACT_MISMATCH')
+          if e.get('promotion_eligible') is not False: raise SystemExit('NFL_M2_V2F_MUST_REMAIN_NON_PROMOTABLE')
+          if e.get('production_registry_consumes_this_artifact') is not False: raise SystemExit('NFL_M2_V2F_REGISTRY_CONSUMPTION_PROHIBITED')
+          if e.get('frozen_gate_changes') is not False: raise SystemExit('NFL_M2_V2F_FROZEN_GATE_CHANGE_PROHIBITED')
+          if e.get('market_inputs_used_in_feature_state') is not False: raise SystemExit('NFL_M2_V2F_MARKET_FEATURE_PROHIBITED')
+          p=e['parameters']
+          if float(p['fold_win_threshold']) != 0.65: raise SystemExit('NFL_M2_V2F_FOLD_GATE_CHANGED')
+          if float(p['calibration_threshold']) != 0.05: raise SystemExit('NFL_M2_V2F_CALIBRATION_GATE_CHANGED')
+          if float(p['margin_kernel_scale']) != 1.0 or float(p['total_kernel_scale']) != 1.0: raise SystemExit('NFL_M2_V2F_BANDWIDTH_CHANGED')
+          print(json.dumps({'status':'V2F_PIT_STATE_FROZEN_HISTORY_DIAGNOSTIC_COMPLETE','git_sha':sha,'historical_evidence':e['candidate_historical_evidence'],'signed_key_probability':e['candidate_distribution_profile']['signed_key_probability'],'key_number_fit':k['fit'],'promotion_eligible':False},sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: nfl-v2f-pit-state-frozen-history-${{ env.EVIDENCE_GIT_SHA }}
+          path: |
+            artifacts/football/nfl_m2_v2f_pit_state_validation.json
+            artifacts/football/nfl_m2_v2f_pit_state_key_math.json
+            artifacts/football/nfl_real_history_audit.json
+            artifacts/football/nfl_source_manifest.json
+            artifacts/football/nfl_production_validation.json
+            artifacts/football/sources/games.csv
+          if-no-files-found: warn
+          retention-days: 30
