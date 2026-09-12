@@ -13,6 +13,7 @@ from typing import Any, Mapping
 from .participation_source_capture import (
     PARTICIPATION_CAPTURE_CONTRACT,
     PARTICIPATION_DATASETS,
+    PBP_PROJECTION_CONTRACT,
 )
 
 DEFAULT_POLICY = Path("config/cfb_prop_participation_model_v1.json")
@@ -56,7 +57,7 @@ def load_cfb_participation_policy(path: str | Path = DEFAULT_POLICY) -> dict[str
         raise CFBParticipationModelError("CFB_PROP_PARTICIPATION_PIT_MODE_INVALID")
     if sources.get("retroactive_backfill_allowed") is not False:
         raise CFBParticipationModelError("CFB_PROP_PARTICIPATION_RETROACTIVE_BACKFILL_FORBIDDEN")
-    if sources.get("market_data_allowed") is not False:
+    if sources.get("market_data_allowed_in_model_input") is not False:
         raise CFBParticipationModelError("CFB_PROP_PARTICIPATION_MARKET_SOURCE_FORBIDDEN")
     declared_datasets = sources.get("required_datasets")
     if not isinstance(declared_datasets, list) or set(map(str, declared_datasets)) != set(PARTICIPATION_DATASETS):
@@ -65,6 +66,19 @@ def load_cfb_participation_policy(path: str | Path = DEFAULT_POLICY) -> dict[str
         raise CFBParticipationModelError("CFB_PROP_PARTICIPATION_CAPTURE_CONTRACT_INVALID")
     if sources.get("readiness_contract") != EXPECTED_READINESS_CONTRACT:
         raise CFBParticipationModelError("CFB_PROP_PARTICIPATION_READINESS_CONTRACT_INVALID")
+    pbp = sources.get("play_by_play_raw_policy")
+    if not isinstance(pbp, Mapping):
+        raise CFBParticipationModelError("CFB_PROP_PARTICIPATION_PBP_FIREWALL_REQUIRED")
+    if pbp.get("raw_market_data_present") is not True:
+        raise CFBParticipationModelError("CFB_PROP_PARTICIPATION_PBP_RAW_MARKET_FLAG_REQUIRED")
+    if pbp.get("raw_predictive_input_allowed") is not False:
+        raise CFBParticipationModelError("CFB_PROP_PARTICIPATION_PBP_RAW_INPUT_FORBIDDEN")
+    if pbp.get("required_projection_contract") != PBP_PROJECTION_CONTRACT:
+        raise CFBParticipationModelError("CFB_PROP_PARTICIPATION_PBP_PROJECTION_CONTRACT_INVALID")
+    if pbp.get("projection_method") != "EXACT_COLUMN_ALLOWLIST":
+        raise CFBParticipationModelError("CFB_PROP_PARTICIPATION_PBP_PROJECTION_METHOD_INVALID")
+    if pbp.get("projection_market_data_allowed") is not False:
+        raise CFBParticipationModelError("CFB_PROP_PARTICIPATION_PBP_PROJECTION_MARKET_FORBIDDEN")
     if sources.get("persist_branch") != "data":
         raise CFBParticipationModelError("CFB_PROP_PARTICIPATION_PERSIST_BRANCH_INVALID")
     if sources.get("persist_path_prefix") != "history/cfb/forward-participation":
@@ -98,7 +112,7 @@ def require_frozen_cfb_participation_model(
     if not isinstance(evidence, list) or {
         "point_in_time_training_source_manifest",
         "deterministic_same_source_same_sha_replay",
-        "independent_forward_holdout",
+        "independent_forward_holdout_strictly_after_training_snapshot",
         "artifact_bound_validation_report",
     } - {str(item) for item in evidence}:
         raise CFBParticipationModelError("CFB_PROP_PARTICIPATION_EVIDENCE_CONTRACT_INVALID")
