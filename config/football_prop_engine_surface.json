@@ -7,7 +7,7 @@
       "freeze_registry": "config/nfl_prop_model_freeze.json",
       "evidence_registry": "config/nfl_prop_evidence.json",
       "certification_registry": "config/nfl_prop_certification.json",
-      "engine_state": "IMPLEMENTED_FAIL_CLOSED",
+      "engine_state": "NO_ENGINE",
       "promotion_state": "AUTOMATIC_TRUTH_GATE_GATED",
       "readiness_state": "REGISTRY_DERIVED"
     },
@@ -57,6 +57,7 @@
     ]
   },
   "explicit_no_engine": {
+    "NFL": "NFL player props are NO_ENGINE until a genuine sport-specific probability engine independently validates under frozen evidence. Research artifacts, provider mappings, hit rates, market prices, and prop acquisition machinery cannot create Model_P or enable bettor-facing prop leans.",
     "targets": "No standard bound provider player-targets settlement market is on this acquisition surface.",
     "first_td": "First scorer requires complete sport-specific return-score and overtime scorer ordering plus player identity before it can join the provider surface.",
     "last_td": "Last scorer requires complete sport-specific return-score and overtime scorer ordering plus player identity before it can join the provider surface.",
