@@ -15,6 +15,8 @@ from .m2_v2f_candidate import NFL_M2_V2F_CANDIDATE_MODEL_ID
 
 POLICY_SCHEMA = "NFL_V2F_FORWARD_VALIDATION_POLICY_V1"
 FORBIDDEN_PROVENANCE = {"synthetic", "reconstructed", "backfilled", "inferred", "derived_from_result"}
+EXPECTED_CANDIDATE_CODE_GIT_SHA = "3b6cdb1461aeda46a822eb820b39bb5155e30201"
+EXPECTED_CANDIDATE_SOURCE_BLOB_SHA1 = "52919be92dbea82a12f7d03c8214265c63aa1f55"
 
 
 class NFLV2FForwardEvidenceError(ValueError):
@@ -81,6 +83,9 @@ def validate_forward_row(row: Mapping[str, Any], policy: Mapping[str, Any]) -> d
     _require(row.get("candidate_id") == NFL_M2_V2F_CANDIDATE_MODEL_ID, "NFL_V2F_FORWARD_CANDIDATE_ID_MISMATCH")
     _require(_git_sha(row.get("preregistration_commit_sha"), "row.preregistration_commit_sha") == p["preregistration_commit_sha"], "NFL_V2F_FORWARD_PREREG_SHA_MISMATCH")
     code_sha = _git_sha(row.get("candidate_code_git_sha"), "row.candidate_code_git_sha")
+    _require(code_sha == EXPECTED_CANDIDATE_CODE_GIT_SHA, "NFL_V2F_FORWARD_CANDIDATE_CODE_SHA_MISMATCH")
+    source_blob = _git_sha(row.get("candidate_source_blob_sha1"), "row.candidate_source_blob_sha1")
+    _require(source_blob == EXPECTED_CANDIDATE_SOURCE_BLOB_SHA1, "NFL_V2F_FORWARD_CANDIDATE_SOURCE_BLOB_MISMATCH")
     event_id = str(row.get("event_id") or "").strip()
     market = str(row.get("market") or "").strip().upper()
     selection = str(row.get("selection") or "").strip()
@@ -118,6 +123,7 @@ def validate_forward_row(row: Mapping[str, Any], policy: Mapping[str, Any]) -> d
         "candidate_id": NFL_M2_V2F_CANDIDATE_MODEL_ID,
         "preregistration_commit_sha": p["preregistration_commit_sha"],
         "candidate_code_git_sha": code_sha,
+        "candidate_source_blob_sha1": source_blob,
         "event_id": event_id,
         "market": market,
         "selection": selection,
