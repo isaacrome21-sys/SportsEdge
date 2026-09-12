@@ -13,6 +13,7 @@ import gzip
 import hashlib
 import json
 from pathlib import Path
+import re
 import sys
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -28,6 +29,7 @@ FORBIDDEN_MARKET_FIELDS = {
     "home_spread_odds", "away_spread_odds", "over_odds", "under_odds",
     "closing_spread", "closing_total",
 }
+_CODE_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
 def _sha256(path: Path) -> str:
@@ -61,14 +63,23 @@ def _assert_market_blind(rows: list[dict]) -> None:
             raise ValueError(f"NFL_V2G_DIAGNOSTIC_MARKET_FIELD_LEAK:{index}:{','.join(leaked)}")
 
 
+def _validate_code_sha(value: str) -> str:
+    normalized = value.strip().lower()
+    if not _CODE_SHA_RE.fullmatch(normalized):
+        raise ValueError("NFL_V2G_INVALID_CODE_SHA")
+    return normalized
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--schedule", type=Path, required=True)
     parser.add_argument("--pbp", type=Path, action="append", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--manifest-output", type=Path, required=True)
+    parser.add_argument("--code-sha", required=True)
     args = parser.parse_args()
 
+    code_sha = _validate_code_sha(args.code_sha)
     schedule = _read(args.schedule, SCHEDULE_FIELDS)
     pbp: list[dict[str, str]] = []
     for path in args.pbp:
@@ -83,6 +94,7 @@ def main() -> int:
         "schema_version": "SPORTSEDGE_NFL_V2G_DIAGNOSTIC_INPUT_V1",
         "status": "RESEARCH_DIAGNOSTIC_ONLY",
         "historical_evidence_integrity": "REUSED_RESEARCH_HISTORY_NOT_FINAL_HOLDOUT",
+        "code_sha": code_sha,
         "market_blind_input_contract": True,
         "forbidden_market_fields": sorted(FORBIDDEN_MARKET_FIELDS),
         "promotion_authority": False,
