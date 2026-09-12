@@ -76,6 +76,37 @@ def _future_games(schedule: Path, *, captured: datetime, horizon_days: int) -> l
     return rows
 
 
+def _validate_existing_identity(existing: dict, correction: dict, game: dict) -> None:
+    """Require an immutable prior row to belong to this exact frozen V2G lane."""
+    validate_prospective_prediction(existing)
+    bound = correction.get("source_bound_research_artifact")
+    if not isinstance(bound, dict):
+        raise ValueError("NFL_V2G_FORWARD_FROZEN_ARTIFACT_REQUIRED")
+    expected = {
+        "candidate_id": str(correction.get("candidate_id") or ""),
+        "artifact_sha256": str(bound.get("artifact_sha256") or "").lower(),
+        "implementation_commit_sha": str(correction.get("implementation_commit_sha") or "").lower(),
+        "candidate_source_git_blob_sha1": str(correction.get("candidate_source_git_blob_sha1") or "").lower(),
+        "preregistration_commit_sha": str(correction.get("preregistration_commit_sha") or "").lower(),
+        "game_id": str(game["game_id"]),
+        "season": int(game["season"]),
+        "week": int(game["week"]),
+        "home_team": str(game["home_team"]),
+        "away_team": str(game["away_team"]),
+    }
+    for field, wanted in expected.items():
+        actual = existing.get(field)
+        if isinstance(wanted, str):
+            actual = str(actual or "").lower() if field.endswith(("sha256", "sha1", "_sha")) or "commit_sha" in field else str(actual or "")
+        elif isinstance(wanted, int):
+            try:
+                actual = int(actual)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"NFL_V2G_FORWARD_EXISTING_IDENTITY_MISMATCH:{field}") from exc
+        if actual != wanted:
+            raise ValueError(f"NFL_V2G_FORWARD_EXISTING_IDENTITY_MISMATCH:{field}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--artifact", type=Path, required=True)
@@ -113,7 +144,7 @@ def main() -> int:
         output = args.output_dir / f"{game['game_id']}.json"
         if output.exists():
             existing = _read_json(output)
-            validate_prospective_prediction(existing)
+            _validate_existing_identity(existing, correction, game)
             skipped_existing.append(game["game_id"])
             continue
         record = build_prospective_prediction(
