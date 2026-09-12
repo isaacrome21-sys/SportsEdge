@@ -12,7 +12,11 @@ import json
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
 
-from .source_manifest import CFBSourceManifestError, validate_cfb_pit_source_manifest
+from .source_manifest import (
+    CFBSourceManifestError,
+    validate_cfb_pit_source_manifest,
+    verify_cfb_source_snapshots,
+)
 
 CFB_PIT_READINESS_CONTRACT = "SPORTSEDGE_CFB_PIT_READINESS_V1"
 CFB_ASOF_AVAILABILITY_PROOF_CONTRACT = "SPORTSEDGE_CFB_ASOF_AVAILABILITY_PROOF_V1"
@@ -105,9 +109,7 @@ def _verify_hash_bound_files(payload: Mapping[str, Any], *, root: Path, label: s
 
 
 def _audit_current_release(path: Path | None) -> dict[str, Any]:
-    if path is None:
-        return {"present": False, "usable_as_pit": False, "classification": None}
-    if not path.is_file():
+    if path is None or not path.is_file():
         return {"present": False, "usable_as_pit": False, "classification": None}
     payload, _ = _load_json(path)
     classification = payload.get("capture_classification")
@@ -126,20 +128,53 @@ def _audit_current_release(path: Path | None) -> dict[str, Any]:
     }
 
 
-def _audit_pit_manifest(path: Path | None) -> tuple[dict[str, Any], str | None]:
+def _audit_pit_manifest(
+    path: Path | None,
+    *,
+    evidence_root: Path | None,
+) -> tuple[dict[str, Any], str | None]:
     if path is None or not path.is_file():
         return {"ready": False, "reasons": ["PIT_SOURCE_MANIFEST_MISSING"]}, None
     payload, raw = _load_json(path)
+    manifest_sha = _sha256_bytes(raw)
     try:
         fit_max_season = int(payload.get("fit_max_season"))
-        validated = validate_cfb_pit_source_manifest(payload, raw_bytes=raw, fit_max_season=fit_max_season)
+        validated = validate_cfb_pit_source_manifest(
+            payload,
+            raw_bytes=raw,
+            fit_max_season=fit_max_season,
+        )
     except (TypeError, ValueError, CFBSourceManifestError) as exc:
         return {
             "ready": False,
             "reasons": ["PIT_SOURCE_MANIFEST_INVALID"],
             "error": str(exc),
-            "sha256": _sha256_bytes(raw),
-        }, _sha256_bytes(raw)
+            "sha256": manifest_sha,
+        }, manifest_sha
+
+    if evidence_root is None or not evidence_root.is_dir():
+        return {
+            "ready": False,
+            "reasons": ["PIT_SOURCE_EVIDENCE_ROOT_MISSING"],
+            "sha256": validated["manifest_sha256"],
+            "source_count": validated["source_count"],
+            "source_ids": validated["source_ids"],
+            "training_window": validated["training_window"],
+        }, validated["manifest_sha256"]
+
+    try:
+        verification = verify_cfb_source_snapshots(validated, evidence_root=evidence_root)
+    except CFBSourceManifestError as exc:
+        return {
+            "ready": False,
+            "reasons": ["PIT_SOURCE_SNAPSHOT_VERIFICATION_FAILED"],
+            "error": str(exc),
+            "sha256": validated["manifest_sha256"],
+            "source_count": validated["source_count"],
+            "source_ids": validated["source_ids"],
+            "training_window": validated["training_window"],
+        }, validated["manifest_sha256"]
+
     return {
         "ready": True,
         "reasons": [],
@@ -147,6 +182,9 @@ def _audit_pit_manifest(path: Path | None) -> tuple[dict[str, Any], str | None]:
         "source_count": validated["source_count"],
         "source_ids": validated["source_ids"],
         "training_window": validated["training_window"],
+        "source_snapshot_verified": verification["source_snapshot_verified"],
+        "source_content_root_sha256": verification["source_content_root_sha256"],
+        "verified_source_count": verification["verified_source_count"],
     }, validated["manifest_sha256"]
 
 
@@ -229,7 +267,10 @@ def audit_cfb_pit_readiness(
         raise CFBPITReadinessError("CFB_TRUTH_GATE_PAIRED_PRICE_REQUIREMENT_NOT_FROZEN_TRUE")
 
     current_release = _audit_current_release(current_release_classification_path)
-    manifest, manifest_sha = _audit_pit_manifest(pit_source_manifest_path)
+    manifest, manifest_sha = _audit_pit_manifest(
+        pit_source_manifest_path,
+        evidence_root=evidence_root,
+    )
     availability = _audit_availability_proof(
         availability_proof_path,
         source_manifest_sha256=manifest_sha,
