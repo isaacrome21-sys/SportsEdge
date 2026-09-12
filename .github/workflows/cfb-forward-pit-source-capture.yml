@@ -73,7 +73,10 @@ jobs:
           if not manifests:
               raise SystemExit('CFB_FORWARD_PIT_CAPTURE_EMPTY')
 
-          captured_at = datetime.now(timezone.utc).replace(microsecond=0)
+          # Preserve sub-second precision. Source retrieval manifests record
+          # microseconds, so truncating the capture time to whole seconds can
+          # make a legitimately earlier retrieval appear to occur after capture.
+          captured_at = datetime.now(timezone.utc)
           rows = []
           for manifest_path in manifests:
               payload = json.loads(manifest_path.read_text(encoding='utf-8'))
