@@ -27,6 +27,7 @@ class NFLV2GPaperDecisionTests(unittest.TestCase):
                 "book": "draftkings",
                 "markets": ["spreads", "totals"],
                 "edge_floor_probability": 0.03,
+                "positive_after_vig_ev_required": True,
                 "max_minutes_after_opener_retrieval": 120,
                 "backfill_allowed": False,
                 "staking_allowed": False,
@@ -83,7 +84,7 @@ class NFLV2GPaperDecisionTests(unittest.TestCase):
         self.assertEqual("home", result["decisions"]["spread"]["selection"]["side"])
         self.assertEqual("over", result["decisions"]["total"]["selection"]["side"])
         self.assertGreaterEqual(result["decisions"]["spread"]["selection"]["edge_probability"], 0.03)
-        self.assertGreaterEqual(result["decisions"]["total"]["selection"]["edge_probability"], 0.03)
+        self.assertGreater(result["decisions"]["spread"]["selection"]["expected_value_units_per_unit"], 0)
         self.assertFalse(result["staking_allowed"])
         self.assertFalse(result["promotion_authority"])
         self.assertFalse(result["may_create_model_p"])
@@ -110,6 +111,26 @@ class NFLV2GPaperDecisionTests(unittest.TestCase):
         result = self.build()
         self.assertEqual("NO_PAPER_DECISION_MARKET_UNAVAILABLE", result["decisions"]["total"]["status"])
         self.assertEqual(1, result["paper_candidate_count"])
+
+    def test_no_vig_edge_with_negative_actual_price_ev_is_not_selected(self):
+        payload = json.loads(self.pred.read_text())
+        payload["score_distribution"] = [
+            {"home_score": 24, "away_score": 17, "margin": 7, "total": 41, "weight": 0.66},
+            {"home_score": 17, "away_score": 24, "margin": -7, "total": 41, "weight": 0.34},
+        ]
+        self.pred.write_text(json.dumps(payload))
+        opener = json.loads(self.opener.read_text())
+        opener["games"][0]["spread"] = {
+            "status": "OK", "home_point": -2.5, "home_price": -200,
+            "away_point": 2.5, "away_price": 150
+        }
+        self.opener.write_text(json.dumps(opener))
+        result = self.build()
+        spread = result["decisions"]["spread"]
+        self.assertEqual("NO_PAPER_EDGE_OR_PRICE", spread["status"])
+        top = spread["candidates"][0]
+        self.assertGreaterEqual(top["edge_probability"], 0.03)
+        self.assertLessEqual(top["expected_value_units_per_unit"], 0)
 
 
 if __name__ == "__main__":
