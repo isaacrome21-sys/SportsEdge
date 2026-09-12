@@ -54,6 +54,15 @@ def _model_training_row(raw: dict[str, Any]) -> dict[str, Any]:
     return row
 
 
+def _model_prediction_row(row: dict[str, Any]) -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    if "home_state" in row:
+        payload["home_state"] = row["home_state"]
+    if "away_state" in row:
+        payload["away_state"] = row["away_state"]
+    return payload
+
+
 def build_nfl_m2_v2e_raw_evaluations(
     rows: Iterable[dict[str, Any]], *, min_train_seasons: int = 2, path_count: int = 2048
 ) -> list[dict[str, Any]]:
@@ -68,7 +77,7 @@ def build_nfl_m2_v2e_raw_evaluations(
         for raw in fold.test_rows:
             row = dict(raw)
             distribution = derive_nfl_m2_v2e_score_distribution(
-                model, {"home_state": row["home_state"], "away_state": row["away_state"]}, path_count=path_count
+                model, _model_prediction_row(row), path_count=path_count
             )
             margins = [p["home_score"] - p["away_score"] for p in distribution]
             totals = [p["home_score"] + p["away_score"] for p in distribution]
