@@ -126,27 +126,32 @@ jobs:
           tests.test_nfl_readiness
           tests.test_football_prop_surface
           tests.test_football_prop_runtime_truth -v
-      - name: Assert RUN IT registry resolves executable NFL game-plus-prop bundle
+      - name: Assert RUN IT registry resolves game-only NFL lane and prop NO_ENGINE
         run: |
           python - <<'PY'
           import importlib
           import json
           from pathlib import Path
+          from sportsedge.football_prop_surface import FootballPropSurfaceError, require_executable_prop_surface
           config = json.loads(Path('config/run_it_surface.json').read_text())
           nfl = config['sports']['NFL']
-          assert nfl['lane'] == 'PREGAME_MODEL_AND_PLAYER_PROPS'
+          assert nfl['lane'] == 'PREGAME_MODEL'
           assert nfl['automatic_completeness'] == 'EXECUTABLE_FAIL_CLOSED'
           assert nfl['automatic_command'] == ['python','scripts/run_football_auto_bundle.py','--sport','NFL','--output','artifacts/run_it/nfl_card.json']
           assert Path(nfl['automatic_command'][1]).is_file()
           module_name, attr = nfl['library_entrypoint'].split(':', 1)
           assert hasattr(importlib.import_module(module_name), attr)
-          from sportsedge.football_prop_surface import require_executable_prop_surface
-          prop = require_executable_prop_surface('NFL')
-          assert prop['engine_state'] == 'IMPLEMENTED_FAIL_CLOSED'
-          assert prop['promotion_state'] == 'AUTOMATIC_TRUTH_GATE_GATED'
-          assert prop['readiness_state'] == 'REGISTRY_DERIVED'
-          assert prop['runtime_state'] == 'ARTIFACT_FROZEN_EVIDENCE_GATED'
-          assert prop['frozen_artifact_sha256'] == '3efa5cc92b5ed1bf53a99cbe0d6e7792d01791a77c8f684874d66213b73d9570'
+          prop_surface = json.loads(Path('config/football_prop_engine_surface.json').read_text())
+          prop = prop_surface['sports']['NFL']
+          assert prop['engine_state'] == 'NO_ENGINE'
+          assert prop['promotion_state'] == 'BLOCKED_PENDING_INDEPENDENT_PROBABILITY_ENGINE_VALIDATION'
+          assert prop['readiness_state'] == 'NO_ENGINE'
+          try:
+              require_executable_prop_surface('NFL')
+          except FootballPropSurfaceError as exc:
+              assert str(exc) == 'FOOTBALL_PROP_ENGINE_NOT_IMPLEMENTED:NFL'
+          else:
+              raise AssertionError('NFL_PROP_RUNTIME_UNEXPECTEDLY_EXECUTABLE')
           PY
       - name: Assert checked-in NFL game and prop artifact claims remain truthful
         run: |
@@ -192,3 +197,25 @@ jobs:
           rc=$?
           set -e
           test "$rc" -eq 2
+      - name: Assert NFL bundle never executes or emits prop Model_P
+        shell: bash
+        run: |
+          set +e
+          python scripts/run_football_auto_bundle.py --sport NFL --output /tmp/nfl-bundle.json
+          rc=$?
+          set -e
+          test "$rc" -eq 2
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          payload = json.loads(Path('/tmp/nfl-bundle.json').read_text())
+          assert payload['report']['lane_status']['PLAYER_PROPS'] == 'NO_ENGINE'
+          assert payload['report']['lane_exit_code']['PLAYER_PROPS'] is None
+          prop_rows = [r for r in payload['report']['results'] if r.get('run_it_lane') == 'PLAYER_PROPS']
+          assert len(prop_rows) == 1
+          row = prop_rows[0]
+          assert row['bet_status'] == 'NO_ENGINE'
+          assert row['model_p'] is None
+          assert row['reason'] == 'NFL_PLAYER_PROPS_NO_ENGINE_PENDING_INDEPENDENT_PROBABILITY_ENGINE_VALIDATION'
+          assert payload['governance']['nfl_props_no_engine_enforced'] is True
+          PY
