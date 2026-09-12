@@ -22,14 +22,20 @@ NFL_M2_V2E_CANDIDATE_MODEL_ID = "nfl_m2_possession_discrete_v2e_candidate"
 NFL_M2_V2E_DISTRIBUTION_CONTRACT = "NFL_M2_V2E_POSSESSION_DISCRETE_SCORE_V1"
 NFL_M2_V2E_FEATURE_CONTRACT = "NFL_M2_V2E_MARKET_BLIND_DRIVE_STATE_V1"
 
-# safety_allowed is attached to the offense's possession but scores two points
-# for the opponent. This preserves actual football scoring mechanics.
-_OUTCOMES = ("td_xp", "td_2pt", "td_no_try", "fg", "safety_allowed", "no_score")
+# Defensive touchdowns and safeties are attached to the offense's possession
+# but credit points to the opponent. The defensive-TD first slice is explicitly
+# seven points; PAT/2PT refinement is a later architecture question, not hidden
+# inside this diagnostic.
+_OUTCOMES = (
+    "td_xp", "td_2pt", "td_no_try", "fg", "def_td_7_allowed",
+    "safety_allowed", "no_score",
+)
 _OWN_POINTS = {
     "td_xp": 7,
     "td_2pt": 8,
     "td_no_try": 6,
     "fg": 3,
+    "def_td_7_allowed": 0,
     "safety_allowed": 0,
     "no_score": 0,
 }
@@ -149,8 +155,6 @@ def _fit_drive_state(
         raise ValueError("NFL_M2_V2E_STATE_WIDTH_MISMATCH")
     x = np.asarray(vectors, dtype=float)
     y = np.asarray([float(row[f"{side}_drives"]) - global_mean for row in rows], dtype=float)
-    # Fixed, non-searched ridge regularization. The intercept is omitted because
-    # global_mean already owns the baseline drive rate.
     gram = x.T @ x + np.eye(x.shape[1], dtype=float) * 10.0
     coef = np.linalg.solve(gram, x.T @ y)
     return tuple(float(value) for value in coef.tolist())
@@ -221,8 +225,6 @@ def _conditional_drive_mean(
         return base
     if len(coefficients) != len(state):
         raise ValueError("NFL_M2_V2E_STATE_WIDTH_MISMATCH")
-    # Keep the research diagnostic inside a physically plausible range without
-    # introducing a fitted/tuned clipping parameter.
     return max(4.0, min(20.0, base + float(np.dot(coefficients, state))))
 
 
@@ -250,9 +252,6 @@ def derive_nfl_m2_v2e_score_distribution(
     home_mean = _conditional_drive_mean(model.home_drive_mean, model.home_state_coefficients, home_state)
     away_mean = _conditional_drive_mean(model.away_drive_mean, model.away_state_coefficients, away_state)
 
-    # Deterministic low-discrepancy-style lattice. Different irrational-ish
-    # multipliers decorrelate drive-count and scoring-event dimensions while
-    # remaining byte-for-byte reproducible without an RNG dependency.
     paths: list[dict[str, int]] = []
     for index in range(path_count):
         base_u = (index + 0.5) / path_count
@@ -269,6 +268,8 @@ def derive_nfl_m2_v2e_score_distribution(
             home_score += _OWN_POINTS[outcome]
             if outcome == "safety_allowed":
                 away_score += 2
+            elif outcome == "def_td_7_allowed":
+                away_score += 7
 
         for drive in range(away_drives):
             u = ((base_u + (drive + 1) * 0.7320508075688772 + 0.17) * 0.4142135623730950) % 1.0
@@ -276,6 +277,8 @@ def derive_nfl_m2_v2e_score_distribution(
             away_score += _OWN_POINTS[outcome]
             if outcome == "safety_allowed":
                 home_score += 2
+            elif outcome == "def_td_7_allowed":
+                home_score += 7
 
         paths.append({"home_score": home_score, "away_score": away_score})
     return tuple(paths)
