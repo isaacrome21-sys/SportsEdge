@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from math import isfinite
 from pathlib import Path
 import re
 import sys
@@ -28,6 +29,7 @@ from scripts.run_nfl_v2_candidate_validation import _assert_source, _verified_ma
 from sportsedge.sports.nfl.history import normalize_nfl_rows, parse_schedule_csv
 from sportsedge.sports.nfl.m2_history_features import fit_nfl_prior_decay_curves
 from sportsedge.sports.nfl.m2_history_policy import build_nfl_m2_history_rows
+from sportsedge.sports.nfl.m2_v2e_candidate import NFL_M2_V2E_PIT_STATE_FIELDS
 from sportsedge.sports.nfl.m2_v2e_drives import build_v2e_drive_training_rows
 from sportsedge.sports.nfl.m2_v2e_validation import build_nfl_m2_v2e_candidate_evidence
 
@@ -56,6 +58,23 @@ def _identity_schedule(schedule: list[dict]) -> list[dict]:
     ]
 
 
+def _pit_state(features: object, *, side: str, game_id: str) -> dict[str, float]:
+    if not isinstance(features, dict):
+        raise SystemExit(f"NFL_M2_V2E_PIT_FEATURES_MISSING:{game_id}:{side}")
+    state: dict[str, float] = {}
+    for key in NFL_M2_V2E_PIT_STATE_FIELDS:
+        if key not in features:
+            raise SystemExit(f"NFL_M2_V2E_PIT_STATE_FIELD_MISSING:{game_id}:{side}:{key}")
+        try:
+            value = float(features[key])
+        except (TypeError, ValueError) as exc:
+            raise SystemExit(f"NFL_M2_V2E_PIT_STATE_FIELD_INVALID:{game_id}:{side}:{key}") from exc
+        if not isfinite(value):
+            raise SystemExit(f"NFL_M2_V2E_PIT_STATE_FIELD_INVALID:{game_id}:{side}:{key}")
+        state[key] = value
+    return state
+
+
 def _join_drive_targets(history_rows: list[dict], drive_rows: list[dict]) -> list[dict]:
     drive_by_game = {str(row.get("game_id") or ""): dict(row) for row in drive_rows}
     if "" in drive_by_game or len(drive_by_game) != len(drive_rows):
@@ -79,12 +98,12 @@ def _join_drive_targets(history_rows: list[dict], drive_rows: list[dict]) -> lis
                 continue
             if key.startswith(target_prefixes):
                 row[key] = value
-        # V2E first historical diagnostic intentionally uses no fitted state
-        # vector. Possession/scoring rates are learned strictly from prior-fold
-        # realized drives. A later architecture may add frozen PIT state only if
-        # predeclared before another outer evaluation.
-        row.pop("home_state", None)
-        row.pop("away_state", None)
+
+        # First-slice V2E state is frozen before outer evaluation and comes only
+        # from the existing PIT production feature row. It conditions both drive
+        # volume and scoring-event mix; no market/evaluation field is included.
+        row["home_state"] = _pit_state(row.get("home_features"), side="home", game_id=game_id)
+        row["away_state"] = _pit_state(row.get("away_features"), side="away", game_id=game_id)
         combined.append(row)
     return combined
 
@@ -181,6 +200,9 @@ def main() -> int:
         "point_in_time_history_row_count": len(history_rows),
         "drive_target_row_count": len(drive_rows),
         "combined_row_count": len(combined_rows),
+        "pit_state_fields": list(NFL_M2_V2E_PIT_STATE_FIELDS),
+        "pit_state_conditions_drive_volume": True,
+        "pit_state_conditions_scoring_event_mix": True,
         "neutral_site_policy": args.neutral_site_policy,
         "source_manifest_path": str(args.source_manifest),
         "starting_qb_coverage_issue_count_before_override": len(before),
@@ -189,6 +211,7 @@ def main() -> int:
         "stadium_home_origin_bridge_count": len(stadium_bridges),
         "production_registry_consumes_this_artifact": False,
         "outer_history_status": "DEVELOPMENT_FALSIFICATION_ONLY_ALREADY_OBSERVED_FOLDS",
+        "prospective_confirmation_required_for_promotion": True,
     })
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -200,6 +223,7 @@ def main() -> int:
         "signed_key_probability": evidence["candidate_distribution_profile"]["signed_key_probability"],
         "promotion_eligible": False,
         "production_registry_consumes_this_artifact": False,
+        "prospective_confirmation_required_for_promotion": True,
     }, sort_keys=True))
     return 0
 
