@@ -16,16 +16,56 @@ post-scheduled-start observations.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
 import sys
+from typing import Any
 
 LEGACY_PATH = Path(__file__).with_name("archive_raw_game_odds.py")
 DECISION_TARGET_MIN = 90
 CLOSE_TARGET_MIN = 10
 WINDOW_SEC = 8 * 60
 TARGETS_MIN = (DECISION_TARGET_MIN, CLOSE_TARGET_MIN)
+
+
+def _capture_role(window: Any) -> str:
+    if window == "T-90m":
+        return "DECISION_CANDIDATE"
+    if window == "T-10m":
+        return "CLOSE_CANDIDATE"
+    raise RuntimeError(f"MLB_PAIRED_ARCHIVE_UNKNOWN_WINDOW:{window}")
+
+
+def _sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _bind_raw_provenance(row: dict[str, Any]) -> dict[str, Any]:
+    if row.get("status") not in {"CAPTURED", "INCOMPLETE_CAPTURE"}:
+        return row
+    raw_value = row.get("raw_file")
+    if not raw_value:
+        raise RuntimeError("MLB_PAIRED_ARCHIVE_RAW_FILE_MISSING")
+    raw_path = Path(str(raw_value))
+    if not raw_path.is_file():
+        raise RuntimeError(f"MLB_PAIRED_ARCHIVE_RAW_FILE_NOT_FOUND:{raw_path}")
+    enriched = dict(row)
+    enriched.update(
+        capture_role=_capture_role(row.get("capture_window")),
+        raw_sha256=_sha256_file(raw_path),
+        raw_bytes=raw_path.stat().st_size,
+        evidence_class="RAW_OBSERVATION_NOT_PROMOTION_EVIDENCE",
+        promotion_authority=False,
+        may_change_market_eligibility=False,
+        model_p=None,
+    )
+    return enriched
 
 
 def _load_legacy():
@@ -36,6 +76,16 @@ def _load_legacy():
     spec.loader.exec_module(module)
     module.TARGETS_MIN = TARGETS_MIN
     module.WINDOW_SEC = WINDOW_SEC
+
+    # Bind the exact raw response bytes into both the durable status row and the
+    # daily ledger before either is written. This is provenance only; it grants
+    # no promotion authority and does not transform the provider payload.
+    original_write_status = module._write_status
+
+    def write_status_with_provenance(status_path, ledger_path, ledger, row):
+        original_write_status(status_path, ledger_path, ledger, _bind_raw_provenance(row))
+
+    module._write_status = write_status_with_provenance
     return module
 
 
@@ -71,12 +121,16 @@ def _self_test() -> int:
     close_hi = CLOSE_TARGET_MIN + WINDOW_SEC / 60
     assert 45 <= decision_lo <= decision_hi <= 120
     assert 2 <= close_lo <= close_hi <= 20
+    assert _capture_role("T-90m") == "DECISION_CANDIDATE"
+    assert _capture_role("T-10m") == "CLOSE_CANDIDATE"
 
     print(json.dumps({
         "status": "SELF_TEST_OK",
         "decision_window_minutes_before_start": [decision_lo, decision_hi],
         "close_window_minutes_before_start": [close_lo, close_hi],
         "post_start_capture_reachable": False,
+        "raw_sha256_bound_on_capture": True,
+        "capture_role_bound_on_capture": True,
         "promotion_authority": False,
         "historical_backfill": False,
     }, sort_keys=True))
