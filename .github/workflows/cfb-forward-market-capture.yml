@@ -1,14 +1,10 @@
 name: cfb-forward-market-capture
 
 on:
+  # Dispatch-only until a separate CFB paid-provider credit budget is frozen.
+  # The free ESPN planner still enforces the frozen decision/close windows before
+  # any paid The Odds API call can occur.
   workflow_dispatch:
-  schedule:
-    # 15-minute cadence during the primary Thu-Sun CFB game windows. The free
-    # ESPN planner runs first; The Odds API is called only when a frozen
-    # decision or close window is due. Manual dispatch covers off-calendar games.
-    - cron: '7,22,37,52 21-23 * * 4,5'
-    - cron: '7,22,37,52 15-23 * * 6'
-    - cron: '7,22,37,52 0-5 * * 0'
 
 permissions:
   contents: write
