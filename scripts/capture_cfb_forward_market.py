@@ -76,12 +76,29 @@ def main() -> int:
         "eligibility_changed": False,
     }
     (args.out_dir / "snapshot.meta.json").write_text(json.dumps(meta, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    if validation.get("snapshot_usable") is not True:
+        status = {
+            "status": "BLOCKED_PROVIDER_SNAPSHOT_NO_USABLE_DRAFTKINGS_MARKETS",
+            "captured_at_utc": captured_at,
+            "payload_sha256": digest,
+            "event_count": validation["event_count"],
+            "draftkings_event_count": validation["draftkings_event_count"],
+            "two_sided_market_count": validation["two_sided_market_count"],
+            "promotion_authority": False,
+            "paired_market_evidence": False,
+        }
+        (args.out_dir / "status.json").write_text(json.dumps(status, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        print(json.dumps(status, sort_keys=True))
+        return 78
+
     status = {
         "status": "CFB_FORWARD_MARKET_SNAPSHOT_CAPTURED",
         "captured_at_utc": captured_at,
         "payload_sha256": digest,
         "event_count": validation["event_count"],
         "draftkings_event_count": validation["draftkings_event_count"],
+        "two_sided_market_count": validation["two_sided_market_count"],
         "promotion_authority": False,
         "paired_market_evidence": False,
     }
