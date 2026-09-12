@@ -1,0 +1,111 @@
+name: NFL V2G prospective evaluation
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Postgame research settlement. Running before a game is final is a no-op.
+    - cron: '41 6 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nfl-v2g-prospective-evaluation
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+
+      - name: Restore immutable prospective predictions and prior evaluations
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin data:data
+          for prefix in \
+            evidence/nfl_v2g/prospective/predictions/2026 \
+            evidence/nfl_v2g/prospective/evaluations/2026 \
+            evidence/nfl_v2g/prospective/result_schedule_snapshots; do
+            mkdir -p "$prefix"
+            while IFS= read -r path; do
+              [ -n "$path" ] || continue
+              mkdir -p "$(dirname "$path")"
+              git show "data:$path" > "$path"
+            done < <(git ls-tree -r --name-only data -- "$prefix")
+          done
+
+      - name: Fetch exact current NFL result schedule bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error --retry 3 \
+            'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv' \
+            -o "$RUNNER_TEMP/nfl-games.csv"
+          test -s "$RUNNER_TEMP/nfl-games.csv"
+          sha256sum "$RUNNER_TEMP/nfl-games.csv"
+
+      - name: Evaluate only completed prospective games
+        shell: bash
+        run: |
+          set -euo pipefail
+          EVALUATOR_BLOB="$(git rev-parse HEAD:scripts/evaluate_nfl_v2g_prospective.py)"
+          WORKFLOW_BLOB="$(git rev-parse HEAD:.github/workflows/nfl-v2g-prospective-evaluation.yml)"
+          python3 scripts/evaluate_nfl_v2g_prospective.py \
+            --predictions-dir evidence/nfl_v2g/prospective/predictions/2026 \
+            --schedule "$RUNNER_TEMP/nfl-games.csv" \
+            --output-dir evidence/nfl_v2g/prospective/evaluations/2026 \
+            --snapshot-output-dir evidence/nfl_v2g/prospective/result_schedule_snapshots \
+            --evaluation-code-git-blob-sha1 "$EVALUATOR_BLOB" \
+            --workflow-git-blob-sha1 "$WORKFLOW_BLOB" \
+            | tee "$RUNNER_TEMP/v2g-evaluation-summary.json"
+
+      - name: Enforce research-only governance on new evaluations
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path('evidence/nfl_v2g/prospective/evaluations/2026')
+          for path in sorted(root.glob('*.json')):
+              row = json.loads(path.read_text())
+              assert row['schema_version'] == 'NFL_M2_V2G_PROSPECTIVE_EVALUATION_V1'
+              assert row['status'] == 'PROSPECTIVE_RESEARCH_EVALUATION_COMPLETE'
+              assert row['market_prices_consumed'] is False
+              assert row['promotion_authority'] is False
+              assert row['may_create_model_p'] is False
+              assert row['market_eligibility_changed'] is False
+              assert row['truth_gate_pass_granted'] is False
+              assert row['official_status_granted'] is False
+              assert row['nfl_props'] == 'NO_ENGINE'
+          print('research_only_governance=PASS')
+          PY
+
+      - name: Persist first-write evaluations to durable data branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- \
+              evidence/nfl_v2g/prospective/evaluations/2026 \
+              evidence/nfl_v2g/prospective/result_schedule_snapshots; then
+            echo 'No new completed prospective games to persist.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            evidence/nfl_v2g/prospective/evaluations/2026 \
+            evidence/nfl_v2g/prospective/result_schedule_snapshots
+          git commit -m "NFL V2G prospective research evaluation (run $GITHUB_RUN_ID)"
+          for i in 1 2 3; do
+            git pull --rebase origin data
+            if git push origin HEAD:data; then exit 0; fi
+            sleep $((i * 5))
+          done
+          echo 'PUSH_FAILED'
+          exit 1
