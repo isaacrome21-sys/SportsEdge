@@ -1,6 +1,6 @@
 {
   "schema_version": "FOOTBALL_PROP_ENGINE_SURFACE_V1",
-  "authority": "This file is the runtime authority for football player-prop engine availability. IMPLEMENTED_FAIL_CLOSED means a sport has an executable market-blind probability path capable of creating Model_P from a frozen artifact plus fresh pregame features; it does not grant promotion authority or imply validation. Evidence, certification, quote freshness, a sport-namespaced frozen edge floor, and Truth Gate remain independently required for OFFICIAL eligibility. Frozen research artifacts, provider mappings, acquisition machinery, hit rates, or market prices alone do not create an executable probability engine.",
+  "authority": "This file is the runtime authority for football player-prop engine availability. It declares implemented bettor-facing probability code paths only. Frozen research artifacts, provider mappings, acquisition machinery, hit rates, or market prices do not create an executable probability engine. Provider markets under implemented_provider_markets apply only to sports whose engine_state is IMPLEMENTED_FAIL_CLOSED; sports declared NO_ENGINE retain explicit NO_ENGINE until an independently validated probability engine is promoted into this runtime surface.",
   "library_entrypoint": "sportsedge.football_prop_readiness:run_football_props_ready",
   "sports": {
     "NFL": {
@@ -16,10 +16,10 @@
       "freeze_registry": "config/cfb_prop_model_freeze.json",
       "evidence_registry": "config/cfb_prop_evidence.json",
       "certification_registry": "config/cfb_prop_certification.json",
-      "engine_state": "IMPLEMENTED_FAIL_CLOSED",
-      "promotion_state": "AUTOMATIC_TRUTH_GATE_GATED",
-      "readiness_state": "REGISTRY_DERIVED",
-      "reason": "CFB has an executable frozen, hash-bound market-blind probability engine. Model candidates remain non-OFFICIAL until independent forward evidence, artifact-bound certification, a frozen empirical edge floor, fresh pregame features/prices, and Truth Gate all pass."
+      "engine_state": "NO_ENGINE",
+      "promotion_state": "BLOCKED_NO_VALIDATED_PROBABILITY_ENGINE",
+      "readiness_state": "NO_ENGINE",
+      "reason": "CFB props remain NO_ENGINE until a genuine probability engine independently validates; frozen training artifacts are research inputs only and have no promotion authority."
     }
   },
   "implemented_provider_markets": {
@@ -32,6 +32,7 @@
   },
   "explicit_no_engine": {
     "NFL": "NFL player props are NO_ENGINE until a genuine sport-specific probability engine independently validates under frozen evidence. Research artifacts, provider mappings, hit rates, market prices, and prop acquisition machinery cannot create Model_P or enable bettor-facing prop leans.",
+    "CFB": "CFB player props are NO_ENGINE until a genuine sport-specific probability engine independently validates under frozen evidence. Frozen research artifacts cannot create Model_P or enable bettor-facing prop leans.",
     "targets": "No standard bound provider player-targets settlement market is on this acquisition surface.",
     "first_td": "First scorer requires complete sport-specific return-score and overtime scorer ordering plus player identity before it can join the provider surface.",
     "last_td": "Last scorer requires complete sport-specific return-score and overtime scorer ordering plus player identity before it can join the provider surface.",
