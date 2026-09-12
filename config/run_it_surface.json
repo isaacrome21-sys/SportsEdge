@@ -10,14 +10,15 @@
       "notes": "Native automatic MLB acquisition with resilient odds failover and confirmed-lineup enforcement; promotion remains deployment/evidence gated."
     },
     "NFL": {
-      "lane": "PREGAME_MODEL_AND_PLAYER_PROPS",
+      "lane": "PREGAME_GAME_MODEL_WITH_PROPS_NO_ENGINE",
       "automatic_command": ["python", "scripts/run_football_auto_bundle.py", "--sport", "NFL", "--output", "artifacts/run_it/nfl_card.json"],
       "library_entrypoint": "sportsedge.sports.nfl.run_machine:run_it_nfl",
       "market_surface": "config/football_runtime_capabilities.json",
       "planning_market_catalog": "config/football_market_surface.json",
+      "governance_source": "config/football_prop_engine_surface.json",
       "automatic_completeness": "EXECUTABLE_FAIL_CLOSED",
-      "blocker": "NFL_FROZEN_M2_AND_PROP_ARTIFACTS_PLUS_LIVE_SOURCES_REQUIRED_FOR_OFFICIAL",
-      "notes": "RUN IT executes the canonical NFL game lane plus shared-path offensive, TD scorer, kicker, and defensive player-prop model lanes where required PIT/live inputs exist. Genuine Model_P + fresh offered price can surface MODEL_CANDIDATE rows before promotion. OFFICIAL remains independently blocked until artifact-bound evidence, certification, frozen edge-floor policy, and Truth Gate requirements pass."
+      "blocker": "NFL_FROZEN_M2_PLUS_LIVE_SOURCES_REQUIRED_FOR_GAME_MODEL_P;NFL_PROPS_NO_ENGINE",
+      "notes": "RUN IT executes the canonical NFL game lane. The PLAYER_PROPS lane is intentionally emitted as blocked NO_ENGINE and is not executed while config/football_prop_engine_surface.json declares NFL NO_ENGINE. Game-market Model_P requires a genuine frozen M2 artifact and live PIT sources; OFFICIAL remains independently blocked until artifact-bound evidence, certification, frozen edge-floor policy, and Truth Gate requirements pass. Research prop artifacts, provider mappings, hit rates, or market prices cannot create NFL prop Model_P."
     },
     "CFB": {
       "lane": "PREGAME_MODEL_AND_PLAYER_PROPS",
