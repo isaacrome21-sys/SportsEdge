@@ -45,8 +45,8 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12.13'
-      - name: Bare-environment archive smoke test
-        run: python -I scripts/archive_raw_game_odds.py --self-test
+      - name: Bare-environment paired-window archive smoke test
+        run: python -I scripts/archive_raw_game_odds_paired.py --self-test
       - name: Resolve UTC day
         id: day
         run: echo "date=$(date -u +%F)" >> "$GITHUB_OUTPUT"
@@ -69,7 +69,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -I scripts/archive_raw_game_odds.py --repair-ledger
+          python -I scripts/archive_raw_game_odds_paired.py --repair-ledger
           echo 'repaired=true' >> "$GITHUB_OUTPUT"
       - name: Deduplicate near-simultaneous successful capture
         id: dedupe
@@ -130,7 +130,7 @@ jobs:
               ledger_path.write_text(json.dumps(ledger, indent=2, sort_keys=True) + '\n')
               print(json.dumps(row))
           PY
-      - name: Capture raw game-market snapshot when inside target window
+      - name: Capture paired raw game-market snapshot when inside target window
         id: capture
         shell: bash
         run: |
@@ -143,7 +143,7 @@ jobs:
             exit 0
           fi
           set +e
-          python -I scripts/archive_raw_game_odds.py
+          python -I scripts/archive_raw_game_odds_paired.py
           code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           exit 0
