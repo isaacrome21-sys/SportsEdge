@@ -1,0 +1,40 @@
+{
+  "schema": "NFL_HOLDOUT_INTEGRITY_CORRECTION_V1",
+  "created_at_utc": "2026-09-12T03:25:00Z",
+  "status": "FROZEN_APPEND_ONLY_CORRECTION",
+  "lane": "NFL",
+  "supersedes_no_source_artifact": true,
+  "original_policy_path": "config/research/nfl_feature_search_policy_2026-09-10.json",
+  "original_policy_preserved_unchanged": true,
+  "finding": "2019 was already inside candidate-evaluated 2016-2025 walk-forward history before the policy later labeled it an untouched historical holdout.",
+  "chronology": {
+    "preexisting_candidate_evidence_pr": 280,
+    "preexisting_candidate_evidence_merged_at_utc": "2026-09-10T10:41:12Z",
+    "preexisting_candidate_evaluation_range": [2016, 2025],
+    "preexisting_candidates_explicitly_reported": ["V2A", "V2B"],
+    "original_policy_created_at_utc": "2026-09-10T12:00:00Z",
+    "original_policy_holdout_season": 2019
+  },
+  "verdicts": {
+    "2019_pristine_holdout_status": "INVALID_AS_PRISTINE_HOLDOUT_PREEXISTING_CONTACT",
+    "2019_may_be_used_as_never_seen_final_holdout": false,
+    "2019_historical_diagnostic_use_allowed": true,
+    "attempt_accounting_can_restore_pristine_status": false
+  },
+  "prospective_replacement_rule": {
+    "required": true,
+    "principle": "A replacement final holdout must be prospective: candidate specification and code identity are frozen before eligible game outcomes exist or are inspected.",
+    "v2f_preregistration_commit": "c5ee8da9a9d1e8a294c0a3f8dad5fb2e7c966402",
+    "eligible_game_rule": "For V2F final-holdout evidence, game kickoff must occur after the V2F preregistration commit and the result must not have been available at candidate freeze time. Feature and market snapshots must satisfy their own PIT contracts.",
+    "historical_2016_2025_role": "DEVELOPMENT_AND_DIAGNOSTIC_ONLY_FOR_V2F_FINAL_HOLDOUT_PURPOSES",
+    "promotion_requires_forward_evidence": true
+  },
+  "governance": {
+    "promotion_changed": false,
+    "eligibility_changed": false,
+    "model_p_created": false,
+    "official_bet_authorized": false,
+    "truth_gate_thresholds_changed": false,
+    "staking_changed": false
+  }
+}
