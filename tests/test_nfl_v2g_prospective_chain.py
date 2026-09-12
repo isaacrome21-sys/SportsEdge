@@ -20,10 +20,16 @@ class NFLV2GProspectiveChainTests(unittest.TestCase):
         self.pred = self.root / "pred.json"
         self.paper = self.root / "paper.json"
         artifact = "e7e591bf1ee7fbf6332cc6795aa1d7126fce9c6a43ac69c164b1f54433457977"
+        implementation = "4dc37c4e445325c77737ec646fa37dbdbe3bfa6d"
+        source_blob = "4d8a3e19033b70962bec6d93d46d92a58305778e"
+        prereg = "c8381b09cdde2ccbddf6787127c838d114dee994"
         self.policy.write_text(json.dumps({
             "schema_version": mod.POLICY_SCHEMA,
             "candidate_id": "nfl_m2_scoring_event_v2g_candidate",
             "frozen_research_artifact_sha256": artifact,
+            "implementation_commit_sha": implementation,
+            "candidate_source_git_blob_sha1": source_blob,
+            "preregistration_commit_sha": prereg,
         }), encoding="utf-8")
         pred = {
             "schema_version": "NFL_M2_V2G_PROSPECTIVE_PREDICTION_V1",
@@ -31,6 +37,9 @@ class NFLV2GProspectiveChainTests(unittest.TestCase):
             "game_id": "2026_02_PIT_NE",
             "candidate_id": "nfl_m2_scoring_event_v2g_candidate",
             "artifact_sha256": artifact,
+            "implementation_commit_sha": implementation,
+            "candidate_source_git_blob_sha1": source_blob,
+            "preregistration_commit_sha": prereg,
             "kickoff_utc": "2026-09-20T17:00:00+00:00",
             "captured_at_utc": "2026-09-12T12:50:13+00:00",
             "market_prices_consumed": False,
@@ -84,6 +93,20 @@ class NFLV2GProspectiveChainTests(unittest.TestCase):
         with self.assertRaises(SystemExit) as ctx:
             mod.validate(self.pred, self.paper, self.policy)
         self.assertIn("NFL_V2G_CHAIN_POLICY_FILE_SHA_MISMATCH", str(ctx.exception))
+
+    def test_wrong_implementation_identity_fails(self):
+        payload = json.loads(self.pred.read_text())
+        payload["implementation_commit_sha"] = "0" * 40
+        payload["prediction_sha256"] = prediction_sha256(payload)
+        self.pred.write_text(json.dumps(payload, sort_keys=True))
+        paper = json.loads(self.paper.read_text())
+        paper["prediction_sha256"] = payload["prediction_sha256"]
+        paper["prediction_file_sha256"] = mod.sha256_file(self.pred)
+        paper["paper_decision_sha256"] = mod.canonical_sha(paper, "paper_decision_sha256")
+        self.paper.write_text(json.dumps(paper))
+        with self.assertRaises(SystemExit) as ctx:
+            mod.validate(self.pred, self.paper, self.policy)
+        self.assertIn("NFL_V2G_CHAIN_POLICY_PROVENANCE_MISMATCH:implementation_commit_sha", str(ctx.exception))
 
 
 if __name__ == "__main__":
