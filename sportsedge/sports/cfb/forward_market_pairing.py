@@ -53,6 +53,7 @@ def _read_snapshot(directory: Path) -> tuple[list[dict[str, Any]], dict[str, Any
     except (OSError, json.JSONDecodeError) as exc:
         raise CFBForwardMarketPairingError("CFB_FORWARD_PAIR_SNAPSHOT_UNREADABLE") from exc
     _require(isinstance(payload, list), "CFB_FORWARD_PAIR_PAYLOAD_LIST_REQUIRED")
+    _require(all(isinstance(x, Mapping) for x in payload), "CFB_FORWARD_PAIR_EVENT_MAPPING_REQUIRED")
     _require(isinstance(meta, dict), "CFB_FORWARD_PAIR_META_OBJECT_REQUIRED")
     _require(meta.get("schema") == SNAPSHOT_SCHEMA, "CFB_FORWARD_PAIR_SNAPSHOT_SCHEMA_INVALID")
     _require(meta.get("source") == "THE_ODDS_API_CURRENT", "CFB_FORWARD_PAIR_SOURCE_INVALID")
@@ -65,7 +66,7 @@ def _read_snapshot(directory: Path) -> tuple[list[dict[str, Any]], dict[str, Any
     _require(meta.get("model_p_created") is False, "CFB_FORWARD_PAIR_MODEL_P_AUTHORITY_FORBIDDEN")
     _require(meta.get("eligibility_changed") is False, "CFB_FORWARD_PAIR_ELIGIBILITY_CHANGE_FORBIDDEN")
     _require(meta.get("paired_market_evidence") is False, "CFB_FORWARD_PAIR_PREDECLARED_PAIRING_FORBIDDEN")
-    return [dict(x) for x in payload if isinstance(x, Mapping)], meta, raw
+    return [dict(x) for x in payload], meta, raw
 
 
 def _group_threshold(market: str, outcomes: list[Mapping[str, Any]]) -> str:
@@ -80,8 +81,9 @@ def _group_threshold(market: str, outcomes: list[Mapping[str, Any]]) -> str:
         unique = {round(x, 10) for x in points}
         _require(len(unique) == 1, "CFB_FORWARD_PAIR_TOTAL_THRESHOLD_INCONSISTENT")
         return f"{next(iter(unique)):g}"
-    # Spread outcomes normally carry opposite signed points. Bind the market to
-    # the absolute original threshold so HOME -3.5 / AWAY +3.5 form one group.
+    # Spread outcomes normally carry opposite signed points. The group threshold
+    # identifies the line magnitude; named-outcome point equality is enforced
+    # separately so a favorite flip cannot masquerade as an original-threshold close.
     unique = {round(abs(x), 10) for x in points}
     _require(len(unique) == 1, "CFB_FORWARD_PAIR_SPREAD_THRESHOLD_INCONSISTENT")
     return f"{next(iter(unique)):g}"
@@ -123,10 +125,16 @@ def _market_index(payload: list[dict[str, Any]]) -> dict[tuple[str, str, str, st
                     price = outcome.get("price")
                     _require(bool(name), "CFB_FORWARD_PAIR_OUTCOME_NAME_REQUIRED")
                     _require(isinstance(price, (int, float)) and not isinstance(price, bool), "CFB_FORWARD_PAIR_PRICE_REQUIRED")
+                    point = outcome.get("point")
+                    if market_key != "h2h":
+                        _require(isinstance(point, (int, float)) and not isinstance(point, bool), f"CFB_FORWARD_PAIR_POINT_REQUIRED:{market_key}")
+                        point = float(point)
+                    else:
+                        point = None
                     normalized.append({
                         "name": name,
                         "price": float(price),
-                        "point": outcome.get("point"),
+                        "point": point,
                     })
                 _require(len({x["name"] for x in normalized}) == 2, "CFB_FORWARD_PAIR_OUTCOME_NAMES_NOT_DISTINCT")
                 index[key] = {
@@ -166,6 +174,9 @@ def pair_snapshots(decision_dir: Path, close_dir: Path) -> dict[str, Any]:
             continue
         if [x["name"] for x in d["outcomes"]] != [x["name"] for x in c["outcomes"]]:
             rejected.append({"identity": list(key), "reason": "OUTCOME_IDENTITY_CHANGED"})
+            continue
+        if [x["point"] for x in d["outcomes"]] != [x["point"] for x in c["outcomes"]]:
+            rejected.append({"identity": list(key), "reason": "OUTCOME_THRESHOLD_CHANGED"})
             continue
         pair = {
             "schema": PAIR_SCHEMA,
