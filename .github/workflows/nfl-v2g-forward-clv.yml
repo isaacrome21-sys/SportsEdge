@@ -1,0 +1,112 @@
+name: nfl-v2g-forward-clv
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '7,17,27,37,47,57 * * * *'
+  pull_request:
+    paths:
+      - 'config/research/nfl_v2g_forward_clv_policy_2026-09-12.json'
+      - 'config/research/nfl_v2g_forward_clv_implementation_freeze_2026-09-12.json'
+      - 'sportsedge/sports/nfl/v2g_forward_clv.py'
+      - 'scripts/run_nfl_v2g_forward_clv.py'
+      - 'tests/test_nfl_v2g_forward_clv.py'
+      - '.github/workflows/nfl-v2g-forward-clv.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('nfl-v2g-forward-clv-pr-{0}', github.event.pull_request.number) || 'sportsedge-paid-odds-api' }}
+  cancel-in-progress: false
+
+jobs:
+  contract-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Verify frozen V2G CLV implementation
+        run: |
+          python - <<'PY'
+          import json, subprocess
+          from pathlib import Path
+          freeze=Path('config/research/nfl_v2g_forward_clv_implementation_freeze_2026-09-12.json')
+          if not freeze.exists():
+              raise SystemExit('NFL_V2G_FORWARD_CLV_IMPLEMENTATION_FREEZE_MISSING')
+          data=json.loads(freeze.read_text())
+          if data.get('schema_version')!='SPORTSEDGE_NFL_V2G_FORWARD_CLV_IMPLEMENTATION_FREEZE_V1' or data.get('status')!='FROZEN_BEFORE_FIRST_WEEK2_MARKET_DECISION':
+              raise SystemExit('NFL_V2G_FORWARD_CLV_IMPLEMENTATION_FREEZE_INVALID')
+          for item in data.get('files',[]):
+              path=str(item['path']); expected=str(item['git_blob_sha1']).lower()
+              actual=subprocess.check_output(['git','hash-object',path],text=True).strip().lower()
+              if actual!=expected:
+                  raise SystemExit(f'NFL_V2G_FORWARD_CLV_CODE_DRIFT:{path}:{actual}:{expected}')
+          for key in ('promotion_authority','may_create_model_p','market_eligibility_changed','truth_gate_pass_granted','official_status_granted'):
+              if data.get(key) is not False:
+                  raise SystemExit(f'NFL_V2G_FORWARD_CLV_AUTHORITY_INVALID:{key}')
+          print('NFL_V2G_FORWARD_CLV_IMPLEMENTATION_FROZEN')
+          PY
+      - name: Compile V2G CLV code
+        run: python -m py_compile sportsedge/sports/nfl/v2g_forward_clv.py scripts/run_nfl_v2g_forward_clv.py
+      - name: Run V2G CLV contract tests
+        run: python -m unittest -q tests.test_nfl_v2g_forward_clv
+
+  forward-cycle:
+    if: github.event_name != 'pull_request'
+    needs: contract-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Restore immutable prospective state
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin data
+          git worktree add --detach .data-v2g origin/data
+          test -d .data-v2g/evidence/nfl_v2g/prospective/predictions/2026 || {
+            echo NFL_V2G_PROSPECTIVE_PREDICTIONS_MISSING >&2
+            exit 78
+          }
+      - name: Run V2G forward CLV cycle
+        env:
+          SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+          SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
+          SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
+          SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
+        run: |
+          python scripts/run_nfl_v2g_forward_clv.py \
+            --prediction-dir .data-v2g/evidence/nfl_v2g/prospective/predictions/2026 \
+            --capture-root data/nfl_2026_confirmation/captures \
+            --state-root .data-v2g/evidence/nfl_v2g/prospective/forward_clv/2026 \
+            --policy config/research/nfl_v2g_forward_clv_policy_2026-09-12.json \
+            --code-git-sha "$GITHUB_SHA"
+      - name: Persist first-write V2G CLV evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          (
+            cd .data-v2g
+            git config user.name sportsedge-v2g-clv-bot
+            git config user.email sportsedge-v2g-clv-bot@users.noreply.github.com
+            git add evidence/nfl_v2g/prospective/forward_clv || true
+            if git diff --cached --quiet; then
+              echo NFL_V2G_NO_NEW_FORWARD_CLV_BYTES
+              exit 0
+            fi
+            git commit -m "evidence: capture NFL V2G forward CLV ${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}"
+            for attempt in 1 2 3 4 5; do
+              if git push origin HEAD:data; then exit 0; fi
+              git fetch origin data
+              git rebase origin/data
+              sleep $((attempt * 2))
+            done
+            exit 98
+          )

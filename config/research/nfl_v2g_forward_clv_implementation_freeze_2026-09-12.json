@@ -1,0 +1,29 @@
+{
+  "schema_version": "SPORTSEDGE_NFL_V2G_FORWARD_CLV_IMPLEMENTATION_FREEZE_V1",
+  "status": "FROZEN_BEFORE_FIRST_WEEK2_MARKET_DECISION",
+  "candidate_id": "nfl_m2_scoring_event_v2g_candidate",
+  "frozen_research_artifact_sha256": "e7e591bf1ee7fbf6332cc6795aa1d7126fce9c6a43ac69c164b1f54433457977",
+  "files": [
+    {
+      "path": "config/research/nfl_v2g_forward_clv_policy_2026-09-12.json",
+      "git_blob_sha1": "4b4448b58ee087ef6c6c1898e10439833b301914"
+    },
+    {
+      "path": "sportsedge/sports/nfl/v2g_forward_clv.py",
+      "git_blob_sha1": "95a7e9b971ae0fa551b42f6e98717df41ccbd041"
+    },
+    {
+      "path": "scripts/run_nfl_v2g_forward_clv.py",
+      "git_blob_sha1": "07e4deb3018e794804445852a2f470d38935e4c5"
+    },
+    {
+      "path": ".github/workflows/nfl-v2g-forward-clv.yml",
+      "git_blob_sha1": "e5d589409978dba9a747ed428cfe50af26ef5194"
+    }
+  ],
+  "promotion_authority": false,
+  "may_create_model_p": false,
+  "market_eligibility_changed": false,
+  "truth_gate_pass_granted": false,
+  "official_status_granted": false
+}

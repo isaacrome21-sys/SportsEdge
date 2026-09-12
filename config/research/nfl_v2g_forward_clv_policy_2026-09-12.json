@@ -1,0 +1,54 @@
+{
+  "schema_version": "SPORTSEDGE_NFL_V2G_FORWARD_CLV_POLICY_V1",
+  "status": "FROZEN_BEFORE_FIRST_WEEK2_MARKET_DECISION",
+  "created_date": "2026-09-12",
+  "candidate_id": "nfl_m2_scoring_event_v2g_candidate",
+  "frozen_research_artifact_sha256": "e7e591bf1ee7fbf6332cc6795aa1d7126fce9c6a43ac69c164b1f54433457977",
+  "prediction_schema_version": "NFL_M2_V2G_PROSPECTIVE_PREDICTION_V1",
+  "first_eligible_week": 2,
+  "bookmaker": "draftkings",
+  "markets": ["spread", "total"],
+  "decision_source": {
+    "contract": "NFL_2026_CONFIRMATION_OPENER",
+    "required_capture_kind": "OPENER",
+    "required_lock_status": ["MATCH", "LOCK_CREATED"],
+    "required_market_status": "OK",
+    "decision_timestamp_field": "retrieved_at_utc",
+    "no_reprice_at_decision": true
+  },
+  "model_probability": {
+    "distribution_semantics": "SUM_FROZEN_V2G_SUPPORT_WEIGHTS",
+    "pushes_are_explicit": true,
+    "clv_probability_semantics": "WIN_CONDITIONAL_ON_NON_PUSH",
+    "market_prices_may_modify_model_probability": false
+  },
+  "selection": {
+    "one_best_side_per_market": true,
+    "ranking_metric": "QUOTED_EXPECTED_VALUE_PER_UNIT_RISKED",
+    "shadow_qualified_rule": "EV_GT_ZERO",
+    "promotion_edge_floor_reference": 0.03,
+    "staking_authority": false
+  },
+  "close_capture": {
+    "window_start_minutes_before_kickoff": 20,
+    "window_end_minutes_before_kickoff": 2,
+    "same_original_decision_threshold_required": true,
+    "headline_or_alternate_market_allowed": true,
+    "missing_original_threshold_status": "INCONCLUSIVE_CLV_REFERENCE_LINE_MISMATCH",
+    "missing_capture_status": "INCONCLUSIVE_MISSING_CAPTURE",
+    "no_backfill": true
+  },
+  "persistence": {
+    "first_write_wins": true,
+    "namespace": "evidence/nfl_v2g/prospective/forward_clv/2026",
+    "raw_close_snapshot_required": true,
+    "exact_code_and_policy_identity_required": true
+  },
+  "historical_data_role": "REUSED_RESEARCH_HISTORY_NOT_FINAL_HOLDOUT",
+  "prospective_outcomes_may_select_or_tune_candidate": false,
+  "promotion_authority": false,
+  "may_create_model_p": false,
+  "market_eligibility_changed": false,
+  "truth_gate_pass_granted": false,
+  "official_status_granted": false
+}
