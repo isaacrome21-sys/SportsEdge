@@ -174,7 +174,12 @@ def collect_one(*, requested_at: str, root: Path = DEFAULT_ROOT, regions: str = 
 
     if raw is None or winning_slot is None:
         provider_codes = sorted({str(a["provider_code"]) for a in attempts if a.get("provider_code")})
-        status = "BLOCKED_PROVIDER_CREDITS" if provider_codes == ["OUT_OF_USAGE_CREDITS"] else "BLOCKED_PROVIDER_AUTH"
+        if provider_codes == ["OUT_OF_USAGE_CREDITS"]:
+            status = "BLOCKED_PROVIDER_CREDITS"
+        elif provider_codes == ["HISTORICAL_UNAVAILABLE_ON_FREE_USAGE_PLAN"]:
+            status = "BLOCKED_PROVIDER_PLAN"
+        else:
+            status = "BLOCKED_PROVIDER_AUTH"
         return {
             "status": status,
             "requested_at": requested,
