@@ -222,7 +222,7 @@ def build_forward_decision_rows(game: Mapping[str, Any], event: Mapping[str, Any
         out.append({
             "decision_ts":captured.isoformat(),"game_start_ts":start.isoformat(),"game_id":game_id,"sport":"nfl","market":market,"side":canonical,"book":NFL_FORWARD_BOOK,
             "line_at_decision":s["line"],"price_at_decision":s["price"],"model_prob":s["win"],"model_push_prob":s["push"],"model_loss_prob":s["loss"],
-            "novig_prob":_novig(s["price"],s["other"]),"ev":s["ev"],"kelly_frac":s["kelly"],"stake_units":s["kelly"],
+            "novig_prob":_novig(s["price"],s["other"]),"ev":s["ev"],"kelly_frac":s["kelly"],"stake_units":0.0,
             "gate_result":"SHADOW_QUALIFIED" if float(s["ev"]) > 0 else "REJECTED_NO_POSITIVE_EV","selection_contract":NFL_FORWARD_SELECTION_CONTRACT,
             "provider_event_id":str(event["id"]),"provider_event_snapshot_sha256":event_hash,"provider_home_team":ph,"provider_away_team":pa,"provider_side_name":s["provider_name"],**ids,
         })
