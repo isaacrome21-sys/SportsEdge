@@ -13,44 +13,55 @@
   "structural_blockers": [
     "STARTING_QB_HARD_WIRED",
     "CFB_BLOWOUT_SUBSTITUTION_UNMODELED",
-    "SKILL_PLAYER_LEASH_UNMODELED"
+    "SKILL_PLAYER_LEASH_UNMODELED",
+    "STATIC_SNAP_ROUTE_ASSUMPTIONS_UNVALIDATED_FOR_CFB"
   ],
   "required_predictive_scope": [
     "starting_qb_retention_and_backup_entry",
-    "skill_player_snap_retention",
-    "route_participation_retention",
-    "rush_target_red_zone_usage_under_game_state"
+    "skill_player_opportunity_retention",
+    "rush_target_red_zone_allocation_under_game_state",
+    "cfb_specific_allocator_replacing_unvalidated_static_snap_route_assumptions"
   ],
   "required_state_inputs": [
     "quarter",
     "clock_seconds_remaining",
-    "score_margin_from_possession_team_perspective"
+    "score_margin_from_possession_team_perspective",
+    "yards_to_endzone"
   ],
   "training_source_requirements": {
     "point_in_time_mode": "FORWARD_CAPTURE_ONLY",
     "retroactive_backfill_allowed": false,
-    "market_data_allowed": false,
+    "market_data_allowed_in_model_input": false,
     "required_datasets": [
       "play_by_play",
       "play_participants",
       "player_box",
       "game_rosters"
     ],
-    "capture_contract": "CFB_PARTICIPATION_SOURCE_CAPTURE_V1",
+    "capture_contract": "CFB_PARTICIPATION_SOURCE_CAPTURE_V2",
     "readiness_contract": "CFB_PARTICIPATION_PIT_READINESS_V1",
+    "play_by_play_raw_policy": {
+      "raw_market_data_present": true,
+      "raw_predictive_input_allowed": false,
+      "required_projection_contract": "CFB_PBP_MARKET_BLIND_PROJECTION_V1",
+      "projection_method": "EXACT_COLUMN_ALLOWLIST",
+      "projection_market_data_allowed": false
+    },
     "persist_branch": "data",
     "persist_path_prefix": "history/cfb/forward-participation"
   },
   "required_evidence": [
     "point_in_time_training_source_manifest",
     "deterministic_same_source_same_sha_replay",
-    "independent_forward_holdout",
+    "independent_forward_holdout_strictly_after_training_snapshot",
     "artifact_bound_validation_report"
   ],
   "notes": [
     "The shared Engine B currently attributes every pass to the declared starting quarterback and does not model CFB backup entry or blowout-driven player leashes.",
+    "The upstream SportsDataverse play_by_play release contains sportsbook-derived and spread-influenced fields. Raw PBP is provenance-only; only the exact market-blind allowlist projection may enter participation-model materialization.",
     "The participation training clock starts only with prospective immutable captures. Existing team-level forward PIT snapshots and current release files cannot be relabeled as historical player-participation PIT evidence.",
+    "Independent forward-holdout games must start strictly after the frozen training snapshot; the snapshot itself cannot certify earlier decisions.",
     "This registry is an engine-activation prerequisite only. It cannot create Model_P, an empirical edge floor, certification, or OFFICIAL eligibility by itself.",
-    "Sportsbook prices, public betting, capper opinions, and closing lines are forbidden as participation-model features."
+    "Sportsbook prices, public betting, capper opinions, closing lines, and spread-derived PBP fields are forbidden as participation-model features."
   ]
 }
