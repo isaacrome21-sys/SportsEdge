@@ -23,6 +23,41 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Verify frozen prospective capture implementation
+        run: |
+          python - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+
+          path = Path('config/research/nfl_v2g_forward_capture_freeze_2026-09-12.json')
+          freeze = json.loads(path.read_text(encoding='utf-8'))
+          if freeze.get('schema_version') != 'SPORTSEDGE_NFL_V2G_FORWARD_CAPTURE_FREEZE_V1':
+              raise SystemExit('NFL_V2G_FORWARD_CAPTURE_FREEZE_SCHEMA_INVALID')
+          if freeze.get('status') != 'FROZEN_BEFORE_FIRST_PROSPECTIVE_PREDICTION':
+              raise SystemExit('NFL_V2G_FORWARD_CAPTURE_FREEZE_STATUS_INVALID')
+          for path_key, blob_key in (
+              ('capture_module_path', 'capture_module_git_blob_sha1'),
+              ('capture_runner_path', 'capture_runner_git_blob_sha1'),
+          ):
+              source = str(freeze.get(path_key) or '')
+              expected = str(freeze.get(blob_key) or '').lower()
+              actual = subprocess.check_output(['git', 'hash-object', source], text=True).strip().lower()
+              if actual != expected:
+                  raise SystemExit(f'NFL_V2G_FORWARD_CAPTURE_CODE_DRIFT:{source}:{actual}:{expected}')
+          correction = json.loads(Path('config/research/nfl_v2g_artifact_freeze_correction_2026-09-12.json').read_text())
+          expected_artifact = str(freeze.get('frozen_research_artifact_sha256') or '').lower()
+          actual_artifact = str((correction.get('source_bound_research_artifact') or {}).get('artifact_sha256') or '').lower()
+          if actual_artifact != expected_artifact:
+              raise SystemExit('NFL_V2G_FORWARD_CAPTURE_ARTIFACT_FREEZE_MISMATCH')
+          if correction.get('candidate_id') != freeze.get('candidate_id'):
+              raise SystemExit('NFL_V2G_FORWARD_CAPTURE_CANDIDATE_FREEZE_MISMATCH')
+          for key in ('promotion_authority', 'may_create_model_p', 'market_eligibility_changed', 'truth_gate_pass_granted', 'official_status_granted'):
+              if freeze.get(key) is not False:
+                  raise SystemExit(f'NFL_V2G_FORWARD_CAPTURE_AUTHORITY_INVALID:{key}')
+          print(json.dumps({'status': 'NFL_V2G_FORWARD_CAPTURE_IMPLEMENTATION_FROZEN', 'artifact_sha256': expected_artifact}, sort_keys=True))
+          PY
+
       - name: Run prospective capture contract tests
         run: python -m unittest -q tests.test_nfl_m2_v2g_forward
 
