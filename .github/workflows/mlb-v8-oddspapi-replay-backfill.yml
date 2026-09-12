@@ -15,10 +15,6 @@ on:
         description: Maximum checkpoint batches this run
         required: false
         default: '30'
-  push:
-    branches: [main]
-    paths:
-      - 'runtime/mlb-v8-replay-control/trigger-oddspapi-corrected.txt'
 
 permissions:
   contents: write
@@ -33,9 +29,9 @@ jobs:
     timeout-minutes: 300
     env:
       SPORTSEDGE_ODDSPAPI_KEY: ${{ secrets.SPORTSEDGE_ODDSAPI_KEY }}
-      BOOKMAKERS: ${{ inputs.bookmakers || 'pinnacle,draftkings,fanduel' }}
-      BATCH_SIZE: ${{ inputs.batch_size || '120' }}
-      MAX_BATCHES: ${{ inputs.max_batches || '30' }}
+      BOOKMAKERS: ${{ inputs.bookmakers }}
+      BATCH_SIZE: ${{ inputs.batch_size }}
+      MAX_BATCHES: ${{ inputs.max_batches }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
