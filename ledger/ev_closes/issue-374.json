@@ -1,0 +1,15 @@
+{
+  "attempt_count": 1,
+  "content_sha256": "dc6d43d7e77cb18ad9207527a0bdba726f61ad14fb65f1c1f5c021f1f076d634",
+  "finalized_at": "2026-09-12T18:36:13Z",
+  "git_ref": "refs/heads/main",
+  "git_sha": "92bac8f092d22f4a1823176a7cb1da6b79210020",
+  "last_reason": "BUDGET_RESERVE_REACHED",
+  "play_id": "issue-374",
+  "policy_id": "EV_TRACKER_POLICY_V2",
+  "record_type": "FINAL_CLOSE",
+  "run_id": "34711684802",
+  "schema_version": 2,
+  "selection": "LAST_USABLE_PRE_START_ATTEMPT",
+  "status": "CLOSE_MISSED"
+}
