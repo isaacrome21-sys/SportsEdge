@@ -17,8 +17,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: nfl-v2g-prospective-evaluation
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'pull_request' && format('nfl-v2g-prospective-evaluation-pr-{0}', github.event.pull_request.number) || 'nfl-v2g-prospective-evaluation-persist' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   contract-test:
@@ -62,30 +62,33 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
-      - name: Restore prospective evidence state
+      - name: Restore immutable prospective evidence state
         shell: bash
         run: |
           set -euo pipefail
           git fetch origin data
           git worktree add --detach .data-v2g origin/data
-          mkdir -p artifacts/football/v2g/outcomes
-      - name: Fetch exact current NFL outcome source bytes
-        shell: bash
-        run: |
-          set -euo pipefail
-          curl --fail --location --silent --show-error --retry 5 --retry-delay 2 --retry-all-errors --connect-timeout 30 \
-            'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv' \
-            -o artifacts/football/v2g/outcomes/games.csv
-          sha256sum artifacts/football/v2g/outcomes/games.csv
-      - name: Settle mature games and materialize fixed checkpoints
+          test -d .data-v2g/evidence/nfl_v2g/prospective/forward_clv/2026 || { echo NFL_V2G_FORWARD_CLV_STATE_MISSING >&2; exit 78; }
+          test -d .data-v2g/evidence/nfl_v2g/prospective/market_bindings/2026 || { echo NFL_V2G_MARKET_BINDINGS_MISSING >&2; exit 78; }
+          mkdir -p .data-v2g/evidence/nfl_v2g/prospective/outcomes/2026
+          mkdir -p .data-v2g/evidence/nfl_v2g/prospective/evaluation/2026
+      - name: Evaluate canonical outcomes and fixed checkpoints
         run: |
           python scripts/run_nfl_v2g_prospective_evaluation.py \
-            --schedule artifacts/football/v2g/outcomes/games.csv \
             --policy config/research/nfl_v2g_prospective_evaluation_policy_2026-09-12.json \
             --forward-root .data-v2g/evidence/nfl_v2g/prospective/forward_clv/2026 \
             --binding-dir .data-v2g/evidence/nfl_v2g/prospective/market_bindings/2026 \
-            --outcome-root .data-v2g/evidence/nfl_v2g/prospective/outcomes
-      - name: Persist first-write outcomes and checkpoint evidence
+            --canonical-outcome-dir .data-v2g/evidence/nfl_v2g/prospective/outcomes/2026 \
+            --evaluation-root .data-v2g/evidence/nfl_v2g/prospective/evaluation/2026
+      - name: Assert evaluator did not mutate canonical outcomes
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git -C .data-v2g diff --quiet -- evidence/nfl_v2g/prospective/outcomes/2026; then
+            echo NFL_V2G_EVAL_CANONICAL_OUTCOME_MUTATION >&2
+            exit 97
+          fi
+      - name: Persist first-write evaluation and checkpoint evidence
         shell: bash
         run: |
           set -euo pipefail
@@ -93,12 +96,12 @@ jobs:
             cd .data-v2g
             git config user.name sportsedge-v2g-evaluator-bot
             git config user.email sportsedge-v2g-evaluator-bot@users.noreply.github.com
-            git add evidence/nfl_v2g/prospective/outcomes || true
+            git add evidence/nfl_v2g/prospective/evaluation/2026 || true
             if git diff --cached --quiet; then
               echo NFL_V2G_NO_NEW_EVALUATION_BYTES
               exit 0
             fi
-            git commit -m "evidence: settle NFL V2G prospective outcomes ${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}"
+            git commit -m "evidence: evaluate NFL V2G prospective checkpoints ${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}"
             for attempt in 1 2 3 4 5; do
               if git push origin HEAD:data; then exit 0; fi
               git fetch origin data
