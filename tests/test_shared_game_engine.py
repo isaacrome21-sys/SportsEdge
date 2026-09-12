@@ -2,7 +2,12 @@ import unittest
 
 from sportsedge.engine_registry import engine_registry
 from sportsedge.generic_market_engine import generic_market_engine_adapter
-from sportsedge.shared_game_engine import build_shared_game_engine_session, score_distribution_sha256
+from sportsedge.shared_game_engine import (
+    SharedGameEngineError,
+    V8_PRIMARY_GAME_MIN_SIMULATIONS,
+    build_shared_game_engine_session,
+    score_distribution_sha256,
+)
 from sportsedge.v7_distribution import simulate_game_distribution
 
 
@@ -17,6 +22,21 @@ class SharedGameEngineStage1Tests(unittest.TestCase):
             "simulations": 2000,
         }
 
+    def test_production_floor_rejects_runtime_downshift(self):
+        engine = build_shared_game_engine_session()
+        with self.assertRaisesRegex(SharedGameEngineError, str(V8_PRIMARY_GAME_MIN_SIMULATIONS)):
+            engine({
+                **self.base_input(),
+                "simulations": V8_PRIMARY_GAME_MIN_SIMULATIONS - 1,
+                "market": "MONEYLINE",
+                "line": 0.0,
+                "side": "HOME",
+            })
+
+    def test_test_floor_override_requires_injected_simulator(self):
+        with self.assertRaisesRegex(SharedGameEngineError, "requires injected simulator"):
+            build_shared_game_engine_session(_minimum_simulations_for_test=1000)
+
     def test_one_distribution_is_reused_for_ml_rl_totals(self):
         calls = []
 
@@ -24,7 +44,9 @@ class SharedGameEngineStage1Tests(unittest.TestCase):
             calls.append(dict(kwargs))
             return simulate_game_distribution(**kwargs)
 
-        engine = build_shared_game_engine_session(simulator=counting_simulator)
+        engine = build_shared_game_engine_session(
+            simulator=counting_simulator, _minimum_simulations_for_test=1000
+        )
         base = self.base_input()
         outputs = [
             engine({**base, "market": "MONEYLINE", "line": 0.0, "side": "HOME"}),
@@ -47,21 +69,18 @@ class SharedGameEngineStage1Tests(unittest.TestCase):
             calls.append(dict(kwargs))
             return simulate_game_distribution(**kwargs)
 
-        engine = build_shared_game_engine_session(simulator=counting_simulator)
+        engine = build_shared_game_engine_session(
+            simulator=counting_simulator, _minimum_simulations_for_test=1000
+        )
         base = self.base_input()
         over_85 = engine({**base, "market": "TOTALS", "line": 8.5, "side": "OVER"})
         under_95 = engine({**base, "market": "TOTALS", "line": 9.5, "side": "UNDER"})
 
-        # The stochastic build happens once and receives none of the sportsbook
-        # proposition identity. The legacy simulator still requires total_line,
-        # so the shared engine supplies a neutral constant rather than the book line.
         self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0]["total_line"], 0.0)
         for forbidden in ("market", "line", "side", "team_side", "american_odds", "sportsbook_price"):
             self.assertNotIn(forbidden, calls[0])
 
-        # The proposition changes only the downstream readout. Stochastic identity
-        # and the frozen score distribution remain byte-identical.
         self.assertEqual(over_85["distribution_sha256"], under_95["distribution_sha256"])
         self.assertEqual(over_85["model_input_hash"], under_95["model_input_hash"])
         self.assertNotEqual(over_85["readout_sha256"], under_95["readout_sha256"])
@@ -88,7 +107,9 @@ class SharedGameEngineStage1Tests(unittest.TestCase):
             calls.append(dict(kwargs))
             return simulate_game_distribution(**kwargs)
 
-        engine = build_shared_game_engine_session(simulator=counting_simulator)
+        engine = build_shared_game_engine_session(
+            simulator=counting_simulator, _minimum_simulations_for_test=1000
+        )
         base = self.base_input()
         first = engine({**base, "market": "MONEYLINE", "line": 0.0, "side": "HOME"})
         second = engine({**base, "feature_source_hash": "source-v2", "market": "MONEYLINE", "line": 0.0, "side": "HOME"})
@@ -97,7 +118,12 @@ class SharedGameEngineStage1Tests(unittest.TestCase):
         self.assertNotEqual(first["distribution_sha256"], second["distribution_sha256"])
 
     def test_stage1_readouts_match_incumbent_probabilities(self):
-        shared = build_shared_game_engine_session()
+        def test_simulator(**kwargs):
+            return simulate_game_distribution(**kwargs)
+
+        shared = build_shared_game_engine_session(
+            simulator=test_simulator, _minimum_simulations_for_test=1000
+        )
         base = self.base_input()
         cases = (
             {"market": "MONEYLINE", "line": 0.0, "side": "HOME"},
