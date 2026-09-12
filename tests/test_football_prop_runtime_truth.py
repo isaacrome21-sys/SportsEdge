@@ -12,11 +12,16 @@ CFB_CERTIFIED_SHA = "923cfd1be42d31a87d9f31ddffce406d44bfc1bb003d1c625f5a4258f77
 
 
 class FootballPropRuntimeTruthTests(unittest.TestCase):
-    def test_checked_in_football_prop_artifacts_are_frozen_and_evidence_gated(self):
-        nfl = require_executable_prop_surface("NFL", path=SURFACE)
-        self.assertEqual(nfl["runtime_state"], "ARTIFACT_FROZEN_EVIDENCE_GATED")
-        self.assertEqual(nfl["frozen_artifact_sha256"], NFL_CERTIFIED_SHA)
-        self.assertEqual(nfl["readiness_state"], "REGISTRY_DERIVED")
+    def test_checked_in_football_prop_artifacts_remain_truthful_without_granting_nfl_engine_authority(self):
+        surface = json.loads(SURFACE.read_text(encoding="utf-8"))
+        self.assertEqual(surface["sports"]["NFL"]["engine_state"], "NO_ENGINE")
+        with self.assertRaisesRegex(FootballPropSurfaceError, "FOOTBALL_PROP_ENGINE_NOT_IMPLEMENTED:NFL"):
+            require_executable_prop_surface("NFL", path=SURFACE)
+
+        nfl_registry = json.loads((ROOT / "config/nfl_prop_model_freeze.json").read_text(encoding="utf-8"))
+        self.assertEqual(nfl_registry["status"], "FROZEN")
+        self.assertEqual(nfl_registry["artifact_sha256"], NFL_CERTIFIED_SHA)
+        self.assertFalse(nfl_registry["promotion_authority"])
 
         cfb = require_executable_prop_surface("CFB", path=SURFACE)
         self.assertEqual(cfb["runtime_state"], "ARTIFACT_FROZEN_EVIDENCE_GATED")
@@ -33,25 +38,24 @@ class FootballPropRuntimeTruthTests(unittest.TestCase):
         self.assertTrue(governance["paired_price_required_for_devig"])
         self.assertNotIn("requires_paired_price_for_market_economics", governance)
 
-    def test_frozen_registry_requires_real_sha(self):
+    def test_executable_frozen_registry_requires_real_sha(self):
         payload = json.loads(SURFACE.read_text(encoding="utf-8"))
         with tempfile.TemporaryDirectory() as td:
             config = Path(td) / "config"; config.mkdir()
             (config / "football_prop_engine_surface.json").write_text(json.dumps(payload), encoding="utf-8")
-            for sport in ("nfl", "cfb"):
-                (config / f"{sport}_prop_model_freeze.json").write_text(json.dumps({"sport": sport.upper(), "status": "FROZEN", "artifact_sha256": None}), encoding="utf-8")
-            with self.assertRaisesRegex(FootballPropSurfaceError, "FOOTBALL_PROP_FROZEN_ARTIFACT_SHA_INVALID:NFL"):
-                require_executable_prop_surface("NFL", path=config / "football_prop_engine_surface.json")
+            (config / "cfb_prop_model_freeze.json").write_text(json.dumps({"sport": "CFB", "status": "FROZEN", "artifact_sha256": None}), encoding="utf-8")
+            with self.assertRaisesRegex(FootballPropSurfaceError, "FOOTBALL_PROP_FROZEN_ARTIFACT_SHA_INVALID:CFB"):
+                require_executable_prop_surface("CFB", path=config / "football_prop_engine_surface.json")
 
-    def test_registry_state_is_derived_not_hard_coded(self):
+    def test_executable_registry_state_is_derived_not_hard_coded(self):
         payload = json.loads(SURFACE.read_text(encoding="utf-8"))
         with tempfile.TemporaryDirectory() as td:
             config = Path(td) / "config"; config.mkdir()
             surface_path = config / "football_prop_engine_surface.json"
             surface_path.write_text(json.dumps(payload), encoding="utf-8")
             digest = "a" * 64
-            (config / "nfl_prop_model_freeze.json").write_text(json.dumps({"sport": "NFL", "status": "FROZEN", "artifact_sha256": digest}), encoding="utf-8")
-            spec = require_executable_prop_surface("NFL", path=surface_path)
+            (config / "cfb_prop_model_freeze.json").write_text(json.dumps({"sport": "CFB", "status": "FROZEN", "artifact_sha256": digest}), encoding="utf-8")
+            spec = require_executable_prop_surface("CFB", path=surface_path)
             self.assertEqual(spec["runtime_state"], "ARTIFACT_FROZEN_EVIDENCE_GATED")
             self.assertEqual(spec["frozen_artifact_sha256"], digest)
 
