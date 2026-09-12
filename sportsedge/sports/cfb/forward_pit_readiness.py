@@ -33,6 +33,21 @@ def _parse_time(value: Any, label: str) -> datetime:
     return parsed
 
 
+def _retrieval_after_capture(retrieved: datetime, captured: datetime, captured_raw: Any) -> bool:
+    """Compare timestamps without inventing precision absent from the capture record.
+
+    Legacy forward snapshots stored ``captured_at_utc`` only to whole seconds even
+    though source retrieval timestamps retained microseconds. For those records the
+    capture instant is an interval covering that represented second, so retrievals
+    within the same second are not evidence of post-capture acquisition. New
+    captures retain fractional seconds and are compared at their recorded precision.
+    """
+    text = str(captured_raw or "")
+    if "." not in text:
+        return retrieved.replace(microsecond=0) > captured
+    return retrieved > captured
+
+
 def _is_sha256(value: Any) -> bool:
     text = str(value or "").lower()
     return len(text) == 64 and all(ch in "0123456789abcdef" for ch in text)
@@ -114,8 +129,9 @@ def audit_cfb_forward_pit_snapshot(classification_path: Path) -> dict[str, Any]:
     if not isinstance(season, int) or isinstance(season, bool) or not (2000 <= season <= 2100):
         reasons.append("SEASON_INVALID")
 
+    captured_raw = payload.get("captured_at_utc")
     try:
-        captured_at = _parse_time(payload.get("captured_at_utc"), "CAPTURE_TIME")
+        captured_at = _parse_time(captured_raw, "CAPTURE_TIME")
     except CFBForwardPITError as exc:
         reasons.append(str(exc))
         captured_at = None
@@ -153,7 +169,7 @@ def audit_cfb_forward_pit_snapshot(classification_path: Path) -> dict[str, Any]:
 
         try:
             retrieved = _parse_time(asset.get("source_retrieved_at"), "SOURCE_RETRIEVED_AT")
-            if captured_at is not None and retrieved > captured_at:
+            if captured_at is not None and _retrieval_after_capture(retrieved, captured_at, captured_raw):
                 asset_errors.append(f"{label}:RETRIEVAL_AFTER_CAPTURE")
         except CFBForwardPITError as exc:
             asset_errors.append(f"{label}:{exc}")
