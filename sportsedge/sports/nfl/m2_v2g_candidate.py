@@ -18,17 +18,9 @@ NFL_M2_V2G_DISTRIBUTION_CONTRACT = "NFL_M2_V2G_STRUCTURAL_SCORING_EVENT_V1"
 NFL_M2_V2G_EVENT_CONTRACT = "NFL_M2_V2G_POSSESSION_EVENT_ROWS_V1"
 
 _MARKET_FIELDS = {
-    "spread_line",
-    "total_line",
-    "moneyline",
-    "home_moneyline",
-    "away_moneyline",
-    "home_spread_odds",
-    "away_spread_odds",
-    "over_odds",
-    "under_odds",
-    "closing_spread",
-    "closing_total",
+    "spread_line", "total_line", "moneyline", "home_moneyline", "away_moneyline",
+    "home_spread_odds", "away_spread_odds", "over_odds", "under_odds",
+    "closing_spread", "closing_total",
 }
 
 
@@ -88,13 +80,11 @@ def build_nfl_v2g_game_event_rows(
     schedule_rows: Iterable[Mapping[str, Any]],
     pbp_rows: Iterable[Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Collapse manifest-bound play-by-play into possession scoring-event rows.
+    """Collapse manifest-bound play-by-play into offensive possession event rows.
 
-    A unique ``(game_id, posteam, drive)`` is one offensive possession. A drive is
-    TOUCHDOWN when at least one offensive play is marked touchdown, otherwise
-    FIELD_GOAL when it contains a made field goal, otherwise OTHER_NO_SCORE.
-    Defensive scores are not credited to the offense because grouping is by the
-    play's possession team.
+    A touchdown is credited only when the source explicitly reports the scoring
+    team and that team equals ``posteam``. This prevents defensive/return scores
+    from being mislabeled as offensive scoring drives.
     """
     schedule: dict[str, dict[str, Any]] = {}
     for raw in schedule_rows:
@@ -129,7 +119,9 @@ def build_nfl_v2g_game_event_rows(
         key = (game_id, posteam, drive)
         state = possessions.setdefault(key, {"touchdown": False, "field_goal": False})
         if _truthy_one(row.get("touchdown")):
-            state["touchdown"] = True
+            td_team = str(row.get("td_team") or "").strip()
+            if td_team and td_team == posteam:
+                state["touchdown"] = True
         play_type = str(row.get("play_type") or "").strip().lower()
         field_goal_result = str(row.get("field_goal_result") or "").strip().lower()
         if play_type == "field_goal" and field_goal_result == "made":
@@ -178,14 +170,8 @@ def build_nfl_v2g_game_event_rows(
             "away_other_no_score": away_events["other_no_score"],
         }
         for field in (
-            "home_score",
-            "away_score",
-            "spread_line",
-            "total_line",
-            "home_spread_odds",
-            "away_spread_odds",
-            "over_odds",
-            "under_odds",
+            "home_score", "away_score", "spread_line", "total_line",
+            "home_spread_odds", "away_spread_odds", "over_odds", "under_odds",
         ):
             if field in game:
                 row[field] = game[field]
@@ -225,7 +211,6 @@ def fit_nfl_m2_v2g_candidate(
     max_touchdowns: int = 9,
     max_field_goals: int = 9,
 ) -> NFLM2V2GCandidateModel:
-    """Fit market-blind scoring rates from training possession-event rows only."""
     data = [dict(row) for row in rows]
     if len(data) < 2:
         raise ValueError("NFL_M2_V2G_TRAINING_ROWS_INSUFFICIENT")
@@ -267,13 +252,9 @@ def fit_nfl_m2_v2g_candidate(
     league_drives = totals["drives"] / float(totals["games"])
     states = {
         team: NFLV2GTeamState(
-            games=value["games"],
-            drives=value["drives"],
-            touchdowns=value["td"],
-            field_goals=value["fg"],
-            drives_faced=value["faced"],
-            touchdowns_allowed=value["td_allowed"],
-            field_goals_allowed=value["fg_allowed"],
+            games=value["games"], drives=value["drives"], touchdowns=value["td"],
+            field_goals=value["fg"], drives_faced=value["faced"],
+            touchdowns_allowed=value["td_allowed"], field_goals_allowed=value["fg_allowed"],
         )
         for team, value in sorted(mutable.items())
     }
@@ -311,7 +292,6 @@ def _team_projection(model: NFLM2V2GCandidateModel, offense: str, defense: str) 
         scale = 0.98 / (td_rate + fg_rate)
         td_rate *= scale
         fg_rate *= scale
-
     off_drives = off.drives / float(off.games) if off.games else model.league_drives_per_team_game
     def_drives = deff.drives_faced / float(deff.games) if deff.games else model.league_drives_per_team_game
     expected_drives = max(1.0, (off_drives + def_drives + model.league_drives_per_team_game) / 3.0)
@@ -347,7 +327,6 @@ def derive_nfl_m2_v2g_score_distribution(
     model: NFLM2V2GCandidateModel,
     row: Mapping[str, Any],
 ) -> tuple[dict[str, float | int], ...]:
-    """Generate a joint score distribution without consuming any market field."""
     if model.model_id != NFL_M2_V2G_CANDIDATE_MODEL_ID:
         raise ValueError("NFL_M2_V2G_MODEL_IDENTITY_INVALID")
     if model.distribution_contract != NFL_M2_V2G_DISTRIBUTION_CONTRACT:
@@ -356,18 +335,13 @@ def derive_nfl_m2_v2g_score_distribution(
     away = str(row.get("away_team") or "").strip()
     if not home or not away or home == away:
         raise ValueError("NFL_M2_V2G_PREDICTION_IDENTITY_INVALID")
-
-    # Deliberately read only team identity from prediction rows. Market fields may
-    # be present for downstream evaluation, but they cannot affect the model PMF.
     _ = tuple(field for field in _MARKET_FIELDS if field in row)
     home_scores = _team_score_distribution(model, home, away)
     away_scores = _team_score_distribution(model, away, home)
     distribution = tuple(
         {
-            "home_score": int(home_score),
-            "away_score": int(away_score),
-            "margin": int(home_score - away_score),
-            "total": int(home_score + away_score),
+            "home_score": int(home_score), "away_score": int(away_score),
+            "margin": int(home_score - away_score), "total": int(home_score + away_score),
             "weight": float(home_prob * away_prob),
         }
         for home_score, home_prob in home_scores.items()
