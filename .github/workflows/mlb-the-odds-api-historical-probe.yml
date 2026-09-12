@@ -1,0 +1,106 @@
+name: mlb-the-odds-api-historical-probe
+
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: ISO8601 historical snapshot request time, e.g. 2026-06-05T22:35:00Z
+        required: true
+        type: string
+      markets:
+        description: Featured markets only
+        required: false
+        default: h2h,spreads,totals
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sportsedge-paid-odds-api
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Verify collector contracts
+        run: |
+          set -euo pipefail
+          python scripts/collect_mlb_the_odds_api_history.py --self-test
+          python -m unittest -q tests.test_collect_mlb_the_odds_api_history tests.test_mlb_the_odds_api_history
+
+      - name: Require The Odds API credential
+        run: |
+          set -euo pipefail
+          if [ -z "${SPORTSEDGE_ODDS_API_KEY:-}" ]; then
+            echo 'SPORTSEDGE_ODDS_API_KEY is not configured' >&2
+            exit 78
+          fi
+
+      - name: Restore durable historical snapshots from data
+        run: |
+          set -euo pipefail
+          git fetch origin data
+          git worktree add --detach .data-todds origin/data
+          if [ -d .data-todds/evidence/mlb_v8_replay_sources/THE_ODDS_API_HISTORICAL ]; then
+            mkdir -p artifacts/mlb_v8_replay_sources/THE_ODDS_API_HISTORICAL
+            cp -R .data-todds/evidence/mlb_v8_replay_sources/THE_ODDS_API_HISTORICAL/. artifacts/mlb_v8_replay_sources/THE_ODDS_API_HISTORICAL/
+          fi
+
+      - name: Collect exact historical snapshot
+        run: |
+          set -euo pipefail
+          python scripts/collect_mlb_the_odds_api_history.py \
+            --date '${{ inputs.date }}' \
+            --markets '${{ inputs.markets }}' \
+            | tee /tmp/the_odds_api_historical_result.json
+
+      - name: Persist immutable provider bytes to data
+        run: |
+          set -euo pipefail
+          SRC=artifacts/mlb_v8_replay_sources/THE_ODDS_API_HISTORICAL
+          DST=.data-todds/evidence/mlb_v8_replay_sources/THE_ODDS_API_HISTORICAL
+          test -d "$SRC"
+          mkdir -p "$DST"
+          cp -R "$SRC"/. "$DST"/
+          (
+            cd .data-todds
+            git config user.name sportsedge-mlb-history-bot
+            git config user.email sportsedge-mlb-history-bot@users.noreply.github.com
+            git add evidence/mlb_v8_replay_sources/THE_ODDS_API_HISTORICAL
+            if git diff --cached --quiet; then
+              echo 'MLB_TODDS_NO_NEW_PROVIDER_BYTES'
+              exit 0
+            fi
+            git commit -m "evidence: archive The Odds API MLB historical snapshot ${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}"
+            for attempt in 1 2 3 4 5; do
+              if git push origin HEAD:data; then
+                exit 0
+              fi
+              git fetch origin data
+              git rebase origin/data
+              sleep $((attempt * 2))
+            done
+            exit 98
+          )
+
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mlb-the-odds-api-history-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            /tmp/the_odds_api_historical_result.json
+            artifacts/mlb_v8_replay_sources/THE_ODDS_API_HISTORICAL
+          if-no-files-found: warn
+          retention-days: 30
