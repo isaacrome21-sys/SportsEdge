@@ -1,0 +1,23 @@
+name: mlb-provider-acceptance-dispatch-once
+
+on:
+  push:
+    paths:
+      - '.github/trigger-mlb-provider-acceptance-once'
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch provider acceptance probe
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run archive-provider-acceptance-probe.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main
