@@ -26,6 +26,9 @@ jobs:
     timeout-minutes: 15
     env:
       SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+      SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
+      SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
+      SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
@@ -39,11 +42,11 @@ jobs:
           python scripts/collect_mlb_the_odds_api_history.py --self-test
           python -m unittest -q tests.test_collect_mlb_the_odds_api_history tests.test_mlb_the_odds_api_history
 
-      - name: Require The Odds API credential
+      - name: Require at least one The Odds API credential
         run: |
           set -euo pipefail
-          if [ -z "${SPORTSEDGE_ODDS_API_KEY:-}" ]; then
-            echo 'SPORTSEDGE_ODDS_API_KEY is not configured' >&2
+          if [ -z "${SPORTSEDGE_ODDS_API_KEY:-}${SPORTSEDGE_ODDS_API_KEY_2:-}${SPORTSEDGE_ODDS_API_KEY_3:-}${SPORTSEDGE_ODDS_API_KEY_4:-}" ]; then
+            echo 'No SPORTSEDGE_ODDS_API_KEY slot is configured' >&2
             exit 78
           fi
 
