@@ -10,6 +10,9 @@ from typing import Any, Mapping
 from .participation_source_capture import (
     PARTICIPATION_CAPTURE_CONTRACT,
     PARTICIPATION_DATASETS,
+    PBP_PREDICTIVE_COLUMNS,
+    PBP_PROJECTION_CONTRACT,
+    PBP_SOURCE_TO_CANONICAL,
 )
 
 SNAPSHOT_SCHEMA = "CFB_FORWARD_PARTICIPATION_CAPTURE_V1"
@@ -60,6 +63,79 @@ def _load_json(path: Path, code: str) -> dict[str, Any]:
     if not isinstance(payload, Mapping):
         raise CFBParticipationPITError(code)
     return dict(payload)
+
+
+def _file_sha256(path: Path) -> str:
+    digest = sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _projection_blockers(
+    *, dataset: str, projection: Any, source_root: Path, content_sha: str
+) -> list[str]:
+    blockers: list[str] = []
+    if dataset != "play_by_play":
+        if projection is not None:
+            blockers.append(f"CFB_PARTICIPATION_UNEXPECTED_PROJECTION:{dataset}")
+        return blockers
+    if not isinstance(projection, Mapping):
+        return ["CFB_PARTICIPATION_PBP_PROJECTION_REQUIRED"]
+    if projection.get("contract") != PBP_PROJECTION_CONTRACT:
+        blockers.append("CFB_PARTICIPATION_PBP_PROJECTION_CONTRACT_INVALID")
+    if projection.get("raw_market_data_present") is not True:
+        blockers.append("CFB_PARTICIPATION_PBP_RAW_MARKET_FLAG_REQUIRED")
+    if projection.get("market_data_in_projection") is not False:
+        blockers.append("CFB_PARTICIPATION_PBP_PROJECTION_MARKET_CONTAMINATION")
+    if projection.get("raw_predictive_input_allowed") is not False:
+        blockers.append("CFB_PARTICIPATION_PBP_RAW_PREDICTIVE_INPUT_FORBIDDEN")
+    if projection.get("projection_predictive_input_allowed") is not True:
+        blockers.append("CFB_PARTICIPATION_PBP_PROJECTION_NOT_AUTHORIZED")
+    if projection.get("model_p_created") is not False or projection.get("promotion_authority") is not False:
+        blockers.append("CFB_PARTICIPATION_PBP_PROJECTION_AUTHORITY_FORBIDDEN")
+    if str(projection.get("source_content_sha256") or "").lower() != content_sha:
+        blockers.append("CFB_PARTICIPATION_PBP_PROJECTION_SOURCE_SHA_MISMATCH")
+    if list(projection.get("source_fields") or []) != list(PBP_SOURCE_TO_CANONICAL):
+        blockers.append("CFB_PARTICIPATION_PBP_PROJECTION_SOURCE_ALLOWLIST_INVALID")
+    if list(projection.get("predictive_columns") or []) != list(PBP_PREDICTIVE_COLUMNS):
+        blockers.append("CFB_PARTICIPATION_PBP_PROJECTION_COLUMNS_INVALID")
+    try:
+        projection_sha = _hex(
+            projection.get("projection_sha256"),
+            64,
+            "CFB_PARTICIPATION_PBP_PROJECTION_SHA_INVALID",
+        )
+        _hex(
+            projection.get("sanitizer_code_sha256"),
+            64,
+            "CFB_PARTICIPATION_PBP_SANITIZER_SHA_INVALID",
+        )
+    except CFBParticipationPITError as exc:
+        blockers.append(str(exc))
+        projection_sha = None
+    count = projection.get("projection_row_count")
+    if isinstance(count, bool) or not isinstance(count, int) or count <= 0:
+        blockers.append("CFB_PARTICIPATION_PBP_PROJECTION_ROW_COUNT_INVALID")
+    rel = str(projection.get("projection_relative_path") or "").strip()
+    if not rel:
+        blockers.append("CFB_PARTICIPATION_PBP_PROJECTION_PATH_REQUIRED")
+    else:
+        projection_path = source_root / rel
+        if not projection_path.is_file():
+            blockers.append("CFB_PARTICIPATION_PBP_PROJECTION_FILE_MISSING")
+        elif projection_sha is not None and _file_sha256(projection_path) != projection_sha:
+            blockers.append("CFB_PARTICIPATION_PBP_PROJECTION_HASH_MISMATCH")
+        else:
+            try:
+                header = projection_path.open("r", encoding="utf-8-sig").readline().rstrip("\r\n").split(",")
+            except OSError:
+                blockers.append("CFB_PARTICIPATION_PBP_PROJECTION_FILE_UNREADABLE")
+            else:
+                if header != list(PBP_PREDICTIVE_COLUMNS):
+                    blockers.append("CFB_PARTICIPATION_PBP_PROJECTION_HEADER_INVALID")
+    return blockers
 
 
 def audit_cfb_participation_snapshot(
@@ -170,8 +246,7 @@ def audit_cfb_participation_snapshot(
         if not cache_path.is_file() or not manifest_path.is_file():
             blockers.append(f"CFB_PARTICIPATION_SOURCE_BYTES_MISSING:{dataset}")
             continue
-        actual_content = sha256(cache_path.read_bytes()).hexdigest()
-        if actual_content != content_sha:
+        if _file_sha256(cache_path) != content_sha:
             blockers.append(f"CFB_PARTICIPATION_CONTENT_HASH_MISMATCH:{dataset}")
             continue
         try:
@@ -238,27 +313,57 @@ def audit_cfb_participation_snapshot(
         if str(asset.get("asset_name") or "") != str(row.get("asset_name") or ""):
             blockers.append(f"CFB_PARTICIPATION_ASSET_NAME_MISMATCH:{dataset}")
             continue
+        identity_mismatch = False
         for field in ("release_tag", "release_id", "asset_id"):
             if asset.get(field) != row.get(field):
                 blockers.append(f"CFB_PARTICIPATION_ASSET_IDENTITY_MISMATCH:{dataset}:{field}")
+                identity_mismatch = True
                 break
+        if identity_mismatch:
+            continue
+        if manifest.get("contract") != PARTICIPATION_CAPTURE_CONTRACT:
+            blockers.append(f"CFB_PARTICIPATION_MANIFEST_CONTRACT_INVALID:{dataset}")
+            continue
+        if manifest.get("point_in_time_from_retrieval_forward") is not True:
+            blockers.append(f"CFB_PARTICIPATION_MANIFEST_FORWARD_PIT_MISSING:{dataset}")
+            continue
+        if manifest.get("retroactive_point_in_time_claim") is not False:
+            blockers.append(f"CFB_PARTICIPATION_MANIFEST_RETROACTIVE_PIT_FORBIDDEN:{dataset}")
+            continue
+        if manifest.get("model_p_created") is not False or manifest.get("promotion_authority") is not False:
+            blockers.append(f"CFB_PARTICIPATION_MANIFEST_AUTHORITY_FORBIDDEN:{dataset}")
+            continue
+
+        raw_market = manifest.get("raw_market_data_present")
+        raw_allowed = manifest.get("raw_predictive_input_allowed")
+        if row.get("raw_market_data_present") is not raw_market:
+            blockers.append(f"CFB_PARTICIPATION_RAW_MARKET_FLAG_MISMATCH:{dataset}")
+            continue
+        if row.get("raw_predictive_input_allowed") is not raw_allowed:
+            blockers.append(f"CFB_PARTICIPATION_RAW_PREDICTIVE_FLAG_MISMATCH:{dataset}")
+            continue
+        projection = manifest.get("predictive_projection")
+        if row.get("predictive_projection") != projection:
+            blockers.append(f"CFB_PARTICIPATION_PROJECTION_BINDING_MISMATCH:{dataset}")
+            continue
+        if dataset == "play_by_play":
+            if raw_market is not True or raw_allowed is not False:
+                blockers.append("CFB_PARTICIPATION_PBP_RAW_SOURCE_POLICY_INVALID")
+                continue
         else:
-            if manifest.get("contract") != PARTICIPATION_CAPTURE_CONTRACT:
-                blockers.append(f"CFB_PARTICIPATION_MANIFEST_CONTRACT_INVALID:{dataset}")
+            if raw_market is not False or raw_allowed is not True:
+                blockers.append(f"CFB_PARTICIPATION_RAW_SOURCE_POLICY_INVALID:{dataset}")
                 continue
-            if manifest.get("market_data") is not False:
-                blockers.append(f"CFB_PARTICIPATION_MARKET_DATA_FORBIDDEN:{dataset}")
-                continue
-            if manifest.get("point_in_time_from_retrieval_forward") is not True:
-                blockers.append(f"CFB_PARTICIPATION_MANIFEST_FORWARD_PIT_MISSING:{dataset}")
-                continue
-            if manifest.get("retroactive_point_in_time_claim") is not False:
-                blockers.append(f"CFB_PARTICIPATION_MANIFEST_RETROACTIVE_PIT_FORBIDDEN:{dataset}")
-                continue
-            if manifest.get("model_p_created") is not False or manifest.get("promotion_authority") is not False:
-                blockers.append(f"CFB_PARTICIPATION_MANIFEST_AUTHORITY_FORBIDDEN:{dataset}")
-                continue
-            verified_assets += 1
+        projection_errors = _projection_blockers(
+            dataset=dataset,
+            projection=projection,
+            source_root=source_root,
+            content_sha=content_sha,
+        )
+        if projection_errors:
+            blockers.extend(projection_errors)
+            continue
+        verified_assets += 1
 
     seen = set(datasets)
     missing = sorted(REQUIRED_DATASETS - seen)
@@ -275,6 +380,8 @@ def audit_cfb_participation_snapshot(
         "verified_asset_count": verified_assets,
         "required_datasets": sorted(REQUIRED_DATASETS),
         "datasets_seen": sorted(seen),
+        "pbp_raw_market_data_present": True,
+        "pbp_predictive_projection_required": True,
         "blockers": blockers,
         "truth_gate_ready": False,
         "model_p_created": False,
