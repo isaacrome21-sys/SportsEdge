@@ -15,6 +15,7 @@
     "edge_floor_probability": 0.03,
     "max_sides_per_game_market": 1,
     "tie_break_rule": "NO_SELECTION_ON_EQUAL_EDGE",
+    "max_minutes_after_opener_retrieval": 120,
     "first_write_wins": true,
     "backfill_allowed": false,
     "staking_allowed": false,
