@@ -56,6 +56,26 @@ class MLBTheOddsAPICollectorTests(unittest.TestCase):
         self.assertEqual([a["provider_code"] for a in out["attempts"]], ["OUT_OF_USAGE_CREDITS"] * 2)
         self.assertFalse(any(Path(td).rglob("snapshot.json")))
 
+    def test_historical_unavailable_free_plan_is_classified_separately_from_auth(self):
+        def plan_blocked(*args, **kwargs):
+            body = io.BytesIO(b'{"error_code":"HISTORICAL_UNAVAILABLE_ON_FREE_USAGE_PLAN"}')
+            raise HTTPError("https://example.invalid", 401, "Unauthorized", {}, body)
+
+        env = {
+            "SPORTSEDGE_ODDS_API_KEY": "secret-1",
+            "SPORTSEDGE_ODDS_API_KEY_2": "secret-2",
+        }
+        with tempfile.TemporaryDirectory() as td, patch.dict(os.environ, env, clear=True):
+            with patch("scripts.collect_mlb_the_odds_api_history._request", side_effect=plan_blocked):
+                out = collect_one(requested_at="2026-06-05T22:35:00Z", root=Path(td))
+        self.assertEqual(out["status"], "BLOCKED_PROVIDER_PLAN")
+        self.assertEqual(out["provider_codes"], ["HISTORICAL_UNAVAILABLE_ON_FREE_USAGE_PLAN"])
+        self.assertEqual(
+            [a["provider_code"] for a in out["attempts"]],
+            ["HISTORICAL_UNAVAILABLE_ON_FREE_USAGE_PLAN"] * 2,
+        )
+        self.assertFalse(any(Path(td).rglob("snapshot.json")))
+
     def test_unknown_401_remains_auth_blocker(self):
         def unauthorized(*args, **kwargs):
             body = io.BytesIO(b'{"error_code":"INVALID_KEY"}')
