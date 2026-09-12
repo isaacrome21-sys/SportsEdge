@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run one football sport's game and player-prop lanes as a single RUN IT card."""
+"""Run one football sport's governed RUN IT lanes as a single card."""
 from __future__ import annotations
 
 import argparse
@@ -13,6 +13,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from sportsedge.football_prop_surface import require_executable_prop_surface
+
+NFL_PROP_NO_ENGINE_REASON = "NFL_PLAYER_PROPS_NO_ENGINE_PENDING_INDEPENDENT_PROBABILITY_ENGINE_VALIDATION"
 
 
 def _stamp(path: Path):
@@ -28,6 +30,16 @@ def _blocked_row(lane: str, reason: str) -> list[dict]:
         "market": lane,
         "model_p": None,
         "bet_status": "BLOCKED",
+        "reason": reason,
+        "run_it_lane": lane,
+    }]
+
+
+def _no_engine_row(lane: str, reason: str) -> list[dict]:
+    return [{
+        "market": lane,
+        "model_p": None,
+        "bet_status": "NO_ENGINE",
         "reason": reason,
         "run_it_lane": lane,
     }]
@@ -87,39 +99,50 @@ def main() -> int:
     args = ap.parse_args()
 
     sport = args.sport.upper()
-    # This is an actual runtime read, not a decorative config flag. If the
-    # authoritative prop surface stops declaring this sport executable, RUN IT
-    # fails before trying either child lane.
-    require_executable_prop_surface(sport, path=ROOT / "config/football_prop_engine_surface.json")
-
     lower = sport.lower()
     game_out = ROOT / f"artifacts/run_it/{lower}_game_card.json"
-    prop_out = ROOT / f"artifacts/run_it/{lower}_prop_card.json"
     game_cmd = [sys.executable, str(ROOT / f"scripts/run_{lower}_auto.py"), "--output", str(game_out)]
-    prop_cmd = [
-        sys.executable, str(ROOT / "scripts/run_football_props_auto.py"),
-        "--sport", sport, "--output", str(prop_out),
-    ]
     if args.asof:
         game_cmd.extend(["--asof", args.asof])
-        prop_cmd.extend(["--asof", args.asof])
 
     game_before = _stamp(game_out)
-    prop_before = _stamp(prop_out)
     game = subprocess.run(game_cmd, cwd=ROOT, text=True, capture_output=True, check=False)
-    prop = subprocess.run(prop_cmd, cwd=ROOT, text=True, capture_output=True, check=False)
     game_rows, game_payload = _load(game_out, "GAME", game.returncode, game_before)
-    prop_rows, prop_payload = _load(prop_out, "PLAYER_PROPS", prop.returncode, prop_before)
-    rows = game_rows + prop_rows
-    status = (
-        "SUCCESS"
-        if game.returncode == 0 and prop.returncode == 0
-        else "PARTIAL"
-        if game.returncode == 0 or prop.returncode == 0
-        else "BLOCKED"
-    )
+
+    if sport == "NFL":
+        # NFL props are intentionally not executable in bettor-facing RUN IT.
+        # A frozen/research artifact with no promotion authority is not sufficient
+        # to establish a genuine independently validated probability engine.
+        prop_rows = _no_engine_row("PLAYER_PROPS", NFL_PROP_NO_ENGINE_REASON)
+        prop_payload = {"status": "NO_ENGINE", "blocker": NFL_PROP_NO_ENGINE_REASON}
+        prop_exit_code = None
+        rows = game_rows + prop_rows
+        status = "SUCCESS" if game.returncode == 0 else "BLOCKED"
+    else:
+        # CFB retains its separately governed executable prop path.
+        require_executable_prop_surface(sport, path=ROOT / "config/football_prop_engine_surface.json")
+        prop_out = ROOT / f"artifacts/run_it/{lower}_prop_card.json"
+        prop_cmd = [
+            sys.executable, str(ROOT / "scripts/run_football_props_auto.py"),
+            "--sport", sport, "--output", str(prop_out),
+        ]
+        if args.asof:
+            prop_cmd.extend(["--asof", args.asof])
+        prop_before = _stamp(prop_out)
+        prop = subprocess.run(prop_cmd, cwd=ROOT, text=True, capture_output=True, check=False)
+        prop_rows, prop_payload = _load(prop_out, "PLAYER_PROPS", prop.returncode, prop_before)
+        prop_exit_code = int(prop.returncode)
+        rows = game_rows + prop_rows
+        status = (
+            "SUCCESS"
+            if game.returncode == 0 and prop.returncode == 0
+            else "PARTIAL"
+            if game.returncode == 0 or prop.returncode == 0
+            else "BLOCKED"
+        )
+
     payload = {
-        "schema_version": "FOOTBALL_AUTO_BUNDLE_V2",
+        "schema_version": "FOOTBALL_AUTO_BUNDLE_V3",
         "status": status,
         "sport": sport,
         "report": {
@@ -131,7 +154,7 @@ def main() -> int:
             },
             "lane_exit_code": {
                 "GAME": int(game.returncode),
-                "PLAYER_PROPS": int(prop.returncode),
+                "PLAYER_PROPS": prop_exit_code,
             },
         },
         "governance": {
@@ -141,6 +164,8 @@ def main() -> int:
             "eligible_changed": False,
             "prop_failures_are_not_silently_skipped": True,
             "stale_child_output_reuse_prohibited": True,
+            "nfl_props_no_engine_enforced": sport == "NFL",
+            "nfl_prop_research_artifacts_not_bettor_facing": sport == "NFL",
         },
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
