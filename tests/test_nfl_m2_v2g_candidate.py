@@ -60,8 +60,6 @@ def test_v2g_distribution_is_normalized_deterministic_and_football_native():
     assert sum(row["weight"] for row in first) == pytest.approx(1.0, abs=1e-12)
     assert all(row["home_score"] >= 0 and row["away_score"] >= 0 for row in first)
 
-    # Every generated score must have at least one nonnegative 7*TD + 3*FG
-    # representation. This rules out arbitrary injected key-number score mass.
     for row in first:
         for score in (row["home_score"], row["away_score"]):
             assert any(
@@ -115,10 +113,10 @@ def test_v2g_event_builder_marks_td_fg_and_other_without_score_inference():
     }]
     pbp = [
         {"game_id": "g1", "posteam": "A", "drive": 1, "touchdown": 0, "play_type": "run"},
-        {"game_id": "g1", "posteam": "A", "drive": 1, "touchdown": 1, "play_type": "pass"},
+        {"game_id": "g1", "posteam": "A", "drive": 1, "touchdown": 1, "td_team": "A", "play_type": "pass"},
         {"game_id": "g1", "posteam": "A", "drive": 2, "touchdown": 0, "play_type": "field_goal", "field_goal_result": "made"},
         {"game_id": "g1", "posteam": "A", "drive": 3, "touchdown": 0, "play_type": "punt"},
-        {"game_id": "g1", "posteam": "B", "drive": 1, "touchdown": 1, "play_type": "run"},
+        {"game_id": "g1", "posteam": "B", "drive": 1, "touchdown": 1, "td_team": "B", "play_type": "run"},
         {"game_id": "g1", "posteam": "B", "drive": 2, "touchdown": 0, "play_type": "punt"},
     ]
     rows = build_nfl_v2g_game_event_rows(schedule, pbp)
