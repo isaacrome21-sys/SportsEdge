@@ -28,6 +28,40 @@ def _content_sha(value: Any) -> str:
     ).hexdigest()
 
 
+def _live_game_state(game: LiveGame) -> dict[str, Any]:
+    """Return the immutable pregame baseball state bound to game-market Model_P.
+
+    This is provenance, not a sportsbook or predictive feature. Production game
+    markets require confirmed batting orders and both probable starters so a Model_P
+    cannot survive a lineup/starter change under the same historical team means.
+    """
+    if game.away_probable_pitcher_id is None or game.home_probable_pitcher_id is None:
+        raise MLBJointModeBridgeError("both probable pitchers required for game market")
+    if not game.away_lineup.confirmed or not game.home_lineup.confirmed:
+        raise MLBJointModeBridgeError("confirmed MLB batting orders required for game market")
+    return {
+        "game_pk": int(game.game_pk),
+        "away_team_id": int(game.away_team_id),
+        "home_team_id": int(game.home_team_id),
+        "away_probable_pitcher_id": int(game.away_probable_pitcher_id),
+        "home_probable_pitcher_id": int(game.home_probable_pitcher_id),
+        "away_lineup": [
+            [int(pid), int(slot)]
+            for pid, slot in zip(game.away_lineup.player_ids, game.away_lineup.batting_slots)
+        ],
+        "home_lineup": [
+            [int(pid), int(slot)]
+            for pid, slot in zip(game.home_lineup.player_ids, game.home_lineup.batting_slots)
+        ],
+        "away_lineup_confirmed": True,
+        "home_lineup_confirmed": True,
+        "venue_id": None if game.venue_id is None else int(game.venue_id),
+        "official_date": game.official_date,
+        "game_number": game.game_number,
+        "double_header": game.double_header,
+    }
+
+
 def _batter_team(game: LiveGame, entity_id: str) -> int:
     try:
         pid = int(entity_id)
@@ -207,6 +241,8 @@ def build_canonical_feature_row(
         }
 
     if market in GAME_MARKETS:
+        live_state = _live_game_state(game)
+        live_state_hash = _content_sha(live_state)
         if market.startswith("F5_"):
             f5 = f5_source or MLBF5HistorySource(opener=source.opener, retrieved_at=source.retrieved_at)
             built = f5.matchup_features(
@@ -218,7 +254,11 @@ def build_canonical_feature_row(
                 **base,
                 "source": "MLB_STATSAPI_STRICTLY_PRIOR_ACTUAL_F5_INNINGS",
                 "f5_feature_version": built["feature_version"],
-                "feature_source_hash": built["feature_source_hash"],
+                "live_game_state_hash": live_state_hash,
+                "feature_source_hash": _content_sha({
+                    "f5_feature_source_hash": built["feature_source_hash"],
+                    "live_game_state_hash": live_state_hash,
+                }),
                 "features": dict(built["features"]),
             }
             if market == "F5_TEAM_TOTALS":
@@ -231,18 +271,20 @@ def build_canonical_feature_row(
             target_date=target_date,
         )
         identity = {
-            "version": "mlb_generic_feature_v1",
+            "version": "mlb_generic_feature_v2_live_state_bound",
             "game_pk": int(game.game_pk),
             "target_date": target_date.isoformat(),
             "away_mean_runs": away,
             "home_mean_runs": home,
             "retrieved_at": source.retrieved_at.isoformat(),
+            "live_game_state_hash": live_state_hash,
         }
         row = {
             **base,
-            "generic_feature_version": "mlb_generic_feature_v1",
+            "generic_feature_version": "mlb_generic_feature_v2_live_state_bound",
             "away_mean_runs": away,
             "home_mean_runs": home,
+            "live_game_state_hash": live_state_hash,
             "source_subset_hash": _content_sha(identity),
         }
         if market == "TEAM_TOTALS":
