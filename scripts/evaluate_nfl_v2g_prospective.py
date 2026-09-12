@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Evaluate settled NFL V2G evidence only at frozen sample checkpoints.
 
-Between checkpoints this reports counts but does not recompute promotion metrics,
-preventing outcome-driven optional stopping. Even a full gate pass is only
-REVIEW_ELIGIBLE; this module has no promotion authority.
+Checkpoint membership is chronological and includes missing-close rows. A missing
+capture therefore stays inside the first N observations as INCONCLUSIVE instead
+of being silently replaced by a later game. Even a full pass is review-only.
 """
 from __future__ import annotations
 
@@ -73,11 +73,10 @@ def ece(rows: list[dict[str, Any]], bins: int = 10) -> float | None:
     total = len(rows)
     score = 0.0
     for group in groups:
-        if not group:
-            continue
-        avg_p = sum(x for x, _ in group) / len(group)
-        avg_y = sum(y for _, y in group) / len(group)
-        score += (len(group) / total) * abs(avg_p - avg_y)
+        if group:
+            avg_p = sum(x for x, _ in group) / len(group)
+            avg_y = sum(y for _, y in group) / len(group)
+            score += (len(group) / total) * abs(avg_p - avg_y)
     return score
 
 
@@ -98,38 +97,47 @@ def load_settlements(root: Path) -> list[dict[str, Any]]:
 
 def market_rows(settlements: list[dict[str, Any]], market: str) -> list[dict[str, Any]]:
     out = []
-    for row in settlements:
-        value = (row.get("predictive_evaluation") or {}).get(market) or {}
-        if value.get("status") == "SCORED":
-            item = dict(value)
-            item["game_id"] = row.get("game_id")
-            item["kickoff_utc"] = row.get("kickoff_utc")
-            item["paper"] = (row.get("paper_evaluation") or {}).get(market) or {}
-            out.append(item)
+    for settlement in settlements:
+        out.append({
+            "game_id": settlement.get("game_id"),
+            "kickoff_utc": settlement.get("kickoff_utc"),
+            "predictive": (settlement.get("predictive_evaluation") or {}).get(market) or {"status": "INCONCLUSIVE_MISSING_CAPTURE"},
+            "paper": (settlement.get("paper_evaluation") or {}).get(market) or {"status": "NO_PAPER_CANDIDATE"},
+        })
     return out
 
 
 def summarize_market(rows: list[dict[str, Any]], limit: int) -> dict[str, Any]:
     sample = rows[:limit]
-    a, b = calibration_fit(sample)
-    model_ll = mean([float(x["model_log_loss"]) for x in sample])
-    market_ll = mean([float(x["closing_market_log_loss"]) for x in sample])
-    model_brier = mean([float(x["model_brier"]) for x in sample])
-    market_brier = mean([float(x["closing_market_brier"]) for x in sample])
-    papers = [x["paper"] for x in sample if (x.get("paper") or {}).get("status") == "SETTLED_PAPER_CANDIDATE"]
+    scored = [x["predictive"] for x in sample if x["predictive"].get("status") == "SCORED"]
+    pushes = [x for x in sample if x["predictive"].get("status") == "NOT_SCORED_PUSH"]
+    missing = [x for x in sample if x["predictive"].get("status") == "INCONCLUSIVE_MISSING_CAPTURE"]
+    other_unscored = [x for x in sample if x["predictive"].get("status") not in {"SCORED", "NOT_SCORED_PUSH", "INCONCLUSIVE_MISSING_CAPTURE"}]
+    a, b = calibration_fit(scored)
+    model_ll = mean([float(x["model_log_loss"]) for x in scored])
+    market_ll = mean([float(x["closing_market_log_loss"]) for x in scored])
+    model_brier = mean([float(x["model_brier"]) for x in scored])
+    market_brier = mean([float(x["closing_market_brier"]) for x in scored])
+    papers = [x["paper"] for x in sample if x["paper"].get("status") == "SETTLED_PAPER_CANDIDATE"]
     profits = [float(x["after_vig_profit_units"]) for x in papers]
     line_clv = [float(x["clv"]["line_clv"]) for x in papers if (x.get("clv") or {}).get("line_clv") is not None]
     prob_clv = [float(x["clv"]["probability_clv"]) for x in papers if (x.get("clv") or {}).get("probability_clv") is not None]
+    beats = None if model_ll is None or market_ll is None else model_ll < market_ll
     return {
         "n": len(sample),
+        "predictive_scorable_n": len(scored),
+        "closing_line_push_n": len(pushes),
+        "missing_close_n": len(missing),
+        "other_unscored_n": len(other_unscored),
+        "complete_close_evidence": len(missing) == 0 and len(other_unscored) == 0,
         "candidate_mean_log_loss": model_ll,
         "closing_market_mean_log_loss": market_ll,
-        "candidate_beats_closing_market_log_loss": bool(model_ll is not None and market_ll is not None and model_ll < market_ll),
+        "candidate_beats_closing_market_log_loss": beats,
         "candidate_mean_brier": model_brier,
         "closing_market_mean_brier": market_brier,
         "calibration_intercept": a,
         "calibration_slope": b,
-        "ece_10bin": ece(sample, 10),
+        "ece_10bin": ece(scored, 10),
         "paper_candidate_n": len(papers),
         "paper_after_vig_profit_units": sum(profits),
         "paper_after_vig_roi": mean(profits),
@@ -164,8 +172,8 @@ def evaluate(root: Path, policy_path: Path) -> dict[str, Any]:
     output: dict[str, Any] = {
         "schema_version": OUT_SCHEMA,
         "candidate_id": policy.get("candidate_id"),
-        "observed_scored_n": observed,
-        "common_scored_n": common_n,
+        "observed_settled_n": observed,
+        "common_settled_n": common_n,
         "checkpoint_evaluated": checkpoint,
         "next_checkpoint": next_checkpoint,
         "optional_stopping_allowed": False,
@@ -190,6 +198,7 @@ def evaluate(root: Path, policy_path: Path) -> dict[str, Any]:
         clv = summary["mean_probability_clv"]
         checks: dict[str, bool | None] = {
             "count": summary["n"] >= minimum,
+            "complete_close_evidence": summary["complete_close_evidence"],
             "beats_closing_market_log_loss": summary["candidate_beats_closing_market_log_loss"],
             "calibration_slope": None if slope is None else float(metrics["calibration_slope_min"]) <= slope <= float(metrics["calibration_slope_max"]),
             "calibration_intercept": None if intercept is None else abs(intercept) <= float(metrics["calibration_intercept_abs_max"]),
