@@ -68,8 +68,8 @@ class NFLV2FForwardEvidenceTests(unittest.TestCase):
     def test_policy_candidate_identity_must_match_code(self):
         bad_policy = copy.deepcopy(POLICY)
         bad_policy["candidate_id"] = "wrong"
-        out = audit_forward_rows([row()], bad_policy)
-        self.assertEqual(out["status"], "BLOCKED_PROSPECTIVE_EVIDENCE") if "status" in out else None
+        with self.assertRaisesRegex(NFLV2FForwardEvidenceError, "POLICY_CANDIDATE_ID_MISMATCH"):
+            audit_forward_rows([row()], bad_policy)
 
     def test_duplicate_same_market_observation_blocks_audit(self):
         out = audit_forward_rows([row(), row()], POLICY)
