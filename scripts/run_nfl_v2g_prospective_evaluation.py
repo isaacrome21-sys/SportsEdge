@@ -27,6 +27,16 @@ def _write_first(path: Path, payload) -> bool:
     path.write_text(text,encoding="utf-8"); return True
 
 
+def _verify_clv_source(clv: dict, decision_path: Path) -> None:
+    decision_sha=_sha(decision_path)
+    if str(clv.get("decision_file_sha256") or "").lower()!=decision_sha:
+        raise SystemExit(f"NFL_V2G_EVAL_CLV_DECISION_FILE_SHA_MISMATCH:{decision_path}")
+    raw_close=decision_path.parent/"raw_close.json"
+    if not raw_close.exists(): raise SystemExit(f"NFL_V2G_EVAL_RAW_CLOSE_MISSING:{raw_close}")
+    if str(clv.get("raw_close_file_sha256") or "").lower()!=_sha(raw_close):
+        raise SystemExit(f"NFL_V2G_EVAL_RAW_CLOSE_SHA_MISMATCH:{raw_close}")
+
+
 def main()->int:
     p=argparse.ArgumentParser()
     p.add_argument("--policy",type=Path,required=True)
@@ -44,10 +54,13 @@ def main()->int:
         outcome=_read(outcome_path)
         binding_path=a.binding_dir/f"{game_id}.json"; binding=_read(binding_path) if binding_path.exists() else None
         clv_path=decision_path.parent/"clv.json"; clv=_read(clv_path) if clv_path.exists() else None
+        if clv is not None: _verify_clv_source(clv,decision_path)
         settlement=build_settlement(decision,binding,clv,outcome,policy=policy)
         settlement["canonical_outcome_path"]=str(outcome_path)
         settlement["canonical_outcome_file_sha256"]=_sha(outcome_path)
         settlement["decision_file_sha256"]=_sha(decision_path)
+        settlement["binding_file_sha256"]=_sha(binding_path) if binding_path.exists() else None
+        settlement["clv_file_sha256"]=_sha(clv_path) if clv_path.exists() else None
         settlement["evaluation_policy_sha256"]=_sha(a.policy)
         created+=int(_write_first(out,settlement))
     settlements=[_read(path) for path in sorted(settlements_dir.glob("*.json"))] if settlements_dir.exists() else []
