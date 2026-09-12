@@ -1,7 +1,7 @@
 # CFB_FORWARD_CLV_POLICY_V1 — forward evidence contract
 
 Policy: `config/cfb_forward_clv_policy_v1.json`  
-Current frozen version: `1.0.2`
+Current frozen version: `1.0.3`
 
 The activation process computes the committed policy SHA-256 and binds every admissible evidence row to it. This document intentionally does not hard-code a pre-activation file hash.
 
@@ -21,35 +21,55 @@ If the original contract is unavailable, the row is `CLV_MISSING` and stays in t
 
 ## Close boundary: actual start, not scheduled kickoff
 
-The frozen close window is **T-20m through T-0 actual start**. Scheduled kickoff only seeds monitoring.
+The frozen close window is **T-20m through T-0 actual start**. Scheduled kickoff only seeds monitoring. Selection is deterministic: `LAST_SUCCESSFUL_VALID_CAPTURE` after every live and posthoc check.
 
-A raw close snapshot is retained only when both sources independently say the event is still pre-start:
+A candidate close snapshot remains provisional only when both independent live checks pass:
 
-1. ESPN CFB scoreboard status is fresh and PRE_START; UNKNOWN/missing/stale/in-progress/postponed fails closed.
-2. DraftKings exposes fresh, two-sided pregame h2h/spread/total markets at capture.
+1. ESPN CFB scoreboard status is PRE_START and no older than 30 seconds.
+2. DraftKings still exposes the requested pregame contract as an open, two-sided market from the same source used for the price.
 
-Raw close snapshots are append-only. After play begins, a separate first-play attestation artifact is written. `LAST_SUCCESSFUL_VALID_CAPTURE` is the deterministic latest raw snapshot strictly before the immutable first-play timestamp. A snapshot at or after first play is `INVALID_POST_START`, even if a live status feed lagged.
+UNKNOWN, missing, stale, delayed-without-reliable-anchor, in-progress, suspended, one-sided, or otherwise unverifiable candidates fail closed. If no candidate survives, the decision row stays in the denominator as `CLV_MISSING`; no backfill or inferred close is permitted.
 
-Delayed PRE_START games remain monitored after scheduled kickoff. A game postponed to another date is void for that date and must be captured again under the new window.
+## Stabilized first-play attestation
 
-## Cluster inference
+ESPN play-by-play is not treated as immutable upstream data. The attestation is fetched no earlier than **12 hours after final status**, then canonicalized, hashed, and sealed as the settlement snapshot. Earlier reads are diagnostic only and cannot validate evidence.
 
-Each canonical market needs at least **12 independent slate clusters** before OFFICIAL inference, regardless of decision count. Twelve is a hard floor, not a sufficiency claim.
+Timestamp precision is part of admissibility. The first-play timestamp must have known uncertainty <=30 seconds, and the quote must satisfy:
 
-CR1 remains one-way clustered by `slate_date_ct`, but small-G inference uses Student-t with `df = G-1`; the effective two-sided 95% critical value is the larger of the frozen 2.0 t-stat floor and `t(0.975, G-1)`. IID fallback is prohibited.
+`quote_ts <= first_play_ts - (timestamp_uncertainty_seconds + 30 seconds)`
+
+Missing or ambiguous precision, uncertainty >30 seconds, an unstable/revised source at seal time, or a comparison inside the uncertainty margin is `INVALID_ATTESTATION_UNVERIFIED`. A quote at or after first play is `INVALID_POST_START` even if the live ESPN status lagged.
+
+Delayed games re-anchor only when there is a verified updated kickoff. If a game remains delayed with no reliable new anchor, polling continues and scheduled time is not treated as the close. A game postponed to another date is `VOID_POSTPONED`; the old close cohort is never reused and the game must be recaptured under the new date/window.
+
+## Provider failure matrix
+
+- ESPN status missing/stale: candidate `INVALID_STATUS_UNVERIFIED`; no surviving candidate => `CLV_MISSING` retained in denominator.
+- ESPN status in progress: candidate `INVALID_POST_START_STATUS`.
+- DraftKings requested pregame market missing/suspended/one-sided: candidate `INVALID_BOOK_STATE`; no surviving candidate => `CLV_MISSING` retained in denominator.
+- Both live sources pass: candidate remains provisional until stabilized first-play attestation.
+- Attestation missing/ambiguous/unstable: candidate `INVALID_ATTESTATION_UNVERIFIED`; no surviving candidate => `CLV_MISSING` retained in denominator.
+
+## Cluster inference and postseason regime
+
+Each canonical market needs at least **12 eligible regular-season slate clusters** before OFFICIAL inference, regardless of decision count. Twelve is a hard floor, not a sufficiency claim.
+
+Conference championships, bowls, and playoff games are `POSTSEASON_DIAGNOSTIC_ONLY` and cannot be pooled into the primary regular-season promotion ledger merely to reach cluster 12. If 12 eligible regular-season clusters are unavailable in 2026, OFFICIAL remains unavailable.
+
+CR1 remains reported and its frozen CLV t-stat >=2.0 gate remains required. Small-G significance also requires deterministic wild-cluster-bootstrap-t with Webb six-point weights, 9,999 repetitions, and two-sided p<=0.05. The seed is versioned and bound to policy SHA plus market ledger. Bootstrap cannot rescue a failed mean-CLV or CR1 t-stat gate.
 
 ## Capture workflow
 
 Workflow: `.github/workflows/cfb-forward-clv-capture.yml`
 
 - Monday 09:00 America/Chicago: FBS opener capture for the upcoming Saturday-through-Monday window.
-- Every five minutes: free ESPN FBS/status gate; paid Odds API event/close calls only when a game is in the seeded close-monitoring window.
+- Scheduled close monitoring must enforce the live ESPN/DraftKings dual-source gate.
 - Close request includes DraftKings `h2h`, `spreads`, `totals`, `alternate_spreads`, `alternate_totals`.
-- Post-start runs write first-play attestation/selection artifacts.
+- Settlement must create the stabilized first-play attestation before any raw close can become admissible.
 - Capture artifacts append only to the `data` branch.
 - No backfill; no overwrite; no Layer B import.
 
-GitHub Actions cannot schedule more frequently than every five minutes. The lane therefore stores every valid scheduled raw snapshot it obtains and selects the latest snapshot that survives posthoc first-play attestation; it does not fabricate one-minute observations that were never captured.
+GitHub Actions cannot guarantee one-minute cadence, so the lane may only select from observations actually captured. It must never fabricate a closer observation.
 
 ## Known provider limitations — fail closed
 
@@ -59,4 +79,8 @@ The current Odds API transport does not expose verified DraftKings market-limit 
 - `TWO_SIDED_SYNC_UNVERIFIED`
 - `promotion_grade_quote_eligible=false`
 
-Those raw prices remain diagnostics/capture plumbing, not promotion-grade CLV, until a verified source contract satisfies the frozen hygiene requirements. Nothing in the workflow invents a limit or a synchronization timestamp.
+Those raw prices remain diagnostics/capture plumbing, not promotion-grade CLV, until a verified source contract satisfies the frozen hygiene requirements. Nothing invents a limit or synchronization timestamp.
+
+## Merge gate
+
+Do **not** merge while runtime behavior lags policy v1.0.3. `scripts/cfb_forward_clv_capture.py`, workflow polling/scheduling, settlement attestation, provider-failure states, postseason regime handling, bootstrap inference, and tests must enforce the frozen policy before merge. A green artifact that merely asserts these semantics is insufficient.
