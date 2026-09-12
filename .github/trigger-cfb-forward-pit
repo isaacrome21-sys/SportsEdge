@@ -1,4 +1,5 @@
 trigger: cfb-forward-pit
-reason: establish first genuine forward-only predictive source snapshot after scheduled capture produced no durable data-branch bytes
+reason: exercise hardened prospective predictive-source capture after byte-binding validator merged
+source_main_sha: fee4b37214e4d5eaa8e8ab074b380b838159d275
 backfill: false
 promotion_authority: false
