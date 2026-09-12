@@ -5,23 +5,22 @@ from pathlib import Path
 import unittest
 
 from sportsedge.football_prop_extended_run_machine import PROVIDER_MARKETS
-from sportsedge.football_prop_surface import require_executable_prop_surface
+from sportsedge.football_prop_surface import FootballPropSurfaceError, require_executable_prop_surface
 
 CFB_ARTIFACT_SHA = "923cfd1be42d31a87d9f31ddffce406d44bfc1bb003d1c625f5a4258f7773f23"
 
 
 class FootballPropSurfaceTests(unittest.TestCase):
-    def test_nfl_and_cfb_surface_is_runtime_bound_and_registry_derived(self):
-        nfl = require_executable_prop_surface("NFL")
-        self.assertEqual(nfl["engine_state"], "IMPLEMENTED_FAIL_CLOSED")
-        self.assertEqual(nfl["promotion_state"], "AUTOMATIC_TRUTH_GATE_GATED")
-        self.assertEqual(nfl["readiness_state"], "REGISTRY_DERIVED")
-        self.assertEqual(nfl["runtime_state"], "ARTIFACT_FROZEN_EVIDENCE_GATED")
-        self.assertEqual(
-            nfl["frozen_artifact_sha256"],
-            "3efa5cc92b5ed1bf53a99cbe0d6e7792d01791a77c8f684874d66213b73d9570",
-        )
-        self.assertTrue(nfl["certification_registry"].endswith("_prop_certification.json"))
+    def test_nfl_is_no_engine_while_cfb_remains_runtime_bound(self):
+        with self.assertRaisesRegex(FootballPropSurfaceError, "FOOTBALL_PROP_ENGINE_NOT_IMPLEMENTED:NFL"):
+            require_executable_prop_surface("NFL")
+
+        payload = json.loads(Path("config/football_prop_engine_surface.json").read_text())
+        nfl = payload["sports"]["NFL"]
+        self.assertEqual(nfl["engine_state"], "NO_ENGINE")
+        self.assertEqual(nfl["promotion_state"], "BLOCKED_PENDING_INDEPENDENT_PROBABILITY_ENGINE_VALIDATION")
+        self.assertEqual(nfl["readiness_state"], "NO_ENGINE")
+        self.assertIn("nfl_player_props", payload["explicit_no_engine"])
 
         cfb = require_executable_prop_surface("CFB")
         self.assertEqual(cfb["engine_state"], "IMPLEMENTED_FAIL_CLOSED")
@@ -44,28 +43,19 @@ class FootballPropSurfaceTests(unittest.TestCase):
         self.assertIn("targets", payload["explicit_no_engine"])
         self.assertIn("first_td", payload["explicit_no_engine"])
         self.assertIn("last_td", payload["explicit_no_engine"])
-        self.assertNotIn("anytime_td", payload["explicit_no_engine"])
-        self.assertNotIn("kicker_props", payload["explicit_no_engine"])
-        self.assertNotIn("defensive_player_props", payload["explicit_no_engine"])
 
-    def test_governance_has_no_permanent_official_or_manual_toggle_veto(self):
+    def test_governance_has_no_market_price_model_p_shortcut(self):
         payload = json.loads(Path("config/football_prop_engine_surface.json").read_text())
         governance = payload["governance"]
-        self.assertTrue(governance["official_bets_allowed_when_all_gates_pass"])
-        self.assertFalse(governance["manual_eligible_toggle_required"])
+        self.assertFalse(governance["market_prices_can_create_model_p"])
+        self.assertFalse(governance["hit_rates_can_create_model_p"])
+        self.assertFalse(governance["capper_or_consensus_can_create_model_p"])
+        self.assertFalse(governance["one_sided_market_can_create_model_p"])
+        self.assertFalse(governance["one_sided_market_can_create_fair_market_p"])
         self.assertTrue(governance["requires_artifact_bound_certification"])
         self.assertTrue(governance["requires_frozen_edge_floor_before_promotable_inference"])
 
-    def test_one_sided_scorer_market_consumes_model_p_but_cannot_create_it(self):
-        payload = json.loads(Path("config/football_prop_engine_surface.json").read_text())
-        governance = payload["governance"]
-        self.assertFalse(governance["one_sided_market_can_create_model_p"])
-        self.assertFalse(governance["one_sided_market_can_create_fair_market_p"])
-        self.assertTrue(governance["one_sided_offer_ev_allowed_with_model_p"])
-        self.assertTrue(governance["paired_price_required_for_devig"])
-        self.assertNotIn("requires_paired_price_for_market_economics", governance)
-
-    def test_checked_in_freeze_registries_remain_truthful(self):
+    def test_checked_in_freeze_registries_remain_truthful_research_records(self):
         nfl = json.loads(Path("config/nfl_prop_model_freeze.json").read_text())
         self.assertEqual(nfl["status"], "FROZEN")
         self.assertEqual(
