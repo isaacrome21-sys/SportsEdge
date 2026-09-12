@@ -12,6 +12,9 @@ Raw captures remain observations only. This module creates no Model_P, promotion
 authority, market eligibility, Truth Gate PASS, edge floor, or historical backfill.
 The legacy T0 +/- 8m window is deliberately unreachable here because it can include
 post-scheduled-start observations.
+
+Use --plan for a free StatsAPI-only readiness check. Plan mode never calls the odds
+provider, never reads or writes the paid-credit ledger, and never creates evidence.
 """
 from __future__ import annotations
 
@@ -89,15 +92,92 @@ def _load_legacy():
     return module
 
 
+def _team_name(game: dict[str, Any], side: str) -> str | None:
+    try:
+        return str(game["teams"][side]["team"]["name"])
+    except Exception:
+        return None
+
+
+def _plan_row(legacy: Any, game: dict[str, Any]) -> dict[str, Any]:
+    start = legacy._parse_iso(str(game["gameDate"]))
+    windows: dict[str, dict[str, str]] = {}
+    for target in TARGETS_MIN:
+        label = "T0" if target == 0 else f"T-{target}m"
+        center = start - timedelta(minutes=target)
+        windows[label] = {
+            "opens_utc": (center - timedelta(seconds=WINDOW_SEC)).isoformat(),
+            "center_utc": center.isoformat(),
+            "closes_utc": (center + timedelta(seconds=WINDOW_SEC)).isoformat(),
+        }
+    return {
+        "game_pk": game.get("gamePk"),
+        "official_start_utc": start.isoformat(),
+        "away_team": _team_name(game, "away"),
+        "home_team": _team_name(game, "home"),
+        "capture_windows": windows,
+    }
+
+
+def _build_plan(legacy: Any, *, now: datetime, slate: str, games: list[dict[str, Any]]) -> dict[str, Any]:
+    target, eligible = legacy._eligible_games(now, games)
+    due_ids = {game.get("gamePk") for game in eligible}
+    schedule = [_plan_row(legacy, game) for game in games]
+    due_games = [row for row in schedule if row.get("game_pk") in due_ids] if target else []
+    return {
+        "status": "CAPTURE_DUE" if target else "OUTSIDE_CAPTURE_WINDOW",
+        "planned_at_utc": now.isoformat(),
+        "slate_date_ct": slate,
+        "capture_window": target,
+        "capture_role": _capture_role(target) if target else None,
+        "games_scheduled": len(games),
+        "games_eligible": len(eligible),
+        "due_games": due_games,
+        "schedule": schedule,
+        "source": "MLB_STATSAPI_SCHEDULE_ONLY",
+        "sportsbook_request_attempted": False,
+        "budget_ledger_touched": False,
+        "evidence_class": "READINESS_PLAN_NOT_EVIDENCE",
+        "promotion_authority": False,
+        "may_change_market_eligibility": False,
+        "model_p": None,
+    }
+
+
+def _plan_only() -> int:
+    legacy = _load_legacy()
+    now = legacy._utcnow()
+    slate = now.astimezone(legacy.CT).date().isoformat()
+    try:
+        games = legacy._fetch_schedule_raw(slate)
+    except Exception as exc:
+        payload = {
+            "status": "PLAN_FAILED_SCHEDULE",
+            "planned_at_utc": now.isoformat(),
+            "slate_date_ct": slate,
+            "reason": f"{type(exc).__name__}:{exc}",
+            "sportsbook_request_attempted": False,
+            "budget_ledger_touched": False,
+            "evidence_class": "READINESS_PLAN_NOT_EVIDENCE",
+            "promotion_authority": False,
+            "may_change_market_eligibility": False,
+            "model_p": None,
+        }
+        print(json.dumps(payload, sort_keys=True))
+        return 4
+    print(json.dumps(_build_plan(legacy, now=now, slate=slate, games=games), sort_keys=True))
+    return 0
+
+
 def _self_test() -> int:
     legacy = _load_legacy()
     now = datetime(2026, 9, 12, 17, 0, tzinfo=timezone.utc)
 
     # Decision observations are confined to T-98m..T-82m, wholly inside T-120m..T-45m.
     decision_games = [
-        {"gameDate": (now + timedelta(minutes=90)).isoformat()},
-        {"gameDate": (now + timedelta(minutes=98)).isoformat()},
-        {"gameDate": (now + timedelta(minutes=81, seconds=59)).isoformat()},
+        {"gamePk": 1, "gameDate": (now + timedelta(minutes=90)).isoformat()},
+        {"gamePk": 2, "gameDate": (now + timedelta(minutes=98)).isoformat()},
+        {"gamePk": 3, "gameDate": (now + timedelta(minutes=81, seconds=59)).isoformat()},
     ]
     target, eligible = legacy._eligible_games(now, decision_games)
     assert target == "T-90m", (target, eligible)
@@ -106,14 +186,24 @@ def _self_test() -> int:
     # Close observations are confined to T-18m..T-2m. T-1:59 and any post-start
     # observation must not qualify, so a selected row is necessarily pregame.
     close_games = [
-        {"gameDate": (now + timedelta(minutes=10)).isoformat()},
-        {"gameDate": (now + timedelta(minutes=18)).isoformat()},
-        {"gameDate": (now + timedelta(minutes=1, seconds=59)).isoformat()},
-        {"gameDate": (now - timedelta(seconds=1)).isoformat()},
+        {"gamePk": 4, "gameDate": (now + timedelta(minutes=10)).isoformat()},
+        {"gamePk": 5, "gameDate": (now + timedelta(minutes=18)).isoformat()},
+        {"gamePk": 6, "gameDate": (now + timedelta(minutes=1, seconds=59)).isoformat()},
+        {"gamePk": 7, "gameDate": (now - timedelta(seconds=1)).isoformat()},
     ]
     target, eligible = legacy._eligible_games(now, close_games)
     assert target == "T-10m", (target, eligible)
     assert len(eligible) == 2, eligible
+
+    # Plan construction is deterministic and carries no paid/evidence authority.
+    plan = _build_plan(legacy, now=now, slate="2026-09-12", games=decision_games)
+    assert plan["status"] == "CAPTURE_DUE"
+    assert plan["capture_role"] == "DECISION_CANDIDATE"
+    assert plan["games_eligible"] == 2
+    assert plan["sportsbook_request_attempted"] is False
+    assert plan["budget_ledger_touched"] is False
+    assert plan["promotion_authority"] is False
+    assert plan["model_p"] is None
 
     decision_lo = DECISION_TARGET_MIN - WINDOW_SEC / 60
     decision_hi = DECISION_TARGET_MIN + WINDOW_SEC / 60
@@ -131,6 +221,7 @@ def _self_test() -> int:
         "post_start_capture_reachable": False,
         "raw_sha256_bound_on_capture": True,
         "capture_role_bound_on_capture": True,
+        "free_plan_mode": True,
         "promotion_authority": False,
         "historical_backfill": False,
     }, sort_keys=True))
@@ -140,6 +231,8 @@ def _self_test() -> int:
 def main() -> int:
     if "--self-test" in sys.argv:
         return _self_test()
+    if "--plan" in sys.argv:
+        return _plan_only()
     legacy = _load_legacy()
     return legacy.main()
 
