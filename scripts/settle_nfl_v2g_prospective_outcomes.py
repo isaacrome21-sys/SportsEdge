@@ -28,6 +28,7 @@ from sportsedge.sports.nfl.m2_v2g_forward import (
 
 OUTCOME_SCHEMA = "NFL_M2_V2G_PROSPECTIVE_OUTCOME_V1"
 _GIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 class OutcomeError(ValueError):
@@ -49,24 +50,18 @@ def _ts(value: Any, field: str) -> datetime:
     return parsed.astimezone(timezone.utc)
 
 
+def _hex(value: Any, *, bits: int, field: str) -> str:
+    text = str(value or "").strip().lower()
+    pattern = _SHA256_RE if bits == 256 else _GIT_SHA_RE if bits == 160 else None
+    _require(pattern is not None and bool(pattern.fullmatch(text)),
+             f"NFL_V2G_OUTCOME_HASH_INVALID:{field}")
+    return text
+
+
 def outcome_sha256(value: Mapping[str, Any]) -> str:
     payload = dict(value)
     payload.pop("outcome_sha256", None)
     return sha256(canonical_bytes(payload)).hexdigest()
-
-
-def validate_outcome(record: Mapping[str, Any]) -> str:
-    _require(record.get("schema_version") == OUTCOME_SCHEMA, "NFL_V2G_OUTCOME_SCHEMA_INVALID")
-    _require(record.get("status") == "PROSPECTIVE_RESEARCH_OUTCOME_CAPTURED", "NFL_V2G_OUTCOME_STATUS_INVALID")
-    for key in (
-        "promotion_authority", "may_create_model_p", "market_eligibility_changed",
-        "truth_gate_pass_granted", "official_status_granted", "market_prices_consumed",
-    ):
-        _require(record.get(key) is False, f"NFL_V2G_OUTCOME_AUTHORITY_INVALID:{key}")
-    expected = outcome_sha256(record)
-    _require(str(record.get("outcome_sha256") or "").lower() == expected,
-             "NFL_V2G_OUTCOME_SHA_MISMATCH")
-    return expected
 
 
 def _score(value: Any, field: str) -> int:
@@ -79,6 +74,58 @@ def _score(value: Any, field: str) -> int:
     integer = int(number)
     _require(number == integer and integer >= 0, f"NFL_V2G_OUTCOME_SCORE_INVALID:{field}")
     return integer
+
+
+def validate_outcome(record: Mapping[str, Any]) -> str:
+    _require(record.get("schema_version") == OUTCOME_SCHEMA, "NFL_V2G_OUTCOME_SCHEMA_INVALID")
+    _require(record.get("status") == "PROSPECTIVE_RESEARCH_OUTCOME_CAPTURED", "NFL_V2G_OUTCOME_STATUS_INVALID")
+    _require(record.get("outcome_source") == "NFLVERSE_GAMES_CSV_POSTGAME_SCORE",
+             "NFL_V2G_OUTCOME_SOURCE_INVALID")
+    game_id = str(record.get("game_id") or "").strip()
+    home_team = str(record.get("home_team") or "").strip()
+    away_team = str(record.get("away_team") or "").strip()
+    _require(bool(game_id), "NFL_V2G_OUTCOME_GAME_ID_REQUIRED")
+    _require(bool(home_team) and bool(away_team) and home_team != away_team,
+             "NFL_V2G_OUTCOME_TEAM_IDENTITY_INVALID")
+    try:
+        season = int(record.get("season"))
+        week = int(record.get("week"))
+    except (TypeError, ValueError) as exc:
+        raise OutcomeError("NFL_V2G_OUTCOME_GAME_SCOPE_INVALID") from exc
+    _require(season >= 2026 and week >= 1, "NFL_V2G_OUTCOME_GAME_SCOPE_INVALID")
+
+    prediction_sha = _hex(record.get("prediction_sha256"), bits=256, field="prediction_sha256")
+    del prediction_sha
+    _hex(record.get("artifact_sha256"), bits=256, field="artifact_sha256")
+    _hex(record.get("result_schedule_snapshot_sha256"), bits=256, field="result_schedule_snapshot_sha256")
+    _hex(record.get("prediction_capture_code_git_sha"), bits=160, field="prediction_capture_code_git_sha")
+    _hex(record.get("settlement_code_git_sha"), bits=160, field="settlement_code_git_sha")
+
+    kickoff = _ts(record.get("kickoff_utc"), "kickoff_utc")
+    observed = _ts(record.get("observed_at_utc"), "observed_at_utc")
+    try:
+        delay = float(record.get("minimum_hours_after_kickoff"))
+    except (TypeError, ValueError) as exc:
+        raise OutcomeError("NFL_V2G_OUTCOME_MIN_DELAY_INVALID") from exc
+    _require(delay >= 5.0, "NFL_V2G_OUTCOME_MIN_DELAY_TOO_SHORT")
+    _require(observed >= kickoff + timedelta(hours=delay), "NFL_V2G_OUTCOME_OBSERVED_TOO_EARLY")
+
+    home_score = _score(record.get("home_score"), "home_score")
+    away_score = _score(record.get("away_score"), "away_score")
+    _require(record.get("final_margin_home_minus_away") == home_score - away_score,
+             "NFL_V2G_OUTCOME_MARGIN_INCONSISTENT")
+    _require(record.get("final_total") == home_score + away_score,
+             "NFL_V2G_OUTCOME_TOTAL_INCONSISTENT")
+
+    for key in (
+        "promotion_authority", "may_create_model_p", "market_eligibility_changed",
+        "truth_gate_pass_granted", "official_status_granted", "market_prices_consumed",
+    ):
+        _require(record.get(key) is False, f"NFL_V2G_OUTCOME_AUTHORITY_INVALID:{key}")
+    expected = outcome_sha256(record)
+    _require(str(record.get("outcome_sha256") or "").lower() == expected,
+             "NFL_V2G_OUTCOME_SHA_MISMATCH")
+    return expected
 
 
 def _schedule_index(schedule_path: Path) -> dict[str, dict[str, str]]:
@@ -126,11 +173,8 @@ def build_outcome(
     home_score = _score(schedule_row.get("home_score"), "home_score")
     away_score = _score(schedule_row.get("away_score"), "away_score")
 
-    code_sha = str(settlement_code_git_sha or "").strip().lower()
-    _require(bool(_GIT_SHA_RE.fullmatch(code_sha)), "NFL_V2G_OUTCOME_CODE_GIT_SHA_INVALID")
-    source_sha = str(schedule_sha256 or "").strip().lower()
-    _require(len(source_sha) == 64 and all(ch in "0123456789abcdef" for ch in source_sha),
-             "NFL_V2G_OUTCOME_SCHEDULE_SHA_INVALID")
+    code_sha = _hex(settlement_code_git_sha, bits=160, field="settlement_code_git_sha")
+    source_sha = _hex(schedule_sha256, bits=256, field="result_schedule_snapshot_sha256")
 
     record: dict[str, Any] = {
         "schema_version": OUTCOME_SCHEMA,
