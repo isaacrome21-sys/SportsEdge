@@ -84,6 +84,38 @@ jobs:
           status_file="artifacts/additional_odds/status/run_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}.json"
           python scripts/archive_mlb_additional_odds.py | tee "$status_file"
           code=${PIPESTATUS[0]}
+          python - "$status_file" "$code" <<'PY'
+          from datetime import datetime, timezone
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import sys
+
+          path = Path(sys.argv[1])
+          exit_code = int(sys.argv[2])
+          raw = path.read_bytes() if path.exists() else b""
+          valid = False
+          try:
+              parsed = json.loads(raw.decode("utf-8").strip())
+              valid = isinstance(parsed, dict) and bool(parsed.get("status"))
+          except Exception:
+              parsed = None
+          if not valid:
+              diagnostic = {
+                  "schema_version": 1,
+                  "status": "ERROR_CAPTURE_STATUS_MISSING_OR_INVALID",
+                  "run_at_utc": datetime.now(timezone.utc).isoformat(),
+                  "github_run_id": os.environ.get("GITHUB_RUN_ID"),
+                  "github_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+                  "capture_exit_code": exit_code,
+                  "captured_stdout_bytes": len(raw),
+                  "captured_stdout_sha256": hashlib.sha256(raw).hexdigest(),
+                  "promotion_authority": False,
+                  "may_change_market_eligibility": False,
+              }
+              path.write_text(json.dumps(diagnostic, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          PY
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           exit 0
       - name: Persist immutable archive and execution status to data branch
