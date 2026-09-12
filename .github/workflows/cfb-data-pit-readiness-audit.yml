@@ -1,0 +1,109 @@
+name: cfb-data-pit-readiness-audit
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'sportsedge/sports/cfb/pit_readiness.py'
+      - 'sportsedge/sports/cfb/source_manifest.py'
+      - 'scripts/audit_cfb_pit_readiness.py'
+      - 'config/cfb_truth_gate_v1.json'
+      - '.github/workflows/cfb-data-pit-readiness-audit.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'sportsedge/sports/cfb/pit_readiness.py'
+      - 'sportsedge/sports/cfb/source_manifest.py'
+      - 'scripts/audit_cfb_pit_readiness.py'
+      - 'config/cfb_truth_gate_v1.json'
+      - '.github/workflows/cfb-data-pit-readiness-audit.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Fetch immutable evidence branch
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin data:data
+          git worktree add data-branch data
+
+      - name: Resolve latest persisted current-release classification
+        id: current
+        run: |
+          set -euo pipefail
+          root='data-branch/history/cfb/current-release'
+          latest=''
+          if [ -d "$root" ]; then
+            latest="$(find "$root" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort | tail -n 1)"
+          fi
+          path=''
+          if [ -n "$latest" ]; then
+            candidate="$root/$latest/cfb_history_capture/current_release_classification.json"
+            if [ -f "$candidate" ]; then
+              path="$candidate"
+            fi
+          fi
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+
+      - name: Audit data-branch PIT readiness fail closed
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/cfb
+          args=(
+            --truth-gate config/cfb_truth_gate_v1.json
+            --output artifacts/cfb/data_branch_pit_readiness.json
+          )
+
+          if [ -n "${{ steps.current.outputs.path }}" ]; then
+            args+=(--current-release-classification "${{ steps.current.outputs.path }}")
+          fi
+
+          pit_root='data-branch/history/cfb/pit'
+          if [ -d "$pit_root" ]; then
+            args+=(--evidence-root "$pit_root")
+            [ ! -f "$pit_root/source_manifest.json" ] || args+=(--pit-source-manifest "$pit_root/source_manifest.json")
+            [ ! -f "$pit_root/asof_availability_proof.json" ] || args+=(--availability-proof "$pit_root/asof_availability_proof.json")
+            [ ! -f "$pit_root/paired_market_evidence.json" ] || args+=(--paired-market-evidence "$pit_root/paired_market_evidence.json")
+          fi
+
+          python scripts/audit_cfb_pit_readiness.py "${args[@]}"
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('artifacts/cfb/data_branch_pit_readiness.json').read_text())
+          if report.get('promotion_authority') is not False:
+              raise SystemExit('CFB_DATA_PIT_AUDIT_PROMOTION_AUTHORITY_FORBIDDEN')
+          if report.get('eligibility_changed') is not False:
+              raise SystemExit('CFB_DATA_PIT_AUDIT_ELIGIBILITY_CHANGE_FORBIDDEN')
+          current = report.get('current_release') or {}
+          if current.get('present') and current.get('usable_as_pit'):
+              raise SystemExit('CFB_CURRENT_RELEASE_MUST_NOT_BECOME_PIT_BY_CLASSIFICATION_ONLY')
+          print(json.dumps({
+              'readiness_state': report.get('readiness_state'),
+              'blockers': report.get('blockers'),
+              'current_release_present': current.get('present'),
+              'current_release_usable_as_pit': current.get('usable_as_pit'),
+              'historical_truth_gate_execution_allowed': report.get('historical_truth_gate_execution_allowed'),
+          }, sort_keys=True))
+          PY
+
+      - name: Upload data-branch readiness report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cfb-data-pit-readiness-${{ github.sha }}
+          path: artifacts/cfb/data_branch_pit_readiness.json
+          if-no-files-found: warn
+          retention-days: 30
