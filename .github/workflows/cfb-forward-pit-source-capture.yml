@@ -10,6 +10,7 @@ on:
         type: string
   schedule:
     - cron: '17 10 * * *'
+    - cron: '47 11 * * *'
 
 permissions:
   contents: write
