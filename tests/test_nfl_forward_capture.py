@@ -74,6 +74,8 @@ class NFLForwardCaptureTests(unittest.TestCase):
         self.assertTrue(all(r["gate_result"] in {"SHADOW_QUALIFIED", "REJECTED_NO_POSITIVE_EV"} for r in rows))
         self.assertTrue(all(r["provider_event_id"] == "evt-1" for r in rows))
         self.assertTrue(all(r["model_artifact_sha256"] == "a" * 64 for r in rows))
+        self.assertTrue(all(r["stake_units"] == 0.0 for r in rows))
+        self.assertTrue(any(r["kelly_frac"] > 0.0 for r in rows))
 
     def test_provider_event_time_must_match_canonical_game_start(self):
         with self.assertRaisesRegex(ValueError, "NFL_FORWARD_EVENT_START_MISMATCH"):
