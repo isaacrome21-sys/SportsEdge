@@ -36,6 +36,15 @@ def american_to_profit_multiplier(american_odds: float) -> float:
     return 100.0 / abs(american_odds)
 
 
+def american_implied_probability(american_odds: float) -> float:
+    """Return raw implied probability for American odds."""
+    if american_odds == 0:
+        raise ValueError("American odds cannot be zero")
+    if american_odds > 0:
+        return 100.0 / (american_odds + 100.0)
+    return abs(american_odds) / (abs(american_odds) + 100.0)
+
+
 def profit_multiplier_to_break_even(multiplier: float) -> float:
     """Return break-even probability for a profit multiplier."""
     if multiplier <= 0:
@@ -56,11 +65,7 @@ def boosted_break_even(american_odds: float, boost_pct: float) -> float:
 
 
 def crosses_key_number(reference_line: float, current_line: float, keys: Iterable[float] = KEY_NUMBERS) -> bool:
-    """Return True when spread magnitude crosses key 3 or 7.
-
-    Lines are represented from the same team's perspective. Example: -2.5 -> -3.5
-    crosses key 3; +7.5 -> +6.5 crosses key 7.
-    """
+    """Return True when spread magnitude crosses key 3 or 7."""
     lo, hi = sorted((abs(reference_line), abs(current_line)))
     return any(lo < key <= hi for key in keys)
 
@@ -84,16 +89,51 @@ def material_line_move(
     raise ValueError(f"Unsupported market_type: {market_type}")
 
 
+def adverse_move_ate_value(row: Mapping[str, Any], move_is_material: bool) -> bool:
+    """Return True when a material move made this selection's number worse.
+
+    Spread values are represented from the selected team's perspective. For totals,
+    selection must identify OVER or UNDER. Moneyline values are American odds.
+    """
+    if not move_is_material:
+        return False
+    if row.get("reference_market_value") is None or row.get("current_market_value") is None:
+        return False
+    reference = float(row["reference_market_value"])
+    current = float(row["current_market_value"])
+    market = str(row.get("market_type", "")).upper()
+    selection = str(row.get("selection", "")).strip().upper()
+    if market == "SPREAD":
+        return current < reference
+    if market == "TOTAL":
+        if selection.startswith("UNDER") or selection == "U":
+            return current < reference
+        if selection.startswith("OVER") or selection == "O":
+            return current > reference
+        return False
+    if market == "MONEYLINE":
+        return american_implied_probability(current) > american_implied_probability(reference)
+    return False
+
+
 def _fresh(age_minutes: Optional[float], max_age: float) -> bool:
     return age_minutes is not None and age_minutes >= 0 and age_minutes <= max_age
 
 
-def _independent_source_families(sources: Iterable[Mapping[str, Any]]) -> set[str]:
+def _independent_source_families(
+    sources: Iterable[Mapping[str, Any]],
+    *,
+    allowed_kinds: Iterable[str] | None = None,
+) -> set[str]:
+    allowed = {str(kind).strip().lower() for kind in (allowed_kinds or []) if str(kind).strip()}
     families: set[str] = set()
     for source in sources:
         if not source.get("independent", False):
             continue
-        if str(source.get("kind", "")).lower() in {"capper", "opinion", "handicapper"}:
+        kind = str(source.get("kind", "")).strip().lower()
+        if kind in {"capper", "opinion", "handicapper"}:
+            continue
+        if allowed and kind not in allowed:
             continue
         family = str(source.get("family", "")).strip().lower()
         if family:
@@ -131,6 +171,9 @@ def evaluate_signal(row: Mapping[str, Any], policy: Mapping[str, Any]) -> Signal
         and bool(row.get("promotion_authority"))
         and model_p is not None
     )
+    underlying_candidate = bool(row.get("underlying_candidate"))
+    candidate_scope = underlying_candidate or model_authorized
+
     if row.get("model_registry_status") != model_cfg["required_registry_status_for_model_lane"]:
         reasons.append("MODEL_UNFROZEN")
     if model_p is None:
@@ -149,70 +192,91 @@ def evaluate_signal(row: Mapping[str, Any], policy: Mapping[str, Any]) -> Signal
         )
         if move_is_material:
             reasons.append("MATERIAL_LINE_MOVE")
+            if candidate_scope and adverse_move_ate_value(row, move_is_material):
+                reasons.append("MOVE_ATE_VALUE")
 
     freshness = policy["freshness"]
     required_stale = False
-    if not _fresh(row.get("odds_age_minutes"), float(freshness["odds_max_age_minutes"])):
+    if candidate_scope and not _fresh(row.get("odds_age_minutes"), float(freshness["odds_max_age_minutes"])):
+        reasons.append("ODDS_STALE_OR_MISSING")
         required_stale = True
-    if row.get("handles_required") and not _fresh(row.get("handles_age_minutes"), float(freshness["handles_max_age_minutes"])):
+    if candidate_scope and row.get("handles_required") and not _fresh(row.get("handles_age_minutes"), float(freshness["handles_max_age_minutes"])):
+        reasons.append("HANDLES_STALE_OR_MISSING")
         required_stale = True
 
     injury_required = bool(row.get("injury_required", True))
-    if injury_required:
+    if candidate_scope and injury_required:
         injury_unknown = bool(row.get("required_starter_status_unknown"))
         injury_stale = not _fresh(row.get("injury_age_minutes"), float(freshness["injury_max_age_minutes"]))
         if injury_unknown or injury_stale:
             reasons.append("INJURY_STALE_OR_UNKNOWN")
             required_stale = True
 
-    if bool(row.get("outdoor_game")):
+    if candidate_scope and bool(row.get("outdoor_game")):
         weather_missing = row.get("weather_available") is False
         weather_stale = not _fresh(row.get("weather_age_minutes"), float(freshness["weather_max_age_minutes"]))
         if weather_missing or weather_stale:
             reasons.append("WEATHER_STALE_OR_MISSING")
             required_stale = True
+        if bool(row.get("severe_weather")):
+            reasons.append("SEVERE_WEATHER_REVIEW")
+            required_stale = True
 
-    if benchmark_disagreement(row, policy):
+    if candidate_scope and benchmark_disagreement(row, policy):
         reasons.append("BENCHMARK_DISAGREEMENT")
 
     tickets_pct = row.get("tickets_pct")
-    if tickets_pct is not None and float(tickets_pct) >= float(policy["market_movement"]["public_ticket_pct_material"]):
-        families = _independent_source_families(row.get("sources") or [])
-        if len(families) < int(policy["market_movement"]["minimum_independent_source_families"]):
+    move_cfg = policy["market_movement"]
+    if candidate_scope and tickets_pct is not None and float(tickets_pct) >= float(move_cfg["public_ticket_pct_material"]):
+        families = _independent_source_families(
+            row.get("sources") or [],
+            allowed_kinds=move_cfg.get("public_confirmation_source_kinds") or [],
+        )
+        if len(families) < int(move_cfg["minimum_independent_source_families"]):
             reasons.append("PUBLIC_HEAVY_UNCONFIRMED")
 
+    price_cfg = policy["price_quality"]
     reference_edge = row.get("reference_edge")
     current_edge = row.get("current_edge")
-    if reference_edge is not None and current_edge is not None and float(reference_edge) > 0:
+    if candidate_scope and reference_edge is not None and current_edge is not None and float(reference_edge) > 0:
         reference_edge_f = float(reference_edge)
         current_edge_f = float(current_edge)
         lost_fraction = max(0.0, (reference_edge_f - current_edge_f) / reference_edge_f)
-        price_cfg = policy["price_quality"]
         if lost_fraction >= float(price_cfg["max_fraction_of_reference_edge_lost_before_price_decay"]):
             reasons.append("PRICE_DECAY")
         if current_edge_f < float(price_cfg["truth_gate_edge_floor"]):
             reasons.append("PRICE_DECAY")
 
+    current_odds = row.get("current_odds")
+    best_same_line_odds = row.get("best_same_line_odds")
+    if candidate_scope and current_odds is not None and best_same_line_odds is not None:
+        gap = american_implied_probability(float(current_odds)) - american_implied_probability(float(best_same_line_odds))
+        if gap >= float(price_cfg.get("max_same_line_implied_probability_gap", 0.015)):
+            reasons.append("BAD_PRICE")
+
     promo = row.get("promo") or {}
     boost_pct = promo.get("boost_pct")
-    current_odds = row.get("current_odds")
     be: Optional[float] = None
     if boost_pct is not None and current_odds is not None:
         be = boosted_break_even(float(current_odds), float(boost_pct))
-        if not model_authorized:
+        if candidate_scope and not model_authorized:
             reasons.append("PROMO_ONLY_EDGE")
 
-    # Preserve order while deduplicating reason codes.
     reasons = list(dict.fromkeys(reasons))
 
     truth_gate_pass = bool(row.get("truth_gate_pass"))
     official_eligible = model_authorized and truth_gate_pass
 
     watch_reasons = {
+        "ODDS_STALE_OR_MISSING",
+        "HANDLES_STALE_OR_MISSING",
         "INJURY_STALE_OR_UNKNOWN",
         "WEATHER_STALE_OR_MISSING",
+        "SEVERE_WEATHER_REVIEW",
         "BENCHMARK_DISAGREEMENT",
         "PRICE_DECAY",
+        "BAD_PRICE",
+        "MOVE_ATE_VALUE",
         "PUBLIC_HEAVY_UNCONFIRMED",
     }
     has_watch_reason = required_stale or any(reason in watch_reasons for reason in reasons)
@@ -223,14 +287,14 @@ def evaluate_signal(row: Mapping[str, Any], policy: Mapping[str, Any]) -> Signal
     elif model_authorized and not truth_gate_pass:
         lane = "MODEL_CANDIDATE"
         tier = "WATCH" if has_watch_reason else "SECONDARY"
-    elif has_watch_reason:
+    elif underlying_candidate and has_watch_reason:
         lane = "WATCH"
         tier = "WATCH"
-    elif bool(row.get("underlying_candidate")) and boost_pct is not None:
+    elif underlying_candidate and boost_pct is not None:
         lane = "PROMO_VALUE"
         tier = "SECONDARY"
         reasons.append("QUALIFIED_CONTEXT")
-    elif bool(row.get("underlying_candidate")):
+    elif underlying_candidate:
         lane = "HYBRID_CONTEXT"
         tier = "SECONDARY"
         reasons.append("QUALIFIED_CONTEXT")
@@ -238,7 +302,6 @@ def evaluate_signal(row: Mapping[str, Any], policy: Mapping[str, Any]) -> Signal
         lane = "PASS"
         tier = "PASS"
 
-    # An unfrozen model can never accidentally surface OFFICIAL.
     if model_cfg.get("unfrozen_registry_forces_official_zero", True) and row.get("model_registry_status") != "FROZEN":
         official_eligible = False
         if lane == "OFFICIAL":
