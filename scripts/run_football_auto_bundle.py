@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run one football sport's game and player-prop lanes as a single RUN IT card."""
+"""Run one football sport's governed RUN IT lanes as a single card."""
 from __future__ import annotations
 
 import argparse
@@ -33,14 +33,18 @@ def _blocked_row(lane: str, reason: str) -> list[dict]:
     }]
 
 
-def _load(path: Path, lane: str, code: int, previous_stamp) -> tuple[list[dict], dict]:
-    """Consume only output proven to have been produced by this child invocation.
+def _no_engine_row(lane: str, reason: str) -> list[dict]:
+    return [{
+        "market": lane,
+        "model_p": None,
+        "bet_status": "NO_ENGINE",
+        "reason": reason,
+        "run_it_lane": lane,
+    }]
 
-    A previous RUN IT card may exist on disk.  If the current child process fails
-    before replacing it, that old card must never be re-used as current Model_P.
-    Non-zero child exits are also fail-closed even when the child managed to write
-    a JSON payload; only its blocker text is retained.
-    """
+
+def _load(path: Path, lane: str, code: int, previous_stamp) -> tuple[list[dict], dict]:
+    """Consume only output proven to have been produced by this child invocation."""
     current_stamp = _stamp(path)
     if current_stamp is None:
         return _blocked_row(lane, f"{lane}_OUTPUT_MISSING"), {}
@@ -92,10 +96,10 @@ def main() -> int:
         require_executable_prop_surface(sport, path=ROOT / "config/football_prop_engine_surface.json")
     except FootballPropSurfaceError as exc:
         # Game Model_P availability is independent of the prop research surface.
-        # An explicit NO_ENGINE prop declaration must block only the prop lane,
-        # never force RUN IT to discard a valid game-market model result.
+        # NFL NO_ENGINE must block only the prop lane and never suppress a valid
+        # game-market result.
         if sport == "NFL" and str(exc) == "FOOTBALL_PROP_ENGINE_NOT_IMPLEMENTED:NFL":
-            prop_surface_reason = "NFL_PROPS_NO_ENGINE"
+            prop_surface_reason = "NFL_PLAYER_PROPS_NO_ENGINE_PENDING_INDEPENDENT_PROBABILITY_ENGINE_VALIDATION"
         else:
             raise
 
@@ -116,14 +120,14 @@ def main() -> int:
     game_rows, game_payload = _load(game_out, "GAME", game.returncode, game_before)
 
     if prop_surface_reason:
-        prop_rows = _blocked_row("PLAYER_PROPS", prop_surface_reason)
+        prop_rows = _no_engine_row("PLAYER_PROPS", prop_surface_reason)
         prop_payload = {
             "status": "NO_ENGINE",
             "blocker": prop_surface_reason,
             "sport": sport,
             "model_p": None,
         }
-        prop_returncode = 2
+        prop_returncode = None
     else:
         prop_before = _stamp(prop_out)
         prop = subprocess.run(prop_cmd, cwd=ROOT, text=True, capture_output=True, check=False)
@@ -131,15 +135,18 @@ def main() -> int:
         prop_rows, prop_payload = _load(prop_out, "PLAYER_PROPS", prop_returncode, prop_before)
 
     rows = game_rows + prop_rows
-    status = (
-        "SUCCESS"
-        if game.returncode == 0 and prop_returncode == 0
-        else "PARTIAL"
-        if game.returncode == 0 or prop_returncode == 0
-        else "BLOCKED"
-    )
+    if sport == "NFL" and prop_surface_reason:
+        status = "SUCCESS" if game.returncode == 0 else "BLOCKED"
+    else:
+        status = (
+            "SUCCESS"
+            if game.returncode == 0 and prop_returncode == 0
+            else "PARTIAL"
+            if game.returncode == 0 or prop_returncode == 0
+            else "BLOCKED"
+        )
     payload = {
-        "schema_version": "FOOTBALL_AUTO_BUNDLE_V2",
+        "schema_version": "FOOTBALL_AUTO_BUNDLE_V3",
         "status": status,
         "sport": sport,
         "report": {
@@ -161,6 +168,7 @@ def main() -> int:
             "eligible_changed": False,
             "prop_failures_are_not_silently_skipped": True,
             "prop_no_engine_does_not_block_game_lane": True,
+            "nfl_prop_no_engine_is_not_bettor_facing_model_p": sport == "NFL" and bool(prop_surface_reason),
             "stale_child_output_reuse_prohibited": True,
         },
     }
