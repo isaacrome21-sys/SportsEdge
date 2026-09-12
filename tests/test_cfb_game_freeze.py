@@ -19,14 +19,14 @@ class CFBGameFreezeTests(unittest.TestCase):
     def test_committed_registry_is_explicitly_unfrozen(self):
         payload = json.loads((ROOT / "config/cfb_game_model_freeze.json").read_text())
         self.assertEqual(payload["status"], "UNFROZEN")
-        self.assertEqual(payload["blocker"], "CFB_PIT_TRAINING_BUNDLE_UNAVAILABLE")
+        self.assertEqual(payload["blocker"], "CFB_RECONSTRUCTED_TRAINING_AND_SELECTION_NOT_COMPLETE")
         self.assertFalse(payload["promotion_authority"])
         self.assertFalse(payload["evidence_clock_authority"])
         self.assertIsNone(payload["artifact_sha256"])
         self.assertIsNone(payload["artifact_file_sha256"])
 
     def test_unfrozen_registry_fails_closed(self):
-        with self.assertRaisesRegex(CFBGameFreezeError, "CFB_PIT_TRAINING_BUNDLE_UNAVAILABLE"):
+        with self.assertRaisesRegex(CFBGameFreezeError, "CFB_RECONSTRUCTED_TRAINING_AND_SELECTION_NOT_COMPLETE"):
             load_cfb_game_freeze(ROOT / "config/cfb_game_model_freeze.json")
 
     def test_frozen_registry_requires_all_identity_hashes(self):

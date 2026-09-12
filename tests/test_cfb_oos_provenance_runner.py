@@ -20,18 +20,32 @@ TEAM_KEYS = (
 )
 
 
-def _metrics(offset: float) -> dict[str, float]:
-    return {key: (i + 1) / 10.0 + offset for i, key in enumerate(TEAM_KEYS)}
+def _metrics(offset: float, *, season: int, week: int) -> dict:
+    metrics = {key: (i + 1) / 10.0 + offset for i, key in enumerate(TEAM_KEYS)}
+    if week == 1:
+        metrics.update({
+            "season": season - 1,
+            "through_week": 99,
+            "sample_source": "PRIOR_SEASON_FALLBACK",
+        })
+    else:
+        metrics.update({
+            "season": season,
+            "through_week": week - 1,
+            "sample_source": "CURRENT_SEASON_PRIOR_WEEKS",
+        })
+    return metrics
 
 
 def _row(season: int, index: int) -> dict:
+    week = index + 1
     return {
         "game_id": f"{season}_{index}",
         "season": season,
-        "week": index + 1,
+        "week": week,
         "neutral_site": False,
-        "home_metrics": _metrics(index / 100.0),
-        "away_metrics": _metrics((index + 5) / 110.0),
+        "home_metrics": _metrics(index / 100.0, season=season, week=week),
+        "away_metrics": _metrics((index + 5) / 110.0, season=season, week=week),
         "weather": {"game_indoor": False, "wind_speed": 7.0, "temperature": 68.0},
         "home_score": 20 + (index % 10),
         "away_score": 14 + ((index * 2) % 10),

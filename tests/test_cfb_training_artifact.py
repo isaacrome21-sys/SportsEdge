@@ -13,6 +13,7 @@ from sportsedge.sports.cfb.model_artifact import cfb_model_code_surface_sha256, 
 from sportsedge.sports.cfb.source_manifest import CFB_PIT_SOURCE_MANIFEST_SCHEMA
 from sportsedge.sports.cfb.training_artifact import (
     CFB_PIT_TRAINING_BUNDLE_SCHEMA,
+    CFB_TRAINING_FEATURE_SEMANTICS,
     CFBTrainingArtifactError,
     build_cfb_artifact_from_pit_bundle,
     validate_cfb_pit_training_bundle,
@@ -28,20 +29,36 @@ TEAM_KEYS = (
 )
 
 
-def _metrics(offset: float) -> dict:
-    return {key: float(index + 1) / 10.0 + offset for index, key in enumerate(TEAM_KEYS)}
+def _metrics(offset: float, *, season: int, game_week: int) -> dict:
+    values = {key: float(index + 1) / 10.0 + offset for index, key in enumerate(TEAM_KEYS)}
+    if game_week == 1:
+        values.update({
+            "season": season - 1,
+            "through_week": 99,
+            "sample_source": "PRIOR_SEASON_FALLBACK",
+            "feature_asof_ts": f"{season}-08-01T12:00:00+00:00",
+        })
+    else:
+        values.update({
+            "season": season,
+            "through_week": game_week - 1,
+            "sample_source": "CURRENT_SEASON_PRIOR_WEEKS",
+            "feature_asof_ts": f"{season}-09-01T12:00:00+00:00",
+        })
+    return values
 
 
 def _bundle() -> dict:
     rows = []
     for i in range(20):
+        week = (i % 12) + 1
         rows.append({
             "game_id": f"2025_{i:02d}_AWAY_HOME",
             "season": 2025,
-            "week": (i % 12) + 1,
+            "week": week,
             "neutral_site": False,
-            "home_metrics": _metrics(i / 100.0),
-            "away_metrics": _metrics((20 - i) / 120.0),
+            "home_metrics": _metrics(i / 100.0, season=2025, game_week=week),
+            "away_metrics": _metrics((20 - i) / 120.0, season=2025, game_week=week),
             "weather": {"game_indoor": False, "wind_speed": 5.0 + (i % 4), "temperature": 65.0 + (i % 9)},
             "home_score": 17 + (i % 18),
             "away_score": 13 + ((i * 3) % 20),
@@ -129,6 +146,7 @@ class CFBTrainingArtifactTests(unittest.TestCase):
             )
             self.assertEqual(provenance["row_count"], 20)
             self.assertEqual(provenance["train_seasons"], [2025])
+            self.assertEqual(provenance["feature_semantics"], CFB_TRAINING_FEATURE_SEMANTICS)
             self.assertTrue(provenance["source_snapshot_verified"])
             self.assertEqual(provenance["verified_source_count"], 2)
             self.assertEqual(provenance["ridge_fit_policy"]["mode"], "FIXED_MANUAL")
@@ -158,6 +176,29 @@ class CFBTrainingArtifactTests(unittest.TestCase):
         bundle = _bundle()
         bundle["rows"][0]["season"] = 2026
         with self.assertRaisesRegex(CFBTrainingArtifactError, "FUTURE_SEASON_FORBIDDEN"):
+            validate_cfb_pit_training_bundle(bundle, raw_bytes=_raw(bundle), fit_max_season=2025)
+
+    def test_full_season_aggregate_cannot_masquerade_as_pit_materializer(self):
+        bundle = _bundle()
+        row = bundle["rows"][5]
+        self.assertGreater(row["week"], 1)
+        row["home_metrics"].update({
+            "through_week": 99,
+            "sample_source": "CURRENT_SEASON_PRIOR_WEEKS",
+        })
+        with self.assertRaisesRegex(CFBTrainingArtifactError, "ASOF_WEEK_FEATURE_SEMANTICS_MISMATCH"):
+            validate_cfb_pit_training_bundle(bundle, raw_bytes=_raw(bundle), fit_max_season=2025)
+
+    def test_week1_requires_prior_season_fallback(self):
+        bundle = _bundle()
+        row = bundle["rows"][0]
+        self.assertEqual(row["week"], 1)
+        row["away_metrics"].update({
+            "season": 2025,
+            "through_week": 0,
+            "sample_source": "CURRENT_SEASON_PRIOR_WEEKS",
+        })
+        with self.assertRaisesRegex(CFBTrainingArtifactError, "WEEK1_FEATURE_SEMANTICS_MISMATCH"):
             validate_cfb_pit_training_bundle(bundle, raw_bytes=_raw(bundle), fit_max_season=2025)
 
     def test_market_contamination_cannot_enter_fitted_artifact(self):

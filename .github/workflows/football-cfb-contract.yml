@@ -98,19 +98,33 @@ jobs:
               'points_per_drive', 'net_field_position', 'explosive_rate',
           )
 
-          def metrics(offset: float) -> dict[str, float]:
-              return {key: round((index + 1) / 10.0 + offset, 8) for index, key in enumerate(team_keys)}
+          def metrics(offset: float, *, season: int, week: int) -> dict:
+              values = {key: round((index + 1) / 10.0 + offset, 8) for index, key in enumerate(team_keys)}
+              if week == 1:
+                  values.update({
+                      'season': season - 1,
+                      'through_week': 99,
+                      'sample_source': 'PRIOR_SEASON_FALLBACK',
+                  })
+              else:
+                  values.update({
+                      'season': season,
+                      'through_week': week - 1,
+                      'sample_source': 'CURRENT_SEASON_PRIOR_WEEKS',
+                  })
+              return values
 
           rows = []
           for i in range(36):
               season = 2022 + (i // 12)
+              week = (i % 12) + 1
               rows.append({
                   'game_id': f'fixture_{season}_{i:02d}_AWAY_HOME',
                   'season': season,
-                  'week': (i % 12) + 1,
+                  'week': week,
                   'neutral_site': bool(i % 7 == 0),
-                  'home_metrics': metrics(i / 100.0),
-                  'away_metrics': metrics((36 - i) / 120.0),
+                  'home_metrics': metrics(i / 100.0, season=season, week=week),
+                  'away_metrics': metrics((36 - i) / 120.0, season=season, week=week),
                   'weather': {
                       'game_indoor': bool(i % 9 == 0),
                       'wind_speed': float(4 + (i % 7)),
