@@ -81,7 +81,8 @@ class NFLV2GForwardCLVTests(unittest.TestCase):
         total=next(r for r in rows if r["market"]=="total")
         self.assertEqual(3.0,spread["probability_line"])
         self.assertEqual(41.5,total["probability_line"])
-        self.assertAlmostEqual(100/220,total["closing_novig_prob"])
+        expected_under_novig=0.5/(0.5+(120/220))
+        self.assertAlmostEqual(expected_under_novig,total["closing_novig_prob"])
         self.assertFalse(spread["promotion_authority"])
 
     def test_missing_original_threshold_is_inconclusive(self):
