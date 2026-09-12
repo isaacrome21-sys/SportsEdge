@@ -48,6 +48,21 @@ def _sha(raw: bytes) -> str:
     return sha256(raw).hexdigest()
 
 
+def _provider_error_code(raw: bytes) -> str | None:
+    """Extract a non-secret provider error code without retaining response text."""
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    code = payload.get("error_code")
+    if code is None:
+        return None
+    text = str(code).strip()
+    return text or None
+
+
 def _atomic(path: Path, raw: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
@@ -131,12 +146,21 @@ def collect_one(*, requested_at: str, root: Path = DEFAULT_ROOT, regions: str = 
                 body = exc.read()
             except Exception:
                 pass
-            attempts.append({"key_slot": slot, "http_status": int(exc.code), "error_body_sha256": _sha(body)})
+            provider_code = _provider_error_code(body)
+            attempt = {
+                "key_slot": slot,
+                "http_status": int(exc.code),
+                "error_body_sha256": _sha(body),
+            }
+            if provider_code is not None:
+                attempt["provider_code"] = provider_code
+            attempts.append(attempt)
             if int(exc.code) not in (401, 403):
                 return {
                     "status": "BLOCKED_PROVIDER_HTTP",
                     "http_status": int(exc.code),
                     "error_body_sha256": _sha(body),
+                    "provider_code": provider_code,
                     "requested_at": requested,
                     "attempted_key_slots": [a["key_slot"] for a in attempts],
                 }
@@ -149,10 +173,13 @@ def collect_one(*, requested_at: str, root: Path = DEFAULT_ROOT, regions: str = 
             }
 
     if raw is None or winning_slot is None:
+        provider_codes = sorted({str(a["provider_code"]) for a in attempts if a.get("provider_code")})
+        status = "BLOCKED_PROVIDER_CREDITS" if provider_codes == ["OUT_OF_USAGE_CREDITS"] else "BLOCKED_PROVIDER_AUTH"
         return {
-            "status": "BLOCKED_PROVIDER_AUTH",
+            "status": status,
             "requested_at": requested,
             "attempts": attempts,
+            "provider_codes": provider_codes,
             "configured_unique_key_slots": len(keys),
         }
 
@@ -197,6 +224,8 @@ def collect_one(*, requested_at: str, root: Path = DEFAULT_ROOT, regions: str = 
 
 def self_test() -> int:
     assert _canonical_request_ts("2026-06-05T22:35:00Z") == "2026-06-05T22:35:00Z"
+    assert _provider_error_code(b'{"error_code":"OUT_OF_USAGE_CREDITS"}') == "OUT_OF_USAGE_CREDITS"
+    assert _provider_error_code(b"not-json") is None
     raw = json.dumps({
         "timestamp": "2026-06-05T22:30:00Z",
         "previous_timestamp": "2026-06-05T22:25:00Z",
