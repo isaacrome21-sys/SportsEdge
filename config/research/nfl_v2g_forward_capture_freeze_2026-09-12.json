@@ -1,0 +1,21 @@
+{
+  "schema_version": "SPORTSEDGE_NFL_V2G_FORWARD_CAPTURE_FREEZE_V1",
+  "status": "FROZEN_BEFORE_FIRST_PROSPECTIVE_PREDICTION",
+  "candidate_id": "nfl_m2_scoring_event_v2g_candidate",
+  "frozen_research_artifact_sha256": "e7e591bf1ee7fbf6332cc6795aa1d7126fce9c6a43ac69c164b1f54433457977",
+  "capture_module_path": "sportsedge/sports/nfl/m2_v2g_forward.py",
+  "capture_module_git_blob_sha1": "065ad78852a51ba857446837cc0ecdabb686d0b0",
+  "capture_runner_path": "scripts/capture_nfl_v2g_prospective_predictions.py",
+  "capture_runner_git_blob_sha1": "23fecaa0494bc09ec1f031f0ba21668db5e462b8",
+  "capture_workflow_path": ".github/workflows/nfl-v2g-prospective-prediction-capture.yml",
+  "capture_workflow_git_blob_sha1": "4e55b06c1f3d4e0f39c489bbace995eaba59c4d8",
+  "first_write_rule": "A game prediction may be created once before kickoff. Existing bytes must validate against this exact candidate/artifact identity and may never be overwritten or regenerated.",
+  "schedule_rule": "Exact nflverse games.csv bytes are SHA256 archived. Only game_type, season, week, gameday, gametime, game_id, home_team, and away_team may determine the captured game identity/time inputs. Sportsbook price fields are forbidden model inputs.",
+  "temporal_rule": "captured_at_utc must be strictly after V2G preregistration and strictly before kickoff_utc.",
+  "capture_code_change_rule": "Any change to the frozen capture module, runner, or workflow Git blob requires a new append-only capture freeze before that changed code or workflow may create prospective prediction bytes.",
+  "promotion_authority": false,
+  "may_create_model_p": false,
+  "market_eligibility_changed": false,
+  "truth_gate_pass_granted": false,
+  "official_status_granted": false
+}
