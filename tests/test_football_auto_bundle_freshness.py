@@ -76,6 +76,16 @@ class FootballAutoBundleFreshnessTests(unittest.TestCase):
             self.assertEqual(rows[0]["reason"], "PLAYER_PROPS_OUTPUT_MISSING")
             self.assertIsNone(rows[0]["model_p"])
 
+    def test_cfb_prop_lane_is_explicit_no_engine(self):
+        executable, reason = BUNDLE._prop_lane_state("CFB")
+        self.assertFalse(executable)
+        self.assertIn("NO_ENGINE", reason)
+
+    def test_nfl_prop_lane_is_explicit_no_engine(self):
+        executable, reason = BUNDLE._prop_lane_state("NFL")
+        self.assertFalse(executable)
+        self.assertIn("NO_ENGINE", reason)
+
 
 if __name__ == "__main__":
     unittest.main()
