@@ -19,7 +19,17 @@
     "moneyline_cents_material": 15,
     "public_ticket_pct_material": 70.0,
     "require_independent_confirmation_for_public_signal": true,
-    "minimum_independent_source_families": 2
+    "minimum_independent_source_families": 2,
+    "public_confirmation_source_kinds": [
+      "market",
+      "sportsbook",
+      "odds",
+      "split",
+      "betting_split",
+      "line_history",
+      "exchange"
+    ],
+    "material_adverse_move_action": "WATCH"
   },
   "freshness": {
     "odds_max_age_minutes": 15,
@@ -38,8 +48,10 @@
   "price_quality": {
     "truth_gate_edge_floor": 0.03,
     "max_fraction_of_reference_edge_lost_before_price_decay": 0.50,
+    "max_same_line_implied_probability_gap": 0.015,
     "current_edge_below_truth_gate_floor_action": "NOT_OFFICIAL",
     "price_decay_action": "WATCH_OR_PASS",
+    "bad_price_action": "WATCH_OR_PASS",
     "never_backfill_missed_price": true
   },
   "injury_weather": {
@@ -68,9 +80,12 @@
     "MODEL_P_MISSING",
     "BENCHMARK_DISAGREEMENT",
     "PRICE_DECAY",
+    "BAD_PRICE",
+    "MOVE_ATE_VALUE",
     "PUBLIC_HEAVY_UNCONFIRMED",
     "INJURY_STALE_OR_UNKNOWN",
     "WEATHER_STALE_OR_MISSING",
+    "SEVERE_WEATHER_REVIEW",
     "PROMO_ONLY_EDGE",
     "MATERIAL_LINE_MOVE",
     "QUALIFIED_CONTEXT"
