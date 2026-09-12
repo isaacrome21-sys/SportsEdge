@@ -3,11 +3,11 @@
   "sports": {
     "MLB": {
       "lane": "PREGAME_MODEL",
-      "automatic_command": ["python", "scripts/run_auto_mlb_resilient.py", "--output", "artifacts/run_it/mlb_card.json"],
+      "automatic_command": ["python", "scripts/run_auto_mlb_resilient.py", "--require-confirmed-lineup", "--output", "artifacts/run_it/mlb_card.json"],
       "market_surface": "config/mlb_market_catalog.json",
       "governance_source": "config/deployments.json",
       "automatic_completeness": "FULL_FAIL_CLOSED",
-      "notes": "Native automatic MLB acquisition with resilient odds failover; promotion remains deployment/evidence gated."
+      "notes": "Native automatic MLB acquisition with resilient odds failover and confirmed-lineup enforcement; promotion remains deployment/evidence gated."
     },
     "NFL": {
       "lane": "PREGAME_MODEL_AND_PLAYER_PROPS",
