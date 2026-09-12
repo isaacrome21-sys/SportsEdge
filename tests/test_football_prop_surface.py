@@ -25,8 +25,18 @@ class FootballPropSurfaceTests(unittest.TestCase):
     def test_nfl_is_explicit_no_engine_until_independently_validated(self):
         self._assert_no_engine("NFL")
 
-    def test_cfb_is_explicit_no_engine_until_independently_validated(self):
-        self._assert_no_engine("CFB")
+    def test_cfb_engine_is_executable_but_evidence_gated(self):
+        payload = json.loads(Path("config/football_prop_engine_surface.json").read_text())
+        spec = payload["sports"]["CFB"]
+        self.assertEqual(spec["engine_state"], "IMPLEMENTED_FAIL_CLOSED")
+        self.assertEqual(spec["readiness_state"], "REGISTRY_DERIVED")
+        self.assertEqual(spec["promotion_state"], "AUTOMATIC_TRUTH_GATE_GATED")
+        self.assertNotIn("CFB", payload["explicit_no_engine"])
+
+        runtime = require_executable_prop_surface("CFB")
+        self.assertEqual(runtime["runtime_state"], "ARTIFACT_FROZEN_EVIDENCE_GATED")
+        self.assertEqual(runtime["frozen_artifact_sha256"], CFB_ARTIFACT_SHA)
+
         freeze = json.loads(Path("config/cfb_prop_model_freeze.json").read_text())
         self.assertEqual(freeze["status"], "FROZEN")
         self.assertEqual(freeze["artifact_sha256"], CFB_ARTIFACT_SHA)
@@ -43,7 +53,7 @@ class FootballPropSurfaceTests(unittest.TestCase):
         self.assertIn("player_sacks", declared)
         self.assertIn("player_tackles_assists", declared)
         self.assertIn("NFL", payload["explicit_no_engine"])
-        self.assertIn("CFB", payload["explicit_no_engine"])
+        self.assertNotIn("CFB", payload["explicit_no_engine"])
         self.assertIn("targets", payload["explicit_no_engine"])
         self.assertIn("first_td", payload["explicit_no_engine"])
         self.assertIn("last_td", payload["explicit_no_engine"])
