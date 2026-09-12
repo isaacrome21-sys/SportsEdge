@@ -73,7 +73,10 @@ jobs:
           if not manifests:
               raise SystemExit('CFB_FORWARD_PIT_CAPTURE_EMPTY')
 
-          captured_at = datetime.now(timezone.utc).replace(microsecond=0)
+          # Preserve sub-second precision. Flooring this boundary to whole seconds can
+          # falsely place a source retrieved at HH:MM:SS.xxx after the capture boundary
+          # even though the boundary is recorded only after every retrieval completes.
+          captured_at = datetime.now(timezone.utc)
           rows = []
           for manifest_path in manifests:
               payload = json.loads(manifest_path.read_text(encoding='utf-8'))
