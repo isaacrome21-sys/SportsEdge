@@ -70,7 +70,7 @@ def test_public_heavy_requires_independent_confirmation():
         base_row(
             tickets_pct=79,
             underlying_candidate=True,
-            sources=[{"family": "aggregator_a", "kind": "market", "independent": True}],
+            sources=[{"family": "aggregator_a", "kind": "betting_split", "independent": True}],
         ),
         POLICY,
     )
@@ -84,7 +84,7 @@ def test_capper_source_does_not_count_as_independent_confirmation():
             tickets_pct=80,
             underlying_candidate=True,
             sources=[
-                {"family": "aggregator_a", "kind": "market", "independent": True},
+                {"family": "aggregator_a", "kind": "betting_split", "independent": True},
                 {"family": "capper_x", "kind": "capper", "independent": True},
             ],
         ),
@@ -93,15 +93,16 @@ def test_capper_source_does_not_count_as_independent_confirmation():
     assert "PUBLIC_HEAVY_UNCONFIRMED" in result.reason_codes
 
 
-def test_news_and_weather_do_not_clear_public_confirmation_gate():
+def test_news_weather_and_plain_odds_do_not_clear_public_confirmation_gate():
     result = evaluate_signal(
         base_row(
             tickets_pct=80,
             underlying_candidate=True,
             sources=[
-                {"family": "aggregator_a", "kind": "market", "independent": True},
+                {"family": "aggregator_a", "kind": "betting_split", "independent": True},
                 {"family": "team_report", "kind": "news", "independent": True},
                 {"family": "weather_feed", "kind": "weather", "independent": True},
+                {"family": "sportsbook_native", "kind": "sportsbook", "independent": True},
             ],
         ),
         POLICY,
@@ -109,14 +110,14 @@ def test_news_and_weather_do_not_clear_public_confirmation_gate():
     assert "PUBLIC_HEAVY_UNCONFIRMED" in result.reason_codes
 
 
-def test_two_independent_market_source_families_clear_public_confirmation_gate():
+def test_two_independent_split_source_families_clear_public_confirmation_gate():
     result = evaluate_signal(
         base_row(
             tickets_pct=80,
             underlying_candidate=True,
             sources=[
-                {"family": "aggregator_a", "kind": "market", "independent": True},
-                {"family": "sportsbook_native", "kind": "sportsbook", "independent": True},
+                {"family": "aggregator_a", "kind": "betting_split", "independent": True},
+                {"family": "sportsbook_native", "kind": "sportsbook_split", "independent": True},
             ],
         ),
         POLICY,
