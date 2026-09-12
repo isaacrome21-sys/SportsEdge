@@ -1,0 +1,4 @@
+triggered_at_utc=2026-09-12T12:23:00Z
+purpose=force actions index refresh for bounded historical probe dispatcher
+promotion_authority=false
+eligibility_change=false
