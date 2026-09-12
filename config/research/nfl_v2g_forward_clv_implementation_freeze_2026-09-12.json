@@ -18,7 +18,7 @@
     },
     {
       "path": ".github/workflows/nfl-v2g-forward-clv.yml",
-      "git_blob_sha1": "e5d589409978dba9a747ed428cfe50af26ef5194"
+      "git_blob_sha1": "3d2f6fb6f9bf201057ee880b3ed28d7ea3cb3bce"
     },
     {
       "path": "tests/test_nfl_v2g_forward_clv.py",
