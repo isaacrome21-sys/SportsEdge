@@ -42,6 +42,8 @@
     "paper_after_vig_roi_required": true,
     "clv_required": true,
     "clv_probability_threshold": 0.005,
+    "probability_clv_gate_requires_full_paper_candidate_comparability": true,
+    "line_clv_is_diagnostic_only_for_probability_clv_gate": true,
     "after_vig_roi_threshold": 0.02,
     "calibration_slope_min": 0.90,
     "calibration_slope_max": 1.10,
