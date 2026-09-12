@@ -101,8 +101,8 @@ jobs:
             git commit -m "provider: persist DraftKings NFL prop probe ${{ github.run_id }}"
             git push origin HEAD:data
           fi
-      - name: Propagate provider result
-        if: always()
+      - name: Enforce provider acceptance on manual dispatch only
+        if: always() && github.event_name == 'workflow_dispatch'
         shell: bash
         run: |
           code='${{ steps.probe.outputs.exit_code }}'
@@ -111,3 +111,16 @@ jobs:
             exit 4
           fi
           exit "$code"
+      - name: Report provider availability without blocking PR contracts
+        if: always() && github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          code='${{ steps.probe.outputs.exit_code }}'
+          if [[ -z "$code" ]]; then
+            echo 'NFL_PROP_PROVIDER_PROBE_DID_NOT_RUN' >&2
+            exit 4
+          fi
+          if [[ "$code" != '0' ]]; then
+            echo 'NFL_PROP_PROVIDER_NOT_ACCEPTED: PR parser/contracts may pass, but provider readiness remains BLOCKED.'
+          fi
+          exit 0
