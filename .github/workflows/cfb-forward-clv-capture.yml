@@ -45,7 +45,9 @@ jobs:
           python-version: '3.12'
 
       - name: Verify frozen CFB capture contract
-        run: python -m unittest tests.test_cfb_forward_clv_capture -v
+        run: |
+          python -m unittest tests.test_cfb_forward_clv_capture -v
+          python -m unittest tests.test_cfb_forward_clv_governance -v
 
       - name: Attach append-only data branch
         if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.phase != 'check') }}
