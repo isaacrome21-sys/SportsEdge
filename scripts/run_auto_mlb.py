@@ -21,7 +21,7 @@ def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--output", default="artifacts/live_mlb_card.json")
     p.add_argument("--prediction-journal-dir", default="artifacts/prediction_journal")
-    p.add_argument("--require-confirmed-lineup", action="store_true")
+    p.add_argument("--require-confirmed-lineup", action=argparse.BooleanOptionalAction, default=True)
     p.add_argument("--edge-floor-config", default=DEFAULT_EDGE_FLOOR_CONFIG)
     p.add_argument("--kelly-multiplier", type=float, default=0.25)
     args = p.parse_args()
