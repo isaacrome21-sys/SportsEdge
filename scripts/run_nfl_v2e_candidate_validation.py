@@ -30,7 +30,10 @@ from sportsedge.sports.nfl.history import normalize_nfl_rows, parse_schedule_csv
 from sportsedge.sports.nfl.m2_history_features import fit_nfl_prior_decay_curves
 from sportsedge.sports.nfl.m2_history_policy import build_nfl_m2_history_rows
 from sportsedge.sports.nfl.m2_v2e_candidate import NFL_M2_V2E_PIT_STATE_FIELDS
-from sportsedge.sports.nfl.m2_v2e_drives import build_v2e_drive_training_rows
+from sportsedge.sports.nfl.m2_v2e_drives import (
+    V2E_TEAM_ALIAS_POLICY,
+    build_v2e_drive_training_rows,
+)
 from sportsedge.sports.nfl.m2_v2e_validation import build_nfl_m2_v2e_candidate_evidence
 
 _GIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -109,7 +112,10 @@ def _join_drive_targets(history_rows: list[dict], drive_rows: list[dict]) -> lis
         if target is None:
             raise SystemExit(f"NFL_M2_V2E_DRIVE_TARGET_MISSING:{game_id}")
         for key, value in target.items():
-            if key in {"game_id", "season", "home_team", "away_team", "source_contract"}:
+            if key in {
+                "game_id", "season", "home_team", "away_team", "source_contract",
+                "team_alias_policy", "team_alias_application_count",
+            }:
                 continue
             if key.startswith(target_prefixes):
                 row[key] = value
@@ -206,6 +212,10 @@ def main() -> int:
         raise SystemExit("NFL_M2_V2E_HISTORY_GAME_IDENTITY_INVALID")
     drive_schedule = _identity_schedule(schedule, allowed_game_ids=retained_game_ids)
     drive_rows = build_v2e_drive_training_rows(drive_schedule, pbp)
+    alias_application_count = sum(int(row.get("team_alias_application_count") or 0) for row in drive_rows)
+    alias_policies = {str(row.get("team_alias_policy") or "") for row in drive_rows}
+    if alias_policies != {V2E_TEAM_ALIAS_POLICY}:
+        raise SystemExit("NFL_M2_V2E_TEAM_ALIAS_POLICY_MISMATCH")
     combined_rows = _join_drive_targets(history_rows, drive_rows)
     evidence = build_nfl_m2_v2e_candidate_evidence(
         combined_rows,
@@ -220,6 +230,8 @@ def main() -> int:
         "drive_target_row_count": len(drive_rows),
         "combined_row_count": len(combined_rows),
         "drive_target_scope": "EXACT_RETAINED_PRODUCTION_HISTORY_GAME_IDS",
+        "drive_team_alias_policy": V2E_TEAM_ALIAS_POLICY,
+        "drive_team_alias_application_count": alias_application_count,
         "pit_state_fields": list(NFL_M2_V2E_PIT_STATE_FIELDS),
         "pit_state_conditions_drive_volume": True,
         "pit_state_conditions_scoring_event_mix": True,
@@ -239,6 +251,8 @@ def main() -> int:
         "status": "V2E_DIAGNOSTIC_COMPLETE",
         "history_rows": len(history_rows),
         "drive_rows": len(drive_rows),
+        "drive_team_alias_policy": V2E_TEAM_ALIAS_POLICY,
+        "drive_team_alias_application_count": alias_application_count,
         "candidate_historical_evidence": evidence["candidate_historical_evidence"],
         "signed_key_probability": evidence["candidate_distribution_profile"]["signed_key_probability"],
         "promotion_eligible": False,
