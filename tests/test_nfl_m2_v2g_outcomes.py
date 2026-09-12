@@ -1,10 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from hashlib import sha256
-import json
-from pathlib import Path
-
 import pytest
 
 from scripts.settle_nfl_v2g_prospective_outcomes import (
@@ -73,7 +68,7 @@ def _schedule_row(**overrides):
     return row
 
 
-def test_outcome_binds_prediction_and_objective_score_only():
+def _outcome():
     record = build_outcome(
         prediction=_prediction(),
         schedule_row=_schedule_row(),
@@ -83,6 +78,11 @@ def test_outcome_binds_prediction_and_objective_score_only():
         min_hours_after_kickoff=8.0,
     )
     assert record is not None
+    return record
+
+
+def test_outcome_binds_prediction_and_objective_score_only():
+    record = _outcome()
     assert record["home_score"] == 27
     assert record["away_score"] == 20
     assert record["final_margin_home_minus_away"] == 7
@@ -141,26 +141,32 @@ def test_outcome_fails_closed_on_schedule_identity_mismatch():
 
 
 def test_outcome_hash_detects_mutation():
-    record = build_outcome(
-        prediction=_prediction(),
-        schedule_row=_schedule_row(),
-        schedule_sha256=SCHEDULE_SHA,
-        settlement_code_git_sha=CODE_SHA,
-        observed_at_utc="2026-09-14T03:00:00+00:00",
-    )
-    assert record is not None
-    mutated = dict(record, home_score=28)
-    with pytest.raises(OutcomeError, match="NFL_V2G_OUTCOME_SHA_MISMATCH"):
+    mutated = dict(_outcome(), outcome_source="OTHER")
+    with pytest.raises(OutcomeError, match="NFL_V2G_OUTCOME_SOURCE_INVALID"):
         validate_outcome(mutated)
 
 
+def test_rehashed_outcome_still_rejects_inconsistent_score_arithmetic():
+    malformed = dict(_outcome(), home_score=28)
+    malformed["outcome_sha256"] = outcome_sha256(malformed)
+    with pytest.raises(OutcomeError, match="NFL_V2G_OUTCOME_MARGIN_INCONSISTENT"):
+        validate_outcome(malformed)
+
+
+def test_rehashed_outcome_still_rejects_early_observation():
+    malformed = dict(_outcome(), observed_at_utc="2026-09-13T20:00:00+00:00")
+    malformed["outcome_sha256"] = outcome_sha256(malformed)
+    with pytest.raises(OutcomeError, match="NFL_V2G_OUTCOME_OBSERVED_TOO_EARLY"):
+        validate_outcome(malformed)
+
+
+def test_rehashed_outcome_still_rejects_bad_bound_hash():
+    malformed = dict(_outcome(), prediction_sha256="not-a-sha")
+    malformed["outcome_sha256"] = outcome_sha256(malformed)
+    with pytest.raises(OutcomeError, match="NFL_V2G_OUTCOME_HASH_INVALID:prediction_sha256"):
+        validate_outcome(malformed)
+
+
 def test_outcome_hash_is_canonical_and_self_excluding():
-    record = build_outcome(
-        prediction=_prediction(),
-        schedule_row=_schedule_row(),
-        schedule_sha256=SCHEDULE_SHA,
-        settlement_code_git_sha=CODE_SHA,
-        observed_at_utc="2026-09-14T03:00:00+00:00",
-    )
-    assert record is not None
+    record = _outcome()
     assert outcome_sha256(record) == record["outcome_sha256"]
