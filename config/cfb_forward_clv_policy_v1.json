@@ -1,9 +1,9 @@
 {
   "policy_id": "CFB_FORWARD_CLV_POLICY_V1",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "sport": "CFB",
   "status": "FROZEN",
-  "frozen_at_ct": "2026-09-12T10:55:31-05:00",
+  "frozen_at_ct": "2026-09-12T11:12:47-05:00",
   "first_admissible_slate_ct": "2026-09-19",
   "activation": {
     "branch": "main",
@@ -48,11 +48,24 @@
       "note": "The decision price is sealed on write. It is never replaced by a later or closing price. ROI, if computed, uses the decision price only."
     },
     "close": {
-      "target_ct": "T-60s before scheduled kickoff",
-      "retry_window_ct": "T-15m through T-60s",
+      "window": "T-20m through T-0 actual start",
+      "boundary_basis": "DUAL_SOURCE_PRE_START_PLUS_POSTHOC_FIRST_PLAY_ATTESTATION",
+      "boundary_note": "Validity is determined by actual event start, not by scheduled kickoff alone. A capture at scheduled kickoff may remain valid if the event has not actually started. A capture at or after actual start is invalid.",
       "retry_interval_seconds": 60,
+      "selection_rule": "LAST_SUCCESSFUL_VALID_CAPTURE",
+      "selection_note": "Deterministic closest valid capture before actual start after all status, book-state, freshness, and first-play attestation checks. No analyst discretion.",
+      "post_start_capture_prohibited": true,
       "missed_close_handling": "CLV_MISSING, row RETAINED IN DENOMINATOR",
-      "note": "A missed close is a failure of the capture lane, not a reason to drop the row. Dropping missed closes would bias the CLV estimate."
+      "backfill_prohibited": true,
+      "note": "A missed close is a failure of the capture lane, not a reason to drop the row. Dropping missed closes would bias the CLV estimate.",
+      "authoritative_status_source": "ESPN_CFB_SCOREBOARD_EVENT_STATUS",
+      "max_status_read_age_seconds": 30,
+      "status_requirement": "PRE_START_ONLY; UNKNOWN, missing, stale, or in-progress => INVALID",
+      "book_requirement": "DraftKings same-book quote must expose the requested pregame market two-sided at capture; missing, suspended, or one-sided => INVALID",
+      "dual_source_rule": "Both authoritative event status and DraftKings pregame market state must independently pass. Either failure => INVALID.",
+      "actual_start_attestation": "Final evidence admissibility requires immutable first-play/event-start timestamp validation after the game. capture_timestamp >= first_play_timestamp => INVALID_POST_START even if live status was late.",
+      "delay_handling": "Scheduled kickoff only seeds monitoring. Updated announced kickoff may re-anchor monitoring. If status remains DELAYED/PRE_START without a reliable new kickoff, continue status polling and preserve enough quote polling to cover the eventual T-20m..T-0 actual-start window. Selection remains LAST_SUCCESSFUL_VALID_CAPTURE.",
+      "postponed_handling": "POSTPONED_TO_OTHER_DATE => current close row VOID_POSTPONED and never reused; recapture under a fresh scheduled/actual-start window on the new date."
     }
   },
   "quote_hygiene": {
@@ -120,10 +133,7 @@
     "standard_errors": {
       "method": "CR1_ONE_WAY_CLUSTER_ROBUST",
       "cluster_unit": "slate_date_ct",
-      "iid_fallback_prohibited": true,
-      "small_sample_reference": "STUDENT_T_DF_G_MINUS_1",
-      "two_sided_95_critical_rule": "MAX_OF_T_STAT_MIN_AND_T_0.975_DF_G_MINUS_1",
-      "note": "The 12-slate requirement is a hard floor, not a claim that 12 clusters is asymptotically sufficient. At G clusters, inference uses the larger of the frozen t_stat_min and the two-sided 95% Student-t critical value with G-1 degrees of freedom."
+      "iid_fallback_prohibited": true
     },
     "clv": {
       "mean_no_vig_clv_pp_min": 0.5,
@@ -164,7 +174,10 @@
     "missing genuine Model_P on a model-claimed row",
     "Layer B / market-context row present in this ledger",
     "evidence mixed across sources or lane definitions",
-    "backfilled capture timestamp"
+    "backfilled capture timestamp",
+    "stale, UNKNOWN, or conflicting event-status attestation on a close capture",
+    "DraftKings pregame market not two-sided/open at close capture",
+    "capture timestamp at or after immutable first-play/event-start timestamp"
   ],
   "warnings_not_blocks": [
     "MC standard error above target",
