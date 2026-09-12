@@ -75,6 +75,41 @@ def _read_projected(path: Path, fields: set[str]) -> list[dict[str, str]]:
         return [{name: row.get(name, "") for name in fields} for row in reader]
 
 
+def _identity_scoped_pbp(rows: Iterable[dict[str, str]]) -> tuple[list[dict[str, str]], int]:
+    """Keep only rows that can belong to an offensive possession.
+
+    nflverse PBP includes administrative/special-teams rows with no drive identity.
+    Those rows are not offensive possessions and must not abort the structural
+    possession model. A made field goal without possession identity still blocks,
+    because silently dropping it would corrupt an offensive scoring count. A
+    touchdown without drive identity is allowed to drop only for kickoff/punt
+    return play types, which are explicitly outside the offensive-possession
+    scoring contract.
+    """
+    kept: list[dict[str, str]] = []
+    dropped = 0
+    for raw in rows:
+        row = dict(raw)
+        posteam = str(row.get("posteam") or "").strip()
+        drive = str(row.get("drive") or "").strip()
+        if posteam and drive:
+            kept.append(row)
+            continue
+
+        play_type = str(row.get("play_type") or "").strip().lower()
+        fg_made = play_type == "field_goal" and str(row.get("field_goal_result") or "").strip().lower() == "made"
+        try:
+            touchdown = float(row.get("touchdown") or 0.0) == 1.0
+        except (TypeError, ValueError):
+            touchdown = False
+        if fg_made:
+            raise ValueError(f"NFL_V2G_SCORING_EVENT_IDENTITY_MISSING:{row.get('game_id')}:FIELD_GOAL")
+        if touchdown and play_type not in {"kickoff", "punt"}:
+            raise ValueError(f"NFL_V2G_SCORING_EVENT_IDENTITY_MISSING:{row.get('game_id')}:TOUCHDOWN:{play_type}")
+        dropped += 1
+    return kept, dropped
+
+
 def _load_manifest(path: Path) -> tuple[dict[str, Any], dict[str, str], str]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if payload.get("schema_version") != 1 or payload.get("sport") != "nfl":
@@ -155,13 +190,16 @@ def build(
         schedule_rows.append({field: raw.get(field) for field in SCHEDULE_FIELDS})
 
     pbp_rows: list[dict[str, str]] = []
+    ignored_unscoped_rows = 0
     source_files: dict[str, str] = {"schedule": _sha256_file(schedule_file)}
     for season in range(start_season, end_season + 1):
         path = _pbp_path(pbp_dir, season)
         label = f"pbp_{season}"
         _verify_source(path, expected.get(label), label)
         source_files[label] = _sha256_file(path)
-        pbp_rows.extend(_read_projected(path, PBP_FIELDS))
+        scoped, dropped = _identity_scoped_pbp(_read_projected(path, PBP_FIELDS))
+        pbp_rows.extend(scoped)
+        ignored_unscoped_rows += dropped
 
     event_rows = build_nfl_v2g_game_event_rows(schedule_rows, pbp_rows)
     event_rows = [row for row in event_rows if start_season <= int(row["season"]) <= end_season]
@@ -195,6 +233,7 @@ def build(
         "candidate_id": NFL_M2_V2G_CANDIDATE_MODEL_ID,
         "season_range": [start_season, end_season],
         "event_row_count": len(event_rows),
+        "ignored_unscoped_pbp_row_count": ignored_unscoped_rows,
         "training_event_rows_sha256": training_sha,
         "source_manifest_sha256": source_manifest_sha,
         "source_files_sha256": source_files,
