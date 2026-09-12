@@ -1,11 +1,11 @@
 """NFL M2 V2E diagnostic candidate: possession-level discrete scoring model.
 
-This module is research-only.  It deliberately leaves production M2, the
+This module is research-only. It deliberately leaves production M2, the
 promotion registry, eligibility, staking, and market pricing untouched.
 
 V2E changes the generative architecture rather than tuning the already-observed
-V2A/V2B/V2C/V2D score-regression family.  Training rows contain only realized
-football possession counts/outcomes plus pregame market-blind state.  The model
+V2A/V2B/V2C/V2D score-regression family. Training rows contain only realized
+football possession counts/outcomes plus pregame market-blind state. The model
 fits a small possession-count distribution and discrete scoring-event rates,
 then creates coherent integer home/away scores before any sportsbook line is
 applied.
@@ -22,13 +22,15 @@ NFL_M2_V2E_CANDIDATE_MODEL_ID = "nfl_m2_possession_discrete_v2e_candidate"
 NFL_M2_V2E_DISTRIBUTION_CONTRACT = "NFL_M2_V2E_POSSESSION_DISCRETE_SCORE_V1"
 NFL_M2_V2E_FEATURE_CONTRACT = "NFL_M2_V2E_MARKET_BLIND_DRIVE_STATE_V1"
 
-_OUTCOMES = ("td_xp", "td_2pt", "td_no_try", "fg", "safety", "no_score")
-_POINTS = {
+# safety_allowed is attached to the offense's possession but scores two points
+# for the opponent. This preserves actual football scoring mechanics.
+_OUTCOMES = ("td_xp", "td_2pt", "td_no_try", "fg", "safety_allowed", "no_score")
+_OWN_POINTS = {
     "td_xp": 7,
     "td_2pt": 8,
     "td_no_try": 6,
     "fg": 3,
-    "safety": 2,
+    "safety_allowed": 0,
     "no_score": 0,
 }
 _PROHIBITED_MARKET_KEYS = {
@@ -260,16 +262,20 @@ def derive_nfl_m2_v2e_score_distribution(
         away_drives = _poisson_quantile(away_drive_u, away_mean)
 
         home_score = 0
+        away_score = 0
         for drive in range(home_drives):
             u = ((base_u + (drive + 1) * 0.4142135623730951) * 0.6180339887498949) % 1.0
             outcome = _OUTCOMES[_categorical_quantile(u, model.home_outcome_probabilities)]
-            home_score += _POINTS[outcome]
+            home_score += _OWN_POINTS[outcome]
+            if outcome == "safety_allowed":
+                away_score += 2
 
-        away_score = 0
         for drive in range(away_drives):
             u = ((base_u + (drive + 1) * 0.7320508075688772 + 0.17) * 0.4142135623730950) % 1.0
             outcome = _OUTCOMES[_categorical_quantile(u, model.away_outcome_probabilities)]
-            away_score += _POINTS[outcome]
+            away_score += _OWN_POINTS[outcome]
+            if outcome == "safety_allowed":
+                home_score += 2
 
         paths.append({"home_score": home_score, "away_score": away_score})
     return tuple(paths)
