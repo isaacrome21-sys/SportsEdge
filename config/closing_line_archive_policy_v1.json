@@ -1,0 +1,34 @@
+{
+  "policy_id": "CLOSING_LINE_ARCHIVE_V1",
+  "status": "ACTIVE",
+  "evidence_class": "NOT_EVIDENCE",
+  "promotion_authority": false,
+  "evidence_clock_authority": false,
+  "doctrine": "Model-free two-sided price archival for NFL, CFB and MLB. This lane observes prices only. It contains no Model_P, no evidence_unit_id, and no decision. It can never be promoted, can never start or extend a promotion evidence clock, and can never be substituted for FOOTBALL_FORWARD_CAPTURE_V2 or MLB replay evidence. Its sole purpose is to accumulate a closing-line dataset that does not currently exist in any free source.",
+  "sports": {
+    "NFL": "americanfootball_nfl",
+    "CFB": "americanfootball_ncaaf",
+    "MLB": "baseball_mlb"
+  },
+  "books": ["draftkings", "pinnacle"],
+  "markets": ["h2h", "spreads", "totals"],
+  "regions": "us,eu",
+  "odds_format": "american",
+  "windows": {
+    "decision": {"min_minutes_before_start": 45, "max_minutes_before_start": 120},
+    "close": {"min_minutes_before_start": 2, "max_minutes_before_start": 20}
+  },
+  "event_index_endpoint_is_free": true,
+  "persistence": {
+    "branch": "data",
+    "path_template": "archive/closing-lines/{sport_key}/{date}.ndjson",
+    "append_only": true,
+    "duplicate_key": ["sport_key", "event_id", "book", "market", "outcome", "point", "window", "captured_at"]
+  },
+  "integrity": {
+    "two_sided_required": true,
+    "must_be_before_start": true,
+    "never_overwrite_captured_price": true,
+    "missing_capture_is_recorded_not_imputed": true
+  }
+}
