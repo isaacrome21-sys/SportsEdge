@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -29,15 +30,39 @@ def main() -> int:
     key = os.environ.get("SPORTSEDGE_ODDSPAPI_KEY", "").strip()
     if not key:
         print(json.dumps({"status": "BLOCKED_NO_ODDSPAPI_KEY", "required_secret": "SPORTSEDGE_ODDSPAPI_KEY"}))
-        return 2
+        return 78
     url = f"{BASE}/markets?" + urlencode({"apiKey": key, "language": "en"})
     req = Request(url, headers={"Accept": "application/json", "User-Agent": "SportsEdge-V8-OddsPapi-Catalog/1.0"})
-    with urlopen(req, timeout=60) as response:
-        raw = response.read()
-        headers = {str(k).lower(): str(v) for k, v in response.headers.items()}
+    try:
+        with urlopen(req, timeout=60) as response:
+            raw = response.read()
+            headers = {str(k).lower(): str(v) for k, v in response.headers.items()}
+    except HTTPError as exc:
+        if exc.code in (401, 403):
+            print(json.dumps({
+                "status": "BLOCKED_ODDSPAPI_CREDENTIAL_UNAUTHORIZED",
+                "http_status": exc.code,
+                "required_secret": "SPORTSEDGE_ODDSPAPI_KEY",
+                "provider": "ODDSPAPI_HISTORICAL",
+            }, sort_keys=True))
+            return 79
+        print(json.dumps({
+            "status": "PROVIDER_HTTP_BLOCKED",
+            "http_status": exc.code,
+            "provider": "ODDSPAPI_HISTORICAL",
+        }, sort_keys=True))
+        return 80
+    except (URLError, TimeoutError) as exc:
+        print(json.dumps({
+            "status": "PROVIDER_NETWORK_BLOCKED",
+            "reason": type(exc).__name__,
+            "provider": "ODDSPAPI_HISTORICAL",
+        }, sort_keys=True))
+        return 81
     payload = json.loads(raw.decode("utf-8"))
     if not isinstance(payload, list) or not payload:
-        raise SystemExit("ODDSPAPI_MARKET_CATALOG_INVALID")
+        print(json.dumps({"status": "ODDSPAPI_MARKET_CATALOG_INVALID"}, sort_keys=True))
+        return 82
     atomic(OUT, raw)
     meta = {
         "source": "ODDSPAPI_MARKET_CATALOG",
