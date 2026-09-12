@@ -1,0 +1,69 @@
+name: cfb-pit-readiness-contract
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'sportsedge/sports/cfb/pit_readiness.py'
+      - 'sportsedge/sports/cfb/source_manifest.py'
+      - 'scripts/audit_cfb_pit_readiness.py'
+      - 'tests/test_cfb_pit_readiness.py'
+      - 'config/cfb_truth_gate_v1.json'
+      - '.github/workflows/cfb-pit-readiness-contract.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'sportsedge/sports/cfb/pit_readiness.py'
+      - 'sportsedge/sports/cfb/source_manifest.py'
+      - 'scripts/audit_cfb_pit_readiness.py'
+      - 'tests/test_cfb_pit_readiness.py'
+      - 'config/cfb_truth_gate_v1.json'
+      - '.github/workflows/cfb-pit-readiness-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Install test dependency
+        run: python -m pip install --disable-pip-version-check numpy==2.5.3
+      - name: Compile readiness surface
+        run: >-
+          python -m py_compile
+          sportsedge/sports/cfb/pit_readiness.py
+          scripts/audit_cfb_pit_readiness.py
+      - name: Run readiness contract tests
+        run: python -m unittest tests.test_cfb_pit_readiness -v
+      - name: Prove empty real evidence fails closed
+        run: |
+          python scripts/audit_cfb_pit_readiness.py \
+            --output artifacts/cfb/pit_readiness_empty.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path('artifacts/cfb/pit_readiness_empty.json').read_text())
+          if report.get('readiness_state') != 'BLOCKED_EVIDENCE_INCOMPLETE':
+              raise SystemExit(f"CFB_PIT_EMPTY_NOT_BLOCKED:{report.get('readiness_state')}")
+          if report.get('forward_clock_allowed') is not False:
+              raise SystemExit('CFB_PIT_EMPTY_FORWARD_CLOCK_ALLOWED')
+          if report.get('promotion_authority') is not False:
+              raise SystemExit('CFB_PIT_READINESS_PROMOTION_AUTHORITY_FORBIDDEN')
+          if report.get('eligibility_changed') is not False:
+              raise SystemExit('CFB_PIT_READINESS_ELIGIBILITY_CHANGE_FORBIDDEN')
+          PY
+      - name: Upload readiness diagnostic
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cfb-pit-readiness-contract
+          path: artifacts/cfb/pit_readiness_empty.json
+          if-no-files-found: warn
+          retention-days: 30
