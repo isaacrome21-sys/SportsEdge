@@ -1,5 +1,5 @@
 trigger: cfb-forward-pit
-reason: exercise hardened prospective predictive-source capture after byte-binding validator merged
-source_main_sha: fee4b37214e4d5eaa8e8ab074b380b838159d275
+reason: verify precise post-retrieval capture timestamp on canonical hardened workflow
+source_main_sha: 870408e229548ffbac33b585709195ceb8d9427c
 backfill: false
 promotion_authority: false
