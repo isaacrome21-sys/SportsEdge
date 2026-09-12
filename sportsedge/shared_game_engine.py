@@ -23,6 +23,7 @@ from .v7_distribution import (
 
 STAGE1_GAME_MARKETS = frozenset({"MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS"})
 V8_PRIMARY_GAME_DEFAULT_SIMULATIONS = 100000
+V8_PRIMARY_GAME_MIN_SIMULATIONS = 100000
 
 
 class SharedGameEngineError(ValueError):
@@ -41,15 +42,15 @@ def _finite_positive(value: Any, name: str) -> float:
     return out
 
 
-def _simulation_count(value: Any) -> int:
+def _simulation_count(value: Any, *, minimum: int = V8_PRIMARY_GAME_MIN_SIMULATIONS) -> int:
     if isinstance(value, bool):
-        raise SharedGameEngineError("simulations must be integer >= 1000")
+        raise SharedGameEngineError(f"simulations must be integer >= {minimum}")
     try:
         out = int(value)
     except (TypeError, ValueError) as exc:
-        raise SharedGameEngineError("simulations must be integer >= 1000") from exc
-    if out < 1000:
-        raise SharedGameEngineError("simulations must be integer >= 1000")
+        raise SharedGameEngineError(f"simulations must be integer >= {minimum}") from exc
+    if out < minimum:
+        raise SharedGameEngineError(f"simulations must be integer >= {minimum}")
     return out
 
 
@@ -68,8 +69,22 @@ def score_distribution_sha256(distribution: GameDistribution) -> str:
 def build_shared_game_engine_session(
     *,
     simulator: Callable[..., GameDistribution] = simulate_game_distribution,
+    _minimum_simulations_for_test: int | None = None,
 ) -> Callable[[Mapping[str, Any]], dict[str, Any]]:
-    """Return one per-card engine closure with an internal distribution cache."""
+    """Return one per-card engine closure with an internal distribution cache.
+
+    Production always enforces the frozen V8 100k path floor. A lower minimum is
+    available only when a non-production simulator is injected by tests; the
+    canonical registry never supplies this escape hatch.
+    """
+    minimum_simulations = V8_PRIMARY_GAME_MIN_SIMULATIONS
+    if _minimum_simulations_for_test is not None:
+        if simulator is simulate_game_distribution:
+            raise SharedGameEngineError("test simulation floor override requires injected simulator")
+        if isinstance(_minimum_simulations_for_test, bool) or int(_minimum_simulations_for_test) < 1000:
+            raise SharedGameEngineError("test simulation floor override must be >= 1000")
+        minimum_simulations = int(_minimum_simulations_for_test)
+
     cache: dict[str, tuple[GameDistribution, str]] = {}
 
     def engine(model_input: Mapping[str, Any]) -> dict[str, Any]:
@@ -83,7 +98,8 @@ def build_shared_game_engine_session(
         away_mean = _finite_positive(model_input.get("away_mean_runs"), "away_mean_runs")
         home_mean = _finite_positive(model_input.get("home_mean_runs"), "home_mean_runs")
         simulations = _simulation_count(
-            model_input.get("simulations", V8_PRIMARY_GAME_DEFAULT_SIMULATIONS)
+            model_input.get("simulations", V8_PRIMARY_GAME_DEFAULT_SIMULATIONS),
+            minimum=minimum_simulations,
         )
         feature_source_hash = model_input.get("feature_source_hash")
 
