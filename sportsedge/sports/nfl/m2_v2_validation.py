@@ -2,7 +2,7 @@
 
 The candidate is evaluated against the same closing no-vig M1 benchmark and the
 same fold-safe isotonic calibration machinery as production M2, but its output is
-diagnostic-only.  Nothing in this module can alter the production registry.
+diagnostic-only. Nothing in this module can alter the production registry.
 """
 from __future__ import annotations
 
@@ -21,6 +21,11 @@ from .m2_v2_candidate import (
     derive_nfl_m2_v2_score_distribution,
     fit_nfl_m2_v2_candidate,
     price_nfl_m2_v2_game_markets,
+)
+from .m2_v2_selector import (
+    DEFAULT_KERNEL_SCALE_GRID,
+    NFL_M2_V2_SELECTOR_CONTRACT,
+    select_nfl_m2_v2_kernel_scales,
 )
 from .m2 import NFL_M2_FEATURE_CONTRACT
 from .production_validation import nflverse_spread_to_home_handicap
@@ -60,26 +65,82 @@ def _conditional_probability(win: float, loss: float) -> float | None:
     return _clip(float(win) / denominator)
 
 
-def build_nfl_m2_v2_raw_evaluations(
+def _fixed_scale_selection(
+    *,
+    fold_train_seasons: Iterable[int],
+    kernel_scale: float,
+    scale_grid: Iterable[float],
+) -> dict[str, Any]:
+    return {
+        "contract": NFL_M2_V2_SELECTOR_CONTRACT,
+        "status": "DISABLED_FIXED_SCALE",
+        "market_data_used": False,
+        "outer_training_seasons": sorted({int(season) for season in fold_train_seasons}),
+        "inner_test_seasons": [],
+        "scale_grid": [float(value) for value in scale_grid],
+        "evaluation_game_count": 0,
+        "selected_margin_kernel_scale": float(kernel_scale),
+        "selected_total_kernel_scale": float(kernel_scale),
+        "selection_objective": None,
+        "candidate_scores": [],
+        "tie_break": "NOT_APPLICABLE_FIXED_SCALE",
+    }
+
+
+def _build_nfl_m2_v2_raw_evaluations_and_selection(
     rows: Iterable[dict[str, Any]],
     *,
     min_train_seasons: int = 2,
     ridge_alpha: float = 10.0,
     kernel_scale: float = 1.0,
-) -> list[dict[str, Any]]:
+    nested_kernel_scale_selection: bool = True,
+    kernel_scale_grid: Iterable[float] = DEFAULT_KERNEL_SCALE_GRID,
+    selector_min_inner_train_seasons: int = 2,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     data = [dict(row) for row in rows]
     if not data:
-        return []
+        return [], []
+    grid = tuple(float(value) for value in kernel_scale_grid)
     folds = season_walk_forward(data, season_key="season", min_train_seasons=min_train_seasons)
     out: list[dict[str, Any]] = []
+    selector_audits: list[dict[str, Any]] = []
     for fold in folds:
+        fold_train_seasons = sorted({int(row["season"]) for row in fold.train_rows})
+        if nested_kernel_scale_selection:
+            selection = select_nfl_m2_v2_kernel_scales(
+                fold.train_rows,
+                ridge_alpha=ridge_alpha,
+                scale_grid=grid,
+                min_inner_train_seasons=selector_min_inner_train_seasons,
+                fallback_scale=kernel_scale,
+            )
+        else:
+            selection = _fixed_scale_selection(
+                fold_train_seasons=fold_train_seasons,
+                kernel_scale=kernel_scale,
+                scale_grid=grid,
+            )
+        if bool(selection.get("market_data_used")):
+            raise ValueError("NFL_M2_V2_SELECTOR_MARKET_DATA_PROHIBITED")
+        if selection.get("outer_training_seasons") != fold_train_seasons:
+            raise ValueError("NFL_M2_V2_SELECTOR_OUTER_TRAIN_IDENTITY_MISMATCH")
+
+        margin_kernel_scale = float(selection["selected_margin_kernel_scale"])
+        total_kernel_scale = float(selection["selected_total_kernel_scale"])
         model = fit_nfl_m2_v2_candidate(
             fold.train_rows,
             ridge_alpha=ridge_alpha,
             kernel_scale=kernel_scale,
+            margin_kernel_scale=margin_kernel_scale,
+            total_kernel_scale=total_kernel_scale,
         )
         if int(fold.test_season) in model.train_seasons:
             raise ValueError("NFL_M2_V2_TEST_SEASON_IN_TRAINING")
+        selector_audits.append({
+            "outer_test_season": int(fold.test_season),
+            **selection,
+        })
+
         for raw in fold.test_rows:
             row = dict(raw)
             distribution = derive_nfl_m2_v2_score_distribution(model, row)
@@ -138,6 +199,10 @@ def build_nfl_m2_v2_raw_evaluations(
                 "train_seasons": model.train_seasons,
                 "ridge_alpha": model.mean_model.ridge_alpha,
                 "kernel_scale": model.kernel_scale,
+                "margin_kernel_scale": model.margin_kernel_scale,
+                "total_kernel_scale": model.total_kernel_scale,
+                "kernel_scale_selection_contract": selection["contract"],
+                "kernel_scale_selection_status": selection["status"],
                 "support_point_count": len(model.support_points),
                 "weighted_support_size": len(distribution),
                 "spread_line": spread_line,
@@ -155,7 +220,29 @@ def build_nfl_m2_v2_raw_evaluations(
                 "m2_over_prob": candidate_over,
                 "candidate_signed_key_probability": key_probabilities,
             })
-    return out
+    return out, selector_audits
+
+
+def build_nfl_m2_v2_raw_evaluations(
+    rows: Iterable[dict[str, Any]],
+    *,
+    min_train_seasons: int = 2,
+    ridge_alpha: float = 10.0,
+    kernel_scale: float = 1.0,
+    nested_kernel_scale_selection: bool = True,
+    kernel_scale_grid: Iterable[float] = DEFAULT_KERNEL_SCALE_GRID,
+    selector_min_inner_train_seasons: int = 2,
+) -> list[dict[str, Any]]:
+    raw, _ = _build_nfl_m2_v2_raw_evaluations_and_selection(
+        rows,
+        min_train_seasons=min_train_seasons,
+        ridge_alpha=ridge_alpha,
+        kernel_scale=kernel_scale,
+        nested_kernel_scale_selection=nested_kernel_scale_selection,
+        kernel_scale_grid=kernel_scale_grid,
+        selector_min_inner_train_seasons=selector_min_inner_train_seasons,
+    )
+    return raw
 
 
 def _loss(pairs: list[tuple[int, float]]) -> tuple[float, float]:
@@ -254,6 +341,9 @@ def build_nfl_m2_v2_candidate_evidence(
     fold_win_threshold: float = 0.65,
     ridge_alpha: float = 10.0,
     kernel_scale: float = 1.0,
+    nested_kernel_scale_selection: bool = True,
+    kernel_scale_grid: Iterable[float] = DEFAULT_KERNEL_SCALE_GRID,
+    selector_min_inner_train_seasons: int = 2,
 ) -> dict[str, Any]:
     manifest = str(source_manifest_sha256 or "").strip().lower()
     if len(manifest) != 64:
@@ -263,11 +353,15 @@ def build_nfl_m2_v2_candidate_evidence(
     except ValueError as exc:
         raise ValueError("NFL_M2_V2_SOURCE_MANIFEST_SHA256_INVALID") from exc
 
-    raw = build_nfl_m2_v2_raw_evaluations(
+    grid = tuple(float(value) for value in kernel_scale_grid)
+    raw, selector_audits = _build_nfl_m2_v2_raw_evaluations_and_selection(
         rows,
         min_train_seasons=min_train_seasons,
         ridge_alpha=ridge_alpha,
         kernel_scale=kernel_scale,
+        nested_kernel_scale_selection=nested_kernel_scale_selection,
+        kernel_scale_grid=grid,
+        selector_min_inner_train_seasons=selector_min_inner_train_seasons,
     )
     calibrated = calibrate_nfl_evaluations(raw, min_fit_seasons=min_calibration_fit_seasons)
     folds = _fold_rows(calibrated)
@@ -307,6 +401,11 @@ def build_nfl_m2_v2_candidate_evidence(
         "calibration_evidence": calibration,
         "candidate_distribution_profile": _key_profile(raw),
         "candidate_historical_evidence": per_market,
+        "nested_kernel_scale_selection": {
+            "enabled": bool(nested_kernel_scale_selection),
+            "contract": NFL_M2_V2_SELECTOR_CONTRACT,
+            "outer_fold_audits": selector_audits,
+        },
         "parameters": {
             "min_train_seasons": int(min_train_seasons),
             "min_calibration_fit_seasons": int(min_calibration_fit_seasons),
@@ -316,9 +415,13 @@ def build_nfl_m2_v2_candidate_evidence(
             "fold_win_threshold": float(fold_win_threshold),
             "ridge_alpha": float(ridge_alpha),
             "kernel_scale": float(kernel_scale),
+            "nested_kernel_scale_selection": bool(nested_kernel_scale_selection),
+            "kernel_scale_grid": list(grid),
+            "selector_min_inner_train_seasons": int(selector_min_inner_train_seasons),
         },
         "diagnostic_question": (
-            "Does preserving observed integer NFL score support repair signed 3/7 mass and improve "
-            "held-out spread/total log loss when the V1 market-blind mean predictor is held fixed?"
+            "Does nested training-only selection of separate margin/total empirical-support "
+            "bandwidths improve held-out spread/total evidence and signed 3/7 mass while the "
+            "V1 market-blind mean predictor and frozen promotion gates remain unchanged?"
         ),
     }
