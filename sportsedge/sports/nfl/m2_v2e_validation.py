@@ -10,6 +10,7 @@ from .m2_v2e_candidate import (
     NFL_M2_V2E_CANDIDATE_MODEL_ID,
     NFL_M2_V2E_DISTRIBUTION_CONTRACT,
     NFL_M2_V2E_FEATURE_CONTRACT,
+    NFL_M2_V2E_STATE_RIDGE_ALPHA,
     derive_nfl_m2_v2e_score_distribution,
     fit_nfl_m2_v2e_candidate,
 )
@@ -17,6 +18,10 @@ from .m2_v2e_candidate import (
 _EPS = 1e-9
 _KEY_NUMBERS = (-7, -3, 3, 7)
 _MARKET_KEYS = ("spread_line", "home_spread_odds", "away_spread_odds", "total_line", "over_odds", "under_odds")
+_OUTCOME_SUFFIXES = (
+    "td_xp", "td_2pt", "td_no_try", "fg", "def_td_7_allowed",
+    "safety_allowed", "no_score",
+)
 
 
 def _float(value: Any) -> float | None:
@@ -48,19 +53,29 @@ def _conditional_probability(win: int, loss: int) -> float | None:
 
 
 def _model_training_row(raw: dict[str, Any]) -> dict[str, Any]:
-    row = dict(raw)
-    for key in _MARKET_KEYS:
-        row.pop(key, None)
+    """Expose only PIT state and realized drive targets to the fitted candidate.
+
+    Realized final scores and evaluation-market fields remain outside the model
+    fitting surface even though they coexist on the historical evaluation row.
+    """
+    row: dict[str, Any] = {
+        "season": int(raw["season"]),
+        "home_state": raw.get("home_state"),
+        "away_state": raw.get("away_state"),
+        "home_drives": raw.get("home_drives"),
+        "away_drives": raw.get("away_drives"),
+    }
+    for side in ("home", "away"):
+        for suffix in _OUTCOME_SUFFIXES:
+            row[f"{side}_{suffix}"] = raw.get(f"{side}_{suffix}")
     return row
 
 
 def _model_prediction_row(row: dict[str, Any]) -> dict[str, Any]:
-    payload: dict[str, Any] = {}
-    if "home_state" in row:
-        payload["home_state"] = row["home_state"]
-    if "away_state" in row:
-        payload["away_state"] = row["away_state"]
-    return payload
+    return {
+        "home_state": row.get("home_state"),
+        "away_state": row.get("away_state"),
+    }
 
 
 def build_nfl_m2_v2e_raw_evaluations(
@@ -99,6 +114,7 @@ def build_nfl_m2_v2e_raw_evaluations(
                 "game_id": str(row.get("game_id") or ""), "season": int(row["season"]), "week": row.get("week"),
                 "model_id": model.model_id, "feature_contract": model.feature_contract,
                 "distribution_contract": model.distribution_contract, "train_seasons": model.train_seasons,
+                "state_feature_names": model.state_feature_names,
                 "score_path_count": len(distribution), "spread_line": spread_line, "total_line": total_line,
                 "spread_push": bool(spread_push), "total_push": bool(total_push),
                 "home_cover_outcome": None if spread_line is None or spread_push else int(actual_margin > spread_line),
@@ -144,7 +160,7 @@ def _fold_rows(evaluations: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
                 "m1_coverage": len(comparable) / len(eligible), "m1_log_loss": m1_ll,
                 "candidate_log_loss": v2e_ll, "m1_brier": m1_brier, "candidate_brier": v2e_brier,
                 "candidate_beats_m1": v2e_ll < m1_ll,
-                "candidate_probability_source": "POSSESSION_DISCRETE_SCORE_PATHS_PLUS_FOLD_SAFE_ISOTONIC",
+                "candidate_probability_source": "PIT_STATE_CONDITIONED_POSSESSION_DISCRETE_PATHS_PLUS_FOLD_SAFE_ISOTONIC",
             })
     return output
 
@@ -160,7 +176,7 @@ def _key_profile(rows: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "contract": "NFL_M2_V2E_OOS_SIGNED_KEY_PMF_V1", "model_id": NFL_M2_V2E_CANDIDATE_MODEL_ID,
         "feature_contract": NFL_M2_V2E_FEATURE_CONTRACT, "distribution_contract": NFL_M2_V2E_DISTRIBUTION_CONTRACT,
-        "probability_source": "OOS_POSSESSION_DISCRETE_FOOTBALL_SCORE_PATHS", "heldout_game_count": len(rows),
+        "probability_source": "OOS_PIT_STATE_CONDITIONED_POSSESSION_DISCRETE_FOOTBALL_SCORE_PATHS", "heldout_game_count": len(rows),
         "test_seasons": sorted({int(r["season"]) for r in rows}),
         "signed_key_probability": {str(key): totals[key] / n for key in _KEY_NUMBERS},
     }
@@ -192,14 +208,19 @@ def build_nfl_m2_v2e_candidate_evidence(
             "historical_predictive_pass": bool(market_folds and rate >= fold_win_threshold),
             "calibration": calibration.get(market),
         }
+    state_names = sorted({tuple(row.get("state_feature_names") or ()) for row in raw})
+    if len(state_names) != 1 or not state_names[0]:
+        raise ValueError("NFL_M2_V2E_OOS_STATE_SCHEMA_INCONSISTENT")
     return {
-        "schema_version": 1, "status": "DIAGNOSTIC_CANDIDATE_ONLY", "promotion_eligible": False,
+        "schema_version": 2, "status": "DIAGNOSTIC_CANDIDATE_ONLY", "promotion_eligible": False,
         "model_id": NFL_M2_V2E_CANDIDATE_MODEL_ID, "feature_contract": NFL_M2_V2E_FEATURE_CONTRACT,
         "distribution_contract": NFL_M2_V2E_DISTRIBUTION_CONTRACT, "source_manifest_sha256": manifest,
         "raw_evaluation_count": len(raw), "fold_count": len(folds), "folds": folds,
+        "state_feature_names": list(state_names[0]),
         "calibration_evidence": calibration, "candidate_distribution_profile": _key_profile(raw),
         "candidate_historical_evidence": per_market,
         "parameters": {"min_train_seasons": int(min_train_seasons), "path_count": int(path_count),
-                       "calibration_threshold": float(calibration_threshold), "fold_win_threshold": float(fold_win_threshold)},
-        "diagnostic_question": "Can a market-blind possession/discrete-scoring generator improve predictive gates and emergent ±3/±7 mass without outer-fold tuning?",
+                       "calibration_threshold": float(calibration_threshold), "fold_win_threshold": float(fold_win_threshold),
+                       "state_ridge_alpha": NFL_M2_V2E_STATE_RIDGE_ALPHA},
+        "diagnostic_question": "Can a PIT-state-conditioned, market-blind possession/discrete-scoring generator improve predictive gates and emergent ±3/±7 mass without outer-fold tuning?",
     }
