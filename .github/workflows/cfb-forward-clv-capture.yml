@@ -16,9 +16,6 @@ on:
         type: boolean
         default: true
   schedule:
-    # GitHub Actions' minimum recurring granularity is five minutes. Using :00
-    # permits the Monday 09:00 CT opener target exactly. Close snapshots are
-    # retried by each scheduled invocation across the frozen actual-start window.
     - cron: '*/5 * * * *'
 
 permissions:
@@ -75,12 +72,14 @@ jobs:
         run: |
           set -euo pipefail
           EXTRA=""
+          POLL=""
           if [[ "${{ inputs.dry_run }}" == "true" ]]; then EXTRA="--dry-run"; fi
+          if [[ "${{ inputs.phase }}" == "close" && "${{ inputs.dry_run }}" == "false" ]]; then POLL="--poll-count 5"; fi
           python scripts/cfb_forward_clv_capture.py "${{ inputs.phase }}" \
             --policy config/cfb_forward_clv_policy_v1.json \
             --out-dir .data-branch \
             --status-out "artifacts/cfb-forward-clv/${{ inputs.phase }}.json" \
-            $EXTRA
+            $EXTRA $POLL
 
       - name: Scheduled Monday opener target
         if: github.event_name == 'schedule'
@@ -90,12 +89,13 @@ jobs:
             --out-dir .data-branch \
             --status-out artifacts/cfb-forward-clv/opener.json
 
-      - name: Scheduled actual-start close snapshot
+      - name: Scheduled actual-start close monitoring
         if: github.event_name == 'schedule'
         run: |
           python scripts/cfb_forward_clv_capture.py close \
             --policy config/cfb_forward_clv_policy_v1.json \
             --out-dir .data-branch \
+            --poll-count 5 \
             --status-out artifacts/cfb-forward-clv/close.json
 
       - name: Scheduled post-start first-play attestation
