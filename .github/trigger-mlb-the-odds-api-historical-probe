@@ -1,4 +1,6 @@
-triggered_at_utc=2026-09-12T12:22:00Z
-purpose=one-shot bounded MLB The Odds API historical probe
+triggered_at_utc=2026-09-12T12:24:00Z
+purpose=one-shot bounded MLB The Odds API historical probe after required-input fix
+requested_snapshot_utc=2026-06-05T22:35:00Z
+markets=h2h,spreads,totals
 promotion_authority=false
 eligibility_change=false
