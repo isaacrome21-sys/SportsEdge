@@ -46,6 +46,17 @@ def _hex64(value: Any, field: str) -> str:
     return text
 
 
+def _canonical_sha256(value: Mapping[str, Any]) -> str:
+    encoded = json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+        allow_nan=False,
+    ).encode("utf-8")
+    return sha256(encoded).hexdigest()
+
+
 def _raw_payload(snapshot: Mapping[str, Any]) -> tuple[dict[str, Any], str]:
     raw = snapshot.get("raw_bytes")
     _require(isinstance(raw, (bytes, bytearray)), "MLB_TODDS_RAW_BYTES_REQUIRED")
@@ -214,7 +225,7 @@ def normalize_decision_close_pair(
         "close": {k: close[k] for k in ("event_id", "market", "selection", "book", "observed_at", "price", "source_sha256", "provenance")},
     }
     validated = validate_decision_close_pair(generic_pair)
-    return {
+    evidence = {
         "schema": PROVIDER_SCHEMA,
         "provider": "The Odds API",
         "promotion_authority": False,
@@ -228,3 +239,5 @@ def normalize_decision_close_pair(
         "decision_raw_sha256": decision["source_sha256"],
         "close_raw_sha256": close["source_sha256"],
     }
+    evidence["provider_evidence_sha256"] = _canonical_sha256(evidence)
+    return evidence
