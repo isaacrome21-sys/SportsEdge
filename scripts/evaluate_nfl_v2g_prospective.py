@@ -3,7 +3,9 @@
 
 Checkpoint membership is chronological and includes missing-close rows. A missing
 capture therefore stays inside the first N observations as INCONCLUSIVE instead
-of being silently replaced by a later game. Even a full pass is review-only.
+of being silently replaced by a later game. Probability CLV is promotion-usable
+only when every PAPER candidate in the checkpoint is comparable at the exact same
+line; line CLV remains diagnostic only. Even a full pass is review-only.
 """
 from __future__ import annotations
 
@@ -122,6 +124,7 @@ def summarize_market(rows: list[dict[str, Any]], limit: int) -> dict[str, Any]:
     profits = [float(x["after_vig_profit_units"]) for x in papers]
     line_clv = [float(x["clv"]["line_clv"]) for x in papers if (x.get("clv") or {}).get("line_clv") is not None]
     prob_clv = [float(x["clv"]["probability_clv"]) for x in papers if (x.get("clv") or {}).get("probability_clv") is not None]
+    probability_clv_complete = bool(papers) and len(prob_clv) == len(papers)
     beats = None if model_ll is None or market_ll is None else model_ll < market_ll
     return {
         "n": len(sample),
@@ -144,7 +147,8 @@ def summarize_market(rows: list[dict[str, Any]], limit: int) -> dict[str, Any]:
         "line_clv_n": len(line_clv),
         "mean_line_clv": mean(line_clv),
         "same_line_probability_clv_n": len(prob_clv),
-        "mean_probability_clv": mean(prob_clv),
+        "probability_clv_complete": probability_clv_complete,
+        "mean_probability_clv": mean(prob_clv) if probability_clv_complete else None,
         "sample_game_ids": [x["game_id"] for x in sample],
     }
 
@@ -159,6 +163,11 @@ def evaluate(root: Path, policy_path: Path) -> dict[str, Any]:
     policy = json.loads(policy_path.read_text(encoding="utf-8"))
     if policy.get("schema_version") != POLICY_SCHEMA:
         die("NFL_V2G_EVAL_POLICY_SCHEMA_INVALID")
+    metrics = policy.get("prospective_metrics") or {}
+    if metrics.get("probability_clv_gate_requires_full_paper_candidate_comparability") is not True:
+        die("NFL_V2G_EVAL_CLV_COMPARABILITY_POLICY_REQUIRED")
+    if metrics.get("line_clv_is_diagnostic_only_for_probability_clv_gate") is not True:
+        die("NFL_V2G_EVAL_LINE_CLV_DIAGNOSTIC_POLICY_REQUIRED")
     checkpoints = [int(x) for x in policy["checkpoints"]["fixed_settled_market_counts"]]
     minimum = int(policy["checkpoints"]["minimum_promotion_count"])
     settlements = load_settlements(root)
@@ -187,7 +196,6 @@ def evaluate(root: Path, policy_path: Path) -> dict[str, Any]:
         return output
 
     markets = {m: summarize_market(by_market[m], checkpoint) for m in ("spread", "total")}
-    metrics = policy["prospective_metrics"]
     gates: dict[str, Any] = {}
     all_gate_values: list[bool | None] = []
     for market, summary in markets.items():
@@ -195,7 +203,8 @@ def evaluate(root: Path, policy_path: Path) -> dict[str, Any]:
         intercept = summary["calibration_intercept"]
         ece_value = summary["ece_10bin"]
         roi = summary["paper_after_vig_roi"]
-        clv = summary["mean_probability_clv"]
+        clv_complete = summary["probability_clv_complete"]
+        clv = summary["mean_probability_clv"] if clv_complete else None
         checks: dict[str, bool | None] = {
             "count": summary["n"] >= minimum,
             "complete_close_evidence": summary["complete_close_evidence"],
@@ -204,6 +213,7 @@ def evaluate(root: Path, policy_path: Path) -> dict[str, Any]:
             "calibration_intercept": None if intercept is None else abs(intercept) <= float(metrics["calibration_intercept_abs_max"]),
             "ece": None if ece_value is None else ece_value <= float(metrics["ece_max"]),
             "after_vig_roi": None if roi is None else roi >= float(metrics["after_vig_roi_threshold"]),
+            "clv_comparability": True if clv_complete else None,
             "clv": None if clv is None else clv >= float(metrics["clv_probability_threshold"]),
         }
         gates[market] = {k: gate(v) for k, v in checks.items()}
