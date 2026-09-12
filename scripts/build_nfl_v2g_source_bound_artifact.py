@@ -42,6 +42,8 @@ PBP_FIELDS = {
 SCHEDULE_FIELDS = {"game_id", "season", "week", "game_type", "home_team", "away_team"}
 CANDIDATE_PATH = ROOT / "sportsedge/sports/nfl/m2_v2g_candidate.py"
 FREEZE_PATH = ROOT / "config/research/nfl_v2g_implementation_freeze_2026-09-12.json"
+TEAM_ALIAS_POLICY = "NFLVERSE_PBP_CURRENT_FRANCHISE_CODE_V1"
+SCHEDULE_TO_PBP_TEAM_ALIAS = {"OAK": "LV", "SD": "LAC"}
 
 
 def _sha256_file(path: Path) -> str:
@@ -76,16 +78,7 @@ def _read_projected(path: Path, fields: set[str]) -> list[dict[str, str]]:
 
 
 def _identity_scoped_pbp(rows: Iterable[dict[str, str]]) -> tuple[list[dict[str, str]], int]:
-    """Keep only rows that can belong to an offensive possession.
-
-    nflverse PBP includes administrative/special-teams rows with no drive identity.
-    Those rows are not offensive possessions and must not abort the structural
-    possession model. A made field goal without possession identity still blocks,
-    because silently dropping it would corrupt an offensive scoring count. A
-    touchdown without drive identity is allowed to drop only for kickoff/punt
-    return play types, which are explicitly outside the offensive-possession
-    scoring contract.
-    """
+    """Keep only rows that can belong to an offensive possession."""
     kept: list[dict[str, str]] = []
     dropped = 0
     for raw in rows:
@@ -110,11 +103,40 @@ def _identity_scoped_pbp(rows: Iterable[dict[str, str]]) -> tuple[list[dict[str,
     return kept, dropped
 
 
+def _normalize_schedule_team_aliases(
+    schedule_rows: Iterable[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
+    """Normalize only source-proven historical franchise codes used by nflverse PBP.
+
+    The mapping is deliberately explicit and minimal. It was observed directly in
+    the hash-bound hosted 2016-2025 corpus: schedule OAK corresponds to PBP LV and
+    schedule SD corresponds to PBP LAC. No fuzzy or inferred mapping is allowed.
+    """
+    normalized: list[dict[str, Any]] = []
+    applications: list[dict[str, str]] = []
+    for raw in schedule_rows:
+        row = dict(raw)
+        game_id = str(row.get("game_id") or "").strip()
+        for field in ("home_team", "away_team"):
+            original = str(row.get(field) or "").strip()
+            mapped = SCHEDULE_TO_PBP_TEAM_ALIAS.get(original, original)
+            row[field] = mapped
+            if mapped != original:
+                applications.append({
+                    "game_id": game_id,
+                    "field": field,
+                    "from": original,
+                    "to": mapped,
+                })
+        normalized.append(row)
+    applications.sort(key=lambda item: (item["game_id"], item["field"], item["from"], item["to"]))
+    return normalized, applications
+
+
 def _team_identity_mismatches(
     schedule_rows: Iterable[dict[str, Any]],
     pbp_rows: Iterable[dict[str, str]],
 ) -> list[dict[str, Any]]:
-    """Return exact schedule-vs-possession team mismatches without inferring aliases."""
     expected: dict[str, tuple[str, str]] = {}
     for raw in schedule_rows:
         game_id = str(raw.get("game_id") or "").strip()
@@ -226,6 +248,7 @@ def build(
         if not (start_season <= season <= end_season):
             continue
         schedule_rows.append({field: raw.get(field) for field in SCHEDULE_FIELDS})
+    schedule_rows, alias_applications = _normalize_schedule_team_aliases(schedule_rows)
 
     pbp_rows: list[dict[str, str]] = []
     ignored_unscoped_rows = 0
@@ -279,6 +302,10 @@ def build(
         "season_range": [start_season, end_season],
         "event_row_count": len(event_rows),
         "ignored_unscoped_pbp_row_count": ignored_unscoped_rows,
+        "team_alias_policy": TEAM_ALIAS_POLICY,
+        "team_alias_map": dict(sorted(SCHEDULE_TO_PBP_TEAM_ALIAS.items())),
+        "team_alias_application_count": len(alias_applications),
+        "team_alias_applications": alias_applications,
         "training_event_rows_sha256": training_sha,
         "source_manifest_sha256": source_manifest_sha,
         "source_files_sha256": source_files,
