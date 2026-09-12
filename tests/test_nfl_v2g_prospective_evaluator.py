@@ -22,6 +22,8 @@ class NFLV2GProspectiveEvaluatorTests(unittest.TestCase):
             "candidate_id": "nfl_m2_scoring_event_v2g_candidate",
             "prospective_metrics": {
                 "clv_probability_threshold": 0.005,
+                "probability_clv_gate_requires_full_paper_candidate_comparability": True,
+                "line_clv_is_diagnostic_only_for_probability_clv_gate": True,
                 "after_vig_roi_threshold": 0.02,
                 "calibration_slope_min": 0.90,
                 "calibration_slope_max": 1.10,
@@ -37,7 +39,8 @@ class NFLV2GProspectiveEvaluatorTests(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def write_row(self, idx, model_p=0.60, market_p=0.55, outcome=None, predictive_status="SCORED"):
+    def write_row(self, idx, model_p=0.60, market_p=0.55, outcome=None,
+                  predictive_status="SCORED", probability_clv=0.01):
         y = idx % 2 if outcome is None else outcome
         def ll(p):
             import math
@@ -60,7 +63,7 @@ class NFLV2GProspectiveEvaluatorTests(unittest.TestCase):
         paper = {
             "status": "SETTLED_PAPER_CANDIDATE",
             "after_vig_profit_units": 0.1,
-            "clv": {"line_clv": 0.5, "probability_clv": 0.01 if predictive_status == "SCORED" else None}
+            "clv": {"line_clv": 0.5, "probability_clv": probability_clv}
         }
         payload = {
             "schema_version": mod.SETTLEMENT_SCHEMA,
@@ -100,7 +103,7 @@ class NFLV2GProspectiveEvaluatorTests(unittest.TestCase):
     def test_missing_close_is_not_dropped_or_replaced(self):
         for i in range(49):
             self.write_row(i)
-        self.write_row(49, predictive_status="INCONCLUSIVE_MISSING_CAPTURE")
+        self.write_row(49, predictive_status="INCONCLUSIVE_MISSING_CAPTURE", probability_clv=None)
         self.write_row(50)
         result = mod.evaluate(self.settlements, self.policy)
         spread = result["markets"]["spread"]
@@ -112,6 +115,20 @@ class NFLV2GProspectiveEvaluatorTests(unittest.TestCase):
         self.assertEqual("g049", spread["sample_game_ids"][-1])
         self.assertEqual("FAIL", result["gates"]["spread"]["complete_close_evidence"])
         self.assertEqual(50, spread["paper_candidate_n"])
+
+    def test_selective_same_line_clv_subset_cannot_pass_gate(self):
+        for i in range(49):
+            self.write_row(i, probability_clv=None)
+        self.write_row(49, probability_clv=0.02)
+        result = mod.evaluate(self.settlements, self.policy)
+        spread = result["markets"]["spread"]
+        self.assertEqual(50, spread["paper_candidate_n"])
+        self.assertEqual(1, spread["same_line_probability_clv_n"])
+        self.assertFalse(spread["probability_clv_complete"])
+        self.assertIsNone(spread["mean_probability_clv"])
+        self.assertEqual("INCONCLUSIVE", result["gates"]["spread"]["clv_comparability"])
+        self.assertEqual("INCONCLUSIVE", result["gates"]["spread"]["clv"])
+        self.assertEqual("PASS", result["gates"]["spread"]["complete_close_evidence"])
 
 
 if __name__ == "__main__":
