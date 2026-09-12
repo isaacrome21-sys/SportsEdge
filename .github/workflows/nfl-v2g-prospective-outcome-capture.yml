@@ -4,12 +4,17 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '47 11 * * *'
+  pull_request:
+    paths:
+      - 'scripts/settle_nfl_v2g_prospective_outcomes.py'
+      - 'tests/test_nfl_m2_v2g_outcomes.py'
+      - '.github/workflows/nfl-v2g-prospective-outcome-capture.yml'
 
 permissions:
   contents: write
 
 concurrency:
-  group: nfl-v2g-prospective-outcome-capture
+  group: nfl-v2g-prospective-outcome-capture-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -90,6 +95,7 @@ jobs:
           PY
 
       - name: Persist immutable result snapshot and outcomes
+        if: github.event_name != 'pull_request'
         shell: bash
         run: |
           set -euo pipefail
