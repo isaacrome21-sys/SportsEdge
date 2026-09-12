@@ -14,7 +14,12 @@ from hashlib import sha256
 import json
 from pathlib import Path
 import re
+import sys
 from typing import Any, Mapping
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 from sportsedge.sports.nfl.m2_v2g_forward import (
     canonical_bytes,
