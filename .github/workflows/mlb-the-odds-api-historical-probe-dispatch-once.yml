@@ -3,7 +3,7 @@ name: mlb-the-odds-api-historical-probe-dispatch-once
 on:
   push:
     paths:
-      - '.github/workflows/mlb-the-odds-api-historical-probe-dispatch-once.yml'
+      - '.github/trigger-mlb-the-odds-api-historical-probe-once'
 
 permissions:
   actions: write
