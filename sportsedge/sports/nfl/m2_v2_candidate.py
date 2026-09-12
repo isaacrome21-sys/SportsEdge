@@ -2,8 +2,8 @@
 
 This is a diagnostic candidate, not a production model and not promotion evidence.
 It deliberately reuses the exact V1 market-blind mean model so Phase A changes only
-the conditional score-distribution layer.  Every support point is an actually
-observed integer training score pair.  Held-out games weight those support points
+the conditional score-distribution layer. Every support point is an actually
+observed integer training score pair. Held-out games weight those support points
 by similarity between training-predicted and held-out-predicted margin/total state.
 No sportsbook line, price, historical key-number target, or held-out outcome enters
 the fit or distribution.
@@ -49,6 +49,8 @@ class NFLM2V2CandidateModel:
     support_points: tuple[NFLM2V2SupportPoint, ...]
     train_seasons: tuple[int, ...]
     kernel_scale: float
+    margin_kernel_scale: float
+    total_kernel_scale: float
 
     def predict(self, row: dict[str, Any]) -> tuple[float, float]:
         return self.mean_model.predict(row)
@@ -66,19 +68,42 @@ def _integer_score(value: Any, field: str) -> int:
     return int(round(number))
 
 
+def _positive_scale(value: Any, field: str) -> float:
+    try:
+        scale = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"NFL_M2_V2_{field}_INVALID") from exc
+    if not isfinite(scale) or scale <= 0.0:
+        raise ValueError(f"NFL_M2_V2_{field}_INVALID")
+    return scale
+
+
 def fit_nfl_m2_v2_candidate(
     rows: Iterable[dict[str, Any]],
     *,
     ridge_alpha: float = 10.0,
     kernel_scale: float = 1.0,
+    margin_kernel_scale: float | None = None,
+    total_kernel_scale: float | None = None,
 ) -> NFLM2V2CandidateModel:
-    """Fit the isolated V2 score-support candidate on training rows only."""
+    """Fit the isolated V2 score-support candidate on training rows only.
+
+    ``kernel_scale`` is retained as the backwards-compatible shared default.
+    Optional dimension-specific scales allow a diagnostic training-only selector
+    to tune margin and total smoothing independently without changing production.
+    """
     data = [dict(row) for row in rows]
     if len(data) < 2:
         raise ValueError("NFL_M2_V2_TRAINING_ROWS_INSUFFICIENT")
-    scale = float(kernel_scale)
-    if not isfinite(scale) or scale <= 0.0:
-        raise ValueError("NFL_M2_V2_KERNEL_SCALE_INVALID")
+    scale = _positive_scale(kernel_scale, "KERNEL_SCALE")
+    margin_scale = _positive_scale(
+        scale if margin_kernel_scale is None else margin_kernel_scale,
+        "MARGIN_KERNEL_SCALE",
+    )
+    total_scale = _positive_scale(
+        scale if total_kernel_scale is None else total_kernel_scale,
+        "TOTAL_KERNEL_SCALE",
+    )
 
     # This invokes the exact production feature validation and ridge mean fit.
     # Root-level market fields are ignored by that fit, while nested market
@@ -110,6 +135,8 @@ def fit_nfl_m2_v2_candidate(
         support_points=tuple(support),
         train_seasons=seasons,
         kernel_scale=scale,
+        margin_kernel_scale=margin_scale,
+        total_kernel_scale=total_scale,
     )
 
 
@@ -128,8 +155,8 @@ def derive_nfl_m2_v2_score_distribution(
         raise ValueError("NFL_M2_V2_SUPPORT_EMPTY")
 
     target_margin, target_total = model.predict(dict(row))
-    margin_bw = float(model.mean_model.margin_sigma) * model.kernel_scale
-    total_bw = float(model.mean_model.total_sigma) * model.kernel_scale
+    margin_bw = float(model.mean_model.margin_sigma) * model.margin_kernel_scale
+    total_bw = float(model.mean_model.total_sigma) * model.total_kernel_scale
     if margin_bw <= 0.0 or total_bw <= 0.0:
         raise ValueError("NFL_M2_V2_BANDWIDTH_INVALID")
 
