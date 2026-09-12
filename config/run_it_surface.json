@@ -18,7 +18,7 @@
       "governance_source": "config/football_prop_engine_surface.json",
       "automatic_completeness": "EXECUTABLE_FAIL_CLOSED",
       "blocker": "NFL_FROZEN_M2_PLUS_LIVE_SOURCES_REQUIRED_FOR_GAME_MODEL_P;NFL_PROPS_NO_ENGINE",
-      "notes": "RUN IT executes the canonical NFL game lane. PLAYER_PROPS is emitted as blocked NO_ENGINE and is not executed while the authoritative prop surface declares NFL NO_ENGINE. Game-market Model_P still requires a genuine frozen M2 artifact and PIT-safe live sources. Research prop artifacts, provider mappings, hit rates, or market prices cannot create NFL prop Model_P."
+      "notes": "RUN IT executes the canonical NFL game lane. PLAYER_PROPS lane is intentionally emitted as blocked NO_ENGINE and is not executed while the authoritative prop surface declares NFL NO_ENGINE. Game-market Model_P still requires a genuine frozen M2 artifact and PIT-safe live sources. Research prop artifacts, provider mappings, hit rates, or market prices cannot create NFL prop Model_P."
     },
     "CFB": {
       "lane": "PREGAME_GAME_MODEL_WITH_PROPS_NO_ENGINE",
@@ -29,7 +29,7 @@
       "governance_source": "config/football_prop_engine_surface.json",
       "automatic_completeness": "EXECUTABLE_FAIL_CLOSED",
       "blocker": "CFB_FROZEN_GAME_PLUS_LIVE_SOURCES_REQUIRED_FOR_GAME_MODEL_P;CFB_PROPS_NO_ENGINE",
-      "notes": "RUN IT executes the canonical CFB game lane. PLAYER_PROPS is emitted as blocked NO_ENGINE and is not executed while the authoritative prop surface declares CFB NO_ENGINE. Frozen prop research artifacts have no promotion authority and cannot create bettor-facing CFB prop Model_P."
+      "notes": "RUN IT executes the canonical CFB game lane. PLAYER_PROPS lane is intentionally emitted as blocked NO_ENGINE and is not executed while the authoritative prop surface declares CFB NO_ENGINE. Frozen prop research artifacts have no promotion authority and cannot create bettor-facing CFB prop Model_P."
     },
     "PGA": {
       "lane": "PREGAME_AND_LIVE_MODEL",
