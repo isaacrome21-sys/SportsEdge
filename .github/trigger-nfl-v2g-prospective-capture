@@ -1,5 +1,5 @@
-triggered_at_utc=2026-09-12T12:50:00Z
-purpose=one-shot frozen NFL V2G prospective prediction capture
+triggered_at_utc=2026-09-12T12:55:00Z
+purpose=one-shot frozen NFL V2G prospective prediction capture after non-frozen package import fix
 capture_workflow=nfl-v2g-prospective-prediction-capture.yml
 retroactive_backfill=false
 promotion_authority=false
