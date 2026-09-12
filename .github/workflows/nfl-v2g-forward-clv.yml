@@ -17,7 +17,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: sportsedge-paid-odds-api
+  group: ${{ github.event_name == 'pull_request' && format('nfl-v2g-forward-clv-pr-{0}', github.event.pull_request.number) || 'sportsedge-paid-odds-api' }}
   cancel-in-progress: false
 
 jobs:
