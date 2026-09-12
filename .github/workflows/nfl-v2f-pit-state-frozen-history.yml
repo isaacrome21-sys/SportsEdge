@@ -73,7 +73,7 @@ jobs:
           --out artifacts/football/nfl_production_validation.json
           --manifest-out artifacts/football/nfl_source_manifest.json
           --model-out artifacts/football/nfl_m2_model.json
-      - name: Run V2F PIT-state untouched-fold diagnostic
+      - name: Run V2F PIT-state fixed-fold research diagnostic
         run: >-
           python scripts/run_nfl_v2f_pit_state_validation.py
           --schedule-file artifacts/football/sources/games.csv
@@ -99,7 +99,7 @@ jobs:
           artifacts/football/nfl_m2_v2f_pit_state_validation.json
           --max-abs-error 0.005
           --out artifacts/football/nfl_m2_v2f_pit_state_key_math.json
-      - name: Assert diagnostic-only identity and unchanged gates
+      - name: Assert diagnostic-only identity, reused-history label, and unchanged gates
         run: |
           python - <<'PY'
           import json, os
@@ -116,11 +116,13 @@ jobs:
           if e.get('production_registry_consumes_this_artifact') is not False: raise SystemExit('NFL_M2_V2F_REGISTRY_CONSUMPTION_PROHIBITED')
           if e.get('frozen_gate_changes') is not False: raise SystemExit('NFL_M2_V2F_FROZEN_GATE_CHANGE_PROHIBITED')
           if e.get('market_inputs_used_in_feature_state') is not False: raise SystemExit('NFL_M2_V2F_MARKET_FEATURE_PROHIBITED')
+          if e.get('historical_evidence_integrity') != 'REUSED_RESEARCH_HISTORY_NOT_FINAL_HOLDOUT': raise SystemExit('NFL_M2_V2F_HISTORY_INTEGRITY_LABEL_INVALID')
+          if e.get('prospective_confirmation_required_for_promotion') is not True: raise SystemExit('NFL_M2_V2F_PROSPECTIVE_CONFIRMATION_REQUIRED')
           p=e['parameters']
           if float(p['fold_win_threshold']) != 0.65: raise SystemExit('NFL_M2_V2F_FOLD_GATE_CHANGED')
           if float(p['calibration_threshold']) != 0.05: raise SystemExit('NFL_M2_V2F_CALIBRATION_GATE_CHANGED')
           if float(p['margin_kernel_scale']) != 1.0 or float(p['total_kernel_scale']) != 1.0: raise SystemExit('NFL_M2_V2F_BANDWIDTH_CHANGED')
-          print(json.dumps({'status':'V2F_PIT_STATE_FROZEN_HISTORY_DIAGNOSTIC_COMPLETE','git_sha':sha,'historical_evidence':e['candidate_historical_evidence'],'signed_key_probability':e['candidate_distribution_profile']['signed_key_probability'],'key_number_fit':k['fit'],'promotion_eligible':False},sort_keys=True))
+          print(json.dumps({'status':'V2F_PIT_STATE_REUSED_HISTORY_DIAGNOSTIC_COMPLETE','git_sha':sha,'historical_evidence_integrity':e['historical_evidence_integrity'],'prospective_confirmation_required_for_promotion':True,'historical_evidence':e['candidate_historical_evidence'],'signed_key_probability':e['candidate_distribution_profile']['signed_key_probability'],'key_number_fit':k['fit'],'promotion_eligible':False},sort_keys=True))
           PY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
