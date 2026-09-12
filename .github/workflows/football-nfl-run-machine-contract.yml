@@ -134,8 +134,9 @@ jobs:
           from pathlib import Path
           config = json.loads(Path('config/run_it_surface.json').read_text())
           nfl = config['sports']['NFL']
-          assert nfl['lane'] == 'PREGAME_MODEL_AND_PLAYER_PROPS'
+          assert nfl['lane'] == 'PREGAME_MODEL'
           assert nfl['automatic_completeness'] == 'EXECUTABLE_FAIL_CLOSED'
+          assert 'NFL_PLAYER_PROPS_NO_ENGINE' in nfl['blocker']
           assert nfl['automatic_command'] == ['python','scripts/run_football_auto_bundle.py','--sport','NFL','--output','artifacts/run_it/nfl_card.json']
           assert Path(nfl['automatic_command'][1]).is_file()
           module_name, attr = nfl['library_entrypoint'].split(':', 1)
