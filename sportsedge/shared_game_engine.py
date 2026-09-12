@@ -22,7 +22,7 @@ from .v7_distribution import (
 )
 
 STAGE1_GAME_MARKETS = frozenset({"MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS"})
-V8_PRIMARY_GAME_DEFAULT_SIMULATIONS = 100000
+V8_PRIMARY_GAME_DEFAULT_SIMULATIONS = 50000
 
 
 class SharedGameEngineError(ValueError):
