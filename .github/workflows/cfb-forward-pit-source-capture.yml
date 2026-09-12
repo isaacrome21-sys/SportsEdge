@@ -8,6 +8,9 @@ on:
         required: true
         default: '2026'
         type: string
+  push:
+    paths:
+      - '.github/trigger-cfb-forward-pit'
   schedule:
     - cron: '17 10 * * *'
     - cron: '47 11 * * *'
