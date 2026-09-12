@@ -1,0 +1,71 @@
+{
+  "schema": "CFB_MODEL_SELECTION_POLICY_V1",
+  "status": "FROZEN_BEFORE_CANDIDATE_EVALUATION",
+  "lane": "CFB",
+  "purpose": "Select one reconstructed-historical CFB serving contract before the first forward evidence clock without treating reconstructed historical scores as unbiased promotion evidence.",
+  "training_provenance_class": "RECONSTRUCTED_HISTORICAL_NOT_PIT",
+  "feature_semantics": "AS_OF_WEEK_MATCHED_V1",
+  "feature_value_source_contract": "CFBD_STATS_SEASON_ADVANCED_ENDWEEK_V1",
+  "provider_metric_model_vintage": "UNKNOWN_CURRENT_PROVIDER_VINTAGE",
+  "provider_metric_materialization_mode": "UNKNOWN_PROVIDER_IMPLEMENTATION",
+  "historical_absolute_score_status": "NOT_UNBIASED_GENERALIZATION_EVIDENCE",
+  "candidate_attempt_budget": 4,
+  "attempts_consumed": 0,
+  "attempt_definition": "One attempt is consumed whenever a materially distinct early-season weighting, prior/current blending, games-in-sample feature, feature set, model specification, training-window specification, or hyperparameter-policy candidate is evaluated on the frozen expanding-season evaluation surface. Re-runs reproducing identical candidate bytes, code, data, and hyperparameters do not consume another attempt.",
+  "candidate_families_predeclared": [
+    "EQUAL_WEIGHT_HARD_SWITCH",
+    "RELIABILITY_WEIGHTED_HARD_SWITCH",
+    "PRIOR_CURRENT_BLEND",
+    "GAMES_IN_SAMPLE_FEATURE"
+  ],
+  "candidate_specification_rule": "Before a candidate is evaluated, its complete formula, feature list, weighting/blending constants, training window, hyperparameter policy, source-contract identity, and code/config SHA256 identities must be recorded. Any revision after seeing an evaluation result is a new attempt and consumes remaining budget.",
+  "selection_metric": "MEAN_EXPANDING_SEASON_JOINT_HOME_AWAY_SCORE_RMSE",
+  "selection_direction": "LOWER_IS_BETTER",
+  "selection_data_rule": "Candidate construction and hyperparameter selection must use only training evidence or nested folds wholly earlier than each evaluation season. No 2026 forward betting outcomes, CLV, sportsbook prices, public betting, or capper/context data may enter candidate construction or ranking.",
+  "declared_diagnostics": {
+    "selection_authority": false,
+    "freeze_veto_authority": false,
+    "attempt_budget_effect": "NONE_UNLESS_USED_TO_CHANGE_A_CANDIDATE",
+    "metrics": [
+      "EXPANDING_SEASON_MARGIN_RMSE",
+      "EXPANDING_SEASON_TOTAL_RMSE",
+      "ABSOLUTE_MARGIN_MASS_AT_3",
+      "ABSOLUTE_MARGIN_MASS_AT_7"
+    ],
+    "key_number_mass_reference_tolerance_percentage_points": 1.5,
+    "interpretation": "These diagnostics are recorded beside the frozen primary score metric to expose betting-surface misspecification before freeze. They cannot override, rerank, rescue, reject, tune, select, or veto freezing the candidate selected by the frozen primary metric and null-control rules. If any diagnostic is used to change a candidate specification, that change is model search and consumes an attempt. A selected candidate with visibly poor margin, total, or key-number shape must still be frozen if it otherwise wins under the frozen selection rules, with the diagnostic failure recorded in artifact provenance and carried into forward validation. Declining to freeze an otherwise valid winner because of a diagnostic would constitute undeclared selection by veto."
+  },
+  "provider_vintage_warning": "PPA, explosiveness, and other model-derived CFBD advanced metrics do not expose a bindable model version in the /stats/season/advanced contract. Replayed historical values may therefore reflect a later provider model vintage. This contamination is shared context, not proof that relative candidate ranking is unbiased.",
+  "placebo_policy": {
+    "shuffle_count": 200,
+    "seed_policy": "DETERMINISTIC_VERSIONED_RNG",
+    "threshold": "95TH_PERCENTILE_OF_NULL_CANDIDATE_IMPROVEMENT_DISTRIBUTION",
+    "null_construction": "Within each expanding-season evaluation fold, deterministically permute paired realized home/away score labels across games while preserving feature rows, candidate identities, fold boundaries, and all preprocessing. Refit and rescore every preregistered candidate on each shuffle.",
+    "candidate_improvement_statistic": "BASELINE_EQUAL_WEIGHT_RMSE_MINUS_CANDIDATE_RMSE",
+    "interpretation": "A candidate is not treated as a demonstrated historical improvement merely because its observed RMSE is lower. Its improvement over the equal-weight baseline must exceed the frozen 95th-percentile null improvement threshold. This is engineering selection control only, not promotion evidence."
+  },
+  "winner_rule": "Among preregistered non-baseline candidates that clear the frozen null-improvement threshold, select the lowest observed selection_metric; ties resolve to the simpler candidate in the fixed candidate_families_predeclared order. A selected winner that has adverse declared diagnostics is still the winner and must not be replaced or vetoed on that basis; those diagnostics are provenance flags for the subsequent freeze and forward-validation record.",
+  "null_outcome_rule": "If no preregistered non-baseline candidate clears the frozen 95th-percentile null-improvement threshold, the bakeoff result is NO_CANDIDATE_DEMONSTRATED_SIGNAL_AT_THIS_SAMPLE. No winner is declared, EQUAL_WEIGHT_HARD_SWITCH is not silently promoted by default, no CFB serving contract is selected for freeze from this bakeoff, FOOTBALL_FORWARD_CAPTURE_V2 remains blocked for this model-selection path, and no fifth candidate may be evaluated under this policy. Any future search requires a separately preregistered policy and fresh untouched evaluation evidence; these results may not be reused as if untouched.",
+  "holdout_spending_rule": "The four-attempt budget is fixed before candidate evaluation. Adding, revising, or substituting a candidate after any result is observed consumes another attempt; there are no free extras. Once four materially distinct candidates have been evaluated, further model-search work requires a separately preregistered future policy and may not reuse the same evaluation results as if untouched.",
+  "controls_budget_rule": "Diagnostics that cannot select, tune, rank, add, remove, revise, reject, or veto freezing a candidate are budget-neutral. Any diagnostic result used to change a candidate specification or to reject/veto an otherwise valid selected winner becomes candidate search and is prohibited under this frozen selection policy unless separately preregistered with fresh untouched evaluation evidence.",
+  "acquisition_start_gate": {
+    "active_cfbd_tier_must_be_verified_before_first_replay_call": true,
+    "monthly_quota_must_be_recorded_before_first_replay_call": true,
+    "estimated_call_plan_must_fit_verified_remaining_quota_with_retry_reserve": true,
+    "verified_cache_reuse_required": true,
+    "resume_from_verified_cache_required": true,
+    "partial_restart_from_2015_prohibited_when_verified_cache_exists": true,
+    "raw_response_hash_required": true,
+    "retrieval_timestamp_required": true,
+    "retry_backoff_required": true,
+    "rule": "Do not start historical CFBD acquisition from an assumed public tier. Bind the run to the account's verified active tier, monthly quota, remaining quota if available, and an explicit call-budget plan. Cache identity must include endpoint, season, endWeek, query parameters, provider contract, and response SHA so completed slices survive interruption and retries."
+  },
+  "freeze_once_rule": "Do not activate FOOTBALL_FORWARD_CAPTURE_V2 until the selected candidate has a hash-bound artifact, feature/source contracts, acquisition and predictive code manifests, and the freeze registry is FROZEN on refs/heads/main. If a candidate wins under the frozen selection rules and clears the null threshold, adverse declared diagnostics must be recorded in provenance but do not authorize withholding the freeze. Any later model-artifact or feature-semantics change restarts the V2 evidence clock under PROMOTION_EVIDENCE_POLICY_V2.",
+  "governance": {
+    "promotion_changed": false,
+    "eligibility_changed": false,
+    "model_p_created": false,
+    "historical_pit_created": false,
+    "official_bet_authorized": false
+  }
+}

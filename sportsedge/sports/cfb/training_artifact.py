@@ -23,6 +23,7 @@ from .model_artifact import build_cfb_model_artifact, cfb_model_code_surface_sha
 from .source_manifest import CFBSourceManifestError, validate_cfb_pit_source_manifest, verify_cfb_source_snapshots
 
 CFB_PIT_TRAINING_BUNDLE_SCHEMA = "CFB_PIT_TRAINING_BUNDLE_V1"
+CFB_TRAINING_FEATURE_SEMANTICS = "AS_OF_WEEK_MATCHED_V1"
 CFB_TRAINING_CODE_SURFACE = (
     "sportsedge/sports/cfb/historical_features.py",
     "sportsedge/sports/cfb/joint_model.py",
@@ -89,6 +90,43 @@ def _game_ids_sha256(game_ids: list[str]) -> str:
     return digest.hexdigest()
 
 
+def _validate_training_row_feature_semantics(row: Mapping[str, Any], *, game_id: str, season: int) -> int:
+    """Require historical training inputs to match the live as-of-week contract.
+
+    Provenance and feature semantics are intentionally separate. A reconstructed
+    historical bundle may be non-PIT provenance, but it still may not train on
+    full-season aggregates that are unavailable to the live week-N serving path.
+    """
+    try:
+        week = int(row.get("week"))
+    except (TypeError, ValueError) as exc:
+        raise CFBTrainingArtifactError(f"CFB_TRAINING_WEEK_INVALID:{game_id}") from exc
+    if week < 1:
+        raise CFBTrainingArtifactError(f"CFB_TRAINING_WEEK_INVALID:{game_id}")
+
+    for side in ("home_metrics", "away_metrics"):
+        metric = row.get(side)
+        if not isinstance(metric, Mapping):
+            raise CFBTrainingArtifactError(f"CFB_TRAINING_METRICS_MISSING:{game_id}:{side}")
+        try:
+            metric_season = int(metric.get("season"))
+            through_week = int(metric.get("through_week"))
+        except (TypeError, ValueError) as exc:
+            raise CFBTrainingArtifactError(f"CFB_TRAINING_METRIC_WINDOW_INVALID:{game_id}:{side}") from exc
+        sample_source = str(metric.get("sample_source") or "").strip().upper()
+        if week == 1:
+            if metric_season != season - 1 or sample_source != "PRIOR_SEASON_FALLBACK":
+                raise CFBTrainingArtifactError(f"CFB_TRAINING_WEEK1_FEATURE_SEMANTICS_MISMATCH:{game_id}:{side}")
+        else:
+            if (
+                metric_season != season
+                or through_week != week - 1
+                or sample_source != "CURRENT_SEASON_PRIOR_WEEKS"
+            ):
+                raise CFBTrainingArtifactError(f"CFB_TRAINING_ASOF_WEEK_FEATURE_SEMANTICS_MISMATCH:{game_id}:{side}")
+    return week
+
+
 def validate_cfb_pit_training_bundle(payload: Mapping[str, Any], *, raw_bytes: bytes, fit_max_season: int) -> dict[str, Any]:
     if not isinstance(payload, Mapping):
         raise CFBTrainingArtifactError("CFB_TRAINING_BUNDLE_MAPPING_REQUIRED")
@@ -121,13 +159,15 @@ def validate_cfb_pit_training_bundle(payload: Mapping[str, Any], *, raw_bytes: b
             raise CFBTrainingArtifactError(f"CFB_TRAINING_SEASON_INVALID:{gid}") from exc
         if season > fit_max:
             raise CFBTrainingArtifactError(f"CFB_TRAINING_FUTURE_SEASON_FORBIDDEN:{gid}:{season}")
+        _validate_training_row_feature_semantics(row, game_id=gid, season=season)
         seasons.add(season); clean_rows.append(row)
     if max(seasons) != fit_max:
         raise CFBTrainingArtifactError("CFB_TRAINING_FIT_MAX_SEASON_NOT_REPRESENTED")
     return {"rows": clean_rows, "row_count": len(clean_rows), "game_ids_sha256": _game_ids_sha256(list(game_ids)),
         "train_seasons": sorted(seasons), "fit_max_season": fit_max, "generated_at_utc": generated_at,
         "source_manifest_sha256": source_manifest_sha, "training_bundle_sha256": sha256(raw_bytes).hexdigest(),
-        "materializer_version": CFB_HISTORICAL_MATERIALIZER_VERSION}
+        "materializer_version": CFB_HISTORICAL_MATERIALIZER_VERSION,
+        "feature_semantics": CFB_TRAINING_FEATURE_SEMANTICS}
 
 
 def build_cfb_artifact_from_pit_bundle(
@@ -185,7 +225,8 @@ def build_cfb_artifact_from_pit_bundle(
         "source_snapshot_verified": source_verification["source_snapshot_verified"],
         "source_content_root_sha256": source_verification["source_content_root_sha256"],
         "verified_source_count": source_verification["verified_source_count"], "game_ids_sha256": validated["game_ids_sha256"],
-        "materializer_version": validated["materializer_version"], "generated_at_utc": validated["generated_at_utc"],
+        "materializer_version": validated["materializer_version"], "feature_semantics": validated["feature_semantics"],
+        "generated_at_utc": validated["generated_at_utc"],
         "fit_max_season": validated["fit_max_season"], "train_seasons": validated["train_seasons"],
         "training_window": manifest["training_window"], "row_count": validated["row_count"], "ridge_alpha": alpha,
         "ridge_fit_policy": fit_policy,
@@ -195,5 +236,6 @@ def build_cfb_artifact_from_pit_bundle(
 
 
 __all__ = ["CFB_PIT_TRAINING_BUNDLE_SCHEMA", "CFB_TRAINING_CODE_SURFACE", "CFB_DERIVATION_CODE_SURFACE",
-    "CFB_TRAINING_SEED_POLICY", "CFBTrainingArtifactError", "build_cfb_artifact_from_pit_bundle",
-    "cfb_derivation_code_surface_sha256", "cfb_training_code_surface_sha256", "validate_cfb_pit_training_bundle"]
+    "CFB_TRAINING_FEATURE_SEMANTICS", "CFB_TRAINING_SEED_POLICY", "CFBTrainingArtifactError",
+    "build_cfb_artifact_from_pit_bundle", "cfb_derivation_code_surface_sha256",
+    "cfb_training_code_surface_sha256", "validate_cfb_pit_training_bundle"]
