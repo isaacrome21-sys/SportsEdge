@@ -110,6 +110,44 @@ def _identity_scoped_pbp(rows: Iterable[dict[str, str]]) -> tuple[list[dict[str,
     return kept, dropped
 
 
+def _team_identity_mismatches(
+    schedule_rows: Iterable[dict[str, Any]],
+    pbp_rows: Iterable[dict[str, str]],
+) -> list[dict[str, Any]]:
+    """Return exact schedule-vs-possession team mismatches without inferring aliases."""
+    expected: dict[str, tuple[str, str]] = {}
+    for raw in schedule_rows:
+        game_id = str(raw.get("game_id") or "").strip()
+        if not game_id or str(raw.get("game_type") or "REG").upper() != "REG":
+            continue
+        expected[game_id] = (
+            str(raw.get("home_team") or "").strip(),
+            str(raw.get("away_team") or "").strip(),
+        )
+    observed: dict[str, set[str]] = {}
+    for raw in pbp_rows:
+        game_id = str(raw.get("game_id") or "").strip()
+        posteam = str(raw.get("posteam") or "").strip()
+        if game_id in expected and posteam:
+            observed.setdefault(game_id, set()).add(posteam)
+
+    mismatches: list[dict[str, Any]] = []
+    for game_id, teams in sorted(expected.items()):
+        expected_set = {team for team in teams if team}
+        observed_set = observed.get(game_id, set())
+        if not observed_set:
+            continue
+        if not expected_set.issubset(observed_set):
+            mismatches.append({
+                "game_id": game_id,
+                "expected_teams": sorted(expected_set),
+                "observed_possession_teams": sorted(observed_set),
+                "missing_expected_teams": sorted(expected_set - observed_set),
+                "unexpected_observed_teams": sorted(observed_set - expected_set),
+            })
+    return mismatches
+
+
 def _load_manifest(path: Path) -> tuple[dict[str, Any], dict[str, str], str]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if payload.get("schema_version") != 1 or payload.get("sport") != "nfl":
@@ -200,6 +238,13 @@ def build(
         scoped, dropped = _identity_scoped_pbp(_read_projected(path, PBP_FIELDS))
         pbp_rows.extend(scoped)
         ignored_unscoped_rows += dropped
+
+    identity_mismatches = _team_identity_mismatches(schedule_rows, pbp_rows)
+    if identity_mismatches:
+        raise ValueError(
+            "NFL_V2G_TEAM_IDENTITY_MISMATCHES:" +
+            json.dumps(identity_mismatches, sort_keys=True, separators=(",", ":"))
+        )
 
     event_rows = build_nfl_v2g_game_event_rows(schedule_rows, pbp_rows)
     event_rows = [row for row in event_rows if start_season <= int(row["season"]) <= end_season]
