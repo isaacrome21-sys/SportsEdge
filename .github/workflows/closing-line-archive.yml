@@ -1,0 +1,110 @@
+name: closing-line-archive
+
+# CLOSING_LINE_ARCHIVE_V1 — model-free two-sided price archival for NFL, CFB
+# and MLB. Every row is labelled NOT_EVIDENCE. This lane holds no promotion
+# authority and no evidence-clock authority. It exists solely to accumulate the
+# closing-line dataset that no free source currently provides.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "dry-run = free event index only; capture = spend credits when a window is open"
+        type: choice
+        options: [dry-run, capture]
+        default: dry-run
+  schedule:
+    # Offset from the NFL forward collector (7,17,...) and the 2026 line
+    # capture (3,13,...) so the three lanes do not queue behind each other on
+    # the shared paid-odds concurrency group.
+    - cron: '1,11,21,31,41,51 * * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sportsedge-paid-odds-api
+  cancel-in-progress: false
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+      SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
+      SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
+      SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Verify archive contract before spending any credit
+        run: python -m unittest tests.test_closing_line_archive -v
+
+      - name: Attach the append-only data branch
+        id: data
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin data >/dev/null 2>&1; then
+            git fetch --depth=1 origin data:data
+            git worktree add .data-branch data
+          else
+            git worktree add --detach .data-branch
+            (cd .data-branch && git checkout --orphan data && git rm -rf --quiet . || true)
+          fi
+          echo "attached=true" >> "$GITHUB_OUTPUT"
+
+      - name: Capture
+        id: capture
+        shell: bash
+        run: |
+          set -euo pipefail
+          MODE="${{ github.event.inputs.mode || 'capture' }}"
+          EXTRA=""
+          if [[ "$MODE" == "dry-run" ]]; then EXTRA="--dry-run"; fi
+          mkdir -p artifacts/closing-line-archive
+          python scripts/capture_closing_line_archive.py \
+            --policy config/closing_line_archive_policy_v1.json \
+            --out-dir .data-branch \
+            --status-out artifacts/closing-line-archive/status.json \
+            $EXTRA
+          echo "rows=$(jq -r '.total_rows_written // 0' artifacts/closing-line-archive/status.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Commit captured prices append-only
+        if: steps.capture.outputs.rows != '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd .data-branch
+          git config user.name  'sportsedge-archive[bot]'
+          git config user.email 'sportsedge-archive@users.noreply.github.com'
+          git add -A archive/closing-lines
+          if git diff --cached --quiet; then
+            echo 'nothing to commit'
+            exit 0
+          fi
+          git commit -m "closing-line-archive: ${{ steps.capture.outputs.rows }} rows at $(date -u +%Y-%m-%dT%H:%M:%SZ) [NOT_EVIDENCE]"
+          for attempt in 1 2 3; do
+            git fetch origin data || true
+            git rebase origin/data || git rebase --abort || true
+            if git push origin HEAD:data; then exit 0; fi
+            sleep $((attempt * 5))
+          done
+          echo 'ARCHIVE_PUSH_FAILED' >&2
+          exit 1
+
+      - name: Upload run status
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: closing-line-archive-status-${{ github.run_id }}
+          path: artifacts/closing-line-archive/status.json
+          if-no-files-found: warn
