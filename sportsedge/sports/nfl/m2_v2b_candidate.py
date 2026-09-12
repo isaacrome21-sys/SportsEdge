@@ -3,10 +3,10 @@
 V2A proved that preserving observed integer NFL score support repairs most of the
 3/7 lattice defect but its predicted-state analog weighting was not predictive
 enough. V2B keeps the same market-blind V1 ridge mean model and empirical integer
-score support, then estimates residual dispersion locally from training rows near
-the target predicted game state. The local covariance is shrunk toward the global
-training-fold covariance using effective local sample size so sparse neighborhoods
-cannot create unstable certainty.
+score support, then estimates local residual location and dispersion from training
+rows near the target predicted game state. The local covariance is shrunk toward
+the global training-fold covariance using effective local sample size so sparse
+neighborhoods cannot create unstable certainty.
 
 No key number receives special treatment. No sportsbook field or held-out outcome
 is consumed while building a held-out distribution.
@@ -21,7 +21,7 @@ from .m2 import NFLM2ScoreModel, NFL_M2_FEATURE_CONTRACT, fit_nfl_m2_score_model
 from .m2_v2_candidate import _integer_score
 
 NFL_M2_V2B_CANDIDATE_MODEL_ID = "nfl_m2_empirical_score_likelihood_v2b_candidate"
-NFL_M2_V2B_DISTRIBUTION_CONTRACT = "NFL_M2_V2B_EMPIRICAL_SCORE_LOCAL_RESIDUAL_LIKELIHOOD_V2"
+NFL_M2_V2B_DISTRIBUTION_CONTRACT = "NFL_M2_V2B_EMPIRICAL_SCORE_LOCAL_RESIDUAL_LIKELIHOOD_V3"
 DEFAULT_NEIGHBORHOOD_SCALE = 1.0
 DEFAULT_COVARIANCE_SHRINKAGE_N = 25.0
 
@@ -126,13 +126,19 @@ def fit_nfl_m2_v2b_candidate(
     )
 
 
-def _local_residual_covariance(
+def _local_residual_parameters(
     model: NFLM2V2BCandidateModel,
     *,
     margin_mu: float,
     total_mu: float,
-) -> tuple[float, float, float, float]:
-    """Return shrunk local margin sigma, total sigma, rho, and effective N."""
+) -> tuple[float, float, float, float, float, float]:
+    """Return local residual means, shrunk sigmas, rho, and effective N.
+
+    Every quantity is estimated from training residual points only. Local residual
+    means are shrunk toward zero using the same effective-sample-size rule used for
+    covariance shrinkage, preventing sparse neighborhoods from creating large
+    unregularized location corrections.
+    """
     if not model.residual_points:
         raise ValueError("NFL_M2_V2B_RESIDUAL_POINTS_EMPTY")
     global_margin_sigma = float(model.mean_model.margin_sigma)
@@ -192,7 +198,11 @@ def _local_residual_covariance(
     total_sigma = sqrt(total_var) * model.kernel_scale
     rho = covariance / sqrt(margin_var * total_var)
     rho = max(-0.95, min(0.95, rho))
-    return margin_sigma, total_sigma, rho, effective_n
+    margin_bias = local_weight * local_margin_mean
+    total_bias = local_weight * local_total_mean
+    if not all(isfinite(value) for value in (margin_bias, total_bias, margin_sigma, total_sigma, rho, effective_n)):
+        raise ValueError("NFL_M2_V2B_LOCAL_PARAMETERS_NONFINITE")
+    return margin_bias, total_bias, margin_sigma, total_sigma, rho, effective_n
 
 
 def derive_nfl_m2_v2b_score_distribution(
@@ -208,12 +218,14 @@ def derive_nfl_m2_v2b_score_distribution(
     if not model.empirical_scores:
         raise ValueError("NFL_M2_V2B_EMPIRICAL_SUPPORT_EMPTY")
 
-    margin_mu, total_mu = model.predict(dict(row))
-    margin_sigma, total_sigma, rho, _effective_n = _local_residual_covariance(
+    raw_margin_mu, raw_total_mu = model.predict(dict(row))
+    margin_bias, total_bias, margin_sigma, total_sigma, rho, _effective_n = _local_residual_parameters(
         model,
-        margin_mu=margin_mu,
-        total_mu=total_mu,
+        margin_mu=raw_margin_mu,
+        total_mu=raw_total_mu,
     )
+    margin_mu = raw_margin_mu + margin_bias
+    total_mu = raw_total_mu + total_bias
     if margin_sigma <= 0.0 or total_sigma <= 0.0:
         raise ValueError("NFL_M2_V2B_BANDWIDTH_INVALID")
     covariance_denom = 1.0 - rho * rho
