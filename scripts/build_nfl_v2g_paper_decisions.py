@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Build immutable PAPER decisions from frozen V2G predictions + opener prices.
-
-This is downstream research evidence only. It never changes V2G probabilities and
-never grants Model_P, staking, market eligibility, Truth Gate PASS, or OFFICIAL.
-"""
+"""Build immutable PAPER decisions from frozen V2G predictions + opener prices."""
 from __future__ import annotations
 
 import argparse
@@ -96,6 +92,8 @@ def validate_policy(policy: dict[str, Any]) -> None:
         die("NFL_V2G_PAPER_POLICY_BOOK_INVALID")
     if set(selection.get("markets") or []) != {"spreads", "totals"}:
         die("NFL_V2G_PAPER_POLICY_MARKETS_INVALID")
+    if selection.get("positive_after_vig_ev_required") is not True:
+        die("NFL_V2G_PAPER_POLICY_POSITIVE_EV_REQUIRED")
     if selection.get("backfill_allowed") is not False or selection.get("staking_allowed") is not False:
         die("NFL_V2G_PAPER_POLICY_GOVERNANCE_INVALID")
 
@@ -142,7 +140,6 @@ def validate_opener(opener: dict[str, Any], pred: dict[str, Any], generated: dat
         die("NFL_V2G_PAPER_BACKFILL_WINDOW_EXCEEDED")
     if generated >= kickoff:
         die("NFL_V2G_PAPER_DECISION_NOT_PREGAME")
-
     matches = []
     for row in opener.get("games") or []:
         if canonical_team(str(row.get("away_team") or "")) != pred.get("away_team"):
@@ -247,17 +244,19 @@ def decide_market(market: str, row: dict[str, Any], pred: dict[str, Any], edge_f
     ranked.sort(key=lambda x: x["edge_probability"], reverse=True)
     top = ranked[0]
     tied = abs(ranked[0]["edge_probability"] - ranked[1]["edge_probability"]) <= 1e-12
-    if tied or top["edge_probability"] < edge_floor:
+    if tied or top["edge_probability"] < edge_floor or top["expected_value_units_per_unit"] <= 0:
         return {
-            "status": "NO_PAPER_EDGE",
+            "status": "NO_PAPER_EDGE_OR_PRICE",
             "market": market,
             "edge_floor_probability": edge_floor,
+            "positive_after_vig_ev_required": True,
             "candidates": ranked,
         }
     return {
         "status": "PAPER_CANDIDATE",
         "market": market,
         "edge_floor_probability": edge_floor,
+        "positive_after_vig_ev_required": True,
         "selection": top,
         "candidates": ranked,
     }
