@@ -14,8 +14,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: nfl-v2g-prospective-outcome-capture-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: false
+  group: nfl-v2g-prospective-outcome-capture-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'persist' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   settle:
