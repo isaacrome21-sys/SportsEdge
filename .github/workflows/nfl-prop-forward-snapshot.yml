@@ -16,6 +16,10 @@ jobs:
     timeout-minutes: 20
     env:
       EVIDENCE_GIT_SHA: ${{ github.sha }}
+      SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+      SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
+      SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
+      SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -37,32 +41,99 @@ jobs:
             cp -R .data-branch/runtime/nfl-prop-forward/state/. .nfl-prop-forward-state/
           fi
 
-      - name: Capture raw DraftKings NFL prop snapshot and provider kickoff map
+      - name: Capture raw NFL prop snapshot and provider kickoff map
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
-          from datetime import datetime, timezone
+          from datetime import datetime, timedelta, timezone
           import hashlib, json, os
           from pathlib import Path
+
           from sportsedge.sports.nfl.draftkings_prop_source import fetch_nfl_prop_quotes
           from sportsedge.sports.nfl.draftkings_prop_event_schedule import fetch_nfl_event_starts
+          from sportsedge.sports.nfl.odds_api_prop_source import fetch_nfl_prop_odds, normalize_nfl_prop_event
+          from sportsedge.sports.nfl.odds_source import fetch_nfl_odds
 
           now = datetime.now(timezone.utc)
-          snap = fetch_nfl_prop_quotes()
-          event_starts = fetch_nfl_event_starts()
-          quotes = [dict(q) for q in snap.quotes]
+          quotes = []
+          event_starts = {}
+          failures = []
+          provider = None
+
+          # Preferred path: direct public DraftKings research surface. It costs no
+          # provider credits. Fail closed into the authenticated fallback rather
+          # than treating temporary DK bootstrap/API drift as a model failure.
+          try:
+              snap = fetch_nfl_prop_quotes()
+              direct_starts = fetch_nfl_event_starts()
+              quotes = [dict(q) for q in snap.quotes]
+              event_starts = dict(direct_starts)
+              failures.extend(list(snap.failures))
+              if quotes and event_starts:
+                  provider = 'DRAFTKINGS_WEB_RESEARCH'
+              else:
+                  failures.append({'reason': 'DK_DIRECT_EMPTY_OR_MISSING_EVENT_STARTS'})
+          except Exception as exc:
+              failures.append({'reason': f'DK_DIRECT:{type(exc).__name__}:{exc}'})
+
+          # Authenticated fallback: The Odds API event-odds endpoint is the
+          # provider-supported route for NFL player props. Only upcoming events
+          # within 72 hours are queried, and only when direct DK produced no
+          # usable snapshot, limiting paid-provider usage.
+          if not (quotes and event_starts):
+              keys = [
+                  os.environ.get(name, '').strip()
+                  for name in (
+                      'SPORTSEDGE_ODDS_API_KEY', 'SPORTSEDGE_ODDS_API_KEY_2',
+                      'SPORTSEDGE_ODDS_API_KEY_3', 'SPORTSEDGE_ODDS_API_KEY_4',
+                  )
+                  if os.environ.get(name, '').strip()
+              ]
+              if not keys:
+                  raise SystemExit('NFL_PROP_FORWARD_NO_PROVIDER_KEYS_FOR_FALLBACK')
+              featured = fetch_nfl_odds(keys).value
+              if not isinstance(featured, list):
+                  raise SystemExit('NFL_PROP_FORWARD_FEATURED_EVENTS_INVALID')
+              fallback_quotes = []
+              fallback_starts = {}
+              horizon = now + timedelta(hours=72)
+              for event in featured:
+                  if not isinstance(event, dict):
+                      continue
+                  event_id = str(event.get('id') or '').strip()
+                  commence_raw = str(event.get('commence_time') or '').strip()
+                  if not event_id or not commence_raw:
+                      continue
+                  try:
+                      commence = datetime.fromisoformat(commence_raw.replace('Z', '+00:00')).astimezone(timezone.utc)
+                  except ValueError:
+                      failures.append({'provider_event_id': event_id, 'reason': 'ODDS_API_COMMENCE_TIME_INVALID'})
+                      continue
+                  if commence < now or commence > horizon:
+                      continue
+                  try:
+                      result = fetch_nfl_prop_odds(keys, event_id=event_id, bookmakers='draftkings,fanduel')
+                      rows = normalize_nfl_prop_event(result.value)
+                      fallback_quotes.extend(rows)
+                      fallback_starts[event_id] = commence.isoformat()
+                  except Exception as exc:
+                      failures.append({'provider_event_id': event_id, 'reason': f'ODDS_API:{type(exc).__name__}:{exc}'})
+              quotes = fallback_quotes
+              event_starts = fallback_starts
+              provider = 'THE_ODDS_API'
+
           payload = {
               'contract': 'NFL_PROP_FORWARD_RAW_SNAPSHOT_V1',
               'captured_at': now.isoformat(),
               'code_git_sha': os.environ['EVIDENCE_GIT_SHA'].lower(),
-              'provider': 'DRAFTKINGS_WEB_RESEARCH',
+              'provider': provider,
               'sport': 'NFL',
               'quotes': quotes,
               'quote_count': len(quotes),
               'event_starts': event_starts,
               'event_start_count': len(event_starts),
-              'failures': list(snap.failures),
+              'failures': failures,
               'promotion_authority': False,
               'model_p_created': False,
               'reconstructed': False,
