@@ -31,6 +31,7 @@ from sportsedge.sports.nfl.m2_history_policy import build_nfl_m2_history_rows
 from sportsedge.sports.nfl.m2_v2_nested_validation import build_nfl_m2_v2_nested_candidate_evidence
 from sportsedge.sports.nfl.m2_v2_validation import build_nfl_m2_v2_candidate_evidence
 from sportsedge.sports.nfl.m2_v2b_validation import build_nfl_m2_v2b_candidate_evidence
+from sportsedge.sports.nfl.m2_v2c_validation import build_nfl_m2_v2c_candidate_evidence
 from sportsedge.sports.nfl.source_manifest import manifest_sha256
 
 _GIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -120,6 +121,7 @@ def main() -> int:
     parser.add_argument("--out", type=Path, default=Path("artifacts/football/nfl_m2_v2_candidate_validation.json"))
     parser.add_argument("--nested-out", type=Path, default=Path("artifacts/football/nfl_m2_v2_nested_candidate_validation.json"))
     parser.add_argument("--v2b-out", type=Path, default=Path("artifacts/football/nfl_m2_v2b_candidate_validation.json"))
+    parser.add_argument("--v2c-out", type=Path, default=Path("artifacts/football/nfl_m2_v2c_candidate_validation.json"))
     args = parser.parse_args()
 
     git_sha = str(args.git_sha).strip().lower()
@@ -137,11 +139,7 @@ def main() -> int:
     pbp_files = _files(args.pbp_dir, "play_by_play_{season}.{ext}", args.start_season, args.end_season)
     participation_files = _files(args.participation_dir, "pbp_participation_{season}.{ext}", args.start_season, args.end_season)
     depth_files = _files(args.depth_dir, "depth_charts_{season}.{ext}", args.start_season, args.end_season)
-    required = {
-        "schedule": args.schedule_file,
-        "stadiums": args.stadium_file,
-        "starter_overrides": args.starter_override_file,
-    }
+    required = {"schedule": args.schedule_file, "stadiums": args.stadium_file, "starter_overrides": args.starter_override_file}
     for season, path in zip(range(args.start_season, args.end_season + 1), pbp_files):
         required[f"pbp_{season}"] = path
     for season, path in zip(range(args.start_season, args.end_season + 1), participation_files):
@@ -154,10 +152,7 @@ def main() -> int:
             raise SystemExit(f"NFL_M2_V2_SOURCE_MANIFEST_ENTRY_MISSING:{name}")
         _assert_source(path, expected, name)
 
-    schedule = normalize_nfl_rows(
-        parse_schedule_csv(args.schedule_file.read_text(encoding="utf-8-sig")),
-        range(args.start_season, args.end_season + 1),
-    )
+    schedule = normalize_nfl_rows(parse_schedule_csv(args.schedule_file.read_text(encoding="utf-8-sig")), range(args.start_season, args.end_season + 1))
     pbp: list[dict[str, str]] = []
     participation: list[dict[str, str]] = []
     depth: list[dict[str, str]] = []
@@ -166,9 +161,7 @@ def main() -> int:
     _extend(depth, depth_files, _DEPTH_FIELDS)
     raw_stadiums = _read_projected(args.stadium_file, _STADIUM_FIELDS)
     stadiums, stadium_bridges = bridge_preopening_away_origins(schedule, raw_stadiums)
-    prior_curves = fit_nfl_prior_decay_curves(
-        schedule, pbp, min_train_seasons=args.min_train_seasons, weeks=range(1, 7)
-    )
+    prior_curves = fit_nfl_prior_decay_curves(schedule, pbp, min_train_seasons=args.min_train_seasons, weeks=range(1, 7))
 
     try:
         override_payload = json.loads(args.starter_override_file.read_text(encoding="utf-8"))
@@ -181,11 +174,7 @@ def main() -> int:
         raise SystemExit(f"NFL_M2_V2_STARTING_QB_COVERAGE_GAPS:{len(after)}")
 
     history_rows = build_nfl_m2_history_rows(
-        schedule,
-        pbp,
-        participation,
-        depth,
-        stadiums,
+        schedule, pbp, participation, depth, stadiums,
         prior_decay_curves=prior_curves,
         neutral_site_policy=args.neutral_site_policy,
     )
@@ -200,60 +189,39 @@ def main() -> int:
         "override_count": len(applied),
         "stadium_bridge_count": len(stadium_bridges),
     }
-    v2a = _attach_run_provenance(
-        build_nfl_m2_v2_candidate_evidence(
-            history_rows,
-            source_manifest_sha256=manifest_hash,
-            min_train_seasons=args.min_train_seasons,
-            ridge_alpha=args.ridge_alpha,
-            kernel_scale=args.kernel_scale,
-        ),
-        **common,
-    )
-    nested = _attach_run_provenance(
-        build_nfl_m2_v2_nested_candidate_evidence(
-            history_rows,
-            source_manifest_sha256=manifest_hash,
-            min_train_seasons=args.min_train_seasons,
-            ridge_alpha=args.ridge_alpha,
-        ),
-        **common,
-    )
-    v2b = _attach_run_provenance(
-        build_nfl_m2_v2b_candidate_evidence(
-            history_rows,
-            source_manifest_sha256=manifest_hash,
-            min_train_seasons=args.min_train_seasons,
-            ridge_alpha=args.ridge_alpha,
-            kernel_scale=args.kernel_scale,
-        ),
-        **common,
-    )
+    v2a = _attach_run_provenance(build_nfl_m2_v2_candidate_evidence(
+        history_rows, source_manifest_sha256=manifest_hash,
+        min_train_seasons=args.min_train_seasons,
+        ridge_alpha=args.ridge_alpha, kernel_scale=args.kernel_scale,
+    ), **common)
+    nested = _attach_run_provenance(build_nfl_m2_v2_nested_candidate_evidence(
+        history_rows, source_manifest_sha256=manifest_hash,
+        min_train_seasons=args.min_train_seasons, ridge_alpha=args.ridge_alpha,
+    ), **common)
+    v2b = _attach_run_provenance(build_nfl_m2_v2b_candidate_evidence(
+        history_rows, source_manifest_sha256=manifest_hash,
+        min_train_seasons=args.min_train_seasons,
+        ridge_alpha=args.ridge_alpha, kernel_scale=args.kernel_scale,
+    ), **common)
+    v2c = _attach_run_provenance(build_nfl_m2_v2c_candidate_evidence(
+        history_rows, source_manifest_sha256=manifest_hash,
+        min_train_seasons=args.min_train_seasons,
+        fallback_alpha=args.ridge_alpha,
+    ), **common)
+
     _write(args.out, v2a)
     _write(args.nested_out, nested)
     _write(args.v2b_out, v2b)
+    _write(args.v2c_out, v2c)
 
     print(json.dumps({
         "status": "V2_CANDIDATE_DIAGNOSTICS_COMPLETE",
         "history_rows": len(history_rows),
         "production_registry_consumes_these_artifacts": False,
-        "v2a": {
-            "model_id": v2a["model_id"],
-            "candidate_historical_evidence": v2a["candidate_historical_evidence"],
-            "signed_key_probability": v2a["candidate_distribution_profile"]["signed_key_probability"],
-        },
-        "v2a_nested": {
-            "model_id": nested["model_id"],
-            "selection_contract": nested["selection_contract"],
-            "candidate_historical_evidence": nested["candidate_historical_evidence"],
-            "signed_key_probability": nested["candidate_distribution_profile"]["signed_key_probability"],
-            "outer_fold_kernel_selection": nested["outer_fold_kernel_selection"],
-        },
-        "v2b": {
-            "model_id": v2b["model_id"],
-            "candidate_historical_evidence": v2b["candidate_historical_evidence"],
-            "signed_key_probability": v2b["candidate_distribution_profile"]["signed_key_probability"],
-        },
+        "v2a": {"model_id": v2a["model_id"], "candidate_historical_evidence": v2a["candidate_historical_evidence"], "signed_key_probability": v2a["candidate_distribution_profile"]["signed_key_probability"]},
+        "v2a_nested": {"model_id": nested["model_id"], "selection_contract": nested["selection_contract"], "candidate_historical_evidence": nested["candidate_historical_evidence"], "signed_key_probability": nested["candidate_distribution_profile"]["signed_key_probability"], "outer_fold_kernel_selection": nested["outer_fold_kernel_selection"]},
+        "v2b": {"model_id": v2b["model_id"], "candidate_historical_evidence": v2b["candidate_historical_evidence"], "signed_key_probability": v2b["candidate_distribution_profile"]["signed_key_probability"]},
+        "v2c": {"model_id": v2c["model_id"], "candidate_historical_evidence": v2c["candidate_historical_evidence"], "signed_key_probability": v2c["candidate_distribution_profile"]["signed_key_probability"], "outer_fold_alpha_selection": v2c["split_alpha_selection"]["outer_fold_audits"]},
     }, sort_keys=True))
     return 0
 
