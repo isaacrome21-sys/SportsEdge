@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Prospective raw capture for CFB_FORWARD_CLV_POLICY_V1.
 
-Raw market snapshots are not evidence by themselves. The lane is fail-closed:
-no Model_P creation, no Layer-B admission, no backfill, no post-start evidence.
+Raw snapshots are not evidence by themselves. No Model_P creation, no Layer-B
+admission, no backfill, and no post-start evidence are permitted here.
 """
 from __future__ import annotations
 
@@ -68,7 +68,9 @@ def load_policy(path: Path) -> dict[str, Any]:
     p = json.loads(path.read_text(encoding="utf-8"))
     if p.get("policy_id") != "CFB_FORWARD_CLV_POLICY_V1" or p.get("status") != "FROZEN":
         raise CaptureError("CFB_FORWARD_POLICY_NOT_FROZEN")
-    adm, clv, close = p.get("row_admissibility") or {}, p.get("clv_definition") or {}, (p.get("capture_schedule") or {}).get("close") or {}
+    adm = p.get("row_admissibility") or {}
+    clv = p.get("clv_definition") or {}
+    close = (p.get("capture_schedule") or {}).get("close") or {}
     required = [
         (adm.get("model_p_required") is True, "MODEL_P_REQUIREMENT"),
         (adm.get("layer_b_rows_prohibited") is True, "LAYER_B_PROHIBITION"),
@@ -95,8 +97,8 @@ def default_opener(req: urllib.request.Request, timeout: int = 30):
     return urllib.request.urlopen(req, timeout=timeout)
 
 
-def fetch_json_url(url: str, opener: Callable[..., Any], *, user_agent: str = "sportsedge-cfb-forward-clv") -> dict[str, Any]:
-    req = urllib.request.Request(url, headers={"User-Agent": user_agent})
+def fetch_json_url(url: str, opener: Callable[..., Any]) -> dict[str, Any]:
+    req = urllib.request.Request(url, headers={"User-Agent": "sportsedge-cfb-forward-clv"})
     with opener(req, timeout=30) as resp:
         raw = resp.read()
     return {"payload": json.loads(raw), "raw_sha256": sha256_bytes(raw), "received_at_utc": iso(datetime.now(UTC))}
@@ -198,9 +200,10 @@ def match_espn(odds_event: Mapping[str, Any], candidates: Iterable[Mapping[str, 
     return hits[0] if len(hits) == 1 else None
 
 
-def status_is_pre(status: Mapping[str, Any], received_at: datetime, policy: Mapping[str, Any]) -> tuple[bool, str]:
+def status_is_pre(status: Mapping[str, Any], received_at: datetime, policy: Mapping[str, Any], *, at: datetime | None = None) -> tuple[bool, str]:
+    at = at or datetime.now(UTC)
     max_age = int(policy["capture_schedule"]["close"]["max_status_read_age_seconds"])
-    age = max(0.0, (datetime.now(UTC) - received_at).total_seconds())
+    age = max(0.0, (at - received_at).total_seconds())
     if age > max_age:
         return False, "STATUS_READ_STALE"
     name = str(status.get("status_name") or "").upper()
@@ -304,7 +307,7 @@ def capture_opener(*, now: datetime, policy_path: Path, policy: Mapping[str, Any
     path = out_dir / "cfb_forward_clv" / "captures" / slate / "opener.json"
     if path.exists():
         return {**report, "status": "ALREADY_CAPTURED", "path": str(path)}
-    days = [(start.astimezone(CT).date() + timedelta(days=i)) for i in range(3)]
+    days = [start.astimezone(CT).date() + timedelta(days=i) for i in range(3)]
     fbs = scoreboard_range(days, opener)
     idx = fetch_event_index(keys, opener)
     wanted = [e for e in idx["payload"] if (ts := event_start(e)) is not None and start <= ts < end and match_espn(e, fbs)]
@@ -335,8 +338,8 @@ def free_gate_due_espn(now: datetime, policy: Mapping[str, Any], opener: Callabl
         if scheduled.astimezone(CT).date() < first_admissible(policy):
             continue
         lead = (scheduled - now).total_seconds()
-        pre, reason = status_is_pre(e, received, policy)
-        # Scheduled time only seeds monitoring. Keep delayed PRE events alive for six hours.
+        pre, reason = status_is_pre(e, received, policy, at=now)
+        # Scheduled time only seeds monitoring. Delayed PRE_START events remain live.
         if pre and -21600 <= lead <= 1200:
             e["status_validation"] = reason
             due.append(e)
@@ -353,26 +356,22 @@ def raw_snapshot_path(out_dir: Path, event: Mapping[str, Any], captured: datetim
 
 
 def capture_close_snapshot(*, now: datetime, policy_path: Path, policy: Mapping[str, Any], out_dir: Path, keys: list[str], opener: Callable[..., Any], dry_run: bool) -> dict[str, Any]:
-    espn_due, status_received = free_gate_due_espn(now, policy, opener)
-    report = {"phase": "CLOSE", "dry_run": dry_run, "espn_due": len(espn_due), "events": []}
+    espn_due, _ = free_gate_due_espn(now, policy, opener)
+    report = {"phase": "CLOSE_SNAPSHOT", "dry_run": dry_run, "espn_due": len(espn_due), "events": []}
     if not espn_due:
         return report
     idx = fetch_event_index(keys, opener)
-    odds_due = []
-    for e in idx["payload"]:
-        matched = match_espn(e, espn_due)
-        if matched:
-            odds_due.append((e, matched))
+    odds_due = [(e, m) for e in idx["payload"] if (m := match_espn(e, espn_due))]
     report["matched_odds_events"] = len(odds_due)
     if dry_run:
         return report
-    for e, status in odds_due:
+    for e, _ in odds_due:
         result = fetch_event_close(str(e["id"]), keys, opener)
         captured = parse_ts(result["received_at_utc"])
         fresh_board = fetch_espn_scoreboard(captured.astimezone(CT).date(), opener)
         fresh_received = parse_ts(fresh_board["received_at_utc"])
         fresh_match = match_espn(e, espn_events(fresh_board["payload"]))
-        pre, status_reason = status_is_pre(fresh_match or {}, fresh_received, policy)
+        pre, status_reason = status_is_pre(fresh_match or {}, fresh_received, policy, at=captured)
         if not pre:
             report["events"].append({"event_id": e.get("id"), "status": "INVALID", "reason": status_reason})
             continue
@@ -391,12 +390,22 @@ def capture_close_snapshot(*, now: datetime, policy_path: Path, policy: Mapping[
             "espn_status_received_at_utc": iso(fresh_received),
             "dk_pregame_main_markets_open_two_sided_fresh": True,
             "exact_contract_alt_ladders_requested": True, "requested_markets": list(CLOSE_MARKETS),
-            "first_play_attestation_status": "PENDING_POST_START",
-            "markets": rows,
+            "first_play_attestation_status": "PENDING_POST_START", "markets": rows,
         }
         write_once(path, record)
         report["events"].append({"event_id": e.get("id"), "status": "CAPTURED_PENDING_ATTESTATION", "path": str(path), "market_rows": len(rows)})
     return report
+
+
+def capture_close_cycle(*, now: datetime, poll_count: int, poll_seconds: int, sleep_fn: Callable[[float], None], **kwargs: Any) -> dict[str, Any]:
+    runs = []
+    current = now
+    for i in range(max(1, poll_count)):
+        runs.append(capture_close_snapshot(now=current, **kwargs))
+        if i + 1 < max(1, poll_count):
+            sleep_fn(poll_seconds)
+            current = datetime.now(UTC)
+    return {"phase": "CLOSE", "poll_count": len(runs), "poll_interval_seconds": poll_seconds, "runs": runs, "status": "SUCCESS"}
 
 
 def iter_wallclocks(obj: Any) -> Iterable[datetime]:
@@ -407,7 +416,7 @@ def iter_wallclocks(obj: Any) -> Iterable[datetime]:
                     yield parse_ts(v)
                 except CaptureError:
                     pass
-            elif k in {"plays", "drives"}:
+            else:
                 yield from iter_wallclocks(v)
     elif isinstance(obj, list):
         for item in obj:
@@ -420,7 +429,6 @@ def first_play_from_summary(payload: Mapping[str, Any]) -> datetime | None:
 
 
 def selected_path_for(snapshot: Path) -> Path:
-    # .../<slate>/close_raw/<odds_id>/<timestamp>.json -> .../<slate>/close_selected/<odds_id>.json
     slate_dir = snapshot.parents[2]
     return slate_dir / "close_selected" / f"{snapshot.parent.name}.json"
 
@@ -435,7 +443,8 @@ def attest_existing(*, out_dir: Path, policy_path: Path, policy: Mapping[str, An
     for selected, snaps in sorted(groups.items(), key=lambda kv: str(kv[0])):
         if selected.exists():
             continue
-        records = [json.loads(p.read_text(encoding="utf-8")) for p in sorted(snaps)]
+        ordered = sorted(snaps)
+        records = [json.loads(p.read_text(encoding="utf-8")) for p in ordered]
         espn_id = str(records[0].get("espn_event_id") or "")
         if not espn_id:
             report["events"].append({"status": "PENDING", "reason": "ESPN_EVENT_ID_MISSING"})
@@ -445,20 +454,16 @@ def attest_existing(*, out_dir: Path, policy_path: Path, policy: Mapping[str, An
         if first_play is None:
             report["events"].append({"espn_event_id": espn_id, "status": "PENDING", "reason": "FIRST_PLAY_TIMESTAMP_UNAVAILABLE"})
             continue
-        valid = []
-        invalid = []
-        for p, r in zip(sorted(snaps), records):
+        valid, invalid = [], []
+        for p, r in zip(ordered, records):
             captured = parse_ts(r["captured_at_utc"])
             (valid if captured < first_play else invalid).append((captured, p, r))
         chosen = max(valid, key=lambda x: x[0]) if valid else None
         outcome = {
             **base_record(policy_path, policy, datetime.now(UTC)),
-            "capture_kind": "CLOSE_SELECTION_ATTESTATION",
-            "espn_event_id": espn_id,
-            "actual_start_attestation": "FIRST_PLAY_WALLCLOCK",
-            "first_play_utc": iso(first_play),
-            "selection_rule": "LAST_SUCCESSFUL_VALID_CAPTURE",
-            "invalid_post_start_snapshot_count": len(invalid),
+            "capture_kind": "CLOSE_SELECTION_ATTESTATION", "espn_event_id": espn_id,
+            "actual_start_attestation": "FIRST_PLAY_WALLCLOCK", "first_play_utc": iso(first_play),
+            "selection_rule": "LAST_SUCCESSFUL_VALID_CAPTURE", "invalid_post_start_snapshot_count": len(invalid),
             "raw_snapshot_count": len(records),
         }
         if chosen:
@@ -481,6 +486,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--status-out")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--now")
+    ap.add_argument("--poll-count", type=int, default=1)
     args = ap.parse_args(argv)
     try:
         policy_path = Path(args.policy)
@@ -494,7 +500,7 @@ def main(argv: list[str] | None = None) -> int:
         elif args.phase == "opener":
             report = capture_opener(now=now, policy_path=policy_path, policy=policy, out_dir=Path(args.out_dir), keys=keys, opener=default_opener, dry_run=args.dry_run)
         elif args.phase == "close":
-            report = capture_close_snapshot(now=now, policy_path=policy_path, policy=policy, out_dir=Path(args.out_dir), keys=keys, opener=default_opener, dry_run=args.dry_run)
+            report = capture_close_cycle(now=now, poll_count=(1 if args.dry_run else args.poll_count), poll_seconds=int(policy["capture_schedule"]["close"]["retry_interval_seconds"]), sleep_fn=time.sleep, policy_path=policy_path, policy=policy, out_dir=Path(args.out_dir), keys=keys, opener=default_opener, dry_run=args.dry_run)
         else:
             report = attest_existing(out_dir=Path(args.out_dir), policy_path=policy_path, policy=policy, opener=default_opener, dry_run=args.dry_run)
         report.setdefault("status", "SUCCESS")
