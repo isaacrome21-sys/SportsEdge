@@ -63,16 +63,26 @@ jobs:
         with:
           python-version: '3.12'
       - name: Restore immutable prospective evidence state
+        id: state
         shell: bash
         run: |
           set -euo pipefail
           git fetch origin data
           git worktree add --detach .data-v2g origin/data
-          test -d .data-v2g/evidence/nfl_v2g/prospective/forward_clv/2026 || { echo NFL_V2G_FORWARD_CLV_STATE_MISSING >&2; exit 78; }
-          test -d .data-v2g/evidence/nfl_v2g/prospective/market_bindings/2026 || { echo NFL_V2G_MARKET_BINDINGS_MISSING >&2; exit 78; }
+          FORWARD=.data-v2g/evidence/nfl_v2g/prospective/forward_clv/2026
+          BINDINGS=.data-v2g/evidence/nfl_v2g/prospective/market_bindings/2026
+          if [[ ! -d "$FORWARD" && ! -d "$BINDINGS" ]]; then
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            echo 'NFL_V2G_EVALUATION_NOT_READY_NO_FORWARD_EVIDENCE'
+            exit 0
+          fi
+          test -d "$FORWARD" || { echo NFL_V2G_FORWARD_CLV_STATE_MISSING >&2; exit 78; }
+          test -d "$BINDINGS" || { echo NFL_V2G_MARKET_BINDINGS_MISSING >&2; exit 78; }
+          echo 'ready=true' >> "$GITHUB_OUTPUT"
           mkdir -p .data-v2g/evidence/nfl_v2g/prospective/outcomes/2026
           mkdir -p .data-v2g/evidence/nfl_v2g/prospective/evaluation/2026
       - name: Evaluate canonical outcomes and fixed checkpoints
+        if: steps.state.outputs.ready == 'true'
         run: |
           python scripts/run_nfl_v2g_prospective_evaluation.py \
             --policy config/research/nfl_v2g_prospective_evaluation_policy_2026-09-12.json \
@@ -81,6 +91,7 @@ jobs:
             --canonical-outcome-dir .data-v2g/evidence/nfl_v2g/prospective/outcomes/2026 \
             --evaluation-root .data-v2g/evidence/nfl_v2g/prospective/evaluation/2026
       - name: Assert evaluator did not mutate canonical outcomes
+        if: steps.state.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -89,6 +100,7 @@ jobs:
             exit 97
           fi
       - name: Persist first-write evaluation and checkpoint evidence
+        if: steps.state.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail

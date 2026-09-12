@@ -18,7 +18,7 @@
     },
     {
       "path": ".github/workflows/nfl-v2g-prospective-evaluation.yml",
-      "git_blob_sha1": "96781add4620bcc1815f3aadef18d62288ddbe34"
+      "git_blob_sha1": "e2246ef84314b781b09c36177ddc0ddc4dea4e4b"
     },
     {
       "path": "tests/test_nfl_v2g_prospective_evaluation.py",
