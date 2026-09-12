@@ -4,9 +4,10 @@ Keys are never logged or returned. A fetch attempt either returns a complete
 provider snapshot or raises; failures are recorded only by 1-based key slot and
 exception class/message. The caller controls the actual provider fetch.
 
-``OUT_OF_USAGE_CREDITS`` is account-terminal. SportsEdge keys may be multiple
-slots for the same provider account, so rotating after the provider declares the
-account exhausted only repeats a paid-provider failure and can multiply calls.
+Account-wide terminal provider states must stop rotation. SportsEdge keys may be
+multiple slots for the same provider account, so trying every slot after the
+provider declares account exhaustion or a plan-level endpoint restriction only
+repeats the same doomed request and can multiply provider calls.
 """
 from __future__ import annotations
 
@@ -14,7 +15,10 @@ from dataclasses import dataclass
 from typing import Callable, Generic, Iterable, TypeVar
 
 T = TypeVar("T")
-TERMINAL_PROVIDER_CODES = ("OUT_OF_USAGE_CREDITS",)
+TERMINAL_PROVIDER_CODES = (
+    "OUT_OF_USAGE_CREDITS",
+    "HISTORICAL_UNAVAILABLE_ON_FREE_USAGE_PLAN",
+)
 
 
 class OddsKeyringError(RuntimeError):
