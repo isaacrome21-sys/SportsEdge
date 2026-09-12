@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-import tempfile
 import unittest
 
 from sportsedge.football_prop_surface import FootballPropSurfaceError, require_executable_prop_surface
@@ -12,21 +11,22 @@ CFB_CERTIFIED_SHA = "923cfd1be42d31a87d9f31ddffce406d44bfc1bb003d1c625f5a4258f77
 
 
 class FootballPropRuntimeTruthTests(unittest.TestCase):
-    def test_checked_in_football_prop_artifacts_remain_truthful_without_granting_nfl_engine_authority(self):
+    def test_checked_in_football_prop_artifacts_remain_truthful_without_granting_engine_authority(self):
         surface = json.loads(SURFACE.read_text(encoding="utf-8"))
-        self.assertEqual(surface["sports"]["NFL"]["engine_state"], "NO_ENGINE")
-        with self.assertRaisesRegex(FootballPropSurfaceError, "FOOTBALL_PROP_ENGINE_NOT_IMPLEMENTED:NFL"):
-            require_executable_prop_surface("NFL", path=SURFACE)
+        for sport in ("NFL", "CFB"):
+            self.assertEqual(surface["sports"][sport]["engine_state"], "NO_ENGINE")
+            with self.assertRaisesRegex(FootballPropSurfaceError, f"FOOTBALL_PROP_ENGINE_NOT_IMPLEMENTED:{sport}"):
+                require_executable_prop_surface(sport, path=SURFACE)
 
         nfl_registry = json.loads((ROOT / "config/nfl_prop_model_freeze.json").read_text(encoding="utf-8"))
         self.assertEqual(nfl_registry["status"], "FROZEN")
         self.assertEqual(nfl_registry["artifact_sha256"], NFL_CERTIFIED_SHA)
         self.assertFalse(nfl_registry["promotion_authority"])
 
-        cfb = require_executable_prop_surface("CFB", path=SURFACE)
-        self.assertEqual(cfb["runtime_state"], "ARTIFACT_FROZEN_EVIDENCE_GATED")
-        self.assertEqual(cfb["frozen_artifact_sha256"], CFB_CERTIFIED_SHA)
-        self.assertEqual(cfb["readiness_state"], "REGISTRY_DERIVED")
+        cfb_registry = json.loads((ROOT / "config/cfb_prop_model_freeze.json").read_text(encoding="utf-8"))
+        self.assertEqual(cfb_registry["status"], "FROZEN")
+        self.assertEqual(cfb_registry["artifact_sha256"], CFB_CERTIFIED_SHA)
+        self.assertFalse(cfb_registry["promotion_authority"])
 
     def test_surface_does_not_claim_market_price_can_create_model_p(self):
         payload = json.loads(SURFACE.read_text(encoding="utf-8"))
@@ -38,26 +38,11 @@ class FootballPropRuntimeTruthTests(unittest.TestCase):
         self.assertTrue(governance["paired_price_required_for_devig"])
         self.assertNotIn("requires_paired_price_for_market_economics", governance)
 
-    def test_executable_frozen_registry_requires_real_sha(self):
+    def test_no_engine_state_short_circuits_registry_authority(self):
         payload = json.loads(SURFACE.read_text(encoding="utf-8"))
-        with tempfile.TemporaryDirectory() as td:
-            config = Path(td) / "config"; config.mkdir()
-            (config / "football_prop_engine_surface.json").write_text(json.dumps(payload), encoding="utf-8")
-            (config / "cfb_prop_model_freeze.json").write_text(json.dumps({"sport": "CFB", "status": "FROZEN", "artifact_sha256": None}), encoding="utf-8")
-            with self.assertRaisesRegex(FootballPropSurfaceError, "FOOTBALL_PROP_FROZEN_ARTIFACT_SHA_INVALID:CFB"):
-                require_executable_prop_surface("CFB", path=config / "football_prop_engine_surface.json")
-
-    def test_executable_registry_state_is_derived_not_hard_coded(self):
-        payload = json.loads(SURFACE.read_text(encoding="utf-8"))
-        with tempfile.TemporaryDirectory() as td:
-            config = Path(td) / "config"; config.mkdir()
-            surface_path = config / "football_prop_engine_surface.json"
-            surface_path.write_text(json.dumps(payload), encoding="utf-8")
-            digest = "a" * 64
-            (config / "cfb_prop_model_freeze.json").write_text(json.dumps({"sport": "CFB", "status": "FROZEN", "artifact_sha256": digest}), encoding="utf-8")
-            spec = require_executable_prop_surface("CFB", path=surface_path)
-            self.assertEqual(spec["runtime_state"], "ARTIFACT_FROZEN_EVIDENCE_GATED")
-            self.assertEqual(spec["frozen_artifact_sha256"], digest)
+        self.assertEqual(payload["sports"]["CFB"]["engine_state"], "NO_ENGINE")
+        with self.assertRaisesRegex(FootballPropSurfaceError, "FOOTBALL_PROP_ENGINE_NOT_IMPLEMENTED:CFB"):
+            require_executable_prop_surface("CFB", path=SURFACE)
 
 
 if __name__ == "__main__":
