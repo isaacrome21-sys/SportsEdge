@@ -45,6 +45,7 @@ def capture_bundle():
                 "weather": {
                     "outdoor_game": True,
                     "available": True,
+                    "severe_weather": True,
                     "captured_at": "2026-09-12T13:45:00Z",
                     "sources": [{"family": "weather", "kind": "weather", "independent": True}],
                 },
@@ -64,6 +65,7 @@ def test_adapter_computes_freshness_and_binds_fail_closed_registry():
     assert row["handles_age_minutes"] == pytest.approx(5.0)
     assert row["injury_age_minutes"] == pytest.approx(40.0)
     assert row["weather_age_minutes"] == pytest.approx(25.0)
+    assert row["severe_weather"] is True
     assert row["tickets_pct"] == 72
     assert {source["family"] for source in row["sources"]} == {"fanduel", "covers", "team-report", "weather"}
 
