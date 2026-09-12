@@ -8,9 +8,11 @@ on:
     paths:
       - 'config/research/nfl_v2g_prospective_paper_evaluation_policy_2026-09-12.json'
       - 'scripts/build_nfl_v2g_paper_decisions.py'
+      - 'scripts/validate_nfl_v2g_prospective_chain.py'
       - 'scripts/settle_nfl_v2g_prospective.py'
       - 'scripts/evaluate_nfl_v2g_prospective.py'
       - 'tests/test_nfl_v2g_paper_decisions.py'
+      - 'tests/test_nfl_v2g_prospective_chain.py'
       - 'tests/test_nfl_v2g_prospective_settlement.py'
       - 'tests/test_nfl_v2g_prospective_evaluator.py'
       - '.github/workflows/nfl-v2g-prospective-settlement.yml'
@@ -34,12 +36,14 @@ jobs:
       - name: Compile prospective evaluation surface
         run: |
           python -m py_compile scripts/build_nfl_v2g_paper_decisions.py
+          python -m py_compile scripts/validate_nfl_v2g_prospective_chain.py
           python -m py_compile scripts/settle_nfl_v2g_prospective.py
           python -m py_compile scripts/evaluate_nfl_v2g_prospective.py
       - name: Freeze prospective evidence semantics
         run: |
           python -m unittest -q \
             tests.test_nfl_v2g_paper_decisions \
+            tests.test_nfl_v2g_prospective_chain \
             tests.test_nfl_v2g_prospective_settlement \
             tests.test_nfl_v2g_prospective_evaluator
 
@@ -101,14 +105,29 @@ jobs:
           for paper in "${decisions[@]}"; do
             [ -e "$paper" ] || continue
             base="$(basename "$paper")"
+            week_num="$(printf '%s' "$base" | cut -d_ -f2)"
             prediction="$ROOT/predictions/2026/$base"
             binding="$ROOT/market_bindings/2026/$base"
+            opener="data/nfl_2026_confirmation/captures/week${week_num}/opener.json"
             dest="$ROOT/settlements/2026/$base"
             test -f "$prediction" || { echo "NFL_V2G_SETTLEMENT_PREDICTION_MISSING:$base" >&2; exit 79; }
+            test -f "$opener" || { echo "NFL_V2G_SETTLEMENT_OPENER_MISSING:$base" >&2; exit 79; }
             if [ -f "$dest" ]; then
               existing=$((existing + 1))
               continue
             fi
+
+            validate_args=(
+              --prediction "$prediction"
+              --paper-decision "$paper"
+              --policy "$POLICY"
+              --opener "$opener"
+            )
+            if [ -f "$binding" ]; then
+              validate_args+=(--market-binding "$binding")
+            fi
+            python scripts/validate_nfl_v2g_prospective_chain.py "${validate_args[@]}"
+
             tmp="$OUT/$base"
             args=(
               --prediction "$prediction"
