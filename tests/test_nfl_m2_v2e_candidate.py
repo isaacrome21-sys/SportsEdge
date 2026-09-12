@@ -4,7 +4,11 @@ import pytest
 
 from sportsedge.sports.nfl.m2_v2e_candidate import (
     NFL_M2_V2E_CANDIDATE_MODEL_ID,
+    NFL_M2_V2E_DISTRIBUTION_CONTRACT,
+    NFL_M2_V2E_FEATURE_CONTRACT,
     NFLM2V2ECandidateModel,
+    _conditional_outcome_probabilities,
+    _standardized_prediction_state,
     derive_nfl_m2_v2e_score_distribution,
     fit_nfl_m2_v2e_candidate,
 )
@@ -13,26 +17,30 @@ from sportsedge.sports.nfl.m2_v2e_candidate import (
 def _row(season: int, shift: int = 0) -> dict:
     home_drives = 10 + (shift % 3)
     away_drives = 10 + ((shift + 1) % 3)
+    home_td = 2 + (shift % 3)
+    home_fg = 1 + ((shift + 1) % 2)
+    away_td = 1 + ((shift + 1) % 3)
+    away_fg = 1 + (shift % 2)
     return {
         "season": season,
-        "home_state": {"offense": 0.10 + shift * 0.01, "defense": -0.03, "qb": 0.04},
-        "away_state": {"offense": 0.03, "defense": 0.02 - shift * 0.01, "qb": 0.01},
+        "home_state": {"offense": 0.10 + shift * 0.04, "defense": -0.03 + shift * 0.01, "qb": 0.04 + shift * 0.02},
+        "away_state": {"offense": 0.03 + shift * 0.01, "defense": 0.02 - shift * 0.035, "qb": 0.01 + shift * 0.01},
         "home_drives": home_drives,
-        "home_td_xp": 3,
+        "home_td_xp": home_td,
         "home_td_2pt": 0,
         "home_td_no_try": 0,
-        "home_fg": 2,
+        "home_fg": home_fg,
         "home_def_td_7_allowed": 0,
         "home_safety_allowed": 0,
-        "home_no_score": home_drives - 5,
+        "home_no_score": home_drives - home_td - home_fg,
         "away_drives": away_drives,
-        "away_td_xp": 2,
+        "away_td_xp": away_td,
         "away_td_2pt": 0,
         "away_td_no_try": 0,
-        "away_fg": 2,
+        "away_fg": away_fg,
         "away_def_td_7_allowed": 0,
         "away_safety_allowed": 0,
-        "away_no_score": away_drives - 4,
+        "away_no_score": away_drives - away_td - away_fg,
     }
 
 
@@ -40,18 +48,41 @@ def _training() -> list[dict]:
     return [_row(2019 + index // 2, index) for index in range(8)]
 
 
-def test_v2e_fits_discrete_possession_model_and_generates_integer_scores():
+def test_v2e_fits_state_conditioned_possession_model_and_generates_integer_scores():
     model = fit_nfl_m2_v2e_candidate(_training())
     assert model.model_id == NFL_M2_V2E_CANDIDATE_MODEL_ID
+    assert model.feature_contract == NFL_M2_V2E_FEATURE_CONTRACT
+    assert model.distribution_contract == NFL_M2_V2E_DISTRIBUTION_CONTRACT
     assert model.promotion_eligible is False
+    assert model.state_feature_names == ("defense", "offense", "qb")
     assert sum(model.home_outcome_probabilities) == pytest.approx(1.0)
     assert sum(model.away_outcome_probabilities) == pytest.approx(1.0)
+    assert any(abs(value) > 1e-12 for row in model.home_outcome_state_coefficients for value in row)
 
     paths = derive_nfl_m2_v2e_score_distribution(model, _row(2024), path_count=512)
     assert len(paths) == 512
     assert all(isinstance(path["home_score"], int) and isinstance(path["away_score"], int) for path in paths)
     assert all(path["home_score"] >= 0 and path["away_score"] >= 0 for path in paths)
     assert len({(path["home_score"], path["away_score"]) for path in paths}) > 10
+
+
+def test_v2e_state_changes_drive_volume_and_scoring_event_mix():
+    model = fit_nfl_m2_v2e_candidate(_training())
+    low = _row(2024, 0)["home_state"]
+    high = _row(2024, 7)["home_state"]
+    low_z = _standardized_prediction_state(model, low)
+    high_z = _standardized_prediction_state(model, high)
+    low_probs = _conditional_outcome_probabilities(
+        model.home_outcome_probabilities, model.home_outcome_state_coefficients, low_z
+    )
+    high_probs = _conditional_outcome_probabilities(
+        model.home_outcome_probabilities, model.home_outcome_state_coefficients, high_z
+    )
+    assert low_probs != high_probs
+
+    low_game = {"home_state": low, "away_state": _row(2024, 0)["away_state"]}
+    high_game = {"home_state": high, "away_state": _row(2024, 0)["away_state"]}
+    assert derive_nfl_m2_v2e_score_distribution(model, low_game, path_count=512) != derive_nfl_m2_v2e_score_distribution(model, high_game, path_count=512)
 
 
 def test_v2e_is_byte_semantics_deterministic():
@@ -73,6 +104,19 @@ def test_v2e_rejects_market_contamination_nested_or_top_level():
     contaminated[0]["home_state"]["closing_total"] = 46.5
     with pytest.raises(ValueError, match="NFL_M2_V2E_MARKET_DATA_PROHIBITED"):
         fit_nfl_m2_v2e_candidate(contaminated)
+
+
+def test_v2e_requires_exact_pit_state_schema():
+    rows = _training()
+    rows[0]["home_state"].pop("qb")
+    with pytest.raises(ValueError, match="NFL_M2_V2E_STATE_SCHEMA_MISMATCH"):
+        fit_nfl_m2_v2e_candidate(rows)
+
+    model = fit_nfl_m2_v2e_candidate(_training())
+    prediction = _row(2024)
+    prediction["home_state"].pop("qb")
+    with pytest.raises(ValueError, match="NFL_M2_V2E_STATE_SCHEMA_MISMATCH"):
+        derive_nfl_m2_v2e_score_distribution(model, prediction, path_count=256)
 
 
 def test_v2e_requires_drive_outcomes_to_sum_exactly():
@@ -100,20 +144,27 @@ def test_v2e_key_numbers_emerge_without_injected_key_mass():
     assert 7 in margins or -7 in margins
 
 
-def test_v2e_sampler_preserves_poisson_drive_mean_instead_of_compressing_unit_interval():
-    model = NFLM2V2ECandidateModel(
-        model_id="nfl_m2_possession_discrete_v2e_candidate",
-        feature_contract="NFL_M2_V2E_MARKET_BLIND_DRIVE_STATE_V1",
-        distribution_contract="NFL_M2_V2E_POSSESSION_DISCRETE_SCORE_V1",
+def _manual_model(home_probs, away_probs) -> NFLM2V2ECandidateModel:
+    return NFLM2V2ECandidateModel(
+        model_id=NFL_M2_V2E_CANDIDATE_MODEL_ID,
+        feature_contract=NFL_M2_V2E_FEATURE_CONTRACT,
+        distribution_contract=NFL_M2_V2E_DISTRIBUTION_CONTRACT,
         train_seasons=(2020,),
         home_drive_mean=10.0,
         away_drive_mean=10.0,
-        home_outcome_probabilities=(0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0),
-        away_outcome_probabilities=(0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0),
+        home_outcome_probabilities=home_probs,
+        away_outcome_probabilities=away_probs,
         home_state_coefficients=(),
         away_state_coefficients=(),
         laplace_alpha=1.0,
         promotion_eligible=False,
+    )
+
+
+def test_v2e_sampler_preserves_poisson_drive_mean_instead_of_compressing_unit_interval():
+    model = _manual_model(
+        (0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0),
+        (0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0),
     )
     paths = derive_nfl_m2_v2e_score_distribution(model, {}, path_count=4096)
     home_drive_mean = sum(path["home_score"] / 3.0 for path in paths) / len(paths)
@@ -123,19 +174,9 @@ def test_v2e_sampler_preserves_poisson_drive_mean_instead_of_compressing_unit_in
 
 
 def test_v2e_safety_on_home_possession_scores_for_away_team():
-    model = NFLM2V2ECandidateModel(
-        model_id="nfl_m2_possession_discrete_v2e_candidate",
-        feature_contract="NFL_M2_V2E_MARKET_BLIND_DRIVE_STATE_V1",
-        distribution_contract="NFL_M2_V2E_POSSESSION_DISCRETE_SCORE_V1",
-        train_seasons=(2020,),
-        home_drive_mean=10.0,
-        away_drive_mean=10.0,
-        home_outcome_probabilities=(0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0),
-        away_outcome_probabilities=(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0),
-        home_state_coefficients=(),
-        away_state_coefficients=(),
-        laplace_alpha=1.0,
-        promotion_eligible=False,
+    model = _manual_model(
+        (0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0),
+        (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0),
     )
     paths = derive_nfl_m2_v2e_score_distribution(model, {}, path_count=256)
     assert all(path["home_score"] == 0 for path in paths)
@@ -144,19 +185,9 @@ def test_v2e_safety_on_home_possession_scores_for_away_team():
 
 
 def test_v2e_defensive_td_on_home_possession_scores_for_away_team():
-    model = NFLM2V2ECandidateModel(
-        model_id="nfl_m2_possession_discrete_v2e_candidate",
-        feature_contract="NFL_M2_V2E_MARKET_BLIND_DRIVE_STATE_V1",
-        distribution_contract="NFL_M2_V2E_POSSESSION_DISCRETE_SCORE_V1",
-        train_seasons=(2020,),
-        home_drive_mean=10.0,
-        away_drive_mean=10.0,
-        home_outcome_probabilities=(0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0),
-        away_outcome_probabilities=(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0),
-        home_state_coefficients=(),
-        away_state_coefficients=(),
-        laplace_alpha=1.0,
-        promotion_eligible=False,
+    model = _manual_model(
+        (0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0),
+        (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0),
     )
     paths = derive_nfl_m2_v2e_score_distribution(model, {}, path_count=256)
     assert all(path["home_score"] == 0 for path in paths)
