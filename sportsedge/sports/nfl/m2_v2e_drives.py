@@ -143,10 +143,17 @@ def build_v2e_drive_training_rows(
     result: list[dict[str, Any]] = []
     for game_id in sorted(schedule):
         season, home, away = schedule[game_id]
-        home_events = by_game.get(game_id, {}).get(home, [])
-        away_events = by_game.get(game_id, {}).get(away, [])
+        observed = by_game.get(game_id, {})
+        home_events = observed.get(home, [])
+        away_events = observed.get(away, [])
         if not home_events or not away_events:
-            raise ValueError(f"NFL_V2E_DRIVE_SIDE_EVIDENCE_MISSING:{game_id}")
+            observed_summary = ",".join(
+                f"{team}={len(events)}" for team, events in sorted(observed.items())
+            ) or "NONE"
+            raise ValueError(
+                "NFL_V2E_DRIVE_SIDE_EVIDENCE_MISSING:"
+                f"{game_id}:expected_home={home}:expected_away={away}:observed={observed_summary}"
+            )
         row: dict[str, Any] = {
             "source_contract": V2E_DRIVE_SOURCE_CONTRACT,
             "game_id": game_id,
