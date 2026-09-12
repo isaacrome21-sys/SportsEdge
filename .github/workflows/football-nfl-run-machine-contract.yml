@@ -134,13 +134,14 @@ jobs:
           from pathlib import Path
           config = json.loads(Path('config/run_it_surface.json').read_text())
           nfl = config['sports']['NFL']
-          assert nfl['lane'] == 'PREGAME_MODEL_AND_PLAYER_PROPS'
+          assert nfl['lane'] == 'PREGAME_GAME_MODEL_WITH_PROPS_NO_ENGINE'
           assert nfl['automatic_completeness'] == 'EXECUTABLE_FAIL_CLOSED'
           assert nfl['automatic_command'] == ['python','scripts/run_football_auto_bundle.py','--sport','NFL','--output','artifacts/run_it/nfl_card.json']
+          assert nfl['governance_source'] == 'config/football_prop_engine_surface.json'
+          assert 'NFL_PROPS_NO_ENGINE' in nfl['blocker']
           assert Path(nfl['automatic_command'][1]).is_file()
           module_name, attr = nfl['library_entrypoint'].split(':', 1)
           assert hasattr(importlib.import_module(module_name), attr)
-
           surface = json.loads(Path('config/football_prop_engine_surface.json').read_text())
           assert surface['sports']['NFL']['engine_state'] == 'NO_ENGINE'
           assert 'NFL' in surface['explicit_no_engine']
@@ -159,14 +160,12 @@ jobs:
           from pathlib import Path
           from sportsedge.football_prop_run_machine import canonical_hash
           from sportsedge.sports.nfl.prop_code_surface import load_nfl_prop_artifact_bundle, verify_nfl_prop_code_surface
-
           game = json.loads(Path('config/nfl_m2_freeze.json').read_text())
           assert game['schema_version'] == 1
           assert game['status'] == 'UNFROZEN'
           assert game['hash_algorithm'] == 'CANONICAL_JSON_SHA256_V1'
           assert game['artifact_sha256'] is None
           assert not Path(game['artifact_path']).exists()
-
           root = Path('.').resolve()
           prop = json.loads(Path('config/nfl_prop_model_freeze.json').read_text())
           assert prop['schema_version'] == 1
