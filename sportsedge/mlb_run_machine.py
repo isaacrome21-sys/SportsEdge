@@ -241,7 +241,7 @@ def run_mlb_machine(
     target_date: date | None = None, odds_api_key: str | None = None, odds_api_keys: tuple[str, ...] = (),
     projected_lineups_url: str | None = None, provider_token: str | None = None,
     now: datetime | None = None, opener: Callable = urlopen,
-    registry_path: str = "config/deployments.json", require_confirmed_lineup: bool = False,
+    registry_path: str = "config/deployments.json", require_confirmed_lineup: bool = True,
     edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG, kelly_multiplier: float = 0.25,
     bookmakers: tuple[str, ...] = ("draftkings",), history_cache_dir: str | Path | None = None,
 ) -> MLBMachineReport:
