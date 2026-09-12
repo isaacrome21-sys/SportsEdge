@@ -26,6 +26,21 @@
     "clock_seconds_remaining",
     "score_margin_from_possession_team_perspective"
   ],
+  "training_source_requirements": {
+    "point_in_time_mode": "FORWARD_CAPTURE_ONLY",
+    "retroactive_backfill_allowed": false,
+    "market_data_allowed": false,
+    "required_datasets": [
+      "play_by_play",
+      "play_participants",
+      "player_box",
+      "game_rosters"
+    ],
+    "capture_contract": "CFB_PARTICIPATION_SOURCE_CAPTURE_V1",
+    "readiness_contract": "CFB_PARTICIPATION_PIT_READINESS_V1",
+    "persist_branch": "data",
+    "persist_path_prefix": "history/cfb/forward-participation"
+  },
   "required_evidence": [
     "point_in_time_training_source_manifest",
     "deterministic_same_source_same_sha_replay",
@@ -34,6 +49,7 @@
   ],
   "notes": [
     "The shared Engine B currently attributes every pass to the declared starting quarterback and does not model CFB backup entry or blowout-driven player leashes.",
+    "The participation training clock starts only with prospective immutable captures. Existing team-level forward PIT snapshots and current release files cannot be relabeled as historical player-participation PIT evidence.",
     "This registry is an engine-activation prerequisite only. It cannot create Model_P, an empirical edge floor, certification, or OFFICIAL eligibility by itself.",
     "Sportsbook prices, public betting, capper opinions, and closing lines are forbidden as participation-model features."
   ]
