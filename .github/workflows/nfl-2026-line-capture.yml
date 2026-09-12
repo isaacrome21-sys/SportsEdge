@@ -1,9 +1,6 @@
 name: NFL 2026 line capture
 
 on:
-  # Dispatch-only legacy confirmation capture. The scheduled authority is
-  # football-nfl-forward-clv-collection.yml; keeping this workflow scheduled
-  # would duplicate DraftKings game-line spend.
   workflow_dispatch:
     inputs:
       mode:
@@ -11,6 +8,12 @@ on:
         type: choice
         options: [check, capture]
         default: check
+  # Frozen confirmation evidence is independent of the forward-CLV collector.
+  # Ten-minute polling is gated against the free nflverse schedule before the
+  # paid DraftKings capture path runs, so the 30..15 minute FINAL window gets a
+  # chance without spending odds-provider credits outside a frozen window.
+  schedule:
+    - cron: '3,13,23,33,43,53 * * * *'
 
 permissions:
   contents: write
@@ -26,7 +29,61 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
+      - name: Gate scheduled run to a frozen capture window using free schedule data
+        if: github.event_name == 'schedule'
+        id: due
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error --retry 3 \
+            'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv' \
+            -o "$RUNNER_TEMP/nfl-games.csv"
+          python3 - <<'PY'
+          import csv, json, os
+          from datetime import datetime, timedelta, timezone
+          from pathlib import Path
+          from zoneinfo import ZoneInfo
+
+          cfg = json.loads(Path('config/nfl_2026_capture.json').read_text())
+          now = datetime.now(timezone.utc)
+          local = now.astimezone(ZoneInfo(cfg['timezone']))
+          hh, mm = map(int, cfg['opener_local_time'].split(':'))
+          opener_target = local.replace(hour=hh, minute=mm, second=0, microsecond=0)
+          opener_due = (
+              local.strftime('%A') == cfg['opener_weekday']
+              and opener_target <= local < opener_target + timedelta(minutes=int(cfg['opener_window_minutes']))
+          )
+
+          final_due = False
+          eastern = ZoneInfo('America/New_York')
+          with open(os.path.join(os.environ['RUNNER_TEMP'], 'nfl-games.csv'), newline='', encoding='utf-8-sig') as handle:
+              for row in csv.DictReader(handle):
+                  if str(row.get('season') or '') != '2026':
+                      continue
+                  gameday = str(row.get('gameday') or '').strip()
+                  gametime = str(row.get('gametime') or '').strip()
+                  if not gameday or not gametime:
+                      continue
+                  try:
+                      kickoff = datetime.fromisoformat(f'{gameday}T{gametime}').replace(tzinfo=eastern).astimezone(timezone.utc)
+                  except ValueError:
+                      continue
+                  start = kickoff - timedelta(minutes=int(cfg['final_minutes_before_kickoff']))
+                  end = min(start + timedelta(minutes=int(cfg['final_window_minutes'])), kickoff)
+                  if start <= now < end:
+                      final_due = True
+                      break
+
+          due = opener_due or final_due
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f"due={'true' if due else 'false'}\n")
+              output.write(f"opener_due={'true' if opener_due else 'false'}\n")
+              output.write(f"final_due={'true' if final_due else 'false'}\n")
+          print(json.dumps({'due': due, 'opener_due': opener_due, 'final_due': final_due, 'checked_at_utc': now.isoformat()}))
+          PY
+
       - name: Run capture
+        if: github.event_name == 'workflow_dispatch' || steps.due.outputs.due == 'true'
         id: run
         env:
           ODDS_API_KEY_1: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
@@ -34,13 +91,14 @@ jobs:
           ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
           ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
           WORKFLOW_PATH: .github/workflows/nfl-2026-line-capture.yml
+          MODE: ${{ github.event_name == 'schedule' && 'capture' || inputs.mode || 'check' }}
         run: |
           set +e
-          python3 scripts/nfl_2026_line_capture.py "${{ inputs.mode || 'capture' }}"
+          python3 scripts/nfl_2026_line_capture.py "$MODE"
           echo "rc=$?" >> "$GITHUB_OUTPUT"
 
       - name: Commit captures
-        if: always() && (inputs.mode || 'capture') == 'capture'
+        if: always() && steps.run.outcome != 'skipped' && (github.event_name == 'schedule' || inputs.mode == 'capture')
         run: |
           DIR=data/nfl_2026_confirmation/captures
           [ -d "$DIR" ] || { echo "No capture directory yet"; exit 0; }
@@ -57,5 +115,5 @@ jobs:
           exit 1
 
       - name: Fail job if capture or check failed
-        if: steps.run.outputs.rc != '0'
+        if: steps.run.outcome != 'skipped' && steps.run.outputs.rc != '0'
         run: exit 1
