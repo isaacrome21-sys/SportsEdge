@@ -120,6 +120,7 @@ jobs:
           import json, os
           from pathlib import Path
           from sportsedge.sports.nfl.m2_v2e_candidate import NFL_M2_V2E_PIT_STATE_FIELDS
+          from sportsedge.sports.nfl.m2_v2e_drives import V2E_TEAM_ALIAS_POLICY
           evidence = json.loads(Path('artifacts/football/nfl_m2_v2e_candidate_validation.json').read_text())
           math = json.loads(Path('artifacts/football/nfl_m2_v2e_candidate_key_math.json').read_text())
           expected = os.environ['EVIDENCE_GIT_SHA'].lower()
@@ -135,6 +136,11 @@ jobs:
               raise SystemExit('NFL_M2_V2E_FROZEN_STATE_SCHEMA_MISMATCH')
           if len(observed_state_fields) != 11:
               raise SystemExit('NFL_M2_V2E_FROZEN_STATE_FIELD_COUNT_MISMATCH')
+          if evidence.get('drive_team_alias_policy') != V2E_TEAM_ALIAS_POLICY:
+              raise SystemExit('NFL_M2_V2E_TEAM_ALIAS_POLICY_MISMATCH')
+          alias_count = evidence.get('drive_team_alias_application_count')
+          if not isinstance(alias_count, int) or isinstance(alias_count, bool) or alias_count < 0:
+              raise SystemExit('NFL_M2_V2E_TEAM_ALIAS_APPLICATION_COUNT_INVALID')
           if evidence.get('outer_history_status') != 'DEVELOPMENT_FALSIFICATION_ONLY_ALREADY_OBSERVED_FOLDS':
               raise SystemExit('NFL_M2_V2E_HISTORY_STATUS_INVALID')
           if evidence.get('prospective_confirmation_required_for_promotion') is not True:
