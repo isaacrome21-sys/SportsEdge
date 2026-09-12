@@ -39,6 +39,7 @@ jobs:
           for path_key, blob_key in (
               ('capture_module_path', 'capture_module_git_blob_sha1'),
               ('capture_runner_path', 'capture_runner_git_blob_sha1'),
+              ('capture_workflow_path', 'capture_workflow_git_blob_sha1'),
           ):
               source = str(freeze.get(path_key) or '')
               expected = str(freeze.get(blob_key) or '').lower()
