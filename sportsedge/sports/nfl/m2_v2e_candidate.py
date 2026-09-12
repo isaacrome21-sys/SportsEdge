@@ -13,7 +13,7 @@ applied.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import exp, isfinite, lgamma, log
+from math import exp, gcd, isfinite, lgamma, log
 from typing import Any, Iterable, Mapping, Sequence
 
 import numpy as np
@@ -124,6 +124,26 @@ def _categorical_quantile(u: float, probabilities: tuple[float, ...]) -> int:
         if u <= cumulative or index == len(probabilities) - 1:
             return index
     raise AssertionError("unreachable")
+
+
+def _stratified_unit(index: int, path_count: int, dimension: int) -> float:
+    """Return one deterministic, full-support stratified uniform variate.
+
+    For each dimension, path indices are permuted across all equally spaced
+    midpoint strata in [0, 1). This prevents the earlier sampler defect where
+    multiplying the base stratum by a constant below one compressed a variate
+    into only part of the unit interval and biased Poisson/categorical draws.
+    Different dimensions use distinct coprime lattice multipliers and offsets;
+    no outcome, market, or held-out information enters the construction.
+    """
+    if path_count <= 0 or index < 0 or index >= path_count or dimension < 0:
+        raise ValueError("NFL_M2_V2E_STRATIFIED_UNIT_ARGUMENT_INVALID")
+    multiplier = 2 * dimension + 1
+    while gcd(multiplier, path_count) != 1:
+        multiplier += 2
+    offset = (dimension * 104729 + 12345) % path_count
+    bucket = (index * multiplier + offset) % path_count
+    return (bucket + 0.5) / float(path_count)
 
 
 @dataclass(frozen=True)
@@ -254,16 +274,15 @@ def derive_nfl_m2_v2e_score_distribution(
 
     paths: list[dict[str, int]] = []
     for index in range(path_count):
-        base_u = (index + 0.5) / path_count
-        home_drive_u = (base_u * 0.7548776662466927) % 1.0
-        away_drive_u = (base_u * 0.5698402909980532 + 0.31) % 1.0
+        home_drive_u = _stratified_unit(index, path_count, 1)
+        away_drive_u = _stratified_unit(index, path_count, 2)
         home_drives = _poisson_quantile(home_drive_u, home_mean)
         away_drives = _poisson_quantile(away_drive_u, away_mean)
 
         home_score = 0
         away_score = 0
         for drive in range(home_drives):
-            u = ((base_u + (drive + 1) * 0.4142135623730951) * 0.6180339887498949) % 1.0
+            u = _stratified_unit(index, path_count, 100 + drive)
             outcome = _OUTCOMES[_categorical_quantile(u, model.home_outcome_probabilities)]
             home_score += _OWN_POINTS[outcome]
             if outcome == "safety_allowed":
@@ -272,7 +291,7 @@ def derive_nfl_m2_v2e_score_distribution(
                 away_score += 7
 
         for drive in range(away_drives):
-            u = ((base_u + (drive + 1) * 0.7320508075688772 + 0.17) * 0.4142135623730950) % 1.0
+            u = _stratified_unit(index, path_count, 1000 + drive)
             outcome = _OUTCOMES[_categorical_quantile(u, model.away_outcome_probabilities)]
             away_score += _OWN_POINTS[outcome]
             if outcome == "safety_allowed":
