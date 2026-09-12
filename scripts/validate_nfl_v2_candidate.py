@@ -27,6 +27,10 @@ from sportsedge.sports.nfl.m2_v2d_candidate import (
     NFL_M2_V2D_CANDIDATE_MODEL_ID,
     NFL_M2_V2D_DISTRIBUTION_CONTRACT,
 )
+from sportsedge.sports.nfl.m2_v2e_candidate import (
+    NFL_M2_V2E_CANDIDATE_MODEL_ID,
+    NFL_M2_V2E_DISTRIBUTION_CONTRACT,
+)
 from sportsedge.sports.nfl.simulator_profile import build_nfl_simulator_profile, validate_profile_fit
 
 _CANDIDATES = {
@@ -44,6 +48,11 @@ _CANDIDATES = {
         "distribution_contract": NFL_M2_V2D_DISTRIBUTION_CONTRACT,
         "profile_contract": "NFL_M2_V2D_CANDIDATE_OOS_SIGNED_KEY_PMF_V1",
         "profile_version": "nfl-m2-v2d-candidate-oos-key-emergent-v1",
+    },
+    NFL_M2_V2E_CANDIDATE_MODEL_ID: {
+        "distribution_contract": NFL_M2_V2E_DISTRIBUTION_CONTRACT,
+        "profile_contract": "NFL_M2_V2E_CANDIDATE_OOS_SIGNED_KEY_PMF_V1",
+        "profile_version": "nfl-m2-v2e-candidate-oos-key-emergent-v1",
     },
 }
 
