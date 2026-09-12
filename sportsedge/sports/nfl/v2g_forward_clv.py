@@ -75,6 +75,11 @@ def validate_policy(policy: Mapping[str, Any]) -> None:
         raise ValueError("NFL_V2G_FORWARD_POLICY_INVALID")
     if policy.get("promotion_authority") is not False or policy.get("may_create_model_p") is not False or policy.get("official_status_granted") is not False:
         raise ValueError("NFL_V2G_FORWARD_POLICY_AUTHORITY_INVALID")
+    clv = policy.get("clv") or {}
+    if clv.get("metric") != "CLOSING_NOVIG_MINUS_DECISION_NOVIG" or clv.get("probability_reference") != "ORIGINAL_DECISION_THRESHOLD":
+        raise ValueError("NFL_V2G_FORWARD_CLV_POLICY_INVALID")
+    if clv.get("same_book_required") is not True or clv.get("model_probability_is_not_clv_reference") is not True:
+        raise ValueError("NFL_V2G_FORWARD_CLV_POLICY_INVALID")
 
 
 def validate_prediction(pred: Mapping[str, Any], policy: Mapping[str, Any]) -> None:
@@ -195,6 +200,8 @@ def grade_close(decisions: Iterable[Mapping[str, Any]], event: Mapping[str, Any]
             if "NFL_FORWARD_ORIGINAL_THRESHOLD_QUOTE_MISSING" not in str(exc): raise
             output.append({"schema_version":CLV_SCHEMA,"game_id":decision["game_id"],"market":decision["market"],"side":decision["side"],"status":"INCONCLUSIVE_CLV_REFERENCE_LINE_MISMATCH","probability_line":decision.get("line_at_decision"),"promotion_authority":False,"may_create_model_p":False,"official_status_granted":False})
             continue
-        clv = float(decision["model_prob"]) - float(close["closing_novig_prob"])
-        output.append({**close,"schema_version":CLV_SCHEMA,"status":"CLV_ELIGIBLE" if decision.get("gate_result")=="SHADOW_QUALIFIED" else "RESEARCH_REFERENCE_ONLY","decision_model_prob":decision["model_prob"],"decision_edge":decision["edge"],"decision_ev":decision["ev"],"clv":clv,"promotion_authority":False,"may_create_model_p":False,"official_status_granted":False})
+        decision_novig = _num(decision.get("novig_prob"), "NFL_V2G_FORWARD_DECISION_NOVIG_INVALID")
+        closing_novig = _num(close.get("closing_novig_prob"), "NFL_V2G_FORWARD_CLOSING_NOVIG_INVALID")
+        clv = closing_novig - decision_novig
+        output.append({**close,"schema_version":CLV_SCHEMA,"status":"CLV_ELIGIBLE" if decision.get("gate_result")=="SHADOW_QUALIFIED" else "RESEARCH_REFERENCE_ONLY","decision_model_prob":decision["model_prob"],"decision_novig_prob":decision_novig,"decision_edge":decision["edge"],"decision_ev":decision["ev"],"clv":clv,"promotion_authority":False,"may_create_model_p":False,"official_status_granted":False})
     return output
