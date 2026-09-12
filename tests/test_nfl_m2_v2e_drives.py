@@ -1,7 +1,10 @@
 import pytest
 
 from scripts.run_nfl_v2e_candidate_validation import _identity_schedule
-from sportsedge.sports.nfl.m2_v2e_drives import build_v2e_drive_training_rows
+from sportsedge.sports.nfl.m2_v2e_drives import (
+    V2E_TEAM_ALIAS_POLICY,
+    build_v2e_drive_training_rows,
+)
 
 
 def _schedule():
@@ -40,6 +43,8 @@ def test_v2e_drive_extractor_separates_offense_defense_and_safety_scoring():
     assert row["home_def_td_7_allowed"] == 1
     assert row["home_fg"] == 1
     assert row["home_no_score"] == 1
+    assert row["team_alias_policy"] == V2E_TEAM_ALIAS_POLICY
+    assert row["team_alias_application_count"] == 0
 
 
 def test_v2e_drive_extractor_rejects_market_data():
@@ -70,3 +75,76 @@ def test_v2e_identity_schedule_only_requires_retained_history_games():
 def test_v2e_identity_schedule_fails_if_retained_game_is_not_in_schedule():
     with pytest.raises(SystemExit, match="NFL_M2_V2E_RETAINED_SCHEDULE_IDENTITY_MISSING"):
         _identity_schedule(_schedule(), allowed_game_ids={"2024_01_A_B", "2024_01_X_Y"})
+
+
+def test_v2e_drive_extractor_applies_only_source_proven_oak_to_lv_alias():
+    schedule = [{
+        "game_id": "2016_01_OAK_NO",
+        "season": 2016,
+        "game_type": "REG",
+        "home_team": "NO",
+        "away_team": "OAK",
+    }]
+    pbp = [
+        {"game_id": "2016_01_OAK_NO", "posteam": "LV", "drive": 1, "play_type": "punt"},
+        {"game_id": "2016_01_OAK_NO", "posteam": "NO", "drive": 2, "play_type": "punt"},
+    ]
+    row = build_v2e_drive_training_rows(schedule, pbp)[0]
+    assert row["away_team"] == "OAK"
+    assert row["away_drives"] == 1
+    assert row["home_drives"] == 1
+    assert row["team_alias_policy"] == "NFLVERSE_PBP_CURRENT_FRANCHISE_CODE_V1"
+    assert row["team_alias_application_count"] == 1
+
+
+def test_v2e_drive_extractor_applies_only_source_proven_sd_to_lac_alias():
+    schedule = [{
+        "game_id": "2016_01_KC_SD",
+        "season": 2016,
+        "game_type": "REG",
+        "home_team": "SD",
+        "away_team": "KC",
+    }]
+    pbp = [
+        {"game_id": "2016_01_KC_SD", "posteam": "LAC", "drive": 1, "play_type": "punt"},
+        {"game_id": "2016_01_KC_SD", "posteam": "KC", "drive": 2, "play_type": "punt"},
+    ]
+    row = build_v2e_drive_training_rows(schedule, pbp)[0]
+    assert row["home_team"] == "SD"
+    assert row["home_drives"] == 1
+    assert row["away_drives"] == 1
+    assert row["team_alias_application_count"] == 1
+
+
+def test_v2e_drive_extractor_does_not_rewrite_modern_lv_identity():
+    schedule = [{
+        "game_id": "2024_01_LV_LAC",
+        "season": 2024,
+        "game_type": "REG",
+        "home_team": "LAC",
+        "away_team": "LV",
+    }]
+    pbp = [
+        {"game_id": "2024_01_LV_LAC", "posteam": "LV", "drive": 1, "play_type": "punt"},
+        {"game_id": "2024_01_LV_LAC", "posteam": "LAC", "drive": 2, "play_type": "punt"},
+    ]
+    row = build_v2e_drive_training_rows(schedule, pbp)[0]
+    assert row["away_team"] == "LV"
+    assert row["home_team"] == "LAC"
+    assert row["team_alias_application_count"] == 0
+
+
+def test_v2e_drive_extractor_never_fuzzy_maps_unknown_team_code():
+    schedule = [{
+        "game_id": "2016_01_OAK_NO",
+        "season": 2016,
+        "game_type": "REG",
+        "home_team": "NO",
+        "away_team": "OAK",
+    }]
+    pbp = [
+        {"game_id": "2016_01_OAK_NO", "posteam": "LAS", "drive": 1, "play_type": "punt"},
+        {"game_id": "2016_01_OAK_NO", "posteam": "NO", "drive": 2, "play_type": "punt"},
+    ]
+    with pytest.raises(ValueError, match="NFL_V2E_DRIVE_SIDE_EVIDENCE_MISSING"):
+        build_v2e_drive_training_rows(schedule, pbp)
