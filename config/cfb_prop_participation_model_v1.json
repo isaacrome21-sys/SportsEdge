@@ -1,0 +1,40 @@
+{
+  "schema_version": "CFB_PROP_PARTICIPATION_MODEL_V1",
+  "sport": "CFB",
+  "status": "UNFITTED_RESEARCH_ONLY",
+  "engine_validation_status": "NOT_RUN",
+  "artifact_path": null,
+  "artifact_sha256": null,
+  "fit_code_git_sha": null,
+  "training_source_manifest_sha256": null,
+  "market_data_used_as_feature": false,
+  "promotion_authority": false,
+  "activation_authority": false,
+  "structural_blockers": [
+    "STARTING_QB_HARD_WIRED",
+    "CFB_BLOWOUT_SUBSTITUTION_UNMODELED",
+    "SKILL_PLAYER_LEASH_UNMODELED"
+  ],
+  "required_predictive_scope": [
+    "starting_qb_retention_and_backup_entry",
+    "skill_player_snap_retention",
+    "route_participation_retention",
+    "rush_target_red_zone_usage_under_game_state"
+  ],
+  "required_state_inputs": [
+    "quarter",
+    "clock_seconds_remaining",
+    "score_margin_from_possession_team_perspective"
+  ],
+  "required_evidence": [
+    "point_in_time_training_source_manifest",
+    "deterministic_same_source_same_sha_replay",
+    "independent_forward_holdout",
+    "artifact_bound_validation_report"
+  ],
+  "notes": [
+    "The shared Engine B currently attributes every pass to the declared starting quarterback and does not model CFB backup entry or blowout-driven player leashes.",
+    "This registry is an engine-activation prerequisite only. It cannot create Model_P, an empirical edge floor, certification, or OFFICIAL eligibility by itself.",
+    "Sportsbook prices, public betting, capper opinions, and closing lines are forbidden as participation-model features."
+  ]
+}
