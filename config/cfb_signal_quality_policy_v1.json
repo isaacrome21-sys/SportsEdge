@@ -78,6 +78,8 @@
   "required_reason_codes": [
     "MODEL_UNFROZEN",
     "MODEL_P_MISSING",
+    "ODDS_STALE_OR_MISSING",
+    "HANDLES_STALE_OR_MISSING",
     "BENCHMARK_DISAGREEMENT",
     "PRICE_DECAY",
     "BAD_PRICE",
