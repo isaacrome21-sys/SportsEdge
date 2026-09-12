@@ -71,7 +71,7 @@ def run_auto_mlb_native_odds(
     now: datetime | None = None,
     opener: Callable = urlopen,
     registry_path: str = "config/deployments.json",
-    require_confirmed_lineup: bool = False,
+    require_confirmed_lineup: bool = True,
     edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG,
     kelly_multiplier: float = 0.25,
     bookmakers: tuple[str, ...] = ("draftkings",),
