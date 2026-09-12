@@ -124,7 +124,7 @@ jobs:
           tests/test_football_prop_runtime_truth.py
           tests/test_football_prop_certification.py
           tests/test_nfl_prop_code_surface.py
-      - name: Assert runtime surface and registry-derived readiness
+      - name: Assert runtime surface is explicit NO_ENGINE
         run: |
           python - <<'PY'
           import json
@@ -134,26 +134,18 @@ jobs:
           surface = json.loads(Path('config/football_prop_engine_surface.json').read_text())
           declared = {market for values in surface['implemented_provider_markets'].values() for market in values}
           assert declared == set(PROVIDER_MARKETS)
-
-          # NFL may have frozen research/code artifacts without having an
-          # independently validated bettor-facing probability engine.
-          assert surface['sports']['NFL']['engine_state'] == 'NO_ENGINE'
-          assert 'NFL' in surface['explicit_no_engine']
-          try:
-              require_executable_prop_surface('NFL')
-          except FootballPropSurfaceError as exc:
-              assert str(exc) == 'FOOTBALL_PROP_ENGINE_NOT_IMPLEMENTED:NFL'
-          else:
-              raise AssertionError('NFL prop surface unexpectedly executable')
-
-          # CFB retains the previously implemented fail-closed runtime surface.
-          cfb = require_executable_prop_surface('CFB')
-          assert cfb['engine_state'] == 'IMPLEMENTED_FAIL_CLOSED'
-          assert cfb['promotion_state'] == 'AUTOMATIC_TRUTH_GATE_GATED'
-          assert cfb['readiness_state'] == 'REGISTRY_DERIVED'
-          assert cfb['runtime_state'] == 'ARTIFACT_FROZEN_EVIDENCE_GATED'
-          assert cfb['frozen_artifact_sha256'] == '923cfd1be42d31a87d9f31ddffce406d44bfc1bb003d1c625f5a4258f7773f23'
-
+          for sport in ('NFL', 'CFB'):
+              spec = surface['sports'][sport]
+              assert spec['engine_state'] == 'NO_ENGINE'
+              assert spec['readiness_state'] == 'NO_ENGINE'
+              assert spec['promotion_state'] == 'BLOCKED_NO_VALIDATED_PROBABILITY_ENGINE'
+              assert sport in surface['explicit_no_engine']
+              try:
+                  require_executable_prop_surface(sport)
+              except FootballPropSurfaceError as exc:
+                  assert str(exc) == f'FOOTBALL_PROP_ENGINE_NOT_IMPLEMENTED:{sport}'
+              else:
+                  raise AssertionError(f'{sport} prop surface unexpectedly executable')
           gov=surface['governance']
           assert gov['market_prices_can_create_model_p'] is False
           assert gov['one_sided_market_can_create_model_p'] is False
@@ -183,7 +175,6 @@ jobs:
           nfl_attestation=verify_nfl_prop_code_surface(root=root, registry=nfl, artifact=nfl_model)
           assert nfl_attestation['status']=='COMPATIBLE'
           assert nfl_attestation['promotion_authority'] is False
-
           cfb=json.loads(Path('config/cfb_prop_model_freeze.json').read_text())
           cfb_model=load_cfb_prop_artifact_bundle(root=root, bundle_path=root / cfb['artifact_path'])
           assert cfb['schema_version']==1
@@ -244,7 +235,7 @@ jobs:
             set -e
             test "$rc" -eq 2
           done
-      - name: Assert RUN IT routes both football sports through bundle
+      - name: Assert RUN IT keeps prop lanes blocked without blocking game lanes
         run: |
           python - <<'PY'
           import json
@@ -252,8 +243,9 @@ jobs:
           surface=json.loads(Path('config/run_it_surface.json').read_text())
           for sport in ('NFL','CFB'):
               lower=sport.lower(); row=surface['sports'][sport]
-              assert row['lane']=='PREGAME_MODEL_AND_PLAYER_PROPS'
+              assert row['lane']=='PREGAME_MODEL'
               assert row['automatic_completeness']=='EXECUTABLE_FAIL_CLOSED'
               assert row['automatic_command']==['python','scripts/run_football_auto_bundle.py','--sport',sport,'--output',f'artifacts/run_it/{lower}_card.json']
+              assert 'PLAYER_PROPS_NO_ENGINE' in row['blocker']
           assert Path('scripts/run_football_auto_bundle.py').is_file()
           PY
