@@ -85,6 +85,17 @@ class CFBForwardMarketPairingTests(unittest.TestCase):
             self.assertEqual({p["market"] for p in report["pairs"]}, {"h2h", "totals"})
             self.assertEqual(report["unmatched_or_threshold_drift_market_count"], 2)
 
+    def test_same_magnitude_favorite_flip_is_rejected(self):
+        from tempfile import TemporaryDirectory
+        with TemporaryDirectory() as td:
+            root = Path(td)
+            decision = _snapshot(root, "decision", captured_at="2026-09-12T16:30:00Z", spread=-3.5)
+            close = _snapshot(root, "close", captured_at="2026-09-12T17:50:00Z", spread=3.5)
+            report = pair_snapshots(decision, close)
+            self.assertEqual(report["valid_market_pair_count"], 2)
+            self.assertEqual({p["market"] for p in report["pairs"]}, {"h2h", "totals"})
+            self.assertTrue(any(x["reason"] == "OUTCOME_THRESHOLD_CHANGED" for x in report["rejections"]))
+
     def test_close_outside_frozen_window_blocks_common_markets(self):
         from tempfile import TemporaryDirectory
         with TemporaryDirectory() as td:
