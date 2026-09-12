@@ -63,6 +63,15 @@ def _provider_error_code(raw: bytes) -> str | None:
     return text or None
 
 
+def _blocked_status(provider_codes: list[str]) -> str:
+    """Classify a fully blocked key rotation without weakening evidence rules."""
+    if provider_codes == ["OUT_OF_USAGE_CREDITS"]:
+        return "BLOCKED_PROVIDER_CREDITS"
+    if provider_codes == ["HISTORICAL_UNAVAILABLE_ON_FREE_USAGE_PLAN"]:
+        return "BLOCKED_PROVIDER_PLAN"
+    return "BLOCKED_PROVIDER_AUTH"
+
+
 def _atomic(path: Path, raw: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
@@ -174,9 +183,8 @@ def collect_one(*, requested_at: str, root: Path = DEFAULT_ROOT, regions: str = 
 
     if raw is None or winning_slot is None:
         provider_codes = sorted({str(a["provider_code"]) for a in attempts if a.get("provider_code")})
-        status = "BLOCKED_PROVIDER_CREDITS" if provider_codes == ["OUT_OF_USAGE_CREDITS"] else "BLOCKED_PROVIDER_AUTH"
         return {
-            "status": status,
+            "status": _blocked_status(provider_codes),
             "requested_at": requested,
             "attempts": attempts,
             "provider_codes": provider_codes,
@@ -226,6 +234,9 @@ def self_test() -> int:
     assert _canonical_request_ts("2026-06-05T22:35:00Z") == "2026-06-05T22:35:00Z"
     assert _provider_error_code(b'{"error_code":"OUT_OF_USAGE_CREDITS"}') == "OUT_OF_USAGE_CREDITS"
     assert _provider_error_code(b"not-json") is None
+    assert _blocked_status(["OUT_OF_USAGE_CREDITS"]) == "BLOCKED_PROVIDER_CREDITS"
+    assert _blocked_status(["HISTORICAL_UNAVAILABLE_ON_FREE_USAGE_PLAN"]) == "BLOCKED_PROVIDER_PLAN"
+    assert _blocked_status(["INVALID_KEY"]) == "BLOCKED_PROVIDER_AUTH"
     raw = json.dumps({
         "timestamp": "2026-06-05T22:30:00Z",
         "previous_timestamp": "2026-06-05T22:25:00Z",
