@@ -76,6 +76,10 @@ jobs:
           from pathlib import Path
           from sportsedge.football_prop_surface import FootballPropSurfaceError, require_executable_prop_surface
           from sportsedge.sports.cfb.participation_pit_readiness import REQUIRED_DATASETS
+          from sportsedge.sports.cfb.participation_source_capture import (
+              PARTICIPATION_CAPTURE_CONTRACT,
+              PBP_PROJECTION_CONTRACT,
+          )
 
           surface=json.loads(Path('config/football_prop_engine_surface.json').read_text())
           cfb=surface['sports']['CFB']
@@ -93,7 +97,15 @@ jobs:
           source_req=participation['training_source_requirements']
           assert source_req['point_in_time_mode']=='FORWARD_CAPTURE_ONLY'
           assert source_req['retroactive_backfill_allowed'] is False
+          assert source_req['market_data_allowed_in_model_input'] is False
           assert set(source_req['required_datasets'])==set(REQUIRED_DATASETS)
+          assert source_req['capture_contract']==PARTICIPATION_CAPTURE_CONTRACT
+          pbp=source_req['play_by_play_raw_policy']
+          assert pbp['raw_market_data_present'] is True
+          assert pbp['raw_predictive_input_allowed'] is False
+          assert pbp['required_projection_contract']==PBP_PROJECTION_CONTRACT
+          assert pbp['projection_method']=='EXACT_COLUMN_ALLOWLIST'
+          assert pbp['projection_market_data_allowed'] is False
           try:
               require_executable_prop_surface('CFB')
           except FootballPropSurfaceError as exc:
@@ -101,5 +113,5 @@ jobs:
           else:
               raise AssertionError('CFB prop surface unexpectedly executable')
           PY
-      - name: Assert capture CLI remains market-blind and forward-only
+      - name: Assert capture CLI remains predictive-market-blind and forward-only
         run: python scripts/cache_cfb_participation_sources.py --season 2026 --self-test
