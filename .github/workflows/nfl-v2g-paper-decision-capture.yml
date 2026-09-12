@@ -1,0 +1,134 @@
+name: nfl-v2g-paper-decision-capture
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'config/research/nfl_v2g_prospective_paper_evaluation_policy_2026-09-12.json'
+      - 'scripts/build_nfl_v2g_paper_decisions.py'
+      - 'tests/test_nfl_v2g_paper_decisions.py'
+      - '.github/workflows/nfl-v2g-paper-decision-capture.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'data/nfl_2026_confirmation/captures/**/opener.json'
+      - 'config/research/nfl_v2g_prospective_paper_evaluation_policy_2026-09-12.json'
+      - 'scripts/build_nfl_v2g_paper_decisions.py'
+      - '.github/workflows/nfl-v2g-paper-decision-capture.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nfl-v2g-paper-decision-capture
+  cancel-in-progress: false
+
+jobs:
+  contract-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Compile builder
+        run: python -m py_compile scripts/build_nfl_v2g_paper_decisions.py
+      - name: Freeze opener PAPER semantics
+        run: python -m unittest -q tests.test_nfl_v2g_paper_decisions
+
+  capture-paper-decisions:
+    if: github.event_name != 'pull_request'
+    needs: contract-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Restore immutable V2G predictions and prior PAPER decisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin data
+          git worktree add --detach .data-v2g origin/data
+          test -d .data-v2g/evidence/nfl_v2g/prospective/predictions/2026 || {
+            echo 'NFL_V2G_PROSPECTIVE_PREDICTIONS_MISSING' >&2
+            exit 78
+          }
+
+      - name: Freeze first-write opener PAPER decisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          POLICY=config/research/nfl_v2g_prospective_paper_evaluation_policy_2026-09-12.json
+          OUT=artifacts/football/v2g/paper_decisions
+          mkdir -p "$OUT"
+          GENERATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          created=0
+          existing=0
+
+          for opener in data/nfl_2026_confirmation/captures/week*/opener.json; do
+            [ -f "$opener" ] || continue
+            week_dir="$(basename "$(dirname "$opener")")"
+            week_num="${week_dir#week}"
+            predictions=(.data-v2g/evidence/nfl_v2g/prospective/predictions/2026/2026_${week_num}_*.json)
+            for prediction in "${predictions[@]}"; do
+              base="$(basename "$prediction")"
+              dest=.data-v2g/evidence/nfl_v2g/prospective/paper_decisions/2026/$base
+              if [ -f "$dest" ]; then
+                existing=$((existing + 1))
+                continue
+              fi
+              tmp="$OUT/$base"
+              python scripts/build_nfl_v2g_paper_decisions.py \
+                --prediction "$prediction" \
+                --opener "$opener" \
+                --policy "$POLICY" \
+                --generated-at-utc "$GENERATED_AT" \
+                --output "$tmp"
+              mkdir -p "$(dirname "$dest")"
+              cp "$tmp" "$dest"
+              created=$((created + 1))
+            done
+          done
+
+          printf '{"created":%d,"existing":%d,"generated_at_utc":"%s"}\n' \
+            "$created" "$existing" "$GENERATED_AT" | tee "$OUT/summary.json"
+
+      - name: Persist first-write PAPER decisions to data branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          (
+            cd .data-v2g
+            git config user.name sportsedge-v2g-paper-bot
+            git config user.email sportsedge-v2g-paper-bot@users.noreply.github.com
+            git add evidence/nfl_v2g/prospective/paper_decisions || true
+            if git diff --cached --quiet; then
+              echo 'NFL_V2G_NO_NEW_PAPER_DECISIONS'
+              exit 0
+            fi
+            git commit -m "evidence: freeze NFL V2G opener PAPER decisions ${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}"
+            for attempt in 1 2 3 4 5; do
+              if git push origin HEAD:data; then
+                exit 0
+              fi
+              git fetch origin data
+              git rebase origin/data
+              sleep $((attempt * 2))
+            done
+            exit 98
+          )
+
+      - name: Upload PAPER decision diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nfl-v2g-paper-decisions-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/football/v2g/paper_decisions
+          if-no-files-found: warn
+          retention-days: 30
