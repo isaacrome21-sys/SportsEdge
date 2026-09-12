@@ -13,6 +13,13 @@ on:
       - 'tests/test_nfl_m2_v2e_drives.py'
       - '.github/workflows/nfl-v2e-diagnostic.yml'
 
+# Only the newest exact PR head may produce authoritative V2E evidence. Older
+# queued/in-progress heads are superseded by construction and should not consume
+# hosted capacity or later be mistaken for the frozen diagnostic result.
+concurrency:
+  group: nfl-v2e-diagnostic-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   diagnostic:
     runs-on: ubuntu-latest
