@@ -11,24 +11,18 @@ CFB_ARTIFACT_SHA = "923cfd1be42d31a87d9f31ddffce406d44bfc1bb003d1c625f5a4258f777
 
 
 class FootballPropSurfaceTests(unittest.TestCase):
-    def test_nfl_is_explicit_no_engine_until_independently_validated(self):
+    def test_nfl_and_cfb_are_explicit_no_engine_until_independently_validated(self):
         payload = json.loads(Path("config/football_prop_engine_surface.json").read_text())
-        self.assertEqual(payload["sports"]["NFL"]["engine_state"], "NO_ENGINE")
-        self.assertIn("NFL", payload["explicit_no_engine"])
-        with self.assertRaisesRegex(
-            FootballPropSurfaceError,
-            "FOOTBALL_PROP_ENGINE_NOT_IMPLEMENTED:NFL",
-        ):
-            require_executable_prop_surface("NFL")
-
-    def test_cfb_surface_is_runtime_bound_and_registry_derived(self):
-        cfb = require_executable_prop_surface("CFB")
-        self.assertEqual(cfb["engine_state"], "IMPLEMENTED_FAIL_CLOSED")
-        self.assertEqual(cfb["promotion_state"], "AUTOMATIC_TRUTH_GATE_GATED")
-        self.assertEqual(cfb["readiness_state"], "REGISTRY_DERIVED")
-        self.assertEqual(cfb["runtime_state"], "ARTIFACT_FROZEN_EVIDENCE_GATED")
-        self.assertEqual(cfb["frozen_artifact_sha256"], CFB_ARTIFACT_SHA)
-        self.assertTrue(cfb["certification_registry"].endswith("_prop_certification.json"))
+        for sport in ("NFL", "CFB"):
+            self.assertEqual(payload["sports"][sport]["engine_state"], "NO_ENGINE")
+            self.assertEqual(payload["sports"][sport]["readiness_state"], "NO_ENGINE")
+            self.assertEqual(payload["sports"][sport]["promotion_state"], "BLOCKED_NO_VALIDATED_PROBABILITY_ENGINE")
+            self.assertIn(sport, payload["explicit_no_engine"])
+            with self.assertRaisesRegex(
+                FootballPropSurfaceError,
+                f"FOOTBALL_PROP_ENGINE_NOT_IMPLEMENTED:{sport}",
+            ):
+                require_executable_prop_surface(sport)
 
     def test_declared_provider_surface_matches_extended_run_machine_exactly(self):
         payload = json.loads(Path("config/football_prop_engine_surface.json").read_text())
@@ -41,6 +35,7 @@ class FootballPropSurfaceTests(unittest.TestCase):
         self.assertIn("player_sacks", declared)
         self.assertIn("player_tackles_assists", declared)
         self.assertIn("NFL", payload["explicit_no_engine"])
+        self.assertIn("CFB", payload["explicit_no_engine"])
         self.assertIn("targets", payload["explicit_no_engine"])
         self.assertIn("first_td", payload["explicit_no_engine"])
         self.assertIn("last_td", payload["explicit_no_engine"])
