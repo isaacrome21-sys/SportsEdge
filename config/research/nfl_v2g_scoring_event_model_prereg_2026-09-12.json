@@ -1,0 +1,64 @@
+{
+  "schema_version": "SPORTSEDGE_NFL_V2G_PREREG_V1",
+  "candidate_id": "nfl_v2g_scoring_event_model_candidate",
+  "status": "PREREGISTERED_RESEARCH_ONLY",
+  "preregistration_base_sha": "5f5af9d86b79157b15a09e48b0cab69d68c3aba1",
+  "prospective_boundary_file": "config/research/nfl_prospective_evaluation_boundary_2026-09-12.json",
+  "problem_statement": "Production M2 and V2A-V2F do not clear the frozen predictive and signed key-number gates. V2G changes the generative structure rather than retuning kernels, score support, means, or state-blend weights.",
+  "architecture": {
+    "class": "STRUCTURAL_SCORING_EVENT_GENERATOR",
+    "unit": "team_possession_scoring_events",
+    "event_states": ["TOUCHDOWN", "FIELD_GOAL", "OTHER_NO_SCORE"],
+    "score_construction": "Generate team scoring-event counts from PIT-safe pregame football state, convert touchdown and field-goal events to football-native integer score support, then derive joint home/away score, margin, total, moneyline, spread and total probabilities from the resulting distribution.",
+    "key_number_policy": "No explicit +/-3 or +/-7 probability target, correction factor, bonus mass, calibration target, or outer-history key-frequency loss is permitted. Key-number mass must emerge from football scoring events.",
+    "market_blind": true,
+    "sportsbook_price_features_allowed": false,
+    "closing_line_features_allowed": false,
+    "public_betting_or_capper_features_allowed": false
+  },
+  "allowed_feature_families": [
+    "PIT_SAFE_TEAM_OFFENSE_STATE",
+    "PIT_SAFE_TEAM_DEFENSE_STATE",
+    "PIT_SAFE_SCORING_RATE_STATE",
+    "PIT_SAFE_RED_ZONE_OR_SCORING_OPPORTUNITY_STATE_WHEN_SOURCE_PROVENANCE_IS_AVAILABLE",
+    "PIT_SAFE_FIELD_GOAL_SCORING_STATE_WHEN_SOURCE_PROVENANCE_IS_AVAILABLE",
+    "QB_AVAILABILITY_AND_STATUS_FROM_EXISTING_PRODUCTION_BOUNDARY",
+    "REST_TRAVEL_VENUE_WEATHER_FROM_EXISTING_PRODUCTION_BOUNDARY"
+  ],
+  "forbidden_inputs": [
+    "sportsbook spread",
+    "sportsbook total",
+    "moneyline",
+    "closing line",
+    "betting splits",
+    "capper picks",
+    "outer-fold outcomes during fitting",
+    "outer-fold signed key-number frequencies during fitting",
+    "prospective outcomes for candidate selection"
+  ],
+  "fit_and_selection": {
+    "historical_2016_2025_role": "REUSED_RESEARCH_HISTORY_NOT_FINAL_HOLDOUT",
+    "outer_walk_forward_role": "DIAGNOSTIC_ONLY",
+    "hyperparameter_selection": "NESTED_TRAINING_ONLY",
+    "selection_objective": "Frozen predictive probability loss only; no key-number objective",
+    "candidate_family_changes_after_first_result": "PROHIBITED_WITHOUT_NEW_PREREGISTRATION",
+    "prospective_outcomes_for_tuning": false
+  },
+  "frozen_evaluation_gates": {
+    "signed_key_number_tolerance": 0.005,
+    "signed_key_numbers": [-7, -3, 3, 7],
+    "fold_win_rate_min": 0.65,
+    "calibration_rules": "UNCHANGED_FROM_ACTIVE_FROZEN_NFL_PROMOTION_POLICY",
+    "deterministic_replay_required": true,
+    "exact_source_manifest_required": true,
+    "exact_code_sha_binding_required": true,
+    "prospective_clv_required_for_promotion": true,
+    "truth_gate_unchanged": true
+  },
+  "promotion_authority": false,
+  "production_model_changed": false,
+  "market_eligibility_changed": false,
+  "edge_floor_changed": false,
+  "official_status_granted": false,
+  "nfl_props": "NO_ENGINE"
+}
