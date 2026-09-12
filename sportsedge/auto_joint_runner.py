@@ -46,7 +46,7 @@ def run_auto_joint_mlb(
     now: datetime | None = None,
     opener: Callable = urlopen,
     registry_path: str = "config/deployments.json",
-    require_confirmed_lineup: bool = False,
+    require_confirmed_lineup: bool = True,
     edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG,
     kelly_multiplier: float = 0.25,
     market_surface_path: str = DEFAULT_MARKET_SURFACE_PATH,
