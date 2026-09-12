@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from sportsedge.football_prop_surface import require_executable_prop_surface
+from sportsedge.football_prop_surface import load_prop_surface, require_executable_prop_surface
 
 
 def _stamp(path: Path):
@@ -79,6 +79,28 @@ def _load(path: Path, lane: str, code: int, previous_stamp) -> tuple[list[dict],
     return tagged, payload
 
 
+def _prop_lane_state(sport: str) -> tuple[bool, str | None]:
+    """Resolve whether this sport has an executable prop engine.
+
+    A frozen artifact or registry is not enough.  The authoritative engine surface
+    must explicitly declare IMPLEMENTED_FAIL_CLOSED.  NO_ENGINE is a valid runtime
+    state and produces a visible blocked lane rather than aborting the game lane.
+    """
+    path = ROOT / "config/football_prop_engine_surface.json"
+    payload = load_prop_surface(path)
+    spec = (payload.get("sports") or {}).get(str(sport).upper())
+    if not isinstance(spec, dict):
+        raise ValueError(f"FOOTBALL_PROP_ENGINE_SURFACE_SPORT_MISSING:{sport}")
+    state = str(spec.get("engine_state") or "").upper()
+    if state == "IMPLEMENTED_FAIL_CLOSED":
+        require_executable_prop_surface(sport, path=path)
+        return True, None
+    if state == "NO_ENGINE":
+        reason = str(spec.get("reason") or f"{sport}_PROPS_NO_ENGINE")
+        return False, reason
+    raise ValueError(f"FOOTBALL_PROP_ENGINE_STATE_INVALID:{sport}:{state}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--sport", required=True, choices=("NFL", "CFB"))
@@ -87,10 +109,7 @@ def main() -> int:
     args = ap.parse_args()
 
     sport = args.sport.upper()
-    # This is an actual runtime read, not a decorative config flag. If the
-    # authoritative prop surface stops declaring this sport executable, RUN IT
-    # fails before trying either child lane.
-    require_executable_prop_surface(sport, path=ROOT / "config/football_prop_engine_surface.json")
+    prop_executable, prop_blocker = _prop_lane_state(sport)
 
     lower = sport.lower()
     game_out = ROOT / f"artifacts/run_it/{lower}_game_card.json"
@@ -105,19 +124,32 @@ def main() -> int:
         prop_cmd.extend(["--asof", args.asof])
 
     game_before = _stamp(game_out)
-    prop_before = _stamp(prop_out)
     game = subprocess.run(game_cmd, cwd=ROOT, text=True, capture_output=True, check=False)
-    prop = subprocess.run(prop_cmd, cwd=ROOT, text=True, capture_output=True, check=False)
     game_rows, game_payload = _load(game_out, "GAME", game.returncode, game_before)
-    prop_rows, prop_payload = _load(prop_out, "PLAYER_PROPS", prop.returncode, prop_before)
+
+    if prop_executable:
+        prop_before = _stamp(prop_out)
+        prop = subprocess.run(prop_cmd, cwd=ROOT, text=True, capture_output=True, check=False)
+        prop_rows, prop_payload = _load(prop_out, "PLAYER_PROPS", prop.returncode, prop_before)
+        prop_exit_code: int | None = int(prop.returncode)
+        prop_status = prop_payload.get("status", "BLOCKED")
+    else:
+        prop_rows = _blocked_row("PLAYER_PROPS", str(prop_blocker or f"{sport}_PROPS_NO_ENGINE"))
+        prop_payload = {
+            "status": "NO_ENGINE",
+            "blocker": str(prop_blocker or f"{sport}_PROPS_NO_ENGINE"),
+        }
+        prop_exit_code = None
+        prop_status = "NO_ENGINE"
+
     rows = game_rows + prop_rows
-    status = (
-        "SUCCESS"
-        if game.returncode == 0 and prop.returncode == 0
-        else "PARTIAL"
-        if game.returncode == 0 or prop.returncode == 0
-        else "BLOCKED"
-    )
+    if game.returncode != 0:
+        status = "BLOCKED"
+    elif prop_executable and prop_exit_code == 0:
+        status = "SUCCESS"
+    else:
+        status = "PARTIAL"
+
     payload = {
         "schema_version": "FOOTBALL_AUTO_BUNDLE_V2",
         "status": status,
@@ -127,11 +159,11 @@ def main() -> int:
             "results": rows,
             "lane_status": {
                 "GAME": game_payload.get("status", "BLOCKED"),
-                "PLAYER_PROPS": prop_payload.get("status", "BLOCKED"),
+                "PLAYER_PROPS": prop_status,
             },
             "lane_exit_code": {
                 "GAME": int(game.returncode),
-                "PLAYER_PROPS": int(prop.returncode),
+                "PLAYER_PROPS": prop_exit_code,
             },
         },
         "governance": {
@@ -140,6 +172,7 @@ def main() -> int:
             "promotion_changed": False,
             "eligible_changed": False,
             "prop_failures_are_not_silently_skipped": True,
+            "no_engine_prop_lane_is_not_executed": not prop_executable,
             "stale_child_output_reuse_prohibited": True,
         },
     }
