@@ -10,24 +10,24 @@
       "notes": "Native automatic MLB acquisition with resilient odds failover; promotion remains deployment/evidence gated."
     },
     "NFL": {
-      "lane": "PREGAME_MODEL_AND_PLAYER_PROPS",
+      "lane": "PREGAME_MODEL",
       "automatic_command": ["python", "scripts/run_football_auto_bundle.py", "--sport", "NFL", "--output", "artifacts/run_it/nfl_card.json"],
       "library_entrypoint": "sportsedge.sports.nfl.run_machine:run_it_nfl",
       "market_surface": "config/football_runtime_capabilities.json",
       "planning_market_catalog": "config/football_market_surface.json",
       "automatic_completeness": "EXECUTABLE_FAIL_CLOSED",
-      "blocker": "NFL_FROZEN_M2_AND_PROP_ARTIFACTS_PLUS_LIVE_SOURCES_REQUIRED_FOR_OFFICIAL",
-      "notes": "RUN IT executes the canonical NFL game lane plus shared-path offensive, TD scorer, kicker, and defensive player-prop model lanes where required PIT/live inputs exist. Genuine Model_P + fresh offered price can surface MODEL_CANDIDATE rows before promotion. OFFICIAL remains independently blocked until artifact-bound evidence, certification, frozen edge-floor policy, and Truth Gate requirements pass."
+      "blocker": "NFL_FROZEN_M2_PLUS_LIVE_SOURCES_REQUIRED_FOR_OFFICIAL; NFL_PLAYER_PROPS_NO_ENGINE",
+      "notes": "RUN IT executes the canonical NFL game lane. NFL player props remain explicit NO_ENGINE until a genuine sport-specific probability engine independently validates under frozen evidence; prop acquisition, research artifacts, hit rates, prices, or mappings cannot create Model_P. OFFICIAL remains independently blocked until artifact-bound evidence, certification, frozen edge-floor policy, and Truth Gate requirements pass."
     },
     "CFB": {
-      "lane": "PREGAME_MODEL_AND_PLAYER_PROPS",
+      "lane": "PREGAME_MODEL",
       "automatic_command": ["python", "scripts/run_football_auto_bundle.py", "--sport", "CFB", "--output", "artifacts/run_it/cfb_card.json"],
       "library_entrypoint": "sportsedge.sports.cfb.run_machine:run_it_cfb",
       "market_surface": "config/football_runtime_capabilities.json",
       "planning_market_catalog": "config/football_market_surface.json",
       "automatic_completeness": "EXECUTABLE_FAIL_CLOSED",
-      "blocker": "CFB_FROZEN_GAME_AND_PROP_ARTIFACTS_PLUS_LIVE_SOURCES_REQUIRED_FOR_OFFICIAL",
-      "notes": "RUN IT executes the canonical CFB game lane plus shared-path offensive, TD scorer, kicker, and defensive player-prop model lanes where required PIT/live inputs exist. Genuine Model_P + fresh offered price can surface MODEL_CANDIDATE rows before promotion. OFFICIAL remains independently blocked until artifact-bound evidence, certification, frozen edge-floor policy, and Truth Gate requirements pass."
+      "blocker": "CFB_FROZEN_GAME_ARTIFACTS_PLUS_LIVE_SOURCES_REQUIRED_FOR_OFFICIAL; CFB_PLAYER_PROPS_NO_ENGINE",
+      "notes": "RUN IT executes the canonical CFB game lane. CFB player props remain explicit NO_ENGINE until a genuine sport-specific probability engine independently validates under frozen evidence; frozen research artifacts do not create Model_P. OFFICIAL remains independently blocked until artifact-bound evidence, certification, frozen edge-floor policy, and Truth Gate requirements pass."
     },
     "PGA": {
       "lane": "PREGAME_AND_LIVE_MODEL",
