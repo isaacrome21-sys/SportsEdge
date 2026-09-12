@@ -1,0 +1,23 @@
+name: nfl-v2g-prospective-dispatch-once
+
+on:
+  push:
+    paths:
+      - '.github/trigger-nfl-v2g-prospective-capture'
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch frozen V2G prospective capture
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run nfl-v2g-prospective-prediction-capture.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main
