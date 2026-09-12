@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import unittest
 
+from scripts.capture_nfl_v2g_prospective_predictions import _validate_existing_identity
 from sportsedge.sports.nfl.m2_v2g_artifact import artifact_sha256, build_v2g_research_artifact
 from sportsedge.sports.nfl.m2_v2g_candidate import NFLM2V2GCandidateModel, NFLV2GTeamState
 from sportsedge.sports.nfl.m2_v2g_forward import (
@@ -56,6 +57,17 @@ def _inputs():
     return artifact, correction
 
 
+def _game():
+    return {
+        "game_id": "2026_02_CHI_GB",
+        "season": 2026,
+        "week": 2,
+        "kickoff_utc": "2026-09-20T17:00:00Z",
+        "home_team": "GB",
+        "away_team": "CHI",
+    }
+
+
 class NFLV2GForwardTests(unittest.TestCase):
     def test_valid_capture_is_hash_bound_and_non_promotional(self):
         artifact, correction = _inputs()
@@ -66,12 +78,7 @@ class NFLV2GForwardTests(unittest.TestCase):
             schedule_snapshot_sha256="3" * 64,
             capture_code_git_sha="4" * 40,
             captured_at_utc="2026-09-16T12:00:00Z",
-            game_id="2026_02_CHI_GB",
-            season=2026,
-            week=2,
-            kickoff_utc="2026-09-20T17:00:00Z",
-            home_team="GB",
-            away_team="CHI",
+            **_game(),
         )
         self.assertEqual(validate_prospective_prediction(row), row["prediction_sha256"])
         self.assertFalse(row["market_prices_consumed"])
@@ -88,8 +95,7 @@ class NFLV2GForwardTests(unittest.TestCase):
             build_prospective_prediction(
                 artifact=artifact, implementation_freeze=FREEZE, freeze_correction=correction,
                 schedule_snapshot_sha256="3" * 64, capture_code_git_sha="4" * 40,
-                captured_at_utc="2026-09-20T18:00:00Z", game_id="2026_02_CHI_GB",
-                season=2026, week=2, kickoff_utc="2026-09-20T17:00:00Z", home_team="GB", away_team="CHI",
+                captured_at_utc="2026-09-20T18:00:00Z", **_game(),
             )
 
     def test_artifact_identity_drift_is_rejected(self):
@@ -100,8 +106,7 @@ class NFLV2GForwardTests(unittest.TestCase):
             build_prospective_prediction(
                 artifact=artifact, implementation_freeze=FREEZE, freeze_correction=correction,
                 schedule_snapshot_sha256="3" * 64, capture_code_git_sha="4" * 40,
-                captured_at_utc="2026-09-16T12:00:00Z", game_id="2026_02_CHI_GB",
-                season=2026, week=2, kickoff_utc="2026-09-20T17:00:00Z", home_team="GB", away_team="CHI",
+                captured_at_utc="2026-09-16T12:00:00Z", **_game(),
             )
 
     def test_prediction_tampering_is_rejected(self):
@@ -109,12 +114,27 @@ class NFLV2GForwardTests(unittest.TestCase):
         row = build_prospective_prediction(
             artifact=artifact, implementation_freeze=FREEZE, freeze_correction=correction,
             schedule_snapshot_sha256="3" * 64, capture_code_git_sha="4" * 40,
-            captured_at_utc="2026-09-16T12:00:00Z", game_id="2026_02_CHI_GB",
-            season=2026, week=2, kickoff_utc="2026-09-20T17:00:00Z", home_team="GB", away_team="CHI",
+            captured_at_utc="2026-09-16T12:00:00Z", **_game(),
         )
         row["summary"]["home_win_probability"] += 0.01
         with self.assertRaisesRegex(NFLV2GForwardError, "PREDICTION_SHA_MISMATCH"):
             validate_prospective_prediction(row)
+
+    def test_existing_first_write_must_match_exact_frozen_artifact(self):
+        artifact, correction = _inputs()
+        row = build_prospective_prediction(
+            artifact=artifact, implementation_freeze=FREEZE, freeze_correction=correction,
+            schedule_snapshot_sha256="3" * 64, capture_code_git_sha="4" * 40,
+            captured_at_utc="2026-09-16T12:00:00Z", **_game(),
+        )
+        _validate_existing_identity(row, correction, _game())
+        stale = copy.deepcopy(row)
+        stale["artifact_sha256"] = "f" * 64
+        # Re-hash to prove the first-write guard checks frozen identity, not only internal integrity.
+        from sportsedge.sports.nfl.m2_v2g_forward import prediction_sha256
+        stale["prediction_sha256"] = prediction_sha256(stale)
+        with self.assertRaisesRegex(ValueError, "EXISTING_IDENTITY_MISMATCH:artifact_sha256"):
+            _validate_existing_identity(stale, correction, _game())
 
 
 if __name__ == "__main__":
