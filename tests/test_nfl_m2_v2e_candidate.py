@@ -100,6 +100,28 @@ def test_v2e_key_numbers_emerge_without_injected_key_mass():
     assert 7 in margins or -7 in margins
 
 
+def test_v2e_sampler_preserves_poisson_drive_mean_instead_of_compressing_unit_interval():
+    model = NFLM2V2ECandidateModel(
+        model_id="nfl_m2_possession_discrete_v2e_candidate",
+        feature_contract="NFL_M2_V2E_MARKET_BLIND_DRIVE_STATE_V1",
+        distribution_contract="NFL_M2_V2E_POSSESSION_DISCRETE_SCORE_V1",
+        train_seasons=(2020,),
+        home_drive_mean=10.0,
+        away_drive_mean=10.0,
+        home_outcome_probabilities=(0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0),
+        away_outcome_probabilities=(0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0),
+        home_state_coefficients=(),
+        away_state_coefficients=(),
+        laplace_alpha=1.0,
+        promotion_eligible=False,
+    )
+    paths = derive_nfl_m2_v2e_score_distribution(model, {}, path_count=4096)
+    home_drive_mean = sum(path["home_score"] / 3.0 for path in paths) / len(paths)
+    away_drive_mean = sum(path["away_score"] / 3.0 for path in paths) / len(paths)
+    assert home_drive_mean == pytest.approx(10.0, abs=0.05)
+    assert away_drive_mean == pytest.approx(10.0, abs=0.05)
+
+
 def test_v2e_safety_on_home_possession_scores_for_away_team():
     model = NFLM2V2ECandidateModel(
         model_id="nfl_m2_possession_discrete_v2e_candidate",
