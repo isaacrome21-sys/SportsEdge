@@ -6,21 +6,35 @@ on:
     paths:
       - 'config/cfb_prop_participation_model_v1.json'
       - 'config/football_prop_engine_surface.json'
+      - 'config/run_it_surface.json'
       - 'sportsedge/sports/cfb/participation_model.py'
+      - 'sportsedge/sports/cfb/participation_source_capture.py'
+      - 'sportsedge/sports/cfb/participation_pit_readiness.py'
       - 'sportsedge/football_prop_surface.py'
+      - 'scripts/cache_cfb_participation_sources.py'
       - 'tests/test_cfb_participation_model.py'
+      - 'tests/test_cfb_participation_source_capture.py'
+      - 'tests/test_cfb_participation_pit_readiness.py'
       - 'tests/test_football_prop_runtime_truth.py'
       - '.github/workflows/cfb-participation-contract.yml'
+      - '.github/workflows/cfb-forward-participation-capture.yml'
   push:
     branches: [main]
     paths:
       - 'config/cfb_prop_participation_model_v1.json'
       - 'config/football_prop_engine_surface.json'
+      - 'config/run_it_surface.json'
       - 'sportsedge/sports/cfb/participation_model.py'
+      - 'sportsedge/sports/cfb/participation_source_capture.py'
+      - 'sportsedge/sports/cfb/participation_pit_readiness.py'
       - 'sportsedge/football_prop_surface.py'
+      - 'scripts/cache_cfb_participation_sources.py'
       - 'tests/test_cfb_participation_model.py'
+      - 'tests/test_cfb_participation_source_capture.py'
+      - 'tests/test_cfb_participation_pit_readiness.py'
       - 'tests/test_football_prop_runtime_truth.py'
       - '.github/workflows/cfb-participation-contract.yml'
+      - '.github/workflows/cfb-forward-participation-capture.yml'
 
 permissions:
   contents: read
@@ -36,17 +50,24 @@ jobs:
           python-version-file: '.python-version'
       - name: Install contracted test dependencies
         run: python -m pip install --disable-pip-version-check -r requirements-test.txt
-      - name: Compile CFB participation activation boundary
+      - name: Compile CFB participation boundary
         run: >-
           python -m py_compile
           sportsedge/sports/cfb/participation_model.py
+          sportsedge/sports/cfb/participation_source_capture.py
+          sportsedge/sports/cfb/participation_pit_readiness.py
           sportsedge/football_prop_surface.py
+          scripts/cache_cfb_participation_sources.py
           tests/test_cfb_participation_model.py
+          tests/test_cfb_participation_source_capture.py
+          tests/test_cfb_participation_pit_readiness.py
           tests/test_football_prop_runtime_truth.py
-      - name: Run CFB participation activation tests
+      - name: Run CFB participation contract tests
         run: >-
           python -m pytest -q
           tests/test_cfb_participation_model.py
+          tests/test_cfb_participation_source_capture.py
+          tests/test_cfb_participation_pit_readiness.py
           tests/test_football_prop_runtime_truth.py
       - name: Assert checked-in CFB prop state remains NO_ENGINE for the structural reason
         run: |
@@ -54,6 +75,7 @@ jobs:
           import json
           from pathlib import Path
           from sportsedge.football_prop_surface import FootballPropSurfaceError, require_executable_prop_surface
+          from sportsedge.sports.cfb.participation_pit_readiness import REQUIRED_DATASETS
 
           surface=json.loads(Path('config/football_prop_engine_surface.json').read_text())
           cfb=surface['sports']['CFB']
@@ -68,6 +90,10 @@ jobs:
           assert participation['market_data_used_as_feature'] is False
           assert participation['promotion_authority'] is False
           assert participation['activation_authority'] is False
+          source_req=participation['training_source_requirements']
+          assert source_req['point_in_time_mode']=='FORWARD_CAPTURE_ONLY'
+          assert source_req['retroactive_backfill_allowed'] is False
+          assert set(source_req['required_datasets'])==set(REQUIRED_DATASETS)
           try:
               require_executable_prop_surface('CFB')
           except FootballPropSurfaceError as exc:
@@ -75,3 +101,5 @@ jobs:
           else:
               raise AssertionError('CFB prop surface unexpectedly executable')
           PY
+      - name: Assert capture CLI remains market-blind and forward-only
+        run: python scripts/cache_cfb_participation_sources.py --season 2026 --self-test
