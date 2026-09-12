@@ -1,0 +1,22 @@
+{
+  "schema_version": "SPORTSEDGE_NFL_V2G_PROSPECTIVE_ACTIVATION_V1",
+  "status": "FROZEN_BEFORE_V2G_PROSPECTIVE_EVIDENCE",
+  "candidate_id": "nfl_v2g_scoring_event_model_candidate",
+  "v2g_preregistration_commit_sha": "c8381b09cdde2ccbddf6787127c838d114dee994",
+  "v2g_preregistration_timestamp_utc": "2026-09-12T03:47:57Z",
+  "v2g_preregistration_base_sha": "5f5af9d86b79157b15a09e48b0cab69d68c3aba1",
+  "global_prospective_boundary_file": "config/research/nfl_prospective_evaluation_boundary_2026-09-12.json",
+  "global_prospective_boundary_blob_sha": "71eb48c8ed77fa5130f927b9306e291227b0c745",
+  "activation_rule": "V2G prospective evidence may only use events and prediction artifacts strictly after the V2G preregistration timestamp. The earlier global prospective boundary cannot make pre-preregistration observations eligible for V2G.",
+  "prediction_rule": "A V2G prediction artifact must be materialized after v2g_preregistration_timestamp_utc and before the applicable event start, and must bind the exact candidate implementation code SHA and model artifact SHA256 once implementation is frozen.",
+  "market_rule": "Any decision and close quotes used with V2G must be genuine pregame observations with exact event, market, selection, threshold, and book identity. No reconstruction, inference, interpolation, or retroactive backfill is allowed.",
+  "outcome_rule": "No outcome available before the frozen prediction may be used as prospective V2G evaluation evidence. Prospective outcomes may not be used to tune or select the V2G candidate family.",
+  "candidate_separation_rule": "V2F and V2G prospective evidence are separate candidate lanes. A prediction or market observation may not be relabelled between candidate identities after capture.",
+  "historical_2016_2025_role": "REUSED_RESEARCH_HISTORY_NOT_FINAL_HOLDOUT",
+  "promotion_authority": false,
+  "production_model_changed": false,
+  "market_eligibility_changed": false,
+  "may_create_model_p": false,
+  "official_status_granted": false,
+  "truth_gate_unchanged": true
+}
