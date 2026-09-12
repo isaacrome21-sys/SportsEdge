@@ -42,6 +42,18 @@ class FootballPropSurfaceTests(unittest.TestCase):
         self.assertEqual(freeze["artifact_sha256"], CFB_ARTIFACT_SHA)
         self.assertFalse(freeze["promotion_authority"])
 
+    def test_runtime_capability_mirror_matches_authoritative_engine_surface(self):
+        surface = json.loads(Path("config/football_prop_engine_surface.json").read_text())
+        capabilities = json.loads(Path("config/football_runtime_capabilities.json").read_text())
+        self.assertEqual(capabilities["prop_engine_authority"], "config/football_prop_engine_surface.json")
+        for sport in ("NFL", "CFB"):
+            self.assertEqual(
+                capabilities["prop_engine_state"][sport],
+                surface["sports"][sport]["engine_state"],
+            )
+        self.assertFalse(capabilities["governance"]["runtime_capability_creates_official_eligibility"])
+        self.assertFalse(capabilities["governance"]["prop_provider_capability_creates_prop_model_p"])
+
     def test_declared_provider_surface_matches_extended_run_machine_exactly(self):
         payload = json.loads(Path("config/football_prop_engine_surface.json").read_text())
         declared = {market for values in payload["implemented_provider_markets"].values() for market in values}
