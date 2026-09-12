@@ -24,6 +24,12 @@ DEFAULT_ROOT = Path("artifacts/mlb_v8_replay_sources/THE_ODDS_API_HISTORICAL")
 DEFAULT_MARKETS = "h2h,spreads,totals"
 DEFAULT_REGIONS = "us"
 DEFAULT_ODDS_FORMAT = "american"
+KEY_NAMES = (
+    "SPORTSEDGE_ODDS_API_KEY",
+    "SPORTSEDGE_ODDS_API_KEY_2",
+    "SPORTSEDGE_ODDS_API_KEY_3",
+    "SPORTSEDGE_ODDS_API_KEY_4",
+)
 
 
 def _parse_utc(value: str) -> datetime:
@@ -66,8 +72,15 @@ def _validate_payload(raw: bytes, requested_at: str) -> dict[str, Any]:
     return payload
 
 
-def _secret() -> str:
-    return os.environ.get("SPORTSEDGE_ODDS_API_KEY", "").strip()
+def _secrets() -> list[tuple[int, str]]:
+    seen: set[str] = set()
+    keys: list[tuple[int, str]] = []
+    for slot, name in enumerate(KEY_NAMES, 1):
+        value = os.environ.get(name, "").strip()
+        if value and value not in seen:
+            seen.add(value)
+            keys.append((slot, value))
+    return keys
 
 
 def _request(*, key: str, requested_at: str, regions: str, markets: str, odds_format: str) -> tuple[bytes, dict[str, str]]:
@@ -79,7 +92,7 @@ def _request(*, key: str, requested_at: str, regions: str, markets: str, odds_fo
         "oddsFormat": odds_format,
     }
     url = BASE + "?" + urlencode(params)
-    req = Request(url, headers={"Accept": "application/json", "User-Agent": "SportsEdge-MLB-Historical/1.0"})
+    req = Request(url, headers={"Accept": "application/json", "User-Agent": "SportsEdge-MLB-Historical/1.1"})
     with urlopen(req, timeout=60) as response:
         return response.read(), {str(k).lower(): str(v) for k, v in response.headers.items()}
 
@@ -87,9 +100,9 @@ def _request(*, key: str, requested_at: str, regions: str, markets: str, odds_fo
 def collect_one(*, requested_at: str, root: Path = DEFAULT_ROOT, regions: str = DEFAULT_REGIONS,
                 markets: str = DEFAULT_MARKETS, odds_format: str = DEFAULT_ODDS_FORMAT) -> dict[str, Any]:
     requested = _canonical_request_ts(requested_at)
-    key = _secret()
-    if not key:
-        return {"status": "BLOCKED_NO_THE_ODDS_API_KEY", "required_secret": "SPORTSEDGE_ODDS_API_KEY"}
+    keys = _secrets()
+    if not keys:
+        return {"status": "BLOCKED_NO_THE_ODDS_API_KEY", "required_secrets": list(KEY_NAMES)}
 
     safe = requested.replace(":", "").replace("-", "")
     out_dir = root / safe
@@ -103,19 +116,45 @@ def collect_one(*, requested_at: str, root: Path = DEFAULT_ROOT, regions: str = 
         _validate_payload(raw, requested)
         return {"status": "ALREADY_ARCHIVED", "requested_at": requested, "payload_sha256": _sha(raw), "path": raw_path.as_posix()}
 
-    try:
-        raw, headers = _request(key=key, requested_at=requested, regions=regions, markets=markets, odds_format=odds_format)
-    except HTTPError as exc:
-        body = b""
+    raw: bytes | None = None
+    headers: dict[str, str] = {}
+    winning_slot: int | None = None
+    attempts: list[dict[str, Any]] = []
+    for slot, key in keys:
         try:
-            body = exc.read()
-        except Exception:
-            pass
-        code = int(exc.code)
-        status = "BLOCKED_PROVIDER_AUTH" if code in (401, 403) else "BLOCKED_PROVIDER_HTTP"
-        return {"status": status, "http_status": code, "error_body_sha256": _sha(body), "requested_at": requested}
-    except (URLError, TimeoutError) as exc:
-        return {"status": "BLOCKED_PROVIDER_NETWORK", "reason": type(exc).__name__, "requested_at": requested}
+            raw, headers = _request(key=key, requested_at=requested, regions=regions, markets=markets, odds_format=odds_format)
+            winning_slot = slot
+            break
+        except HTTPError as exc:
+            body = b""
+            try:
+                body = exc.read()
+            except Exception:
+                pass
+            attempts.append({"key_slot": slot, "http_status": int(exc.code), "error_body_sha256": _sha(body)})
+            if int(exc.code) not in (401, 403):
+                return {
+                    "status": "BLOCKED_PROVIDER_HTTP",
+                    "http_status": int(exc.code),
+                    "error_body_sha256": _sha(body),
+                    "requested_at": requested,
+                    "attempted_key_slots": [a["key_slot"] for a in attempts],
+                }
+        except (URLError, TimeoutError) as exc:
+            return {
+                "status": "BLOCKED_PROVIDER_NETWORK",
+                "reason": type(exc).__name__,
+                "requested_at": requested,
+                "attempted_key_slots": [a["key_slot"] for a in attempts] + [slot],
+            }
+
+    if raw is None or winning_slot is None:
+        return {
+            "status": "BLOCKED_PROVIDER_AUTH",
+            "requested_at": requested,
+            "attempts": attempts,
+            "configured_unique_key_slots": len(keys),
+        }
 
     payload = _validate_payload(raw, requested)
     digest = _sha(raw)
@@ -136,6 +175,7 @@ def collect_one(*, requested_at: str, root: Path = DEFAULT_ROOT, regions: str = 
         "retrieved_at_utc": datetime.now(timezone.utc).isoformat(),
         "quota_remaining": headers.get("x-requests-remaining"),
         "quota_used": headers.get("x-requests-used"),
+        "credential_slot": winning_slot,
         "interpolated": False,
         "reconstructed": False,
         "promotion_authority": False,
@@ -150,6 +190,7 @@ def collect_one(*, requested_at: str, root: Path = DEFAULT_ROOT, regions: str = 
         "event_count": len(payload["data"]),
         "payload_sha256": digest,
         "path": raw_path.as_posix(),
+        "credential_slot": winning_slot,
         "promotion_authority": False,
     }
 
