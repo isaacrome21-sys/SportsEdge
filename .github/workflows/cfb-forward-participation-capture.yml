@@ -1,0 +1,262 @@
+name: cfb-forward-participation-capture
+
+on:
+  workflow_dispatch:
+    inputs:
+      season:
+        description: 'Season to snapshot prospectively'
+        required: true
+        default: '2026'
+        type: string
+  push:
+    branches: [main]
+    paths:
+      - '.github/trigger-cfb-forward-participation'
+      - '.github/workflows/cfb-forward-participation-capture.yml'
+  schedule:
+    - cron: '7 14 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cfb-forward-participation-capture
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CAPTURE_GIT_SHA: ${{ github.sha }}
+      CFB_FORWARD_SEASON: ${{ github.event_name == 'workflow_dispatch' && inputs.season || '2026' }}
+    steps:
+      - name: Checkout audited revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.CAPTURE_GIT_SHA }}
+
+      - name: Set up contracted Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: '.python-version'
+
+      - name: Compile participation capture boundary
+        run: >-
+          python -m py_compile
+          sportsedge/sports/cfb/historical_release.py
+          sportsedge/sports/cfb/participation_source_capture.py
+          sportsedge/sports/cfb/participation_pit_readiness.py
+          scripts/cache_cfb_participation_sources.py
+
+      - name: Snapshot prospective participation source bytes
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/cfb_forward_participation/capture
+          python scripts/cache_cfb_participation_sources.py \
+            --season "$CFB_FORWARD_SEASON" \
+            --cache-root artifacts/cfb_forward_participation/source \
+            | tee artifacts/cfb_forward_participation/capture/sources.json
+
+      - name: Bind retrieval-time PIT classification and PBP firewall
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+          import hashlib
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+          from sportsedge.sports.cfb.participation_source_capture import (
+              PARTICIPATION_CAPTURE_CONTRACT,
+              PBP_PROJECTION_CONTRACT,
+              PBP_PREDICTIVE_COLUMNS,
+              PBP_SOURCE_TO_CANONICAL,
+          )
+
+          required = {'play_by_play', 'play_participants', 'player_box', 'game_rosters'}
+          root = Path('artifacts/cfb_forward_participation/source')
+          manifests = sorted(root.glob('*/*/manifest.json'))
+          if not manifests:
+              raise SystemExit('CFB_FORWARD_PARTICIPATION_CAPTURE_EMPTY')
+
+          def digest(path):
+              h=hashlib.sha256()
+              with path.open('rb') as handle:
+                  for chunk in iter(lambda: handle.read(1024 * 1024), b''):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          captured_at = datetime.now(timezone.utc)
+          rows = []
+          seen = set()
+          for manifest_path in manifests:
+              payload = json.loads(manifest_path.read_text(encoding='utf-8'))
+              asset = payload.get('asset') or {}
+              dataset = str(asset.get('dataset') or '').strip().lower()
+              if dataset not in required:
+                  raise SystemExit(f'CFB_FORWARD_PARTICIPATION_DATASET_UNEXPECTED:{dataset}')
+              if dataset in seen:
+                  raise SystemExit(f'CFB_FORWARD_PARTICIPATION_DATASET_DUPLICATE:{dataset}')
+              seen.add(dataset)
+              if payload.get('contract') != PARTICIPATION_CAPTURE_CONTRACT:
+                  raise SystemExit(f'CFB_FORWARD_PARTICIPATION_CONTRACT_INVALID:{dataset}')
+              if payload.get('point_in_time_from_retrieval_forward') is not True:
+                  raise SystemExit(f'CFB_FORWARD_PARTICIPATION_FORWARD_PIT_FLAG_MISSING:{dataset}')
+              if payload.get('retroactive_point_in_time_claim') is not False:
+                  raise SystemExit(f'CFB_FORWARD_PARTICIPATION_RETROACTIVE_PIT_FORBIDDEN:{dataset}')
+              if payload.get('model_p_created') is not False or payload.get('promotion_authority') is not False:
+                  raise SystemExit(f'CFB_FORWARD_PARTICIPATION_AUTHORITY_FORBIDDEN:{dataset}')
+              cache_rel = str(payload.get('cache_relative_path') or '').strip()
+              if not cache_rel:
+                  raise SystemExit(f'CFB_FORWARD_PARTICIPATION_CACHE_PATH_MISSING:{dataset}')
+              cache_path = root / cache_rel
+              if not cache_path.is_file():
+                  raise SystemExit(f'CFB_FORWARD_PARTICIPATION_ASSET_MISSING:{dataset}')
+              actual = digest(cache_path)
+              expected = str(payload.get('content_sha256') or '').lower()
+              if actual != expected:
+                  raise SystemExit(f'CFB_FORWARD_PARTICIPATION_HASH_MISMATCH:{dataset}')
+
+              raw_market = payload.get('raw_market_data_present')
+              raw_allowed = payload.get('raw_predictive_input_allowed')
+              projection = payload.get('predictive_projection')
+              if dataset == 'play_by_play':
+                  if raw_market is not True or raw_allowed is not False:
+                      raise SystemExit('CFB_FORWARD_PARTICIPATION_PBP_RAW_POLICY_INVALID')
+                  if not isinstance(projection, dict):
+                      raise SystemExit('CFB_FORWARD_PARTICIPATION_PBP_PROJECTION_REQUIRED')
+                  if projection.get('contract') != PBP_PROJECTION_CONTRACT:
+                      raise SystemExit('CFB_FORWARD_PARTICIPATION_PBP_PROJECTION_CONTRACT_INVALID')
+                  if projection.get('market_data_in_projection') is not False:
+                      raise SystemExit('CFB_FORWARD_PARTICIPATION_PBP_PROJECTION_MARKET_CONTAMINATION')
+                  if projection.get('raw_predictive_input_allowed') is not False:
+                      raise SystemExit('CFB_FORWARD_PARTICIPATION_PBP_RAW_INPUT_FORBIDDEN')
+                  if projection.get('projection_predictive_input_allowed') is not True:
+                      raise SystemExit('CFB_FORWARD_PARTICIPATION_PBP_PROJECTION_NOT_AUTHORIZED')
+                  if projection.get('source_fields') != list(PBP_SOURCE_TO_CANONICAL):
+                      raise SystemExit('CFB_FORWARD_PARTICIPATION_PBP_SOURCE_ALLOWLIST_INVALID')
+                  if projection.get('predictive_columns') != list(PBP_PREDICTIVE_COLUMNS):
+                      raise SystemExit('CFB_FORWARD_PARTICIPATION_PBP_COLUMNS_INVALID')
+                  projection_rel = str(projection.get('projection_relative_path') or '').strip()
+                  projection_path = root / projection_rel
+                  if not projection_rel or not projection_path.is_file():
+                      raise SystemExit('CFB_FORWARD_PARTICIPATION_PBP_PROJECTION_FILE_MISSING')
+                  if digest(projection_path) != projection.get('projection_sha256'):
+                      raise SystemExit('CFB_FORWARD_PARTICIPATION_PBP_PROJECTION_HASH_MISMATCH')
+              else:
+                  if raw_market is not False or raw_allowed is not True or projection is not None:
+                      raise SystemExit(f'CFB_FORWARD_PARTICIPATION_RAW_SOURCE_POLICY_INVALID:{dataset}')
+
+              rows.append({
+                  'dataset': dataset,
+                  'season': asset.get('season'),
+                  'release_tag': asset.get('release_tag'),
+                  'release_id': asset.get('release_id'),
+                  'asset_id': asset.get('asset_id'),
+                  'asset_name': asset.get('asset_name'),
+                  'content_sha256': expected,
+                  'source_retrieved_at': payload.get('retrieved_at'),
+                  'manifest_sha256': payload.get('manifest_sha256'),
+                  'cache_relative_path': cache_rel,
+                  'raw_market_data_present': raw_market,
+                  'raw_predictive_input_allowed': raw_allowed,
+                  'predictive_projection': projection,
+              })
+
+          if seen != required:
+              raise SystemExit('CFB_FORWARD_PARTICIPATION_DATASETS_INCOMPLETE:' + ','.join(sorted(required - seen)))
+
+          classification = {
+              'schema_version': 'CFB_FORWARD_PARTICIPATION_CAPTURE_V1',
+              'sport': 'CFB',
+              'capture_git_sha': os.environ['CAPTURE_GIT_SHA'].lower(),
+              'season': int(os.environ['CFB_FORWARD_SEASON']),
+              'captured_at_utc': captured_at.isoformat().replace('+00:00', 'Z'),
+              'pit_classification': 'FORWARD_PARTICIPATION_SOURCE_SNAPSHOT_FROM_RETRIEVAL_TIME_ONLY',
+              'point_in_time_from_capture_forward': True,
+              'retroactive_point_in_time_claim': False,
+              'promotion_evidence': False,
+              'model_p_created': False,
+              'eligibility_changed': False,
+              'raw_market_data_present_in_provenance': True,
+              'market_data_in_predictive_capture': False,
+              'participation_model_fit_performed': False,
+              'usage_rule': (
+                  'Raw PBP is retained only for provenance because the upstream file contains '
+                  'sportsbook-derived and spread-influenced columns. Participation-model code may '
+                  'consume only the hash-bound exact allowlist projection. All four sources establish '
+                  'availability only for decisions at or after this capture; no earlier PIT claim exists.'
+              ),
+              'asset_count': len(rows),
+              'assets': sorted(rows, key=lambda row: row['dataset']),
+          }
+          target = Path('artifacts/cfb_forward_participation/capture/classification.json')
+          target.write_text(json.dumps(classification, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          capture_id = captured_at.strftime('%Y%m%dT%H%M%SZ') + '-' + os.environ['CAPTURE_GIT_SHA'][:12]
+          Path('artifacts/cfb_forward_participation/capture/id.txt').write_text(capture_id + '\n', encoding='utf-8')
+          print(json.dumps({
+              'status': 'CFB_FORWARD_PARTICIPATION_CAPTURED',
+              'capture_id': capture_id,
+              'captured_at_utc': classification['captured_at_utc'],
+              'asset_count': len(rows),
+              'raw_market_data_present_in_provenance': True,
+              'market_data_in_predictive_capture': False,
+              'promotion_evidence': False,
+              'model_p_created': False,
+          }, sort_keys=True))
+          PY
+
+      - name: Validate complete participation snapshot before persistence
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from sportsedge.sports.cfb.participation_pit_readiness import audit_cfb_participation_snapshot
+
+          report = audit_cfb_participation_snapshot(
+              Path('artifacts/cfb_forward_participation/capture/classification.json')
+          )
+          if report.get('participation_source_asof_ready') is not True:
+              raise SystemExit(
+                  'CFB_FORWARD_PARTICIPATION_BINDING_INVALID:' + json.dumps(report, sort_keys=True)
+              )
+          for field in ('truth_gate_ready', 'model_p_created', 'promotion_authority', 'eligibility_changed', 'retroactive_point_in_time_claim'):
+              if report.get(field) is not False:
+                  raise SystemExit(f'CFB_FORWARD_PARTICIPATION_AUTHORITY_FORBIDDEN:{field}')
+          if report.get('verified_asset_count') != 4:
+              raise SystemExit('CFB_FORWARD_PARTICIPATION_ASSET_COUNT_INVALID')
+          if report.get('pbp_raw_market_data_present') is not True or report.get('pbp_predictive_projection_required') is not True:
+              raise SystemExit('CFB_FORWARD_PARTICIPATION_PBP_FIREWALL_NOT_ENFORCED')
+          print(json.dumps(report, sort_keys=True))
+          PY
+
+      - name: Persist immutable participation snapshot on data branch
+        env:
+          DATA_BRANCH: data
+        run: |
+          set -euo pipefail
+          capture_id="$(tr -d '\n' < artifacts/cfb_forward_participation/capture/id.txt)"
+          git fetch --no-tags origin "${DATA_BRANCH}:${DATA_BRANCH}"
+          worktree_dir="$(mktemp -d)"
+          trap 'git worktree remove --force "$worktree_dir" >/dev/null 2>&1 || true; rm -rf "$worktree_dir"' EXIT
+          git worktree add "$worktree_dir" "${DATA_BRANCH}"
+          dest="$worktree_dir/history/cfb/forward-participation/${capture_id}"
+          test ! -e "$dest" || { echo "CFB_FORWARD_PARTICIPATION_CAPTURE_ID_COLLISION:${capture_id}" >&2; exit 1; }
+          mkdir -p "$dest"
+          cp -a artifacts/cfb_forward_participation/source "$dest/source"
+          cp -a artifacts/cfb_forward_participation/capture "$dest/capture"
+          cd "$worktree_dir"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "history/cfb/forward-participation/${capture_id}"
+          git commit -m "data(cfb): forward participation snapshot ${capture_id}"
+          git push origin "HEAD:${DATA_BRANCH}"
+
+      - name: Upload capture artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cfb-forward-participation-${{ env.CAPTURE_GIT_SHA }}-${{ github.run_id }}
+          path: artifacts/cfb_forward_participation/**
+          if-no-files-found: error
+          retention-days: 30
