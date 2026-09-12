@@ -1,0 +1,160 @@
+name: nfl-v2g-market-evidence-binding
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/bind_nfl_v2g_market_evidence.py'
+      - 'tests/test_nfl_v2g_market_evidence_binding.py'
+      - '.github/workflows/nfl-v2g-market-evidence-binding.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'data/nfl_2026_confirmation/captures/**'
+      - 'scripts/bind_nfl_v2g_market_evidence.py'
+      - '.github/workflows/nfl-v2g-market-evidence-binding.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nfl-v2g-market-evidence-binding
+  cancel-in-progress: false
+
+jobs:
+  contract-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Compile binder
+        run: python -m py_compile scripts/bind_nfl_v2g_market_evidence.py
+      - name: Freeze paired-evidence semantics
+        run: python -m unittest -q tests.test_nfl_v2g_market_evidence_binding
+
+  bind-ready-evidence:
+    if: github.event_name != 'pull_request'
+    needs: contract-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Restore immutable V2G predictions and prior bindings
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin data
+          git worktree add --detach .data-v2g origin/data
+          test -d .data-v2g/evidence/nfl_v2g/prospective/predictions/2026 || {
+            echo 'NFL_V2G_PROSPECTIVE_PREDICTIONS_MISSING' >&2
+            exit 78
+          }
+
+      - name: Bind only genuine paired market evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          OUT=artifacts/football/v2g/market_bindings
+          mkdir -p "$OUT"
+          bound=0
+          partial=0
+          inconclusive=0
+
+          for week_dir in data/nfl_2026_confirmation/captures/week*; do
+            [ -d "$week_dir" ] || continue
+            opener="$week_dir/opener.json"
+            final_dir="$week_dir/final"
+            [ -f "$opener" ] || continue
+            [ -d "$final_dir" ] || continue
+            week_name="$(basename "$week_dir")"
+            week_num="${week_name#week}"
+            predictions=(.data-v2g/evidence/nfl_v2g/prospective/predictions/2026/2026_${week_num}_*.json)
+            for prediction in "${predictions[@]}"; do
+              base="$(basename "$prediction")"
+              tmp="$OUT/$base"
+              python scripts/bind_nfl_v2g_market_evidence.py \
+                --prediction "$prediction" \
+                --opener "$opener" \
+                --final-dir "$final_dir" \
+                --output "$tmp"
+              status="$(python - "$tmp" <<'PY'
+          import json, sys
+          print(json.load(open(sys.argv[1], encoding='utf-8'))['status'])
+          PY
+          )"
+              case "$status" in
+                READY_FOR_PROSPECTIVE_EVALUATION)
+                  bound=$((bound + 1))
+                  ;;
+                PARTIAL_MARKET_EVIDENCE)
+                  partial=$((partial + 1))
+                  ;;
+                INCONCLUSIVE_MISSING_CAPTURE)
+                  inconclusive=$((inconclusive + 1))
+                  continue
+                  ;;
+                *)
+                  echo "NFL_V2G_BINDING_STATUS_INVALID:$status" >&2
+                  exit 79
+                  ;;
+              esac
+
+              dest=.data-v2g/evidence/nfl_v2g/prospective/market_bindings/2026/$base
+              mkdir -p "$(dirname "$dest")"
+              if [ -f "$dest" ]; then
+                cmp "$dest" "$tmp" || {
+                  echo "NFL_V2G_REFUSING_MARKET_BINDING_OVERWRITE:$dest" >&2
+                  exit 91
+                }
+              else
+                cp "$tmp" "$dest"
+              fi
+            done
+          done
+
+          printf '{"ready":%d,"partial":%d,"inconclusive":%d}\n' \
+            "$bound" "$partial" "$inconclusive" | tee "$OUT/summary.json"
+
+      - name: Persist first-write market bindings to data branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          (
+            cd .data-v2g
+            git config user.name sportsedge-v2g-evidence-bot
+            git config user.email sportsedge-v2g-evidence-bot@users.noreply.github.com
+            git add evidence/nfl_v2g/prospective/market_bindings || true
+            if git diff --cached --quiet; then
+              echo 'NFL_V2G_NO_NEW_MARKET_BINDINGS'
+              exit 0
+            fi
+            git commit -m "evidence: bind NFL V2G market captures ${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}"
+            for attempt in 1 2 3 4 5; do
+              if git push origin HEAD:data; then
+                exit 0
+              fi
+              git fetch origin data
+              git rebase origin/data
+              sleep $((attempt * 2))
+            done
+            exit 98
+          )
+
+      - name: Upload binding diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nfl-v2g-market-binding-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/football/v2g/market_bindings
+          if-no-files-found: warn
+          retention-days: 30
