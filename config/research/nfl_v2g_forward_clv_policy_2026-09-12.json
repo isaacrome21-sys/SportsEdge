@@ -19,8 +19,14 @@
   "model_probability": {
     "distribution_semantics": "SUM_FROZEN_V2G_SUPPORT_WEIGHTS",
     "pushes_are_explicit": true,
-    "clv_probability_semantics": "WIN_CONDITIONAL_ON_NON_PUSH",
+    "decision_edge_probability_semantics": "WIN_CONDITIONAL_ON_NON_PUSH",
     "market_prices_may_modify_model_probability": false
+  },
+  "clv": {
+    "metric": "CLOSING_NOVIG_MINUS_DECISION_NOVIG",
+    "probability_reference": "ORIGINAL_DECISION_THRESHOLD",
+    "same_book_required": true,
+    "model_probability_is_not_clv_reference": true
   },
   "selection": {
     "one_best_side_per_market": true,
