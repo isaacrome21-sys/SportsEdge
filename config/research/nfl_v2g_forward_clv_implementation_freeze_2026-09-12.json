@@ -6,11 +6,11 @@
   "files": [
     {
       "path": "config/research/nfl_v2g_forward_clv_policy_2026-09-12.json",
-      "git_blob_sha1": "4b4448b58ee087ef6c6c1898e10439833b301914"
+      "git_blob_sha1": "60e88a456e3dd7ff15cb45a334126e3ba273f69c"
     },
     {
       "path": "sportsedge/sports/nfl/v2g_forward_clv.py",
-      "git_blob_sha1": "95a7e9b971ae0fa551b42f6e98717df41ccbd041"
+      "git_blob_sha1": "7a7c62ed789c052230fef2c3fa2f10417de29075"
     },
     {
       "path": "scripts/run_nfl_v2g_forward_clv.py",
