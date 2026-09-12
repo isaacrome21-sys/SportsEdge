@@ -1,0 +1,72 @@
+{
+  "schema_version": "SPORTSEDGE_NFL_V2G_PROSPECTIVE_PAPER_EVALUATION_POLICY_V1",
+  "status": "FROZEN_BEFORE_FIRST_WEEK2_OPENER_CAPTURE",
+  "candidate_id": "nfl_m2_scoring_event_v2g_candidate",
+  "frozen_research_artifact_sha256": "e7e591bf1ee7fbf6332cc6795aa1d7126fce9c6a43ac69c164b1f54433457977",
+  "prospective_boundary_path": "config/research/nfl_prospective_evaluation_boundary_2026-09-12.json",
+  "confirmation_capture_config_path": "config/nfl_2026_capture.json",
+  "purpose": "Freeze downstream paper-selection, settlement, benchmark and checkpoint semantics before Week 2 opener evidence exists. This policy cannot create Model_P, promotion, staking, eligibility, Truth Gate PASS or OFFICIAL status.",
+  "paper_selection": {
+    "source_window": "OPENER_ONLY",
+    "book": "draftkings",
+    "markets": ["spreads", "totals"],
+    "market_no_vig_method": "PROPORTIONAL_TWO_WAY_V1",
+    "model_probability_definition": "conditional probability of winning the exact offered contract given no push, derived only from the frozen V2G score distribution",
+    "edge_floor_probability": 0.03,
+    "max_sides_per_game_market": 1,
+    "tie_break_rule": "NO_SELECTION_ON_EQUAL_EDGE",
+    "first_write_wins": true,
+    "backfill_allowed": false,
+    "staking_allowed": false,
+    "official_bet_allowed": false
+  },
+  "settlement": {
+    "source": "nflverse_games_csv_exact_snapshot",
+    "score_only_after_final_score_present": true,
+    "prediction_must_precede_kickoff": true,
+    "paper_decision_must_precede_final_capture_and_outcome": true,
+    "paired_final_market_capture_required_for_clv": true,
+    "missing_final_market_capture_status": "INCONCLUSIVE_MISSING_CAPTURE",
+    "late_or_backfilled_evidence_status": "BLOCKED_TEMPORAL_INTEGRITY",
+    "outcome_source_snapshot_sha256_required": true,
+    "first_write_wins": true
+  },
+  "prospective_metrics": {
+    "score_market_contracts": ["spread", "total"],
+    "model_log_loss_vs_closing_no_vig_required": true,
+    "model_brier_vs_closing_no_vig_required": true,
+    "paper_after_vig_roi_required": true,
+    "clv_required": true,
+    "clv_probability_threshold": 0.005,
+    "after_vig_roi_threshold": 0.02,
+    "calibration_slope_min": 0.90,
+    "calibration_slope_max": 1.10,
+    "calibration_intercept_abs_max": 0.03,
+    "ece_max": 0.025,
+    "line_clv_definition": {
+      "spread": "selected-side opener handicap minus selected-side closing handicap; positive is favorable",
+      "over": "closing total minus opener total; positive is favorable",
+      "under": "opener total minus closing total; positive is favorable"
+    },
+    "probability_clv_definition": "closing no-vig probability minus opener no-vig probability for the same selected side only when the closing contract line equals the opener contract line",
+    "line_changed_probability_clv_status": "NOT_COMPARABLE_LINE_CHANGED"
+  },
+  "checkpoints": {
+    "fixed_settled_market_counts": [50, 100, 150, 200, 250, 300, 400, 500],
+    "minimum_promotion_count": 200,
+    "pre_200_role": "DIAGNOSTIC_ONLY_NO_PROMOTION",
+    "at_or_after_200_role": "REVIEW_ELIGIBLE_ONLY_IF_ALL_EXISTING_GATES_PASS",
+    "optional_stopping_allowed": false,
+    "candidate_change_after_outcome_contact": "NEW_CANDIDATE_AND_NEW_PROSPECTIVE_COHORT_REQUIRED"
+  },
+  "governance": {
+    "historical_2016_2025_role": "REUSED_RESEARCH_HISTORY_NOT_FINAL_HOLDOUT",
+    "market_prices_consumed_by_model": false,
+    "promotion_authority": false,
+    "may_create_model_p": false,
+    "market_eligibility_changed": false,
+    "truth_gate_pass_granted": false,
+    "official_status_granted": false,
+    "nfl_props_status": "NO_ENGINE"
+  }
+}
