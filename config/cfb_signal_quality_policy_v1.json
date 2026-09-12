@@ -21,13 +21,10 @@
     "require_independent_confirmation_for_public_signal": true,
     "minimum_independent_source_families": 2,
     "public_confirmation_source_kinds": [
-      "market",
-      "sportsbook",
-      "odds",
       "split",
       "betting_split",
-      "line_history",
-      "exchange"
+      "sportsbook_split",
+      "public_consensus"
     ],
     "material_adverse_move_action": "WATCH"
   },
