@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 300
     env:
-      SPORTSEDGE_ODDSPAPI_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+      SPORTSEDGE_ODDSPAPI_KEY: ${{ secrets.SPORTSEDGE_ODDSPAPI_KEY }}
       BOOKMAKERS: ${{ inputs.bookmakers }}
       BATCH_SIZE: ${{ inputs.batch_size }}
       MAX_BATCHES: ${{ inputs.max_batches }}
@@ -45,11 +45,11 @@ jobs:
           python scripts/backfill_mlb_v8_oddspapi.py --self-test
           python scripts/build_mlb_v8_oddspapi_pit.py --self-test
 
-      - name: Require authorized OddsPapi credential
+      - name: Require dedicated authorized OddsPapi credential
         run: |
           set -euo pipefail
           if [ -z "${SPORTSEDGE_ODDSPAPI_KEY:-}" ]; then
-            echo 'SPORTSEDGE_ODDS_API_KEY is not configured' >&2
+            echo 'SPORTSEDGE_ODDSPAPI_KEY is not configured; do not substitute a key for another odds provider.' >&2
             exit 78
           fi
 
