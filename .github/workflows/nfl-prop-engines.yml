@@ -8,6 +8,7 @@ on:
       - 'sportsedge/sports/nfl/prop_validation.py'
       - 'sportsedge/sports/nfl/prop_engine_validation.py'
       - 'sportsedge/sports/nfl/prop_market_history.py'
+      - 'scripts/run_nfl_prop_engine_validation.py'
       - 'tests/test_nfl_prop_engines.py'
       - 'tests/test_nfl_prop_validation.py'
       - 'tests/test_nfl_prop_engine_validation.py'
@@ -17,7 +18,7 @@ on:
 jobs:
   contracts:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     env:
       EVIDENCE_GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
@@ -36,6 +37,7 @@ jobs:
           sportsedge/sports/nfl/prop_validation.py
           sportsedge/sports/nfl/prop_engine_validation.py
           sportsedge/sports/nfl/prop_market_history.py
+          scripts/run_nfl_prop_engine_validation.py
       - name: Run prop engine and validation contracts
         run: >-
           python -m pytest
@@ -72,3 +74,37 @@ jobs:
           if evidence.get('market_price_evidence_present') is not False:
               raise SystemExit('NFL_PROP_MARKET_EVIDENCE_MUST_NOT_BE_INFERRED')
           PY
+      - name: Run exact-source historical prop replay
+        run: >-
+          python scripts/run_nfl_prop_engine_validation.py
+          --start-season 2021
+          --end-season 2025
+          --git-sha "$EVIDENCE_GIT_SHA"
+          --min-games 6
+          --out artifacts/football/nfl_prop_engine_validation.json
+          --manifest-out artifacts/football/nfl_prop_engine_source_manifest.json
+      - name: Assert replay artifact binding and non-promotion
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          evidence=json.loads(Path('artifacts/football/nfl_prop_engine_validation.json').read_text())
+          expected=os.environ['EVIDENCE_GIT_SHA'].lower()
+          if evidence.get('code_git_sha') != expected:
+              raise SystemExit('NFL_PROP_VALIDATION_GIT_SHA_BINDING_MISMATCH')
+          if evidence.get('promotion_eligible') is not False or evidence.get('promotion_authority') is not False:
+              raise SystemExit('NFL_PROP_REPLAY_MUST_REMAIN_NON_PROMOTING')
+          if evidence.get('production_registry_consumes_this_artifact') is not False:
+              raise SystemExit('NFL_PROP_REPLAY_REGISTRY_ISOLATION_FAILED')
+          if evidence.get('evaluation_count', 0) <= 0:
+              raise SystemExit('NFL_PROP_REPLAY_EMPTY')
+          PY
+      - name: Upload prop diagnostic artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nfl-prop-engine-diagnostic-${{ env.EVIDENCE_GIT_SHA }}
+          path: |
+            artifacts/football/nfl_prop_engine_validation.json
+            artifacts/football/nfl_prop_engine_source_manifest.json
+          if-no-files-found: error
+          retention-days: 30
