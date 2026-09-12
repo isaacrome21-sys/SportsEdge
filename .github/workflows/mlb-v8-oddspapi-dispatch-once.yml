@@ -1,0 +1,26 @@
+name: mlb-v8-oddspapi-dispatch-once
+
+on:
+  push:
+    paths:
+      - '.github/trigger-mlb-v8-oddspapi-dispatch'
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch MLB V8 OddsPapi replay
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run mlb-v8-oddspapi-replay-backfill.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main \
+            -f bookmakers='pinnacle,draftkings,fanduel' \
+            -f batch_size='120' \
+            -f max_batches='30'
