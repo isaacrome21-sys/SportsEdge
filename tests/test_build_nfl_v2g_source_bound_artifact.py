@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.build_nfl_v2g_source_bound_artifact import build
+from scripts.build_nfl_v2g_source_bound_artifact import _identity_scoped_pbp, build
 from sportsedge.sports.nfl.source_manifest import build_nfl_source_manifest
 
 
@@ -62,6 +62,7 @@ def test_source_bound_builder_produces_deterministic_non_promotional_artifact(tm
     assert first_report["artifact_sha256"] == second_report["artifact_sha256"]
     assert first_report["byte_determinism"] == "PASS"
     assert first_report["event_row_count"] == 2
+    assert first_report["ignored_unscoped_pbp_row_count"] == 0
     assert first_report["promotion_authority"] is False
     assert first_report["may_create_model_p"] is False
     assert first_artifact["promotion_authority"] is False
@@ -77,3 +78,33 @@ def test_source_bound_builder_rejects_tampered_pbp(tmp_path):
             schedule_file=schedule, pbp_dir=pbp_dir, source_manifest=manifest,
             start_season=2016, end_season=2016,
         )
+
+
+def test_unscoped_non_possession_rows_are_dropped_but_counted():
+    rows = [
+        {"game_id": "g", "posteam": "A", "drive": "", "touchdown": "0", "td_team": "", "play_type": "kickoff", "field_goal_result": ""},
+        {"game_id": "g", "posteam": "A", "drive": "1", "touchdown": "0", "td_team": "", "play_type": "run", "field_goal_result": ""},
+    ]
+    kept, dropped = _identity_scoped_pbp(rows)
+    assert dropped == 1
+    assert len(kept) == 1
+    assert kept[0]["drive"] == "1"
+
+
+def test_unscoped_made_field_goal_fails_closed():
+    rows = [{
+        "game_id": "g", "posteam": "A", "drive": "", "touchdown": "0", "td_team": "",
+        "play_type": "field_goal", "field_goal_result": "made",
+    }]
+    with pytest.raises(ValueError, match="NFL_V2G_SCORING_EVENT_IDENTITY_MISSING:g:FIELD_GOAL"):
+        _identity_scoped_pbp(rows)
+
+
+def test_unscoped_kick_return_touchdown_is_not_offensive_possession():
+    rows = [{
+        "game_id": "g", "posteam": "A", "drive": "", "touchdown": "1", "td_team": "A",
+        "play_type": "kickoff", "field_goal_result": "",
+    }]
+    kept, dropped = _identity_scoped_pbp(rows)
+    assert kept == []
+    assert dropped == 1
