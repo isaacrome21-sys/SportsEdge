@@ -19,10 +19,13 @@
     "max": 120
   },
   "close_window_minutes_before_start": {
-    "min": 2,
+    "min": 0,
     "max": 20
   },
-  "close_definition_id": "DK_SAME_THRESHOLD_T20_T2_POWER_V1",
+  "close_definition_id": "DK_SAME_THRESHOLD_T20_T0_POWER_V1",
+  "close_capture_boundary": "PRE_START_ONLY_THROUGH_SCHEDULED_KICKOFF",
+  "post_start_capture_allowed": false,
+  "backfill_allowed": false,
   "devig_method": "POWER_V1",
   "provider_request_shape": "SPORT_BULK_V1",
   "same_threshold_required_for_spreads_totals": true,
@@ -45,6 +48,7 @@
     "CFB cannot activate until a genuine frozen CFB game model/evidence unit and frozen lane threshold identity exist.",
     "NFL cannot activate under this policy until its durable model freeze and V2 evidence unit are bound.",
     "The legacy NFL forward collector remains historical/legacy until adapters are migrated explicitly.",
+    "Close capture is valid from T-20 through T-0 while the event is still pre-start. Any observation after the event has started is invalid and may not be backfilled.",
     "For spread and total evidence, the close must price the original decision threshold; a moved headline/main line is not a substitute."
   ]
 }
