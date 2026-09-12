@@ -1,12 +1,15 @@
+import io
 import json
 import os
 from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
+from urllib.error import HTTPError
 
 from scripts.collect_mlb_the_odds_api_history import (
     _canonical_request_ts,
+    _provider_error_code,
     _validate_payload,
     collect_one,
 )
@@ -23,11 +26,48 @@ class MLBTheOddsAPICollectorTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "PROVIDER_TIMESTAMP_AFTER_REQUEST"):
             _validate_payload(bad, "2026-06-05T22:35:00Z")
 
+    def test_provider_error_code_is_extracted_without_body_retention(self):
+        self.assertEqual(
+            _provider_error_code(b'{"error_code":"OUT_OF_USAGE_CREDITS","message":"do not persist me"}'),
+            "OUT_OF_USAGE_CREDITS",
+        )
+        self.assertIsNone(_provider_error_code(b"not-json"))
+
     def test_missing_secret_blocks_without_writing(self):
         with tempfile.TemporaryDirectory() as td, patch.dict(os.environ, {}, clear=True):
             out = collect_one(requested_at="2026-06-05T22:35:00Z", root=Path(td))
             self.assertEqual(out["status"], "BLOCKED_NO_THE_ODDS_API_KEY")
             self.assertFalse(any(Path(td).rglob("*")))
+
+    def test_all_out_of_credit_keys_are_classified_separately_from_auth(self):
+        def exhausted(*args, **kwargs):
+            body = io.BytesIO(b'{"error_code":"OUT_OF_USAGE_CREDITS","message":"quota exhausted"}')
+            raise HTTPError("https://example.invalid", 401, "Unauthorized", {}, body)
+
+        env = {
+            "SPORTSEDGE_ODDS_API_KEY": "secret-1",
+            "SPORTSEDGE_ODDS_API_KEY_2": "secret-2",
+        }
+        with tempfile.TemporaryDirectory() as td, patch.dict(os.environ, env, clear=True):
+            with patch("scripts.collect_mlb_the_odds_api_history._request", side_effect=exhausted):
+                out = collect_one(requested_at="2026-06-05T22:35:00Z", root=Path(td))
+        self.assertEqual(out["status"], "BLOCKED_PROVIDER_CREDITS")
+        self.assertEqual(out["provider_codes"], ["OUT_OF_USAGE_CREDITS"])
+        self.assertEqual([a["provider_code"] for a in out["attempts"]], ["OUT_OF_USAGE_CREDITS"] * 2)
+        self.assertFalse(any(Path(td).rglob("snapshot.json")))
+
+    def test_unknown_401_remains_auth_blocker(self):
+        def unauthorized(*args, **kwargs):
+            body = io.BytesIO(b'{"error_code":"INVALID_KEY"}')
+            raise HTTPError("https://example.invalid", 401, "Unauthorized", {}, body)
+
+        with tempfile.TemporaryDirectory() as td, patch.dict(
+            os.environ, {"SPORTSEDGE_ODDS_API_KEY": "secret"}, clear=True
+        ):
+            with patch("scripts.collect_mlb_the_odds_api_history._request", side_effect=unauthorized):
+                out = collect_one(requested_at="2026-06-05T22:35:00Z", root=Path(td))
+        self.assertEqual(out["status"], "BLOCKED_PROVIDER_AUTH")
+        self.assertEqual(out["provider_codes"], ["INVALID_KEY"])
 
     def test_exact_raw_bytes_and_metadata_are_archived(self):
         raw = json.dumps({
