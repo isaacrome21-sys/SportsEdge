@@ -42,6 +42,8 @@ PBP_FIELDS = {
 SCHEDULE_FIELDS = {"game_id", "season", "week", "game_type", "home_team", "away_team"}
 CANDIDATE_PATH = ROOT / "sportsedge/sports/nfl/m2_v2g_candidate.py"
 FREEZE_PATH = ROOT / "config/research/nfl_v2g_implementation_freeze_2026-09-12.json"
+TEAM_ALIAS_POLICY = "NFLVERSE_PBP_CURRENT_FRANCHISE_CODE_V1"
+SCHEDULE_TO_PBP_TEAM_ALIAS = {"OAK": "LV", "SD": "LAC"}
 
 
 def _sha256_file(path: Path) -> str:
@@ -73,6 +75,99 @@ def _read_projected(path: Path, fields: set[str]) -> list[dict[str, str]]:
         if missing:
             raise ValueError(f"NFL_V2G_SOURCE_FIELDS_MISSING:{path}:{','.join(missing)}")
         return [{name: row.get(name, "") for name in fields} for row in reader]
+
+
+def _identity_scoped_pbp(rows: Iterable[dict[str, str]]) -> tuple[list[dict[str, str]], int]:
+    """Keep only rows that can belong to an offensive possession."""
+    kept: list[dict[str, str]] = []
+    dropped = 0
+    for raw in rows:
+        row = dict(raw)
+        posteam = str(row.get("posteam") or "").strip()
+        drive = str(row.get("drive") or "").strip()
+        if posteam and drive:
+            kept.append(row)
+            continue
+
+        play_type = str(row.get("play_type") or "").strip().lower()
+        fg_made = play_type == "field_goal" and str(row.get("field_goal_result") or "").strip().lower() == "made"
+        try:
+            touchdown = float(row.get("touchdown") or 0.0) == 1.0
+        except (TypeError, ValueError):
+            touchdown = False
+        if fg_made:
+            raise ValueError(f"NFL_V2G_SCORING_EVENT_IDENTITY_MISSING:{row.get('game_id')}:FIELD_GOAL")
+        if touchdown and play_type not in {"kickoff", "punt"}:
+            raise ValueError(f"NFL_V2G_SCORING_EVENT_IDENTITY_MISSING:{row.get('game_id')}:TOUCHDOWN:{play_type}")
+        dropped += 1
+    return kept, dropped
+
+
+def _normalize_schedule_team_aliases(
+    schedule_rows: Iterable[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
+    """Normalize only source-proven historical franchise codes used by nflverse PBP.
+
+    The mapping is deliberately explicit and minimal. It was observed directly in
+    the hash-bound hosted 2016-2025 corpus: schedule OAK corresponds to PBP LV and
+    schedule SD corresponds to PBP LAC. No fuzzy or inferred mapping is allowed.
+    """
+    normalized: list[dict[str, Any]] = []
+    applications: list[dict[str, str]] = []
+    for raw in schedule_rows:
+        row = dict(raw)
+        game_id = str(row.get("game_id") or "").strip()
+        for field in ("home_team", "away_team"):
+            original = str(row.get(field) or "").strip()
+            mapped = SCHEDULE_TO_PBP_TEAM_ALIAS.get(original, original)
+            row[field] = mapped
+            if mapped != original:
+                applications.append({
+                    "game_id": game_id,
+                    "field": field,
+                    "from": original,
+                    "to": mapped,
+                })
+        normalized.append(row)
+    applications.sort(key=lambda item: (item["game_id"], item["field"], item["from"], item["to"]))
+    return normalized, applications
+
+
+def _team_identity_mismatches(
+    schedule_rows: Iterable[dict[str, Any]],
+    pbp_rows: Iterable[dict[str, str]],
+) -> list[dict[str, Any]]:
+    expected: dict[str, tuple[str, str]] = {}
+    for raw in schedule_rows:
+        game_id = str(raw.get("game_id") or "").strip()
+        if not game_id or str(raw.get("game_type") or "REG").upper() != "REG":
+            continue
+        expected[game_id] = (
+            str(raw.get("home_team") or "").strip(),
+            str(raw.get("away_team") or "").strip(),
+        )
+    observed: dict[str, set[str]] = {}
+    for raw in pbp_rows:
+        game_id = str(raw.get("game_id") or "").strip()
+        posteam = str(raw.get("posteam") or "").strip()
+        if game_id in expected and posteam:
+            observed.setdefault(game_id, set()).add(posteam)
+
+    mismatches: list[dict[str, Any]] = []
+    for game_id, teams in sorted(expected.items()):
+        expected_set = {team for team in teams if team}
+        observed_set = observed.get(game_id, set())
+        if not observed_set:
+            continue
+        if not expected_set.issubset(observed_set):
+            mismatches.append({
+                "game_id": game_id,
+                "expected_teams": sorted(expected_set),
+                "observed_possession_teams": sorted(observed_set),
+                "missing_expected_teams": sorted(expected_set - observed_set),
+                "unexpected_observed_teams": sorted(observed_set - expected_set),
+            })
+    return mismatches
 
 
 def _load_manifest(path: Path) -> tuple[dict[str, Any], dict[str, str], str]:
@@ -153,15 +248,26 @@ def build(
         if not (start_season <= season <= end_season):
             continue
         schedule_rows.append({field: raw.get(field) for field in SCHEDULE_FIELDS})
+    schedule_rows, alias_applications = _normalize_schedule_team_aliases(schedule_rows)
 
     pbp_rows: list[dict[str, str]] = []
+    ignored_unscoped_rows = 0
     source_files: dict[str, str] = {"schedule": _sha256_file(schedule_file)}
     for season in range(start_season, end_season + 1):
         path = _pbp_path(pbp_dir, season)
         label = f"pbp_{season}"
         _verify_source(path, expected.get(label), label)
         source_files[label] = _sha256_file(path)
-        pbp_rows.extend(_read_projected(path, PBP_FIELDS))
+        scoped, dropped = _identity_scoped_pbp(_read_projected(path, PBP_FIELDS))
+        pbp_rows.extend(scoped)
+        ignored_unscoped_rows += dropped
+
+    identity_mismatches = _team_identity_mismatches(schedule_rows, pbp_rows)
+    if identity_mismatches:
+        raise ValueError(
+            "NFL_V2G_TEAM_IDENTITY_MISMATCHES:" +
+            json.dumps(identity_mismatches, sort_keys=True, separators=(",", ":"))
+        )
 
     event_rows = build_nfl_v2g_game_event_rows(schedule_rows, pbp_rows)
     event_rows = [row for row in event_rows if start_season <= int(row["season"]) <= end_season]
@@ -195,6 +301,11 @@ def build(
         "candidate_id": NFL_M2_V2G_CANDIDATE_MODEL_ID,
         "season_range": [start_season, end_season],
         "event_row_count": len(event_rows),
+        "ignored_unscoped_pbp_row_count": ignored_unscoped_rows,
+        "team_alias_policy": TEAM_ALIAS_POLICY,
+        "team_alias_map": dict(sorted(SCHEDULE_TO_PBP_TEAM_ALIAS.items())),
+        "team_alias_application_count": len(alias_applications),
+        "team_alias_applications": alias_applications,
         "training_event_rows_sha256": training_sha,
         "source_manifest_sha256": source_manifest_sha,
         "source_files_sha256": source_files,
