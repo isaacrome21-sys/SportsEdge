@@ -23,7 +23,9 @@
     "markets": ["spread", "total"],
     "decision_gate_result": "SHADOW_QUALIFIED",
     "minimum_decision_edge": 0.03,
+    "market_binding_contract": "SPORTSEDGE_NFL_V2G_MARKET_EVIDENCE_BINDING_V1",
     "market_binding_status": "READY_FOR_PROSPECTIVE_EVALUATION",
+    "clv_contract": "SPORTSEDGE_NFL_V2G_FORWARD_CLV_V1",
     "clv_status": "CLV_ELIGIBLE",
     "clv_metric": "CLOSING_NOVIG_MINUS_DECISION_NOVIG",
     "same_original_threshold_required": true
