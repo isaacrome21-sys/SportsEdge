@@ -290,7 +290,7 @@ def _convert(index: int, result: UnifiedCardResult) -> AutoCardResult:
     )
 
 
-def run_auto_mlb(*, quote_url: str, feature_url: str, projected_lineups_url: str | None = None, provider_token: str | None = None, now: datetime | None = None, opener: Callable = urlopen, registry_path: str = "config/deployments.json", require_confirmed_lineup: bool = False, edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG, kelly_multiplier: float = 0.25, market_surface_path: str = DEFAULT_MARKET_SURFACE_PATH) -> AutoRunReport:
+def run_auto_mlb(*, quote_url: str, feature_url: str, projected_lineups_url: str | None = None, provider_token: str | None = None, now: datetime | None = None, opener: Callable = urlopen, registry_path: str = "config/deployments.json", require_confirmed_lineup: bool = True, edge_floor_config_path: str = DEFAULT_EDGE_FLOOR_CONFIG, kelly_multiplier: float = 0.25, market_surface_path: str = DEFAULT_MARKET_SURFACE_PATH) -> AutoRunReport:
     current = _aware_utc(now or datetime.now(timezone.utc))
     slate_date_ct = current.astimezone(CHICAGO_TZ).date().isoformat()
     surface_version, market_specs = load_market_surface(market_surface_path)
