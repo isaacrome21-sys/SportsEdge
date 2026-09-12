@@ -1,0 +1,116 @@
+name: cfb-forward-market-capture
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 15-minute cadence during the primary Thu-Sun CFB game windows. The free
+    # ESPN planner runs first; The Odds API is called only when a frozen
+    # decision or close window is due. Manual dispatch covers off-calendar games.
+    - cron: '7,22,37,52 21-23 * * 4,5'
+    - cron: '7,22,37,52 15-23 * * 6'
+    - cron: '7,22,37,52 0-5 * * 0'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sportsedge-paid-odds-api
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+      SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
+      SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
+      SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
+      CAPTURE_GIT_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Verify forward market capture contracts
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            sportsedge/sports/cfb/forward_market_capture.py \
+            sportsedge/sports/cfb/odds_source.py \
+            scripts/capture_cfb_forward_market.py
+          python -m unittest -q tests.test_cfb_forward_market_capture
+
+      - name: Freeze free FBS scoreboard planning inputs
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/cfb_forward_market/scoreboard
+          today="$(date -u +%Y%m%d)"
+          tomorrow="$(date -u -d '+1 day' +%Y%m%d)"
+          for day in "$today" "$tomorrow"; do
+            curl --fail --location --retry 3 \
+              "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=${day}&limit=1000&groups=80" \
+              -o "artifacts/cfb_forward_market/scoreboard/${day}.json"
+          done
+
+      - name: Capture paid DraftKings snapshot only when due
+        id: capture
+        run: |
+          set -euo pipefail
+          now="$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
+          mkdir -p artifacts/cfb_forward_market/current
+          args=()
+          while IFS= read -r file; do args+=(--scoreboard "$file"); done < <(find artifacts/cfb_forward_market/scoreboard -type f -name '*.json' | sort)
+          python scripts/capture_cfb_forward_market.py \
+            "${args[@]}" --now "$now" \
+            --out-dir artifacts/cfb_forward_market/current
+          status="$(jq -r '.status' artifacts/cfb_forward_market/current/status.json)"
+          if [[ "$status" == 'CFB_FORWARD_MARKET_SNAPSHOT_CAPTURED' ]]; then
+            echo 'captured=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'captured=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Persist immutable provider snapshot on data branch
+        if: steps.capture.outputs.captured == 'true'
+        run: |
+          set -euo pipefail
+          captured_at="$(jq -r '.captured_at_utc' artifacts/cfb_forward_market/current/snapshot.meta.json)"
+          payload_sha="$(jq -r '.payload_sha256' artifacts/cfb_forward_market/current/snapshot.meta.json)"
+          year="${captured_at:0:4}"
+          capture_id="$(printf '%s' "$captured_at" | tr -cd '0-9TZ' | tr -d 'Z')-${payload_sha:0:12}"
+          git fetch --no-tags origin data:data
+          worktree_dir="$(mktemp -d)"
+          trap 'git worktree remove --force "$worktree_dir" >/dev/null 2>&1 || true; rm -rf "$worktree_dir"' EXIT
+          git worktree add "$worktree_dir" data
+          dest="$worktree_dir/evidence/cfb/forward-market/${year}/${capture_id}"
+          test ! -e "$dest" || { echo "CFB_FORWARD_MARKET_CAPTURE_COLLISION:${capture_id}" >&2; exit 1; }
+          mkdir -p "$dest"
+          cp artifacts/cfb_forward_market/current/snapshot.json "$dest/snapshot.json"
+          cp artifacts/cfb_forward_market/current/snapshot.meta.json "$dest/snapshot.meta.json"
+          cp artifacts/cfb_forward_market/current/plan.json "$dest/plan.json"
+          cd "$worktree_dir"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "evidence/cfb/forward-market/${year}/${capture_id}"
+          git commit -m "data(cfb): forward market snapshot ${capture_id}"
+          for attempt in 1 2 3 4 5; do
+            if git push origin HEAD:data; then exit 0; fi
+            git fetch origin data
+            git rebase origin/data
+            sleep $((attempt * 2))
+          done
+          exit 98
+
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cfb-forward-market-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/cfb_forward_market/**
+          if-no-files-found: warn
+          retention-days: 30
