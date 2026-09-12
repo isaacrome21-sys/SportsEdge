@@ -1,0 +1,31 @@
+{
+  "schema": "NFL_V2F_RELEASE_FREEZE_V1",
+  "status": "FROZEN_BEFORE_FIRST_PROSPECTIVE_OBSERVATION",
+  "candidate_id": "nfl_m2_native_score_mean_crossfit_support_v2f_candidate",
+  "distribution_contract": "NFL_M2_V2F_NATIVE_SCORE_CROSSFIT_EMPIRICAL_SUPPORT_V1",
+  "policy_file": "config/research/nfl_v2f_forward_validation_policy_2026-09-12.json",
+  "original_preregistration_commit_sha": "5385eaa7d7f78d6fcf945df913ce8deb74c8e4a7",
+  "implementation_lineage_preregistration_commit_sha": "c5ee8da9a9d1e8a294c0a3f8dad5fb2e7c966402",
+  "candidate_implementation_commit_sha": "3b6cdb1461aeda46a822eb820b39bb5155e30201",
+  "candidate_source_path": "sportsedge/sports/nfl/m2_v2f_candidate.py",
+  "candidate_source_git_blob_sha1": "52919be92dbea82a12f7d03c8214265c63aa1f55",
+  "frozen_parameters": {
+    "ridge_alpha": 10.0,
+    "home_kernel_scale": 1.0,
+    "away_kernel_scale": 1.0,
+    "hyperparameter_search_allowed": false
+  },
+  "chronology": {
+    "preregistration_timestamp_utc": "2026-09-12T03:14:30Z",
+    "first_prospective_observation_exists_at_freeze": false,
+    "historical_2016_2025_role": "DEVELOPMENT_AND_DIAGNOSTIC_ONLY",
+    "2019_pristine_holdout_allowed": false
+  },
+  "authority": {
+    "promotion_authority": false,
+    "may_change_market_eligibility": false,
+    "may_create_model_p": false,
+    "official_bet_authorized": false
+  },
+  "usage_rule": "Prospective capture must bind candidate_id, both preregistration lineage facts, candidate implementation commit, candidate source blob, and the forward validation policy. Any mismatch blocks the observation. This manifest clarifies provenance only and does not rewrite the frozen event clock or model specification."
+}
