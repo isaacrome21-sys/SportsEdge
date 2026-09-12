@@ -22,10 +22,10 @@ def game():
         game_pk=777,
         away_team_id=1,
         home_team_id=2,
-        away_probable_pitcher_id=None,
-        home_probable_pitcher_id=None,
-        away_lineup=TeamLineup(1, "away", (), (), False),
-        home_lineup=TeamLineup(2, "home", (), (), False),
+        away_probable_pitcher_id=11,
+        home_probable_pitcher_id=22,
+        away_lineup=TeamLineup(1, "away", tuple(range(101, 110)), tuple(range(1, 10)), True),
+        home_lineup=TeamLineup(2, "home", tuple(range(201, 210)), tuple(range(1, 10)), True),
         status="Preview",
     )
 
