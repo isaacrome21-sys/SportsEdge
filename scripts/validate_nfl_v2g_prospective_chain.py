@@ -49,6 +49,15 @@ def validate(prediction: Path, paper_path: Path, policy_path: Path, opener: Path
     if policy.get("schema_version") != POLICY_SCHEMA:
         die("NFL_V2G_CHAIN_POLICY_SCHEMA_INVALID")
     validate_prospective_prediction(pred)
+    if pred.get("candidate_id") != policy.get("candidate_id"):
+        die("NFL_V2G_CHAIN_POLICY_CANDIDATE_MISMATCH")
+    if pred.get("artifact_sha256") != policy.get("frozen_research_artifact_sha256"):
+        die("NFL_V2G_CHAIN_POLICY_ARTIFACT_MISMATCH")
+    for field in ("implementation_commit_sha", "candidate_source_git_blob_sha1", "preregistration_commit_sha"):
+        expected = str(policy.get(field) or "").lower()
+        if not expected or str(pred.get(field) or "").lower() != expected:
+            die(f"NFL_V2G_CHAIN_POLICY_PROVENANCE_MISMATCH:{field}")
+
     if paper.get("schema_version") != PAPER_SCHEMA:
         die("NFL_V2G_CHAIN_PAPER_SCHEMA_INVALID")
     if paper.get("game_id") != pred.get("game_id") or paper.get("candidate_id") != pred.get("candidate_id"):
