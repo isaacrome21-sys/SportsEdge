@@ -4,6 +4,9 @@ name: closing-line-archive
 # and MLB. Every row is labelled NOT_EVIDENCE. This lane holds no promotion
 # authority and no evidence-clock authority. It exists solely to accumulate the
 # closing-line dataset that no free source currently provides.
+#
+# The universal t0_prestart lane is scheduled-start-adjacent only: 0 < lead <= 5
+# minutes. The capture code rejects lead <= 0, so post-start prices are unreachable.
 
 on:
   workflow_dispatch:
@@ -14,10 +17,10 @@ on:
         options: [dry-run, capture]
         default: dry-run
   schedule:
-    # Offset from the NFL forward collector (7,17,...) and the 2026 line
-    # capture (3,13,...) so the three lanes do not queue behind each other on
-    # the shared paid-odds concurrency group.
-    - cron: '1,11,21,31,41,51 * * * *'
+    # Five-minute cadence gives the all-sports t0_prestart window a real chance
+    # to fire while the free event index still prevents paid calls when nothing
+    # is due. Offset from the NFL confirmation collector's :03/:13/... cadence.
+    - cron: '1,6,11,16,21,26,31,36,41,46,51,56 * * * *'
 
 permissions:
   contents: write
