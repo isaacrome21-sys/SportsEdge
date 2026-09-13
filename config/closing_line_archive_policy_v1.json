@@ -4,11 +4,12 @@
   "evidence_class": "NOT_EVIDENCE",
   "promotion_authority": false,
   "evidence_clock_authority": false,
-  "doctrine": "Model-free two-sided price archival for NFL, CFB and MLB. This lane observes prices only. It contains no Model_P, no evidence_unit_id, and no decision. It can never be promoted, can never start or extend a promotion evidence clock, and can never be substituted for FOOTBALL_FORWARD_CAPTURE_V2 or MLB replay evidence. Its sole purpose is to accumulate a closing-line dataset that does not currently exist in any free source. The t0_prestart window is a final scheduled-start-adjacent observation only and is valid solely while commence_time is still strictly in the future.",
+  "doctrine": "Model-free two-sided price archival for NFL, CFB, MLB and UFC/MMA. This lane observes prices only. It contains no Model_P, no evidence_unit_id, and no decision. It can never be promoted, can never start or extend a promotion evidence clock, and can never be substituted for FOOTBALL_FORWARD_CAPTURE_V2, MLB replay evidence, or UFC promotion evidence. Its sole purpose is to accumulate a closing-line dataset that does not currently exist in any free source. The t0_prestart window is a final scheduled-start-adjacent observation only and is valid solely while commence_time is still strictly in the future.",
   "sports": {
     "NFL": "americanfootball_nfl",
     "CFB": "americanfootball_ncaaf",
-    "MLB": "baseball_mlb"
+    "MLB": "baseball_mlb",
+    "UFC": "mma_mixed_martial_arts"
   },
   "books": ["draftkings", "pinnacle"],
   "markets": ["h2h", "spreads", "totals"],
