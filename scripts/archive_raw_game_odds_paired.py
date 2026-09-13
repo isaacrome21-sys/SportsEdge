@@ -2,11 +2,16 @@
 """Safe paired-window wrapper for the append-only MLB game-odds archive.
 
 This wrapper intentionally reuses the standalone stdlib archive implementation while
-narrowing paid observations to the two pregame windows that can feed a future paired
+narrowing paid observations to three pregame windows that can feed a future paired
 closing-price evidence path:
 
-- decision candidate: T-90m +/- 8m (inside frozen T-120m..T-45m decision window)
+- early decision candidate: T-90m +/- 8m (inside frozen T-120m..T-45m decision window)
+- late decision candidate: T-55m +/- 8m (inside frozen T-120m..T-45m decision window)
 - close candidate: T-10m +/- 8m (inside frozen T-20m..T-2m pregame close window)
+
+The late decision window exists so a lineup/starter-bound production Model_P can be
+paired to a contemporaneous decision quote when confirmed lineups are unavailable at
+T-90. It does not relax the frozen decision window or permit the close to create Model_P.
 
 Raw captures remain observations only. This module creates no Model_P, promotion
 authority, market eligibility, Truth Gate PASS, edge floor, or historical backfill.
@@ -27,14 +32,15 @@ import sys
 from typing import Any
 
 LEGACY_PATH = Path(__file__).with_name("archive_raw_game_odds.py")
-DECISION_TARGET_MIN = 90
+EARLY_DECISION_TARGET_MIN = 90
+LATE_DECISION_TARGET_MIN = 55
 CLOSE_TARGET_MIN = 10
 WINDOW_SEC = 8 * 60
-TARGETS_MIN = (DECISION_TARGET_MIN, CLOSE_TARGET_MIN)
+TARGETS_MIN = (EARLY_DECISION_TARGET_MIN, LATE_DECISION_TARGET_MIN, CLOSE_TARGET_MIN)
 
 
 def _capture_role(window: Any) -> str:
-    if window == "T-90m":
+    if window in {"T-90m", "T-55m"}:
         return "DECISION_CANDIDATE"
     if window == "T-10m":
         return "CLOSE_CANDIDATE"
@@ -173,14 +179,25 @@ def _self_test() -> int:
     legacy = _load_legacy()
     now = datetime(2026, 9, 12, 17, 0, tzinfo=timezone.utc)
 
-    # Decision observations are confined to T-98m..T-82m, wholly inside T-120m..T-45m.
-    decision_games = [
+    # Early decision observations are confined to T-98m..T-82m.
+    early_decision_games = [
         {"gamePk": 1, "gameDate": (now + timedelta(minutes=90)).isoformat()},
         {"gamePk": 2, "gameDate": (now + timedelta(minutes=98)).isoformat()},
         {"gamePk": 3, "gameDate": (now + timedelta(minutes=81, seconds=59)).isoformat()},
     ]
-    target, eligible = legacy._eligible_games(now, decision_games)
+    target, eligible = legacy._eligible_games(now, early_decision_games)
     assert target == "T-90m", (target, eligible)
+    assert len(eligible) == 2, eligible
+
+    # Late decision observations are confined to T-63m..T-47m and therefore
+    # remain wholly inside the frozen T-120m..T-45m decision window.
+    late_decision_games = [
+        {"gamePk": 8, "gameDate": (now + timedelta(minutes=55)).isoformat()},
+        {"gamePk": 9, "gameDate": (now + timedelta(minutes=63)).isoformat()},
+        {"gamePk": 10, "gameDate": (now + timedelta(minutes=46, seconds=59)).isoformat()},
+    ]
+    target, eligible = legacy._eligible_games(now, late_decision_games)
+    assert target == "T-55m", (target, eligible)
     assert len(eligible) == 2, eligible
 
     # Close observations are confined to T-18m..T-2m. T-1:59 and any post-start
@@ -196,7 +213,7 @@ def _self_test() -> int:
     assert len(eligible) == 2, eligible
 
     # Plan construction is deterministic and carries no paid/evidence authority.
-    plan = _build_plan(legacy, now=now, slate="2026-09-12", games=decision_games)
+    plan = _build_plan(legacy, now=now, slate="2026-09-12", games=early_decision_games)
     assert plan["status"] == "CAPTURE_DUE"
     assert plan["capture_role"] == "DECISION_CANDIDATE"
     assert plan["games_eligible"] == 2
@@ -205,18 +222,24 @@ def _self_test() -> int:
     assert plan["promotion_authority"] is False
     assert plan["model_p"] is None
 
-    decision_lo = DECISION_TARGET_MIN - WINDOW_SEC / 60
-    decision_hi = DECISION_TARGET_MIN + WINDOW_SEC / 60
+    early_decision_lo = EARLY_DECISION_TARGET_MIN - WINDOW_SEC / 60
+    early_decision_hi = EARLY_DECISION_TARGET_MIN + WINDOW_SEC / 60
+    late_decision_lo = LATE_DECISION_TARGET_MIN - WINDOW_SEC / 60
+    late_decision_hi = LATE_DECISION_TARGET_MIN + WINDOW_SEC / 60
     close_lo = CLOSE_TARGET_MIN - WINDOW_SEC / 60
     close_hi = CLOSE_TARGET_MIN + WINDOW_SEC / 60
-    assert 45 <= decision_lo <= decision_hi <= 120
+    assert 45 <= early_decision_lo <= early_decision_hi <= 120
+    assert 45 <= late_decision_lo <= late_decision_hi <= 120
+    assert late_decision_lo > close_hi
     assert 2 <= close_lo <= close_hi <= 20
     assert _capture_role("T-90m") == "DECISION_CANDIDATE"
+    assert _capture_role("T-55m") == "DECISION_CANDIDATE"
     assert _capture_role("T-10m") == "CLOSE_CANDIDATE"
 
     print(json.dumps({
         "status": "SELF_TEST_OK",
-        "decision_window_minutes_before_start": [decision_lo, decision_hi],
+        "early_decision_window_minutes_before_start": [early_decision_lo, early_decision_hi],
+        "late_decision_window_minutes_before_start": [late_decision_lo, late_decision_hi],
         "close_window_minutes_before_start": [close_lo, close_hi],
         "post_start_capture_reachable": False,
         "raw_sha256_bound_on_capture": True,
