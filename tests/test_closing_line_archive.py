@@ -46,6 +46,15 @@ class PolicyTests(unittest.TestCase):
         self.assertFalse(POLICY["promotion_authority"])
         self.assertFalse(POLICY["evidence_clock_authority"])
 
+    def test_t0_prestart_is_all_sports_and_non_promoting(self):
+        self.assertEqual(set(POLICY["sports"]), {"NFL", "CFB", "MLB"})
+        self.assertEqual(POLICY["windows"]["t0_prestart"], {
+            "min_minutes_before_start": 0,
+            "max_minutes_before_start": 5,
+        })
+        self.assertTrue(POLICY["integrity"]["must_be_before_start"])
+        self.assertFalse(POLICY["promotion_authority"])
+
     def test_policy_id_mismatch_fails_closed(self):
         with tempfile.TemporaryDirectory() as tmp:
             bad = Path(tmp) / "bad.json"
@@ -55,21 +64,35 @@ class PolicyTests(unittest.TestCase):
 
 
 class WindowTests(unittest.TestCase):
-    def test_close_and_decision_windows_resolve(self):
+    def test_t0_close_and_decision_windows_resolve(self):
+        self.assertEqual(window_for(NOW + timedelta(minutes=1), NOW, POLICY), "t0_prestart")
+        self.assertEqual(window_for(NOW + timedelta(minutes=5), NOW, POLICY), "t0_prestart")
         self.assertEqual(window_for(NOW + timedelta(minutes=10), NOW, POLICY), "close")
         self.assertEqual(window_for(NOW + timedelta(minutes=60), NOW, POLICY), "decision")
+
+    def test_t0_never_admits_at_or_after_start(self):
+        self.assertIsNone(window_for(NOW, NOW, POLICY))
+        self.assertIsNone(window_for(NOW - timedelta(microseconds=1), NOW, POLICY))
+        self.assertIsNone(window_for(NOW - timedelta(minutes=1), NOW, POLICY))
 
     def test_outside_windows_is_not_due(self):
         self.assertIsNone(window_for(NOW + timedelta(minutes=300), NOW, POLICY))
         self.assertIsNone(window_for(NOW + timedelta(minutes=30), NOW, POLICY))
 
-    def test_started_game_is_never_due(self):
-        self.assertIsNone(window_for(NOW - timedelta(minutes=1), NOW, POLICY))
-
     def test_due_events_selects_only_in_window(self):
-        events = [_event("a", 10), _event("b", 300), _event("c", 60), _event("d", -5)]
+        events = [
+            _event("t0", 1),
+            _event("close", 10),
+            _event("far", 300),
+            _event("decision", 60),
+            _event("started", -5),
+        ]
         due = due_events(events, NOW, POLICY)
-        self.assertEqual(due, {"a": "close", "c": "decision"})
+        self.assertEqual(due, {
+            "t0": "t0_prestart",
+            "close": "close",
+            "decision": "decision",
+        })
 
 
 class RowTests(unittest.TestCase):
@@ -84,6 +107,25 @@ class RowTests(unittest.TestCase):
             self.assertEqual(row["window"], "close")
             self.assertNotIn("model_p", row)
             self.assertNotIn("evidence_unit_id", row)
+
+    def test_t0_row_is_not_evidence_and_remains_prestart(self):
+        rows, skipped = build_rows(
+            "americanfootball_nfl", [_odds_event("a", 1)], {"a": "t0_prestart"}, NOW, POLICY
+        )
+        self.assertEqual(skipped, [])
+        self.assertEqual(len(rows), 2)
+        for row in rows:
+            self.assertEqual(row["window"], "t0_prestart")
+            self.assertEqual(row["evidence_class"], "NOT_EVIDENCE")
+            self.assertNotIn("model_p", row)
+            self.assertNotIn("evidence_unit_id", row)
+
+    def test_started_t0_candidate_is_skipped(self):
+        rows, skipped = build_rows(
+            "americanfootball_nfl", [_odds_event("a", -1)], {"a": "t0_prestart"}, NOW, POLICY
+        )
+        self.assertEqual(rows, [])
+        self.assertEqual(skipped[0]["reason"], "EVENT_ALREADY_STARTED")
 
     def test_one_sided_market_is_skipped_not_imputed(self):
         rows, skipped = build_rows(
@@ -167,6 +209,20 @@ class RunTests(unittest.TestCase):
             )
             after = files[0].read_text()
             self.assertTrue(after.startswith(before), "existing captured prices must never be rewritten")
+
+    def test_t0_due_event_works_for_all_three_sports(self):
+        calls: list[str] = []
+        with tempfile.TemporaryDirectory() as tmp:
+            report = run(
+                now=NOW,
+                policy=POLICY,
+                out_dir=Path(tmp),
+                keys=["k"],
+                opener=self._opener([_event("a", 1)], [_odds_event("a", 1)], calls),
+            )
+        self.assertEqual(report["total_rows_written"], 6)
+        self.assertEqual(set(report["sports"]), {"NFL", "CFB", "MLB"})
+        self.assertTrue(all("t0_prestart" in entry["windows"] for entry in report["sports"].values()))
 
     def test_dry_run_never_calls_paid_endpoint(self):
         calls: list[str] = []
