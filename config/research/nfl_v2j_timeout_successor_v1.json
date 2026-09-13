@@ -1,7 +1,7 @@
 {
   "policy_id": "NFL_V2J_TIMEOUT_SUCCESSOR_V1",
-  "status": "FROZEN_PRE_ACTIVATION",
-  "execution_enabled": false,
+  "status": "FROZEN_ACTIVE_ONE_SHOT",
+  "execution_enabled": true,
   "predecessor": {
     "workflow_run_id": 34754505720,
     "head_sha": "6f16e003b94502845ce38991897f2cca83fe6375",
