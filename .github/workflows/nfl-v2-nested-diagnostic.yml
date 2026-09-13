@@ -1,0 +1,159 @@
+name: nfl-v2-nested-diagnostic
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'sportsedge/sports/nfl/**'
+      - 'scripts/*nfl*.py'
+      - '.github/workflows/nfl-v2-nested-diagnostic.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'sportsedge/sports/nfl/**'
+      - 'scripts/*nfl*.py'
+      - '.github/workflows/nfl-v2-nested-diagnostic.yml'
+
+jobs:
+  nested-v2a-diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      EVIDENCE_GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EVIDENCE_GIT_SHA }}
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Install runtime dependencies
+        run: python -m pip install --disable-pip-version-check numpy==2.5.3
+
+      - name: Compile nested diagnostic surface
+        run: |
+          python -m py_compile \
+            sportsedge/sports/nfl/m2_v2_nested_validation.py \
+            sportsedge/sports/nfl/m2_v2_candidate.py \
+            sportsedge/sports/nfl/m2_v2_validation.py \
+            scripts/run_nfl_production_validation.py \
+            scripts/run_nfl_v2_candidate_validation.py \
+            scripts/audit_nfl_real_history.py \
+            scripts/validate_nfl_v2_candidate.py
+
+      - name: Run NFL contract tests
+        run: python -m unittest discover -s tests -p 'test_nfl*.py' -v
+
+      - name: Freeze exact public NFL inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/football/sources/{pbp,participation,depth}
+          fetch_source() {
+            curl --fail --location --silent --show-error \
+              --retry 5 --retry-delay 2 --retry-all-errors \
+              --connect-timeout 30 "$1" -o "$2"
+          }
+          fetch_source \
+            'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv' \
+            artifacts/football/sources/games.csv
+          fetch_source \
+            'https://raw.githubusercontent.com/greerreNFL/Stadiums/efa9543af50b01424754219fa0e4f3c7044ff198/data/team_stadiums.csv' \
+            artifacts/football/sources/team_stadiums.csv
+          for season in $(seq 2016 2025); do
+            fetch_source \
+              "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_${season}.csv.gz" \
+              "artifacts/football/sources/pbp/play_by_play_${season}.csv.gz"
+            fetch_source \
+              "https://github.com/nflverse/nflverse-data/releases/download/pbp_participation/pbp_participation_${season}.csv" \
+              "artifacts/football/sources/participation/pbp_participation_${season}.csv"
+            fetch_source \
+              "https://github.com/nflverse/nflverse-data/releases/download/depth_charts/depth_charts_${season}.csv" \
+              "artifacts/football/sources/depth/depth_charts_${season}.csv"
+          done
+
+      - name: Build exact-head production source manifest
+        env:
+          TZ: UTC
+        run: >-
+          python scripts/run_nfl_production_validation.py
+          --schedule-file artifacts/football/sources/games.csv
+          --pbp-dir artifacts/football/sources/pbp
+          --participation-dir artifacts/football/sources/participation
+          --depth-dir artifacts/football/sources/depth
+          --stadium-file artifacts/football/sources/team_stadiums.csv
+          --git-sha "$EVIDENCE_GIT_SHA"
+          --start-season 2016 --end-season 2025
+          --neutral-site-policy exclude_from_evaluation
+          --out artifacts/football/nfl_production_validation.json
+          --manifest-out artifacts/football/nfl_source_manifest.json
+          --model-out artifacts/football/nfl_m2_model.json
+
+      - name: Build isolated nested V2A candidate
+        run: >-
+          python scripts/run_nfl_v2_candidate_validation.py
+          --schedule-file artifacts/football/sources/games.csv
+          --pbp-dir artifacts/football/sources/pbp
+          --participation-dir artifacts/football/sources/participation
+          --depth-dir artifacts/football/sources/depth
+          --stadium-file artifacts/football/sources/team_stadiums.csv
+          --source-manifest artifacts/football/nfl_source_manifest.json
+          --git-sha "$EVIDENCE_GIT_SHA"
+          --start-season 2016 --end-season 2025
+          --neutral-site-policy exclude_from_evaluation
+          --out artifacts/football/nfl_m2_v2_candidate_validation.json
+          --nested-out artifacts/football/nfl_m2_v2_nested_candidate_validation.json
+          --v2b-out artifacts/football/nfl_m2_v2b_candidate_validation.json
+
+      - name: Build frozen schedule audit
+        run: >-
+          python scripts/audit_nfl_real_history.py
+          --source-file artifacts/football/sources/games.csv
+          --min-season 1999 --max-season 2025
+          --output artifacts/football/nfl_real_history_audit.json
+
+      - name: Compare nested V2A to frozen key-number tolerance
+        run: >-
+          python scripts/validate_nfl_v2_candidate.py
+          artifacts/football/nfl_real_history_audit.json
+          artifacts/football/nfl_m2_v2_nested_candidate_validation.json
+          --max-abs-error 0.005
+          --out artifacts/football/nfl_m2_v2_nested_candidate_key_math.json
+
+      - name: Enforce diagnostic-only authority
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          candidate = json.loads(Path('artifacts/football/nfl_m2_v2_nested_candidate_validation.json').read_text())
+          key_math = json.loads(Path('artifacts/football/nfl_m2_v2_nested_candidate_key_math.json').read_text())
+          if candidate.get('code_git_sha') != os.environ['EVIDENCE_GIT_SHA'].lower():
+              raise SystemExit('NFL_V2_NESTED_CODE_SHA_MISMATCH')
+          if candidate.get('production_registry_consumes_this_artifact') is not False:
+              raise SystemExit('NFL_V2_NESTED_PRODUCTION_AUTHORITY_FORBIDDEN')
+          forbidden = ('official', 'eligible', 'promotion_authority', 'model_p_authority')
+          for field in forbidden:
+              if candidate.get(field) not in (None, False):
+                  raise SystemExit(f'NFL_V2_NESTED_FORBIDDEN_AUTHORITY:{field}')
+          print(json.dumps({
+              'status': 'DIAGNOSTIC_ONLY',
+              'model_id': candidate.get('model_id'),
+              'historical': candidate.get('candidate_historical_evidence'),
+              'signed_key_probability': candidate.get('candidate_distribution_profile', {}).get('signed_key_probability'),
+              'key_math_status': key_math.get('status'),
+              'production_registry_consumes_this_artifact': False,
+          }, sort_keys=True))
+          PY
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nfl-v2-nested-diagnostic-${{ env.EVIDENCE_GIT_SHA }}
+          path: |
+            artifacts/football/nfl_m2_v2_nested_candidate_validation.json
+            artifacts/football/nfl_m2_v2_nested_candidate_key_math.json
+            artifacts/football/nfl_source_manifest.json
+            artifacts/football/nfl_real_history_audit.json
+          if-no-files-found: error
+          retention-days: 30
