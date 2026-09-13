@@ -47,7 +47,8 @@ class PolicyTests(unittest.TestCase):
         self.assertFalse(POLICY["evidence_clock_authority"])
 
     def test_t0_prestart_is_all_sports_and_non_promoting(self):
-        self.assertEqual(set(POLICY["sports"]), {"NFL", "CFB", "MLB"})
+        self.assertEqual(set(POLICY["sports"]), {"NFL", "CFB", "MLB", "UFC"})
+        self.assertEqual(POLICY["sports"]["UFC"], "mma_mixed_martial_arts")
         self.assertEqual(POLICY["windows"]["t0_prestart"], {
             "min_minutes_before_start": 0,
             "max_minutes_before_start": 5,
@@ -110,7 +111,7 @@ class RowTests(unittest.TestCase):
 
     def test_t0_row_is_not_evidence_and_remains_prestart(self):
         rows, skipped = build_rows(
-            "americanfootball_nfl", [_odds_event("a", 1)], {"a": "t0_prestart"}, NOW, POLICY
+            "mma_mixed_martial_arts", [_odds_event("a", 1)], {"a": "t0_prestart"}, NOW, POLICY
         )
         self.assertEqual(skipped, [])
         self.assertEqual(len(rows), 2)
@@ -122,7 +123,7 @@ class RowTests(unittest.TestCase):
 
     def test_started_t0_candidate_is_skipped(self):
         rows, skipped = build_rows(
-            "americanfootball_nfl", [_odds_event("a", -1)], {"a": "t0_prestart"}, NOW, POLICY
+            "mma_mixed_martial_arts", [_odds_event("a", -1)], {"a": "t0_prestart"}, NOW, POLICY
         )
         self.assertEqual(rows, [])
         self.assertEqual(skipped[0]["reason"], "EVENT_ALREADY_STARTED")
@@ -193,7 +194,7 @@ class RunTests(unittest.TestCase):
                 opener=self._opener([_event("a", 10)], [_odds_event("a", 10)], calls),
             )
             self.assertIn("paid", calls)
-            self.assertEqual(report["total_rows_written"], 6)  # 2 rows x 3 sports
+            self.assertEqual(report["total_rows_written"], 8)  # 2 rows x 4 sports
             files = list(Path(tmp).rglob("*.ndjson"))
             self.assertTrue(files)
             first = files[0].read_text().strip().splitlines()
@@ -210,7 +211,7 @@ class RunTests(unittest.TestCase):
             after = files[0].read_text()
             self.assertTrue(after.startswith(before), "existing captured prices must never be rewritten")
 
-    def test_t0_due_event_works_for_all_three_sports(self):
+    def test_t0_due_event_works_for_all_four_sports(self):
         calls: list[str] = []
         with tempfile.TemporaryDirectory() as tmp:
             report = run(
@@ -220,8 +221,8 @@ class RunTests(unittest.TestCase):
                 keys=["k"],
                 opener=self._opener([_event("a", 1)], [_odds_event("a", 1)], calls),
             )
-        self.assertEqual(report["total_rows_written"], 6)
-        self.assertEqual(set(report["sports"]), {"NFL", "CFB", "MLB"})
+        self.assertEqual(report["total_rows_written"], 8)
+        self.assertEqual(set(report["sports"]), {"NFL", "CFB", "MLB", "UFC"})
         self.assertTrue(all("t0_prestart" in entry["windows"] for entry in report["sports"].values()))
 
     def test_dry_run_never_calls_paid_endpoint(self):
