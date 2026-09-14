@@ -44,7 +44,7 @@ jobs:
         run: |
           python -m unittest tests.test_capture_nfl_market_maker_radar -v
           python -m unittest tests.test_market_maker_radar -v
-          python -m unittest tests.test_pinnacle_nfl_market_normalizer -v
+          python -m unittest tests.test_normalize_pinnacle_nfl_markets -v
           python -m unittest tests.test_fanduel_nfl_market_normalizer -v
           python -m unittest tests.test_direct_dk_game_market_source -v
 
