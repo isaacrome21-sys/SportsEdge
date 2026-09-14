@@ -278,7 +278,9 @@ def test_repository_policy_is_unconditional_zero_authority_and_registers_late_de
     ids = {row["delta_id"] for row in registry["deltas"]}
     assert {"PR_683", "PR_687", "PR_701", "PR_702", "PR_703"}.issubset(ids)
     assert registry["deltas"]
-    assert registry["reconciled_through_sha"] == registry["deltas"][-1]["merge_sha"]
+    current_main = _git(Path.cwd(), "rev-parse", "origin/main")
+    assert registry["reconciled_through_sha"] == current_main
+    assert registry["deltas"][-1]["merge_sha"] == current_main
     assert registry["bundle_inventory_complete"] is False
 
 
