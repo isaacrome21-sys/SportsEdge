@@ -31,18 +31,31 @@ def test_public_repo_adoption_cannot_close_data_or_decision_gaps() -> None:
             assert row["adoption_mode"] == "FORBIDDEN"
 
 
-def test_external_model_logic_is_challenger_only() -> None:
+def test_every_external_reference_is_cataloged_and_scoped() -> None:
+    payload = _payload()
+    catalog = {row["repo"]: row for row in payload["public_reference_catalog"]}
+    assert catalog
+    for repo, row in catalog.items():
+        assert "/" in repo
+        assert row["approved_scope"]
+        assert row["forbidden_scope"]
+    for blocker in payload["blockers"]:
+        for repo in blocker.get("reference_repos", []):
+            assert repo in catalog
+            assert blocker["classification"] == "MISSING_IMPLEMENTATION"
+            assert blocker["public_repo_adoption_allowed"] is True
+
+
+def test_external_model_logic_is_challenger_or_plumbing_only() -> None:
     payload = _payload()
     rules = payload["rules"]
     assert rules["evidence_facing_external_model_logic_enters_as_challenger_only"] is True
     assert rules["external_calibration_or_prior_authority_forbidden"] is True
     assert rules["external_historical_windows_do_not_establish_pit"] is True
     assert rules["external_repo_results_do_not_establish_provenance"] is True
+    assert rules["public_reference_must_name_exact_repo_and_scope"] is True
 
-    mlb = next(
-        row for row in payload["blockers"]
-        if row["id"] == "MLB_DFS_ENDOGENOUS_JOINT_PATH_PRODUCER"
-    )
+    mlb = next(row for row in payload["blockers"] if row["id"] == "MLB_DFS_ENDOGENOUS_JOINT_PATH_PRODUCER")
     assert mlb["classification"] == "MISSING_IMPLEMENTATION"
     assert mlb["public_repo_adoption_allowed"] is True
     assert mlb["adoption_mode"] == "CHALLENGER_ONLY"
@@ -53,6 +66,27 @@ def test_external_model_logic_is_challenger_only() -> None:
         "external_training_windows",
         "external_readiness_claims",
     }.issubset(forbidden)
+
+    for blocker_id in (
+        "NFL_PLAYER_PROP_PROBABILITY_ENGINE",
+        "CFB_PLAYER_PARTICIPATION_AND_PROP_ENGINE",
+        "DFS_FIELD_DUPLICATION_AND_CONTEST_EV_SIMULATION",
+    ):
+        row = next(item for item in payload["blockers"] if item["id"] == blocker_id)
+        assert row["classification"] == "MISSING_IMPLEMENTATION"
+        assert row["adoption_mode"] == "PLUMBING_ONLY"
+        assert row["reference_repos"]
+        assert row["forbidden_reference_scope"]
+
+
+def test_prop_runtime_gaps_are_not_hidden_by_data_plumbing() -> None:
+    payload = _payload()
+    states = {row["id"]: row["state"] for row in payload["blockers"]}
+    assert states["NFL_PLAYER_PROP_PROBABILITY_ENGINE"] == "NO_ENGINE"
+    assert states["CFB_PLAYER_PARTICIPATION_AND_PROP_ENGINE"] == "NO_ENGINE_PARTICIPATION_LAYER_REQUIRED"
+    evidence = next(row for row in payload["blockers"] if row["id"] == "FOOTBALL_PROP_FORWARD_PIT_AND_VALIDATION_EVIDENCE")
+    assert evidence["classification"] == "MISSING_DATA"
+    assert evidence["public_repo_adoption_allowed"] is False
 
 
 def test_plumbing_cannot_change_evidence_semantics() -> None:
