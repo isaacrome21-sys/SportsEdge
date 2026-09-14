@@ -13,7 +13,10 @@ from typing import Any, Callable, Mapping
 from urllib.request import Request, urlopen
 
 DK_ROOT = "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1"
-FULL_GAME_CATEGORY_ID = 493
+# DraftKings currently identifies the league-level Game Lines category as 492.
+# The prior 493 endpoint returned a valid metadata-only payload with no events,
+# markets, or selections, so keep this ID under an explicit regression test.
+FULL_GAME_CATEGORY_ID = 492
 LEAGUE_IDS = {
     "americanfootball_nfl": 88808,
     "americanfootball_ncaaf": 87637,
