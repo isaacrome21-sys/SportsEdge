@@ -43,12 +43,15 @@ def main() -> int:
     parser.add_argument("--start", required=True, help="Slate start: timezone-aware ISO-8601, 19:10, or 7:10PM")
     parser.add_argument("--date", help="YYYY-MM-DD when --start is a clock time; defaults to today in --timezone")
     parser.add_argument("--timezone", default="America/Chicago", help="IANA zone for clock-only --start values")
-    parser.add_argument("--projections", help="SportsEdge DFS projection snapshot JSON")
-    parser.add_argument("--joint-paths", help="Aligned SportsEdge joint simulation path snapshot; defaults to --projections when omitted")
+    parser.add_argument("--projections", help="SportsEdge DFS projection snapshot JSON; omitted means auto-build when supported")
+    parser.add_argument("--joint-paths", help="Aligned SportsEdge joint simulation path snapshot; defaults to auto-generated/projection paths when omitted")
     parser.add_argument("--dk-salaries", help="Official DKSalaries.csv fallback when live DK acquisition is unavailable")
     parser.add_argument("--allow-dk-fppg-baseline", action="store_true", help="Emergency baseline only; not a validated SportsEdge projection model")
     parser.add_argument("--no-auto-context", action="store_true", help="Disable live lineup/injury/game-status context (debug/backtest only)")
     parser.add_argument("--allow-context-failure", action="store_true", help="Continue if live context acquisition fails; diagnostics will mark the failure")
+    parser.add_argument("--no-auto-projection", action="store_true", help="Disable automatic SportsEdge DFS projection generation")
+    parser.add_argument("--auto-projection-paths", type=int, default=5000, help="Outcome paths for automatic joint player projection generation")
+    parser.add_argument("--auto-projection-seed", type=int, help="Optional deterministic automatic projection seed")
     parser.add_argument("--no-contest-ev", action="store_true", help="Skip real single-entry contest field/payout EV selection")
     parser.add_argument("--strict-contest-ev", action="store_true", help="Fail instead of falling back if contest-EV inputs are incomplete")
     parser.add_argument("--ev-sims", type=int, default=1000, help="Joint outcome paths used for contest EV (minimum 1000)")
@@ -73,6 +76,9 @@ def main() -> int:
         max_projection_age_hours=args.max_projection_age_hours,
         auto_context=not args.no_auto_context,
         allow_context_failure=args.allow_context_failure,
+        auto_projection=not args.no_auto_projection,
+        auto_projection_paths=args.auto_projection_paths,
+        auto_projection_seed=args.auto_projection_seed,
         contest_ev_enabled=not args.no_contest_ev,
         strict_contest_ev=args.strict_contest_ev,
         contest_ev_max_simulations=args.ev_sims,
@@ -88,7 +94,7 @@ def main() -> int:
     print(
         f"salary=${result.lineup.salary} mean={result.lineup.projected_points:.2f} "
         f"ceiling={result.lineup.ceiling:.2f} corr={result.lineup.correlation_score:.2f} "
-        f"mode={result.diagnostics.get('selection_mode')}"
+        f"mode={result.diagnostics.get('selection_mode')} projection={result.diagnostics.get('projection_mode')}"
     )
     if result.ev_selection is not None:
         ev = result.ev_selection.ev
