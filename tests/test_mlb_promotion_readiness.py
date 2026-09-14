@@ -1,6 +1,10 @@
 import unittest
 
-from sportsedge.mlb_promotion_readiness import _floor_readiness, build_mlb_promotion_readiness
+from sportsedge.mlb_promotion_readiness import (
+    _floor_readiness,
+    _pre_eligibility_acceptance_complete,
+    build_mlb_promotion_readiness,
+)
 
 
 BASE_CONFIG = {
@@ -61,12 +65,30 @@ class MLBPromotionReadinessTests(unittest.TestCase):
         self.assertEqual(row["evidence_sha256"], "a" * 64)
         self.assertIsNone(row["blocker"])
 
+    def test_pre_eligibility_readiness_does_not_require_eligibility(self):
+        state = {
+            "runtime_engine": True,
+            "registered": True,
+            "eligible": False,
+            "behavioral_status": "KEEP_MEASURED",
+            "feature_realization_status": "COMPLETE",
+            "validation_missing": [],
+        }
+        self.assertTrue(_pre_eligibility_acceptance_complete(state))
+        state["feature_realization_status"] = "UNVERIFIED"
+        self.assertFalse(_pre_eligibility_acceptance_complete(state))
+
     def test_default_inventory_never_reports_official_without_floor(self):
         report = build_mlb_promotion_readiness()
         self.assertGreater(report["market_count"], 0)
+        self.assertEqual(
+            report["six_gate_complete_count"],
+            report["pre_eligibility_acceptance_complete_count"],
+        )
         for row in report["markets"]:
             if row["official_ready"]:
                 self.assertTrue(row["edge_floor"]["frozen"])
+                self.assertTrue(row["pre_eligibility_acceptance_complete"])
                 self.assertTrue(row["acceptance_complete"])
                 self.assertTrue(row["deployment_eligible"])
 
