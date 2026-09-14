@@ -128,9 +128,18 @@ jobs:
       - name: Test reconciliation and inventory state machines
         run: python -m pytest -q tests/test_freeze_reconciliation.py tests/test_freeze_inventory.py
 
+      - name: Build hash-bound effective coverage view
+        run: >-
+          python scripts/build_reconciliation_registry_view.py
+          --output-policy /tmp/freeze_inventory_policy_effective.json
+          --output-registry /tmp/freeze_reconciliation_registry_effective.json
+          --attestation artifacts/governance/reconciliation_coverage_attestation.json
+
       - name: Audit complete governance surface inventory
         run: >-
           PYTHONPATH=. python scripts/audit_freeze_inventory.py
+          --policy /tmp/freeze_inventory_policy_effective.json
+          --registry /tmp/freeze_reconciliation_registry_effective.json
           --ref HEAD
           --output artifacts/governance/freeze_inventory_report.json
 
@@ -152,6 +161,7 @@ jobs:
       - name: Reconcile each registered delta against each bundle
         run: >-
           PYTHONPATH=. python scripts/reconcile_freeze_deltas.py
+          --registry /tmp/freeze_reconciliation_registry_effective.json
           --current-main-ref origin/main
           --output artifacts/governance/freeze_reconciliation_report.json
 
