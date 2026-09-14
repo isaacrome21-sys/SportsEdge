@@ -7,27 +7,16 @@ from typing import Iterable, Mapping
 from .v2k_drive_core import DriveRow, normalize_drive_rows
 
 _OUTCOME_MAP = {
-    "touchdown": "TD",
-    "td": "TD",
-    "field_goal": "FG",
-    "field goal": "FG",
-    "fg": "FG",
-    "interception": "TURNOVER",
-    "fumble": "TURNOVER",
-    "turnover_on_downs": "TURNOVER",
-    "turnover on downs": "TURNOVER",
-    "punt": "PUNT_OTHER",
-    "end_of_half": "PUNT_OTHER",
-    "end of half": "PUNT_OTHER",
-    "end_of_game": "PUNT_OTHER",
-    "end of game": "PUNT_OTHER",
-    "missed_field_goal": "PUNT_OTHER",
-    "missed field goal": "PUNT_OTHER",
+    "touchdown": "TD", "td": "TD",
+    "field_goal": "FG", "field goal": "FG", "fg": "FG",
+    "interception": "TURNOVER", "fumble": "TURNOVER",
+    "turnover_on_downs": "TURNOVER", "turnover on downs": "TURNOVER",
+    "punt": "PUNT_OTHER", "end_of_half": "PUNT_OTHER", "end of half": "PUNT_OTHER",
+    "end_of_game": "PUNT_OTHER", "end of game": "PUNT_OTHER",
+    "missed_field_goal": "PUNT_OTHER", "missed field goal": "PUNT_OTHER",
     "safety": "SAFETY",
-    "defensive_touchdown": "DEF_ST_SCORE",
-    "defensive touchdown": "DEF_ST_SCORE",
-    "special_teams_touchdown": "DEF_ST_SCORE",
-    "special teams touchdown": "DEF_ST_SCORE",
+    "defensive_touchdown": "DEF_ST_SCORE", "defensive touchdown": "DEF_ST_SCORE",
+    "special_teams_touchdown": "DEF_ST_SCORE", "special teams touchdown": "DEF_ST_SCORE",
 }
 
 _REQUIRED = {
@@ -48,6 +37,27 @@ def _canonical_outcome(value: object) -> str:
     if key not in _OUTCOME_MAP:
         raise ValueError("V2K_DRIVE_OUTCOME_UNMAPPED")
     return _OUTCOME_MAP[key]
+
+
+def _validate_game_chronology(rows: list[DriveRow]) -> None:
+    if not rows:
+        return
+    season_week_kickoff = {(r.season, r.week, r.kickoff_utc) for r in rows}
+    if len(season_week_kickoff) != 1:
+        raise ValueError("V2K_GAME_IDENTITY_INCONSISTENT")
+    previous: DriveRow | None = None
+    for row in rows:
+        if row.period > 5:
+            raise ValueError("V2K_PERIOD_UNSUPPORTED")
+        clock_max = 600 if row.period == 5 else 900
+        if row.clock_seconds_remaining_period > clock_max:
+            raise ValueError("V2K_CLOCK_STATE_INVALID")
+        if previous is not None:
+            if row.period < previous.period:
+                raise ValueError("V2K_PERIOD_REGRESSION")
+            if row.period == previous.period and row.clock_seconds_remaining_period > previous.clock_seconds_remaining_period:
+                raise ValueError("V2K_CLOCK_REGRESSION")
+        previous = row
 
 
 def build_drive_rows_from_pbp(
@@ -77,7 +87,8 @@ def build_drive_rows_from_pbp(
     by_game: dict[str, list[tuple[int, DriveRow]]] = defaultdict(list)
     for (game_id, _drive_id), plays in grouped.items():
         ordered = sorted(plays, key=lambda p: int(p["play_index"]))
-        if [int(p["play_index"]) for p in ordered] != sorted({int(p["play_index"]) for p in ordered}):
+        indexes = [int(p["play_index"]) for p in ordered]
+        if len(indexes) != len(set(indexes)):
             raise ValueError("V2K_PLAY_INDEX_DUPLICATE")
         first, last = ordered[0], ordered[-1]
         offense = str(first["offense"])
@@ -86,26 +97,17 @@ def build_drive_rows_from_pbp(
             raise ValueError("V2K_DRIVE_TEAM_IDENTITY_CHANGED")
         outcome = _canonical_outcome(last["drive_result"])
         conversion_points = int(last.get("conversion_points") or 0)
-        drive_order = int(first.get("drive_order") if first.get("drive_order") is not None else min(int(p["play_index"]) for p in ordered))
+        drive_order = int(first.get("drive_order") if first.get("drive_order") is not None else min(indexes))
         row = DriveRow(
             game_id=game_id,
-            season=int(first["season"]),
-            week=int(first["week"]),
-            kickoff_utc=str(first["kickoff_utc"]),
-            drive_index=0,  # replaced below by deterministic game-local ordering
-            offense=offense,
-            defense=defense,
-            start_yardline_100=float(first["start_yardline_100"]),
-            outcome=outcome,
-            offense_score_before=int(first["offense_score_before"]),
-            defense_score_before=int(first["defense_score_before"]),
-            offense_score_after=int(last["offense_score_after"]),
-            defense_score_after=int(last["defense_score_after"]),
-            period=int(first["period"]),
-            clock_seconds_remaining_period=int(first["clock_seconds_remaining_period"]),
+            season=int(first["season"]), week=int(first["week"]), kickoff_utc=str(first["kickoff_utc"]),
+            drive_index=0, offense=offense, defense=defense,
+            start_yardline_100=float(first["start_yardline_100"]), outcome=outcome,
+            offense_score_before=int(first["offense_score_before"]), defense_score_before=int(first["defense_score_before"]),
+            offense_score_after=int(last["offense_score_after"]), defense_score_after=int(last["defense_score_after"]),
+            period=int(first["period"]), clock_seconds_remaining_period=int(first["clock_seconds_remaining_period"]),
             conversion_points=conversion_points,
-            source_manifest_sha256=source_manifest_sha256,
-            source_code_sha=source_code_sha,
+            source_manifest_sha256=source_manifest_sha256, source_code_sha=source_code_sha,
         )
         by_game[game_id].append((drive_order, row))
 
@@ -114,18 +116,14 @@ def build_drive_rows_from_pbp(
         ordered_drives = sorted(by_game[game_id], key=lambda item: item[0])
         if len({order for order, _ in ordered_drives}) != len(ordered_drives):
             raise ValueError("V2K_DRIVE_ORDER_DUPLICATE")
-        for idx, (_order, row) in enumerate(ordered_drives):
-            rows.append(DriveRow(**{**row.__dict__, "drive_index": idx}))
+        normalized_game = [DriveRow(**{**row.__dict__, "drive_index": idx}) for idx, (_order, row) in enumerate(ordered_drives)]
+        _validate_game_chronology(normalized_game)
+        rows.extend(normalized_game)
     return normalize_drive_rows(rows)
 
 
 AUTHORITY = {
-    "model_p": False,
-    "pricing": False,
-    "promotion": False,
-    "staking": False,
-    "run_it": False,
-    "official": False,
-    "untouched_readout": False,
+    "model_p": False, "pricing": False, "promotion": False, "staking": False,
+    "run_it": False, "official": False, "untouched_readout": False,
     "development_validation_scoring": False,
 }
