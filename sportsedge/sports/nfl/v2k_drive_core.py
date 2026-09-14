@@ -16,6 +16,7 @@ from typing import Iterable, Mapping, Sequence
 DRIVE_OUTCOMES = ("TD", "FG", "TURNOVER", "PUNT_OTHER", "SAFETY", "DEF_ST_SCORE")
 STATE_BUCKETS = ("NORMAL", "LATE_TIED", "LATE_TRAILING", "LATE_LEADING", "OVERTIME")
 FIELD_BUCKETS = ("SHORT_FIELD", "MID_FIELD", "LONG_FIELD")
+OVERTIME_RULE_VERSION = "NFL_2025_REG_BOTH_TEAMS_POSSESS_10MIN_V1"
 
 
 def _field_bucket(yardline_100: float) -> str:
@@ -66,8 +67,11 @@ class DriveRow:
             raise ValueError("V2K_DRIVE_IDENTITY_INVALID")
         if self.outcome not in DRIVE_OUTCOMES:
             raise ValueError("V2K_DRIVE_OUTCOME_UNMAPPED")
-        if self.drive_index < 0 or self.period < 1 or self.clock_seconds_remaining_period < 0:
+        if self.drive_index < 0 or self.period < 1 or self.period > 5 or self.clock_seconds_remaining_period < 0:
             raise ValueError("V2K_DRIVE_CHRONOLOGY_INVALID")
+        clock_max = 600 if self.period == 5 else 900
+        if self.clock_seconds_remaining_period > clock_max:
+            raise ValueError("V2K_CLOCK_STATE_INVALID")
         if not 0.0 <= float(self.start_yardline_100) <= 100.0:
             raise ValueError("V2K_START_FIELD_POSITION_INVALID")
         if any(x < 0 for x in (self.offense_score_before, self.defense_score_before, self.offense_score_after, self.defense_score_after)):
@@ -255,6 +259,7 @@ def simulate_joint_game(
     seed: int,
     regulation_drives: int | None = None,
     max_overtime_drives: int = 8,
+    opening_possession: str | None = None,
 ) -> SimulationResult:
     if home_team == away_team or max_overtime_drives <= 0:
         raise ValueError("V2K_SIMULATION_ARGUMENT_INVALID")
@@ -265,8 +270,12 @@ def simulate_joint_game(
         regulation_drives = int(model.regulation_drive_counts[rng.randrange(len(model.regulation_drive_counts))])
     if regulation_drives <= 0:
         raise ValueError("V2K_SIMULATION_ARGUMENT_INVALID")
+    if opening_possession is None:
+        opening_possession = home_team if rng.randrange(2) == 0 else away_team
+    if opening_possession not in (home_team, away_team):
+        raise ValueError("V2K_OPENING_POSSESSION_INVALID")
 
-    state = GameState(home_team, away_team, possession=home_team)
+    state = GameState(home_team, away_team, possession=opening_possession)
     path: list[Mapping[str, object]] = []
     ot_drives = 0
 
@@ -297,6 +306,7 @@ def simulate_joint_game(
                 raise ValueError("V2K_EXCEPTIONAL_SCORE_EMPIRICAL_SUPPORT_REQUIRED")
             pts_def = int(model.exceptional_score_points[rng.randrange(len(model.exceptional_score_points))])
 
+        first_ot_defensive_score = in_ot and ot_drives == 1 and pts_def > 0
         home, away = state.home_score, state.away_score
         if offense == home_team:
             home += pts_off
@@ -318,11 +328,16 @@ def simulate_joint_game(
             "home_score": home,
             "away_score": away,
             "overtime": in_ot,
+            "overtime_rule_version": OVERTIME_RULE_VERSION if in_ot else None,
         })
 
         next_index = state.drive_index + 1
         period, seconds = _clock_state(next_index, regulation_drives)
         state = GameState(home_team, away_team, defense, home, away, 5 if in_ot else period, 0 if in_ot else seconds, next_index, in_ot)
+        if first_ot_defensive_score:
+            break
+        # 2025 regular-season rule: both teams get one possession even after an
+        # opening offensive TD/FG; after both opportunities, a lead ends the game.
         if in_ot and home != away and ot_drives >= 2:
             break
 
