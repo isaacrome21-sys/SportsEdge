@@ -26,6 +26,85 @@ jobs:
       - name: Fetch exact current main
         run: git fetch --no-tags origin main
 
+      - name: Block active direct-main workflow writers
+        run: |
+          python - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+
+          policy = json.loads(Path('config/freeze_reconciliation_policy_v1.json').read_text())
+          guard = policy.get('direct_main_writer_guard') or {}
+          if guard.get('required') is not True:
+              raise SystemExit('DIRECT_MAIN_WRITER_GUARD_NOT_REQUIRED')
+          if guard.get('status') != 'FROZEN_FAIL_CLOSED':
+              raise SystemExit('DIRECT_MAIN_WRITER_GUARD_NOT_FROZEN')
+
+          prefix = str(guard.get('workflow_prefix') or '')
+          suffixes = tuple(str(v) for v in (guard.get('workflow_suffixes') or ()))
+          write_marker = str(guard.get('write_permission_marker') or '')
+          push_markers = tuple(str(v) for v in (guard.get('direct_push_markers') or ()))
+          allowed = {str(v) for v in (guard.get('allowed_paths') or ())}
+          if not prefix or not suffixes or not write_marker or not push_markers:
+              raise SystemExit('DIRECT_MAIN_WRITER_GUARD_CONFIG_INCOMPLETE')
+          if allowed:
+              raise SystemExit('DIRECT_MAIN_WRITER_EXEMPTIONS_FORBIDDEN_DURING_HOLD')
+
+          tree = subprocess.run(
+              ['git', 'ls-tree', '-r', '--name-only', 'origin/main'],
+              check=True, capture_output=True, text=True,
+          ).stdout.splitlines()
+          workflow_paths = sorted(
+              path for path in tree
+              if path.startswith(prefix) and path.endswith(suffixes)
+          )
+          active = []
+          inspected = []
+          for path in workflow_paths:
+              text = subprocess.run(
+                  ['git', 'show', f'origin/main:{path}'],
+                  check=True, capture_output=True, text=True,
+              ).stdout
+              has_write = write_marker in text
+              matched_push = sorted(marker for marker in push_markers if marker in text)
+              inspected.append({
+                  'path': path,
+                  'contents_write': has_write,
+                  'direct_push_markers': matched_push,
+              })
+              if has_write and matched_push and path not in allowed:
+                  active.append(path)
+
+          current_main = subprocess.run(
+              ['git', 'rev-parse', 'origin/main'],
+              check=True, capture_output=True, text=True,
+          ).stdout.strip()
+          artifact = {
+              'schema': 'SPORTSEDGE_DIRECT_MAIN_WRITER_GUARD_V1',
+              'status': 'BLOCKED_ACTIVE_DIRECT_MAIN_WRITER' if active else 'QUIESCED',
+              'current_main_sha': current_main,
+              'workflow_count': len(workflow_paths),
+              'active_direct_main_writers': active,
+              'inspected_workflows': inspected,
+              'authority': {
+                  'model_p': False,
+                  'truth_gate': False,
+                  'promotion': False,
+                  'staking': False,
+                  'official': False,
+                  'validation_attempt': False,
+                  'untouched_readout': False,
+              },
+          }
+          out = Path('artifacts/governance/direct_main_writer_guard.json')
+          out.parent.mkdir(parents=True, exist_ok=True)
+          out.write_text(json.dumps(artifact, indent=2, sort_keys=True) + '\n')
+          print('direct_main_writer_status=' + artifact['status'])
+          print('active_direct_main_writers=' + ','.join(active))
+          if active:
+              raise SystemExit('ACTIVE_DIRECT_MAIN_WRITER:' + ','.join(active))
+          PY
+
       - name: Enforce unconditional hold before classification
         env:
           HEAD_REF: ${{ github.head_ref }}
