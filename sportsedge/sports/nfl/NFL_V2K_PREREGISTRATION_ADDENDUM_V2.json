@@ -1,0 +1,60 @@
+{
+  "schema": "NFL_V2K_PREREGISTRATION_ADDENDUM_V2",
+  "status": "FROZEN_VERSION_IDENTITY_ADDENDUM_ONLY",
+  "purpose": "Replace only the empirical-reference/admission version identity required before a future untouched V2K readout; preserve all substantive preregistration semantics.",
+  "bindings": {
+    "original_preregistration_git_blob_sha1": "f8487883186fc85b77f4e632b1aa710327473b8a",
+    "frozen_reference_git_blob_sha1": "7483f6c2a9a09c4b260797010d3765601dedd9ed",
+    "attempt_ledger_git_blob_sha1": "14022680891de3c3d73013ffabc8aee4611e86e6",
+    "human_policy_selection_git_blob_sha1": "5553078d22bdcd570adfc755a484b4b8b83f5390",
+    "implementation_admission_v3_git_blob_sha1": "0f836c435cb78586da0cf6f609fcbec008fcad93"
+  },
+  "selected_policy": "MODERN_REG_2018_2025",
+  "reference_prerequisite": {
+    "required_schema": "NFL_V2K_EMPIRICAL_KEY_REFERENCE_V1",
+    "required_status": "FROZEN_READY",
+    "required_selected_policy": "MODERN_REG_2018_2025",
+    "required_absolute_mass_tolerance": 0.005,
+    "fit_and_signed_key_reference_population_must_match": true
+  },
+  "preserved_semantics": {
+    "single_shot_untouched_readout": true,
+    "evidence_isolation": true,
+    "v2j_untouched_values_for_tuning_forbidden": true,
+    "2026_use": "SHADOW_ARCHIVE_ONLY",
+    "max_development_attempts": 5,
+    "calibration_cannot_rescue_predictive_failure": true,
+    "predictive_success_cannot_rescue_key_failure": true,
+    "key_success_cannot_rescue_calibration_failure": true,
+    "candidate_must_strictly_improve_calibration_slope_metric": true,
+    "candidate_must_strictly_improve_signed_key_mass_metric": true,
+    "ci_does_not_relax_absolute_mass_tolerance": true
+  },
+  "untouched_readout_preconditions": {
+    "versioned_addendum_merged": true,
+    "research_implementation_admission_merged": true,
+    "attempt_ledger_append_only_and_within_budget": true,
+    "folds_frozen": true,
+    "source_manifests_frozen": true,
+    "feature_allowlist_frozen": true,
+    "rng_algorithm_version_seed_policy_frozen": true,
+    "simulation_count_frozen": true,
+    "all_thresholds_frozen": true,
+    "development_validation_attempts_separately_versioned": true
+  },
+  "authority": {
+    "research_implementation": false,
+    "development_validation_execution": false,
+    "untouched_readout": false,
+    "model_p": false,
+    "pricing": false,
+    "promotion": false,
+    "staking": false,
+    "run_it": false,
+    "official": false
+  },
+  "release_boundary": {
+    "bettor_facing_release_issue": 608,
+    "candidate_validity_pass_does_not_grant_bettor_facing_authority": true
+  }
+}
