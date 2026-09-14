@@ -1,0 +1,128 @@
+{
+  "schema": "SPORTSEDGE_FREEZE_INVENTORY_V1",
+  "status": "AUDIT_REQUIRED_BEFORE_COMPLETION",
+  "structural_registry_bundles": [
+    "NFL_V2J_V2K_GOVERNANCE_FREEZE_V1",
+    "CFB_HISTORICAL_MARKET_ARCHIVE_FREEZE_V1",
+    "MARKET_MAKER_RADAR_EVIDENCE_FREEZE_V2"
+  ],
+  "rules": [
+    {
+      "rule_id": "CFB_GAME_MODEL_UNFROZEN",
+      "classification": "INCOMPLETE_BLOCKED",
+      "exact": ["config/cfb_game_model_freeze.json"],
+      "reason": "Registry is explicitly UNFROZEN and carries no evidence-clock or promotion authority."
+    },
+    {
+      "rule_id": "NFL_M2_UNFROZEN",
+      "classification": "INCOMPLETE_BLOCKED",
+      "exact": ["config/nfl_m2_freeze.json"],
+      "reason": "M2 failed frozen predictive/key-number gates and remains explicitly UNFROZEN."
+    },
+    {
+      "rule_id": "CFB_MODEL_SELECTION_PREREG",
+      "classification": "ACTIVE",
+      "bundle_id": "CFB_MODEL_SELECTION_PREREG_V1",
+      "exact": [
+        "config/cfb_model_candidate_prereg_v1.json",
+        "config/cfb_model_selection_policy_v1.json"
+      ],
+      "reason": "Candidate family and selection geometry are preregistered immutable research boundaries even while the game model remains unfrozen."
+    },
+    {
+      "rule_id": "CFB_TRUTH_GATE",
+      "classification": "ACTIVE",
+      "bundle_id": "CFB_TRUTH_GATE_FREEZE_V1",
+      "exact": ["config/cfb_truth_gate_v1.json"],
+      "reason": "CFB truth-gate semantics are an active governed threshold boundary."
+    },
+    {
+      "rule_id": "CFB_PROP_ARTIFACT",
+      "classification": "ACTIVE",
+      "bundle_id": "CFB_PROP_ARTIFACT_FREEZE_V1",
+      "exact": ["config/cfb_prop_model_freeze.json"],
+      "reason": "The CFB prop artifact registry is explicitly FROZEN with artifact and predictive code-surface identities."
+    },
+    {
+      "rule_id": "NFL_PROP_ARTIFACT",
+      "classification": "ACTIVE",
+      "bundle_id": "NFL_PROP_ARTIFACT_FREEZE_V1",
+      "exact": ["config/nfl_prop_model_freeze.json"],
+      "reason": "The NFL prop artifact registry is explicitly FROZEN with artifact and predictive code-surface identities."
+    },
+    {
+      "rule_id": "NFL_PROMOTION_SOURCE_FREEZE",
+      "classification": "ACTIVE",
+      "bundle_id": "NFL_V2J_V2K_GOVERNANCE_FREEZE_V1",
+      "exact": ["config/nfl_promotion_source_freeze_v1.json"],
+      "reason": "Immutable NFL promotion source identity remains binding regardless of current candidate authority."
+    },
+    {
+      "rule_id": "GLOBAL_PROMOTION_EVIDENCE",
+      "classification": "ACTIVE",
+      "bundle_id": "GLOBAL_PROMOTION_EVIDENCE_FREEZE_V2",
+      "exact": [
+        "config/promotion_evidence_policy_manifest.json",
+        "config/promotion_evidence_policy_v2.json",
+        "config/truth_gate_floors.json"
+      ],
+      "reason": "Cross-sport promotion/evidence and Truth Gate semantics are active governed policy."
+    },
+    {
+      "rule_id": "WORKFLOW_CRON_POLICY",
+      "classification": "ACTIVE",
+      "bundle_id": "WORKFLOW_CRON_POLICY_FREEZE_V1",
+      "exact": ["config/workflow_cron_policy_v1.json"],
+      "reason": "Cron admission determines which irreversible PIT evidence clocks can accrue."
+    },
+    {
+      "rule_id": "MLB_V8_EVIDENCE_POLICY",
+      "classification": "ACTIVE",
+      "bundle_id": "MLB_V8_EVIDENCE_POLICY_FREEZE_V1",
+      "exact": ["config/mlb_v8_evidence_policy.json"],
+      "reason": "MLB V8 PIT/decision/close/forward-holdout semantics are active evidence policy."
+    },
+    {
+      "rule_id": "DIRECT_DK_FORWARD_ADMISSION",
+      "classification": "ACTIVE",
+      "bundle_id": "DIRECT_DK_FORWARD_PAIR_ADMISSION_V1",
+      "exact": ["config/direct_dk_forward_pair_admission_v1.json"],
+      "reason": "Direct DraftKings forward-pair admission changes which irreversible observations may accrue."
+    },
+    {
+      "rule_id": "NFL_V2G_PROSPECTIVE_BOUNDARIES",
+      "classification": "ACTIVE",
+      "bundle_id": "NFL_V2G_PROSPECTIVE_FREEZE_V1",
+      "exact": ["config/research/nfl_prospective_evaluation_boundary_2026-09-12.json"],
+      "prefixes": ["config/research/nfl_v2g_"],
+      "reason": "V2G preregistration, implementation and forward-capture/evaluation boundaries remain immutable prospective provenance."
+    },
+    {
+      "rule_id": "NFL_V2H_V2I_V2J_PREREG",
+      "classification": "ACTIVE",
+      "bundle_id": "NFL_V2H_V2I_V2J_HISTORICAL_PREREG_V1",
+      "prefixes": [
+        "config/research/nfl_v2h_",
+        "config/research/nfl_v2i_",
+        "config/research/nfl_v2j_"
+      ],
+      "reason": "Completed/rejected candidate preregistrations remain immutable historical evidence provenance and cannot be rewritten after readout."
+    },
+    {
+      "rule_id": "NFL_PLAYER_OUTCOME_ATTEMPT_LEDGER",
+      "classification": "ACTIVE",
+      "bundle_id": "NFL_PLAYER_OUTCOME_RESEARCH_LEDGER_V1",
+      "exact": ["config/research/nfl_player_outcome_g1_attempt_ledger.json"],
+      "reason": "Attempt accounting is an immutable research-governance boundary even without bettor-facing authority."
+    },
+    {
+      "rule_id": "RECONCILIATION_CONTROL_PLANE",
+      "classification": "NON_AUTHORITATIVE",
+      "exact": [
+        "config/freeze_reconciliation_policy_v1.json",
+        "config/freeze_reconciliation_registry_v1.json"
+      ],
+      "reason": "These files implement the control-plane hard stop itself; they do not freeze model/evidence content and are exact-head checked separately."
+    }
+  ]
+}
