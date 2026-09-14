@@ -1,10 +1,12 @@
+import io
 import json
 import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.error import HTTPError
 
-from scripts.probe_direct_market_feeds import probe
+from scripts.probe_direct_market_feeds import _fetch, probe
 
 UTC = timezone.utc
 
@@ -65,6 +67,28 @@ class DirectMarketFeedProbeTests(unittest.TestCase):
         fanduel_headers = {k.lower(): v for k, v in calls[1].header_items()}
         self.assertIn("x-api-key", pinnacle_headers)
         self.assertEqual(fanduel_headers.get("x-sportsbook-region"), "NJ")
+
+    def test_http_error_reports_status_content_type_and_body_fingerprint(self):
+        error_body = b'{"error":"forbidden"}'
+
+        def opener(request, timeout=30):
+            raise HTTPError(
+                request.full_url,
+                403,
+                "Forbidden",
+                {"content-type": "application/json; charset=utf-8"},
+                io.BytesIO(error_body),
+            )
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            r"DIRECT_MARKET_PROBE_HTTP_ERROR:pinnacle:status=403:content_type=application/json:body_sha256=[0-9a-f]{64}:body_bytes=21",
+        ):
+            _fetch(
+                "https://guest.api.arcadia.pinnacle.com/0.1/matchups/1/markets/related/straight",
+                provider="pinnacle",
+                opener=opener,
+            )
 
     def test_one_provider_failure_blocks_combined_probe_without_escalating_authority(self):
         def opener(request, timeout=30):

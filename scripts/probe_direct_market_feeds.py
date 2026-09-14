@@ -18,6 +18,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
+from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -90,6 +91,19 @@ def _fetch(
             headers = getattr(response, "headers", None)
             if headers is not None:
                 ctype = headers.get("content-type")
+    except HTTPError as exc:
+        try:
+            error_raw = exc.read()
+        except Exception:
+            error_raw = b""
+        headers = getattr(exc, "headers", None)
+        ctype = headers.get("content-type") if headers is not None else None
+        ctype_text = str(ctype or "unknown").split(";", 1)[0].strip().lower() or "unknown"
+        raise DirectMarketProbeError(
+            "DIRECT_MARKET_PROBE_HTTP_ERROR:"
+            f"{provider}:status={int(exc.code)}:content_type={ctype_text}:"
+            f"body_sha256={_sha(error_raw)}:body_bytes={len(error_raw)}"
+        ) from exc
     except Exception as exc:
         raise DirectMarketProbeError(
             f"DIRECT_MARKET_PROBE_FETCH_FAILED:{provider}:{type(exc).__name__}"
