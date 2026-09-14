@@ -1,0 +1,45 @@
+{
+  "policy_id": "MLB_DFS_PITCHER_PATH_SET_POLICY_V1",
+  "status": "UNFROZEN_EMPIRICAL_BANDS_REQUIRED",
+  "validation_version": "MLB_SP_PATH_SET_V1",
+  "purpose": "Require computed path-set evidence before an MLB starter DFS producer can be considered ready.",
+  "required_metrics": {
+    "bf_earned_run_correlation": {
+      "rule": "strictly_less_than_zero",
+      "threshold": 0.0
+    },
+    "p_outs_ge_21": {
+      "rule": "inside_frozen_empirical_band",
+      "min": null,
+      "max": null
+    },
+    "bullpen_active_fraction": {
+      "rule": "at_or_above_frozen_minimum",
+      "min": null
+    },
+    "lead_divergence_fraction": {
+      "rule": "at_or_above_frozen_positive_minimum",
+      "min": null
+    }
+  },
+  "freeze_requirements": [
+    "derive thresholds from declared market-blind strictly-prior historical starter/game paths",
+    "pin source bytes and source hashes",
+    "declare training/reference window before generator evaluation",
+    "freeze minimum path count",
+    "freeze all thresholds before any producer is evaluated"
+  ],
+  "authority": {
+    "model_p": false,
+    "truth_gate": false,
+    "promotion": false,
+    "staking": false,
+    "official": false,
+    "dfs_production_ready": false
+  },
+  "notes": [
+    "Per-path producer booleans cannot satisfy this policy.",
+    "A single complete-game path is legal; a path distribution that never exercises the hook/bullpen/final-state dynamics is not.",
+    "No numeric empirical band is invented by this preregistration. Production validation remains blocked until the policy is frozen."
+  ]
+}
