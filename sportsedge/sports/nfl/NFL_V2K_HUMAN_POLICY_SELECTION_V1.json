@@ -1,0 +1,60 @@
+{
+  "schema": "NFL_V2K_HUMAN_POLICY_SELECTION_V1",
+  "status": "FROZEN_HUMAN_SELECTED",
+  "selected_policy": "MODERN_REG_2018_2025",
+  "decision": "SELECT_MODERN_REG_2018_2025",
+  "recorded_date": "2026-09-14",
+  "human_provenance": {
+    "github_issue": 616,
+    "github_comment_id": 5662476744,
+    "github_comment_body_sha256": "22598423589abda5ea2ad7754189411477738d07c6911cd468bbcdc57fc55ddf",
+    "github_user": "isaacrome21-sys",
+    "prior_inferred_selection_is_not_approval_provenance": true
+  },
+  "population_policy": {
+    "first_season": 2018,
+    "last_season": 2025,
+    "season_types": ["REG"],
+    "fit_and_signed_key_reference_population_must_match": true,
+    "signed_key_reference_policy": "MODERN_REG_2018_2025",
+    "broad_2002_2025_reference_for_primary_gate_forbidden": true,
+    "sign_convention": "OFFICIAL_SCHEDULE_HOME_FINAL_MINUS_AWAY_FINAL",
+    "overtime_handling": "OFFICIAL_FINAL_SCORE_INCLUDING_OVERTIME",
+    "neutral_site_handling": "INCLUDE_USING_OFFICIAL_SCHEDULE_HOME_AWAY_DESIGNATION"
+  },
+  "covid_2020_policy": {
+    "season": 2020,
+    "status": "COVID_REGIME_FLAGGED",
+    "included_in_primary_window": true,
+    "primary_weight": "NORMAL_UNCHANGED",
+    "chronology": "NORMAL_DETERMINISTIC_CHRONOLOGY",
+    "may_exclude_from_primary_gate": false,
+    "may_downweight_primary_fit": false,
+    "may_change_thresholds": false,
+    "sensitivity_slice_required": true,
+    "sensitivity_slice_authority": "DIAGNOSTIC_ONLY",
+    "sensitivity_result_may_retune_candidate": false
+  },
+  "bindings": {
+    "preregistration_git_blob_sha1": "f8487883186fc85b77f4e632b1aa710327473b8a",
+    "frozen_reference_git_blob_sha1": "7483f6c2a9a09c4b260797010d3765601dedd9ed",
+    "attempt_ledger_git_blob_sha1": "14022680891de3c3d73013ffabc8aee4611e86e6",
+    "report_only_proposal_git_blob_sha1": "2109c6d7546bbbed2b5c587eb13fd52d9325f488"
+  },
+  "attempt_budget": {
+    "max_development_attempts": 5,
+    "attempts_used_at_selection": 0,
+    "selection_consumes_attempt": false
+  },
+  "authority": {
+    "research_implementation_selection": true,
+    "historical_development_validation_execution": false,
+    "untouched_readout": false,
+    "model_p": false,
+    "pricing": false,
+    "promotion": false,
+    "staking": false,
+    "run_it": false,
+    "official": false
+  }
+}
