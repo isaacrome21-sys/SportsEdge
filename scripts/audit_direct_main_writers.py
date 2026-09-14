@@ -113,7 +113,11 @@ def classify_git_push(command: str, checkout_non_main: str | None = None) -> tup
 
 def _referenced_local_paths(text: str) -> list[tuple[str, str]]:
     refs: set[tuple[str, str]] = set()
-    for match in re.finditer(r"(?:bash|sh)\s+([^\s;&|]+)|(?:^|\s)(\./[^\s;&|]+)", text, re.M):
+    # Shell interpreters must be standalone command words. Without the word
+    # boundary, text such as `git push origin ...` contains the substring
+    # `sh origin` and is falsely treated as a call to a local file named
+    # `origin`, which turns proven non-main pushes into unresolved findings.
+    for match in re.finditer(r"\b(?:bash|sh)\s+([^\s;&|]+)|(?:^|\s)(\./[^\s;&|]+)", text, re.M):
         value = match.group(1) or match.group(2)
         if value and "$" not in value and "${{" not in value:
             refs.add((value.removeprefix("./"), "FILE"))
