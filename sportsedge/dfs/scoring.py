@@ -156,6 +156,36 @@ def _mlb_sample_stats(player: DKPlayer, sample: Mapping[str, float]) -> dict[str
     return out
 
 
+def dk_scores_from_samples(
+    player: DKPlayer,
+    sport: str,
+    samples: Iterable[Mapping[str, float]],
+) -> tuple[float, ...]:
+    """Return aligned per-path DraftKings scores without sorting simulation order.
+
+    Upstream joint simulators must use the same path index for correlated players.
+    Preserving input order here lets the field/contest layer evaluate lineups on the
+    exact same game path instead of destroying correlation by independently sorting.
+    """
+    scores: list[float] = []
+    sport = sport.upper()
+    for sample in samples:
+        if "dk_points" in sample:
+            scores.append(float(sample["dk_points"]))
+            continue
+        if sport in {"NFL", "CFB"}:
+            scores.append(football_expected_dk_points(_football_sample_stats(player, sample)))
+        elif sport == "MLB" and player.is_pitcher:
+            scores.append(mlb_pitcher_expected_dk_points(_mlb_sample_stats(player, sample)))
+        elif sport == "MLB":
+            scores.append(mlb_hitter_expected_dk_points(_mlb_sample_stats(player, sample)))
+        else:
+            raise ValueError(f"DFS_UNSUPPORTED_SPORT:{sport}")
+    if len(scores) < 1000:
+        raise ValueError(f"DFS_TOO_FEW_PLAYER_PATHS:{player.player_id}:{len(scores)}")
+    return tuple(scores)
+
+
 def projection_from_samples(
     player: DKPlayer,
     sport: str,
@@ -164,27 +194,9 @@ def projection_from_samples(
     source: str,
     ownership: float | None = None,
 ) -> Projection:
-    """Convert complete SportsEdge outcome paths into a DFS score distribution.
-
-    Partial Stage-3 distributions intentionally fail closed until TD/event/run layers
-    have augmented them with every component needed by DraftKings scoring.
-    """
-    scores: list[float] = []
-    for sample in samples:
-        if "dk_points" in sample:
-            scores.append(float(sample["dk_points"]))
-            continue
-        if sport.upper() in {"NFL", "CFB"}:
-            scores.append(football_expected_dk_points(_football_sample_stats(player, sample)))
-        elif sport.upper() == "MLB" and player.is_pitcher:
-            scores.append(mlb_pitcher_expected_dk_points(_mlb_sample_stats(player, sample)))
-        elif sport.upper() == "MLB":
-            scores.append(mlb_hitter_expected_dk_points(_mlb_sample_stats(player, sample)))
-        else:
-            raise ValueError(f"DFS_UNSUPPORTED_SPORT:{sport}")
-    if len(scores) < 1000:
-        raise ValueError(f"DFS_TOO_FEW_PLAYER_PATHS:{player.player_id}:{len(scores)}")
-    scores.sort()
+    """Convert complete SportsEdge outcome paths into a DFS score distribution."""
+    raw_scores = dk_scores_from_samples(player, sport, samples)
+    scores = sorted(raw_scores)
 
     def quantile(q: float) -> float:
         idx = min(len(scores) - 1, max(0, int(round((len(scores) - 1) * q))))
