@@ -7,7 +7,8 @@ name: nfl-market-maker-radar-capture
 # Pinnacle is the market-maker reference; DraftKings and FanDuel are soft books.
 # V2 starts the three provider transports concurrently, records local request and
 # retrieval provenance, and refuses timing-ineligible polls as signal inputs.
-# Rows, raw payloads, and research candidate records are append-only on `data`.
+# Rows, raw payloads, research candidate records, and CLV settlement records are
+# append-only on `data`.
 
 on:
   workflow_dispatch:
@@ -24,6 +25,7 @@ on:
       - 'sportsedge/draftkings_game_market_source.py'
       - 'scripts/analyze_market_maker_radar.py'
       - 'scripts/analyze_market_maker_radar_v2.py'
+      - 'scripts/settle_market_maker_candidate_ledger.py'
       - 'config/market_maker_radar_v1.json'
       - 'config/market_maker_radar_v2.json'
       - 'config/workflow_cron_policy_v1.json'
@@ -39,8 +41,10 @@ on:
       - 'sportsedge/draftkings_game_market_source.py'
       - 'scripts/analyze_market_maker_radar.py'
       - 'scripts/analyze_market_maker_radar_v2.py'
+      - 'scripts/settle_market_maker_candidate_ledger.py'
       - 'tests/test_market_maker_radar.py'
       - 'tests/test_market_maker_radar_v2.py'
+      - 'tests/test_market_maker_candidate_settlement.py'
       - 'config/market_maker_radar_v1.json'
       - 'config/market_maker_radar_v2.json'
       - 'config/workflow_cron_policy_v1.json'
@@ -72,6 +76,7 @@ jobs:
           python -m unittest tests.test_capture_nfl_market_maker_radar_v2 -v
           python -m unittest tests.test_market_maker_radar -v
           python -m unittest tests.test_market_maker_radar_v2 -v
+          python -m unittest tests.test_market_maker_candidate_settlement -v
           python -m unittest tests.test_normalize_pinnacle_nfl_markets -v
           python -m unittest tests.test_fanduel_nfl_market_normalizer -v
           python -m unittest tests.test_direct_dk_game_market_source -v
@@ -136,7 +141,25 @@ jobs:
             .threshold_freeze.status == "FROZEN_BEFORE_FIRST_LEAD_LAG_SIGNAL"
           ' artifacts/nfl-market-maker-radar/latest.json >/dev/null
 
-      - name: Commit append-only observations and candidate ledger
+      - name: Settle exact-contract CLV candidates
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/settle_market_maker_candidate_ledger.py \
+            --policy config/market_maker_radar_v2.json \
+            --archive-root .data-branch/archive/market-maker-radar/nfl \
+            --ledger-root .data-branch \
+            --out artifacts/nfl-market-maker-radar/settlement.json
+          jq -e '
+            .primary_metric == "CLV" and
+            .model_p_authority == false and
+            .promotion_authority == false and
+            .staking_authority == false and
+            .official_authority == false
+          ' artifacts/nfl-market-maker-radar/settlement.json >/dev/null
+
+      - name: Commit append-only observations candidate ledger and settlements
         if: github.event_name != 'pull_request'
         shell: bash
         run: |
@@ -152,7 +175,8 @@ jobs:
           CAPTURE_ID="$(jq -r '.capture_id' ../artifacts/nfl-market-maker-radar/capture-status.json)"
           ROWS="$(jq -r '.rows_written' ../artifacts/nfl-market-maker-radar/capture-status.json)"
           NEW_CANDIDATES="$(jq -r '.candidate_ledger_new_count' ../artifacts/nfl-market-maker-radar/latest.json)"
-          git commit -m "nfl-market-maker-radar: ${CAPTURE_ID} rows=${ROWS} candidates=${NEW_CANDIDATES} [LAYER_B_NOT_EVIDENCE]"
+          NEW_SETTLEMENTS="$(jq -r '.new_settlement_count' ../artifacts/nfl-market-maker-radar/settlement.json)"
+          git commit -m "nfl-market-maker-radar: ${CAPTURE_ID} rows=${ROWS} candidates=${NEW_CANDIDATES} settlements=${NEW_SETTLEMENTS} [LAYER_B_NOT_EVIDENCE]"
           for attempt in 1 2 3; do
             git fetch origin data || true
             git rebase origin/data || git rebase --abort || true
