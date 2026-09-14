@@ -55,6 +55,14 @@ class DKPlayer:
     draftable_id: str = ""
     raw: dict[str, Any] = field(default_factory=dict, compare=False, repr=False)
 
+    @property
+    def is_pitcher(self) -> bool:
+        return bool(set(self.positions) & {"P", "SP", "RP"})
+
+    @property
+    def is_defense(self) -> bool:
+        return bool(set(self.positions) & {"DST", "DEF"})
+
     def eligible_for(self, slot: str) -> bool:
         slot = _SLOT_ALIASES.get(slot.upper(), slot.upper())
         if self.roster_slots:
@@ -64,13 +72,13 @@ class DKPlayer:
             return slot in slots
         pos = set(self.positions)
         if slot == "P":
-            return bool(pos & {"P", "SP", "RP"})
+            return self.is_pitcher
         if slot == "FLEX":
             return bool(pos & {"RB", "WR", "TE"})
         if slot == "SUPERFLEX":
             return bool(pos & {"QB", "RB", "WR", "TE"})
         if slot == "DST":
-            return bool(pos & {"DST", "DEF"})
+            return self.is_defense
         return slot in pos
 
 
