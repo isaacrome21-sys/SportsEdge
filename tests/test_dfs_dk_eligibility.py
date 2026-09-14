@@ -27,6 +27,13 @@ def test_sp_and_rp_are_pitchers_for_roster_conflicts_and_scoring() -> None:
             "p_reach_5ip": 0.88,
             "p_lead_at_exit": 0.58,
             "p_lead_preserved_to_final": 0.82,
+            "hook_endogenous_to_path": 1,
+            "hook_decision_batter_by_batter": 1,
+            "hook_conditioned_on_pitch_count": 1,
+            "hook_conditioned_on_runs_allowed": 1,
+            "bullpen_remainder_routed": 1,
+            "hit_conservation_validated": 1,
+            "game_simulated_to_final": 1,
         },
         source="TEST",
     )
