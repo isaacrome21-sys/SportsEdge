@@ -68,6 +68,7 @@ def main() -> int:
     parser.add_argument("--repo", default=".")
     parser.add_argument("--ref", required=True)
     parser.add_argument("--compare-ref")
+    parser.add_argument("--output")
     args = parser.parse_args()
 
     repo = Path(args.repo).resolve()
@@ -86,7 +87,12 @@ def main() -> int:
         result["compare_resolved_sha"] = compare_sha
         result["compare_governed_surface_registry_digest_sha256"] = compare_digest
         result["digests_match"] = primary_digest == compare_digest
-    print(json.dumps(result, sort_keys=True))
+    rendered = json.dumps(result, sort_keys=True) + "\n"
+    if args.output:
+        out = Path(args.output)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(rendered, encoding="utf-8")
+    print(rendered, end="")
     return 0
 
 
