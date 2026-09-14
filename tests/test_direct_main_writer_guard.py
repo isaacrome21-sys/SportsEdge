@@ -59,10 +59,16 @@ def test_inherited_permissions_do_not_clear_non_git_writer(tmp_path: Path) -> No
 
 
 def test_non_literal_writer_families_are_detected(tmp_path: Path) -> None:
-    workflow = """name: x\non: workflow_dispatch\npermissions:\n  contents: write\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n      - run: gh api -X PATCH repos/o/r/git/refs/heads/main\n      - run: curl -X PUT https://api.github.com/repos/o/r/contents/a\n      - uses: stefanzweifel/git-auto-commit-action@v5\n      - uses: ad-m/github-push-action@v0.8.0\n"""
+    workflow = """name: x\non: workflow_dispatch\npermissions:\n  contents: write\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n      - run: gh api -X PATCH repos/o/r/git/refs/heads/main\n      - run: gh api -X PUT repos/o/r/contents/b\n      - run: curl -X PUT https://api.github.com/repos/o/r/contents/a\n      - uses: stefanzweifel/git-auto-commit-action@v5\n      - uses: ad-m/github-push-action@v0.8.0\n"""
     report = audit(_repo(tmp_path, workflow))
     reasons = {f["reason"] for f in report["blocking_findings"]}
-    assert {"GH_API_MAIN_REF", "HTTP_MAIN_REF_API", "GIT_AUTO_COMMIT_ACTION", "GITHUB_PUSH_ACTION"}.issubset(reasons)
+    assert {
+        "GH_API_MAIN_REF",
+        "GH_API_CONTENTS_WRITE",
+        "HTTP_CONTENTS_API_WRITE",
+        "GIT_AUTO_COMMIT_ACTION",
+        "GITHUB_PUSH_ACTION",
+    }.issubset(reasons)
 
 
 def test_called_shell_script_is_scanned(tmp_path: Path) -> None:
