@@ -1,0 +1,130 @@
+{
+  "archive_type": "MLB_PROP_PIT_QUOTES",
+  "captured_at": "2026-09-14T01:35:59.042713+00:00",
+  "event_failure_count": 10,
+  "event_failures": [
+    {
+      "provider_event_id": "34658488",
+      "provider_event_sha256": "810e0bc08b67e1636d3d4be7e14b15f07100afe811e972057c9b3af3eb54ae11",
+      "reason": "FIRST_PITCH_MISSING"
+    },
+    {
+      "provider_event_id": "34664936",
+      "provider_event_sha256": "65c49c868a5e306712f1f701d07e502404e3ad438c59f0df224a88cdd537677d",
+      "reason": "FIRST_PITCH_MISSING"
+    },
+    {
+      "provider_event_id": "34664940",
+      "provider_event_sha256": "36c796d01956e4b370f6b4c3e654dddf44d5d9f53b794c01d4d3d74728012cee",
+      "reason": "FIRST_PITCH_MISSING"
+    },
+    {
+      "provider_event_id": "34664948",
+      "provider_event_sha256": "81f01c29ce13e70a112bbed3f655538d1a0ee3f8faf10d26c7f7d96e8bcc9668",
+      "reason": "FIRST_PITCH_MISSING"
+    },
+    {
+      "provider_event_id": "34664956",
+      "provider_event_sha256": "7db5cdffb63466f81b8c72dfb19c8a0b7d535802caaaeaf2994b18cb94530580",
+      "reason": "FIRST_PITCH_MISSING"
+    },
+    {
+      "provider_event_id": "34664961",
+      "provider_event_sha256": "3abb09b3bc32a770e509703ac813866b1a7efa913faebf6c9de8b71dd5fc55cd",
+      "reason": "FIRST_PITCH_MISSING"
+    },
+    {
+      "provider_event_id": "34664966",
+      "provider_event_sha256": "3de9b2ed3183bb04ecf4ab475f408c20b5056380b1d49abc8b86df2c553462e7",
+      "reason": "FIRST_PITCH_MISSING"
+    },
+    {
+      "provider_event_id": "34664977",
+      "provider_event_sha256": "505af710ba0fbd9f6bc28ccf376a6c994dda123fc0c7a67c69997eef807826b1",
+      "reason": "FIRST_PITCH_MISSING"
+    },
+    {
+      "provider_event_id": "34664978",
+      "provider_event_sha256": "581f88a1f6b7f6fdddb9af37a85ea18d581dd9afa4b91eff31a0a2f18822db42",
+      "reason": "FIRST_PITCH_MISSING"
+    },
+    {
+      "provider_event_id": "34664982",
+      "provider_event_sha256": "75b53e7c6cdbc8c999fd1075d0d9e5cbaadba30c9db445beb64cc3cdc6757449",
+      "reason": "FIRST_PITCH_MISSING"
+    }
+  ],
+  "evidence_class": "LIVE_PROVIDER_QUOTE_ARCHIVE",
+  "identity_policy": {
+    "automatic_identity_binding_required_later": true,
+    "participant_name_is_canonical_player_id": false,
+    "provider_event_is_canonical_game_id": false,
+    "zero_or_multiple_identity_matches_fail_closed": true
+  },
+  "market_counts": {
+    "BATTER_BB": 0,
+    "BATTER_K": 0,
+    "DOUBLES": 0,
+    "EITHER_PITCHER_BB": 0,
+    "EITHER_PITCHER_ER": 0,
+    "EITHER_PITCHER_HITS_ALLOWED": 0,
+    "EXTRA_BASE_HITS": 0,
+    "HITS": 0,
+    "HITS_RUNS_RBIS": 0,
+    "HITS_RUNS_STOLEN_BASES": 0,
+    "HITS_STOLEN_BASES": 0,
+    "HITS_WALKS_STOLEN_BASES": 0,
+    "HOME_RUNS": 0,
+    "PITCHER_BB": 0,
+    "PITCHER_ER": 0,
+    "PITCHER_HITS_ALLOWED": 0,
+    "PITCHER_HITS_WALKS_ER": 0,
+    "PITCHER_K": 0,
+    "PITCHER_OUTS": 0,
+    "RBI": 0,
+    "RUNS": 0,
+    "RUNS_RBIS": 0,
+    "SINGLES": 0,
+    "STOLEN_BASES": 0,
+    "TOTAL_BASES": 0,
+    "TRIPLES": 0
+  },
+  "payload_sha256": "de38d2c74cf3effc028c00a2661a68b975c7fd5757299a0ba89d54c2f0974334",
+  "pit_target_quote_count": 0,
+  "provider": "DRAFTKINGS_WEB_RESEARCH",
+  "provider_failure_count": 0,
+  "provider_failures": [],
+  "provider_quote_count": 0,
+  "quotes": [],
+  "rejected_target_count": 0,
+  "rejected_targets": [],
+  "schema_version": 2,
+  "target_markets": [
+    "BATTER_BB",
+    "BATTER_K",
+    "DOUBLES",
+    "EITHER_PITCHER_BB",
+    "EITHER_PITCHER_ER",
+    "EITHER_PITCHER_HITS_ALLOWED",
+    "EXTRA_BASE_HITS",
+    "HITS",
+    "HITS_RUNS_RBIS",
+    "HITS_RUNS_STOLEN_BASES",
+    "HITS_STOLEN_BASES",
+    "HITS_WALKS_STOLEN_BASES",
+    "HOME_RUNS",
+    "PITCHER_BB",
+    "PITCHER_ER",
+    "PITCHER_HITS_ALLOWED",
+    "PITCHER_HITS_WALKS_ER",
+    "PITCHER_K",
+    "PITCHER_OUTS",
+    "RBI",
+    "RUNS",
+    "RUNS_RBIS",
+    "SINGLES",
+    "STOLEN_BASES",
+    "TOTAL_BASES",
+    "TRIPLES"
+  ]
+}
