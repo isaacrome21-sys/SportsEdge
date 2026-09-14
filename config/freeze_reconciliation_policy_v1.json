@@ -42,11 +42,17 @@
     "status": "FROZEN_FAIL_CLOSED",
     "required": true,
     "workflow_prefix": ".github/workflows/",
-    "workflow_suffixes": [".yml", ".yaml"],
+    "workflow_suffixes": [
+      ".yml",
+      ".yaml"
+    ],
     "write_permission_marker": "contents: write",
-    "direct_push_markers": ["git push"],
+    "direct_push_markers": [
+      "git push"
+    ],
     "allowed_paths": [],
-    "rule": "While FULL_MAIN_HOLD is active, any workflow on exact current main that has contents: write and contains a direct git push is an active direct-main writer and blocks reconciliation release. No direct-main workflow writer is exempt during the hold."
+    "rule": "Report workflows with write permission and a push marker for inspection. This lexical diagnostic includes non-main archive writers and is not proof of a push target. The user explicitly waived blocking development on branch protection and writer quiescence; delta coverage and evidence revocation requirements remain mandatory.",
+    "enforcement": "DIAGNOSTIC_USER_WAIVER"
   },
   "release_conditions": {
     "bundle_inventory_complete": true,
@@ -57,7 +63,7 @@
     "refrozen_bundle_requires_timestamp_plus_prior_bundle_hash_invalidation": true,
     "revoked_bundle_invalidates_prior_forward_clock": true,
     "current_main_sha_must_equal_reconciled_through_sha": true,
-    "direct_main_writers_quiesced": true
+    "direct_main_writers_quiesced": false
   },
   "authority": {
     "model_p": false,
@@ -68,5 +74,14 @@
     "validation_attempt": false,
     "untouched_readout": false
   },
-  "enforcement_note": "Repository CI can fail pull requests while this hold is active, but GitHub can still permit a manual merge unless the repository ruleset or branch protection marks the check required. Do not represent CI-only enforcement as an unbypassable server-side lock."
+  "enforcement_note": "Repository CI can fail pull requests while this hold is active, but GitHub can still permit a manual merge unless the repository ruleset or branch protection marks the check required. Do not represent CI-only enforcement as an unbypassable server-side lock.",
+  "operational_prerequisite_waiver": {
+    "scope": [
+      "server_side_main_branch_protection",
+      "blocking_on_direct_main_writer_diagnostic"
+    ],
+    "user_instruction": "Fuck that prerequisite then and move on a finish everything",
+    "scope_limit": "Operational release prerequisite only. No evidence, model validation, Model_P, promotion, staking or OFFICIAL authority is created.",
+    "main_movement_policy": "Read current main before each mutation and merge; register any new deltas before reconciliation release."
+  }
 }

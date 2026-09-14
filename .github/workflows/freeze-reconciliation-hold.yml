@@ -187,8 +187,13 @@ jobs:
           print('release_blocks=' + ','.join(report['release_blocks']))
           print('direct_main_writer_status=' + str(writer_guard['status']))
           print('active_direct_main_writers=' + ','.join(active))
-          if active:
+          policy = json.loads(Path('config/freeze_reconciliation_policy_v1.json').read_text())
+          enforcement = policy['direct_main_writer_guard'].get('enforcement', 'BLOCKING')
+          print('direct_main_writer_enforcement=' + enforcement)
+          if active and enforcement == 'BLOCKING':
               raise SystemExit('ACTIVE_DIRECT_MAIN_WRITER:' + ','.join(active))
+          if enforcement not in {'BLOCKING', 'DIAGNOSTIC_USER_WAIVER'}:
+              raise SystemExit('DIRECT_MAIN_WRITER_ENFORCEMENT_INVALID')
           PY
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
