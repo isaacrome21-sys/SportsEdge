@@ -1,10 +1,13 @@
 """Executable, checksum-bound cache layer for SportsDataverse CFB history."""
 from __future__ import annotations
 
+import csv
 from datetime import datetime, timezone
+import gzip
 from hashlib import sha256
 import json
 from pathlib import Path
+import re
 from typing import Any, Callable, Iterable, Mapping
 from urllib.request import Request, urlopen
 
@@ -21,6 +24,8 @@ from .historical_release import (
 )
 
 USER_AGENT = "SportsEdge-CFB-History/1"
+MARKET_ARCHIVE_SOURCE_ID = "CFB_HISTORICAL_MARKET_SOURCE_V1"
+_HEX64 = re.compile(r"^[0-9a-f]{64}$")
 
 
 class CFBHistoryCacheError(ValueError):
@@ -199,3 +204,168 @@ def cache_many(
         for year in years
         for name in names
     )
+
+
+def _load_market_archive_contract(path: str | Path) -> dict[str, Any]:
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise CFBHistoryCacheError("CFB_MARKET_ARCHIVE_CONTRACT_INVALID") from exc
+    if payload.get("source_id") != MARKET_ARCHIVE_SOURCE_ID:
+        raise CFBHistoryCacheError("CFB_MARKET_ARCHIVE_SOURCE_ID_INVALID")
+    if payload.get("mode") != "RESEARCH_ONLY" or payload.get("status") != "FROZEN_RESEARCH_SOURCE":
+        raise CFBHistoryCacheError("CFB_MARKET_ARCHIVE_MODE_INVALID")
+    upstream = payload.get("upstream") or {}
+    digest = str(upstream.get("expected_sha256") or "").lower()
+    if not _HEX64.fullmatch(digest):
+        raise CFBHistoryCacheError("CFB_MARKET_ARCHIVE_SHA256_REQUIRED")
+    try:
+        size = int(upstream["expected_size_bytes"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise CFBHistoryCacheError("CFB_MARKET_ARCHIVE_SIZE_REQUIRED") from exc
+    if size <= 0 or not str(upstream.get("raw_url") or "").startswith("https://"):
+        raise CFBHistoryCacheError("CFB_MARKET_ARCHIVE_UPSTREAM_INVALID")
+    authority = payload.get("authority") or {}
+    for field in (
+        "model_p_authority",
+        "truth_gate_authority",
+        "promotion_authority",
+        "staking_authority",
+        "official_bet_authority",
+    ):
+        if authority.get(field) is not False:
+            raise CFBHistoryCacheError("CFB_MARKET_ARCHIVE_FORBIDDEN_AUTHORITY:" + field)
+    limits = payload.get("evidence_limitations") or {}
+    for field in ("per_row_pit_certified", "decision_time_certified", "close_time_certified", "clv_authority"):
+        if limits.get(field) is not False:
+            raise CFBHistoryCacheError("CFB_MARKET_ARCHIVE_EVIDENCE_LIMIT_INVALID:" + field)
+    return payload
+
+
+def _verify_market_archive_file(path: Path, *, expected_size: int, expected_sha256: str) -> None:
+    if not path.is_file() or path.stat().st_size != expected_size:
+        raise CFBHistoryCacheError("CFB_MARKET_ARCHIVE_CACHE_SIZE_MISMATCH")
+    digest = sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    if digest.hexdigest() != expected_sha256:
+        raise CFBHistoryCacheError("CFB_MARKET_ARCHIVE_CACHE_SHA256_MISMATCH")
+
+
+def cache_market_archive(
+    *,
+    contract_path: str | Path,
+    cache_root: str | Path,
+    allow_benchmark: bool = False,
+    opener: Callable[..., Any] = urlopen,
+    retrieved_at: datetime | None = None,
+) -> dict[str, Any]:
+    """Cache the exact multi-season market archive behind an explicit benchmark gate."""
+    if not allow_benchmark:
+        raise CFBHistoricalReleaseError("CFB_MARKET_DATA_PROHIBITED:historical_market_archive")
+    contract = _load_market_archive_contract(contract_path)
+    upstream = contract["upstream"]
+    expected_size = int(upstream["expected_size_bytes"])
+    expected_sha = str(upstream["expected_sha256"]).lower()
+    target = Path(cache_root) / "betting_archive" / Path(str(upstream["path"])).name
+    reused = False
+    if target.is_file():
+        try:
+            _verify_market_archive_file(
+                target, expected_size=expected_size, expected_sha256=expected_sha
+            )
+            reused = True
+        except CFBHistoryCacheError:
+            reused = False
+
+    if not reused:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        partial = target.with_name(target.name + ".part")
+        digest = sha256()
+        size = 0
+        try:
+            with _open(opener, str(upstream["raw_url"])) as response, partial.open("wb") as handle:
+                while True:
+                    chunk = response.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    if not isinstance(chunk, (bytes, bytearray)):
+                        raise CFBHistoryCacheError("CFB_MARKET_ARCHIVE_STREAM_BYTES_REQUIRED")
+                    data = bytes(chunk)
+                    digest.update(data)
+                    size += len(data)
+                    handle.write(data)
+            if size != expected_size:
+                raise CFBHistoryCacheError("CFB_MARKET_ARCHIVE_SIZE_MISMATCH")
+            if digest.hexdigest() != expected_sha:
+                raise CFBHistoryCacheError("CFB_MARKET_ARCHIVE_SHA256_MISMATCH")
+            partial.replace(target)
+        except Exception:
+            try:
+                partial.unlink()
+            except FileNotFoundError:
+                pass
+            raise
+
+    _verify_market_archive_file(target, expected_size=expected_size, expected_sha256=expected_sha)
+    retrieved = (retrieved_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
+    profile = contract.get("verified_profile") or {}
+    manifest: dict[str, Any] = {
+        "contract": "CFB_HISTORICAL_MARKET_ARCHIVE_CACHE_V1",
+        "source_id": contract["source_id"],
+        "usage": "BENCHMARK_ONLY",
+        "retrieved_at": retrieved,
+        "content_sha256": expected_sha,
+        "content_size_bytes": expected_size,
+        "upstream_repository": upstream["repository"],
+        "upstream_commit": upstream["commit"],
+        "upstream_path": upstream["path"],
+        "cache_relative_path": str(Path("betting_archive") / target.name),
+        "cache_reused": reused,
+        "row_count": int(profile.get("row_count", 0)),
+        "season_start": profile.get("season_start"),
+        "season_end": profile.get("season_end"),
+        "pit_certified": False,
+        "clv_authority": False,
+        "promotion_authority": False,
+    }
+    manifest_sha = sha256(
+        json.dumps(manifest, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    ).hexdigest()
+    manifest["manifest_sha256"] = manifest_sha
+    manifest_path = target.parent / "manifest.json"
+    _atomic_json(manifest_path, manifest)
+    return {
+        "dataset": "historical_market_archive",
+        "usage": "BENCHMARK_ONLY",
+        "cache_file": str(target),
+        "manifest_file": str(manifest_path),
+        "content_sha256": expected_sha,
+        "manifest_sha256": manifest_sha,
+        "row_count": manifest["row_count"],
+        "cache_reused": reused,
+    }
+
+
+def iter_market_archive(*, contract_path: str | Path, cache_file: str | Path):
+    """Stream checksum-verified historical market rows for benchmark/research use."""
+    contract = _load_market_archive_contract(contract_path)
+    upstream = contract["upstream"]
+    path = Path(cache_file)
+    _verify_market_archive_file(
+        path,
+        expected_size=int(upstream["expected_size_bytes"]),
+        expected_sha256=str(upstream["expected_sha256"]).lower(),
+    )
+    required = list(contract.get("required_columns") or [])
+    with gzip.open(path, "rt", encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle)
+        if not reader.fieldnames or any(name not in reader.fieldnames for name in required):
+            raise CFBHistoryCacheError("CFB_MARKET_ARCHIVE_HEADER_INVALID")
+        found = False
+        for row in reader:
+            found = True
+            yield {str(k): "" if v is None else str(v) for k, v in row.items()}
+        if not found:
+            raise CFBHistoryCacheError("CFB_MARKET_ARCHIVE_EMPTY")

@@ -23,6 +23,21 @@
       "forbidden_interpretation": "Opening/closing fields without independently verified observation timestamps are not paired PIT evidence."
     },
     {
+      "id": "SPORTSDATAVERSE_CFBFASTR_DATA_MARKET_ARCHIVE",
+      "repository": "sportsdataverse/cfbfastR-data",
+      "commit": "f5a05dc815951b8dbe18961a824f34cf154dfa61",
+      "path": "betting/csv/cfb_line_odds.csv.gz",
+      "license": "DATA_SOURCE_LICENSE_MUST_BE_RESPECTED_PER_UPSTREAM",
+      "source_contract": "config/research/cfb_historical_market_source_v1.json",
+      "usage": "BENCHMARK_ONLY",
+      "adopted_patterns": [
+        "checksum-bound real historical multi-book CFB market archive for seasons 2006-2025",
+        "historical book and market coverage research",
+        "retrospective benchmark and backtest context"
+      ],
+      "forbidden_interpretation": "Retrospective rows are not per-row PIT-certified decision/close observations and cannot satisfy CLV, paired-market, Truth Gate, promotion, or OFFICIAL evidence."
+    },
+    {
       "id": "CFBD_PYTHON",
       "repository": "CFBD/cfbd-python",
       "license": "MIT",
