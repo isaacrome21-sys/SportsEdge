@@ -1,6 +1,11 @@
 import unittest
 
-from sportsedge.mlb_promotion_readiness import _floor_readiness, build_mlb_promotion_readiness
+from sportsedge.edge_floors import DEFAULT_EDGE_FLOOR_CONFIG, load_edge_floor_config
+from sportsedge.mlb_promotion_readiness import (
+    _floor_readiness,
+    _predeployment_complete,
+    build_mlb_promotion_readiness,
+)
 
 
 BASE_CONFIG = {
@@ -61,12 +66,53 @@ class MLBPromotionReadinessTests(unittest.TestCase):
         self.assertEqual(row["evidence_sha256"], "a" * 64)
         self.assertIsNone(row["blocker"])
 
-    def test_default_inventory_never_reports_official_without_floor(self):
+    def test_v3_default_floor_resolution_is_explicitly_mlb(self):
+        config = load_edge_floor_config(DEFAULT_EDGE_FLOOR_CONFIG)
+        row = _floor_readiness(market="MONEYLINE", config=config)
+        self.assertTrue(row["frozen"])
+        self.assertIsNone(row["blocker"])
+
+    def test_predeployment_complete_excludes_only_final_eligibility_switch(self):
+        row = {
+            "current_state": {
+                "runtime_engine": True,
+                "registered": True,
+                "eligible": False,
+                "behavioral_status": "KEEP_MEASURED",
+                "feature_realization_status": "COMPLETE",
+                "validation_missing": [],
+            },
+            "acceptance_complete": False,
+        }
+        self.assertTrue(_predeployment_complete(row))
+        self.assertFalse(row["acceptance_complete"])
+
+    def test_predeployment_fails_closed_on_any_evidence_or_feature_gap(self):
+        base = {
+            "runtime_engine": True,
+            "registered": True,
+            "behavioral_status": "KEEP_MEASURED",
+            "feature_realization_status": "COMPLETE",
+            "validation_missing": [],
+        }
+        for key, value in (
+            ("runtime_engine", False),
+            ("registered", False),
+            ("behavioral_status", "FIX"),
+            ("feature_realization_status", "PARTIAL"),
+            ("validation_missing", ["calibration"]),
+        ):
+            state = dict(base)
+            state[key] = value
+            self.assertFalse(_predeployment_complete({"current_state": state}), key)
+
+    def test_default_inventory_never_reports_official_without_floor_or_predeployment(self):
         report = build_mlb_promotion_readiness()
         self.assertGreater(report["market_count"], 0)
         for row in report["markets"]:
             if row["official_ready"]:
                 self.assertTrue(row["edge_floor"]["frozen"])
+                self.assertTrue(row["predeployment_complete"])
                 self.assertTrue(row["acceptance_complete"])
                 self.assertTrue(row["deployment_eligible"])
 
