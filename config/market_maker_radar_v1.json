@@ -1,6 +1,6 @@
 {
   "policy_id": "MARKET_MAKER_RADAR_V1",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "status": "ACTIVE_LAYER_B_HARD_MARKET",
   "description": "Price-only market-maker lead/lag and stale-soft-book radar. Price leadership is the primary signal. Public splits, RLM labels, capper opinion, and unverified sharp-action labels cannot create a signal.",
   "model_free": true,
@@ -33,6 +33,7 @@
   "alerts": {
     "stale_offer_fair_probability_gap_pp": 1.0,
     "minimum_spread_or_total_line_gap": 0.5,
+    "minimum_price_implied_probability_move_pp": 0.25,
     "minimum_soft_followers": 1,
     "steam_min_books": 3,
     "threshold_status": "RESEARCH_ALERT_THRESHOLD_NOT_VALIDATED_EDGE_FLOOR"
@@ -40,7 +41,7 @@
   "signal_classes": {
     "market_maker_lead": "PRIMARY_HARD_MARKET",
     "stale_soft_price": "PRIMARY_HARD_MARKET",
-    "stale_soft_line": "PRIMARY_HARD_MARKET",
+    "line_advantage_candidate": "PRIMARY_HARD_MARKET_UNPRICED_DIFFERENT_LINE",
     "multi_book_steam": "SECONDARY_PRICE_ONLY",
     "soft_move_unconfirmed": "DIAGNOSTIC_ONLY",
     "public_split_divergence": "ANNOTATION_ONLY",
