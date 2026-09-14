@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import csv
 from datetime import datetime, timezone
 import json
+from pathlib import Path
 from typing import Any, Callable, Iterable
 from urllib.request import Request, urlopen
 
@@ -46,7 +48,7 @@ def _http_json(url: str, timeout: int = 15) -> dict[str, Any]:
     try:
         with urlopen(req, timeout=timeout) as resp:  # noqa: S310 - intentional public HTTPS source
             payload = json.loads(resp.read().decode("utf-8"))
-    except Exception as exc:  # network shape is intentionally surfaced fail-closed
+    except Exception as exc:
         raise DraftKingsError(f"DK_HTTP_FAILED:{type(exc).__name__}:{exc}") from exc
     if not isinstance(payload, dict):
         raise DraftKingsError("DK_JSON_SHAPE_INVALID")
@@ -60,8 +62,7 @@ class DraftKingsClient:
         self._getter = getter or _http_json
 
     def lobby(self, sport: str) -> dict[str, Any]:
-        sport = sport.upper()
-        return self._getter(LOBBY_URL.format(sport=sport))
+        return self._getter(LOBBY_URL.format(sport=sport.upper()))
 
     def discover_slates(self, sport: str) -> list[DKSlate]:
         sport = sport.upper()
@@ -92,10 +93,7 @@ class DraftKingsClient:
             except (TypeError, ValueError):
                 continue
             g = group_meta.get(gid_i, {})
-            start = _parse_dt(
-                _num(c, "sd", "StartDate", "startDate", "startTime")
-                or _num(g, "StartDate", "startDate", "startTime")
-            )
+            start = _parse_dt(_num(c, "sd", "StartDate", "startDate", "startTime") or _num(g, "StartDate", "startDate", "startTime"))
             if start is None:
                 continue
             game_type = _num(c, "gameTypeId", "GameTypeId", "gt") or _num(g, "GameTypeId", "gameTypeId")
@@ -118,7 +116,6 @@ class DraftKingsClient:
             if prior is None or (slate.total_prizes or 0.0) > (prior.total_prizes or 0.0):
                 best[gid_i] = slate
 
-        # Some lobby shapes expose draft groups even when no contest list is returned.
         for gid_i, g in group_meta.items():
             if gid_i in best:
                 continue
@@ -135,6 +132,53 @@ class DraftKingsClient:
                 raw={"draft_group": g},
             )
         return sorted(best.values(), key=lambda s: (s.start_time, s.draft_group_id))
+
+    def load_salary_csv(self, path: str | Path) -> list[DKPlayer]:
+        """Load an official user-exported DraftKings salary CSV as transport fallback."""
+        players: list[DKPlayer] = []
+        with Path(path).open("r", encoding="utf-8-sig", newline="") as handle:
+            rows = csv.DictReader(handle)
+            for row in rows:
+                pid = row.get("ID") or row.get("Id") or row.get("id")
+                name = row.get("Name") or row.get("Name + ID") or ""
+                salary = row.get("Salary")
+                team = str(row.get("TeamAbbrev") or row.get("TeamAbbreviation") or "").upper()
+                if not pid or not salary or not name:
+                    continue
+                if " (" in name and row.get("Name") is None:
+                    name = name.rsplit(" (", 1)[0]
+                positions = parse_positions(row.get("Position") or row.get("Roster Position") or "")
+                game_info = str(row.get("Game Info") or "")
+                matchup = game_info.split(" ", 1)[0].upper()
+                opponent = ""
+                if "@" in matchup:
+                    away, home = matchup.split("@", 1)
+                    if team == away:
+                        opponent = home
+                    elif team == home:
+                        opponent = away
+                fppg = None
+                try:
+                    fppg = float(row.get("AvgPointsPerGame") or "")
+                except ValueError:
+                    pass
+                try:
+                    salary_i = int(float(salary))
+                except (TypeError, ValueError):
+                    continue
+                players.append(DKPlayer(
+                    player_id=str(pid),
+                    name=str(name).strip(),
+                    team=team,
+                    opponent=opponent,
+                    positions=positions,
+                    salary=salary_i,
+                    dk_fppg=fppg,
+                    raw={"salary_csv": dict(row)},
+                ))
+        if not players:
+            raise DraftKingsError("DK_SALARY_CSV_EMPTY")
+        return players
 
     def fetch_draftables(self, draft_group_id: int) -> list[DKPlayer]:
         payload = self._getter(DRAFTABLES_URL.format(draft_group_id=int(draft_group_id)))
@@ -198,19 +242,11 @@ class DraftKingsClient:
         return players
 
 
-def resolve_slate(
-    slates: Iterable[DKSlate],
-    *,
-    requested_start: datetime,
-    tolerance_minutes: int = 20,
-) -> DKSlate:
+def resolve_slate(slates: Iterable[DKSlate], *, requested_start: datetime, tolerance_minutes: int = 20) -> DKSlate:
     if requested_start.tzinfo is None:
         raise ValueError("DFS_REQUESTED_START_MUST_BE_TIMEZONE_AWARE")
     requested = requested_start.astimezone(timezone.utc)
-    ranked = sorted(
-        slates,
-        key=lambda s: (abs((s.start_time - requested).total_seconds()), -(s.game_count or 0), -(s.total_prizes or 0.0)),
-    )
+    ranked = sorted(slates, key=lambda s: (abs((s.start_time - requested).total_seconds()), -(s.game_count or 0), -(s.total_prizes or 0.0)))
     if not ranked:
         raise DraftKingsError("DK_NO_SLATES_DISCOVERED")
     delta = abs((ranked[0].start_time - requested).total_seconds()) / 60.0
