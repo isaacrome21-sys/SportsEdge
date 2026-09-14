@@ -19,8 +19,8 @@ def _csv() -> bytes:
 
 
 def test_complete_entered_contest_produces_exact_realized_ownership() -> None:
-    lock = datetime(2026, 9, 14, 0, 0, tzinfo=timezone.utc)
-    captured = datetime(2026, 9, 14, 5, 0, tzinfo=timezone.utc)
+    lock = datetime(2026, 9, 14, 5, 0, tzinfo=timezone.utc)
+    captured = datetime(2026, 9, 14, 10, 0, tzinfo=timezone.utc)
     snapshot = build_realized_ownership_snapshot(
         _csv(),
         contest_id="777",
@@ -38,8 +38,8 @@ def test_complete_entered_contest_produces_exact_realized_ownership() -> None:
 
 
 def test_export_must_contain_our_entry_and_complete_field() -> None:
-    lock = datetime(2026, 9, 14, 0, 0, tzinfo=timezone.utc)
-    captured = datetime(2026, 9, 14, 5, 0, tzinfo=timezone.utc)
+    lock = datetime(2026, 9, 14, 5, 0, tzinfo=timezone.utc)
+    captured = datetime(2026, 9, 14, 10, 0, tzinfo=timezone.utc)
     with pytest.raises(OwnershipEvidenceError, match="OUR_ENTRY_NOT_FOUND"):
         build_realized_ownership_snapshot(
             _csv(),
@@ -64,6 +64,20 @@ def test_realized_ownership_cannot_be_captured_prelock() -> None:
     lock = datetime(2026, 9, 14, 5, 0, tzinfo=timezone.utc)
     captured = datetime(2026, 9, 14, 4, 59, tzinfo=timezone.utc)
     with pytest.raises(OwnershipEvidenceError, match="CAPTURE_PRELOCK"):
+        build_realized_ownership_snapshot(
+            _csv(),
+            contest_id="777",
+            our_entry_id="1001",
+            slate_lock=lock,
+            captured_at=captured,
+            expected_field_size=2,
+        )
+
+
+def test_pre_epoch_exports_cannot_be_backfilled_into_promotion_evidence() -> None:
+    lock = datetime(2026, 9, 14, 4, 59, tzinfo=timezone.utc)
+    captured = datetime(2026, 9, 14, 10, 0, tzinfo=timezone.utc)
+    with pytest.raises(OwnershipEvidenceError, match="PRE_EPOCH"):
         build_realized_ownership_snapshot(
             _csv(),
             contest_id="777",
