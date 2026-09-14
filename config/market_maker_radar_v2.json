@@ -114,8 +114,9 @@
     "candidate_ledger": {
       "append_only": true,
       "flat_stake_units": 1.0,
-      "episode_rule": "FIRST_QUALIFYING_CAPTURE_AFTER_NONQUALIFYING_CAPTURE",
-      "rearm_requires_threshold_exit": true,
+      "candidate_identity_rule": "FIRST_QUALIFYING_SIGNAL_PER_EVENT_MARKET_OUTCOME_SOFT_BOOK",
+      "rearm": false,
+      "rationale": "Prevent repeated five-minute stale screens for one contract from being counted as independent hypothetical bets.",
       "candidate_record_is_immutable": true,
       "settlement_is_separate_record": true,
       "unsettled_status": "PENDING_CLOSE",
