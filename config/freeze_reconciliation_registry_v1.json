@@ -138,6 +138,15 @@
     {
       "bundle_id": "MARKET_MAKER_RADAR_EVIDENCE_FREEZE_V2",
       "freeze_sha": "564e5567acf63adbf750e033df08a8c368f6884d",
+      "coverage_paths": [
+        ".github/workflows/market-maker-radar.yml",
+        "config/market_maker_radar_v1.json",
+        "docs/market_maker_radar.md",
+        "scripts/capture_nfl_market_maker_radar.py",
+        "scripts/evaluate_market_maker_execution_pilot.py",
+        "scripts/log_market_maker_execution_attempt.py",
+        "scripts/recheck_market_maker_candidate_persistence.py"
+      ],
       "coverage_prefixes": [
         ".github/workflows/nfl-market-maker-radar",
         "config/market_maker_radar_v2.json",
