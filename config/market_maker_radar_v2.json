@@ -1,8 +1,8 @@
 {
   "policy_id": "MARKET_MAKER_RADAR_V1",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "status": "ACTIVE_LAYER_B_HARD_MARKET",
-  "description": "Price-only market-maker lead/lag and stale-soft-book radar with frozen pre-signal thresholds, cross-book retrieval hygiene, and immutable stale-price research candidate ledgering. Public splits, RLM labels, capper opinion, and unverified sharp-action labels cannot create a signal.",
+  "description": "Price-only market-maker lead/lag and stale-soft-book radar with frozen pre-signal thresholds, cross-book retrieval hygiene, fixed-offset takeability checks, immutable stale-price candidate ledgering, and preregistered evaluation checkpoints. Public splits, RLM labels, capper opinion, and unverified sharp-action labels cannot create a signal.",
   "model_free": true,
   "evidence_class": "LAYER_B_HARD_MARKET_DIAGNOSTIC",
   "authority": {
@@ -36,6 +36,24 @@
     "provider_quote_timestamp_requirement": "TRUSTWORTHY_SOURCE_TIMESTAMP_REQUIRED_FOR_WITHIN_POLL_LEADER",
     "provider_quote_age_default": "UNKNOWN_UNLESS_SOURCE_EXPOSES_TRUSTWORTHY_TIMESTAMP"
   },
+  "takeability": {
+    "persistence_recheck_enabled": true,
+    "persistence_recheck_offset_seconds": 30,
+    "persistence_recheck_tolerance_seconds": 10,
+    "exact_contract_required": true,
+    "offered_price_is_not_assumed_takeable": true,
+    "persisted_price_is_takeability_proxy_only": true,
+    "persisted_price_is_not_fill_proof": true,
+    "execution_fields": [
+      "offered_price_american",
+      "attempted_price_american",
+      "filled_price_american",
+      "stake_requested_units",
+      "stake_accepted_units",
+      "attempted_at",
+      "filled_at"
+    ]
+  },
   "alerts": {
     "stale_offer_fair_probability_gap_pp": 1.0,
     "minimum_spread_or_total_line_gap": 0.5,
@@ -54,13 +72,18 @@
       "timing.lead_follow_window_seconds": 900,
       "timing.steam_window_seconds": 300,
       "timing.max_cross_book_retrieval_skew_seconds": 30,
+      "takeability.persistence_recheck_offset_seconds": 30,
+      "takeability.persistence_recheck_tolerance_seconds": 10,
       "alerts.stale_offer_fair_probability_gap_pp": 1.0,
       "alerts.minimum_spread_or_total_line_gap": 0.5,
       "alerts.minimum_price_implied_probability_move_pp": 0.25,
       "alerts.minimum_soft_followers": 1,
       "alerts.steam_min_books": 3,
       "grading.candidate_ledger.clv_close_max_age_seconds": 900,
-      "grading.candidate_ledger.exact_contract_required": true
+      "grading.candidate_ledger.exact_contract_required": true,
+      "grading.evaluation_checkpoints.candidate_n": [100, 250, 500, 1000],
+      "grading.evaluation_checkpoints.persisted_n": [100, 250, 500, 1000],
+      "grading.evaluation_checkpoints.filled_n": [100, 250, 500, 1000]
     }
   },
   "signal_classes": {
@@ -71,6 +94,19 @@
     "soft_move_unconfirmed": "DIAGNOSTIC_ONLY",
     "public_split_divergence": "ANNOTATION_ONLY",
     "rlm": "ANNOTATION_ONLY_REQUIRES_NEWS_ATTRIBUTION"
+  },
+  "run_it_independence": {
+    "independence_group_id": "HARD_MARKET_PRICE_MOVEMENT_V1",
+    "counts_as_independent_context_class": false,
+    "rule": "MARKET_PRICE_OPPORTUNITY_AND_HARD_MARKET_SIGNAL_FROM_THE_SAME_PRICE_MOVEMENT_COUNT_AS_ONE_CLASS",
+    "dedupe_signal_classes": [
+      "MARKET_MAKER_LEAD",
+      "STALE_SOFT_PRICE",
+      "LINE_ADVANTAGE_CANDIDATE",
+      "MULTI_BOOK_STEAM",
+      "RLM",
+      "PUBLIC_SPLIT_DIVERGENCE"
+    ]
   },
   "news_attribution": {
     "required_before_calling_move_rlm": true,
@@ -92,7 +128,11 @@
     "model_input_authority": false
   },
   "grading": {
-    "primary_metric": "CLV",
+    "primary_metric": "REALIZED_ROI_ON_FILLED_WAGERS",
+    "research_only_primary_metric_when_no_fills": "PERSISTED_PRICE_FLAT_1U_ROI",
+    "process_metric": "CLV",
+    "clv_role": "DETECTOR_PROCESS_CHECK_NOT_EDGE_VALIDATION",
+    "offered_price_roi_role": "OPTIMISTIC_DIAGNOSTIC_ONLY_NOT_PRIMARY",
     "source_family_ids": {
       "pinnacle_to_draftkings": "PINNACLE_TO_DRAFTKINGS_LEAD_LAG_V1",
       "pinnacle_to_fanduel": "PINNACLE_TO_FANDUEL_LEAD_LAG_V1"
@@ -112,7 +152,26 @@
     "never_blend_source_families": true,
     "minimum_n_for_claim": 100,
     "status_before_minimum_n": "INSUFFICIENT",
-    "report_metrics": ["clv", "hit_rate", "flat_1u_roi"],
+    "report_metrics": [
+      "clv",
+      "persistence_rate",
+      "fill_rate",
+      "stake_acceptance_rate",
+      "mean_stake_acceptance_ratio",
+      "hit_rate",
+      "offered_price_flat_1u_roi",
+      "persisted_price_flat_1u_roi",
+      "realized_filled_roi"
+    ],
+    "evaluation_checkpoints": {
+      "freeze_status": "FROZEN_BEFORE_FIRST_FORMAL_PERFORMANCE_EVALUATION",
+      "frozen_at": "2026-09-14T10:40:00Z",
+      "candidate_n": [100, 250, 500, 1000],
+      "persisted_n": [100, 250, 500, 1000],
+      "filled_n": [100, 250, 500, 1000],
+      "between_checkpoint_status": "COLLECT_ONLY_NO_FORMAL_PERFORMANCE_CLAIM",
+      "no_optional_looks": true
+    },
     "candidate_ledger": {
       "append_only": true,
       "flat_stake_units": 1.0,
@@ -120,6 +179,8 @@
       "rearm": false,
       "rationale": "Prevent repeated five-minute stale screens for one contract from being counted as independent hypothetical bets.",
       "candidate_record_is_immutable": true,
+      "persistence_record_is_separate": true,
+      "execution_record_is_separate": true,
       "settlement_is_separate_record": true,
       "settlement_method": "LAST_TIMING_ELIGIBLE_PINNACLE_PRESTART_EXACT_CONTRACT",
       "clv_close_max_age_seconds": 900,
