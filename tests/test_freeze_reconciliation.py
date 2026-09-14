@@ -279,13 +279,14 @@ def test_repository_policy_is_unconditional_zero_authority_and_registers_late_de
     ids = {row["delta_id"] for row in registry["deltas"]}
     assert {"PR_683", "PR_687", "PR_701", "PR_702", "PR_703"}.issubset(ids)
     assert registry["deltas"]
-    current_main = _git(Path.cwd(), "rev-parse", "origin/main")
-    assert main_matches_reconciliation_boundary(
-        Path.cwd(),
-        policy=policy,
-        reconciled_through_sha=registry["reconciled_through_sha"],
-        current_main_ref=current_main,
-    )
+    release = policy["release_conditions"]
+    assert "current_main_sha_must_equal_reconciled_through_sha" not in release
+    assert release["current_main_must_descend_from_registered_content_anchor"] is True
+    assert release["governed_surface_registry_digest_must_equal_registered_digest"] is True
+    assert release["reconciliation_merge_digest_primary"] is True
+    terminal = policy["terminal_boundary_semantics"]
+    assert terminal["status"] == "DIGEST_PRIMARY_NON_SELF_AGING"
+    assert terminal["boundary_file"] == "config/reconciliation_content_boundary_v1.json"
     assert registry["deltas"][-1]["merge_sha"] == registry["reconciled_through_sha"]
     assert registry["bundle_inventory_complete"] is False
 
