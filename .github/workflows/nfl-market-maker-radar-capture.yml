@@ -1,0 +1,136 @@
+name: nfl-market-maker-radar-capture
+
+# Five-minute, direct-public, zero-authority NFL market snapshot lane.
+# Pinnacle is the market-maker reference; DraftKings and FanDuel are soft books.
+# All books in one poll share one capture clock, so request ordering cannot create
+# a fake leader. Rows and exact raw provider payloads are append-only on `data`.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '3,8,13,18,23,28,33,38,43,48,53,58 * * * *'
+  pull_request:
+    paths:
+      - 'scripts/capture_nfl_market_maker_radar.py'
+      - 'tests/test_capture_nfl_market_maker_radar.py'
+      - 'scripts/normalize_pinnacle_nfl_markets.py'
+      - 'scripts/normalize_fanduel_nfl_markets.py'
+      - 'sportsedge/draftkings_game_market_source.py'
+      - 'scripts/analyze_market_maker_radar.py'
+      - 'config/market_maker_radar_v1.json'
+      - '.github/workflows/nfl-market-maker-radar-capture.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sportsedge-nfl-market-maker-radar-capture
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Verify direct radar contracts
+        run: |
+          python -m unittest tests.test_capture_nfl_market_maker_radar -v
+          python -m unittest tests.test_market_maker_radar -v
+          python -m unittest tests.test_pinnacle_nfl_market_normalizer -v
+          python -m unittest tests.test_fanduel_nfl_market_normalizer -v
+          python -m unittest tests.test_direct_dk_game_market_source -v
+
+      - name: Attach append-only data branch
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin data >/dev/null 2>&1; then
+            git fetch --depth=1 origin data:data
+            git worktree add .data-branch data
+          else
+            git worktree add --detach .data-branch
+            (cd .data-branch && git checkout --orphan data && git rm -rf --quiet . || true)
+          fi
+
+      - name: Capture direct Pinnacle DK FanDuel NFL snapshot
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/nfl-market-maker-radar
+          python -m scripts.capture_nfl_market_maker_radar \
+            --out-root .data-branch \
+            --status-out artifacts/nfl-market-maker-radar/capture-status.json
+          jq -e '
+            (.state == "CAPTURED" or .state == "PARTIAL") and
+            .rows_written > 0 and
+            .authority.model_p_input == false and
+            .authority.truth_gate_input == false and
+            .authority.promotion_authority == false and
+            .authority.eligibility_authority == false and
+            .authority.staking_authority == false and
+            .authority.official_authority == false and
+            .authority.evidence_clock_authority == false and
+            .authority.wager_placement_authority == false
+          ' artifacts/nfl-market-maker-radar/capture-status.json >/dev/null
+
+      - name: Commit append-only direct radar observations
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd .data-branch
+          git config user.name  'sportsedge-radar[bot]'
+          git config user.email 'sportsedge-radar@users.noreply.github.com'
+          git add -A archive/market-maker-radar
+          if git diff --cached --quiet; then
+            echo 'nothing to commit'
+            exit 0
+          fi
+          CAPTURE_ID="$(jq -r '.capture_id' ../artifacts/nfl-market-maker-radar/capture-status.json)"
+          ROWS="$(jq -r '.rows_written' ../artifacts/nfl-market-maker-radar/capture-status.json)"
+          git commit -m "nfl-market-maker-radar: ${CAPTURE_ID} rows=${ROWS} [LAYER_B_NOT_EVIDENCE]"
+          for attempt in 1 2 3; do
+            git fetch origin data || true
+            git rebase origin/data || git rebase --abort || true
+            if git push origin HEAD:data; then exit 0; fi
+            sleep $((attempt * 5))
+          done
+          echo 'NFL_RADAR_DATA_PUSH_FAILED' >&2
+          exit 1
+
+      - name: Analyze direct radar history
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/analyze_market_maker_radar.py \
+            --policy config/market_maker_radar_v1.json \
+            --input-root .data-branch/archive/market-maker-radar/nfl \
+            --since-hours 24 \
+            --out artifacts/nfl-market-maker-radar/latest.json
+          jq -e '
+            .model_p_authority == false and
+            .truth_gate_input == false and
+            .promotion_authority == false and
+            .eligibility_authority == false and
+            .staking_authority == false and
+            .official_authority == false
+          ' artifacts/nfl-market-maker-radar/latest.json >/dev/null
+
+      - name: Upload capture and radar diagnostic
+        if: github.event_name != 'pull_request' && always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nfl-market-maker-radar-${{ github.run_id }}
+          path: artifacts/nfl-market-maker-radar
+          if-no-files-found: warn
