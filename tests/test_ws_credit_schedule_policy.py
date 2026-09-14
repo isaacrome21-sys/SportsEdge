@@ -35,7 +35,17 @@ def test_parked_paid_workflows_have_no_timer() -> None:
 
 def test_remaining_authorities_still_have_schedules() -> None:
     for path in sorted(SCHEDULED_PAID):
-        assert "schedule:" in _text(path), path
+        text = _text(path)
+        if path == ".github/workflows/ev-tracker.yml":
+            # The projection lists permitted consumers, not a claim of capture
+            # during the explicitly quiesced reconciliation interval.
+            assert "EV_TRACKER_DIRECT_MAIN_WRITER_QUIESCED" in text
+            assert "workflow_dispatch:" in text
+            assert "schedule:" not in text
+            assert "contents: write" not in text
+            assert "secrets." not in text
+        else:
+            assert "schedule:" in text, path
 
 
 def test_push_ci_cannot_spend_mlb_auto_credits() -> None:

@@ -302,3 +302,33 @@ def test_invalid_non_unconditional_policy_fails_closed(repo: dict[str, object]) 
             registry=registry,
             current_main_ref=str(repo["irrelevant"]),
         )
+
+def test_ready_matrix_does_not_release_an_active_hold(repo: dict[str, object]) -> None:
+    registry = {
+        "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1",
+        "baseline_main_sha": repo["baseline"],
+        "reconciled_through_sha": repo["irrelevant"],
+        "bundle_inventory_complete": True,
+        "deltas": [_delta("IRRELEVANT", str(repo["irrelevant"]), 1)],
+        "bundles": [_bundle(str(repo["baseline"]))],
+    }
+    policy = _policy()
+    active = build_reconciliation_report(
+        repo=repo["root"], policy=policy, registry=registry,
+        current_main_ref=str(repo["irrelevant"]),
+    )
+    assert active["release_ready"] is True
+    assert active["release_authorized"] is False
+    policy["status"] = "RESOLVED"
+    resolved = build_reconciliation_report(
+        repo=repo["root"], policy=policy, registry=registry,
+        current_main_ref=str(repo["irrelevant"]),
+    )
+    assert resolved["release_authorized"] is True
+    assert active["report_sha256"] != resolved["report_sha256"]
+    advanced = build_reconciliation_report(
+        repo=repo["root"], policy=policy, registry=registry,
+        current_main_ref=str(repo["drift"]),
+    )
+    assert advanced["release_ready"] is False
+    assert advanced["release_authorized"] is False

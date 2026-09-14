@@ -175,14 +175,15 @@ jobs:
           from pathlib import Path
           report = json.loads(Path('artifacts/governance/freeze_reconciliation_report.json').read_text())
           writer_guard = json.loads(Path('artifacts/governance/direct_main_writer_guard.json').read_text())
-          if report['policy_status'] == 'ACTIVE_BLOCKED' and report['release_ready']:
-              raise SystemExit('ACTIVE_BLOCKED_POLICY_CANNOT_REPORT_RELEASE_READY')
+          if report['policy_status'] == 'ACTIVE_BLOCKED' and report['release_authorized']:
+              raise SystemExit('ACTIVE_BLOCKED_POLICY_CANNOT_AUTHORIZE_RELEASE')
           if any((report.get('authority') or {}).values()):
               raise SystemExit('FREEZE_RECONCILIATION_REPORT_AUTHORITY_ESCALATION')
           if any((writer_guard.get('authority') or {}).values()):
               raise SystemExit('DIRECT_MAIN_WRITER_GUARD_AUTHORITY_ESCALATION')
           active = list(writer_guard.get('active_direct_main_writers') or ())
           print('release_ready=' + str(report['release_ready']))
+          print('release_authorized=' + str(report['release_authorized']))
           print('release_blocks=' + ','.join(report['release_blocks']))
           print('direct_main_writer_status=' + str(writer_guard['status']))
           print('active_direct_main_writers=' + ','.join(active))

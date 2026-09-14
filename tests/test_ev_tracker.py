@@ -53,14 +53,17 @@ class Policy(unittest.TestCase):
         import re
         text = (ROOT / ".github/workflows/ev-tracker.yml").read_text()
         uses = re.findall(r"uses:\s*([^\s#]+)", text)
-        self.assertTrue(uses)
+        if not uses:
+            self.assertIn("EV_TRACKER_DIRECT_MAIN_WRITER_QUIESCED", text)
         for ref in uses:
             self.assertRegex(ref, r"^[\w.-]+/[\w.-]+@[0-9a-f]{40}$")
 
-    def test_workflow_push_failure_is_not_silent(self):
+    def test_quiesced_workflow_cannot_mutate_repository(self):
         text = (ROOT / ".github/workflows/ev-tracker.yml").read_text()
-        self.assertNotIn("&& break; sleep 5; done", text)
-        self.assertEqual(text.count('if [ "$pushed" != "1" ]; then echo "PUSH_FAILED'), 2)
+        self.assertIn("EV_TRACKER_DIRECT_MAIN_WRITER_QUIESCED", text)
+        self.assertIn("contents: read", text)
+        for forbidden in ("contents: write", "issues: write", "git push", "git commit", "secrets."):
+            self.assertNotIn(forbidden, text)
 
 
 class Math(unittest.TestCase):
@@ -445,17 +448,12 @@ class Sweep(Base):
         out = tr.run_sweep(POLICY, FakeClient(), gh, self.OWNER, MAIN, tr.Outbox())
         self.assertEqual((out["errors"], out["logged"]), (["GITHUB_API_ERROR"], 1))
 
-    def test_workflow_lock_and_sweep_permissions(self):
+    def test_quiesced_workflow_cannot_capture_or_notify(self):
         text = (ROOT / ".github/workflows/ev-tracker.yml").read_text()
-        self.assertEqual(text.count("group: sportsedge-paid-odds-api"), 2)
-        close_job = text.split("\n  close:")[1]
-        self.assertIn("issues: write", close_job)
-        self.assertIn("GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}", close_job)
-        self.assertIn("ledger/ev_plays", close_job)
-        for job in (text.split("\n  close:")[0], close_job):
-            commit, notify = job.index("git commit"), job.index("ev_tracker.py notify")
-            self.assertLess(commit, notify, "confirmations must be posted after the ledger push")
-            self.assertIn("--diff-filter=MDRT", job)
+        self.assertIn("workflow_dispatch:", text)
+        self.assertIn("EV_TRACKER_DIRECT_MAIN_WRITER_QUIESCED", text)
+        for forbidden in ("schedule:", "issue_comment:", "issues:", "ev_tracker.py", "ODDS_API_KEY"):
+            self.assertNotIn(forbidden, text)
 
 
 class Client(unittest.TestCase):

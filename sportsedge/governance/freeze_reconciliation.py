@@ -543,6 +543,9 @@ def build_reconciliation_report(
     for row in rows:
         outcome_counts[row.outcome] += 1
     release_ready = not blocks
+    # A completed matrix can be ready while the process hold is still active.
+    # Only a separately resolved policy can authorize release of that hold.
+    release_authorized = release_ready and policy["status"] == "RESOLVED"
     return {
         "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REPORT_V1",
         "issue": int(policy["issue"]),
@@ -556,6 +559,7 @@ def build_reconciliation_report(
         "outcome_counts": outcome_counts,
         "rows": [row.as_dict() for row in rows],
         "release_ready": release_ready,
+        "release_authorized": release_authorized,
         "release_blocks": sorted(set(blocks)),
         "authority": dict(policy.get("authority") or {}),
         "report_sha256": _canonical_sha256(
@@ -565,6 +569,8 @@ def build_reconciliation_report(
                 "reconciled_through_sha": reconciled_through,
                 "rows": [row.as_dict() for row in rows],
                 "blocks": sorted(set(blocks)),
+                "policy_status": policy["status"],
+                "release_authorized": release_authorized,
             }
         ),
     }

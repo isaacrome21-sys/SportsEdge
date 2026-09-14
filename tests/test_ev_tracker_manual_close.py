@@ -132,14 +132,11 @@ class ManualCloseTests(unittest.TestCase):
         self.assertEqual(rec["observation"]["status"], "UNAVAILABLE")
         self.assertEqual(rec["observation"]["reason"], "NO_FRESH_SHARP_QUOTE")
 
-    def test_workflow_manual_job_has_no_paid_key_and_is_create_only(self):
+    def test_manual_close_writer_is_quiesced_with_scheduled_writer(self):
         text = (ROOT / ".github/workflows/ev-tracker.yml").read_text()
-        manual_job = text.split("  manual-close:\n", 1)[1].split("\n  close:\n", 1)[0]
-        self.assertNotIn("ODDS_API_KEY", manual_job)
-        self.assertIn("group: ev-tracker-manual-close-${{ github.event.issue.number }}", manual_job)
-        self.assertIn("git add -A ledger/ev_manual_close_observations", manual_job)
-        self.assertIn("--diff-filter=MDRT -- ledger/", manual_job)
-        self.assertIn("MANUAL_PUSH_FAILED: manual observation was not persisted", manual_job)
+        self.assertIn("EV_TRACKER_DIRECT_MAIN_WRITER_QUIESCED", text)
+        for forbidden in ("manual-close:", "ev_manual_close", "ODDS_API_KEY", "git add", "git push"):
+            self.assertNotIn(forbidden, text)
 
 
 if __name__ == "__main__":
