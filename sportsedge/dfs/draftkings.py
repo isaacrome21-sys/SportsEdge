@@ -37,6 +37,23 @@ def _num(obj: dict[str, Any], *keys: str) -> Any:
     return None
 
 
+def _parse_named_roster_slots(row: dict[str, Any]) -> tuple[str, ...]:
+    raw = row.get("rosterSlots") or row.get("rosterSlot") or row.get("rosterPosition") or row.get("rosterPositions")
+    if raw is None:
+        return ()
+    if isinstance(raw, list):
+        values: list[str] = []
+        for item in raw:
+            if isinstance(item, dict):
+                value = item.get("name") or item.get("abbr") or item.get("position") or item.get("value")
+                if value:
+                    values.append(str(value))
+            elif item is not None:
+                values.append(str(item))
+        return parse_positions(values)
+    return parse_positions(str(raw))
+
+
 def _http_json(url: str, timeout: int = 15) -> dict[str, Any]:
     req = Request(
         url,
@@ -148,6 +165,7 @@ class DraftKingsClient:
                 if " (" in name and row.get("Name") is None:
                     name = name.rsplit(" (", 1)[0]
                 positions = parse_positions(row.get("Position") or row.get("Roster Position") or "")
+                roster_slots = parse_positions(row.get("Roster Position") or "")
                 game_info = str(row.get("Game Info") or "")
                 matchup = game_info.split(" ", 1)[0].upper()
                 opponent = ""
@@ -173,6 +191,7 @@ class DraftKingsClient:
                     opponent=opponent,
                     positions=positions,
                     salary=salary_i,
+                    roster_slots=roster_slots,
                     dk_fppg=fppg,
                     raw={"salary_csv": dict(row)},
                 ))
@@ -218,6 +237,7 @@ class DraftKingsClient:
             if pid is None:
                 continue
             positions = parse_positions(row.get("position") or row.get("rosterSlot") or "")
+            roster_slots = _parse_named_roster_slots(row)
             if not positions:
                 continue
             players.append(
@@ -228,6 +248,7 @@ class DraftKingsClient:
                     opponent=opponent,
                     positions=positions,
                     salary=int(salary),
+                    roster_slots=roster_slots,
                     game_id=str(comp.get("competitionId") or ""),
                     game_start=_parse_dt(comp.get("startTime")),
                     dk_fppg=fppg,
