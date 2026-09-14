@@ -84,13 +84,29 @@ class CFBHistoricalMarketSourceTests(unittest.TestCase):
         ):
             self.assertIs(contract["authority"][field], False)
 
-    def test_existing_external_repo_policy_remains_research_only(self):
+    def test_existing_external_repo_policy_remains_reference_only_and_non_authoritative(self):
         policy = json.loads(ADOPTIONS.read_text(encoding="utf-8"))
-        self.assertEqual(policy["mode"], "RESEARCH_ONLY")
-        self.assertEqual(policy["effective_status"], "BLOCKED_NON_PIT")
-        self.assertIs(policy["source_authority"]["model_p_authority"], False)
-        self.assertIs(policy["source_authority"]["truth_gate_authority"], False)
-        self.assertIs(policy["source_authority"]["official_bet_authority"], False)
+        self.assertEqual(policy["status"], "RESEARCH_AND_ENGINEERING_REFERENCE_ONLY")
+        authority = policy["authority"]
+        for field in (
+            "predictive_model_input",
+            "model_p_authority",
+            "truth_gate_input",
+            "promotion_authority",
+            "eligibility_authority",
+            "edge_floor_authority",
+            "official_authority",
+        ):
+            self.assertIs(authority[field], False)
+        governance = policy["governance"]
+        for field in (
+            "may_create_model_p",
+            "may_satisfy_pit_source_manifest",
+            "may_satisfy_asof_availability_proof",
+            "may_satisfy_paired_market_evidence",
+            "may_change_market_eligibility",
+        ):
+            self.assertIs(governance[field], False)
 
     def test_bootstrap_accepts_exact_git_blob_but_normal_mode_requires_sha256(self):
         data = self._fixture_bytes()
