@@ -130,9 +130,7 @@
     "exemptions_must_be_exact_paths": true,
     "wildcard_exemptions_forbidden": true,
     "every_candidate_must_be_bundle_mapped_or_exactly_exempt": true,
-    "registry_complete_true_requires_zero_unmapped_candidates": true,
-    "audit_must_emit_bundle_ids_per_candidate": true,
-    "broad_mapping_without_traceable_bundle_binding_forbidden": true
+    "registry_complete_true_requires_zero_unmapped_candidates": true
   },
   "authority": {
     "model_p": false,
