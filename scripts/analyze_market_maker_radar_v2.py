@@ -7,8 +7,10 @@ or steam signals. Raw observations remain archived even when timing-ineligible.
 
 STALE_SOFT_PRICE is a model-free research candidate, not Model_P and not an
 automatic bet. The first qualifying observation for each event/market/outcome/
-soft-book contract gets one immutable flat-1u candidate record. CLV settlement
-is deliberately separate so the original candidate can never be rewritten.
+soft-book contract gets one immutable candidate record. A captured offer is not
+assumed takeable; fixed-offset persistence and any real execution are separate
+append-only records. CLV is a detector/process check, not the primary edge
+validation metric for this lane.
 """
 from __future__ import annotations
 
@@ -91,9 +93,6 @@ def _stale_family(signal: Mapping[str, Any], policy: Mapping[str, Any]) -> str:
 
 
 def _candidate_id(signal: Mapping[str, Any], source_family_id: str) -> str:
-    # One immutable candidate per event/market/outcome/soft-book contract. This
-    # deliberately avoids counting the same stale screen every five minutes as
-    # a fresh hypothetical wager.
     material = {
         "source_family_id": source_family_id,
         "event_id": signal.get("event_id"),
@@ -103,6 +102,17 @@ def _candidate_id(signal: Mapping[str, Any], source_family_id: str) -> str:
     }
     encoded = json.dumps(material, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _independence_fields(policy: Mapping[str, Any]) -> dict[str, Any]:
+    contract = policy.get("run_it_independence") or {}
+    group = str(contract.get("independence_group_id") or "")
+    if not group or contract.get("counts_as_independent_context_class") is not False:
+        raise RadarV2Error("RADAR_V2_RUN_IT_INDEPENDENCE_CONTRACT_INVALID")
+    return {
+        "run_it_independence_group_id": group,
+        "counts_as_independent_context_class": False,
+    }
 
 
 def candidate_record(signal: Mapping[str, Any], policy: Mapping[str, Any]) -> dict[str, Any]:
@@ -126,6 +136,9 @@ def candidate_record(signal: Mapping[str, Any], policy: Mapping[str, Any]) -> di
         "soft_book": signal.get("soft_book"),
         "point": signal.get("point"),
         "offered_price_american": signal.get("soft_price_american"),
+        "offered_price_takeable_assumed": False,
+        "takeability_status": "PENDING_FIXED_OFFSET_RECHECK",
+        "execution_status": "NO_EXECUTION_RECORD",
         "reference_pinnacle_price_american": signal.get("pinnacle_price_american"),
         "reference_pinnacle_fair_probability": signal.get("pinnacle_fair_probability"),
         "fair_probability_gap_pp": signal.get("fair_probability_gap_pp"),
@@ -144,6 +157,7 @@ def candidate_record(signal: Mapping[str, Any], policy: Mapping[str, Any]) -> di
         "official_authority": False,
         "automatic_wager_authority": False,
         "manual_candidate_review_eligible": True,
+        **_independence_fields(policy),
     }
 
 
@@ -155,11 +169,16 @@ def _persist_candidate(root: Path, record: Mapping[str, Any]) -> tuple[Path, boo
     target.parent.mkdir(parents=True, exist_ok=True)
     payload = json.dumps(dict(record), indent=2, sort_keys=True) + "\n"
     if target.exists():
-        # Candidate records are immutable. An existing identical identity is not
-        # rewritten with a later/better-looking signal.
         return rel, False
     target.write_text(payload, encoding="utf-8")
     return rel, True
+
+
+def _next_checkpoint(n: int, checkpoints: Sequence[int]) -> int | None:
+    for checkpoint in checkpoints:
+        if n < int(checkpoint):
+            return int(checkpoint)
+    return None
 
 
 def _ledger_summary(root: Path, policy: Mapping[str, Any]) -> dict[str, Any]:
@@ -169,6 +188,7 @@ def _ledger_summary(root: Path, policy: Mapping[str, Any]) -> dict[str, Any]:
         for path in base.glob("*/*.json"):
             counts[path.parent.name] += 1
     minimum_n = int(policy["grading"]["minimum_n_for_claim"])
+    checkpoints = [int(v) for v in policy["grading"]["evaluation_checkpoints"]["candidate_n"]]
     out: dict[str, Any] = {}
     for family, n in sorted(counts.items()):
         out[family] = {
@@ -177,13 +197,31 @@ def _ledger_summary(root: Path, policy: Mapping[str, Any]) -> dict[str, Any]:
             "validation_status": (
                 policy["grading"]["status_before_minimum_n"]
                 if n < minimum_n
-                else "CLV_SETTLEMENT_REQUIRED_BEFORE_ANY_EDGE_CLAIM"
+                else "FORMAL_EVALUATION_ONLY_AT_FROZEN_CHECKPOINTS"
             ),
+            "next_candidate_checkpoint": _next_checkpoint(n, checkpoints),
+            "formal_checkpoint_now": n in checkpoints,
             "clv": None,
             "hit_rate": None,
-            "flat_1u_roi": None,
+            "offered_price_flat_1u_roi": None,
+            "persisted_price_flat_1u_roi": None,
+            "realized_filled_roi": None,
         }
     return out
+
+
+def _stamp_report_independence(report: Mapping[str, Any], policy: Mapping[str, Any]) -> dict[str, Any]:
+    output = dict(report)
+    fields = _independence_fields(policy)
+    for key in ("lead_lag_signals", "stale_soft_prices", "line_advantage_candidates", "steam_clusters"):
+        stamped = []
+        for raw in output.get(key) or []:
+            row = dict(raw)
+            row.update(fields)
+            stamped.append(row)
+        output[key] = stamped
+    output["run_it_independence"] = dict(policy["run_it_independence"])
+    return output
 
 
 def analyze(
@@ -193,19 +231,19 @@ def analyze(
     ledger_root: Path | None = None,
 ) -> dict[str, Any]:
     eligible, excluded = timing_eligible_rows(rows, policy)
-    report = analyze_v1(eligible, policy)
+    report = _stamp_report_independence(analyze_v1(eligible, policy), policy)
 
     stale = report.get("stale_soft_prices") or []
     for signal in stale:
         signal["source_family_id"] = _stale_family(signal, policy)
         signal["manual_candidate_review_eligible"] = True
         signal["automatic_wager_authority"] = False
+        signal["offered_price_takeable_assumed"] = False
+        signal["takeability_status"] = "PENDING_FIXED_OFFSET_RECHECK"
 
     new_records: list[dict[str, Any]] = []
     existing_records: list[dict[str, Any]] = []
     if ledger_root is not None:
-        # Sort so the earliest observed qualifying screen wins the immutable
-        # candidate identity when several five-minute polls show the same offer.
         ordered = sorted(stale, key=lambda s: (str(s.get("captured_at") or ""), str(s.get("signal_id") or "")))
         for signal in ordered:
             record = candidate_record(signal, policy)
@@ -213,6 +251,7 @@ def analyze(
             item = {"candidate_id": record["candidate_id"], "source_family_id": record["source_family_id"], "path": str(rel)}
             (new_records if created else existing_records).append(item)
 
+    grading = policy["grading"]
     report.update({
         "policy_version": policy["version"],
         "threshold_freeze": policy["threshold_freeze"],
@@ -227,6 +266,12 @@ def analyze(
         "candidate_ledger_existing": existing_records,
         "automatic_wager_authority": False,
         "manual_candidate_review_authority": True,
+        "primary_metric": grading["primary_metric"],
+        "research_only_primary_metric_when_no_fills": grading["research_only_primary_metric_when_no_fills"],
+        "process_metric": grading["process_metric"],
+        "clv_role": grading["clv_role"],
+        "offered_price_roi_role": grading["offered_price_roi_role"],
+        "evaluation_checkpoints": grading["evaluation_checkpoints"],
     })
     if ledger_root is not None:
         report["candidate_ledger_summary"] = _ledger_summary(ledger_root, policy)
