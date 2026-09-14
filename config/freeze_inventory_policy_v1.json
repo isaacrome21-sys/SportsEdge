@@ -69,6 +69,15 @@
         "candidate_count": 317,
         "mapped_or_exactly_exempt_count": 87,
         "unmapped_count": 230
+      },
+      {
+        "pass_id": "PASS_4",
+        "head_sha": "ec7938c582bbe76e3020320692ad1aba42f7ab92",
+        "pull_request_head_sha": "5f1dbc2b598a25bdb9c0dde84443e8b20c68012b",
+        "artifact_digest": "sha256:754c0ff4c2fd1efe09b7b7ec7dc8f336163e4a9d7e375909d90b488f516ac7f3",
+        "candidate_count": 317,
+        "mapped_or_exactly_exempt_count": 118,
+        "unmapped_count": 199
       }
     ]
   },
