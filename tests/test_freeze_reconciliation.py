@@ -12,6 +12,7 @@ from sportsedge.governance.freeze_reconciliation import (
     main_matches_reconciliation_boundary,
     reconcile_delta_bundle,
 )
+from sportsedge.governance.reconciliation_content_identity import governed_surface_digest
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -250,7 +251,7 @@ def test_incomplete_bundle_inventory_is_a_hard_block(repo: dict[str, object]) ->
     assert "ACTIVE_FREEZE_BUNDLE_INVENTORY_INCOMPLETE" in report["release_blocks"]
 
 
-def test_main_advancing_after_reconciliation_reblocks(repo: dict[str, object]) -> None:
+def test_governed_content_change_after_reconciliation_reblocks(repo: dict[str, object]) -> None:
     registry = {
         "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1",
         "baseline_main_sha": repo["baseline"],
@@ -266,7 +267,13 @@ def test_main_advancing_after_reconciliation_reblocks(repo: dict[str, object]) -
         current_main_ref=str(repo["drift"]),
     )
     assert report["release_ready"] is False
-    assert any(block.startswith("MAIN_ADVANCED_BEYOND_RECONCILIATION") for block in report["release_blocks"])
+    assert any(
+        block.startswith("MAIN_GOVERNED_CONTENT_DIVERGED_FROM_RECONCILIATION")
+        for block in report["release_blocks"]
+    )
+    boundary = report["boundary_identity"]
+    assert boundary["ancestry_ok"] is True
+    assert boundary["content_identity_ok"] is False
 
 
 def test_repository_policy_is_unconditional_zero_authority_and_registers_late_deltas() -> None:
@@ -275,6 +282,10 @@ def test_repository_policy_is_unconditional_zero_authority_and_registers_late_de
     assert policy["main_merge_hold"] == "UNCONDITIONAL"
     assert policy["status"] == "RESOLVED"
     assert policy["authorized_reconciliation_branch"] == "fix/freeze-reconciliation-inventory-20260914"
+    assert policy["reconciliation_merge_method"] == "merge"
+    assert policy["release_conditions"]["current_main_must_descend_from_reconciled_through_sha"] is True
+    assert policy["release_conditions"]["current_governed_surface_digest_must_equal_registered_boundary_digest"] is True
+    assert policy["release_conditions"]["sha_equality_is_not_a_terminal_condition"] is True
     assert not any(policy["authority"].values())
     ids = {row["delta_id"] for row in registry["deltas"]}
     assert {"PR_683", "PR_687", "PR_701", "PR_702", "PR_703"}.issubset(ids)
@@ -283,6 +294,7 @@ def test_repository_policy_is_unconditional_zero_authority_and_registers_late_de
     assert main_matches_reconciliation_boundary(
         Path.cwd(),
         policy=policy,
+        registry=registry,
         reconciled_through_sha=registry["reconciled_through_sha"],
         current_main_ref=current_main,
     )
@@ -290,46 +302,115 @@ def test_repository_policy_is_unconditional_zero_authority_and_registers_late_de
     assert registry["bundle_inventory_complete"] is False
 
 
-def test_terminal_reconciliation_merge_is_narrow_and_self_closing(repo: dict[str, object]) -> None:
+def test_content_neutral_single_parent_successor_is_self_closing(repo: dict[str, object]) -> None:
     root = repo["root"]
     reconciled = str(repo["inventory_drift"])
+    registry = {
+        "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1",
+        "baseline_main_sha": repo["baseline"],
+        "reconciled_through_sha": reconciled,
+        "bundle_inventory_complete": True,
+        "deltas": [_delta("ANCHOR", reconciled, 1)],
+        "bundles": [_bundle(str(repo["baseline"]))],
+    }
+    (root / "other.txt").write_text("squash-like neutral successor\n", encoding="utf-8")
+    successor = _commit(root, "content-neutral single-parent successor")
+    assert main_matches_reconciliation_boundary(
+        root,
+        policy=_policy(),
+        registry=registry,
+        reconciled_through_sha=reconciled,
+        current_main_ref=successor,
+    )
+    before = governed_surface_digest(root, registry=registry, ref=reconciled)
+    after = governed_surface_digest(root, registry=registry, ref=successor)
+    assert before == after
+
+
+def test_content_neutral_two_parent_merge_is_self_closing(repo: dict[str, object]) -> None:
+    root = repo["root"]
+    reconciled = str(repo["inventory_drift"])
+    registry = {
+        "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1",
+        "baseline_main_sha": repo["baseline"],
+        "reconciled_through_sha": reconciled,
+        "bundle_inventory_complete": True,
+        "deltas": [_delta("ANCHOR", reconciled, 1)],
+        "bundles": [_bundle(str(repo["baseline"]))],
+    }
     _git(root, "switch", "-c", "reconcile-terminal")
-    (root / "config").mkdir(exist_ok=True)
-    (root / "config" / "freeze_reconciliation_terminal_note.json").write_text("{}\n")
-    branch_head = _commit(root, "reconciliation-only terminal change")
+    (root / "reconciliation-note.txt").write_text("neutral\n", encoding="utf-8")
+    branch_head = _commit(root, "content-neutral reconciliation change")
     _git(root, "switch", "main")
     _git(root, "merge", "--no-ff", branch_head, "-m", "merge reconciliation terminal")
     merge_sha = _git(root, "rev-parse", "HEAD")
     assert main_matches_reconciliation_boundary(
         root,
         policy=_policy(),
+        registry=registry,
         reconciled_through_sha=reconciled,
         current_main_ref=merge_sha,
     )
-    (root / "other.txt").write_text("ordinary movement\n")
-    ordinary = _commit(root, "ordinary main movement")
+
+
+def test_descendant_governed_change_fails_content_identity(repo: dict[str, object]) -> None:
+    root = repo["root"]
+    reconciled = str(repo["inventory_drift"])
+    registry = {
+        "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1",
+        "baseline_main_sha": repo["baseline"],
+        "reconciled_through_sha": reconciled,
+        "bundle_inventory_complete": True,
+        "deltas": [_delta("ANCHOR", reconciled, 1)],
+        "bundles": [_bundle(str(repo["baseline"]))],
+    }
+    (root / "policy" / "freeze.txt").write_text("v3\n", encoding="utf-8")
+    current = _commit(root, "governed descendant change")
     assert not main_matches_reconciliation_boundary(
         root,
         policy=_policy(),
+        registry=registry,
         reconciled_through_sha=reconciled,
-        current_main_ref=ordinary,
+        current_main_ref=current,
     )
 
 
-def test_terminal_reconciliation_merge_rejects_nonreconciliation_path(repo: dict[str, object]) -> None:
+def test_non_descendant_matching_content_fails_ancestry(repo: dict[str, object]) -> None:
     root = repo["root"]
-    reconciled = str(repo["inventory_drift"])
-    _git(root, "switch", "-c", "bad-terminal")
-    (root / "other.txt").write_text("not governance only\n")
-    branch_head = _commit(root, "non-reconciliation change")
-    _git(root, "switch", "main")
-    _git(root, "merge", "--no-ff", branch_head, "-m", "merge bad terminal")
-    current = _git(root, "rev-parse", "HEAD")
+    reconciled = str(repo["irrelevant"])
+    registry = {
+        "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1",
+        "baseline_main_sha": repo["baseline"],
+        "reconciled_through_sha": reconciled,
+        "bundle_inventory_complete": True,
+        "deltas": [_delta("ANCHOR", reconciled, 1)],
+        "bundles": [_bundle(str(repo["baseline"]))],
+    }
+    _git(root, "switch", "-c", "divergent", str(repo["baseline"]))
+    (root / "other.txt").write_text("different ungoverned branch\n", encoding="utf-8")
+    divergent = _commit(root, "divergent content-neutral branch")
+    assert governed_surface_digest(root, registry=registry, ref=reconciled) == governed_surface_digest(
+        root, registry=registry, ref=divergent
+    )
     assert not main_matches_reconciliation_boundary(
         root,
         policy=_policy(),
+        registry=registry,
         reconciled_through_sha=reconciled,
-        current_main_ref=current,
+        current_main_ref=divergent,
+    )
+
+
+def test_722_merge_is_governed_content_neutral() -> None:
+    root = Path.cwd()
+    registry = json.loads(Path("config/freeze_reconciliation_registry_v1.json").read_text())
+    registered = "a6e5a155edc9bc59676816091473a8540d694e0c"
+    merged = "bd47021bd2d0fbb748e64795f0b37108a70b4389"
+    registered_digest = governed_surface_digest(root, registry=registry, ref=registered)
+    merged_digest = governed_surface_digest(root, registry=registry, ref=merged)
+    assert registered_digest == merged_digest, (
+        "#722 merge changed governed content: "
+        f"registered={registered_digest} merged={merged_digest}"
     )
 
 
