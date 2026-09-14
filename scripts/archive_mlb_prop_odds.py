@@ -15,6 +15,10 @@ from pathlib import Path
 import sys
 from typing import Any, Mapping
 
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
 from sportsedge.draftkings_prop_source import COUNT_MARKETS, _json, fetch_mlb_prop_quotes
 
 TARGET_MARKETS = frozenset(COUNT_MARKETS)
@@ -35,8 +39,8 @@ def _parse_iso(value: Any) -> datetime | None:
         dt = datetime.fromisoformat(text)
     except ValueError:
         return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+    if dt.tzinfo is None or dt.utcoffset() is None:
+        return None
     return dt.astimezone(timezone.utc)
 
 
@@ -112,11 +116,17 @@ def _event_index(base_url: str, league_id: int) -> tuple[dict[str, dict[str, Any
 
 
 def build_archive_payload(*, now: datetime | None = None) -> dict[str, Any]:
-    captured_at = (now or _utcnow()).astimezone(timezone.utc)
+    started_at = now or _utcnow()
+    if started_at.tzinfo is None or started_at.utcoffset() is None:
+        raise ValueError("ARCHIVE_CLOCK_TIMEZONE_REQUIRED")
     snap = fetch_mlb_prop_quotes()
     if snap.base_url is None or snap.league_id is None:
         raise RuntimeError("DK_PROVIDER_METADATA_MISSING")
     events, event_failures = _event_index(snap.base_url, snap.league_id)
+    # Availability starts after all source requests complete, never before HTTP.
+    captured_at = (now or _utcnow()).astimezone(timezone.utc)
+    if captured_at < started_at:
+        raise ValueError("ARCHIVE_CLOCK_MOVED_BACKWARDS")
 
     provider_rows = [dict(row) for row in snap.quotes]
     target_rows: list[dict[str, Any]] = []
@@ -151,7 +161,7 @@ def build_archive_payload(*, now: datetime | None = None) -> dict[str, Any]:
                 }
             )
             continue
-        if retrieved >= first_pitch:
+        if retrieved >= first_pitch or captured_at >= first_pitch:
             rejected_rows.append(
                 {
                     "market": market,
@@ -162,6 +172,11 @@ def build_archive_payload(*, now: datetime | None = None) -> dict[str, Any]:
                     "first_pitch_at": first_pitch.isoformat(),
                 }
             )
+            continue
+
+        if retrieved > captured_at:
+            rejected_rows.append({"market": market, "provider_event_id": event_id,
+                                  "reason": "QUOTE_TIMESTAMP_AFTER_CAPTURE"})
             continue
 
         row = {

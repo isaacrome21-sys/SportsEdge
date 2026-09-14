@@ -1,4 +1,7 @@
 import importlib.util
+import json
+import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -63,6 +66,28 @@ def _event():
 
 
 class ArchiveMLBPropOddsTests(unittest.TestCase):
+    def test_direct_cli_works_without_pythonpath_or_working_directory(self):
+        with tempfile.TemporaryDirectory() as td:
+            result = subprocess.run([sys.executable, "-I", str(SCRIPT), "--self-test"],
+                                    cwd=td, text=True, capture_output=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)["status"], "SELF_TEST_OK")
+
+    def test_naive_provider_timestamp_is_not_assumed_utc(self):
+        self.assertIsNone(mod._parse_iso("2026-08-24T00:10:00"))
+
+    def test_capture_crossing_first_pitch_is_rejected(self):
+        with patch.object(mod, "fetch_mlb_prop_quotes", return_value=_snapshot(retrieved_at="2026-08-24T00:09:59Z")), patch.object(mod, "_event_index", return_value=({"123": _event()}, [])), patch.object(mod, "_utcnow", side_effect=[datetime(2026,8,24,0,9,58,tzinfo=timezone.utc), datetime(2026,8,24,0,10,1,tzinfo=timezone.utc)]):
+            result = mod.build_archive_payload()
+        self.assertEqual(result["pit_target_quote_count"], 0)
+        self.assertEqual(result["rejected_targets"][0]["reason"], "NOT_PREGAME")
+
+    def test_future_quote_cannot_be_accepted(self):
+        with patch.object(mod, "fetch_mlb_prop_quotes", return_value=_snapshot(retrieved_at="2026-08-24T00:09:59Z")), patch.object(mod, "_event_index", return_value=({"123": _event()}, [])):
+            result = mod.build_archive_payload(now=datetime(2026,8,24,0,5,tzinfo=timezone.utc))
+        self.assertEqual(result["pit_target_quote_count"], 0)
+        self.assertEqual(result["rejected_targets"][0]["reason"], "QUOTE_TIMESTAMP_AFTER_CAPTURE")
+
     def test_target_market_set_is_derived_from_live_dk_parser(self):
         self.assertEqual(mod.TARGET_MARKETS, frozenset(COUNT_MARKETS))
         self.assertIn("HITS", mod.TARGET_MARKETS)

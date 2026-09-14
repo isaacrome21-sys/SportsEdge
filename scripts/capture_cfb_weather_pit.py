@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Prospective, model-free CFB pre-kickoff weather + prestart capture.
 
-The collector uses public ESPN CFB scoreboard/summary JSON only as a prospective
-observation source. It stores the exact raw response bytes by SHA-256 and appends
+The collector uses public ESPN CFB scoreboard/summary JSON and, when explicit
+venue coordinates are available, Open-Meteo forecasts as prospective sources.
+It stores the exact raw response bytes by SHA-256 and appends
 normalized observations on the SportsEdge data branch. Missing weather is a
 recorded miss, never imputed. No Model_P, Truth-Gate, promotion or staking
 authority is created here.
@@ -13,10 +14,17 @@ import argparse
 import hashlib
 import json
 import sys
+import time
+import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+from sportsedge.public_weather_forecast import forecast_url, kickoff_hour_forecast
 
 UTC = timezone.utc
 SCOREBOARD_ROOT = "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard"
@@ -45,7 +53,7 @@ def _parse_ts(value: Any) -> datetime:
 
 
 def _iso(value: datetime) -> str:
-    return value.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _default_opener(url: str, timeout: int = 20):
@@ -53,12 +61,22 @@ def _default_opener(url: str, timeout: int = 20):
     return urllib.request.urlopen(req, timeout=timeout)
 
 
-def _fetch_bytes(url: str, opener: Callable[..., Any]) -> bytes:
-    try:
-        with opener(url, timeout=20) as response:
-            return response.read()
-    except Exception as exc:
-        raise CFBWeatherCaptureError("CFB_WEATHER_FETCH_FAILED") from exc
+def _fetch_bytes(url: str, opener: Callable[..., Any], *, pause: Callable[[float], None] = time.sleep) -> bytes:
+    for attempt in range(3):
+        try:
+            with opener(url, timeout=20) as response:
+                return response.read()
+        except urllib.error.HTTPError as exc:
+            retryable = exc.code in {429, 500, 502, 503, 504}
+            reason = f"CFB_WEATHER_HTTP_{exc.code}"
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            retryable, reason = True, "CFB_WEATHER_TRANSPORT_FAILED"
+        except Exception as exc:
+            raise CFBWeatherCaptureError("CFB_WEATHER_FETCH_FAILED") from exc
+        if not retryable or attempt == 2:
+            raise CFBWeatherCaptureError(reason)
+        pause(float(attempt + 1))
+    raise AssertionError("unreachable")
 
 
 def _decode(raw: bytes) -> Mapping[str, Any]:
@@ -164,7 +182,11 @@ def capture_weather(
     policy: Mapping[str, Any],
     out_dir: Path,
     opener: Callable[..., Any] = _default_opener,
+    clock: Callable[[], datetime] | None = None,
 ) -> dict[str, Any]:
+    clock = clock or (lambda: datetime.now(UTC))
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise CFBWeatherCaptureError("CFB_WEATHER_TIMESTAMP_NAIVE")
     captured_at = _iso(now)
     events: dict[str, tuple[Mapping[str, Any], bytes, str]] = {}
     for delta in (0, 1):
@@ -203,19 +225,49 @@ def capture_weather(
         summary_url = f"{SUMMARY_ROOT}?event={event_id}"
         summary_raw = _fetch_bytes(summary_url, opener)
         summary = _decode(summary_raw)
+        received_at = clock()
+        if received_at.tzinfo is None or received_at.utcoffset() is None or received_at < now:
+            raise CFBWeatherCaptureError("CFB_WEATHER_CAPTURE_CLOCK_INVALID")
+        window = _window_for(start, received_at, policy)
+        if window is None:
+            skips.append({"event_id": event_id, "reason": "RESPONSE_OUTSIDE_PRESTART_WINDOW"})
+            continue
         summary_comp = _summary_comp(summary)
         summary_state = _status_state(summary_comp)
         if summary_state and summary_state != "pre":
             skips.append({"event_id": event_id, "window": window, "reason": "SUMMARY_NOT_PRESTART"})
             continue
         weather, source = _weather_from(summary, summary_comp, comp)
+        supporting_raw = []
         if weather is None:
-            skips.append({"event_id": event_id, "window": window, "reason": "WEATHER_NOT_PUBLISHED"})
-            continue
+            venue = (summary.get("gameInfo") or {}).get("venue") or comp.get("venue") or {}
+            location = (venue.get("location") or venue) if isinstance(venue, Mapping) else {}
+            if not isinstance(location, Mapping):
+                location = {}
+            try:
+                url = forecast_url(location.get("latitude"), location.get("longitude"), start)
+                forecast_raw = _fetch_bytes(url, opener)
+                weather = kickoff_hour_forecast(_decode(forecast_raw), start)
+            except (ValueError, CFBWeatherCaptureError) as exc:
+                skips.append({"event_id": event_id, "window": window, "reason": "WEATHER_NOT_PUBLISHED", "fallback_reason": str(exc)})
+                continue
+            previous_receipt = received_at
+            received_at = clock()
+            if received_at.tzinfo is None or received_at.utcoffset() is None or received_at < previous_receipt:
+                raise CFBWeatherCaptureError("CFB_WEATHER_CAPTURE_CLOCK_INVALID")
+            window = _window_for(start, received_at, policy)
+            if window is None:
+                skips.append({"event_id": event_id, "reason": "RESPONSE_OUTSIDE_PRESTART_WINDOW"})
+                continue
+            for raw in (scoreboard_raw, summary_raw):
+                path, digest = _persist_raw(out_dir, raw)
+                supporting_raw.append({"raw_relative_path": path, "raw_sha256": digest})
+            source, source_raw, source_url = "OPEN_METEO_FORECAST", forecast_raw, url
         if source == "ESPN_CFB_SUMMARY":
             source_raw, source_url = summary_raw, summary_url
-        else:
+        elif source == "ESPN_CFB_SCOREBOARD":
             source_raw, source_url = scoreboard_raw, scoreboard_url
+        captured_at = _iso(received_at)
         raw_path, raw_sha = _persist_raw(out_dir, source_raw)
         material = f"{event_id}\n{captured_at}\n{window}\n{raw_sha}".encode("utf-8")
         observation_id = hashlib.sha256(material).hexdigest()
@@ -236,11 +288,13 @@ def capture_weather(
             "away_team": away,
             "commence_time": _iso(start),
             "captured_at_utc": captured_at,
-            "scheduled_lead_minutes": round((start - now).total_seconds() / 60.0, 6),
+            "scheduled_lead_minutes": round((start - received_at).total_seconds() / 60.0, 6),
             "window": window,
             "status_state": "pre",
             "prestart_attested": True,
             "weather": weather,
+            "supporting_raw": supporting_raw,
+            "timestamp_semantics": "RESPONSE_RECEIPT_UPPER_BOUND",
         }
         _append_row(out_dir, row)
         written += 1
@@ -248,7 +302,7 @@ def capture_weather(
 
     return {
         "contract": "SPORTSEDGE_CFB_WEATHER_PIT_CAPTURE_V1",
-        "ran_at_utc": captured_at,
+        "ran_at_utc": _iso(now),
         "event_count": len(events),
         "observations_written": written,
         "observation_ids": observations,
@@ -267,7 +321,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--now", default=None)
     args = parser.parse_args(argv)
     try:
-        now = _parse_ts(args.now) if args.now else datetime.now(UTC)
+        if args.now is not None:
+            raise CFBWeatherCaptureError("CFB_WEATHER_LIVE_CLOCK_OVERRIDE_PROHIBITED")
+        now = datetime.now(UTC)
         policy = _load_policy(Path(args.policy))
         report = capture_weather(now=now, policy=policy, out_dir=Path(args.out_dir))
     except CFBWeatherCaptureError as exc:
