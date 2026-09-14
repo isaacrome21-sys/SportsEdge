@@ -7,8 +7,10 @@ Football matchup list and deterministically selects the first provider-ordered
 period-0 game markets. Specials, futures, props, live/started games, and neutral
 multiway markets are excluded without fuzzy team-name inference.
 
-The selected game's detail and straight-market payloads are then preserved
-byte-for-byte. No Model_P or promotion authority is created here.
+The selected row already contains the game identity fields needed by SportsEdge,
+so the probe does not depend on the redundant `/matchups/{id}` detail endpoint.
+It preserves the matchup-list bytes and the selected game's straight-market
+payload byte-for-byte. No Model_P or promotion authority is created here.
 """
 from __future__ import annotations
 
@@ -151,20 +153,17 @@ def probe(
             "item_keys": sorted(str(k) for k in selected.keys()),
         }
 
-        for label, path in (
-            ("matchup_detail", f"/matchups/{matchup_id}"),
-            ("straight_markets", f"/matchups/{matchup_id}/markets/related/straight"),
-        ):
-            raw, payload, status, content_type = _fetch(
-                f"{PINNACLE_ROOT}{path}", provider="pinnacle", opener=opener
-            )
-            report["captures"][label] = {
-                "http_status": status,
-                "content_type": content_type,
-                **_persist_raw(out_dir, "pinnacle", label, raw),
-                "shape": _shape(payload),
-            }
-
+        raw, markets, status, content_type = _fetch(
+            f"{PINNACLE_ROOT}/matchups/{matchup_id}/markets/related/straight",
+            provider="pinnacle",
+            opener=opener,
+        )
+        report["captures"]["straight_markets"] = {
+            "http_status": status,
+            "content_type": content_type,
+            **_persist_raw(out_dir, "pinnacle", "straight_markets", raw),
+            "shape": _shape(markets),
+        }
         report["state"] = "REACHABLE"
     except DirectMarketProbeError as exc:
         report["reason"] = str(exc)
