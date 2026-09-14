@@ -260,6 +260,154 @@ def reconcile_delta_bundle(
     )
 
 
+def reconcile_freeze_to_baseline(
+    repo: Path,
+    *,
+    baseline_main_sha: str,
+    bundle: Mapping[str, Any],
+) -> MatrixRow:
+    """Reconcile all bundle drift from its freeze through the hold baseline.
+
+    The delta matrix only observes commits explicitly registered after the hold
+    baseline. Active bundles may have frozen earlier, so freeze-to-baseline drift
+    must be adjudicated independently or pre-hold semantic changes can disappear
+    from the reconciliation record.
+    """
+
+    freeze_sha = resolve_sha(repo, str(bundle["freeze_sha"]))
+    baseline_sha = resolve_sha(repo, baseline_main_sha)
+    bundle_id = str(bundle["bundle_id"])
+    delta_id = "PREHOLD_BASELINE"
+
+    if freeze_sha == baseline_sha:
+        return MatrixRow(
+            delta_id=delta_id,
+            pr=0,
+            merge_sha=baseline_sha,
+            parent_sha=freeze_sha,
+            bundle_id=bundle_id,
+            bundle_freeze_sha=freeze_sha,
+            outcome="NOT_APPLICABLE",
+            reason="BUNDLE_FREEZE_EQUALS_HOLD_BASELINE",
+            changed_paths=(),
+            covered_changed_paths=(),
+            before_bundle_sha256=None,
+            after_bundle_sha256=None,
+            delta_sha256=_delta_sha(merge_sha=baseline_sha, parent_sha=freeze_sha, paths=()),
+        )
+
+    try:
+        if is_ancestor(repo, baseline_sha, freeze_sha):
+            return MatrixRow(
+                delta_id=delta_id,
+                pr=0,
+                merge_sha=baseline_sha,
+                parent_sha=freeze_sha,
+                bundle_id=bundle_id,
+                bundle_freeze_sha=freeze_sha,
+                outcome="NOT_APPLICABLE",
+                reason="BUNDLE_FREEZE_POSTDATES_HOLD_BASELINE",
+                changed_paths=(),
+                covered_changed_paths=(),
+                before_bundle_sha256=None,
+                after_bundle_sha256=None,
+                delta_sha256=_delta_sha(
+                    merge_sha=baseline_sha, parent_sha=freeze_sha, paths=()
+                ),
+            )
+        if not is_ancestor(repo, freeze_sha, baseline_sha):
+            return MatrixRow(
+                delta_id=delta_id,
+                pr=0,
+                merge_sha=baseline_sha,
+                parent_sha=freeze_sha,
+                bundle_id=bundle_id,
+                bundle_freeze_sha=freeze_sha,
+                outcome="PROVISIONAL_DRIFT_BLOCKED",
+                reason="FREEZE_TO_HOLD_BASELINE_ANCESTRY_DIVERGED",
+                changed_paths=(),
+                covered_changed_paths=(),
+                before_bundle_sha256=None,
+                after_bundle_sha256=None,
+                delta_sha256=_canonical_sha256(
+                    {
+                        "freeze_sha": freeze_sha,
+                        "baseline_sha": baseline_sha,
+                        "bundle_id": bundle_id,
+                        "reason": "ANCESTRY_DIVERGED",
+                    }
+                ),
+            )
+        paths = changed_paths(repo, freeze_sha, baseline_sha)
+        covered = tuple(path for path in paths if _covered(path, bundle))
+        identity = _delta_sha(
+            merge_sha=baseline_sha, parent_sha=freeze_sha, paths=paths
+        )
+        if not covered:
+            return MatrixRow(
+                delta_id=delta_id,
+                pr=0,
+                merge_sha=baseline_sha,
+                parent_sha=freeze_sha,
+                bundle_id=bundle_id,
+                bundle_freeze_sha=freeze_sha,
+                outcome="NOT_APPLICABLE",
+                reason="NO_COVERED_PATH_CHANGE_FREEZE_TO_HOLD_BASELINE",
+                changed_paths=paths,
+                covered_changed_paths=(),
+                before_bundle_sha256=None,
+                after_bundle_sha256=None,
+                delta_sha256=identity,
+            )
+        before = bundle_snapshot(repo, bundle, freeze_sha)
+        after = bundle_snapshot(repo, bundle, baseline_sha)
+    except FreezeReconciliationError as exc:
+        return MatrixRow(
+            delta_id=delta_id,
+            pr=0,
+            merge_sha=baseline_sha,
+            parent_sha=freeze_sha,
+            bundle_id=bundle_id,
+            bundle_freeze_sha=freeze_sha,
+            outcome="PROVISIONAL_DRIFT_BLOCKED",
+            reason=f"FREEZE_TO_HOLD_BASELINE_REPLAY_UNRESOLVED:{exc}",
+            changed_paths=(),
+            covered_changed_paths=(),
+            before_bundle_sha256=None,
+            after_bundle_sha256=None,
+            delta_sha256=_canonical_sha256(
+                {
+                    "freeze_sha": freeze_sha,
+                    "baseline_sha": baseline_sha,
+                    "bundle_id": bundle_id,
+                    "error": str(exc),
+                }
+            ),
+        )
+
+    if before.aggregate_sha256 == after.aggregate_sha256:
+        outcome = "MATCH"
+        reason = "COVERED_BUNDLE_MATCHES_FREEZE_AT_HOLD_BASELINE"
+    else:
+        outcome = "DRIFT_CONFIRMED"
+        reason = "COVERED_BUNDLE_DRIFT_BEFORE_HOLD_BASELINE"
+    return MatrixRow(
+        delta_id=delta_id,
+        pr=0,
+        merge_sha=baseline_sha,
+        parent_sha=freeze_sha,
+        bundle_id=bundle_id,
+        bundle_freeze_sha=freeze_sha,
+        outcome=outcome,
+        reason=reason,
+        changed_paths=paths,
+        covered_changed_paths=covered,
+        before_bundle_sha256=before.aggregate_sha256,
+        after_bundle_sha256=after.aggregate_sha256,
+        delta_sha256=identity,
+    )
+
+
 def _validate_registry(policy: Mapping[str, Any], registry: Mapping[str, Any]) -> None:
     if policy.get("schema") != "SPORTSEDGE_FREEZE_RECONCILIATION_POLICY_V1":
         raise FreezeReconciliationError("FREEZE_RECONCILIATION_POLICY_SCHEMA_INVALID")
@@ -269,6 +417,8 @@ def _validate_registry(policy: Mapping[str, Any], registry: Mapping[str, Any]) -
         raise FreezeReconciliationError("FREEZE_MAIN_HOLD_MUST_BE_UNCONDITIONAL")
     if policy.get("status") not in {"ACTIVE_BLOCKED", "RESOLVED"}:
         raise FreezeReconciliationError("FREEZE_POLICY_STATUS_INVALID")
+    if not registry.get("baseline_main_sha"):
+        raise FreezeReconciliationError("FREEZE_RECONCILIATION_BASELINE_MAIN_SHA_MISSING")
     deltas = registry.get("deltas")
     bundles = registry.get("bundles")
     if not isinstance(deltas, list) or not deltas:
@@ -343,10 +493,25 @@ def build_reconciliation_report(
 ) -> dict[str, Any]:
     _validate_registry(policy, registry)
     current_main_sha = resolve_sha(repo, current_main_ref)
+    baseline_main_sha = resolve_sha(repo, str(registry["baseline_main_sha"]))
     rows: list[MatrixRow] = []
     rows_by_bundle: dict[str, list[MatrixRow]] = {
         str(bundle["bundle_id"]): [] for bundle in registry["bundles"]
     }
+
+    for bundle in registry["bundles"]:
+        row = reconcile_freeze_to_baseline(
+            repo,
+            baseline_main_sha=baseline_main_sha,
+            bundle=bundle,
+        )
+        if row.outcome not in MATRIX_OUTCOMES:
+            raise FreezeReconciliationError(
+                f"FREEZE_RECONCILIATION_OUTCOME_INVALID:{row.outcome}"
+            )
+        rows.append(row)
+        rows_by_bundle[row.bundle_id].append(row)
+
     for delta in registry["deltas"]:
         for bundle in registry["bundles"]:
             row = reconcile_delta_bundle(repo, delta, bundle)
@@ -384,6 +549,7 @@ def build_reconciliation_report(
         "policy_status": policy["status"],
         "main_merge_hold": policy["main_merge_hold"],
         "current_main_sha": current_main_sha,
+        "baseline_main_sha": baseline_main_sha,
         "reconciled_through_sha": reconciled_through,
         "bundle_inventory_complete": bool(registry.get("bundle_inventory_complete")),
         "matrix_row_count": len(rows),
@@ -395,6 +561,7 @@ def build_reconciliation_report(
         "report_sha256": _canonical_sha256(
             {
                 "current_main_sha": current_main_sha,
+                "baseline_main_sha": baseline_main_sha,
                 "reconciled_through_sha": reconciled_through,
                 "rows": [row.as_dict() for row in rows],
                 "blocks": sorted(set(blocks)),
