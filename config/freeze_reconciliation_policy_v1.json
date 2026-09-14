@@ -37,15 +37,27 @@
     "refrozen_bundle_requires_timestamp_plus_prior_bundle_hash_invalidation": true,
     "refrozen_disposition_currently_allowed": false,
     "revoked_bundle_invalidates_prior_forward_clock": true,
-    "current_main_sha_must_equal_reconciled_through_sha": true,
+    "current_main_must_descend_from_registered_content_anchor": true,
+    "governed_surface_registry_digest_must_equal_registered_digest": true,
+    "reconciliation_merge_digest_primary": true,
+    "reconciliation_merge_parentage_corroboration_only": true,
     "direct_main_writers_quiesced": false
   },
+  "terminal_boundary_semantics": {
+    "schema": "SPORTSEDGE_RECONCILIATION_CONTENT_BOUNDARY_V1",
+    "status": "DIGEST_PRIMARY_NON_SELF_AGING",
+    "boundary_file": "config/reconciliation_content_boundary_v1.json",
+    "rule": "A current main descendant of the registered anchor remains admissible only while the recomputed effective governed-surface registry digest equals the registered digest. Commit-SHA equality is not a terminal invariant because an in-repository record cannot contain the hash of the commit that creates it.",
+    "candidate_rule": "Pull requests are checked against HEAD as a candidate. A stable boundary requires candidate digest equality; an explicit reconciliation transition may move from the registered predecessor digest to a preregistered candidate digest while current main is still the exact anchor.",
+    "merge_parentage_rule": "A one-step two-parent reconciliation merge may corroborate the transition when its first parent is the anchor and its second parent's governed digest is the registered digest. Parentage is never primary because squash merges do not retain audited-head ancestry.",
+    "squash_rule": "Squash remains mechanically admissible only through the same governed-surface digest identity test."
+  },
   "authority": {"model_p": false, "truth_gate": false, "promotion": false, "staking": false, "official": false, "validation_attempt": false, "untouched_readout": false},
-  "enforcement_note": "Repository CI can fail pull requests while this hold is active, but GitHub can still permit a manual or external write because main is not protected server-side. Do not represent CI, the writer detector, or an exact-head audit as proof that main cannot advance.",
+  "enforcement_note": "Repository CI can fail pull requests while this hold is active, but GitHub can still permit a manual or external write because main is not protected server-side. Do not represent CI, the writer detector, or a content-boundary audit as proof that main cannot advance.",
   "operational_prerequisite_waiver": {
     "scope": ["server_side_main_branch_protection", "blocking_on_direct_main_writer_diagnostic"],
     "user_instruction": "Fuck that prerequisite then and move on a finish everything",
     "scope_limit": "Operational release prerequisite only. No evidence, model validation, Model_P, promotion, staking or OFFICIAL authority is created.",
-    "main_movement_policy": "Read current main before each mutation and merge; register any new deltas before reconciliation release."
+    "main_movement_policy": "Read current main before each mutation and merge. Recompute the governed-surface digest; governance-neutral descendants may retain the registered boundary, while any governed-surface digest change must fail closed until explicitly reconciled and preregistered."
   }
 }
