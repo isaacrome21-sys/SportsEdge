@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Fixed-offset takeability proxy for stale soft-book radar candidates.
+"""Fixed-offset takeability proxies for stale soft-book radar candidates.
 
 A captured stale price is not assumed takeable. For each newly-created candidate,
-this script re-polls the same soft book at the policy-frozen offset and records
-whether the exact contract still exists and what price is available then.
+this script re-polls the same soft book at one policy-frozen offset and records
+whether the exact contract still exists and what price is available then. The
+workflow invokes it independently at every preregistered offset.
 
 Persistence is only a takeability proxy; it is never represented as a fill.
 Candidate records remain immutable. Persistence records are separate append-only
@@ -57,6 +58,14 @@ def _point_equal(a: Any, b: Any) -> bool:
     if left is None or right is None:
         return left is None and right is None
     return math.isclose(left, right, abs_tol=1e-9)
+
+
+def _requested_offset(policy: Mapping[str, Any], override: float | None) -> float:
+    value = float(policy["takeability"]["persistence_recheck_offset_seconds"] if override is None else override)
+    allowed = {float(item) for item in policy["takeability"].get("persistence_recheck_offsets_seconds", [value])}
+    if value not in allowed:
+        raise PersistenceError(f"RADAR_PERSISTENCE_OFFSET_NOT_PREREGISTERED:{value}")
+    return value
 
 
 def _candidate_paths(report: Mapping[str, Any], root: Path) -> list[Path]:
@@ -114,18 +123,20 @@ def classify_candidate(
     request_started_at: datetime,
     retrieved_at: datetime,
     policy: Mapping[str, Any],
+    requested_offset_seconds: float | None = None,
 ) -> dict[str, Any]:
     book = str(candidate.get("soft_book") or "").lower()
     if book not in SOFT_FETCHERS:
         raise PersistenceError(f"RADAR_PERSISTENCE_BOOK_UNSUPPORTED:{book}")
     created = _parse_ts(candidate.get("candidate_created_at"))
-    requested_offset = float(policy["takeability"]["persistence_recheck_offset_seconds"])
+    requested_offset = _requested_offset(policy, requested_offset_seconds)
     tolerance = float(policy["takeability"]["persistence_recheck_tolerance_seconds"])
     actual_offset = (rechecked_at - created).total_seconds()
     within_tolerance = abs(actual_offset - requested_offset) <= tolerance
 
     base = {
         "record_type": "MARKET_MAKER_RADAR_CANDIDATE_PERSISTENCE_V1",
+        "policy_version": policy.get("version"),
         "candidate_id": candidate.get("candidate_id"),
         "source_family_id": candidate.get("source_family_id"),
         "event_id": candidate.get("event_id"),
@@ -187,10 +198,7 @@ def classify_candidate(
 
     if len(exact) != 1:
         return base | {
-            "persistence_status": (
-                "EXACT_CONTRACT_NOT_AVAILABLE_AT_RECHECK" if same_outcome
-                else "OUTCOME_NOT_AVAILABLE_AT_RECHECK"
-            ),
+            "persistence_status": "EXACT_CONTRACT_NOT_AVAILABLE_AT_RECHECK" if same_outcome else "OUTCOME_NOT_AVAILABLE_AT_RECHECK",
             "persisted_price_american": None,
             "persisted_exact_contract": False,
             "persisted_price_grade_eligible": False,
@@ -221,13 +229,15 @@ def classify_candidate(
 
 
 def _persistence_path(root: Path, record: Mapping[str, Any]) -> Path:
+    offset = float(record["requested_offset_seconds"])
+    label = str(int(offset)) if offset.is_integer() else str(offset).replace(".", "p")
     return (
         root
         / "archive"
         / "market-maker-radar"
         / "candidate-persistence"
         / str(record["source_family_id"])
-        / f"{record['candidate_id']}.json"
+        / f"{record['candidate_id']}__offset_{label}s.json"
     )
 
 
@@ -247,13 +257,16 @@ def recheck(
     policy: Mapping[str, Any],
     now: datetime | None = None,
     fetchers: Mapping[str, Callable[..., Any]] | None = None,
+    requested_offset_seconds: float | None = None,
 ) -> dict[str, Any]:
+    requested = _requested_offset(policy, requested_offset_seconds)
     if not candidates:
         return {
             "state": "NO_NEW_CANDIDATES",
             "candidate_count": 0,
             "new_persistence_count": 0,
             "existing_persistence_count": 0,
+            "requested_offset_seconds": requested,
             "records": [],
             "primary_metric": policy["grading"]["primary_metric"],
             "clv_role": policy["grading"]["clv_role"],
@@ -310,14 +323,15 @@ def recheck(
                 request_started_at=result["request_started_at"],
                 retrieved_at=result["retrieved_at"],
                 policy=policy,
+                requested_offset_seconds=requested,
             )
         else:
             created = _parse_ts(candidate.get("candidate_created_at"))
-            requested = float(policy["takeability"]["persistence_recheck_offset_seconds"])
             tolerance = float(policy["takeability"]["persistence_recheck_tolerance_seconds"])
             actual = (rechecked_at - created).total_seconds()
             record = {
                 "record_type": "MARKET_MAKER_RADAR_CANDIDATE_PERSISTENCE_V1",
+                "policy_version": policy.get("version"),
                 "candidate_id": candidate.get("candidate_id"),
                 "source_family_id": candidate.get("source_family_id"),
                 "event_id": candidate.get("event_id"),
@@ -347,9 +361,8 @@ def recheck(
                 "official_authority": False,
                 "automatic_wager_authority": False,
             }
-        created = _persist(out_root, record)
-        (new_count if created else existing_count)
-        if created:
+        created_new = _persist(out_root, record)
+        if created_new:
             new_count += 1
         else:
             existing_count += 1
@@ -360,6 +373,7 @@ def recheck(
         "candidate_count": len(candidates),
         "new_persistence_count": new_count,
         "existing_persistence_count": existing_count,
+        "requested_offset_seconds": requested,
         "records": records,
         "primary_metric": policy["grading"]["primary_metric"],
         "research_only_primary_metric_when_no_fills": policy["grading"]["research_only_primary_metric_when_no_fills"],
@@ -375,6 +389,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--analysis-report", required=True)
     parser.add_argument("--out-root", required=True)
     parser.add_argument("--status-out", required=True)
+    parser.add_argument("--offset-seconds", type=float, default=None)
     parser.add_argument("--now", default=None)
     args = parser.parse_args(argv)
 
@@ -382,7 +397,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     root = Path(args.out_root)
     candidates = _load_candidates(Path(args.analysis_report), root)
     now = _parse_ts(args.now) if args.now else None
-    report = recheck(candidates=candidates, out_root=root, policy=policy, now=now)
+    report = recheck(
+        candidates=candidates,
+        out_root=root,
+        policy=policy,
+        now=now,
+        requested_offset_seconds=args.offset_seconds,
+    )
     target = Path(args.status_out)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")

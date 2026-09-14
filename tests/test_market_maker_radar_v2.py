@@ -31,7 +31,7 @@ class PolicyFreezeTests(unittest.TestCase):
         self.assertTrue(freeze["change_requires_new_policy_version"])
         self.assertEqual(freeze["frozen_fields"]["timing.lead_follow_window_seconds"], 900)
         self.assertEqual(freeze["frozen_fields"]["timing.max_cross_book_retrieval_skew_seconds"], 30)
-        self.assertEqual(freeze["frozen_fields"]["takeability.persistence_recheck_offset_seconds"], 30)
+        self.assertEqual(freeze["frozen_fields"]["takeability.persistence_recheck_offsets_seconds"], [30, 180])
         self.assertEqual(freeze["frozen_fields"]["alerts.stale_offer_fair_probability_gap_pp"], 1.0)
 
     def test_lane_is_roi_first_clv_process_only_and_checkpointed(self):

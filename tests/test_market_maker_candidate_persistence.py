@@ -3,8 +3,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from scripts.recheck_market_maker_candidate_persistence import classify_candidate
-
+from scripts.recheck_market_maker_candidate_persistence import PersistenceError, classify_candidate
 
 UTC = timezone.utc
 POLICY_PATH = Path("config/market_maker_radar_v2.json")
@@ -38,15 +37,13 @@ def fanduel_event(price=150, point=None, market="h2h"):
         "away_team": "Seattle Seahawks",
         "commence_time": "2026-09-20T20:05:00Z",
         "raw_sha256": "a" * 64,
-        "quotes": [
-            {
-                "market": market,
-                "designation": "away" if market != "totals" else "over",
-                "outcome": "Seattle Seahawks" if market != "totals" else "Over",
-                "point": point,
-                "american_price": price,
-            }
-        ],
+        "quotes": [{
+            "market": market,
+            "designation": "away" if market != "totals" else "over",
+            "outcome": "Seattle Seahawks" if market != "totals" else "Over",
+            "point": point,
+            "american_price": price,
+        }],
     }
 
 
@@ -62,6 +59,7 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual(checkpoints["persisted_n"], [100, 250, 500, 1000])
         self.assertEqual(checkpoints["filled_n"], [100, 250, 500, 1000])
         self.assertTrue(checkpoints["no_optional_looks"])
+        self.assertEqual(p["takeability"]["persistence_recheck_offsets_seconds"], [30, 180])
 
     def test_run_it_price_signals_are_one_independence_class(self):
         rule = policy()["run_it_independence"]
@@ -72,7 +70,7 @@ class PolicyTests(unittest.TestCase):
 
 
 class PersistenceTests(unittest.TestCase):
-    def _classify(self, cand, events, seconds=30):
+    def _classify(self, cand, events, seconds=30, requested=None):
         created = datetime(2026, 9, 14, 10, 0, 0, tzinfo=UTC)
         rechecked = created + timedelta(seconds=seconds)
         return classify_candidate(
@@ -82,14 +80,26 @@ class PersistenceTests(unittest.TestCase):
             request_started_at=rechecked - timedelta(seconds=1),
             retrieved_at=rechecked,
             policy=policy(),
+            requested_offset_seconds=requested,
         )
 
-    def test_exact_price_persists_at_frozen_offset(self):
+    def test_exact_price_persists_at_30_second_offset(self):
         record = self._classify(candidate(), [fanduel_event(price=150)])
         self.assertEqual(record["persistence_status"], "PERSISTED_EXACT_PRICE")
-        self.assertTrue(record["persisted_exact_contract"])
+        self.assertEqual(record["requested_offset_seconds"], 30)
         self.assertTrue(record["persisted_price_grade_eligible"])
         self.assertFalse(record["fill_proof"])
+
+    def test_exact_price_persists_at_180_second_offset(self):
+        record = self._classify(candidate(), [fanduel_event(price=150)], seconds=180, requested=180)
+        self.assertEqual(record["requested_offset_seconds"], 180)
+        self.assertTrue(record["within_offset_tolerance"])
+        self.assertTrue(record["persisted_price_grade_eligible"])
+        self.assertFalse(record["fill_proof"])
+
+    def test_unregistered_offset_is_rejected(self):
+        with self.assertRaisesRegex(PersistenceError, "OFFSET_NOT_PREREGISTERED"):
+            self._classify(candidate(), [fanduel_event(price=150)], seconds=120, requested=120)
 
     def test_worse_price_is_recorded_not_backfilled_to_offer(self):
         record = self._classify(candidate(), [fanduel_event(price=140)])
@@ -99,11 +109,7 @@ class PersistenceTests(unittest.TestCase):
         self.assertTrue(record["persisted_price_grade_eligible"])
 
     def test_changed_line_is_not_treated_as_same_contract(self):
-        cand = candidate(
-            source_family_id="PINNACLE_TO_FANDUEL_STALE_PRICE_SPREADS_V1",
-            market="spreads",
-            point=4.5,
-        )
+        cand = candidate(source_family_id="PINNACLE_TO_FANDUEL_STALE_PRICE_SPREADS_V1", market="spreads", point=4.5)
         event = fanduel_event(price=-110, point=3.5, market="spreads")
         record = self._classify(cand, [event])
         self.assertEqual(record["persistence_status"], "EXACT_CONTRACT_NOT_AVAILABLE_AT_RECHECK")

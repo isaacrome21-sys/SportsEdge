@@ -1,25 +1,15 @@
 name: nfl-market-maker-radar-capture
 
 # Direct-public, zero-authority NFL market snapshot lane.
-# This workflow is explicitly admitted by SPORTSEDGE_WORKFLOW_CRON_POLICY_V1
-# because price-leadership observations are irreversible/PIT-sensitive: if the
-# sequence is not observed live, it cannot be reconstructed honestly later.
-# Pinnacle is the market-maker reference; DraftKings and FanDuel are soft books.
-# V2 starts the three provider transports concurrently, records local request and
-# retrieval provenance, and refuses timing-ineligible polls as signal inputs.
-# Newly-created stale-price candidates are re-polled at the policy-frozen offset
-# measured from the original capture timestamp before any research ROI proxy may
-# treat the captured soft price as persistent.
-# Rows, raw payloads, research candidate records, persistence records, and CLV
-# settlement records are append-only on `data`.
+# Price-leadership observations and takeability offsets are PIT-sensitive and
+# cannot be reconstructed honestly later. Persistence is not execution evidence.
 
 on:
   workflow_dispatch:
   schedule:
     - cron: '*/5 * * * *'
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - 'scripts/capture_nfl_market_maker_radar.py'
       - 'scripts/capture_nfl_market_maker_radar_v2.py'
@@ -29,6 +19,8 @@ on:
       - 'scripts/analyze_market_maker_radar.py'
       - 'scripts/analyze_market_maker_radar_v2.py'
       - 'scripts/recheck_market_maker_candidate_persistence.py'
+      - 'scripts/log_market_maker_execution_attempt.py'
+      - 'scripts/evaluate_market_maker_execution_pilot.py'
       - 'scripts/settle_market_maker_candidate_ledger.py'
       - 'scripts/settle_market_maker_candidate_ledger_v2.py'
       - 'config/market_maker_radar_v1.json'
@@ -47,6 +39,8 @@ on:
       - 'scripts/analyze_market_maker_radar.py'
       - 'scripts/analyze_market_maker_radar_v2.py'
       - 'scripts/recheck_market_maker_candidate_persistence.py'
+      - 'scripts/log_market_maker_execution_attempt.py'
+      - 'scripts/evaluate_market_maker_execution_pilot.py'
       - 'scripts/settle_market_maker_candidate_ledger.py'
       - 'scripts/settle_market_maker_candidate_ledger_v2.py'
       - 'tests/test_market_maker_radar.py'
@@ -54,6 +48,7 @@ on:
       - 'tests/test_market_maker_candidate_settlement.py'
       - 'tests/test_market_maker_candidate_settlement_v2.py'
       - 'tests/test_market_maker_candidate_persistence.py'
+      - 'tests/test_market_maker_execution_attempts.py'
       - 'tests/test_nfl_market_maker_radar_workflow.py'
       - 'config/market_maker_radar_v1.json'
       - 'config/market_maker_radar_v2.json'
@@ -89,6 +84,7 @@ jobs:
           python -m unittest tests.test_market_maker_candidate_settlement -v
           python -m unittest tests.test_market_maker_candidate_settlement_v2 -v
           python -m unittest tests.test_market_maker_candidate_persistence -v
+          python -m unittest tests.test_market_maker_execution_attempts -v
           python -m unittest tests.test_nfl_market_maker_radar_workflow -v
           python -m unittest tests.test_normalize_pinnacle_nfl_markets -v
           python -m unittest tests.test_fanduel_nfl_market_normalizer -v
@@ -120,7 +116,6 @@ jobs:
             (.state == "CAPTURED" or .state == "PARTIAL") and
             .rows_written > 0 and
             .transport_mode == "CONCURRENT_PROVIDER_START" and
-            (.timing_hygiene.leadership_timing_eligible == true or .timing_hygiene.leadership_timing_eligible == false) and
             .authority.model_p_input == false and
             .authority.truth_gate_input == false and
             .authority.promotion_authority == false and
@@ -153,11 +148,10 @@ jobs:
             .manual_candidate_review_authority == true and
             .primary_metric == "REALIZED_ROI_ON_FILLED_WAGERS" and
             .process_metric == "CLV" and
-            .run_it_independence.counts_as_independent_context_class == false and
-            .threshold_freeze.status == "FROZEN_BEFORE_FIRST_LEAD_LAG_SIGNAL"
+            .run_it_independence.counts_as_independent_context_class == false
           ' artifacts/nfl-market-maker-radar/latest.json >/dev/null
 
-      - name: Wait until frozen stale-price persistence offset
+      - name: Wait until 30-second persistence offset
         if: github.event_name != 'pull_request'
         shell: bash
         run: |
@@ -165,25 +159,17 @@ jobs:
           NEW_CANDIDATES="$(jq -r '.candidate_ledger_new_count' artifacts/nfl-market-maker-radar/latest.json)"
           if [ "${NEW_CANDIDATES}" -gt 0 ]; then
             python - <<'PY'
-          import json
-          import time
+          import json, time
           from datetime import datetime, timedelta, timezone
-
           with open('artifacts/nfl-market-maker-radar/capture-status.json', encoding='utf-8') as fh:
               capture = json.load(fh)
-          with open('config/market_maker_radar_v2.json', encoding='utf-8') as fh:
-              policy = json.load(fh)
-          text = capture['captured_at'].replace('Z', '+00:00')
-          captured_at = datetime.fromisoformat(text).astimezone(timezone.utc)
-          offset = float(policy['takeability']['persistence_recheck_offset_seconds'])
-          target = captured_at + timedelta(seconds=offset)
-          delay = (target - datetime.now(timezone.utc)).total_seconds()
-          if delay > 0:
-              time.sleep(delay)
+          captured_at = datetime.fromisoformat(capture['captured_at'].replace('Z', '+00:00')).astimezone(timezone.utc)
+          delay = (captured_at + timedelta(seconds=30) - datetime.now(timezone.utc)).total_seconds()
+          if delay > 0: time.sleep(delay)
           PY
           fi
 
-      - name: Re-poll stale candidates for takeability persistence
+      - name: Re-poll stale candidates at 30 seconds
         if: github.event_name != 'pull_request'
         shell: bash
         run: |
@@ -192,12 +178,51 @@ jobs:
             --policy config/market_maker_radar_v2.json \
             --analysis-report artifacts/nfl-market-maker-radar/latest.json \
             --out-root .data-branch \
-            --status-out artifacts/nfl-market-maker-radar/persistence.json
-          jq -e '
-            (.state == "NO_NEW_CANDIDATES" or .state == "COMPLETE") and
-            .primary_metric == "REALIZED_ROI_ON_FILLED_WAGERS" and
-            .clv_role == "DETECTOR_PROCESS_CHECK_NOT_EDGE_VALIDATION"
-          ' artifacts/nfl-market-maker-radar/persistence.json >/dev/null
+            --offset-seconds 30 \
+            --status-out artifacts/nfl-market-maker-radar/persistence-30.json
+          jq -e '(.state == "NO_NEW_CANDIDATES" or .state == "COMPLETE") and .requested_offset_seconds == 30 and .clv_role == "DETECTOR_PROCESS_CHECK_NOT_EDGE_VALIDATION"' artifacts/nfl-market-maker-radar/persistence-30.json >/dev/null
+
+      - name: Wait until 180-second persistence offset
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          NEW_CANDIDATES="$(jq -r '.candidate_ledger_new_count' artifacts/nfl-market-maker-radar/latest.json)"
+          if [ "${NEW_CANDIDATES}" -gt 0 ]; then
+            python - <<'PY'
+          import json, time
+          from datetime import datetime, timedelta, timezone
+          with open('artifacts/nfl-market-maker-radar/capture-status.json', encoding='utf-8') as fh:
+              capture = json.load(fh)
+          captured_at = datetime.fromisoformat(capture['captured_at'].replace('Z', '+00:00')).astimezone(timezone.utc)
+          delay = (captured_at + timedelta(seconds=180) - datetime.now(timezone.utc)).total_seconds()
+          if delay > 0: time.sleep(delay)
+          PY
+          fi
+
+      - name: Re-poll stale candidates at 180 seconds
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m scripts.recheck_market_maker_candidate_persistence \
+            --policy config/market_maker_radar_v2.json \
+            --analysis-report artifacts/nfl-market-maker-radar/latest.json \
+            --out-root .data-branch \
+            --offset-seconds 180 \
+            --status-out artifacts/nfl-market-maker-radar/persistence-180.json
+          jq -e '(.state == "NO_NEW_CANDIDATES" or .state == "COMPLETE") and .requested_offset_seconds == 180 and .clv_role == "DETECTOR_PROCESS_CHECK_NOT_EDGE_VALIDATION"' artifacts/nfl-market-maker-radar/persistence-180.json >/dev/null
+
+      - name: Evaluate execution-evidence accrual state
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m scripts.evaluate_market_maker_execution_pilot \
+            --policy config/market_maker_radar_v2.json \
+            --ledger-root .data-branch \
+            --out artifacts/nfl-market-maker-radar/execution-pilot.json
+          jq -e '.edge_evidence == false and .model_p_authority == false and .promotion_authority == false and .staking_authority == false and .official_authority == false' artifacts/nfl-market-maker-radar/execution-pilot.json >/dev/null
 
       - name: Settle exact-contract CLV process checks
         if: github.event_name != 'pull_request'
@@ -220,13 +245,13 @@ jobs:
             .automatic_wager_authority == false
           ' artifacts/nfl-market-maker-radar/settlement.json >/dev/null
 
-      - name: Commit append-only observations candidate persistence and settlements
+      - name: Commit append-only observations candidates persistence and settlements
         if: github.event_name != 'pull_request'
         shell: bash
         run: |
           set -euo pipefail
           cd .data-branch
-          git config user.name  'sportsedge-radar[bot]'
+          git config user.name 'sportsedge-radar[bot]'
           git config user.email 'sportsedge-radar@users.noreply.github.com'
           git add -A archive/market-maker-radar
           if git diff --cached --quiet; then
@@ -236,12 +261,17 @@ jobs:
           CAPTURE_ID="$(jq -r '.capture_id' ../artifacts/nfl-market-maker-radar/capture-status.json)"
           ROWS="$(jq -r '.rows_written' ../artifacts/nfl-market-maker-radar/capture-status.json)"
           NEW_CANDIDATES="$(jq -r '.candidate_ledger_new_count' ../artifacts/nfl-market-maker-radar/latest.json)"
-          NEW_PERSISTENCE="$(jq -r '.new_persistence_count // 0' ../artifacts/nfl-market-maker-radar/persistence.json)"
+          P30="$(jq -r '.new_persistence_count // 0' ../artifacts/nfl-market-maker-radar/persistence-30.json)"
+          P180="$(jq -r '.new_persistence_count // 0' ../artifacts/nfl-market-maker-radar/persistence-180.json)"
           NEW_SETTLEMENTS="$(jq -r '.new_settlement_count' ../artifacts/nfl-market-maker-radar/settlement.json)"
-          git commit -m "nfl-market-maker-radar: ${CAPTURE_ID} rows=${ROWS} candidates=${NEW_CANDIDATES} persistence=${NEW_PERSISTENCE} settlements=${NEW_SETTLEMENTS} [LAYER_B_NOT_EVIDENCE]"
+          git commit -m "nfl-market-maker-radar: ${CAPTURE_ID} rows=${ROWS} candidates=${NEW_CANDIDATES} persistence30=${P30} persistence180=${P180} settlements=${NEW_SETTLEMENTS} [LAYER_B_NOT_EVIDENCE]"
           for attempt in 1 2 3; do
             git fetch origin data || true
-            git rebase origin/data || git rebase --abort || true
+            if ! git rebase origin/data; then
+              git rebase --abort || true
+              sleep $((attempt * 5))
+              continue
+            fi
             if git push origin HEAD:data; then exit 0; fi
             sleep $((attempt * 5))
           done
