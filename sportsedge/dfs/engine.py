@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -32,15 +32,22 @@ class DfsEngine:
         sport: str,
         requested_start: datetime,
         projection_snapshot: str | Path | None = None,
+        salary_csv: str | Path | None = None,
         allow_dk_fppg_baseline: bool = False,
         beam_width: int = 30_000,
         max_projection_age_hours: float = 36.0,
     ) -> DfsRunResult:
         sport = sport.upper()
         rules = get_rules(sport)
-        slates = self.dk.discover_slates(sport)
-        slate = resolve_slate(slates, requested_start=requested_start)
-        players = self.dk.fetch_draftables(slate.draft_group_id)
+        if salary_csv is not None:
+            slate = DKSlate(sport, -1, requested_start.astimezone(timezone.utc), name="DKSalaries.csv fallback")
+            players = self.dk.load_salary_csv(salary_csv)
+            salary_source = "DKSALARIES_CSV"
+        else:
+            slates = self.dk.discover_slates(sport)
+            slate = resolve_slate(slates, requested_start=requested_start)
+            players = self.dk.fetch_draftables(slate.draft_group_id)
+            salary_source = "DK_DRAFTABLES_JSON"
         projections: dict[str, Projection] = {}
         if projection_snapshot is not None:
             projections.update(load_projection_snapshot(projection_snapshot, players, sport))
@@ -55,13 +62,7 @@ class DfsEngine:
             slate_start=slate.start_time,
             max_age=timedelta(hours=max_projection_age_hours),
         )
-        lineup = optimize_single_entry(
-            sport,
-            rules,
-            players,
-            projections,
-            beam_width=beam_width,
-        )
+        lineup = optimize_single_entry(sport, rules, players, projections, beam_width=beam_width)
         sources: dict[str, int] = {}
         for proj in projections.values():
             sources[proj.source] = sources.get(proj.source, 0) + 1
@@ -73,6 +74,7 @@ class DfsEngine:
             lineup=lineup,
             diagnostics={
                 "draft_group_id": slate.draft_group_id,
+                "salary_source": salary_source,
                 "slate_start_utc": slate.start_time.isoformat(),
                 "player_count": len(players),
                 "projection_count": len(projections),
