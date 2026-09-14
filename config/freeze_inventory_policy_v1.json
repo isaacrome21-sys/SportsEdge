@@ -32,6 +32,46 @@
     "OFFICIAL authority",
     "Model_P"
   ],
+  "scanner_contract": {
+    "status": "FROZEN_AT_PASS_1",
+    "canonical_json_sha256": "d271f6f1583c2a0c071a18610765750df0bf3eda8eba48738c72ebe8eb03534f",
+    "candidate_total_floor": 317,
+    "rule": "Candidate roots, path tokens, content suffixes, content markers, and inventory rules may not be narrowed during reconciliation. Candidate total may stay flat or rise as newly discovered surfaces are added; it may not fall below the pass-1 floor before release."
+  },
+  "inventory_convergence": {
+    "status": "PREREGISTERED_BEFORE_PASS_3",
+    "outcome_on_stall": "INVENTORY_NONCONVERGENT",
+    "stall_window_transitions": 3,
+    "stall_definition": "Three consecutive distinct-head audit transitions in which unmapped_count does not strictly decrease from the immediately preceding completed pass.",
+    "terminal_effect": "BLOCK_RELEASE_REQUIRE_SCOPE_REVIEW_NOT_MORE_BLIND_MAPPING",
+    "completed_passes": [
+      {
+        "pass_id": "PASS_1",
+        "head_sha": "babf7212de121019f44fa374662ae80c8b7b71f7",
+        "artifact_digest": "sha256:66ce001908d26a08de51cbb79c2433cf766f906cb8fc18cffa8601da72838a1e",
+        "candidate_count": 317,
+        "mapped_or_exactly_exempt_count": 61,
+        "unmapped_count": 256
+      },
+      {
+        "pass_id": "PASS_2",
+        "head_sha": "e4ca7735f9f73608397a3a2b1648043a27d18f8b",
+        "artifact_digest": "sha256:ded5a3ff79dc6d8c8dd5135a3dca308bdaa4ea5020ec090a1fbdd0317fa3d3d5",
+        "candidate_count": 317,
+        "mapped_or_exactly_exempt_count": 87,
+        "unmapped_count": 230
+      }
+    ]
+  },
+  "cfb_candidate_prereg_chronology": {
+    "status": "PARTIALLY_PROVEN_FAIL_CLOSED",
+    "evaluation_gate_install_sha": "dfe7772772014765dcbc3af889b8922a8a19371b",
+    "prereg_freeze_commit_sha": "4629afd60972fe73eb0217508dc7a4ae51ce6ccf",
+    "first_authorized_evaluation_sha": null,
+    "first_authorized_evaluation_run_id": null,
+    "pre_gate_exploratory_evaluation_excluded": false,
+    "claim_limit": "The gate-install and prereg-freeze ordering is repository-proven. Absence of any pre-gate exploratory evaluation is not yet independently proven, so FROZEN_BEFORE_FIRST_EVALUATION is not accepted as a self-authenticating chronology claim."
+  },
   "exact_exemptions": {
     "config/freeze_reconciliation_policy_v1.json": "RECONCILIATION_CONTROL_PLANE",
     "config/freeze_reconciliation_registry_v1.json": "RECONCILIATION_CONTROL_PLANE",
