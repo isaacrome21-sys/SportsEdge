@@ -1,13 +1,44 @@
 {
   "version": 1,
-  "status": "ADJUDICATION_PENDING",
-  "reason": "NFL_2026_CAPTURE_CODE_DELTA_NOT_RECONCILED",
+  "status": "ADJUDICATED_NOT_APPLICABLE",
+  "reason": "NFL_2026_CAPTURE_CODE_DELTAS_ADJUDICATED_NO_FROZEN_BUNDLE_INTERSECTION",
   "triggering_merge_sha": "a75250bfd5881c0cafe82a47a877d9ea764fc203",
   "triggering_pr": 712,
+  "quarantine_merge_sha": "4564a9d2ccd7a55b0547a4ebd5a1b714850aab99",
+  "quarantine_pr": 713,
   "effective_from_utc": "2026-09-14T20:33:46Z",
+  "adjudication": {
+    "reconciliation_pr": 714,
+    "reconciliation_merge_sha": "9e8c7eeed998b4bea1386000c41630fe9380b834",
+    "exact_head_sha": "8c1a7138f0f42d57277addd215579c3374874e80",
+    "workflow_run_id": 34895805146,
+    "workflow_job_id": 104149337294,
+    "artifact_id": 10368996278,
+    "artifact_digest": "sha256:9962c32633dea97be0438671e03dff677b91e185a4642bb1884f587d017082a9",
+    "inventory": {
+      "candidate_count": 317,
+      "mapped_or_exactly_exempt_count": 317,
+      "unmapped_count": 0,
+      "computed_complete": true
+    },
+    "reconciliation_matrix": {
+      "row_count": 168,
+      "drift_confirmed": 15,
+      "not_applicable": 153,
+      "provisional_drift_blocked": 0
+    },
+    "capture_delta_results": {
+      "PR_712_NFL_CAPTURE_INTEGRITY": "NOT_APPLICABLE_ALL_FROZEN_BUNDLES",
+      "PR_713_NFL_CAPTURE_QUARANTINE": "NOT_APPLICABLE_ALL_FROZEN_BUNDLES",
+      "reason": "NO_COVERED_PATH_INTERSECTION"
+    },
+    "release_blocks": [],
+    "clearance_rule_satisfied": true
+  },
   "row_classification": {
     "pre_repair_identification": "run.github_sha == a75250bfd5881c0cafe82a47a877d9ea764fc203",
-    "new_rows": "TOP_LEVEL_ADJUDICATION_STAMP_REQUIRED",
+    "quarantine_rows_remain_traceable": true,
+    "new_rows": "NO_ADJUDICATION_STAMP_REQUIRED_FOR_PR_712_PR_713",
     "backfill_allowed": false,
     "capture_should_continue": true
   },
@@ -18,5 +49,5 @@
     "staking": false,
     "official": false
   },
-  "clearance_rule": "MAY_CHANGE_TO_ADJUDICATED_ONLY_AFTER_EXACT_HEAD_RECONCILIATION_EVALUATES_COVERAGE_INVENTORY_AND_DELTA_FOR_THIS_CAPTURE_CHANGE"
+  "scope_note": "This clears only the PR 712 / PR 713 capture-code quarantine. It is not a claim that future main deltas are reconciled, nor does it grant model, evidence-promotion, staking, Truth Gate, or OFFICIAL authority."
 }
