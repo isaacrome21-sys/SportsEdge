@@ -1,8 +1,9 @@
 name: fanduel-football-market-shape-probe
 
-# One-shot response-shape capture used to build a direct FanDuel NFL normalizer.
+# Live response-shape + primary-market normalization proof for direct FanDuel NFL.
 # Pull requests run deterministic tests only. A merge/path-filtered push performs
-# the live read-only probe once and preserves exact raw bytes. Zero authority.
+# the read-only live probe, SHA-binds the raw event page, normalizes exactly the
+# primary full-game ML/spread/total, and preserves the artifact. Zero authority.
 
 on:
   workflow_dispatch:
@@ -10,14 +11,18 @@ on:
     paths:
       - 'scripts/probe_direct_market_feeds.py'
       - 'scripts/probe_fanduel_football_market_shape.py'
+      - 'scripts/normalize_fanduel_nfl_markets.py'
       - 'tests/test_fanduel_football_market_shape_probe.py'
+      - 'tests/test_fanduel_nfl_market_normalizer.py'
       - '.github/workflows/fanduel-football-market-shape-probe.yml'
   push:
     branches: [main]
     paths:
       - 'scripts/probe_direct_market_feeds.py'
       - 'scripts/probe_fanduel_football_market_shape.py'
+      - 'scripts/normalize_fanduel_nfl_markets.py'
       - 'tests/test_fanduel_football_market_shape_probe.py'
+      - 'tests/test_fanduel_nfl_market_normalizer.py'
       - '.github/workflows/fanduel-football-market-shape-probe.yml'
 
 permissions:
@@ -33,8 +38,10 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Verify deterministic zero-authority probe contract
-        run: python -m unittest tests.test_fanduel_football_market_shape_probe -v
+      - name: Verify deterministic zero-authority contracts
+        run: |
+          python -m unittest tests.test_fanduel_football_market_shape_probe -v
+          python -m unittest tests.test_fanduel_nfl_market_normalizer -v
 
       - name: Capture live NFL content-page and event-page shapes
         if: github.event_name != 'pull_request'
@@ -67,7 +74,50 @@ jobs:
           jq '{state, reason, selection_rule, selected_event, captures: (.captures | with_entries(.value |= {http_status,content_type,raw_sha256,raw_bytes,shape,attachments_keys,layout_keys,market_container_type,market_count}))}' \
             artifacts/fanduel-football-market-shape/status.json
 
-      - name: Upload exact shape artifact
+      - name: Normalize fresh SHA-bound FanDuel primary markets
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS=artifacts/fanduel-football-market-shape/status.json
+          RAW_REL="$(jq -r '.captures.event_page.raw_relative_path' "$STATUS")"
+          test -n "$RAW_REL"
+          test "$RAW_REL" != "null"
+          python -m scripts.normalize_fanduel_nfl_markets \
+            --status "$STATUS" \
+            --event-page "artifacts/fanduel-football-market-shape/$RAW_REL" \
+            --out artifacts/fanduel-football-market-shape/normalized.json
+          jq -e '
+            .state == "NORMALIZED" and
+            .quote_count == 6 and
+            ([.quotes[].market] | sort | . == ["h2h","h2h","spreads","spreads","totals","totals"]) and
+            (.quotes | all(
+              .book == "fanduel" and
+              .timestamp_source == "CAPTURED_AT" and
+              .provider_quote_timestamp_available == false and
+              .book_last_update == null and
+              .authority.model_p_input == false and
+              .authority.truth_gate_input == false and
+              .authority.promotion_authority == false and
+              .authority.staking_authority == false and
+              .authority.official_authority == false and
+              .authority.evidence_clock_authority == false and
+              .authority.wager_placement_authority == false
+            )) and
+            .authority.model_p_input == false and
+            .authority.truth_gate_input == false and
+            .authority.promotion_authority == false and
+            .authority.eligibility_authority == false and
+            .authority.staking_authority == false and
+            .authority.official_authority == false and
+            .authority.production_registry_authority == false and
+            .authority.evidence_clock_authority == false and
+            .authority.wager_placement_authority == false
+          ' artifacts/fanduel-football-market-shape/normalized.json >/dev/null
+          jq '{state, source_family_id, event, captured_at, raw_sha256, quote_count, quotes: [.quotes[] | {market,designation,outcome_name,point,american_price,decimal_price_provider,timestamp_source}]}' \
+            artifacts/fanduel-football-market-shape/normalized.json
+
+      - name: Upload exact live + normalized artifact
         if: github.event_name != 'pull_request' && always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
