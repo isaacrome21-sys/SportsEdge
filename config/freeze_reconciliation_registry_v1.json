@@ -46,6 +46,34 @@
       "disposition": null
     },
     {
+      "bundle_id": "NFL_PROP_MODEL_FREEZE_V1",
+      "freeze_sha": "5dfa29347bed608771e6a2395ce8e894dbfdd881",
+      "coverage_prefixes": [
+        "config/nfl_prop_model_freeze.json",
+        "config/nfl_prop_code_surface_v1.json",
+        "config/nfl_prop_evidence.json",
+        "config/nfl_prop_certification.json",
+        "artifacts/football/nfl_prop_artifact_bundle_v1.json",
+        "sportsedge/props/nfl",
+        "tests/test_nfl_prop"
+      ],
+      "disposition": null
+    },
+    {
+      "bundle_id": "CFB_PROP_MODEL_FREEZE_V1",
+      "freeze_sha": "67184a5a120a2bc868531c7827783f562f82ee0b",
+      "coverage_prefixes": [
+        "config/cfb_prop_model_freeze.json",
+        "config/cfb_prop_code_surface_v1.json",
+        "config/cfb_prop_evidence.json",
+        "config/cfb_prop_certification.json",
+        "artifacts/football/cfb_prop_artifact_bundle_v1.json",
+        "sportsedge/props/cfb",
+        "tests/test_cfb_prop"
+      ],
+      "disposition": null
+    },
+    {
       "bundle_id": "CFB_HISTORICAL_MARKET_ARCHIVE_FREEZE_V1",
       "freeze_sha": "564e5567acf63adbf750e033df08a8c368f6884d",
       "coverage_prefixes": [
