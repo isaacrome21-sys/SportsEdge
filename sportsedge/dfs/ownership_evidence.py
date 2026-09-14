@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 from typing import Mapping
 
+OWNERSHIP_EVIDENCE_EPOCH_UTC = datetime(2026, 9, 14, 5, 0, tzinfo=timezone.utc)
 _SLOT_RE = re.compile(r"(?<!\S)(P|C|1B|2B|3B|SS|OF|UTIL)(?=\s)")
 _ID_SUFFIX_RE = re.compile(r"\s*\((\d+)\)\s*$")
 
@@ -80,13 +81,18 @@ def build_realized_ownership_snapshot(
 ) -> RealizedOwnershipSnapshot:
     """Compute exact realized ownership from a complete post-contest DK standings export.
 
-    Evidence is retrospective by construction. It is valid for ownership calibration
-    on later slates and is explicitly forbidden from influencing the same slate.
-    Every entrant lineup must parse completely; partial exports fail closed.
+    Evidence is forward-only from the frozen epoch and retrospective by construction.
+    It is valid for ownership calibration on later slates and is explicitly forbidden
+    from influencing the same slate. Every entrant lineup must parse completely;
+    partial exports fail closed.
     """
 
     lock = _utc(slate_lock)
     captured = _utc(captured_at)
+    if lock < OWNERSHIP_EVIDENCE_EPOCH_UTC:
+        raise OwnershipEvidenceError(
+            f"DFS_OWNERSHIP_PRE_EPOCH:{lock.isoformat()}:{OWNERSHIP_EVIDENCE_EPOCH_UTC.isoformat()}"
+        )
     if captured < lock:
         raise OwnershipEvidenceError("DFS_OWNERSHIP_CAPTURE_PRELOCK")
     if roster_size < 1:
