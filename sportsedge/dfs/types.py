@@ -4,14 +4,23 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+_SLOT_ALIASES = {
+    "S-FLEX": "SUPERFLEX",
+    "SUPER FLEX": "SUPERFLEX",
+    "SUPER-FLEX": "SUPERFLEX",
+    "D/ST": "DST",
+    "DEF": "DST",
+}
+
 
 def parse_positions(value: str | list[str] | tuple[str, ...]) -> tuple[str, ...]:
     if isinstance(value, (list, tuple)):
         parts = [str(x).strip().upper() for x in value]
     else:
-        text = str(value or "").replace("/", ",")
+        text = str(value or "").replace("/", ",").replace(";", ",")
         parts = [x.strip().upper() for x in text.split(",")]
-    return tuple(dict.fromkeys(p for p in parts if p))
+    normalized = [_SLOT_ALIASES.get(p, p) for p in parts if p]
+    return tuple(dict.fromkeys(normalized))
 
 
 @dataclass(frozen=True)
@@ -37,6 +46,7 @@ class DKPlayer:
     opponent: str
     positions: tuple[str, ...]
     salary: int
+    roster_slots: tuple[str, ...] = ()
     game_id: str = ""
     game_start: datetime | None = None
     dk_fppg: float | None = None
@@ -46,7 +56,9 @@ class DKPlayer:
     raw: dict[str, Any] = field(default_factory=dict, compare=False, repr=False)
 
     def eligible_for(self, slot: str) -> bool:
-        slot = slot.upper()
+        slot = _SLOT_ALIASES.get(slot.upper(), slot.upper())
+        if self.roster_slots:
+            return slot in set(self.roster_slots)
         pos = set(self.positions)
         if slot == "FLEX":
             return bool(pos & {"RB", "WR", "TE"})
