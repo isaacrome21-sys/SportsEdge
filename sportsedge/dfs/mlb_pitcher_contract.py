@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Mapping
 
-MLB_PITCHER_PATH_ACCOUNTING_VERSION = "MLB_SP_ACCOUNTING_V2"
+MLB_PITCHER_PATH_ACCOUNTING_VERSION = "MLB_SP_ACCOUNTING_V3"
 
 
 class MlbPitcherAccountingError(ValueError):
@@ -91,10 +91,8 @@ def normalize_starter_path(sample: Mapping[str, object]) -> dict[str, float]:
         raise MlbPitcherAccountingError(
             f"DFS_MLB_PITCHER_PATH_BF_NOT_INTEGER:{batters_faced}"
         )
-    if strikeouts > outs:
-        raise MlbPitcherAccountingError(
-            f"DFS_MLB_PITCHER_PATH_K_EXCEEDS_OUTS:{strikeouts}:{outs}"
-        )
+    # Strikeouts are bounded by batters faced, not outs. A dropped third strike can
+    # create four strikeouts in an inning, so K > outs is legal baseball state.
     if strikeouts + hits + walks + hbp > batters_faced + 1e-9:
         raise MlbPitcherAccountingError(
             "DFS_MLB_PITCHER_PATH_EVENTS_EXCEED_BF:"
