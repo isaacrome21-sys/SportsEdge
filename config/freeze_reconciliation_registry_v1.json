@@ -2,7 +2,7 @@
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1",
   "issue": 686,
   "baseline_main_sha": "564e5567acf63adbf750e033df08a8c368f6884d",
-  "reconciled_through_sha": "4564a9d2ccd7a55b0547a4ebd5a1b714850aab99",
+  "reconciled_through_sha": "a6e5a155edc9bc59676816091473a8540d694e0c",
   "bundle_inventory_complete": false,
   "inventory_block_reason": "MACHINE_AUDIT_REQUIRED_ZERO_UNMAPPED_GOVERNANCE_SURFACES_BEFORE_TRUE",
   "deltas": [
@@ -109,6 +109,18 @@
       "pr": 713,
       "merge_sha": "4564a9d2ccd7a55b0547a4ebd5a1b714850aab99",
       "note": "Quarantines unreconciled NFL capture rows while preserving no-backfill collection and repairs due-gate self-concealment."
+    },
+    {
+      "delta_id": "PR_714_RECONCILIATION_TERMINAL_MERGE",
+      "pr": 714,
+      "merge_sha": "9e8c7eeed998b4bea1386000c41630fe9380b834",
+      "note": "The prior reconciliation-only terminal merge advanced main beyond the PR_713 registered point. It is now explicitly registered before reconciling later ordinary main movement."
+    },
+    {
+      "delta_id": "PR_716_MLB_PROP_LIVE_SCHEMA_REPAIR",
+      "pr": 716,
+      "merge_sha": "a6e5a155edc9bc59676816091473a8540d694e0c",
+      "note": "Repairs live DraftKings MLB prop acquisition and strict PIT event timing without changing promotion or eligibility authority. Bundle impact must be determined by the reconciliation matrix, not by this note."
     }
   ],
   "bundles": [
@@ -318,6 +330,7 @@
         ".github/workflows/dfs-engine-contract",
         "config/mlb_dfs_",
         "docs/DK_DFS_",
+        "scripts/build_dk_ownership",
         "scripts/freeze_dk_ownership",
         "sportsedge/dfs/",
         "tests/test_dfs_"
