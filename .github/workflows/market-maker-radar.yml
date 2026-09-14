@@ -1,0 +1,90 @@
+name: market-maker-radar
+
+# Zero-authority Layer B hard-market diagnostic. This workflow consumes the
+# append-only closing-line data branch and never grants Model_P, Truth Gate,
+# promotion, eligibility, staking or OFFICIAL authority.
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/analyze_market_maker_radar.py'
+      - 'config/market_maker_radar_v1.json'
+      - 'config/closing_line_archive_policy_v1.json'
+      - 'config/football_public_splits_v1.json'
+      - 'tests/test_market_maker_radar.py'
+      - '.github/workflows/market-maker-radar.yml'
+  workflow_dispatch:
+  workflow_run:
+    workflows: ['closing-line-archive']
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Verify market-maker radar contract
+        run: python -m unittest tests.test_market_maker_radar -v
+
+  analyze:
+    if: github.event_name != 'pull_request'
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Attach append-only closing-line data branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin data >/dev/null 2>&1; then
+            git fetch --depth=1 origin data:data
+            git worktree add .data-branch data
+          else
+            mkdir -p .data-branch/archive/closing-lines
+          fi
+
+      - name: Analyze recent price leadership and stale soft-book offers
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/market-maker-radar
+          python scripts/analyze_market_maker_radar.py \
+            --policy config/market_maker_radar_v1.json \
+            --input-root .data-branch/archive/closing-lines \
+            --since-hours 24 \
+            --out artifacts/market-maker-radar/latest.json
+
+      - name: Assert report retains zero authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -e '
+            .model_p_authority == false and
+            .truth_gate_input == false and
+            .promotion_authority == false and
+            .eligibility_authority == false and
+            .staking_authority == false and
+            .official_authority == false
+          ' artifacts/market-maker-radar/latest.json >/dev/null
+
+      - name: Upload market-maker radar diagnostic
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: market-maker-radar-${{ github.run_id }}
+          path: artifacts/market-maker-radar/latest.json
+          if-no-files-found: error

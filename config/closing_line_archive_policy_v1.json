@@ -4,14 +4,14 @@
   "evidence_class": "NOT_EVIDENCE",
   "promotion_authority": false,
   "evidence_clock_authority": false,
-  "doctrine": "Model-free two-sided price archival for NFL, CFB, MLB and UFC/MMA. This lane observes prices only. It contains no Model_P, no evidence_unit_id, and no decision. It can never be promoted, can never start or extend a promotion evidence clock, and can never be substituted for FOOTBALL_FORWARD_CAPTURE_V2, MLB replay evidence, or UFC promotion evidence. Its sole purpose is to accumulate a closing-line dataset that does not currently exist in any free source. The t0_prestart window is a final scheduled-start-adjacent observation only and is valid solely while commence_time is still strictly in the future.",
+  "doctrine": "Model-free two-sided price archival for NFL, CFB, MLB and UFC/MMA. This lane observes prices only. It contains no Model_P, no evidence_unit_id, and no decision. It can never be promoted, can never start or extend a promotion evidence clock, and can never be substituted for FOOTBALL_FORWARD_CAPTURE_V2, MLB replay evidence, or UFC promotion evidence. Its sole purpose is to accumulate a closing-line dataset that does not currently exist in any free source. The t0_prestart window is a final scheduled-start-adjacent observation only and is valid solely while commence_time is still strictly in the future. DraftKings, FanDuel and Pinnacle observations may additionally feed the zero-authority MARKET_MAKER_RADAR_V1 price-leadership diagnostic; that diagnostic does not change this archive's NOT_EVIDENCE status.",
   "sports": {
     "NFL": "americanfootball_nfl",
     "CFB": "americanfootball_ncaaf",
     "MLB": "baseball_mlb",
     "UFC": "mma_mixed_martial_arts"
   },
-  "books": ["draftkings", "pinnacle"],
+  "books": ["draftkings", "fanduel", "pinnacle"],
   "markets": ["h2h", "spreads", "totals"],
   "regions": "us,eu",
   "odds_format": "american",
@@ -32,5 +32,14 @@
     "must_be_before_start": true,
     "never_overwrite_captured_price": true,
     "missing_capture_is_recorded_not_imputed": true
+  },
+  "market_radar": {
+    "policy": "MARKET_MAKER_RADAR_V1",
+    "price_leadership_only": true,
+    "market_maker_books": ["pinnacle"],
+    "soft_books": ["draftkings", "fanduel"],
+    "provider_required_books": ["circa"],
+    "promotion_authority": false,
+    "model_p_authority": false
   }
 }
