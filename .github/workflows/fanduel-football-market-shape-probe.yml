@@ -1,0 +1,76 @@
+name: fanduel-football-market-shape-probe
+
+# One-shot response-shape capture used to build a direct FanDuel NFL normalizer.
+# Pull requests run deterministic tests only. A merge/path-filtered push performs
+# the live read-only probe once and preserves exact raw bytes. Zero authority.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/probe_direct_market_feeds.py'
+      - 'scripts/probe_fanduel_football_market_shape.py'
+      - 'tests/test_fanduel_football_market_shape_probe.py'
+      - '.github/workflows/fanduel-football-market-shape-probe.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/probe_direct_market_feeds.py'
+      - 'scripts/probe_fanduel_football_market_shape.py'
+      - 'tests/test_fanduel_football_market_shape_probe.py'
+      - '.github/workflows/fanduel-football-market-shape-probe.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Verify deterministic zero-authority probe contract
+        run: python -m unittest tests.test_fanduel_football_market_shape_probe -v
+
+      - name: Capture live NFL content-page and event-page shapes
+        if: github.event_name != 'pull_request'
+        id: live
+        continue-on-error: true
+        run: |
+          mkdir -p artifacts/fanduel-football-market-shape
+          python -m scripts.probe_fanduel_football_market_shape \
+            --out-dir artifacts/fanduel-football-market-shape \
+            --status-out artifacts/fanduel-football-market-shape/status.json
+
+      - name: Enforce reachability and zero authority
+        if: github.event_name != 'pull_request' && always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f artifacts/fanduel-football-market-shape/status.json
+          jq -e '
+            .state == "REACHABLE" and
+            .authority.model_p_input == false and
+            .authority.truth_gate_input == false and
+            .authority.promotion_authority == false and
+            .authority.eligibility_authority == false and
+            .authority.staking_authority == false and
+            .authority.official_authority == false and
+            .authority.production_registry_authority == false and
+            .authority.evidence_clock_authority == false and
+            .authority.wager_placement_authority == false
+          ' artifacts/fanduel-football-market-shape/status.json >/dev/null
+          jq '{state, reason, selection_rule, selected_event, captures: (.captures | with_entries(.value |= {http_status,content_type,raw_sha256,raw_bytes,shape,attachments_keys,layout_keys,market_container_type,market_count}))}' \
+            artifacts/fanduel-football-market-shape/status.json
+
+      - name: Upload exact shape artifact
+        if: github.event_name != 'pull_request' && always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fanduel-football-market-shape-${{ github.sha }}
+          path: artifacts/fanduel-football-market-shape
+          if-no-files-found: error
