@@ -183,14 +183,30 @@ def _next_checkpoint(n: int, checkpoints: Sequence[int]) -> int | None:
 
 def _ledger_summary(root: Path, policy: Mapping[str, Any]) -> dict[str, Any]:
     base = root / "archive" / "market-maker-radar" / "candidate-ledger"
+    persistence_base = root / "archive" / "market-maker-radar" / "candidate-persistence"
     counts: dict[str, int] = defaultdict(int)
+    legacy_pre_persistence: dict[str, list[str]] = defaultdict(list)
+    current_version = str(policy["version"])
+
     if base.exists():
         for path in base.glob("*/*.json"):
-            counts[path.parent.name] += 1
+            family = path.parent.name
+            counts[family] += 1
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            candidate_id = str(payload.get("candidate_id") or path.stem)
+            candidate_version = str(payload.get("policy_version") or "")
+            persistence_path = persistence_base / family / f"{candidate_id}.json"
+            if candidate_version != current_version and not persistence_path.exists():
+                legacy_pre_persistence[family].append(candidate_id)
+
     minimum_n = int(policy["grading"]["minimum_n_for_claim"])
     checkpoints = [int(v) for v in policy["grading"]["evaluation_checkpoints"]["candidate_n"]]
     out: dict[str, Any] = {}
     for family, n in sorted(counts.items()):
+        legacy_ids = sorted(legacy_pre_persistence.get(family) or [])
         out[family] = {
             "candidate_n": n,
             "settled_n": 0,
@@ -201,6 +217,11 @@ def _ledger_summary(root: Path, policy: Mapping[str, Any]) -> dict[str, Any]:
             ),
             "next_candidate_checkpoint": _next_checkpoint(n, checkpoints),
             "formal_checkpoint_now": n in checkpoints,
+            "legacy_pre_persistence_candidate_n": len(legacy_ids),
+            "legacy_pre_persistence_candidate_ids": legacy_ids,
+            "legacy_persisted_price_grade_status": (
+                "UNGRADABLE_NO_FIXED_OFFSET_OBSERVATION" if legacy_ids else "NONE"
+            ),
             "clv": None,
             "hit_rate": None,
             "offered_price_flat_1u_roi": None,
@@ -224,6 +245,24 @@ def _stamp_report_independence(report: Mapping[str, Any], policy: Mapping[str, A
     return output
 
 
+def _roi_first_caveats(report: Mapping[str, Any]) -> list[str]:
+    inherited = [
+        str(item)
+        for item in (report.get("caveats") or [])
+        if "CLV grading is required before any source-family performance claim" not in str(item)
+    ]
+    required = [
+        "CLV is a detector/process check for this stale-price lane; it is not edge validation by itself.",
+        "Realized ROI on filled wagers is the primary lane-validation metric; persisted-price ROI is research-only when fill data do not exist.",
+        "Captured offered-price ROI is optimistic diagnostic only because the quote may not have been takeable.",
+        "Candidates created before the fixed-offset persistence contract cannot be retroactively persistence-graded.",
+    ]
+    for item in required:
+        if item not in inherited:
+            inherited.append(item)
+    return inherited
+
+
 def analyze(
     rows: Sequence[Mapping[str, Any]],
     policy: Mapping[str, Any],
@@ -232,6 +271,7 @@ def analyze(
 ) -> dict[str, Any]:
     eligible, excluded = timing_eligible_rows(rows, policy)
     report = _stamp_report_independence(analyze_v1(eligible, policy), policy)
+    report["caveats"] = _roi_first_caveats(report)
 
     stale = report.get("stale_soft_prices") or []
     for signal in stale:

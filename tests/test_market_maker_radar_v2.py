@@ -42,6 +42,13 @@ class PolicyFreezeTests(unittest.TestCase):
         self.assertEqual(grading["evaluation_checkpoints"]["candidate_n"], [100, 250, 500, 1000])
         self.assertTrue(grading["evaluation_checkpoints"]["no_optional_looks"])
 
+    def test_report_caveats_do_not_re_promote_clv_to_primary_validation(self):
+        report = analyze([], POLICY)
+        joined = " ".join(report["caveats"])
+        self.assertNotIn("CLV grading is required before any source-family performance claim", joined)
+        self.assertIn("Realized ROI on filled wagers is the primary lane-validation metric", joined)
+        self.assertIn("Captured offered-price ROI is optimistic diagnostic only", joined)
+
 
 class TimingGateTests(unittest.TestCase):
     def test_old_or_timing_ineligible_rows_cannot_create_stale_signal(self):
@@ -102,10 +109,31 @@ class CandidateLedgerTests(unittest.TestCase):
             self.assertEqual(summary["candidate_n"], 1)
             self.assertEqual(summary["validation_status"], "INSUFFICIENT")
             self.assertEqual(summary["next_candidate_checkpoint"], 100)
+            self.assertEqual(summary["legacy_pre_persistence_candidate_n"], 0)
             self.assertIsNone(summary["clv"])
             self.assertIsNone(summary["offered_price_flat_1u_roi"])
             self.assertIsNone(summary["persisted_price_flat_1u_roi"])
             self.assertIsNone(summary["realized_filled_roi"])
+
+    def test_pre_1_3_candidate_without_persistence_is_explicitly_ungradable(self):
+        family = "PINNACLE_TO_FANDUEL_STALE_PRICE_H2H_V1"
+        candidate_id = "legacy-candidate"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / "archive" / "market-maker-radar" / "candidate-ledger" / family / f"{candidate_id}.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps({
+                "record_type": "MARKET_MAKER_RADAR_STALE_PRICE_CANDIDATE_V1",
+                "candidate_id": candidate_id,
+                "source_family_id": family,
+                "policy_version": "1.2.0",
+            }), encoding="utf-8")
+            report = analyze([], POLICY, ledger_root=root)
+            summary = report["candidate_ledger_summary"][family]
+            self.assertEqual(summary["candidate_n"], 1)
+            self.assertEqual(summary["legacy_pre_persistence_candidate_n"], 1)
+            self.assertEqual(summary["legacy_pre_persistence_candidate_ids"], [candidate_id])
+            self.assertEqual(summary["legacy_persisted_price_grade_status"], "UNGRADABLE_NO_FIXED_OFFSET_OBSERVATION")
 
 
 if __name__ == "__main__":
