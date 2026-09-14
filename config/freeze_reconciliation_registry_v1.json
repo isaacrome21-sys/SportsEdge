@@ -2,7 +2,7 @@
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1",
   "issue": 686,
   "baseline_main_sha": "564e5567acf63adbf750e033df08a8c368f6884d",
-  "reconciled_through_sha": "27f789b0b37ac17876b97fcd1fd794cb2c394349",
+  "reconciled_through_sha": "05877519650ab451d4b5cd73d8ea6d42d1baebe1",
   "bundle_inventory_complete": false,
   "inventory_block_reason": "MACHINE_AUDIT_REQUIRED_ZERO_UNMAPPED_GOVERNANCE_SURFACES_BEFORE_TRUE",
   "deltas": [
@@ -21,7 +21,8 @@
     {"delta_id":"PR_702","pr":702,"merge_sha":"09a2aecdc168f65d50a1120017491a0d104e6140"},
     {"delta_id":"PR_703","pr":703,"merge_sha":"00b4db27f15cc22b089e2a2d974cf483eed86e58"},
     {"delta_id":"DIRECT_MAIN_81BD1E18_NOOP","pr":0,"merge_sha":"81bd1e1807a65e0ed7060971152a0c1ca9c0d21c"},
-    {"delta_id":"DIRECT_MAIN_27F789B0_REVERT","pr":0,"merge_sha":"27f789b0b37ac17876b97fcd1fd794cb2c394349"}
+    {"delta_id":"DIRECT_MAIN_27F789B0_REVERT","pr":0,"merge_sha":"27f789b0b37ac17876b97fcd1fd794cb2c394349"},
+    {"delta_id":"DIRECT_MAIN_05877519_EV_TRACKER_CLOSE_UPDATE","pr":0,"merge_sha":"05877519650ab451d4b5cd73d8ea6d42d1baebe1","note":"Automated direct-to-main mutation during ACTIVE_BLOCKED hold; changed output/ev_tracker/health.md only. Registered for provenance; semantic freeze-drift disposition remains governed by bundle reconciliation."}
   ],
   "bundles": [
     {
