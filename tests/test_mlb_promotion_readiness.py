@@ -1,4 +1,8 @@
+from pathlib import Path
+import shutil
+import tempfile
 import unittest
+from unittest.mock import patch
 
 from sportsedge.mlb_promotion_readiness import (
     _floor_readiness,
@@ -77,6 +81,109 @@ class MLBPromotionReadinessTests(unittest.TestCase):
         self.assertTrue(_pre_eligibility_acceptance_complete(state))
         state["feature_realization_status"] = "UNVERIFIED"
         self.assertFalse(_pre_eligibility_acceptance_complete(state))
+
+    def test_official_reads_persisted_eligibility_and_canonical_acceptance(self):
+        current_state = {
+            "runtime_engine": True,
+            "registered": True,
+            "eligible": False,
+            "behavioral_status": "KEEP_MEASURED",
+            "feature_realization_status": "COMPLETE",
+            "validation_missing": [],
+        }
+        finish = {
+            "markets": [
+                {
+                    "market": "HITS",
+                    "deployment_eligible": False,
+                    "acceptance_complete": False,
+                    "blockers": [],
+                }
+            ]
+        }
+        acceptance = {"markets": [{"market": "HITS", "current_state": current_state}]}
+        frozen_floor = {
+            "frozen": True,
+            "value_probability_points": "0.03",
+            "method_version": "TEST_ONLY_V1",
+            "evidence_sha256": "a" * 64,
+            "blocker": None,
+        }
+
+        with (
+            patch("sportsedge.mlb_promotion_readiness.build_mlb_finish_line", return_value=finish),
+            patch("sportsedge.mlb_promotion_readiness.build_acceptance_matrix", return_value=acceptance),
+            patch("sportsedge.mlb_promotion_readiness.load_edge_floor_config", return_value=BASE_CONFIG),
+            patch("sportsedge.mlb_promotion_readiness._floor_readiness", return_value=frozen_floor),
+        ):
+            report = build_mlb_promotion_readiness()
+        row = report["markets"][0]
+        self.assertTrue(row["promotion_prerequisites_complete"])
+        self.assertFalse(row["deployment_eligible"])
+        self.assertFalse(row["acceptance_complete"])
+        self.assertFalse(row["official_ready"])
+
+        finish["markets"][0]["deployment_eligible"] = True
+        finish["markets"][0]["acceptance_complete"] = True
+        current_state["eligible"] = True
+        with (
+            patch("sportsedge.mlb_promotion_readiness.build_mlb_finish_line", return_value=finish),
+            patch("sportsedge.mlb_promotion_readiness.build_acceptance_matrix", return_value=acceptance),
+            patch("sportsedge.mlb_promotion_readiness.load_edge_floor_config", return_value=BASE_CONFIG),
+            patch("sportsedge.mlb_promotion_readiness._floor_readiness", return_value=frozen_floor),
+        ):
+            report = build_mlb_promotion_readiness()
+        self.assertTrue(report["markets"][0]["official_ready"])
+
+    def test_eligible_flag_alone_cannot_bypass_canonical_acceptance(self):
+        state = {
+            "runtime_engine": True,
+            "registered": True,
+            "eligible": True,
+            "behavioral_status": "KEEP_MEASURED",
+            "feature_realization_status": "COMPLETE",
+            "validation_missing": [],
+        }
+        finish = {
+            "markets": [
+                {
+                    "market": "HITS",
+                    "deployment_eligible": True,
+                    "acceptance_complete": False,
+                    "blockers": [],
+                }
+            ]
+        }
+        acceptance = {"markets": [{"market": "HITS", "current_state": state}]}
+        frozen_floor = {
+            "frozen": True,
+            "value_probability_points": "0.03",
+            "method_version": "TEST_ONLY_V1",
+            "evidence_sha256": "a" * 64,
+            "blocker": None,
+        }
+        with (
+            patch("sportsedge.mlb_promotion_readiness.build_mlb_finish_line", return_value=finish),
+            patch("sportsedge.mlb_promotion_readiness.build_acceptance_matrix", return_value=acceptance),
+            patch("sportsedge.mlb_promotion_readiness.load_edge_floor_config", return_value=BASE_CONFIG),
+            patch("sportsedge.mlb_promotion_readiness._floor_readiness", return_value=frozen_floor),
+        ):
+            report = build_mlb_promotion_readiness()
+        row = report["markets"][0]
+        self.assertTrue(row["promotion_prerequisites_complete"])
+        self.assertTrue(row["deployment_eligible"])
+        self.assertFalse(row["official_ready"])
+        self.assertIn("CANONICAL_ACCEPTANCE_INCOMPLETE", row["promotion_blockers"])
+
+    def test_audit_does_not_mutate_deployment_registry(self):
+        source = Path("config/deployments.json")
+        with tempfile.TemporaryDirectory() as td:
+            copied = Path(td) / "deployments.json"
+            shutil.copyfile(source, copied)
+            before = copied.read_bytes()
+            build_mlb_promotion_readiness(deployments_path=copied)
+            after = copied.read_bytes()
+        self.assertEqual(after, before)
 
     def test_default_inventory_never_reports_official_without_floor(self):
         report = build_mlb_promotion_readiness()
