@@ -40,7 +40,7 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p artifacts/pinnacle-football-market-shape
-          python scripts/probe_pinnacle_football_market_shape.py \
+          python -m scripts.probe_pinnacle_football_market_shape \
             --out-dir artifacts/pinnacle-football-market-shape \
             --status-out artifacts/pinnacle-football-market-shape/status.json
 
