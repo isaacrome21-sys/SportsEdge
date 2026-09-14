@@ -1,21 +1,25 @@
 name: market-maker-radar
 
-# Zero-authority Layer B hard-market diagnostic. This workflow consumes the
-# append-only closing-line data branch and never grants Model_P, Truth Gate,
-# promotion, eligibility, staking or OFFICIAL authority.
+# Zero-authority Layer B hard-market diagnostic. This workflow consumes both the
+# append-only paid closing-line archive and the direct-public NFL radar lane.
+# It never grants Model_P, Truth Gate, promotion, eligibility, staking or OFFICIAL
+# authority.
 
 on:
   pull_request:
     paths:
       - 'scripts/analyze_market_maker_radar.py'
+      - 'scripts/capture_nfl_market_maker_radar.py'
       - 'config/market_maker_radar_v1.json'
       - 'config/closing_line_archive_policy_v1.json'
       - 'config/football_public_splits_v1.json'
       - 'tests/test_market_maker_radar.py'
+      - 'tests/test_capture_nfl_market_maker_radar.py'
       - '.github/workflows/market-maker-radar.yml'
+      - '.github/workflows/nfl-market-maker-radar-capture.yml'
   workflow_dispatch:
   workflow_run:
-    workflows: ['closing-line-archive']
+    workflows: ['closing-line-archive', 'nfl-market-maker-radar-capture']
     types: [completed]
 
 permissions:
@@ -31,7 +35,9 @@ jobs:
         with:
           python-version: '3.12'
       - name: Verify market-maker radar contract
-        run: python -m unittest tests.test_market_maker_radar -v
+        run: |
+          python -m unittest tests.test_market_maker_radar -v
+          python -m unittest tests.test_capture_nfl_market_maker_radar -v
 
   analyze:
     if: github.event_name != 'pull_request'
@@ -47,7 +53,7 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Attach append-only closing-line data branch
+      - name: Attach append-only market data branch
         shell: bash
         run: |
           set -euo pipefail
@@ -55,7 +61,7 @@ jobs:
             git fetch --depth=1 origin data:data
             git worktree add .data-branch data
           else
-            mkdir -p .data-branch/archive/closing-lines
+            mkdir -p .data-branch/archive/closing-lines .data-branch/archive/market-maker-radar/nfl
           fi
 
       - name: Analyze recent price leadership and stale soft-book offers
@@ -63,9 +69,20 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/market-maker-radar
+          ARGS=()
+          for ROOT in \
+            .data-branch/archive/closing-lines \
+            .data-branch/archive/market-maker-radar/nfl
+          do
+            if [[ -d "$ROOT" ]]; then
+              while IFS= read -r FILE; do
+                ARGS+=(--input "$FILE")
+              done < <(find "$ROOT" -type f -name '*.ndjson' -print | sort)
+            fi
+          done
           python scripts/analyze_market_maker_radar.py \
             --policy config/market_maker_radar_v1.json \
-            --input-root .data-branch/archive/closing-lines \
+            "${ARGS[@]}" \
             --since-hours 24 \
             --out artifacts/market-maker-radar/latest.json
 
