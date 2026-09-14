@@ -60,6 +60,15 @@
         "candidate_count": 317,
         "mapped_or_exactly_exempt_count": 87,
         "unmapped_count": 230
+      },
+      {
+        "pass_id": "PASS_3",
+        "head_sha": "8dc4671ebd5d1b5860b573e31133234094afeff3",
+        "pull_request_head_sha": "932fb09d2e81818bba4d18a30a799edf2410d6d1",
+        "artifact_digest": "sha256:785e0af2311e1e7d4573ba55fda89922e0418814fce720bd03b1745d2c0c1f21",
+        "candidate_count": 317,
+        "mapped_or_exactly_exempt_count": 87,
+        "unmapped_count": 230
       }
     ]
   },
@@ -67,10 +76,14 @@
     "status": "PARTIALLY_PROVEN_FAIL_CLOSED",
     "evaluation_gate_install_sha": "dfe7772772014765dcbc3af889b8922a8a19371b",
     "prereg_freeze_commit_sha": "4629afd60972fe73eb0217508dc7a4ae51ce6ccf",
+    "gate_install_is_ancestor_of_prereg_freeze": true,
+    "gate_to_prereg_compare_status": "ahead",
+    "gate_to_prereg_ahead_by": 60,
+    "ordering_proof_method": "GIT_MERGE_BASE_ANCESTRY",
     "first_authorized_evaluation_sha": null,
     "first_authorized_evaluation_run_id": null,
     "pre_gate_exploratory_evaluation_excluded": false,
-    "claim_limit": "The gate-install and prereg-freeze ordering is repository-proven. Absence of any pre-gate exploratory evaluation is not yet independently proven, so FROZEN_BEFORE_FIRST_EVALUATION is not accepted as a self-authenticating chronology claim."
+    "claim_limit": "Repository ancestry proves the evaluation gate was installed before the prereg freeze. Absence of any pre-gate exploratory evaluation is not yet independently proven, so FROZEN_BEFORE_FIRST_EVALUATION is not accepted as a self-authenticating chronology claim."
   },
   "exact_exemptions": {
     "config/freeze_reconciliation_policy_v1.json": "RECONCILIATION_CONTROL_PLANE",
