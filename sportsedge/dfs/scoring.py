@@ -4,6 +4,7 @@ from math import sqrt
 from statistics import fmean, pstdev
 from typing import Iterable, Mapping
 
+from .mlb_pitcher_contract import normalize_starter_path, validate_pitcher_expectation
 from .types import DKPlayer, Projection
 
 
@@ -77,6 +78,7 @@ def projection_from_stats(
     if sport in {"NFL", "CFB"}:
         mean = football_expected_dk_points(stats)
     elif sport == "MLB" and player.is_pitcher:
+        validate_pitcher_expectation(stats)
         mean = mlb_pitcher_expected_dk_points(stats)
     elif sport == "MLB":
         mean = mlb_hitter_expected_dk_points(stats)
@@ -145,11 +147,10 @@ def _football_sample_stats(player: DKPlayer, sample: Mapping[str, float]) -> dic
 
 
 def _mlb_sample_stats(player: DKPlayer, sample: Mapping[str, float]) -> dict[str, float]:
-    out = {str(k): float(v) for k, v in sample.items() if isinstance(v, (int, float))}
     if player.is_pitcher:
-        required = {"outs", "strikeouts", "earned_runs", "hits_allowed", "walks_allowed"}
-    else:
-        required = {"singles", "doubles", "triples", "home_runs", "rbi", "runs", "walks", "hbp", "stolen_bases"}
+        return normalize_starter_path(sample)
+    out = {str(k): float(v) for k, v in sample.items() if isinstance(v, (int, float))}
+    required = {"singles", "doubles", "triples", "home_runs", "rbi", "runs", "walks", "hbp", "stolen_bases"}
     missing = sorted(required - set(out))
     if missing:
         raise ValueError(f"DFS_SAMPLE_COMPONENTS_MISSING:{player.player_id}:{','.join(missing)}")
@@ -171,6 +172,10 @@ def dk_scores_from_samples(
     sport = sport.upper()
     for sample in samples:
         if "dk_points" in sample:
+            if sport == "MLB" and player.is_pitcher:
+                raise ValueError(
+                    f"DFS_MLB_PITCHER_DK_POINTS_BYPASS_FORBIDDEN:{player.player_id}"
+                )
             scores.append(float(sample["dk_points"]))
             continue
         if sport in {"NFL", "CFB"}:
