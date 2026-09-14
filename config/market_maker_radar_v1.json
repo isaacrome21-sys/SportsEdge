@@ -1,9 +1,10 @@
 {
   "policy_id": "MARKET_MAKER_RADAR_V1",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "status": "ACTIVE_LAYER_B_HARD_MARKET",
   "description": "Price-only market-maker lead/lag and stale-soft-book radar. Price leadership is the primary signal. Public splits, RLM labels, capper opinion, and unverified sharp-action labels cannot create a signal.",
   "model_free": true,
+  "evidence_class": "LAYER_B_HARD_MARKET_DIAGNOSTIC",
   "authority": {
     "model_p_authority": false,
     "predictive_model_input": false,
@@ -25,7 +26,7 @@
     "max_recent_age_seconds": 900,
     "change_time_source_priority": ["book_last_update", "captured_at"],
     "same_timestamp_rule": "SYNCHRONOUS_NOT_LEADER",
-    "same_capture_rule": "SYNCHRONOUS_NOT_LEADER",
+    "same_capture_rule": "ALLOW_DISTINCT_BOOK_LAST_UPDATE_ONLY_OTHERWISE_SYNCHRONOUS",
     "lead_follow_window_seconds": 900,
     "steam_window_seconds": 300
   },
@@ -35,6 +36,15 @@
     "minimum_soft_followers": 1,
     "steam_min_books": 3,
     "threshold_status": "RESEARCH_ALERT_THRESHOLD_NOT_VALIDATED_EDGE_FLOOR"
+  },
+  "signal_classes": {
+    "market_maker_lead": "PRIMARY_HARD_MARKET",
+    "stale_soft_price": "PRIMARY_HARD_MARKET",
+    "stale_soft_line": "PRIMARY_HARD_MARKET",
+    "multi_book_steam": "SECONDARY_PRICE_ONLY",
+    "soft_move_unconfirmed": "DIAGNOSTIC_ONLY",
+    "public_split_divergence": "ANNOTATION_ONLY",
+    "rlm": "ANNOTATION_ONLY_REQUIRES_NEWS_ATTRIBUTION"
   },
   "news_attribution": {
     "required_before_calling_move_rlm": true,
