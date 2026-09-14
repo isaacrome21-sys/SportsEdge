@@ -165,7 +165,7 @@
     ],
     "evaluation_checkpoints": {
       "freeze_status": "FROZEN_BEFORE_FIRST_FORMAL_PERFORMANCE_EVALUATION",
-      "frozen_at": "2026-09-14T10:40:00Z",
+      "frozen_at": "2026-09-14T10:51:26Z",
       "candidate_n": [100, 250, 500, 1000],
       "persisted_n": [100, 250, 500, 1000],
       "filled_n": [100, 250, 500, 1000],
