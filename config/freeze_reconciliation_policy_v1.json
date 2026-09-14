@@ -6,6 +6,7 @@
   "hold_started_from_main_sha": "564e5567acf63adbf750e033df08a8c368f6884d",
   "observed_main_sha_when_policy_authored": "00b4db27f15cc22b089e2a2d974cf483eed86e58",
   "authorized_reconciliation_branch": "fix/freeze-reconciliation-inventory-20260914",
+  "reconciliation_merge_method": "merge",
   "allowed_matrix_outcomes": ["MATCH", "PROVISIONAL_DRIFT_BLOCKED", "NOT_APPLICABLE", "DRIFT_CONFIRMED"],
   "terminal_matrix_outcomes": ["MATCH", "NOT_APPLICABLE", "DRIFT_CONFIRMED"],
   "drift_terminal_dispositions": ["REVOKED"],
@@ -37,15 +38,17 @@
     "refrozen_bundle_requires_timestamp_plus_prior_bundle_hash_invalidation": true,
     "refrozen_disposition_currently_allowed": false,
     "revoked_bundle_invalidates_prior_forward_clock": true,
-    "current_main_sha_must_equal_reconciled_through_sha": true,
+    "current_main_must_descend_from_reconciled_through_sha": true,
+    "current_governed_surface_digest_must_equal_registered_boundary_digest": true,
+    "sha_equality_is_not_a_terminal_condition": true,
     "direct_main_writers_quiesced": false
   },
   "authority": {"model_p": false, "truth_gate": false, "promotion": false, "staking": false, "official": false, "validation_attempt": false, "untouched_readout": false},
-  "enforcement_note": "Repository CI can fail pull requests while this hold is active, but GitHub can still permit a manual or external write because main is not protected server-side. Do not represent CI, the writer detector, or an exact-head audit as proof that main cannot advance.",
+  "enforcement_note": "Repository CI can fail pull requests while this hold is active, but GitHub can still permit a manual or external write because main is not protected server-side. Do not represent CI, the writer detector, or an exact-head audit as proof that main cannot advance. Reconciliation terminality is ancestry plus governed-surface content identity, not current-main SHA equality.",
   "operational_prerequisite_waiver": {
     "scope": ["server_side_main_branch_protection", "blocking_on_direct_main_writer_diagnostic"],
     "user_instruction": "Fuck that prerequisite then and move on a finish everything",
     "scope_limit": "Operational release prerequisite only. No evidence, model validation, Model_P, promotion, staking or OFFICIAL authority is created.",
-    "main_movement_policy": "Read current main before each mutation and merge; register any new deltas before reconciliation release."
+    "main_movement_policy": "Read current main before each mutation and merge; governed-content-neutral descendants remain reconciliation-admissible only when ancestry and content identity both pass."
   }
 }
