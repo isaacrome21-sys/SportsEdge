@@ -16,6 +16,22 @@ from sportsedge.governance.freeze_reconciliation import (  # noqa: E402
 )
 
 
+def assert_refreeze_machine_verified(registry: dict[str, object]) -> None:
+    refrozen: list[str] = []
+    for bundle in registry.get("bundles") or []:
+        if not isinstance(bundle, dict):
+            continue
+        disposition = bundle.get("disposition")
+        if isinstance(disposition, dict) and disposition.get("state") == "REFROZEN":
+            refrozen.append(str(bundle.get("bundle_id") or "UNKNOWN_BUNDLE"))
+    if refrozen:
+        raise SystemExit(
+            "REFROZEN_SEMANTICS_NOT_MACHINE_VERIFIED:"
+            + ",".join(sorted(refrozen))
+            + ":ONLY_REVOKED_ALLOWED_UNTIL_PRIOR_BUNDLE_HASH_TIMESTAMP_AND_ROW_ADMISSIBILITY_ARE_VERIFIED"
+        )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Reconcile every registered post-freeze delta against every active freeze bundle."
@@ -33,10 +49,13 @@ def main() -> int:
     args = parser.parse_args()
 
     repo = Path(args.repo).resolve()
+    policy = load_json(args.policy)
+    registry = load_json(args.registry)
+    assert_refreeze_machine_verified(registry)
     report = build_reconciliation_report(
         repo=repo,
-        policy=load_json(args.policy),
-        registry=load_json(args.registry),
+        policy=policy,
+        registry=registry,
         current_main_ref=args.current_main_ref,
     )
     rendered = json.dumps(report, sort_keys=True, indent=2) + "\n"
