@@ -117,6 +117,19 @@ def _fetch(
     return raw, payload, status, ctype
 
 
+def _first_mapping(value: Any) -> Mapping[str, Any] | None:
+    if isinstance(value, Mapping):
+        for item in value.values():
+            if isinstance(item, Mapping):
+                return item
+        return None
+    if isinstance(value, list):
+        for item in value:
+            if isinstance(item, Mapping):
+                return item
+    return None
+
+
 def _shape(payload: Any) -> dict[str, Any]:
     if isinstance(payload, list):
         first = payload[0] if payload else None
@@ -129,6 +142,7 @@ def _shape(payload: Any) -> dict[str, Any]:
         attachments = payload.get("attachments")
         attachment_keys = sorted(str(k) for k in attachments.keys()) if isinstance(attachments, Mapping) else []
         counts: dict[str, int] = {}
+        first_item_keys: dict[str, list[str]] = {}
         if isinstance(attachments, Mapping):
             for key in ("events", "markets", "runners", "competitions"):
                 value = attachments.get(key)
@@ -136,11 +150,15 @@ def _shape(payload: Any) -> dict[str, Any]:
                     counts[key] = len(value)
                 elif isinstance(value, list):
                     counts[key] = len(value)
+                first = _first_mapping(value)
+                if first is not None:
+                    first_item_keys[key] = sorted(str(k) for k in first.keys())
         return {
             "top_level_type": "object",
             "top_level_keys": sorted(str(k) for k in payload.keys()),
             "attachment_keys": attachment_keys,
             "attachment_counts": counts,
+            "attachment_first_item_keys": first_item_keys,
         }
     return {"top_level_type": type(payload).__name__}
 
