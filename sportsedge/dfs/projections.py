@@ -3,9 +3,10 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
 
 from .scoring import dk_fppg_baseline, projection_from_samples, projection_from_stats
+from .sources.common import normalize_name
 from .types import DKPlayer, Projection
 
 
@@ -19,22 +20,25 @@ def _dt(value: Any) -> datetime | None:
     return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
 
 
-def load_projection_snapshot(path: str | Path, players: Iterable[DKPlayer], sport: str) -> dict[str, Projection]:
-    payload = json.loads(Path(path).read_text(encoding="utf-8"))
-    snapshot_updated_at = _dt(payload.get("updated_at")) if isinstance(payload, dict) else None
-    rows = payload.get("players") if isinstance(payload, dict) else payload
+def projections_from_payload(
+    payload: Mapping[str, Any] | list[Any],
+    players: Iterable[DKPlayer],
+    sport: str,
+) -> dict[str, Projection]:
+    snapshot_updated_at = _dt(payload.get("updated_at")) if isinstance(payload, Mapping) else None
+    rows = payload.get("players") if isinstance(payload, Mapping) else payload
     if not isinstance(rows, list):
         raise ValueError("DFS_PROJECTION_SNAPSHOT_SHAPE_INVALID")
     by_id = {p.player_id: p for p in players}
-    by_name_team = {(p.name.casefold(), p.team): p for p in players}
+    by_name_team = {(normalize_name(p.name), p.team.upper()): p for p in players}
     out: dict[str, Projection] = {}
     for row in rows:
-        if not isinstance(row, dict):
+        if not isinstance(row, Mapping):
             continue
         pid = str(row.get("player_id") or row.get("playerDkId") or "")
         p = by_id.get(pid)
         if p is None:
-            key = (str(row.get("name") or "").casefold(), str(row.get("team") or "").upper())
+            key = (normalize_name(str(row.get("name") or "")), str(row.get("team") or "").upper())
             p = by_name_team.get(key)
         if p is None:
             continue
@@ -51,7 +55,7 @@ def load_projection_snapshot(path: str | Path, players: Iterable[DKPlayer], spor
                 **{**proj.__dict__, "updated_at": _dt(row.get("updated_at")) or snapshot_updated_at}
             )
             continue
-        if isinstance(row.get("stats"), dict):
+        if isinstance(row.get("stats"), Mapping):
             proj = projection_from_stats(p, sport, row["stats"], source=str(row.get("source") or "SPORTSEDGE_STATS"))
             out[p.player_id] = Projection(
                 **{**proj.__dict__, "updated_at": _dt(row.get("updated_at")) or snapshot_updated_at}
@@ -64,6 +68,7 @@ def load_projection_snapshot(path: str | Path, players: Iterable[DKPlayer], spor
         ceiling = float(row.get("ceiling") or 0.0) or mean + (1.65 * std if std else max(4.0, mean * 0.45))
         floor = float(row.get("floor") or 0.0) or max(0.0, mean - (1.15 * std if std else max(3.0, mean * 0.35)))
         own = row.get("ownership")
+        payload_source = payload.get("source") if isinstance(payload, Mapping) else None
         out[p.player_id] = Projection(
             player_id=p.player_id,
             mean=mean,
@@ -71,11 +76,16 @@ def load_projection_snapshot(path: str | Path, players: Iterable[DKPlayer], spor
             floor=max(0.0, min(mean, floor)),
             stddev=std,
             ownership=float(own) if own is not None else None,
-            source=str(row.get("source") or payload.get("source") if isinstance(payload, dict) else "SNAPSHOT"),
+            source=str(row.get("source") or payload_source or "SNAPSHOT"),
             updated_at=_dt(row.get("updated_at")) or snapshot_updated_at,
             components={str(k): float(v) for k, v in (row.get("components") or {}).items() if isinstance(v, (int, float))},
         )
     return out
+
+
+def load_projection_snapshot(path: str | Path, players: Iterable[DKPlayer], sport: str) -> dict[str, Projection]:
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    return projections_from_payload(payload, players, sport)
 
 
 def ensure_projection_coverage(
