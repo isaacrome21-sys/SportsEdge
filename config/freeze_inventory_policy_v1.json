@@ -44,6 +44,7 @@
     "stall_window_transitions": 3,
     "stall_definition": "Three consecutive distinct-head audit transitions in which unmapped_count does not strictly decrease from the immediately preceding completed pass.",
     "terminal_effect": "BLOCK_RELEASE_REQUIRE_SCOPE_REVIEW_NOT_MORE_BLIND_MAPPING",
+    "progress_metric": "mapped_or_exactly_exempt_count and unmapped_count are tracked per completed hosted pass; newly discovered candidates may raise candidate_count but may not be hidden by scanner narrowing.",
     "completed_passes": [
       {
         "pass_id": "PASS_1",
@@ -59,7 +60,8 @@
         "artifact_digest": "sha256:ded5a3ff79dc6d8c8dd5135a3dca308bdaa4ea5020ec090a1fbdd0317fa3d3d5",
         "candidate_count": 317,
         "mapped_or_exactly_exempt_count": 87,
-        "unmapped_count": 230
+        "unmapped_count": 230,
+        "mapped_delta_from_prior": 26
       },
       {
         "pass_id": "PASS_3",
@@ -68,7 +70,8 @@
         "artifact_digest": "sha256:785e0af2311e1e7d4573ba55fda89922e0418814fce720bd03b1745d2c0c1f21",
         "candidate_count": 317,
         "mapped_or_exactly_exempt_count": 87,
-        "unmapped_count": 230
+        "unmapped_count": 230,
+        "mapped_delta_from_prior": 0
       },
       {
         "pass_id": "PASS_4",
@@ -77,7 +80,22 @@
         "artifact_digest": "sha256:754c0ff4c2fd1efe09b7b7ec7dc8f336163e4a9d7e375909d90b488f516ac7f3",
         "candidate_count": 317,
         "mapped_or_exactly_exempt_count": 118,
-        "unmapped_count": 199
+        "unmapped_count": 199,
+        "mapped_delta_from_prior": 31
+      },
+      {
+        "pass_id": "PASS_5",
+        "head_sha": "061a6320a061036b7b7f8522bd0ada41030ae536",
+        "pull_request_head_sha": "cfcd8431709fbb0ca1345709a62b22144766d98d",
+        "artifact_digest": "sha256:7158177983809262993c0cd2fb0a635b3a368a34c5723351fbe85700c03ddab5",
+        "candidate_count": 317,
+        "mapped_or_exactly_exempt_count": 161,
+        "unmapped_count": 156,
+        "mapped_delta_from_prior": 43,
+        "newly_mapped_surface_count": 43,
+        "newly_mapped_surface_delta_intersection_count": 0,
+        "drift_count": 11,
+        "drift_count_interpretation": "UNCHANGED_DRIFT_COUNT_EXPLAINED_BY_ZERO_INTERSECTION_BETWEEN_THE_43_NEWLY_MAPPED_SURFACES_AND_THE_14_RECONCILIATION_DELTAS; not treated as evidence of no drift outside the enumerated delta set."
       }
     ]
   },
@@ -112,7 +130,9 @@
     "exemptions_must_be_exact_paths": true,
     "wildcard_exemptions_forbidden": true,
     "every_candidate_must_be_bundle_mapped_or_exactly_exempt": true,
-    "registry_complete_true_requires_zero_unmapped_candidates": true
+    "registry_complete_true_requires_zero_unmapped_candidates": true,
+    "audit_must_emit_bundle_ids_per_candidate": true,
+    "broad_mapping_without_traceable_bundle_binding_forbidden": true
   },
   "authority": {
     "model_p": false,
