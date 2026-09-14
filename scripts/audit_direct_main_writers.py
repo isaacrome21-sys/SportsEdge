@@ -87,8 +87,6 @@ def classify_git_push(command: str, checkout_non_main: str | None = None) -> tup
     match = re.search(r"\bgit\s+push\b.*", command)
     if not match:
         return "NON_WRITER", "NO_GIT_PUSH"
-    # Classify only the git command itself. Shell control syntax after a push
-    # (`; then`, `&& echo`, `|| retry`) is not part of the refspec.
     git_command = re.split(r"\s*(?:&&|\|\||;)\s*", match.group(0), maxsplit=1)[0]
     try:
         tokens = shlex.split(git_command, posix=True)
@@ -115,8 +113,6 @@ def classify_git_push(command: str, checkout_non_main: str | None = None) -> tup
 
 def _referenced_local_paths(text: str) -> list[tuple[str, str]]:
     refs: set[tuple[str, str]] = set()
-    # Only recognize same-line shell invocations. This avoids interpreting YAML
-    # `shell: bash` followed by a later `run:` key as `bash run:`.
     for raw in text.splitlines():
         stripped = raw.strip()
         if stripped.startswith("- run:"):
@@ -178,6 +174,10 @@ def audit(repo: Path, ref: str = "HEAD") -> dict[str, Any]:
                     findings.append({"workflow": path, "source": source_path, "line": line_no, "classification": "MAIN_WRITER", "reason": reason, "permission_state": permission_state, "permission_reason": permission_reason})
     blocking = [f for f in findings if f["classification"] in {"MAIN_WRITER", "UNRESOLVABLE"}]
     status = "QUIESCED" if not blocking else "BLOCKED_OR_UNRESOLVED"
+    if blocking:
+        proof_ceiling = "STATIC_SCAN_FOUND_BLOCKING_OR_UNRESOLVED_WRITERS; WAIVER_DOES_NOT_CONVERT_FINDINGS_TO_QUIESCED; DOES_NOT_PROVE_MAIN_CANNOT_ADVANCE"
+    else:
+        proof_ceiling = "NO_DECLARED_OR_STATICALLY_REACHABLE_MAIN_WRITER_DETECTED_AT_THIS_REF; DOES_NOT_PROVE_MAIN_CANNOT_ADVANCE"
     return {
         "schema": "SPORTSEDGE_DIRECT_MAIN_WRITER_GUARD_V2",
         "status": status,
@@ -187,7 +187,7 @@ def audit(repo: Path, ref: str = "HEAD") -> dict[str, Any]:
         "findings": findings,
         "blocking_findings": blocking,
         "authority": {k: False for k in ("model_p", "truth_gate", "promotion", "staking", "official", "validation_attempt", "readout")},
-        "proof_ceiling": "NO_DECLARED_OR_STATICALLY_REACHABLE_MAIN_WRITER_DETECTED_AT_THIS_REF; DOES_NOT_PROVE_MAIN_CANNOT_ADVANCE",
+        "proof_ceiling": proof_ceiling,
     }
 
 
