@@ -6,6 +6,7 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
+from .cfb_auto_projection import build_cfb_auto_projection_snapshot
 from .dk_contest import DraftKingsContestClient
 from .draftkings import DraftKingsClient, resolve_slate
 from .field import FieldGenerationConfig
@@ -115,9 +116,10 @@ class DfsEngine:
         }
         if projection_snapshot is not None:
             projections.update(load_projection_snapshot(projection_snapshot, players, sport))
-        elif auto_projection and sport == "NFL":
+        elif auto_projection and sport in {"NFL", "CFB"}:
             try:
-                auto_projection_payload = build_nfl_auto_projection_snapshot(
+                builder = build_nfl_auto_projection_snapshot if sport == "NFL" else build_cfb_auto_projection_snapshot
+                auto_projection_payload = builder(
                     players=players,
                     slate_start=slate.start_time,
                     paths=auto_projection_paths,
@@ -126,7 +128,7 @@ class DfsEngine:
                 projections.update(projections_from_payload(auto_projection_payload, players, sport))
                 projection_diagnostics = {
                     "auto_projection_enabled": True,
-                    "projection_mode": "SPORTSEDGE_NFL_AUTO_JOINT_PATHS",
+                    "projection_mode": f"SPORTSEDGE_{sport}_AUTO_JOINT_PATHS",
                     "projection_model_id": auto_projection_payload.get("model_id"),
                     "projection_model_status": auto_projection_payload.get("status"),
                     "projection_path_set_id": auto_projection_payload.get("path_set_id"),
@@ -135,7 +137,7 @@ class DfsEngine:
                 }
             except Exception as exc:
                 if not allow_dk_fppg_baseline:
-                    raise RuntimeError(f"DFS_AUTO_PROJECTION_FAILED:NFL:{type(exc).__name__}:{exc}") from exc
+                    raise RuntimeError(f"DFS_AUTO_PROJECTION_FAILED:{sport}:{type(exc).__name__}:{exc}") from exc
                 projection_diagnostics = {
                     "auto_projection_enabled": True,
                     "projection_mode": "DK_FPPG_EMERGENCY_FALLBACK",
