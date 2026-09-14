@@ -11,7 +11,7 @@ import re
 from typing import Mapping
 
 OWNERSHIP_EVIDENCE_EPOCH_UTC = datetime(2026, 9, 14, 5, 0, tzinfo=timezone.utc)
-_SLOT_RE = re.compile(r"(?<!\S)(P|C|1B|2B|3B|SS|OF|UTIL)(?=\s)")
+_SLOT_RE = re.compile(r"(?:^|(?<=\)\s))(P|C|1B|2B|3B|SS|OF|UTIL)(?=\s)")
 _ID_SUFFIX_RE = re.compile(r"\s*\((\d+)\)\s*$")
 
 
