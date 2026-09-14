@@ -122,6 +122,30 @@ def test_delta_already_present_at_freeze_is_temporally_not_applicable(repo: dict
     assert row.reason == "DELTA_ALREADY_INCLUDED_IN_BUNDLE_FREEZE"
 
 
+def test_prehold_drift_from_freeze_to_baseline_is_not_skipped(repo: dict[str, object]) -> None:
+    registry = {
+        "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1",
+        "baseline_main_sha": repo["drift"],
+        "reconciled_through_sha": repo["inventory_drift"],
+        "bundle_inventory_complete": True,
+        "deltas": [_delta("POST_HOLD", str(repo["inventory_drift"]), 3)],
+        "bundles": [_bundle(str(repo["baseline"]))],
+    }
+    report = build_reconciliation_report(
+        repo=repo["root"],
+        policy=_policy(),
+        registry=registry,
+        current_main_ref=str(repo["inventory_drift"]),
+    )
+    prehold = [row for row in report["rows"] if row["delta_id"] == "PREHOLD_BASELINE"]
+    assert len(prehold) == 1
+    assert prehold[0]["outcome"] == "DRIFT_CONFIRMED"
+    assert prehold[0]["reason"] == "COVERED_BUNDLE_DRIFT_BEFORE_HOLD_BASELINE"
+    assert "policy/freeze.txt" in prehold[0]["covered_changed_paths"]
+    assert report["outcome_counts"]["DRIFT_CONFIRMED"] == 2
+    assert "DRIFT_DISPOSITION_REQUIRED:BUNDLE_A" in report["release_blocks"]
+
+
 def test_confirmed_drift_requires_refreeze_or_revocation(repo: dict[str, object]) -> None:
     root = repo["root"]
     registry = {
