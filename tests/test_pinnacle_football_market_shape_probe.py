@@ -80,7 +80,7 @@ class PinnacleFootballMarketShapeProbeTests(unittest.TestCase):
         )
         self.assertFalse(_is_upcoming_nfl_game(neutral, now=NOW))
 
-    def test_deterministic_first_upcoming_nfl_game_and_raw_capture(self):
+    def test_deterministic_first_upcoming_nfl_game_and_straight_market_capture(self):
         calls = []
 
         def opener(request, timeout=30):
@@ -105,26 +105,17 @@ class PinnacleFootballMarketShapeProbeTests(unittest.TestCase):
                     _game(22),
                     _game(33, start="2026-09-20T17:00:00Z"),
                 ])
-            if url.endswith("/matchups/22"):
-                return _Response(
-                    {
-                        "id": 22,
-                        "league": {"name": "NFL"},
-                        "type": "matchup",
-                        "participants": [
-                            {"name": "Kansas City Chiefs", "alignment": "home"},
-                            {"name": "Denver Broncos", "alignment": "away"},
-                        ],
-                    }
-                )
             if url.endswith("/matchups/22/markets/related/straight"):
                 return _Response(
                     [
                         {
                             "key": "m;0",
-                            "type": "moneyline",
+                            "matchupId": 22,
                             "period": 0,
-                            "prices": [{"price": -110}, {"price": 100}],
+                            "prices": [
+                                {"designation": "home", "price": -110},
+                                {"designation": "away", "price": 100},
+                            ],
                         }
                     ]
                 )
@@ -137,10 +128,10 @@ class PinnacleFootballMarketShapeProbeTests(unittest.TestCase):
             self.assertEqual(report["selected_matchup"]["home_team"], "Kansas City Chiefs")
             self.assertEqual(report["selected_matchup"]["away_team"], "Denver Broncos")
             self.assertEqual(report["selection_rule"], SELECTION_RULE)
-            self.assertEqual(set(report["captures"]), {"matchups", "matchup_detail", "straight_markets"})
-            self.assertEqual(len(list((Path(tmp) / "raw" / "pinnacle").glob("*.json"))), 3)
+            self.assertEqual(set(report["captures"]), {"matchups", "straight_markets"})
+            self.assertEqual(len(list((Path(tmp) / "raw" / "pinnacle").glob("*.json"))), 2)
             self.assertTrue(all(v is False for v in report["authority"].values()))
-        self.assertEqual(len(calls), 3)
+        self.assertEqual(len(calls), 2)
 
     def test_no_upcoming_nfl_game_fails_closed(self):
         def opener(request, timeout=30):
