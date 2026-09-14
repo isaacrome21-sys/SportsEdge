@@ -1,0 +1,37 @@
+name: direct-dk-forward-pair-contract
+
+on:
+  pull_request:
+    paths:
+      - 'config/direct_dk_forward_pair_admission_v1.json'
+      - 'sportsedge/validation/direct_dk_forward_pairing.py'
+      - 'tests/test_direct_dk_forward_pairing.py'
+      - '.github/workflows/direct-dk-forward-pair-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: '.python-version'
+      - name: Verify forward pairing boundary
+        run: python -m unittest tests.test_direct_dk_forward_pairing -v
+      - name: Assert no betting authority and frozen clocks
+        run: |
+          python - <<'PY'
+          import json
+          p=json.load(open('config/direct_dk_forward_pair_admission_v1.json'))
+          assert all(v is False for v in p['authority'].values())
+          assert p['sports']['americanfootball_nfl']['capture_not_before_utc']=='2026-09-15T14:00:00Z'
+          assert p['sports']['americanfootball_ncaaf']['first_admissible_game_date']=='2026-09-19'
+          assert p['sports']['baseball_mlb']['promotion_clock_status']=='PARKED_2026'
+          assert p['required']['backfill_forbidden'] is True
+          print('direct_dk_forward_pair_boundary=PASS')
+          PY

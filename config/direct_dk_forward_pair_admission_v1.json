@@ -1,0 +1,46 @@
+{
+  "schema": "SPORTSEDGE_DIRECT_DK_FORWARD_PAIR_ADMISSION_V1",
+  "status": "FROZEN_NON_PROMOTING",
+  "sports": {
+    "americanfootball_nfl": {
+      "decision_window_minutes": [45, 120],
+      "close_window_minutes": [2, 20],
+      "capture_not_before_utc": "2026-09-15T14:00:00Z",
+      "first_admissible_game_date": "2026-09-17"
+    },
+    "americanfootball_ncaaf": {
+      "decision_window_minutes": [45, 120],
+      "close_window_minutes": [2, 20],
+      "capture_not_before_utc": null,
+      "first_admissible_game_date": "2026-09-19"
+    },
+    "baseball_mlb": {
+      "decision_window_minutes": [45, 120],
+      "close_window_minutes": [2, 20],
+      "capture_not_before_utc": null,
+      "first_admissible_game_date": null,
+      "promotion_clock_status": "PARKED_2026"
+    }
+  },
+  "required": {
+    "provider": "DRAFTKINGS_DIRECT_WEB",
+    "sportsbook": "draftkings",
+    "source_schema": "DIRECT_DK_CLOSING_ROW_V1",
+    "source_evidence_class": "NOT_EVIDENCE",
+    "raw_sha256_required": true,
+    "http_receipt_timestamp_required": true,
+    "two_sided_same_capture_required": true,
+    "same_event_book_market_threshold_required": true,
+    "decision_before_close_before_start": true,
+    "threshold_drift_forbidden": true,
+    "outcome_identity_drift_forbidden": true,
+    "backfill_forbidden": true
+  },
+  "authority": {
+    "model_p_authority": false,
+    "truth_gate_pass_authority": false,
+    "promotion_authority": false,
+    "staking_authority": false,
+    "official_bet_authority": false
+  }
+}
