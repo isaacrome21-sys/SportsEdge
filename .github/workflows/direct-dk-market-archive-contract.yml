@@ -1,0 +1,46 @@
+name: direct-dk-market-archive-contract
+
+on:
+  pull_request:
+    paths:
+      - 'sportsedge/draftkings_game_market_source.py'
+      - 'scripts/capture_direct_dk_closing_lines.py'
+      - 'tests/test_direct_dk_game_market_source.py'
+      - 'tests/test_capture_direct_dk_closing_lines.py'
+      - '.github/workflows/direct-dk-market-archive-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: '.python-version'
+      - name: Run fail-closed unit contracts
+        run: python -m unittest tests.test_direct_dk_game_market_source tests.test_capture_direct_dk_closing_lines -v
+      - name: Probe current public DraftKings full-game transport
+        run: |
+          python - <<'PY'
+          import hashlib,json
+          from sportsedge.draftkings_game_market_source import fetch_board,normalize_board
+          result={}
+          for sport in ('americanfootball_nfl','americanfootball_ncaaf','baseball_mlb'):
+              board=fetch_board(sport)
+              payload=board.payload
+              for key in ('events','markets','selections'):
+                  if not isinstance(payload.get(key),list):
+                      raise SystemExit(f'DK_SCHEMA_MISSING:{sport}:{key}')
+              rows=normalize_board(board)
+              result[sport]={'source_uri':board.source_uri,'received_at':board.received_at.isoformat(),
+                             'raw_sha256':hashlib.sha256(board.raw).hexdigest(),
+                             'events':len(payload['events']),'markets':len(payload['markets']),
+                             'selections':len(payload['selections']),'paired_rows':len(rows),
+                             'game_evidence_created':False,'promotion_authority':False}
+          print(json.dumps(result,sort_keys=True))
+          PY
