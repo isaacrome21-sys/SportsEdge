@@ -4,12 +4,13 @@ import unittest
 from sportsedge.sports.nfl.v2k_drive_core import (
     AUTHORITY,
     DRIVE_OUTCOMES,
-    DriveRow,
+    FIELD_BUCKETS,
+    STATE_BUCKETS,
+    HierarchicalStrength,
     fit_hierarchical_strength,
     simulate_joint_game,
 )
 from sportsedge.sports.nfl.v2k_drive_source import build_drive_rows_from_pbp
-
 
 MANIFEST = "a" * 64
 CODE_SHA = "b" * 40
@@ -17,22 +18,13 @@ CODE_SHA = "b" * 40
 
 def play(game, drive, idx, offense, defense, result, *, order=None, start=75.0, before=(0, 0), after=(0, 0), period=1, clock=900, conversion=0):
     row = {
-        "game_id": game,
-        "season": 2024,
-        "week": 1,
-        "kickoff_utc": "2024-09-08T17:00:00Z",
-        "drive_id": drive,
-        "play_index": idx,
-        "offense": offense,
-        "defense": defense,
-        "start_yardline_100": start,
-        "drive_result": result,
-        "offense_score_before": before[0],
-        "defense_score_before": before[1],
-        "offense_score_after": after[0],
-        "defense_score_after": after[1],
-        "period": period,
-        "clock_seconds_remaining_period": clock,
+        "game_id": game, "season": 2024, "week": 1,
+        "kickoff_utc": "2024-09-08T17:00:00Z", "drive_id": drive,
+        "play_index": idx, "offense": offense, "defense": defense,
+        "start_yardline_100": start, "drive_result": result,
+        "offense_score_before": before[0], "defense_score_before": before[1],
+        "offense_score_after": after[0], "defense_score_after": after[1],
+        "period": period, "clock_seconds_remaining_period": clock,
         "conversion_points": conversion,
     }
     if order is not None:
@@ -42,20 +34,35 @@ def play(game, drive, idx, offense, defense, result, *, order=None, start=75.0, 
 
 def training_rows():
     records = []
-    # A has a larger, TD-heavy offense sample; B is small and weaker. This gives
-    # non-zero between-team variance so the sample-size shrinkage ordering is testable.
     order = 0
+    # Larger TD-heavy A sample, small B sample, and a third profile create
+    # non-zero between-team variance for deterministic shrinkage tests.
     for i in range(12):
-        result = "touchdown" if i < 8 else "punt"
-        records.append(play("G1", f"A{i}", order, "A", "B", result, order=order, after=(7 if result == "touchdown" else 0, 0)))
+        td = i < 8
+        result = "touchdown" if td else "punt"
+        conv = 2 if i == 0 else (1 if td else 0)
+        records.append(play("G1", f"A{i}", order, "A", "B", result, order=order,
+                            start=25.0 if i % 3 == 0 else 75.0,
+                            before=(14, 14) if i == 7 else (0, 0),
+                            after=(20 + conv, 14) if i == 7 else ((6 + conv) if td else 0, 0),
+                            period=4 if i == 7 else 1, clock=120 if i == 7 else 900, conversion=conv))
         order += 1
     for i in range(3):
-        result = "touchdown" if i == 0 else "punt"
-        records.append(play("G2", f"B{i}", order, "B", "A", result, order=order, after=(7 if result == "touchdown" else 0, 0)))
+        td = i == 0
+        result = "touchdown" if td else "punt"
+        records.append(play("G2", f"B{i}", order, "B", "A", result, order=order,
+                            start=50.0, before=(10, 17) if i == 1 else (0, 0),
+                            after=(7 if td else 10, 17 if i == 1 else 0),
+                            period=4 if i == 1 else 2, clock=180 if i == 1 else 700,
+                            conversion=1 if td else 0))
         order += 1
     for i in range(8):
-        result = "field_goal" if i < 2 else "punt"
-        records.append(play("G3", f"C{i}", order, "C", "A", result, order=order, after=(3 if result == "field_goal" else 0, 0)))
+        fg = i < 2
+        result = "field_goal" if fg else "punt"
+        records.append(play("G3", f"C{i}", order, "C", "A", result, order=order,
+                            start=60.0, before=(17, 14) if i == 1 else (0, 0),
+                            after=(20 if i == 1 else (3 if fg else 0), 14 if i == 1 else 0),
+                            period=4 if i == 1 else 3, clock=90 if i == 1 else 500))
         order += 1
     return build_drive_rows_from_pbp(records, source_manifest_sha256=MANIFEST, source_code_sha=CODE_SHA)
 
@@ -81,30 +88,45 @@ class TestNFLV2KAttempt0Core(unittest.TestCase):
     def test_unknown_outcome_and_duplicate_play_fail_closed(self):
         with self.assertRaisesRegex(ValueError, "V2K_DRIVE_OUTCOME_UNMAPPED"):
             build_drive_rows_from_pbp([play("G", "d1", 1, "A", "B", "mystery")], source_manifest_sha256=MANIFEST, source_code_sha=CODE_SHA)
-        dup = [
-            play("G", "d1", 1, "A", "B", "punt"),
-            play("G", "d1", 1, "A", "B", "punt"),
-        ]
+        dup = [play("G", "d1", 1, "A", "B", "punt"), play("G", "d1", 1, "A", "B", "punt")]
         with self.assertRaisesRegex(ValueError, "V2K_PLAY_INDEX_DUPLICATE"):
             build_drive_rows_from_pbp(dup, source_manifest_sha256=MANIFEST, source_code_sha=CODE_SHA)
 
-    def test_hierarchical_probabilities_normalize_and_unknown_team_is_league_mean(self):
+    def test_hierarchical_probabilities_are_finite_normalized_and_unknown_strength_is_neutral(self):
         model = fit_hierarchical_strength(training_rows())
-        probs = model.probabilities("A", "B")
+        probs = model.probabilities("A", "B", start_yardline_100=50.0, state_bucket="NORMAL")
         self.assertAlmostEqual(sum(probs.values()), 1.0, places=12)
         self.assertTrue(all(math.isfinite(v) and v >= 0 for v in probs.values()))
-        unknown = model.probabilities("UNKNOWN_O", "UNKNOWN_D")
+        self.assertNotIn("UNKNOWN_O", model.offense_effect)
+        self.assertNotIn("UNKNOWN_D", model.defense_effect)
+        unknown = model.probabilities("UNKNOWN_O", "UNKNOWN_D", start_yardline_100=50.0, state_bucket="NORMAL")
+        expected_raw = {
+            o: max(0.0, model.league_baseline[o] + model.state_effect["NORMAL"][o] + model.field_effect["MID_FIELD"][o])
+            for o in DRIVE_OUTCOMES
+        }
+        z = sum(expected_raw.values())
         for outcome in DRIVE_OUTCOMES:
-            self.assertAlmostEqual(unknown[outcome], model.league_baseline[outcome], places=12)
+            self.assertAlmostEqual(unknown[outcome], expected_raw[outcome] / z, places=12)
 
     def test_small_sample_shrinks_at_least_as_much_as_large_sample(self):
         model = fit_hierarchical_strength(training_rows())
         self.assertGreaterEqual(model.shrinkage_weight["A"], model.shrinkage_weight["B"])
 
+    def test_conversion_field_position_possession_and_state_are_training_derived(self):
+        rows = training_rows()
+        model = fit_hierarchical_strength(rows)
+        td = [r for r in rows if r.outcome == "TD"]
+        for points in (0, 1, 2):
+            self.assertAlmostEqual(model.conversion_probabilities[points], sum(r.conversion_points == points for r in td) / len(td))
+        self.assertEqual(model.start_field_positions, tuple(r.start_yardline_100 for r in rows))
+        self.assertEqual(sorted(model.regulation_drive_counts), [3, 8, 12])
+        self.assertEqual(set(model.state_effect), set(STATE_BUCKETS))
+        self.assertEqual(set(model.field_effect), set(FIELD_BUCKETS))
+
     def test_joint_simulation_is_deterministic_sequential_and_coherent(self):
         model = fit_hierarchical_strength(training_rows())
-        a = simulate_joint_game(model, "A", "B", seed=20260914, max_regulation_drives=12, max_overtime_drives=4)
-        b = simulate_joint_game(model, "A", "B", seed=20260914, max_regulation_drives=12, max_overtime_drives=4)
+        a = simulate_joint_game(model, "A", "B", seed=20260914, regulation_drives=12, max_overtime_drives=4)
+        b = simulate_joint_game(model, "A", "B", seed=20260914, regulation_drives=12, max_overtime_drives=4)
         self.assertEqual(a, b)
         self.assertEqual(a.margin, a.home_score - a.away_score)
         self.assertEqual(a.total, a.home_score + a.away_score)
@@ -112,14 +134,26 @@ class TestNFLV2KAttempt0Core(unittest.TestCase):
         self.assertEqual(a.team_totals["B"], a.away_score)
         for left, right in zip(a.path, a.path[1:]):
             self.assertEqual(left["defense"], right["offense"])
+        self.assertTrue(all(0.0 <= p["start_yardline_100"] <= 100.0 for p in a.path))
+
+    def test_empirical_possession_count_is_deterministic_under_seed(self):
+        model = fit_hierarchical_strength(training_rows())
+        a = simulate_joint_game(model, "A", "B", seed=11, max_overtime_drives=2)
+        b = simulate_joint_game(model, "A", "B", seed=11, max_overtime_drives=2)
+        self.assertEqual(a, b)
 
     def test_overtime_is_explicit_and_bounded(self):
-        # Pure no-score baseline forces a regulation tie and therefore OT.
-        from sportsedge.sports.nfl.v2k_drive_core import HierarchicalStrength
         baseline = {o: 0.0 for o in DRIVE_OUTCOMES}
         baseline["PUNT_OTHER"] = 1.0
-        model = HierarchicalStrength(baseline, {}, {}, {})
-        result = simulate_joint_game(model, "A", "B", seed=7, max_regulation_drives=4, max_overtime_drives=2)
+        zero = {o: 0.0 for o in DRIVE_OUTCOMES}
+        model = HierarchicalStrength(
+            league_baseline=baseline, offense_effect={}, defense_effect={}, shrinkage_weight={},
+            state_effect={s: dict(zero) for s in STATE_BUCKETS},
+            field_effect={f: dict(zero) for f in FIELD_BUCKETS},
+            conversion_probabilities={0: 1.0, 1: 0.0, 2: 0.0},
+            start_field_positions=(75.0,), regulation_drive_counts=(4,), exceptional_score_points=(),
+        )
+        result = simulate_joint_game(model, "A", "B", seed=7, regulation_drives=4, max_overtime_drives=2)
         self.assertEqual(len(result.path), 6)
         self.assertTrue(result.path[-1]["overtime"])
         self.assertTrue(result.path[-2]["overtime"])
@@ -131,8 +165,6 @@ class TestNFLV2KAttempt0Core(unittest.TestCase):
             self.assertIs(value, False)
 
     def test_no_historical_evaluation_surface_is_imported(self):
-        # This test intentionally guards scope: the attempt-0 core exposes mechanics,
-        # not calibration, key-reference scoring, or historical candidate evaluation.
         import sportsedge.sports.nfl.v2k_drive_core as core
         names = set(vars(core))
         forbidden = {"calibration_slope", "signed_key_rmse", "evaluate_candidate", "run_walk_forward"}
