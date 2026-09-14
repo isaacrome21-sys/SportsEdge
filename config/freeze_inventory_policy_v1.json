@@ -122,6 +122,7 @@
     "sportsedge/governance/freeze_reconciliation.py": "RECONCILIATION_CONTROL_PLANE",
     "sportsedge/governance/freeze_inventory.py": "RECONCILIATION_CONTROL_PLANE",
     "sportsedge/governance/reconciliation_content_boundary.py": "RECONCILIATION_CONTROL_PLANE",
+    "sportsedge/governance/reconciliation_content_identity.py": "RECONCILIATION_CONTROL_PLANE",
     "scripts/reconcile_freeze_deltas.py": "RECONCILIATION_CONTROL_PLANE",
     "scripts/reconcile_freeze_deltas_content_boundary.py": "RECONCILIATION_CONTROL_PLANE",
     "scripts/compute_reconciliation_content_digest.py": "RECONCILIATION_CONTROL_PLANE",
