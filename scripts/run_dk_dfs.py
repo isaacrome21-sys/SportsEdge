@@ -13,6 +13,7 @@ def main() -> int:
     parser.add_argument("--sport", required=True, choices=("MLB", "NFL", "CFB"))
     parser.add_argument("--start", required=True, help="Timezone-aware ISO-8601 slate start, e.g. 2026-09-18T19:30:00-04:00")
     parser.add_argument("--projections", help="SportsEdge DFS projection snapshot JSON")
+    parser.add_argument("--dk-salaries", help="Official DKSalaries.csv fallback when live DK acquisition is unavailable")
     parser.add_argument("--allow-dk-fppg-baseline", action="store_true", help="Emergency baseline only; not a validated SportsEdge projection model")
     parser.add_argument("--beam-width", type=int, default=30000)
     parser.add_argument("--max-projection-age-hours", type=float, default=36.0)
@@ -24,6 +25,7 @@ def main() -> int:
         sport=args.sport,
         requested_start=requested,
         projection_snapshot=args.projections,
+        salary_csv=args.dk_salaries,
         allow_dk_fppg_baseline=args.allow_dk_fppg_baseline,
         beam_width=args.beam_width,
         max_projection_age_hours=args.max_projection_age_hours,
