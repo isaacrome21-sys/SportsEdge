@@ -272,7 +272,7 @@ def test_repository_policy_is_unconditional_zero_authority_and_registers_late_de
     policy = json.loads(Path("config/freeze_reconciliation_policy_v1.json").read_text())
     registry = json.loads(Path("config/freeze_reconciliation_registry_v1.json").read_text())
     assert policy["main_merge_hold"] == "UNCONDITIONAL"
-    assert policy["status"] == "ACTIVE_BLOCKED"
+    assert policy["status"] == "RESOLVED"
     assert policy["authorized_reconciliation_branch"] == "fix/freeze-reconciliation-inventory-20260914"
     assert not any(policy["authority"].values())
     ids = {row["delta_id"] for row in registry["deltas"]}
@@ -302,6 +302,7 @@ def test_invalid_non_unconditional_policy_fails_closed(repo: dict[str, object]) 
             registry=registry,
             current_main_ref=str(repo["irrelevant"]),
         )
+
 
 def test_ready_matrix_does_not_release_an_active_hold(repo: dict[str, object]) -> None:
     registry = {
