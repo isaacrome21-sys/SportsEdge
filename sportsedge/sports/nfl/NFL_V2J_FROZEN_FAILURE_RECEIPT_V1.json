@@ -1,0 +1,70 @@
+{
+  "schema": "NFL_V2J_FROZEN_FAILURE_RECEIPT_V1",
+  "status": "FROZEN_PREDICTIVE_FAILURE_ZERO_AUTHORITY",
+  "recorded_utc": "2026-09-14T13:55:00Z",
+  "upstream": {
+    "workflow_run_id": 34790748032,
+    "head_sha": "685a9f3bf8bb6e1c59c007db2b8205ca8a59f527",
+    "successor_artifact_id": 10333513081,
+    "successor_artifact_digest": "sha256:1605075778dfb1be6fc186667abc0f317fcd3a406c716f7c7a6bf7ad4ed56267",
+    "first_readout_sha256": "4bcccbc6c6a3a7201a3306383ebdbb5300e7056397426e4f916bdc3a2314b178",
+    "key_math_sha256": "bcf39e06b259a56b8ffad087a279f88f0a258d3374a305f9384cb7ce908c72d0"
+  },
+  "adjudication": {
+    "workflow_run_id": 34809137480,
+    "artifact_id": 10333489740,
+    "artifact_digest": "sha256:d36a92b110c40a6b2f8f7f4620e1fb45b549c357c889f6e51473db87b59c69fa",
+    "adjudicator_git_sha": "6a5dece6b5a51c511731217a213c912f013bb53e",
+    "policy_sha256": "d8e18bcc487c87133bf23c9e9ec7b78c8dd97d707efd2885dc8a345aff9e8d09",
+    "verdict": "V2J_FROZEN_GATES_FAIL_ZERO_AUTHORITY",
+    "frozen_gate_pass": false,
+    "historical_predictive_pass": false,
+    "calibration_pass": false,
+    "signed_key_gate_pass": false,
+    "candidate_rejected_by_frozen_gates": true
+  },
+  "market_results": {
+    "spread": {
+      "fold_win_rate": 0.5,
+      "required_fold_win_rate": 0.65,
+      "historical_predictive_pass": false,
+      "calibration_pass": true,
+      "pass": false
+    },
+    "total": {
+      "fold_win_rate": 0.0,
+      "required_fold_win_rate": 0.65,
+      "historical_predictive_pass": false,
+      "calibration_pass": false,
+      "pass": false
+    }
+  },
+  "lifecycle": {
+    "v2j_state": "REJECTED",
+    "surface": "PAPER",
+    "stake_units": 0,
+    "bettor_facing_model_p_allowed": false,
+    "v2k_research_may_advance": true,
+    "v2k_automatically_activated": false,
+    "v2k_attempt_consumed_by_this_receipt": false
+  },
+  "authority": {
+    "model_p": false,
+    "pricing": false,
+    "promotion": false,
+    "staking": false,
+    "run_it": false,
+    "official": false,
+    "production_registry": false,
+    "v2k_development_validation_execution": false,
+    "v2k_untouched_readout": false
+  },
+  "next_boundary": {
+    "candidate_family": "NFL_V2K_DRIVE_HIERARCHICAL_JOINT_G1",
+    "research_implementation_already_admitted": true,
+    "development_validation_scoring_remains_blocked_until_folds_sources_features_rng_seed_simulation_count_thresholds_and_attempt_record_are_frozen": true,
+    "structural_gate_requires_strict_improvement_in_both_calibration_slope_error_and_signed_key_mass_metric": true,
+    "threshold_weakening_forbidden": true,
+    "v2j_readout_values_for_v2k_tuning_forbidden": true
+  }
+}
