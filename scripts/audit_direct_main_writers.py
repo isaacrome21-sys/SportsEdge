@@ -11,13 +11,14 @@ from typing import Any
 
 WORKFLOW_SUFFIXES = (".yml", ".yaml")
 NON_GIT_MAIN_PATTERNS = (
-    ("GH_API_MAIN_REF", re.compile(r"\bgh\s+api\b[^\n]*(?:/git/refs/heads/main|/git/refs/heads/main\b)")),
-    ("HTTP_MAIN_REF_API", re.compile(r"\b(?:curl|wget)\b[^\n]*(?:/git/refs/heads/main|/contents/)")),
+    ("GH_API_MAIN_REF", re.compile(r"\bgh\s+api\b[^\n]*/git/refs/heads/main\b")),
+    ("GH_API_CONTENTS_WRITE", re.compile(r"\bgh\s+api\b[^\n]*/contents/")),
+    ("HTTP_MAIN_REF_API", re.compile(r"\b(?:curl|wget)\b[^\n]*/git/refs/heads/main\b")),
+    ("HTTP_CONTENTS_API_WRITE", re.compile(r"\b(?:curl|wget)\b[^\n]*/contents/")),
     ("GITHUB_SCRIPT_CONTENT_WRITE", re.compile(r"\b(?:createOrUpdateFileContents|updateRef|createRef)\b")),
     ("GIT_AUTO_COMMIT_ACTION", re.compile(r"stefanzweifel/git-auto-commit-action@", re.I)),
     ("GITHUB_PUSH_ACTION", re.compile(r"ad-m/github-push-action@", re.I)),
 )
-INTERPOLATION_RE = re.compile(r"\$\{|\$\{|\$\(|\$[A-Za-z_] |\$[A-Za-z_]", re.X)
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -99,11 +100,7 @@ def classify_git_push(command: str, checkout_non_main: str | None = None) -> tup
     if any("${{" in tok or "$(" in tok or tok.startswith("$") for tok in args):
         return "UNRESOLVABLE", "PUSH_TARGET_INTERPOLATED"
     positional = [tok for tok in args if not tok.startswith("-")]
-    if not positional:
-        return "UNRESOLVABLE", "BARE_GIT_PUSH_TARGET_UNRESOLVED"
-    # First positional argument is normally the remote. With only one token, it
-    # can also be a repository URL; in either case no destination ref is proven.
-    if len(positional) == 1:
+    if not positional or len(positional) == 1:
         return "UNRESOLVABLE", "BARE_GIT_PUSH_TARGET_UNRESOLVED"
     refspecs = positional[1:]
     classifications = [_classify_refspec(token, checkout_non_main) for token in refspecs]
@@ -114,14 +111,14 @@ def classify_git_push(command: str, checkout_non_main: str | None = None) -> tup
     return "NON_MAIN", "PUSH_TARGETS_PROVEN_NON_MAIN"
 
 
-def _referenced_local_paths(text: str) -> list[str]:
-    refs: set[str] = set()
+def _referenced_local_paths(text: str) -> list[tuple[str, str]]:
+    refs: set[tuple[str, str]] = set()
     for match in re.finditer(r"(?:bash|sh)\s+([^\s;&|]+)|(?:^|\s)(\./[^\s;&|]+)", text, re.M):
         value = match.group(1) or match.group(2)
         if value and "$" not in value and "${{" not in value:
-            refs.add(value.removeprefix("./"))
+            refs.add((value.removeprefix("./"), "FILE"))
     for match in re.finditer(r"uses:\s*\.\/([^\s#]+)", text):
-        refs.add(match.group(1).rstrip("/") + "/action.yml")
+        refs.add((match.group(1).rstrip("/"), "COMPOSITE"))
     return sorted(refs)
 
 
@@ -130,12 +127,12 @@ def _permissions_state(text: str) -> tuple[str, str]:
         return "WRITE", "CONTENTS_WRITE_EXPLICIT"
     if re.search(r"(?m)^\s*contents:\s*read\s*$", text):
         return "READ_ONLY", "CONTENTS_READ_EXPLICIT"
-    # Absence is not proof of read-only: repository/workflow defaults may grant write.
     return "UNRESOLVABLE", "CONTENTS_PERMISSION_INHERITED_OR_UNSPECIFIED"
 
 
 def audit(repo: Path, ref: str = "HEAD") -> dict[str, Any]:
     tree = _tree(repo, ref)
+    tree_set = set(tree)
     workflows = [p for p in tree if p.startswith(".github/workflows/") and p.endswith(WORKFLOW_SUFFIXES)]
     findings: list[dict[str, Any]] = []
     for path in workflows:
@@ -143,23 +140,24 @@ def audit(repo: Path, ref: str = "HEAD") -> dict[str, Any]:
         checkout_non_main = _checkout_static_non_main(text)
         permission_state, permission_reason = _permissions_state(text)
         sources: list[tuple[str, str]] = [(path, text)]
-        for local in _referenced_local_paths(text):
-            if local in tree:
-                sources.append((local, _read(repo, ref, local)))
-            else:
+        for local, kind in _referenced_local_paths(text):
+            candidates = [local] if kind == "FILE" else [local + "/action.yml", local + "/action.yaml"]
+            existing = [candidate for candidate in candidates if candidate in tree_set]
+            if not existing:
                 findings.append({"workflow": path, "source": local, "classification": "UNRESOLVABLE", "reason": "CALLED_LOCAL_SOURCE_NOT_FOUND", "permission_state": permission_state, "permission_reason": permission_reason})
+                continue
+            for candidate in existing:
+                sources.append((candidate, _read(repo, ref, candidate)))
         for source_path, source_text in sources:
             for line_no, line in enumerate(source_text.splitlines(), 1):
                 if "git push" in line:
                     classification, reason = classify_git_push(line.strip(), checkout_non_main)
-                    if classification != "NON_MAIN" and classification != "NON_WRITER":
+                    if classification not in {"NON_MAIN", "NON_WRITER"}:
                         findings.append({"workflow": path, "source": source_path, "line": line_no, "classification": classification, "reason": reason, "permission_state": permission_state, "permission_reason": permission_reason, "snippet": line.strip()})
             for reason, pattern in NON_GIT_MAIN_PATTERNS:
                 for match in pattern.finditer(source_text):
                     line_no = source_text.count("\n", 0, match.start()) + 1
                     findings.append({"workflow": path, "source": source_path, "line": line_no, "classification": "MAIN_WRITER", "reason": reason, "permission_state": permission_state, "permission_reason": permission_reason})
-        # A writer sink with inherited/unspecified permission is never cleared by
-        # permission absence. Permission affects exploitability, not detection.
     blocking = [f for f in findings if f["classification"] in {"MAIN_WRITER", "UNRESOLVABLE"}]
     status = "QUIESCED" if not blocking else "BLOCKED_OR_UNRESOLVED"
     return {
