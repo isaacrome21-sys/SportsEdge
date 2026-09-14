@@ -5,6 +5,11 @@ name: closing-line-archive
 # preserves the exact canonical paid Odds API payload by SHA-256 so future
 # sport-specific admission can verify row provenance instead of trusting a hash.
 #
+# If the paid provider is specifically blocked by HTTP 401, the same scheduler
+# may persist zero-authority direct DraftKings observations. The paid-source
+# failure remains a hard workflow failure after fallback persistence; fallback
+# rows never satisfy the paid/multi-book source contract or promotion evidence.
+#
 # MLB remains guarded by StatsAPI status/first-play before a paid capture is
 # admitted. Overlapping windows use explicit priority: close > t0_prestart >
 # decision. No promotion or evidence-clock authority is granted here.
@@ -51,6 +56,7 @@ jobs:
           python -m unittest tests.test_closing_line_archive -v
           python -m unittest tests.test_closing_line_archive_v2 -v
           python -m unittest tests.test_closing_line_archive_v3 -v
+          python -m unittest tests.test_direct_dk_game_market_source tests.test_capture_direct_dk_closing_lines -v
 
       - name: Attach the append-only data branch
         id: data
@@ -66,36 +72,62 @@ jobs:
           fi
           echo "attached=true" >> "$GITHUB_OUTPUT"
 
-      - name: Capture
+      - name: Capture paid multi-book archive
         id: capture
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
           MODE="${{ github.event.inputs.mode || 'capture' }}"
           EXTRA=""
           if [[ "$MODE" == "dry-run" ]]; then EXTRA="--dry-run"; fi
           mkdir -p artifacts/closing-line-archive
+          set +e
           python -m scripts.capture_closing_line_archive_v3 \
             --policy config/closing_line_archive_policy_v1.json \
             --out-dir .data-branch \
             --status-out artifacts/closing-line-archive/status.json \
             $EXTRA
-          echo "rows=$(jq -r '.total_rows_written // 0' artifacts/closing-line-archive/status.json)" >> "$GITHUB_OUTPUT"
+          RC=$?
+          set -e
+          ROWS="$(jq -r '.total_rows_written // 0' artifacts/closing-line-archive/status.json 2>/dev/null || echo 0)"
+          REASON="$(jq -r '.reason // ""' artifacts/closing-line-archive/status.json 2>/dev/null || true)"
+          echo "rc=$RC" >> "$GITHUB_OUTPUT"
+          echo "rows=$ROWS" >> "$GITHUB_OUTPUT"
+          echo "reason=$REASON" >> "$GITHUB_OUTPUT"
+          if [[ "$RC" -ne 0 && "$REASON" != "CLOSING_LINE_ARCHIVE_HTTP_401" ]]; then
+            echo "Paid archive failed outside the admitted 401 fallback boundary: $REASON" >&2
+            exit "$RC"
+          fi
+
+      - name: Capture direct DraftKings fallback on paid-provider 401
+        id: direct_dk
+        if: steps.capture.outputs.rc != '0' && steps.capture.outputs.reason == 'CLOSING_LINE_ARCHIVE_HTTP_401'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/direct-dk-closing-line-archive
+          python scripts/capture_direct_dk_closing_lines.py \
+            --policy config/closing_line_archive_policy_v1.json \
+            --out-dir .data-branch \
+            --status-out artifacts/direct-dk-closing-line-archive/status.json
+          echo "rows=$(jq -r '.total_rows_written // 0' artifacts/direct-dk-closing-line-archive/status.json)" >> "$GITHUB_OUTPUT"
 
       - name: Commit captured prices and raw payloads append-only
-        if: steps.capture.outputs.rows != '0'
+        if: always() && (steps.capture.outputs.rows != '0' || steps.direct_dk.outputs.rows != '0')
         shell: bash
         run: |
           set -euo pipefail
           cd .data-branch
           git config user.name  'sportsedge-archive[bot]'
           git config user.email 'sportsedge-archive@users.noreply.github.com'
-          git add -A archive/closing-lines
+          git add -A archive/closing-lines archive/direct-dk 2>/dev/null || true
           if git diff --cached --quiet; then
             echo 'nothing to commit'
             exit 0
           fi
-          git commit -m "closing-line-archive: ${{ steps.capture.outputs.rows }} rows at $(date -u +%Y-%m-%dT%H:%M:%SZ) [NOT_EVIDENCE]"
+          PAID_ROWS="${{ steps.capture.outputs.rows || '0' }}"
+          DK_ROWS="${{ steps.direct_dk.outputs.rows || '0' }}"
+          git commit -m "closing-line-archive: paid=${PAID_ROWS} direct-dk=${DK_ROWS} at $(date -u +%Y-%m-%dT%H:%M:%SZ) [NOT_EVIDENCE]"
           for attempt in 1 2 3; do
             git fetch origin data || true
             git rebase origin/data || git rebase --abort || true
@@ -105,10 +137,19 @@ jobs:
           echo 'ARCHIVE_PUSH_FAILED' >&2
           exit 1
 
+      - name: Keep paid-provider 401 fail-closed after fallback persistence
+        if: steps.capture.outputs.rc != '0' && steps.capture.outputs.reason == 'CLOSING_LINE_ARCHIVE_HTTP_401'
+        shell: bash
+        run: |
+          echo 'CLOSING_LINE_ARCHIVE_HTTP_401: direct DraftKings fallback may have persisted NOT_EVIDENCE rows, but paid/multi-book source remains blocked.' >&2
+          exit 2
+
       - name: Upload run status
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: closing-line-archive-status-${{ github.run_id }}
-          path: artifacts/closing-line-archive/status.json
+          path: |
+            artifacts/closing-line-archive/status.json
+            artifacts/direct-dk-closing-line-archive/status.json
           if-no-files-found: warn
