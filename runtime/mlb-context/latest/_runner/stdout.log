@@ -1,16 +1,16 @@
 {
-  "catchers_absent": 10,
-  "catchers_present": 0,
+  "catchers_absent": 7,
+  "catchers_present": 3,
   "failures": [],
   "games": 10,
   "games_scheduled": 10,
-  "lineups_absent": 10,
-  "lineups_present": 0,
-  "retrieved_at": "2026-09-14T10:08:53.040078+00:00",
+  "lineups_absent": 7,
+  "lineups_present": 3,
+  "retrieved_at": "2026-09-14T19:48:45.212031+00:00",
   "slate_date_ct": "2026-09-14",
   "status": "PASS",
-  "umpires_absent": 10,
-  "umpires_present": 0,
-  "weather_absent": 10,
-  "weather_present": 0
+  "umpires_absent": 3,
+  "umpires_present": 7,
+  "weather_absent": 3,
+  "weather_present": 7
 }
