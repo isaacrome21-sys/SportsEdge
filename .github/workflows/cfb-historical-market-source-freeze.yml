@@ -34,13 +34,12 @@ jobs:
       - name: Run fail-closed source contract tests
         run: python -m pytest -q tests/test_cfb_historical_market_source.py
 
-      - name: Materialize exact upstream archive and bootstrap SHA-256
+      - name: Materialize and verify exact pinned archive
         run: >-
           python scripts/materialize_cfb_historical_market_archive.py
           --config config/research/cfb_historical_market_source_v1.json
           --attestation-out artifacts/cfb/history/cfb_historical_market_attestation.json
           --archive-out artifacts/cfb/history/cfb_line_odds.csv.gz
-          --allow-bootstrap-sha256
 
       - name: Enforce research-only attestation boundary
         run: |
@@ -48,7 +47,7 @@ jobs:
           import json
           from pathlib import Path
           p=json.loads(Path('artifacts/cfb/history/cfb_historical_market_attestation.json').read_text())
-          if p.get('status') not in {'BOOTSTRAP_SHA256_OBSERVED','PASS'}:
+          if p.get('status') != 'PASS':
               raise SystemExit('CFB_HISTORICAL_MARKET_ATTESTATION_STATUS_INVALID')
           if p.get('pit_certified') is not False or p.get('clv_authority') is not False:
               raise SystemExit('CFB_HISTORICAL_MARKET_PIT_OR_CLV_AUTHORITY_FORBIDDEN')
@@ -58,6 +57,8 @@ jobs:
           for field in ('model_p_authority','truth_gate_authority','promotion_authority','staking_authority','official_bet_authority'):
               if auth.get(field) is not False:
                   raise SystemExit('CFB_HISTORICAL_MARKET_FORBIDDEN_AUTHORITY:'+field)
+          if p['observed']['sha256'] != '7ae899d9035750dccf22470d7923087a2659052aeb37a44204c35fbf6bf38d4d':
+              raise SystemExit('CFB_HISTORICAL_MARKET_SHA256_NOT_FROZEN')
           print('observed_sha256='+p['observed']['sha256'])
           print('rows='+str(p['profile']['row_count']))
           print('seasons='+str(p['profile']['season_min'])+'-'+str(p['profile']['season_max']))
@@ -66,7 +67,7 @@ jobs:
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: cfb-historical-market-bootstrap-${{ github.event.pull_request.head.sha || github.sha }}
+          name: cfb-historical-market-freeze-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             artifacts/cfb/history/cfb_historical_market_attestation.json
             artifacts/cfb/history/cfb_line_odds.csv.gz
