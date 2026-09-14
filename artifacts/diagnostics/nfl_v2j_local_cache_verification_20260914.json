@@ -1,0 +1,81 @@
+{
+  "limitations": [
+    "Two predetermined real rows, not an all-fold performance or promotion evaluation.",
+    "Archived local source manifest differs from the cancelled hosted run.",
+    "Local NumPy 2.3.5 differs from the hosted pinned environment.",
+    "Driver file hash was captured at report time after adding preflight helpers; it is not an execution attestation. The candidate, reference and cache files were unchanged."
+  ],
+  "local_result": {
+    "cases": [
+      {
+        "byte_equal": true,
+        "cached_seconds": 15.356328104000568,
+        "cached_sha256": "3536869e9a5fc7ff00ee16796c6ffef78bc10fcf859c68b98561b169b3705c25",
+        "environment_points": 492,
+        "game_id": "2020_01_HOU_KC",
+        "reference_seconds": 25.95468252699993,
+        "reference_sha256": "3536869e9a5fc7ff00ee16796c6ffef78bc10fcf859c68b98561b169b3705c25",
+        "regime_rows": 45,
+        "season": 2020,
+        "training_rows": 492
+      },
+      {
+        "byte_equal": true,
+        "cached_seconds": 57.43931422300011,
+        "cached_sha256": "0ed85f96e4c0e6657882e19ad359c0d4f9f258e09b6b08507a097b339a868b47",
+        "environment_points": 1677,
+        "game_id": "2025_01_DAL_PHI",
+        "reference_seconds": 99.37038911999934,
+        "reference_sha256": "0ed85f96e4c0e6657882e19ad359c0d4f9f258e09b6b08507a097b339a868b47",
+        "regime_rows": 53,
+        "season": 2025,
+        "training_rows": 1677
+      }
+    ],
+    "code_sha256": {
+      "scripts/verify_nfl_v2j_historical_cache.py": "b2408d3638228628f97f436e76dbd2b26fe618257de47508c647f338caaa6680",
+      "sportsedge/sports/nfl/m2_v2j_candidate.py": "beacfe59138fafb679b589ea1cd780b32ae6742656019da68ab46257ec86f4a8",
+      "sportsedge/sports/nfl/m2_v2j_runtime_cache.py": "203e251ced52552817b527275b7bbe517c14e6be934b6fe201eb9736c4e81673",
+      "sportsedge/sports/nfl/m2_v2j_validation.py": "8853dab1e6d87a8547f14777db73e1a13e2ebd92ea91c9f5e782dba92bc37b5a"
+    },
+    "full_readout_performed": false,
+    "numpy": "2.3.5",
+    "promotion_authority": false,
+    "python": "3.12.14",
+    "scope": "EARLY_LATE_REAL_ROW_EQUIVALENCE_ONLY",
+    "source_bytes_reverified": false,
+    "source_manifest_sha256": "89539179bc8dca74cd3a6e1b2dd5dd6e8e5c02bccf1022f79a49a580c482b720",
+    "status": "PASS"
+  },
+  "promotion_authority": false,
+  "source_verification": {
+    "all_source_bytes_verified": true,
+    "cancelled_run_source_manifest_sha256": "62b57b7147cb7d9949c84bcb97984a11ada45cab5757c0e2efab62df1664c9ec",
+    "reference_candidate_git_blob": "4e09b22bef3b197a493ad1dcde7e98a78506f896",
+    "reference_matches_cancelled_run_code": true,
+    "reference_readout_git_blob": "3a122a2bf01964a62b9552343bc509caec0edb05",
+    "same_source_manifest_as_cancelled_run": false,
+    "scope": "LOCAL_HISTORICAL_EQUIVALENCE_NOT_REPLACEMENT_READOUT",
+    "source_count": 33,
+    "source_manifest_sha256": "89539179bc8dca74cd3a6e1b2dd5dd6e8e5c02bccf1022f79a49a580c482b720",
+    "status": "PASS"
+  },
+  "status": "LOCAL_EQUIVALENCE_PASS",
+  "successor": {
+    "artifacts_at_check": 0,
+    "contract": "SUCCESS",
+    "duplicate_rerun_created": false,
+    "fold_seasons": [
+      2020,
+      2021,
+      2022,
+      2023,
+      2024,
+      2025
+    ],
+    "last_observed_state": "ALL_SIX_FOLDS_RUNNING_HELDOUT_EVALUATION",
+    "launched_by_this_verification": false,
+    "run_id": 34790748032,
+    "sha": "685a9f3bf8bb6e1c59c007db2b8205ca8a59f527"
+  }
+}
