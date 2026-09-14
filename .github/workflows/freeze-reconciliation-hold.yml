@@ -26,7 +26,7 @@ jobs:
       - name: Fetch exact current main
         run: git fetch --no-tags origin main
 
-      - name: Audit active direct-main workflow writers
+      - name: Audit direct-main workflow writers in proposed merge state
         run: |
           python - <<'PY'
           import json
@@ -50,8 +50,11 @@ jobs:
           if allowed:
               raise SystemExit('DIRECT_MAIN_WRITER_EXEMPTIONS_FORBIDDEN_DURING_HOLD')
 
+          # Evaluate HEAD, the exact PR merge candidate. This lets branch
+          # protection require this check before the quiescing change lands;
+          # scanning origin/main here creates an unsatisfiable bootstrap loop.
           tree = subprocess.run(
-              ['git', 'ls-tree', '-r', '--name-only', 'origin/main'],
+              ['git', 'ls-tree', '-r', '--name-only', 'HEAD'],
               check=True, capture_output=True, text=True,
           ).stdout.splitlines()
           workflow_paths = sorted(
@@ -62,7 +65,7 @@ jobs:
           inspected = []
           for path in workflow_paths:
               text = subprocess.run(
-                  ['git', 'show', f'origin/main:{path}'],
+                  ['git', 'show', f'HEAD:{path}'],
                   check=True, capture_output=True, text=True,
               ).stdout
               has_write = write_marker in text
@@ -75,14 +78,14 @@ jobs:
               if has_write and matched_push and path not in allowed:
                   active.append(path)
 
-          current_main = subprocess.run(
-              ['git', 'rev-parse', 'origin/main'],
+          proposed_head = subprocess.run(
+              ['git', 'rev-parse', 'HEAD'],
               check=True, capture_output=True, text=True,
           ).stdout.strip()
           artifact = {
               'schema': 'SPORTSEDGE_DIRECT_MAIN_WRITER_GUARD_V1',
               'status': 'BLOCKED_ACTIVE_DIRECT_MAIN_WRITER' if active else 'QUIESCED',
-              'current_main_sha': current_main,
+              'proposed_merge_sha': proposed_head,
               'workflow_count': len(workflow_paths),
               'active_direct_main_writers': active,
               'inspected_workflows': inspected,
