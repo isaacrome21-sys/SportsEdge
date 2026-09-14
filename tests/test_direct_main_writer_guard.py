@@ -39,6 +39,17 @@ def test_target_classifier_proves_only_static_non_main_destinations() -> None:
     assert classify_git_push("git push --mirror origin") == ("MAIN_WRITER", "PUSH_MIRROR_INCLUDES_MAIN")
 
 
+def test_shell_wrapped_static_non_main_push_stays_non_main() -> None:
+    assert classify_git_push("if git push origin HEAD:data; then exit 0; fi") == (
+        "NON_MAIN",
+        "PUSH_TARGETS_PROVEN_NON_MAIN",
+    )
+    assert classify_git_push("git push origin HEAD:data && echo persisted") == (
+        "NON_MAIN",
+        "PUSH_TARGETS_PROVEN_NON_MAIN",
+    )
+
+
 def test_unresolvable_push_forms_fail_closed_with_distinct_reason_codes() -> None:
     assert classify_git_push("git push") == ("UNRESOLVABLE", "BARE_GIT_PUSH_TARGET_UNRESOLVED")
     assert classify_git_push("git push origin $BRANCH") == ("UNRESOLVABLE", "PUSH_TARGET_INTERPOLATED")
@@ -76,6 +87,12 @@ def test_called_shell_script_is_scanned(tmp_path: Path) -> None:
     report = audit(_repo(tmp_path, workflow, {"scripts/persist.sh": "git push origin main\n"}))
     finding = next(f for f in report["blocking_findings"] if f["reason"] == "PUSH_TARGET_MAIN")
     assert finding["source"] == "scripts/persist.sh"
+
+
+def test_yaml_shell_key_is_not_misread_as_local_bash_call(tmp_path: Path) -> None:
+    workflow = """name: x\non: workflow_dispatch\npermissions:\n  contents: read\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n      - shell: bash\n        run: echo safe\n"""
+    report = audit(_repo(tmp_path, workflow))
+    assert not any(f["reason"] == "CALLED_LOCAL_SOURCE_NOT_FOUND" for f in report["blocking_findings"])
 
 
 def test_mlb_head_data_case_clears(tmp_path: Path) -> None:
