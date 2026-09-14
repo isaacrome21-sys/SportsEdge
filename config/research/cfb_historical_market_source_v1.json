@@ -3,7 +3,7 @@
   "source_id": "CFB_HISTORICAL_MARKET_SOURCE_V1",
   "sport": "cfb",
   "mode": "RESEARCH_ONLY",
-  "status": "BOOTSTRAP_SHA256_PENDING",
+  "status": "FROZEN_RESEARCH_SOURCE",
   "upstream": {
     "repository": "sportsdataverse/cfbfastR-data",
     "commit": "f5a05dc815951b8dbe18961a824f34cf154dfa61",
@@ -11,7 +11,30 @@
     "raw_url": "https://raw.githubusercontent.com/sportsdataverse/cfbfastR-data/f5a05dc815951b8dbe18961a824f34cf154dfa61/betting/csv/cfb_line_odds.csv.gz",
     "git_blob_sha1": "fe568cf1ef50794c80fdbbbff6a8e1061f76528e",
     "expected_size_bytes": 7047701,
-    "expected_sha256": null
+    "expected_sha256": "7ae899d9035750dccf22470d7923087a2659052aeb37a44204c35fbf6bf38d4d"
+  },
+  "verified_profile": {
+    "row_count": 1183529,
+    "season_start": 2006,
+    "season_end": 2025,
+    "season_count": 20,
+    "book_count": 34,
+    "market_type_counts": {
+      "money_line": 320130,
+      "spread": 456471,
+      "total": 406928
+    },
+    "null_counts": {
+      "game_id": 155078,
+      "date_time": 0,
+      "lines": 320130,
+      "odds": 80264,
+      "opening_lines": 1062916,
+      "opening_odds": 1092630,
+      "book": 0,
+      "home_team_id": 165933,
+      "away_team_id": 165933
+    }
   },
   "documented_history": {
     "season_start": 2006,
