@@ -2,9 +2,9 @@
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1",
   "issue": 686,
   "baseline_main_sha": "564e5567acf63adbf750e033df08a8c368f6884d",
-  "reconciled_through_sha": "09a2aecdc168f65d50a1120017491a0d104e6140",
+  "reconciled_through_sha": "00b4db27f15cc22b089e2a2d974cf483eed86e58",
   "bundle_inventory_complete": false,
-  "inventory_block_reason": "INITIAL_REGISTRY_COVERS_THE_KNOWN_NFL_V2K_CFB_ARCHIVE_RADAR_GLOBAL_PROMOTION_AND_MLB_DFS_FREEZES_BUT_MUST_BE_AUDITED_AGAINST_ALL_ACTIVE_FREEZE_RECORDS_BEFORE_HOLD_RELEASE",
+  "inventory_block_reason": "MACHINE_AUDIT_REQUIRED_ZERO_UNMAPPED_GOVERNANCE_SURFACES_BEFORE_TRUE",
   "deltas": [
     {"delta_id":"PR_683","pr":683,"merge_sha":"f242c916903cdea60301db1d4380653460945eba"},
     {"delta_id":"PR_689","pr":689,"merge_sha":"6c3fe073d9a0a240ddd7f58938a4f32d3abedceb"},
@@ -18,7 +18,8 @@
     {"delta_id":"PR_699","pr":699,"merge_sha":"7cddfa6b55e32081f0a0bbc5b0591241d504fb45"},
     {"delta_id":"PR_687","pr":687,"merge_sha":"1325bfb62031e54c1b46023bd170ad455d38516e"},
     {"delta_id":"PR_701","pr":701,"merge_sha":"7f8cd83df5ec4fe91e4c347ee843f861da8ba459"},
-    {"delta_id":"PR_702","pr":702,"merge_sha":"09a2aecdc168f65d50a1120017491a0d104e6140"}
+    {"delta_id":"PR_702","pr":702,"merge_sha":"09a2aecdc168f65d50a1120017491a0d104e6140"},
+    {"delta_id":"PR_703","pr":703,"merge_sha":"00b4db27f15cc22b089e2a2d974cf483eed86e58"}
   ],
   "bundles": [
     {
