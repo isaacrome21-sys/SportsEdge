@@ -4,7 +4,7 @@ This file freezes the remaining MLB DFS evidence rules that are easiest to accid
 
 ## 1. Starting-pitcher accounting
 
-A simulated MLB starter path is not scoreable unless the damage is explicitly starter-scoped and the path records the starter's exit workload. Required fields are:
+A simulated MLB starter path is not scoreable unless the damage is explicitly starter-scoped, the hook is endogenous to the same path, and the remainder of the game is conserved after starter exit. Required fields are:
 
 - `outs`
 - `strikeouts`
@@ -15,14 +15,24 @@ A simulated MLB starter path is not scoreable unless the damage is explicitly st
 - `starter_exit_batters_faced`
 - `starter_exit_pitch_count`
 - `starter_scoped_events=1`
+- `hook_endogenous_to_path=1`
+- `hook_decision_batter_by_batter=1`
+- `hook_conditioned_on_pitch_count=1`
+- `hook_conditioned_on_runs_allowed=1`
+- `bullpen_remainder_routed=1`
+- `bullpen_hits_allowed`
+- `opponent_team_hits`
+- `game_simulated_to_final=1`
 - `lead_at_exit`
 - `lead_preserved_to_final`
 
-The +4 DraftKings win is derived inside the DFS scorer. It requires at least 15 outs, a lead at the starter's exit, and that lead surviving to the final. A final-score-only win flag or opaque `dk_points` pitcher path is rejected. Mean-only pitcher projections must also carry workload and win-qualification components; a naked `win_probability` is insufficient.
+The +4 DraftKings win is derived inside the DFS scorer. It requires at least 15 outs, a lead at the starter's exit, and that lead surviving a game that was actually simulated to final. A final-score-only win flag or opaque `dk_points` pitcher path is rejected. Mean-only pitcher projections must also carry workload, hook/conservation validation, and win-qualification components; a naked `win_probability` is insufficient.
 
-This does not prescribe a fixed 22-25 BF hook. The upstream simulator must model the hook endogenously from the same batter-by-batter path, including cumulative pitch count and runs allowed. When the starter exits, the unconsumed opponent offense must be routed to a bullpen aggregate, and the game must continue to final state before starter-win qualification is resolved. The DFS layer verifies state; it must not create these quantities with a heuristic cap.
+The contract does not prescribe a fixed 22-25 BF hook. BF must emerge from a per-batter continuation decision in the same simulated path, conditioned at minimum on cumulative pitch count and runs allowed. This preserves the dependence between pitcher performance and removal rather than drawing workload independently.
 
-**Current production state:** `BLOCKED / UPSTREAM_STATE_MISSING`. The audited DFS production path consumes an external joint-path snapshot; no in-repo MLB DFS producer currently generates the required batter-by-batter starter hook, bullpen remainder routing, and post-exit full-game continuation. Green downstream contract tests therefore prove fail-closed consumption, not upstream readiness. This state may change only when a production producer satisfies `mlb_pitcher_upstream_state(...)` and its integration is covered by CI.
+When the starter exits, unconsumed opponent offense must be routed to a bullpen aggregate. At minimum, team hits must satisfy `hits_allowed + bullpen_hits_allowed == opponent_team_hits` on every path. The game then continues to final state before starter-win qualification is resolved. The DFS layer verifies this state; it must not create these quantities with a heuristic innings/BF cap or delete post-hook offense.
+
+**Current production state:** `BLOCKED / UPSTREAM_STATE_MISSING`. The audited DFS production path consumes an external joint-path snapshot; no in-repo MLB DFS producer currently generates the required batter-by-batter starter hook, bullpen remainder routing, hit conservation, and post-exit full-game continuation. Green downstream contract tests therefore prove fail-closed consumption, not upstream readiness. This state may change only when a production producer satisfies `mlb_pitcher_upstream_state(...)` and its integration is covered by CI.
 
 ## 2. Ownership evidence clock
 
@@ -73,6 +83,9 @@ Top-1% rate remains descriptive telemetry and has no promotion vote.
 - no contest entered means ownership evidence is `NOT_ACCRUING`, not merely pending;
 - retrospective ownership cannot leak into the same slate;
 - pitcher DK points cannot be produced from unscoped full-game outcomes;
+- starter workload cannot be drawn independently of the simulated performance path;
+- starter exit must reassign, not delete, opponent offense;
+- starter win must be resolved from a game simulated through final state;
 - downstream contract validity is not upstream producer readiness;
 - missing upstream pitcher state is `BLOCKED / UPSTREAM_STATE_MISSING`;
 - missing evidence is never permission to invent a default.
