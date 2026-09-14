@@ -1,0 +1,32 @@
+name: dfs-engine-contract
+
+on:
+  pull_request:
+    paths:
+      - 'sportsedge/dfs/**'
+      - 'scripts/run_dk_dfs.py'
+      - 'tests/test_dfs_engine.py'
+      - 'docs/DK_DFS_ENGINE.md'
+      - '.github/workflows/dfs-engine-contract.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'sportsedge/dfs/**'
+      - 'scripts/run_dk_dfs.py'
+      - 'tests/test_dfs_engine.py'
+      - 'docs/DK_DFS_ENGINE.md'
+      - '.github/workflows/dfs-engine-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify unified DraftKings DFS contract
+        run: python -m unittest tests.test_dfs_engine -v
