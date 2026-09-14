@@ -32,12 +32,25 @@ class NflV2KReferenceV2ProposalTest(unittest.TestCase):
         self.assertTrue(review["automation_may_not_approve_version_bump"])
         self.assertTrue(review["automation_may_not_admit_implementation"])
 
-    def test_frozen_v1_reference_is_not_rewritten(self):
+    def test_human_reviewed_v1_freeze_does_not_admit_implementation(self):
         self.assertEqual(self.v1["schema"], "NFL_V2K_EMPIRICAL_KEY_REFERENCE_V1")
-        self.assertEqual(self.v1["status"], "BLOCKED_REFERENCE_NOT_BUILT")
-        self.assertEqual(self.v1["authority"], "NONE")
-        self.assertIsNone(self.v1["reference"]["season_scope"])
-        self.assertTrue(all(v is None for v in self.v1["reference"]["signed_margin_mass"].values()))
+        self.assertEqual(self.v1["status"], "FROZEN_READY")
+        self.assertEqual(self.v1["authority"], "REFERENCE_ONLY")
+        self.assertEqual(self.v1["selected_policy"], "MODERN_REG_2018_2025")
+        self.assertEqual(self.v1["reference"]["season_scope"], "2018-2025 REG")
+        modern = self.proposal["evidence_profiles"]["MODERN_REG_2018_2025"]
+        self.assertEqual(self.v1["reference"]["game_count"], modern["game_count"])
+        for key in SIGNED_KEYS:
+            self.assertAlmostEqual(
+                self.v1["reference"]["signed_margin_mass"][str(key)],
+                modern["signed_margin_mass"][str(key)]["probability"],
+                places=15,
+            )
+        self.assertTrue(all(v is False for v in self.v1["authority_boundary"].values()))
+        # The report-only proposal builder itself did not mutate V1; this later
+        # reviewed freeze is a separate governance action and grants no candidate authority.
+        self.assertFalse(self.proposal["build_attestation"]["frozen_v1_reference_mutated"])
+        self.assertFalse(self.proposal["implementation_admitted"])
 
     def test_attempt_ledger_remains_frozen_before_implementation(self):
         self.assertEqual(self.ledger["status"], "FROZEN_BEFORE_IMPLEMENTATION")

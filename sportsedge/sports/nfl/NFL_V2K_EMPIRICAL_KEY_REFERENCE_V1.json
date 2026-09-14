@@ -1,10 +1,12 @@
 {
   "schema": "NFL_V2K_EMPIRICAL_KEY_REFERENCE_V1",
-  "status": "BLOCKED_REFERENCE_NOT_BUILT",
-  "authority": "NONE",
-  "purpose": "Independent signed historical margin-mass reference for V2K key-number validation.",
+  "status": "FROZEN_READY",
+  "authority": "REFERENCE_ONLY",
+  "purpose": "Independent signed historical final-margin reference for V2K key-number validation. It grants no Model_P, promotion, staking, CLV, or OFFICIAL authority.",
   "required_signed_keys": [-7, -3, 3, 7],
   "absolute_mass_tolerance": 0.005,
+  "selected_policy": "MODERN_REG_2018_2025",
+  "selection_rationale": "Use the last eight complete regular seasons before 2026 to reduce scoring/rules-regime mixing while retaining enough games for per-key uncertainty estimates.",
   "source_requirements": {
     "real_historical_games_only": true,
     "sportsbook_prices_forbidden": true,
@@ -22,18 +24,83 @@
     "built_before_any_untouched_v2k_readout": true,
     "immutable_after_untouched_readout": true
   },
+  "reference_policy": {
+    "first_season": 2018,
+    "last_season": 2025,
+    "season_types": ["REG"],
+    "sign_convention": "OFFICIAL_SCHEDULE_HOME_FINAL_MINUS_AWAY_FINAL",
+    "neutral_site_handling": "INCLUDE_USING_OFFICIAL_SCHEDULE_HOME_AWAY_DESIGNATION",
+    "overtime_handling": "OFFICIAL_FINAL_SCORE_INCLUDING_OVERTIME"
+  },
   "reference": {
-    "season_scope": null,
-    "game_count": null,
-    "raw_source_sha256": null,
-    "builder_code_sha256": null,
-    "source_manifest_sha256": null,
+    "season_scope": "2018-2025 REG",
+    "game_count": 2127,
+    "per_season_game_count": {
+      "2018": 256,
+      "2019": 256,
+      "2020": 256,
+      "2021": 272,
+      "2022": 271,
+      "2023": 272,
+      "2024": 272,
+      "2025": 272
+    },
+    "raw_source_sha256": "902f1a3796d576ee846e2b54e99b46a5ab1bdd17bd34c93e8f9f1f797f61281e",
+    "builder_code_sha256": "238bd2e58cbd71a575462e83f80a4ec2528f3b891b88b18f118cbfad530d4d5d",
+    "source_manifest_sha256": "5d6d5ec66012039100d0954622d45ced6ed79c48dba355e3cf2ec2c3ec59342a",
+    "source_manifest_file_sha256": "ea8915e5b63ed7c0b4450b948f54bff3547e1b203650b59a2c68004425e8908d",
+    "evidence_workflow_run_id": 34763311001,
+    "evidence_artifact_id": 10319922606,
+    "evidence_artifact_digest": "sha256:e53f16804c74ec197b23dd17180ad88d1c696d4a93e593ecc17fa8ccf480a437",
     "signed_margin_mass": {
-      "-7": null,
-      "-3": null,
-      "3": null,
-      "7": null
+      "-7": 0.04184297132110954,
+      "-3": 0.06723084156088388,
+      "3": 0.07710390220968501,
+      "7": 0.043253408556652564
+    },
+    "signed_margin_counts": {
+      "-7": 89,
+      "-3": 143,
+      "3": 164,
+      "7": 92
+    },
+    "uncertainty": {
+      "method": "WILSON_SCORE_95_TWO_SIDED",
+      "standard_error_method": "SQRT_P_TIMES_ONE_MINUS_P_OVER_N",
+      "pooled_key_uncertainty_forbidden": true,
+      "-7": {"standard_error": 0.004341560509733311, "ci95_low": 0.03412727536581765, "ci95_high": 0.05121058872911767},
+      "-3": {"standard_error": 0.005429847317542096, "ci95_low": 0.05734973988561753, "ci95_high": 0.07867232671200998},
+      "3": {"standard_error": 0.005784034023760815, "ci95_low": 0.06651438975753914, "ci95_high": 0.08921820003557974},
+      "7": {"standard_error": 0.004410876372526356, "ci95_low": 0.035400303632619805, "ci95_high": 0.05275334949024286}
     }
   },
-  "block_reason": "Real historical source bytes and the frozen signed-key table have not yet been bound on main. Uploaded demonstration values are not admissible evidence."
+  "frozen_control": {
+    "identity": "NFL_M2_FROZEN_CONTROL",
+    "model_id": "nfl_m2_ridge_v1",
+    "calibration_slope": 0.6559729344130425,
+    "calibration_slope_metric": 0.3440270655869575,
+    "signed_key_mass_rmse": 0.03333957857632348,
+    "signed_key_probability": {
+      "-7": 0.022927566011147524,
+      "-3": 0.027562545959592302,
+      "3": 0.029582834782523746,
+      "7": 0.027238043583633874
+    }
+  },
+  "structural_improvement_gate": {
+    "candidate_must_strictly_improve_calibration_slope_metric": true,
+    "candidate_must_strictly_improve_signed_key_mass_metric": true,
+    "either_dimension_alone_counts_as_pass": false,
+    "absolute_per_key_tolerance_still_required": true,
+    "ci_does_not_relax_absolute_mass_tolerance": true,
+    "calibration_slope_metric": "ABS_CALIBRATION_SLOPE_MINUS_1",
+    "signed_key_mass_metric": "RMSE_ACROSS_SIGNED_KEYS_-7_-3_+3_+7_VS_FROZEN_REFERENCE"
+  },
+  "authority_boundary": {
+    "model_p_authority": false,
+    "truth_gate_authority": false,
+    "promotion_authority": false,
+    "staking_authority": false,
+    "official_bet_authority": false
+  }
 }
