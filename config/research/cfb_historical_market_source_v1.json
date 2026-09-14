@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "source_id": "CFB_HISTORICAL_MARKET_SOURCE_V1",
+  "sport": "cfb",
+  "mode": "RESEARCH_ONLY",
+  "status": "BOOTSTRAP_SHA256_PENDING",
+  "upstream": {
+    "repository": "sportsdataverse/cfbfastR-data",
+    "commit": "f5a05dc815951b8dbe18961a824f34cf154dfa61",
+    "path": "betting/csv/cfb_line_odds.csv.gz",
+    "raw_url": "https://raw.githubusercontent.com/sportsdataverse/cfbfastR-data/f5a05dc815951b8dbe18961a824f34cf154dfa61/betting/csv/cfb_line_odds.csv.gz",
+    "git_blob_sha1": "fe568cf1ef50794c80fdbbbff6a8e1061f76528e",
+    "expected_size_bytes": 7047701,
+    "expected_sha256": null
+  },
+  "documented_history": {
+    "season_start": 2006,
+    "season_end": 2025,
+    "documented_row_count": 1183529,
+    "historical_archive_era": "2006-2019",
+    "cfbd_lines_era": "2020-2025",
+    "documented_cfbd_games": 7460,
+    "documented_modern_books": [
+      "Bovada",
+      "DraftKings",
+      "ESPN Bet"
+    ],
+    "build_repository": "sportsdataverse/cfbfastR-cfb-data",
+    "build_commit": "6aba7545bf8306e3c145054b3a7abbe4075908de",
+    "build_script": "python/betting/build_line_odds.py"
+  },
+  "required_columns": [
+    "id",
+    "game_id",
+    "season",
+    "game_desc",
+    "date_time",
+    "market_type",
+    "abbr",
+    "lines",
+    "odds",
+    "opening_lines",
+    "opening_odds",
+    "book",
+    "season_type",
+    "week",
+    "home_team_id",
+    "away_team_id"
+  ],
+  "evidence_limitations": {
+    "retrospective_archive": true,
+    "per_row_pit_certified": false,
+    "decision_time_certified": false,
+    "close_time_certified": false,
+    "clv_authority": false,
+    "git_commit_time_is_not_row_capture_time": true,
+    "opening_or_closing_semantics_must_not_be_inferred_beyond_documented_fields": true
+  },
+  "allowed_uses": [
+    "historical_market_coverage_profiling",
+    "research_backtesting_context",
+    "book_and_market_availability_research",
+    "model_research_and_benchmarking",
+    "candidate_feature_research_when_separately_pit_safe"
+  ],
+  "authority": {
+    "feature_authority": "RESEARCH_ONLY",
+    "model_p_authority": false,
+    "truth_gate_authority": false,
+    "promotion_authority": false,
+    "staking_authority": false,
+    "official_bet_authority": false
+  }
+}
