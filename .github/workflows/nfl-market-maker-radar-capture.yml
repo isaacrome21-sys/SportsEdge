@@ -45,6 +45,7 @@ on:
       - 'tests/test_market_maker_radar.py'
       - 'tests/test_market_maker_radar_v2.py'
       - 'tests/test_market_maker_candidate_settlement.py'
+      - 'tests/test_nfl_market_maker_radar_workflow.py'
       - 'config/market_maker_radar_v1.json'
       - 'config/market_maker_radar_v2.json'
       - 'config/workflow_cron_policy_v1.json'
@@ -77,6 +78,7 @@ jobs:
           python -m unittest tests.test_market_maker_radar -v
           python -m unittest tests.test_market_maker_radar_v2 -v
           python -m unittest tests.test_market_maker_candidate_settlement -v
+          python -m unittest tests.test_nfl_market_maker_radar_workflow -v
           python -m unittest tests.test_normalize_pinnacle_nfl_markets -v
           python -m unittest tests.test_fanduel_nfl_market_normalizer -v
           python -m unittest tests.test_direct_dk_game_market_source -v
@@ -123,7 +125,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python scripts/analyze_market_maker_radar_v2.py \
+          python -m scripts.analyze_market_maker_radar_v2 \
             --policy config/market_maker_radar_v2.json \
             --input-root .data-branch/archive/market-maker-radar/nfl \
             --ledger-out-root .data-branch \
@@ -146,7 +148,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python scripts/settle_market_maker_candidate_ledger.py \
+          python -m scripts.settle_market_maker_candidate_ledger \
             --policy config/market_maker_radar_v2.json \
             --archive-root .data-branch/archive/market-maker-radar/nfl \
             --ledger-root .data-branch \
