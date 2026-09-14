@@ -18,7 +18,6 @@
     "DRIFT_CONFIRMED"
   ],
   "drift_terminal_dispositions": [
-    "REFROZEN",
     "REVOKED"
   ],
   "refreeze_record_required_fields": [
@@ -32,27 +31,22 @@
     "prior_evidence_invalidation_rule"
   ],
   "refreeze_semantics": {
+    "status": "DEFINED_NOT_YET_MACHINE_VERIFIED",
     "forward_clock_restart_required": true,
     "invalidation_boundary_requires_timestamp_and_prior_bundle_hash": true,
     "pre_refreeze_rows_may_not_be_relabelled_under_new_bundle": true,
     "row_admissibility_requires_capture_time_and_bundle_hash_match": true,
-    "rule": "Prospective evidence is admissible only under the exact bundle semantics/hash in force at capture. A REFROZEN disposition restarts the forward clock and invalidates prior semantics by both timestamp and prior bundle hash."
+    "terminal_disposition_allowed": false,
+    "rule": "REFROZEN is not a terminal disposition in this reconciliation lane until the machine verifies the prior bundle hash, invalidation timestamp, new bundle hash, and row-by-row capture-time/hash admissibility together. Until then confirmed drift may terminate only as REVOKED."
   },
   "direct_main_writer_guard": {
-    "status": "FROZEN_FAIL_CLOSED",
+    "status": "FROZEN_FAIL_CLOSED_CLASSIFIER_V2",
     "required": true,
-    "workflow_prefix": ".github/workflows/",
-    "workflow_suffixes": [
-      ".yml",
-      ".yaml"
-    ],
-    "write_permission_marker": "contents: write",
-    "direct_push_markers": [
-      "git push"
-    ],
-    "allowed_paths": [],
-    "rule": "Report workflows with write permission and a push marker for inspection. This lexical diagnostic includes non-main archive writers and is not proof of a push target. The user explicitly waived blocking development on branch protection and writer quiescence; delta coverage and evidence revocation requirements remain mandatory.",
-    "enforcement": "DIAGNOSTIC_USER_WAIVER"
+    "classification_rule": "A destination is NON_MAIN only when the target ref is statically provable non-main. Explicit main, --all, --mirror, non-git main-write APIs/actions, and statically reachable called scripts/composite actions are writer findings. Bare pushes, interpolated or command-substituted refspecs, HEAD without a statically non-main checkout ref, missing local called sources, and inherited/unspecified write permissions are never treated as proof of quiescence.",
+    "reason_codes_required": true,
+    "proof_ceiling": "The guard can establish only that no workflow-declared or statically reachable main writer was detected at the audited ref and that no target was left unresolved under its scan contract. It cannot prove that unprotected main cannot advance through manual, app, API, or other external writes.",
+    "enforcement": "DIAGNOSTIC_USER_WAIVER",
+    "waiver_effect": "Writer findings remain machine-classified and artifacted but do not independently block release while the explicit operational waiver remains in force. The waiver does not convert any finding to QUIESCED and grants no evidence or model authority."
   },
   "release_conditions": {
     "bundle_inventory_complete": true,
@@ -61,6 +55,7 @@
     "every_drifted_bundle_has_terminal_disposition": true,
     "refrozen_bundle_requires_new_freeze_sha_and_forward_clock_restart": true,
     "refrozen_bundle_requires_timestamp_plus_prior_bundle_hash_invalidation": true,
+    "refrozen_disposition_currently_allowed": false,
     "revoked_bundle_invalidates_prior_forward_clock": true,
     "current_main_sha_must_equal_reconciled_through_sha": true,
     "direct_main_writers_quiesced": false
@@ -74,7 +69,7 @@
     "validation_attempt": false,
     "untouched_readout": false
   },
-  "enforcement_note": "Repository CI can fail pull requests while this hold is active, but GitHub can still permit a manual merge unless the repository ruleset or branch protection marks the check required. Do not represent CI-only enforcement as an unbypassable server-side lock.",
+  "enforcement_note": "Repository CI can fail pull requests while this hold is active, but GitHub can still permit a manual or external write because main is not protected server-side. Do not represent CI, the writer detector, or an exact-head audit as proof that main cannot advance.",
   "operational_prerequisite_waiver": {
     "scope": [
       "server_side_main_branch_protection",
