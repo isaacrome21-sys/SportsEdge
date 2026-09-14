@@ -66,9 +66,10 @@ def build_mlb_promotion_readiness(
     ``pre_eligibility_acceptance_complete`` proves runtime, registration,
     behavioral measurement, feature realization, and validation evidence without
     consulting the deployment eligibility flag. A frozen edge floor is an
-    additional production prerequisite. ``official_ready`` remains stricter and
-    requires the deployment registry to already mark the market eligible. This
-    function never changes that flag.
+    additional production prerequisite. ``official_ready`` is deliberately not a
+    second promotion engine: it requires both the persisted deployment eligibility
+    flag and the canonical acceptance matrix to already be complete. This function
+    never changes either state.
     """
     finish = build_mlb_finish_line(**finish_line_kwargs)
     acceptance_kwargs = {
@@ -94,6 +95,7 @@ def build_mlb_promotion_readiness(
         acceptance_state = dict(acceptance_by_market[market]["current_state"])
         pre_eligibility_complete = _pre_eligibility_acceptance_complete(acceptance_state)
         deployment_eligible = row.get("deployment_eligible") is True
+        canonical_acceptance_complete = row.get("acceptance_complete") is True
         floor_frozen = floor["frozen"] is True
 
         blockers = list(row.get("blockers") or [])
@@ -101,12 +103,19 @@ def build_mlb_promotion_readiness(
             blockers.append("PRE_ELIGIBILITY_ACCEPTANCE_INCOMPLETE")
         if not floor_frozen and "EDGE_FLOOR_NOT_FROZEN" not in blockers:
             blockers.append("EDGE_FLOOR_NOT_FROZEN")
+        if deployment_eligible and not canonical_acceptance_complete and "CANONICAL_ACCEPTANCE_INCOMPLETE" not in blockers:
+            blockers.append("CANONICAL_ACCEPTANCE_INCOMPLETE")
 
         promotion_prerequisites_complete = bool(pre_eligibility_complete and floor_frozen)
-        official_ready = bool(promotion_prerequisites_complete and deployment_eligible)
+        official_ready = bool(
+            promotion_prerequisites_complete
+            and deployment_eligible
+            and canonical_acceptance_complete
+        )
         if official_ready and (
             "EDGE_FLOOR_NOT_FROZEN" in blockers
             or "PRE_ELIGIBILITY_ACCEPTANCE_INCOMPLETE" in blockers
+            or "CANONICAL_ACCEPTANCE_INCOMPLETE" in blockers
         ):
             raise RuntimeError(f"MLB_PROMOTION_READINESS_INVARIANT_BROKEN:{market}")
 
