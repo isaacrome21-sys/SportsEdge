@@ -7,6 +7,11 @@ SportsEdge code. The probe is read-only and zero-authority: it exists only to pr
 that the direct public quote transports are reachable and to freeze the response
 shape before a normalizer is written.
 
+For Pinnacle, the probe follows the documented deterministic discovery chain:
+`sports -> Football -> /sports/{id}/matchups -> first hasMarkets=true matchup ->
+matchup detail + related straight markets`. The chosen sample is provider-order,
+not hand-selected, and every raw response is content-addressed by SHA256.
+
 No account authentication, wager placement, Model_P, Truth Gate, promotion, staking,
 OFFICIAL, registry, or evidence-clock authority exists here.
 """
@@ -143,6 +148,106 @@ def _persist_raw(out_dir: Path, provider: str, label: str, raw: bytes) -> dict[s
     }
 
 
+def _capture(
+    *,
+    out_dir: Path,
+    provider: str,
+    label: str,
+    url: str,
+    opener: Callable[..., Any],
+) -> tuple[dict[str, Any], Any]:
+    raw, payload, status, content_type = _fetch(url, provider=provider, opener=opener)
+    meta = {
+        "http_status": status,
+        "content_type": content_type,
+        **_persist_raw(out_dir, provider, label, raw),
+        "shape": _shape(payload),
+    }
+    return meta, payload
+
+
+def _pinnacle_probe(
+    *,
+    out_dir: Path,
+    opener: Callable[..., Any],
+) -> dict[str, Any]:
+    sports_meta, sports = _capture(
+        out_dir=out_dir,
+        provider="pinnacle",
+        label="sports",
+        url=f"{PINNACLE_ROOT}/sports",
+        opener=opener,
+    )
+    if not isinstance(sports, list):
+        raise DirectMarketProbeError("PINNACLE_SPORTS_NOT_LIST")
+    football = next(
+        (
+            row
+            for row in sports
+            if isinstance(row, Mapping)
+            and str(row.get("name", "")).strip().casefold() == "football"
+            and row.get("id") is not None
+        ),
+        None,
+    )
+    if football is None:
+        raise DirectMarketProbeError("PINNACLE_FOOTBALL_SPORT_NOT_FOUND")
+    sport_id = int(football["id"])
+
+    matchups_meta, matchups = _capture(
+        out_dir=out_dir,
+        provider="pinnacle",
+        label=f"football-{sport_id}-matchups",
+        url=f"{PINNACLE_ROOT}/sports/{sport_id}/matchups",
+        opener=opener,
+    )
+    if not isinstance(matchups, list):
+        raise DirectMarketProbeError("PINNACLE_FOOTBALL_MATCHUPS_NOT_LIST")
+    sample = next(
+        (
+            row
+            for row in matchups
+            if isinstance(row, Mapping)
+            and row.get("hasMarkets") is True
+            and row.get("id") is not None
+        ),
+        None,
+    )
+    if sample is None:
+        raise DirectMarketProbeError("PINNACLE_FOOTBALL_MARKETED_MATCHUP_NOT_FOUND")
+    matchup_id = int(sample["id"])
+
+    detail_meta, detail = _capture(
+        out_dir=out_dir,
+        provider="pinnacle",
+        label=f"matchup-{matchup_id}",
+        url=f"{PINNACLE_ROOT}/matchups/{matchup_id}",
+        opener=opener,
+    )
+    markets_meta, markets = _capture(
+        out_dir=out_dir,
+        provider="pinnacle",
+        label=f"matchup-{matchup_id}-straight-markets",
+        url=f"{PINNACLE_ROOT}/matchups/{matchup_id}/markets/related/straight",
+        opener=opener,
+    )
+
+    return {
+        "state": "REACHABLE",
+        **sports_meta,
+        "football_sport_id": sport_id,
+        "sample_matchup_id": matchup_id,
+        "discovery": {
+            "selection_rule": "FIRST_PROVIDER_ORDER_HAS_MARKETS_TRUE",
+            "football_matchups": matchups_meta,
+            "sample_matchup": detail_meta,
+            "sample_straight_markets": markets_meta,
+            "sample_matchup_shape": _shape(detail),
+            "sample_straight_markets_shape": _shape(markets),
+        },
+    }
+
+
 def probe(
     *,
     out_dir: Path,
@@ -152,7 +257,6 @@ def probe(
     captured_at = (now or datetime.now(UTC)).astimezone(UTC)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    pinnacle_url = f"{PINNACLE_ROOT}/sports"
     fd_query = urlencode(
         {
             "_ak": FANDUEL_PUBLIC_WEB_KEY,
@@ -164,7 +268,7 @@ def probe(
     fanduel_url = f"{FANDUEL_ROOT}/sbapi/content-managed-page?{fd_query}"
 
     report: dict[str, Any] = {
-        "contract": "DIRECT_MARKET_PUBLIC_FEED_PROBE_V1",
+        "contract": "DIRECT_MARKET_PUBLIC_FEED_PROBE_V2",
         "state": "BLOCKED",
         "captured_at": captured_at.isoformat().replace("+00:00", "Z"),
         "upstream_reference": {
@@ -177,25 +281,31 @@ def probe(
         "providers": {},
     }
 
-    for provider, label, url in (
-        ("pinnacle", "sports", pinnacle_url),
-        ("fanduel", "nfl-content-page", fanduel_url),
-    ):
-        try:
-            raw, payload, status, content_type = _fetch(url, provider=provider, opener=opener)
-            persisted = _persist_raw(out_dir, provider, label, raw)
-            report["providers"][provider] = {
-                "state": "REACHABLE",
-                "http_status": status,
-                "content_type": content_type,
-                **persisted,
-                "shape": _shape(payload),
-            }
-        except DirectMarketProbeError as exc:
-            report["providers"][provider] = {
-                "state": "BLOCKED",
-                "reason": str(exc),
-            }
+    try:
+        report["providers"]["pinnacle"] = _pinnacle_probe(out_dir=out_dir, opener=opener)
+    except DirectMarketProbeError as exc:
+        report["providers"]["pinnacle"] = {
+            "state": "BLOCKED",
+            "reason": str(exc),
+        }
+
+    try:
+        fd_meta, _payload = _capture(
+            out_dir=out_dir,
+            provider="fanduel",
+            label="nfl-content-page",
+            url=fanduel_url,
+            opener=opener,
+        )
+        report["providers"]["fanduel"] = {
+            "state": "REACHABLE",
+            **fd_meta,
+        }
+    except DirectMarketProbeError as exc:
+        report["providers"]["fanduel"] = {
+            "state": "BLOCKED",
+            "reason": str(exc),
+        }
 
     states = [entry.get("state") for entry in report["providers"].values()]
     report["state"] = "REACHABLE" if states and all(x == "REACHABLE" for x in states) else "BLOCKED"
