@@ -15,7 +15,19 @@ def test_sp_and_rp_are_pitchers_for_roster_conflicts_and_scoring() -> None:
     proj = projection_from_stats(
         sp,
         "MLB",
-        {"outs": 18, "strikeouts": 7, "earned_runs": 2, "hits_allowed": 5, "walks_allowed": 2, "win_probability": 0.55},
+        {
+            "outs": 18,
+            "strikeouts": 7,
+            "earned_runs": 2,
+            "hits_allowed": 5,
+            "walks_allowed": 2,
+            "win_probability": 0.55,
+            "expected_batters_faced": 24,
+            "expected_pitch_count": 96,
+            "p_reach_5ip": 0.88,
+            "p_lead_at_exit": 0.58,
+            "p_lead_preserved_to_final": 0.82,
+        },
         source="TEST",
     )
     assert proj.mean > 20.0
