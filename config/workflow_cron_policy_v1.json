@@ -16,6 +16,7 @@
     ".github/workflows/nfl-v2g-prospective-prediction-capture.yml",
     ".github/workflows/mlb-pit-lineup-starter-archive.yml",
     ".github/workflows/mlb-prop-pit-archive.yml",
-    ".github/workflows/mlb-game-context-refresh.yml"
+    ".github/workflows/mlb-game-context-refresh.yml",
+    ".github/workflows/nfl-market-maker-radar-capture.yml"
   ]
 }
