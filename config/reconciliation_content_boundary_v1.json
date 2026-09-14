@@ -1,0 +1,23 @@
+{
+  "schema": "SPORTSEDGE_RECONCILIATION_CONTENT_BOUNDARY_V1",
+  "issue": 723,
+  "anchor_main_sha": "bd47021bd2d0fbb748e64795f0b37108a70b4389",
+  "predecessor_governed_surface_digest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "registered_governed_surface_digest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "digest_semantics": "Canonical SHA-256 over the effective freeze registry semantics plus path-and-byte identities of every file selected by every effective freeze bundle. Delta provenance and SHA boundary bookkeeping are excluded from the digest payload.",
+  "merge_strategy": {
+    "preferred_method": "merge",
+    "digest_primary": true,
+    "parentage_corroboration": "OPTIONAL_ONE_STEP_TWO_PARENT_MERGE",
+    "squash_behavior": "DIGEST_PRIMARY_PARENTAGE_UNAVAILABLE"
+  },
+  "authority": {
+    "model": false,
+    "truth_gate": false,
+    "promotion": false,
+    "staking": false,
+    "official": false,
+    "validation_attempt": false,
+    "readout": false
+  }
+}
