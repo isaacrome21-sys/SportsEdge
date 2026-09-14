@@ -60,6 +60,7 @@ jobs:
           tests/test_freeze_reconciliation.py
           tests/test_freeze_inventory.py
           tests/test_direct_main_writer_guard.py
+          tests/test_reconcile_freeze_deltas_cli.py
 
       - name: Build hash-bound effective coverage view
         run: >-
