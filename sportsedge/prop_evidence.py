@@ -6,12 +6,14 @@ group from independently captured evidence. Per-market calibration is a separate
 consistency check: it may veto readiness but can never satisfy a missing evidence
 group.
 
-A group marked PASS is accepted only when it is bound to an evidence SHA-256.
-That prevents a configuration-only status flip from satisfying the dependency.
+The checked-in production registry is still governed by the permanent unpromoted
+workflow. The strict row evaluator below is intentionally introduced behind that
+freeze so negative contracts exist before any freeze-to-gate conversion can use it.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 import re
 from typing import Any, Mapping
 
@@ -88,12 +90,128 @@ class PropEvidenceReadiness:
     ready_for_forward_capture: bool
 
 
+@dataclass(frozen=True)
+class PropGroupEvidenceValidation:
+    group: str
+    passed: bool
+    blockers: tuple[str, ...]
+
+
+def expected_market_identities(group: str) -> tuple[str, ...]:
+    """Return the exact canonical market set whose dependency graph uses a group."""
+    group_name = str(group or "").strip().upper()
+    if group_name not in EVIDENCE_GROUPS:
+        raise PropEvidenceError(f"unknown evidence group: {group_name or '<EMPTY>'}")
+    return tuple(sorted(
+        market
+        for market, dependencies in MARKET_EVIDENCE_DEPENDENCIES.items()
+        if group_name in dependencies
+    ))
+
+
+def _parse_utc_timestamp(value: Any) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
+def evaluate_group_evidence_row(
+    *,
+    group: str,
+    row: Mapping[str, Any],
+    as_of_utc: str,
+) -> PropGroupEvidenceValidation:
+    """Fail-closed evaluation for one future prop-evidence PASS row.
+
+    This evaluator is deliberately stricter than the legacy registry resolver and
+    is not yet wired to promotion. A row can pass only when it is complete, fresh,
+    bound to the requested evidence component, and bound to the exact canonical
+    market identities that consume that component. The existing workflow remains
+    the production freeze until a later change explicitly replaces it.
+    """
+    group_name = str(group or "").strip().upper()
+    if group_name not in EVIDENCE_GROUPS:
+        raise PropEvidenceError(f"unknown evidence group: {group_name or '<EMPTY>'}")
+    if not isinstance(row, Mapping):
+        return PropGroupEvidenceValidation(
+            group=group_name,
+            passed=False,
+            blockers=("EVIDENCE_ROW_NOT_OBJECT",),
+        )
+
+    blockers: list[str] = []
+    status = str(row.get("status") or "MISSING").strip().upper()
+    if status != "PASS":
+        blockers.append("STATUS_NOT_PASS")
+
+    required_fields = (
+        "evidence_sha256",
+        "evidence_group",
+        "market_identities",
+        "captured_at_utc",
+        "valid_through_utc",
+    )
+    for field in required_fields:
+        if row.get(field) in (None, "", []):
+            blockers.append(f"EVIDENCE_METADATA_INCOMPLETE:{field}")
+
+    digest = str(row.get("evidence_sha256") or "").lower()
+    if digest and not _SHA256_RE.fullmatch(digest):
+        blockers.append("EVIDENCE_SHA256_INVALID")
+
+    evidence_group = str(row.get("evidence_group") or "").strip().upper()
+    if evidence_group and evidence_group != group_name:
+        blockers.append("EVIDENCE_GROUP_IDENTITY_MISMATCH")
+
+    identities = row.get("market_identities")
+    expected = expected_market_identities(group_name)
+    if identities not in (None, "", []):
+        if not isinstance(identities, (list, tuple)):
+            blockers.append("MARKET_IDENTITY_MISMATCH")
+        else:
+            normalized = tuple(sorted(str(item or "").strip().upper() for item in identities))
+            if normalized != expected or len(set(normalized)) != len(normalized):
+                blockers.append("MARKET_IDENTITY_MISMATCH")
+
+    as_of = _parse_utc_timestamp(as_of_utc)
+    if as_of is None:
+        raise PropEvidenceError("as_of_utc must be an offset-aware ISO-8601 timestamp")
+    captured = _parse_utc_timestamp(row.get("captured_at_utc"))
+    valid_through = _parse_utc_timestamp(row.get("valid_through_utc"))
+    if row.get("captured_at_utc") not in (None, "") and captured is None:
+        blockers.append("EVIDENCE_TIMESTAMP_INVALID:captured_at_utc")
+    if row.get("valid_through_utc") not in (None, "") and valid_through is None:
+        blockers.append("EVIDENCE_TIMESTAMP_INVALID:valid_through_utc")
+    if captured is not None and captured > as_of:
+        blockers.append("EVIDENCE_CAPTURE_AFTER_AS_OF")
+    if captured is not None and valid_through is not None and valid_through <= captured:
+        blockers.append("EVIDENCE_VALIDITY_RANGE_INVALID")
+    if valid_through is not None and valid_through <= as_of:
+        blockers.append("EVIDENCE_STALE")
+
+    return PropGroupEvidenceValidation(
+        group=group_name,
+        passed=not blockers,
+        blockers=tuple(blockers),
+    )
+
+
 def group_state_from_registry(payload: Mapping[str, Any]) -> dict[str, bool]:
     """Resolve primary group readiness from the persisted evidence registry.
 
     PASS is fail-closed unless the row includes a syntactically valid evidence
-    SHA-256. MISSING/BLOCKED are both unresolved. The function never derives
-    readiness from per-market hit rates, calibration, market prices, or counts.
+    SHA-256. MISSING/BLOCKED are both unresolved. This legacy resolver remains
+    behind the checked-in permanent freeze; it is intentionally not upgraded to
+    the strict evaluator in the same change that introduces the negative tests.
     """
     if not isinstance(payload, Mapping):
         raise PropEvidenceError("prop evidence registry must be a mapping")
