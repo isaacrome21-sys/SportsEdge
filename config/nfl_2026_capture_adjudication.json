@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "status": "ADJUDICATION_PENDING",
+  "reason": "NFL_2026_CAPTURE_CODE_DELTA_NOT_RECONCILED",
+  "triggering_merge_sha": "a75250bfd5881c0cafe82a47a877d9ea764fc203",
+  "triggering_pr": 712,
+  "effective_from_utc": "2026-09-14T20:33:46Z",
+  "row_classification": {
+    "pre_repair_identification": "run.github_sha == a75250bfd5881c0cafe82a47a877d9ea764fc203",
+    "new_rows": "TOP_LEVEL_ADJUDICATION_STAMP_REQUIRED",
+    "backfill_allowed": false,
+    "capture_should_continue": true
+  },
+  "authority": {
+    "model_p": false,
+    "promotion": false,
+    "truth_gate": false,
+    "staking": false,
+    "official": false
+  },
+  "clearance_rule": "MAY_CHANGE_TO_ADJUDICATED_ONLY_AFTER_EXACT_HEAD_RECONCILIATION_EVALUATES_COVERAGE_INVENTORY_AND_DELTA_FOR_THIS_CAPTURE_CHANGE"
+}
