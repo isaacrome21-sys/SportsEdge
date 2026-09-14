@@ -115,3 +115,39 @@ def test_stale_exemption_blocks_completion(tmp_path: Path):
     )
     assert report["computed_complete"] is False
     assert report["stale_exemptions"] == ["config/does_not_exist.json"]
+
+
+def test_three_stalled_transitions_emit_inventory_nonconvergent(tmp_path: Path):
+    repo = _repo(tmp_path)
+    (repo / "config" / "surprise_freeze.json").write_text('{"status":"FROZEN_READY"}\n')
+    current = _commit(repo, "still unmapped")
+    policy = _policy()
+    policy["inventory_convergence"] = {
+        "outcome_on_stall": "INVENTORY_NONCONVERGENT",
+        "stall_window_transitions": 3,
+        "completed_passes": [
+            {"head_sha": "1" * 40, "candidate_count": 1, "mapped_or_exactly_exempt_count": 0, "unmapped_count": 1},
+            {"head_sha": "2" * 40, "candidate_count": 1, "mapped_or_exactly_exempt_count": 0, "unmapped_count": 1},
+            {"head_sha": "3" * 40, "candidate_count": 1, "mapped_or_exactly_exempt_count": 0, "unmapped_count": 1},
+        ],
+    }
+    assert current not in {"1" * 40, "2" * 40, "3" * 40}
+    report = audit_inventory(repo=repo, ref="HEAD", policy=policy, registry=_registry(complete=False))
+    assert report["convergence"]["consecutive_non_decreasing_unmapped_transitions"] == 3
+    assert report["convergence"]["outcome"] == "INVENTORY_NONCONVERGENT"
+    assert "INVENTORY_NONCONVERGENT" in report["release_blocks"]
+
+
+def test_pass_history_accounting_must_balance(tmp_path: Path):
+    repo = _repo(tmp_path)
+    (repo / "config" / "surprise_freeze.json").write_text('{"status":"FROZEN_READY"}\n')
+    _commit(repo, "candidate")
+    policy = _policy()
+    policy["inventory_convergence"] = {
+        "stall_window_transitions": 3,
+        "completed_passes": [
+            {"head_sha": "1" * 40, "candidate_count": 2, "mapped_or_exactly_exempt_count": 0, "unmapped_count": 1}
+        ],
+    }
+    with pytest.raises(FreezeInventoryError, match="PASS_ACCOUNTING_INVALID"):
+        audit_inventory(repo=repo, ref="HEAD", policy=policy, registry=_registry(complete=False))
