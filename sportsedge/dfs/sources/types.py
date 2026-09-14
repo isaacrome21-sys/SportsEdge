@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+import re
 from typing import Any
 
 
@@ -18,8 +19,9 @@ class PlayerAvailability:
     @property
     def unavailable(self) -> bool:
         text = f"{self.status} {self.detail}".casefold()
-        hard = ("out", "inactive", "suspended", "injured reserve", "ir", "doubtful - out")
-        return any(token in text for token in hard)
+        if any(phrase in text for phrase in ("injured reserve", "reserve/injured", "physically unable to perform")):
+            return True
+        return bool(re.search(r"\b(out|inactive|suspended|ir)\b", text))
 
 
 @dataclass(frozen=True)
