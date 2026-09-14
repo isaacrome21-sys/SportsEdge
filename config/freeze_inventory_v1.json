@@ -119,10 +119,11 @@
       "rule_id": "RECONCILIATION_CONTROL_PLANE",
       "classification": "NON_AUTHORITATIVE",
       "exact": [
+        "config/freeze_inventory_v1.json",
         "config/freeze_reconciliation_policy_v1.json",
         "config/freeze_reconciliation_registry_v1.json"
       ],
-      "reason": "These files implement the control-plane hard stop itself; they do not freeze model/evidence content and are exact-head checked separately."
+      "reason": "These files implement the reconciliation control plane itself; they do not freeze model/evidence content and are exact-head checked separately."
     }
   ]
 }
