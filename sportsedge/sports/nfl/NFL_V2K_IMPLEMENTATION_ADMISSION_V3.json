@@ -1,0 +1,48 @@
+{
+  "admission_conditions": {
+    "bettor_facing_authority_requires_issue_608_release_bridge": true,
+    "development_validation_attempt_record_required_before_scoring": true,
+    "market_features_forbidden_in_model_fit": true,
+    "untouched_readout_requires_separate_frozen_folds_sources_features_rng_seed_simulation_count_thresholds": true,
+    "uploaded_demo_coefficients_as_fitted_parameters_forbidden": true,
+    "v2j_untouched_values_for_v2k_tuning_forbidden": true
+  },
+  "attempt_budget": {
+    "attempt_consumed_by_activation": false,
+    "attempts_used": 0,
+    "first_materially_different_fitted_specification_scored_on_development_validation_consumes_attempt_1": true,
+    "max_development_attempts": 5
+  },
+  "authority": {
+    "development_validation_execution": false,
+    "model_p": false,
+    "official": false,
+    "pricing": false,
+    "promotion": false,
+    "research_implementation": true,
+    "run_it": false,
+    "staking": false,
+    "untouched_readout": false
+  },
+  "bindings": {
+    "activation_builder_sha256": "b753df81fc5d2dde64fe9402a56e4a36dbf173721e2c9a7f1551aa9ce3ab61d2",
+    "attempt_ledger_git_blob_sha1": "14022680891de3c3d73013ffabc8aee4611e86e6",
+    "frozen_reference_git_blob_sha1": "7483f6c2a9a09c4b260797010d3765601dedd9ed",
+    "human_policy_selection_git_blob_sha1": "5553078d22bdcd570adfc755a484b4b8b83f5390",
+    "human_selection_comment_body_sha256": "22598423589abda5ea2ad7754189411477738d07c6911cd468bbcdc57fc55ddf",
+    "human_selection_comment_id": 5662476744,
+    "preregistration_git_blob_sha1": "f8487883186fc85b77f4e632b1aa710327473b8a",
+    "report_only_proposal_git_blob_sha1": "2109c6d7546bbbed2b5c587eb13fd52d9325f488"
+  },
+  "candidate_family": "NFL_V2K_DRIVE_HIERARCHICAL_JOINT_G1",
+  "effective_only_when_merged_to_main": true,
+  "population_contract": {
+    "covid_2020": "INCLUDED_PRIMARY_NORMAL_WEIGHT_FLAGGED_SENSITIVITY_ONLY",
+    "fit_window": "2018-2025 REG",
+    "same_population_required": true,
+    "signed_key_reference_window": "2018-2025 REG"
+  },
+  "schema": "NFL_V2K_IMPLEMENTATION_ADMISSION_V3",
+  "selected_policy": "MODERN_REG_2018_2025",
+  "status": "ADMITTED_RESEARCH_IMPLEMENTATION_ONLY"
+}
