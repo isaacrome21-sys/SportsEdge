@@ -17,6 +17,7 @@ class InventoryCandidate:
     path: str
     reasons: tuple[str, ...]
     bundle_ids: tuple[str, ...]
+    bundle_bindings: tuple[dict[str, str], ...]
     exemption: str | None
 
     def as_dict(self) -> dict[str, Any]:
@@ -24,6 +25,7 @@ class InventoryCandidate:
             "path": self.path,
             "reasons": list(self.reasons),
             "bundle_ids": list(self.bundle_ids),
+            "bundle_bindings": [dict(item) for item in self.bundle_bindings],
             "exemption": self.exemption,
         }
 
@@ -61,6 +63,35 @@ def _covered(path: str, bundle: Mapping[str, Any]) -> bool:
     exact = {str(value) for value in bundle.get("coverage_paths") or ()}
     prefixes = tuple(str(value) for value in bundle.get("coverage_prefixes") or ())
     return path in exact or any(path.startswith(prefix) for prefix in prefixes)
+
+
+def _binding_details(path: str, bundle: Mapping[str, Any]) -> tuple[dict[str, str], ...]:
+    bundle_id = str(bundle["bundle_id"])
+    freeze_sha = str(bundle.get("freeze_sha") or "")
+    details: list[dict[str, str]] = []
+    for value in bundle.get("coverage_paths") or ():
+        selector = str(value)
+        if path == selector:
+            details.append(
+                {
+                    "bundle_id": bundle_id,
+                    "bundle_freeze_sha": freeze_sha,
+                    "match_kind": "EXACT_PATH",
+                    "matched_selector": selector,
+                }
+            )
+    for value in bundle.get("coverage_prefixes") or ():
+        selector = str(value)
+        if path.startswith(selector):
+            details.append(
+                {
+                    "bundle_id": bundle_id,
+                    "bundle_freeze_sha": freeze_sha,
+                    "match_kind": "PREFIX",
+                    "matched_selector": selector,
+                }
+            )
+    return tuple(details)
 
 
 def _scanner_contract_payload(policy: Mapping[str, Any]) -> dict[str, Any]:
@@ -184,8 +215,22 @@ def _convergence_state(
         )
 
     non_decreasing_flags: list[bool] = []
+    transition_metrics: list[dict[str, Any]] = []
     for prior, current in zip(history, history[1:]):
-        non_decreasing_flags.append(int(current["unmapped_count"]) >= int(prior["unmapped_count"]))
+        prior_mapped = int(prior["mapped_or_exactly_exempt_count"])
+        current_mapped = int(current["mapped_or_exactly_exempt_count"])
+        prior_unmapped = int(prior["unmapped_count"])
+        current_unmapped = int(current["unmapped_count"])
+        non_decreasing_flags.append(current_unmapped >= prior_unmapped)
+        transition_metrics.append(
+            {
+                "from_pass_id": prior.get("pass_id"),
+                "to_pass_id": current.get("pass_id"),
+                "mapped_delta": current_mapped - prior_mapped,
+                "unmapped_delta": current_unmapped - prior_unmapped,
+                "candidate_delta": int(current["candidate_count"]) - int(prior["candidate_count"]),
+            }
+        )
     streak = 0
     for flag in reversed(non_decreasing_flags):
         if not flag:
@@ -200,6 +245,7 @@ def _convergence_state(
         "stall_window_transitions": window,
         "outcome": outcome,
         "history": history,
+        "transition_metrics": transition_metrics,
     }
 
 
@@ -223,13 +269,27 @@ def audit_inventory(
         reasons = _candidate_reasons(path, text, policy)
         if not reasons:
             continue
-        mapped = tuple(sorted(str(b["bundle_id"]) for b in bundles if _covered(path, b)))
+        bindings: list[dict[str, str]] = []
+        for bundle in bundles:
+            bindings.extend(_binding_details(path, bundle))
+        mapped = tuple(sorted({item["bundle_id"] for item in bindings}))
+        binding_tuple = tuple(
+            sorted(
+                bindings,
+                key=lambda item: (
+                    item["bundle_id"],
+                    item["match_kind"],
+                    item["matched_selector"],
+                ),
+            )
+        )
         exemption = exemptions.get(path)
         candidates.append(
             InventoryCandidate(
                 path=path,
                 reasons=reasons,
                 bundle_ids=mapped,
+                bundle_bindings=binding_tuple,
                 exemption=exemption,
             )
         )
@@ -275,6 +335,10 @@ def audit_inventory(
         "mapped_or_exactly_exempt_count": mapped_or_exempt_count,
         "unmapped_count": len(unmapped),
         "candidates": [c.as_dict() for c in candidates],
+        "mapping_traceability": {
+            "status": "EXPLICIT",
+            "rule": "Every mapped candidate emits the bundle id, bundle freeze sha, match kind, and exact selector that caused the binding.",
+        },
         "unmapped_paths": unmapped,
         "stale_exemptions": stale_exemptions,
         "multiply_mapped_paths": multiply_mapped,
