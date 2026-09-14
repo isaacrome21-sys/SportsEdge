@@ -19,6 +19,7 @@ from scripts.materialize_cfb_historical_market_archive import (
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = ROOT / "config/research/cfb_historical_market_source_v1.json"
 ADOPTIONS = ROOT / "config/cfb_external_repo_adoptions_v1.json"
+EXPECTED_SHA256 = "7ae899d9035750dccf22470d7923087a2659052aeb37a44204c35fbf6bf38d4d"
 
 
 class CFBHistoricalMarketSourceTests(unittest.TestCase):
@@ -66,12 +67,17 @@ class CFBHistoricalMarketSourceTests(unittest.TestCase):
     def test_checked_contract_pins_exact_upstream_identity_and_zero_authority(self):
         contract = _load_contract(CONTRACT)
         upstream = contract["upstream"]
+        self.assertEqual(contract["status"], "FROZEN_RESEARCH_SOURCE")
         self.assertEqual(upstream["repository"], "sportsdataverse/cfbfastR-data")
         self.assertEqual(upstream["commit"], "f5a05dc815951b8dbe18961a824f34cf154dfa61")
         self.assertEqual(upstream["path"], "betting/csv/cfb_line_odds.csv.gz")
         self.assertEqual(upstream["git_blob_sha1"], "fe568cf1ef50794c80fdbbbff6a8e1061f76528e")
         self.assertEqual(upstream["expected_size_bytes"], 7047701)
-        self.assertIsNone(upstream["expected_sha256"])
+        self.assertEqual(upstream["expected_sha256"], EXPECTED_SHA256)
+        profile = contract["verified_profile"]
+        self.assertEqual(profile["row_count"], 1183529)
+        self.assertEqual(profile["book_count"], 34)
+        self.assertEqual(profile["market_type_counts"], {"money_line": 320130, "spread": 456471, "total": 406928})
         self.assertEqual(contract["mode"], "RESEARCH_ONLY")
         self.assertIs(contract["evidence_limitations"]["per_row_pit_certified"], False)
         self.assertIs(contract["evidence_limitations"]["clv_authority"], False)
