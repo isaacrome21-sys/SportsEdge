@@ -33,3 +33,5 @@ jobs:
           assert 'eligible markets unexpectedly present' in text
           print('PRODUCTION_PROP_FREEZE_UNCHANGED')
           PY
+
+# Branch-only harness. Remove before any merge; production freeze remains untouched.
