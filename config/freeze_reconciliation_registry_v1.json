@@ -2,27 +2,114 @@
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1",
   "issue": 686,
   "baseline_main_sha": "564e5567acf63adbf750e033df08a8c368f6884d",
-  "reconciled_through_sha": "05877519650ab451d4b5cd73d8ea6d42d1baebe1",
+  "reconciled_through_sha": "4564a9d2ccd7a55b0547a4ebd5a1b714850aab99",
   "bundle_inventory_complete": false,
   "inventory_block_reason": "MACHINE_AUDIT_REQUIRED_ZERO_UNMAPPED_GOVERNANCE_SURFACES_BEFORE_TRUE",
   "deltas": [
-    {"delta_id":"PR_683","pr":683,"merge_sha":"f242c916903cdea60301db1d4380653460945eba"},
-    {"delta_id":"PR_689","pr":689,"merge_sha":"6c3fe073d9a0a240ddd7f58938a4f32d3abedceb"},
-    {"delta_id":"PR_691","pr":691,"merge_sha":"76f0fb454d48cf6df8e51660114d52878fd3665e"},
-    {"delta_id":"PR_692","pr":692,"merge_sha":"7a92455f081ee52a454b2c49ff798d902a3ace68"},
-    {"delta_id":"PR_688","pr":688,"merge_sha":"ed9aa39ded1da89eca2bb7019a5f810dde83af78"},
-    {"delta_id":"PR_690","pr":690,"merge_sha":"7ed79c51e790d393108864513c34dd296d9fd175"},
-    {"delta_id":"PR_695","pr":695,"merge_sha":"8dcd645447fb110b8cfc250b36c502836302097b"},
-    {"delta_id":"PR_697","pr":697,"merge_sha":"546d07de8ea286d0218c4c70f95ca2618e645374"},
-    {"delta_id":"PR_698","pr":698,"merge_sha":"8de77a15080e6329bcd70058b735ff972f93ebc7"},
-    {"delta_id":"PR_699","pr":699,"merge_sha":"7cddfa6b55e32081f0a0bbc5b0591241d504fb45"},
-    {"delta_id":"PR_687","pr":687,"merge_sha":"1325bfb62031e54c1b46023bd170ad455d38516e"},
-    {"delta_id":"PR_701","pr":701,"merge_sha":"7f8cd83df5ec4fe91e4c347ee843f861da8ba459"},
-    {"delta_id":"PR_702","pr":702,"merge_sha":"09a2aecdc168f65d50a1120017491a0d104e6140"},
-    {"delta_id":"PR_703","pr":703,"merge_sha":"00b4db27f15cc22b089e2a2d974cf483eed86e58"},
-    {"delta_id":"DIRECT_MAIN_81BD1E18_NOOP","pr":0,"merge_sha":"81bd1e1807a65e0ed7060971152a0c1ca9c0d21c"},
-    {"delta_id":"DIRECT_MAIN_27F789B0_REVERT","pr":0,"merge_sha":"27f789b0b37ac17876b97fcd1fd794cb2c394349"},
-    {"delta_id":"DIRECT_MAIN_05877519_EV_TRACKER_CLOSE_UPDATE","pr":0,"merge_sha":"05877519650ab451d4b5cd73d8ea6d42d1baebe1","note":"Automated direct-to-main mutation during ACTIVE_BLOCKED hold; changed output/ev_tracker/health.md only. Registered for provenance; semantic freeze-drift disposition remains governed by bundle reconciliation."}
+    {
+      "delta_id": "PR_683",
+      "pr": 683,
+      "merge_sha": "f242c916903cdea60301db1d4380653460945eba"
+    },
+    {
+      "delta_id": "PR_689",
+      "pr": 689,
+      "merge_sha": "6c3fe073d9a0a240ddd7f58938a4f32d3abedceb"
+    },
+    {
+      "delta_id": "PR_691",
+      "pr": 691,
+      "merge_sha": "76f0fb454d48cf6df8e51660114d52878fd3665e"
+    },
+    {
+      "delta_id": "PR_692",
+      "pr": 692,
+      "merge_sha": "7a92455f081ee52a454b2c49ff798d902a3ace68"
+    },
+    {
+      "delta_id": "PR_688",
+      "pr": 688,
+      "merge_sha": "ed9aa39ded1da89eca2bb7019a5f810dde83af78"
+    },
+    {
+      "delta_id": "PR_690",
+      "pr": 690,
+      "merge_sha": "7ed79c51e790d393108864513c34dd296d9fd175"
+    },
+    {
+      "delta_id": "PR_695",
+      "pr": 695,
+      "merge_sha": "8dcd645447fb110b8cfc250b36c502836302097b"
+    },
+    {
+      "delta_id": "PR_697",
+      "pr": 697,
+      "merge_sha": "546d07de8ea286d0218c4c70f95ca2618e645374"
+    },
+    {
+      "delta_id": "PR_698",
+      "pr": 698,
+      "merge_sha": "8de77a15080e6329bcd70058b735ff972f93ebc7"
+    },
+    {
+      "delta_id": "PR_699",
+      "pr": 699,
+      "merge_sha": "7cddfa6b55e32081f0a0bbc5b0591241d504fb45"
+    },
+    {
+      "delta_id": "PR_687",
+      "pr": 687,
+      "merge_sha": "1325bfb62031e54c1b46023bd170ad455d38516e"
+    },
+    {
+      "delta_id": "PR_701",
+      "pr": 701,
+      "merge_sha": "7f8cd83df5ec4fe91e4c347ee843f861da8ba459"
+    },
+    {
+      "delta_id": "PR_702",
+      "pr": 702,
+      "merge_sha": "09a2aecdc168f65d50a1120017491a0d104e6140"
+    },
+    {
+      "delta_id": "PR_703",
+      "pr": 703,
+      "merge_sha": "00b4db27f15cc22b089e2a2d974cf483eed86e58"
+    },
+    {
+      "delta_id": "DIRECT_MAIN_81BD1E18_NOOP",
+      "pr": 0,
+      "merge_sha": "81bd1e1807a65e0ed7060971152a0c1ca9c0d21c"
+    },
+    {
+      "delta_id": "DIRECT_MAIN_27F789B0_REVERT",
+      "pr": 0,
+      "merge_sha": "27f789b0b37ac17876b97fcd1fd794cb2c394349"
+    },
+    {
+      "delta_id": "DIRECT_MAIN_05877519_EV_TRACKER_CLOSE_UPDATE",
+      "pr": 0,
+      "merge_sha": "05877519650ab451d4b5cd73d8ea6d42d1baebe1",
+      "note": "Automated direct-to-main mutation during ACTIVE_BLOCKED hold; changed output/ev_tracker/health.md only. Registered for provenance; semantic freeze-drift disposition remains governed by bundle reconciliation."
+    },
+    {
+      "delta_id": "PR_705_RECONCILIATION_RELEASE_MERGE",
+      "pr": 705,
+      "merge_sha": "3fa151b22fb619031bde2fd7cbd75e1ee9c64471",
+      "note": "The reconciliation release merge itself advanced main beyond the pre-merge registered point; registered here so the self-aging transition is explicit."
+    },
+    {
+      "delta_id": "PR_712_NFL_CAPTURE_INTEGRITY",
+      "pr": 712,
+      "merge_sha": "a75250bfd5881c0cafe82a47a877d9ea764fc203",
+      "note": "NFL 2026 capture-integrity hardening; exact-head reconciliation previously stopped before coverage/inventory/delta evaluation because the registry had self-aged after PR 705."
+    },
+    {
+      "delta_id": "PR_713_NFL_CAPTURE_QUARANTINE",
+      "pr": 713,
+      "merge_sha": "4564a9d2ccd7a55b0547a4ebd5a1b714850aab99",
+      "note": "Quarantines unreconciled NFL capture rows while preserving no-backfill collection and repairs due-gate self-concealment."
+    }
   ],
   "bundles": [
     {

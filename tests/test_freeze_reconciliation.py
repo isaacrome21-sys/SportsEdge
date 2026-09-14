@@ -9,6 +9,7 @@ import pytest
 from sportsedge.governance.freeze_reconciliation import (
     FreezeReconciliationError,
     build_reconciliation_report,
+    main_matches_reconciliation_boundary,
     reconcile_delta_bundle,
 )
 
@@ -279,9 +280,57 @@ def test_repository_policy_is_unconditional_zero_authority_and_registers_late_de
     assert {"PR_683", "PR_687", "PR_701", "PR_702", "PR_703"}.issubset(ids)
     assert registry["deltas"]
     current_main = _git(Path.cwd(), "rev-parse", "origin/main")
-    assert registry["reconciled_through_sha"] == current_main
-    assert registry["deltas"][-1]["merge_sha"] == current_main
+    assert main_matches_reconciliation_boundary(
+        Path.cwd(),
+        policy=policy,
+        reconciled_through_sha=registry["reconciled_through_sha"],
+        current_main_ref=current_main,
+    )
+    assert registry["deltas"][-1]["merge_sha"] == registry["reconciled_through_sha"]
     assert registry["bundle_inventory_complete"] is False
+
+
+def test_terminal_reconciliation_merge_is_narrow_and_self_closing(repo: dict[str, object]) -> None:
+    root = repo["root"]
+    reconciled = str(repo["inventory_drift"])
+    _git(root, "switch", "-c", "reconcile-terminal")
+    (root / "config").mkdir(exist_ok=True)
+    (root / "config" / "freeze_reconciliation_terminal_note.json").write_text("{}\n")
+    branch_head = _commit(root, "reconciliation-only terminal change")
+    _git(root, "switch", "main")
+    _git(root, "merge", "--no-ff", branch_head, "-m", "merge reconciliation terminal")
+    merge_sha = _git(root, "rev-parse", "HEAD")
+    assert main_matches_reconciliation_boundary(
+        root,
+        policy=_policy(),
+        reconciled_through_sha=reconciled,
+        current_main_ref=merge_sha,
+    )
+    (root / "other.txt").write_text("ordinary movement\n")
+    ordinary = _commit(root, "ordinary main movement")
+    assert not main_matches_reconciliation_boundary(
+        root,
+        policy=_policy(),
+        reconciled_through_sha=reconciled,
+        current_main_ref=ordinary,
+    )
+
+
+def test_terminal_reconciliation_merge_rejects_nonreconciliation_path(repo: dict[str, object]) -> None:
+    root = repo["root"]
+    reconciled = str(repo["inventory_drift"])
+    _git(root, "switch", "-c", "bad-terminal")
+    (root / "other.txt").write_text("not governance only\n")
+    branch_head = _commit(root, "non-reconciliation change")
+    _git(root, "switch", "main")
+    _git(root, "merge", "--no-ff", branch_head, "-m", "merge bad terminal")
+    current = _git(root, "rev-parse", "HEAD")
+    assert not main_matches_reconciliation_boundary(
+        root,
+        policy=_policy(),
+        reconciled_through_sha=reconciled,
+        current_main_ref=current,
+    )
 
 
 def test_invalid_non_unconditional_policy_fails_closed(repo: dict[str, object]) -> None:
