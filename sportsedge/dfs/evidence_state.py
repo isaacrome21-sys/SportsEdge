@@ -44,7 +44,10 @@ def mlb_pitcher_upstream_state(
     produced_fields: Iterable[str],
     *,
     batter_by_batter_generator: bool,
+    hook_conditioned_on_pitch_count: bool,
+    hook_conditioned_on_runs_allowed: bool,
     bullpen_remainder_routed: bool,
+    hit_conservation_validated: bool,
     full_game_continued_after_starter_exit: bool,
 ) -> LaneEvidenceState:
     """State whether production paths can honestly support starter DFS accounting."""
@@ -58,6 +61,14 @@ def mlb_pitcher_upstream_state(
         "starter_exit_batters_faced",
         "starter_exit_pitch_count",
         "starter_scoped_events",
+        "hook_endogenous_to_path",
+        "hook_decision_batter_by_batter",
+        "hook_conditioned_on_pitch_count",
+        "hook_conditioned_on_runs_allowed",
+        "bullpen_remainder_routed",
+        "bullpen_hits_allowed",
+        "opponent_team_hits",
+        "game_simulated_to_final",
         "lead_at_exit",
         "lead_preserved_to_final",
     }
@@ -66,8 +77,14 @@ def mlb_pitcher_upstream_state(
     structural = []
     if not batter_by_batter_generator:
         structural.append("BATTER_BY_BATTER_GENERATOR")
+    if not hook_conditioned_on_pitch_count:
+        structural.append("HOOK_PITCH_COUNT_STATE")
+    if not hook_conditioned_on_runs_allowed:
+        structural.append("HOOK_RUNS_ALLOWED_STATE")
     if not bullpen_remainder_routed:
         structural.append("BULLPEN_REMAINDER_ROUTING")
+    if not hit_conservation_validated:
+        structural.append("TEAM_HIT_CONSERVATION")
     if not full_game_continued_after_starter_exit:
         structural.append("POST_EXIT_FULL_GAME_CONTINUATION")
     defects = [*missing, *structural]
@@ -79,6 +96,6 @@ def mlb_pitcher_upstream_state(
         )
     return LaneEvidenceState(
         status="READY_FOR_PATH_VALIDATION",
-        reason="UPSTREAM_STARTER_EXIT_STATE_AVAILABLE",
+        reason="UPSTREAM_ENDOGENOUS_HOOK_BULLPEN_AND_FINAL_STATE_AVAILABLE",
         evidence_accruing=True,
     )
