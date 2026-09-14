@@ -3,6 +3,7 @@ name: nfl-v2j-postrun-adjudication
 on:
   pull_request:
     paths:
+      - 'config/research/nfl_v2j_postrun_adjudication_v1.json'
       - 'scripts/adjudicate_nfl_v2j_postrun.py'
       - 'tests/test_nfl_v2j_postrun_adjudication.py'
       - '.github/workflows/nfl-v2j-postrun-adjudication.yml'
@@ -90,6 +91,7 @@ jobs:
           python scripts/adjudicate_nfl_v2j_postrun.py
           --first-readout artifacts/football/v2j_adjudication/upstream/nfl_v2j_first_readout.json
           --key-math artifacts/football/v2j_adjudication/upstream/nfl_v2j_key_math.json
+          --policy config/research/nfl_v2j_postrun_adjudication_v1.json
           --upstream-run-id "$UPSTREAM_RUN_ID"
           --upstream-head-sha "$UPSTREAM_HEAD_SHA"
           --adjudicator-git-sha "$ADJUDICATOR_GIT_SHA"
