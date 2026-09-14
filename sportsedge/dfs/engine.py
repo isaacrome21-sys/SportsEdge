@@ -10,6 +10,7 @@ from .cfb_auto_projection import build_cfb_auto_projection_snapshot
 from .dk_contest import DraftKingsContestClient
 from .draftkings import DraftKingsClient, resolve_slate
 from .field import FieldGenerationConfig
+from .mlb_auto_projection import build_mlb_auto_projection_snapshot
 from .nfl_auto_projection import build_nfl_auto_projection_snapshot
 from .optimizer import OptimizedLineup, optimize_single_entry
 from .projections import (
@@ -116,19 +117,26 @@ class DfsEngine:
         }
         if projection_snapshot is not None:
             projections.update(load_projection_snapshot(projection_snapshot, players, sport))
-        elif auto_projection and sport in {"NFL", "CFB"}:
+        elif auto_projection and sport in {"MLB", "NFL", "CFB"}:
             try:
-                builder = build_nfl_auto_projection_snapshot if sport == "NFL" else build_cfb_auto_projection_snapshot
-                auto_projection_payload = builder(
+                builders = {
+                    "MLB": build_mlb_auto_projection_snapshot,
+                    "NFL": build_nfl_auto_projection_snapshot,
+                    "CFB": build_cfb_auto_projection_snapshot,
+                }
+                auto_projection_payload = builders[sport](
                     players=players,
                     slate_start=slate.start_time,
                     paths=auto_projection_paths,
                     seed=auto_projection_seed,
                 )
                 projections.update(projections_from_payload(auto_projection_payload, players, sport))
+                projections_mode = f"SPORTSEDGE_{sport}_AUTO_JOINT_PATHS"
+                if sport == "MLB":
+                    projections_mode = "SPORTSEDGE_MLB_AUTO_JOINT_PATHS_V2_STARTER_STINT"
                 projection_diagnostics = {
                     "auto_projection_enabled": True,
-                    "projection_mode": f"SPORTSEDGE_{sport}_AUTO_JOINT_PATHS",
+                    "projection_mode": projections_mode,
                     "projection_model_id": auto_projection_payload.get("model_id"),
                     "projection_model_status": auto_projection_payload.get("status"),
                     "projection_path_set_id": auto_projection_payload.get("path_set_id"),
