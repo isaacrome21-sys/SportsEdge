@@ -1,0 +1,116 @@
+{
+  "schema": "SPORTSEDGE_RECONCILIATION_COVERAGE_EXTENSION_V1",
+  "bundle_extensions": {
+    "NFL_V2J_V2K_GOVERNANCE_FREEZE_V1": {
+      "coverage_paths": [
+        "scripts/audit_nfl_real_history.py"
+      ],
+      "coverage_prefixes": [
+        "sportsedge/sports/nfl/m2_v2j_",
+        "sportsedge/sports/nfl/v2k_"
+      ]
+    },
+    "NFL_PROP_MODEL_FREEZE_V1": {
+      "coverage_paths": [
+        "scripts/build_nfl_prop_model_artifact.py"
+      ],
+      "coverage_prefixes": [
+        "sportsedge/sports/nfl/computed_prop_",
+        "sportsedge/sports/nfl/prop_"
+      ]
+    },
+    "CFB_PROP_MODEL_FREEZE_V1": {
+      "coverage_paths": [
+        "config/cfb_prop_depth_source_policy_v1.json",
+        "scripts/build_cfb_prop_model_artifact.py",
+        "scripts/run_cfb_props_manual.py"
+      ],
+      "coverage_prefixes": [
+        "sportsedge/sports/cfb/prop_"
+      ]
+    },
+    "CFB_CANDIDATE_PREREG_FREEZE_V1": {
+      "coverage_paths": [
+        "sportsedge/sports/cfb/candidate_model_v2.py"
+      ],
+      "coverage_prefixes": []
+    },
+    "GLOBAL_PROMOTION_EVIDENCE_FREEZE_V2": {
+      "coverage_paths": [
+        ".github/workflows/cfb-data-pit-readiness-audit.yml",
+        ".github/workflows/cfb-forward-evidence-audit.yml",
+        ".github/workflows/cfb-forward-pit-source-capture.yml",
+        ".github/workflows/cfb-forward-weather-evidence.yml",
+        ".github/workflows/cfb-pit-readiness-contract.yml",
+        ".github/workflows/mlb-additional-pit-archive.yml",
+        ".github/workflows/mlb-authentic-provider-freeze.yml",
+        ".github/workflows/mlb-paired-window-plan-smoke.yml",
+        ".github/workflows/mlb-pit-lineup-starter-contract.yml",
+        ".github/workflows/mlb-promotion-readiness-audit.yml",
+        ".github/workflows/mlb-provider-freeze-capture.yml",
+        ".github/workflows/mlb-provider-freeze-contract.yml",
+        ".github/workflows/mlb-sportsdataio-production-acceptance.yml",
+        ".github/workflows/mlb-v7-statsapi-history-bootstrap.yml",
+        ".github/workflows/mlb-v7-statsapi-history-persist.yml",
+        ".github/workflows/mlb-v7-statsapi-history.yml",
+        ".github/workflows/mlb-v7-travel-history-probe.yml",
+        ".github/workflows/mlb-v7-venue-reference-acquisition.yml",
+        ".github/workflows/mlb-v7-venue-reference-persist.yml",
+        ".github/workflows/mlb-v8-actual-start-binding.yml",
+        ".github/workflows/mlb-v8-evidence.yml",
+        ".github/workflows/mlb-v8-oddspapi-replay-readiness-v2.yml",
+        "config/cfb_truth_gate_v1.json",
+        "config/mlb_replay_policy_v1.json",
+        "config/mlb_v8_evidence_policy.json",
+        "config/mlb_v8_oddspapi_evidence_contract.json",
+        "config/mlb_validation_evidence.json",
+        "scripts/archive_mlb_pit_lineup_starters.py",
+        "scripts/archive_raw_game_odds_paired.py",
+        "scripts/attest_mlb_v8_actual_starts.py",
+        "scripts/audit_cfb_forward_evidence.py",
+        "scripts/audit_cfb_pit_readiness.py",
+        "scripts/audit_mlb_promotion_readiness.py",
+        "scripts/audit_mlb_v8_forward_pit_provenance.py",
+        "scripts/audit_mlb_v8_paired_replay_readiness_v2.py",
+        "scripts/build_mlb_v8_oddspapi_pit_v2.py",
+        "scripts/capture_cfb_weather_pit.py",
+        "scripts/capture_mlb_odds_api_freeze.py",
+        "scripts/capture_mlb_v8_forward_evidence.py",
+        "scripts/collect_mlb_the_odds_api_history.py",
+        "scripts/run_mlb_v8_forward_lane_v2.py",
+        "scripts/verify_mlb_odds_api_freeze.py",
+        "sportsedge/sports/cfb/acquisition_readiness.py",
+        "sportsedge/sports/cfb/depth_chart_source.py",
+        "sportsedge/sports/cfb/forward_evidence.py",
+        "sportsedge/sports/cfb/forward_pit_readiness.py",
+        "sportsedge/sports/cfb/market_benchmark.py",
+        "sportsedge/sports/cfb/pit_readiness.py",
+        "sportsedge/sports/cfb/promotion_attempt.py",
+        "sportsedge/sports/cfb/truth_gate.py",
+        "sportsedge/sports/mlb/paired_replay_readiness.py",
+        "sportsedge/sports/mlb/replay_policy.py",
+        "sportsedge/sports/mlb/the_odds_api_history.py",
+        "sportsedge/sports/mlb/the_odds_api_pairing.py"
+      ],
+      "coverage_prefixes": []
+    }
+  },
+  "exact_exemptions": {
+    "config/cfb_game_model_freeze.json": "CFB_GAME_MODEL_REGISTRY_CURRENTLY_HAS_NO_ACTIVE_MODEL_BUNDLE",
+    ".github/workflows/odds-api-auth-diagnostic.yml": "AUTH_DIAGNOSTIC_ONLY_NO_ACTIVE_BUNDLE",
+    "scripts/diagnose_odds_api_auth.py": "AUTH_DIAGNOSTIC_ONLY_NO_ACTIVE_BUNDLE",
+    "scripts/probe_public_weather_forecast.py": "WEATHER_PROBE_CONTEXT_ONLY_NO_ACTIVE_BUNDLE",
+    "config/football_external_context_v1.json": "FOOTBALL_CONTEXT_ONLY_NO_ACTIVE_BUNDLE",
+    "config/football_public_splits_v1.json": "FOOTBALL_CONTEXT_ONLY_NO_ACTIVE_BUNDLE",
+    "docs/nfl_hybrid_context.md": "FOOTBALL_CONTEXT_ONLY_NO_ACTIVE_BUNDLE"
+  },
+  "authority": {
+    "model": false,
+    "truth_gate": false,
+    "promotion": false,
+    "staking": false,
+    "official": false,
+    "validation_attempt": false,
+    "readout": false
+  }
+}
