@@ -106,6 +106,52 @@ def changed_paths(repo: Path, parent_sha: str, merge_sha: str) -> tuple[str, ...
     return tuple(sorted({line.strip() for line in output.splitlines() if line.strip()}))
 
 
+TERMINAL_RECONCILIATION_MERGE_PATH_PREFIXES = (
+    "config/freeze_reconciliation_",
+    "sportsedge/governance/freeze_reconciliation.py",
+    "scripts/audit_freeze_inventory.py",
+    "scripts/build_reconciliation_registry_view.py",
+    "scripts/reconcile_freeze_deltas.py",
+    "tests/test_freeze_",
+    "tests/test_reconcile_freeze_deltas_cli.py",
+)
+
+
+def main_matches_reconciliation_boundary(
+    repo: Path,
+    *,
+    policy: Mapping[str, Any],
+    reconciled_through_sha: str,
+    current_main_ref: str,
+) -> bool:
+    """Accept exact equality or one reconciliation-only merge commit.
+
+    The merge exception is deliberately narrow: current main must be a two-parent
+    merge whose first parent is the exact registered reconciliation point, every
+    changed path must be reconciliation machinery, and the policy must remain
+    zero-authority. Any later ordinary main movement fails closed again.
+    """
+    reconciled = resolve_sha(repo, reconciled_through_sha)
+    current = resolve_sha(repo, current_main_ref)
+    if current == reconciled:
+        return True
+    if any(bool(value) for value in (policy.get("authority") or {}).values()):
+        return False
+    parents = _git(repo, "rev-list", "--parents", "-n", "1", current).stdout.strip().split()
+    if len(parents) != 3:
+        return False
+    _, first, _second = parents
+    if first != reconciled:
+        return False
+    paths = changed_paths(repo, first, current)
+    if not paths:
+        return False
+    return all(
+        any(path.startswith(prefix) for prefix in TERMINAL_RECONCILIATION_MERGE_PATH_PREFIXES)
+        for path in paths
+    )
+
+
 def _covered(path: str, bundle: Mapping[str, Any]) -> bool:
     exact = {str(value) for value in bundle.get("coverage_paths") or ()}
     prefixes = tuple(str(value) for value in bundle.get("coverage_prefixes") or ())
@@ -534,7 +580,12 @@ def build_reconciliation_report(
             )
         )
     reconciled_through = resolve_sha(repo, str(registry["reconciled_through_sha"]))
-    if current_main_sha != reconciled_through:
+    if not main_matches_reconciliation_boundary(
+        repo,
+        policy=policy,
+        reconciled_through_sha=reconciled_through,
+        current_main_ref=current_main_sha,
+    ):
         blocks.append(
             f"MAIN_ADVANCED_BEYOND_RECONCILIATION:{reconciled_through}:{current_main_sha}"
         )
