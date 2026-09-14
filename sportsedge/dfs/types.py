@@ -58,8 +58,13 @@ class DKPlayer:
     def eligible_for(self, slot: str) -> bool:
         slot = _SLOT_ALIASES.get(slot.upper(), slot.upper())
         if self.roster_slots:
-            return slot in set(self.roster_slots)
+            slots = set(self.roster_slots)
+            if slot == "P" and bool(slots & {"P", "SP", "RP"}):
+                return True
+            return slot in slots
         pos = set(self.positions)
+        if slot == "P":
+            return bool(pos & {"P", "SP", "RP"})
         if slot == "FLEX":
             return bool(pos & {"RB", "WR", "TE"})
         if slot == "SUPERFLEX":
