@@ -26,7 +26,7 @@ jobs:
       - name: Fetch exact current main
         run: git fetch --no-tags origin main
 
-      - name: Block active direct-main workflow writers
+      - name: Audit active direct-main workflow writers
         run: |
           python - <<'PY'
           import json
@@ -101,8 +101,6 @@ jobs:
           out.write_text(json.dumps(artifact, indent=2, sort_keys=True) + '\n')
           print('direct_main_writer_status=' + artifact['status'])
           print('active_direct_main_writers=' + ','.join(active))
-          if active:
-              raise SystemExit('ACTIVE_DIRECT_MAIN_WRITER:' + ','.join(active))
           PY
 
       - name: Enforce unconditional hold before classification
@@ -157,18 +155,26 @@ jobs:
           --current-main-ref origin/main
           --output artifacts/governance/freeze_reconciliation_report.json
 
-      - name: Prove hold is still fail closed while inventory or dispositions remain
+      - name: Prove hold is still fail closed while inventory dispositions or writers remain
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
           report = json.loads(Path('artifacts/governance/freeze_reconciliation_report.json').read_text())
+          writer_guard = json.loads(Path('artifacts/governance/direct_main_writer_guard.json').read_text())
           if report['policy_status'] == 'ACTIVE_BLOCKED' and report['release_ready']:
               raise SystemExit('ACTIVE_BLOCKED_POLICY_CANNOT_REPORT_RELEASE_READY')
           if any((report.get('authority') or {}).values()):
               raise SystemExit('FREEZE_RECONCILIATION_REPORT_AUTHORITY_ESCALATION')
+          if any((writer_guard.get('authority') or {}).values()):
+              raise SystemExit('DIRECT_MAIN_WRITER_GUARD_AUTHORITY_ESCALATION')
+          active = list(writer_guard.get('active_direct_main_writers') or ())
           print('release_ready=' + str(report['release_ready']))
           print('release_blocks=' + ','.join(report['release_blocks']))
+          print('direct_main_writer_status=' + str(writer_guard['status']))
+          print('active_direct_main_writers=' + ','.join(active))
+          if active:
+              raise SystemExit('ACTIVE_DIRECT_MAIN_WRITER:' + ','.join(active))
           PY
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
