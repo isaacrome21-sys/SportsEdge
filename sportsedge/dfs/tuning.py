@@ -87,6 +87,7 @@ def objective_grid(
 
 
 def _train_score(metrics: BacktestMetrics) -> tuple[float, float, float, float]:
+    """Research ranking only; this score has no promotion authority."""
     metrics.validate()
     return (
         metrics.roi,
@@ -104,16 +105,20 @@ def chronological_holdout_tune(
     evaluator: Callable[[ObjectiveWeights, tuple[HistoricalSlate, ...]], BacktestMetrics],
     holdout_fraction: float = 0.25,
     min_holdout_slates: int = 20,
-    min_roi_improvement: float = 0.0,
-    min_top_one_percent_improvement: float = 0.0,
-    max_drawdown_worsening: float = 0.05,
+    max_roi_worsening: float = 0.10,
+    max_drawdown_worsening: float = 0.15,
 ) -> TuningResult:
-    """Select on chronological training slates; authorize only on untouched holdout.
+    """Rank DFS objective candidates without granting automatic promotion.
 
-    The evaluator is intentionally injected so the tuning gate cannot reach around
-    the frozen historical artifacts or silently change the contest/player model.
-    A candidate must improve BOTH holdout ROI and top-1% rate versus baseline, while
-    respecting the drawdown tolerance. Otherwise the frozen baseline remains live.
+    Contest ROI/top-1% over a modest number of slates are too noisy to be a
+    positive promotion gate. This function still performs a chronological split,
+    ranks research candidates on the training window, and evaluates the frozen
+    candidate on untouched holdout. ROI and drawdown are treated only as vetoes.
+
+    Projection-model promotion is governed separately by
+    ``projection_promotion.evaluate_projection_promotion`` using player-level
+    calibration/error evidence. Until a separate pre-registered policy-validation
+    contract exists for objective weights, the frozen baseline remains live.
     """
     baseline.validate()
     if not 0.10 <= holdout_fraction <= 0.50:
@@ -151,25 +156,25 @@ def chronological_holdout_tune(
     if selected_holdout.slate_count != len(holdout) or baseline_holdout.slate_count != len(holdout):
         raise ValueError("DFS_TUNING_HOLDOUT_COUNT_MISMATCH")
 
-    roi_ok = selected_holdout.roi >= baseline_holdout.roi + min_roi_improvement
-    top1_ok = (
-        selected_holdout.top_one_percent_rate
-        >= baseline_holdout.top_one_percent_rate + min_top_one_percent_improvement
+    roi_veto_ok = selected_holdout.roi >= baseline_holdout.roi - max_roi_worsening
+    drawdown_veto_ok = (
+        selected_holdout.max_drawdown
+        <= baseline_holdout.max_drawdown + max_drawdown_worsening
     )
-    drawdown_ok = selected_holdout.max_drawdown <= baseline_holdout.max_drawdown + max_drawdown_worsening
-    promoted = bool(roi_ok and top1_ok and drawdown_ok and selected.digest() != baseline.digest())
-    reason = "HOLDOUT_PASS" if promoted else (
-        "HOLDOUT_BLOCKED:"
-        + ",".join(
-            name
-            for name, ok in (("ROI", roi_ok), ("TOP1", top1_ok), ("DRAWDOWN", drawdown_ok))
-            if not ok
-        )
+    vetoes = [
+        name
+        for name, ok in (("ROI", roi_veto_ok), ("DRAWDOWN", drawdown_veto_ok))
+        if not ok
+    ]
+    reason = (
+        "RESEARCH_CANDIDATE_BLOCKED_BY_VETO:" + ",".join(vetoes)
+        if vetoes
+        else "RESEARCH_CANDIDATE_ONLY:NO_POLICY_PROMOTION_AUTHORITY"
     )
     return TuningResult(
-        selected=selected if promoted else baseline,
+        selected=baseline,
         baseline=baseline,
-        promoted=promoted,
+        promoted=False,
         reason=reason,
         train_metrics=selected_train,
         holdout_metrics=selected_holdout,
