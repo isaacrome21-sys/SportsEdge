@@ -4,6 +4,7 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Iterable
 
+from .objective import DEFAULT_OBJECTIVE_WEIGHTS, ObjectiveWeights
 from .rules import SportRules
 from .types import DKPlayer, Projection
 
@@ -23,6 +24,8 @@ class OptimizedLineup:
     ceiling: float
     objective: float
     correlation_score: float
+    objective_version: str = ""
+    objective_sha256: str = ""
 
 
 @dataclass(frozen=True)
@@ -36,13 +39,12 @@ class _State:
     team_counts: tuple[tuple[str, int], ...]
 
 
-def _base_player_score(proj: Projection) -> float:
-    score = proj.mean + 0.34 * proj.upside
+def _base_player_score(proj: Projection, weights: ObjectiveWeights = DEFAULT_OBJECTIVE_WEIGHTS) -> float:
+    score = weights.mean_weight * proj.mean + weights.upside_weight * proj.upside
     if proj.ownership is not None:
         own = max(0.0, min(1.0, proj.ownership))
-        # Single-entry GPP: reward useful ceiling at lower ownership without making ownership the projection.
-        score += 0.08 * proj.mean * max(0.0, 0.20 - own)
-        score -= 0.05 * proj.mean * max(0.0, own - 0.28)
+        score += weights.low_ownership_weight * proj.mean * max(0.0, 0.20 - own)
+        score -= weights.chalk_penalty_weight * proj.mean * max(0.0, own - 0.28)
     return score
 
 
@@ -127,7 +129,6 @@ def _valid_final(sport: str, rules: SportRules, players: tuple[DKPlayer, ...]) -
             return False
     if sport in {"NFL", "CFB"}:
         for qb in (p for p in players if "QB" in p.positions):
-            # Tournament construction rule: each rostered QB should have at least one same-team WR/TE.
             if not any(
                 x.player_id != qb.player_id
                 and x.team == qb.team
@@ -146,8 +147,10 @@ def optimize_single_entry(
     *,
     beam_width: int = 30_000,
     per_slot_limit: int = 70,
+    objective_weights: ObjectiveWeights = DEFAULT_OBJECTIVE_WEIGHTS,
 ) -> OptimizedLineup:
     sport = sport.upper()
+    objective_weights.validate()
     pool = [p for p in players if not p.is_disabled and p.player_id in projections and p.salary > 0]
     if not pool:
         raise ValueError("DFS_PLAYER_POOL_EMPTY")
@@ -159,10 +162,9 @@ def optimize_single_entry(
         eligible = [p for p in pool if p.eligible_for(slot)]
         if not eligible:
             raise ValueError(f"DFS_NO_ELIGIBLE_PLAYERS:{slot}")
-        eligible.sort(key=lambda p: (_base_player_score(projections[p.player_id]), projections[p.player_id].mean), reverse=True)
+        eligible.sort(key=lambda p: (_base_player_score(projections[p.player_id], objective_weights), projections[p.player_id].mean), reverse=True)
         slot_candidates[idx] = eligible[:per_slot_limit]
 
-    # Fill restrictive slots first while preserving original slot identity.
     slot_order = sorted(range(len(canonical_slots)), key=lambda i: (len(slot_candidates[i]), canonical_slots[i]))
     states = [_State((), frozenset(), 0, 0.0, 0.0, 0.0, ())]
     min_salary_by_remaining = []
@@ -201,7 +203,7 @@ def optimize_single_entry(
                         chosen=state.chosen + ((pidx, slot),),
                         used=state.used | {cand.player_id},
                         salary=salary,
-                        base_score=state.base_score + _base_player_score(proj) + inc_corr,
+                        base_score=state.base_score + _base_player_score(proj, objective_weights) + objective_weights.correlation_weight * inc_corr,
                         projected_points=state.projected_points + proj.mean,
                         ceiling=state.ceiling + proj.ceiling,
                         team_counts=tuple(sorted(new_counts.items())),
@@ -213,17 +215,17 @@ def optimize_single_entry(
         states = expanded[:beam_width]
 
     best: OptimizedLineup | None = None
+    objective_sha = objective_weights.digest()
     for state in states:
         selected = tuple(pool[pidx] for pidx, _ in state.chosen)
         if not _valid_final(sport, rules, selected):
             continue
         final_corr = _final_correlation(sport, selected)
-        objective = state.base_score + final_corr
+        objective = state.base_score + objective_weights.correlation_weight * final_corr
         entries_unsorted = [
             LineupEntry(slot=slot, player=pool[pidx], projection=projections[pool[pidx].player_id])
             for pidx, slot in state.chosen
         ]
-        # Reconstruct in canonical slot order, preserving duplicate slot names by taking in insertion order.
         entries: list[LineupEntry] = []
         remaining = entries_unsorted[:]
         for slot in canonical_slots:
@@ -239,6 +241,8 @@ def optimize_single_entry(
             ceiling=state.ceiling,
             objective=objective,
             correlation_score=final_corr,
+            objective_version=objective_weights.version,
+            objective_sha256=objective_sha,
         )
         if best is None or lineup.objective > best.objective:
             best = lineup
