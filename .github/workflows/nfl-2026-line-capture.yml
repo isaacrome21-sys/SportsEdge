@@ -51,26 +51,49 @@ jobs:
             -o "$RUNNER_TEMP/nfl-games.csv"
           python3 - <<'PY'
           import csv, json, os
+          from collections import Counter
           from datetime import date, datetime, timedelta, timezone
           from pathlib import Path
           from zoneinfo import ZoneInfo
 
           cfg = json.loads(Path('config/nfl_2026_capture.json').read_text())
           now = datetime.now(timezone.utc)
-          local = now.astimezone(ZoneInfo(cfg['timezone']))
+          tz = ZoneInfo(cfg['timezone'])
+          local = now.astimezone(tz)
+          anchor = date.fromisoformat(cfg['week1_tuesday_local_date'])
+
           hh, mm = map(int, cfg['opener_local_time'].split(':'))
           opener_target = local.replace(hour=hh, minute=mm, second=0, microsecond=0)
-          opener_due = (
+          opener_window_open = (
               local.strftime('%A') == cfg['opener_weekday']
               and opener_target <= local < opener_target + timedelta(minutes=int(cfg['opener_window_minutes']))
           )
-          anchor = date.fromisoformat(cfg['week1_tuesday_local_date'])
-          opener_week = ((local.date() - anchor).days // 7 + 1) if opener_due else 0
+          opener_week = ((local.date() - anchor).days // 7 + 1) if opener_window_open else 0
           if opener_week < int(cfg['first_week']):
-              opener_due = False
+              opener_window_open = False
               opener_week = 0
+          opener_path = Path(cfg['output_dir']) / f"week{opener_week:02d}" / 'opener.json' if opener_week else None
+          opener_due = bool(opener_window_open and opener_path and not opener_path.is_file())
 
-          final_due_kickoffs = []
+          # Count already-materialized FINAL rows by kickoff so repeated polling
+          # asks the paid provider only for still-missing rows.
+          captured_final = Counter()
+          for path in Path(cfg['output_dir']).glob('week*/final/*.json'):
+              try:
+                  record = json.loads(path.read_text())
+              except (OSError, json.JSONDecodeError):
+                  continue
+              for game in record.get('games') or []:
+                  raw = str(game.get('commence_time') or '').strip()
+                  if not raw:
+                      continue
+                  try:
+                      dt = datetime.fromisoformat(raw.replace('Z', '+00:00')).astimezone(timezone.utc)
+                  except ValueError:
+                      continue
+                  captured_final[dt.strftime('%Y-%m-%dT%H:%M:%SZ')] += 1
+
+          expected_open_final = Counter()
           eastern = ZoneInfo('America/New_York')
           with open(os.path.join(os.environ['RUNNER_TEMP'], 'nfl-games.csv'), newline='', encoding='utf-8-sig') as handle:
               for row in csv.DictReader(handle):
@@ -84,16 +107,19 @@ jobs:
                       kickoff = datetime.fromisoformat(f'{gameday}T{gametime}').replace(tzinfo=eastern).astimezone(timezone.utc)
                   except ValueError:
                       continue
-                  local_kickoff = kickoff.astimezone(ZoneInfo(cfg['timezone']))
-                  week = (local_kickoff.date() - anchor).days // 7 + 1
+                  week = (kickoff.astimezone(tz).date() - anchor).days // 7 + 1
                   if week < int(cfg['first_week']):
                       continue
                   start = kickoff - timedelta(minutes=int(cfg['final_minutes_before_kickoff']))
                   end = min(start + timedelta(minutes=int(cfg['final_window_minutes'])), kickoff)
                   if start <= now < end:
-                      final_due_kickoffs.append(kickoff.strftime('%Y-%m-%dT%H:%M:%SZ'))
+                      expected_open_final[kickoff.strftime('%Y-%m-%dT%H:%M:%SZ')] += 1
 
-          final_due_kickoffs.sort()
+          final_due_kickoffs = []
+          for kickoff_z, expected_count in sorted(expected_open_final.items()):
+              missing = max(0, expected_count - captured_final[kickoff_z])
+              final_due_kickoffs.extend([kickoff_z] * missing)
+
           final_due = bool(final_due_kickoffs)
           due = opener_due or final_due
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
@@ -104,6 +130,7 @@ jobs:
               output.write('final_due_kickoffs=' + json.dumps(final_due_kickoffs, separators=(',', ':')) + '\n')
           print(json.dumps({
               'due': due,
+              'opener_window_open': opener_window_open,
               'opener_due': opener_due,
               'opener_week': opener_week,
               'final_due': final_due,
