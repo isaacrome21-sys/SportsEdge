@@ -1,14 +1,29 @@
 name: nfl-market-maker-radar-capture
 
 # Direct-public, zero-authority NFL market snapshot lane.
-# Scheduled execution is intentionally disabled until this workflow is explicitly
-# admitted by the frozen cron policy. Manual dispatch remains available.
+# This workflow is explicitly admitted by SPORTSEDGE_WORKFLOW_CRON_POLICY_V1
+# because price-leadership observations are irreversible/PIT-sensitive: if the
+# sequence is not observed live, it cannot be reconstructed honestly later.
 # Pinnacle is the market-maker reference; DraftKings and FanDuel are soft books.
 # All books in one poll share one capture clock, so request ordering cannot create
 # a fake leader. Rows and exact raw provider payloads are append-only on `data`.
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '*/5 * * * *'
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/capture_nfl_market_maker_radar.py'
+      - 'scripts/normalize_pinnacle_nfl_markets.py'
+      - 'scripts/normalize_fanduel_nfl_markets.py'
+      - 'sportsedge/draftkings_game_market_source.py'
+      - 'scripts/analyze_market_maker_radar.py'
+      - 'config/market_maker_radar_v1.json'
+      - 'config/workflow_cron_policy_v1.json'
+      - '.github/workflows/nfl-market-maker-radar-capture.yml'
   pull_request:
     paths:
       - 'scripts/capture_nfl_market_maker_radar.py'
@@ -18,6 +33,7 @@ on:
       - 'sportsedge/draftkings_game_market_source.py'
       - 'scripts/analyze_market_maker_radar.py'
       - 'config/market_maker_radar_v1.json'
+      - 'config/workflow_cron_policy_v1.json'
       - '.github/workflows/nfl-market-maker-radar-capture.yml'
 
 permissions:
