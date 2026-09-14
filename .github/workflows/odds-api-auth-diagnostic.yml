@@ -23,6 +23,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: sportsedge-paid-odds-api
+  cancel-in-progress: false
+
 jobs:
   diagnose:
     runs-on: ubuntu-latest
