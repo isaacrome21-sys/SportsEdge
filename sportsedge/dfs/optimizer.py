@@ -47,11 +47,11 @@ def _base_player_score(proj: Projection) -> float:
 
 
 def _is_pitcher(p: DKPlayer) -> bool:
-    return "P" in p.positions
+    return p.is_pitcher
 
 
 def _is_dst(p: DKPlayer) -> bool:
-    return bool(set(p.positions) & {"DST", "DEF"})
+    return p.is_defense
 
 
 def _mlb_conflict(chosen: Iterable[DKPlayer], candidate: DKPlayer) -> bool:
