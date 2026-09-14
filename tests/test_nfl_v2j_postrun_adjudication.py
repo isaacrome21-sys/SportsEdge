@@ -7,6 +7,30 @@ from scripts.adjudicate_nfl_v2j_postrun import adjudicate
 
 
 class NFLV2JPostrunAdjudicationTests(unittest.TestCase):
+    def _policy(self) -> dict:
+        return {
+            "policy_id": "NFL_V2J_POSTRUN_ADJUDICATION_V1",
+            "status": "FROZEN_PRE_READOUT",
+            "frozen_gates": {
+                "spread_fold_win_rate_min": 0.65,
+                "total_fold_win_rate_min": 0.65,
+                "spread_calibration_max_bin_deviation": 0.05,
+                "total_calibration_max_bin_deviation": 0.05,
+                "signed_key_max_abs_error": 0.005,
+                "signed_keys": [-7, -3, 3, 7],
+                "all_required": True,
+            },
+            "authority": {
+                "model_p_authority": False,
+                "promotion_authority": False,
+                "staking_authority": False,
+                "official_authority": False,
+                "production_registry_authority": False,
+                "nfl_m2_freeze_authorized": False,
+                "v2k_automatically_activated": False,
+            },
+        }
+
     def _readout(self) -> dict:
         calibration = {
             "threshold": 0.05,
@@ -53,15 +77,22 @@ class NFLV2JPostrunAdjudicationTests(unittest.TestCase):
             },
         }
 
-    def _adjudicate(self, readout: dict | None = None, key_math: dict | None = None) -> dict:
+    def _adjudicate(
+        self,
+        readout: dict | None = None,
+        key_math: dict | None = None,
+        policy: dict | None = None,
+    ) -> dict:
         return adjudicate(
             readout or self._readout(),
             key_math or self._key_math(),
+            policy or self._policy(),
             upstream_run_id=123,
             upstream_head_sha="1" * 40,
             adjudicator_git_sha="2" * 40,
             first_readout_sha256="3" * 64,
             key_math_sha256="4" * 64,
+            policy_sha256="5" * 64,
         )
 
     def test_all_frozen_gates_pass_but_authority_stays_false(self) -> None:
@@ -105,6 +136,12 @@ class NFLV2JPostrunAdjudicationTests(unittest.TestCase):
         readout["candidate_historical_evidence"]["spread"]["required_fold_win_rate"] = 0.60
         with self.assertRaisesRegex(ValueError, "FOLD_THRESHOLD_DRIFT"):
             self._adjudicate(readout=readout)
+
+    def test_policy_drift_fails_closed(self) -> None:
+        policy = self._policy()
+        policy["frozen_gates"]["signed_key_max_abs_error"] = 0.01
+        with self.assertRaisesRegex(ValueError, "POLICY_THRESHOLD_DRIFT"):
+            self._adjudicate(policy=policy)
 
     def test_authority_escalation_fails_closed(self) -> None:
         readout = self._readout()
