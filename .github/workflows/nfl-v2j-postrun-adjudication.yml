@@ -46,10 +46,10 @@ jobs:
     env:
       UPSTREAM_RUN_ID: ${{ github.event.workflow_run.id }}
       UPSTREAM_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
-      ADJUDICATOR_GIT_SHA: ${{ github.sha }}
+      ADJUDICATOR_GIT_SHA: 6a5dece6b5a51c511731217a213c912f013bb53e
       GH_TOKEN: ${{ github.token }}
     steps:
-      - name: Checkout versioned post-run adjudicator
+      - name: Checkout pinned post-run adjudicator
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ env.ADJUDICATOR_GIT_SHA }}
@@ -109,12 +109,14 @@ jobs:
               raise SystemExit('NFL_V2J_ADJUDICATION_RUN_ID_MISMATCH')
           if p.get('upstream_head_sha')!=os.environ['UPSTREAM_HEAD_SHA'].lower():
               raise SystemExit('NFL_V2J_ADJUDICATION_HEAD_SHA_MISMATCH')
+          if p.get('adjudicator_git_sha')!=os.environ['ADJUDICATOR_GIT_SHA'].lower():
+              raise SystemExit('NFL_V2J_ADJUDICATION_CODE_PIN_MISMATCH')
           if p.get('v2k_automatically_activated') is not False or p.get('nfl_m2_freeze_authorized') is not False:
               raise SystemExit('NFL_V2J_ADJUDICATION_FORBIDDEN_TRANSITION')
           for f in ('model_p_authority','promotion_authority','staking_authority','official_authority','production_registry_authority'):
               if p.get(f) is not False:
                   raise SystemExit('NFL_V2J_ADJUDICATION_FORBIDDEN_AUTHORITY:'+f)
-          print(json.dumps({'verdict':p['verdict'],'frozen_gate_pass':p['frozen_gate_pass'],'promotion_authority':False},sort_keys=True))
+          print(json.dumps({'verdict':p['verdict'],'frozen_gate_pass':p['frozen_gate_pass'],'adjudicator_git_sha':p['adjudicator_git_sha'],'promotion_authority':False},sort_keys=True))
           PY
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
