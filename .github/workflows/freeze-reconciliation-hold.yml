@@ -48,8 +48,29 @@ jobs:
           print('freeze_hold=PASS status=' + policy['status'])
           PY
 
-      - name: Test reconciliation state machine
-        run: python -m pytest -q tests/test_freeze_reconciliation.py
+      - name: Test reconciliation and inventory state machines
+        run: python -m pytest -q tests/test_freeze_reconciliation.py tests/test_freeze_inventory.py
+
+      - name: Audit complete governance surface inventory
+        run: >-
+          PYTHONPATH=. python scripts/audit_freeze_inventory.py
+          --ref HEAD
+          --output artifacts/governance/freeze_inventory_report.json
+
+      - name: Enforce computed inventory whenever registry claims complete
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          inventory = json.loads(Path('artifacts/governance/freeze_inventory_report.json').read_text())
+          claimed = inventory['registry_claimed_complete']
+          if claimed and inventory['release_blocks']:
+              raise SystemExit('FREEZE_INVENTORY_FALSE_COMPLETE_CLAIM:' + ','.join(inventory['release_blocks']))
+          print('inventory_computed_complete=' + str(inventory['computed_complete']))
+          print('inventory_unmapped_count=' + str(len(inventory['unmapped_paths'])))
+          if inventory['unmapped_paths']:
+              print('inventory_unmapped=' + '|'.join(inventory['unmapped_paths']))
+          PY
 
       - name: Reconcile each registered delta against each bundle
         run: >-
@@ -70,3 +91,11 @@ jobs:
           print('release_ready=' + str(report['release_ready']))
           print('release_blocks=' + ','.join(report['release_blocks']))
           PY
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: freeze-reconciliation-audit-${{ github.event.pull_request.head.sha || github.sha }}
+          path: artifacts/governance/*.json
+          if-no-files-found: warn
+          retention-days: 30
