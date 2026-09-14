@@ -51,21 +51,49 @@ jobs:
             -o "$RUNNER_TEMP/nfl-games.csv"
           python3 - <<'PY'
           import csv, json, os
-          from datetime import datetime, timedelta, timezone
+          from collections import Counter
+          from datetime import date, datetime, timedelta, timezone
           from pathlib import Path
           from zoneinfo import ZoneInfo
 
           cfg = json.loads(Path('config/nfl_2026_capture.json').read_text())
           now = datetime.now(timezone.utc)
-          local = now.astimezone(ZoneInfo(cfg['timezone']))
+          tz = ZoneInfo(cfg['timezone'])
+          local = now.astimezone(tz)
+          anchor = date.fromisoformat(cfg['week1_tuesday_local_date'])
+
           hh, mm = map(int, cfg['opener_local_time'].split(':'))
           opener_target = local.replace(hour=hh, minute=mm, second=0, microsecond=0)
-          opener_due = (
+          opener_window_open = (
               local.strftime('%A') == cfg['opener_weekday']
               and opener_target <= local < opener_target + timedelta(minutes=int(cfg['opener_window_minutes']))
           )
+          opener_week = ((local.date() - anchor).days // 7 + 1) if opener_window_open else 0
+          if opener_week < int(cfg['first_week']):
+              opener_window_open = False
+              opener_week = 0
+          opener_path = Path(cfg['output_dir']) / f"week{opener_week:02d}" / 'opener.json' if opener_week else None
+          opener_due = bool(opener_window_open and opener_path and not opener_path.is_file())
 
-          final_due = False
+          # Count already-materialized FINAL rows by kickoff so repeated polling
+          # asks the paid provider only for still-missing rows.
+          captured_final = Counter()
+          for path in Path(cfg['output_dir']).glob('week*/final/*.json'):
+              try:
+                  record = json.loads(path.read_text())
+              except (OSError, json.JSONDecodeError):
+                  continue
+              for game in record.get('games') or []:
+                  raw = str(game.get('commence_time') or '').strip()
+                  if not raw:
+                      continue
+                  try:
+                      dt = datetime.fromisoformat(raw.replace('Z', '+00:00')).astimezone(timezone.utc)
+                  except ValueError:
+                      continue
+                  captured_final[dt.strftime('%Y-%m-%dT%H:%M:%SZ')] += 1
+
+          expected_open_final = Counter()
           eastern = ZoneInfo('America/New_York')
           with open(os.path.join(os.environ['RUNNER_TEMP'], 'nfl-games.csv'), newline='', encoding='utf-8-sig') as handle:
               for row in csv.DictReader(handle):
@@ -79,23 +107,41 @@ jobs:
                       kickoff = datetime.fromisoformat(f'{gameday}T{gametime}').replace(tzinfo=eastern).astimezone(timezone.utc)
                   except ValueError:
                       continue
+                  week = (kickoff.astimezone(tz).date() - anchor).days // 7 + 1
+                  if week < int(cfg['first_week']):
+                      continue
                   start = kickoff - timedelta(minutes=int(cfg['final_minutes_before_kickoff']))
                   end = min(start + timedelta(minutes=int(cfg['final_window_minutes'])), kickoff)
                   if start <= now < end:
-                      final_due = True
-                      break
+                      expected_open_final[kickoff.strftime('%Y-%m-%dT%H:%M:%SZ')] += 1
 
+          final_due_kickoffs = []
+          for kickoff_z, expected_count in sorted(expected_open_final.items()):
+              missing = max(0, expected_count - captured_final[kickoff_z])
+              final_due_kickoffs.extend([kickoff_z] * missing)
+
+          final_due = bool(final_due_kickoffs)
           due = opener_due or final_due
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
               output.write(f"due={'true' if due else 'false'}\n")
               output.write(f"opener_due={'true' if opener_due else 'false'}\n")
+              output.write(f"opener_week={opener_week}\n")
               output.write(f"final_due={'true' if final_due else 'false'}\n")
-          print(json.dumps({'due': due, 'opener_due': opener_due, 'final_due': final_due, 'checked_at_utc': now.isoformat()}))
+              output.write('final_due_kickoffs=' + json.dumps(final_due_kickoffs, separators=(',', ':')) + '\n')
+          print(json.dumps({
+              'due': due,
+              'opener_window_open': opener_window_open,
+              'opener_due': opener_due,
+              'opener_week': opener_week,
+              'final_due': final_due,
+              'final_due_kickoffs': final_due_kickoffs,
+              'checked_at_utc': now.isoformat(),
+          }))
           PY
 
-      - name: Record elapsed missing opener windows without backfill
+      - name: Record elapsed missing windows without backfill
         if: github.event_name == 'schedule'
-        run: python3 scripts/audit_nfl_2026_capture_gaps.py
+        run: python3 scripts/audit_nfl_2026_capture_gaps.py --schedule-csv "$RUNNER_TEMP/nfl-games.csv"
 
       - name: Run capture
         if: github.event_name == 'workflow_dispatch' || steps.due.outputs.due == 'true'
@@ -111,6 +157,21 @@ jobs:
           set +e
           python3 scripts/nfl_2026_line_capture.py "$MODE"
           echo "rc=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Verify every due scheduled capture materialized
+        if: github.event_name == 'schedule' && steps.due.outputs.due == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(
+            --schedule-csv "$RUNNER_TEMP/nfl-games.csv"
+            --github-run-id "$GITHUB_RUN_ID"
+            --verify-final-kickoffs '${{ steps.due.outputs.final_due_kickoffs }}'
+          )
+          if [ '${{ steps.due.outputs.opener_due }}' = 'true' ]; then
+            args+=(--verify-opener-week '${{ steps.due.outputs.opener_week }}')
+          fi
+          python3 scripts/audit_nfl_2026_capture_gaps.py "${args[@]}"
 
       - name: Commit captures and absence markers
         if: always() && (github.event_name == 'schedule' || (steps.run.outcome != 'skipped' && inputs.mode == 'capture'))
