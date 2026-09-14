@@ -29,6 +29,16 @@ jobs:
         run: PYTHONPATH=. python -m pytest -q tests/test_props_source_family_ledger.py
       - name: Guard against prop-engine authority or Stage 7 bypass
         run: |
-          set -euo pipefail
-          ! grep -E 'official_authority["'"']?\s*[:=]\s*True|can_create_model_p["'"']?\s*[:=]\s*True|staking_authority["'"']?\s*[:=]\s*True' sportsedge/props_source_family_ledger.py
-          ! grep -E 'bind_prop_market\(' sportsedge/props_source_family_ledger.py
+          python - <<'PY'
+          from pathlib import Path
+          text = Path('sportsedge/props_source_family_ledger.py').read_text()
+          forbidden = (
+              '"official_authority": True',
+              '"can_create_model_p": True',
+              '"staking_authority": True',
+              'bind_prop_market(',
+          )
+          hits = [token for token in forbidden if token in text]
+          if hits:
+              raise SystemExit('PROP_SOURCE_LEDGER_AUTHORITY_OR_BINDING_BYPASS:' + ','.join(hits))
+          PY
