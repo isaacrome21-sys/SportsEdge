@@ -23,8 +23,8 @@ from urllib.parse import urlencode
 from urllib.request import urlopen
 
 from scripts.probe_direct_market_feeds import (
+    FANDUEL_PUBLIC_WEB_KEY,
     FANDUEL_ROOT,
-    FANDUEL_WEB_KEY,
     DirectMarketProbeError,
     _authority,
     _fetch,
@@ -119,7 +119,7 @@ def _first_upcoming_event(payload: Any, *, now: datetime) -> Mapping[str, Any]:
 def _content_page_url() -> str:
     query = urlencode(
         {
-            "_ak": FANDUEL_WEB_KEY,
+            "_ak": FANDUEL_PUBLIC_WEB_KEY,
             "page": "CUSTOM",
             "customPageId": "nfl",
             "timezone": "America/New_York",
@@ -129,7 +129,7 @@ def _content_page_url() -> str:
 
 
 def _event_page_url(event_id: int) -> str:
-    query = urlencode({"_ak": FANDUEL_WEB_KEY, "eventId": event_id})
+    query = urlencode({"_ak": FANDUEL_PUBLIC_WEB_KEY, "eventId": event_id})
     return f"{FANDUEL_ROOT}/sbapi/event-page?{query}"
 
 
