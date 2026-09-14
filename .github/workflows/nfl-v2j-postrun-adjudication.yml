@@ -1,0 +1,123 @@
+name: nfl-v2j-postrun-adjudication
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/adjudicate_nfl_v2j_postrun.py'
+      - 'tests/test_nfl_v2j_postrun_adjudication.py'
+      - '.github/workflows/nfl-v2j-postrun-adjudication.yml'
+  workflow_run:
+    workflows: ["nfl-v2j-timeout-successor"]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  contract:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Compile adjudication surface
+        run: python -m py_compile scripts/adjudicate_nfl_v2j_postrun.py tests/test_nfl_v2j_postrun_adjudication.py
+
+      - name: Prove frozen verdict and zero-authority boundary
+        run: python -m unittest discover -s tests -p 'test_nfl_v2j_postrun_adjudication.py' -v
+
+  adjudicate:
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      UPSTREAM_RUN_ID: ${{ github.event.workflow_run.id }}
+      UPSTREAM_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      ADJUDICATOR_GIT_SHA: ${{ github.sha }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout versioned post-run adjudicator
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.ADJUDICATOR_GIT_SHA }}
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Download exact completed V2J successor evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/football/v2j_adjudication/upstream
+          gh run download "$UPSTREAM_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "nfl-v2j-timeout-successor-$UPSTREAM_HEAD_SHA" \
+            --dir artifacts/football/v2j_adjudication/upstream
+          test -f artifacts/football/v2j_adjudication/upstream/nfl_v2j_first_readout.json
+          test -f artifacts/football/v2j_adjudication/upstream/nfl_v2j_key_math.json
+          test -f artifacts/football/v2j_adjudication/upstream/nfl_v2j_timeout_successor_attestation.json
+
+      - name: Verify exact fold-sharded execution attestation
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p=json.loads(Path('artifacts/football/v2j_adjudication/upstream/nfl_v2j_timeout_successor_attestation.json').read_text())
+          if p.get('status')!='EXACT_FOLD_SHARDED_EXECUTION_COMPLETE_ZERO_AUTHORITY':
+              raise SystemExit('NFL_V2J_ADJUDICATION_UPSTREAM_EXECUTION_INCOMPLETE')
+          if str(p.get('execution_code_git_sha') or '').lower()!=os.environ['UPSTREAM_HEAD_SHA'].lower():
+              raise SystemExit('NFL_V2J_ADJUDICATION_UPSTREAM_HEAD_MISMATCH')
+          for f in ('promotion_authority','model_p_authority','staking_authority','official_authority'):
+              if p.get(f) is not False:
+                  raise SystemExit('NFL_V2J_ADJUDICATION_UPSTREAM_AUTHORITY_INVALID:'+f)
+          PY
+
+      - name: Apply frozen V2J historical calibration and signed-key gates
+        run: >-
+          python scripts/adjudicate_nfl_v2j_postrun.py
+          --first-readout artifacts/football/v2j_adjudication/upstream/nfl_v2j_first_readout.json
+          --key-math artifacts/football/v2j_adjudication/upstream/nfl_v2j_key_math.json
+          --upstream-run-id "$UPSTREAM_RUN_ID"
+          --upstream-head-sha "$UPSTREAM_HEAD_SHA"
+          --adjudicator-git-sha "$ADJUDICATOR_GIT_SHA"
+          --out artifacts/football/v2j_adjudication/nfl_v2j_postrun_adjudication.json
+
+      - name: Enforce verdict has zero downstream authority
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p=json.loads(Path('artifacts/football/v2j_adjudication/nfl_v2j_postrun_adjudication.json').read_text())
+          if p.get('status')!='COMPLETE_ZERO_AUTHORITY':
+              raise SystemExit('NFL_V2J_ADJUDICATION_STATUS_INVALID')
+          if p.get('upstream_run_id')!=int(os.environ['UPSTREAM_RUN_ID']):
+              raise SystemExit('NFL_V2J_ADJUDICATION_RUN_ID_MISMATCH')
+          if p.get('upstream_head_sha')!=os.environ['UPSTREAM_HEAD_SHA'].lower():
+              raise SystemExit('NFL_V2J_ADJUDICATION_HEAD_SHA_MISMATCH')
+          if p.get('v2k_automatically_activated') is not False or p.get('nfl_m2_freeze_authorized') is not False:
+              raise SystemExit('NFL_V2J_ADJUDICATION_FORBIDDEN_TRANSITION')
+          for f in ('model_p_authority','promotion_authority','staking_authority','official_authority','production_registry_authority'):
+              if p.get(f) is not False:
+                  raise SystemExit('NFL_V2J_ADJUDICATION_FORBIDDEN_AUTHORITY:'+f)
+          print(json.dumps({'verdict':p['verdict'],'frozen_gate_pass':p['frozen_gate_pass'],'promotion_authority':False},sort_keys=True))
+          PY
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nfl-v2j-postrun-adjudication-${{ env.UPSTREAM_HEAD_SHA }}
+          path: artifacts/football/v2j_adjudication/nfl_v2j_postrun_adjudication.json
+          if-no-files-found: error
+          retention-days: 90
