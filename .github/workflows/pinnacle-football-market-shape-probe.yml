@@ -8,12 +8,14 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
+      - 'scripts/probe_direct_market_feeds.py'
       - 'scripts/probe_pinnacle_football_market_shape.py'
       - 'tests/test_pinnacle_football_market_shape_probe.py'
       - '.github/workflows/pinnacle-football-market-shape-probe.yml'
   push:
     branches: [main]
     paths:
+      - 'scripts/probe_direct_market_feeds.py'
       - 'scripts/probe_pinnacle_football_market_shape.py'
       - 'tests/test_pinnacle_football_market_shape_probe.py'
       - '.github/workflows/pinnacle-football-market-shape-probe.yml'
@@ -34,7 +36,7 @@ jobs:
       - name: Verify deterministic zero-authority probe contract
         run: python -m unittest tests.test_pinnacle_football_market_shape_probe -v
 
-      - name: Capture live matchup/detail/straight-market shapes
+      - name: Capture live matchup and straight-market shapes
         if: github.event_name != 'pull_request'
         id: live
         continue-on-error: true
@@ -62,7 +64,7 @@ jobs:
             .authority.evidence_clock_authority == false and
             .authority.wager_placement_authority == false
           ' artifacts/pinnacle-football-market-shape/status.json >/dev/null
-          jq '{state, selection_rule, football_sport_id, selected_matchup, captures: (.captures | with_entries(.value |= {http_status,content_type,raw_sha256,raw_bytes,shape}))}' \
+          jq '{state, reason, selection_rule, football_sport_id, selected_matchup, captures: (.captures | with_entries(.value |= {http_status,content_type,raw_sha256,raw_bytes,shape}))}' \
             artifacts/pinnacle-football-market-shape/status.json
 
       - name: Upload exact shape artifact
