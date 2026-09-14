@@ -1,7 +1,7 @@
 {
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_POLICY_V1",
   "issue": 686,
-  "status": "ACTIVE_BLOCKED",
+  "status": "RESOLVED",
   "main_merge_hold": "UNCONDITIONAL",
   "hold_started_from_main_sha": "564e5567acf63adbf750e033df08a8c368f6884d",
   "observed_main_sha_when_policy_authored": "00b4db27f15cc22b089e2a2d974cf483eed86e58",
