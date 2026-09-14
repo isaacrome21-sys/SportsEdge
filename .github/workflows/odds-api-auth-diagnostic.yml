@@ -1,0 +1,93 @@
+name: odds-api-auth-diagnostic
+
+# One-shot diagnostic for the paid Odds API lane. The PR path only runs unit
+# tests. After merge, the path-filtered push runs one minimal paid probe and
+# classifies provider auth/quota failures without printing keys or request URLs.
+# This workflow has zero predictive, promotion, staking, OFFICIAL, registry, or
+# evidence-clock authority.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/odds-api-auth-diagnostic.yml'
+      - 'scripts/diagnose_odds_api_auth.py'
+      - 'tests/test_odds_api_auth_diagnostic.py'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/odds-api-auth-diagnostic.yml'
+      - 'scripts/diagnose_odds_api_auth.py'
+      - 'tests/test_odds_api_auth_diagnostic.py'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+      SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
+      SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
+      SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Verify redaction and fail-closed contract
+        run: python -m unittest tests.test_odds_api_auth_diagnostic -v
+
+      - name: Run minimal paid-endpoint diagnostic
+        if: github.event_name != 'pull_request'
+        id: probe
+        continue-on-error: true
+        run: |
+          mkdir -p artifacts/odds-api-auth-diagnostic
+          python scripts/diagnose_odds_api_auth.py \
+            --out artifacts/odds-api-auth-diagnostic/status.json
+
+      - name: Enforce zero authority and surface exact provider class
+        if: github.event_name != 'pull_request' && always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f artifacts/odds-api-auth-diagnostic/status.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = json.loads(Path('artifacts/odds-api-auth-diagnostic/status.json').read_text())
+          expected = {
+              'model_p_input': False,
+              'promotion_authority': False,
+              'truth_gate_input': False,
+              'staking_authority': False,
+              'official_authority': False,
+              'production_registry_authority': False,
+              'evidence_clock_authority': False,
+          }
+          assert p.get('authority') == expected, p.get('authority')
+          print('ODDS_API_AUTH_STATE=' + str(p.get('state')))
+          for attempt in p.get('attempts', []):
+              print(
+                  'ODDS_API_KEY_SLOT=' + str(attempt.get('key_slot'))
+                  + ' STATE=' + str(attempt.get('state'))
+                  + ' PROVIDER_ERROR=' + str(attempt.get('provider_error_code', ''))
+                  + ' REMAINING=' + str((attempt.get('quota_headers') or {}).get('x-requests-remaining', ''))
+              )
+          if p.get('state') != 'AUTHENTICATED':
+              raise SystemExit(2)
+          PY
+
+      - name: Upload redacted diagnostic artifact
+        if: github.event_name != 'pull_request' && always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: odds-api-auth-diagnostic-${{ github.sha }}
+          path: artifacts/odds-api-auth-diagnostic/status.json
+          if-no-files-found: error
