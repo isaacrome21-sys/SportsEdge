@@ -1,0 +1,120 @@
+{
+  "schema": "SPORTSEDGE_FINISH_LINE_BLOCKERS_V1",
+  "status": "DRAFT_BLOCKED_BY_FREEZE_RECONCILIATION",
+  "classification_values": [
+    "MISSING_IMPLEMENTATION",
+    "MISSING_DATA",
+    "MISSING_DECISION"
+  ],
+  "adoption_modes": [
+    "FORBIDDEN",
+    "PLUMBING_ONLY",
+    "CHALLENGER_ONLY",
+    "NATIVE_BUILD"
+  ],
+  "rules": {
+    "classify_before_public_repo_search": true,
+    "public_code_may_close_only_missing_implementation": true,
+    "missing_data_public_code_adoption_forbidden": true,
+    "missing_decision_public_code_adoption_forbidden": true,
+    "evidence_facing_external_model_logic_enters_as_challenger_only": true,
+    "external_calibration_or_prior_authority_forbidden": true,
+    "external_historical_windows_do_not_establish_pit": true,
+    "external_repo_results_do_not_establish_provenance": true,
+    "plumbing_adoption_may_not_change_evidence_semantics": true,
+    "no_model_p_or_truth_gate_or_official_authority": true
+  },
+  "blockers": [
+    {
+      "id": "GOVERNANCE_FREEZE_RECONCILIATION",
+      "classification": "MISSING_IMPLEMENTATION",
+      "state": "ACTIVE_BLOCKED",
+      "issue_refs": [686, 704],
+      "pr_refs": [703, 705],
+      "public_repo_adoption_allowed": false,
+      "adoption_mode": "NATIVE_BUILD",
+      "finish_condition": "Machine-complete freeze inventory, per-delta-per-bundle reconciliation, terminal drift dispositions, and required server-side main protection are all proven."
+    },
+    {
+      "id": "MLB_DFS_ENDOGENOUS_JOINT_PATH_PRODUCER",
+      "classification": "MISSING_IMPLEMENTATION",
+      "state": "IMPLEMENTATION_IN_PROGRESS_NOT_VALIDATED",
+      "pr_refs": [700, 701],
+      "public_repo_adoption_allowed": true,
+      "adoption_mode": "CHALLENGER_ONLY",
+      "approved_reference_scope": [
+        "plate_appearance_state_machine",
+        "pitcher_fatigue_or_hook_mechanics",
+        "baserunner_state_transitions",
+        "game_state_conservation_tests"
+      ],
+      "forbidden_reference_scope": [
+        "external_fitted_probabilities",
+        "external_calibration",
+        "external_training_windows",
+        "external_readiness_claims"
+      ],
+      "finish_condition": "PIT-bound in-repo producer emits aligned hitter/pitcher paths, passes frozen path-set structural validation and later player-level calibration evidence."
+    },
+    {
+      "id": "MLB_CFB_HISTORICAL_CLOSING_LINE_EVIDENCE",
+      "classification": "MISSING_DATA",
+      "state": "BLOCKED_PROVIDER_AUTHORIZATION_OR_VERIFIED_SOURCE",
+      "issue_refs": [642, 382],
+      "public_repo_adoption_allowed": false,
+      "adoption_mode": "FORBIDDEN",
+      "finish_condition": "Authentic provider-specific historical decision/close bytes with trustworthy timestamps and provenance are acquired and frozen; code adapters alone do not satisfy this blocker."
+    },
+    {
+      "id": "CFB_HISTORICAL_PIT_FEATURE_VINTAGES",
+      "classification": "MISSING_DATA",
+      "state": "EVIDENCE_INCOMPLETE",
+      "public_repo_adoption_allowed": false,
+      "adoption_mode": "FORBIDDEN",
+      "finish_condition": "Historical predictive inputs, including weather if retained, have durable as-of provenance proving pre-kickoff availability or are removed in a new frozen specification."
+    },
+    {
+      "id": "MARKET_MAKER_RADAR_FILL_AND_LIMIT_EVIDENCE",
+      "classification": "MISSING_DATA",
+      "state": "NOT_ACCRUING_WITHOUT_EXECUTION_ATTEMPTS",
+      "public_repo_adoption_allowed": false,
+      "adoption_mode": "FORBIDDEN",
+      "finish_condition": "Real execution attempts accumulate fill, changed-price, rejection, void and accepted/requested stake evidence at preregistered checkpoints."
+    },
+    {
+      "id": "DK_REALIZED_OWNERSHIP_EVIDENCE",
+      "classification": "MISSING_DATA",
+      "state": "EVIDENCE_PENDING_CONTEST_EXPORTS",
+      "public_repo_adoption_allowed": false,
+      "adoption_mode": "FORBIDDEN",
+      "finish_condition": "Complete post-contest standings exports from contests actually entered are frozen prospectively and ownership calibration matures."
+    },
+    {
+      "id": "NFL_V2K_ATTEMPT_1_COMPUTATION_IDENTITY",
+      "classification": "MISSING_IMPLEMENTATION",
+      "state": "PRE_SCORE_FREEZE_REQUIRED",
+      "issue_refs": [693],
+      "public_repo_adoption_allowed": false,
+      "adoption_mode": "NATIVE_BUILD",
+      "finish_condition": "PCG64/SeedSequence identity, immutable source/features/folds, 50k paths/game, replay contract and attempt-1 record are frozen before any development/validation score is computed."
+    },
+    {
+      "id": "NFL_V2K_FRESH_UNTOUCHED_READOUT",
+      "classification": "MISSING_DATA",
+      "state": "INSUFFICIENT_FRESH_UNTOUCHED_EVIDENCE",
+      "issue_refs": [693],
+      "public_repo_adoption_allowed": false,
+      "adoption_mode": "FORBIDDEN",
+      "finish_condition": "A genuinely fresh untouched population exists after development is frozen; reused historical NFL outcomes cannot be relabeled untouched."
+    },
+    {
+      "id": "MAIN_REQUIRED_STATUS_CHECK_PROTECTION",
+      "classification": "MISSING_DECISION",
+      "state": "REPOSITORY_ADMIN_ACTION_REQUIRED",
+      "issue_refs": [704],
+      "public_repo_adoption_allowed": false,
+      "adoption_mode": "FORBIDDEN",
+      "finish_condition": "Repository ruleset or branch protection requires the freeze-reconciliation hold check and ordinary merges cannot bypass it."
+    }
+  ]
+}
