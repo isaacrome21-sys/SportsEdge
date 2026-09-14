@@ -1,0 +1,42 @@
+{
+  "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_POLICY_V1",
+  "issue": 686,
+  "status": "ACTIVE_BLOCKED",
+  "main_merge_hold": "UNCONDITIONAL",
+  "hold_started_from_main_sha": "564e5567acf63adbf750e033df08a8c368f6884d",
+  "observed_main_sha_when_policy_authored": "09a2aecdc168f65d50a1120017491a0d104e6140",
+  "authorized_reconciliation_branch": "fix/freeze-reconciliation-delta-matrix-20260914",
+  "allowed_matrix_outcomes": [
+    "MATCH",
+    "PROVISIONAL_DRIFT_BLOCKED",
+    "NOT_APPLICABLE",
+    "DRIFT_CONFIRMED"
+  ],
+  "terminal_matrix_outcomes": [
+    "MATCH",
+    "NOT_APPLICABLE",
+    "DRIFT_CONFIRMED"
+  ],
+  "drift_terminal_dispositions": [
+    "REFROZEN",
+    "REVOKED"
+  ],
+  "release_conditions": {
+    "bundle_inventory_complete": true,
+    "all_delta_bundle_rows_terminal": true,
+    "every_drifted_bundle_has_terminal_disposition": true,
+    "refrozen_bundle_requires_new_freeze_sha_and_forward_clock_restart": true,
+    "revoked_bundle_invalidates_prior_forward_clock": true,
+    "current_main_sha_must_equal_reconciled_through_sha": true
+  },
+  "authority": {
+    "model_p": false,
+    "truth_gate": false,
+    "promotion": false,
+    "staking": false,
+    "official": false,
+    "validation_attempt": false,
+    "untouched_readout": false
+  },
+  "enforcement_note": "Repository CI can fail pull requests while this hold is active, but GitHub can still permit a manual merge unless the repository ruleset or branch protection marks the check required. Do not represent CI-only enforcement as an unbypassable server-side lock."
+}

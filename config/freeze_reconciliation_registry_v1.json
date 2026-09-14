@@ -1,0 +1,105 @@
+{
+  "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1",
+  "issue": 686,
+  "baseline_main_sha": "564e5567acf63adbf750e033df08a8c368f6884d",
+  "reconciled_through_sha": "09a2aecdc168f65d50a1120017491a0d104e6140",
+  "bundle_inventory_complete": false,
+  "inventory_block_reason": "INITIAL_REGISTRY_COVERS_THE_KNOWN_NFL_V2K_CFB_ARCHIVE_RADAR_GLOBAL_PROMOTION_AND_MLB_DFS_FREEZES_BUT_MUST_BE_AUDITED_AGAINST_ALL_ACTIVE_FREEZE_RECORDS_BEFORE_HOLD_RELEASE",
+  "deltas": [
+    {"delta_id":"PR_683","pr":683,"merge_sha":"f242c916903cdea60301db1d4380653460945eba"},
+    {"delta_id":"PR_689","pr":689,"merge_sha":"6c3fe073d9a0a240ddd7f58938a4f32d3abedceb"},
+    {"delta_id":"PR_691","pr":691,"merge_sha":"76f0fb454d48cf6df8e51660114d52878fd3665e"},
+    {"delta_id":"PR_692","pr":692,"merge_sha":"7a92455f081ee52a454b2c49ff798d902a3ace68"},
+    {"delta_id":"PR_688","pr":688,"merge_sha":"ed9aa39ded1da89eca2bb7019a5f810dde83af78"},
+    {"delta_id":"PR_690","pr":690,"merge_sha":"7ed79c51e790d393108864513c34dd296d9fd175"},
+    {"delta_id":"PR_695","pr":695,"merge_sha":"8dcd645447fb110b8cfc250b36c502836302097b"},
+    {"delta_id":"PR_697","pr":697,"merge_sha":"546d07de8ea286d0218c4c70f95ca2618e645374"},
+    {"delta_id":"PR_698","pr":698,"merge_sha":"8de77a15080e6329bcd70058b735ff972f93ebc7"},
+    {"delta_id":"PR_699","pr":699,"merge_sha":"7cddfa6b55e32081f0a0bbc5b0591241d504fb45"},
+    {"delta_id":"PR_687","pr":687,"merge_sha":"1325bfb62031e54c1b46023bd170ad455d38516e"},
+    {"delta_id":"PR_701","pr":701,"merge_sha":"7f8cd83df5ec4fe91e4c347ee843f861da8ba459"},
+    {"delta_id":"PR_702","pr":702,"merge_sha":"09a2aecdc168f65d50a1120017491a0d104e6140"}
+  ],
+  "bundles": [
+    {
+      "bundle_id": "NFL_V2J_V2K_GOVERNANCE_FREEZE_V1",
+      "freeze_sha": "564e5567acf63adbf750e033df08a8c368f6884d",
+      "coverage_prefixes": [
+        ".github/workflows/nfl-v2j",
+        ".github/workflows/nfl-v2k",
+        "scripts/build_nfl_v2j",
+        "scripts/build_nfl_v2k",
+        "scripts/run_nfl_v2j",
+        "scripts/run_nfl_v2k",
+        "sportsedge/sports/nfl/NFL_V2J_",
+        "sportsedge/sports/nfl/NFL_V2K_",
+        "sportsedge/sports/nfl/nfl_v2j",
+        "sportsedge/sports/nfl/nfl_v2k",
+        "tests/test_nfl_v2j",
+        "tests/test_nfl_v2k",
+        "config/nfl_2026_prospective_governance_v1.json",
+        "config/nfl_feature_search_policy_v1.json",
+        "config/nfl_m2_freeze.json",
+        "config/nfl_promotion_source_freeze_v1.json"
+      ],
+      "disposition": null
+    },
+    {
+      "bundle_id": "CFB_HISTORICAL_MARKET_ARCHIVE_FREEZE_V1",
+      "freeze_sha": "564e5567acf63adbf750e033df08a8c368f6884d",
+      "coverage_prefixes": [
+        ".github/workflows/cfb-historical-market-source-freeze",
+        "config/research/cfb_historical_market_source_v1.json",
+        "scripts/materialize_cfb_historical_market_archive",
+        "sportsedge/sports/cfb/history_cache",
+        "sportsedge/sports/cfb/market_archive",
+        "tests/test_cfb_historical_market",
+        "tests/test_cfb_history_cache",
+        "tests/test_cfb_market_archive"
+      ],
+      "disposition": null
+    },
+    {
+      "bundle_id": "MARKET_MAKER_RADAR_EVIDENCE_FREEZE_V2",
+      "freeze_sha": "564e5567acf63adbf750e033df08a8c368f6884d",
+      "coverage_prefixes": [
+        ".github/workflows/nfl-market-maker-radar",
+        "config/market_maker_radar_v2.json",
+        "scripts/analyze_market_maker_radar",
+        "scripts/settle_market_maker",
+        "scripts/capture_market_maker",
+        "sportsedge/market_maker",
+        "tests/test_market_maker"
+      ],
+      "disposition": null
+    },
+    {
+      "bundle_id": "GLOBAL_PROMOTION_EVIDENCE_FREEZE_V2",
+      "freeze_sha": "564e5567acf63adbf750e033df08a8c368f6884d",
+      "coverage_prefixes": [
+        "config/promotion_evidence_policy_v2.json",
+        "config/promotion_evidence_policy_manifest.json",
+        "config/truth_gate_floors.json",
+        "config/evidence_unit_contract_v1.json",
+        "sportsedge/promotion",
+        "sportsedge/truth_gate",
+        "tests/test_promotion",
+        "tests/test_truth_gate"
+      ],
+      "disposition": null
+    },
+    {
+      "bundle_id": "MLB_DFS_EVIDENCE_FREEZE_V1",
+      "freeze_sha": "7a92455f081ee52a454b2c49ff798d902a3ace68",
+      "coverage_prefixes": [
+        ".github/workflows/dfs-engine-contract",
+        "config/mlb_dfs_",
+        "docs/DK_DFS_",
+        "scripts/freeze_dk_ownership",
+        "sportsedge/dfs/",
+        "tests/test_dfs_"
+      ],
+      "disposition": null
+    }
+  ]
+}
