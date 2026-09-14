@@ -13,7 +13,6 @@ NFLVERSE_PLAYER_STATS_URL = (
     "stats_player/stats_player_week_{season}.csv"
 )
 
-_ID_FIELDS = ("player_id", "player_display_name", "player_name", "position", "team", "opponent_team")
 _NUMERIC_FIELDS = (
     "season", "week", "attempts", "passing_yards", "passing_tds", "interceptions",
     "carries", "rushing_yards", "rushing_tds", "targets", "receptions",
@@ -72,13 +71,13 @@ def fetch_nflverse_player_stats(
 
 def build_prior_player_stat_history(
     *,
-    current_rows: Iterable[Mapping[str, Any]],
+    current_rows: Iterable[Mapping[str, Any]] = (),
     prior_rows: Iterable[Mapping[str, Any]] = (),
     season: int,
     target_week: int,
     team_ids: Iterable[str],
-    current_source_uri: str,
-    current_source_sha256: str,
+    current_source_uri: str | None = None,
+    current_source_sha256: str | None = None,
     prior_source_uri: str | None = None,
     prior_source_sha256: str | None = None,
     max_games: int = 10,
@@ -88,6 +87,10 @@ def build_prior_player_stat_history(
     Current-season rows use only `week < target_week`. Prior-season rows are allowed
     only from `season - 1` regular season. Same-week games are excluded deliberately
     because weekly player-stat files do not prove intra-week pregame ordering.
+
+    Week 1 may legitimately have no current-season player-stat asset because there
+    are no prior current-season games to use. After Week 1, missing current-season
+    provenance is a hard error rather than a silent stale-prior fallback.
     """
     resolved_season = int(season)
     resolved_week = int(target_week)
@@ -99,18 +102,19 @@ def build_prior_player_stat_history(
     teams.discard("")
     if not teams:
         raise NFLContextError("NFL_DFS_TEAM_IDS_REQUIRED")
-    if not str(current_source_uri).startswith("https://") or len(str(current_source_sha256)) != 64:
-        raise NFLContextError("NFL_DFS_CURRENT_STATS_PROVENANCE_INVALID")
-    if prior_rows and (
-        not str(prior_source_uri or "").startswith("https://")
-        or len(str(prior_source_sha256 or "")) != 64
-    ):
-        raise NFLContextError("NFL_DFS_PRIOR_STATS_PROVENANCE_INVALID")
+    current = [dict(row) for row in current_rows]
+    prior = [dict(row) for row in prior_rows]
+    if resolved_week > 1 or current:
+        if not str(current_source_uri or "").startswith("https://") or len(str(current_source_sha256 or "")) != 64:
+            raise NFLContextError("NFL_DFS_CURRENT_STATS_PROVENANCE_INVALID")
+    if prior:
+        if not str(prior_source_uri or "").startswith("https://") or len(str(prior_source_sha256 or "")) != 64:
+            raise NFLContextError("NFL_DFS_PRIOR_STATS_PROVENANCE_INVALID")
 
     accepted: list[dict[str, Any]] = []
     for source_label, rows, expected_season, source_uri, digest in (
-        ("CURRENT", current_rows, resolved_season, current_source_uri, current_source_sha256),
-        ("PRIOR", prior_rows, resolved_season - 1, prior_source_uri, prior_source_sha256),
+        ("CURRENT", current, resolved_season, current_source_uri, current_source_sha256),
+        ("PRIOR", prior, resolved_season - 1, prior_source_uri, prior_source_sha256),
     ):
         for raw in rows:
             row_season = int(_num(raw.get("season")))
@@ -170,6 +174,7 @@ def build_prior_player_stat_history(
         "teams": sorted(teams),
         "strictly_prior_week_only": True,
         "max_games": int(max_games),
+        "current_source_status": "AVAILABLE" if current else "NOT_REQUIRED_WEEK1" if resolved_week == 1 else "MISSING",
         "current_source_uri": current_source_uri,
         "current_source_sha256": current_source_sha256,
         "prior_source_uri": prior_source_uri,
