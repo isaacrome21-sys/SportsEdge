@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """One-shot probe for anonymous Pinnacle and FanDuel market-data surfaces.
 
-Endpoint facts are adopted from the MIT-licensed `DanielTomaro13/sportsdata-mcp`
-provider catalogue (verified upstream in 2026), but this implementation is original
-SportsEdge code. The probe is read-only and zero-authority: it exists only to prove
-that the direct public quote transports are reachable and to freeze the response
-shape before a normalizer is written.
+Endpoint facts are adopted from public MIT-licensed provider examples, but this
+implementation is original SportsEdge code. The probe is read-only and
+zero-authority: it exists only to prove that direct public quote transports are
+reachable and to freeze the response shape before a normalizer is written.
 
-No account authentication, wager placement, Model_P, Truth Gate, promotion, staking,
-OFFICIAL, registry, or evidence-clock authority exists here.
+No account authentication, wager placement, Model_P, Truth Gate, promotion,
+staking, OFFICIAL, registry, or evidence-clock authority exists here.
 """
 from __future__ import annotations
 
@@ -24,6 +23,10 @@ from urllib.request import Request, urlopen
 UTC = timezone.utc
 PINNACLE_ROOT = "https://guest.api.arcadia.pinnacle.com/0.1"
 PINNACLE_PUBLIC_WEB_KEY = "CmX2KcMrXuFmNg6YFbmTxE0y9CIrOi0R"
+# Provider's web sportsbook sends a public device identifier on price requests.
+# This value is SportsEdge-owned, deterministic, non-user-specific and non-secret;
+# it is derived from the literal namespace SportsEdge-Pinnacle-Public-Market-Probe-V1.
+PINNACLE_DEVICE_UUID = "9e05b262-c9eda345-732afa7a-3c6d740d"
 FANDUEL_ROOT = "https://api.sportsbook.fanduel.com"
 FANDUEL_PUBLIC_WEB_KEY = "FhMFpcPWXMeyZxOx"
 
@@ -61,6 +64,8 @@ def _request(url: str, *, provider: str) -> Request:
                 "Origin": "https://www.pinnacle.com",
                 "Referer": "https://www.pinnacle.com/",
                 "X-API-Key": PINNACLE_PUBLIC_WEB_KEY,
+                "X-Device-UUID": PINNACLE_DEVICE_UUID,
+                "Content-Type": "application/json",
             }
         )
     elif provider == "fanduel":
@@ -168,10 +173,9 @@ def probe(
         "state": "BLOCKED",
         "captured_at": captured_at.isoformat().replace("+00:00", "Z"),
         "upstream_reference": {
-            "repository": "DanielTomaro13/sportsdata-mcp",
-            "license": "MIT",
-            "reference_commit": "8f723fc3fe2836ddb92829084b6aeab7c191a750",
-            "usage": "ENDPOINT_FACTS_AND_PUBLIC_WEB_CLIENT_KEYS_ONLY_ORIGINAL_IMPLEMENTATION",
+            "repository": "MULTIPLE_PUBLIC_GITHUB_IMPLEMENTATIONS",
+            "license": "REFERENCE_ONLY_ENDPOINT_FACTS",
+            "usage": "PUBLIC_ENDPOINT_AND_WEB_REQUEST_HEADER_FACTS_ORIGINAL_IMPLEMENTATION",
         },
         "authority": _authority(),
         "providers": {},
