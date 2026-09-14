@@ -16,7 +16,9 @@ from typing import Iterable, Mapping, Sequence
 DRIVE_OUTCOMES = ("TD", "FG", "TURNOVER", "PUNT_OTHER", "SAFETY", "DEF_ST_SCORE")
 STATE_BUCKETS = ("NORMAL", "LATE_TIED", "LATE_TRAILING", "LATE_LEADING", "OVERTIME")
 FIELD_BUCKETS = ("SHORT_FIELD", "MID_FIELD", "LONG_FIELD")
-OVERTIME_RULE_VERSION = "NFL_2025_REG_BOTH_TEAMS_POSSESS_10MIN_V1"
+TERMINATION_REASONS = ("NORMAL", "END_OF_HALF", "END_OF_GAME")
+OVERTIME_RULE_VERSION = "NFL_2025_REG_BOTH_TEAMS_POSSESS_V1"
+TRUNCATION_POLICY_VERSION = "V2K_DRIVE_LEVEL_HALF_GAME_TRUNCATION_V1"
 
 
 def _field_bucket(yardline_100: float) -> str:
@@ -59,6 +61,7 @@ class DriveRow:
     period: int
     clock_seconds_remaining_period: int
     conversion_points: int = 0
+    termination_reason: str = "NORMAL"
     source_manifest_sha256: str = ""
     source_code_sha: str = ""
 
@@ -67,6 +70,8 @@ class DriveRow:
             raise ValueError("V2K_DRIVE_IDENTITY_INVALID")
         if self.outcome not in DRIVE_OUTCOMES:
             raise ValueError("V2K_DRIVE_OUTCOME_UNMAPPED")
+        if self.termination_reason not in TERMINATION_REASONS:
+            raise ValueError("V2K_TERMINATION_REASON_INVALID")
         if self.drive_index < 0 or self.period < 1 or self.period > 5 or self.clock_seconds_remaining_period < 0:
             raise ValueError("V2K_DRIVE_CHRONOLOGY_INVALID")
         clock_max = 600 if self.period == 5 else 900
@@ -275,6 +280,8 @@ def simulate_joint_game(
     if opening_possession not in (home_team, away_team):
         raise ValueError("V2K_OPENING_POSSESSION_INVALID")
 
+    second_half_opening = away_team if opening_possession == home_team else home_team
+    half_cut = max(1, regulation_drives // 2)
     state = GameState(home_team, away_team, possession=opening_possession)
     path: list[Mapping[str, object]] = []
     ot_drives = 0
@@ -283,7 +290,10 @@ def simulate_joint_game(
         in_ot = state.drive_index >= regulation_drives
         if in_ot:
             ot_drives += 1
-        offense = state.possession
+        if in_ot and ot_drives == 1:
+            offense = home_team if rng.randrange(2) == 0 else away_team
+        else:
+            offense = state.possession
         defense = away_team if offense == home_team else home_team
         offense_score = state.home_score if offense == home_team else state.away_score
         defense_score = state.away_score if offense == home_team else state.home_score
@@ -315,6 +325,16 @@ def simulate_joint_game(
             away += pts_off
             home += pts_def
 
+        next_index = state.drive_index + 1
+        if in_ot:
+            termination_reason = "NORMAL"
+        elif next_index >= regulation_drives:
+            termination_reason = "END_OF_GAME"
+        elif next_index == half_cut:
+            termination_reason = "END_OF_HALF"
+        else:
+            termination_reason = "NORMAL"
+
         path.append({
             "drive_index": state.drive_index,
             "period": 5 if in_ot else state.period,
@@ -327,13 +347,18 @@ def simulate_joint_game(
             "conversion_points": conv,
             "home_score": home,
             "away_score": away,
+            "termination_reason": termination_reason,
+            "truncation_policy_version": TRUNCATION_POLICY_VERSION,
             "overtime": in_ot,
             "overtime_rule_version": OVERTIME_RULE_VERSION if in_ot else None,
         })
 
-        next_index = state.drive_index + 1
         period, seconds = _clock_state(next_index, regulation_drives)
-        state = GameState(home_team, away_team, defense, home, away, 5 if in_ot else period, 0 if in_ot else seconds, next_index, in_ot)
+        if termination_reason == "END_OF_HALF":
+            next_possession = second_half_opening
+        else:
+            next_possession = defense
+        state = GameState(home_team, away_team, next_possession, home, away, 5 if in_ot else period, 0 if in_ot else seconds, next_index, in_ot)
         if first_ot_defensive_score:
             break
         # 2025 regular-season rule: both teams get one possession even after an
