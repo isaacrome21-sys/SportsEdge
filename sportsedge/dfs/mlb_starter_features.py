@@ -7,7 +7,7 @@ from ..mlb_f5_features import MLBF5HistorySource
 from ..mlb_generic_features import MLBGenericHistorySource, _number, _outs_from_ip
 from ..source_lineage import canonical_json_sha256
 
-DFS_MLB_STARTER_FEATURE_VERSION = "dfs_mlb_starter_path_features_v1"
+DFS_MLB_STARTER_FEATURE_VERSION = "dfs_mlb_starter_path_features_v2"
 MIN_STARTS = 5
 DEFAULT_START_WINDOW = 20
 DEFAULT_CREDIT_WINDOW = 60
@@ -59,8 +59,9 @@ def build_starter_path_features(
     """Build strictly-prior workload/leash and team win-credit rows for DFS paths.
 
     Incomplete starts are skipped rather than imputed. A usable start must expose
-    actual BF, pitch count, HBP and the starter's scored events. Win-credit rows are
-    official inning-by-inning team score paths and never use historical pitcher wins.
+    actual BF, pitch count, HBP, total runs and the starter's scored events.
+    Win-credit rows are official inning-by-inning team score paths and never use
+    historical pitcher wins.
     """
 
     if start_window < MIN_STARTS:
@@ -92,9 +93,9 @@ def build_starter_path_features(
             )
             strikeouts = _integer_stat(stat, ("strikeOuts",), "strikeOuts")
             earned_runs = _integer_stat(stat, ("earnedRuns",), "earnedRuns")
+            runs = _integer_stat(stat, ("runs",), "runs")
             hits = _integer_stat(stat, ("hits",), "hits")
             walks = _integer_stat(stat, ("baseOnBalls",), "baseOnBalls")
-            runs = _integer_stat(stat, ("runs",), "runs", allow_missing=True)
             complete_games = _integer_stat(
                 stat, ("completeGames",), "completeGames", allow_missing=True
             )
@@ -106,12 +107,12 @@ def build_starter_path_features(
             continue
 
         assert bf is not None and pitches is not None and hbp is not None
-        assert strikeouts is not None and earned_runs is not None
+        assert strikeouts is not None and earned_runs is not None and runs is not None
         assert hits is not None and walks is not None
         if not 0 <= outs <= 27 or bf <= 0 or pitches < bf:
             incomplete += 1
             continue
-        if strikeouts + hits + walks + hbp > bf:
+        if earned_runs > runs or strikeouts + hits + walks + hbp > bf:
             incomplete += 1
             continue
 
@@ -119,7 +120,7 @@ def build_starter_path_features(
         cg_shutout = (
             bool(shutouts)
             if shutouts is not None
-            else bool(complete_game and runs is not None and runs == 0)
+            else bool(complete_game and runs == 0)
         )
         no_hitter = bool(outs >= 27 and hits == 0)
         history.append(
@@ -128,6 +129,7 @@ def build_starter_path_features(
                 "outs": outs,
                 "strikeouts": strikeouts,
                 "earned_runs": earned_runs,
+                "runs_allowed": runs,
                 "hits_allowed": hits,
                 "walks_allowed": walks,
                 "hbp_allowed": hbp,
