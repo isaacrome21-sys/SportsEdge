@@ -9,13 +9,17 @@ on:
   pull_request:
     paths:
       - 'scripts/probe_direct_market_feeds.py'
+      - 'scripts/normalize_fanduel_nfl_markets.py'
       - 'tests/test_direct_market_feed_probe.py'
+      - 'tests/test_fanduel_nfl_market_normalizer.py'
       - '.github/workflows/direct-market-feed-probe.yml'
   push:
     branches: [main]
     paths:
       - 'scripts/probe_direct_market_feeds.py'
+      - 'scripts/normalize_fanduel_nfl_markets.py'
       - 'tests/test_direct_market_feed_probe.py'
+      - 'tests/test_fanduel_nfl_market_normalizer.py'
       - '.github/workflows/direct-market-feed-probe.yml'
 
 permissions:
