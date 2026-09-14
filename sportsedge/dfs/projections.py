@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Any, Iterable
 
-from .scoring import dk_fppg_baseline, projection_from_stats
+from .scoring import dk_fppg_baseline, projection_from_samples, projection_from_stats
 from .types import DKPlayer, Projection
 
 
@@ -37,6 +37,19 @@ def load_projection_snapshot(path: str | Path, players: Iterable[DKPlayer], spor
             key = (str(row.get("name") or "").casefold(), str(row.get("team") or "").upper())
             p = by_name_team.get(key)
         if p is None:
+            continue
+        if isinstance(row.get("samples"), list):
+            own = row.get("ownership")
+            proj = projection_from_samples(
+                p,
+                sport,
+                row["samples"],
+                source=str(row.get("source") or "SPORTSEDGE_DISTRIBUTION"),
+                ownership=float(own) if own is not None else None,
+            )
+            out[p.player_id] = Projection(
+                **{**proj.__dict__, "updated_at": _dt(row.get("updated_at")) or snapshot_updated_at}
+            )
             continue
         if isinstance(row.get("stats"), dict):
             proj = projection_from_stats(p, sport, row["stats"], source=str(row.get("source") or "SPORTSEDGE_STATS"))
