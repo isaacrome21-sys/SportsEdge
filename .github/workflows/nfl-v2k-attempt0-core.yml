@@ -1,0 +1,33 @@
+name: nfl-v2k-attempt0-core
+
+on:
+  pull_request:
+    paths:
+      - 'sportsedge/sports/nfl/v2k_drive_core.py'
+      - 'sportsedge/sports/nfl/v2k_drive_source.py'
+      - 'tests/test_nfl_v2k_attempt0_core.py'
+      - '.github/workflows/nfl-v2k-attempt0-core.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  attempt0-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Compile attempt-0 surface
+        run: python -m py_compile sportsedge/sports/nfl/v2k_drive_core.py sportsedge/sports/nfl/v2k_drive_source.py tests/test_nfl_v2k_attempt0_core.py
+      - name: Prove deterministic mechanics and zero authority
+        run: PYTHONPATH=. python tests/test_nfl_v2k_attempt0_core.py
+      - name: Guard against historical evaluation admission
+        run: |
+          set -euo pipefail
+          ! grep -R -E 'NFL_V2K_EMPIRICAL_KEY_REFERENCE|signed_key_rmse|calibration_slope|run_walk_forward|evaluate_candidate' \
+            sportsedge/sports/nfl/v2k_drive_core.py sportsedge/sports/nfl/v2k_drive_source.py
