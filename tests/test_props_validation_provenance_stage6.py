@@ -298,6 +298,23 @@ class PropsValidationProvenanceStage6Tests(unittest.TestCase):
                 model_version=MODEL_VERSION, code_git_sha=CODE_SHA,
             )
 
+    def test_stage7_cannot_reuse_validation_for_different_market(self):
+        with self.assertRaisesRegex(ValueError, "VALIDATION_ATTESTATION_MARKET_MISMATCH"):
+            bind_prop_market_with_attestation(
+                sport="NFL", market="player_pass_yds", entity_id="player-live",
+                model_probability=.60, offered_odds=125, validation_attestation=_build(),
+                model_id=MODEL_ID, model_version=MODEL_VERSION, code_git_sha=CODE_SHA)
+
+    def test_stage7_rejects_pooled_market_validation(self):
+        predictions, outcomes, pits, training = _fixture()
+        predictions[0]["market_id"] = "player_pass_yds"
+        attestation = _build(predictions=predictions, outcomes=outcomes, pits=pits, training=training)
+        with self.assertRaisesRegex(ValueError, "VALIDATION_ATTESTATION_MIXED_MARKETS_NOT_ADMITTED"):
+            bind_prop_market_with_attestation(
+                sport="NFL", market="player_anytime_td", entity_id="player-live",
+                model_probability=.60, offered_odds=125, validation_attestation=attestation,
+                model_id=MODEL_ID, model_version=MODEL_VERSION, code_git_sha=CODE_SHA)
+
 
 if __name__ == "__main__":
     unittest.main()

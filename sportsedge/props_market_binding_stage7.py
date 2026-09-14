@@ -83,6 +83,15 @@ def bind_prop_market_with_attestation(*,sport:str,market:str,entity_id:str,model
     if str(attestation.get("model_id"))!=str(model_id):raise ValueError("VALIDATION_ATTESTATION_MODEL_ID_MISMATCH")
     if str(attestation.get("model_version"))!=str(model_version):raise ValueError("VALIDATION_ATTESTATION_MODEL_VERSION_MISMATCH")
     if str(attestation.get("code_git_sha"))!=str(code_git_sha).lower():raise ValueError("VALIDATION_ATTESTATION_CODE_SHA_MISMATCH")
+    rows = attestation.get("rows")
+    if not isinstance(rows, list) or not rows or any(not isinstance(r, Mapping) or not str(r.get("market_id") or "").strip() for r in rows):
+        raise ValueError("VALIDATION_ATTESTATION_MARKET_BINDING_REQUIRED")
+    markets = {str(r["market_id"]) for r in rows}
+    # Pooled calibration across different propositions cannot validate one market.
+    if len(markets) != 1:
+        raise ValueError("VALIDATION_ATTESTATION_MIXED_MARKETS_NOT_ADMITTED")
+    if markets != {str(market)}:
+        raise ValueError("VALIDATION_ATTESTATION_MARKET_MISMATCH")
     bound=bind_prop_market(
         sport=sport,market=market,entity_id=entity_id,model_probability=model_probability,
         offered_odds=offered_odds,validation_passed=True,line=line,
