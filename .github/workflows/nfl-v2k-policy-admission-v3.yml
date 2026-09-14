@@ -1,0 +1,71 @@
+name: nfl-v2k-policy-admission-v3
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/nfl-v2k-policy-admission-v3.yml'
+      - 'scripts/build_nfl_v2k_policy_admission_v3.py'
+      - 'sportsedge/sports/nfl/NFL_V2K_HUMAN_POLICY_SELECTION_V1.json'
+      - 'sportsedge/sports/nfl/NFL_V2K_IMPLEMENTATION_ADMISSION_V3.json'
+      - 'sportsedge/sports/nfl/NFL_V2K_EMPIRICAL_KEY_REFERENCE_V1.json'
+      - 'sportsedge/sports/nfl/NFL_V2K_CLEAN_PREREG_2026-09-13.md'
+      - 'sportsedge/sports/nfl/NFL_V2K_ATTEMPT_LEDGER_V1.json'
+      - 'sportsedge/sports/nfl/NFL_V2K_EMPIRICAL_KEY_REFERENCE_V2_PROPOSAL.json'
+      - 'tests/test_nfl_v2k_policy_admission_v3.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  verify-policy-admission:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Verify exact human-selection provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMENT_ID: '5662476744'
+          EXPECTED_ISSUE: '616'
+          EXPECTED_USER: 'isaacrome21-sys'
+          EXPECTED_BODY_SHA256: '22598423589abda5ea2ad7754189411477738d07c6911cd468bbcdc57fc55ddf'
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --location \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}" \
+            --output /tmp/v2k-selection.json
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          data = json.loads(Path('/tmp/v2k-selection.json').read_text())
+          if data.get('id') != int(os.environ['COMMENT_ID']):
+              raise SystemExit('COMMENT_ID_MISMATCH')
+          if str(data.get('issue_url') or '').rstrip('/').split('/')[-1] != os.environ['EXPECTED_ISSUE']:
+              raise SystemExit('ISSUE_MISMATCH')
+          if ((data.get('user') or {}).get('login')) != os.environ['EXPECTED_USER']:
+              raise SystemExit('USER_MISMATCH')
+          actual = hashlib.sha256(str(data.get('body') or '').encode()).hexdigest()
+          if actual != os.environ['EXPECTED_BODY_SHA256']:
+              raise SystemExit(f'BODY_SHA256_MISMATCH:{actual}')
+          print(json.dumps({'comment_id': data['id'], 'body_sha256': actual}, sort_keys=True))
+          PY
+      - name: Reproduce admission byte-for-byte
+        run: |
+          set -euo pipefail
+          python scripts/build_nfl_v2k_policy_admission_v3.py \
+            --selection sportsedge/sports/nfl/NFL_V2K_HUMAN_POLICY_SELECTION_V1.json \
+            --reference sportsedge/sports/nfl/NFL_V2K_EMPIRICAL_KEY_REFERENCE_V1.json \
+            --prereg sportsedge/sports/nfl/NFL_V2K_CLEAN_PREREG_2026-09-13.md \
+            --ledger sportsedge/sports/nfl/NFL_V2K_ATTEMPT_LEDGER_V1.json \
+            --proposal sportsedge/sports/nfl/NFL_V2K_EMPIRICAL_KEY_REFERENCE_V2_PROPOSAL.json \
+            --output /tmp/NFL_V2K_IMPLEMENTATION_ADMISSION_V3.json
+          cmp --silent sportsedge/sports/nfl/NFL_V2K_IMPLEMENTATION_ADMISSION_V3.json /tmp/NFL_V2K_IMPLEMENTATION_ADMISSION_V3.json
+      - name: Enforce zero-authority admission contract
+        run: PYTHONPATH=. python tests/test_nfl_v2k_policy_admission_v3.py
