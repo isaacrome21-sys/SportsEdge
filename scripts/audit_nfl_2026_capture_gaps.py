@@ -209,6 +209,8 @@ def verify_due(cfg: dict, opener_week: int | None, final_kickoffs: list[str],
                     failures.append("DUE_OPENER_WRONG_KIND")
                 if not record.get("retrieved_at_utc") or not record.get("hashes"):
                     failures.append("DUE_OPENER_MISSING_CONTRACT_FIELDS")
+                if not isinstance(record.get("games"), list) or not record.get("games"):
+                    failures.append("DUE_OPENER_EMPTY_OR_MISSING_GAMES")
 
     if final_kickoffs:
         expected = Counter(final_kickoffs)
@@ -232,6 +234,8 @@ def verify_due(cfg: dict, opener_week: int | None, final_kickoffs: list[str],
                 failures.append(f"DUE_FINAL_WRONG_KIND:{path}")
             if not record.get("retrieved_at_utc") or not record.get("hashes"):
                 failures.append(f"DUE_FINAL_MISSING_CONTRACT_FIELDS:{path}")
+            if not isinstance(record.get("games"), list) or not record.get("games"):
+                failures.append(f"DUE_FINAL_EMPTY_OR_MISSING_GAMES:{path}")
     return failures
 
 
