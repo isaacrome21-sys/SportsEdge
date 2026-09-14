@@ -1,18 +1,20 @@
 """Provider-neutral current/live market adapter for The Odds API.
 
-This module is intentionally market-only. Prices may bind SportsEdge decisions,
-but never become Model_P features. It supports current boards and historical
-snapshots so RUN IT can preserve an auditable quote trail.
+This module is intentionally market-only. Prices may bind SportsEdge pregame
+execution decisions, but never become Model_P features. Live quotes may be
+collected for research/market-state purposes but have no bettor-facing runtime
+authority until a separately validated live engine exists.
 """
 from __future__ import annotations
 
 from datetime import datetime, timezone
 import json
 from typing import Any, Callable, Iterable, Mapping
-from urllib.parse import urlencode
+from urllib.error import HTTPError, URLError
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from urllib.request import urlopen
 
-from .market_data_contract import MarketDataContractError, MarketQuote, canonical_json_sha256
+from .market_data_contract import MarketQuote, canonical_json_sha256
 
 BASE_URL = "https://api.the-odds-api.com/v4"
 DEFAULT_MARKETS = ("h2h", "spreads", "totals")
@@ -36,6 +38,17 @@ def _parse_time(value: Any, *, field: str) -> datetime:
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise TheOddsApiError(f"{field}_TIMEZONE_REQUIRED")
     return parsed.astimezone(timezone.utc)
+
+
+def _redacted_url(url: str) -> str:
+    """Return a log-safe URL with credential-like query values removed."""
+    parts = urlsplit(url)
+    safe_pairs = []
+    for key, value in parse_qsl(parts.query, keep_blank_values=True):
+        if key.lower() in {"apikey", "api_key", "key", "token", "authorization"}:
+            value = "REDACTED"
+        safe_pairs.append((key, value))
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(safe_pairs), parts.fragment))
 
 
 def build_current_odds_url(
@@ -89,11 +102,26 @@ def build_historical_odds_url(
 
 
 def _get_json(url: str, *, opener: Callable = urlopen) -> Any:
+    safe_url = _redacted_url(url)
     try:
         with opener(url, timeout=20) as response:
             return json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        if exc.code == 401:
+            raise TheOddsApiError(f"PROVIDER_AUTH_FAILED_401:{safe_url}") from exc
+        if exc.code == 403:
+            raise TheOddsApiError(f"PROVIDER_AUTH_FORBIDDEN_403:{safe_url}") from exc
+        if exc.code == 429:
+            raise TheOddsApiError(f"PROVIDER_RATE_LIMITED_429:{safe_url}") from exc
+        raise TheOddsApiError(f"PROVIDER_HTTP_ERROR_{exc.code}:{safe_url}") from exc
+    except URLError as exc:
+        raise TheOddsApiError(f"PROVIDER_NETWORK_FAILED:{type(exc.reason).__name__}:{safe_url}") from exc
+    except json.JSONDecodeError as exc:
+        raise TheOddsApiError(f"PROVIDER_JSON_INVALID:{safe_url}") from exc
     except Exception as exc:
-        raise TheOddsApiError(f"PROVIDER_FETCH_FAILED:{type(exc).__name__}:{exc}") from exc
+        # Never stringify the raw exception because urllib exceptions can include
+        # the credential-bearing request URL.
+        raise TheOddsApiError(f"PROVIDER_FETCH_FAILED:{type(exc).__name__}:{safe_url}") from exc
 
 
 def normalize_event(
