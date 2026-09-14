@@ -9,10 +9,16 @@ from typing import Any
 from .dk_contest import DraftKingsContestClient
 from .draftkings import DraftKingsClient, resolve_slate
 from .field import FieldGenerationConfig
+from .nfl_auto_projection import build_nfl_auto_projection_snapshot
 from .optimizer import OptimizedLineup, optimize_single_entry
-from .projections import ensure_projection_coverage, load_projection_snapshot, validate_projection_freshness
+from .projections import (
+    ensure_projection_coverage,
+    load_projection_snapshot,
+    projections_from_payload,
+    validate_projection_freshness,
+)
 from .rules import get_rules
-from .score_paths import load_aligned_score_paths
+from .score_paths import aligned_score_paths_from_payload, load_aligned_score_paths
 from .selection import EVSelectionResult, select_single_entry_by_ev
 from .sources.football_espn import EspnFootballContextClient
 from .sources.mlb_statsapi import MLBStatsApiContextClient
@@ -56,6 +62,9 @@ class DfsEngine:
         max_projection_age_hours: float = 36.0,
         auto_context: bool = True,
         allow_context_failure: bool = False,
+        auto_projection: bool = True,
+        auto_projection_paths: int = 5000,
+        auto_projection_seed: int | None = None,
         contest_ev_enabled: bool = True,
         strict_contest_ev: bool = False,
         contest_ev_max_simulations: int = 1000,
@@ -99,8 +108,42 @@ class DfsEngine:
                 }
 
         projections: dict[str, Projection] = {}
+        auto_projection_payload: dict[str, Any] | None = None
+        projection_diagnostics: dict[str, Any] = {
+            "auto_projection_enabled": bool(auto_projection),
+            "projection_mode": "EXTERNAL_SNAPSHOT" if projection_snapshot is not None else "UNRESOLVED",
+        }
         if projection_snapshot is not None:
             projections.update(load_projection_snapshot(projection_snapshot, players, sport))
+        elif auto_projection and sport == "NFL":
+            try:
+                auto_projection_payload = build_nfl_auto_projection_snapshot(
+                    players=players,
+                    slate_start=slate.start_time,
+                    paths=auto_projection_paths,
+                    seed=auto_projection_seed,
+                )
+                projections.update(projections_from_payload(auto_projection_payload, players, sport))
+                projection_diagnostics = {
+                    "auto_projection_enabled": True,
+                    "projection_mode": "SPORTSEDGE_NFL_AUTO_JOINT_PATHS",
+                    "projection_model_id": auto_projection_payload.get("model_id"),
+                    "projection_model_status": auto_projection_payload.get("status"),
+                    "projection_path_set_id": auto_projection_payload.get("path_set_id"),
+                    "projection_path_count": auto_projection_payload.get("path_count"),
+                    "projection_auto_diagnostics": auto_projection_payload.get("diagnostics"),
+                }
+            except Exception as exc:
+                if not allow_dk_fppg_baseline:
+                    raise RuntimeError(f"DFS_AUTO_PROJECTION_FAILED:NFL:{type(exc).__name__}:{exc}") from exc
+                projection_diagnostics = {
+                    "auto_projection_enabled": True,
+                    "projection_mode": "DK_FPPG_EMERGENCY_FALLBACK",
+                    "auto_projection_error": f"{type(exc).__name__}:{exc}",
+                }
+        elif auto_projection:
+            projection_diagnostics["projection_mode"] = f"AUTO_NOT_YET_IMPLEMENTED_{sport}"
+
         projections = ensure_projection_coverage(
             players,
             projections,
@@ -121,13 +164,18 @@ class DfsEngine:
         }
 
         path_snapshot = joint_path_snapshot or projection_snapshot
-        if contest_ev_enabled and path_snapshot is None:
+        in_memory_paths = auto_projection_payload if joint_path_snapshot is None and projection_snapshot is None else None
+        if contest_ev_enabled and path_snapshot is None and in_memory_paths is None:
             ev_diagnostics["contest_ev_reason"] = "NO_JOINT_PATH_SNAPSHOT"
         elif contest_ev_enabled and salary_source != "DK_DRAFTABLES_JSON":
             ev_diagnostics["contest_ev_reason"] = "NO_LIVE_DK_CONTEST_ID_WITH_CSV_TRANSPORT"
         elif contest_ev_enabled:
             try:
-                score_paths = load_aligned_score_paths(path_snapshot, players, sport)
+                score_paths = (
+                    aligned_score_paths_from_payload(in_memory_paths, players, sport)
+                    if in_memory_paths is not None
+                    else load_aligned_score_paths(path_snapshot, players, sport)
+                )
                 lobby_payload = self.dk.lobby(sport)
                 contest_detail = self.dk_contest.find_single_entry(
                     draft_group_id=slate.draft_group_id,
@@ -219,6 +267,7 @@ class DfsEngine:
                 "lineup_objective_sha256": lineup.objective_sha256,
                 "beam_width": beam_width,
                 **context_diagnostics,
+                **projection_diagnostics,
                 **freshness,
                 **ev_diagnostics,
             },
