@@ -58,7 +58,9 @@
       "alerts.minimum_spread_or_total_line_gap": 0.5,
       "alerts.minimum_price_implied_probability_move_pp": 0.25,
       "alerts.minimum_soft_followers": 1,
-      "alerts.steam_min_books": 3
+      "alerts.steam_min_books": 3,
+      "grading.candidate_ledger.clv_close_max_age_seconds": 900,
+      "grading.candidate_ledger.exact_contract_required": true
     }
   },
   "signal_classes": {
@@ -119,6 +121,10 @@
       "rationale": "Prevent repeated five-minute stale screens for one contract from being counted as independent hypothetical bets.",
       "candidate_record_is_immutable": true,
       "settlement_is_separate_record": true,
+      "settlement_method": "LAST_TIMING_ELIGIBLE_PINNACLE_PRESTART_EXACT_CONTRACT",
+      "clv_close_max_age_seconds": 900,
+      "exact_contract_required": true,
+      "different_point_close_status": "UNGRADABLE_NO_EXACT_CONTRACT_CLOSE",
       "unsettled_status": "PENDING_CLOSE",
       "validation_status_before_100": "INSUFFICIENT"
     }
