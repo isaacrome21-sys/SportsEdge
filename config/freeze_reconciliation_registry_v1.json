@@ -28,6 +28,7 @@
       "coverage_prefixes": [
         ".github/workflows/nfl-v2j",
         ".github/workflows/nfl-v2k",
+        ".github/workflows/nfl-source-freeze-bootstrap",
         "scripts/build_nfl_v2j",
         "scripts/build_nfl_v2k",
         "scripts/run_nfl_v2j",
@@ -38,6 +39,7 @@
         "sportsedge/sports/nfl/nfl_v2k",
         "tests/test_nfl_v2j",
         "tests/test_nfl_v2k",
+        "config/research/nfl_v2",
         "config/nfl_2026_prospective_governance_v1.json",
         "config/nfl_feature_search_policy_v1.json",
         "config/nfl_m2_freeze.json",
@@ -49,6 +51,7 @@
       "bundle_id": "NFL_PROP_MODEL_FREEZE_V1",
       "freeze_sha": "5dfa29347bed608771e6a2395ce8e894dbfdd881",
       "coverage_prefixes": [
+        ".github/workflows/football-nfl-prop-artifact-freeze.yml",
         "config/nfl_prop_model_freeze.json",
         "config/nfl_prop_code_surface_v1.json",
         "config/nfl_prop_evidence.json",
@@ -63,6 +66,7 @@
       "bundle_id": "CFB_PROP_MODEL_FREEZE_V1",
       "freeze_sha": "67184a5a120a2bc868531c7827783f562f82ee0b",
       "coverage_prefixes": [
+        ".github/workflows/football-cfb-prop-artifact-freeze.yml",
         "config/cfb_prop_model_freeze.json",
         "config/cfb_prop_code_surface_v1.json",
         "config/cfb_prop_evidence.json",
@@ -70,6 +74,23 @@
         "artifacts/football/cfb_prop_artifact_bundle_v1.json",
         "sportsedge/props/cfb",
         "tests/test_cfb_prop"
+      ],
+      "disposition": null
+    },
+    {
+      "bundle_id": "CFB_CANDIDATE_PREREG_FREEZE_V1",
+      "freeze_sha": "4629afd60972fe73eb0217508dc7a4ae51ce6ccf",
+      "coverage_prefixes": [
+        ".github/workflows/cfb-candidate-first-evaluation-readiness.yml",
+        "config/cfb_model_candidate_prereg_v1.json",
+        "config/cfb_model_candidate_code_manifest_v1.json",
+        "config/cfb_model_candidate_specs_v1.json",
+        "config/cfb_model_selection_policy_v1.json",
+        "scripts/audit_cfb_model_selection_prereg.py",
+        "sportsedge/sports/cfb/candidate_prereg_binding.py",
+        "sportsedge/sports/cfb/model_selection_prereg.py",
+        "tests/test_cfb_model_candidate",
+        "tests/test_cfb_model_selection"
       ],
       "disposition": null
     },
