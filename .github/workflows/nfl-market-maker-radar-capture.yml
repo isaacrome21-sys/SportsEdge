@@ -7,8 +7,10 @@ name: nfl-market-maker-radar-capture
 # Pinnacle is the market-maker reference; DraftKings and FanDuel are soft books.
 # V2 starts the three provider transports concurrently, records local request and
 # retrieval provenance, and refuses timing-ineligible polls as signal inputs.
-# Rows, raw payloads, research candidate records, and CLV settlement records are
-# append-only on `data`.
+# Newly-created stale-price candidates are re-polled at the policy-frozen offset
+# before any research ROI proxy may treat the captured soft price as persistent.
+# Rows, raw payloads, research candidate records, persistence records, and CLV
+# settlement records are append-only on `data`.
 
 on:
   workflow_dispatch:
@@ -25,7 +27,9 @@ on:
       - 'sportsedge/draftkings_game_market_source.py'
       - 'scripts/analyze_market_maker_radar.py'
       - 'scripts/analyze_market_maker_radar_v2.py'
+      - 'scripts/recheck_market_maker_candidate_persistence.py'
       - 'scripts/settle_market_maker_candidate_ledger.py'
+      - 'scripts/settle_market_maker_candidate_ledger_v2.py'
       - 'config/market_maker_radar_v1.json'
       - 'config/market_maker_radar_v2.json'
       - 'config/workflow_cron_policy_v1.json'
@@ -41,10 +45,13 @@ on:
       - 'sportsedge/draftkings_game_market_source.py'
       - 'scripts/analyze_market_maker_radar.py'
       - 'scripts/analyze_market_maker_radar_v2.py'
+      - 'scripts/recheck_market_maker_candidate_persistence.py'
       - 'scripts/settle_market_maker_candidate_ledger.py'
+      - 'scripts/settle_market_maker_candidate_ledger_v2.py'
       - 'tests/test_market_maker_radar.py'
       - 'tests/test_market_maker_radar_v2.py'
       - 'tests/test_market_maker_candidate_settlement.py'
+      - 'tests/test_market_maker_candidate_persistence.py'
       - 'tests/test_nfl_market_maker_radar_workflow.py'
       - 'config/market_maker_radar_v1.json'
       - 'config/market_maker_radar_v2.json'
@@ -78,6 +85,7 @@ jobs:
           python -m unittest tests.test_market_maker_radar -v
           python -m unittest tests.test_market_maker_radar_v2 -v
           python -m unittest tests.test_market_maker_candidate_settlement -v
+          python -m unittest tests.test_market_maker_candidate_persistence -v
           python -m unittest tests.test_nfl_market_maker_radar_workflow -v
           python -m unittest tests.test_normalize_pinnacle_nfl_markets -v
           python -m unittest tests.test_fanduel_nfl_market_normalizer -v
@@ -143,25 +151,54 @@ jobs:
             .threshold_freeze.status == "FROZEN_BEFORE_FIRST_LEAD_LAG_SIGNAL"
           ' artifacts/nfl-market-maker-radar/latest.json >/dev/null
 
-      - name: Settle exact-contract CLV candidates
+      - name: Wait frozen stale-price persistence offset
         if: github.event_name != 'pull_request'
         shell: bash
         run: |
           set -euo pipefail
-          python -m scripts.settle_market_maker_candidate_ledger \
+          NEW_CANDIDATES="$(jq -r '.candidate_ledger_new_count' artifacts/nfl-market-maker-radar/latest.json)"
+          if [ "${NEW_CANDIDATES}" -gt 0 ]; then
+            sleep 30
+          fi
+
+      - name: Re-poll stale candidates for takeability persistence
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m scripts.recheck_market_maker_candidate_persistence \
+            --policy config/market_maker_radar_v2.json \
+            --analysis-report artifacts/nfl-market-maker-radar/latest.json \
+            --out-root .data-branch \
+            --status-out artifacts/nfl-market-maker-radar/persistence.json
+          jq -e '
+            (.state == "NO_NEW_CANDIDATES" or .state == "COMPLETE") and
+            .primary_metric == "REALIZED_ROI_ON_FILLED_WAGERS" and
+            .clv_role == "DETECTOR_PROCESS_CHECK_NOT_EDGE_VALIDATION"
+          ' artifacts/nfl-market-maker-radar/persistence.json >/dev/null
+
+      - name: Settle exact-contract CLV process checks
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m scripts.settle_market_maker_candidate_ledger_v2 \
             --policy config/market_maker_radar_v2.json \
             --archive-root .data-branch/archive/market-maker-radar/nfl \
             --ledger-root .data-branch \
             --out artifacts/nfl-market-maker-radar/settlement.json
           jq -e '
-            .primary_metric == "CLV" and
+            .primary_metric == "REALIZED_ROI_ON_FILLED_WAGERS" and
+            .process_metric == "CLV" and
+            .clv_role == "DETECTOR_PROCESS_CHECK_NOT_EDGE_VALIDATION" and
             .model_p_authority == false and
             .promotion_authority == false and
             .staking_authority == false and
-            .official_authority == false
+            .official_authority == false and
+            .automatic_wager_authority == false
           ' artifacts/nfl-market-maker-radar/settlement.json >/dev/null
 
-      - name: Commit append-only observations candidate ledger and settlements
+      - name: Commit append-only observations candidate persistence and settlements
         if: github.event_name != 'pull_request'
         shell: bash
         run: |
@@ -177,8 +214,9 @@ jobs:
           CAPTURE_ID="$(jq -r '.capture_id' ../artifacts/nfl-market-maker-radar/capture-status.json)"
           ROWS="$(jq -r '.rows_written' ../artifacts/nfl-market-maker-radar/capture-status.json)"
           NEW_CANDIDATES="$(jq -r '.candidate_ledger_new_count' ../artifacts/nfl-market-maker-radar/latest.json)"
+          NEW_PERSISTENCE="$(jq -r '.new_persistence_count // 0' ../artifacts/nfl-market-maker-radar/persistence.json)"
           NEW_SETTLEMENTS="$(jq -r '.new_settlement_count' ../artifacts/nfl-market-maker-radar/settlement.json)"
-          git commit -m "nfl-market-maker-radar: ${CAPTURE_ID} rows=${ROWS} candidates=${NEW_CANDIDATES} settlements=${NEW_SETTLEMENTS} [LAYER_B_NOT_EVIDENCE]"
+          git commit -m "nfl-market-maker-radar: ${CAPTURE_ID} rows=${ROWS} candidates=${NEW_CANDIDATES} persistence=${NEW_PERSISTENCE} settlements=${NEW_SETTLEMENTS} [LAYER_B_NOT_EVIDENCE]"
           for attempt in 1 2 3; do
             git fetch origin data || true
             git rebase origin/data || git rebase --abort || true
