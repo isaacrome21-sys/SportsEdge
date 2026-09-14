@@ -38,9 +38,9 @@ class DirectMarketFeedProbeTests(unittest.TestCase):
             return _Response(
                 {
                     "attachments": {
-                        "events": {"1": {"eventId": 1}},
-                        "markets": {"m": {"marketId": "m"}},
-                        "runners": {"r": {"selectionId": 1}},
+                        "events": {"1": {"eventId": 1, "name": "Away @ Home"}},
+                        "markets": {"m": {"marketId": "m", "marketName": "Moneyline"}},
+                        "runners": {"r": {"selectionId": 1, "runnerName": "Home"}},
                     },
                     "layout": {},
                 }
@@ -55,7 +55,11 @@ class DirectMarketFeedProbeTests(unittest.TestCase):
             )
             self.assertEqual(report["state"], "REACHABLE")
             self.assertEqual(report["providers"]["pinnacle"]["shape"]["top_level_type"], "list")
-            self.assertEqual(report["providers"]["fanduel"]["shape"]["attachment_counts"]["events"], 1)
+            fd_shape = report["providers"]["fanduel"]["shape"]
+            self.assertEqual(fd_shape["attachment_counts"]["events"], 1)
+            self.assertEqual(fd_shape["attachment_first_item_keys"]["events"], ["eventId", "name"])
+            self.assertEqual(fd_shape["attachment_first_item_keys"]["markets"], ["marketId", "marketName"])
+            self.assertEqual(fd_shape["attachment_first_item_keys"]["runners"], ["runnerName", "selectionId"])
             self.assertTrue(list((out / "raw" / "pinnacle").glob("*.json")))
             self.assertTrue(list((out / "raw" / "fanduel").glob("*.json")))
             self.assertTrue(all(value is False for value in report["authority"].values()))
