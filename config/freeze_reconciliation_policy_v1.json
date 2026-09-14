@@ -4,8 +4,8 @@
   "status": "ACTIVE_BLOCKED",
   "main_merge_hold": "UNCONDITIONAL",
   "hold_started_from_main_sha": "564e5567acf63adbf750e033df08a8c368f6884d",
-  "observed_main_sha_when_policy_authored": "09a2aecdc168f65d50a1120017491a0d104e6140",
-  "authorized_reconciliation_branch": "fix/freeze-reconciliation-delta-matrix-20260914",
+  "observed_main_sha_when_policy_authored": "00b4db27f15cc22b089e2a2d974cf483eed86e58",
+  "authorized_reconciliation_branch": "fix/freeze-reconciliation-inventory-20260914",
   "allowed_matrix_outcomes": [
     "MATCH",
     "PROVISIONAL_DRIFT_BLOCKED",
@@ -23,6 +23,7 @@
   ],
   "release_conditions": {
     "bundle_inventory_complete": true,
+    "bundle_inventory_must_be_machine_audited": true,
     "all_delta_bundle_rows_terminal": true,
     "every_drifted_bundle_has_terminal_disposition": true,
     "refrozen_bundle_requires_new_freeze_sha_and_forward_clock_restart": true,
