@@ -53,7 +53,7 @@ jobs:
 
       - name: Reconcile each registered delta against each bundle
         run: >-
-          python scripts/reconcile_freeze_deltas.py
+          PYTHONPATH=. python scripts/reconcile_freeze_deltas.py
           --current-main-ref origin/main
           --output artifacts/governance/freeze_reconciliation_report.json
 
