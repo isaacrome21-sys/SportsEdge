@@ -38,6 +38,16 @@
     "row_admissibility_requires_capture_time_and_bundle_hash_match": true,
     "rule": "Prospective evidence is admissible only under the exact bundle semantics/hash in force at capture. A REFROZEN disposition restarts the forward clock and invalidates prior semantics by both timestamp and prior bundle hash."
   },
+  "direct_main_writer_guard": {
+    "status": "FROZEN_FAIL_CLOSED",
+    "required": true,
+    "workflow_prefix": ".github/workflows/",
+    "workflow_suffixes": [".yml", ".yaml"],
+    "write_permission_marker": "contents: write",
+    "direct_push_markers": ["git push"],
+    "allowed_paths": [],
+    "rule": "While FULL_MAIN_HOLD is active, any workflow on exact current main that has contents: write and contains a direct git push is an active direct-main writer and blocks reconciliation release. No direct-main workflow writer is exempt during the hold."
+  },
   "release_conditions": {
     "bundle_inventory_complete": true,
     "bundle_inventory_must_be_machine_audited": true,
@@ -46,7 +56,8 @@
     "refrozen_bundle_requires_new_freeze_sha_and_forward_clock_restart": true,
     "refrozen_bundle_requires_timestamp_plus_prior_bundle_hash_invalidation": true,
     "revoked_bundle_invalidates_prior_forward_clock": true,
-    "current_main_sha_must_equal_reconciled_through_sha": true
+    "current_main_sha_must_equal_reconciled_through_sha": true,
+    "direct_main_writers_quiesced": true
   },
   "authority": {
     "model_p": false,
