@@ -31,7 +31,16 @@ class PolicyFreezeTests(unittest.TestCase):
         self.assertTrue(freeze["change_requires_new_policy_version"])
         self.assertEqual(freeze["frozen_fields"]["timing.lead_follow_window_seconds"], 900)
         self.assertEqual(freeze["frozen_fields"]["timing.max_cross_book_retrieval_skew_seconds"], 30)
+        self.assertEqual(freeze["frozen_fields"]["takeability.persistence_recheck_offset_seconds"], 30)
         self.assertEqual(freeze["frozen_fields"]["alerts.stale_offer_fair_probability_gap_pp"], 1.0)
+
+    def test_lane_is_roi_first_clv_process_only_and_checkpointed(self):
+        grading = POLICY["grading"]
+        self.assertEqual(grading["primary_metric"], "REALIZED_ROI_ON_FILLED_WAGERS")
+        self.assertEqual(grading["process_metric"], "CLV")
+        self.assertEqual(grading["clv_role"], "DETECTOR_PROCESS_CHECK_NOT_EDGE_VALIDATION")
+        self.assertEqual(grading["evaluation_checkpoints"]["candidate_n"], [100, 250, 500, 1000])
+        self.assertTrue(grading["evaluation_checkpoints"]["no_optional_looks"])
 
 
 class TimingGateTests(unittest.TestCase):
@@ -65,6 +74,11 @@ class CandidateLedgerTests(unittest.TestCase):
             first = analyze(rows, POLICY, ledger_root=root)
             self.assertEqual(first["stale_soft_price_count"], 2)
             self.assertEqual(first["candidate_ledger_new_count"], 1)
+            self.assertEqual(first["primary_metric"], "REALIZED_ROI_ON_FILLED_WAGERS")
+            self.assertEqual(first["process_metric"], "CLV")
+            self.assertEqual(first["run_it_independence"]["independence_group_id"], "HARD_MARKET_PRICE_MOVEMENT_V1")
+            self.assertFalse(first["stale_soft_prices"][0]["counts_as_independent_context_class"])
+
             candidate = first["candidate_ledger_new"][0]
             self.assertEqual(candidate["source_family_id"], "PINNACLE_TO_DRAFTKINGS_STALE_PRICE_H2H_V1")
             candidate_path = root / candidate["path"]
@@ -74,6 +88,10 @@ class CandidateLedgerTests(unittest.TestCase):
             self.assertEqual(payload["validation_status"], "INSUFFICIENT")
             self.assertFalse(payload["automatic_wager_authority"])
             self.assertTrue(payload["manual_candidate_review_eligible"])
+            self.assertFalse(payload["offered_price_takeable_assumed"])
+            self.assertEqual(payload["takeability_status"], "PENDING_FIXED_OFFSET_RECHECK")
+            self.assertEqual(payload["run_it_independence_group_id"], "HARD_MARKET_PRICE_MOVEMENT_V1")
+            self.assertFalse(payload["counts_as_independent_context_class"])
             before = candidate_path.read_bytes()
 
             second = analyze(rows, POLICY, ledger_root=root)
@@ -83,8 +101,11 @@ class CandidateLedgerTests(unittest.TestCase):
             summary = second["candidate_ledger_summary"]["PINNACLE_TO_DRAFTKINGS_STALE_PRICE_H2H_V1"]
             self.assertEqual(summary["candidate_n"], 1)
             self.assertEqual(summary["validation_status"], "INSUFFICIENT")
+            self.assertEqual(summary["next_candidate_checkpoint"], 100)
             self.assertIsNone(summary["clv"])
-            self.assertIsNone(summary["flat_1u_roi"])
+            self.assertIsNone(summary["offered_price_flat_1u_roi"])
+            self.assertIsNone(summary["persisted_price_flat_1u_roi"])
+            self.assertIsNone(summary["realized_filled_roi"])
 
 
 if __name__ == "__main__":
