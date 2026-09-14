@@ -11,8 +11,10 @@ on:
   pull_request:
     paths:
       - 'scripts/audit_nfl_2026_capture_gaps.py'
+      - 'scripts/stamp_nfl_2026_capture_quarantine.py'
       - 'tests/test_nfl_2026_capture_gap_audit.py'
       - 'config/nfl_2026_capture.json'
+      - 'config/nfl_2026_capture_adjudication.json'
       - '.github/workflows/nfl-2026-line-capture.yml'
   # Frozen confirmation evidence is independent of the forward-CLV collector.
   # Ten-minute polling is gated against the free nflverse schedule before the
@@ -35,9 +37,9 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
-      - name: Verify no-backfill gap-audit contract
+      - name: Verify no-backfill gap-audit and quarantine contracts
         run: |
-          python3 -m py_compile scripts/audit_nfl_2026_capture_gaps.py
+          python3 -m py_compile scripts/audit_nfl_2026_capture_gaps.py scripts/stamp_nfl_2026_capture_quarantine.py
           python3 -m unittest -q tests.test_nfl_2026_capture_gap_audit
 
       - name: Gate scheduled run to a frozen capture window using free schedule data
@@ -62,6 +64,19 @@ jobs:
           local = now.astimezone(tz)
           anchor = date.fromisoformat(cfg['week1_tuesday_local_date'])
 
+          def valid_capture_record(record, kind):
+              if record.get('capture_kind') != kind:
+                  return False
+              if record.get('book') != cfg.get('bookmaker'):
+                  return False
+              if not record.get('retrieved_at_utc'):
+                  return False
+              hashes = record.get('hashes')
+              if not isinstance(hashes, dict) or not hashes:
+                  return False
+              games = record.get('games')
+              return isinstance(games, list) and bool(games)
+
           hh, mm = map(int, cfg['opener_local_time'].split(':'))
           opener_target = local.replace(hour=hh, minute=mm, second=0, microsecond=0)
           opener_window_open = (
@@ -73,15 +88,23 @@ jobs:
               opener_window_open = False
               opener_week = 0
           opener_path = Path(cfg['output_dir']) / f"week{opener_week:02d}" / 'opener.json' if opener_week else None
-          opener_due = bool(opener_window_open and opener_path and not opener_path.is_file())
+          opener_existing_valid = False
+          if opener_path and opener_path.is_file():
+              try:
+                  opener_existing_valid = valid_capture_record(json.loads(opener_path.read_text()), 'OPENER')
+              except (OSError, json.JSONDecodeError):
+                  opener_existing_valid = False
+          opener_due = bool(opener_window_open and opener_path and not opener_existing_valid)
 
-          # Count already-materialized FINAL rows by kickoff so repeated polling
-          # asks the paid provider only for still-missing rows.
+          # Count only contract-valid FINAL rows. A malformed/partial row must
+          # never suppress due=true or skip the current-run materialization audit.
           captured_final = Counter()
           for path in Path(cfg['output_dir']).glob('week*/final/*.json'):
               try:
                   record = json.loads(path.read_text())
               except (OSError, json.JSONDecodeError):
+                  continue
+              if not valid_capture_record(record, 'FINAL'):
                   continue
               for game in record.get('games') or []:
                   raw = str(game.get('commence_time') or '').strip()
@@ -131,6 +154,7 @@ jobs:
           print(json.dumps({
               'due': due,
               'opener_window_open': opener_window_open,
+              'opener_existing_valid': opener_existing_valid,
               'opener_due': opener_due,
               'opener_week': opener_week,
               'final_due': final_due,
@@ -157,6 +181,10 @@ jobs:
           set +e
           python3 scripts/nfl_2026_line_capture.py "$MODE"
           echo "rc=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Stamp current-run captures as adjudication-pending
+        if: steps.run.outcome != 'skipped'
+        run: python3 scripts/stamp_nfl_2026_capture_quarantine.py --github-run-id "$GITHUB_RUN_ID"
 
       - name: Verify every due scheduled capture materialized
         if: github.event_name == 'schedule' && steps.due.outputs.due == 'true'
