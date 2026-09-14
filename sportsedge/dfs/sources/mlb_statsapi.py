@@ -128,7 +128,8 @@ class MLBStatsApiContextClient:
 
         A posted nine-man lineup is enforced only when all nine starters can be
         reconciled to the DK team pool. This prevents spelling/ID mismatches from
-        silently deleting a real starter.
+        silently deleting a real starter. Reconciled starters are enriched with
+        batting order / MLBAM id / game identity for the downstream joint model.
         """
         out = list(players)
         index_by_team: dict[str, list[int]] = {}
@@ -142,6 +143,7 @@ class MLBStatsApiContextClient:
         for game in evidence.games:
             home = normalize_team(str(game.get("home") or ""))
             away = normalize_team(str(game.get("away") or ""))
+            game_pk = str(game.get("game_pk") or "")
             status = game.get("status") if isinstance(game.get("status"), dict) else {}
             status_text = f"{status.get('abstract', '')} {status.get('detailed', '')}".casefold()
             if "postpon" in status_text or "cancel" in status_text:
@@ -160,15 +162,29 @@ class MLBStatsApiContextClient:
                 team_indices = index_by_team[team]
                 dk_hitters = [i for i in team_indices if not out[i].is_pitcher]
                 posted = lineups.get(side) if isinstance(lineups.get(side), list) else []
-                starter_names = {normalize_name(str(x.get("name") or "")) for x in posted if isinstance(x, dict)}
-                starter_names.discard("")
-                if len(starter_names) == 9:
-                    matched = {normalize_name(out[i].name) for i in dk_hitters if normalize_name(out[i].name) in starter_names}
+                starter_by_name = {
+                    normalize_name(str(x.get("name") or "")): dict(x)
+                    for x in posted if isinstance(x, dict) and normalize_name(str(x.get("name") or ""))
+                }
+                if len(starter_by_name) == 9:
+                    matched = {normalize_name(out[i].name) for i in dk_hitters if normalize_name(out[i].name) in starter_by_name}
                     if len(matched) == 9:
                         confirmed_teams.append(team)
                         for idx in dk_hitters:
-                            if normalize_name(out[idx].name) not in starter_names:
+                            norm = normalize_name(out[idx].name)
+                            info = starter_by_name.get(norm)
+                            if info is None:
                                 out[idx] = replace(out[idx], is_disabled=True, status="MLB_NOT_IN_CONFIRMED_LINEUP")
+                                continue
+                            raw = dict(out[idx].raw)
+                            raw.update({
+                                "mlb_id": str(info.get("mlb_id") or ""),
+                                "mlb_batting_order": int(info.get("order") or 0),
+                                "mlb_game_pk": game_pk,
+                                "mlb_context_side": side,
+                                "mlb_confirmed_lineup": True,
+                            })
+                            out[idx] = replace(out[idx], raw=raw)
                     else:
                         reconciliation_blocks.append(f"{team}:LINEUP_MATCH_{len(matched)}_OF_9")
 
@@ -180,6 +196,14 @@ class MLBStatsApiContextClient:
                     if len(matched_pitchers) == 1:
                         probable_teams.append(team)
                         keep = matched_pitchers[0]
+                        raw = dict(out[keep].raw)
+                        raw.update({
+                            "mlb_id": str(pinfo.get("mlb_id") or ""),
+                            "mlb_game_pk": game_pk,
+                            "mlb_context_side": side,
+                            "mlb_probable_starter": True,
+                        })
+                        out[keep] = replace(out[keep], raw=raw)
                         for idx in pitcher_indices:
                             if idx != keep:
                                 out[idx] = replace(out[idx], is_disabled=True, status="MLB_NOT_PROBABLE_STARTER")
