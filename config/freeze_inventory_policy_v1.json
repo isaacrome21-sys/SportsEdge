@@ -116,6 +116,7 @@
     "config/freeze_reconciliation_policy_v1.json": "RECONCILIATION_CONTROL_PLANE",
     "config/freeze_reconciliation_registry_v1.json": "RECONCILIATION_CONTROL_PLANE",
     "config/freeze_inventory_policy_v1.json": "RECONCILIATION_CONTROL_PLANE",
+    "config/nfl_2026_capture_adjudication.json": "NFL_CAPTURE_QUARANTINE_ADJUDICATION_RECORD_NO_MODEL_OR_PROMOTION_AUTHORITY",
     ".github/workflows/freeze-reconciliation-hold.yml": "RECONCILIATION_CONTROL_PLANE",
     "sportsedge/governance/__init__.py": "RECONCILIATION_CONTROL_PLANE",
     "sportsedge/governance/freeze_reconciliation.py": "RECONCILIATION_CONTROL_PLANE",

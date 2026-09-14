@@ -88,7 +88,6 @@ class CaptureGapAuditTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             cfg = self.cfg(root)
             rows = [{"season": "2026", "gameday": "2026-09-10", "gametime": "20:15"}]
-            # FINAL window is 19:45..20:00 ET, so 19:50 must not be called missed.
             now = datetime(2026, 9, 10, 19, 50, tzinfo=ZoneInfo("America/New_York"))
             written = audit(cfg, now, rows, "abc123")
             self.assertFalse(any("final_missed" in str(p) for p in written))
@@ -104,10 +103,33 @@ class CaptureGapAuditTest(unittest.TestCase):
                 "retrieved_at_utc": "2026-09-08T14:03:00+00:00",
                 "hashes": {"policy_sha256": "x"},
                 "run": {"github_run_id": "123"},
+                "games": [{"commence_time": "2026-09-13T17:00:00Z"}],
             }))
             self.assertEqual(verify_due(cfg, 2, [], "123"), [])
             failures = verify_due(cfg, 2, [], "999")
             self.assertIn("DUE_OPENER_NOT_FROM_CURRENT_RUN:123", failures)
+
+    def test_verify_due_missing_opener_fails_closed(self):
+        with tempfile.TemporaryDirectory() as root:
+            cfg = self.cfg(root)
+            failures = verify_due(cfg, 2, [], "123")
+            self.assertTrue(any(x.startswith("DUE_OPENER_NOT_MATERIALIZED:") for x in failures))
+
+    def test_verify_due_partial_opener_with_no_games_fails_closed(self):
+        with tempfile.TemporaryDirectory() as root:
+            cfg = self.cfg(root)
+            opener = Path(root) / "captures/week02/opener.json"
+            opener.parent.mkdir(parents=True)
+            opener.write_text(json.dumps({
+                "capture_kind": "OPENER",
+                "book": "draftkings",
+                "retrieved_at_utc": "2026-09-08T14:03:00+00:00",
+                "hashes": {"policy_sha256": "x"},
+                "run": {"github_run_id": "123"},
+                "games": [],
+            }))
+            failures = verify_due(cfg, 2, [], "123")
+            self.assertIn("DUE_OPENER_EMPTY_OR_MISSING_GAMES", failures)
 
     def test_verify_due_final_uses_kickoff_multiplicity_and_current_run(self):
         with tempfile.TemporaryDirectory() as root:
@@ -129,6 +151,24 @@ class CaptureGapAuditTest(unittest.TestCase):
             self.assertEqual(verify_due(cfg, None, due, "123"), [])
             failures = verify_due(cfg, None, due + ["2026-09-11T00:15:00Z"], "123")
             self.assertTrue(any(x.startswith("DUE_FINAL_NOT_MATERIALIZED") for x in failures))
+
+    def test_verify_due_partial_final_fails_closed(self):
+        with tempfile.TemporaryDirectory() as root:
+            cfg = self.cfg(root)
+            final = Path(root) / "captures/week02/final/20260911T000000Z.json"
+            final.parent.mkdir(parents=True)
+            final.write_text(json.dumps({
+                "capture_kind": "FINAL",
+                "book": "draftkings",
+                "retrieved_at_utc": "2026-09-11T00:00:00+00:00",
+                "hashes": {"policy_sha256": "x"},
+                "run": {"github_run_id": "123"},
+                "games": [],
+            }))
+            due = ["2026-09-11T00:15:00Z"]
+            failures = verify_due(cfg, None, due, "123")
+            self.assertTrue(any(x.startswith("DUE_FINAL_NOT_MATERIALIZED") for x in failures))
+            self.assertTrue(any(x.startswith("DUE_FINAL_EMPTY_OR_MISSING_GAMES:") for x in failures))
 
 
 if __name__ == "__main__":
