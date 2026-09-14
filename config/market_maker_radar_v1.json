@@ -1,0 +1,69 @@
+{
+  "policy_id": "MARKET_MAKER_RADAR_V1",
+  "version": "1.0.0",
+  "status": "ACTIVE_LAYER_B_HARD_MARKET",
+  "description": "Price-only market-maker lead/lag and stale-soft-book radar. Price leadership is the primary signal. Public splits, RLM labels, capper opinion, and unverified sharp-action labels cannot create a signal.",
+  "model_free": true,
+  "authority": {
+    "model_p_authority": false,
+    "predictive_model_input": false,
+    "truth_gate_input": false,
+    "promotion_authority": false,
+    "eligibility_authority": false,
+    "staking_authority": false,
+    "official_authority": false,
+    "alert_authority": true
+  },
+  "books": {
+    "market_makers": ["pinnacle"],
+    "soft_books": ["draftkings", "fanduel"],
+    "provider_required": ["circa"]
+  },
+  "markets": ["h2h", "spreads", "totals"],
+  "timing": {
+    "expected_poll_cadence_seconds": 300,
+    "max_recent_age_seconds": 900,
+    "change_time_source_priority": ["book_last_update", "captured_at"],
+    "same_timestamp_rule": "SYNCHRONOUS_NOT_LEADER",
+    "same_capture_rule": "SYNCHRONOUS_NOT_LEADER",
+    "lead_follow_window_seconds": 900,
+    "steam_window_seconds": 300
+  },
+  "alerts": {
+    "stale_offer_fair_probability_gap_pp": 1.0,
+    "minimum_spread_or_total_line_gap": 0.5,
+    "minimum_soft_followers": 1,
+    "steam_min_books": 3,
+    "threshold_status": "RESEARCH_ALERT_THRESHOLD_NOT_VALIDATED_EDGE_FLOOR"
+  },
+  "news_attribution": {
+    "required_before_calling_move_rlm": true,
+    "default_state": "UNADJUDICATED",
+    "simultaneous_move_interpretation": "NEWS_OR_COMMON_INFORMATION_POSSIBLE"
+  },
+  "public_splits": {
+    "role": "ANNOTATION_ONLY",
+    "sharp_signal_authority": false,
+    "model_input_authority": false,
+    "wager_support_authority": false
+  },
+  "exchange_liquidity": {
+    "role": "OPTIONAL_HARD_MARKET_CORROBORATION",
+    "automated_capture": false,
+    "sources": ["novig", "prophetx", "kalshi"],
+    "require_executable_price_or_resting_liquidity": true,
+    "wallet_or_capper_label_is_insufficient": true,
+    "model_input_authority": false
+  },
+  "grading": {
+    "primary_metric": "CLV",
+    "source_family_ids": {
+      "pinnacle_to_draftkings": "PINNACLE_TO_DRAFTKINGS_LEAD_LAG_V1",
+      "pinnacle_to_fanduel": "PINNACLE_TO_FANDUEL_LEAD_LAG_V1"
+    },
+    "never_blend_source_families": true,
+    "minimum_n_for_claim": 100,
+    "status_before_minimum_n": "INSUFFICIENT",
+    "report_metrics": ["clv", "hit_rate", "flat_1u_roi"]
+  }
+}
