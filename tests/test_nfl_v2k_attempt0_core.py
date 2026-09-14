@@ -7,6 +7,7 @@ from sportsedge.sports.nfl.v2k_drive_core import (
     FIELD_BUCKETS,
     OVERTIME_RULE_VERSION,
     STATE_BUCKETS,
+    TRUNCATION_POLICY_VERSION,
     HierarchicalStrength,
     fit_hierarchical_strength,
     simulate_joint_game,
@@ -36,8 +37,6 @@ def play(game, drive, idx, offense, defense, result, *, order=None, start=75.0, 
 def training_rows():
     records = []
     order = 0
-    # Synthetic chronology is monotone within each game. A has the largest and
-    # strongest sample; B is deliberately smaller/weaker for shrinkage testing.
     for i in range(12):
         td = i < 8
         result = "touchdown" if td else "punt"
@@ -85,6 +84,15 @@ class TestNFLV2KAttempt0Core(unittest.TestCase):
         self.assertTrue(all(r.source_manifest_sha256 == MANIFEST for r in rows))
         self.assertTrue(all(r.source_code_sha == CODE_SHA for r in rows))
 
+    def test_source_preserves_half_and_game_termination(self):
+        rows = build_drive_rows_from_pbp([
+            play("G", "d1", 1, "A", "B", "punt", order=1, period=1, clock=500),
+            play("G", "d2", 2, "B", "A", "end_of_half", order=2, period=2, clock=0),
+            play("G", "d3", 3, "A", "B", "punt", order=3, period=3, clock=500),
+            play("G", "d4", 4, "B", "A", "end_of_game", order=4, period=4, clock=0),
+        ], source_manifest_sha256=MANIFEST, source_code_sha=CODE_SHA)
+        self.assertEqual([r.termination_reason for r in rows], ["NORMAL", "END_OF_HALF", "NORMAL", "END_OF_GAME"])
+
     def test_market_field_fails_closed(self):
         r = play("G", "d1", 1, "A", "B", "punt")
         r["closing_spread"] = -3.0
@@ -103,6 +111,14 @@ class TestNFLV2KAttempt0Core(unittest.TestCase):
         ]
         with self.assertRaisesRegex(ValueError, "V2K_CLOCK_REGRESSION"):
             build_drive_rows_from_pbp(bad_clock, source_manifest_sha256=MANIFEST, source_code_sha=CODE_SHA)
+
+    def test_drive_after_end_game_fails_closed(self):
+        records = [
+            play("G", "d1", 1, "A", "B", "end_of_game", order=1, period=4, clock=0),
+            play("G", "d2", 2, "B", "A", "punt", order=2, period=4, clock=0),
+        ]
+        with self.assertRaisesRegex(ValueError, "V2K_DRIVE_AFTER_END_OF_GAME"):
+            build_drive_rows_from_pbp(records, source_manifest_sha256=MANIFEST, source_code_sha=CODE_SHA)
 
     def test_hierarchical_probabilities_are_finite_normalized_and_unknown_strength_is_neutral(self):
         model = fit_hierarchical_strength(training_rows())
@@ -134,16 +150,29 @@ class TestNFLV2KAttempt0Core(unittest.TestCase):
 
     def test_joint_simulation_is_deterministic_stateful_and_coherent(self):
         model = fit_hierarchical_strength(training_rows())
-        a = simulate_joint_game(model, "A", "B", seed=20260914, regulation_drives=12, max_overtime_drives=4)
-        b = simulate_joint_game(model, "A", "B", seed=20260914, regulation_drives=12, max_overtime_drives=4)
+        a = simulate_joint_game(model, "A", "B", seed=20260914, regulation_drives=12, max_overtime_drives=4, opening_possession="A")
+        b = simulate_joint_game(model, "A", "B", seed=20260914, regulation_drives=12, max_overtime_drives=4, opening_possession="A")
         self.assertEqual(a, b)
         self.assertEqual(a.margin, a.home_score - a.away_score)
         self.assertEqual(a.total, a.home_score + a.away_score)
         self.assertEqual(a.team_totals["A"], a.home_score)
         self.assertEqual(a.team_totals["B"], a.away_score)
         for left, right in zip(a.path, a.path[1:]):
-            self.assertEqual(left["defense"], right["offense"])
+            if left["termination_reason"] != "END_OF_HALF":
+                self.assertEqual(left["defense"], right["offense"])
         self.assertTrue(all(0.0 <= p["start_yardline_100"] <= 100.0 for p in a.path))
+
+    def test_half_and_game_truncation_are_explicit_and_halftime_possession_resets(self):
+        model = fit_hierarchical_strength(training_rows())
+        result = simulate_joint_game(model, "A", "B", seed=31, regulation_drives=4, max_overtime_drives=2, opening_possession="A")
+        regulation = [p for p in result.path if not p["overtime"]]
+        half = [p for p in regulation if p["termination_reason"] == "END_OF_HALF"]
+        game = [p for p in regulation if p["termination_reason"] == "END_OF_GAME"]
+        self.assertEqual(len(half), 1)
+        self.assertEqual(len(game), 1)
+        half_index = regulation.index(half[0])
+        self.assertEqual(regulation[half_index + 1]["offense"], "B")
+        self.assertTrue(all(p["truncation_policy_version"] == TRUNCATION_POLICY_VERSION for p in result.path))
 
     def test_empirical_possession_count_is_deterministic_under_seed(self):
         model = fit_hierarchical_strength(training_rows())
