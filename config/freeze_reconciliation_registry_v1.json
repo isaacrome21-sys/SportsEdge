@@ -113,7 +113,11 @@
     },
     {
       "bundle_id": "CFB_PROP_MODEL_FREEZE_V1",
-      "freeze_sha": "67184a5a120a2bc868531c7827783f562f82ee0b",
+      "freeze_sha": "108d6144a62e714a8da6a32272f7fa98f07b9cd7",
+      "freeze_identity_semantics": "MAIN_LINE_ACTIVATION_COMMIT",
+      "predictive_code_git_sha": "67184a5a120a2bc868531c7827783f562f82ee0b",
+      "activation_config_blob_sha": "c3df366e62db2397c58dccf5f24e13644aef6b18",
+      "activation_artifact_sha256": "923cfd1be42d31a87d9f31ddffce406d44bfc1bb003d1c625f5a4258f7773f23",
       "coverage_prefixes": [
         ".github/workflows/football-cfb-prop-artifact-freeze.yml",
         "config/cfb_prop_model_freeze.json",
