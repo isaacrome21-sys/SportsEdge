@@ -1,0 +1,217 @@
+{
+  "schema": "SPORTSEDGE_FINISH_LINE_BLOCKERS_V2",
+  "status": "DRAFT_BLOCKED_BY_FREEZE_RECONCILIATION",
+  "classification_values": [
+    "MISSING_IMPLEMENTATION",
+    "MISSING_EVIDENCE",
+    "MISSING_PERMISSION",
+    "MISSING_DECISION"
+  ],
+  "terminal_states": [
+    "INSUFFICIENT_EVIDENCE"
+  ],
+  "adoption_modes": [
+    "FORBIDDEN",
+    "PLUMBING_ONLY",
+    "CHALLENGER_ONLY",
+    "NATIVE_BUILD"
+  ],
+  "rules": {
+    "classify_before_public_repo_search": true,
+    "blocker_may_have_multiple_classifications": true,
+    "implementation_complete_does_not_imply_lane_complete": true,
+    "public_code_may_close_only_missing_implementation": true,
+    "missing_evidence_public_code_adoption_forbidden": true,
+    "missing_permission_public_code_adoption_forbidden": true,
+    "missing_decision_public_code_adoption_forbidden": true,
+    "evidence_facing_external_model_logic_enters_as_challenger_only": true,
+    "external_calibration_or_prior_authority_forbidden": true,
+    "external_historical_windows_do_not_establish_pit": true,
+    "external_repo_results_do_not_establish_provenance": true,
+    "plumbing_adoption_may_not_change_evidence_semantics": true,
+    "synthetic_ownership_cannot_unblock_contest_ev": true,
+    "contest_ev_requires_realized_ownership_evidence": true,
+    "no_model_p_or_truth_gate_or_official_authority": true,
+    "public_reference_must_name_exact_repo_and_scope": true
+  },
+  "public_reference_catalog": [
+    {
+      "repo": "jldbc/pybaseball",
+      "license/use": "REFERENCE_OR_PLUMBING_ONLY",
+      "approved_scope": ["statcast_request_chunking", "single_game_statcast_transport", "pitch_level_schema_normalization"],
+      "forbidden_scope": ["fitted_probabilities", "calibration", "readiness", "pit_claims"]
+    },
+    {
+      "repo": "nflverse/nflverse-pbp",
+      "license/use": "PLUMBING_ONLY",
+      "approved_scope": ["pbp_schema", "player_stats_transport", "release_based_data_loading"],
+      "forbidden_scope": ["model_authority", "fresh_holdout_claims", "sportsbook_evidence"]
+    },
+    {
+      "repo": "nflverse/nflfastR",
+      "license/use": "REFERENCE_OR_PLUMBING_ONLY",
+      "approved_scope": ["pbp_cleaning_patterns", "football_state_feature_conventions"],
+      "forbidden_scope": ["transferring_epa_models_as_sportsedge_model_p", "transferring_calibration"]
+    },
+    {
+      "repo": "sportsdataverse/cfbfastR-cfb-data",
+      "license/use": "PLUMBING_ONLY",
+      "approved_scope": ["cfb_play_participants_schema", "player_box_schema", "roster_identity_join_patterns"],
+      "forbidden_scope": ["retroactive_pit_claims", "market_odds_as_model_features", "promotion_evidence"]
+    },
+    {
+      "repo": "CFBD/cfbd-python",
+      "license/use": "PLUMBING_ONLY",
+      "approved_scope": ["roster_api_client_patterns", "play_and_play_stat_client_patterns"],
+      "forbidden_scope": ["provider_authorization_bypass", "retroactive_pit_claims", "model_authority"]
+    },
+    {
+      "repo": "DimaKudosh/pydfs-lineup-optimizer",
+      "license/use": "REFERENCE_OR_PLUMBING_ONLY",
+      "approved_scope": ["constraint_solver_architecture", "roster_slot_constraints", "solver_backend_patterns"],
+      "forbidden_scope": ["ownership_predictions", "player_projections", "contest_ev_claims"]
+    },
+    {
+      "repo": "tburger101/dfs_simulator",
+      "license/use": "REFERENCE_ONLY_NO_DATA_TRANSFER",
+      "approved_scope": ["field_generation_control_flow", "stack_constraint_orchestration", "correlated_simulation_orchestration", "lineup_rank_aggregation"],
+      "forbidden_scope": ["projected_ownership_values", "ownership_priors", "correlation_values", "projection_values", "positive_ev_claims"]
+    },
+    {
+      "repo": "chanzer0/MLB-DFS-Tools",
+      "license/use": "REFERENCE_ONLY_NO_DATA_TRANSFER",
+      "approved_scope": ["contest_field_sampling_control_flow", "stack_structure_orchestration", "contest_structure_parsing", "payout_allocation_and_tie_split_patterns", "duplication_accounting_patterns"],
+      "forbidden_scope": ["ownership_predictions", "stack_ownership_values", "player_projections", "distributional_assumptions", "roi_or_ev_claims"]
+    }
+  ],
+  "blockers": [
+    {
+      "id": "GOVERNANCE_FREEZE_RECONCILIATION",
+      "classifications": ["MISSING_IMPLEMENTATION"],
+      "state": "ACTIVE_BLOCKED",
+      "issue_refs": [686, 704],
+      "pr_refs": [703, 705],
+      "public_repo_adoption_allowed": false,
+      "adoption_mode": "NATIVE_BUILD",
+      "finish_condition": "Machine-complete freeze inventory, per-delta-per-bundle reconciliation, and terminal drift dispositions are proven."
+    },
+    {
+      "id": "MLB_DFS_ENDOGENOUS_JOINT_PATH_PRODUCER",
+      "classifications": ["MISSING_IMPLEMENTATION"],
+      "state": "IMPLEMENTATION_IN_PROGRESS_NOT_VALIDATED",
+      "pr_refs": [700, 701],
+      "public_repo_adoption_allowed": true,
+      "adoption_mode": "CHALLENGER_ONLY",
+      "reference_repos": ["jldbc/pybaseball"],
+      "finish_condition": "PIT-bound in-repo producer emits aligned hitter/pitcher paths, passes frozen structural validation, and then waits for independent calibration evidence."
+    },
+    {
+      "id": "NFL_PLAYER_PROP_PROBABILITY_ENGINE",
+      "classifications": ["MISSING_IMPLEMENTATION"],
+      "state": "NO_ENGINE",
+      "public_repo_adoption_allowed": true,
+      "adoption_mode": "PLUMBING_ONLY",
+      "reference_repos": ["nflverse/nflverse-pbp", "nflverse/nflfastR"],
+      "finish_condition": "Volume, efficiency, TD and joint player-distribution layers exist, are PIT-safe, replayable, and chronologically validated."
+    },
+    {
+      "id": "CFB_PLAYER_PARTICIPATION_AND_PROP_ENGINE",
+      "classifications": ["MISSING_IMPLEMENTATION"],
+      "state": "NO_ENGINE_PARTICIPATION_LAYER_REQUIRED",
+      "public_repo_adoption_allowed": true,
+      "adoption_mode": "PLUMBING_ONLY",
+      "reference_repos": ["sportsdataverse/cfbfastR-cfb-data", "CFBD/cfbd-python"],
+      "finish_condition": "CFB participation/substitution, volume, efficiency, TD and joint player-distribution layers are PIT-safe, replayable, and chronologically validated."
+    },
+    {
+      "id": "DFS_FIELD_DUPLICATION_AND_CONTEST_EV_SIMULATION",
+      "classifications": ["MISSING_IMPLEMENTATION", "MISSING_EVIDENCE"],
+      "state": "IMPLEMENTATION_BUILDABLE_OUTPUT_BLOCKED",
+      "implementation_state": "MISSING_FIELD_DUPLICATION_EXACT_PAYOUT_EV_MACHINERY",
+      "evidence_state": "MISSING_REALIZED_OWNERSHIP_CALIBRATION",
+      "dependency_blocker_ids": ["DK_REALIZED_OWNERSHIP_EVIDENCE"],
+      "public_repo_adoption_allowed": true,
+      "adoption_mode": "PLUMBING_ONLY",
+      "reference_repos": ["DimaKudosh/pydfs-lineup-optimizer", "tburger101/dfs_simulator", "chanzer0/MLB-DFS-Tools"],
+      "approved_reference_scope": ["solver_and_roster_constraints", "field_generation_control_flow", "stack_and_correlation_orchestration", "duplication_accounting", "contest_payout_and_tie_split_control_flow"],
+      "forbidden_reference_scope": ["external_ownership_values", "external_ownership_priors", "external_projection_values", "external_correlation_values", "external_ev_or_roi_claims"],
+      "activation_guard": "CONTEST_EV_BLOCKED_UNTIL_REALIZED_OWNERSHIP_EVIDENCE_MATURE",
+      "finish_condition": "Machinery is complete and tested, AND field generation is driven by calibrated SportsEdge ownership/correlation evidence from prospectively frozen real contest exports."
+    },
+    {
+      "id": "MLB_CFB_HISTORICAL_CLOSING_LINE_EVIDENCE",
+      "classifications": ["MISSING_EVIDENCE"],
+      "state": "INSUFFICIENT_EVIDENCE",
+      "terminal_for_current_spec": true,
+      "public_repo_adoption_allowed": false,
+      "adoption_mode": "FORBIDDEN",
+      "finish_condition": "Authentic provider-specific historical decision/close bytes with trustworthy timestamps and provenance are acquired and frozen."
+    },
+    {
+      "id": "CFB_HISTORICAL_PIT_FEATURE_VINTAGES",
+      "classifications": ["MISSING_EVIDENCE"],
+      "state": "INSUFFICIENT_EVIDENCE",
+      "terminal_for_current_spec": true,
+      "public_repo_adoption_allowed": false,
+      "adoption_mode": "FORBIDDEN",
+      "finish_condition": "Durable historical as-of provenance is acquired, or a new frozen specification removes features whose historical PIT state cannot be proven."
+    },
+    {
+      "id": "FOOTBALL_PROP_FORWARD_PIT_AND_VALIDATION_EVIDENCE",
+      "classifications": ["MISSING_EVIDENCE"],
+      "state": "INSUFFICIENT_EVIDENCE",
+      "terminal_for_current_evaluation": true,
+      "public_repo_adoption_allowed": false,
+      "adoption_mode": "FORBIDDEN",
+      "finish_condition": "Prospective pregame feature snapshots and postgame outcomes accrue under frozen NFL/CFB prop specifications to the preregistered evidence minimum."
+    },
+    {
+      "id": "MARKET_MAKER_RADAR_FILL_AND_LIMIT_EVIDENCE",
+      "classifications": ["MISSING_EVIDENCE"],
+      "state": "NOT_ACCRUING_WITHOUT_EXECUTION_ATTEMPTS",
+      "user_action_required": true,
+      "public_repo_adoption_allowed": false,
+      "adoption_mode": "FORBIDDEN",
+      "finish_condition": "Real execution attempts accumulate fill, changed-price, rejection, void and accepted/requested stake evidence at preregistered checkpoints."
+    },
+    {
+      "id": "DK_REALIZED_OWNERSHIP_EVIDENCE",
+      "classifications": ["MISSING_EVIDENCE"],
+      "state": "NOT_ACCRUING_UNTIL_CONTEST_ENTRY_AND_EXPORT",
+      "user_action_required": true,
+      "public_repo_adoption_allowed": false,
+      "adoption_mode": "FORBIDDEN",
+      "finish_condition": "Contests are actually entered and complete post-contest standings exports are prospectively frozen until ownership calibration matures."
+    },
+    {
+      "id": "NFL_V2K_ATTEMPT_1_COMPUTATION_IDENTITY",
+      "classifications": ["MISSING_IMPLEMENTATION"],
+      "state": "PRE_SCORE_FREEZE_REQUIRED",
+      "issue_refs": [693],
+      "public_repo_adoption_allowed": false,
+      "adoption_mode": "NATIVE_BUILD",
+      "finish_condition": "PCG64/SeedSequence identity, immutable sources/features/folds, 50k paths/game, replay contract and attempt-1 record are frozen before scoring."
+    },
+    {
+      "id": "NFL_V2K_FRESH_UNTOUCHED_READOUT",
+      "classifications": ["MISSING_EVIDENCE"],
+      "state": "INSUFFICIENT_EVIDENCE",
+      "terminal_for_current_spec": true,
+      "issue_refs": [693],
+      "public_repo_adoption_allowed": false,
+      "adoption_mode": "FORBIDDEN",
+      "finish_condition": "A genuinely fresh untouched population exists after development is frozen; exposed historical outcomes cannot be relabeled untouched."
+    },
+    {
+      "id": "MAIN_REQUIRED_STATUS_CHECK_PROTECTION",
+      "classifications": ["MISSING_PERMISSION"],
+      "state": "REPOSITORY_ADMIN_PERMISSION_REQUIRED",
+      "issue_refs": [704],
+      "public_repo_adoption_allowed": false,
+      "adoption_mode": "FORBIDDEN",
+      "observed_repository_rulesets": 0,
+      "assistant_connection_can_administer_rulesets": false,
+      "finish_condition": "A repository administrator creates branch protection or a ruleset on main requiring the freeze-reconciliation status check and preventing bypass by ordinary merges."
+    }
+  ]
+}
