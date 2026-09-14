@@ -22,8 +22,47 @@
     "external_historical_windows_do_not_establish_pit": true,
     "external_repo_results_do_not_establish_provenance": true,
     "plumbing_adoption_may_not_change_evidence_semantics": true,
-    "no_model_p_or_truth_gate_or_official_authority": true
+    "no_model_p_or_truth_gate_or_official_authority": true,
+    "public_reference_must_name_exact_repo_and_scope": true
   },
+  "public_reference_catalog": [
+    {
+      "repo": "jldbc/pybaseball",
+      "license/use": "REFERENCE_OR_PLUMBING_ONLY",
+      "approved_scope": ["statcast_request_chunking", "single_game_statcast_transport", "pitch_level_schema_normalization"],
+      "forbidden_scope": ["fitted_probabilities", "calibration", "readiness", "pit_claims"]
+    },
+    {
+      "repo": "nflverse/nflverse-pbp",
+      "license/use": "PLUMBING_ONLY",
+      "approved_scope": ["pbp_schema", "player_stats_transport", "release_based_data_loading"],
+      "forbidden_scope": ["model_authority", "fresh_holdout_claims", "sportsbook_evidence"]
+    },
+    {
+      "repo": "nflverse/nflfastR",
+      "license/use": "REFERENCE_OR_PLUMBING_ONLY",
+      "approved_scope": ["pbp_cleaning_patterns", "football_state_feature_conventions"],
+      "forbidden_scope": ["transferring_epa_models_as_sportsedge_model_p", "transferring_calibration"]
+    },
+    {
+      "repo": "sportsdataverse/cfbfastR-cfb-data",
+      "license/use": "PLUMBING_ONLY",
+      "approved_scope": ["cfb_play_participants_schema", "player_box_schema", "roster_identity_join_patterns"],
+      "forbidden_scope": ["retroactive_pit_claims", "market_odds_as_model_features", "promotion_evidence"]
+    },
+    {
+      "repo": "CFBD/cfbd-python",
+      "license/use": "PLUMBING_ONLY",
+      "approved_scope": ["roster_api_client_patterns", "play_and_play_stat_client_patterns"],
+      "forbidden_scope": ["provider_authorization_bypass", "retroactive_pit_claims", "model_authority"]
+    },
+    {
+      "repo": "DimaKudosh/pydfs-lineup-optimizer",
+      "license/use": "REFERENCE_OR_PLUMBING_ONLY",
+      "approved_scope": ["constraint_solver_architecture", "roster_slot_constraints", "solver_backend_patterns"],
+      "forbidden_scope": ["ownership_predictions", "player_projections", "contest_ev_claims"]
+    }
+  ],
   "blockers": [
     {
       "id": "GOVERNANCE_FREEZE_RECONCILIATION",
@@ -42,9 +81,11 @@
       "pr_refs": [700, 701],
       "public_repo_adoption_allowed": true,
       "adoption_mode": "CHALLENGER_ONLY",
+      "reference_repos": ["jldbc/pybaseball"],
       "approved_reference_scope": [
-        "plate_appearance_state_machine",
-        "pitcher_fatigue_or_hook_mechanics",
+        "statcast_transport_and_schema_only",
+        "plate_appearance_state_machine_patterns",
+        "pitcher_fatigue_or_hook_mechanics_as_challenger_only",
         "baserunner_state_transitions",
         "game_state_conservation_tests"
       ],
@@ -55,6 +96,68 @@
         "external_readiness_claims"
       ],
       "finish_condition": "PIT-bound in-repo producer emits aligned hitter/pitcher paths, passes frozen path-set structural validation and later player-level calibration evidence."
+    },
+    {
+      "id": "NFL_PLAYER_PROP_PROBABILITY_ENGINE",
+      "classification": "MISSING_IMPLEMENTATION",
+      "state": "NO_ENGINE",
+      "pr_refs": [439, 451],
+      "public_repo_adoption_allowed": true,
+      "adoption_mode": "PLUMBING_ONLY",
+      "reference_repos": ["nflverse/nflverse-pbp", "nflverse/nflfastR"],
+      "approved_reference_scope": [
+        "pbp_and_player_stats_loading",
+        "player_identity_and_team_joining",
+        "football_state_feature_conventions"
+      ],
+      "forbidden_reference_scope": [
+        "external_fitted_prop_probabilities",
+        "external_epa_or_win_probability_as_sportsedge_model_p",
+        "external_calibration",
+        "external_holdout_claims"
+      ],
+      "finish_condition": "Sports-specific volume, efficiency, joint player distribution and TD layers exist, consume only PIT-safe inputs, pass chronological validation, and are independently promoted before market binding."
+    },
+    {
+      "id": "CFB_PLAYER_PARTICIPATION_AND_PROP_ENGINE",
+      "classification": "MISSING_IMPLEMENTATION",
+      "state": "NO_ENGINE_PARTICIPATION_LAYER_REQUIRED",
+      "pr_refs": [467, 472, 473],
+      "public_repo_adoption_allowed": true,
+      "adoption_mode": "PLUMBING_ONLY",
+      "reference_repos": ["sportsdataverse/cfbfastR-cfb-data", "CFBD/cfbd-python"],
+      "approved_reference_scope": [
+        "play_participant_schema",
+        "game_roster_identity",
+        "player_box_schema",
+        "play_stat_transport"
+      ],
+      "forbidden_reference_scope": [
+        "retroactive_pit_claims",
+        "external_substitution_coefficients",
+        "external_calibration",
+        "market_data_in_model_fit"
+      ],
+      "finish_condition": "CFB-specific participation/substitution, volume, efficiency, joint distribution and TD layers are fitted from admissible data, frozen, replayable, forward-validated, and promoted before bettor-facing props leave NO_ENGINE."
+    },
+    {
+      "id": "DFS_FIELD_DUPLICATION_AND_CONTEST_EV_SIMULATION",
+      "classification": "MISSING_IMPLEMENTATION",
+      "state": "HEURISTIC_OBJECTIVE_NOT_CONTEST_EV",
+      "public_repo_adoption_allowed": true,
+      "adoption_mode": "PLUMBING_ONLY",
+      "reference_repos": ["DimaKudosh/pydfs-lineup-optimizer"],
+      "approved_reference_scope": [
+        "solver_backend_patterns",
+        "roster_constraint_patterns",
+        "lineup_generation_performance_patterns"
+      ],
+      "forbidden_reference_scope": [
+        "external_ownership_predictions",
+        "external_player_projections",
+        "external_roi_or_ev_claims"
+      ],
+      "finish_condition": "Field lineups are sampled from calibrated SportsEdge ownership/correlation models, duplicated lineups are modeled, contest payout rules are exact, and the selected single-entry lineup maximizes estimated contest EV rather than a heuristic score."
     },
     {
       "id": "MLB_CFB_HISTORICAL_CLOSING_LINE_EVIDENCE",
@@ -72,6 +175,14 @@
       "public_repo_adoption_allowed": false,
       "adoption_mode": "FORBIDDEN",
       "finish_condition": "Historical predictive inputs, including weather if retained, have durable as-of provenance proving pre-kickoff availability or are removed in a new frozen specification."
+    },
+    {
+      "id": "FOOTBALL_PROP_FORWARD_PIT_AND_VALIDATION_EVIDENCE",
+      "classification": "MISSING_DATA",
+      "state": "EVIDENCE_NOT_MATURE",
+      "public_repo_adoption_allowed": false,
+      "adoption_mode": "FORBIDDEN",
+      "finish_condition": "Prospective pregame participation/availability/features and postgame outcomes accrue under frozen NFL and CFB prop specifications; external historical datasets cannot substitute for missing forward evidence."
     },
     {
       "id": "MARKET_MAKER_RADAR_FILL_AND_LIMIT_EVIDENCE",
