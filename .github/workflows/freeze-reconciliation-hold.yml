@@ -26,6 +26,12 @@ jobs:
       - name: Fetch exact current main
         run: git fetch --no-tags origin main
 
+      - name: Audit workflow writers with target-aware fail-closed classification
+        run: >-
+          PYTHONPATH=. python scripts/audit_direct_main_writers.py
+          --ref HEAD
+          --output artifacts/governance/direct_main_writer_guard.json
+
       - name: Enforce unconditional hold before classification
         env:
           HEAD_REF: ${{ github.head_ref }}
@@ -48,25 +54,85 @@ jobs:
           print('freeze_hold=PASS status=' + policy['status'])
           PY
 
-      - name: Test reconciliation state machine
-        run: python -m pytest -q tests/test_freeze_reconciliation.py
+      - name: Test reconciliation inventory and writer state machines
+        run: >-
+          python -m pytest -q
+          tests/test_freeze_reconciliation.py
+          tests/test_freeze_inventory.py
+          tests/test_direct_main_writer_guard.py
+          tests/test_reconcile_freeze_deltas_cli.py
+
+      - name: Build hash-bound effective coverage view
+        run: >-
+          python scripts/build_reconciliation_registry_view.py
+          --output-policy /tmp/freeze_inventory_policy_effective.json
+          --output-registry /tmp/freeze_reconciliation_registry_effective.json
+          --attestation artifacts/governance/reconciliation_coverage_attestation.json
+
+      - name: Audit complete governance surface inventory
+        run: >-
+          PYTHONPATH=. python scripts/audit_freeze_inventory.py
+          --policy /tmp/freeze_inventory_policy_effective.json
+          --registry /tmp/freeze_reconciliation_registry_effective.json
+          --ref HEAD
+          --output artifacts/governance/freeze_inventory_report.json
+
+      - name: Enforce computed inventory whenever registry claims complete
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          inventory = json.loads(Path('artifacts/governance/freeze_inventory_report.json').read_text())
+          claimed = inventory['registry_claimed_complete']
+          if claimed and inventory['release_blocks']:
+              raise SystemExit('FREEZE_INVENTORY_FALSE_COMPLETE_CLAIM:' + ','.join(inventory['release_blocks']))
+          print('inventory_computed_complete=' + str(inventory['computed_complete']))
+          print('inventory_unmapped_count=' + str(len(inventory['unmapped_paths'])))
+          if inventory['unmapped_paths']:
+              print('inventory_unmapped=' + '|'.join(inventory['unmapped_paths']))
+          PY
 
       - name: Reconcile each registered delta against each bundle
         run: >-
           PYTHONPATH=. python scripts/reconcile_freeze_deltas.py
+          --registry /tmp/freeze_reconciliation_registry_effective.json
           --current-main-ref origin/main
           --output artifacts/governance/freeze_reconciliation_report.json
 
-      - name: Prove hold is still fail closed while inventory or dispositions remain
+      - name: Prove hold is still fail closed while inventory dispositions or writers remain
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
           report = json.loads(Path('artifacts/governance/freeze_reconciliation_report.json').read_text())
-          if report['policy_status'] == 'ACTIVE_BLOCKED' and report['release_ready']:
-              raise SystemExit('ACTIVE_BLOCKED_POLICY_CANNOT_REPORT_RELEASE_READY')
+          writer_guard = json.loads(Path('artifacts/governance/direct_main_writer_guard.json').read_text())
+          if report['policy_status'] == 'ACTIVE_BLOCKED' and report['release_authorized']:
+              raise SystemExit('ACTIVE_BLOCKED_POLICY_CANNOT_AUTHORIZE_RELEASE')
           if any((report.get('authority') or {}).values()):
               raise SystemExit('FREEZE_RECONCILIATION_REPORT_AUTHORITY_ESCALATION')
+          if any((writer_guard.get('authority') or {}).values()):
+              raise SystemExit('DIRECT_MAIN_WRITER_GUARD_AUTHORITY_ESCALATION')
+          blocking = list(writer_guard.get('blocking_findings') or ())
           print('release_ready=' + str(report['release_ready']))
+          print('release_authorized=' + str(report['release_authorized']))
           print('release_blocks=' + ','.join(report['release_blocks']))
+          print('direct_main_writer_status=' + str(writer_guard['status']))
+          print('direct_main_writer_blocking_findings=' + str(len(blocking)))
+          for finding in blocking:
+              print('writer_finding=' + str(finding.get('workflow')) + ':' + str(finding.get('reason')))
+          policy = json.loads(Path('config/freeze_reconciliation_policy_v1.json').read_text())
+          enforcement = policy['direct_main_writer_guard'].get('enforcement', 'BLOCKING')
+          print('direct_main_writer_enforcement=' + enforcement)
+          if blocking and enforcement == 'BLOCKING':
+              raise SystemExit('ACTIVE_OR_UNRESOLVED_DIRECT_MAIN_WRITER')
+          if enforcement not in {'BLOCKING', 'DIAGNOSTIC_USER_WAIVER'}:
+              raise SystemExit('DIRECT_MAIN_WRITER_ENFORCEMENT_INVALID')
           PY
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: freeze-reconciliation-audit-${{ github.event.pull_request.head.sha || github.sha }}
+          path: artifacts/governance/*.json
+          if-no-files-found: warn
+          retention-days: 30

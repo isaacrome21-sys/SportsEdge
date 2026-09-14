@@ -1,42 +1,51 @@
 {
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_POLICY_V1",
   "issue": 686,
-  "status": "ACTIVE_BLOCKED",
+  "status": "RESOLVED",
   "main_merge_hold": "UNCONDITIONAL",
   "hold_started_from_main_sha": "564e5567acf63adbf750e033df08a8c368f6884d",
-  "observed_main_sha_when_policy_authored": "09a2aecdc168f65d50a1120017491a0d104e6140",
-  "authorized_reconciliation_branch": "fix/freeze-reconciliation-delta-matrix-20260914",
-  "allowed_matrix_outcomes": [
-    "MATCH",
-    "PROVISIONAL_DRIFT_BLOCKED",
-    "NOT_APPLICABLE",
-    "DRIFT_CONFIRMED"
-  ],
-  "terminal_matrix_outcomes": [
-    "MATCH",
-    "NOT_APPLICABLE",
-    "DRIFT_CONFIRMED"
-  ],
-  "drift_terminal_dispositions": [
-    "REFROZEN",
-    "REVOKED"
-  ],
+  "observed_main_sha_when_policy_authored": "00b4db27f15cc22b089e2a2d974cf483eed86e58",
+  "authorized_reconciliation_branch": "fix/freeze-reconciliation-inventory-20260914",
+  "allowed_matrix_outcomes": ["MATCH", "PROVISIONAL_DRIFT_BLOCKED", "NOT_APPLICABLE", "DRIFT_CONFIRMED"],
+  "terminal_matrix_outcomes": ["MATCH", "NOT_APPLICABLE", "DRIFT_CONFIRMED"],
+  "drift_terminal_dispositions": ["REVOKED"],
+  "refreeze_record_required_fields": ["prior_bundle_id", "prior_bundle_hash", "new_bundle_id", "new_freeze_sha", "new_bundle_hash", "forward_clock_restart_at", "prior_semantics_invalid_after", "prior_evidence_invalidation_rule"],
+  "refreeze_semantics": {
+    "status": "DEFINED_NOT_YET_MACHINE_VERIFIED",
+    "forward_clock_restart_required": true,
+    "invalidation_boundary_requires_timestamp_and_prior_bundle_hash": true,
+    "pre_refreeze_rows_may_not_be_relabelled_under_new_bundle": true,
+    "row_admissibility_requires_capture_time_and_bundle_hash_match": true,
+    "terminal_disposition_allowed": false,
+    "rule": "REFROZEN is not a terminal disposition in this reconciliation lane until the machine verifies the prior bundle hash, invalidation timestamp, new bundle hash, and row-by-row capture-time/hash admissibility together. Until then confirmed drift may terminate only as REVOKED."
+  },
+  "direct_main_writer_guard": {
+    "status": "FROZEN_FAIL_CLOSED_CLASSIFIER_V2",
+    "required": true,
+    "classification_rule": "A destination is NON_MAIN only when the target ref is statically provable non-main. Explicit main, --all, --mirror, non-git main-write APIs/actions, and statically reachable called scripts/composite actions are writer findings. Bare pushes, interpolated or command-substituted refspecs, HEAD without a statically non-main checkout ref, missing local called sources, and inherited/unspecified write permissions are never treated as proof of quiescence.",
+    "reason_codes_required": true,
+    "proof_ceiling": "The guard can establish only that no workflow-declared or statically reachable main writer was detected at the audited ref and that no target was left unresolved under its scan contract. It cannot prove that unprotected main cannot advance through manual, app, API, or other external writes.",
+    "enforcement": "DIAGNOSTIC_USER_WAIVER",
+    "waiver_effect": "Writer findings remain machine-classified and artifacted but do not independently block release while the explicit operational waiver remains in force. The waiver does not convert any finding to QUIESCED and grants no evidence or model authority."
+  },
   "release_conditions": {
     "bundle_inventory_complete": true,
+    "bundle_inventory_must_be_machine_audited": true,
     "all_delta_bundle_rows_terminal": true,
     "every_drifted_bundle_has_terminal_disposition": true,
     "refrozen_bundle_requires_new_freeze_sha_and_forward_clock_restart": true,
+    "refrozen_bundle_requires_timestamp_plus_prior_bundle_hash_invalidation": true,
+    "refrozen_disposition_currently_allowed": false,
     "revoked_bundle_invalidates_prior_forward_clock": true,
-    "current_main_sha_must_equal_reconciled_through_sha": true
+    "current_main_sha_must_equal_reconciled_through_sha": true,
+    "direct_main_writers_quiesced": false
   },
-  "authority": {
-    "model_p": false,
-    "truth_gate": false,
-    "promotion": false,
-    "staking": false,
-    "official": false,
-    "validation_attempt": false,
-    "untouched_readout": false
-  },
-  "enforcement_note": "Repository CI can fail pull requests while this hold is active, but GitHub can still permit a manual merge unless the repository ruleset or branch protection marks the check required. Do not represent CI-only enforcement as an unbypassable server-side lock."
+  "authority": {"model_p": false, "truth_gate": false, "promotion": false, "staking": false, "official": false, "validation_attempt": false, "untouched_readout": false},
+  "enforcement_note": "Repository CI can fail pull requests while this hold is active, but GitHub can still permit a manual or external write because main is not protected server-side. Do not represent CI, the writer detector, or an exact-head audit as proof that main cannot advance.",
+  "operational_prerequisite_waiver": {
+    "scope": ["server_side_main_branch_protection", "blocking_on_direct_main_writer_diagnostic"],
+    "user_instruction": "Fuck that prerequisite then and move on a finish everything",
+    "scope_limit": "Operational release prerequisite only. No evidence, model validation, Model_P, promotion, staking or OFFICIAL authority is created.",
+    "main_movement_policy": "Read current main before each mutation and merge; register any new deltas before reconciliation release."
+  }
 }
