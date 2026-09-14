@@ -76,7 +76,7 @@ def projection_from_stats(
     sport = sport.upper()
     if sport in {"NFL", "CFB"}:
         mean = football_expected_dk_points(stats)
-    elif sport == "MLB" and "P" in player.positions:
+    elif sport == "MLB" and player.is_pitcher:
         mean = mlb_pitcher_expected_dk_points(stats)
     elif sport == "MLB":
         mean = mlb_hitter_expected_dk_points(stats)
@@ -146,7 +146,7 @@ def _football_sample_stats(player: DKPlayer, sample: Mapping[str, float]) -> dic
 
 def _mlb_sample_stats(player: DKPlayer, sample: Mapping[str, float]) -> dict[str, float]:
     out = {str(k): float(v) for k, v in sample.items() if isinstance(v, (int, float))}
-    if "P" in player.positions:
+    if player.is_pitcher:
         required = {"outs", "strikeouts", "earned_runs", "hits_allowed", "walks_allowed"}
     else:
         required = {"singles", "doubles", "triples", "home_runs", "rbi", "runs", "walks", "hbp", "stolen_bases"}
@@ -176,7 +176,7 @@ def projection_from_samples(
             continue
         if sport.upper() in {"NFL", "CFB"}:
             scores.append(football_expected_dk_points(_football_sample_stats(player, sample)))
-        elif sport.upper() == "MLB" and "P" in player.positions:
+        elif sport.upper() == "MLB" and player.is_pitcher:
             scores.append(mlb_pitcher_expected_dk_points(_mlb_sample_stats(player, sample)))
         elif sport.upper() == "MLB":
             scores.append(mlb_hitter_expected_dk_points(_mlb_sample_stats(player, sample)))
