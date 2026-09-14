@@ -8,7 +8,8 @@ name: nfl-market-maker-radar-capture
 # V2 starts the three provider transports concurrently, records local request and
 # retrieval provenance, and refuses timing-ineligible polls as signal inputs.
 # Newly-created stale-price candidates are re-polled at the policy-frozen offset
-# before any research ROI proxy may treat the captured soft price as persistent.
+# measured from the original capture timestamp before any research ROI proxy may
+# treat the captured soft price as persistent.
 # Rows, raw payloads, research candidate records, persistence records, and CLV
 # settlement records are append-only on `data`.
 
@@ -51,6 +52,7 @@ on:
       - 'tests/test_market_maker_radar.py'
       - 'tests/test_market_maker_radar_v2.py'
       - 'tests/test_market_maker_candidate_settlement.py'
+      - 'tests/test_market_maker_candidate_settlement_v2.py'
       - 'tests/test_market_maker_candidate_persistence.py'
       - 'tests/test_nfl_market_maker_radar_workflow.py'
       - 'config/market_maker_radar_v1.json'
@@ -85,6 +87,7 @@ jobs:
           python -m unittest tests.test_market_maker_radar -v
           python -m unittest tests.test_market_maker_radar_v2 -v
           python -m unittest tests.test_market_maker_candidate_settlement -v
+          python -m unittest tests.test_market_maker_candidate_settlement_v2 -v
           python -m unittest tests.test_market_maker_candidate_persistence -v
           python -m unittest tests.test_nfl_market_maker_radar_workflow -v
           python -m unittest tests.test_normalize_pinnacle_nfl_markets -v
@@ -148,17 +151,36 @@ jobs:
             .official_authority == false and
             .automatic_wager_authority == false and
             .manual_candidate_review_authority == true and
+            .primary_metric == "REALIZED_ROI_ON_FILLED_WAGERS" and
+            .process_metric == "CLV" and
+            .run_it_independence.counts_as_independent_context_class == false and
             .threshold_freeze.status == "FROZEN_BEFORE_FIRST_LEAD_LAG_SIGNAL"
           ' artifacts/nfl-market-maker-radar/latest.json >/dev/null
 
-      - name: Wait frozen stale-price persistence offset
+      - name: Wait until frozen stale-price persistence offset
         if: github.event_name != 'pull_request'
         shell: bash
         run: |
           set -euo pipefail
           NEW_CANDIDATES="$(jq -r '.candidate_ledger_new_count' artifacts/nfl-market-maker-radar/latest.json)"
           if [ "${NEW_CANDIDATES}" -gt 0 ]; then
-            sleep 30
+            python - <<'PY'
+          import json
+          import time
+          from datetime import datetime, timedelta, timezone
+
+          with open('artifacts/nfl-market-maker-radar/capture-status.json', encoding='utf-8') as fh:
+              capture = json.load(fh)
+          with open('config/market_maker_radar_v2.json', encoding='utf-8') as fh:
+              policy = json.load(fh)
+          text = capture['captured_at'].replace('Z', '+00:00')
+          captured_at = datetime.fromisoformat(text).astimezone(timezone.utc)
+          offset = float(policy['takeability']['persistence_recheck_offset_seconds'])
+          target = captured_at + timedelta(seconds=offset)
+          delay = (target - datetime.now(timezone.utc)).total_seconds()
+          if delay > 0:
+              time.sleep(delay)
+          PY
           fi
 
       - name: Re-poll stale candidates for takeability persistence
