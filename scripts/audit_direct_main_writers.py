@@ -84,15 +84,17 @@ def _classify_refspec(token: str, checkout_non_main: str | None) -> tuple[str, s
 
 
 def classify_git_push(command: str, checkout_non_main: str | None = None) -> tuple[str, str]:
+    match = re.search(r"\bgit\s+push\b.*", command)
+    if not match:
+        return "NON_WRITER", "NO_GIT_PUSH"
+    # Classify only the git command itself. Shell control syntax after a push
+    # (`; then`, `&& echo`, `|| retry`) is not part of the refspec.
+    git_command = re.split(r"\s*(?:&&|\|\||;)\s*", match.group(0), maxsplit=1)[0]
     try:
-        tokens = shlex.split(command, posix=True)
+        tokens = shlex.split(git_command, posix=True)
     except ValueError:
         return "UNRESOLVABLE", "PUSH_COMMAND_UNPARSEABLE"
-    try:
-        idx = next(i for i in range(len(tokens) - 1) if tokens[i] == "git" and tokens[i + 1] == "push")
-    except StopIteration:
-        return "NON_WRITER", "NO_GIT_PUSH"
-    args = tokens[idx + 2 :]
+    args = tokens[2:]
     if "--all" in args:
         return "MAIN_WRITER", "PUSH_ALL_INCLUDES_MAIN"
     if "--mirror" in args:
@@ -113,14 +115,26 @@ def classify_git_push(command: str, checkout_non_main: str | None = None) -> tup
 
 def _referenced_local_paths(text: str) -> list[tuple[str, str]]:
     refs: set[tuple[str, str]] = set()
-    # Shell interpreters must be standalone command words. Without the word
-    # boundary, text such as `git push origin ...` contains the substring
-    # `sh origin` and is falsely treated as a call to a local file named
-    # `origin`, which turns proven non-main pushes into unresolved findings.
-    for match in re.finditer(r"\b(?:bash|sh)\s+([^\s;&|]+)|(?:^|\s)(\./[^\s;&|]+)", text, re.M):
-        value = match.group(1) or match.group(2)
-        if value and "$" not in value and "${{" not in value:
-            refs.add((value.removeprefix("./"), "FILE"))
+    # Only recognize same-line shell invocations. This avoids interpreting YAML
+    # `shell: bash` followed by a later `run:` key as `bash run:`.
+    for raw in text.splitlines():
+        stripped = raw.strip()
+        if stripped.startswith("- run:"):
+            candidate = stripped[len("- run:") :].strip()
+        elif stripped.startswith("run:"):
+            candidate = stripped[len("run:") :].strip()
+        else:
+            candidate = stripped
+        match = re.match(r"^(?:bash|sh)\s+([^\s;&|]+)", candidate)
+        if match:
+            value = match.group(1)
+            if "$" not in value and "${{" not in value:
+                refs.add((value.removeprefix("./"), "FILE"))
+        match = re.match(r"^\./([^\s;&|]+)", candidate)
+        if match:
+            value = match.group(1)
+            if "$" not in value and "${{" not in value:
+                refs.add((value, "FILE"))
     for match in re.finditer(r"uses:\s*\.\/([^\s#]+)", text):
         refs.add((match.group(1).rstrip("/"), "COMPOSITE"))
     return sorted(refs)
@@ -159,8 +173,8 @@ def audit(repo: Path, ref: str = "HEAD") -> dict[str, Any]:
                     if classification not in {"NON_MAIN", "NON_WRITER"}:
                         findings.append({"workflow": path, "source": source_path, "line": line_no, "classification": classification, "reason": reason, "permission_state": permission_state, "permission_reason": permission_reason, "snippet": line.strip()})
             for reason, pattern in NON_GIT_MAIN_PATTERNS:
-                for match in pattern.finditer(source_text):
-                    line_no = source_text.count("\n", 0, match.start()) + 1
+                for pattern_match in pattern.finditer(source_text):
+                    line_no = source_text.count("\n", 0, pattern_match.start()) + 1
                     findings.append({"workflow": path, "source": source_path, "line": line_no, "classification": "MAIN_WRITER", "reason": reason, "permission_state": permission_state, "permission_reason": permission_reason})
     blocking = [f for f in findings if f["classification"] in {"MAIN_WRITER", "UNRESOLVABLE"}]
     status = "QUIESCED" if not blocking else "BLOCKED_OR_UNRESOLVED"
@@ -172,7 +186,7 @@ def audit(repo: Path, ref: str = "HEAD") -> dict[str, Any]:
         "workflow_count": len(workflows),
         "findings": findings,
         "blocking_findings": blocking,
-        "authority": {k: False for k in ("model_p", "truth_gate", "promotion", "staking", "official", "validation_attempt", "untouched_readout")},
+        "authority": {k: False for k in ("model_p", "truth_gate", "promotion", "staking", "official", "validation_attempt", "readout")},
         "proof_ceiling": "NO_DECLARED_OR_STATICALLY_REACHABLE_MAIN_WRITER_DETECTED_AT_THIS_REF; DOES_NOT_PROVE_MAIN_CANNOT_ADVANCE",
     }
 
