@@ -4,13 +4,9 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
+      - '**/*.py'
       - 'config/research/cfb_historical_market_source_v1.json'
       - 'config/cfb_external_repo_adoptions_v1.json'
-      - 'sportsedge/sports/cfb/history_cache.py'
-      - 'scripts/materialize_cfb_historical_market_archive.py'
-      - 'tests/test_cfb_historical_market_source.py'
-      - 'tests/test_cfb_historical_market_contamination_boundary.py'
-      - 'tests/test_cfb_history_cache.py'
       - '.github/workflows/cfb-historical-market-source-freeze.yml'
 
 permissions:
@@ -47,10 +43,11 @@ jobs:
           tests/test_cfb_historical_market_source.py
           tests/test_cfb_historical_market_contamination_boundary.py
           tests/test_cfb_history_cache.py
+          tests/test_cfb_market_archive_restrictions.py
 
       - name: Materialize and verify exact pinned archive
         run: >-
-          python scripts/materialize_cfb_historical_market_archive.py
+          python -m scripts.materialize_cfb_historical_market_archive
           --config config/research/cfb_historical_market_source_v1.json
           --attestation-out artifacts/cfb/history/cfb_historical_market_attestation.json
           --archive-out artifacts/cfb/history/cfb_line_odds.csv.gz
@@ -67,14 +64,11 @@ jobs:
               raise SystemExit('CFB_HISTORICAL_MARKET_PIT_OR_CLV_AUTHORITY_FORBIDDEN')
           if p.get('promotion_authority') is not False:
               raise SystemExit('CFB_HISTORICAL_MARKET_PROMOTION_AUTHORITY_FORBIDDEN')
-          auth=p.get('authority') or {}
-          for field in ('feature_authority','model_p_authority','truth_gate_authority','promotion_authority','staking_authority','official_bet_authority'):
-              if auth.get(field) is not False:
-                  raise SystemExit('CFB_HISTORICAL_MARKET_FORBIDDEN_AUTHORITY:'+field)
-          forbidden=set(p.get('forbidden_uses') or [])
-          for field in ('predictive_model_features','model_training_inputs','model_calibration_inputs','model_p_generation','paired_no_vig_market_benchmark','decision_close_clv_evidence','truth_gate_evidence','promotion_evidence','staking_authority','official_bet_authority'):
-              if field not in forbidden:
-                  raise SystemExit('CFB_HISTORICAL_MARKET_FORBIDDEN_USE_MISSING:'+field)
+          from sportsedge.sports.cfb.market_archive_contract import load_contract, validate_restrictions
+          validate_restrictions(p)
+          source = load_contract('config/research/cfb_historical_market_source_v1.json')
+          if p['restriction_sha256'] != source['restriction_sha256']:
+              raise SystemExit('CFB_MARKET_ATTESTATION_RESTRICTION_MISMATCH')
           if p['observed']['sha256'] != '7ae899d9035750dccf22470d7923087a2659052aeb37a44204c35fbf6bf38d4d':
               raise SystemExit('CFB_HISTORICAL_MARKET_SHA256_NOT_FROZEN')
           print('observed_sha256='+p['observed']['sha256'])
@@ -83,11 +77,34 @@ jobs:
           print('books='+str(p['profile']['book_count']))
           PY
 
+      - name: Verify restricted live cache write and read
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from sportsedge.sports.cfb.history_cache import cache_market_archive
+          from sportsedge.sports.cfb.market_archive import iter_market_archive
+          from sportsedge.sports.cfb.market_archive_contract import load_contract, validate_restrictions
+          config = 'config/research/cfb_historical_market_source_v1.json'
+          use = 'historical_market_coverage_profiling'
+          result = cache_market_archive(contract_path=config, cache_root='artifacts/cfb/cache',
+                                        allow_benchmark=True, use=use)
+          manifest = json.loads(Path(result['manifest_file']).read_text())
+          validate_restrictions(manifest)
+          assert manifest['restriction_sha256'] == load_contract(config)['restriction_sha256']
+          rows = iter_market_archive(contract_path=config, cache_file=result['cache_file'], use=use)
+          assert next(rows, None) is not None
+          rows.close()
+          Path('artifacts/cfb/history/cache_manifest.json').write_text(json.dumps(manifest, sort_keys=True))
+          print('restricted_cache_roundtrip=PASS restriction_sha256=' + manifest['restriction_sha256'])
+          PY
+
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: cfb-historical-market-freeze-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             artifacts/cfb/history/cfb_historical_market_attestation.json
             artifacts/cfb/history/cfb_line_odds.csv.gz
+            artifacts/cfb/history/cache_manifest.json
           if-no-files-found: error
           retention-days: 30

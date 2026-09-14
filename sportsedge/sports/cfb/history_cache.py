@@ -11,6 +11,10 @@ import re
 from typing import Any, Callable, Iterable, Mapping
 from urllib.request import Request, urlopen
 
+from .market_archive_contract import (
+    load_contract, require_use, restriction_fields, digest as contract_digest,
+)
+
 from .historical_release import (
     BENCHMARK_ONLY_DATASETS,
     PREDICTIVE_DATASETS,
@@ -207,14 +211,7 @@ def cache_many(
 
 
 def _load_market_archive_contract(path: str | Path) -> dict[str, Any]:
-    try:
-        payload = json.loads(Path(path).read_text(encoding="utf-8"))
-    except Exception as exc:
-        raise CFBHistoryCacheError("CFB_MARKET_ARCHIVE_CONTRACT_INVALID") from exc
-    if payload.get("source_id") != MARKET_ARCHIVE_SOURCE_ID:
-        raise CFBHistoryCacheError("CFB_MARKET_ARCHIVE_SOURCE_ID_INVALID")
-    if payload.get("mode") != "RESEARCH_ONLY" or payload.get("status") != "FROZEN_RESEARCH_SOURCE":
-        raise CFBHistoryCacheError("CFB_MARKET_ARCHIVE_MODE_INVALID")
+    payload = load_contract(path)
     upstream = payload.get("upstream") or {}
     digest = str(upstream.get("expected_sha256") or "").lower()
     if not _HEX64.fullmatch(digest):
@@ -225,20 +222,6 @@ def _load_market_archive_contract(path: str | Path) -> dict[str, Any]:
         raise CFBHistoryCacheError("CFB_MARKET_ARCHIVE_SIZE_REQUIRED") from exc
     if size <= 0 or not str(upstream.get("raw_url") or "").startswith("https://"):
         raise CFBHistoryCacheError("CFB_MARKET_ARCHIVE_UPSTREAM_INVALID")
-    authority = payload.get("authority") or {}
-    for field in (
-        "model_p_authority",
-        "truth_gate_authority",
-        "promotion_authority",
-        "staking_authority",
-        "official_bet_authority",
-    ):
-        if authority.get(field) is not False:
-            raise CFBHistoryCacheError("CFB_MARKET_ARCHIVE_FORBIDDEN_AUTHORITY:" + field)
-    limits = payload.get("evidence_limitations") or {}
-    for field in ("per_row_pit_certified", "decision_time_certified", "close_time_certified", "clv_authority"):
-        if limits.get(field) is not False:
-            raise CFBHistoryCacheError("CFB_MARKET_ARCHIVE_EVIDENCE_LIMIT_INVALID:" + field)
     return payload
 
 
@@ -257,6 +240,7 @@ def cache_market_archive(
     *,
     contract_path: str | Path,
     cache_root: str | Path,
+    use: str,
     allow_benchmark: bool = False,
     opener: Callable[..., Any] = urlopen,
     retrieved_at: datetime | None = None,
@@ -265,12 +249,15 @@ def cache_market_archive(
     if not allow_benchmark:
         raise CFBHistoricalReleaseError("CFB_MARKET_DATA_PROHIBITED:historical_market_archive")
     contract = _load_market_archive_contract(contract_path)
+    require_use(contract, use)
     upstream = contract["upstream"]
     expected_size = int(upstream["expected_size_bytes"])
     expected_sha = str(upstream["expected_sha256"]).lower()
-    target = Path(cache_root) / "betting_archive" / Path(str(upstream["path"])).name
+    target = (Path(cache_root) / "betting_archive" / contract["restriction_sha256"]
+              / expected_sha / Path(str(upstream["path"])).name)
     reused = False
     if target.is_file():
+        _verify_market_manifest(target, contract)
         try:
             _verify_market_archive_file(
                 target, expected_size=expected_size, expected_sha256=expected_sha
@@ -309,10 +296,20 @@ def cache_market_archive(
             raise
 
     _verify_market_archive_file(target, expected_size=expected_size, expected_sha256=expected_sha)
+    if reused:
+        manifest_path = target.parent / "manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        return {"dataset": "historical_market_archive", "usage": "BENCHMARK_ONLY",
+                "cache_file": str(target), "manifest_file": str(manifest_path),
+                "content_sha256": expected_sha, "manifest_sha256": manifest["manifest_sha256"],
+                "restriction_sha256": contract["restriction_sha256"],
+                "row_count": manifest["row_count"], "cache_reused": True}
     retrieved = (retrieved_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
     profile = contract.get("verified_profile") or {}
     manifest: dict[str, Any] = {
-        "contract": "CFB_HISTORICAL_MARKET_ARCHIVE_CACHE_V1",
+        "contract": "CFB_HISTORICAL_MARKET_ARCHIVE_CACHE_V2",
+        **restriction_fields(contract),
+        "source_contract_sha256": contract_digest(contract),
         "source_id": contract["source_id"],
         "usage": "BENCHMARK_ONLY",
         "retrieved_at": retrieved,
@@ -321,7 +318,7 @@ def cache_market_archive(
         "upstream_repository": upstream["repository"],
         "upstream_commit": upstream["commit"],
         "upstream_path": upstream["path"],
-        "cache_relative_path": str(Path("betting_archive") / target.name),
+        "cache_relative_path": str(target.relative_to(Path(cache_root))),
         "cache_reused": reused,
         "row_count": int(profile.get("row_count", 0)),
         "season_start": profile.get("season_start"),
@@ -343,16 +340,19 @@ def cache_market_archive(
         "manifest_file": str(manifest_path),
         "content_sha256": expected_sha,
         "manifest_sha256": manifest_sha,
+        "restriction_sha256": contract["restriction_sha256"],
         "row_count": manifest["row_count"],
         "cache_reused": reused,
     }
 
 
-def iter_market_archive(*, contract_path: str | Path, cache_file: str | Path):
+def _iter_market_archive(*, contract_path: str | Path, cache_file: str | Path, use: str):
     """Stream checksum-verified historical market rows for benchmark/research use."""
     contract = _load_market_archive_contract(contract_path)
+    require_use(contract, use)
     upstream = contract["upstream"]
     path = Path(cache_file)
+    _verify_market_manifest(path, contract)
     _verify_market_archive_file(
         path,
         expected_size=int(upstream["expected_size_bytes"]),
@@ -369,3 +369,28 @@ def iter_market_archive(*, contract_path: str | Path, cache_file: str | Path):
             yield {str(k): "" if v is None else str(v) for k, v in row.items()}
         if not found:
             raise CFBHistoryCacheError("CFB_MARKET_ARCHIVE_EMPTY")
+
+
+def _verify_market_manifest(path: Path, contract: dict) -> None:
+    """Never bless legacy bytes in place; require write-time V2 provenance."""
+    if (path.parent.name != contract["upstream"]["expected_sha256"]
+            or path.parent.parent.name != contract["restriction_sha256"]
+            or path.parent.parent.parent.name != "betting_archive"):
+        raise CFBHistoryCacheError("CFB_MARKET_CACHE_NAMESPACE_MISMATCH")
+    try:
+        manifest = json.loads((path.parent / "manifest.json").read_text())
+    except (OSError, ValueError) as exc:
+        raise CFBHistoryCacheError("CFB_MARKET_CACHE_MANIFEST_REQUIRED") from exc
+    expected = restriction_fields(contract)
+    for key, value in expected.items():
+        if contract_digest(manifest.get(key)) != contract_digest(value):
+            raise CFBHistoryCacheError("CFB_MARKET_CACHE_RESTRICTION_MISMATCH:" + key)
+    if (manifest.get("contract") != "CFB_HISTORICAL_MARKET_ARCHIVE_CACHE_V2"
+            or manifest.get("source_contract_sha256") != contract_digest(contract)
+            or manifest.get("content_sha256") != contract["upstream"]["expected_sha256"]
+            or manifest.get("content_size_bytes") != contract["upstream"]["expected_size_bytes"]
+            or manifest.get("source_id") != contract["source_id"]):
+        raise CFBHistoryCacheError("CFB_MARKET_CACHE_SOURCE_MISMATCH")
+    claimed = manifest.pop("manifest_sha256", None)
+    if claimed != contract_digest(manifest):
+        raise CFBHistoryCacheError("CFB_MARKET_CACHE_MANIFEST_HASH_MISMATCH")

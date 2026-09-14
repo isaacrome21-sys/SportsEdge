@@ -20,66 +20,15 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-REQUIRED_FORBIDDEN_USES = {
-    "predictive_model_features",
-    "model_training_inputs",
-    "model_calibration_inputs",
-    "model_p_generation",
-    "paired_no_vig_market_benchmark",
-    "decision_close_clv_evidence",
-    "truth_gate_evidence",
-    "promotion_evidence",
-    "staking_authority",
-    "official_bet_authority",
-}
-FORBIDDEN_ALLOWED_USE_TOKENS = ("feature", "training", "model_p", "calibration")
+from sportsedge.sports.cfb.market_archive_contract import (
+    load_contract as _load_contract, restriction_fields,
+)
 
 
 def _git_blob_sha1(data: bytes) -> str:
     header = f"blob {len(data)}\0".encode("ascii")
     return hashlib.sha1(header + data).hexdigest()
 
-
-def _load_contract(path: Path) -> dict[str, Any]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if payload.get("schema_version") != 1:
-        raise ValueError("CFB_HISTORICAL_MARKET_SCHEMA_INVALID")
-    if payload.get("source_id") != "CFB_HISTORICAL_MARKET_SOURCE_V1":
-        raise ValueError("CFB_HISTORICAL_MARKET_SOURCE_ID_INVALID")
-    if payload.get("sport") != "cfb" or payload.get("mode") != "RESEARCH_ONLY":
-        raise ValueError("CFB_HISTORICAL_MARKET_MODE_INVALID")
-    authority = payload.get("authority") or {}
-    for field in (
-        "feature_authority",
-        "model_p_authority",
-        "truth_gate_authority",
-        "promotion_authority",
-        "staking_authority",
-        "official_bet_authority",
-    ):
-        if authority.get(field) is not False:
-            raise ValueError(f"CFB_HISTORICAL_MARKET_FORBIDDEN_AUTHORITY:{field}")
-    limits = payload.get("evidence_limitations") or {}
-    for field in (
-        "per_row_pit_certified",
-        "decision_time_certified",
-        "close_time_certified",
-        "clv_authority",
-        "paired_two_sided_quote_certified",
-    ):
-        if limits.get(field) is not False:
-            raise ValueError(f"CFB_HISTORICAL_MARKET_EVIDENCE_LIMIT_INVALID:{field}")
-    allowed = payload.get("allowed_uses")
-    forbidden = payload.get("forbidden_uses")
-    if not isinstance(allowed, list) or not all(isinstance(x, str) and x for x in allowed):
-        raise ValueError("CFB_HISTORICAL_MARKET_ALLOWED_USES_INVALID")
-    if not isinstance(forbidden, list) or not all(isinstance(x, str) and x for x in forbidden):
-        raise ValueError("CFB_HISTORICAL_MARKET_FORBIDDEN_USES_INVALID")
-    if any(token in use.lower() for use in allowed for token in FORBIDDEN_ALLOWED_USE_TOKENS):
-        raise ValueError("CFB_HISTORICAL_MARKET_MODEL_FEATURE_USE_FORBIDDEN")
-    if not REQUIRED_FORBIDDEN_USES.issubset(set(forbidden)):
-        raise ValueError("CFB_HISTORICAL_MARKET_FORBIDDEN_USES_INCOMPLETE")
-    return payload
 
 
 def _validate_bytes(
@@ -208,8 +157,7 @@ def materialize(
         "observed": observed,
         "profile": profile,
         "evidence_limitations": contract["evidence_limitations"],
-        "allowed_uses": contract["allowed_uses"],
-        "forbidden_uses": contract["forbidden_uses"],
+        **restriction_fields(contract),
         "authority": contract["authority"],
         "pit_certified": False,
         "clv_authority": False,

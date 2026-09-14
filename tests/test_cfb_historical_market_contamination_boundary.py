@@ -26,7 +26,7 @@ class CFBHistoricalMarketContaminationBoundaryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             p = Path(td) / 'contract.json'
             p.write_text(json.dumps(payload))
-            with self.assertRaisesRegex(ValueError, 'MODEL_FEATURE_USE_FORBIDDEN'):
+            with self.assertRaisesRegex(ValueError, 'USE_PROJECTION_INVALID'):
                 _load_contract(p)
 
     def test_missing_forbidden_use_fails_closed(self):
@@ -35,7 +35,7 @@ class CFBHistoricalMarketContaminationBoundaryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             p = Path(td) / 'contract.json'
             p.write_text(json.dumps(payload))
-            with self.assertRaisesRegex(ValueError, 'FORBIDDEN_USES_INCOMPLETE'):
+            with self.assertRaisesRegex(ValueError, 'USE_PROJECTION_INVALID'):
                 _load_contract(p)
 
     def test_feature_authority_true_fails_closed(self):
@@ -44,7 +44,7 @@ class CFBHistoricalMarketContaminationBoundaryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             p = Path(td) / 'contract.json'
             p.write_text(json.dumps(payload))
-            with self.assertRaisesRegex(ValueError, 'FORBIDDEN_AUTHORITY:feature_authority'):
+            with self.assertRaisesRegex(ValueError, 'FORBIDDEN_AUTHORITY_OR_LIMIT'):
                 _load_contract(p)
 
 if __name__ == '__main__':

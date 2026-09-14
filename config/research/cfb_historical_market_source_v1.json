@@ -106,5 +106,44 @@
     "promotion_authority": false,
     "staking_authority": false,
     "official_bet_authority": false
-  }
+  },
+  "restrictions": {
+    "version": "CFB_MARKET_RESTRICTIONS_V2",
+    "uses": {
+      "historical_market_coverage_profiling": "ALLOW",
+      "research_backtesting_context": "ALLOW",
+      "book_and_market_availability_research": "ALLOW",
+      "signed_key_number_reference_context": "ALLOW",
+      "simulated_distribution_realism_benchmark": "ALLOW",
+      "predictive_model_features": "DENY",
+      "model_training_inputs": "DENY",
+      "model_calibration_inputs": "DENY",
+      "model_p_generation": "DENY",
+      "paired_no_vig_market_benchmark": "DENY",
+      "decision_close_clv_evidence": "DENY",
+      "truth_gate_evidence": "DENY",
+      "promotion_evidence": "DENY",
+      "staking_authority": "DENY",
+      "official_bet_authority": "DENY"
+    },
+    "authority": {
+      "feature_authority": false,
+      "model_p_authority": false,
+      "truth_gate_authority": false,
+      "promotion_authority": false,
+      "staking_authority": false,
+      "official_bet_authority": false
+    },
+    "evidence_limitations": {
+      "retrospective_archive": true,
+      "per_row_pit_certified": false,
+      "decision_time_certified": false,
+      "close_time_certified": false,
+      "clv_authority": false,
+      "paired_two_sided_quote_certified": false,
+      "git_commit_time_is_not_row_capture_time": true,
+      "opening_or_closing_semantics_must_not_be_inferred_beyond_documented_fields": true
+    }
+  },
+  "restriction_sha256": "778e2183e8e4e0fcf715c6b44b81fa7c4016a920a2d0855a20b7c292ba31961d"
 }
