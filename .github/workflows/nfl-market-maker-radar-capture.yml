@@ -5,8 +5,10 @@ name: nfl-market-maker-radar-capture
 # because price-leadership observations are irreversible/PIT-sensitive: if the
 # sequence is not observed live, it cannot be reconstructed honestly later.
 # Pinnacle is the market-maker reference; DraftKings and FanDuel are soft books.
-# All books in one poll share one capture clock, so request ordering cannot create
-# a fake leader. Rows and exact raw provider payloads are append-only on `data`.
+# V2 starts the three provider transports concurrently, records local request and
+# retrieval provenance, and refuses timing-ineligible polls as signal inputs.
+# Rows, raw payloads, research candidate records, and CLV settlement records are
+# append-only on `data`.
 
 on:
   workflow_dispatch:
@@ -17,22 +19,34 @@ on:
       - main
     paths:
       - 'scripts/capture_nfl_market_maker_radar.py'
+      - 'scripts/capture_nfl_market_maker_radar_v2.py'
       - 'scripts/normalize_pinnacle_nfl_markets.py'
       - 'scripts/normalize_fanduel_nfl_markets.py'
       - 'sportsedge/draftkings_game_market_source.py'
       - 'scripts/analyze_market_maker_radar.py'
+      - 'scripts/analyze_market_maker_radar_v2.py'
+      - 'scripts/settle_market_maker_candidate_ledger.py'
       - 'config/market_maker_radar_v1.json'
+      - 'config/market_maker_radar_v2.json'
       - 'config/workflow_cron_policy_v1.json'
       - '.github/workflows/nfl-market-maker-radar-capture.yml'
   pull_request:
     paths:
       - 'scripts/capture_nfl_market_maker_radar.py'
+      - 'scripts/capture_nfl_market_maker_radar_v2.py'
       - 'tests/test_capture_nfl_market_maker_radar.py'
+      - 'tests/test_capture_nfl_market_maker_radar_v2.py'
       - 'scripts/normalize_pinnacle_nfl_markets.py'
       - 'scripts/normalize_fanduel_nfl_markets.py'
       - 'sportsedge/draftkings_game_market_source.py'
       - 'scripts/analyze_market_maker_radar.py'
+      - 'scripts/analyze_market_maker_radar_v2.py'
+      - 'scripts/settle_market_maker_candidate_ledger.py'
+      - 'tests/test_market_maker_radar.py'
+      - 'tests/test_market_maker_radar_v2.py'
+      - 'tests/test_market_maker_candidate_settlement.py'
       - 'config/market_maker_radar_v1.json'
+      - 'config/market_maker_radar_v2.json'
       - 'config/workflow_cron_policy_v1.json'
       - '.github/workflows/nfl-market-maker-radar-capture.yml'
 
@@ -59,7 +73,10 @@ jobs:
       - name: Verify direct radar contracts
         run: |
           python -m unittest tests.test_capture_nfl_market_maker_radar -v
+          python -m unittest tests.test_capture_nfl_market_maker_radar_v2 -v
           python -m unittest tests.test_market_maker_radar -v
+          python -m unittest tests.test_market_maker_radar_v2 -v
+          python -m unittest tests.test_market_maker_candidate_settlement -v
           python -m unittest tests.test_normalize_pinnacle_nfl_markets -v
           python -m unittest tests.test_fanduel_nfl_market_normalizer -v
           python -m unittest tests.test_direct_dk_game_market_source -v
@@ -77,18 +94,20 @@ jobs:
             (cd .data-branch && git checkout --orphan data && git rm -rf --quiet . || true)
           fi
 
-      - name: Capture direct Pinnacle DK FanDuel NFL snapshot
+      - name: Capture concurrent Pinnacle DK FanDuel NFL snapshot
         if: github.event_name != 'pull_request'
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p artifacts/nfl-market-maker-radar
-          python -m scripts.capture_nfl_market_maker_radar \
+          python -m scripts.capture_nfl_market_maker_radar_v2 \
             --out-root .data-branch \
             --status-out artifacts/nfl-market-maker-radar/capture-status.json
           jq -e '
             (.state == "CAPTURED" or .state == "PARTIAL") and
             .rows_written > 0 and
+            .transport_mode == "CONCURRENT_PROVIDER_START" and
+            (.timing_hygiene.leadership_timing_eligible == true or .timing_hygiene.leadership_timing_eligible == false) and
             .authority.model_p_input == false and
             .authority.truth_gate_input == false and
             .authority.promotion_authority == false and
@@ -99,7 +118,48 @@ jobs:
             .authority.wager_placement_authority == false
           ' artifacts/nfl-market-maker-radar/capture-status.json >/dev/null
 
-      - name: Commit append-only direct radar observations
+      - name: Analyze timing-eligible radar history and ledger stale candidates
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/analyze_market_maker_radar_v2.py \
+            --policy config/market_maker_radar_v2.json \
+            --input-root .data-branch/archive/market-maker-radar/nfl \
+            --ledger-out-root .data-branch \
+            --since-hours 24 \
+            --out artifacts/nfl-market-maker-radar/latest.json
+          jq -e '
+            .model_p_authority == false and
+            .truth_gate_input == false and
+            .promotion_authority == false and
+            .eligibility_authority == false and
+            .staking_authority == false and
+            .official_authority == false and
+            .automatic_wager_authority == false and
+            .manual_candidate_review_authority == true and
+            .threshold_freeze.status == "FROZEN_BEFORE_FIRST_LEAD_LAG_SIGNAL"
+          ' artifacts/nfl-market-maker-radar/latest.json >/dev/null
+
+      - name: Settle exact-contract CLV candidates
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/settle_market_maker_candidate_ledger.py \
+            --policy config/market_maker_radar_v2.json \
+            --archive-root .data-branch/archive/market-maker-radar/nfl \
+            --ledger-root .data-branch \
+            --out artifacts/nfl-market-maker-radar/settlement.json
+          jq -e '
+            .primary_metric == "CLV" and
+            .model_p_authority == false and
+            .promotion_authority == false and
+            .staking_authority == false and
+            .official_authority == false
+          ' artifacts/nfl-market-maker-radar/settlement.json >/dev/null
+
+      - name: Commit append-only observations candidate ledger and settlements
         if: github.event_name != 'pull_request'
         shell: bash
         run: |
@@ -114,7 +174,9 @@ jobs:
           fi
           CAPTURE_ID="$(jq -r '.capture_id' ../artifacts/nfl-market-maker-radar/capture-status.json)"
           ROWS="$(jq -r '.rows_written' ../artifacts/nfl-market-maker-radar/capture-status.json)"
-          git commit -m "nfl-market-maker-radar: ${CAPTURE_ID} rows=${ROWS} [LAYER_B_NOT_EVIDENCE]"
+          NEW_CANDIDATES="$(jq -r '.candidate_ledger_new_count' ../artifacts/nfl-market-maker-radar/latest.json)"
+          NEW_SETTLEMENTS="$(jq -r '.new_settlement_count' ../artifacts/nfl-market-maker-radar/settlement.json)"
+          git commit -m "nfl-market-maker-radar: ${CAPTURE_ID} rows=${ROWS} candidates=${NEW_CANDIDATES} settlements=${NEW_SETTLEMENTS} [LAYER_B_NOT_EVIDENCE]"
           for attempt in 1 2 3; do
             git fetch origin data || true
             git rebase origin/data || git rebase --abort || true
@@ -123,25 +185,6 @@ jobs:
           done
           echo 'NFL_RADAR_DATA_PUSH_FAILED' >&2
           exit 1
-
-      - name: Analyze direct radar history
-        if: github.event_name != 'pull_request'
-        shell: bash
-        run: |
-          set -euo pipefail
-          python scripts/analyze_market_maker_radar.py \
-            --policy config/market_maker_radar_v1.json \
-            --input-root .data-branch/archive/market-maker-radar/nfl \
-            --since-hours 24 \
-            --out artifacts/nfl-market-maker-radar/latest.json
-          jq -e '
-            .model_p_authority == false and
-            .truth_gate_input == false and
-            .promotion_authority == false and
-            .eligibility_authority == false and
-            .staking_authority == false and
-            .official_authority == false
-          ' artifacts/nfl-market-maker-radar/latest.json >/dev/null
 
       - name: Upload capture and radar diagnostic
         if: github.event_name != 'pull_request' && always()
