@@ -9,6 +9,7 @@ import tempfile
 import unittest
 
 from sportsedge.sports.cfb import history_cache as hc
+from sportsedge.sports.cfb.market_archive import iter_market_archive
 from sportsedge.sports.cfb.historical_release import CFBHistoricalReleaseError
 
 
@@ -110,6 +111,9 @@ def write_archive_contract(root: Path, raw: bytes) -> Path:
             "official_bet_authority": False,
         },
     }
+    canonical = json.loads((Path(__file__).resolve().parents[1] / "config/research/cfb_historical_market_source_v1.json").read_text())
+    for key in ("schema_version", "sport", "restrictions", "restriction_sha256", "allowed_uses", "forbidden_uses", "authority", "evidence_limitations"):
+        payload[key] = canonical[key]
     path.write_text(json.dumps(payload), encoding="utf-8")
     return path
 
@@ -180,6 +184,7 @@ class HistoryCacheTests(unittest.TestCase):
             with self.assertRaisesRegex(CFBHistoricalReleaseError, "MARKET_DATA_PROHIBITED"):
                 hc.cache_market_archive(
                     contract_path=contract,
+                    use="historical_market_coverage_profiling",
                     cache_root=root / "cache",
                     opener=opener,
                 )
@@ -196,6 +201,7 @@ class HistoryCacheTests(unittest.TestCase):
             contract = write_archive_contract(root, raw)
             first = hc.cache_market_archive(
                 contract_path=contract,
+                    use="historical_market_coverage_profiling",
                 cache_root=root / "cache",
                 allow_benchmark=True,
                 opener=opener,
@@ -211,8 +217,9 @@ class HistoryCacheTests(unittest.TestCase):
             self.assertEqual(manifest["content_sha256"], sha256(raw).hexdigest())
             self.assertEqual(len(manifest["manifest_sha256"]), 64)
             rows = list(
-                hc.iter_market_archive(
+                iter_market_archive(
                     contract_path=contract,
+                    use="historical_market_coverage_profiling",
                     cache_file=first["cache_file"],
                 )
             )
@@ -220,6 +227,7 @@ class HistoryCacheTests(unittest.TestCase):
 
             second = hc.cache_market_archive(
                 contract_path=contract,
+                    use="historical_market_coverage_profiling",
                 cache_root=root / "cache",
                 allow_benchmark=True,
                 opener=opener,
@@ -238,6 +246,7 @@ class HistoryCacheTests(unittest.TestCase):
             opener = FakeArchiveOpener(raw)
             first = hc.cache_market_archive(
                 contract_path=contract,
+                    use="historical_market_coverage_profiling",
                 cache_root=root / "cache",
                 allow_benchmark=True,
                 opener=opener,
@@ -245,6 +254,7 @@ class HistoryCacheTests(unittest.TestCase):
             Path(first["cache_file"]).write_bytes(b"corrupt")
             second = hc.cache_market_archive(
                 contract_path=contract,
+                    use="historical_market_coverage_profiling",
                 cache_root=root / "cache",
                 allow_benchmark=True,
                 opener=opener,
@@ -257,11 +267,12 @@ class HistoryCacheTests(unittest.TestCase):
             with self.assertRaises(hc.CFBHistoryCacheError):
                 hc.cache_market_archive(
                     contract_path=contract,
+                    use="historical_market_coverage_profiling",
                     cache_root=bad_root,
                     allow_benchmark=True,
                     opener=bad,
                 )
-            target = bad_root / "betting_archive" / "cfb_line_odds.csv.gz"
+            target = bad_root / "betting_archive" / json.loads(contract.read_text())["restriction_sha256"] / sha256(raw).hexdigest() / "cfb_line_odds.csv.gz"
             self.assertFalse(target.exists())
             self.assertFalse(target.with_name(target.name + ".part").exists())
 
