@@ -25,6 +25,9 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Install frozen test dependency
+        run: python -m pip install --disable-pip-version-check pytest==9.1.1
+
       - name: Compile freeze surface
         run: python -m py_compile scripts/materialize_cfb_historical_market_archive.py tests/test_cfb_historical_market_source.py
 
