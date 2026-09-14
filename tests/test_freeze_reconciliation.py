@@ -249,10 +249,11 @@ def test_repository_policy_is_unconditional_zero_authority_and_registers_late_de
     registry = json.loads(Path("config/freeze_reconciliation_registry_v1.json").read_text())
     assert policy["main_merge_hold"] == "UNCONDITIONAL"
     assert policy["status"] == "ACTIVE_BLOCKED"
-    assert policy["authorized_reconciliation_branch"] == "fix/freeze-reconciliation-delta-matrix-20260914"
+    assert policy["authorized_reconciliation_branch"] == "fix/freeze-reconciliation-inventory-20260914"
     assert not any(policy["authority"].values())
     ids = {row["delta_id"] for row in registry["deltas"]}
-    assert {"PR_683", "PR_687", "PR_701", "PR_702"}.issubset(ids)
+    assert {"PR_683", "PR_687", "PR_701", "PR_702", "PR_703"}.issubset(ids)
+    assert registry["reconciled_through_sha"] == "00b4db27f15cc22b089e2a2d974cf483eed86e58"
     assert registry["bundle_inventory_complete"] is False
 
 
