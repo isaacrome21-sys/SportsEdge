@@ -121,10 +121,6 @@ def normalize_starter_path(sample: Mapping[str, object]) -> dict[str, float]:
         raise MlbPitcherAccountingError(
             f"DFS_MLB_PITCHER_PATH_BF_NOT_INTEGER:{batters_faced}"
         )
-    if strikeouts > outs:
-        raise MlbPitcherAccountingError(
-            f"DFS_MLB_PITCHER_PATH_K_EXCEEDS_OUTS:{strikeouts}:{outs}"
-        )
     if strikeouts + hits + walks + hbp > batters_faced + 1e-9:
         raise MlbPitcherAccountingError(
             "DFS_MLB_PITCHER_PATH_EVENTS_EXCEED_BF:"
