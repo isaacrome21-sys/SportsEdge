@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Materialize and profile the pinned CFB historical market archive.
 
-This is a research-only source boundary.  It verifies transport bytes against the
+This is a research-only source boundary. It verifies transport bytes against the
 checked contract and profiles the archive, but it deliberately does not certify
 per-row point-in-time capture, close timestamps, CLV, Model_P, or promotion.
+Market-derived values are prohibited from predictive model features/training even
+when they could otherwise be shown point-in-time safe.
 """
 from __future__ import annotations
 
@@ -17,6 +19,20 @@ import urllib.request
 from collections import Counter
 from pathlib import Path
 from typing import Any
+
+REQUIRED_FORBIDDEN_USES = {
+    "predictive_model_features",
+    "model_training_inputs",
+    "model_calibration_inputs",
+    "model_p_generation",
+    "paired_no_vig_market_benchmark",
+    "decision_close_clv_evidence",
+    "truth_gate_evidence",
+    "promotion_evidence",
+    "staking_authority",
+    "official_bet_authority",
+}
+FORBIDDEN_ALLOWED_USE_TOKENS = ("feature", "training", "model_p", "calibration")
 
 
 def _git_blob_sha1(data: bytes) -> str:
@@ -34,6 +50,7 @@ def _load_contract(path: Path) -> dict[str, Any]:
         raise ValueError("CFB_HISTORICAL_MARKET_MODE_INVALID")
     authority = payload.get("authority") or {}
     for field in (
+        "feature_authority",
         "model_p_authority",
         "truth_gate_authority",
         "promotion_authority",
@@ -48,9 +65,20 @@ def _load_contract(path: Path) -> dict[str, Any]:
         "decision_time_certified",
         "close_time_certified",
         "clv_authority",
+        "paired_two_sided_quote_certified",
     ):
         if limits.get(field) is not False:
             raise ValueError(f"CFB_HISTORICAL_MARKET_EVIDENCE_LIMIT_INVALID:{field}")
+    allowed = payload.get("allowed_uses")
+    forbidden = payload.get("forbidden_uses")
+    if not isinstance(allowed, list) or not all(isinstance(x, str) and x for x in allowed):
+        raise ValueError("CFB_HISTORICAL_MARKET_ALLOWED_USES_INVALID")
+    if not isinstance(forbidden, list) or not all(isinstance(x, str) and x for x in forbidden):
+        raise ValueError("CFB_HISTORICAL_MARKET_FORBIDDEN_USES_INVALID")
+    if any(token in use.lower() for use in allowed for token in FORBIDDEN_ALLOWED_USE_TOKENS):
+        raise ValueError("CFB_HISTORICAL_MARKET_MODEL_FEATURE_USE_FORBIDDEN")
+    if not REQUIRED_FORBIDDEN_USES.issubset(set(forbidden)):
+        raise ValueError("CFB_HISTORICAL_MARKET_FORBIDDEN_USES_INCOMPLETE")
     return payload
 
 
@@ -180,6 +208,8 @@ def materialize(
         "observed": observed,
         "profile": profile,
         "evidence_limitations": contract["evidence_limitations"],
+        "allowed_uses": contract["allowed_uses"],
+        "forbidden_uses": contract["forbidden_uses"],
         "authority": contract["authority"],
         "pit_certified": False,
         "clv_authority": False,
