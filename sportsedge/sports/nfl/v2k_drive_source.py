@@ -19,6 +19,11 @@ _OUTCOME_MAP = {
     "special_teams_touchdown": "DEF_ST_SCORE", "special teams touchdown": "DEF_ST_SCORE",
 }
 
+_TERMINATION_MAP = {
+    "end_of_half": "END_OF_HALF", "end of half": "END_OF_HALF",
+    "end_of_game": "END_OF_GAME", "end of game": "END_OF_GAME",
+}
+
 _REQUIRED = {
     "game_id", "season", "week", "kickoff_utc", "drive_id", "play_index",
     "offense", "defense", "start_yardline_100", "drive_result",
@@ -39,6 +44,10 @@ def _canonical_outcome(value: object) -> str:
     return _OUTCOME_MAP[key]
 
 
+def _termination_reason(value: object) -> str:
+    return _TERMINATION_MAP.get(str(value or "").strip().lower(), "NORMAL")
+
+
 def _validate_game_chronology(rows: list[DriveRow]) -> None:
     if not rows:
         return
@@ -46,7 +55,10 @@ def _validate_game_chronology(rows: list[DriveRow]) -> None:
     if len(season_week_kickoff) != 1:
         raise ValueError("V2K_GAME_IDENTITY_INCONSISTENT")
     previous: DriveRow | None = None
+    end_game_seen = False
     for row in rows:
+        if end_game_seen:
+            raise ValueError("V2K_DRIVE_AFTER_END_OF_GAME")
         if row.period > 5:
             raise ValueError("V2K_PERIOD_UNSUPPORTED")
         clock_max = 600 if row.period == 5 else 900
@@ -57,6 +69,10 @@ def _validate_game_chronology(rows: list[DriveRow]) -> None:
                 raise ValueError("V2K_PERIOD_REGRESSION")
             if row.period == previous.period and row.clock_seconds_remaining_period > previous.clock_seconds_remaining_period:
                 raise ValueError("V2K_CLOCK_REGRESSION")
+        if row.termination_reason == "END_OF_HALF" and row.period not in (2,):
+            raise ValueError("V2K_END_OF_HALF_PERIOD_INVALID")
+        if row.termination_reason == "END_OF_GAME":
+            end_game_seen = True
         previous = row
 
 
@@ -66,12 +82,7 @@ def build_drive_rows_from_pbp(
     source_manifest_sha256: str,
     source_code_sha: str,
 ) -> tuple[DriveRow, ...]:
-    """Collapse ordered play records into one fail-closed row per drive.
-
-    The adapter consumes football state only. Presence of sportsbook/market keys fails
-    closed rather than silently dropping them, which makes the market-blind contract
-    testable at the source-normalization seam.
-    """
+    """Collapse ordered play records into one fail-closed row per drive."""
     if not source_manifest_sha256 or not source_code_sha:
         raise ValueError("V2K_SOURCE_BINDING_REQUIRED")
 
@@ -96,6 +107,7 @@ def build_drive_rows_from_pbp(
         if any(str(p["offense"]) != offense or str(p["defense"]) != defense for p in ordered):
             raise ValueError("V2K_DRIVE_TEAM_IDENTITY_CHANGED")
         outcome = _canonical_outcome(last["drive_result"])
+        termination_reason = _termination_reason(last["drive_result"])
         conversion_points = int(last.get("conversion_points") or 0)
         drive_order = int(first.get("drive_order") if first.get("drive_order") is not None else min(indexes))
         row = DriveRow(
@@ -106,7 +118,7 @@ def build_drive_rows_from_pbp(
             offense_score_before=int(first["offense_score_before"]), defense_score_before=int(first["defense_score_before"]),
             offense_score_after=int(last["offense_score_after"]), defense_score_after=int(last["defense_score_after"]),
             period=int(first["period"]), clock_seconds_remaining_period=int(first["clock_seconds_remaining_period"]),
-            conversion_points=conversion_points,
+            conversion_points=conversion_points, termination_reason=termination_reason,
             source_manifest_sha256=source_manifest_sha256, source_code_sha=source_code_sha,
         )
         by_game[game_id].append((drive_order, row))
