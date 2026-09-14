@@ -1,0 +1,131 @@
+"""Deterministic market-blind PBP -> ordered V2K drive rows for attempt 0."""
+from __future__ import annotations
+
+from collections import defaultdict
+from typing import Iterable, Mapping
+
+from .v2k_drive_core import DriveRow, normalize_drive_rows
+
+_OUTCOME_MAP = {
+    "touchdown": "TD",
+    "td": "TD",
+    "field_goal": "FG",
+    "field goal": "FG",
+    "fg": "FG",
+    "interception": "TURNOVER",
+    "fumble": "TURNOVER",
+    "turnover_on_downs": "TURNOVER",
+    "turnover on downs": "TURNOVER",
+    "punt": "PUNT_OTHER",
+    "end_of_half": "PUNT_OTHER",
+    "end of half": "PUNT_OTHER",
+    "end_of_game": "PUNT_OTHER",
+    "end of game": "PUNT_OTHER",
+    "missed_field_goal": "PUNT_OTHER",
+    "missed field goal": "PUNT_OTHER",
+    "safety": "SAFETY",
+    "defensive_touchdown": "DEF_ST_SCORE",
+    "defensive touchdown": "DEF_ST_SCORE",
+    "special_teams_touchdown": "DEF_ST_SCORE",
+    "special teams touchdown": "DEF_ST_SCORE",
+}
+
+_REQUIRED = {
+    "game_id", "season", "week", "kickoff_utc", "drive_id", "play_index",
+    "offense", "defense", "start_yardline_100", "drive_result",
+    "offense_score_before", "defense_score_before", "offense_score_after",
+    "defense_score_after", "period", "clock_seconds_remaining_period",
+}
+
+_FORBIDDEN_MARKET_KEYS = {
+    "spread", "closing_spread", "total", "closing_total", "moneyline",
+    "home_odds", "away_odds", "implied_probability", "market_probability",
+}
+
+
+def _canonical_outcome(value: object) -> str:
+    key = str(value or "").strip().lower()
+    if key not in _OUTCOME_MAP:
+        raise ValueError("V2K_DRIVE_OUTCOME_UNMAPPED")
+    return _OUTCOME_MAP[key]
+
+
+def build_drive_rows_from_pbp(
+    records: Iterable[Mapping[str, object]],
+    *,
+    source_manifest_sha256: str,
+    source_code_sha: str,
+) -> tuple[DriveRow, ...]:
+    """Collapse ordered play records into one fail-closed row per drive.
+
+    The adapter consumes football state only. Presence of sportsbook/market keys fails
+    closed rather than silently dropping them, which makes the market-blind contract
+    testable at the source-normalization seam.
+    """
+    if not source_manifest_sha256 or not source_code_sha:
+        raise ValueError("V2K_SOURCE_BINDING_REQUIRED")
+
+    grouped: dict[tuple[str, object], list[Mapping[str, object]]] = defaultdict(list)
+    for record in records:
+        if _FORBIDDEN_MARKET_KEYS.intersection(record):
+            raise ValueError("V2K_MARKET_FIELD_FORBIDDEN")
+        missing = sorted(k for k in _REQUIRED if k not in record or record[k] is None)
+        if missing:
+            raise ValueError("V2K_REQUIRED_PBP_FIELD_MISSING:" + ",".join(missing))
+        grouped[(str(record["game_id"]), record["drive_id"])].append(record)
+
+    by_game: dict[str, list[tuple[int, DriveRow]]] = defaultdict(list)
+    for (game_id, _drive_id), plays in grouped.items():
+        ordered = sorted(plays, key=lambda p: int(p["play_index"]))
+        if [int(p["play_index"]) for p in ordered] != sorted({int(p["play_index"]) for p in ordered}):
+            raise ValueError("V2K_PLAY_INDEX_DUPLICATE")
+        first, last = ordered[0], ordered[-1]
+        offense = str(first["offense"])
+        defense = str(first["defense"])
+        if any(str(p["offense"]) != offense or str(p["defense"]) != defense for p in ordered):
+            raise ValueError("V2K_DRIVE_TEAM_IDENTITY_CHANGED")
+        outcome = _canonical_outcome(last["drive_result"])
+        conversion_points = int(last.get("conversion_points") or 0)
+        drive_order = int(first.get("drive_order") if first.get("drive_order") is not None else min(int(p["play_index"]) for p in ordered))
+        row = DriveRow(
+            game_id=game_id,
+            season=int(first["season"]),
+            week=int(first["week"]),
+            kickoff_utc=str(first["kickoff_utc"]),
+            drive_index=0,  # replaced below by deterministic game-local ordering
+            offense=offense,
+            defense=defense,
+            start_yardline_100=float(first["start_yardline_100"]),
+            outcome=outcome,
+            offense_score_before=int(first["offense_score_before"]),
+            defense_score_before=int(first["defense_score_before"]),
+            offense_score_after=int(last["offense_score_after"]),
+            defense_score_after=int(last["defense_score_after"]),
+            period=int(first["period"]),
+            clock_seconds_remaining_period=int(first["clock_seconds_remaining_period"]),
+            conversion_points=conversion_points,
+            source_manifest_sha256=source_manifest_sha256,
+            source_code_sha=source_code_sha,
+        )
+        by_game[game_id].append((drive_order, row))
+
+    rows: list[DriveRow] = []
+    for game_id in sorted(by_game):
+        ordered_drives = sorted(by_game[game_id], key=lambda item: item[0])
+        if len({order for order, _ in ordered_drives}) != len(ordered_drives):
+            raise ValueError("V2K_DRIVE_ORDER_DUPLICATE")
+        for idx, (_order, row) in enumerate(ordered_drives):
+            rows.append(DriveRow(**{**row.__dict__, "drive_index": idx}))
+    return normalize_drive_rows(rows)
+
+
+AUTHORITY = {
+    "model_p": False,
+    "pricing": False,
+    "promotion": False,
+    "staking": False,
+    "run_it": False,
+    "official": False,
+    "untouched_readout": False,
+    "development_validation_scoring": False,
+}
