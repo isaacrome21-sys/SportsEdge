@@ -22,7 +22,14 @@ if str(_REPO_ROOT) not in sys.path:
 from sportsedge.draftkings_prop_source import COUNT_MARKETS, _json, fetch_mlb_prop_quotes
 
 TARGET_MARKETS = frozenset(COUNT_MARKETS)
-EVENT_TIME_KEYS = ("startDate", "startDateTime", "startTime", "commenceTime", "commence_time")
+EVENT_TIME_KEYS = (
+    "startEventDate",
+    "startDate",
+    "startDateTime",
+    "startTime",
+    "commenceTime",
+    "commence_time",
+)
 
 
 def _utcnow() -> datetime:
@@ -79,7 +86,10 @@ def _atomic_json(path: Path, payload: Any) -> None:
     tmp.replace(path)
 
 
-def _event_index(base_url: str, league_id: int) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]]]:
+def _event_index(
+    base_url: str,
+    league_id: int,
+) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]]]:
     payload = _json(f"{base_url}v1/leagues/{league_id}")
     events = payload.get("events") if isinstance(payload, Mapping) else None
     if not isinstance(events, list):
@@ -91,7 +101,7 @@ def _event_index(base_url: str, league_id: int) -> tuple[dict[str, dict[str, Any
         if not isinstance(raw_event, Mapping):
             continue
         event = dict(raw_event)
-        event_id = str(event.get("id") or "").strip()
+        event_id = str(event.get("id") or event.get("eventId") or "").strip()
         if not event_id:
             continue
         first_pitch = _event_first_pitch(event)
@@ -102,6 +112,7 @@ def _event_index(base_url: str, league_id: int) -> tuple[dict[str, dict[str, Any
                     "provider_event_id": event_id,
                     "reason": "FIRST_PITCH_MISSING",
                     "provider_event_sha256": event_sha,
+                    "provider_event_keys": sorted(str(key) for key in event.keys()),
                 }
             )
             continue
@@ -119,11 +130,12 @@ def build_archive_payload(*, now: datetime | None = None) -> dict[str, Any]:
     started_at = now or _utcnow()
     if started_at.tzinfo is None or started_at.utcoffset() is None:
         raise ValueError("ARCHIVE_CLOCK_TIMEZONE_REQUIRED")
+
     snap = fetch_mlb_prop_quotes()
     if snap.base_url is None or snap.league_id is None:
         raise RuntimeError("DK_PROVIDER_METADATA_MISSING")
+
     events, event_failures = _event_index(snap.base_url, snap.league_id)
-    # Availability starts after all source requests complete, never before HTTP.
     captured_at = (now or _utcnow()).astimezone(timezone.utc)
     if captured_at < started_at:
         raise ValueError("ARCHIVE_CLOCK_MOVED_BACKWARDS")
@@ -140,6 +152,7 @@ def build_archive_payload(*, now: datetime | None = None) -> dict[str, Any]:
         event_id = str(quote.get("provider_event_id") or "").strip()
         event = events.get(event_id)
         retrieved = _parse_iso(quote.get("retrieved_at"))
+
         if event is None:
             rejected_rows.append(
                 {
@@ -150,6 +163,7 @@ def build_archive_payload(*, now: datetime | None = None) -> dict[str, Any]:
                 }
             )
             continue
+
         first_pitch = _parse_iso(event.get("first_pitch_at"))
         if retrieved is None or first_pitch is None:
             rejected_rows.append(
@@ -161,6 +175,7 @@ def build_archive_payload(*, now: datetime | None = None) -> dict[str, Any]:
                 }
             )
             continue
+
         if retrieved >= first_pitch or captured_at >= first_pitch:
             rejected_rows.append(
                 {
@@ -175,8 +190,13 @@ def build_archive_payload(*, now: datetime | None = None) -> dict[str, Any]:
             continue
 
         if retrieved > captured_at:
-            rejected_rows.append({"market": market, "provider_event_id": event_id,
-                                  "reason": "QUOTE_TIMESTAMP_AFTER_CAPTURE"})
+            rejected_rows.append(
+                {
+                    "market": market,
+                    "provider_event_id": event_id,
+                    "reason": "QUOTE_TIMESTAMP_AFTER_CAPTURE",
+                }
+            )
             continue
 
         row = {
@@ -257,6 +277,9 @@ def _self_test() -> int:
     assert _event_first_pitch({"startDate": "2026-08-24T00:10:00Z"}) == datetime(
         2026, 8, 24, 0, 10, tzinfo=timezone.utc
     )
+    assert _event_first_pitch({"startEventDate": "2026-09-14T23:10:00.0000000Z"}) == datetime(
+        2026, 9, 14, 23, 10, tzinfo=timezone.utc
+    )
     assert _event_first_pitch(
         {"metadata": {"commenceTime": "2026-08-24T00:10:00+00:00"}}
     ) is not None
@@ -296,6 +319,9 @@ def main() -> int:
                     "pit_target_quote_count": payload["pit_target_quote_count"],
                     "target_market_count": len(payload["target_markets"]),
                     "market_counts": payload["market_counts"],
+                    "provider_quote_count": payload["provider_quote_count"],
+                    "provider_failure_count": payload["provider_failure_count"],
+                    "event_failure_count": payload["event_failure_count"],
                     "payload_sha256": payload["payload_sha256"],
                     "immutable_file": str(immutable),
                     "latest_file": str(latest),
