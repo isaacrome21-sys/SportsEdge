@@ -23,6 +23,13 @@ def canonical_sha256(value: object) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def _validate_sha256(value: object, error: str) -> str:
+    text = str(value or "")
+    if len(text) != 64 or any(ch not in "0123456789abcdef" for ch in text):
+        raise SystemExit(error)
+    return text
+
+
 def validate_extension(extension: Mapping[str, Any], registry: Mapping[str, Any]) -> None:
     if extension.get("schema") != SCHEMA:
         raise SystemExit("COVERAGE_EXTENSION_SCHEMA_INVALID")
@@ -54,6 +61,41 @@ def validate_extension(extension: Mapping[str, Any], registry: Mapping[str, Any]
             raise SystemExit("COVERAGE_EXTENSION_EXEMPTION_INVALID")
         if any(token in path for token in ("*", "?", "[", "]")):
             raise SystemExit(f"COVERAGE_EXTENSION_EXEMPTION_WILDCARD_FORBIDDEN:{path}")
+
+    claim = extension.get("inventory_completion_claim")
+    if claim is not None:
+        if not isinstance(claim, Mapping):
+            raise SystemExit("INVENTORY_COMPLETION_CLAIM_INVALID")
+        if claim.get("status") != "HOSTED_AUDIT_ZERO_UNMAPPED":
+            raise SystemExit("INVENTORY_COMPLETION_CLAIM_STATUS_INVALID")
+        if claim.get("set_effective_registry_complete") is not True:
+            raise SystemExit("INVENTORY_COMPLETION_CLAIM_NOT_EFFECTIVE")
+        if int(claim.get("candidate_count", -1)) < 1 or int(claim.get("unmapped_count", -1)) != 0:
+            raise SystemExit("INVENTORY_COMPLETION_CLAIM_COUNTS_INVALID")
+        head = str(claim.get("proof_head_sha") or "")
+        if len(head) != 40:
+            raise SystemExit("INVENTORY_COMPLETION_CLAIM_HEAD_INVALID")
+        if int(claim.get("proof_run_id", 0)) <= 0 or int(claim.get("proof_artifact_id", 0)) <= 0:
+            raise SystemExit("INVENTORY_COMPLETION_CLAIM_PROVENANCE_INVALID")
+        _validate_sha256(claim.get("proof_artifact_digest_sha256"), "INVENTORY_COMPLETION_CLAIM_ARTIFACT_DIGEST_INVALID")
+        _validate_sha256(claim.get("proof_extension_canonical_sha256"), "INVENTORY_COMPLETION_CLAIM_EXTENSION_DIGEST_INVALID")
+
+    dispositions = extension.get("bundle_dispositions") or {}
+    if not isinstance(dispositions, Mapping):
+        raise SystemExit("BUNDLE_DISPOSITIONS_INVALID")
+    for bundle_id, disposition in dispositions.items():
+        if str(bundle_id) not in known:
+            raise SystemExit(f"BUNDLE_DISPOSITION_UNKNOWN_BUNDLE:{bundle_id}")
+        if not isinstance(disposition, Mapping):
+            raise SystemExit(f"BUNDLE_DISPOSITION_INVALID:{bundle_id}")
+        if disposition.get("state") != "REVOKED":
+            raise SystemExit(f"BUNDLE_DISPOSITION_ONLY_REVOCATION_ALLOWED_PRE_MERGE:{bundle_id}")
+        if not str(disposition.get("revoked_at") or ""):
+            raise SystemExit(f"BUNDLE_REVOCATION_TIMESTAMP_REQUIRED:{bundle_id}")
+        if disposition.get("prior_forward_clock_invalidated") is not True:
+            raise SystemExit(f"BUNDLE_REVOCATION_CLOCK_INVALIDATION_REQUIRED:{bundle_id}")
+        if not str(disposition.get("reason") or ""):
+            raise SystemExit(f"BUNDLE_REVOCATION_REASON_REQUIRED:{bundle_id}")
 
 
 def merge_view(
@@ -87,6 +129,19 @@ def merge_view(
             else:
                 added_prefixes += len(set(additions) - set(existing))
 
+    dispositions = extension.get("bundle_dispositions") or {}
+    for bundle_id, disposition in sorted(dispositions.items()):
+        bundle = by_id[str(bundle_id)]
+        existing = bundle.get("disposition")
+        if existing is not None and existing != disposition:
+            raise SystemExit(f"BUNDLE_DISPOSITION_CONFLICT:{bundle_id}")
+        bundle["disposition"] = copy.deepcopy(dict(disposition))
+
+    claim = extension.get("inventory_completion_claim") or {}
+    if claim:
+        effective_registry["bundle_inventory_complete"] = True
+        effective_registry["inventory_block_reason"] = None
+
     extension_sha = canonical_sha256(extension)
     attestation = {
         "schema": "SPORTSEDGE_RECONCILIATION_COVERAGE_ATTESTATION_V1",
@@ -95,6 +150,9 @@ def merge_view(
         "exact_exemption_count": len(extension_exemptions),
         "added_coverage_path_count": added_paths,
         "added_coverage_prefix_count": added_prefixes,
+        "bundle_disposition_count": len(dispositions),
+        "inventory_completion_claim_applied": bool(claim),
+        "inventory_completion_proof": dict(claim) if claim else None,
         "scanner_discovery_contract_changed": False,
         "coverage_only_broadening": True,
         "authority": {key: False for key in ("model", "truth_gate", "promotion", "staking", "official", "validation_attempt", "readout")},
