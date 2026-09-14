@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "policy_id": "NFL_V2J_POSTRUN_ADJUDICATION_V1",
+  "status": "FROZEN_PRE_READOUT",
+  "upstream_workflow": "nfl-v2j-timeout-successor",
+  "upstream_required_status": "EXACT_FOLD_SHARDED_EXECUTION_COMPLETE_ZERO_AUTHORITY",
+  "frozen_gates": {
+    "spread_fold_win_rate_min": 0.65,
+    "total_fold_win_rate_min": 0.65,
+    "spread_calibration_max_bin_deviation": 0.05,
+    "total_calibration_max_bin_deviation": 0.05,
+    "signed_key_max_abs_error": 0.005,
+    "signed_keys": [-7, -3, 3, 7],
+    "all_required": true
+  },
+  "authority": {
+    "model_p_authority": false,
+    "promotion_authority": false,
+    "staking_authority": false,
+    "official_authority": false,
+    "production_registry_authority": false,
+    "nfl_m2_freeze_authorized": false,
+    "v2k_automatically_activated": false
+  },
+  "interpretation": "A completed V2J readout may be classified as passing or failing the already-preregistered historical, calibration, and signed-key gates. This policy cannot promote, freeze, stake, create OFFICIAL status, or select/activate V2K governance."
+}
