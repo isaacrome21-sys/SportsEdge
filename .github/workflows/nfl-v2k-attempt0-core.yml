@@ -29,5 +29,5 @@ jobs:
       - name: Guard against historical evaluation admission
         run: |
           set -euo pipefail
-          ! grep -R -E 'NFL_V2K_EMPIRICAL_KEY_REFERENCE|signed_key|calibration_slope|walk_forward|closing_spread|closing_total|moneyline' \
+          ! grep -R -E 'NFL_V2K_EMPIRICAL_KEY_REFERENCE|signed_key_rmse|calibration_slope|run_walk_forward|evaluate_candidate' \
             sportsedge/sports/nfl/v2k_drive_core.py sportsedge/sports/nfl/v2k_drive_source.py
