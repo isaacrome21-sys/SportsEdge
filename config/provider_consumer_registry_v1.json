@@ -21,6 +21,15 @@
       "migration_state": "NO_ELIGIBLE_ESPN_SUBSTITUTION"
     },
     {
+      "consumer": "CFB_RUN_IT_MARKET_CONTEXT",
+      "markets": ["MONEYLINE", "SPREAD", "TOTALS"],
+      "preferred_provider": "CFBD_LINES",
+      "paid_fallback": null,
+      "provenance": "CFBD_LINES_PLUS_SOURCE_PAYLOAD_PROVIDER_NAME_FETCH_TIME_PROVENANCE_ONLY",
+      "exact_book": "CONTEXT_ONLY_NOT_EXACT_BOOK_CONFIRMATION",
+      "migration_state": "CONTEXT_ONLY_NO_TTL_OR_CLOSING_BENCHMARK"
+    },
+    {
       "consumer": "NFL_2026_CONFIRMATION",
       "markets": ["FROZEN_CONTRACT"],
       "preferred_provider": "FROZEN_UNCHANGED",

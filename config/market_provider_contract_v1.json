@@ -25,6 +25,36 @@
       "ineligible_markets": ["NRFI", "YRFI", "PLAYER_PROPS", "TEAM_TOTALS", "ADDITIONAL_DERIVATIVES"]
     },
     {
+      "provider": "CFBD_LINES",
+      "transport": "FREE_API_KEY",
+      "markets": ["MONEYLINE", "SPREAD", "TOTALS"],
+      "book_identity": {
+        "basis": "SOURCE_PAYLOAD_PROVIDER_NAME",
+        "required": true,
+        "named_book_allowlist": ["DraftKings", "FanDuel", "BetMGM", "Caesars", "ESPN BET", "Bovada", "bet365"],
+        "consensus_excluded": true
+      },
+      "freshness": {
+        "basis": "FETCH_TIME_PROVENANCE_ONLY_NO_SOURCE_NATIVE_QUOTE_TIMESTAMP",
+        "source_native_timestamp_available": false,
+        "fetch_timestamp_recorded": true,
+        "fetch_timestamp_is_quote_observation": false,
+        "ttl_seconds": null,
+        "timestamp_required": false,
+        "ttl_eligible": false
+      },
+      "eligible_for_book_agnostic_context": true,
+      "context_only": true,
+      "eligible_for_exact_book_contract": false,
+      "exact_book_contract_eligible": false,
+      "closing_benchmark_eligible": false,
+      "model_p_eligible": false,
+      "truth_gate_eligible": false,
+      "promotion_authority": false,
+      "staking_authority": false,
+      "official_authority": false
+    },
+    {
       "provider": "THE_ODDS_API",
       "transport": "METERED_API_KEY",
       "markets": ["MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS", "NRFI", "YRFI", "PLAYER_PROPS", "ADDITIONAL_DERIVATIVES"],
@@ -45,6 +75,8 @@
     "SOURCE_BOOK_IDENTITY_MISSING_FOR_EXACT_BOOK_CONTRACT",
     "SOURCE_TIMESTAMP_MISSING_WHEN_REQUIRED",
     "SOURCE_TIMESTAMP_STALE",
-    "FALLBACK_MUST_NOT_INHERIT_PRIMARY_PROVIDER_IDENTITY"
+    "FALLBACK_MUST_NOT_INHERIT_PRIMARY_PROVIDER_IDENTITY",
+    "FETCH_TIME_MUST_NOT_SATISFY_SOURCE_NATIVE_FRESHNESS",
+    "CONSENSUS_PROVIDER_INELIGIBLE_FOR_CFBD_CONTEXT"
   ]
 }

@@ -19,10 +19,19 @@ class ProviderConsumerRegistryTests(unittest.TestCase):
         self.assertEqual(row["preferred_provider"], "THE_ODDS_API")
         self.assertEqual(row["migration_state"], "NO_ELIGIBLE_ESPN_SUBSTITUTION")
 
+    def test_cfb_market_context_is_cfbd_context_only(self):
+        row = self.rows["CFB_RUN_IT_MARKET_CONTEXT"]
+        self.assertEqual(row["preferred_provider"], "CFBD_LINES")
+        self.assertEqual(set(row["markets"]), {"MONEYLINE", "SPREAD", "TOTALS"})
+        self.assertIsNone(row["paid_fallback"])
+        self.assertEqual(row["migration_state"], "CONTEXT_ONLY_NO_TTL_OR_CLOSING_BENCHMARK")
+        self.assertIn("FETCH_TIME_PROVENANCE_ONLY", row["provenance"])
+
     def test_frozen_nfl_confirmation_is_excluded(self):
         row = self.rows["NFL_2026_CONFIRMATION"]
         self.assertEqual(row["migration_state"], "EXCLUDED")
         self.assertEqual(row["preferred_provider"], "FROZEN_UNCHANGED")
+        self.assertNotEqual(row["preferred_provider"], "CFBD_LINES")
 
 
 if __name__ == "__main__":
