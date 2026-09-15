@@ -1,0 +1,50 @@
+name: nfl-candidate-authority-contract
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'config/nfl_candidate_authority_policy_v1.json'
+      - 'config/run_it_surface.json'
+      - 'sportsedge/sports/nfl/candidate_authority.py'
+      - 'tests/test_nfl_candidate_authority.py'
+      - '.github/workflows/nfl-candidate-authority-contract.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'config/nfl_candidate_authority_policy_v1.json'
+      - 'config/run_it_surface.json'
+      - 'sportsedge/sports/nfl/candidate_authority.py'
+      - 'tests/test_nfl_candidate_authority.py'
+      - '.github/workflows/nfl-candidate-authority-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  authority-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: '.python-version'
+      - name: Compile authority boundary
+        run: python -m py_compile sportsedge/sports/nfl/candidate_authority.py tests/test_nfl_candidate_authority.py
+      - name: Enforce candidate authority and 2026 quarantine
+        run: python -m unittest tests.test_nfl_candidate_authority -v
+      - name: Assert current production freeze still has no bettor-facing NFL Model_P
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          freeze=json.loads(Path('config/nfl_m2_freeze.json').read_text())
+          runit=json.loads(Path('config/run_it_surface.json').read_text())['sports']['NFL']
+          assert freeze['status'] == 'UNFROZEN'
+          assert freeze['artifact_sha256'] is None
+          assert runit['bettor_facing_model_authority'] == 'NONE_PENDING_PROMOTION'
+          assert runit['fallback_without_authorized_model'] == 'MARKET_CONTEXT_ONLY'
+          assert runit['research_candidate_usage'] == 'PAPER_ONLY_ZERO_UNITS'
+          assert runit['reserved_2026_stream_usage'] == 'FORWARD_EVIDENCE_ONLY_NO_TUNING'
+          PY
