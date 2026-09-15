@@ -6,11 +6,11 @@
   "games_scheduled": 15,
   "lineups_absent": 15,
   "lineups_present": 0,
-  "retrieved_at": "2026-09-15T09:37:56.058292+00:00",
+  "retrieved_at": "2026-09-15T18:53:16.759518+00:00",
   "slate_date_ct": "2026-09-15",
   "status": "PASS",
-  "umpires_absent": 15,
-  "umpires_present": 0,
-  "weather_absent": 15,
-  "weather_present": 0
+  "umpires_absent": 13,
+  "umpires_present": 2,
+  "weather_absent": 13,
+  "weather_present": 2
 }
