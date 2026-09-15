@@ -6,8 +6,10 @@ on:
       - 'config/market_provider_contract_v1.json'
       - 'docs/market_provider_migration_20260915.md'
       - 'sportsedge/market_provider_contract.py'
+      - 'sportsedge/market_provider_router.py'
       - 'sportsedge/espn_game_odds_source.py'
       - 'tests/test_market_provider_contract.py'
+      - 'tests/test_market_provider_router.py'
       - 'tests/test_espn_game_odds_source.py'
       - 'scripts/audit_market_provider_migration.py'
       - '.github/workflows/market-provider-contract.yml'
@@ -22,9 +24,9 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Compile
-        run: python3 -m py_compile sportsedge/market_provider_contract.py scripts/audit_market_provider_migration.py
+        run: python3 -m py_compile sportsedge/market_provider_contract.py sportsedge/market_provider_router.py scripts/audit_market_provider_migration.py
       - name: Provider contract tests
-        run: python3 -m unittest -q tests.test_market_provider_contract tests.test_espn_game_odds_source
+        run: python3 -m unittest -q tests.test_market_provider_contract tests.test_market_provider_router tests.test_espn_game_odds_source
       - name: Migration audit
         run: python3 scripts/audit_market_provider_migration.py
       - name: Frozen confirmation exclusion
