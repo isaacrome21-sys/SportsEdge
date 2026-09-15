@@ -68,7 +68,7 @@ def main() -> int:
         )
         payload = {
             "schema_version": "SPORTSEDGE_CFBD_CFB_MARKET_CONTEXT_RUN_V1",
-            "status": "AVAILABLE" if snapshot.rows else "NO_ELIGIBLE_QUOTES",
+            "status": snapshot.disposition,
             "season": int(args.season),
             "week": int(args.week),
             "season_type": str(args.season_type),
@@ -97,7 +97,7 @@ def main() -> int:
             "rejected": len(snapshot.rejected),
             "output": str(args.output),
         }, sort_keys=True))
-        return 0 if snapshot.rows else 2
+        return 0 if snapshot.disposition in {"AVAILABLE", "VALID_NO_BET_SLATE"} else 2
     except CFBDMarketContextError as exc:
         payload = {
             "schema_version": "SPORTSEDGE_CFBD_CFB_MARKET_CONTEXT_RUN_V1",
