@@ -7,6 +7,8 @@ from pathlib import Path
 import subprocess
 from typing import Any, Iterable, Mapping
 
+from sportsedge.governance.reconciliation_content_identity import boundary_matches
+
 MATRIX_OUTCOMES = frozenset(
     {"MATCH", "PROVISIONAL_DRIFT_BLOCKED", "NOT_APPLICABLE", "DRIFT_CONFIRMED"}
 )
@@ -66,7 +68,9 @@ def _canonical_sha256(payload: object) -> str:
     return sha256(encoded).hexdigest()
 
 
-def _git(repo: Path, *args: str, check: bool = True, text: bool = True) -> subprocess.CompletedProcess:
+def _git(
+    repo: Path, *args: str, check: bool = True, text: bool = True
+) -> subprocess.CompletedProcess:
     proc = subprocess.run(
         ["git", *args],
         cwd=repo,
@@ -106,50 +110,29 @@ def changed_paths(repo: Path, parent_sha: str, merge_sha: str) -> tuple[str, ...
     return tuple(sorted({line.strip() for line in output.splitlines() if line.strip()}))
 
 
-TERMINAL_RECONCILIATION_MERGE_PATH_PREFIXES = (
-    "config/freeze_reconciliation_",
-    "sportsedge/governance/freeze_reconciliation.py",
-    "scripts/audit_freeze_inventory.py",
-    "scripts/build_reconciliation_registry_view.py",
-    "scripts/reconcile_freeze_deltas.py",
-    "tests/test_freeze_",
-    "tests/test_reconcile_freeze_deltas_cli.py",
-)
-
-
 def main_matches_reconciliation_boundary(
     repo: Path,
     *,
     policy: Mapping[str, Any],
+    registry: Mapping[str, Any],
     reconciled_through_sha: str,
     current_main_ref: str,
 ) -> bool:
-    """Accept exact equality or one reconciliation-only merge commit.
+    """Require ancestry plus governed-surface content identity.
 
-    The merge exception is deliberately narrow: current main must be a two-parent
-    merge whose first parent is the exact registered reconciliation point, every
-    changed path must be reconciliation machinery, and the policy must remain
-    zero-authority. Any later ordinary main movement fails closed again.
+    Commit-SHA equality is intentionally not a terminal condition: an in-repo
+    reconciliation record cannot name the commit that lands that record. The
+    registered SHA is an ancestry anchor. Governed content is the identity.
     """
-    reconciled = resolve_sha(repo, reconciled_through_sha)
-    current = resolve_sha(repo, current_main_ref)
-    if current == reconciled:
-        return True
     if any(bool(value) for value in (policy.get("authority") or {}).values()):
         return False
-    parents = _git(repo, "rev-list", "--parents", "-n", "1", current).stdout.strip().split()
-    if len(parents) != 3:
-        return False
-    _, first, _second = parents
-    if first != reconciled:
-        return False
-    paths = changed_paths(repo, first, current)
-    if not paths:
-        return False
-    return all(
-        any(path.startswith(prefix) for prefix in TERMINAL_RECONCILIATION_MERGE_PATH_PREFIXES)
-        for path in paths
+    matched, _ = boundary_matches(
+        repo,
+        registry=registry,
+        registered_ref=reconciled_through_sha,
+        current_ref=current_main_ref,
     )
+    return matched
 
 
 def _covered(path: str, bundle: Mapping[str, Any]) -> bool:
@@ -168,7 +151,9 @@ def _blob_bytes(repo: Path, commit_sha: str, path: str) -> bytes:
     return bytes(proc.stdout)
 
 
-def bundle_snapshot(repo: Path, bundle: Mapping[str, Any], commit_sha: str) -> BundleSnapshot:
+def bundle_snapshot(
+    repo: Path, bundle: Mapping[str, Any], commit_sha: str
+) -> BundleSnapshot:
     files: list[tuple[str, str]] = []
     for path in _tree_paths(repo, commit_sha):
         if not _covered(path, bundle):
@@ -178,7 +163,9 @@ def bundle_snapshot(repo: Path, bundle: Mapping[str, Any], commit_sha: str) -> B
     aggregate = _canonical_sha256(
         {"bundle_id": bundle["bundle_id"], "files": files}
     )
-    return BundleSnapshot(commit_sha=commit_sha, files=tuple(files), aggregate_sha256=aggregate)
+    return BundleSnapshot(
+        commit_sha=commit_sha, files=tuple(files), aggregate_sha256=aggregate
+    )
 
 
 def _delta_sha(
@@ -225,9 +212,6 @@ def reconcile_delta_bundle(
 
     identity = _delta_sha(merge_sha=merge_sha, parent_sha=parent_sha, paths=paths)
 
-    # If the delta was already present at the bundle's frozen commit, it cannot be
-    # a post-freeze drift event for that bundle. This is temporal irrelevance, not
-    # a semantic classification.
     if merge_sha == freeze_sha or is_ancestor(repo, merge_sha, freeze_sha):
         return MatrixRow(
             delta_id=delta_id,
@@ -312,14 +296,6 @@ def reconcile_freeze_to_baseline(
     baseline_main_sha: str,
     bundle: Mapping[str, Any],
 ) -> MatrixRow:
-    """Reconcile all bundle drift from its freeze through the hold baseline.
-
-    The delta matrix only observes commits explicitly registered after the hold
-    baseline. Active bundles may have frozen earlier, so freeze-to-baseline drift
-    must be adjudicated independently or pre-hold semantic changes can disappear
-    from the reconciliation record.
-    """
-
     freeze_sha = resolve_sha(repo, str(bundle["freeze_sha"]))
     baseline_sha = resolve_sha(repo, baseline_main_sha)
     bundle_id = str(bundle["bundle_id"])
@@ -339,7 +315,9 @@ def reconcile_freeze_to_baseline(
             covered_changed_paths=(),
             before_bundle_sha256=None,
             after_bundle_sha256=None,
-            delta_sha256=_delta_sha(merge_sha=baseline_sha, parent_sha=freeze_sha, paths=()),
+            delta_sha256=_delta_sha(
+                merge_sha=baseline_sha, parent_sha=freeze_sha, paths=()
+            ),
         )
 
     try:
@@ -505,11 +483,7 @@ def _bundle_resolution_blocks(
         return (f"DRIFT_DISPOSITION_REQUIRED:{bundle_id}",)
     state = str(disposition.get("state") or "")
     if state == "REFROZEN":
-        required = (
-            "new_bundle_id",
-            "new_freeze_sha",
-            "forward_clock_restart_at",
-        )
+        required = ("new_bundle_id", "new_freeze_sha", "forward_clock_restart_at")
         missing = [key for key in required if not disposition.get(key)]
         if missing:
             return (f"REFREEZE_FIELDS_MISSING:{bundle_id}:{','.join(missing)}",)
@@ -547,9 +521,7 @@ def build_reconciliation_report(
 
     for bundle in registry["bundles"]:
         row = reconcile_freeze_to_baseline(
-            repo,
-            baseline_main_sha=baseline_main_sha,
-            bundle=bundle,
+            repo, baseline_main_sha=baseline_main_sha, bundle=bundle
         )
         if row.outcome not in MATRIX_OUTCOMES:
             raise FreezeReconciliationError(
@@ -579,23 +551,38 @@ def build_reconciliation_report(
                 repo, bundle, rows_by_bundle[str(bundle["bundle_id"])]
             )
         )
+
     reconciled_through = resolve_sha(repo, str(registry["reconciled_through_sha"]))
-    if not main_matches_reconciliation_boundary(
-        repo,
-        policy=policy,
-        reconciled_through_sha=reconciled_through,
-        current_main_ref=current_main_sha,
-    ):
+    try:
+        boundary_ok, boundary = boundary_matches(
+            repo,
+            registry=registry,
+            registered_ref=reconciled_through,
+            current_ref=current_main_sha,
+        )
+    except Exception as exc:
+        boundary_ok = False
+        boundary = {
+            "registered_sha": reconciled_through,
+            "current_sha": current_main_sha,
+            "ancestry_ok": False,
+            "registered_governed_surface_sha256": None,
+            "current_governed_surface_sha256": None,
+            "content_identity_ok": False,
+            "error": str(exc),
+        }
+    if any(bool(value) for value in (policy.get("authority") or {}).values()):
+        boundary_ok = False
+    if not boundary_ok:
         blocks.append(
-            f"MAIN_ADVANCED_BEYOND_RECONCILIATION:{reconciled_through}:{current_main_sha}"
+            "MAIN_GOVERNED_CONTENT_DIVERGED_FROM_RECONCILIATION:"
+            f"{reconciled_through}:{current_main_sha}"
         )
 
     outcome_counts = {name: 0 for name in sorted(MATRIX_OUTCOMES)}
     for row in rows:
         outcome_counts[row.outcome] += 1
     release_ready = not blocks
-    # A completed matrix can be ready while the process hold is still active.
-    # Only a separately resolved policy can authorize release of that hold.
     release_authorized = release_ready and policy["status"] == "RESOLVED"
     return {
         "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REPORT_V1",
@@ -605,6 +592,7 @@ def build_reconciliation_report(
         "current_main_sha": current_main_sha,
         "baseline_main_sha": baseline_main_sha,
         "reconciled_through_sha": reconciled_through,
+        "boundary_identity": boundary,
         "bundle_inventory_complete": bool(registry.get("bundle_inventory_complete")),
         "matrix_row_count": len(rows),
         "outcome_counts": outcome_counts,
@@ -618,6 +606,7 @@ def build_reconciliation_report(
                 "current_main_sha": current_main_sha,
                 "baseline_main_sha": baseline_main_sha,
                 "reconciled_through_sha": reconciled_through,
+                "boundary_identity": boundary,
                 "rows": [row.as_dict() for row in rows],
                 "blocks": sorted(set(blocks)),
                 "policy_status": policy["status"],
