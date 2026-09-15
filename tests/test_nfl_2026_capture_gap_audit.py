@@ -23,6 +23,16 @@ class CaptureGapAuditTest(unittest.TestCase):
             "output_dir": str(Path(root) / "captures"),
         }
 
+    def valid_opener(self, run_id="123"):
+        return {
+            "capture_kind": "OPENER",
+            "book": "draftkings",
+            "retrieved_at_utc": "2026-09-08T14:03:00+00:00",
+            "hashes": {"policy_sha256": "x"},
+            "run": {"github_run_id": run_id},
+            "games": [{"event_id": "game-1", "commence_time": "2026-09-11T00:15:00Z"}],
+        }
+
     def test_elapsed_missing_opener_writes_marker_not_capture(self):
         with tempfile.TemporaryDirectory() as root:
             cfg = self.cfg(root)
@@ -36,17 +46,31 @@ class CaptureGapAuditTest(unittest.TestCase):
             data = json.loads(marker.read_text())
             self.assertEqual(data["status"], "MISSED_OR_BLOCKED")
             self.assertTrue(data["no_backfill"])
-            self.assertEqual(data["reason"], "OPENER_WINDOW_ELAPSED_WITHOUT_CAPTURE")
+            self.assertEqual(data["reason"], "OPENER_WINDOW_ELAPSED_WITHOUT_VALID_CAPTURE")
 
-    def test_existing_capture_prevents_marker(self):
+    def test_valid_existing_capture_prevents_marker(self):
         with tempfile.TemporaryDirectory() as root:
             cfg = self.cfg(root)
             opener = Path(root) / "captures/week02/opener.json"
             opener.parent.mkdir(parents=True)
-            opener.write_text("{}\n")
+            opener.write_text(json.dumps(self.valid_opener()) + "\n")
             now = datetime(2026, 9, 12, 23, 0, tzinfo=ZoneInfo("America/Chicago"))
             self.assertEqual(audit(cfg, now), [])
             self.assertFalse((opener.parent / "opener_missed.json").exists())
+
+    def test_malformed_or_empty_existing_opener_does_not_suppress_miss(self):
+        for payload in ({}, {**self.valid_opener(), "games": []}):
+            with self.subTest(payload=payload):
+                with tempfile.TemporaryDirectory() as root:
+                    cfg = self.cfg(root)
+                    opener = Path(root) / "captures/week02/opener.json"
+                    opener.parent.mkdir(parents=True)
+                    opener.write_text(json.dumps(payload) + "\n")
+                    now = datetime(2026, 9, 12, 23, 0, tzinfo=ZoneInfo("America/Chicago"))
+                    written = audit(cfg, now)
+                    marker = opener.parent / "opener_missed.json"
+                    self.assertIn(marker, written)
+                    self.assertTrue(marker.is_file())
 
     def test_open_window_never_marks_missed(self):
         with tempfile.TemporaryDirectory() as root:
@@ -84,6 +108,24 @@ class CaptureGapAuditTest(unittest.TestCase):
             self.assertEqual(data["schedule_sha256"], "abc123")
             self.assertTrue(data["no_backfill"])
 
+    def test_invalid_final_record_does_not_suppress_missing_marker(self):
+        with tempfile.TemporaryDirectory() as root:
+            cfg = self.cfg(root)
+            final = Path(root) / "captures/week02/final/invalid.json"
+            final.parent.mkdir(parents=True)
+            final.write_text(json.dumps({
+                "capture_kind": "FINAL",
+                "book": "draftkings",
+                "retrieved_at_utc": "2026-09-11T00:00:00+00:00",
+                "hashes": {},
+                "run": {"github_run_id": "123"},
+                "games": [{"commence_time": "2026-09-11T00:15:00Z"}],
+            }))
+            rows = [{"season": "2026", "gameday": "2026-09-10", "gametime": "20:15"}]
+            now = datetime(2026, 9, 10, 20, 5, tzinfo=ZoneInfo("America/New_York"))
+            written = audit(cfg, now, rows, "abc123")
+            self.assertTrue(any("final_missed" in str(p) for p in written))
+
     def test_final_group_does_not_mark_before_window_ends(self):
         with tempfile.TemporaryDirectory() as root:
             cfg = self.cfg(root)
@@ -98,16 +140,19 @@ class CaptureGapAuditTest(unittest.TestCase):
             cfg = self.cfg(root)
             opener = Path(root) / "captures/week02/opener.json"
             opener.parent.mkdir(parents=True)
-            opener.write_text(json.dumps({
-                "capture_kind": "OPENER",
-                "book": "draftkings",
-                "retrieved_at_utc": "2026-09-08T14:03:00+00:00",
-                "hashes": {"policy_sha256": "x"},
-                "run": {"github_run_id": "123"},
-            }))
+            opener.write_text(json.dumps(self.valid_opener()))
             self.assertEqual(verify_due(cfg, 2, [], "123"), [])
             failures = verify_due(cfg, 2, [], "999")
             self.assertIn("DUE_OPENER_NOT_FROM_CURRENT_RUN:123", failures)
+
+    def test_verify_due_opener_rejects_empty_games(self):
+        with tempfile.TemporaryDirectory() as root:
+            cfg = self.cfg(root)
+            opener = Path(root) / "captures/week02/opener.json"
+            opener.parent.mkdir(parents=True)
+            opener.write_text(json.dumps({**self.valid_opener(), "games": []}))
+            failures = verify_due(cfg, 2, [], "123")
+            self.assertIn("DUE_OPENER_EMPTY_GAMES", failures)
 
     def test_verify_due_final_uses_kickoff_multiplicity_and_current_run(self):
         with tempfile.TemporaryDirectory() as root:
