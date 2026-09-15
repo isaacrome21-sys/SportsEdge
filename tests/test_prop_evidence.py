@@ -15,8 +15,13 @@ from sportsedge.prop_evidence import (
     assess_prop_evidence,
     dependent_hitter_markets,
     dependent_pitcher_markets,
+    evaluate_group_evidence_row,
+    expected_market_identities,
     group_state_from_registry,
 )
+
+
+AS_OF_UTC = "2026-09-14T23:00:00Z"
 
 
 def _all_ready() -> dict[str, bool]:
@@ -33,6 +38,17 @@ def _registry(status: str = "PASS") -> dict:
     return {"schema_version": 1, "groups": rows}
 
 
+def _complete_group_row(group: str) -> dict:
+    return {
+        "status": "PASS",
+        "evidence_sha256": "a" * 64,
+        "evidence_group": group,
+        "market_identities": list(expected_market_identities(group)),
+        "captured_at_utc": "2026-09-14T22:00:00Z",
+        "valid_through_utc": "2026-09-15T23:00:00Z",
+    }
+
+
 class PropEvidenceTests(unittest.TestCase):
     def test_registry_pass_requires_evidence_hash(self):
         payload = _registry()
@@ -46,6 +62,81 @@ class PropEvidenceTests(unittest.TestCase):
         state = group_state_from_registry(payload)
         self.assertFalse(state[HITTER_PA])
         self.assertTrue(state[HITTER_EVENT_TYPE])
+
+    def test_every_group_missing_fails_closed(self):
+        for group in sorted(EVIDENCE_GROUPS):
+            with self.subTest(group=group):
+                result = evaluate_group_evidence_row(
+                    group=group,
+                    row={"status": "MISSING"},
+                    as_of_utc=AS_OF_UTC,
+                )
+                self.assertFalse(result.passed)
+                self.assertIn("STATUS_NOT_PASS", result.blockers)
+
+    def test_every_group_partial_pass_evidence_fails_closed(self):
+        for group in sorted(EVIDENCE_GROUPS):
+            with self.subTest(group=group):
+                row = _complete_group_row(group)
+                del row["valid_through_utc"]
+                result = evaluate_group_evidence_row(
+                    group=group,
+                    row=row,
+                    as_of_utc=AS_OF_UTC,
+                )
+                self.assertFalse(result.passed)
+                self.assertIn("EVIDENCE_METADATA_INCOMPLETE:valid_through_utc", result.blockers)
+
+    def test_every_group_stale_evidence_fails_closed(self):
+        for group in sorted(EVIDENCE_GROUPS):
+            with self.subTest(group=group):
+                row = _complete_group_row(group)
+                row["valid_through_utc"] = "2026-09-14T22:59:59Z"
+                result = evaluate_group_evidence_row(
+                    group=group,
+                    row=row,
+                    as_of_utc=AS_OF_UTC,
+                )
+                self.assertFalse(result.passed)
+                self.assertIn("EVIDENCE_STALE", result.blockers)
+
+    def test_every_group_wrong_market_identity_fails_closed(self):
+        for group in sorted(EVIDENCE_GROUPS):
+            with self.subTest(group=group):
+                row = _complete_group_row(group)
+                row["market_identities"] = ["MONEYLINE"]
+                result = evaluate_group_evidence_row(
+                    group=group,
+                    row=row,
+                    as_of_utc=AS_OF_UTC,
+                )
+                self.assertFalse(result.passed)
+                self.assertIn("MARKET_IDENTITY_MISMATCH", result.blockers)
+
+    def test_every_group_wrong_component_identity_fails_closed(self):
+        groups = sorted(EVIDENCE_GROUPS)
+        for index, group in enumerate(groups):
+            with self.subTest(group=group):
+                row = _complete_group_row(group)
+                row["evidence_group"] = groups[(index + 1) % len(groups)]
+                result = evaluate_group_evidence_row(
+                    group=group,
+                    row=row,
+                    as_of_utc=AS_OF_UTC,
+                )
+                self.assertFalse(result.passed)
+                self.assertIn("EVIDENCE_GROUP_IDENTITY_MISMATCH", result.blockers)
+
+    def test_complete_fresh_identity_bound_evidence_is_evaluator_pass(self):
+        for group in sorted(EVIDENCE_GROUPS):
+            with self.subTest(group=group):
+                result = evaluate_group_evidence_row(
+                    group=group,
+                    row=_complete_group_row(group),
+                    as_of_utc=AS_OF_UTC,
+                )
+                self.assertTrue(result.passed)
+                self.assertEqual(result.blockers, ())
 
     def test_hitter_pa_failure_blocks_every_dependent_hitter_market(self):
         state = _all_ready()
