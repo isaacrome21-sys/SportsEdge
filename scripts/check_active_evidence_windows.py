@@ -94,10 +94,11 @@ def mutation_failures(repo_root: Path, registry_path: Path) -> list[str]:
                 failures.append(f"ACTIVE_WINDOW_LIVENESS_AUTHORITY_NOT_FOUND:{window_id}:{liveness_authority}")
             else:
                 liveness_text = liveness_path.read_text(encoding="utf-8")
-                if "schedule:" not in liveness_text:
-                    failures.append(f"ACTIVE_WINDOW_LIVENESS_SCHEDULE_MISSING:{window_id}")
-                if "check_active_evidence_windows.py" not in liveness_text:
-                    failures.append(f"ACTIVE_WINDOW_LIVENESS_CHECK_MISSING:{window_id}")
+                required = raw.get("required_liveness_literals") or ["check_active_evidence_windows.py"]
+                for literal in required:
+                    literal = str(literal)
+                    if literal not in liveness_text:
+                        failures.append(f"ACTIVE_WINDOW_LIVENESS_CONTRACT_MISSING:{window_id}:{literal}")
     return failures
 
 
