@@ -76,12 +76,29 @@ def schedule_kickoff_utc(row: dict) -> datetime | None:
         return None
 
 
+def valid_capture_record(record: dict, cfg: dict, kind: str) -> bool:
+    """Return true only for a capture that is admissible as PRESENT."""
+    if record.get("capture_kind") != kind:
+        return False
+    if record.get("book") != cfg.get("bookmaker"):
+        return False
+    if not record.get("retrieved_at_utc"):
+        return False
+    hashes = record.get("hashes")
+    if not isinstance(hashes, dict) or not hashes:
+        return False
+    games = record.get("games")
+    return isinstance(games, list) and bool(games)
+
+
 def captured_final_games(cfg: dict) -> list[dict]:
     games: list[dict] = []
     for path in Path(cfg["output_dir"]).glob("week*/final/*.json"):
         try:
             record = load_json(path)
         except (OSError, json.JSONDecodeError):
+            continue
+        if not valid_capture_record(record, cfg, "FINAL"):
             continue
         run_id = str((record.get("run") or {}).get("github_run_id") or "")
         for game in record.get("games") or []:
@@ -114,7 +131,8 @@ def audit(cfg: dict, now: datetime, schedule_rows: list[dict] | None = None,
     current_week = max(1, (local_now.date() - anchor).days // 7 + 1)
     written: list[Path] = []
 
-    # OPENER absence evidence.
+    # OPENER absence evidence. Only a contract-valid capture suppresses a miss;
+    # a malformed/empty file is evidence of a failed capture, not PRESENT.
     for week in range(int(cfg["first_week"]), current_week + 1):
         start, end = opener_window_for_week(week, cfg)
         if local_now < end:
@@ -122,14 +140,20 @@ def audit(cfg: dict, now: datetime, schedule_rows: list[dict] | None = None,
         week_dir = out_dir / f"week{week:02d}"
         opener = week_dir / "opener.json"
         marker = week_dir / "opener_missed.json"
-        if opener.exists() or marker.exists():
+        opener_valid = False
+        if opener.is_file():
+            try:
+                opener_valid = valid_capture_record(load_json(opener), cfg, "OPENER")
+            except (OSError, json.JSONDecodeError):
+                opener_valid = False
+        if opener_valid or marker.exists():
             continue
         week_dir.mkdir(parents=True, exist_ok=True)
         record = {
             "status": "MISSED_OR_BLOCKED",
             "capture_kind": "OPENER",
             "week": week,
-            "reason": "OPENER_WINDOW_ELAPSED_WITHOUT_CAPTURE",
+            "reason": "OPENER_WINDOW_ELAPSED_WITHOUT_VALID_CAPTURE",
             "target_local": start.isoformat(),
             "window_end_local": end.isoformat(),
             "observed_missing_at_utc": now.astimezone(timezone.utc).isoformat(),
@@ -207,8 +231,11 @@ def verify_due(cfg: dict, opener_week: int | None, final_kickoffs: list[str],
                     failures.append("DUE_OPENER_WRONG_BOOK")
                 if record.get("capture_kind") != "OPENER":
                     failures.append("DUE_OPENER_WRONG_KIND")
-                if not record.get("retrieved_at_utc") or not record.get("hashes"):
+                if not record.get("retrieved_at_utc") or not isinstance(record.get("hashes"), dict) or not record.get("hashes"):
                     failures.append("DUE_OPENER_MISSING_CONTRACT_FIELDS")
+                games = record.get("games")
+                if not isinstance(games, list) or not games:
+                    failures.append("DUE_OPENER_EMPTY_GAMES")
 
     if final_kickoffs:
         expected = Counter(final_kickoffs)
@@ -218,7 +245,7 @@ def verify_due(cfg: dict, opener_week: int | None, final_kickoffs: list[str],
                 failures.append(
                     f"DUE_FINAL_NOT_MATERIALIZED:{kickoff_z}:expected={expected_count}:actual={actual[kickoff_z]}"
                 )
-        # Validate book/kind/contract fields for current-run FINAL records too.
+        # Validate book/kind/contract fields and nonempty games for current-run FINAL records too.
         for path in Path(cfg["output_dir"]).glob("week*/final/*.json"):
             try:
                 record = load_json(path)
@@ -230,8 +257,11 @@ def verify_due(cfg: dict, opener_week: int | None, final_kickoffs: list[str],
                 failures.append(f"DUE_FINAL_WRONG_BOOK:{path}")
             if record.get("capture_kind") != "FINAL":
                 failures.append(f"DUE_FINAL_WRONG_KIND:{path}")
-            if not record.get("retrieved_at_utc") or not record.get("hashes"):
+            if not record.get("retrieved_at_utc") or not isinstance(record.get("hashes"), dict) or not record.get("hashes"):
                 failures.append(f"DUE_FINAL_MISSING_CONTRACT_FIELDS:{path}")
+            games = record.get("games")
+            if not isinstance(games, list) or not games:
+                failures.append(f"DUE_FINAL_EMPTY_GAMES:{path}")
     return failures
 
 
