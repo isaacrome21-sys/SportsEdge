@@ -105,9 +105,23 @@ jobs:
       - name: Verify PGA engine code surface
         run: |
           python -m py_compile sportsedge/pga/*.py
+          mkdir -p artifacts/model-stack
           python - <<'PY'
+          import json
+          from pathlib import Path
           from sportsedge.pga.runner import run_pga
-          print({'pga_runner_importable': callable(run_pga), 'automatic_provider': 'BLOCKED_FIELD_AND_LIVE_INPUT'})
+          report={
+              'status':'ENGINE_IMPORTABLE_AUTOMATIC_INPUT_BLOCKED',
+              'runner_importable':callable(run_pga),
+              'automatic_provider':'BLOCKED_FIELD_AND_LIVE_INPUT',
+              'promotion_authority':False,
+          }
+          if not report['runner_importable']:
+              raise SystemExit('PGA_RUNNER_NOT_IMPORTABLE')
+          Path('artifacts/model-stack/pga_engine_check.json').write_text(
+              json.dumps(report,indent=2,sort_keys=True)+'\n', encoding='utf-8'
+          )
+          print(report)
           PY
 
       - name: Write whole-stack disposition manifest
@@ -132,7 +146,15 @@ jobs:
           ufc_promo=read('ufc_promotion_evidence.json')
           cfb_prereg=read('cfb_model_selection_prereg.json')
           cfb_pit=read('cfb_pit_readiness.json')
+          pga=read('pga_engine_check.json')
           surface=json.loads(Path('config/run_it_surface.json').read_text())
+
+          if cfb_prereg and cfb_pit:
+              cfb_state='READINESS_AUDITED_NO_ATTEMPT_SPENT'
+          elif cfb_prereg or cfb_pit:
+              cfb_state='READINESS_AUDIT_PARTIAL'
+          else:
+              cfb_state='READINESS_AUDIT_NOT_RUN'
 
           report={
               'schema_version':'SPORTSEDGE_WHOLE_MODEL_TRAIN_DISPOSITION_V1',
@@ -157,7 +179,7 @@ jobs:
                       'promotion_authority':False,
                   },
                   'CFB':{
-                      'state':'READINESS_AUDITED_NO_ATTEMPT_SPENT',
+                      'state':cfb_state,
                       'prereg_status':None if not cfb_prereg else cfb_prereg.get('status'),
                       'pit_readiness':None if not cfb_pit else cfb_pit.get('readiness_state'),
                       'historical_truth_gate_execution_allowed':None if not cfb_pit else cfb_pit.get('historical_truth_gate_execution_allowed'),
@@ -170,7 +192,8 @@ jobs:
                       'automatic_blocker':surface['sports']['UFC'].get('automatic_blocker'),
                   },
                   'PGA':{
-                      'state':'ENGINE_IMPORTABLE_AUTOMATIC_INPUT_BLOCKED',
+                      'state':pga.get('status') if pga else 'ENGINE_CHECK_NOT_RUN',
+                      'runner_importable':None if not pga else pga.get('runner_importable'),
                       'automatic_command':surface['sports']['PGA'].get('automatic_command'),
                       'automatic_blocker':surface['sports']['PGA'].get('automatic_blocker'),
                   },
