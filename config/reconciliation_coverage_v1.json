@@ -152,6 +152,7 @@
     "scripts/probe_public_weather_forecast.py": "WEATHER_PROBE_CONTEXT_ONLY_NO_ACTIVE_BUNDLE",
     "scripts/run_cfb_auto.py": "CFB_GAME_RUNTIME_BLOCKED_WITHOUT_ACTIVE_MODEL_BUNDLE",
     "scripts/run_cfb_hybrid.py": "CFB_GAME_RUNTIME_BLOCKED_WITHOUT_ACTIVE_MODEL_BUNDLE",
+    "scripts/run_cfbd_cfb_market_context.py": "CFB_MARKET_CONTEXT_FETCH_ONLY_NO_MODEL_OR_PROMOTION_AUTHORITY",
     "scripts/run_free_mlb_game_markets.py": "MLB_GAME_MARKET_CONTEXT_ROUTER_ONLY_NO_MODEL_OR_PROMOTION_AUTHORITY",
     "scripts/run_hits_holdout.py": "HISTORICAL_RESEARCH_HOLDOUT_TOOL_NO_ACTIVE_BUNDLE",
     "scripts/run_total_bases_holdout.py": "HISTORICAL_RESEARCH_HOLDOUT_TOOL_NO_ACTIVE_BUNDLE",
