@@ -138,6 +138,7 @@
     "docs/SPORTSEDGE_GITHUB_BENCHMARK_AUDIT_2026-09-01.md": "RESEARCH_ONLY_BENCHMARK_AUDIT_NO_FREEZE_AUTHORITY",
     "docs/research/2026-09-10-baseline-fit-findings.md": "RESEARCH_ONLY_FINDINGS_NO_FREEZE_AUTHORITY",
     "docs/research/2026-09-10-three-lane-verdict-program.md": "RESEARCH_ONLY_PROGRAM_NOTE_NO_FREEZE_AUTHORITY",
+    "docs/EXTERNAL_ADOPTION_TEMPORAL_EVAL_20260914.md": "RESEARCH_ONLY_EXTERNAL_REPO_ADOPTION_PROVENANCE_NO_FREEZE_AUTHORITY",
     ".github/workflows/direct-market-feed-probe.yml": "DIAGNOSTIC_PROBE_ONLY_NO_FREEZE_OR_PROMOTION_AUTHORITY",
     ".github/workflows/fanduel-football-market-shape-probe.yml": "DIAGNOSTIC_PROBE_ONLY_NO_FREEZE_OR_PROMOTION_AUTHORITY",
     ".github/workflows/pinnacle-football-market-shape-probe.yml": "DIAGNOSTIC_PROBE_ONLY_NO_FREEZE_OR_PROMOTION_AUTHORITY",
