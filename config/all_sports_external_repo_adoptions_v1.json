@@ -29,6 +29,16 @@
           "keep raw provider identifiers alongside normalized fields"
         ],
         "forbidden_interpretation": "Retrospective stats are research inputs only unless SportsEdge separately proves causal as-of availability for the target workflow."
+      },
+      {
+        "repository": "zero-sum-seattle/python-mlb-statsapi",
+        "source_commit": "40bc78e66c372e62a99289c11bdc95173684934f",
+        "license": "MIT",
+        "adopted_patterns": [
+          "represent MLB linescores as inning records with separate home and away run values",
+          "parse provider-native linescore state without substituting final-score scaling"
+        ],
+        "forbidden_interpretation": "The public repository is an engineering/schema reference only. It supplies no SportsEdge prediction, calibration evidence, feature authority, market eligibility, or OFFICIAL authority."
       }
     ],
     "CFB": [
