@@ -14,12 +14,13 @@
     },
     "CFB": {
       "freeze_registry": "config/cfb_prop_model_freeze.json",
+      "participation_model_registry": "config/cfb_prop_participation_model_v1.json",
       "evidence_registry": "config/cfb_prop_evidence.json",
       "certification_registry": "config/cfb_prop_certification.json",
       "engine_state": "NO_ENGINE",
       "promotion_state": "BLOCKED_NO_VALIDATED_PROBABILITY_ENGINE",
       "readiness_state": "NO_ENGINE",
-      "reason": "CFB props remain NO_ENGINE until a genuine probability engine independently validates; frozen training artifacts are research inputs only and have no promotion authority."
+      "reason": "CFB props remain NO_ENGINE: the shared Engine B hard-wires the declared starting QB and does not yet have an independently fitted/frozen CFB backup-entry, blowout-substitution, and skill-player leash model. The existing frozen prop artifact remains research-only and has no promotion authority."
     }
   },
   "implemented_provider_markets": {
@@ -32,7 +33,7 @@
   },
   "explicit_no_engine": {
     "NFL": "NFL player props are NO_ENGINE until a genuine sport-specific probability engine independently validates under frozen evidence. Research artifacts, provider mappings, hit rates, market prices, and prop acquisition machinery cannot create Model_P or enable bettor-facing prop leans.",
-    "CFB": "CFB player props are NO_ENGINE until a genuine sport-specific probability engine independently validates under frozen evidence. Frozen research artifacts cannot create Model_P or enable bettor-facing prop leans.",
+    "CFB": "CFB player props are NO_ENGINE until a separate CFB participation/substitution model is fitted, frozen, hash-bound, and independently forward validated. The current shared allocator hard-wires the starting QB and does not model CFB blowout substitution or skill-player leashes; research artifacts cannot create Model_P authority or bettor-facing prop leans.",
     "targets": "No standard bound provider player-targets settlement market is on this acquisition surface.",
     "first_td": "First scorer requires complete sport-specific return-score and overtime scorer ordering plus player identity before it can join the provider surface.",
     "last_td": "Last scorer requires complete sport-specific return-score and overtime scorer ordering plus player identity before it can join the provider surface.",
@@ -47,6 +48,7 @@
     "capper_or_consensus_can_create_model_p": false,
     "requires_frozen_artifact": true,
     "requires_pregame_feature_snapshot": true,
+    "cfb_requires_frozen_participation_model_before_engine_activation": true,
     "paired_price_required_for_devig": true,
     "one_sided_offer_ev_allowed_with_model_p": true,
     "one_sided_market_can_create_model_p": false,

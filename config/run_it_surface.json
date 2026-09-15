@@ -28,8 +28,8 @@
       "planning_market_catalog": "config/football_market_surface.json",
       "governance_source": "config/football_prop_engine_surface.json",
       "automatic_completeness": "EXECUTABLE_FAIL_CLOSED",
-      "blocker": "CFB_FROZEN_GAME_PLUS_LIVE_SOURCES_REQUIRED_FOR_GAME_MODEL_P;CFB_PROPS_NO_ENGINE",
-      "notes": "RUN IT executes the canonical CFB game lane. PLAYER_PROPS lane is intentionally emitted as blocked NO_ENGINE and is not executed while the authoritative prop surface declares CFB NO_ENGINE. Frozen prop research artifacts have no promotion authority and cannot create bettor-facing CFB prop Model_P."
+      "blocker": "CFB_FROZEN_GAME_PLUS_LIVE_SOURCES_REQUIRED_FOR_GAME_MODEL_P;CFB_PROPS_NO_ENGINE;CFB_PROP_PARTICIPATION_MODEL_NOT_FROZEN",
+      "notes": "RUN IT executes the canonical CFB game lane. PLAYER_PROPS remains blocked NO_ENGINE because the shared allocator hard-wires the declared starting QB and does not yet contain a fitted/frozen CFB backup-entry, blowout-substitution, and skill-player leash model. The separate participation registry must be FROZEN and independently forward validated before CFB prop engine activation; the existing prop artifact alone has no bettor-facing Model_P or promotion authority."
     },
     "PGA": {
       "lane": "PREGAME_AND_LIVE_MODEL",

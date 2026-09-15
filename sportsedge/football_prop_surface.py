@@ -7,6 +7,10 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from sportsedge.football_prop_extended_run_machine import PROVIDER_MARKETS
+from sportsedge.sports.cfb.participation_model import (
+    CFBParticipationModelError,
+    require_frozen_cfb_participation_model,
+)
 
 DEFAULT_PROP_SURFACE = Path("config/football_prop_engine_surface.json")
 EXPECTED_SCHEMA = "FOOTBALL_PROP_ENGINE_SURFACE_V1"
@@ -58,6 +62,17 @@ def _freeze_state(surface_path: Path, spec: Mapping[str, Any], sport: str) -> tu
     return "MODEL_ARTIFACT_BLOCKED", None
 
 
+def _cfb_participation_state(surface_path: Path, spec: Mapping[str, Any]) -> Mapping[str, Any]:
+    declared = str(spec.get("participation_model_registry") or "").strip()
+    if not declared:
+        raise FootballPropSurfaceError("CFB_PROP_PARTICIPATION_REGISTRY_UNBOUND")
+    registry_path = _repo_relative(surface_path, declared)
+    try:
+        return require_frozen_cfb_participation_model(registry_path)
+    except CFBParticipationModelError as exc:
+        raise FootballPropSurfaceError(str(exc)) from exc
+
+
 def require_executable_prop_surface(sport: str, *, path: str | Path = DEFAULT_PROP_SURFACE) -> Mapping[str, Any]:
     surface_path = Path(path)
     payload = load_prop_surface(surface_path)
@@ -91,11 +106,18 @@ def require_executable_prop_surface(sport: str, *, path: str | Path = DEFAULT_PR
     if provider_keys != set(PROVIDER_MARKETS):
         raise FootballPropSurfaceError("FOOTBALL_PROP_PROVIDER_MARKET_SURFACE_MISMATCH")
     governance=payload.get("governance")
-    required_true=("official_bets_allowed_when_all_gates_pass","requires_frozen_artifact","requires_pregame_feature_snapshot","paired_price_required_for_devig","one_sided_offer_ev_allowed_with_model_p","requires_pregame_quote","requires_quote_ttl","requires_forward_evidence_for_promotion","requires_artifact_bound_certification","requires_frozen_edge_floor_before_promotable_inference","evidence_resolution_time_enforced")
+    required_true=("official_bets_allowed_when_all_gates_pass","requires_frozen_artifact","requires_pregame_feature_snapshot","cfb_requires_frozen_participation_model_before_engine_activation","paired_price_required_for_devig","one_sided_offer_ev_allowed_with_model_p","requires_pregame_quote","requires_quote_ttl","requires_forward_evidence_for_promotion","requires_artifact_bound_certification","requires_frozen_edge_floor_before_promotable_inference","evidence_resolution_time_enforced")
     if not isinstance(governance, Mapping) or any(governance.get(k) is not True for k in required_true):
         raise FootballPropSurfaceError("FOOTBALL_PROP_GOVERNANCE_CONTRACT_INVALID")
     required_false=("manual_eligible_toggle_required","market_prices_can_create_model_p","hit_rates_can_create_model_p","capper_or_consensus_can_create_model_p","one_sided_market_can_create_model_p","one_sided_market_can_create_fair_market_p")
     if any(governance.get(k) is not False for k in required_false):
         raise FootballPropSurfaceError("FOOTBALL_PROP_MODEL_P_GOVERNANCE_INVALID")
     runtime_state, artifact_sha = _freeze_state(surface_path, spec, resolved)
-    return {**dict(spec), "runtime_state": runtime_state, "frozen_artifact_sha256": artifact_sha}
+    participation = None
+    if resolved == "CFB":
+        participation = _cfb_participation_state(surface_path, spec)
+    out = {**dict(spec), "runtime_state": runtime_state, "frozen_artifact_sha256": artifact_sha}
+    if participation is not None:
+        out["participation_model_artifact_sha256"] = participation["artifact_sha256"]
+        out["participation_model_validation_status"] = participation["engine_validation_status"]
+    return out
