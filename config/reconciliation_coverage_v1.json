@@ -152,7 +152,7 @@
     "sportsedge/sports/external_sidecar.py": "EXTERNAL_CONTEXT_SIDECAR_NO_ACTIVE_MODEL_BUNDLE",
     "sportsedge/sports/mlb/prop_volume_stage1.py": "MLB_PROP_RESEARCH_STAGE_NO_ACTIVE_PROP_BUNDLE",
     "sportsedge/sports/nfl/defensive_context.py": "NFL_RUNTIME_CONTEXT_NO_ACTIVE_MODEL_BUNDLE",
-    "sportsedge/sports/nfl/team_totals.py": "NFL_RUNTIME_MARKET_SURFACE_NO_ACTIVE_BUNDLE",
+    "sportsedge/sports/nfl/team_totals.py": "NFL_RUNTIME_MARKET_SURFACE_NO_ACTIVE_MODEL_BUNDLE",
     "sportsedge/sports/nfl/venue_contract.py": "NFL_RUNTIME_CONTEXT_NO_ACTIVE_MODEL_BUNDLE"
   },
   "inventory_completion_claim": {
