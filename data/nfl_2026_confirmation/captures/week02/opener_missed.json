@@ -1,0 +1,12 @@
+{
+  "capture_kind": "OPENER",
+  "evidence_semantics": "ABSENCE_MARKER_ONLY_NOT_MARKET_DATA",
+  "expected_capture_path": "data/nfl_2026_confirmation/captures/week02/opener.json",
+  "no_backfill": true,
+  "observed_missing_at_utc": "2026-09-15T18:24:39.765627+00:00",
+  "reason": "OPENER_WINDOW_ELAPSED_WITHOUT_VALID_CAPTURE",
+  "status": "MISSED_OR_BLOCKED",
+  "target_local": "2026-09-15T09:00:00-05:00",
+  "week": 2,
+  "window_end_local": "2026-09-15T10:00:00-05:00"
+}
