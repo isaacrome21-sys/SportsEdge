@@ -1,6 +1,8 @@
 # WS-CREDIT paid-schedule audit
 
-Effective scope: 2026-09-11. This is operational-only and does not change any model, feature schema, candidate threshold, evidence-unit definition, close definition, promotion rule, or historical evidence.
+Effective scope: 2026-09-11. This is an operational budget-allocation record. It does not change any model, feature schema, candidate threshold, evidence-unit definition, close definition, promotion rule, or historical evidence.
+
+This document records the September 11 action as taken. Later workflow activation or governance changes are separate events and do not rewrite this historical scope.
 
 ## Scheduled paid authorities after this change
 
@@ -25,6 +27,12 @@ The legacy NFL capture writes `data/nfl_2026_confirmation/captures`. A repositor
 
 Secret values, subscription ownership, and provider terms cannot be established from repository code. Multiple configured key slots must not be treated as independent quota entitlements unless the account owner has confirmed that use is permitted.
 
-## Evidence-unit impact
+## Evidence impact correction
 
-NONE. This workstream only changes scheduling/operational budget allocation. It does not start, reset, merge, or reinterpret a Promotion Evidence V2 clock.
+**Evidence-definition impact: NONE.** This workstream does not start, reset, merge, reinterpret, or alter the definition of a Promotion Evidence V2 unit.
+
+**Evidence-accrual opportunity: TERMINATED for the active MLB forward lane.** Parking `mlb-v8-evidence.yml` removed automatic acquisition during the already preregistered MLB 2026 forward interval. That operational change therefore affected the opportunity to accumulate evidence even though it did not change evidence semantics.
+
+The terminal MLB audit subsequently established that the V8 lane had already failed to accrue any durable evidence units before the September 11 parking decision. The parking action therefore terminated an already non-accruing lane rather than interrupting a functioning partial sample. See `docs/MLB_2026_FORWARD_HOLDOUT_DISPOSITION.md`.
+
+This distinction is a process correction: an operational scheduling change to an ACTIVE preregistered evidence window must record its accrual consequence even when evidence definitions remain unchanged.
