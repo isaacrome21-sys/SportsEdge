@@ -1,0 +1,63 @@
+{
+  "schema": "SPORTSEDGE_ACTIVE_EVIDENCE_WINDOWS_V1",
+  "default_rule": "An ACTIVE preregistered evidence window must retain its declared acquisition authority and must have an independent liveness check. Workflow success is never evidence liveness by itself.",
+  "mutation_rule": "Parking, disabling, removing schedule authority, materially reducing cadence, removing the declared provider path, or removing persistence for an ACTIVE window requires an explicit recorded disposition in this registry before the mutation may merge.",
+  "windows": [
+    {
+      "id": "MLB_2026_FORWARD_V8",
+      "sport": "MLB",
+      "status": "CLOSED_FAILED_NONACCRUAL",
+      "preregistered_window": {
+        "start": "2026-09-01",
+        "end": "2026-09-27"
+      },
+      "v8_admissible_start": "2026-09-03",
+      "acquisition_authority": ".github/workflows/mlb-v8-evidence.yml",
+      "provider_dependency": "THE_ODDS_API",
+      "terminal_disposition": "FAILED_NONACCRUAL_ZERO_DURABLE_EVIDENCE_CLOSED_UNUSABLE",
+      "durable_evidence_units": 0,
+      "known_failure_scope": "SHARED_INFRASTRUCTURE",
+      "known_failure": "THE_ODDS_API_HTTP_401_OUT_OF_USAGE_CREDITS",
+      "automatic_acquisition_terminated": "2026-09-11",
+      "termination_cause": "ODDS_API_BUDGET_REALLOCATION_TO_FOOTBALL",
+      "resumption": "FORBIDDEN_FOR_2026_HOLDOUT",
+      "notes": "September 11 is not a redefined holdout endpoint. The frozen window remains September 1-27; V8 never accumulated a durable evidence unit before automatic acquisition was parked."
+    },
+    {
+      "id": "NFL_2026_CONFIRMATION_ARCHIVE",
+      "sport": "NFL",
+      "status": "ACTIVE",
+      "active_from": "2026-09-15",
+      "acquisition_authority": ".github/workflows/nfl-2026-line-capture.yml",
+      "provider_dependency": "THE_ODDS_API_DRAFTKINGS",
+      "persistence_root": "data/nfl_2026_confirmation/captures",
+      "liveness_mode": "DUE_WINDOW_MUST_REACH_DURABLE_TERMINAL_STATE",
+      "independent_liveness_authority": ".github/workflows/active-evidence-window-liveness.yml",
+      "required_authority_literals": [
+        "schedule:",
+        "scripts/nfl_2026_line_capture.py",
+        "scripts/audit_nfl_2026_capture_gaps.py",
+        "Verify every due scheduled capture materialized",
+        "data/nfl_2026_confirmation/captures"
+      ],
+      "no_backfill": true
+    },
+    {
+      "id": "NFL_2026_FORWARD_CLV",
+      "sport": "NFL",
+      "status": "ACTIVE",
+      "active_from": "2026-09-14",
+      "acquisition_authority": ".github/workflows/football-nfl-forward-clv-collection.yml",
+      "provider_dependency": "THE_ODDS_API_DRAFTKINGS",
+      "persistence_root": "runtime/nfl-forward",
+      "liveness_mode": "PER_DUE_RUN_FAIL_CLOSED_PLUS_MUTATION_GUARD",
+      "required_authority_literals": [
+        "schedule:",
+        "scripts/fetch_nfl_forward_odds.py",
+        "Persist release-scoped decision/close state to data branch",
+        "runtime/nfl-forward"
+      ],
+      "no_backfill": true
+    }
+  ]
+}
