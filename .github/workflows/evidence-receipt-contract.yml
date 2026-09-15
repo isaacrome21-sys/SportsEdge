@@ -12,6 +12,7 @@ on:
       - 'tests/test_evidence_receipt.py'
       - 'tests/test_cfb_forward_target_direction.py'
       - 'tests/test_mlb_v8_replay_receipt.py'
+      - 'tests/test_nfl_2026_capture_receipt.py'
       - '.github/workflows/evidence-receipt-contract.yml'
       - '.github/workflows/mlb-v8-replay-backfill.yml'
       - '.github/workflows/nfl-2026-evidence-receipt.yml'
@@ -42,6 +43,7 @@ jobs:
           tests.test_evidence_receipt
           tests.test_cfb_forward_target_direction
           tests.test_mlb_v8_replay_receipt
+          tests.test_nfl_2026_capture_receipt
       - name: Re-run existing MLB replay archive self-test
         run: python3 scripts/build_mlb_v8_replay_archive.py --self-test
       - name: Assert live NFL capture controls were not changed by this PR
