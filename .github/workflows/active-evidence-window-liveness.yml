@@ -1,0 +1,52 @@
+name: active-evidence-window-liveness
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'config/active_evidence_windows_v1.json'
+      - 'config/nfl_2026_capture.json'
+      - 'scripts/check_active_evidence_windows.py'
+      - 'scripts/audit_nfl_2026_capture_gaps.py'
+      - 'tests/test_active_evidence_window_guards.py'
+      - '.github/workflows/active-evidence-window-liveness.yml'
+      - '.github/workflows/nfl-2026-line-capture.yml'
+      - '.github/workflows/football-nfl-forward-clv-collection.yml'
+  # Independent deadman. This does not call a paid market-data provider.
+  # It inspects the durable repository state after recently elapsed frozen
+  # NFL capture windows. A green capture workflow is not a liveness input.
+  schedule:
+    - cron: '17 * * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Guard active-window acquisition authorities
+        run: python3 scripts/check_active_evidence_windows.py mutation
+      - name: Test active-window guards
+        run: python3 -m unittest -q tests.test_active_evidence_window_guards
+
+  nfl-durable-deadman:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Fetch free NFL schedule snapshot
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error --retry 3 \
+            'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv' \
+            -o "$RUNNER_TEMP/nfl-games.csv"
+      - name: Fail loudly on recent durable non-accrual
+        run: >-
+          python3 scripts/check_active_evidence_windows.py nfl-liveness
+          --schedule-csv "$RUNNER_TEMP/nfl-games.csv"
+          --lookback-hours 4
