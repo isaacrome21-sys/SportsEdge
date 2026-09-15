@@ -109,10 +109,11 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-          from sportsedge.pga.runner import run_pga
+          from sportsedge.pga.runner import run_live_pga_model
           report={
               'status':'ENGINE_IMPORTABLE_AUTOMATIC_INPUT_BLOCKED',
-              'runner_importable':callable(run_pga),
+              'runner_symbol':'sportsedge.pga.runner.run_live_pga_model',
+              'runner_importable':callable(run_live_pga_model),
               'automatic_provider':'BLOCKED_FIELD_AND_LIVE_INPUT',
               'promotion_authority':False,
           }
