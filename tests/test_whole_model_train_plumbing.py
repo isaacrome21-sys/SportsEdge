@@ -74,6 +74,15 @@ class WholeModelTrainPlumbingTest(unittest.TestCase):
         for command in forbidden:
             self.assertNotIn(command, workflow)
 
+    def test_manifest_requires_lane_artifacts_before_claiming_cfb_or_pga_success(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("READINESS_AUDIT_NOT_RUN", workflow)
+        self.assertIn("READINESS_AUDIT_PARTIAL", workflow)
+        self.assertIn("ENGINE_CHECK_NOT_RUN", workflow)
+        self.assertIn("pga_engine_check.json", workflow)
+        self.assertNotIn("'state':'READINESS_AUDITED_NO_ATTEMPT_SPENT',", workflow)
+        self.assertNotIn("'state':'ENGINE_IMPORTABLE_AUTOMATIC_INPUT_BLOCKED',", workflow)
+
     def test_attempt9_public_source_is_exactly_pinned(self):
         cfg = json.loads((ROOT / "config/public_training_sources_v1.json").read_text())
         nfl = cfg["sources"]["nfl_attempt9"]
