@@ -74,6 +74,14 @@ class WholeModelTrainPlumbingTest(unittest.TestCase):
         for command in forbidden:
             self.assertNotIn(command, workflow)
 
+    def test_pga_check_uses_existing_live_runner_symbol(self):
+        from sportsedge.pga.runner import run_live_pga_model
+
+        self.assertTrue(callable(run_live_pga_model))
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("from sportsedge.pga.runner import run_live_pga_model", workflow)
+        self.assertNotIn("from sportsedge.pga.runner import run_pga", workflow)
+
     def test_manifest_requires_lane_artifacts_before_claiming_cfb_or_pga_success(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("READINESS_AUDIT_NOT_RUN", workflow)
