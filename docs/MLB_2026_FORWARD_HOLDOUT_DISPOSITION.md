@@ -37,9 +37,17 @@ The September 8 exact-run artifact establishes the first hard root cause in the 
 
 Classification: **SHARED_INFRASTRUCTURE**.
 
+This was not a newly discovered provider failure mode. A provider-acceptance probe on **2026-08-17** had already recorded the same HTTP 401 `OUT_OF_USAGE_CREDITS` response. The September failure was therefore a recurrence of a known production risk. What was missing was an independent liveness detector capable of distinguishing a green scheduler/orchestrator from actual durable evidence accrual. The recurring failure was not surfaced by an automated active-window control while the preregistered MLB window was live.
+
 The failure occurred in the shared market-data/provider-quota path upstream of MLB-specific lineup requirements or successful Model_P production. NFL production capture also depends on The Odds API credential/provider path, so this diagnosis is an immediate cross-sport operational risk rather than only a 2027 MLB bug report.
 
 This does not prove that every September 8-10 failure had the identical root cause. It is sufficient to prove that at least one valid decision opportunity failed on shared provider infrastructure and that the 2026 lane accumulated zero durable V8 evidence units.
+
+## NFL preflight before the first live confirmation window
+
+A direct provider-acceptance rerun at **2026-09-15T04:33:38Z** returned the same HTTP 401 `OUT_OF_USAGE_CREDITS` condition and persisted `status: BLOCKED_NO_CREDITS`. Four production key slots were present, but the provider response was classified as account-wide terminal under the shared Odds API keyring contract, so key rotation intentionally stops on this condition.
+
+Operational conclusion: **NFL provider readiness is BLOCKED until Odds API usage capacity is restored.** This preflight is provider-path acceptance only; it is not an NFL timepoint capture, does not create forward evidence, and does not alter no-backfill policy.
 
 ## September 11 parking decision
 
