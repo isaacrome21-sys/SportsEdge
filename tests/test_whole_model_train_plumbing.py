@@ -22,6 +22,17 @@ def _load_builder():
     return module
 
 
+def _module_help(module_name: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, "-m", module_name, "--help"],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+
 class WholeModelTrainPlumbingTest(unittest.TestCase):
     def test_nfl_preflight_supports_direct_and_module_help(self):
         direct = subprocess.run(
@@ -32,30 +43,36 @@ class WholeModelTrainPlumbingTest(unittest.TestCase):
             stderr=subprocess.PIPE,
             check=False,
         )
-        module = subprocess.run(
-            [sys.executable, "-m", "scripts.nfl_2026_provider_preflight", "--help"],
-            cwd=ROOT,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-        )
+        module = _module_help("scripts.nfl_2026_provider_preflight")
         self.assertEqual(direct.returncode, 0, direct.stderr)
         self.assertEqual(module.returncode, 0, module.stderr)
 
-    def test_ufc_builder_supports_module_help_and_workflow_uses_it(self):
-        module = subprocess.run(
-            [sys.executable, "-m", "scripts.build_ufc_training_artifact", "--help"],
-            cwd=ROOT,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
+    def test_package_dependent_workflow_scripts_use_module_mode(self):
+        modules = (
+            "scripts.build_ufc_training_artifact",
+            "scripts.audit_cfb_model_selection_prereg",
+            "scripts.audit_cfb_pit_readiness",
         )
-        self.assertEqual(module.returncode, 0, module.stderr)
+        for module_name in modules:
+            with self.subTest(module=module_name):
+                result = _module_help(module_name)
+                self.assertEqual(result.returncode, 0, result.stderr)
+
         workflow = WORKFLOW.read_text(encoding="utf-8")
-        self.assertIn("python -m scripts.build_ufc_training_artifact", workflow)
-        self.assertNotIn("python scripts/build_ufc_training_artifact.py", workflow)
+        expected = (
+            "python -m scripts.build_ufc_training_artifact",
+            "python -m scripts.audit_cfb_model_selection_prereg",
+            "python -m scripts.audit_cfb_pit_readiness",
+        )
+        forbidden = (
+            "python scripts/build_ufc_training_artifact.py",
+            "python scripts/audit_cfb_model_selection_prereg.py",
+            "python scripts/audit_cfb_pit_readiness.py",
+        )
+        for command in expected:
+            self.assertIn(command, workflow)
+        for command in forbidden:
+            self.assertNotIn(command, workflow)
 
     def test_attempt9_public_source_is_exactly_pinned(self):
         cfg = json.loads((ROOT / "config/public_training_sources_v1.json").read_text())
