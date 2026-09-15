@@ -34,6 +34,7 @@ jobs:
         run: |
           python -m py_compile sportsedge/sports/cfb/forward_evidence.py scripts/audit_cfb_forward_evidence.py
           python -m unittest tests.test_cfb_forward_evidence -v
+          python -m scripts.audit_cfb_forward_evidence --help >/dev/null
 
       - name: Fetch immutable data branch
         shell: bash
@@ -50,7 +51,7 @@ jobs:
           if [[ "${{ github.event_name == 'workflow_dispatch' && inputs.require_ready || false }}" == "true" ]]; then
             extra="--require-ready"
           fi
-          python scripts/audit_cfb_forward_evidence.py \
+          python -m scripts.audit_cfb_forward_evidence \
             --data-root .data-branch \
             --out artifacts/cfb_forward_evidence/report.json \
             $extra
