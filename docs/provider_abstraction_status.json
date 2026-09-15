@@ -1,0 +1,13 @@
+{
+  "schema": "PROVIDER_ABSTRACTION_STATUS_V1",
+  "branch": "feat/free-provider-abstraction-20260915",
+  "base_sha": "abaed7e4351f8579404dc725a4c736a0bff00ba8",
+  "content_state": "READY_FOR_HOSTED_CI",
+  "hosted_ci": "NOT_YET_RUN_ON_PR_HEAD",
+  "spend_attribution": "PARTIALLY_PROVEN",
+  "frozen_nfl_confirmation_changed": false,
+  "model_p_authority": false,
+  "promotion_authority": false,
+  "staking_authority": false,
+  "official_authority": false
+}
