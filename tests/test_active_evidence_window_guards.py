@@ -27,7 +27,7 @@ class ActiveEvidenceWindowGuardTests(unittest.TestCase):
                 encoding="utf-8",
             )
             (root / ".github/workflows/deadman.yml").write_text(
-                "schedule:\n  - cron: '17 * * * *'\nrun: python check_active_evidence_windows.py\n",
+                "workflow_run:\n  workflows: [other-writer]\nrun: python check_active_evidence_windows.py\n",
                 encoding="utf-8",
             )
             registry = {
@@ -40,6 +40,9 @@ class ActiveEvidenceWindowGuardTests(unittest.TestCase):
                         "persistence_root": "durable/root",
                         "independent_liveness_authority": ".github/workflows/deadman.yml",
                         "required_authority_literals": ["schedule:", "capture.py"],
+                        "required_liveness_literals": [
+                            "workflow_run:", "other-writer", "check_active_evidence_windows.py"
+                        ],
                     },
                     {
                         "id": "CLOSED",
@@ -71,6 +74,34 @@ class ActiveEvidenceWindowGuardTests(unittest.TestCase):
             path.write_text(json.dumps(registry), encoding="utf-8")
             failures = MOD.mutation_failures(root, path)
             self.assertIn("ACTIVE_WINDOW_AUTHORITY_CONTRACT_MISSING:ACTIVE:schedule:", failures)
+
+    def test_mutation_guard_fails_when_declared_liveness_trigger_is_removed(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / ".github/workflows").mkdir(parents=True)
+            (root / "config").mkdir()
+            (root / ".github/workflows/capture.yml").write_text(
+                "schedule:\nrun: capture.py\npath: durable/root\n", encoding="utf-8"
+            )
+            (root / ".github/workflows/deadman.yml").write_text(
+                "run: python check_active_evidence_windows.py\n", encoding="utf-8"
+            )
+            registry = {
+                "schema": "SPORTSEDGE_ACTIVE_EVIDENCE_WINDOWS_V1",
+                "windows": [{
+                    "id": "ACTIVE",
+                    "status": "ACTIVE",
+                    "acquisition_authority": ".github/workflows/capture.yml",
+                    "persistence_root": "durable/root",
+                    "independent_liveness_authority": ".github/workflows/deadman.yml",
+                    "required_authority_literals": ["schedule:", "capture.py"],
+                    "required_liveness_literals": ["workflow_run:", "check_active_evidence_windows.py"],
+                }],
+            }
+            path = root / "config/registry.json"
+            path.write_text(json.dumps(registry), encoding="utf-8")
+            failures = MOD.mutation_failures(root, path)
+            self.assertIn("ACTIVE_WINDOW_LIVENESS_CONTRACT_MISSING:ACTIVE:workflow_run:", failures)
 
     def _write_capture_config(self, root: Path) -> Path:
         cfg = {
