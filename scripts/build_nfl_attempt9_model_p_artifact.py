@@ -2,21 +2,21 @@
 """Build the frozen probability wrapper for NFL attempt-9.
 
 This script consumes the exact reconstructed attempt-9 runtime and the same
-commit-pinned nflverse source used by that runtime.  It fits an isotonic mapping
-on the 2017-2019 selection holdout only.  That fit is explicitly exposed and
-has zero promotion authority; only later prospective 2026 evidence can validate
-or promote this Model_P identity.
+commit-pinned nflverse source used by that runtime. It fits an isotonic mapping
+on the 2017-2019 selection holdout only. That fit is explicitly exposed and has
+zero promotion authority; only later prospective 2026 evidence can validate or
+promote this Model_P identity.
 """
 from __future__ import annotations
 
 import argparse
 from collections import defaultdict
 from hashlib import sha256
+from itertools import groupby
 import json
 from math import erf, sqrt
 from pathlib import Path
 import re
-from itertools import groupby
 from typing import Any
 
 import numpy as np
@@ -68,18 +68,6 @@ def _verify_runtime(artifact: dict[str, Any]) -> str:
     return expected
 
 
-def _predict(target: dict[str, Any], features: list[float]) -> float:
-    vector = np.asarray(features, dtype=float)
-    mean = np.asarray(target["feature_mean"], dtype=float)
-    std = np.asarray(target["feature_std"], dtype=float)
-    beta = np.asarray(target["coefficients"], dtype=float)
-    if vector.shape != (6,) or mean.shape != (6,) or std.shape != (6,) or beta.shape != (6,):
-        raise ValueError("NFL_ATTEMPT9_MODEL_P_RUNTIME_GEOMETRY_INVALID")
-    if np.any(std == 0):
-        raise ValueError("NFL_ATTEMPT9_MODEL_P_RUNTIME_ZERO_STD")
-    return float(((vector - mean) / std) @ beta + float(target["intercept"]))
-
-
 def _normal_upper(threshold: float, *, mean: float, sigma: float) -> float:
     if sigma <= 0.0:
         raise ValueError("NFL_ATTEMPT9_MODEL_P_SIGMA_INVALID")
@@ -87,10 +75,17 @@ def _normal_upper(threshold: float, *, mean: float, sigma: float) -> float:
     return min(1.0 - 1e-9, max(1e-9, 1.0 - cdf))
 
 
-def _holdout_rows(games: list[dict[str, Any]], runtime: dict[str, Any]) -> list[dict[str, Any]]:
+def _holdout_market_rows(games: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Rebuild only the held-out row identity/market metadata in feature order.
+
+    Predictions are intentionally not recomputed row-by-row here. The frozen
+    prediction digest was produced by vectorized NumPy matrix multiplication;
+    recomputing one row at a time can change last-bit floating-point text while
+    leaving the model mathematically identical. Exact identity is checked using
+    the same vectorized path below.
+    """
     ordered = sorted(games, key=lambda game: (game["date"], game["id"]))
     history: defaultdict[str, list[tuple[int, int]]] = defaultdict(list)
-    targets = runtime["runtime"]["targets"]
     rows: list[dict[str, Any]] = []
     for game_date, group in groupby(ordered, key=lambda game: game["date"]):
         batch = list(group)
@@ -99,12 +94,6 @@ def _holdout_rows(games: list[dict[str, Any]], runtime: dict[str, Any]) -> list[
             away = game["away"]
             if len(history[home]) < 5 or len(history[away]) < 5:
                 continue
-            hp = runtime_builder._weighted(history[home])
-            ap = runtime_builder._weighted(history[away])
-            features = [
-                float(hp[0]), float(hp[1]), float(ap[0]), float(ap[1]),
-                float(hp[0] - hp[1]), float(ap[0] - ap[1]),
-            ]
             season = int(str(game_date)[:4])
             if 2017 <= season <= 2019:
                 rows.append(
@@ -115,14 +104,43 @@ def _holdout_rows(games: list[dict[str, Any]], runtime: dict[str, Any]) -> list[
                         "total_line": game.get("total_line"),
                         "home_margin": float(game["hs"] - game["as"]),
                         "game_total": float(game["hs"] + game["as"]),
-                        "predicted_margin": _predict(targets["margin"], features),
-                        "predicted_total": _predict(targets["total"], features),
                     }
                 )
         for game in batch:
             history[game["home"]].append((game["hs"], game["as"]))
             history[game["away"]].append((game["as"], game["hs"]))
     return rows
+
+
+def _vectorized_holdout_predictions(
+    games: list[dict[str, Any]], runtime: dict[str, Any]
+) -> dict[str, np.ndarray]:
+    x, _margin, _total, dates = runtime_builder.build_features(games)
+    holdout = np.asarray(
+        [runtime_builder.HOLDOUT_START <= int(date[:4]) <= runtime_builder.HOLDOUT_END for date in dates],
+        dtype=bool,
+    )
+    x_holdout = x[holdout]
+    out: dict[str, np.ndarray] = {}
+    for market in ("margin", "total"):
+        target = runtime["runtime"]["targets"][market]
+        mean = np.asarray(target["feature_mean"], dtype=float)
+        std = np.asarray(target["feature_std"], dtype=float)
+        beta = np.asarray(target["coefficients"], dtype=float)
+        if x_holdout.shape[1:] != (6,) or mean.shape != (6,) or std.shape != (6,) or beta.shape != (6,):
+            raise ValueError("NFL_ATTEMPT9_MODEL_P_RUNTIME_GEOMETRY_INVALID")
+        if np.any(std == 0):
+            raise ValueError("NFL_ATTEMPT9_MODEL_P_RUNTIME_ZERO_STD")
+        scaled_holdout = (x_holdout - mean) / std
+        predictions = scaled_holdout @ beta + float(target["intercept"])
+        expected = str(target["holdout_prediction_sha256"])
+        actual = runtime_builder._prediction_sha(predictions)
+        if actual != expected:
+            raise ValueError(
+                f"NFL_ATTEMPT9_MODEL_P_PREDICTION_BINDING_MISMATCH:{market}:{actual}:{expected}"
+            )
+        out[market] = predictions
+    return out
 
 
 def _market_fit(rows: list[dict[str, Any]], *, market: str, sigma: float) -> dict[str, Any]:
@@ -182,18 +200,16 @@ def build_model_p_artifact(
         raise ValueError("NFL_ATTEMPT9_MODEL_P_RUNTIME_SOURCE_BINDING_MISMATCH")
 
     games = runtime_builder.parse_games(raw)
-    rows = _holdout_rows(games, runtime)
-    margin_predictions = np.asarray([row["predicted_margin"] for row in rows], dtype=float)
-    total_predictions = np.asarray([row["predicted_total"] for row in rows], dtype=float)
-    if len(rows) != int(runtime["runtime"]["targets"]["margin"]["holdout_count"]):
-        raise ValueError(f"NFL_ATTEMPT9_MODEL_P_HOLDOUT_COUNT_MISMATCH:{len(rows)}")
-    for market, predictions in (("margin", margin_predictions), ("total", total_predictions)):
-        expected = runtime["runtime"]["targets"][market]["holdout_prediction_sha256"]
-        actual = runtime_builder._prediction_sha(predictions)
-        if actual != expected:
-            raise ValueError(
-                f"NFL_ATTEMPT9_MODEL_P_PREDICTION_BINDING_MISMATCH:{market}:{actual}:{expected}"
-            )
+    rows = _holdout_market_rows(games)
+    predictions = _vectorized_holdout_predictions(games, runtime)
+    expected_count = int(runtime["runtime"]["targets"]["margin"]["holdout_count"])
+    if len(rows) != expected_count:
+        raise ValueError(f"NFL_ATTEMPT9_MODEL_P_HOLDOUT_COUNT_MISMATCH:{len(rows)}:{expected_count}")
+    if len(predictions["margin"]) != len(rows) or len(predictions["total"]) != len(rows):
+        raise ValueError("NFL_ATTEMPT9_MODEL_P_HOLDOUT_ALIGNMENT_MISMATCH")
+    for index, row in enumerate(rows):
+        row["predicted_margin"] = float(predictions["margin"][index])
+        row["predicted_total"] = float(predictions["total"][index])
 
     markets = {
         "spread": _market_fit(
