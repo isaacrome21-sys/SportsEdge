@@ -8,6 +8,7 @@ on:
       - 'docs/market_provider_migration_20260915.md'
       - 'docs/market_provider_spend_audit_20260915.md'
       - 'docs/free_provider_public_repo_adoption.md'
+      - 'docs/provider_abstraction_terminal_state.md'
       - 'sportsedge/market_provider_contract.py'
       - 'sportsedge/market_provider_router.py'
       - 'sportsedge/free_game_market_acquisition.py'
@@ -19,6 +20,7 @@ on:
       - 'tests/test_provider_migration_ledger.py'
       - 'tests/test_provider_frozen_exclusion.py'
       - 'tests/test_provider_consumer_registry.py'
+      - 'tests/test_provider_branch_scope.py'
       - 'tests/test_espn_game_odds_source.py'
       - 'scripts/audit_market_provider_migration.py'
       - 'scripts/provider_usage_attribution.py'
@@ -37,7 +39,7 @@ jobs:
       - name: Compile
         run: python3 -m py_compile sportsedge/market_provider_contract.py sportsedge/market_provider_router.py sportsedge/free_game_market_acquisition.py scripts/audit_market_provider_migration.py scripts/provider_usage_attribution.py scripts/run_free_mlb_game_markets.py
       - name: Provider contract tests
-        run: python3 -m unittest -q tests.test_market_provider_contract tests.test_market_provider_router tests.test_free_game_market_acquisition tests.test_provider_usage_attribution tests.test_provider_migration_ledger tests.test_provider_frozen_exclusion tests.test_provider_consumer_registry tests.test_espn_game_odds_source
+        run: python3 -m unittest -q tests.test_market_provider_contract tests.test_market_provider_router tests.test_free_game_market_acquisition tests.test_provider_usage_attribution tests.test_provider_migration_ledger tests.test_provider_frozen_exclusion tests.test_provider_consumer_registry tests.test_provider_branch_scope tests.test_espn_game_odds_source
       - name: Migration audit
         run: python3 scripts/audit_market_provider_migration.py
       - name: Frozen confirmation exclusion
