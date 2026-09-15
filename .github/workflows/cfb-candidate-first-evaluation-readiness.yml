@@ -6,24 +6,24 @@ on:
     paths:
       - 'config/cfb_model_selection_policy_v1.json'
       - 'config/cfb_model_candidate_prereg_v1.json'
-      - 'config/cfb_truth_gate_v1.json'
+      - 'config/cfb_game_model_freeze.json'
       - 'scripts/audit_cfb_model_selection_prereg.py'
-      - 'scripts/audit_cfb_pit_readiness.py'
+      - 'scripts/audit_cfb_selection_readiness.py'
       - 'sportsedge/sports/cfb/model_selection_prereg.py'
-      - 'sportsedge/sports/cfb/pit_readiness.py'
-      - 'sportsedge/sports/cfb/source_manifest.py'
+      - 'sportsedge/sports/cfb/acquisition_readiness.py'
+      - 'sportsedge/sports/cfb/selection_readiness.py'
       - '.github/workflows/cfb-candidate-first-evaluation-readiness.yml'
   push:
     branches: [main]
     paths:
       - 'config/cfb_model_selection_policy_v1.json'
       - 'config/cfb_model_candidate_prereg_v1.json'
-      - 'config/cfb_truth_gate_v1.json'
+      - 'config/cfb_game_model_freeze.json'
       - 'scripts/audit_cfb_model_selection_prereg.py'
-      - 'scripts/audit_cfb_pit_readiness.py'
+      - 'scripts/audit_cfb_selection_readiness.py'
       - 'sportsedge/sports/cfb/model_selection_prereg.py'
-      - 'sportsedge/sports/cfb/pit_readiness.py'
-      - 'sportsedge/sports/cfb/source_manifest.py'
+      - 'sportsedge/sports/cfb/acquisition_readiness.py'
+      - 'sportsedge/sports/cfb/selection_readiness.py'
       - '.github/workflows/cfb-candidate-first-evaluation-readiness.yml'
 
 permissions:
@@ -58,120 +58,57 @@ jobs:
           git fetch --no-tags origin data:data
           git worktree add data-branch data
 
-      - name: Resolve persisted CFB evidence inputs
-        id: evidence
+      - name: Resolve reconstructed-selection inputs
+        id: selection_inputs
         shell: bash
         run: |
           set -euo pipefail
-          current_root='data-branch/history/cfb/current-release'
-          current=''
-          if [ -d "$current_root" ]; then
-            latest="$(find "$current_root" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort | tail -n 1)"
-            if [ -n "$latest" ]; then
-              candidate="$current_root/$latest/cfb_history_capture/current_release_classification.json"
-              [ ! -f "$candidate" ] || current="$candidate"
-            fi
-          fi
-          echo "current=$current" >> "$GITHUB_OUTPUT"
+          root='data-branch/history/cfb/reconstructed-selection'
+          acquisition=''
+          bundle=''
+          [ ! -f "$root/acquisition_manifest.json" ] || acquisition="$root/acquisition_manifest.json"
+          [ ! -f "$root/selection_bundle_manifest.json" ] || bundle="$root/selection_bundle_manifest.json"
+          echo "acquisition=$acquisition" >> "$GITHUB_OUTPUT"
+          echo "bundle=$bundle" >> "$GITHUB_OUTPUT"
 
-          pit_root='data-branch/history/cfb/pit'
-          echo "pit_root=$pit_root" >> "$GITHUB_OUTPUT"
-          for pair in \
-            'manifest:source_manifest.json' \
-            'availability:asof_availability_proof.json' \
-            'market:paired_market_evidence.json'; do
-            key="${pair%%:*}"
-            file="${pair#*:}"
-            value=''
-            [ ! -f "$pit_root/$file" ] || value="$pit_root/$file"
-            echo "$key=$value" >> "$GITHUB_OUTPUT"
-          done
-
-      - name: Audit evidence readiness without consuming an attempt
+      - name: Audit reconstructed first-evaluation readiness
         shell: bash
         run: |
           set -euo pipefail
           args=(
-            --truth-gate config/cfb_truth_gate_v1.json
-            --output artifacts/cfb/pit_readiness.json
+            --prereg-report artifacts/cfb/candidate_prereg_readiness.json
+            --acquisition-out artifacts/cfb/acquisition_readiness.json
+            --out artifacts/cfb/first_evaluation_readiness.json
           )
-          [ -z "${{ steps.evidence.outputs.current }}" ] || args+=(--current-release-classification "${{ steps.evidence.outputs.current }}")
-          if [ -d "${{ steps.evidence.outputs.pit_root }}" ]; then
-            args+=(--evidence-root "${{ steps.evidence.outputs.pit_root }}")
-          fi
-          [ -z "${{ steps.evidence.outputs.manifest }}" ] || args+=(--pit-source-manifest "${{ steps.evidence.outputs.manifest }}")
-          [ -z "${{ steps.evidence.outputs.availability }}" ] || args+=(--availability-proof "${{ steps.evidence.outputs.availability }}")
-          [ -z "${{ steps.evidence.outputs.market }}" ] || args+=(--paired-market-evidence "${{ steps.evidence.outputs.market }}")
-          python scripts/audit_cfb_pit_readiness.py "${args[@]}"
+          [ -z "${{ steps.selection_inputs.outputs.acquisition }}" ] || args+=(--acquisition-manifest "${{ steps.selection_inputs.outputs.acquisition }}")
+          [ -z "${{ steps.selection_inputs.outputs.bundle }}" ] || args+=(--selection-bundle "${{ steps.selection_inputs.outputs.bundle }}")
+          python scripts/audit_cfb_selection_readiness.py "${args[@]}"
 
-      - name: Freeze first-evaluation decision
-        shell: bash
+      - name: Assert selection/promotion boundary
         run: |
           set -euo pipefail
           python - <<'PY'
           import json
           from pathlib import Path
 
-          prereg = json.loads(Path('artifacts/cfb/candidate_prereg_readiness.json').read_text())
-          pit = json.loads(Path('artifacts/cfb/pit_readiness.json').read_text())
-          frozen = json.loads(Path('config/cfb_model_candidate_prereg_v1.json').read_text())
-          governance = frozen.get('governance') or {}
-
-          if governance.get('attempts_consumed') != 0:
-              raise SystemExit('CFB_FIRST_EVAL_READINESS_EXPECTS_ZERO_ATTEMPTS_CONSUMED')
-          if governance.get('evaluation_performed') is not False:
-              raise SystemExit('CFB_FIRST_EVAL_READINESS_EXPECTS_NO_PRIOR_EVALUATION')
-          for key in ('model_p_created', 'promotion_authority', 'eligibility_changed', 'official_authority'):
-              if governance.get(key) is not False:
-                  raise SystemExit(f'CFB_FIRST_EVAL_AUTHORITY_FORBIDDEN:{key}')
-
-          prereg_ready = prereg.get('status') == 'READY_FOR_FIRST_EVALUATION'
-          pit_ready = pit.get('historical_truth_gate_execution_allowed') is True
-          allowed = prereg_ready and pit_ready
-          blockers = []
-          if not prereg_ready:
-              blockers.append('PREREGISTRATION_NOT_READY')
-          if not pit_ready:
-              blockers.extend(pit.get('blockers') or ['GENUINE_PIT_SOURCE_CONTRACT_NOT_READY'])
-
-          report = {
-              'schema_version': 'CFB_FIRST_EVALUATION_READINESS_V1',
-              'status': 'FIRST_EVALUATION_ALLOWED' if allowed else 'BLOCKED_SOURCE_CONTRACT',
-              'first_evaluation_allowed': allowed,
-              'attempts_consumed': 0,
-              'evaluation_performed': False,
-              'model_p_created': False,
-              'promotion_authority': False,
-              'eligibility_changed': False,
-              'official_authority': False,
-              'preregistration_status': prereg.get('status'),
-              'pit_readiness_state': pit.get('readiness_state'),
-              'historical_truth_gate_execution_allowed': pit.get('historical_truth_gate_execution_allowed'),
-              'forward_clock_allowed': pit.get('forward_clock_allowed'),
-              'blockers': list(dict.fromkeys(blockers)),
-              'do_not_consume_attempt_until_source_contract_ready': True,
-          }
-          Path('artifacts/cfb/first_evaluation_readiness.json').write_text(
-              json.dumps(report, indent=2, sort_keys=True) + '\n'
-          )
-          print(json.dumps(report, sort_keys=True))
-          PY
-
-      - name: Assert fail-closed authority boundary
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          import json
-          from pathlib import Path
           report = json.loads(Path('artifacts/cfb/first_evaluation_readiness.json').read_text())
-          for key in ('model_p_created', 'promotion_authority', 'eligibility_changed', 'official_authority'):
-              if report.get(key) is not False:
-                  raise SystemExit(f'CFB_FIRST_EVAL_READINESS_AUTHORITY_LEAK:{key}')
+          if report.get('historical_pit_required_for_selection') is not False:
+              raise SystemExit('CFB_SELECTION_GATE_REINTRODUCED_PIT_DEPENDENCY')
           if report.get('attempts_consumed') != 0 or report.get('evaluation_performed') is not False:
               raise SystemExit('CFB_FIRST_EVAL_READINESS_CONSUMED_ATTEMPT')
+          for key in (
+              'historical_pit_created', 'model_p_created', 'promotion_authority',
+              'evidence_clock_authority', 'eligibility_changed', 'official_authority',
+          ):
+              if report.get(key) is not False:
+                  raise SystemExit(f'CFB_FIRST_EVAL_READINESS_AUTHORITY_LEAK:{key}')
           if report.get('first_evaluation_allowed'):
-              if report.get('historical_truth_gate_execution_allowed') is not True:
-                  raise SystemExit('CFB_FIRST_EVAL_ALLOWED_WITHOUT_PIT_GATE')
+              if report.get('selection_lane') != 'RECONSTRUCTED_HISTORICAL_NOT_PIT':
+                  raise SystemExit('CFB_FIRST_EVAL_WRONG_SELECTION_LANE')
+              if report.get('reconstructed_acquisition_ready') is not True:
+                  raise SystemExit('CFB_FIRST_EVAL_ALLOWED_WITHOUT_ACQUISITION_READINESS')
+              if report.get('reconstructed_selection_bundle_ready') is not True:
+                  raise SystemExit('CFB_FIRST_EVAL_ALLOWED_WITHOUT_SELECTION_BUNDLE')
           PY
 
       - name: Upload first-evaluation readiness evidence
@@ -181,7 +118,7 @@ jobs:
           name: cfb-first-evaluation-readiness-${{ github.sha }}
           path: |
             artifacts/cfb/candidate_prereg_readiness.json
-            artifacts/cfb/pit_readiness.json
+            artifacts/cfb/acquisition_readiness.json
             artifacts/cfb/first_evaluation_readiness.json
           if-no-files-found: warn
           retention-days: 30
