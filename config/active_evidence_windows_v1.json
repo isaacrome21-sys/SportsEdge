@@ -40,6 +40,11 @@
         "Verify every due scheduled capture materialized",
         "data/nfl_2026_confirmation/captures"
       ],
+      "required_liveness_literals": [
+        "workflow_run:",
+        "football-nfl-forward-clv-collection",
+        "check_active_evidence_windows.py"
+      ],
       "no_backfill": true
     },
     {
