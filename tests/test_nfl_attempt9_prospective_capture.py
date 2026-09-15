@@ -21,6 +21,13 @@ FEATURES = [
     "home_net",
     "away_net",
 ]
+HISTORY_DATES = [
+    "2025-09-07",
+    "2025-09-14",
+    "2025-09-21",
+    "2025-09-28",
+    "2025-10-05",
+]
 
 
 def _artifact() -> dict:
@@ -73,15 +80,15 @@ def _write_schedule(path: Path) -> None:
         "home_team", "away_team", "home_score", "away_score",
     ]
     rows = []
-    for index in range(5):
+    for index, gameday in enumerate(HISTORY_DATES):
         rows.append({
             "game_id": f"A-{index}", "season": "2025", "week": str(index + 1),
-            "game_type": "REG", "gameday": f"2025-09-{7 + index * 7:02d}", "gametime": "13:00",
+            "game_type": "REG", "gameday": gameday, "gametime": "13:00",
             "home_team": "A", "away_team": f"X{index}", "home_score": str(20 + index), "away_score": str(10 + index),
         })
         rows.append({
             "game_id": f"B-{index}", "season": "2025", "week": str(index + 1),
-            "game_type": "REG", "gameday": f"2025-09-{7 + index * 7:02d}", "gametime": "16:00",
+            "game_type": "REG", "gameday": gameday, "gametime": "16:00",
             "home_team": f"Y{index}", "away_team": "B", "home_score": str(14 + index), "away_score": str(24 + index),
         })
     rows.append({
