@@ -17,6 +17,7 @@ on:
       - 'tests/test_espn_game_odds_source.py'
       - 'scripts/audit_market_provider_migration.py'
       - 'scripts/provider_usage_attribution.py'
+      - 'scripts/run_free_mlb_game_markets.py'
       - '.github/workflows/market-provider-contract.yml'
   workflow_dispatch:
 
@@ -29,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Compile
-        run: python3 -m py_compile sportsedge/market_provider_contract.py sportsedge/market_provider_router.py sportsedge/free_game_market_acquisition.py scripts/audit_market_provider_migration.py scripts/provider_usage_attribution.py
+        run: python3 -m py_compile sportsedge/market_provider_contract.py sportsedge/market_provider_router.py sportsedge/free_game_market_acquisition.py scripts/audit_market_provider_migration.py scripts/provider_usage_attribution.py scripts/run_free_mlb_game_markets.py
       - name: Provider contract tests
         run: python3 -m unittest -q tests.test_market_provider_contract tests.test_market_provider_router tests.test_free_game_market_acquisition tests.test_provider_usage_attribution tests.test_espn_game_odds_source
       - name: Migration audit
