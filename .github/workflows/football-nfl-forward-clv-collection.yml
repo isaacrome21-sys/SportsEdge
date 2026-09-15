@@ -40,6 +40,11 @@ jobs:
       - name: Install pinned runtime dependency
         run: python -m pip install --disable-pip-version-check numpy==2.5.3
 
+      - name: Verify provider reserve guard contract
+        run: |
+          python3 -m py_compile scripts/odds_api_quota_guard.py
+          python3 -m unittest -q tests.test_nfl_2026_provider_budget
+
       - name: Freeze current NFL schedule before any decision
         shell: bash
         run: |
@@ -187,6 +192,17 @@ jobs:
             --min-lead-minutes 45 --horizon-minutes 120 \
             --out "$GITHUB_WORKSPACE/artifacts/football/forward-run/nfl_live_features.json")
 
+      - name: Protect confirmation reserve before paid decision request
+        if: steps.release.outputs.available == 'true' && steps.plan.outputs.decision_due == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Main NFL forward /odds request asks for h2h, spreads, totals: 3 credits.
+          # 76 confirmation-reserve credits must remain after this lower-priority call.
+          python3 scripts/odds_api_quota_guard.py \
+            --minimum-remaining 79 \
+            --out artifacts/football/forward-run/decision-quota-guard.json
+
       - name: Fetch raw DraftKings decision snapshot
         if: steps.release.outputs.available == 'true' && steps.plan.outputs.decision_due == 'true'
         shell: bash
@@ -226,13 +242,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p artifacts/football/forward-run/close-odds
+          mkdir -p artifacts/football/forward-run/close-odds artifacts/football/forward-run/close-quota-guards
           jq -r '.close_event_ids[]' artifacts/football/forward-run/plan-after.json | while IFS= read -r event_id; do
             [[ -n "$event_id" ]] || continue
             if ! [[ "$event_id" =~ ^[A-Za-z0-9_-]{1,128}$ ]]; then
               echo "NFL_FORWARD_EVENT_ID_INVALID:$event_id" >&2
               exit 1
             fi
+            # Exact-event close asks for five markets. Re-probe before each event
+            # so multiple closes can never drain into the confirmation reserve.
+            python3 scripts/odds_api_quota_guard.py \
+              --minimum-remaining 81 \
+              --out "$GITHUB_WORKSPACE/artifacts/football/forward-run/close-quota-guards/$event_id.json"
             (cd model-release && PYTHONPATH=. python scripts/fetch_nfl_forward_odds.py \
               --event-id "$event_id" \
               --out "$GITHUB_WORKSPACE/artifacts/football/forward-run/close-odds/$event_id.json")
@@ -312,6 +333,7 @@ jobs:
           name: nfl-forward-status-${{ github.run_id }}
           path: |
             artifacts/football/forward-run/*.json
+            artifacts/football/forward-run/close-quota-guards/*.json
           if-no-files-found: warn
           retention-days: 30
 

@@ -1,0 +1,51 @@
+{
+  "schema": "SPORTSEDGE_NFL_2026_PROVIDER_BUDGET_V1",
+  "status": "PROSPECTIVE_OPERATIONAL_GUARD",
+  "provider": "THE_ODDS_API",
+  "quota_probe_endpoint": "/v4/sports/",
+  "quota_probe_cost_credits": 0,
+  "required_quota_headers": [
+    "x-requests-remaining",
+    "x-requests-used",
+    "x-requests-last"
+  ],
+  "quota_reset_rule": "PROVIDER_RECONCILED__NO_UNVERIFIED_AUTOMATIC_RESET",
+  "preflight_lead_minutes": 720,
+  "preflight_schedule_minute_utc": 3,
+  "confirmation": {
+    "regions": 1,
+    "markets_per_paid_request": 2,
+    "expected_request_cost_credits": 2,
+    "opener_window_minutes": 60,
+    "poll_interval_minutes": 10,
+    "max_opener_attempts": 6,
+    "max_final_attempts_per_game": 2,
+    "max_games_per_week": 16,
+    "derived_weekly_worst_case_reserve_credits": 76,
+    "reserve_formula": "(max_opener_attempts + max_final_attempts_per_game * max_games_per_week) * expected_request_cost_credits"
+  },
+  "lower_priority_paid_work": {
+    "minimum_confirmation_reserve_credits": 76,
+    "max_single_forward_request_cost_credits": 5,
+    "rule": "DO_NOT_START_LOWER_PRIORITY_PAID_REQUEST_IF_REMAINING_MINUS_REQUEST_COST_WOULD_FALL_BELOW_CONFIRMATION_RESERVE"
+  },
+  "unknown_quota_state": "FAIL_CLOSED",
+  "authority": {
+    "model_p_input": false,
+    "promotion_authority": false,
+    "truth_gate_input": false,
+    "staking_authority": false,
+    "official_authority": false,
+    "production_registry_authority": false,
+    "evidence_clock_authority": false,
+    "backfill_authority": false
+  },
+  "provenance": {
+    "adopted_patterns": [
+      "the-odds-api/samples-python: quota headers are first-class provider telemetry",
+      "xupeng211/FootballPrediction: expected request cost, reserved safety buffer, automated spend ceiling, provider-reconciled reset, fail-closed unknown quota",
+      "octokit/plugin-throttling.js: provider rate-limit state is a control event distinct from ordinary work"
+    ],
+    "thresholds": "SPORTSEDGE_DERIVED_NOT_COPIED"
+  }
+}
