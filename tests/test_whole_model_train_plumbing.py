@@ -107,11 +107,15 @@ class WholeModelTrainPlumbingTest(unittest.TestCase):
 
     def test_attempt9_historical_numeric_environment_records_knowns_and_unknowns(self):
         cfg = json.loads((ROOT / "config/public_training_sources_v1.json").read_text())
-        env = cfg["sources"]["nfl_attempt9"]["historical_numeric_environment"]
+        nfl = cfg["sources"]["nfl_attempt9"]
+        env = nfl["historical_numeric_environment"]
+        self.assertEqual(env["azure_region"], "eastus2")
         self.assertEqual(env["python_version"], "3.12.14")
         self.assertEqual(env["numpy_version"], "2.5.3")
         self.assertEqual(env["runner_image_version"], "20260907.300.1")
+        self.assertEqual(env["cpu_model"], "UNRECORDED_IN_ORIGINAL_RUN")
         self.assertEqual(env["blas_build"], "UNRECORDED_IN_ORIGINAL_RUN")
+        self.assertEqual(env["openblas_coretype"], "UNRECORDED_IN_ORIGINAL_RUN")
         self.assertEqual(
             env["numpy_wheel"],
             "numpy-2.5.3-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
@@ -124,12 +128,17 @@ class WholeModelTrainPlumbingTest(unittest.TestCase):
                 "MKL_NUM_THREADS": "UNRECORDED_IN_ORIGINAL_RUN",
             },
         )
+        observations = nfl["numeric_compatibility_observations"]
+        self.assertTrue(any(row["result"] == "COEFFICIENT_TEXT_MISMATCH_AT_LAST_ULPS" for row in observations))
+        self.assertTrue(any(row["result"].startswith("ALL_TESTED_THREAD_COUNTS_REPRODUCED_EXACT") for row in observations))
 
-    def test_attempt9_reconstruction_process_is_single_threaded(self):
+    def test_attempt9_reconstruction_pins_compatibility_environment(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("python-version: '3.12.14'", workflow)
         marker = "- name: Reconstruct exact frozen NFL attempt-9 runtime owner"
         self.assertIn(marker, workflow)
         step = workflow.split(marker, 1)[1].split("- name:", 1)[0]
+        self.assertIn("OPENBLAS_CORETYPE: ZEN", step)
         self.assertIn("OPENBLAS_NUM_THREADS: '1'", step)
         self.assertIn("OMP_NUM_THREADS: '1'", step)
         self.assertIn("MKL_NUM_THREADS: '1'", step)
