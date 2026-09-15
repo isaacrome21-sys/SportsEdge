@@ -1,45 +1,29 @@
 name: pin-action-shas
-# Pins all marketplace actions to immutable commits.
+# Verifies all marketplace actions are pinned to immutable commits.
+# This workflow is deliberately read-only: it must never mutate main.
 on:
   push:
     branches: [main]
     paths:
       - 'scripts/pin_github_actions.py'
       - '.github/workflows/pin-action-shas.yml'
+  pull_request:
+    paths:
+      - 'scripts/pin_github_actions.py'
+      - '.github/workflows/**'
 permissions:
-  contents: write
+  contents: read
 jobs:
   pin:
     runs-on: ubuntu-latest
     steps:
-      - name: Clone repository without marketplace actions
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Verify action references are already pinned
         run: |
-          git clone "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" repo
-      - name: Pin action references
-        run: |
-          cd repo
+          set -euo pipefail
           python scripts/pin_github_actions.py
-      - name: Commit complete workflow files
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          cd repo
-          git config user.name "sportsedge-automation"
-          git config user.email "actions@users.noreply.github.com"
-          if git diff --quiet; then
-            echo "NO_CHANGES"
-            exit 0
+          if ! git diff --exit-code -- .github/workflows; then
+            echo "UNPINNED_ACTION_REFERENCES: run the pinning tool on a branch and submit the resulting workflow diff by PR" >&2
+            exit 1
           fi
-          git add .github/workflows
-          git commit -m "Supply chain: pin GitHub Actions to immutable SHAs"
-          for attempt in 1 2 3 4 5; do
-            git pull --rebase origin main
-            if git push origin HEAD:main; then
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "PIN_PUSH_RETRY_EXHAUSTED" >&2
-          exit 1
+          echo "ACTION_SHA_PINS_VERIFIED_READ_ONLY"
