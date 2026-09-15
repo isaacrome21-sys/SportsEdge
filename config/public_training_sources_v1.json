@@ -26,6 +26,23 @@
       "holdout_prediction_sha256": {
         "margin": "c858003887a1ed1265b4a0df715e5fc95be5184af05a453530cda463a804fc32",
         "total": "be84e697a0f2b7bd1c40e35312c9e76f36417272f18afe0f4497ec0e193a8fa6"
+      },
+      "historical_numeric_environment": {
+        "source": "github_actions_run_34492360674_job_102922059960_logs",
+        "runner_version": "2.337.0",
+        "runner_os": "Ubuntu 24.04.5 LTS",
+        "runner_image": "ubuntu-24.04",
+        "runner_image_version": "20260907.300.1",
+        "python_implementation": "CPython",
+        "python_version": "3.12.14",
+        "numpy_version": "2.5.3",
+        "numpy_wheel": "numpy-2.5.3-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+        "blas_build": "UNRECORDED_IN_ORIGINAL_RUN",
+        "thread_environment": {
+          "OPENBLAS_NUM_THREADS": "UNRECORDED_IN_ORIGINAL_RUN",
+          "OMP_NUM_THREADS": "UNRECORDED_IN_ORIGINAL_RUN",
+          "MKL_NUM_THREADS": "UNRECORDED_IN_ORIGINAL_RUN"
+        }
       }
     },
     "ufc_history": {
