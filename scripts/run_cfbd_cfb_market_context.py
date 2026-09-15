@@ -45,6 +45,17 @@ def _write(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def _snapshot_status(snapshot) -> tuple[str, int, str | None]:
+    if snapshot.rows:
+        return "AVAILABLE", 0, None
+    if not snapshot.rejected:
+        return "VALID_NO_BET_SLATE", 0, None
+    reasons = [str(row.get("reason") or "") for row in snapshot.rejected]
+    if reasons and all(reason == "CFBD_LINES_MISSING" for reason in reasons):
+        return "BLOCKED_NO_ODDS", 2, "CFBD_LINES_MISSING"
+    return "NO_ELIGIBLE_QUOTES", 2, None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--season", type=int, required=True)
@@ -66,9 +77,10 @@ def main() -> int:
             api_key=_key(),
             now=now,
         )
+        status, exit_code, blocker = _snapshot_status(snapshot)
         payload = {
             "schema_version": "SPORTSEDGE_CFBD_CFB_MARKET_CONTEXT_RUN_V1",
-            "status": "AVAILABLE" if snapshot.rows else "NO_ELIGIBLE_QUOTES",
+            "status": status,
             "season": int(args.season),
             "week": int(args.week),
             "season_type": str(args.season_type),
@@ -90,6 +102,8 @@ def main() -> int:
                 "official_authority": False,
             },
         }
+        if blocker is not None:
+            payload["blocker"] = blocker
         _write(args.output, payload)
         print(json.dumps({
             "status": payload["status"],
@@ -97,7 +111,7 @@ def main() -> int:
             "rejected": len(snapshot.rejected),
             "output": str(args.output),
         }, sort_keys=True))
-        return 0 if snapshot.rows else 2
+        return exit_code
     except CFBDMarketContextError as exc:
         payload = {
             "schema_version": "SPORTSEDGE_CFBD_CFB_MARKET_CONTEXT_RUN_V1",
