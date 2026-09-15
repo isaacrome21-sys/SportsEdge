@@ -1,0 +1,60 @@
+{
+  "schema_version": "SPORTSEDGE_PUBLIC_TRAINING_SOURCES_V1",
+  "status": "PINNED_PUBLIC_DATA_SOURCES_ONLY",
+  "authority": {
+    "creates_model_p": false,
+    "changes_promotion": false,
+    "changes_truth_gate": false,
+    "changes_official": false,
+    "changes_staking": false
+  },
+  "sources": {
+    "nfl_attempt9": {
+      "repository": "nflverse/nfldata",
+      "license": "MIT",
+      "usage": "FACTUAL_RESULTS_AND_SCHEDULE_DATA_ONLY",
+      "commit": "be9813d153e6694af4d98c7287a7db32225806ae",
+      "path": "data/games.csv",
+      "raw_url": "https://raw.githubusercontent.com/nflverse/nfldata/be9813d153e6694af4d98c7287a7db32225806ae/data/games.csv",
+      "expected_sha256": "59c8bea7e185dde9e6053a06c24c34f6e5a91dcaea3187c0d9bab12759bb05fb",
+      "frozen_attempt": 9,
+      "derivation_commit": "e2c07f484976f6e9f3d9b0a3c17099c2bb22cef7",
+      "actions_run_id": 34492360674,
+      "actions_artifact_id": 10158281181,
+      "actions_artifact_digest": "sha256:9c95c0cbefc2f99f6dec37fda01f58d2fcac0ad6770de2c9311fbf5ce40ea996",
+      "report_content_sha256": "c254142e38b2cf06e0f0eabe3b0070bc8bfcfbae4de29d181cae60137b1122d3",
+      "holdout_prediction_sha256": {
+        "margin": "c858003887a1ed1265b4a0df715e5fc95be5184af05a453530cda463a804fc32",
+        "total": "be84e697a0f2b7bd1c40e35312c9e76f36417272f18afe0f4497ec0e193a8fa6"
+      }
+    },
+    "ufc_history": {
+      "repository": "Greco1899/scrape_ufc_stats",
+      "license": "GPL-3.0",
+      "usage": "FACTUAL_CSV_DATA_ONLY_NO_CODE_COPY",
+      "commit": "cb4ecb64dd62324a7a51a378f6b5bbb0fc99bc65",
+      "files": {
+        "events": "ufc_event_details.csv",
+        "results": "ufc_fight_results.csv",
+        "stats": "ufc_fight_stats.csv",
+        "fighters": "ufc_fighter_tott.csv"
+      }
+    },
+    "cfb_market_archive": {
+      "repository": "sportsdataverse/cfbfastR-data",
+      "license": "MIT",
+      "usage": "BENCHMARK_ONLY_NOT_PIT_CERTIFIED",
+      "commit": "f5a05dc815951b8dbe18961a824f34cf154dfa61",
+      "path": "betting/csv/cfb_line_odds.csv.gz"
+    },
+    "mlb": {
+      "repository_reference": "jamesdwillis/baseballapi",
+      "license": "MIT",
+      "usage": "MLB_STATS_API_CONTRACT_PATTERN_ONLY; FACTUAL_PROVIDER_DATA_REMAINS_SEPARATE"
+    },
+    "pga": {
+      "status": "NO_PUBLIC_SOURCE_PROMOTED_TO_AUTOMATIC_PROVIDER",
+      "reason": "Existing SportsEdge PGA model requires field/tee-time/weather/live-state inputs with PIT identity; no reviewed public repository currently satisfies that complete contract without additional source governance."
+    }
+  }
+}
