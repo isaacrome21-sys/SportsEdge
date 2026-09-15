@@ -1,7 +1,7 @@
 """CFBD CFB market context with explicit non-freshness semantics.
 
 CFBD's live lines payload identifies a provider/book but does not provide a
-source-native quote observation timestamp.  Fetch time is therefore retained as
+source-native quote observation timestamp. Fetch time is therefore retained as
 transport provenance only and can never satisfy a TTL, closing-line, promotion,
 or OFFICIAL evidence contract.
 """
@@ -35,6 +35,7 @@ class CFBDMarketContextSnapshot:
     rejected: tuple[dict[str, Any], ...]
     fetched_at_utc: str
     payload_sha256: str
+    disposition: str
 
 
 def _aware(value: Any) -> datetime:
@@ -143,6 +144,20 @@ def _market_values(line: Mapping[str, Any]) -> dict[str, Any]:
     return markets
 
 
+def _slate_disposition(
+    payload: list[Any],
+    accepted: list[dict[str, Any]],
+    rejected: list[dict[str, Any]],
+) -> str:
+    if accepted:
+        return "AVAILABLE"
+    if not payload:
+        return "VALID_NO_BET_SLATE"
+    if any(row.get("reason") in {"CFBD_LINES_EMPTY", "CFBD_LINES_MISSING"} for row in rejected):
+        return "BLOCKED_NO_ODDS"
+    return "NO_ELIGIBLE_QUOTES"
+
+
 def build_cfbd_cfb_market_context(
     payload: Any,
     *,
@@ -153,6 +168,11 @@ def build_cfbd_cfb_market_context(
 
     The returned rows intentionally contain no `source_updated_at` or equivalent.
     `fetched_at_utc` says only when SportsEdge retrieved the payload.
+
+    A source-attested empty top-level slate is a valid zero-bet slate. If CFBD
+    returns scheduled game objects but their line collection is empty or absent,
+    the snapshot is blocked for missing odds rather than treated as a successful
+    zero-row market snapshot.
     """
     fetched = _aware(fetched_at)
     if not isinstance(payload, list):
@@ -169,12 +189,13 @@ def build_cfbd_cfb_market_context(
         game_id = str(game.get("id") or game.get("gameId") or "").strip()
         line_rows = game.get("lines")
         if isinstance(line_rows, list):
+            if not line_rows:
+                rejected.append({"game_id": game_id or None, "reason": "CFBD_LINES_EMPTY"})
+                continue
             candidates = line_rows
         elif "provider" in game or "linesProviderId" in game:
             candidates = [game]
         else:
-            candidates = []
-        if not candidates:
             rejected.append({"game_id": game_id or None, "reason": "CFBD_LINES_MISSING"})
             continue
 
@@ -233,6 +254,7 @@ def build_cfbd_cfb_market_context(
         rejected=tuple(rejected),
         fetched_at_utc=fetched.isoformat(),
         payload_sha256=_payload_hash(payload),
+        disposition=_slate_disposition(payload, accepted, rejected),
     )
 
 
