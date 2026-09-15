@@ -48,6 +48,10 @@ jobs:
             tests.test_nfl_2026_provider_budget
 
       - name: Reconstruct exact frozen NFL attempt-9 runtime owner
+        env:
+          OPENBLAS_NUM_THREADS: '1'
+          OMP_NUM_THREADS: '1'
+          MKL_NUM_THREADS: '1'
         run: |
           python scripts/build_nfl_attempt9_runtime_artifact.py \
             --output artifacts/model-stack/nfl_attempt9_runtime_model.json
