@@ -1,0 +1,23 @@
+{
+  "asset": {
+    "asset_id": 565295301,
+    "asset_name": "adv_team_2026.csv",
+    "browser_download_url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_cfb_adv_team/adv_team_2026.csv",
+    "dataset": "adv_team",
+    "release_id": 334089410,
+    "release_tag": "espn_cfb_adv_team",
+    "release_updated_at": "2026-09-15T08:45:19Z",
+    "season": 2026,
+    "sha256": "8ef31b9a5cdd4624cbfc2f856e5aa05aec5b31746c81561c56b8305a6af319fb",
+    "size": 181218,
+    "usage": "PREDICTIVE_INPUT"
+  },
+  "cache_relative_path": "adv_team/2026/adv_team_2026.csv",
+  "cache_reused": false,
+  "content_sha256": "8ef31b9a5cdd4624cbfc2f856e5aa05aec5b31746c81561c56b8305a6af319fb",
+  "contract": "CFB_SPORTSDATAVERSE_RELEASE_V1",
+  "manifest_sha256": "f65a934a47942e1aa9bf97756237ff567c2a5a7f3ecd5030cc14c6d2f7263b23",
+  "market_role": "PREDICTIVE_INPUT",
+  "retrieved_at": "2026-09-15T15:04:21.727224+00:00",
+  "row_count": 357
+}
