@@ -10,6 +10,7 @@
     ".github/workflows/cfb-forward-pit-source-capture.yml",
     ".github/workflows/cfb-forward-weather-evidence.yml",
     ".github/workflows/cfb-current-history-capture.yml",
+    ".github/workflows/cfb-forward-participation-capture.yml",
     ".github/workflows/archive-mlb-game-odds.yml",
     ".github/workflows/archive-mlb-game-odds-failover.yml",
     ".github/workflows/mlb-v8-actual-start-binding.yml",
