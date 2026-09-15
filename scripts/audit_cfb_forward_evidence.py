@@ -5,8 +5,14 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import sys
 from typing import Any
 
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from sportsedge.core.validation.evidence_receipt import build_evidence_receipt
 from sportsedge.sports.cfb.forward_evidence import audit_cfb_forward_market_weather_evidence
 
 
@@ -30,10 +36,39 @@ def _read_ndjson(paths: list[Path]) -> list[dict[str, Any]]:
     return rows
 
 
+def _receipt_files(
+    root: Path,
+    market_paths: list[Path],
+    weather_paths: list[Path],
+    market_rows: list[dict[str, Any]],
+    weather_rows: list[dict[str, Any]],
+    report_path: Path,
+) -> list[tuple[str, Path]]:
+    bound: dict[str, Path] = {}
+    for path in [*market_paths, *weather_paths]:
+        rel = path.relative_to(root).as_posix()
+        bound[f"observations/{rel}"] = path
+    for row in market_rows:
+        rel = row.get("fetch_payload_path")
+        if isinstance(rel, str) and rel.strip():
+            candidate = root / rel
+            if candidate.is_file() and not Path(rel).is_absolute() and ".." not in Path(rel).parts:
+                bound[f"raw/{Path(rel).as_posix()}"] = candidate
+    for row in weather_rows:
+        rel = row.get("raw_relative_path")
+        if isinstance(rel, str) and rel.strip():
+            candidate = root / rel
+            if candidate.is_file() and not Path(rel).is_absolute() and ".." not in Path(rel).parts:
+                bound[f"raw/{Path(rel).as_posix()}"] = candidate
+    bound["outputs/report.json"] = report_path
+    return sorted(bound.items())
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-root", default=".")
     parser.add_argument("--out", default="artifacts/cfb_forward_evidence/report.json")
+    parser.add_argument("--receipt-out", default="artifacts/cfb_forward_evidence/receipt.json")
     parser.add_argument("--require-ready", action="store_true")
     args = parser.parse_args(argv)
 
@@ -53,7 +88,22 @@ def main(argv: list[str] | None = None) -> int:
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(json.dumps(report, sort_keys=True))
+
+    receipt = build_evidence_receipt(
+        _receipt_files(root, market_paths, weather_paths, market_rows, weather_rows, out),
+        sport="cfb",
+        purpose="forward_market_weather_chain_of_custody",
+        metadata={
+            "contract": report.get("contract"),
+            "target_direction": report.get("target_direction"),
+            "market_weather_evidence_ready": report.get("market_weather_evidence_ready"),
+        },
+    )
+    receipt_out = Path(args.receipt_out)
+    receipt_out.parent.mkdir(parents=True, exist_ok=True)
+    receipt_out.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    print(json.dumps({**report, "evidence_receipt_sha256": receipt["receipt_sha256"]}, sort_keys=True))
     if args.require_ready and report.get("market_weather_evidence_ready") is not True:
         return 2
     return 0
