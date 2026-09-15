@@ -29,7 +29,13 @@ def _sha(path: Path) -> str:
     return sha256(path.read_bytes()).hexdigest()
 
 
-def _lock_status(lock_path: Path, policy: Path) -> tuple[str, list[str]]:
+def _lock_status(
+    lock_path: Path,
+    policy: Path,
+    config_path: Path = CONFIG,
+    capture_script: Path = CAPTURE_SCRIPT,
+    capture_workflow: Path = CAPTURE_WORKFLOW,
+) -> tuple[str, list[str]]:
     if not lock_path.is_file():
         return "NO_LOCK_YET", []
     try:
@@ -38,12 +44,24 @@ def _lock_status(lock_path: Path, policy: Path) -> tuple[str, list[str]]:
         return "LOCK_INVALID_JSON", ["capture_lock.json"]
     current = {
         "policy_sha256": _sha(policy),
-        "config_sha256": _sha(CONFIG),
-        "script_sha256": _sha(CAPTURE_SCRIPT),
-        "workflow_sha256": _sha(CAPTURE_WORKFLOW),
+        "config_sha256": _sha(config_path),
+        "script_sha256": _sha(capture_script),
+        "workflow_sha256": _sha(capture_workflow),
     }
     mismatches = [key for key, value in current.items() if saved.get(key) != value]
     return ("MATCH" if not mismatches else "MISMATCH"), mismatches
+
+
+def _is_capture_record(path: Path, capture_root: Path) -> bool:
+    rel = path.relative_to(capture_root)
+    if len(rel.parts) == 2 and rel.parts[0].startswith("week") and rel.name == "opener.json":
+        return True
+    return (
+        len(rel.parts) >= 3
+        and rel.parts[0].startswith("week")
+        and rel.parts[1] == "final"
+        and rel.suffix == ".json"
+    )
 
 
 def build(config_path: Path = CONFIG, out: Path = DEFAULT_OUT) -> dict:
@@ -51,7 +69,16 @@ def build(config_path: Path = CONFIG, out: Path = DEFAULT_OUT) -> dict:
     policy = Path(cfg["policy_path"])
     capture_root = Path(cfg["output_dir"])
     lock_path = capture_root / "capture_lock.json"
-    lock_status, lock_mismatches = _lock_status(lock_path, policy)
+
+    evidence_files: list[Path] = []
+    if capture_root.is_dir():
+        evidence_files = sorted(p for p in capture_root.rglob("*") if p.is_file())
+    capture_records = [path for path in evidence_files if _is_capture_record(path, capture_root)]
+
+    lock_status, lock_mismatches = _lock_status(lock_path, policy, config_path)
+    if lock_status == "NO_LOCK_YET" and capture_records:
+        lock_status = "LOCK_MISSING_WITH_CAPTURE_RECORDS"
+        lock_mismatches = ["capture_lock.json"]
 
     files: list[tuple[str, Path]] = [
         ("controls/config/nfl_2026_capture.json", config_path),
@@ -59,11 +86,8 @@ def build(config_path: Path = CONFIG, out: Path = DEFAULT_OUT) -> dict:
         ("controls/scripts/nfl_2026_line_capture.py", CAPTURE_SCRIPT),
         ("controls/workflows/nfl-2026-line-capture.yml", CAPTURE_WORKFLOW),
     ]
-    evidence_files: list[Path] = []
-    if capture_root.is_dir():
-        evidence_files = sorted(p for p in capture_root.rglob("*") if p.is_file())
-        for path in evidence_files:
-            files.append((f"capture/{path.relative_to(capture_root).as_posix()}", path))
+    for path in evidence_files:
+        files.append((f"capture/{path.relative_to(capture_root).as_posix()}", path))
 
     receipt = build_evidence_receipt(
         files,
@@ -75,6 +99,7 @@ def build(config_path: Path = CONFIG, out: Path = DEFAULT_OUT) -> dict:
             "first_week": cfg.get("first_week"),
             "no_backfill": True,
             "capture_file_count": len(evidence_files),
+            "capture_record_count": len(capture_records),
             "capture_lock_status": lock_status,
             "capture_lock_mismatches": lock_mismatches,
             "live_capture_path_modified_by_receipt_builder": False,
@@ -95,7 +120,7 @@ def main() -> int:
     receipt = build(args.config, args.out)
     print(json.dumps(receipt, sort_keys=True))
     metadata = receipt["metadata"]
-    if args.require_evidence and int(metadata["capture_file_count"]) == 0:
+    if args.require_evidence and int(metadata["capture_record_count"]) == 0:
         return 2
     if args.require_lock_match and metadata["capture_lock_status"] not in {"MATCH", "NO_LOCK_YET"}:
         return 3
