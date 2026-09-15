@@ -90,7 +90,7 @@ jobs:
         run: |
           set -euo pipefail
           set +e
-          python scripts/audit_cfb_model_selection_prereg.py \
+          python -m scripts.audit_cfb_model_selection_prereg \
             --out artifacts/model-stack/cfb_model_selection_prereg.json
           rc=$?
           set -e
@@ -99,7 +99,7 @@ jobs:
 
       - name: Audit CFB PIT readiness without scoring candidates
         run: |
-          python scripts/audit_cfb_pit_readiness.py \
+          python -m scripts.audit_cfb_pit_readiness \
             --output artifacts/model-stack/cfb_pit_readiness.json
 
       - name: Verify PGA engine code surface
