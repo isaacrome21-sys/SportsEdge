@@ -14,6 +14,7 @@
     },
     "CFB": {
       "freeze_registry": "config/cfb_prop_model_freeze.json",
+      "participation_model_registry": "config/cfb_prop_participation_model_v1.json",
       "evidence_registry": "config/cfb_prop_evidence.json",
       "certification_registry": "config/cfb_prop_certification.json",
       "engine_state": "NO_ENGINE",
