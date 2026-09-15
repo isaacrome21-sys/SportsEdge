@@ -105,11 +105,51 @@ class WholeModelTrainPlumbingTest(unittest.TestCase):
             "sha256:9c95c0cbefc2f99f6dec37fda01f58d2fcac0ad6770de2c9311fbf5ce40ea996",
         )
 
+    def test_attempt9_historical_numeric_environment_records_knowns_and_unknowns(self):
+        cfg = json.loads((ROOT / "config/public_training_sources_v1.json").read_text())
+        env = cfg["sources"]["nfl_attempt9"]["historical_numeric_environment"]
+        self.assertEqual(env["python_version"], "3.12.14")
+        self.assertEqual(env["numpy_version"], "2.5.3")
+        self.assertEqual(env["runner_image_version"], "20260907.300.1")
+        self.assertEqual(env["blas_build"], "UNRECORDED_IN_ORIGINAL_RUN")
+        self.assertEqual(
+            env["numpy_wheel"],
+            "numpy-2.5.3-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+        )
+        self.assertEqual(
+            env["thread_environment"],
+            {
+                "OPENBLAS_NUM_THREADS": "UNRECORDED_IN_ORIGINAL_RUN",
+                "OMP_NUM_THREADS": "UNRECORDED_IN_ORIGINAL_RUN",
+                "MKL_NUM_THREADS": "UNRECORDED_IN_ORIGINAL_RUN",
+            },
+        )
+
+    def test_attempt9_reconstruction_process_is_single_threaded(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        marker = "- name: Reconstruct exact frozen NFL attempt-9 runtime owner"
+        self.assertIn(marker, workflow)
+        step = workflow.split(marker, 1)[1].split("- name:", 1)[0]
+        self.assertIn("OPENBLAS_NUM_THREADS: '1'", step)
+        self.assertIn("OMP_NUM_THREADS: '1'", step)
+        self.assertIn("MKL_NUM_THREADS: '1'", step)
+
     def test_attempt9_prediction_digest_is_canonical(self):
         builder = _load_builder()
         values = builder.np.asarray([1.25, -2.5, 0.0], dtype=float)
         expected = hashlib.sha256(b"[1.25,-2.5,0.0]").hexdigest()
         self.assertEqual(builder._prediction_sha(values), expected)
+
+    def test_attempt9_exact_coefficient_text_contract(self):
+        builder = _load_builder()
+        self.assertEqual(
+            builder._float_list_json(builder.EXPECTED_COEFFICIENTS["margin"]),
+            "[1.9219959071859163,-1.1939546971867534,-1.700049235015833,0.4894639011852299,2.051162351492163,-1.4712827317889383]",
+        )
+        self.assertEqual(
+            builder._float_list_json(builder.EXPECTED_COEFFICIENTS["total"]),
+            "[1.9674873702327231,1.4677035717536322,1.6205830069927165,1.2581489139175235,0.45966409421453325,0.3368500740711741]",
+        )
 
     def test_attempt9_same_date_rows_do_not_see_same_date_results(self):
         builder = _load_builder()
