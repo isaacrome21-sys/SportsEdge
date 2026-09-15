@@ -81,6 +81,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Install test dependency
+        run: python3 -m pip install 'numpy==2.5.3'
       - name: Compile
         run: python3 -m py_compile sportsedge/market_provider_contract.py sportsedge/market_provider_router.py sportsedge/free_game_market_acquisition.py scripts/audit_market_provider_migration.py scripts/provider_usage_attribution.py scripts/run_free_mlb_game_markets.py
       - name: Provider contract tests
