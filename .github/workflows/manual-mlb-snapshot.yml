@@ -42,7 +42,7 @@ on:
         default: '60'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   run-snapshot:
@@ -103,16 +103,10 @@ jobs:
         if: steps.resolve.outputs.live == 'true'
         run: PYTHONPATH=. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.resolve.outputs.path }}" --run-date "${{ steps.resolve.outputs.run_date }}" --max-age-minutes "${{ github.event.inputs.max_age_minutes || '60' }}" --output artifacts/manual_mlb_snapshot_card.json
 
-      - name: Persist latest audited result
+      - name: Assert main remains read-only
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          cp artifacts/manual_mlb_snapshot_card.json artifacts/manual_mlb_snapshot_card_latest.json
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add artifacts/manual_mlb_snapshot_card_latest.json
-          git diff --cached --quiet && exit 0
-          git commit -m "Persist latest manual MLB SportsEdge result"
-          git push
+        run: echo 'MANUAL_MLB_RESULT_ARTIFACT_ONLY_NO_DIRECT_MAIN_WRITE'
+
       - name: Upload result
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
