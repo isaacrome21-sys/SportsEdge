@@ -1,0 +1,50 @@
+{
+  "schema_version": "MARKET_PROVIDER_CONTRACT_V1",
+  "authority": "ROUTING_AND_PROVENANCE_ONLY",
+  "promotion_authority": false,
+  "model_p_authority": false,
+  "non_silent_satisfaction": true,
+  "rules": [
+    {
+      "provider": "ESPN_SCOREBOARD",
+      "transport": "PUBLIC_NO_CREDENTIAL",
+      "markets": ["MONEYLINE", "RUN_LINE", "TOTALS"],
+      "book_identity": {
+        "basis": "SOURCE_PAYLOAD_PROVIDER_DISPLAY_NAME",
+        "required": true,
+        "fallback_book": "espn_partner",
+        "fallback_satisfies_exact_book_contract": false
+      },
+      "freshness": {
+        "basis": "SOURCE_NATIVE_TIMESTAMP",
+        "ttl_seconds": 60,
+        "timestamp_required": true
+      },
+      "eligible_for_book_agnostic_context": true,
+      "eligible_for_exact_book_contract": "ONLY_WHEN_SOURCE_PAYLOAD_EXPLICITLY_IDENTIFIES_REQUIRED_BOOK",
+      "ineligible_markets": ["NRFI", "YRFI", "PLAYER_PROPS", "TEAM_TOTALS", "ADDITIONAL_DERIVATIVES"]
+    },
+    {
+      "provider": "THE_ODDS_API",
+      "transport": "METERED_API_KEY",
+      "markets": ["MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS", "NRFI", "YRFI", "PLAYER_PROPS", "ADDITIONAL_DERIVATIVES"],
+      "book_identity": {
+        "basis": "SOURCE_PAYLOAD_BOOKMAKER_KEY",
+        "required": true
+      },
+      "freshness": {
+        "basis": "SOURCE_SPECIFIC",
+        "ttl_seconds": 300
+      },
+      "eligible_for_book_agnostic_context": true,
+      "eligible_for_exact_book_contract": "WHEN_REQUEST_AND_PAYLOAD_ESTABLISH_REQUIRED_BOOK"
+    }
+  ],
+  "hard_failures": [
+    "SOURCE_DOES_NOT_COVER_MARKET",
+    "SOURCE_BOOK_IDENTITY_MISSING_FOR_EXACT_BOOK_CONTRACT",
+    "SOURCE_TIMESTAMP_MISSING_WHEN_REQUIRED",
+    "SOURCE_TIMESTAMP_STALE",
+    "FALLBACK_MUST_NOT_INHERIT_PRIMARY_PROVIDER_IDENTITY"
+  ]
+}
