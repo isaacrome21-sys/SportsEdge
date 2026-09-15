@@ -16,6 +16,8 @@ Status: PARTIALLY_PROVEN. Do not infer request counts that are not present in du
 - How many credits were consumed by MLB V8 historical recovery versus live/automatic acquisition versus other consumers.
 - That migrating current game-market consumers alone would have prevented this exhaustion.
 
+The broad MLB acquisition path is a plausible consumer of metered credits, but that attribution remains an inference. Historical request counts or quota shares MUST NOT be estimated without durable provider accounting evidence.
+
 ## Engineering consequence
 
 The provider abstraction is justified independently of the exhaustion attribution: free eligible observations should be preferred for book-agnostic ML/RL/totals, while unsupported markets fail closed or use a metered provider. Savings claims remain unquantified until a durable request/quota ledger establishes attribution.
