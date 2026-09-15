@@ -1,0 +1,98 @@
+name: nfl-attempt9-prediction-contract
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'config/nfl_2026_attempt9_prediction_capture_freeze_v1.json'
+      - 'config/public_training_sources_v1.json'
+      - 'config/nfl_2026_capture.json'
+      - 'scripts/build_nfl_attempt9_runtime_artifact.py'
+      - 'scripts/capture_nfl_attempt9_prospective_predictions.py'
+      - 'tests/test_nfl_attempt9_prospective_capture.py'
+      - '.github/workflows/nfl-attempt9-prospective-prediction-capture.yml'
+      - '.github/workflows/nfl-attempt9-prediction-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12.14'
+      - name: Install exact numerical dependency
+        run: python -m pip install --disable-pip-version-check 'numpy==2.5.3'
+      - name: Verify frozen code bindings and raw-only authority
+        run: |
+          python - <<'PY'
+          import json, subprocess
+          from pathlib import Path
+          freeze=json.loads(Path('config/nfl_2026_attempt9_prediction_capture_freeze_v1.json').read_text())
+          assert freeze['status']=='FROZEN_BEFORE_FIRST_PROSPECTIVE_PREDICTION'
+          for row in freeze['git_blob_bindings']:
+              actual=subprocess.check_output(['git','hash-object',row['path']],text=True).strip().lower()
+              if actual != row['git_blob_sha1'].lower():
+                  raise SystemExit(f"NFL_ATTEMPT9_PREDICTION_CAPTURE_CODE_DRIFT:{row['path']}:{actual}:{row['git_blob_sha1']}")
+          for key in ('creates_model_p','promotion_authority','truth_gate_authority','official_authority','staking_authority','backfill_allowed'):
+              if freeze[key] is not False:
+                  raise SystemExit(f'NFL_ATTEMPT9_PREDICTION_CAPTURE_AUTHORITY_INVALID:{key}')
+          contract=freeze['prediction_contract']
+          if contract['probabilities_emitted'] or contract['edges_emitted'] or contract['stakes_emitted']:
+              raise SystemExit('NFL_ATTEMPT9_PREDICTION_CONTRACT_NOT_RAW_ONLY')
+          PY
+      - name: Run prospective-capture regressions
+        run: python -m unittest -v tests.test_nfl_attempt9_prospective_capture
+      - name: Reconstruct exact frozen runtime artifact
+        env:
+          OPENBLAS_CORETYPE: ZEN
+          OPENBLAS_NUM_THREADS: '1'
+          OMP_NUM_THREADS: '1'
+          MKL_NUM_THREADS: '1'
+        run: |
+          mkdir -p artifacts/nfl-attempt9-contract
+          python scripts/build_nfl_attempt9_runtime_artifact.py \
+            --output artifacts/nfl-attempt9-contract/runtime.json
+      - name: Exercise live future-game producer without persistence
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error \
+            --retry 5 --retry-delay 2 --retry-all-errors --connect-timeout 30 \
+            'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv' \
+            -o artifacts/nfl-attempt9-contract/games.csv
+          CAPTURED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          python scripts/capture_nfl_attempt9_prospective_predictions.py \
+            --artifact artifacts/nfl-attempt9-contract/runtime.json \
+            --schedule artifacts/nfl-attempt9-contract/games.csv \
+            --output-dir artifacts/nfl-attempt9-contract/predictions \
+            --capture-code-git-sha "$GITHUB_SHA" \
+            --captured-at-utc "$CAPTURED_AT" \
+            --horizon-days 9 \
+            | tee artifacts/nfl-attempt9-contract/summary.json
+      - name: Assert every produced row remains raw and zero-authority
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for path in Path('artifacts/nfl-attempt9-contract/predictions').glob('*.json'):
+              row=json.loads(path.read_text())
+              for key in ('model_p_created','promotion_authority','truth_gate_pass','official_authority','staking_authority','market_price_used'):
+                  if row.get(key) is not False:
+                      raise SystemExit(f'NFL_ATTEMPT9_PROSPECTIVE_AUTHORITY_INVALID:{path.name}:{key}')
+              forbidden=('probability','edge','stake')
+              if any(any(token in key.lower() for token in forbidden) for key in row):
+                  raise SystemExit(f'NFL_ATTEMPT9_PROSPECTIVE_FORBIDDEN_OUTPUT:{path.name}')
+          PY
+      - name: Upload read-only diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nfl-attempt9-prediction-contract-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/nfl-attempt9-contract
+          if-no-files-found: warn
+          retention-days: 30
