@@ -6,7 +6,7 @@ from sportsedge.sports.cfb.forward_evidence import _nearest
 def _row(lead: float, capture_id: str) -> dict[str, object]:
     return {
         "lead_minutes": lead,
-        "captured_at": f"2026-09-12T00:{capture_id[-2:]}:00Z",
+        "captured_at": "2026-09-12T00:00:00Z",
         "capture_id": capture_id,
     }
 
