@@ -24,6 +24,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install test dependency
+        run: python -m pip install "pytest>=8,<10"
       - name: Run receipt and CFB selection regressions
         run: >-
           python -m pytest -q
