@@ -31,6 +31,7 @@ def _game(provider="DraftKings", **line_overrides):
 class CFBDCFBMarketContextTests(unittest.TestCase):
     def test_named_allowlisted_book_is_context_only_and_not_freshness_evidence(self):
         snap = build_cfbd_cfb_market_context([_game()], fetched_at=FETCHED)
+        self.assertEqual(snap.disposition, "AVAILABLE")
         self.assertEqual(len(snap.rows), 1)
         self.assertEqual(snap.rejected, ())
         row = snap.rows[0]
@@ -74,12 +75,28 @@ class CFBDCFBMarketContextTests(unittest.TestCase):
     def test_consensus_provider_is_rejected_even_if_it_has_prices(self):
         snap = build_cfbd_cfb_market_context([_game(provider="Consensus")], fetched_at=FETCHED)
         self.assertEqual(snap.rows, ())
+        self.assertEqual(snap.disposition, "NO_ELIGIBLE_QUOTES")
         self.assertEqual(snap.rejected[0]["reason"], "CFBD_CONSENSUS_PROVIDER_INELIGIBLE")
 
     def test_unknown_named_provider_fails_closed(self):
         snap = build_cfbd_cfb_market_context([_game(provider="Unknown Book")], fetched_at=FETCHED)
         self.assertEqual(snap.rows, ())
+        self.assertEqual(snap.disposition, "NO_ELIGIBLE_QUOTES")
         self.assertEqual(snap.rejected[0]["reason"], "CFBD_PROVIDER_NOT_ALLOWLISTED")
+
+    def test_empty_top_level_payload_is_valid_no_bet_slate(self):
+        snap = build_cfbd_cfb_market_context([], fetched_at=FETCHED)
+        self.assertEqual(snap.rows, ())
+        self.assertEqual(snap.rejected, ())
+        self.assertEqual(snap.disposition, "VALID_NO_BET_SLATE")
+
+    def test_scheduled_game_with_empty_lines_is_blocked_no_odds(self):
+        game = _game()
+        game["lines"] = []
+        snap = build_cfbd_cfb_market_context([game], fetched_at=FETCHED)
+        self.assertEqual(snap.rows, ())
+        self.assertEqual(snap.disposition, "BLOCKED_NO_ODDS")
+        self.assertEqual(snap.rejected[0]["reason"], "CFBD_LINES_EMPTY")
 
     def test_fetch_time_can_never_satisfy_generic_ttl_router(self):
         quote = {
