@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
 """Reconstruct the frozen NFL attempt-9 owner as a deterministic runtime artifact.
 
-This does not promote the candidate or create Model_P.  It rebuilds the exact
+This does not promote the candidate or create Model_P. It rebuilds the exact
 pre-2026 selected research owner from its pinned public source so prospective
 raw margin/total forecasts can execute without refitting against 2026 data.
 """
 from __future__ import annotations
 
 import argparse
+import contextlib
 import csv
 import hashlib
 import io
 import json
+import os
+import platform
 from collections import defaultdict
 from itertools import groupby
 from pathlib import Path
+import sys
 from urllib.request import Request, urlopen
 
 import numpy as np
@@ -34,6 +38,7 @@ DECAY = 0.85
 HOLDOUT_START = 2017
 HOLDOUT_END = 2019
 TARGETS = {"margin": 10.0, "total": 0.1}
+THREAD_ENV_KEYS = ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS")
 EXPECTED_COEFFICIENTS = {
     "margin": [
         1.9219959071859163,
@@ -63,9 +68,41 @@ def _sha256(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def _float_list_json(values: list[float] | np.ndarray) -> str:
+    return json.dumps([float(value) for value in values], separators=(",", ":"))
+
+
 def _prediction_sha(values: np.ndarray) -> str:
-    payload = json.dumps([float(v) for v in values], separators=(",", ":")).encode("utf-8")
-    return _sha256(payload)
+    return _sha256(_float_list_json(values).encode("utf-8"))
+
+
+def _numpy_config_snapshot() -> dict:
+    """Return the current NumPy/BLAS build metadata without guessing history."""
+    try:
+        value = np.show_config(mode="dicts")
+        if isinstance(value, dict):
+            return value
+    except (TypeError, ValueError):
+        pass
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        np.show_config()
+    text = buffer.getvalue()
+    return {
+        "fallback_text": text,
+        "fallback_text_sha256": _sha256(text.encode("utf-8")),
+    }
+
+
+def _numeric_environment() -> dict:
+    return {
+        "python_implementation": platform.python_implementation(),
+        "python_version": platform.python_version(),
+        "python_executable": sys.executable,
+        "numpy_version": np.__version__,
+        "thread_environment": {key: os.environ.get(key) for key in THREAD_ENV_KEYS},
+        "numpy_config": _numpy_config_snapshot(),
+    }
 
 
 def _fetch(url: str) -> bytes:
@@ -179,21 +216,34 @@ def fit_target(x: np.ndarray, y: np.ndarray, dates: list[str], alpha: float) -> 
     intercept = float(y_train.mean() - scaled_train.mean(axis=0) @ beta)
     predictions = scaled_holdout @ beta + intercept
     rmse = float(np.sqrt(np.mean((predictions - y_holdout) ** 2)))
+    coefficient_json = _float_list_json(beta)
+    prediction_sha = _prediction_sha(predictions)
     return {
         "alpha": float(alpha),
         "feature_mean": [float(value) for value in mean],
         "feature_std": [float(value) for value in std],
         "coefficients": [float(value) for value in beta],
+        "coefficient_json": coefficient_json,
+        "coefficient_json_sha256": _sha256(coefficient_json.encode("utf-8")),
         "intercept": intercept,
         "holdout_count": int(len(predictions)),
         "holdout_rmse": rmse,
-        "holdout_prediction_sha256": _prediction_sha(predictions),
+        "holdout_prediction_sha256": prediction_sha,
     }
 
 
 def reconstruct(source_config: Path) -> dict:
     config = json.loads(source_config.read_text(encoding="utf-8"))
     source = config["sources"]["nfl_attempt9"]
+    historical_environment = source.get("historical_numeric_environment")
+    if not isinstance(historical_environment, dict):
+        raise RuntimeError("NFL_ATTEMPT9_HISTORICAL_NUMERIC_ENVIRONMENT_MISSING")
+    if np.__version__ != historical_environment.get("numpy_version"):
+        raise RuntimeError(
+            "NFL_ATTEMPT9_NUMPY_VERSION_MISMATCH:"
+            f"{np.__version__}:{historical_environment.get('numpy_version')}"
+        )
+
     raw = _fetch(source["raw_url"])
     observed_source_sha = _sha256(raw)
     if observed_source_sha != source["expected_sha256"]:
@@ -212,16 +262,26 @@ def reconstruct(source_config: Path) -> dict:
     }
     expected_prediction_sha = source["holdout_prediction_sha256"]
     for name, target in targets.items():
-        expected_beta = np.asarray(EXPECTED_COEFFICIENTS[name], dtype=float)
-        actual_beta = np.asarray(target["coefficients"], dtype=float)
-        if not np.allclose(actual_beta, expected_beta, rtol=0.0, atol=1e-12):
-            raise RuntimeError(f"NFL_ATTEMPT9_COEFFICIENT_MISMATCH:{name}")
+        expected_coefficient_json = _float_list_json(EXPECTED_COEFFICIENTS[name])
+        actual_coefficient_json = str(target["coefficient_json"])
+        if actual_coefficient_json != expected_coefficient_json:
+            raise RuntimeError(
+                "NFL_ATTEMPT9_COEFFICIENT_TEXT_MISMATCH:"
+                f"{name}:actual={actual_coefficient_json}:expected={expected_coefficient_json}"
+            )
         if not np.isclose(
             target["holdout_rmse"], EXPECTED_HOLDOUT_RMSE[name], rtol=0.0, atol=1e-12
         ):
-            raise RuntimeError(f"NFL_ATTEMPT9_RMSE_MISMATCH:{name}")
+            raise RuntimeError(
+                "NFL_ATTEMPT9_RMSE_MISMATCH:"
+                f"{name}:actual={target['holdout_rmse']}:expected={EXPECTED_HOLDOUT_RMSE[name]}"
+            )
         if target["holdout_prediction_sha256"] != expected_prediction_sha[name]:
-            raise RuntimeError(f"NFL_ATTEMPT9_PREDICTION_SHA_MISMATCH:{name}")
+            raise RuntimeError(
+                "NFL_ATTEMPT9_PREDICTION_SHA_MISMATCH_WITH_EXACT_COEFFICIENTS:"
+                f"{name}:actual={target['holdout_prediction_sha256']}:"
+                f"expected={expected_prediction_sha[name]}"
+            )
 
     artifact = {
         "schema_version": "SPORTSEDGE_NFL_ATTEMPT9_RUNTIME_ARTIFACT_V1",
@@ -248,7 +308,8 @@ def reconstruct(source_config: Path) -> dict:
             "report_content_sha256": source["report_content_sha256"],
         },
         "runtime": {
-            "numpy_version": np.__version__,
+            "historical_numeric_environment": historical_environment,
+            "reconstruction_numeric_environment": _numeric_environment(),
             "targets": targets,
         },
         "authority": {
@@ -261,7 +322,7 @@ def reconstruct(source_config: Path) -> dict:
         },
         "use": "PROSPECTIVE_RAW_MARGIN_AND_TOTAL_FORECASTS_ONLY_UNTIL_SEPARATE_PROBABILITY_AND_PROMOTION_CONTRACT_EARNS_AUTHORITY",
     }
-    canonical = json.dumps(artifact, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    canonical = json.dumps(artifact, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
     artifact["artifact_sha256"] = _sha256(canonical)
     return artifact
 
@@ -271,9 +332,17 @@ def main() -> int:
     parser.add_argument("--source-config", type=Path, default=DEFAULT_SOURCES)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     args = parser.parse_args()
+    print(
+        json.dumps(
+            {"nfl_attempt9_reconstruction_numeric_environment": _numeric_environment()},
+            sort_keys=True,
+            default=str,
+        ),
+        flush=True,
+    )
     artifact = reconstruct(args.source_config)
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(artifact, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    args.output.write_text(json.dumps(artifact, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8")
     print(json.dumps({
         "status": artifact["status"],
         "artifact_sha256": artifact["artifact_sha256"],
