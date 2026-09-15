@@ -1,0 +1,33 @@
+{
+  "schema_version": "PROVIDER_CONSUMER_REGISTRY_V1",
+  "authority": "AUDIT_ONLY",
+  "consumers": [
+    {
+      "consumer": "MLB_RUN_IT_GAME_MARKET_CONTEXT",
+      "markets": ["MONEYLINE", "RUN_LINE", "TOTALS"],
+      "preferred_provider": "ESPN_SCOREBOARD",
+      "paid_fallback": "THE_ODDS_API",
+      "provenance": "ESPN_SCOREBOARD_PLUS_SOURCE_PAYLOAD_SPORTSBOOK",
+      "exact_book": "SOURCE_PAYLOAD_REQUIRED",
+      "migration_state": "FREE_FIRST_ENTRYPOINT_ADDED"
+    },
+    {
+      "consumer": "MLB_RUN_IT_EXTENDED_MARKETS",
+      "markets": ["TEAM_TOTALS", "NRFI", "YRFI", "PLAYER_PROPS", "ADDITIONAL_DERIVATIVES"],
+      "preferred_provider": "THE_ODDS_API",
+      "paid_fallback": null,
+      "provenance": "THE_ODDS_API",
+      "exact_book": "PROVIDER_PAYLOAD_REQUIRED",
+      "migration_state": "NO_ELIGIBLE_ESPN_SUBSTITUTION"
+    },
+    {
+      "consumer": "NFL_2026_CONFIRMATION",
+      "markets": ["FROZEN_CONTRACT"],
+      "preferred_provider": "FROZEN_UNCHANGED",
+      "paid_fallback": null,
+      "provenance": "FROZEN_CONTRACT",
+      "exact_book": "FROZEN_CONTRACT",
+      "migration_state": "EXCLUDED"
+    }
+  ]
+}
