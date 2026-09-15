@@ -10,6 +10,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILDER = ROOT / "scripts/build_nfl_attempt9_runtime_artifact.py"
+WORKFLOW = ROOT / ".github/workflows/whole-model-train.yml"
 
 
 def _load_builder():
@@ -41,6 +42,20 @@ class WholeModelTrainPlumbingTest(unittest.TestCase):
         )
         self.assertEqual(direct.returncode, 0, direct.stderr)
         self.assertEqual(module.returncode, 0, module.stderr)
+
+    def test_ufc_builder_supports_module_help_and_workflow_uses_it(self):
+        module = subprocess.run(
+            [sys.executable, "-m", "scripts.build_ufc_training_artifact", "--help"],
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        self.assertEqual(module.returncode, 0, module.stderr)
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("python -m scripts.build_ufc_training_artifact", workflow)
+        self.assertNotIn("python scripts/build_ufc_training_artifact.py", workflow)
 
     def test_attempt9_public_source_is_exactly_pinned(self):
         cfg = json.loads((ROOT / "config/public_training_sources_v1.json").read_text())
