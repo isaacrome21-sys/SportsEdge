@@ -76,7 +76,7 @@ jobs:
 
       - name: Train UFC artifact from pinned factual UFCStats mirror bytes
         run: |
-          python scripts/build_ufc_training_artifact.py \
+          python -m scripts.build_ufc_training_artifact \
             --event-url '${{ steps.ufc_sources.outputs.events_url }}' \
             --results-url '${{ steps.ufc_sources.outputs.results_url }}' \
             --stats-url '${{ steps.ufc_sources.outputs.stats_url }}' \
