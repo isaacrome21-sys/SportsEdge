@@ -1,0 +1,36 @@
+name: market-provider-contract
+
+on:
+  pull_request:
+    paths:
+      - 'config/market_provider_contract_v1.json'
+      - 'docs/market_provider_migration_20260915.md'
+      - 'sportsedge/market_provider_contract.py'
+      - 'sportsedge/espn_game_odds_source.py'
+      - 'tests/test_market_provider_contract.py'
+      - 'tests/test_espn_game_odds_source.py'
+      - 'scripts/audit_market_provider_migration.py'
+      - '.github/workflows/market-provider-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Compile
+        run: python3 -m py_compile sportsedge/market_provider_contract.py scripts/audit_market_provider_migration.py
+      - name: Provider contract tests
+        run: python3 -m unittest -q tests.test_market_provider_contract tests.test_espn_game_odds_source
+      - name: Migration audit
+        run: python3 scripts/audit_market_provider_migration.py
+      - name: Frozen confirmation exclusion
+        run: |
+          git fetch origin main --depth=1
+          changed="$(git diff --name-only origin/main...HEAD)"
+          ! grep -Fxq 'scripts/nfl_2026_line_capture.py' <<<"$changed"
+          ! grep -Fxq 'config/nfl_2026_capture.json' <<<"$changed"
+          ! grep -Fxq '.github/workflows/nfl-2026-line-capture.yml' <<<"$changed"
