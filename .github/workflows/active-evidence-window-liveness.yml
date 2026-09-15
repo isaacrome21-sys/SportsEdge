@@ -12,11 +12,14 @@ on:
       - '.github/workflows/active-evidence-window-liveness.yml'
       - '.github/workflows/nfl-2026-line-capture.yml'
       - '.github/workflows/football-nfl-forward-clv-collection.yml'
-  # Independent deadman. This does not call a paid market-data provider.
-  # It inspects the durable repository state after recently elapsed frozen
-  # NFL capture windows. A green capture workflow is not a liveness input.
-  schedule:
-    - cron: '17 * * * *'
+  # Independent of the NFL confirmation line-capture writer being watched.
+  # The forward collector is already an authorized scheduled workflow; every
+  # completion, including a failure, drives this free durable-state deadman.
+  workflow_run:
+    workflows:
+      - football-nfl-forward-clv-collection
+    types:
+      - completed
 
 permissions:
   contents: read
