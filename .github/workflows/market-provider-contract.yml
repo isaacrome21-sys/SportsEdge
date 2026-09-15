@@ -81,6 +81,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
       - name: Install test dependency
         run: python3 -m pip install 'numpy==2.5.3'
       - name: Compile
@@ -91,7 +93,6 @@ jobs:
         run: python3 scripts/audit_market_provider_migration.py
       - name: Frozen confirmation exclusion
         run: |
-          git fetch origin main --depth=1
           changed="$(git diff --name-only origin/main...HEAD)"
           ! grep -Fxq 'scripts/nfl_2026_line_capture.py' <<<"$changed"
           ! grep -Fxq 'config/nfl_2026_capture.json' <<<"$changed"
