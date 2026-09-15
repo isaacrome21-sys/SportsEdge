@@ -14,7 +14,16 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from scripts.odds_api_quota_guard import configured_keys, probe_quota, zero_authority
+# GitHub Actions historically invokes this file both as a module and by path.
+# Module mode sees the repository root; direct-file mode sees scripts/ only.
+# Support both explicitly so an import-path accident cannot turn a preflight
+# into a green no-op.
+try:
+    from scripts.odds_api_quota_guard import configured_keys, probe_quota, zero_authority
+except ModuleNotFoundError as exc:
+    if exc.name != "scripts":
+        raise
+    from odds_api_quota_guard import configured_keys, probe_quota, zero_authority
 
 CAPTURE_CONFIG = Path("config/nfl_2026_capture.json")
 BUDGET_CONFIG = Path("config/nfl_2026_provider_budget_v1.json")
