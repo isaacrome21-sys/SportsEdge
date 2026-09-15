@@ -39,3 +39,17 @@ The +400 trigger remains frozen as the escalation boundary for three-method sens
 The explicit probability haircut remains 0.0 points. The aggregation rule remains `ESTIMATOR_ONLY_NO_MINIMUM_ACROSS_METHODS`. These values are policy inputs, not results selected after observing floor, replay, calibration, hit-rate, market-consensus, or handicapper outcomes.
 
 No edge floor is created by this freeze. No market becomes eligible. No Model_P, calibration result, replay depth, hit rate, or evidence record is added or inferred.
+
+## 2026-09-14 — MLB first-five linescore repair
+
+Status: implementation defect repaired; all MLB deployment, evidence, calibration, parity, and promotion gates remain unchanged.
+
+The canonical F5 distribution declares that first-five markets are built from actual strictly-prior first-five inning scores and explicitly forbids scaling full-game means by `5/9`. The generic MLB feature builder nevertheless emitted `f5_away_mean_runs` and `f5_home_mean_runs` by multiplying full-game team run means by `5/9`, while the shared F5 engine requires aligned `away_f5_runs_for`, `away_f5_runs_against`, `home_f5_runs_for`, and `home_f5_runs_against` histories. That mismatch was an implementation defect, not evidence that the candidate was validated.
+
+For the repair, the public MIT-licensed `zero-sum-seattle/python-mlb-statsapi` repository was consulted at immutable commit `40bc78e66c372e62a99289c11bdc95173684934f` for the MLB StatsAPI linescore data shape: ordered inning records with distinct home and away run values. SportsEdge independently implements the parser using its existing native HTTP acquisition path; no third-party prediction, coefficient, model output, or promotion evidence is imported.
+
+The repaired feature builder now requests regular-season schedule records with hydrated linescores, requires all innings 1 through 5 to contain valid nonnegative integer home/away run counts, orients runs-for/runs-against by stable team ID, sorts strictly-prior games chronologically, keeps the trailing 30 valid games, and emits the four arrays consumed by the shared F5 distribution. Incomplete linescores are skipped and insufficient history continues to fail closed in the F5 distribution contract. `F5_TEAM_TOTALS` is routed through the same actual-history surface.
+
+Regression tests deliberately make final scores diverge from first-five scores, reverse provider game order, and include an incomplete linescore so a return to the `5/9` shortcut, order dependence, or silent partial-game substitution fails.
+
+This change modifies candidate feature realization and therefore requires SportsEdge's own chronological/PIT validation, calibration, settlement, forward-evidence, and production-parity work before any eligibility change. It does not change `config/deployments.json`, does not populate an edge floor, does not create bettor-facing Model_P authority, and does not authorize an OFFICIAL wager.
