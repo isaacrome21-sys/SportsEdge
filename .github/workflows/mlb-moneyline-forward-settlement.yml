@@ -42,7 +42,9 @@ jobs:
             sportsedge/mlb_moneyline_paper_decision.py \
             sportsedge/mlb_moneyline_v2_settlement.py \
             sportsedge/mlb_moneyline_v2_checkpoint.py \
-            sportsedge/mlb_moneyline_v2_checkpoint_runtime.py
+            sportsedge/mlb_moneyline_v2_checkpoint_runtime.py \
+            sportsedge/mlb_moneyline_v2_probation.py \
+            sportsedge/mlb_moneyline_v2_probation_runtime.py
           python -m unittest \
             tests.test_mlb_moneyline_forward_lane \
             tests.test_mlb_moneyline_paper_decision \
@@ -50,6 +52,7 @@ jobs:
             tests.test_mlb_moneyline_v2_settlement \
             tests.test_settle_mlb_moneyline_forward_evidence_v2 \
             tests.test_mlb_moneyline_v2_checkpoint \
+            tests.test_mlb_moneyline_v2_probation \
             tests.test_persist_forward_evidence_data_branch -v
 
       - name: Restore cumulative forward evidence from data branch
@@ -93,6 +96,19 @@ jobs:
           echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
           exit 0
 
+      - name: Evaluate checkpoint-50 PROBATION readiness
+        id: probation
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          python -m sportsedge.mlb_moneyline_v2_probation_runtime \
+            --checkpoint-report artifacts/mlb_moneyline_v2_checkpoint_report.json \
+            --report artifacts/mlb_moneyline_v2_probation_readiness.json | tee probation_readiness_result.json
+          rc=${PIPESTATUS[0]}
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+
       - name: Persist immutable completed evidence to data branch
         id: persist
         shell: bash
@@ -108,7 +124,7 @@ jobs:
           echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Upload V2 settlement, metric, and checkpoint receipts
+      - name: Upload V2 settlement, checkpoint, and readiness receipts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -116,21 +132,25 @@ jobs:
           path: |
             settlement_result.json
             checkpoint_result.json
+            probation_readiness_result.json
             settlement_persistence_result.json
             artifacts/mlb_moneyline_forward_gate_report_v2.json
             artifacts/mlb_moneyline_v2_checkpoint_report.json
+            artifacts/mlb_moneyline_v2_probation_readiness.json
             data/mlb_forward_evidence/**
             data/mlb_forward_settlement_raw/**
           if-no-files-found: warn
           retention-days: 90
 
-      - name: Enforce fail-closed settlement and checkpoint status
+      - name: Enforce fail-closed settlement, checkpoint, and readiness integrity
         if: always()
         shell: bash
         run: |
           settlement_rc='${{ steps.settle.outputs.exit_code }}'
           checkpoint_rc='${{ steps.checkpoint.outputs.exit_code }}'
+          probation_rc='${{ steps.probation.outputs.exit_code }}'
           persist_rc='${{ steps.persist.outputs.exit_code }}'
           test -n "$settlement_rc" && test "$settlement_rc" -eq 0
           test -n "$checkpoint_rc" && test "$checkpoint_rc" -eq 0
+          test -n "$probation_rc" && test "$probation_rc" -eq 0
           test -n "$persist_rc" && test "$persist_rc" -eq 0
