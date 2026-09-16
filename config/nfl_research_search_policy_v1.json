@@ -145,13 +145,21 @@
       "bookmaker": "draftkings",
       "markets": ["spreads", "totals"],
       "require_two_sided_prices": true,
+      "source_priority": ["DRAFTKINGS_DIRECT_WEB_V1", "DRAFTKINGS_ODDS_API_V1"],
+      "observation_timestamp_semantics": "SPORTSEDGE_HTTP_RESPONSE_RECEIPT_UPPER_BOUND",
+      "provider_quote_timestamp_role": "AUXILIARY_ONLY",
+      "fallback_scope": "WHOLE_SOURCE_FAILURE_ONLY",
+      "cross_source_market_merge": false,
+      "direct_valid_board_market_gaps_trigger_fallback": false,
+      "direct_source_contract_path": "docs/nfl_direct_capture_source_contract_v1.md",
+      "source_amendment_basis": "Declared before the first successful NFL 2026 confirmation capture and before capture_lock.json existed; Week 2 contained only a missed marker and failed attempts, so no successful observation definition had been hash-bound.",
       "no_backfill": true,
       "closing_line_benchmark_only": true,
       "market_prices_as_model_features": false,
       "capture_immutability": "At the first successful capture, hash-lock this policy, config/nfl_2026_capture.json, scripts/nfl_2026_line_capture.py, and .github/workflows/nfl-2026-line-capture.yml. Later mismatches remain captured with MISMATCH status and the run fails visibly.",
-      "policy_completion_note": "Operational opener weekday, acceptance windows, first-success semantics, DraftKings market scope, and two-sided-price requirement completed before any Week 2 capture file existed."
+      "policy_completion_note": "Operational opener weekday, acceptance windows, first-success semantics, DraftKings market scope, two-sided-price requirement, and the direct-DraftKings primary transport/fallback semantics were fixed before the first successful 2026 confirmation capture."
     },
-    "confirmation_rule": "2026 is a one-time forward confirmation after the frozen candidate and capture protocol; do not change the model, segments, capture times, or thresholds after Week 2 capture begins.",
+    "confirmation_rule": "2026 is a one-time forward confirmation after the frozen candidate and capture protocol; do not change the model, segments, capture times, thresholds, or accepted source semantics after the first successful capture binds the capture lock.",
     "confirmation_outcome": "CLEARS_CONFIRMATION if the predeclared timing rule and any tested segment rules pass; otherwise FAILS_CONFIRMATION or INCONCLUSIVE_MISSING_CAPTURE."
   }
 }

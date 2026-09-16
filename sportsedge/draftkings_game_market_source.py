@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
 from typing import Any, Callable, Mapping
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 DK_ROOT = "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1"
@@ -23,8 +24,10 @@ LEAGUE_IDS = {
     "baseball_mlb": 84240,
 }
 
+
 class DraftKingsGameMarketError(RuntimeError):
     pass
+
 
 @dataclass(frozen=True)
 class RawDraftKingsBoard:
@@ -58,6 +61,10 @@ def fetch_board(sport_key: str, *, opener: Callable[..., Any] = _open,
     try:
         with opener(uri, timeout=20) as response:
             raw = response.read()
+    except HTTPError as exc:
+        raise DraftKingsGameMarketError(f"DK_GAME_HTTP_{int(exc.code)}") from exc
+    except (URLError, TimeoutError) as exc:
+        raise DraftKingsGameMarketError("DK_GAME_TRANSPORT_FAILED") from exc
     except Exception as exc:
         raise DraftKingsGameMarketError("DK_GAME_FETCH_FAILED") from exc
     try:
@@ -131,9 +138,12 @@ def normalize_board(board: RawDraftKingsBoard) -> list[dict[str, Any]]:
         if event is None:
             continue
         canonical = None
-        if name == "Moneyline": canonical = "h2h"
-        elif name in {"Spread", "Run Line"}: canonical = "spreads"
-        elif name == "Total": canonical = "totals"
+        if name == "Moneyline":
+            canonical = "h2h"
+        elif name in {"Spread", "Run Line"}:
+            canonical = "spreads"
+        elif name == "Total":
+            canonical = "totals"
         if canonical is None:
             continue
         try:
@@ -153,15 +163,20 @@ def normalize_board(board: RawDraftKingsBoard) -> list[dict[str, Any]]:
             outcome = None
             if canonical == "totals":
                 low = label.lower()
-                if low.startswith("over"): outcome = "Over"
-                elif low.startswith("under"): outcome = "Under"
+                if low.startswith("over"):
+                    outcome = "Over"
+                elif low.startswith("under"):
+                    outcome = "Under"
             else:
-                if home in label or label in home: outcome = home
-                elif away in label or label in away: outcome = away
+                if home in label or label in home:
+                    outcome = home
+                elif away in label or label in away:
+                    outcome = away
                 else:
                     hm = home.split()[-1] in label if home.split() else False
                     am = away.split()[-1] in label if away.split() else False
-                    if hm ^ am: outcome = home if hm else away
+                    if hm ^ am:
+                        outcome = home if hm else away
             if outcome is None:
                 continue
             normalized.append({"outcome": outcome, "point": point, "price_american": price})

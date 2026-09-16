@@ -12,6 +12,24 @@
   "sport_key": "americanfootball_nfl",
   "bookmaker": "draftkings",
   "markets": ["spreads", "totals"],
+  "source_priority": [
+    "DRAFTKINGS_DIRECT_WEB_V1",
+    "DRAFTKINGS_ODDS_API_V1"
+  ],
+  "observation_timestamp_semantics": "SPORTSEDGE_HTTP_RESPONSE_RECEIPT_UPPER_BOUND",
+  "provider_quote_timestamp_role": "AUXILIARY_ONLY",
+  "fallback_scope": "WHOLE_SOURCE_FAILURE_ONLY",
+  "cross_source_market_merge": false,
+  "direct_valid_board_market_gaps_trigger_fallback": false,
+  "schedule_coverage_semantics": "EXACT_KICKOFF_UTC_MULTIPLICITY",
+  "schedule_source": "nflverse/nfldata data/games.csv",
+  "direct_source_contract_path": "docs/nfl_direct_capture_source_contract_v1.md",
+  "source_code_bindings": {
+    "sportsedge/nfl_direct_capture_source.py": "2929d7dd91a706bc3a26b1e9d8400c9977fc393b",
+    "sportsedge/draftkings_game_market_source.py": "6319cceb6b0d8bba1db4c6bea1cbbb7634bb3e6c",
+    "sportsedge/nfl_confirmation_schedule.py": "f0ced7f83fd733d09438e9215618ad10e8db5ba6",
+    "docs/nfl_direct_capture_source_contract_v1.md": "5dd1171b0f20f82fd863c872cd4ec2c4fc2c8a65"
+  },
   "output_dir": "data/nfl_2026_confirmation/captures",
   "predictions_dir": "data/nfl_2026_confirmation/predictions"
 }

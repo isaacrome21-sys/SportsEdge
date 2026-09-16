@@ -20,6 +20,7 @@ import json
 from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from typing import Mapping
 from zoneinfo import ZoneInfo
 
 
@@ -77,10 +78,13 @@ def schedule_kickoff_utc(row: dict) -> datetime | None:
 
 
 def valid_capture_record(record: dict, cfg: dict, kind: str) -> bool:
-    """Return true only for a capture that is admissible as PRESENT."""
+    """Return true only for a capture admissible as PRESENT under the lane contract."""
     if record.get("capture_kind") != kind:
         return False
     if record.get("book") != cfg.get("bookmaker"):
+        return False
+    source_priority = cfg.get("source_priority") or []
+    if source_priority and record.get("source_class") not in source_priority:
         return False
     if not record.get("retrieved_at_utc"):
         return False
@@ -88,7 +92,24 @@ def valid_capture_record(record: dict, cfg: dict, kind: str) -> bool:
     if not isinstance(hashes, dict) or not hashes:
         return False
     games = record.get("games")
-    return isinstance(games, list) and bool(games)
+    if not isinstance(games, list) or not games:
+        return False
+    for game in games:
+        if not isinstance(game, Mapping):
+            return False
+        if game.get("spread", {}).get("status") != "OK":
+            return False
+        if game.get("total", {}).get("status") != "OK":
+            return False
+    if cfg.get("schedule_coverage_semantics"):
+        schedule = record.get("schedule")
+        if not isinstance(schedule, Mapping):
+            return False
+        if schedule.get("matching_semantics") != "KICKOFF_UTC_MULTIPLICITY":
+            return False
+        if not schedule.get("sha256"):
+            return False
+    return True
 
 
 def captured_final_games(cfg: dict) -> list[dict]:
@@ -132,7 +153,7 @@ def audit(cfg: dict, now: datetime, schedule_rows: list[dict] | None = None,
     written: list[Path] = []
 
     # OPENER absence evidence. Only a contract-valid capture suppresses a miss;
-    # a malformed/empty file is evidence of a failed capture, not PRESENT.
+    # a malformed/empty/one-sided/wrong-source file is failed capture, not PRESENT.
     for week in range(int(cfg["first_week"]), current_week + 1):
         start, end = opener_window_for_week(week, cfg)
         if local_now < end:
@@ -236,6 +257,8 @@ def verify_due(cfg: dict, opener_week: int | None, final_kickoffs: list[str],
                 games = record.get("games")
                 if not isinstance(games, list) or not games:
                     failures.append("DUE_OPENER_EMPTY_GAMES")
+                elif not valid_capture_record(record, cfg, "OPENER"):
+                    failures.append("DUE_OPENER_CONTRACT_INVALID")
 
     if final_kickoffs:
         expected = Counter(final_kickoffs)
@@ -245,7 +268,6 @@ def verify_due(cfg: dict, opener_week: int | None, final_kickoffs: list[str],
                 failures.append(
                     f"DUE_FINAL_NOT_MATERIALIZED:{kickoff_z}:expected={expected_count}:actual={actual[kickoff_z]}"
                 )
-        # Validate book/kind/contract fields and nonempty games for current-run FINAL records too.
         for path in Path(cfg["output_dir"]).glob("week*/final/*.json"):
             try:
                 record = load_json(path)
@@ -262,6 +284,8 @@ def verify_due(cfg: dict, opener_week: int | None, final_kickoffs: list[str],
             games = record.get("games")
             if not isinstance(games, list) or not games:
                 failures.append(f"DUE_FINAL_EMPTY_GAMES:{path}")
+            elif not valid_capture_record(record, cfg, "FINAL"):
+                failures.append(f"DUE_FINAL_CONTRACT_INVALID:{path}")
     return failures
 
 
