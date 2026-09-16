@@ -107,11 +107,26 @@ def test_hash_lock_detects_changed_provenance(capture, tmp_path):
 def test_workflow_keeps_polling_but_gates_paid_capture():
     text = WORKFLOW.read_text()
     assert "schedule:" in text
-    assert "cron: '3,13,23,33,43,53 * * * *'" in text
+
+    # The frozen lane polls every ten minutes at :03/:13/:23/:33/:43/:53.
+    # The cron may be expressed as one combined entry or six equivalent entries;
+    # the contract is the polling instants, not the YAML spelling.
+    combined = "cron: '3,13,23,33,43,53 * * * *'" in text
+    split = all(
+        f"cron: '{minute} * * * *'" in text
+        for minute in (3, 13, 23, 33, 43, 53)
+    )
+    assert combined or split
+
     assert "Gate scheduled run to a frozen capture window using free schedule data" in text
     assert "steps.due.outputs.due == 'true'" in text
     assert "github.event_name == 'schedule' && 'capture'" in text
     assert "cancel-in-progress: false" in text
+
+    # Advance provider health must key off the scheduled slot, not delayed runner
+    # wall-clock time, or GitHub scheduler latency can silently skip the probe.
+    assert "github.event.schedule" in text
+    assert "$(date -u +%M)" not in text
 
 
 def test_manual_default_is_check_not_capture():
