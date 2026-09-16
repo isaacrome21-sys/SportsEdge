@@ -38,11 +38,17 @@ jobs:
           python -m py_compile \
             scripts/capture_mlb_moneyline_model_p.py \
             scripts/capture_mlb_direct_paired_ml.py \
+            scripts/capture_mlb_moneyline_paper_decisions.py \
             scripts/persist_forward_evidence_data_branch.py \
             sportsedge/mlb_moneyline_forward_prediction.py \
+            sportsedge/mlb_moneyline_forward_lane.py \
+            sportsedge/mlb_moneyline_paper_decision.py \
             sportsedge/mlb_moneyline_forward_ledger.py
           python -m unittest \
             tests.test_mlb_moneyline_forward_prediction \
+            tests.test_mlb_moneyline_forward_lane \
+            tests.test_mlb_moneyline_paper_decision \
+            tests.test_capture_mlb_moneyline_paper_decisions \
             tests.test_mlb_moneyline_forward_ledger \
             tests.test_persist_forward_evidence_data_branch \
             tests.test_direct_web_capture_source \
@@ -60,7 +66,10 @@ jobs:
           set -euo pipefail
           git fetch --depth=1 origin data
           day='${{ steps.day.outputs.date }}'
-          for path in "data/mlb_forward_predictions/$day" "data/mlb_forward_capture/$day"; do
+          for path in \
+            "data/mlb_forward_predictions/$day" \
+            "data/mlb_forward_capture/$day" \
+            "data/mlb_forward_decisions/$day"; do
             if git cat-file -e "origin/data:$path" 2>/dev/null; then
               git archive origin/data "$path" | tar -x
             fi
@@ -90,6 +99,20 @@ jobs:
           echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
           exit 0
 
+      - name: Freeze pregame PAPER decisions
+        id: decisions
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          python scripts/capture_mlb_moneyline_paper_decisions.py \
+            --prediction-root data/mlb_forward_predictions \
+            --quote-root data/mlb_forward_capture \
+            --decision-root data/mlb_forward_decisions | tee decision_result.json
+          rc=${PIPESTATUS[0]}
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+
       - name: Persist valid evidence create-only to data branch
         id: persist
         shell: bash
@@ -100,6 +123,7 @@ jobs:
           python scripts/persist_forward_evidence_data_branch.py \
             --path "data/mlb_forward_predictions/$day" \
             --path "data/mlb_forward_capture/$day" \
+            --path "data/mlb_forward_decisions/$day" \
             --branch data \
             --worktree "$RUNNER_TEMP/sportsedge-mlb-forward-data" | tee persistence_result.json
           rc=${PIPESTATUS[0]}
@@ -114,9 +138,11 @@ jobs:
           path: |
             model_p_result.json
             quote_result.json
+            decision_result.json
             persistence_result.json
             data/mlb_forward_predictions/${{ steps.day.outputs.date }}/**
             data/mlb_forward_capture/${{ steps.day.outputs.date }}/**
+            data/mlb_forward_decisions/${{ steps.day.outputs.date }}/**
           if-no-files-found: warn
           retention-days: 90
 
@@ -126,7 +152,9 @@ jobs:
         run: |
           model_rc='${{ steps.modelp.outputs.exit_code }}'
           quote_rc='${{ steps.quotes.outputs.exit_code }}'
+          decision_rc='${{ steps.decisions.outputs.exit_code }}'
           persist_rc='${{ steps.persist.outputs.exit_code }}'
           test -n "$model_rc" && test "$model_rc" -eq 0
           test -n "$quote_rc" && test "$quote_rc" -eq 0
+          test -n "$decision_rc" && test "$decision_rc" -eq 0
           test -n "$persist_rc" && test "$persist_rc" -eq 0

@@ -7,6 +7,7 @@
   "sportsbook": "draftkings",
   "model_reference_side": "HOME",
   "model_surface_manifest": "config/mlb_model_surface_v1.json",
+  "slate_cluster_key": "UTC_EVENT_START_DATE",
   "prediction_window_minutes_before_start": {
     "low_exclusive": 40.0,
     "high_inclusive": 60.0
@@ -17,7 +18,9 @@
     "direction": "EARLY_ONLY_AT_OR_BEFORE_TARGET",
     "two_sided_required": true,
     "must_be_before_start": true,
-    "lock_once_recorded": true
+    "freeze_must_occur_at_or_before_target": true,
+    "lock_once_recorded": true,
+    "timestamp_basis": "SPORTSEDGE_RECEIPT_TIME_IMMUTABLE_DATA_BRANCH"
   },
   "paper_decision": {
     "state": "PAPER",
@@ -26,13 +29,18 @@
     "edge_floor_market": "moneyline",
     "require_positive_ev": true,
     "side_selection": "MAX_MODEL_EDGE_FROM_FIXED_HOME_REFERENCE",
+    "graded_count_inclusion": "PAPER_BET_FROZEN_ONLY",
     "no_qualifying_side_disposition": "PAPER_PASS_FROZEN"
   },
   "close_capture": {
     "source": "draftkings",
     "selection": "LAST_VERIFIABLE_PAIRED_PRE_FIRST_PITCH_QUOTE",
     "two_sided_required": true,
-    "must_be_before_start": true
+    "must_be_before_start": true,
+    "missing_close_policy": "KEEP_GRADED_BET_IN_CHECKPOINT_DENOMINATOR_EXCLUDE_FROM_CLV",
+    "clv_metric": "SELECTED_SIDE_CLOSE_FAIR_PROBABILITY_MINUS_ENTRY_FAIR_PROBABILITY",
+    "clv_positive_direction": "POSITIVE_MEANS_MARKET_MOVED_TOWARD_SELECTED_SIDE",
+    "devig_basis": "SAME_FROZEN_DEVIG_POLICY_AT_ENTRY_AND_CLOSE"
   },
   "promotion_policy": "config/promotion_evidence_policy_v2.json",
   "promotion_policy_manifest": "config/promotion_evidence_policy_manifest.json",
