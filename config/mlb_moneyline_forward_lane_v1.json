@@ -36,7 +36,11 @@
     "source": "draftkings",
     "selection": "LAST_VERIFIABLE_PAIRED_PRE_FIRST_PITCH_QUOTE",
     "two_sided_required": true,
-    "must_be_before_start": true
+    "must_be_before_start": true,
+    "missing_close_policy": "KEEP_GRADED_BET_IN_CHECKPOINT_DENOMINATOR_EXCLUDE_FROM_CLV",
+    "clv_metric": "SELECTED_SIDE_CLOSE_FAIR_PROBABILITY_MINUS_ENTRY_FAIR_PROBABILITY",
+    "clv_positive_direction": "POSITIVE_MEANS_MARKET_MOVED_TOWARD_SELECTED_SIDE",
+    "devig_basis": "SAME_FROZEN_DEVIG_POLICY_AT_ENTRY_AND_CLOSE"
   },
   "promotion_policy": "config/promotion_evidence_policy_v2.json",
   "promotion_policy_manifest": "config/promotion_evidence_policy_manifest.json",
