@@ -1,21 +1,22 @@
 from __future__ import annotations
 
-from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import unittest
 
+from sportsedge.mlb_model_artifact import mlb_model_artifact_sha256
 from sportsedge.mlb_moneyline_forward_lane import load_forward_lane_binding
 from sportsedge.mlb_moneyline_v2_checkpoint import (
     MLBMoneylineV2CheckpointError,
     _student_t_critical_975,
-    evaluate_v2_checkpoints,
 )
+from sportsedge.mlb_moneyline_v2_checkpoint_runtime import evaluate_v2_checkpoints
 
 
 class MLBMoneylineV2CheckpointTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.binding = load_forward_lane_binding()
+        cls.artifact = mlb_model_artifact_sha256()
 
     def _row(
         self,
@@ -51,7 +52,7 @@ class MLBMoneylineV2CheckpointTests(unittest.TestCase):
             "game_pk": 900000 + index,
             "slate_date": start.date().isoformat(),
             "event_start_ts": start.isoformat(),
-            "model_artifact_sha256": self.binding["model_artifact_sha256"],
+            "model_artifact_sha256": self.artifact,
             "selected_side": "HOME",
             "entry_selected_odds": 100.0,
             "entry_fair_probability": 0.50,
@@ -161,6 +162,12 @@ class MLBMoneylineV2CheckpointTests(unittest.TestCase):
         row = self._row(0)
         row["policy_sha256"] = "0" * 64
         with self.assertRaisesRegex(MLBMoneylineV2CheckpointError, "binding mismatch"):
+            evaluate_v2_checkpoints([row])
+
+    def test_model_artifact_change_starts_new_clock(self):
+        row = self._row(0)
+        row["model_artifact_sha256"] = "0" * 64
+        with self.assertRaisesRegex(MLBMoneylineV2CheckpointError, "model artifact binding mismatch"):
             evaluate_v2_checkpoints([row])
 
     def test_slate_date_must_equal_utc_event_start_date(self):
