@@ -10,6 +10,7 @@ from typing import Any, Iterable, Mapping
 
 from .devig import DevigError, devig_with_policy
 from .edge_floors import EdgeFloorError, load_edge_floor_config, require_frozen_devig_policy
+from .truth_gate import TruthGateError
 
 CLV_VERSION = "mlb_moneyline_clv_v2_frozen_devig"
 
@@ -34,7 +35,7 @@ def paired_no_vig(home_odds: Any, away_odds: Any, *, config: Mapping[str,Any] | 
     policy=_policy(config); home,away=_pair("PAIR",home_odds,away_odds)
     try:
         result=devig_with_policy(home,away,policy=policy)
-    except DevigError as exc:
+    except (DevigError, TruthGateError) as exc:
         raise MLBMoneylineCLVError(str(exc)) from exc
     return result.selected.candidate_fair_probability,result.selected.opposite_fair_probability
 
@@ -51,7 +52,7 @@ def evaluate_paired_closes(rows: Iterable[Mapping[str,Any]], *, min_mean_clv: fl
         home,away=_pair(game_pk,row.get("close_home_odds"),row.get("close_away_odds"))
         candidate,opposite=(home,away) if side=="HOME" else (away,home)
         try: result=devig_with_policy(candidate,opposite,policy=policy)
-        except DevigError as exc: raise MLBMoneylineCLVError(f"row {i}: {exc}") from exc
+        except (DevigError, TruthGateError) as exc: raise MLBMoneylineCLVError(f"row {i}: {exc}") from exc
         values.append(p-result.selected.candidate_fair_probability)
         spreads.append(result.sensitivity_spread_probability_points)
         longshots+=int(result.longshot_triggered)
