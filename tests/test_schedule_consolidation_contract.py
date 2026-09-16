@@ -14,10 +14,14 @@ def test_auto_mlb_is_parked_and_paid_probe_removal_contract():
     assert "probe_game_odds.py" not in text
 
 
-def test_primary_archive_is_manual_only_while_mlb_parked():
+def test_primary_archive_is_scheduled_keyless_direct_capture():
     text = _text("archive-mlb-game-odds.yml")
     assert "workflow_dispatch:" in text
-    assert "schedule:" not in text
+    assert "schedule:" in text
+    assert "cron: '1-56/5 * * * *'" in text
+    assert "capture_mlb_direct_paired_ml.py" in text
+    assert "SPORTSEDGE_ODDS_API_KEY" not in text
+    assert "secrets." not in text
 
 
 def test_backup_dispatcher_is_manual_only():
@@ -32,7 +36,7 @@ def test_failover_has_no_unrelated_workflow_run_trigger():
     assert "workflow_run:" not in text
 
 
-def test_deadman_is_manual_only_while_mlb_parked():
+def test_deadman_is_manual_only_while_paid_mlb_lanes_are_parked():
     text = _text("mlb-deadman.yml")
     assert "workflow_dispatch:" in text
     assert "schedule:" not in text
