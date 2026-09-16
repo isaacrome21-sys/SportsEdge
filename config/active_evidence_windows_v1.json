@@ -55,11 +55,18 @@
       "acquisition_authority": ".github/workflows/football-nfl-forward-clv-collection.yml",
       "provider_dependency": "THE_ODDS_API_DRAFTKINGS",
       "persistence_root": "runtime/nfl-forward",
-      "liveness_mode": "PER_DUE_RUN_FAIL_CLOSED_PLUS_MUTATION_GUARD",
+      "liveness_mode": "PER_DUE_RUN_FAIL_CLOSED_PLUS_DURABLE_ACCRUAL_GUARD",
+      "independent_liveness_authority": ".github/workflows/active-evidence-window-liveness.yml",
       "required_authority_literals": [
         "schedule:",
         "scripts/fetch_nfl_forward_odds.py",
         "Persist release-scoped decision/close state to data branch",
+        "runtime/nfl-forward"
+      ],
+      "required_liveness_literals": [
+        "workflow_run:",
+        "football-nfl-forward-clv-collection",
+        "check_nfl_forward_accrual.py",
         "runtime/nfl-forward"
       ],
       "no_backfill": true
