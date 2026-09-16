@@ -1,0 +1,51 @@
+{
+  "schema_version": "MLB_MONEYLINE_FORWARD_LANE_V1",
+  "status": "FROZEN_BEFORE_FIRST_GRADED_DECISION",
+  "lane_id": "MLB_MONEYLINE_DK_T30_V1",
+  "sport": "MLB",
+  "market": "MONEYLINE",
+  "sportsbook": "draftkings",
+  "model_reference_side": "HOME",
+  "model_surface_manifest": "config/mlb_model_surface_v1.json",
+  "prediction_window_minutes_before_start": {
+    "low_exclusive": 40.0,
+    "high_inclusive": 60.0
+  },
+  "decision_capture": {
+    "target_minutes_before_start": 30.0,
+    "early_tolerance_minutes": 6.0,
+    "direction": "EARLY_ONLY_AT_OR_BEFORE_TARGET",
+    "two_sided_required": true,
+    "must_be_before_start": true,
+    "lock_once_recorded": true
+  },
+  "paper_decision": {
+    "state": "PAPER",
+    "stake_units": 0.0,
+    "edge_floor_config": "config/truth_gate_floors.json",
+    "edge_floor_market": "moneyline",
+    "require_positive_ev": true,
+    "side_selection": "MAX_MODEL_EDGE_FROM_FIXED_HOME_REFERENCE",
+    "no_qualifying_side_disposition": "PAPER_PASS_FROZEN"
+  },
+  "close_capture": {
+    "source": "draftkings",
+    "selection": "LAST_VERIFIABLE_PAIRED_PRE_FIRST_PITCH_QUOTE",
+    "two_sided_required": true,
+    "must_be_before_start": true
+  },
+  "promotion_policy": "config/promotion_evidence_policy_v2.json",
+  "promotion_policy_manifest": "config/promotion_evidence_policy_manifest.json",
+  "evidence_paths": {
+    "predictions": "data/mlb_forward_predictions",
+    "quotes": "data/mlb_forward_capture",
+    "paper_decisions": "data/mlb_forward_decisions",
+    "completed": "data/mlb_forward_evidence"
+  },
+  "authority": {
+    "promotion_authority": false,
+    "deployment_change_allowed": false,
+    "staking_change_allowed": false,
+    "official_change_allowed": false
+  }
+}
