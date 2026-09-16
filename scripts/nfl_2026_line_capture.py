@@ -6,6 +6,10 @@ source semantics are fixed here before any successful 2026 confirmation row:
 DRAFTKINGS_DIRECT_WEB_V1 is primary; DRAFTKINGS_ODDS_API_V1 is fallback only
 when the direct source itself fails. A valid direct board with missing/one-sided
 markets never triggers cross-source filling.
+
+Before the first lock can be created, every admitted capture must also match the
+nflverse schedule by exact kickoff-UTC multiplicity. A syntactically valid but
+partial board is not a successful capture.
 """
 import hashlib
 import json
@@ -14,6 +18,7 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -27,6 +32,13 @@ from sportsedge.nfl_direct_capture_source import (  # noqa: E402
     SOURCE_CLASS as DIRECT_SOURCE_CLASS,
     acquire_board,
     game_rows_direct,
+)
+from sportsedge.nfl_confirmation_schedule import (  # noqa: E402
+    ScheduleExpectationError,
+    load_snapshot,
+    opener_expected_kickoffs,
+    final_expected_due_kickoffs,
+    require_exact_coverage,
 )
 
 API = "https://api.the-odds-api.com/v4/sports"
@@ -52,6 +64,14 @@ def utc_now():
 
 def sha256_file(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def git_blob_sha(path):
+    raw = Path(path).read_bytes()
+    digest = hashlib.sha1()
+    digest.update(f"blob {len(raw)}\0".encode("ascii"))
+    digest.update(raw)
+    return digest.hexdigest()
 
 
 def iso_z(dt):
@@ -85,6 +105,20 @@ def load_config():
         problems.append("cross_source_market_merge must be false")
     if cfg.get("direct_valid_board_market_gaps_trigger_fallback") is not False:
         problems.append("direct_valid_board_market_gaps_trigger_fallback must be false")
+    if cfg.get("schedule_coverage_semantics") != "EXACT_KICKOFF_UTC_MULTIPLICITY":
+        problems.append("schedule_coverage_semantics must be EXACT_KICKOFF_UTC_MULTIPLICITY")
+    bindings = cfg.get("source_code_bindings")
+    if not isinstance(bindings, dict) or not bindings:
+        problems.append("source_code_bindings missing")
+    else:
+        for path, expected in sorted(bindings.items()):
+            try:
+                actual = git_blob_sha(path)
+            except OSError:
+                problems.append(f"source binding path missing: {path}")
+                continue
+            if actual != expected:
+                problems.append(f"source binding mismatch: {path}")
     if problems:
         raise CaptureError("CONFIG_INVALID: " + "; ".join(problems))
     return cfg
@@ -249,6 +283,20 @@ def require_two_sided(rows, cfg):
         raise CaptureError("TWO_SIDED_ADMISSION_FAILED " + json.dumps(failures, separators=(",", ":")))
 
 
+def require_schedule_coverage(rows, expected, kind):
+    try:
+        require_exact_coverage(rows, expected, kind=kind)
+    except ScheduleExpectationError as exc:
+        raise CaptureError(str(exc)) from exc
+
+
+def load_schedule_snapshot():
+    try:
+        return load_snapshot()
+    except ScheduleExpectationError as exc:
+        raise CaptureError(str(exc)) from exc
+
+
 # ---------- capture plumbing ----------
 
 def run_meta():
@@ -302,6 +350,14 @@ def direct_meta(transport, raw_path):
     }
 
 
+def schedule_meta(snapshot, expected):
+    return {
+        **snapshot.provenance(),
+        "expected_kickoffs": dict(sorted(expected.items())),
+        "expected_game_count": sum(expected.values()),
+    }
+
+
 def odds_params(cfg, t_from, t_to):
     return {"bookmakers": cfg["bookmaker"], "markets": ",".join(cfg["markets"]),
             "oddsFormat": "american", "dateFormat": "iso",
@@ -347,9 +403,15 @@ def do_opener(cfg, now, hashes):
     path = Path(cfg["output_dir"]) / f"week{due['week']:02d}" / "opener.json"
     if path.exists():
         return None
+
+    snapshot = load_schedule_snapshot()
+    try:
+        expected = opener_expected_kickoffs(cfg, due["week"], snapshot)
+    except ScheduleExpectationError as exc:
+        raise CaptureError(str(exc)) from exc
+
     ws, we = week_bounds_utc(due["week"], cfg)
     t_from = max(ws, now)
-
     direct_failure = None
     try:
         transport, rows = acquire_direct_rows(cfg, t_from, we)
@@ -360,6 +422,7 @@ def do_opener(cfg, now, hashes):
 
     if transport is not None:
         try:
+            require_schedule_coverage(rows, expected, "OPENER")
             require_two_sided(rows, cfg)
         except CaptureError as exc:
             log_attempt(cfg, {"run_started_utc": now.isoformat(), "kind": "OPENER", "week": due["week"],
@@ -377,6 +440,7 @@ def do_opener(cfg, now, hashes):
             "minutes_after_target": round((retrieved - due["target"]).total_seconds() / 60, 2),
             "lock_status": status, "hashes": hashes, "run": run_meta(),
             "predictions_at_opener": predictions_status(cfg, due["week"]),
+            "schedule": schedule_meta(snapshot, expected),
             "transport": direct_meta(transport, raw_path),
             "games": rows,
         }
@@ -386,6 +450,7 @@ def do_opener(cfg, now, hashes):
     # Direct source itself failed: only now may the declared vendor fallback run.
     try:
         events, odds, rows = api_opener_rows(cfg, t_from, we)
+        require_schedule_coverage(rows, expected, "OPENER")
         require_two_sided(rows, cfg)
     except CaptureError as exc:
         log_attempt(cfg, {"run_started_utc": now.isoformat(), "kind": "OPENER", "week": due["week"],
@@ -402,6 +467,7 @@ def do_opener(cfg, now, hashes):
         "minutes_after_target": round((retrieved - due["target"]).total_seconds() / 60, 2),
         "lock_status": status, "hashes": hashes, "run": run_meta(),
         "predictions_at_opener": predictions_status(cfg, due["week"]),
+        "schedule": schedule_meta(snapshot, expected),
         "transport": {
             "source_class": API_SOURCE_CLASS,
             "timestamp_semantics": "SPORTSEDGE_HTTP_RESPONSE_RECEIPT_UPPER_BOUND",
@@ -421,7 +487,11 @@ def do_opener(cfg, now, hashes):
 def captured_final_ids(cfg):
     ids = set()
     for p in Path(cfg["output_dir"]).glob("week*/final/*.json"):
-        ids.update(g["event_id"] for g in json.loads(p.read_text()).get("games", []))
+        try:
+            record = json.loads(p.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        ids.update(g["event_id"] for g in record.get("games", []) if g.get("event_id"))
     return ids
 
 
@@ -440,6 +510,14 @@ def _due_final_rows(rows, cfg, now):
 
 
 def do_final(cfg, now, hashes):
+    snapshot = load_schedule_snapshot()
+    try:
+        expected = final_expected_due_kickoffs(cfg, now, snapshot)
+    except ScheduleExpectationError as exc:
+        raise CaptureError(str(exc)) from exc
+    if not expected:
+        return None
+
     direct_failure = None
     try:
         transport, board_rows = acquire_direct_rows(cfg)
@@ -450,43 +528,47 @@ def do_final(cfg, now, hashes):
 
     if transport is not None:
         rows = _due_final_rows(board_rows, cfg, now)
-        if not rows:
-            return None
         try:
+            require_schedule_coverage(rows, expected, "FINAL")
             require_two_sided(rows, cfg)
         except CaptureError as exc:
             log_attempt(cfg, {"run_started_utc": now.isoformat(), "kind": "FINAL",
-                              "event_ids": [r["event_id"] for r in rows],
+                              "event_ids": [r.get("event_id") for r in rows],
                               "source_class": DIRECT_SOURCE_CLASS, "outcome": str(exc),
                               "attempts": transport["attempts"], **run_meta()})
             raise
         raw_path = persist_direct_raw(cfg, transport)
         retrieved = parse_iso(transport["observed_at_utc"])
         source_meta = direct_meta(transport, raw_path)
+        raw_odds = None
     else:
         lead = timedelta(minutes=cfg["final_minutes_before_kickoff"])
-        events = api_get(f"{cfg['sport_key']}/events",
-                         {"commenceTimeFrom": iso_z(now), "commenceTimeTo": iso_z(now + lead + timedelta(minutes=1)),
-                          "dateFormat": "iso"})
-        done = captured_final_ids(cfg)
         due_events = []
-        for ev in events["data"]:
-            kickoff = parse_iso(ev["commence_time"])
-            if ev["id"] in done or week_of(kickoff, cfg) < cfg["first_week"]:
-                continue
-            window = timedelta(minutes=cfg["final_window_minutes"])
-            if kickoff - lead <= now < min(kickoff - lead + window, kickoff):
-                due_events.append(ev)
-        if not due_events:
-            return None
-        kicks = [parse_iso(e["commence_time"]) for e in due_events]
+        odds = None
         try:
-            odds = api_get(f"{cfg['sport_key']}/odds", odds_params(cfg, min(kicks), max(kicks) + timedelta(minutes=1)))
+            events = api_get(f"{cfg['sport_key']}/events",
+                             {"commenceTimeFrom": iso_z(now),
+                              "commenceTimeTo": iso_z(now + lead + timedelta(minutes=1)),
+                              "dateFormat": "iso"})
+            done = captured_final_ids(cfg)
+            window = timedelta(minutes=cfg["final_window_minutes"])
+            for ev in events["data"]:
+                kickoff = parse_iso(ev["commence_time"])
+                if ev["id"] in done or week_of(kickoff, cfg) < cfg["first_week"]:
+                    continue
+                if kickoff - lead <= now < min(kickoff - lead + window, kickoff):
+                    due_events.append(ev)
+            kicks = [parse_iso(e["commence_time"]) for e in due_events]
+            if not kicks:
+                raise CaptureError("API_EVENTS_MISSING_DUE_SCHEDULE_GAMES")
+            odds = api_get(f"{cfg['sport_key']}/odds",
+                           odds_params(cfg, min(kicks), max(kicks) + timedelta(minutes=1)))
             rows = game_rows(due_events, odds["data"], cfg, wanted_ids={e["id"] for e in due_events})
+            require_schedule_coverage(rows, expected, "FINAL")
             require_two_sided(rows, cfg)
         except CaptureError as exc:
             log_attempt(cfg, {"run_started_utc": now.isoformat(), "kind": "FINAL",
-                              "event_ids": [e["id"] for e in due_events],
+                              "event_ids": [e.get("id") for e in due_events],
                               "source_class": API_SOURCE_CLASS, "outcome": str(exc),
                               "direct_attempts": getattr(direct_failure, "attempts", []), **run_meta()})
             raise
@@ -498,6 +580,7 @@ def do_final(cfg, now, hashes):
             "direct_attempts": getattr(direct_failure, "attempts", []),
             "odds": {x: odds[x] for x in ("key_slot", "quota", "failed_key_slots", "raw_sha256", "received_at_utc")},
         }
+        raw_odds = odds["data"]
 
     lead = timedelta(minutes=cfg["final_minutes_before_kickoff"])
     for row in rows:
@@ -516,14 +599,16 @@ def do_final(cfg, now, hashes):
             "source_class": source_meta["source_class"],
             "run_started_utc": now.isoformat(), "retrieved_at_utc": iso_z(retrieved),
             "lock_status": status, "hashes": hashes, "run": run_meta(),
+            "schedule": schedule_meta(snapshot, expected),
             "transport": source_meta,
             "games": [r for r in rows if r["week"] == week],
         }
-        if source_meta["source_class"] == API_SOURCE_CLASS:
-            record["raw_odds"] = odds["data"]
+        if raw_odds is not None:
+            record["raw_odds"] = raw_odds
         write_new(Path(cfg["output_dir"]) / f"week{week:02d}" / "final" / f"{stamp}.json", record)
         written.append(record)
-    return {"capture_kind": "FINAL", "lock_status": status, "records": written}
+    return {"capture_kind": "FINAL", "source_class": source_meta["source_class"],
+            "lock_status": status, "records": written}
 
 
 # ---------- check mode ----------
