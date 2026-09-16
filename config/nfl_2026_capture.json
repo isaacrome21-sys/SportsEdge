@@ -22,6 +22,10 @@
   "cross_source_market_merge": false,
   "direct_valid_board_market_gaps_trigger_fallback": false,
   "direct_source_contract_path": "docs/nfl_direct_capture_source_contract_v1.md",
+  "source_code_bindings": {
+    "sportsedge/nfl_direct_capture_source.py": "81f6b75b83a59b8e432ab6fbce06ac8e55e8df45",
+    "sportsedge/draftkings_game_market_source.py": "4ea0b6e79e234d9f3633a3641b95551d1a94e08d"
+  },
   "output_dir": "data/nfl_2026_confirmation/captures",
   "predictions_dir": "data/nfl_2026_confirmation/predictions"
 }
