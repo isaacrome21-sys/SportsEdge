@@ -7,19 +7,28 @@ name: archive-mlb-game-odds
 # capture and retain its evidence. No Odds API secrets, no paid budget ledger,
 # no fallback provider.
 #
-# A transport failure or an in-window one-sided market exits 2 and fails the job
-# visibly. A slate with no game inside a capture window exits 0: that is a
-# routine no-op, not a block, and must not be reported as failure.
+# Transport failure, an empty board, or an in-window one-sided market exits 2
+# and fails visibly. NO_CAPTURE_DUE is green only when the acquired MLB board
+# is non-empty and no game is inside T60/T30/T10.
 #
 # Grants no promotion authority. Does not read or modify config/deployments.json
 # or the frozen moneyline edge floor. Retained rows are FORWARD_CAPTURE_PARTIAL.
 
 on:
   workflow_dispatch:
+  push:
+    branches: [mlb-keyless-forward-capture]
+    paths:
+      - '.github/workflows/archive-mlb-game-odds.yml'
+      - 'scripts/capture_mlb_direct_paired_ml.py'
+      - 'scripts/persist_captured_evidence.py'
+      - 'sportsedge/direct_web_capture_source.py'
+      - 'sportsedge/draftkings_game_market_source.py'
+      - 'tests/test_capture_mlb_direct_paired_ml.py'
+      - 'tests/test_direct_web_capture_source.py'
+      - 'tests/test_draftkings_game_line_category_map.py'
+      - 'tests/test_persist_captured_evidence.py'
   schedule:
-    # Wake every 5 minutes; the script decides whether any game sits inside a
-    # defined pregame window (T60 / T30 / T10) and writes at most one row per
-    # (event, window). Waking is cheap; writing is event-relative.
     - cron: '*/5 * * * *'
 
 permissions:
@@ -34,27 +43,26 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 8
     env:
-      # Scripts are executed by path, so Python otherwise starts with scripts/
-      # as sys.path[0]. Keep the repository root importable for sportsedge.*.
       PYTHONPATH: .
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          # Persistence rebuilds onto the remote tip on a push race, so the
-          # working tree must be able to fetch and reset against origin/main.
           fetch-depth: 0
+          ref: mlb-keyless-forward-capture
 
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d870655
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
 
       - name: Contract tests
         run: |
           python -m py_compile scripts/capture_mlb_direct_paired_ml.py \
-            sportsedge/direct_web_capture_source.py
+            sportsedge/direct_web_capture_source.py \
+            sportsedge/draftkings_game_market_source.py
           python -m unittest \
             tests.test_direct_web_capture_source \
             tests.test_capture_mlb_direct_paired_ml \
+            tests.test_draftkings_game_line_category_map \
             tests.test_persist_captured_evidence -v
 
       - name: Capture
@@ -63,10 +71,6 @@ jobs:
           python scripts/capture_mlb_direct_paired_ml.py \
             --output-dir data/mlb_forward_capture | tee capture_result.json
 
-      # A green acquisition followed by a failed push is NOT retained evidence.
-      # This step commits, handles a main-moved race by rebuilding onto the new
-      # remote tip, refuses to retry a branch-protection refusal, and verifies
-      # the commit is present on the remote before reporting success.
       - name: Persist retained observations
         run: |
           git config user.name  "sportsedge-capture"
