@@ -1,5 +1,7 @@
 name: football-cfb-prop-artifact-freeze
 
+# Fresh verification is obtained via workflow_dispatch or a path-scoped PR/push.
+# A successful model-artifact binding emits CFB_PROP_REAL_FREEZE_OK in the job log.
 on:
   workflow_dispatch:
   pull_request:
