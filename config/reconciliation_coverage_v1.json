@@ -114,6 +114,7 @@
   },
   "exact_exemptions": {
     ".github/workflows/active-evidence-window-liveness.yml": "ACTIVE_EVIDENCE_WINDOW_LIVENESS_GOVERNANCE_CONTROL_NO_MODEL_OR_PROMOTION_AUTHORITY",
+    ".github/workflows/archive-mlb-game-odds.yml": "PROSPECTIVE_MLB_MONEYLINE_EVIDENCE_CAPTURE_ONLY_NO_PROMOTION_OR_OFFICIAL_AUTHORITY",
     ".github/workflows/mlb-cfb-prop-engine-governance.yml": "RESEARCH_BUILD_ORDER_ONLY_NO_ACTIVE_BUNDLE",
     ".github/workflows/mlb-development-v2.yml": "RESEARCH_MODEL_DEVELOPMENT_ONLY_NO_ACTIVE_BUNDLE",
     ".github/workflows/odds-api-auth-diagnostic.yml": "AUTH_DIAGNOSTIC_ONLY_NO_ACTIVE_BUNDLE",
@@ -140,6 +141,7 @@
     "docs/provider_abstraction_pr_body.md": "MARKET_PROVIDER_DOCUMENTATION_ONLY_NO_MODEL_OR_PROMOTION_AUTHORITY",
     "docs/provider_abstraction_review_checklist.md": "MARKET_PROVIDER_DOCUMENTATION_ONLY_NO_MODEL_OR_PROMOTION_AUTHORITY",
     "docs/provider_abstraction_status.json": "MARKET_PROVIDER_STATUS_AUDIT_ONLY_NO_MODEL_OR_PROMOTION_AUTHORITY",
+    "scripts/capture_mlb_moneyline_model_p.py": "PROSPECTIVE_MLB_MONEYLINE_MODEL_P_CAPTURE_ONLY_NO_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY",
     "scripts/check_active_evidence_windows.py": "ACTIVE_EVIDENCE_WINDOW_GOVERNANCE_GUARD_NO_MODEL_OR_PROMOTION_AUTHORITY",
     "scripts/diagnose_odds_api_auth.py": "AUTH_DIAGNOSTIC_ONLY_NO_ACTIVE_BUNDLE",
     "scripts/fit_football_baselines.py": "RESEARCH_BASELINE_FIT_ONLY_NO_ACTIVE_BUNDLE",
