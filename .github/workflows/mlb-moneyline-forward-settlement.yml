@@ -42,7 +42,9 @@ jobs:
             sportsedge/mlb_moneyline_paper_decision.py \
             sportsedge/mlb_moneyline_v2_settlement.py \
             sportsedge/mlb_moneyline_v2_checkpoint.py \
-            sportsedge/mlb_moneyline_v2_checkpoint_runtime.py
+            sportsedge/mlb_moneyline_v2_checkpoint_runtime.py \
+            sportsedge/mlb_moneyline_forward_calibration.py \
+            sportsedge/mlb_moneyline_authority_readiness.py
           python -m unittest \
             tests.test_mlb_moneyline_forward_lane \
             tests.test_mlb_moneyline_paper_decision \
@@ -50,6 +52,9 @@ jobs:
             tests.test_mlb_moneyline_v2_settlement \
             tests.test_settle_mlb_moneyline_forward_evidence_v2 \
             tests.test_mlb_moneyline_v2_checkpoint \
+            tests.test_mlb_moneyline_evidence \
+            tests.test_mlb_moneyline_forward_calibration \
+            tests.test_mlb_moneyline_authority_readiness \
             tests.test_persist_forward_evidence_data_branch -v
 
       - name: Restore cumulative forward evidence from data branch
@@ -62,7 +67,9 @@ jobs:
             data/mlb_forward_capture \
             data/mlb_forward_decisions \
             data/mlb_forward_evidence \
-            data/mlb_forward_settlement_raw; do
+            data/mlb_forward_settlement_raw \
+            data/mlb_forward_calibration \
+            data/mlb_forward_calibration_raw; do
             if git cat-file -e "origin/data:$path" 2>/dev/null; then
               git archive origin/data "$path" | tar -x
             fi
@@ -80,6 +87,21 @@ jobs:
           echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
           exit 0
 
+      - name: Settle every prospective Model_P prediction for calibration
+        id: calibration
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          python -m sportsedge.mlb_moneyline_forward_calibration \
+            --prediction-root data/mlb_forward_predictions \
+            --calibration-root data/mlb_forward_calibration \
+            --raw-root data/mlb_forward_calibration_raw \
+            --report artifacts/mlb_moneyline_forward_calibration_report.json | tee calibration_result.json
+          rc=${PIPESTATUS[0]}
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+
       - name: Evaluate fixed 50/100/150 V2 checkpoints
         id: checkpoint
         shell: bash
@@ -93,6 +115,21 @@ jobs:
           echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
           exit 0
 
+      - name: Intersect terminal evidence prerequisites without granting authority
+        id: readiness
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          python -m sportsedge.mlb_moneyline_authority_readiness \
+            --calibration-report artifacts/mlb_moneyline_forward_calibration_report.json \
+            --checkpoint-report artifacts/mlb_moneyline_v2_checkpoint_report.json \
+            --evidence-root data/mlb_forward_evidence \
+            --report artifacts/mlb_moneyline_authority_readiness_report.json | tee readiness_result.json
+          rc=${PIPESTATUS[0]}
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+
       - name: Persist immutable completed evidence to data branch
         id: persist
         shell: bash
@@ -102,35 +139,47 @@ jobs:
           python scripts/persist_forward_evidence_data_branch.py \
             --path data/mlb_forward_evidence \
             --path data/mlb_forward_settlement_raw \
+            --path data/mlb_forward_calibration \
+            --path data/mlb_forward_calibration_raw \
             --branch data \
             --worktree "$RUNNER_TEMP/sportsedge-mlb-settlement-data" | tee settlement_persistence_result.json
           rc=${PIPESTATUS[0]}
           echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Upload V2 settlement, metric, and checkpoint receipts
+      - name: Upload settlement, calibration, checkpoint, and readiness receipts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: mlb-moneyline-forward-settlement-v2-${{ github.run_id }}
           path: |
             settlement_result.json
+            calibration_result.json
             checkpoint_result.json
+            readiness_result.json
             settlement_persistence_result.json
             artifacts/mlb_moneyline_forward_gate_report_v2.json
+            artifacts/mlb_moneyline_forward_calibration_report.json
             artifacts/mlb_moneyline_v2_checkpoint_report.json
+            artifacts/mlb_moneyline_authority_readiness_report.json
             data/mlb_forward_evidence/**
             data/mlb_forward_settlement_raw/**
+            data/mlb_forward_calibration/**
+            data/mlb_forward_calibration_raw/**
           if-no-files-found: warn
           retention-days: 90
 
-      - name: Enforce fail-closed settlement and checkpoint status
+      - name: Enforce fail-closed settlement, calibration, checkpoint, and readiness status
         if: always()
         shell: bash
         run: |
           settlement_rc='${{ steps.settle.outputs.exit_code }}'
+          calibration_rc='${{ steps.calibration.outputs.exit_code }}'
           checkpoint_rc='${{ steps.checkpoint.outputs.exit_code }}'
+          readiness_rc='${{ steps.readiness.outputs.exit_code }}'
           persist_rc='${{ steps.persist.outputs.exit_code }}'
           test -n "$settlement_rc" && test "$settlement_rc" -eq 0
+          test -n "$calibration_rc" && test "$calibration_rc" -eq 0
           test -n "$checkpoint_rc" && test "$checkpoint_rc" -eq 0
+          test -n "$readiness_rc" && test "$readiness_rc" -eq 0
           test -n "$persist_rc" && test "$persist_rc" -eq 0
