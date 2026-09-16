@@ -1,10 +1,11 @@
 """Read-only terminal readiness intersection for governed MLB MONEYLINE authority.
 
 This module cannot promote a market or edit deployment/staking state. Its only job
-is to prove whether all already-frozen prerequisites have been observed together:
-prospective calibration, V2 fixed-checkpoint evidence, model-directed no-vig close
-edge, frozen floor, and current deployment state. Any missing evidence remains a
-blocker and every authority flag emitted here is always false.
+is to prove whether already-frozen prerequisites have been observed together:
+checkpoint-50 prerequisite readiness, prospective calibration, checkpoint-150 V2
+metrics, model-directed no-vig closing evidence, and the frozen edge floor. Every
+authority flag emitted here is always false; a separate governed transition is
+still required after this receipt passes.
 """
 from __future__ import annotations
 
@@ -22,6 +23,7 @@ from .mlb_moneyline_v2_checkpoint_runtime import load_evidence_tree
 READINESS_SCHEMA = "mlb_moneyline_authority_readiness_v1"
 DEFAULT_CALIBRATION_REPORT = "artifacts/mlb_moneyline_forward_calibration_report.json"
 DEFAULT_CHECKPOINT_REPORT = "artifacts/mlb_moneyline_v2_checkpoint_report.json"
+DEFAULT_PROBATION_REPORT = "artifacts/mlb_moneyline_v2_probation_readiness.json"
 DEFAULT_EVIDENCE_ROOT = "data/mlb_forward_evidence"
 DEFAULT_REPORT = "artifacts/mlb_moneyline_authority_readiness_report.json"
 
@@ -57,6 +59,42 @@ def _checkpoint_150(report: Mapping[str, Any]) -> Mapping[str, Any] | None:
     return None
 
 
+def _probation_pass(
+    report: Mapping[str, Any] | None,
+    *,
+    lane: Mapping[str, Any],
+    active_artifact: str,
+) -> bool:
+    if not isinstance(report, Mapping):
+        return False
+    for key, expected in (
+        ("lane_id", lane["lane_id"]),
+        ("model_artifact_sha256", active_artifact),
+        ("market_definition_sha256", lane["market_definition_sha256"]),
+        ("policy_sha256", lane["policy_sha256"]),
+    ):
+        if str(report.get(key) or "") != str(expected):
+            raise MLBMoneylineAuthorityReadinessError(
+                f"probation readiness identity mismatch: {key}"
+            )
+    if any(
+        report.get(key) is not False
+        for key in (
+            "promotion_authority",
+            "deployment_change_allowed",
+            "staking_change_allowed",
+            "official_change_allowed",
+        )
+    ):
+        raise MLBMoneylineAuthorityReadinessError(
+            "probation readiness receipt cannot carry authority"
+        )
+    return bool(
+        report.get("status") == "PROBATION_TRANSITION_READY_FOR_AUTHORITY_REVIEW"
+        and report.get("transition_ready_for_authority_review") is True
+    )
+
+
 def evaluate_authority_readiness(
     *,
     calibration_report: Mapping[str, Any],
@@ -64,6 +102,7 @@ def evaluate_authority_readiness(
     evidence_rows: list[Mapping[str, Any]],
     deployments: Mapping[str, Any],
     floor_config: Mapping[str, Any],
+    probation_report: Mapping[str, Any] | None = None,
     binding: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     lane = dict(binding or load_forward_lane_binding())
@@ -77,6 +116,17 @@ def evaluate_authority_readiness(
     if len(active_artifact) != 64:
         raise MLBMoneylineAuthorityReadinessError("active model artifact identity unavailable")
 
+    calibration_artifact = str(calibration_report.get("model_artifact_sha256") or "")
+    checkpoint_artifact = str(checkpoint_report.get("model_artifact_sha256") or "")
+    if calibration_artifact and calibration_artifact != active_artifact:
+        raise MLBMoneylineAuthorityReadinessError("calibration model artifact mismatch")
+    if checkpoint_artifact and checkpoint_artifact != active_artifact:
+        raise MLBMoneylineAuthorityReadinessError("checkpoint model artifact mismatch")
+
+    probation_pass = _probation_pass(
+        probation_report, lane=lane, active_artifact=active_artifact
+    )
+
     cal_metrics = calibration_report.get("calibration_metrics")
     if not isinstance(cal_metrics, Mapping):
         cal_metrics = {}
@@ -89,11 +139,23 @@ def evaluate_authority_readiness(
         and _finite(cal_thresholds.get("ece_max"), "ece_max") == 0.025
     )
     calibration_metrics_present = all(
-        key in cal_metrics
-        for key in ("brier", "log_loss", "calibration_slope", "calibration_intercept", "ece")
+        key in cal_metrics and cal_metrics.get(key) is not None
+        for key in (
+            "brier",
+            "log_loss",
+            "calibration_slope",
+            "calibration_intercept",
+            "ece",
+        )
     )
     if calibration_metrics_present:
-        for key in ("brier", "log_loss", "calibration_slope", "calibration_intercept", "ece"):
+        for key in (
+            "brier",
+            "log_loss",
+            "calibration_slope",
+            "calibration_intercept",
+            "ece",
+        ):
             _finite(cal_metrics.get(key), key)
     calibration_pass = bool(
         threshold_contract_ok
@@ -113,6 +175,7 @@ def evaluate_authority_readiness(
         and cp150.get("clv_95_ci_lower_pp") is not None
         and _finite(cp150.get("clv_95_ci_lower_pp"), "checkpoint CLV lower") > 0.0
         and _finite(cp150.get("roi_fraction_per_1u"), "checkpoint ROI") >= -0.075
+        and not list(cp150.get("kill_rules_fired") or ())
     )
 
     close_rows = [
@@ -149,15 +212,21 @@ def evaluate_authority_readiness(
 
     moneyline = ((deployments.get("markets") or {}).get("MONEYLINE") or {})
     deployment_currently_locked = moneyline.get("eligible") is False
-    if moneyline.get("eligible") is True and not (
-        calibration_pass and checkpoint_150_pass and model_directed_clv_pass and floor_pass
-    ):
+    pre_transition_evidence = (
+        probation_pass
+        and calibration_pass
+        and checkpoint_150_pass
+        and model_directed_clv_pass
+        and floor_pass
+    )
+    if moneyline.get("eligible") is True and not pre_transition_evidence:
         raise MLBMoneylineAuthorityReadinessError(
             "MONEYLINE eligible before terminal evidence prerequisites"
         )
 
     checks = {
         "frozen_nonzero_edge_floor": floor_pass,
+        "checkpoint_50_probation_prerequisites_ready_for_authority_review": probation_pass,
         "prospective_calibration_min_200_and_band_pass": calibration_pass,
         "v2_checkpoint_150_official_candidate_metrics_pass": checkpoint_150_pass,
         "model_directed_no_vig_close_edge_at_least_0_005": model_directed_clv_pass,
@@ -168,6 +237,8 @@ def evaluate_authority_readiness(
         status = "TERMINAL_EVIDENCE_PREREQUISITES_OBSERVED_TRANSITION_STILL_REQUIRED"
     elif not calibration_pass:
         status = "WAITING_FOR_CALIBRATION_GATE"
+    elif not probation_pass:
+        status = "WAITING_FOR_CHECKPOINT_50_PREREQUISITE_ATTESTATION"
     elif not checkpoint_150_pass:
         status = "WAITING_FOR_V2_CHECKPOINT_150"
     elif not model_directed_clv_pass:
@@ -186,6 +257,9 @@ def evaluate_authority_readiness(
         "checks": checks,
         "all_terminal_evidence_prerequisites_observed": evidence_complete,
         "calibration": dict(cal_metrics),
+        "probation_readiness_status": (
+            probation_report.get("status") if isinstance(probation_report, Mapping) else None
+        ),
         "v2_checkpoint_150": dict(cp150) if cp150 else None,
         "model_directed_clv": clv,
         "deployment_snapshot": dict(moneyline),
@@ -205,6 +279,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--calibration-report", default=DEFAULT_CALIBRATION_REPORT)
     parser.add_argument("--checkpoint-report", default=DEFAULT_CHECKPOINT_REPORT)
+    parser.add_argument("--probation-report", default=DEFAULT_PROBATION_REPORT)
     parser.add_argument("--evidence-root", default=DEFAULT_EVIDENCE_ROOT)
     parser.add_argument("--deployments", default="config/deployments.json")
     parser.add_argument("--floors", default="config/truth_gate_floors.json")
@@ -213,12 +288,14 @@ def main(argv: list[str] | None = None) -> int:
     try:
         calibration = _load(args.calibration_report, "calibration report")
         checkpoint = _load(args.checkpoint_report, "checkpoint report")
+        probation = _load(args.probation_report, "probation readiness report")
         deployments = _load(args.deployments, "deployments")
         floors = _load(args.floors, "truth gate floors")
         rows = load_evidence_tree(args.evidence_root)
         report = evaluate_authority_readiness(
             calibration_report=calibration,
             checkpoint_report=checkpoint,
+            probation_report=probation,
             evidence_rows=rows,
             deployments=deployments,
             floor_config=floors,
