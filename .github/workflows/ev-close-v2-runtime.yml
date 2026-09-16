@@ -1,0 +1,147 @@
+name: ev-close-v2-runtime
+
+# Close-only runtime lane. New [BET] intake stays disabled in ev-tracker.yml.
+# Existing sealed V2 rows are hydrated create-only from data and never rewritten.
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+concurrency:
+  group: sportsedge-ev-tracker-v2-data
+  cancel-in-progress: false
+
+jobs:
+  close:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12.13"
+
+      - name: Hydrate create-only EV runtime state from data
+        run: |
+          set -euo pipefail
+          data_dir="$RUNNER_TEMP/ev-tracker-data"
+          git fetch origin data
+          git worktree add --detach "$data_dir" origin/data
+          runtime_root="$data_dir/runtime/ev-tracker-v2"
+          if [ -d "$runtime_root/ledger" ]; then
+            while IFS= read -r -d '' src; do
+              rel="${src#"$runtime_root/"}"
+              if [ -e "$rel" ]; then
+                cmp -s "$src" "$rel" || { echo "HYDRATE_CONFLICT:$rel"; exit 1; }
+              else
+                mkdir -p "$(dirname "$rel")"
+                cp "$src" "$rel"
+              fi
+            done < <(find "$runtime_root/ledger" -type f -print0)
+          fi
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          before = {}
+          root = Path('ledger')
+          if root.exists():
+              for path in sorted(p for p in root.rglob('*') if p.is_file()):
+                  before[path.as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
+          (Path(os.environ['RUNNER_TEMP'])/'ev-before.json').write_text(json.dumps(before, sort_keys=True))
+          PY
+
+      - name: Run scheduled V2 close sweep
+        id: tracker
+        env:
+          ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          python scripts/ev_tracker.py close
+          code=$?
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Prove sealed-row immutability
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, json, os, sys
+          from pathlib import Path
+          before = json.loads((Path(os.environ['RUNNER_TEMP'])/'ev-before.json').read_text())
+          after = {}
+          root = Path('ledger')
+          if root.exists():
+              for path in sorted(p for p in root.rglob('*') if p.is_file()):
+                  after[path.as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
+          drift = [f'deleted:{p}' if p not in after else f'modified:{p}' for p,d in before.items() if p not in after or after[p] != d]
+          if drift:
+              raise SystemExit('IMMUTABLE_LEDGER_DRIFT:' + ','.join(drift))
+          new_files = sorted(set(after)-set(before))
+          (Path(os.environ['RUNNER_TEMP'])/'ev-new-files.txt').write_text(''.join(f'{p}\n' for p in new_files))
+          print(json.dumps({'new_ledger_rows': len(new_files), 'paths': new_files}, sort_keys=True))
+          PY
+
+      - name: Persist only new rows and zero-authority health on data
+        env:
+          CODE: ${{ steps.tracker.outputs.code }}
+        run: |
+          set -euo pipefail
+          data_dir="$RUNNER_TEMP/ev-tracker-data"
+          runtime_root="$data_dir/runtime/ev-tracker-v2"
+          mkdir -p "$runtime_root/ledger" "$runtime_root/health"
+          persisted=0
+          if [ "$CODE" = "0" ] || [ "$CODE" = "3" ]; then
+            while IFS= read -r rel; do
+              [ -n "$rel" ] || continue
+              target="$runtime_root/$rel"
+              if [ -e "$target" ]; then
+                cmp -s "$rel" "$target" || { echo "PERSIST_CONFLICT:$rel"; exit 1; }
+              else
+                mkdir -p "$(dirname "$target")"; cp "$rel" "$target"; persisted=$((persisted+1))
+              fi
+            done < "$RUNNER_TEMP/ev-new-files.txt"
+          fi
+          python - "$runtime_root/health/latest.json" "$CODE" "$persisted" <<'PY'
+          import json, os, sys
+          from datetime import datetime, timezone
+          from pathlib import Path
+          payload = {
+              'schema_version':'SPORTSEDGE_EV_TRACKER_RUNTIME_HEALTH_V1',
+              'captured_at_utc':datetime.now(timezone.utc).isoformat(),
+              'workflow_run_id':os.environ.get('GITHUB_RUN_ID'),
+              'source_sha':os.environ.get('GITHUB_SHA'),
+              'engine_exit_code':int(sys.argv[2]),
+              'new_ledger_rows_persisted':int(sys.argv[3]),
+              'intake_enabled':False,
+              'backfill_enabled':False,
+              'evidence_authority':False,
+              'model_p_authority':False,
+              'truth_gate_authority':False,
+              'promotion_authority':False,
+              'official_authority':False,
+          }
+          Path(sys.argv[1]).write_text(json.dumps(payload, indent=2, sort_keys=True)+'\n')
+          PY
+          cd "$data_dir"
+          git config user.name sportsedge-bot
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add runtime/ev-tracker-v2
+          if ! git diff --cached --quiet; then
+            git commit -m "ev-tracker: persist close runtime state"
+            git pull --rebase origin data
+            git push origin HEAD:data
+          fi
+
+      - name: Fail only on close-engine execution health
+        env:
+          CODE: ${{ steps.tracker.outputs.code }}
+        run: |
+          if [ "$CODE" != "0" ]; then
+            echo "EV_TRACKER_CLOSE_NOT_HEALTHY: exit $CODE"
+            exit "$CODE"
+          fi
