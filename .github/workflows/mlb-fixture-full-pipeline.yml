@@ -34,12 +34,15 @@ jobs:
         with:
           python-version: '3.12.13'
       - name: Install runtime dependencies
-        run: python -m pip install --disable-pip-version-check numpy==2.5.3 pytest==9.1.1
+        run: python -m pip install --disable-pip-version-check numpy==2.5.3 pytest==9.1.1 PyYAML==6.0.2
       - name: Compile paid-provider freeze and replay surface
         run: |
           python -m py_compile \
             sportsedge/odds_api_frozen.py \
             sportsedge/mlb_frozen_quotes.py \
+            sportsedge/mlb_moneyline_evidence.py \
+            sportsedge/mlb_moneyline_forward_calibration.py \
+            sportsedge/mlb_moneyline_authority_readiness.py \
             scripts/capture_mlb_odds_api_freeze.py \
             scripts/verify_mlb_odds_api_freeze.py
       - name: Prove frozen MLB pipeline on current SHA
@@ -78,6 +81,9 @@ jobs:
             tests.test_game_odds_source_unittest \
             tests.test_mlb_acquisition_quote_attestation \
             tests.test_odds_api_frozen \
+            tests.test_mlb_moneyline_evidence \
+            tests.test_mlb_moneyline_forward_calibration \
+            tests.test_mlb_moneyline_authority_readiness \
             -v
       - name: Assert no provider secrets are required
         shell: bash
