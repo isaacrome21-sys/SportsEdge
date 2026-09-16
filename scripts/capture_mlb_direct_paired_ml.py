@@ -4,6 +4,12 @@
 Persists exact two-sided DraftKings moneyline observations taken strictly before
 event start, using the direct-web transport. No API credentials are used.
 
+Every acquisition inside T60/T30/T10 is retained as its own immutable snapshot,
+keyed by provider event, window, SportsEdge receipt timestamp, and raw-payload
+hash. This is required for CLV: the forward ledger can select the decision-time
+quote near T30 and the last actually observed pre-first-pitch quote as the close.
+Repeated observations in the same window are therefore evidence, not duplicates.
+
 Grants no promotion authority. Writes nothing to config/deployments.json and does
 not read or modify the frozen 3% moneyline edge floor. Every retained row is
 stamped evidence_disposition=FORWARD_CAPTURE_PARTIAL: it can prove transport, PIT
@@ -28,6 +34,12 @@ class CaptureBlocked(RuntimeError):
 def _artifact_sha(binder):
     try: return binder()
     except Exception as exc: raise CaptureBlocked("BLOCKED_ARTIFACT",str(exc)) from exc
+def _snapshot_key(row: Mapping[str,Any], observed: datetime, raw_sha256: str) -> str:
+    stamp=observed.strftime("%Y%m%dT%H%M%S%fZ")
+    raw=str(raw_sha256 or "").lower()
+    if len(raw)!=64 or any(ch not in "0123456789abcdef" for ch in raw):
+        raise CaptureBlocked("BLOCKED_RAW_SHA256",raw_sha256)
+    return f"{row['provider_event_id']}__{row['capture_window']}__{stamp}__{raw[:16]}"
 def paired_moneylines(transport: Mapping[str,Any]):
     observed=_parse(transport["observed_at_utc"])
     board=RawDraftKingsBoard(transport["sport_key"],transport["source_uri"],b"",observed,transport["raw_payload"])
@@ -64,9 +76,9 @@ def capture(*,output_dir=DEFAULT_OUTPUT_DIR,clock:Callable[[],datetime]=_now,fet
     if scan["anomalies"]: raise CaptureBlocked("BLOCKED_ONE_SIDED",{"anomalies":scan["anomalies"]})
     observed=_parse(transport["observed_at_utc"]); slate=observed.date().isoformat(); written=[]; skipped_existing=[]; base=Path(output_dir)/slate
     for row in scan["rows"]:
-        key=f"{row['provider_event_id']}__{row['capture_window']}"; path=base/f"{key}.json"
+        key=_snapshot_key(row,observed,transport["raw_sha256"]); path=base/f"{key}.json"
         if path.exists(): skipped_existing.append(key); continue
-        record={**row,"model_artifact_sha256":artifact_sha,"model_artifact_grants_promotion":False,"raw_sha256":transport["raw_sha256"],"source_uri":transport["source_uri"],"transport_host":transport["transport_host"],"attempts":transport["attempts"],"adapter_module_sha256":transport["adapter_module_sha256"],"capture_module_sha256":_self_sha(),"captured_at_utc":transport["observed_at_utc"]}
+        record={**row,"capture_observation_id":key,"model_artifact_sha256":artifact_sha,"model_artifact_grants_promotion":False,"raw_sha256":transport["raw_sha256"],"source_uri":transport["source_uri"],"transport_host":transport["transport_host"],"attempts":transport["attempts"],"adapter_module_sha256":transport["adapter_module_sha256"],"capture_module_sha256":_self_sha(),"captured_at_utc":transport["observed_at_utc"]}
         path.parent.mkdir(parents=True,exist_ok=True); path.write_text(json.dumps(record,indent=2,sort_keys=True)); written.append(str(path))
     if not written:
         return {"status":"ALREADY_CAPTURED" if skipped_existing else "NO_CAPTURE_DUE","evidence_disposition":EVIDENCE_DISPOSITION,"slate_date":slate,"observations_retained":0,"already_present":skipped_existing,"events_on_board":scan["events_on_board"],"events_in_window":scan["in_window"],"paths":[],"raw_sha256":transport["raw_sha256"],"model_artifact_sha256":artifact_sha}
