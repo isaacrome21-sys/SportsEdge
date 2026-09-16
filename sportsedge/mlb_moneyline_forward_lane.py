@@ -129,6 +129,10 @@ def load_forward_lane_binding(
         close.get("selection") != "LAST_VERIFIABLE_PAIRED_PRE_FIRST_PITCH_QUOTE"
         or close.get("two_sided_required") is not True
         or close.get("must_be_before_start") is not True
+        or close.get("missing_close_policy") != "KEEP_GRADED_BET_IN_CHECKPOINT_DENOMINATOR_EXCLUDE_FROM_CLV"
+        or close.get("clv_metric") != "SELECTED_SIDE_CLOSE_FAIR_PROBABILITY_MINUS_ENTRY_FAIR_PROBABILITY"
+        or close.get("clv_positive_direction") != "POSITIVE_MEANS_MARKET_MOVED_TOWARD_SELECTED_SIDE"
+        or close.get("devig_basis") != "SAME_FROZEN_DEVIG_POLICY_AT_ENTRY_AND_CLOSE"
     ):
         raise MLBMoneylineForwardLaneError("close capture contract mismatch")
     if any(
