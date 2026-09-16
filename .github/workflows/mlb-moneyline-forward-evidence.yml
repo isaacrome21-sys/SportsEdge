@@ -1,0 +1,109 @@
+name: mlb-moneyline-forward-evidence
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/5 * * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mlb-moneyline-forward-evidence-v1
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12.13'
+
+      - name: Contract tests
+        run: |
+          python -m py_compile \
+            scripts/capture_mlb_moneyline_model_p.py \
+            scripts/capture_mlb_direct_paired_ml.py \
+            scripts/persist_forward_evidence_data_branch.py \
+            sportsedge/mlb_moneyline_forward_prediction.py \
+            sportsedge/mlb_moneyline_forward_ledger.py
+          python -m unittest \
+            tests.test_mlb_moneyline_forward_prediction \
+            tests.test_mlb_moneyline_forward_ledger \
+            tests.test_persist_forward_evidence_data_branch \
+            tests.test_direct_web_capture_source \
+            tests.test_capture_mlb_direct_paired_ml \
+            tests.test_draftkings_game_line_category_map -v
+
+      - name: Capture market-blind Model_P predictions
+        id: modelp
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          python scripts/capture_mlb_moneyline_model_p.py \
+            --output-dir data/mlb_forward_predictions | tee model_p_result.json
+          rc=${PIPESTATUS[0]}
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Capture paired DraftKings MONEYLINE quotes
+        id: quotes
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          python scripts/capture_mlb_direct_paired_ml.py \
+            --output-dir data/mlb_forward_capture | tee quote_result.json
+          rc=${PIPESTATUS[0]}
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Persist valid evidence create-only to data branch
+        id: persist
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          python scripts/persist_forward_evidence_data_branch.py \
+            --path data/mlb_forward_predictions \
+            --path data/mlb_forward_capture \
+            --branch data \
+            --worktree "$RUNNER_TEMP/sportsedge-mlb-forward-data" | tee persistence_result.json
+          rc=${PIPESTATUS[0]}
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload prospective evidence receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mlb-moneyline-forward-evidence-${{ github.run_id }}
+          path: |
+            model_p_result.json
+            quote_result.json
+            persistence_result.json
+            data/mlb_forward_predictions/**
+            data/mlb_forward_capture/**
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Enforce fail-closed capture status
+        if: always()
+        shell: bash
+        run: |
+          model_rc='${{ steps.modelp.outputs.exit_code }}'
+          quote_rc='${{ steps.quotes.outputs.exit_code }}'
+          persist_rc='${{ steps.persist.outputs.exit_code }}'
+          test -n "$model_rc" && test "$model_rc" -eq 0
+          test -n "$quote_rc" && test "$quote_rc" -eq 0
+          test -n "$persist_rc" && test "$persist_rc" -eq 0
