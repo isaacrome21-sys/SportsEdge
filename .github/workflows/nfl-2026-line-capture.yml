@@ -231,7 +231,7 @@ jobs:
             if git pull --rebase --quiet origin data && git push --quiet origin HEAD:data; then exit 0; fi
             sleep $((i * 5))
           done
-          echo 'NFL_PROVIDER_PREFLIGHT_PERSIST_FAILED'
+          echo 'NFL_PROVIDER_PREFLIGHT_PERSIST_FAILED' >&2
           exit 1
 
       - name: Record elapsed missing windows without backfill
