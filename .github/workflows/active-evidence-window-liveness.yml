@@ -7,8 +7,10 @@ on:
       - 'config/active_evidence_windows_v1.json'
       - 'config/nfl_2026_capture.json'
       - 'scripts/check_active_evidence_windows.py'
+      - 'scripts/check_nfl_forward_accrual.py'
       - 'scripts/audit_nfl_2026_capture_gaps.py'
       - 'tests/test_active_evidence_window_guards.py'
+      - 'tests/test_nfl_forward_accrual.py'
       - '.github/workflows/active-evidence-window-liveness.yml'
       - '.github/workflows/nfl-2026-line-capture.yml'
       - '.github/workflows/football-nfl-forward-clv-collection.yml'
@@ -35,7 +37,9 @@ jobs:
       - name: Guard active-window acquisition authorities
         run: python3 scripts/check_active_evidence_windows.py mutation
       - name: Test active-window guards
-        run: python3 -m unittest -q tests.test_active_evidence_window_guards
+        run: |
+          python3 -m py_compile scripts/check_nfl_forward_accrual.py
+          python3 -m unittest -q tests.test_active_evidence_window_guards tests.test_nfl_forward_accrual
 
   nfl-durable-deadman:
     if: github.event_name != 'pull_request'
@@ -48,8 +52,35 @@ jobs:
           curl --fail --location --silent --show-error --retry 3 \
             'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv' \
             -o "$RUNNER_TEMP/nfl-games.csv"
-      - name: Fail loudly on recent durable non-accrual
+      - name: Restore durable data branch read-only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data
+          git worktree add --detach .data-liveness FETCH_HEAD
+      - name: Fail loudly on recent confirmation durable non-accrual
         run: >-
           python3 scripts/check_active_evidence_windows.py nfl-liveness
           --schedule-csv "$RUNNER_TEMP/nfl-games.csv"
           --lookback-hours 4
+      - name: Fail loudly on forward durable non-accrual since activation
+        shell: bash
+        run: |
+          set -euo pipefail
+          LOOKBACK_HOURS="$(python3 - <<'PY'
+          from datetime import datetime, timezone
+          import json
+          from pathlib import Path
+
+          registry = json.loads(Path('config/active_evidence_windows_v1.json').read_text(encoding='utf-8'))
+          window = next(x for x in registry['windows'] if x.get('id') == 'NFL_2026_FORWARD_CLV')
+          raw = str(window['active_from'])
+          active = datetime.fromisoformat(raw if 'T' in raw else raw + 'T00:00:00').replace(tzinfo=timezone.utc)
+          hours = max(0.0, (datetime.now(timezone.utc) - active).total_seconds() / 3600.0)
+          print(hours)
+          PY
+          )"
+          python3 scripts/check_nfl_forward_accrual.py \
+            --schedule-csv "$RUNNER_TEMP/nfl-games.csv" \
+            --state-root .data-liveness/runtime/nfl-forward \
+            --lookback-hours "$LOOKBACK_HOURS"
