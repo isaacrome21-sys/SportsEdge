@@ -8,16 +8,16 @@ def payload(minutes_before=32,one_sided=False):
  start=NOW+timedelta(minutes=minutes_before); sels=[{"marketId":"m1","label":"New York Yankees","displayOdds":{"american":"-145"}},{"marketId":"m1","label":"Boston Red Sox","displayOdds":{"american":"+122"}}]
  if one_sided:sels=sels[:1]
  return {"events":[{"id":"MLB1","name":"Boston Red Sox @ New York Yankees","startEventDate":start.isoformat().replace("+00:00","Z"),"participants":[{"name":"Boston Red Sox","venueRole":"Away"},{"name":"New York Yankees","venueRole":"Home"}]}],"markets":[{"id":"m1","eventId":"MLB1","name":"Moneyline"}],"selections":sels}
-def fetcher(p):
+def fetcher(p,observed=NOW):
  def _f(sk):
   from sportsedge.draftkings_game_market_source import board_url
-  raw=json.dumps(p).encode(); return RawDraftKingsBoard(sk,board_url(sk),raw,NOW,p)
+  raw=json.dumps(p).encode(); return RawDraftKingsBoard(sk,board_url(sk),raw,observed,p)
  return _f
 class MLBDirectCaptureTest(unittest.TestCase):
  def test_retains_and_binds(self):
   with tempfile.TemporaryDirectory() as d:
    r=cap.capture(output_dir=d,clock=lambda:NOW,fetch=fetcher(payload()),artifact_binder=lambda:"a"*64); row=json.loads(Path(r["paths"][0]).read_text())
-  self.assertEqual(r["status"],"RETAINED"); self.assertEqual(row["capture_window"],"T30"); self.assertFalse(row["promotion_authority"]); self.assertEqual(row["model_artifact_sha256"],"a"*64); self.assertEqual(r["events_on_board"],1); self.assertEqual(r["events_in_window"],1)
+  self.assertEqual(r["status"],"RETAINED"); self.assertEqual(row["capture_window"],"T30"); self.assertFalse(row["promotion_authority"]); self.assertEqual(row["model_artifact_sha256"],"a"*64); self.assertEqual(r["events_on_board"],1); self.assertEqual(r["events_in_window"],1); self.assertEqual(row["capture_observation_id"],Path(r["paths"][0]).stem)
  def test_no_capture_due_requires_nonempty_board(self):
   with tempfile.TemporaryDirectory() as d:r=cap.capture(output_dir=d,fetch=fetcher(payload(200)),artifact_binder=lambda:"a"*64)
   self.assertEqual(r["status"],"NO_CAPTURE_DUE"); self.assertEqual(r["events_on_board"],1); self.assertEqual(r["events_in_window"],0)
@@ -29,8 +29,15 @@ class MLBDirectCaptureTest(unittest.TestCase):
   with tempfile.TemporaryDirectory() as d:
    with self.assertRaises(cap.CaptureBlocked) as c:cap.capture(output_dir=d,fetch=fetcher(payload(one_sided=True)),artifact_binder=lambda:"a"*64)
   self.assertEqual(c.exception.reason,"BLOCKED_ONE_SIDED")
- def test_dedup(self):
+ def test_exact_same_observation_dedup(self):
   with tempfile.TemporaryDirectory() as d:
    cap.capture(output_dir=d,fetch=fetcher(payload()),artifact_binder=lambda:"a"*64); r=cap.capture(output_dir=d,fetch=fetcher(payload()),artifact_binder=lambda:"a"*64)
   self.assertEqual(r["status"],"ALREADY_CAPTURED")
+ def test_repeated_same_window_is_retained_for_close_selection(self):
+  p=payload()
+  with tempfile.TemporaryDirectory() as d:
+   first=cap.capture(output_dir=d,fetch=fetcher(p,NOW),artifact_binder=lambda:"a"*64)
+   second=cap.capture(output_dir=d,fetch=fetcher(p,NOW+timedelta(minutes=5)),artifact_binder=lambda:"a"*64)
+   rows=sorted(Path(d).rglob("*.json"))
+  self.assertEqual(first["status"],"RETAINED"); self.assertEqual(second["status"],"RETAINED"); self.assertEqual(len(rows),2); self.assertNotEqual(Path(first["paths"][0]).name,Path(second["paths"][0]).name)
 if __name__=="__main__": unittest.main()
