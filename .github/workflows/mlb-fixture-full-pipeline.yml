@@ -43,6 +43,7 @@ jobs:
             sportsedge/mlb_moneyline_evidence.py \
             sportsedge/mlb_moneyline_forward_calibration.py \
             sportsedge/mlb_moneyline_authority_readiness.py \
+            sportsedge/mlb_moneyline_fresh_runtime.py \
             scripts/capture_mlb_odds_api_freeze.py \
             scripts/verify_mlb_odds_api_freeze.py
       - name: Prove frozen MLB pipeline on current SHA
@@ -84,6 +85,7 @@ jobs:
             tests.test_mlb_moneyline_evidence \
             tests.test_mlb_moneyline_forward_calibration \
             tests.test_mlb_moneyline_authority_readiness \
+            tests.test_mlb_moneyline_fresh_runtime \
             -v
       - name: Assert no provider secrets are required
         shell: bash
