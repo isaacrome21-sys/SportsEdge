@@ -1,0 +1,46 @@
+{
+  "schema_version": "SPORTSEDGE_EXTERNAL_EV_PROVIDER_HEALTH_POLICY_V1",
+  "policy_id": "EXTERNAL_EV_PROVIDER_HEALTH_V1",
+  "lane": "EXTERNAL_EV",
+  "provider": "pinnacle",
+  "mode": "OBSERVE_ONLY",
+  "provider_state": "ACTIVE",
+  "suspension_declared_at": null,
+  "threshold": {
+    "status": "UNFROZEN",
+    "automated_suspension_enabled": false,
+    "note": "Observe independent provider health before freezing any suspension threshold."
+  },
+  "admission_contract": {
+    "policy_at_admission_is_immutable": true,
+    "active_admission_close_obligation_survives_later_suspension": true,
+    "missing_close_denominator_label": "MISSING_CLOSE",
+    "existing_v2_misses_remain_in_denominator": true,
+    "backfill_existing_misses": false,
+    "suspension_is_prospective_only": true,
+    "effective_time_equals_declared_at": true,
+    "backdating_forbidden": true
+  },
+  "probe": {
+    "independent_of_bet_stream": true,
+    "cadence_minutes": 60,
+    "representative_sports": ["baseball_mlb", "americanfootball_nfl", "americanfootball_ncaaf"],
+    "representative_markets": ["h2h", "spreads", "totals"],
+    "required_fields": [
+      "captured_at_utc",
+      "transport_ok",
+      "pinnacle_present",
+      "representative_event_id",
+      "offered_market_keys",
+      "latency_ms",
+      "failure_class"
+    ]
+  },
+  "governance": {
+    "evidence_authority": false,
+    "model_p_authority": false,
+    "truth_gate_authority": false,
+    "promotion_authority": false,
+    "official_authority": false
+  }
+}
