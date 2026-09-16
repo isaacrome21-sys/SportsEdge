@@ -52,8 +52,8 @@ def week_of(_dt):
 
 
 class DirectCaptureAdapterTest(unittest.TestCase):
-    def _transport(self, **kw):
-        payload = board_payload(**kw)
+    def _transport(self, payload=None, **kw):
+        payload = payload or board_payload(**kw)
         raw = (" \n" + json.dumps(payload, separators=(",", ":")) + " \n").encode()
 
         def _fetch(sk):
@@ -124,13 +124,23 @@ class DirectCaptureAdapterTest(unittest.TestCase):
         with self.assertRaisesRegex(src.DirectCaptureError, "EVENT_IDENTITY_UNADMITTED"):
             src.game_rows_direct(self._transport(bad_event_name=True), week_of=week_of)
 
+    def test_one_bad_identity_cannot_hide_inside_other_valid_games(self):
+        payload = board_payload()
+        payload["events"].append({
+            "id": "E2",
+            "name": "Malformed versus Event",
+            "startEventDate": "2026-09-20T20:00:00Z",
+        })
+        with self.assertRaisesRegex(src.DirectCaptureError, "EVENT_IDENTITY_UNADMITTED"):
+            src.game_rows_direct(self._transport(payload=payload), week_of=week_of)
+
     def test_failure_records_attempt_history(self):
         def boom(_sk):
-            raise DraftKingsGameMarketError("DK_HTTP_403")
+            raise DraftKingsGameMarketError("DK_GAME_HTTP_403")
 
         with self.assertRaises(src.DirectCaptureError) as ctx:
             src.acquire_board(fetcher=boom, clock=FakeClock())
-        self.assertEqual(ctx.exception.attempts[0]["result_class"], "DK_HTTP_403")
+        self.assertEqual(ctx.exception.attempts[0]["result_class"], "DK_GAME_HTTP_403")
         self.assertEqual(ctx.exception.attempts[0]["host"], "sportsbook-nash.draftkings.com")
 
 
