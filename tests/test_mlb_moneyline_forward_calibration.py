@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 import hashlib
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -14,9 +15,10 @@ from sportsedge.mlb_moneyline_forward_calibration import (
 
 
 ARTIFACT = "a" * 64
+PRIOR_ARTIFACT = "b" * 64
 
 
-def prediction(game_pk: int = 1, *, leak: bool = False):
+def prediction(game_pk: int = 1, *, leak: bool = False, artifact: str = ARTIFACT):
     start = datetime(2026, 9, 16, 20, tzinfo=timezone.utc)
     feature = start if leak else start - timedelta(minutes=50)
     return {
@@ -35,7 +37,7 @@ def prediction(game_pk: int = 1, *, leak: bool = False):
         "feature_asof_ts": feature.isoformat(),
         "event_start_ts": start.isoformat(),
         "prediction_generated_at_utc": (start - timedelta(minutes=45)).isoformat(),
-        "model_artifact_sha256": ARTIFACT,
+        "model_artifact_sha256": artifact,
     }
 
 
@@ -84,8 +86,9 @@ class ForwardCalibrationTest(unittest.TestCase):
             root = Path(td)
             pred = root / "pred" / "2026-09-16"
             pred.mkdir(parents=True)
-            import json
-            (pred / "game_1.json").write_text(json.dumps(prediction()) + "\n", encoding="utf-8")
+            (pred / "game_1.json").write_text(
+                json.dumps(prediction()) + "\n", encoding="utf-8"
+            )
             report = settle_forward_calibration(
                 prediction_root=root / "pred",
                 calibration_root=root / "cal",
@@ -111,8 +114,66 @@ class ForwardCalibrationTest(unittest.TestCase):
             root = Path(td)
             pred = root / "pred"
             pred.mkdir(parents=True)
-            import json
-            (pred / "game_1.json").write_text(json.dumps(prediction(leak=True)) + "\n", encoding="utf-8")
+            (pred / "game_1.json").write_text(
+                json.dumps(prediction(leak=True)) + "\n", encoding="utf-8"
+            )
+            with self.assertRaises(MLBMoneylineForwardCalibrationError):
+                settle_forward_calibration(
+                    prediction_root=pred,
+                    calibration_root=root / "cal",
+                    raw_root=root / "raw",
+                    report_path=root / "report.json",
+                    now=datetime(2026, 9, 17, tzinfo=timezone.utc),
+                    settlement_fetcher=lambda _: final_source(),
+                )
+
+    def test_prior_artifact_predictions_are_retained_but_excluded_from_new_clock(self):
+        with TemporaryDirectory() as td, patch(
+            "sportsedge.mlb_moneyline_forward_calibration.mlb_model_artifact_sha256",
+            return_value=ARTIFACT,
+        ):
+            root = Path(td)
+            pred = root / "pred"
+            pred.mkdir(parents=True)
+            stale = prediction(game_pk=9, artifact=PRIOR_ARTIFACT)
+            stale["market_blind"] = False
+            stale["feature_asof_ts"] = stale["event_start_ts"]
+            (pred / "prior.json").write_text(
+                json.dumps(stale) + "\n", encoding="utf-8"
+            )
+            (pred / "current.json").write_text(
+                json.dumps(prediction()) + "\n", encoding="utf-8"
+            )
+            report = settle_forward_calibration(
+                prediction_root=pred,
+                calibration_root=root / "cal",
+                raw_root=root / "raw",
+                report_path=root / "report.json",
+                now=datetime(2026, 9, 17, tzinfo=timezone.utc),
+                settlement_fetcher=lambda game_pk: final_source(game_pk),
+            )
+            self.assertEqual(report["predictions_seen_current_artifact"], 1)
+            self.assertEqual(report["prior_artifact_predictions_ignored"], 1)
+            self.assertEqual(
+                report["prior_prediction_artifact_sha256s"], [PRIOR_ARTIFACT]
+            )
+            self.assertEqual(report["calibration_metrics"]["n"], 1)
+            self.assertEqual(
+                report["clock_reset_rule"],
+                "MODEL_ARTIFACT_SHA_CHANGE_RESETS_CURRENT_CALIBRATION_CLOCK",
+            )
+
+    def test_invalid_artifact_identity_never_silently_resets_clock(self):
+        with TemporaryDirectory() as td, patch(
+            "sportsedge.mlb_moneyline_forward_calibration.mlb_model_artifact_sha256",
+            return_value=ARTIFACT,
+        ):
+            root = Path(td)
+            pred = root / "pred"
+            pred.mkdir(parents=True)
+            bad = prediction()
+            bad["model_artifact_sha256"] = "not-a-sha"
+            (pred / "bad.json").write_text(json.dumps(bad) + "\n", encoding="utf-8")
             with self.assertRaises(MLBMoneylineForwardCalibrationError):
                 settle_forward_calibration(
                     prediction_root=pred,

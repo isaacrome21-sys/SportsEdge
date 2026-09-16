@@ -1,9 +1,9 @@
 """Prospective calibration settlement for the market-blind MLB MONEYLINE Model_P.
 
-This lane grades every immutable prospective Model_P prediction, not only bets that
-clear an edge floor.  That keeps calibration evidence independent of downstream
-market selection.  It never consumes sportsbook prices and never grants promotion,
-deployment, staking, Truth Gate, or OFFICIAL authority.
+Only predictions from the current immutable model artifact enter the current
+calibration clock. Rows bound to a prior valid artifact are retained on the data
+branch but ignored after an artifact change, matching Promotion Evidence Policy
+V2 reset semantics. Active-artifact rows remain strict PIT and fail closed.
 """
 from __future__ import annotations
 
@@ -47,6 +47,13 @@ def _utc(value: Any, field: str) -> datetime:
     return out.astimezone(timezone.utc)
 
 
+def _artifact(value: Any, field: str = "model_artifact_sha256") -> str:
+    text = str(value or "").lower()
+    if len(text) != 64 or any(ch not in "0123456789abcdef" for ch in text):
+        raise MLBMoneylineForwardCalibrationError(f"{field} invalid")
+    return text
+
+
 def _json_files(root: str | Path) -> list[dict[str, Any]]:
     path = Path(root)
     if not path.exists():
@@ -75,14 +82,18 @@ def _write_create_only(path: Path, payload: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
         if path.read_bytes() != payload:
-            raise MLBMoneylineForwardCalibrationError(f"immutable calibration collision: {path}")
+            raise MLBMoneylineForwardCalibrationError(
+                f"immutable calibration collision: {path}"
+            )
         return
     try:
         with path.open("xb") as handle:
             handle.write(payload)
     except FileExistsError:
         if path.read_bytes() != payload:
-            raise MLBMoneylineForwardCalibrationError(f"immutable calibration collision: {path}")
+            raise MLBMoneylineForwardCalibrationError(
+                f"immutable calibration collision: {path}"
+            )
 
 
 def _prediction(row: Mapping[str, Any], active_artifact: str) -> dict[str, Any]:
@@ -91,10 +102,12 @@ def _prediction(row: Mapping[str, Any], active_artifact: str) -> dict[str, Any]:
     if row.get("evidence_disposition") != "FORWARD_MODEL_P_PREDICTION":
         raise MLBMoneylineForwardCalibrationError("prospective Model_P disposition required")
     if row.get("market_blind") is not True or row.get("promotion_authority") is not False:
-        raise MLBMoneylineForwardCalibrationError("market-blind non-authoritative prediction required")
-    if str(row.get("market") or "") != "MONEYLINE" or str(row.get("model_side") or "") != "HOME":
+        raise MLBMoneylineForwardCalibrationError(
+            "market-blind non-authoritative prediction required"
+        )
+    if row.get("market") != "MONEYLINE" or row.get("model_side") != "HOME":
         raise MLBMoneylineForwardCalibrationError("fixed HOME MONEYLINE prediction required")
-    if str(row.get("model_artifact_sha256") or "") != active_artifact:
+    if _artifact(row.get("model_artifact_sha256")) != active_artifact:
         raise MLBMoneylineForwardCalibrationError("prediction model artifact binding mismatch")
     try:
         game_pk = int(row.get("game_pk"))
@@ -102,7 +115,9 @@ def _prediction(row: Mapping[str, Any], active_artifact: str) -> dict[str, Any]:
         home_id = int(row.get("home_team_id"))
         model_p = float(row.get("model_p"))
     except (TypeError, ValueError) as exc:
-        raise MLBMoneylineForwardCalibrationError("prediction identity/probability invalid") from exc
+        raise MLBMoneylineForwardCalibrationError(
+            "prediction identity/probability invalid"
+        ) from exc
     if not isfinite(model_p) or not 0.0 < model_p < 1.0:
         raise MLBMoneylineForwardCalibrationError("prediction model_p invalid")
     feature_asof = _utc(row.get("feature_asof_ts"), "feature_asof_ts")
@@ -123,29 +138,38 @@ def _prediction(row: Mapping[str, Any], active_artifact: str) -> dict[str, Any]:
         "prediction_generated_at_utc": generated,
         "event_start_ts": start,
         "prediction_record_sha256": _canonical_sha256(row),
-        "source_record": dict(row),
     }
 
 
-def _existing_calibration(rows: Iterable[Mapping[str, Any]], active_artifact: str) -> dict[int, dict[str, Any]]:
-    out: dict[int, dict[str, Any]] = {}
+def _existing_calibration(
+    rows: Iterable[Mapping[str, Any]], active_artifact: str
+) -> tuple[dict[int, dict[str, Any]], int, list[str]]:
+    current: dict[int, dict[str, Any]] = {}
+    prior_count = 0
+    prior_artifacts: set[str] = set()
     for raw in rows:
         if raw.get("schema_version") != CALIBRATION_ROW_SCHEMA:
             raise MLBMoneylineForwardCalibrationError("unknown calibration row schema")
-        artifact = str(raw.get("model_artifact_sha256") or "")
+        artifact = _artifact(raw.get("model_artifact_sha256"))
         if artifact != active_artifact:
+            prior_count += 1
+            prior_artifacts.add(artifact)
             continue
         if raw.get("market_blind") is not True or raw.get("promotion_authority") is not False:
-            raise MLBMoneylineForwardCalibrationError("calibration row authority/market-blind flags invalid")
+            raise MLBMoneylineForwardCalibrationError(
+                "calibration row authority/market-blind flags invalid"
+            )
         try:
             game_pk = int(raw.get("game_pk"))
         except (TypeError, ValueError) as exc:
             raise MLBMoneylineForwardCalibrationError("calibration game_pk invalid") from exc
         row = dict(raw)
-        if game_pk in out and _canonical_bytes(out[game_pk]) != _canonical_bytes(row):
-            raise MLBMoneylineForwardCalibrationError("DUPLICATE_OR_MUTATED_CALIBRATION_ROW")
-        out[game_pk] = row
-    return out
+        if game_pk in current and _canonical_bytes(current[game_pk]) != _canonical_bytes(row):
+            raise MLBMoneylineForwardCalibrationError(
+                "DUPLICATE_OR_MUTATED_CALIBRATION_ROW"
+            )
+        current[game_pk] = row
+    return current, prior_count, sorted(prior_artifacts)
 
 
 def settle_forward_calibration(
@@ -158,16 +182,32 @@ def settle_forward_calibration(
     settlement_fetcher: Callable[[int], Mapping[str, Any] | None] | None = None,
 ) -> dict[str, Any]:
     now_utc = _utc(now or datetime.now(timezone.utc), "now")
-    active_artifact = mlb_model_artifact_sha256()
+    active_artifact = _artifact(mlb_model_artifact_sha256(), "active model artifact")
+
     predictions: dict[int, dict[str, Any]] = {}
+    prior_prediction_count = 0
+    prior_prediction_artifacts: set[str] = set()
     for raw in _json_files(prediction_root):
+        row_artifact = _artifact(raw.get("model_artifact_sha256"))
+        if row_artifact != active_artifact:
+            prior_prediction_count += 1
+            prior_prediction_artifacts.add(row_artifact)
+            continue
         parsed = _prediction(raw, active_artifact)
         game_pk = int(parsed["game_pk"])
-        if game_pk in predictions and predictions[game_pk]["prediction_record_sha256"] != parsed["prediction_record_sha256"]:
-            raise MLBMoneylineForwardCalibrationError("conflicting prospective prediction for game")
+        if (
+            game_pk in predictions
+            and predictions[game_pk]["prediction_record_sha256"]
+            != parsed["prediction_record_sha256"]
+        ):
+            raise MLBMoneylineForwardCalibrationError(
+                "conflicting prospective prediction for game"
+            )
         predictions[game_pk] = parsed
 
-    completed = _existing_calibration(_json_files(calibration_root), active_artifact)
+    completed, prior_calibration_count, prior_calibration_artifacts = _existing_calibration(
+        _json_files(calibration_root), active_artifact
+    )
     fetcher = settlement_fetcher or (lambda game_pk: fetch_final_settlement(game_pk))
     retained: list[str] = []
     pending_start: list[int] = []
@@ -185,7 +225,9 @@ def settle_forward_calibration(
             pending_final.append(game_pk)
             continue
         if not isinstance(source, Mapping):
-            raise MLBMoneylineForwardCalibrationError(f"settlement source invalid for {game_pk}")
+            raise MLBMoneylineForwardCalibrationError(
+                f"settlement source invalid for {game_pk}"
+            )
         settlement = dict(source.get("settlement") or {})
         try:
             settle_away_id = int(settlement.get("away_team_id"))
@@ -193,22 +235,39 @@ def settle_forward_calibration(
             away_score = int(settlement.get("away_score"))
             home_score = int(settlement.get("home_score"))
         except (TypeError, ValueError) as exc:
-            raise MLBMoneylineForwardCalibrationError(f"settlement identity/score invalid for {game_pk}") from exc
-        if (settle_away_id, settle_home_id) != (pred["away_team_id"], pred["home_team_id"]):
-            raise MLBMoneylineForwardCalibrationError(f"settlement team identity mismatch for {game_pk}")
+            raise MLBMoneylineForwardCalibrationError(
+                f"settlement identity/score invalid for {game_pk}"
+            ) from exc
+        if (settle_away_id, settle_home_id) != (
+            pred["away_team_id"],
+            pred["home_team_id"],
+        ):
+            raise MLBMoneylineForwardCalibrationError(
+                f"settlement team identity mismatch for {game_pk}"
+            )
         if str(settlement.get("status") or "").upper() != "FINAL" or away_score == home_score:
-            raise MLBMoneylineForwardCalibrationError(f"FINAL non-tied MLB settlement required for {game_pk}")
+            raise MLBMoneylineForwardCalibrationError(
+                f"FINAL non-tied MLB settlement required for {game_pk}"
+            )
         raw = source.get("raw_bytes")
         if not isinstance(raw, (bytes, bytearray)):
-            raise MLBMoneylineForwardCalibrationError(f"raw settlement bytes required for {game_pk}")
+            raise MLBMoneylineForwardCalibrationError(
+                f"raw settlement bytes required for {game_pk}"
+            )
         raw_bytes = bytes(raw)
         raw_sha = hashlib.sha256(raw_bytes).hexdigest()
         if str(source.get("raw_sha256") or "") != raw_sha:
-            raise MLBMoneylineForwardCalibrationError(f"settlement raw SHA mismatch for {game_pk}")
+            raise MLBMoneylineForwardCalibrationError(
+                f"settlement raw SHA mismatch for {game_pk}"
+            )
         source_uri = str(source.get("source_uri") or "")
         if not source_uri.startswith("https://statsapi.mlb.com/"):
-            raise MLBMoneylineForwardCalibrationError(f"settlement source URI invalid for {game_pk}")
-        settlement_observed = _utc(source.get("observed_at_utc"), "settlement observed_at_utc")
+            raise MLBMoneylineForwardCalibrationError(
+                f"settlement source URI invalid for {game_pk}"
+            )
+        settlement_observed = _utc(
+            source.get("observed_at_utc"), "settlement observed_at_utc"
+        )
         row = {
             "schema_version": CALIBRATION_ROW_SCHEMA,
             "status": "FORWARD_CALIBRATION_COMPLETE",
@@ -240,7 +299,11 @@ def settle_forward_calibration(
         }
         day = pred["event_start_ts"].date().isoformat()
         raw_path = Path(raw_root) / day / f"game_{game_pk}__{raw_sha}.json"
-        out_path = Path(calibration_root) / day / f"game_{game_pk}__{active_artifact[:12]}.json"
+        out_path = (
+            Path(calibration_root)
+            / day
+            / f"game_{game_pk}__{active_artifact[:12]}.json"
+        )
         _write_create_only(raw_path, raw_bytes)
         _write_create_only(out_path, _canonical_bytes(row))
         retained.append(str(out_path))
@@ -248,21 +311,33 @@ def settle_forward_calibration(
 
     current_rows = [completed[key] for key in sorted(completed)]
     try:
-        metrics = evaluate_moneyline_predictions(current_rows, min_sample=200, ece_bins=10)
+        metrics = evaluate_moneyline_predictions(
+            current_rows, min_sample=200, ece_bins=10
+        )
     except MLBMoneylineEvidenceError as exc:
         raise MLBMoneylineForwardCalibrationError(str(exc)) from exc
+
     report = {
         "schema_version": CALIBRATION_RUNNER_SCHEMA,
         "generated_at_utc": now_utc.isoformat(),
         "model_artifact_sha256": active_artifact,
         "predictions_seen_current_artifact": len(predictions),
+        "prior_artifact_predictions_ignored": prior_prediction_count,
+        "prior_prediction_artifact_sha256s": sorted(prior_prediction_artifacts),
         "completed_calibration_rows": len(current_rows),
+        "prior_artifact_calibration_rows_ignored": prior_calibration_count,
+        "prior_calibration_artifact_sha256s": prior_calibration_artifacts,
         "new_completed_calibration_rows": len(retained),
         "retained_paths": retained,
         "pending_start_game_pks": pending_start,
         "pending_final_game_pks": pending_final,
         "calibration_metrics": metrics,
-        "status": "CALIBRATION_GATE_PASS" if metrics.get("sample_gate_pass") and metrics.get("calibration_gate_pass") else "FORWARD_CALIBRATION_ACCUMULATING",
+        "clock_reset_rule": "MODEL_ARTIFACT_SHA_CHANGE_RESETS_CURRENT_CALIBRATION_CLOCK",
+        "status": (
+            "CALIBRATION_GATE_PASS"
+            if metrics.get("sample_gate_pass") and metrics.get("calibration_gate_pass")
+            else "FORWARD_CALIBRATION_ACCUMULATING"
+        ),
         "promotion_authority": False,
         "deployment_change_allowed": False,
         "staking_change_allowed": False,
@@ -270,7 +345,9 @@ def settle_forward_calibration(
     }
     target = Path(report_path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    target.write_text(
+        json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     return report
 
 
@@ -299,7 +376,9 @@ def main(argv: list[str] | None = None) -> int:
             "official_change_allowed": False,
         }
         Path(args.report).parent.mkdir(parents=True, exist_ok=True)
-        Path(args.report).write_text(json.dumps(blocked, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        Path(args.report).write_text(
+            json.dumps(blocked, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
         print(json.dumps(blocked, indent=2, sort_keys=True))
         return 2
     print(json.dumps(report, indent=2, sort_keys=True))
