@@ -4,6 +4,10 @@ This lane freezes one HOME-reference probability per game before the downstream
 DraftKings decision quote. It never consumes sportsbook prices, implied
 probabilities, consensus, public betting, or handicapper opinion and grants no
 promotion, staking, or OFFICIAL authority.
+
+The probability is dispatched through the same canonical ``engine_registry``
+MONEYLINE engine used by the production card path.  This prevents a shadow
+forward-evidence implementation from drifting away from live inference.
 """
 from __future__ import annotations
 
@@ -14,16 +18,22 @@ from math import isfinite
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
-from .generic_market_engine import generic_market_engine_adapter
+from .engine_registry import engine_registry
 from .mlb_model_artifact import mlb_model_artifact_sha256
 from .mlb_moneyline_pit import PIT_VERSION, MLBMoneylinePITError, build_moneyline_feature
 from .mlb_source import parse_game_start
+from .shared_game_engine import (
+    V8_PRIMARY_GAME_DEFAULT_SIMULATIONS,
+    V8_PRIMARY_GAME_MIN_SIMULATIONS,
+)
 
-PREDICTION_VERSION = "mlb_moneyline_forward_model_p_v1"
+PREDICTION_VERSION = "mlb_moneyline_forward_model_p_v2_production_parity"
 EVIDENCE_DISPOSITION = "FORWARD_MODEL_P_PREDICTION"
 PREDICTION_WINDOW_LOW_MIN = 40.0
 PREDICTION_WINDOW_HIGH_MIN = 60.0
-DEFAULT_SIMULATIONS = 100000
+DEFAULT_SIMULATIONS = V8_PRIMARY_GAME_DEFAULT_SIMULATIONS
+PRODUCTION_ENGINE_DISPATCH = "sportsedge.engine_registry.engine_registry[MONEYLINE]"
+_PRODUCTION_MONEYLINE_ENGINE = engine_registry()["MONEYLINE"]
 
 
 class MLBMoneylineForwardPredictionError(ValueError):
@@ -104,6 +114,40 @@ def _team_observations(
     return observations, retained
 
 
+def production_moneyline_model_input(
+    *,
+    game_pk: int,
+    away_mean_runs: float,
+    home_mean_runs: float,
+    feature_source_hash: str,
+    simulations: int = DEFAULT_SIMULATIONS,
+) -> dict[str, Any]:
+    """Build the exact market-blind MONEYLINE input shape used for production dispatch."""
+    if isinstance(simulations, bool) or int(simulations) < V8_PRIMARY_GAME_MIN_SIMULATIONS:
+        raise MLBMoneylineForwardPredictionError(
+            f"simulations must be >= {V8_PRIMARY_GAME_MIN_SIMULATIONS} for production parity"
+        )
+    return {
+        "game_id": str(int(game_pk)),
+        "market": "MONEYLINE",
+        "entity_id": str(int(game_pk)),
+        "line": 0.0,
+        "side": "HOME",
+        "away_mean_runs": float(away_mean_runs),
+        "home_mean_runs": float(home_mean_runs),
+        "total_line": 0.0,
+        "feature_source_hash": str(feature_source_hash),
+        "simulations": int(simulations),
+    }
+
+
+def price_production_moneyline_model_p(model_input: dict[str, Any]) -> dict[str, Any]:
+    """Dispatch only through the canonical production MONEYLINE engine registry entry."""
+    if str(model_input.get("market")) != "MONEYLINE" or str(model_input.get("side")) != "HOME":
+        raise MLBMoneylineForwardPredictionError("forward Model_P requires fixed HOME MONEYLINE reference")
+    return dict(_PRODUCTION_MONEYLINE_ENGINE(model_input))
+
+
 def build_forward_prediction(
     *,
     snapshot: Any,
@@ -121,8 +165,10 @@ def build_forward_prediction(
         raise MLBMoneylineForwardPredictionError("prediction must precede event start")
     if str(getattr(snapshot, "status", "")) != "Preview":
         raise MLBMoneylineForwardPredictionError("prediction requires Preview game state")
-    if simulations < 1000:
-        raise MLBMoneylineForwardPredictionError("simulations must be >= 1000")
+    if isinstance(simulations, bool) or int(simulations) < V8_PRIMARY_GAME_MIN_SIMULATIONS:
+        raise MLBMoneylineForwardPredictionError(
+            f"simulations must be >= {V8_PRIMARY_GAME_MIN_SIMULATIONS} for production parity"
+        )
 
     target_date = _target_date(snapshot, start)
     away_obs, away_retained = _team_observations(
@@ -144,18 +190,14 @@ def build_forward_prediction(
     except MLBMoneylinePITError as exc:
         raise MLBMoneylineForwardPredictionError(str(exc)) from exc
 
-    model_input = {
-        "game_id": str(snapshot.game_pk),
-        "market": "MONEYLINE",
-        "entity_id": str(snapshot.game_pk),
-        "line": 0.0,
-        "side": "HOME",
-        "away_mean_runs": feature["away_mean_runs"],
-        "home_mean_runs": feature["home_mean_runs"],
-        "feature_source_hash": feature["feature_source_hash"],
-        "simulations": int(simulations),
-    }
-    engine = generic_market_engine_adapter(model_input)
+    model_input = production_moneyline_model_input(
+        game_pk=int(snapshot.game_pk),
+        away_mean_runs=feature["away_mean_runs"],
+        home_mean_runs=feature["home_mean_runs"],
+        feature_source_hash=feature["feature_source_hash"],
+        simulations=int(simulations),
+    )
+    engine = price_production_moneyline_model_p(model_input)
     generated_at = _utc(source_clock(), "prediction generated_at")
     if not generated_at < start:
         raise MLBMoneylineForwardPredictionError("prediction generation crossed event start")
@@ -196,9 +238,13 @@ def build_forward_prediction(
         "away_mean_runs": float(feature["away_mean_runs"]),
         "home_mean_runs": float(feature["home_mean_runs"]),
         "model_input_hash": str(engine["model_input_hash"]),
+        "distribution_sha256": str(engine["distribution_sha256"]),
+        "readout_sha256": str(engine["readout_sha256"]),
+        "readout_version": str(engine["readout_version"]),
         "engine_version": str(engine["engine_version"]),
         "seed_policy": str(engine["seed_policy"]),
         "mc_paths": int(engine["mc_paths"]),
+        "production_engine_dispatch": PRODUCTION_ENGINE_DISPATCH,
         "source": "LIVE_OBSERVED_MLB_STATSAPI_GAMELOG",
         "source_timestamp_semantics": "POST_RESPONSE_RECEIPT_TIME_CONSERVATIVE",
     }
