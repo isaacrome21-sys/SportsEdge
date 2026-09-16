@@ -99,3 +99,13 @@ def assemble_forward_evidence(*, prediction: Mapping[str,Any], quotes: Iterable[
         "decision_policy":"30m target; tolerance +6m EARLY_ONLY_AT_OR_BEFORE_TARGET",
         "close_policy":"last verifiable pre-first-pitch DraftKings paired quote",
     }
+
+def evidence_rows_for_gates(records: Iterable[Mapping[str,Any]]) -> tuple[list[dict[str,Any]],list[dict[str,Any]]]:
+    """Project complete ledger records into the already-frozen calibration and CLV evaluators."""
+    calibration=[]; clv=[]
+    for i,row in enumerate(records):
+        if row.get("status")!="FORWARD_EVIDENCE_COMPLETE": raise MLBMoneylineForwardLedgerError(f"row {i}: incomplete forward evidence")
+        if row.get("promotion_authority") is not False: raise MLBMoneylineForwardLedgerError(f"row {i}: authority flag invalid")
+        calibration.append({"model_p":_prob(row.get("model_p")),"outcome":int(row.get("outcome")),"market_blind":True,"feature_asof_ts":row.get("feature_asof_ts"),"event_start_ts":row.get("event_start_ts")})
+        clv.append({"game_pk":row.get("game_pk"),"model_side":row.get("model_side"),"model_p":_prob(row.get("model_p")),"close_home_odds":row.get("close_home_odds"),"close_away_odds":row.get("close_away_odds")})
+    return calibration,clv
