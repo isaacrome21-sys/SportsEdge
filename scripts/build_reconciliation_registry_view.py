@@ -98,6 +98,22 @@ def validate_extension(extension: Mapping[str, Any], registry: Mapping[str, Any]
             raise SystemExit(f"BUNDLE_REVOCATION_REASON_REQUIRED:{bundle_id}")
 
 
+def _registered_refreeze_supersedes_revocation(existing: object, extension_disposition: Mapping[str, Any]) -> bool:
+    """Allow a newer registry refreeze to supersede an older extension revocation.
+
+    The extension is deliberately limited to fail-closed REVOKED states. A later,
+    explicitly registered REFROZEN state lives in the governed base registry. It
+    may supersede that stale revocation only when the refreeze carries the minimum
+    identity and forward-clock fields. Other disposition disagreements remain a
+    hard conflict.
+    """
+    if not isinstance(existing, Mapping):
+        return False
+    if extension_disposition.get("state") != "REVOKED" or existing.get("state") != "REFROZEN":
+        return False
+    return all(str(existing.get(key) or "") for key in ("new_bundle_id", "new_freeze_sha", "forward_clock_restart_at"))
+
+
 def merge_view(
     policy: Mapping[str, Any], registry: Mapping[str, Any], extension: Mapping[str, Any]
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
@@ -130,10 +146,14 @@ def merge_view(
                 added_prefixes += len(set(additions) - set(existing))
 
     dispositions = extension.get("bundle_dispositions") or {}
+    superseded_revocations: list[str] = []
     for bundle_id, disposition in sorted(dispositions.items()):
         bundle = by_id[str(bundle_id)]
         existing = bundle.get("disposition")
         if existing is not None and existing != disposition:
+            if _registered_refreeze_supersedes_revocation(existing, disposition):
+                superseded_revocations.append(str(bundle_id))
+                continue
             raise SystemExit(f"BUNDLE_DISPOSITION_CONFLICT:{bundle_id}")
         bundle["disposition"] = copy.deepcopy(dict(disposition))
 
@@ -151,6 +171,7 @@ def merge_view(
         "added_coverage_path_count": added_paths,
         "added_coverage_prefix_count": added_prefixes,
         "bundle_disposition_count": len(dispositions),
+        "superseded_extension_revocations": sorted(superseded_revocations),
         "inventory_completion_claim_applied": bool(claim),
         "inventory_completion_proof": dict(claim) if claim else None,
         "scanner_discovery_contract_changed": False,
