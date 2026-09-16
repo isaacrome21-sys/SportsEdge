@@ -12,6 +12,16 @@
   "sport_key": "americanfootball_nfl",
   "bookmaker": "draftkings",
   "markets": ["spreads", "totals"],
+  "source_priority": [
+    "DRAFTKINGS_DIRECT_WEB_V1",
+    "DRAFTKINGS_ODDS_API_V1"
+  ],
+  "observation_timestamp_semantics": "SPORTSEDGE_HTTP_RESPONSE_RECEIPT_UPPER_BOUND",
+  "provider_quote_timestamp_role": "AUXILIARY_ONLY",
+  "fallback_scope": "WHOLE_SOURCE_FAILURE_ONLY",
+  "cross_source_market_merge": false,
+  "direct_valid_board_market_gaps_trigger_fallback": false,
+  "direct_source_contract_path": "docs/nfl_direct_capture_source_contract_v1.md",
   "output_dir": "data/nfl_2026_confirmation/captures",
   "predictions_dir": "data/nfl_2026_confirmation/predictions"
 }
