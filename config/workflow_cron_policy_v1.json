@@ -18,6 +18,7 @@
     ".github/workflows/mlb-pit-lineup-starter-archive.yml",
     ".github/workflows/mlb-prop-pit-archive.yml",
     ".github/workflows/mlb-game-context-refresh.yml",
+    ".github/workflows/mlb-moneyline-forward-evidence.yml",
     ".github/workflows/nfl-market-maker-radar-capture.yml"
   ]
 }
