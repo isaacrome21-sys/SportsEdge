@@ -1,18 +1,17 @@
 name: archive-mlb-game-odds
 
-# Keyless DraftKings direct-web paired moneyline forward capture.
+# Prospective MLB MONEYLINE evidence lane.
 #
-# This workflow previously ran a paid The Odds API poller and was parked for the
-# remainder of 2026. It now has exactly one purpose: run the direct paired
-# capture and retain its evidence. No Odds API secrets, no paid budget ledger,
-# no fallback provider.
+# Every five minutes this workflow independently captures a market-blind Model_P
+# prediction when a Preview game is 40-60 minutes from first pitch, then captures
+# exact two-sided DraftKings moneylines in the existing T60/T30/T10 windows.
+# The prediction is produced only from live-observed MLB StatsAPI game-log data;
+# sportsbook prices never enter Model_P. Both paths remain zero-authority until
+# frozen calibration/CLV/sample/production-parity gates are satisfied.
 #
-# Transport failure, an empty board, or an in-window one-sided market exits 2
-# and fails visibly. NO_CAPTURE_DUE is green only when the acquired MLB board
-# is non-empty and no game is inside T60/T30/T10.
-#
-# Grants no promotion authority. Does not read or modify config/deployments.json
-# or the frozen moneyline edge floor. Retained rows are FORWARD_CAPTURE_PARTIAL.
+# Transport failure, a due Model_P failure, an empty DraftKings board, or an
+# in-window one-sided market fails visibly. NO_PREDICTION_DUE/NO_CAPTURE_DUE are
+# green only when their respective preconditions are genuinely absent.
 
 on:
   workflow_dispatch:
@@ -44,16 +43,39 @@ jobs:
 
       - name: Contract tests
         run: |
-          python -m py_compile scripts/capture_mlb_direct_paired_ml.py \
+          python -m py_compile \
+            scripts/capture_mlb_moneyline_model_p.py \
+            scripts/capture_mlb_direct_paired_ml.py \
+            sportsedge/mlb_moneyline_forward_prediction.py \
+            sportsedge/mlb_moneyline_forward_ledger.py \
             sportsedge/direct_web_capture_source.py \
             sportsedge/draftkings_game_market_source.py
           python -m unittest \
+            tests.test_mlb_moneyline_forward_prediction \
             tests.test_direct_web_capture_source \
             tests.test_capture_mlb_direct_paired_ml \
             tests.test_draftkings_game_line_category_map \
             tests.test_persist_captured_evidence -v
 
-      - name: Capture
+      - name: Capture market-blind Model_P predictions
+        run: |
+          set +e
+          set -o pipefail
+          python scripts/capture_mlb_moneyline_model_p.py \
+            --output-dir data/mlb_forward_predictions | tee model_p_result.json
+          rc=${PIPESTATUS[0]}
+          echo "$rc" > model_p_exit_code.txt
+          exit 0
+
+      - name: Persist Model_P predictions
+        run: |
+          git config user.name  "sportsedge-capture"
+          git config user.email "sportsedge-capture@users.noreply.github.com"
+          python scripts/persist_captured_evidence.py \
+            --path data/mlb_forward_predictions \
+            --branch main
+
+      - name: Capture paired DraftKings quotes
         run: |
           set -o pipefail
           python scripts/capture_mlb_direct_paired_ml.py \
@@ -66,3 +88,9 @@ jobs:
           python scripts/persist_captured_evidence.py \
             --path data/mlb_forward_capture \
             --branch main
+
+      - name: Enforce Model_P capture status
+        if: always()
+        run: |
+          rc=$(cat model_p_exit_code.txt 2>/dev/null || echo 2)
+          test "$rc" -eq 0
