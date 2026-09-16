@@ -1,0 +1,24 @@
+{
+  "schema_version": "SPORTSEDGE_MLB_V2_REPLAY_COVERAGE_POLICY_V1",
+  "audit_start": "2026-03-25",
+  "audit_end": "2026-08-31",
+  "forbidden_window_start": "2026-09-01",
+  "forbidden_window_end": "2026-09-27",
+  "read_only": true,
+  "known_preconditions": {
+    "pinnacle_admissible_archive_present": false,
+    "pinnacle_status": "KNOWN_PRECONDITION_NOT_AUDIT_DISCOVERY"
+  },
+  "measured_providers": ["draftkings", "fanduel", "betmgm", "caesars"],
+  "featured_core_markets": ["MONEYLINE", "RUN_LINE", "TOTALS", "NRFI", "YRFI"],
+  "minimum_joint_n": 200,
+  "absence_taxonomy": ["PINNACLE_NEVER_OFFERED", "ARCHIVE_MISSING", "UNATTRIBUTABLE_ABSENCE"],
+  "default_absence_class": "UNATTRIBUTABLE_ABSENCE",
+  "governance": {
+    "promotion_authority": false,
+    "may_change_market_eligibility": false,
+    "model_p_authority": false,
+    "truth_gate_authority": false,
+    "official_authority": false
+  }
+}
