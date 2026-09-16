@@ -10,9 +10,12 @@ on:
 permissions:
   contents: read
 
+# Serialize every workflow that touches the paid Odds API credential pool,
+# including zero-credit health probes. This prevents the health alarm from
+# racing a frozen evidence capture or another provider consumer.
 concurrency:
-  group: nfl-2026-provider-health
-  cancel-in-progress: true
+  group: sportsedge-paid-odds-api
+  cancel-in-progress: false
 
 jobs:
   provider-health:
