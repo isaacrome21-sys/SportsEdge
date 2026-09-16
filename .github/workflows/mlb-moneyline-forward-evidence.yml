@@ -4,6 +4,15 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+  workflow_run:
+    # Operational fallback: the MLB PIT archive has a proven in-season
+    # 15-minute scheduled cadence. This trigger transfers no model, promotion,
+    # staking, or OFFICIAL authority; the evidence workflow still checks out main
+    # and enforces its own fail-closed contracts.
+    workflows:
+      - mlb-pit-lineup-starter-archive
+    types:
+      - completed
   schedule:
     - cron: '*/5 * * * *'
 
