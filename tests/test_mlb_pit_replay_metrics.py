@@ -43,6 +43,16 @@ class ReplayMetricsTests(unittest.TestCase):
         self.assertEqual(result["clusters"], 2)
         self.assertEqual(result["status"], "CR1_SCORED")
 
+    def test_missing_outcome_is_excluded_from_binary_scoring(self):
+        rows = [
+            self.row(decision_id="d1", outcome=""),
+            self.row(decision_id="d2", slate_date_ct="2026-04-02", outcome="0"),
+        ]
+        x = score(rows)
+        self.assertEqual(x["binary_score_n"], 1)
+        self.assertEqual(x["excluded_from_binary_scoring_missing_outcome"], 1)
+        self.assertAlmostEqual(x["brier"], 0.36)
+
     def test_missing_close_is_excluded_not_imputed(self):
         rows = [
             self.row(decision_id="d1", close_no_vig_p=""),
@@ -70,6 +80,10 @@ class ReplayMetricsTests(unittest.TestCase):
     def test_bad_probability_fails(self):
         with self.assertRaisesRegex(ValueError, "invalid"):
             score([self.row(model_p="1.1")])
+
+    def test_bad_binary_outcome_fails(self):
+        with self.assertRaisesRegex(ValueError, "invalid"):
+            score([self.row(outcome="0.5")])
 
     def test_empty_is_not_evidence(self):
         self.assertEqual(score([])["status"], "NO_EVIDENCE")
