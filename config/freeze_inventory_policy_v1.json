@@ -1,37 +1,10 @@
 {
   "schema": "SPORTSEDGE_FREEZE_INVENTORY_POLICY_V1",
   "status": "ACTIVE_FAIL_CLOSED",
-  "candidate_roots": [
-    "config/",
-    ".github/workflows/",
-    "sportsedge/sports/",
-    "sportsedge/governance/",
-    "scripts/",
-    "docs/"
-  ],
-  "candidate_path_tokens": [
-    "freeze",
-    "prereg",
-    "evidence",
-    "truth_gate",
-    "truth-gate",
-    "promotion",
-    "certification",
-    "admission",
-    "attempt_ledger",
-    "governance"
-  ],
+  "candidate_roots": ["config/", ".github/workflows/", "sportsedge/sports/", "sportsedge/governance/", "scripts/", "docs/"],
+  "candidate_path_tokens": ["freeze", "prereg", "evidence", "truth_gate", "truth-gate", "promotion", "certification", "admission", "attempt_ledger", "governance"],
   "content_scan_suffixes": [".json", ".yml", ".yaml", ".md", ".py"],
-  "content_markers": [
-    "FROZEN_",
-    "FROZEN_READY",
-    "promotion_authority",
-    "truth_gate_authority",
-    "untouched_readout",
-    "attempts_used",
-    "OFFICIAL authority",
-    "Model_P"
-  ],
+  "content_markers": ["FROZEN_", "FROZEN_READY", "promotion_authority", "truth_gate_authority", "untouched_readout", "attempts_used", "OFFICIAL authority", "Model_P"],
   "scanner_contract": {
     "status": "FROZEN_AT_PASS_1",
     "canonical_json_sha256": "d271f6f1583c2a0c071a18610765750df0bf3eda8eba48738c72ebe8eb03534f",
@@ -70,6 +43,7 @@
     "config/freeze_reconciliation_policy_v1.json":"RECONCILIATION_CONTROL_PLANE",
     "config/freeze_reconciliation_registry_v1.json":"RECONCILIATION_CONTROL_PLANE",
     "config/freeze_inventory_policy_v1.json":"RECONCILIATION_CONTROL_PLANE",
+    "config/reconciliation_coverage_v1.json":"RECONCILIATION_CONTROL_PLANE",
     ".github/workflows/freeze-reconciliation-hold.yml":"RECONCILIATION_CONTROL_PLANE",
     "sportsedge/governance/__init__.py":"RECONCILIATION_CONTROL_PLANE",
     "sportsedge/governance/freeze_reconciliation.py":"RECONCILIATION_CONTROL_PLANE",
