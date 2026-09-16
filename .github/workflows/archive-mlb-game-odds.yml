@@ -13,11 +13,14 @@ name: archive-mlb-game-odds
 #
 # Grants no promotion authority. Does not read or modify config/deployments.json
 # or the frozen moneyline edge floor. Retained rows are FORWARD_CAPTURE_PARTIAL.
+#
+# The minute offset below intentionally re-registers the schedule on the default
+# branch and avoids top-of-minute contention. Cadence remains every five minutes.
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '1-56/5 * * * *'
 
 permissions:
   contents: write
