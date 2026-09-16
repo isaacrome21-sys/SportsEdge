@@ -44,25 +44,28 @@ class ForwardPredictionTest(unittest.TestCase):
         start = now + timedelta(minutes=50)
         out = build_forward_prediction(
             snapshot=snapshot(start), history=FakeHistory(now), now=now,
-            artifact_sha="a" * 64, simulations=2000,
+            artifact_sha="a" * 64, simulations=2000, clock=lambda: now,
         )
         self.assertEqual(out["market"], "MONEYLINE")
         self.assertIs(out["market_blind"], True)
         self.assertEqual(out["model_side"], "HOME")
         self.assertEqual(out["reference_side_policy"], "FIXED_HOME_REFERENCE_NO_MARKET_SELECTION")
         self.assertTrue(0 < out["model_p"] < 1)
+        self.assertEqual(datetime.fromisoformat(out["feature_asof_ts"]), now)
+        self.assertEqual(datetime.fromisoformat(out["prediction_generated_at_utc"]), now)
         self.assertLess(datetime.fromisoformat(out["feature_asof_ts"]), start)
         self.assertIs(out["promotion_authority"], False)
         self.assertIn("odds", out["forbidden_market_inputs"])
         self.assertEqual(out["feature_observation_count"], 24)
         self.assertEqual(len(out["feature_observations"]), 24)
+        self.assertEqual(out["source_timestamp_semantics"], "POST_RESPONSE_RECEIPT_TIME_CONSERVATIVE")
 
     def test_prediction_after_start_fails_closed(self):
         now = datetime(2026, 9, 20, 18, 10, tzinfo=timezone.utc)
         with self.assertRaisesRegex(MLBMoneylineForwardPredictionError, "precede"):
             build_forward_prediction(
                 snapshot=snapshot(now), history=FakeHistory(now), now=now,
-                artifact_sha="a" * 64, simulations=2000,
+                artifact_sha="a" * 64, simulations=2000, clock=lambda: now,
             )
 
     def test_insufficient_history_blocks_due_game(self):
@@ -72,7 +75,7 @@ class ForwardPredictionTest(unittest.TestCase):
             with self.assertRaisesRegex(MLBMoneylineForwardPredictionBlocked, "BLOCKED_DUE_MODEL_P"):
                 capture_due_predictions(
                     schedule=[snapshot(start)], history=FakeHistory(now, n=9), now=now,
-                    output_dir=tmp, artifact_sha="a" * 64, simulations=2000,
+                    output_dir=tmp, artifact_sha="a" * 64, simulations=2000, clock=lambda: now,
                 )
 
     def test_capture_is_create_only_and_only_inside_window(self):
@@ -82,7 +85,7 @@ class ForwardPredictionTest(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             first = capture_due_predictions(
                 schedule=[due, later], history=FakeHistory(now), now=now,
-                output_dir=tmp, artifact_sha="a" * 64, simulations=2000,
+                output_dir=tmp, artifact_sha="a" * 64, simulations=2000, clock=lambda: now,
             )
             self.assertEqual(first["status"], "RETAINED")
             self.assertEqual(first["games_due"], 1)
@@ -91,7 +94,7 @@ class ForwardPredictionTest(unittest.TestCase):
             before = path.read_bytes()
             second = capture_due_predictions(
                 schedule=[due, later], history=FakeHistory(now), now=now,
-                output_dir=tmp, artifact_sha="a" * 64, simulations=2000,
+                output_dir=tmp, artifact_sha="a" * 64, simulations=2000, clock=lambda: now,
             )
             self.assertEqual(second["status"], "ALREADY_CAPTURED")
             self.assertEqual(path.read_bytes(), before)
@@ -101,7 +104,7 @@ class ForwardPredictionTest(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             out = capture_due_predictions(
                 schedule=[snapshot(now + timedelta(minutes=90))], history=FakeHistory(now), now=now,
-                output_dir=tmp, artifact_sha="a" * 64, simulations=2000,
+                output_dir=tmp, artifact_sha="a" * 64, simulations=2000, clock=lambda: now,
             )
             self.assertEqual(out["status"], "NO_PREDICTION_DUE")
             self.assertIs(out["promotion_authority"], False)
