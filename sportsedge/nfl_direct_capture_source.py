@@ -1,14 +1,7 @@
 """DRAFTKINGS_DIRECT_WEB_V1 acquisition adapter for NFL confirmation capture.
 
-This is a transport/admission adapter only. It creates no Model_P, promotion,
-Truth Gate, staking, or OFFICIAL authority.
-
-Contract:
-- observed_at_utc is SportsEdge HTTP-response receipt time, not a provider quote timestamp.
-- exact provider bytes are retained in-memory for the caller to persist unchanged.
-- book_last_update/market_last_update are never synthesized from receipt time.
-- one-sided or otherwise unadmitted markets are never imputed.
-- one direct DraftKings host only; adding a fallback host requires a new source class.
+Transport/admission only; grants no Model_P, promotion, Truth Gate, staking, or
+OFFICIAL authority.
 """
 from __future__ import annotations
 
@@ -91,7 +84,6 @@ def acquire_board(
         "transport_host": _host_of(board.source_uri),
         "requested_at_utc": _iso_z(started),
         "observed_at_utc": _iso_z(received),
-        # Caller must persist these exact bytes before serializing the capture row.
         "raw_bytes": board.raw,
         "raw_sha256": hashlib.sha256(board.raw).hexdigest(),
         "raw_payload": board.payload,
@@ -153,12 +145,7 @@ def game_rows_direct(
     window_start: datetime | None = None,
     window_end: datetime | None = None,
 ) -> list[dict[str, Any]]:
-    """Build vendor-compatible game rows without hiding malformed/one-sided markets.
-
-    The event set comes from the raw board, not only normalized quote rows. That
-    prevents normalize_board() from erasing an event merely because a requested
-    market failed two-sided admission.
-    """
+    """Build capture rows while keeping market gaps visible and fail-closed."""
     from sportsedge.draftkings_game_market_source import RawDraftKingsBoard
 
     payload = transport.get("raw_payload")
@@ -177,7 +164,6 @@ def game_rows_direct(
         by_event.setdefault(str(quote["provider_event_id"]), []).append(quote)
 
     out: list[dict[str, Any]] = []
-    relevant_raw_events = 0
     identity_failures = 0
     for event in payload.get("events", []):
         if not isinstance(event, Mapping) or event.get("id") is None:
@@ -192,7 +178,6 @@ def game_rows_direct(
             continue
         if window_end is not None and commence >= window_end:
             continue
-        relevant_raw_events += 1
         try:
             away, home = _event_teams(event)
         except DirectCaptureError:
@@ -223,9 +208,12 @@ def game_rows_direct(
                 row["spread"] = {"status": "LINE_MISMATCH"}
             else:
                 row["spread"] = {
-                    "status": "OK", "market_last_update": None,
-                    "home_point": h["point"], "home_price": h["price_american"],
-                    "away_point": a["point"], "away_price": a["price_american"],
+                    "status": "OK",
+                    "market_last_update": None,
+                    "home_point": h["point"],
+                    "home_price": h["price_american"],
+                    "away_point": a["point"],
+                    "away_price": a["price_american"],
                 }
         elif not raw_spread_exists:
             row["spread"] = {"status": "NOT_LISTED"}
@@ -245,9 +233,11 @@ def game_rows_direct(
                 row["total"] = {"status": "LINE_MISMATCH"}
             else:
                 row["total"] = {
-                    "status": "OK", "market_last_update": None,
+                    "status": "OK",
+                    "market_last_update": None,
                     "point": over["point"],
-                    "over_price": over["price_american"], "under_price": under["price_american"],
+                    "over_price": over["price_american"],
+                    "under_price": under["price_american"],
                 }
         elif not raw_total_exists:
             row["total"] = {"status": "NOT_LISTED"}
@@ -258,6 +248,9 @@ def game_rows_direct(
 
         out.append(row)
 
-    if relevant_raw_events and not out and identity_failures:
+    # Never permit a malformed event to disappear from an otherwise successful
+    # board. Any identity/start failure makes the direct source unusable as a
+    # whole for this observation, which is eligible for source-level fallback.
+    if identity_failures:
         raise DirectCaptureError("DK_DIRECT_EVENT_IDENTITY_UNADMITTED")
     return out
