@@ -17,10 +17,14 @@ class MLBDirectCaptureTest(unittest.TestCase):
  def test_retains_and_binds(self):
   with tempfile.TemporaryDirectory() as d:
    r=cap.capture(output_dir=d,clock=lambda:NOW,fetch=fetcher(payload()),artifact_binder=lambda:"a"*64); row=json.loads(Path(r["paths"][0]).read_text())
-  self.assertEqual(r["status"],"RETAINED"); self.assertEqual(row["capture_window"],"T30"); self.assertFalse(row["promotion_authority"]); self.assertEqual(row["model_artifact_sha256"],"a"*64)
- def test_no_capture_due(self):
+  self.assertEqual(r["status"],"RETAINED"); self.assertEqual(row["capture_window"],"T30"); self.assertFalse(row["promotion_authority"]); self.assertEqual(row["model_artifact_sha256"],"a"*64); self.assertEqual(r["events_on_board"],1); self.assertEqual(r["events_in_window"],1)
+ def test_no_capture_due_requires_nonempty_board(self):
   with tempfile.TemporaryDirectory() as d:r=cap.capture(output_dir=d,fetch=fetcher(payload(200)),artifact_binder=lambda:"a"*64)
-  self.assertEqual(r["status"],"NO_CAPTURE_DUE")
+  self.assertEqual(r["status"],"NO_CAPTURE_DUE"); self.assertEqual(r["events_on_board"],1); self.assertEqual(r["events_in_window"],0)
+ def test_empty_board_blocks(self):
+  with tempfile.TemporaryDirectory() as d:
+   with self.assertRaises(cap.CaptureBlocked) as c:cap.capture(output_dir=d,fetch=fetcher({"events":[],"markets":[],"selections":[]}),artifact_binder=lambda:"a"*64)
+  self.assertEqual(c.exception.reason,"BLOCKED_EMPTY_BOARD"); self.assertEqual(c.exception.detail["events_on_board"],0); self.assertIn("raw_sha256",c.exception.detail); self.assertIn("source_uri",c.exception.detail)
  def test_one_sided_blocks(self):
   with tempfile.TemporaryDirectory() as d:
    with self.assertRaises(cap.CaptureBlocked) as c:cap.capture(output_dir=d,fetch=fetcher(payload(one_sided=True)),artifact_binder=lambda:"a"*64)
