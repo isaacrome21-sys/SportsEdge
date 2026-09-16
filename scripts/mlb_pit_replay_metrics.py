@@ -4,7 +4,8 @@
 The scorer implements the frozen slate-date one-way cluster-robust CR1 estimator
 for CLV and ROI and emits every canonical MLB market, including zero-evidence and
 policy-unauthorized dispositions. Missing close observations are excluded from CLV;
-they are never synthesized. There is no IID fallback.
+non-binary/push/void/unsettled outcomes are excluded from Brier/log-loss; missing
+settlements are excluded from ROI. Nothing is synthesized and there is no IID fallback.
 
 This script never imports third-party predictions/results and grants no Model_P,
 promotion, floor-freeze, eligibility, Truth Gate, staking, or OFFICIAL authority.
@@ -151,6 +152,7 @@ def score(rows: list[dict[str, str]], *, unauthorized: bool = False) -> dict[str
         return {
             "status": "N_WAY_UNAUTHORIZED_V1",
             "n": len(rows),
+            "binary_score_n": 0,
             "brier": None,
             "log_loss": None,
             "clv": cr1_mean([], []),
@@ -160,6 +162,7 @@ def score(rows: list[dict[str, str]], *, unauthorized: bool = False) -> dict[str
         return {
             "status": "NO_EVIDENCE",
             "n": 0,
+            "binary_score_n": 0,
             "brier": None,
             "log_loss": None,
             "clv": cr1_mean([], []),
@@ -173,13 +176,22 @@ def score(rows: list[dict[str, str]], *, unauthorized: bool = False) -> dict[str
     if any(not value for value in ids) or len(ids) != len(set(ids)):
         raise ValueError("duplicate/empty decision_id forbidden")
 
-    ps = [required_float(row, "model_p") for row in rows]
-    ys = [required_float(row, "outcome") for row in rows]
-    if any(not 0.0 <= p <= 1.0 for p in ps) or any(y not in (0.0, 1.0) for y in ys):
+    model_ps = [required_float(row, "model_p") for row in rows]
+    if any(not 0.0 <= p <= 1.0 for p in model_ps):
         raise ValueError("invalid probability/outcome")
+    binary_ps: list[float] = []
+    binary_ys: list[float] = []
+    for row, p in zip(rows, model_ps):
+        y = optional_float(row, "outcome")
+        if y is None:
+            continue
+        if y not in (0.0, 1.0):
+            raise ValueError("invalid probability/outcome")
+        binary_ps.append(p)
+        binary_ys.append(y)
     eps = 1e-15
-    brier = mean((p - y) ** 2 for p, y in zip(ps, ys))
-    logloss = mean(-(y * math.log(max(eps, p)) + (1 - y) * math.log(max(eps, 1 - p))) for p, y in zip(ps, ys))
+    brier = mean((p - y) ** 2 for p, y in zip(binary_ps, binary_ys))
+    logloss = mean(-(y * math.log(max(eps, p)) + (1 - y) * math.log(max(eps, 1 - p))) for p, y in zip(binary_ps, binary_ys))
 
     clv_values: list[float] = []
     clv_clusters: list[str] = []
@@ -214,10 +226,12 @@ def score(rows: list[dict[str, str]], *, unauthorized: bool = False) -> dict[str
         "status": "SCORED_NOT_PROMOTED",
         "n": len(rows),
         "slate_clusters_all_decisions": len({row[CLUSTER_KEY] for row in rows}),
+        "binary_score_n": len(binary_ys),
         "brier": brier,
         "log_loss": logloss,
         "clv": cr1_mean(clv_values, clv_clusters),
         "roi": cr1_ratio(roi_net, roi_risk, roi_clusters),
+        "excluded_from_binary_scoring_missing_outcome": len(rows) - len(binary_ys),
         "excluded_from_clv_missing_close": len(rows) - len(clv_values),
         "excluded_from_roi_missing_settlement": len(rows) - len(roi_net),
     }
