@@ -1,6 +1,7 @@
 import hashlib
 import tempfile
 import unittest
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
@@ -8,6 +9,15 @@ from unittest.mock import patch
 from scripts import nfl_2026_line_capture as cap
 
 UTC = timezone.utc
+
+
+class FakeSnapshot:
+    def provenance(self):
+        return {
+            "source": "nflverse/nfldata data/games.csv",
+            "sha256": "f" * 64,
+            "matching_semantics": "KICKOFF_UTC_MULTIPLICITY",
+        }
 
 
 def cfg(root):
@@ -45,12 +55,12 @@ def direct_transport(raw=b'{"provider":"exact bytes"}'):
     }
 
 
-def ok_row():
+def ok_row(event_id="E1", kickoff="2026-09-27T17:00:00Z"):
     return {
-        "event_id": "E1",
+        "event_id": event_id,
         "home_team": "Chicago Bears",
         "away_team": "Green Bay Packers",
-        "commence_time": "2026-09-27T17:00:00Z",
+        "commence_time": kickoff,
         "week": 3,
         "book": "draftkings",
         "source_class": cap.DIRECT_SOURCE_CLASS,
@@ -67,25 +77,51 @@ class DirectCaptureWiringTests(unittest.TestCase):
     NOW = datetime(2026, 9, 22, 14, 5, tzinfo=UTC)
     HASHES = {"policy_sha256": "p", "config_sha256": "c", "script_sha256": "s"}
 
+    def schedule_patches(self, expected=None):
+        expected = expected or Counter({"2026-09-27T17:00:00Z": 1})
+        return (
+            patch.object(cap, "load_schedule_snapshot", return_value=FakeSnapshot()),
+            patch.object(cap, "opener_expected_kickoffs", return_value=expected),
+        )
+
     def test_direct_success_is_primary_and_creates_lock_only_after_admission(self):
         with tempfile.TemporaryDirectory() as td:
             c = cfg(td)
-            with patch.object(cap, "acquire_direct_rows", return_value=(direct_transport(), [ok_row()])), \
+            p1, p2 = self.schedule_patches()
+            with p1, p2, \
+                 patch.object(cap, "acquire_direct_rows", return_value=(direct_transport(), [ok_row()])), \
                  patch.object(cap, "api_opener_rows") as fallback:
                 record = cap.do_opener(c, self.NOW, self.HASHES)
             fallback.assert_not_called()
             self.assertEqual(record["source_class"], cap.DIRECT_SOURCE_CLASS)
             self.assertEqual(record["lock_status"], "LOCK_CREATED")
+            self.assertEqual(record["schedule"]["expected_game_count"], 1)
             self.assertTrue((Path(c["output_dir"]) / "capture_lock.json").is_file())
             raw_path = Path(record["transport"]["raw_relative_path"])
             self.assertEqual(raw_path.read_bytes(), direct_transport()["raw_bytes"])
+
+    def test_partial_slate_never_locks_or_falls_through(self):
+        with tempfile.TemporaryDirectory() as td:
+            c = cfg(td)
+            expected = Counter({"2026-09-27T17:00:00Z": 2})
+            p1, p2 = self.schedule_patches(expected)
+            with p1, p2, \
+                 patch.object(cap, "acquire_direct_rows", return_value=(direct_transport(), [ok_row()])), \
+                 patch.object(cap, "api_opener_rows") as fallback:
+                with self.assertRaisesRegex(cap.CaptureError, "SCHEDULE_COVERAGE_MISMATCH"):
+                    cap.do_opener(c, self.NOW, self.HASHES)
+            fallback.assert_not_called()
+            self.assertFalse((Path(c["output_dir"]) / "capture_lock.json").exists())
+            self.assertFalse((Path(c["output_dir"]) / "week03" / "opener.json").exists())
 
     def test_direct_market_gap_never_falls_through_and_never_locks(self):
         with tempfile.TemporaryDirectory() as td:
             c = cfg(td)
             bad = ok_row()
             bad["total"] = {"status": "ONE_SIDED"}
-            with patch.object(cap, "acquire_direct_rows", return_value=(direct_transport(), [bad])), \
+            p1, p2 = self.schedule_patches()
+            with p1, p2, \
+                 patch.object(cap, "acquire_direct_rows", return_value=(direct_transport(), [bad])), \
                  patch.object(cap, "api_opener_rows") as fallback:
                 with self.assertRaisesRegex(cap.CaptureError, "TWO_SIDED_ADMISSION_FAILED"):
                     cap.do_opener(c, self.NOW, self.HASHES)
@@ -114,8 +150,13 @@ class DirectCaptureWiringTests(unittest.TestCase):
             }
             vendor_row = ok_row()
             vendor_row["source_class"] = cap.API_SOURCE_CLASS
-            failure = cap.DirectSourceFailure("DK_DIRECT_BOARD_UNAVAILABLE", attempts=[{"attempt": 1, "result_class": "DK_GAME_FETCH_FAILED"}])
-            with patch.object(cap, "acquire_direct_rows", side_effect=failure), \
+            failure = cap.DirectSourceFailure(
+                "DK_DIRECT_BOARD_UNAVAILABLE",
+                attempts=[{"attempt": 1, "result_class": "DK_GAME_FETCH_FAILED"}],
+            )
+            p1, p2 = self.schedule_patches()
+            with p1, p2, \
+                 patch.object(cap, "acquire_direct_rows", side_effect=failure), \
                  patch.object(cap, "api_opener_rows", return_value=(events, odds, [vendor_row])) as fallback:
                 record = cap.do_opener(c, self.NOW, self.HASHES)
             fallback.assert_called_once()
@@ -127,7 +168,8 @@ class DirectCaptureWiringTests(unittest.TestCase):
             c = cfg(td)
             t = direct_transport()
             t["raw_sha256"] = "0" * 64
-            with patch.object(cap, "acquire_direct_rows", return_value=(t, [ok_row()])):
+            p1, p2 = self.schedule_patches()
+            with p1, p2, patch.object(cap, "acquire_direct_rows", return_value=(t, [ok_row()])):
                 with self.assertRaisesRegex(cap.CaptureError, "DIRECT_RAW_HASH_MISMATCH"):
                     cap.do_opener(c, self.NOW, self.HASHES)
             self.assertFalse((Path(c["output_dir"]) / "capture_lock.json").exists())
