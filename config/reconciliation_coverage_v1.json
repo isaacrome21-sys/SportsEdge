@@ -150,6 +150,7 @@
     "scripts/fit_mlb_baseline.py": "RESEARCH_BASELINE_FIT_ONLY_NO_ACTIVE_BUNDLE",
     "scripts/fit_mlb_development.py": "RESEARCH_MODEL_DEVELOPMENT_ONLY_NO_ACTIVE_BUNDLE",
     "scripts/fit_mlb_development_v2.py": "RESEARCH_MODEL_DEVELOPMENT_ONLY_NO_ACTIVE_BUNDLE",
+    "scripts/mlb_pit_replay_metrics.py": "MLB_PIT_REPLAY_SCORING_ONLY_FROZEN_POLICY_BOUND_NO_MODEL_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY",
     "scripts/nfl_2026_provider_preflight.py": "NFL_PROVIDER_QUOTA_PREFLIGHT_ONLY_NO_MODEL_OR_PROMOTION_AUTHORITY",
     "scripts/odds_api_quota_guard.py": "PROVIDER_QUOTA_OPERATIONAL_GUARD_NO_MODEL_OR_PROMOTION_AUTHORITY",
     "scripts/probe_mlb_v7_finalization_sources.py": "LEGACY_SOURCE_PROBE_ONLY_NO_ACTIVE_BUNDLE",
