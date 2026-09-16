@@ -1,9 +1,9 @@
 """Read-only terminal readiness intersection for governed MLB MONEYLINE authority.
 
-This module cannot promote a market or edit deployment/staking state.  Its only job
+This module cannot promote a market or edit deployment/staking state. Its only job
 is to prove whether all already-frozen prerequisites have been observed together:
 prospective calibration, V2 fixed-checkpoint evidence, model-directed no-vig close
-edge, frozen floor, and current deployment state.  Any missing evidence remains a
+edge, frozen floor, and current deployment state. Any missing evidence remains a
 blocker and every authority flag emitted here is always false.
 """
 from __future__ import annotations
@@ -69,9 +69,11 @@ def evaluate_authority_readiness(
     lane = dict(binding or load_forward_lane_binding())
     active_artifact = str(lane.get("model_artifact_sha256") or "")
     if len(active_artifact) != 64:
-        # load_forward_lane_binding intentionally does not add the model artifact;
-        # checkpoint runtime does.  Read it from the reports when absent here.
-        active_artifact = str(checkpoint_report.get("model_artifact_sha256") or calibration_report.get("model_artifact_sha256") or "")
+        active_artifact = str(
+            checkpoint_report.get("model_artifact_sha256")
+            or calibration_report.get("model_artifact_sha256")
+            or ""
+        )
     if len(active_artifact) != 64:
         raise MLBMoneylineAuthorityReadinessError("active model artifact identity unavailable")
 
@@ -87,7 +89,8 @@ def evaluate_authority_readiness(
         and _finite(cal_thresholds.get("ece_max"), "ece_max") == 0.025
     )
     calibration_metrics_present = all(
-        key in cal_metrics for key in ("brier", "log_loss", "calibration_slope", "calibration_intercept", "ece")
+        key in cal_metrics
+        for key in ("brier", "log_loss", "calibration_slope", "calibration_intercept", "ece")
     )
     if calibration_metrics_present:
         for key in ("brier", "log_loss", "calibration_slope", "calibration_intercept", "ece"):
@@ -124,17 +127,20 @@ def evaluate_authority_readiness(
         clv = evaluate_paired_closes(close_rows, min_mean_clv=0.005)
     except MLBMoneylineCLVError as exc:
         raise MLBMoneylineAuthorityReadinessError(str(exc)) from exc
-    model_directed_clv_pass = bool(clv.get("clv_gate_pass") is True and int(clv.get("n", 0)) > 0)
+    model_directed_clv_pass = bool(
+        clv.get("clv_gate_pass") is True and int(clv.get("n", 0)) > 0
+    )
 
     truth_gate = floor_config.get("truth_gate") or {}
+    production = truth_gate.get("production") or {}
     floor_policy = truth_gate.get("floor_policy") or {}
-    sports = floor_policy.get("sports") or {}
-    mlb = sports.get("MLB") or {}
+    edge_floors = truth_gate.get("edge_floors") or {}
+    mlb = edge_floors.get("MLB") or {}
     floor_pass = bool(
-        floor_config.get("schema_version") == 3
-        and truth_gate.get("fail_closed") is True
-        and truth_gate.get("allow_cli_floor_override") is False
-        and truth_gate.get("require_frozen_floor_for_eligible_market") is True
+        truth_gate.get("schema_version") == 3
+        and production.get("fail_closed") is True
+        and production.get("allow_cli_floor_override") is False
+        and production.get("require_frozen_floor_for_eligible_market") is True
         and floor_policy.get("status") == "FROZEN_BEFORE_JUDGED_STREAM"
         and _finite(floor_policy.get("default_floor"), "default floor") == 0.03
         and _finite(floor_policy.get("longshot_or_one_sided_floor"), "longshot floor") == 0.05
@@ -143,8 +149,12 @@ def evaluate_authority_readiness(
 
     moneyline = ((deployments.get("markets") or {}).get("MONEYLINE") or {})
     deployment_currently_locked = moneyline.get("eligible") is False
-    if moneyline.get("eligible") is True and not (calibration_pass and checkpoint_150_pass and model_directed_clv_pass and floor_pass):
-        raise MLBMoneylineAuthorityReadinessError("MONEYLINE eligible before terminal evidence prerequisites")
+    if moneyline.get("eligible") is True and not (
+        calibration_pass and checkpoint_150_pass and model_directed_clv_pass and floor_pass
+    ):
+        raise MLBMoneylineAuthorityReadinessError(
+            "MONEYLINE eligible before terminal evidence prerequisites"
+        )
 
     checks = {
         "frozen_nonzero_edge_floor": floor_pass,
@@ -180,7 +190,10 @@ def evaluate_authority_readiness(
         "model_directed_clv": clv,
         "deployment_snapshot": dict(moneyline),
         "warning_gate_status": "SEPARATE_OFFICIAL_WARNING_CLEARANCE_REQUIRED_AT_TRANSITION",
-        "transition_rule": "This receipt is read-only. A separate governed transition must verify warning clearance and fresh runtime hard checks before any deployment, stake, or OFFICIAL change.",
+        "transition_rule": (
+            "This receipt is read-only. A separate governed transition must verify warning "
+            "clearance and fresh runtime hard checks before any deployment, stake, or OFFICIAL change."
+        ),
         "promotion_authority": False,
         "deployment_change_allowed": False,
         "staking_change_allowed": False,
