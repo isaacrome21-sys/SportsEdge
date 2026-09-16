@@ -33,6 +33,10 @@ jobs:
   capture:
     runs-on: ubuntu-24.04
     timeout-minutes: 8
+    env:
+      # Scripts are executed by path, so Python otherwise starts with scripts/
+      # as sys.path[0]. Keep the repository root importable for sportsedge.*.
+      PYTHONPATH: .
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
