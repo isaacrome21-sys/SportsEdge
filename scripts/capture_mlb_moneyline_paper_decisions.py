@@ -123,6 +123,7 @@ def capture_decisions(
     not_due: list[int] = []
     already_present: list[int] = []
     newly_blocked: list[int] = []
+    freeze_day = freeze_now.date().isoformat()
 
     for game_pk, prediction in sorted(predictions.items()):
         if game_pk in existing:
@@ -146,14 +147,7 @@ def capture_decisions(
             continue
         if status not in {"PAPER_BET_FROZEN", "PAPER_PASS_FROZEN", "BLOCKED_MISSED_DECISION_FREEZE"}:
             raise PaperDecisionCaptureError(f"unexpected decision status for {game_pk}: {status}")
-        try:
-            start = datetime.fromisoformat(str(prediction.get("event_start_ts") or "").replace("Z", "+00:00"))
-        except ValueError as exc:
-            raise PaperDecisionCaptureError(f"event_start_ts invalid for {game_pk}") from exc
-        if start.tzinfo is None:
-            raise PaperDecisionCaptureError(f"event_start_ts timezone missing for {game_pk}")
-        day = start.astimezone(timezone.utc).date().isoformat()
-        path = Path(decision_root) / day / f"game_{game_pk}.json"
+        path = Path(decision_root) / freeze_day / f"game_{game_pk}.json"
         if _write_create_only(path, decision):
             retained.append(str(path))
             if status == "BLOCKED_MISSED_DECISION_FREEZE":
@@ -176,6 +170,7 @@ def capture_decisions(
         "market_definition_sha256": binding["market_definition_sha256"],
         "policy_id": binding["policy_id"],
         "policy_sha256": binding["policy_sha256"],
+        "freeze_day_utc": freeze_day,
         "predictions_seen": len(predictions),
         "quotes_seen": len(quotes),
         "decisions_retained": len(retained),
