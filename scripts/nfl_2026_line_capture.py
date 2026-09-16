@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """NFL 2026 confirmation line capture (DraftKings spreads + totals).
 
-The first successful capture hash-locks policy/config/script/workflow. Therefore
-source semantics are fixed here before any successful 2026 confirmation row:
 DRAFTKINGS_DIRECT_WEB_V1 is primary; DRAFTKINGS_ODDS_API_V1 is fallback only
 when the direct source itself fails. A valid direct board with missing/one-sided
 markets never triggers cross-source filling.
 
-Before the first lock can be created, every admitted capture must also match the
-nflverse schedule by exact kickoff-UTC multiplicity. A syntactically valid but
-partial board is not a successful capture.
+Before the first lock can be created, every admitted capture must match the
+nflverse schedule by exact kickoff-UTC multiplicity and satisfy exact two-sided
+spread/total admission. Source modules are content-bound through the locked
+configuration.
 """
 import hashlib
 import json
@@ -18,7 +17,6 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
-from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -35,9 +33,10 @@ from sportsedge.nfl_direct_capture_source import (  # noqa: E402
 )
 from sportsedge.nfl_confirmation_schedule import (  # noqa: E402
     ScheduleExpectationError,
+    captured_final_event_ids,
+    final_expected_due_kickoffs,
     load_snapshot,
     opener_expected_kickoffs,
-    final_expected_due_kickoffs,
     require_exact_coverage,
 )
 
@@ -80,6 +79,33 @@ def iso_z(dt):
 
 def parse_iso(s):
     return datetime.fromisoformat(s.replace("Z", "+00:00"))
+
+
+def _atomic_create_bytes(path, data):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        raise CaptureError(f"REFUSING_OVERWRITE {path}")
+    tmp = path.with_name(f".{path.name}.tmp.{os.getpid()}")
+    try:
+        with tmp.open("xb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        try:
+            os.link(tmp, path)
+        except FileExistsError as exc:
+            raise CaptureError(f"REFUSING_OVERWRITE {path}") from exc
+    finally:
+        try:
+            tmp.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def _atomic_create_json(path, value):
+    payload = (json.dumps(value, indent=2) + "\n").encode("utf-8")
+    _atomic_create_bytes(path, payload)
 
 
 # ---------- config and locking ----------
@@ -142,12 +168,37 @@ def lock_status(cfg, hashes, now, create):
     if not lock.exists():
         if not create:
             return "NO_LOCK_YET"
-        lock.parent.mkdir(parents=True, exist_ok=True)
-        lock.write_text(json.dumps({**hashes, "locked_at_utc": now.isoformat()}, indent=2))
-        return "LOCK_CREATED"
-    saved = json.loads(lock.read_text())
+        try:
+            _atomic_create_json(lock, {**hashes, "locked_at_utc": now.isoformat()})
+            return "LOCK_CREATED"
+        except CaptureError:
+            if not lock.exists():
+                raise
+    try:
+        saved = json.loads(lock.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise CaptureError("CAPTURE_LOCK_INVALID") from exc
     diffs = [k for k in hashes if saved.get(k) != hashes[k]]
     return "MATCH" if not diffs else "MISMATCH:" + ",".join(diffs)
+
+
+def _any_capture_record(cfg):
+    root = Path(cfg["output_dir"])
+    if any(root.glob("week*/opener.json")):
+        return True
+    return any(root.glob("week*/final/*.json"))
+
+
+def rollback_new_lock_if_uncommitted(cfg, hashes, status):
+    if status != "LOCK_CREATED" or _any_capture_record(cfg):
+        return
+    lock = Path(cfg["output_dir"]) / "capture_lock.json"
+    try:
+        saved = json.loads(lock.read_text())
+    except (OSError, json.JSONDecodeError):
+        return
+    if all(saved.get(k) == v for k, v in hashes.items()):
+        lock.unlink(missing_ok=True)
 
 
 # ---------- Odds API fallback ----------
@@ -312,10 +363,7 @@ def log_attempt(cfg, entry):
 
 
 def write_new(path, record):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if path.exists():
-        raise CaptureError(f"REFUSING_OVERWRITE {path}")
-    path.write_text(json.dumps(record, indent=2))
+    _atomic_create_json(path, record)
 
 
 def persist_direct_raw(cfg, transport):
@@ -327,10 +375,11 @@ def persist_direct_raw(cfg, transport):
         raise CaptureError("DIRECT_RAW_HASH_MISMATCH")
     path = Path(cfg["output_dir"]) / "raw" / "draftkings-direct" / f"{digest}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    if path.exists() and hashlib.sha256(path.read_bytes()).hexdigest() != digest:
-        raise CaptureError("DIRECT_RAW_PATH_COLLISION")
-    if not path.exists():
-        path.write_bytes(bytes(raw))
+    if path.exists():
+        if hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+            raise CaptureError("DIRECT_RAW_PATH_COLLISION")
+    else:
+        _atomic_create_bytes(path, bytes(raw))
     return str(path)
 
 
@@ -394,6 +443,17 @@ def api_opener_rows(cfg, t_from, t_to):
     return events, odds, game_rows(events["data"], odds["data"], cfg)
 
 
+def _write_record_with_lock(path, record, cfg, hashes, now):
+    status = lock_status(cfg, hashes, now, create=True)
+    record["lock_status"] = status
+    try:
+        write_new(path, record)
+    except Exception:
+        rollback_new_lock_if_uncommitted(cfg, hashes, status)
+        raise
+    return status
+
+
 # ---------- OPENER ----------
 
 def do_opener(cfg, now, hashes):
@@ -431,23 +491,21 @@ def do_opener(cfg, now, hashes):
             raise
         raw_path = persist_direct_raw(cfg, transport)
         retrieved = parse_iso(transport["observed_at_utc"])
-        status = lock_status(cfg, hashes, now, create=True)
         record = {
             "capture_kind": "OPENER", "week": due["week"], "book": cfg["bookmaker"], "markets": cfg["markets"],
             "source_class": DIRECT_SOURCE_CLASS,
             "target_local": due["target"].isoformat(), "run_started_utc": now.isoformat(),
             "retrieved_at_utc": transport["observed_at_utc"],
             "minutes_after_target": round((retrieved - due["target"]).total_seconds() / 60, 2),
-            "lock_status": status, "hashes": hashes, "run": run_meta(),
+            "hashes": hashes, "run": run_meta(),
             "predictions_at_opener": predictions_status(cfg, due["week"]),
             "schedule": schedule_meta(snapshot, expected),
             "transport": direct_meta(transport, raw_path),
             "games": rows,
         }
-        write_new(path, record)
+        status = _write_record_with_lock(path, record, cfg, hashes, now)
         return record
 
-    # Direct source itself failed: only now may the declared vendor fallback run.
     try:
         events, odds, rows = api_opener_rows(cfg, t_from, we)
         require_schedule_coverage(rows, expected, "OPENER")
@@ -458,14 +516,13 @@ def do_opener(cfg, now, hashes):
                           "direct_attempts": getattr(direct_failure, "attempts", []), **run_meta()})
         raise
     retrieved = parse_iso(odds["received_at_utc"])
-    status = lock_status(cfg, hashes, now, create=True)
     record = {
         "capture_kind": "OPENER", "week": due["week"], "book": cfg["bookmaker"], "markets": cfg["markets"],
         "source_class": API_SOURCE_CLASS,
         "target_local": due["target"].isoformat(), "run_started_utc": now.isoformat(),
         "retrieved_at_utc": odds["received_at_utc"],
         "minutes_after_target": round((retrieved - due["target"]).total_seconds() / 60, 2),
-        "lock_status": status, "hashes": hashes, "run": run_meta(),
+        "hashes": hashes, "run": run_meta(),
         "predictions_at_opener": predictions_status(cfg, due["week"]),
         "schedule": schedule_meta(snapshot, expected),
         "transport": {
@@ -478,21 +535,14 @@ def do_opener(cfg, now, hashes):
         },
         "games": rows, "raw_events": events["data"], "raw_odds": odds["data"],
     }
-    write_new(path, record)
+    _write_record_with_lock(path, record, cfg, hashes, now)
     return record
 
 
 # ---------- FINAL ----------
 
 def captured_final_ids(cfg):
-    ids = set()
-    for p in Path(cfg["output_dir"]).glob("week*/final/*.json"):
-        try:
-            record = json.loads(p.read_text())
-        except (OSError, json.JSONDecodeError):
-            continue
-        ids.update(g["event_id"] for g in record.get("games", []) if g.get("event_id"))
-    return ids
+    return captured_final_event_ids(cfg)
 
 
 def _due_final_rows(rows, cfg, now):
@@ -590,22 +640,23 @@ def do_final(cfg, now, hashes):
         if retrieved >= kickoff:
             raise CaptureError("AFTER_KICKOFF_INVALID")
 
-    status = lock_status(cfg, hashes, now, create=True)
     written = []
+    status = None
     for week in sorted({r["week"] for r in rows}):
         stamp = retrieved.strftime("%Y%m%dT%H%M%SZ")
+        path = Path(cfg["output_dir"]) / f"week{week:02d}" / "final" / f"{stamp}.json"
         record = {
             "capture_kind": "FINAL", "week": week, "book": cfg["bookmaker"], "markets": cfg["markets"],
             "source_class": source_meta["source_class"],
             "run_started_utc": now.isoformat(), "retrieved_at_utc": iso_z(retrieved),
-            "lock_status": status, "hashes": hashes, "run": run_meta(),
+            "hashes": hashes, "run": run_meta(),
             "schedule": schedule_meta(snapshot, expected),
             "transport": source_meta,
             "games": [r for r in rows if r["week"] == week],
         }
         if raw_odds is not None:
             record["raw_odds"] = raw_odds
-        write_new(Path(cfg["output_dir"]) / f"week{week:02d}" / "final" / f"{stamp}.json", record)
+        status = _write_record_with_lock(path, record, cfg, hashes, now)
         written.append(record)
     return {"capture_kind": "FINAL", "source_class": source_meta["source_class"],
             "lock_status": status, "records": written}
@@ -628,8 +679,6 @@ def do_check(cfg, now, hashes):
         print(f"{DIRECT_SOURCE_CLASS}: FAILED {exc} attempts={exc.attempts}")
         rc = 1
 
-    # Fallback health is diagnostic only; a dead vendor key must not invalidate a
-    # healthy primary direct-DK source.
     keys = api_keys()
     if not keys:
         print(f"{API_SOURCE_CLASS}: NO_API_KEYS (fallback unavailable)")
