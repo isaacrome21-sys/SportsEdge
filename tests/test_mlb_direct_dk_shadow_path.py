@@ -15,7 +15,7 @@ UTC = timezone.utc
 RECEIVED = datetime(2026, 9, 15, 16, 0, tzinfo=UTC)
 
 
-def payload(*, bad_spread=False, drop_under=False):
+def payload(*, bad_spread=False, drop_under=False, omit_total_market=False):
     spread_away = 2.5 if not bad_spread else 3.5
     selections = [
         {"marketId": "m1", "label": "Chicago Cubs", "displayOdds": {"american": "-120"}},
@@ -27,13 +27,17 @@ def payload(*, bad_spread=False, drop_under=False):
     ]
     if drop_under:
         selections = [x for x in selections if not str(x["label"]).startswith("Under")]
+    markets = [
+        {"id": "m1", "eventId": "dk1", "name": "Moneyline"},
+        {"id": "m2", "eventId": "dk1", "name": "Run Line"},
+        {"id": "m3", "eventId": "dk1", "name": "Total"},
+    ]
+    if omit_total_market:
+        markets = [m for m in markets if m["id"] != "m3"]
+        selections = [s for s in selections if s["marketId"] != "m3"]
     return {
         "events": [{"id": "dk1", "name": "Chicago Cubs @ Pittsburgh Pirates", "startEventDate": "2026-09-15T23:40:00Z"}],
-        "markets": [
-            {"id": "m1", "eventId": "dk1", "name": "Moneyline"},
-            {"id": "m2", "eventId": "dk1", "name": "Run Line"},
-            {"id": "m3", "eventId": "dk1", "name": "Total"},
-        ],
+        "markets": markets,
         "selections": selections,
     }
 
@@ -72,11 +76,18 @@ class DirectDKMLBSourceTests(unittest.TestCase):
         self.assertFalse(any(q["market"] == "RUN_LINE" for q in snap.quotes))
         self.assertTrue(any("DIRECT_DK_SPREAD_LINE_MISMATCH" in f["reason"] for f in snap.failures))
 
-    def test_one_sided_total_is_not_synthesized(self):
+    def test_one_sided_total_is_rejected_and_observable(self):
         snap = normalize_direct_dk_mlb_board(board=board(payload(drop_under=True)), schedule=[game()])
         self.assertFalse(any(q["market"] == "TOTALS" for q in snap.quotes))
-        # normalize_board omits the invalid pair entirely; absence must never create a synthetic quote.
-        self.assertEqual(len([q for q in snap.quotes if q["market"] == "TOTALS"]), 0)
+        failures = [f for f in snap.failures if f.get("market") == "totals"]
+        self.assertEqual(len(failures), 1)
+        self.assertEqual(failures[0]["stage"], "MARKET_ADMISSION")
+        self.assertIn("DIRECT_DK_MARKET_PRESENT_BUT_NOT_ADMISSIBLE", failures[0]["reason"])
+
+    def test_truly_absent_total_is_not_misclassified_as_rejected(self):
+        snap = normalize_direct_dk_mlb_board(board=board(payload(omit_total_market=True)), schedule=[game()])
+        self.assertFalse(any(q["market"] == "TOTALS" for q in snap.quotes))
+        self.assertFalse(any(f.get("market") == "totals" for f in snap.failures))
 
     def test_unbound_provider_event_emits_no_quotes(self):
         wrong = game()
