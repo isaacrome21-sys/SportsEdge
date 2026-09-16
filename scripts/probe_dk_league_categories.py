@@ -9,9 +9,9 @@ from urllib.request import Request, urlopen
 
 from sportsedge.draftkings_game_market_source import (
     DK_ROOT,
-    FULL_GAME_CATEGORY_ID,
     LEAGUE_IDS,
     RawDraftKingsBoard,
+    game_line_category_id,
     normalize_board,
 )
 
@@ -89,7 +89,8 @@ def _category_candidates(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
 
 def probe_sport(sport_key: str) -> dict[str, Any]:
     league_id = LEAGUE_IDS[sport_key]
-    category_url = f"{DK_ROOT}/leagues/{league_id}/categories/{FULL_GAME_CATEGORY_ID}"
+    current_category_id = game_line_category_id(sport_key)
+    category_url = f"{DK_ROOT}/leagues/{league_id}/categories/{current_category_id}"
     bare_url = f"{DK_ROOT}/leagues/{league_id}"
 
     category_raw, category_payload = _fetch(category_url)
@@ -105,7 +106,7 @@ def probe_sport(sport_key: str) -> dict[str, Any]:
         cid = int(item["category_id"])
         url = f"{DK_ROOT}/leagues/{league_id}/categories/{cid}"
         try:
-            raw, payload = (category_raw, category_payload) if cid == FULL_GAME_CATEGORY_ID else _fetch(url)
+            raw, payload = (category_raw, category_payload) if cid == current_category_id else _fetch(url)
             pairs = _valid_pair_count(sport_key, url, raw, payload)
             result = {
                 **item,
@@ -133,7 +134,7 @@ def probe_sport(sport_key: str) -> dict[str, Any]:
     return {
         "sport_key": sport_key,
         "league_id": league_id,
-        "current_category_id": FULL_GAME_CATEGORY_ID,
+        "current_category_id": current_category_id,
         "current_category_uri": category_url,
         "current_category_raw_sha256": hashlib.sha256(category_raw).hexdigest(),
         "current_category_events": category_events,
