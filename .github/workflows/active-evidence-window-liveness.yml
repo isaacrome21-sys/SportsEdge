@@ -63,9 +63,24 @@ jobs:
           python3 scripts/check_active_evidence_windows.py nfl-liveness
           --schedule-csv "$RUNNER_TEMP/nfl-games.csv"
           --lookback-hours 4
-      - name: Fail loudly on recent forward durable non-accrual
-        run: >-
-          python3 scripts/check_nfl_forward_accrual.py
-          --schedule-csv "$RUNNER_TEMP/nfl-games.csv"
-          --state-root .data-liveness/runtime/nfl-forward
-          --lookback-hours 4
+      - name: Fail loudly on forward durable non-accrual since activation
+        shell: bash
+        run: |
+          set -euo pipefail
+          LOOKBACK_HOURS="$(python3 - <<'PY'
+          from datetime import datetime, timezone
+          import json
+          from pathlib import Path
+
+          registry = json.loads(Path('config/active_evidence_windows_v1.json').read_text(encoding='utf-8'))
+          window = next(x for x in registry['windows'] if x.get('id') == 'NFL_2026_FORWARD_CLV')
+          raw = str(window['active_from'])
+          active = datetime.fromisoformat(raw if 'T' in raw else raw + 'T00:00:00').replace(tzinfo=timezone.utc)
+          hours = max(0.0, (datetime.now(timezone.utc) - active).total_seconds() / 3600.0)
+          print(hours)
+          PY
+          )"
+          python3 scripts/check_nfl_forward_accrual.py \
+            --schedule-csv "$RUNNER_TEMP/nfl-games.csv" \
+            --state-root .data-liveness/runtime/nfl-forward \
+            --lookback-hours "$LOOKBACK_HOURS"
