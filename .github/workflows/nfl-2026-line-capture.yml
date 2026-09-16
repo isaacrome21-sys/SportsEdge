@@ -18,6 +18,7 @@ on:
       - 'sportsedge/nfl_direct_capture_source.py'
       - 'sportsedge/draftkings_game_market_source.py'
       - 'tests/test_nfl_direct_capture_source.py'
+      - 'tests/test_nfl_2026_direct_capture_wiring.py'
       - 'tests/test_direct_dk_game_market_source.py'
       - 'tests/test_capture_direct_dk_closing_lines.py'
       - 'tests/test_nfl_2026_capture_gap_audit.py'
@@ -36,8 +37,10 @@ on:
 permissions:
   contents: write
 
+# This workflow still receives The Odds API fallback secrets, so it remains under
+# the repository-wide paid-provider serialization lock even though direct DK is primary.
 concurrency:
-  group: sportsedge-nfl-confirmation-capture
+  group: sportsedge-paid-odds-api
   cancel-in-progress: false
 
 jobs:
@@ -49,7 +52,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
-      - name: Verify capture, no-backfill, and provider contracts
+      - name: Verify capture, source binding, no-backfill, and provider contracts
         run: |
           python3 -m py_compile \
             scripts/nfl_2026_line_capture.py \
@@ -59,8 +62,22 @@ jobs:
             scripts/nfl_2026_provider_preflight.py \
             sportsedge/nfl_direct_capture_source.py \
             sportsedge/draftkings_game_market_source.py
+          python3 - <<'PY'
+          import json, subprocess
+          from pathlib import Path
+          cfg = json.loads(Path('config/nfl_2026_capture.json').read_text())
+          bindings = cfg.get('source_code_bindings') or {}
+          if not bindings:
+              raise SystemExit('NFL_SOURCE_CODE_BINDINGS_MISSING')
+          for path, expected in sorted(bindings.items()):
+              actual = subprocess.check_output(['git', 'hash-object', path], text=True).strip()
+              if actual != expected:
+                  raise SystemExit(f'NFL_SOURCE_CODE_BINDING_MISMATCH:{path}:expected={expected}:actual={actual}')
+          print('NFL_SOURCE_CODE_BINDINGS_OK')
+          PY
           python3 -m unittest -q \
             tests.test_nfl_direct_capture_source \
+            tests.test_nfl_2026_direct_capture_wiring \
             tests.test_direct_dk_game_market_source \
             tests.test_capture_direct_dk_closing_lines \
             tests.test_nfl_2026_capture_gap_audit \
