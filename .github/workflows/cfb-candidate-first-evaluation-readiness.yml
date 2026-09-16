@@ -87,7 +87,7 @@ jobs:
             echo "$key=$value" >> "$GITHUB_OUTPUT"
           done
 
-      - name: Audit evidence readiness without consuming an attempt
+      - name: Audit promotion-grade PIT readiness without consuming an attempt
         shell: bash
         run: |
           set -euo pipefail
@@ -104,7 +104,7 @@ jobs:
           [ -z "${{ steps.evidence.outputs.market }}" ] || args+=(--paired-market-evidence "${{ steps.evidence.outputs.market }}")
           python scripts/audit_cfb_pit_readiness.py "${args[@]}"
 
-      - name: Freeze first-evaluation decision
+      - name: Freeze candidate-selection first-evaluation decision
         shell: bash
         run: |
           set -euo pipefail
@@ -127,17 +127,22 @@ jobs:
 
           prereg_ready = prereg.get('status') == 'READY_FOR_FIRST_EVALUATION'
           pit_ready = pit.get('historical_truth_gate_execution_allowed') is True
-          allowed = prereg_ready and pit_ready
-          blockers = []
+
+          # Scope amendment #730: reconstructed-history candidate-family selection
+          # is governed by preregistration/selection policy, not promotion-grade PIT.
+          allowed = prereg_ready
+          selection_blockers = []
           if not prereg_ready:
-              blockers.append('PREREGISTRATION_NOT_READY')
-          if not pit_ready:
-              blockers.extend(pit.get('blockers') or ['GENUINE_PIT_SOURCE_CONTRACT_NOT_READY'])
+              selection_blockers.append('PREREGISTRATION_NOT_READY')
+          promotion_pit_blockers = [] if pit_ready else list(
+              pit.get('blockers') or ['GENUINE_PIT_SOURCE_CONTRACT_NOT_READY']
+          )
 
           report = {
-              'schema_version': 'CFB_FIRST_EVALUATION_READINESS_V1',
-              'status': 'FIRST_EVALUATION_ALLOWED' if allowed else 'BLOCKED_SOURCE_CONTRACT',
+              'schema_version': 'CFB_FIRST_EVALUATION_READINESS_V2',
+              'status': 'FIRST_EVALUATION_ALLOWED' if allowed else 'BLOCKED_SELECTION_PREREGISTRATION',
               'first_evaluation_allowed': allowed,
+              'selection_scope_only': True,
               'attempts_consumed': 0,
               'evaluation_performed': False,
               'model_p_created': False,
@@ -148,8 +153,10 @@ jobs:
               'pit_readiness_state': pit.get('readiness_state'),
               'historical_truth_gate_execution_allowed': pit.get('historical_truth_gate_execution_allowed'),
               'forward_clock_allowed': pit.get('forward_clock_allowed'),
-              'blockers': list(dict.fromkeys(blockers)),
-              'do_not_consume_attempt_until_source_contract_ready': True,
+              'blockers': selection_blockers,
+              'promotion_pit_diagnostic_blockers': promotion_pit_blockers,
+              'promotion_pit_is_not_selection_veto': True,
+              'do_not_consume_attempt_until_selection_contract_ready': True,
           }
           Path('artifacts/cfb/first_evaluation_readiness.json').write_text(
               json.dumps(report, indent=2, sort_keys=True) + '\n'
@@ -169,9 +176,10 @@ jobs:
                   raise SystemExit(f'CFB_FIRST_EVAL_READINESS_AUTHORITY_LEAK:{key}')
           if report.get('attempts_consumed') != 0 or report.get('evaluation_performed') is not False:
               raise SystemExit('CFB_FIRST_EVAL_READINESS_CONSUMED_ATTEMPT')
-          if report.get('first_evaluation_allowed'):
-              if report.get('historical_truth_gate_execution_allowed') is not True:
-                  raise SystemExit('CFB_FIRST_EVAL_ALLOWED_WITHOUT_PIT_GATE')
+          if report.get('first_evaluation_allowed') and report.get('preregistration_status') != 'READY_FOR_FIRST_EVALUATION':
+              raise SystemExit('CFB_FIRST_EVAL_ALLOWED_WITHOUT_PREREGISTRATION')
+          if report.get('first_evaluation_allowed') and report.get('selection_scope_only') is not True:
+              raise SystemExit('CFB_FIRST_EVAL_SCOPE_NOT_SELECTION_ONLY')
           PY
 
       - name: Upload first-evaluation readiness evidence
