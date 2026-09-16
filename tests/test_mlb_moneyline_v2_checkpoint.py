@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 
 from sportsedge.mlb_model_artifact import mlb_model_artifact_sha256
@@ -9,7 +12,11 @@ from sportsedge.mlb_moneyline_v2_checkpoint import (
     MLBMoneylineV2CheckpointError,
     _student_t_critical_975,
 )
-from sportsedge.mlb_moneyline_v2_checkpoint_runtime import evaluate_v2_checkpoints
+from sportsedge.mlb_moneyline_v2_checkpoint_runtime import (
+    evaluate_evidence_tree,
+    evaluate_v2_checkpoints,
+    main as checkpoint_runtime_main,
+)
 
 
 class MLBMoneylineV2CheckpointTests(unittest.TestCase):
@@ -181,6 +188,40 @@ class MLBMoneylineV2CheckpointTests(unittest.TestCase):
         row["clv_probability_points"] = 0.99
         with self.assertRaisesRegex(MLBMoneylineV2CheckpointError, "CLV identity mismatch"):
             evaluate_v2_checkpoints([row])
+
+    def test_missing_evidence_tree_is_valid_waiting_state(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp) / "not-created-yet"
+            report = evaluate_evidence_tree(root)
+        self.assertEqual(report["status"], "WAITING_FOR_FIRST_CHECKPOINT")
+        self.assertEqual(report["total_valid_v2_graded_bets"], 0)
+        self.assertEqual(report["source_json_file_count"], 0)
+        self.assertIs(report["promotion_authority"], False)
+
+    def test_evidence_tree_loads_cumulative_v2_rows(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp) / "evidence"
+            root.mkdir()
+            for i in range(3):
+                (root / f"{i}.json").write_text(json.dumps(self._row(i)), encoding="utf-8")
+            report = evaluate_evidence_tree(root)
+        self.assertEqual(report["total_valid_v2_graded_bets"], 3)
+        self.assertEqual(report["source_json_file_count"], 3)
+        self.assertEqual(report["next_checkpoint_count"], 50)
+
+    def test_runtime_cli_writes_blocked_receipt_on_invalid_json(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp) / "evidence"
+            root.mkdir()
+            (root / "bad.json").write_text("{not-json", encoding="utf-8")
+            report_path = Path(tmp) / "checkpoint.json"
+            rc = checkpoint_runtime_main(
+                ["--evidence-root", str(root), "--report", str(report_path)]
+            )
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+        self.assertEqual(rc, 2)
+        self.assertEqual(report["status"], "BLOCKED_CHECKPOINT_RUNTIME_ERROR")
+        self.assertIs(report["promotion_authority"], False)
 
 
 if __name__ == "__main__":
