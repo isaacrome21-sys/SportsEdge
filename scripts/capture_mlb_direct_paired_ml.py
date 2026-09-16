@@ -59,6 +59,8 @@ def capture(*,output_dir=DEFAULT_OUTPUT_DIR,clock:Callable[[],datetime]=_now,fet
     try: transport=acquire_board(SPORT_KEY,**kwargs)
     except DirectCaptureError as exc: raise CaptureBlocked("BLOCKED_TRANSPORT",getattr(exc,"attempts",None)) from exc
     scan=paired_moneylines(transport)
+    if scan["events_on_board"] == 0:
+        raise CaptureBlocked("BLOCKED_EMPTY_BOARD",{"events_on_board":0,"events_in_window":0,"raw_sha256":transport["raw_sha256"],"source_uri":transport["source_uri"]})
     if scan["anomalies"]: raise CaptureBlocked("BLOCKED_ONE_SIDED",{"anomalies":scan["anomalies"]})
     observed=_parse(transport["observed_at_utc"]); slate=observed.date().isoformat(); written=[]; skipped_existing=[]; base=Path(output_dir)/slate
     for row in scan["rows"]:
@@ -68,7 +70,7 @@ def capture(*,output_dir=DEFAULT_OUTPUT_DIR,clock:Callable[[],datetime]=_now,fet
         path.parent.mkdir(parents=True,exist_ok=True); path.write_text(json.dumps(record,indent=2,sort_keys=True)); written.append(str(path))
     if not written:
         return {"status":"ALREADY_CAPTURED" if skipped_existing else "NO_CAPTURE_DUE","evidence_disposition":EVIDENCE_DISPOSITION,"slate_date":slate,"observations_retained":0,"already_present":skipped_existing,"events_on_board":scan["events_on_board"],"events_in_window":scan["in_window"],"paths":[],"raw_sha256":transport["raw_sha256"],"model_artifact_sha256":artifact_sha}
-    return {"status":"RETAINED","evidence_disposition":EVIDENCE_DISPOSITION,"slate_date":slate,"observations_retained":len(written),"already_present":skipped_existing,"paths":written,"raw_sha256":transport["raw_sha256"],"model_artifact_sha256":artifact_sha}
+    return {"status":"RETAINED","evidence_disposition":EVIDENCE_DISPOSITION,"slate_date":slate,"observations_retained":len(written),"already_present":skipped_existing,"events_on_board":scan["events_on_board"],"events_in_window":scan["in_window"],"paths":written,"raw_sha256":transport["raw_sha256"],"model_artifact_sha256":artifact_sha}
 def _self_sha():
     import hashlib
     return hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
