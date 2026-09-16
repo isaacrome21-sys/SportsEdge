@@ -1,18 +1,11 @@
 #!/usr/bin/env python3
 """NFL 2026 confirmation line capture (DraftKings spreads + totals).
 
-Rules enforced here:
-- OPENER: first successful capture at/after the frozen local time on the frozen
-  weekday, inside the opener window. Target week = window starting on the first
-  Tuesday on/after the capture date.
-- FINAL: first successful capture at/after kickoff minus the frozen lead, inside
-  the final window, and always before kickoff.
-- No backfills: nothing is ever captured outside those windows, whatever triggered
-  the run. Existing capture files are never overwritten.
-- Policy file, this config, this script and the workflow are hash-locked at the
-  first capture. Any later change is still captured but flagged MISMATCH and the
-  job fails visibly.
-Standard library only.
+The first successful capture hash-locks policy/config/script/workflow. Therefore
+source semantics are fixed here before any successful 2026 confirmation row:
+DRAFTKINGS_DIRECT_WEB_V1 is primary; DRAFTKINGS_ODDS_API_V1 is fallback only
+when the direct source itself fails. A valid direct board with missing/one-sided
+markets never triggers cross-source filling.
 """
 import hashlib
 import json
@@ -25,7 +18,19 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from sportsedge.nfl_direct_capture_source import (  # noqa: E402
+    DirectCaptureError,
+    SOURCE_CLASS as DIRECT_SOURCE_CLASS,
+    acquire_board,
+    game_rows_direct,
+)
+
 API = "https://api.the-odds-api.com/v4/sports"
+API_SOURCE_CLASS = "DRAFTKINGS_ODDS_API_V1"
 WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 ALLOWED_OPENER_DAYS = {"Sunday", "Monday", "Tuesday"}
 CONFIG_PATH = os.environ.get("CAPTURE_CONFIG", "config/nfl_2026_capture.json")
@@ -33,6 +38,12 @@ CONFIG_PATH = os.environ.get("CAPTURE_CONFIG", "config/nfl_2026_capture.json")
 
 class CaptureError(Exception):
     pass
+
+
+class DirectSourceFailure(CaptureError):
+    def __init__(self, message, attempts=None):
+        super().__init__(message)
+        self.attempts = list(attempts or [])
 
 
 def utc_now():
@@ -66,6 +77,14 @@ def load_config():
         problems.append("week1_tuesday_local_date invalid")
     if not problems and not Path(cfg["policy_path"]).is_file():
         problems.append(f"policy file not found: {cfg['policy_path']}")
+    if cfg.get("source_priority") != [DIRECT_SOURCE_CLASS, API_SOURCE_CLASS]:
+        problems.append("source_priority must be direct DraftKings then Odds API")
+    if cfg.get("fallback_scope") != "WHOLE_SOURCE_FAILURE_ONLY":
+        problems.append("fallback_scope must be WHOLE_SOURCE_FAILURE_ONLY")
+    if cfg.get("cross_source_market_merge") is not False:
+        problems.append("cross_source_market_merge must be false")
+    if cfg.get("direct_valid_board_market_gaps_trigger_fallback") is not False:
+        problems.append("direct_valid_board_market_gaps_trigger_fallback must be false")
     if problems:
         raise CaptureError("CONFIG_INVALID: " + "; ".join(problems))
     return cfg
@@ -97,7 +116,7 @@ def lock_status(cfg, hashes, now, create):
     return "MATCH" if not diffs else "MISMATCH:" + ",".join(diffs)
 
 
-# ---------- API ----------
+# ---------- Odds API fallback ----------
 
 def api_keys():
     keys = [os.environ.get(f"ODDS_API_KEY_{i}", "").strip() for i in range(1, 5)]
@@ -167,7 +186,7 @@ def opener_due(now, cfg):
     return None if week < cfg["first_week"] else {"week": week, "target": target}
 
 
-# ---------- normalization ----------
+# ---------- normalization/admission ----------
 
 def spread_row(market, home, away):
     if not market:
@@ -203,7 +222,7 @@ def game_rows(events, odds, cfg, wanted_ids=None):
         o = odds_by_id.get(ev["id"])
         row = {"event_id": ev["id"], "home_team": ev["home_team"], "away_team": ev["away_team"],
                "commence_time": ev["commence_time"], "week": week_of(parse_iso(ev["commence_time"]), cfg),
-               "book": cfg["bookmaker"]}
+               "book": cfg["bookmaker"], "source_class": API_SOURCE_CLASS}
         book = next((b for b in (o or {}).get("bookmakers", []) if b.get("key") == cfg["bookmaker"]), None)
         if not book:
             row.update(book_last_update=None, spread={"status": "NOT_LISTED"}, total={"status": "NOT_LISTED"})
@@ -216,7 +235,21 @@ def game_rows(events, odds, cfg, wanted_ids=None):
     return rows
 
 
-# ---------- capture steps ----------
+def require_two_sided(rows, cfg):
+    if not rows:
+        raise CaptureError("NO_GAMES_IN_CAPTURE_WINDOW")
+    failures = []
+    for row in rows:
+        for market in cfg["markets"]:
+            key = "spread" if market == "spreads" else "total" if market == "totals" else None
+            if key and row.get(key, {}).get("status") != "OK":
+                failures.append({"event_id": row.get("event_id"), "market": market,
+                                 "status": row.get(key, {}).get("status")})
+    if failures:
+        raise CaptureError("TWO_SIDED_ADMISSION_FAILED " + json.dumps(failures, separators=(",", ":")))
+
+
+# ---------- capture plumbing ----------
 
 def run_meta():
     return {k.lower(): os.environ.get(k) for k in
@@ -237,6 +270,38 @@ def write_new(path, record):
     path.write_text(json.dumps(record, indent=2))
 
 
+def persist_direct_raw(cfg, transport):
+    raw = transport.get("raw_bytes")
+    if not isinstance(raw, (bytes, bytearray)):
+        raise CaptureError("DIRECT_RAW_BYTES_MISSING")
+    digest = hashlib.sha256(raw).hexdigest()
+    if digest != transport.get("raw_sha256"):
+        raise CaptureError("DIRECT_RAW_HASH_MISMATCH")
+    path = Path(cfg["output_dir"]) / "raw" / "draftkings-direct" / f"{digest}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists() and hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+        raise CaptureError("DIRECT_RAW_PATH_COLLISION")
+    if not path.exists():
+        path.write_bytes(bytes(raw))
+    return str(path)
+
+
+def direct_meta(transport, raw_path):
+    return {
+        "source_class": DIRECT_SOURCE_CLASS,
+        "source_uri": transport["source_uri"],
+        "transport_host": transport["transport_host"],
+        "observed_at_utc": transport["observed_at_utc"],
+        "timestamp_semantics": "SPORTSEDGE_HTTP_RESPONSE_RECEIPT_UPPER_BOUND",
+        "provider_quote_timestamp_available": False,
+        "raw_sha256": transport["raw_sha256"],
+        "raw_relative_path": raw_path,
+        "attempts": transport["attempts"],
+        "adapter_module_sha256": transport["adapter_module_sha256"],
+        "github_sha": os.environ.get("GITHUB_SHA"),
+    }
+
+
 def odds_params(cfg, t_from, t_to):
     return {"bookmakers": cfg["bookmaker"], "markets": ",".join(cfg["markets"]),
             "oddsFormat": "american", "dateFormat": "iso",
@@ -252,6 +317,29 @@ def predictions_status(cfg, week):
             "files": [{"path": str(p), "sha256": sha256_file(p)} for p in files]}
 
 
+def acquire_direct_rows(cfg, window_start=None, window_end=None):
+    try:
+        transport = acquire_board(cfg["sport_key"])
+        rows = game_rows_direct(
+            transport,
+            week_of=lambda dt: week_of(dt, cfg),
+            window_start=window_start,
+            window_end=window_end,
+        )
+    except DirectCaptureError as exc:
+        raise DirectSourceFailure(str(exc), getattr(exc, "attempts", [])) from exc
+    return transport, rows
+
+
+def api_opener_rows(cfg, t_from, t_to):
+    events = api_get(f"{cfg['sport_key']}/events",
+                     {"commenceTimeFrom": iso_z(t_from), "commenceTimeTo": iso_z(t_to), "dateFormat": "iso"})
+    odds = api_get(f"{cfg['sport_key']}/odds", odds_params(cfg, t_from, t_to))
+    return events, odds, game_rows(events["data"], odds["data"], cfg)
+
+
+# ---------- OPENER ----------
+
 def do_opener(cfg, now, hashes):
     due = opener_due(now, cfg)
     if not due:
@@ -259,85 +347,180 @@ def do_opener(cfg, now, hashes):
     path = Path(cfg["output_dir"]) / f"week{due['week']:02d}" / "opener.json"
     if path.exists():
         return None
+    ws, we = week_bounds_utc(due["week"], cfg)
+    t_from = max(ws, now)
+
+    direct_failure = None
     try:
-        ws, we = week_bounds_utc(due["week"], cfg)
-        t_from = max(ws, now)
-        events = api_get(f"{cfg['sport_key']}/events",
-                         {"commenceTimeFrom": iso_z(t_from), "commenceTimeTo": iso_z(we), "dateFormat": "iso"})
-        odds = api_get(f"{cfg['sport_key']}/odds", odds_params(cfg, t_from, we))
-    except CaptureError as e:
+        transport, rows = acquire_direct_rows(cfg, t_from, we)
+    except DirectSourceFailure as exc:
+        direct_failure = exc
+        transport = None
+        rows = None
+
+    if transport is not None:
+        try:
+            require_two_sided(rows, cfg)
+        except CaptureError as exc:
+            log_attempt(cfg, {"run_started_utc": now.isoformat(), "kind": "OPENER", "week": due["week"],
+                              "source_class": DIRECT_SOURCE_CLASS, "outcome": str(exc),
+                              "attempts": transport["attempts"], **run_meta()})
+            raise
+        raw_path = persist_direct_raw(cfg, transport)
+        retrieved = parse_iso(transport["observed_at_utc"])
+        status = lock_status(cfg, hashes, now, create=True)
+        record = {
+            "capture_kind": "OPENER", "week": due["week"], "book": cfg["bookmaker"], "markets": cfg["markets"],
+            "source_class": DIRECT_SOURCE_CLASS,
+            "target_local": due["target"].isoformat(), "run_started_utc": now.isoformat(),
+            "retrieved_at_utc": transport["observed_at_utc"],
+            "minutes_after_target": round((retrieved - due["target"]).total_seconds() / 60, 2),
+            "lock_status": status, "hashes": hashes, "run": run_meta(),
+            "predictions_at_opener": predictions_status(cfg, due["week"]),
+            "transport": direct_meta(transport, raw_path),
+            "games": rows,
+        }
+        write_new(path, record)
+        return record
+
+    # Direct source itself failed: only now may the declared vendor fallback run.
+    try:
+        events, odds, rows = api_opener_rows(cfg, t_from, we)
+        require_two_sided(rows, cfg)
+    except CaptureError as exc:
         log_attempt(cfg, {"run_started_utc": now.isoformat(), "kind": "OPENER", "week": due["week"],
-                          "outcome": str(e), **run_meta()})
+                          "source_class": API_SOURCE_CLASS, "outcome": str(exc),
+                          "direct_attempts": getattr(direct_failure, "attempts", []), **run_meta()})
         raise
     retrieved = parse_iso(odds["received_at_utc"])
     status = lock_status(cfg, hashes, now, create=True)
     record = {
         "capture_kind": "OPENER", "week": due["week"], "book": cfg["bookmaker"], "markets": cfg["markets"],
+        "source_class": API_SOURCE_CLASS,
         "target_local": due["target"].isoformat(), "run_started_utc": now.isoformat(),
         "retrieved_at_utc": odds["received_at_utc"],
         "minutes_after_target": round((retrieved - due["target"]).total_seconds() / 60, 2),
         "lock_status": status, "hashes": hashes, "run": run_meta(),
         "predictions_at_opener": predictions_status(cfg, due["week"]),
-        "api": {k: {x: v[x] for x in ("key_slot", "quota", "failed_key_slots", "raw_sha256", "received_at_utc")}
-                for k, v in (("events", events), ("odds", odds))},
-        "games": game_rows(events["data"], odds["data"], cfg),
-        "raw_events": events["data"], "raw_odds": odds["data"],
+        "transport": {
+            "source_class": API_SOURCE_CLASS,
+            "timestamp_semantics": "SPORTSEDGE_HTTP_RESPONSE_RECEIPT_UPPER_BOUND",
+            "provider_quote_timestamp_available": True,
+            "direct_attempts": getattr(direct_failure, "attempts", []),
+            "events": {x: events[x] for x in ("key_slot", "quota", "failed_key_slots", "raw_sha256", "received_at_utc")},
+            "odds": {x: odds[x] for x in ("key_slot", "quota", "failed_key_slots", "raw_sha256", "received_at_utc")},
+        },
+        "games": rows, "raw_events": events["data"], "raw_odds": odds["data"],
     }
     write_new(path, record)
     return record
 
 
+# ---------- FINAL ----------
+
 def captured_final_ids(cfg):
     ids = set()
     for p in Path(cfg["output_dir"]).glob("week*/final/*.json"):
-        ids.update(g["event_id"] for g in json.loads(p.read_text())["games"])
+        ids.update(g["event_id"] for g in json.loads(p.read_text()).get("games", []))
     return ids
 
 
-def do_final(cfg, now, hashes):
+def _due_final_rows(rows, cfg, now):
     lead = timedelta(minutes=cfg["final_minutes_before_kickoff"])
     window = timedelta(minutes=cfg["final_window_minutes"])
-    events = api_get(f"{cfg['sport_key']}/events",
-                     {"commenceTimeFrom": iso_z(now), "commenceTimeTo": iso_z(now + lead + timedelta(minutes=1)),
-                      "dateFormat": "iso"})
     done = captured_final_ids(cfg)
     due = []
-    for ev in events["data"]:
-        kickoff = parse_iso(ev["commence_time"])
-        if ev["id"] in done or week_of(kickoff, cfg) < cfg["first_week"]:
+    for row in rows:
+        kickoff = parse_iso(row["commence_time"])
+        if row["event_id"] in done or week_of(kickoff, cfg) < cfg["first_week"]:
             continue
         if kickoff - lead <= now < min(kickoff - lead + window, kickoff):
-            due.append(ev)
-    if not due:
-        return None
-    kicks = [parse_iso(e["commence_time"]) for e in due]
+            due.append(row)
+    return due
+
+
+def do_final(cfg, now, hashes):
+    direct_failure = None
     try:
-        odds = api_get(f"{cfg['sport_key']}/odds",
-                       odds_params(cfg, min(kicks), max(kicks) + timedelta(minutes=1)))
-    except CaptureError as e:
-        log_attempt(cfg, {"run_started_utc": now.isoformat(), "kind": "FINAL",
-                          "event_ids": [e2["id"] for e2 in due], "outcome": str(e), **run_meta()})
-        raise
-    retrieved = parse_iso(odds["received_at_utc"])
-    rows = game_rows(due, odds["data"], cfg, wanted_ids={e["id"] for e in due})
-    for r in rows:
-        kickoff = parse_iso(r["commence_time"])
-        r["target_utc"] = (kickoff - lead).isoformat()
-        r["minutes_before_kickoff"] = round((kickoff - retrieved).total_seconds() / 60, 2)
+        transport, board_rows = acquire_direct_rows(cfg)
+    except DirectSourceFailure as exc:
+        direct_failure = exc
+        transport = None
+        board_rows = None
+
+    if transport is not None:
+        rows = _due_final_rows(board_rows, cfg, now)
+        if not rows:
+            return None
+        try:
+            require_two_sided(rows, cfg)
+        except CaptureError as exc:
+            log_attempt(cfg, {"run_started_utc": now.isoformat(), "kind": "FINAL",
+                              "event_ids": [r["event_id"] for r in rows],
+                              "source_class": DIRECT_SOURCE_CLASS, "outcome": str(exc),
+                              "attempts": transport["attempts"], **run_meta()})
+            raise
+        raw_path = persist_direct_raw(cfg, transport)
+        retrieved = parse_iso(transport["observed_at_utc"])
+        source_meta = direct_meta(transport, raw_path)
+    else:
+        lead = timedelta(minutes=cfg["final_minutes_before_kickoff"])
+        events = api_get(f"{cfg['sport_key']}/events",
+                         {"commenceTimeFrom": iso_z(now), "commenceTimeTo": iso_z(now + lead + timedelta(minutes=1)),
+                          "dateFormat": "iso"})
+        done = captured_final_ids(cfg)
+        due_events = []
+        for ev in events["data"]:
+            kickoff = parse_iso(ev["commence_time"])
+            if ev["id"] in done or week_of(kickoff, cfg) < cfg["first_week"]:
+                continue
+            window = timedelta(minutes=cfg["final_window_minutes"])
+            if kickoff - lead <= now < min(kickoff - lead + window, kickoff):
+                due_events.append(ev)
+        if not due_events:
+            return None
+        kicks = [parse_iso(e["commence_time"]) for e in due_events]
+        try:
+            odds = api_get(f"{cfg['sport_key']}/odds", odds_params(cfg, min(kicks), max(kicks) + timedelta(minutes=1)))
+            rows = game_rows(due_events, odds["data"], cfg, wanted_ids={e["id"] for e in due_events})
+            require_two_sided(rows, cfg)
+        except CaptureError as exc:
+            log_attempt(cfg, {"run_started_utc": now.isoformat(), "kind": "FINAL",
+                              "event_ids": [e["id"] for e in due_events],
+                              "source_class": API_SOURCE_CLASS, "outcome": str(exc),
+                              "direct_attempts": getattr(direct_failure, "attempts", []), **run_meta()})
+            raise
+        retrieved = parse_iso(odds["received_at_utc"])
+        source_meta = {
+            "source_class": API_SOURCE_CLASS,
+            "timestamp_semantics": "SPORTSEDGE_HTTP_RESPONSE_RECEIPT_UPPER_BOUND",
+            "provider_quote_timestamp_available": True,
+            "direct_attempts": getattr(direct_failure, "attempts", []),
+            "odds": {x: odds[x] for x in ("key_slot", "quota", "failed_key_slots", "raw_sha256", "received_at_utc")},
+        }
+
+    lead = timedelta(minutes=cfg["final_minutes_before_kickoff"])
+    for row in rows:
+        kickoff = parse_iso(row["commence_time"])
+        row["target_utc"] = (kickoff - lead).isoformat()
+        row["minutes_before_kickoff"] = round((kickoff - retrieved).total_seconds() / 60, 2)
         if retrieved >= kickoff:
-            r["capture_validity"] = "AFTER_KICKOFF_INVALID"
+            raise CaptureError("AFTER_KICKOFF_INVALID")
+
     status = lock_status(cfg, hashes, now, create=True)
     written = []
     for week in sorted({r["week"] for r in rows}):
         stamp = retrieved.strftime("%Y%m%dT%H%M%SZ")
         record = {
             "capture_kind": "FINAL", "week": week, "book": cfg["bookmaker"], "markets": cfg["markets"],
-            "run_started_utc": now.isoformat(), "retrieved_at_utc": odds["received_at_utc"],
+            "source_class": source_meta["source_class"],
+            "run_started_utc": now.isoformat(), "retrieved_at_utc": iso_z(retrieved),
             "lock_status": status, "hashes": hashes, "run": run_meta(),
-            "api": {"odds": {x: odds[x] for x in ("key_slot", "quota", "failed_key_slots", "raw_sha256")}},
+            "transport": source_meta,
             "games": [r for r in rows if r["week"] == week],
-            "raw_odds": odds["data"],
         }
+        if source_meta["source_class"] == API_SOURCE_CLASS:
+            record["raw_odds"] = odds["data"]
         write_new(Path(cfg["output_dir"]) / f"week{week:02d}" / "final" / f"{stamp}.json", record)
         written.append(record)
     return {"capture_kind": "FINAL", "lock_status": status, "records": written}
@@ -350,22 +533,31 @@ def do_check(cfg, now, hashes):
     print("CONFIG_OK")
     print("Policy:", cfg["policy_path"], hashes["policy_sha256"])
     print("Lock:", lock_status(cfg, hashes, now, create=False))
+    rc = 0
+    upcoming = []
+    try:
+        transport, rows = acquire_direct_rows(cfg, now, now + timedelta(days=9))
+        print(f"{DIRECT_SOURCE_CLASS}: OK ({len(rows)} board games)")
+        upcoming = rows
+    except DirectSourceFailure as exc:
+        print(f"{DIRECT_SOURCE_CLASS}: FAILED {exc} attempts={exc.attempts}")
+        rc = 1
+
+    # Fallback health is diagnostic only; a dead vendor key must not invalidate a
+    # healthy primary direct-DK source.
     keys = api_keys()
     if not keys:
-        print("NO_API_KEYS")
-        return 1
-    rc = 0
-    upcoming = None
-    for slot, key in keys:
-        try:
-            res = api_get(f"{cfg['sport_key']}/events",
-                          {"commenceTimeFrom": iso_z(now), "commenceTimeTo": iso_z(now + timedelta(days=9)),
-                           "dateFormat": "iso"}, keys=[(slot, key)])
-            print(f"Key slot {slot}: OK (events endpoint is free)")
-            upcoming = upcoming or res["data"]
-        except CaptureError as e:
-            print(f"Key slot {slot}: FAILED {e}")
-            rc = 1
+        print(f"{API_SOURCE_CLASS}: NO_API_KEYS (fallback unavailable)")
+    else:
+        for slot, key in keys:
+            try:
+                api_get(f"{cfg['sport_key']}/events",
+                        {"commenceTimeFrom": iso_z(now), "commenceTimeTo": iso_z(now + timedelta(days=9)),
+                         "dateFormat": "iso"}, keys=[(slot, key)])
+                print(f"{API_SOURCE_CLASS} key slot {slot}: OK")
+            except CaptureError as exc:
+                print(f"{API_SOURCE_CLASS} key slot {slot}: FAILED {exc}")
+
     local_today = now.astimezone(tz).date()
     for i in range(0, 22):
         d = local_today + timedelta(days=i)
@@ -375,10 +567,10 @@ def do_check(cfg, now, hashes):
             print(f"Next opener capture: week {opener_week_for_day(d, cfg)} at {t.isoformat()}")
             break
     lead = timedelta(minutes=cfg["final_minutes_before_kickoff"])
-    for ev in sorted(upcoming or [], key=lambda e: e["commence_time"]):
-        k = parse_iso(ev["commence_time"])
+    for row in sorted(upcoming, key=lambda r: r["commence_time"]):
+        k = parse_iso(row["commence_time"])
         if week_of(k, cfg) >= cfg["first_week"]:
-            print(f"  wk{week_of(k, cfg)} {ev['away_team']} @ {ev['home_team']}: "
+            print(f"  wk{week_of(k, cfg)} {row['away_team']} @ {row['home_team']}: "
                   f"kickoff {k.astimezone(tz):%a %m-%d %H:%M}, final capture from {(k - lead).astimezone(tz):%H:%M} CT")
     return rc
 
@@ -405,7 +597,7 @@ def main():
         if result:
             captured = True
             games = result.get("games") or [g for r in result.get("records", []) for g in r["games"]]
-            print(f"{result['capture_kind']}: {len(games)} games, lock {result['lock_status']}")
+            print(f"{result['capture_kind']}: {len(games)} games, source {result.get('source_class', 'mixed-records')}, lock {result['lock_status']}")
             if result["lock_status"].startswith("MISMATCH"):
                 rc = 1
     if not captured and rc == 0:
