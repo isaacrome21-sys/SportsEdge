@@ -174,6 +174,18 @@ class DirectCaptureWiringTests(unittest.TestCase):
                     cap.do_opener(c, self.NOW, self.HASHES)
             self.assertFalse((Path(c["output_dir"]) / "capture_lock.json").exists())
 
+    def test_first_lock_rolls_back_if_row_write_fails(self):
+        with tempfile.TemporaryDirectory() as td:
+            c = cfg(td)
+            p1, p2 = self.schedule_patches()
+            with p1, p2, \
+                 patch.object(cap, "acquire_direct_rows", return_value=(direct_transport(), [ok_row()])), \
+                 patch.object(cap, "write_new", side_effect=cap.CaptureError("DISK_WRITE_FAILED")):
+                with self.assertRaisesRegex(cap.CaptureError, "DISK_WRITE_FAILED"):
+                    cap.do_opener(c, self.NOW, self.HASHES)
+            self.assertFalse((Path(c["output_dir"]) / "capture_lock.json").exists())
+            self.assertFalse((Path(c["output_dir"]) / "week03" / "opener.json").exists())
+
 
 if __name__ == "__main__":
     unittest.main()
