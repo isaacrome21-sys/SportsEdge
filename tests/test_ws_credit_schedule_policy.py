@@ -7,7 +7,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 PARKED = {
-    ".github/workflows/archive-mlb-game-odds.yml",
     ".github/workflows/auto-mlb.yml",
     ".github/workflows/mlb-additional-pit-archive.yml",
     ".github/workflows/mlb-deadman.yml",
@@ -21,6 +20,10 @@ SCHEDULED_PAID = {
     ".github/workflows/nfl-2026-line-capture.yml",
 }
 
+SCHEDULED_KEYLESS = {
+    ".github/workflows/archive-mlb-game-odds.yml",
+}
+
 
 def _text(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
@@ -31,6 +34,15 @@ def test_parked_paid_workflows_have_no_timer() -> None:
         text = _text(path)
         assert "workflow_dispatch:" in text, path
         assert "schedule:" not in text, path
+
+
+def test_keyless_capture_is_scheduled_without_paid_credentials() -> None:
+    for path in sorted(SCHEDULED_KEYLESS):
+        text = _text(path)
+        assert "schedule:" in text, path
+        assert "SPORTSEDGE_ODDS_API_KEY" not in text, path
+        assert "secrets." not in text, path
+        assert "capture_mlb_direct_paired_ml.py" in text, path
 
 
 def test_remaining_authorities_still_have_schedules() -> None:
@@ -62,8 +74,14 @@ def test_projection_matches_workflow_authority() -> None:
     policy = json.loads(_text("config/odds_api_request_projection_v3.json"))
     assert set(policy["parked_dispatch_only_workflows"]) == PARKED
     assert set(policy["invariants"]["allowed_scheduled_paid_consumers"]) == SCHEDULED_PAID
+    assert set(policy["invariants"]["allowed_scheduled_keyless_consumers"]) == SCHEDULED_KEYLESS
     assert policy["invariants"]["mlb_scheduled_paid_workflows"] == 0
+    assert policy["invariants"]["mlb_scheduled_keyless_workflows"] == 1
     assert policy["invariants"]["legacy_nfl_2026_line_capture_scheduled"] is True
+    direct = policy["scheduled_keyless_consumers"]["mlb_direct_paired_moneyline"]
+    assert direct["workflow"] == ".github/workflows/archive-mlb-game-odds.yml"
+    assert direct["paid_provider_credits"] == 0
+    assert direct["credential_secrets"] == []
     capture = policy["scheduled_consumers"]["nfl_2026_confirmation_capture"]
     assert capture["workflow"] == ".github/workflows/nfl-2026-line-capture.yml"
     assert capture["idle_paid_requests"] == 0
