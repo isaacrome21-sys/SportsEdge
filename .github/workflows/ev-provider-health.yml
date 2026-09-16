@@ -1,0 +1,48 @@
+name: ev-provider-health
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+concurrency:
+  group: sportsedge-ev-tracker-v2-data
+  cancel-in-progress: false
+
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12.13"
+      - name: Observe Pinnacle independently of bet stream
+        env:
+          ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+        run: >-
+          python scripts/ev_provider_health_probe.py
+          --output "$RUNNER_TEMP/provider-health.json"
+      - name: Persist observation to data branch
+        run: |
+          set -euo pipefail
+          data_dir="$RUNNER_TEMP/ev-provider-data"
+          git fetch origin data
+          git worktree add --detach "$data_dir" origin/data
+          dst="$data_dir/runtime/ev-tracker-v2/provider-health"
+          mkdir -p "$dst"
+          stamp="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          cp "$RUNNER_TEMP/provider-health.json" "$dst/$stamp.json"
+          cp "$RUNNER_TEMP/provider-health.json" "$dst/latest.json"
+          cd "$data_dir"
+          git config user.name sportsedge-bot
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add runtime/ev-tracker-v2/provider-health
+          git commit -m "ev-provider-health: observe Pinnacle ${stamp}"
+          git pull --rebase origin data
+          git push origin HEAD:data
