@@ -1,0 +1,25 @@
+{
+  "calibration_fit_sample": 1275,
+  "development_validation_gate_pass": false,
+  "development_validation_grants_promotion": false,
+  "development_validation_metrics": {
+    "brier": 0.24615493096279012,
+    "calibration_intercept": -0.03286200029337556,
+    "calibration_slope": 1.7161853799700766,
+    "ece_10_equal_frequency": 0.04384044401142672,
+    "log_loss": 0.6854464746350174
+  },
+  "development_validation_sample": 989,
+  "forward_holdout_not_before_utc": "2026-09-16T02:47:43.733049+00:00",
+  "model_artifact_sha256": "14f7102731bcdbd76da78898715fa36c29015c10d825dbe372bb3627cf3219c0",
+  "promotion_authority": false,
+  "remaining_blockers": [
+    "merge frozen lane/model to main before promotion evidence clock can start",
+    "real forward timestamp-attested Model_P rows",
+    "paired two-sided pregame and close quotes for CLV",
+    "50/100/150 fixed promotion-policy checkpoints",
+    "production inference parity for exact v3 artifact"
+  ],
+  "schema_version": 1,
+  "truth_gate_complete": false
+}

@@ -1,0 +1,29 @@
+{
+  "artifact_sha256": "14f7102731bcdbd76da78898715fa36c29015c10d825dbe372bb3627cf3219c0",
+  "base_model_artifact_sha256": "c5c16beb21f69914d44048a19b4d0be65f2d8ff007e3ce0f05c25e7267ed5aa5",
+  "base_model_version": "mlb_moneyline_rolling_market_blind_v2",
+  "development_validation_consumed_for_selection": true,
+  "development_validation_window": "2026-07-01T00:00:00+00:00 through 2026-09-15",
+  "forbidden_inputs": [
+    "odds",
+    "current_lines",
+    "implied_probability",
+    "public_betting",
+    "consensus",
+    "handicapper_opinion"
+  ],
+  "forward_holdout_not_before_utc": "2026-09-16T02:47:43.733049+00:00",
+  "forward_holdout_rule": "new observations only; source observed_at_utc must be strictly before event_start_ts; no pre-freeze row may count",
+  "generated_at_utc": "2026-09-16T02:47:43.733049+00:00",
+  "market": "MONEYLINE",
+  "market_blind": true,
+  "market_data_used_as_model_feature": false,
+  "model_version": "mlb_moneyline_rolling_market_blind_v3",
+  "promotion_authority": false,
+  "schema_version": 1,
+  "second_stage_temporal_calibrator": {
+    "fit_window": "2026 season start through 2026-07-01T00:00:00+00:00 exclusive",
+    "intercept": -0.01463540125215763,
+    "slope": 0.6291758500075134
+  }
+}
