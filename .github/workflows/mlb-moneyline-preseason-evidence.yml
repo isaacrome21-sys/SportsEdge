@@ -4,9 +4,14 @@ on:
   workflow_dispatch:
   push:
     branches: [mlb-moneyline-governance-completion]
-    paths-ignore:
-      - 'data/mlb_moneyline_preseason/**'
-      - 'artifacts/mlb_moneyline_preseason/**'
+    paths:
+      - '.github/workflows/mlb-moneyline-preseason-evidence.yml'
+      - 'sportsedge/mlb_moneyline_pit.py'
+      - 'scripts/build_mlb_moneyline_preseason_evidence.py'
+      - 'tests/test_mlb_moneyline_pit.py'
+      - 'tests/test_build_mlb_moneyline_preseason_evidence.py'
+      - 'requirements-test.txt'
+      - 'pyproject.toml'
 
 permissions:
   contents: write
