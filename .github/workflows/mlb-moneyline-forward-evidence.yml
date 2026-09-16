@@ -44,6 +44,23 @@ jobs:
             tests.test_capture_mlb_direct_paired_ml \
             tests.test_draftkings_game_line_category_map -v
 
+      - name: Resolve UTC evidence day
+        id: day
+        shell: bash
+        run: echo "date=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore immutable daily evidence from data branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data
+          day='${{ steps.day.outputs.date }}'
+          for path in "data/mlb_forward_predictions/$day" "data/mlb_forward_capture/$day"; do
+            if git cat-file -e "origin/data:$path" 2>/dev/null; then
+              git archive origin/data "$path" | tar -x
+            fi
+          done
+
       - name: Capture market-blind Model_P predictions
         id: modelp
         shell: bash
@@ -74,9 +91,10 @@ jobs:
         run: |
           set +e
           set -o pipefail
+          day='${{ steps.day.outputs.date }}'
           python scripts/persist_forward_evidence_data_branch.py \
-            --path data/mlb_forward_predictions \
-            --path data/mlb_forward_capture \
+            --path "data/mlb_forward_predictions/$day" \
+            --path "data/mlb_forward_capture/$day" \
             --branch data \
             --worktree "$RUNNER_TEMP/sportsedge-mlb-forward-data" | tee persistence_result.json
           rc=${PIPESTATUS[0]}
@@ -92,8 +110,8 @@ jobs:
             model_p_result.json
             quote_result.json
             persistence_result.json
-            data/mlb_forward_predictions/**
-            data/mlb_forward_capture/**
+            data/mlb_forward_predictions/${{ steps.day.outputs.date }}/**
+            data/mlb_forward_capture/${{ steps.day.outputs.date }}/**
           if-no-files-found: warn
           retention-days: 90
 
