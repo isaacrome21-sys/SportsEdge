@@ -1,28 +1,29 @@
 name: archive-mlb-game-odds
 
-# Prospective MLB MONEYLINE evidence lane.
-#
-# Every five minutes this workflow independently captures a market-blind Model_P
-# prediction when a Preview game is 40-60 minutes from first pitch, then captures
-# exact two-sided DraftKings moneylines in the existing T60/T30/T10 windows.
-# The prediction is produced only from live-observed MLB StatsAPI game-log data;
-# sportsbook prices never enter Model_P. Both paths remain zero-authority until
-# frozen calibration/CLV/sample/production-parity gates are satisfied.
-#
-# Transport failure, a due Model_P failure, an empty DraftKings board, or an
-# in-window one-sided market fails visibly. NO_PREDICTION_DUE/NO_CAPTURE_DUE are
-# green only when their respective preconditions are genuinely absent.
-
 on:
+  # MLB is parked for the remainder of 2026. Preserve explicit manual repair or
+  # capture dispatches, but remove the paid scheduled poller.
   workflow_dispatch:
-  schedule:
-    - cron: '*/5 * * * *'
+    inputs:
+      repair_budget_ledger:
+        description: 'Repair same-day UNKNOWN budget ledger without making a paid request'
+        required: false
+        default: false
+        type: boolean
+      known_consumed_actual:
+        description: 'Known same-day credits consumed; required when repairing'
+        required: false
+        type: string
+      repair_reason:
+        description: 'Audit reason/source for the known consumed count'
+        required: false
+        type: string
 
 permissions:
   contents: write
 
 concurrency:
-  group: mlb-direct-paired-capture
+  group: sportsedge-paid-odds-api
   cancel-in-progress: false
 
 jobs:
@@ -30,67 +31,168 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 8
     env:
-      PYTHONPATH: .
+      SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+      SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
+      SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
+      SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
+      SPORTSEDGE_ODDS_BOOKMAKERS: draftkings
+      SPORTSEDGE_ODDS_DAILY_BUDGET_CREDITS: '12'
+      SPORTSEDGE_ODDS_BUDGET_LEDGER: .cache/sportsedge/odds-budget/ledger.json
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          fetch-depth: 0
-          ref: main
-
+          fetch-depth: 1
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
-          python-version: '3.12'
-
-      - name: Contract tests
+          python-version: '3.12.13'
+      - name: Bare-environment paired-window archive smoke test
+        run: python -I scripts/archive_raw_game_odds_paired.py --self-test
+      - name: Resolve UTC day
+        id: day
+        run: echo "date=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+      - name: Restore durable budget ledger from data branch
+        shell: bash
         run: |
-          python -m py_compile \
-            scripts/capture_mlb_moneyline_model_p.py \
-            scripts/capture_mlb_direct_paired_ml.py \
-            sportsedge/mlb_moneyline_forward_prediction.py \
-            sportsedge/mlb_moneyline_forward_ledger.py \
-            sportsedge/direct_web_capture_source.py \
-            sportsedge/draftkings_game_market_source.py
-          python -m unittest \
-            tests.test_mlb_moneyline_forward_prediction \
-            tests.test_direct_web_capture_source \
-            tests.test_capture_mlb_direct_paired_ml \
-            tests.test_draftkings_game_line_category_map \
-            tests.test_persist_captured_evidence -v
-
-      - name: Capture market-blind Model_P predictions
+          set -euo pipefail
+          git fetch --depth=1 origin data:data
+          git worktree add .data-branch data
+          mkdir -p .cache/sportsedge/odds-budget
+          if [ -f .data-branch/runtime/odds-budget/ledger.json ]; then
+            cp .data-branch/runtime/odds-budget/ledger.json "$SPORTSEDGE_ODDS_BUDGET_LEDGER"
+          fi
+      - name: Explicitly repair UNKNOWN daily budget ledger
+        id: repair
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.repair_budget_ledger }}
+        env:
+          SPORTSEDGE_ODDS_BUDGET_REPAIR_KNOWN_CONSUMED: ${{ inputs.known_consumed_actual }}
+          SPORTSEDGE_ODDS_BUDGET_REPAIR_REASON: ${{ inputs.repair_reason }}
+        shell: bash
         run: |
+          set -euo pipefail
+          python -I scripts/archive_raw_game_odds_paired.py --repair-ledger
+          echo 'repaired=true' >> "$GITHUB_OUTPUT"
+      - name: Deduplicate near-simultaneous successful capture
+        id: dedupe
+        if: ${{ steps.repair.outputs.repaired != 'true' }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          from datetime import datetime, timezone
+          import json
+          import os
+          from pathlib import Path
+          ledger_path = Path(os.environ['SPORTSEDGE_ODDS_BUDGET_LEDGER'])
+          now = datetime.now(timezone.utc)
+          skip = False
+          source = None
+          ledger = {}
+          try:
+              ledger = json.loads(ledger_path.read_text())
+          except Exception:
+              ledger = {}
+          for row in reversed(ledger.get('runs', [])):
+              if row.get('status') != 'CAPTURED':
+                  continue
+              try:
+                  stamp = str(row['run_at_utc']).replace('Z', '+00:00')
+                  captured_at = datetime.fromisoformat(stamp).astimezone(timezone.utc)
+              except Exception:
+                  continue
+              age = (now - captured_at).total_seconds()
+              if 0 <= age <= 5 * 60:
+                  skip = True
+                  source = row
+              break
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as out:
+              out.write(f"skip={'true' if skip else 'false'}\n")
+          if skip and source is not None:
+              day = now.date().isoformat()
+              status_dir = Path('artifacts/raw_odds/status') / day
+              status_dir.mkdir(parents=True, exist_ok=True)
+              stamp = now.strftime('%Y%m%dT%H%M%S.%fZ')
+              row = {
+                  'run_at_utc': now.isoformat(),
+                  'status': 'SKIP_RECENT_CAPTURE_DEDUP',
+                  'credits_consumed_actual': 0,
+                  'source_run_at_utc': source.get('run_at_utc'),
+                  'source_capture_window': source.get('capture_window'),
+                  'source_raw_file': source.get('raw_file'),
+                  'dedupe_horizon_seconds': 300,
+              }
+              (status_dir / f'run_{stamp}.json').write_text(json.dumps(row, indent=2, sort_keys=True) + '\n')
+              runs = ledger.setdefault('runs', [])
+              runs.append(row)
+              if len(runs) > 500:
+                  del runs[:-500]
+              ledger['last_status'] = row['status']
+              ledger['last_run_at_utc'] = row['run_at_utc']
+              ledger_path.parent.mkdir(parents=True, exist_ok=True)
+              ledger_path.write_text(json.dumps(ledger, indent=2, sort_keys=True) + '\n')
+              print(json.dumps(row))
+          PY
+      - name: Capture paired raw game-market snapshot when inside target window
+        id: capture
+        shell: bash
+        run: |
+          if [ '${{ steps.repair.outputs.repaired }}' = 'true' ]; then
+            echo 'exit_code=0' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ '${{ steps.dedupe.outputs.skip }}' = 'true' ]; then
+            echo 'exit_code=0' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           set +e
-          set -o pipefail
-          python scripts/capture_mlb_moneyline_model_p.py \
-            --output-dir data/mlb_forward_predictions | tee model_p_result.json
-          rc=${PIPESTATUS[0]}
-          echo "$rc" > model_p_exit_code.txt
+          python -I scripts/archive_raw_game_odds_paired.py
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           exit 0
-
-      - name: Persist Model_P predictions
-        run: |
-          git config user.name  "sportsedge-capture"
-          git config user.email "sportsedge-capture@users.noreply.github.com"
-          python scripts/persist_captured_evidence.py \
-            --path data/mlb_forward_predictions \
-            --branch main
-
-      - name: Capture paired DraftKings quotes
-        run: |
-          set -o pipefail
-          python scripts/capture_mlb_direct_paired_ml.py \
-            --output-dir data/mlb_forward_capture | tee capture_result.json
-
-      - name: Persist retained observations
-        run: |
-          git config user.name  "sportsedge-capture"
-          git config user.email "sportsedge-capture@users.noreply.github.com"
-          python scripts/persist_captured_evidence.py \
-            --path data/mlb_forward_capture \
-            --branch main
-
-      - name: Enforce Model_P capture status
+      - name: Persist ledger, status, and replayable raw odds to data branch
         if: always()
+        shell: bash
         run: |
-          rc=$(cat model_p_exit_code.txt 2>/dev/null || echo 2)
-          test "$rc" -eq 0
+          set -euo pipefail
+          if [ ! -d .data-branch/.git ] && [ ! -f .data-branch/.git ]; then
+            echo 'data branch worktree is unavailable' >&2
+            exit 98
+          fi
+          mkdir -p .data-branch/runtime/odds-budget
+          mkdir -p ".data-branch/runtime/archive-status/${{ steps.day.outputs.date }}"
+          if [ -f "$SPORTSEDGE_ODDS_BUDGET_LEDGER" ]; then
+            cp "$SPORTSEDGE_ODDS_BUDGET_LEDGER" .data-branch/runtime/odds-budget/ledger.json
+          fi
+          if [ -d "artifacts/raw_odds/status/${{ steps.day.outputs.date }}" ]; then
+            cp artifacts/raw_odds/status/${{ steps.day.outputs.date }}/*.json ".data-branch/runtime/archive-status/${{ steps.day.outputs.date }}/" 2>/dev/null || true
+          fi
+          if [ -d "artifacts/raw_odds/${{ steps.day.outputs.date }}" ]; then
+            mkdir -p ".data-branch/archive/raw_odds/${{ steps.day.outputs.date }}"
+            cp -R "artifacts/raw_odds/${{ steps.day.outputs.date }}/." ".data-branch/archive/raw_odds/${{ steps.day.outputs.date }}/"
+          fi
+          cd .data-branch
+          git config user.name 'sportsedge-archive-bot'
+          git config user.email 'sportsedge-archive-bot@users.noreply.github.com'
+          git add runtime/odds-budget/ledger.json runtime/archive-status archive/raw_odds || true
+          if ! git diff --cached --quiet; then
+            git commit -m "archive: persist MLB odds run ${{ github.run_id }}"
+            git push origin HEAD:data
+          fi
+      - name: Upload execution status, budget ledger, and raw capture
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mlb-raw-game-odds-${{ github.run_id }}
+          path: |
+            artifacts/raw_odds/**
+            .cache/sportsedge/odds-budget/ledger.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Propagate capture failure after evidence upload
+        if: always()
+        shell: bash
+        run: |
+          code='${{ steps.capture.outputs.exit_code }}'
+          if [ -z "$code" ]; then
+            echo 'Capture step did not emit an exit code.' >&2
+            exit 99
+          fi
+          exit "$code"
