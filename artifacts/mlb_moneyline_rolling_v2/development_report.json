@@ -1,0 +1,25 @@
+{
+  "development_calibration_diagnostic_pass": false,
+  "development_evidence_grants_promotion": false,
+  "development_metrics": {
+    "brier": 0.24744224828924524,
+    "calibration_intercept": -0.029859515541737273,
+    "calibration_slope": 0.804554767459511,
+    "ece_10_equal_frequency": 0.03568536650043169,
+    "log_loss": 0.6880507778684212
+  },
+  "development_sample_size": 2264,
+  "forward_holdout_not_before_utc": "2026-09-16T02:44:09.052411+00:00",
+  "model_artifact_sha256": "c5c16beb21f69914d44048a19b4d0be65f2d8ff007e3ce0f05c25e7267ed5aa5",
+  "pre_2026_09_16_evidence_spent_for_selection": true,
+  "promotion_authority": false,
+  "remaining_blockers": [
+    "real forward timestamp-attested PIT predictions after candidate freeze",
+    "paired no-vig closing-price CLV evidence",
+    "minimum frozen forward sample requirement",
+    "fresh quote acquisition and identity binding",
+    "production inference parity"
+  ],
+  "schema_version": 1,
+  "truth_gate_complete": false
+}
