@@ -5,9 +5,9 @@ from sportsedge.mlb_moneyline_forward_ledger import MLBMoneylineForwardLedgerErr
 def _base():
     start=datetime(2026,9,20,19,10,tzinfo=timezone.utc)
     art="a"*64
-    pred={"game_pk":123,"model_side":"HOME","model_p":.58,"market_blind":True,"feature_asof_ts":(start-timedelta(hours=4)).isoformat(),"event_start_ts":start.isoformat(),"prediction_generated_at_utc":(start-timedelta(minutes=40)).isoformat(),"model_artifact_sha256":art}
-    def q(m,home=-125,away=110):
-        return {"sportsbook":"draftkings","model_artifact_sha256":art,"scheduled_start_utc":start.isoformat(),"observed_at_utc":(start-timedelta(minutes=m)).isoformat(),"provider_event_id":"dk-1","raw_sha256":str(int(m)).zfill(64),"moneyline":{"status":"OK","home_price_american":home,"away_price_american":away}}
+    pred={"game_pk":123,"away_team":"Away Club","home_team":"Home Club","model_side":"HOME","model_p":.58,"market_blind":True,"feature_asof_ts":(start-timedelta(hours=4)).isoformat(),"event_start_ts":start.isoformat(),"prediction_generated_at_utc":(start-timedelta(minutes=40)).isoformat(),"model_artifact_sha256":art}
+    def q(m,home=-125,away=110,away_team="Away Club",home_team="Home Club"):
+        return {"sportsbook":"draftkings","model_artifact_sha256":art,"away_team":away_team,"home_team":home_team,"scheduled_start_utc":start.isoformat(),"observed_at_utc":(start-timedelta(minutes=m)).isoformat(),"provider_event_id":"dk-1","raw_sha256":str(int(m)).zfill(64),"moneyline":{"status":"OK","home_price_american":home,"away_price_american":away}}
     settlement={"game_pk":123,"status":"FINAL","home_score":5,"away_score":3}
     return pred,q,settlement
 
@@ -38,6 +38,17 @@ def test_artifact_mismatch_fails_closed():
     pred,q,settlement=_base(); bad=q(31); bad["model_artifact_sha256"]="b"*64
     with pytest.raises(MLBMoneylineForwardLedgerError,match="artifact mismatch"):
         assemble_forward_evidence(prediction=pred,quotes=[bad],settlement=settlement)
+
+def test_same_start_unrelated_game_is_ignored():
+    pred,q,settlement=_base()
+    unrelated=q(31,away_team="Other Away",home_team="Other Home")
+    out=assemble_forward_evidence(prediction=pred,quotes=[unrelated,q(31),q(5)],settlement=settlement)
+    assert out["status"]=="FORWARD_EVIDENCE_COMPLETE"
+
+def test_missing_prediction_team_identity_fails_closed():
+    pred,q,settlement=_base(); pred.pop("home_team")
+    with pytest.raises(MLBMoneylineForwardLedgerError,match="team identity"):
+        assemble_forward_evidence(prediction=pred,quotes=[q(31)],settlement=settlement)
 
 def test_nonfinal_settlement_blocks():
     pred,q,settlement=_base(); settlement["status"]="LIVE"
