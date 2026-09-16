@@ -37,7 +37,7 @@ jobs:
       - name: Test chronology
         run: python -m pytest -q tests/test_build_mlb_moneyline_rolling_candidate.py
       - name: Evaluate frozen-development candidate
-        run: python scripts/build_mlb_moneyline_rolling_candidate.py
+        run: PYTHONPATH=. python scripts/build_mlb_moneyline_rolling_candidate.py
       - name: Persist candidate artifact
         shell: bash
         run: |
