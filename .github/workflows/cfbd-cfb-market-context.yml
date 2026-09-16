@@ -1,0 +1,60 @@
+name: cfbd-cfb-market-context
+
+on:
+  workflow_dispatch:
+    inputs:
+      season:
+        description: CFB season
+        required: true
+        default: "2026"
+      week:
+        description: CFB week
+        required: true
+        default: "4"
+
+permissions:
+  contents: read
+
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12.13"
+      - name: Fetch context with fail-closed domain exit
+        id: domain
+        env:
+          CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+        run: |
+          set +e
+          python scripts/run_cfbd_cfb_market_context.py \
+            --season "${{ inputs.season }}" \
+            --week "${{ inputs.week }}" \
+            --output artifacts/run_it/cfb_market_context.json
+          code=$?
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Classify operational health separately from domain state
+        env:
+          DOMAIN_CODE: ${{ steps.domain.outputs.code }}
+        run: |
+          python scripts/classify_cfb_market_context_operation.py \
+            --artifact artifacts/run_it/cfb_market_context.json \
+            --engine-exit-code "$DOMAIN_CODE" \
+            --output artifacts/run_it/cfb_market_context_operation.json
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+          p=json.loads(Path('artifacts/run_it/cfb_market_context_operation.json').read_text())
+          print(f"Domain status: **{p['domain_status']}**")
+          print(f"Operational status: **{p['operational_status']}**")
+          PY
+      - name: Upload domain and operational artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cfbd-cfb-market-context-${{ github.run_id }}
+          path: artifacts/run_it/cfb_market_context*.json
+          if-no-files-found: warn
