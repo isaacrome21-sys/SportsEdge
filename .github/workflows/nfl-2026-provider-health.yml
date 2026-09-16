@@ -1,0 +1,54 @@
+name: NFL 2026 provider health
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Independent control-plane alarm. The quota endpoint is configured as
+    # zero-credit; this workflow never captures or writes market evidence.
+    - cron: '7 * * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nfl-2026-provider-health
+  cancel-in-progress: true
+
+jobs:
+  provider-health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Fetch free NFL schedule
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error --retry 3 \
+            'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv' \
+            -o "$RUNNER_TEMP/nfl-games.csv"
+
+      - name: Verify provider credentials before frozen windows
+        env:
+          SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+          SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
+          SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
+          SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/nfl-provider-health
+          # Module invocation makes the repository root import path explicit.
+          # A blocked provider state exits non-zero and therefore turns this
+          # workflow red instead of becoming a green no-op.
+          python3 -m scripts.nfl_2026_provider_preflight \
+            --schedule-csv "$RUNNER_TEMP/nfl-games.csv" \
+            --out artifacts/nfl-provider-health/status.json
+
+      - name: Upload redacted health report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nfl-provider-health-${{ github.run_id }}
+          path: artifacts/nfl-provider-health/status.json
+          if-no-files-found: warn
+          retention-days: 14
