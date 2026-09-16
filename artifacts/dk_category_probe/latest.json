@@ -1,0 +1,1889 @@
+{
+  "acceptance_criterion": "category response must contain Moneyline markets that normalize to exact two-sided pairs",
+  "observed_at_utc": "2026-09-16T02:48:56.860839+00:00",
+  "promotion_authority": false,
+  "read_only_diagnostic": true,
+  "schema_version": 1,
+  "sports": [
+    {
+      "advertised_categories": [
+        {
+          "category_id": 493,
+          "name": "Game Lines"
+        },
+        {
+          "category_id": 723,
+          "name": "Live Inning Props"
+        },
+        {
+          "category_id": 729,
+          "name": "Innings"
+        },
+        {
+          "category_id": 743,
+          "name": "Batter Props"
+        },
+        {
+          "category_id": 758,
+          "name": "Live Game Props"
+        },
+        {
+          "category_id": 760,
+          "name": "Half Inning Props"
+        },
+        {
+          "category_id": 985,
+          "name": "Live Batter Props"
+        },
+        {
+          "category_id": 988,
+          "name": "Plate Appearance"
+        },
+        {
+          "category_id": 1024,
+          "name": "1st Inning"
+        },
+        {
+          "category_id": 1031,
+          "name": "Pitcher Props"
+        },
+        {
+          "category_id": 1256,
+          "name": "Live Pitcher Props"
+        },
+        {
+          "category_id": 1762,
+          "name": "Leagues"
+        },
+        {
+          "category_id": 1774,
+          "name": "Champion"
+        },
+        {
+          "category_id": 1924,
+          "name": "New Markets 26"
+        },
+        {
+          "category_id": 186321348,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 186321353,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 186321362,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 186321366,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 186321374,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 186321375,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 186321384,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 186321385,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 186321386,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 186321387,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 186321388,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 186321389,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 186321399,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 186321451,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 186321459,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 186321461,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 186321462,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 286321348,
+          "name": "Run Line"
+        },
+        {
+          "category_id": 286321353,
+          "name": "Run Line"
+        },
+        {
+          "category_id": 286321362,
+          "name": "Run Line"
+        },
+        {
+          "category_id": 286321366,
+          "name": "Run Line"
+        },
+        {
+          "category_id": 286321374,
+          "name": "Run Line"
+        },
+        {
+          "category_id": 286321375,
+          "name": "Run Line"
+        },
+        {
+          "category_id": 286321384,
+          "name": "Run Line"
+        },
+        {
+          "category_id": 286321385,
+          "name": "Run Line"
+        },
+        {
+          "category_id": 286321386,
+          "name": "Run Line"
+        },
+        {
+          "category_id": 286321387,
+          "name": "Run Line"
+        },
+        {
+          "category_id": 286321388,
+          "name": "Run Line"
+        },
+        {
+          "category_id": 286321389,
+          "name": "Run Line"
+        },
+        {
+          "category_id": 286321399,
+          "name": "Run Line"
+        },
+        {
+          "category_id": 286321451,
+          "name": "Run Line"
+        },
+        {
+          "category_id": 286321459,
+          "name": "Run Line"
+        },
+        {
+          "category_id": 286321461,
+          "name": "Run Line"
+        },
+        {
+          "category_id": 286321462,
+          "name": "Run Line"
+        },
+        {
+          "category_id": 386321348,
+          "name": "Total"
+        },
+        {
+          "category_id": 386321353,
+          "name": "Total"
+        },
+        {
+          "category_id": 386321362,
+          "name": "Total"
+        },
+        {
+          "category_id": 386321366,
+          "name": "Total"
+        },
+        {
+          "category_id": 386321374,
+          "name": "Total"
+        },
+        {
+          "category_id": 386321375,
+          "name": "Total"
+        },
+        {
+          "category_id": 386321384,
+          "name": "Total"
+        },
+        {
+          "category_id": 386321385,
+          "name": "Total"
+        },
+        {
+          "category_id": 386321386,
+          "name": "Total"
+        },
+        {
+          "category_id": 386321387,
+          "name": "Total"
+        },
+        {
+          "category_id": 386321388,
+          "name": "Total"
+        },
+        {
+          "category_id": 386321389,
+          "name": "Total"
+        },
+        {
+          "category_id": 386321399,
+          "name": "Total"
+        },
+        {
+          "category_id": 386321451,
+          "name": "Total"
+        },
+        {
+          "category_id": 386321459,
+          "name": "Total"
+        },
+        {
+          "category_id": 386321461,
+          "name": "Total"
+        },
+        {
+          "category_id": 386321462,
+          "name": "Total"
+        }
+      ],
+      "bare_league_events": 17,
+      "bare_league_raw_sha256": "24dbf42e5d28f7ad05ad2aa4fe2229f9ff843fdf12507045ec7e3e650d78b10e",
+      "bare_league_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240",
+      "category_probe_results": [
+        {
+          "category_id": 493,
+          "events": 17,
+          "moneyline_markets": 17,
+          "name": "Game Lines",
+          "raw_sha256": "24dbf42e5d28f7ad05ad2aa4fe2229f9ff843fdf12507045ec7e3e650d78b10e",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/493",
+          "valid_two_sided_moneyline_pairs": 17
+        },
+        {
+          "category_id": 723,
+          "events": 2,
+          "moneyline_markets": 0,
+          "name": "Live Inning Props",
+          "raw_sha256": "7f157b9227eff3b03e1628088a192f43c289c765cc46e893fdd56bb08769b062",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/723",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 729,
+          "events": 3,
+          "moneyline_markets": 0,
+          "name": "Innings",
+          "raw_sha256": "89c1329801b5018900c2eb8bfb108b835f519ef44586c7bd9c46db31b0f22efa",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/729",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 743,
+          "events": 1,
+          "moneyline_markets": 0,
+          "name": "Batter Props",
+          "raw_sha256": "28b61c8fde6b5c2240ec71551d590204d0092642f72ed891be702b9f3308bfc1",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/743",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 758,
+          "events": 3,
+          "moneyline_markets": 0,
+          "name": "Live Game Props",
+          "raw_sha256": "32f499bb76166391354faa214630a225a70ac5f48acdb04da2d1f138e6ba2baf",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/758",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 760,
+          "events": 4,
+          "moneyline_markets": 0,
+          "name": "Half Inning Props",
+          "raw_sha256": "06d5a402ba3733c83c8664a9953a83bc83578d433d7e41111f7114749c8f3962",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/760",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 985,
+          "events": 4,
+          "moneyline_markets": 0,
+          "name": "Live Batter Props",
+          "raw_sha256": "76615e0676ea8cfe30f9c49515f3e3a8ee881451975a1548cc47b43bb00d2550",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/985",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 988,
+          "events": 4,
+          "moneyline_markets": 0,
+          "name": "Plate Appearance",
+          "raw_sha256": "a22cf86b49b118398d8f0a3ac58ef5bde90b22563146207147afe7585fab5738",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/988",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 1024,
+          "events": 7,
+          "moneyline_markets": 0,
+          "name": "1st Inning",
+          "raw_sha256": "ff3fd9a4e0c5b9781138c83f86f288a1034435cc878f70caf6cbc26285fc5d95",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/1024",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 1031,
+          "events": 1,
+          "moneyline_markets": 0,
+          "name": "Pitcher Props",
+          "raw_sha256": "52b024b637f6aa362abd2e0531506f39e3050110386f73a210563060c1eb565e",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/1031",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 1256,
+          "events": 1,
+          "moneyline_markets": 0,
+          "name": "Live Pitcher Props",
+          "raw_sha256": "45b4e06a66bd932236f376b6cbf68b1cde13eb335180b1f674ce41ce4c1ef72f",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/1256",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 1762,
+          "events": 2,
+          "moneyline_markets": 0,
+          "name": "Leagues",
+          "raw_sha256": "aab9413d15fc63827d04d1e459baa743e327f056cd30d26bee62c08d9d5f3397",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/1762",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 1774,
+          "events": 1,
+          "moneyline_markets": 0,
+          "name": "Champion",
+          "raw_sha256": "745220e49df042ab98aaf55b47edea3caeefad07c4edd5f216618f7f164383b6",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/1774",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 1924,
+          "events": 1,
+          "moneyline_markets": 0,
+          "name": "New Markets 26",
+          "raw_sha256": "01b1e7bf57ca1cbb59ba1a55077c5de8df068c676b8e2960fb122b45e4fa7695",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/1924",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 186321348,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "814c56ed083c1ec063c5923c79ab1801e3bb7ca5f34eb4607902e0568816d56c",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/186321348",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 186321353,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "b0a84950bbb0c675b2d99aa0f0d10c9bfb8bce839492bc14f6bac04a3b7f07fb",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/186321353",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 186321362,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "155b7a2f1c30d7c0ed72a05e125bba8dcec9f01da8a0fb78e159a56b4bd770e6",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/186321362",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 186321366,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "18f1096ab1e571878ad5c1aba5e14ed7e634c0de251465c9397e5720b072045f",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/186321366",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 186321374,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "5c09fd9654b76aa6cf8968dbc61bea20b1e0df0de80a38fae4f4d3622c19cef5",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/186321374",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 186321375,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "903ec9d5d5a5235ea607c3916084d25e500a04f66ecfcd998f8f5e489e96a7db",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/186321375",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 186321384,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "3aecda17b2d558a93427f8cb1bae83a5215f5722726705b38f6728b86dd2eab7",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/186321384",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 186321385,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "2a075a1f7e0eb2125db8aeaaa9b3aa11b38987939a551d07209d021f03ed8c83",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/186321385",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 186321386,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "090ac24132104942f151cac692d2018b8429c25dbf35a52b36279f2342792986",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/186321386",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 186321387,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "1db1cb9816674e4acb432ddd14a43bf8820992e4c6fe6428e90e92a46f6b9938",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/186321387",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 186321388,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "b5e234dcfe9dbd7827f1443a0c3b1c0e4cb9def9e113f07ad79d9951fe025171",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/186321388",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 186321389,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "e2349b300ffece4375ef6b2a2ea82e9f09cbd24c8e4df54f3509f6937143f133",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/186321389",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 186321399,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "e89350263a36b8220fced5a3b5de34213452ac5a5d54d2924738b175517c8e36",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/186321399",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 186321451,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "65d33445d0a6c54f4634e136eeb2cfe789af3eca0c228ed0b61358b853200363",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/186321451",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 186321459,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "d1004da32f2e79c67f8680b0c922bdca6affdf6b9fa4f88425e41607bcebe4cb",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/186321459",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 186321461,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "4815aa0f7c55725abe52743bb89cb887781f2528cd4a1ff7e0a4bcc6938c9efb",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/186321461",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 186321462,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "2adcaa862d86ffa03cca74ad1396cb3e0b7861ee42e46172d0e8d6cc6a835207",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/186321462",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 286321348,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Run Line",
+          "raw_sha256": "7095a34168a90034e0e81992ca94de0f999a9a5ea81a87d3eb27e486b55c6752",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/286321348",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 286321353,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Run Line",
+          "raw_sha256": "722356d12f1a073352b8405d05ed5908f6c4b0ae1fbd9bf9b7dca01949dd6754",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/286321353",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 286321362,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Run Line",
+          "raw_sha256": "a9ac6d0bfe58068b3cc720dc7f0ec6e92663870dc6ac243233c374a84c3dac85",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/286321362",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 286321366,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Run Line",
+          "raw_sha256": "7af8a859b970bafe894253b697f56202dacbb0c3bd0ace5263d74f7283189c5a",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/286321366",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 286321374,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Run Line",
+          "raw_sha256": "2c624d05eb9a3330a9b6fd768061472b51c7fb66084cea17de6b142ca8f625eb",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/286321374",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 286321375,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Run Line",
+          "raw_sha256": "59751a94306822b19ac6d83e372a3e1427002dd501b111305f96b13ef78ba0f2",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/286321375",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 286321384,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Run Line",
+          "raw_sha256": "b39ab6a2f834f811659d67122b58c23d2ba14c3f682646a627e0f805db37c42d",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/286321384",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 286321385,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Run Line",
+          "raw_sha256": "7029c243db08a6d629f2f6eed7206cf3bd0b5f8a26ad36511811cc644c128598",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/286321385",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 286321386,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Run Line",
+          "raw_sha256": "3f95f7f6f45dc42636a602270c3a7159098cb56a594d0dc1eef294e7d6ce9e01",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/286321386",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 286321387,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Run Line",
+          "raw_sha256": "633e51acc2643365681e1d3a5669cdb0b80aeeeb6d36ebfa46a1518d163cbdaa",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/286321387",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 286321388,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Run Line",
+          "raw_sha256": "736e83ed3c3347fa6080626f21a3ea1b15d6cbbc2b1ccf921b29e4ca9389c69d",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/286321388",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 286321389,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Run Line",
+          "raw_sha256": "7847355da4b7d10e2c4ae55cb56526bec6e749d28e397bcfe6e274ed40daf22f",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/286321389",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 286321399,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Run Line",
+          "raw_sha256": "177e1f78fffd3144be643c81ce1bfa7e6aaa528bb7cf4e5ece3dda0603798d05",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/286321399",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 286321451,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Run Line",
+          "raw_sha256": "5b07fe3e1e14fd46a874061a4638c425682c21441fe171449d0c0ab2ca9f20e2",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/286321451",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 286321459,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Run Line",
+          "raw_sha256": "8abb41c8a5c2919c7c7f2261672a5232581dc489101939f7a9ffec636dcec690",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/286321459",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 286321461,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Run Line",
+          "raw_sha256": "077029a48e0914de98d75b6fd33de2ef74f607f2a9a1f0bb7051391f9146f324",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/286321461",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 286321462,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Run Line",
+          "raw_sha256": "eee49ab303ee7cc407dfe9703aa60208ff26932f7944bf7375fe2020c985b0ee",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/286321462",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 386321348,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Total",
+          "raw_sha256": "025432e55197ce2de190a8d6aedecfda9e503e4f90a3b0e3f6a9b67bfc8b9a34",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/386321348",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 386321353,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Total",
+          "raw_sha256": "344dc7cce2674a79b8a322eb44640a9fd26b4e51d52f88726f9a5239b54a033d",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/386321353",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 386321362,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Total",
+          "raw_sha256": "580bfc6e682fb3c960990cb2e1ace4e9758021ae2e5aba142947d5f4bd5648fe",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/386321362",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 386321366,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Total",
+          "raw_sha256": "e5ec2e35a649c710372ebfc7369f21cc822e4fcdd760a4b70a377f07446c4c95",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/386321366",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 386321374,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Total",
+          "raw_sha256": "26ee9ad65f9d69a2e3408f2d4042e3d13ea0da6acdd225f69f7875998f574dd4",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/386321374",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 386321375,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Total",
+          "raw_sha256": "ad3319754a782893ee47c7f8ff06ef6fb86e5fb289d3828cf51959e960f6c0a1",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/386321375",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 386321384,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Total",
+          "raw_sha256": "e569b35ed2a29917bb1e1a8bf7e5718a59c854cc7dbed2d52b710bab04e4f955",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/386321384",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 386321385,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Total",
+          "raw_sha256": "de94a7bf2f417b802d37a0cbe1dca298a8d9b8508d786447bead9c2fa9156f40",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/386321385",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 386321386,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Total",
+          "raw_sha256": "50ae8a60db40a6a248a63e2a782475c4ebb0c1f70a74354666373563263d7709",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/386321386",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 386321387,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Total",
+          "raw_sha256": "0139c26fe75f2f077874b5c9339fe6610aa427d78f9b4ca9a82566c9f5545013",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/386321387",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 386321388,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Total",
+          "raw_sha256": "e1f35d6e9a9fcdcadbb1c222caf12a777d246cc590ed48a5a8f1db1727e86201",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/386321388",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 386321389,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Total",
+          "raw_sha256": "b3b8a141f3cd01e3fd830dd4b971789429a50862ea64c5418858abb9c7755621",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/386321389",
+          "valid_two_sided_moneyline_pairs": 0
+        }
+      ],
+      "current_category_events": 0,
+      "current_category_id": 492,
+      "current_category_moneyline_markets": 0,
+      "current_category_raw_sha256": "667a5cbd3f18d0fc8dfd69fec9edfab7c1d051ea39b67c148374b31a5b394c9c",
+      "current_category_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/492",
+      "current_category_valid_two_sided_moneyline_pairs": 0,
+      "league_id": 84240,
+      "promotion_authority": false,
+      "sport_key": "baseball_mlb",
+      "verdict": "CATEGORY_ID_LIKELY_WRONG_FOR_THIS_LEAGUE",
+      "verified_category_candidates": [
+        {
+          "category_id": 493,
+          "events": 17,
+          "moneyline_markets": 17,
+          "name": "Game Lines",
+          "raw_sha256": "24dbf42e5d28f7ad05ad2aa4fe2229f9ff843fdf12507045ec7e3e650d78b10e",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/493",
+          "valid_two_sided_moneyline_pairs": 17
+        }
+      ]
+    },
+    {
+      "advertised_categories": [
+        {
+          "category_id": 492,
+          "name": "Game Lines"
+        },
+        {
+          "category_id": 526,
+          "name": "Halves"
+        },
+        {
+          "category_id": 527,
+          "name": "Quarters"
+        },
+        {
+          "category_id": 528,
+          "name": "Game Props"
+        },
+        {
+          "category_id": 529,
+          "name": "Futures"
+        },
+        {
+          "category_id": 530,
+          "name": "Team Props"
+        },
+        {
+          "category_id": 638,
+          "name": "Kicking Props"
+        },
+        {
+          "category_id": 787,
+          "name": "Awards"
+        },
+        {
+          "category_id": 982,
+          "name": "DK Specials"
+        },
+        {
+          "category_id": 999,
+          "name": "DK Squares"
+        },
+        {
+          "category_id": 1000,
+          "name": "Passing Props "
+        },
+        {
+          "category_id": 1001,
+          "name": "Rushing Props"
+        },
+        {
+          "category_id": 1003,
+          "name": "TD Scorers"
+        },
+        {
+          "category_id": 1076,
+          "name": "Playoffs"
+        },
+        {
+          "category_id": 1286,
+          "name": "Wins"
+        },
+        {
+          "category_id": 1303,
+          "name": "1st Drive"
+        },
+        {
+          "category_id": 1304,
+          "name": "Quick Hits"
+        },
+        {
+          "category_id": 1342,
+          "name": "Receiving Props"
+        },
+        {
+          "category_id": 1559,
+          "name": "1st of Game"
+        },
+        {
+          "category_id": 1595,
+          "name": "Stat Leaders"
+        },
+        {
+          "category_id": 1644,
+          "name": "Game Specials"
+        },
+        {
+          "category_id": 1743,
+          "name": "Special Teams Props"
+        },
+        {
+          "category_id": 1744,
+          "name": "Defensive Props"
+        },
+        {
+          "category_id": 1803,
+          "name": "2026 Draft"
+        },
+        {
+          "category_id": 184695445,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695447,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695459,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695463,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695480,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695486,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695487,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695490,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695508,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695522,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695538,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695545,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695548,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695552,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695562,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695578,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695584,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695586,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695601,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695613,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695622,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695629,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695645,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695652,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695655,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695659,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695684,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695701,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695703,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695704,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695719,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 184695721,
+          "name": "Moneyline"
+        },
+        {
+          "category_id": 284695445,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695447,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695459,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695463,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695480,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695486,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695487,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695490,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695508,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695522,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695538,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695545,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695548,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695552,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695562,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695578,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695584,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695586,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695601,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695613,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695622,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695629,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695645,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695652,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695655,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695659,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695684,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695701,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695703,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695704,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695719,
+          "name": "Spread"
+        },
+        {
+          "category_id": 284695721,
+          "name": "Spread"
+        },
+        {
+          "category_id": 384695445,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695447,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695459,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695463,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695480,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695486,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695487,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695490,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695508,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695522,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695538,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695545,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695548,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695552,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695562,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695578,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695584,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695586,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695601,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695613,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695622,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695629,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695645,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695652,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695655,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695659,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695684,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695701,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695703,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695704,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695719,
+          "name": "Total"
+        },
+        {
+          "category_id": 384695721,
+          "name": "Total"
+        }
+      ],
+      "bare_league_events": 32,
+      "bare_league_raw_sha256": "7fd027293c09290b7cce6f58c843520c9796696d889963b111b7f0a97d5005d9",
+      "bare_league_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808",
+      "category_probe_results": [
+        {
+          "category_id": 492,
+          "events": 32,
+          "moneyline_markets": 32,
+          "name": "Game Lines",
+          "raw_sha256": "7fd027293c09290b7cce6f58c843520c9796696d889963b111b7f0a97d5005d9",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/492",
+          "valid_two_sided_moneyline_pairs": 32
+        },
+        {
+          "category_id": 526,
+          "events": 16,
+          "moneyline_markets": 0,
+          "name": "Halves",
+          "raw_sha256": "ae1082973f9205493a0380542cfad51cc614cbd39426d26827e5b0f4398bab3e",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/526",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 527,
+          "events": 16,
+          "moneyline_markets": 0,
+          "name": "Quarters",
+          "raw_sha256": "abeced30594a96c70a390a57ef7201942312b694ebdb6bed9487bbb8ac947fe5",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/527",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 528,
+          "events": 16,
+          "moneyline_markets": 0,
+          "name": "Game Props",
+          "raw_sha256": "202f19b6a69b1525c8f45b3b45bc74bb2da604a7618b9abaef0c22ee7dc4a7f5",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/528",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 529,
+          "events": 1,
+          "moneyline_markets": 0,
+          "name": "Futures",
+          "raw_sha256": "0b93bc358979f888b21ed3cc633535f10a42710db66e657a2b354c56f1960252",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/529",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 530,
+          "events": 16,
+          "moneyline_markets": 0,
+          "name": "Team Props",
+          "raw_sha256": "b415491220a21a3d00892e8ce4e81ed64bbab67fc712be68f731679e14a20913",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/530",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 638,
+          "events": 1,
+          "moneyline_markets": 0,
+          "name": "Kicking Props",
+          "raw_sha256": "d577df6128831fca47a348195d88cad5b358034c9d76e51faff496c6afad4f0d",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/638",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 787,
+          "events": 1,
+          "moneyline_markets": 0,
+          "name": "Awards",
+          "raw_sha256": "d4313802c1869a6ba2bbc0bae3bdf558152c2034170649f20f63b993391a9ea9",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/787",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 982,
+          "events": 1,
+          "moneyline_markets": 0,
+          "name": "DK Specials",
+          "raw_sha256": "7eb905cf1a9fdb87d4ad40222678b79e8702e17dfa0fdc8bb99eb47d9309dfb9",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/982",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 999,
+          "events": 15,
+          "moneyline_markets": 0,
+          "name": "DK Squares",
+          "raw_sha256": "26ce06694d06ef6f67b31ac448d72cb4b2e8108495ade339580e36049b71e433",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/999",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 1000,
+          "events": 6,
+          "moneyline_markets": 0,
+          "name": "Passing Props ",
+          "raw_sha256": "cce34f33216584ce153229fd1a21107196629c884e5d7666988c00a121b52e50",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/1000",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 1001,
+          "events": 5,
+          "moneyline_markets": 0,
+          "name": "Rushing Props",
+          "raw_sha256": "6ef579d3fc64cc1d78cd77188d5ce156ad55695dfbd87f755f842a2ebd8ab576",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/1001",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 1003,
+          "events": 15,
+          "moneyline_markets": 0,
+          "name": "TD Scorers",
+          "raw_sha256": "be7e9169cb4569f4b64190b77373e8d5f82f422302204b9f69a6b3b7e39b2b9a",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/1003",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 1076,
+          "events": 1,
+          "moneyline_markets": 0,
+          "name": "Playoffs",
+          "raw_sha256": "e941a840fd99359de30de7985c2b5ab4fead554e0ba74803a5bdf9dda78bc443",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/1076",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 1286,
+          "events": 1,
+          "moneyline_markets": 0,
+          "name": "Wins",
+          "raw_sha256": "1ab7bc0ae77190343a4b8795c8ae2f186fe7f7341f2200d9ac3da3e2bde6c2ca",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/1286",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 1303,
+          "events": 16,
+          "moneyline_markets": 0,
+          "name": "1st Drive",
+          "raw_sha256": "9635370108df40bd1d143d859cbc0a917b56eccd5bdf924987066cce4b75fea4",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/1303",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 1304,
+          "events": 1,
+          "moneyline_markets": 0,
+          "name": "Quick Hits",
+          "raw_sha256": "452720cf8aa7447d5b2e9976ef3e67076e14aabe403de05042d417edbcfd7e08",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/1304",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 1342,
+          "events": 5,
+          "moneyline_markets": 0,
+          "name": "Receiving Props",
+          "raw_sha256": "ed28d1657949da6b36b330fab45c0e389a9e3693f1e8645e006b4d0ef461f695",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/1342",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 1559,
+          "events": 1,
+          "moneyline_markets": 0,
+          "name": "1st of Game",
+          "raw_sha256": "4dc31d2396ddb3efcaebf97596309eb6fb483f70d471b51ea41c549ef2a4ed04",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/1559",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 1595,
+          "events": 1,
+          "moneyline_markets": 0,
+          "name": "Stat Leaders",
+          "raw_sha256": "010c3a46a905ccf9054bb67da870bcf84aca02bad350d615123704c86a8cda65",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/1595",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 1644,
+          "events": 1,
+          "moneyline_markets": 0,
+          "name": "Game Specials",
+          "raw_sha256": "2ec3265979be9da8fa5b61382b50df9e1a57bee0fd5a71f1d0c972b55f52340f",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/1644",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 1743,
+          "events": 1,
+          "moneyline_markets": 0,
+          "name": "Special Teams Props",
+          "raw_sha256": "016170338d995b0daab7c200a22bd69301c48750bb443f547c7f7f1a110a98c8",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/1743",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 1744,
+          "events": 1,
+          "moneyline_markets": 0,
+          "name": "Defensive Props",
+          "raw_sha256": "7acc1c65421bedfe67d4fd211ae3db4a735161f4088180693f977627ce003763",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/1744",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 1803,
+          "events": 1,
+          "moneyline_markets": 0,
+          "name": "2026 Draft",
+          "raw_sha256": "da4e2e278f862892a74ff3b89fd04941c6c35a3a0bd5c66d8325ca298809c3ba",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/1803",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695445,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "41ac5dddf908d36801e4333a0b6a12316700b6fb6564ce2c4179bfe022ce2e9a",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695445",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695447,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "0eb19e8f235e60c3f7fdca6bf3d558fb6afdf6707fa2b3f1d8271cc0e4f5d257",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695447",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695459,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "b19a74e1a2ac399ce792f40b971bb12226f9a87f33f28f1ac1dbab2ca3975301",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695459",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695463,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "07ade5987016529463f5537b6240526afe3f405d9a1ac376179679a2cfcff675",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695463",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695480,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "2bb838bc7cd58e7f843936c350276c2e34243f84358d588a66312a4759a13159",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695480",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695486,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "0b8ff6d6fccdc15920da213c04d69951e69d58cd96a8f9d8c49e592b7659a565",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695486",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695487,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "55552ab4d232f29bf9c6e2f783f53acf65bdc503a31c6b0ed06f2d1cbb2fad78",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695487",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695490,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "592541f127ba892c342bd969821259ab06205ab8ecdd4950a46f8cececb1cfaf",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695490",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695508,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "23b9ca56076951b5c3a0c6f83d8bdbbf9b143f058c335beb4a51c30a6a2f1f4c",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695508",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695522,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "9136e078ef26e029d15c063cdaa5b9d2f52e2b888a728a23ecebefcee7c4383b",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695522",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695538,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "c7158c52ee3876cf1f19a2dc0afaf7be392434d381175cb681349482987fc147",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695538",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695545,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "066ecbc029e4a91937bb500ecb6e1301564c22fba2b0e88657b9ea2070670433",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695545",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695548,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "679a6b0f50095462c6e296681ad5b1a07e88d7e109c21e34fc5f9de658888f6c",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695548",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695552,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "4b4bbcfdb57ad6b68054b7d59e411c22853f5aa79279c7c5010a89da856ef3af",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695552",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695562,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "b6c83fc797051c5ed3878edbeb8e5a7b7c803b4fd08ef1f95d61f89740ebbc5f",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695562",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695578,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "da6ffd0c0b57c444b47412e751fdc6cd88fac55e0f2ff9501af401ae09daeb3f",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695578",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695584,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "5a1e5d90271c00792444dabd3fee4bc81034c88c2ad17d85f7b7095c3af03d4c",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695584",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695586,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "44eccc79c4e6135ccbcf38d067f71c3e5cb6aede85bda92f8a63162e19ece40f",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695586",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695601,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "9da612237ef34602ddfd97be12e2f6b61f14996d76a105ed91475199302017ba",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695601",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695613,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "6ea43b3eb42c2769674164d546720574f77b4f93530403011262af02b6b40d51",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695613",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695622,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "a3176d9fc4221106d5011130fa2f370f5f195bf7e19d5bf598ed23750be98f10",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695622",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695629,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "38002ca131cf9a0920e8bf026c15c0ce6bafa6ac0c0583aa5887e6524388ff34",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695629",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695645,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "9c573ec5942c48da315389900f5263ff094a9fcaad25e2fc0847f4119348c483",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695645",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695652,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "4fd00fe543bfa5a0e3e490bfe7e12e2956eca041aa2e7046ef6642a168e01387",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695652",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695655,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "b84d67ce11034189b48f7b66489fb6a2bedc01bc13e9a47ad24ac40648ee0a2b",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695655",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695659,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "5633893f96afb3f86fd37bcf101aeaca3d7c479a28acf3b05c41e105d40d1632",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695659",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695684,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "26cc2952f6f2fd6901c0acd82d69e00501cfcd24c66a5de84e9d4ddd8091aeb4",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695684",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695701,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "b36674ae3b513f0abb9b464034bd7ee327f970a4fc29313359a781840848966b",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695701",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695703,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "ec5b77b3b135f0de84fdc3319d4baed8c3439733597cb901c4a9c0c7f7bcce62",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695703",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695704,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "5a04f718fd1fe130470d97ead761d4cc19ef10d1cef4929230ea657929bcd487",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695704",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695719,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "f4da36f386c04bb5f09bf69e63dc7539d0efa189e2938b1206625419e65e657f",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695719",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 184695721,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Moneyline",
+          "raw_sha256": "eec42404aadf94bcccb654ab48940446725ff3ab5d508a478a74e2b8a7771285",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/184695721",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 284695445,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Spread",
+          "raw_sha256": "dbd509b9bc88845e7d318b5b744d0b4141390f61448a2a06e35190ff9d37c026",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/284695445",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 284695447,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Spread",
+          "raw_sha256": "e2434055b9087b2ea1a066ccf74b24ba17d937bef76e9cd61df26977b51fc98a",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/284695447",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 284695459,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Spread",
+          "raw_sha256": "14647a001aef9ac1e6cf68068a96da80d7edd557e385e2a40d042aaa02772c6f",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/284695459",
+          "valid_two_sided_moneyline_pairs": 0
+        },
+        {
+          "category_id": 284695463,
+          "events": 0,
+          "moneyline_markets": 0,
+          "name": "Spread",
+          "raw_sha256": "3cb3786a2017ed28f06f3d4c00739b36ed620ffff22717236a32a559308d1cf8",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/284695463",
+          "valid_two_sided_moneyline_pairs": 0
+        }
+      ],
+      "current_category_events": 32,
+      "current_category_id": 492,
+      "current_category_moneyline_markets": 32,
+      "current_category_raw_sha256": "7fd027293c09290b7cce6f58c843520c9796696d889963b111b7f0a97d5005d9",
+      "current_category_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/492",
+      "current_category_valid_two_sided_moneyline_pairs": 32,
+      "league_id": 88808,
+      "promotion_authority": false,
+      "sport_key": "americanfootball_nfl",
+      "verdict": "CATEGORY_RETURNS_VALID_TWO_SIDED_MONEYLINE",
+      "verified_category_candidates": [
+        {
+          "category_id": 492,
+          "events": 32,
+          "moneyline_markets": 32,
+          "name": "Game Lines",
+          "raw_sha256": "7fd027293c09290b7cce6f58c843520c9796696d889963b111b7f0a97d5005d9",
+          "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/492",
+          "valid_two_sided_moneyline_pairs": 32
+        }
+      ]
+    }
+  ]
+}
