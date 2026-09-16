@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "contract_id": "EXTERNAL_EV_SOURCE_AVAILABILITY_V1",
+  "parent_policy_id": "EV_TRACKER_POLICY_V2",
+  "evidence_ref": "refs/heads/main",
+  "status": "FROZEN_NON_RETROACTIVE_INTERPRETATION",
+  "purpose": "Define source-unavailability handling without rewriting the already-live EV_TRACKER_POLICY_V2 evidence clock.",
+  "existing_play_rule": {
+    "logged_play_eligibility_is_not_revoked_by_later_source_outage": true,
+    "started_eligible_plays_remain_in_coverage_denominator": true,
+    "no_usable_pre_start_close_after_frozen_attempts": "CLOSE_MISSED",
+    "missed_or_ungradeable_close_remains_in_denominator": true,
+    "retroactive_clock_pause_forbidden": true,
+    "retroactive_reclassification_forbidden": true,
+    "backfill_forbidden": true
+  },
+  "source_rule": {
+    "soft_book_substitution_for_sharp_close_forbidden": true,
+    "parent_sharp_weights_unchanged": true,
+    "parent_min_sharp_weight_unchanged": true,
+    "provider_absence_does_not_authorize_new_benchmark_weights": true
+  },
+  "future_structural_unavailability_rule": {
+    "current_active_suspension": null,
+    "may_suspend_new_admissions_only": true,
+    "suspension_must_be_committed_to_evidence_ref_before_affected_admission": true,
+    "suspension_requires_explicit_effective_from_utc": true,
+    "existing_plays_continue_close_and_settlement": true,
+    "suspension_may_not_rewrite_prior_coverage_denominator": true,
+    "resume_requires_explicit_prospective_main_commit": true
+  },
+  "authority": {
+    "model_p": false,
+    "truth_gate": false,
+    "promotion": false,
+    "official": false,
+    "staking": false,
+    "changes_ev_tracker_policy_v2": false
+  }
+}
