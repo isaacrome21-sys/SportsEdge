@@ -14,7 +14,7 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import Iterable, Mapping, Sequence
+from typing import Mapping, Sequence
 from zoneinfo import ZoneInfo
 
 SCHEDULE_ENV = "NFL_SCHEDULE_CSV"
@@ -114,6 +114,14 @@ def _record_admissible(record: Mapping[str, object], cfg: Mapping[str, object]) 
     hashes = record.get("hashes")
     if not isinstance(hashes, Mapping) or not hashes:
         return False
+    if cfg.get("schedule_coverage_semantics"):
+        schedule = record.get("schedule")
+        if not isinstance(schedule, Mapping):
+            return False
+        if schedule.get("matching_semantics") != "KICKOFF_UTC_MULTIPLICITY":
+            return False
+        if not schedule.get("sha256"):
+            return False
     games = record.get("games")
     if not isinstance(games, list) or not games:
         return False
@@ -129,16 +137,20 @@ def _record_admissible(record: Mapping[str, object], cfg: Mapping[str, object]) 
     return True
 
 
-def captured_final_kickoffs(cfg: Mapping[str, object]) -> Counter[str]:
-    counts: Counter[str] = Counter()
+def _admissible_final_records(cfg: Mapping[str, object]):
     root = Path(str(cfg["output_dir"]))
     for path in root.glob("week*/final/*.json"):
         try:
             record = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
-        if not isinstance(record, Mapping) or not _record_admissible(record, cfg):
-            continue
+        if isinstance(record, Mapping) and _record_admissible(record, cfg):
+            yield record
+
+
+def captured_final_kickoffs(cfg: Mapping[str, object]) -> Counter[str]:
+    counts: Counter[str] = Counter()
+    for record in _admissible_final_records(cfg):
         for game in record.get("games") or []:
             raw = str(game.get("commence_time") or "").strip()
             if not raw:
@@ -149,6 +161,16 @@ def captured_final_kickoffs(cfg: Mapping[str, object]) -> Counter[str]:
                 continue
             counts[iso_z(kickoff)] += 1
     return counts
+
+
+def captured_final_event_ids(cfg: Mapping[str, object]) -> set[str]:
+    ids: set[str] = set()
+    for record in _admissible_final_records(cfg):
+        for game in record.get("games") or []:
+            event_id = str(game.get("event_id") or "").strip()
+            if event_id:
+                ids.add(event_id)
+    return ids
 
 
 def final_expected_due_kickoffs(
