@@ -1,6 +1,6 @@
 from datetime import datetime,timedelta,timezone
 import pytest
-from sportsedge.mlb_moneyline_forward_ledger import MLBMoneylineForwardLedgerError,assemble_forward_evidence
+from sportsedge.mlb_moneyline_forward_ledger import MLBMoneylineForwardLedgerError,assemble_forward_evidence,evidence_rows_for_gates
 
 def _base():
     start=datetime(2026,9,20,19,10,tzinfo=timezone.utc)
@@ -11,9 +11,12 @@ def _base():
     settlement={"game_pk":123,"status":"FINAL","home_score":5,"away_score":3}
     return pred,q,settlement
 
-def test_complete_uses_early_only_decision_and_latest_close():
+def _complete():
     pred,q,settlement=_base()
-    out=assemble_forward_evidence(prediction=pred,quotes=[q(35),q(30.5),q(9)],settlement=settlement)
+    return assemble_forward_evidence(prediction=pred,quotes=[q(35),q(30.5),q(9)],settlement=settlement)
+
+def test_complete_uses_early_only_decision_and_latest_close():
+    out=_complete()
     assert out["status"]=="FORWARD_EVIDENCE_COMPLETE"
     assert out["decision_minutes_before_start"]==pytest.approx(30.5)
     assert out["close_minutes_before_start"]==pytest.approx(9)
@@ -45,3 +48,12 @@ def test_market_blindness_required():
     pred,q,settlement=_base(); pred["market_blind"]=False
     with pytest.raises(MLBMoneylineForwardLedgerError,match="market_blind"):
         assemble_forward_evidence(prediction=pred,quotes=[q(31)],settlement=settlement)
+
+def test_complete_record_projects_into_existing_gate_shapes():
+    cal,clv=evidence_rows_for_gates([_complete()])
+    assert cal==[{"model_p":.58,"outcome":1,"market_blind":True,"feature_asof_ts":cal[0]["feature_asof_ts"],"event_start_ts":cal[0]["event_start_ts"]}]
+    assert clv[0]["game_pk"]==123 and clv[0]["model_side"]=="HOME" and clv[0]["close_home_odds"]==-125.0
+
+def test_incomplete_record_cannot_reach_gate_projection():
+    with pytest.raises(MLBMoneylineForwardLedgerError,match="incomplete"):
+        evidence_rows_for_gates([{"status":"BLOCKED_NO_ADMISSIBLE_CLOSE","promotion_authority":False}])
