@@ -1,0 +1,36 @@
+{
+  "calibration_gate_pass": false,
+  "calibration_thresholds": {
+    "ece_max": 0.025,
+    "intercept_abs_max": 0.03,
+    "min_sample": 200,
+    "slope": [
+      0.9,
+      1.1
+    ]
+  },
+  "clv_evidence_status": "MISSING_PAIRED_NO_VIG_CLOSES",
+  "deployment_eligible_after_this_artifact": false,
+  "edge_floor": 0.03,
+  "forward_evidence_status": "NOT_SATISFIED_BY_HISTORICAL_CALIBRATION",
+  "holdout_cutoff": "2026-09-15",
+  "market": "MONEYLINE",
+  "metrics": {
+    "brier": 0.24694623768729695,
+    "calibration_intercept": -0.053391057088636694,
+    "calibration_slope": 0.7255072731047779,
+    "ece_10_equal_frequency": 0.03424548015727091,
+    "log_loss": 0.687111764535618
+  },
+  "model_artifact_sha256": "e9cc6532c3075aff7d9385c2ba6bfd9ec566a8fcebfdd3098ea3349a265d1fae",
+  "promotion_authority": false,
+  "remaining_blockers": [
+    "paired no-vig closing-price CLV evidence",
+    "required forward evidence/sample under frozen policy",
+    "fresh quote acquisition and identity binding",
+    "production inference parity with this exact model artifact"
+  ],
+  "sample_size": 2265,
+  "schema_version": 1,
+  "truth_gate_complete": false
+}

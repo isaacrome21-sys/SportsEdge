@@ -1,0 +1,217 @@
+[
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2022/statsapi_schedule_2022-03-01_2022-03-31.json",
+    "sha256": "e945970d3a4d1b17afde3ecfc6a444e395dceb14f2c9e4a35d1e06837d79f9b0",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2022-03-01&endDate=2022-03-31&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2022/statsapi_schedule_2022-04-01_2022-05-01.json",
+    "sha256": "abf490ba25c864b8bb65053a3a287e02c590370c871a1cbfbee324e47d9657b6",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2022-04-01&endDate=2022-05-01&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2022/statsapi_schedule_2022-05-02_2022-06-01.json",
+    "sha256": "73bb7ecc8a783239ff3397fc7e9222551b00032484329518b26e7905258bbca8",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2022-05-02&endDate=2022-06-01&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2022/statsapi_schedule_2022-06-02_2022-07-02.json",
+    "sha256": "5df4e3968d737eb8a75ff12fc07162d32c6f961c088eaadba3b978d208371eae",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2022-06-02&endDate=2022-07-02&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2022/statsapi_schedule_2022-07-03_2022-08-02.json",
+    "sha256": "69be810eb68a3cdf44b1c6be04ccc66136ee00a11fb9a8b29cc3dc522ace716b",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2022-07-03&endDate=2022-08-02&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2022/statsapi_schedule_2022-08-03_2022-09-02.json",
+    "sha256": "fa669aff540ec08428223a179b01c3befafb2b8a350e29ffc5e7f6f38062dc48",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2022-08-03&endDate=2022-09-02&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2022/statsapi_schedule_2022-09-03_2022-10-03.json",
+    "sha256": "b3d27c290f682c09169c19c65d7b2b778d671aa8b762f84a3b23bcc58b124a93",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2022-09-03&endDate=2022-10-03&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2022/statsapi_schedule_2022-10-04_2022-11-03.json",
+    "sha256": "bb5167c0de2b3be6b1fc55372d3789758cd9e8e96647cb3d5c9c0105563a6848",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2022-10-04&endDate=2022-11-03&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2022/statsapi_schedule_2022-11-04_2022-11-15.json",
+    "sha256": "e945970d3a4d1b17afde3ecfc6a444e395dceb14f2c9e4a35d1e06837d79f9b0",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2022-11-04&endDate=2022-11-15&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2023/statsapi_schedule_2023-03-01_2023-03-31.json",
+    "sha256": "db60a45ea3cb12824fda632042e7e1551948d348cc2efe7c8060c0cfaebbbec3",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2023-03-01&endDate=2023-03-31&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2023/statsapi_schedule_2023-04-01_2023-05-01.json",
+    "sha256": "1244fe70be4dd37cdb311fb9b5e9f1cacae682ed6cc9fcf2df259182b61d3ca2",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2023-04-01&endDate=2023-05-01&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2023/statsapi_schedule_2023-05-02_2023-06-01.json",
+    "sha256": "44a2e0613cea55d8ee733179d344240e6029819019d0f8cbadd5a58f2d409ee5",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2023-05-02&endDate=2023-06-01&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2023/statsapi_schedule_2023-06-02_2023-07-02.json",
+    "sha256": "b61e463389198bb11c01d5160c1a13beb1cf04be9846a36fa753a629d08ef56f",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2023-06-02&endDate=2023-07-02&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2023/statsapi_schedule_2023-07-03_2023-08-02.json",
+    "sha256": "01ce3c404817f1a44121afe23d682ddc9b9211214bd8be4a992d0caf2175210d",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2023-07-03&endDate=2023-08-02&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2023/statsapi_schedule_2023-08-03_2023-09-02.json",
+    "sha256": "ee764dcf8bfcf5e7670acb8afcc49a41786f3bd0de5cd96cff4df6b17913b146",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2023-08-03&endDate=2023-09-02&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2023/statsapi_schedule_2023-09-03_2023-10-03.json",
+    "sha256": "77d1869a61e11f1949e247ed0007f226997d1f1ebf4c1c9e5b6b82937ad2463f",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2023-09-03&endDate=2023-10-03&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2023/statsapi_schedule_2023-10-04_2023-11-03.json",
+    "sha256": "e945970d3a4d1b17afde3ecfc6a444e395dceb14f2c9e4a35d1e06837d79f9b0",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2023-10-04&endDate=2023-11-03&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2023/statsapi_schedule_2023-11-04_2023-11-15.json",
+    "sha256": "e945970d3a4d1b17afde3ecfc6a444e395dceb14f2c9e4a35d1e06837d79f9b0",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2023-11-04&endDate=2023-11-15&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2024/statsapi_schedule_2024-03-01_2024-03-31.json",
+    "sha256": "702fcead2263fcb3bb4f1461f54ed63bb706e75001bff984f305e424a90c0ee6",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2024-03-01&endDate=2024-03-31&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2024/statsapi_schedule_2024-04-01_2024-05-01.json",
+    "sha256": "f211fa2582bc0095ba95d7a64c0196c43e4933cd479ca8d629e998694dbdc098",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2024-04-01&endDate=2024-05-01&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2024/statsapi_schedule_2024-05-02_2024-06-01.json",
+    "sha256": "c138d3b9ce0b03fee23fd9e42e373efa789092a304ca1bc46deb666d07386324",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2024-05-02&endDate=2024-06-01&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2024/statsapi_schedule_2024-06-02_2024-07-02.json",
+    "sha256": "99d955eeb80c99b0dbf08a8487dd371043000f767464c91c08f9e2a386743d36",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2024-06-02&endDate=2024-07-02&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2024/statsapi_schedule_2024-07-03_2024-08-02.json",
+    "sha256": "9cb4ada25f32b4d008773d56f3d3c6645bdf4f2cd7b5d3813607862e9ee3e0fa",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2024-07-03&endDate=2024-08-02&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2024/statsapi_schedule_2024-08-03_2024-09-02.json",
+    "sha256": "1c184e5131a8fd845c96809f9c5688dda7132c8f1e31b0c5352f46d234d637c3",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2024-08-03&endDate=2024-09-02&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2024/statsapi_schedule_2024-09-03_2024-10-03.json",
+    "sha256": "491aa858e7d832574d6cebe8ac6168e2ce511f49da9e287fd6f28c0c29d5772d",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2024-09-03&endDate=2024-10-03&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2024/statsapi_schedule_2024-10-04_2024-11-03.json",
+    "sha256": "e945970d3a4d1b17afde3ecfc6a444e395dceb14f2c9e4a35d1e06837d79f9b0",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2024-10-04&endDate=2024-11-03&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2024/statsapi_schedule_2024-11-04_2024-11-15.json",
+    "sha256": "e945970d3a4d1b17afde3ecfc6a444e395dceb14f2c9e4a35d1e06837d79f9b0",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2024-11-04&endDate=2024-11-15&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2025/statsapi_schedule_2025-03-01_2025-03-31.json",
+    "sha256": "9484349ba9c0b1b2979e741cf4697b4fd9f3c4add2dc4c1f4a014a9143b725f4",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2025-03-01&endDate=2025-03-31&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2025/statsapi_schedule_2025-04-01_2025-05-01.json",
+    "sha256": "d492f22d3fc25cb32882a4d90d131ee16e3a9bf19b1d574840ba82877490016b",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2025-04-01&endDate=2025-05-01&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2025/statsapi_schedule_2025-05-02_2025-06-01.json",
+    "sha256": "f19991502dd10205fd3ce2f4930dabb1d358029ab5af5bfed64ba3473dde0801",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2025-05-02&endDate=2025-06-01&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2025/statsapi_schedule_2025-06-02_2025-07-02.json",
+    "sha256": "e68a6b3604ad471e70a4fb47c5af465455c96e60bf8573d7b0760bab1b09facb",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2025-06-02&endDate=2025-07-02&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2025/statsapi_schedule_2025-07-03_2025-08-02.json",
+    "sha256": "c61e4a071fe03c5aaad8950a301eb21e038705104b3d691801019eebcfebefa3",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2025-07-03&endDate=2025-08-02&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2025/statsapi_schedule_2025-08-03_2025-09-02.json",
+    "sha256": "1c994678e646c8028c0d340eb49dbdced69914f5e60daa53f85f0ced467abb4b",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2025-08-03&endDate=2025-09-02&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2025/statsapi_schedule_2025-09-03_2025-10-03.json",
+    "sha256": "e5e52f086ffc1b7aa10761148fd384cbe819c8a5cdd8e78d156d4163a6aa583c",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2025-09-03&endDate=2025-10-03&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2025/statsapi_schedule_2025-10-04_2025-11-03.json",
+    "sha256": "e945970d3a4d1b17afde3ecfc6a444e395dceb14f2c9e4a35d1e06837d79f9b0",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2025-10-04&endDate=2025-11-03&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2025/statsapi_schedule_2025-11-04_2025-11-15.json",
+    "sha256": "e945970d3a4d1b17afde3ecfc6a444e395dceb14f2c9e4a35d1e06837d79f9b0",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2025-11-04&endDate=2025-11-15&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2026/statsapi_schedule_2026-03-01_2026-03-31.json",
+    "sha256": "7445566f127c55529530578c9f710a9efc3bf692b77e8e0297dc2e97bf8d2edc",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2026-03-01&endDate=2026-03-31&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2026/statsapi_schedule_2026-04-01_2026-05-01.json",
+    "sha256": "4373202ab537645f939a89f69cde2bb17dbfbaae8c31998eadc6ca576e84c977",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2026-04-01&endDate=2026-05-01&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2026/statsapi_schedule_2026-05-02_2026-06-01.json",
+    "sha256": "8a615722ba360d054deba0c097899d111d0d2523b82c868040389bdea0167652",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2026-05-02&endDate=2026-06-01&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2026/statsapi_schedule_2026-06-02_2026-07-02.json",
+    "sha256": "5c598c8c24b5456537846d4b7c4cbc64eb40b06721f96ed67cba4526873c2ace",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2026-06-02&endDate=2026-07-02&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2026/statsapi_schedule_2026-07-03_2026-08-02.json",
+    "sha256": "e79bffaa8d61fff46ae7b0565050199a7998587d38a912e50ee44d52e1a64008",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2026-07-03&endDate=2026-08-02&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2026/statsapi_schedule_2026-08-03_2026-09-02.json",
+    "sha256": "015107d48ff155bbf133f735be607508723cdd2a68412bb025ac8ab9f325c6f4",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2026-08-03&endDate=2026-09-02&hydrate=linescore"
+  },
+  {
+    "path": "data/mlb_moneyline_preseason/raw/2026/statsapi_schedule_2026-09-03_2026-09-15.json",
+    "sha256": "31c09974d1eecb8be772a47aef4e1c9a44d4b77c1d53e0694fedaa17a37ea802",
+    "url": "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&startDate=2026-09-03&endDate=2026-09-15&hydrate=linescore"
+  }
+]

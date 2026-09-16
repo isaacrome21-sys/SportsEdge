@@ -1,0 +1,54 @@
+{
+  "artifact_sha256": "e9cc6532c3075aff7d9385c2ba6bfd9ec566a8fcebfdd3098ea3349a265d1fae",
+  "calibration_season": 2025,
+  "edge_floor": 0.03,
+  "feature_names": [
+    "prior_win_pct_diff",
+    "prior_pythagorean_diff",
+    "prior_run_diff_per_game_diff",
+    "prior_home_vs_away_split_diff"
+  ],
+  "feature_standardization_mean": [
+    1.778550176711192e-05,
+    2.0687700618966882e-05,
+    0.00020834444927193396,
+    0.053943426859664766
+  ],
+  "feature_standardization_sd": [
+    0.12244989812334994,
+    0.12619497562091708,
+    1.2591550218931984,
+    0.13265076561037134
+  ],
+  "forbidden_inputs": [
+    "odds",
+    "current_lines",
+    "implied_probability",
+    "public_betting",
+    "consensus",
+    "handicapper_opinion"
+  ],
+  "holdout_season": 2026,
+  "market": "MONEYLINE",
+  "market_blind": true,
+  "model_version": "mlb_moneyline_preseason_market_blind_v1",
+  "pit_policy": "whole prior regular season only; fixed Jan-31 UTC freeze; >=30-day source-event embargo; feature_asof_ts < event_start_ts",
+  "platt_calibrator": {
+    "intercept": 0.06895222859130877,
+    "slope": 1.400720812131429
+  },
+  "promotion_authority": false,
+  "raw_logistic_beta": [
+    0.08667784748138263,
+    -0.20710899674112895,
+    -0.02570574125543887,
+    0.359150267244379,
+    0.13088044420527536
+  ],
+  "schema_version": 1,
+  "source_receipts_sha256": "b8dd0d4c2c10f31f268abffa3e3fdfb117ba330a91168fb6e5f5dd06f25f9574",
+  "training_seasons": [
+    2023,
+    2024
+  ]
+}
