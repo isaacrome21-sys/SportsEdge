@@ -13,14 +13,14 @@ from typing import Any, Callable, Mapping
 from urllib.request import Request, urlopen
 
 DK_ROOT = "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1"
-# DraftKings currently identifies the league-level Game Lines category as 492.
-# The prior 493 endpoint returned a valid metadata-only payload with no events,
-# markets, or selections, so keep this ID under an explicit regression test.
-FULL_GAME_CATEGORY_ID = 492
 LEAGUE_IDS = {
     "americanfootball_nfl": 88808,
     "americanfootball_ncaaf": 87637,
     "baseball_mlb": 84240,
+}
+VERIFIED_GAME_LINE_CATEGORY_IDS = {
+    "americanfootball_nfl": 492,
+    "baseball_mlb": 493,
 }
 
 class DraftKingsGameMarketError(RuntimeError):
@@ -35,11 +35,20 @@ class RawDraftKingsBoard:
     payload: Mapping[str, Any]
 
 
+def game_line_category_id(sport_key: str) -> int:
+    if sport_key not in LEAGUE_IDS:
+        raise DraftKingsGameMarketError("DK_GAME_SPORT_UNSUPPORTED")
+    category_id = VERIFIED_GAME_LINE_CATEGORY_IDS.get(sport_key)
+    if category_id is None:
+        raise DraftKingsGameMarketError("DK_GAME_CATEGORY_UNVERIFIED")
+    return int(category_id)
+
+
 def board_url(sport_key: str) -> str:
     league_id = LEAGUE_IDS.get(sport_key)
     if league_id is None:
         raise DraftKingsGameMarketError("DK_GAME_SPORT_UNSUPPORTED")
-    return f"{DK_ROOT}/leagues/{league_id}/categories/{FULL_GAME_CATEGORY_ID}"
+    return f"{DK_ROOT}/leagues/{league_id}/categories/{game_line_category_id(sport_key)}"
 
 
 def _open(url: str, timeout: int = 20):
@@ -108,11 +117,6 @@ def _parse_start(value: Any) -> datetime:
 
 
 def normalize_board(board: RawDraftKingsBoard) -> list[dict[str, Any]]:
-    """Normalize only exact two-sided full-game ML/spread/total markets.
-
-    Missing or ambiguous sides are omitted rather than synthesized. Returned rows are
-    transport observations only; no evidence or promotion authority is granted.
-    """
     payload = board.payload
     events = {str(e.get("id")): e for e in payload.get("events", []) if isinstance(e, Mapping) and e.get("id") is not None}
     markets = [m for m in payload.get("markets", []) if isinstance(m, Mapping)]
