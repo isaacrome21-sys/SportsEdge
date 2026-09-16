@@ -20,17 +20,49 @@ class CaptureGapAuditTest(unittest.TestCase):
             "final_minutes_before_kickoff": 30,
             "final_window_minutes": 15,
             "bookmaker": "draftkings",
+            "source_priority": ["DRAFTKINGS_DIRECT_WEB_V1", "DRAFTKINGS_ODDS_API_V1"],
+            "schedule_coverage_semantics": "EXACT_KICKOFF_UTC_MULTIPLICITY",
             "output_dir": str(Path(root) / "captures"),
+        }
+
+    def game(self, kickoff="2026-09-11T00:15:00Z"):
+        return {
+            "event_id": "game-1",
+            "commence_time": kickoff,
+            "spread": {"status": "OK"},
+            "total": {"status": "OK"},
+        }
+
+    def schedule_meta(self):
+        return {
+            "source": "nflverse/nfldata data/games.csv",
+            "sha256": "a" * 64,
+            "matching_semantics": "KICKOFF_UTC_MULTIPLICITY",
+            "expected_game_count": 1,
         }
 
     def valid_opener(self, run_id="123"):
         return {
             "capture_kind": "OPENER",
             "book": "draftkings",
+            "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
             "retrieved_at_utc": "2026-09-08T14:03:00+00:00",
             "hashes": {"policy_sha256": "x"},
             "run": {"github_run_id": run_id},
-            "games": [{"event_id": "game-1", "commence_time": "2026-09-11T00:15:00Z"}],
+            "schedule": self.schedule_meta(),
+            "games": [self.game()],
+        }
+
+    def valid_final(self, run_id="123", games=None):
+        return {
+            "capture_kind": "FINAL",
+            "book": "draftkings",
+            "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
+            "retrieved_at_utc": "2026-09-11T00:00:00+00:00",
+            "hashes": {"policy_sha256": "x"},
+            "run": {"github_run_id": run_id},
+            "schedule": self.schedule_meta(),
+            "games": games or [self.game()],
         }
 
     def test_elapsed_missing_opener_writes_marker_not_capture(self):
@@ -58,8 +90,13 @@ class CaptureGapAuditTest(unittest.TestCase):
             self.assertEqual(audit(cfg, now), [])
             self.assertFalse((opener.parent / "opener_missed.json").exists())
 
-    def test_malformed_or_empty_existing_opener_does_not_suppress_miss(self):
-        for payload in ({}, {**self.valid_opener(), "games": []}):
+    def test_malformed_empty_or_one_sided_opener_does_not_suppress_miss(self):
+        one_sided = self.valid_opener()
+        one_sided["games"][0]["total"] = {"status": "ONE_SIDED"}
+        wrong_source = self.valid_opener()
+        wrong_source["source_class"] = "ESPN_CONSENSUS"
+        payloads = ({}, {**self.valid_opener(), "games": []}, one_sided, wrong_source)
+        for payload in payloads:
             with self.subTest(payload=payload):
                 with tempfile.TemporaryDirectory() as root:
                     cfg = self.cfg(root)
@@ -113,14 +150,22 @@ class CaptureGapAuditTest(unittest.TestCase):
             cfg = self.cfg(root)
             final = Path(root) / "captures/week02/final/invalid.json"
             final.parent.mkdir(parents=True)
-            final.write_text(json.dumps({
-                "capture_kind": "FINAL",
-                "book": "draftkings",
-                "retrieved_at_utc": "2026-09-11T00:00:00+00:00",
-                "hashes": {},
-                "run": {"github_run_id": "123"},
-                "games": [{"commence_time": "2026-09-11T00:15:00Z"}],
-            }))
+            invalid = self.valid_final()
+            invalid["hashes"] = {}
+            final.write_text(json.dumps(invalid))
+            rows = [{"season": "2026", "gameday": "2026-09-10", "gametime": "20:15"}]
+            now = datetime(2026, 9, 10, 20, 5, tzinfo=ZoneInfo("America/New_York"))
+            written = audit(cfg, now, rows, "abc123")
+            self.assertTrue(any("final_missed" in str(p) for p in written))
+
+    def test_one_sided_final_does_not_suppress_missing_marker(self):
+        with tempfile.TemporaryDirectory() as root:
+            cfg = self.cfg(root)
+            final = Path(root) / "captures/week02/final/invalid.json"
+            final.parent.mkdir(parents=True)
+            invalid = self.valid_final()
+            invalid["games"][0]["spread"] = {"status": "ONE_SIDED"}
+            final.write_text(json.dumps(invalid))
             rows = [{"season": "2026", "gameday": "2026-09-10", "gametime": "20:15"}]
             now = datetime(2026, 9, 10, 20, 5, tzinfo=ZoneInfo("America/New_York"))
             written = audit(cfg, now, rows, "abc123")
@@ -130,7 +175,6 @@ class CaptureGapAuditTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             cfg = self.cfg(root)
             rows = [{"season": "2026", "gameday": "2026-09-10", "gametime": "20:15"}]
-            # FINAL window is 19:45..20:00 ET, so 19:50 must not be called missed.
             now = datetime(2026, 9, 10, 19, 50, tzinfo=ZoneInfo("America/New_York"))
             written = audit(cfg, now, rows, "abc123")
             self.assertFalse(any("final_missed" in str(p) for p in written))
@@ -159,17 +203,10 @@ class CaptureGapAuditTest(unittest.TestCase):
             cfg = self.cfg(root)
             final = Path(root) / "captures/week02/final/20260911T000000Z.json"
             final.parent.mkdir(parents=True)
-            final.write_text(json.dumps({
-                "capture_kind": "FINAL",
-                "book": "draftkings",
-                "retrieved_at_utc": "2026-09-11T00:00:00+00:00",
-                "hashes": {"policy_sha256": "x"},
-                "run": {"github_run_id": "123"},
-                "games": [
-                    {"commence_time": "2026-09-11T00:15:00Z"},
-                    {"commence_time": "2026-09-11T00:15:00Z"},
-                ],
-            }))
+            games = [self.game(), self.game()]
+            record = self.valid_final(games=games)
+            record["schedule"]["expected_game_count"] = 2
+            final.write_text(json.dumps(record))
             due = ["2026-09-11T00:15:00Z", "2026-09-11T00:15:00Z"]
             self.assertEqual(verify_due(cfg, None, due, "123"), [])
             failures = verify_due(cfg, None, due + ["2026-09-11T00:15:00Z"], "123")
