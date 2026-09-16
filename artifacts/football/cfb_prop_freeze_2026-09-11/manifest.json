@@ -1,0 +1,33 @@
+{
+  "artifact_sha256": "4d77ac6d8b81f34d801ab9b186b8165d829f71d60917d2a54d2c97920f148795",
+  "bound_code_git_sha": "1ef10af3f4c52366e812d255670b486d098b7fe7",
+  "files": {
+    "fit_diagnostics.json": "b21aad356ddc2aae96f4ba6a24ae2497ccd55b4f3b0ef6c890a3d02fe8560217",
+    "freeze.json": "f0d4781c7f0f4505d8db89bdaeeb8cfcc8e8384b7089e747b6cba09a8900a123",
+    "model.json": "e30ecd947e638203a44f7c09294664e4c9d65027444680051f463f8b81a06f5b"
+  },
+  "frozen_source_parquet_sha256": "aa037920e980acf17317747f2010a031b3b7e1013a44a7b15db18b1dd9df0e63",
+  "governance": {
+    "model_p_created": false,
+    "official_status_granted": false,
+    "promotion_authority": false,
+    "source_replay_reconstructed": false,
+    "staking_authority": false,
+    "truth_gate_pass_granted": false
+  },
+  "schema_version": "CFB_PROP_RETAINED_FREEZE_BUNDLE_V1",
+  "source_artifact_id": 10263030950,
+  "source_artifact_zip_sha256": "e08529230e6f971dfba02344dadff9e9b120c7915f89576a295a750e5bc980ea",
+  "source_job_id": 103257149174,
+  "source_manifest_sha256": "d9f7ba468680dcf3cb63321b3d6b624bf6ae079e426c70e2541d3cc9e4347d44",
+  "source_run_id": 34597672786,
+  "source_workflow": "football-cfb-prop-artifact-freeze.yml",
+  "status": "RETAINED_NON_PROMOTING",
+  "upstream_drift_observation": {
+    "classification": "FROZEN_SOURCE_URL_MUTATED_NO_REFREEZE",
+    "current_asset_id": 566697725,
+    "current_parquet_sha256": "740566c0d034fa767008a40797dd491acb91dee47934cefb4225494f71c42853",
+    "observed_date": "2026-09-16",
+    "release_immutable": false
+  }
+}
