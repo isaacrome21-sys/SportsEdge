@@ -1,7 +1,7 @@
 """Prospective, market-blind Model_P capture for MLB MONEYLINE.
 
 This lane freezes one HOME-reference probability per game before the downstream
-DraftKings decision quote.  It never consumes sportsbook prices, implied
+DraftKings decision quote. It never consumes sportsbook prices, implied
 probabilities, consensus, public betting, or handicapper opinion and grants no
 promotion, staking, or OFFICIAL authority.
 """
@@ -12,7 +12,7 @@ import hashlib
 import json
 from math import isfinite
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any, Callable, Iterable
 
 from .generic_market_engine import generic_market_engine_adapter
 from .mlb_model_artifact import mlb_model_artifact_sha256
@@ -59,11 +59,22 @@ def _target_date(snapshot: Any, start: datetime) -> date:
     return start.date()
 
 
-def _team_observations(history: Any, *, team_id: int, target_date: date) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    retrieved = _utc(history.retrieved_at, "history.retrieved_at")
+def _team_observations(
+    history: Any,
+    *,
+    team_id: int,
+    target_date: date,
+    clock: Callable[[], datetime],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    # Timestamp after the provider response has been consumed. This is
+    # deliberately conservative: it makes no claim about when MLB published the
+    # historical rows, only that SportsEdge had observed them by this instant.
     rows = list(history.team_rows(team_id=int(team_id), target_date=target_date))[-30:]
+    observed = _utc(clock(), "source observed_at")
     if len(rows) < 10:
-        raise MLBMoneylineForwardPredictionError(f"PIT_INSUFFICIENT_HISTORY: team_id={team_id} n={len(rows)} minimum=10")
+        raise MLBMoneylineForwardPredictionError(
+            f"PIT_INSUFFICIENT_HISTORY: team_id={team_id} n={len(rows)} minimum=10"
+        )
     observations: list[dict[str, Any]] = []
     retained: list[dict[str, Any]] = []
     for row in rows:
@@ -80,14 +91,14 @@ def _team_observations(history: Any, *, team_id: int, target_date: date) -> tupl
         observations.append({
             "team_id": int(team_id),
             "runs": runs,
-            "feature_asof_ts": retrieved.isoformat(),
+            "feature_asof_ts": observed.isoformat(),
             "source_game_pk": None,
         })
         retained.append({
             "team_id": int(team_id),
             "runs": runs,
             "source_date": source_date_text,
-            "observed_at_utc": retrieved.isoformat(),
+            "observed_at_utc": observed.isoformat(),
             "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
         })
     return observations, retained
@@ -100,11 +111,13 @@ def build_forward_prediction(
     now: datetime,
     artifact_sha: str | None = None,
     simulations: int = DEFAULT_SIMULATIONS,
+    clock: Callable[[], datetime] | None = None,
 ) -> dict[str, Any]:
     """Build one immutable HOME-reference probability from live-observed baseball data."""
-    now_utc = _utc(now, "now")
+    window_now = _utc(now, "now")
+    source_clock = clock or (lambda: datetime.now(timezone.utc))
     start = parse_game_start(getattr(snapshot, "game_date"))
-    if not now_utc < start:
+    if not window_now < start:
         raise MLBMoneylineForwardPredictionError("prediction must precede event start")
     if str(getattr(snapshot, "status", "")) != "Preview":
         raise MLBMoneylineForwardPredictionError("prediction requires Preview game state")
@@ -112,8 +125,12 @@ def build_forward_prediction(
         raise MLBMoneylineForwardPredictionError("simulations must be >= 1000")
 
     target_date = _target_date(snapshot, start)
-    away_obs, away_retained = _team_observations(history, team_id=int(snapshot.away_id), target_date=target_date)
-    home_obs, home_retained = _team_observations(history, team_id=int(snapshot.home_id), target_date=target_date)
+    away_obs, away_retained = _team_observations(
+        history, team_id=int(snapshot.away_id), target_date=target_date, clock=source_clock
+    )
+    home_obs, home_retained = _team_observations(
+        history, team_id=int(snapshot.home_id), target_date=target_date, clock=source_clock
+    )
     try:
         feature = build_moneyline_feature(
             game_pk=int(snapshot.game_pk),
@@ -139,6 +156,9 @@ def build_forward_prediction(
         "simulations": int(simulations),
     }
     engine = generic_market_engine_adapter(model_input)
+    generated_at = _utc(source_clock(), "prediction generated_at")
+    if not generated_at < start:
+        raise MLBMoneylineForwardPredictionError("prediction generation crossed event start")
     model_p = float(engine["model_p"])
     if not isfinite(model_p) or not 0.0 < model_p < 1.0:
         raise MLBMoneylineForwardPredictionError("Model_P invalid")
@@ -165,7 +185,7 @@ def build_forward_prediction(
         "forbidden_market_inputs": list(feature["forbidden_market_inputs"]),
         "feature_asof_ts": feature["feature_asof_ts"],
         "event_start_ts": start.isoformat(),
-        "prediction_generated_at_utc": now_utc.isoformat(),
+        "prediction_generated_at_utc": generated_at.isoformat(),
         "model_artifact_sha256": bound_artifact,
         "pit_contract_version": PIT_VERSION,
         "pit_module_sha256": _module_sha256(getattr(pit_module, "__file__", None)),
@@ -180,6 +200,7 @@ def build_forward_prediction(
         "seed_policy": str(engine["seed_policy"]),
         "mc_paths": int(engine["mc_paths"]),
         "source": "LIVE_OBSERVED_MLB_STATSAPI_GAMELOG",
+        "source_timestamp_semantics": "POST_RESPONSE_RECEIPT_TIME_CONSERVATIVE",
     }
 
 
@@ -195,6 +216,7 @@ def capture_due_predictions(
     output_dir: str | Path,
     artifact_sha: str | None = None,
     simulations: int = DEFAULT_SIMULATIONS,
+    clock: Callable[[], datetime] | None = None,
 ) -> dict[str, Any]:
     """Create-only capture for games currently inside the prospective Model_P window."""
     now_utc = _utc(now, "now")
@@ -232,6 +254,7 @@ def capture_due_predictions(
                 now=now_utc,
                 artifact_sha=artifact_sha,
                 simulations=simulations,
+                clock=clock,
             )
         except Exception as exc:
             blocked.append({"game_pk": int(snapshot.game_pk), "reason": str(exc)})
