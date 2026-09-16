@@ -1,0 +1,109 @@
+name: mlb-moneyline-forward-settlement
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 * * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mlb-moneyline-forward-settlement-v1
+  cancel-in-progress: false
+
+jobs:
+  settle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12.13'
+
+      - name: Contract tests
+        run: |
+          python -m py_compile \
+            scripts/settle_mlb_moneyline_forward_evidence.py \
+            scripts/persist_forward_evidence_data_branch.py \
+            sportsedge/mlb_moneyline_forward_ledger.py \
+            sportsedge/mlb_moneyline_evidence.py \
+            sportsedge/mlb_moneyline_clv.py
+          python -m unittest \
+            tests.test_settle_mlb_moneyline_forward_evidence \
+            tests.test_mlb_moneyline_forward_ledger \
+            tests.test_mlb_moneyline_evidence \
+            tests.test_mlb_moneyline_clv \
+            tests.test_persist_forward_evidence_data_branch -v
+
+      - name: Restore cumulative forward evidence from data branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data
+          for path in \
+            data/mlb_forward_predictions \
+            data/mlb_forward_capture \
+            data/mlb_forward_evidence \
+            data/mlb_forward_settlement_raw; do
+            if git cat-file -e "origin/data:$path" 2>/dev/null; then
+              git archive origin/data "$path" | tar -x
+            fi
+          done
+
+      - name: Settle finals and score frozen metric prerequisites
+        id: settle
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          python scripts/settle_mlb_moneyline_forward_evidence.py \
+            --report artifacts/mlb_moneyline_forward_gate_report.json | tee settlement_result.json
+          rc=${PIPESTATUS[0]}
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Persist immutable completed evidence to data branch
+        id: persist
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          python scripts/persist_forward_evidence_data_branch.py \
+            --path data/mlb_forward_evidence \
+            --path data/mlb_forward_settlement_raw \
+            --branch data \
+            --worktree "$RUNNER_TEMP/sportsedge-mlb-settlement-data" | tee settlement_persistence_result.json
+          rc=${PIPESTATUS[0]}
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload settlement and metric receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mlb-moneyline-forward-settlement-${{ github.run_id }}
+          path: |
+            settlement_result.json
+            settlement_persistence_result.json
+            artifacts/mlb_moneyline_forward_gate_report.json
+            data/mlb_forward_evidence/**
+            data/mlb_forward_settlement_raw/**
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Enforce fail-closed settlement status
+        if: always()
+        shell: bash
+        run: |
+          settlement_rc='${{ steps.settle.outputs.exit_code }}'
+          persist_rc='${{ steps.persist.outputs.exit_code }}'
+          test -n "$settlement_rc" && test "$settlement_rc" -eq 0
+          test -n "$persist_rc" && test "$persist_rc" -eq 0
