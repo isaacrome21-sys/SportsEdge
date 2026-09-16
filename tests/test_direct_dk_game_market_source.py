@@ -44,21 +44,20 @@ class DirectDKSourceTests(unittest.TestCase):
         p=fixture(); p['events'][0]['name']='Away Team vs Home Team'
         self.assertEqual(normalize_board(self.board(p)),[])
 
-    def test_supported_urls_use_live_game_lines_category_and_unknown_sport(self):
+    def test_supported_urls_use_live_verified_league_categories(self):
         self.assertIn('/88808/categories/492',board_url('americanfootball_nfl'))
-        self.assertIn('/87637/categories/492',board_url('americanfootball_ncaaf'))
-        self.assertIn('/84240/categories/492',board_url('baseball_mlb'))
+        self.assertIn('/84240/categories/493',board_url('baseball_mlb'))
+        with self.assertRaisesRegex(DraftKingsGameMarketError,'CATEGORY_UNVERIFIED'):
+            board_url('americanfootball_ncaaf')
         with self.assertRaisesRegex(DraftKingsGameMarketError,'UNSUPPORTED'):
             board_url('unknown')
 
     def test_metadata_only_board_never_synthesizes_quotes(self):
-        # Regression shape from the obsolete /categories/493 route: HTTP/JSON was
-        # valid and advertised Game Lines=492, but carried no event-market rows.
         payload={
             'events':[],
             'markets':[],
             'selections':[],
-            'categories':[{'id':492,'name':'Game Lines'}],
+            'categories':[{'id':999,'name':'Metadata Only'}],
         }
         self.assertEqual(normalize_board(self.board(payload)),[])
 
