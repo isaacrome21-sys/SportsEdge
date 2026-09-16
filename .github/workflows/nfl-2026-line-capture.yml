@@ -17,8 +17,10 @@ on:
       - 'scripts/nfl_2026_provider_preflight.py'
       - 'sportsedge/nfl_direct_capture_source.py'
       - 'sportsedge/draftkings_game_market_source.py'
+      - 'sportsedge/nfl_confirmation_schedule.py'
       - 'tests/test_nfl_direct_capture_source.py'
       - 'tests/test_nfl_2026_direct_capture_wiring.py'
+      - 'tests/test_nfl_confirmation_schedule.py'
       - 'tests/test_direct_dk_game_market_source.py'
       - 'tests/test_capture_direct_dk_closing_lines.py'
       - 'tests/test_nfl_2026_capture_gap_audit.py'
@@ -49,6 +51,7 @@ jobs:
     timeout-minutes: 5
     env:
       PYTHONPATH: ${{ github.workspace }}
+      NFL_SCHEDULE_CSV: ${{ runner.temp }}/nfl-games.csv
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
@@ -61,7 +64,8 @@ jobs:
             scripts/odds_api_quota_guard.py \
             scripts/nfl_2026_provider_preflight.py \
             sportsedge/nfl_direct_capture_source.py \
-            sportsedge/draftkings_game_market_source.py
+            sportsedge/draftkings_game_market_source.py \
+            sportsedge/nfl_confirmation_schedule.py
           python3 - <<'PY'
           import json, subprocess
           from pathlib import Path
@@ -78,10 +82,20 @@ jobs:
           python3 -m unittest -q \
             tests.test_nfl_direct_capture_source \
             tests.test_nfl_2026_direct_capture_wiring \
+            tests.test_nfl_confirmation_schedule \
             tests.test_direct_dk_game_market_source \
             tests.test_capture_direct_dk_closing_lines \
             tests.test_nfl_2026_capture_gap_audit \
             tests.test_nfl_2026_provider_budget
+
+      - name: Fetch NFL schedule snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error --retry 3 \
+            'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv' \
+            -o "$NFL_SCHEDULE_CSV"
+          test -s "$NFL_SCHEDULE_CSV"
 
       - name: Gate scheduled run to a frozen capture window using free schedule data
         if: github.event_name == 'schedule'
@@ -89,9 +103,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --location --silent --show-error --retry 3 \
-            'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv' \
-            -o "$RUNNER_TEMP/nfl-games.csv"
           python3 - <<'PY'
           import csv, json, os
           from collections import Counter
@@ -166,7 +177,7 @@ jobs:
 
           expected_open_final = Counter()
           eastern = ZoneInfo('America/New_York')
-          with open(os.path.join(os.environ['RUNNER_TEMP'], 'nfl-games.csv'), newline='', encoding='utf-8-sig') as handle:
+          with open(os.environ['NFL_SCHEDULE_CSV'], newline='', encoding='utf-8-sig') as handle:
               for row in csv.DictReader(handle):
                   if str(row.get('season') or '') != '2026':
                       continue
@@ -230,7 +241,7 @@ jobs:
           mkdir -p artifacts/nfl-provider-preflight
           set +e
           python3 scripts/nfl_2026_provider_preflight.py \
-            --schedule-csv "$RUNNER_TEMP/nfl-games.csv" \
+            --schedule-csv "$NFL_SCHEDULE_CSV" \
             --out artifacts/nfl-provider-preflight/status.json
           rc=$?
           set -e
@@ -263,7 +274,7 @@ jobs:
 
       - name: Record elapsed missing windows without backfill
         if: github.event_name == 'schedule'
-        run: python3 scripts/audit_nfl_2026_capture_gaps.py --schedule-csv "$RUNNER_TEMP/nfl-games.csv"
+        run: python3 scripts/audit_nfl_2026_capture_gaps.py --schedule-csv "$NFL_SCHEDULE_CSV"
 
       - name: Run capture
         if: >-
@@ -292,7 +303,7 @@ jobs:
         run: |
           set -euo pipefail
           args=(
-            --schedule-csv "$RUNNER_TEMP/nfl-games.csv"
+            --schedule-csv "$NFL_SCHEDULE_CSV"
             --github-run-id "$GITHUB_RUN_ID"
             --verify-final-kickoffs '${{ steps.due.outputs.final_due_kickoffs }}'
           )
