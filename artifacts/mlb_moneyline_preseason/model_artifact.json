@@ -1,5 +1,5 @@
 {
-  "artifact_sha256": "e9cc6532c3075aff7d9385c2ba6bfd9ec566a8fcebfdd3098ea3349a265d1fae",
+  "artifact_sha256": "d96d4cee264ee94d380a8d73e86ee1cebd1efc14cb293258e9a2adbd3434c33c",
   "calibration_season": 2025,
   "edge_floor": 0.03,
   "feature_names": [
@@ -34,16 +34,16 @@
   "model_version": "mlb_moneyline_preseason_market_blind_v1",
   "pit_policy": "whole prior regular season only; fixed Jan-31 UTC freeze; >=30-day source-event embargo; feature_asof_ts < event_start_ts",
   "platt_calibrator": {
-    "intercept": 0.06895222859130877,
+    "intercept": 0.06895222859130871,
     "slope": 1.400720812131429
   },
   "promotion_authority": false,
   "raw_logistic_beta": [
-    0.08667784748138263,
-    -0.20710899674112895,
-    -0.02570574125543887,
-    0.359150267244379,
-    0.13088044420527536
+    0.08667784748138264,
+    -0.20710899674112887,
+    -0.025705741255438754,
+    0.35915026724437893,
+    0.1308804442052752
   ],
   "schema_version": 1,
   "source_receipts_sha256": "b8dd0d4c2c10f31f268abffa3e3fdfb117ba330a91168fb6e5f5dd06f25f9574",

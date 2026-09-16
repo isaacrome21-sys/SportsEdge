@@ -17,12 +17,12 @@
   "market": "MONEYLINE",
   "metrics": {
     "brier": 0.24694623768729695,
-    "calibration_intercept": -0.053391057088636694,
-    "calibration_slope": 0.7255072731047779,
-    "ece_10_equal_frequency": 0.03424548015727091,
+    "calibration_intercept": -0.05339105708863663,
+    "calibration_slope": 0.7255072731047781,
+    "ece_10_equal_frequency": 0.03424548015727087,
     "log_loss": 0.687111764535618
   },
-  "model_artifact_sha256": "e9cc6532c3075aff7d9385c2ba6bfd9ec566a8fcebfdd3098ea3349a265d1fae",
+  "model_artifact_sha256": "d96d4cee264ee94d380a8d73e86ee1cebd1efc14cb293258e9a2adbd3434c33c",
   "promotion_authority": false,
   "remaining_blockers": [
     "paired no-vig closing-price CLV evidence",
