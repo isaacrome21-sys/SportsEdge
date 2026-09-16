@@ -88,13 +88,35 @@ def cluster_cr1(values: list[float], clusters: list[str]) -> dict[str, float | i
     mu = sum(values) / n
     if g < 2:
         return {"se": None, "t_stat": None, "clusters": g}
-    # Intercept-only sandwich: (X'X)^-1 sum_g (X_g'u_g)^2 (X'X)^-1,
-    # with CR1 finite-cluster correction G/(G-1). The usual (N-1)/(N-K)
-    # factor is 1 for K=1.
     meat = sum(sum(v - mu for v in vals) ** 2 for vals in grouped.values())
     variance = (g / (g - 1.0)) * meat / (n * n)
     se = math.sqrt(max(0.0, variance))
     t_stat = mu / se if se > 0.0 else None
+    return {"se": se, "t_stat": t_stat, "clusters": g}
+
+
+def cluster_cr1_ratio(
+    numerators: list[float], denominators: list[float], clusters: list[str]
+) -> dict[str, float | int | None]:
+    """One-way CR1 SE/t-stat for ratio sum(numerator) / sum(denominator)."""
+    if not (len(numerators) == len(denominators) == len(clusters)):
+        raise ValueError("ratio estimator inputs must have equal lengths")
+    if not numerators:
+        return {"se": None, "t_stat": None, "clusters": 0}
+    total_denominator = sum(denominators)
+    if total_denominator <= 0.0:
+        return {"se": None, "t_stat": None, "clusters": len(set(clusters))}
+    ratio = sum(numerators) / total_denominator
+    grouped_score: dict[str, float] = defaultdict(float)
+    for numerator, denominator, cluster in zip(numerators, denominators, clusters):
+        grouped_score[cluster] += numerator - ratio * denominator
+    g = len(grouped_score)
+    if g < 2:
+        return {"se": None, "t_stat": None, "clusters": g}
+    meat = sum(score_g * score_g for score_g in grouped_score.values())
+    variance = (g / (g - 1.0)) * meat / (total_denominator * total_denominator)
+    se = math.sqrt(max(0.0, variance))
+    t_stat = ratio / se if se > 0.0 else None
     return {"se": se, "t_stat": t_stat, "clusters": g}
 
 
@@ -130,7 +152,9 @@ def validate_rows(rows: list[dict[str, str]]) -> None:
             raise ValueError("invalid no-vig probability")
         if risk < 0.0:
             raise ValueError("negative risked_stake forbidden")
-        f(row, "net_return")
+        net_return = f(row, "net_return")
+        if risk == 0.0 and net_return != 0.0:
+            raise ValueError("nonzero net_return with zero risked_stake forbidden")
 
 
 def score(rows: list[dict[str, str]], *, validated: bool = False) -> dict[str, Any]:
@@ -145,15 +169,13 @@ def score(rows: list[dict[str, str]], *, validated: bool = False) -> dict[str, A
     brier = mean([(p-y)**2 for p, y in zip(ps, ys)])
     logloss = mean([-(y*math.log(max(eps,p)) + (1-y)*math.log(max(eps,1-p))) for p,y in zip(ps,ys)])
     clv = [f(r,"close_no_vig_p") - f(r,"decision_no_vig_p") for r in rows]
-    risk = sum(f(r,"risked_stake") for r in rows)
-    roi = sum(f(r,"net_return") for r in rows) / risk if risk > 0 else None
-    # Per-decision return-on-risk contribution. Zero-risk rows cannot contribute
-    # to the ROI t-stat; materialization must exclude void/push/ambiguous rows.
-    roi_contrib = [f(r,"net_return") / f(r,"risked_stake") for r in rows if f(r,"risked_stake") > 0]
-    roi_clusters = [r["slate_date_ct"] for r in rows if f(r,"risked_stake") > 0]
+    stakes = [f(r,"risked_stake") for r in rows]
+    net_returns = [f(r,"net_return") for r in rows]
+    risk = sum(stakes)
+    roi = sum(net_returns) / risk if risk > 0 else None
     slate_clusters = [r["slate_date_ct"] for r in rows]
     clv_cr1 = cluster_cr1(clv, slate_clusters)
-    roi_cr1 = cluster_cr1(roi_contrib, roi_clusters)
+    roi_cr1 = cluster_cr1_ratio(net_returns, stakes, slate_clusters)
 
     return {
         "status": "SCORED_NOT_PROMOTED",
