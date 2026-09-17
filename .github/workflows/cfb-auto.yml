@@ -3,8 +3,7 @@ name: cfb auto
 # Operational alias for the existing CFB model-artifact freeze verification.
 # This workflow does not create a second model-artifact authority: it dispatches
 # the canonical football-cfb-prop-artifact-freeze workflow and reports only that
-# workflow's conclusion and binding proof. No Model_P, Truth Gate, promotion,
-# eligibility, staking, backfill, or OFFICIAL authority is created here.
+# workflow's conclusion and binding proof. It cannot change any governed state.
 on:
   workflow_dispatch:
 
