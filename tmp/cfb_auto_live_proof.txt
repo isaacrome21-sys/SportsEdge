@@ -1,11 +1,24 @@
 bootstrap_branch=cfb/auto-live-proof-bootstrap
 target_ref=main
-dispatch_after_epoch=1789644640
-dispatch_rc=0
-dispatch_output=https://github.com/isaacrome21-sys/SportsEdge/actions/runs/35216064545
-wrapper_run_id=35216064545
-wrapper_conclusion=failure
-wrapper_url=https://github.com/isaacrome21-sys/SportsEdge/actions/runs/35216064545
-wrapper_markers_begin
-wrapper_markers_end
-canonical_run_id=NONE
+main_sha=f23d08bcc48c24368a78447c230a4f626afe1178
+wrapper_run_id=35216625345
+wrapper_conclusion=success
+wrapper_url=https://github.com/isaacrome21-sys/SportsEdge/actions/runs/35216625345
+canonical_run_id=35216636934
+canonical_conclusion=success
+canonical_url=https://github.com/isaacrome21-sys/SportsEdge/actions/runs/35216636934
+source_replay_state=UPSTREAM_DRIFT
+expected_source_parquet_sha256=aa037920e980acf17317747f2010a031b3b7e1013a44a7b15db18b1dd9df0e63
+observed_upstream_parquet_sha256=740566c0d034fa767008a40797dd491acb91dee47934cefb4225494f71c42853
+retained_artifact_zip_sha256=e08529230e6f971dfba02344dadff9e9b120c7915f89576a295a750e5bc980ea
+retained_artifact_id=10495377742
+proof=CFB_PROP_REAL_FREEZE_OK artifact_sha256=4d77ac6d8b81f34d801ab9b186b8165d829f71d60917d2a54d2c97920f148795 teams=139 verification=RETAINED_ACTIONS_BUNDLE source_replay=UPSTREAM_DRIFT bound_code_sha=1ef10af3f4c52366e812d255670b486d098b7fe7
+terminal=CFB_AUTO_GREEN canonical_run_id=35216636934
+scope=OPERATIONAL_BINDING_PROOF_ONLY
+model_p_authority=false
+truth_gate_authority=false
+promotion_authority=false
+eligibility_authority=false
+staking_authority=false
+backfill_authority=false
+official_authority=false
