@@ -343,7 +343,8 @@ jobs:
         if: >-
           always() && github.event_name == 'schedule' &&
           steps.preflight.outputs.state == 'PROVIDER_BLOCKED_PREFLIGHT'
-        run: echo 'NFL_FALLBACK_PROVIDER_BLOCKED: direct DraftKings remains the primary capture path'
+        run: |
+          echo 'NFL_FALLBACK_PROVIDER_BLOCKED: direct DraftKings remains the primary capture path'
 
       - name: Fail job if capture or check failed
         if: steps.run.outcome != 'skipped' && steps.run.outputs.rc != '0'
