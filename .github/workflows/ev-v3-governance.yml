@@ -38,3 +38,4 @@ jobs:
           tests/test_ev_v3_state.py
           tests/test_ev_tracker_v3_no_authority.py
           tests/test_ev_tracker_v3_quiescence.py
+          tests/test_ev_tracker_v3_outage_threshold.py
