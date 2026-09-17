@@ -16,6 +16,7 @@ on:
       - 'tests/test_ev_*v3*.py'
       - 'tests/test_ev_credential_health.py'
       - 'tests/test_nfl_confirmation_v3_suspension.py'
+      - 'tests/test_v3_public_repo_adoption_boundary.py'
   workflow_dispatch:
 
 permissions:
@@ -44,3 +45,4 @@ jobs:
           tests/test_ev_tracker_v3_outage_threshold.py
           tests/test_ev_tracker_v3_health_patch.py
           tests/test_nfl_confirmation_v3_suspension.py
+          tests/test_v3_public_repo_adoption_boundary.py
