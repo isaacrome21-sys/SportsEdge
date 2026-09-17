@@ -1,0 +1,26 @@
+{
+  "policy_id": "NFL_CONFIRMATION_SUSPENSION_V3",
+  "activation": "PROSPECTIVE_ONLY_AFTER_MAIN_MERGE",
+  "initial_state": "ACTIVE",
+  "suspension_eligible": true,
+  "lane_type": "AUTOMATED_PROVIDER",
+  "manual_lane_can_suspend": false,
+  "machine_derived_only": true,
+  "provider_outage": {
+    "bounded_window_minutes": 30,
+    "min_distinct_events": 2,
+    "credential_scope": "ALL_CONFIGURED_SLOTS",
+    "eligible_error_classes": ["HTTP_401", "HTTP_403", "HTTP_5XX", "UNREACHABLE", "TIMEOUT"],
+    "budget_exhaustion_is_outage": false
+  },
+  "recovery": {
+    "required_consecutive_successful_slates": 3,
+    "recovery_captures": "NOT_EVIDENCE"
+  },
+  "history": {
+    "prior_misses_immutable": true,
+    "backfill": "FORBIDDEN",
+    "retroactive_reclassification": "FORBIDDEN"
+  },
+  "authority": "NO_MODEL_P_NO_TRUTH_GATE_NO_PROMOTION_NO_STAKING_NO_OFFICIAL"
+}
