@@ -9,6 +9,7 @@ permissions:
   contents: write
 
 env:
+  PYTHONPATH: .
   REFREEZE_SHA: f23d08bcc48c24368a78447c230a4f626afe1178
   REFREEZE_AT: '2026-09-17T11:36:44Z'
   TRIGGER_SHA: 9a4f81a6a2a2eaf3c77c1ff9f0510f99a3a3a170
