@@ -61,6 +61,55 @@ def _checkout_static_non_main(text: str) -> str | None:
     return None
 
 
+def _static_env_values(text: str) -> dict[str, str]:
+    values: dict[str, set[str]] = {}
+    for line in text.splitlines():
+        match = re.match(r"^\s+([A-Z_][A-Z0-9_]*):\s*['\"]?([A-Za-z0-9._/-]+)['\"]?\s*(?:#.*)?$", line)
+        if match:
+            values.setdefault(match.group(1), set()).add(match.group(2))
+    return {key: next(iter(found)) for key, found in values.items() if len(found) == 1}
+
+
+def _explicit_repository_checkout_paths(text: str) -> set[str]:
+    lines = text.splitlines()
+    paths: set[str] = set()
+    for idx, line in enumerate(lines):
+        if "uses:" not in line or "actions/checkout@" not in line:
+            continue
+        indent = len(line) - len(line.lstrip())
+        repository = None
+        path = None
+        for follow in lines[idx + 1 :]:
+            stripped = follow.strip()
+            if not stripped:
+                continue
+            follow_indent = len(follow) - len(follow.lstrip())
+            if follow_indent <= indent:
+                break
+            if stripped.startswith("repository:"):
+                repository = stripped.split(":", 1)[1].strip().strip("'\"")
+            elif stripped.startswith("path:"):
+                path = stripped.split(":", 1)[1].strip().strip("'\"")
+        if repository and path and repository != "${{ github.repository }}" and "$" not in path:
+            paths.add(path.rstrip("/"))
+    return paths
+
+
+def _step_uses_explicit_repository_checkout(lines: list[str], index: int, paths: set[str]) -> bool:
+    start = index
+    while start > 0:
+        if re.match(r"^\s*- name:", lines[start]):
+            break
+        start -= 1
+    prefix = "\n".join(lines[start : index + 1])
+    for path in paths:
+        if re.search(rf"(?m)^\s*working-directory:\s*['\"]?{re.escape(path)}['\"]?\s*$", prefix):
+            return True
+        if re.search(rf"(?m)^\s*cd\s+['\"]?{re.escape(path)}['\"]?\s*$", prefix):
+            return True
+    return False
+
+
 def _classify_refspec(token: str, checkout_non_main: str | None) -> tuple[str, str]:
     if "${{" in token or "$" in token or "$(" in token:
         return "UNRESOLVABLE", "PUSH_TARGET_INTERPOLATED"
@@ -83,11 +132,15 @@ def _classify_refspec(token: str, checkout_non_main: str | None) -> tuple[str, s
     return "UNRESOLVABLE", "PUSH_TARGET_UNRESOLVED"
 
 
-def classify_git_push(command: str, checkout_non_main: str | None = None) -> tuple[str, str]:
+def classify_git_push(command: str, checkout_non_main: str | None = None, static_env: dict[str, str] | None = None, separate_checkout: bool = False) -> tuple[str, str]:
+    if separate_checkout:
+        return "NON_MAIN", "PUSH_TARGET_EXPLICIT_SEPARATE_REPOSITORY_CHECKOUT"
     match = re.search(r"\bgit\s+push\b.*", command)
     if not match:
         return "NON_WRITER", "NO_GIT_PUSH"
     git_command = re.split(r"\s*(?:&&|\|\||;)\s*", match.group(0), maxsplit=1)[0]
+    for key, value in (static_env or {}).items():
+        git_command = git_command.replace(f"${{{key}}}", value).replace(f"${key}", value)
     try:
         tokens = shlex.split(git_command, posix=True)
     except ValueError:
@@ -152,6 +205,8 @@ def audit(repo: Path, ref: str = "HEAD") -> dict[str, Any]:
     for path in workflows:
         text = _read(repo, ref, path)
         checkout_non_main = _checkout_static_non_main(text)
+        static_env = _static_env_values(text)
+        separate_paths = _explicit_repository_checkout_paths(text)
         permission_state, permission_reason = _permissions_state(text)
         sources: list[tuple[str, str]] = [(path, text)]
         for local, kind in _referenced_local_paths(text):
@@ -163,11 +218,16 @@ def audit(repo: Path, ref: str = "HEAD") -> dict[str, Any]:
             for candidate in existing:
                 sources.append((candidate, _read(repo, ref, candidate)))
         for source_path, source_text in sources:
-            for line_no, line in enumerate(source_text.splitlines(), 1):
+            source_lines = source_text.splitlines()
+            for line_no, line in enumerate(source_lines, 1):
                 if "git push" in line:
-                    classification, reason = classify_git_push(line.strip(), checkout_non_main)
+                    stripped = line.strip()
+                    if stripped.startswith(("'git push", '"git push')):
+                        continue
+                    separate_checkout = source_path == path and _step_uses_explicit_repository_checkout(source_lines, line_no - 1, separate_paths)
+                    classification, reason = classify_git_push(stripped, checkout_non_main, static_env, separate_checkout)
                     if classification not in {"NON_MAIN", "NON_WRITER"}:
-                        findings.append({"workflow": path, "source": source_path, "line": line_no, "classification": classification, "reason": reason, "permission_state": permission_state, "permission_reason": permission_reason, "snippet": line.strip()})
+                        findings.append({"workflow": path, "source": source_path, "line": line_no, "classification": classification, "reason": reason, "permission_state": permission_state, "permission_reason": permission_reason, "snippet": stripped})
             for reason, pattern in NON_GIT_MAIN_PATTERNS:
                 for pattern_match in pattern.finditer(source_text):
                     line_no = source_text.count("\n", 0, pattern_match.start()) + 1
