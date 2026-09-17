@@ -1,0 +1,115 @@
+name: tmp-reconcile-through-pr815
+
+on:
+  push:
+    branches:
+      - fix/reconcile-through-pr815-20260917
+    paths:
+      - '.github/workflows/tmp-reconcile-through-pr815.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: fix/reconcile-through-pr815-20260917
+          fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Register first-parent main movement through PR 815
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('config/freeze_reconciliation_registry_v1.json')
+          registry = json.loads(path.read_text())
+          expected = '7d64c5e6b149324e54286f29b7058b696886749b'
+          if registry.get('reconciled_through_sha') != expected:
+              raise SystemExit('RECONCILIATION_BOUNDARY_MOVED:' + str(registry.get('reconciled_through_sha')))
+
+          rows = [
+              (807, '6256c6125c35b6034697577c470a287290204769', 'Reconciliation release merge after PR #803; register the self-aging main transition. Machine matrix determines bundle impact.'),
+              (808, '6e1c566f68b5383656bb10697b37358abd5903c3', 'MLB prospective MONEYLINE heartbeat bridge; preserves market-blind Model_P, frozen T30 PAPER semantics, no-backfill and zero authority.'),
+              (810, '9a095800829a18b09e986cc3fa2cc4c9dfcdae61', 'MLB heartbeat continuation across per-game missed windows; preserves frozen timing and zero authority.'),
+              (812, 'f8ea5dc02beb7cec606fa26c348fd4d4cf1fe212', 'MLB durable T30 accrual liveness guard; records non-accrual honestly and preserves no-backfill and zero authority.'),
+              (814, '39a7dc3d5b962ca571e64e8d1757b51fb9ec36bd', 'NFL independent confirmation-window discovery; no model or betting authority change.'),
+              (817, '23fcdbcc9531181540960d30fdef82c6b61d8244', 'Governance direct-writer repair and NFL confirmation persistence to data branch; no evidence or model authority change.'),
+              (813, '2e4410c99630d72664956ead8e3cad0beb4d81d5', 'CFB auto artifact-binding verifier alias; operational verifier only with zero model/promotion/OFFICIAL authority.'),
+              (818, 'f23d08bcc48c24368a78447c230a4f626afe1178', 'CFB auto runtime repository-context repair; operational only with zero authority.'),
+              (819, 'f397573c06ede6310ae9d1ba932ed67dbedb38ad', 'CFB first-evaluation readiness fail-closes on revoked candidate prereg freeze. Covered candidate bundle remains REVOKED; attempts remain zero.'),
+              (800, '53dd9334441e5da1538ed016cc8123141d27806e', 'MLB frozen-policy PIT replay scorer restoration; non-authoritative historical dependency only.'),
+              (815, '2b4011058429bd6a689e7a69e0286a7e341629bb', 'NFL direct DraftKings confirmation contract wired onto current main; preserves no-backfill and zero Model_P/Truth Gate/promotion/staking/OFFICIAL authority.'),
+          ]
+          existing = {(int(r.get('pr', -1)), str(r.get('merge_sha', ''))) for r in registry.get('deltas', [])}
+          for pr, sha, note in rows:
+              if (pr, sha) in existing:
+                  raise SystemExit(f'DUPLICATE_DELTA:{pr}:{sha}')
+              registry['deltas'].append({
+                  'delta_id': f'PR_{pr}_CURRENT_MAIN_CATCHUP',
+                  'merge_sha': sha,
+                  'note': note,
+                  'pr': pr,
+              })
+          registry['reconciled_through_sha'] = rows[-1][1]
+          path.write_text(json.dumps(registry, sort_keys=True, separators=(',', ':')) + '\n')
+          PY
+
+      - name: Add focused chronology and fail-closed regression
+        run: |
+          cat > tests/test_reconciliation_catchup_pr815.py <<'PY'
+          from __future__ import annotations
+
+          import json
+          from pathlib import Path
+
+          EXPECTED = [
+              (807, '6256c6125c35b6034697577c470a287290204769'),
+              (808, '6e1c566f68b5383656bb10697b37358abd5903c3'),
+              (810, '9a095800829a18b09e986cc3fa2cc4c9dfcdae61'),
+              (812, 'f8ea5dc02beb7cec606fa26c348fd4d4cf1fe212'),
+              (814, '39a7dc3d5b962ca571e64e8d1757b51fb9ec36bd'),
+              (817, '23fcdbcc9531181540960d30fdef82c6b61d8244'),
+              (813, '2e4410c99630d72664956ead8e3cad0beb4d81d5'),
+              (818, 'f23d08bcc48c24368a78447c230a4f626afe1178'),
+              (819, 'f397573c06ede6310ae9d1ba932ed67dbedb38ad'),
+              (800, '53dd9334441e5da1538ed016cc8123141d27806e'),
+              (815, '2b4011058429bd6a689e7a69e0286a7e341629bb'),
+          ]
+
+          def test_reconciliation_catchup_is_first_parent_complete_through_pr815() -> None:
+              registry = json.loads(Path('config/freeze_reconciliation_registry_v1.json').read_text())
+              assert registry['reconciled_through_sha'] == EXPECTED[-1][1]
+              tail = registry['deltas'][-len(EXPECTED):]
+              assert [(row['pr'], row['merge_sha']) for row in tail] == EXPECTED
+
+          def test_candidate_prereg_bundle_stays_revoked_and_attempt_zero() -> None:
+              registry = json.loads(Path('config/freeze_reconciliation_registry_v1.json').read_text())
+              bundle = next(row for row in registry['bundles'] if row['bundle_id'] == 'CFB_CANDIDATE_PREREG_FREEZE_V1')
+              assert bundle['disposition']['state'] == 'REVOKED'
+              prereg = json.loads(Path('config/cfb_model_candidate_prereg_v1.json').read_text())
+              governance = prereg['governance']
+              assert governance['attempts_consumed'] == 0
+              assert governance['evaluation_performed'] is False
+              assert governance['model_p_created'] is False
+              assert governance['promotion_authority'] is False
+              assert governance['official_authority'] is False
+          PY
+
+      - name: Verify focused state before persistence
+        run: |
+          python -m unittest tests.test_reconciliation_catchup_pr815 -v
+          python -m unittest tests.test_reconciliation_catchup_pr803 tests.test_reconciliation_catchup_pr791 -v
+
+      - name: Commit catch-up to branch
+        run: |
+          git config user.name 'sportsedge-reconciliation-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add config/freeze_reconciliation_registry_v1.json tests/test_reconciliation_catchup_pr815.py
+          git commit -m 'Governance: reconcile main through PR 815'
+          git push origin HEAD:fix/reconcile-through-pr815-20260917
