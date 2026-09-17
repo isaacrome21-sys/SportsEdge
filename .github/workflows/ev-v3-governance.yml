@@ -10,6 +10,7 @@ on:
       - 'sportsedge/ev_suspension_v3.py'
       - 'scripts/ev_credential_health.py'
       - 'scripts/ev_tracker_v3_gate.py'
+      - 'scripts/ev_tracker_v3_health_patch.py'
       - 'scripts/ev_v3_state.py'
       - 'tests/test_ev_*v3*.py'
       - 'tests/test_ev_credential_health.py'
@@ -39,3 +40,4 @@ jobs:
           tests/test_ev_tracker_v3_no_authority.py
           tests/test_ev_tracker_v3_quiescence.py
           tests/test_ev_tracker_v3_outage_threshold.py
+          tests/test_ev_tracker_v3_health_patch.py
