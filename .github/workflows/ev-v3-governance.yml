@@ -35,3 +35,4 @@ jobs:
           tests/test_ev_tracker_v3_policy.py
           tests/test_ev_tracker_v3_gate.py
           tests/test_ev_v3_state.py
+          tests/test_ev_tracker_v3_no_authority.py
