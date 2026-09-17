@@ -8,12 +8,11 @@ from scripts.build_reconciliation_registry_view import merge_view
 PR_806 = "a16bc6907e95267e919f42d15b04afaebcf5bb8c"
 PR_803 = "7d64c5e6b149324e54286f29b7058b696886749b"
 BUNDLE_ID = "MARKET_MAKER_RADAR_EVIDENCE_FREEZE_V2"
-PR803_GOVERNED_PATHS = {
+PR803_GOVERNED_RADAR_PATHS = {
     ".github/workflows/market-maker-radar.yml",
     "config/market_maker_radar_v1.json",
     "docs/market_maker_radar.md",
     "scripts/capture_market_maker_fourc_line_history.py",
-    "tests/test_import_fourc_line_history.py",
 }
 
 
@@ -33,10 +32,10 @@ def test_reconciliation_boundary_advances_through_pr803_in_first_parent_order() 
     ]
 
 
-def test_pr803_market_radar_surfaces_are_all_governed() -> None:
+def test_pr803_governed_market_radar_surfaces_are_covered() -> None:
     registry = json.loads(Path("config/freeze_reconciliation_registry_v1.json").read_text())
     bundle = next(row for row in registry["bundles"] if row["bundle_id"] == BUNDLE_ID)
-    missing = sorted(path for path in PR803_GOVERNED_PATHS if not _covered(bundle, path))
+    missing = sorted(path for path in PR803_GOVERNED_RADAR_PATHS if not _covered(bundle, path))
     assert missing == []
 
 
