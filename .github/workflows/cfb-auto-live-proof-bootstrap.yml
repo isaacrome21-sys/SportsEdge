@@ -1,0 +1,82 @@
+name: cfb auto live proof bootstrap
+
+on:
+  push:
+    branches:
+      - cfb/auto-live-proof-bootstrap
+    paths:
+      - .github/workflows/cfb-auto-live-proof-bootstrap.yml
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  dispatch-main-cfb-auto:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Dispatch exact main cfb auto and retain proof receipt
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -u
+          before="$(date -u +%s)"
+          mkdir -p tmp
+          receipt=tmp/cfb_auto_live_proof.txt
+          {
+            echo "bootstrap_branch=${GITHUB_REF_NAME}"
+            echo "target_ref=main"
+            echo "dispatch_after_epoch=${before}"
+          } > "$receipt"
+
+          dispatch_output="$(gh workflow run cfb-auto.yml --ref main 2>&1)"
+          dispatch_rc=$?
+          echo "dispatch_rc=${dispatch_rc}" >> "$receipt"
+          printf 'dispatch_output=%s\n' "$dispatch_output" >> "$receipt"
+
+          if [ "$dispatch_rc" -eq 0 ]; then
+            wrapper_id=""
+            for _ in $(seq 1 40); do
+              runs="$(gh run list --workflow cfb-auto.yml --branch main --event workflow_dispatch --limit 20 --json databaseId,createdAt,status,conclusion,url 2>/dev/null || echo '[]')"
+              wrapper_id="$(printf '%s' "$runs" | jq -r --argjson before "$before" '[.[] | select((.createdAt | fromdateiso8601) >= $before)] | sort_by(.createdAt) | last | .databaseId // empty')"
+              [ -n "$wrapper_id" ] && break
+              sleep 2
+            done
+            echo "wrapper_run_id=${wrapper_id:-NONE}" >> "$receipt"
+            if [ -n "$wrapper_id" ]; then
+              gh run watch "$wrapper_id" >/dev/null 2>&1 || true
+              gh run view "$wrapper_id" --json conclusion,url --jq '"wrapper_conclusion=" + (.conclusion // "") + "\nwrapper_url=" + (.url // "")' >> "$receipt" 2>&1 || true
+              wrapper_logs="$(gh run view "$wrapper_id" --log 2>&1 || true)"
+              echo "wrapper_markers_begin" >> "$receipt"
+              printf '%s\n' "$wrapper_logs" | grep -E 'CFB_AUTO_|CFB_PROP_REAL_FREEZE_OK|unknown flag|unknown shorthand|error:' | tail -n 40 >> "$receipt" || true
+              echo "wrapper_markers_end" >> "$receipt"
+            fi
+          else
+            echo "wrapper_run_id=NOT_DISPATCHED" >> "$receipt"
+          fi
+
+          canonical_id=""
+          for _ in $(seq 1 10); do
+            runs="$(gh run list --workflow football-cfb-prop-artifact-freeze.yml --branch main --event workflow_dispatch --limit 20 --json databaseId,createdAt,status,conclusion,url 2>/dev/null || echo '[]')"
+            canonical_id="$(printf '%s' "$runs" | jq -r --argjson before "$before" '[.[] | select((.createdAt | fromdateiso8601) >= $before)] | sort_by(.createdAt) | last | .databaseId // empty')"
+            [ -n "$canonical_id" ] && break
+            sleep 2
+          done
+          echo "canonical_run_id=${canonical_id:-NONE}" >> "$receipt"
+          if [ -n "$canonical_id" ]; then
+            gh run watch "$canonical_id" >/dev/null 2>&1 || true
+            gh run view "$canonical_id" --json conclusion,url --jq '"canonical_conclusion=" + (.conclusion // "") + "\ncanonical_url=" + (.url // "")' >> "$receipt" 2>&1 || true
+            canonical_logs="$(gh run view "$canonical_id" --log 2>&1 || true)"
+            echo "canonical_markers_begin" >> "$receipt"
+            printf '%s\n' "$canonical_logs" | grep -E 'CFB_PROP_REAL_FREEZE_OK|UPSTREAM_DRIFT|RETAINED_ACTIONS_BUNDLE|error:' | tail -n 40 >> "$receipt" || true
+            echo "canonical_markers_end" >> "$receipt"
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$receipt"
+          git commit -m "Test: retain cfb auto live proof receipt" || true
+          git push origin "HEAD:${GITHUB_REF_NAME}"
