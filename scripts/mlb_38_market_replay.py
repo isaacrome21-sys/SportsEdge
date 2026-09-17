@@ -20,7 +20,10 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
-from mlb_pit_replay_metrics import flatten_catalog, score, sha256_file, unauthorized_markets
+try:
+    from scripts.mlb_pit_replay_metrics import flatten_catalog, score, sha256_file, unauthorized_markets
+except ModuleNotFoundError:
+    from mlb_pit_replay_metrics import flatten_catalog, score, sha256_file, unauthorized_markets
 from sportsedge.mlb_promotion_replay import build_mlb_promotion_replay
 from sportsedge.sports.mlb.provider_market_catalog import (
     NO_DIRECT_PROVIDER_KEY,
