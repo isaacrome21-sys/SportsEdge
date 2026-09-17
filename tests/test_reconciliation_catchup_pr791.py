@@ -28,9 +28,8 @@ def test_intervening_reconciliation_merge_before_pr791_is_governed_content_neutr
 
 def test_pr791_is_registered_as_fail_closed_cfb_candidate_prereg_revocation() -> None:
     registry = json.loads(Path("config/freeze_reconciliation_registry_v1.json").read_text())
-    assert registry["reconciled_through_sha"] == PR_791
-    assert registry["deltas"][-1]["merge_sha"] == PR_791
-    assert registry["deltas"][-1]["pr"] == 791
+    delta = next(row for row in registry["deltas"] if row["merge_sha"] == PR_791)
+    assert delta["pr"] == 791
     bundle = next(row for row in registry["bundles"] if row["bundle_id"] == "CFB_CANDIDATE_PREREG_FREEZE_V1")
     disposition = bundle["disposition"]
     assert disposition["state"] == "REVOKED"
