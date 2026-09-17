@@ -5,6 +5,7 @@ import argparse
 import copy
 import hashlib
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -114,6 +115,44 @@ def _registered_refreeze_supersedes_revocation(existing: object, extension_dispo
     return all(str(existing.get(key) or "") for key in ("new_bundle_id", "new_freeze_sha", "forward_clock_restart_at"))
 
 
+def _parse_revoked_at(value: object) -> datetime:
+    text = str(value or "").strip()
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError as exc:
+        raise SystemExit("BUNDLE_REVOCATION_TIMESTAMP_INVALID") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise SystemExit("BUNDLE_REVOCATION_TIMESTAMP_NAIVE")
+    return parsed
+
+
+def _merge_fail_closed_revocations(
+    existing: object, extension_disposition: Mapping[str, Any]
+) -> dict[str, Any] | None:
+    """Resolve two REVOKED records by preserving the earlier invalidation.
+
+    A later registry revocation must never weaken an already-effective extension
+    revocation by moving the invalidation clock forward. Conversely, an earlier
+    registry revocation is stricter and is retained. This helper can only return
+    a REVOKED disposition with prior-forward-clock invalidation true; it cannot
+    create authority or an active/refrozen state.
+    """
+    if not isinstance(existing, Mapping):
+        return None
+    if existing.get("state") != "REVOKED" or extension_disposition.get("state") != "REVOKED":
+        return None
+    if existing.get("prior_forward_clock_invalidated") is not True:
+        return None
+    if extension_disposition.get("prior_forward_clock_invalidated") is not True:
+        return None
+    existing_at = _parse_revoked_at(existing.get("revoked_at"))
+    extension_at = _parse_revoked_at(extension_disposition.get("revoked_at"))
+    chosen = existing if existing_at <= extension_at else extension_disposition
+    return copy.deepcopy(dict(chosen))
+
+
 def merge_view(
     policy: Mapping[str, Any], registry: Mapping[str, Any], extension: Mapping[str, Any]
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
@@ -147,12 +186,18 @@ def merge_view(
 
     dispositions = extension.get("bundle_dispositions") or {}
     superseded_revocations: list[str] = []
+    merged_revocations: list[str] = []
     for bundle_id, disposition in sorted(dispositions.items()):
         bundle = by_id[str(bundle_id)]
         existing = bundle.get("disposition")
         if existing is not None and existing != disposition:
             if _registered_refreeze_supersedes_revocation(existing, disposition):
                 superseded_revocations.append(str(bundle_id))
+                continue
+            merged_revocation = _merge_fail_closed_revocations(existing, disposition)
+            if merged_revocation is not None:
+                bundle["disposition"] = merged_revocation
+                merged_revocations.append(str(bundle_id))
                 continue
             raise SystemExit(f"BUNDLE_DISPOSITION_CONFLICT:{bundle_id}")
         bundle["disposition"] = copy.deepcopy(dict(disposition))
@@ -172,6 +217,7 @@ def merge_view(
         "added_coverage_prefix_count": added_prefixes,
         "bundle_disposition_count": len(dispositions),
         "superseded_extension_revocations": sorted(superseded_revocations),
+        "merged_fail_closed_revocations": sorted(merged_revocations),
         "inventory_completion_claim_applied": bool(claim),
         "inventory_completion_proof": dict(claim) if claim else None,
         "scanner_discovery_contract_changed": False,
