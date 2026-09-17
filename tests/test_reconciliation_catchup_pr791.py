@@ -26,29 +26,30 @@ def test_intervening_reconciliation_merge_before_pr791_is_governed_content_neutr
     assert detail["content_identity_ok"] is True
 
 
-def test_pr791_is_registered_as_conservative_cfb_candidate_prereg_refreeze() -> None:
+def test_pr791_is_registered_as_fail_closed_cfb_candidate_prereg_revocation() -> None:
     registry = json.loads(Path("config/freeze_reconciliation_registry_v1.json").read_text())
     assert registry["reconciled_through_sha"] == PR_791
     assert registry["deltas"][-1]["merge_sha"] == PR_791
     assert registry["deltas"][-1]["pr"] == 791
     bundle = next(row for row in registry["bundles"] if row["bundle_id"] == "CFB_CANDIDATE_PREREG_FREEZE_V1")
     disposition = bundle["disposition"]
-    assert disposition["state"] == "REFROZEN"
-    assert disposition["new_bundle_id"] == "CFB_CANDIDATE_PREREG_FREEZE_V2"
-    assert disposition["new_freeze_sha"] == PR_791
-    assert disposition["forward_clock_restart_at"] == "2026-09-17T00:24:27Z"
+    assert disposition["state"] == "REVOKED"
+    assert disposition["revoked_at"] == "2026-09-17T00:24:27Z"
+    assert disposition["prior_forward_clock_invalidated"] is True
     assert "ATTEMPT_COUNT_REMAINS_ZERO" in disposition["reason"]
+    assert "REFREEZE" in disposition["reason"]
+    assert "NOT_MACHINE_VERIFIED" in disposition["reason"]
 
 
-def test_registered_candidate_prereg_refreeze_supersedes_only_stale_extension_revocation() -> None:
+def test_registered_candidate_prereg_revocation_is_consistent_with_coverage_extension() -> None:
     policy = json.loads(Path("config/freeze_inventory_policy_v1.json").read_text())
     registry = json.loads(Path("config/freeze_reconciliation_registry_v1.json").read_text())
     extension = json.loads(Path("config/reconciliation_coverage_v1.json").read_text())
 
     _, effective, attestation = merge_view(policy, registry, extension)
     bundle = next(row for row in effective["bundles"] if row["bundle_id"] == "CFB_CANDIDATE_PREREG_FREEZE_V1")
-    assert bundle["disposition"]["state"] == "REFROZEN"
-    assert "CFB_CANDIDATE_PREREG_FREEZE_V1" in attestation["superseded_extension_revocations"]
+    assert bundle["disposition"]["state"] == "REVOKED"
+    assert "CFB_CANDIDATE_PREREG_FREEZE_V1" not in attestation["superseded_extension_revocations"]
 
     bad = json.loads(json.dumps(registry))
     bad_bundle = next(row for row in bad["bundles"] if row["bundle_id"] == "CFB_CANDIDATE_PREREG_FREEZE_V1")
