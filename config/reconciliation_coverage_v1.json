@@ -138,7 +138,6 @@
     "docs/PUBLIC_REPO_ADOPTION_PROVIDER_BUDGET.md": "OPERATIONAL_PROVIDER_GUARD_ADOPTION_PROVENANCE_NO_MODEL_OR_PROMOTION_AUTHORITY",
     "docs/TOP_DOWN_MARKET_VALUE_V1.md": "MARKET_CONTEXT_RESEARCH_ONLY_NO_ACTIVE_BUNDLE",
     "docs/market_provider_migration_20260915.md": "MARKET_PROVIDER_MIGRATION_DOCUMENTATION_ONLY_NO_MODEL_OR_PROMOTION_AUTHORITY",
-    "docs/nfl_direct_capture_source_contract_v1.md": "NFL_PROSPECTIVE_TRANSPORT_CONTRACT_ONLY_NO_MODEL_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY",
     "docs/nfl_hybrid_context.md": "FOOTBALL_CONTEXT_ONLY_NO_ACTIVE_MODEL_BUNDLE",
     "docs/provider_abstraction_pr_body.md": "MARKET_PROVIDER_DOCUMENTATION_ONLY_NO_MODEL_OR_PROMOTION_AUTHORITY",
     "docs/provider_abstraction_review_checklist.md": "MARKET_PROVIDER_DOCUMENTATION_ONLY_NO_MODEL_OR_PROMOTION_AUTHORITY",
@@ -152,8 +151,7 @@
     "scripts/fit_mlb_development.py": "RESEARCH_MODEL_DEVELOPMENT_ONLY_NO_ACTIVE_BUNDLE",
     "scripts/fit_mlb_development_v2.py": "RESEARCH_MODEL_DEVELOPMENT_ONLY_NO_ACTIVE_BUNDLE",
     "scripts/nfl_2026_provider_preflight.py": "NFL_PROVIDER_QUOTA_PREFLIGHT_ONLY_NO_MODEL_OR_PROMOTION_AUTHORITY",
-    "scripts/nfl_direct_dk_preflight.py": "NFL_DIRECT_DK_TRANSPORT_DIAGNOSTIC_ONLY_NO_EVIDENCE_MODEL_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY",
-    "scripts/nfl_next_capture_window.py": "NFL_SCHEDULE_OBLIGATION_REPORTER_ONLY_NO_EVIDENCE_MODEL_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY",
+    "scripts/nfl_next_capture_window.py": "NFL_SCHEDULE_ONLY_OBLIGATION_REPORTER_NO_ODDS_MODEL_OR_PROMOTION_AUTHORITY",
     "scripts/odds_api_quota_guard.py": "PROVIDER_QUOTA_OPERATIONAL_GUARD_NO_MODEL_OR_PROMOTION_AUTHORITY",
     "scripts/probe_mlb_v7_finalization_sources.py": "LEGACY_SOURCE_PROBE_ONLY_NO_ACTIVE_BUNDLE",
     "scripts/probe_public_weather_forecast.py": "WEATHER_PROBE_CONTEXT_ONLY_NO_ACTIVE_BUNDLE",
@@ -175,18 +173,7 @@
     "sportsedge/sports/nfl/team_totals.py": "NFL_RUNTIME_MARKET_SURFACE_NO_ACTIVE_MODEL_BUNDLE",
     "sportsedge/sports/nfl/venue_contract.py": "NFL_RUNTIME_CONTEXT_NO_ACTIVE_MODEL_BUNDLE"
   },
-  "inventory_completion_claim": {
-    "status": "HOSTED_AUDIT_ZERO_UNMAPPED",
-    "set_effective_registry_complete": true,
-    "proof_head_sha": "2634a10af71823706ded9fe6fd14fbe255c65492",
-    "proof_run_id": 34873091611,
-    "proof_artifact_id": 10358874078,
-    "proof_artifact_digest_sha256": "6785fe27e0a1596f06d8440f7d9d7f7633b71fa17e5945cac7cd1b77cb81ab6c",
-    "proof_inventory_report_sha256": "3db2ac345ddb1e5824a2a3351b0d9454ff6e8a4968c48c7222cb223b6cf54e8d",
-    "proof_extension_canonical_sha256": "f89ca4fbc73f6690bba8aaf6cb6febc9bdc4e23510f8f9d1ec177c96c984743f",
-    "candidate_count": 317,
-    "unmapped_count": 0
-  },
+  "inventory_completion_claim": null,
   "bundle_dispositions": {
     "NFL_V2J_V2K_GOVERNANCE_FREEZE_V1": {
       "state": "REVOKED",
