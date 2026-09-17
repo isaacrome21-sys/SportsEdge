@@ -19,11 +19,12 @@ jobs:
   verify-canonical-binding:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
     steps:
       - name: Dispatch canonical CFB artifact-freeze verifier
         id: dispatch
-        env:
-          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -33,14 +34,14 @@ jobs:
 
       - name: Wait for dispatched canonical run and classify result
         env:
-          GH_TOKEN: ${{ github.token }}
           BEFORE: ${{ steps.dispatch.outputs.before }}
         shell: bash
         run: |
           set -euo pipefail
           run_id=""
           for _ in $(seq 1 30); do
-            candidate="$(gh run list --workflow football-cfb-prop-artifact-freeze.yml --branch "${GITHUB_REF_NAME}" --event workflow_dispatch --limit 10 --json databaseId,createdAt --jq --argjson before "$BEFORE" '[.[] | select((.createdAt | fromdateiso8601) >= $before)] | sort_by(.createdAt) | last | .databaseId // empty')"
+            runs="$(gh run list --workflow football-cfb-prop-artifact-freeze.yml --branch "${GITHUB_REF_NAME}" --event workflow_dispatch --limit 10 --json databaseId,createdAt)"
+            candidate="$(jq -r --argjson before "$BEFORE" '[.[] | select((.createdAt | fromdateiso8601) >= $before)] | sort_by(.createdAt) | last | .databaseId // empty' <<<"$runs")"
             if [ -n "$candidate" ]; then
               run_id="$candidate"
               break
