@@ -55,14 +55,63 @@
       "acquisition_authority": ".github/workflows/football-nfl-forward-clv-collection.yml",
       "provider_dependency": "THE_ODDS_API_DRAFTKINGS",
       "persistence_root": "runtime/nfl-forward",
-      "liveness_mode": "PER_DUE_RUN_FAIL_CLOSED_PLUS_MUTATION_GUARD",
+      "liveness_mode": "PER_DUE_RUN_FAIL_CLOSED_PLUS_DURABLE_ACCRUAL_GUARD",
+      "independent_liveness_authority": ".github/workflows/active-evidence-window-liveness.yml",
       "required_authority_literals": [
         "schedule:",
         "scripts/fetch_nfl_forward_odds.py",
         "Persist release-scoped decision/close state to data branch",
         "runtime/nfl-forward"
       ],
+      "required_liveness_literals": [
+        "workflow_run:",
+        "football-nfl-forward-clv-collection",
+        "check_nfl_forward_accrual.py",
+        "runtime/nfl-forward"
+      ],
       "no_backfill": true
+    },
+    {
+      "id": "MLB_MONEYLINE_V2_FORWARD",
+      "sport": "MLB",
+      "status": "ACTIVE",
+      "active_from": "2026-09-17T01:34:20Z",
+      "active_from_meaning": "INDEPENDENT_OPERATIONAL_LIVENESS_GUARD_START_ONLY_NOT_V2_EVIDENCE_CLOCK_RESET",
+      "evidence_clock_rule": "Promotion Evidence Policy V2 and the frozen lane bindings remain authoritative for evidence chronology; this liveness registration does not relabel or backfill any earlier row.",
+      "acquisition_authority": ".github/workflows/mlb-moneyline-forward-evidence.yml",
+      "provider_dependency": "DRAFTKINGS_DIRECT_WEB_PLUS_MLB_STATSAPI",
+      "persistence_root": "data/mlb_forward_decisions",
+      "liveness_mode": "RECENT_DUE_T30_MUST_HAVE_CONTRACT_VALID_DURABLE_PAPER_TERMINAL",
+      "independent_liveness_authority": ".github/workflows/active-evidence-window-liveness.yml",
+      "decision_window": "T30_EARLY_ONLY_30_TO_36_MINUTES_BEFORE_EVENT_START",
+      "operational_lookback_hours": 4,
+      "required_authority_literals": [
+        "workflow_run:",
+        "mlb-game-context-refresh",
+        "scripts/capture_mlb_moneyline_model_p.py",
+        "scripts/capture_mlb_direct_paired_ml.py",
+        "scripts/capture_mlb_moneyline_paper_decisions.py",
+        "data/mlb_forward_decisions"
+      ],
+      "required_liveness_literals": [
+        "workflow_run:",
+        "mlb-moneyline-forward-evidence",
+        "mlb-moneyline-liveness",
+        ".data-liveness/data/mlb_forward_decisions"
+      ],
+      "valid_operational_terminals": [
+        "PAPER_BET_FROZEN",
+        "PAPER_PASS_FROZEN"
+      ],
+      "blocked_missed_window_is_accrual": false,
+      "no_backfill": true,
+      "authority": {
+        "model_p": false,
+        "truth_gate": false,
+        "promotion": false,
+        "staking": false,
+        "official": false
+      }
     }
   ]
 }

@@ -25,7 +25,15 @@ on:
   # paid DraftKings capture path runs, so the 30..15 minute FINAL window gets a
   # chance without spending odds-provider credits outside a frozen window.
   schedule:
-    - cron: '3,13,23,33,43,53 * * * *'
+    # Keep the same ten-minute polling cadence as the frozen capture lane, but
+    # split the entries so github.event.schedule identifies the hourly health slot
+    # even when GitHub starts the runner several minutes late.
+    - cron: '3 * * * *'
+    - cron: '13 * * * *'
+    - cron: '23 * * * *'
+    - cron: '33 * * * *'
+    - cron: '43 * * * *'
+    - cron: '53 * * * *'
 
 permissions:
   contents: write
@@ -184,9 +192,10 @@ jobs:
           SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
         run: |
           set -euo pipefail
-          # Outside a live due window, one probe per hour is sufficient and avoids
-          # turning a zero-credit endpoint into needless provider traffic.
-          if [[ '${{ steps.due.outputs.due }}' != 'true' && "$(date -u +%M)" != '03' ]]; then
+          # Outside a live due window, one probe per hour is sufficient. Key the
+          # health slot to the cron expression that fired, not wall-clock runner
+          # minute, because GitHub scheduled jobs may start late.
+          if [[ '${{ steps.due.outputs.due }}' != 'true' && '${{ github.event.schedule }}' != '3 * * * *' ]]; then
             echo 'state=SKIPPED_CADENCE' >> "$GITHUB_OUTPUT"
             echo 'provider_probe_run=false' >> "$GITHUB_OUTPUT"
             exit 0
