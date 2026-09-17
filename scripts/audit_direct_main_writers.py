@@ -41,13 +41,13 @@ def _checkout_static_non_main(text: str) -> str | None:
     for idx, line in enumerate(lines):
         if "uses:" not in line or "actions/checkout@" not in line:
             continue
-        indent = len(line) - len(line.lstrip())
+        step_indent = len(line) - len(line.lstrip()) - 2
         for follow in lines[idx + 1 :]:
             stripped = follow.strip()
             if not stripped:
                 continue
             follow_indent = len(follow) - len(follow.lstrip())
-            if follow_indent <= indent:
+            if follow_indent <= step_indent or (follow_indent == step_indent + 2 and stripped.startswith("- ")):
                 break
             match = re.match(r"ref:\s*['\"]?([^'\"#\s]+)", stripped)
             if match:
@@ -76,7 +76,7 @@ def _explicit_repository_checkout_paths(text: str) -> set[str]:
     for idx, line in enumerate(lines):
         if "uses:" not in line or "actions/checkout@" not in line:
             continue
-        indent = len(line) - len(line.lstrip())
+        step_indent = len(line) - len(line.lstrip()) - 2
         repository = None
         path = None
         for follow in lines[idx + 1 :]:
@@ -84,7 +84,7 @@ def _explicit_repository_checkout_paths(text: str) -> set[str]:
             if not stripped:
                 continue
             follow_indent = len(follow) - len(follow.lstrip())
-            if follow_indent <= indent:
+            if follow_indent <= step_indent or (follow_indent == step_indent + 2 and stripped.startswith("- ")):
                 break
             if stripped.startswith("repository:"):
                 repository = stripped.split(":", 1)[1].strip().strip("'\"")
