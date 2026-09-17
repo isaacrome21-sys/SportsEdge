@@ -1,0 +1,30 @@
+{
+  "asset": {
+    "asset_id": 570542319,
+    "asset_name": "game_rosters_2026.csv",
+    "browser_download_url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_cfb_game_rosters/game_rosters_2026.csv",
+    "dataset": "game_rosters",
+    "release_id": 334089583,
+    "release_tag": "espn_cfb_game_rosters",
+    "release_updated_at": "2026-09-17T15:32:03Z",
+    "season": 2026,
+    "sha256": "7e4ea67a3c52aec2e42d98e2d7cbd02552283b9122fc5ecd1ab58e6ef0b006a3",
+    "size": 18272229,
+    "usage": "PREDICTIVE_PARTICIPATION_INPUT"
+  },
+  "cache_relative_path": "game_rosters/2026/game_rosters_2026.csv",
+  "cache_reused": false,
+  "content_sha256": "7e4ea67a3c52aec2e42d98e2d7cbd02552283b9122fc5ecd1ab58e6ef0b006a3",
+  "contract": "CFB_PARTICIPATION_SOURCE_CAPTURE_V2",
+  "manifest_sha256": "2bcb08c18ebc0e9c82f1881246397811a3d005fddb924f6b1af60461e1ebeb38",
+  "market_role": "PREDICTIVE_PARTICIPATION_INPUT",
+  "model_p_created": false,
+  "point_in_time_from_retrieval_forward": true,
+  "predictive_projection": null,
+  "promotion_authority": false,
+  "raw_market_data_present": false,
+  "raw_predictive_input_allowed": true,
+  "retrieved_at": "2026-09-17T18:08:11.500101+00:00",
+  "retroactive_point_in_time_claim": false,
+  "row_count": 17522
+}
