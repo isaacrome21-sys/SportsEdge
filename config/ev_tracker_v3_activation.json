@@ -1,0 +1,13 @@
+{
+  "record_type": "POLICY_ACTIVATION_DISPOSITION",
+  "lane": "EXTERNAL_EV",
+  "new_policy_id": "EV_TRACKER_POLICY_V3",
+  "prior_policy_id": "EV_TRACKER_POLICY_V2",
+  "disposition": "RESOLVED_TO_PROSPECTIVE_V3",
+  "activation_ref": "refs/heads/main",
+  "clock": "N0_ON_FIRST_V3_RECORD_AFTER_MAIN_ACTIVATION",
+  "prior_history": "IMMUTABLE",
+  "backfill": "FORBIDDEN",
+  "retroactive_reclassification": "FORBIDDEN",
+  "note": "This feature-branch record has no activation authority. V3 becomes active only if merged to evidence_ref and the manifest resolves to V3 there."
+}
