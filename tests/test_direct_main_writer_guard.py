@@ -99,6 +99,12 @@ def test_explicit_separate_repository_checkout_push_is_not_public_main(tmp_path:
     assert report["blocking_findings"] == []
 
 
+def test_named_explicit_separate_repository_checkout_push_is_not_public_main(tmp_path: Path) -> None:
+    workflow = """name: x\non: workflow_dispatch\npermissions:\n  contents: write\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Checkout private evidence repository\n        uses: actions/checkout@v4\n        with:\n          repository: ${{ secrets.PRIVATE_REPOSITORY }}\n          path: .private/evidence\n      - name: persist private bytes\n        run: |\n          cd .private/evidence\n          git commit -m evidence\n          git push origin HEAD\n"""
+    report = audit(_repo(tmp_path, workflow))
+    assert report["blocking_findings"] == []
+
+
 def test_separate_checkout_does_not_clear_push_from_public_checkout(tmp_path: Path) -> None:
     workflow = """name: x\non: workflow_dispatch\npermissions:\n  contents: write\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          repository: other/repo\n          path: _private/evidence\n      - name: unsafe public push\n        run: git push origin main\n"""
     report = audit(_repo(tmp_path, workflow))
