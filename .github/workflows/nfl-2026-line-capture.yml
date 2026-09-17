@@ -25,6 +25,9 @@ on:
   # paid DraftKings capture path runs, so the 30..15 minute FINAL window gets a
   # chance without spending odds-provider credits outside a frozen window.
   schedule:
+    # Keep the same ten-minute polling cadence as the frozen capture lane, but
+    # split the entries so github.event.schedule identifies the hourly health slot
+    # even when GitHub starts the runner several minutes late.
     - cron: '3 * * * *'
     - cron: '13 * * * *'
     - cron: '23 * * * *'
@@ -111,6 +114,8 @@ jobs:
                   opener_existing_valid = False
           opener_due = bool(opener_window_open and opener_path and not opener_existing_valid)
 
+          # Count only contract-valid FINAL rows. A malformed/partial row must
+          # never suppress due=true or skip the current-run materialization audit.
           captured_final = Counter()
           for path in Path(cfg['output_dir']).glob('week*/final/*.json'):
               try:
@@ -164,7 +169,16 @@ jobs:
               output.write(f"opener_week={opener_week}\n")
               output.write(f"final_due={'true' if final_due else 'false'}\n")
               output.write('final_due_kickoffs=' + json.dumps(final_due_kickoffs, separators=(',', ':')) + '\n')
-          print(json.dumps({'due': due, 'opener_due': opener_due, 'opener_week': opener_week, 'final_due': final_due, 'final_due_kickoffs': final_due_kickoffs, 'checked_at_utc': now.isoformat()}))
+          print(json.dumps({
+              'due': due,
+              'opener_window_open': opener_window_open,
+              'opener_existing_valid': opener_existing_valid,
+              'opener_due': opener_due,
+              'opener_week': opener_week,
+              'final_due': final_due,
+              'final_due_kickoffs': final_due_kickoffs,
+              'checked_at_utc': now.isoformat(),
+          }))
           PY
 
       - name: Preflight zero-credit provider quota before confirmation window
@@ -178,6 +192,9 @@ jobs:
           SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
         run: |
           set -euo pipefail
+          # Outside a live due window, one probe per hour is sufficient. Key the
+          # health slot to the cron expression that fired, not wall-clock runner
+          # minute, because GitHub scheduled jobs may start late.
           if [[ '${{ steps.due.outputs.due }}' != 'true' && '${{ github.event.schedule }}' != '3 * * * *' ]]; then
             echo 'state=SKIPPED_CADENCE' >> "$GITHUB_OUTPUT"
             echo 'provider_probe_run=false' >> "$GITHUB_OUTPUT"
@@ -185,7 +202,9 @@ jobs:
           fi
           mkdir -p artifacts/nfl-provider-preflight
           set +e
-          python3 scripts/nfl_2026_provider_preflight.py --schedule-csv "$RUNNER_TEMP/nfl-games.csv" --out artifacts/nfl-provider-preflight/status.json
+          python3 scripts/nfl_2026_provider_preflight.py \
+            --schedule-csv "$RUNNER_TEMP/nfl-games.csv" \
+            --out artifacts/nfl-provider-preflight/status.json
           rc=$?
           set -e
           echo "rc=$rc" >> "$GITHUB_OUTPUT"
@@ -245,7 +264,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          args=(--schedule-csv "$RUNNER_TEMP/nfl-games.csv" --github-run-id "$GITHUB_RUN_ID" --verify-final-kickoffs '${{ steps.due.outputs.final_due_kickoffs }}')
+          args=(
+            --schedule-csv "$RUNNER_TEMP/nfl-games.csv"
+            --github-run-id "$GITHUB_RUN_ID"
+            --verify-final-kickoffs '${{ steps.due.outputs.final_due_kickoffs }}'
+          )
           if [ '${{ steps.due.outputs.opener_due }}' = 'true' ]; then
             args+=(--verify-opener-week '${{ steps.due.outputs.opener_week }}')
           fi
