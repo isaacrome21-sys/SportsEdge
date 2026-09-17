@@ -1,0 +1,11 @@
+{
+  "record_type": "QUIESCENCE_DISPOSITION",
+  "lane": "EXTERNAL_EV",
+  "prior_state": "QUIESCED",
+  "disposition": "RESOLVED",
+  "next_state": "ACTIVE_SUBJECT_TO_V3_MACHINE_HEALTH_STATE",
+  "effective_only_after_main_activation": true,
+  "manual_override": false,
+  "evidence_authority": false,
+  "note": "Records the requested un-quiesce disposition. It does not itself admit evidence and has no effect from a feature branch."
+}
