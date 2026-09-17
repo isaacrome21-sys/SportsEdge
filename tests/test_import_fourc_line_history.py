@@ -5,7 +5,7 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 
-from scripts.import_fourc_line_history import FourCImportError, import_file, normalize_capsule
+from scripts.capture_market_maker_fourc_line_history import FourCImportError, import_file, normalize_capsule
 
 UTC = timezone.utc
 SOURCE_CAPTURE_SHA = "a" * 64
