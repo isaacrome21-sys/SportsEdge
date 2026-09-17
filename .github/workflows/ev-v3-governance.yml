@@ -7,6 +7,7 @@ on:
       - 'config/ev_tracker_policy_manifest.json'
       - 'config/ev_tracker_v3_activation.json'
       - 'config/ev_tracker_v3_quiescence_disposition.json'
+      - 'config/nfl_confirmation_v3_suspension.json'
       - 'sportsedge/ev_suspension_v3.py'
       - 'scripts/ev_credential_health.py'
       - 'scripts/ev_tracker_v3_gate.py'
@@ -14,6 +15,7 @@ on:
       - 'scripts/ev_v3_state.py'
       - 'tests/test_ev_*v3*.py'
       - 'tests/test_ev_credential_health.py'
+      - 'tests/test_nfl_confirmation_v3_suspension.py'
   workflow_dispatch:
 
 permissions:
@@ -41,3 +43,4 @@ jobs:
           tests/test_ev_tracker_v3_quiescence.py
           tests/test_ev_tracker_v3_outage_threshold.py
           tests/test_ev_tracker_v3_health_patch.py
+          tests/test_nfl_confirmation_v3_suspension.py
