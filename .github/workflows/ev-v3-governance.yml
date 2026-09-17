@@ -6,6 +6,7 @@ on:
       - 'config/ev_tracker_policy_v3.json'
       - 'config/ev_tracker_policy_manifest.json'
       - 'config/ev_tracker_v3_activation.json'
+      - 'config/ev_tracker_v3_quiescence_disposition.json'
       - 'sportsedge/ev_suspension_v3.py'
       - 'scripts/ev_credential_health.py'
       - 'scripts/ev_tracker_v3_gate.py'
@@ -36,3 +37,4 @@ jobs:
           tests/test_ev_tracker_v3_gate.py
           tests/test_ev_v3_state.py
           tests/test_ev_tracker_v3_no_authority.py
+          tests/test_ev_tracker_v3_quiescence.py
