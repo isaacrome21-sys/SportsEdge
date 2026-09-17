@@ -38,7 +38,7 @@ A missing market-maker feed yields a blocked diagnostic rather than silently tre
 
 ## 4C line-history corroboration
 
-SportsEdge does **not** assume or scrape an undocumented 4C API. `scripts/import_fourc_line_history.py` accepts a deliberately small `FOURC_LINE_HISTORY_CAPSULE_V1` JSON capsule made from a retained 4C line-history source capture or supported export. The capsule must carry:
+SportsEdge does **not** assume or scrape an undocumented 4C API. `scripts/capture_market_maker_fourc_line_history.py` accepts a deliberately small `FOURC_LINE_HISTORY_CAPSULE_V1` JSON capsule made from a retained 4C line-history source capture or supported export. The capsule must carry:
 
 - the 4C source URL;
 - a SHA-256 binding to the retained source capture;
@@ -51,7 +51,7 @@ The importer computes a second SHA-256 over the exact capsule bytes. Every norma
 Example import:
 
 ```bash
-python scripts/import_fourc_line_history.py \
+python scripts/capture_market_maker_fourc_line_history.py \
   --input /path/to/fourc-capsule.json \
   --out /path/to/archive/market-maker-radar/fourc/2026-09-16.ndjson
 ```
