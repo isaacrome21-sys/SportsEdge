@@ -1,0 +1,11 @@
+bootstrap_branch=cfb/auto-live-proof-bootstrap
+target_ref=main
+dispatch_after_epoch=1789644640
+dispatch_rc=0
+dispatch_output=https://github.com/isaacrome21-sys/SportsEdge/actions/runs/35216064545
+wrapper_run_id=35216064545
+wrapper_conclusion=failure
+wrapper_url=https://github.com/isaacrome21-sys/SportsEdge/actions/runs/35216064545
+wrapper_markers_begin
+wrapper_markers_end
+canonical_run_id=NONE
