@@ -1,20 +1,23 @@
 name: market-maker-radar
 
-# Zero-authority Layer B hard-market diagnostic. This workflow consumes both the
-# append-only paid closing-line archive and the direct-public NFL radar lane.
-# It never grants Model_P, Truth Gate, promotion, eligibility, staking or OFFICIAL
-# authority.
+# Zero-authority Layer B hard-market diagnostic. This workflow consumes the
+# append-only paid closing-line archive, the direct-public NFL radar lane, and
+# provenance-bound 4C line-history imports. It never grants Model_P, Truth Gate,
+# promotion, eligibility, staking or OFFICIAL authority.
 
 on:
   pull_request:
     paths:
       - 'scripts/analyze_market_maker_radar.py'
       - 'scripts/capture_nfl_market_maker_radar.py'
+      - 'scripts/import_fourc_line_history.py'
       - 'config/market_maker_radar_v1.json'
       - 'config/closing_line_archive_policy_v1.json'
       - 'config/football_public_splits_v1.json'
+      - 'docs/market_maker_radar.md'
       - 'tests/test_market_maker_radar.py'
       - 'tests/test_capture_nfl_market_maker_radar.py'
+      - 'tests/test_import_fourc_line_history.py'
       - '.github/workflows/market-maker-radar.yml'
       - '.github/workflows/nfl-market-maker-radar-capture.yml'
   workflow_dispatch:
@@ -38,6 +41,7 @@ jobs:
         run: |
           python -m unittest tests.test_market_maker_radar -v
           python -m unittest tests.test_capture_nfl_market_maker_radar -v
+          python -m unittest tests.test_import_fourc_line_history -v
 
   analyze:
     if: github.event_name != 'pull_request'
@@ -61,7 +65,10 @@ jobs:
             git fetch --depth=1 origin data:data
             git worktree add .data-branch data
           else
-            mkdir -p .data-branch/archive/closing-lines .data-branch/archive/market-maker-radar/nfl
+            mkdir -p \
+              .data-branch/archive/closing-lines \
+              .data-branch/archive/market-maker-radar/nfl \
+              .data-branch/archive/market-maker-radar/fourc
           fi
 
       - name: Analyze recent price leadership and stale soft-book offers
@@ -72,7 +79,8 @@ jobs:
           ARGS=()
           for ROOT in \
             .data-branch/archive/closing-lines \
-            .data-branch/archive/market-maker-radar/nfl
+            .data-branch/archive/market-maker-radar/nfl \
+            .data-branch/archive/market-maker-radar/fourc
           do
             if [[ -d "$ROOT" ]]; then
               while IFS= read -r FILE; do
