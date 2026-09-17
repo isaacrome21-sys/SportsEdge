@@ -1,0 +1,69 @@
+name: patch-mlb-798-inventory-once
+
+on:
+  push:
+    branches:
+      - feat/mlb-38-market-replay-full
+    paths:
+      - .github/workflows/patch-mlb-798-inventory-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12.14'
+      - name: Add exact no-authority inventory exemptions
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('config/freeze_inventory_policy_v1.json')
+          data = json.loads(path.read_text(encoding='utf-8'))
+          assert data['schema'] == 'SPORTSEDGE_FREEZE_INVENTORY_POLICY_V1'
+          assert data['status'] == 'ACTIVE_FAIL_CLOSED'
+          assert data['scanner_contract']['candidate_total_floor'] == 317
+          assert data['rules']['exemptions_must_be_exact_paths'] is True
+          assert data['rules']['wildcard_exemptions_forbidden'] is True
+          assert data['rules']['every_candidate_must_be_bundle_mapped_or_exactly_exempt'] is True
+          assert all(value is False for value in data['authority'].values())
+
+          additions = {
+              'scripts/mlb_38_market_replay.py': 'MLB_38_MARKET_REPLAY_ORCHESTRATION_ONLY_FROZEN_POLICY_BOUND_NO_MODEL_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY',
+              'scripts/mlb_build_historical_request_plan.py': 'MLB_HISTORICAL_REQUEST_PLANNING_ONLY_NO_NETWORK_MODEL_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY',
+              'sportsedge/sports/mlb/historical_event_request_plan.py': 'MLB_HISTORICAL_REQUEST_DESCRIPTOR_PLANNING_ONLY_NO_CREDENTIAL_NETWORK_MODEL_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY',
+              'sportsedge/sports/mlb/historical_event_snapshot_ingest.py': 'MLB_HISTORICAL_PROVIDER_SNAPSHOT_INGEST_AND_SHA_BINDING_ONLY_NO_MODEL_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY',
+              'sportsedge/sports/mlb/provider_market_catalog.py': 'MLB_PROVIDER_MARKET_SEMANTIC_COVERAGE_MAP_ONLY_NO_MODEL_P_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY',
+              'sportsedge/sports/mlb/the_odds_api_materializer.py': 'MLB_PROVIDER_QUOTE_MATERIALIZATION_ONLY_NO_MODEL_P_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY',
+          }
+          exact = data['exact_exemptions']
+          for key, value in additions.items():
+              prior = exact.get(key)
+              assert prior in (None, value), f'conflicting exemption for {key}: {prior!r}'
+              exact[key] = value
+
+          assert all('*' not in key for key in exact)
+          assert all(value is False for value in data['authority'].values())
+          path.write_text(json.dumps(data, indent=2, sort_keys=False) + '\n', encoding='utf-8')
+          PY
+      - name: Commit exact-scope policy update
+        shell: bash
+        run: |
+          git config user.name 'sportsedge-governance-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add config/freeze_inventory_policy_v1.json
+          if git diff --cached --quiet; then
+            echo 'No policy delta required'
+            exit 0
+          fi
+          git commit -m 'Governance: classify MLB replay inventory surfaces'
+          git push origin HEAD:feat/mlb-38-market-replay-full
