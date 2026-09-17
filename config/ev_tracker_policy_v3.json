@@ -1,0 +1,56 @@
+{
+  "policy_id": "EV_TRACKER_POLICY_V3",
+  "supersedes": "EV_TRACKER_POLICY_V2",
+  "lane": "EXTERNAL_EV",
+  "evidence_ref": "refs/heads/main",
+  "activation": "Prospective only. V3 starts at n=0 at the first record written on evidence_ref with this policy_id. V1/V2 records and misses remain immutable under their original policy hashes and are never migrated, recomputed, deleted, or reclassified.",
+  "authority_boundaries": {
+    "creates_model_p": false,
+    "truth_gate_authority": false,
+    "promotion_authority": false,
+    "staking_authority": false,
+    "official_authority": false
+  },
+  "suspension": {
+    "states": ["ACTIVE", "SUSPENDED", "RECOVERING"],
+    "machine_derived_only": true,
+    "human_toggle_allowed": false,
+    "outcome_blind": true,
+    "forbidden_inputs": ["realized_result", "realized_clv", "roi", "win_loss", "grading_state"],
+    "eligible_lane_types": ["AUTOMATED_PROVIDER"],
+    "manual_lane_can_suspend": false,
+    "provider_failure_codes": ["ODDS_API_UNAUTHORIZED", "ODDS_API_FORBIDDEN", "ODDS_API_HTTP_5XX", "ODDS_API_UNREACHABLE", "ODDS_API_TIMEOUT"],
+    "non_outage_codes": ["BUDGET_RESERVE_REACHED", "CREDITS_EXHAUSTED", "MANUAL_MISSED", "USER_DELAY"],
+    "trigger": {
+      "bounded_window_minutes": 30,
+      "min_distinct_events": 2,
+      "credential_scope": "ALL_CONFIGURED_SLOTS",
+      "require_provider_class_failure": true
+    },
+    "admission_while_suspended": "REFUSE_EVIDENCE_ADMISSION",
+    "recovery": {
+      "required_consecutive_successful_slates": 3,
+      "capture_disposition": "NOT_EVIDENCE",
+      "success_requires_two_sided_admissible_close": true,
+      "reset_streak_on_failure": true
+    },
+    "ledger": {
+      "append_only": true,
+      "transition_inputs": "ATTEMPT_RECORDS_ONLY",
+      "transition_record_requires": ["from_state", "to_state", "effective_at", "reason_code", "policy_id", "policy_sha256", "prior_policy_id", "prior_policy_sha256"],
+      "pre_suspension_records_immutable": true
+    }
+  },
+  "credential_health": {
+    "unauthorized_codes": ["ODDS_API_UNAUTHORIZED", "ODDS_API_FORBIDDEN"],
+    "zero_credits_is_healthy": false,
+    "dead_or_exhausted_slot_is_healthy": false,
+    "pre_window_alarm": true,
+    "alarm_creates_evidence": false
+  },
+  "budget": {
+    "reserve_credits": 40,
+    "reserve_reached_is_provider_outage": false
+  },
+  "doctrine": "Suspension is a prospective, machine-evaluated acquisition-health state, never a discretionary pause. It cannot excuse budget exhaustion, manual non-delivery, or any miss that was already due before the transition boundary. Recovery observations are NOT_EVIDENCE."
+}
