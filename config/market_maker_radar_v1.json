@@ -1,8 +1,8 @@
 {
   "policy_id": "MARKET_MAKER_RADAR_V1",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "status": "ACTIVE_LAYER_B_HARD_MARKET",
-  "description": "Price-only market-maker lead/lag and stale-soft-book radar. Price leadership is the primary signal. Public splits, RLM labels, capper opinion, and unverified sharp-action labels cannot create a signal.",
+  "description": "Price-only market-maker lead/lag and stale-soft-book radar with isolated 4C line-history corroboration. Price leadership is the primary signal. Public splits, RLM labels, capper opinion, and unverified sharp-action labels cannot create a signal.",
   "model_free": true,
   "evidence_class": "LAYER_B_HARD_MARKET_DIAGNOSTIC",
   "authority": {
@@ -16,8 +16,8 @@
     "alert_authority": true
   },
   "books": {
-    "market_makers": ["pinnacle"],
-    "soft_books": ["draftkings", "fanduel"],
+    "market_makers": ["pinnacle", "fourc_pinnacle"],
+    "soft_books": ["draftkings", "fanduel", "fourc_draftkings", "fourc_fanduel"],
     "provider_required": ["circa"]
   },
   "markets": ["h2h", "spreads", "totals"],
@@ -66,11 +66,33 @@
     "wallet_or_capper_label_is_insufficient": true,
     "model_input_authority": false
   },
+  "external_line_history": {
+    "fourc": {
+      "source_class": "FOURC_LINE_HISTORY_V1",
+      "site_url": "https://www.4codds.com/",
+      "role": "INDEPENDENT_AGGREGATOR_CORROBORATION_ONLY",
+      "transport_status": "PROVENANCE_BOUND_CAPSULE_IMPORT_ONLY",
+      "automated_scraping": false,
+      "documented_public_api_bound": false,
+      "book_namespace": "fourc_",
+      "books": ["fourc_pinnacle", "fourc_draftkings", "fourc_fanduel"],
+      "provider_quote_timestamp_authority": false,
+      "displayed_move_time_semantics": "AGGREGATOR_OBSERVATION_TIME",
+      "native_sportsbook_identity_authority": false,
+      "draftkings_evidence_authority": false,
+      "truth_gate_input": false,
+      "promotion_authority": false,
+      "official_authority": false,
+      "never_blend_with_native_source_families": true
+    }
+  },
   "grading": {
     "primary_metric": "CLV",
     "source_family_ids": {
       "pinnacle_to_draftkings": "PINNACLE_TO_DRAFTKINGS_LEAD_LAG_V1",
-      "pinnacle_to_fanduel": "PINNACLE_TO_FANDUEL_LEAD_LAG_V1"
+      "pinnacle_to_fanduel": "PINNACLE_TO_FANDUEL_LEAD_LAG_V1",
+      "fourc_pinnacle_to_fourc_draftkings": "FOURC_PINNACLE_TO_DRAFTKINGS_LEAD_LAG_V1",
+      "fourc_pinnacle_to_fourc_fanduel": "FOURC_PINNACLE_TO_FANDUEL_LEAD_LAG_V1"
     },
     "never_blend_source_families": true,
     "minimum_n_for_claim": 100,
