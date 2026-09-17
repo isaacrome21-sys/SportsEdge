@@ -1,0 +1,40 @@
+{
+  "schema_version": "MLB_PUBLIC_REPO_ADOPTIONS_V1",
+  "sport": "MLB",
+  "status": "ENGINEERING_REFERENCE_ONLY",
+  "authority": {
+    "predictive_model_input": false,
+    "model_p_authority": false,
+    "truth_gate_input": false,
+    "promotion_authority": false,
+    "eligibility_authority": false,
+    "edge_floor_authority": false,
+    "official_authority": false,
+    "evidence_transfer": false
+  },
+  "adoptions": [
+    {
+      "source_repository": "zero-sum-seattle/python-mlb-statsapi",
+      "source_commit": "40bc78e66c372e62a99289c11bdc95173684934f",
+      "license": "MIT",
+      "source_files_consulted": [
+        "mlbstatsapi/models/game/livedata/linescore/linescore.py",
+        "mlbstatsapi/models/game/livedata/linescore/attributes.py"
+      ],
+      "adopted_pattern": "MLB StatsAPI linescore is represented as ordered inning objects with separate home and away run values; SportsEdge independently parses that public provider shape to construct strict-prior first-five run histories.",
+      "local_files": [
+        "sportsedge/mlb_generic_features.py",
+        "tests/test_mlb_generic_f5_features.py"
+      ],
+      "copy_mode": "INDEPENDENT_REIMPLEMENTATION_FROM_PUBLIC_PROVIDER_DATA_SHAPE",
+      "forbidden_interpretation": "The public repository supplies no SportsEdge prediction, fitted coefficient, calibration result, historical quote evidence, forward result, deployment parity proof, market eligibility, or OFFICIAL authority."
+    }
+  ],
+  "governance": {
+    "may_change_market_eligibility": false,
+    "may_satisfy_paired_market_evidence": false,
+    "may_create_model_p_by_adoption": false,
+    "requires_sportsedge_validation_after_implementation_change": true,
+    "notes": "The local F5 change repairs an implementation mismatch with the already-declared SportsEdge F5 distribution contract. Promotion remains separately gated."
+  }
+}

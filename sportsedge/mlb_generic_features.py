@@ -1,7 +1,7 @@
 """Chronological native feature builder for expanded MLB shadow markets."""
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import hashlib
 import json
 from math import exp, isfinite
@@ -10,7 +10,7 @@ from typing import Any, Callable, Mapping
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-GENERIC_FEATURE_VERSION = "mlb_generic_feature_v1"
+GENERIC_FEATURE_VERSION = "mlb_generic_feature_v2"
 PLAYER_COUNT_MARKETS = frozenset({
     "HOME_RUNS", "RBI", "RUNS", "HITS_RUNS_RBIS", "SINGLES", "DOUBLES", "TRIPLES",
     "BATTER_BB", "BATTER_K", "STOLEN_BASES", "PITCHER_K", "PITCHER_HITS_ALLOWED",
@@ -18,7 +18,8 @@ PLAYER_COUNT_MARKETS = frozenset({
 })
 PA_BOUNDED_BATTER_MARKETS = frozenset({"BATTER_K", "BATTER_BB", "SINGLES", "DOUBLES"})
 BINARY_MARKETS = frozenset({"PITCHER_RECORD_WIN", "FIRST_HOME_RUN"})
-GAME_MARKETS = frozenset({"MONEYLINE", "RUN_LINE", "TOTALS", "NRFI", "YRFI", "F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS"})
+GAME_MARKETS = frozenset({"MONEYLINE", "RUN_LINE", "TOTALS", "NRFI", "YRFI", "F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS", "F5_TEAM_TOTALS"})
+F5_MARKETS = frozenset({"F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS", "F5_TEAM_TOTALS"})
 
 BATTER_STAT_KEYS = {
     "HOME_RUNS": "homeRuns", "RBI": "rbi", "RUNS": "runs", "DOUBLES": "doubles",
@@ -58,6 +59,17 @@ def _number(value: Any, field: str) -> float:
     if not isfinite(out):
         raise MLBGenericFeatureError(f"{field}: nonfinite")
     return out
+
+def _nonnegative_integer(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not isfinite(numeric) or numeric < 0 or numeric != int(numeric):
+        return None
+    return int(numeric)
 
 def _outs_from_ip(value: Any) -> float:
     text = str(value).strip()
@@ -99,12 +111,66 @@ def _splits(payload: Mapping[str, Any], *, target_date: date) -> list[Mapping[st
     rows.sort(key=lambda x: x["date"])
     return rows
 
+def _schedule_games(payload: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    games: list[Mapping[str, Any]] = []
+    dates = payload.get("dates")
+    if not isinstance(dates, list):
+        return games
+    for day in dates:
+        if not isinstance(day, Mapping):
+            continue
+        for game in day.get("games") or []:
+            if isinstance(game, Mapping):
+                games.append(game)
+    games.sort(key=lambda game: (str(game.get("gameDate") or game.get("officialDate") or ""), str(game.get("gamePk") or "")))
+    return games
+
+def _first_five_score(game: Mapping[str, Any]) -> tuple[int, int] | None:
+    """Return (away, home) runs through five complete innings or None.
+
+    The schedule endpoint's hydrated linescore exposes inning objects with separate
+    away/home run counts. Requiring all innings 1..5 prevents final-score scaling,
+    partial-game leakage, and silent substitution when a linescore is incomplete.
+    """
+    status = game.get("status")
+    if isinstance(status, Mapping) and str(status.get("abstractGameState") or "").lower() != "final":
+        return None
+    linescore = game.get("linescore")
+    if not isinstance(linescore, Mapping):
+        return None
+    innings = linescore.get("innings")
+    if not isinstance(innings, list):
+        return None
+    first_five: dict[int, tuple[int, int]] = {}
+    for inning in innings:
+        if not isinstance(inning, Mapping):
+            continue
+        number = _nonnegative_integer(inning.get("num"))
+        if number is None or number < 1 or number > 5 or number in first_five:
+            continue
+        away = inning.get("away")
+        home = inning.get("home")
+        if not isinstance(away, Mapping) or not isinstance(home, Mapping):
+            return None
+        away_runs = _nonnegative_integer(away.get("runs"))
+        home_runs = _nonnegative_integer(home.get("runs"))
+        if away_runs is None or home_runs is None:
+            return None
+        first_five[number] = (away_runs, home_runs)
+    if set(first_five) != {1, 2, 3, 4, 5}:
+        return None
+    return (
+        sum(first_five[inning][0] for inning in range(1, 6)),
+        sum(first_five[inning][1] for inning in range(1, 6)),
+    )
+
 class MLBGenericHistorySource:
     def __init__(self, *, opener: Callable = urlopen, retrieved_at: datetime | None = None):
         self.opener = opener
         self.retrieved_at = (retrieved_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
         self._player_cache: dict[tuple[int, str, int], Mapping[str, Any]] = {}
         self._team_cache: dict[tuple[int, int], Mapping[str, Any]] = {}
+        self._f5_cache: dict[tuple[int, date], tuple[tuple[int, int], ...]] = {}
 
     def _player_season(self, player_id: int, group: str, season: int) -> Mapping[str, Any]:
         key = (int(player_id), group, int(season))
@@ -119,6 +185,52 @@ class MLBGenericHistorySource:
             query = urlencode({"stats": "gameLog", "group": "hitting", "season": season, "gameType": "R"})
             self._team_cache[key] = _read_json(f"https://statsapi.mlb.com/api/v1/teams/{team_id}/stats?{query}", opener=self.opener)
         return self._team_cache[key]
+
+    def _team_f5_history(self, *, team_id: int, target_date: date) -> tuple[tuple[int, int], ...]:
+        key = (int(team_id), target_date)
+        if key not in self._f5_cache:
+            end_date = target_date - timedelta(days=1)
+            start_date = target_date - timedelta(days=370)
+            query = urlencode({
+                "sportId": 1,
+                "teamId": int(team_id),
+                "gameType": "R",
+                "startDate": start_date.isoformat(),
+                "endDate": end_date.isoformat(),
+                "hydrate": "linescore",
+            })
+            payload = _read_json(f"https://statsapi.mlb.com/api/v1/schedule?{query}", opener=self.opener)
+            rows: list[tuple[int, int]] = []
+            for game in _schedule_games(payload):
+                official_date = game.get("officialDate")
+                if official_date:
+                    try:
+                        if date.fromisoformat(str(official_date)[:10]) >= target_date:
+                            continue
+                    except ValueError:
+                        continue
+                score = _first_five_score(game)
+                if score is None:
+                    continue
+                teams = game.get("teams")
+                if not isinstance(teams, Mapping):
+                    continue
+                away = teams.get("away")
+                home = teams.get("home")
+                if not isinstance(away, Mapping) or not isinstance(home, Mapping):
+                    continue
+                away_team = away.get("team")
+                home_team = home.get("team")
+                if not isinstance(away_team, Mapping) or not isinstance(home_team, Mapping):
+                    continue
+                away_id = _nonnegative_integer(away_team.get("id"))
+                home_id = _nonnegative_integer(home_team.get("id"))
+                if int(team_id) == away_id:
+                    rows.append((score[0], score[1]))
+                elif int(team_id) == home_id:
+                    rows.append((score[1], score[0]))
+            self._f5_cache[key] = tuple(rows[-30:])
+        return self._f5_cache[key]
 
     def player_rows(self, *, player_id: int, group: str, target_date: date) -> list[Mapping[str, Any]]:
         rows: list[Mapping[str, Any]] = []
@@ -236,11 +348,16 @@ class MLBGenericHistorySource:
             _, _, game_hr = self.team_means(away_team_id=away_team_id, home_team_id=home_team_id, target_date=target_date)
             base["event_probability"] = 0.0 if game_hr <= 0 else min(1.0, max(0.0, (player_hr / game_hr) * (1.0 - exp(-game_hr))))
         elif market in GAME_MARKETS:
-            away_runs, home_runs, _ = self.team_means(away_team_id=away_team_id, home_team_id=home_team_id, target_date=target_date)
-            if market.startswith("F5_"):
-                base["f5_away_mean_runs"] = away_runs * (5.0 / 9.0)
-                base["f5_home_mean_runs"] = home_runs * (5.0 / 9.0)
+            if market in F5_MARKETS:
+                away_history = self._team_f5_history(team_id=away_team_id, target_date=target_date)
+                home_history = self._team_f5_history(team_id=home_team_id, target_date=target_date)
+                base["away_f5_runs_for"] = [row[0] for row in away_history]
+                base["away_f5_runs_against"] = [row[1] for row in away_history]
+                base["home_f5_runs_for"] = [row[0] for row in home_history]
+                base["home_f5_runs_against"] = [row[1] for row in home_history]
+                base["source"] = "MLB_STATSAPI_STRICT_PRIOR_F5_LINESCORE"
             else:
+                away_runs, home_runs, _ = self.team_means(away_team_id=away_team_id, home_team_id=home_team_id, target_date=target_date)
                 base["away_mean_runs"] = away_runs
                 base["home_mean_runs"] = home_runs
         else:
