@@ -10,7 +10,7 @@ on:
     paths:
       - 'scripts/analyze_market_maker_radar.py'
       - 'scripts/capture_nfl_market_maker_radar.py'
-      - 'scripts/import_fourc_line_history.py'
+      - 'scripts/capture_market_maker_fourc_line_history.py'
       - 'config/market_maker_radar_v1.json'
       - 'config/closing_line_archive_policy_v1.json'
       - 'config/football_public_splits_v1.json'
