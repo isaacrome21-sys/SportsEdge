@@ -5,16 +5,16 @@ on:
   push:
     branches: [main]
   workflow_run:
-    # Operational fallback: the MLB PIT archive has a proven in-season
-    # 15-minute scheduled cadence. This trigger transfers no model, promotion,
-    # staking, or OFFICIAL authority; the evidence workflow still checks out main
-    # and enforces its own fail-closed contracts.
+    # Operational heartbeat fallbacks transfer no model, promotion, staking, or
+    # OFFICIAL authority. The MLB context refresher is already scheduled every
+    # 15 minutes during MLB game hours; this workflow bridges each completion
+    # into three prospective observations roughly five minutes apart. The PIT
+    # starter archive remains an additional one-shot fallback.
     workflows:
+      - mlb-game-context-refresh
       - mlb-pit-lineup-starter-archive
     types:
       - completed
-  schedule:
-    - cron: '*/5 * * * *'
 
 permissions:
   contents: write
@@ -26,7 +26,7 @@ concurrency:
 jobs:
   capture:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 25
     env:
       PYTHONPATH: .
     steps:
@@ -139,6 +139,57 @@ jobs:
           echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
           exit 0
 
+      - name: Bridge 15-minute MLB context heartbeat into 5-minute evidence cadence
+        id: bridge
+        if: >-
+          github.event_name == 'workflow_run' &&
+          github.event.workflow_run.name == 'mlb-game-context-refresh' &&
+          steps.modelp.outputs.exit_code == '0' &&
+          steps.quotes.outputs.exit_code == '0' &&
+          steps.decisions.outputs.exit_code == '0' &&
+          steps.persist.outputs.exit_code == '0'
+        shell: bash
+        run: |
+          set -u
+          day='${{ steps.day.outputs.date }}'
+          final_rc=0
+          for round in 2 3; do
+            sleep 300
+            echo "forward_evidence_bridge_round=$round"
+
+            set +e
+            set -o pipefail
+            python scripts/capture_mlb_moneyline_model_p.py \
+              --output-dir data/mlb_forward_predictions | tee "bridge_${round}_model_p_result.json"
+            model_rc=${PIPESTATUS[0]}
+
+            python scripts/capture_mlb_direct_paired_ml.py \
+              --output-dir data/mlb_forward_capture | tee "bridge_${round}_quote_result.json"
+            quote_rc=${PIPESTATUS[0]}
+
+            python scripts/capture_mlb_moneyline_paper_decisions.py \
+              --prediction-root data/mlb_forward_predictions \
+              --quote-root data/mlb_forward_capture \
+              --decision-root data/mlb_forward_decisions | tee "bridge_${round}_decision_result.json"
+            decision_rc=${PIPESTATUS[0]}
+
+            python scripts/persist_forward_evidence_data_branch.py \
+              --path "data/mlb_forward_predictions/$day" \
+              --path "data/mlb_forward_capture/$day" \
+              --path "data/mlb_forward_decisions/$day" \
+              --branch data \
+              --worktree "$RUNNER_TEMP/sportsedge-mlb-forward-data" | tee "bridge_${round}_persistence_result.json"
+            persist_rc=${PIPESTATUS[0]}
+            set -e
+
+            if [ "$model_rc" -ne 0 ] || [ "$quote_rc" -ne 0 ] || [ "$decision_rc" -ne 0 ] || [ "$persist_rc" -ne 0 ]; then
+              final_rc=2
+              break
+            fi
+          done
+          echo "exit_code=$final_rc" >> "$GITHUB_OUTPUT"
+          exit "$final_rc"
+
       - name: Upload prospective evidence receipts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -149,6 +200,10 @@ jobs:
             quote_result.json
             decision_result.json
             persistence_result.json
+            bridge_*_model_p_result.json
+            bridge_*_quote_result.json
+            bridge_*_decision_result.json
+            bridge_*_persistence_result.json
             data/mlb_forward_predictions/${{ steps.day.outputs.date }}/**
             data/mlb_forward_capture/${{ steps.day.outputs.date }}/**
             data/mlb_forward_decisions/${{ steps.day.outputs.date }}/**
@@ -163,7 +218,11 @@ jobs:
           quote_rc='${{ steps.quotes.outputs.exit_code }}'
           decision_rc='${{ steps.decisions.outputs.exit_code }}'
           persist_rc='${{ steps.persist.outputs.exit_code }}'
+          bridge_rc='${{ steps.bridge.outputs.exit_code }}'
           test -n "$model_rc" && test "$model_rc" -eq 0
           test -n "$quote_rc" && test "$quote_rc" -eq 0
           test -n "$decision_rc" && test "$decision_rc" -eq 0
           test -n "$persist_rc" && test "$persist_rc" -eq 0
+          if [ -n "$bridge_rc" ]; then
+            test "$bridge_rc" -eq 0
+          fi
