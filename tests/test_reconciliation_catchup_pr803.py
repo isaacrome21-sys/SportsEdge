@@ -22,14 +22,12 @@ def _covered(bundle: dict, path: str) -> bool:
     return any(path.startswith(prefix) for prefix in (bundle.get("coverage_prefixes") or []))
 
 
-def test_reconciliation_boundary_advances_through_pr803_in_first_parent_order() -> None:
+def test_reconciliation_history_contains_pr803_after_pr806_in_first_parent_order() -> None:
     registry = json.loads(Path("config/freeze_reconciliation_registry_v1.json").read_text())
-    assert registry["reconciled_through_sha"] == PR_803
-    tail = registry["deltas"][-2:]
-    assert [(row["pr"], row["merge_sha"]) for row in tail] == [
-        (806, PR_806),
-        (803, PR_803),
-    ]
+    sequence = [(row["pr"], row["merge_sha"]) for row in registry["deltas"]]
+    idx = sequence.index((803, PR_803))
+    assert idx > 0
+    assert sequence[idx - 1] == (806, PR_806)
 
 
 def test_pr803_governed_market_radar_surfaces_are_covered() -> None:
