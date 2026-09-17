@@ -6,6 +6,8 @@ on:
       - fix/reconcile-through-pr815-20260917
     paths:
       - '.github/workflows/tmp-reconcile-through-pr815.yml'
+      - 'tests/test_reconciliation_catchup_pr803.py'
+      - 'tests/test_reconciliation_catchup_pr791.py'
 
 permissions:
   contents: write
