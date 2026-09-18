@@ -11,7 +11,7 @@ from sportsedge.governance.reconciliation_content_identity import boundary_match
 OLD_BOUNDARY = "f8afb5c5e3251b6ede8a39ef25c47fdd07dfb7ee"
 PRE_791 = "6aa3edfa33e13e0b81d57586e1600ec5b5d17ccb"
 PR_791 = "9a4f81a6a2a2eaf3c77c1ff9f0510f99a3a3a170"
-REFREEZE_SHA = "f397573c06ede6310ae9d1ba932ed67dbedb38ad"
+REFREEZE_SHA = "eea6bf836e88239df92eacfb2bfcc522ae7e77e0"
 
 
 def test_intervening_reconciliation_merge_before_pr791_is_governed_content_neutral() -> None:
@@ -39,7 +39,7 @@ def test_pr791_candidate_prereg_is_machine_verified_refrozen_at_current_main_bou
     assert disposition["trigger_delta_sha"] == PR_791
     assert disposition["new_bundle_id"] == "CFB_CANDIDATE_PREREG_FREEZE_V2"
     assert disposition["new_freeze_sha"] == REFREEZE_SHA
-    assert disposition["forward_clock_restart_at"] == "2026-09-17T12:46:52Z"
+    assert disposition["forward_clock_restart_at"] == "2026-09-18T03:25:11Z"
     assert disposition["row_admissibility_semantics"] == "PREREGISTRATION_ONLY_NO_EVALUATION_ROWS_V1"
     assert disposition["selection_scope_only"] is True
     assert all(value is False for value in disposition["authority"].values())
