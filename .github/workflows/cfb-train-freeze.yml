@@ -12,7 +12,10 @@ on:
       - 'sportsedge/sports/cfb/candidate_live_source.py'
       - 'sportsedge/sports/cfb/selected_candidate_model.py'
       - 'sportsedge/sports/cfb/selected_candidate_artifact.py'
+      - 'sportsedge/sports/cfb/selected_candidate_runtime.py'
+      - 'sportsedge/sports/cfb/run_machine.py'
       - 'tests/test_cfb_selected_candidate_serving.py'
+      - 'tests/test_cfb_selected_candidate_runtime.py'
       - 'tests/test_cfb_train_freeze_contract.py'
       - 'config/cfb_model_selection_policy_v1.json'
       - 'config/cfb_model_candidate_prereg_v1.json'
@@ -45,12 +48,14 @@ jobs:
             sportsedge/sports/cfb/reconstructed_selection.py \
             sportsedge/sports/cfb/candidate_live_source.py \
             sportsedge/sports/cfb/selected_candidate_model.py \
-            sportsedge/sports/cfb/selected_candidate_artifact.py
+            sportsedge/sports/cfb/selected_candidate_artifact.py \
+            sportsedge/sports/cfb/selected_candidate_runtime.py
           python -m unittest \
             tests.test_cfb_reconstructed_selection_preflight \
             tests.test_cfb_reconstructed_selection_acquisition \
             tests.test_cfb_reconstructed_selection_materializer \
             tests.test_cfb_selected_candidate_serving \
+            tests.test_cfb_selected_candidate_runtime \
             tests.test_cfb_train_freeze_contract
       - name: Prove frozen selection policy is still unspent
         run: |
@@ -108,7 +113,7 @@ jobs:
       - name: Stop before candidate evaluation until selected-candidate serving contract is merged
         run: |
           echo 'CFB_TRAIN_FREEZE_BLOCKED reason=SELECTED_CANDIDATE_SERVING_CONTRACT_NOT_YET_MERGED'
-          echo 'Historical evaluator exists, but production artifact/runtime cannot yet faithfully serve every frozen candidate family.'
+          echo 'Historical evaluator exists, but production artifact/runtime must be merged on protected main before the first candidate evaluation.'
           echo 'No attempt consumed; no historical acquisition started.'
           exit 3
       - name: Upload redacted gate result
