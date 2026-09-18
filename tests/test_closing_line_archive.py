@@ -49,6 +49,13 @@ class PolicyTests(unittest.TestCase):
         self.assertFalse(POLICY["promotion_authority"])
         self.assertFalse(POLICY["evidence_clock_authority"])
 
+    def test_paid_archive_is_us_only_and_excludes_pinnacle(self):
+        self.assertEqual(POLICY["regions"], "us")
+        self.assertEqual(POLICY["books"], ["draftkings", "fanduel"])
+        self.assertNotIn("pinnacle", POLICY["books"])
+        self.assertNotIn("eu", {part.strip() for part in POLICY["regions"].split(",")})
+        self.assertEqual(POLICY["market_radar"]["market_maker_books"], [])
+
     def test_t0_prestart_is_all_sports_and_non_promoting(self):
         self.assertEqual(set(POLICY["sports"]), {"NFL", "CFB", "MLB", "UFC"})
         self.assertEqual(POLICY["sports"]["UFC"], "mma_mixed_martial_arts")
