@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import copy
+import json
+from pathlib import Path
+
 import pytest
 
 from scripts.reconcile_freeze_deltas import assert_refreeze_machine_verified
@@ -41,3 +45,35 @@ def test_revoked_disposition_remains_allowed() -> None:
         ]
     }
     assert_refreeze_machine_verified(registry)
+
+
+def test_registered_cfb_candidate_prereg_refreeze_is_machine_verified() -> None:
+    registry = json.loads(Path("config/freeze_reconciliation_registry_v1.json").read_text())
+    bundle = next(
+        row
+        for row in registry["bundles"]
+        if row["bundle_id"] == "CFB_CANDIDATE_PREREG_FREEZE_V1"
+    )
+    if (bundle.get("disposition") or {}).get("state") != "REFROZEN":
+        pytest.skip("candidate prereg refreeze not yet materialized on this branch")
+    assert_refreeze_machine_verified(registry)
+
+
+def test_cfb_candidate_prereg_refreeze_rejects_unbound_freeze_commit() -> None:
+    registry = json.loads(Path("config/freeze_reconciliation_registry_v1.json").read_text())
+    bundle = next(
+        row
+        for row in registry["bundles"]
+        if row["bundle_id"] == "CFB_CANDIDATE_PREREG_FREEZE_V1"
+    )
+    if (bundle.get("disposition") or {}).get("state") != "REFROZEN":
+        pytest.skip("candidate prereg refreeze not yet materialized on this branch")
+    bad = copy.deepcopy(registry)
+    bad_bundle = next(
+        row
+        for row in bad["bundles"]
+        if row["bundle_id"] == "CFB_CANDIDATE_PREREG_FREEZE_V1"
+    )
+    bad_bundle["disposition"]["new_freeze_sha"] = "1" * 40
+    with pytest.raises(SystemExit):
+        assert_refreeze_machine_verified(bad)
