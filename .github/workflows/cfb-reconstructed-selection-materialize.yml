@@ -1,0 +1,174 @@
+name: cfb-reconstructed-selection-materialize
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'config/cfb_cfbd_reconstructed_selection_budget_v1.json'
+      - 'scripts/preflight_cfb_reconstructed_selection.py'
+      - 'scripts/acquire_cfb_reconstructed_selection.py'
+      - 'scripts/materialize_cfb_reconstructed_selection.py'
+      - 'sportsedge/sports/cfb/reconstructed_selection.py'
+      - 'tests/test_cfb_reconstructed_selection_preflight.py'
+      - 'tests/test_cfb_reconstructed_selection_acquisition.py'
+      - 'tests/test_cfb_reconstructed_selection_materializer.py'
+      - '.github/workflows/cfb-reconstructed-selection-materialize.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: CFB reconstructed-selection materialization contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: '.python-version'
+
+      - name: Compile acquisition and materialization contracts
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            scripts/preflight_cfb_reconstructed_selection.py \
+            scripts/acquire_cfb_reconstructed_selection.py \
+            scripts/materialize_cfb_reconstructed_selection.py \
+            sportsedge/sports/cfb/reconstructed_selection.py
+
+      - name: Run reconstructed-selection contract tests
+        run: |
+          set -euo pipefail
+          python -m unittest \
+            tests.test_cfb_reconstructed_selection_preflight \
+            tests.test_cfb_reconstructed_selection_acquisition \
+            tests.test_cfb_reconstructed_selection_materializer
+
+  materialize:
+    name: CFB reconstructed-selection guarded materialization
+    if: github.event_name == 'workflow_dispatch'
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: '.python-version'
+
+      - name: Verify provider before first historical call
+        id: preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/cfb
+          python scripts/preflight_cfb_reconstructed_selection.py \
+            --private-out "$RUNNER_TEMP/cfb_cfbd_private_preflight.json" \
+            --public-out artifacts/cfb/cfbd_reconstructed_selection_preflight_public.json
+
+      - name: Record fail-closed blocked acquisition state
+        if: steps.preflight.outputs.state != 'VERIFIED_BEFORE_FIRST_REPLAY_CALL'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          preflight = json.loads(Path('artifacts/cfb/cfbd_reconstructed_selection_preflight_public.json').read_text())
+          report = {
+              'schema': 'CFB_RECONSTRUCTED_ACQUISITION_PUBLIC_V1',
+              'status': 'BLOCKED_BEFORE_HISTORICAL_ACQUISITION',
+              'preflight_status': preflight.get('status'),
+              'blockers': preflight.get('blockers') or ['PROVIDER_PREFLIGHT_NOT_VERIFIED'],
+              'historical_replay_calls_performed': 0,
+              'attempt_consumed': False,
+              'evaluation_performed': False,
+              'historical_pit_created': False,
+              'model_p_created': False,
+              'truth_gate_authority': False,
+              'promotion_authority': False,
+              'staking_authority': False,
+              'eligibility_changed': False,
+              'official_authority': False,
+              'backfill': False,
+          }
+          Path('artifacts/cfb/cfb_reconstructed_acquisition_public.json').write_text(
+              json.dumps(report, indent=2, sort_keys=True) + '\n'
+          )
+          print(json.dumps(report, sort_keys=True))
+          PY
+
+      - name: Acquire reconstructed inputs into runner-private cache
+        if: steps.preflight.outputs.state == 'VERIFIED_BEFORE_FIRST_REPLAY_CALL'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/acquire_cfb_reconstructed_selection.py \
+            --private-preflight "$RUNNER_TEMP/cfb_cfbd_private_preflight.json" \
+            --private-cache-root "$RUNNER_TEMP/cfb_reconstructed_cache" \
+            --private-payload-out "$RUNNER_TEMP/cfb_reconstructed_acquisition_payload.json" \
+            --public-attestation-out artifacts/cfb/cfb_reconstructed_acquisition_public.json
+
+      - name: Materialize hash-bound selection bundle without evaluation
+        if: steps.preflight.outputs.state == 'VERIFIED_BEFORE_FIRST_REPLAY_CALL'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/materialize_cfb_reconstructed_selection.py \
+            --private-input "$RUNNER_TEMP/cfb_reconstructed_acquisition_payload.json" \
+            --bundle-out artifacts/cfb/selection_bundle_manifest.json \
+            --source-manifest-out artifacts/cfb/reconstructed_source_manifest.json \
+            --private-rows-out "$RUNNER_TEMP/cfb_reconstructed_selection_rows.json"
+
+      - name: Assert public outputs contain zero authority and no raw provider rows
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          paths = [
+              Path('artifacts/cfb/cfbd_reconstructed_selection_preflight_public.json'),
+              Path('artifacts/cfb/cfb_reconstructed_acquisition_public.json'),
+              Path('artifacts/cfb/selection_bundle_manifest.json'),
+          ]
+          for path in paths:
+              if not path.is_file():
+                  continue
+              payload = json.loads(path.read_text())
+              for key in (
+                  'attempt_consumed', 'evaluation_performed', 'historical_pit_created',
+                  'model_p_created', 'truth_gate_authority', 'promotion_authority',
+                  'staking_authority', 'eligibility_changed', 'official_authority', 'backfill',
+              ):
+                  if key in payload and payload[key] is not False:
+                      raise SystemExit(f'CFB_RECONSTRUCTED_AUTHORITY_LEAK:{path}:{key}')
+              authority = payload.get('authority')
+              if isinstance(authority, dict) and any(value is not False for value in authority.values()):
+                  raise SystemExit(f'CFB_RECONSTRUCTED_AUTHORITY_MAP_LEAK:{path}')
+          if Path('artifacts/cfb/cfb_reconstructed_selection_rows.json').exists():
+              raise SystemExit('CFB_RECONSTRUCTED_RAW_ROWS_PUBLIC_PATH_FORBIDDEN')
+          print(json.dumps({'status': 'ZERO_AUTHORITY_PUBLIC_OUTPUTS_OK'}, sort_keys=True))
+          PY
+
+      - name: Upload public reconstructed-selection attestations only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cfb-reconstructed-selection-materialization-${{ github.sha }}
+          path: |
+            artifacts/cfb/cfbd_reconstructed_selection_preflight_public.json
+            artifacts/cfb/cfb_reconstructed_acquisition_public.json
+            artifacts/cfb/selection_bundle_manifest.json
+            artifacts/cfb/reconstructed_source_manifest.json
+          if-no-files-found: warn
+          retention-days: 30
