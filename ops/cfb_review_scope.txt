@@ -1,0 +1,1 @@
+Review scope: reconstructed selection + prereg refreeze + fail-closed train/freeze preflight.
