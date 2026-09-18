@@ -95,9 +95,10 @@ jobs:
               raise SystemExit('CFB_TRAIN_FREEZE_REPLAY_CALL_LEAK')
           print('CFB_TRAIN_FREEZE_PROVIDER_READY_ZERO_REPLAY_CALLS')
           PY
-      - name: Stop before candidate evaluation until serving-contract evaluator is merged
+      - name: Stop before candidate evaluation until selected-candidate serving contract is merged
         run: |
-          echo 'CFB_TRAIN_FREEZE_BLOCKED reason=SELECTED_CANDIDATE_SERVING_CONTRACT_EVALUATOR_NOT_YET_MERGED'
+          echo 'CFB_TRAIN_FREEZE_BLOCKED reason=SELECTED_CANDIDATE_SERVING_CONTRACT_NOT_YET_MERGED'
+          echo 'Historical evaluator exists, but production artifact/runtime cannot yet faithfully serve every frozen candidate family.'
           echo 'No attempt consumed; no historical acquisition started.'
           exit 3
       - name: Upload redacted gate result
