@@ -141,9 +141,12 @@ def run_auto_mlb_espn_game_odds(
         "reason": "ESPN_FALLBACK_SCOPED_TO_GAME_MARKETS; PLAYER_PROPS_NOT_ACQUIRED",
     }]
     return AutoRunReport(
-        report.slate_date_ct,
-        report.generated_at_utc,
-        report.run_status,
-        report.results,
-        tuple(acquisition_failures) + report.source_failures,
+        slate_date_ct=report.slate_date_ct,
+        generated_at_utc=report.generated_at_utc,
+        run_status=report.run_status,
+        card_status=report.card_status,
+        results=report.results,
+        coverage_slots=report.coverage_slots,
+        source_failures=tuple(acquisition_failures) + report.source_failures,
+        market_surface_version=report.market_surface_version,
     )
