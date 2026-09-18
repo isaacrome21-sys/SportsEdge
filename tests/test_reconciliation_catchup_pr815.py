@@ -22,6 +22,7 @@ POST_815 = [
     (823, '852b759b146beba64457a398b3b293eec8a17750'),
     (826, '374ffc70c7bfc2fae968ae4d506b2d325ec1ee5d'),
     (830, 'fc5fc8a7baa4daf2e82699972ee877bce3d869c6'),
+    (832, '6491cff72832f46ce926c3d3dd22aca4c3d455ed'),
 ]
 
 
@@ -36,7 +37,7 @@ def test_pr815_catchup_sequence_remains_history_stable() -> None:
     assert pairs[start:start + len(HISTORICAL_THROUGH_815)] == HISTORICAL_THROUGH_815
 
 
-def test_reconciliation_advances_through_pr830_in_first_parent_order() -> None:
+def test_reconciliation_advances_through_pr832_in_first_parent_order() -> None:
     registry = json.loads(Path('config/freeze_reconciliation_registry_v1.json').read_text())
     assert registry['reconciled_through_sha'] == POST_815[-1][1]
     assert _pairs(registry)[-len(POST_815):] == POST_815
