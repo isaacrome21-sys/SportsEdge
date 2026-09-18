@@ -9,8 +9,14 @@
     "games": 12,
     "fbs_membership": 11,
     "weather": 11,
-    "advanced_metrics": 210,
-    "total": 244
+    "advanced_metrics": 220,
+    "total": 254
+  },
+  "advanced_metrics_budget_basis": {
+    "selection_seasons": 11,
+    "pregame_current_snapshots_per_selection_season": 19,
+    "prior_season_fallback_snapshots": 11,
+    "formula": "11*19 + 11 = 220; weeks 2-20 use current-season endWeek 1-19 and week 1 requires an explicit immediately-prior-season snapshot, including 2014 for the 2015 fold"
   },
   "retry_reserve_calls": 50,
   "standard_tier_monthly_quotas": {
