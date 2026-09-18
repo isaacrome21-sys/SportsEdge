@@ -1,2 +1,0 @@
-base=main
-head=cfb-train-freeze-safe-20260918

@@ -1,1 +1,0 @@
-STOP before evaluation unless serving contract supports all four frozen candidates.

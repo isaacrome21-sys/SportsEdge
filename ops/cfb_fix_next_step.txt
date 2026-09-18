@@ -1,1 +1,0 @@
-NEXT: review/merge this pre-attempt repair, then add CFBD_API_KEY and run preflight. Do not consume candidate evaluation until serving contract supports every preregistered family.
