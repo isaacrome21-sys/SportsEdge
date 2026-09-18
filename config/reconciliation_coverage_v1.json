@@ -189,7 +189,9 @@
     "sportsedge/sports/nfl/defensive_context.py": "NFL_RUNTIME_CONTEXT_NO_ACTIVE_MODEL_BUNDLE",
     "sportsedge/sports/nfl/team_totals.py": "NFL_RUNTIME_MARKET_SURFACE_NO_ACTIVE_BUNDLE",
     "sportsedge/sports/nfl/venue_contract.py": "NFL_RUNTIME_CONTEXT_NO_ACTIVE_MODEL_BUNDLE",
-    "tests/test_cfb_reconstructed_selection_preflight.py": "TEST_ONLY_CFB_PROVIDER_PREFLIGHT_NO_RUNTIME_AUTHORITY"
+    "tests/test_cfb_reconstructed_selection_preflight.py": "TEST_ONLY_CFB_PROVIDER_PREFLIGHT_NO_RUNTIME_AUTHORITY",
+    "sportsedge/sports/cfb/reconstructed_selection_acquisition.py": "CFB_RECONSTRUCTED_SELECTION_ACQUISITION_CACHE_CONTRACT_ONLY_NO_NETWORK_MODEL_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY",
+    "tests/test_cfb_reconstructed_selection_acquisition.py": "TEST_ONLY_CFB_RECONSTRUCTED_SELECTION_ACQUISITION_CONTRACT_NO_RUNTIME_AUTHORITY"
   },
   "inventory_completion_claim": null,
   "bundle_dispositions": {
