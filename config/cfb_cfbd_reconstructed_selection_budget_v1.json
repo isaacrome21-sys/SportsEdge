@@ -1,6 +1,6 @@
 {
   "schema_version": "CFB_CFBD_RECONSTRUCTED_SELECTION_BUDGET_V1",
-  "purpose": "Verify the authenticated CFBD account and a conservative replay-call budget before any reconstructed historical selection acquisition begins.",
+  "purpose": "Verify the authenticated CFBD account and a conservative CFBD replay-call budget before reconstructed historical selection acquisition begins. Weather is reconstructed separately from CFBD venue metadata plus public Open-Meteo historical reanalysis and is never promotion/PIT evidence.",
   "selection_start_season": 2015,
   "selection_end_season": 2025,
   "prior_fallback_season": 2014,
@@ -8,15 +8,29 @@
   "planned_new_calls_upper_bound": {
     "games": 12,
     "fbs_membership": 11,
-    "weather": 11,
+    "venues": 1,
     "advanced_metrics": 220,
-    "total": 254
+    "cfbd_weather": 0,
+    "total": 244
   },
   "advanced_metrics_budget_basis": {
     "selection_seasons": 11,
     "pregame_current_snapshots_per_selection_season": 19,
     "prior_season_fallback_snapshots": 11,
     "formula": "11*19 + 11 = 220; weeks 2-20 use current-season endWeek 1-19 and week 1 requires an explicit immediately-prior-season snapshot, including 2014 for the 2015 fold"
+  },
+  "weather_reconstruction": {
+    "contract": "CFBD_VENUES_OPEN_METEO_ERA5_RECONSTRUCTED_CURRENT_PROVIDER_VINTAGE",
+    "venue_endpoint": "/venues",
+    "archive_endpoint": "https://archive-api.open-meteo.com/v1/archive",
+    "archive_model": "era5",
+    "hourly_variables": ["temperature_2m", "wind_speed_10m"],
+    "temperature_unit": "fahrenheit",
+    "wind_speed_unit": "mph",
+    "time_selection": "UTC_KICKOFF_HOUR_FLOOR_NO_INTERPOLATION",
+    "max_venues_per_archive_request": 20,
+    "provenance_class": "RECONSTRUCTED_HISTORICAL_NOT_PIT",
+    "promotion_authority": false
   },
   "retry_reserve_calls": 50,
   "standard_tier_monthly_quotas": {
@@ -37,10 +51,8 @@
     "5": "TIER_5",
     "6": "TIER_6"
   },
-  "weather_min_patron_level": 1,
   "account_info_endpoint": "/info",
   "advanced_endpoint": "/stats/season/advanced",
-  "weather_endpoint": "/games/weather",
   "tier_source": "https://collegefootballdata.com/api-tiers",
   "tier_source_checked_date": "2026-09-17",
   "rules": {
@@ -49,6 +61,9 @@
     "standard_tier_mapping_must_be_self_consistent": true,
     "call_plan_plus_retry_reserve_must_fit_remaining": true,
     "historical_replay_calls_performed_by_preflight": false,
+    "cfbd_paid_weather_entitlement_not_required_for_selection": true,
+    "weather_reconstruction_must_preserve_frozen_indoor_wind_temperature_features": true,
+    "weather_reconstruction_may_not_claim_historical_pit": true,
     "raw_cfbd_data_may_not_be_persisted_to_public_repository": true
   },
   "authority": {
