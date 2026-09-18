@@ -21,6 +21,7 @@ POST_815 = [
     (822, 'd17a66fe43cb7a6db7955c4e529bc59fd23a2a9f'),
     (823, '852b759b146beba64457a398b3b293eec8a17750'),
     (826, '374ffc70c7bfc2fae968ae4d506b2d325ec1ee5d'),
+    (830, 'fc5fc8a7baa4daf2e82699972ee877bce3d869c6'),
 ]
 
 
@@ -35,7 +36,7 @@ def test_pr815_catchup_sequence_remains_history_stable() -> None:
     assert pairs[start:start + len(HISTORICAL_THROUGH_815)] == HISTORICAL_THROUGH_815
 
 
-def test_reconciliation_advances_through_pr826_in_first_parent_order() -> None:
+def test_reconciliation_advances_through_pr830_in_first_parent_order() -> None:
     registry = json.loads(Path('config/freeze_reconciliation_registry_v1.json').read_text())
     assert registry['reconciled_through_sha'] == POST_815[-1][1]
     assert _pairs(registry)[-len(POST_815):] == POST_815
@@ -50,6 +51,8 @@ def test_candidate_prereg_bundle_remains_attempt_zero_and_zero_authority() -> No
         assert disposition['verification_schema'] == 'CFB_CANDIDATE_PREREG_REFREEZE_V1'
         assert disposition['selection_scope_only'] is True
         assert all(value is False for value in disposition['authority'].values())
+    else:
+        assert disposition['prior_forward_clock_invalidated'] is True
 
     prereg = json.loads(Path('config/cfb_model_candidate_prereg_v1.json').read_text())
     governance = prereg['governance']
