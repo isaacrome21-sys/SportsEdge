@@ -1,7 +1,7 @@
 {
   "schema_version": "RUN_IT_REQUEST_V1",
-  "request_id": "FULL_MODEL_20260918_RESUME_2",
+  "request_id": "FULL_MODEL_20260918_MLB_RECOVERY_3",
   "requested_at_utc": null,
   "action": "RUN",
-  "scope": "ALL"
+  "scope": "MLB"
 }
