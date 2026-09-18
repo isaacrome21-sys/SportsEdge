@@ -1,0 +1,91 @@
+name: cfb-post833-refreeze-bootstrap
+
+on:
+  push:
+    branches: [cfb-train-freeze-safe-20260918]
+    paths:
+      - '.github/workflows/cfb-post833-refreeze-bootstrap.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: cfb-train-freeze-safe-20260918
+          fetch-depth: 0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: '.python-version'
+
+      - name: Materialize verified post-833 prereg refreeze on current-main lineage
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('config/freeze_reconciliation_registry_v1.json')
+          registry = json.loads(path.read_text())
+          bundles = registry.get('bundles') or []
+          bundle = next((row for row in bundles if row.get('bundle_id') == 'CFB_CANDIDATE_PREREG_FREEZE_V1'), None)
+          if bundle is None:
+              raise SystemExit('CFB_CANDIDATE_PREREG_BUNDLE_MISSING')
+
+          bundle['disposition'] = {
+              'state': 'REFROZEN',
+              'verification_schema': 'CFB_CANDIDATE_PREREG_REFREEZE_V1',
+              'prior_bundle_freeze_sha': '4629afd60972fe73eb0217508dc7a4ae51ce6ccf',
+              'trigger_delta_sha': '4fc4aa9a60b69137a0efc4d7d59ccee95f53b0bb',
+              'new_bundle_id': 'CFB_CANDIDATE_PREREG_FREEZE_V3',
+              'new_freeze_sha': '529b06af94061a5eb86efd9909b15b62cefce938',
+              'forward_clock_restart_at': '2026-09-18T12:01:33Z',
+              'prior_forward_clock_invalidated': True,
+              'row_admissibility_semantics': 'PREREGISTRATION_ONLY_NO_EVALUATION_ROWS_V1',
+              'selection_scope_only': True,
+              'authority': {
+                  'eligibility': False,
+                  'model_p': False,
+                  'official': False,
+                  'promotion': False,
+                  'staking': False,
+                  'truth_gate': False,
+                  'validation_attempt': False,
+              },
+              'reason': 'MACHINE_VERIFIED_POST_PR833_WEEK1_CORRECTED_CANDIDATE_BYTES_AND_CODE_MANIFEST; PR833_IN_ANCESTRY; ZERO_ATTEMPTS; NO_EVALUATION_ROWS; REFROZEN_FAIL_CLOSED_FOR_SELECTION_SCOPE_ONLY',
+          }
+
+          deltas = registry.setdefault('deltas', [])
+          if not any(int(row.get('pr') or 0) == 843 for row in deltas if isinstance(row, dict)):
+              deltas.append({
+                  'delta_id': 'PR_843_ARCHIVE_RESERVE_DK_ONLY_NO_MLB',
+                  'merge_sha': '2dcd200a244a959c04c972ed652c5142804a6b18',
+                  'note': 'Registers the current-main PR #843 archive-spend guard after its PR #842 catch-up. No CFB candidate bytes changed and no model or betting authority is granted.',
+                  'pr': 843,
+              })
+          registry['reconciled_through_sha'] = '2dcd200a244a959c04c972ed652c5142804a6b18'
+          path.write_text(json.dumps(registry, sort_keys=True, separators=(',', ':')) + '\n')
+          PY
+
+      - name: Machine-verify refreeze semantics and current-main reconciliation
+        run: |
+          set -euo pipefail
+          python scripts/reconcile_freeze_deltas.py \
+            --repo . \
+            --current-main-ref origin/main \
+            --output artifacts/cfb/post833_refreeze_reconciliation.json
+
+      - name: Remove one-shot bootstrap and persist only durable changes
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/cfb-post833-refreeze-bootstrap.yml
+          git config user.name 'sportsedge-refreeze-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add config/freeze_reconciliation_registry_v1.json scripts/reconcile_freeze_deltas.py .github/workflows/cfb-post833-refreeze-bootstrap.yml
+          git commit -m 'CFB: clean-port machine-verified post-833 prereg refreeze'
+          git push origin HEAD:cfb-train-freeze-safe-20260918
