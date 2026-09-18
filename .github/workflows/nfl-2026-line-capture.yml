@@ -102,6 +102,17 @@ jobs:
             -o "$NFL_SCHEDULE_CSV"
           test -s "$NFL_SCHEDULE_CSV"
 
+      - name: Hydrate persisted confirmation evidence from data branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data
+          evidence_dir='data/nfl_2026_confirmation/captures'
+          if git cat-file -e "origin/data:${evidence_dir}" 2>/dev/null; then
+            rm -rf "$evidence_dir"
+            git archive origin/data "$evidence_dir" | tar -x
+          fi
+
       - name: Gate scheduled run to a frozen capture window using free schedule data
         if: github.event_name == 'schedule'
         id: due
@@ -322,21 +333,37 @@ jobs:
           fi
           python3 scripts/audit_nfl_2026_capture_gaps.py "${args[@]}"
 
-      - name: Commit captures and absence markers
+      - name: Persist captures and absence markers to data branch
         if: always() && (github.event_name == 'schedule' || (steps.run.outcome != 'skipped' && inputs.mode == 'capture'))
+        shell: bash
         run: |
+          set -euo pipefail
           DIR=data/nfl_2026_confirmation/captures
           [ -d "$DIR" ] || { echo "No capture directory yet"; exit 0; }
+          git fetch --depth=1 origin data
+          worktree_dir="$(mktemp -d)"
+          trap 'git worktree remove --force "$worktree_dir" >/dev/null 2>&1 || true; rm -rf "$worktree_dir"' EXIT
+          git worktree add --detach "$worktree_dir" origin/data
+          dest="$worktree_dir/$DIR"
+          mkdir -p "$dest"
+          cp -a "$DIR/." "$dest/"
+          cd "$worktree_dir"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "$DIR"
-          if git diff --cached --quiet; then echo "Nothing to commit"; exit 0; fi
+          if git diff --cached --quiet; then echo "Nothing to persist"; exit 0; fi
           git commit -m "NFL 2026 confirmation evidence (run $GITHUB_RUN_ID)"
           for i in 1 2 3; do
-            if git pull --rebase --quiet && git push --quiet; then exit 0; fi
+            git fetch --quiet origin data
+            if ! git rebase --quiet origin/data; then
+              git rebase --abort >/dev/null 2>&1 || true
+              sleep $((i * 5))
+              continue
+            fi
+            if git push --quiet origin HEAD:data; then exit 0; fi
             sleep $((i * 5))
           done
-          echo "PUSH_FAILED"
+          echo "NFL_CAPTURE_DATA_PERSIST_FAILED" >&2
           exit 1
 
       - name: Report blocked fallback provider
