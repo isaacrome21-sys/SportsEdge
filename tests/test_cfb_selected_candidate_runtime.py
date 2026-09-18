@@ -119,12 +119,12 @@ class TestCFBSelectedCandidateRuntime(unittest.TestCase):
             {
                 "game_id": "g1", "market": "MONEYLINE", "side": "HOME", "line": 0.0,
                 "american_odds": -110, "book_key": "draftkings", "sportsbook": "DraftKings",
-                "retrieved_at": "2026-09-18T14:55:00+00:00", "offer_id": "home",
+                "retrieved_at": "2026-09-18T14:59:00+00:00", "offer_id": "home",
             },
             {
                 "game_id": "g1", "market": "MONEYLINE", "side": "AWAY", "line": 0.0,
                 "american_odds": -110, "book_key": "draftkings", "sportsbook": "DraftKings",
-                "retrieved_at": "2026-09-18T14:55:00+00:00", "offer_id": "away",
+                "retrieved_at": "2026-09-18T14:59:00+00:00", "offer_id": "away",
             },
         ]
         report = run_selected_candidate_cfb_machine(
