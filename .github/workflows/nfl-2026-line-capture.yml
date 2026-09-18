@@ -10,24 +10,32 @@ on:
         default: check
   pull_request:
     paths:
+      - 'scripts/nfl_2026_line_capture.py'
       - 'scripts/audit_nfl_2026_capture_gaps.py'
       - 'scripts/stamp_nfl_2026_capture_quarantine.py'
       - 'scripts/odds_api_quota_guard.py'
       - 'scripts/nfl_2026_provider_preflight.py'
+      - 'scripts/nfl_direct_dk_preflight.py'
+      - 'sportsedge/nfl_direct_capture_source.py'
+      - 'sportsedge/draftkings_game_market_source.py'
+      - 'sportsedge/nfl_confirmation_schedule.py'
+      - 'tests/test_nfl_direct_capture_source.py'
+      - 'tests/test_nfl_2026_direct_capture_wiring.py'
+      - 'tests/test_nfl_confirmation_schedule.py'
+      - 'tests/test_nfl_direct_dk_preflight.py'
       - 'tests/test_nfl_2026_capture_gap_audit.py'
       - 'tests/test_nfl_2026_provider_budget.py'
       - 'config/nfl_2026_capture.json'
+      - 'config/nfl_research_search_policy_v1.json'
       - 'config/nfl_2026_capture_adjudication.json'
       - 'config/nfl_2026_provider_budget_v1.json'
+      - 'docs/nfl_direct_capture_source_contract_v1.md'
       - '.github/workflows/nfl-2026-line-capture.yml'
   # Frozen confirmation evidence is independent of the forward-CLV collector.
-  # Ten-minute polling is gated against the free nflverse schedule before the
-  # paid DraftKings capture path runs, so the 30..15 minute FINAL window gets a
-  # chance without spending odds-provider credits outside a frozen window.
+  # Ten-minute polling is gated against the free nflverse schedule. Direct
+  # DraftKings web JSON is primary; the paid provider is whole-source fallback.
+  # Split cron entries preserve scheduler-delay-safe hourly health identity.
   schedule:
-    # Keep the same ten-minute polling cadence as the frozen capture lane, but
-    # split the entries so github.event.schedule identifies the hourly health slot
-    # even when GitHub starts the runner several minutes late.
     - cron: '3 * * * *'
     - cron: '13 * * * *'
     - cron: '23 * * * *'
@@ -46,19 +54,53 @@ jobs:
   capture:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      NFL_SCHEDULE_CSV: ${{ runner.temp }}/nfl-games.csv
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
-      - name: Verify no-backfill and provider-budget contracts
+      - name: Verify capture, source binding, no-backfill, and provider contracts
         run: |
           python3 -m py_compile \
+            scripts/nfl_2026_line_capture.py \
             scripts/audit_nfl_2026_capture_gaps.py \
             scripts/stamp_nfl_2026_capture_quarantine.py \
             scripts/odds_api_quota_guard.py \
-            scripts/nfl_2026_provider_preflight.py
+            scripts/nfl_2026_provider_preflight.py \
+            scripts/nfl_direct_dk_preflight.py \
+            sportsedge/nfl_direct_capture_source.py \
+            sportsedge/draftkings_game_market_source.py \
+            sportsedge/nfl_confirmation_schedule.py
+          python3 - <<'PY'
+          import json, subprocess
+          from pathlib import Path
+          cfg = json.loads(Path('config/nfl_2026_capture.json').read_text())
+          bindings = cfg.get('source_code_bindings') or {}
+          if not bindings:
+              raise SystemExit('NFL_SOURCE_CODE_BINDINGS_MISSING')
+          for path, expected in sorted(bindings.items()):
+              actual = subprocess.check_output(['git', 'hash-object', path], text=True).strip()
+              if actual != expected:
+                  raise SystemExit(f'NFL_SOURCE_CODE_BINDING_MISMATCH:{path}:expected={expected}:actual={actual}')
+          print('NFL_SOURCE_CODE_BINDINGS_OK')
+          PY
           python3 -m unittest -q \
+            tests.test_nfl_direct_capture_source \
+            tests.test_nfl_2026_direct_capture_wiring \
+            tests.test_nfl_confirmation_schedule \
+            tests.test_nfl_direct_dk_preflight \
             tests.test_nfl_2026_capture_gap_audit \
             tests.test_nfl_2026_provider_budget
+
+      - name: Fetch NFL schedule snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error --retry 3 \
+            'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv' \
+            -o "$NFL_SCHEDULE_CSV"
+          test -s "$NFL_SCHEDULE_CSV"
 
       - name: Gate scheduled run to a frozen capture window using free schedule data
         if: github.event_name == 'schedule'
@@ -66,9 +108,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --location --silent --show-error --retry 3 \
-            'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv' \
-            -o "$RUNNER_TEMP/nfl-games.csv"
           python3 - <<'PY'
           import csv, json, os
           from collections import Counter
@@ -87,13 +126,27 @@ jobs:
                   return False
               if record.get('book') != cfg.get('bookmaker'):
                   return False
+              if record.get('source_class') not in cfg.get('source_priority', []):
+                  return False
               if not record.get('retrieved_at_utc'):
                   return False
               hashes = record.get('hashes')
               if not isinstance(hashes, dict) or not hashes:
                   return False
+              schedule = record.get('schedule')
+              if not isinstance(schedule, dict):
+                  return False
+              if schedule.get('matching_semantics') != 'KICKOFF_UTC_MULTIPLICITY' or not schedule.get('sha256'):
+                  return False
               games = record.get('games')
-              return isinstance(games, list) and bool(games)
+              if not isinstance(games, list) or not games:
+                  return False
+              for game in games:
+                  if game.get('spread', {}).get('status') != 'OK':
+                      return False
+                  if game.get('total', {}).get('status') != 'OK':
+                      return False
+              return True
 
           hh, mm = map(int, cfg['opener_local_time'].split(':'))
           opener_target = local.replace(hour=hh, minute=mm, second=0, microsecond=0)
@@ -114,8 +167,6 @@ jobs:
                   opener_existing_valid = False
           opener_due = bool(opener_window_open and opener_path and not opener_existing_valid)
 
-          # Count only contract-valid FINAL rows. A malformed/partial row must
-          # never suppress due=true or skip the current-run materialization audit.
           captured_final = Counter()
           for path in Path(cfg['output_dir']).glob('week*/final/*.json'):
               try:
@@ -136,7 +187,7 @@ jobs:
 
           expected_open_final = Counter()
           eastern = ZoneInfo('America/New_York')
-          with open(os.path.join(os.environ['RUNNER_TEMP'], 'nfl-games.csv'), newline='', encoding='utf-8-sig') as handle:
+          with open(os.environ['NFL_SCHEDULE_CSV'], newline='', encoding='utf-8-sig') as handle:
               for row in csv.DictReader(handle):
                   if str(row.get('season') or '') != '2026':
                       continue
@@ -181,7 +232,7 @@ jobs:
           }))
           PY
 
-      - name: Preflight zero-credit provider quota before confirmation window
+      - name: Diagnose fallback provider health
         if: github.event_name == 'schedule'
         id: preflight
         shell: bash
@@ -192,9 +243,6 @@ jobs:
           SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
         run: |
           set -euo pipefail
-          # Outside a live due window, one probe per hour is sufficient. Key the
-          # health slot to the cron expression that fired, not wall-clock runner
-          # minute, because GitHub scheduled jobs may start late.
           if [[ '${{ steps.due.outputs.due }}' != 'true' && '${{ github.event.schedule }}' != '3 * * * *' ]]; then
             echo 'state=SKIPPED_CADENCE' >> "$GITHUB_OUTPUT"
             echo 'provider_probe_run=false' >> "$GITHUB_OUTPUT"
@@ -203,14 +251,14 @@ jobs:
           mkdir -p artifacts/nfl-provider-preflight
           set +e
           python3 scripts/nfl_2026_provider_preflight.py \
-            --schedule-csv "$RUNNER_TEMP/nfl-games.csv" \
+            --schedule-csv "$NFL_SCHEDULE_CSV" \
             --out artifacts/nfl-provider-preflight/status.json
           rc=$?
           set -e
           echo "rc=$rc" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Persist redacted provider preflight metadata to data branch
+      - name: Persist redacted fallback-provider preflight metadata to data branch
         if: github.event_name == 'schedule' && steps.preflight.outputs.provider_probe_run == 'true'
         shell: bash
         run: |
@@ -236,12 +284,12 @@ jobs:
 
       - name: Record elapsed missing windows without backfill
         if: github.event_name == 'schedule'
-        run: python3 scripts/audit_nfl_2026_capture_gaps.py --schedule-csv "$RUNNER_TEMP/nfl-games.csv"
+        run: python3 scripts/audit_nfl_2026_capture_gaps.py --schedule-csv "$NFL_SCHEDULE_CSV"
 
       - name: Run capture
         if: >-
           github.event_name == 'workflow_dispatch' ||
-          (steps.due.outputs.due == 'true' && steps.preflight.outputs.immediate_capture_possible != 'false')
+          steps.due.outputs.due == 'true'
         id: run
         env:
           ODDS_API_KEY_1: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
@@ -265,7 +313,7 @@ jobs:
         run: |
           set -euo pipefail
           args=(
-            --schedule-csv "$RUNNER_TEMP/nfl-games.csv"
+            --schedule-csv "$NFL_SCHEDULE_CSV"
             --github-run-id "$GITHUB_RUN_ID"
             --verify-final-kickoffs '${{ steps.due.outputs.final_due_kickoffs }}'
           )
@@ -291,14 +339,12 @@ jobs:
           echo "PUSH_FAILED"
           exit 1
 
-      - name: Fail loudly on blocked advance preflight
+      - name: Report blocked fallback provider
         if: >-
           always() && github.event_name == 'schedule' &&
-          steps.due.outputs.due != 'true' &&
           steps.preflight.outputs.state == 'PROVIDER_BLOCKED_PREFLIGHT'
         run: |
-          echo 'NFL_PROVIDER_BLOCKED_PREFLIGHT: restore provider capacity before the frozen capture target' >&2
-          exit 2
+          echo 'NFL_FALLBACK_PROVIDER_BLOCKED: direct DraftKings remains the primary capture path'
 
       - name: Fail job if capture or check failed
         if: steps.run.outcome != 'skipped' && steps.run.outputs.rc != '0'

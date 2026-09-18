@@ -10,16 +10,19 @@ on:
       - 'scripts/check_nfl_forward_accrual.py'
       - 'scripts/audit_nfl_2026_capture_gaps.py'
       - 'tests/test_active_evidence_window_guards.py'
+      - 'tests/test_mlb_moneyline_active_liveness.py'
       - 'tests/test_nfl_forward_accrual.py'
       - '.github/workflows/active-evidence-window-liveness.yml'
+      - '.github/workflows/mlb-moneyline-forward-evidence.yml'
       - '.github/workflows/nfl-2026-line-capture.yml'
       - '.github/workflows/football-nfl-forward-clv-collection.yml'
-  # Independent of the NFL confirmation line-capture writer being watched.
-  # The forward collector is already an authorized scheduled workflow; every
-  # completion, including a failure, drives this free durable-state deadman.
+  # Independent durable-state deadman triggers. A writer's Actions conclusion is
+  # never itself accepted as evidence; each deadman restores the data branch and
+  # validates contract-bound durable rows against a public schedule snapshot.
   workflow_run:
     workflows:
       - football-nfl-forward-clv-collection
+      - mlb-moneyline-forward-evidence
     types:
       - completed
 
@@ -38,11 +41,16 @@ jobs:
         run: python3 scripts/check_active_evidence_windows.py mutation
       - name: Test active-window guards
         run: |
-          python3 -m py_compile scripts/check_nfl_forward_accrual.py
-          python3 -m unittest -q tests.test_active_evidence_window_guards tests.test_nfl_forward_accrual
+          python3 -m py_compile scripts/check_active_evidence_windows.py scripts/check_nfl_forward_accrual.py
+          python3 -m unittest -q \
+            tests.test_active_evidence_window_guards \
+            tests.test_mlb_moneyline_active_liveness \
+            tests.test_nfl_forward_accrual
 
   nfl-durable-deadman:
-    if: github.event_name != 'pull_request'
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.name == 'football-nfl-forward-clv-collection')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -84,3 +92,43 @@ jobs:
             --schedule-csv "$RUNNER_TEMP/nfl-games.csv" \
             --state-root .data-liveness/runtime/nfl-forward \
             --lookback-hours "$LOOKBACK_HOURS"
+
+  mlb-moneyline-durable-deadman:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.name == 'mlb-moneyline-forward-evidence')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Resolve public MLB schedule window
+        id: dates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          from datetime import datetime, timedelta, timezone
+          now = datetime.now(timezone.utc)
+          print('start=' + (now.date() - timedelta(days=1)).isoformat())
+          print('end=' + (now.date() + timedelta(days=1)).isoformat())
+          PY
+      - name: Fetch public MLB StatsAPI schedule snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error --retry 3 \
+            "https://statsapi.mlb.com/api/v1/schedule?sportId=1&startDate=${{ steps.dates.outputs.start }}&endDate=${{ steps.dates.outputs.end }}" \
+            -o "$RUNNER_TEMP/mlb-schedule.json"
+      - name: Restore durable data branch read-only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data
+          git worktree add --detach .data-liveness FETCH_HEAD
+      - name: Fail loudly on recent MLB MONEYLINE T30 durable non-accrual
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/check_active_evidence_windows.py mlb-moneyline-liveness \
+            --schedule-json "$RUNNER_TEMP/mlb-schedule.json" \
+            --decision-root .data-liveness/data/mlb_forward_decisions \
+            --lookback-hours 4

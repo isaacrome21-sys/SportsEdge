@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """Fail-closed guards for preregistered evidence windows.
 
-Two independent failure modes are covered:
+Independent failure modes are covered:
 
 * mutation: an ACTIVE window loses or weakens its declared acquisition authority
   without first receiving an explicit registry disposition;
 * nfl-liveness: a frozen NFL confirmation capture window elapsed recently but no
-  contract-valid durable capture exists.
+  contract-valid durable capture exists;
+* mlb-moneyline-liveness: a frozen MLB MONEYLINE T30 decision window elapsed
+  recently but no contract-valid durable PAPER terminal exists.
 
-A green GitHub Actions run is never accepted as evidence of liveness.  The NFL
-check reads only the durable capture records in the checkout plus the frozen
-schedule snapshot supplied by the caller.
+A green GitHub Actions run is never accepted as evidence of liveness. These
+checks read durable data-branch records plus public schedule snapshots supplied
+by the caller. A missed MLB decision remains a failure; it is never backfilled or
+reclassified merely because the runner itself was green.
 """
 from __future__ import annotations
 
@@ -20,8 +23,13 @@ from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 import json
 from pathlib import Path
-from typing import Any
+import re
+from typing import Any, Mapping
 from zoneinfo import ZoneInfo
+
+SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+MLB_VALID_DECISION_STATUSES = {"PAPER_BET_FROZEN", "PAPER_PASS_FROZEN"}
+MLB_BLOCKED_DECISION_STATUSES = {"BLOCKED_MISSED_DECISION_FREEZE", "BLOCKED_MISSED_DECISION_WINDOW"}
 
 
 def _json(path: Path) -> Any:
@@ -41,6 +49,19 @@ def _aware(value: str | None) -> datetime:
         out = datetime.now(timezone.utc)
     if out.tzinfo is None or out.utcoffset() is None:
         raise SystemExit("ACTIVE_WINDOW_NOW_MUST_BE_TIMEZONE_AWARE")
+    return out.astimezone(timezone.utc)
+
+
+def _timestamp(value: Any) -> datetime | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    try:
+        out = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if out.tzinfo is None or out.utcoffset() is None:
+        return None
     return out.astimezone(timezone.utc)
 
 
@@ -222,6 +243,134 @@ def nfl_liveness_failures(cfg_path: Path, schedule_path: Path, now: datetime,
     return failures
 
 
+def _mlb_schedule_games(schedule_path: Path) -> list[tuple[int, datetime]]:
+    payload = _json(schedule_path)
+    if not isinstance(payload, Mapping):
+        raise SystemExit("MLB_MONEYLINE_LIVENESS_SCHEDULE_NOT_OBJECT")
+    games: list[tuple[int, datetime]] = []
+    seen: set[int] = set()
+    for day in payload.get("dates") or []:
+        if not isinstance(day, Mapping):
+            continue
+        for game in day.get("games") or []:
+            if not isinstance(game, Mapping):
+                continue
+            status = game.get("status") or {}
+            detailed = str(status.get("detailedState") or "").strip().lower()
+            if detailed in {"postponed", "cancelled", "canceled"}:
+                continue
+            try:
+                game_pk = int(game.get("gamePk"))
+            except (TypeError, ValueError):
+                continue
+            start = _timestamp(game.get("gameDate"))
+            if start is None:
+                continue
+            if game_pk in seen:
+                raise SystemExit(f"MLB_MONEYLINE_LIVENESS_DUPLICATE_SCHEDULE_GAME:{game_pk}")
+            seen.add(game_pk)
+            games.append((game_pk, start))
+    return games
+
+
+def _mlb_decision_rows(root: Path) -> dict[int, list[dict[str, Any]]]:
+    rows: dict[int, list[dict[str, Any]]] = {}
+    if not root.exists():
+        return rows
+    for path in sorted(root.rglob("*.json")):
+        try:
+            record = _json(path)
+        except SystemExit:
+            continue
+        if not isinstance(record, dict):
+            continue
+        try:
+            game_pk = int(record.get("game_pk"))
+        except (TypeError, ValueError):
+            continue
+        rows.setdefault(game_pk, []).append(record)
+    return rows
+
+
+def _valid_mlb_moneyline_terminal(record: Mapping[str, Any], game_pk: int,
+                                  event_start: datetime) -> bool:
+    status = str(record.get("status") or "")
+    if status not in MLB_VALID_DECISION_STATUSES:
+        return False
+    try:
+        if int(record.get("game_pk")) != game_pk:
+            return False
+    except (TypeError, ValueError):
+        return False
+    if str(record.get("lane_id") or "") != "MLB_MONEYLINE_DK_T30_V1":
+        return False
+    if str(record.get("state") or "") != "PAPER" or float(record.get("stake_units", -1)) != 0.0:
+        return False
+    if record.get("promotion_authority") is not False:
+        return False
+    for field in (
+        "lane_definition_sha256",
+        "market_definition_sha256",
+        "policy_sha256",
+        "policy_manifest_sha256",
+        "edge_floor_config_sha256",
+        "model_artifact_sha256",
+        "prediction_record_sha256",
+    ):
+        if SHA256_RE.fullmatch(str(record.get(field) or "")) is None:
+            return False
+    start = _timestamp(record.get("event_start_ts"))
+    frozen = _timestamp(record.get("decision_frozen_at_utc"))
+    quote = _timestamp(record.get("decision_quote_observed_at_utc"))
+    if start is None or frozen is None or quote is None:
+        return False
+    if abs((start - event_start).total_seconds()) > 1.0:
+        return False
+    freeze_minutes = (start - frozen).total_seconds() / 60.0
+    quote_minutes = (start - quote).total_seconds() / 60.0
+    if not (30.0 <= freeze_minutes <= 36.0 and 30.0 <= quote_minutes <= 36.0 and quote <= frozen < start):
+        return False
+    if status == "PAPER_BET_FROZEN":
+        return record.get("graded_bet") is True and record.get("evidence_counts") is True
+    return record.get("graded_bet") is False and record.get("evidence_counts") is False
+
+
+def mlb_moneyline_liveness_failures(schedule_path: Path, decision_root: Path,
+                                    now: datetime, lookback_hours: float) -> list[str]:
+    """Return failures for recently elapsed frozen T30 windows without durable valid terminals.
+
+    Only the recent operational lookback is evaluated. Historical misses remain
+    immutable on the data branch and are not reclassified, but they do not make
+    this operational deadman permanently red after the lookback expires.
+    """
+    games = _mlb_schedule_games(schedule_path)
+    rows_by_game = _mlb_decision_rows(decision_root)
+    lookback = timedelta(hours=float(lookback_hours))
+    failures: list[str] = []
+    for game_pk, start in games:
+        decision_window_end = start - timedelta(minutes=30)
+        elapsed = now - decision_window_end
+        if elapsed < timedelta(0) or elapsed > lookback:
+            continue
+        candidates = rows_by_game.get(game_pk, [])
+        valid = [row for row in candidates if _valid_mlb_moneyline_terminal(row, game_pk, start)]
+        if len(valid) == 1:
+            continue
+        blocked = sorted({
+            str(row.get("status") or "") for row in candidates
+            if str(row.get("status") or "") in MLB_BLOCKED_DECISION_STATUSES
+        })
+        if len(valid) > 1:
+            failures.append(f"MLB_MONEYLINE_ACTIVE_WINDOW_DUPLICATE_VALID_TERMINAL:game={game_pk}:valid={len(valid)}")
+        elif blocked:
+            failures.append(
+                f"MLB_MONEYLINE_ACTIVE_WINDOW_NONACCRUAL:game={game_pk}:terminal={'+'.join(blocked)}"
+            )
+        else:
+            failures.append(f"MLB_MONEYLINE_ACTIVE_WINDOW_ZERO_VALID_TERMINAL:game={game_pk}")
+    return failures
+
+
 def _emit(mode: str, failures: list[str]) -> int:
     status = "PASS" if not failures else "FAIL"
     print(json.dumps({"mode": mode, "status": status, "failures": failures}, sort_keys=True))
@@ -242,12 +391,28 @@ def main() -> int:
     live.add_argument("--now")
     live.add_argument("--lookback-hours", type=float, default=4.0)
 
+    mlb = sub.add_parser("mlb-moneyline-liveness")
+    mlb.add_argument("--schedule-json", type=Path, required=True)
+    mlb.add_argument("--decision-root", type=Path, required=True)
+    mlb.add_argument("--now")
+    mlb.add_argument("--lookback-hours", type=float, default=4.0)
+
     args = parser.parse_args()
     if args.command == "mutation":
         return _emit("mutation", mutation_failures(args.repo_root, args.registry))
+    if args.command == "nfl-liveness":
+        return _emit(
+            "nfl-liveness",
+            nfl_liveness_failures(args.capture_config, args.schedule_csv, _aware(args.now), args.lookback_hours),
+        )
     return _emit(
-        "nfl-liveness",
-        nfl_liveness_failures(args.capture_config, args.schedule_csv, _aware(args.now), args.lookback_hours),
+        "mlb-moneyline-liveness",
+        mlb_moneyline_liveness_failures(
+            args.schedule_json,
+            args.decision_root,
+            _aware(args.now),
+            args.lookback_hours,
+        ),
     )
 
 
