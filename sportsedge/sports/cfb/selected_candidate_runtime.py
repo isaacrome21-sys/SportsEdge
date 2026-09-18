@@ -2,14 +2,14 @@
 
 This module bridges the preregistered selected-candidate model surface to the existing
 CFB run machine without changing market pricing, de-vigging, seed identity, or betting
-authority.  It is serving plumbing only: no candidate evaluation, attempt consumption,
+authority. It is serving plumbing only: no candidate evaluation, attempt consumption,
 Model_P promotion, Truth Gate, eligibility, staking, evidence clock, backfill, or
 OFFICIAL authority is created here.
 """
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import dataclass, replace
+from dataclasses import MISSING, dataclass, replace
 from datetime import datetime
 from typing import Any, Callable, Mapping, Sequence
 from urllib.request import urlopen
@@ -46,7 +46,7 @@ class CFBSelectedCandidateRuntimeAdapter:
     """Duck-typed joint-model adapter with selected-family prediction semantics.
 
     ``simulate_cfb_joint_distribution`` only requires the joint identity constants,
-    residual/OT state, ``predict_means`` and ``artifact_sha256``.  Those stochastic
+    residual/OT state, ``predict_means`` and ``artifact_sha256``. Those stochastic
     mechanics are intentionally identical to the selected-candidate simulator, so the
     adapter changes only the feature transform used for the conditional score means.
     """
@@ -76,9 +76,11 @@ class CFBSelectedCandidateRuntimeAdapter:
                 f"CFB_SELECTED_RUNTIME_GAME_ROW_MISSING:{game_id or 'UNKNOWN'}"
             )
         candidate_row = deepcopy(dict(bound))
-        # The canonical run machine owns live game/weather state.  Preserve that state
+        # The canonical run machine owns live game/weather state. Preserve that state
         # while the adapter supplies only the frozen dual-snapshot candidate features.
-        candidate_row["neutral_site"] = row.get("neutral_site", candidate_row.get("neutral_site", False))
+        candidate_row["neutral_site"] = row.get(
+            "neutral_site", candidate_row.get("neutral_site", False)
+        )
         weather = row.get("weather")
         if isinstance(weather, Mapping):
             candidate_row["weather"] = dict(weather)
@@ -87,9 +89,17 @@ class CFBSelectedCandidateRuntimeAdapter:
 
 def _metric_object(raw: Mapping[str, Any]) -> CFBTeamMetrics:
     fields = CFBTeamMetrics.__dataclass_fields__
-    missing = [name for name in fields if name not in raw and fields[name].default is fields[name].default_factory]
-    # Dataclass default introspection is awkward across Python versions; constructor
-    # validation below remains the authoritative fail-closed check.
+    missing = [
+        name
+        for name, field in fields.items()
+        if name not in raw
+        and field.default is MISSING
+        and field.default_factory is MISSING
+    ]
+    if missing:
+        raise CFBSelectedCandidateRuntimeError(
+            "CFB_SELECTED_RUNTIME_METRIC_FIELDS_MISSING:" + ",".join(sorted(missing))
+        )
     values = {name: raw[name] for name in fields if name in raw}
     try:
         return CFBTeamMetrics(**values)
@@ -174,7 +184,7 @@ def run_selected_candidate_cfb_machine(
     """Serve one already-selected family through the canonical CFB run machine.
 
     MANUAL requires games, dual candidate snapshots, quotes, and FBS membership.
-    HYBRID owns only quotes; AUTOMATIC owns all external inputs.  Fetched modes build
+    HYBRID owns only quotes; AUTOMATIC owns all external inputs. Fetched modes build
     the same dual prior/current snapshots required by the frozen candidate transform.
     """
     selected = str(mode or "").strip().upper()
@@ -201,10 +211,14 @@ def run_selected_candidate_cfb_machine(
         if not key:
             raise CFBSelectedCandidateRuntimeError("CFBD_API_KEY_REQUIRED")
         team_rows = team_fetcher(season=season, cfbd_api_key=key, opener=opener)
-        canonical_games = game_fetcher(season=season, week=week, cfbd_api_key=key, opener=opener)
+        canonical_games = game_fetcher(
+            season=season, week=week, cfbd_api_key=key, opener=opener
+        )
         canonical_games = attach_weather(
             canonical_games,
-            weather_fetcher(season=season, week=week, cfbd_api_key=key, opener=opener),
+            weather_fetcher(
+                season=season, week=week, cfbd_api_key=key, opener=opener
+            ),
         )
         snapshots = candidate_metric_fetcher(
             season=season,
@@ -215,11 +229,15 @@ def run_selected_candidate_cfb_machine(
         )
         if selected == "HYBRID":
             if quotes is None:
-                raise CFBSelectedCandidateRuntimeError("CFB_SELECTED_RUNTIME_HYBRID_REQUIRES_QUOTES")
+                raise CFBSelectedCandidateRuntimeError(
+                    "CFB_SELECTED_RUNTIME_HYBRID_REQUIRES_QUOTES"
+                )
             canonical_quotes = list(quotes)
         else:
             if quotes is not None:
-                raise CFBSelectedCandidateRuntimeError("CFB_SELECTED_RUNTIME_AUTOMATIC_OWNS_QUOTES")
+                raise CFBSelectedCandidateRuntimeError(
+                    "CFB_SELECTED_RUNTIME_AUTOMATIC_OWNS_QUOTES"
+                )
             odds_key = str(odds_api_key or "").strip()
             if not odds_key:
                 raise CFBSelectedCandidateRuntimeError("ODDS_API_KEY_REQUIRED")
