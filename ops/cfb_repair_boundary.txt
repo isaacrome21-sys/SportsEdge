@@ -1,0 +1,1 @@
+No direct-main writes. No evaluation attempt. No historical replay calls from this repair.
