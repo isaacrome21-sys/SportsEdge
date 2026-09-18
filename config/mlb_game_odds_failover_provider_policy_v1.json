@@ -1,0 +1,18 @@
+{
+  "policy_id": "MLB_GAME_ODDS_FAILOVER_PROVIDER_POLICY_V1",
+  "provider": "the_odds_api",
+  "sport_key": "baseball_mlb",
+  "request_profiles": {
+    "game_odds": {
+      "endpoint_scope": "sport_bulk",
+      "markets": ["h2h", "spreads", "totals"],
+      "regions": ["us", "us2"],
+      "credits_per_call": 6
+    }
+  },
+  "reserve_role": "manual_only",
+  "runtime_binding": {
+    "request_builder": "scripts/archive_raw_game_odds.py",
+    "workflow": ".github/workflows/archive-mlb-game-odds-failover.yml"
+  }
+}
