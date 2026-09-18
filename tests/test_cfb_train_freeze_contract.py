@@ -29,7 +29,7 @@ class CFBTrainFreezeContractTests(unittest.TestCase):
         self.assertNotIn('git push origin main', text)
         self.assertNotIn('git push origin HEAD:main', text)
         self.assertIn('secrets.CFBD_API_KEY', text)
-        self.assertIn('SELECTED_CANDIDATE_SERVING_CONTRACT_EVALUATOR_NOT_YET_MERGED', text)
+        self.assertIn('SELECTED_CANDIDATE_SERVING_CONTRACT_NOT_YET_MERGED', text)
 
 
 if __name__ == '__main__':
