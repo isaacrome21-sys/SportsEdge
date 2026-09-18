@@ -6,6 +6,10 @@ It deliberately prints only a redacted public report. Exact account/quota values
 may be written to a caller-selected private temporary file, but must not be
 committed to this public repository.
 
+The selection lane does not require CFBD's paid weather endpoint. Frozen weather
+features are reconstructed separately from CFBD venue metadata plus public
+Open-Meteo historical reanalysis and remain RECONSTRUCTED_HISTORICAL_NOT_PIT.
+
 No candidate evaluation is performed and no Model_P, Truth Gate, promotion,
 eligibility, staking, OFFICIAL, evidence-clock, or backfill authority is created.
 """
@@ -21,6 +25,7 @@ from urllib.request import Request, urlopen
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / "config/cfb_cfbd_reconstructed_selection_budget_v1.json"
 INFO_URL = "https://api.collegefootballdata.com/info"
+EXPECTED_WEATHER_CONTRACT = "CFBD_VENUES_OPEN_METEO_ERA5_RECONSTRUCTED_CURRENT_PROVIDER_VINTAGE"
 
 
 class CFBProviderPreflightError(RuntimeError):
@@ -70,6 +75,22 @@ def fetch_account_info(api_key: str, *, opener: Callable = urlopen) -> dict[str,
     return dict(payload)
 
 
+def _weather_transport(config: Mapping[str, Any]) -> tuple[str, bool]:
+    weather = config.get("weather_reconstruction")
+    if not isinstance(weather, Mapping):
+        return "", False
+    contract = str(weather.get("contract") or "").strip()
+    ready = (
+        contract == EXPECTED_WEATHER_CONTRACT
+        and weather.get("venue_endpoint") == "/venues"
+        and str(weather.get("archive_endpoint") or "").startswith("https://archive-api.open-meteo.com/")
+        and weather.get("archive_model") == "era5"
+        and weather.get("provenance_class") == "RECONSTRUCTED_HISTORICAL_NOT_PIT"
+        and weather.get("promotion_authority") is False
+    )
+    return contract, ready
+
+
 def evaluate_account(info: Mapping[str, Any], config: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
     blockers: list[str] = []
     try:
@@ -94,10 +115,9 @@ def evaluate_account(info: Mapping[str, Any], config: Mapping[str, Any]) -> tupl
         if remaining > monthly_quota:
             blockers.append("CFBD_TIER_QUOTA_MAPPING_INCONSISTENT")
 
-    weather_min = int(config["weather_min_patron_level"])
-    weather_entitled = patron_level >= weather_min
-    if not weather_entitled:
-        blockers.append("CFBD_WEATHER_ENDPOINT_REQUIRES_PATRON_TIER")
+    weather_contract, weather_transport_ready = _weather_transport(config)
+    if not weather_transport_ready:
+        blockers.append("CFB_RECONSTRUCTED_WEATHER_TRANSPORT_CONTRACT_INVALID")
 
     plan = config.get("planned_new_calls_upper_bound") or {}
     planned = int(plan.get("total", -1))
@@ -118,7 +138,10 @@ def evaluate_account(info: Mapping[str, Any], config: Mapping[str, Any]) -> tupl
         "remaining_quota": remaining,
         "planned_new_calls": planned,
         "retry_reserve_calls": reserve,
-        "weather_entitled": weather_entitled,
+        "cfbd_weather_entitled": patron_level >= 1,
+        "cfbd_weather_required_for_selection": False,
+        "weather_source_contract": weather_contract,
+        "weather_transport_ready": weather_transport_ready,
         "verified_cache_reuse": True,
         "resume_from_verified_cache": True,
         "restart_from_2015": False,
@@ -132,7 +155,10 @@ def evaluate_account(info: Mapping[str, Any], config: Mapping[str, Any]) -> tupl
         "status": private_report["status"],
         "account_info_verified": True,
         "standard_tier_mapping_verified": monthly_quota is not None and "CFBD_TIER_QUOTA_MAPPING_INCONSISTENT" not in blockers,
-        "weather_entitled": weather_entitled,
+        "cfbd_weather_entitled": private_report["cfbd_weather_entitled"],
+        "cfbd_weather_required_for_selection": False,
+        "weather_source_contract": weather_contract,
+        "weather_transport_ready": weather_transport_ready,
         "call_plan_fits": call_plan_fits,
         "historical_replay_calls_performed": 0,
         "blockers": blockers,
@@ -153,7 +179,7 @@ def _write_outputs(report: Mapping[str, Any]) -> None:
         return
     with open(path, "a", encoding="utf-8") as handle:
         handle.write(f"state={report['status']}\n")
-        handle.write(f"weather_entitled={str(bool(report['weather_entitled'])).lower()}\n")
+        handle.write(f"weather_transport_ready={str(bool(report.get('weather_transport_ready'))).lower()}\n")
         handle.write(f"call_plan_fits={str(bool(report['call_plan_fits'])).lower()}\n")
 
 
@@ -171,7 +197,10 @@ def main(argv: list[str] | None = None) -> int:
             "status": "BLOCKED_PROVIDER_PREFLIGHT",
             "account_info_verified": False,
             "standard_tier_mapping_verified": False,
-            "weather_entitled": False,
+            "cfbd_weather_entitled": False,
+            "cfbd_weather_required_for_selection": False,
+            "weather_source_contract": EXPECTED_WEATHER_CONTRACT,
+            "weather_transport_ready": False,
             "call_plan_fits": False,
             "historical_replay_calls_performed": 0,
             "blockers": [str(exc)],
@@ -185,7 +214,6 @@ def main(argv: list[str] | None = None) -> int:
         args.private_out.write_text(json.dumps(private, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps(public, sort_keys=True))
     _write_outputs(public)
-    # A governed BLOCKED state is an honest successful preflight execution.
     return 0
 
 
