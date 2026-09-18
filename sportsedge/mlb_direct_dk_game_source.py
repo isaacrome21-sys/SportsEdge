@@ -15,14 +15,16 @@ from typing import Any, Callable, Iterable, Mapping
 from urllib.request import urlopen
 
 from .draftkings_game_market_source import fetch_board, normalize_board
-from .mlb_source import GameSnapshot, fetch_schedule
-from .odds_api_source import bind_provider_event, normalize_name
+from .mlb_source import GameSnapshot, fetch_schedule, parse_game_start
+from .odds_api_source import normalize_name
+from .runtime import parse_timestamp
 
 SOURCE_CLASS = "DRAFTKINGS_DIRECT_WEB_V1"
 BOOK_KEY = "draftkings"
 SPORTSBOOK = "DraftKings"
 SPORT_KEY = "baseball_mlb"
 DEFAULT_TTL_SECONDS = 180
+EVENT_TIME_TOLERANCE_SECONDS = 90 * 60
 _RAW_MARKETS = {
     "Moneyline": "h2h",
     "Spread": "spreads",
@@ -47,9 +49,9 @@ class DirectDKMLBSnapshot:
 
 def _team_side(name: Any, game: GameSnapshot) -> tuple[str, int]:
     key = normalize_name(name)
-    if key == normalize_name(game.home_name):
+    if key == normalize_name(game.home_name) or _dk_team_alias_matches(name, game.home_name):
         return "HOME", int(game.home_id)
-    if key == normalize_name(game.away_name):
+    if key == normalize_name(game.away_name) or _dk_team_alias_matches(name, game.away_name):
         return "AWAY", int(game.away_id)
     raise DirectDKMLBSourceError("DIRECT_DK_TEAM_UNRESOLVED")
 
@@ -76,6 +78,48 @@ def _raw_provider_event(event: Mapping[str, Any]) -> dict[str, Any]:
     if not away or not home:
         raise DirectDKMLBSourceError("DIRECT_DK_EVENT_IDENTITY_INCOMPLETE")
     return {"id": event_id, "home_team": home, "away_team": away, "commence_time": commence}
+
+
+def _dk_team_alias_matches(provider_name: Any, stats_name: Any) -> bool:
+    """Match DK's city-abbreviated display names without broad fuzzy identity.
+
+    Examples: ``CHI Cubs`` -> ``Chicago Cubs`` and ``NY Yankees`` ->
+    ``New York Yankees``. The nickname portion must be an exact normalized suffix
+    of the StatsAPI club name; final event admission still requires home/away and
+    kickoff-time uniqueness.
+    """
+    provider_text = str(provider_name or "").strip()
+    stats_norm = normalize_name(stats_name)
+    provider_norm = normalize_name(provider_text)
+    if not provider_norm or not stats_norm:
+        return False
+    if provider_norm == stats_norm:
+        return True
+    parts = provider_text.split()
+    nickname = normalize_name(" ".join(parts[1:])) if len(parts) > 1 else provider_norm
+    return bool(nickname) and stats_norm.endswith(nickname)
+
+
+def _bind_direct_event(event: Mapping[str, Any], schedule: Iterable[GameSnapshot]) -> GameSnapshot:
+    try:
+        commence = parse_timestamp(event.get("commence_time")).astimezone(timezone.utc)
+    except Exception as exc:
+        raise DirectDKMLBSourceError("DIRECT_DK_EVENT_TIME_INVALID") from exc
+    home = event.get("home_team")
+    away = event.get("away_team")
+    if not normalize_name(home) or not normalize_name(away):
+        raise DirectDKMLBSourceError("DIRECT_DK_EVENT_TEAM_IDENTITY_MISSING")
+    timed = []
+    for game in schedule:
+        if not _dk_team_alias_matches(home, game.home_name):
+            continue
+        if not _dk_team_alias_matches(away, game.away_name):
+            continue
+        if abs((parse_game_start(game.game_date) - commence).total_seconds()) <= EVENT_TIME_TOLERANCE_SECONDS:
+            timed.append(game)
+    if len(timed) != 1:
+        raise DirectDKMLBSourceError("DIRECT_DK_EVENT_GAME_NOT_FOUND" if not timed else "DIRECT_DK_EVENT_GAME_AMBIGUOUS")
+    return timed[0]
 
 
 def _raw_market_inventory(payload: Mapping[str, Any]) -> tuple[dict[str, Mapping[str, Any]], set[tuple[str, str]]]:
@@ -105,8 +149,7 @@ def _validate_pair(market: str, rows: list[Mapping[str, Any]], game: GameSnapsho
         if abs(points[0] - points[1]) > 1e-9:
             raise DirectDKMLBSourceError("DIRECT_DK_TOTAL_LINE_MISMATCH")
         return
-    expected = {str(game.home_name), str(game.away_name)}
-    if outcomes != expected:
+    if not all(any(_dk_team_alias_matches(outcome, expected) for expected in (game.home_name, game.away_name)) for outcome in outcomes):
         raise DirectDKMLBSourceError("DIRECT_DK_TEAM_SIDES_INVALID")
     if market == "spreads":
         points = [_finite_point(row.get("point")) for row in rows]
@@ -127,7 +170,7 @@ def _quote(row: Mapping[str, Any], *, game: GameSnapshot, provider_event: Mappin
         "source_event_id": str(provider_event["id"]),
         "source_home_team_name": str(provider_event["home_team"]),
         "source_away_team_name": str(provider_event["away_team"]),
-        "source_identity_version": "DRAFTKINGS_DIRECT_WEB_STATSAPI_BIND_V1",
+        "source_identity_version": "DRAFTKINGS_DIRECT_WEB_STATSAPI_BIND_V2_STRICT_ALIAS",
         "canonical_game_id": str(game.game_pk),
         "canonical_home_team_id": str(game.home_id),
         "canonical_away_team_id": str(game.away_id),
@@ -181,7 +224,7 @@ def normalize_direct_dk_mlb_board(*, board: Any, schedule: Iterable[GameSnapshot
             if raw_event is None:
                 raise DirectDKMLBSourceError("DIRECT_DK_EVENT_IDENTITY_INCOMPLETE")
             event = _raw_provider_event(raw_event)
-            game = bind_provider_event(event, games)
+            game = _bind_direct_event(event, games)
             bound[event_id] = (event, game)
         except Exception as exc:
             failures.append({"provider_event_id": event_id, "stage": "IDENTITY_BIND", "reason": f"{type(exc).__name__}:{exc}"})
