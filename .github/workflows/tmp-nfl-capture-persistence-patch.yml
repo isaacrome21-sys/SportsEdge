@@ -1,0 +1,79 @@
+name: tmp-nfl-capture-persistence-patch
+
+on:
+  push:
+    branches:
+      - nfl/fix-capture-data-branch-persistence-20260918
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    if: github.actor != 'github-actions[bot]'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Restore explicit data-branch persistence and self-delete
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('.github/workflows/nfl-2026-line-capture.yml')
+          text = p.read_text()
+          old = '''      - name: Commit captures and absence markers
+        if: always() && (github.event_name == 'schedule' || (steps.run.outcome != 'skipped' && inputs.mode == 'capture'))
+        run: |
+          DIR=data/nfl_2026_confirmation/captures
+          [ -d "$DIR" ] || { echo "No capture directory yet"; exit 0; }
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$DIR"
+          if git diff --cached --quiet; then echo "Nothing to commit"; exit 0; fi
+          git commit -m "NFL 2026 confirmation evidence (run $GITHUB_RUN_ID)"
+          for i in 1 2 3; do
+            if git pull --rebase --quiet && git push --quiet; then exit 0; fi
+            sleep $((i * 5))
+          done
+          echo "PUSH_FAILED"
+          exit 1
+'''
+          new = '''      - name: Persist captures and absence markers on data branch
+        if: always() && (github.event_name == 'schedule' || (steps.run.outcome != 'skipped' && inputs.mode == 'capture'))
+        shell: bash
+        run: |
+          set -euo pipefail
+          DIR=data/nfl_2026_confirmation/captures
+          [ -d "$DIR" ] || { echo "No capture directory yet"; exit 0; }
+          git fetch --depth=1 origin data:data
+          worktree_dir="$(mktemp -d)"
+          trap 'git worktree remove --force "$worktree_dir" >/dev/null 2>&1 || true; rm -rf "$worktree_dir"' EXIT
+          git worktree add "$worktree_dir" data
+          dest="$worktree_dir/$DIR"
+          mkdir -p "$dest"
+          cp -a "$DIR/." "$dest/"
+          cd "$worktree_dir"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$DIR"
+          if git diff --cached --quiet; then echo "Nothing to persist"; exit 0; fi
+          git commit -m "NFL 2026 confirmation evidence (run $GITHUB_RUN_ID)"
+          for i in 1 2 3; do
+            if git pull --rebase --quiet origin data && git push --quiet origin HEAD:data; then exit 0; fi
+            sleep $((i * 5))
+          done
+          echo "PUSH_FAILED"
+          exit 1
+'''
+          if old not in text:
+              raise SystemExit('EXPECTED_BARE_PUSH_BLOCK_NOT_FOUND')
+          p.write_text(text.replace(old, new, 1))
+          PY
+          rm .github/workflows/tmp-nfl-capture-persistence-patch.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/workflows/nfl-2026-line-capture.yml .github/workflows/tmp-nfl-capture-persistence-patch.yml
+          git diff --cached --check
+          git commit -m 'NFL: restore explicit data-branch capture persistence'
+          git push origin HEAD:nfl/fix-capture-data-branch-persistence-20260918
