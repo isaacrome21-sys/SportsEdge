@@ -1,0 +1,6 @@
+{
+  "request_id": "MLB_DIRECT_SHADOW_RECOVERY_20260918_1",
+  "action": "RUN",
+  "scope": "MLB_GAME_MARKETS_ONLY",
+  "authority": "SHADOW_ONLY"
+}
