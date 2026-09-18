@@ -24,7 +24,7 @@ from sportsedge.sports.cfb.model_selection_prereg import (  # noqa: E402
 
 CFB_CANDIDATE_BUNDLE = "CFB_CANDIDATE_PREREG_FREEZE_V1"
 CFB_CANDIDATE_REFREEZE_SCHEMA = "CFB_CANDIDATE_PREREG_REFREEZE_V1"
-CFB_CANDIDATE_TRIGGER_PR = 791
+CFB_CANDIDATE_TRIGGER_PR = 833
 
 
 def _git(repo: Path, *args: str, check: bool = True) -> str:
@@ -90,7 +90,7 @@ def _verify_cfb_candidate_prereg_refreeze(
         raise SystemExit("CFB_CANDIDATE_REFREEZE_DISPOSITION_REQUIRED")
     if disposition.get("verification_schema") != CFB_CANDIDATE_REFREEZE_SCHEMA:
         raise SystemExit("CFB_CANDIDATE_REFREEZE_VERIFICATION_SCHEMA_INVALID")
-    if disposition.get("new_bundle_id") != "CFB_CANDIDATE_PREREG_FREEZE_V2":
+    if disposition.get("new_bundle_id") != "CFB_CANDIDATE_PREREG_FREEZE_V3":
         raise SystemExit("CFB_CANDIDATE_REFREEZE_BUNDLE_ID_INVALID")
 
     prior_freeze = str(bundle.get("freeze_sha") or "")
