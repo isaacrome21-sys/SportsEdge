@@ -24,6 +24,21 @@ jobs:
           python-version: '3.12'
       - name: Install runtime dependencies
         run: python -m pip install --disable-pip-version-check numpy==2.5.3
+      - name: Diagnose DraftKings and StatsAPI identity surfaces
+        shell: bash
+        run: |
+          python - <<'PY'
+          from datetime import datetime, timezone
+          from zoneinfo import ZoneInfo
+          from sportsedge.draftkings_game_market_source import fetch_board
+          from sportsedge.mlb_source import fetch_schedule
+          now = datetime.now(timezone.utc)
+          slate = now.astimezone(ZoneInfo('America/Chicago')).date().isoformat()
+          schedule = fetch_schedule(slate, now=now)
+          board = fetch_board('baseball_mlb')
+          print('STATSAPI_SCHEDULE', [(g.game_pk, g.away_name, g.home_name, g.game_date.isoformat() if hasattr(g.game_date, 'isoformat') else str(g.game_date)) for g in schedule])
+          print('DK_EVENTS', [(e.get('id'), e.get('name'), e.get('startEventDate')) for e in (board.payload.get('events') or [])])
+          PY
       - name: Run keyless DraftKings MLB shadow model
         shell: bash
         run: |
