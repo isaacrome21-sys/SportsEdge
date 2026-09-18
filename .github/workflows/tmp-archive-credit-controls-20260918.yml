@@ -25,7 +25,9 @@ jobs:
           python-version: '3.12'
 
       - name: Apply durable patch
-        run: python scripts/tmp_apply_archive_credit_controls_20260918.py
+        run: |
+          python scripts/tmp_apply_archive_credit_controls_20260918.py
+          python scripts/tmp_fix_archive_credit_test_counts_20260918.py
 
       - name: Run focused regression suite
         run: |
