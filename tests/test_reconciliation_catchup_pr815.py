@@ -17,16 +17,24 @@ EXPECTED = [
     (815, '2b4011058429bd6a689e7a69e0286a7e341629bb'),
 ]
 
+
 def test_reconciliation_catchup_is_first_parent_complete_through_pr815() -> None:
     registry = json.loads(Path('config/freeze_reconciliation_registry_v1.json').read_text())
     assert registry['reconciled_through_sha'] == EXPECTED[-1][1]
     tail = registry['deltas'][-len(EXPECTED):]
     assert [(row['pr'], row['merge_sha']) for row in tail] == EXPECTED
 
-def test_candidate_prereg_bundle_stays_revoked_and_attempt_zero() -> None:
+
+def test_candidate_prereg_bundle_remains_attempt_zero_and_zero_authority() -> None:
     registry = json.loads(Path('config/freeze_reconciliation_registry_v1.json').read_text())
     bundle = next(row for row in registry['bundles'] if row['bundle_id'] == 'CFB_CANDIDATE_PREREG_FREEZE_V1')
-    assert bundle['disposition']['state'] == 'REVOKED'
+    disposition = bundle['disposition']
+    assert disposition['state'] in {'REVOKED', 'REFROZEN'}
+    if disposition['state'] == 'REFROZEN':
+        assert disposition['verification_schema'] == 'CFB_CANDIDATE_PREREG_REFREEZE_V1'
+        assert disposition['selection_scope_only'] is True
+        assert all(value is False for value in disposition['authority'].values())
+
     prereg = json.loads(Path('config/cfb_model_candidate_prereg_v1.json').read_text())
     governance = prereg['governance']
     assert governance['attempts_consumed'] == 0
