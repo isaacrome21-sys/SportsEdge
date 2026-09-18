@@ -3,7 +3,8 @@
 This module defines the frozen request plan and verifiable cache identities only.  It
 performs no network I/O, model fitting, candidate evaluation, promotion, or betting
 authority. Raw CFBD responses must live in a caller-supplied private cache outside
-the public repository.
+the public repository. Any future execution transport must separately prove provider
+preflight and a private cache destination before using this request plan.
 """
 from __future__ import annotations
 
