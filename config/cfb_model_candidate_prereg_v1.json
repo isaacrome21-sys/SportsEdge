@@ -1,7 +1,7 @@
 {
   "schema": "CFB_MODEL_CANDIDATE_PREREG_V1",
   "status": "FROZEN_BEFORE_FIRST_EVALUATION",
-  "code_manifest_sha256": "57186bab4a327a32b6d3b3c302a2245b0c04d4859d8680f2144af18c3c9bd6b5",
+  "code_manifest_sha256": "e97add03d338c10bd87664c40fac1500cf7458147050c5f9119e054ea98ee7e8",
   "candidate_spec_bundle_sha256": "ad61297dca678dea76f6ed8cf3e94ccaa21cc3382a4b23d0c0b7dfda26e7991f",
   "candidates": {
     "EQUAL_WEIGHT_HARD_SWITCH": {
@@ -13,7 +13,7 @@
       "training_window": {"start_season": 2015, "end_season": 2025, "season_type": "REGULAR", "classification": "FBS", "evaluation": "EXPANDING_SEASON_OUTER_FOLDS", "no_2026_forward_outcomes": true},
       "hyperparameter_policy": {"mode":"TEMPORAL_NESTED_EXPANDING_SEASON","ridge_alpha_grid":[0.1,1.0,3.0,10.0,30.0,100.0,300.0],"selection_metric":"JOINT_HOME_AWAY_SCORE_RMSE","tie_break":"LOWEST_MEAN_RMSE_THEN_LOWEST_ALPHA","inner_folds_must_precede_outer_validation_season":true,"post_result_retuning_allowed":false},
       "source_contract_identity": "AS_OF_WEEK_MATCHED_V1|CFBD_STATS_SEASON_ADVANCED_ENDWEEK_V1|CFB_JOINT_HISTORY_PIT_V1|CFB_CANDIDATE_DUAL_SNAPSHOT_V1",
-      "code_sha256": "57186bab4a327a32b6d3b3c302a2245b0c04d4859d8680f2144af18c3c9bd6b5",
+      "code_sha256": "e97add03d338c10bd87664c40fac1500cf7458147050c5f9119e054ea98ee7e8",
       "config_sha256": "ad61297dca678dea76f6ed8cf3e94ccaa21cc3382a4b23d0c0b7dfda26e7991f"
     },
     "RELIABILITY_WEIGHTED_HARD_SWITCH": {
@@ -25,7 +25,7 @@
       "training_window": {"start_season": 2015, "end_season": 2025, "season_type": "REGULAR", "classification": "FBS", "evaluation": "EXPANDING_SEASON_OUTER_FOLDS", "no_2026_forward_outcomes": true},
       "hyperparameter_policy": {"mode":"TEMPORAL_NESTED_EXPANDING_SEASON","ridge_alpha_grid":[0.1,1.0,3.0,10.0,30.0,100.0,300.0],"selection_metric":"JOINT_HOME_AWAY_SCORE_RMSE","tie_break":"LOWEST_MEAN_RMSE_THEN_LOWEST_ALPHA","inner_folds_must_precede_outer_validation_season":true,"post_result_retuning_allowed":false},
       "source_contract_identity": "AS_OF_WEEK_MATCHED_V1|CFBD_STATS_SEASON_ADVANCED_ENDWEEK_V1|CFB_JOINT_HISTORY_PIT_V1|CFB_CANDIDATE_DUAL_SNAPSHOT_V1",
-      "code_sha256": "57186bab4a327a32b6d3b3c302a2245b0c04d4859d8680f2144af18c3c9bd6b5",
+      "code_sha256": "e97add03d338c10bd87664c40fac1500cf7458147050c5f9119e054ea98ee7e8",
       "config_sha256": "ad61297dca678dea76f6ed8cf3e94ccaa21cc3382a4b23d0c0b7dfda26e7991f"
     },
     "PRIOR_CURRENT_BLEND": {
@@ -37,7 +37,7 @@
       "training_window": {"start_season": 2015, "end_season": 2025, "season_type": "REGULAR", "classification": "FBS", "evaluation": "EXPANDING_SEASON_OUTER_FOLDS", "no_2026_forward_outcomes": true},
       "hyperparameter_policy": {"mode":"TEMPORAL_NESTED_EXPANDING_SEASON","ridge_alpha_grid":[0.1,1.0,3.0,10.0,30.0,100.0,300.0],"selection_metric":"JOINT_HOME_AWAY_SCORE_RMSE","tie_break":"LOWEST_MEAN_RMSE_THEN_LOWEST_ALPHA","inner_folds_must_precede_outer_validation_season":true,"post_result_retuning_allowed":false},
       "source_contract_identity": "AS_OF_WEEK_MATCHED_V1|CFBD_STATS_SEASON_ADVANCED_ENDWEEK_V1|CFB_JOINT_HISTORY_PIT_V1|CFB_CANDIDATE_DUAL_SNAPSHOT_V1",
-      "code_sha256": "57186bab4a327a32b6d3b3c302a2245b0c04d4859d8680f2144af18c3c9bd6b5",
+      "code_sha256": "e97add03d338c10bd87664c40fac1500cf7458147050c5f9119e054ea98ee7e8",
       "config_sha256": "ad61297dca678dea76f6ed8cf3e94ccaa21cc3382a4b23d0c0b7dfda26e7991f"
     },
     "GAMES_IN_SAMPLE_FEATURE": {
@@ -49,7 +49,7 @@
       "training_window": {"start_season": 2015, "end_season": 2025, "season_type": "REGULAR", "classification": "FBS", "evaluation": "EXPANDING_SEASON_OUTER_FOLDS", "no_2026_forward_outcomes": true},
       "hyperparameter_policy": {"mode":"TEMPORAL_NESTED_EXPANDING_SEASON","ridge_alpha_grid":[0.1,1.0,3.0,10.0,30.0,100.0,300.0],"selection_metric":"JOINT_HOME_AWAY_SCORE_RMSE","tie_break":"LOWEST_MEAN_RMSE_THEN_LOWEST_ALPHA","inner_folds_must_precede_outer_validation_season":true,"post_result_retuning_allowed":false},
       "source_contract_identity": "AS_OF_WEEK_MATCHED_V1|CFBD_STATS_SEASON_ADVANCED_ENDWEEK_V1|CFB_JOINT_HISTORY_PIT_V1|CFB_CANDIDATE_DUAL_SNAPSHOT_V1",
-      "code_sha256": "57186bab4a327a32b6d3b3c302a2245b0c04d4859d8680f2144af18c3c9bd6b5",
+      "code_sha256": "e97add03d338c10bd87664c40fac1500cf7458147050c5f9119e054ea98ee7e8",
       "config_sha256": "ad61297dca678dea76f6ed8cf3e94ccaa21cc3382a4b23d0c0b7dfda26e7991f"
     }
   },
