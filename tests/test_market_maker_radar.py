@@ -68,11 +68,14 @@ class PolicyTests(unittest.TestCase):
         self.assertFalse(splits["predictive_model_input"])
         self.assertTrue(splits["rlm_label_requires_news_attribution"])
 
-    def test_archive_includes_fd_pinnacle_and_dk_but_not_fake_circa(self):
+    def test_archive_uses_dk_and_fd_only_without_fake_circa(self):
         archive = json.loads(Path("config/closing_line_archive_policy_v1.json").read_text())
-        self.assertEqual(set(archive["books"]), {"draftkings", "fanduel", "pinnacle"})
+        self.assertEqual(set(archive["books"]), {"draftkings", "fanduel"})
+        self.assertEqual(archive["regions"], "us")
+        self.assertEqual(archive["market_radar"]["market_maker_books"], [])
         self.assertEqual(archive["market_radar"]["provider_required_books"], ["circa"])
         self.assertNotIn("circa", archive["books"])
+        self.assertNotIn("pinnacle", archive["books"])
 
 
 class MathTests(unittest.TestCase):
