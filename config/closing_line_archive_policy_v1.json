@@ -4,28 +4,51 @@
   "evidence_class": "NOT_EVIDENCE",
   "promotion_authority": false,
   "evidence_clock_authority": false,
-  "doctrine": "Model-free two-sided price archival for NFL, CFB, MLB and UFC/MMA. This lane observes prices only. It contains no Model_P, no evidence_unit_id, and no decision. It can never be promoted, can never start or extend a promotion evidence clock, and can never be substituted for FOOTBALL_FORWARD_CAPTURE_V2, MLB replay evidence, or UFC promotion evidence. Its sole purpose is to accumulate a closing-line dataset that does not currently exist in any free source. The t0_prestart window is a final scheduled-start-adjacent observation only and is valid solely while commence_time is still strictly in the future. DraftKings and FanDuel observations may additionally feed zero-authority price-leadership diagnostics; those diagnostics do not change this archive's NOT_EVIDENCE status.",
+  "doctrine": "Model-free two-sided price archival for NFL, CFB and UFC/MMA. This lane observes prices only. It contains no Model_P, no evidence_unit_id, and no decision. It can never be promoted, can never start or extend a promotion evidence clock, and can never be substituted for FOOTBALL_FORWARD_CAPTURE_V2, MLB replay evidence, or UFC promotion evidence. MLB is parked and receives zero scheduled paid archive calls. The t0_prestart window is a final scheduled-start-adjacent observation only and is valid solely while commence_time is still strictly in the future. DraftKings observations may feed zero-authority diagnostics; without a configured market-maker observation, price leadership is unavailable rather than inferred from DraftKings.",
   "sports": {
     "NFL": "americanfootball_nfl",
     "CFB": "americanfootball_ncaaf",
-    "MLB": "baseball_mlb",
     "UFC": "mma_mixed_martial_arts"
   },
-  "books": ["draftkings", "fanduel"],
-  "markets": ["h2h", "spreads", "totals"],
+  "books": [
+    "draftkings"
+  ],
+  "markets": [
+    "h2h",
+    "spreads",
+    "totals"
+  ],
   "regions": "us",
   "odds_format": "american",
   "windows": {
-    "t0_prestart": {"min_minutes_before_start": 0, "max_minutes_before_start": 5},
-    "close": {"min_minutes_before_start": 2, "max_minutes_before_start": 20},
-    "decision": {"min_minutes_before_start": 45, "max_minutes_before_start": 120}
+    "t0_prestart": {
+      "min_minutes_before_start": 0,
+      "max_minutes_before_start": 5
+    },
+    "close": {
+      "min_minutes_before_start": 2,
+      "max_minutes_before_start": 20
+    },
+    "decision": {
+      "min_minutes_before_start": 45,
+      "max_minutes_before_start": 120
+    }
   },
   "event_index_endpoint_is_free": true,
   "persistence": {
     "branch": "data",
     "path_template": "archive/closing-lines/{sport_key}/{date}.ndjson",
     "append_only": true,
-    "duplicate_key": ["sport_key", "event_id", "book", "market", "outcome", "point", "window", "captured_at"]
+    "duplicate_key": [
+      "sport_key",
+      "event_id",
+      "book",
+      "market",
+      "outcome",
+      "point",
+      "window",
+      "captured_at"
+    ]
   },
   "integrity": {
     "two_sided_required": true,
@@ -37,9 +60,26 @@
     "policy": "MARKET_MAKER_RADAR_V1",
     "price_leadership_only": true,
     "market_maker_books": [],
-    "soft_books": ["draftkings", "fanduel"],
-    "provider_required_books": ["circa"],
+    "soft_books": [
+      "draftkings"
+    ],
+    "provider_required_books": [
+      "circa"
+    ],
     "promotion_authority": false,
     "model_p_authority": false
+  },
+  "parked_sports": {
+    "MLB": {
+      "sport_key": "baseball_mlb",
+      "scheduled_paid_capture": false,
+      "reason": "MLB_PARKED_ZERO_SCHEDULED_PAID_ARCHIVE_CALLS"
+    }
+  },
+  "provider_budget_guard": {
+    "enabled": true,
+    "budget_path": "config/nfl_2026_provider_budget_v1.json",
+    "paid_request_cost_credits": 3,
+    "rule": "REPROBE_BEFORE_EVERY_PAID_CALL_AND_SKIP_IF_REQUEST_WOULD_BREACH_NFL_CONFIRMATION_RESERVE"
   }
 }

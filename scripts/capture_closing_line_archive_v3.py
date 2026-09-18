@@ -19,9 +19,11 @@ from typing import Any, Mapping
 
 import scripts.capture_closing_line_archive as v1
 import scripts.capture_closing_line_archive_v2 as v2
+import scripts.odds_api_quota_guard as quota_guard
 
 UTC = timezone.utc
 RAW_ARCHIVE_VERSION = "RAW_PAYLOAD_GUARD_V3"
+DEFAULT_PROVIDER_BUDGET_PATH = "config/nfl_2026_provider_budget_v1.json"
 
 
 def canonical_payload_bytes(payload: list[Mapping[str, Any]]) -> bytes:
@@ -50,6 +52,58 @@ def persist_raw_payload(
         target.write_bytes(body)
     return rel.as_posix(), digest
 
+
+
+def _provider_budget_contract(policy: Mapping[str, Any]) -> dict[str, int] | None:
+    guard = policy.get("provider_budget_guard") or {}
+    if guard.get("enabled") is not True:
+        return None
+    budget_path = Path(str(guard.get("budget_path") or DEFAULT_PROVIDER_BUDGET_PATH))
+    try:
+        budget = json.loads(budget_path.read_text(encoding="utf-8"))
+        reserve = budget["lower_priority_paid_work"]["minimum_confirmation_reserve_credits"]
+        request_cost = guard["paid_request_cost_credits"]
+    except Exception as exc:
+        raise v1.ArchiveError("CLOSING_LINE_ARCHIVE_PROVIDER_BUDGET_INVALID") from exc
+    if not isinstance(reserve, int) or reserve < 0:
+        raise v1.ArchiveError("CLOSING_LINE_ARCHIVE_PROVIDER_RESERVE_INVALID")
+    if not isinstance(request_cost, int) or request_cost <= 0:
+        raise v1.ArchiveError("CLOSING_LINE_ARCHIVE_REQUEST_COST_INVALID")
+    return {
+        "confirmation_reserve_credits": reserve,
+        "paid_request_cost_credits": request_cost,
+        "minimum_remaining_before_request": reserve + request_cost,
+    }
+
+
+def _reserve_ready_keys(
+    keys: list[str],
+    *,
+    policy: Mapping[str, Any],
+    opener,
+) -> tuple[list[str], dict[str, Any] | None]:
+    contract = _provider_budget_contract(policy)
+    if contract is None:
+        return list(keys), None
+    slots = [(f"ARCHIVE_KEY_{idx + 1}", key) for idx, key in enumerate(keys)]
+    report = quota_guard.probe_quota(
+        slots,
+        minimum_remaining=contract["minimum_remaining_before_request"],
+        opener=opener,
+    )
+    ready_slots = set(report.get("ready_key_slots") or [])
+    eligible = [key for slot, key in slots if slot in ready_slots]
+    summary = {
+        "state": report.get("state"),
+        "reason": report.get("reason"),
+        "minimum_remaining": report.get("minimum_remaining"),
+        "max_remaining": report.get("max_remaining"),
+        "ready_key_slots": sorted(ready_slots),
+        "tested_key_slots": list(report.get("tested_key_slots") or []),
+        **contract,
+        "authority": quota_guard.zero_authority(),
+    }
+    return eligible, summary
 
 def run(
     *,
@@ -95,7 +149,19 @@ def run(
             "skipped": skipped_guard,
         }
         if due and not dry_run:
-            odds_payload = v1.fetch_odds(sport_key, policy, keys, opener)
+            paid_keys, budget_guard = _reserve_ready_keys(keys, policy=policy, opener=opener)
+            if budget_guard is not None:
+                entry["provider_budget_guard"] = budget_guard
+            if not paid_keys:
+                if budget_guard and budget_guard.get("reason") != "INSUFFICIENT_REMAINING_CREDITS":
+                    raise v1.ArchiveError(
+                        f"CLOSING_LINE_ARCHIVE_QUOTA_PREFLIGHT_BLOCKED:{budget_guard.get('reason') or 'UNKNOWN'}"
+                    )
+                entry["paid_call_skipped"] = True
+                entry["skip_reason"] = "NFL_CONFIRMATION_RESERVE_GUARD"
+                report["sports"][label] = entry
+                continue
+            odds_payload = v1.fetch_odds(sport_key, policy, paid_keys, opener)
             entry["paid_call_made"] = True
             raw_path, raw_sha = persist_raw_payload(sport_key, odds_payload, out_dir)
             rows, skipped = v1.build_rows(sport_key, odds_payload, due, now, policy)

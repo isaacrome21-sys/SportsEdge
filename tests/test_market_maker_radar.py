@@ -68,14 +68,15 @@ class PolicyTests(unittest.TestCase):
         self.assertFalse(splits["predictive_model_input"])
         self.assertTrue(splits["rlm_label_requires_news_attribution"])
 
-    def test_archive_uses_dk_and_fd_only_without_fake_circa(self):
+    def test_archive_uses_dk_only_without_fake_circa_or_reference_book(self):
         archive = json.loads(Path("config/closing_line_archive_policy_v1.json").read_text())
-        self.assertEqual(set(archive["books"]), {"draftkings", "fanduel"})
+        self.assertEqual(set(archive["books"]), {"draftkings"})
         self.assertEqual(archive["regions"], "us")
         self.assertEqual(archive["market_radar"]["market_maker_books"], [])
         self.assertEqual(archive["market_radar"]["provider_required_books"], ["circa"])
         self.assertNotIn("circa", archive["books"])
         self.assertNotIn("pinnacle", archive["books"])
+        self.assertNotIn("fanduel", archive["books"])
 
 
 class MathTests(unittest.TestCase):
@@ -98,6 +99,15 @@ class MathTests(unittest.TestCase):
 
 
 class LeadLagTests(unittest.TestCase):
+    def test_draftkings_only_history_cannot_assign_market_maker_leader(self):
+        rows = [
+            row(capture="c0", captured_at="2026-09-14T12:00:00Z", book="draftkings", outcome="Home", price=-110),
+            row(capture="c1", captured_at="2026-09-14T12:05:00Z", book="draftkings", outcome="Home", price=-125),
+        ]
+        report = analyze(rows, POLICY)
+        self.assertEqual(report["lead_lag_signal_count"], 0)
+        self.assertEqual(report["synchronous_pair_count"], 0)
+
     def test_pinnacle_lead_to_dk_and_fd_is_separate_source_family(self):
         rows = [
             row(capture="c0", captured_at="2026-09-14T12:00:00Z", book="pinnacle", outcome="Home", price=-110),
