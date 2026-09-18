@@ -2,8 +2,13 @@
   "schema": "SPORTSEDGE_RECONCILIATION_COVERAGE_EXTENSION_V1",
   "bundle_extensions": {
     "NFL_V2J_V2K_GOVERNANCE_FREEZE_V1": {
-      "coverage_paths": ["scripts/audit_nfl_real_history.py"],
-      "coverage_prefixes": ["sportsedge/sports/nfl/m2_v2j_", "sportsedge/sports/nfl/v2k_"]
+      "coverage_paths": [
+        "scripts/audit_nfl_real_history.py"
+      ],
+      "coverage_prefixes": [
+        "sportsedge/sports/nfl/m2_v2j_",
+        "sportsedge/sports/nfl/v2k_"
+      ]
     },
     "NFL_PROP_MODEL_FREEZE_V1": {
       "coverage_paths": [
@@ -13,7 +18,10 @@
         "scripts/run_football_auto_bundle.py",
         "scripts/run_football_props_auto.py"
       ],
-      "coverage_prefixes": ["sportsedge/sports/nfl/computed_prop_", "sportsedge/sports/nfl/prop_"]
+      "coverage_prefixes": [
+        "sportsedge/sports/nfl/computed_prop_",
+        "sportsedge/sports/nfl/prop_"
+      ]
     },
     "CFB_PROP_MODEL_FREEZE_V1": {
       "coverage_paths": [
@@ -25,10 +33,14 @@
         "scripts/run_football_auto_bundle.py",
         "scripts/run_football_props_auto.py"
       ],
-      "coverage_prefixes": ["sportsedge/sports/cfb/prop_"]
+      "coverage_prefixes": [
+        "sportsedge/sports/cfb/prop_"
+      ]
     },
     "CFB_CANDIDATE_PREREG_FREEZE_V1": {
-      "coverage_paths": ["sportsedge/sports/cfb/candidate_model_v2.py"],
+      "coverage_paths": [
+        "sportsedge/sports/cfb/candidate_model_v2.py"
+      ],
       "coverage_prefixes": []
     },
     "GLOBAL_PROMOTION_EVIDENCE_FREEZE_V2": {
@@ -116,11 +128,13 @@
   "exact_exemptions": {
     ".github/workflows/active-evidence-window-liveness.yml": "ACTIVE_EVIDENCE_WINDOW_LIVENESS_GOVERNANCE_CONTROL_NO_MODEL_OR_PROMOTION_AUTHORITY",
     ".github/workflows/archive-mlb-game-odds.yml": "PROSPECTIVE_MLB_MONEYLINE_EVIDENCE_CAPTURE_ONLY_NO_PROMOTION_OR_OFFICIAL_AUTHORITY",
+    ".github/workflows/cfb-reconstructed-selection-provider-preflight.yml": "CFB_RECONSTRUCTED_SELECTION_PROVIDER_PREFLIGHT_ONLY_ZERO_REPLAY_CALLS_NO_MODEL_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY",
     ".github/workflows/mlb-cfb-prop-engine-governance.yml": "RESEARCH_BUILD_ORDER_ONLY_NO_ACTIVE_BUNDLE",
     ".github/workflows/mlb-development-v2.yml": "RESEARCH_MODEL_DEVELOPMENT_ONLY_NO_ACTIVE_BUNDLE",
     ".github/workflows/odds-api-auth-diagnostic.yml": "AUTH_DIAGNOSTIC_ONLY_NO_ACTIVE_BUNDLE",
     ".github/workflows/v7-backfill-source-readiness.yml": "LEGACY_RESEARCH_SOURCE_READINESS_NO_ACTIVE_BUNDLE",
     "config/active_evidence_windows_v1.json": "ACTIVE_EVIDENCE_WINDOW_OPERATIONAL_REGISTRY_NO_MODEL_OR_PROMOTION_AUTHORITY",
+    "config/cfb_cfbd_reconstructed_selection_budget_v1.json": "CFB_RECONSTRUCTED_SELECTION_PROVIDER_BUDGET_CONTROL_ONLY_NO_MODEL_OR_PROMOTION_AUTHORITY",
     "config/cfb_game_model_freeze.json": "CFB_GAME_MODEL_REGISTRY_CURRENTLY_HAS_NO_ACTIVE_MODEL_BUNDLE",
     "config/football_external_context_v1.json": "FOOTBALL_CONTEXT_ONLY_NO_ACTIVE_BUNDLE",
     "config/football_public_splits_v1.json": "FOOTBALL_CONTEXT_ONLY_NO_ACTIVE_BUNDLE",
@@ -155,6 +169,7 @@
     "scripts/nfl_direct_dk_preflight.py": "NFL_DIRECT_DK_DIAGNOSTIC_PREFLIGHT_ONLY_NO_EVIDENCE_MODEL_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY",
     "scripts/nfl_next_capture_window.py": "NFL_SCHEDULE_ONLY_OBLIGATION_REPORTER_NO_ODDS_MODEL_OR_PROMOTION_AUTHORITY",
     "scripts/odds_api_quota_guard.py": "PROVIDER_QUOTA_OPERATIONAL_GUARD_NO_MODEL_OR_PROMOTION_AUTHORITY",
+    "scripts/preflight_cfb_reconstructed_selection.py": "CFB_RECONSTRUCTED_SELECTION_PROVIDER_QUOTA_PREFLIGHT_ONLY_ZERO_REPLAY_CALLS_NO_MODEL_OR_PROMOTION_AUTHORITY",
     "scripts/probe_mlb_v7_finalization_sources.py": "LEGACY_SOURCE_PROBE_ONLY_NO_ACTIVE_BUNDLE",
     "scripts/probe_public_weather_forecast.py": "WEATHER_PROBE_CONTEXT_ONLY_NO_ACTIVE_BUNDLE",
     "scripts/run_cfb_auto.py": "CFB_GAME_RUNTIME_BLOCKED_WITHOUT_ACTIVE_MODEL_BUNDLE",
@@ -173,7 +188,8 @@
     "sportsedge/sports/mlb/prop_volume_stage1.py": "MLB_PROP_RESEARCH_STAGE_NO_ACTIVE_PROP_BUNDLE",
     "sportsedge/sports/nfl/defensive_context.py": "NFL_RUNTIME_CONTEXT_NO_ACTIVE_MODEL_BUNDLE",
     "sportsedge/sports/nfl/team_totals.py": "NFL_RUNTIME_MARKET_SURFACE_NO_ACTIVE_BUNDLE",
-    "sportsedge/sports/nfl/venue_contract.py": "NFL_RUNTIME_CONTEXT_NO_ACTIVE_MODEL_BUNDLE"
+    "sportsedge/sports/nfl/venue_contract.py": "NFL_RUNTIME_CONTEXT_NO_ACTIVE_MODEL_BUNDLE",
+    "tests/test_cfb_reconstructed_selection_preflight.py": "TEST_ONLY_CFB_PROVIDER_PREFLIGHT_NO_RUNTIME_AUTHORITY"
   },
   "inventory_completion_claim": null,
   "bundle_dispositions": {
