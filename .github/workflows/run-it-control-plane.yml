@@ -56,6 +56,7 @@ jobs:
       cancel-in-progress: false
     runs-on: ubuntu-latest
     env:
+      PYTHONPATH: ${{ github.workspace }}
       SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
       SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
       SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
@@ -77,6 +78,7 @@ jobs:
             python scripts/run_it_all.py --execute --scope ALL --output artifacts/run_it/control_plane.json
           fi
       - name: Upload unified RUN IT output
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: run-it-output
