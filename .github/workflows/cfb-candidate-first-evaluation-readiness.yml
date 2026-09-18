@@ -14,6 +14,7 @@ on:
       - 'scripts/audit_cfb_pit_readiness.py'
       - 'scripts/build_reconciliation_registry_view.py'
       - 'sportsedge/sports/cfb/model_selection_prereg.py'
+      - 'sportsedge/sports/cfb/acquisition_readiness.py'
       - 'sportsedge/sports/cfb/pit_readiness.py'
       - 'sportsedge/sports/cfb/source_manifest.py'
       - '.github/workflows/cfb-candidate-first-evaluation-readiness.yml'
@@ -30,6 +31,7 @@ on:
       - 'scripts/audit_cfb_pit_readiness.py'
       - 'scripts/build_reconciliation_registry_view.py'
       - 'sportsedge/sports/cfb/model_selection_prereg.py'
+      - 'sportsedge/sports/cfb/acquisition_readiness.py'
       - 'sportsedge/sports/cfb/pit_readiness.py'
       - 'sportsedge/sports/cfb/source_manifest.py'
       - '.github/workflows/cfb-candidate-first-evaluation-readiness.yml'
@@ -90,6 +92,10 @@ jobs:
           fi
           echo "current=$current" >> "$GITHUB_OUTPUT"
 
+          acquisition='data-branch/history/cfb/reconstructed-selection/acquisition_manifest.json'
+          [ -f "$acquisition" ] || acquisition=''
+          echo "acquisition=$acquisition" >> "$GITHUB_OUTPUT"
+
           pit_root='data-branch/history/cfb/pit'
           echo "pit_root=$pit_root" >> "$GITHUB_OUTPUT"
           for pair in \
@@ -120,6 +126,30 @@ jobs:
           [ -z "${{ steps.evidence.outputs.market }}" ] || args+=(--paired-market-evidence "${{ steps.evidence.outputs.market }}")
           python scripts/audit_cfb_pit_readiness.py "${args[@]}"
 
+      - name: Audit frozen reconstructed-acquisition gate without consuming an attempt
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          from sportsedge.sports.cfb.acquisition_readiness import audit_cfb_acquisition_readiness
+
+          policy = json.loads(Path('config/cfb_model_selection_policy_v1.json').read_text())
+          raw_path = '''${{ steps.evidence.outputs.acquisition }}'''.strip()
+          acquisition = None
+          if raw_path:
+              path = Path(raw_path)
+              if path.is_file():
+                  acquisition = json.loads(path.read_text())
+          report = audit_cfb_acquisition_readiness(policy, acquisition)
+          Path('artifacts/cfb/acquisition_readiness.json').write_text(
+              json.dumps(report, indent=2, sort_keys=True) + '\n'
+          )
+          print(json.dumps(report, sort_keys=True))
+          PY
+
       - name: Freeze candidate-selection first-evaluation decision
         shell: bash
         run: |
@@ -130,6 +160,7 @@ jobs:
 
           prereg = json.loads(Path('artifacts/cfb/candidate_prereg_readiness.json').read_text())
           pit = json.loads(Path('artifacts/cfb/pit_readiness.json').read_text())
+          acquisition = json.loads(Path('artifacts/cfb/acquisition_readiness.json').read_text())
           frozen = json.loads(Path('config/cfb_model_candidate_prereg_v1.json').read_text())
           effective_registry = json.loads(
               Path('artifacts/cfb/effective_freeze_reconciliation_registry.json').read_text()
@@ -156,18 +187,26 @@ jobs:
           freeze_ready = freeze_state == 'REFROZEN'
 
           prereg_ready = prereg.get('status') == 'READY_FOR_FIRST_EVALUATION'
+          acquisition_ready = acquisition.get('status') == 'READY_FOR_HISTORICAL_REPLAY'
           pit_ready = pit.get('historical_truth_gate_execution_allowed') is True
 
           # Scope amendment #730 keeps promotion-grade PIT separate from candidate
-          # selection admission. Reconciliation authority is different: a revoked
-          # prereg freeze cannot authorize any candidate evaluation attempt.
-          allowed = prereg_ready and freeze_ready
+          # selection admission. The frozen model-selection policy still requires
+          # verified acquisition/account/quota/cache readiness before the first
+          # reconstructed historical replay call. Reconciliation authority is
+          # separate: a revoked prereg freeze cannot authorize evaluation either.
+          allowed = prereg_ready and freeze_ready and acquisition_ready
           selection_blockers = []
           if not prereg_ready:
               selection_blockers.append('PREREGISTRATION_NOT_READY')
           if not freeze_ready:
               selection_blockers.append(
                   f'CANDIDATE_PREREG_FREEZE_NOT_REFROZEN:{freeze_state}'
+              )
+          if not acquisition_ready:
+              selection_blockers.append('RECONSTRUCTED_ACQUISITION_NOT_READY')
+              selection_blockers.extend(
+                  acquisition.get('blockers') or ['ACQUISITION_MANIFEST_MISSING']
               )
           promotion_pit_blockers = [] if pit_ready else list(
               pit.get('blockers') or ['GENUINE_PIT_SOURCE_CONTRACT_NOT_READY']
@@ -177,8 +216,10 @@ jobs:
               status = 'FIRST_EVALUATION_ALLOWED'
           elif not prereg_ready:
               status = 'BLOCKED_SELECTION_PREREGISTRATION'
-          else:
+          elif not freeze_ready:
               status = 'BLOCKED_SELECTION_FREEZE_AUTHORITY'
+          else:
+              status = 'BLOCKED_SELECTION_ACQUISITION'
 
           report = {
               'schema_version': 'CFB_FIRST_EVALUATION_READINESS_V3',
@@ -195,6 +236,8 @@ jobs:
               'candidate_prereg_freeze_bundle_id': 'CFB_CANDIDATE_PREREG_FREEZE_V1',
               'candidate_prereg_freeze_disposition': freeze_state,
               'candidate_prereg_freeze_refrozen': freeze_ready,
+              'acquisition_readiness_status': acquisition.get('status'),
+              'reconstructed_acquisition_ready': acquisition_ready,
               'pit_readiness_state': pit.get('readiness_state'),
               'historical_truth_gate_execution_allowed': pit.get('historical_truth_gate_execution_allowed'),
               'forward_clock_allowed': pit.get('forward_clock_allowed'),
@@ -225,6 +268,8 @@ jobs:
               raise SystemExit('CFB_FIRST_EVAL_ALLOWED_WITHOUT_PREREGISTRATION')
           if report.get('first_evaluation_allowed') and report.get('candidate_prereg_freeze_disposition') != 'REFROZEN':
               raise SystemExit('CFB_FIRST_EVAL_ALLOWED_WITHOUT_REFROZEN_PREREG_FREEZE')
+          if report.get('first_evaluation_allowed') and report.get('acquisition_readiness_status') != 'READY_FOR_HISTORICAL_REPLAY':
+              raise SystemExit('CFB_FIRST_EVAL_ALLOWED_WITHOUT_ACQUISITION_READINESS')
           if report.get('first_evaluation_allowed') and report.get('selection_scope_only') is not True:
               raise SystemExit('CFB_FIRST_EVAL_SCOPE_NOT_SELECTION_ONLY')
           PY
@@ -236,6 +281,7 @@ jobs:
           name: cfb-first-evaluation-readiness-${{ github.sha }}
           path: |
             artifacts/cfb/candidate_prereg_readiness.json
+            artifacts/cfb/acquisition_readiness.json
             artifacts/cfb/pit_readiness.json
             artifacts/cfb/first_evaluation_readiness.json
             artifacts/cfb/effective_freeze_reconciliation_registry.json
