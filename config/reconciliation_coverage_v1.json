@@ -2,8 +2,13 @@
   "schema": "SPORTSEDGE_RECONCILIATION_COVERAGE_EXTENSION_V1",
   "bundle_extensions": {
     "NFL_V2J_V2K_GOVERNANCE_FREEZE_V1": {
-      "coverage_paths": ["scripts/audit_nfl_real_history.py"],
-      "coverage_prefixes": ["sportsedge/sports/nfl/m2_v2j_", "sportsedge/sports/nfl/v2k_"]
+      "coverage_paths": [
+        "scripts/audit_nfl_real_history.py"
+      ],
+      "coverage_prefixes": [
+        "sportsedge/sports/nfl/m2_v2j_",
+        "sportsedge/sports/nfl/v2k_"
+      ]
     },
     "NFL_PROP_MODEL_FREEZE_V1": {
       "coverage_paths": [
@@ -13,7 +18,10 @@
         "scripts/run_football_auto_bundle.py",
         "scripts/run_football_props_auto.py"
       ],
-      "coverage_prefixes": ["sportsedge/sports/nfl/computed_prop_", "sportsedge/sports/nfl/prop_"]
+      "coverage_prefixes": [
+        "sportsedge/sports/nfl/computed_prop_",
+        "sportsedge/sports/nfl/prop_"
+      ]
     },
     "CFB_PROP_MODEL_FREEZE_V1": {
       "coverage_paths": [
@@ -25,10 +33,14 @@
         "scripts/run_football_auto_bundle.py",
         "scripts/run_football_props_auto.py"
       ],
-      "coverage_prefixes": ["sportsedge/sports/cfb/prop_"]
+      "coverage_prefixes": [
+        "sportsedge/sports/cfb/prop_"
+      ]
     },
     "CFB_CANDIDATE_PREREG_FREEZE_V1": {
-      "coverage_paths": ["sportsedge/sports/cfb/candidate_model_v2.py"],
+      "coverage_paths": [
+        "sportsedge/sports/cfb/candidate_model_v2.py"
+      ],
       "coverage_prefixes": []
     },
     "GLOBAL_PROMOTION_EVIDENCE_FREEZE_V2": {
@@ -38,6 +50,7 @@
         ".github/workflows/cfb-forward-pit-source-capture.yml",
         ".github/workflows/cfb-forward-weather-evidence.yml",
         ".github/workflows/cfb-pit-readiness-contract.yml",
+        ".github/workflows/ev-v3-governance.yml",
         ".github/workflows/mlb-additional-pit-archive.yml",
         ".github/workflows/mlb-authentic-provider-freeze.yml",
         ".github/workflows/mlb-paired-window-plan-smoke.yml",
@@ -60,6 +73,7 @@
         "config/cross_sport_backtest_policy_v1.json",
         "config/ev_tracker_policy_v1.json",
         "config/ev_tracker_policy_v2.json",
+        "config/ev_tracker_policy_v3.json",
         "config/market_id_canonicalization_v1.json",
         "config/mlb_moneyline_forward_lane_v1.json",
         "config/mlb_prop_evidence_groups.json",
@@ -73,6 +87,7 @@
         "docs/LIVE_DATA_ARCHIVE_V1.md",
         "docs/LIVE_ENGINE_V1.md",
         "docs/MLB_V8_RUN_IT_SCHEMA_2026-09-03.json",
+        "docs/ev_tracker_v3_suspension_doctrine.md",
         "docs/hybrid_provenance_contract.md",
         "docs/market_data_runtime_guards.md",
         "docs/nrfi_durable_evidence_recovery.md",
@@ -173,7 +188,8 @@
     "sportsedge/sports/mlb/prop_volume_stage1.py": "MLB_PROP_RESEARCH_STAGE_NO_ACTIVE_PROP_BUNDLE",
     "sportsedge/sports/nfl/defensive_context.py": "NFL_RUNTIME_CONTEXT_NO_ACTIVE_MODEL_BUNDLE",
     "sportsedge/sports/nfl/team_totals.py": "NFL_RUNTIME_MARKET_SURFACE_NO_ACTIVE_BUNDLE",
-    "sportsedge/sports/nfl/venue_contract.py": "NFL_RUNTIME_CONTEXT_NO_ACTIVE_MODEL_BUNDLE"
+    "sportsedge/sports/nfl/venue_contract.py": "NFL_RUNTIME_CONTEXT_NO_ACTIVE_MODEL_BUNDLE",
+    "docs/public_repo_v3_pattern_adoptions.md": "PUBLIC_REPO_ADOPTION_PROVENANCE_ONLY_NO_MODEL_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY"
   },
   "inventory_completion_claim": null,
   "bundle_dispositions": {
