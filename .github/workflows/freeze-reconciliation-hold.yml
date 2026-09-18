@@ -11,6 +11,7 @@ permissions:
 
 jobs:
   main-merge-hold:
+    name: main-merge-hold from the freeze-reconciliation-hold
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
