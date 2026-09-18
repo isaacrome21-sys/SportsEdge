@@ -9,6 +9,11 @@ on:
       - 'scripts/acquire_cfb_reconstructed_selection.py'
       - 'scripts/materialize_cfb_reconstructed_selection.py'
       - 'sportsedge/sports/cfb/reconstructed_selection.py'
+      - 'sportsedge/sports/cfb/candidate_live_source.py'
+      - 'sportsedge/sports/cfb/selected_candidate_model.py'
+      - 'sportsedge/sports/cfb/selected_candidate_artifact.py'
+      - 'tests/test_cfb_selected_candidate_serving.py'
+      - 'tests/test_cfb_train_freeze_contract.py'
       - 'config/cfb_model_selection_policy_v1.json'
       - 'config/cfb_model_candidate_prereg_v1.json'
       - 'config/cfb_game_model_freeze.json'
@@ -30,18 +35,23 @@ jobs:
           python-version-file: '.python-version'
       - name: Install test dependencies
         run: python -m pip install --disable-pip-version-check -r requirements-test.txt
-      - name: Verify reconstructed acquisition/materialization plumbing
+      - name: Verify reconstructed and selected-candidate pre-attempt contracts
         run: |
           set -euo pipefail
           python -m py_compile \
             scripts/preflight_cfb_reconstructed_selection.py \
             scripts/acquire_cfb_reconstructed_selection.py \
             scripts/materialize_cfb_reconstructed_selection.py \
-            sportsedge/sports/cfb/reconstructed_selection.py
+            sportsedge/sports/cfb/reconstructed_selection.py \
+            sportsedge/sports/cfb/candidate_live_source.py \
+            sportsedge/sports/cfb/selected_candidate_model.py \
+            sportsedge/sports/cfb/selected_candidate_artifact.py
           python -m unittest \
             tests.test_cfb_reconstructed_selection_preflight \
             tests.test_cfb_reconstructed_selection_acquisition \
-            tests.test_cfb_reconstructed_selection_materializer
+            tests.test_cfb_reconstructed_selection_materializer \
+            tests.test_cfb_selected_candidate_serving \
+            tests.test_cfb_train_freeze_contract
       - name: Prove frozen selection policy is still unspent
         run: |
           python - <<'PY'
