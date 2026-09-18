@@ -41,10 +41,14 @@ def test_pr815_catchup_sequence_remains_history_stable() -> None:
     assert pairs[start:start + len(HISTORICAL_THROUGH_815)] == HISTORICAL_THROUGH_815
 
 
-def test_reconciliation_advances_through_pr842_in_first_parent_order() -> None:
+def test_reconciliation_contains_pr842_sequence_and_can_advance_later() -> None:
     registry = json.loads(Path('config/freeze_reconciliation_registry_v1.json').read_text())
-    assert registry['reconciled_through_sha'] == POST_815[-1][1]
-    assert _pairs(registry)[-len(POST_815):] == POST_815
+    pairs = _pairs(registry)
+    start = pairs.index(POST_815[0])
+    assert pairs[start:start + len(POST_815)] == POST_815
+    end_index = start + len(POST_815) - 1
+    assert end_index < len(pairs)
+    assert registry['reconciled_through_sha'] == pairs[-1][1]
 
 
 def test_candidate_prereg_bundle_remains_attempt_zero_and_zero_authority() -> None:
