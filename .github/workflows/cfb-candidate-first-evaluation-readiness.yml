@@ -47,6 +47,7 @@ permissions:
 
 jobs:
   readiness:
+    name: CFB readiness
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
