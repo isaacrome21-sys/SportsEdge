@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-EXPECTED = [
+HISTORICAL_THROUGH_815 = [
     (807, '6256c6125c35b6034697577c470a287290204769'),
     (808, '6e1c566f68b5383656bb10697b37358abd5903c3'),
     (810, '9a095800829a18b09e986cc3fa2cc4c9dfcdae61'),
@@ -17,12 +17,28 @@ EXPECTED = [
     (815, '2b4011058429bd6a689e7a69e0286a7e341629bb'),
 ]
 
+POST_815 = [
+    (822, 'd17a66fe43cb7a6db7955c4e529bc59fd23a2a9f'),
+    (823, '852b759b146beba64457a398b3b293eec8a17750'),
+    (826, '374ffc70c7bfc2fae968ae4d506b2d325ec1ee5d'),
+]
 
-def test_reconciliation_catchup_is_first_parent_complete_through_pr815() -> None:
+
+def _pairs(registry):
+    return [(row['pr'], row['merge_sha']) for row in registry['deltas']]
+
+
+def test_pr815_catchup_sequence_remains_history_stable() -> None:
     registry = json.loads(Path('config/freeze_reconciliation_registry_v1.json').read_text())
-    assert registry['reconciled_through_sha'] == EXPECTED[-1][1]
-    tail = registry['deltas'][-len(EXPECTED):]
-    assert [(row['pr'], row['merge_sha']) for row in tail] == EXPECTED
+    pairs = _pairs(registry)
+    start = pairs.index(HISTORICAL_THROUGH_815[0])
+    assert pairs[start:start + len(HISTORICAL_THROUGH_815)] == HISTORICAL_THROUGH_815
+
+
+def test_reconciliation_advances_through_pr826_in_first_parent_order() -> None:
+    registry = json.loads(Path('config/freeze_reconciliation_registry_v1.json').read_text())
+    assert registry['reconciled_through_sha'] == POST_815[-1][1]
+    assert _pairs(registry)[-len(POST_815):] == POST_815
 
 
 def test_candidate_prereg_bundle_remains_attempt_zero_and_zero_authority() -> None:
