@@ -1,0 +1,106 @@
+name: tmp-reconcile-pr840-for-clv
+
+on:
+  push:
+    branches:
+      - fix/clv-remove-pinnacle-paid-region
+    paths:
+      - '.github/workflows/tmp-reconcile-pr840-for-clv.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: fix/clv-remove-pinnacle-paid-region
+          fetch-depth: 0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Register PR 840 protected-main transition
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          registry_path = Path('config/freeze_reconciliation_registry_v1.json')
+          registry = json.loads(registry_path.read_text())
+          expected_old = '529b06af94061a5eb86efd9909b15b62cefce938'
+          target = '6b842b17ca0bb1eec7370daaf3a981189ecf4e00'
+          row = {
+              'delta_id': 'PR_840_CFB_PROVIDER_PREFLIGHT_HARDENING',
+              'merge_sha': target,
+              'note': 'Hardens the CFB provider preflight so acquisition readiness requires verified CFBD auth/tier/weather/quota fit with zero replay calls and zero authority. Candidate prereg remains REVOKED; attempts remain zero and evaluation remains unrun.',
+              'pr': 840,
+          }
+
+          current = registry.get('reconciled_through_sha')
+          if current not in {expected_old, target}:
+              raise SystemExit(f'UNEXPECTED_RECONCILIATION_BOUNDARY:{current}')
+
+          existing = {item['delta_id']: item for item in registry['deltas']}
+          prior = existing.get(row['delta_id'])
+          if prior is None:
+              registry['deltas'].append(row)
+          elif prior != row:
+              raise SystemExit('PR_840_DELTA_IDENTITY_DRIFT')
+          registry['reconciled_through_sha'] = target
+
+          bundle = next(item for item in registry['bundles'] if item['bundle_id'] == 'CFB_CANDIDATE_PREREG_FREEZE_V1')
+          if (bundle.get('disposition') or {}).get('state') != 'REVOKED':
+              raise SystemExit('CFB_CANDIDATE_PREREG_MUST_REMAIN_REVOKED')
+
+          prereg = json.loads(Path('config/cfb_model_candidate_prereg_v1.json').read_text())
+          gov = prereg['governance']
+          if gov.get('attempts_consumed') != 0 or gov.get('evaluation_performed') is not False:
+              raise SystemExit('CFB_ATTEMPT_OR_EVALUATION_AUTHORITY_DRIFT')
+          for key in ('model_p_created', 'promotion_authority', 'official_authority'):
+              if gov.get(key) is not False:
+                  raise SystemExit(f'CFB_AUTHORITY_DRIFT:{key}')
+
+          registry_path.write_text(json.dumps(registry, separators=(',', ':')) + '\n')
+
+          test_path = Path('tests/test_reconciliation_catchup_pr815.py')
+          text = test_path.read_text()
+          anchor = "    (839, '529b06af94061a5eb86efd9909b15b62cefce938'),\n]"
+          replacement = "    (839, '529b06af94061a5eb86efd9909b15b62cefce938'),\n    (840, '6b842b17ca0bb1eec7370daaf3a981189ecf4e00'),\n]"
+          if "(840, '6b842b17ca0bb1eec7370daaf3a981189ecf4e00')" not in text:
+              if anchor not in text:
+                  raise SystemExit('PR840_TEST_ANCHOR_MISSING')
+              text = text.replace(anchor, replacement, 1)
+          text = text.replace(
+              'test_reconciliation_advances_through_pr839_in_first_parent_order',
+              'test_reconciliation_advances_through_pr840_in_first_parent_order',
+          )
+          test_path.write_text(text)
+          PY
+
+      - name: Verify reconciliation and zero-attempt governance
+        run: |
+          set -euo pipefail
+          python -m pip install -r requirements-test.txt
+          git fetch --no-tags origin main
+          python -m pytest -q tests/test_reconciliation_catchup_pr815.py tests/test_freeze_reconciliation.py
+
+      - name: Commit reconciliation bytes to branch only
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- config/freeze_reconciliation_registry_v1.json tests/test_reconciliation_catchup_pr815.py; then
+            echo 'No reconciliation changes needed.'
+            exit 0
+          fi
+          git config user.name 'sportsedge-reconciliation-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add config/freeze_reconciliation_registry_v1.json tests/test_reconciliation_catchup_pr815.py
+          git commit -m 'Governance: register PR 840 reconciliation merge'
+          git push origin HEAD:fix/clv-remove-pinnacle-paid-region
