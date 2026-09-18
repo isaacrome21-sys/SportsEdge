@@ -49,15 +49,18 @@ class PolicyTests(unittest.TestCase):
         self.assertFalse(POLICY["promotion_authority"])
         self.assertFalse(POLICY["evidence_clock_authority"])
 
-    def test_paid_archive_is_us_only_and_excludes_pinnacle(self):
+    def test_paid_archive_is_draftkings_only_us_and_excludes_pinnacle_fanduel(self):
         self.assertEqual(POLICY["regions"], "us")
-        self.assertEqual(POLICY["books"], ["draftkings", "fanduel"])
+        self.assertEqual(POLICY["books"], ["draftkings"])
+        self.assertNotIn("fanduel", POLICY["books"])
         self.assertNotIn("pinnacle", POLICY["books"])
         self.assertNotIn("eu", {part.strip() for part in POLICY["regions"].split(",")})
         self.assertEqual(POLICY["market_radar"]["market_maker_books"], [])
 
     def test_t0_prestart_is_all_sports_and_non_promoting(self):
-        self.assertEqual(set(POLICY["sports"]), {"NFL", "CFB", "MLB", "UFC"})
+        self.assertEqual(set(POLICY["sports"]), {"NFL", "CFB", "UFC"})
+        self.assertNotIn("MLB", POLICY["sports"])
+        self.assertFalse(POLICY["parked_sports"]["MLB"]["scheduled_paid_capture"])
         self.assertEqual(POLICY["sports"]["UFC"], "mma_mixed_martial_arts")
         self.assertEqual(POLICY["windows"]["t0_prestart"], {
             "min_minutes_before_start": 0,
@@ -235,7 +238,7 @@ class RunTests(unittest.TestCase):
                 opener=self._opener([_event("a", 10)], [_odds_event("a", 10)], calls),
             )
             self.assertIn("paid", calls)
-            self.assertEqual(report["total_rows_written"], 8)
+            self.assertEqual(report["total_rows_written"], 6)
             files = list(Path(tmp).rglob("*.ndjson"))
             self.assertTrue(files)
             first = files[0].read_text().strip().splitlines()
@@ -263,8 +266,8 @@ class RunTests(unittest.TestCase):
                 keys=["k"],
                 opener=self._opener([_event("a", 3)], [_odds_event("a", 3)], calls),
             )
-            self.assertEqual(report["total_rows_written"], 16)
-            self.assertEqual(set(report["sports"]), {"NFL", "CFB", "MLB", "UFC"})
+            self.assertEqual(report["total_rows_written"], 12)
+            self.assertEqual(set(report["sports"]), {"NFL", "CFB", "UFC"})
             for entry in report["sports"].values():
                 self.assertEqual(entry["window_memberships_due"], 2)
                 self.assertEqual(set(entry["windows"]), {"t0_prestart", "close"})
