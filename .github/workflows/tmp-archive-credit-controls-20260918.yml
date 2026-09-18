@@ -1,5 +1,5 @@
 name: tmp-archive-credit-controls-20260918
-# Final bootstrap rerun after parked-MLB expectation updates.
+# Bootstrap only; durable patch excludes workflow bytes.
 
 on:
   push:
@@ -49,7 +49,6 @@ jobs:
             tests/test_closing_line_archive.py \
             tests/test_closing_line_archive_credit_guard.py \
             tests/test_market_maker_radar.py \
-            .github/workflows/closing-line-archive.yml \
             config/freeze_reconciliation_registry_v1.json \
             tests/test_reconciliation_catchup_pr815.py
           if git diff --cached --quiet; then
