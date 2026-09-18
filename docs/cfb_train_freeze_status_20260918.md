@@ -1,9 +1,9 @@
-# CFB train/freeze repair status — 2026-09-18
+# CFB train/freeze pre-attempt status — 2026-09-18
 
-This branch restores the machine-verified post-PR-833 candidate preregistration refreeze and adds the guarded reconstructed-selection acquisition/materialization lane needed before candidate evaluation.
+The selected-candidate serving gap is closed on this branch. All four frozen candidate families are executable through a hash-bound selected-candidate artifact and the canonical runtime adapter, with hosted direct-vs-adapter distribution parity tests.
 
-The new `cfb-train-freeze` entrypoint intentionally stops after the zero-cost CFBD provider preflight. It does **not** spend one of the four frozen candidate attempts until the selected-candidate serving contract can faithfully execute all four preregistered families, including `GAMES_IN_SAMPLE_FEATURE`, in the production joint-distribution runtime.
+The frozen model-selection budget remains 0 of 4 attempts consumed and no candidate evaluation has been performed. Model_P, Truth Gate, promotion, eligibility, staking, evidence-clock, backfill, and OFFICIAL authority remain false.
 
-Current authority remains zero: no Model_P, Truth Gate, promotion, eligibility, staking, evidence-clock, backfill, or OFFICIAL authority is created by these repairs. Reconstructed historical data remains `RECONSTRUCTED_HISTORICAL_NOT_PIT` and cannot be relabeled as promotion evidence.
+The first evaluation is still blocked by the reconstructed-selection acquisition contract. The authenticated CFBD provider preflight verifies the account and quota budget, but the current account does not have the weather endpoint entitlement required by the frozen acquisition plan. No historical replay call has been made by the preflight, and acquisition must remain fail-closed until that provider/source-contract requirement is satisfied.
 
-The remaining external prerequisite is a repository Actions secret named exactly `CFBD_API_KEY`; secrets cannot be added through the connected GitHub App. The preflight must verify the account, weather entitlement, remaining quota, and the frozen replay-call budget before any historical acquisition begins.
+Reconstructed historical data remains `RECONSTRUCTED_HISTORICAL_NOT_PIT` and cannot be relabeled as promotion evidence.
