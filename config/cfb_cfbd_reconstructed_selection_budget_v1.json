@@ -1,0 +1,59 @@
+{
+  "schema_version": "CFB_CFBD_RECONSTRUCTED_SELECTION_BUDGET_V1",
+  "purpose": "Verify the authenticated CFBD account and a conservative replay-call budget before any reconstructed historical selection acquisition begins.",
+  "selection_start_season": 2015,
+  "selection_end_season": 2025,
+  "prior_fallback_season": 2014,
+  "max_regular_week_planning_bound": 20,
+  "planned_new_calls_upper_bound": {
+    "games": 12,
+    "fbs_membership": 11,
+    "weather": 11,
+    "advanced_metrics": 210,
+    "total": 244
+  },
+  "retry_reserve_calls": 50,
+  "standard_tier_monthly_quotas": {
+    "0": 1000,
+    "1": 5000,
+    "2": 30000,
+    "3": 75000,
+    "4": 125000,
+    "5": 200000,
+    "6": 500000
+  },
+  "tier_labels": {
+    "0": "FREE",
+    "1": "TIER_1",
+    "2": "TIER_2",
+    "3": "TIER_3",
+    "4": "TIER_4",
+    "5": "TIER_5",
+    "6": "TIER_6"
+  },
+  "weather_min_patron_level": 1,
+  "account_info_endpoint": "/info",
+  "advanced_endpoint": "/stats/season/advanced",
+  "weather_endpoint": "/games/weather",
+  "tier_source": "https://collegefootballdata.com/api-tiers",
+  "tier_source_checked_date": "2026-09-17",
+  "rules": {
+    "assumed_public_tier_prohibited": true,
+    "remaining_quota_must_be_provider_reported": true,
+    "standard_tier_mapping_must_be_self_consistent": true,
+    "call_plan_plus_retry_reserve_must_fit_remaining": true,
+    "historical_replay_calls_performed_by_preflight": false,
+    "raw_cfbd_data_may_not_be_persisted_to_public_repository": true
+  },
+  "authority": {
+    "attempt_consumed": false,
+    "evaluation_performed": false,
+    "model_p": false,
+    "truth_gate": false,
+    "promotion": false,
+    "eligibility": false,
+    "staking": false,
+    "official": false,
+    "backfill": false
+  }
+}
