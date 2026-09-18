@@ -1,0 +1,79 @@
+name: cfb-reconstructed-selection-provider-preflight
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'config/cfb_cfbd_reconstructed_selection_budget_v1.json'
+      - 'scripts/preflight_cfb_reconstructed_selection.py'
+      - 'tests/test_cfb_reconstructed_selection_preflight.py'
+      - '.github/workflows/cfb-reconstructed-selection-provider-preflight.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    name: CFB reconstructed-selection provider preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: '.python-version'
+
+      - name: Compile and test preflight contract
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/preflight_cfb_reconstructed_selection.py
+          python -m unittest tests.test_cfb_reconstructed_selection_preflight
+
+      - name: Verify provider account and replay budget without historical acquisition
+        id: preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          private_file="${RUNNER_TEMP}/cfb_cfbd_private_preflight.json"
+          python scripts/preflight_cfb_reconstructed_selection.py \
+            --private-out "$private_file" \
+            --public-out artifacts/cfb/cfbd_reconstructed_selection_preflight_public.json
+          test -f artifacts/cfb/cfbd_reconstructed_selection_preflight_public.json
+          rm -f "$private_file"
+
+      - name: Assert zero authority and zero replay calls
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('artifacts/cfb/cfbd_reconstructed_selection_preflight_public.json').read_text())
+          if report.get('historical_replay_calls_performed') != 0:
+              raise SystemExit('CFB_PREFLIGHT_PERFORMED_HISTORICAL_REPLAY_CALL')
+          authority = report.get('authority') or {}
+          if not authority or any(value is not False for value in authority.values()):
+              raise SystemExit('CFB_PREFLIGHT_AUTHORITY_LEAK')
+          if report.get('status') not in {'VERIFIED_BEFORE_FIRST_REPLAY_CALL', 'BLOCKED_PROVIDER_PREFLIGHT'}:
+              raise SystemExit('CFB_PREFLIGHT_STATUS_INVALID')
+          print(json.dumps({
+              'status': report['status'],
+              'weather_entitled': report.get('weather_entitled'),
+              'call_plan_fits': report.get('call_plan_fits'),
+              'historical_replay_calls_performed': 0,
+              'authority': authority,
+          }, sort_keys=True))
+          PY
+
+      - name: Upload redacted preflight attestation
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cfb-reconstructed-selection-provider-preflight-${{ github.sha }}
+          path: artifacts/cfb/cfbd_reconstructed_selection_preflight_public.json
+          if-no-files-found: warn
+          retention-days: 30
