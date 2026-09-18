@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Materialize a reconstructed CFB selection bundle from private acquisition bytes.
 
-This script performs no network calls and no model evaluation.  The input payload is
-expected to live in runner-private temporary storage.  By default only hash-bound,
+This script performs no network calls and no model evaluation. The input payload is
+expected to live in runner-private temporary storage. By default only hash-bound,
 zero-authority manifests are written; normalized selection rows are written only
 when an explicit private output path is supplied.
 """
@@ -29,6 +29,7 @@ from sportsedge.sports.cfb.source import CFBTeamMetrics
 
 POLICY = ROOT / "config/cfb_model_selection_policy_v1.json"
 PREDICTIVE_MANIFEST = ROOT / "config/cfb_model_candidate_code_manifest_v1.json"
+EXPECTED_WEATHER_CONTRACT = "CFBD_VENUES_OPEN_METEO_ERA5_RECONSTRUCTED_CURRENT_PROVIDER_VINTAGE"
 
 
 class CFBReconstructedMaterializationError(RuntimeError):
@@ -63,8 +64,10 @@ def _validate_preflight(raw: object) -> Mapping[str, Any]:
         raise CFBReconstructedMaterializationError("CFB_RECONSTRUCTED_PRIVATE_PREFLIGHT_SCHEMA_INVALID")
     if raw.get("status") != "VERIFIED_BEFORE_FIRST_REPLAY_CALL":
         raise CFBReconstructedMaterializationError("CFB_RECONSTRUCTED_PROVIDER_NOT_VERIFIED")
-    if raw.get("weather_entitled") is not True:
-        raise CFBReconstructedMaterializationError("CFB_RECONSTRUCTED_WEATHER_NOT_ENTITLED")
+    if raw.get("weather_transport_ready") is not True:
+        raise CFBReconstructedMaterializationError("CFB_RECONSTRUCTED_WEATHER_TRANSPORT_NOT_READY")
+    if str(raw.get("weather_source_contract") or "").strip() != EXPECTED_WEATHER_CONTRACT:
+        raise CFBReconstructedMaterializationError("CFB_RECONSTRUCTED_WEATHER_CONTRACT_MISMATCH")
     if raw.get("historical_replay_calls_performed") != 0:
         raise CFBReconstructedMaterializationError("CFB_RECONSTRUCTED_PREFLIGHT_ALREADY_REPLAYED")
     try:
@@ -148,6 +151,8 @@ def run(payload: Mapping[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any
     )
     policy = _load(POLICY)
     weather_contract = str(payload.get("weather_source_contract") or "").strip()
+    if weather_contract != EXPECTED_WEATHER_CONTRACT:
+        raise CFBReconstructedMaterializationError("CFB_RECONSTRUCTED_PAYLOAD_WEATHER_CONTRACT_MISMATCH")
     bundle = build_selection_bundle_manifest(
         rows=rows,
         source_manifest=source_manifest,
