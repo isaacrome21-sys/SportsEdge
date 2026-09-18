@@ -1,0 +1,53 @@
+name: tmp-cfb-preflight-coverage-patch
+
+on:
+  push:
+    branches:
+      - cfb/reconstructed-selection-acquisition-v1
+    paths:
+      - '.github/workflows/tmp-cfb-preflight-coverage-patch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: cfb/reconstructed-selection-acquisition-v1
+          fetch-depth: 0
+
+      - name: Add exact zero-authority reconciliation exemptions and remove bootstrap
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('config/reconciliation_coverage_v1.json')
+          payload = json.loads(path.read_text(encoding='utf-8'))
+          exact = payload.setdefault('exact_exemptions', {})
+          additions = {
+              '.github/workflows/cfb-reconstructed-selection-provider-preflight.yml': 'CFB_RECONSTRUCTED_SELECTION_PROVIDER_PREFLIGHT_ONLY_ZERO_REPLAY_CALLS_NO_MODEL_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY',
+              'config/cfb_cfbd_reconstructed_selection_budget_v1.json': 'CFB_RECONSTRUCTED_SELECTION_PROVIDER_BUDGET_CONTROL_ONLY_NO_MODEL_OR_PROMOTION_AUTHORITY',
+              'scripts/preflight_cfb_reconstructed_selection.py': 'CFB_RECONSTRUCTED_SELECTION_PROVIDER_QUOTA_PREFLIGHT_ONLY_ZERO_REPLAY_CALLS_NO_MODEL_OR_PROMOTION_AUTHORITY',
+              'tests/test_cfb_reconstructed_selection_preflight.py': 'TEST_ONLY_CFB_PROVIDER_PREFLIGHT_NO_RUNTIME_AUTHORITY',
+          }
+          for key, value in additions.items():
+              prior = exact.get(key)
+              if prior not in (None, value):
+                  raise SystemExit(f'CFB_PREFLIGHT_EXEMPTION_CONFLICT:{key}:{prior}')
+              exact[key] = value
+          payload['exact_exemptions'] = dict(sorted(exact.items()))
+          path.write_text(json.dumps(payload, indent=2) + '\n', encoding='utf-8')
+          Path('.github/workflows/tmp-cfb-preflight-coverage-patch.yml').unlink()
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add config/reconciliation_coverage_v1.json .github/workflows/tmp-cfb-preflight-coverage-patch.yml
+          git diff --cached --check
+          git commit -m 'Governance: classify CFB provider preflight as zero-authority'
+          git push origin HEAD:cfb/reconstructed-selection-acquisition-v1
