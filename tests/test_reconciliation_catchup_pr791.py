@@ -27,7 +27,7 @@ def test_intervening_reconciliation_merge_before_pr791_is_governed_content_neutr
     assert detail["content_identity_ok"] is True
 
 
-def test_pr791_machine_refreeze_history_allows_later_fail_closed_revocation() -> None:
+def test_pr791_machine_refreeze_history_allows_later_fail_closed_revocation_or_refreeze() -> None:
     registry = json.loads(Path("config/freeze_reconciliation_registry_v1.json").read_text())
     delta = next(row for row in registry["deltas"] if row["merge_sha"] == PR_791)
     assert delta["pr"] == 791
@@ -38,10 +38,21 @@ def test_pr791_machine_refreeze_history_allows_later_fail_closed_revocation() ->
     if state == "REFROZEN":
         assert disposition["verification_schema"] == "CFB_CANDIDATE_PREREG_REFREEZE_V1"
         assert disposition["prior_bundle_freeze_sha"] == bundle["freeze_sha"]
-        assert disposition["trigger_delta_sha"] == PR_791
-        assert disposition["new_bundle_id"] == "CFB_CANDIDATE_PREREG_FREEZE_V2"
-        assert disposition["new_freeze_sha"] == REFREEZE_SHA
-        assert disposition["forward_clock_restart_at"] == "2026-09-18T03:31:14Z"
+        trigger_sha = disposition["trigger_delta_sha"]
+        deltas = registry["deltas"]
+        pr791_index = next(i for i, row in enumerate(deltas) if row["merge_sha"] == PR_791)
+        trigger_index = next(i for i, row in enumerate(deltas) if row["merge_sha"] == trigger_sha)
+        assert trigger_index >= pr791_index
+        if trigger_sha == PR_791:
+            assert disposition["new_bundle_id"] == "CFB_CANDIDATE_PREREG_FREEZE_V2"
+            assert disposition["new_freeze_sha"] == REFREEZE_SHA
+            assert disposition["forward_clock_restart_at"] == "2026-09-18T03:31:14Z"
+        else:
+            assert disposition["prior_forward_clock_invalidated"] is True
+            assert disposition["new_bundle_id"].startswith("CFB_CANDIDATE_PREREG_FREEZE_V")
+            assert str(disposition.get("new_freeze_sha") or "").strip()
+            assert str(disposition.get("forward_clock_restart_at") or "").strip()
+            assert str(disposition.get("reason") or "").strip()
         assert disposition["row_admissibility_semantics"] == "PREREGISTRATION_ONLY_NO_EVALUATION_ROWS_V1"
         assert disposition["selection_scope_only"] is True
         assert all(value is False for value in disposition["authority"].values())
