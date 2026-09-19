@@ -1,0 +1,45 @@
+{
+  "schema": "CFB_OPEN_PAPER_MODEL_CONFIG_V1",
+  "status": "PAPER_SHADOW_ONLY",
+  "model_id": "CFB_OPEN_PAPER_RIDGE_RESIDUAL_V1",
+  "label": "PAPER_SHADOW_CFB_OPEN_V1",
+  "source": {
+    "repository": "sportsdataverse/sportsdataverse-data",
+    "release_tag": "cfb_matchup_line",
+    "release_api": "https://api.github.com/repos/sportsdataverse/sportsdataverse-data/releases/tags/cfb_matchup_line",
+    "asset_pattern": "cfb_matchup_line_{season}.csv",
+    "source_contract": "SPORTSDATAVERSE_CFB_MATCHUP_LINE_ASOF_V1"
+  },
+  "training": {
+    "start_season": 2015,
+    "end_season": 2025,
+    "alpha_grid": [0.1, 1.0, 3.0, 10.0, 30.0, 100.0, 300.0],
+    "alpha_selection_folds": [2022, 2023, 2024],
+    "untouched_holdout_season": 2025,
+    "oof_residual_seasons": [2019, 2020, 2021, 2022, 2023, 2024, 2025],
+    "selection_metric": "JOINT_HOME_AWAY_RMSE"
+  },
+  "simulation": {
+    "n_paths": 20000,
+    "seed_base": 20260919
+  },
+  "feature_policy": {
+    "market_blind": true,
+    "qb_hindsight_fields_prohibited": true,
+    "realized_outcomes_targets_only": true,
+    "missing_value_policy": "TRAIN_MEAN_PLUS_MISSING_INDICATOR",
+    "weather_in_core_v1": false,
+    "market_lines_applied_post_distribution_only": true
+  },
+  "authority": {
+    "candidate_attempt_consumed": false,
+    "model_p": false,
+    "truth_gate": false,
+    "promotion": false,
+    "eligibility": false,
+    "staking": false,
+    "evidence_clock": false,
+    "official": false,
+    "backfill": false
+  }
+}
