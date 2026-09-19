@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "official_authority": false,
+  "paper_recency_pfpa_v1": {
+    "role": "RESEARCH_OVERLAY_ONLY",
+    "may_emit_candidate": false,
+    "may_rewrite_model_p": false,
+    "reason": "Recency PF/PA is not the SportsEdge ridge/drive/inning engine."
+  },
+  "required_for_paper_candidate": [
+    "frozen_or_paper_authorized_engine_artifact",
+    "point_in_time_features",
+    "sportsbook_quote",
+    "truth_gate_not_required_for_paper_but_model_p_must_be_engine"
+  ],
+  "current_blockers": {
+    "CFB": "CFB_JOINT_MODEL_V1 UNFROZEN; reconstructed selection not complete",
+    "NFL": "drive/spread engines unfrozen; no official_authority",
+    "MLB": "deployments.json all eligible=false"
+  }
+}
