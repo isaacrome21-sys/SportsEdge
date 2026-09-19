@@ -15,7 +15,7 @@
     ".github/workflows/archive-mlb-game-odds.yml",
     ".github/workflows/archive-mlb-game-odds-failover.yml",
     ".github/workflows/mlb-v8-actual-start-binding.yml",
-    ".github.com/workflows/nfl-v2g-prospective-prediction-capture.yml",
+    ".github/workflows/nfl-v2g-prospective-prediction-capture.yml",
     ".github/workflows/mlb-pit-lineup-starter-archive.yml",
     ".github/workflows/mlb-prop-pit-archive.yml",
     ".github/workflows/mlb-game-context-refresh.yml",
