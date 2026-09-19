@@ -2,6 +2,15 @@ name: cfb-train-freeze
 
 on:
   workflow_dispatch:
+    inputs:
+      confirm_consume_all_four_attempts:
+        description: "PREFLIGHT_ONLY or explicit all-four bakeoff confirmation"
+        required: true
+        default: "PREFLIGHT_ONLY"
+        type: choice
+        options:
+          - PREFLIGHT_ONLY
+          - CONSUME_ALL_FOUR_CFB_ATTEMPTS
   pull_request:
     paths:
       - '.github/workflows/cfb-train-freeze.yml'
@@ -9,6 +18,10 @@ on:
       - 'scripts/acquire_cfb_reconstructed_selection.py'
       - 'scripts/materialize_cfb_reconstructed_selection.py'
       - 'sportsedge/sports/cfb/reconstructed_selection.py'
+      - 'sportsedge/sports/cfb/candidate_bakeoff.py'
+      - 'scripts/run_cfb_candidate_bakeoff.py'
+      - 'config/cfb_candidate_bakeoff_evaluator_v1.json'
+      - 'tests/test_cfb_candidate_bakeoff.py'
       - 'sportsedge/sports/cfb/candidate_live_source.py'
       - 'sportsedge/sports/cfb/selected_candidate_model.py'
       - 'sportsedge/sports/cfb/selected_candidate_artifact.py'
@@ -46,11 +59,14 @@ jobs:
             scripts/acquire_cfb_reconstructed_selection.py \
             scripts/materialize_cfb_reconstructed_selection.py \
             sportsedge/sports/cfb/reconstructed_selection.py \
+            sportsedge/sports/cfb/candidate_bakeoff.py \
+            scripts/run_cfb_candidate_bakeoff.py \
             sportsedge/sports/cfb/candidate_live_source.py \
             sportsedge/sports/cfb/selected_candidate_model.py \
             sportsedge/sports/cfb/selected_candidate_artifact.py \
             sportsedge/sports/cfb/selected_candidate_runtime.py
           python -m unittest \
+            tests.test_cfb_candidate_bakeoff \
             tests.test_cfb_reconstructed_selection_preflight \
             tests.test_cfb_reconstructed_selection_acquisition \
             tests.test_cfb_reconstructed_selection_materializer \
@@ -110,12 +126,22 @@ jobs:
               raise SystemExit('CFB_TRAIN_FREEZE_REPLAY_CALL_LEAK')
           print('CFB_TRAIN_FREEZE_PROVIDER_READY_ZERO_REPLAY_CALLS')
           PY
-      - name: Stop before candidate evaluation until selected-candidate serving contract is merged
+      - name: Enforce explicit evaluation confirmation
+        shell: bash
         run: |
-          echo 'CFB_TRAIN_FREEZE_BLOCKED reason=SELECTED_CANDIDATE_SERVING_CONTRACT_NOT_YET_MERGED'
-          echo 'Historical evaluator exists, but production artifact/runtime must be merged on protected main before the first candidate evaluation.'
-          echo 'No attempt consumed; no historical acquisition started.'
-          exit 3
+          set -euo pipefail
+          mode="${{ inputs.confirm_consume_all_four_attempts }}"
+          if [[ "$mode" == "PREFLIGHT_ONLY" ]]; then
+            echo 'CFB_TRAIN_FREEZE_PREFLIGHT_ONLY status=VERIFIED_BEFORE_FIRST_REPLAY_CALL'
+            echo 'No attempt consumed; no historical acquisition started.'
+            exit 3
+          fi
+          if [[ "$mode" != "CONSUME_ALL_FOUR_CFB_ATTEMPTS" ]]; then
+            echo "CFB_TRAIN_FREEZE_BLOCKED reason=CFB_TRAIN_FREEZE_CONFIRMATION_INVALID:$mode"
+            exit 2
+          fi
+          echo 'CFB_TRAIN_FREEZE_EVALUATION_CONFIRMATION_ACCEPTED'
+          echo 'Acquisition/evaluation remains fail-closed until the attempt execution job is merged.'
       - name: Upload redacted gate result
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
