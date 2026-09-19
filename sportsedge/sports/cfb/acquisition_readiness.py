@@ -8,6 +8,7 @@
 # PAPER slate runner retrigger for required CFB readiness check.
 # PAPER weekend-window retrigger for required CFB readiness check.
 # PAPER CFB rating coverage retrigger for required CFB readiness check.
+# Kill toy PF/PA candidates retrigger for required CFB readiness check.
 from __future__ import annotations
 
 import re
