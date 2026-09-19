@@ -4,6 +4,14 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+  # The forward PAPER lane must not depend on a separate scheduled workflow
+  # actually firing. A direct five-minute heartbeat is narrow enough to hit both
+  # the T60-T40 market-blind prediction window and the T36-T30 decision window.
+  # These scheduled runs preserve the existing no-backfill and zero-authority
+  # contract; they only create prospective observations when a window is due.
+  schedule:
+    - cron: '*/5 15-23 * * *'
+    - cron: '*/5 0-5 * * *'
   workflow_run:
     # Operational heartbeat fallbacks transfer no model, promotion, staking, or
     # OFFICIAL authority. The MLB context refresher is already scheduled every
@@ -26,7 +34,7 @@ concurrency:
 jobs:
   capture:
     # A failed upstream workflow must never become an evidence-clock heartbeat.
-    # Push and manual runs are independent of this guard.
+    # Push, schedule, and manual runs are independent of this guard.
     if: >-
       github.event_name != 'workflow_run' ||
       github.event.workflow_run.conclusion == 'success'
