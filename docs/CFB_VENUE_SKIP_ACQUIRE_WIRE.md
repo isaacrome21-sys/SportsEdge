@@ -1,9 +1,9 @@
 # CFB venue skip acquire wire
 
-Status: helpers are on main from #848. The acquire script still needs to call them.
+Status: acquire script uses `sportsedge.sports.cfb.venue_coordinates` helpers.
 
-Required behavior:
-- Incomplete CFBD venue rows skip.
-- Do not raise CFB_VENUE_COORDINATES_MISSING during venue index build.
-- Games whose venue cannot be resolved are omitted from reconstructed weather, not used to abort the 244-call acquisition.
+Behavior:
+- Incomplete CFBD venue rows are skipped (no CFB_VENUE_COORDINATES_MISSING abort).
+- Games whose venue cannot be resolved are omitted from reconstructed weather.
+- Payload games list is filtered to games with weather rows.
 - official_authority stays false.
