@@ -218,8 +218,20 @@ def simulate_cfb_joint_distribution(
     return tuple(rows)
 
 
+def _price_total(values: Iterable[float], line: float) -> dict[str, float]:
+    data = list(values)
+    n = float(len(data))
+    return {
+        "over": sum(x > line for x in data) / n,
+        "under": sum(x < line for x in data) / n,
+        "push": sum(x == line for x in data) / n,
+        "line": line,
+    }
+
+
 def price_cfb_game_markets(
     distribution: Iterable[Mapping[str, Any]], *, spread_line: float, total_line: float,
+    home_team_total_line: float | None = None, away_team_total_line: float | None = None,
 ) -> dict[str, Any]:
     data = [dict(row) for row in distribution]
     if not data:
@@ -229,17 +241,23 @@ def price_cfb_game_markets(
     n = float(len(data))
     margins = [_num(row.get("margin"), "margin") for row in data]
     totals = [_num(row.get("total"), "total") for row in data]
+    home_scores = [_num(row.get("home_score"), "home_score") for row in data]
+    away_scores = [_num(row.get("away_score"), "away_score") for row in data]
     home_w = sum(x > 0 for x in margins) / n
     away_w = sum(x < 0 for x in margins) / n
     tie = sum(x == 0 for x in margins) / n
     home_cover = sum(x + s > 0 for x in margins) / n
     away_cover = sum(x + s < 0 for x in margins) / n
     spread_push = sum(x + s == 0 for x in margins) / n
-    over = sum(x > t for x in totals) / n
-    under = sum(x < t for x in totals) / n
-    total_push = sum(x == t for x in totals) / n
-    return {
+    result: dict[str, Any] = {
         "moneyline": {"home": home_w, "away": away_w, "tie_unresolved": tie},
         "spread": {"home": home_cover, "away": away_cover, "push": spread_push, "home_line": s},
-        "total": {"over": over, "under": under, "push": total_push, "line": t},
+        "total": _price_total(totals, t),
     }
+    if home_team_total_line is not None:
+        htt = _num(home_team_total_line, "home_team_total_line")
+        result["home_team_total"] = _price_total(home_scores, htt)
+    if away_team_total_line is not None:
+        att = _num(away_team_total_line, "away_team_total_line")
+        result["away_team_total"] = _price_total(away_scores, att)
+    return result

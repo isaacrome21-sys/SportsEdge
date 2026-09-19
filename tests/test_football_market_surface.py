@@ -66,13 +66,13 @@ def test_registry_engine_capability_is_explicit_per_sport():
     data = _load()
     assert data["schema_version"] == 2
     assert data["capability_contract"] == "DECLARATION_DOES_NOT_IMPLY_ENGINE_CAPABILITY_V1"
-    implemented = {"moneyline", "spread", "total"}
+    implemented_nfl = {"moneyline", "spread", "total"}
+    implemented_cfb = {"moneyline", "spread", "total", "team_total"}
     for row in data["markets"]:
         states = row["engine_state_by_sport"]
         assert set(states) == {"NFL", "CFB"}
-        expected = "IMPLEMENTED" if row["market"] in implemented else "NO_ENGINE"
-        assert states["NFL"] == expected
-        assert states["CFB"] == expected
+        assert states["NFL"] == ("IMPLEMENTED" if row["market"] in implemented_nfl else "NO_ENGINE")
+        assert states["CFB"] == ("IMPLEMENTED" if row["market"] in implemented_cfb else "NO_ENGINE")
 
 
 def test_declared_no_engine_market_cannot_be_interpreted_as_implemented():
