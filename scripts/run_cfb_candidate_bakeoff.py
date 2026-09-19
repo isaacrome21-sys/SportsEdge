@@ -9,10 +9,10 @@ import sys
 ROOT=Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path: sys.path.insert(0,str(ROOT))
 
-from sportsedge.sports.cfb.candidate_bakeoff import evaluate_cfb_candidate_bakeoff
+from sportsedge.sports.cfb.candidate_bakeoff_v2 import evaluate_cfb_candidate_bakeoff_v2
 from sportsedge.sports.cfb.candidate_prereg_binding import verify_candidate_prereg_binding
 
-CONFIG=ROOT/"config/cfb_candidate_bakeoff_evaluator_v1.json"
+CONFIG=ROOT/"config/cfb_candidate_bakeoff_evaluator_v2.json"
 POLICY=ROOT/"config/cfb_model_selection_policy_v1.json"
 PREREG=ROOT/"config/cfb_model_candidate_prereg_v1.json"
 
@@ -53,7 +53,7 @@ def main(argv=None):
               "predictive_code_manifest_sha256":bundle.get("predictive_code_manifest_sha256"),
               "acquisition_code_manifest_sha256":bundle.get("acquisition_code_manifest_sha256"),
               "evaluator_code_git_blob":cfg.get("evaluator_code_git_blob")}
-    result=evaluate_cfb_candidate_bakeoff(rows,cfg,input_identity=identity)
+    result=evaluate_cfb_candidate_bakeoff_v2(rows,cfg,input_identity=identity)
     args.out.parent.mkdir(parents=True,exist_ok=True)
     args.out.write_text(json.dumps(result,indent=2,sort_keys=True)+"\n")
     print(json.dumps({"status":result["status"],"result_sha256":result["result_sha256"],
