@@ -1,0 +1,12 @@
+{
+  "batter_entities": 486,
+  "pitcher_entities": 559,
+  "provider_tier": "PRIMARY_STATS",
+  "raw_pitch_rows": 111319,
+  "retrieved_at": "2026-09-19T02:53:50.124798+00:00",
+  "source": "BASEBALL_SAVANT_STATCAST_VIA_PYBASEBALL",
+  "status": "PASS",
+  "ttl_seconds": 129600,
+  "window_end": "2026-09-19",
+  "window_start": "2026-08-21"
+}
