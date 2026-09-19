@@ -37,45 +37,7 @@ def main():
     ap.add_argument("--min-edge",type=float,default=0.02); args=ap.parse_args()
     key=(os.getenv("ODDS_API_KEY") or os.getenv("SPORTSEDGE_ODDS_API_KEY") or "").strip()
     if not key: raise SystemExit("CFB_PAPER_ODDS_API_KEY_REQUIRED")
-    now=datetime.now(timezone.utc); events=fetch(key); candidates=[]; observed=0
-    for ev in events:
-        start=datetime.fromisoformat(str(ev["commence_time"]).replace("Z","+00:00"))
-        if start<=now: continue
-        markets={}
-        for bk in ev.get("bookmakers",[]):
-            bkey=bk.get("key")
-            for m in bk.get("markets",[]):
-                market=m.get("key")
-                if market not in {"h2h","spreads","totals"}: continue
-                outs=m.get("outcomes",[])
-                # Spread/total consensus is meaningful only at the identical line.
-                if market=="h2h":
-                    line_key=None
-                else:
-                    pts=sorted(float(x.get("point",0)) for x in outs)
-                    if len(pts)!=2: continue
-                    line_key=tuple(pts)
-                probs=pair_probs(outs)
-                if not probs: continue
-                markets.setdefault((market,line_key),{})[bkey]={"outcomes":outs,"probs":probs}
-        for (market,line_key),books in markets.items():
-            dk=books.get("draftkings")
-            peers=[v for k,v in books.items() if k!="draftkings"]
-            if not dk or len(peers)<2: continue
-            for o in dk["outcomes"]:
-                name=str(o["name"]); observed+=1
-                vals=[p["probs"].get(name) for p in peers if name in p["probs"]]
-                if len(vals)<2: continue
-                consensus=sum(vals)/len(vals); dk_raw=implied(o["price"])
-                # EV using market-consensus probability, not Model_P.
-                dec=1+(100/abs(float(o["price"])) if float(o["price"])<0 else float(o["price"])/100)
-                ev=consensus*(dec-1)-(1-consensus)
-                edge=consensus-dk_raw
-                if edge>=args.min_edge and ev>0:
-                    candidates.append({"game_id":str(ev.get("id") if isinstance(ev,dict) else ev),
-                        "away_team":evnt_away if False else str(ev.get("away_team",""))})
-    # Rebuild candidates without accidental event-variable shadowing.
-    candidates=[]
+    now=datetime.now(timezone.utc); events=fetch(key); candidates=[]
     for event in events:
         start=datetime.fromisoformat(str(event["commence_time"]).replace("Z","+00:00"))
         if start<=now: continue
