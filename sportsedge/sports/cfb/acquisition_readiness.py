@@ -1,6 +1,7 @@
 """Fail-closed readiness gate for reconstructed CFB historical acquisition."""
 # Provider-preflight readiness is non-authoritative and must not consume an evaluation attempt.
 # Public-splits PYTHONPATH fix retrigger for required CFB readiness check.
+# Public-splits decoder fix retrigger for required CFB readiness check.
 from __future__ import annotations
 
 import re
