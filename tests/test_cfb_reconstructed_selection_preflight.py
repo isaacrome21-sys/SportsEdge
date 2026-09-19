@@ -9,7 +9,7 @@ from scripts.preflight_cfb_reconstructed_selection import evaluate_account, fetc
 CONFIG = {
     "standard_tier_monthly_quotas": {"0": 1000, "1": 5000, "2": 30000, "3": 75000, "4": 125000, "5": 200000, "6": 500000},
     "tier_labels": {"0": "FREE", "1": "TIER_1", "2": "TIER_2", "3": "TIER_3", "4": "TIER_4", "5": "TIER_5", "6": "TIER_6"},
-    "planned_new_calls_upper_bound": {"total": 244},
+    "planned_new_calls_upper_bound": {"total": 200},
     "retry_reserve_calls": 50,
     "weather_reconstruction": {
         "contract": "CFBD_VENUES_OPEN_METEO_ERA5_RECONSTRUCTED_CURRENT_PROVIDER_VINTAGE",
@@ -39,7 +39,7 @@ class TestCFBReconstructedSelectionPreflight(unittest.TestCase):
         self.assertEqual(private["status"], "VERIFIED_BEFORE_FIRST_REPLAY_CALL")
         self.assertEqual(private["active_cfbd_tier"], "TIER_1")
         self.assertEqual(private["monthly_quota"], 5000)
-        self.assertEqual(private["planned_new_calls"], 244)
+        self.assertEqual(private["planned_new_calls"], 200)
         self.assertEqual(private["retry_reserve_calls"], 50)
         self.assertTrue(public["call_plan_fits"])
         self.assertTrue(public["weather_transport_ready"])
@@ -56,12 +56,12 @@ class TestCFBReconstructedSelectionPreflight(unittest.TestCase):
         self.assertEqual(private["historical_replay_calls_performed"], 0)
 
     def test_remaining_quota_must_cover_plan_and_retry_reserve(self):
-        private, _ = evaluate_account({"patronLevel": 1, "remainingCalls": 293}, CONFIG)
+        private, _ = evaluate_account({"patronLevel": 1, "remainingCalls": 249}, CONFIG)
         self.assertIn("CFBD_REPLAY_PLAN_EXCEEDS_REMAINING_QUOTA", private["blockers"])
         self.assertEqual(private["status"], "BLOCKED_PROVIDER_PREFLIGHT")
 
     def test_exact_plan_plus_reserve_is_admissible(self):
-        private, _ = evaluate_account({"patronLevel": 1, "remainingCalls": 294}, CONFIG)
+        private, _ = evaluate_account({"patronLevel": 1, "remainingCalls": 250}, CONFIG)
         self.assertEqual(private["status"], "VERIFIED_BEFORE_FIRST_REPLAY_CALL")
 
     def test_invalid_weather_transport_fails_closed(self):
