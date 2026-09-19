@@ -1,4 +1,5 @@
 import json
+import unittest
 from datetime import datetime, timezone
 
 from scripts.run_cfb_paper_market import build_payload, load_events
@@ -53,39 +54,43 @@ def _manual_board():
     ]
 
 
-def test_missing_market_input_emits_explicit_zero_authority_blocker():
-    events, source, input_status = load_events("", inline_json="")
-    payload = build_payload(
-        events,
-        0.02,
-        datetime(2026, 9, 19, tzinfo=timezone.utc),
-        source,
-        input_status,
-    )
-    assert payload["status"] == "PAPER_ONLY"
-    assert payload["input_status"] == "BLOCKED_NO_MARKET_INPUT"
-    assert payload["market_input_source"] == "MARKET_INPUT_UNAVAILABLE"
-    assert payload["candidates"] == []
-    assert not any(payload["authority"].values())
+class TestCFBPaperMarketManualInput(unittest.TestCase):
+    def test_missing_market_input_emits_explicit_zero_authority_blocker(self):
+        events, source, input_status = load_events("", inline_json="")
+        payload = build_payload(
+            events,
+            0.02,
+            datetime(2026, 9, 19, tzinfo=timezone.utc),
+            source,
+            input_status,
+        )
+        self.assertEqual(payload["status"], "PAPER_ONLY")
+        self.assertEqual(payload["input_status"], "BLOCKED_NO_MARKET_INPUT")
+        self.assertEqual(payload["market_input_source"], "MARKET_INPUT_UNAVAILABLE")
+        self.assertEqual(payload["candidates"], [])
+        self.assertFalse(any(payload["authority"].values()))
+
+    def test_inline_manual_board_runs_same_consensus_logic_without_api_key(self):
+        events, source, input_status = load_events("", inline_json=json.dumps(_manual_board()))
+        payload = build_payload(
+            events,
+            0.02,
+            datetime(2026, 9, 19, tzinfo=timezone.utc),
+            source,
+            input_status,
+        )
+        self.assertEqual(payload["input_status"], "READY")
+        self.assertEqual(payload["market_input_source"], "MANUAL_JSON_INLINE")
+        self.assertEqual(len(payload["candidates"]), 1)
+        candidate = payload["candidates"][0]
+        self.assertEqual(candidate["side"], "Team A")
+        self.assertEqual(candidate["draftkings_odds"], 150.0)
+        self.assertGreater(candidate["market_consensus_edge"], 0.02)
+        self.assertGreater(candidate["market_consensus_ev_per_dollar"], 0)
+        self.assertIsNone(candidate["model_p"])
+        self.assertFalse(candidate["official"])
+        self.assertFalse(any(payload["authority"].values()))
 
 
-def test_inline_manual_board_runs_same_consensus_logic_without_api_key():
-    events, source, input_status = load_events("", inline_json=json.dumps(_manual_board()))
-    payload = build_payload(
-        events,
-        0.02,
-        datetime(2026, 9, 19, tzinfo=timezone.utc),
-        source,
-        input_status,
-    )
-    assert payload["input_status"] == "READY"
-    assert payload["market_input_source"] == "MANUAL_JSON_INLINE"
-    assert len(payload["candidates"]) == 1
-    candidate = payload["candidates"][0]
-    assert candidate["side"] == "Team A"
-    assert candidate["draftkings_odds"] == 150.0
-    assert candidate["market_consensus_edge"] > 0.02
-    assert candidate["market_consensus_ev_per_dollar"] > 0
-    assert candidate["model_p"] is None
-    assert candidate["official"] is False
-    assert not any(payload["authority"].values())
+if __name__ == "__main__":
+    unittest.main()
