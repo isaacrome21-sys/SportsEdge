@@ -1,0 +1,31 @@
+name: direct-dk-board-snapshot
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "4,19,34,49 * * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+      - name: Snapshot DraftKings NFL/CFB/MLB boards
+        run: python scripts/capture_direct_dk_board_snapshot.py --out artifacts/dk_board_snapshot.json
+      - name: Upload quote-only snapshot
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dk-board-snapshot-${{ github.run_id }}
+          path: artifacts/dk_board_snapshot.json
+          if-no-files-found: warn
+          retention-days: 7
