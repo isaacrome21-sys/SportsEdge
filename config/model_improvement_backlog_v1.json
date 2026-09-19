@@ -4,11 +4,20 @@
   "official_authority": false,
   "do_not_copy": [
     {"source": "blaizerlahman/CFB-Model", "why": "Uses SP+ and betting lines as features; live 2024 was 48.3% ATS."},
-    {"source": "generic GitHub ATS bots", "why": "Most train on closing spreads. That is leakage relative to SportsEdge Model_P."}
+    {"source": "generic GitHub ATS bots", "why": "Most train on closing spreads. That is leakage relative to SportsEdge Model_P."},
+    {"source": "The Odds API live fallback", "why": "OUT_OF_USAGE_CREDITS. Quote rail is DK direct / ESPN-named-DK until credits exist."}
   ],
   "adopt_as_method_not_weights": [
     {"source": "nflverse/nflfastR and sportsdataverse/cfbfastR", "take": "EPA/CPOE from PIT play-by-play, hash-bound artifacts, leave-one-season-out."},
     {"source": "Statcast rolling windows", "take": "Barrel, exit velo, platoon, 10/35/75-game windows as feature candidates."}
+  ],
+  "do_not_add_to_model_p_yet": [
+    "public splits / handles / RLM",
+    "Pinnacle steam",
+    "SP+ / FPI / consensus",
+    "MLB Statcast barrel/EV",
+    "umpire / catcher / confirmed lineup",
+    "NFL EPA pass/rush search losers from attempts 3-8"
   ],
   "candidates": {
     "CFB": [
