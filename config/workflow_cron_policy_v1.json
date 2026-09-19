@@ -5,6 +5,7 @@
     ".github/workflows/closing-line-archive.yml",
     ".github/workflows/nfl-2026-line-capture.yml",
     ".github/workflows/nfl-2026-provider-health.yml",
+    ".github/workflows/nfl-direct-dk-forward-pairs.yml",
     ".github/workflows/nfl-v2g-forward-clv.yml",
     ".github/workflows/football-nfl-forward-clv-collection.yml",
     ".github/workflows/ev-tracker.yml",
