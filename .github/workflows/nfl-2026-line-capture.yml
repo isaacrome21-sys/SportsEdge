@@ -56,7 +56,6 @@ jobs:
     timeout-minutes: 5
     env:
       PYTHONPATH: ${{ github.workspace }}
-      NFL_SCHEDULE_CSV: ${{ runner.temp }}/nfl-games.csv
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
@@ -97,6 +96,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          NFL_SCHEDULE_CSV="$RUNNER_TEMP/nfl-games.csv"
+          echo "NFL_SCHEDULE_CSV=$NFL_SCHEDULE_CSV" >> "$GITHUB_ENV"
           curl --fail --location --silent --show-error --retry 3 \
             'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv' \
             -o "$NFL_SCHEDULE_CSV"
