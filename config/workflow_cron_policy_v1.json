@@ -21,6 +21,9 @@
     ".github/workflows/mlb-game-context-refresh.yml",
     ".github/workflows/mlb-moneyline-forward-evidence.yml",
     ".github/workflows/mlb-moneyline-forward-settlement.yml",
-    ".github/workflows/nfl-market-maker-radar-capture.yml"
+    ".github/workflows/nfl-market-maker-radar-capture.yml",
+    ".github/workflows/football-public-splits.yml",
+    ".github/workflows/football-vsin-contest-context.yml",
+    ".github/workflows/statcast-daily-refresh.yml"
   ]
 }
