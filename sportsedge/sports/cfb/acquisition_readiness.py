@@ -1,6 +1,6 @@
 """Fail-closed readiness gate for reconstructed CFB historical acquisition."""
 # Provider-preflight readiness is non-authoritative and must not consume an evaluation attempt.
-# Context-clock PR retrigger for required CFB readiness check.
+# Model-improvement-on-850 retrigger for required CFB readiness check.
 from __future__ import annotations
 
 import re
