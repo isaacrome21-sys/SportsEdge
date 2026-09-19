@@ -2,6 +2,9 @@ name: football-vsin-contest-context
 
 on:
   workflow_dispatch:
+  schedule:
+    # Context-only VSiN/Circa archive. Never Model_P. Never official.
+    - cron: "10 16 * * *"
   pull_request:
     paths:
       - "config/football_external_context_v1.json"

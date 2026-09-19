@@ -2,6 +2,9 @@ name: football-public-splits
 
 on:
   workflow_dispatch:
+  schedule:
+    # Context-only ticket/money splits. Never Model_P. Never official.
+    - cron: "20 */2 * * *"
 
 permissions:
   contents: read
