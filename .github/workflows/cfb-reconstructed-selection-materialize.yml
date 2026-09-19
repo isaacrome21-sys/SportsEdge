@@ -2,6 +2,15 @@ name: cfb-reconstructed-selection-materialize
 
 on:
   workflow_dispatch:
+    inputs:
+      evaluation_mode:
+        description: "Materialize only, or consume the frozen all-four CFB bakeoff"
+        required: true
+        default: "MATERIALIZE_ONLY"
+        type: choice
+        options:
+          - MATERIALIZE_ONLY
+          - CONSUME_ALL_FOUR_CFB_ATTEMPTS
   pull_request:
     paths:
       - 'config/cfb_cfbd_reconstructed_selection_budget_v1.json'
@@ -128,6 +137,31 @@ jobs:
             --source-manifest-out artifacts/cfb/reconstructed_source_manifest.json \
             --private-rows-out "$RUNNER_TEMP/cfb_reconstructed_selection_rows.json"
 
+      - name: Run frozen all-four candidate bakeoff exactly once when explicitly confirmed
+        if: steps.preflight.outputs.state == 'VERIFIED_BEFORE_FIRST_REPLAY_CALL' && inputs.evaluation_mode == 'CONSUME_ALL_FOUR_CFB_ATTEMPTS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "$RUNNER_TEMP/cfb_reconstructed_selection_rows.json"
+          test -f artifacts/cfb/selection_bundle_manifest.json
+          python scripts/run_cfb_candidate_bakeoff.py \
+            --private-rows "$RUNNER_TEMP/cfb_reconstructed_selection_rows.json" \
+            --selection-bundle artifacts/cfb/selection_bundle_manifest.json \
+            --out artifacts/cfb/candidate_bakeoff_result.json \
+            --confirm CONSUME_ALL_FOUR_CFB_ATTEMPTS
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path('artifacts/cfb/candidate_bakeoff_result.json').read_text())
+          if r.get('schema')!='CFB_CANDIDATE_BAKEOFF_RESULT_V1':
+              raise SystemExit('CFB_BAKEOFF_RESULT_SCHEMA_INVALID')
+          if r.get('status') not in {'WINNER_SELECTED_FOR_FREEZE','NO_CANDIDATE_DEMONSTRATED_SIGNAL_AT_THIS_SAMPLE'}:
+              raise SystemExit('CFB_BAKEOFF_RESULT_STATUS_INVALID')
+          if any((r.get('authority') or {}).values()):
+              raise SystemExit('CFB_BAKEOFF_AUTHORITY_LEAK')
+          print('CFB_BAKEOFF_RESULT_FROZEN_IN_RUN_ARTIFACT sha256='+str(r.get('result_sha256')))
+          PY
+
       - name: Assert public outputs contain zero authority and no raw provider rows
         if: always()
         shell: bash
@@ -170,5 +204,6 @@ jobs:
             artifacts/cfb/cfb_reconstructed_acquisition_public.json
             artifacts/cfb/selection_bundle_manifest.json
             artifacts/cfb/reconstructed_source_manifest.json
+            artifacts/cfb/candidate_bakeoff_result.json
           if-no-files-found: warn
           retention-days: 30
