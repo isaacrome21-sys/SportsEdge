@@ -79,8 +79,12 @@ jobs:
               raise SystemExit('CFB_PREFLIGHT_ACCOUNT_NOT_VERIFIED')
           if report.get('standard_tier_mapping_verified') is not True:
               raise SystemExit('CFB_PREFLIGHT_TIER_MAPPING_NOT_VERIFIED')
-          if report.get('weather_entitled') is not True:
-              raise SystemExit('CFB_PREFLIGHT_WEATHER_NOT_ENTITLED')
+          if report.get('weather_transport_ready') is not True:
+              raise SystemExit('CFB_PREFLIGHT_WEATHER_TRANSPORT_NOT_READY')
+          if report.get('cfbd_weather_required_for_selection') is not False:
+              raise SystemExit('CFB_PREFLIGHT_CFBD_WEATHER_REQUIREMENT_INVALID')
+          if report.get('weather_source_contract') != 'CFBD_VENUES_OPEN_METEO_ERA5_RECONSTRUCTED_CURRENT_PROVIDER_VINTAGE':
+              raise SystemExit('CFB_PREFLIGHT_WEATHER_SOURCE_CONTRACT_INVALID')
           if report.get('call_plan_fits') is not True:
               raise SystemExit('CFB_PREFLIGHT_REPLAY_BUDGET_DOES_NOT_FIT')
           if report.get('blockers') != []:
@@ -90,7 +94,9 @@ jobs:
               'status': report['status'],
               'account_info_verified': True,
               'standard_tier_mapping_verified': True,
-              'weather_entitled': True,
+              'weather_transport_ready': True,
+              'cfbd_weather_required_for_selection': False,
+              'weather_source_contract': report['weather_source_contract'],
               'call_plan_fits': True,
               'historical_replay_calls_performed': 0,
               'authority': expected_authority,
