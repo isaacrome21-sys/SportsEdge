@@ -1,0 +1,30 @@
+name: cfb paper market card
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  paper-card:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate research-only CFB paper card
+        run: python scripts/run_cfb_paper_market.py
+      - name: Assert zero betting authority
+        run: |
+          python - <<'PY'
+          import json
+          p=json.load(open('artifacts/cfb/cfb_paper_market_card.json'))
+          assert p['status']=='PAPER_ONLY'
+          assert p['authority'] and not any(p['authority'].values())
+          assert all(x['model_p'] is None and x['official'] is False for x in p['candidates'])
+          print('CFB_PAPER_CARD_ZERO_AUTHORITY candidates='+str(len(p['candidates'])))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cfb-paper-market-card
+          path: artifacts/cfb/cfb_paper_market_card.json
+          retention-days: 14
