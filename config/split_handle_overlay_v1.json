@@ -1,0 +1,14 @@
+{
+  "schema": "SPLIT_HANDLE_OVERLAY_V1",
+  "rule": "Some ticket/handle patterns have situational value. They may overlay PAPER. They may never write Model_P.",
+  "model_p_authority": false,
+  "official_authority": false,
+  "truth_gate_input": false,
+  "allowed_patterns": [
+    {"id": "RLM_TICKETS_VS_LINE", "when": "ticket_pct >= 70 AND line moved the other way by >= 0.5 points", "action": "CONTEXT_LEAN_AGAINST_PUBLIC"},
+    {"id": "MONEY_TICKET_DIVERGENCE", "when": "abs(money_pct - ticket_pct) >= 15", "action": "CONTEXT_LEAN_WITH_MONEY"},
+    {"id": "STEAM_THEN_PERSIST", "when": "Pinnacle led and the soft book stayed stale 30s and 180s", "action": "CONTEXT_TAKEABILITY_CHECK"}
+  ],
+  "paper_effects": ["downgrade", "block", "keep_but_tag"],
+  "cannot": ["upgrade_to_official", "change_model_p", "pass_truth_gate"]
+}

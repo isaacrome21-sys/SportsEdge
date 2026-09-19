@@ -1,0 +1,33 @@
+{
+  "schema": "MODEL_IMPROVEMENT_BACKLOG_V1",
+  "rule": "Adopt public-repo methods only as feature candidates. Never copy fitted weights. Never put lines, handles, or third-party ratings into Model_P until they beat the frozen engine on walk-forward Brier, log-loss, and CLV.",
+  "official_authority": false,
+  "do_not_copy": [
+    {"source": "blaizerlahman/CFB-Model", "why": "Uses SP+ and betting lines as features; live 2024 was 48.3% ATS."},
+    {"source": "generic GitHub ATS bots", "why": "Most train on closing spreads. That is leakage relative to SportsEdge Model_P."}
+  ],
+  "adopt_as_method_not_weights": [
+    {"source": "nflverse/nflfastR and sportsdataverse/cfbfastR", "take": "EPA/CPOE from PIT play-by-play, hash-bound artifacts, leave-one-season-out."},
+    {"source": "Statcast rolling windows", "take": "Barrel, exit velo, platoon, 10/35/75-game windows as feature candidates."}
+  ],
+  "candidates": {
+    "CFB": [
+      {"id": "cfb_returning_production", "layer": "FEATURE_CANDIDATE"},
+      {"id": "cfb_recruit_talent", "layer": "FEATURE_CANDIDATE"},
+      {"id": "cfb_epa_success_cpoe", "layer": "FEATURE_CANDIDATE"},
+      {"id": "cfb_rest_travel_short_week", "layer": "FEATURE_CANDIDATE"},
+      {"id": "cfb_sp_plus_fpi", "layer": "CONTEXT_ONLY"}
+    ],
+    "NFL": [
+      {"id": "nfl_epa_success_cpoe", "layer": "FEATURE_CANDIDATE"},
+      {"id": "nfl_rest_short_week_travel", "layer": "FEATURE_CANDIDATE"},
+      {"id": "nfl_qb_availability", "layer": "FEATURE_CANDIDATE"},
+      {"id": "nfl_pinnacle_steam", "layer": "CONTEXT_ONLY"}
+    ],
+    "MLB": [
+      {"id": "mlb_statcast_barrel_ev", "layer": "FEATURE_CANDIDATE"},
+      {"id": "mlb_platoon_park_wind", "layer": "FEATURE_CANDIDATE"},
+      {"id": "mlb_confirmed_lineup_ump_catcher", "layer": "FEATURE_CANDIDATE"}
+    ]
+  }
+}
