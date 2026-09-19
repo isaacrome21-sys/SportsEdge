@@ -55,6 +55,36 @@
       "official_authority": false
     },
     {
+      "provider": "SELENE_CONTEXT",
+      "transport": "MANUAL_BROWSER_CAPTURE",
+      "base_url": "https://app.seleneodds.com",
+      "markets": ["MONEYLINE", "SPREAD", "RUN_LINE", "TOTALS", "TEAM_TOTALS", "NRFI", "YRFI", "PLAYER_PROPS", "ADDITIONAL_DERIVATIVES"],
+      "book_identity": {
+        "basis": "DISPLAYED_BOOKMAKER_OR_EXCHANGE",
+        "required": true,
+        "unlabeled_price_rejected": true
+      },
+      "freshness": {
+        "basis": "MANUAL_CAPTURE_TIME_PROVENANCE",
+        "capture_timestamp_required": true,
+        "source_native_timestamp_required": false,
+        "capture_time_is_not_source_native_quote_time": true,
+        "ttl_seconds": null,
+        "ttl_eligible": false
+      },
+      "eligible_for_book_agnostic_context": true,
+      "context_only": true,
+      "eligible_for_exact_book_contract": false,
+      "exact_book_contract_eligible": false,
+      "closing_benchmark_eligible": false,
+      "model_p_eligible": false,
+      "truth_gate_eligible": false,
+      "promotion_authority": false,
+      "staking_authority": false,
+      "official_authority": false,
+      "automation_policy": "DISABLED_UNTIL_DOCUMENTED_API_AND_GOVERNED_INTEGRATION"
+    },
+    {
       "provider": "THE_ODDS_API",
       "transport": "METERED_API_KEY",
       "markets": ["MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS", "NRFI", "YRFI", "PLAYER_PROPS", "ADDITIONAL_DERIVATIVES"],
@@ -77,6 +107,7 @@
     "SOURCE_TIMESTAMP_STALE",
     "FALLBACK_MUST_NOT_INHERIT_PRIMARY_PROVIDER_IDENTITY",
     "FETCH_TIME_MUST_NOT_SATISFY_SOURCE_NATIVE_FRESHNESS",
-    "CONSENSUS_PROVIDER_INELIGIBLE_FOR_CFBD_CONTEXT"
+    "CONSENSUS_PROVIDER_INELIGIBLE_FOR_CFBD_CONTEXT",
+    "SELENE_CONTEXT_MUST_NOT_SATISFY_MODEL_P_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY"
   ]
 }
