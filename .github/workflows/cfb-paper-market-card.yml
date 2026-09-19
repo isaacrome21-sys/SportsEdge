@@ -1,6 +1,11 @@
 name: cfb paper market card
 on:
   workflow_dispatch:
+    inputs:
+      board_json:
+        description: Optional manual cross-book market board JSON; leave blank to use configured provider
+        required: false
+        type: string
 permissions:
   contents: read
 jobs:
@@ -12,6 +17,7 @@ jobs:
     timeout-minutes: 10
     env:
       ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+      CFB_PAPER_BOARD_JSON: ${{ inputs.board_json }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Generate research-only CFB paper card
@@ -24,7 +30,9 @@ jobs:
           assert p['status']=='PAPER_ONLY'
           assert p['authority'] and not any(p['authority'].values())
           assert all(x['model_p'] is None and x['official'] is False for x in p['candidates'])
-          print('CFB_PAPER_CARD_ZERO_AUTHORITY candidates='+str(len(p['candidates'])))
+          if p['input_status'] != 'READY':
+              assert p['candidates'] == []
+          print('CFB_PAPER_CARD_ZERO_AUTHORITY input_status='+p['input_status']+' candidates='+str(len(p['candidates'])))
           PY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
