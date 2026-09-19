@@ -23,7 +23,7 @@
   "direct_source_contract_path": "docs/nfl_direct_capture_source_contract_v1.md",
   "source_code_bindings": {
     "sportsedge/nfl_direct_capture_source.py": "0d581ad1ba37ed2a97b519efd21002788efd00e7",
-    "sportsedge/draftkings_game_market_source.py": "41f1f45d4653d8d82b1121616d5d00599c2012de",
+    "sportsedge/draftkings_game_market_source.py": "6230693f07b03eccf28bb2cfa2f8118157d150da",
     "sportsedge/nfl_confirmation_schedule.py": "b6447abdae9f9c0357b60aa9bb1cebb245ae077d",
     "docs/nfl_direct_capture_source_contract_v1.md": "7de50041e298873aef36c8d6753715b5a3e29b92"
   },
