@@ -5,7 +5,6 @@ data may support the frozen selection exercise, but it never creates historical
 PIT evidence, Model_P, Truth Gate, promotion, staking, eligibility, or OFFICIAL
 authority.
 """
-# Required-check trigger only. Behavior unchanged.
 from __future__ import annotations
 
 import re
