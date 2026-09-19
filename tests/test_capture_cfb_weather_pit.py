@@ -6,7 +6,14 @@ from urllib.error import HTTPError
 from datetime import datetime, timezone
 from pathlib import Path
 
-from scripts.capture_cfb_weather_pit import capture_weather, _fetch_bytes, CFBWeatherCaptureError, main
+from scripts.capture_cfb_weather_pit import (
+    CFBWeatherCaptureError,
+    ESPN_KEYLESS_USER_AGENTS,
+    _default_opener,
+    _fetch_bytes,
+    capture_weather,
+    main,
+)
 
 UTC = timezone.utc
 
@@ -109,6 +116,18 @@ class CFBWeatherCaptureTests(unittest.TestCase):
         with self.assertRaisesRegex(CFBWeatherCaptureError, 'CFB_WEATHER_HTTP_401'):
             _fetch_bytes('https://example.test', opener, pause=pause)
         self.assertEqual(opener.call_count, 1)
+
+    def test_default_opener_rotates_keyless_nonbrowser_user_agent_after_403(self):
+        blocked = HTTPError('https://site.api.espn.com/test', 403, 'forbidden', {}, None)
+        with patch(
+            'scripts.capture_cfb_weather_pit.urllib.request.urlopen',
+            side_effect=[blocked, _Response({})],
+        ) as network:
+            response = _default_opener('https://site.api.espn.com/test')
+            self.assertEqual(response.read(), b'{}')
+        self.assertEqual(network.call_count, 2)
+        seen = [call.args[0].get_header('User-agent') for call in network.call_args_list]
+        self.assertEqual(seen, list(ESPN_KEYLESS_USER_AGENTS))
 
     def test_live_cli_cannot_backdate_capture(self):
         with patch('scripts.capture_cfb_weather_pit._default_opener') as network:
