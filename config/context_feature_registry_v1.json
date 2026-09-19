@@ -8,6 +8,10 @@
     "rest_travel": {"pull": true, "model_p": false, "run_it": true},
     "weather_wind_indoor": {"pull": true, "model_p": false, "run_it": true},
     "umpire_park_bullpen": {"pull": true, "model_p": false, "run_it": true},
+    "qb_starter_confirmed": {"pull": true, "model_p": false, "run_it": true},
+    "returning_production_talent": {"pull": true, "model_p": false, "run_it": true},
+    "epa_success_cpoe_own_pbp": {"pull": true, "model_p": false, "run_it": true},
+    "external_power_ratings": {"pull": true, "model_p": false, "run_it": true, "never_model_p": true},
     "ticket_handles_splits_steam": {"pull": true, "model_p": false, "run_it": true, "never_model_p": true},
     "odds_lines_juice": {"pull": true, "model_p": false, "run_it": false, "quote_only": true, "never_model_p": true}
   },

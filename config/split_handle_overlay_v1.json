@@ -1,0 +1,35 @@
+{
+  "schema": "SPLIT_HANDLE_OVERLAY_V1",
+  "rule": "Some ticket/handle patterns have situational value. They may overlay PAPER. They may never write Model_P.",
+  "model_p_authority": false,
+  "official_authority": false,
+  "truth_gate_input": false,
+  "allowed_patterns": [
+    {
+      "id": "RLM_TICKETS_VS_LINE",
+      "when": "ticket_pct >= 70 AND line moved the other way by >= 0.5 points",
+      "action": "CONTEXT_LEAN_AGAINST_PUBLIC",
+      "why": "Classic reverse line movement. Public is on one side, the number moved opposite."
+    },
+    {
+      "id": "MONEY_TICKET_DIVERGENCE",
+      "when": "abs(money_pct - ticket_pct) >= 15",
+      "action": "CONTEXT_LEAN_WITH_MONEY",
+      "why": "Fewer tickets, more dollars. Handle is not the same thing as ticket count."
+    },
+    {
+      "id": "STEAM_THEN_PERSIST",
+      "when": "Pinnacle led and the soft book stayed stale 30s and 180s",
+      "action": "CONTEXT_TAKEABILITY_CHECK",
+      "why": "Already in NFL radar. Confirms whether an apparent edge was still there."
+    }
+  ],
+  "forbidden": [
+    "rewrite Model_P",
+    "create an official bet from splits alone",
+    "treat 60/40 tickets as sharp money",
+    "treat raw handle % as a probability"
+  ],
+  "paper_effects": ["downgrade", "block", "keep_but_tag"],
+  "cannot": ["upgrade_to_official", "change_model_p", "pass_truth_gate"]
+}
