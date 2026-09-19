@@ -1,0 +1,55 @@
+{
+  "schema": "MODEL_IMPROVEMENT_BACKLOG_V1",
+  "rule": "Adopt public-repo methods only as feature candidates. Never copy fitted weights. Never put lines, handles, or third-party ratings into Model_P until they beat the frozen engine on walk-forward Brier, log-loss, and CLV.",
+  "official_authority": false,
+  "do_not_copy": [
+    {
+      "source": "blaizerlahman/CFB-Model",
+      "why": "Uses SP+ and betting lines as features; live 2024 was 48.3% ATS. Market-contaminated and unprofitable."
+    },
+    {
+      "source": "generic GitHub ATS bots",
+      "why": "Most train on closing spreads. That is leakage relative to SportsEdge Model_P."
+    }
+  ],
+  "adopt_as_method_not_weights": [
+    {
+      "source": "nflverse/nflfastR and sportsdataverse/cfbfastR",
+      "take": "EPA/CPOE/success-rate from point-in-time play-by-play, hash-bound model artifacts, leave-one-season-out calibration."
+    },
+    {
+      "source": "sportsdataverse cfb_model_artifacts discipline",
+      "take": "Published artifact + checksum + model card. Do not ingest their EP booster into Model_P."
+    },
+    {
+      "source": "pybaseball + Statcast rolling windows",
+      "take": "Barrel, exit velo, hard-hit, platoon, 10/35/75-game pitcher and 75/162 batter windows. Feature candidates only."
+    }
+  ],
+  "candidates": {
+    "CFB": [
+      {"id": "cfb_returning_production", "layer": "FEATURE_CANDIDATE", "why": "Public returning-production files exist; raw roster continuity is not a market."},
+      {"id": "cfb_recruit_talent", "layer": "FEATURE_CANDIDATE", "why": "247/composite talent is pregame public information if timestamped before kickoff."},
+      {"id": "cfb_epa_success_cpoe", "layer": "FEATURE_CANDIDATE", "why": "Build from our own PIT PBP. Do not import cfbfastR booster weights."},
+      {"id": "cfb_rest_travel_short_week", "layer": "FEATURE_CANDIDATE", "why": "Schedule-derived, market-blind."},
+      {"id": "cfb_sp_plus_fpi", "layer": "CONTEXT_ONLY", "why": "Someone else's model. Useful as a disagreement check, never Model_P."}
+    ],
+    "NFL": [
+      {"id": "nfl_epa_success_cpoe", "layer": "FEATURE_CANDIDATE", "why": "nflverse PBP already exists in the stack."},
+      {"id": "nfl_rest_short_week_travel", "layer": "FEATURE_CANDIDATE", "why": "Schedule-derived."},
+      {"id": "nfl_indoor_wind_surface", "layer": "FEATURE_CANDIDATE", "why": "Venue/weather already pulled; freeze before kickoff."},
+      {"id": "nfl_qb_availability", "layer": "FEATURE_CANDIDATE", "why": "Confirmed starter only. News rumor stays context."},
+      {"id": "nfl_pinnacle_steam", "layer": "CONTEXT_ONLY", "why": "Market signal. Can block PAPER. Cannot write Model_P."}
+    ],
+    "MLB": [
+      {"id": "mlb_statcast_barrel_ev", "layer": "FEATURE_CANDIDATE", "why": "Clocked Statcast snapshot once #850 merges."},
+      {"id": "mlb_platoon_park_wind", "layer": "FEATURE_CANDIDATE", "why": "Matchup + park + weather are market-blind if PIT."},
+      {"id": "mlb_confirmed_lineup_ump_catcher", "layer": "FEATURE_CANDIDATE", "why": "Already in game-context refresh. Block rather than guess."},
+      {"id": "mlb_sp_plus_style_ratings", "layer": "NO", "why": "Do not import external baseball ratings into Model_P."}
+    ]
+  },
+  "promotion_rule": {
+    "into_model_p": "Walk-forward only. Must not worsen holdout Brier or log-loss vs frozen engine, and must not lose to close after Bonferroni on the same segments the frozen spec uses.",
+    "into_official": "Truth Gate still required. This file cannot promote anything."
+  }
+}
