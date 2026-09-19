@@ -2,6 +2,9 @@ name: draftkings-prop-provider-probe
 
 on:
   workflow_dispatch:
+  schedule:
+    # Quote discovery only. Never Model_P. Never official.
+    - cron: "7,37 * * * *"
   push:
     paths:
       - 'sportsedge/draftkings_prop_source.py'
@@ -51,6 +54,8 @@ jobs:
                   'market_counts': markets,
                   'failure_count': len(snap.failures),
                   'failure_sample': list(snap.failures[:20]),
+                  'official_authority': False,
+                  'model_p_authority': False,
               }
           except Exception as exc:
               row = {
@@ -58,6 +63,8 @@ jobs:
                   'provider': 'DRAFTKINGS_WEB_RESEARCH',
                   'status': 'ERROR',
                   'reason': f'{type(exc).__name__}:{exc}',
+                  'official_authority': False,
+                  'model_p_authority': False,
               }
           path.write_text(json.dumps(row, indent=2, sort_keys=True) + '\n')
           print(json.dumps(row, indent=2, sort_keys=True))

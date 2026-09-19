@@ -24,6 +24,7 @@
     ".github/workflows/nfl-market-maker-radar-capture.yml",
     ".github/workflows/football-public-splits.yml",
     ".github/workflows/football-vsin-contest-context.yml",
-    ".github/workflows/statcast-daily-refresh.yml"
+    ".github/workflows/statcast-daily-refresh.yml",
+    ".github/workflows/draftkings-prop-provider-probe.yml"
   ]
 }
