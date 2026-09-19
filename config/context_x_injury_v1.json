@@ -1,0 +1,16 @@
+{
+  "schema": "SPORTSEDGE_CONTEXT_X_INJURY_V1",
+  "official_authority": false,
+  "model_p_input": false,
+  "layer": "CONTEXT_OVERLAY",
+  "accounts": [
+    "AdamSchefter",
+    "RapSheet",
+    "TomPelissero",
+    "IanRapoport",
+    "BrettMcMurphy",
+    "PeteThamel",
+    "FieldYates"
+  ],
+  "use": "News/injury context for PAPER cards. Never a Model_P feature until a walk-forward injury-adjusted engine exists."
+}
