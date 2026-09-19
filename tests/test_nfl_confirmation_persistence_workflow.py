@@ -1,38 +1,44 @@
 from pathlib import Path
+import re
 import subprocess
-import yaml
+import textwrap
+import unittest
 
 
-def steps():
-    workflow = yaml.safe_load(Path('.github/workflows/nfl-2026-line-capture.yml').read_text())
-    return workflow['jobs']['capture']['steps']
+def step(name):
+    text = Path('.github/workflows/nfl-2026-line-capture.yml').read_text()
+    chunks = re.split(r'^      - name: ', text, flags=re.MULTILINE)
+    return next(block for block in chunks[1:] if block.splitlines()[0] == name)
 
 
-def test_restore_precedes_capture_and_refuses_overwrites():
-    rows = steps()
-    names = [row.get('name') for row in rows]
-    restore = next(row for row in rows if row.get('name', '').startswith('Restore immutable'))
-    assert names.index(restore['name']) < names.index('Run capture')
-    assert '_copy_create_only' in restore['run']
-    assert 'origin/data' in restore['run']
-    assert "github.event_name != 'pull_request'" == restore['if']
-    subprocess.run(['bash', '-n'], input=restore['run'], text=True, check=True)
+def shell(block):
+    return textwrap.dedent(block.split('        run: |\n', 1)[1]).strip()
 
 
-def test_capture_persistence_targets_data_not_protected_main():
-    persist = next(row for row in steps() if row.get('name') == 'Commit captures and absence markers')
-    assert 'persist_nfl_confirmation_archive.py' in persist['run']
-    assert 'git push' not in persist['run']
-    assert 'git commit' not in persist['run']
-    assert 'set -euo pipefail' in persist['run']
-    subprocess.run(['bash', '-n'], input=persist['run'], text=True, check=True)
+class NFLConfirmationPersistenceWorkflowTests(unittest.TestCase):
+    def test_restore_precedes_capture_and_refuses_overwrites(self):
+        text = Path('.github/workflows/nfl-2026-line-capture.yml').read_text()
+        name = 'Restore immutable confirmation archive from data branch'
+        restore = step(name)
+        self.assertLess(text.index(name), text.index('- name: Run capture'))
+        self.assertIn('_copy_create_only', restore)
+        self.assertIn('origin/data', restore)
+        self.assertIn("if: github.event_name != 'pull_request'", restore)
+        self.assertIn("relative.name != 'attempts.jsonl'", restore)
+        subprocess.run(['bash', '-n'], input=shell(restore), text=True, check=True)
 
+    def test_capture_persistence_targets_data_not_protected_main(self):
+        block = step('Commit captures and absence markers')
+        self.assertIn('persist_nfl_confirmation_archive.py', block)
+        self.assertNotIn('git push', block)
+        self.assertNotIn('git commit', block)
+        self.assertIn('set -euo pipefail', block)
+        subprocess.run(['bash', '-n'], input=shell(block), text=True, check=True)
 
-def test_failed_persistence_keeps_run_specific_artifact():
-    backup = next(row for row in steps() if row.get('name', '').startswith('Preserve confirmation archive'))
-    assert backup['if'].startswith('always()')
-    assert backup['uses'].startswith('actions/upload-artifact@')
-    assert '${{ github.run_id }}' in backup['with']['name']
-    assert '${{ github.run_attempt }}' in backup['with']['name']
-    assert backup['with']['path'] == 'data/nfl_2026_confirmation/captures'
-
+    def test_failed_persistence_keeps_run_specific_artifact(self):
+        backup = step('Preserve confirmation archive even when persistence fails')
+        self.assertIn('if: always()', backup)
+        self.assertIn('actions/upload-artifact@', backup)
+        self.assertIn('${{ github.run_id }}', backup)
+        self.assertIn('${{ github.run_attempt }}', backup)
+        self.assertIn('path: data/nfl_2026_confirmation/captures', backup)
