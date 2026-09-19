@@ -4,7 +4,7 @@
   "supersedes": "config/cfb_candidate_bakeoff_evaluator_v1.json",
   "repair_reason": "V1 kept observed candidate predictions fixed during null shuffles; frozen selection policy requires every preregistered candidate to be refit and rescored on each shuffle.",
   "evaluator_path": "sportsedge/sports/cfb/candidate_bakeoff_v2.py",
-  "evaluator_code_git_blob": "44e69fad01ea7e8a494c390f3f99b86fa4ecae5f",
+  "evaluator_code_git_blob": "9ebb86a816e42ca07f63ad500fc5a2cd1fe2346a",
   "candidate_families": ["EQUAL_WEIGHT_HARD_SWITCH","RELIABILITY_WEIGHTED_HARD_SWITCH","PRIOR_CURRENT_BLEND","GAMES_IN_SAMPLE_FEATURE"],
   "outer_validation_seasons": [2018,2019,2020,2021,2022,2023,2024,2025],
   "outer_fold_rule": "EXPANDING_SEASON; validation season must have at least 3 earlier seasons beginning with 2015",
