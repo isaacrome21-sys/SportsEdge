@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
+import gzip
 import json
 from pathlib import Path
 import sys
 from typing import Any
+from urllib.request import urlopen
 
 from sportsedge.market_context.public_splits import (
     PublicSplitsError,
@@ -20,6 +22,36 @@ from sportsedge.market_context.public_splits import (
     diagnostics,
     snapshot_from_dict,
 )
+
+
+class _DecodedBody:
+    def __init__(self, raw: bytes) -> None:
+        self._raw = raw
+
+    def read(self) -> bytes:
+        return self._raw
+
+    def __enter__(self) -> "_DecodedBody":
+        return self
+
+    def __exit__(self, *_args: object) -> bool:
+        return False
+
+
+def _opener(request: object, timeout: int = 20) -> _DecodedBody:
+    with urlopen(request, timeout=timeout) as response:
+        raw = response.read()
+    if raw.startswith(b"\x1f\x8b"):
+        try:
+            raw = gzip.decompress(raw)
+        except Exception as exc:
+            raise PublicSplitsError("PUBLIC_SPLITS_GZIP_INVALID") from exc
+    for encoding in ("utf-8", "utf-8-sig", "cp1252"):
+        try:
+            return _DecodedBody(raw.decode(encoding).encode("utf-8"))
+        except UnicodeDecodeError:
+            continue
+    raise PublicSplitsError("PUBLIC_SPLITS_RESPONSE_UTF8_REQUIRED")
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -64,6 +96,7 @@ def main(argv: list[str] | None = None) -> int:
 
     snapshot = capture_vsin_cfb(
         now=datetime.now(timezone.utc),
+        opener=_opener,
         source_url=str(source["url"]),
     )
     notable = diagnostics(
