@@ -1,0 +1,61 @@
+name: mlb moneyline shadow card
+on:
+  workflow_dispatch:
+    inputs:
+      slate_date:
+        description: Optional CT slate date YYYY-MM-DD; blank uses current CT date
+        required: false
+        type: string
+      dk_json:
+        description: Optional manual DraftKings moneyline JSON array with game_pk, home_odds, away_odds
+        required: false
+        type: string
+      simulations:
+        description: Monte Carlo paths; production-parity minimum is enforced by engine
+        required: false
+        default: '100000'
+        type: string
+      min_ev:
+        description: Research PAPER EV threshold per dollar
+        required: false
+        default: '0.01'
+        type: string
+permissions:
+  contents: read
+jobs:
+  shadow-card:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      MLB_DK_MONEYLINE_JSON: ${{ inputs.dk_json }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Run canonical-engine MLB SHADOW_P card
+        run: >-
+          python scripts/run_mlb_moneyline_shadow_card.py
+          --slate-date "${{ inputs.slate_date }}"
+          --simulations "${{ inputs.simulations }}"
+          --min-ev "${{ inputs.min_ev }}"
+      - name: Assert paper-only authority and artifact boundary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = json.loads(Path('artifacts/mlb/mlb_moneyline_shadow_card.json').read_text())
+          assert p['status'] == 'PAPER_ONLY'
+          assert p['label'] == 'SHADOW_P'
+          assert p['authority'] and not any(p['authority'].values())
+          assert all(g.get('governed_model_p') is None for g in p.get('games', []))
+          assert all(g.get('official') is False for g in p.get('games', []))
+          assert not Path('data/mlb_forward').exists()
+          print('MLB_SHADOW_CARD_ZERO_AUTHORITY games='+str(len(p.get('games', []))))
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: mlb-moneyline-shadow-card
+          path: artifacts/mlb/mlb_moneyline_shadow_card.json
+          retention-days: 14
