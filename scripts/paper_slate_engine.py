@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PAPER slate from public results + DraftKings. Not official."""
+"""PAPER slate. PF/PA is research overlay only. Not the SportsEdge engine."""
 from __future__ import annotations
 
 import argparse
@@ -30,6 +30,8 @@ SPORTS = {
     "baseball_mlb": {"hfa": 0.15, "sigma_margin": 3.2, "max_abs_line": 3.0},
 }
 HORIZON_HOURS = 84
+POLICY_PATH = ROOT / "config" / "paper_engine_policy_v1.json"
+CFB_FREEZE = ROOT / "config" / "cfb_game_model_freeze.json"
 
 
 def _get(url: str) -> bytes:
@@ -212,9 +214,9 @@ def priced_play(pred: dict[str, Any], game: dict[str, Any], sigma: float) -> dic
         "side": home,
         "line": float(line),
         "price_american": int(price),
-        "model_p": round(cover_p, 4),
+        "overlay_p": round(cover_p, 4),
         "book_fair_p": round(implied, 4),
-        "edge_pp": round(100.0 * (cover_p - implied), 2),
+        "overlay_edge_pp": round(100.0 * (cover_p - implied), 2),
     }
 
 
@@ -223,6 +225,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", default="artifacts/paper_slate.json")
     args = parser.parse_args(argv)
     now = datetime.now(timezone.utc)
+    policy = json.loads(POLICY_PATH.read_text()) if POLICY_PATH.exists() else {}
+    freeze = json.loads(CFB_FREEZE.read_text()) if CFB_FREEZE.exists() else {}
     ratings = {
         "americanfootball_nfl": nfl_ratings(),
         "americanfootball_ncaaf": _espn_ratings(ESPN_CFB, 42, 8, min_n=2),
@@ -245,8 +249,11 @@ def main(argv: list[str] | None = None) -> int:
                 "commence_time": game["commence_time"],
                 "status": "PAPER_NOT_OFFICIAL",
                 "official_authority": False,
-                "model": "paper_recency_pfpa_v1",
-                "reason": "UNFROZEN_PAPER_ENGINE",
+                "candidate": False,
+                "model_p": None,
+                "engine": "UNFROZEN",
+                "overlay": "paper_recency_pfpa_v1",
+                "reason": "ENGINE_UNFROZEN_NO_MODEL_P",
             }
             if not in_horizon(game.get("commence_time"), now):
                 card["reason"] = "OUTSIDE_WEEKEND_WINDOW"
@@ -254,17 +261,14 @@ def main(argv: list[str] | None = None) -> int:
                 continue
             pred = predict(game["home_team"], game["away_team"], ratings[sport], spec["hfa"])
             if pred is None:
-                card["reason"] = "NO_RATING_MATCH"
+                card["reason"] = "ENGINE_UNFROZEN_AND_NO_OVERLAY_MATCH"
                 plays.append(card)
                 continue
-            card["prediction"] = pred
+            card["research_prediction"] = pred
             priced = priced_play(pred, game, spec["sigma_margin"])
             if priced:
-                card["priced"] = priced
-                too_wide = abs(float(priced["line"])) > spec["max_abs_line"]
-                card["candidate"] = priced["edge_pp"] >= 3.0 and not too_wide
-                if too_wide:
-                    card["reason"] = "LINE_OUTSIDE_PAPER_BAND"
+                card["research_overlay"] = priced
+                card["reason"] = "ENGINE_UNFROZEN_RESEARCH_OVERLAY_ONLY"
             plays.append(card)
     report = {
         "contract": "SPORTSEDGE_PAPER_SLATE_V1",
@@ -272,9 +276,12 @@ def main(argv: list[str] | None = None) -> int:
         "horizon_hours": HORIZON_HOURS,
         "official_authority": False,
         "odds_api_used": False,
+        "policy": policy,
+        "cfb_freeze_status": freeze.get("status"),
+        "cfb_freeze_blocker": freeze.get("blocker"),
         "sports": sport_status,
         "plays": plays,
-        "candidates": [p for p in plays if p.get("candidate")],
+        "candidates": [],
     }
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -282,9 +289,9 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps({
         "wrote": str(out),
         "plays": len(plays),
-        "candidates": len(report["candidates"]),
-        "in_window": sum(1 for p in plays if p.get("reason") != "OUTSIDE_WEEKEND_WINDOW"),
-        "sports": {k: v.get("status") for k, v in sport_status.items()},
+        "candidates": 0,
+        "cfb_freeze_status": freeze.get("status"),
+        "reason": "ENGINE_UNFROZEN_NO_MODEL_P",
         "official_authority": False,
     }, sort_keys=True))
     return 0
