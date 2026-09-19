@@ -20,6 +20,10 @@ import sys
 from typing import Any, Callable, Iterable, Mapping
 from zoneinfo import ZoneInfo
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from sportsedge.mlb_generic_features import MLBGenericHistorySource
 from sportsedge.mlb_moneyline_forward_prediction import (
     DEFAULT_SIMULATIONS,
