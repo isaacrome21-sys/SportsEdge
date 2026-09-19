@@ -18,6 +18,10 @@ on:
       - 'scripts/acquire_cfb_reconstructed_selection.py'
       - 'scripts/materialize_cfb_reconstructed_selection.py'
       - 'sportsedge/sports/cfb/reconstructed_selection.py'
+      - 'sportsedge/sports/cfb/candidate_bakeoff_v2.py'
+      - 'scripts/run_cfb_candidate_bakeoff.py'
+      - 'config/cfb_candidate_bakeoff_evaluator_v2.json'
+      - 'tests/test_cfb_candidate_bakeoff_v2.py'
       - 'tests/test_cfb_reconstructed_selection_preflight.py'
       - 'tests/test_cfb_reconstructed_selection_acquisition.py'
       - 'tests/test_cfb_reconstructed_selection_materializer.py'
@@ -47,7 +51,9 @@ jobs:
             scripts/preflight_cfb_reconstructed_selection.py \
             scripts/acquire_cfb_reconstructed_selection.py \
             scripts/materialize_cfb_reconstructed_selection.py \
-            sportsedge/sports/cfb/reconstructed_selection.py
+            sportsedge/sports/cfb/reconstructed_selection.py \
+            sportsedge/sports/cfb/candidate_bakeoff_v2.py \
+            scripts/run_cfb_candidate_bakeoff.py
 
       - name: Run reconstructed-selection contract tests
         run: |
