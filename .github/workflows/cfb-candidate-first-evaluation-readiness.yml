@@ -20,6 +20,7 @@ on:
       - 'scripts/audit_cfb_selection_readiness.py'
       - 'sportsedge/sports/cfb/acquisition_readiness.py'
       - 'sportsedge/sports/cfb/selection_readiness.py'
+      - '.github/workflows/cfb-reconstructed-selection-provider-preflight.yml'
       - '.github/workflows/cfb-candidate-first-evaluation-readiness.yml'
   push:
     branches: [main]
@@ -40,6 +41,7 @@ on:
       - 'scripts/audit_cfb_selection_readiness.py'
       - 'sportsedge/sports/cfb/acquisition_readiness.py'
       - 'sportsedge/sports/cfb/selection_readiness.py'
+      - '.github/workflows/cfb-reconstructed-selection-provider-preflight.yml'
       - '.github/workflows/cfb-candidate-first-evaluation-readiness.yml'
 
 permissions:
