@@ -86,6 +86,7 @@
       "decision_window": "T30_EARLY_ONLY_30_TO_36_MINUTES_BEFORE_EVENT_START",
       "operational_lookback_hours": 4,
       "required_authority_literals": [
+        "schedule:",
         "workflow_run:",
         "mlb-game-context-refresh",
         "scripts/capture_mlb_moneyline_model_p.py",
