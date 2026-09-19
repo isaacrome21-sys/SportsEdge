@@ -3,6 +3,7 @@
 # Public-splits PYTHONPATH fix retrigger for required CFB readiness check.
 # Public-splits decoder fix retrigger for required CFB readiness check.
 # DK prop clock retrigger for required CFB readiness check.
+# Blueprint ops park retrigger for required CFB readiness check.
 # DK-only board snapshot retrigger for required CFB readiness check.
 from __future__ import annotations
 
