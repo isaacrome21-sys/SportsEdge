@@ -7,12 +7,12 @@ NOW=datetime(2026,9,16,18,0,0,tzinfo=timezone.utc); PAYLOAD={"events":[],"market
 def _fetch(sk): return RawDraftKingsBoard(sk,board_url(sk),json.dumps(PAYLOAD).encode(),NOW,PAYLOAD)
 class SharedTransportTest(unittest.TestCase):
  def test_sport_neutral_across_verified_leagues(self):
-  for sk,host in (("americanfootball_nfl","sportsbook-nash.draftkings.com"),("baseball_mlb","sportsbook-nash.draftkings.com")):
+  for sk,host in (("americanfootball_nfl","sportsbook-nash.draftkings.com"),("americanfootball_ncaaf","sportsbook-nash.draftkings.com"),("baseball_mlb","sportsbook-nash.draftkings.com")):
    rec=t.acquire_board(sk,fetcher=_fetch); self.assertEqual(rec["sport_key"],sk); self.assertEqual(rec["transport_host"],host); self.assertEqual(rec["source_class"],"DRAFTKINGS_DIRECT_WEB_V1")
- def test_unverified_category_fails_before_fetch(self):
+ def test_unknown_sport_fails_before_fetch(self):
   called=[]
   def should_not_fetch(sk): called.append(sk); return _fetch(sk)
-  with self.assertRaises(DraftKingsGameMarketError): t.acquire_board("americanfootball_ncaaf",fetcher=should_not_fetch)
+  with self.assertRaises(DraftKingsGameMarketError): t.acquire_board("unknown_sport",fetcher=should_not_fetch)
   self.assertEqual(called,[])
  def test_hashes_received_bytes_not_reserialization(self):
   import hashlib
