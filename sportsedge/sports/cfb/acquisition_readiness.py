@@ -4,6 +4,7 @@
 # Public-splits decoder fix retrigger for required CFB readiness check.
 # DK prop clock retrigger for required CFB readiness check.
 # Blueprint ops park retrigger for required CFB readiness check.
+# PAPER DK CFB board retrigger for required CFB readiness check.
 from __future__ import annotations
 
 import re
