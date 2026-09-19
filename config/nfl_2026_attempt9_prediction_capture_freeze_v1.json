@@ -1,0 +1,71 @@
+{
+  "schema_version": "SPORTSEDGE_NFL_ATTEMPT9_PREDICTION_CAPTURE_FREEZE_V1",
+  "status": "FROZEN_BEFORE_FIRST_PROSPECTIVE_PREDICTION",
+  "candidate": {
+    "selected_attempt": 9,
+    "feature_set": "exponential_recency_weighted_baseline",
+    "decay": 0.85,
+    "owner_scope": "NFL_2026_PROSPECTIVE_CONFIRMATION_RAW_MARGIN_TOTAL"
+  },
+  "destination_contract": {
+    "config_path": "config/nfl_2026_capture.json",
+    "predictions_dir": "data/nfl_2026_confirmation/predictions",
+    "schedule_snapshots_dir": "data/nfl_2026_confirmation/prediction_schedule_snapshots",
+    "first_write_only": true,
+    "future_games_only": true,
+    "horizon_days": 9,
+    "retroactive_prediction_allowed": false
+  },
+  "numerical_reconstruction_contract": {
+    "python_version": "3.12.14",
+    "numpy_version": "2.5.3",
+    "openblas_coretype": "ZEN",
+    "openblas_num_threads": 1,
+    "omp_num_threads": 1,
+    "mkl_num_threads": 1,
+    "compatibility_recipe_only": true,
+    "historical_cpu_identity_claimed": false,
+    "historical_openblas_coretype_claimed": false,
+    "exact_historical_coefficient_text_required": true,
+    "exact_historical_prediction_sha256_required": true
+  },
+  "git_blob_bindings": [
+    {
+      "path": "scripts/build_nfl_attempt9_runtime_artifact.py",
+      "git_blob_sha1": "113e887da78c0cfde199d71606626ee72baca9da"
+    },
+    {
+      "path": "scripts/capture_nfl_attempt9_prospective_predictions.py",
+      "git_blob_sha1": "84e0956be1ccf3990f3dc28fed67770772b93b93"
+    },
+    {
+      "path": ".github/workflows/nfl-attempt9-prospective-prediction-capture.yml",
+      "git_blob_sha1": "0ad2d5473de929784472f0ec30bedfa32a679f94"
+    },
+    {
+      "path": "config/public_training_sources_v1.json",
+      "git_blob_sha1": "3ef8ea2a16542b63b2833f2e05977e86ed8c2f2b"
+    },
+    {
+      "path": "config/nfl_2026_capture.json",
+      "git_blob_sha1": "79eead8ac5551f8e6f9ff2795ebdb4cf606d9f14"
+    }
+  ],
+  "prediction_contract": {
+    "outputs": [
+      "raw_predicted_home_margin",
+      "raw_predicted_game_total"
+    ],
+    "market_prices_used": false,
+    "probabilities_emitted": false,
+    "edges_emitted": false,
+    "stakes_emitted": false
+  },
+  "creates_model_p": false,
+  "promotion_authority": false,
+  "truth_gate_authority": false,
+  "official_authority": false,
+  "staking_authority": false,
+  "backfill_allowed": false,
+  "notes": "This freeze authorizes prospective first-write raw forecasts only after merge. It does not convert attempt 9 into a probability model and does not repair any previously missed opener/final evidence window."
+}

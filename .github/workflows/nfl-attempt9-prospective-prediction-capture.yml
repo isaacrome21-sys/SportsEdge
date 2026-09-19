@@ -1,0 +1,164 @@
+name: nfl-attempt9-prospective-prediction-capture
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '7 12 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nfl-attempt9-prospective-prediction-capture
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12.14'
+
+      - name: Install exact frozen numerical dependency
+        run: python -m pip install --disable-pip-version-check 'numpy==2.5.3'
+
+      - name: Verify prospective raw-prediction contract
+        run: |
+          python -m py_compile \
+            scripts/build_nfl_attempt9_runtime_artifact.py \
+            scripts/capture_nfl_attempt9_prospective_predictions.py
+          python -m unittest -q \
+            tests.test_nfl_attempt9_prospective_capture \
+            tests.test_whole_model_train_plumbing
+
+      - name: Verify frozen prediction-capture implementation
+        run: |
+          python - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+          freeze_path=Path('config/nfl_2026_attempt9_prediction_capture_freeze_v1.json')
+          if not freeze_path.is_file():
+              raise SystemExit('NFL_ATTEMPT9_PREDICTION_CAPTURE_FREEZE_MISSING')
+          freeze=json.loads(freeze_path.read_text())
+          if freeze.get('schema_version') != 'SPORTSEDGE_NFL_ATTEMPT9_PREDICTION_CAPTURE_FREEZE_V1':
+              raise SystemExit('NFL_ATTEMPT9_PREDICTION_CAPTURE_FREEZE_SCHEMA_INVALID')
+          if freeze.get('status') != 'FROZEN_BEFORE_FIRST_PROSPECTIVE_PREDICTION':
+              raise SystemExit('NFL_ATTEMPT9_PREDICTION_CAPTURE_FREEZE_STATUS_INVALID')
+          for row in freeze.get('git_blob_bindings') or []:
+              path=str(row.get('path') or '')
+              expected=str(row.get('git_blob_sha1') or '').lower()
+              actual=subprocess.check_output(['git','hash-object',path],text=True).strip().lower()
+              if actual != expected:
+                  raise SystemExit(f'NFL_ATTEMPT9_PREDICTION_CAPTURE_CODE_DRIFT:{path}:{actual}:{expected}')
+          for key in ('creates_model_p','promotion_authority','truth_gate_authority','official_authority','staking_authority','backfill_allowed'):
+              if freeze.get(key) is not False:
+                  raise SystemExit(f'NFL_ATTEMPT9_PREDICTION_CAPTURE_AUTHORITY_INVALID:{key}')
+          print(json.dumps({'status':'NFL_ATTEMPT9_PREDICTION_CAPTURE_IMPLEMENTATION_FROZEN'},sort_keys=True))
+          PY
+
+      - name: Reconstruct exact frozen attempt-9 runtime artifact
+        env:
+          OPENBLAS_CORETYPE: ZEN
+          OPENBLAS_NUM_THREADS: '1'
+          OMP_NUM_THREADS: '1'
+          MKL_NUM_THREADS: '1'
+        run: |
+          mkdir -p artifacts/nfl-attempt9/forward
+          python scripts/build_nfl_attempt9_runtime_artifact.py \
+            --output artifacts/nfl-attempt9/frozen_runtime_artifact.json
+
+      - name: Restore prior immutable prediction captures from data branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin data
+          git worktree add --detach .data-attempt9 origin/data
+          mkdir -p artifacts/nfl-attempt9/forward/predictions
+          if [ -d .data-attempt9/data/nfl_2026_confirmation/predictions ]; then
+            cp -R .data-attempt9/data/nfl_2026_confirmation/predictions/. \
+              artifacts/nfl-attempt9/forward/predictions/
+          fi
+
+      - name: Fetch exact current nflverse schedule bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error \
+            --retry 5 --retry-delay 2 --retry-all-errors --connect-timeout 30 \
+            'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv' \
+            -o artifacts/nfl-attempt9/forward/games.csv
+          sha256sum artifacts/nfl-attempt9/forward/games.csv
+
+      - name: Capture first-write future-game raw forecasts
+        shell: bash
+        run: |
+          set -euo pipefail
+          CAPTURED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          python scripts/capture_nfl_attempt9_prospective_predictions.py \
+            --artifact artifacts/nfl-attempt9/frozen_runtime_artifact.json \
+            --schedule artifacts/nfl-attempt9/forward/games.csv \
+            --output-dir artifacts/nfl-attempt9/forward/predictions \
+            --capture-code-git-sha "$GITHUB_SHA" \
+            --captured-at-utc "$CAPTURED_AT" \
+            --horizon-days 9 \
+            | tee artifacts/nfl-attempt9/forward/capture_summary.json
+
+      - name: Persist schedule snapshot and first-write predictions to data branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          SCHEDULE_SHA="$(sha256sum artifacts/nfl-attempt9/forward/games.csv | awk '{print $1}')"
+          SNAPSHOT_DIR=.data-attempt9/data/nfl_2026_confirmation/prediction_schedule_snapshots
+          PRED_DIR=.data-attempt9/data/nfl_2026_confirmation/predictions
+          mkdir -p "$SNAPSHOT_DIR" "$PRED_DIR"
+          SNAPSHOT="$SNAPSHOT_DIR/${SCHEDULE_SHA}.csv"
+          if [ -f "$SNAPSHOT" ]; then
+            cmp "$SNAPSHOT" artifacts/nfl-attempt9/forward/games.csv
+          else
+            cp artifacts/nfl-attempt9/forward/games.csv "$SNAPSHOT"
+          fi
+          for src in artifacts/nfl-attempt9/forward/predictions/*.json; do
+            [ -e "$src" ] || continue
+            dst="$PRED_DIR/$(basename "$src")"
+            if [ -f "$dst" ]; then
+              cmp "$dst" "$src"
+            else
+              cp "$src" "$dst"
+            fi
+          done
+          (
+            cd .data-attempt9
+            git config user.name sportsedge-attempt9-prediction-bot
+            git config user.email sportsedge-attempt9-prediction-bot@users.noreply.github.com
+            git add data/nfl_2026_confirmation/predictions data/nfl_2026_confirmation/prediction_schedule_snapshots
+            if git diff --cached --quiet; then
+              echo 'NFL_ATTEMPT9_NO_NEW_PROSPECTIVE_BYTES'
+              exit 0
+            fi
+            git commit -m "evidence: capture prospective NFL attempt9 raw predictions ${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}"
+            for attempt in 1 2 3 4 5; do
+              if git push origin HEAD:data; then
+                exit 0
+              fi
+              git fetch origin data
+              git rebase origin/data
+              sleep $((attempt * 2))
+            done
+            exit 98
+          )
+
+      - name: Upload prediction-capture diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nfl-attempt9-prospective-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts/nfl-attempt9/forward/capture_summary.json
+            artifacts/nfl-attempt9/forward/predictions
+          if-no-files-found: warn
+          retention-days: 30
