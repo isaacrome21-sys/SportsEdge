@@ -15,12 +15,15 @@
     ".github/workflows/archive-mlb-game-odds.yml",
     ".github/workflows/archive-mlb-game-odds-failover.yml",
     ".github/workflows/mlb-v8-actual-start-binding.yml",
-    ".github/workflows/nfl-v2g-prospective-prediction-capture.yml",
+    ".github.com/workflows/nfl-v2g-prospective-prediction-capture.yml",
     ".github/workflows/mlb-pit-lineup-starter-archive.yml",
     ".github/workflows/mlb-prop-pit-archive.yml",
     ".github/workflows/mlb-game-context-refresh.yml",
     ".github/workflows/mlb-moneyline-forward-evidence.yml",
     ".github/workflows/mlb-moneyline-forward-settlement.yml",
-    ".github/workflows/nfl-market-maker-radar-capture.yml"
+    ".github/workflows/nfl-market-maker-radar-capture.yml",
+    ".github/workflows/football-public-splits.yml",
+    ".github/workflows/football-vsin-contest-context.yml",
+    ".github/workflows/statcast-daily-refresh.yml"
   ]
 }
