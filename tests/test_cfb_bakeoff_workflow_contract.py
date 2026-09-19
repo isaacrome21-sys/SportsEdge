@@ -10,7 +10,8 @@ class TestCFBBakeoffWorkflowContract(unittest.TestCase):
         self.assertIn("scripts/run_cfb_candidate_bakeoff.py",text)
         self.assertIn('--private-rows "$RUNNER_TEMP/cfb_reconstructed_selection_rows.json"',text)
         self.assertIn("artifacts/cfb/candidate_bakeoff_result.json",text)
-        upload=text.split("Upload public reconstructed-selection attestations only",1)[1]
+        self.assertIn("artifacts/cfb/cfb_selected_candidate_model_proposal.json",text)
+        upload=text.split("Upload public reconstructed-selection attestations",1)[1]
         self.assertNotIn("cfb_reconstructed_selection_rows.json",upload)
         self.assertNotIn("cfb_reconstructed_acquisition_payload.json",upload)
 

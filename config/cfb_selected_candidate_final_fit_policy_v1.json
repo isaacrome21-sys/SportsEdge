@@ -1,0 +1,30 @@
+{
+  "schema": "CFB_SELECTED_CANDIDATE_FINAL_FIT_POLICY_V1",
+  "status": "FROZEN_BEFORE_FIRST_EVALUATION",
+  "purpose": "Predeclare the deterministic post-bakeoff refit rule before any of the four frozen CFB candidate attempts are evaluated.",
+  "required_bakeoff_schema": "CFB_CANDIDATE_BAKEOFF_RESULT_V2",
+  "required_bakeoff_status": "WINNER_SELECTED_FOR_FREEZE",
+  "final_training_rows": "ALL_HASH_BOUND_RECONSTRUCTED_SELECTION_ROWS_2015_2025",
+  "ridge_alpha_rule": "USE_SELECTED_FAMILY_ALPHA_FROM_LATEST_OUTER_FOLD",
+  "latest_outer_validation_season": 2025,
+  "alpha_source_path": "observed[WINNER].folds[season=2025].alpha",
+  "rationale": "The latest outer fold's alpha was chosen only from nested expanding folds strictly earlier than that outer season. Reusing that already-preregistered nested alpha for the final all-row refit avoids any post-result hyperparameter search or tuning.",
+  "post_result_retuning_allowed": false,
+  "alternate_alpha_selection_after_bakeoff_allowed": false,
+  "require_nonempty_overtime_profile": true,
+  "artifact_schema": "CFB_SELECTED_CANDIDATE_MODEL_ARTIFACT_V1",
+  "artifact_output_is_proposal_only": true,
+  "activation_rule": "This policy may build a hash-bound zero-authority model proposal after a frozen winner exists. FROZEN serving status and any forward evidence clock require a separate refs/heads/main freeze commit binding the exact artifact and manifests.",
+  "authority": {
+    "attempt_consumed": false,
+    "evaluation_performed": false,
+    "model_p": false,
+    "truth_gate": false,
+    "promotion": false,
+    "eligibility": false,
+    "staking": false,
+    "evidence_clock": false,
+    "official": false,
+    "backfill": false
+  }
+}
