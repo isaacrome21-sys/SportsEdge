@@ -14,17 +14,22 @@ on:
   pull_request:
     paths:
       - 'config/cfb_cfbd_reconstructed_selection_budget_v1.json'
+      - 'config/cfb_selected_candidate_final_fit_policy_v1.json'
       - 'scripts/preflight_cfb_reconstructed_selection.py'
       - 'scripts/acquire_cfb_reconstructed_selection.py'
       - 'scripts/materialize_cfb_reconstructed_selection.py'
+      - 'scripts/build_cfb_selected_candidate_artifact.py'
       - 'sportsedge/sports/cfb/reconstructed_selection.py'
       - 'sportsedge/sports/cfb/candidate_bakeoff_v2.py'
+      - 'sportsedge/sports/cfb/selected_candidate_model.py'
+      - 'sportsedge/sports/cfb/selected_candidate_artifact.py'
       - 'scripts/run_cfb_candidate_bakeoff.py'
       - 'config/cfb_candidate_bakeoff_evaluator_v2.json'
       - 'tests/test_cfb_candidate_bakeoff_v2.py'
       - 'tests/test_cfb_reconstructed_selection_preflight.py'
       - 'tests/test_cfb_reconstructed_selection_acquisition.py'
       - 'tests/test_cfb_reconstructed_selection_materializer.py'
+      - 'tests/test_cfb_selected_candidate_artifact_builder.py'
       - '.github/workflows/cfb-reconstructed-selection-materialize.yml'
 
 permissions:
@@ -47,7 +52,7 @@ jobs:
       - name: Install evaluator runtime dependency
         run: python -m pip install numpy
 
-      - name: Compile acquisition and materialization contracts
+      - name: Compile acquisition, evaluation, and final-fit contracts
         run: |
           set -euo pipefail
           python -m py_compile \
@@ -56,7 +61,10 @@ jobs:
             scripts/materialize_cfb_reconstructed_selection.py \
             sportsedge/sports/cfb/reconstructed_selection.py \
             sportsedge/sports/cfb/candidate_bakeoff_v2.py \
-            scripts/run_cfb_candidate_bakeoff.py
+            scripts/run_cfb_candidate_bakeoff.py \
+            sportsedge/sports/cfb/selected_candidate_model.py \
+            sportsedge/sports/cfb/selected_candidate_artifact.py \
+            scripts/build_cfb_selected_candidate_artifact.py
 
       - name: Run reconstructed-selection contract tests
         run: |
@@ -65,7 +73,23 @@ jobs:
             tests.test_cfb_reconstructed_selection_preflight \
             tests.test_cfb_reconstructed_selection_acquisition \
             tests.test_cfb_reconstructed_selection_materializer \
-            tests.test_cfb_candidate_bakeoff_v2
+            tests.test_cfb_candidate_bakeoff_v2 \
+            tests.test_cfb_selected_candidate_artifact_builder
+
+      - name: Prove final-fit policy is frozen before first evaluation
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          policy=json.loads(Path('config/cfb_selected_candidate_final_fit_policy_v1.json').read_text())
+          assert policy['status']=='FROZEN_BEFORE_FIRST_EVALUATION'
+          assert policy['ridge_alpha_rule']=='USE_SELECTED_FAMILY_ALPHA_FROM_LATEST_OUTER_FOLD'
+          assert policy['post_result_retuning_allowed'] is False
+          assert policy['alternate_alpha_selection_after_bakeoff_allowed'] is False
+          assert policy['artifact_output_is_proposal_only'] is True
+          assert policy['authority'] and not any(policy['authority'].values())
+          print('CFB_SELECTED_FINAL_FIT_POLICY_FROZEN_ZERO_AUTHORITY')
+          PY
 
   materialize:
     name: CFB reconstructed-selection guarded materialization
@@ -175,6 +199,28 @@ jobs:
           print('CFB_BAKEOFF_RESULT_FROZEN_IN_RUN_ARTIFACT sha256='+str(r.get('result_sha256')))
           PY
 
+      - name: Build selected-candidate model proposal under preregistered final-fit rule
+        if: steps.preflight.outputs.state == 'VERIFIED_BEFORE_FIRST_REPLAY_CALL' && inputs.evaluation_mode == 'CONSUME_ALL_FOUR_CFB_ATTEMPTS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          status="$(python - <<'PY'
+          import json
+          print(json.load(open('artifacts/cfb/candidate_bakeoff_result.json'))['status'])
+          PY
+          )"
+          if [[ "$status" == "NO_CANDIDATE_DEMONSTRATED_SIGNAL_AT_THIS_SAMPLE" ]]; then
+            echo 'CFB_SELECTED_MODEL_NOT_BUILT reason=NO_CANDIDATE_DEMONSTRATED_SIGNAL_AT_THIS_SAMPLE'
+            exit 0
+          fi
+          test "$status" = "WINNER_SELECTED_FOR_FREEZE"
+          python scripts/build_cfb_selected_candidate_artifact.py \
+            --private-rows "$RUNNER_TEMP/cfb_reconstructed_selection_rows.json" \
+            --selection-bundle artifacts/cfb/selection_bundle_manifest.json \
+            --bakeoff-result artifacts/cfb/candidate_bakeoff_result.json \
+            --out artifacts/cfb/cfb_selected_candidate_model_proposal.json \
+            --attestation-out artifacts/cfb/cfb_selected_candidate_model_build_attestation.json
+
       - name: Assert public outputs contain zero authority and no raw provider rows
         if: always()
         shell: bash
@@ -187,6 +233,9 @@ jobs:
               Path('artifacts/cfb/cfbd_reconstructed_selection_preflight_public.json'),
               Path('artifacts/cfb/cfb_reconstructed_acquisition_public.json'),
               Path('artifacts/cfb/selection_bundle_manifest.json'),
+              Path('artifacts/cfb/candidate_bakeoff_result.json'),
+              Path('artifacts/cfb/cfb_selected_candidate_model_proposal.json'),
+              Path('artifacts/cfb/cfb_selected_candidate_model_build_attestation.json'),
           ]
           for path in paths:
               if not path.is_file():
@@ -207,7 +256,7 @@ jobs:
           print(json.dumps({'status': 'ZERO_AUTHORITY_PUBLIC_OUTPUTS_OK'}, sort_keys=True))
           PY
 
-      - name: Upload public reconstructed-selection attestations only
+      - name: Upload public reconstructed-selection attestations and model proposal only
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -218,5 +267,7 @@ jobs:
             artifacts/cfb/selection_bundle_manifest.json
             artifacts/cfb/reconstructed_source_manifest.json
             artifacts/cfb/candidate_bakeoff_result.json
+            artifacts/cfb/cfb_selected_candidate_model_proposal.json
+            artifacts/cfb/cfb_selected_candidate_model_build_attestation.json
           if-no-files-found: warn
           retention-days: 30
