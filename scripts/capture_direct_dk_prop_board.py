@@ -12,15 +12,35 @@ ROOT = "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1"
 BOARDS = {
     "americanfootball_nfl": {
         "league_id": 88808,
-        "categories": {"TD Scorers": 1003, "Passing Props": 1000, "Receiving Props": 1342, "Rushing Props": 1001},
+        "categories": {
+            "TD Scorers": 1003,
+            "Passing Props": 1000,
+            "Receiving Props": 1342,
+            "Rushing Props": 1001,
+            "Game Props": 528,
+            "Team Props": 530,
+        },
     },
     "americanfootball_ncaaf": {
         "league_id": 87637,
-        "categories": {"TD Scorers": 1003, "Passing Props": 1000, "Receiving Props": 1342, "Rushing Props": 1001},
+        "categories": {
+            "TD Scorers": 1003,
+            "Passing Props": 1000,
+            "Receiving Props": 1342,
+            "Rushing Props": 1001,
+            "Game Props": 528,
+            "Team Props": 530,
+        },
     },
     "baseball_mlb": {
         "league_id": 84240,
-        "categories": {"Batter Props": 743, "Pitcher Props": 1031},
+        "categories": {
+            "Batter Props": 743,
+            "Pitcher Props": 1031,
+            "Plate Appearance": 988,
+            "1st Inning": 1024,
+            "Innings": 729,
+        },
     },
 }
 
