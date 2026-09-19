@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 import unittest
 
 from scripts.preflight_cfb_reconstructed_selection import evaluate_account, fetch_account_info
 
 
+ROOT = Path(__file__).resolve().parents[1]
 CONFIG = {
     "standard_tier_monthly_quotas": {"0": 1000, "1": 5000, "2": 30000, "3": 75000, "4": 125000, "5": 200000, "6": 500000},
     "tier_labels": {"0": "FREE", "1": "TIER_1", "2": "TIER_2", "3": "TIER_3", "4": "TIER_4", "5": "TIER_5", "6": "TIER_6"},
@@ -92,6 +94,14 @@ class TestCFBReconstructedSelectionPreflight(unittest.TestCase):
         self.assertEqual(seen["url"], "https://api.collegefootballdata.com/info")
         self.assertEqual(seen["authorization"], "Bearer secret-key")
         self.assertEqual(seen["timeout"], 20)
+
+    def test_hosted_preflight_asserts_reconstructed_weather_transport_not_paid_weather(self):
+        text = (ROOT / ".github/workflows/cfb-reconstructed-selection-provider-preflight.yml").read_text()
+        self.assertIn("report.get('weather_transport_ready') is not True", text)
+        self.assertIn("report.get('cfbd_weather_required_for_selection') is not False", text)
+        self.assertIn("CFBD_VENUES_OPEN_METEO_ERA5_RECONSTRUCTED_CURRENT_PROVIDER_VINTAGE", text)
+        self.assertNotIn("report.get('weather_entitled')", text)
+        self.assertNotIn("CFB_PREFLIGHT_WEATHER_NOT_ENTITLED", text)
 
 
 if __name__ == "__main__":
