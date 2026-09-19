@@ -1,4 +1,5 @@
 """Fail-closed readiness gate for reconstructed CFB historical acquisition."""
+# Provider-preflight readiness is non-authoritative and must not consume an evaluation attempt.
 from __future__ import annotations
 
 import re
