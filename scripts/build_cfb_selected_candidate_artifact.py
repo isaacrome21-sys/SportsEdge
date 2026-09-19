@@ -156,6 +156,12 @@ def build_from_inputs(
         "final_ridge_alpha": alpha,
         "final_alpha_rule": policy.get("ridge_alpha_rule"),
         "final_alpha_source_season": int(policy.get("latest_outer_validation_season")),
+        "selection_attempt_accounting": {
+            "bakeoff_schema": result.get("schema"),
+            "bakeoff_evaluation_completed": True,
+            "candidate_attempts_consumed_by_frozen_bakeoff": 4,
+            "additional_attempts_consumed_by_artifact_build": 0,
+        },
         "selection_rows_sha256": rows_sha,
         "source_manifest_sha256": bundle.get("source_manifest_sha256"),
         "predictive_code_manifest_sha256": bundle.get("predictive_code_manifest_sha256"),
@@ -169,8 +175,6 @@ def build_from_inputs(
         "overtime_profile_games": len(model.overtime_deltas),
         "activation_required": "SEPARATE_REFS_HEADS_MAIN_FREEZE_COMMIT_BINDING_EXACT_ARTIFACT_AND_MANIFESTS",
         "authority": {
-            "attempt_consumed": False,
-            "evaluation_performed": False,
             "model_p": False,
             "truth_gate": False,
             "promotion": False,
