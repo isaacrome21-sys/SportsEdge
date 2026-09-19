@@ -21,6 +21,9 @@ on:
       - 'sportsedge/sports/cfb/acquisition_readiness.py'
       - 'sportsedge/sports/cfb/selection_readiness.py'
       - '.github/workflows/cfb-candidate-first-evaluation-readiness.yml'
+      - 'scripts/run_live_run_it.py'
+      - 'sportsedge/live_dispatcher.py'
+      - 'tests/test_live_dispatcher.py'
   push:
     branches: [main]
     paths:
