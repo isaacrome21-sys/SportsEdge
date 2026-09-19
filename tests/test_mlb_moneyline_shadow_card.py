@@ -1,4 +1,8 @@
 import json
+import os
+from pathlib import Path
+import subprocess
+import sys
 import unittest
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -14,6 +18,17 @@ from scripts.run_mlb_moneyline_shadow_card import (
 
 
 class TestMLBMoneylineShadowCard(unittest.TestCase):
+    def test_direct_cli_starts_without_pythonpath(self):
+        root = Path(__file__).resolve().parents[1]
+        env = dict(os.environ)
+        env.pop("PYTHONPATH", None)
+        result = subprocess.run(
+            [sys.executable, "scripts/run_mlb_moneyline_shadow_card.py", "--help"],
+            cwd=root, env=env, capture_output=True, text=True, timeout=30,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("--slate-date", result.stdout)
+
     def test_american_math(self):
         self.assertAlmostEqual(american_implied(-150), 0.6)
         self.assertAlmostEqual(american_implied(150), 0.4)
