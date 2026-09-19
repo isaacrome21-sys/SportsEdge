@@ -1,6 +1,6 @@
 """Fail-closed readiness gate for reconstructed CFB historical acquisition."""
 # Provider-preflight readiness is non-authoritative and must not consume an evaluation attempt.
-# PAPER/context PRs still need this file touched so the required CFB readiness check runs.
+# Venue-skip acquire PR retrigger for required CFB readiness check.
 from __future__ import annotations
 
 import re
