@@ -55,28 +55,29 @@ def _norm_cdf(x: float) -> float:
     return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
 
 
-def recency_mean(values: list[float], decay: float = 0.85, cap: int = 10) -> float | None:
-    if len(values) < 3:
+def recency_mean(values: list[float], decay: float = 0.85, cap: int = 10, min_n: int = 2) -> float | None:
+    if len(values) < min_n:
         return None
     use = values[-cap:]
     weights = [decay ** (len(use) - 1 - i) for i in range(len(use))]
     return sum(v * w for v, w in zip(use, weights)) / sum(weights)
 
 
-def _pack(by_team: dict[str, list[tuple[str, float, float]]], cap: int = 10) -> dict[str, dict[str, float]]:
+def _pack(by_team: dict[str, list[tuple[str, float, float]]], cap: int = 10, min_n: int = 2) -> dict[str, dict[str, float]]:
     out: dict[str, dict[str, float]] = {}
     for team, games in by_team.items():
         games.sort()
-        pf = recency_mean([g[1] for g in games], cap=cap)
-        pa = recency_mean([g[2] for g in games], cap=cap)
+        pf = recency_mean([g[1] for g in games], cap=cap, min_n=min_n)
+        pa = recency_mean([g[2] for g in games], cap=cap, min_n=min_n)
         if pf is None or pa is None:
             continue
         out[team] = {"pf": pf, "pa": pa, "net": pf - pa, "n": float(len(games))}
     return out
 
 
-def _espn_ratings(template: str, days: int, cap: int) -> dict[str, dict[str, float]]:
+def _espn_ratings(template: str, days: int, cap: int, min_n: int = 2) -> dict[str, dict[str, float]]:
     teams: dict[str, list[tuple[str, float, float]]] = defaultdict(list)
+    aliases: dict[str, str] = {}
     today = date.today()
     for offset in range(days):
         day = today - timedelta(days=offset)
@@ -91,15 +92,31 @@ def _espn_ratings(template: str, days: int, cap: int) -> dict[str, dict[str, flo
             parts = comp.get("competitors") or []
             if len(parts) != 2:
                 continue
-            try:
-                scored = [(str(p["team"]["displayName"]), float(p["score"])) for p in parts]
-            except (KeyError, TypeError, ValueError):
+            scored = []
+            for part in parts:
+                team = part.get("team") or {}
+                name = str(team.get("displayName") or "").strip()
+                if not name:
+                    continue
+                try:
+                    scored.append((name, float(part["score"])))
+                except (KeyError, TypeError, ValueError):
+                    scored = []
+                    break
+                for alias in (team.get("shortDisplayName"), team.get("abbreviation"), team.get("name")):
+                    if alias and str(alias).strip() and str(alias).strip() != name:
+                        aliases[str(alias).strip()] = name
+            if len(scored) != 2:
                 continue
             a, b = scored
             when = str(event.get("date") or "")
             teams[a[0]].append((when, a[1], b[1]))
             teams[b[0]].append((when, b[1], a[1]))
-    return _pack(teams, cap=cap)
+    packed = _pack(teams, cap=cap, min_n=min_n)
+    for alias, canonical in aliases.items():
+        if alias not in packed and canonical in packed:
+            packed[alias] = packed[canonical]
+    return packed
 
 
 def nfl_ratings() -> dict[str, dict[str, float]]:
@@ -118,7 +135,7 @@ def nfl_ratings() -> dict[str, dict[str, float]]:
         day = str(row.get("gameday") or "")
         by_team[str(row.get("home_team"))].append((day, hs, aws))
         by_team[str(row.get("away_team"))].append((day, aws, hs))
-    return _pack(by_team)
+    return _pack(by_team, min_n=3)
 
 
 def match_team(name: str, ratings: dict[str, dict[str, float]]) -> str | None:
@@ -208,8 +225,8 @@ def main(argv: list[str] | None = None) -> int:
     now = datetime.now(timezone.utc)
     ratings = {
         "americanfootball_nfl": nfl_ratings(),
-        "americanfootball_ncaaf": _espn_ratings(ESPN_CFB, 28, 8),
-        "baseball_mlb": _espn_ratings(ESPN_MLB, 21, 10),
+        "americanfootball_ncaaf": _espn_ratings(ESPN_CFB, 42, 8, min_n=2),
+        "baseball_mlb": _espn_ratings(ESPN_MLB, 21, 10, min_n=3),
     }
     plays: list[dict[str, Any]] = []
     sport_status: dict[str, Any] = {}
