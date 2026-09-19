@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Acquire the frozen 2015-2025 reconstructed CFB selection inputs.
 
-Raw CFBD responses are written only to a caller-selected private cache directory.
-The public acquisition attestation contains request/response hashes and governance
-state, not raw provider data or exact account/quota values.
+CFBD supplies games, FBS membership, venues, and advanced metrics. Historical
+weather is reconstructed separately from CFBD venue metadata plus Open-Meteo ERA5
+reanalysis. All raw responses remain runner-private and are hash-bound in the
+source manifest. This lane is RECONSTRUCTED_HISTORICAL_NOT_PIT and has no
+promotion authority.
 
 This script never fits or evaluates a candidate and creates no Model_P, Truth Gate,
 promotion, eligibility, staking, OFFICIAL, evidence-clock, PIT, or backfill authority.
@@ -18,7 +20,7 @@ import os
 from pathlib import Path
 import sys
 import time
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -26,11 +28,18 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from sportsedge.sports.cfb.reconstructed_weather import (
+    OPEN_METEO_ARCHIVE_ROOT,
+    WEATHER_CONTRACT,
+    archive_url,
+    parse_archive_batch,
+    parse_venues,
+    weather_row,
+)
 from sportsedge.sports.cfb.source import normalize_advanced_team_metrics
 
 CONFIG = ROOT / "config/cfb_cfbd_reconstructed_selection_budget_v1.json"
 CFBD_BASE = "https://api.collegefootballdata.com"
-WEATHER_CONTRACT = "CFBD_GAMES_WEATHER_RECONSTRUCTED_CURRENT_PROVIDER_VINTAGE"
 
 
 class CFBAcquisitionError(RuntimeError):
@@ -75,8 +84,10 @@ def _validate_private_preflight(raw: object, expected_calls: int) -> Mapping[str
         raise CFBAcquisitionError("CFB_ACQUISITION_PRIVATE_PREFLIGHT_SCHEMA_INVALID")
     if raw.get("status") != "VERIFIED_BEFORE_FIRST_REPLAY_CALL":
         raise CFBAcquisitionError("CFB_ACQUISITION_PREFLIGHT_NOT_VERIFIED")
-    if raw.get("weather_entitled") is not True:
-        raise CFBAcquisitionError("CFB_ACQUISITION_WEATHER_NOT_ENTITLED")
+    if raw.get("weather_transport_ready") is not True:
+        raise CFBAcquisitionError("CFB_ACQUISITION_WEATHER_TRANSPORT_NOT_READY")
+    if str(raw.get("weather_source_contract") or "").strip() != WEATHER_CONTRACT:
+        raise CFBAcquisitionError("CFB_ACQUISITION_WEATHER_CONTRACT_MISMATCH")
     if raw.get("historical_replay_calls_performed") != 0:
         raise CFBAcquisitionError("CFB_ACQUISITION_PREFLIGHT_REPLAY_CALL_LEAK")
     try:
@@ -129,11 +140,7 @@ def build_request_plan(config: Mapping[str, Any]) -> list[dict[str, Any]]:
             {"year": season},
             "CFBD_FBS_MEMBERSHIP_V1",
         ))
-        out.append(_request(
-            "/games/weather",
-            {"year": season, "seasonType": "regular", "classification": "fbs"},
-            WEATHER_CONTRACT,
-        ))
+    out.append(_request("/venues", {}, "CFBD_VENUES_GEOMETRY_DOME_V1"))
     for season in range(prior, end):
         out.append(_request(
             "/stats/season/advanced",
@@ -162,6 +169,32 @@ def build_request_plan(config: Mapping[str, Any]) -> list[dict[str, Any]]:
     return out
 
 
+def _cache_paths(cache_root: Path, query_sha: str) -> tuple[Path, Path]:
+    return cache_root / f"{query_sha}.json", cache_root / f"{query_sha}.meta.json"
+
+
+def _read_cache(cache_root: Path, query_sha: str) -> tuple[Any, dict[str, Any]] | None:
+    body_path, meta_path = _cache_paths(cache_root, query_sha)
+    if not (body_path.is_file() and meta_path.is_file()):
+        return None
+    raw = body_path.read_bytes()
+    meta = _load(meta_path)
+    if not isinstance(meta, Mapping):
+        raise CFBAcquisitionError(f"CFB_ACQUISITION_CACHE_META_INVALID:{query_sha}")
+    if _sha(raw) != meta.get("response_sha256"):
+        raise CFBAcquisitionError(f"CFB_ACQUISITION_CACHE_HASH_MISMATCH:{query_sha}")
+    if meta.get("query_sha256") != query_sha:
+        raise CFBAcquisitionError(f"CFB_ACQUISITION_CACHE_QUERY_MISMATCH:{query_sha}")
+    return json.loads(raw.decode("utf-8")), dict(meta)
+
+
+def _write_cache(cache_root: Path, query_sha: str, raw: bytes, meta: Mapping[str, Any]) -> None:
+    cache_root.mkdir(parents=True, exist_ok=True)
+    body_path, meta_path = _cache_paths(cache_root, query_sha)
+    body_path.write_bytes(raw)
+    meta_path.write_text(json.dumps(dict(meta), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
 def _fetch_one(
     item: Mapping[str, Any],
     *,
@@ -171,24 +204,17 @@ def _fetch_one(
     max_attempts: int = 3,
 ) -> tuple[Any, dict[str, Any], bool]:
     query_sha = str(item["query_sha256"])
-    body_path = cache_root / f"{query_sha}.json"
-    meta_path = cache_root / f"{query_sha}.meta.json"
-    if body_path.is_file() and meta_path.is_file():
-        raw = body_path.read_bytes()
-        meta = _load(meta_path)
-        if not isinstance(meta, Mapping):
-            raise CFBAcquisitionError(f"CFB_ACQUISITION_CACHE_META_INVALID:{query_sha}")
-        if _sha(raw) != meta.get("response_sha256"):
-            raise CFBAcquisitionError(f"CFB_ACQUISITION_CACHE_HASH_MISMATCH:{query_sha}")
-        if meta.get("query_sha256") != query_sha:
-            raise CFBAcquisitionError(f"CFB_ACQUISITION_CACHE_QUERY_MISMATCH:{query_sha}")
-        return json.loads(raw.decode("utf-8")), dict(meta), True
+    cached = _read_cache(cache_root, query_sha)
+    if cached is not None:
+        payload, meta = cached
+        return payload, meta, True
 
     key = str(api_key or "").strip()
     if not key:
         raise CFBAcquisitionError("CFBD_API_KEY_MISSING")
     params = item.get("params") or {}
-    url = f"{CFBD_BASE}{item['endpoint']}?{urlencode(params)}"
+    query = urlencode(params)
+    url = f"{CFBD_BASE}{item['endpoint']}" + (f"?{query}" if query else "")
     request = Request(url, headers={"Authorization": f"Bearer {key}", "Accept": "application/json"})
     last: Exception | None = None
     for attempt in range(1, max_attempts + 1):
@@ -207,9 +233,7 @@ def _fetch_one(
                 "response_sha256": _sha(raw),
                 "retrieved_at_utc": retrieved,
             }
-            cache_root.mkdir(parents=True, exist_ok=True)
-            body_path.write_bytes(raw)
-            meta_path.write_text(json.dumps(meta, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            _write_cache(cache_root, query_sha, raw, meta)
             return decoded, meta, False
         except Exception as exc:
             last = exc
@@ -217,6 +241,72 @@ def _fetch_one(
                 time.sleep(2 ** (attempt - 1))
     raise CFBAcquisitionError(
         f"CFB_ACQUISITION_FETCH_FAILED:{item['endpoint']}:{type(last).__name__}"
+    ) from last
+
+
+def _fetch_archive_batch(
+    *,
+    venues: Sequence[Any],
+    season: int,
+    week: int,
+    start_date: str,
+    end_date: str,
+    cache_root: Path,
+    opener=urlopen,
+    max_attempts: int = 3,
+) -> tuple[Any, dict[str, Any], bool]:
+    url = archive_url(venues, start_date, end_date)
+    identity = {
+        "endpoint": OPEN_METEO_ARCHIVE_ROOT,
+        "season": int(season),
+        "week": int(week),
+        "start_date": start_date,
+        "end_date": end_date,
+        "venue_ids": [int(venue.venue_id) for venue in venues],
+        "provider_contract": WEATHER_CONTRACT,
+        "archive_model": "era5",
+        "hourly": ["temperature_2m", "wind_speed_10m"],
+        "temperature_unit": "fahrenheit",
+        "wind_speed_unit": "mph",
+        "timezone": "GMT",
+    }
+    query_sha = _sha(_canonical_bytes(identity))
+    cached = _read_cache(cache_root, query_sha)
+    if cached is not None:
+        payload, meta = cached
+        return payload, meta, True
+
+    request = Request(url, headers={"Accept": "application/json", "User-Agent": "SportsEdge-CFB-reconstructed-weather/1"})
+    last: Exception | None = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            with opener(request, timeout=60) as response:
+                raw = response.read()
+            decoded = json.loads(raw.decode("utf-8"))
+            retrieved = _now()
+            meta = {
+                "endpoint": OPEN_METEO_ARCHIVE_ROOT,
+                "season": int(season),
+                "end_week": int(week),
+                "params": {
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "venue_ids": identity["venue_ids"],
+                    "archive_model": "era5",
+                },
+                "provider_contract": WEATHER_CONTRACT,
+                "query_sha256": query_sha,
+                "response_sha256": _sha(raw),
+                "retrieved_at_utc": retrieved,
+            }
+            _write_cache(cache_root, query_sha, raw, meta)
+            return decoded, meta, False
+        except Exception as exc:
+            last = exc
+            if attempt < max_attempts:
+                time.sleep(2 ** (attempt - 1))
+    raise CFBAcquisitionError(
+        f"CFB_OPEN_METEO_ARCHIVE_FETCH_FAILED:{season}:{week}:{type(last).__name__}"
     ) from last
 
 
@@ -243,21 +333,41 @@ def _membership_set(rows: list[Mapping[str, Any]]) -> set[str]:
     return {str(row.get("school") or "").strip() for row in rows if str(row.get("school") or "").strip()}
 
 
+def _chunks(values: Sequence[Any], size: int) -> list[list[Any]]:
+    if size <= 0:
+        raise CFBAcquisitionError("CFB_OPEN_METEO_BATCH_SIZE_INVALID")
+    return [list(values[index:index + size]) for index in range(0, len(values), size)]
+
+
+def _parse_start(value: object) -> datetime:
+    text = str(value or "").strip().replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError as exc:
+        raise CFBAcquisitionError("CFB_ACQUISITION_GAME_START_INVALID") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise CFBAcquisitionError("CFB_ACQUISITION_GAME_START_INVALID")
+    return parsed.astimezone(timezone.utc)
+
+
 def _build_private_payload(
     *,
     preflight: Mapping[str, Any],
     fetched: Mapping[str, tuple[Any, Mapping[str, Any]]],
     plan: list[Mapping[str, Any]],
-) -> dict[str, Any]:
-    by_identity: dict[tuple[str, int, int | None], tuple[Any, Mapping[str, Any]]] = {}
+    config: Mapping[str, Any],
+    cache_root: Path,
+    archive_opener=urlopen,
+) -> tuple[dict[str, Any], int, int]:
+    by_identity: dict[tuple[str, int | None, int | None], tuple[Any, Mapping[str, Any]]] = {}
     for item in plan:
         params = item["params"]
-        key = (str(item["endpoint"]), int(params["year"]), int(params["endWeek"]) if "endWeek" in params else None)
-        by_identity[key] = fetched[str(item["query_sha256"])]
+        year = int(params["year"]) if "year" in params else None
+        end_week = int(params["endWeek"]) if "endWeek" in params else None
+        by_identity[(str(item["endpoint"]), year, end_week)] = fetched[str(item["query_sha256"])]
 
     games_by_season: dict[int, list[Mapping[str, Any]]] = {}
     membership_by_season: dict[int, list[Mapping[str, Any]]] = {}
-    weather_rows_by_season: dict[int, tuple[list[Mapping[str, Any]], str]] = {}
     for season in range(2014, 2026):
         raw, _meta = by_identity[("/games", season, None)]
         if not isinstance(raw, list):
@@ -268,20 +378,16 @@ def _build_private_payload(
         if not isinstance(raw, list):
             raise CFBAcquisitionError(f"CFB_ACQUISITION_MEMBERSHIP_NOT_LIST:{season}")
         membership_by_season[season] = [dict(row) for row in raw if isinstance(row, Mapping)]
-        weather_raw, weather_meta = by_identity[("/games/weather", season, None)]
-        if not isinstance(weather_raw, list):
-            raise CFBAcquisitionError(f"CFB_ACQUISITION_WEATHER_NOT_LIST:{season}")
-        weather_rows_by_season[season] = (
-            [dict(row) for row in weather_raw if isinstance(row, Mapping)],
-            str(weather_meta["retrieved_at_utc"]),
-        )
 
+    venues_raw, venues_meta = by_identity[("/venues", None, None)]
+    if not isinstance(venues_raw, list):
+        raise CFBAcquisitionError("CFB_ACQUISITION_VENUES_NOT_LIST")
+    venues = parse_venues([dict(row) for row in venues_raw if isinstance(row, Mapping)])
+
+    selected_raw_games: list[Mapping[str, Any]] = []
     games: list[dict[str, Any]] = []
-    weather_by_game: dict[str, dict[str, Any]] = {}
     for season in range(2015, 2026):
         membership = _membership_set(membership_by_season[season])
-        weather_rows, weather_retrieved = weather_rows_by_season[season]
-        weather_index = {str(row.get("id")): row for row in weather_rows if row.get("id") is not None}
         for row in games_by_season[season]:
             if row.get("completed") is not True:
                 continue
@@ -292,14 +398,18 @@ def _build_private_payload(
             if row.get("homePoints") is None or row.get("awayPoints") is None:
                 raise CFBAcquisitionError(f"CFB_ACQUISITION_COMPLETED_SCORE_MISSING:{row.get('id')}")
             game_id = str(row.get("id") or "").strip()
-            weather = weather_index.get(game_id)
-            if weather is None:
-                raise CFBAcquisitionError(f"CFB_ACQUISITION_WEATHER_MISSING:{game_id}")
-            indoors = weather.get("gameIndoors")
-            if type(indoors) is not bool:
-                raise CFBAcquisitionError(f"CFB_ACQUISITION_WEATHER_INDOOR_INVALID:{game_id}")
-            if not indoors and (weather.get("windSpeed") is None or weather.get("temperature") is None):
-                raise CFBAcquisitionError(f"CFB_ACQUISITION_OUTDOOR_WEATHER_INCOMPLETE:{game_id}")
+            if not game_id:
+                raise CFBAcquisitionError("CFB_ACQUISITION_GAME_ID_MISSING")
+            venue_id_raw = row.get("venueId")
+            if venue_id_raw is None:
+                raise CFBAcquisitionError(f"CFB_ACQUISITION_VENUE_ID_MISSING:{game_id}")
+            try:
+                venue_id = int(venue_id_raw)
+            except (TypeError, ValueError) as exc:
+                raise CFBAcquisitionError(f"CFB_ACQUISITION_VENUE_ID_INVALID:{game_id}") from exc
+            if venue_id not in venues:
+                raise CFBAcquisitionError(f"CFB_ACQUISITION_VENUE_UNKNOWN:{game_id}:{venue_id}")
+            selected_raw_games.append(row)
             games.append({
                 "game_id": game_id,
                 "season": int(row.get("season", season)),
@@ -312,11 +422,65 @@ def _build_private_payload(
                 "home_score": row.get("homePoints"),
                 "away_score": row.get("awayPoints"),
             })
-            weather_by_game[game_id] = {
-                **weather,
-                "source": WEATHER_CONTRACT,
-                "retrieved_at_utc": weather_retrieved,
-            }
+
+    weather_cfg = config.get("weather_reconstruction") or {}
+    batch_size = int(weather_cfg.get("max_venues_per_archive_request", 20))
+    outdoor_groups: dict[tuple[int, int], list[Mapping[str, Any]]] = {}
+    weather_by_game: dict[str, dict[str, Any]] = {}
+    for row in selected_raw_games:
+        venue = venues[int(row["venueId"])]
+        gid = str(row["id"])
+        if venue.dome:
+            weather_by_game[gid] = weather_row(
+                game=row,
+                venue=venue,
+                archive_grid=None,
+                retrieved_at_utc=str(venues_meta["retrieved_at_utc"]),
+            )
+        else:
+            key = (int(row["season"]), int(row["week"]))
+            outdoor_groups.setdefault(key, []).append(row)
+
+    weather_metas: list[dict[str, Any]] = []
+    archive_network_calls = 0
+    archive_cache_hits = 0
+    for (season, week), rows in sorted(outdoor_groups.items()):
+        venue_ids = sorted({int(row["venueId"]) for row in rows})
+        for ids in _chunks(venue_ids, batch_size):
+            specs = [venues[vid] for vid in ids]
+            idset = set(ids)
+            scoped = [row for row in rows if int(row["venueId"]) in idset]
+            starts = [_parse_start(row.get("startDate")) for row in scoped]
+            start_date = min(starts).date().isoformat()
+            end_date = max(starts).date().isoformat()
+            payload, meta, cached = _fetch_archive_batch(
+                venues=specs,
+                season=season,
+                week=week,
+                start_date=start_date,
+                end_date=end_date,
+                cache_root=cache_root,
+                opener=archive_opener,
+            )
+            if cached:
+                archive_cache_hits += 1
+            else:
+                archive_network_calls += 1
+            weather_metas.append(dict(meta))
+            grids = parse_archive_batch(payload, specs)
+            for row in scoped:
+                venue = venues[int(row["venueId"])]
+                weather_by_game[str(row["id"])] = weather_row(
+                    game=row,
+                    venue=venue,
+                    archive_grid=grids[venue.venue_id],
+                    retrieved_at_utc=str(meta["retrieved_at_utc"]),
+                )
+
+    if len(weather_by_game) != len(selected_raw_games):
+        raise CFBAcquisitionError(
+            f"CFB_ACQUISITION_WEATHER_COVERAGE_INCOMPLETE:{len(weather_by_game)}:{len(selected_raw_games)}"
+        )
 
     metrics: list[dict[str, Any]] = []
     for season in range(2014, 2025):
@@ -352,17 +516,17 @@ def _build_private_payload(
                     sample_source="CURRENT_SEASON_PRIOR_WEEKS",
                 ).to_dict())
 
-    responses = [dict(fetched[str(item["query_sha256"])][1]) for item in plan]
+    responses = [dict(fetched[str(item["query_sha256"])][1]) for item in plan] + weather_metas
     source_manifest = {
         "schema": "CFB_RECONSTRUCTED_SOURCE_MANIFEST_V1",
         "provenance_class": "RECONSTRUCTED_HISTORICAL_NOT_PIT",
-        "provider": "CollegeFootballData",
+        "providers": ["CollegeFootballData", "Open-Meteo ERA5"],
         "raw_provider_data_persisted_publicly": False,
         "response_count": len(responses),
         "responses": responses,
         "historical_pit_created": False,
     }
-    return {
+    return ({
         "schema": "CFB_RECONSTRUCTED_ACQUISITION_PAYLOAD_V1",
         "private_preflight": dict(preflight),
         "source_manifest": source_manifest,
@@ -371,7 +535,7 @@ def _build_private_payload(
         "weather_by_game": weather_by_game,
         "fbs_membership_by_season": {str(k): v for k, v in membership_by_season.items()},
         "weather_source_contract": WEATHER_CONTRACT,
-    }
+    }, archive_network_calls, archive_cache_hits)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -390,8 +554,10 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("CFBD_API_KEY_MISSING")
 
     fetched: dict[str, tuple[Any, Mapping[str, Any]]] = {}
-    cache_hits = 0
-    network_calls = 0
+    cfbd_cache_hits = 0
+    cfbd_network_calls = 0
+    weather_network_calls = 0
+    weather_cache_hits = 0
     try:
         for item in plan:
             payload, meta, cached = _fetch_one(
@@ -401,13 +567,15 @@ def main(argv: list[str] | None = None) -> int:
             )
             fetched[str(item["query_sha256"])] = (payload, meta)
             if cached:
-                cache_hits += 1
+                cfbd_cache_hits += 1
             else:
-                network_calls += 1
-        private_payload = _build_private_payload(
+                cfbd_network_calls += 1
+        private_payload, weather_network_calls, weather_cache_hits = _build_private_payload(
             preflight=preflight,
             fetched=fetched,
             plan=plan,
+            config=config,
+            cache_root=args.private_cache_root,
         )
     except Exception as exc:
         args.public_attestation_out.parent.mkdir(parents=True, exist_ok=True)
@@ -415,9 +583,13 @@ def main(argv: list[str] | None = None) -> int:
             "schema": "CFB_RECONSTRUCTED_ACQUISITION_PUBLIC_V1",
             "status": "BLOCKED_ACQUISITION",
             "reason": f"{type(exc).__name__}:{exc}",
-            "planned_request_count": len(plan),
-            "network_calls_performed": network_calls,
-            "verified_cache_hits": cache_hits,
+            "planned_cfbd_request_count": len(plan),
+            "cfbd_network_calls_performed": cfbd_network_calls,
+            "cfbd_verified_cache_hits": cfbd_cache_hits,
+            "public_weather_network_calls_performed": weather_network_calls,
+            "public_weather_verified_cache_hits": weather_cache_hits,
+            "weather_source_contract": WEATHER_CONTRACT,
+            "cfbd_weather_entitlement_required": False,
             "raw_provider_data_persisted_publicly": False,
             "authority": _zero_authority(),
         }
@@ -432,11 +604,15 @@ def main(argv: list[str] | None = None) -> int:
         "schema": "CFB_RECONSTRUCTED_ACQUISITION_PUBLIC_V1",
         "status": "ACQUISITION_MATERIALIZED_PRIVATELY",
         "provider_preflight_verified": True,
-        "weather_entitlement_verified": True,
+        "cfbd_weather_entitlement_required": False,
+        "weather_transport_verified": True,
+        "weather_source_contract": WEATHER_CONTRACT,
         "quota_plan_verified": True,
-        "planned_request_count": len(plan),
-        "network_calls_performed": network_calls,
-        "verified_cache_hits": cache_hits,
+        "planned_cfbd_request_count": len(plan),
+        "cfbd_network_calls_performed": cfbd_network_calls,
+        "cfbd_verified_cache_hits": cfbd_cache_hits,
+        "public_weather_network_calls_performed": weather_network_calls,
+        "public_weather_verified_cache_hits": weather_cache_hits,
         "source_response_count": len(response_hashes),
         "source_response_hash_set_sha256": _sha(_canonical_bytes(sorted(response_hashes))),
         "raw_provider_data_persisted_publicly": False,
