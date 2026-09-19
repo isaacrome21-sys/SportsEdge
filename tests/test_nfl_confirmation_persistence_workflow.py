@@ -21,8 +21,7 @@ def test_restore_precedes_capture_and_refuses_overwrites():
 
 def test_capture_persistence_targets_data_not_protected_main():
     persist = next(row for row in steps() if row.get('name') == 'Commit captures and absence markers')
-    assert 'persist_forward_evidence_data_branch.py' in persist['run']
-    assert '--branch data' in persist['run']
+    assert 'persist_nfl_confirmation_archive.py' in persist['run']
     assert 'git push' not in persist['run']
     assert 'git commit' not in persist['run']
     assert 'set -euo pipefail' in persist['run']

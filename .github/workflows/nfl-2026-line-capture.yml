@@ -108,6 +108,7 @@ jobs:
           from pathlib import Path
           from scripts.persist_forward_evidence_data_branch import _copy_create_only, _source_files
           files = _source_files(Path(os.environ['NFL_RESTORE_DIR']), ['data/nfl_2026_confirmation/captures'])
+          files = [(source, relative) for source, relative in files if relative.name != 'attempts.jsonl']
           _copy_create_only(files, worktree=Path.cwd())
           print('NFL_CONFIRMATION_ARCHIVE_RESTORED_CREATE_ONLY')
           PYRESTORE
@@ -348,11 +349,8 @@ jobs:
         if: always() && (github.event_name == 'schedule' || (steps.run.outcome != 'skipped' && inputs.mode == 'capture'))
         run: |
           set -euo pipefail
-          python3 scripts/persist_forward_evidence_data_branch.py \
-            --path data/nfl_2026_confirmation/captures \
-            --branch data \
-            --worktree "$RUNNER_TEMP/nfl-confirmation-data" \
-            --message "NFL confirmation archive (run $GITHUB_RUN_ID)"
+          python3 scripts/persist_nfl_confirmation_archive.py \
+            --worktree "$RUNNER_TEMP/nfl-confirmation-data"
 
       - name: Preserve confirmation archive even when persistence fails
         if: always() && github.event_name != 'pull_request'

@@ -6,6 +6,8 @@ This is an engineering review, not model-validation or promotion evidence.
 
 NFL confirmation capture previously committed and pushed from its code checkout. Protected main can reject that write and lose newly captured bytes when the runner exits. The repair restores the existing data-branch archive before admission, refuses differing bytes at an existing identity, persists through the existing create-only data-branch writer, and preserves a uniquely named per-run artifact even on failure.
 
+The mutable attempts.jsonl diagnostic log is archived under a unique run/attempt identity, not overwritten at a shared path or restored as capture evidence. Capture records and locks retain their original paths and exact bytes.
+
 The workflow is part of the capture hash lock. Its changed hash must remain visible as a mismatch against any existing lock. This repair does not reset locks, change frozen capture windows or models, adjudicate records, or authorize promotion. A hosted capture/persistence run is still required to establish operation. Restoring previously captured bytes is not retrospective capture or backfill.
 
 ## Public repositories inspected
