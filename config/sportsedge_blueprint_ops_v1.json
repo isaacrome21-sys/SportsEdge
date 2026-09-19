@@ -1,0 +1,88 @@
+{
+  "schema": "SPORTSEDGE_BLUEPRINT_OPS_V1",
+  "as_of_utc": "2026-09-19T03:15:00Z",
+  "official_authority": false,
+  "model_p_authority": false,
+  "rule": "Blueprint math stays frozen. This file only governs ops, quote rails, and what must not be added to Model_P.",
+  "keep": [
+    "Market-blind Model_P",
+    "Missing data blocks",
+    "POWER_V1 0.0pp haircut; longshot disagreement block",
+    "Promotion V2 CLV-first; ROI is a kill check",
+    "CFB 4 candidate formulas unused",
+    "NFL attempt 9 PAPER / confirmation only",
+    "MLB last-30 is a baseline, not a sharp engine"
+  ],
+  "subtract": [
+    {
+      "item": "The Odds API as live fallback",
+      "why": "Account is OUT_OF_USAGE_CREDITS / HTTP 401. Week 2 opener already missed. Do not spend remaining or unknown quota on archive, radar, or MLB forward."
+    },
+    {
+      "item": "CFBD weather endpoint as a CFB start gate",
+      "why": "Account lacks that endpoint. Reconstructed weather is venues + Open-Meteo/ERA5."
+    },
+    {
+      "item": "Handles, splits, steam, SP+, FPI, capper picks in Model_P",
+      "why": "Blueprint firewall. Context overlay only."
+    },
+    {
+      "item": "Lowering NFL 3pp / 0.65 fold-win / key-number bars so weekend bets print",
+      "why": "Attempt 9 already lost to the close on holdout. Printing OFFICIAL would be a policy leak, not an edge."
+    },
+    {
+      "item": "Consuming a CFB candidate attempt before reconstructed selection exists",
+      "why": "0 of 4 attempts used. Fit is not acquire."
+    }
+  ],
+  "add": [
+    {
+      "item": "Quote rail order",
+      "value": ["DRAFTKINGS_DIRECT_WEB", "ESPN_PAYLOAD_NAMED_DRAFTKINGS", "THE_ODDS_API_PARKED"]
+    },
+    {
+      "item": "Lane reason codes",
+      "value": [
+        "NO_ENGINE",
+        "ODDS_API_PARKED",
+        "DK_QUOTE_ONLY",
+        "MISSING_PIT",
+        "UNFROZEN_MODEL",
+        "CALIBRATION_FAILED",
+        "CONFIRMATION_WINDOW_MISSED",
+        "SETTLEMENT_UNSUPPORTED",
+        "INSUFFICIENT_SAMPLE"
+      ]
+    },
+    {
+      "item": "PAPER_NOT_OFFICIAL envelope",
+      "value": "Already on main. Manual review can block/downgrade only."
+    }
+  ],
+  "price_rails": {
+    "paid_odds_api": "PARKED",
+    "draftkings_direct": "PRIMARY_QUOTE",
+    "espn_named_draftkings": "ALLOWED_MLB_GAME_MARKETS_ONLY",
+    "pinnacle_radar": "CONTEXT_ONLY",
+    "vsin_splits": "CONTEXT_ONLY",
+    "model_p_input": false
+  },
+  "sport_ops": {
+    "CFB": {
+      "model": "cfb_joint_ridge_residual_v1",
+      "attempts_used": 0,
+      "attempts_max": 4,
+      "next": "Finish reconstructed selection materialize. Do not fit."
+    },
+    "NFL": {
+      "model": "attempt_9_recency_weighted_baseline",
+      "status": "UNFROZEN_PAPER_CONFIRMATION",
+      "next": "DK-only Tuesday 9am CT opener + T-30. No paid fallback."
+    },
+    "MLB": {
+      "model": "mlb_v7_distribution_v3",
+      "status": "FAILED_NONACCRUAL_FORWARD",
+      "next": "Keep Statcast/weather/ump/lineup collection. Do not inject into Model_P. Do not spend Odds API on props."
+    }
+  }
+}
