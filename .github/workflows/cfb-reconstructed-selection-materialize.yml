@@ -55,7 +55,7 @@ jobs:
           python -m unittest \
             tests.test_cfb_reconstructed_selection_preflight \
             tests.test_cfb_reconstructed_selection_acquisition \
-            tests.test_cfb_reconstructed_selection_materializer
+            tests.test_cfb_reconstructed_selection_materializer \\\n            tests.test_cfb_candidate_bakeoff_v2
 
   materialize:
     name: CFB reconstructed-selection guarded materialization
@@ -153,7 +153,7 @@ jobs:
           import json
           from pathlib import Path
           r=json.loads(Path('artifacts/cfb/candidate_bakeoff_result.json').read_text())
-          if r.get('schema')!='CFB_CANDIDATE_BAKEOFF_RESULT_V1':
+          if r.get('schema')!='CFB_CANDIDATE_BAKEOFF_RESULT_V2':
               raise SystemExit('CFB_BAKEOFF_RESULT_SCHEMA_INVALID')
           if r.get('status') not in {'WINNER_SELECTED_FOR_FREEZE','NO_CANDIDATE_DEMONSTRATED_SIGNAL_AT_THIS_SAMPLE'}:
               raise SystemExit('CFB_BAKEOFF_RESULT_STATUS_INVALID')
