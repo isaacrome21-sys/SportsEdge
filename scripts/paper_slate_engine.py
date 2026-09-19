@@ -22,12 +22,14 @@ from sportsedge.draftkings_game_market_source import fetch_board, normalize_boar
 
 NFLVERSE = "https://github.com/nflverse/nfldata/raw/master/data/games.csv"
 ESPN_CFB = "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates={date}&limit=300"
+ESPN_MLB = "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates={date}&limit=100"
 UA = {"User-Agent": "SportsEdge-PaperEngine/1", "Accept": "application/json,text/csv"}
 SPORTS = {
-    "americanfootball_nfl": {"hfa": 2.2, "sigma_margin": 13.5},
-    "americanfootball_ncaaf": {"hfa": 2.8, "sigma_margin": 16.5},
-    "baseball_mlb": {"hfa": 0.15, "sigma_margin": 3.2},
+    "americanfootball_nfl": {"hfa": 2.2, "sigma_margin": 13.5, "max_abs_line": 14.0},
+    "americanfootball_ncaaf": {"hfa": 2.8, "sigma_margin": 16.5, "max_abs_line": 17.0},
+    "baseball_mlb": {"hfa": 0.15, "sigma_margin": 3.2, "max_abs_line": 3.0},
 }
+HORIZON_HOURS = 84
 
 
 def _get(url: str) -> bytes:
@@ -73,32 +75,13 @@ def _pack(by_team: dict[str, list[tuple[str, float, float]]], cap: int = 10) -> 
     return out
 
 
-def nfl_ratings() -> dict[str, dict[str, float]]:
-    raw = _get(NFLVERSE).decode("utf-8", "replace")
-    rows = list(csv.DictReader(io.StringIO(raw)))
-    by_team: dict[str, list[tuple[str, float, float]]] = defaultdict(list)
-    for row in rows:
-        if str(row.get("game_type") or "REG") not in {"REG", "WC", "DIV", "CON", "SB"}:
-            continue
-        if str(row.get("season") or "") < "2024":
-            continue
-        try:
-            hs, aws = float(row["home_score"]), float(row["away_score"])
-        except (KeyError, TypeError, ValueError):
-            continue
-        day = str(row.get("gameday") or "")
-        by_team[str(row.get("home_team"))].append((day, hs, aws))
-        by_team[str(row.get("away_team"))].append((day, aws, hs))
-    return _pack(by_team)
-
-
-def espn_cfb_ratings(days: int = 28) -> dict[str, dict[str, float]]:
+def _espn_ratings(template: str, days: int, cap: int) -> dict[str, dict[str, float]]:
     teams: dict[str, list[tuple[str, float, float]]] = defaultdict(list)
     today = date.today()
     for offset in range(days):
         day = today - timedelta(days=offset)
         try:
-            payload = json.loads(_get(ESPN_CFB.format(date=day.strftime("%Y%m%d"))))
+            payload = json.loads(_get(template.format(date=day.strftime("%Y%m%d"))))
         except Exception:
             continue
         for event in payload.get("events") or []:
@@ -116,7 +99,26 @@ def espn_cfb_ratings(days: int = 28) -> dict[str, dict[str, float]]:
             when = str(event.get("date") or "")
             teams[a[0]].append((when, a[1], b[1]))
             teams[b[0]].append((when, b[1], a[1]))
-    return _pack(teams, cap=8)
+    return _pack(teams, cap=cap)
+
+
+def nfl_ratings() -> dict[str, dict[str, float]]:
+    raw = _get(NFLVERSE).decode("utf-8", "replace")
+    rows = list(csv.DictReader(io.StringIO(raw)))
+    by_team: dict[str, list[tuple[str, float, float]]] = defaultdict(list)
+    for row in rows:
+        if str(row.get("game_type") or "REG") not in {"REG", "WC", "DIV", "CON", "SB"}:
+            continue
+        if str(row.get("season") or "") < "2024":
+            continue
+        try:
+            hs, aws = float(row["home_score"]), float(row["away_score"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        day = str(row.get("gameday") or "")
+        by_team[str(row.get("home_team"))].append((day, hs, aws))
+        by_team[str(row.get("away_team"))].append((day, aws, hs))
+    return _pack(by_team)
 
 
 def match_team(name: str, ratings: dict[str, dict[str, float]]) -> str | None:
@@ -162,6 +164,18 @@ def group_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return list(games.values())
 
 
+def in_horizon(commence: object, now: datetime) -> bool:
+    if not isinstance(commence, str) or not commence:
+        return False
+    try:
+        kick = datetime.fromisoformat(commence.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if kick.tzinfo is None:
+        kick = kick.replace(tzinfo=timezone.utc)
+    return now <= kick <= now + timedelta(hours=HORIZON_HOURS)
+
+
 def priced_play(pred: dict[str, Any], game: dict[str, Any], sigma: float) -> dict[str, Any] | None:
     home = game["home_team"]
     book = (game.get("quotes") or {}).get("spreads") or {}
@@ -191,10 +205,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", default="artifacts/paper_slate.json")
     args = parser.parse_args(argv)
+    now = datetime.now(timezone.utc)
     ratings = {
         "americanfootball_nfl": nfl_ratings(),
-        "americanfootball_ncaaf": espn_cfb_ratings(),
-        "baseball_mlb": {},
+        "americanfootball_ncaaf": _espn_ratings(ESPN_CFB, 28, 8),
+        "baseball_mlb": _espn_ratings(ESPN_MLB, 21, 10),
     }
     plays: list[dict[str, Any]] = []
     sport_status: dict[str, Any] = {}
@@ -216,6 +231,10 @@ def main(argv: list[str] | None = None) -> int:
                 "model": "paper_recency_pfpa_v1",
                 "reason": "UNFROZEN_PAPER_ENGINE",
             }
+            if not in_horizon(game.get("commence_time"), now):
+                card["reason"] = "OUTSIDE_WEEKEND_WINDOW"
+                plays.append(card)
+                continue
             pred = predict(game["home_team"], game["away_team"], ratings[sport], spec["hfa"])
             if pred is None:
                 card["reason"] = "NO_RATING_MATCH"
@@ -225,11 +244,15 @@ def main(argv: list[str] | None = None) -> int:
             priced = priced_play(pred, game, spec["sigma_margin"])
             if priced:
                 card["priced"] = priced
-                card["candidate"] = priced["edge_pp"] >= 3.0
+                too_wide = abs(float(priced["line"])) > spec["max_abs_line"]
+                card["candidate"] = priced["edge_pp"] >= 3.0 and not too_wide
+                if too_wide:
+                    card["reason"] = "LINE_OUTSIDE_PAPER_BAND"
             plays.append(card)
     report = {
         "contract": "SPORTSEDGE_PAPER_SLATE_V1",
-        "captured_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "captured_at": now.isoformat().replace("+00:00", "Z"),
+        "horizon_hours": HORIZON_HOURS,
         "official_authority": False,
         "odds_api_used": False,
         "sports": sport_status,
@@ -243,6 +266,7 @@ def main(argv: list[str] | None = None) -> int:
         "wrote": str(out),
         "plays": len(plays),
         "candidates": len(report["candidates"]),
+        "in_window": sum(1 for p in plays if p.get("reason") != "OUTSIDE_WEEKEND_WINDOW"),
         "sports": {k: v.get("status") for k, v in sport_status.items()},
         "official_authority": False,
     }, sort_keys=True))
