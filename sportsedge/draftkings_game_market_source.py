@@ -20,6 +20,7 @@ LEAGUE_IDS = {
 }
 VERIFIED_GAME_LINE_CATEGORY_IDS = {
     "americanfootball_nfl": 492,
+    "americanfootball_ncaaf": 492,
     "baseball_mlb": 493,
 }
 

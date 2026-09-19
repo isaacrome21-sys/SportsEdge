@@ -1,0 +1,33 @@
+{
+  "schema": "SPORTSEDGE_MANUAL_QUOTE_INTAKE_V1",
+  "official_authority": false,
+  "model_p_input": false,
+  "usage": "When DraftKings board fetch misses a market, paste two-sided quotes. Never rewrite Model_P.",
+  "required_fields": [
+    "sport",
+    "away_team",
+    "home_team",
+    "kickoff_utc",
+    "market",
+    "side",
+    "line",
+    "price_american",
+    "sportsbook",
+    "captured_at_utc"
+  ],
+  "sports": ["CFB", "NFL", "MLB"],
+  "markets": ["h2h", "spreads", "totals"],
+  "example": {
+    "sport": "CFB",
+    "away_team": "Away",
+    "home_team": "Home",
+    "kickoff_utc": "2026-09-19T16:00:00Z",
+    "market": "spreads",
+    "side": "Home",
+    "line": -3.5,
+    "price_american": -110,
+    "sportsbook": "DraftKings",
+    "captured_at_utc": "2026-09-19T12:00:00Z",
+    "paired_two_sided": true
+  }
+}
