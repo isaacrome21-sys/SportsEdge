@@ -5,12 +5,15 @@ permissions:
   contents: read
 jobs:
   paper-card:
+    concurrency:
+      group: sportsedge-paid-odds-api
+      cancel-in-progress: false
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Generate research-only CFB paper card
         run: python scripts/run_cfb_paper_market.py
       - name: Assert zero betting authority
@@ -23,7 +26,7 @@ jobs:
           assert all(x['model_p'] is None and x['official'] is False for x in p['candidates'])
           print('CFB_PAPER_CARD_ZERO_AUTHORITY candidates='+str(len(p['candidates'])))
           PY
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: cfb-paper-market-card
           path: artifacts/cfb/cfb_paper_market_card.json
