@@ -92,6 +92,27 @@ jobs:
             tests.test_nfl_2026_capture_gap_audit \
             tests.test_nfl_2026_provider_budget
 
+      - name: Restore immutable confirmation archive from data branch
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data
+          archive_path=data/nfl_2026_confirmation/captures
+          restore_dir="$RUNNER_TEMP/nfl-confirmation-restore"
+          mkdir -p "$restore_dir"
+          if git cat-file -e "origin/data:$archive_path" 2>/dev/null; then
+            git archive origin/data "$archive_path" | tar -x -C "$restore_dir"
+            NFL_RESTORE_DIR="$restore_dir" python3 - <<'PYRESTORE'
+          import os
+          from pathlib import Path
+          from scripts.persist_forward_evidence_data_branch import _copy_create_only, _source_files
+          files = _source_files(Path(os.environ['NFL_RESTORE_DIR']), ['data/nfl_2026_confirmation/captures'])
+          _copy_create_only(files, worktree=Path.cwd())
+          print('NFL_CONFIRMATION_ARCHIVE_RESTORED_CREATE_ONLY')
+          PYRESTORE
+          fi
+
       - name: Fetch NFL schedule snapshot
         shell: bash
         run: |
@@ -326,19 +347,21 @@ jobs:
       - name: Commit captures and absence markers
         if: always() && (github.event_name == 'schedule' || (steps.run.outcome != 'skipped' && inputs.mode == 'capture'))
         run: |
-          DIR=data/nfl_2026_confirmation/captures
-          [ -d "$DIR" ] || { echo "No capture directory yet"; exit 0; }
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "$DIR"
-          if git diff --cached --quiet; then echo "Nothing to commit"; exit 0; fi
-          git commit -m "NFL 2026 confirmation evidence (run $GITHUB_RUN_ID)"
-          for i in 1 2 3; do
-            if git pull --rebase --quiet && git push --quiet; then exit 0; fi
-            sleep $((i * 5))
-          done
-          echo "PUSH_FAILED"
-          exit 1
+          set -euo pipefail
+          python3 scripts/persist_forward_evidence_data_branch.py \
+            --path data/nfl_2026_confirmation/captures \
+            --branch data \
+            --worktree "$RUNNER_TEMP/nfl-confirmation-data" \
+            --message "NFL confirmation archive (run $GITHUB_RUN_ID)"
+
+      - name: Preserve confirmation archive even when persistence fails
+        if: always() && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nfl-confirmation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: data/nfl_2026_confirmation/captures
+          if-no-files-found: warn
+          retention-days: 90
 
       - name: Report blocked fallback provider
         if: >-
