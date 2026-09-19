@@ -267,6 +267,10 @@ def materialize_reconstructed_selection_rows(
                 "weather": _weather(game, weather_raw),
                 "home_score": _score(raw.get("home_score"), "home_score"),
                 "away_score": _score(raw.get("away_score"), "away_score"),
+                **({
+                    "regulation_home_score": _score(raw.get("regulation_home_score"), "regulation_home_score"),
+                    "regulation_away_score": _score(raw.get("regulation_away_score"), "regulation_away_score"),
+                } if raw.get("regulation_home_score") is not None and raw.get("regulation_away_score") is not None else {}),
                 "provenance_class": RECONSTRUCTED_PROVENANCE,
                 "historical_pit_created": False,
             }

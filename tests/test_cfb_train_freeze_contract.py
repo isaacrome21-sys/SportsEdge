@@ -29,7 +29,10 @@ class CFBTrainFreezeContractTests(unittest.TestCase):
         self.assertNotIn('git push origin main', text)
         self.assertNotIn('git push origin HEAD:main', text)
         self.assertIn('secrets.CFBD_API_KEY', text)
-        self.assertIn('SELECTED_CANDIDATE_SERVING_CONTRACT_NOT_YET_MERGED', text)
+        self.assertIn('PREFLIGHT_ONLY', text)
+        self.assertIn('CONSUME_ALL_FOUR_CFB_ATTEMPTS', text)
+        self.assertIn('CFB_TRAIN_FREEZE_PREFLIGHT_ONLY', text)
+        self.assertIn('CFB_TRAIN_FREEZE_EVALUATION_CONFIRMATION_ACCEPTED', text)
 
 
 if __name__ == '__main__':

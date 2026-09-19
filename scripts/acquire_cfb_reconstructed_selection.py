@@ -621,6 +621,15 @@ def _build_private_payload(
                 "venue": row.get("venue"),
                 "home_score": row.get("homePoints"),
                 "away_score": row.get("awayPoints"),
+                **({
+                    "regulation_home_score": sum(float(x) for x in row.get("homeLineScores")[:4]),
+                    "regulation_away_score": sum(float(x) for x in row.get("awayLineScores")[:4]),
+                } if (
+                    isinstance(row.get("homeLineScores"), list) and len(row.get("homeLineScores")) >= 4
+                    and isinstance(row.get("awayLineScores"), list) and len(row.get("awayLineScores")) >= 4
+                    and all(x is not None for x in row.get("homeLineScores")[:4])
+                    and all(x is not None for x in row.get("awayLineScores")[:4])
+                ) else {}),
             })
 
     weather_by_game, weather_metas, weather_calls, weather_cache_hits = _build_weather(
