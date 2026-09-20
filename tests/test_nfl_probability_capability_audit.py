@@ -7,7 +7,7 @@ def test_every_declared_nfl_market_is_accounted_for_without_granting_authority()
 
 def test_priority_markets_have_probability_readouts():
     by={row["market"]:row for row in audit()["markets"]}
-    for market in ("spread","total","moneyline","anytime_td"):
+    for market in ("spread","total","moneyline","anytime_td","two_plus_td","safety"):
         assert by[market]["probability_readout_present"] is True
 
 def test_unimplemented_sequence_markets_stay_explicitly_missing():
