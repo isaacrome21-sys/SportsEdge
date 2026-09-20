@@ -1,0 +1,296 @@
+{
+  "adjudication": {
+    "authority": {
+      "model_p": false,
+      "official": false,
+      "promotion": false,
+      "staking": false,
+      "truth_gate": false
+    },
+    "capture_code_sha": "78aae277890d5ef8b02d72e1cc075150d07b1867",
+    "capture_should_continue": true,
+    "no_backfill": true,
+    "reason": "NFL_2026_CAPTURE_CODE_DELTA_NOT_RECONCILED",
+    "status": "ADJUDICATION_PENDING",
+    "triggering_merge_sha": "a75250bfd5881c0cafe82a47a877d9ea764fc203"
+  },
+  "book": "draftkings",
+  "capture_kind": "FINAL",
+  "games": [
+    {
+      "away_team": "MIN Vikings",
+      "book": "draftkings",
+      "book_last_update": null,
+      "commence_time": "2026-09-20T17:00:00Z",
+      "event_id": "34118014",
+      "home_team": "CHI Bears",
+      "minutes_before_kickoff": 28.69,
+      "observed_at_utc": "2026-09-20T16:31:18.528116Z",
+      "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
+      "spread": {
+        "away_point": 4.5,
+        "away_price": -108,
+        "home_point": -4.5,
+        "home_price": -112,
+        "market_last_update": null,
+        "status": "OK"
+      },
+      "target_utc": "2026-09-20T16:30:00+00:00",
+      "total": {
+        "market_last_update": null,
+        "over_price": -115,
+        "point": 46.5,
+        "status": "OK",
+        "under_price": -105
+      },
+      "week": 2
+    },
+    {
+      "away_team": "CIN Bengals",
+      "book": "draftkings",
+      "book_last_update": null,
+      "commence_time": "2026-09-20T17:00:00Z",
+      "event_id": "34118026",
+      "home_team": "HOU Texans",
+      "minutes_before_kickoff": 28.69,
+      "observed_at_utc": "2026-09-20T16:31:18.528116Z",
+      "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
+      "spread": {
+        "away_point": 3,
+        "away_price": -118,
+        "home_point": -3,
+        "home_price": -102,
+        "market_last_update": null,
+        "status": "OK"
+      },
+      "target_utc": "2026-09-20T16:30:00+00:00",
+      "total": {
+        "market_last_update": null,
+        "over_price": -110,
+        "point": 45.5,
+        "status": "OK",
+        "under_price": -110
+      },
+      "week": 2
+    },
+    {
+      "away_team": "PIT Steelers",
+      "book": "draftkings",
+      "book_last_update": null,
+      "commence_time": "2026-09-20T17:00:00Z",
+      "event_id": "34118226",
+      "home_team": "NE Patriots",
+      "minutes_before_kickoff": 28.69,
+      "observed_at_utc": "2026-09-20T16:31:18.528116Z",
+      "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
+      "spread": {
+        "away_point": 4.5,
+        "away_price": -102,
+        "home_point": -4.5,
+        "home_price": -118,
+        "market_last_update": null,
+        "status": "OK"
+      },
+      "target_utc": "2026-09-20T16:30:00+00:00",
+      "total": {
+        "market_last_update": null,
+        "over_price": -105,
+        "point": 41.5,
+        "status": "OK",
+        "under_price": -115
+      },
+      "week": 2
+    },
+    {
+      "away_team": "PHI Eagles",
+      "book": "draftkings",
+      "book_last_update": null,
+      "commence_time": "2026-09-20T17:00:00Z",
+      "event_id": "34118241",
+      "home_team": "TEN Titans",
+      "minutes_before_kickoff": 28.69,
+      "observed_at_utc": "2026-09-20T16:31:18.528116Z",
+      "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
+      "spread": {
+        "away_point": -7,
+        "away_price": -115,
+        "home_point": 7,
+        "home_price": -105,
+        "market_last_update": null,
+        "status": "OK"
+      },
+      "target_utc": "2026-09-20T16:30:00+00:00",
+      "total": {
+        "market_last_update": null,
+        "over_price": -112,
+        "point": 39.5,
+        "status": "OK",
+        "under_price": -108
+      },
+      "week": 2
+    },
+    {
+      "away_team": "CLE Browns",
+      "book": "draftkings",
+      "book_last_update": null,
+      "commence_time": "2026-09-20T17:00:00Z",
+      "event_id": "34118151",
+      "home_team": "TB Buccaneers",
+      "minutes_before_kickoff": 28.69,
+      "observed_at_utc": "2026-09-20T16:31:18.528116Z",
+      "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
+      "spread": {
+        "away_point": 8.5,
+        "away_price": -115,
+        "home_point": -8.5,
+        "home_price": -105,
+        "market_last_update": null,
+        "status": "OK"
+      },
+      "target_utc": "2026-09-20T16:30:00+00:00",
+      "total": {
+        "market_last_update": null,
+        "over_price": -108,
+        "point": 41.5,
+        "status": "OK",
+        "under_price": -112
+      },
+      "week": 2
+    },
+    {
+      "away_team": "CAR Panthers",
+      "book": "draftkings",
+      "book_last_update": null,
+      "commence_time": "2026-09-20T17:00:00Z",
+      "event_id": "34118054",
+      "home_team": "ATL Falcons",
+      "minutes_before_kickoff": 28.69,
+      "observed_at_utc": "2026-09-20T16:31:18.528116Z",
+      "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
+      "spread": {
+        "away_point": -2.5,
+        "away_price": -120,
+        "home_point": 2.5,
+        "home_price": 100,
+        "market_last_update": null,
+        "status": "OK"
+      },
+      "target_utc": "2026-09-20T16:30:00+00:00",
+      "total": {
+        "market_last_update": null,
+        "over_price": -110,
+        "point": 43.5,
+        "status": "OK",
+        "under_price": -110
+      },
+      "week": 2
+    },
+    {
+      "away_team": "NO Saints",
+      "book": "draftkings",
+      "book_last_update": null,
+      "commence_time": "2026-09-20T17:00:00Z",
+      "event_id": "34118168",
+      "home_team": "BAL Ravens",
+      "minutes_before_kickoff": 28.69,
+      "observed_at_utc": "2026-09-20T16:31:18.528116Z",
+      "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
+      "spread": {
+        "away_point": 8.5,
+        "away_price": -115,
+        "home_point": -8.5,
+        "home_price": -105,
+        "market_last_update": null,
+        "status": "OK"
+      },
+      "target_utc": "2026-09-20T16:30:00+00:00",
+      "total": {
+        "market_last_update": null,
+        "over_price": -105,
+        "point": 45.5,
+        "status": "OK",
+        "under_price": -115
+      },
+      "week": 2
+    },
+    {
+      "away_team": "GB Packers",
+      "book": "draftkings",
+      "book_last_update": null,
+      "commence_time": "2026-09-20T17:00:00Z",
+      "event_id": "34118196",
+      "home_team": "NY Jets",
+      "minutes_before_kickoff": 28.69,
+      "observed_at_utc": "2026-09-20T16:31:18.528116Z",
+      "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
+      "spread": {
+        "away_point": -3.5,
+        "away_price": -108,
+        "home_point": 3.5,
+        "home_price": -112,
+        "market_last_update": null,
+        "status": "OK"
+      },
+      "target_utc": "2026-09-20T16:30:00+00:00",
+      "total": {
+        "market_last_update": null,
+        "over_price": -110,
+        "point": 44.5,
+        "status": "OK",
+        "under_price": -110
+      },
+      "week": 2
+    }
+  ],
+  "hashes": {
+    "config_sha256": "883e6b3df15745847d5424c40b80cc6fc88916b62594e29c5afcac0fc1f6e842",
+    "policy_path": "config/nfl_research_search_policy_v1.json",
+    "policy_sha256": "f81e5bb1f10440adb50e0fc1e9bd0f204ab008147c31ad62d8601bf75c2529ba",
+    "script_sha256": "0f1a32f96f94840e39161e5f4b133f703d1da40b693889b6c28a181ec408c241",
+    "workflow_sha256": "f51f1b3c668f08e19681816f13efc30cee2375c2da23152f98c035c8041fb04a"
+  },
+  "lock_status": "LOCK_CREATED",
+  "markets": [
+    "spreads",
+    "totals"
+  ],
+  "retrieved_at_utc": "2026-09-20T16:31:18Z",
+  "run": {
+    "github_event_name": "schedule",
+    "github_run_attempt": "1",
+    "github_run_id": "35522960241",
+    "github_sha": "78aae277890d5ef8b02d72e1cc075150d07b1867"
+  },
+  "run_started_utc": "2026-09-20T16:31:17.969317+00:00",
+  "schedule": {
+    "expected_game_count": 8,
+    "expected_kickoffs": {
+      "2026-09-20T17:00:00Z": 8
+    },
+    "matching_semantics": "KICKOFF_UTC_MULTIPLICITY",
+    "sha256": "4eb9aa1421ada4eb366a13be7123fde1a69c729ffae89b5ada36eda44312006c",
+    "source": "nflverse/nfldata data/games.csv"
+  },
+  "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
+  "transport": {
+    "adapter_module_sha256": "76fe056b668ce71db9d1424f4049bc1be9f3e3c69d78b758353ecca141e25b1d",
+    "attempts": [
+      {
+        "attempt": 1,
+        "host": "sportsbook-nash.draftkings.com",
+        "received_at_utc": "2026-09-20T16:31:18.528116Z",
+        "result_class": "OK"
+      }
+    ],
+    "github_sha": "78aae277890d5ef8b02d72e1cc075150d07b1867",
+    "observed_at_utc": "2026-09-20T16:31:18.528116Z",
+    "provider_quote_timestamp_available": false,
+    "raw_relative_path": "data/nfl_2026_confirmation/captures/raw/draftkings-direct/475e281a98c45765daf5927f89d0f980da985685a63e97b3cedcaa561cb5b8b9.json",
+    "raw_sha256": "475e281a98c45765daf5927f89d0f980da985685a63e97b3cedcaa561cb5b8b9",
+    "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
+    "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/492",
+    "timestamp_semantics": "SPORTSEDGE_HTTP_RESPONSE_RECEIPT_UPPER_BOUND",
+    "transport_host": "sportsbook-nash.draftkings.com"
+  },
+  "week": 2
+}

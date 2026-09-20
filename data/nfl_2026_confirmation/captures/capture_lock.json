@@ -1,0 +1,8 @@
+{
+  "policy_path": "config/nfl_research_search_policy_v1.json",
+  "policy_sha256": "f81e5bb1f10440adb50e0fc1e9bd0f204ab008147c31ad62d8601bf75c2529ba",
+  "config_sha256": "883e6b3df15745847d5424c40b80cc6fc88916b62594e29c5afcac0fc1f6e842",
+  "script_sha256": "0f1a32f96f94840e39161e5f4b133f703d1da40b693889b6c28a181ec408c241",
+  "workflow_sha256": "f51f1b3c668f08e19681816f13efc30cee2375c2da23152f98c035c8041fb04a",
+  "locked_at_utc": "2026-09-20T16:31:17.969317+00:00"
+}
