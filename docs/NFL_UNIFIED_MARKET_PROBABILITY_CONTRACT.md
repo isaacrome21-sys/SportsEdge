@@ -372,3 +372,18 @@ Every reported simulated metric includes path count, RNG/version/seed and Monte 
 
 ### Historical rule binding
 The season rule-regime registry must cover the entire development window, not only 2024+. At minimum it must encode and source-hash the **2016 touchback-placement change** and the **2018 kickoff-formation/safety changes**, plus every later kickoff/OT rule change that materially affects possession start state, ordering or scoring mechanics. Rule parameters are selected by game date/season before simulation.
+
+
+## Development evaluator scoring and compute contract
+
+Development changes are judged on **pooled out-of-fold** performance first. Season-fold 3/7/10 mass is reported with empirical sampling uncertainty and is diagnostic rather than treated as a noise-free target.
+
+For every held-out development game, persist the simulated integer-margin PMF and score the realized margin with preregistered negative log likelihood. To prevent undefined/infinite scores from finite Monte Carlo support, use additive smoothing fixed before evaluation: **Jeffreys 0.5 pseudocount per integer margin bin on support -80..80**, then renormalize. Report pooled out-of-fold mean NLL plus fold-level NLL. Structural changes must not be justified solely by improved key-number mass; their pooled OOF distribution score and the complete structural diagnostic set are recorded together.
+
+The 50,000-path precision contract is unchanged.
+
+### Compute implementation
+
+Before the first full development sweep, the challenger must provide a vectorized/batched simulation path suitable for GitHub-hosted runners. Python object-per-possession loops may remain as a reference implementation for small invariant tests, but the evaluator uses NumPy array state over simulation paths and bounded game batches.
+
+A deterministic equivalence test must compare the reference and vectorized implementations on frozen fixtures at the level of structural distributions/invariants. The fast path records batch size, NumPy/RNG version, seeds, path count and runtime. Runtime/resource failure is COMPUTE_INSUFFICIENT and cannot be resolved by silently lowering the frozen path count or precision requirement.
