@@ -290,3 +290,34 @@ The development partition remains 2016-2019 and 2021-2023, with 2020 sensitivity
 Because 2024 introduced the dynamic kickoff and 2025 modified kickoff/touchback rules and regular-season overtime, structural metrics sensitive to those rules must be reported by season/regime as well as pooled. A pooled pass cannot conceal a required regime-specific failure. Existing frozen tolerances apply to each sufficiently sampled required regime metric; preregistered minimum-sample rules continue to fail closed where applicable.
 
 The eight-attempt challenger budget remains unchanged.
+
+
+## Amendment 2 — new-regime behavior priors and noise-aware gates (pre-output)
+
+**Status:** preregistered before any possession-challenger simulation output or attempt-1 evaluation. This amendment consumes zero attempts.
+
+### Rule parameters versus behavioral parameters
+
+Rulebook-defined transition constraints (spots, legal kickoff/onside structure, OT possession guarantees/duration) remain deterministic exogenous inputs. Behavior not specified by the rulebook is a separate parameter class and may not be inferred from the 2024-2025 challenger holdout.
+
+For the 2024 and 2025 rule regimes, kickoff behavior and other regime-specific behavior inputs must be fixed before holdout evaluation from **published league-level summaries or other contemporaneous public aggregate reports** that do not expose the challenger's holdout target calculations. Each prior records source, publication date, applicable season, extraction rule and source hash. Examples include landing-zone/touchback/return mix and aggregate return-yard distribution. These values are disclosed as external empirical priors, not learned challenger coefficients.
+
+If no admissible predeclared public aggregate exists for a required behavior parameter, use a documented conservative prior/range derived from pre-regime development data and mark the affected structural diagnostic PRIOR_UNCERTAIN. Do not fit the missing value on 2024 or 2025 outcomes after evaluation begins.
+
+For 2026 rule changes with no completed-season behavioral sample, all regime-specific behavior inputs are **declared priors** with source/rationale and uncertainty bounds. They cannot create a validated 2026 structural claim until prospective data tests them. Sensitivity runs over the frozen prior bounds are required for any 2026 research readout materially affected by those parameters.
+
+### Pooled hard gates plus noise-aware season diagnostics
+
+Primary structural acceptance uses the already frozen **pooled 2024-2025 hard gates**. Season-specific 2024 and 2025 results are mandatory diagnostics and can block acceptance only under a preregistered sampling-error rule rather than the pooled fixed tolerance.
+
+For a season-specific proportion metric with empirical rate p and n qualifying observations, define SE = sqrt(p*(1-p)/n). Its diagnostic acceptance band is the larger of:
+1. the metric's existing frozen absolute tolerance; or
+2. **1.96 * SE**.
+
+For a season-specific mean metric, use the larger of the frozen absolute tolerance or **1.96 * empirical standard_error(mean)**. For quantiles, use a deterministic **2,000-replicate bootstrap** with a recorded seed derived from the policy SHA; the season diagnostic band is the larger of the frozen tolerance or the bootstrap 95% half-width.
+
+A season diagnostic blocks only when its simulated-vs-empirical error exceeds that noise-aware band. Required minimum-sample rules still apply; insufficient samples remain INSUFFICIENT_SAMPLE and fail closed where the protocol marks the metric required.
+
+The pooled gate remains the primary acceptance test; season diagnostics cannot rescue a pooled failure. Conversely, a pooled pass cannot override a season-specific failure outside its preregistered noise-aware band.
+
+The eight-attempt budget remains unchanged.
