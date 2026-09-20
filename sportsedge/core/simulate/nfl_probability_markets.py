@@ -9,6 +9,7 @@ from collections.abc import Iterable
 
 from .usage import AttributedFootballPath
 from .player_markets import _paths, _player_profile
+from .nfl_possession_challenger import VectorizedSummary, VectorizedPossessionChallengerBaseline
 
 
 def _offensive_touchdown_counts(
@@ -64,3 +65,20 @@ def derive_two_plus_touchdown_probability(
     counts = _offensive_touchdown_counts(paths, player_id=player_id)
     p = sum(value >= 2.0 for value in counts) / float(len(counts))
     return {"yes": p, "no": 1.0 - p}
+
+
+def derive_safety_probability(summary: VectorizedSummary) -> dict[str, float]:
+    """Return P(at least one safety) from the possession challenger's parent paths.
+
+    The summary must retain per-path outcome counts. This is a challenger-only
+    structural read-out and carries no production or promotion authority.
+    """
+    counts = summary.outcome_counts
+    expected = len(VectorizedPossessionChallengerBaseline.OUTCOMES)
+    if getattr(counts, "ndim", None) != 2 or counts.shape[1] != expected:
+        raise ValueError("CHALLENGER_OUTCOME_COUNT_SHAPE_INVALID")
+    if len(counts) == 0:
+        raise ValueError("SIMULATION_ROWS_EMPTY")
+    safety_index = list(VectorizedPossessionChallengerBaseline.OUTCOMES).index("SAFETY")
+    yes = sum(int(value) > 0 for value in counts[:, safety_index]) / float(len(counts))
+    return {"yes": yes, "no": 1.0 - yes}
