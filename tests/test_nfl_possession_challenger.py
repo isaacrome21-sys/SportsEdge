@@ -1,4 +1,8 @@
 import numpy as np
+import pytest
+import json
+import os
+from pathlib import Path
 from sportsedge.core.simulate.nfl_possession_challenger import (
     Possession, PossessionPath, PossessionChallengerBaseline,
     VectorizedPossessionChallengerBaseline,
@@ -75,49 +79,79 @@ def _ks(a,b):
     x=np.sort(np.unique(np.concatenate((a,b))))
     return float(np.max(np.abs(np.searchsorted(np.sort(a),x,side="right")/len(a)-np.searchsorted(np.sort(b),x,side="right")/len(b))))
 
-def _assert_equivalent(kwargs,n=200_000):
+def _record_equivalence(report):
+    print(json.dumps(report,sort_keys=True),flush=True)
+    directory=os.environ.get("SPORTSEDGE_EQ_REPORT_DIR")
+    if directory:
+        path=Path(directory)
+        path.mkdir(parents=True,exist_ok=True)
+        (path/f"equivalence-{report['reference_seed']}-{report['vector_seed']}.json").write_text(
+            json.dumps(report,indent=2,sort_keys=True)+"\n")
+
+
+def _assert_equivalent(kwargs,vector_seed,n=200_000):
+    assert kwargs["seed"] != vector_seed
     rm,rt,rp,rc,ro=_reference_arrays(kwargs,n)
-    v=VectorizedPossessionChallengerBaseline(**kwargs).simulate(n)
-    assert abs(rm.mean()-v.margins.mean()) <= .15
-    assert abs(rt.mean()-v.totals.mean()) <= .15
-    assert abs(rp.mean()/2-(v.home_possessions+v.away_possessions).mean()/2) <= .05
-    assert _ks(rm,v.margins) <= .01
-    assert _ks(rt,v.totals) <= .01
+    v=VectorizedPossessionChallengerBaseline(**{**kwargs,"seed":vector_seed}).simulate(n)
     reference_shares=rc.sum(axis=0)/rc.sum()
     vector_shares=v.outcome_counts.sum(axis=0)/v.outcome_counts.sum()
-    outcome_diffs=np.abs(reference_shares-vector_shares)
-    assert np.all(outcome_diffs <= .003), {
-        name:float(diff) for name,diff in zip(VectorizedPossessionChallengerBaseline.OUTCOMES,outcome_diffs)
-        if diff>.003
+    diffs=np.abs(reference_shares-vector_shares)
+    metrics={
+        "mean_margin_difference":float(abs(rm.mean()-v.margins.mean())),
+        "mean_total_difference":float(abs(rt.mean()-v.totals.mean())),
+        "mean_possessions_per_team_difference":float(abs(rp.mean()/2-(v.home_possessions+v.away_possessions).mean()/2)),
+        "margin_ks":_ks(rm,v.margins),"total_ks":_ks(rt,v.totals),
+        "outcome_share_differences":dict(zip(map(str,VectorizedPossessionChallengerBaseline.OUTCOMES),map(float,diffs))),
+        "exact_mass_differences":{str(k):float(abs(np.mean(np.abs(rm)==k)-np.mean(np.abs(v.margins)==k))) for k in (3,7)},
     }
-    for k in (3,7):
-        d=abs(np.mean(np.abs(rm)==k)-np.mean(np.abs(v.margins)==k))
-        if d>.003:
-            # Frozen one-time precision retry; tolerance does not move.
-            rm2,_,_,_,_=_reference_arrays({**kwargs,"seed":kwargs["seed"]+10000},1_000_000)
-            v2=VectorizedPossessionChallengerBaseline(**{**kwargs,"seed":kwargs["seed"]+20000}).simulate(1_000_000)
-            d=abs(np.mean(np.abs(rm2)==k)-np.mean(np.abs(v2.margins)==k))
-        assert d <= .003
-    return {
-        "reference_ot_rate":float(np.mean(ro>0)),
-        "vector_ot_rate":float(np.mean(v.overtime_possessions>0)),
-        "reference_shares":reference_shares,
-        "vector_shares":vector_shares,
-    }
+    report={"reference_seed":kwargs["seed"],"vector_seed":vector_seed,
+            "parameters":kwargs,"paths_per_implementation":n,"numpy":np.__version__,
+            "rng":"PCG64","metrics":metrics,"status":"RUNNING","retry":None,
+            "authority":"NONE_SYNTHETIC_MECHANICS_ONLY"}
+    _record_equivalence(report)
+    try:
+        assert metrics["mean_margin_difference"] <= .15
+        assert metrics["mean_total_difference"] <= .15
+        assert metrics["mean_possessions_per_team_difference"] <= .05
+        assert metrics["margin_ks"] <= .01 and metrics["total_ks"] <= .01
+        assert np.all(diffs <= .003),metrics["outcome_share_differences"]
+        failing=[k for k in (3,7) if metrics["exact_mass_differences"][str(k)]>.003]
+        if failing:
+            # One fixed precision retry, only for failed exact-mass metrics.
+            rs=kwargs["seed"]+10000; vs=vector_seed+20000
+            rm2,_,_,_,_=_reference_arrays({**kwargs,"seed":rs},1_000_000)
+            v2=VectorizedPossessionChallengerBaseline(**{**kwargs,"seed":vs}).simulate(1_000_000)
+            retry_diffs={str(k):float(abs(np.mean(np.abs(rm2)==k)-np.mean(np.abs(v2.margins)==k))) for k in failing}
+            report["retry"]={"reference_seed":rs,"vector_seed":vs,"paths_per_implementation":1_000_000,
+                             "exact_mass_differences":retry_diffs}
+            assert all(d<=.003 for d in retry_diffs.values())
+        report["status"]="PASS"
+    except BaseException:
+        report["status"]="FAIL_OR_INTERRUPTED"
+        raise
+    finally:
+        _record_equivalence(report)
+    return {"reference_ot_rate":float(np.mean(ro>0)),
+            "vector_ot_rate":float(np.mean(v.overtime_possessions>0)),
+            "reference_shares":reference_shares,"vector_shares":vector_shares}
 
-def test_vector_reference_near_even_high_ot_and_safety_distribution():
-    result=_assert_equivalent(dict(seed=4101,td_rate=.10,fg_rate=.08,safety_rate=.01))
+
+@pytest.mark.parametrize("season,reference_seed,vector_seed",[(2026,4101,5101),(2016,4401,5401),(2024,4501,5501)])
+def test_vector_reference_near_even_high_ot_and_safety_distribution(season,reference_seed,vector_seed):
+    result=_assert_equivalent(dict(seed=reference_seed,season=season,td_rate=.10,fg_rate=.08,safety_rate=.01),vector_seed)
     safety_i=list(VectorizedPossessionChallengerBaseline.OUTCOMES).index("SAFETY")
     assert result["reference_ot_rate"] >= .05
     assert result["vector_ot_rate"] >= .05
     assert result["reference_shares"][safety_i] >= .005
     assert result["vector_shares"][safety_i] >= .005
 
+
 def test_vector_reference_lopsided_home_distribution():
-    _assert_equivalent(dict(seed=4201,home_strength=8.0,away_strength=-4.0,strength_scale=100.0,strength_clip=.08))
+    _assert_equivalent(dict(seed=4201,season=2026,home_strength=8.0,away_strength=-4.0,strength_scale=100.0,strength_clip=.08),5201)
+
 
 def test_vector_reference_lopsided_away_distribution():
-    _assert_equivalent(dict(seed=4301,home_strength=-5.0,away_strength=7.0,strength_scale=100.0,strength_clip=.08))
+    _assert_equivalent(dict(seed=4301,season=2026,home_strength=-5.0,away_strength=7.0,strength_scale=100.0,strength_clip=.08),5301)
 
 def test_reference_safety_points_go_to_defense():
     p=PossessionPath(

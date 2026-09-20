@@ -2,13 +2,15 @@
 
 State-naive by design: no score/time-dependent coaching policy. Fixed football
 mechanics (half expiry, scoring composition, safety, regulation OT) are modeled
-so development diagnostics are not contaminated by missing rules.
+with explicit regular-season OT regimes. This remains a coarse drive model;
+play-level expiry, penalties, kickoffs and return scores are not modeled here.
 Zero production/promotion authority.
 """
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 import numpy as np
+from .nfl_challenger_ot_rules import regular_season_ot_rules
 
 Outcome=Literal["TD","FG","PUNT","TURNOVER","DOWNS","SAFETY","END_HALF"]
 
@@ -48,7 +50,8 @@ class PossessionChallengerBaseline:
                  mean_drive_seconds=155.0,opening_receiver_home_prob=.5,
                  home_strength=0.0,away_strength=0.0,strength_scale=100.0,
                  strength_clip=.08,xp_make_rate=.94,two_point_try_rate=.06,
-                 two_point_make_rate=.48):
+                 two_point_make_rate=.48,season=2026):
+        self.ot_rules=regular_season_ot_rules(season)
         if seed is None: raise ValueError("EXPLICIT_SEED_REQUIRED")
         if home_team==away_team: raise ValueError("HOME_AWAY_TEAM_COLLISION")
         self.game_id=game_id; self.home_team=home_team; self.away_team=away_team
@@ -96,20 +99,40 @@ class PossessionChallengerBaseline:
                 if p.offense==self.home_team: a+=-p.points
                 else: h+=-p.points
         return h,a
+    def _overtime(self,receiver,start_index):
+        """Resolve a tied game's OT with a real clock, from zero OT scores."""
+        offense=receiver; remaining=self.ot_rules.period_seconds; out=[]
+        h=a=0
+        while remaining>0:
+            raw=max(1,int(round(self.rng.gamma(4.0,self.mean_drive_seconds/4.0))))
+            duration=min(raw,remaining)
+            outcome,points=("END_HALF",0) if raw>remaining else self._outcome(offense)
+            # A winning TD needs no try. Opening TDs before 2025 win outright;
+            # later TDs omit the try only if six points already establish a lead.
+            own,other=(h,a) if offense==self.home_team else (a,h)
+            if outcome=="TD" and (
+                (not out and self.ot_rules.opening_td_ends_game)
+                or (out and own+6>other)
+            ):
+                points=6
+            out.append(Possession(start_index+len(out),3,offense,self._other(offense),
+                                  remaining,remaining-duration,outcome,points))
+            remaining-=duration
+            h,a=self._scores(out)
+            first=len(out)==1
+            if remaining==0 or outcome=="SAFETY": break
+            if first and outcome=="TD" and self.ot_rules.opening_td_ends_game: break
+            if not first and h!=a: break
+            offense=self._other(offense)
+        return out
+
     def simulate_one(self,simulation_id):
         opening=self.home_team if self.rng.random()<self.opening_receiver_home_prob else self.away_team
         second=self._other(opening); h1,idx=self._half(1,opening,0); h2,idx=self._half(2,second,idx)
         ps=h1+h2; h,a=self._scores(ps)
-        # State-naive sudden-resolution OT baseline. Season-specific OT possession
-        # semantics are introduced by the rule-regime layer before holdout.
         if h==a:
-            offense=self.home_team if self.rng.random()<.5 else self.away_team
-            for _ in range(12):
-                o,pts=self._outcome(offense)
-                ps.append(Possession(idx,3,offense,self._other(offense),600,0,o,pts)); idx+=1
-                h,a=self._scores(ps)
-                if h!=a: break
-                offense=self._other(offense)
+            receiver=self.home_team if self.rng.random()<.5 else self.away_team
+            ps.extend(self._overtime(receiver,idx))
         return PossessionPath(self.game_id,simulation_id,self.home_team,self.away_team,opening,second,tuple(ps))
     def simulate(self,n): return [self.simulate_one(i) for i in range(max(0,int(n)))]
 
@@ -133,7 +156,8 @@ class VectorizedPossessionChallengerBaseline:
     def __init__(self,*,seed,td_rate=.22,fg_rate=.16,turnover_rate=.11,downs_rate=.04,
                  safety_rate=.003,mean_drive_seconds=155.0,opening_receiver_home_prob=.5,
                  home_strength=0.0,away_strength=0.0,strength_scale=100.0,strength_clip=.08,
-                 xp_make_rate=.94,two_point_try_rate=.06,two_point_make_rate=.48):
+                 xp_make_rate=.94,two_point_try_rate=.06,two_point_make_rate=.48,season=2026):
+        self.ot_rules=regular_season_ot_rules(season)
         if seed is None: raise ValueError("EXPLICIT_SEED_REQUIRED")
         punt=1-(td_rate+fg_rate+turnover_rate+downs_rate+safety_rate)
         self.base=np.array([td_rate,fg_rate,punt,turnover_rate,downs_rate,safety_rate],float)
@@ -159,6 +183,32 @@ class VectorizedPossessionChallengerBaseline:
         pts=self.POINTS[ch].copy(); td=ch==0
         if np.any(td): pts[td]=self._td_points(int(td.sum()))
         return ch,pts
+    def _overtime(self,hs,aw,hp,ap,counts,ot):
+        n=len(hs)
+        active=hs==aw
+        home=np.zeros(n,dtype=bool); home[active]=self.rng.random(int(active.sum()))<.5
+        rem=np.full(n,self.ot_rules.period_seconds,dtype=np.int32)
+        while np.any(active):
+            ids=np.flatnonzero(active); h=home[ids]
+            raw=np.maximum(1,np.rint(self.rng.gamma(4,self.mean_drive_seconds/4,size=len(ids))).astype(np.int32))
+            trunc=raw>rem[ids]; dur=np.minimum(raw,rem[ids])
+            ch,pts=self._drive(h); pts=np.where(trunc,0,pts)
+            first=ot[ids]==0
+            own=np.where(h,hs[ids],aw[ids]); other=np.where(h,aw[ids],hs[ids])
+            winning_td=(ch==0) & ~trunc & (
+                (first & self.ot_rules.opening_td_ends_game) | (~first & (own+6>other))
+            )
+            pts=np.where(winning_td,6,pts)
+            normal=pts>=0; safety=pts<0
+            hs[ids]+=np.where(normal & h,pts,0)+np.where(safety & ~h,-pts,0)
+            aw[ids]+=np.where(normal & ~h,pts,0)+np.where(safety & h,-pts,0)
+            hp[ids]+=h; ap[ids]+=~h; ot[ids]+=1
+            np.add.at(counts,(ids,np.where(trunc,6,ch)),1)
+            rem[ids]-=dur
+            terminal=(rem[ids]==0) | safety | winning_td | (~first & (hs[ids]!=aw[ids]))
+            active[ids]=~terminal
+            home[ids]=~home[ids]
+
     def simulate(self,n):
         n=int(n)
         if n<=0:
@@ -179,15 +229,5 @@ class VectorizedPossessionChallengerBaseline:
                 np.add.at(counts,(ids[valid],ch[valid]),1)
                 np.add.at(counts,(ids[trunc],np.full(int(trunc.sum()),6,dtype=np.int16)),1)
                 rem[ids]-=dur; home[ids]=~home[ids]
-        tied=hs==aw
-        # State-naive OT resolution; rule-regime-specific OT replaces this before holdout.
-        home=np.zeros(n,dtype=bool); home[tied]=self.rng.random(int(tied.sum()))<.5
-        for _ in range(12):
-            ids=np.flatnonzero(tied)
-            if not len(ids): break
-            ch,pts=self._drive(home[ids]); h=home[ids]; normal=pts>=0; safety=pts<0
-            hs[ids]+=np.where(normal & h,pts,0)+np.where(safety & ~h,-pts,0)
-            aw[ids]+=np.where(normal & ~h,pts,0)+np.where(safety & h,-pts,0)
-            hp[ids]+=h; ap[ids]+=~h; ot[ids]+=1; np.add.at(counts,(ids,ch),1)
-            tied=hs==aw; home[ids]=~home[ids]
+        self._overtime(hs,aw,hp,ap,counts,ot)
         return VectorizedSummary(hs-aw,hs+aw,hp,ap,counts,ot)
