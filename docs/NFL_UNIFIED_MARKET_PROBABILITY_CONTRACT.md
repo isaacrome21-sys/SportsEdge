@@ -230,3 +230,40 @@ No challenger market probability is trusted until held-out structural tests pass
 - score/time-state behavioral diagnostics, including trailing/leading late-game decisions.
 
 Failure of a required structural gate blocks every downstream challenger market that depends on it. Passing mechanics tests alone cannot create VALIDATED_MODEL, promotion evidence or OFFICIAL authority.
+
+
+## Possession challenger preregistered tuning/holdout protocol
+
+This protocol is frozen before challenger implementation begins.
+
+### Data partition
+
+- Development/calibration seasons: **2016-2019 and 2021-2023**.
+- 2020 is an **exception/sensitivity season only** because of the materially unusual pandemic attendance/home-field environment. It cannot be used to tune parameters or rescue a failed primary gate.
+- Primary untouched structural holdout: **2024-2025 regular seasons**.
+- 2026 is prospective only and cannot be used for challenger tuning or retrospective structural acceptance.
+- No parameter choice, tolerance, feature, rule or metric may be changed after inspecting 2024-2025 challenger results within an attempt. Any such change consumes the next attempt; holdout results from prior attempts remain permanently recorded.
+
+### Structural acceptance bands
+
+Compute empirical references from the frozen 2024-2025 holdout and compare challenger simulation to those references with the same game/team conditioning. Required gates:
+- mean possessions per team-game: absolute error <= **0.50 possessions**;
+- opening-drive scoring rate: absolute error <= **3.0 percentage points**;
+- first-score probability for the opening-kickoff receiver: absolute error <= **3.0 pp**;
+- drive outcome shares for TD, FG, punt, turnover, turnover-on-downs and end-half/game: each absolute error <= **3.0 pp**;
+- absolute final-margin mass at exactly 3: error <= **2.0 pp**;
+- absolute final-margin mass at exactly 7: error <= **2.0 pp**;
+- absolute final-margin mass at exactly 10: error <= **1.5 pp**;
+- mean total points per game: absolute error <= **2.0 points**;
+- total-points distribution: simulated vs empirical quantiles at 10/25/50/75/90 percentiles each within **3.0 points**;
+- late-game state diagnostics: for frozen leading/trailing buckets inside the final five minutes, fourth-down attempt rate and no-huddle/pace proxy must each be within **5.0 pp** where the empirical bucket has at least 200 qualifying possessions.
+
+All required gates must pass. Sparse late-game buckets below the preregistered minimum are reported INSUFFICIENT_SAMPLE and block structural promotion rather than being silently dropped or pooled after results are seen.
+
+### Attempt budget
+
+The possession challenger has a hard budget of **8 calibration attempts**. Attempt 1 is the first fully executable preregistered challenger evaluated on the primary holdout. Any subsequent change to fitted parameters, state transitions, scoring probabilities, clock logic, fourth-down behavior, overtime behavior, feature set, tolerance, or acceptance calculation consumes one new attempt before reevaluation.
+
+Bug fixes that can alter any simulated output also consume an attempt once attempt 1 has been evaluated. Pure tooling/reporting fixes proven byte-identical on the frozen simulation artifact do not.
+
+Every attempt records code SHA, policy SHA, data/source hashes, RNG/version/seeds, parameter artifact, structural metrics and disposition. Attempts cannot be deleted or relabeled. If attempt 8 fails, the challenger is recorded FAILED_BUDGET_EXHAUSTED; the budget is not extended during this protocol.
