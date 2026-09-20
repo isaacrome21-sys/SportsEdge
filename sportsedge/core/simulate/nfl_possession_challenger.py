@@ -23,9 +23,19 @@ class PossessionPath:
     opening_receiver:str; second_half_receiver:str
     possessions:tuple[Possession,...]
     @property
-    def home_score(self): return sum(p.points for p in self.possessions if p.offense==self.home_team)
+    def home_score(self):
+        score=0
+        for p in self.possessions:
+            if p.points>=0 and p.offense==self.home_team: score+=p.points
+            elif p.points<0 and p.offense==self.away_team: score+=-p.points
+        return score
     @property
-    def away_score(self): return sum(p.points for p in self.possessions if p.offense==self.away_team)
+    def away_score(self):
+        score=0
+        for p in self.possessions:
+            if p.points>=0 and p.offense==self.away_team: score+=p.points
+            elif p.points<0 and p.offense==self.home_team: score+=-p.points
+        return score
     @property
     def margin(self): return self.home_score-self.away_score
     @property
@@ -106,17 +116,19 @@ class PossessionChallengerBaseline:
 @dataclass(frozen=True)
 class VectorizedSummary:
     margins:np.ndarray; totals:np.ndarray; home_possessions:np.ndarray
-    away_possessions:np.ndarray; outcome_counts:np.ndarray
+    away_possessions:np.ndarray; outcome_counts:np.ndarray; overtime_possessions:np.ndarray
     def structural_metrics(self):
         n=max(1,len(self.margins))
         return {"mean_margin":float(np.mean(self.margins)),"mean_total":float(np.mean(self.totals)),
           "mean_possessions_per_team":float(np.mean(self.home_possessions+self.away_possessions)/2),
           "margin_mass_3":float(np.mean(np.abs(self.margins)==3)),
           "margin_mass_7":float(np.mean(np.abs(self.margins)==7)),
-          "margin_mass_10":float(np.mean(np.abs(self.margins)==10)),"paths":int(n)}
+          "margin_mass_10":float(np.mean(np.abs(self.margins)==10)),
+          "overtime_path_rate":float(np.mean(self.overtime_possessions>0)) if len(self.overtime_possessions) else 0.0,
+          "paths":int(n)}
 
 class VectorizedPossessionChallengerBaseline:
-    OUTCOMES=np.array(["TD","FG","PUNT","TURNOVER","DOWNS","SAFETY"])
+    OUTCOMES=np.array(["TD","FG","PUNT","TURNOVER","DOWNS","SAFETY","END_HALF"])
     POINTS=np.array([6,3,0,0,0,-2],dtype=np.int16)
     def __init__(self,*,seed,td_rate=.22,fg_rate=.16,turnover_rate=.11,downs_rate=.04,
                  safety_rate=.003,mean_drive_seconds=155.0,opening_receiver_home_prob=.5,
@@ -150,9 +162,10 @@ class VectorizedPossessionChallengerBaseline:
     def simulate(self,n):
         n=int(n)
         if n<=0:
-            z=np.zeros(0,dtype=np.int16); return VectorizedSummary(z,z,z,z,np.zeros((0,6),dtype=np.int32))
+            z=np.zeros(0,dtype=np.int16); return VectorizedSummary(z,z,z,z,np.zeros((0,7),dtype=np.int32),z)
         hs=np.zeros(n,dtype=np.int16); aw=np.zeros(n,dtype=np.int16); hp=np.zeros(n,dtype=np.int16); ap=np.zeros(n,dtype=np.int16)
-        counts=np.zeros((n,6),dtype=np.int16); opening=self.rng.random(n)<self.opening_receiver_home_prob
+        counts=np.zeros((n,7),dtype=np.int16); ot=np.zeros(n,dtype=np.int16)
+        opening=self.rng.random(n)<self.opening_receiver_home_prob
         for half in (1,2):
             home=opening.copy() if half==1 else ~opening; rem=np.full(n,1800,dtype=np.int32)
             while np.any(rem>0):
@@ -164,6 +177,7 @@ class VectorizedPossessionChallengerBaseline:
                 hp[ids]+=h; ap[ids]+=~h
                 valid=~trunc
                 np.add.at(counts,(ids[valid],ch[valid]),1)
+                np.add.at(counts,(ids[trunc],np.full(int(trunc.sum()),6,dtype=np.int16)),1)
                 rem[ids]-=dur; home[ids]=~home[ids]
         tied=hs==aw
         # State-naive OT resolution; rule-regime-specific OT replaces this before holdout.
@@ -174,6 +188,6 @@ class VectorizedPossessionChallengerBaseline:
             ch,pts=self._drive(home[ids]); h=home[ids]; normal=pts>=0; safety=pts<0
             hs[ids]+=np.where(normal & h,pts,0)+np.where(safety & ~h,-pts,0)
             aw[ids]+=np.where(normal & ~h,pts,0)+np.where(safety & h,-pts,0)
-            hp[ids]+=h; ap[ids]+=~h; np.add.at(counts,(ids,ch),1)
+            hp[ids]+=h; ap[ids]+=~h; ot[ids]+=1; np.add.at(counts,(ids,ch),1)
             tied=hs==aw; home[ids]=~home[ids]
-        return VectorizedSummary(hs-aw,hs+aw,hp,ap,counts)
+        return VectorizedSummary(hs-aw,hs+aw,hp,ap,counts,ot)
