@@ -267,3 +267,26 @@ The possession challenger has a hard budget of **8 calibration attempts**. Attem
 Bug fixes that can alter any simulated output also consume an attempt once attempt 1 has been evaluated. Pure tooling/reporting fixes proven byte-identical on the frozen simulation artifact do not.
 
 Every attempt records code SHA, policy SHA, data/source hashes, RNG/version/seeds, parameter artifact, structural metrics and disposition. Attempts cannot be deleted or relabeled. If attempt 8 fails, the challenger is recorded FAILED_BUDGET_EXHAUSTED; the budget is not extended during this protocol.
+
+
+## Amendment 1 — rule-regime parameterization (pre-output)
+
+**Status:** preregistered amendment made before any possession-challenger simulation output or attempt-1 evaluation exists. This amends the protocol introduced at commit 343d761; it does not consume an attempt.
+
+The challenger will **parameterize NFL rule regimes** rather than re-split the holdout. Rule parameters are exogenous inputs sourced from the applicable NFL rulebook and are never fitted to challenger holdout outcomes.
+
+At minimum the rule-regime object must bind:
+- season/effective-date identity and rulebook/source hash;
+- kickoff format;
+- kickoff/touchback placement rules that determine possession start state;
+- onside-kick eligibility relevant to game state;
+- regular-season overtime format, duration and possession-guarantee semantics;
+- any later rule change that materially changes possession order/start state.
+
+Historical games are simulated under the rule regime actually in force for that season. The primary structural holdout remains **2024-2025 regular seasons**, but it is now described as **held out from possession-challenger development**, not globally untouched by SportsEdge. Prior project exposure to game outcomes in those seasons is acknowledged and must be disclosed in the challenger evaluation report.
+
+The development partition remains 2016-2019 and 2021-2023, with 2020 sensitivity-only. Development estimates behavior conditional on state; deterministic rulebook parameters provide the regime-specific transition constraints for 2024, 2025 and prospective 2026. Holdout outcomes may not be used to fit kickoff/touchback/OT parameters.
+
+Because 2024 introduced the dynamic kickoff and 2025 modified kickoff/touchback rules and regular-season overtime, structural metrics sensitive to those rules must be reported by season/regime as well as pooled. A pooled pass cannot conceal a required regime-specific failure. Existing frozen tolerances apply to each sufficiently sampled required regime metric; preregistered minimum-sample rules continue to fail closed where applicable.
+
+The eight-attempt challenger budget remains unchanged.
