@@ -1,0 +1,467 @@
+{
+  "away_mean_runs": 4.433333333333334,
+  "away_team": "Toronto Blue Jays",
+  "away_team_id": 141,
+  "distribution_sha256": "1bb77c456ea158d5e138f4fefea551b01aa719295f468bd308559995341bca53",
+  "engine_version": "mlb_v7_distribution_v3_rng_provenance",
+  "event_start_ts": "2026-09-20T18:35:00+00:00",
+  "evidence_disposition": "FORWARD_MODEL_P_PREDICTION",
+  "feature_asof_ts": "2026-09-20T17:48:55.420760+00:00",
+  "feature_observation_count": 60,
+  "feature_observations": [
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 3.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-08-16",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 10.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-08-18",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 6.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-08-19",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 5.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-08-20",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 1.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-08-21",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 4.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-08-22",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 3.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-08-23",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 3.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-08-25",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 3.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-08-26",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 2.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-08-27",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 8.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-08-28",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 4.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-08-29",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 7.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-08-30",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 1.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-01",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 11.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-02",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 6.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-03",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 9.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-04",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 4.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-05",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 1.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-06",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 5.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-07",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 4.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-08",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 0.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-09",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 4.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-11",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 7.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-12",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 8.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-13",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 5.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-14",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 1.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-15",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 5.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-16",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 1.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-18",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.102472+00:00",
+      "runs": 2.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-19",
+      "team_id": 141
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 5.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-08-18",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 0.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-08-19",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 2.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-08-20",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 2.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-08-21",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 0.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-08-22",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 5.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-08-23",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 11.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-08-24",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 7.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-08-25",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 4.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-08-26",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 1.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-08-28",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 3.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-08-29",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 7.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-08-30",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 8.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-08-31",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 8.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-01",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 2.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-02",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 6.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-03",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 6.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-04",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 3.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-05",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 8.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-06",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 10.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-08",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 2.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-09",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 3.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-10",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 1.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-11",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 6.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-12",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 7.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-13",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 4.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-15",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 7.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-16",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 3.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-17",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 7.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-18",
+      "team_id": 140
+    },
+    {
+      "observed_at_utc": "2026-09-20T17:48:55.420760+00:00",
+      "runs": 6.0,
+      "source": "MLB_STATSAPI_CHRONOLOGICAL_GAMELOG",
+      "source_date": "2026-09-19",
+      "team_id": 140
+    }
+  ],
+  "feature_source_hash": "0a6e6965939e0540d6019aa4631324cbb6e2bfe8f72c6cfeb06497cbcd109ec4",
+  "forbidden_market_inputs": [
+    "current_lines",
+    "odds",
+    "implied_probability",
+    "public_betting",
+    "consensus",
+    "handicapper_opinion"
+  ],
+  "game_pk": 822844,
+  "home_mean_runs": 4.8,
+  "home_team": "Texas Rangers",
+  "home_team_id": 140,
+  "market": "MONEYLINE",
+  "market_blind": true,
+  "mc_paths": 100000,
+  "model_artifact_sha256": "4559f7c09239c64465a4f8b9960847ff7304a9f2b703ac5b539bb393431d7fa0",
+  "model_input_hash": "b7504608323fa9cd18132e2a3111d97ba0b471a5d2d1134a6a370ba54c74924a",
+  "model_p": 0.5505,
+  "model_side": "HOME",
+  "pit_contract_version": "mlb_moneyline_pit_v1",
+  "pit_module_sha256": "3ff50292377955f2b9374cdb085edc2948bed7987f65f99a28219a275411f909",
+  "prediction_generated_at_utc": "2026-09-20T17:48:55.823357+00:00",
+  "prediction_minutes_before_start": 46.0897,
+  "prediction_module_sha256": "64611ec3ff586e508ee038ed14a6ba4e58490127a02496d41c6b0a40da50f7ec",
+  "production_engine_dispatch": "sportsedge.engine_registry.engine_registry[MONEYLINE]",
+  "promotion_authority": false,
+  "readout_sha256": "d8b24eedeaa25c287768c9d413a4fd0f27692f37622c61cb7610ff3e6442f131",
+  "readout_version": "mlb_v7_game_readout_v1",
+  "reference_side_policy": "FIXED_HOME_REFERENCE_NO_MARKET_SELECTION",
+  "schema_version": "mlb_moneyline_forward_model_p_v2_production_parity",
+  "seed_policy": "identity_sha256_256bit",
+  "source": "LIVE_OBSERVED_MLB_STATSAPI_GAMELOG",
+  "source_timestamp_semantics": "POST_RESPONSE_RECEIPT_TIME_CONSERVATIVE"
+}
