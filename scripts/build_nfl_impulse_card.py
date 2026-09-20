@@ -13,9 +13,13 @@ from sportsedge.sports.nfl.impulse_mode import (
     build_impulse_board,
     rank_profit_boost_sgps,
 )
+from sportsedge.sports.nfl.player_path_overlay_v1 import (
+    simulate_player_overlays_by_seed,
+)
 from sportsedge.sports.nfl.sgp_joint_probability import (
     enrich_sgp_candidates_with_joint_probability,
 )
+from sportsedge.sports.nfl.sgp_v2k_adapter import attach_player_stats_by_seed
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -41,6 +45,18 @@ def _parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help="optional JSON array of same-game simulation paths used to compute candidate joint P",
+    )
+    parser.add_argument(
+        "--player-path-profiles",
+        type=Path,
+        default=None,
+        help="optional football-only team/player profiles used to add same-seed player outcomes to simulation paths",
+    )
+    parser.add_argument(
+        "--player-path-seed-salt",
+        type=int,
+        default=9102026,
+        help="deterministic RNG salt for same-seed player outcome overlays",
     )
     parser.add_argument(
         "--allow-partial-simulation-paths",
@@ -70,15 +86,38 @@ def main(argv: Sequence[str] | None = None) -> int:
         limit=args.limit,
     )
 
+    if args.player_path_profiles is not None and args.simulation_paths is None:
+        raise ValueError("--player-path-profiles requires --simulation-paths")
+
     if args.promo_candidates is not None:
         candidates = json.loads(args.promo_candidates.read_text())
         if not isinstance(candidates, list):
             raise ValueError("promo candidates JSON must be an array")
 
+        joint_source = "CANDIDATE_PAYLOAD"
         if args.simulation_paths is not None:
             simulation_paths = json.loads(args.simulation_paths.read_text())
             if not isinstance(simulation_paths, list):
                 raise ValueError("simulation paths JSON must be an array")
+
+            if args.player_path_profiles is not None:
+                profiles = json.loads(args.player_path_profiles.read_text())
+                if not isinstance(profiles, dict):
+                    raise ValueError("player path profiles JSON must be an object keyed by team")
+                overlays = simulate_player_overlays_by_seed(
+                    simulation_paths,
+                    profiles,
+                    seed_salt=args.player_path_seed_salt,
+                )
+                simulation_paths = attach_player_stats_by_seed(
+                    simulation_paths,
+                    overlays,
+                    strict=not args.allow_partial_simulation_paths,
+                )
+                joint_source = "SAME_SIMULATION_PATHS_WITH_PLAYER_OVERLAY_V1"
+            else:
+                joint_source = "SAME_SIMULATION_PATHS"
+
             candidates = enrich_sgp_candidates_with_joint_probability(
                 candidates,
                 simulation_paths,
@@ -98,9 +137,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             wager=args.promo_wager,
             terms=terms,
         )
-        card["promo_joint_probability_source"] = (
-            "SAME_SIMULATION_PATHS" if args.simulation_paths is not None else "CANDIDATE_PAYLOAD"
-        )
+        card["promo_joint_probability_source"] = joint_source
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(card, indent=2, sort_keys=True) + "\n")
