@@ -174,3 +174,25 @@ Every randomized leakage-invariance test must use an explicit recorded RNG imple
 ## Final-head freeze
 
 All policy hashes, implementation hashes and artifact bindings in this stacked work are provisional until the final merge candidate is known. Immediately before merge, regenerate the freeze/attestation against the actual PR head and require the recorded SHA-256 identities to match that exact head. A prior intermediate commit, including c3e0a93, cannot serve as final freeze authority after subsequent changes.
+
+
+## Sequence-market structural blocker
+
+The current structural Engine A event generator is **not possession ordered**: it samples each team's scoring events independently and then sorts them by period/clock. Therefore first-score, first-TD and race-to-N readouts are mechanics-only EXPERIMENTAL diagnostics and must not be labeled VALIDATED_MODEL or accrue promotion evidence from this generator.
+
+Before sequence markets can validate, the parent simulator must model opening possession (coin-toss/receive/defer policy), alternating possession transitions, halftime possession flip, drive termination/scoring and overtime possession rules. Validate the resulting first-score rate conditional on opening receiver against a frozen historical benchmark. Event-order plausibility alone is insufficient.
+
+## Key-number dependency
+
+Winning-margin bands, spread derivatives and any market reading exact margin mass inherit the known key-number validation requirement. Until held-out mass around NFL key margins (including 3 and 7) passes the frozen behavioral test, these readouts carry a `KNOWN_KEY_NUMBER_MISCALIBRATION` experimental disposition and cannot be promoted.
+
+## Sequence settlement freeze prerequisite
+
+Settlement is part of each market identity and must be sourced from the target sportsbook's frozen rules before evidence begins. The family policy must explicitly encode:
+- whether safety, defensive TD and return/special-teams TD count for first score;
+- first-TD treatment when no touchdown occurs;
+- race-to-N treatment when neither team reaches N;
+- player did-not-play/void handling and participation cutoff;
+- overtime inclusion/exclusion where applicable.
+
+First-TD remains N-way/one-sided and promotion-blocked until its preregistered fair-value/devig methodology is frozen. No settlement assumption in research code grants evidence authority.
