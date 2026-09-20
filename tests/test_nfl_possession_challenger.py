@@ -21,22 +21,55 @@ def test_baseline_is_seed_reproducible():
     assert a==b
 
 def _reference_arrays(kwargs,n):
-    ps=PossessionChallengerBaseline(game_id="g",home_team="H",away_team="A",**kwargs).simulate(n)
+    # Retain numeric summaries only: the frozen million-path precision retry
+    # must not keep tens of millions of Possession objects alive.
+    simulator=PossessionChallengerBaseline(game_id="g",home_team="H",away_team="A",**kwargs)
     outcome_index={o:i for i,o in enumerate(VectorizedPossessionChallengerBaseline.OUTCOMES)}
+    margins=np.empty(n,dtype=np.int32)
+    totals=np.empty(n,dtype=np.int32)
+    possessions=np.empty(n,dtype=np.int32)
     counts=np.zeros((n,len(outcome_index)),dtype=np.int32)
-    ot=np.zeros(n,dtype=np.int16)
-    for i,path in enumerate(ps):
+    ot=np.zeros(n,dtype=np.int32)
+    for i in range(n):
+        path=simulator.simulate_one(i)
+        margins[i]=path.margin
+        totals[i]=path.total
+        possessions[i]=len(path.possessions)
         for possession in path.possessions:
             counts[i,outcome_index[possession.outcome]]+=1
             if possession.half==3:
                 ot[i]+=1
-    return (
-        np.array([p.margin for p in ps]),
-        np.array([p.total for p in ps]),
-        np.array([len(p.possessions) for p in ps]),
-        counts,
-        ot,
-    )
+    return margins,totals,possessions,counts,ot
+
+
+def test_streamed_reference_preserves_materialized_paths_and_rng_order():
+    kwargs=dict(seed=4101,td_rate=.10,fg_rate=.08,safety_rate=.10)
+    paths=PossessionChallengerBaseline(
+        game_id="g",home_team="H",away_team="A",**kwargs
+    ).simulate(300)
+    margins,totals,possessions,counts,ot=_reference_arrays(kwargs,len(paths))
+    np.testing.assert_array_equal(margins,[p.margin for p in paths])
+    np.testing.assert_array_equal(totals,[p.total for p in paths])
+    np.testing.assert_array_equal(possessions,[len(p.possessions) for p in paths])
+    np.testing.assert_array_equal(ot,[sum(q.half==3 for q in p.possessions) for p in paths])
+    for j,outcome in enumerate(VectorizedPossessionChallengerBaseline.OUTCOMES):
+        np.testing.assert_array_equal(
+            counts[:,j],[sum(q.outcome==outcome for q in p.possessions) for p in paths]
+        )
+    assert np.any(ot>0)
+    assert counts[:,5].sum()>0
+    np.testing.assert_array_equal(counts.sum(axis=1),possessions)
+
+
+def test_streamed_reference_does_not_materialize_simulation_batch(monkeypatch):
+    def forbidden(*args,**kwargs):
+        raise AssertionError("reference summaries must stream simulate_one")
+    monkeypatch.setattr(PossessionChallengerBaseline,"simulate",forbidden)
+    arrays=_reference_arrays(dict(seed=11),3)
+    assert all(len(a)==3 for a in arrays)
+    empty=_reference_arrays(dict(seed=11),0)
+    assert all(len(a)==0 for a in empty)
+
 
 def _ks(a,b):
     x=np.sort(np.unique(np.concatenate((a,b))))
