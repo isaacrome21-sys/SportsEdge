@@ -13,6 +13,9 @@ from sportsedge.sports.nfl.impulse_mode import (
     build_impulse_board,
     rank_profit_boost_sgps,
 )
+from sportsedge.sports.nfl.sgp_joint_probability import (
+    enrich_sgp_candidates_with_joint_probability,
+)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -31,7 +34,18 @@ def _parser() -> argparse.ArgumentParser:
         "--promo-candidates",
         type=Path,
         default=None,
-        help="optional JSON array of same-game parlay candidates with joint_model_probability",
+        help="optional JSON array of same-game parlay candidates",
+    )
+    parser.add_argument(
+        "--simulation-paths",
+        type=Path,
+        default=None,
+        help="optional JSON array of same-game simulation paths used to compute candidate joint P",
+    )
+    parser.add_argument(
+        "--allow-partial-simulation-paths",
+        action="store_true",
+        help="allow paths with missing leg data to be excluded instead of failing closed",
     )
     parser.add_argument("--promo-wager", type=float, default=25.0)
     parser.add_argument("--promo-boost-rate", type=float, default=0.50)
@@ -60,6 +74,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         candidates = json.loads(args.promo_candidates.read_text())
         if not isinstance(candidates, list):
             raise ValueError("promo candidates JSON must be an array")
+
+        if args.simulation_paths is not None:
+            simulation_paths = json.loads(args.simulation_paths.read_text())
+            if not isinstance(simulation_paths, list):
+                raise ValueError("simulation paths JSON must be an array")
+            candidates = enrich_sgp_candidates_with_joint_probability(
+                candidates,
+                simulation_paths,
+                strict=not args.allow_partial_simulation_paths,
+            )
+
         terms = ProfitBoostTerms(
             boost_rate=args.promo_boost_rate,
             max_wager=args.promo_max_wager,
@@ -72,6 +97,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             candidates,
             wager=args.promo_wager,
             terms=terms,
+        )
+        card["promo_joint_probability_source"] = (
+            "SAME_SIMULATION_PATHS" if args.simulation_paths is not None else "CANDIDATE_PAYLOAD"
         )
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
