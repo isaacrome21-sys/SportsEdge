@@ -4,16 +4,56 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '3,13,23,33,43,53 * * * *'
+  pull_request:
+    paths:
+      - 'scripts/capture_cfb_weather_pit_v2.py'
+      - 'tests/test_capture_cfb_weather_pit_v2.py'
+      - '.github/workflows/cfb-forward-weather-evidence.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: cfb-forward-weather-evidence
+  group: cfb-forward-weather-evidence-${{ github.event_name }}
   cancel-in-progress: false
 
 jobs:
+  transport-probe:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Verify fallback transport contract
+        run: |
+          python -m py_compile scripts/capture_cfb_weather_pit_v2.py
+          python -m unittest tests.test_capture_cfb_weather_pit_v2 -v
+
+      - name: Probe ESPN site and CDN transports
+        run: |
+          mkdir -p artifacts/cfb-forward-weather-probe
+          python scripts/capture_cfb_weather_pit_v2.py \
+            --probe-only \
+            --status-out artifacts/cfb-forward-weather-probe/status.json
+
+      - name: Upload non-authoritative transport probe
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cfb-forward-weather-transport-probe-${{ github.run_id }}
+          path: artifacts/cfb-forward-weather-probe/status.json
+          if-no-files-found: error
+          retention-days: 30
+
   capture:
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -25,8 +65,8 @@ jobs:
 
       - name: Verify prospective weather capture contract
         run: |
-          python -m py_compile scripts/capture_cfb_weather_pit.py sportsedge/sports/cfb/forward_evidence.py
-          python -m unittest tests.test_capture_cfb_weather_pit tests.test_cfb_forward_evidence -v
+          python -m py_compile scripts/capture_cfb_weather_pit.py scripts/capture_cfb_weather_pit_v2.py sportsedge/sports/cfb/forward_evidence.py
+          python -m unittest tests.test_capture_cfb_weather_pit tests.test_capture_cfb_weather_pit_v2 tests.test_cfb_forward_evidence -v
 
       - name: Attach append-only data branch
         shell: bash
@@ -41,7 +81,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/cfb-forward-weather
-          python scripts/capture_cfb_weather_pit.py \
+          python scripts/capture_cfb_weather_pit_v2.py \
             --policy config/closing_line_archive_policy_v1.json \
             --out-dir .data-branch \
             --status-out artifacts/cfb-forward-weather/status.json
