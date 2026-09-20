@@ -17,12 +17,56 @@ def test_baseline_alternates_and_flips_halftime():
         assert xs[0].offense == (p.opening_receiver if half==1 else p.second_half_receiver)
         assert all(a.offense!=b.offense for a,b in zip(xs,xs[1:]))
         assert xs[-1].end_seconds==0
-        assert xs[-1].outcome=="END_HALF" and xs[-1].points==0
+        if xs[-1].outcome=="END_HALF":
+            assert xs[-1].points==0
 
 def test_baseline_is_seed_reproducible():
     a=PossessionChallengerBaseline(game_id="g",home_team="H",away_team="A",seed=11).simulate(20)
     b=PossessionChallengerBaseline(game_id="g",home_team="H",away_team="A",seed=11).simulate(20)
     assert a==b
+
+
+class _ScriptedRegulationClock:
+    def __init__(self,durations): self.durations=iter(durations)
+    def random(self,n=None): return 0.0 if n is None else np.zeros(n)
+    def gamma(self,*args,size=None):
+        duration=next(self.durations)
+        return duration if size is None else np.full(size,duration)
+
+
+def test_reference_final_regulation_drive_finishing_at_zero_can_score():
+    s=PossessionChallengerBaseline(game_id="g",home_team="H",away_team="A",seed=1)
+    s.rng=_ScriptedRegulationClock([1800])
+    s._outcome=lambda offense:("TD",7)
+    half,_=s._half(1,"H",0)
+    assert len(half)==1
+    assert (half[0].outcome,half[0].points,half[0].end_seconds)==("TD",7,0)
+
+
+def test_reference_final_regulation_drive_overrun_is_censored():
+    s=PossessionChallengerBaseline(game_id="g",home_team="H",away_team="A",seed=1)
+    s.rng=_ScriptedRegulationClock([1801])
+    s._outcome=lambda offense:("TD",7)
+    half,_=s._half(1,"H",0)
+    assert len(half)==1
+    assert (half[0].outcome,half[0].points,half[0].end_seconds)==("END_HALF",0,0)
+
+
+def test_vector_final_regulation_drives_finishing_at_zero_can_score():
+    s=VectorizedPossessionChallengerBaseline(seed=2)
+    s.rng=_ScriptedRegulationClock([1800,1800])
+    outcomes=iter([("TD",7),("FG",3)])
+    def drive(home):
+        outcome,points=next(outcomes)
+        index=list(s.OUTCOMES).index(outcome)
+        return np.full(len(home),index),np.full(len(home),points,dtype=np.int16)
+    s._drive=drive
+    v=s.simulate(1)
+    assert (int(v.margins[0]),int(v.totals[0]),int(v.overtime_possessions[0]))==(4,10,0)
+    assert int(v.outcome_counts[0,0])==1
+    assert int(v.outcome_counts[0,1])==1
+    assert int(v.outcome_counts[0,6])==0
+
 
 def _reference_arrays(kwargs,n):
     # Retain numeric summaries only: the frozen million-path precision retry
