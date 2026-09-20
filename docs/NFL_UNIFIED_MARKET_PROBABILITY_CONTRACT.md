@@ -159,3 +159,18 @@ Any team expected-scoring feature entering ATTD Model_P must come from SportsEdg
 ## Leakage invariance
 
 ATTD feature tests must perturb every current-game label and every post-kickoff field available to the builder, individually and in randomized combinations, and assert the complete pregame feature vector is byte-equivalent. Coverage-shell and box-count features additionally require documented historical availability over the frozen train/validation window. If coverage is insufficient, those fields remain research diagnostics or are excluded from the frozen candidate rather than silently shortening the holdout.
+
+
+## TD allocation residual and score-type separation
+
+Player TD allocation must retain an explicit residual/other-player bucket for eligible offensive touchdowns whose scorer is outside the modeled candidate set. Candidate shares are never renormalized to 100% merely because the candidate list is incomplete. The residual bucket participates in every simulation and is reported in diagnostics.
+
+Only offensive TD events eligible under the sportsbook's player-TD settlement contract enter offensive scorer allocation. Defensive touchdowns and special-teams/return touchdowns remain separate event paths and cannot leak into rushing/receiving scorer shares. Any ambiguous event type fails closed until settlement mapping is resolved.
+
+## Reproducible randomized leakage tests
+
+Every randomized leakage-invariance test must use an explicit recorded RNG implementation/version and seed. On failure, the seed and perturbed field set must be emitted so the exact case can be replayed. CI must not use ambient/random system entropy for these tests.
+
+## Final-head freeze
+
+All policy hashes, implementation hashes and artifact bindings in this stacked work are provisional until the final merge candidate is known. Immediately before merge, regenerate the freeze/attestation against the actual PR head and require the recorded SHA-256 identities to match that exact head. A prior intermediate commit, including c3e0a93, cannot serve as final freeze authority after subsequent changes.
