@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from sportsedge.core.simulate.nfl_probability_markets import derive_anytime_touchdown_probability
+from sportsedge.core.simulate.nfl_probability_markets import (
+    derive_anytime_touchdown_probability,
+    derive_two_plus_touchdown_probability,
+)
 
 
 class Profile:
@@ -40,6 +43,22 @@ def test_anytime_td_does_not_count_passing_td():
     assert derive_anytime_touchdown_probability([row],player_id="p1")["yes"]==0.0
 
 
+def test_two_plus_td_uses_same_shared_offensive_td_count():
+    rows=[Path(0,0),Path(1,0),Path(1,1),Path(2,1)]
+    assert derive_two_plus_touchdown_probability(rows,player_id="p1")=={"yes":0.5,"no":0.5}
+
+
+def test_two_plus_td_does_not_count_passing_td():
+    row=Path(1,0)
+    row._stats["p1"]["passing_tds"]=5
+    assert derive_two_plus_touchdown_probability([row],player_id="p1")["yes"]==0.0
+
+
 def test_anytime_td_fails_closed_on_unresolved_participation():
     with pytest.raises(ValueError,match="PARTICIPATION_UNRESOLVED"):
         derive_anytime_touchdown_probability([Path(0,0,active=None)],player_id="p1")
+
+
+def test_two_plus_td_fails_closed_on_unresolved_participation():
+    with pytest.raises(ValueError,match="PARTICIPATION_UNRESOLVED"):
+        derive_two_plus_touchdown_probability([Path(2,0,active=None)],player_id="p1")
