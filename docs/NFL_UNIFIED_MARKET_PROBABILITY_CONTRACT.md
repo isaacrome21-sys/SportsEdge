@@ -387,3 +387,26 @@ The 50,000-path precision contract is unchanged.
 Before the first full development sweep, the challenger must provide a vectorized/batched simulation path suitable for GitHub-hosted runners. Python object-per-possession loops may remain as a reference implementation for small invariant tests, but the evaluator uses NumPy array state over simulation paths and bounded game batches.
 
 A deterministic equivalence test must compare the reference and vectorized implementations on frozen fixtures at the level of structural distributions/invariants. The fast path records batch size, NumPy/RNG version, seeds, path count and runtime. Runtime/resource failure is COMPUTE_INSUFFICIENT and cannot be resolved by silently lowering the frozen path count or precision requirement.
+
+
+### Vectorized/reference distributional equivalence
+
+Seeded path identity is **not** required between the object reference and vectorized implementations because random draws may be consumed in a different order. Before the vectorized evaluator is trusted, both implementations must be run on the same frozen synthetic matchup fixtures with **>=200,000 paths each** and independent recorded seeds.
+
+Equivalence is distributional. Required comparisons and maximum absolute differences are:
+- mean final margin: <= **0.15 points**;
+- mean game total: <= **0.15 points**;
+- mean possessions per team-game: <= **0.05 possessions**;
+- exact margin mass at 3 and 7: <= **0.30 percentage points** each;
+- each drive-outcome share (TD/FG/punt/turnover/downs/end-half-game when represented): <= **0.30 percentage points**;
+- empirical margin and total CDFs: two-sample KS distance <= **0.01**.
+
+All comparisons must pass. Failure is VECTOR_REFERENCE_MISMATCH and blocks development evaluation; it is an implementation defect, not a modeling result.
+
+### Out-of-fold NLL benchmark
+
+The possession challenger NLL must be interpreted against a frozen simple benchmark on the exact same leave-one-season-out games and the exact same PIT expected-margin input.
+
+For each fold, fit **one residual standard deviation parameter** using only that fold's development-training seasons: residual = actual final margin minus PIT expected margin. The benchmark for each held-out game is a Normal distribution centered on its PIT expected margin with that training-only residual standard deviation, discretized to integer margins using half-point bin boundaries. Apply the same -80..80 support and Jeffreys 0.5 pseudocount/renormalization convention used for challenger scoring.
+
+Report fold and pooled mean NLL for challenger and benchmark, plus paired per-game NLL difference. The challenger must have **lower pooled out-of-fold mean NLL** than the benchmark before its structural complexity can be claimed to add distributional predictive value. A failure does not consume a holdout attempt because this comparison occurs entirely in development.
