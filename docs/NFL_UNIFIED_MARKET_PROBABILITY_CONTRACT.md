@@ -87,3 +87,29 @@ Canonical Truth Gate remains the only OFFICIAL authority. This contract must not
 - authorize Kelly/staking when Truth Gate is blocked
 
 When evidence is insufficient, emit MODEL_P_NOT_OFFICIAL or BLOCKED with the precise reason.
+
+
+## ATTD research-feature layer
+
+SportsEdge combines the shared-path touchdown probability engine with transparent research diagnostics inspired by publicly described ATTD research workflows. These diagnostics are inputs/candidate features, not copied external scores and not independent evidence.
+
+Candidate PIT-safe feature families:
+- expected touchdowns (xTD) versus actual touchdowns, with a descriptive TD-debt residual
+- opportunity by field zone: goal line (0-5), red zone (6-20), fringe (21-40), and open field
+- carries, targets and xTD within each zone
+- snap share, route participation, target share, rush share, touches and goal-line share
+- team scoring environment / independent expected team points
+- opponent-adjusted touchdown environment
+- coverage-shell splits where source identity and pregame availability are valid
+- box-count splits for rushers where source identity and sample support are valid
+- weather, venue, rest/travel, injury and inactive context under the PIT contract
+
+### Composite research score
+
+A Venom-style single scan/ranking number may be useful for the board, but SportsEdge must build and validate its own score. It may summarize SportsEdge features for ranking only; it must not be substituted for Model_P, edge, EV, calibration evidence, or Truth-Gate authority. External proprietary scores/probabilities/weights must never be copied into Model_P.
+
+Suggested output fields are `attd_model_p`, `expected_tds`, `actual_tds_prior`, `td_debt`, zone opportunity splits, coverage/box diagnostics, role/volume diagnostics, market fair probability, edge, EV, and authority status.
+
+### Anti-leakage rules
+
+Actual TDs and games-since-last-TD must be cutoff before the target kickoff. TD debt is descriptive unless a preregistered candidate proves incremental out-of-sample value; a player being "due" cannot itself increase Model_P. Coverage/box splits require minimum-sample handling and shrinkage before predictive use. Opponent tendencies must be derived only from prior games. Public research tools, videos, social posts and capper tags are context/feature inspiration only and cannot vote on a play.
