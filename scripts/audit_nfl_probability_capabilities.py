@@ -46,6 +46,7 @@ READOUTS={
 "longest_reception":"sportsedge.core.simulate.player_markets:derive_player_stat_market",
 "longest_rush":"sportsedge.core.simulate.player_markets:derive_player_stat_market",
 "anytime_td":"sportsedge.core.simulate.nfl_probability_markets:derive_anytime_touchdown_probability",
+"two_plus_td":"sportsedge.core.simulate.nfl_probability_markets:derive_two_plus_touchdown_probability",
 "fg_made":"sportsedge.core.simulate.kicker_markets:derive_kicker_stat_market",
 "kicking_points":"sportsedge.core.simulate.kicker_markets:derive_kicker_stat_market",
 "xp_made":"sportsedge.core.simulate.kicker_markets:derive_kicker_stat_market",
