@@ -321,3 +321,37 @@ A season diagnostic blocks only when its simulated-vs-empirical error exceeds th
 The pooled gate remains the primary acceptance test; season diagnostics cannot rescue a pooled failure. Conversely, a pooled pass cannot override a season-specific failure outside its preregistered noise-aware band.
 
 The eight-attempt budget remains unchanged.
+
+
+## Amendment 3 — imported versus downstream structural evidence (pre-output)
+
+**Status:** frozen before any possession-challenger simulation output or attempt-1 evaluation. Zero attempts consumed.
+
+Every structural metric is classified before output. Classification cannot be changed after challenger results are observed.
+
+### IMPORTED — consistency only, zero gate authority
+The following are directly set or materially determined by external new-regime priors and therefore cannot contribute a structural PASS:
+- kickoff landing-zone / placement mix;
+- touchback rate;
+- kickoff return versus touchback/out-of-play mix;
+- kickoff return-yard distribution parameters supplied as priors;
+- post-kickoff starting-field-position distribution to the extent directly induced by those priors.
+
+These must be reported and checked for implementation consistency. A mismatch can FAIL/BLOCK the implementation, but a match contributes no positive evidence toward challenger acceptance.
+
+### DOWNSTREAM — evidential gates
+The following must emerge from the possession/game mechanics and retain full preregistered gate authority:
+- possessions per team-game;
+- opening-drive scoring rate;
+- first-score probability conditional on opening-kickoff receiver;
+- non-kickoff drive outcome mix: TD, FG, punt, turnover, turnover-on-downs, end-half/game;
+- final margin mass at exactly 3, 7 and 10;
+- mean and distribution of total points;
+- late-game score/time-state fourth-down and pace behavior;
+- any future sequence/player market diagnostic not directly supplied by an imported prior.
+
+If a downstream metric later becomes directly parameterized by an external prior, that is a protocol change and cannot be reclassified inside the current attempt series.
+
+### Pre-holdout development check
+
+Before attempt 1 may inspect the 2024-2025 challenger holdout, the frozen challenger implementation must run on development seasons and record at minimum possessions per team-game and exact 3/7 margin mass (plus the other available structural diagnostics). This development check is for implementation/calibration readiness only and cannot create promotion evidence. Parameter changes made in response are permitted before attempt 1; once the implementation is sealed for holdout evaluation, the eight-attempt accounting begins.
