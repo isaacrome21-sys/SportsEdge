@@ -196,3 +196,37 @@ Settlement is part of each market identity and must be sourced from the target s
 - overtime inclusion/exclusion where applicable.
 
 First-TD remains N-way/one-sided and promotion-blocked until its preregistered fair-value/devig methodology is frozen. No settlement assumption in research code grants evidence authority.
+
+
+## Possession engine challenger isolation
+
+The possession-ordered simulator is a **separate challenger**. It must not replace, mutate, refit, or silently feed the generator/model identity used by the frozen 2026 spread/total/moneyline evidence lane. All 2026 game-market confirmation captures, scoring, CLV and Truth-Gate accounting remain bound to their existing frozen model/artifact identities.
+
+The challenger receives its own implementation identity, frozen policy, artifact hashes, validation ledger and—only after passing preregistered structural validation—a separately authorized prospective evidence ledger. Any future replacement of the incumbent requires an explicit frozen comparison/replacement protocol; no mid-season authority transfer is permitted.
+
+### Challenger path contract
+
+One ordered possession path is the source of truth for every challenger readout. It must represent:
+- opening kickoff/receive/defer resolution and opening possession;
+- alternating possession transitions;
+- halftime possession flip;
+- clock consumption, end-of-half behavior and two-minute state;
+- score/time-dependent fourth-down and pace behavior;
+- regulation and explicit overtime possession rules;
+- offensive, defensive and special-teams scoring as distinct event types;
+- player TD attribution plus residual/other-player mass on the same parent path.
+
+First score, first TD, race-to-N, team/player TD totals, final margin and totals must all be deterministic slices of that same path.
+
+### Structural validation before market validation
+
+No challenger market probability is trusted until held-out structural tests pass under a frozen historical window. At minimum record:
+- possessions per game distribution;
+- opening-drive scoring rate;
+- first-score rate conditional on opening-kickoff receiver;
+- drive outcome mix (TD, FG, punt, turnover, downs, end-half/game and modeled special outcomes);
+- final margin mass at 3, 7 and 10, with preregistered tolerances;
+- total-points distribution/calibration;
+- score/time-state behavioral diagnostics, including trailing/leading late-game decisions.
+
+Failure of a required structural gate blocks every downstream challenger market that depends on it. Passing mechanics tests alone cannot create VALIDATED_MODEL, promotion evidence or OFFICIAL authority.
