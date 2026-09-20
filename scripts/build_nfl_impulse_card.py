@@ -6,8 +6,9 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Sequence
+from typing import Any, Sequence
 
+from sportsedge.sports.nfl.game_path_probability import build_game_market_board
 from sportsedge.sports.nfl.impulse_mode import (
     ProfitBoostTerms,
     build_impulse_board,
@@ -35,16 +36,22 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--limit", type=int, default=None)
 
     parser.add_argument(
+        "--simulation-paths",
+        type=Path,
+        default=None,
+        help="optional JSON array of same-game simulation paths",
+    )
+    parser.add_argument(
+        "--game-market-legs",
+        type=Path,
+        default=None,
+        help="optional JSON array of exact spread/total/team-total/ML legs evaluated on score paths",
+    )
+    parser.add_argument(
         "--promo-candidates",
         type=Path,
         default=None,
         help="optional JSON array of same-game parlay candidates",
-    )
-    parser.add_argument(
-        "--simulation-paths",
-        type=Path,
-        default=None,
-        help="optional JSON array of same-game simulation paths used to compute candidate joint P",
     )
     parser.add_argument(
         "--player-path-profiles",
@@ -72,6 +79,13 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _load_array(path: Path, label: str) -> list[Any]:
+    value = json.loads(path.read_text())
+    if not isinstance(value, list):
+        raise ValueError(f"{label} JSON must be an array")
+    return value
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     payload = json.loads(args.input.read_text())
@@ -88,40 +102,63 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.player_path_profiles is not None and args.simulation_paths is None:
         raise ValueError("--player-path-profiles requires --simulation-paths")
+    if args.game_market_legs is not None and args.simulation_paths is None:
+        raise ValueError("--game-market-legs requires --simulation-paths")
+
+    simulation_paths: list[dict[str, Any]] | None = None
+    if args.simulation_paths is not None:
+        loaded_paths = _load_array(args.simulation_paths, "simulation paths")
+        if not all(isinstance(row, dict) for row in loaded_paths):
+            raise ValueError("simulation paths JSON rows must be objects")
+        simulation_paths = [dict(row) for row in loaded_paths]
+
+        if args.player_path_profiles is not None:
+            profiles = json.loads(args.player_path_profiles.read_text())
+            if not isinstance(profiles, dict):
+                raise ValueError("player path profiles JSON must be an object keyed by team")
+            overlays = simulate_player_overlays_by_seed(
+                simulation_paths,
+                profiles,
+                seed_salt=args.player_path_seed_salt,
+            )
+            simulation_paths = attach_player_stats_by_seed(
+                simulation_paths,
+                overlays,
+                strict=not args.allow_partial_simulation_paths,
+            )
+            card["player_path_overlay"] = {
+                "model_id": "NFL_PLAYER_PATH_OVERLAY_V1",
+                "method": "SAME_SIMULATION_SEED",
+                "path_count": len(simulation_paths),
+            }
+
+    if args.game_market_legs is not None:
+        assert simulation_paths is not None
+        game_legs = _load_array(args.game_market_legs, "game market legs")
+        if not all(isinstance(row, dict) for row in game_legs):
+            raise ValueError("game market legs JSON rows must be objects")
+        card["game_path_markets"] = build_game_market_board(
+            simulation_paths,
+            game_legs,
+            strict=not args.allow_partial_simulation_paths,
+        )
 
     if args.promo_candidates is not None:
-        candidates = json.loads(args.promo_candidates.read_text())
-        if not isinstance(candidates, list):
-            raise ValueError("promo candidates JSON must be an array")
+        candidates = _load_array(args.promo_candidates, "promo candidates")
+        if not all(isinstance(row, dict) for row in candidates):
+            raise ValueError("promo candidate rows must be objects")
 
         joint_source = "CANDIDATE_PAYLOAD"
-        if args.simulation_paths is not None:
-            simulation_paths = json.loads(args.simulation_paths.read_text())
-            if not isinstance(simulation_paths, list):
-                raise ValueError("simulation paths JSON must be an array")
-
-            if args.player_path_profiles is not None:
-                profiles = json.loads(args.player_path_profiles.read_text())
-                if not isinstance(profiles, dict):
-                    raise ValueError("player path profiles JSON must be an object keyed by team")
-                overlays = simulate_player_overlays_by_seed(
-                    simulation_paths,
-                    profiles,
-                    seed_salt=args.player_path_seed_salt,
-                )
-                simulation_paths = attach_player_stats_by_seed(
-                    simulation_paths,
-                    overlays,
-                    strict=not args.allow_partial_simulation_paths,
-                )
-                joint_source = "SAME_SIMULATION_PATHS_WITH_PLAYER_OVERLAY_V1"
-            else:
-                joint_source = "SAME_SIMULATION_PATHS"
-
+        if simulation_paths is not None:
             candidates = enrich_sgp_candidates_with_joint_probability(
                 candidates,
                 simulation_paths,
                 strict=not args.allow_partial_simulation_paths,
+            )
+            joint_source = (
+                "SAME_SIMULATION_PATHS_WITH_PLAYER_OVERLAY_V1"
+                if args.player_path_profiles is not None
+                else "SAME_SIMULATION_PATHS"
             )
 
         terms = ProfitBoostTerms(
