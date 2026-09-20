@@ -83,7 +83,9 @@ class PossessionChallengerBaseline:
         offense=receiver; remaining=1800; out=[]; idx=start_index
         while remaining>0:
             raw=max(1,int(round(self.rng.gamma(4.0,self.mean_drive_seconds/4.0))))
-            truncated=raw>=remaining; duration=min(raw,remaining)
+            # A drive that consumes exactly the remaining clock is allowed to
+            # finish at 0:00. Only a drive extending beyond the half is censored.
+            truncated=raw>remaining; duration=min(raw,remaining)
             outcome,points=("END_HALF",0) if truncated else self._outcome(offense)
             # SAFETY points belong to the defense; encode as negative offense points.
             out.append(Possession(idx,half,offense,self._other(offense),remaining,remaining-duration,outcome,points))
@@ -220,7 +222,9 @@ class VectorizedPossessionChallengerBaseline:
             home=opening.copy() if half==1 else ~opening; rem=np.full(n,1800,dtype=np.int32)
             while np.any(rem>0):
                 ids=np.flatnonzero(rem>0); raw=np.maximum(1,np.rint(self.rng.gamma(4,self.mean_drive_seconds/4,size=len(ids))).astype(np.int32))
-                trunc=raw>=rem[ids]; dur=np.minimum(raw,rem[ids]); ch,pts=self._drive(home[ids]); pts=np.where(trunc,0,pts)
+                # Match the reference semantics: a drive ending exactly at 0:00
+                # may score; only an overrun is converted to END_HALF.
+                trunc=raw>rem[ids]; dur=np.minimum(raw,rem[ids]); ch,pts=self._drive(home[ids]); pts=np.where(trunc,0,pts)
                 h=home[ids]; normal=pts>=0; safety=pts<0
                 hs[ids]+=np.where(normal & h,pts,0)+np.where(safety & ~h,-pts,0)
                 aw[ids]+=np.where(normal & ~h,pts,0)+np.where(safety & h,-pts,0)
