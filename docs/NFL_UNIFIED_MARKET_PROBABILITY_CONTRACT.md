@@ -113,3 +113,49 @@ Suggested output fields are `attd_model_p`, `expected_tds`, `actual_tds_prior`, 
 ### Anti-leakage rules
 
 Actual TDs and games-since-last-TD must be cutoff before the target kickoff. TD debt is descriptive unless a preregistered candidate proves incremental out-of-sample value; a player being "due" cannot itself increase Model_P. Coverage/box splits require minimum-sample handling and shrinkage before predictive use. Opponent tendencies must be derived only from prior games. Public research tools, videos, social posts and capper tags are context/feature inspiration only and cannot vote on a play.
+
+
+## Prop reopening and evidence authority
+
+NFL player props are deliberately reopened for **research/EXPERIMENTAL implementation only**. This does not revoke the prior NO_ENGINE production freeze, does not move prop markets ahead of the frozen NFL game-market forward clocks, and does not authorize prospective promotion evidence. The production registry remains NO_ENGINE until a separate, explicit, frozen policy change is reviewed and merged.
+
+A coherent probability read-out is EXPERIMENTAL, not automatically a validated Model_P. A market/family may be labeled VALIDATED_MODEL only after its preregistered historical/PIT evaluation and calibration gates pass. OFFICIAL remains downstream of prospective Truth-Gate evidence.
+
+For the 2026 evidence lane, spread, total and moneyline remain the active game-market priority. ATTD and other props stay research-only until their family policy, quote methodology, capture burden and validation contract are frozen.
+
+## Prop-family preregistration
+
+Before any prop-family observation can count toward promotion evidence, freeze:
+- family identity and shared latent component
+- eligible selections and logging universe
+- feature/artifact/model identities
+- historical train/validation windows and minimum sample rules
+- scoring metrics and calibration gates
+- sportsbook quote structure and vig-removal methodology
+- opener/final capture windows and missing-quote disposition
+- settlement source/rules
+- prospective evidence unit and minimum evidence requirement
+
+Log the full eligible candidate universe before ranking/filtering. The research score may sort presentation but cannot decide which eligible rows are persisted.
+
+Evidence is counted by shared component/family rather than pretending correlated derivative markets are independent confirmations.
+
+## ATTD quote policy prerequisite
+
+ATTD must fail closed for promotion evidence while only a one-sided Yes quote is available under a paired-quote devig policy. Do not synthesize a No side or infer vig from another book. A one-sided or N-way fair-value method must be preregistered and frozen before observing its validation/promotion results. Until then, offered-price EV may be displayed only under an explicitly non-authoritative research label and must not be described as no-vig edge.
+
+## Shared touchdown allocation
+
+ATTD simulation must conserve the parent team scoring path. For every simulated team offensive touchdown, assign the scorer through the team's conditional player-share distribution. Player TD totals therefore cannot exceed the simulated team's attributable offensive TD total. Participation, role and teammate shares are resolved before allocation; missing mass or unresolved identity fails closed rather than creating an anonymous probability shortcut.
+
+## Position-level ATTD evaluation
+
+Evaluate ATTD with proper scoring/calibration both overall and separately for at least RB, WR and TE. Record sample count, base rate, log loss, Brier score, calibration intercept/slope and ECE by position. A pooled pass cannot conceal a failing required position segment. Any minimum-sample exception must be frozen before evaluation.
+
+## Market-blind scoring environment
+
+Any team expected-scoring feature entering ATTD Model_P must come from SportsEdge's independent market-blind football distribution. Sportsbook spreads, totals, implied team totals, prices or consensus lines are prohibited Model_P inputs unless a future separately preregistered model explicitly validates them. They remain comparison data.
+
+## Leakage invariance
+
+ATTD feature tests must perturb every current-game label and every post-kickoff field available to the builder, individually and in randomized combinations, and assert the complete pregame feature vector is byte-equivalent. Coverage-shell and box-count features additionally require documented historical availability over the frozen train/validation window. If coverage is insufficient, those fields remain research diagnostics or are excluded from the frozen candidate rather than silently shortening the holdout.
