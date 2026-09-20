@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Literal
 import numpy as np
 
-Outcome=Literal["TD","FG","PUNT","TURNOVER","DOWNS"]
+Outcome=Literal["TD","FG","PUNT","TURNOVER","DOWNS","END_HALF"]
 
 @dataclass(frozen=True)
 class Possession:
@@ -34,7 +34,7 @@ class PossessionChallengerBaseline:
     """Development baseline; parameters must be fit/frozen outside holdout."""
     def __init__(self,*,game_id,home_team,away_team,seed,
                  td_rate=.22,fg_rate=.16,turnover_rate=.11,downs_rate=.04,
-                 mean_drive_seconds=155.0,opening_receiver_home_prob=.5):
+                 mean_drive_seconds=155.0,opening_receiver_home_prob=.5,home_strength=0.0,away_strength=0.0,strength_scale=100.0,strength_clip=.08):
         if seed is None: raise ValueError("EXPLICIT_SEED_REQUIRED")
         if home_team==away_team: raise ValueError("HOME_AWAY_TEAM_COLLISION")
         rates=[td_rate,fg_rate,turnover_rate,downs_rate]
@@ -44,7 +44,7 @@ class PossessionChallengerBaseline:
         self.seed=int(seed); self.rng=np.random.default_rng(self.seed)
         self.rates=np.array([td_rate,fg_rate,1-sum(rates),turnover_rate,downs_rate],float)
         self.mean_drive_seconds=float(mean_drive_seconds)
-        self.opening_receiver_home_prob=float(opening_receiver_home_prob)
+        self.opening_receiver_home_prob=float(opening_receiver_home_prob)\n        self.home_strength=float(home_strength); self.away_strength=float(away_strength)\n        self.strength_scale=float(strength_scale); self.strength_clip=float(strength_clip)\n        self.strength_scale=float(strength_scale); self.strength_clip=float(strength_clip)
 
     def _other(self,t): return self.away_team if t==self.home_team else self.home_team
     def _outcome(self):
@@ -98,7 +98,7 @@ class VectorizedPossessionChallengerBaseline:
 
     def __init__(self,*,seed,td_rate=.22,fg_rate=.16,turnover_rate=.11,
                  downs_rate=.04,mean_drive_seconds=155.0,
-                 opening_receiver_home_prob=.5,home_strength=0.0,away_strength=0.0):
+                 opening_receiver_home_prob=.5,home_strength=0.0,away_strength=0.0,\n                 strength_scale=100.0,strength_clip=.08):
         if seed is None: raise ValueError("EXPLICIT_SEED_REQUIRED")
         base=np.array([td_rate,fg_rate,1-(td_rate+fg_rate+turnover_rate+downs_rate),turnover_rate,downs_rate],float)
         if np.any(base<0): raise ValueError("INVALID_DRIVE_RATES")
@@ -111,7 +111,7 @@ class VectorizedPossessionChallengerBaseline:
         # Development-only matchup dispersion. Strength shifts TD vs punt mass
         # symmetrically and is supplied PIT by the evaluator, never learned here.
         delta=np.where(home_offense,self.home_strength-self.away_strength,self.away_strength-self.home_strength)
-        shift=np.clip(delta/100.0,-.08,.08)
+        shift=np.clip(delta/self.strength_scale,-self.strength_clip,self.strength_clip)
         p=np.broadcast_to(self.base,(len(home_offense),5)).copy()
         p[:,0]+=shift; p[:,2]-=shift
         if np.any(p<0): raise ValueError("STRENGTH_SHIFT_INVALID")
@@ -132,7 +132,7 @@ class VectorizedPossessionChallengerBaseline:
                 dur=np.maximum(1,np.rint(self.rng.gamma(4.0,self.mean_drive_seconds/4.0,size=m)).astype(np.int32))
                 dur=np.minimum(dur,remaining[ids])
                 rates=self._rates(home_offense[ids])
-                u=self.rng.random(m); choice=(u[:,None]>np.cumsum(rates,axis=1)).sum(axis=1)
+                u=self.rng.random(m); choice=np.minimum((u[:,None]>np.cumsum(rates,axis=1)).sum(axis=1),4)
                 pts=self.POINTS[choice]
                 h=home_offense[ids]
                 home_score[ids]+=np.where(h,pts,0).astype(np.int16)
