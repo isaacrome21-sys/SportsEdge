@@ -355,3 +355,20 @@ If a downstream metric later becomes directly parameterized by an external prior
 ### Pre-holdout development check
 
 Before attempt 1 may inspect the 2024-2025 challenger holdout, the frozen challenger implementation must run on development seasons and record at minimum possessions per team-game and exact 3/7 margin mass (plus the other available structural diagnostics). This development check is for implementation/calibration readiness only and cannot create promotion evidence. Parameter changes made in response are permitted before attempt 1; once the implementation is sealed for holdout evaluation, the eight-attempt accounting begins.
+
+
+## Development evaluator contract (pre-holdout)
+
+Before the possession challenger is sealed for attempt 1, development evaluation must satisfy all of the following.
+
+### Matchup-conditioned PIT inputs
+Evaluate the actual development schedule, not league-average synthetic matchups. Each game receives only pregame point-in-time team-strength inputs computed from information available before that kickoff. Strength features and their source hashes/timestamps are persisted with the simulation manifest. Same-game/future outcomes and closing sportsbook prices cannot be strength inputs.
+
+### Leave-one-season-out development validation
+For each eligible development season S, fit/calibrate permitted behavioral parameters on the other development seasons and evaluate on S. Report every structural metric by fold and pooled across out-of-fold predictions. Parameter changes are judged on out-of-fold improvement; in-sample development fit cannot justify a change by itself.
+
+### Monte Carlo precision
+Every reported simulated metric includes path count, RNG/version/seed and Monte Carlo standard error or deterministic bootstrap interval as appropriate. Use at least **50,000 paths per development game** for the final pre-holdout baseline report. For proportion metrics, require MCSE <= **0.25 percentage points**; if not achieved, increase paths deterministically until it is. For means/quantiles, require the simulation 95% MC half-width <= **25% of that metric's frozen acceptance tolerance**. Failure to meet precision is MC_PRECISION_INSUFFICIENT, not a model failure/pass.
+
+### Historical rule binding
+The season rule-regime registry must cover the entire development window, not only 2024+. At minimum it must encode and source-hash the **2016 touchback-placement change** and the **2018 kickoff-formation/safety changes**, plus every later kickoff/OT rule change that materially affects possession start state, ordering or scoring mechanics. Rule parameters are selected by game date/season before simulation.
