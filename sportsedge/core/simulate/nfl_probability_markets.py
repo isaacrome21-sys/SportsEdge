@@ -6,6 +6,10 @@ Truth-Gate, staking, eligibility, or OFFICIAL authority.
 from __future__ import annotations
 
 from collections.abc import Iterable
+from math import isfinite
+from numbers import Real
+
+import numpy as np
 
 from .usage import AttributedFootballPath
 from .player_markets import _paths, _player_profile
@@ -40,7 +44,14 @@ def _offensive_touchdown_counts(
         # do not make the quarterback a scorer and return TDs remain separate.
         if "rushing_tds" not in row or "receiving_tds" not in row:
             raise ValueError("PLAYER_TD_COMPONENTS_MISSING")
-        counts.append(float(row["rushing_tds"]) + float(row["receiving_tds"]))
+        components = [row["rushing_tds"], row["receiving_tds"]]
+        if any(
+            isinstance(value, (bool, np.bool_)) or not isinstance(value, Real)
+            or not isfinite(value) or value < 0 or float(value) != int(value)
+            for value in components
+        ):
+            raise ValueError("PLAYER_TD_COUNT_INVALID")
+        counts.append(sum(int(value) for value in components))
     return counts
 
 
@@ -79,6 +90,14 @@ def derive_safety_probability(summary: VectorizedSummary) -> dict[str, float]:
         raise ValueError("CHALLENGER_OUTCOME_COUNT_SHAPE_INVALID")
     if len(counts) == 0:
         raise ValueError("SIMULATION_ROWS_EMPTY")
+    if counts.dtype.kind not in "iuf" or not np.all(np.isfinite(counts)):
+        raise ValueError("CHALLENGER_OUTCOME_COUNT_INVALID")
+    if np.any(counts < 0) or np.any(counts != np.floor(counts)):
+        raise ValueError("CHALLENGER_OUTCOME_COUNT_INVALID")
+    for values in (summary.margins, summary.totals, summary.home_possessions,
+                   summary.away_possessions, summary.overtime_possessions):
+        if getattr(values, "shape", None) != (len(counts),):
+            raise ValueError("CHALLENGER_SUMMARY_ROW_MISMATCH")
     safety_index = list(VectorizedPossessionChallengerBaseline.OUTCOMES).index("SAFETY")
     yes = sum(int(value) > 0 for value in counts[:, safety_index]) / float(len(counts))
     return {"yes": yes, "no": 1.0 - yes}
