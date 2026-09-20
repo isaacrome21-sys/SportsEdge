@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from copy import deepcopy
 
+import numpy as np
 import pytest
 
 from sportsedge.core.simulate.nfl_challenger_validation import (
     score_challenger_structural_metrics,
+    summarize_vectorized_structural_metrics,
 )
+from sportsedge.core.simulate.nfl_possession_challenger import VectorizedSummary
 
 
 def _metrics():
@@ -42,6 +45,78 @@ def _metrics():
 
 def _by_metric(report):
     return {row["metric"]:row for row in report["metrics"]}
+
+
+def _summary():
+    margins=np.array([3,-7,10,1],dtype=np.int16)
+    totals=np.array([40,50,60,30],dtype=np.int16)
+    hp=np.array([10,11,12,9],dtype=np.int16)
+    ap=np.array([10,11,12,9],dtype=np.int16)
+    counts=np.array([
+        [2,1,3,1,1,0,2],
+        [1,2,3,1,1,0,2],
+        [3,1,2,1,1,0,2],
+        [2,1,3,1,1,0,2],
+    ],dtype=np.int16)
+    ot=np.array([0,1,0,0],dtype=np.int16)
+    return VectorizedSummary(margins,totals,hp,ap,counts,ot)
+
+
+def test_supported_vectorized_metrics_emit_only_represented_state():
+    report=summarize_vectorized_structural_metrics(_summary())
+    assert report["schema"]=="NFL_CHALLENGER_SUPPORTED_STRUCTURAL_METRICS_V1"
+    assert report["path_count"]==4
+    assert report["quantile_method"]=="numpy_linear"
+    assert report["authority"]=="NONE_RESEARCH_ONLY"
+    assert report["official_authority"] is False
+    metrics=report["metrics"]
+    assert metrics["mean_possessions_per_team_game"]==10.5
+    assert metrics["absolute_margin_mass"]=={"3":.25,"7":.25,"10":.25}
+    assert metrics["mean_total_points"]==45.0
+    assert metrics["total_point_quantiles"]=={
+        "10":33.0,"25":37.5,"50":45.0,"75":52.5,"90":57.0,
+    }
+    assert set(metrics["drive_outcome_shares"])=={
+        "TD","FG","PUNT","TURNOVER","DOWNS","END_HALF_GAME"
+    }
+    assert "opening_drive_scoring_rate" in report["missing_required_metrics"]
+    assert "first_score_opening_receiver_rate" in report["missing_required_metrics"]
+    assert "late_game.leading.fourth_down_attempt_rate" in report["missing_required_metrics"]
+
+
+def test_supported_vectorized_outcome_denominator_keeps_safety_mass():
+    summary=_summary()
+    counts=summary.outcome_counts.copy()
+    counts[0,5]=2
+    report=summarize_vectorized_structural_metrics(
+        VectorizedSummary(summary.margins,summary.totals,summary.home_possessions,
+                          summary.away_possessions,counts,summary.overtime_possessions)
+    )
+    shares=report["metrics"]["drive_outcome_shares"]
+    assert sum(shares.values())<1.0
+    assert sum(shares.values())==pytest.approx(40/42)
+
+
+def test_supported_vectorized_metrics_fail_closed_on_corrupt_shape():
+    summary=_summary()
+    bad=VectorizedSummary(
+        summary.margins,summary.totals[:-1],summary.home_possessions,
+        summary.away_possessions,summary.outcome_counts,summary.overtime_possessions,
+    )
+    with pytest.raises(ValueError,match="CHALLENGER_SUMMARY_ROW_MISMATCH"):
+        summarize_vectorized_structural_metrics(bad)
+
+
+def test_supported_vectorized_metrics_fail_closed_on_fractional_outcome_count():
+    summary=_summary()
+    counts=summary.outcome_counts.astype(float)
+    counts[0,0]=1.5
+    bad=VectorizedSummary(
+        summary.margins,summary.totals,summary.home_possessions,
+        summary.away_possessions,counts,summary.overtime_possessions,
+    )
+    with pytest.raises(ValueError,match="CHALLENGER_OUTCOME_COUNT_INVALID"):
+        summarize_vectorized_structural_metrics(bad)
 
 
 def test_identical_structural_metrics_pass_with_zero_authority():
