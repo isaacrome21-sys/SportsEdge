@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
 from sportsedge.core.simulate.nfl_probability_markets import (
     derive_anytime_touchdown_probability,
     derive_two_plus_touchdown_probability,
+    derive_safety_probability,
 )
+from sportsedge.core.simulate.nfl_possession_challenger import VectorizedSummary
 
 
 class Profile:
@@ -52,6 +55,22 @@ def test_two_plus_td_does_not_count_passing_td():
     row=Path(1,0)
     row._stats["p1"]["passing_tds"]=5
     assert derive_two_plus_touchdown_probability([row],player_id="p1")["yes"]==0.0
+
+
+def test_safety_probability_uses_per_path_parent_outcome_counts():
+    counts=np.zeros((4,7),dtype=np.int16)
+    counts[1,5]=1
+    counts[3,5]=2
+    z=np.zeros(4,dtype=np.int16)
+    summary=VectorizedSummary(z,z,z,z,counts,z)
+    assert derive_safety_probability(summary)=={"yes":0.5,"no":0.5}
+
+
+def test_safety_probability_fails_closed_without_paths():
+    z=np.zeros(0,dtype=np.int16)
+    summary=VectorizedSummary(z,z,z,z,np.zeros((0,7),dtype=np.int16),z)
+    with pytest.raises(ValueError,match="SIMULATION_ROWS_EMPTY"):
+        derive_safety_probability(summary)
 
 
 def test_anytime_td_fails_closed_on_unresolved_participation():
