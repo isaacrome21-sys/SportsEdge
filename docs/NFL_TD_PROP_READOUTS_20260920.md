@@ -37,3 +37,20 @@ Verification: focused tests cover touchdown ordering/identity, no-TD outcomes,
 count push mass, same-sample game totals, prop routing and generator reuse, plus
 existing player, period, kicker and defensive readouts. No historical candidate
 evaluation was run and no attempt was consumed.
+
+## Receptions validation integrity
+
+The G1 chronological readout now rejects duplicate player/season/week identities
+(including whitespace aliases), missing or invalid reception counts, invalid
+chronology and invalid history/line configuration before fitting. Missing data
+cannot become a zero reception outcome, and duplicate rows cannot leak the
+current outcome into prior history. Metric helpers reject nonfinite quantities,
+nonbinary labels and probabilities outside [0, 1] before numerical clipping.
+Tests cover reversed inputs, season rollover, separate player histories, future
+outcome isolation and invalid data in both training and evaluation rows. These
+are fixture checks, not a historical validation attempt or promotion evidence.
+
+Hosted verification of the original TD/prop commit: the focused contract passed;
+both full-suite jobs recorded 3,177 passed and one failure in the existing freeze
+reconciliation boundary assertion against main 78aae277. That repository release
+block remains unresolved; no test, governance hash or release gate was bypassed.
