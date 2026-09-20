@@ -1,0 +1,23 @@
+{
+  "schema_version": "NFL_IMPULSE_PROMO_V1",
+  "sportsbook": "DraftKings",
+  "sport": "NFL",
+  "game_id": "IND@KC",
+  "game_label": "Indianapolis Colts @ Kansas City Chiefs",
+  "game_date": "2026-09-20",
+  "scheduled_time_et": "20:20",
+  "promotion_type": "SGP_PROFIT_BOOST",
+  "boost_rate": 0.50,
+  "min_legs": 3,
+  "min_total_american_odds": -200,
+  "max_wager": 25.0,
+  "sgp_only": true,
+  "profit_boost_applies_to_winnings_only": true,
+  "expires": "END_OF_GAME",
+  "source": "USER_PROVIDED_DRAFTKINGS_SCREENSHOT_2026-09-20",
+  "decision_mode": "IMPULSE",
+  "requires_joint_model_probability": true,
+  "do_not_multiply_leg_probabilities": true,
+  "official_p_required": false,
+  "truth_gate_required": false
+}
