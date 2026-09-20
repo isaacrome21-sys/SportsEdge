@@ -1,8 +1,8 @@
 """Fail-closed structural gate math for the isolated NFL possession challenger.
 
 This module performs no data acquisition and does not open the frozen 2024-2025
-holdout.  It only scores already-materialized simulated and empirical metrics
-against the preregistered bands in ``NFL_UNIFIED_MARKET_PROBABILITY_CONTRACT.md``.
+holdout. It only emits/scorers already-materialized simulated and empirical
+metrics against the preregistered bands in ``NFL_UNIFIED_MARKET_PROBABILITY_CONTRACT.md``.
 Passing this scorer is research evidence only; it grants no Model_P, promotion,
 staking, Truth-Gate, or OFFICIAL authority.
 """
@@ -12,6 +12,13 @@ from collections.abc import Mapping
 from math import isfinite
 from numbers import Real
 from typing import Any
+
+import numpy as np
+
+from .nfl_possession_challenger import (
+    VectorizedPossessionChallengerBaseline,
+    VectorizedSummary,
+)
 
 DRIVE_OUTCOMES=("TD","FG","PUNT","TURNOVER","DOWNS","END_HALF_GAME")
 TOTAL_QUANTILES=("10","25","50","75","90")
@@ -47,6 +54,81 @@ def _row(name: str, simulated: float, empirical: float, tolerance: float) -> dic
         "absolute_error":error,
         "tolerance":tolerance,
         "disposition":"PASS" if error<=tolerance else "FAIL",
+    }
+
+
+def summarize_vectorized_structural_metrics(summary: VectorizedSummary) -> dict[str,Any]:
+    """Emit only structural metrics represented by the current vectorized paths.
+
+    This deliberately does not invent opening-drive, first-score or late-game
+    metrics. They remain explicit blockers until the simulator/source carries
+    the required state. Quantiles use NumPy's frozen ``linear`` method.
+    """
+    if not isinstance(summary,VectorizedSummary):
+        raise TypeError("VECTORIZED_CHALLENGER_SUMMARY_REQUIRED")
+    n=len(summary.margins)
+    if n<=0:
+        raise ValueError("CHALLENGER_STRUCTURAL_PATHS_EMPTY")
+    arrays=(
+        summary.totals,summary.home_possessions,summary.away_possessions,
+        summary.overtime_possessions,
+    )
+    if any(getattr(values,"shape",None)!=(n,) for values in arrays):
+        raise ValueError("CHALLENGER_SUMMARY_ROW_MISMATCH")
+    counts=summary.outcome_counts
+    expected=len(VectorizedPossessionChallengerBaseline.OUTCOMES)
+    if getattr(counts,"shape",None)!=(n,expected):
+        raise ValueError("CHALLENGER_OUTCOME_COUNT_SHAPE_INVALID")
+    numeric=(summary.margins,)+arrays+(counts,)
+    if any(getattr(values,"dtype",None) is None or values.dtype.kind not in "iuf" for values in numeric):
+        raise ValueError("CHALLENGER_STRUCTURAL_ARRAY_INVALID")
+    if any(not np.all(np.isfinite(values)) for values in numeric):
+        raise ValueError("CHALLENGER_STRUCTURAL_ARRAY_INVALID")
+    if np.any(counts<0) or np.any(counts!=np.floor(counts)):
+        raise ValueError("CHALLENGER_OUTCOME_COUNT_INVALID")
+    outcome_total=float(np.sum(counts))
+    if outcome_total<=0:
+        raise ValueError("CHALLENGER_DRIVE_OUTCOMES_EMPTY")
+
+    indexes={str(name):i for i,name in enumerate(VectorizedPossessionChallengerBaseline.OUTCOMES)}
+    outcome_key={
+        "TD":"TD","FG":"FG","PUNT":"PUNT","TURNOVER":"TURNOVER",
+        "DOWNS":"DOWNS","END_HALF_GAME":"END_HALF",
+    }
+    shares={
+        public:float(np.sum(counts[:,indexes[internal]])/outcome_total)
+        for public,internal in outcome_key.items()
+    }
+    quantiles=np.quantile(summary.totals,[.10,.25,.50,.75,.90],method="linear")
+    metrics={
+        "mean_possessions_per_team_game":float(np.mean(summary.home_possessions+summary.away_possessions)/2.0),
+        "drive_outcome_shares":shares,
+        "absolute_margin_mass":{
+            str(k):float(np.mean(np.abs(summary.margins)==k)) for k in (3,7,10)
+        },
+        "mean_total_points":float(np.mean(summary.totals)),
+        "total_point_quantiles":{
+            key:float(value) for key,value in zip(TOTAL_QUANTILES,quantiles)
+        },
+    }
+    return {
+        "schema":"NFL_CHALLENGER_SUPPORTED_STRUCTURAL_METRICS_V1",
+        "path_count":n,
+        "quantile_method":"numpy_linear",
+        "metrics":metrics,
+        "missing_required_metrics":[
+            "opening_drive_scoring_rate",
+            "first_score_opening_receiver_rate",
+            "late_game.leading.fourth_down_attempt_rate",
+            "late_game.leading.pace_proxy_rate",
+            "late_game.trailing.fourth_down_attempt_rate",
+            "late_game.trailing.pace_proxy_rate",
+        ],
+        "authority":"NONE_RESEARCH_ONLY",
+        "promotion_authority":False,
+        "truth_gate_authority":False,
+        "staking_authority":False,
+        "official_authority":False,
     }
 
 
