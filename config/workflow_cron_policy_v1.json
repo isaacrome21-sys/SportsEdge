@@ -4,6 +4,7 @@
   "allowed_scheduled_workflows": [
     ".github/workflows/closing-line-archive.yml",
     ".github/workflows/nfl-2026-line-capture.yml",
+    ".github/workflows/nfl-2026-provider-health.yml",
     ".github/workflows/nfl-v2g-forward-clv.yml",
     ".github/workflows/football-nfl-forward-clv-collection.yml",
     ".github/workflows/ev-tracker.yml",
@@ -18,6 +19,14 @@
     ".github/workflows/mlb-pit-lineup-starter-archive.yml",
     ".github/workflows/mlb-prop-pit-archive.yml",
     ".github/workflows/mlb-game-context-refresh.yml",
-    ".github/workflows/nfl-market-maker-radar-capture.yml"
+    ".github/workflows/mlb-moneyline-forward-evidence.yml",
+    ".github/workflows/mlb-moneyline-forward-settlement.yml",
+    ".github/workflows/nfl-market-maker-radar-capture.yml",
+    ".github/workflows/football-public-splits.yml",
+    ".github/workflows/football-vsin-contest-context.yml",
+    ".github/workflows/statcast-daily-refresh.yml",
+    ".github/workflows/draftkings-prop-provider-probe.yml",
+    ".github/workflows/direct-dk-board-snapshot.yml",
+    ".github/workflows/nfl-attempt9-prospective-prediction-capture.yml"
   ]
 }
