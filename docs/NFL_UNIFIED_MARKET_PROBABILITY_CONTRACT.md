@@ -410,3 +410,18 @@ The possession challenger NLL must be interpreted against a frozen simple benchm
 For each fold, fit **one residual standard deviation parameter** using only that fold's development-training seasons: residual = actual final margin minus PIT expected margin. The benchmark for each held-out game is a Normal distribution centered on its PIT expected margin with that training-only residual standard deviation, discretized to integer margins using half-point bin boundaries. Apply the same -80..80 support and Jeffreys 0.5 pseudocount/renormalization convention used for challenger scoring.
 
 Report fold and pooled mean NLL for challenger and benchmark, plus paired per-game NLL difference. The challenger must have **lower pooled out-of-fold mean NLL** than the benchmark before its structural complexity can be claimed to add distributional predictive value. A failure does not consume a holdout attempt because this comparison occurs entirely in development.
+
+
+### Equivalence retry and edge-case fixtures
+
+The 0.30 percentage-point exact-margin-mass tolerance is immutable. Because finite Monte Carlo noise can produce an occasional borderline failure at 200,000 paths per implementation, a failed **exact-3 or exact-7 mass check only** receives one deterministic precision retry at **1,000,000 paths per implementation** using preregistered retry seeds. The original result and retry are both retained. The retry does not change the tolerance. Failure at 1,000,000 paths is VECTOR_REFERENCE_MISMATCH. No other failed equivalence metric receives this retry unless separately preregistered before results.
+
+The frozen equivalence fixture set must exercise rare transition branches rather than only average games. It includes at minimum:
+- near-even matchup(s) configured to generate substantial regulation-tie/OT exposure;
+- lopsided home-favorite and away-favorite matchup(s);
+- end-of-half possessions with the clock expiring during/after a drive;
+- scoring on the final regulation possession;
+- safety events once safety mechanics exist;
+- regulation ties and each supported season-specific overtime regime once OT mechanics exist.
+
+A fixture is marked NOT_YET_IMPLEMENTED only while its underlying mechanic is absent from the challenger. It must become a blocking equivalence fixture in the same change that introduces that mechanic, before any development claim based on that mechanic.
