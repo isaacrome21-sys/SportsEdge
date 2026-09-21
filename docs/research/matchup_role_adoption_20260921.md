@@ -64,6 +64,73 @@ No-vig edge stays null: same-book pairing and frozen devig remain upstream.
 
 ## Coverage and outstanding work
 
+### RUN IT: strongest positive-EV lines first
+
+The requested default presentation is a short scored card, not a wall of
+eligibility labels. Run:
+
+```sh
+python scripts/run_matchup_research.py board lines.json --format markdown
+```
+
+It displays up to five highest-scoring, current positive-EV candidates scoring
+at least 60/100. Multiple books quoting the identical contract produce one
+display selection at the best available scored price. Nothing qualifying means
+an empty card, not a forced recommendation. These are individually ranked lines,
+not a portfolio or parlay; correlation and stake sizing are not inferred.
+`--limit`, `--min-score` and `--all-lines` control the display. JSON retains every
+submitted row and its explanation, including missing models and rejected inputs.
+
+The score is **70 × clip(EV / 0.30, 0, 1) + 30 × P(win | no push)**, rounded to
+one decimal. These are disclosed display weights, not learned coefficients.
+60 is a UI cutoff, not evidence of predictive accuracy. Model win probability
+and expected profit per unit remain separate. Positive EV is conditional on the
+supplied model being right; this PR does not establish calibration or profitability.
+No external percentage is renamed as an internally validated probability.
+
+Input is an object with `rows`, optional `now` (otherwise current UTC), and
+optional `quote_ttl_seconds`/`estimate_ttl_seconds` (defaults 300/900). A row has:
+
+- `quote`: `quote_id`, `book`, `contract`, `american_odds`, `quote_at`, `start`.
+- Optional `estimate`: `contract`, unconditional `win` and `push`, `model_id`,
+  `model_version`, `artifact_sha256`, `features_as_of`, `generated_at`, `valid_until`.
+- Both contracts must exactly agree on `sport`, `event_id`, `market`, `selection`,
+  nullable `entity_id` and `line`, `period`, `rules_id`, and `payout_type`.
+  The only supported payout type is `WIN_LOSS_PUSH`. Explicit rules and period
+  prevent offensive-regulation TDs from being matched to book-complete ATTD.
+
+All timestamps require offsets. Expired, future, started, missing-source and
+mismatched estimates cannot score. Refreshing an estimate timestamp cannot revive
+an old feature snapshot. Artifact identity is caller-attested, not verified by
+this renderer. Probability estimation, live data acquisition, screenshot/text
+parsing and market-specific adapters remain upstream; quotes alone cannot produce
+probabilities. This opt-in command is not a replacement for the production runner.
+
+`examples/research_scored_board_synthetic.json` is an executable **synthetic**
+example at a fixed historical time, not a current betting line:
+
+```sh
+python scripts/run_matchup_research.py board examples/research_scored_board_synthetic.json --format markdown
+```
+
+### PR #895 reconciliation repair
+
+The three initial failing checks shared one repository assertion: main's governed
+content no longer matched checkpoint `2dcd200a244a959c04c972ed652c5142804a6b18`.
+The registry now records all 32 intervening first-parent commits through
+`78aae277890d5ef8b02d72e1cc075150d07b1867`. Entries use actual git SHAs; `pr: 0`
+means the commit subject did not identify a PR. No PR identity was guessed.
+
+Before advancing the checkpoint, the effective coverage audit replayed all 736
+delta/bundle rows: 47 confirmed drift, 689 not applicable, zero unresolved rows.
+All drift dispositions remain terminal under the existing policy; no disposition,
+selector, authority, test or hold was relaxed. Effective governed-surface SHA-256:
+`fb1945e2c003e6e1890e7c93aa026bcec9033a080230ad00a8552b2055e75f40`.
+The registry still declares inventory incomplete and reconciliation still reports
+`ACTIVE_FREEZE_BUNDLE_INVENTORY_INCOMPLETE`; this change does not claim release authority.
+Reproduce with `scripts/build_reconciliation_registry_view.py` followed by
+`scripts/reconcile_freeze_deltas.py --registry <effective-registry> --current-main-ref origin/main`.
+
 | Family | What this change delivers | Still required |
 | --- | --- | --- |
 | NRFI/YRFI | Executable matchup candidate and shared-environment mixture | PIT feature adapter, fitted coefficient artifact, untouched evaluation, official evidence |
@@ -89,3 +156,8 @@ Existing Engine B and player-market suites are also run.
 Local validation uses Python 3.12.14 / NumPy 2.3.5; the repository's exact contract
 is Python 3.12.13 with the dependencies in `requirements-test.txt`. Local results
 are engineering checks, not a claim to have satisfied that hosted CI gate.
+
+After the #895 repair, `python -m pytest -q tests` passed 3,198 tests and 770
+subtests locally. Thirteen scored-board tests cover value arithmetic, no filler
+picks, price ranking/deduplication, exact settlement identity, stale/future data,
+source requirements, pushes, market coverage, and the executable Markdown card.

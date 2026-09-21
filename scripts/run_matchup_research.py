@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Execute explicit JSON research inputs; never fetch, fit, stake or promote.
 
-Usage: python scripts/run_matchup_research.py {nrfi,td,price} input.json
+Usage: python scripts/run_matchup_research.py {nrfi,td,price,board} input.json
 Outputs JSON to stdout. See docs/research/matchup_role_adoption_20260921.md.
 """
 import argparse
@@ -15,6 +15,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 def run(mode, data):
     data = dict(data)
+    if mode == 'board':
+        from sportsedge.research.scored_board import build_scored_board
+        from datetime import timezone
+        data.setdefault('now', datetime.now(timezone.utc))
+        return build_scored_board(**data)
     if mode == 'nrfi':
         from sportsedge.research.first_inning_matchup import (
             BatterOBP, FirstInningParameters, PitcherFirstInning, predict_first_inning,
@@ -58,11 +63,22 @@ def run(mode, data):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode', choices=('nrfi', 'td', 'price'))
+    parser.add_argument('mode', choices=('nrfi', 'td', 'price', 'board'))
     parser.add_argument('input', type=Path)
+    parser.add_argument('--format', choices=('json', 'markdown'), default='json')
+    parser.add_argument('--limit', type=int, default=5, help='Maximum positive-EV candidates in the board')
+    parser.add_argument('--min-score', type=float, default=60, help='Display cutoff, not calibrated confidence')
+    parser.add_argument('--all-lines', action='store_true', help='Show the full board audit, including unscored lines')
     args = parser.parse_args()
+    if args.format == 'markdown' and args.mode != 'board':
+        parser.error('--format markdown requires board mode')
     result = run(args.mode, json.loads(args.input.read_text()))
-    print(json.dumps(result, sort_keys=True, allow_nan=False))
+    if args.format == 'markdown':
+        from sportsedge.research.scored_board import render_scored_board
+        print(render_scored_board(result, limit=args.limit, min_score=args.min_score,
+                                  show_all=args.all_lines), end='')
+    else:
+        print(json.dumps(result, sort_keys=True, allow_nan=False))
 
 
 if __name__ == '__main__':
