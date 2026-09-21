@@ -1,0 +1,41 @@
+{
+  "schema": "SPORTSEDGE_NFL_PROP_CHALLENGER_CONTEXT_V1",
+  "policy_id": "NFL_PROP_CHALLENGER_CONTEXT_V1",
+  "status": "RESEARCH_ONLY_NO_MODEL_P",
+  "authority": {
+    "model_p": false,
+    "truth_gate": false,
+    "promotion": false,
+    "staking": false,
+    "official": false
+  },
+  "inputs": {
+    "team_proe_z": {"min": -3.0, "max": 3.0},
+    "opponent_pass_epa_z": {"min": -3.0, "max": 3.0},
+    "opponent_rush_epa_z": {"min": -3.0, "max": 3.0},
+    "wind_mph": {"min": 0.0, "max": 60.0},
+    "roof_closed": {"type": "boolean"}
+  },
+  "coefficients": {
+    "pass_volume": {
+      "team_proe_z": 0.04,
+      "opponent_pass_epa_z": 0.03,
+      "high_wind_threshold_mph": 15.0,
+      "high_wind_multiplier": 0.92
+    },
+    "rush_volume": {
+      "team_proe_z": -0.03,
+      "opponent_rush_epa_z": 0.03,
+      "high_wind_threshold_mph": 15.0,
+      "high_wind_multiplier": 1.05
+    },
+    "target_volume": {
+      "team_proe_z": 0.03,
+      "opponent_pass_epa_z": 0.02,
+      "high_wind_threshold_mph": 15.0,
+      "high_wind_multiplier": 0.95
+    }
+  },
+  "multiplier_bounds": [0.75, 1.25],
+  "change_control": "Any coefficient, threshold, input definition, or bound change requires a new policy_id/version and a new file hash before evaluation. This V1 is an unvalidated research challenger and may not be tuned after observing prop outcomes."
+}
