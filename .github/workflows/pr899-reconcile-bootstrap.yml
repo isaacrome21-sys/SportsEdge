@@ -18,7 +18,7 @@ jobs:
         with:
           ref: research/nfl-role-prop-challenger-20260921
           fetch-depth: 0
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+      - uses: actions/setup-python@a26af69be951213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
       - name: Install test dependencies
@@ -76,17 +76,44 @@ jobs:
           git mv tests/test_nfl_prop_challenger_contract.py tests/test_research_nfl_prop_challenger_contract.py
       - name: Machine classify reconciliation
         run: |
-          PYTHONPATH=. python scripts/reconcile_freeze_deltas.py --repo . --current-main-ref origin/main --output /tmp/reconciliation.json
-          python - <<'PY'
+          set +e
+          PYTHONPATH=. python scripts/reconcile_freeze_deltas.py --repo . --current-main-ref origin/main --output /tmp/reconciliation.json > /tmp/reconciliation.log 2>&1
+          classifier_rc=$?
+          set -e
+          cat /tmp/reconciliation.log || true
+          validation_rc=0
+          if [ -f /tmp/reconciliation.json ]; then
+            python - <<'PY' || validation_rc=$?
           import json
           r=json.load(open('/tmp/reconciliation.json'))
           bad=[b for b in r.get('release_blocks',[]) if b != 'ACTIVE_FREEZE_BUNDLE_INVENTORY_INCOMPLETE']
+          print('outcome_counts=', r.get('outcome_counts'))
           print('release_blocks=', r.get('release_blocks'))
+          print('authority=', r.get('authority'))
           if bad:
               raise SystemExit('UNRESOLVED_RECONCILIATION_DRIFT:' + ','.join(bad))
           if any(bool(v) for v in (r.get('authority') or {}).values()):
               raise SystemExit('RECONCILIATION_AUTHORITY_ESCALATION')
           PY
+          else
+            validation_rc=99
+          fi
+          if [ "$classifier_rc" -ne 0 ] || [ "$validation_rc" -ne 0 ]; then
+            {
+              echo "classifier_rc=$classifier_rc"
+              echo "validation_rc=$validation_rc"
+              echo "--- stdout/stderr ---"
+              cat /tmp/reconciliation.log || true
+              echo "--- report ---"
+              if [ -f /tmp/reconciliation.json ]; then cat /tmp/reconciliation.json; else echo "REPORT_MISSING"; fi
+            } > docs/research/pr899_reconciliation_diagnostic.txt
+            git config user.name "sportsedge-reconciliation-bot"
+            git config user.email "actions@users.noreply.github.com"
+            git add docs/research/pr899_reconciliation_diagnostic.txt
+            git commit -m "Record PR899 reconciliation classifier diagnostic"
+            git push origin HEAD:research/nfl-role-prop-challenger-20260921
+            exit 1
+          fi
       - name: Focused contracts
         run: |
           python -m pytest -q \
@@ -96,8 +123,9 @@ jobs:
       - name: Persist durable repair and remove bootstrap
         run: |
           rm .github/workflows/pr899-reconcile-bootstrap.yml
+          rm -f docs/research/pr899_reconciliation_diagnostic.txt
           git config user.name "sportsedge-reconciliation-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add config/freeze_reconciliation_registry_v1.json tests/test_research_nfl_prop_challenger_contract.py tests/test_nfl_prop_challenger_contract.py .github/workflows/pr899-reconcile-bootstrap.yml
+          git add -A
           git commit -m "Reconcile PR898 prop drift and isolate PR899 research tests"
           git push origin HEAD:research/nfl-role-prop-challenger-20260921
