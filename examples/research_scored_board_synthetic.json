@@ -1,0 +1,48 @@
+{
+  "now": "2026-09-21T12:00:00Z",
+  "quote_ttl_seconds": 300,
+  "estimate_ttl_seconds": 900,
+  "rows": [
+    {
+      "quote": {
+        "quote_id": "q1",
+        "book": "SYNTHETIC",
+        "contract": {
+          "sport": "MLB",
+          "event_id": "SYNTHETIC-GAME",
+          "market": "NRFI",
+          "selection": "YES",
+          "entity_id": null,
+          "line": null,
+          "period": "FIRST_INNING",
+          "rules_id": "SYNTHETIC_CONFIRMED_STARTERS",
+          "payout_type": "WIN_LOSS_PUSH"
+        },
+        "american_odds": 100,
+        "quote_at": "2026-09-21T11:59:00Z",
+        "start": "2026-09-21T13:00:00Z"
+      },
+      "estimate": {
+        "contract": {
+          "sport": "MLB",
+          "event_id": "SYNTHETIC-GAME",
+          "market": "NRFI",
+          "selection": "YES",
+          "entity_id": null,
+          "line": null,
+          "period": "FIRST_INNING",
+          "rules_id": "SYNTHETIC_CONFIRMED_STARTERS",
+          "payout_type": "WIN_LOSS_PUSH"
+        },
+        "win": 0.6,
+        "push": 0,
+        "model_id": "SYNTHETIC_TEST_ONLY",
+        "model_version": "v1",
+        "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generated_at": "2026-09-21T11:58:00Z",
+        "features_as_of": "2026-09-21T11:57:00Z",
+        "valid_until": "2026-09-21T12:05:00Z"
+      }
+    }
+  ]
+}
