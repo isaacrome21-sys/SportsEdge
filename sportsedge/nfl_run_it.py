@@ -1,22 +1,28 @@
 """NFL sides/totals RUN IT card.
 
-Quotes + model probabilities in. Short ranked +EV card out.
-An empty card is a valid result. Official labels live in the ledger, not here.
+Fresh paired prices + non-certifying estimates (or joint-score simulations) in.
+Short ranked +EV card out. Empty is a valid result.
 """
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from math import isfinite
 from typing import Any, Iterable, Mapping, Sequence
 
+from sports.common.ev_math import EVError, devig, parse_utc
 from sportsedge.core.simulate.markets import derive_game_markets
 from sportsedge.market_ids import canonical_market_id
 from sportsedge.truth_gate import american_to_decimal
 
 
-CARD_SCHEMA = "SPORTSEDGE_NFL_RUN_IT_CARD_V1"
+CARD_SCHEMA = "SPORTSEDGE_NFL_RUN_IT_CARD_V2"
 SUPPORTED_MARKETS = frozenset({"moneyline", "spread", "total"})
-DEFAULT_EDGE_FLOOR = 0.02  # probability points; card floor, not Official gate
+DEFAULT_EDGE_FLOOR = 0.02
+QUOTE_TTL_SECONDS = 180
+MAX_QUOTE_SKEW_SECONDS = 30
+DEVIG_METHOD = "POWER_V1"
+AUTHORITY_FOOTER = "NOT Model_P / NOT Truth Gate / NOT OFFICIAL"
 
 
 class NflRunItError(ValueError):
@@ -34,13 +40,13 @@ class CardPick:
     line: float | None
     price_american: int
     book: str
-    model_p: float
-    novig_p: float
+    retrieved_at: str
+    estimate_p: float
+    push_p: float
+    market_no_vig_p: float
     edge_probability_points: float
     ev_per_dollar: float
-    score: int
-    reason: str
-    paired: bool
+    devig_method: str
 
 
 @dataclass(frozen=True)
@@ -50,6 +56,7 @@ class RunItCard:
     picks: tuple[CardPick, ...]
     omitted: int
     empty_reason: str | None
+    authority_footer: str = AUTHORITY_FOOTER
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -58,26 +65,29 @@ class RunItCard:
             "picks": [asdict(p) for p in self.picks],
             "omitted": self.omitted,
             "empty_reason": self.empty_reason,
+            "authority_footer": self.authority_footer,
         }
 
     def render(self) -> str:
-        if not self.picks:
-            return "NFL — RUN IT\nNothing looks strong enough."
         lines = ["NFL — RUN IT"]
-        for p in self.picks:
-            if p.market == "total":
-                sel = f"{p.away}/{p.home} {p.selection} {p.line:g}"
-            elif p.market == "spread":
-                sel = f"{p.selection} {p.line:+g}"
-            else:
-                sel = p.selection
-            price = f"{p.price_american:+d}"
-            edge = f"edge {p.edge_probability_points * 100:+.1f}pp"
-            lines.append(
-                f"{p.rank}. {sel}  {price}   {edge}   {p.score}   {p.reason}"
-            )
+        if not self.picks:
+            lines.append("Nothing looks strong enough.")
+        else:
+            for p in self.picks:
+                if p.market == "total":
+                    sel = f"{p.away}/{p.home} {p.selection} {p.line:g}"
+                elif p.market == "spread":
+                    sel = f"{p.selection} {p.line:+g}"
+                else:
+                    sel = p.selection
+                lines.append(
+                    f"{p.rank}. {sel}  {p.price_american:+d}   "
+                    f"edge {p.edge_probability_points * 100:+.1f}pp   "
+                    f"EV {p.ev_per_dollar * 100:+.1f}%"
+                )
         if self.omitted:
-            lines.append(f"— {self.omitted} other quote(s) below the floor.")
+            lines.append(f"— {self.omitted} quote(s) omitted by fail-closed filters or floor.")
+        lines.append(self.authority_footer)
         return "\n".join(lines)
 
 
@@ -96,6 +106,16 @@ def _american(value: Any) -> int:
     if not isfinite(odds) or odds != int(odds) or -100 < odds < 100:
         raise NflRunItError("american price must be integer <= -100 or >= 100")
     return int(odds)
+
+
+def _timestamp(value: Any, code: str) -> datetime:
+    if value is None or not str(value).strip():
+        raise NflRunItError(code)
+    try:
+        dt = parse_utc(value)
+    except (EVError, TypeError, ValueError) as exc:
+        raise NflRunItError(code) from exc
+    return dt.astimezone(timezone.utc)
 
 
 def _optional_line(row: Mapping[str, Any], market: str) -> float | None:
@@ -121,9 +141,9 @@ def _normalize_selection(market: str, selection: str, home: str, away: str) -> s
             raise NflRunItError(f"unsupported total selection: {selection}")
         return upper
     if market in {"moneyline", "spread"}:
-        if upper in {"HOME"}:
+        if upper == "HOME":
             return home
-        if upper in {"AWAY"}:
+        if upper == "AWAY":
             return away
         if sel not in {home, away}:
             raise NflRunItError(f"selection must be home or away team: {selection}")
@@ -141,6 +161,10 @@ def normalize_quote(raw: Mapping[str, Any]) -> dict[str, Any]:
     if market not in SUPPORTED_MARKETS:
         raise NflRunItError(f"NFL_RUN_IT_MARKET_OUT_OF_SCOPE:{market}")
     selection = _normalize_selection(market, _req_text(raw, "selection"), home, away)
+    book = str(raw.get("book") or raw.get("book_key") or "").strip()
+    if not book:
+        raise NflRunItError("QUOTE_IDENTITY_INCOMPLETE:book")
+    retrieved_at = _timestamp(raw.get("retrieved_at"), "QUOTE_RETRIEVED_AT_REQUIRED")
     return {
         "game_id": game_id,
         "home": home,
@@ -149,14 +173,16 @@ def normalize_quote(raw: Mapping[str, Any]) -> dict[str, Any]:
         "selection": selection,
         "line": _optional_line(raw, market),
         "price_american": _american(raw.get("price_american", raw.get("american_odds"))),
-        "book": str(raw.get("book") or raw.get("book_key") or "unknown").strip(),
-        "reason_hint": str(raw["reason_hint"]).strip() if raw.get("reason_hint") else None,
+        "book": book,
+        "retrieved_at": retrieved_at,
     }
 
 
-def normalize_model_row(raw: Mapping[str, Any]) -> dict[str, Any]:
+def normalize_estimate_row(raw: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(raw, Mapping):
-        raise NflRunItError("model row must be an object")
+        raise NflRunItError("estimate row must be an object")
+    if "model_p" in raw:
+        raise NflRunItError("MODEL_P_FIELD_FORBIDDEN_USE_ESTIMATE_P")
     game_id = _req_text(raw, "game_id")
     market = canonical_market_id("nfl", _req_text(raw, "market"))
     if market not in SUPPORTED_MARKETS:
@@ -164,36 +190,28 @@ def normalize_model_row(raw: Mapping[str, Any]) -> dict[str, Any]:
     home = str(raw.get("home") or "").strip()
     away = str(raw.get("away") or "").strip()
     selection_raw = _req_text(raw, "selection")
-    selection = (
-        _normalize_selection(market, selection_raw, home, away)
-        if home and away
-        else selection_raw
-    )
-    p = raw.get("model_p")
+    selection = _normalize_selection(market, selection_raw, home, away) if home and away else selection_raw
     try:
-        model_p = float(p)
+        estimate_p = float(raw.get("estimate_p"))
     except (TypeError, ValueError) as exc:
-        raise NflRunItError("model_p invalid") from exc
-    if not isfinite(model_p) or not 0.0 < model_p < 1.0:
-        raise NflRunItError("model_p must be in (0,1)")
+        raise NflRunItError("estimate_p invalid") from exc
+    if not isfinite(estimate_p) or not 0.0 < estimate_p < 1.0:
+        raise NflRunItError("estimate_p must be in (0,1)")
     line = raw.get("line")
     norm_line = None if line is None else float(line)
+    if norm_line is not None and not isfinite(norm_line):
+        raise NflRunItError("estimate line must be finite")
     return {
         "game_id": game_id,
         "market": market,
         "selection": selection,
         "line": norm_line,
-        "model_p": model_p,
-        "why": str(raw["why"]).strip() if raw.get("why") else None,
+        "estimate_p": estimate_p,
     }
 
 
-def _model_key(game_id: str, market: str, selection: str, line: float | None) -> tuple:
+def _estimate_key(game_id: str, market: str, selection: str, line: float | None) -> tuple:
     return (game_id, market, selection, None if line is None else round(float(line), 4))
-
-
-def _implied(price: int) -> float:
-    return 1.0 / american_to_decimal(price)
 
 
 def _pair_key(q: Mapping[str, Any]) -> tuple:
@@ -204,9 +222,7 @@ def _pair_key(q: Mapping[str, Any]) -> tuple:
 
 
 def _is_complement(a: Mapping[str, Any], b: Mapping[str, Any]) -> bool:
-    if _pair_key(a) != _pair_key(b):
-        return False
-    if a["selection"] == b["selection"]:
+    if _pair_key(a) != _pair_key(b) or a["selection"] == b["selection"]:
         return False
     if a["market"] == "total":
         return {a["selection"], b["selection"]} == {"OVER", "UNDER"}
@@ -215,40 +231,41 @@ def _is_complement(a: Mapping[str, Any], b: Mapping[str, Any]) -> bool:
 
 def find_pair(candidate: Mapping[str, Any], quotes: Sequence[Mapping[str, Any]]) -> Mapping[str, Any] | None:
     matches = [q for q in quotes if q is not candidate and _is_complement(candidate, q)]
-    if len(matches) == 1:
-        return matches[0]
-    return None
+    return matches[0] if len(matches) == 1 else None
 
 
-def novig_probability(candidate: Mapping[str, Any], opposite: Mapping[str, Any] | None) -> tuple[float, bool]:
-    raw = _implied(int(candidate["price_american"]))
-    if opposite is None:
-        return raw, False
-    other = _implied(int(opposite["price_american"]))
-    total = raw + other
-    if total <= 0:
-        raise NflRunItError("invalid paired implied sum")
-    return raw / total, True
+def _validate_quote_time(quote: Mapping[str, Any], *, as_of: datetime) -> None:
+    retrieved_at = quote["retrieved_at"]
+    age_s = (as_of - retrieved_at).total_seconds()
+    if age_s > QUOTE_TTL_SECONDS:
+        raise NflRunItError("QUOTE_STALE")
+    if age_s < -MAX_QUOTE_SKEW_SECONDS:
+        raise NflRunItError("QUOTE_CLOCK_SKEW")
 
 
-def ev_per_dollar(model_p: float, price: int) -> float:
+def market_no_vig_probability(candidate: Mapping[str, Any], opposite: Mapping[str, Any]) -> float:
+    skew = abs((candidate["retrieved_at"] - opposite["retrieved_at"]).total_seconds())
+    if skew > MAX_QUOTE_SKEW_SECONDS:
+        raise NflRunItError("PAIRED_QUOTE_TIME_SKEW")
+    decimals = [
+        american_to_decimal(int(candidate["price_american"])),
+        american_to_decimal(int(opposite["price_american"])),
+    ]
+    try:
+        return float(devig(decimals, trigger_american=400, max_spread_pp=1.0)[0])
+    except EVError as exc:
+        raise NflRunItError(exc.code) from exc
+
+
+def ev_per_dollar(estimate_p: float, price: int, *, push_p: float = 0.0) -> float:
+    if push_p < 0 or estimate_p < 0 or estimate_p + push_p > 1.0 + 1e-12:
+        raise NflRunItError("INVALID_WIN_PUSH_MASS")
+    loss_p = max(0.0, 1.0 - estimate_p - push_p)
     dec = american_to_decimal(price)
-    return model_p * (dec - 1.0) - (1.0 - model_p)
+    return estimate_p * (dec - 1.0) - loss_p
 
 
-def score_pick(*, edge: float, paired: bool, has_reason: bool, price: int) -> int:
-    """Support rank. Does not invent edge."""
-    pts = min(70.0, max(0.0, edge) * 1200.0)
-    if paired:
-        pts += 15.0
-    if has_reason:
-        pts += 10.0
-    if abs(price) <= 250:
-        pts += 5.0
-    return int(max(0, min(100, round(pts))))
-
-
-def model_p_from_simulation(
+def estimate_p_from_simulation(
     rows: Iterable[Mapping[str, Any]],
     *,
     market: str,
@@ -257,7 +274,7 @@ def model_p_from_simulation(
     home: str,
     away: str,
 ) -> tuple[float, float]:
-    """Return (model_p, push_p) from joint score rows at the posted line."""
+    """Return (estimate_p, push_p) from joint score rows at the posted line."""
     spread_line = 0.0
     total_line = None
     if market == "spread":
@@ -284,74 +301,91 @@ def model_p_from_simulation(
     if market == "spread":
         block = markets["spread"]
         push = float(block["push"])
-        if selection == home:
-            return float(block["home_cover"]), push
-        return float(block["away_cover"]), push
+        return (float(block["home_cover"]), push) if selection == home else (float(block["away_cover"]), push)
     block = markets["total"]
     push = float(block["push"])
-    if selection == "OVER":
-        return float(block["over"]), push
-    return float(block["under"]), push
+    return (float(block["over"]), push) if selection == "OVER" else (float(block["under"]), push)
+
+
+def _integer_line_requires_simulation(quote: Mapping[str, Any]) -> bool:
+    line = quote["line"]
+    return (
+        quote["market"] in {"spread", "total"}
+        and line is not None
+        and abs(float(line) - round(float(line))) < 1e-9
+    )
 
 
 def run_it(
     quotes: Sequence[Mapping[str, Any]],
-    models: Sequence[Mapping[str, Any]],
+    estimates: Sequence[Mapping[str, Any]],
     *,
     edge_floor: float = DEFAULT_EDGE_FLOOR,
     simulations: Mapping[str, Sequence[Mapping[str, Any]]] | None = None,
+    as_of: datetime | str | None = None,
 ) -> RunItCard:
     if not isinstance(edge_floor, (int, float)) or isinstance(edge_floor, bool) or not isfinite(float(edge_floor)) or float(edge_floor) < 0:
         raise NflRunItError("edge_floor must be finite and >= 0")
     floor = float(edge_floor)
+    now = datetime.now(timezone.utc) if as_of is None else _timestamp(as_of, "AS_OF_INVALID")
 
     norm_quotes = [normalize_quote(q) for q in quotes]
-    model_map: dict[tuple, dict[str, Any]] = {}
-    for raw in models:
-        row = normalize_model_row(raw)
-        key = _model_key(row["game_id"], row["market"], row["selection"], row["line"])
-        if key in model_map and model_map[key]["model_p"] != row["model_p"]:
-            raise NflRunItError(f"conflicting model_p for {key}")
-        model_map[key] = row
+    for quote in norm_quotes:
+        _validate_quote_time(quote, as_of=now)
+        if find_pair(quote, norm_quotes) is None:
+            raise NflRunItError(f"PAIRED_PRICE_REQUIRED:{_pair_key(quote)}")
+
+    estimate_map: dict[tuple, dict[str, Any]] = {}
+    for raw in estimates:
+        row = normalize_estimate_row(raw)
+        key = _estimate_key(row["game_id"], row["market"], row["selection"], row["line"])
+        if key in estimate_map and estimate_map[key]["estimate_p"] != row["estimate_p"]:
+            raise NflRunItError(f"conflicting estimate_p for {key}")
+        estimate_map[key] = row
 
     scored: list[dict[str, Any]] = []
     omitted = 0
     for quote in norm_quotes:
-        key = _model_key(quote["game_id"], quote["market"], quote["selection"], quote["line"])
-        model = model_map.get(key)
-        push_p = 0.0
-        why = quote.get("reason_hint")
-        if model is None:
-            sim_rows = (simulations or {}).get(quote["game_id"])
-            if not sim_rows:
-                omitted += 1
-                continue
-            model_p, push_p = model_p_from_simulation(
-                sim_rows,
+        key = _estimate_key(quote["game_id"], quote["market"], quote["selection"], quote["line"])
+        estimate = estimate_map.get(key)
+        sim_rows = (simulations or {}).get(quote["game_id"])
+        requires_sim = _integer_line_requires_simulation(quote)
+
+        if requires_sim and not sim_rows:
+            if estimate is not None:
+                raise NflRunItError(f"SIMULATIONS_REQUIRED_FOR_INTEGER_LINE:{key}")
+            omitted += 1
+            continue
+
+        if requires_sim or (estimate is None and sim_rows):
+            estimate_p, push_p = estimate_p_from_simulation(
+                sim_rows or (),
                 market=quote["market"],
                 selection=quote["selection"],
                 line=quote["line"],
                 home=quote["home"],
                 away=quote["away"],
             )
+        elif estimate is not None:
+            estimate_p = float(estimate["estimate_p"])
+            push_p = 0.0
         else:
-            model_p = float(model["model_p"])
-            why = model.get("why") or why
+            omitted += 1
+            continue
 
         opposite = find_pair(quote, norm_quotes)
-        novig_p, paired = novig_probability(quote, opposite)
-        non_push = max(1e-12, 1.0 - push_p)
-        conditional = model_p / non_push
-        edge = conditional - novig_p
-        ev = ev_per_dollar(model_p, quote["price_american"])
+        if opposite is None:
+            raise NflRunItError(f"PAIRED_PRICE_REQUIRED:{_pair_key(quote)}")
+        no_vig_p = market_no_vig_probability(quote, opposite)
+        non_push = 1.0 - push_p
+        if non_push <= 0:
+            raise NflRunItError("NON_PUSH_MASS_ZERO")
+        conditional_estimate = estimate_p / non_push
+        edge = conditional_estimate - no_vig_p
+        ev = ev_per_dollar(estimate_p, quote["price_american"], push_p=push_p)
         if edge <= floor or ev <= 0:
             omitted += 1
             continue
-        reason = why or (
-            f"Model {model_p:.3f} vs no-vig {novig_p:.3f} at {quote['price_american']:+d}"
-            if paired
-            else f"Model {model_p:.3f} vs raw implied {novig_p:.3f} at {quote['price_american']:+d} (unpaired)"
-        )
         scored.append(
             {
                 "game_id": quote["game_id"],
@@ -362,30 +396,32 @@ def run_it(
                 "line": quote["line"],
                 "price_american": quote["price_american"],
                 "book": quote["book"],
-                "model_p": model_p,
-                "novig_p": novig_p,
+                "retrieved_at": quote["retrieved_at"].isoformat().replace("+00:00", "Z"),
+                "estimate_p": estimate_p,
+                "push_p": push_p,
+                "market_no_vig_p": no_vig_p,
                 "edge_probability_points": edge,
                 "ev_per_dollar": ev,
-                "score": score_pick(
-                    edge=edge,
-                    paired=paired,
-                    has_reason=bool(why),
-                    price=quote["price_american"],
-                ),
-                "reason": reason,
-                "paired": paired,
+                "devig_method": DEVIG_METHOD,
             }
         )
 
-    scored.sort(key=lambda r: (-r["ev_per_dollar"], -r["edge_probability_points"], -r["score"]))
+    scored.sort(
+        key=lambda r: (
+            -r["ev_per_dollar"],
+            -r["edge_probability_points"],
+            r["game_id"],
+            r["market"],
+            r["selection"],
+        )
+    )
     picks = tuple(CardPick(rank=i, **row) for i, row in enumerate(scored, start=1))
-    empty = None if picks else "Nothing looks strong enough."
     return RunItCard(
         schema=CARD_SCHEMA,
         sport="nfl",
         picks=picks,
         omitted=omitted,
-        empty_reason=empty,
+        empty_reason=None if picks else "Nothing looks strong enough.",
     )
 
 
@@ -396,18 +432,23 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     parser = argparse.ArgumentParser(description="NFL sides/totals RUN IT card")
     parser.add_argument("--quotes", required=True)
-    parser.add_argument("--models", default=None)
+    parser.add_argument("--estimates", default=None)
     parser.add_argument("--simulations", default=None)
     parser.add_argument("--edge-floor", type=float, default=DEFAULT_EDGE_FLOOR)
+    parser.add_argument("--as-of", default=None)
     parser.add_argument("--json-out", default=None)
     args = parser.parse_args(argv)
 
     quotes = json.loads(Path(args.quotes).read_text(encoding="utf-8"))
-    models = json.loads(Path(args.models).read_text(encoding="utf-8")) if args.models else []
-    simulations = (
-        json.loads(Path(args.simulations).read_text(encoding="utf-8")) if args.simulations else None
+    estimates = json.loads(Path(args.estimates).read_text(encoding="utf-8")) if args.estimates else []
+    simulations = json.loads(Path(args.simulations).read_text(encoding="utf-8")) if args.simulations else None
+    card = run_it(
+        quotes,
+        estimates,
+        edge_floor=args.edge_floor,
+        simulations=simulations,
+        as_of=args.as_of,
     )
-    card = run_it(quotes, models, edge_floor=args.edge_floor, simulations=simulations)
     print(card.render())
     if args.json_out:
         Path(args.json_out).write_text(json.dumps(card.to_dict(), indent=2) + "\n", encoding="utf-8")
