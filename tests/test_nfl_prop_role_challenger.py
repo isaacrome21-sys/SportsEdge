@@ -49,11 +49,7 @@ class NFLPropRoleChallengerTests(unittest.TestCase):
 
     def test_probability_lane_rejects_market_inputs_recursively(self):
         with self.assertRaisesRegex(PropChallengerError, "MARKET_INPUT_FORBIDDEN"):
-            stabilize_role(
-                entity_id="p1",
-                history=[],
-                projected_role={**self.prior, "nested": {"sportsbook": "DraftKings"}},
-            )
+            stabilize_role(entity_id="p1", history=[], projected_role={**self.prior, "nested": {"sportsbook": "DraftKings"}})
         role = stabilize_role(entity_id="p1", history=[], projected_role=self.prior)
         with self.assertRaisesRegex(PropChallengerError, "MARKET_INPUT_FORBIDDEN"):
             apply_context(role, {"opponent": {"spread": -3.5}})
@@ -62,10 +58,7 @@ class NFLPropRoleChallengerTests(unittest.TestCase):
 
     def test_context_is_explicit_multiplier_not_hidden_score(self):
         role = stabilize_role(entity_id="p1", history=[], projected_role=self.prior)
-        adjusted = apply_context(
-            role,
-            {"pass_volume_multiplier": 0.9, "rush_volume_multiplier": 1.1, "target_multiplier": 1.05},
-        )
+        adjusted = apply_context(role,{"pass_volume_multiplier": 0.9,"rush_volume_multiplier": 1.1,"target_multiplier": 1.05})
         self.assertAlmostEqual(adjusted.pass_attempt_mean, role.pass_attempt_mean * 0.9)
         self.assertAlmostEqual(adjusted.rush_attempt_mean, role.rush_attempt_mean * 1.1)
         self.assertAlmostEqual(adjusted.target_mean, role.target_mean * 1.05)
@@ -87,22 +80,10 @@ class NFLPropRoleChallengerTests(unittest.TestCase):
             self.assertEqual(row["rush_receiving_yards"], row["rushing_yards"] + row["receiving_yards"])
 
     def test_paired_fresh_same_book_quote_produces_research_evaluation(self):
-        sim = PropSimulation(
-            "p1",
-            tuple({"receptions": x} for x in ([4] * 20 + [5] * 30 + [6] * 50)),
-            1,
-        )
+        sim = PropSimulation("p1", tuple({"receptions": x} for x in ([4] * 20 + [5] * 30 + [6] * 50)), 1)
         over = {"side": "OVER", "line": 4.5, "price": -110, "book": "DraftKings", "retrieved_at": "2026-09-21T18:00:00Z"}
         under = {"side": "UNDER", "line": 4.5, "price": -110, "book": "DraftKings", "retrieved_at": "2026-09-21T18:00:10Z"}
-        result = evaluate_paired_quote(
-            simulation=sim,
-            market="RECEPTIONS",
-            side="OVER",
-            line=4.5,
-            over_quote=over,
-            under_quote=under,
-            as_of="2026-09-21T18:01:00Z",
-        )
+        result = evaluate_paired_quote(simulation=sim,market="RECEPTIONS",side="OVER",line=4.5,over_quote=over,under_quote=under,as_of="2026-09-21T18:01:00Z")
         self.assertAlmostEqual(result.estimate_p, 0.80)
         self.assertAlmostEqual(result.push_p, 0.0)
         self.assertAlmostEqual(result.market_no_vig_p, 0.5, places=8)
@@ -120,39 +101,28 @@ class NFLPropRoleChallengerTests(unittest.TestCase):
         over = {"side": "OVER", "line": 4.5, "price": -110, "book": "DraftKings", "retrieved_at": "2026-09-21T18:00:00Z"}
         missing_price = {"side": "UNDER", "line": 4.5, "book": "DraftKings", "retrieved_at": "2026-09-21T18:00:00Z"}
         with self.assertRaisesRegex(PropChallengerError, "BAD_AMERICAN_ODDS"):
-            evaluate_paired_quote(simulation=sim, market="RECEPTIONS", side="OVER", line=4.5,
-                                  over_quote=over, under_quote=missing_price, as_of="2026-09-21T18:01:00Z")
+            evaluate_paired_quote(simulation=sim, market="RECEPTIONS", side="OVER", line=4.5,over_quote=over, under_quote=missing_price, as_of="2026-09-21T18:01:00Z")
         other_book = {"side": "UNDER", "line": 4.5, "price": -110, "book": "FanDuel", "retrieved_at": "2026-09-21T18:00:00Z"}
         with self.assertRaisesRegex(PropChallengerError, "PAIRED_QUOTE_BOOK_MISMATCH"):
-            evaluate_paired_quote(simulation=sim, market="RECEPTIONS", side="OVER", line=4.5,
-                                  over_quote=over, under_quote=other_book, as_of="2026-09-21T18:01:00Z")
+            evaluate_paired_quote(simulation=sim, market="RECEPTIONS", side="OVER", line=4.5,over_quote=over, under_quote=other_book, as_of="2026-09-21T18:01:00Z")
 
     def test_quote_freshness_and_pair_skew_fail_closed(self):
         sim = PropSimulation("p1", tuple({"receptions": 5} for _ in range(10)), 1)
         over = {"side": "OVER", "line": 4.5, "price": -110, "book": "DraftKings", "retrieved_at": "2026-09-21T17:55:00Z"}
         under = {"side": "UNDER", "line": 4.5, "price": -110, "book": "DraftKings", "retrieved_at": "2026-09-21T17:55:00Z"}
         with self.assertRaisesRegex(PropChallengerError, "QUOTE_STALE"):
-            evaluate_paired_quote(simulation=sim, market="RECEPTIONS", side="OVER", line=4.5,
-                                  over_quote=over, under_quote=under, as_of="2026-09-21T18:00:00Z")
-
+            evaluate_paired_quote(simulation=sim, market="RECEPTIONS", side="OVER", line=4.5,over_quote=over, under_quote=under, as_of="2026-09-21T18:00:00Z")
         over2 = {**over, "retrieved_at": "2026-09-21T18:00:00Z"}
         under2 = {**under, "retrieved_at": "2026-09-21T18:00:31Z"}
         with self.assertRaisesRegex(PropChallengerError, "PAIRED_QUOTE_TIME_SKEW"):
-            evaluate_paired_quote(simulation=sim, market="RECEPTIONS", side="OVER", line=4.5,
-                                  over_quote=over2, under_quote=under2, as_of="2026-09-21T18:00:31Z")
+            evaluate_paired_quote(simulation=sim, market="RECEPTIONS", side="OVER", line=4.5,over_quote=over2, under_quote=under2, as_of="2026-09-21T18:00:31Z")
 
     def test_integer_line_push_mass_is_carried_into_ev(self):
-        rows = (
-            {"pass_attempts": 2},
-            {"pass_attempts": 3},
-            {"pass_attempts": 4},
-            {"pass_attempts": 4},
-        )
+        rows = ({"pass_attempts": 2},{"pass_attempts": 3},{"pass_attempts": 4},{"pass_attempts": 4})
         sim = PropSimulation("qb", rows, 3)
         over = {"side": "OVER", "line": 3.0, "price": -110, "book": "DraftKings", "retrieved_at": "2026-09-21T18:00:00Z"}
         under = {"side": "UNDER", "line": 3.0, "price": -110, "book": "DraftKings", "retrieved_at": "2026-09-21T18:00:00Z"}
-        result = evaluate_paired_quote(simulation=sim, market="PASS_ATTEMPTS", side="OVER", line=3.0,
-                                       over_quote=over, under_quote=under, as_of="2026-09-21T18:00:10Z")
+        result = evaluate_paired_quote(simulation=sim, market="PASS_ATTEMPTS", side="OVER", line=3.0,over_quote=over, under_quote=under, as_of="2026-09-21T18:00:10Z")
         self.assertAlmostEqual(result.estimate_p, 0.5)
         self.assertAlmostEqual(result.push_p, 0.25)
         self.assertAlmostEqual(result.estimate_p_nonpush, 2 / 3)
@@ -160,11 +130,7 @@ class NFLPropRoleChallengerTests(unittest.TestCase):
 
     def test_diagnostic_tags_are_separate_from_probability_lane(self):
         role = stabilize_role(entity_id="p1", history=[], projected_role=self.prior)
-        tags = diagnostic_tags(
-            role=role,
-            football_context={"wind_mph": 18},
-            market_context={"book_count": 6},
-        )
+        tags = diagnostic_tags(role=role, football_context={"wind_mph": 18}, market_context={"book_count": 6})
         self.assertIn("PROJECTED_ROLE", tags)
         self.assertIn("HIGH_WIND", tags)
         self.assertIn("DEEP_MARKET", tags)
