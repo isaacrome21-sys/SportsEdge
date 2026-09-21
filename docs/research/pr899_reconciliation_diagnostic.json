@@ -1,0 +1,474 @@
+{
+  "authority": {
+    "model_p": false,
+    "official": false,
+    "promotion": false,
+    "staking": false,
+    "truth_gate": false,
+    "untouched_readout": false,
+    "validation_attempt": false
+  },
+  "blocking_or_drift_rows": [
+    {
+      "bundle_id": "NFL_PROP_MODEL_FREEZE_V1",
+      "covered_changed_paths": [
+        ".github/workflows/football-nfl-prop-artifact-freeze.yml",
+        "config/nfl_prop_certification.json",
+        "tests/test_nfl_prop_code_surface.py"
+      ],
+      "delta_id": "PREHOLD_BASELINE",
+      "merge_sha": "564e5567acf63adbf750e033df08a8c368f6884d",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 0,
+      "reason": "COVERED_BUNDLE_DRIFT_BEFORE_HOLD_BASELINE"
+    },
+    {
+      "bundle_id": "CFB_PROP_MODEL_FREEZE_V1",
+      "covered_changed_paths": [
+        "artifacts/football/cfb_prop_artifact_bundle_v1.json",
+        "tests/test_cfb_prop_depth_source.py",
+        "tests/test_cfb_prop_manual_depth.py",
+        "tests/test_cfb_prop_manual_runtime_time.py"
+      ],
+      "delta_id": "PREHOLD_BASELINE",
+      "merge_sha": "564e5567acf63adbf750e033df08a8c368f6884d",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 0,
+      "reason": "COVERED_BUNDLE_DRIFT_BEFORE_HOLD_BASELINE"
+    },
+    {
+      "bundle_id": "CFB_CANDIDATE_PREREG_FREEZE_V1",
+      "covered_changed_paths": [
+        ".github/workflows/cfb-candidate-first-evaluation-readiness.yml"
+      ],
+      "delta_id": "PREHOLD_BASELINE",
+      "merge_sha": "564e5567acf63adbf750e033df08a8c368f6884d",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 0,
+      "reason": "COVERED_BUNDLE_DRIFT_BEFORE_HOLD_BASELINE"
+    },
+    {
+      "bundle_id": "NFL_V2J_V2K_GOVERNANCE_FREEZE_V1",
+      "covered_changed_paths": [
+        ".github/workflows/nfl-v2k-policy-admission-v3.yml",
+        "scripts/build_nfl_v2k_policy_admission_v3.py",
+        "sportsedge/sports/nfl/NFL_V2K_HUMAN_POLICY_SELECTION_V1.json",
+        "sportsedge/sports/nfl/NFL_V2K_IMPLEMENTATION_ADMISSION_V3.json",
+        "tests/test_nfl_v2k_policy_admission_v3.py"
+      ],
+      "delta_id": "PR_683",
+      "merge_sha": "f242c916903cdea60301db1d4380653460945eba",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 683,
+      "reason": "COVERED_BUNDLE_BYTES_OR_INVENTORY_CHANGED"
+    },
+    {
+      "bundle_id": "MARKET_MAKER_RADAR_EVIDENCE_FREEZE_V2",
+      "covered_changed_paths": [
+        ".github/workflows/nfl-market-maker-radar-capture.yml",
+        "config/market_maker_radar_v2.json",
+        "scripts/analyze_market_maker_radar_v2.py",
+        "scripts/recheck_market_maker_candidate_persistence.py",
+        "scripts/settle_market_maker_candidate_ledger_v2.py",
+        "tests/test_market_maker_candidate_persistence.py",
+        "tests/test_market_maker_candidate_settlement_v2.py",
+        "tests/test_market_maker_radar_v2.py"
+      ],
+      "delta_id": "PR_689",
+      "merge_sha": "6c3fe073d9a0a240ddd7f58938a4f32d3abedceb",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 689,
+      "reason": "COVERED_BUNDLE_BYTES_OR_INVENTORY_CHANGED"
+    },
+    {
+      "bundle_id": "MARKET_MAKER_RADAR_EVIDENCE_FREEZE_V2",
+      "covered_changed_paths": [
+        "scripts/analyze_market_maker_radar_v2.py",
+        "tests/test_market_maker_radar_v2.py"
+      ],
+      "delta_id": "PR_691",
+      "merge_sha": "76f0fb454d48cf6df8e51660114d52878fd3665e",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 691,
+      "reason": "COVERED_BUNDLE_BYTES_OR_INVENTORY_CHANGED"
+    },
+    {
+      "bundle_id": "NFL_V2J_V2K_GOVERNANCE_FREEZE_V1",
+      "covered_changed_paths": [
+        ".github/workflows/nfl-v2k-preregistration-addendum-v2.yml",
+        "sportsedge/sports/nfl/NFL_V2K_PREREGISTRATION_ADDENDUM_V2.json",
+        "tests/test_nfl_v2k_preregistration_addendum_v2.py"
+      ],
+      "delta_id": "PR_688",
+      "merge_sha": "ed9aa39ded1da89eca2bb7019a5f810dde83af78",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 688,
+      "reason": "COVERED_BUNDLE_BYTES_OR_INVENTORY_CHANGED"
+    },
+    {
+      "bundle_id": "NFL_V2J_V2K_GOVERNANCE_FREEZE_V1",
+      "covered_changed_paths": [
+        ".github/workflows/nfl-v2k-attempt0-core.yml",
+        "tests/test_nfl_v2k_attempt0_core.py"
+      ],
+      "delta_id": "PR_690",
+      "merge_sha": "7ed79c51e790d393108864513c34dd296d9fd175",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 690,
+      "reason": "COVERED_BUNDLE_BYTES_OR_INVENTORY_CHANGED"
+    },
+    {
+      "bundle_id": "MARKET_MAKER_RADAR_EVIDENCE_FREEZE_V2",
+      "covered_changed_paths": [
+        ".github/workflows/nfl-market-maker-radar-capture.yml",
+        "config/market_maker_radar_v2.json",
+        "scripts/evaluate_market_maker_execution_pilot.py",
+        "scripts/log_market_maker_execution_attempt.py",
+        "scripts/recheck_market_maker_candidate_persistence.py",
+        "tests/test_market_maker_candidate_persistence.py",
+        "tests/test_market_maker_execution_attempts.py",
+        "tests/test_market_maker_radar_v2.py"
+      ],
+      "delta_id": "PR_697",
+      "merge_sha": "546d07de8ea286d0218c4c70f95ca2618e645374",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 697,
+      "reason": "COVERED_BUNDLE_BYTES_OR_INVENTORY_CHANGED"
+    },
+    {
+      "bundle_id": "MLB_DFS_EVIDENCE_FREEZE_V1",
+      "covered_changed_paths": [
+        "docs/DK_DFS_EVIDENCE_CONTRACT.md",
+        "sportsedge/dfs/evidence_state.py",
+        "sportsedge/dfs/mlb_pitcher_contract.py",
+        "tests/test_dfs_dk_eligibility.py",
+        "tests/test_dfs_evidence_state.py",
+        "tests/test_dfs_mlb_pitcher_accounting.py"
+      ],
+      "delta_id": "PR_698",
+      "merge_sha": "8de77a15080e6329bcd70058b735ff972f93ebc7",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 698,
+      "reason": "COVERED_BUNDLE_BYTES_OR_INVENTORY_CHANGED"
+    },
+    {
+      "bundle_id": "MLB_DFS_EVIDENCE_FREEZE_V1",
+      "covered_changed_paths": [
+        "sportsedge/dfs/mlb_pitcher_contract.py",
+        "tests/test_dfs_mlb_pitcher_accounting_v3.py"
+      ],
+      "delta_id": "PR_699",
+      "merge_sha": "7cddfa6b55e32081f0a0bbc5b0591241d504fb45",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 699,
+      "reason": "COVERED_BUNDLE_BYTES_OR_INVENTORY_CHANGED"
+    },
+    {
+      "bundle_id": "CFB_HISTORICAL_MARKET_ARCHIVE_FREEZE_V1",
+      "covered_changed_paths": [
+        ".github/workflows/cfb-historical-market-source-freeze.yml",
+        "config/research/cfb_historical_market_source_v1.json",
+        "scripts/materialize_cfb_historical_market_archive.py",
+        "sportsedge/sports/cfb/history_cache.py",
+        "sportsedge/sports/cfb/market_archive.py",
+        "sportsedge/sports/cfb/market_archive_contract.py",
+        "tests/test_cfb_historical_market_contamination_boundary.py",
+        "tests/test_cfb_history_cache.py",
+        "tests/test_cfb_market_archive_restrictions.py"
+      ],
+      "delta_id": "PR_687",
+      "merge_sha": "1325bfb62031e54c1b46023bd170ad455d38516e",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 687,
+      "reason": "COVERED_BUNDLE_BYTES_OR_INVENTORY_CHANGED"
+    },
+    {
+      "bundle_id": "MLB_DFS_EVIDENCE_FREEZE_V1",
+      "covered_changed_paths": [
+        "config/mlb_dfs_pitcher_path_set_policy_v1.json",
+        "sportsedge/dfs/evidence_state.py",
+        "sportsedge/dfs/mlb_pitcher_pathset.py",
+        "tests/test_dfs_evidence_state.py",
+        "tests/test_dfs_mlb_pitcher_pathset.py"
+      ],
+      "delta_id": "PR_701",
+      "merge_sha": "7f8cd83df5ec4fe91e4c347ee843f861da8ba459",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 701,
+      "reason": "COVERED_BUNDLE_BYTES_OR_INVENTORY_CHANGED"
+    },
+    {
+      "bundle_id": "NFL_V2J_V2K_GOVERNANCE_FREEZE_V1",
+      "covered_changed_paths": [
+        "sportsedge/sports/nfl/NFL_V2J_FROZEN_FAILURE_RECEIPT_V1.json",
+        "tests/test_nfl_v2j_frozen_failure_receipt.py"
+      ],
+      "delta_id": "PR_702",
+      "merge_sha": "09a2aecdc168f65d50a1120017491a0d104e6140",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 702,
+      "reason": "COVERED_BUNDLE_BYTES_OR_INVENTORY_CHANGED"
+    },
+    {
+      "bundle_id": "CFB_PROP_MODEL_FREEZE_V1",
+      "covered_changed_paths": [
+        "tests/test_cfb_prop_participation_model.py"
+      ],
+      "delta_id": "PR_727_CFB_PARTICIPATION_INTEGRATION",
+      "merge_sha": "44a6a1722d524dafd7f70c24c1b61d4b81b71c03",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 727,
+      "reason": "COVERED_BUNDLE_BYTES_OR_INVENTORY_CHANGED"
+    },
+    {
+      "bundle_id": "NFL_V2J_V2K_GOVERNANCE_FREEZE_V1",
+      "covered_changed_paths": [
+        ".github/workflows/football-nfl-forward-clv-collection.yml"
+      ],
+      "delta_id": "PR_736_NFL_PROVIDER_BUDGET_GUARD",
+      "merge_sha": "2930583ee1bac7a94644fe182278212ffe728452",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 736,
+      "reason": "COVERED_BUNDLE_BYTES_OR_INVENTORY_CHANGED"
+    },
+    {
+      "bundle_id": "CFB_PROP_MODEL_FREEZE_V1",
+      "covered_changed_paths": [
+        ".github/workflows/football-cfb-prop-artifact-freeze.yml"
+      ],
+      "delta_id": "PR_797_CFB_RETAINED_FREEZE_VERIFICATION",
+      "merge_sha": "f8afb5c5e3251b6ede8a39ef25c47fdd07dfb7ee",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 797,
+      "reason": "COVERED_BUNDLE_BYTES_OR_INVENTORY_CHANGED"
+    },
+    {
+      "bundle_id": "CFB_CANDIDATE_PREREG_FREEZE_V1",
+      "covered_changed_paths": [
+        ".github/workflows/cfb-candidate-first-evaluation-readiness.yml"
+      ],
+      "delta_id": "PR_791_CFB_SELECTION_READINESS_SCOPE",
+      "merge_sha": "9a4f81a6a2a2eaf3c77c1ff9f0510f99a3a3a170",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 791,
+      "reason": "COVERED_BUNDLE_BYTES_OR_INVENTORY_CHANGED"
+    },
+    {
+      "bundle_id": "MARKET_MAKER_RADAR_EVIDENCE_FREEZE_V2",
+      "covered_changed_paths": [
+        ".github/workflows/market-maker-radar.yml",
+        "config/market_maker_radar_v1.json",
+        "docs/market_maker_radar.md",
+        "scripts/capture_market_maker_fourc_line_history.py"
+      ],
+      "delta_id": "PR_803_FOURC_LINE_HISTORY_CORROBORATION",
+      "merge_sha": "7d64c5e6b149324e54286f29b7058b696886749b",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 803,
+      "reason": "COVERED_BUNDLE_BYTES_OR_INVENTORY_CHANGED"
+    },
+    {
+      "bundle_id": "CFB_CANDIDATE_PREREG_FREEZE_V1",
+      "covered_changed_paths": [
+        ".github/workflows/cfb-candidate-first-evaluation-readiness.yml"
+      ],
+      "delta_id": "PR_819_CURRENT_MAIN_CATCHUP",
+      "merge_sha": "f397573c06ede6310ae9d1ba932ed67dbedb38ad",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 819,
+      "reason": "COVERED_BUNDLE_BYTES_OR_INVENTORY_CHANGED"
+    },
+    {
+      "bundle_id": "CFB_CANDIDATE_PREREG_FREEZE_V1",
+      "covered_changed_paths": [
+        ".github/workflows/cfb-candidate-first-evaluation-readiness.yml",
+        "scripts/audit_cfb_selection_readiness.py",
+        "sportsedge/sports/cfb/selection_readiness.py",
+        "tests/test_cfb_model_selection_readiness.py"
+      ],
+      "delta_id": "PR_826_CFB_RECONSTRUCTED_SELECTION_READINESS",
+      "merge_sha": "374ffc70c7bfc2fae968ae4d506b2d325ec1ee5d",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 826,
+      "reason": "COVERED_BUNDLE_BYTES_OR_INVENTORY_CHANGED"
+    },
+    {
+      "bundle_id": "CFB_CANDIDATE_PREREG_FREEZE_V1",
+      "covered_changed_paths": [
+        "config/cfb_model_candidate_code_manifest_v1.json",
+        "config/cfb_model_candidate_prereg_v1.json"
+      ],
+      "delta_id": "PR_833_CFB_WEEK1_EXECUTION_CORRECTION",
+      "merge_sha": "4fc4aa9a60b69137a0efc4d7d59ccee95f53b0bb",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 833,
+      "reason": "COVERED_BUNDLE_BYTES_OR_INVENTORY_CHANGED"
+    },
+    {
+      "bundle_id": "MARKET_MAKER_RADAR_EVIDENCE_FREEZE_V2",
+      "covered_changed_paths": [
+        "tests/test_market_maker_radar.py"
+      ],
+      "delta_id": "PR_842_CLV_REMOVE_PINNACLE_EU",
+      "merge_sha": "0ea693e36f0832ac0427cd9d278b3b0312d0350e",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 842,
+      "reason": "COVERED_BUNDLE_BYTES_OR_INVENTORY_CHANGED"
+    },
+    {
+      "bundle_id": "GLOBAL_PROMOTION_EVIDENCE_FREEZE_V2",
+      "covered_changed_paths": [
+        "config/closing_line_archive_policy_v1.json"
+      ],
+      "delta_id": "PR_842_CLV_REMOVE_PINNACLE_EU",
+      "merge_sha": "0ea693e36f0832ac0427cd9d278b3b0312d0350e",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 842,
+      "reason": "COVERED_BUNDLE_BYTES_OR_INVENTORY_CHANGED"
+    },
+    {
+      "bundle_id": "MARKET_MAKER_RADAR_EVIDENCE_FREEZE_V2",
+      "covered_changed_paths": [
+        "tests/test_market_maker_radar.py"
+      ],
+      "delta_id": "PR_843_ARCHIVE_RESERVE_DK_ONLY_NO_MLB",
+      "merge_sha": "2dcd200a244a959c04c972ed652c5142804a6b18",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 843,
+      "reason": "COVERED_BUNDLE_BYTES_OR_INVENTORY_CHANGED"
+    },
+    {
+      "bundle_id": "GLOBAL_PROMOTION_EVIDENCE_FREEZE_V2",
+      "covered_changed_paths": [
+        "config/closing_line_archive_policy_v1.json",
+        "scripts/capture_closing_line_archive_v3.py"
+      ],
+      "delta_id": "PR_843_ARCHIVE_RESERVE_DK_ONLY_NO_MLB",
+      "merge_sha": "2dcd200a244a959c04c972ed652c5142804a6b18",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 843,
+      "reason": "COVERED_BUNDLE_BYTES_OR_INVENTORY_CHANGED"
+    },
+    {
+      "bundle_id": "CFB_PROP_MODEL_FREEZE_V1",
+      "covered_changed_paths": [
+        "tests/test_cfb_prop_state_allocator.py"
+      ],
+      "delta_id": "MAIN_ADVANCE_78aae277890d",
+      "merge_sha": "78aae277890d5ef8b02d72e1cc075150d07b1867",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 0,
+      "reason": "COVERED_BUNDLE_BYTES_OR_INVENTORY_CHANGED"
+    },
+    {
+      "bundle_id": "NFL_PROP_MODEL_FREEZE_V1",
+      "covered_changed_paths": [
+        "tests/test_nfl_prop_research_lane.py",
+        "tests/test_nfl_prop_role_challenger.py"
+      ],
+      "delta_id": "PR_898_NFL_PROP_ROLE_CHALLENGER",
+      "merge_sha": "ed628eaa978dd11a2097da91fa006067fb55e717",
+      "outcome": "DRIFT_CONFIRMED",
+      "pr": 898,
+      "reason": "COVERED_BUNDLE_BYTES_OR_INVENTORY_CHANGED"
+    }
+  ],
+  "classifier_log_tail": [
+    "      \"delta_id\": \"PR_898_NFL_PROP_ROLE_CHALLENGER\",",
+    "      \"delta_sha256\": \"3af110620012f4c9812df1b34f50c083825f46f2c1d4ed8e1ba5eefce13ffca4\",",
+    "      \"merge_sha\": \"ed628eaa978dd11a2097da91fa006067fb55e717\",",
+    "      \"outcome\": \"NOT_APPLICABLE\",",
+    "      \"parent_sha\": \"49e3b866eea899f6f29f19911337c27aed443eb8\",",
+    "      \"pr\": 898,",
+    "      \"reason\": \"NO_COVERED_PATH_INTERSECTION\"",
+    "    },",
+    "    {",
+    "      \"after_bundle_sha256\": null,",
+    "      \"before_bundle_sha256\": null,",
+    "      \"bundle_freeze_sha\": \"564e5567acf63adbf750e033df08a8c368f6884d\",",
+    "      \"bundle_id\": \"MARKET_MAKER_RADAR_EVIDENCE_FREEZE_V2\",",
+    "      \"changed_paths\": [",
+    "        \"config/research/nfl_prop_role_context_manifest.json\",",
+    "        \"config/research/nfl_prop_role_context_v1.json\",",
+    "        \"docs/research/nfl_role_prop_challenger_20260921.md\",",
+    "        \"sportsedge/sports/nfl/prop_research_lane.py\",",
+    "        \"sportsedge/sports/nfl/prop_role_challenger.py\",",
+    "        \"tests/test_nfl_prop_research_lane.py\",",
+    "        \"tests/test_nfl_prop_role_challenger.py\"",
+    "      ],",
+    "      \"covered_changed_paths\": [],",
+    "      \"delta_id\": \"PR_898_NFL_PROP_ROLE_CHALLENGER\",",
+    "      \"delta_sha256\": \"3af110620012f4c9812df1b34f50c083825f46f2c1d4ed8e1ba5eefce13ffca4\",",
+    "      \"merge_sha\": \"ed628eaa978dd11a2097da91fa006067fb55e717\",",
+    "      \"outcome\": \"NOT_APPLICABLE\",",
+    "      \"parent_sha\": \"49e3b866eea899f6f29f19911337c27aed443eb8\",",
+    "      \"pr\": 898,",
+    "      \"reason\": \"NO_COVERED_PATH_INTERSECTION\"",
+    "    },",
+    "    {",
+    "      \"after_bundle_sha256\": null,",
+    "      \"before_bundle_sha256\": null,",
+    "      \"bundle_freeze_sha\": \"564e5567acf63adbf750e033df08a8c368f6884d\",",
+    "      \"bundle_id\": \"GLOBAL_PROMOTION_EVIDENCE_FREEZE_V2\",",
+    "      \"changed_paths\": [",
+    "        \"config/research/nfl_prop_role_context_manifest.json\",",
+    "        \"config/research/nfl_prop_role_context_v1.json\",",
+    "        \"docs/research/nfl_role_prop_challenger_20260921.md\",",
+    "        \"sportsedge/sports/nfl/prop_research_lane.py\",",
+    "        \"sportsedge/sports/nfl/prop_role_challenger.py\",",
+    "        \"tests/test_nfl_prop_research_lane.py\",",
+    "        \"tests/test_nfl_prop_role_challenger.py\"",
+    "      ],",
+    "      \"covered_changed_paths\": [],",
+    "      \"delta_id\": \"PR_898_NFL_PROP_ROLE_CHALLENGER\",",
+    "      \"delta_sha256\": \"3af110620012f4c9812df1b34f50c083825f46f2c1d4ed8e1ba5eefce13ffca4\",",
+    "      \"merge_sha\": \"ed628eaa978dd11a2097da91fa006067fb55e717\",",
+    "      \"outcome\": \"NOT_APPLICABLE\",",
+    "      \"parent_sha\": \"49e3b866eea899f6f29f19911337c27aed443eb8\",",
+    "      \"pr\": 898,",
+    "      \"reason\": \"NO_COVERED_PATH_INTERSECTION\"",
+    "    },",
+    "    {",
+    "      \"after_bundle_sha256\": null,",
+    "      \"before_bundle_sha256\": null,",
+    "      \"bundle_freeze_sha\": \"7a92455f081ee52a454b2c49ff798d902a3ace68\",",
+    "      \"bundle_id\": \"MLB_DFS_EVIDENCE_FREEZE_V1\",",
+    "      \"changed_paths\": [",
+    "        \"config/research/nfl_prop_role_context_manifest.json\",",
+    "        \"config/research/nfl_prop_role_context_v1.json\",",
+    "        \"docs/research/nfl_role_prop_challenger_20260921.md\",",
+    "        \"sportsedge/sports/nfl/prop_research_lane.py\",",
+    "        \"sportsedge/sports/nfl/prop_role_challenger.py\",",
+    "        \"tests/test_nfl_prop_research_lane.py\",",
+    "        \"tests/test_nfl_prop_role_challenger.py\"",
+    "      ],",
+    "      \"covered_changed_paths\": [],",
+    "      \"delta_id\": \"PR_898_NFL_PROP_ROLE_CHALLENGER\",",
+    "      \"delta_sha256\": \"3af110620012f4c9812df1b34f50c083825f46f2c1d4ed8e1ba5eefce13ffca4\",",
+    "      \"merge_sha\": \"ed628eaa978dd11a2097da91fa006067fb55e717\",",
+    "      \"outcome\": \"NOT_APPLICABLE\",",
+    "      \"parent_sha\": \"49e3b866eea899f6f29f19911337c27aed443eb8\",",
+    "      \"pr\": 898,",
+    "      \"reason\": \"NO_COVERED_PATH_INTERSECTION\"",
+    "    }",
+    "  ],",
+    "  \"schema\": \"SPORTSEDGE_FREEZE_RECONCILIATION_REPORT_V1\"",
+    "}"
+  ],
+  "classifier_rc": 0,
+  "outcome_counts": {
+    "DRIFT_CONFIRMED": 28,
+    "MATCH": 0,
+    "NOT_APPLICABLE": 732,
+    "PROVISIONAL_DRIFT_BLOCKED": 0
+  },
+  "release_blocks": [
+    "ACTIVE_FREEZE_BUNDLE_INVENTORY_INCOMPLETE",
+    "DRIFT_DISPOSITION_REQUIRED:CFB_HISTORICAL_MARKET_ARCHIVE_FREEZE_V1",
+    "DRIFT_DISPOSITION_REQUIRED:GLOBAL_PROMOTION_EVIDENCE_FREEZE_V2",
+    "DRIFT_DISPOSITION_REQUIRED:MARKET_MAKER_RADAR_EVIDENCE_FREEZE_V2",
+    "DRIFT_DISPOSITION_REQUIRED:MLB_DFS_EVIDENCE_FREEZE_V1",
+    "DRIFT_DISPOSITION_REQUIRED:NFL_V2J_V2K_GOVERNANCE_FREEZE_V1"
+  ],
+  "validation_rc": 1
+}
