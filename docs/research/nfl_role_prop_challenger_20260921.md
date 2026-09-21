@@ -8,7 +8,7 @@ This challenger adapts the useful architecture observed in the supplied prop-mod
 
 ## Architecture
 
-`projected role + trailing usage -> stabilized opportunity -> football context -> one shared player simulation -> prop distribution -> paired quote -> POWER_V1 no-vig -> EV`
+`point-in-time projected role + prior-game usage -> stabilized opportunity -> hash-bound football context -> one shared player simulation -> prop distribution -> paired quote -> POWER_V1 no-vig -> prop-only card/ledger`
 
 Supported families:
 
@@ -23,21 +23,54 @@ Supported families:
 - receiving yards
 - rushing + receiving yards
 
-## Role stabilization
+## Point-in-time role stabilization
 
-Trailing usage is recency weighted and shrunk toward a pregame projected-role prior. Sparse histories and new roles are labeled `PROJECTED_ROLE` rather than treated as stable samples.
+The card-facing entrypoint is `prepare_role_snapshot(...)` in `prop_research_lane.py`. It requires an explicit timezone-aware `as_of` strictly before kickoff. Every historical row and the projected-role row require `known_at <= as_of`.
+
+Historical usage rows from the current game are rejected. Realized same-game fields such as actual/same-game snaps, snap share, routes, targets, carries, or other realized usage are rejected even when they are present in an input payload. This prevents a later box-score/snap feed from leaking into a pregame role estimate.
+
+After that PIT filter, trailing usage is recency weighted and shrunk toward the pregame projected-role prior. Sparse histories and new roles are labeled `PROJECTED_ROLE` rather than treated as stable samples.
 
 The probability lane is market blind. Sportsbook price, sportsbook line, market depth, and book agreement are rejected from role/context/efficiency inputs.
 
-Football context is represented only through explicit preregisterable multipliers such as pass volume, rush volume, target opportunity, availability, opponent-efficiency adjustments, PROE/game-plan adjustments, and weather effects. Those multipliers are visible inputs, not a hidden composite score.
+## Frozen context multipliers
 
-## Shared simulation
+Card-facing context is loaded only from the active versioned manifest:
+
+`config/research/nfl_prop_role_context_manifest.json`
+
+The manifest binds the active config path, version, and SHA-256. A byte change in the active multiplier config without a corresponding new version/manifest hash fails closed.
+
+V1 intentionally exposes only a neutral multiplier profile while non-market context effects are still unfitted. The low-level `apply_context(...)` primitive remains available for isolated research, but it is not the governed card-facing path. Any future non-neutral multiplier set must be preregistered as a new version rather than tuned after observing prop outcomes.
+
+## Shared simulation and correlated exposure
 
 A single seeded simulation produces all player outcomes together. A shared latent pace factor moves pass, rush, and target opportunity in the same path. Passing, rushing, and receiving outcomes are generated from those opportunities and efficiency rates.
 
 `RUSH_RECEIVING_YARDS` is literally the per-path sum of rushing and receiving yards. It is not priced by independently combining two marginal probabilities.
 
 The simulation emits `estimate_p`; it does not emit `model_p`.
+
+Bet rows are assigned an exposure group by `(game_id, player, component)`. Current components are:
+
+- `USAGE`: attempts/completions/receptions
+- `YARDAGE`: passing/rushing/receiving/rush+receiving yards
+- `TD`: passing touchdowns
+- `TURNOVER`: interceptions
+
+Multiple edges produced by the same player/component simulation are displayed as separate contracts but count as **one independent exposure group**. For example, one player's rushing-yards, receiving-yards, and rush+receiving-yards rows are one `YARDAGE` exposure, not three independent bets.
+
+## Separate prop card and ledger
+
+Props never render through the NFL sides/totals `#896` card. This lane has its own schema:
+
+`SPORTSEDGE_NFL_PROP_RESEARCH_CARD_V1`
+
+and its own immutable research ledger namespace:
+
+`ledger/nfl_prop_challenger/...`
+
+The ledger records both every displayed contract and the unique exposure-group count. It carries literal zero authority and is not game-market evidence.
 
 ## Market layer
 
