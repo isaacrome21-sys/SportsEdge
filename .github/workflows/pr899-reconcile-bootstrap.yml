@@ -70,47 +70,66 @@ jobs:
           r['reconciled_through_sha'] = 'ed628eaa978dd11a2097da91fa006067fb55e717'
           p.write_text(json.dumps(r, sort_keys=True, separators=(',', ':')) + '\n')
           PY
-      - name: Move PR899 contract test outside frozen production prefix
+      - name: Keep PR899 research test outside frozen production prefix
         run: |
-          test -f tests/test_nfl_prop_challenger_contract.py
-          git mv tests/test_nfl_prop_challenger_contract.py tests/test_research_nfl_prop_challenger_contract.py
+          if [ -f tests/test_nfl_prop_challenger_contract.py ]; then
+            git mv tests/test_nfl_prop_challenger_contract.py tests/test_research_nfl_prop_challenger_contract.py
+          else
+            test -f tests/test_research_nfl_prop_challenger_contract.py
+          fi
       - name: Machine classify reconciliation
         run: |
+          rm -f docs/research/pr899_reconciliation_diagnostic.txt docs/research/pr899_reconciliation_diagnostic.json
           set +e
           PYTHONPATH=. python scripts/reconcile_freeze_deltas.py --repo . --current-main-ref origin/main --output /tmp/reconciliation.json > /tmp/reconciliation.log 2>&1
           classifier_rc=$?
           set -e
-          cat /tmp/reconciliation.log || true
           validation_rc=0
           if [ -f /tmp/reconciliation.json ]; then
             python - <<'PY' || validation_rc=$?
           import json
+          from pathlib import Path
           r=json.load(open('/tmp/reconciliation.json'))
           bad=[b for b in r.get('release_blocks',[]) if b != 'ACTIVE_FREEZE_BUNDLE_INVENTORY_INCOMPLETE']
-          print('outcome_counts=', r.get('outcome_counts'))
-          print('release_blocks=', r.get('release_blocks'))
-          print('authority=', r.get('authority'))
-          if bad:
-              raise SystemExit('UNRESOLVED_RECONCILIATION_DRIFT:' + ','.join(bad))
-          if any(bool(v) for v in (r.get('authority') or {}).values()):
-              raise SystemExit('RECONCILIATION_AUTHORITY_ESCALATION')
+          if bad or any(bool(v) for v in (r.get('authority') or {}).values()):
+              raise SystemExit(1)
           PY
           else
             validation_rc=99
           fi
           if [ "$classifier_rc" -ne 0 ] || [ "$validation_rc" -ne 0 ]; then
-            {
-              echo "classifier_rc=$classifier_rc"
-              echo "validation_rc=$validation_rc"
-              echo "--- stdout/stderr ---"
-              cat /tmp/reconciliation.log || true
-              echo "--- report ---"
-              if [ -f /tmp/reconciliation.json ]; then cat /tmp/reconciliation.json; else echo "REPORT_MISSING"; fi
-            } > docs/research/pr899_reconciliation_diagnostic.txt
+            CLASSIFIER_RC="$classifier_rc" VALIDATION_RC="$validation_rc" python - <<'PY'
+          import json, os
+          from pathlib import Path
+          report_path=Path('/tmp/reconciliation.json')
+          report=json.loads(report_path.read_text()) if report_path.exists() else {}
+          rows=[]
+          def walk(x):
+              if isinstance(x, dict):
+                  outcome=x.get('outcome')
+                  reason=str(x.get('reason',''))
+                  if outcome in {'PROVISIONAL_DRIFT_BLOCKED','DRIFT_CONFIRMED'} or 'RECONCILIATION_REQUIRED' in reason or 'UNRESOLVED' in reason:
+                      rows.append({k:x.get(k) for k in ('delta_id','pr','merge_sha','bundle_id','outcome','reason','covered_changed_paths') if k in x})
+                  for v in x.values(): walk(v)
+              elif isinstance(x, list):
+                  for v in x: walk(v)
+          walk(report)
+          compact={
+              'classifier_rc': int(os.environ['CLASSIFIER_RC']),
+              'validation_rc': int(os.environ['VALIDATION_RC']),
+              'outcome_counts': report.get('outcome_counts'),
+              'release_blocks': report.get('release_blocks'),
+              'authority': report.get('authority'),
+              'blocking_or_drift_rows': rows[:200],
+              'classifier_log_tail': Path('/tmp/reconciliation.log').read_text(errors='replace').splitlines()[-80:],
+          }
+          Path('docs/research/pr899_reconciliation_diagnostic.json').write_text(json.dumps(compact,indent=2,sort_keys=True)+'\n')
+          PY
             git config user.name "sportsedge-reconciliation-bot"
             git config user.email "actions@users.noreply.github.com"
-            git add docs/research/pr899_reconciliation_diagnostic.txt
-            git commit -m "Record PR899 reconciliation classifier diagnostic"
+            git add -A docs/research/pr899_reconciliation_diagnostic.txt docs/research/pr899_reconciliation_diagnostic.json tests/test_research_nfl_prop_challenger_contract.py tests/test_nfl_prop_challenger_contract.py 2>/dev/null || true
+            git add -A docs/research tests
+            git commit -m "Record compact PR899 reconciliation diagnostic"
             git push origin HEAD:research/nfl-role-prop-challenger-20260921
             exit 1
           fi
@@ -123,7 +142,7 @@ jobs:
       - name: Persist durable repair and remove bootstrap
         run: |
           rm .github/workflows/pr899-reconcile-bootstrap.yml
-          rm -f docs/research/pr899_reconciliation_diagnostic.txt
+          rm -f docs/research/pr899_reconciliation_diagnostic.txt docs/research/pr899_reconciliation_diagnostic.json
           git config user.name "sportsedge-reconciliation-bot"
           git config user.email "actions@users.noreply.github.com"
           git add -A
