@@ -35,7 +35,7 @@ jobs:
           expected="ed628eaa978dd11a2097da91fa006067fb55e717"
           test "$actual" = "$expected" || { echo "MAIN_MOVED:$actual:expected=$expected"; exit 1; }
 
-      - name: Register every unclassified first-parent main commit
+      - name: Register every unclassified first-parent main commit and fail-close PR 898 drift
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -72,9 +72,23 @@ jobs:
               registry.setdefault('deltas', []).append(row)
               existing.add(sha)
               added.append(row)
+
+          prop_bundle = next(
+              (row for row in registry.get('bundles') or [] if row.get('bundle_id') == 'NFL_PROP_MODEL_FREEZE_V1'),
+              None,
+          )
+          if prop_bundle is None:
+              raise SystemExit('NFL_PROP_MODEL_FREEZE_V1_MISSING')
+          prop_bundle['disposition'] = {
+              'prior_forward_clock_invalidated': True,
+              'reason': 'PR_898_CHANGED_COVERED_NFL_PROP_TEST_SURFACE; RESEARCH_CHALLENGER_MERGED_WITHOUT_FULL_REFREEZE; REVOKED_FAIL_CLOSED',
+              'revoked_at': '2026-09-21T13:34:04Z',
+              'state': 'REVOKED',
+          }
+
           registry['reconciled_through_sha'] = target
           path.write_text(json.dumps(registry, sort_keys=True, separators=(',', ':')) + '\n')
-          print(json.dumps({'anchor': anchor, 'target': target, 'first_parent_commits': len(commits), 'added': len(added)}, sort_keys=True))
+          print(json.dumps({'anchor': anchor, 'target': target, 'first_parent_commits': len(commits), 'added': len(added), 'nfl_prop_disposition': 'REVOKED'}, sort_keys=True))
           PY
 
       - name: Machine-classify the updated registry
