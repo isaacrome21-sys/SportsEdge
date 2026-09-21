@@ -117,3 +117,5 @@ jobs:
           git diff --cached --quiet && { echo 'NO_RECONCILIATION_CHANGE'; exit 1; }
           git commit -m 'Governance: reconcile protected main through PR 885'
           git push origin HEAD:governance/reconcile-through-885-20260919
+
+# Rerun marker: 2026-09-21 current-main reconciliation for PR #896 unblock.
