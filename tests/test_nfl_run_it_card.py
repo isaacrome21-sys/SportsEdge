@@ -1,4 +1,9 @@
-from sportsedge.nfl_run_it import run_it
+import pytest
+
+from sportsedge.nfl_run_it import AUTHORITY_FOOTER, NflRunItError, run_it
+
+
+NOW = "2026-09-21T10:45:00Z"
 
 
 def _q(**kwargs):
@@ -7,89 +12,136 @@ def _q(**kwargs):
         "home": "KC",
         "away": "NYJ",
         "book": "dk",
+        "retrieved_at": NOW,
     }
     base.update(kwargs)
     return base
 
 
-def test_empty_slate_is_valid_when_quotes_missing():
-    card = run_it([], [])
+def test_empty_slate_is_valid_and_non_certifying():
+    card = run_it([], [], as_of=NOW)
     assert card.picks == ()
     assert card.empty_reason == "Nothing looks strong enough."
-    assert "Nothing looks strong enough." in card.render()
+    text = card.render()
+    assert "Nothing looks strong enough." in text
+    assert text.endswith(AUTHORITY_FOOTER)
 
 
-def test_empty_when_edge_below_floor():
+def test_one_sided_quote_is_refused():
+    quotes = [_q(market="moneyline", selection="KC", price_american=-150)]
+    with pytest.raises(NflRunItError, match="PAIRED_PRICE_REQUIRED"):
+        run_it(quotes, [], as_of=NOW)
+
+
+def test_retrieved_at_is_required_and_stale_quotes_fail_closed():
+    missing = [
+        _q(market="moneyline", selection="KC", price_american=-150, retrieved_at=None),
+        _q(market="moneyline", selection="NYJ", price_american=130),
+    ]
+    with pytest.raises(NflRunItError, match="QUOTE_RETRIEVED_AT_REQUIRED"):
+        run_it(missing, [], as_of=NOW)
+
+    stale = [
+        _q(market="moneyline", selection="KC", price_american=-150, retrieved_at="2026-09-21T10:41:59Z"),
+        _q(market="moneyline", selection="NYJ", price_american=130, retrieved_at="2026-09-21T10:41:59Z"),
+    ]
+    with pytest.raises(NflRunItError, match="QUOTE_STALE"):
+        run_it(stale, [], as_of=NOW)
+
+
+def test_future_clock_and_pair_skew_are_refused():
+    future = [
+        _q(market="moneyline", selection="KC", price_american=-150, retrieved_at="2026-09-21T10:45:31Z"),
+        _q(market="moneyline", selection="NYJ", price_american=130),
+    ]
+    with pytest.raises(NflRunItError, match="QUOTE_CLOCK_SKEW"):
+        run_it(future, [], as_of=NOW)
+
+    skewed = [
+        _q(market="moneyline", selection="KC", price_american=-150),
+        _q(market="moneyline", selection="NYJ", price_american=130, retrieved_at="2026-09-21T10:44:29Z"),
+    ]
+    estimates = [_q(market="moneyline", selection="KC", line=None, estimate_p=0.70)]
+    with pytest.raises(NflRunItError, match="PAIRED_QUOTE_TIME_SKEW"):
+        run_it(skewed, estimates, as_of=NOW)
+
+
+def test_model_p_field_is_forbidden_on_non_certifying_card():
+    quotes = [
+        _q(market="moneyline", selection="KC", price_american=-150),
+        _q(market="moneyline", selection="NYJ", price_american=130),
+    ]
+    rows = [_q(market="moneyline", selection="KC", line=None, model_p=0.70)]
+    with pytest.raises(NflRunItError, match="MODEL_P_FIELD_FORBIDDEN_USE_ESTIMATE_P"):
+        run_it(quotes, rows, as_of=NOW)
+
+
+def test_integer_spread_scalar_estimate_requires_joint_simulations():
     quotes = [
         _q(market="spread", selection="KC", line=-3.0, price_american=-110),
         _q(market="spread", selection="NYJ", line=3.0, price_american=-110),
     ]
-    models = [
-        _q(market="spread", selection="KC", line=-3.0, model_p=0.52, why="tiny lean"),
-    ]
-    card = run_it(quotes, models, edge_floor=0.02)
-    assert card.picks == ()
-    assert card.omitted == 2
+    estimates = [_q(market="spread", selection="KC", line=-3.0, estimate_p=0.57)]
+    with pytest.raises(NflRunItError, match="SIMULATIONS_REQUIRED_FOR_INTEGER_LINE"):
+        run_it(quotes, estimates, as_of=NOW)
 
 
-def test_ranks_by_ev_at_posted_price_not_score():
+def test_integer_spread_simulation_carries_push_mass_into_ev():
     quotes = [
-        _q(market="spread", selection="KC", line=-3.0, price_american=-105),
-        _q(market="spread", selection="NYJ", line=3.0, price_american=-115),
+        _q(market="spread", selection="KC", line=-3.0, price_american=-110),
+        _q(market="spread", selection="NYJ", line=3.0, price_american=-110),
+    ]
+    rows = (
+        [{"home_score": 27, "away_score": 17} for _ in range(60)]
+        + [{"home_score": 27, "away_score": 24} for _ in range(20)]
+        + [{"home_score": 20, "away_score": 24} for _ in range(20)]
+    )
+    card = run_it(
+        quotes,
+        [],
+        simulations={"2026-W3-KC-NYJ": rows},
+        edge_floor=0.02,
+        as_of=NOW,
+    )
+    assert len(card.picks) == 1
+    pick = card.picks[0]
+    assert pick.selection == "KC"
+    assert pick.line == -3.0
+    assert pick.estimate_p == pytest.approx(0.60)
+    assert pick.push_p == pytest.approx(0.20)
+    assert pick.market_no_vig_p == pytest.approx(0.50)
+    assert pick.ev_per_dollar == pytest.approx(0.60 * (100 / 110) - 0.20)
+    assert pick.devig_method == "POWER_V1"
+
+
+def test_noninteger_markets_rank_only_by_price_economics():
+    quotes = [
+        _q(market="spread", selection="KC", line=-2.5, price_american=-105),
+        _q(market="spread", selection="NYJ", line=2.5, price_american=-115),
         _q(market="total", selection="OVER", line=47.5, price_american=-108),
         _q(market="total", selection="UNDER", line=47.5, price_american=-112),
         _q(game_id="2026-W3-DET-CHI", home="CHI", away="DET", market="moneyline", selection="DET", price_american=150),
         _q(game_id="2026-W3-DET-CHI", home="CHI", away="DET", market="moneyline", selection="CHI", price_american=-170),
     ]
-    models = [
-        _q(market="spread", selection="KC", line=-3.0, model_p=0.57, why="Key-number mass + rest"),
-        _q(market="total", selection="OVER", line=47.5, model_p=0.56, why="Pace, wind-neutral"),
-        {
-            "game_id": "2026-W3-DET-CHI",
-            "home": "CHI",
-            "away": "DET",
-            "market": "moneyline",
-            "selection": "DET",
-            "line": None,
-            "model_p": 0.48,
-            "why": "QB gap vs inflated favorite",
-        },
+    estimates = [
+        _q(market="spread", selection="KC", line=-2.5, estimate_p=0.57),
+        _q(market="total", selection="OVER", line=47.5, estimate_p=0.56),
+        _q(game_id="2026-W3-DET-CHI", home="CHI", away="DET", market="moneyline", selection="DET", line=None, estimate_p=0.48),
     ]
-    card = run_it(quotes, models, edge_floor=0.015)
-    assert len(card.picks) >= 1
+    card = run_it(quotes, estimates, edge_floor=0.015, as_of=NOW)
+    assert card.picks
     evs = [p.ev_per_dollar for p in card.picks]
     assert evs == sorted(evs, reverse=True)
-    assert all(p.price_american in {-105, -108, 150, -110, -115, -112, -170} for p in card.picks)
-    assert all(p.score >= 0 and p.score <= 100 for p in card.picks)
-    text = card.render()
-    assert text.startswith("NFL — RUN IT")
-    assert "edge" in text
+    payload = card.to_dict()
+    assert all("score" not in p and "reason" not in p and "model_p" not in p for p in payload["picks"])
+    assert payload["authority_footer"] == AUTHORITY_FOOTER
 
 
-def test_binds_posted_line_from_simulation():
+def test_longshot_over_plus_400_uses_sensitivity_gate():
     quotes = [
-        _q(market="spread", selection="KC", line=-3.0, price_american=-110),
-        _q(market="spread", selection="NYJ", line=3.0, price_american=-110),
+        _q(market="moneyline", selection="NYJ", price_american=500),
+        _q(market="moneyline", selection="KC", price_american=-800),
     ]
-    rows = [{"home_score": 27, "away_score": 17} for _ in range(80)] + [
-        {"home_score": 20, "away_score": 24} for _ in range(20)
-    ]
-    card = run_it(quotes, [], simulations={"2026-W3-KC-NYJ": rows}, edge_floor=0.02)
-    assert len(card.picks) == 1
-    pick = card.picks[0]
-    assert pick.selection == "KC"
-    assert pick.line == -3.0
-    assert pick.model_p == 0.8
-    assert pick.paired is True
-
-
-def test_does_not_emit_official_label():
-    quotes = [
-        _q(market="moneyline", selection="KC", price_american=-150),
-        _q(market="moneyline", selection="NYJ", price_american=130),
-    ]
-    models = [_q(market="moneyline", selection="KC", model_p=0.70, why="talent gap")]
-    card = run_it(quotes, models, edge_floor=0.01)
-    blob = card.render() + str(card.to_dict())
-    assert "OFFICIAL" not in blob
-    assert "SPORTSEDGE OFFICIAL" not in blob
+    estimates = [_q(market="moneyline", selection="NYJ", line=None, estimate_p=0.20)]
+    with pytest.raises(NflRunItError, match="DEVIG_METHOD_SENSITIVITY"):
+        run_it(quotes, estimates, as_of=NOW)
