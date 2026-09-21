@@ -53,6 +53,20 @@ def _covered(path: str, bundle: Mapping[str, Any]) -> bool:
     return path in exact or any(path.startswith(prefix) for prefix in prefixes)
 
 
+def _is_active_bundle(bundle: Mapping[str, Any]) -> bool:
+    """Return whether a bundle still contributes to the active governed surface.
+
+    A REVOKED bundle has already invalidated its forward clock and carries no
+    usable frozen authority. Continuing to fingerprint its covered files would
+    make unrelated follow-up work on the revoked surface re-open the global
+    reconciliation hold forever. REFROZEN and undisposed bundles remain active.
+    """
+    disposition = bundle.get("disposition")
+    if isinstance(disposition, Mapping) and str(disposition.get("state") or "") == "REVOKED":
+        return False
+    return True
+
+
 def governed_surface_digest(
     repo: Path,
     *,
@@ -64,7 +78,9 @@ def governed_surface_digest(
     The commit SHA is deliberately excluded. Identity is the sorted set of active
     bundle selectors plus the selected path/blob hashes at ``ref``. This makes a
     governance-neutral descendant content-identical while any covered byte or
-    covered inventory change alters the digest.
+    covered inventory change in an active bundle alters the digest. Revoked
+    bundles are excluded because their forward clock is already invalidated and
+    they carry no active freeze authority.
     """
     resolved = resolve_sha(repo, ref)
     tree = tuple(
@@ -79,6 +95,8 @@ def governed_surface_digest(
     for bundle in sorted(bundles, key=lambda item: str(item.get("bundle_id") or "")):
         if not isinstance(bundle, Mapping) or not bundle.get("bundle_id"):
             raise ReconciliationContentIdentityError("GOVERNED_SURFACE_BUNDLE_INVALID")
+        if not _is_active_bundle(bundle):
+            continue
         files: list[tuple[str, str]] = []
         for path in tree:
             if not _covered(path, bundle):
