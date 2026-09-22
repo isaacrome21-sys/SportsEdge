@@ -44,6 +44,7 @@ class NHLGamePaths:
         return len(self.home_final)
 
 
+
 def _poisson(rng: random.Random, lam: float) -> int:
     """Knuth Poisson sampler; hockey regulation rates are small."""
     if lam == 0:
@@ -57,12 +58,14 @@ def _poisson(rng: random.Random, lam: float) -> int:
     return count - 1
 
 
+
 def deterministic_seed(state: NHLGameState, model_version: str = "") -> int:
     payload = (
         f"{state.game_id}|{state.home_regulation_goals:.12g}|"
         f"{state.away_regulation_goals:.12g}|{state.home_ot_win_probability:.12g}|{model_version}"
     )
     return int.from_bytes(hashlib.sha256(payload.encode("utf-8")).digest()[:8], "big")
+
 
 
 def simulate_game_paths(
