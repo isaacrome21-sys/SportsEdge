@@ -42,6 +42,17 @@ CHICAGO_TZ = ZoneInfo("America/Chicago")
 MEMORY_QUOTES_URL = "https://sportsedge.local/run-it-quotes"
 VALID_MODES = frozenset({"AUTO_SELECT", "MANUAL", "HYBRID", "AUTOMATIC"})
 
+# Frozen quote-hygiene defaults shared with the replay policy: 180s TTL, 30s paired skew.
+DEFAULT_QUOTE_TTL_SECONDS = 180
+
+# Provenance of a quote's retrieved_at. INTAKE_STAMPED means SportsEdge stamped the
+# moment the line was received, NOT when the sportsbook price was observed. It is
+# presentation-freshness only: never CLV, replay, Truth Gate, or OFFICIAL evidence.
+TIMESTAMP_SOURCE_PROVIDED = "PROVIDED"
+TIMESTAMP_SOURCE_INTAKE_STAMPED = "INTAKE_STAMPED"
+TIMESTAMP_SOURCE_MISSING = "MISSING"
+TIMESTAMP_SOURCE_INVALID = "INVALID"
+
 
 class MLBRunMachineError(RuntimeError):
     pass
@@ -81,6 +92,7 @@ class MLBMachineResult:
     fair_odds: int | None = None
     scored_market_p: float | None = None
     score_reason_codes: tuple[str, ...] = ()
+    timestamp_source: str | None = None
 
 
 @dataclass(frozen=True)
@@ -147,17 +159,47 @@ def _hybrid_period(market: str) -> str:
     return "FG"
 
 
+def _parse_provided_timestamp(value: Any) -> datetime:
+    """Parse a caller-provided retrieved_at; naive or unparseable values fail closed."""
+    try:
+        stamp = datetime.fromisoformat(str(value).strip().replace("Z", "+00:00"))
+    except (TypeError, ValueError) as exc:
+        raise MLBRunMachineError("RETRIEVED_AT_INVALID") from exc
+    if stamp.tzinfo is None or stamp.utcoffset() is None:
+        raise MLBRunMachineError("RETRIEVED_AT_TIMEZONE_REQUIRED")
+    return stamp.astimezone(timezone.utc)
+
+
 def _prepare_hybrid_quotes(quotes: Sequence[Mapping[str, Any]], *, current: datetime) -> list[dict[str, Any]]:
+    """Normalize manual HYBRID quotes.
+
+    A missing retrieved_at is stamped with the intake instant and labeled
+    INTAKE_STAMPED. A provided retrieved_at is preserved and labeled PROVIDED; a
+    naive or invalid provided value raises instead of being silently replaced.
+    """
+    intake = _aware_utc(current)
     out: list[dict[str, Any]] = []
-    for raw in quotes:
+    for index, raw in enumerate(quotes):
         if not isinstance(raw, Mapping):
             raise MLBRunMachineError("HYBRID_QUOTE_MUST_BE_OBJECT")
         row = dict(raw)
         market = str(row.get("market") or "").strip().upper()
         if market:
             row["market"] = market
-        row.setdefault("retrieved_at", current.isoformat())
-        row.setdefault("ttl_seconds", 300)
+        provided = row.get("retrieved_at")
+        if provided is None or (isinstance(provided, str) and not provided.strip()):
+            row["retrieved_at"] = intake.isoformat()
+            row["timestamp_source"] = TIMESTAMP_SOURCE_INTAKE_STAMPED
+        else:
+            try:
+                stamp = _parse_provided_timestamp(provided)
+            except MLBRunMachineError as exc:
+                raise MLBRunMachineError(f"{exc}:quote[{index}]") from exc
+            if stamp == intake:
+                # Keeps the intake-stamp join in _machine_result unambiguous.
+                raise MLBRunMachineError(f"RETRIEVED_AT_COLLIDES_WITH_INTAKE_STAMP:quote[{index}]")
+            row["timestamp_source"] = TIMESTAMP_SOURCE_PROVIDED
+        row.setdefault("ttl_seconds", DEFAULT_QUOTE_TTL_SECONDS)
         row.setdefault("period", _hybrid_period(market))
         row.setdefault("book_key", "manual_input")
         row.setdefault("sportsbook", "Manual Input")
@@ -196,28 +238,53 @@ def _row_value(row: Any, name: str, default: Any = None) -> Any:
     return getattr(row, name, default)
 
 
-def _parse_quote_age(row: Any, *, current: datetime | None = None) -> tuple[float, float]:
-    ttl = float(_row_value(row, "ttl_seconds", 300) or 300)
+def _parse_quote_age(row: Any, *, current: datetime | None = None) -> tuple[float, float, datetime | None, str | None]:
+    """Return (age_seconds, ttl_seconds, parsed_stamp, timestamp_problem).
+
+    A missing, naive, or unparseable timestamp is treated as stale (age > ttl) and
+    reported as QUOTE_TIMESTAMP_MISSING / RETRIEVED_AT_TIMEZONE_REQUIRED /
+    RETRIEVED_AT_INVALID. It is never treated as fresh.
+    """
+    ttl = float(_row_value(row, "ttl_seconds", DEFAULT_QUOTE_TTL_SECONDS) or DEFAULT_QUOTE_TTL_SECONDS)
     retrieved = _row_value(row, "quote_retrieved_at") or _row_value(row, "retrieved_at")
     if not retrieved:
-        return 0.0, ttl
-    try:
-        stamp = datetime.fromisoformat(str(retrieved).replace("Z", "+00:00"))
-        if stamp.tzinfo is None:
-            return ttl + 1.0, ttl
-        reference = _aware_utc(current) if current is not None else datetime.now(timezone.utc)
-        age = max(0.0, (reference - stamp.astimezone(timezone.utc)).total_seconds())
-        return age, ttl
-    except (TypeError, ValueError):
-        return ttl + 1.0, ttl
+        return ttl + 1.0, ttl, None, "QUOTE_TIMESTAMP_MISSING"
+    if isinstance(retrieved, datetime):
+        stamp = retrieved
+    else:
+        try:
+            stamp = datetime.fromisoformat(str(retrieved).replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            return ttl + 1.0, ttl, None, "RETRIEVED_AT_INVALID"
+    if stamp.tzinfo is None or stamp.utcoffset() is None:
+        return ttl + 1.0, ttl, None, "RETRIEVED_AT_TIMEZONE_REQUIRED"
+    stamp = stamp.astimezone(timezone.utc)
+    reference = _aware_utc(current) if current is not None else datetime.now(timezone.utc)
+    age = max(0.0, (reference - stamp).total_seconds())
+    return age, ttl, stamp, None
 
 
-def _machine_result(source_index: int, row: Any, *, current: datetime | None = None) -> MLBMachineResult:
+def _timestamp_source(row: Any, stamp: datetime | None, problem: str | None, intake_stamp: datetime | None) -> str:
+    if problem == "QUOTE_TIMESTAMP_MISSING":
+        return TIMESTAMP_SOURCE_MISSING
+    if problem is not None or stamp is None:
+        return TIMESTAMP_SOURCE_INVALID
+    declared = str(_row_value(row, "timestamp_source") or "").strip().upper()
+    if declared in {TIMESTAMP_SOURCE_PROVIDED, TIMESTAMP_SOURCE_INTAKE_STAMPED}:
+        return declared
+    if intake_stamp is not None and stamp == _aware_utc(intake_stamp):
+        return TIMESTAMP_SOURCE_INTAKE_STAMPED
+    return TIMESTAMP_SOURCE_PROVIDED
+
+
+def _machine_result(source_index: int, row: Any, *, current: datetime | None = None,
+                    intake_stamp: datetime | None = None) -> MLBMachineResult:
     model_p = _row_value(row, "model_p")
     odds = _row_value(row, "american_odds")
     raw_row = row if isinstance(row, Mapping) else vars(row)
     inputs_complete, missing_families = scored_input_readiness(raw_row)
-    quote_age, quote_ttl = _parse_quote_age(row, current=current)
+    quote_age, quote_ttl, stamp, timestamp_problem = _parse_quote_age(row, current=current)
+    timestamp_source = _timestamp_source(row, stamp, timestamp_problem, intake_stamp)
     opposite_odds = _row_value(row, "opposite_odds")
     market = str(_row_value(row, "market", "UNKNOWN")).upper()
     n_way = market == "FIRST_HOME_RUN"
@@ -227,6 +294,7 @@ def _machine_result(source_index: int, row: Any, *, current: datetime | None = N
         n_way_market=n_way, quote_age_seconds=quote_age, quote_ttl_seconds=quote_ttl,
         reliability=reliability, inputs_complete=inputs_complete,
     )
+    extra_codes = (timestamp_problem,) if timestamp_problem else ()
     return MLBMachineResult(
         source_index=int(_row_value(row, "source_index", source_index)),
         game_id=str(_row_value(row, "game_id", "UNKNOWN")),
@@ -259,13 +327,18 @@ def _machine_result(source_index: int, row: Any, *, current: datetime | None = N
         scored_status=scored.status,
         fair_odds=scored.fair_odds,
         scored_market_p=scored.market_p,
-        score_reason_codes=scored.reason_codes + tuple(f"MISSING_FEATURE_FAMILY:{x}" for x in missing_families),
+        score_reason_codes=scored.reason_codes + extra_codes + tuple(f"MISSING_FEATURE_FAMILY:{x}" for x in missing_families),
+        timestamp_source=timestamp_source,
     )
 
 
-def _report(*, mode: str, current: datetime, slate_date_ct: str, run_status: str, rows: Sequence[Any], source_failures: Sequence[Mapping[str, Any]] = ()) -> MLBMachineReport:
+def _report(*, mode: str, current: datetime, slate_date_ct: str, run_status: str, rows: Sequence[Any],
+            source_failures: Sequence[Mapping[str, Any]] = (), intake_stamp: datetime | None = None) -> MLBMachineReport:
     paired_rows = pair_opposite_odds(rows)
-    results = tuple(_machine_result(i, row, current=current) for i, row in enumerate(paired_rows))
+    results = tuple(
+        _machine_result(i, row, current=current, intake_stamp=intake_stamp)
+        for i, row in enumerate(paired_rows)
+    )
     status = str(run_status)
     summary = _summary(results)
     if summary["model_candidates"] and summary["official_bets"] == 0:
@@ -318,7 +391,7 @@ def run_mlb_machine(
             require_confirmed_lineup=require_confirmed_lineup,
             edge_floor_config_path=edge_floor_config_path, kelly_multiplier=kelly_multiplier,
         )
-        return _report(mode=selected, current=current, slate_date_ct=report.slate_date_ct, run_status=report.run_status, rows=report.results, source_failures=report.source_failures)
+        return _report(mode=selected, current=current, slate_date_ct=report.slate_date_ct, run_status=report.run_status, rows=report.results, source_failures=report.source_failures, intake_stamp=current)
     if selected == "AUTOMATIC":
         keys: list[str] = []
         for raw in (odds_api_key, *odds_api_keys):
