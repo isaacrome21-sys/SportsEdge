@@ -194,7 +194,7 @@ def _row_value(row: Any, name: str, default: Any = None) -> Any:
     return getattr(row, name, default)
 
 
-def _parse_quote_age(row: Any) -> tuple[float, float]:
+def _parse_quote_age(row: Any, *, current: datetime | None = None) -> tuple[float, float]:
     ttl = float(_row_value(row, "ttl_seconds", 300) or 300)
     retrieved = _row_value(row, "quote_retrieved_at") or _row_value(row, "retrieved_at")
     if not retrieved:
@@ -203,17 +203,18 @@ def _parse_quote_age(row: Any) -> tuple[float, float]:
         stamp = datetime.fromisoformat(str(retrieved).replace("Z", "+00:00"))
         if stamp.tzinfo is None:
             return ttl + 1.0, ttl
-        age = max(0.0, (datetime.now(timezone.utc) - stamp.astimezone(timezone.utc)).total_seconds())
+        reference = _aware_utc(current) if current is not None else datetime.now(timezone.utc)
+        age = max(0.0, (reference - stamp.astimezone(timezone.utc)).total_seconds())
         return age, ttl
     except (TypeError, ValueError):
         return ttl + 1.0, ttl
 
 
-def _machine_result(source_index: int, row: Any) -> MLBMachineResult:
+def _machine_result(source_index: int, row: Any, *, current: datetime | None = None) -> MLBMachineResult:
     model_p = _row_value(row, "model_p")
     odds = _row_value(row, "american_odds")
     inputs_complete = str(_row_value(row, "bet_status", "BLOCKED")).upper() != "BLOCKED"
-    quote_age, quote_ttl = _parse_quote_age(row)
+    quote_age, quote_ttl = _parse_quote_age(row, current=current)
     opposite_odds = _row_value(row, "opposite_odds")
     market = str(_row_value(row, "market", "UNKNOWN")).upper()
     n_way = market == "FIRST_HOME_RUN"
@@ -260,7 +261,7 @@ def _machine_result(source_index: int, row: Any) -> MLBMachineResult:
 
 
 def _report(*, mode: str, current: datetime, slate_date_ct: str, run_status: str, rows: Sequence[Any], source_failures: Sequence[Mapping[str, Any]] = ()) -> MLBMachineReport:
-    results = tuple(_machine_result(i, row) for i, row in enumerate(rows))
+    results = tuple(_machine_result(i, row, current=current) for i, row in enumerate(rows))
     status = str(run_status)
     summary = _summary(results)
     if summary["model_candidates"] and summary["official_bets"] == 0:
