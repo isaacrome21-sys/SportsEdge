@@ -35,6 +35,7 @@ from .manual_hybrid_joint_runner import run_manual_hybrid_joint_mlb
 from .prediction_journal import normalize_legacy_block_reason
 from .mlb_edge_score import score_mlb_edge
 from .mlb_market_dispositions import market_dispositions
+from .mlb_quote_pairing import pair_opposite_odds
 
 CHICAGO_TZ = ZoneInfo("America/Chicago")
 MEMORY_QUOTES_URL = "https://sportsedge.local/run-it-quotes"
@@ -261,7 +262,8 @@ def _machine_result(source_index: int, row: Any, *, current: datetime | None = N
 
 
 def _report(*, mode: str, current: datetime, slate_date_ct: str, run_status: str, rows: Sequence[Any], source_failures: Sequence[Mapping[str, Any]] = ()) -> MLBMachineReport:
-    results = tuple(_machine_result(i, row, current=current) for i, row in enumerate(rows))
+    paired_rows = pair_opposite_odds(rows)
+    results = tuple(_machine_result(i, row, current=current) for i, row in enumerate(paired_rows))
     status = str(run_status)
     summary = _summary(results)
     if summary["model_candidates"] and summary["official_bets"] == 0:
