@@ -25,6 +25,7 @@ class GameState:
     possession_sd: float = 4.5
     shared_efficiency_sd: float = 4.0
     team_efficiency_sd: float = 8.0
+    overtime_possessions: float = 10.5
 
 
 @dataclass(frozen=True)
@@ -42,8 +43,10 @@ def _seed(state: GameState) -> int:
 def simulate_game(state: GameState, n_paths: int = 20_000) -> ScorePaths:
     """Generate coherent final-score paths from pregame basketball state.
 
-    This is an engine, not a fitted model. Distributional parameters must be
-    estimated/calibrated chronologically before production use.
+    Regulation ties are resolved on the same simulation path with repeated OT
+    periods. This keeps moneyline/spread/total/team-total markets coherent instead
+    of treating a full-game NBA tie as a push. This remains an engine, not a fitted
+    model; distributional parameters require chronological calibration.
     """
     if n_paths <= 0:
         raise ValueError("n_paths must be positive")
@@ -54,11 +57,14 @@ def simulate_game(state: GameState, n_paths: int = 20_000) -> ScorePaths:
         state.possession_sd,
         state.shared_efficiency_sd,
         state.team_efficiency_sd,
+        state.overtime_possessions,
     )
     if not all(np.isfinite(x) for x in numeric):
         raise ValueError("NBA simulation inputs must be finite")
     if state.expected_possessions <= 0 or min(state.home_points_per_100, state.away_points_per_100) <= 0:
         raise ValueError("pace and efficiencies must be positive")
+    if state.overtime_possessions <= 0:
+        raise ValueError("overtime possessions must be positive")
     if min(state.possession_sd, state.shared_efficiency_sd, state.team_efficiency_sd) < 0:
         raise ValueError("simulation dispersions cannot be negative")
 
@@ -73,9 +79,21 @@ def simulate_game(state: GameState, n_paths: int = 20_000) -> ScorePaths:
     away_rate = np.maximum(1.0, state.away_points_per_100 + shared + away_specific)
     home_mean = possessions * home_rate / 100.0 + state.home_advantage_points
     away_mean = possessions * away_rate / 100.0
-
-    # Conditional Poisson scoring keeps paths integer-valued while the shared
-    # possession/environment terms preserve game-level dependence.
     home = rng.poisson(np.maximum(0.01, home_mean)).astype(np.int16)
     away = rng.poisson(np.maximum(0.01, away_mean)).astype(np.int16)
+
+    # NBA full-game markets include overtime. Resolve every tie without inventing
+    # an independent winner: both OT scores use the same pregame efficiency path.
+    tied = home == away
+    while np.any(tied):
+        idx = np.flatnonzero(tied)
+        ot_shared = rng.normal(0.0, state.shared_efficiency_sd, len(idx))
+        h_rate = np.maximum(1.0, home_rate[idx] + ot_shared)
+        a_rate = np.maximum(1.0, away_rate[idx] + ot_shared)
+        h_mean = state.overtime_possessions * h_rate / 100.0
+        a_mean = state.overtime_possessions * a_rate / 100.0
+        home[idx] += rng.poisson(np.maximum(0.01, h_mean)).astype(np.int16)
+        away[idx] += rng.poisson(np.maximum(0.01, a_mean)).astype(np.int16)
+        tied = home == away
+
     return ScorePaths(home_points=home, away_points=away, seed=seed)
