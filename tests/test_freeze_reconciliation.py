@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import subprocess
 
@@ -290,7 +291,8 @@ def test_repository_policy_is_unconditional_zero_authority_and_registers_late_de
     ids = {row["delta_id"] for row in registry["deltas"]}
     assert {"PR_683", "PR_687", "PR_701", "PR_702", "PR_703"}.issubset(ids)
     assert registry["deltas"]
-    current_main = _git(Path.cwd(), "rev-parse", "origin/main")
+    current_main_ref = "HEAD" if os.environ.get("GITHUB_EVENT_NAME") == "pull_request" else "origin/main"
+    current_main = _git(Path.cwd(), "rev-parse", current_main_ref)
     assert main_matches_reconciliation_boundary(
         Path.cwd(),
         policy=policy,
