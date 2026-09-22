@@ -11,7 +11,7 @@ from typing import Any
 @dataclass(frozen=True)
 class OpportunityScore:
     model_p: float
-    fair_american_odds: int
+    fair_american_odds: int | None
     book_american_odds: int
     ev_per_dollar: float
     edge_probability_points: float
@@ -23,14 +23,20 @@ def american_implied_probability(odds: Any) -> float:
     if not isfinite(value) or value == 0: raise ValueError("american odds must be finite and non-zero")
     return 100/(value+100) if value>0 else (-value)/((-value)+100)
 
-def probability_to_american(p: float) -> int:
-    if not isfinite(p) or not 0<p<1: raise ValueError("probability must be between zero and one")
+def probability_to_american(p: float) -> int | None:
+    p=float(p)
+    if not isfinite(p) or not 0<=p<=1: raise ValueError("probability must be between zero and one inclusive")
+    # American odds have no finite representation at probability endpoints.
+    # Keep the genuine model probability unchanged and expose fair odds as
+    # unavailable rather than clipping a deterministic result to a fake price.
+    if p == 0 or p == 1:
+        return None
     raw=-100*p/(1-p) if p>=.5 else 100*(1-p)/p
     return int(round(raw))
 
 def expected_value_per_dollar(model_p: float, american_odds: Any) -> float:
     p=float(model_p); odds=float(american_odds)
-    if not 0<p<1: raise ValueError("model_p must be between zero and one")
+    if not isfinite(p) or not 0<=p<=1: raise ValueError("model_p must be between zero and one inclusive")
     if not isfinite(odds) or odds==0: raise ValueError("american odds must be finite and non-zero")
     profit=odds/100 if odds>0 else 100/(-odds)
     return p*profit-(1-p)
