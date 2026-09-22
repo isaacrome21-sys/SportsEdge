@@ -282,6 +282,26 @@ def _timestamp_source(row: Any, stamp: datetime | None, problem: str | None, int
     return TIMESTAMP_SOURCE_PROVIDED
 
 
+def _model_reliability(row: Any) -> tuple[float, str | None]:
+    """Missing reliability defaults to 1.0 (frozen contract); an explicit value is kept.
+
+    An explicit 0.0 stays 0.0. A non-numeric, non-finite, or out-of-range value is
+    never upgraded to full reliability: it becomes 0.0 with MODEL_RELIABILITY_INVALID.
+    """
+    raw = _row_value(row, "model_reliability")
+    if raw is None:
+        return 1.0, None
+    if isinstance(raw, bool):
+        return 0.0, "MODEL_RELIABILITY_INVALID"
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return 0.0, "MODEL_RELIABILITY_INVALID"
+    if not isfinite(value) or value < 0.0 or value > 1.0:
+        return 0.0, "MODEL_RELIABILITY_INVALID"
+    return value, None
+
+
 def _push_possible(market: str, line: Any) -> bool:
     """True when the contract can settle as a push: integer lines and tie-refund markets."""
     if market in TIE_PUSH_MARKETS:
@@ -306,7 +326,7 @@ def _machine_result(source_index: int, row: Any, *, current: datetime | None = N
     opposite_odds = _row_value(row, "opposite_odds")
     market = str(_row_value(row, "market", "UNKNOWN")).upper()
     n_way = market == "FIRST_HOME_RUN"
-    reliability = float(_row_value(row, "model_reliability", 1.0) or 1.0)
+    reliability, reliability_problem = _model_reliability(row)
     push_probability = _row_value(row, "push_probability")
     scored = score_mlb_edge(
         model_p=model_p, american_odds=odds, opposite_odds=opposite_odds,
@@ -315,7 +335,7 @@ def _machine_result(source_index: int, row: Any, *, current: datetime | None = N
         push_probability=push_probability,
         push_possible=_push_possible(market, _row_value(row, "line")),
     )
-    extra_codes = (timestamp_problem,) if timestamp_problem else ()
+    extra_codes = tuple(code for code in (timestamp_problem, reliability_problem) if code)
     return MLBMachineResult(
         source_index=int(_row_value(row, "source_index", source_index)),
         game_id=str(_row_value(row, "game_id", "UNKNOWN")),
