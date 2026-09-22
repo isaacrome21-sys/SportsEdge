@@ -10,6 +10,12 @@ def test_stale_quote_blocks():
     r=score_mlb_edge(model_p=.60,american_odds=120,opposite_odds=-140,quote_age_seconds=301,quote_ttl_seconds=300)
     assert r.status=="BLOCKED" and "STALE_QUOTE" in r.reason_codes
 
+def test_default_quote_ttl_is_180_seconds():
+    fresh=score_mlb_edge(model_p=.60,american_odds=120,opposite_odds=-140,quote_age_seconds=180)
+    stale=score_mlb_edge(model_p=.60,american_odds=120,opposite_odds=-140,quote_age_seconds=181)
+    assert fresh.status=="ACTIONABLE"
+    assert stale.status=="BLOCKED" and stale.reason_codes==("STALE_QUOTE",)
+
 def test_missing_required_input_blocks():
     assert score_mlb_edge(model_p=.60,american_odds=120,opposite_odds=-140,inputs_complete=False).status=="BLOCKED"
 
