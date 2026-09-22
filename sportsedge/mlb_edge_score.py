@@ -69,7 +69,7 @@ class MLBScoredEdge:
 def score_mlb_edge(
     *, model_p: float | None, american_odds: int | float | None,
     opposite_odds: int | float | None = None, n_way_market: bool = False,
-    quote_age_seconds: float = 0.0, quote_ttl_seconds: float = 300.0,
+    quote_age_seconds: float = 0.0, quote_ttl_seconds: float = 180.0,
     reliability: float = 1.0, inputs_complete: bool = True,
     model_available: bool = True, min_actionable_ev: float = 0.0,
     context: Mapping[str, Any] | None = None,
