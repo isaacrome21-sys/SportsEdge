@@ -194,15 +194,39 @@ def _row_value(row: Any, name: str, default: Any = None) -> Any:
     return getattr(row, name, default)
 
 
+def _parse_quote_age(row: Any) -> tuple[float, float]:
+    ttl = float(_row_value(row, "ttl_seconds", 300) or 300)
+    retrieved = _row_value(row, "quote_retrieved_at") or _row_value(row, "retrieved_at")
+    if not retrieved:
+        return 0.0, ttl
+    try:
+        stamp = datetime.fromisoformat(str(retrieved).replace("Z", "+00:00"))
+        if stamp.tzinfo is None:
+            return ttl + 1.0, ttl
+        age = max(0.0, (datetime.now(timezone.utc) - stamp.astimezone(timezone.utc)).total_seconds())
+        return age, ttl
+    except (TypeError, ValueError):
+        return ttl + 1.0, ttl
+
+
 def _machine_result(source_index: int, row: Any) -> MLBMachineResult:
     model_p = _row_value(row, "model_p")
     odds = _row_value(row, "american_odds")
     inputs_complete = str(_row_value(row, "bet_status", "BLOCKED")).upper() != "BLOCKED"
-    scored = score_mlb_edge(model_p=model_p, american_odds=odds, inputs_complete=inputs_complete)
+    quote_age, quote_ttl = _parse_quote_age(row)
+    opposite_odds = _row_value(row, "opposite_odds")
+    market = str(_row_value(row, "market", "UNKNOWN")).upper()
+    n_way = market == "FIRST_HOME_RUN"
+    reliability = float(_row_value(row, "model_reliability", 1.0) or 1.0)
+    scored = score_mlb_edge(
+        model_p=model_p, american_odds=odds, opposite_odds=opposite_odds,
+        n_way_market=n_way, quote_age_seconds=quote_age, quote_ttl_seconds=quote_ttl,
+        reliability=reliability, inputs_complete=inputs_complete,
+    )
     return MLBMachineResult(
         source_index=int(_row_value(row, "source_index", source_index)),
         game_id=str(_row_value(row, "game_id", "UNKNOWN")),
-        market=str(_row_value(row, "market", "UNKNOWN")),
+        market=market,
         entity_id=str(_row_value(row, "entity_id", "UNKNOWN")),
         line=_row_value(row, "line"),
         side=str(_row_value(row, "side", "UNKNOWN")),
