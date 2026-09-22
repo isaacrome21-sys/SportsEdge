@@ -1,0 +1,25 @@
+name: cfb-reconstructed-materialize-push-bridge
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/trigger-cfb-reconstructed-materialize'
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  dispatch-materialize-only:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch guarded CFB materialization only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run cfb-reconstructed-selection-materialize.yml \
+            --repo "${{ github.repository }}" \
+            --ref main \
+            -f evaluation_mode=MATERIALIZE_ONLY
