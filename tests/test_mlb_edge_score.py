@@ -60,3 +60,55 @@ def test_context_cannot_change_score():
 
 def test_no_model_is_explicit():
     assert score_mlb_edge(model_p=None,american_odds=110).status=="NO_MODEL"
+
+# --- commit 4/6: push-aware settlement pricing --------------------------------
+
+def test_push_mass_flips_integer_total_from_pass_to_actionable():
+    # Total 9, -110/-110. p_win .50, p_push .10, p_loss .40.
+    r=score_mlb_edge(model_p=.50,american_odds=-110,opposite_odds=-110,push_probability=.10,push_possible=True)
+    profit=100/110
+    assert abs(r.ev_per_dollar-(.50*profit-.40))<1e-12          # push returns stake
+    assert r.ev_per_dollar > 0 and r.status=="ACTIONABLE"
+    assert abs((.50*profit-.50)-(-0.0454545))<1e-6             # binary treatment would be negative
+    assert abs(r.edge-(.50/.90-.5))<1e-12                      # settled basis vs no-vig .5
+    assert r.p_push==.10 and abs(r.p_loss-.40)<1e-12
+    assert r.fair_odds==-125                                   # from settled p .5556
+    assert "PUSH_AWARE_SETTLEMENT" in r.reason_codes
+
+def test_push_math_matches_canonical_pipeline_economics():
+    # Same formulas as generic_card_pipeline._candidate_economics:
+    # EV = p*(dec-1) - (1-p-push); edge = p/(1-push) - fair.
+    p,push=.46,.12
+    r=score_mlb_edge(model_p=p,american_odds=-105,opposite_odds=-115,push_probability=push,push_possible=True)
+    dec=1+100/105
+    assert abs(r.ev_per_dollar-(p*(dec-1)-(1-p-push)))<1e-12
+    assert abs(r.edge-(p/(1-push)-r.market_p))<1e-12
+
+def test_team_total_push_mass_applies():
+    r=score_mlb_edge(model_p=.40,american_odds=120,opposite_odds=-145,push_probability=.18,push_possible=True)
+    assert abs(r.ev_per_dollar-(.40*1.2-(1-.40-.18)))<1e-12
+    assert abs(r.edge-(.40/.82-r.market_p))<1e-12
+
+def test_integer_line_without_push_mass_fails_closed():
+    r=score_mlb_edge(model_p=.50,american_odds=-110,opposite_odds=-110,push_possible=True)
+    assert r.status=="BLOCKED" and r.reason_codes==("PUSH_PROBABILITY_UNAVAILABLE",)
+    assert r.confidence_score==0 and r.edge is None and r.ev_per_dollar is None
+
+def test_non_push_markets_unchanged_by_commit_4():
+    for p,o,opp in [(.62,-150,130),(.55,120,-140),(.58,105,-125)]:
+        a=score_mlb_edge(model_p=p,american_odds=o,opposite_odds=opp)
+        b=score_mlb_edge(model_p=p,american_odds=o,opposite_odds=opp,push_probability=0.0)
+        profit=100/(-o) if o<0 else o/100
+        assert abs(a.ev_per_dollar-(p*profit-(1-p)))<1e-12
+        assert abs(a.edge-(p-a.market_p))<1e-12
+        assert a.fair_odds==fair_american_odds(p)
+        assert "PUSH_AWARE_SETTLEMENT" not in a.reason_codes
+        assert (a.status,a.confidence_score,a.edge,a.ev_per_dollar)==(b.status,b.confidence_score,b.edge,b.ev_per_dollar)
+
+def test_invalid_push_mass_raises():
+    import pytest
+    from sportsedge.mlb_edge_score import MLBEdgeScoreError
+    with pytest.raises(MLBEdgeScoreError,match="MODEL_PUSH_MASS_INVALID"):
+        score_mlb_edge(model_p=.60,american_odds=-110,opposite_odds=-110,push_probability=.40,push_possible=True)
+    with pytest.raises(MLBEdgeScoreError,match="MODEL_PUSH_MASS_INVALID"):
+        score_mlb_edge(model_p=.50,american_odds=-110,opposite_odds=-110,push_probability=-.01,push_possible=True)
