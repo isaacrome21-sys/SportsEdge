@@ -23,11 +23,22 @@ def _metrics(x):
 
 def _row(i):
     dt = datetime(2024, 8, 1, tzinfo=timezone.utc) + timedelta(days=i)
+    week = 2 + i // 7
+    metric_identity = {
+        "season": 2024,
+        "through_week": week - 1,
+        "sample_source": "CURRENT_SEASON_PRIOR_WEEKS",
+    }
     return {
-        "kickoff_utc": dt.isoformat().replace("+00:00", "Z"), "season": 2024,
-        "home_score": 24 + (i % 10), "away_score": 17 + (i % 7), "neutral_site": False,
+        "kickoff_utc": dt.isoformat().replace("+00:00", "Z"),
+        "season": 2024,
+        "week": week,
+        "home_score": 24 + (i % 10),
+        "away_score": 17 + (i % 7),
+        "neutral_site": False,
         "weather": {"game_indoor": True},
-        "home_metrics": _metrics(1.0 + i / 100.0), "away_metrics": _metrics(.8 + i / 120.0),
+        "home_metrics": {**_metrics(1.0 + i / 100.0), **metric_identity},
+        "away_metrics": {**_metrics(0.8 + i / 120.0), **metric_identity},
     }
 
 
