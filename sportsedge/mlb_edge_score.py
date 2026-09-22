@@ -1,8 +1,9 @@
 """Non-authoritative MLB edge/confidence presentation.
 
-This layer intentionally consumes Model_P; it never creates or modifies it. Social,
-capper, split, weather commentary, and other context are display-only and cannot
-change the score. Governance/Truth Gate remains a separate certification layer.
+This layer consumes an engine probability estimate; it never certifies Model_P or
+modifies the engine estimate. Social, capper, split, weather commentary, and other
+context are display-only and cannot change the score. Governance/Truth Gate remains
+a separate certification layer.
 """
 from __future__ import annotations
 from dataclasses import dataclass
@@ -10,6 +11,8 @@ from math import isfinite
 from typing import Any, Mapping
 
 from sports.common.ev_math import EVError, american_to_decimal as _american_to_decimal, devig as _devig
+
+AUTHORITY_FOOTER = "NOT Model_P · NOT Truth Gate · NOT OFFICIAL"
 
 
 class MLBEdgeScoreError(ValueError):
@@ -68,7 +71,7 @@ def binary_no_vig_probability(odds: int|float, opposite_odds: int|float) -> floa
 class MLBScoredEdge:
     status: str
     confidence_score: int
-    model_p: float | None
+    estimate_p: float | None
     market_p: float | None
     fair_odds: int | None
     edge: float | None
@@ -87,8 +90,9 @@ def score_mlb_edge(
     context: Mapping[str, Any] | None = None,
     push_probability: float | None = None, push_possible: bool = False,
 ) -> MLBScoredEdge:
-    """Score one quote. ``model_p`` is unconditional P(win); ``push_probability`` is
-    P(push) from the same distribution readout. When the market can push
+    """Score one quote. ``model_p`` is the engine's unconditional P(win) input;
+    ``push_probability`` is P(push) from the same distribution readout. The returned
+    bettor-facing probability field is ``estimate_p``. When the market can push
     (``push_possible``) and push mass is unknown, the row fails closed.
     """
     # context is accepted for presentation plumbing only. Never use it below.
