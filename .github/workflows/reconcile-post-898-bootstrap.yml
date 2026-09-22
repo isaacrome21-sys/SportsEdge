@@ -101,10 +101,6 @@ jobs:
                   'prefixes_added': len(after_prefixes - before_prefixes),
               }
 
-          # Inventory audit treats exact exemptions as canonical registry metadata.
-          # Copy only the reviewed path->reason classifications. Do not import
-          # extension dispositions or completion claims: canonical bundle
-          # dispositions remain authoritative and inventory stays fail-closed.
           exact = registry.setdefault('exact_exemptions', {})
           if not isinstance(exact, dict):
               raise SystemExit('RECONCILIATION_REGISTRY_EXACT_EXEMPTIONS_INVALID')
@@ -125,8 +121,6 @@ jobs:
           if exemption_conflicts:
               raise SystemExit('RECONCILIATION_EXEMPTION_CONFLICT:' + ','.join(exemption_conflicts))
 
-          # Never manufacture an inventory-complete claim here. A separate
-          # canonical inventory audit must prove zero unmapped governance surfaces.
           registry['bundle_inventory_complete'] = False
 
           prop_bundle = bundles.get('NFL_PROP_MODEL_FREEZE_V1')
@@ -156,10 +150,33 @@ jobs:
       - name: Machine-classify the updated canonical registry
         run: |
           set -euo pipefail
+          set +e
           PYTHONPATH=. python scripts/reconcile_freeze_deltas.py \
             --repo . \
             --current-main-ref origin/main \
-            --output /tmp/reconciliation_report.json
+            --output /tmp/reconciliation_report.json \
+            > /tmp/reconciliation_classifier.stdout \
+            2> /tmp/reconciliation_classifier.stderr
+          rc=$?
+          set -e
+          cat /tmp/reconciliation_classifier.stdout || true
+          cat /tmp/reconciliation_classifier.stderr >&2 || true
+          if [ "$rc" -ne 0 ]; then
+            mkdir -p ops
+            {
+              echo "exit_code=$rc"
+              echo "--- stdout ---"
+              cat /tmp/reconciliation_classifier.stdout
+              echo "--- stderr ---"
+              cat /tmp/reconciliation_classifier.stderr
+            } > ops/reconciliation_classifier_failure.txt
+            git config user.name 'sportsedge-reconciliation-bot'
+            git config user.email 'actions@users.noreply.github.com'
+            git add ops/reconciliation_classifier_failure.txt
+            git commit -m 'Governance: record reconciliation classifier failure'
+            git push origin HEAD:governance/reconcile-post-898-20260921
+            exit "$rc"
+          fi
           python - <<'PY'
           import json
           from pathlib import Path
