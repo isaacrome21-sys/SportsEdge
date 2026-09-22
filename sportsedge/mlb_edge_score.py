@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from math import isfinite
 from typing import Any, Mapping
 
+from sports.common.ev_math import EVError, american_to_decimal as _american_to_decimal, devig as _devig
+
 
 class MLBEdgeScoreError(ValueError):
     pass
@@ -36,9 +38,20 @@ def ev_per_dollar(p: float, odds: int | float) -> float:
 
 
 def binary_no_vig_probability(odds: int|float, opposite_odds: int|float) -> float:
-    a=american_implied_probability(odds)
-    b=american_implied_probability(opposite_odds)
-    return a/(a+b)
+    """POWER_V1 two-sided no-vig probability for ``odds`` via the shared ev_math.devig.
+
+    Above +400 the shared sensitivity guard compares POWER/MULTIPLICATIVE/SHIN and
+    raises DEVIG_METHOD_SENSITIVITY when they disagree by more than 1pp. There is no
+    minimum-across-methods rule: a sensitive market fails closed.
+    """
+    american_implied_probability(odds)
+    american_implied_probability(opposite_odds)
+    try:
+        fair=_devig([_american_to_decimal(odds), _american_to_decimal(opposite_odds)],
+                    trigger_american=400, max_spread_pp=1.0)
+    except EVError as exc:
+        raise MLBEdgeScoreError(exc.code) from exc
+    return fair[0]
 
 
 @dataclass(frozen=True)
@@ -79,8 +92,13 @@ def score_mlb_edge(
     raw_market_p=american_implied_probability(american_odds)
     reasons=[]
     if opposite_odds is not None and not n_way_market:
-        market_p=binary_no_vig_probability(american_odds, opposite_odds)
-        reasons.append("BINARY_NO_VIG")
+        try:
+            market_p=binary_no_vig_probability(american_odds, opposite_odds)
+        except MLBEdgeScoreError as exc:
+            if str(exc) != "DEVIG_METHOD_SENSITIVITY":
+                raise
+            return MLBScoredEdge("BLOCKED",0,p,None,fair_american_odds(p),None,None,("DEVIG_METHOD_SENSITIVITY",))
+        reasons.append("POWER_V1_NO_VIG")
     else:
         market_p=raw_market_p
         reasons.append("RAW_IMPLIED_USED" if n_way_market else "OPPOSITE_QUOTE_UNAVAILABLE")
