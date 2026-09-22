@@ -17,25 +17,26 @@ def test_plus_and_minus_fair_odds():
     assert fair_american_odds(.40)==150
     assert fair_american_odds(.60)==-150
 
-def test_binary_no_vig_and_nway_not_binary_normalized():
+def test_binary_no_vig_symmetric_pair_is_half():
     assert abs(binary_no_vig_probability(-110,-110)-.5)<1e-12
+
+def test_one_sided_quote_is_refused_not_scored():
+    r=score_mlb_edge(model_p=.70,american_odds=120)
+    assert r.status=="BLOCKED"
+    assert r.reason_codes==("OPPOSITE_QUOTE_UNAVAILABLE",)
+    assert r.confidence_score==0 and r.market_p is None and r.edge is None and r.ev_per_dollar is None
+
+def test_n_way_market_blocks_even_with_opposite_price():
     r=score_mlb_edge(model_p=.25,american_odds=400,opposite_odds=-500,n_way_market=True)
     assert r.status=="BLOCKED"
     assert r.reason_codes==("N_WAY_DEVIG_UNFROZEN",)
-    assert r.market_p is None and r.edge is None and r.ev_per_dollar is None
-
-def test_one_sided_quote_is_blocked_not_raw_implied_scored():
-    r=score_mlb_edge(model_p=.60,american_odds=120)
-    assert r.status=="BLOCKED"
-    assert r.reason_codes==("OPPOSITE_QUOTE_UNAVAILABLE",)
-    assert r.confidence_score==0
-    assert r.market_p is None and r.edge is None and r.ev_per_dollar is None
+    assert r.confidence_score==0 and r.market_p is None
 
 def test_no_vig_is_shared_power_v1_not_multiplicative():
     implied=[1/american_to_decimal(-150),1/american_to_decimal(130)]
     assert abs(binary_no_vig_probability(-150,130)-devig_power(implied)[0])<1e-12
     r=score_mlb_edge(model_p=.62,american_odds=-150,opposite_odds=130)
-    assert "POWER_V1_NO_VIG" in r.reason_codes
+    assert r.reason_codes==("POWER_V1_NO_VIG",)
     assert abs(r.market_p-devig_power(implied)[0])<1e-12
 
 def test_longshot_method_sensitivity_blocks_instead_of_scoring():
@@ -48,8 +49,8 @@ def test_longshot_method_sensitivity_blocks_instead_of_scoring():
 def test_context_cannot_change_score():
     a=score_mlb_edge(model_p=.60,american_odds=110,opposite_odds=-130,context={"capper":"A","tickets":99})
     b=score_mlb_edge(model_p=.60,american_odds=110,opposite_odds=-130,context={"capper":"B","tickets":1})
-    assert a==b
     assert a.status=="ACTIONABLE"
+    assert a==b
 
 def test_no_model_is_explicit():
     assert score_mlb_edge(model_p=None,american_odds=110).status=="NO_MODEL"
