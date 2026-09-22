@@ -22,3 +22,28 @@ def test_report_serializes_score_fields():
     payload=machine_report_to_dict(report)
     assert payload["results"][0]["confidence_score"]==result.confidence_score
     assert payload["results"][0]["scored_status"]=="ACTIONABLE"
+
+
+def test_one_sided_machine_row_is_blocked_not_scored():
+    row={
+        "game_id":"g1","market":"MONEYLINE","selection":"HOME","line":None,
+        "price_american":120,"estimate_p":0.60,
+        "status":"ACTIONABLE","reason_codes":[],
+    }
+    result=_machine_result(row)
+    assert result["scored_status"]=="BLOCKED"
+    assert result["sportsedge_score"]==0
+    assert result["market_probability"] is None
+    assert "OPPOSITE_QUOTE_UNAVAILABLE" in result["score_reason_codes"]
+
+def test_first_home_run_machine_row_is_blocked_until_nway_devig_is_frozen():
+    row={
+        "game_id":"g1","market":"FIRST_HOME_RUN","selection":"BATTER_1","line":None,
+        "price_american":400,"opposite_price_american":-500,"estimate_p":0.25,
+        "status":"ACTIONABLE","reason_codes":[],
+    }
+    result=_machine_result(row)
+    assert result["scored_status"]=="BLOCKED"
+    assert result["sportsedge_score"]==0
+    assert result["market_probability"] is None
+    assert "N_WAY_DEVIG_UNFROZEN" in result["score_reason_codes"]
