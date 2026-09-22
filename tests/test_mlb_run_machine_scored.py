@@ -124,3 +124,27 @@ def test_half_lines_moneyline_and_run_line_are_not_push_capable():
         assert "PUSH_PROBABILITY_UNAVAILABLE" not in out.score_reason_codes
         assert out.push_probability==0.0
     assert half.scored_status=="ACTIONABLE" and ml.scored_status=="ACTIONABLE"
+
+# --- commit 5/6: model_reliability=0.0 regression --------------------------------
+
+def test_explicit_zero_reliability_row_is_not_upgraded():
+    from sportsedge.mlb_edge_score import score_mlb_edge
+    full=_machine_result(0,_row(model_p=.62),current=NOW)
+    zero=_machine_result(0,_row(model_p=.62,model_reliability=0.0),current=NOW)
+    assert zero.confidence_score < full.confidence_score
+    expected=score_mlb_edge(model_p=.62,american_odds=120,opposite_odds=-140,reliability=0.0,
+                            quote_age_seconds=20,quote_ttl_seconds=180)
+    assert zero.confidence_score==expected.confidence_score
+    assert "MODEL_RELIABILITY_INVALID" not in zero.score_reason_codes
+
+def test_missing_reliability_defaults_to_full():
+    missing=_machine_result(0,_row(model_p=.62),current=NOW)
+    explicit=_machine_result(0,_row(model_p=.62,model_reliability=1.0),current=NOW)
+    assert missing.confidence_score==explicit.confidence_score
+
+def test_invalid_reliability_is_zero_and_flagged_not_full():
+    full=_machine_result(0,_row(model_p=.62),current=NOW)
+    for bad in ("high",float("nan"),1.5,-0.2,True):
+        out=_machine_result(0,_row(model_p=.62,model_reliability=bad),current=NOW)
+        assert "MODEL_RELIABILITY_INVALID" in out.score_reason_codes
+        assert out.confidence_score < full.confidence_score
