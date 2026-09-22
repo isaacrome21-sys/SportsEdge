@@ -89,19 +89,17 @@ def score_mlb_edge(
         raise MLBEdgeScoreError("INVALID_QUOTE_AGE_OR_TTL")
     if quote_age_seconds > quote_ttl_seconds:
         return MLBScoredEdge("BLOCKED",0,p,None,fair_american_odds(p),None,None,("STALE_QUOTE",))
-    raw_market_p=american_implied_probability(american_odds)
-    reasons=[]
-    if opposite_odds is not None and not n_way_market:
-        try:
-            market_p=binary_no_vig_probability(american_odds, opposite_odds)
-        except MLBEdgeScoreError as exc:
-            if str(exc) != "DEVIG_METHOD_SENSITIVITY":
-                raise
-            return MLBScoredEdge("BLOCKED",0,p,None,fair_american_odds(p),None,None,("DEVIG_METHOD_SENSITIVITY",))
-        reasons.append("POWER_V1_NO_VIG")
-    else:
-        market_p=raw_market_p
-        reasons.append("RAW_IMPLIED_USED" if n_way_market else "OPPOSITE_QUOTE_UNAVAILABLE")
+    if n_way_market:
+        return MLBScoredEdge("BLOCKED",0,p,None,fair_american_odds(p),None,None,("N_WAY_DEVIG_UNFROZEN",))
+    if opposite_odds is None:
+        return MLBScoredEdge("BLOCKED",0,p,None,fair_american_odds(p),None,None,("OPPOSITE_QUOTE_UNAVAILABLE",))
+    try:
+        market_p=binary_no_vig_probability(american_odds, opposite_odds)
+    except MLBEdgeScoreError as exc:
+        if str(exc) != "DEVIG_METHOD_SENSITIVITY":
+            raise
+        return MLBScoredEdge("BLOCKED",0,p,None,fair_american_odds(p),None,None,("DEVIG_METHOD_SENSITIVITY",))
+    reasons=["POWER_V1_NO_VIG"]
     edge=p-market_p
     ev=ev_per_dollar(p, american_odds)
     rel=max(0.0,min(1.0,float(reliability)))
