@@ -89,9 +89,14 @@ def score_mlb_edge(
         raise MLBEdgeScoreError("INVALID_QUOTE_AGE_OR_TTL")
     if quote_age_seconds > quote_ttl_seconds:
         return MLBScoredEdge("BLOCKED",0,p,None,fair_american_odds(p),None,None,("STALE_QUOTE",))
+    american_implied_probability(american_odds)
     if n_way_market:
+        # N-way markets (e.g. FIRST_HOME_RUN) need their own frozen N-way/no-HR
+        # settlement and devig methodology; two-sided POWER_V1 does not apply and
+        # raw vig-inclusive implied probability is never a fair baseline.
         return MLBScoredEdge("BLOCKED",0,p,None,fair_american_odds(p),None,None,("N_WAY_DEVIG_UNFROZEN",))
     if opposite_odds is None:
+        # One-sided quotes are refused: no paired same-book/same-line price, no score.
         return MLBScoredEdge("BLOCKED",0,p,None,fair_american_odds(p),None,None,("OPPOSITE_QUOTE_UNAVAILABLE",))
     try:
         market_p=binary_no_vig_probability(american_odds, opposite_odds)
