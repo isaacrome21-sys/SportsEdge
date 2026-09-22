@@ -28,10 +28,6 @@ class UnifiedCardResult:
     implied_probability: float | None = None
     edge: float | None = None
     ev_per_dollar: float | None = None
-    fair_american_odds: int | None = None
-    sportsedge_score: int | None = None
-    stars: float | None = None
-    opportunity_edge_probability_points: float | None = None
     model_input_hash: str | None = None
     distribution_sha256: str | None = None
     readout_sha256: str | None = None
@@ -45,6 +41,10 @@ class UnifiedCardResult:
     offer_id: str | None = None
     raw_implied_probability: float | None = None
     market_no_vig_p_status: str | None = None
+    fair_american_odds: int | None = None
+    sportsedge_score: int | None = None
+    stars: float | None = None
+    opportunity_edge_probability_points: float | None = None
 
 def _convert(result) -> UnifiedCardResult:
     model_p=getattr(result,"model_p",None)
