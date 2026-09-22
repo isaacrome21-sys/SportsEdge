@@ -7,11 +7,11 @@ def test_score_bounded_and_stronger_edge_monotonic():
     assert 0 <= low.confidence_score < high.confidence_score <= 100
 
 def test_stale_quote_blocks():
-    r=score_mlb_edge(model_p=.60,american_odds=120,quote_age_seconds=301,quote_ttl_seconds=300)
+    r=score_mlb_edge(model_p=.60,american_odds=120,opposite_odds=-140,quote_age_seconds=301,quote_ttl_seconds=300)
     assert r.status=="BLOCKED" and "STALE_QUOTE" in r.reason_codes
 
 def test_missing_required_input_blocks():
-    assert score_mlb_edge(model_p=.60,american_odds=120,inputs_complete=False).status=="BLOCKED"
+    assert score_mlb_edge(model_p=.60,american_odds=120,opposite_odds=-140,inputs_complete=False).status=="BLOCKED"
 
 def test_plus_and_minus_fair_odds():
     assert fair_american_odds(.40)==150
@@ -20,9 +20,9 @@ def test_plus_and_minus_fair_odds():
 def test_binary_no_vig_and_nway_not_binary_normalized():
     assert abs(binary_no_vig_probability(-110,-110)-.5)<1e-12
     r=score_mlb_edge(model_p=.25,american_odds=400,opposite_odds=-500,n_way_market=True)
-    assert "RAW_IMPLIED_USED" in r.reason_codes and "POWER_V1_NO_VIG" not in r.reason_codes
+    assert r.status=="BLOCKED"\n    assert r.reason_codes==("N_WAY_DEVIG_UNFROZEN",)\n    assert r.market_p is None and r.edge is None and r.ev_per_dollar is None
 
-def test_no_vig_is_shared_power_v1_not_multiplicative():
+def test_one_sided_quote_is_blocked_not_raw_implied_scored():\n    r=score_mlb_edge(model_p=.60,american_odds=120)\n    assert r.status=="BLOCKED"\n    assert r.reason_codes==("OPPOSITE_QUOTE_UNAVAILABLE",)\n    assert r.confidence_score==0\n    assert r.market_p is None and r.edge is None and r.ev_per_dollar is None\n\ndef test_no_vig_is_shared_power_v1_not_multiplicative():
     implied=[1/american_to_decimal(-150),1/american_to_decimal(130)]
     assert abs(binary_no_vig_probability(-150,130)-devig_power(implied)[0])<1e-12
     r=score_mlb_edge(model_p=.62,american_odds=-150,opposite_odds=130)
@@ -37,8 +37,8 @@ def test_longshot_method_sensitivity_blocks_instead_of_scoring():
     assert r.confidence_score==0 and r.edge is None and r.ev_per_dollar is None
 
 def test_context_cannot_change_score():
-    a=score_mlb_edge(model_p=.60,american_odds=110,context={"capper":"A","tickets":99})
-    b=score_mlb_edge(model_p=.60,american_odds=110,context={"capper":"B","tickets":1})
+    a=score_mlb_edge(model_p=.60,american_odds=110,opposite_odds=-130,context={"capper":"A","tickets":99})
+    b=score_mlb_edge(model_p=.60,american_odds=110,opposite_odds=-130,context={"capper":"B","tickets":1})
     assert a==b
 
 def test_no_model_is_explicit():
