@@ -142,7 +142,10 @@ def score_mlb_edge(
     # model is compared on that same basis; EV stays unconditional over win/push/loss.
     edge=p_settled-market_p
     ev=ev_per_dollar(p, american_odds, push)
-    rel=max(0.0,min(1.0,float(reliability)))
+    rel=float(reliability)
+    if not isfinite(rel) or rel < 0.0 or rel > 1.0:
+        # A NaN would otherwise slip through max/min clamping as full reliability.
+        raise MLBEdgeScoreError("RELIABILITY_OUT_OF_RANGE")
     freshness=max(0.0,min(1.0,1.0-quote_age_seconds/quote_ttl_seconds))
     # Score is evidence strength, not win probability: EV/edge drive upside while
     # reliability and quote freshness prevent unsupported 90+ grades.
