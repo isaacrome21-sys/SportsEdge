@@ -35,7 +35,7 @@ jobs:
           expected="ed628eaa978dd11a2097da91fa006067fb55e717"
           test "$actual" = "$expected" || { echo "MAIN_MOVED:$actual:expected=$expected"; exit 1; }
 
-      - name: Register every unclassified first-parent main commit and fail-close PR 898 drift
+      - name: Register main catch-up, canonicalize reviewed coverage, and fail-close PR 898 drift
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -44,10 +44,15 @@ jobs:
           import subprocess
           from pathlib import Path
 
-          path = Path('config/freeze_reconciliation_registry_v1.json')
-          registry = json.loads(path.read_text())
+          registry_path = Path('config/freeze_reconciliation_registry_v1.json')
+          extension_path = Path('config/reconciliation_coverage_v1.json')
+          registry = json.loads(registry_path.read_text())
+          extension = json.loads(extension_path.read_text())
           anchor = str(registry['reconciled_through_sha'])
           target = 'ed628eaa978dd11a2097da91fa006067fb55e717'
+
+          if extension.get('schema') != 'SPORTSEDGE_RECONCILIATION_COVERAGE_EXTENSION_V1':
+              raise SystemExit('RECONCILIATION_COVERAGE_EXTENSION_SCHEMA_INVALID')
 
           def git(*args):
               return subprocess.check_output(['git', *args], text=True).strip()
@@ -73,10 +78,58 @@ jobs:
               existing.add(sha)
               added.append(row)
 
-          prop_bundle = next(
-              (row for row in registry.get('bundles') or [] if row.get('bundle_id') == 'NFL_PROP_MODEL_FREEZE_V1'),
-              None,
-          )
+          bundles = {
+              str(row.get('bundle_id') or ''): row
+              for row in registry.get('bundles') or []
+              if isinstance(row, dict)
+          }
+          promoted = {}
+          for bundle_id, ext in sorted((extension.get('bundle_extensions') or {}).items()):
+              bundle = bundles.get(str(bundle_id))
+              if bundle is None:
+                  raise SystemExit(f'RECONCILIATION_EXTENSION_UNKNOWN_BUNDLE:{bundle_id}')
+              if not isinstance(ext, dict):
+                  raise SystemExit(f'RECONCILIATION_EXTENSION_BUNDLE_INVALID:{bundle_id}')
+              before_paths = set(map(str, bundle.get('coverage_paths') or []))
+              before_prefixes = set(map(str, bundle.get('coverage_prefixes') or []))
+              after_paths = before_paths | set(map(str, ext.get('coverage_paths') or []))
+              after_prefixes = before_prefixes | set(map(str, ext.get('coverage_prefixes') or []))
+              bundle['coverage_paths'] = sorted(after_paths)
+              bundle['coverage_prefixes'] = sorted(after_prefixes)
+              promoted[str(bundle_id)] = {
+                  'paths_added': len(after_paths - before_paths),
+                  'prefixes_added': len(after_prefixes - before_prefixes),
+              }
+
+          # Inventory audit treats exact exemptions as canonical registry metadata.
+          # Copy only the reviewed path->reason classifications. Do not import
+          # extension dispositions or completion claims: canonical bundle
+          # dispositions remain authoritative and inventory stays fail-closed.
+          exact = registry.setdefault('exact_exemptions', {})
+          if not isinstance(exact, dict):
+              raise SystemExit('RECONCILIATION_REGISTRY_EXACT_EXEMPTIONS_INVALID')
+          ext_exact = extension.get('exact_exemptions') or {}
+          if not isinstance(ext_exact, dict):
+              raise SystemExit('RECONCILIATION_EXTENSION_EXACT_EXEMPTIONS_INVALID')
+          exemption_conflicts = []
+          exemptions_added = 0
+          for path, reason in sorted(ext_exact.items()):
+              path = str(path)
+              reason = str(reason)
+              if path in exact and str(exact[path]) != reason:
+                  exemption_conflicts.append(path)
+                  continue
+              if path not in exact:
+                  exact[path] = reason
+                  exemptions_added += 1
+          if exemption_conflicts:
+              raise SystemExit('RECONCILIATION_EXEMPTION_CONFLICT:' + ','.join(exemption_conflicts))
+
+          # Never manufacture an inventory-complete claim here. A separate
+          # canonical inventory audit must prove zero unmapped governance surfaces.
+          registry['bundle_inventory_complete'] = False
+
+          prop_bundle = bundles.get('NFL_PROP_MODEL_FREEZE_V1')
           if prop_bundle is None:
               raise SystemExit('NFL_PROP_MODEL_FREEZE_V1_MISSING')
           prop_bundle['disposition'] = {
@@ -87,11 +140,20 @@ jobs:
           }
 
           registry['reconciled_through_sha'] = target
-          path.write_text(json.dumps(registry, sort_keys=True, separators=(',', ':')) + '\n')
-          print(json.dumps({'anchor': anchor, 'target': target, 'first_parent_commits': len(commits), 'added': len(added), 'nfl_prop_disposition': 'REVOKED'}, sort_keys=True))
+          registry_path.write_text(json.dumps(registry, sort_keys=True, separators=(',', ':')) + '\n')
+          print(json.dumps({
+              'anchor': anchor,
+              'target': target,
+              'first_parent_commits': len(commits),
+              'added': len(added),
+              'coverage_promoted': promoted,
+              'exact_exemptions_added': exemptions_added,
+              'bundle_inventory_complete': False,
+              'nfl_prop_disposition': 'REVOKED',
+          }, sort_keys=True))
           PY
 
-      - name: Machine-classify the updated registry
+      - name: Machine-classify the updated canonical registry
         run: |
           set -euo pipefail
           PYTHONPATH=. python scripts/reconcile_freeze_deltas.py \
@@ -107,6 +169,12 @@ jobs:
           unexpected = sorted(blocks - allowed)
           print('outcome_counts=' + json.dumps(report.get('outcome_counts') or {}, sort_keys=True))
           print('release_blocks=' + json.dumps(sorted(blocks)))
+          nfl_prop_rows = [
+              row for row in report.get('rows') or []
+              if row.get('bundle_id') == 'NFL_PROP_MODEL_FREEZE_V1'
+              and row.get('outcome') == 'DRIFT_CONFIRMED'
+          ]
+          print('nfl_prop_drift_rows=' + json.dumps(nfl_prop_rows, sort_keys=True))
           if unexpected:
               raise SystemExit('UNRESOLVED_RECONCILIATION_DRIFT:' + ','.join(unexpected))
           if any((report.get('authority') or {}).values()):
@@ -121,7 +189,7 @@ jobs:
           tests/test_reconciliation_catchup_pr791.py
           tests/test_reconciliation_catchup_pr815.py
 
-      - name: Persist only the durable registry catch-up
+      - name: Persist only canonical registry catch-up
         run: |
           set -euo pipefail
           rm -f .github/workflows/reconcile-post-898-bootstrap.yml
