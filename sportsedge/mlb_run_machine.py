@@ -33,6 +33,7 @@ from .edge_floors import DEFAULT_EDGE_FLOOR_CONFIG
 from .live_slate import LiveGame
 from .manual_hybrid_joint_runner import run_manual_hybrid_joint_mlb
 from .prediction_journal import normalize_legacy_block_reason
+from .mlb_edge_score import score_mlb_edge
 
 CHICAGO_TZ = ZoneInfo("America/Chicago")
 MEMORY_QUOTES_URL = "https://sportsedge.local/run-it-quotes"
@@ -72,6 +73,11 @@ class MLBMachineResult:
     sportsbook: str | None = None
     quote_retrieved_at: str | None = None
     offer_id: str | None = None
+    confidence_score: int | None = None
+    scored_status: str | None = None
+    fair_odds: int | None = None
+    scored_market_p: float | None = None
+    score_reason_codes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -187,6 +193,10 @@ def _row_value(row: Any, name: str, default: Any = None) -> Any:
 
 
 def _machine_result(source_index: int, row: Any) -> MLBMachineResult:
+    model_p = _row_value(row, "model_p")
+    odds = _row_value(row, "american_odds")
+    inputs_complete = str(_row_value(row, "bet_status", "BLOCKED")).upper() != "BLOCKED"
+    scored = score_mlb_edge(model_p=model_p, american_odds=odds, inputs_complete=inputs_complete)
     return MLBMachineResult(
         source_index=int(_row_value(row, "source_index", source_index)),
         game_id=str(_row_value(row, "game_id", "UNKNOWN")),
@@ -195,7 +205,7 @@ def _machine_result(source_index: int, row: Any) -> MLBMachineResult:
         line=_row_value(row, "line"),
         side=str(_row_value(row, "side", "UNKNOWN")),
         american_odds=_row_value(row, "american_odds"),
-        model_p=_row_value(row, "model_p"),
+        model_p=model_p,
         bet_status=str(_row_value(row, "bet_status", "BLOCKED")),
         reason=str(_row_value(row, "reason", "UNKNOWN")),
         shadow_status=_row_value(row, "shadow_status"),
@@ -215,6 +225,11 @@ def _machine_result(source_index: int, row: Any) -> MLBMachineResult:
         sportsbook=_row_value(row, "sportsbook"),
         quote_retrieved_at=_row_value(row, "quote_retrieved_at"),
         offer_id=_row_value(row, "offer_id"),
+        confidence_score=scored.confidence_score,
+        scored_status=scored.status,
+        fair_odds=scored.fair_odds,
+        scored_market_p=scored.market_p,
+        score_reason_codes=scored.reason_codes,
     )
 
 
