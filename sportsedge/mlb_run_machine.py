@@ -34,6 +34,7 @@ from .live_slate import LiveGame
 from .manual_hybrid_joint_runner import run_manual_hybrid_joint_mlb
 from .prediction_journal import normalize_legacy_block_reason
 from .mlb_edge_score import score_mlb_edge
+from .mlb_market_dispositions import market_dispositions
 
 CHICAGO_TZ = ZoneInfo("America/Chicago")
 MEMORY_QUOTES_URL = "https://sportsedge.local/run-it-quotes"
@@ -183,6 +184,7 @@ def _summary(results: Sequence[MLBMachineResult]) -> dict[str, Any]:
         "bet_status_counts": statuses,
         "official_bets": statuses.get("OFFICIAL_BET", 0),
         "blocked": statuses.get("BLOCKED", 0),
+        "scored_market_dispositions": market_dispositions([asdict(x) for x in results]),
     }
 
 
