@@ -47,9 +47,9 @@ def build_scorecard(*, model_p: float, fair_market_p: float, american_odds: floa
     if non_push<=0:
         raise CFBScorecardError("CFB_SCORECARD_SETTLED_SPACE_EMPTY")
     settled=float(model_p)/non_push
-    return {
+    # Finite Monte Carlo samples can legitimately produce exact 0/1 outcomes.\n    # Keep the scorecard total and explicit instead of crashing RUN IT.\n    fair_odds: int | str = probability_to_american(settled) if 0.0 < settled < 1.0 else ("OFF_BOARD_-INF" if settled >= 1.0 else "OFF_BOARD_+INF")\n    return {
         "model_pct":round(settled*100.0,1),
-        "fair_odds":probability_to_american(settled),
+        "fair_odds":fair_odds,
         "book_odds":int(round(float(american_odds))),
         "market_no_vig_pct":round(float(fair_market_p)*100.0,1),
         "edge_pct":round(float(edge)*100.0,1),
