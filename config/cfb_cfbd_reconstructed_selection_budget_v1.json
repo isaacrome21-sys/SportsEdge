@@ -4,20 +4,21 @@
   "selection_start_season": 2015,
   "selection_end_season": 2025,
   "prior_fallback_season": 2014,
-  "max_regular_week_planning_bound": 20,
+  "max_regular_week_planning_bound": 16,
   "planned_new_calls_upper_bound": {
     "games": 12,
     "fbs_membership": 11,
     "venues": 1,
-    "advanced_metrics": 220,
+    "advanced_metrics": 176,
     "cfbd_weather": 0,
-    "total": 244
+    "total": 200
   },
   "advanced_metrics_budget_basis": {
     "selection_seasons": 11,
-    "pregame_current_snapshots_per_selection_season": 19,
+    "pregame_current_snapshots_per_selection_season": 15,
     "prior_season_fallback_snapshots": 11,
-    "formula": "11*19 + 11 = 220; weeks 2-20 use current-season endWeek 1-19 and week 1 requires an explicit immediately-prior-season snapshot, including 2014 for the 2015 fold"
+    "provider_week_contract_max": 16,
+    "formula": "11*15 + 11 = 176; games through provider week 16 require current-season endWeek 1-15 and week 1 requires an explicit immediately-prior-season snapshot, including 2014 for the 2015 fold"
   },
   "weather_reconstruction": {
     "contract": "CFBD_VENUES_OPEN_METEO_ERA5_RECONSTRUCTED_CURRENT_PROVIDER_VINTAGE",
