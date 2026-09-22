@@ -1,0 +1,43 @@
+{
+  "adapter_module_sha256": "bd139dd34c13c9bf8c4e5abb90f7cd3efe4a45597fdd1e3add0edc32d8ee68b2",
+  "attempts": [
+    {
+      "attempt": 1,
+      "host": "sportsbook-nash.draftkings.com",
+      "received_at_utc": "2026-09-22T21:32:15.533980Z",
+      "result_class": "OK"
+    }
+  ],
+  "away_team": "WAS Nationals",
+  "book_last_update": null,
+  "capture_module_sha256": "8171f9049a562078350de1634d2cf08938dfa76c08f651c67c941bb6ebbc563a",
+  "capture_observation_id": "34704707__T60__20260922T213215533980Z__2d18f9257f276f3a",
+  "capture_window": "T60",
+  "captured_at_utc": "2026-09-22T21:32:15.533980Z",
+  "evidence_disposition": "FORWARD_CAPTURE_PARTIAL",
+  "home_team": "DET Tigers",
+  "minutes_before_start": 67.74,
+  "model_artifact_grants_promotion": false,
+  "model_artifact_sha256": "4559f7c09239c64465a4f8b9960847ff7304a9f2b703ac5b539bb393431d7fa0",
+  "moneyline": {
+    "away_price_american": 130,
+    "home_price_american": -157,
+    "status": "OK"
+  },
+  "observed_at_utc": "2026-09-22T21:32:15.533980Z",
+  "pit_basis": "OBSERVED_AT_UTC_VS_SCHEDULED_START_UTC",
+  "promotion_authority": false,
+  "provider": "DRAFTKINGS_DIRECT_WEB",
+  "provider_event_id": "34704707",
+  "provider_quote_timestamp_available": false,
+  "quote_side_skew_seconds": 0,
+  "quote_synchronization": "SINGLE_PAYLOAD_BOTH_SIDES",
+  "quote_synchronization_note": "Structural same-payload synchronization: both sides arrived in one response. This is NOT two independently timestamped quotes measured at zero seconds of skew.",
+  "raw_sha256": "2d18f9257f276f3a9117b269a542cc6faf259c519b8567db5ae87977b59cb36a",
+  "scheduled_start_utc": "2026-09-22T22:40:00Z",
+  "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
+  "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/493",
+  "sport_key": "baseball_mlb",
+  "sportsbook": "draftkings",
+  "transport_host": "sportsbook-nash.draftkings.com"
+}
