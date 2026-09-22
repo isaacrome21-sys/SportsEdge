@@ -42,10 +42,17 @@ def test_shared_game_state_supports_all_full_game_derivatives():
     assert paths.home_points.shape == paths.away_points.shape
 
 
+def test_full_game_paths_have_no_ties_after_overtime_resolution():
+    paths = simulate_game(_state(home_advantage_points=0.0), 5000)
+    assert not np.any(paths.home_points == paths.away_points)
+
+
 def test_invalid_state_fails_closed():
     with pytest.raises(ValueError):
         simulate_game(_state(expected_possessions=0), 100)
     with pytest.raises(ValueError):
         simulate_game(_state(team_efficiency_sd=-1), 100)
+    with pytest.raises(ValueError):
+        simulate_game(_state(overtime_possessions=0), 100)
     with pytest.raises(ValueError):
         simulate_game(_state(), 0)
