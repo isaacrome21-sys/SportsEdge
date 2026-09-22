@@ -31,7 +31,7 @@ _CAPABILITIES = {
     "PLAYER_REBOUNDS": NBAMarketCapability("PLAYER_REBOUNDS", "REQUIRES_ENGINE", _PLAYER + ("rebound_chance_state",), "Needs PIT-safe minutes/role and rebound-opportunity paths."),
     "PLAYER_ASSISTS": NBAMarketCapability("PLAYER_ASSISTS", "REQUIRES_ENGINE", _PLAYER + ("creation_state", "teammate_conversion_state"), "Needs PIT-safe creation role and teammate conversion paths."),
     "PLAYER_THREES": NBAMarketCapability("PLAYER_THREES", "REQUIRES_ENGINE", _PLAYER + ("three_attempt_state", "three_make_state"), "Needs minutes plus 3PA and make-rate state."),
-    "PLAYER_PRA": NBAMarketCapability("PLAYER_PRA", "REQUIRES_ENGINE", _PLAYER, "Must be derived by summing points/rebounds/assists on each shared simulation path."),
+    "PLAYER_PRA": NBAMarketCapability("PLAYER_PRA", "REQUIRES_ENGINE", _PLAYER, "Must be derived same-path by summing points/rebounds/assists on each shared simulation path, not independent marginals."),
     "PLAYER_PR": NBAMarketCapability("PLAYER_PR", "REQUIRES_ENGINE", _PLAYER, "Must use same-path points and rebounds, not independent marginals."),
     "PLAYER_PA": NBAMarketCapability("PLAYER_PA", "REQUIRES_ENGINE", _PLAYER, "Must use same-path points and assists, not independent marginals."),
     "PLAYER_RA": NBAMarketCapability("PLAYER_RA", "REQUIRES_ENGINE", _PLAYER, "Must use same-path rebounds and assists, not independent marginals."),
