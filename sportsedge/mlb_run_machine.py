@@ -36,6 +36,7 @@ from .prediction_journal import normalize_legacy_block_reason
 from .mlb_edge_score import score_mlb_edge
 from .mlb_market_dispositions import market_dispositions
 from .mlb_quote_pairing import pair_opposite_odds
+from .mlb_input_readiness import scored_input_readiness
 
 CHICAGO_TZ = ZoneInfo("America/Chicago")
 MEMORY_QUOTES_URL = "https://sportsedge.local/run-it-quotes"
@@ -214,7 +215,8 @@ def _parse_quote_age(row: Any, *, current: datetime | None = None) -> tuple[floa
 def _machine_result(source_index: int, row: Any, *, current: datetime | None = None) -> MLBMachineResult:
     model_p = _row_value(row, "model_p")
     odds = _row_value(row, "american_odds")
-    inputs_complete = str(_row_value(row, "bet_status", "BLOCKED")).upper() != "BLOCKED"
+    raw_row = row if isinstance(row, Mapping) else vars(row)
+    inputs_complete, missing_families = scored_input_readiness(raw_row)
     quote_age, quote_ttl = _parse_quote_age(row, current=current)
     opposite_odds = _row_value(row, "opposite_odds")
     market = str(_row_value(row, "market", "UNKNOWN")).upper()
@@ -257,7 +259,7 @@ def _machine_result(source_index: int, row: Any, *, current: datetime | None = N
         scored_status=scored.status,
         fair_odds=scored.fair_odds,
         scored_market_p=scored.market_p,
-        score_reason_codes=scored.reason_codes,
+        score_reason_codes=scored.reason_codes + tuple(f"MISSING_FEATURE_FAMILY:{x}" for x in missing_families),
     )
 
 
