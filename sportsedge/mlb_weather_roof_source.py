@@ -72,6 +72,13 @@ def _period_start(period: Mapping[str, Any]) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
+def _quantitative_value(value: Any) -> tuple[Any, Any]:
+    """Return NWS quantitative value + unit code without inventing conversions."""
+    if not isinstance(value, Mapping):
+        return None, None
+    return value.get("value"), value.get("unitCode")
+
+
 def select_hourly_period(hourly_payload: Mapping[str, Any], *, target: datetime) -> dict[str, Any] | None:
     props = hourly_payload.get("properties") or {}
     periods = props.get("periods") if isinstance(props, Mapping) else []
@@ -89,10 +96,16 @@ def select_hourly_period(hourly_payload: Mapping[str, Any], *, target: datetime)
     precip = period.get("probabilityOfPrecipitation") or {}
     if not isinstance(precip, Mapping):
         precip = {}
+    humidity, humidity_unit = _quantitative_value(period.get("relativeHumidity"))
+    dewpoint, dewpoint_unit = _quantitative_value(period.get("dewpoint"))
     return {
         "start_time": period.get("startTime"),
         "temperature": period.get("temperature"),
         "temperature_unit": period.get("temperatureUnit"),
+        "relative_humidity_pct": humidity,
+        "relative_humidity_unit": humidity_unit,
+        "dewpoint": dewpoint,
+        "dewpoint_unit": dewpoint_unit,
         "wind_speed": period.get("windSpeed"),
         "wind_direction": period.get("windDirection"),
         "precip_probability_pct": precip.get("value"),
