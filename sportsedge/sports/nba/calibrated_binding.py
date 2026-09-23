@@ -41,8 +41,23 @@ def calibrated_fair_price(
     resolved = fair.win_probability + fair.lose_probability
     if resolved <= 0:
         raise ValueError("market must contain resolved outcome mass")
+
+    # No calibrator means a true identity transform. Besides being semantically
+    # cleaner, returning the original immutable fair-price object avoids tiny
+    # floating-point drift from unnecessarily reconstructing W/L mass.
+    if calibrator is None:
+        provenance = NBAProbabilityProvenance(
+            raw_probability=fair.win_probability,
+            calibrated_probability=fair.win_probability,
+            model_version=model_version,
+            simulation_sha256=simulation_sha256,
+            calibration_version=None,
+            calibration_sha256=None,
+        )
+        return fair, provenance
+
     raw_conditional = fair.win_probability / resolved
-    calibrated_conditional = calibrator.calibrate(raw_conditional) if calibrator else raw_conditional
+    calibrated_conditional = calibrator.calibrate(raw_conditional)
 
     # Preserve push mass exactly. Calibration only redistributes resolved W/L mass.
     wp = resolved * calibrated_conditional
@@ -55,8 +70,8 @@ def calibrated_fair_price(
         calibrated_probability=wp,
         model_version=model_version,
         simulation_sha256=simulation_sha256,
-        calibration_version=calibrator.version if calibrator else None,
-        calibration_sha256=calibrator.training_sha256 if calibrator else None,
+        calibration_version=calibrator.version,
+        calibration_sha256=calibrator.training_sha256,
     )
     return calibrated, provenance
 
