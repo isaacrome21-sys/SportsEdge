@@ -45,7 +45,9 @@ def test_score_is_independent_of_ev_edge_and_price():
 
 
 def test_fair_american_helpers():
-    assert american_from_probability(0.50) == 100
+    # Even money has two equivalent American renderings (+100/-100). The
+    # production helper deterministically uses -100 at exactly 50%.
+    assert american_from_probability(0.50) == -100
     assert american_from_probability(0.40) == 150
 
 
