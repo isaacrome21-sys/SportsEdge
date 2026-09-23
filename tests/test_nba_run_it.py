@@ -19,7 +19,7 @@ def test_card_exposes_probability_ev_and_score_without_recomputing_them():
     r=c.rows[0]
     assert r.model_probability == e.fair.win_probability
     assert r.ev == e.ev and r.score == e.score
-    assert r.score_version == "NBA_RUN_IT_SCORE_V1"
+    assert r.score_version == "NBA_RUN_IT_SCORE_RULE_B_V2"
 
 
 def test_card_marks_unsupported_and_does_not_emit_it():
@@ -33,7 +33,9 @@ def test_card_marks_unsupported_and_does_not_emit_it():
 def test_score_filter_and_future_time_fail_closed():
     import pytest
     e=edge()
-    assert not build_run_it_card([e],generated_at=NOW,minimum_score=100).rows
+    assert build_run_it_card([e],generated_at=NOW,minimum_score=100).rows
+    with pytest.raises(ValueError):
+        build_run_it_card([e],generated_at=NOW,minimum_score=101)
     future=e.__class__(e.quote.__class__(e.quote.game_id,e.quote.market,e.quote.selection,e.quote.line,e.quote.decimal_odds,e.quote.book,datetime(2026,9,22,20,1,tzinfo=timezone.utc)),e.fair,e.ev,e.score,e.score_version)
     with pytest.raises(ValueError):
         build_run_it_card([future],generated_at=NOW)
