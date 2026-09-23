@@ -1,0 +1,25 @@
+{
+  "base_url_present": true,
+  "failure_count": 0,
+  "failure_sample": [],
+  "league_id": 84240,
+  "market_counts": {
+    "DOUBLES": 144,
+    "HITS": 342,
+    "HITS_RUNS_RBIS": 126,
+    "PITCHER_BB": 6,
+    "PITCHER_ER": 12,
+    "PITCHER_HITS_ALLOWED": 12,
+    "PITCHER_K": 40,
+    "RBI": 144,
+    "RUNS": 144,
+    "SINGLES": 162,
+    "TOTAL_BASES": 118
+  },
+  "model_p_authority": false,
+  "official_authority": false,
+  "provider": "DRAFTKINGS_WEB_RESEARCH",
+  "quotes_returned": 1250,
+  "run_at_utc": "2026-09-23T07:40:26.344484+00:00",
+  "status": "PASS"
+}
