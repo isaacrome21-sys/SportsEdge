@@ -1,19 +1,34 @@
 """Transparent bettor-facing pricing for NFL RUN IT.
 
-This is a presentation layer inspired by the disclosed MySpariEdge board pattern:
-model estimate, fair price, sportsbook comparison, edge/EV, and a sortable score.
-It does not reproduce or claim MySpariEdge's proprietary score formula or weights.
-The score is not a calibrated win probability and grants no Model_P/Truth-Gate authority.
+The user-supplied MySpariEdge NFL Props Edge / Prop Picks / Touchdown Picks /
+Game Picks materials motivate the bettor-facing separation of model estimate,
+fair price, market comparison and a sortable 0-100 presentation. SportsEdge does
+not copy MySpariEdge's hidden formula or weights.
+
+Locked Score rule B: EV and edge are economics used to qualify/rank candidates;
+they never feed the 0-100 Score. Score is built only from explicit model/role
+qualification flags supplied upstream. It is not a calibrated win probability.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 from math import isfinite
+from typing import Mapping
 
 from sportsedge.truth_gate import american_to_decimal
 
 
-SCORE_LABEL = "SPORTSEDGE_TRANSPARENT_EV_SCORE_V1"
+SCORE_LABEL = "SPORTSEDGE_QUALIFICATION_ROLE_SCORE_V1"
+QUALIFICATION_FLAGS = (
+    "model_ready",
+    "pit_safe",
+    "role_stable",
+    "usage_supported",
+    "matchup_supported",
+    "injury_context_ready",
+    "shared_simulation_ready",
+    "market_binding_ready",
+)
 
 
 class NflRunItScoreError(ValueError):
@@ -42,19 +57,24 @@ def american_from_probability(probability: float) -> int:
     return int(round(100.0 * (1.0 - probability) / probability))
 
 
-def transparent_score(ev_per_dollar: float) -> int:
-    """Map price economics to a bounded display score; 50 means zero EV.
+def qualification_role_score(flags: Mapping[str, bool]) -> int:
+    """Return a 0-100 display score from qualification/role flags only.
 
-    This intentionally mirrors SportsEdge's already-merged transparent NHL scoring
-    convention so scores are comparable in meaning across RUN IT surfaces. It is
-    a presentation transform only, never a win probability or performance claim.
+    Every frozen flag has equal transparent weight in V1. Missing/extra flags or
+    non-bools fail closed so price economics cannot be smuggled into Score.
     """
-    if not isfinite(ev_per_dollar):
-        raise NflRunItScoreError("ev_per_dollar must be finite")
-    return int(round(max(0.0, min(100.0, 50.0 + 200.0 * ev_per_dollar))))
+    if not isinstance(flags, Mapping):
+        raise NflRunItScoreError("qualification flags must be a mapping")
+    if set(flags) != set(QUALIFICATION_FLAGS):
+        raise NflRunItScoreError("qualification flags must match frozen schema")
+    if any(type(flags[name]) is not bool for name in QUALIFICATION_FLAGS):
+        raise NflRunItScoreError("qualification flags must be boolean")
+    passed = sum(int(flags[name]) for name in QUALIFICATION_FLAGS)
+    return int(round(100.0 * passed / len(QUALIFICATION_FLAGS)))
 
 
-def price_run_it_pick(*, estimate_p: float, push_p: float, price_american: int, market_no_vig_p: float) -> NflRunItPrice:
+def price_run_it_pick(*, estimate_p: float, push_p: float, price_american: int,
+                      market_no_vig_p: float, qualification_flags: Mapping[str, bool]) -> NflRunItPrice:
     for name, value in (("estimate_p", estimate_p), ("push_p", push_p), ("market_no_vig_p", market_no_vig_p)):
         if not isfinite(value):
             raise NflRunItScoreError(f"{name} must be finite")
@@ -73,4 +93,6 @@ def price_run_it_pick(*, estimate_p: float, push_p: float, price_american: int, 
     edge = fair_probability - market_no_vig_p
     decimal = american_to_decimal(int(price_american))
     ev = estimate_p * (decimal - 1.0) - loss_p
-    return NflRunItPrice(estimate_p, push_p, loss_p, fair_probability, fair_american, market_no_vig_p, edge, ev, transparent_score(ev))
+    score = qualification_role_score(qualification_flags)
+    return NflRunItPrice(estimate_p, push_p, loss_p, fair_probability, fair_american,
+                         market_no_vig_p, edge, ev, score)
