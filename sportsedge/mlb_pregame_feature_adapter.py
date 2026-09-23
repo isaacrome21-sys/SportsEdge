@@ -46,6 +46,11 @@ UMPIRE_FIELDS = (
     "walk_tendency",
     "run_environment_tendency",
 )
+UMPIRE_VALIDATION_KEYS = (
+    "called_strike_tendency",
+    "walk_tendency",
+    "run_environment_tendency",
+)
 
 
 class MLBPregameFeatureAdapterError(ValueError):
@@ -138,33 +143,49 @@ def _environment(bundle: Mapping[str, Any]) -> dict[str, Any]:
 def _umpire(bundle: Mapping[str, Any]) -> dict[str, Any]:
     lane = bundle.get("umpire") or {}
     zone_lane = bundle.get("umpire_zone") or {}
+    walk_lane = bundle.get("umpire_walk") or {}
+    validation = bundle.get("umpire_feature_validation") or {}
     assignment = lane.get("assignment") if isinstance(lane, Mapping) else {}
     tendencies = lane.get("tendencies") if isinstance(lane, Mapping) else {}
     assignment = assignment if isinstance(assignment, Mapping) else {}
     tendencies = tendencies if isinstance(tendencies, Mapping) else {}
     zone_lane = zone_lane if isinstance(zone_lane, Mapping) else {}
+    walk_lane = walk_lane if isinstance(walk_lane, Mapping) else {}
+    validation = validation if isinstance(validation, Mapping) else {}
     deltas = tendencies.get("deltas") if isinstance(tendencies, Mapping) else {}
     deltas = deltas if isinstance(deltas, Mapping) else {}
 
-    # Only a sample-passing, PIT-built zone lane may populate the called-strike
-    # field. The broader game-level strikeout delta remains context only.
+    # Availability and promotion are separate. A research lane can populate a value
+    # for auditing, but it cannot make scored-input readiness true by itself.
     zone_called_strike = None
     if str(zone_lane.get("status") or "").upper() == "AVAILABLE":
         zone_called_strike = _number(zone_lane.get("called_strike_tendency"))
+    walk_tendency = None
+    if str(walk_lane.get("status") or "").upper() == "AVAILABLE":
+        walk_tendency = _number(walk_lane.get("walk_tendency"))
 
     values = {
         "plate_umpire_id": assignment.get("umpire_id"),
         "called_strike_tendency": zone_called_strike,
-        # Game walk totals are retained below as broad context but are not promoted
-        # to the required plate-umpire walk tendency field without PA-level modeling.
-        "walk_tendency": None,
+        "walk_tendency": walk_tendency,
         "run_environment_tendency": _number(deltas.get("runs_delta")),
     }
     missing = tuple(name for name in UMPIRE_FIELDS if not _known(values.get(name)))
+    validation_blockers = tuple(
+        name for name in UMPIRE_VALIDATION_KEYS
+        if _known(values.get(name)) and validation.get(name) is not True
+    )
+    input_complete = not missing
+    ready = input_complete and not validation_blockers
     return {
         "values": values,
-        "ready": not missing,
+        "ready": ready,
+        "input_complete": input_complete,
         "missing_fields": missing,
+        "validation_blockers": validation_blockers,
+        "validation": {
+            name: validation.get(name) is True for name in UMPIRE_VALIDATION_KEYS
+        },
         "zone_context": {
             "status": zone_lane.get("status"),
             "model_version": zone_lane.get("model_version"),
@@ -172,6 +193,16 @@ def _umpire(bundle: Mapping[str, Any]) -> dict[str, Any]:
             "raw_called_strike_bias": zone_lane.get("raw_called_strike_bias"),
             "shrunk_called_strike_bias": zone_lane.get("shrunk_called_strike_bias"),
             "source_subset_sha256": zone_lane.get("source_subset_sha256"),
+            "promotion_status": zone_lane.get("promotion_status"),
+        },
+        "walk_context": {
+            "status": walk_lane.get("status"),
+            "model_version": walk_lane.get("model_version"),
+            "umpire_plate_appearances": walk_lane.get("umpire_plate_appearances"),
+            "raw_walk_bias": walk_lane.get("raw_walk_bias"),
+            "shrunk_walk_bias": walk_lane.get("shrunk_walk_bias"),
+            "source_subset_sha256": walk_lane.get("source_subset_sha256"),
+            "promotion_status": walk_lane.get("promotion_status"),
         },
         "broad_game_context": {
             "runs_delta": _number(deltas.get("runs_delta")),
@@ -183,7 +214,9 @@ def _umpire(bundle: Mapping[str, Any]) -> dict[str, Any]:
         "policy_notes": (
             "game strikeouts_delta is not called_strike_tendency",
             "called_strike_tendency is accepted only from a sample-passing PIT zone residual lane",
-            "walks_delta is broad game context and is not substituted for the required walk_tendency field",
+            "game walks_delta is not walk_tendency",
+            "walk_tendency is accepted only from a sample-passing PIT batter/pitcher-adjusted PA residual lane",
+            "available research values do not become scored-input ready without explicit temporal-validation flags",
         ),
     }
 
