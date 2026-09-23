@@ -16,6 +16,9 @@ class MLBEdgeScoreError(ValueError):
     pass
 
 
+MLB_EDGE_SCORE_PROVENANCE = "MODEL_P_EDGE_SCORE_V1"
+
+
 def american_implied_probability(odds: int | float) -> float:
     o=float(odds)
     if not isfinite(o) or o == 0 or -100 < o < 100:
@@ -64,6 +67,7 @@ class MLBScoredEdge:
     edge: float | None
     ev_per_dollar: float | None
     reason_codes: tuple[str, ...]
+    confidence_provenance: str = MLB_EDGE_SCORE_PROVENANCE
 
 
 def score_mlb_edge(
