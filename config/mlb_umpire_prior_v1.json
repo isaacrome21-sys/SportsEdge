@@ -1,0 +1,24 @@
+{
+  "schema_version": "mlb_umpire_prior_v1",
+  "baseline_season": 2025,
+  "baseline_source": "Baseball-Reference Major League Batting Year-by-Year Averages",
+  "baseline_source_url": "https://www.baseball-reference.com/leagues/majors/bat.shtml",
+  "units": "per MLB game; per-team-game league averages doubled",
+  "league_prior": {
+    "runs_per_game": 8.9,
+    "strikeouts_per_game": 16.72,
+    "walks_per_game": 6.32
+  },
+  "prior_equivalent_games": 8,
+  "min_home_plate_games": 8,
+  "history_days": 365,
+  "policy": {
+    "below_min_games_delta": 0.0,
+    "model_p_eligible": false
+  },
+  "notes": [
+    "2025 MLB per-team-game averages were 4.45 R, 8.36 SO, and 3.16 BB; values above are doubled to game totals.",
+    "prior_equivalent_games is a frozen governance hyperparameter, not an empirical sample-size claim.",
+    "Any change to these values requires a new versioned config file."
+  ]
+}
