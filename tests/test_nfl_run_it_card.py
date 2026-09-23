@@ -111,6 +111,11 @@ def test_integer_spread_simulation_carries_push_mass_into_ev():
     assert pick.push_p == pytest.approx(0.20)
     assert pick.market_no_vig_p == pytest.approx(0.50)
     assert pick.ev_per_dollar == pytest.approx(0.60 * (100 / 110) - 0.20)
+    assert pick.fair_probability == pytest.approx(0.75)
+    assert pick.fair_american == -300
+    assert 0 <= pick.score_0_100 <= 100
+    assert pick.score_label == "SPORTSEDGE_TRANSPARENT_EV_SCORE_V1"
+    assert "Score " in card.render()
     assert pick.devig_method == "POWER_V1"
 
 
@@ -133,7 +138,8 @@ def test_noninteger_markets_rank_only_by_price_economics():
     evs = [p.ev_per_dollar for p in card.picks]
     assert evs == sorted(evs, reverse=True)
     payload = card.to_dict()
-    assert all("score" not in p and "reason" not in p and "model_p" not in p for p in payload["picks"])
+    assert all("score_0_100" in p and "fair_american" in p for p in payload["picks"])
+    assert all("reason" not in p and "model_p" not in p for p in payload["picks"])
     assert payload["authority_footer"] == AUTHORITY_FOOTER
 
 
