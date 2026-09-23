@@ -5,8 +5,9 @@ does not guess whether a retractable roof will actually be open or closed.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
+import re
 from typing import Any, Callable, Mapping
 from urllib.request import Request, urlopen
 
@@ -114,6 +115,98 @@ def select_hourly_period(hourly_payload: Mapping[str, Any], *, target: datetime)
     }
 
 
+def _parse_iso_duration(value: str) -> timedelta | None:
+    """Parse the day/hour/minute/second ISO-8601 subset used by NWS validTime."""
+    match = re.fullmatch(
+        r"P(?:(?P<days>\d+)D)?(?:T(?:(?P<hours>\d+)H)?(?:(?P<minutes>\d+)M)?(?:(?P<seconds>\d+(?:\.\d+)?)S)?)?",
+        str(value or ""),
+    )
+    if not match:
+        return None
+    if not any(match.group(name) for name in ("days", "hours", "minutes", "seconds")):
+        return None
+    return timedelta(
+        days=int(match.group("days") or 0),
+        hours=int(match.group("hours") or 0),
+        minutes=int(match.group("minutes") or 0),
+        seconds=float(match.group("seconds") or 0.0),
+    )
+
+
+def _grid_valid_time(value: Any) -> tuple[datetime, datetime | None] | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    start_text, _, duration_text = text.partition("/")
+    try:
+        start = datetime.fromisoformat(start_text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if start.tzinfo is None or start.utcoffset() is None:
+        return None
+    start = start.astimezone(timezone.utc)
+    if not duration_text:
+        return start, None
+    duration = _parse_iso_duration(duration_text)
+    return start, (start + duration if duration is not None else None)
+
+
+def select_grid_value(
+    grid_payload: Mapping[str, Any],
+    *,
+    key: str,
+    target: datetime,
+) -> dict[str, Any] | None:
+    """Select the NWS grid value covering target, otherwise nearest interval start."""
+    props = grid_payload.get("properties") or {}
+    block = props.get(key) if isinstance(props, Mapping) else None
+    if not isinstance(block, Mapping):
+        return None
+    values = block.get("values")
+    if not isinstance(values, list):
+        return None
+    unit_code = block.get("uom") or block.get("unitCode")
+    candidates: list[tuple[float, Mapping[str, Any], datetime, datetime | None]] = []
+    target_utc = target.astimezone(timezone.utc)
+    for row in values:
+        if not isinstance(row, Mapping):
+            continue
+        interval = _grid_valid_time(row.get("validTime"))
+        if interval is None:
+            continue
+        start, end = interval
+        if end is not None and start <= target_utc < end:
+            return {
+                "value": row.get("value"),
+                "unit_code": unit_code,
+                "valid_time": row.get("validTime"),
+                "selection": "CONTAINS_TARGET",
+            }
+        candidates.append((abs((start - target_utc).total_seconds()), row, start, end))
+    if not candidates:
+        return None
+    _, row, _, _ = min(candidates, key=lambda item: item[0])
+    return {
+        "value": row.get("value"),
+        "unit_code": unit_code,
+        "valid_time": row.get("validTime"),
+        "selection": "NEAREST_START",
+    }
+
+
+def select_grid_context(grid_payload: Mapping[str, Any], *, target: datetime) -> dict[str, Any]:
+    keys = (
+        "surfacePressure",
+        "temperature",
+        "relativeHumidity",
+        "dewpoint",
+        "windSpeed",
+        "windDirection",
+        "probabilityOfPrecipitation",
+    )
+    return {key: select_grid_value(grid_payload, key=key, target=target) for key in keys}
+
+
 def acquire_weather_roof_context(
     *,
     game_pk: int,
@@ -123,6 +216,7 @@ def acquire_weather_roof_context(
     opener: Callable = urlopen,
     points_payload: Mapping[str, Any] | None = None,
     hourly_payload: Mapping[str, Any] | None = None,
+    grid_payload: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     if as_of.tzinfo is None or as_of.utcoffset() is None:
         raise ValueError("as_of must be timezone-aware")
@@ -136,7 +230,9 @@ def acquire_weather_roof_context(
     errors: list[str] = []
     point_url: str | None = None
     forecast_hourly_url: str | None = None
+    forecast_grid_data_url: str | None = None
     forecast: dict[str, Any] | None = None
+    grid_context: dict[str, Any] | None = None
 
     try:
         lat = float(latitude)
@@ -154,9 +250,13 @@ def acquire_weather_roof_context(
                 errors.append(str(exc))
         props = (point_data or {}).get("properties") or {}
         if isinstance(props, Mapping):
-            value = props.get("forecastHourly")
-            if value:
-                forecast_hourly_url = str(value)
+            hourly_value = props.get("forecastHourly")
+            grid_value = props.get("forecastGridData")
+            if hourly_value:
+                forecast_hourly_url = str(hourly_value)
+            if grid_value:
+                forecast_grid_data_url = str(grid_value)
+
         hour_data: Mapping[str, Any] | None = hourly_payload
         if hour_data is None and forecast_hourly_url:
             try:
@@ -166,7 +266,16 @@ def acquire_weather_roof_context(
         if hour_data is not None:
             forecast = select_hourly_period(hour_data, target=target)
 
-    if forecast is not None:
+        grid_data: Mapping[str, Any] | None = grid_payload
+        if grid_data is None and forecast_grid_data_url:
+            try:
+                grid_data = _open_json(forecast_grid_data_url, opener=opener)
+            except MLBWeatherRoofSourceError as exc:
+                errors.append(str(exc))
+        if grid_data is not None:
+            grid_context = select_grid_context(grid_data, target=target)
+
+    if forecast is not None or grid_context is not None:
         status = "AVAILABLE"
     elif lat is None or lon is None:
         status = "UNAVAILABLE_NO_COORDINATES"
@@ -185,7 +294,9 @@ def acquire_weather_roof_context(
         "roof_state_reason": "STATIC_VENUE_METADATA_DOES_NOT_PROVE_GAME_DAY_ROOF_STATE",
         "points_url": point_url,
         "forecast_hourly_url": forecast_hourly_url,
+        "forecast_grid_data_url": forecast_grid_data_url,
         "forecast": forecast,
+        "grid": grid_context,
         "errors": errors,
         "status": status,
         "model_p_eligible": False,
