@@ -13,6 +13,7 @@ from typing import Any, Iterable, Mapping, Sequence
 from sports.common.ev_math import EVError, devig, parse_utc
 from sportsedge.core.simulate.markets import derive_game_markets
 from sportsedge.market_ids import canonical_market_id
+from sportsedge.nfl_run_it_scoring import SCORE_LABEL, price_run_it_pick
 from sportsedge.truth_gate import american_to_decimal
 
 
@@ -44,8 +45,12 @@ class CardPick:
     estimate_p: float
     push_p: float
     market_no_vig_p: float
+    fair_probability: float
+    fair_american: int
     edge_probability_points: float
     ev_per_dollar: float
+    score_0_100: int
+    score_label: str
     devig_method: str
 
 
@@ -82,6 +87,7 @@ class RunItCard:
                     sel = p.selection
                 lines.append(
                     f"{p.rank}. {sel}  {p.price_american:+d}   "
+                    f"Score {p.score_0_100}/100   fair {p.fair_american:+d}   "
                     f"edge {p.edge_probability_points * 100:+.1f}pp   "
                     f"EV {p.ev_per_dollar * 100:+.1f}%"
                 )
@@ -377,12 +383,14 @@ def run_it(
         if opposite is None:
             raise NflRunItError(f"PAIRED_PRICE_REQUIRED:{_pair_key(quote)}")
         no_vig_p = market_no_vig_probability(quote, opposite)
-        non_push = 1.0 - push_p
-        if non_push <= 0:
-            raise NflRunItError("NON_PUSH_MASS_ZERO")
-        conditional_estimate = estimate_p / non_push
-        edge = conditional_estimate - no_vig_p
-        ev = ev_per_dollar(estimate_p, quote["price_american"], push_p=push_p)
+        priced = price_run_it_pick(
+            estimate_p=estimate_p,
+            push_p=push_p,
+            price_american=quote["price_american"],
+            market_no_vig_p=no_vig_p,
+        )
+        edge = priced.edge_probability_points
+        ev = priced.ev_per_dollar
         if edge <= floor or ev <= 0:
             omitted += 1
             continue
@@ -400,8 +408,12 @@ def run_it(
                 "estimate_p": estimate_p,
                 "push_p": push_p,
                 "market_no_vig_p": no_vig_p,
+                "fair_probability": priced.fair_probability,
+                "fair_american": priced.fair_american,
                 "edge_probability_points": edge,
                 "ev_per_dollar": ev,
+                "score_0_100": priced.score_0_100,
+                "score_label": SCORE_LABEL,
                 "devig_method": DEVIG_METHOD,
             }
         )
