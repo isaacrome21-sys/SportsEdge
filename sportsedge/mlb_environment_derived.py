@@ -1,9 +1,10 @@
 """Derived MLB pregame environment context from public NWS grid data.
 
 This module standardizes physical weather quantities and computes moist-air density
-from actual NWS surface pressure, temperature, and relative humidity. It deliberately
-does not infer park factors, roof state, stadium-relative wind components, or delay
-risk. Those require separate evidence/geometry and remain fail-closed.
+from actual NWS surface pressure, temperature, and relative humidity. When StatsAPI
+venue metadata exposes a field azimuth, the NWS meteorological wind-from direction is
+projected onto the home-plate-to-outfield axis. It does not infer park factors, roof
+state, or delay risk.
 
 The output is research/context only and never creates Model_P.
 """
@@ -126,12 +127,40 @@ def moist_air_density_kg_m3(
     return rho
 
 
-def derive_environment_context(weather_roof: Mapping[str, Any]) -> dict[str, Any]:
+def stadium_wind_components_mph(
+    *,
+    wind_speed_mph: float,
+    wind_from_degrees: float,
+    field_azimuth_degrees: float,
+) -> tuple[float, float, float]:
+    """Project meteorological wind onto the home-plate-to-outfield field axis.
+
+    StatsAPI ``location.azimuthAngle`` is consumed as the field azimuth. Weather
+    direction is meteorological (where wind comes FROM). Positive signed component
+    is blowing out toward the azimuth; negative is blowing in toward home plate.
+    """
+    speed = float(wind_speed_mph)
+    if speed < 0 or not math.isfinite(speed):
+        raise MLBEnvironmentDerivedError("INVALID_WIND_SPEED")
+    wind_from = float(wind_from_degrees) % 360.0
+    azimuth = float(field_azimuth_degrees) % 360.0
+    out_from = (azimuth + 180.0) % 360.0
+    signed = speed * math.cos(math.radians(wind_from - out_from))
+    return max(signed, 0.0), max(-signed, 0.0), signed
+
+
+def derive_environment_context(
+    weather_roof: Mapping[str, Any],
+    park_venue: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     if not isinstance(weather_roof, Mapping):
         raise MLBEnvironmentDerivedError("WEATHER_ROOF_MUST_BE_OBJECT")
     grid = weather_roof.get("grid") or {}
     if not isinstance(grid, Mapping):
         grid = {}
+    venue_lane = park_venue or {}
+    venue = venue_lane.get("venue") if isinstance(venue_lane, Mapping) else {}
+    venue = venue if isinstance(venue, Mapping) else {}
 
     temp_raw, temp_unit = _grid_measure(grid, "temperature")
     humidity_raw, humidity_unit = _grid_measure(grid, "relativeHumidity")
@@ -148,6 +177,9 @@ def derive_environment_context(weather_roof: Mapping[str, Any]) -> dict[str, Any
     wind_direction_degrees = _direction_degrees(direction_raw, direction_unit)
     precip_probability_pct = _humidity_pct(precip_raw, precip_unit)
     dewpoint_c = _temperature_c(dewpoint_raw, dewpoint_unit)
+    field_azimuth_degrees = _number(venue.get("azimuth_angle_degrees"))
+    if field_azimuth_degrees is not None:
+        field_azimuth_degrees %= 360.0
 
     blockers: list[str] = []
     for name, value in (
@@ -167,6 +199,14 @@ def derive_environment_context(weather_roof: Mapping[str, Any]) -> dict[str, Any
             surface_pressure_pa=pressure_pa,
         )
 
+    wind_out = wind_in = signed_wind = None
+    if wind_speed_mph is not None and wind_direction_degrees is not None and field_azimuth_degrees is not None:
+        wind_out, wind_in, signed_wind = stadium_wind_components_mph(
+            wind_speed_mph=wind_speed_mph,
+            wind_from_degrees=wind_direction_degrees,
+            field_azimuth_degrees=field_azimuth_degrees,
+        )
+
     values = {
         "temperature_c": None if temperature_c is None else round(temperature_c, 6),
         "temperature_f": None if temperature_c is None else round(temperature_c * 9.0 / 5.0 + 32.0, 6),
@@ -176,12 +216,13 @@ def derive_environment_context(weather_roof: Mapping[str, Any]) -> dict[str, Any
         "air_density_kg_m3": None if air_density is None else round(air_density, 8),
         "wind_speed_mph": None if wind_speed_mph is None else round(wind_speed_mph, 6),
         "wind_direction_degrees": None if wind_direction_degrees is None else round(wind_direction_degrees, 6),
+        "field_azimuth_degrees": None if field_azimuth_degrees is None else round(field_azimuth_degrees, 6),
+        "wind_signed_out_mph": None if signed_wind is None else round(signed_wind, 6),
+        "wind_out_component_mph": None if wind_out is None else round(wind_out, 6),
+        "wind_in_component_mph": None if wind_in is None else round(wind_in, 6),
         "precip_probability_pct": None if precip_probability_pct is None else round(precip_probability_pct, 6),
         "roof_state": weather_roof.get("roof_state"),
         "roof_type": weather_roof.get("roof_type"),
-        # Stadium-relative components need outfield bearing/orientation and are not guessed.
-        "wind_out_component_mph": None,
-        "wind_in_component_mph": None,
         "delay_risk": None,
     }
     return {
@@ -192,13 +233,15 @@ def derive_environment_context(weather_roof: Mapping[str, Any]) -> dict[str, Any
         "scheduled_start_utc": weather_roof.get("scheduled_start_utc"),
         "status": "AVAILABLE" if not blockers else "INCOMPLETE",
         "required_input_blockers": blockers,
+        "wind_geometry_status": "AVAILABLE" if signed_wind is not None else "MISSING_WIND_OR_AZIMUTH",
         "values": values,
         "source_weather_sha256": weather_roof.get("payload_sha256"),
+        "source_venue_sha256": venue_lane.get("payload_sha256") if isinstance(venue_lane, Mapping) else None,
         "model_p_eligible": False,
         "promotion_status": "RESEARCH_ONLY_UNTIL_TEMPORAL_VALIDATION",
         "policy_notes": (
             "air density uses actual NWS surface pressure; no standard-pressure substitution",
-            "stadium-relative wind components require separately governed field orientation",
+            "wind projection uses StatsAPI location.azimuthAngle only when present",
             "roof state and delay risk remain fail-closed when unproven",
         ),
     }
