@@ -40,6 +40,12 @@ ENVIRONMENT_FIELDS = (
     "roof_state",
     "dome_state",
 )
+ENVIRONMENT_VALIDATION_KEYS = (
+    "park_factors",
+    "air_density",
+    "wind_components",
+    "roof_delay_state",
+)
 UMPIRE_FIELDS = (
     "plate_umpire_id",
     "called_strike_tendency",
@@ -92,14 +98,23 @@ def _known(value: Any) -> bool:
 
 def _environment(bundle: Mapping[str, Any]) -> dict[str, Any]:
     park_lane = bundle.get("park_venue") or {}
+    park_factor_lane = bundle.get("park_factors") or {}
     weather_lane = bundle.get("weather_roof") or {}
     derived_lane = bundle.get("environment_derived") or {}
+    validation = bundle.get("environment_feature_validation") or {}
     venue = park_lane.get("venue") if isinstance(park_lane, Mapping) else {}
     forecast = weather_lane.get("forecast") if isinstance(weather_lane, Mapping) else {}
     derived_values = derived_lane.get("values") if isinstance(derived_lane, Mapping) else {}
+    park_values = park_factor_lane.get("values") if isinstance(park_factor_lane, Mapping) else {}
     venue = venue if isinstance(venue, Mapping) else {}
     forecast = forecast if isinstance(forecast, Mapping) else {}
     derived_values = derived_values if isinstance(derived_values, Mapping) else {}
+    park_values = park_values if isinstance(park_values, Mapping) else {}
+    validation = validation if isinstance(validation, Mapping) else {}
+
+    park_available = str(park_factor_lane.get("status") or "").upper() == "AVAILABLE" if isinstance(park_factor_lane, Mapping) else False
+    def park_number(name: str) -> float | None:
+        return _number(park_values.get(name)) if park_available else None
 
     derived_temperature = _number(derived_values.get("temperature_f"))
     derived_wind_speed = _number(derived_values.get("wind_speed_mph"))
@@ -111,16 +126,15 @@ def _environment(bundle: Mapping[str, Any]) -> dict[str, Any]:
     derived_wind_in = _number(derived_values.get("wind_in_component_mph"))
     derived_delay_risk = derived_values.get("delay_risk")
     derived_roof_state = derived_values.get("roof_state")
+    derived_dome_state = derived_values.get("dome_state")
 
-    # Park geometry is context, not a substitute for fitted park factors. Derived
-    # weather values may fill physical fields, but they do not promote readiness.
     values = {
-        "park_hr_factor": None,
-        "park_hr_factor_lhb": None,
-        "park_hr_factor_rhb": None,
-        "park_runs_factor": None,
-        "park_1b_factor": None,
-        "park_2b_3b_factor": None,
+        "park_hr_factor": park_number("park_hr_factor"),
+        "park_hr_factor_lhb": park_number("park_hr_factor_lhb"),
+        "park_hr_factor_rhb": park_number("park_hr_factor_rhb"),
+        "park_runs_factor": park_number("park_runs_factor"),
+        "park_1b_factor": park_number("park_1b_factor"),
+        "park_2b_3b_factor": park_number("park_2b_3b_factor"),
         "temperature": derived_temperature if derived_temperature is not None else _number(forecast.get("temperature")),
         "wind_speed": derived_wind_speed if derived_wind_speed is not None else _wind_mph(forecast.get("wind_speed")),
         "wind_direction": derived_wind_direction if derived_wind_direction is not None else forecast.get("wind_direction"),
@@ -131,17 +145,35 @@ def _environment(bundle: Mapping[str, Any]) -> dict[str, Any]:
         "precip_probability": derived_precip if derived_precip is not None else _number(forecast.get("precip_probability_pct")),
         "delay_risk": derived_delay_risk,
         "roof_state": derived_roof_state if _known(derived_roof_state) else (weather_lane.get("roof_state") if isinstance(weather_lane, Mapping) else None),
-        "dome_state": None,
+        "dome_state": derived_dome_state,
     }
     missing = tuple(name for name in ENVIRONMENT_FIELDS if not _known(values.get(name)))
+    validation_blockers = tuple(
+        name for name in ENVIRONMENT_VALIDATION_KEYS
+        if validation.get(name) is not True
+    )
+    input_complete = not missing
+    ready = input_complete and not validation_blockers
     return {
         "values": values,
-        "ready": not missing,
+        "ready": ready,
+        "input_complete": input_complete,
         "missing_fields": missing,
+        "validation_blockers": validation_blockers,
+        "validation": {
+            name: validation.get(name) is True for name in ENVIRONMENT_VALIDATION_KEYS
+        },
+        "park_factor_context": {
+            "status": park_factor_lane.get("status") if isinstance(park_factor_lane, Mapping) else None,
+            "model_version": park_factor_lane.get("model_version") if isinstance(park_factor_lane, Mapping) else None,
+            "source_subset_sha256": park_factor_lane.get("source_subset_sha256") if isinstance(park_factor_lane, Mapping) else None,
+            "promotion_status": park_factor_lane.get("promotion_status") if isinstance(park_factor_lane, Mapping) else None,
+        },
         "derived_context": {
             "status": derived_lane.get("status") if isinstance(derived_lane, Mapping) else None,
             "source": derived_lane.get("source") if isinstance(derived_lane, Mapping) else None,
             "source_weather_sha256": derived_lane.get("source_weather_sha256") if isinstance(derived_lane, Mapping) else None,
+            "source_venue_sha256": derived_lane.get("source_venue_sha256") if isinstance(derived_lane, Mapping) else None,
             "promotion_status": derived_lane.get("promotion_status") if isinstance(derived_lane, Mapping) else None,
         },
         "venue_context": {
@@ -151,13 +183,14 @@ def _environment(bundle: Mapping[str, Any]) -> dict[str, Any]:
             "turf_type": venue.get("turf_type"),
             "latitude": venue.get("latitude"),
             "longitude": venue.get("longitude"),
-            "field_dimensions": venue.get("field_dimensions"),
+            "azimuth_angle_degrees": venue.get("azimuth_angle_degrees"),
+            "field_dimensions": venue.get("field_dimensions_ft") or venue.get("field_dimensions"),
         },
         "policy_notes": (
             "static venue geometry is not a fitted park factor",
-            "derived weather context may populate physical values but cannot self-promote Model_P readiness",
+            "available park/weather values cannot self-promote scored-input readiness",
             "roof_state UNKNOWN is never promoted to an open/closed assumption",
-            "park factors, stadium-relative wind, delay risk, and dome state must be proven before environment can be ready",
+            "environment requires explicit temporal-validation flags for park, air, wind, and roof/delay components",
         ),
     }
 
@@ -177,8 +210,6 @@ def _umpire(bundle: Mapping[str, Any]) -> dict[str, Any]:
     deltas = tendencies.get("deltas") if isinstance(tendencies, Mapping) else {}
     deltas = deltas if isinstance(deltas, Mapping) else {}
 
-    # Availability and promotion are separate. A research lane can populate a value
-    # for auditing, but it cannot make scored-input readiness true by itself.
     zone_called_strike = None
     if str(zone_lane.get("status") or "").upper() == "AVAILABLE":
         zone_called_strike = _number(zone_lane.get("called_strike_tendency"))
