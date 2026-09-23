@@ -137,19 +137,26 @@ def _environment(bundle: Mapping[str, Any]) -> dict[str, Any]:
 
 def _umpire(bundle: Mapping[str, Any]) -> dict[str, Any]:
     lane = bundle.get("umpire") or {}
+    zone_lane = bundle.get("umpire_zone") or {}
     assignment = lane.get("assignment") if isinstance(lane, Mapping) else {}
     tendencies = lane.get("tendencies") if isinstance(lane, Mapping) else {}
     assignment = assignment if isinstance(assignment, Mapping) else {}
     tendencies = tendencies if isinstance(tendencies, Mapping) else {}
+    zone_lane = zone_lane if isinstance(zone_lane, Mapping) else {}
     deltas = tendencies.get("deltas") if isinstance(tendencies, Mapping) else {}
     deltas = deltas if isinstance(deltas, Mapping) else {}
 
+    # Only a sample-passing, PIT-built zone lane may populate the called-strike
+    # field. The broader game-level strikeout delta remains context only.
+    zone_called_strike = None
+    if str(zone_lane.get("status") or "").upper() == "AVAILABLE":
+        zone_called_strike = _number(zone_lane.get("called_strike_tendency"))
+
     values = {
         "plate_umpire_id": assignment.get("umpire_id"),
-        # Game strikeout totals are not called-strike tendency. Do not alias them.
-        "called_strike_tendency": None,
+        "called_strike_tendency": zone_called_strike,
         # Game walk totals are retained below as broad context but are not promoted
-        # to the required plate-umpire walk tendency field without pitch/PA modeling.
+        # to the required plate-umpire walk tendency field without PA-level modeling.
         "walk_tendency": None,
         "run_environment_tendency": _number(deltas.get("runs_delta")),
     }
@@ -158,6 +165,14 @@ def _umpire(bundle: Mapping[str, Any]) -> dict[str, Any]:
         "values": values,
         "ready": not missing,
         "missing_fields": missing,
+        "zone_context": {
+            "status": zone_lane.get("status"),
+            "model_version": zone_lane.get("model_version"),
+            "umpire_called_pitches": zone_lane.get("umpire_called_pitches"),
+            "raw_called_strike_bias": zone_lane.get("raw_called_strike_bias"),
+            "shrunk_called_strike_bias": zone_lane.get("shrunk_called_strike_bias"),
+            "source_subset_sha256": zone_lane.get("source_subset_sha256"),
+        },
         "broad_game_context": {
             "runs_delta": _number(deltas.get("runs_delta")),
             "strikeouts_delta": _number(deltas.get("strikeouts_delta")),
@@ -166,7 +181,8 @@ def _umpire(bundle: Mapping[str, Any]) -> dict[str, Any]:
             "home_plate_games": tendencies.get("home_plate_games"),
         },
         "policy_notes": (
-            "strikeouts_delta is not called_strike_tendency",
+            "game strikeouts_delta is not called_strike_tendency",
+            "called_strike_tendency is accepted only from a sample-passing PIT zone residual lane",
             "walks_delta is broad game context and is not substituted for the required walk_tendency field",
         ),
     }
