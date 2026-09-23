@@ -1,9 +1,8 @@
 """Fail-closed NHL market capability contract.
 
-This module is intentionally a capability boundary, not a fitted model.  A market
-may be priced only when the state named here is produced by a PIT-safe,
-deterministic NHL engine.  It prevents generic SportsEdge presentation code from
-silently treating unsupported hockey markets as modeled probabilities.
+A market is registered as engine-backed only when deterministic state exists in-tree.
+This does not claim fitted predictive performance: PIT-safe/versioned model inputs are
+still required before RUN IT may emit a probability or score.
 """
 
 from dataclasses import dataclass
@@ -38,35 +37,47 @@ _CAPABILITIES = {
     ),
     "HOME_TEAM_TOTAL": NHLMarketCapability(
         "HOME_TEAM_TOTAL", "REQUIRES_ENGINE", _GAME_STATE + ("final_goal_paths",),
-        "Derivable only from the shared home/away final-goal distribution.",
+        "Derivable from shared home final-goal paths.",
     ),
     "AWAY_TEAM_TOTAL": NHLMarketCapability(
         "AWAY_TEAM_TOTAL", "REQUIRES_ENGINE", _GAME_STATE + ("final_goal_paths",),
-        "Derivable only from the shared home/away final-goal distribution.",
+        "Derivable from shared away final-goal paths.",
     ),
     "REGULATION_MONEYLINE": NHLMarketCapability(
         "REGULATION_MONEYLINE", "REQUIRES_ENGINE", _GAME_STATE,
-        "Requires explicit home/draw/away regulation outcomes; never reuse final ML.",
+        "Requires explicit home/draw/away regulation outcomes.",
     ),
     "PERIOD_MONEYLINE": NHLMarketCapability(
-        "PERIOD_MONEYLINE", "NO_ENGINE", ("period_goal_paths",),
-        "Do not infer period markets from full-game goal paths.",
+        "PERIOD_MONEYLINE", "REQUIRES_ENGINE", ("period_goal_paths", "versioned_period_parameters"),
+        "Coherent period paths exist; fitted/versioned period parameters remain required.",
     ),
     "PERIOD_TOTAL": NHLMarketCapability(
-        "PERIOD_TOTAL", "NO_ENGINE", ("period_goal_paths",),
-        "Do not infer period totals from full-game goal paths.",
+        "PERIOD_TOTAL", "REQUIRES_ENGINE", ("period_goal_paths", "versioned_period_parameters"),
+        "Coherent period paths exist; fitted/versioned period parameters remain required.",
     ),
     "PLAYER_SHOTS": NHLMarketCapability(
-        "PLAYER_SHOTS", "NO_ENGINE", ("pit_player_role", "shared_player_shot_paths"),
-        "Needs PIT-safe lines/TOI/PP role and same-path player shot distributions.",
+        "PLAYER_SHOTS", "REQUIRES_ENGINE", ("pit_player_role", "shared_player_shot_paths"),
+        "PIT role/workload and same-path player shot distributions are required.",
     ),
     "PLAYER_POINTS": NHLMarketCapability(
-        "PLAYER_POINTS", "NO_ENGINE", ("pit_player_role", "shared_player_event_paths"),
-        "Needs same-path goals/assists with teammate and game-state dependence.",
+        "PLAYER_POINTS", "REQUIRES_ENGINE", ("pit_player_event_role", "shared_player_event_paths"),
+        "Same-path player event engine exists; fitted/versioned event shares remain required.",
     ),
     "PLAYER_GOALS": NHLMarketCapability(
-        "PLAYER_GOALS", "NO_ENGINE", ("pit_player_role", "shared_player_event_paths"),
-        "Needs same-path player scoring events; team goal probability is insufficient.",
+        "PLAYER_GOALS", "REQUIRES_ENGINE", ("pit_player_event_role", "shared_player_event_paths"),
+        "Same-path player scoring engine exists; fitted/versioned event shares remain required.",
+    ),
+    "GOALIE_SAVES": NHLMarketCapability(
+        "GOALIE_SAVES", "NO_ENGINE", ("opponent_sog_paths", "goalie_save_paths"),
+        "No coherent opponent-SOG plus goalie-save engine exists yet.",
+    ),
+    "PLAYER_BLOCKS": NHLMarketCapability(
+        "PLAYER_BLOCKS", "NO_ENGINE", ("pit_player_role", "shared_player_block_paths"),
+        "No PIT-safe shared player block distribution exists yet.",
+    ),
+    "PLAYER_HITS": NHLMarketCapability(
+        "PLAYER_HITS", "NO_ENGINE", ("pit_player_role", "shared_player_hit_paths"),
+        "No PIT-safe shared player hit distribution exists yet.",
     ),
 }
 
@@ -77,9 +88,7 @@ def capability_for(market: str) -> NHLMarketCapability:
     return _CAPABILITIES.get(
         key,
         NHLMarketCapability(
-            key or "UNKNOWN",
-            "NO_ENGINE",
-            (),
+            key or "UNKNOWN", "NO_ENGINE", (),
             "NHL market is not registered; no model probability may be emitted.",
         ),
     )
