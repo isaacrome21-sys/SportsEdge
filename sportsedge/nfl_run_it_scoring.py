@@ -17,23 +17,15 @@ from typing import Mapping
 
 from sportsedge.truth_gate import american_to_decimal
 
-
 SCORE_LABEL = "SPORTSEDGE_QUALIFICATION_ROLE_SCORE_V1"
 QUALIFICATION_FLAGS = (
-    "model_ready",
-    "pit_safe",
-    "role_stable",
-    "usage_supported",
-    "matchup_supported",
-    "injury_context_ready",
-    "shared_simulation_ready",
+    "model_ready", "pit_safe", "role_stable", "usage_supported",
+    "matchup_supported", "injury_context_ready", "shared_simulation_ready",
     "market_binding_ready",
 )
 
-
 class NflRunItScoreError(ValueError):
     pass
-
 
 @dataclass(frozen=True)
 class NflRunItPrice:
@@ -48,7 +40,6 @@ class NflRunItPrice:
     score_0_100: int
     score_label: str = SCORE_LABEL
 
-
 def american_from_probability(probability: float) -> int:
     if not isfinite(probability) or not 0.0 < probability < 1.0:
         raise NflRunItScoreError("probability must be finite and in (0,1)")
@@ -56,25 +47,19 @@ def american_from_probability(probability: float) -> int:
         return int(round(-100.0 * probability / (1.0 - probability)))
     return int(round(100.0 * (1.0 - probability) / probability))
 
-
 def qualification_role_score(flags: Mapping[str, bool]) -> int:
-    """Return a 0-100 display score from qualification/role flags only.
-
-    Every frozen flag has equal transparent weight in V1. Missing/extra flags or
-    non-bools fail closed so price economics cannot be smuggled into Score.
-    """
+    """Return a 0-100 display score from qualification/role flags only."""
     if not isinstance(flags, Mapping):
         raise NflRunItScoreError("qualification flags must be a mapping")
     if set(flags) != set(QUALIFICATION_FLAGS):
         raise NflRunItScoreError("qualification flags must match frozen schema")
     if any(type(flags[name]) is not bool for name in QUALIFICATION_FLAGS):
         raise NflRunItScoreError("qualification flags must be boolean")
-    passed = sum(int(flags[name]) for name in QUALIFICATION_FLAGS)
-    return int(round(100.0 * passed / len(QUALIFICATION_FLAGS)))
-
+    return int(round(100.0 * sum(int(flags[n]) for n in QUALIFICATION_FLAGS) / len(QUALIFICATION_FLAGS)))
 
 def price_run_it_pick(*, estimate_p: float, push_p: float, price_american: int,
-                      market_no_vig_p: float, qualification_flags: Mapping[str, bool]) -> NflRunItPrice:
+                      market_no_vig_p: float,
+                      qualification_flags: Mapping[str, bool] | None = None) -> NflRunItPrice:
     for name, value in (("estimate_p", estimate_p), ("push_p", push_p), ("market_no_vig_p", market_no_vig_p)):
         if not isfinite(value):
             raise NflRunItScoreError(f"{name} must be finite")
@@ -93,6 +78,9 @@ def price_run_it_pick(*, estimate_p: float, push_p: float, price_american: int,
     edge = fair_probability - market_no_vig_p
     decimal = american_to_decimal(int(price_american))
     ev = estimate_p * (decimal - 1.0) - loss_p
-    score = qualification_role_score(qualification_flags)
+    # Legacy callers without role flags get a fail-closed zero score, never an
+    # EV-derived substitute. Follow-up RUN IT wiring supplies real flags.
+    flags = qualification_flags if qualification_flags is not None else {n: False for n in QUALIFICATION_FLAGS}
+    score = qualification_role_score(flags)
     return NflRunItPrice(estimate_p, push_p, loss_p, fair_probability, fair_american,
                          market_no_vig_p, edge, ev, score)
