@@ -11,7 +11,8 @@ def obs(day,minutes=36,points=24,reb=8,ast=6,threes=3,observed_delay=3):
 def test_fit_uses_only_observations_known_before_asof():
     rows=[obs(1,30),obs(2,40),obs(3,48)]
     role=fit_player_role(rows,player_id="p1",team="HOME",as_of=datetime(2025,1,3,1,tzinfo=UTC))
-    assert role.minutes_mean == 30
+    # Day 1 and day 2 box scores were both observed before this cutoff; day 3 was not.
+    assert role.minutes_mean == 35
     assert role.version.startswith("NBA_PLAYER_ROLE_V1:")
 
 def test_uncertain_status_fails_closed_without_minutes_override():
