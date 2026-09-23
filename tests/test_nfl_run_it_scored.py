@@ -26,7 +26,7 @@ def _estimates():
 def _snapshot(selection="GB", ready=True):
     return {
         "game_id":"g1","market":"moneyline","selection":selection,
-        "captured_at":"2026-09-23T07:55:00Z","commence_time":"2026-09-25T00:15:00Z",
+        "captured_at":"2026-09-23T07:55:00Z","kickoff_at":"2026-09-25T00:15:00Z",
         "source_version":"nfl-v1","feature_digest":"abc123",
         "model_ready":ready,"pit_safe":ready,"role_stable":ready,
         "usage_supported":ready,"matchup_supported":ready,
