@@ -11,7 +11,7 @@
 - One bounded step per queue run. Quality over speed.
 
 ## Phase 0 — finish 2026 / establish the lane
-- TODO — Audit the candidate historical DraftKings 2021–2025 source for timestamp provenance, same-book two-sided pricing, and true closing-price provenance. Record PASS/FAIL/MISSING only; do not tune a model from it.
+- DONE — Audited candidate historical DraftKings 2021–2025 source. FAIL for governed replay: per-quote timestamp and true closing-price provenance are not established. 2027 defaults to prospective forward capture unless another historical source passes the frozen audit.
 - TODO — Freeze the single 2027 candidate lane and its market definitions across ML, run line, and full-game total.
 - TODO — Freeze PIT feature eligibility and leakage rules for the candidate lane.
 - TODO — Freeze deterministic simulation/versioned RNG and settlement semantics, including push mass.
