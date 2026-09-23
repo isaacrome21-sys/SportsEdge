@@ -61,6 +61,8 @@ def _player_ids_from_live(live_payload: Mapping[str, Any]) -> dict[str, list[int
             else:
                 batters.append(pid)
 
+    # Probable pitchers live under gameData and can be available before the
+    # boxscore/lineups exist. Do not make them conditional on liveData.boxscore.
     probable_pitchers = game_data.get("probablePitchers") if isinstance(game_data, Mapping) else {}
     if isinstance(probable_pitchers, Mapping):
         for side in ("away", "home"):
