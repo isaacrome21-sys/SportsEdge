@@ -95,6 +95,11 @@ def parse_venue(payload: Mapping[str, Any]) -> dict[str, Any] | None:
     if longitude is None:
         longitude = _float(coords.get("longitude"))
 
+    azimuth = _float(location.get("azimuthAngle"))
+    if azimuth is not None:
+        azimuth %= 360.0
+    elevation = _float(location.get("elevation"))
+
     dimensions: dict[str, float | None] = {}
     for key in ("leftLine", "leftCenter", "center", "rightCenter", "rightLine"):
         dimensions[key] = _float(field.get(key))
@@ -112,6 +117,9 @@ def parse_venue(payload: Mapping[str, Any]) -> dict[str, Any] | None:
         "latitude": latitude,
         "longitude": longitude,
         "timezone_id": str(timezone_block.get("id") or timezone_block.get("tz") or "").strip() or None,
+        "azimuth_angle_degrees": azimuth,
+        "azimuth_source_field": "location.azimuthAngle" if azimuth is not None else None,
+        "elevation_raw": elevation,
         "roof_type": str(field.get("roofType") or "").strip() or None,
         "turf_type": str(field.get("turfType") or "").strip() or None,
         "capacity": int(field["capacity"]) if str(field.get("capacity") or "").isdigit() else None,

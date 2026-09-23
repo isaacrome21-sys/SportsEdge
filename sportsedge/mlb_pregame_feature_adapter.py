@@ -40,8 +40,19 @@ ENVIRONMENT_FIELDS = (
     "roof_state",
     "dome_state",
 )
+ENVIRONMENT_VALIDATION_KEYS = (
+    "park_factors",
+    "air_density",
+    "wind_components",
+    "roof_delay_state",
+)
 UMPIRE_FIELDS = (
     "plate_umpire_id",
+    "called_strike_tendency",
+    "walk_tendency",
+    "run_environment_tendency",
+)
+UMPIRE_VALIDATION_KEYS = (
     "called_strike_tendency",
     "walk_tendency",
     "run_environment_tendency",
@@ -87,37 +98,84 @@ def _known(value: Any) -> bool:
 
 def _environment(bundle: Mapping[str, Any]) -> dict[str, Any]:
     park_lane = bundle.get("park_venue") or {}
+    park_factor_lane = bundle.get("park_factors") or {}
     weather_lane = bundle.get("weather_roof") or {}
+    derived_lane = bundle.get("environment_derived") or {}
+    validation = bundle.get("environment_feature_validation") or {}
     venue = park_lane.get("venue") if isinstance(park_lane, Mapping) else {}
     forecast = weather_lane.get("forecast") if isinstance(weather_lane, Mapping) else {}
+    derived_values = derived_lane.get("values") if isinstance(derived_lane, Mapping) else {}
+    park_values = park_factor_lane.get("values") if isinstance(park_factor_lane, Mapping) else {}
     venue = venue if isinstance(venue, Mapping) else {}
     forecast = forecast if isinstance(forecast, Mapping) else {}
+    derived_values = derived_values if isinstance(derived_values, Mapping) else {}
+    park_values = park_values if isinstance(park_values, Mapping) else {}
+    validation = validation if isinstance(validation, Mapping) else {}
 
-    # Park geometry is context, not a substitute for fitted park factors.
+    park_available = str(park_factor_lane.get("status") or "").upper() == "AVAILABLE" if isinstance(park_factor_lane, Mapping) else False
+    def park_number(name: str) -> float | None:
+        return _number(park_values.get(name)) if park_available else None
+
+    derived_temperature = _number(derived_values.get("temperature_f"))
+    derived_wind_speed = _number(derived_values.get("wind_speed_mph"))
+    derived_wind_direction = _number(derived_values.get("wind_direction_degrees"))
+    derived_humidity = _number(derived_values.get("relative_humidity_pct"))
+    derived_air_density = _number(derived_values.get("air_density_kg_m3"))
+    derived_precip = _number(derived_values.get("precip_probability_pct"))
+    derived_wind_out = _number(derived_values.get("wind_out_component_mph"))
+    derived_wind_in = _number(derived_values.get("wind_in_component_mph"))
+    derived_delay_risk = derived_values.get("delay_risk")
+    derived_roof_state = derived_values.get("roof_state")
+    derived_dome_state = derived_values.get("dome_state")
+
     values = {
-        "park_hr_factor": None,
-        "park_hr_factor_lhb": None,
-        "park_hr_factor_rhb": None,
-        "park_runs_factor": None,
-        "park_1b_factor": None,
-        "park_2b_3b_factor": None,
-        "temperature": _number(forecast.get("temperature")),
-        "wind_speed": _wind_mph(forecast.get("wind_speed")),
-        "wind_direction": forecast.get("wind_direction"),
-        "wind_out_component": None,
-        "wind_in_component": None,
-        "humidity": None,
-        "air_density": None,
-        "precip_probability": _number(forecast.get("precip_probability_pct")),
-        "delay_risk": None,
-        "roof_state": weather_lane.get("roof_state") if isinstance(weather_lane, Mapping) else None,
-        "dome_state": None,
+        "park_hr_factor": park_number("park_hr_factor"),
+        "park_hr_factor_lhb": park_number("park_hr_factor_lhb"),
+        "park_hr_factor_rhb": park_number("park_hr_factor_rhb"),
+        "park_runs_factor": park_number("park_runs_factor"),
+        "park_1b_factor": park_number("park_1b_factor"),
+        "park_2b_3b_factor": park_number("park_2b_3b_factor"),
+        "temperature": derived_temperature if derived_temperature is not None else _number(forecast.get("temperature")),
+        "wind_speed": derived_wind_speed if derived_wind_speed is not None else _wind_mph(forecast.get("wind_speed")),
+        "wind_direction": derived_wind_direction if derived_wind_direction is not None else forecast.get("wind_direction"),
+        "wind_out_component": derived_wind_out,
+        "wind_in_component": derived_wind_in,
+        "humidity": derived_humidity if derived_humidity is not None else _number(forecast.get("relative_humidity_pct")),
+        "air_density": derived_air_density,
+        "precip_probability": derived_precip if derived_precip is not None else _number(forecast.get("precip_probability_pct")),
+        "delay_risk": derived_delay_risk,
+        "roof_state": derived_roof_state if _known(derived_roof_state) else (weather_lane.get("roof_state") if isinstance(weather_lane, Mapping) else None),
+        "dome_state": derived_dome_state,
     }
     missing = tuple(name for name in ENVIRONMENT_FIELDS if not _known(values.get(name)))
+    validation_blockers = tuple(
+        name for name in ENVIRONMENT_VALIDATION_KEYS
+        if validation.get(name) is not True
+    )
+    input_complete = not missing
+    ready = input_complete and not validation_blockers
     return {
         "values": values,
-        "ready": not missing,
+        "ready": ready,
+        "input_complete": input_complete,
         "missing_fields": missing,
+        "validation_blockers": validation_blockers,
+        "validation": {
+            name: validation.get(name) is True for name in ENVIRONMENT_VALIDATION_KEYS
+        },
+        "park_factor_context": {
+            "status": park_factor_lane.get("status") if isinstance(park_factor_lane, Mapping) else None,
+            "model_version": park_factor_lane.get("model_version") if isinstance(park_factor_lane, Mapping) else None,
+            "source_subset_sha256": park_factor_lane.get("source_subset_sha256") if isinstance(park_factor_lane, Mapping) else None,
+            "promotion_status": park_factor_lane.get("promotion_status") if isinstance(park_factor_lane, Mapping) else None,
+        },
+        "derived_context": {
+            "status": derived_lane.get("status") if isinstance(derived_lane, Mapping) else None,
+            "source": derived_lane.get("source") if isinstance(derived_lane, Mapping) else None,
+            "source_weather_sha256": derived_lane.get("source_weather_sha256") if isinstance(derived_lane, Mapping) else None,
+            "source_venue_sha256": derived_lane.get("source_venue_sha256") if isinstance(derived_lane, Mapping) else None,
+            "promotion_status": derived_lane.get("promotion_status") if isinstance(derived_lane, Mapping) else None,
+        },
         "venue_context": {
             "venue_id": venue.get("venue_id"),
             "venue_name": venue.get("venue_name"),
@@ -125,12 +183,14 @@ def _environment(bundle: Mapping[str, Any]) -> dict[str, Any]:
             "turf_type": venue.get("turf_type"),
             "latitude": venue.get("latitude"),
             "longitude": venue.get("longitude"),
-            "field_dimensions": venue.get("field_dimensions"),
+            "azimuth_angle_degrees": venue.get("azimuth_angle_degrees"),
+            "field_dimensions": venue.get("field_dimensions_ft") or venue.get("field_dimensions"),
         },
         "policy_notes": (
             "static venue geometry is not a fitted park factor",
+            "available park/weather values cannot self-promote scored-input readiness",
             "roof_state UNKNOWN is never promoted to an open/closed assumption",
-            "wind vector, humidity, air density, and delay risk must be derived before environment can be ready",
+            "environment requires explicit temporal-validation flags for park, air, wind, and roof/delay components",
         ),
     }
 
@@ -138,33 +198,47 @@ def _environment(bundle: Mapping[str, Any]) -> dict[str, Any]:
 def _umpire(bundle: Mapping[str, Any]) -> dict[str, Any]:
     lane = bundle.get("umpire") or {}
     zone_lane = bundle.get("umpire_zone") or {}
+    walk_lane = bundle.get("umpire_walk") or {}
+    validation = bundle.get("umpire_feature_validation") or {}
     assignment = lane.get("assignment") if isinstance(lane, Mapping) else {}
     tendencies = lane.get("tendencies") if isinstance(lane, Mapping) else {}
     assignment = assignment if isinstance(assignment, Mapping) else {}
     tendencies = tendencies if isinstance(tendencies, Mapping) else {}
     zone_lane = zone_lane if isinstance(zone_lane, Mapping) else {}
+    walk_lane = walk_lane if isinstance(walk_lane, Mapping) else {}
+    validation = validation if isinstance(validation, Mapping) else {}
     deltas = tendencies.get("deltas") if isinstance(tendencies, Mapping) else {}
     deltas = deltas if isinstance(deltas, Mapping) else {}
 
-    # Only a sample-passing, PIT-built zone lane may populate the called-strike
-    # field. The broader game-level strikeout delta remains context only.
     zone_called_strike = None
     if str(zone_lane.get("status") or "").upper() == "AVAILABLE":
         zone_called_strike = _number(zone_lane.get("called_strike_tendency"))
+    walk_tendency = None
+    if str(walk_lane.get("status") or "").upper() == "AVAILABLE":
+        walk_tendency = _number(walk_lane.get("walk_tendency"))
 
     values = {
         "plate_umpire_id": assignment.get("umpire_id"),
         "called_strike_tendency": zone_called_strike,
-        # Game walk totals are retained below as broad context but are not promoted
-        # to the required plate-umpire walk tendency field without PA-level modeling.
-        "walk_tendency": None,
+        "walk_tendency": walk_tendency,
         "run_environment_tendency": _number(deltas.get("runs_delta")),
     }
     missing = tuple(name for name in UMPIRE_FIELDS if not _known(values.get(name)))
+    validation_blockers = tuple(
+        name for name in UMPIRE_VALIDATION_KEYS
+        if _known(values.get(name)) and validation.get(name) is not True
+    )
+    input_complete = not missing
+    ready = input_complete and not validation_blockers
     return {
         "values": values,
-        "ready": not missing,
+        "ready": ready,
+        "input_complete": input_complete,
         "missing_fields": missing,
+        "validation_blockers": validation_blockers,
+        "validation": {
+            name: validation.get(name) is True for name in UMPIRE_VALIDATION_KEYS
+        },
         "zone_context": {
             "status": zone_lane.get("status"),
             "model_version": zone_lane.get("model_version"),
@@ -172,6 +246,16 @@ def _umpire(bundle: Mapping[str, Any]) -> dict[str, Any]:
             "raw_called_strike_bias": zone_lane.get("raw_called_strike_bias"),
             "shrunk_called_strike_bias": zone_lane.get("shrunk_called_strike_bias"),
             "source_subset_sha256": zone_lane.get("source_subset_sha256"),
+            "promotion_status": zone_lane.get("promotion_status"),
+        },
+        "walk_context": {
+            "status": walk_lane.get("status"),
+            "model_version": walk_lane.get("model_version"),
+            "umpire_plate_appearances": walk_lane.get("umpire_plate_appearances"),
+            "raw_walk_bias": walk_lane.get("raw_walk_bias"),
+            "shrunk_walk_bias": walk_lane.get("shrunk_walk_bias"),
+            "source_subset_sha256": walk_lane.get("source_subset_sha256"),
+            "promotion_status": walk_lane.get("promotion_status"),
         },
         "broad_game_context": {
             "runs_delta": _number(deltas.get("runs_delta")),
@@ -183,7 +267,9 @@ def _umpire(bundle: Mapping[str, Any]) -> dict[str, Any]:
         "policy_notes": (
             "game strikeouts_delta is not called_strike_tendency",
             "called_strike_tendency is accepted only from a sample-passing PIT zone residual lane",
-            "walks_delta is broad game context and is not substituted for the required walk_tendency field",
+            "game walks_delta is not walk_tendency",
+            "walk_tendency is accepted only from a sample-passing PIT batter/pitcher-adjusted PA residual lane",
+            "available research values do not become scored-input ready without explicit temporal-validation flags",
         ),
     }
 
