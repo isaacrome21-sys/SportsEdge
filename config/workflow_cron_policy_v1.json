@@ -26,6 +26,7 @@
     ".github/workflows/football-vsin-contest-context.yml",
     ".github/workflows/statcast-daily-refresh.yml",
     ".github/workflows/draftkings-prop-provider-probe.yml",
-    ".github/workflows/direct-dk-board-snapshot.yml"
+    ".github/workflows/direct-dk-board-snapshot.yml",
+    ".github/workflows/nfl-dk-direct-confirmation-capture.yml"
   ]
 }
