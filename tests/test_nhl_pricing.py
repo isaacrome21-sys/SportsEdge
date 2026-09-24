@@ -34,3 +34,22 @@ def test_quote_fails_closed_without_provenance_or_valid_odds():
         NHLQuote("ML", "HOME", -110, "", "2026-01-01T00:00:00Z").validate()
     with pytest.raises(ValueError):
         NHLQuote("ML", "HOME", 50, "book", "2026-01-01T00:00:00Z").validate()
+
+
+def test_quote_requires_timezone_aware_capture():
+    from sportsedge.sports.nhl.pricing import NHLQuote
+    import pytest
+    q=NHLQuote("TOTAL","OVER 6.5",-110,"book","2026-09-24T10:00:00")
+    with pytest.raises(ValueError, match="timezone-aware"):
+        q.validate()
+
+
+def test_quote_freshness_rejects_stale_and_future():
+    from sportsedge.sports.nhl.pricing import NHLQuote, validate_quote_freshness
+    import pytest
+    q=NHLQuote("TOTAL","OVER 6.5",-110,"book","2026-09-24T10:00:00Z","feed-v1")
+    validate_quote_freshness(q, as_of="2026-09-24T10:04:59Z", max_age_seconds=300)
+    with pytest.raises(ValueError, match="stale"):
+        validate_quote_freshness(q, as_of="2026-09-24T10:05:01Z", max_age_seconds=300)
+    with pytest.raises(ValueError, match="future"):
+        validate_quote_freshness(q, as_of="2026-09-24T09:59:59Z", max_age_seconds=300)
