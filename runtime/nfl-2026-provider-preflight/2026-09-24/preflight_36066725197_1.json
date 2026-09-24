@@ -1,0 +1,92 @@
+{
+  "authority": {
+    "backfill_authority": false,
+    "evidence_clock_authority": false,
+    "model_p_input": false,
+    "official_authority": false,
+    "production_registry_authority": false,
+    "promotion_authority": false,
+    "staking_authority": false,
+    "truth_gate_input": false
+  },
+  "checked_at_utc": "2026-09-24T22:19:09.201687+00:00",
+  "forward_paid_allowed": false,
+  "immediate_capture_cost_credits": 2,
+  "immediate_capture_possible": false,
+  "minutes_until_target": 85.847,
+  "preflight_lead_minutes": 720,
+  "provider_probe_run": true,
+  "provider_quota": {
+    "attempts": [
+      {
+        "http_status": 200,
+        "key_slot": "SPORTSEDGE_ODDS_API_KEY",
+        "quota_headers": {
+          "x-requests-last": 0,
+          "x-requests-remaining": 0,
+          "x-requests-used": 500
+        },
+        "state": "BELOW_RESERVE"
+      },
+      {
+        "http_status": 200,
+        "key_slot": "SPORTSEDGE_ODDS_API_KEY_2",
+        "quota_headers": {
+          "x-requests-last": 0,
+          "x-requests-remaining": 0,
+          "x-requests-used": 500
+        },
+        "state": "BELOW_RESERVE"
+      },
+      {
+        "http_status": 200,
+        "key_slot": "SPORTSEDGE_ODDS_API_KEY_3",
+        "quota_headers": {
+          "x-requests-last": 0,
+          "x-requests-remaining": 0,
+          "x-requests-used": 500
+        },
+        "state": "BELOW_RESERVE"
+      },
+      {
+        "http_status": 200,
+        "key_slot": "SPORTSEDGE_ODDS_API_KEY_4",
+        "quota_headers": {
+          "x-requests-last": 0,
+          "x-requests-remaining": 0,
+          "x-requests-used": 500
+        },
+        "state": "BELOW_RESERVE"
+      }
+    ],
+    "authority": {
+      "backfill_authority": false,
+      "evidence_clock_authority": false,
+      "model_p_input": false,
+      "official_authority": false,
+      "production_registry_authority": false,
+      "promotion_authority": false,
+      "staking_authority": false,
+      "truth_gate_input": false
+    },
+    "max_remaining": 0,
+    "minimum_remaining": 76,
+    "ready_key_slots": [],
+    "reason": "INSUFFICIENT_REMAINING_CREDITS",
+    "schema_version": "SPORTSEDGE_ODDS_API_QUOTA_PREFLIGHT_V1",
+    "state": "BLOCKED",
+    "tested_key_slots": [
+      "SPORTSEDGE_ODDS_API_KEY",
+      "SPORTSEDGE_ODDS_API_KEY_2",
+      "SPORTSEDGE_ODDS_API_KEY_3",
+      "SPORTSEDGE_ODDS_API_KEY_4"
+    ]
+  },
+  "required_confirmation_reserve_credits": 76,
+  "schema_version": "SPORTSEDGE_NFL_2026_PROVIDER_PREFLIGHT_V1",
+  "state": "PROVIDER_BLOCKED_PREFLIGHT",
+  "target_at_utc": "2026-09-24T23:45:00+00:00",
+  "target_event_key": "2026_03_ATL_GB",
+  "target_kind": "FINAL",
+  "target_week": 3
+}
