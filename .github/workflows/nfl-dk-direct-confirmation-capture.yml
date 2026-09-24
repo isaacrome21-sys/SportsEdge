@@ -4,9 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       force:
-        description: "Proof parsing/pairing outside frozen windows without writing governed evidence"
+        description: "Proof parsing/admission outside frozen windows without writing governed evidence"
         type: boolean
         default: false
+  pull_request:
+    paths:
+      - '.github/workflows/nfl-dk-direct-confirmation-capture.yml'
+      - 'scripts/capture_nfl_dk_confirmation.py'
+      - 'tests/test_capture_nfl_dk_confirmation.py'
+      - 'config/workflow_cron_policy_v1.json'
   schedule:
     - cron: "7,22,37,52 * * * *"
 
@@ -43,9 +49,24 @@ jobs:
             git archive origin/data data/nfl_2026_confirmation/captures | tar -x
           fi
 
+      - name: Fetch nflverse schedule snapshot
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          NFL_SCHEDULE_CSV="$RUNNER_TEMP/nfl-games.csv"
+          echo "NFL_SCHEDULE_CSV=$NFL_SCHEDULE_CSV" >> "$GITHUB_ENV"
+          curl --fail --location --silent --show-error --retry 3 \
+            'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv' \
+            -o "$NFL_SCHEDULE_CSV"
+          test -s "$NFL_SCHEDULE_CSV"
+
       - name: Capture DraftKings board
+        if: github.event_name != 'pull_request'
         id: run
         shell: bash
+        env:
+          WORKFLOW_PATH: .github/workflows/nfl-dk-direct-confirmation-capture.yml
         run: |
           set +e
           extra=()
@@ -66,7 +87,7 @@ jobs:
           python3 scripts/persist_nfl_confirmation_archive.py --worktree "$RUNNER_TEMP/nfl-dk-data"
 
       - name: Upload local archive copy
-        if: always()
+        if: always() && github.event_name != 'pull_request'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: nfl-dk-direct-${{ github.run_id }}
@@ -76,6 +97,6 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
-      - name: Fail on blocked fetch when a window was claimed
-        if: steps.run.outputs.rc == '2' && github.event_name == 'workflow_dispatch'
+      - name: Fail when a claimed capture/proof is blocked
+        if: steps.run.outputs.rc == '2'
         run: exit 1
