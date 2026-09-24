@@ -1,0 +1,35 @@
+name: nfl-attempt9-shadow-contract
+on:
+  pull_request:
+    paths:
+      - 'scripts/capture_nfl_attempt9_prospective_predictions.py'
+      - 'scripts/run_nfl_attempt9_shadow.py'
+      - 'sportsedge/sports/nfl/attempt9_model_p.py'
+      - 'sportsedge/truth_gate.py'
+      - 'artifacts/football/nfl_attempt9_*.json'
+      - 'config/football_market_surface.json'
+      - 'tests/test_nfl_attempt9_*.py'
+      - '.github/workflows/nfl-attempt9-shadow-contract.yml'
+permissions:
+  contents: read
+jobs:
+  shadow-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'numpy==2.5.3'
+      - name: Verify frozen inference, pairing, immutable capture, and Truth Gate
+        run: >-
+          python -m unittest -v
+          tests.test_nfl_attempt9_shadow
+          tests.test_nfl_attempt9_prospective_capture
+          tests.test_nfl_attempt9_model_p
+          tests.test_nfl_attempt9_frozen_artifacts
+          tests.test_nfl_readiness
+          tests.test_nfl_run_machine
+          tests.test_nfl_team_totals
+          tests.test_football_prop_runtime_truth
