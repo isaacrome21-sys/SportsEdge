@@ -19,6 +19,10 @@ CFBD_BASE = "https://api.collegefootballdata.com"
 ODDS_BASE = "https://api.the-odds-api.com/v4/sports/americanfootball_ncaaf/odds"
 CFB_SOURCE_CONTRACT = "CFB_AUTO_SOURCE_V1"
 SUPPORTED_GAME_MARKETS = frozenset({"MONEYLINE", "SPREAD", "TOTAL"})
+MAX_ABS_SPREAD_LINE = 70.0
+MIN_TOTAL_LINE = 10.0
+MAX_TOTAL_LINE = 120.0
+LINE_EPSILON = 1e-9
 
 
 class CFBSourceError(ValueError):
@@ -310,6 +314,54 @@ def _offer_id(event_id: str, book_key: str, market: str, side: str, line: float,
     return sha256(raw).hexdigest()
 
 
+def _validate_spread_pair(
+    outcomes: Iterable[Mapping[str, Any]], *, alias_index: Mapping[str, str], home: str, away: str,
+) -> float:
+    points: dict[str, float] = {}
+    for outcome in outcomes:
+        name = str(outcome.get("name") or "").strip()
+        team = bind_provider_team(name, alias_index)
+        if team not in {home, away}:
+            raise CFBSourceError(f"CFB_SPREAD_TEAM_UNRESOLVED:{name}")
+        point = _num(outcome.get("point"), "spread.point")
+        if abs(point) > MAX_ABS_SPREAD_LINE:
+            raise CFBSourceError(f"CFB_SPREAD_LINE_OUT_OF_RANGE:{point}")
+        prior = points.get(team)
+        if prior is not None and abs(prior - point) > LINE_EPSILON:
+            raise CFBSourceError(f"CFB_SPREAD_DUPLICATE_CONFLICT:{team}:{prior}:{point}")
+        points[team] = point
+    if home not in points:
+        raise CFBSourceError("CFB_HOME_SPREAD_MISSING")
+    if away not in points:
+        raise CFBSourceError("CFB_AWAY_SPREAD_MISSING")
+    if abs(points[home] + points[away]) > LINE_EPSILON:
+        raise CFBSourceError(f"CFB_SPREAD_PAIR_MISMATCH:{points[home]}:{points[away]}")
+    return points[home]
+
+
+def _validate_total_pair(outcomes: Iterable[Mapping[str, Any]]) -> float:
+    points: dict[str, float] = {}
+    for outcome in outcomes:
+        name = str(outcome.get("name") or "").strip()
+        side = name.upper()
+        if side not in {"OVER", "UNDER"}:
+            raise CFBSourceError(f"CFB_TOTAL_SIDE_INVALID:{name}")
+        point = _num(outcome.get("point"), "total.point")
+        if point < MIN_TOTAL_LINE or point > MAX_TOTAL_LINE:
+            raise CFBSourceError(f"CFB_TOTAL_LINE_OUT_OF_RANGE:{point}")
+        prior = points.get(side)
+        if prior is not None and abs(prior - point) > LINE_EPSILON:
+            raise CFBSourceError(f"CFB_TOTAL_DUPLICATE_CONFLICT:{side}:{prior}:{point}")
+        points[side] = point
+    if "OVER" not in points:
+        raise CFBSourceError("CFB_TOTAL_OVER_MISSING")
+    if "UNDER" not in points:
+        raise CFBSourceError("CFB_TOTAL_UNDER_MISSING")
+    if abs(points["OVER"] - points["UNDER"]) > LINE_EPSILON:
+        raise CFBSourceError(f"CFB_TOTAL_PAIR_MISMATCH:{points['OVER']}:{points['UNDER']}")
+    return points["OVER"]
+
+
 def parse_the_odds_api_quotes(
     payload: Any, *, games: Iterable[CFBGame], alias_index: Mapping[str, str],
     bookmakers: Iterable[str] = ("draftkings",),
@@ -346,17 +398,11 @@ def parse_the_odds_api_quotes(
                 retrieved = _dt(market_row.get("last_update") or book_ts, "market.last_update").isoformat()
                 outcomes = [x for x in (market_row.get("outcomes") or []) if isinstance(x, Mapping)]
                 home_spread: float | None = None
+                total_line: float | None = None
                 if canonical == "SPREAD":
-                    for outcome in outcomes:
-                        try:
-                            bound = bind_provider_team(str(outcome.get("name") or ""), alias_index)
-                        except CFBSourceError:
-                            continue
-                        if bound == home:
-                            home_spread = _num(outcome.get("point"), "spread.point")
-                            break
-                    if home_spread is None:
-                        raise CFBSourceError("CFB_HOME_SPREAD_MISSING")
+                    home_spread = _validate_spread_pair(outcomes, alias_index=alias_index, home=home, away=away)
+                elif canonical == "TOTAL":
+                    total_line = _validate_total_pair(outcomes)
                 for outcome in outcomes:
                     name = str(outcome.get("name") or "").strip()
                     price = _num(outcome.get("price"), "odds.price")
@@ -373,7 +419,7 @@ def parse_the_odds_api_quotes(
                         if upper not in {"OVER", "UNDER"}:
                             raise CFBSourceError(f"CFB_TOTAL_SIDE_INVALID:{name}")
                         side = upper
-                        line, entity = _num(outcome.get("point"), "total.point"), game.game_id
+                        line, entity = float(total_line), game.game_id
                     if not side:
                         raise CFBSourceError(f"CFB_ODDS_SIDE_UNRESOLVED:{name}")
                     out.append(CFBQuote(
