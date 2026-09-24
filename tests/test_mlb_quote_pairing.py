@@ -4,10 +4,11 @@ T0="2026-09-22T17:00:00+00:00"
 T10="2026-09-22T17:00:10+00:00"
 T31="2026-09-22T17:00:31+00:00"
 
-def _row(side,odds,*,line=8.5,book="dk",retrieved_at=T0,market="TOTALS",entity="g"):
+def _row(side,odds,*,line=8.5,book="dk",retrieved_at=T0,market="TOTALS",entity="g",**extra):
     row={"game_id":"g","market":market,"entity_id":entity,"line":line,"side":side,"american_odds":odds,"book_key":book}
     if retrieved_at is not None:
         row["retrieved_at"]=retrieved_at
+    row.update(extra)
     return row
 
 def test_pairs_same_book_same_line_same_entity():
@@ -39,3 +40,19 @@ def test_missing_or_naive_timestamp_never_pairs():
     assert "opposite_odds" not in missing[0] and "opposite_odds" not in missing[1]
     naive=pair_opposite_odds([_row("OVER",-110,retrieved_at="2026-09-22T17:00:00"),_row("UNDER",-105)])
     assert "opposite_odds" not in naive[0] and "opposite_odds" not in naive[1]
+
+def test_moneyline_pairs_team_names_not_home_away_tokens():
+    rows=[
+        _row("NYY",-150,market="MONEYLINE",line=None,home="NYY",away="BOS"),
+        _row("BOS",130,market="MONEYLINE",line=None,home="NYY",away="BOS",retrieved_at=T10),
+    ]
+    out=pair_opposite_odds(rows)
+    assert out[0]["opposite_odds"]==130 and out[1]["opposite_odds"]==-150
+
+def test_run_line_pairs_opposite_signed_lines_on_team_sides():
+    rows=[
+        _row("LAD",-115,market="RUN_LINE",line=-1.5,home="LAD",away="SDP"),
+        _row("SDP",-105,market="RUN_LINE",line=1.5,home="LAD",away="SDP",retrieved_at=T10),
+    ]
+    out=pair_opposite_odds(rows)
+    assert out[0]["opposite_odds"]==-105 and out[1]["opposite_odds"]==-115

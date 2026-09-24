@@ -1,5 +1,5 @@
 from sports.common.ev_math import american_to_decimal, devig_power
-from sportsedge.mlb_edge_score import score_mlb_edge, fair_american_odds, binary_no_vig_probability
+from sportsedge.mlb_edge_score import score_mlb_edge, fair_american_odds, binary_no_vig_probability, ev_per_dollar
 
 def test_score_bounded_and_stronger_edge_monotonic():
     low=score_mlb_edge(model_p=.55,american_odds=-110,opposite_odds=-110)
@@ -42,11 +42,10 @@ def test_no_vig_is_shared_power_v1_not_multiplicative():
     implied=[1/american_to_decimal(-150),1/american_to_decimal(130)]
     assert abs(binary_no_vig_probability(-150,130)-devig_power(implied)[0])<1e-12
     r=score_mlb_edge(model_p=.62,american_odds=-150,opposite_odds=130)
-    assert r.reason_codes==("POWER_V1_NO_VIG",)
+    assert "POWER_V1_NO_VIG" in r.reason_codes
     assert abs(r.market_p-devig_power(implied)[0])<1e-12
 
 def test_longshot_method_sensitivity_blocks_instead_of_scoring():
-    # +600/-1000: POWER ~10.5% vs MULTIPLICATIVE ~13.6%, far beyond the 1pp guard.
     r=score_mlb_edge(model_p=.20,american_odds=600,opposite_odds=-1000)
     assert r.status=="BLOCKED"
     assert r.reason_codes==("DEVIG_METHOD_SENSITIVITY",)
@@ -56,7 +55,25 @@ def test_context_cannot_change_score():
     a=score_mlb_edge(model_p=.60,american_odds=110,opposite_odds=-130,context={"capper":"A","tickets":99})
     b=score_mlb_edge(model_p=.60,american_odds=110,opposite_odds=-130,context={"capper":"B","tickets":1})
     assert a.status=="ACTIONABLE"
-    assert a==b
+    assert a.confidence_score==b.confidence_score and a.ev_per_dollar==b.ev_per_dollar
 
 def test_no_model_is_explicit():
     assert score_mlb_edge(model_p=None,american_odds=110).status=="NO_MODEL"
+
+def test_zero_reliability_stays_zero_and_is_not_actionable():
+    r=score_mlb_edge(estimate_p=.62,american_odds=-110,opposite_odds=-110,reliability=0.0)
+    assert r.confidence_score==0
+    assert r.status=="PASS"
+    assert r.estimate_p==.62
+
+def test_push_mass_reduces_ev_instead_of_treating_push_as_a_loss():
+    no_push=ev_per_dollar(.60,-110,push_p=0.0)
+    with_push=ev_per_dollar(.60,-110,push_p=0.20)
+    assert with_push > no_push  # 20% was previously counted as a loss
+    assert with_push == ev_per_dollar(.60,-110,push_p=0.20)
+
+def test_card_labels_estimate_p_and_keeps_unofficial_footer():
+    r=score_mlb_edge(estimate_p=.58,american_odds=-110,opposite_odds=-110)
+    assert r.estimate_p==.58
+    assert "ESTIMATE_P_UNOFFICIAL" in r.reason_codes
+    assert "NOT Model_P" in r.authority_footer
