@@ -1,0 +1,102 @@
+name: nfl-dk-direct-confirmation-capture
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Proof parsing/admission outside frozen windows without writing governed evidence"
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - '.github/workflows/nfl-dk-direct-confirmation-capture.yml'
+      - 'scripts/capture_nfl_dk_confirmation.py'
+      - 'tests/test_capture_nfl_dk_confirmation.py'
+      - 'config/workflow_cron_policy_v1.json'
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nfl-dk-direct-confirmation
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: ".python-version"
+
+      - name: Unit contracts
+        run: python -m unittest tests.test_capture_nfl_dk_confirmation -q
+
+      - name: Restore confirmation archive from data branch
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data || true
+          if git cat-file -e origin/data:data/nfl_2026_confirmation/captures 2>/dev/null; then
+            git archive origin/data data/nfl_2026_confirmation/captures | tar -x
+          fi
+
+      - name: Fetch nflverse schedule snapshot
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          NFL_SCHEDULE_CSV="$RUNNER_TEMP/nfl-games.csv"
+          echo "NFL_SCHEDULE_CSV=$NFL_SCHEDULE_CSV" >> "$GITHUB_ENV"
+          curl --fail --location --silent --show-error --retry 3 \
+            'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv' \
+            -o "$NFL_SCHEDULE_CSV"
+          test -s "$NFL_SCHEDULE_CSV"
+
+      - name: Capture DraftKings board
+        if: github.event_name != 'pull_request'
+        id: run
+        shell: bash
+        env:
+          WORKFLOW_PATH: .github/workflows/nfl-dk-direct-confirmation-capture.yml
+        run: |
+          set +e
+          extra=()
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.force }}" = "true" ]; then
+            extra+=(--force)
+          fi
+          python3 scripts/capture_nfl_dk_confirmation.py "${extra[@]}" --status-out artifacts/nfl-dk-direct/status.json
+          echo "rc=$?" >> "$GITHUB_OUTPUT"
+          set -e
+          test -f artifacts/nfl-dk-direct/status.json
+          cat artifacts/nfl-dk-direct/status.json
+
+      - name: Persist captures to data branch
+        if: always() && github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/persist_nfl_confirmation_archive.py --worktree "$RUNNER_TEMP/nfl-dk-data"
+
+      - name: Upload local archive copy
+        if: always() && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nfl-dk-direct-${{ github.run_id }}
+          path: |
+            data/nfl_2026_confirmation/captures
+            artifacts/nfl-dk-direct/status.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Fail when a claimed capture/proof is blocked
+        if: steps.run.outputs.rc == '2'
+        run: exit 1

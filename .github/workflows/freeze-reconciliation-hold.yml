@@ -98,10 +98,12 @@ jobs:
           PY
 
       - name: Reconcile each registered delta against each bundle
+        env:
+          CURRENT_MAIN_REF: ${{ github.event_name == 'pull_request' && 'HEAD' || 'origin/main' }}
         run: >-
           PYTHONPATH=. python scripts/reconcile_freeze_deltas.py
           --registry /tmp/freeze_reconciliation_registry_effective.json
-          --current-main-ref origin/main
+          --current-main-ref "$CURRENT_MAIN_REF"
           --output artifacts/governance/freeze_reconciliation_report.json
 
       - name: Prove hold is still fail closed while inventory dispositions or writers remain

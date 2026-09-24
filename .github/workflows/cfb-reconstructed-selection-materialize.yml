@@ -1,6 +1,10 @@
 name: cfb-reconstructed-selection-materialize
 
 on:
+  # A repository_dispatch hook lets connected automation clients start the safe
+  # materialize-only lane even when they do not expose Actions workflow_dispatch.
+  repository_dispatch:
+    types: [cfb_reconstructed_materialize]
   workflow_dispatch:
     inputs:
       evaluation_mode:
@@ -93,7 +97,7 @@ jobs:
 
   materialize:
     name: CFB reconstructed-selection guarded materialization
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch'
     needs: contract
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -175,7 +179,7 @@ jobs:
             --private-rows-out "$RUNNER_TEMP/cfb_reconstructed_selection_rows.json"
 
       - name: Run frozen all-four candidate bakeoff exactly once when explicitly confirmed
-        if: steps.preflight.outputs.state == 'VERIFIED_BEFORE_FIRST_REPLAY_CALL' && inputs.evaluation_mode == 'CONSUME_ALL_FOUR_CFB_ATTEMPTS'
+        if: github.event_name == 'workflow_dispatch' && steps.preflight.outputs.state == 'VERIFIED_BEFORE_FIRST_REPLAY_CALL' && inputs.evaluation_mode == 'CONSUME_ALL_FOUR_CFB_ATTEMPTS'
         shell: bash
         run: |
           set -euo pipefail
@@ -200,7 +204,7 @@ jobs:
           PY
 
       - name: Build selected-candidate model proposal under preregistered final-fit rule
-        if: steps.preflight.outputs.state == 'VERIFIED_BEFORE_FIRST_REPLAY_CALL' && inputs.evaluation_mode == 'CONSUME_ALL_FOUR_CFB_ATTEMPTS'
+        if: github.event_name == 'workflow_dispatch' && steps.preflight.outputs.state == 'VERIFIED_BEFORE_FIRST_REPLAY_CALL' && inputs.evaluation_mode == 'CONSUME_ALL_FOUR_CFB_ATTEMPTS'
         shell: bash
         run: |
           set -euo pipefail
