@@ -4,13 +4,13 @@
   "failures": [],
   "games": 16,
   "games_scheduled": 16,
-  "lineups_absent": 2,
-  "lineups_present": 14,
-  "retrieved_at": "2026-09-23T22:11:56.674968+00:00",
+  "lineups_absent": 1,
+  "lineups_present": 15,
+  "retrieved_at": "2026-09-24T00:32:45.721628+00:00",
   "slate_date_ct": "2026-09-23",
   "status": "PASS",
-  "umpires_absent": 2,
-  "umpires_present": 14,
-  "weather_absent": 2,
-  "weather_present": 14
+  "umpires_absent": 0,
+  "umpires_present": 16,
+  "weather_absent": 0,
+  "weather_present": 16
 }
