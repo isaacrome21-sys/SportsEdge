@@ -37,6 +37,8 @@ def bind_availability_roles(
         raise ValueError("player_teams are required")
     rows = tuple(availability)
     latest = latest_availability(rows, as_of=as_of)
+    if not latest:
+        raise ValueError("no PIT-eligible availability snapshots")
     digest = availability_digest(tuple(latest.values()))
     overrides = uncertain_minutes or {}
     roles = []
