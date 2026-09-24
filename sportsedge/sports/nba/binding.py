@@ -1,8 +1,8 @@
 """NBA sportsbook quote binding and bettor-facing score contract.
 
 Quotes are bound to an already-computed model probability. They never create
-Model_P. Scores summarize model edge plus evidence quality on a 0-100 surface;
-they are not claimed win probabilities.
+Model_P. Score is a qualification/evidence-quality surface only; EV and edge
+remain separate ranking fields and never feed Score.
 """
 from dataclasses import dataclass
 from datetime import datetime
@@ -38,7 +38,7 @@ class NBABoundEdge:
     fair: NBAFairPrice
     ev: float
     score: int
-    score_version: str = "NBA_RUN_IT_SCORE_V1"
+    score_version: str = "NBA_RUN_IT_SCORE_RULE_B_V2"
 
 
 def bind_quote(
@@ -62,9 +62,10 @@ def bind_quote(
         if not math.isfinite(value) or not 0.0 <= value <= 1.0:
             raise ValueError(f"{name} must be in [0, 1]")
     ev=expected_value(fair,quote.decimal_odds)
-    # Product score, not probability: 50 is neutral. Positive EV moves the score
-    # upward while model/context quality limits confidence in that edge.
+    # Rule B: Score communicates qualification/evidence quality only. Market
+    # attractiveness is expressed by fair probability/price and EV, which callers
+    # may rank separately. This prevents price-derived EV from masquerading as
+    # model confidence.
     quality=math.sqrt(model_quality*context_quality)
-    edge_component=max(-0.25,min(0.25,ev))*100.0
-    score=round(max(0.0,min(100.0,50.0 + edge_component*quality*2.0)))
+    score=round(max(0.0,min(100.0,100.0*quality)))
     return NBABoundEdge(quote,fair,ev,score)
