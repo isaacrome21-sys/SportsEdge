@@ -12,7 +12,7 @@
 
 ## Phase 0 — finish 2026 / establish the lane
 - DONE — Audited candidate historical DraftKings 2021–2025 source. FAIL for governed replay: per-quote timestamp and true closing-price provenance are not established. 2027 defaults to prospective forward capture unless another historical source passes the frozen audit.
-- TODO — Freeze the single 2027 candidate lane and its market definitions across ML, run line, and full-game total.
+- DONE — Frozen in `docs/mlb_2027_candidate_lane_freeze.md`: one coherent full-game run distribution feeding moneyline, run line, and full-game total, with explicit market definitions and scope boundaries.
 - TODO — Freeze PIT feature eligibility and leakage rules for the candidate lane.
 - TODO — Freeze deterministic simulation/versioned RNG and settlement semantics, including push mass.
 - TODO — Freeze same-book opposite-side quote binding; never infer the missing side.
