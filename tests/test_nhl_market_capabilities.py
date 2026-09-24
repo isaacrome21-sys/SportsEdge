@@ -30,3 +30,13 @@ def test_unknown_market_fails_closed():
     cap = capability_for("first_goal_scorer")
     assert cap.status == "NO_ENGINE"
     assert cap.required_state == ()
+
+
+def test_coherent_period_and_player_markets_are_engine_backed():
+    for market in ("PERIOD_MONEYLINE", "PERIOD_TOTAL", "PLAYER_SHOTS", "PLAYER_POINTS", "PLAYER_GOALS"):
+        assert capability_for(market).status == "REQUIRES_ENGINE"
+
+
+def test_unmodeled_goalie_and_counting_props_fail_closed():
+    for market in ("GOALIE_SAVES", "PLAYER_BLOCKS", "PLAYER_HITS"):
+        assert capability_for(market).status == "NO_ENGINE"
