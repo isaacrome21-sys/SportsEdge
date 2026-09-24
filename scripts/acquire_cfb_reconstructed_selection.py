@@ -32,6 +32,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from sportsedge.sports.cfb.source import normalize_advanced_team_metrics
+from sportsedge.sports.cfb.venue_coordinates import venue_indexes
 
 CONFIG = ROOT / "config/cfb_cfbd_reconstructed_selection_budget_v1.json"
 CFBD_BASE = "https://api.collegefootballdata.com"
@@ -359,49 +360,11 @@ def _dt(value: object, code: str) -> datetime:
     return parsed.astimezone(timezone.utc)
 
 
-def _venue_coordinates(raw: Mapping[str, Any]) -> tuple[float, float]:
-    lat = raw.get("latitude")
-    lon = raw.get("longitude")
-    if lat is None or lon is None:
-        location = raw.get("location")
-        if isinstance(location, Mapping):
-            lat = location.get("y")
-            lon = location.get("x")
-    try:
-        lat_f, lon_f = float(lat), float(lon)
-    except (TypeError, ValueError) as exc:
-        raise CFBAcquisitionError("CFB_VENUE_COORDINATES_MISSING") from exc
-    if not isfinite(lat_f) or not isfinite(lon_f) or not (-90 <= lat_f <= 90) or not (-180 <= lon_f <= 180):
-        raise CFBAcquisitionError("CFB_VENUE_COORDINATES_INVALID")
-    return lat_f, lon_f
-
-
 def _venue_indexes(rows: Sequence[Mapping[str, Any]]) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
-    by_id: dict[str, dict[str, Any]] = {}
-    by_name: dict[str, dict[str, Any]] = {}
-    for raw in rows:
-        venue_id = str(raw.get("id") or "").strip()
-        name = str(raw.get("name") or "").strip()
-        dome = raw.get("dome")
-        if not venue_id or not name or type(dome) is not bool:
-            continue
-        lat, lon = _venue_coordinates(raw)
-        normalized = {
-            "venue_id": venue_id,
-            "name": name,
-            "dome": dome,
-            "latitude": lat,
-            "longitude": lon,
-        }
-        by_id[venue_id] = normalized
-        folded = name.casefold()
-        if folded in by_name and by_name[folded]["venue_id"] != venue_id:
-            raise CFBAcquisitionError(f"CFB_VENUE_NAME_AMBIGUOUS:{name}")
-        by_name[folded] = normalized
+    by_id, by_name = venue_indexes(rows)
     if not by_id:
         raise CFBAcquisitionError("CFB_VENUES_EMPTY")
     return by_id, by_name
-
 
 def _resolve_venue(
     game: Mapping[str, Any],

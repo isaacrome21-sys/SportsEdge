@@ -14,6 +14,7 @@ from scripts.acquire_cfb_reconstructed_selection import (
     _validate_private_preflight,
     _weather_hour_key,
     _weather_request,
+    _venue_indexes,
     build_request_plan,
 )
 
@@ -110,6 +111,21 @@ class TestCFBReconstructedSelectionAcquisition(unittest.TestCase):
             self.assertTrue(cached)
             self.assertEqual(payload, [{"id": 1}])
             self.assertEqual(returned_meta["query_sha256"], q)
+
+    def test_acquisition_venue_index_accepts_provider_shapes_and_skips_unusable_rows(self):
+        rows = [
+            {"id": 1, "name": "Canonical", "dome": False, "latitude": 41.0, "longitude": -87.0},
+            {"id": 2, "name": "Lng", "dome": False, "lat": 42.0, "lng": -88.0},
+            {"id": 3, "name": "Lon", "dome": False, "lat": 43.0, "lon": -89.0},
+            {"id": 4, "name": "Nested", "dome": True, "location": {"y": 44.0, "x": -90.0}},
+            {"id": 5, "name": "Unusable", "dome": False},
+        ]
+        by_id, by_name = _venue_indexes(rows)
+        self.assertEqual(set(by_id), {"1", "2", "3", "4"})
+        self.assertEqual(by_id["2"]["longitude"], -88.0)
+        self.assertEqual(by_id["3"]["longitude"], -89.0)
+        self.assertEqual(by_id["4"]["latitude"], 44.0)
+        self.assertNotIn("unusable", by_name)
 
     def test_open_meteo_request_is_hash_bound_to_frozen_contract(self):
         venues = [
