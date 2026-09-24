@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       force:
-        description: "Write a FINAL snapshot even outside the frozen window (proof only)"
+        description: "Proof parsing/pairing outside frozen windows without writing governed evidence"
         type: boolean
         default: false
   schedule:
