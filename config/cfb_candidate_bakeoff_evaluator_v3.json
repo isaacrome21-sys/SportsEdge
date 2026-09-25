@@ -9,7 +9,10 @@
     "sportsedge/sports/cfb/candidate_bakeoff.py": "064208efaae1b96a5e466066404c71e78191f6c3",
     "sportsedge/sports/cfb/candidate_bakeoff_v2.py": "9ebb86a816e42ca07f63ad500fc5a2cd1fe2346a",
     "sportsedge/sports/cfb/candidate_model_v2.py": "5077571bcd93215c6b972f3e28f6ac27ebef59a8",
-    "sportsedge/sports/cfb/candidate_registry_v2.py": "98c9bf0407817947fca8decf6786eeee019688a6"
+    "sportsedge/sports/cfb/candidate_registry_v2.py": "98c9bf0407817947fca8decf6786eeee019688a6",
+    "sportsedge/sports/cfb/candidate_families.py": "d7aa6fd40a04e1ba117e6a55268cbb05bdbd5d8b",
+    "sportsedge/sports/cfb/candidate_variants.py": "3667d069c620a9208523c6aa6d28f3429c771cc9",
+    "sportsedge/sports/cfb/joint_model.py": "ff91ad867a5240d7f1cd90c707d29d534bde8dd2"
   },
   "public_equivalence": {
     "reference_evaluator": "sportsedge/sports/cfb/candidate_bakeoff_v2.py",
