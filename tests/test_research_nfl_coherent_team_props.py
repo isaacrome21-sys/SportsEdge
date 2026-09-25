@@ -60,10 +60,11 @@ def state(pass_multiplier=1.0, rush_multiplier=1.0, team_tds=3):
 
 
 def pool():
+    # One coherent fitted yardage identity: every completion view averages 11 YPC.
     return [
-        receiver("WR1", 10, 0.68, 12.0),
-        receiver("WR2", 7, 0.65, 10.5),
-        receiver("OTHER", 6, 0.62, 8.5),
+        receiver("WR1", 10, 0.68, 11.0),
+        receiver("WR2", 7, 0.65, 11.0),
+        receiver("OTHER", 6, 0.62, 11.0),
     ]
 
 
@@ -77,6 +78,26 @@ def test_game_script_uses_explicit_inputs_and_moves_workload_directionally():
     del bad["pass_multiplier"]
     with pytest.raises(NflPropSimulationError, match="SCRIPT_MULTIPLIER_REQUIRED:pass_multiplier"):
         scripted_role_means(qb(), bad)
+
+
+def test_context_pass_or_rush_multiplier_cannot_double_apply_game_script():
+    bad_qb = qb()
+    bad_qb["context"] = {
+        "shared_workload_sigma": 0.0,
+        "pass_multiplier": 1.20,
+        "source": "role",
+    }
+    with pytest.raises(NflPropSimulationError, match="CONTEXT_SCRIPT_MULTIPLIER_CONFLICT"):
+        scripted_role_means(bad_qb, state(pass_multiplier=1.20))
+
+    bad_receiver = receiver("WR1", 8, 0.7, 11.0)
+    bad_receiver["context"] = {
+        "shared_workload_sigma": 0.0,
+        "rush_multiplier": 1.15,
+        "source": "role",
+    }
+    with pytest.raises(NflPropSimulationError, match="CONTEXT_SCRIPT_MULTIPLIER_CONFLICT"):
+        simulate_team_on_game_paths(qb(), [bad_receiver], [state()], seed=3)
 
 
 def test_team_paths_are_deterministic_and_conserve_qb_receiving_identity():
@@ -99,6 +120,14 @@ def test_team_paths_are_deterministic_and_conserve_qb_receiving_identity():
             row["rush_receiving_yards"] == row["rushing_yards"] + row["receiving_yards"]
             for row in game["receivers"].values()
         )
+
+
+def test_mismatched_qb_ypc_and_receiver_pool_ypr_fails_closed():
+    bad_pool = pool()
+    bad_pool[0]["role_prior"] = dict(bad_pool[0]["role_prior"])
+    bad_pool[0]["role_prior"]["receiving_yards_per_reception"] = 13.0
+    with pytest.raises(NflPropSimulationError, match="YARDAGE_IDENTITY_MISMATCH"):
+        simulate_team_on_game_paths(qb(), bad_pool, [state()], seed=5)
 
 
 def test_receiver_pool_requires_real_completion_weight():
