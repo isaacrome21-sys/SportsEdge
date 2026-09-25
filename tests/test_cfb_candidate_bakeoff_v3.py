@@ -6,6 +6,8 @@ from unittest import TestCase
 from sportsedge.sports.cfb.candidate_families import TEAM_METRIC_KEYS
 from sportsedge.sports.cfb.candidate_model_v2 import fit_cfb_candidate_score_model
 from sportsedge.sports.cfb.candidate_registry_v2 import RELIABILITY
+from sportsedge.sports.cfb.reconstructed_selection import materialize_reconstructed_selection_rows
+from sportsedge.sports.cfb.source import CFBTeamMetrics
 import sportsedge.sports.cfb.candidate_bakeoff_v2 as v2
 import sportsedge.sports.cfb.candidate_bakeoff_v3 as v3
 
@@ -40,6 +42,17 @@ def _rows(end_season=2018):
                 "home_score":24 + (i%5) + (season-2015),"away_score":17 + (i%4),
             })
     return out
+
+
+def _materializer_metric(team):
+    return CFBTeamMetrics(
+        team=team,season=2014,through_week=99,sample_source="PRIOR_SEASON_FALLBACK",
+        off_ppa_rush=0.1,off_ppa_dropback=0.2,def_ppa_rush_allowed=0.3,
+        def_ppa_dropback_allowed=0.4,off_success_rate=0.5,def_success_rate_allowed=0.6,
+        standard_down_ppa=0.7,passing_down_success_rate=0.8,eckel_rate=0.9,
+        points_per_eckel=1.0,points_per_drive=1.1,net_field_position=1.2,
+        explosive_rate=1.3,feature_asof_ts="2026-09-18T12:00:00+00:00",
+    )
 
 
 class TestCFBCandidateBakeoffV3(TestCase):
@@ -105,25 +118,23 @@ class TestCFBCandidateBakeoffV3(TestCase):
             [(float(r["home_score"])-ph,float(r["away_score"])-pa) for r,(ph,pa) in zip(train,expected_train)],
         )
 
-    def test_capture_identity_accepts_materializer_output_schema(self):
-        materialized_row={
-            "game_id":"2019-3-abc",
-            "season":2019,
-            "week":3,
-            "neutral_site":False,
-            "home_metrics":{},
-            "away_metrics":{},
-            "weather":{},
-            "home_score":31.0,
-            "away_score":24.0,
-            "provenance_class":"RECONSTRUCTED_HISTORICAL_NOT_PIT",
-            "historical_pit_created":False,
-            "home_prior_metrics":{},
-            "away_prior_metrics":{},
-            "home_current_metrics":{},
-            "away_current_metrics":{},
-        }
-        self.assertEqual(v3._id(materialized_row),{"season":2019,"week":3,"game_id":"2019-3-abc"})
+    def test_capture_identity_accepts_actual_materializer_output_row(self):
+        rows=materialize_reconstructed_selection_rows(
+            games=[{
+                "game_id":"materialized-1","season":2015,"week":1,
+                "start_ts":"2015-09-05T17:00:00+00:00","home_team":"Home","away_team":"Away",
+                "neutral_site":False,"home_score":31,"away_score":20,
+            }],
+            metrics=[_materializer_metric("Home"),_materializer_metric("Away")],
+            weather_by_game={"materialized-1":{
+                "source":"CFBD_GAMES_WEATHER_RECONSTRUCTED_CURRENT_PROVIDER_VINTAGE",
+                "retrieved_at_utc":"2026-09-18T12:00:00+00:00","gameIndoors":False,
+                "windSpeed":8.0,"temperature":72.0,
+            }},
+            fbs_membership_by_season={2015:[{"school":"Home"},{"school":"Away"}]},
+        )
+        self.assertEqual(len(rows),1)
+        self.assertEqual(v3._id(rows[0]),{"season":2015,"week":1,"game_id":"materialized-1"})
 
 
 if __name__=="__main__":
