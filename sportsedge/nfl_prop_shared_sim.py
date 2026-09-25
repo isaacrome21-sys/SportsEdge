@@ -1,12 +1,12 @@
-"""Transparent NFL role/workload -> shared prop simulation.
+"""Transparent NFL role/workload -> independent prop simulation.
 
 Adapts disclosed MySpariEdge-style concepts (projected role, usage, matchup,
-injury/context and shared simulation) without proprietary coefficients. Market
-prices are forbidden here: this module produces independent estimate_p rows for
-nfl_prop_run_it_score_b.
+injury/context) without proprietary coefficients. Market prices are forbidden
+here: this module produces independent estimate_p rows for nfl_prop_run_it_score_b.
 
-Same-game pairings must share one latent via simulate_game. Per-player
-simulate_player is for isolated unit tests only; it is not a same-game board.
+simulate_game is a placeholder shared-volume latent only. It does not allocate
+QB passing yards onto receivers and does not invert pass vs rush by game script.
+Coherent same-game pairing belongs in the #1006 / #1007 collapse.
 """
 from __future__ import annotations
 
@@ -26,17 +26,30 @@ ROLE_KEYS = (
     "receiving_yards_per_reception",
 )
 RATE_KEYS = frozenset({"completion_rate", "pass_td_rate", "interception_rate", "catch_rate"})
-TD_RATE_KEYS = frozenset({"pass_td_rate"})
-# Volume stats keep a light 8-game prior; TD rates need much heavier regression.
+RARE_RATE_KEYS = frozenset({"pass_td_rate", "interception_rate"})
 DEFAULT_VOLUME_PRIOR_STRENGTH = 8.0
-DEFAULT_TD_PRIOR_STRENGTH = 40.0
+DEFAULT_RARE_PRIOR_STRENGTH = 40.0
+# Context multipliers are market-blind usage/injury/weather knobs, not totals.
+MULTIPLIER_KEYS = (
+    "volume_multiplier", "pass_multiplier", "rush_multiplier", "target_multiplier",
+    "efficiency_multiplier", "pass_efficiency_multiplier",
+    "rush_efficiency_multiplier", "receiving_efficiency_multiplier",
+)
+MULTIPLIER_MIN = 0.40
+MULTIPLIER_MAX = 1.80
+ALLOWED_CONTEXT_SOURCES = frozenset({
+    "role", "injury", "weather", "matchup", "participation", "none",
+})
 FORBIDDEN_MARKET_KEYS = frozenset({
     "price_american", "odds", "market_no_vig_p", "edge_probability_points",
     "ev_per_dollar", "fair_american", "sportsbook_probability",
-    "implied_team_total", "implied_total", " vig", "no_vig",
+    "implied_team_total", "implied_total", "no_vig", "novig",
+    "american_odds", "price", "vig",
 })
+# Exact-ish fragments only. Do not use "ev_" — it flags prev_week_targets.
 FORBIDDEN_MARKET_KEY_FRAGMENTS = (
-    "price", "odds", "american", "no_vig", "novig", "implied", "edge_", "ev_",
+    "price_american", "american_odds", "no_vig", "novig", "implied_team",
+    "implied_total", "sportsbook", "fair_american", "ev_per", "edge_probability",
 )
 
 
@@ -64,7 +77,6 @@ def _looks_like_market_key(key: str) -> bool:
 
 
 def _assert_no_market_inputs(node: Any, path: str = "") -> None:
-    """Reject sportsbook / implied-price fields at any nesting depth."""
     if isinstance(node, Mapping):
         for key, value in node.items():
             name = f"{path}.{key}" if path else str(key)
@@ -76,13 +88,30 @@ def _assert_no_market_inputs(node: Any, path: str = "") -> None:
             _assert_no_market_inputs(value, f"{path}[{i}]")
 
 
+def _assert_market_blind_context(payload: Mapping[str, Any]) -> None:
+    c = payload.get("context") or {}
+    if not isinstance(c, Mapping):
+        raise NflPropSimulationError("CONTEXT_OBJECT_REQUIRED")
+    source = str(c.get("source", payload.get("context_source", "none"))).lower()
+    if source not in ALLOWED_CONTEXT_SOURCES:
+        raise NflPropSimulationError("CONTEXT_SOURCE_NOT_MARKET_BLIND")
+    for key in MULTIPLIER_KEYS:
+        if key not in c:
+            continue
+        v = _num(c[key], f"context.{key}")
+        if v < MULTIPLIER_MIN or v > MULTIPLIER_MAX:
+            raise NflPropSimulationError(f"CONTEXT_MULTIPLIER_OUT_OF_RANGE:{key}")
+
+
 def stabilized_role(
     payload: Mapping[str, Any],
     *,
     prior_strength: float = DEFAULT_VOLUME_PRIOR_STRENGTH,
-    td_prior_strength: float = DEFAULT_TD_PRIOR_STRENGTH,
+    rare_prior_strength: float = DEFAULT_RARE_PRIOR_STRENGTH,
+    td_prior_strength: float | None = None,
 ) -> dict[str, float]:
     _assert_no_market_inputs(payload)
+    _assert_market_blind_context(payload)
     prior = payload.get("role_prior")
     trailing = payload.get("trailing") or {}
     if not isinstance(prior, Mapping):
@@ -91,8 +120,11 @@ def stabilized_role(
         raise NflPropSimulationError("TRAILING_OBJECT_REQUIRED")
     n = max(0.0, _num(payload.get("sample_size", 0), "sample_size"))
     s_vol = _num(prior_strength, "prior_strength")
-    s_td = _num(td_prior_strength, "td_prior_strength")
-    if s_vol < 0 or s_td < 0 or n + s_vol <= 0:
+    s_rare = _num(
+        rare_prior_strength if td_prior_strength is None else td_prior_strength,
+        "rare_prior_strength",
+    )
+    if s_vol < 0 or s_rare < 0 or n + s_vol <= 0:
         raise NflPropSimulationError("ROLE_WEIGHT_INVALID")
     out: dict[str, float] = {}
     for k in ROLE_KEYS:
@@ -100,7 +132,7 @@ def stabilized_role(
             raise NflPropSimulationError(f"ROLE_PRIOR_MISSING:{k}")
         p = _num(prior[k], k)
         o = p if k not in trailing else _num(trailing[k], k)
-        s = s_td if k in TD_RATE_KEYS else s_vol
+        s = s_rare if k in RARE_RATE_KEYS else s_vol
         v = (s * p + n * o) / (s + n)
         if v < 0 or (k in RATE_KEYS and v > 1):
             raise NflPropSimulationError(f"ROLE_VALUE_INVALID:{k}")
@@ -115,6 +147,8 @@ def _ctx(payload: Mapping[str, Any], key: str, default: float = 1.0) -> float:
     v = _num(c.get(key, default), f"context.{key}")
     if v <= 0:
         raise NflPropSimulationError(f"CONTEXT_POSITIVE_REQUIRED:{key}")
+    if key in MULTIPLIER_KEYS and (v < MULTIPLIER_MIN or v > MULTIPLIER_MAX):
+        raise NflPropSimulationError(f"CONTEXT_MULTIPLIER_OUT_OF_RANGE:{key}")
     return v
 
 
@@ -143,13 +177,19 @@ def _receiving_yards(rng: random.Random, n: int, mean: float) -> int:
     return max(0, int(round(sum(rng.gammavariate(2.0, mean / 2.0) for _ in range(n)))))
 
 
+def _rush_carry(rng: random.Random, mean: float) -> float:
+    """Mixture: bulk Gaussian (allows losses) + rare explosive tail."""
+    if rng.random() < 0.06:
+        # Explosive carry. Mean of this branch is high; weight keeps E[Y] near `mean`.
+        return max(12.0, rng.gammavariate(2.2, 9.0))
+    sd = max(2.2, abs(mean) * 0.70)
+    return rng.gauss(mean * 0.78, sd)
+
+
 def _rushing_yards(rng: random.Random, n: int, mean: float) -> int:
-    """Per-carry Gaussian so stuffed / lost-yardage carries can go negative."""
     if n <= 0:
         return 0
-    sd = max(2.5, abs(mean) * 0.85)
-    total = sum(rng.gauss(mean, sd) for _ in range(n))
-    return int(round(total))
+    return int(round(sum(_rush_carry(rng, mean) for _ in range(n))))
 
 
 def _passing_yards(rng: random.Random, n: int, mean: float) -> int:
@@ -175,11 +215,13 @@ def _one_draw(role: Mapping[str, float], payload: Mapping[str, Any], rng: random
     py = _passing_yards(rng, comp, role["pass_yards_per_completion"] * eff * pe)
     ry = _rushing_yards(rng, ra, role["rush_yards_per_attempt"] * eff * re)
     cy = _receiving_yards(rng, rec, role["receiving_yards_per_reception"] * eff * ce)
-    # TDs are a subset of completions so they cannot exceed completions.
     cr = max(role["completion_rate"], 1e-6)
+    inc_rate = max(1.0 - role["completion_rate"], 1e-6)
     td_given_comp = min(1.0, role["pass_td_rate"] / cr)
+    int_given_inc = min(1.0, role["interception_rate"] / inc_rate)
     pass_tds = _binom(rng, comp, td_given_comp)
-    ints = _binom(rng, max(0, pa - pass_tds), role["interception_rate"])
+    incompletions = max(0, pa - comp)
+    ints = _binom(rng, incompletions, int_given_inc)
     return {
         "pass_attempts": pa,
         "completions": comp,
@@ -216,10 +258,11 @@ def simulate_player(
     n_sims: int = 20000,
     seed: int = 21,
 ) -> list[dict[str, int]]:
-    """Isolated player draws. Same-game boards must use simulate_game."""
+    """Isolated player draws. Not a same-game board."""
     if isinstance(n_sims, bool) or int(n_sims) != n_sims or n_sims <= 0:
         raise NflPropSimulationError("N_SIMS_INVALID")
     _assert_no_market_inputs(payload)
+    _assert_market_blind_context(payload)
     role = stabilized_role(payload)
     rng = random.Random(int(seed))
     sigma = _sigma(payload)
@@ -235,10 +278,10 @@ def simulate_game(
     n_sims: int = 20000,
     seed: int = 21,
 ) -> list[list[dict[str, int]]]:
-    """Same-game simulation: one shared latent per draw across all players.
+    """Placeholder: one shared volume latent per draw.
 
-    Returns n_sims lists, each list aligned to `players`.
-    This is the hook for #1006 / #1007 coherent game-script pairing.
+    Does not conserve passing yards across QB and receivers, and does not
+    invert pass vs rush when a team trails. Use the #1006/#1007 stack for that.
     """
     if isinstance(n_sims, bool) or int(n_sims) != n_sims or n_sims <= 0:
         raise NflPropSimulationError("N_SIMS_INVALID")
@@ -246,9 +289,9 @@ def simulate_game(
         raise NflPropSimulationError("PLAYERS_REQUIRED")
     for payload in players:
         _assert_no_market_inputs(payload)
+        _assert_market_blind_context(payload)
     roles = [stabilized_role(p) for p in players]
     rng = random.Random(int(seed))
-    # Game-level sigma is the max of player sigmas so a quiet player cannot mute the script.
     sigma = max(_sigma(p) for p in players)
     games: list[list[dict[str, int]]] = []
     for _ in range(int(n_sims)):
