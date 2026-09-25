@@ -1,0 +1,44 @@
+{
+  "schema": "CFB_CANDIDATE_BAKEOFF_EVALUATOR_V3",
+  "status": "FROZEN_BEFORE_FIRST_EVALUATION",
+  "supersedes": "config/cfb_candidate_bakeoff_evaluator_v2.json",
+  "repair_reason": "V2 discards observed outer-fold predictions and same-fit training residuals needed by the preregistered dispersion diagnostic. V3 adds a zero-authority side-channel capture while requiring the public result and result_sha256 to remain byte-identical to V2.",
+  "evaluator_path": "sportsedge/sports/cfb/candidate_bakeoff_v3.py",
+  "evaluator_code_git_blob": "549842f368e6402860739e78e5f85bb33050a41d",
+  "public_equivalence": {
+    "reference_evaluator": "sportsedge/sports/cfb/candidate_bakeoff_v2.py",
+    "reference_evaluator_code_git_blob": "9ebb86a816e42ca07f63ad500fc5a2cd1fe2346a",
+    "rule": "For identical rows, config, and input_identity, V3 public result and result_sha256 must equal V2 exactly. Capture must not enter the public result or its hash."
+  },
+  "candidate_families": ["EQUAL_WEIGHT_HARD_SWITCH","RELIABILITY_WEIGHTED_HARD_SWITCH","PRIOR_CURRENT_BLEND","GAMES_IN_SAMPLE_FEATURE"],
+  "outer_validation_seasons": [2018,2019,2020,2021,2022,2023,2024,2025],
+  "outer_fold_rule": "EXPANDING_SEASON; validation season must have at least 3 earlier seasons beginning with 2015",
+  "selection_metric": "MEAN_EXPANDING_SEASON_JOINT_HOME_AWAY_SCORE_RMSE",
+  "selection_direction": "LOWER_IS_BETTER",
+  "ridge_alpha_grid": [0.1,1.0,3.0,10.0,30.0,100.0,300.0],
+  "inner_alpha_rule": "TEMPORAL_NESTED_EXPANDING_SEASON; each inner validation season has at least 2 earlier training seasons; tie lowest mean RMSE then lowest alpha",
+  "null": {
+    "family_wise_statistic": "MAX_BASELINE_MINUS_CHALLENGER_RMSE_ACROSS_3_CHALLENGERS",
+    "shuffle_count": 200,
+    "permutation": "WITHIN_OUTER_VALIDATION_SEASON_PAIRED_HOME_AWAY_LABELS",
+    "refit_rule": "REFIT_AND_RESCORE_EVERY_PREREGISTERED_CANDIDATE_ON_EACH_SHUFFLE",
+    "percentile": 0.95,
+    "percentile_method": "higher",
+    "strict_exceedance": true,
+    "seed": 20260919
+  },
+  "capture": {
+    "captured_families": ["RELIABILITY_WEIGHTED_HARD_SWITCH","PRIOR_CURRENT_BLEND","GAMES_IN_SAMPLE_FEATURE"],
+    "capture_pass": "OBSERVED_UNPERMUTED_ONLY",
+    "retained_after_selection": "WINNER_FAMILY_ONLY",
+    "per_outer_fold": ["outer_predictions","same_fit_training_residuals","frozen_alpha"],
+    "new_mean_fit_allowed": false,
+    "post_bakeoff_reproduction_allowed": false,
+    "capture_in_public_result": false,
+    "capture_hash_required": true,
+    "authority": "ZERO"
+  },
+  "attempt_accounting": {"attempt_budget":4,"single_bakeoff_consumes_all_four_attempts":true,"partial_or_sequential_candidate_evaluation_prohibited":true,"identical_reproduction_allowed_only_for_result_hash_verification":true},
+  "diagnostics_are_provenance_only": true,
+  "authority": {"model_p_created":false,"truth_gate_authority":false,"promotion_authority":false,"eligibility_changed":false,"staking_authority":false,"evidence_clock_authority":false,"backfill":false,"official_authority":false}
+}
