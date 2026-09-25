@@ -5,6 +5,7 @@
   "repair_reason": "V2 discards observed outer-fold predictions and same-fit training residuals needed by the preregistered dispersion diagnostic. V3 adds a zero-authority side-channel capture while requiring the public result and result_sha256 to remain byte-identical to V2.",
   "evaluator_path": "sportsedge/sports/cfb/candidate_bakeoff_v3.py",
   "evaluator_code_git_blob": "549842f368e6402860739e78e5f85bb33050a41d",
+  "dependency_binding_rule": "Every code blob that directly or transitively determines candidate fitting, feature materialization, alpha selection, null refitting, or scoring is bound below and verified by test before first evaluation.",
   "dependency_blobs": {
     "sportsedge/sports/cfb/candidate_bakeoff.py": "064208efaae1b96a5e466066404c71e78191f6c3",
     "sportsedge/sports/cfb/candidate_bakeoff_v2.py": "9ebb86a816e42ca07f63ad500fc5a2cd1fe2346a",
