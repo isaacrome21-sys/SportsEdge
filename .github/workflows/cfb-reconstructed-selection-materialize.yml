@@ -19,17 +19,22 @@ on:
     paths:
       - 'config/cfb_cfbd_reconstructed_selection_budget_v1.json'
       - 'config/cfb_selected_candidate_final_fit_policy_v1.json'
+      - 'config/cfb_candidate_bakeoff_evaluator_v3.json'
+      - 'config/cfb_dispersion_only_prereg_v1.json'
       - 'scripts/preflight_cfb_reconstructed_selection.py'
       - 'scripts/acquire_cfb_reconstructed_selection.py'
       - 'scripts/materialize_cfb_reconstructed_selection.py'
       - 'scripts/build_cfb_selected_candidate_artifact.py'
       - 'sportsedge/sports/cfb/reconstructed_selection.py'
       - 'sportsedge/sports/cfb/candidate_bakeoff_v2.py'
+      - 'sportsedge/sports/cfb/candidate_bakeoff_v3.py'
       - 'sportsedge/sports/cfb/selected_candidate_model.py'
       - 'sportsedge/sports/cfb/selected_candidate_artifact.py'
       - 'scripts/run_cfb_candidate_bakeoff.py'
       - 'config/cfb_candidate_bakeoff_evaluator_v2.json'
       - 'tests/test_cfb_candidate_bakeoff_v2.py'
+      - 'tests/test_cfb_candidate_bakeoff_v3.py'
+      - 'tests/test_cfb_dispersion_only_prereg_v1.py'
       - 'tests/test_cfb_reconstructed_selection_preflight.py'
       - 'tests/test_cfb_reconstructed_selection_acquisition.py'
       - 'tests/test_cfb_reconstructed_selection_materializer.py'
@@ -65,6 +70,7 @@ jobs:
             scripts/materialize_cfb_reconstructed_selection.py \
             sportsedge/sports/cfb/reconstructed_selection.py \
             sportsedge/sports/cfb/candidate_bakeoff_v2.py \
+            sportsedge/sports/cfb/candidate_bakeoff_v3.py \
             scripts/run_cfb_candidate_bakeoff.py \
             sportsedge/sports/cfb/selected_candidate_model.py \
             sportsedge/sports/cfb/selected_candidate_artifact.py \
@@ -78,6 +84,8 @@ jobs:
             tests.test_cfb_reconstructed_selection_acquisition \
             tests.test_cfb_reconstructed_selection_materializer \
             tests.test_cfb_candidate_bakeoff_v2 \
+            tests.test_cfb_candidate_bakeoff_v3 \
+            tests.test_cfb_dispersion_only_prereg_v1 \
             tests.test_cfb_selected_candidate_artifact_builder
 
       - name: Prove final-fit policy is frozen before first evaluation
@@ -189,18 +197,33 @@ jobs:
             --private-rows "$RUNNER_TEMP/cfb_reconstructed_selection_rows.json" \
             --selection-bundle artifacts/cfb/selection_bundle_manifest.json \
             --out artifacts/cfb/candidate_bakeoff_result.json \
+            --private-capture-out "$RUNNER_TEMP/cfb_candidate_bakeoff_private_capture.json" \
             --confirm CONSUME_ALL_FOUR_CFB_ATTEMPTS
+          test -s "$RUNNER_TEMP/cfb_candidate_bakeoff_private_capture.json"
+          test ! -e artifacts/cfb/cfb_candidate_bakeoff_private_capture.json
           python - <<'PY'
           import json
           from pathlib import Path
           r=json.loads(Path('artifacts/cfb/candidate_bakeoff_result.json').read_text())
+          c=json.loads(Path(__import__('os').environ['RUNNER_TEMP']).joinpath('cfb_candidate_bakeoff_private_capture.json').read_text())
           if r.get('schema')!='CFB_CANDIDATE_BAKEOFF_RESULT_V2':
               raise SystemExit('CFB_BAKEOFF_RESULT_SCHEMA_INVALID')
           if r.get('status') not in {'WINNER_SELECTED_FOR_FREEZE','NO_CANDIDATE_DEMONSTRATED_SIGNAL_AT_THIS_SAMPLE'}:
               raise SystemExit('CFB_BAKEOFF_RESULT_STATUS_INVALID')
           if any((r.get('authority') or {}).values()):
               raise SystemExit('CFB_BAKEOFF_AUTHORITY_LEAK')
+          if c.get('schema')!='CFB_CANDIDATE_BAKEOFF_PRIVATE_CAPTURE_V1':
+              raise SystemExit('CFB_BAKEOFF_PRIVATE_CAPTURE_SCHEMA_INVALID')
+          if any((c.get('authority') or {}).values()):
+              raise SystemExit('CFB_BAKEOFF_PRIVATE_CAPTURE_AUTHORITY_LEAK')
+          if r.get('status')=='WINNER_SELECTED_FOR_FREEZE':
+              if c.get('status')!='WINNER_CAPTURE_RETAINED' or c.get('retained_family')!=r.get('winner'):
+                  raise SystemExit('CFB_BAKEOFF_PRIVATE_WINNER_CAPTURE_INVALID')
+          else:
+              if c.get('status')!='NO_WINNER_NO_CAPTURE_RETAINED' or c.get('winner_capture') is not None:
+                  raise SystemExit('CFB_BAKEOFF_PRIVATE_NULL_CAPTURE_INVALID')
           print('CFB_BAKEOFF_RESULT_FROZEN_IN_RUN_ARTIFACT sha256='+str(r.get('result_sha256')))
+          print('CFB_BAKEOFF_PRIVATE_CAPTURE_HELD_RUNNER_TEMP sha256='+str(c.get('capture_sha256')))
           PY
 
       - name: Build selected-candidate model proposal under preregistered final-fit rule
@@ -257,6 +280,8 @@ jobs:
                   raise SystemExit(f'CFB_RECONSTRUCTED_AUTHORITY_MAP_LEAK:{path}')
           if Path('artifacts/cfb/cfb_reconstructed_selection_rows.json').exists():
               raise SystemExit('CFB_RECONSTRUCTED_RAW_ROWS_PUBLIC_PATH_FORBIDDEN')
+          if Path('artifacts/cfb/cfb_candidate_bakeoff_private_capture.json').exists():
+              raise SystemExit('CFB_BAKEOFF_PRIVATE_CAPTURE_PUBLIC_PATH_FORBIDDEN')
           print(json.dumps({'status': 'ZERO_AUTHORITY_PUBLIC_OUTPUTS_OK'}, sort_keys=True))
           PY
 
