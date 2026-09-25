@@ -99,6 +99,9 @@ def _validate_inputs(
     ordered_ids = [_rid(r) for r in data]
     if len(set(ordered_ids)) != len(ordered_ids):
         raise CFBDispersionEvaluationError("CFB_DISPERSION_PARENT_ROW_ID_DUPLICATE")
+    if ordered_ids != sorted(ordered_ids):
+        raise CFBDispersionEvaluationError("CFB_DISPERSION_PARENT_ROW_ORDER_INVALID")
+    row_map = {_rid(r): r for r in data}
     for season, fold in folds.items():
         expected_outer = [rid for rid in ordered_ids if rid[0] == season]
         expected_train = [rid for rid in ordered_ids if rid[0] < season]
@@ -108,7 +111,6 @@ def _validate_inputs(
             raise CFBDispersionEvaluationError("CFB_DISPERSION_CAPTURE_ROWS_REQUIRED")
         if [_rid(r) for r in outer] != expected_outer or [_rid(r) for r in train] != expected_train:
             raise CFBDispersionEvaluationError("CFB_DISPERSION_CAPTURE_ROW_SET_MISMATCH")
-        row_map = {_rid(r): r for r in data}
         for p in outer:
             raw = row_map[_rid(p)]
             if float(p["realized_home_score"]) != float(raw["home_score"]) or float(p["realized_away_score"]) != float(raw["away_score"]):
@@ -210,15 +212,19 @@ def simulate_v2_capture_paths(
     return h, a
 
 
-def ranked_probability_score(sim: np.ndarray, actual: int) -> float:
-    if sim.ndim != 1 or sim.size == 0:
+def _rps_on_support(sim: np.ndarray, actual: int, lo: int, hi: int) -> float:
+    if sim.ndim != 1 or sim.size == 0 or lo > hi:
         raise CFBDispersionEvaluationError("CFB_DISPERSION_RPS_SIM_INVALID")
-    lo, hi = min(int(np.min(sim)), int(actual)), max(int(np.max(sim)), int(actual))
-    support = np.arange(lo, hi + 1, dtype=int)
+    support = np.arange(int(lo), int(hi) + 1, dtype=int)
     ordered = np.sort(sim.astype(int, copy=False))
     cdf = np.searchsorted(ordered, support, side="right") / float(len(ordered))
     observed = (int(actual) <= support).astype(float)
     return float(np.sum((cdf - observed) ** 2))
+
+
+def ranked_probability_score(sim: np.ndarray, actual: int) -> float:
+    lo, hi = min(int(np.min(sim)), int(actual)), max(int(np.max(sim)), int(actual))
+    return _rps_on_support(sim, actual, lo, hi)
 
 
 def _pit(sim: np.ndarray, actual: int, u: float) -> float:
@@ -286,8 +292,12 @@ def evaluate_cfb_dispersion_only(
         h2, a2 = simulate_v2_capture_paths(mh, ma, v2_state[season], overtime[season], seed=seed, n_paths=N_PATHS)
         m1, t1, m2, t2 = h1 - a1, h1 + a1, h2 - a2, h2 + a2
         actual_m, actual_t = ah - aa, ah + aa
-        rps1 = 0.5 * ranked_probability_score(m1, actual_m) + 0.5 * ranked_probability_score(t1, actual_t)
-        rps2 = 0.5 * ranked_probability_score(m2, actual_m) + 0.5 * ranked_probability_score(t2, actual_t)
+        mlo = min(int(np.min(m1)), int(np.min(m2)), actual_m)
+        mhi = max(int(np.max(m1)), int(np.max(m2)), actual_m)
+        tlo = min(int(np.min(t1)), int(np.min(t2)), actual_t)
+        thi = max(int(np.max(t1)), int(np.max(t2)), actual_t)
+        rps1 = 0.5 * _rps_on_support(m1, actual_m, mlo, mhi) + 0.5 * _rps_on_support(t1, actual_t, tlo, thi)
+        rps2 = 0.5 * _rps_on_support(m2, actual_m, mlo, mhi) + 0.5 * _rps_on_support(t2, actual_t, tlo, thi)
         game_scores.append({"season": season, "week": week, "game_id": _rid(raw)[2], "v1_rps": rps1, "v2_rps": rps2, "rps_diff_v1_minus_v2": rps1-rps2})
         um, ut = float(pit_rng.random()), float(pit_rng.random())
         pits["v1"]["margin"].append(_pit(m1, actual_m, um)); pits["v2"]["margin"].append(_pit(m2, actual_m, um))
@@ -340,6 +350,11 @@ def evaluate_cfb_dispersion_only(
         "scored_seasons": list(SCORING_SEASONS),
         "n_games": n_games,
         "n_paths_per_game_per_model": N_PATHS,
+        "mean_refits_performed": 0,
+        "additional_exclusions": 0,
+        "mean_predictions_identical_v1_v2": True,
+        "overtime_profile_shared_v1_v2": True,
+        "frozen_alphas_by_outer_season": {str(s): float(folds[s]["frozen_alpha"]) for s in range(2018, 2026)},
         "primary_metric": {
             "name": "MEAN_RANKED_PROBABILITY_SCORE_MARGIN_AND_TOTAL",
             "v1_rps": v1_mean,
@@ -350,6 +365,7 @@ def evaluate_cfb_dispersion_only(
             "bootstrap_resamples": BOOTSTRAP_RESAMPLES,
             "bootstrap_seed": BOOTSTRAP_SEED,
             "interval_method": "PERCENTILE_LINEAR_2.5_97.5",
+            "common_support_per_game": True,
         },
         "secondary_diagnostics_no_authority": {
             "randomized_pit_coverage": coverage,
@@ -357,7 +373,7 @@ def evaluate_cfb_dispersion_only(
             "absolute_margin_mass": key_diag,
         },
         "row_counts_by_season_week": dict(sorted(counts.items())),
-        "simulation": {"seed_policy": "EXPLICIT_NUMPY_PCG64_V1", "base_seed": BASE_SEED, "pit_seed": PIT_SEED},
+        "simulation": {"seed_policy": "EXPLICIT_NUMPY_PCG64_V1", "base_seed": BASE_SEED, "pit_seed": PIT_SEED, "row_order": "season,week,game_id"},
         "provenance_class": "RECONSTRUCTED_HISTORICAL_NOT_PIT",
         "classification": ["RESEARCH_ONLY", "NOT_Model_P", "NOT_Truth_Gate", "NOT_OFFICIAL"],
         "authority": {"model_p_created": False, "truth_gate_authority": False, "promotion_authority": False, "eligibility_changed": False, "staking_authority": False, "official_authority": False, "historical_pit_created": False, "backfill": False},
