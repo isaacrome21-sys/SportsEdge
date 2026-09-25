@@ -1,0 +1,79 @@
+{
+  "schema": "SPORTSEDGE_HISTORICAL_PRICE_SOURCE_ADMISSION_V1",
+  "status": "FROZEN_RESEARCH_ONLY",
+  "authority": {
+    "model_p": false,
+    "promotion": false,
+    "official": false
+  },
+  "purpose": "Admit historical sportsbook snapshots for benchmark and replay evidence only. Market data may never enter model-fit features.",
+  "provider": {
+    "name": "The Odds API",
+    "documentation_url": "https://the-odds-api.com/historical-odds-data/",
+    "historical_nfl_featured_markets_start_utc": "2020-06-06T10:05:00Z",
+    "snapshot_interval_before_2022_09_18_minutes": 10,
+    "snapshot_interval_from_2022_09_18_minutes": 5,
+    "additional_markets_start_utc": "2023-05-03T05:30:00Z",
+    "paid_plan_required": true
+  },
+  "public_architecture_reference": {
+    "repository_url": "https://github.com/hitechlan1001/OddsAPI-Historical-Data-Fetcher",
+    "commit_sha": "0b5794089e22d5800ca5143a35d437236ae1a83c",
+    "adopted_scope": [
+      "historical event discovery before odds retrieval",
+      "requesting h2h/spreads/totals from The Odds API historical endpoint",
+      "season-bounded resumable acquisition concept"
+    ],
+    "not_adopted": [
+      "consensus aggregation",
+      "fitted artifacts",
+      "thresholds",
+      "validation claims",
+      "provider data as model features"
+    ],
+    "dependency_mode": "REIMPLEMENTED_NOT_LIVE_DEPENDENCY"
+  },
+  "admitted_sports": ["NFL", "CFB", "MLB"],
+  "admitted_market_families": ["moneyline", "spread", "game_total"],
+  "required_snapshot_fields": [
+    "sport_key",
+    "event_id",
+    "commence_time_utc",
+    "snapshot_timestamp_utc",
+    "book_key",
+    "book_title",
+    "book_last_update_utc",
+    "market_key",
+    "outcomes",
+    "raw_byte_sha256",
+    "retrieved_at_utc",
+    "source_request_sha256"
+  ],
+  "pairing_requirements": {
+    "moneyline": "BOTH_TEAMS_SAME_BOOK_SAME_SNAPSHOT",
+    "spread": "BOTH_TEAMS_MATCHED_POINTS_SAME_BOOK_SAME_SNAPSHOT",
+    "game_total": "OVER_AND_UNDER_MATCHED_TOTAL_SAME_BOOK_SAME_SNAPSHOT"
+  },
+  "temporal_rules": {
+    "snapshot_must_precede_commence_time": true,
+    "book_last_update_must_not_exceed_snapshot_timestamp": true,
+    "retrieved_at_may_be_later_than_event": true,
+    "historical_retrieval_is_replay_evidence_not_forward_capture": true
+  },
+  "contamination_firewall": {
+    "sportsbook_inputs_allowed_in_model_fit": false,
+    "sportsbook_inputs_allowed_in_model_features": false,
+    "sportsbook_inputs_allowed_for_benchmark": true,
+    "sportsbook_inputs_allowed_for_clv": true,
+    "sportsbook_inputs_allowed_for_market_no_vig": true
+  },
+  "admission_behavior": {
+    "missing_required_field": "BLOCK",
+    "unpaired_market": "BLOCK_PAIRED_BENCHMARK",
+    "timestamp_at_or_after_kickoff": "BLOCK",
+    "book_update_after_snapshot": "BLOCK",
+    "unknown_market": "BLOCK",
+    "raw_bytes_unhashed": "BLOCK"
+  },
+  "notes": "This contract admits source structure only. It does not assert that any SportsEdge historical row has been retrieved, verified, or earned promotion authority. Public-source architecture may be adopted; evidence must be SportsEdge-owned, source-hashed, and PIT-adjudicated."
+}
