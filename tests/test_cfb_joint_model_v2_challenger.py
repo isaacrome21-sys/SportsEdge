@@ -90,10 +90,15 @@ class ChallengerTests(unittest.TestCase):
         h, a = simulate_cfb_v2_paths(self.model, self.rows[2], seed=9, n_paths=3000)
         mass = key_number_mass(h, a)
         self.assertEqual(set(mass), {3, 7, 10, 14})
-        cal = outcome_calibration(
-            lambda r, s: simulate_cfb_v2_paths(self.model, r, seed=s, n_paths=500), self.rows[:40],
-        )
+        seen_n_paths = []
+
+        def simulate(r, s, n_paths):
+            seen_n_paths.append(n_paths)
+            return simulate_cfb_v2_paths(self.model, r, seed=s, n_paths=n_paths)
+
+        cal = outcome_calibration(simulate, self.rows[:40], n_paths=500)
         self.assertEqual(cal["n"], 40)
+        self.assertEqual(seen_n_paths, [500] * 40)
         for key in ("margin", "total"):
             self.assertLessEqual(cal[key]["cover_50"], cal[key]["cover_80"])
             self.assertLessEqual(cal[key]["cover_80"], cal[key]["cover_95"])
