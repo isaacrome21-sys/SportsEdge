@@ -200,14 +200,14 @@ def outcome_calibration(
 ) -> dict[str, Any]:
     """Market-blind distribution calibration on held-out games.
 
-    ``simulate(row, seed)`` must return (home, away) arrays. Returns randomized-PIT
+    ``simulate(row, seed, n_paths)`` must return (home, away) arrays. Returns randomized-PIT
     interval coverage for margin and total. A calibrated model hits ~0.50/0.80/0.95;
     coverage below target = distribution too narrow (overconfident edges).
     """
     rng = np.random.default_rng(seed)
     pits = {"margin": [], "total": []}
     for i, r in enumerate(rows):
-        h, a = simulate(r, seed + i)
+        h, a = simulate(r, seed + i, n_paths)
         ah, aa = _num(r.get("home_score"), "home_score"), _num(r.get("away_score"), "away_score")
         pits["margin"].append(_randomized_pit(h - a, ah - aa, rng.random()))
         pits["total"].append(_randomized_pit(h + a, ah + aa, rng.random()))
