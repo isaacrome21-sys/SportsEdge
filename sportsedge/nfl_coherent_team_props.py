@@ -9,9 +9,11 @@ owns role stabilization and single-player draw kernels.
 
 For receiving props, QB completions and passing yards are allocated across the
 provided receiver pool on the same path.  Completion weights come only from each
-receiver's stabilized targets x catch rate.  Per-reception yard shapes mirror the
-existing shared-sim receiving kernel, then are rescaled so receiver yards sum
-exactly to QB passing yards on every path.
+receiver's stabilized targets x catch rate.  The fitted QB yards/completion and
+the catch-weighted receiver yards/reception inputs must agree before simulation;
+the allocator will not silently repair inconsistent inputs by rescaling them.
+Per-reception yard shapes mirror the existing shared-sim receiving kernel, then
+integer rounding preserves exact path-level QB/receiver yard identity.
 
 For anytime TD, this module accepts explicit per-player TD opportunity shares.
 It does not recreate the old 50/50 rush/goal-line and target/close-target blend.
@@ -24,7 +26,7 @@ authority.
 """
 from __future__ import annotations
 
-from math import floor, isfinite
+from math import floor, isclose, isfinite
 import random
 from typing import Any, Mapping, Sequence
 
@@ -94,7 +96,12 @@ def _sigma(payload: Mapping[str, Any]) -> float:
 
 
 def _absorbed_role(payload: Mapping[str, Any]) -> tuple[dict[str, float], float]:
-    """Fold validated pregame context multipliers into the stabilized role."""
+    """Fold non-script pregame context into the stabilized role.
+
+    ``pass_multiplier`` and ``rush_multiplier`` are reserved for the explicit
+    game-state script in this coherent path.  A non-neutral value in player
+    context would otherwise multiply the same concept twice, so it fails closed.
+    """
     _assert_no_market_inputs(payload)
     role = dict(stabilized_role(payload))
     volume = _context_multiplier(payload, "volume_multiplier")
@@ -106,8 +113,11 @@ def _absorbed_role(payload: Mapping[str, Any]) -> tuple[dict[str, float], float]
     rush_eff = _context_multiplier(payload, "rush_efficiency_multiplier")
     recv_eff = _context_multiplier(payload, "receiving_efficiency_multiplier")
 
-    role["pass_attempts"] *= volume * pass_mult
-    role["rush_attempts"] *= volume * rush_mult
+    if abs(pass_mult - 1.0) > 1e-12 or abs(rush_mult - 1.0) > 1e-12:
+        raise NflPropSimulationError("CONTEXT_SCRIPT_MULTIPLIER_CONFLICT")
+
+    role["pass_attempts"] *= volume
+    role["rush_attempts"] *= volume
     role["targets"] *= volume * target_mult
     role["pass_yards_per_completion"] *= efficiency * pass_eff
     role["rush_yards_per_attempt"] *= efficiency * rush_eff
@@ -203,6 +213,29 @@ def _integer_scale(total: int, names: Sequence[str], raw: Mapping[str, float]) -
     return base
 
 
+def _assert_yardage_identity(
+    qb_role: Mapping[str, float],
+    receiver_roles: Sequence[Mapping[str, float]],
+    catch_weights: Sequence[float],
+) -> None:
+    """Require fitted QB YPC to equal catch-weighted receiver YPR.
+
+    These are two views of the same completed-pass yardage identity.  If they do
+    not agree, silently scaling receiver yard shapes to the QB total would hide a
+    model-input contradiction, so the path fails closed.
+    """
+    total_weight = sum(catch_weights)
+    if total_weight <= 0:
+        return
+    pooled_ypr = sum(
+        weight * role["receiving_yards_per_reception"]
+        for weight, role in zip(catch_weights, receiver_roles)
+    ) / total_weight
+    qb_ypc = qb_role["pass_yards_per_completion"]
+    if not isclose(pooled_ypr, qb_ypc, rel_tol=1e-9, abs_tol=1e-9):
+        raise NflPropSimulationError("YARDAGE_IDENTITY_MISMATCH")
+
+
 def simulate_team_on_game_paths(
     qb_payload: Mapping[str, Any],
     receivers: Sequence[Mapping[str, Any]],
@@ -253,6 +286,8 @@ def simulate_team_on_game_paths(
                 n_sims=1,
                 seed=child_seed,
             )[0]
+
+        _assert_yardage_identity(qb_role, receiver_roles, catch_weights)
 
         completions = int(qb_draw["completions"])
         reception_counts = {name: 0 for name in names}
