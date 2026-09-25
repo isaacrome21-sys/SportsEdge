@@ -1,5 +1,8 @@
+import random
+
 import pytest
 from sportsedge.nfl_prop_shared_sim import (
+    _rushing_yards,
     estimate_prop,
     simulate_player,
     simulate_game,
@@ -110,6 +113,36 @@ def test_volume_multiplier_cannot_smuggle_a_team_total():
         simulate_player(p, n_sims=5)
 
 
+def test_non_neutral_multiplier_requires_explicit_real_source():
+    p = player()
+    del p["context"]["source"]
+    p["context"]["rush_multiplier"] = 1.15
+    with pytest.raises(NflPropSimulationError, match="CONTEXT_SOURCE_REQUIRED"):
+        simulate_player(p, n_sims=5)
+
+    p = player()
+    p["context"]["source"] = "none"
+    p["context"]["rush_multiplier"] = 1.15
+    with pytest.raises(NflPropSimulationError, match="CONTEXT_SOURCE_REQUIRED"):
+        simulate_player(p, n_sims=5)
+
+    p = player()
+    del p["context"]["source"]
+    simulate_player(p, n_sims=3)
+
+
+def test_large_role_change_belongs_in_role_prior_not_multiplier():
+    p = player()
+    p["context"]["rush_multiplier"] = 3.0
+    p["context"]["source"] = "injury"
+    with pytest.raises(NflPropSimulationError, match="CONTEXT_MULTIPLIER_OUT_OF_RANGE"):
+        simulate_player(p, n_sims=5)
+
+    p = player()
+    p["role_prior"]["rush_attempts"] = 18
+    assert stabilized_role(p)["rush_attempts"] == 18
+
+
 def test_rare_rates_use_heavier_shrinkage_than_volume():
     p = player()
     p["sample_size"] = 2
@@ -120,6 +153,16 @@ def test_rare_rates_use_heavier_shrinkage_than_volume():
     expected_int = (40 * 0.025 + 2 * 0.12) / 42
     assert abs(role["pass_td_rate"] - expected_td) < 1e-12
     assert abs(role["interception_rate"] - expected_int) < 1e-12
+
+
+def test_rushing_yards_preserve_requested_ypc():
+    carries_per_draw = 15
+    draws = 15000
+    for i, mean in enumerate((0.4, 3.5, 4.3, 5.5)):
+        rng = random.Random(100 + i)
+        yards = sum(_rushing_yards(rng, carries_per_draw, mean) for _ in range(draws))
+        observed = yards / (draws * carries_per_draw)
+        assert abs(observed - mean) < 0.08
 
 
 def test_rushing_yards_have_losses_and_a_right_tail():
