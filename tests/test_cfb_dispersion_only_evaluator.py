@@ -57,6 +57,7 @@ def _governed_fixture(n=100):
             if g==0:
                 row.update(regulation_home_score=21,regulation_away_score=21,home_score=28,away_score=21)
             rows.append(row)
+    rows.sort(key=lambda r:(int(r["season"]),int(r["week"]),str(r["game_id"])))
     folds=[]
     for season in range(2018,2026):
         train=[r for r in rows if r["season"]<season]
@@ -124,8 +125,17 @@ class TestCFBDispersionOnlyEvaluator(TestCase):
         self.assertEqual(out["n_games"],700)
         self.assertEqual(out["n_paths_per_game_per_model"],20)
         self.assertEqual(out["capture_sha256"],capture["capture_sha256"])
+        self.assertEqual(out["mean_refits_performed"],0)
+        self.assertTrue(out["primary_metric"]["common_support_per_game"])
         self.assertIn(out["status"],{"V2_DEMONSTRATED_DISPERSION_IMPROVEMENT_DIAGNOSTIC_ONLY","NO_DEMONSTRATED_DISPERSION_IMPROVEMENT"})
         self.assertTrue(all(v is False for v in out["authority"].values()))
+
+    def test_parent_row_order_is_frozen(self):
+        rows,result,capture=_governed_fixture()
+        rows[0],rows[1]=rows[1],rows[0]
+        result.pop("result_sha256"); result["rows_sha256"]=_hash(rows); result["result_sha256"]=_hash(result)
+        with self.assertRaisesRegex(de.CFBDispersionEvaluationError,"PARENT_ROW_ORDER_INVALID"):
+            de.evaluate_cfb_dispersion_only(rows,result,capture)
 
     def test_tampered_capture_hash_fails_closed(self):
         rows,result,capture=_governed_fixture()
