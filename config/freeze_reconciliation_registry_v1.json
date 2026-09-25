@@ -1,1 +1,841 @@
-{"baseline_main_sha":"564e5567acf63adbf750e033df08a8c368f6884d","bundle_inventory_complete":false,"bundles":[{"bundle_id":"NFL_V2J_V2K_GOVERNANCE_FREEZE_V1","coverage_paths":[".github/workflows/nfl-v2-nested-diagnostic.yml",".github/workflows/nfl-v2g-forward-clv.yml",".github/workflows/nfl-v2g-market-evidence-binding.yml",".github/workflows/nfl-v2g-prospective-evaluation.yml",".github/workflows/nfl-v2g-prospective-outcome-capture.yml",".github/workflows/nfl-v2g-prospective-prediction-capture.yml",".github/workflows/nfl-v2g-source-bound-artifact.yml",".github/workflows/nfl-v2h-first-readout.yml",".github/workflows/nfl-v2i-first-readout.yml",".github/workflows/nfl-2026-prospective-governance.yml",".github/workflows/football-nfl-forward-clv-collection.yml",".github/workflows/football-nfl-promotion-evidence.yml",".github/workflows/football-nfl-run-machine-contract.yml","config/research/nfl_feature_search_policy_2026-09-10.json","config/research/nfl_holdout_integrity_correction_2026-09-12.json","config/research/nfl_player_outcome_g1_attempt_ledger.json","config/research/nfl_prospective_evaluation_boundary_2026-09-12.json","scripts/adjudicate_nfl_v2j_postrun.py","scripts/bind_nfl_v2g_market_evidence.py","scripts/build_nfl_clv_evidence.py","scripts/build_nfl_promotion_registry.py","scripts/build_nfl_v2g_source_bound_artifact.py","scripts/capture_nfl_v2g_prospective_predictions.py","scripts/merge_nfl_v2j_fold_shards.py","scripts/run_nfl_auto.py","scripts/run_nfl_historical_validation.py","scripts/run_nfl_production_validation.py","scripts/run_nfl_production_validation_frozen.py","scripts/run_nfl_v2g_forward_clv.py","scripts/run_nfl_v2g_historical_diagnostic.py","scripts/run_nfl_v2h_first_readout.py","scripts/run_nfl_v2i_first_readout.py","scripts/settle_nfl_v2g_prospective_outcomes.py","scripts/validate_nfl_v2g_candidate.py","scripts/validate_nfl_v2h_candidate.py","scripts/validate_nfl_v2i_candidate.py","sportsedge/sports/nfl/EVIDENCE_REBUILD_2026-09-11.md","sportsedge/sports/nfl/NFL_V2H_FIRST_READOUT_RESULT_2026-09-12.json","sportsedge/sports/nfl/NFL_V2I_FIRST_READOUT_RESULT_2026-09-12.json","sportsedge/sports/nfl/archive_adjudication.py","sportsedge/sports/nfl/readiness.py","sportsedge/sports/nfl/run_machine.py","sportsedge/sports/nfl/source_manifest.py"],"coverage_prefixes":[".github/workflows/nfl-v2j",".github/workflows/nfl-v2k",".github/workflows/nfl-source-freeze-bootstrap","scripts/build_nfl_v2j","scripts/build_nfl_v2k","scripts/run_nfl_v2j","scripts/run_nfl_v2k","sportsedge/sports/nfl/NFL_V2J_","sportsedge/sports/nfl/NFL_V2K_","sportsedge/sports/nfl/nfl_v2j","sportsedge/sports/nfl/nfl_v2k","sportsedge/sports/nfl/m2_v2g","sportsedge/sports/nfl/m2_v2h","sportsedge/sports/nfl/m2_v2i","sportsedge/sports/nfl/v2g_","tests/test_nfl_v2j","tests/test_nfl_v2k","config/research/nfl_v2","config/nfl_2026_prospective_governance_v1.json","config/nfl_feature_search_policy_v1.json","config/nfl_m2_freeze.json","config/nfl_promotion_source_freeze_v1.json"],"disposition":null,"freeze_sha":"564e5567acf63adbf750e033df08a8c368f6884d"},{"activation_artifact_sha256":"3efa5cc92b5ed1bf53a99cbe0d6e7792d01791a77c8f684874d66213b73d9570","activation_config_blob_sha":"014875484c9725af7480d77b406a9aea4e856b0d","bundle_id":"NFL_PROP_MODEL_FREEZE_V1","coverage_prefixes":[".github/workflows/football-nfl-prop-artifact-freeze.yml","config/nfl_prop_model_freeze.json","config/nfl_prop_code_surface_v1.json","config/nfl_prop_evidence.json","config/nfl_prop_certification.json","artifacts/football/nfl_prop_artifact_bundle_v1.json","sportsedge/props/nfl","tests/test_nfl_prop"],"disposition":null,"freeze_identity_semantics":"MAIN_LINE_ACTIVATION_COMMIT","freeze_sha":"a72ac337e3b6be2162ce88b0223f69e8e6bbdff6","predictive_code_git_sha":"5dfa29347bed608771e6a2395ce8e894dbfdd881"},{"activation_artifact_sha256":"923cfd1be42d31a87d9f31ddffce406d44bfc1bb003d1c625f5a4258f7773f23","activation_config_blob_sha":"c3df366e62db2397c58dccf5f24e13644aef6b18","bundle_id":"CFB_PROP_MODEL_FREEZE_V1","coverage_prefixes":[".github/workflows/football-cfb-prop-artifact-freeze.yml","config/cfb_prop_model_freeze.json","config/cfb_prop_code_surface_v1.json","config/cfb_prop_evidence.json","config/cfb_prop_certification.json","artifacts/football/cfb_prop_artifact_bundle_v1.json","sportsedge/props/cfb","tests/test_cfb_prop"],"disposition":{"prior_forward_clock_invalidated":true,"reason":"PR_797_CHANGED_COVERED_FREEZE_VERIFICATION_WORKFLOW; FULL_REFREEZE_HASH_TIMESTAMP_ROW_ADMISSIBILITY_SEMANTICS_NOT_MACHINE_VERIFIED; REVOKED_FAIL_CLOSED","revoked_at":"2026-09-16T23:23:45Z","state":"REVOKED"},"freeze_identity_semantics":"MAIN_LINE_ACTIVATION_COMMIT","freeze_sha":"108d6144a62e714a8da6a32272f7fa98f07b9cd7","predictive_code_git_sha":"67184a5a120a2bc868531c7827783f562f82ee0b"},{"bundle_id":"CFB_CANDIDATE_PREREG_FREEZE_V1","coverage_paths":["scripts/audit_cfb_selection_readiness.py","sportsedge/sports/cfb/selection_readiness.py"],"coverage_prefixes":[".github/workflows/cfb-candidate-first-evaluation-readiness.yml","config/cfb_model_candidate_prereg_v1.json","config/cfb_model_candidate_code_manifest_v1.json","config/cfb_model_candidate_specs_v1.json","config/cfb_model_selection_policy_v1.json","scripts/audit_cfb_model_selection_prereg.py","sportsedge/sports/cfb/candidate_prereg_binding.py","sportsedge/sports/cfb/model_selection_prereg.py","tests/test_cfb_model_candidate","tests/test_cfb_model_selection"],"disposition":{"authority":{"eligibility":false,"model_p":false,"official":false,"promotion":false,"staking":false,"truth_gate":false,"validation_attempt":false},"forward_clock_restart_at":"2026-09-18T12:01:33Z","new_bundle_id":"CFB_CANDIDATE_PREREG_FREEZE_V3","new_freeze_sha":"529b06af94061a5eb86efd9909b15b62cefce938","prior_bundle_freeze_sha":"4629afd60972fe73eb0217508dc7a4ae51ce6ccf","prior_forward_clock_invalidated":true,"reason":"MACHINE_VERIFIED_POST_PR833_WEEK1_CORRECTED_CANDIDATE_BYTES_AND_CODE_MANIFEST; PR833_IN_ANCESTRY; ZERO_ATTEMPTS; NO_EVALUATION_ROWS; REFROZEN_FAIL_CLOSED_FOR_SELECTION_SCOPE_ONLY","row_admissibility_semantics":"PREREGISTRATION_ONLY_NO_EVALUATION_ROWS_V1","selection_scope_only":true,"state":"REFROZEN","trigger_delta_sha":"4fc4aa9a60b69137a0efc4d7d59ccee95f53b0bb","verification_schema":"CFB_CANDIDATE_PREREG_REFREEZE_V1"},"freeze_sha":"4629afd60972fe73eb0217508dc7a4ae51ce6ccf"},{"bundle_id":"CFB_HISTORICAL_MARKET_ARCHIVE_FREEZE_V1","coverage_prefixes":[".github/workflows/cfb-historical-market-source-freeze","config/research/cfb_historical_market_source_v1.json","scripts/materialize_cfb_historical_market_archive","sportsedge/sports/cfb/history_cache","sportsedge/sports/cfb/market_archive","tests/test_cfb_historical_market","tests/test_cfb_history_cache","tests/test_cfb_market_archive"],"disposition":null,"freeze_sha":"564e5567acf63adbf750e033df08a8c368f6884d"},{"bundle_id":"MARKET_MAKER_RADAR_EVIDENCE_FREEZE_V2","coverage_paths":[".github/workflows/market-maker-radar.yml","config/market_maker_radar_v1.json","docs/market_maker_radar.md","scripts/capture_nfl_market_maker_radar.py","scripts/evaluate_market_maker_execution_pilot.py","scripts/log_market_maker_execution_attempt.py","scripts/recheck_market_maker_candidate_persistence.py"],"coverage_prefixes":[".github/workflows/nfl-market-maker-radar","config/market_maker_radar_v2.json","scripts/analyze_market_maker_radar","scripts/settle_market_maker","scripts/capture_market_maker","sportsedge/market_maker","tests/test_market_maker"],"disposition":null,"freeze_sha":"564e5567acf63adbf750e033df08a8c368f6884d"},{"bundle_id":"GLOBAL_PROMOTION_EVIDENCE_FREEZE_V2","coverage_paths":[".github/workflows/direct-dk-market-archive-contract.yml",".github/workflows/football-nfl-promotion-evidence.yml",".github/workflows/three-sport-core-certification-audit.yml",".github/workflows/truth-gate-floor-provenance.yml","config/closing_line_archive_policy_v1.json","config/direct_dk_forward_pair_admission_v1.json","config/football_forward_capture_policy_v2.json","docs/LIVE_PROMOTION_STATUS.md","docs/decision_policy_validation_boundary.md","docs/official_market_gate.md","scripts/audit_three_sport_core_certification.py","scripts/capture_closing_line_archive.py","scripts/capture_closing_line_archive_v3.py","scripts/capture_direct_dk_closing_lines.py","scripts/verify_evidence_determinism.py"],"coverage_prefixes":["config/promotion_evidence_policy_v2.json","config/promotion_evidence_policy_manifest.json","config/truth_gate_floors.json","config/evidence_unit_contract_v1.json","sportsedge/promotion","sportsedge/truth_gate","tests/test_promotion","tests/test_truth_gate"],"disposition":null,"freeze_sha":"564e5567acf63adbf750e033df08a8c368f6884d"},{"bundle_id":"MLB_DFS_EVIDENCE_FREEZE_V1","coverage_prefixes":[".github/workflows/dfs-engine-contract","config/mlb_dfs_","docs/DK_DFS_","scripts/build_dk_ownership","scripts/freeze_dk_ownership","sportsedge/dfs/","tests/test_dfs_"],"disposition":null,"freeze_sha":"7a92455f081ee52a454b2c49ff798d902a3ace68"}],"deltas":[{"delta_id":"PR_683","merge_sha":"f242c916903cdea60301db1d4380653460945eba","pr":683},{"delta_id":"PR_689","merge_sha":"6c3fe073d9a0a240ddd7f58938a4f32d3abedceb","pr":689},{"delta_id":"PR_691","merge_sha":"76f0fb454d48cf6df8e51660114d52878fd3665e","pr":691},{"delta_id":"PR_692","merge_sha":"7a92455f081ee52a454b2c49ff798d902a3ace68","pr":692},{"delta_id":"PR_688","merge_sha":"ed9aa39ded1da89eca2bb7019a5f810dde83af78","pr":688},{"delta_id":"PR_690","merge_sha":"7ed79c51e790d393108864513c34dd296d9fd175","pr":690},{"delta_id":"PR_695","merge_sha":"8dcd645447fb110b8cfc250b36c502836302097b","pr":695},{"delta_id":"PR_697","merge_sha":"546d07de8ea286d0218c4c70f95ca2618e645374","pr":697},{"delta_id":"PR_698","merge_sha":"8de77a15080e6329bcd70058b735ff972f93ebc7","pr":698},{"delta_id":"PR_699","merge_sha":"7cddfa6b55e32081f0a0bbc5b0591241d504fb45","pr":699},{"delta_id":"PR_687","merge_sha":"1325bfb62031e54c1b46023bd170ad455d38516e","pr":687},{"delta_id":"PR_701","merge_sha":"7f8cd83df5ec4fe91e4c347ee843f861da8ba459","pr":701},{"delta_id":"PR_702","merge_sha":"09a2aecdc168f65d50a1120017491a0d104e6140","pr":702},{"delta_id":"PR_703","merge_sha":"00b4db27f15cc22b089e2a2d974cf483eed86e58","pr":703},{"delta_id":"DIRECT_MAIN_81BD1E18_NOOP","merge_sha":"81bd1e1807a65e0ed7060971152a0c1ca9c0d21c","pr":0},{"delta_id":"DIRECT_MAIN_27F789B0_REVERT","merge_sha":"27f789b0b37ac17876b97fcd1fd794cb2c394349","pr":0},{"delta_id":"DIRECT_MAIN_05877519_EV_TRACKER_CLOSE_UPDATE","merge_sha":"05877519650ab451d4b5cd73d8ea6d42d1baebe1","note":"Automated direct-to-main mutation during ACTIVE_BLOCKED hold; changed output/ev_tracker/health.md only. Registered for provenance; semantic freeze-drift disposition remains governed by bundle reconciliation.","pr":0},{"delta_id":"PR_705_RECONCILIATION_RELEASE_MERGE","merge_sha":"3fa151b22fb619031bde2fd7cbd75e1ee9c64471","note":"The reconciliation release merge itself advanced main beyond the pre-merge registered point; registered here so the self-aging transition is explicit.","pr":705},{"delta_id":"PR_712_NFL_CAPTURE_INTEGRITY","merge_sha":"a75250bfd5881c0cafe82a47a877d9ea764fc203","note":"NFL 2026 capture-integrity hardening; exact-head reconciliation previously stopped before coverage/inventory/delta evaluation because the registry had self-aged after PR 705.","pr":712},{"delta_id":"PR_713_NFL_CAPTURE_QUARANTINE","merge_sha":"4564a9d2ccd7a55b0547a4ebd5a1b714850aab99","note":"Quarantines unreconciled NFL capture rows while preserving no-backfill collection and repairs due-gate self-concealment.","pr":713},{"delta_id":"PR_714_RECONCILIATION_TERMINAL_MERGE","merge_sha":"9e8c7eeed998b4bea1386000c41630fe9380b834","note":"The prior reconciliation-only terminal merge advanced main beyond the PR_713 registered point. It is now explicitly registered before reconciling later ordinary main movement.","pr":714},{"delta_id":"PR_716_MLB_PROP_LIVE_SCHEMA_REPAIR","merge_sha":"a6e5a155edc9bc59676816091473a8540d694e0c","note":"Repairs live DraftKings MLB prop acquisition and strict PIT event timing without changing promotion or eligibility authority. Bundle impact must be determined by the reconciliation matrix, not by this note.","pr":716},{"delta_id":"PR_722_RECONCILIATION_RELEASE_MERGE","merge_sha":"bd47021bd2d0fbb748e64795f0b37108a70b4389","note":"Reconciliation-only merge after PR_716; machine matrix determines bundle impact.","pr":722},{"delta_id":"DIRECT_MAIN_6F1D95D8_CONTENT_IDENTITY","merge_sha":"6f1d95d8feed6b36ce44b2f625de24a6dd0e0a8a","note":"Direct main governance change introducing governed-surface content identity; machine matrix determines bundle impact.","pr":0},{"delta_id":"PR_724_CONTENT_IDENTITY_CONTROL","merge_sha":"e4de5443ad8acc86cfa9345d01442db9853dac4c","note":"Replaces self-aging reconciliation SHA equality with ancestry plus governed-surface content identity; machine matrix determines bundle impact.","pr":724},{"delta_id":"DIRECT_MAIN_FAB3FA85_NOOP","merge_sha":"fab3fa855167ecaca65263dcf239364e540e64d2","note":"Accidental direct-main noop registered for complete first-parent provenance.","pr":0},{"delta_id":"DIRECT_MAIN_F0704D8D_REVERT","merge_sha":"f0704d8d9cbacd5ecabb48c01adbc1682fcc8def","note":"Reverts the accidental direct-main empty-file write; registered for complete first-parent provenance.","pr":0},{"delta_id":"PR_726_NFL_CAPTURE_PRESENT_CONTRACT","merge_sha":"a78fb74186b8f84f1df720412ce0d70edbd4e68e","note":"Hardens NFL capture PRESENT semantics to require contract-valid nonempty evidence; machine matrix determines bundle impact.","pr":726},{"delta_id":"PR_729_DIRECT_MAIN_WRITER_QUIESCENCE","merge_sha":"a30aec56dc4a0f956d67534c91a95a9aecc43e32","note":"Quiesces two direct-main automation writers; machine matrix determines bundle impact.","pr":729},{"delta_id":"PR_728_TEMPORAL_EVAL_PLUMBING","merge_sha":"c1b1c827116a91fb7101bc9ffed407a943260fb4","note":"Adds sport-neutral untouched temporal evaluation plumbing without promotion authority; machine matrix determines bundle impact.","pr":728},{"delta_id":"PR_730_CFB_SCOPE_RECONCILIATION","merge_sha":"c824f204b2cf33fcaea0f6de80ce6037b3f21b51","note":"Records CFB selection/training/promotion scope interpretation; machine matrix determines bundle impact.","pr":730},{"delta_id":"PR_727_CFB_PARTICIPATION_INTEGRATION","merge_sha":"44a6a1722d524dafd7f70c24c1b61d4b81b71c03","note":"Integrates CFB participation research and PIT capture plumbing after explicit scope reconciliation; machine matrix determines bundle impact.","pr":727},{"delta_id":"PR_737_CFB_FORWARD_EVIDENCE_AUDIT_EXECUTION","merge_sha":"d641a7412fa5c236f5b7fb2176b5844d237f4f09","note":"Repairs CFB forward-evidence audit module execution hygiene only; machine matrix determines bundle impact.","pr":737},{"delta_id":"PR_736_NFL_PROVIDER_BUDGET_GUARD","merge_sha":"2930583ee1bac7a94644fe182278212ffe728452","note":"Adds prospective NFL provider quota/preflight controls and exact governance exemptions; machine matrix determines bundle impact.","pr":736},{"delta_id":"PR_797_CFB_RETAINED_FREEZE_VERIFICATION","merge_sha":"f8afb5c5e3251b6ede8a39ef25c47fdd07dfb7ee","note":"Catch-up anchor after machine-proving the prior registered boundary through the parent of PR #797 is governed-content-identical. PR #797 changes the covered CFB prop freeze workflow; the bundle remains fail-closed REVOKED because full refreeze hash/timestamp/row-admissibility semantics are not machine-verified; no model or betting authority is granted.","pr":797},{"delta_id":"PR_791_CFB_SELECTION_READINESS_SCOPE","merge_sha":"9a4f81a6a2a2eaf3c77c1ff9f0510f99a3a3a170","note":"PR #791 changes the covered CFB candidate first-evaluation readiness workflow to align reconstructed-history selection scope with the merged #730 amendment. Candidate evaluation remains unconsumed at attempt zero; the bundle remains fail-closed REVOKED because full refreeze semantics are not machine-verified; no model or betting authority is granted.","pr":791},{"delta_id":"PR_806_RECONCILIATION_RELEASE_MERGE","merge_sha":"a16bc6907e95267e919f42d15b04afaebcf5bb8c","note":"Reconciliation-only merge after PR #791; it restores the registered boundary and fail-closed revocation semantics. Machine matrix determines bundle impact.","pr":806},{"delta_id":"PR_803_FOURC_LINE_HISTORY_CORROBORATION","merge_sha":"7d64c5e6b149324e54286f29b7058b696886749b","note":"Adds provenance-bound zero-authority 4C line-history corroboration to covered MARKET_MAKER_RADAR_EVIDENCE_FREEZE_V2 surfaces. The effective bundle was already fail-closed REVOKED by the coverage extension; no Model_P, Truth Gate, promotion, eligibility, staking, evidence-clock, DraftKings evidence, wager-placement, or OFFICIAL authority is granted.","pr":803},{"delta_id":"PR_807_CURRENT_MAIN_CATCHUP","merge_sha":"6256c6125c35b6034697577c470a287290204769","note":"Reconciliation release merge after PR #803; register the self-aging main transition. Machine matrix determines bundle impact.","pr":807},{"delta_id":"PR_808_CURRENT_MAIN_CATCHUP","merge_sha":"6e1c566f68b5383656bb10697b37358abd5903c3","note":"MLB prospective MONEYLINE heartbeat bridge; preserves market-blind Model_P, frozen T30 PAPER semantics, no-backfill and zero authority.","pr":808},{"delta_id":"PR_810_CURRENT_MAIN_CATCHUP","merge_sha":"9a095800829a18b09e986cc3fa2cc4c9dfcdae61","note":"MLB heartbeat continuation across per-game missed windows; preserves frozen timing and zero authority.","pr":810},{"delta_id":"PR_812_CURRENT_MAIN_CATCHUP","merge_sha":"f8ea5dc02beb7cec606fa26c348fd4d4cf1fe212","note":"MLB durable T30 accrual liveness guard; records non-accrual honestly and preserves no-backfill and zero authority.","pr":812},{"delta_id":"PR_814_CURRENT_MAIN_CATCHUP","merge_sha":"39a7dc3d5b962ca571e64e8d1757b51fb9ec36bd","note":"NFL independent confirmation-window discovery; no model or betting authority change.","pr":814},{"delta_id":"PR_817_CURRENT_MAIN_CATCHUP","merge_sha":"23fcdbcc9531181540960d30fdef82c6b61d8244","note":"Governance direct-writer repair and NFL confirmation persistence to data branch; no evidence or model authority change.","pr":817},{"delta_id":"PR_813_CURRENT_MAIN_CATCHUP","merge_sha":"2e4410c99630d72664956ead8e3cad0beb4d81d5","note":"CFB auto artifact-binding verifier alias; operational verifier only with zero model/promotion/OFFICIAL authority.","pr":813},{"delta_id":"PR_818_CURRENT_MAIN_CATCHUP","merge_sha":"f23d08bcc48c24368a78447c230a4f626afe1178","note":"CFB auto runtime repository-context repair; operational only with zero authority.","pr":818},{"delta_id":"PR_819_CURRENT_MAIN_CATCHUP","merge_sha":"f397573c06ede6310ae9d1ba932ed67dbedb38ad","note":"CFB first-evaluation readiness fail-closes on revoked candidate prereg freeze. Covered candidate bundle remains REVOKED; attempts remain zero.","pr":819},{"delta_id":"PR_800_CURRENT_MAIN_CATCHUP","merge_sha":"53dd9334441e5da1538ed016cc8123141d27806e","note":"MLB frozen-policy PIT replay scorer restoration; non-authoritative historical dependency only.","pr":800},{"delta_id":"PR_815_CURRENT_MAIN_CATCHUP","merge_sha":"2b4011058429bd6a689e7a69e0286a7e341629bb","note":"NFL direct DraftKings confirmation contract wired onto current main; preserves no-backfill and zero Model_P/Truth Gate/promotion/staking/OFFICIAL authority.","pr":815},{"delta_id":"PR_822_RECONCILIATION_CATCHUP_MERGE","merge_sha":"d17a66fe43cb7a6db7955c4e529bc59fd23a2a9f","note":"Reconciliation-only merge that advanced main beyond the PR815 registered point; governed candidate/model content remains unchanged and authority remains zero.","pr":822},{"delta_id":"PR_823_CFB_CANDIDATE_PREREG_REFREEZE","merge_sha":"852b759b146beba64457a398b3b293eec8a17750","note":"Merges the machine-verified CFB candidate prereg refreeze on current main; attempts remain zero, evaluation remains unrun, and no model or betting authority is granted.","pr":823},{"delta_id":"PR_826_CFB_RECONSTRUCTED_SELECTION_READINESS","merge_sha":"374ffc70c7bfc2fae968ae4d506b2d325ec1ee5d","note":"Adds fail-closed reconstructed-selection acquisition/bundle readiness and protected-main check naming; candidate prereg is machine-refrozen at 0e24934bb6787e2d9ffe1cbb377f128fb2e7dfc9 with zero attempts and zero authority.","pr":826},{"delta_id":"PR_830_RECONCILIATION_CATCHUP_MERGE","merge_sha":"fc5fc8a7baa4daf2e82699972ee877bce3d869c6","note":"Reconciliation-only merge after PR #826; registers the self-aging protected-main transition with zero model or betting authority.","pr":830},{"delta_id":"PR_832_CFB_PROVIDER_PREFLIGHT","merge_sha":"6491cff72832f46ce926c3d3dd22aca4c3d455ed","note":"Adds zero-authority CFBD account/quota/weather/replay-budget preflight. Performs zero historical replay calls and consumes zero evaluation attempts.","pr":832},{"delta_id":"PR_833_CFB_WEEK1_EXECUTION_CORRECTION","merge_sha":"4fc4aa9a60b69137a0efc4d7d59ccee95f53b0bb","note":"Corrects Week-1 execution for frozen CFB candidate families and explicitly leaves the prior candidate prereg refreeze REVOKED pending separate post-merge machine refreeze; attempts remain zero and evaluation remains unrun.","pr":833},{"delta_id":"PR_839_RECONCILIATION_CATCHUP_MERGE","merge_sha":"529b06af94061a5eb86efd9909b15b62cefce938","note":"Reconciliation-only merge registering protected main through PR #833; candidate prereg remains REVOKED, attempts remain zero, and no model or betting authority is granted.","pr":839},{"delta_id":"PR_840_CFB_PROVIDER_PREFLIGHT_HARDENING","merge_sha":"6b842b17ca0bb1eec7370daaf3a981189ecf4e00","note":"Hardens the CFB provider preflight so acquisition readiness requires verified CFBD auth/tier/weather/quota fit with zero replay calls and zero authority. Candidate prereg remains REVOKED; attempts remain zero and evaluation remains unrun.","pr":840},{"delta_id":"PR_842_CLV_REMOVE_PINNACLE_EU","merge_sha":"0ea693e36f0832ac0427cd9d278b3b0312d0350e","note":"Reduces the zero-authority closing-line archive to US DraftKings/FanDuel without Pinnacle/EU. Rows remain NOT_EVIDENCE; no Model_P, Truth Gate, promotion, eligibility, staking, evidence-clock, backfill, or OFFICIAL authority is granted.","pr":842},{"delta_id":"PR_843_ARCHIVE_RESERVE_DK_ONLY_NO_MLB","merge_sha":"2dcd200a244a959c04c972ed652c5142804a6b18","note":"Registers the current-main PR #843 archive-spend guard after its PR #842 catch-up. No CFB candidate bytes changed and no model or betting authority is granted.","pr":843},{"delta_id":"MAIN_ADVANCE_db2f17063fe7","merge_sha":"db2f17063fe731f885ab1bf8fca35384133dc6e5","note":"Merge pull request #845 from isaacrome21-sys/cfb-train-freeze-safe-20260918","pr":845},{"delta_id":"MAIN_ADVANCE_d59a7228b653","merge_sha":"d59a7228b653c1b95f1c747e8aa5174f0cfb0245","note":"Merge pull request #847 from isaacrome21-sys/cfb-preflight-weather-contract-fix-20260918","pr":847},{"delta_id":"MAIN_ADVANCE_d955a717ead9","merge_sha":"d955a717ead9e2912a3371d97faae72c1aa47472","note":"PAPER output lane + CFB venue helpers + context registry","pr":0},{"delta_id":"MAIN_ADVANCE_a3efcbc57ade","merge_sha":"a3efcbc57ade3e0f8878e363a57bcbb8d83f004f","note":"Lock CFB venue-skip contract for reconstructed-selection acquire","pr":0},{"delta_id":"MAIN_ADVANCE_54e85dea0ca4","merge_sha":"54e85dea0ca4b2772711a07d54d7f6daa734d446","note":"Clock context-only splits, VSiN, and Statcast","pr":0},{"delta_id":"MAIN_ADVANCE_db9df62a6d28","merge_sha":"db9df62a6d28efe8cf681d092123573ed0d3e0de","note":"Register model-improvement candidates and split overlay","pr":0},{"delta_id":"MAIN_ADVANCE_7c7c342dc795","merge_sha":"7c7c342dc795e84d212f2596a77162a33cc2f19f","note":"Fix public-splits PYTHONPATH so the clock can capture","pr":0},{"delta_id":"MAIN_ADVANCE_3198c5c4ba89","merge_sha":"3198c5c4ba89e5dae5d0490279b0e8a09b29c13f","note":"Decode gzip/cp1252 VSiN bodies for public splits","pr":0},{"delta_id":"MAIN_ADVANCE_132a75eb1107","merge_sha":"132a75eb110757b3abc6ef81bc00c54d16fe6e77","note":"Clock DraftKings prop discovery","pr":0},{"delta_id":"MAIN_ADVANCE_87105900242a","merge_sha":"87105900242a516d7429a7253f66378427c188fb","note":"Park paid Odds API; freeze blueprint ops","pr":0},{"delta_id":"MAIN_ADVANCE_459ed229fd3f","merge_sha":"459ed229fd3ff59b271a151fe4de31144945dafb","note":"PAPER path: verify CFB DK game lines","pr":0},{"delta_id":"MAIN_ADVANCE_a272e04fb4ce","merge_sha":"a272e04fb4ce2f4bc96b245194ab7c3f66fae902","note":"Add PAPER slate runner","pr":0},{"delta_id":"MAIN_ADVANCE_6d29b473cc7a","merge_sha":"6d29b473cc7aed7c94d24a1eb842159803f50377","note":"PAPER weekend window and MLB ratings","pr":0},{"delta_id":"MAIN_ADVANCE_bc9ff9253202","merge_sha":"bc9ff92532024cba7ddc5e02e93a07f8fb5108f8","note":"PAPER CFB ratings with 2-game minimum","pr":0},{"delta_id":"MAIN_ADVANCE_37f97b4e089a","merge_sha":"37f97b4e089a7675899eead1a49b3770d130b257","note":"Kill toy PF/PA candidates","pr":0},{"delta_id":"MAIN_ADVANCE_89cf5bd1ed12","merge_sha":"89cf5bd1ed1214f9ad0f8e15c9eba776c496bb8d","note":"CFB: finish pre-evaluation plumbing and retain RUN IT pregame slate (#865)","pr":865},{"delta_id":"MAIN_ADVANCE_b45d66566ec2","merge_sha":"b45d66566ec2abb087e4962da65a5b60baf58f9a","note":"CFB: execute frozen all-four first bakeoff (#866)","pr":866},{"delta_id":"MAIN_ADVANCE_4aaa0f9192a7","merge_sha":"4aaa0f9192a7ab8ff573a2e9051443d81f88e312","note":"CFB: add zero-authority market-consensus paper card (#867)","pr":867},{"delta_id":"MAIN_ADVANCE_54b8ec63d01a","merge_sha":"54b8ec63d01a028428ac3a135ecfa99897391dbf","note":"Merge PR #868: CFB null-bakeoff refit/rescore repair","pr":0},{"delta_id":"MAIN_ADVANCE_3ebd503b7fe0","merge_sha":"3ebd503b7fe0bdb5a233f3a799091239002c5a07","note":"Merge PR #869: CFB reconstructed-selection NumPy dependency","pr":0},{"delta_id":"MAIN_ADVANCE_7eade596b1e5","merge_sha":"7eade596b1e51f8ec88cabe30b81279843350fa3","note":"Merge pull request #870 from isaacrome21-sys/fix/cfb-status-quota-20260919","pr":870},{"delta_id":"MAIN_ADVANCE_3a3393653c33","merge_sha":"3a3393653c33a3e4e596264ddf9704f536462e40","note":"Merge pull request #871 from isaacrome21-sys/fix/nfl-runner-temp-startup-20260919","pr":871},{"delta_id":"MAIN_ADVANCE_5480eeb55578","merge_sha":"5480eeb555784bfef202a9080ae808c1e3347fb1","note":"Merge pull request #872 from isaacrome21-sys/fix/cfb-paper-manual-input-20260919","pr":872},{"delta_id":"MAIN_ADVANCE_13a01309e0cb","merge_sha":"13a01309e0cb5c7d6b12a78b13befaa3b48634c3","note":"Merge pull request #873 from isaacrome21-sys/feat/mlb-shadow-paper-card-20260919","pr":873},{"delta_id":"MAIN_ADVANCE_8bf2357f3638","merge_sha":"8bf2357f36389a6ecd5aa0b76683a4dee5777ad2","note":"Merge pull request #874 from isaacrome21-sys/fix/mlb-shadow-cli-startup-20260919","pr":874},{"delta_id":"MAIN_ADVANCE_2d0980483eff","merge_sha":"2d0980483effa0bd05ae50e4614be9b9f35abde3","note":"Merge pull request #875 from isaacrome21-sys/fix/nfl-confirmation-data-persistence-20260919","pr":875},{"delta_id":"MAIN_ADVANCE_b60173ea1e1b","merge_sha":"b60173ea1e1b6f443631fa63b46a7dcda8d2235e","note":"Merge pull request #876 from isaacrome21-sys/mlb/38-market-replay-current-main-v3","pr":876},{"delta_id":"MAIN_ADVANCE_f138916e176c","merge_sha":"f138916e176c84fe8f6dd3a53fb67aaed4cb07ca","note":"Merge pull request #879 from isaacrome21-sys/fix/mlb-moneyline-direct-heartbeat-20260919","pr":879},{"delta_id":"MAIN_ADVANCE_e29874763850","merge_sha":"e298747638502c4c760cf78f2793f0711773ffcf","note":"Merge pull request #880 from isaacrome21-sys/fix/cfb-weather-espn-403-20260919","pr":880},{"delta_id":"MAIN_ADVANCE_a30e0f9651c5","merge_sha":"a30e0f9651c55cfead549b1d3a1f40fb79fc6943","note":"Merge pull request #878 from isaacrome21-sys/nfl/attempt9-model-p-current-main-v3","pr":878},{"delta_id":"MAIN_ADVANCE_d6bbfa0db272","merge_sha":"d6bbfa0db272d8a7791227e63d055df5ec28943b","note":"CFB: close selected-model final-fit artifact path","pr":0},{"delta_id":"MAIN_ADVANCE_78aae277890d","merge_sha":"78aae277890d5ef8b02d72e1cc075150d07b1867","note":"CFB props: add game-state opportunity allocator","pr":0}],"inventory_block_reason":"MACHINE_AUDIT_REQUIRED_ZERO_UNMAPPED_GOVERNANCE_SURFACES_BEFORE_TRUE","issue":686,"reconciled_through_sha":"78aae277890d5ef8b02d72e1cc075150d07b1867","schema":"SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"}
+{
+  "baseline_main_sha": "564e5567acf63adbf750e033df08a8c368f6884d",
+  "bundle_inventory_complete": false,
+  "bundles": [
+    {
+      "bundle_id": "NFL_V2J_V2K_GOVERNANCE_FREEZE_V1",
+      "coverage_paths": [
+        ".github/workflows/nfl-v2-nested-diagnostic.yml",
+        ".github/workflows/nfl-v2g-forward-clv.yml",
+        ".github/workflows/nfl-v2g-market-evidence-binding.yml",
+        ".github/workflows/nfl-v2g-prospective-evaluation.yml",
+        ".github/workflows/nfl-v2g-prospective-outcome-capture.yml",
+        ".github/workflows/nfl-v2g-prospective-prediction-capture.yml",
+        ".github/workflows/nfl-v2g-source-bound-artifact.yml",
+        ".github/workflows/nfl-v2h-first-readout.yml",
+        ".github/workflows/nfl-v2i-first-readout.yml",
+        ".github/workflows/nfl-2026-prospective-governance.yml",
+        ".github/workflows/football-nfl-forward-clv-collection.yml",
+        ".github/workflows/football-nfl-promotion-evidence.yml",
+        ".github/workflows/football-nfl-run-machine-contract.yml",
+        "config/research/nfl_feature_search_policy_2026-09-10.json",
+        "config/research/nfl_holdout_integrity_correction_2026-09-12.json",
+        "config/research/nfl_player_outcome_g1_attempt_ledger.json",
+        "config/research/nfl_prospective_evaluation_boundary_2026-09-12.json",
+        "scripts/adjudicate_nfl_v2j_postrun.py",
+        "scripts/bind_nfl_v2g_market_evidence.py",
+        "scripts/build_nfl_clv_evidence.py",
+        "scripts/build_nfl_promotion_registry.py",
+        "scripts/build_nfl_v2g_source_bound_artifact.py",
+        "scripts/capture_nfl_v2g_prospective_predictions.py",
+        "scripts/merge_nfl_v2j_fold_shards.py",
+        "scripts/run_nfl_auto.py",
+        "scripts/run_nfl_historical_validation.py",
+        "scripts/run_nfl_production_validation.py",
+        "scripts/run_nfl_production_validation_frozen.py",
+        "scripts/run_nfl_v2g_forward_clv.py",
+        "scripts/run_nfl_v2g_historical_diagnostic.py",
+        "scripts/run_nfl_v2h_first_readout.py",
+        "scripts/run_nfl_v2i_first_readout.py",
+        "scripts/settle_nfl_v2g_prospective_outcomes.py",
+        "scripts/validate_nfl_v2g_candidate.py",
+        "scripts/validate_nfl_v2h_candidate.py",
+        "scripts/validate_nfl_v2i_candidate.py",
+        "sportsedge/sports/nfl/EVIDENCE_REBUILD_2026-09-11.md",
+        "sportsedge/sports/nfl/NFL_V2H_FIRST_READOUT_RESULT_2026-09-12.json",
+        "sportsedge/sports/nfl/NFL_V2I_FIRST_READOUT_RESULT_2026-09-12.json",
+        "sportsedge/sports/nfl/archive_adjudication.py",
+        "sportsedge/sports/nfl/readiness.py",
+        "sportsedge/sports/nfl/run_machine.py",
+        "sportsedge/sports/nfl/source_manifest.py"
+      ],
+      "coverage_prefixes": [
+        ".github/workflows/nfl-v2j",
+        ".github/workflows/nfl-v2k",
+        ".github/workflows/nfl-source-freeze-bootstrap",
+        "scripts/build_nfl_v2j",
+        "scripts/build_nfl_v2k",
+        "scripts/run_nfl_v2j",
+        "scripts/run_nfl_v2k",
+        "sportsedge/sports/nfl/NFL_V2J_",
+        "sportsedge/sports/nfl/NFL_V2K_",
+        "sportsedge/sports/nfl/nfl_v2j",
+        "sportsedge/sports/nfl/nfl_v2k",
+        "sportsedge/sports/nfl/m2_v2g",
+        "sportsedge/sports/nfl/m2_v2h",
+        "sportsedge/sports/nfl/m2_v2i",
+        "sportsedge/sports/nfl/v2g_",
+        "tests/test_nfl_v2j",
+        "tests/test_nfl_v2k",
+        "config/research/nfl_v2",
+        "config/nfl_2026_prospective_governance_v1.json",
+        "config/nfl_feature_search_policy_v1.json",
+        "config/nfl_m2_freeze.json",
+        "config/nfl_promotion_source_freeze_v1.json"
+      ],
+      "disposition": null,
+      "freeze_sha": "564e5567acf63adbf750e033df08a8c368f6884d"
+    },
+    {
+      "activation_artifact_sha256": "3efa5cc92b5ed1bf53a99cbe0d6e7792d01791a77c8f684874d66213b73d9570",
+      "activation_config_blob_sha": "014875484c9725af7480d77b406a9aea4e856b0d",
+      "bundle_id": "NFL_PROP_MODEL_FREEZE_V1",
+      "coverage_paths": [
+        ".github/workflows/football-nfl-prop-artifact-freeze.yml",
+        "config/nfl_prop_model_freeze.json",
+        "config/nfl_prop_code_surface_v1.json",
+        "config/nfl_prop_evidence.json",
+        "config/nfl_prop_certification.json",
+        "artifacts/football/nfl_prop_artifact_bundle_v1.json",
+        "sportsedge/football_prop_run_machine.py",
+        "sportsedge/football_prop_extended_run_machine.py",
+        "sportsedge/core/simulate/drive_play.py",
+        "sportsedge/core/simulate/player_markets.py",
+        "sportsedge/core/simulate/usage.py",
+        "sportsedge/core/simulate/special_teams.py",
+        "sportsedge/core/simulate/kicker_markets.py",
+        "sportsedge/core/simulate/defense_markets.py",
+        "sportsedge/core/simulate/defense_usage.py",
+        "sportsedge/sports/nfl/prop_artifact_training.py"
+      ],
+      "disposition": null,
+      "freeze_identity_semantics": "MAIN_LINE_ACTIVATION_COMMIT",
+      "freeze_sha": "a72ac337e3b6be2162ce88b0223f69e8e6bbdff6",
+      "predictive_code_git_sha": "5dfa29347bed608771e6a2395ce8e894dbfdd881"
+    },
+    {
+      "activation_artifact_sha256": "923cfd1be42d31a87d9f31ddffce406d44bfc1bb003d1c625f5a4258f7773f23",
+      "activation_config_blob_sha": "c3df366e62db2397c58dccf5f24e13644aef6b18",
+      "bundle_id": "CFB_PROP_MODEL_FREEZE_V1",
+      "coverage_prefixes": [
+        ".github/workflows/football-cfb-prop-artifact-freeze.yml",
+        "config/cfb_prop_model_freeze.json",
+        "config/cfb_prop_code_surface_v1.json",
+        "config/cfb_prop_evidence.json",
+        "config/cfb_prop_certification.json",
+        "artifacts/football/cfb_prop_artifact_bundle_v1.json",
+        "sportsedge/props/cfb",
+        "tests/test_cfb_prop"
+      ],
+      "disposition": {
+        "prior_forward_clock_invalidated": true,
+        "reason": "PR_797_CHANGED_COVERED_FREEZE_VERIFICATION_WORKFLOW; FULL_REFREEZE_HASH_TIMESTAMP_ROW_ADMISSIBILITY_SEMANTICS_NOT_MACHINE_VERIFIED; REVOKED_FAIL_CLOSED",
+        "revoked_at": "2026-09-16T23:23:45Z",
+        "state": "REVOKED"
+      },
+      "freeze_identity_semantics": "MAIN_LINE_ACTIVATION_COMMIT",
+      "freeze_sha": "108d6144a62e714a8da6a32272f7fa98f07b9cd7",
+      "predictive_code_git_sha": "67184a5a120a2bc868531c7827783f562f82ee0b"
+    },
+    {
+      "bundle_id": "CFB_CANDIDATE_PREREG_FREEZE_V1",
+      "coverage_paths": [
+        "scripts/audit_cfb_selection_readiness.py",
+        "sportsedge/sports/cfb/selection_readiness.py"
+      ],
+      "coverage_prefixes": [
+        ".github/workflows/cfb-candidate-first-evaluation-readiness.yml",
+        "config/cfb_model_candidate_prereg_v1.json",
+        "config/cfb_model_candidate_code_manifest_v1.json",
+        "config/cfb_model_candidate_specs_v1.json",
+        "config/cfb_model_selection_policy_v1.json",
+        "scripts/audit_cfb_model_selection_prereg.py",
+        "sportsedge/sports/cfb/candidate_prereg_binding.py",
+        "sportsedge/sports/cfb/model_selection_prereg.py",
+        "tests/test_cfb_model_candidate",
+        "tests/test_cfb_model_selection"
+      ],
+      "disposition": {
+        "authority": {
+          "eligibility": false,
+          "model_p": false,
+          "official": false,
+          "promotion": false,
+          "staking": false,
+          "truth_gate": false,
+          "validation_attempt": false
+        },
+        "forward_clock_restart_at": "2026-09-18T12:01:33Z",
+        "new_bundle_id": "CFB_CANDIDATE_PREREG_FREEZE_V3",
+        "new_freeze_sha": "529b06af94061a5eb86efd9909b15b62cefce938",
+        "prior_bundle_freeze_sha": "4629afd60972fe73eb0217508dc7a4ae51ce6ccf",
+        "prior_forward_clock_invalidated": true,
+        "reason": "MACHINE_VERIFIED_POST_PR833_WEEK1_CORRECTED_CANDIDATE_BYTES_AND_CODE_MANIFEST; PR833_IN_ANCESTRY; ZERO_ATTEMPTS; NO_EVALUATION_ROWS; REFROZEN_FAIL_CLOSED_FOR_SELECTION_SCOPE_ONLY",
+        "row_admissibility_semantics": "PREREGISTRATION_ONLY_NO_EVALUATION_ROWS_V1",
+        "selection_scope_only": true,
+        "state": "REFROZEN",
+        "trigger_delta_sha": "4fc4aa9a60b69137a0efc4d7d59ccee95f53b0bb",
+        "verification_schema": "CFB_CANDIDATE_PREREG_REFREEZE_V1"
+      },
+      "freeze_sha": "4629afd60972fe73eb0217508dc7a4ae51ce6ccf"
+    },
+    {
+      "bundle_id": "CFB_HISTORICAL_MARKET_ARCHIVE_FREEZE_V1",
+      "coverage_prefixes": [
+        ".github/workflows/cfb-historical-market-source-freeze",
+        "config/research/cfb_historical_market_source_v1.json",
+        "scripts/materialize_cfb_historical_market_archive",
+        "sportsedge/sports/cfb/history_cache",
+        "sportsedge/sports/cfb/market_archive",
+        "tests/test_cfb_historical_market",
+        "tests/test_cfb_history_cache",
+        "tests/test_cfb_market_archive"
+      ],
+      "disposition": null,
+      "freeze_sha": "564e5567acf63adbf750e033df08a8c368f6884d"
+    },
+    {
+      "bundle_id": "MARKET_MAKER_RADAR_EVIDENCE_FREEZE_V2",
+      "coverage_paths": [
+        ".github/workflows/market-maker-radar.yml",
+        "config/market_maker_radar_v1.json",
+        "docs/market_maker_radar.md",
+        "scripts/capture_nfl_market_maker_radar.py",
+        "scripts/evaluate_market_maker_execution_pilot.py",
+        "scripts/log_market_maker_execution_attempt.py",
+        "scripts/recheck_market_maker_candidate_persistence.py"
+      ],
+      "coverage_prefixes": [
+        ".github/workflows/nfl-market-maker-radar",
+        "config/market_maker_radar_v2.json",
+        "scripts/analyze_market_maker_radar",
+        "scripts/settle_market_maker",
+        "scripts/capture_market_maker",
+        "sportsedge/market_maker",
+        "tests/test_market_maker"
+      ],
+      "disposition": null,
+      "freeze_sha": "564e5567acf63adbf750e033df08a8c368f6884d"
+    },
+    {
+      "bundle_id": "GLOBAL_PROMOTION_EVIDENCE_FREEZE_V2",
+      "coverage_paths": [
+        ".github/workflows/direct-dk-market-archive-contract.yml",
+        ".github/workflows/football-nfl-promotion-evidence.yml",
+        ".github/workflows/three-sport-core-certification-audit.yml",
+        ".github/workflows/truth-gate-floor-provenance.yml",
+        "config/closing_line_archive_policy_v1.json",
+        "config/direct_dk_forward_pair_admission_v1.json",
+        "config/football_forward_capture_policy_v2.json",
+        "docs/LIVE_PROMOTION_STATUS.md",
+        "docs/decision_policy_validation_boundary.md",
+        "docs/official_market_gate.md",
+        "scripts/audit_three_sport_core_certification.py",
+        "scripts/capture_closing_line_archive.py",
+        "scripts/capture_closing_line_archive_v3.py",
+        "scripts/capture_direct_dk_closing_lines.py",
+        "scripts/verify_evidence_determinism.py"
+      ],
+      "coverage_prefixes": [
+        "config/promotion_evidence_policy_v2.json",
+        "config/promotion_evidence_policy_manifest.json",
+        "config/truth_gate_floors.json",
+        "config/evidence_unit_contract_v1.json",
+        "sportsedge/promotion",
+        "sportsedge/truth_gate",
+        "tests/test_promotion",
+        "tests/test_truth_gate"
+      ],
+      "disposition": null,
+      "freeze_sha": "564e5567acf63adbf750e033df08a8c368f6884d"
+    },
+    {
+      "bundle_id": "MLB_DFS_EVIDENCE_FREEZE_V1",
+      "coverage_prefixes": [
+        ".github/workflows/dfs-engine-contract",
+        "config/mlb_dfs_",
+        "docs/DK_DFS_",
+        "scripts/build_dk_ownership",
+        "scripts/freeze_dk_ownership",
+        "sportsedge/dfs/",
+        "tests/test_dfs_"
+      ],
+      "disposition": null,
+      "freeze_sha": "7a92455f081ee52a454b2c49ff798d902a3ace68"
+    }
+  ],
+  "deltas": [
+    {
+      "delta_id": "PR_683",
+      "merge_sha": "f242c916903cdea60301db1d4380653460945eba",
+      "pr": 683
+    },
+    {
+      "delta_id": "PR_689",
+      "merge_sha": "6c3fe073d9a0a240ddd7f58938a4f32d3abedceb",
+      "pr": 689
+    },
+    {
+      "delta_id": "PR_691",
+      "merge_sha": "76f0fb454d48cf6df8e51660114d52878fd3665e",
+      "pr": 691
+    },
+    {
+      "delta_id": "PR_692",
+      "merge_sha": "7a92455f081ee52a454b2c49ff798d902a3ace68",
+      "pr": 692
+    },
+    {
+      "delta_id": "PR_688",
+      "merge_sha": "ed9aa39ded1da89eca2bb7019a5f810dde83af78",
+      "pr": 688
+    },
+    {
+      "delta_id": "PR_690",
+      "merge_sha": "7ed79c51e790d393108864513c34dd296d9fd175",
+      "pr": 690
+    },
+    {
+      "delta_id": "PR_695",
+      "merge_sha": "8dcd645447fb110b8cfc250b36c502836302097b",
+      "pr": 695
+    },
+    {
+      "delta_id": "PR_697",
+      "merge_sha": "546d07de8ea286d0218c4c70f95ca2618e645374",
+      "pr": 697
+    },
+    {
+      "delta_id": "PR_698",
+      "merge_sha": "8de77a15080e6329bcd70058b735ff972f93ebc7",
+      "pr": 698
+    },
+    {
+      "delta_id": "PR_699",
+      "merge_sha": "7cddfa6b55e32081f0a0bbc5b0591241d504fb45",
+      "pr": 699
+    },
+    {
+      "delta_id": "PR_687",
+      "merge_sha": "1325bfb62031e54c1b46023bd170ad455d38516e",
+      "pr": 687
+    },
+    {
+      "delta_id": "PR_701",
+      "merge_sha": "7f8cd83df5ec4fe91e4c347ee843f861da8ba459",
+      "pr": 701
+    },
+    {
+      "delta_id": "PR_702",
+      "merge_sha": "09a2aecdc168f65d50a1120017491a0d104e6140",
+      "pr": 702
+    },
+    {
+      "delta_id": "PR_703",
+      "merge_sha": "00b4db27f15cc22b089e2a2d974cf483eed86e58",
+      "pr": 703
+    },
+    {
+      "delta_id": "DIRECT_MAIN_81BD1E18_NOOP",
+      "merge_sha": "81bd1e1807a65e0ed7060971152a0c1ca9c0d21c",
+      "pr": 0
+    },
+    {
+      "delta_id": "DIRECT_MAIN_27F789B0_REVERT",
+      "merge_sha": "27f789b0b37ac17876b97fcd1fd794cb2c394349",
+      "pr": 0
+    },
+    {
+      "delta_id": "DIRECT_MAIN_05877519_EV_TRACKER_CLOSE_UPDATE",
+      "merge_sha": "05877519650ab451d4b5cd73d8ea6d42d1baebe1",
+      "note": "Automated direct-to-main mutation during ACTIVE_BLOCKED hold; changed output/ev_tracker/health.md only. Registered for provenance; semantic freeze-drift disposition remains governed by bundle reconciliation.",
+      "pr": 0
+    },
+    {
+      "delta_id": "PR_705_RECONCILIATION_RELEASE_MERGE",
+      "merge_sha": "3fa151b22fb619031bde2fd7cbd75e1ee9c64471",
+      "note": "The reconciliation release merge itself advanced main beyond the pre-merge registered point; registered here so the self-aging transition is explicit.",
+      "pr": 705
+    },
+    {
+      "delta_id": "PR_712_NFL_CAPTURE_INTEGRITY",
+      "merge_sha": "a75250bfd5881c0cafe82a47a877d9ea764fc203",
+      "note": "NFL 2026 capture-integrity hardening; exact-head reconciliation previously stopped before coverage/inventory/delta evaluation because the registry had self-aged after PR 705.",
+      "pr": 712
+    },
+    {
+      "delta_id": "PR_713_NFL_CAPTURE_QUARANTINE",
+      "merge_sha": "4564a9d2ccd7a55b0547a4ebd5a1b714850aab99",
+      "note": "Quarantines unreconciled NFL capture rows while preserving no-backfill collection and repairs due-gate self-concealment.",
+      "pr": 713
+    },
+    {
+      "delta_id": "PR_714_RECONCILIATION_TERMINAL_MERGE",
+      "merge_sha": "9e8c7eeed998b4bea1386000c41630fe9380b834",
+      "note": "The prior reconciliation-only terminal merge advanced main beyond the PR_713 registered point. It is now explicitly registered before reconciling later ordinary main movement.",
+      "pr": 714
+    },
+    {
+      "delta_id": "PR_716_MLB_PROP_LIVE_SCHEMA_REPAIR",
+      "merge_sha": "a6e5a155edc9bc59676816091473a8540d694e0c",
+      "note": "Repairs live DraftKings MLB prop acquisition and strict PIT event timing without changing promotion or eligibility authority. Bundle impact must be determined by the reconciliation matrix, not by this note.",
+      "pr": 716
+    },
+    {
+      "delta_id": "PR_722_RECONCILIATION_RELEASE_MERGE",
+      "merge_sha": "bd47021bd2d0fbb748e64795f0b37108a70b4389",
+      "note": "Reconciliation-only merge after PR_716; machine matrix determines bundle impact.",
+      "pr": 722
+    },
+    {
+      "delta_id": "DIRECT_MAIN_6F1D95D8_CONTENT_IDENTITY",
+      "merge_sha": "6f1d95d8feed6b36ce44b2f625de24a6dd0e0a8a",
+      "note": "Direct main governance change introducing governed-surface content identity; machine matrix determines bundle impact.",
+      "pr": 0
+    },
+    {
+      "delta_id": "PR_724_CONTENT_IDENTITY_CONTROL",
+      "merge_sha": "e4de5443ad8acc86cfa9345d01442db9853dac4c",
+      "note": "Replaces self-aging reconciliation SHA equality with ancestry plus governed-surface content identity; machine matrix determines bundle impact.",
+      "pr": 724
+    },
+    {
+      "delta_id": "DIRECT_MAIN_FAB3FA85_NOOP",
+      "merge_sha": "fab3fa855167ecaca65263dcf239364e540e64d2",
+      "note": "Accidental direct-main noop registered for complete first-parent provenance.",
+      "pr": 0
+    },
+    {
+      "delta_id": "DIRECT_MAIN_F0704D8D_REVERT",
+      "merge_sha": "f0704d8d9cbacd5ecabb48c01adbc1682fcc8def",
+      "note": "Reverts the accidental direct-main empty-file write; registered for complete first-parent provenance.",
+      "pr": 0
+    },
+    {
+      "delta_id": "PR_726_NFL_CAPTURE_PRESENT_CONTRACT",
+      "merge_sha": "a78fb74186b8f84f1df720412ce0d70edbd4e68e",
+      "note": "Hardens NFL capture PRESENT semantics to require contract-valid nonempty evidence; machine matrix determines bundle impact.",
+      "pr": 726
+    },
+    {
+      "delta_id": "PR_729_DIRECT_MAIN_WRITER_QUIESCENCE",
+      "merge_sha": "a30aec56dc4a0f956d67534c91a95a9aecc43e32",
+      "note": "Quiesces two direct-main automation writers; machine matrix determines bundle impact.",
+      "pr": 729
+    },
+    {
+      "delta_id": "PR_728_TEMPORAL_EVAL_PLUMBING",
+      "merge_sha": "c1b1c827116a91fb7101bc9ffed407a943260fb4",
+      "note": "Adds sport-neutral untouched temporal evaluation plumbing without promotion authority; machine matrix determines bundle impact.",
+      "pr": 728
+    },
+    {
+      "delta_id": "PR_730_CFB_SCOPE_RECONCILIATION",
+      "merge_sha": "c824f204b2cf33fcaea0f6de80ce6037b3f21b51",
+      "note": "Records CFB selection/training/promotion scope interpretation; machine matrix determines bundle impact.",
+      "pr": 730
+    },
+    {
+      "delta_id": "PR_727_CFB_PARTICIPATION_INTEGRATION",
+      "merge_sha": "44a6a1722d524dafd7f70c24c1b61d4b81b71c03",
+      "note": "Integrates CFB participation research and PIT capture plumbing after explicit scope reconciliation; machine matrix determines bundle impact.",
+      "pr": 727
+    },
+    {
+      "delta_id": "PR_737_CFB_FORWARD_EVIDENCE_AUDIT_EXECUTION",
+      "merge_sha": "d641a7412fa5c236f5b7fb2176b5844d237f4f09",
+      "note": "Repairs CFB forward-evidence audit module execution hygiene only; machine matrix determines bundle impact.",
+      "pr": 737
+    },
+    {
+      "delta_id": "PR_736_NFL_PROVIDER_BUDGET_GUARD",
+      "merge_sha": "2930583ee1bac7a94644fe182278212ffe728452",
+      "note": "Adds prospective NFL provider quota/preflight controls and exact governance exemptions; machine matrix determines bundle impact.",
+      "pr": 736
+    },
+    {
+      "delta_id": "PR_797_CFB_RETAINED_FREEZE_VERIFICATION",
+      "merge_sha": "f8afb5c5e3251b6ede8a39ef25c47fdd07dfb7ee",
+      "note": "Catch-up anchor after machine-proving the prior registered boundary through the parent of PR #797 is governed-content-identical. PR #797 changes the covered CFB prop freeze workflow; the bundle remains fail-closed REVOKED because full refreeze hash/timestamp/row-admissibility semantics are not machine-verified; no model or betting authority is granted.",
+      "pr": 797
+    },
+    {
+      "delta_id": "PR_791_CFB_SELECTION_READINESS_SCOPE",
+      "merge_sha": "9a4f81a6a2a2eaf3c77c1ff9f0510f99a3a3a170",
+      "note": "PR #791 changes the covered CFB candidate first-evaluation readiness workflow to align reconstructed-history selection scope with the merged #730 amendment. Candidate evaluation remains unconsumed at attempt zero; the bundle remains fail-closed REVOKED because full refreeze semantics are not machine-verified; no model or betting authority is granted.",
+      "pr": 791
+    },
+    {
+      "delta_id": "PR_806_RECONCILIATION_RELEASE_MERGE",
+      "merge_sha": "a16bc6907e95267e919f42d15b04afaebcf5bb8c",
+      "note": "Reconciliation-only merge after PR #791; it restores the registered boundary and fail-closed revocation semantics. Machine matrix determines bundle impact.",
+      "pr": 806
+    },
+    {
+      "delta_id": "PR_803_FOURC_LINE_HISTORY_CORROBORATION",
+      "merge_sha": "7d64c5e6b149324e54286f29b7058b696886749b",
+      "note": "Adds provenance-bound zero-authority 4C line-history corroboration to covered MARKET_MAKER_RADAR_EVIDENCE_FREEZE_V2 surfaces. The effective bundle was already fail-closed REVOKED by the coverage extension; no Model_P, Truth Gate, promotion, eligibility, staking, evidence-clock, DraftKings evidence, wager-placement, or OFFICIAL authority is granted.",
+      "pr": 803
+    },
+    {
+      "delta_id": "PR_807_CURRENT_MAIN_CATCHUP",
+      "merge_sha": "6256c6125c35b6034697577c470a287290204769",
+      "note": "Reconciliation release merge after PR #803; register the self-aging main transition. Machine matrix determines bundle impact.",
+      "pr": 807
+    },
+    {
+      "delta_id": "PR_808_CURRENT_MAIN_CATCHUP",
+      "merge_sha": "6e1c566f68b5383656bb10697b37358abd5903c3",
+      "note": "MLB prospective MONEYLINE heartbeat bridge; preserves market-blind Model_P, frozen T30 PAPER semantics, no-backfill and zero authority.",
+      "pr": 808
+    },
+    {
+      "delta_id": "PR_810_CURRENT_MAIN_CATCHUP",
+      "merge_sha": "9a095800829a18b09e986cc3fa2cc4c9dfcdae61",
+      "note": "MLB heartbeat continuation across per-game missed windows; preserves frozen timing and zero authority.",
+      "pr": 810
+    },
+    {
+      "delta_id": "PR_812_CURRENT_MAIN_CATCHUP",
+      "merge_sha": "f8ea5dc02beb7cec606fa26c348fd4d4cf1fe212",
+      "note": "MLB durable T30 accrual liveness guard; records non-accrual honestly and preserves no-backfill and zero authority.",
+      "pr": 812
+    },
+    {
+      "delta_id": "PR_814_CURRENT_MAIN_CATCHUP",
+      "merge_sha": "39a7dc3d5b962ca571e64e8d1757b51fb9ec36bd",
+      "note": "NFL independent confirmation-window discovery; no model or betting authority change.",
+      "pr": 814
+    },
+    {
+      "delta_id": "PR_817_CURRENT_MAIN_CATCHUP",
+      "merge_sha": "23fcdbcc9531181540960d30fdef82c6b61d8244",
+      "note": "Governance direct-writer repair and NFL confirmation persistence to data branch; no evidence or model authority change.",
+      "pr": 817
+    },
+    {
+      "delta_id": "PR_813_CURRENT_MAIN_CATCHUP",
+      "merge_sha": "2e4410c99630d72664956ead8e3cad0beb4d81d5",
+      "note": "CFB auto artifact-binding verifier alias; operational verifier only with zero model/promotion/OFFICIAL authority.",
+      "pr": 813
+    },
+    {
+      "delta_id": "PR_818_CURRENT_MAIN_CATCHUP",
+      "merge_sha": "f23d08bcc48c24368a78447c230a4f626afe1178",
+      "note": "CFB auto runtime repository-context repair; operational only with zero authority.",
+      "pr": 818
+    },
+    {
+      "delta_id": "PR_819_CURRENT_MAIN_CATCHUP",
+      "merge_sha": "f397573c06ede6310ae9d1ba932ed67dbedb38ad",
+      "note": "CFB first-evaluation readiness fail-closes on revoked candidate prereg freeze. Covered candidate bundle remains REVOKED; attempts remain zero.",
+      "pr": 819
+    },
+    {
+      "delta_id": "PR_800_CURRENT_MAIN_CATCHUP",
+      "merge_sha": "53dd9334441e5da1538ed016cc8123141d27806e",
+      "note": "MLB frozen-policy PIT replay scorer restoration; non-authoritative historical dependency only.",
+      "pr": 800
+    },
+    {
+      "delta_id": "PR_815_CURRENT_MAIN_CATCHUP",
+      "merge_sha": "2b4011058429bd6a689e7a69e0286a7e341629bb",
+      "note": "NFL direct DraftKings confirmation contract wired onto current main; preserves no-backfill and zero Model_P/Truth Gate/promotion/staking/OFFICIAL authority.",
+      "pr": 815
+    },
+    {
+      "delta_id": "PR_822_RECONCILIATION_CATCHUP_MERGE",
+      "merge_sha": "d17a66fe43cb7a6db7955c4e529bc59fd23a2a9f",
+      "note": "Reconciliation-only merge that advanced main beyond the PR815 registered point; governed candidate/model content remains unchanged and authority remains zero.",
+      "pr": 822
+    },
+    {
+      "delta_id": "PR_823_CFB_CANDIDATE_PREREG_REFREEZE",
+      "merge_sha": "852b759b146beba64457a398b3b293eec8a17750",
+      "note": "Merges the machine-verified CFB candidate prereg refreeze on current main; attempts remain zero, evaluation remains unrun, and no model or betting authority is granted.",
+      "pr": 823
+    },
+    {
+      "delta_id": "PR_826_CFB_RECONSTRUCTED_SELECTION_READINESS",
+      "merge_sha": "374ffc70c7bfc2fae968ae4d506b2d325ec1ee5d",
+      "note": "Adds fail-closed reconstructed-selection acquisition/bundle readiness and protected-main check naming; candidate prereg is machine-refrozen at 0e24934bb6787e2d9ffe1cbb377f128fb2e7dfc9 with zero attempts and zero authority.",
+      "pr": 826
+    },
+    {
+      "delta_id": "PR_830_RECONCILIATION_CATCHUP_MERGE",
+      "merge_sha": "fc5fc8a7baa4daf2e82699972ee877bce3d869c6",
+      "note": "Reconciliation-only merge after PR #826; registers the self-aging protected-main transition with zero model or betting authority.",
+      "pr": 830
+    },
+    {
+      "delta_id": "PR_832_CFB_PROVIDER_PREFLIGHT",
+      "merge_sha": "6491cff72832f46ce926c3d3dd22aca4c3d455ed",
+      "note": "Adds zero-authority CFBD account/quota/weather/replay-budget preflight. Performs zero historical replay calls and consumes zero evaluation attempts.",
+      "pr": 832
+    },
+    {
+      "delta_id": "PR_833_CFB_WEEK1_EXECUTION_CORRECTION",
+      "merge_sha": "4fc4aa9a60b69137a0efc4d7d59ccee95f53b0bb",
+      "note": "Corrects Week-1 execution for frozen CFB candidate families and explicitly leaves the prior candidate prereg refreeze REVOKED pending separate post-merge machine refreeze; attempts remain zero and evaluation remains unrun.",
+      "pr": 833
+    },
+    {
+      "delta_id": "PR_839_RECONCILIATION_CATCHUP_MERGE",
+      "merge_sha": "529b06af94061a5eb86efd9909b15b62cefce938",
+      "note": "Reconciliation-only merge registering protected main through PR #833; candidate prereg remains REVOKED, attempts remain zero, and no model or betting authority is granted.",
+      "pr": 839
+    },
+    {
+      "delta_id": "PR_840_CFB_PROVIDER_PREFLIGHT_HARDENING",
+      "merge_sha": "6b842b17ca0bb1eec7370daaf3a981189ecf4e00",
+      "note": "Hardens the CFB provider preflight so acquisition readiness requires verified CFBD auth/tier/weather/quota fit with zero replay calls and zero authority. Candidate prereg remains REVOKED; attempts remain zero and evaluation remains unrun.",
+      "pr": 840
+    },
+    {
+      "delta_id": "PR_842_CLV_REMOVE_PINNACLE_EU",
+      "merge_sha": "0ea693e36f0832ac0427cd9d278b3b0312d0350e",
+      "note": "Reduces the zero-authority closing-line archive to US DraftKings/FanDuel without Pinnacle/EU. Rows remain NOT_EVIDENCE; no Model_P, Truth Gate, promotion, eligibility, staking, evidence-clock, backfill, or OFFICIAL authority is granted.",
+      "pr": 842
+    },
+    {
+      "delta_id": "PR_843_ARCHIVE_RESERVE_DK_ONLY_NO_MLB",
+      "merge_sha": "2dcd200a244a959c04c972ed652c5142804a6b18",
+      "note": "Registers the current-main PR #843 archive-spend guard after its PR #842 catch-up. No CFB candidate bytes changed and no model or betting authority is granted.",
+      "pr": 843
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_db2f17063fe7",
+      "merge_sha": "db2f17063fe731f885ab1bf8fca35384133dc6e5",
+      "note": "Merge pull request #845 from isaacrome21-sys/cfb-train-freeze-safe-20260918",
+      "pr": 845
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_d59a7228b653",
+      "merge_sha": "d59a7228b653c1b95f1c747e8aa5174f0cfb0245",
+      "note": "Merge pull request #847 from isaacrome21-sys/cfb-preflight-weather-contract-fix-20260918",
+      "pr": 847
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_d955a717ead9",
+      "merge_sha": "d955a717ead9e2912a3371d97faae72c1aa47472",
+      "note": "PAPER output lane + CFB venue helpers + context registry",
+      "pr": 0
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_a3efcbc57ade",
+      "merge_sha": "a3efcbc57ade3e0f8878e363a57bcbb8d83f004f",
+      "note": "Lock CFB venue-skip contract for reconstructed-selection acquire",
+      "pr": 0
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_54e85dea0ca4",
+      "merge_sha": "54e85dea0ca4b2772711a07d54d7f6daa734d446",
+      "note": "Clock context-only splits, VSiN, and Statcast",
+      "pr": 0
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_db9df62a6d28",
+      "merge_sha": "db9df62a6d28efe8cf681d092123573ed0d3e0de",
+      "note": "Register model-improvement candidates and split overlay",
+      "pr": 0
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_7c7c342dc795",
+      "merge_sha": "7c7c342dc795e84d212f2596a77162a33cc2f19f",
+      "note": "Fix public-splits PYTHONPATH so the clock can capture",
+      "pr": 0
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_3198c5c4ba89",
+      "merge_sha": "3198c5c4ba89e5dae5d0490279b0e8a09b29c13f",
+      "note": "Decode gzip/cp1252 VSiN bodies for public splits",
+      "pr": 0
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_132a75eb1107",
+      "merge_sha": "132a75eb110757b3abc6ef81bc00c54d16fe6e77",
+      "note": "Clock DraftKings prop discovery",
+      "pr": 0
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_87105900242a",
+      "merge_sha": "87105900242a516d7429a7253f66378427c188fb",
+      "note": "Park paid Odds API; freeze blueprint ops",
+      "pr": 0
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_459ed229fd3f",
+      "merge_sha": "459ed229fd3ff59b271a151fe4de31144945dafb",
+      "note": "PAPER path: verify CFB DK game lines",
+      "pr": 0
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_a272e04fb4ce",
+      "merge_sha": "a272e04fb4ce2f4bc96b245194ab7c3f66fae902",
+      "note": "Add PAPER slate runner",
+      "pr": 0
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_6d29b473cc7a",
+      "merge_sha": "6d29b473cc7aed7c94d24a1eb842159803f50377",
+      "note": "PAPER weekend window and MLB ratings",
+      "pr": 0
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_bc9ff9253202",
+      "merge_sha": "bc9ff92532024cba7ddc5e02e93a07f8fb5108f8",
+      "note": "PAPER CFB ratings with 2-game minimum",
+      "pr": 0
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_37f97b4e089a",
+      "merge_sha": "37f97b4e089a7675899eead1a49b3770d130b257",
+      "note": "Kill toy PF/PA candidates",
+      "pr": 0
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_89cf5bd1ed12",
+      "merge_sha": "89cf5bd1ed1214f9ad0f8e15c9eba776c496bb8d",
+      "note": "CFB: finish pre-evaluation plumbing and retain RUN IT pregame slate (#865)",
+      "pr": 865
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_b45d66566ec2",
+      "merge_sha": "b45d66566ec2abb087e4962da65a5b60baf58f9a",
+      "note": "CFB: execute frozen all-four first bakeoff (#866)",
+      "pr": 866
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_4aaa0f9192a7",
+      "merge_sha": "4aaa0f9192a7ab8ff573a2e9051443d81f88e312",
+      "note": "CFB: add zero-authority market-consensus paper card (#867)",
+      "pr": 867
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_54b8ec63d01a",
+      "merge_sha": "54b8ec63d01a028428ac3a135ecfa99897391dbf",
+      "note": "Merge PR #868: CFB null-bakeoff refit/rescore repair",
+      "pr": 0
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_3ebd503b7fe0",
+      "merge_sha": "3ebd503b7fe0bdb5a233f3a799091239002c5a07",
+      "note": "Merge PR #869: CFB reconstructed-selection NumPy dependency",
+      "pr": 0
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_7eade596b1e5",
+      "merge_sha": "7eade596b1e51f8ec88cabe30b81279843350fa3",
+      "note": "Merge pull request #870 from isaacrome21-sys/fix/cfb-status-quota-20260919",
+      "pr": 870
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_3a3393653c33",
+      "merge_sha": "3a3393653c33a3e4e596264ddf9704f536462e40",
+      "note": "Merge pull request #871 from isaacrome21-sys/fix/nfl-runner-temp-startup-20260919",
+      "pr": 871
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_5480eeb55578",
+      "merge_sha": "5480eeb555784bfef202a9080ae808c1e3347fb1",
+      "note": "Merge pull request #872 from isaacrome21-sys/fix/cfb-paper-manual-input-20260919",
+      "pr": 872
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_13a01309e0cb",
+      "merge_sha": "13a01309e0cb5c7d6b12a78b13befaa3b48634c3",
+      "note": "Merge pull request #873 from isaacrome21-sys/feat/mlb-shadow-paper-card-20260919",
+      "pr": 873
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_8bf2357f3638",
+      "merge_sha": "8bf2357f36389a6ecd5aa0b76683a4dee5777ad2",
+      "note": "Merge pull request #874 from isaacrome21-sys/fix/mlb-shadow-cli-startup-20260919",
+      "pr": 874
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_2d0980483eff",
+      "merge_sha": "2d0980483effa0bd05ae50e4614be9b9f35abde3",
+      "note": "Merge pull request #875 from isaacrome21-sys/fix/nfl-confirmation-data-persistence-20260919",
+      "pr": 875
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_b60173ea1e1b",
+      "merge_sha": "b60173ea1e1b6f443631fa63b46a7dcda8d2235e",
+      "note": "Merge pull request #876 from isaacrome21-sys/mlb/38-market-replay-current-main-v3",
+      "pr": 876
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_f138916e176c",
+      "merge_sha": "f138916e176c84fe8f6dd3a53fb67aaed4cb07ca",
+      "note": "Merge pull request #879 from isaacrome21-sys/fix/mlb-moneyline-direct-heartbeat-20260919",
+      "pr": 879
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_e29874763850",
+      "merge_sha": "e298747638502c4c760cf78f2793f0711773ffcf",
+      "note": "Merge pull request #880 from isaacrome21-sys/fix/cfb-weather-espn-403-20260919",
+      "pr": 880
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_a30e0f9651c5",
+      "merge_sha": "a30e0f9651c55cfead549b1d3a1f40fb79fc6943",
+      "note": "Merge pull request #878 from isaacrome21-sys/nfl/attempt9-model-p-current-main-v3",
+      "pr": 878
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_d6bbfa0db272",
+      "merge_sha": "d6bbfa0db272d8a7791227e63d055df5ec28943b",
+      "note": "CFB: close selected-model final-fit artifact path",
+      "pr": 0
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_78aae277890d",
+      "merge_sha": "78aae277890d5ef8b02d72e1cc075150d07b1867",
+      "note": "CFB props: add game-state opportunity allocator",
+      "pr": 0
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_ED628EAA_NFL_PROP_RESEARCH",
+      "merge_sha": "ed628eaa978dd11a2097da91fa006067fb55e717",
+      "pr": 898,
+      "note": "NFL role-prop research challenger. Under the manifest-bound NFL prop coverage, PR #898 changes research-only config, docs, modules, and tests outside NFL_PROP_MODEL_FREEZE_V1. The active bundle remains disposition=null; this records provenance only and grants no model, promotion, staking, or OFFICIAL authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_64FBAD2A_NFL_PROP_TEST_RENAME",
+      "merge_sha": "64fbad2a04cf98cc34e36020bb9094246b6fdc26",
+      "pr": 901,
+      "note": "Content-neutral research test rename. Under corrected manifest-bound coverage, both the old and new research test paths are outside NFL_PROP_MODEL_FREEZE_V1; records the main transition after PR #898."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_89A8AFA1_CURRENT_MAIN_CATCHUP",
+      "merge_sha": "89a8afa1aeaef95e258ef98b9ea2e73cf96043b2",
+      "pr": 1026,
+      "note": "Catch-up anchor through reviewed NFL/CFB/MLB/NBA/NHL development. Reconciliation matrix determines covered-bundle impact; all governed authority remains zero and revoked bundle dispositions remain fail-closed."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_8891BD86_NHL_MARKETS",
+      "merge_sha": "8891bd86647d1e53c859dc2f478c3e5e06238cf9",
+      "pr": 1030,
+      "note": "NHL coherent period/player market implementation; no manifest-bound NFL prop file changed."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_C3AC7FF8_NHL_QUOTE_FRESHNESS",
+      "merge_sha": "c3ac7ff8fdb107bbf2cbcd95282b3a75b0fcf6f4",
+      "pr": 1034,
+      "note": "NHL quote-freshness provenance hardening; no manifest-bound NFL prop file changed."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_E5DD351E_NBA_AVAILABILITY_BINDING",
+      "merge_sha": "e5dd351e7ec245b9887acce67581637a52ef150b",
+      "pr": 1035,
+      "note": "NBA PIT availability binding; no manifest-bound NFL prop file changed."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_B43BA245_NHL_TEAM_SOG_PATHS",
+      "merge_sha": "b43ba245d83028afd57ec359ce9b7ba0f2efa2ba",
+      "pr": 1038,
+      "note": "NHL coherent team SOG paths; no manifest-bound NFL prop file changed."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_08A12425_NHL_SOG_BINDING",
+      "merge_sha": "08a124250a6e52c75b7217608606faaff2f42b1e",
+      "pr": 1040,
+      "note": "NHL team-to-roster SOG binding; exact current-main reconciliation anchor. All ten manifest-bound NFL prop code blobs remain byte-identical to config/nfl_prop_code_surface_v1.json."
+    }
+  ],
+  "inventory_block_reason": "MACHINE_AUDIT_REQUIRED_ZERO_UNMAPPED_GOVERNANCE_SURFACES_BEFORE_TRUE",
+  "issue": 686,
+  "reconciled_through_sha": "08a124250a6e52c75b7217608606faaff2f42b1e",
+  "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
+}
