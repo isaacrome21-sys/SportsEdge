@@ -21,8 +21,15 @@ def test_regulation_market_is_distinct_from_final_moneyline():
     assert "overtime_shootout_state" not in cap.required_state
 
 
-def test_period_and_player_markets_fail_closed_until_real_state_exists():
+def test_coherent_period_and_player_markets_are_engine_backed():
     for market in ("PERIOD_MONEYLINE", "PERIOD_TOTAL", "PLAYER_SHOTS", "PLAYER_POINTS", "PLAYER_GOALS"):
+        cap = capability_for(market)
+        assert cap.status == "REQUIRES_ENGINE"
+        assert "shared_regulation_goal_paths" in cap.required_state
+
+
+def test_unmodeled_goalie_and_counting_props_fail_closed():
+    for market in ("GOALIE_SAVES", "PLAYER_BLOCKS", "PLAYER_HITS"):
         assert capability_for(market).status == "NO_ENGINE"
 
 

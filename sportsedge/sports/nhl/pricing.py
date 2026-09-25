@@ -5,6 +5,7 @@ historical performance claims. Pricing preserves push mass.
 """
 from dataclasses import dataclass
 import math
+from datetime import datetime, timezone
 from .markets import OutcomeProbability
 
 
@@ -15,10 +16,14 @@ class NHLQuote:
     american_odds: int
     book: str
     captured_at: str
+    source_version: str = "UNVERSIONED"
 
     def validate(self) -> None:
-        if not self.market or not self.selection or not self.book or not self.captured_at:
-            raise ValueError("market/selection/book/captured_at are required")
+        if not self.market or not self.selection or not self.book or not self.captured_at or not self.source_version:
+            raise ValueError("market/selection/book/captured_at/source_version are required")
+        dt = datetime.fromisoformat(self.captured_at.replace("Z", "+00:00"))
+        if dt.tzinfo is None or dt.utcoffset() is None:
+            raise ValueError("quote captured_at must be timezone-aware")
         if -100 < self.american_odds < 100:
             raise ValueError("American odds must be <= -100 or >= +100")
 
@@ -63,3 +68,20 @@ def price_outcome(outcome: OutcomeProbability, quote: NHLQuote) -> NHLPrice:
         outcome.win, outcome.push, outcome.loss, fair_probability,
         american_from_probability(fair_probability), ev, score,
     )
+
+
+def validate_quote_freshness(quote: NHLQuote, *, as_of: str, max_age_seconds: int) -> None:
+    """Fail closed on future or stale quotes relative to an explicit run timestamp."""
+    quote.validate()
+    if max_age_seconds < 0:
+        raise ValueError("max_age_seconds must be nonnegative")
+    captured = datetime.fromisoformat(quote.captured_at.replace("Z", "+00:00")).astimezone(timezone.utc)
+    current = datetime.fromisoformat(as_of.replace("Z", "+00:00"))
+    if current.tzinfo is None or current.utcoffset() is None:
+        raise ValueError("as_of must be timezone-aware")
+    current = current.astimezone(timezone.utc)
+    age = (current - captured).total_seconds()
+    if age < 0:
+        raise ValueError("quote captured_at is in the future")
+    if age > max_age_seconds:
+        raise ValueError("stale market quote")
