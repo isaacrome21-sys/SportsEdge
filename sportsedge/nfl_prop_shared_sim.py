@@ -29,7 +29,11 @@ RATE_KEYS = frozenset({"completion_rate", "pass_td_rate", "interception_rate", "
 RARE_RATE_KEYS = frozenset({"pass_td_rate", "interception_rate"})
 DEFAULT_VOLUME_PRIOR_STRENGTH = 8.0
 DEFAULT_RARE_PRIOR_STRENGTH = 40.0
-# Context multipliers are market-blind usage/injury/weather knobs, not totals.
+
+# Context multipliers are bounded, market-blind nudges only. They are not a
+# transport for genuine role changes. A backup moving from (say) 6 to 18
+# expected carries belongs in role_prior, with provenance, rather than a 3x
+# multiplier. Do not widen this bound to encode a new role.
 MULTIPLIER_KEYS = (
     "volume_multiplier", "pass_multiplier", "rush_multiplier", "target_multiplier",
     "efficiency_multiplier", "pass_efficiency_multiplier",
@@ -40,6 +44,19 @@ MULTIPLIER_MAX = 1.80
 ALLOWED_CONTEXT_SOURCES = frozenset({
     "role", "injury", "weather", "matchup", "participation", "none",
 })
+
+# Rushing-carry mixture. The tail is 12 + Gamma(2, 4.5), so its mean is known
+# exactly (21.0). Solving the bulk mean from the mixture identity preserves the
+# caller's requested yards/carry for every input mean, including stuffed backs.
+RUSH_EXPLOSIVE_PROB = 0.06
+RUSH_EXPLOSIVE_FLOOR = 12.0
+RUSH_EXPLOSIVE_GAMMA_SHAPE = 2.0
+RUSH_EXPLOSIVE_GAMMA_SCALE = 4.5
+RUSH_EXPLOSIVE_MEAN = (
+    RUSH_EXPLOSIVE_FLOOR
+    + RUSH_EXPLOSIVE_GAMMA_SHAPE * RUSH_EXPLOSIVE_GAMMA_SCALE
+)
+
 FORBIDDEN_MARKET_KEYS = frozenset({
     "price_american", "odds", "market_no_vig_p", "edge_probability_points",
     "ev_per_dollar", "fair_american", "sportsbook_probability",
@@ -92,15 +109,26 @@ def _assert_market_blind_context(payload: Mapping[str, Any]) -> None:
     c = payload.get("context") or {}
     if not isinstance(c, Mapping):
         raise NflPropSimulationError("CONTEXT_OBJECT_REQUIRED")
-    source = str(c.get("source", payload.get("context_source", "none"))).lower()
+
+    source_raw = c.get("source", payload.get("context_source"))
+    source = "none" if source_raw is None else str(source_raw).lower()
     if source not in ALLOWED_CONTEXT_SOURCES:
         raise NflPropSimulationError("CONTEXT_SOURCE_NOT_MARKET_BLIND")
+
+    adjusted = False
     for key in MULTIPLIER_KEYS:
         if key not in c:
             continue
         v = _num(c[key], f"context.{key}")
         if v < MULTIPLIER_MIN or v > MULTIPLIER_MAX:
             raise NflPropSimulationError(f"CONTEXT_MULTIPLIER_OUT_OF_RANGE:{key}")
+        if abs(v - 1.0) > 1e-12:
+            adjusted = True
+
+    # An actual adjustment must identify its market-blind evidence source.
+    # `none` is reserved for an unadjusted context, not as a provenance bypass.
+    if adjusted and (source_raw is None or source == "none"):
+        raise NflPropSimulationError("CONTEXT_SOURCE_REQUIRED")
 
 
 def stabilized_role(
@@ -178,12 +206,17 @@ def _receiving_yards(rng: random.Random, n: int, mean: float) -> int:
 
 
 def _rush_carry(rng: random.Random, mean: float) -> float:
-    """Mixture: bulk Gaussian (allows losses) + rare explosive tail."""
-    if rng.random() < 0.06:
-        # Explosive carry. Mean of this branch is high; weight keeps E[Y] near `mean`.
-        return max(12.0, rng.gammavariate(2.2, 9.0))
+    """Gaussian bulk plus explosive tail with exactly preserved E[yards/carry]."""
+    bulk_mean = (
+        mean - RUSH_EXPLOSIVE_PROB * RUSH_EXPLOSIVE_MEAN
+    ) / (1.0 - RUSH_EXPLOSIVE_PROB)
+    if rng.random() < RUSH_EXPLOSIVE_PROB:
+        return RUSH_EXPLOSIVE_FLOOR + rng.gammavariate(
+            RUSH_EXPLOSIVE_GAMMA_SHAPE,
+            RUSH_EXPLOSIVE_GAMMA_SCALE,
+        )
     sd = max(2.2, abs(mean) * 0.70)
-    return rng.gauss(mean * 0.78, sd)
+    return rng.gauss(bulk_mean, sd)
 
 
 def _rushing_yards(rng: random.Random, n: int, mean: float) -> int:
