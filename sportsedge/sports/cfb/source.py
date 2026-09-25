@@ -258,6 +258,8 @@ def normalize_advanced_team_metrics(
     off_fp = _num(_nested(off, "fieldPosition", "averageStart"), "offense.fieldPosition.averageStart")
     def_fp = _num(_nested(deff, "fieldPosition", "averageStart"), "defense.fieldPosition.averageStart")
     asof = _dt(feature_asof_ts, "feature_asof_ts")
+    if team not in season_points:
+        raise CFBSourceError(f"CFB_SEASON_POINTS_MISSING:{team}")
     return CFBTeamMetrics(
         team=team, season=int(row.get("season")), through_week=int(through_week), sample_source=sample_source,
         off_ppa_rush=_num(_nested(off, "rushingPlays", "ppa"), "offense.rushingPlays.ppa"),
@@ -270,7 +272,7 @@ def normalize_advanced_team_metrics(
         passing_down_success_rate=_num(_nested(off, "passingDowns", "successRate"), "offense.passingDowns.successRate"),
         eckel_rate=float(opps / drives),
         points_per_eckel=_num(off.get("pointsPerOpportunity"), "offense.pointsPerOpportunity"),
-        points_per_drive=float(_num(season_points.get(team, 0.0), "season_points") / drives),
+        points_per_drive=float(_num(season_points[team], "season_points") / drives),
         net_field_position=float(off_fp - def_fp),
         explosive_rate=_num(off.get("explosiveness"), "offense.explosiveness"),
         feature_asof_ts=asof.isoformat(),
