@@ -1,6 +1,7 @@
 import pytest
 
 from sportsedge.nfl_coherent_team_props import (
+    coherent_pass_yards_per_completion,
     scripted_role_means,
     simulate_anytime_td_board_on_game_paths,
     simulate_team_on_game_paths,
@@ -60,11 +61,12 @@ def state(pass_multiplier=1.0, rush_multiplier=1.0, team_tds=3):
 
 
 def pool():
-    # One coherent fitted yardage identity: every completion view averages 11 YPC.
+    # Realistic, separately fitted receiver YPRs that do NOT equal the QB's raw
+    # fitted YPC (11.0).  The coherent path must derive one identity, not block.
     return [
-        receiver("WR1", 10, 0.68, 11.0),
-        receiver("WR2", 7, 0.65, 11.0),
-        receiver("OTHER", 6, 0.62, 11.0),
+        receiver("WR1", 10, 0.68, 12.0),
+        receiver("WR2", 7, 0.65, 10.5),
+        receiver("OTHER", 6, 0.62, 8.5),
     ]
 
 
@@ -122,12 +124,60 @@ def test_team_paths_are_deterministic_and_conserve_qb_receiving_identity():
         )
 
 
-def test_mismatched_qb_ypc_and_receiver_pool_ypr_fails_closed():
-    bad_pool = pool()
-    bad_pool[0]["role_prior"] = dict(bad_pool[0]["role_prior"])
-    bad_pool[0]["role_prior"]["receiving_yards_per_reception"] = 13.0
-    with pytest.raises(NflPropSimulationError, match="YARDAGE_IDENTITY_MISMATCH"):
-        simulate_team_on_game_paths(qb(), bad_pool, [state()], seed=5)
+def _with_qb_ypc(value):
+    out = qb()
+    out["role_prior"] = dict(out["role_prior"])
+    out["role_prior"]["pass_yards_per_completion"] = value
+    return out
+
+
+def test_disagreeing_qb_and_receiver_fits_derive_one_identity_instead_of_blocking():
+    # Raw QB fit (7.5) deliberately disagrees with the receiver pool.
+    states = [state(1.10, 0.90, 2), state(0.90, 1.10, 3)] * 15
+    paths = simulate_team_on_game_paths(_with_qb_ypc(7.5), pool(), states, seed=5)
+    assert len(paths) == len(states)
+    for game in paths:
+        q = game["qb"]
+        rows = game["receivers"].values()
+        assert sum(row["receptions"] for row in rows) == q["completions"]
+        assert sum(row["receiving_yards"] for row in rows) == q["passing_yards"]
+
+    weights = [10 * 0.68, 7 * 0.65, 6 * 0.62]
+    expected = (weights[0] * 12.0 + weights[1] * 10.5 + weights[2] * 8.5) / sum(weights)
+    assert coherent_pass_yards_per_completion(pool(), state()) == pytest.approx(expected)
+
+
+def test_raw_qb_ypc_fit_has_no_effect_on_coherent_paths():
+    states = [state(1.15, 0.85, 2), state(1.00, 1.00, 4)] * 10
+    low = simulate_team_on_game_paths(_with_qb_ypc(7.5), pool(), states, seed=13)
+    high = simulate_team_on_game_paths(_with_qb_ypc(15.0), pool(), states, seed=13)
+    assert low == high
+
+
+def test_receiver_efficiency_context_moves_derived_qb_yardage():
+    boosted = pool()
+    boosted[0]["context"] = {
+        "shared_workload_sigma": 0.0,
+        "receiving_efficiency_multiplier": 1.20,
+        "source": "matchup",
+    }
+    assert coherent_pass_yards_per_completion(boosted, state()) > coherent_pass_yards_per_completion(
+        pool(), state()
+    )
+
+
+def test_qb_pass_yardage_context_fails_closed_rather_than_being_discarded():
+    for key in ("pass_efficiency_multiplier", "efficiency_multiplier"):
+        bad_qb = qb()
+        bad_qb["context"] = {"shared_workload_sigma": 0.0, key: 1.10, "source": "matchup"}
+        with pytest.raises(NflPropSimulationError, match=f"QB_PASS_YARDAGE_CONTEXT_CONFLICT:{key}"):
+            simulate_team_on_game_paths(bad_qb, pool(), [state()], seed=5)
+
+
+def test_receiver_pool_with_catch_weight_but_no_yardage_fails_closed():
+    zero_yardage = [receiver("WR1", 8, 0.7, 0.0), receiver("OTHER", 5, 0.6, 0.0)]
+    with pytest.raises(NflPropSimulationError, match="RECEIVING_YARD_WEIGHT_REQUIRED"):
+        simulate_team_on_game_paths(qb(), zero_yardage, [state()], seed=5)
 
 
 def test_receiver_pool_requires_real_completion_weight():
