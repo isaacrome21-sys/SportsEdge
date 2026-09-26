@@ -245,7 +245,7 @@ def determine_due(cfg: Mapping[str, Any], now: datetime, snapshot: Any, out_dir:
     return opener, final_expected
 
 
-def next_final_window(cfg: Mapping[str, Any], now: datetime, snapshot: Any, *, horizon_minutes: int = 45) -> tuple[datetime, datetime] | None:
+def next_final_window(cfg: Mapping[str, Any], now: datetime, snapshot: Any, *, horizon_minutes: int = 35) -> tuple[datetime, datetime] | None:
     """Return the earliest uncaptured FINAL window opening within the arm horizon."""
     now = now.astimezone(timezone.utc)
     lead = timedelta(minutes=int(cfg["final_minutes_before_kickoff"]))
@@ -286,14 +286,30 @@ def run_armed(*, force: bool = False, clock=utc_now, sleeper=time.sleep) -> dict
     while True:
         current = clock().astimezone(timezone.utc)
         if current >= end:
-            return last or {
+            # Armed attempts are provisional while the frozen window remains
+            # open. Emit exactly one absence marker only after the window has
+            # elapsed without an admissible FINAL.
+            expected = Counter()
+            from sportsedge.nfl_confirmation_schedule import schedule_kickoff_utc
+            for row in snapshot.rows:
+                kickoff = schedule_kickoff_utc(row)
+                if kickoff is not None and kickoff - timedelta(minutes=int(cfg["final_minutes_before_kickoff"])) == start:
+                    expected[iso_z(kickoff)] += 1
+            missed = mark_due_missed(
+                ROOT / str(cfg["output_dir"]), cfg, current, None, expected,
+                str((last or {}).get("reason") or "FINAL_WINDOW_ELAPSED_WITH_INCOMPLETE_CAPTURE"),
+                str((last or {}).get("detail") or ""),
+            ) if expected else []
+            return {
+                **(last or {}),
                 "authority_footer": AUTHORITY,
                 "as_of_utc": iso_z(current),
                 "model_p_created": False,
                 "promotion_authority": False,
                 "status": "FINAL_WINDOW_ELAPSED_WITH_INCOMPLETE_CAPTURE",
+                "missed_files": missed,
             }
-        last = run(force=force, as_of=current)
+        last = run(force=force, as_of=current, write_missed_markers=False)
         if last.get("status") == "CAPTURED":
             return last
         # A concurrent armed job may have won the atomic write. Re-evaluate the
@@ -406,7 +422,7 @@ def build_record(*, kind: str, week: int, now: datetime, board: RawDraftKingsBoa
     return record
 
 
-def run(*, force: bool, as_of: datetime | None = None) -> dict[str, Any]:
+def run(*, force: bool, as_of: datetime | None = None, write_missed_markers: bool = True) -> dict[str, Any]:
     cfg = load_cfg()
     now = (as_of or utc_now()).astimezone(timezone.utc)
     out_dir = ROOT / str(cfg["output_dir"])
@@ -437,7 +453,7 @@ def run(*, force: bool, as_of: datetime | None = None) -> dict[str, Any]:
     except (Blocked, DirectCaptureError, ValueError) as exc:
         reason = exc.reason if isinstance(exc, Blocked) else "DIRECT_PARSE_BLOCKED"
         detail = exc.detail if isinstance(exc, Blocked) else str(exc)
-        missed = mark_due_missed(out_dir, cfg, now, opener, final_expected, reason, detail) if due else []
+        missed = mark_due_missed(out_dir, cfg, now, opener, final_expected, reason, detail) if due and write_missed_markers else []
         report.update(status="MISSED_OR_BLOCKED" if due else "PROOF_BLOCKED", reason=reason, detail=detail, missed_files=missed)
         return report
 
@@ -483,7 +499,7 @@ def run(*, force: bool, as_of: datetime | None = None) -> dict[str, Any]:
     except (Blocked, ScheduleExpectationError, ValueError) as exc:
         reason = exc.reason if isinstance(exc, Blocked) else "ADMISSION_BLOCKED"
         detail = exc.detail if isinstance(exc, Blocked) else str(exc)
-        missed = mark_due_missed(out_dir, cfg, now, opener, final_expected, reason, detail)
+        missed = mark_due_missed(out_dir, cfg, now, opener, final_expected, reason, detail) if write_missed_markers else []
         report.update(status="MISSED_OR_BLOCKED", reason=reason, detail=detail, missed_files=missed)
         return report
 
