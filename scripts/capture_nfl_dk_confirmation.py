@@ -319,11 +319,10 @@ def run_armed(*, force: bool = False, clock=utc_now, sleeper=time.sleep) -> dict
                 **last,
                 "status": "ALREADY_CAPTURED",
             }
-        remaining = (end - current).total_seconds()
-        if remaining <= 60:
-            sleeper(max(0.0, remaining))
+        remaining = (end - clock().astimezone(timezone.utc)).total_seconds()
+        if remaining <= 0:
             continue
-        sleeper(60)
+        sleeper(min(60.0, remaining))
 
 
 def select_expected(rows: list[dict[str, Any]], expected: Counter[str], *, kind: str) -> list[dict[str, Any]]:
