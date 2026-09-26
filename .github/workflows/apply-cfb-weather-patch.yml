@@ -1,0 +1,87 @@
+name: apply-cfb-weather-patch
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fix branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/cfb-1056-weather-missing-20260926
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Apply null-weather acquire wire
+        run: |
+          set -euo pipefail
+          git apply --check patches/cfb_acquire_null_weather_wire.patch
+          git apply patches/cfb_acquire_null_weather_wire.patch
+          # Caller unpack of 5-tuple: patch _build_private_payload call sites if present
+          if grep -n "_build_weather(" scripts/acquire_cfb_reconstructed_selection.py | head -5; then
+            echo "_build_weather present after apply"
+          fi
+          # Ensure call sites unpack weather_missing_ids when present
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("scripts/acquire_cfb_reconstructed_selection.py")
+          t = p.read_text()
+          # Wire unpack if still 4-tuple assignment
+          old = "weather_by_game, weather_metas, weather_network_calls, weather_cache_hits = _build_weather("
+          new = "weather_by_game, weather_metas, weather_network_calls, weather_cache_hits, weather_missing_ids = _build_weather("
+          if old in t:
+              t = t.replace(old, new)
+              print("updated 4-tuple unpack to 5-tuple")
+          old2 = "weather_by_game, weather_metas, weather_calls, weather_cache_hits = _build_weather("
+          new2 = "weather_by_game, weather_metas, weather_calls, weather_cache_hits, weather_missing_ids = _build_weather("
+          if old2 in t:
+              t = t.replace(old2, new2)
+              print("updated alt 4-tuple unpack to 5-tuple")
+          # Inject attestation fields if missing
+          needle = '"weather_verified_cache_hits": weather_cache_hits,'
+          inject = (
+              '"weather_verified_cache_hits": weather_cache_hits,\n'
+              '        "weather_missing_count": len(weather_missing_ids),\n'
+              '        "weather_missing_game_ids": list(weather_missing_ids),'
+          )
+          if needle in t and "weather_missing_count" not in t:
+              t = t.replace(needle, inject, 1)
+              print("injected weather_missing attestation fields")
+          # Default empty list if variable unused path
+          if "weather_missing_ids" not in t:
+              raise SystemExit("weather_missing_ids not wired")
+          p.write_text(t)
+          lines = t.count("\n") + 1
+          print(f"acquire line count after wire: {lines}")
+          PY
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install package
+        run: |
+          pip install -e ".[dev]" 2>/dev/null || pip install -e . || true
+          pip install numpy pytest 2>/dev/null || true
+
+      - name: Run null-weather tests
+        run: |
+          python -m pytest tests/test_cfb_weather_missing_no_imputation.py tests/test_cfb_acquire_null_weather_venue_skip.py -q
+
+      - name: Commit and push wire
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/acquire_cfb_reconstructed_selection.py
+          if git diff --cached --quiet; then
+            echo "No acquire changes to commit (already applied?)"
+            exit 0
+          fi
+          git commit -m "CFB: wire acquire to null-weather helper (workflow apply)"
+          git push origin HEAD:fix/cfb-1056-weather-missing-20260926
