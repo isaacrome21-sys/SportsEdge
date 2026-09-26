@@ -1,6 +1,6 @@
 # CFB venue skip acquire wire
 
-Status: helpers are on main from #848. The acquire script still needs to call them.
+Status: helpers are on main from #848. Acquire now calls them and skips unusable venues.
 
 Required behavior:
 - Incomplete CFBD venue rows skip.
