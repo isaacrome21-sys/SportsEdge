@@ -28,10 +28,15 @@
  
  
  def _normalize_open_meteo_payload(payload: Any, expected: int) -> list[Mapping[str, Any]]:
-@@ -433,95 +431,16 @@
+@@ -428,100 +426,24 @@
+ def _build_weather(
+     *,
+     games: Sequence[Mapping[str, Any]],
+     venues_raw: Sequence[Mapping[str, Any]],
+     config: Mapping[str, Any],
      weather_cache_root: Path,
      opener: Callable = urlopen,
- ) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]], int, int]:
+-) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]], int, int]:
 -    by_id, by_name = _venue_indexes(venues_raw)
 -    resolved: dict[str, dict[str, Any]] = {}
 -    for game in games:
@@ -120,6 +125,7 @@
 -    if missing:
 -        raise CFBAcquisitionError(f"CFB_RECONSTRUCTED_WEATHER_MISSING:{missing[0]}")
 -    return weather_by_game, weather_metas, weather_calls, weather_cache_hits
++) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]], int, int, list[str]]:
 +    return build_weather_with_null_path(
 +        games=games,
 +        venues_raw=venues_raw,
@@ -127,9 +133,12 @@
 +        weather_cache_root=weather_cache_root,
 +        weather_request_fn=_weather_request,
 +        fetch_public_weather_fn=_fetch_public_weather,
++        normalize_open_meteo_payload_fn=_normalize_open_meteo_payload,
++        hourly_index_fn=_hourly_index,
++        weather_hour_key_fn=_weather_hour_key,
++        error_cls=CFBAcquisitionError,
 +        opener=opener,
 +    )
-+
  
  
  def _build_private_payload(
