@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import unittest
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 from urllib.error import HTTPError
 
@@ -121,6 +121,57 @@ class WindowSemanticsTests(unittest.TestCase):
         self.assertEqual(report["status"], "MISSED_OR_BLOCKED")
         self.assertEqual(report["missed_files"], ["missed.json"])
         mark.assert_called_once()
+
+
+class ArmedWindowTests(unittest.TestCase):
+    def test_armed_waits_until_window_start_then_captures(self):
+        start = datetime(2026, 9, 27, 16, 30, tzinfo=timezone.utc)
+        end = start + timedelta(minutes=15)
+        ticks = iter([start - timedelta(minutes=20), start])
+        sleeps = []
+        with patch.object(cap, "load_cfg", return_value={"final_minutes_before_kickoff": 30, "final_window_minutes": 15}), \
+             patch.object(cap, "load_snapshot", return_value=Snapshot()), \
+             patch.object(cap, "next_final_window", return_value=(start, end)), \
+             patch.object(cap, "run", return_value={"status": "CAPTURED"}) as run:
+            report = cap.run_armed(clock=lambda: next(ticks), sleeper=sleeps.append)
+        self.assertEqual(report["status"], "CAPTURED")
+        self.assertEqual(sleeps, [1200.0])
+        run.assert_called_once_with(force=False, as_of=start)
+
+    def test_armed_never_calls_capture_after_window_end(self):
+        start = datetime(2026, 9, 27, 16, 30, tzinfo=timezone.utc)
+        end = start + timedelta(minutes=15)
+        with patch.object(cap, "load_cfg", return_value={"final_minutes_before_kickoff": 30, "final_window_minutes": 15}), \
+             patch.object(cap, "load_snapshot", return_value=Snapshot()), \
+             patch.object(cap, "next_final_window", return_value=(start, end)), \
+             patch.object(cap, "run") as run:
+            report = cap.run_armed(clock=lambda: end, sleeper=lambda _s: None)
+        self.assertEqual(report["status"], "FINAL_WINDOW_ELAPSED_WITH_INCOMPLETE_CAPTURE")
+        run.assert_not_called()
+
+    def test_late_trigger_inside_window_captures_immediately(self):
+        start = datetime(2026, 9, 27, 16, 30, tzinfo=timezone.utc)
+        end = start + timedelta(minutes=15)
+        late = start + timedelta(minutes=10)
+        with patch.object(cap, "load_cfg", return_value={"final_minutes_before_kickoff": 30, "final_window_minutes": 15}), \
+             patch.object(cap, "load_snapshot", return_value=Snapshot()), \
+             patch.object(cap, "next_final_window", return_value=(start, end)), \
+             patch.object(cap, "run", return_value={"status": "CAPTURED"}) as run:
+            report = cap.run_armed(clock=lambda: late, sleeper=lambda _s: self.fail("must not sleep before capture"))
+        self.assertEqual(report["status"], "CAPTURED")
+        run.assert_called_once_with(force=False, as_of=late)
+
+    def test_duplicate_run_exits_when_first_writer_already_captured(self):
+        start = datetime(2026, 9, 27, 16, 30, tzinfo=timezone.utc)
+        end = start + timedelta(minutes=15)
+        times = iter([start, start])
+        with patch.object(cap, "load_cfg", return_value={"final_minutes_before_kickoff": 30, "final_window_minutes": 15}), \
+             patch.object(cap, "load_snapshot", return_value=Snapshot()), \
+             patch.object(cap, "next_final_window", return_value=(start, end)), \
+             patch.object(cap, "run", return_value={"status": "MISSED_OR_BLOCKED"}), \
+             patch.object(cap, "final_expected_due_kickoffs", return_value=Counter()):
+            report = cap.run_armed(clock=lambda: next(times), sleeper=lambda _s: None)
+        self.assertEqual(report["status"], "ALREADY_CAPTURED")
 
 
 class FetchBlockedTests(unittest.TestCase):
