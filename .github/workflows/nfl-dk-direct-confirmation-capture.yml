@@ -26,7 +26,7 @@ concurrency:
 jobs:
   capture:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 55
     env:
       PYTHONPATH: ${{ github.workspace }}
     steps:
@@ -73,7 +73,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.force }}" = "true" ]; then
             extra+=(--force)
           fi
-          python3 scripts/capture_nfl_dk_confirmation.py "${extra[@]}" --status-out artifacts/nfl-dk-direct/status.json
+          python3 scripts/capture_nfl_dk_confirmation.py --armed "${extra[@]}" --status-out artifacts/nfl-dk-direct/status.json
           echo "rc=$?" >> "$GITHUB_OUTPUT"
           set -e
           test -f artifacts/nfl-dk-direct/status.json

@@ -13,6 +13,7 @@ import hashlib
 import json
 import os
 import sys
+import time
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -244,6 +245,86 @@ def determine_due(cfg: Mapping[str, Any], now: datetime, snapshot: Any, out_dir:
     return opener, final_expected
 
 
+def next_final_window(cfg: Mapping[str, Any], now: datetime, snapshot: Any, *, horizon_minutes: int = 35) -> tuple[datetime, datetime] | None:
+    """Return the earliest uncaptured FINAL window opening within the arm horizon."""
+    now = now.astimezone(timezone.utc)
+    lead = timedelta(minutes=int(cfg["final_minutes_before_kickoff"]))
+    width = timedelta(minutes=int(cfg["final_window_minutes"]))
+    captured = set()
+    try:
+        from sportsedge.nfl_confirmation_schedule import captured_final_kickoffs
+        captured = {z for z, n in captured_final_kickoffs(dict(cfg)).items() if n > 0}
+    except (OSError, ValueError):
+        pass
+    candidates: list[tuple[datetime, datetime]] = []
+    for row in snapshot.rows:
+        from sportsedge.nfl_confirmation_schedule import schedule_kickoff_utc
+        kickoff = schedule_kickoff_utc(row)
+        if kickoff is None or week_of(kickoff, cfg) < int(cfg["first_week"]):
+            continue
+        if iso_z(kickoff) in captured:
+            continue
+        start = kickoff - lead
+        end = min(start + width, kickoff)
+        if now < end and start <= now + timedelta(minutes=horizon_minutes):
+            candidates.append((start, end))
+    return min(candidates, key=lambda pair: pair[0]) if candidates else None
+
+
+def run_armed(*, force: bool = False, clock=utc_now, sleeper=time.sleep) -> dict[str, Any]:
+    """Wait for an imminent FINAL window, then retry inside it until captured/closed."""
+    cfg = load_cfg()
+    snapshot = load_snapshot()
+    now = clock().astimezone(timezone.utc)
+    window = next_final_window(cfg, now, snapshot)
+    if window is None:
+        return run(force=force, as_of=now)
+    start, end = window
+    if now < start:
+        sleeper(max(0.0, (start - now).total_seconds()))
+    last: dict[str, Any] | None = None
+    while True:
+        current = clock().astimezone(timezone.utc)
+        if current >= end:
+            # Armed attempts are provisional while the frozen window remains
+            # open. Emit exactly one absence marker only after the window has
+            # elapsed without an admissible FINAL.
+            expected = Counter()
+            from sportsedge.nfl_confirmation_schedule import schedule_kickoff_utc
+            for row in snapshot.rows:
+                kickoff = schedule_kickoff_utc(row)
+                if kickoff is not None and kickoff - timedelta(minutes=int(cfg["final_minutes_before_kickoff"])) == start:
+                    expected[iso_z(kickoff)] += 1
+            missed = mark_due_missed(
+                ROOT / str(cfg["output_dir"]), cfg, current, None, expected,
+                str((last or {}).get("reason") or "FINAL_WINDOW_ELAPSED_WITH_INCOMPLETE_CAPTURE"),
+                str((last or {}).get("detail") or ""),
+            ) if expected else []
+            return {
+                **(last or {}),
+                "authority_footer": AUTHORITY,
+                "as_of_utc": iso_z(current),
+                "model_p_created": False,
+                "promotion_authority": False,
+                "status": "FINAL_WINDOW_ELAPSED_WITH_INCOMPLETE_CAPTURE",
+                "missed_files": missed,
+            }
+        last = run(force=force, as_of=current, write_missed_markers=False)
+        if last.get("status") == "CAPTURED":
+            return last
+        # A concurrent armed job may have won the atomic write. Re-evaluate the
+        # governed archive before retrying; no duplicate/backfill write is made.
+        if not final_expected_due_kickoffs(dict(cfg), current, snapshot):
+            return {
+                **last,
+                "status": "ALREADY_CAPTURED",
+            }
+        remaining = (end - current).total_seconds()
+        if remaining <= 0:
+            continue
+        sleeper(min(60.0, remaining))
+
+
 def select_expected(rows: list[dict[str, Any]], expected: Counter[str], *, kind: str) -> list[dict[str, Any]]:
     remaining = Counter(expected)
     selected: list[dict[str, Any]] = []
@@ -341,7 +422,7 @@ def build_record(*, kind: str, week: int, now: datetime, board: RawDraftKingsBoa
     return record
 
 
-def run(*, force: bool, as_of: datetime | None = None) -> dict[str, Any]:
+def run(*, force: bool, as_of: datetime | None = None, write_missed_markers: bool = True) -> dict[str, Any]:
     cfg = load_cfg()
     now = (as_of or utc_now()).astimezone(timezone.utc)
     out_dir = ROOT / str(cfg["output_dir"])
@@ -372,7 +453,7 @@ def run(*, force: bool, as_of: datetime | None = None) -> dict[str, Any]:
     except (Blocked, DirectCaptureError, ValueError) as exc:
         reason = exc.reason if isinstance(exc, Blocked) else "DIRECT_PARSE_BLOCKED"
         detail = exc.detail if isinstance(exc, Blocked) else str(exc)
-        missed = mark_due_missed(out_dir, cfg, now, opener, final_expected, reason, detail) if due else []
+        missed = mark_due_missed(out_dir, cfg, now, opener, final_expected, reason, detail) if due and write_missed_markers else []
         report.update(status="MISSED_OR_BLOCKED" if due else "PROOF_BLOCKED", reason=reason, detail=detail, missed_files=missed)
         return report
 
@@ -387,63 +468,50 @@ def run(*, force: bool, as_of: datetime | None = None) -> dict[str, Any]:
         if opener:
             games = select_expected(rows, opener["expected"], kind="OPENER")
             record = build_record(
-                kind="OPENER", week=int(opener["week"]), now=now, board=board,
-                date_header=date_header, raw_rel=raw_rel, raw_sha=raw_sha,
-                snapshot=snapshot, expected=opener["expected"], games=games,
-                target=opener["target"],
+                kind="OPENER", week=int(opener["week"]), now=now, board=board, date_header=date_header,
+                raw_rel=raw_rel, raw_sha=raw_sha, snapshot=snapshot, expected=opener["expected"],
+                games=games, target=opener["target"],
             )
             write_json(opener["path"], record)
             written.append(str(opener["path"].relative_to(ROOT)))
-
         if final_expected:
-            final_games = select_expected(rows, final_expected, kind="FINAL")
+            games = select_expected(rows, final_expected, kind="FINAL")
             by_week: dict[int, list[dict[str, Any]]] = {}
-            for row in final_games:
-                by_week.setdefault(int(row["week"]), []).append(row)
-            for week, games in sorted(by_week.items()):
-                expected = Counter({
-                    kickoff: count
-                    for kickoff, count in final_expected.items()
-                    if week_of(parse_z(kickoff), cfg) == week
-                })
-                stamp = board.received_at.strftime("%Y%m%dT%H%M%SZ")
-                path = out_dir / f"week{week:02d}" / "final" / f"{stamp}.json"
+            for game in games:
+                by_week.setdefault(int(game["week"]), []).append(game)
+            for week, week_games in sorted(by_week.items()):
+                week_expected = Counter(iso_z(parse_z(str(g["commence_time"]))) for g in week_games)
+                path = out_dir / f"week{week:02d}" / f"final_{now.strftime('%Y%m%dT%H%M%SZ')}.json"
                 record = build_record(
-                    kind="FINAL", week=week, now=now, board=board,
-                    date_header=date_header, raw_rel=raw_rel, raw_sha=raw_sha,
-                    snapshot=snapshot, expected=expected, games=games,
+                    kind="FINAL", week=week, now=now, board=board, date_header=date_header,
+                    raw_rel=raw_rel, raw_sha=raw_sha, snapshot=snapshot, expected=week_expected, games=week_games,
                 )
                 write_json(path, record)
                 written.append(str(path.relative_to(ROOT)))
+        report.update(status="CAPTURED", written=written, raw_sha256=raw_sha)
+        return report
     except (Blocked, ScheduleExpectationError, ValueError) as exc:
         reason = exc.reason if isinstance(exc, Blocked) else "ADMISSION_BLOCKED"
         detail = exc.detail if isinstance(exc, Blocked) else str(exc)
-        missed = mark_due_missed(out_dir, cfg, now, opener, final_expected, reason, detail)
+        missed = mark_due_missed(out_dir, cfg, now, opener, final_expected, reason, detail) if write_missed_markers else []
         report.update(status="MISSED_OR_BLOCKED", reason=reason, detail=detail, missed_files=missed)
         return report
-
-    report.update(
-        status="CAPTURED",
-        files=written,
-        raw_sha256=raw_sha,
-        retrieved_at_utc=iso_z(board.received_at),
-    )
-    return report
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--force", action="store_true", help="proof parsing/admission outside frozen windows without writing governed evidence")
+    parser.add_argument("--armed", action="store_true", help="wait for an imminent FINAL window and retry only inside it")
     parser.add_argument("--status-out", default="")
     args = parser.parse_args(argv)
-    report = run(force=args.force)
+    report = run_armed(force=args.force) if args.armed else run(force=args.force)
     text = json.dumps(report, indent=2, sort_keys=True)
     print(text)
     if args.status_out:
         target = Path(args.status_out)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(text + "\n", encoding="utf-8")
-    return 0 if report.get("status") in {"CAPTURED", "NO_WINDOW", "PROOF_OK"} else 2
+    return 0 if report.get("status") in {"CAPTURED", "ALREADY_CAPTURED", "NO_WINDOW", "PROOF_OK"} else 2
 
 
 if __name__ == "__main__":
