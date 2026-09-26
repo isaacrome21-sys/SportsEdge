@@ -1,6 +1,7 @@
 import pytest
 
 from sportsedge.nfl_prop_run_it_score_b import PROP_FAMILIES, NflPropBoardError, run_prop_board
+from sportsedge.truth_gate import american_to_decimal
 
 BOOKS = ("draftkings", "fanduel", "betmgm")
 
@@ -80,6 +81,7 @@ def test_all_supported_prop_families_price_and_score(market: str) -> None:
         as_of="2026-09-23T12:00:30Z",
     )[0]
     assert row.status == "OK"
+    assert row.book == "draftkings"
     assert row.market == market
     assert row.score_0_100 == 100
     assert len(row.books_used) == 3
@@ -141,7 +143,6 @@ def test_estimate_rejects_nested_sportsbook_keys() -> None:
 
 
 def test_line_disagreement_blocks_hygiene() -> None:
-    # Same market/player, books post different lines
     q = quotes("receptions", 4.5, books=("draftkings",))
     q += quotes("receptions", 5.5, books=("fanduel",))
     q += quotes("receptions", 4.5, books=("betmgm",))
@@ -198,6 +199,59 @@ def test_insufficient_books_blocks_row_not_board() -> None:
     assert by_player["Q"].block_reason == "BLOCKED_INSUFFICIENT_BOOKS"
 
 
+def test_executable_price_is_declared_book_not_median() -> None:
+    q = []
+    for book, over, under in (
+        ("draftkings", 110, -130),
+        ("fanduel", 120, -140),
+        ("betmgm", 130, -150),
+    ):
+        q.extend(quotes("receptions", 4.5, over=over, under=under, books=(book,)))
+    row = run_prop_board(
+        estimates=[
+            {
+                "game_id": "g",
+                "player": "P",
+                "market": "receptions",
+                "selection": "OVER",
+                "line": 4.5,
+                "estimate_p": 0.6,
+            }
+        ],
+        quotes=q,
+        qualification_snapshots=[snap("receptions")],
+        as_of="2026-09-23T12:00:30Z",
+    )[0]
+    assert row.status == "OK"
+    assert row.book == "draftkings"
+    assert row.price_american == 110
+    assert row.price_american != 120
+    expected_ev = 0.6 * (american_to_decimal(110) - 1) - 0.4
+    assert abs(row.ev_per_dollar - expected_ev) < 1e-12
+    assert len(row.books_used) == 3
+
+
+def test_executable_book_missing_blocks_row() -> None:
+    q = quotes("receptions", 4.5, books=("fanduel", "betmgm", "caesars"))
+    row = run_prop_board(
+        estimates=[
+            {
+                "game_id": "g",
+                "player": "P",
+                "market": "receptions",
+                "selection": "OVER",
+                "line": 4.5,
+                "estimate_p": 0.6,
+            }
+        ],
+        quotes=q,
+        qualification_snapshots=[snap("receptions")],
+        as_of="2026-09-23T12:00:30Z",
+    )[0]
+    assert row.status == "BLOCKED"
+    assert row.block_reason == "BLOCKED_EXECUTABLE_BOOK_MISSING"
+
+
 def test_integer_line_push_is_conditioned_for_edge_and_ev() -> None:
     row = run_prop_board(
         estimates=[
@@ -217,4 +271,5 @@ def test_integer_line_push_is_conditioned_for_edge_and_ev() -> None:
     )[0]
     assert row.status == "OK"
     assert row.push_p == 0.2
+    assert row.book == "draftkings"
     assert row.fair_american != 0
