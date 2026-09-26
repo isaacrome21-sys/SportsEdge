@@ -14,6 +14,8 @@ from sportsedge.nfl_direct_capture_source import game_rows_direct
 
 
 class Snapshot:
+    rows = ()
+
     def provenance(self):
         return {
             "source": "fixture",
@@ -208,7 +210,7 @@ class ArmedWindowTests(unittest.TestCase):
                 "final_window_minutes": 15,
                 "output_dir": "artifacts/nfl-dk-direct",
             }), \
-             patch.object(cap, "load_snapshot", return_value=Snapshot()), \
+             patch.object(cap, "load_snapshot", return_value=type("WindowSnapshot", (Snapshot,), {"rows": ({"season": "2026", "gameday": "2026-09-27", "gametime": "13:00"},)})()), \
              patch.object(cap, "next_final_window", return_value=(start, end)), \
              patch.object(cap, "run", return_value={"status": "MISSED_OR_BLOCKED", "reason": "FETCH_FAILED", "detail": "blocked"}), \
              patch.object(cap, "final_expected_due_kickoffs", return_value=Counter({"2026-09-27T17:00:00Z": 1})), \
@@ -240,7 +242,7 @@ class ArmedWindowTests(unittest.TestCase):
         self.assertEqual(start, datetime(2026, 9, 27, 16, 30, tzinfo=timezone.utc))
         self.assertEqual(end, datetime(2026, 9, 27, 16, 45, tzinfo=timezone.utc))
         with patch("sportsedge.nfl_confirmation_schedule.captured_final_kickoffs", return_value=Counter({"2026-09-27T17:00:00Z": 1})):
-            start2, end2 = cap.next_final_window(cfg, datetime(2026, 9, 27, 16, 10, tzinfo=timezone.utc), RealSnapshot())
+            start2, end2 = cap.next_final_window(cfg, datetime(2026, 9, 27, 16, 15, tzinfo=timezone.utc), RealSnapshot())
         self.assertEqual(start2, datetime(2026, 9, 27, 16, 50, tzinfo=timezone.utc))
         self.assertEqual(end2, datetime(2026, 9, 27, 17, 5, tzinfo=timezone.utc))
 
