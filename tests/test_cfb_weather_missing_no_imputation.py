@@ -2,23 +2,22 @@ from __future__ import annotations
 
 import unittest
 
-from sportsedge.sports.cfb.joint_model import CFBModelError, _feature_vector
-from sportsedge.sports.cfb.reconstructed_selection import _weather
+from sportsedge.sports.cfb.reconstructed_selection import (
+    CFBReconstructedSelectionError,
+    _weather,
+    WEATHER_MISSING_SOURCE,
+)
 from sportsedge.sports.cfb.source import CFBGame
-from sportsedge.sports.cfb.reconstructed_acquire_weather import resolve_venue, WEATHER_MISSING_SOURCE
-
-
-def _metrics():
-    keys = (
-        "off_ppa_rush", "off_ppa_dropback", "def_ppa_rush_allowed", "def_ppa_dropback_allowed",
-        "off_success_rate", "def_success_rate_allowed", "standard_down_ppa",
-        "passing_down_success_rate", "eckel_rate", "points_per_eckel", "points_per_drive",
-        "net_field_position", "explosive_rate",
-    )
-    return {k: 0.1 for k in keys}
+from sportsedge.sports.cfb.reconstructed_acquire_weather import resolve_venue
 
 
 class TestWeatherMissingNoImputation(unittest.TestCase):
+    """WEATHER_MISSING is enforced outside V3-bound joint_model.py.
+
+    joint_model.py blob ff91ad867a5240d7f1cd90c707d29d534bde8dd2 is frozen in
+    cfb_candidate_bakeoff_evaluator_v3.json and must not change.
+    """
+
     def test_resolve_venue_none(self):
         self.assertIsNone(resolve_venue({"id": 1, "venueId": 99, "venue": "X"}, by_id={}, by_name={}))
 
@@ -41,22 +40,20 @@ class TestWeatherMissingNoImputation(unittest.TestCase):
         self.assertTrue(out["weather_missing"])
         self.assertEqual(out["source"], WEATHER_MISSING_SOURCE)
 
-    def test_joint_model_refuses_missing_weather_imputation(self):
-        row = {
-            "neutral_site": False,
-            "home_metrics": _metrics(),
-            "away_metrics": _metrics(),
-            "weather": {
-                "source": WEATHER_MISSING_SOURCE,
-                "weather_missing": True,
+    def test_reconstructed_weather_rejects_null_indoor_without_missing_flag(self):
+        game = CFBGame(
+            game_id="g2", season=2020, week=3, start_ts="2020-09-12T16:00:00+00:00",
+            home_team="A", away_team="B", neutral_site=False, venue=None,
+        )
+        with self.assertRaises(CFBReconstructedSelectionError) as ctx:
+            _weather(game, {
+                "source": "SOME_OTHER_SOURCE",
+                "retrieved_at_utc": "2020-09-12T12:00:00+00:00",
                 "gameIndoors": None,
                 "windSpeed": None,
                 "temperature": None,
-            },
-        }
-        with self.assertRaises(CFBModelError) as ctx:
-            _feature_vector(row)
-        self.assertIn("WEATHER_MISSING", str(ctx.exception))
+            })
+        self.assertIn("WEATHER_INDOOR_INVALID", str(ctx.exception))
 
 
 if __name__ == "__main__":
