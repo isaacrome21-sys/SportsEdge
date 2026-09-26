@@ -1,4 +1,5 @@
 name: nfl-dk-direct-confirmation-capture
+# Restored scheduler: frozen V1 source/admission semantics unchanged.
 
 on:
   workflow_dispatch:
