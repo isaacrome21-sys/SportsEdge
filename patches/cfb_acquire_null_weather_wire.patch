@@ -1,0 +1,135 @@
+--- a/scripts/acquire_cfb_reconstructed_selection.py
++++ b/scripts/acquire_cfb_reconstructed_selection.py
+@@ -33,6 +33,10 @@
+ 
+ from sportsedge.sports.cfb.source import normalize_advanced_team_metrics
+ from sportsedge.sports.cfb.venue_coordinates import venue_indexes
++from sportsedge.sports.cfb.reconstructed_acquire_weather import (
++    build_weather_with_null_path,
++    resolve_venue as _helper_resolve_venue,
++)
+ 
+ CONFIG = ROOT / "config/cfb_cfbd_reconstructed_selection_budget_v1.json"
+ CFBD_BASE = "https://api.collegefootballdata.com"
+@@ -371,14 +375,8 @@
+     *,
+     by_id: Mapping[str, Mapping[str, Any]],
+     by_name: Mapping[str, Mapping[str, Any]],
+-) -> dict[str, Any]:
+-    venue_id = str(game.get("venueId") or game.get("venue_id") or "").strip()
+-    if venue_id and venue_id in by_id:
+-        return dict(by_id[venue_id])
+-    venue_name = str(game.get("venue") or "").strip()
+-    if venue_name and venue_name.casefold() in by_name:
+-        return dict(by_name[venue_name.casefold()])
+-    raise CFBAcquisitionError(f"CFB_GAME_VENUE_UNRESOLVED:{game.get('id') or game.get('game_id')}")
++) -> dict[str, Any] | None:
++    return _helper_resolve_venue(game, by_id=by_id, by_name=by_name)
+ 
+ 
+ def _normalize_open_meteo_payload(payload: Any, expected: int) -> list[Mapping[str, Any]]:
+@@ -433,95 +431,16 @@
+     weather_cache_root: Path,
+     opener: Callable = urlopen,
+ ) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]], int, int]:
+-    by_id, by_name = _venue_indexes(venues_raw)
+-    resolved: dict[str, dict[str, Any]] = {}
+-    for game in games:
+-        gid = str(game["game_id"])
+-        resolved[gid] = _resolve_venue(game, by_id=by_id, by_name=by_name)
+-
+-    weather_by_game: dict[str, dict[str, Any]] = {}
+-    outdoor_by_season: dict[int, list[Mapping[str, Any]]] = {}
+-    venue_retrieved = _now()
+-    for game in games:
+-        gid = str(game["game_id"])
+-        venue = resolved[gid]
+-        if venue["dome"]:
+-            weather_by_game[gid] = {
+-                "gameIndoors": True,
+-                "windSpeed": 0.0,
+-                "temperature": 70.0,
+-                "source": WEATHER_CONTRACT,
+-                "retrieved_at_utc": venue_retrieved,
+-                "venue_id": venue["venue_id"],
+-            }
+-        else:
+-            outdoor_by_season.setdefault(int(game["season"]), []).append(game)
+-
+-    max_batch = int((config.get("weather_reconstruction") or {}).get("max_venues_per_archive_request", 20))
+-    if max_batch < 1 or max_batch > 100:
+-        raise CFBAcquisitionError("CFB_OPEN_METEO_BATCH_SIZE_INVALID")
+-
+-    weather_metas: list[dict[str, Any]] = []
+-    weather_calls = 0
+-    weather_cache_hits = 0
+-    for season, season_games in sorted(outdoor_by_season.items()):
+-        venue_ids = sorted({resolved[str(game["game_id"])]["venue_id"] for game in season_games})
+-        for offset in range(0, len(venue_ids), max_batch):
+-            batch_ids = venue_ids[offset:offset + max_batch]
+-            batch_set = set(batch_ids)
+-            batch_venues = [dict(by_id[venue_id]) for venue_id in batch_ids]
+-            batch_games = [
+-                game for game in season_games
+-                if resolved[str(game["game_id"])]["venue_id"] in batch_set
+-            ]
+-            kickoff_dates = [_dt(game["start_ts"], "CFB_GAME_KICKOFF_INVALID").date() for game in batch_games]
+-            request_item = _weather_request(
+-                config=config,
+-                season=season,
+-                venues=batch_venues,
+-                start_date=min(kickoff_dates).isoformat(),
+-                end_date=max(kickoff_dates).isoformat(),
+-            )
+-            payload, meta, cached = _fetch_public_weather(
+-                request_item,
+-                cache_root=weather_cache_root,
+-                opener=opener,
+-            )
+-            weather_metas.append(dict(meta))
+-            if cached:
+-                weather_cache_hits += 1
+-            else:
+-                weather_calls += 1
+-            location_rows = _normalize_open_meteo_payload(payload, len(batch_venues))
+-            hourly_by_venue = {
+-                str(venue["venue_id"]): _hourly_index(location)
+-                for venue, location in zip(batch_venues, location_rows)
+-            }
+-            retrieved = str(meta["retrieved_at_utc"])
+-            for game in batch_games:
+-                gid = str(game["game_id"])
+-                venue_id = resolved[gid]["venue_id"]
+-                key = _weather_hour_key(game["start_ts"])
+-                values = hourly_by_venue[venue_id].get(key)
+-                if values is None:
+-                    raise CFBAcquisitionError(f"CFB_OPEN_METEO_KICKOFF_HOUR_MISSING:{gid}:{key}")
+-                temp_f, wind_mph = values
+-                weather_by_game[gid] = {
+-                    "gameIndoors": False,
+-                    "windSpeed": wind_mph,
+-                    "temperature": temp_f,
+-                    "source": WEATHER_CONTRACT,
+-                    "retrieved_at_utc": retrieved,
+-                    "venue_id": venue_id,
+-                    "reanalysis_model": "era5",
+-                    "time_selection": "UTC_KICKOFF_HOUR_FLOOR_NO_INTERPOLATION",
+-                }
+-
+-    missing = sorted(str(game["game_id"]) for game in games if str(game["game_id"]) not in weather_by_game)
+-    if missing:
+-        raise CFBAcquisitionError(f"CFB_RECONSTRUCTED_WEATHER_MISSING:{missing[0]}")
+-    return weather_by_game, weather_metas, weather_calls, weather_cache_hits
++    return build_weather_with_null_path(
++        games=games,
++        venues_raw=venues_raw,
++        config=config,
++        weather_cache_root=weather_cache_root,
++        weather_request_fn=_weather_request,
++        fetch_public_weather_fn=_fetch_public_weather,
++        opener=opener,
++    )
++
+ 
+ 
+ def _build_private_payload(
