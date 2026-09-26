@@ -1,8 +1,13 @@
 """Broad NFL player-prop RUN IT board with locked Score B.
 
-Independent projection/simulation probability, fair price, paired market
-economics, and a separate qualification/role score. No proprietary formula.
-Estimate inputs must not contain sportsbook price/odds/no-vig/edge/EV fields.
+Quote hygiene (#898 design):
+- ≥3 books must supply a complete OVER/UNDER pair at the identical line.
+- Different lines across books → BLOCKED_QUOTE_HYGIENE for that row.
+- Fewer than 3 books at the consensus line → BLOCKED_INSUFFICIENT_BOOKS.
+- Never select the best-edge book: median executable price and median no-vig.
+
+Per-row failures return status=BLOCKED with a reason; other rows still rank.
+Estimates must pass nfl_prop_shared_sim._assert_no_market_inputs.
 
 No Model_P, Truth Gate, freeze, eligibility, or OFFICIAL authority.
 """
@@ -11,9 +16,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from math import isfinite
+from statistics import median
 from typing import Any, Mapping, Sequence
 
 from sports.common.ev_math import EVError, devig, parse_utc
+from sportsedge.nfl_prop_shared_sim import NflPropSimulationError, _assert_no_market_inputs
 from sportsedge.nfl_run_it_score_binding import score_b_by_identity
 from sportsedge.truth_gate import american_to_decimal
 
@@ -33,6 +40,7 @@ PROP_FAMILIES = frozenset(
 )
 TTL = 180
 SKEW = 30
+MIN_BOOKS = 3
 
 
 class NflPropBoardError(ValueError):
@@ -47,14 +55,17 @@ class PropPick:
     market: str
     selection: str
     line: float
-    price_american: int
+    status: str
+    block_reason: str | None
+    price_american: int | None
     estimate_p: float
     push_p: float
-    fair_american: int
-    market_no_vig_p: float
-    edge_probability_points: float
-    ev_per_dollar: float
-    score_0_100: int
+    fair_american: int | None
+    market_no_vig_p: float | None
+    edge_probability_points: float | None
+    ev_per_dollar: float | None
+    score_0_100: int | None
+    books_used: tuple[str, ...]
 
 
 def _ts(value: Any) -> datetime:
@@ -72,6 +83,43 @@ def _fair(p: float) -> int:
     return int(round(100 * (1 - p) / p))
 
 
+def _median_int(values: Sequence[int]) -> int:
+    return int(round(median(sorted(values))))
+
+
+def _blocked(
+    *,
+    rank: int,
+    game_id: str,
+    player: str,
+    market: str,
+    selection: str,
+    line: float,
+    estimate_p: float,
+    push_p: float,
+    reason: str,
+) -> PropPick:
+    return PropPick(
+        rank=rank,
+        game_id=game_id,
+        player=player,
+        market=market,
+        selection=selection,
+        line=line,
+        status="BLOCKED",
+        block_reason=reason,
+        price_american=None,
+        estimate_p=estimate_p,
+        push_p=push_p,
+        fair_american=None,
+        market_no_vig_p=None,
+        edge_probability_points=None,
+        ev_per_dollar=None,
+        score_0_100=None,
+        books_used=(),
+    )
+
+
 def run_prop_board(
     *,
     estimates: Sequence[Mapping[str, Any]],
@@ -80,18 +128,17 @@ def run_prop_board(
     as_of: datetime | str,
 ) -> list[PropPick]:
     now = _ts(as_of)
-    scores = score_b_by_identity(qualification_snapshots)
-    forbidden = {
-        "price_american",
-        "odds",
-        "market_no_vig_p",
-        "edge_probability_points",
-        "ev_per_dollar",
-    }
+    try:
+        scores = score_b_by_identity(qualification_snapshots)
+    except Exception as exc:
+        raise NflPropBoardError(f"QUALIFICATION_BINDING_FAILED:{exc}") from exc
+
     est: dict[tuple[str, str, str, str, float], tuple[float, float]] = {}
     for row in estimates:
-        if forbidden.intersection(row):
-            raise NflPropBoardError("MARKET_INPUT_FORBIDDEN_IN_PROP_ESTIMATE")
+        try:
+            _assert_no_market_inputs(row)
+        except NflPropSimulationError as exc:
+            raise NflPropBoardError("MARKET_INPUT_FORBIDDEN_IN_PROP_ESTIMATE") from exc
         game = str(row.get("game_id") or "").strip()
         player = str(row.get("player") or "").strip()
         market = str(row.get("market") or "").strip()
@@ -108,67 +155,165 @@ def run_prop_board(
             raise NflPropBoardError("PROP_ESTIMATE_MASS_INVALID")
         est[(game, player, market, side, line)] = (p, push)
 
-    groups: dict[tuple[str, str, str, float], dict[str, tuple[int, datetime]]] = {}
+    # book -> (game, player, market) -> line -> side -> (price, retrieved)
+    by_book: dict[str, dict[tuple[str, str, str], dict[float, dict[str, tuple[int, datetime]]]]] = {}
     for quote in quotes:
         game = str(quote.get("game_id") or "").strip()
         player = str(quote.get("player") or "").strip()
         market = str(quote.get("market") or "").strip()
         side = str(quote.get("selection") or "").upper().strip()
         book = str(quote.get("book") or "").lower().strip()
+        if not game or not player or market not in PROP_FAMILIES or side not in {"OVER", "UNDER"} or not book:
+            continue
         try:
             line = float(quote["line"])
             price = int(quote["price_american"])
-        except (KeyError, TypeError, ValueError) as exc:
-            raise NflPropBoardError("PROP_QUOTE_NUMERIC_INVALID") from exc
-        if (
-            not game
-            or not player
-            or market not in PROP_FAMILIES
-            or side not in {"OVER", "UNDER"}
-            or book != "draftkings"
-            or -100 < price < 100
-        ):
-            raise NflPropBoardError("PROP_QUOTE_IDENTITY_INVALID")
-        retrieved = _ts(quote.get("retrieved_at"))
+            retrieved = _ts(quote.get("retrieved_at"))
+        except (NflPropBoardError, KeyError, TypeError, ValueError):
+            continue
+        if -100 < price < 100:
+            continue
         age = (now - retrieved).total_seconds()
-        if age > TTL:
-            raise NflPropBoardError("QUOTE_STALE")
-        if age < -SKEW:
-            raise NflPropBoardError("QUOTE_CLOCK_SKEW")
-        groups.setdefault((game, player, market, line), {})[side] = (price, retrieved)
+        if age > TTL or age < -SKEW:
+            continue
+        by_book.setdefault(book, {}).setdefault((game, player, market), {}).setdefault(line, {})[
+            side
+        ] = (price, retrieved)
 
-    rows: list[dict[str, Any]] = []
+    ranked_ready: list[dict[str, Any]] = []
+    blocked_rows: list[PropPick] = []
+
     for (game, player, market, side, line), (p, push) in est.items():
-        pair = groups.get((game, player, market, line), {})
-        if set(pair) != {"OVER", "UNDER"}:
-            raise NflPropBoardError("PAIRED_PROP_PRICE_REQUIRED")
-        if abs((pair["OVER"][1] - pair["UNDER"][1]).total_seconds()) > SKEW:
-            raise NflPropBoardError("PAIRED_QUOTE_TIME_SKEW")
-        dec = [american_to_decimal(pair["OVER"][0]), american_to_decimal(pair["UNDER"][0])]
-        try:
-            nv = devig(dec, trigger_american=400, max_spread_pp=1.0)
-        except EVError as exc:
-            raise NflPropBoardError(str(getattr(exc, "code", exc))) from exc
-        idx = 0 if side == "OVER" else 1
-        no_vig = float(nv[idx])
-        price = pair[side][0]
+        identity = (game, player, market)
+
+        # Collect per-book lines and complete pairs near the estimate line.
+        book_lines: dict[str, set[float]] = {}
+        book_pairs_at_line: dict[str, dict[str, tuple[int, datetime]]] = {}
+        for book, idents in by_book.items():
+            lines_map = idents.get(identity, {})
+            book_lines[book] = set(lines_map.keys())
+            # exact line match (float)
+            for posted_line, sides in lines_map.items():
+                if abs(posted_line - line) > 1e-9:
+                    continue
+                if set(sides.keys()) >= {"OVER", "UNDER"}:
+                    if abs((sides["OVER"][1] - sides["UNDER"][1]).total_seconds()) > SKEW:
+                        continue
+                    book_pairs_at_line[book] = sides
+
+        # Hygiene: books quoting this market/player with disagreeing lines.
+        observed_lines: set[float] = set()
+        for lines in book_lines.values():
+            observed_lines |= lines
+        if len(observed_lines) > 1:
+            blocked_rows.append(
+                _blocked(
+                    rank=0,
+                    game_id=game,
+                    player=player,
+                    market=market,
+                    selection=side,
+                    line=line,
+                    estimate_p=p,
+                    push_p=push,
+                    reason="BLOCKED_QUOTE_HYGIENE",
+                )
+            )
+            continue
+
+        if len(book_pairs_at_line) < MIN_BOOKS:
+            blocked_rows.append(
+                _blocked(
+                    rank=0,
+                    game_id=game,
+                    player=player,
+                    market=market,
+                    selection=side,
+                    line=line,
+                    estimate_p=p,
+                    push_p=push,
+                    reason="BLOCKED_INSUFFICIENT_BOOKS",
+                )
+            )
+            continue
+
+        side_prices = [book_pairs_at_line[b][side][0] for b in sorted(book_pairs_at_line)]
+        no_vig_vals: list[float] = []
+        sensitivity_fail = False
+        for book in sorted(book_pairs_at_line):
+            pair = book_pairs_at_line[book]
+            dec = [american_to_decimal(pair["OVER"][0]), american_to_decimal(pair["UNDER"][0])]
+            try:
+                nv = devig(dec, trigger_american=400, max_spread_pp=1.0)
+            except EVError:
+                sensitivity_fail = True
+                break
+            idx = 0 if side == "OVER" else 1
+            no_vig_vals.append(float(nv[idx]))
+        if sensitivity_fail:
+            blocked_rows.append(
+                _blocked(
+                    rank=0,
+                    game_id=game,
+                    player=player,
+                    market=market,
+                    selection=side,
+                    line=line,
+                    estimate_p=p,
+                    push_p=push,
+                    reason="BLOCKED_DEVIG_SENSITIVITY",
+                )
+            )
+            continue
+
+        score_key = (game, market, player)
+        if score_key not in scores:
+            blocked_rows.append(
+                _blocked(
+                    rank=0,
+                    game_id=game,
+                    player=player,
+                    market=market,
+                    selection=side,
+                    line=line,
+                    estimate_p=p,
+                    push_p=push,
+                    reason="BLOCKED_MISSING_QUALIFICATION",
+                )
+            )
+            continue
+
+        price = _median_int(side_prices)
+        no_vig = float(median(no_vig_vals))
         loss = max(0.0, 1 - p - push)
         decisive = p + loss
         if decisive <= 0:
-            raise NflPropBoardError("NON_PUSH_MASS_ZERO")
+            blocked_rows.append(
+                _blocked(
+                    rank=0,
+                    game_id=game,
+                    player=player,
+                    market=market,
+                    selection=side,
+                    line=line,
+                    estimate_p=p,
+                    push_p=push,
+                    reason="BLOCKED_NON_PUSH_MASS_ZERO",
+                )
+            )
+            continue
         fair_p = p / decisive
         edge = fair_p - no_vig
         ev = p * (american_to_decimal(price) - 1) - loss
-        score_key = (game, market, player)
-        if score_key not in scores:
-            raise NflPropBoardError("QUALIFICATION_SNAPSHOT_REQUIRED_FOR_PROP")
-        rows.append(
+        ranked_ready.append(
             {
                 "game_id": game,
                 "player": player,
                 "market": market,
                 "selection": side,
                 "line": line,
+                "status": "OK",
+                "block_reason": None,
                 "price_american": price,
                 "estimate_p": p,
                 "push_p": push,
@@ -177,10 +322,11 @@ def run_prop_board(
                 "edge_probability_points": edge,
                 "ev_per_dollar": ev,
                 "score_0_100": scores[score_key],
+                "books_used": tuple(sorted(book_pairs_at_line)),
             }
         )
 
-    rows.sort(
+    ranked_ready.sort(
         key=lambda r: (
             -r["ev_per_dollar"],
             -r["edge_probability_points"],
@@ -191,4 +337,30 @@ def run_prop_board(
             r["line"],
         )
     )
-    return [PropPick(rank=i, **row) for i, row in enumerate(rows, 1)]
+    out: list[PropPick] = []
+    for i, row in enumerate(ranked_ready, 1):
+        out.append(PropPick(rank=i, **row))
+    blocked_rows.sort(key=lambda r: (r.game_id, r.market, r.player, r.selection, r.line))
+    for i, row in enumerate(blocked_rows, start=len(out) + 1):
+        out.append(
+            PropPick(
+                rank=i,
+                game_id=row.game_id,
+                player=row.player,
+                market=row.market,
+                selection=row.selection,
+                line=row.line,
+                status="BLOCKED",
+                block_reason=row.block_reason,
+                price_american=None,
+                estimate_p=row.estimate_p,
+                push_p=row.push_p,
+                fair_american=None,
+                market_no_vig_p=None,
+                edge_probability_points=None,
+                ev_per_dollar=None,
+                score_0_100=None,
+                books_used=(),
+            )
+        )
+    return out
