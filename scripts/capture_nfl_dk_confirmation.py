@@ -13,6 +13,7 @@ import hashlib
 import json
 import os
 import sys
+import time
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -244,6 +245,70 @@ def determine_due(cfg: Mapping[str, Any], now: datetime, snapshot: Any, out_dir:
     return opener, final_expected
 
 
+def next_final_window(cfg: Mapping[str, Any], now: datetime, snapshot: Any, *, horizon_minutes: int = 45) -> tuple[datetime, datetime] | None:
+    """Return the earliest uncaptured FINAL window opening within the arm horizon."""
+    now = now.astimezone(timezone.utc)
+    lead = timedelta(minutes=int(cfg["final_minutes_before_kickoff"]))
+    width = timedelta(minutes=int(cfg["final_window_minutes"]))
+    captured = set()
+    try:
+        from sportsedge.nfl_confirmation_schedule import captured_final_kickoffs
+        captured = {z for z, n in captured_final_kickoffs(dict(cfg)).items() if n > 0}
+    except (OSError, ValueError):
+        pass
+    candidates: list[tuple[datetime, datetime]] = []
+    for row in snapshot.rows:
+        from sportsedge.nfl_confirmation_schedule import schedule_kickoff_utc
+        kickoff = schedule_kickoff_utc(row)
+        if kickoff is None or week_of(kickoff, cfg) < int(cfg["first_week"]):
+            continue
+        if iso_z(kickoff) in captured:
+            continue
+        start = kickoff - lead
+        end = min(start + width, kickoff)
+        if now < end and start <= now + timedelta(minutes=horizon_minutes):
+            candidates.append((start, end))
+    return min(candidates, key=lambda pair: pair[0]) if candidates else None
+
+
+def run_armed(*, force: bool = False, clock=utc_now, sleeper=time.sleep) -> dict[str, Any]:
+    """Wait for an imminent FINAL window, then retry inside it until captured/closed."""
+    cfg = load_cfg()
+    snapshot = load_snapshot()
+    now = clock().astimezone(timezone.utc)
+    window = next_final_window(cfg, now, snapshot)
+    if window is None:
+        return run(force=force, as_of=now)
+    start, end = window
+    if now < start:
+        sleeper(max(0.0, (start - now).total_seconds()))
+    last: dict[str, Any] | None = None
+    while True:
+        current = clock().astimezone(timezone.utc)
+        if current >= end:
+            return last or {
+                "authority_footer": AUTHORITY,
+                "as_of_utc": iso_z(current),
+                "model_p_created": False,
+                "promotion_authority": False,
+                "status": "FINAL_WINDOW_ELAPSED_WITH_INCOMPLETE_CAPTURE",
+            }
+        last = run(force=force, as_of=current)
+        if last.get("status") == "CAPTURED":
+            return last
+        # A concurrent armed job may have won the atomic write. Re-evaluate the
+        # governed archive before retrying; no duplicate/backfill write is made.
+        if not final_expected_due_kickoffs(dict(cfg), current, snapshot):
+            return {
+                **last,
+                "status": "ALREADY_CAPTURED",
+            }
+        remaining = (end - current).total_seconds()
+        if remaining <= 60:
+            return last
+        sleeper(60)
+
+
 def select_expected(rows: list[dict[str, Any]], expected: Counter[str], *, kind: str) -> list[dict[str, Any]]:
     remaining = Counter(expected)
     selected: list[dict[str, Any]] = []
@@ -434,16 +499,17 @@ def run(*, force: bool, as_of: datetime | None = None) -> dict[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--force", action="store_true", help="proof parsing/admission outside frozen windows without writing governed evidence")
+    parser.add_argument("--armed", action="store_true", help="wait for an imminent FINAL window and retry only inside it")
     parser.add_argument("--status-out", default="")
     args = parser.parse_args(argv)
-    report = run(force=args.force)
+    report = run_armed(force=args.force) if args.armed else run(force=args.force)
     text = json.dumps(report, indent=2, sort_keys=True)
     print(text)
     if args.status_out:
         target = Path(args.status_out)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(text + "\n", encoding="utf-8")
-    return 0 if report.get("status") in {"CAPTURED", "NO_WINDOW", "PROOF_OK"} else 2
+    return 0 if report.get("status") in {"CAPTURED", "ALREADY_CAPTURED", "NO_WINDOW", "PROOF_OK"} else 2
 
 
 if __name__ == "__main__":
