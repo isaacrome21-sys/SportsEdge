@@ -6,7 +6,8 @@ Quote hygiene (#898 design):
 
 Price vs benchmark split:
 - Executable price = one pre-declared book (default draftkings) and its real
-  posted YES price. EV and fair_american use that price only.
+  posted YES price. EV uses that price only.
+- fair_american = model fair odds from estimate_p (not from any book price).
 - Benchmark = median of per-book POWER_V1 no-vig across qualifying books.
 - Never choose the executable book by price or edge.
 - If the executable book lacks a fresh pair → BLOCKED_EXECUTABLE_BOOK_MISSING.
