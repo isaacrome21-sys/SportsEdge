@@ -50,11 +50,13 @@ def player(name, targets, catch_rate, ypr, rush_attempts, receiving_td_share, ru
 
 
 def pool():
+    # Realistic heterogeneous receiver YPRs; the QB's completed-pass yardage is
+    # derived from this pool rather than required to match a separate QB fit.
     return [
-        player("RB1", 6, 0.72, 11.0, 13, 0.12, 0.45),
-        player("WR1", 10, 0.68, 11.0, 1, 0.38, 0.02),
-        player("WR2", 7, 0.65, 11.0, 1, 0.24, 0.01),
-        player("OTHER", 6, 0.62, 11.0, 5, 0.10, 0.18),
+        player("RB1", 6, 0.72, 8.5, 13, 0.12, 0.45),
+        player("WR1", 10, 0.68, 12.0, 1, 0.38, 0.02),
+        player("WR2", 7, 0.65, 10.5, 1, 0.24, 0.01),
+        player("OTHER", 6, 0.62, 8.5, 5, 0.10, 0.18),
     ]
 
 
@@ -104,7 +106,7 @@ def test_same_seed_is_identical_and_all_td_invariants_hold():
 def test_zero_catch_player_cannot_receive_passing_td_even_with_large_share():
     players = [
         player("NO_CATCH", 12, 0.0, 12.0, 0, 1.0, 0.0),
-        player("OTHER", 20, 0.85, 11.0, 12, 0.20, 0.50),
+        player("OTHER", 20, 0.85, 10.0, 12, 0.20, 0.50),
     ]
     paths = simulate_coherent_team_scoring_paths(
         qb(),

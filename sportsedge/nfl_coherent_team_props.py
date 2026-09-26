@@ -9,9 +9,17 @@ owns role stabilization and single-player draw kernels.
 
 For receiving props, QB completions and passing yards are allocated across the
 provided receiver pool on the same path.  Completion weights come only from each
-receiver's stabilized targets x catch rate.  The fitted QB yards/completion and
-the catch-weighted receiver yards/reception inputs must agree before simulation;
-the allocator will not silently repair inconsistent inputs by rescaling them.
+receiver's stabilized targets x catch rate.
+
+Completed-pass yardage has exactly one source of truth: the receiver pool.  The
+QB's yards/completion on this path is *derived* as the catch-weighted mean of the
+receivers' post-context yards/reception, then the QB is simulated with that
+derived value.  Any separately fitted QB ``pass_yards_per_completion`` is not
+used here, so two competing fits can never disagree (and are never silently
+rescaled into agreement).  QB context that would move completed-pass yardage
+(``efficiency_multiplier`` / ``pass_efficiency_multiplier``) must therefore be
+neutral and fails closed otherwise; express those effects on the receivers, and
+QB rushing efficiency through ``rush_efficiency_multiplier``.
 Per-reception yard shapes mirror the existing shared-sim receiving kernel, then
 integer rounding preserves exact path-level QB/receiver yard identity.
 
@@ -26,7 +34,7 @@ authority.
 """
 from __future__ import annotations
 
-from math import floor, isclose, isfinite
+from math import floor, isfinite
 import random
 from typing import Any, Mapping, Sequence
 
@@ -213,27 +221,45 @@ def _integer_scale(total: int, names: Sequence[str], raw: Mapping[str, float]) -
     return base
 
 
-def _assert_yardage_identity(
-    qb_role: Mapping[str, float],
+_QB_PASS_YARDAGE_CONTEXT_KEYS = ("efficiency_multiplier", "pass_efficiency_multiplier")
+
+
+def _assert_qb_pass_yardage_context_neutral(qb_payload: Mapping[str, Any]) -> None:
+    """QB context may not move completed-pass yardage in the coherent path.
+
+    The QB's yards/completion is derived from the receiver pool, so a QB-side
+    yardage multiplier would be silently discarded.  Fail closed instead.
+    """
+    for key in _QB_PASS_YARDAGE_CONTEXT_KEYS:
+        if abs(_context_multiplier(qb_payload, key) - 1.0) > 1e-12:
+            raise NflPropSimulationError(f"QB_PASS_YARDAGE_CONTEXT_CONFLICT:{key}")
+
+
+def _derived_pass_yards_per_completion(
     receiver_roles: Sequence[Mapping[str, float]],
     catch_weights: Sequence[float],
-) -> None:
-    """Require fitted QB YPC to equal catch-weighted receiver YPR.
-
-    These are two views of the same completed-pass yardage identity.  If they do
-    not agree, silently scaling receiver yard shapes to the QB total would hide a
-    model-input contradiction, so the path fails closed.
-    """
+) -> float:
+    """Catch-weighted receiver yards/reception: the single completed-pass identity."""
     total_weight = sum(catch_weights)
     if total_weight <= 0:
-        return
+        raise NflPropSimulationError("RECEIVER_WEIGHT_REQUIRED")
     pooled_ypr = sum(
         weight * role["receiving_yards_per_reception"]
         for weight, role in zip(catch_weights, receiver_roles)
     ) / total_weight
-    qb_ypc = qb_role["pass_yards_per_completion"]
-    if not isclose(pooled_ypr, qb_ypc, rel_tol=1e-9, abs_tol=1e-9):
-        raise NflPropSimulationError("YARDAGE_IDENTITY_MISMATCH")
+    if not isfinite(pooled_ypr) or pooled_ypr <= 0:
+        raise NflPropSimulationError("RECEIVING_YARD_WEIGHT_REQUIRED")
+    return pooled_ypr
+
+
+def coherent_pass_yards_per_completion(
+    receivers: Sequence[Mapping[str, Any]],
+    state: Mapping[str, Any],
+) -> float:
+    """Expose the derived QB yards/completion for one game state (audit/tests)."""
+    roles = [_scripted_role(receiver, state)[0] for receiver in receivers]
+    weights = [role["targets"] * role["catch_rate"] for role in roles]
+    return _derived_pass_yards_per_completion(roles, weights)
 
 
 def simulate_team_on_game_paths(
@@ -261,33 +287,44 @@ def simulate_team_on_game_paths(
     names = [_player_name(receiver) for receiver in receivers]
     if len(set(names)) != len(names):
         raise NflPropSimulationError("RECEIVER_IDENTITY_DUPLICATE")
+    _assert_qb_pass_yardage_context_neutral(qb_payload)
 
     rng = random.Random(int(seed))
     games: list[dict[str, Any]] = []
     for state in game_states:
         qb_role, qb_sigma = _scripted_role(qb_payload, state)
         qb_seed = rng.randrange(0, 2**63)
+
+        # Receiver roles are deterministic (no RNG), so building them before the
+        # QB draw leaves the seed sequence unchanged.
+        receiver_roles: list[dict[str, float]] = []
+        receiver_sigmas: list[float] = []
+        catch_weights: list[float] = []
+        for receiver in receivers:
+            role, sigma = _scripted_role(receiver, state)
+            receiver_roles.append(role)
+            receiver_sigmas.append(sigma)
+            catch_weights.append(role["targets"] * role["catch_rate"])
+
+        # Single source of truth: the receiver pool defines completed-pass yardage.
+        qb_role["pass_yards_per_completion"] = _derived_pass_yards_per_completion(
+            receiver_roles,
+            catch_weights,
+        )
         qb_draw = simulate_player(
             _neutral_payload(qb_role, qb_sigma),
             n_sims=1,
             seed=qb_seed,
         )[0]
 
-        receiver_roles: list[dict[str, float]] = []
         receiver_draws: dict[str, dict[str, int]] = {}
-        catch_weights: list[float] = []
-        for name, receiver in zip(names, receivers):
-            role, sigma = _scripted_role(receiver, state)
-            receiver_roles.append(role)
-            catch_weights.append(role["targets"] * role["catch_rate"])
+        for name, role, sigma in zip(names, receiver_roles, receiver_sigmas):
             child_seed = rng.randrange(0, 2**63)
             receiver_draws[name] = simulate_player(
                 _neutral_payload(role, sigma),
                 n_sims=1,
                 seed=child_seed,
             )[0]
-
-        _assert_yardage_identity(qb_role, receiver_roles, catch_weights)
 
         completions = int(qb_draw["completions"])
         reception_counts = {name: 0 for name in names}
