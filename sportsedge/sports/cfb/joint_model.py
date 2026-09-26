@@ -79,6 +79,9 @@ def _feature_vector(row: Mapping[str, Any]) -> np.ndarray:
     weather = row.get("weather") or {}
     if not isinstance(weather, Mapping):
         raise CFBModelError("CFB_WEATHER_MAPPING_REQUIRED")
+    # Fail closed: never impute missing weather as 0 / 70 / False.
+    if weather.get("weather_missing") is True or str(weather.get("source") or "").strip() == "WEATHER_MISSING":
+        raise CFBModelError("CFB_WEATHER_MISSING_NOT_IMPUTED")
     indoors_raw = weather.get("game_indoor", weather.get("gameIndoors"))
     if type(indoors_raw) is not bool:
         raise CFBModelError("CFB_WEATHER_INDOOR_FLAG_REQUIRED")
