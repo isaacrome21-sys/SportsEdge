@@ -1,0 +1,119 @@
+name: apply-cfb-weather-patch
+
+on:
+  workflow_dispatch:
+
+# One-shot: apply null-weather acquire wire on the CFB fix branch only.
+# Never pushes to main. Delete this workflow after one successful run.
+
+permissions:
+  contents: write
+
+env:
+  TARGET_BRANCH: fix/cfb-1056-weather-missing-20260926
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse main / enforce target branch
+        run: |
+          set -euo pipefail
+          echo "TARGET_BRANCH=${TARGET_BRANCH}"
+          if [ "${TARGET_BRANCH}" = "main" ] || [ "${TARGET_BRANCH}" = "master" ]; then
+            echo "REFUSING: target branch must not be main/master"
+            exit 1
+          fi
+          if [ "${TARGET_BRANCH}" != "fix/cfb-1056-weather-missing-20260926" ]; then
+            echo "REFUSING: hardcoded target is fix/cfb-1056-weather-missing-20260926 only"
+            exit 1
+          fi
+
+      - name: Checkout fix branch only
+        uses: actions/checkout@v4
+        with:
+          ref: fix/cfb-1056-weather-missing-20260926
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Guard against accidental main checkout
+        run: |
+          set -euo pipefail
+          BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          echo "checked out: ${BRANCH}"
+          if [ "${BRANCH}" = "main" ] || [ "${BRANCH}" = "master" ]; then
+            echo "REFUSING: checked out main/master"
+            exit 1
+          fi
+          test "${BRANCH}" = "fix/cfb-1056-weather-missing-20260926"
+
+      - name: Apply null-weather acquire wire
+        run: |
+          set -euo pipefail
+          test -f patches/cfb_acquire_null_weather_wire.patch
+          git apply --check patches/cfb_acquire_null_weather_wire.patch
+          git apply patches/cfb_acquire_null_weather_wire.patch
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("scripts/acquire_cfb_reconstructed_selection.py")
+          t = p.read_text()
+          for old, new in [
+              (
+                  "weather_by_game, weather_metas, weather_network_calls, weather_cache_hits = _build_weather(",
+                  "weather_by_game, weather_metas, weather_network_calls, weather_cache_hits, weather_missing_ids = _build_weather(",
+              ),
+              (
+                  "weather_by_game, weather_metas, weather_calls, weather_cache_hits = _build_weather(",
+                  "weather_by_game, weather_metas, weather_calls, weather_cache_hits, weather_missing_ids = _build_weather(",
+              ),
+          ]:
+              if old in t:
+                  t = t.replace(old, new)
+                  print("updated unpack:", new[:40])
+          needle = '"weather_verified_cache_hits": weather_cache_hits,'
+          if needle in t and "weather_missing_count" not in t:
+              t = t.replace(
+                  needle,
+                  '"weather_verified_cache_hits": weather_cache_hits,\n'
+                  '        "weather_missing_count": len(weather_missing_ids),\n'
+                  '        "weather_missing_game_ids": list(weather_missing_ids),',
+                  1,
+              )
+              print("injected weather_missing attestation fields")
+          if "weather_missing_ids" not in t:
+              raise SystemExit("weather_missing_ids not wired")
+          if "build_weather_with_null_path" not in t:
+              raise SystemExit("helper not wired")
+          if "CFB_GAME_VENUE_UNRESOLVED" in t:
+              raise SystemExit("old raise still present")
+          p.write_text(t)
+          print("acquire line count:", t.count(chr(10)) + 1)
+          PY
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install package
+        run: |
+          pip install -e ".[dev]" 2>/dev/null || pip install -e . || true
+          pip install numpy pytest 2>/dev/null || true
+
+      - name: Run null-weather tests
+        run: |
+          python -m pytest tests/test_cfb_weather_missing_no_imputation.py tests/test_cfb_acquire_null_weather_venue_skip.py -q
+
+      - name: Commit and push to fix branch only (never main)
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/acquire_cfb_reconstructed_selection.py
+          if git diff --cached --quiet; then
+            echo "No acquire changes to commit (already applied?)"
+            exit 0
+          fi
+          git commit -m "CFB: wire acquire to null-weather helper (workflow apply)"
+          # Explicit refspec: only the fix branch
+          git push origin "HEAD:fix/cfb-1056-weather-missing-20260926"
+          echo "Pushed only to fix/cfb-1056-weather-missing-20260926"
