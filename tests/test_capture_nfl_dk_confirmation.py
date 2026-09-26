@@ -136,7 +136,7 @@ class ArmedWindowTests(unittest.TestCase):
             report = cap.run_armed(clock=lambda: next(ticks), sleeper=sleeps.append)
         self.assertEqual(report["status"], "CAPTURED")
         self.assertEqual(sleeps, [1200.0])
-        run.assert_called_once_with(force=False, as_of=start)
+        run.assert_called_once_with(force=False, as_of=start, write_missed_markers=False)
 
     def test_armed_never_calls_capture_after_window_end(self):
         start = datetime(2026, 9, 27, 16, 30, tzinfo=timezone.utc)
@@ -159,7 +159,7 @@ class ArmedWindowTests(unittest.TestCase):
              patch.object(cap, "run", return_value={"status": "CAPTURED"}) as run:
             report = cap.run_armed(clock=lambda: late, sleeper=lambda _s: self.fail("must not sleep before capture"))
         self.assertEqual(report["status"], "CAPTURED")
-        run.assert_called_once_with(force=False, as_of=late)
+        run.assert_called_once_with(force=False, as_of=late, write_missed_markers=False)
 
     def test_duplicate_run_exits_when_first_writer_already_captured(self):
         start = datetime(2026, 9, 27, 16, 30, tzinfo=timezone.utc)
@@ -172,6 +172,50 @@ class ArmedWindowTests(unittest.TestCase):
              patch.object(cap, "final_expected_due_kickoffs", return_value=Counter()):
             report = cap.run_armed(clock=lambda: next(times), sleeper=lambda _s: None)
         self.assertEqual(report["status"], "ALREADY_CAPTURED")
+
+
+    def test_retry_attempt_suppresses_provisional_miss_marker(self):
+        start = datetime(2026, 9, 27, 16, 30, tzinfo=timezone.utc)
+        end = start + timedelta(minutes=15)
+        times = iter([start, start, start + timedelta(minutes=1)])
+        reports = iter([
+            {"status": "MISSED_OR_BLOCKED", "reason": "FETCH_FAILED"},
+            {"status": "CAPTURED"},
+        ])
+        calls = []
+        with patch.object(cap, "load_cfg", return_value={"final_minutes_before_kickoff": 30, "final_window_minutes": 15}), \
+             patch.object(cap, "load_snapshot", return_value=Snapshot()), \
+             patch.object(cap, "next_final_window", return_value=(start, end)), \
+             patch.object(cap, "run", side_effect=lambda **kw: (calls.append(kw), next(reports))[1]), \
+             patch.object(cap, "final_expected_due_kickoffs", return_value=Counter({"2026-09-27T17:00:00Z": 1})):
+            report = cap.run_armed(clock=lambda: next(times), sleeper=lambda _s: None)
+        self.assertEqual(report["status"], "CAPTURED")
+        self.assertTrue(all(call["write_missed_markers"] is False for call in calls))
+
+    def test_next_final_window_real_math_horizon_and_captured_exclusion(self):
+        class RealSnapshot:
+            rows = (
+                {"season": "2026", "gameday": "2026-09-27", "gametime": "13:00"},
+                {"season": "2026", "gameday": "2026-09-27", "gametime": "13:20"},
+            )
+        cfg = {
+            "timezone": "America/Chicago",
+            "week1_tuesday_local_date": "2026-09-08",
+            "first_week": 1,
+            "final_minutes_before_kickoff": 30,
+            "final_window_minutes": 15,
+            "output_dir": "unused",
+        }
+        # nflverse gametime is ET: 13:00 ET = 17:00 UTC, FINAL opens 16:30.
+        with patch("sportsedge.nfl_confirmation_schedule.captured_final_kickoffs", return_value=Counter()):
+            self.assertIsNone(cap.next_final_window(cfg, datetime(2026, 9, 27, 15, 54, tzinfo=timezone.utc), RealSnapshot()))
+            start, end = cap.next_final_window(cfg, datetime(2026, 9, 27, 15, 55, tzinfo=timezone.utc), RealSnapshot())
+        self.assertEqual(start, datetime(2026, 9, 27, 16, 30, tzinfo=timezone.utc))
+        self.assertEqual(end, datetime(2026, 9, 27, 16, 45, tzinfo=timezone.utc))
+        with patch("sportsedge.nfl_confirmation_schedule.captured_final_kickoffs", return_value=Counter({"2026-09-27T17:00:00Z": 1})):
+            start2, end2 = cap.next_final_window(cfg, datetime(2026, 9, 27, 16, 10, tzinfo=timezone.utc), RealSnapshot())
+        self.assertEqual(start2, datetime(2026, 9, 27, 16, 50, tzinfo=timezone.utc))
+        self.assertEqual(end2, datetime(2026, 9, 27, 17, 5, tzinfo=timezone.utc))
 
 
 class FetchBlockedTests(unittest.TestCase):
