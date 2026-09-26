@@ -3,18 +3,48 @@ name: apply-cfb-weather-patch
 on:
   workflow_dispatch:
 
+# One-shot: apply null-weather acquire wire on the CFB fix branch only.
+# Never pushes to main. Delete this workflow after one successful run.
+
 permissions:
   contents: write
+
+env:
+  TARGET_BRANCH: fix/cfb-1056-weather-missing-20260926
 
 jobs:
   apply:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout fix branch
+      - name: Refuse main / enforce target branch
+        run: |
+          set -euo pipefail
+          echo "TARGET_BRANCH=${TARGET_BRANCH}"
+          if [ "${TARGET_BRANCH}" = "main" ] || [ "${TARGET_BRANCH}" = "master" ]; then
+            echo "REFUSING: target branch must not be main/master"
+            exit 1
+          fi
+          if [ "${TARGET_BRANCH}" != "fix/cfb-1056-weather-missing-20260926" ]; then
+            echo "REFUSING: hardcoded target is fix/cfb-1056-weather-missing-20260926 only"
+            exit 1
+          fi
+
+      - name: Checkout fix branch only
         uses: actions/checkout@v4
         with:
           ref: fix/cfb-1056-weather-missing-20260926
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Guard against accidental main checkout
+        run: |
+          set -euo pipefail
+          BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          echo "checked out: ${BRANCH}"
+          if [ "${BRANCH}" = "main" ] || [ "${BRANCH}" = "master" ]; then
+            echo "REFUSING: checked out main/master"
+            exit 1
+          fi
+          test "${BRANCH}" = "fix/cfb-1056-weather-missing-20260926"
 
       - name: Apply null-weather acquire wire
         run: |
@@ -73,7 +103,7 @@ jobs:
         run: |
           python -m pytest tests/test_cfb_weather_missing_no_imputation.py tests/test_cfb_acquire_null_weather_venue_skip.py -q
 
-      - name: Commit and push wire
+      - name: Commit and push to fix branch only (never main)
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -84,4 +114,6 @@ jobs:
             exit 0
           fi
           git commit -m "CFB: wire acquire to null-weather helper (workflow apply)"
-          git push origin HEAD:fix/cfb-1056-weather-missing-20260926
+          # Explicit refspec: only the fix branch
+          git push origin "HEAD:fix/cfb-1056-weather-missing-20260926"
+          echo "Pushed only to fix/cfb-1056-weather-missing-20260926"
