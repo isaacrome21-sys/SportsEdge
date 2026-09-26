@@ -2,13 +2,18 @@
 
 Quote hygiene (#898 design):
 - ≥3 books must supply a complete OVER/UNDER pair at the identical line.
-- Different lines across books → BLOCKED_QUOTE_HYGIENE for that row.
+- Different lines across books → BLOCKED_QUOTE_HYGIENE.
 - Fewer than 3 books at the consensus line → BLOCKED_INSUFFICIENT_BOOKS.
-- Never select the best-edge book: median executable price and median no-vig.
 
-Per-row failures return status=BLOCKED with a reason; other rows still rank.
+Price vs benchmark split:
+- Executable price = one pre-declared book (default draftkings) and its real
+  posted price for the selection. EV and fair_american use that price only.
+- Benchmark = median of per-book POWER_V1 no-vig across qualifying books.
+- Never choose the executable book by price or edge.
+- If the executable book lacks a fresh pair at the agreed line →
+  BLOCKED_EXECUTABLE_BOOK_MISSING.
+
 Estimates must pass nfl_prop_shared_sim._assert_no_market_inputs.
-
 No Model_P, Truth Gate, freeze, eligibility, or OFFICIAL authority.
 """
 from __future__ import annotations
@@ -41,6 +46,7 @@ PROP_FAMILIES = frozenset(
 TTL = 180
 SKEW = 30
 MIN_BOOKS = 3
+DEFAULT_EXECUTABLE_BOOK = "draftkings"
 
 
 class NflPropBoardError(ValueError):
@@ -57,6 +63,7 @@ class PropPick:
     line: float
     status: str
     block_reason: str | None
+    book: str | None
     price_american: int | None
     estimate_p: float
     push_p: float
@@ -83,10 +90,6 @@ def _fair(p: float) -> int:
     return int(round(100 * (1 - p) / p))
 
 
-def _median_int(values: Sequence[int]) -> int:
-    return int(round(median(sorted(values))))
-
-
 def _blocked(
     *,
     rank: int,
@@ -108,6 +111,7 @@ def _blocked(
         line=line,
         status="BLOCKED",
         block_reason=reason,
+        book=None,
         price_american=None,
         estimate_p=estimate_p,
         push_p=push_p,
@@ -126,8 +130,13 @@ def run_prop_board(
     quotes: Sequence[Mapping[str, Any]],
     qualification_snapshots: Sequence[Mapping[str, Any]],
     as_of: datetime | str,
+    executable_book: str = DEFAULT_EXECUTABLE_BOOK,
 ) -> list[PropPick]:
     now = _ts(as_of)
+    exec_book = str(executable_book or DEFAULT_EXECUTABLE_BOOK).lower().strip()
+    if not exec_book:
+        raise NflPropBoardError("EXECUTABLE_BOOK_REQUIRED")
+
     try:
         scores = score_b_by_identity(qualification_snapshots)
     except Exception as exc:
@@ -155,7 +164,6 @@ def run_prop_board(
             raise NflPropBoardError("PROP_ESTIMATE_MASS_INVALID")
         est[(game, player, market, side, line)] = (p, push)
 
-    # book -> (game, player, market) -> line -> side -> (price, retrieved)
     by_book: dict[str, dict[tuple[str, str, str], dict[float, dict[str, tuple[int, datetime]]]]] = {}
     for quote in quotes:
         game = str(quote.get("game_id") or "").strip()
@@ -186,13 +194,11 @@ def run_prop_board(
     for (game, player, market, side, line), (p, push) in est.items():
         identity = (game, player, market)
 
-        # Collect per-book lines and complete pairs near the estimate line.
         book_lines: dict[str, set[float]] = {}
         book_pairs_at_line: dict[str, dict[str, tuple[int, datetime]]] = {}
         for book, idents in by_book.items():
             lines_map = idents.get(identity, {})
             book_lines[book] = set(lines_map.keys())
-            # exact line match (float)
             for posted_line, sides in lines_map.items():
                 if abs(posted_line - line) > 1e-9:
                     continue
@@ -201,7 +207,6 @@ def run_prop_board(
                         continue
                     book_pairs_at_line[book] = sides
 
-        # Hygiene: books quoting this market/player with disagreeing lines.
         observed_lines: set[float] = set()
         for lines in book_lines.values():
             observed_lines |= lines
@@ -237,7 +242,22 @@ def run_prop_board(
             )
             continue
 
-        side_prices = [book_pairs_at_line[b][side][0] for b in sorted(book_pairs_at_line)]
+        if exec_book not in book_pairs_at_line:
+            blocked_rows.append(
+                _blocked(
+                    rank=0,
+                    game_id=game,
+                    player=player,
+                    market=market,
+                    selection=side,
+                    line=line,
+                    estimate_p=p,
+                    push_p=push,
+                    reason="BLOCKED_EXECUTABLE_BOOK_MISSING",
+                )
+            )
+            continue
+
         no_vig_vals: list[float] = []
         sensitivity_fail = False
         for book in sorted(book_pairs_at_line):
@@ -283,7 +303,8 @@ def run_prop_board(
             )
             continue
 
-        price = _median_int(side_prices)
+        # Executable: fixed book only — never median, never best edge.
+        price = int(book_pairs_at_line[exec_book][side][0])
         no_vig = float(median(no_vig_vals))
         loss = max(0.0, 1 - p - push)
         decisive = p + loss
@@ -314,6 +335,7 @@ def run_prop_board(
                 "line": line,
                 "status": "OK",
                 "block_reason": None,
+                "book": exec_book,
                 "price_american": price,
                 "estimate_p": p,
                 "push_p": push,
@@ -352,6 +374,7 @@ def run_prop_board(
                 line=row.line,
                 status="BLOCKED",
                 block_reason=row.block_reason,
+                book=None,
                 price_american=None,
                 estimate_p=row.estimate_p,
                 push_p=row.push_p,
