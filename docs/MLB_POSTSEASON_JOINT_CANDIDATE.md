@@ -7,6 +7,26 @@ commit `c711cb681b8337d190b6cd6b048605194d9e99e7`, and repairs game-state behavi
 The original PR remains open; it has not been declared redundant or closed.
 The frozen V7 simulator, registry, policies and deployment flags are unchanged.
 
+## Market readiness boundary
+
+| Surface | Current status | Promotion effect |
+| --- | --- | --- |
+| Moneyline | Research only | None |
+| Run line | Research only | None |
+| Full-game totals | Research only | None |
+| Batter/pitcher count props implemented by the joint-path readout | Research only; production readiness not established | None |
+| NRFI/YRFI | Outside current three-market validation scope | Fail closed |
+| First five | Outside current three-market validation scope | Fail closed |
+| First-inning / inning markets | Outside current three-market validation scope | Fail closed |
+| Team totals | Outside current three-market validation scope | Fail closed |
+
+The three-market game scope means exactly MONEYLINE, RUN_LINE and full-game TOTALS.
+It does not imply that the three markets have passed temporal validation. The readout
+returns `production_ready=false` and carries no Model_P, Truth Gate, promotion,
+staking or OFFICIAL authority. Player-prop readouts likewise return
+`production_ready=false` with readiness `NOT_ESTABLISHED`. Period markets are
+rejected explicitly rather than represented as zero-probability or zero-edge rows.
+
 ## Implemented repairs
 
 - Required `rules_mode`: REGULAR_SEASON or POSTSEASON, bound into path identity.
@@ -25,8 +45,9 @@ The frozen V7 simulator, registry, policies and deployment flags are unchanged.
 - Aligned final game scores and hitter PA/K counts accompany player samples.
 - Research readouts derive ML, run line, total and supported hitter/pitcher
   counts from the same path set, preserve pushes, and enforce player-role binding.
-- Stolen-base markets, first-HR, period markets and other unimplemented readouts
-  raise explicit errors; a placeholder zero is not used as their probability.
+- Stolen-base markets, first-HR, NRFI/YRFI, first-five, team-total and inning
+  markets raise explicit errors when not implemented or outside the validation
+  scope; a placeholder zero is not used as their probability.
 
 Entry points:
 
@@ -80,12 +101,13 @@ PITCHER_WORKLOAD, PITCHER_EVENT_ALLOWED. This PR leaves every status unchanged.
 
 ## Verification
 
-48 focused tests passed before publication, covering the ported fitter/path tests,
-new postseason regressions, V3 pitcher accounting and common game readouts.
-Tests include path-level team/player run conservation, empty-base postseason
-extras, grand-slam and ordinary walk-offs, no third-out sacrifice run, explicit
-unresolved-path failures, shared market identity, push conservation, invalid
-probability rejection, and unsupported-market/role rejection.
+Focused engineering tests cover the ported fitter/path tests, postseason regressions,
+V3 pitcher accounting and common game readouts. Tests include path-level team/player
+run conservation, empty-base postseason extras, grand-slam and ordinary walk-offs,
+no third-out sacrifice run, explicit unresolved-path failures, shared market identity,
+push conservation, invalid probability rejection, unsupported player-market/role
+rejection, explicit three-market research metadata, and fail-closed NRFI/YRFI/F5/
+inning/team-total scope checks.
 
 Rules references:
 
