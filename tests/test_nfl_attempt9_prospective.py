@@ -37,7 +37,7 @@ class NFLAttempt9ProspectiveTests(unittest.TestCase):
             quote_observed_at_utc="2026-09-27T17:59:00Z",
             capture_code_git_sha="c"*40, book="draftkings", quote_sha256="d"*64,
             market="spread", selection="home", line=-3.5, price_american=-110,
-            raw_prediction=6.0,
+            opposite_price_american=-110, raw_prediction=6.0,
         )
 
     def test_builds_model_p_evidence_without_authority(self):
@@ -62,6 +62,11 @@ class NFLAttempt9ProspectiveTests(unittest.TestCase):
     def test_invalid_price_fails_closed(self):
         kw=self.kwargs(); kw["price_american"]=float("nan")
         with self.assertRaisesRegex(ValueError,"PRICE_INVALID"):
+            build_decision(**kw)
+
+    def test_missing_or_invalid_opposite_price_fails_closed(self):
+        kw=self.kwargs(); kw["opposite_price_american"]=0
+        with self.assertRaisesRegex(ValueError,"OPPOSITE_PRICE_INVALID"):
             build_decision(**kw)
 
     def test_post_kick_decision_fails_closed(self):
