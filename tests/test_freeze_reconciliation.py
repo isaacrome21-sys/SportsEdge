@@ -156,7 +156,7 @@ def test_confirmed_drift_requires_refreeze_or_revocation(repo: dict[str, object]
         "reconciled_through_sha": repo["drift"],
         "bundle_inventory_complete": True,
         "deltas": [_delta("DRIFT", str(repo["drift"]), 2)],
-        "bundles": [bad],
+        "bundles": [_bundle(str(repo["baseline"]))],
     }
     report = build_reconciliation_report(
         repo=root,
