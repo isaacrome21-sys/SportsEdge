@@ -1,10 +1,13 @@
+import json
+import tempfile
 import unittest
+from pathlib import Path
 
 from sportsedge.sports.nfl.attempt9_model_p import (
     CALIBRATION_CONTRACT, CANDIDATE_ID, MODEL_P_ID, MODEL_P_SCHEMA,
     MODEL_P_STATUS, canonical_sha256 as artifact_sha,
 )
-from sportsedge.sports.nfl.attempt9_prospective import build_decision, validate_decision
+from sportsedge.sports.nfl.attempt9_prospective import build_decision, validate_decision, write_decision_once
 
 
 class NFLAttempt9ProspectiveTests(unittest.TestCase):
@@ -77,6 +80,39 @@ class NFLAttempt9ProspectiveTests(unittest.TestCase):
         row["model_p"]=0.99
         with self.assertRaisesRegex(ValueError,"DECISION_SHA_MISMATCH"):
             validate_decision(row)
+
+    def test_artifact_aware_replay_rejects_rehashed_probability_mutation(self):
+        row=build_decision(**self.kwargs())
+        row["model_p"]=0.99
+        from sportsedge.sports.nfl.attempt9_prospective import canonical_sha256
+        row["decision_sha256"]=canonical_sha256({k:v for k,v in row.items() if k!="decision_sha256"})
+        with self.assertRaisesRegex(ValueError,"MODEL_P_REPLAY_MISMATCH"):
+            validate_decision(row, artifact=self.artifact())
+
+    def test_write_once_is_idempotent_and_never_overwrites(self):
+        row=build_decision(**self.kwargs())
+        with tempfile.TemporaryDirectory() as td:
+            path=Path(td)/"decision.json"
+            self.assertTrue(write_decision_once(path,row,artifact=self.artifact()))
+            original=path.read_text(encoding="utf-8")
+            self.assertFalse(write_decision_once(path,row,artifact=self.artifact()))
+            self.assertEqual(path.read_text(encoding="utf-8"),original)
+
+            changed=dict(row)
+            changed["price_american"]=-105.0
+            from sportsedge.sports.nfl.attempt9_prospective import canonical_sha256
+            changed["decision_sha256"]=canonical_sha256({k:v for k,v in changed.items() if k!="decision_sha256"})
+            with self.assertRaisesRegex(ValueError,"IMMUTABLE_CONFLICT"):
+                write_decision_once(path,changed,artifact=self.artifact())
+            self.assertEqual(path.read_text(encoding="utf-8"),original)
+
+    def test_write_once_rejects_existing_corrupt_file(self):
+        row=build_decision(**self.kwargs())
+        with tempfile.TemporaryDirectory() as td:
+            path=Path(td)/"decision.json"
+            path.write_text("{not-json",encoding="utf-8")
+            with self.assertRaisesRegex(ValueError,"EXISTING_RECORD_INVALID"):
+                write_decision_once(path,row,artifact=self.artifact())
 
 
 if __name__=="__main__":
