@@ -60,7 +60,7 @@ class NFLAttempt9ProspectiveEvidenceTests(unittest.TestCase):
             build_evidence(self.decision(),**kw)
 
     def test_close_outside_final_window_fails_closed(self):
-        kw=self.kwargs(); kw["closing_quote_at_utc"]="2026-09-27T19:44:00Z"
+        kw=self.kwargs(); kw["closing_quote_at_utc"]="2026-09-27T19:46:00Z"
         with self.assertRaisesRegex(ValueError,"CLOSE_OUTSIDE_GOVERNED_WINDOW"):
             build_evidence(self.decision(),**kw)
 
