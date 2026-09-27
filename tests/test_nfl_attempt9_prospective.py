@@ -1,4 +1,3 @@
-import copy
 import unittest
 
 from sportsedge.sports.nfl.attempt9_model_p import (
@@ -55,6 +54,11 @@ class NFLAttempt9ProspectiveTests(unittest.TestCase):
     def test_moneyline_fails_closed(self):
         kw=self.kwargs(); kw["market"]="moneyline"
         with self.assertRaisesRegex(ValueError,"MARKET_UNSUPPORTED"):
+            build_decision(**kw)
+
+    def test_invalid_price_fails_closed(self):
+        kw=self.kwargs(); kw["price_american"]=float("nan")
+        with self.assertRaisesRegex(ValueError,"PRICE_INVALID"):
             build_decision(**kw)
 
     def test_post_kick_decision_fails_closed(self):
