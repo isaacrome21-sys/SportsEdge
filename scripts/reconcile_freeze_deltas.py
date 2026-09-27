@@ -3,123 +3,207 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime
+import hashlib
 import json
 from pathlib import Path
+import subprocess
 import sys
+from typing import Any, Mapping
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from sportsedge.governance.freeze_reconciliation import (  # noqa: E402
-    FreezeReconciliationError,
     build_reconciliation_report,
-    bundle_snapshot,
-    is_ancestor,
     load_json,
-    resolve_sha,
+)
+from sportsedge.sports.cfb.model_selection_prereg import (  # noqa: E402
+    audit_model_selection_prereg,
 )
 
+CFB_CANDIDATE_BUNDLE = "CFB_CANDIDATE_PREREG_FREEZE_V1"
+CFB_CANDIDATE_REFREEZE_SCHEMA = "CFB_CANDIDATE_PREREG_REFREEZE_V1"
+CFB_CANDIDATE_TRIGGER_PR = 833
 
-def _parse_utc_z(value: object, *, field: str, bundle_id: str) -> datetime:
-    text = str(value or "")
-    if not text.endswith("Z"):
-        raise SystemExit(f"REFROZEN_TIMESTAMP_INVALID:{bundle_id}:{field}")
+
+def _git(repo: Path, *args: str, check: bool = True) -> str:
+    proc = subprocess.run(
+        ["git", *args],
+        cwd=repo,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if check and proc.returncode != 0:
+        detail = (proc.stderr or proc.stdout).strip()
+        raise SystemExit(f"REFROZEN_GIT_CHECK_FAILED:{' '.join(args)}:{detail}")
+    return proc.stdout.strip()
+
+
+def _is_ancestor(repo: Path, older: str, newer: str) -> bool:
+    proc = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", older, newer],
+        cwd=repo,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    return proc.returncode == 0
+
+
+def _sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _parse_timestamp(value: object, error: str) -> datetime:
+    text = str(value or "").strip()
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
     try:
-        return datetime.fromisoformat(text[:-1] + "+00:00")
+        parsed = datetime.fromisoformat(text)
     except ValueError as exc:
+        raise SystemExit(error) from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise SystemExit(error)
+    return parsed
+
+
+def _covered_change(bundle: Mapping[str, Any], path: str) -> bool:
+    normalized = path.strip("/")
+    for exact in bundle.get("coverage_paths") or []:
+        if normalized == str(exact).strip("/"):
+            return True
+    for prefix in bundle.get("coverage_prefixes") or []:
+        value = str(prefix).strip("/")
+        if normalized == value or normalized.startswith(value):
+            return True
+    return False
+
+
+def _verify_cfb_candidate_prereg_refreeze(
+    registry: Mapping[str, Any], bundle: Mapping[str, Any], repo: Path
+) -> None:
+    disposition = bundle.get("disposition")
+    if not isinstance(disposition, Mapping):
+        raise SystemExit("CFB_CANDIDATE_REFREEZE_DISPOSITION_REQUIRED")
+    if disposition.get("verification_schema") != CFB_CANDIDATE_REFREEZE_SCHEMA:
+        raise SystemExit("CFB_CANDIDATE_REFREEZE_VERIFICATION_SCHEMA_INVALID")
+    if disposition.get("new_bundle_id") != "CFB_CANDIDATE_PREREG_FREEZE_V3":
+        raise SystemExit("CFB_CANDIDATE_REFREEZE_BUNDLE_ID_INVALID")
+
+    prior_freeze = str(bundle.get("freeze_sha") or "")
+    if disposition.get("prior_bundle_freeze_sha") != prior_freeze:
+        raise SystemExit("CFB_CANDIDATE_REFREEZE_PRIOR_FREEZE_MISMATCH")
+    new_freeze = str(disposition.get("new_freeze_sha") or "")
+    if len(prior_freeze) != 40 or len(new_freeze) != 40:
+        raise SystemExit("CFB_CANDIDATE_REFREEZE_GIT_SHA_INVALID")
+
+    trigger_rows = [
+        row
+        for row in registry.get("deltas") or []
+        if isinstance(row, Mapping) and int(row.get("pr") or 0) == CFB_CANDIDATE_TRIGGER_PR
+    ]
+    if len(trigger_rows) != 1:
+        raise SystemExit("CFB_CANDIDATE_REFREEZE_TRIGGER_DELTA_NOT_UNIQUE")
+    trigger_sha = str(trigger_rows[0].get("merge_sha") or "")
+    if disposition.get("trigger_delta_sha") != trigger_sha:
+        raise SystemExit("CFB_CANDIDATE_REFREEZE_TRIGGER_SHA_MISMATCH")
+
+    _git(repo, "cat-file", "-e", f"{prior_freeze}^{{commit}}")
+    _git(repo, "cat-file", "-e", f"{trigger_sha}^{{commit}}")
+    _git(repo, "cat-file", "-e", f"{new_freeze}^{{commit}}")
+    if not _is_ancestor(repo, prior_freeze, trigger_sha):
+        raise SystemExit("CFB_CANDIDATE_REFREEZE_PRIOR_NOT_ANCESTOR_OF_TRIGGER")
+    if not _is_ancestor(repo, trigger_sha, new_freeze):
+        raise SystemExit("CFB_CANDIDATE_REFREEZE_TRIGGER_NOT_ANCESTOR_OF_NEW_FREEZE")
+
+    restarted = _parse_timestamp(
+        disposition.get("forward_clock_restart_at"),
+        "CFB_CANDIDATE_REFREEZE_TIMESTAMP_INVALID",
+    )
+    commit_epoch = int(_git(repo, "show", "-s", "--format=%ct", new_freeze))
+    if int(restarted.timestamp()) != commit_epoch:
+        raise SystemExit("CFB_CANDIDATE_REFREEZE_TIMESTAMP_NOT_BOUND_TO_FREEZE_COMMIT")
+
+    changed = [line for line in _git(repo, "diff", "--name-only", new_freeze, "--").splitlines() if line]
+    covered = sorted(path for path in changed if _covered_change(bundle, path))
+    if covered:
+        raise SystemExit("CFB_CANDIDATE_REFREEZE_COVERED_BYTES_DRIFT:" + ",".join(covered))
+
+    prereg_path = repo / "config/cfb_model_candidate_prereg_v1.json"
+    policy_path = repo / "config/cfb_model_selection_policy_v1.json"
+    code_manifest_path = repo / "config/cfb_model_candidate_code_manifest_v1.json"
+    specs_path = repo / "config/cfb_model_candidate_specs_v1.json"
+    prereg = json.loads(prereg_path.read_text(encoding="utf-8"))
+    policy = json.loads(policy_path.read_text(encoding="utf-8"))
+    code_manifest = json.loads(code_manifest_path.read_text(encoding="utf-8"))
+    specs = json.loads(specs_path.read_text(encoding="utf-8"))
+
+    if _sha256_file(code_manifest_path) != prereg.get("code_manifest_sha256"):
+        raise SystemExit("CFB_CANDIDATE_REFREEZE_CODE_MANIFEST_SHA256_MISMATCH")
+    if _sha256_file(specs_path) != prereg.get("candidate_spec_bundle_sha256"):
+        raise SystemExit("CFB_CANDIDATE_REFREEZE_SPEC_BUNDLE_SHA256_MISMATCH")
+
+    identities = code_manifest.get("git_blob_identities") or {}
+    if not isinstance(identities, Mapping) or not identities:
+        raise SystemExit("CFB_CANDIDATE_REFREEZE_CODE_BLOB_IDENTITIES_MISSING")
+    for path, expected in sorted(identities.items()):
+        actual = _git(repo, "hash-object", str(path))
+        if actual != str(expected):
+            raise SystemExit(f"CFB_CANDIDATE_REFREEZE_CODE_BLOB_MISMATCH:{path}")
+
+    report = audit_model_selection_prereg(policy, prereg)
+    if report.get("status") != "READY_FOR_FIRST_EVALUATION":
         raise SystemExit(
-            f"REFROZEN_TIMESTAMP_INVALID:{bundle_id}:{field}"
-        ) from exc
+            "CFB_CANDIDATE_REFREEZE_PREREG_NOT_READY:"
+            + ",".join(str(v) for v in report.get("blockers") or [])
+        )
+    if report.get("attempts_consumed") != 0 or report.get("model_fit_performed") is not False:
+        raise SystemExit("CFB_CANDIDATE_REFREEZE_ATTEMPT_OR_FIT_ALREADY_CONSUMED")
+
+    governance = prereg.get("governance") or {}
+    if governance.get("attempts_consumed") != 0 or governance.get("evaluation_performed") is not False:
+        raise SystemExit("CFB_CANDIDATE_REFREEZE_GOVERNANCE_ATTEMPT_STATE_INVALID")
+    for key in ("model_p_created", "promotion_authority", "eligibility_changed", "official_authority"):
+        if governance.get(key) is not False:
+            raise SystemExit(f"CFB_CANDIDATE_REFREEZE_AUTHORITY_FORBIDDEN:{key}")
+    if int(policy.get("candidate_attempt_budget", -1)) != 4 or int(policy.get("attempts_consumed", -1)) != 0:
+        raise SystemExit("CFB_CANDIDATE_REFREEZE_POLICY_ATTEMPT_ACCOUNTING_INVALID")
+    if set(map(str, policy.get("candidate_families_predeclared") or [])) != set(map(str, prereg.get("candidates") or {})):
+        raise SystemExit("CFB_CANDIDATE_REFREEZE_FAMILY_SET_MISMATCH")
+
+    if disposition.get("row_admissibility_semantics") != "PREREGISTRATION_ONLY_NO_EVALUATION_ROWS_V1":
+        raise SystemExit("CFB_CANDIDATE_REFREEZE_ROW_ADMISSIBILITY_INVALID")
+    if disposition.get("selection_scope_only") is not True:
+        raise SystemExit("CFB_CANDIDATE_REFREEZE_SELECTION_SCOPE_REQUIRED")
+    authority = disposition.get("authority") or {}
+    if not isinstance(authority, Mapping) or any(bool(value) for value in authority.values()):
+        raise SystemExit("CFB_CANDIDATE_REFREEZE_AUTHORITY_ESCALATION")
 
 
 def assert_refreeze_machine_verified(
-    *, repo: Path, registry: dict[str, object], report: dict[str, object]
+    registry: dict[str, object], repo: Path = REPO_ROOT
 ) -> None:
-    """Fail closed unless every REFROZEN disposition is replay-verifiable.
-
-    A refreeze is admissible only when the registry binds the prior and new
-    covered-surface hashes, binds invalidation to the forward-clock restart,
-    and the new freeze includes every confirmed drift row for that bundle.
-    This grants no model, promotion, staking, Truth Gate, or OFFICIAL authority.
-    """
-
-    rows = report.get("rows") or []
-    reconciled_through = resolve_sha(repo, str(registry["reconciled_through_sha"]))
-
+    unverified: list[str] = []
     for bundle in registry.get("bundles") or []:
         if not isinstance(bundle, dict):
             continue
         disposition = bundle.get("disposition")
         if not isinstance(disposition, dict) or disposition.get("state") != "REFROZEN":
             continue
-
         bundle_id = str(bundle.get("bundle_id") or "UNKNOWN_BUNDLE")
-        required = (
-            "new_bundle_id",
-            "new_freeze_sha",
-            "forward_clock_restart_at",
-            "prior_bundle_hash",
-            "new_bundle_hash",
-            "prior_semantics_invalid_after",
-            "prior_evidence_invalidation_rule",
+        if bundle_id == CFB_CANDIDATE_BUNDLE:
+            _verify_cfb_candidate_prereg_refreeze(registry, bundle, repo)
+            continue
+        unverified.append(bundle_id)
+    if unverified:
+        raise SystemExit(
+            "REFROZEN_SEMANTICS_NOT_MACHINE_VERIFIED:"
+            + ",".join(sorted(unverified))
+            + ":ONLY_REVOKED_ALLOWED_UNTIL_PRIOR_BUNDLE_HASH_TIMESTAMP_AND_ROW_ADMISSIBILITY_ARE_VERIFIED"
         )
-        missing = [key for key in required if not disposition.get(key)]
-        if missing:
-            raise SystemExit(
-                f"REFROZEN_MACHINE_FIELDS_MISSING:{bundle_id}:{','.join(missing)}"
-            )
-        if str(disposition["new_bundle_id"]) == bundle_id:
-            raise SystemExit(f"REFROZEN_NEW_BUNDLE_ID_NOT_NEW:{bundle_id}")
-        if disposition["prior_evidence_invalidation_rule"] != "HASH_AND_TIME":
-            raise SystemExit(f"REFROZEN_INVALIDATION_RULE_INVALID:{bundle_id}")
-
-        restart = _parse_utc_z(
-            disposition["forward_clock_restart_at"],
-            field="forward_clock_restart_at",
-            bundle_id=bundle_id,
-        )
-        invalid_after = _parse_utc_z(
-            disposition["prior_semantics_invalid_after"],
-            field="prior_semantics_invalid_after",
-            bundle_id=bundle_id,
-        )
-        if restart != invalid_after:
-            raise SystemExit(f"REFROZEN_CLOCK_INVALIDATION_MISMATCH:{bundle_id}")
-
-        try:
-            old_sha = resolve_sha(repo, str(bundle["freeze_sha"]))
-            new_sha = resolve_sha(repo, str(disposition["new_freeze_sha"]))
-            if not is_ancestor(repo, old_sha, new_sha):
-                raise SystemExit(f"REFROZEN_NOT_DESCENDANT:{bundle_id}")
-            if not is_ancestor(repo, new_sha, reconciled_through):
-                raise SystemExit(f"REFROZEN_AFTER_RECONCILIATION_BOUNDARY:{bundle_id}")
-            prior_snapshot = bundle_snapshot(repo, bundle, old_sha)
-            new_snapshot = bundle_snapshot(repo, bundle, new_sha)
-        except FreezeReconciliationError as exc:
-            raise SystemExit(f"REFROZEN_REPLAY_UNRESOLVED:{bundle_id}:{exc}") from exc
-
-        if prior_snapshot.aggregate_sha256 != disposition["prior_bundle_hash"]:
-            raise SystemExit(f"REFROZEN_PRIOR_BUNDLE_HASH_MISMATCH:{bundle_id}")
-        if new_snapshot.aggregate_sha256 != disposition["new_bundle_hash"]:
-            raise SystemExit(f"REFROZEN_NEW_BUNDLE_HASH_MISMATCH:{bundle_id}")
-
-        bundle_rows = [
-            row
-            for row in rows
-            if isinstance(row, dict) and row.get("bundle_id") == bundle_id
-        ]
-        if any(row.get("outcome") == "PROVISIONAL_DRIFT_BLOCKED" for row in bundle_rows):
-            raise SystemExit(f"REFROZEN_PROVISIONAL_ROWS_REMAIN:{bundle_id}")
-        drift_rows = [row for row in bundle_rows if row.get("outcome") == "DRIFT_CONFIRMED"]
-        if not drift_rows:
-            raise SystemExit(f"REFROZEN_WITHOUT_CONFIRMED_DRIFT:{bundle_id}")
-        for row in drift_rows:
-            drift_sha = resolve_sha(repo, str(row["merge_sha"]))
-            if not is_ancestor(repo, drift_sha, new_sha):
-                raise SystemExit(
-                    f"REFROZEN_DRIFT_NOT_INCLUDED:{bundle_id}:{row.get('delta_id')}"
-                )
 
 
 def main() -> int:
@@ -141,13 +225,13 @@ def main() -> int:
     repo = Path(args.repo).resolve()
     policy = load_json(args.policy)
     registry = load_json(args.registry)
+    assert_refreeze_machine_verified(registry, repo=repo)
     report = build_reconciliation_report(
         repo=repo,
         policy=policy,
         registry=registry,
         current_main_ref=args.current_main_ref,
     )
-    assert_refreeze_machine_verified(repo=repo, registry=registry, report=report)
     rendered = json.dumps(report, sort_keys=True, indent=2) + "\n"
     if args.output:
         out = Path(args.output)
