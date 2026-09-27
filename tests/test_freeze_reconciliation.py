@@ -290,6 +290,8 @@ def test_repository_policy_is_unconditional_zero_authority_and_registers_late_de
     ids = {row["delta_id"] for row in registry["deltas"]}
     assert {"PR_683", "PR_687", "PR_701", "PR_702", "PR_703"}.issubset(ids)
     assert registry["deltas"]
+    # On pull_request events HEAD is GitHub's synthetic merge commit, not main.
+    # The boundary assertion is explicitly about the actual current main branch.
     current_main = _git(Path.cwd(), "rev-parse", "origin/main")
     assert main_matches_reconciliation_boundary(
         Path.cwd(),

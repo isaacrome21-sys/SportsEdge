@@ -29,6 +29,7 @@ from typing import Any, Callable, Mapping, Sequence
 from urllib.request import urlopen
 
 from .classification_policy import assert_fbs_only_games
+from .scorecard import build_scorecard
 from .joint_model import CFBJointScoreModel, CFB_SEED_POLICY, price_cfb_game_markets, simulate_cfb_joint_distribution
 from .source import (
     CFBGame, CFBQuote, CFBTeamMetrics, SUPPORTED_GAME_MARKETS, attach_weather,
@@ -70,6 +71,7 @@ class CFBMachineResult:
     sportsbook: str | None
     quote_retrieved_at: str | None
     offer_id: str | None
+    scorecard: dict[str, float | int | str] | None = None
 
 
 @dataclass(frozen=True)
@@ -232,7 +234,7 @@ def _blocked_no_engine(q: Mapping[str, Any]) -> CFBMachineResult:
         bet_status="BLOCKED", engine_status="NO_ENGINE", reason="NO_ENGINE", model_artifact_sha256=None,
         distribution_sha256=None, seed=None, seed_policy=None, book_key=str(q.get("book_key") or "") or None,
         sportsbook=str(q.get("sportsbook") or "") or None, quote_retrieved_at=str(q.get("retrieved_at") or "") or None,
-        offer_id=str(q.get("offer_id") or "") or None)
+        offer_id=str(q.get("offer_id") or "") or None, scorecard=None)
 
 
 def _summary(results: Sequence[CFBMachineResult]) -> dict[str, Any]:
@@ -295,13 +297,21 @@ def _run_canonical(*, mode: str, season: int, week: int, now: datetime, model: C
             qt = _quote_time(q.get("retrieved_at"))
             if (current - qt).total_seconds() > int(quote_ttl_seconds):
                 reason = "CFB_QUOTE_STALE"; fair = raw_p = edge = ev = None
+            scorecard = None
+            if fair is not None and edge is not None and ev is not None:
+                scorecard = build_scorecard(
+                    model_p=model_p, fair_market_p=fair, american_odds=float(q["american_odds"]),
+                    edge=edge, ev_per_dollar=ev, push_p=push_p, n_paths=n_paths,
+                    quote_age_seconds=max(0.0, (current - qt).total_seconds()),
+                    quote_ttl_seconds=float(quote_ttl_seconds),
+                )
             results.append(CFBMachineResult(
                 game_id=gid, market=market, side=side, line=float(q["line"]), american_odds=float(q["american_odds"]),
                 model_p=model_p, push_p=push_p, fair_market_p=fair, raw_implied_p=raw_p, hold=hold, edge=edge, ev_per_dollar=ev,
                 bet_status="BLOCKED", engine_status="PRICED", reason=reason, model_artifact_sha256=model_sha,
                 distribution_sha256=dist_hashes[gid], seed=seeds[gid], seed_policy=CFB_SEED_POLICY,
                 book_key=str(q.get("book_key") or "") or None, sportsbook=str(q.get("sportsbook") or "") or None,
-                quote_retrieved_at=qt.isoformat(), offer_id=str(q.get("offer_id") or "") or None))
+                quote_retrieved_at=qt.isoformat(), offer_id=str(q.get("offer_id") or "") or None, scorecard=scorecard))
     ordered = tuple(sorted(results, key=lambda r: (r.game_id, r.market, r.book_key or "", r.line or 0.0, r.side)))
     if not ordered:
         status = "BLOCKED"

@@ -1,0 +1,18 @@
+{
+  "schema_version": "SPORTSEDGE_CFB_TRAIN_FREEZE_REPAIR_STATUS_V1",
+  "status": "PREATTEMPT_REPAIR_READY_FOR_REVIEW",
+  "candidate_prereg_refreeze_ported": true,
+  "reconstructed_selection_materializer_ported": true,
+  "train_freeze_entrypoint_added": true,
+  "selected_candidate_runtime_gap_recorded": true,
+  "external_secret_required": "CFBD_API_KEY",
+  "attempts_consumed": 0,
+  "evaluation_performed": false,
+  "historical_replay_calls_performed_by_this_repair": 0,
+  "model_p_created": false,
+  "promotion_authority": false,
+  "truth_gate_authority": false,
+  "eligibility_changed": false,
+  "staking_authority": false,
+  "official_authority": false
+}

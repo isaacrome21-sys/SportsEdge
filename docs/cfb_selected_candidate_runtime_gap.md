@@ -1,0 +1,7 @@
+# CFB selected-candidate serving status
+
+The frozen CFB bakeoff contains four preregistered candidate families. The `GAMES_IN_SAMPLE_FEATURE` family appends two features beyond the canonical base joint-model vector, and the reliability/blend families require dual prior/current snapshots.
+
+This branch now provides a hash-bound selected-candidate model/artifact surface plus `CFB_SELECTED_CANDIDATE_CANONICAL_RUNTIME_V1`, which pre-binds the exact frozen dual-snapshot candidate inputs and delegates simulation, market pricing, de-vigging, seed identity, and readout behavior to the existing canonical CFB run machine. Hosted parity tests require the direct selected-family simulator and the canonical runtime adapter to produce identical distributions under the same seed for all four frozen families.
+
+The serving gap is therefore closed at the pre-attempt engineering layer. This does not authorize historical acquisition or candidate evaluation, consume an attempt, create Model_P or Truth Gate authority, change eligibility, permit staking, start an evidence clock, backfill evidence, or create OFFICIAL authority. The reconstructed-selection provider/acquisition gate remains independent and must be satisfied before any first evaluation attempt.

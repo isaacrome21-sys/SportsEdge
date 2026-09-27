@@ -1,0 +1,25 @@
+{
+  "schema": "PAPER_OUTPUT_POLICY_V1",
+  "status": "ACTIVE_NOT_OFFICIAL",
+  "purpose": "Allow SportsEdge to emit visible model candidates without granting official betting authority.",
+  "labels": {
+    "output_class": "PAPER",
+    "forbidden_labels": ["OFFICIAL", "LIVE_PROMOTED", "STAKEABLE"]
+  },
+  "governance": {
+    "official_authority": false,
+    "promotion_authority": false,
+    "eligibility_changed": false,
+    "staking_authority": false,
+    "model_p_created": false,
+    "truth_gate_authority": false,
+    "paper_output_allowed": true,
+    "paper_cannot_promote_itself": true
+  },
+  "rules": [
+    "PAPER candidates must be labeled PAPER_NOT_OFFICIAL.",
+    "PAPER output cannot set official_authority true.",
+    "A market remaining NO_ENGINE or WAIT stays non-official.",
+    "Official bets still require the frozen sport lane: data, model, calibration, sportsbook confirmation, and settlement."
+  ]
+}

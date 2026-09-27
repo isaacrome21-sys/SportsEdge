@@ -1,0 +1,24 @@
+{
+  "authority": {
+    "model_p": false,
+    "official": false,
+    "promotion": false,
+    "staking": false,
+    "truth_gate": false
+  },
+  "notes": [
+    "V1 deliberately freezes a neutral card-facing context profile until non-market multipliers are fitted/preregistered.",
+    "Card-facing code accepts profile ids from this file, never arbitrary runtime multipliers.",
+    "Any multiplier change requires a new versioned config and manifest hash."
+  ],
+  "profiles": {
+    "NEUTRAL": {
+      "pass_volume_multiplier": 1.0,
+      "rush_volume_multiplier": 1.0,
+      "target_multiplier": 1.0
+    }
+  },
+  "schema": "SPORTSEDGE_NFL_PROP_CONTEXT_CONFIG_V1",
+  "status": "RESEARCH_ONLY",
+  "version": "NFL_PROP_CONTEXT_V1"
+}

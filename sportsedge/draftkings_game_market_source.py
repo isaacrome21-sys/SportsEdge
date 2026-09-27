@@ -20,6 +20,7 @@ LEAGUE_IDS = {
 }
 VERIFIED_GAME_LINE_CATEGORY_IDS = {
     "americanfootball_nfl": 492,
+    "americanfootball_ncaaf": 492,
     "baseball_mlb": 493,
 }
 
@@ -86,7 +87,7 @@ def _american(selection: Mapping[str, Any]) -> int:
     value: Any = display.get("american") if isinstance(display, Mapping) else display
     if value is None:
         value = selection.get("oddsAmerican") or selection.get("americanOdds")
-    text = str(value or "").strip().replace("−", "-").replace("+", "")
+    text = str(value or "").strip().replace("\u2212", "-").replace("+", "")
     try:
         return int(text)
     except Exception as exc:

@@ -1,0 +1,14 @@
+{
+  "active_path": "config/research/nfl_prop_role_context_v1.json",
+  "active_sha256": "e79024f225496f3cc7a2991a3589b2414aa0d9177ab6d0ce664f3b73c4a2f018",
+  "active_version": "NFL_PROP_CONTEXT_V1",
+  "authority": {
+    "model_p": false,
+    "official": false,
+    "promotion": false,
+    "staking": false,
+    "truth_gate": false
+  },
+  "change_rule": "Any multiplier-byte change requires a new versioned config path/version and manifest update.",
+  "schema": "SPORTSEDGE_NFL_PROP_CONTEXT_MANIFEST_V1"
+}

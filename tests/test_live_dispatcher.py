@@ -50,6 +50,20 @@ def test_pregame_without_runner_reports_gap():
     result = dispatch_event(event("PREGAME"))
     assert result.lane == "PREGAME"
     assert result.status == "DATA_GAP"
+    assert result.reason == "PREGAME_RUNNER_UNAVAILABLE"
+
+
+def test_mixed_pregame_and_live_slate_keeps_pregame_visible():
+    results = dispatch_slate(
+        (event("PREGAME"), event("LIVE")),
+        live_providers=(StateOnlyProvider(),),
+    )
+    assert len(results) == 2
+    assert results[0].lane == "PREGAME"
+    assert results[0].status == "DATA_GAP"
+    assert results[0].reason == "PREGAME_RUNNER_UNAVAILABLE"
+    assert results[1].lane == "LIVE"
+    assert results[1].status == "READY"
 
 
 def test_odds_provider_normalizes_two_way_main_markets():

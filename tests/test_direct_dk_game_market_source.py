@@ -47,18 +47,12 @@ class DirectDKSourceTests(unittest.TestCase):
     def test_supported_urls_use_live_verified_league_categories(self):
         self.assertIn('/88808/categories/492',board_url('americanfootball_nfl'))
         self.assertIn('/84240/categories/493',board_url('baseball_mlb'))
-        with self.assertRaisesRegex(DraftKingsGameMarketError,'CATEGORY_UNVERIFIED'):
-            board_url('americanfootball_ncaaf')
+        self.assertIn('/87637/categories/492',board_url('americanfootball_ncaaf'))
         with self.assertRaisesRegex(DraftKingsGameMarketError,'UNSUPPORTED'):
             board_url('unknown')
 
     def test_metadata_only_board_never_synthesizes_quotes(self):
-        payload={
-            'events':[],
-            'markets':[],
-            'selections':[],
-            'categories':[{'id':999,'name':'Metadata Only'}],
-        }
+        payload={'events':[],'markets':[],'selections':[],'categories':[{'id':999,'name':'Metadata Only'}]}
         self.assertEqual(normalize_board(self.board(payload)),[])
 
 if __name__=='__main__': unittest.main()

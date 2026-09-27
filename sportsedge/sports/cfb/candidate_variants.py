@@ -16,11 +16,29 @@ def _snapshots(row: Mapping[str, Any], side: str, metric_keys) -> tuple[Mapping[
         raise ValueError(f"CFB_CANDIDATE_DUAL_SNAPSHOT_METRICS_MISSING:{side}")
     if int(prior.get("season", -1)) != season - 1:
         raise ValueError(f"CFB_CANDIDATE_PRIOR_SNAPSHOT_INVALID:{side}")
-    if int(current.get("season", -1)) != season or int(current.get("through_week", -1)) != max(0, week - 1):
-        raise ValueError(f"CFB_CANDIDATE_CURRENT_SNAPSHOT_INVALID:{side}")
     games = current.get("games_in_sample")
     if not isinstance(games, int) or games < 0:
         raise ValueError(f"CFB_CANDIDATE_GAMES_IN_SAMPLE_INVALID:{side}")
+
+    # Week 1 has no current-season prior-week sample by construction.  The
+    # deterministic history layer therefore aliases the current snapshot to the
+    # immediately prior-season fallback with games_in_sample=0.  All three
+    # non-baseline frozen formulas reduce to the prior snapshot at games=0.
+    if week == 1:
+        if games != 0:
+            raise ValueError(f"CFB_CANDIDATE_WEEK1_GAMES_IN_SAMPLE_NONZERO:{side}")
+        if (
+            int(current.get("season", -1)) != season - 1
+            or str(current.get("sample_source") or "").upper() != "PRIOR_SEASON_FALLBACK"
+        ):
+            raise ValueError(f"CFB_CANDIDATE_WEEK1_CURRENT_FALLBACK_INVALID:{side}")
+    else:
+        if (
+            int(current.get("season", -1)) != season
+            or int(current.get("through_week", -1)) != week - 1
+            or str(current.get("sample_source") or "").upper() != "CURRENT_SEASON_PRIOR_WEEKS"
+        ):
+            raise ValueError(f"CFB_CANDIDATE_CURRENT_SNAPSHOT_INVALID:{side}")
     return prior, current, games
 
 

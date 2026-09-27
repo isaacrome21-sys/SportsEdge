@@ -1,4 +1,14 @@
 """Fail-closed readiness gate for reconstructed CFB historical acquisition."""
+# Provider-preflight readiness is non-authoritative and must not consume an evaluation attempt.
+# Public-splits PYTHONPATH fix retrigger for required CFB readiness check.
+# Public-splits decoder fix retrigger for required CFB readiness check.
+# DK prop clock retrigger for required CFB readiness check.
+# Blueprint ops park retrigger for required CFB readiness check.
+# PAPER DK CFB board retrigger for required CFB readiness check.
+# PAPER slate runner retrigger for required CFB readiness check.
+# PAPER weekend-window retrigger for required CFB readiness check.
+# PAPER CFB rating coverage retrigger for required CFB readiness check.
+# Kill toy PF/PA candidates retrigger for required CFB readiness check.
 from __future__ import annotations
 
 import re

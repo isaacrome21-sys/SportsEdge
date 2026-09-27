@@ -1,0 +1,217 @@
+{
+  "schema": "CFB_DISPERSION_ONLY_PREREG_V1",
+  "status": "FROZEN_BEFORE_DISPERSION_EVALUATION",
+  "lane": "CFB",
+  "purpose": "Evaluate V1 versus V2 score dispersion only after the frozen four-family mean-model bakeoff has selected and locked a winner. This diagnostic cannot alter the mean-model bakeoff, consume another candidate attempt, create Model_P, pass Truth Gate, or authorize betting output.",
+  "bindings": {
+    "parent_policy": {
+      "path": "config/cfb_model_selection_policy_v1.json",
+      "git_blob": "e82f72f77687ca5afc1f058de11d63aa1e24a006",
+      "required_schema": "CFB_MODEL_SELECTION_POLICY_V1",
+      "required_status": "FROZEN_BEFORE_CANDIDATE_EVALUATION"
+    },
+    "bakeoff_v3_config": {
+      "path": "config/cfb_candidate_bakeoff_evaluator_v3.json",
+      "git_blob": "da78ba32ad3c48dd61e4dc418c39950b69343e8b",
+      "required_schema": "CFB_CANDIDATE_BAKEOFF_EVALUATOR_V3",
+      "required_status": "FROZEN_BEFORE_FIRST_EVALUATION"
+    },
+    "bakeoff_v3_evaluator": {
+      "path": "sportsedge/sports/cfb/candidate_bakeoff_v3.py",
+      "git_blob": "549842f368e6402860739e78e5f85bb33050a41d"
+    },
+    "v2_reference": {
+      "path": "sportsedge/sports/cfb/joint_model_v2_challenger.py",
+      "git_blob": "bfed1f12aba33c28acd73bcdd5666b50f5e24acb"
+    },
+    "dispersion_evaluator": {
+      "path": "sportsedge/sports/cfb/dispersion_only_evaluator.py",
+      "git_blob": "b1420f28b6534e21b66c474b57c563a04ff4c673"
+    },
+    "dispersion_evaluator_tests": {
+      "path": "tests/test_cfb_dispersion_only_evaluator.py",
+      "git_blob": "9d4ee5f4a5059ca682543f8ea836b762b830a247"
+    },
+    "direct_dispersion_dependency_blobs": {
+      "sportsedge/sports/cfb/candidate_bakeoff.py": "064208efaae1b96a5e466066404c71e78191f6c3",
+      "sportsedge/sports/cfb/joint_model.py": "ff91ad867a5240d7f1cd90c707d29d534bde8dd2"
+    }
+  },
+  "ordering": [
+    "This preregistration must be frozen on protected main before the four-attempt bakeoff is run.",
+    "Run the frozen four-family mean-model bakeoff under CFB_CANDIDATE_BAKEOFF_EVALUATOR_V3.",
+    "If the bakeoff returns NO_CANDIDATE_DEMONSTRATED_SIGNAL_AT_THIS_SAMPLE, stop; this dispersion evaluation does not run.",
+    "If the bakeoff returns WINNER_SELECTED_FOR_FREEZE, lock that winner and its original V3 private capture before inspecting any dispersion result.",
+    "Run the bound dispersion evaluator only from the original V3 winner capture and the identical hash-bound parent materialized rows."
+  ],
+  "budget_neutral_basis": {
+    "parent_field": "controls_budget_rule",
+    "parent_rule_verbatim": "Diagnostics that cannot select, tune, rank, add, remove, revise, reject, or veto freezing a candidate are budget-neutral. Any diagnostic result used to change a candidate specification or to reject/veto an otherwise valid selected winner becomes candidate search and is prohibited under this frozen selection policy unless separately preregistered with fresh untouched evaluation evidence.",
+    "attempts_consumed_by_this_diagnostic": 0,
+    "may_select_mean_model": false,
+    "may_tune_mean_model": false,
+    "may_rank_mean_models": false,
+    "may_add_or_remove_mean_candidate": false,
+    "may_revise_mean_candidate": false,
+    "may_reject_or_veto_bakeoff_winner": false
+  },
+  "null_bakeoff_rule": "If the parent bakeoff returns NO_CANDIDATE_DEMONSTRATED_SIGNAL_AT_THIS_SAMPLE, this evaluation DOES NOT RUN. No equal-weight baseline substitution, fallback mean model, fifth candidate, or other replacement is permitted.",
+  "data_provenance": {
+    "class": "RECONSTRUCTED_HISTORICAL_NOT_PIT",
+    "historical_absolute_score_status": "NOT_UNBIASED_GENERALIZATION_EVIDENCE",
+    "source_pipeline": "cfb-reconstructed-selection-materialize.yml",
+    "provider_metric_model_vintage": "UNKNOWN_CURRENT_PROVIDER_VINTAGE",
+    "provider_metric_materialization_mode": "UNKNOWN_PROVIDER_IMPLEMENTATION",
+    "provider_vintage_warning": "PPA, explosiveness, and other model-derived CFBD advanced metrics do not expose a bindable model version in the /stats/season/advanced contract. Replayed historical values may therefore reflect a later provider model vintage. This contamination is shared context, not proof that relative candidate ranking is unbiased.",
+    "historical_pit_created": false,
+    "promotion_evidence": false
+  },
+  "capture_contract": {
+    "required_schema": "CFB_CANDIDATE_BAKEOFF_PRIVATE_CAPTURE_V1",
+    "required_status": "WINNER_CAPTURE_RETAINED",
+    "capture_pass": "OBSERVED_UNPERMUTED_ONLY",
+    "retained_family": "MUST_EQUAL_LOCKED_BAKEOFF_WINNER",
+    "capture_sha256_must_verify": true,
+    "bakeoff_result_sha256_must_verify": true,
+    "parent_selection_rows_sha256_must_match": true,
+    "new_mean_fit_allowed": false,
+    "post_bakeoff_mean_reproduction_allowed": false,
+    "required_outer_folds": [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025],
+    "per_outer_fold_required": [
+      "frozen_alpha",
+      "outer_predictions for every parent materialized row in that outer season",
+      "same-fit paired training residuals for every parent materialized row with season before the outer season"
+    ]
+  },
+  "folds": {
+    "parent_outer_validation_seasons": [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025],
+    "first_scored_dispersion_season": 2019,
+    "last_scored_dispersion_season": 2025,
+    "early_season_roles": {
+      "2015-2017": "PARENT_TRAINING_ONLY; no dispersion role",
+      "2018": "RESIDUAL_SEED_ONLY; not scored"
+    },
+    "v1_residual_rule": "For scored season s, V1 residuals are the paired in-sample training residuals captured from the exact winner-family fold-s fit on rows with season < s at fold s's frozen alpha.",
+    "v2_residual_rule": "For scored season s, V2 residuals for every season r from 2018 through s-1 are exactly realized scores minus the captured parent outer-fold winner predictions for r. No additional mean fits and no alpha selection occur.",
+    "scored_row_identity": "Scored rows are exactly the parent materialized rows with season 2019-2025, in ascending (season, week, game_id) order.",
+    "additional_exclusions_allowed": false,
+    "unscorable_required_row_rule": "FAIL_WHOLE_RUN_CLOSED"
+  },
+  "dispersion_definitions": {
+    "v1": {
+      "id": "V1_IN_SAMPLE_PAIRED_RESIDUALS",
+      "mean_predictions": "LOCKED_PARENT_WINNER_OUTER_PREDICTIONS",
+      "residuals": "CAPTURED_SAME_FIT_IN_SAMPLE_TRAINING_RESIDUALS",
+      "mean_dependent_scale": false,
+      "pairing_preserved": true
+    },
+    "v2": {
+      "id": "CFB_V2_HETERO_FORWARD_CHAINED_OOF",
+      "reference_git_blob": "bfed1f12aba33c28acd73bcdd5666b50f5e24acb",
+      "mean_predictions": "IDENTICAL_LOCKED_PARENT_WINNER_OUTER_PREDICTIONS",
+      "residuals": "CAPTURED_PARENT_OUTER_FOLD_RESIDUALS_FROM_PRIOR_SEASONS_ONLY",
+      "scale_rule": "Fit separate home and away linear absolute-residual scales s(mu)=c0+c1*mu using the bound V2 _fit_scale implementation; floor = 0.25 times median absolute residual; standardize paired prior-fold residuals and rescale at the scored game's locked means.",
+      "pairing_preserved": true
+    }
+  },
+  "overtime_rule": "For scored season s, V1 and V2 resolve tied simulated paths with the identical empirical overtime-delta profile derived only from parent materialized rows with season < s. If a tie requires resolution and no eligible overtime profile exists, the run fails closed.",
+  "simulation": {
+    "n_paths_per_game_per_model": 5000,
+    "path_count_frozen": true,
+    "seed_policy": "EXPLICIT_NUMPY_PCG64_V1",
+    "base_seed": 20260925,
+    "row_order": "ASCENDING_(season,week,game_id)",
+    "row_seed_rule": "base_seed + zero_based_row_index",
+    "same_row_seed_used_for_v1_and_v2": true,
+    "pit_randomization_seed": 20260927,
+    "unequal_path_counts_fail_closed": true,
+    "post_result_path_count_change_prohibited": true
+  },
+  "primary_metric": {
+    "name": "MEAN_RANKED_PROBABILITY_SCORE_MARGIN_AND_TOTAL",
+    "direction": "LOWER_IS_BETTER",
+    "per_target_definition": "For each game and target, use the common integer support spanning the union of V1 simulated values, V2 simulated values, and the realized value. For every integer k in that support, RPS is the sum of (F(k) - I[realized <= k])^2.",
+    "game_level_definition": "game_RPS = 0.5 * margin_RPS + 0.5 * total_RPS",
+    "aggregate_definition": "Arithmetic mean of game_RPS across every required scored row.",
+    "comparison_statistic": "V1_RPS - V2_RPS",
+    "v2_better_rule": "V1_RPS - V2_RPS > 0 AND the paired season-week cluster-bootstrap 95% confidence interval excludes 0 on the positive side.",
+    "otherwise": "NO_DEMONSTRATED_DISPERSION_IMPROVEMENT",
+    "tie_rule": "An exact tie, non-positive point estimate, or confidence interval containing 0 resolves to NO_DEMONSTRATED_DISPERSION_IMPROVEMENT. No post-result threshold adjustment."
+  },
+  "paired_cluster_bootstrap": {
+    "clusters": "season-week",
+    "resamples": 2000,
+    "confidence_level": 0.95,
+    "interval": "PERCENTILE_LINEAR_2.5_97.5",
+    "seed": 20260926,
+    "resampling_rule": "Resample unique season-week clusters with replacement. Include every game belonging to each selected cluster occurrence and recompute the arithmetic mean game-level V1-minus-V2 RPS difference.",
+    "simulation_repeated_inside_bootstrap": false
+  },
+  "secondary_diagnostics_no_authority": {
+    "selection_authority": false,
+    "veto_authority": false,
+    "promotion_authority": false,
+    "metrics": [
+      "Randomized-PIT coverage at 50/80/95 for margin and total overall",
+      "Randomized-PIT coverage at 50/80/95 for margin and total by locked predicted-total tercile",
+      "Absolute margin mass at 3 and 7 versus realized frequencies with a 1.5 percentage-point reference tolerance"
+    ],
+    "predicted_total_terciles": "Compute once from the locked winner mean predictions across all scored games before comparing dispersion results; V1 and V2 use the same assignments.",
+    "key_number_reference_tolerance_percentage_points": 1.5
+  },
+  "reference_equivalence": {
+    "required": true,
+    "rule": "Using the V1 feature family fixture, the capture-driven V2 simulation must reproduce the bound joint_model_v2_challenger home and away path arrays bit-for-bit at identical seed and n_paths.",
+    "bound_test_blob": "9d4ee5f4a5059ca682543f8ea836b762b830a247"
+  },
+  "decision_effect": {
+    "v2_positive_result_label": "V2_DEMONSTRATED_DISPERSION_IMPROVEMENT_DIAGNOSTIC_ONLY",
+    "otherwise_label": "NO_DEMONSTRATED_DISPERSION_IMPROVEMENT",
+    "may_change_bakeoff_winner": false,
+    "may_rerank_mean_models": false,
+    "may_veto_bakeoff_winner": false,
+    "may_restore_eliminated_candidate": false,
+    "may_consume_model_selection_attempt": false,
+    "may_modify_parent_policy": false,
+    "may_create_model_p": false,
+    "may_pass_truth_gate": false,
+    "may_authorize_official_output": false,
+    "automatic_production_promotion": false,
+    "interpretation": "A positive V2 result is reconstructed-historical diagnostic evidence only. Any production adoption of V2 dispersion requires separately preregistered untouched or forward validation."
+  },
+  "required_output_provenance": [
+    "Exact main commit SHA",
+    "Exact parent policy blob SHA",
+    "Exact V3 config and evaluator blob SHAs",
+    "Exact dispersion evaluator blob SHA",
+    "Exact V2 reference blob SHA",
+    "Bakeoff result_sha256",
+    "Winner capture_sha256",
+    "Parent selection_rows_sha256",
+    "Locked winner family",
+    "Frozen alpha by outer season",
+    "Scored row count by season-week",
+    "Confirmation of zero mean refits",
+    "Confirmation of zero additional exclusions",
+    "Confirmation V1 and V2 used identical locked means",
+    "Confirmation V1 and V2 used identical season-specific overtime profiles",
+    "Confirmation both models used exactly 5000 paths per game",
+    "Primary RPS values and paired bootstrap interval",
+    "All declared secondary diagnostics",
+    "Python and NumPy runtime versions"
+  ],
+  "authority": {
+    "model_p_created": false,
+    "truth_gate_authority": false,
+    "promotion_authority": false,
+    "eligibility_changed": false,
+    "staking_authority": false,
+    "official_authority": false,
+    "historical_pit_created": false,
+    "backfill": false
+  },
+  "freeze": {
+    "amendment_rule": "After this file is frozen on protected main, any material change to metric, decision rule, folds, row identity, exclusions, path count, RNG policy, bootstrap method, overtime policy, residual definitions, capture semantics, bound code, or evaluator semantics requires a new versioned preregistration and may not reuse already-inspected dispersion results as untouched evidence.",
+    "run_prohibition_before_freeze": true
+  }
+}

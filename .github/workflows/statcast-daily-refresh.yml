@@ -2,6 +2,9 @@ name: statcast-daily-refresh
 
 on:
   workflow_dispatch:
+  schedule:
+    # Feature snapshot only. Does not unpark MLB official.
+    - cron: "15 15 * * *"
   push:
     paths:
       - 'sportsedge/statcast_daily_source.py'

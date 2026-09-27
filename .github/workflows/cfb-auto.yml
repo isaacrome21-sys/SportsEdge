@@ -1,0 +1,71 @@
+name: cfb auto
+
+# Operational alias for the existing CFB model-artifact freeze verification.
+# This workflow does not create a second model-artifact authority: it dispatches
+# the canonical football-cfb-prop-artifact-freeze workflow and reports only that
+# workflow's conclusion and binding proof. It cannot change any governed state.
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: cfb-auto
+  cancel-in-progress: false
+
+jobs:
+  verify-canonical-binding:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Dispatch canonical CFB artifact-freeze verifier
+        id: dispatch
+        shell: bash
+        run: |
+          set -euo pipefail
+          before="$(date -u +%s)"
+          gh workflow run football-cfb-prop-artifact-freeze.yml --ref "${GITHUB_REF_NAME}"
+          echo "before=${before}" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for dispatched canonical run and classify result
+        env:
+          BEFORE: ${{ steps.dispatch.outputs.before }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_id=""
+          for _ in $(seq 1 30); do
+            runs="$(gh run list --workflow football-cfb-prop-artifact-freeze.yml --branch "${GITHUB_REF_NAME}" --event workflow_dispatch --limit 10 --json databaseId,createdAt)"
+            candidate="$(jq -r --argjson before "$BEFORE" '[.[] | select((.createdAt | fromdateiso8601) >= $before)] | sort_by(.createdAt) | last | .databaseId // empty' <<<"$runs")"
+            if [ -n "$candidate" ]; then
+              run_id="$candidate"
+              break
+            fi
+            sleep 2
+          done
+          if [ -z "$run_id" ]; then
+            echo "CFB_AUTO_INFRA reason=CANONICAL_RUN_NOT_OBSERVED"
+            exit 2
+          fi
+
+          echo "CFB_AUTO_CANONICAL_RUN_ID=${run_id}"
+          if ! gh run watch "$run_id" --exit-status; then
+            conclusion="$(gh run view "$run_id" --json conclusion --jq '.conclusion')"
+            echo "CFB_AUTO_CANONICAL_NOT_GREEN conclusion=${conclusion} run_id=${run_id}"
+            exit 1
+          fi
+
+          conclusion="$(gh run view "$run_id" --json conclusion --jq '.conclusion')"
+          test "$conclusion" = "success"
+          logs="$(gh run view "$run_id" --log)"
+          if ! grep -q 'CFB_PROP_REAL_FREEZE_OK' <<<"$logs"; then
+            echo "CFB_AUTO_BLOCKED reason=MODEL_ARTIFACT_HASH_BINDING_PROOF_MISSING run_id=${run_id}"
+            exit 3
+          fi
+          proof="$(grep 'CFB_PROP_REAL_FREEZE_OK' <<<"$logs" | tail -n 1)"
+          echo "CFB_AUTO_GREEN canonical_run_id=${run_id} ${proof}"
