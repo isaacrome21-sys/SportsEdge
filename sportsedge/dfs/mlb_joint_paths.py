@@ -294,6 +294,7 @@ class _StarterState:
     pitch_count: int = 0
     strikeouts: int = 0
     earned_runs: int = 0
+    runs_allowed: int = 0
     hits_allowed: int = 0
     walks_allowed: int = 0
     hbp_allowed: int = 0
@@ -391,8 +392,10 @@ def _score_runner(
     game_state.add_run(offense_side)
     game_state.last_scoring_player = runner.player_id
     hitters[runner.player_id].runs += 1
-    if runner.responsibility == "STARTER" and runner.earned:
-        defense_starter.earned_runs += 1
+    if runner.responsibility == "STARTER":
+        defense_starter.runs_allowed += 1
+        if runner.earned:
+            defense_starter.earned_runs += 1
 
     return 1
 
@@ -536,7 +539,7 @@ def _simulate_half_inning(
     if inning >= 10 and game.rules_mode == "REGULAR_SEASON":
         ghost_index = (game_state.next_batter[offense_side] - 1) % 9
         ghost_id = offense.lineup[ghost_index].player_id
-        bases[1] = _Runner(ghost_id, "GHOST", earned=False)
+        bases[1] = _Runner(ghost_id, "STARTER" if starter.active else "BULLPEN", earned=False)
 
     pa_count = 0
     while outs < 3:
@@ -648,7 +651,7 @@ def _simulate_half_inning(
         if starter.active and not starter.pending_hook:
             remove_probability = defense.hook_surface.removal_probability(
                 pitch_count=starter.pitch_count,
-                runs_allowed=starter.earned_runs,
+                runs_allowed=starter.runs_allowed,
             )
             if rng.random() < remove_probability:
                 if outs >= 3:

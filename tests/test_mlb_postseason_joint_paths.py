@@ -36,6 +36,7 @@ def test_extra_inning_runner_is_explicit(monkeypatch, rules, inning, runs):
     state, starters, _, _ = half(monkeypatch, ["HR"], rules=rules, inning=inning, offense="AWAY")
     assert state.away_score == runs
     assert starters["HOME"].earned_runs == 1  # placed runner is unearned
+    assert starters["HOME"].runs_allowed == runs  # hook uses all charged runs
 
 
 @pytest.mark.parametrize("hit", ["1B", "2B", "3B"])

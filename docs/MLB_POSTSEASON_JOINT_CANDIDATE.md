@@ -16,6 +16,9 @@ The frozen V7 simulator, registry, policies and deployment flags are unchanged.
   count every runner and the batter. Hit credit on ordinary walk-offs is limited
   by the bases advanced by the winning runner, assuming the batter runs it out.
 - A sacrifice fly cannot score a run when its catch is the third out.
+- Starter hook state counts all charged runs separately from earned runs;
+  the regular-season placed runner stays unearned without disappearing from
+  the hook's runs-allowed input.
 - Nonfinite probabilities fail input validation.
 - A half-inning reaching the 1,000-PA computational limit or a game unresolved
   after 30 innings fails the entire run. No synthetic winner or discarded path.
