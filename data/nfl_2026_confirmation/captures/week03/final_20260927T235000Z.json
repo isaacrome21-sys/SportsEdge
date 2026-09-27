@@ -1,0 +1,71 @@
+{
+  "authority_footer": "NOT Model_P / NOT Truth Gate / NOT OFFICIAL",
+  "book": "draftkings",
+  "capture_kind": "FINAL",
+  "games": [
+    {
+      "away_team": "LA Rams",
+      "book": "draftkings",
+      "book_last_update": null,
+      "commence_time": "2026-09-28T00:20:00Z",
+      "event_id": "34118276",
+      "home_team": "DEN Broncos",
+      "observed_at_utc": "2026-09-27T23:50:00Z",
+      "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
+      "spread": {
+        "away_point": -1.5,
+        "away_price": 100,
+        "home_point": 1.5,
+        "home_price": -120,
+        "market_last_update": null,
+        "status": "OK"
+      },
+      "total": {
+        "market_last_update": null,
+        "over_price": -102,
+        "point": 44.5,
+        "status": "OK",
+        "under_price": -118
+      },
+      "week": 3
+    }
+  ],
+  "hashes": {
+    "config_sha256": "883e6b3df15745847d5424c40b80cc6fc88916b62594e29c5afcac0fc1f6e842",
+    "policy_sha256": "f81e5bb1f10440adb50e0fc1e9bd0f204ab008147c31ad62d8601bf75c2529ba",
+    "script_sha256": "980a95d1ce14d1c8910b8bb212d3951c047974bf17330239f2e5f96b3466e375",
+    "workflow_sha256": "6a0d1381d3a080970fc67db6993d3510602aea15e3a7bde12c4b0f6bdbb23c38"
+  },
+  "markets": [
+    "spreads",
+    "totals"
+  ],
+  "no_backfill": true,
+  "promotion_authority": false,
+  "provider": "DRAFTKINGS_DIRECT_WEB",
+  "retrieved_at_utc": "2026-09-27T23:50:00Z",
+  "run": {
+    "github_event_name": "schedule",
+    "github_run_attempt": "1",
+    "github_run_id": "36358567364",
+    "github_sha": "7653e9387d6f6bc0d93d0b51011ba75a26ed9138"
+  },
+  "run_started_utc": "2026-09-27T23:50:00Z",
+  "schedule": {
+    "expected_game_count": 1,
+    "expected_kickoffs": {
+      "2026-09-28T00:20:00Z": 1
+    },
+    "matching_semantics": "KICKOFF_UTC_MULTIPLICITY",
+    "sha256": "1de6e71239d8a196d438a363ab6190a5bffbaef35072c3b9b84e6edfa58f3564",
+    "source": "nflverse/nfldata data/games.csv"
+  },
+  "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
+  "transport": {
+    "raw_relative_path": "raw/draftkings-direct/0bdf4ff8741566b281211f31c65bbcd62da44c9bc37481987d3159326c4d5032.json",
+    "raw_sha256": "0bdf4ff8741566b281211f31c65bbcd62da44c9bc37481987d3159326c4d5032",
+    "server_date_header": "Sun, 27 Sep 2026 23:50:00 GMT",
+    "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/492"
+  },
+  "week": 3
+}
