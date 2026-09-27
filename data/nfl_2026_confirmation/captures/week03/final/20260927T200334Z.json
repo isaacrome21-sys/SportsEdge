@@ -1,0 +1,128 @@
+{
+  "adjudication": {
+    "authority": {
+      "model_p": false,
+      "official": false,
+      "promotion": false,
+      "staking": false,
+      "truth_gate": false
+    },
+    "capture_code_sha": "c8ac37215981655014f2fd53c46d3875c2b19c1e",
+    "capture_should_continue": true,
+    "no_backfill": true,
+    "reason": "NFL_2026_CAPTURE_CODE_DELTA_NOT_RECONCILED",
+    "status": "ADJUDICATION_PENDING",
+    "triggering_merge_sha": "a75250bfd5881c0cafe82a47a877d9ea764fc203"
+  },
+  "book": "draftkings",
+  "capture_kind": "FINAL",
+  "games": [
+    {
+      "away_team": "LV Raiders",
+      "book": "draftkings",
+      "book_last_update": null,
+      "commence_time": "2026-09-27T20:25:00Z",
+      "event_id": "34118012",
+      "home_team": "NO Saints",
+      "minutes_before_kickoff": 21.42,
+      "observed_at_utc": "2026-09-27T20:03:34.737709Z",
+      "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
+      "spread": {
+        "away_point": 3.5,
+        "away_price": -112,
+        "home_point": -3.5,
+        "home_price": -108,
+        "market_last_update": null,
+        "status": "OK"
+      },
+      "target_utc": "2026-09-27T19:55:00+00:00",
+      "total": {
+        "market_last_update": null,
+        "over_price": -118,
+        "point": 43.5,
+        "status": "OK",
+        "under_price": -102
+      },
+      "week": 3
+    },
+    {
+      "away_team": "BAL Ravens",
+      "book": "draftkings",
+      "book_last_update": null,
+      "commence_time": "2026-09-27T20:25:00Z",
+      "event_id": "34118119",
+      "home_team": "DAL Cowboys",
+      "minutes_before_kickoff": 21.42,
+      "observed_at_utc": "2026-09-27T20:03:34.737709Z",
+      "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
+      "spread": {
+        "away_point": -3,
+        "away_price": -120,
+        "home_point": 3,
+        "home_price": 100,
+        "market_last_update": null,
+        "status": "OK"
+      },
+      "target_utc": "2026-09-27T19:55:00+00:00",
+      "total": {
+        "market_last_update": null,
+        "over_price": -120,
+        "point": 53.5,
+        "status": "OK",
+        "under_price": 100
+      },
+      "week": 3
+    }
+  ],
+  "hashes": {
+    "config_sha256": "883e6b3df15745847d5424c40b80cc6fc88916b62594e29c5afcac0fc1f6e842",
+    "policy_path": "config/nfl_research_search_policy_v1.json",
+    "policy_sha256": "f81e5bb1f10440adb50e0fc1e9bd0f204ab008147c31ad62d8601bf75c2529ba",
+    "script_sha256": "0f1a32f96f94840e39161e5f4b133f703d1da40b693889b6c28a181ec408c241",
+    "workflow_sha256": "f51f1b3c668f08e19681816f13efc30cee2375c2da23152f98c035c8041fb04a"
+  },
+  "lock_status": "MATCH",
+  "markets": [
+    "spreads",
+    "totals"
+  ],
+  "retrieved_at_utc": "2026-09-27T20:03:34Z",
+  "run": {
+    "github_event_name": "schedule",
+    "github_run_attempt": "1",
+    "github_run_id": "36346587981",
+    "github_sha": "c8ac37215981655014f2fd53c46d3875c2b19c1e"
+  },
+  "run_started_utc": "2026-09-27T20:03:34.470999+00:00",
+  "schedule": {
+    "expected_game_count": 2,
+    "expected_kickoffs": {
+      "2026-09-27T20:25:00Z": 2
+    },
+    "matching_semantics": "KICKOFF_UTC_MULTIPLICITY",
+    "sha256": "d1677faba76ad86647b5a52727d0a4d64583371fa06deb47a8f6fa1257d2f46f",
+    "source": "nflverse/nfldata data/games.csv"
+  },
+  "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
+  "transport": {
+    "adapter_module_sha256": "76fe056b668ce71db9d1424f4049bc1be9f3e3c69d78b758353ecca141e25b1d",
+    "attempts": [
+      {
+        "attempt": 1,
+        "host": "sportsbook-nash.draftkings.com",
+        "received_at_utc": "2026-09-27T20:03:34.737709Z",
+        "result_class": "OK"
+      }
+    ],
+    "github_sha": "c8ac37215981655014f2fd53c46d3875c2b19c1e",
+    "observed_at_utc": "2026-09-27T20:03:34.737709Z",
+    "provider_quote_timestamp_available": false,
+    "raw_relative_path": "data/nfl_2026_confirmation/captures/raw/draftkings-direct/f5415f0eae2c8ce485686abb90e60458448c6805d857fee452c8337a9bc923ac.json",
+    "raw_sha256": "f5415f0eae2c8ce485686abb90e60458448c6805d857fee452c8337a9bc923ac",
+    "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
+    "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/492",
+    "timestamp_semantics": "SPORTSEDGE_HTTP_RESPONSE_RECEIPT_UPPER_BOUND",
+    "transport_host": "sportsbook-nash.draftkings.com"
+  },
+  "week": 3
+}
