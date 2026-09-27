@@ -37,7 +37,7 @@ class NFLAttempt9ProspectiveTests(unittest.TestCase):
             quote_observed_at_utc="2026-09-27T17:59:00Z",
             capture_code_git_sha="c"*40, book="draftkings", quote_sha256="d"*64,
             market="spread", selection="home", line=-3.5, price_american=-110,
-            raw_prediction=6.0,
+            opposite_price_american=-110, raw_prediction=6.0,
         )
 
     def test_builds_model_p_evidence_without_authority(self):
