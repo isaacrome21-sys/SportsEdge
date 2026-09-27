@@ -317,6 +317,10 @@ def adapt_pregame_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
         "model_p_eligible": False,
         "promotion_status": "CONTEXT_ONLY_UNTIL_FITTED_AND_VALIDATED",
     }
+    if "input_readiness" in bundle:
+        # Preserve the explicit completeness veto separately from fitted-family
+        # readiness. Complete raw inputs never promote a model family.
+        output["pregame_input_readiness"] = deepcopy(bundle["input_readiness"])
     output["payload_sha256"] = _content_sha(output)
     return output
 
@@ -344,6 +348,8 @@ def attach_pregame_context(
     row["pregame_context"] = adapted["predictive_context"]
     row["pregame_context_sha256"] = adapted["payload_sha256"]
     row["pregame_context_status"] = adapted["promotion_status"]
+    if "pregame_input_readiness" in adapted:
+        row["pregame_input_readiness"] = adapted["pregame_input_readiness"]
 
     if enforce_family_readiness:
         existing = row.get("feature_family_readiness")

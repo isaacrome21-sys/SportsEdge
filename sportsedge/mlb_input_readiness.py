@@ -20,6 +20,10 @@ def scored_input_readiness(row: Mapping[str,Any], *, path: str|Path=REQ_PATH) ->
     # Upstream BLOCKED is always authoritative.
     if str(row.get("bet_status") or "").upper()=="BLOCKED":
         return False,("UPSTREAM_BLOCKED",)
+    if "pregame_input_readiness" in row:
+        pregame = row["pregame_input_readiness"]
+        if not isinstance(pregame, Mapping) or pregame.get("ready") is not True:
+            return False,("PREGAME_INPUTS_INCOMPLETE",)
     readiness=row.get("feature_family_readiness")
     if readiness is None:
         # Legacy engines have already gated required inputs upstream; do not invent
