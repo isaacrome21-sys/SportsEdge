@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 import subprocess
 
@@ -157,7 +156,7 @@ def test_confirmed_drift_requires_refreeze_or_revocation(repo: dict[str, object]
         "reconciled_through_sha": repo["drift"],
         "bundle_inventory_complete": True,
         "deltas": [_delta("DRIFT", str(repo["drift"]), 2)],
-        "bundles": [_bundle(str(repo["baseline"]))],
+        "bundles": [bad],
     }
     report = build_reconciliation_report(
         repo=root,
@@ -291,8 +290,9 @@ def test_repository_policy_is_unconditional_zero_authority_and_registers_late_de
     ids = {row["delta_id"] for row in registry["deltas"]}
     assert {"PR_683", "PR_687", "PR_701", "PR_702", "PR_703"}.issubset(ids)
     assert registry["deltas"]
-    current_main_ref = "HEAD" if os.environ.get("GITHUB_EVENT_NAME") == "pull_request" else "origin/main"
-    current_main = _git(Path.cwd(), "rev-parse", current_main_ref)
+    # On pull_request events HEAD is GitHub's synthetic merge commit, not main.
+    # The boundary assertion is explicitly about the actual current main branch.
+    current_main = _git(Path.cwd(), "rev-parse", "origin/main")
     assert main_matches_reconciliation_boundary(
         Path.cwd(),
         policy=policy,
