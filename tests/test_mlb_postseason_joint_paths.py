@@ -115,13 +115,17 @@ def test_final_scores_equal_player_runs_on_every_path(result):
 def test_all_game_readouts_share_paths_and_preserve_pushes(result):
     def read(market, side, line=None):
         return read_joint_research_probability(result, market=market, side=side, line=line)
-    assert read("MONEYLINE", "HOME")["research_p"] + read("MONEYLINE", "AWAY")["research_p"] == pytest.approx(1)
+    ml = read("MONEYLINE", "HOME")
+    assert ml["research_p"] + read("MONEYLINE", "AWAY")["research_p"] == pytest.approx(1)
     over, under = read("TOTALS", "OVER", 8), read("TOTALS", "UNDER", 8)
     assert over["research_p"] + under["research_p"] + over["push_p"] == pytest.approx(1)
     assert over["push_p"] == under["push_p"]
     home, away = read("RUN_LINE", "HOME", -1), read("RUN_LINE", "AWAY", 1)
     assert home["research_p"] + away["research_p"] + home["push_p"] == pytest.approx(1)
     assert home["path_set_id"] == over["path_set_id"] == result.path_set_id
+    assert ml["validation_scope"] == "THREE_MARKET_RESEARCH_ONLY"
+    assert ml["production_ready"] is False
+    assert ml["production_readiness"] == "RESEARCH_ONLY_POSTSEASON_VALIDATION_PENDING"
     assert home["official_authority"] is False
 
 
@@ -131,6 +135,9 @@ def test_hitter_props_use_same_samples_and_preserve_pushes(result, market):
     over = read_joint_research_probability(result, side="OVER", **kwargs)
     under = read_joint_research_probability(result, side="UNDER", **kwargs)
     assert over["research_p"] + under["research_p"] + over["push_p"] == pytest.approx(1)
+    assert over["validation_scope"] == "PLAYER_PROP_RESEARCH_ONLY"
+    assert over["production_ready"] is False
+    assert over["production_readiness"] == "NOT_ESTABLISHED"
     assert over["model_p_authority"] is False
 
 
@@ -139,11 +146,21 @@ def test_pitcher_props_derive_from_starter_samples(result, market):
     readout = read_joint_research_probability(result, market=market, side="OVER", line=1.5, player_id="AWY-P")
     assert 0 <= readout["research_p"] <= 1
     assert readout["push_p"] == 0
+    assert readout["production_ready"] is False
     with pytest.raises(ValueError, match="COUNT_INVALID"):
         read_joint_research_probability(result, market=market, side="OVER", line=1.5, player_id="AWY-H1")
 
 
-@pytest.mark.parametrize("market", ["STOLEN_BASES", "FIRST_HOME_RUN", "F5_TOTALS", "NRFI"])
-def test_unsupported_market_does_not_become_a_zero_probability(result, market):
+@pytest.mark.parametrize("market", ["STOLEN_BASES", "FIRST_HOME_RUN"])
+def test_unimplemented_prop_market_does_not_become_a_zero_probability(result, market):
     with pytest.raises(ValueError, match="MARKET_UNSUPPORTED"):
+        read_joint_research_probability(result, market=market, side="OVER", line=0.5, player_id="HME-H1")
+
+
+@pytest.mark.parametrize("market", [
+    "NRFI", "YRFI", "F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS",
+    "FIRST_FIVE_TOTALS", "FIRST_INNING_TOTALS", "INNING_3_TOTALS", "TEAM_TOTALS",
+])
+def test_period_and_outside_scope_markets_fail_closed(result, market):
+    with pytest.raises(ValueError, match="MARKET_OUTSIDE_VALIDATION_SCOPE"):
         read_joint_research_probability(result, market=market, side="OVER", line=0.5, player_id="HME-H1")
