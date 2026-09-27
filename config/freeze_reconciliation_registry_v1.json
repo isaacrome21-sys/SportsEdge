@@ -250,7 +250,21 @@
         "sportsedge/dfs/",
         "tests/test_dfs_"
       ],
-      "disposition": null,
+      "disposition": {
+        "prior_forward_clock_invalidated": true,
+        "reason": "PR_1075_ADDED_SPORTSEDGE_DFS_MLB_JOINT_PATHS_AND_TEST_DFS_MLB_JOINT_PATHS_INSIDE_THE_FROZEN_MLB_DFS_EVIDENCE_SURFACE; BYTE_AND_INVENTORY_DRIFT_CONFIRMED; REVOKED_FAIL_CLOSED",
+        "revoked_at": "2026-09-27T21:33:24Z",
+        "state": "REVOKED",
+        "authority": {
+          "eligibility": false,
+          "model_p": false,
+          "official": false,
+          "promotion": false,
+          "staking": false,
+          "truth_gate": false,
+          "validation_attempt": false
+        }
+      },
       "freeze_sha": "7a92455f081ee52a454b2c49ff798d902a3ace68"
     }
   ],
@@ -832,10 +846,106 @@
       "merge_sha": "08a124250a6e52c75b7217608606faaff2f42b1e",
       "pr": 1040,
       "note": "NHL team-to-roster SOG binding; exact current-main reconciliation anchor. All ten manifest-bound NFL prop code blobs remain byte-identical to config/nfl_prop_code_surface_v1.json."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_B8A84BE2_NFL_PROP_MANIFEST_RECONCILIATION",
+      "merge_sha": "b8a84be2bc6ed468a4966f4a40675e72ab16a80d",
+      "pr": 1045,
+      "note": "Governance reconciliation binding the NFL prop freeze to its exact manifest surface. No model or betting authority granted."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_F62051CD_NFL_SHARED_PROP_SIM_REVIEW",
+      "merge_sha": "f62051cd0745acf68baa10d5fa1aa0c726001271",
+      "pr": 1044,
+      "note": "Research shared-prop simulation fixes on current main; matrix determines bundle impact. No Model_P, Truth Gate, promotion, staking, or OFFICIAL authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_97AAF753_NFL_COHERENT_TEAM_PROP_PATHS",
+      "merge_sha": "97aaf7535c854be1556ed7a7b5dcd092d8f041bf",
+      "pr": 1046,
+      "note": "Research-only coherent NFL team prop path collapse. No governed authority granted."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_30D2D4F7_NFL_COHERENT_SCORING",
+      "merge_sha": "30d2d4f7e0c0f677dfe4c82c0f852cec642360f7",
+      "pr": 1047,
+      "note": "Research coherent team/player TD scoring paths. No governed authority granted."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_37078B6A_NFL_PROP_PATH_GUARDS",
+      "merge_sha": "37078b6a37a28ab2b8281bea05b77f9e648bc1ed",
+      "pr": 1048,
+      "note": "Research script-multiplier and yardage-identity guards. No governed authority granted."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_2A6D1ED2_CFB_SEASON_POINTS_FAIL_CLOSED",
+      "merge_sha": "2a6d1ed261a91e49d37f573d6577770c9353e7c0",
+      "pr": 1050,
+      "note": "CFB source fail-closed repair for missing season points; matrix determines bundle impact and no authority is granted."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_73CD55F5_CFB_V2_DISPERSION_CHALLENGER",
+      "merge_sha": "73cd55f5a22165d92e4bd533c086ea881ec1df37",
+      "pr": 1049,
+      "note": "CFB V2 dispersion challenger candidate only; NOT Model_P and zero betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_8246AEA1_CFB_CALIBRATION_PATH_FORWARDING",
+      "merge_sha": "8246aea1402a50ef2b0c7b63daafd8ab54cc040f",
+      "pr": 1051,
+      "note": "CFB candidate calibration path-count forwarding repair; no promotion or betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_DE19C075_CFB_BAKEOFF_V3_CAPTURE",
+      "merge_sha": "de19c075b66069fbc221240d12c951fd18bd2b59",
+      "pr": 1052,
+      "note": "CFB V3 bakeoff capture side channel with zero authority; no bakeoff dispatch by this merge."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_49B9DE03_CFB_DISPERSION_EVALUATOR",
+      "merge_sha": "49b9de035379da3d2ffd0f71ed665d3ee4a6ea34",
+      "pr": 1053,
+      "note": "Governed CFB dispersion-only evaluator; research-only and NOT Model_P / NOT Truth Gate / NOT OFFICIAL."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_8F6BEE70_CFB_DISPERSION_PREREG",
+      "merge_sha": "8f6bee70446ba817ca25813e34cfb64b28577908",
+      "pr": 1054,
+      "note": "CFB dispersion-only preregistration; does not consume an evaluation attempt or grant authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_E985B009_CFB_BAKEOFF_V3_RUNNER",
+      "merge_sha": "e985b0097c7dffe337f2d3df044524f2a19c7588",
+      "pr": 1055,
+      "note": "Switches the still-unspent governed CFB bakeoff runner to V3 without dispatching the bakeoff; zero authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_34791839_NFL_RECEIVER_DERIVED_YPC",
+      "merge_sha": "347918396558f358db78bc478d6068c8dda8a08f",
+      "pr": 1057,
+      "note": "Research coherent NFL receiver-pool completed-pass yardage identity; no governed authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_C8AC3721_NFL_FINAL_CAPTURE_ARMING",
+      "merge_sha": "c8ac37215981655014f2fd53c46d3875c2b19c1e",
+      "pr": 1059,
+      "note": "NFL direct DraftKings FINAL capture arming. No backfill, Model_P, promotion, staking, Truth Gate, or OFFICIAL authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_8DD85695_MLB_PREGAME_COMPLETENESS",
+      "merge_sha": "8dd85695e858c7523820b3a0ba59a774c38a91e8",
+      "pr": 1074,
+      "note": "MLB pregame completeness and scoring-veto preservation. Research/PAPER semantics remain fail-closed."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_706AE22C_MLB_POSTSEASON_JOINT_PATHS",
+      "merge_sha": "706ae22c569e62b11754bc8795051ef33ac93101",
+      "pr": 1075,
+      "note": "Research-only MLB postseason extras/walk-off repair and aligned ML/run-line/full-game-total/player-count readouts. This merge adds files under the frozen MLB DFS evidence surface; that prior freeze is revoked fail-closed below. No Model_P, Truth Gate, promotion, staking, eligibility, evidence-clock restart, or OFFICIAL authority."
     }
   ],
   "inventory_block_reason": "MACHINE_AUDIT_REQUIRED_ZERO_UNMAPPED_GOVERNANCE_SURFACES_BEFORE_TRUE",
   "issue": 686,
-  "reconciled_through_sha": "08a124250a6e52c75b7217608606faaff2f42b1e",
+  "reconciled_through_sha": "706ae22c569e62b11754bc8795051ef33ac93101",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
