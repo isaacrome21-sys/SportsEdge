@@ -101,6 +101,48 @@ class ScoredBoardTests(unittest.TestCase):
         self.assertAlmostEqual(scored['score_components']['likelihood_points'], 18.75)
         self.assertNotIn('parlay', result)
 
+    def test_price_edge_is_not_expected_return_or_no_vig_edge(self):
+        result = board([fixture(win=.6, odds=-130)])
+        row = result['rows'][0]
+        self.assertAlmostEqual(row['fair_american'], -150)
+        self.assertAlmostEqual(row['break_even_probability'], 130 / 230)
+        self.assertAlmostEqual(row['raw_price_edge'], .6 - 130 / 230)
+        self.assertAlmostEqual(row['expected_profit_per_unit'], .6 * 100 / 130 - .4)
+        self.assertIsNone(row['no_vig_edge'])
+        text = render_scored_board(result, min_score=0)
+        self.assertIn('Raw edge (pp)', text)
+        self.assertIn('+3.48', text)
+        self.assertIn('+0.062', text)
+        self.assertIn('2026-09-21T11:59:00Z', text)
+        self.assertIn('2026-09-21T13:00:00Z', text)
+
+    def test_push_fair_odds_use_conditional_probability(self):
+        item = fixture(win=.5, odds=100)
+        item['estimate']['push'] = .2
+        row = board([item])['rows'][0]
+        self.assertAlmostEqual(row['conditional_win_probability'], .625)
+        self.assertAlmostEqual(row['fair_american'], -166.6666666667)
+        self.assertAlmostEqual(row['raw_price_edge'], .125)
+        self.assertAlmostEqual(row['expected_profit_per_unit'], .2)
+
+    def test_stale_price_has_no_display_edge_but_retains_quote_time(self):
+        item = fixture()
+        item['quote']['quote_at'] = '2026-09-21T11:00:00Z'
+        result = board([item]); row = result['rows'][0]
+        self.assertIsNone(row['raw_price_edge'])
+        self.assertIsNone(row['expected_profit_per_unit'])
+        self.assertIsNone(row['score'])
+        self.assertIn('11:00:00', render_scored_board(result, show_all=True))
+
+    def test_all_push_has_no_finite_fair_odds_or_ranking(self):
+        item = fixture(win=0)
+        item['estimate']['push'] = 1
+        row = board([item])['rows'][0]
+        self.assertIsNone(row['fair_american'])
+        self.assertIsNone(row['raw_price_edge'])
+        self.assertIsNone(row['score'])
+        self.assertEqual(row['note'], 'ALL_PUSH')
+
     def test_other_markets_need_their_own_estimate_and_settlement(self):
         rows = []
         for sport, market, period in [('NFL', 'OFFENSIVE_TD_1+', 'REGULATION'),

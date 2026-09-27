@@ -79,6 +79,9 @@ def build_scored_board(rows, *, now, quote_ttl_seconds=300, estimate_ttl_seconds
                "model_win_probability": None, "push_probability": None,
                "expected_profit_per_unit": None, "score_components": None,
                "estimate_source": None, "contract": None, "quote_id": None,
+               "fair_american": None, "break_even_probability": None,
+               "raw_price_edge": None, "no_vig_edge": None,
+               "conditional_win_probability": None, "quote_at": None, "start": None,
                "book": None, "american_odds": None, "status": "NEEDS_DATA"}
         try:
             if not isinstance(raw, Mapping):
@@ -87,7 +90,8 @@ def build_scored_board(rows, *, now, quote_ttl_seconds=300, estimate_ttl_seconds
             if not isinstance(quote, Mapping):
                 raise ValueError("QUOTE_REQUIRED")
             row.update(quote_id=quote.get('quote_id'), book=quote.get('book'),
-                       american_odds=quote.get('american_odds'))
+                       american_odds=quote.get('american_odds'),
+                       quote_at=quote.get('quote_at'), start=quote.get('start'))
             contract = _contract(quote.get('contract'))
             row['contract'] = contract
             if contract['payout_type'] != 'WIN_LOSS_PUSH':
@@ -124,7 +128,12 @@ def build_scored_board(rows, *, now, quote_ttl_seconds=300, estimate_ttl_seconds
                 quote_at=_time(quote['quote_at']) if quote.get('quote_at') is not None else None,
                 now=now, start=start, ttl_seconds=quote_ttl_seconds)
             row.update(model_win_probability=value['win_probability'],
-                       push_probability=value['push_probability'])
+                       push_probability=value['push_probability'],
+                       fair_american=value['fair_american'],
+                       conditional_win_probability=value['conditional_win_probability'],
+                       break_even_probability=value['break_even_probability'],
+                       raw_price_edge=value['raw_price_edge'],
+                       no_vig_edge=value['no_vig_edge'])
             if value['expected_profit_per_unit'] is None:
                 raise ValueError(value['status'])
             score, components = _score(value['conditional_win_probability'],
@@ -143,6 +152,10 @@ def build_scored_board(rows, *, now, quote_ttl_seconds=300, estimate_ttl_seconds
     return {"schema": VERSION, "as_of": now.isoformat(),
             "score_description": SCORE_DESCRIPTION,
             "score_formula": "70*clip(EV/0.30,0,1) + 30*P(win|no push)",
+            "price_description": ("Fair odds use P(win|no push). Raw edge is "
+                "P(win|no push) minus book break-even probability, in probability units; "
+                "displayed as percentage points. EV is expected net profit per unit "
+                "including pushes. No-vig edge is unavailable without a paired market."),
             "submitted_rows": len(rows), "scored_rows": len(ranked), "rows": output,
             "audit": {"input_sha256": canonical_json_sha256(rows),
                       "quote_ttl_seconds": quote_ttl_seconds,
@@ -172,11 +185,12 @@ def render_scored_board(board, *, limit=5, min_score=60, show_all=False):
     visible = board['rows'] if show_all else unique[:limit]
     title = 'All lines' if show_all else 'Top positive-EV candidates'
     lines = [f"RUN IT — {title} ({len(visible)})",
-             f"As of {board['as_of']}. {board['score_description']}", "",
-             "| Game / entity | Market / period | Selection / line | Book / odds | Score /100 | Model % | EV /unit | Note |",
-             "| --- | --- | --- | --- | ---: | ---: | ---: | --- |"]
+             f"As of {board['as_of']}. {board['score_description']}",
+             board['price_description'], "",
+             "| Game / entity | Market / period | Selection / line | Book / odds | Score /100 | Model % | Fair odds | Raw edge (pp) | EV /unit | Quote time | Start | Note |",
+             "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |"]
     if not visible:
-        return '\n'.join(lines[:3]) + f'No current positive-EV candidates meet the {min_score:g}/100 display cutoff.\n'
+        return '\n'.join(lines[:4]) + f'No current positive-EV candidates meet the {min_score:g}/100 display cutoff.\n'
     for row in visible:
         contract = row['contract'] or {}
         cells = [f"{contract.get('event_id', 'Unknown')} / {contract.get('entity_id') or 'Game'}",
@@ -185,7 +199,9 @@ def render_scored_board(board, *, limit=5, min_score=60, show_all=False):
                  f"{row['book'] or '—'} / {row['american_odds'] if row['american_odds'] is not None else '—'}",
                  row['score'],
                  f"{100 * row['model_win_probability']:.1f}%" if row['model_win_probability'] is not None else None,
+                 f"{row['fair_american']:+.1f}" if row['fair_american'] is not None else None,
+                 f"{100 * row['raw_price_edge']:+.2f}" if row['raw_price_edge'] is not None else None,
                  f"{row['expected_profit_per_unit']:+.3f}" if row['expected_profit_per_unit'] is not None else None,
-                 row['note']]
+                 row['quote_at'], row['start'], row['note']]
         lines.append('| ' + ' | '.join(cell(c) for c in cells) + ' |')
     return '\n'.join(lines) + '\n'
