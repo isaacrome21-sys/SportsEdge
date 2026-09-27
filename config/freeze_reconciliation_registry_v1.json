@@ -250,7 +250,12 @@
         "sportsedge/dfs/",
         "tests/test_dfs_"
       ],
-      "disposition": null,
+      "disposition": {
+        "state": "REVOKED",
+        "revoked_at": "2026-09-27T21:58:36Z",
+        "prior_forward_clock_invalidated": true,
+        "reason": "POST_08A12425_MAIN_MOVEMENT_CHANGED_MANIFEST_COVERED_SPORTSEDGE_DFS_AND_TEST_DFS_BYTES; PRIOR_MLB_DFS_EVIDENCE_FREEZE_INVALIDATED; REVOKED_FAIL_CLOSED_NO_AUTHORITY"
+      },
       "freeze_sha": "7a92455f081ee52a454b2c49ff798d902a3ace68"
     }
   ],
@@ -832,10 +837,202 @@
       "merge_sha": "08a124250a6e52c75b7217608606faaff2f42b1e",
       "pr": 1040,
       "note": "NHL team-to-roster SOG binding; exact current-main reconciliation anchor. All ten manifest-bound NFL prop code blobs remain byte-identical to config/nfl_prop_code_surface_v1.json."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_3A4B1C60_DIRECT",
+      "merge_sha": "3a4b1c604178eac5f04e1a83a1bd1843c687f8f6",
+      "pr": 0,
+      "note": "NFL shared prop sim hardening"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_09C98D49_DIRECT",
+      "merge_sha": "09c98d493ffb18a7fefb864b025f2cef52f81afd",
+      "pr": 0,
+      "note": "NFL interception/shrinkage/rush-tail repair"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_F83812B3_DIRECT",
+      "merge_sha": "f83812b385967fb1de4de260837579e1c9e315d6",
+      "pr": 0,
+      "note": "NFL rushing mean preservation and sourced adjustments"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_1B828703_DIRECT",
+      "merge_sha": "1b82870305e415cd61ccfbefd108bdcd2d91464c",
+      "pr": 0,
+      "note": "NFL rushing/context provenance regression tests"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_4BCD8891_DIRECT",
+      "merge_sha": "4bcd8891b5aa66ddca0d3bbd17ac8918f6bca625",
+      "pr": 0,
+      "note": "NFL prop freeze manifest binding"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_B8A84BE2_PR_1045",
+      "merge_sha": "b8a84be2bc6ed468a4966f4a40675e72ab16a80d",
+      "pr": 1045,
+      "note": "NFL prop manifest reconciliation"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_C90ADBF6_DIRECT",
+      "merge_sha": "c90adbf6aaa22c4349d7f5b30cb41d84d30c945f",
+      "pr": 0,
+      "note": "Rename shared prop sim tests outside frozen surface"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_C87A88F5_DIRECT",
+      "merge_sha": "c87a88f5275eb90707b6606e2cf73f166c34c613",
+      "pr": 0,
+      "note": "Merge current main after governance reconciliation"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_F62051CD_PR_1044",
+      "merge_sha": "f62051cd0745acf68baa10d5fa1aa0c726001271",
+      "pr": 1044,
+      "note": "NFL shared prop sim review fixes"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_4CC4AFE8_DIRECT",
+      "merge_sha": "4cc4afe82aa27ce618f960d44c179249ea281f29",
+      "pr": 0,
+      "note": "NFL coherent team prop path collapse"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_EB443AC1_DIRECT",
+      "merge_sha": "eb443ac1d61c5d373df094a851ae983279bc197b",
+      "pr": 0,
+      "note": "NFL coherent team prop path research tests"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_97AAF753_PR_1046",
+      "merge_sha": "97aaf7535c854be1556ed7a7b5dcd092d8f041bf",
+      "pr": 1046,
+      "note": "NFL coherent team prop collapse merge"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_D3C4044D_DIRECT",
+      "merge_sha": "d3c4044df8fce8b2b4a6f93b566de15412a4da5a",
+      "pr": 0,
+      "note": "NFL coherent team TD scoring paths"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_CBC77DFF_DIRECT",
+      "merge_sha": "cbc77dff8675b3d63ca3717a73df4ac7d14f5997",
+      "pr": 0,
+      "note": "NFL coherent scoring path invariant tests"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_30D2D4F7_PR_1047",
+      "merge_sha": "30d2d4f7e0c0f677dfe4c82c0f852cec642360f7",
+      "pr": 1047,
+      "note": "NFL unified team/player TD coherent paths"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_68FB7B75_DIRECT",
+      "merge_sha": "68fb7b750298d9778cca6eac10af160a727fd83f",
+      "pr": 0,
+      "note": "NFL script multiplier and YPR guards"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_AE893892_DIRECT",
+      "merge_sha": "ae893892423d114b9b7c634b3663a94a86433ffd",
+      "pr": 0,
+      "note": "NFL multiplier/yardage identity tests"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_F78B78EA_DIRECT",
+      "merge_sha": "f78b78ea2006f4a1e924b1126e119c5469d689af",
+      "pr": 0,
+      "note": "NFL scoring fixtures aligned to yardage identity"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_37078B6A_PR_1048",
+      "merge_sha": "37078b6a37a28ab2b8281bea05b77f9e648bc1ed",
+      "pr": 1048,
+      "note": "NFL multiplier and yardage identity merge"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_8283662D_DIRECT",
+      "merge_sha": "8283662dd9223b1babd32cb4bfffca772d5a92c4",
+      "pr": 0,
+      "note": "CFB V2 dispersion challenger"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_2A6D1ED2_PR_1050",
+      "merge_sha": "2a6d1ed261a91e49d37f573d6577770c9353e7c0",
+      "pr": 1050,
+      "note": "CFB fail closed on missing season points"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_61AF8648_DIRECT",
+      "merge_sha": "61af864899b82631b8ab2fb8c149d2ba5bb2fd6f",
+      "pr": 0,
+      "note": "Merge main into CFB V2 dispersion challenger"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_73CD55F5_PR_1049",
+      "merge_sha": "73cd55f5a22165d92e4bd533c086ea881ec1df37",
+      "pr": 1049,
+      "note": "CFB V2 dispersion challenger merge"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_8246AEA1_PR_1051",
+      "merge_sha": "8246aea1402a50ef2b0c7b63daafd8ab54cc040f",
+      "pr": 1051,
+      "note": "CFB outcome calibration n_paths fix"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_DE19C075_DIRECT",
+      "merge_sha": "de19c075b66069fbc221240d12c951fd18bd2b59",
+      "pr": 0,
+      "note": "CFB candidate bakeoff V3 capture side channel"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_49B9DE03_DIRECT",
+      "merge_sha": "49b9de035379da3d2ffd0f71ed665d3ee4a6ea34",
+      "pr": 0,
+      "note": "CFB dispersion-only evaluator"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_8F6BEE70_DIRECT",
+      "merge_sha": "8f6bee70446ba817ca25813e34cfb64b28577908",
+      "pr": 0,
+      "note": "CFB dispersion-only preregistration freeze"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_E985B009_DIRECT",
+      "merge_sha": "e985b0097c7dffe337f2d3df044524f2a19c7588",
+      "pr": 0,
+      "note": "CFB governed bakeoff runner V3"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_34791839_PR_1057",
+      "merge_sha": "347918396558f358db78bc478d6068c8dda8a08f",
+      "pr": 1057,
+      "note": "NFL derive QB pass YPC from receiver pool"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_C8AC3721_PR_1059",
+      "merge_sha": "c8ac37215981655014f2fd53c46d3875c2b19c1e",
+      "pr": 1059,
+      "note": "NFL scheduled final capture windows"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_8DD85695_PR_1074",
+      "merge_sha": "8dd85695e858c7523820b3a0ba59a774c38a91e8",
+      "pr": 1074,
+      "note": "MLB pregame completeness/scoring veto repair"
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_706AE22C_PR_1075",
+      "merge_sha": "706ae22c569e62b11754bc8795051ef33ac93101",
+      "pr": 1075,
+      "note": "MLB postseason joint paths and research market scope"
     }
   ],
   "inventory_block_reason": "MACHINE_AUDIT_REQUIRED_ZERO_UNMAPPED_GOVERNANCE_SURFACES_BEFORE_TRUE",
   "issue": 686,
-  "reconciled_through_sha": "08a124250a6e52c75b7217608606faaff2f42b1e",
+  "reconciled_through_sha": "706ae22c569e62b11754bc8795051ef33ac93101",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
