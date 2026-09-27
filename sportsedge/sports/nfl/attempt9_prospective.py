@@ -89,6 +89,8 @@ def build_decision(
     _require(bool(str(book).strip()), "NFL_A9_LEDGER_BOOK_REQUIRED")
     code_sha = _hex(capture_code_git_sha, 40, "NFL_A9_LEDGER_CODE_SHA_INVALID")
     qsha = _hex(quote_sha256, 64, "NFL_A9_LEDGER_QUOTE_SHA_INVALID")
+    price = _finite(price_american, "NFL_A9_LEDGER_PRICE_INVALID")
+    _require(price != 0.0, "NFL_A9_LEDGER_PRICE_INVALID")
     p = model_probability(
         artifact,
         market=market_key,
@@ -114,7 +116,7 @@ def build_decision(
         "market": market_key,
         "selection": str(selection).strip().lower(),
         "line": float(line),
-        "price_american": float(price_american),
+        "price_american": price,
         "raw_prediction": float(raw_prediction),
         "model_p": float(p["model_p"]),
         "push_probability": float(p["push_probability"]),
@@ -149,6 +151,8 @@ def validate_decision(row: Mapping[str, Any]) -> str:
     _hex(row.get("runtime_artifact_sha256"), 64, "NFL_A9_LEDGER_RUNTIME_SHA_INVALID")
     _hex(row.get("training_source_sha256"), 64, "NFL_A9_LEDGER_SOURCE_SHA_INVALID")
     _hex(row.get("quote_sha256"), 64, "NFL_A9_LEDGER_QUOTE_SHA_INVALID")
+    price = _finite(row.get("price_american"), "NFL_A9_LEDGER_PRICE_INVALID")
+    _require(price != 0.0, "NFL_A9_LEDGER_PRICE_INVALID")
     p = _finite(row.get("model_p"), "NFL_A9_LEDGER_MODEL_P_INVALID")
     _require(0.0 < p < 1.0, "NFL_A9_LEDGER_MODEL_P_INVALID")
     _require(_finite(row.get("push_probability"), "NFL_A9_LEDGER_PUSH_INVALID") == 0.0, "NFL_A9_LEDGER_PUSH_NOT_SUPPORTED")
