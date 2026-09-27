@@ -64,6 +64,11 @@ class NFLAttempt9ProspectiveTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"PRICE_INVALID"):
             build_decision(**kw)
 
+    def test_missing_or_invalid_opposite_price_fails_closed(self):
+        kw=self.kwargs(); kw["opposite_price_american"]=0
+        with self.assertRaisesRegex(ValueError,"OPPOSITE_PRICE_INVALID"):
+            build_decision(**kw)
+
     def test_post_kick_decision_fails_closed(self):
         kw=self.kwargs(); kw["decision_at_utc"]="2026-09-27T20:00:00Z"
         with self.assertRaisesRegex(ValueError,"PIT_VIOLATION"):
