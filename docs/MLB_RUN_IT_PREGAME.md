@@ -19,6 +19,73 @@ Every public context lane emitted by this bundle carries `model_p_eligible=false
 
 `unimplemented_lanes` is empty for the acquisition contract in v2. This does **not** mean every lane is predictive or validated; it means the promised acquisition/context surfaces are present.
 
+## Input completeness (v3)
+
+`acquisition_status=AVAILABLE` means the bundle was assembled. Bundle `status`
+is now `PARTIAL` unless both probable starters and both batting orders are complete.
+The starter and lineup lanes expose `complete_by_side` and distinguish
+`AVAILABLE`, `PARTIAL`, and `MISSING`.
+
+`input_readiness.ready` checks only these raw inputs:
+
+- two distinct positive integer probable-starter IDs;
+- exactly nine distinct positive integer batting-order IDs per team;
+- no batter listed for both teams.
+
+Numeric string IDs are supported. Boolean, fractional, nonpositive, malformed,
+duplicate and partial inputs cannot satisfy completeness. Raw batting orders are
+checked before normalization so dropping a malformed tenth entry cannot create
+a seemingly complete nine-player lineup. `missing_reasons` identifies the side
+and input requiring attention.
+
+This does not confirm pitcher workload, roster eligibility, scratch clearance,
+price freshness, game-clock status, predictive validation or OFFICIAL authority.
+In particular, no prior lineup baseline still means the scratch check is
+`NOT_EVALUABLE` even if the current order is complete.
+
+The feature adapter carries this explicit metadata as `pregame_input_readiness`.
+The scored-input checker vetoes an incomplete or malformed explicit value before
+its legacy no-family-metadata fallback. A complete value cannot override missing
+feature-family validation. Older bundles with no such field retain their prior
+behavior; independent legacy entrypoints are not silently certified by this change.
+
+For a command that requires complete starter/lineup inputs:
+
+```bash
+python -m scripts.run_it_mlb_pregame 776123 --require-complete-inputs \
+  --out artifacts/mlb/pregame/776123.json
+```
+
+The diagnostic JSON is written even when the command exits 2 for incomplete
+inputs. Acquisition-only use without the flag continues to return partial bundles.
+
+## Postseason audit — September 27, 2026
+
+The current `sportsedge/v7_distribution.py` implementation does **not** establish
+postseason-correct simulation:
+
+- `simulate_game_distribution` has no season-type/rules-mode parameter;
+- `_resolve_extras` uses a generic `extra_half_inning_mean` (default 0.55), with no
+  base-state representation to prove empty-base postseason extras;
+- home extra-inning scoring is capped at the away inning's runs plus one, which
+  cannot represent a multi-run walk-off home run;
+- after 30 tied extra innings it adds a run to a randomly selected winner;
+- regulation scores are aggregate draws, not inning/plate-appearance paths.
+
+Both `shared_game_engine.py` and the full-game path in `generic_market_engine.py`
+call this simulator. The pregame completeness repair does not modify it or its
+frozen parameters. Do not label its output postseason-verified.
+
+MLB's published postseason rule excludes the regular-season automatic runner:
+https://www.mlb.com/news/mlb-extra-innings-rules-for-playoffs-2024-automatic-runners-and-pitch-clock
+
+The next simulator candidate needs explicit rules-mode identity, sourced/fitted
+empty-base extra-inning transitions, correct walk-off home-run treatment, and an
+explicit unresolved-path failure instead of a forced outcome. It must follow the
+existing candidate/validation process; adding a postseason label or hand-tuning
+the 0.55 constant is not evidence. The failed 2026 forward window, frozen policy,
+2027 candidate-lane specification and OFFICIAL boundary are unchanged.
+
 ## Park / venue
 
 `sportsedge.mlb_park_venue_source` binds `gameData.venue.id` to the public StatsAPI venue endpoint using `hydrate=location,fieldInfo,timezone`.
