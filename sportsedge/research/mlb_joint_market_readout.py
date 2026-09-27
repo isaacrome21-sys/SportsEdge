@@ -26,6 +26,34 @@ PLAYER_FIELDS = {
     "TOTAL_BASES": ("singles", "doubles", "triples", "home_runs"),
 }
 
+GAME_RESEARCH_MARKETS = frozenset({"MONEYLINE", "RUN_LINE", "TOTALS"})
+EXPLICITLY_OUTSIDE_VALIDATION_SCOPE = frozenset(
+    {
+        "NRFI",
+        "YRFI",
+        "F5_MONEYLINE",
+        "F5_RUN_LINE",
+        "F5_TOTALS",
+        "FIRST_FIVE_MONEYLINE",
+        "FIRST_FIVE_RUN_LINE",
+        "FIRST_FIVE_TOTALS",
+        "FIRST_INNING_MONEYLINE",
+        "FIRST_INNING_RUN_LINE",
+        "FIRST_INNING_TOTALS",
+        "TEAM_TOTALS",
+    }
+)
+
+
+def _outside_validation_scope(market: str) -> bool:
+    return (
+        market in EXPLICITLY_OUTSIDE_VALIDATION_SCOPE
+        or market.startswith("F5_")
+        or market.startswith("FIRST_FIVE_")
+        or market.startswith("FIRST_INNING_")
+        or market.startswith("INNING_")
+    )
+
 
 def _count(value):
     if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -46,7 +74,9 @@ def read_joint_research_probability(
         raise ValueError("MLB_JOINT_PATH_COUNT_INVALID")
     if snapshot.get("path_set_id") != result.path_set_id or snapshot.get("path_count") != n:
         raise ValueError("MLB_JOINT_PATH_IDENTITY_MISMATCH")
-    if market in {"MONEYLINE", "RUN_LINE", "TOTALS"}:
+    if _outside_validation_scope(market):
+        raise ValueError(f"MLB_JOINT_MARKET_OUTSIDE_VALIDATION_SCOPE:{market}")
+    if market in GAME_RESEARCH_MARKETS:
         rows = snapshot.get("game_samples")
         if not isinstance(rows, list) or len(rows) != n:
             raise ValueError("MLB_JOINT_GAME_SAMPLES_MISSING")
@@ -63,6 +93,8 @@ def read_joint_research_probability(
         })}
         readout = read_game_probability(distribution, market=market, side=side, line=line)
         win_p, push_p = readout.probability, readout.push_probability
+        validation_scope = "THREE_MARKET_RESEARCH_ONLY"
+        production_readiness = "RESEARCH_ONLY_POSTSEASON_VALIDATION_PENDING"
     else:
         if market not in PLAYER_FIELDS:
             raise ValueError(f"MLB_JOINT_MARKET_UNSUPPORTED:{market}")
@@ -84,11 +116,17 @@ def read_joint_research_probability(
                           if market == "TOTAL_BASES" else sum(fields))
         win_p = sum(value > line if side == "OVER" else value < line for value in values) / n
         push_p = sum(value == line for value in values) / n
+        validation_scope = "PLAYER_PROP_RESEARCH_ONLY"
+        production_readiness = "NOT_ESTABLISHED"
     return {
         "market": market, "side": side, "line": line, "player_id": player_id,
         "research_p": win_p, "push_p": push_p,
         "path_set_id": result.path_set_id, "path_count": n,
         "rules_mode": snapshot.get("rules_mode"),
+        "validation_scope": validation_scope,
+        "validation_status": snapshot.get("validation_status", "UNVALIDATED_RESEARCH"),
+        "production_ready": False,
+        "production_readiness": production_readiness,
         "model_p_authority": False, "truth_gate_authority": False,
         "promotion_authority": False, "official_authority": False,
         "label": "NOT Model_P · NOT Truth Gate · NOT OFFICIAL",
