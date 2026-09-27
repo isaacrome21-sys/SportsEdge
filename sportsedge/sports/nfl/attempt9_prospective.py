@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
+from pathlib import Path
 from math import isfinite
 from typing import Any, Mapping
 
@@ -132,7 +133,7 @@ def build_decision(
     return row
 
 
-def validate_decision(row: Mapping[str, Any]) -> str:
+def validate_decision(row: Mapping[str, Any], *, artifact: Mapping[str, Any] | None = None) -> str:
     _require(row.get("schema_version") == SCHEMA, "NFL_A9_LEDGER_SCHEMA_INVALID")
     _require(row.get("status") == STATUS, "NFL_A9_LEDGER_STATUS_INVALID")
     _require(row.get("model_p_id") == MODEL_P_ID, "NFL_A9_LEDGER_MODEL_ID_MISMATCH")
@@ -158,4 +159,56 @@ def validate_decision(row: Mapping[str, Any]) -> str:
     _require(_finite(row.get("push_probability"), "NFL_A9_LEDGER_PUSH_INVALID") == 0.0, "NFL_A9_LEDGER_PUSH_NOT_SUPPORTED")
     expected = canonical_sha256({k: v for k, v in row.items() if k != "decision_sha256"})
     _require(str(row.get("decision_sha256") or "").lower() == expected, "NFL_A9_LEDGER_DECISION_SHA_MISMATCH")
+    if artifact is not None:
+        artifact_digest = verify_model_p_artifact(artifact)
+        _require(str(row.get("model_p_artifact_sha256") or "").lower() == artifact_digest, "NFL_A9_LEDGER_ARTIFACT_MISMATCH")
+        _require(str(artifact.get("model_p_id") or "") == row.get("model_p_id"), "NFL_A9_LEDGER_MODEL_ID_MISMATCH")
+        _require(str(artifact.get("runtime_artifact_sha256") or "").lower() == row.get("runtime_artifact_sha256"), "NFL_A9_LEDGER_RUNTIME_SHA_MISMATCH")
+        _require(str(artifact.get("source_sha256") or "").lower() == row.get("training_source_sha256"), "NFL_A9_LEDGER_SOURCE_SHA_MISMATCH")
+        replay = model_probability(
+            artifact,
+            market=str(row.get("market") or ""),
+            raw_prediction=_finite(row.get("raw_prediction"), "NFL_A9_LEDGER_PREDICTION_INVALID"),
+            line=_finite(row.get("line"), "NFL_A9_LEDGER_LINE_INVALID"),
+            selection=str(row.get("selection") or ""),
+        )
+        _require(abs(float(replay["model_p"]) - p) <= 1e-12, "NFL_A9_LEDGER_MODEL_P_REPLAY_MISMATCH")
+        _require(abs(float(replay["push_probability"]) - float(row.get("push_probability"))) <= 1e-12, "NFL_A9_LEDGER_PUSH_REPLAY_MISMATCH")
     return expected
+
+
+def write_decision_once(
+    path: str | Path,
+    row: Mapping[str, Any],
+    *,
+    artifact: Mapping[str, Any],
+) -> bool:
+    """Persist one immutable prospective decision.
+
+    Returns True only for the first write. An exact retry is an idempotent
+    no-op. Any pre-existing different record fails closed and is never
+    overwritten.
+    """
+    validate_decision(row, artifact=artifact)
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(dict(row), sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n"
+    try:
+        with target.open("x", encoding="utf-8") as handle:
+            handle.write(payload)
+        return True
+    except FileExistsError:
+        try:
+            existing = json.loads(target.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise NFLAttempt9ProspectiveError("NFL_A9_LEDGER_EXISTING_RECORD_INVALID") from exc
+        validate_decision(existing, artifact=artifact)
+        _require(
+            existing.get("decision_sha256") == row.get("decision_sha256"),
+            "NFL_A9_LEDGER_IMMUTABLE_CONFLICT",
+        )
+        _require(
+            canonical_sha256(existing) == canonical_sha256(dict(row)),
+            "NFL_A9_LEDGER_IMMUTABLE_CONFLICT",
+        )
+        return False
