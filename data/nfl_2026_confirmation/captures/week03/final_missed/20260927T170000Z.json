@@ -1,0 +1,15 @@
+{
+  "capture_kind": "FINAL",
+  "captured_games_at_kickoff": 0,
+  "evidence_semantics": "ABSENCE_MARKER_ONLY_NOT_MARKET_DATA",
+  "expected_games_at_kickoff": 9,
+  "kickoff_utc": "2026-09-27T17:00:00Z",
+  "missing_games_at_kickoff": 9,
+  "no_backfill": true,
+  "observed_missing_at_utc": "2026-09-27T16:53:32.630974+00:00",
+  "reason": "FINAL_WINDOW_ELAPSED_WITH_INCOMPLETE_CAPTURE",
+  "schedule_sha256": "9eeb57968ca903fb9207a3559111ba874ce5706b3a426e486b63d8076fcef423",
+  "schedule_source": "nflverse/nfldata data/games.csv",
+  "status": "MISSED_OR_BLOCKED",
+  "week": 3
+}
