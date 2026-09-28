@@ -8,7 +8,7 @@
   "source_mirror_path": "data/raw/cfb_locations_updated.csv",
   "source_mirror_git_blob_sha1": "aa3ef7cfd7ea44b085508c8af46bbde72dd0da9c",
   "source_content_sha256": "e7f41149d8d163ccb5f0d3f8789da3bebf916b01070578863736970de60162d3",
-  "snapshot_content_sha256": "4b77f7fe04726eae9a80828b42f1fb01eb6f31e28375bf67d49f7be74bb0510f",
+  "snapshot_content_sha256": "00a19d69e36b500b6749c176bd387e71440d8cbae5be3d1fc0e362ee71369f7e",
   "snapshot_record_count": 1314,
   "source_rows": 658,
   "team_records": 658,
