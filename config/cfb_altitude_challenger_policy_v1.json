@@ -1,0 +1,138 @@
+{
+  "schema": "CFB_ALTITUDE_CHALLENGER_POLICY_V1",
+  "status": "FROZEN_BEFORE_CANDIDATE_EVALUATION",
+  "purpose": "Preregister a market-blind altitude challenger without modifying the frozen CFB model-selection v1 search.",
+  "governance": {
+    "separate_from_cfb_model_selection_policy_v1": true,
+    "candidate_attempt_budget": 3,
+    "attempts_consumed": 0,
+    "fitting_performed": false,
+    "evaluation_performed": false,
+    "model_p_created": false,
+    "promotion_authority": false,
+    "official_authority": false,
+    "market_data_allowed": false,
+    "season_2026_allowed_for_fit_tune_or_selection": false,
+    "closing_line_gate_issue": 1070,
+    "selection_mode_until_closing_line_gate_clears": "GAME_SCORE_OUTCOMES_ONLY"
+  },
+  "baseline_contract": {
+    "rule": "Add exactly one preregistered altitude candidate to the existing market-blind CFB score model; do not alter the baseline feature set, target construction, residual sampler, or hyperparameter search in the same attempt.",
+    "targets": [
+      "final_home_points",
+      "final_away_points"
+    ],
+    "prohibited_inputs": [
+      "spread",
+      "total",
+      "moneyline",
+      "odds",
+      "ticket_percentage",
+      "handle_percentage",
+      "rlm",
+      "steam",
+      "handicapper_pick"
+    ]
+  },
+  "source_contract": {
+    "provider": "CollegeFootballData",
+    "license_cost_requirement": "FREE_SOURCE_ONLY",
+    "schema_repository": "CFBD/cfbd-python",
+    "schema_commit_sha": "06dbcb5a7977470c3b6296f1f18c9df64676876f",
+    "venue_schema_path": "docs/Venue.md",
+    "team_schema_path": "docs/Team.md",
+    "game_schema_path": "docs/Game.md",
+    "required_source_fields": {
+      "venue": ["id", "elevation"],
+      "team": ["id", "location.id", "location.elevation"],
+      "game": ["id", "season", "week", "start_date", "venue_id", "home_id", "away_id"]
+    },
+    "static_metadata_claim": "Elevation is treated as venue metadata, not as a game outcome or market observation.",
+    "missing_elevation_policy": "FAIL_CLOSED_NO_IMPUTATION",
+    "snapshot_required_before_any_fit": true,
+    "snapshot_contract": {
+      "format": "UTF-8 JSONL sorted deterministically by entity type then numeric id",
+      "required_manifest_fields": [
+        "source_provider",
+        "source_schema_commit_sha",
+        "retrieved_at_utc",
+        "record_count",
+        "content_sha256"
+      ],
+      "content_sha256_algorithm": "SHA-256",
+      "manifest_must_be_bound_before_first_evaluation": true,
+      "post_binding_mutation_policy": "NEW_POLICY_VERSION_REQUIRED"
+    }
+  },
+  "feature_contract": {
+    "base_definition": "altitude_delta_ft = max(game_venue_elevation_ft - away_team_home_venue_elevation_ft, 0)",
+    "home_team_altitude_delta_for_this_lane": "NOT_USED",
+    "neutral_site_rule": "Use the actual game venue elevation and away-team home venue elevation; do not substitute the listed home team's home venue.",
+    "missing_or_unresolved_venue_rule": "FAIL_CLOSED",
+    "candidates": [
+      {
+        "id": "altitude_linear_capped_v1",
+        "attempt_number": 1,
+        "formula": "min(altitude_delta_ft, 6000) / 1000",
+        "fixed_constants": {
+          "cap_ft": 6000,
+          "scale_ft": 1000
+        }
+      },
+      {
+        "id": "altitude_bins_v1",
+        "attempt_number": 2,
+        "formula": "one-hot bins of altitude_delta_ft using fixed cut points",
+        "fixed_constants": {
+          "cut_points_ft": [1000, 3000],
+          "bins": ["[0,1000)", "[1000,3000)", "[3000,+inf)"]
+        }
+      },
+      {
+        "id": "altitude_short_rest_interaction_v1",
+        "attempt_number": 3,
+        "formula": "(min(altitude_delta_ft, 6000) / 1000) * I(away_rest_days <= 6)",
+        "fixed_constants": {
+          "cap_ft": 6000,
+          "scale_ft": 1000,
+          "short_rest_days_max": 6
+        },
+        "rest_contract": "away_rest_days must be computed only from games completed before target kickoff; missing prior-game evidence fails closed."
+      }
+    ]
+  },
+  "evaluation_contract": {
+    "dataset_manifest_required_before_first_fit": true,
+    "eligible_seasons_rule": "Use only seasons in the pre-fit dataset manifest with complete PIT-eligible baseline features and bound altitude metadata; never use 2026 for fit, tuning, candidate selection, or threshold selection.",
+    "split_rule": "WALK_FORWARD_BY_SEASON_NO_RANDOM_FOLDS",
+    "primary_metric": {
+      "name": "joint_score_rmse",
+      "formula": "sqrt(mean((home_error^2 + away_error^2) / 2))",
+      "selection_rule": "A challenger cannot advance unless held-out joint_score_rmse is strictly lower than the unchanged baseline on the same rows."
+    },
+    "diagnostics_not_selection_targets": [
+      "margin_rmse",
+      "total_rmse",
+      "altitude_subgroup_residual_mean",
+      "altitude_subgroup_residual_rmse"
+    ],
+    "global_guard": "Reject any candidate whose altitude-subgroup diagnostic improves while overall held-out joint_score_rmse worsens or is unchanged.",
+    "market_metrics_prohibited_until_issue_1070_clears": [
+      "ats_accuracy",
+      "closing_line_value",
+      "market_edge",
+      "market_ev"
+    ]
+  },
+  "attempt_accounting": {
+    "consume_attempt_when": "The first held-out candidate score is computed after policy and dataset/snapshot manifests are bound.",
+    "do_not_consume_attempt_for": [
+      "schema validation",
+      "source retrieval",
+      "snapshot hashing",
+      "dry-run feature construction without outcomes",
+      "unit tests"
+    ],
+    "no_candidate_mutation_after_scoring": true
+  }
+}
