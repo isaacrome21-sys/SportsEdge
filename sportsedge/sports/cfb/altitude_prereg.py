@@ -1,6 +1,6 @@
 """Fail-closed governance for the separately preregistered CFB altitude challenger.
 
-This module does not fit or score a model.  It validates that the altitude search is
+This module does not fit or score a model. It validates that the altitude search is
 separate from the frozen CFB model-selection v1 search and that any future static
 venue-elevation snapshot is byte-bound before a candidate can be evaluated.
 """
@@ -14,10 +14,35 @@ from typing import Any, Mapping
 
 
 POLICY_PATH = "config/cfb_altitude_challenger_policy_v1.json"
+EXPECTED_SOURCE_SCHEMA_COMMIT = "06dbcb5a7977470c3b6296f1f18c9df64676876f"
 EXPECTED_CANDIDATES = (
     "altitude_linear_capped_v1",
     "altitude_bins_v1",
     "altitude_short_rest_interaction_v1",
+)
+EXPECTED_CANDIDATE_SPECS = (
+    {
+        "id": "altitude_linear_capped_v1",
+        "attempt_number": 1,
+        "formula": "min(altitude_delta_ft, 6000) / 1000",
+        "fixed_constants": {"cap_ft": 6000, "scale_ft": 1000},
+    },
+    {
+        "id": "altitude_bins_v1",
+        "attempt_number": 2,
+        "formula": "one-hot bins of altitude_delta_ft using fixed cut points",
+        "fixed_constants": {
+            "cut_points_ft": [1000, 3000],
+            "bins": ["[0,1000)", "[1000,3000)", "[3000,+inf)"],
+        },
+    },
+    {
+        "id": "altitude_short_rest_interaction_v1",
+        "attempt_number": 3,
+        "formula": "(min(altitude_delta_ft, 6000) / 1000) * I(away_rest_days <= 6)",
+        "fixed_constants": {"cap_ft": 6000, "scale_ft": 1000, "short_rest_days_max": 6},
+        "rest_contract": "away_rest_days must be computed only from games completed before target kickoff; missing prior-game evidence fails closed.",
+    },
 )
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
@@ -70,6 +95,10 @@ def audit_altitude_policy(policy: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(feature, Mapping):
         feature = {}
         blockers.append("FEATURE_CONTRACT_MISSING")
+    if feature.get("base_definition") != "altitude_delta_ft = max(game_venue_elevation_ft - away_team_home_venue_elevation_ft, 0)":
+        blockers.append("ALTITUDE_BASE_DEFINITION_MISMATCH")
+    if feature.get("missing_or_unresolved_venue_rule") != "FAIL_CLOSED":
+        blockers.append("UNRESOLVED_VENUE_MUST_FAIL_CLOSED")
     rows = feature.get("candidates")
     if not isinstance(rows, list):
         rows = []
@@ -77,9 +106,8 @@ def audit_altitude_policy(policy: Mapping[str, Any]) -> dict[str, Any]:
     candidate_ids = tuple(row.get("id") for row in rows if isinstance(row, Mapping))
     if candidate_ids != EXPECTED_CANDIDATES:
         blockers.append("CANDIDATE_SET_OR_ORDER_MISMATCH")
-    attempt_numbers = tuple(row.get("attempt_number") for row in rows if isinstance(row, Mapping))
-    if attempt_numbers != (1, 2, 3):
-        blockers.append("CANDIDATE_ATTEMPT_ORDER_MISMATCH")
+    if rows != list(EXPECTED_CANDIDATE_SPECS):
+        blockers.append("CANDIDATE_SPEC_MUTATED")
 
     source = policy.get("source_contract")
     if not isinstance(source, Mapping):
@@ -89,7 +117,9 @@ def audit_altitude_policy(policy: Mapping[str, Any]) -> dict[str, Any]:
         blockers.append("SOURCE_PROVIDER_MISMATCH")
     if source.get("license_cost_requirement") != "FREE_SOURCE_ONLY":
         blockers.append("SOURCE_MUST_BE_FREE")
-    if not _is_sha256(source.get("schema_commit_sha")):
+    if source.get("schema_commit_sha") != EXPECTED_SOURCE_SCHEMA_COMMIT:
+        blockers.append("SOURCE_SCHEMA_COMMIT_MISMATCH")
+    elif not _is_sha256(source.get("schema_commit_sha")):
         blockers.append("SOURCE_SCHEMA_COMMIT_SHA_INVALID")
     if source.get("missing_elevation_policy") != "FAIL_CLOSED_NO_IMPUTATION":
         blockers.append("MISSING_ELEVATION_MUST_FAIL_CLOSED")
@@ -99,8 +129,7 @@ def audit_altitude_policy(policy: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(snapshot_contract, Mapping):
         snapshot_contract = {}
         blockers.append("SNAPSHOT_CONTRACT_MISSING")
-    required_manifest = snapshot_contract.get("required_manifest_fields")
-    if required_manifest != [
+    if snapshot_contract.get("required_manifest_fields") != [
         "source_provider",
         "source_schema_commit_sha",
         "retrieved_at_utc",
@@ -108,6 +137,10 @@ def audit_altitude_policy(policy: Mapping[str, Any]) -> dict[str, Any]:
         "content_sha256",
     ]:
         blockers.append("SNAPSHOT_MANIFEST_FIELDS_MISMATCH")
+    if snapshot_contract.get("content_sha256_algorithm") != "SHA-256":
+        blockers.append("SNAPSHOT_HASH_ALGORITHM_MISMATCH")
+    if snapshot_contract.get("manifest_must_be_bound_before_first_evaluation") is not True:
+        blockers.append("SNAPSHOT_MANIFEST_MUST_PRECEDE_EVALUATION")
     if snapshot_contract.get("post_binding_mutation_policy") != "NEW_POLICY_VERSION_REQUIRED":
         blockers.append("SNAPSHOT_MUTATION_POLICY_MISMATCH")
 
@@ -115,13 +148,19 @@ def audit_altitude_policy(policy: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(evaluation, Mapping):
         evaluation = {}
         blockers.append("EVALUATION_CONTRACT_MISSING")
+    if evaluation.get("dataset_manifest_required_before_first_fit") is not True:
+        blockers.append("DATASET_MANIFEST_MUST_PRECEDE_FIT")
     primary = evaluation.get("primary_metric")
     if not isinstance(primary, Mapping) or primary.get("name") != "joint_score_rmse":
         blockers.append("PRIMARY_METRIC_MUST_BE_JOINT_SCORE_RMSE")
     if evaluation.get("split_rule") != "WALK_FORWARD_BY_SEASON_NO_RANDOM_FOLDS":
         blockers.append("WALK_FORWARD_SPLIT_REQUIRED")
-    prohibited = evaluation.get("market_metrics_prohibited_until_issue_1070_clears")
-    if prohibited != ["ats_accuracy", "closing_line_value", "market_edge", "market_ev"]:
+    if evaluation.get("market_metrics_prohibited_until_issue_1070_clears") != [
+        "ats_accuracy",
+        "closing_line_value",
+        "market_edge",
+        "market_ev",
+    ]:
         blockers.append("MARKET_METRIC_PROHIBITION_MISMATCH")
 
     baseline = policy.get("baseline_contract")
@@ -130,7 +169,8 @@ def audit_altitude_policy(policy: Mapping[str, Any]) -> dict[str, Any]:
         blockers.append("BASELINE_CONTRACT_MISSING")
     if baseline.get("targets") != ["final_home_points", "final_away_points"]:
         blockers.append("OUTCOME_TARGETS_MISMATCH")
-    if not baseline.get("prohibited_inputs"):
+    prohibited_inputs = baseline.get("prohibited_inputs")
+    if not isinstance(prohibited_inputs, list) or not prohibited_inputs:
         blockers.append("PROHIBITED_INPUTS_MISSING")
 
     return {
@@ -155,11 +195,7 @@ def verify_altitude_snapshot(
     manifest: Mapping[str, Any],
     snapshot_path: Path,
 ) -> dict[str, Any]:
-    """Verify a future static-metadata snapshot against its immutable manifest.
-
-    READY means only that policy + bytes are bound. It is not permission to call any
-    probability Model_P or to promote a betting output.
-    """
+    """Verify future static-metadata bytes against their immutable manifest."""
 
     audit = audit_altitude_policy(policy)
     blockers = list(audit["blockers"])
@@ -212,6 +248,7 @@ def audit_altitude_prereg_from_root(*, root: Path) -> dict[str, Any]:
 __all__ = [
     "CFBAltitudePreregError",
     "EXPECTED_CANDIDATES",
+    "EXPECTED_SOURCE_SCHEMA_COMMIT",
     "POLICY_PATH",
     "audit_altitude_policy",
     "audit_altitude_prereg_from_root",
