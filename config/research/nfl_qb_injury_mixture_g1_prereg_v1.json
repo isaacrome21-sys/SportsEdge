@@ -1,0 +1,38 @@
+{
+  "schema": "NFL_QB_INJURY_MIXTURE_G1_PREREG_V1",
+  "status": "PREREGISTERED_COVERAGE_AUDIT_ONLY",
+  "purpose": "Govern a distinct QB/injury mixture research family without extending the exhausted box-score feature search.",
+  "attempt_budget": {
+    "maximum_candidate_attempts": 3,
+    "attempts_used": 0,
+    "scoring_forbidden_until_coverage_audit_frozen": true
+  },
+  "states": ["AVAILABLE", "QUESTIONABLE", "DOUBTFUL", "OUT", "MISSING"],
+  "missing_policy": "MISSING_IS_DISTINCT_AND_MUST_NOT_DEFAULT_TO_AVAILABLE",
+  "pit_policy": {
+    "prediction_cutoff_required": true,
+    "injury_record_must_be_known_at_or_before_cutoff": true,
+    "records_without_verifiable_pit_timestamp": "MISSING"
+  },
+  "coverage_gate": {
+    "nominal_source": "nflverse injuries / nflreadr load_injuries",
+    "nominal_documented_start_season": 2009,
+    "sample_window_selection_before_audit": "FORBIDDEN",
+    "required_audit_seasons": "2009-2025",
+    "required_dimensions": ["season", "week", "qb", "status", "report_timestamp_or_missing"],
+    "known_source_warning": "A documented nflverse issue reported 2025 injury loading failure; nominal availability is not proof of complete historical coverage."
+  },
+  "2026": {
+    "role": "UNAVAILABLE_FOR_TUNING_OR_SELECTION",
+    "may_touch_frozen_confirmation_policy": false
+  },
+  "authority": {
+    "research_implementation": true,
+    "development_validation_scoring": false,
+    "model_p": false,
+    "run_it": false,
+    "promotion": false,
+    "staking": false,
+    "official": false
+  }
+}
