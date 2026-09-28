@@ -94,6 +94,33 @@ class DirectAdmissionTests(unittest.TestCase):
         self.assertEqual(record["games"][0]["total"]["status"], "OK")
 
 
+class WriterReaderIntegrationTests(unittest.TestCase):
+    def test_direct_final_is_visible_to_shared_schedule_reader(self):
+        from tempfile import TemporaryDirectory
+        from pathlib import Path
+        from sportsedge.nfl_confirmation_schedule import captured_final_kickoffs
+        cfg = cap.load_cfg()
+        now = datetime(2026, 9, 24, 23, 50, tzinfo=timezone.utc)
+        expected = Counter({"2026-09-25T00:15:00Z": 1})
+        board = fixture_board()
+        from dataclasses import replace
+        board = replace(board, received_at=now)
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cfg["output_dir"] = "captures"
+            with patch.object(cap, "ROOT", root), \
+                 patch.object(cap, "load_cfg", return_value=cfg), \
+                 patch.object(cap, "load_snapshot", return_value=Snapshot()), \
+                 patch.object(cap, "determine_due", return_value=(None, expected)), \
+                 patch.object(cap, "current_hashes", return_value={"script_sha256":"a"*64}), \
+                 patch.object(cap, "fetch_once", return_value=(board, None)):
+                report = cap.run(force=False, as_of=now)
+            self.assertEqual(report["status"], "CAPTURED")
+            self.assertTrue((root / "captures/week03/final/20260924T235000Z.json").is_file())
+            cfg["output_dir"] = str(root / "captures")
+            self.assertEqual(captured_final_kickoffs(cfg), expected)
+
+
 class WindowSemanticsTests(unittest.TestCase):
     def test_no_window_does_not_touch_draftkings(self):
         with patch.object(cap, "load_snapshot", return_value=Snapshot()), \
