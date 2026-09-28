@@ -1,0 +1,9 @@
+{
+  "games_observed": 0,
+  "observations": [],
+  "observed_at_utc": "2026-09-28T21:36:59.493891+00:00",
+  "promotion_authority": false,
+  "schedule_source_sha256": "e945970d3a4d1b17afde3ecfc6a444e395dceb14f2c9e4a35d1e06837d79f9b0",
+  "schema": "SPORTSEDGE_MLB_PIT_LINEUP_STARTER_CAPTURE_V1",
+  "slate_date": "2026-09-28"
+}
