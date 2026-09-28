@@ -146,6 +146,9 @@ def validate_inference_policy(
     if any(governance.get(key) is not False for key in false_keys):
         raise NFLAttempt9InferenceError("NFL_A9_INFERENCE_AUTHORITY_INVALID")
 
+    if dict(policy) != load_frozen_inference_policy():
+        raise NFLAttempt9InferenceError("NFL_A9_INFERENCE_POLICY_DRIFT")
+
 
 def _iid_t(values: Sequence[float]) -> float:
     if len(values) < 2:

@@ -110,6 +110,25 @@ class NFLAttempt9InferenceTests(unittest.TestCase):
                 thresholds=self.thresholds(),
             )
 
+    def test_policy_numeric_changes_even_if_stricter_are_rejected(self):
+        for field, value in (("iid_t_stat_floor", 3.0),
+                             ("cluster_t_stat_floor", 3.0),
+                             ("minimum_distinct_clusters", 13)):
+            policy = deepcopy(load_frozen_inference_policy())
+            policy["clv_inference"][field] = value
+            with self.assertRaises(NFLAttempt9InferenceError):
+                compute_clv_inference([.01,.02], [1,2], policy=policy,
+                                      thresholds=self.thresholds())
+
+    def test_cluster_matches_independent_hand_calculation(self):
+        from sportsedge.sports.nfl.attempt9_inference import _cluster_t
+        t, g = _cluster_t([.02,.04,-.01,.03,.05,.00], [1,1,2,2,3,3])
+        mu = .13 / 6
+        scores = [.06-2*mu, .02-2*mu, .05-2*mu]
+        expected = mu / ((3/2)*sum(x*x for x in scores)/36)**.5
+        self.assertEqual(g, 3)
+        self.assertAlmostEqual(t, expected, places=12)
+
 
 if __name__ == "__main__":
     unittest.main()
