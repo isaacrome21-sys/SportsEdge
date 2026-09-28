@@ -1,0 +1,50 @@
+name: cfb-historical-line-source-audit
+
+on:
+  pull_request:
+    paths:
+      - "scripts/audit_cfb_historical_lines_source.py"
+      - "tests/test_cfb_historical_line_source_audit.py"
+      - ".github/workflows/cfb-historical-line-source-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit-public-archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Audit pinned free historical archive
+        run: |
+          python scripts/audit_cfb_historical_lines_source.py --output _proof/cfb_lines/source_audit_v1.json
+      - name: Show audit verdict
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('_proof/cfb_lines/source_audit_v1.json')
+          r = json.loads(p.read_text())
+          print(json.dumps({
+              'status': r['status'],
+              'rows': r['coverage']['rows'],
+              'season_min': r['coverage']['season_min'],
+              'season_max': r['coverage']['season_max'],
+              'quote_timestamp_columns': r['quote_timestamp_columns'],
+              'closing_semantics_verified': r['closing_semantics_verified'],
+              'truth_gate_authority': r['truth_gate_authority'],
+              'next_gate': r['next_gate'],
+          }, sort_keys=True))
+          PY
+      - name: Upload audit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cfb-historical-line-source-audit-${{ github.sha }}
+          path: _proof/cfb_lines/source_audit_v1.json
+          if-no-files-found: error
+          retention-days: 90
