@@ -48,7 +48,8 @@ def test_snapshot_is_deterministic_sorted_and_converts_meters_to_feet() -> None:
     ]
     alabama = lines[0]
     assert alabama["location"]["elevation_m"] == 70.05136108
-    assert alabama["location"]["elevation_ft"] == pytest.approx(229.826, abs=0.001)
+    # 70.05136108 m * exact meters-to-feet constant = 229.827300... ft.
+    assert alabama["location"]["elevation_ft"] == pytest.approx(229.8273, abs=1e-6)
     assert a.manifest["governance"]["attempt_consumed"] is False
     assert a.manifest["governance"]["evaluation_performed"] is False
 
