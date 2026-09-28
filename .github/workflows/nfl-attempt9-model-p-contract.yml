@@ -9,7 +9,10 @@ on:
       - 'artifacts/football/nfl_attempt9_model_p_v1.json'
       - 'scripts/build_nfl_attempt9_runtime_artifact.py'
       - 'scripts/build_nfl_attempt9_model_p_artifact.py'
-      - 'sportsedge/sports/nfl/attempt9_model_p.py'
+      - 'sportsedge/sports/nfl/attempt9*.py'
+      - 'config/nfl_attempt9_prospective_inference_v1.json'
+      - 'config/nfl_2026_prospective_governance_v1.json'
+      - 'tests/test_nfl_attempt9*.py'
       - 'sportsedge/truth_gate.py'
       - 'tests/test_nfl_attempt9_model_p.py'
       - 'tests/test_nfl_attempt9_frozen_artifacts.py'
@@ -33,7 +36,12 @@ jobs:
         run: |
           python -m unittest -v \
             tests.test_nfl_attempt9_model_p \
-            tests.test_nfl_attempt9_frozen_artifacts
+            tests.test_nfl_attempt9_frozen_artifacts \
+            tests.test_nfl_attempt9_truth_gate \
+            tests.test_nfl_attempt9_inference_policy \
+            tests.test_nfl_attempt9_inference \
+            tests.test_nfl_attempt9_prospective \
+            tests.test_nfl_attempt9_prospective_evidence
       - name: Verify committed known-good runtime and Model_P artifacts
         run: |
           set -euo pipefail

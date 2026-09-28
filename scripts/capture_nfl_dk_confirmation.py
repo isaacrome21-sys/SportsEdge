@@ -481,7 +481,7 @@ def run(*, force: bool, as_of: datetime | None = None, write_missed_markers: boo
                 by_week.setdefault(int(game["week"]), []).append(game)
             for week, week_games in sorted(by_week.items()):
                 week_expected = Counter(iso_z(parse_z(str(g["commence_time"]))) for g in week_games)
-                path = out_dir / f"week{week:02d}" / f"final_{now.strftime('%Y%m%dT%H%M%SZ')}.json"
+                path = out_dir / f"week{week:02d}" / "final" / f"{now.strftime('%Y%m%dT%H%M%SZ')}.json"
                 record = build_record(
                     kind="FINAL", week=week, now=now, board=board, date_header=date_header,
                     raw_rel=raw_rel, raw_sha=raw_sha, snapshot=snapshot, expected=week_expected, games=week_games,

@@ -35,7 +35,7 @@ class MLBPropRoutingCleanupTests(unittest.TestCase):
             "line": 3.5, "side": "OVER", "feature_source_hash": "a" * 64,
             "features": {"history_pool": [_joint_hitter_row(4) for _ in range(10)]},
         })
-        self.assertEqual(joint["model_p"], 1.0)
+        self.assertAlmostEqual(joint["model_p"], 1.0, delta=1e-12)
 
         legacy = {
             "build_hash": "b" * 64, "game_id": "g", "market": "HITS",
