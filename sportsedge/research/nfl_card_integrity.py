@@ -121,6 +121,10 @@ def build_nfl_research_card(
         edge = scored.get('raw_price_edge')
         score = scored.get('score')
         reasons = []
+        note = str(scored.get('note') or '')
+        if note in {'STALE_QUOTE', 'QUOTE_TIME_MISSING', 'FUTURE_QUOTE',
+                    'STALE_ESTIMATE', 'STALE_FEATURE_SNAPSHOT'}:
+            reasons.append(note)
         if ev is None or ev <= 0:
             reasons.append('NON_POSITIVE_EV')
         if edge is None or edge <= 0:
