@@ -1,8 +1,7 @@
 """Fail-closed governance for the separately preregistered CFB altitude challenger.
 
-This module does not fit or score a model. It validates that the altitude search is
-separate from the frozen CFB model-selection v1 search and that any future static
-venue-elevation snapshot is byte-bound before a candidate can be evaluated.
+No fitting or scoring occurs here. The verifier freezes the search contract and
+byte-binds any future static venue-elevation snapshot before evaluation.
 """
 from __future__ import annotations
 
@@ -11,7 +10,6 @@ import json
 from pathlib import Path
 import re
 from typing import Any, Mapping
-
 
 POLICY_PATH = "config/cfb_altitude_challenger_policy_v1.json"
 EXPECTED_SOURCE_SCHEMA_COMMIT = "06dbcb5a7977470c3b6296f1f18c9df64676876f"
@@ -45,10 +43,11 @@ EXPECTED_CANDIDATE_SPECS = (
     },
 )
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 
 
 class CFBAltitudePreregError(ValueError):
-    """Raised when a policy or snapshot manifest cannot be parsed safely."""
+    pass
 
 
 def _load_json(path: Path) -> Mapping[str, Any]:
@@ -65,120 +64,103 @@ def _is_sha256(value: object) -> bool:
     return isinstance(value, str) and _SHA256.fullmatch(value.lower()) is not None
 
 
-def audit_altitude_policy(policy: Mapping[str, Any]) -> dict[str, Any]:
-    """Validate the frozen search contract without consuming an attempt."""
+def _is_git_sha(value: object) -> bool:
+    return isinstance(value, str) and _GIT_SHA.fullmatch(value.lower()) is not None
 
+
+def audit_altitude_policy(policy: Mapping[str, Any]) -> dict[str, Any]:
     blockers: list[str] = []
     if policy.get("schema") != "CFB_ALTITUDE_CHALLENGER_POLICY_V1":
         blockers.append("POLICY_SCHEMA_MISMATCH")
     if policy.get("status") != "FROZEN_BEFORE_CANDIDATE_EVALUATION":
         blockers.append("POLICY_NOT_FROZEN_BEFORE_EVALUATION")
 
-    governance = policy.get("governance")
-    if not isinstance(governance, Mapping):
-        governance = {}
+    g = policy.get("governance") if isinstance(policy.get("governance"), Mapping) else {}
+    if not g:
         blockers.append("GOVERNANCE_MISSING")
-    if governance.get("separate_from_cfb_model_selection_policy_v1") is not True:
-        blockers.append("FROZEN_V1_SEARCH_MUST_REMAIN_SEPARATE")
-    if governance.get("candidate_attempt_budget") != 3:
-        blockers.append("ATTEMPT_BUDGET_MUST_EQUAL_THREE")
-    if governance.get("attempts_consumed") != 0:
-        blockers.append("FIRST_GATE_REQUIRES_ZERO_ATTEMPTS_CONSUMED")
-    if governance.get("market_data_allowed") is not False:
-        blockers.append("MARKET_INPUTS_MUST_BE_DISABLED")
-    if governance.get("season_2026_allowed_for_fit_tune_or_selection") is not False:
-        blockers.append("SEASON_2026_MUST_BE_EXCLUDED")
-    if governance.get("selection_mode_until_closing_line_gate_clears") != "GAME_SCORE_OUTCOMES_ONLY":
-        blockers.append("SELECTION_MUST_BE_GAME_SCORE_OUTCOMES_ONLY")
+    checks = (
+        (g.get("separate_from_cfb_model_selection_policy_v1") is True, "FROZEN_V1_SEARCH_MUST_REMAIN_SEPARATE"),
+        (g.get("candidate_attempt_budget") == 3, "ATTEMPT_BUDGET_MUST_EQUAL_THREE"),
+        (g.get("attempts_consumed") == 0, "FIRST_GATE_REQUIRES_ZERO_ATTEMPTS_CONSUMED"),
+        (g.get("market_data_allowed") is False, "MARKET_INPUTS_MUST_BE_DISABLED"),
+        (g.get("season_2026_allowed_for_fit_tune_or_selection") is False, "SEASON_2026_MUST_BE_EXCLUDED"),
+        (g.get("selection_mode_until_closing_line_gate_clears") == "GAME_SCORE_OUTCOMES_ONLY", "SELECTION_MUST_BE_GAME_SCORE_OUTCOMES_ONLY"),
+    )
+    blockers.extend(code for ok, code in checks if not ok)
 
-    feature = policy.get("feature_contract")
-    if not isinstance(feature, Mapping):
-        feature = {}
+    feature = policy.get("feature_contract") if isinstance(policy.get("feature_contract"), Mapping) else {}
+    if not feature:
         blockers.append("FEATURE_CONTRACT_MISSING")
     if feature.get("base_definition") != "altitude_delta_ft = max(game_venue_elevation_ft - away_team_home_venue_elevation_ft, 0)":
         blockers.append("ALTITUDE_BASE_DEFINITION_MISMATCH")
     if feature.get("missing_or_unresolved_venue_rule") != "FAIL_CLOSED":
         blockers.append("UNRESOLVED_VENUE_MUST_FAIL_CLOSED")
-    rows = feature.get("candidates")
-    if not isinstance(rows, list):
-        rows = []
-        blockers.append("CANDIDATES_MISSING")
+    rows = feature.get("candidates") if isinstance(feature.get("candidates"), list) else []
     candidate_ids = tuple(row.get("id") for row in rows if isinstance(row, Mapping))
     if candidate_ids != EXPECTED_CANDIDATES:
         blockers.append("CANDIDATE_SET_OR_ORDER_MISMATCH")
     if rows != list(EXPECTED_CANDIDATE_SPECS):
         blockers.append("CANDIDATE_SPEC_MUTATED")
 
-    source = policy.get("source_contract")
-    if not isinstance(source, Mapping):
-        source = {}
+    source = policy.get("source_contract") if isinstance(policy.get("source_contract"), Mapping) else {}
+    if not source:
         blockers.append("SOURCE_CONTRACT_MISSING")
     if source.get("provider") != "CollegeFootballData":
         blockers.append("SOURCE_PROVIDER_MISMATCH")
     if source.get("license_cost_requirement") != "FREE_SOURCE_ONLY":
         blockers.append("SOURCE_MUST_BE_FREE")
-    if source.get("schema_commit_sha") != EXPECTED_SOURCE_SCHEMA_COMMIT:
+    source_sha = source.get("schema_commit_sha")
+    if source_sha != EXPECTED_SOURCE_SCHEMA_COMMIT:
         blockers.append("SOURCE_SCHEMA_COMMIT_MISMATCH")
-    elif not _is_sha256(source.get("schema_commit_sha")):
+    if not _is_git_sha(source_sha):
         blockers.append("SOURCE_SCHEMA_COMMIT_SHA_INVALID")
     if source.get("missing_elevation_policy") != "FAIL_CLOSED_NO_IMPUTATION":
         blockers.append("MISSING_ELEVATION_MUST_FAIL_CLOSED")
     if source.get("snapshot_required_before_any_fit") is not True:
         blockers.append("SNAPSHOT_MUST_PRECEDE_FIT")
-    snapshot_contract = source.get("snapshot_contract")
-    if not isinstance(snapshot_contract, Mapping):
-        snapshot_contract = {}
+    snapshot = source.get("snapshot_contract") if isinstance(source.get("snapshot_contract"), Mapping) else {}
+    if not snapshot:
         blockers.append("SNAPSHOT_CONTRACT_MISSING")
-    if snapshot_contract.get("required_manifest_fields") != [
-        "source_provider",
-        "source_schema_commit_sha",
-        "retrieved_at_utc",
-        "record_count",
-        "content_sha256",
+    if snapshot.get("required_manifest_fields") != [
+        "source_provider", "source_schema_commit_sha", "retrieved_at_utc", "record_count", "content_sha256"
     ]:
         blockers.append("SNAPSHOT_MANIFEST_FIELDS_MISMATCH")
-    if snapshot_contract.get("content_sha256_algorithm") != "SHA-256":
+    if snapshot.get("content_sha256_algorithm") != "SHA-256":
         blockers.append("SNAPSHOT_HASH_ALGORITHM_MISMATCH")
-    if snapshot_contract.get("manifest_must_be_bound_before_first_evaluation") is not True:
+    if snapshot.get("manifest_must_be_bound_before_first_evaluation") is not True:
         blockers.append("SNAPSHOT_MANIFEST_MUST_PRECEDE_EVALUATION")
-    if snapshot_contract.get("post_binding_mutation_policy") != "NEW_POLICY_VERSION_REQUIRED":
+    if snapshot.get("post_binding_mutation_policy") != "NEW_POLICY_VERSION_REQUIRED":
         blockers.append("SNAPSHOT_MUTATION_POLICY_MISMATCH")
 
-    evaluation = policy.get("evaluation_contract")
-    if not isinstance(evaluation, Mapping):
-        evaluation = {}
+    evaluation = policy.get("evaluation_contract") if isinstance(policy.get("evaluation_contract"), Mapping) else {}
+    if not evaluation:
         blockers.append("EVALUATION_CONTRACT_MISSING")
     if evaluation.get("dataset_manifest_required_before_first_fit") is not True:
         blockers.append("DATASET_MANIFEST_MUST_PRECEDE_FIT")
-    primary = evaluation.get("primary_metric")
-    if not isinstance(primary, Mapping) or primary.get("name") != "joint_score_rmse":
+    primary = evaluation.get("primary_metric") if isinstance(evaluation.get("primary_metric"), Mapping) else {}
+    if primary.get("name") != "joint_score_rmse":
         blockers.append("PRIMARY_METRIC_MUST_BE_JOINT_SCORE_RMSE")
     if evaluation.get("split_rule") != "WALK_FORWARD_BY_SEASON_NO_RANDOM_FOLDS":
         blockers.append("WALK_FORWARD_SPLIT_REQUIRED")
     if evaluation.get("market_metrics_prohibited_until_issue_1070_clears") != [
-        "ats_accuracy",
-        "closing_line_value",
-        "market_edge",
-        "market_ev",
+        "ats_accuracy", "closing_line_value", "market_edge", "market_ev"
     ]:
         blockers.append("MARKET_METRIC_PROHIBITION_MISMATCH")
 
-    baseline = policy.get("baseline_contract")
-    if not isinstance(baseline, Mapping):
-        baseline = {}
+    baseline = policy.get("baseline_contract") if isinstance(policy.get("baseline_contract"), Mapping) else {}
+    if not baseline:
         blockers.append("BASELINE_CONTRACT_MISSING")
     if baseline.get("targets") != ["final_home_points", "final_away_points"]:
         blockers.append("OUTCOME_TARGETS_MISMATCH")
-    prohibited_inputs = baseline.get("prohibited_inputs")
-    if not isinstance(prohibited_inputs, list) or not prohibited_inputs:
+    if not isinstance(baseline.get("prohibited_inputs"), list) or not baseline.get("prohibited_inputs"):
         blockers.append("PROHIBITED_INPUTS_MISSING")
 
     return {
         "schema": "CFB_ALTITUDE_PREREG_AUDIT_V1",
         "status": "READY_TO_BIND_SNAPSHOT" if not blockers else "BLOCKED_ALTITUDE_PREREG",
         "blockers": blockers,
-        "candidate_attempt_budget": governance.get("candidate_attempt_budget"),
-        "attempts_consumed": governance.get("attempts_consumed"),
+        "candidate_attempt_budget": g.get("candidate_attempt_budget"),
+        "attempts_consumed": g.get("attempts_consumed"),
         "candidate_ids": list(candidate_ids),
         "fit_performed": False,
         "evaluation_performed": False,
@@ -189,24 +171,15 @@ def audit_altitude_policy(policy: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def verify_altitude_snapshot(
-    *,
-    policy: Mapping[str, Any],
-    manifest: Mapping[str, Any],
-    snapshot_path: Path,
-) -> dict[str, Any]:
-    """Verify future static-metadata bytes against their immutable manifest."""
-
+def verify_altitude_snapshot(*, policy: Mapping[str, Any], manifest: Mapping[str, Any], snapshot_path: Path) -> dict[str, Any]:
     audit = audit_altitude_policy(policy)
     blockers = list(audit["blockers"])
     source = policy.get("source_contract") if isinstance(policy.get("source_contract"), Mapping) else {}
-
     if manifest.get("source_provider") != source.get("provider"):
         blockers.append("SNAPSHOT_SOURCE_PROVIDER_MISMATCH")
     if manifest.get("source_schema_commit_sha") != source.get("schema_commit_sha"):
         blockers.append("SNAPSHOT_SCHEMA_COMMIT_MISMATCH")
-    retrieved = manifest.get("retrieved_at_utc")
-    if not isinstance(retrieved, str) or not retrieved.strip():
+    if not isinstance(manifest.get("retrieved_at_utc"), str) or not manifest.get("retrieved_at_utc", "").strip():
         blockers.append("SNAPSHOT_RETRIEVED_AT_MISSING")
     count = manifest.get("record_count")
     if not isinstance(count, int) or isinstance(count, bool) or count <= 0:
@@ -216,9 +189,9 @@ def verify_altitude_snapshot(
         blockers.append("SNAPSHOT_SHA256_INVALID")
 
     path = Path(snapshot_path)
+    actual_hash: str | None = None
     if not path.is_file():
         blockers.append("SNAPSHOT_FILE_MISSING")
-        actual_hash = None
     else:
         actual_hash = sha256(path.read_bytes()).hexdigest()
         if _is_sha256(expected_hash) and actual_hash != expected_hash:
@@ -239,10 +212,7 @@ def verify_altitude_snapshot(
 
 
 def audit_altitude_prereg_from_root(*, root: Path) -> dict[str, Any]:
-    """Load the repository policy and audit it without touching data."""
-
-    policy = _load_json(Path(root) / POLICY_PATH)
-    return audit_altitude_policy(policy)
+    return audit_altitude_policy(_load_json(Path(root) / POLICY_PATH))
 
 
 __all__ = [
