@@ -1,6 +1,6 @@
 """Deterministic materialization for the preregistered CFB altitude snapshot.
 
-This module does not fit or score a model.  It converts a pinned, public
+This module does not fit or score a model. It converts a pinned, public
 CFBD-derived teams/venues export into the byte-stable JSONL snapshot required by
 ``CFB_ALTITUDE_CHALLENGER_POLICY_V1`` and emits a manifest that can be bound by
 ``verify_altitude_snapshot`` before any candidate evaluation.
@@ -105,7 +105,7 @@ def _parse_rows(source_bytes: bytes) -> list[dict[str, str]]:
 def build_snapshot_records(source_bytes: bytes) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """Build canonical team + home-venue records from the pinned CFBD export.
 
-    Null elevation is preserved as null.  It is never imputed.  If the same
+    Null elevation is preserved as null. It is never imputed. If the same
     venue id appears with two distinct non-null CFBD elevations, materialization
     fails instead of averaging or choosing one after looking at outcomes.
     """
@@ -163,7 +163,7 @@ def build_snapshot_records(source_bytes: bytes) -> tuple[list[dict[str, Any]], d
             )
         if previous is None and elevation_m is not None:
             # This is not imputation: the same CFBD venue is present on another
-            # source row with an explicit value.  Preserve that source value on
+            # source row with an explicit value. Preserve that source value on
             # the venue entity while the team row above remains null.
             existing["elevation_m"] = elevation_m
             existing["elevation_ft"] = elevation_ft
@@ -238,6 +238,77 @@ def materialize_snapshot(
     return SnapshotMaterialization(snapshot_bytes=snapshot_bytes, manifest=manifest)
 
 
+def verify_frozen_binding(*, manifest: Mapping[str, Any], binding: Mapping[str, Any]) -> dict[str, Any]:
+    """Fail closed unless a regenerated snapshot exactly matches the frozen proof."""
+
+    expected_pairs = {
+        "source_provider": binding.get("source_provider"),
+        "source_schema_commit_sha": binding.get("source_schema_commit_sha"),
+        "source_mirror_repository": binding.get("source_mirror_repository"),
+        "source_mirror_commit_sha": binding.get("source_mirror_commit_sha"),
+        "source_mirror_path": binding.get("source_mirror_path"),
+        "source_mirror_git_blob_sha1": binding.get("source_mirror_git_blob_sha1"),
+        "source_content_sha256": binding.get("source_content_sha256"),
+        "content_sha256": binding.get("snapshot_content_sha256"),
+        "record_count": binding.get("snapshot_record_count"),
+    }
+    for manifest_key, expected in expected_pairs.items():
+        actual = manifest.get(manifest_key)
+        if expected is None:
+            raise CFBAltitudeSnapshotError(f"ALTITUDE_BINDING_FIELD_MISSING:{manifest_key}")
+        if actual != expected:
+            raise CFBAltitudeSnapshotError(
+                f"ALTITUDE_BINDING_MISMATCH:{manifest_key}:expected={expected}:actual={actual}"
+            )
+
+    manifest_stats = manifest.get("stats")
+    if not isinstance(manifest_stats, Mapping):
+        raise CFBAltitudeSnapshotError("ALTITUDE_BINDING_MANIFEST_STATS_MISSING")
+    for key in (
+        "source_rows",
+        "team_records",
+        "venue_records",
+        "teams_missing_venue",
+        "teams_missing_elevation",
+        "venues_missing_elevation",
+    ):
+        expected = binding.get(key)
+        if expected is None:
+            raise CFBAltitudeSnapshotError(f"ALTITUDE_BINDING_FIELD_MISSING:{key}")
+        actual = manifest_stats.get(key)
+        if actual != expected:
+            raise CFBAltitudeSnapshotError(
+                f"ALTITUDE_BINDING_MISMATCH:stats.{key}:expected={expected}:actual={actual}"
+            )
+
+    governance = binding.get("governance")
+    if not isinstance(governance, Mapping):
+        raise CFBAltitudeSnapshotError("ALTITUDE_BINDING_GOVERNANCE_MISSING")
+    if governance.get("attempts_used") != 0 or governance.get("attempts_max") != 3:
+        raise CFBAltitudeSnapshotError("ALTITUDE_BINDING_ATTEMPT_STATE_INVALID")
+    for key in (
+        "fit_performed",
+        "evaluation_performed",
+        "attempt_consumed",
+        "model_p_created",
+        "truth_gate_authority",
+        "promotion_authority",
+        "official_authority",
+    ):
+        if governance.get(key) is not False:
+            raise CFBAltitudeSnapshotError(f"ALTITUDE_BINDING_GOVERNANCE_NOT_FALSE:{key}")
+
+    return {
+        "status": "FROZEN_STATIC_SOURCE_BINDING_VERIFIED_NO_EVALUATION",
+        "content_sha256": manifest["content_sha256"],
+        "record_count": manifest["record_count"],
+        "attempts_used": 0,
+        "attempts_max": 3,
+        "fit_performed": False,
+        "evaluation_performed": False,
+    }
+
+
 __all__ = [
     "CFBAltitudeSnapshotError",
     "METERS_TO_FEET",
@@ -251,4 +322,5 @@ __all__ = [
     "canonical_jsonl",
     "git_blob_sha1",
     "materialize_snapshot",
+    "verify_frozen_binding",
 ]
