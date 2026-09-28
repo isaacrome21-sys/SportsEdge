@@ -10,9 +10,10 @@ class ClosingLineDirectDKFallbackWorkflowTests(unittest.TestCase):
     def setUpClass(cls):
         cls.text = WORKFLOW.read_text(encoding="utf-8")
 
-    def test_existing_schedule_is_not_expanded(self):
-        self.assertIn("cron: '1,6,11,16,21,26,31,36,41,46,51,56 * * * *'", self.text)
-        self.assertEqual(self.text.count("cron:"), 1)
+    def test_retired_paid_schedule_stays_dispatch_only(self):
+        self.assertNotIn("  schedule:", self.text)
+        self.assertNotIn("cron:", self.text)
+        self.assertIn("  workflow_dispatch:", self.text)
 
     def test_fallback_is_exactly_scoped_to_paid_401(self):
         condition = "steps.capture.outputs.rc != '0' && steps.capture.outputs.reason == 'CLOSING_LINE_ARCHIVE_HTTP_401'"
