@@ -15,6 +15,7 @@ from sportsedge.research.market_value import compare_price
 from sportsedge.source_lineage import canonical_json_sha256
 
 VERSION = "RUN_IT_SCORE_V2"
+AUTHORITY_LABEL = "EXPERIMENTAL / NOT OFFICIAL"
 CONTRACT_FIELDS = (
     "sport",
     "event_id",
@@ -211,6 +212,8 @@ def build_scored_board(rows, *, now, quote_ttl_seconds=300, estimate_ttl_seconds
     return {
         "schema": VERSION,
         "as_of": now.isoformat(),
+        "authority_label": AUTHORITY_LABEL,
+        "official": False,
         "score_description": SCORE_DESCRIPTION,
         "score_formula": "upstream qualification_score only; price/edge/EV/probability excluded",
         "price_description": (
@@ -229,6 +232,8 @@ def build_scored_board(rows, *, now, quote_ttl_seconds=300, estimate_ttl_seconds
             "source_verification": "CALLER_ATTESTED",
             "score_calibrated": False,
             "score_price_invariant": True,
+            "score_uses_ev": False,
+            "score_uses_edge": False,
             "official_eligible": False,
             "promotion_authority": False,
             "stake": 0.0,
@@ -237,7 +242,7 @@ def build_scored_board(rows, *, now, quote_ttl_seconds=300, estimate_ttl_seconds
 
 
 def render_scored_board(board, *, limit=5, min_score=60, show_all=False):
-    """Default to qualified positive-EV lines; full audit remains available."""
+    """Default to qualified positive-value research edges; full audit remains available."""
     if type(limit) is not int or limit < 1:
         raise ValueError("POSITIVE_LIMIT_REQUIRED")
     if type(min_score) not in (int, float) or not isfinite(min_score) or not 0 <= min_score <= 100:
@@ -251,9 +256,11 @@ def render_scored_board(board, *, limit=5, min_score=60, show_all=False):
         for row in board["rows"]
         if row["score"] is not None
         and row["expected_profit_per_unit"] > 0
+        and row["raw_price_edge"] is not None
+        and row["raw_price_edge"] > 0
         and row["score"] >= min_score
     ]
-    # Alternatives at different books are the same selection, not extra picks.
+    # Alternatives at different books are the same selection, not extra rows.
     unique, seen = [], set()
     for row in eligible:
         key = canonical_json_sha256(row["contract"])
@@ -261,9 +268,9 @@ def render_scored_board(board, *, limit=5, min_score=60, show_all=False):
             unique.append(row)
             seen.add(key)
     visible = board["rows"] if show_all else unique[:limit]
-    title = "All lines" if show_all else "Top positive-EV candidates"
+    title = "All lines" if show_all else "Research edges"
     lines = [
-        f"RUN IT — {title} ({len(visible)})",
+        f"RUN IT — {AUTHORITY_LABEL} — {title} ({len(visible)})",
         f"As of {board['as_of']}. {board['score_description']}",
         board["price_description"],
         "",
@@ -271,7 +278,7 @@ def render_scored_board(board, *, limit=5, min_score=60, show_all=False):
         "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |",
     ]
     if not visible:
-        return "\n".join(lines[:4]) + f"No current positive-EV candidates meet the {min_score:g}/100 display cutoff.\n"
+        return "\n".join(lines[:4]) + f"No current positive-EV research edges meet the {min_score:g}/100 qualification cutoff.\n"
     for row in visible:
         contract = row["contract"] or {}
         cells = [
