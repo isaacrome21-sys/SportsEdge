@@ -10,6 +10,7 @@ from sportsedge.sports.cfb.altitude_snapshot import (
     CFBAltitudeSnapshotError,
     git_blob_sha1,
     materialize_snapshot,
+    verify_frozen_binding,
 )
 
 
@@ -20,6 +21,33 @@ HEADER = (
 
 def _source(*rows: str) -> bytes:
     return (HEADER + "\n".join(rows) + "\n").encode("utf-8")
+
+
+def _binding_for(manifest: dict[str, object]) -> dict[str, object]:
+    stats = dict(manifest["stats"])  # type: ignore[arg-type]
+    return {
+        "source_provider": manifest["source_provider"],
+        "source_schema_commit_sha": manifest["source_schema_commit_sha"],
+        "source_mirror_repository": manifest["source_mirror_repository"],
+        "source_mirror_commit_sha": manifest["source_mirror_commit_sha"],
+        "source_mirror_path": manifest["source_mirror_path"],
+        "source_mirror_git_blob_sha1": manifest["source_mirror_git_blob_sha1"],
+        "source_content_sha256": manifest["source_content_sha256"],
+        "snapshot_content_sha256": manifest["content_sha256"],
+        "snapshot_record_count": manifest["record_count"],
+        **stats,
+        "governance": {
+            "fit_performed": False,
+            "evaluation_performed": False,
+            "attempt_consumed": False,
+            "attempts_used": 0,
+            "attempts_max": 3,
+            "model_p_created": False,
+            "truth_gate_authority": False,
+            "promotion_authority": False,
+            "official_authority": False,
+        },
+    }
 
 
 def test_snapshot_is_deterministic_sorted_and_converts_meters_to_feet() -> None:
@@ -110,3 +138,21 @@ def test_materialized_manifest_binds_existing_frozen_policy(tmp_path: Path) -> N
     )
     assert result["status"] == "SNAPSHOT_BOUND_NO_EVALUATION"
     assert result["attempt_consumed_by_this_verifier"] is False
+
+
+def test_frozen_binding_accepts_exact_regeneration_and_rejects_drift() -> None:
+    raw = _source("333,Alabama,fbs,3657,Bryant Denny Stadium,70.0")
+    materialized = materialize_snapshot(
+        raw,
+        retrieved_at_utc="2026-09-28T01:00:00Z",
+        expected_git_blob_sha1=git_blob_sha1(raw),
+    )
+    manifest = dict(materialized.manifest)
+    binding = _binding_for(manifest)
+    result = verify_frozen_binding(manifest=manifest, binding=binding)
+    assert result["status"] == "FROZEN_STATIC_SOURCE_BINDING_VERIFIED_NO_EVALUATION"
+    assert result["attempts_used"] == 0
+
+    binding["snapshot_content_sha256"] = "0" * 64
+    with pytest.raises(CFBAltitudeSnapshotError, match="ALTITUDE_BINDING_MISMATCH:content_sha256"):
+        verify_frozen_binding(manifest=manifest, binding=binding)
