@@ -1,0 +1,31 @@
+{
+  "schema": "CFB_ALTITUDE_SNAPSHOT_BINDING_V1",
+  "status": "FROZEN_STATIC_SOURCE_BINDING_NO_EVALUATION",
+  "source_provider": "CollegeFootballData",
+  "source_schema_commit_sha": "06dbcb5a7977470c3b6296f1f18c9df64676876f",
+  "source_mirror_repository": "mslade50/football_weather",
+  "source_mirror_commit_sha": "aea8274b8c2035372d19d8a509423b0645b7bfe9",
+  "source_mirror_path": "data/raw/cfb_locations_updated.csv",
+  "source_mirror_git_blob_sha1": "aa3ef7cfd7ea44b085508c8af46bbde72dd0da9c",
+  "source_content_sha256": "128e0ebee9d1a64cdf8cd6eb8e8fd747a3a8ab9ee71e876d684be436d4fe5ff6",
+  "snapshot_content_sha256": "4b77f7fe04726eae9a80828b42f1fb01eb6f31e28375bf67d49f7be74bb0510f",
+  "snapshot_record_count": 1314,
+  "source_rows": 658,
+  "team_records": 658,
+  "venue_records": 656,
+  "teams_missing_venue": 0,
+  "teams_missing_elevation": 394,
+  "venues_missing_elevation": 392,
+  "proof_retrieved_at_utc": "2026-09-28T01:37:05.607889Z",
+  "governance": {
+    "fit_performed": false,
+    "evaluation_performed": false,
+    "attempt_consumed": false,
+    "attempts_used": 0,
+    "attempts_max": 3,
+    "model_p_created": false,
+    "truth_gate_authority": false,
+    "promotion_authority": false,
+    "official_authority": false
+  }
+}
