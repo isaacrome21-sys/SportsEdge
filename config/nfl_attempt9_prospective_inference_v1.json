@@ -1,0 +1,52 @@
+{
+  "schema": "SPORTSEDGE_NFL_ATTEMPT9_PROSPECTIVE_INFERENCE_V1",
+  "status": "FROZEN_BEFORE_PROMOTION_READOUT_USE",
+  "scope": {
+    "sport": "NFL",
+    "season": 2026,
+    "candidate": "attempt-9",
+    "markets": ["spread", "total"],
+    "role": "PROSPECTIVE_TRUTH_GATE_INFERENCE_ONLY"
+  },
+  "decision_uniqueness": {
+    "key": ["game_id", "market", "selection"],
+    "canonical_rule": "EARLIEST_VALID_DECISION_AT_UTC_THEN_SHA256",
+    "later_captures_may_increase_sample_size": false,
+    "evidence_availability_may_choose_capture": false,
+    "backfill_allowed": false
+  },
+  "clv_inference": {
+    "estimand": "MEAN_CLV_PROBABILITY_POINTS",
+    "iid_statistic": "ONE_SAMPLE_T_STAT_ON_ELIGIBLE_DECISION_CLV",
+    "cluster_estimator": "CR1_INTERCEPT_ONLY_CLUSTER_ROBUST",
+    "cluster_unit": "NFL_WEEK",
+    "cluster_df": "G_MINUS_1",
+    "minimum_distinct_clusters": 12,
+    "iid_t_stat_floor": 2.0,
+    "cluster_t_stat_floor": 2.0,
+    "cluster_reference_distribution": "STUDENT_T",
+    "cluster_reference_quantile": 0.975,
+    "cluster_reference_df": "G_MINUS_1",
+    "cluster_pass_rule": "CLUSTER_T_STAT_MUST_BE_AT_LEAST_MAX_2_0_AND_T_0_975_G_MINUS_1",
+    "combined_pass_rule": "IID_T_STAT_MUST_BE_AT_LEAST_2_0_AND_CLUSTER_PASS_RULE_MUST_PASS",
+    "small_sample_correction": "CR1_G_OVER_G_MINUS_1_FOR_INTERCEPT_ONLY_MEAN",
+    "nonfinite_statistic_passes": false
+  },
+  "coverage": {
+    "pending_or_missing_evidence_may_disappear_from_denominator": false,
+    "pending_rows_report_separately": true,
+    "complete_canonical_evidence_required_for_gate_pass": true
+  },
+  "governance": {
+    "may_lower_existing_thresholds": false,
+    "may_use_2026_outcomes_to_choose_estimator": false,
+    "may_use_2026_clv_to_choose_estimator": false,
+    "may_change_model_probability": false,
+    "may_change_model_features": false,
+    "may_change_edge_floor": false,
+    "promotion_authority": false,
+    "official_authority": false,
+    "staking_authority": false,
+    "note": "This addendum resolves only the previously unspecified inference method. It hardens, rather than relaxes, the existing prospective threshold by requiring both IID and week-clustered evidence."
+  }
+}

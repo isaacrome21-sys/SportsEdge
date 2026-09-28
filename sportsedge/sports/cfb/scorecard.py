@@ -18,6 +18,12 @@ def probability_to_american(probability: float) -> int:
 def confidence_score(*, model_p: float, fair_market_p: float, ev_per_dollar: float,
                      push_p: float=0.0, n_paths: int=20000,
                      quote_age_seconds: float=0.0, quote_ttl_seconds: float=180.0) -> float:
+    """Qualification-only Score B.
+
+    Market edge, EV, price attractiveness, and the magnitude of Model_P never
+    contribute points. The market/EV arguments remain only for API compatibility
+    and finite-input hygiene.
+    """
     p=float(model_p); market=float(fair_market_p); ev=float(ev_per_dollar); push=float(push_p)
     if not all(isfinite(x) for x in (p,market,ev,push)):
         raise CFBScorecardError("CFB_SCORECARD_NONFINITE")
@@ -28,16 +34,12 @@ def confidence_score(*, model_p: float, fair_market_p: float, ev_per_dollar: flo
     ttl=float(quote_ttl_seconds); age=max(0.0,float(quote_age_seconds))
     if not isfinite(ttl) or ttl<=0:
         raise CFBScorecardError("CFB_SCORECARD_TTL_INVALID")
-    settled=p/max(1e-12,1.0-push)
-    edge=settled-market
-    edge_component=max(-25.0,min(25.0,edge*250.0))
-    ev_component=max(-15.0,min(15.0,ev*100.0))
-    path_factor=min(1.0,(int(n_paths)/20000.0)**0.5)
-    freshness_factor=max(0.0,1.0-age/ttl)
-    push_factor=max(.70,1.0-push)
-    raw=50.0+edge_component+ev_component
-    adjusted=50.0+(raw-50.0)*path_factor*freshness_factor*push_factor
-    return round(max(0.0,min(100.0,adjusted)),1)
+
+    # Locked Score rule B: points come only from qualification checks.
+    path_points=40.0*min(1.0,int(n_paths)/20000.0)
+    freshness_points=40.0*max(0.0,1.0-age/ttl)
+    push_points=20.0*max(0.0,1.0-push/0.30)
+    return round(max(0.0,min(100.0,path_points+freshness_points+push_points)),1)
 
 def build_scorecard(*, model_p: float, fair_market_p: float, american_odds: float,
                     edge: float, ev_per_dollar: float, push_p: float=0.0,
