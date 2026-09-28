@@ -1,0 +1,18 @@
+{
+  "base_url_present": true,
+  "failure_count": 0,
+  "failure_sample": [],
+  "league_id": 84240,
+  "market_counts": {
+    "HITS": 54,
+    "HITS_RUNS_RBIS": 54,
+    "PITCHER_K": 6,
+    "TOTAL_BASES": 4
+  },
+  "model_p_authority": false,
+  "official_authority": false,
+  "provider": "DRAFTKINGS_WEB_RESEARCH",
+  "quotes_returned": 118,
+  "run_at_utc": "2026-09-28T05:11:17.441559+00:00",
+  "status": "PASS"
+}
