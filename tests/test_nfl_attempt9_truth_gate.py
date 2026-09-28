@@ -110,7 +110,8 @@ class NFLAttempt9TruthGateTests(unittest.TestCase):
         out=self.evaluate([d,other], [e,close])
         self.assertGreater(out["mean_clv"], 0)
         self.assertFalse(out["checks"]["minimum_clv_t_stat"])
-        self.assertFalse(out["checks"]["inference_policy_resolved"])
+        self.assertTrue(out["checks"]["inference_policy_resolved"])
+        self.assertFalse(out["checks"]["minimum_clustered_clv_t_stat"])
 
     def test_roi_rejects_unknown_and_push_outcomes(self):
         from sportsedge.sports.nfl.attempt9_truth_gate import _roi

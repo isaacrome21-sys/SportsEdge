@@ -7,11 +7,11 @@ result remains non-OFFICIAL until a separate deployment authority transition.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from math import isfinite, sqrt
-from statistics import mean, stdev
+from statistics import mean
 from typing import Any, Iterable, Mapping
 import re
 
+from .attempt9_inference import compute_clv_inference, load_frozen_inference_policy
 from .attempt9_prospective import validate_decision
 from .attempt9_prospective_evidence import validate_evidence
 
@@ -72,6 +72,7 @@ def evaluate_truth_gate(
     evaluation_asof_utc: str | None = None,
 ) -> dict[str, Any]:
     thresholds=governance["nfl_game_market_precommitted_thresholds"]
+    inference_policy=load_frozen_inference_policy()
 
     # Validate every submitted capture first. Exact duplicate hashes remain a
     # hard error. A second, different capture of the same game/market/selection
@@ -135,35 +136,44 @@ def evaluate_truth_gate(
     edge_floor=float(thresholds["minimum_model_edge_probability_points"])
     eligible=[(d,e) for d,e in paired if float(d["model_p"])-float(e["decision_novig_probability"]) >= edge_floor]
     weeks=set()
+    eligible_weeks=[]
     for d,_ in eligible:
         m=_WEEK_RE.match(str(d["game_id"]))
         if not m: raise ValueError("NFL_A9_GATE_GAME_WEEK_UNPARSABLE")
-        weeks.add(int(m.group(1)))
+        week=int(m.group(1))
+        weeks.add(week)
+        eligible_weeks.append(week)
     n=len(eligible)
     clvs=[float(e["clv"]) for _,e in eligible]
     rois=[_roi(float(d["price_american"]),str(e["outcome"])) for d,e in eligible]
     cal=[(float(d["model_p"]),1.0 if e["outcome"]=="WIN" else 0.0) for d,e in eligible]
-    if n>=2:
-        mean_clv=mean(clvs); sd=stdev(clvs); clv_t=mean_clv/(sd/sqrt(n)) if sd>0 else float("nan")
-    else:
-        mean_clv=float("nan"); clv_t=float("nan")
+    inference=compute_clv_inference(
+        clvs,
+        eligible_weeks,
+        policy=inference_policy,
+        thresholds=thresholds,
+    )
+    mean_clv=float(inference["mean_clv"])
+    clv_t=float(inference["iid_t_stat"])
     if n>=2:
         slope,intercept,ece,maxdev=_calibration(cal)
         roi=mean(rois)
     else:
         slope=intercept=ece=maxdev=roi=float("nan")
+    minimum_clusters=max(
+        int(thresholds["minimum_distinct_week_clusters"]),
+        int(inference_policy["clv_inference"]["minimum_distinct_clusters"]),
+    )
     checks={
       # No canonical decision may silently disappear. Duplicate later captures
       # are reported separately but do not enter this denominator.
       "complete_evidence_coverage":bool(by_sha) and len(paired)==len(by_sha),
-      # The frozen policy does not specify the inference estimator. Keep the
-      # existing IID statistic diagnostic-only until prospective adjudication;
-      # do not retrofit a method and claim it was frozen before observed data.
-      "inference_policy_resolved":False,
+      "inference_policy_resolved":inference["policy_resolved"] is True,
       "minimum_promoted_decisions":n>=int(thresholds["minimum_promoted_decisions"]),
-      "minimum_distinct_week_clusters":len(weeks)>=int(thresholds["minimum_distinct_week_clusters"]),
+      "minimum_distinct_week_clusters":len(weeks)>=minimum_clusters,
       "minimum_mean_clv":n>=2 and mean_clv>=float(thresholds["minimum_mean_clv_probability_points"]),
-      "minimum_clv_t_stat":n>=2 and isfinite(clv_t) and clv_t>=float(thresholds["minimum_clv_t_stat"]),
+      "minimum_clv_t_stat":inference["iid_pass"] is True,
+      "minimum_clustered_clv_t_stat":inference["cluster_pass"] is True,
       "minimum_after_vig_roi":n>=2 and roi>=float(thresholds["minimum_after_vig_roi"]),
       "calibration_slope":n>=2 and float(thresholds["calibration_slope_min"])<=slope<=float(thresholds["calibration_slope_max"]),
       "calibration_intercept":n>=2 and abs(intercept)<=float(thresholds["calibration_intercept_abs_max"]),
@@ -189,12 +199,19 @@ def evaluate_truth_gate(
       "evidence_status_asof_utc":asof.isoformat() if asof is not None else None,
       "evidence_status_basis":"EXPLICIT_ASOF_PREKICK_PENDING" if asof is not None else "ASOF_NOT_SUPPLIED_TREATED_MISSING_FAIL_CLOSED",
       "evidence_coverage":len(paired)/len(by_sha) if by_sha else 0.0,
-      "clv_inference_status":"UNRESOLVED_POLICY_IID_DIAGNOSTIC_ONLY",
+      "clv_inference_status":"FROZEN_POLICY_BOUND_IID_AND_CR1_WEEK_CLUSTERED",
+      "clv_inference_policy_git_blob_sha1":inference["policy_git_blob_sha1"],
       "eligible_decisions":n,
       "paired_decisions":len(paired),
       "distinct_week_clusters":len(weeks),
       "mean_clv":mean_clv,
       "clv_t_stat":clv_t,
+      "clv_cluster_estimator":inference["cluster_estimator"],
+      "clv_cluster_unit":inference["cluster_unit"],
+      "clv_cluster_t_stat":inference["cluster_t_stat"],
+      "clv_cluster_df":inference["cluster_df"],
+      "clv_cluster_reference_critical":inference["cluster_reference_critical"],
+      "clv_cluster_required_t":inference["cluster_required_t"],
       "after_vig_roi":roi,
       "calibration_slope":slope,
       "calibration_intercept":intercept,
