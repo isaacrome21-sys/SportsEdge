@@ -28,15 +28,15 @@ class NFLAttempt9TruthGateTests(unittest.TestCase):
           "minimum_distinct_week_clusters":12,"calibration_slope_min":.90,"calibration_slope_max":1.10,
           "calibration_intercept_abs_max":.03,"ece_max":.025,"max_nonempty_bin_deviation":.05}}
 
-    def pair(self):
+    def pair(self, game_id="2026_03_A_B", market="spread", capture_sha="c"*40):
         a=self.artifact()
-        d=build_decision(artifact=a,game_id="2026_03_A_B",kickoff_utc="2026-09-27T20:00:00Z",
+        d=build_decision(artifact=a,game_id=game_id,kickoff_utc="2026-09-27T20:00:00Z",
           decision_at_utc="2026-09-27T18:00:00Z",feature_asof_utc="2026-09-27T17:30:00Z",
-          quote_observed_at_utc="2026-09-27T17:59:00Z",capture_code_git_sha="c"*40,
-          book="draftkings",quote_sha256="d"*64,market="spread",selection="home",line=-3.5,
+          quote_observed_at_utc="2026-09-27T17:59:00Z",capture_code_git_sha=capture_sha,
+          book="draftkings",quote_sha256="d"*64,market=market,selection="home" if market=="spread" else "over",line=-3.5 if market=="spread" else 40.5,
           price_american=-110,opposite_price_american=-110,raw_prediction=6)
         e=build_evidence(d,artifact=a,closing_quote_at_utc="2026-09-27T19:40:00Z",
-          closing_book="draftkings",closing_line=-3.5,closing_price_american=-130,
+          closing_book="draftkings",closing_line=-3.5 if market=="spread" else 40.5,closing_price_american=-130,
           closing_opposite_price_american=110,closing_quote_sha256="e"*64,
           settled_at_utc="2026-09-27T23:30:00Z",home_score=27,away_score=20,
           settlement_source_sha256="f"*64)
@@ -71,6 +71,52 @@ class NFLAttempt9TruthGateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"DUPLICATE_DECISION"):
             evaluate_truth_gate([d,d],[e],artifact=a,governance=self.governance(),
               ci_attested=True,pit_integrity_verified=True,truth_gate_floor_verified=True)
+
+    def evaluate(self, decisions, evidence):
+        return evaluate_truth_gate(decisions, evidence, artifact=self.artifact(),
+            governance=self.governance(), ci_attested=True,
+            pit_integrity_verified=True, truth_gate_floor_verified=True)
+
+    def test_duplicate_evidence_cannot_inflate_sample(self):
+        _,d,e=self.pair()
+        with self.assertRaisesRegex(ValueError, "DUPLICATE_EVIDENCE"):
+            self.evaluate([d], [e,e])
+
+    def test_markets_cannot_pool_sample_size(self):
+        _,d,e=self.pair()
+        _,other,close=self.pair(market="total")
+        with self.assertRaisesRegex(ValueError, "MIXED_MARKETS"):
+            self.evaluate([d,other], [e,close])
+
+    def test_missing_evidence_stays_in_denominator(self):
+        _,d,e=self.pair()
+        _,missing,_=self.pair(game_id="2026_03_C_D")
+        out=self.evaluate([d,missing], [e])
+        self.assertEqual(out["submitted_decisions"], 2)
+        self.assertEqual(out["missing_evidence_decisions"], 1)
+        self.assertEqual(out["evidence_coverage"], .5)
+        self.assertFalse(out["checks"]["complete_evidence_coverage"])
+        self.assertEqual(out["status"], "BLOCKED")
+
+    def test_unpaired_identity_drift_is_rejected(self):
+        _,d,e=self.pair()
+        _,missing,_=self.pair(game_id="2026_03_C_D", capture_sha="a"*40)
+        with self.assertRaisesRegex(ValueError, "IDENTITY_DRIFT"):
+            self.evaluate([d,missing], [e])
+
+    def test_constant_positive_clv_cannot_pass_t_stat(self):
+        _,d,e=self.pair()
+        _,other,close=self.pair(game_id="2026_04_C_D")
+        out=self.evaluate([d,other], [e,close])
+        self.assertGreater(out["mean_clv"], 0)
+        self.assertFalse(out["checks"]["minimum_clv_t_stat"])
+        self.assertFalse(out["checks"]["inference_policy_resolved"])
+
+    def test_roi_rejects_unknown_and_push_outcomes(self):
+        from sportsedge.sports.nfl.attempt9_truth_gate import _roi
+        for outcome in ("PUSH", "VOID", "UNKNOWN", ""):
+            with self.assertRaisesRegex(ValueError, "OUTCOME_UNSUPPORTED"):
+                _roi(-110, outcome)
 
 
 if __name__=="__main__":
