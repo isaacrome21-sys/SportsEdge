@@ -118,6 +118,46 @@ class NFLAttempt9TruthGateTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "OUTCOME_UNSUPPORTED"):
                 _roi(-110, outcome)
 
+    def test_same_game_market_selection_counts_earliest_valid_capture_once(self):
+        a,early,early_evidence=self.pair()
+        later=build_decision(
+          artifact=a,game_id="2026_03_A_B",kickoff_utc="2026-09-27T20:00:00Z",
+          decision_at_utc="2026-09-27T18:30:00Z",feature_asof_utc="2026-09-27T18:00:00Z",
+          quote_observed_at_utc="2026-09-27T18:29:00Z",capture_code_git_sha="c"*40,
+          book="draftkings",quote_sha256="1"*64,market="spread",selection="home",
+          line=-4.0,price_american=-115,opposite_price_american=-105,raw_prediction=6)
+        later_evidence=build_evidence(
+          later,artifact=a,closing_quote_at_utc="2026-09-27T19:40:00Z",
+          closing_book="draftkings",closing_line=-4.0,closing_price_american=-130,
+          closing_opposite_price_american=110,closing_quote_sha256="2"*64,
+          settled_at_utc="2026-09-27T23:30:00Z",home_score=27,away_score=20,
+          settlement_source_sha256="f"*64)
+        out=evaluate_truth_gate(
+          [later,early],[later_evidence,early_evidence],artifact=a,
+          governance=self.governance(),ci_attested=True,pit_integrity_verified=True,
+          truth_gate_floor_verified=True)
+        self.assertEqual(out["submitted_decisions"],2)
+        self.assertEqual(out["unique_game_market_selection_decisions"],1)
+        self.assertEqual(out["suppressed_duplicate_capture_decisions"],1)
+        self.assertEqual(out["suppressed_duplicate_capture_evidence_rows"],1)
+        self.assertEqual(out["paired_decisions"],1)
+        self.assertEqual(out["eligible_decisions"],1)
+        self.assertEqual(
+          out["decision_uniqueness_policy"],
+          "EARLIEST_VALID_DECISION_AT_UTC_THEN_SHA256_PER_GAME_MARKET_SELECTION")
+
+    def test_future_unsettled_decision_reports_pending_with_explicit_asof(self):
+        a,d,_=self.pair()
+        out=evaluate_truth_gate(
+          [d],[],artifact=a,governance=self.governance(),
+          ci_attested=True,pit_integrity_verified=True,truth_gate_floor_verified=True,
+          evaluation_asof_utc="2026-09-27T19:00:00Z")
+        self.assertEqual(out["pending_evidence_decisions"],1)
+        self.assertEqual(out["missing_evidence_decisions"],0)
+        self.assertEqual(out["evidence_coverage"],0.0)
+        self.assertFalse(out["checks"]["complete_evidence_coverage"])
+        self.assertEqual(out["status"],"BLOCKED")
+
 
 if __name__=="__main__":
     unittest.main()
