@@ -125,10 +125,10 @@ class NFLAttempt9TruthGateTests(unittest.TestCase):
           decision_at_utc="2026-09-27T18:30:00Z",feature_asof_utc="2026-09-27T18:00:00Z",
           quote_observed_at_utc="2026-09-27T18:29:00Z",capture_code_git_sha="c"*40,
           book="draftkings",quote_sha256="1"*64,market="spread",selection="home",
-          line=-4.0,price_american=-115,opposite_price_american=-105,raw_prediction=6)
+          line=-4.5,price_american=-115,opposite_price_american=-105,raw_prediction=6)
         later_evidence=build_evidence(
           later,artifact=a,closing_quote_at_utc="2026-09-27T19:40:00Z",
-          closing_book="draftkings",closing_line=-4.0,closing_price_american=-130,
+          closing_book="draftkings",closing_line=-4.5,closing_price_american=-130,
           closing_opposite_price_american=110,closing_quote_sha256="2"*64,
           settled_at_utc="2026-09-27T23:30:00Z",home_score=27,away_score=20,
           settlement_source_sha256="f"*64)
