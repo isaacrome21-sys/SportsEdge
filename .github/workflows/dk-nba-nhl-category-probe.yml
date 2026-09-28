@@ -1,0 +1,82 @@
+name: dk-nba-nhl-category-probe
+
+# Read-only discovery of the current DraftKings Game Lines category IDs for NBA
+# and NHL. Pull requests run fixture tests only. A path-filtered merge to main
+# performs one live probe and uploads raw bytes plus a diagnostic status report.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/probe_dk_game_lines_categories.py'
+      - 'tests/test_dk_game_lines_category_probe.py'
+      - '.github/workflows/dk-nba-nhl-category-probe.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/probe_dk_game_lines_categories.py'
+      - 'tests/test_dk_game_lines_category_probe.py'
+      - '.github/workflows/dk-nba-nhl-category-probe.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        sport: [nba, nhl]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Verify category-discovery contract
+        run: python -m unittest tests.test_dk_game_lines_category_probe -v
+
+      - name: Probe live DraftKings league metadata and Game Lines board
+        if: github.event_name != 'pull_request'
+        id: live
+        continue-on-error: true
+        run: |
+          out="artifacts/dk-category-probe/${{ matrix.sport }}"
+          mkdir -p "$out"
+          python scripts/probe_dk_game_lines_categories.py \
+            --sport '${{ matrix.sport }}' \
+            --out-dir "$out" \
+            --status-out "$out/status.json"
+
+      - name: Enforce diagnostic-only contract and verified shape
+        if: github.event_name != 'pull_request' && always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          status="artifacts/dk-category-probe/${{ matrix.sport }}/status.json"
+          test -f "$status"
+          jq -e '
+            .authority.model_input == false and
+            .authority.truth_gate_input == false and
+            .authority.promotion == false and
+            .authority.eligibility == false and
+            .authority.staking == false and
+            .authority.official == false and
+            .authority.production_config == false and
+            .authority.evidence_clock == false and
+            .authority.wager_placement == false and
+            .candidate_semantics == "UNFROZEN_DISCOVERY_INPUT_ONLY" and
+            .state == "VERIFIED_DIAGNOSTIC_ONLY" and
+            .discovery.category_id_status == "DISCOVERED_NOT_FROZEN"
+          ' "$status" >/dev/null
+          jq '{sport,state,candidate_league_id,discovery,league_metadata:{http_status,raw_sha256,observed_at_utc},game_lines_board:{http_status,raw_sha256,observed_at_utc,shape_counts},reason}' "$status"
+
+      - name: Upload category-probe artifact
+        if: github.event_name != 'pull_request' && always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dk-${{ matrix.sport }}-category-probe-${{ github.sha }}
+          path: artifacts/dk-category-probe/${{ matrix.sport }}
+          if-no-files-found: error
