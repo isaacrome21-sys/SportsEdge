@@ -44,8 +44,12 @@ an audit timestamp but produce no score, price edge or EV. Existing positive-EV
 selection and exact-contract deduplication remain in force.
 
 This is a presentation/data-contract improvement. It does not improve or prove
-predictive accuracy. Additive output fields retain RUN_IT_SCORE_V1; the existing
-score formula is unchanged. Forecast sources remain caller-attested.
+predictive accuracy. The board schema is RUN_IT_SCORE_V2: Score comes only from
+an explicit upstream qualification score. Market price, raw edge, EV and win
+probability are excluded from Score by contract and covered by an invariance test.
+Price/EV may break presentation ties between equal qualification scores but never
+change the Score itself. Forecast sources and qualification scores remain
+caller-attested and do not create promotion or official authority.
 
 ## Next predictive work, with evidence prerequisites
 
