@@ -1,0 +1,112 @@
+name: mlb-prop-forward-evidence
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  schedule:
+    # Prospective-only heartbeat across normal MLB game hours. The evidence date
+    # is resolved in America/New_York to match the MLB schedule date.
+    - cron: '*/15 15-23 * * *'
+    - cron: '*/15 0-5 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mlb-prop-forward-evidence-v1
+  cancel-in-progress: false
+
+jobs:
+  capture-and-settle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12.13'
+
+      - name: Contract tests
+        run: |
+          python -m py_compile \
+            sportsedge/mlb_prop_forward_evidence.py \
+            scripts/capture_mlb_prop_forward_evidence.py \
+            scripts/persist_forward_evidence_data_branch.py
+          python -m unittest \
+            tests.test_mlb_prop_forward_evidence \
+            tests.test_prop_evidence \
+            tests.test_persist_forward_evidence_data_branch -v
+
+      - name: Resolve MLB schedule date
+        id: day
+        shell: bash
+        run: echo "date=$(TZ=America/New_York date +%F)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore immutable prop evidence from data branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data
+          day='${{ steps.day.outputs.date }}'
+          path="data/mlb_prop_forward/$day"
+          if git cat-file -e "origin/data:$path" 2>/dev/null; then
+            git archive origin/data "$path" | tar -x
+          fi
+
+      - name: Capture pregame receipts and settle final games
+        id: evidence
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          python scripts/capture_mlb_prop_forward_evidence.py \
+            --date '${{ steps.day.outputs.date }}' \
+            --output-root data/mlb_prop_forward | tee mlb_prop_forward_result.json
+          rc=${PIPESTATUS[0]}
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Persist receipts create-only to data branch
+        id: persist
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          day='${{ steps.day.outputs.date }}'
+          python scripts/persist_forward_evidence_data_branch.py \
+            --path "data/mlb_prop_forward/$day" \
+            --branch data \
+            --worktree "$RUNNER_TEMP/sportsedge-mlb-prop-forward-data" \
+            --message "evidence: persist prospective MLB prop observations" | tee mlb_prop_forward_persistence.json
+          rc=${PIPESTATUS[0]}
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload capture receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mlb-prop-forward-evidence-${{ github.run_id }}
+          path: |
+            mlb_prop_forward_result.json
+            mlb_prop_forward_persistence.json
+            data/mlb_prop_forward/${{ steps.day.outputs.date }}/**
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Enforce fail-closed evidence status
+        if: always()
+        shell: bash
+        run: |
+          evidence_rc='${{ steps.evidence.outputs.exit_code }}'
+          persist_rc='${{ steps.persist.outputs.exit_code }}'
+          test -n "$evidence_rc" && test "$evidence_rc" -eq 0
+          test -n "$persist_rc" && test "$persist_rc" -eq 0
