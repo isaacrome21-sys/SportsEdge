@@ -4,11 +4,14 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-  schedule:
-    # Prospective-only heartbeat across normal MLB game hours. The evidence date
-    # is resolved in America/New_York to match the MLB schedule date.
-    - cron: '*/15 15-23 * * *'
-    - cron: '*/15 0-5 * * *'
+  workflow_run:
+    # Reuse already-approved MLB PIT/context heartbeats instead of adding a new
+    # scheduled workflow or changing the frozen cron policy.
+    workflows:
+      - mlb-game-context-refresh
+      - mlb-prop-pit-archive
+    types:
+      - completed
 
 permissions:
   contents: write
@@ -19,6 +22,10 @@ concurrency:
 
 jobs:
   capture-and-settle:
+    # A failed upstream heartbeat must never become an evidence-clock event.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
