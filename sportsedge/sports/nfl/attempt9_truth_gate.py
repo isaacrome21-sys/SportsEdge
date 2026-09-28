@@ -6,7 +6,7 @@ result remains non-OFFICIAL until a separate deployment authority transition.
 """
 from __future__ import annotations
 
-from math import sqrt
+from math import isfinite, sqrt
 from statistics import mean, stdev
 from typing import Any, Iterable, Mapping
 import re
@@ -19,6 +19,8 @@ _WEEK_RE = re.compile(r"^\d{4}_(\d{2})_")
 
 
 def _roi(price: float, outcome: str) -> float:
+    if outcome not in {"WIN", "LOSS"}:
+        raise ValueError("NFL_A9_GATE_OUTCOME_UNSUPPORTED")
     if outcome == "LOSS":
         return -1.0
     return price / 100.0 if price > 0 else 100.0 / (-price)
@@ -61,15 +63,22 @@ def evaluate_truth_gate(
         if sha in by_sha:
             raise ValueError("NFL_A9_GATE_DUPLICATE_DECISION")
         by_sha[sha]=dict(d)
+    markets={d["market"] for d in by_sha.values()}
+    if len(markets)>1:
+        raise ValueError("NFL_A9_GATE_MIXED_MARKETS_EVALUATE_SEPARATELY")
     paired=[]
+    seen_evidence=set()
     for e in evidence_rows:
         sha=str(e.get("decision_sha256") or "")
         if sha not in by_sha:
             raise ValueError("NFL_A9_GATE_ORPHAN_EVIDENCE")
+        if sha in seen_evidence:
+            raise ValueError("NFL_A9_GATE_DUPLICATE_EVIDENCE")
+        seen_evidence.add(sha)
         d=by_sha[sha]
         validate_evidence(e,d,artifact=artifact)
         paired.append((d,dict(e)))
-    identities={(d["model_p_id"],d["model_p_artifact_sha256"],d["capture_code_git_sha"],d["training_source_sha256"]) for d,_ in paired}
+    identities={(d["model_p_id"],d["model_p_artifact_sha256"],d["capture_code_git_sha"],d["training_source_sha256"]) for d in by_sha.values()}
     if len(identities)>1:
         raise ValueError("NFL_A9_GATE_IDENTITY_DRIFT")
     edge_floor=float(thresholds["minimum_model_edge_probability_points"])
@@ -84,7 +93,7 @@ def evaluate_truth_gate(
     rois=[_roi(float(d["price_american"]),str(e["outcome"])) for d,e in eligible]
     cal=[(float(d["model_p"]),1.0 if e["outcome"]=="WIN" else 0.0) for d,e in eligible]
     if n>=2:
-        mean_clv=mean(clvs); sd=stdev(clvs); clv_t=float("inf") if sd==0 and mean_clv>0 else (mean_clv/(sd/sqrt(n)) if sd>0 else 0.0)
+        mean_clv=mean(clvs); sd=stdev(clvs); clv_t=mean_clv/(sd/sqrt(n)) if sd>0 else float("nan")
     else:
         mean_clv=float("nan"); clv_t=float("nan")
     if n>=2:
@@ -93,10 +102,17 @@ def evaluate_truth_gate(
     else:
         slope=intercept=ece=maxdev=roi=float("nan")
     checks={
+      # No missing evidence may silently disappear. A lower coverage threshold
+      # needs a separately versioned, prospectively governed policy.
+      "complete_evidence_coverage":bool(by_sha) and len(paired)==len(by_sha),
+      # The frozen policy does not specify the inference estimator. Keep the
+      # existing IID statistic diagnostic-only until prospective adjudication;
+      # do not retrofit a method and claim it was frozen before observed data.
+      "inference_policy_resolved":False,
       "minimum_promoted_decisions":n>=int(thresholds["minimum_promoted_decisions"]),
       "minimum_distinct_week_clusters":len(weeks)>=int(thresholds["minimum_distinct_week_clusters"]),
       "minimum_mean_clv":n>=2 and mean_clv>=float(thresholds["minimum_mean_clv_probability_points"]),
-      "minimum_clv_t_stat":n>=2 and clv_t>=float(thresholds["minimum_clv_t_stat"]),
+      "minimum_clv_t_stat":n>=2 and isfinite(clv_t) and clv_t>=float(thresholds["minimum_clv_t_stat"]),
       "minimum_after_vig_roi":n>=2 and roi>=float(thresholds["minimum_after_vig_roi"]),
       "calibration_slope":n>=2 and float(thresholds["calibration_slope_min"])<=slope<=float(thresholds["calibration_slope_max"]),
       "calibration_intercept":n>=2 and abs(intercept)<=float(thresholds["calibration_intercept_abs_max"]),
@@ -111,6 +127,11 @@ def evaluate_truth_gate(
     return {
       "schema_version":SCHEMA,
       "status":"PASS_NOT_DEPLOYED" if passed else "BLOCKED",
+      "market":next(iter(markets)) if markets else None,
+      "submitted_decisions":len(by_sha),
+      "missing_evidence_decisions":len(by_sha)-len(paired),
+      "evidence_coverage":len(paired)/len(by_sha) if by_sha else 0.0,
+      "clv_inference_status":"UNRESOLVED_POLICY_IID_DIAGNOSTIC_ONLY",
       "eligible_decisions":n,
       "paired_decisions":len(paired),
       "distinct_week_clusters":len(weeks),
