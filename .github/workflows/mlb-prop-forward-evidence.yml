@@ -52,11 +52,14 @@ jobs:
 
   capture-and-settle:
     needs: contract
-    # PRs prove contracts only. Runtime evidence is written only from merged main,
-    # and a failed upstream heartbeat never becomes an evidence-clock event.
+    # PRs prove contracts only. Runtime evidence is written only from merged main.
+    # workflow_run clocks must themselves be successful runs from main; PR or
+    # feature-branch upstream runs can never create prospective evidence.
     if: >-
       github.event_name != 'pull_request' &&
-      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
+      (github.event_name != 'workflow_run' ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main'))
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
