@@ -1,0 +1,42 @@
+name: cfb-altitude-snapshot-proof
+
+on:
+  pull_request:
+    paths:
+      - "config/cfb_altitude_challenger_policy_v1.json"
+      - "config/cfb_altitude_snapshot_binding_v1.json"
+      - "sportsedge/sports/cfb/altitude_prereg.py"
+      - "sportsedge/sports/cfb/altitude_snapshot.py"
+      - "scripts/materialize_cfb_altitude_snapshot.py"
+      - "tests/test_cfb_altitude_snapshot.py"
+      - ".github/workflows/cfb-altitude-snapshot-proof.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  materialize-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+      - name: Materialize and verify frozen free-source snapshot
+        run: |
+          python scripts/materialize_cfb_altitude_snapshot.py --output-dir _proof/cfb_altitude
+      - name: Show bound manifest
+        run: |
+          cat _proof/cfb_altitude/cfb_altitude_static_v1.manifest.json
+          sha256sum _proof/cfb_altitude/cfb_altitude_static_v1.jsonl
+      - name: Upload immutable proof artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cfb-altitude-snapshot-proof-${{ github.sha }}
+          path: _proof/cfb_altitude/
+          if-no-files-found: error
+          retention-days: 90
