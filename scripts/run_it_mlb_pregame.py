@@ -33,6 +33,10 @@ def main() -> int:
     parser.add_argument("--statcast-html", action="store_true")
     parser.add_argument("--dk-quotes", default=None, help="path to native/manual DraftKings quote JSON")
     parser.add_argument("--out", default=None)
+    parser.add_argument(
+        "--require-complete-inputs", action="store_true",
+        help="write the diagnostic bundle, then exit 2 unless both starters and both nine-player lineups are complete",
+    )
     args = parser.parse_args()
     as_of = (
         datetime.fromisoformat(args.as_of.replace("Z", "+00:00"))
@@ -54,6 +58,8 @@ def main() -> int:
         print(path)
     else:
         print(text)
+    if args.require_complete_inputs and bundle.get("input_readiness", {}).get("ready") is not True:
+        return 2
     return 0
 
 

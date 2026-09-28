@@ -21,12 +21,46 @@ from .source_lineage import canonical_json_sha256
 from .statcast_daily_source import StatcastSnapshot
 
 LIVE_FEED_BASE = "https://statsapi.mlb.com/api/v1.1/game"
-SCHEMA_VERSION = "mlb_run_it_pregame_v2"
+SCHEMA_VERSION = "mlb_run_it_pregame_v3"
 SOURCE = "MLB_PUBLIC_PREGAME_BUNDLE"
 
 
 class MLBRunItPregameError(RuntimeError):
     pass
+
+
+def _positive_id(value: Any) -> int | None:
+    # Do not truncate floats or accept True as player 1.
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
+        return None
+    if isinstance(value, str) and not value.isascii():
+        return None
+    if isinstance(value, str) and not value.isdigit():
+        return None
+    parsed = int(value)
+    return parsed if parsed > 0 else None
+
+
+def _mapping(value: Any) -> Mapping[str, Any]:
+    return value if isinstance(value, Mapping) else {}
+
+
+def _lineup_completeness(live_payload: Mapping[str, Any]) -> dict[str, bool]:
+    live = _mapping(live_payload.get("liveData"))
+    teams = _mapping(_mapping(live.get("boxscore")).get("teams"))
+    complete = {}
+    for side in ("away", "home"):
+        raw = _mapping(teams.get(side)).get("battingOrder")
+        # Check the raw sequence so normalization cannot hide malformed entries.
+        ids = [_positive_id(value) for value in raw] if isinstance(raw, list) else []
+        complete[side] = len(ids) == 9 and None not in ids and len(set(ids)) == 9
+    return complete
+
+
+def _availability(complete: Mapping[str, bool], present: bool) -> str:
+    if all(complete.values()):
+        return "AVAILABLE"
+    return "PARTIAL" if present else "MISSING"
 
 
 def live_feed_url(game_pk: int) -> str:
@@ -74,9 +108,8 @@ def _probable_pitchers(live_payload: Mapping[str, Any]) -> dict[str, dict[str, A
         row = probable.get(side)
         if not isinstance(row, Mapping):
             continue
-        try:
-            player_id = int(row.get("id"))
-        except (TypeError, ValueError):
+        player_id = _positive_id(row.get("id"))
+        if player_id is None:
             continue
         out[side] = {
             "player_id": player_id,
@@ -106,15 +139,35 @@ def acquire_mlb_run_it_pregame(
     live = dict(live_payload) if live_payload is not None else _open_live_feed(int(game_pk), opener=opener)
     day = _official_date(live)
 
+    probable = _probable_pitchers(live)
+    starter_complete = {side: probable[side] is not None for side in ("away", "home")}
+    if all(starter_complete.values()) and probable["away"]["player_id"] == probable["home"]["player_id"]:
+        starter_complete = {"away": False, "home": False}
     starters = {
-        "status": "AVAILABLE" if any(_probable_pitchers(live).values()) else "MISSING",
-        "probable_pitchers": _probable_pitchers(live),
+        "status": _availability(starter_complete, any(probable.values())),
+        "complete_by_side": starter_complete,
+        "probable_pitchers": probable,
         "model_p_eligible": False,
     }
     lineups = confirmed_lineup_ids(live)
+    lineup_complete = _lineup_completeness(live)
+    if all(lineup_complete.values()) and set(lineups["away"]) & set(lineups["home"]):
+        lineup_complete = {"away": False, "home": False}
     lineup_lane = {
-        "status": "AVAILABLE" if any(lineups.values()) else "MISSING",
+        "status": _availability(lineup_complete, any(lineups.values())),
+        "complete_by_side": lineup_complete,
         "confirmed_lineup_ids": lineups,
+        "model_p_eligible": False,
+    }
+    missing_inputs = [
+        f"{side.upper()}_{kind}_MISSING_OR_INVALID"
+        for kind, completeness in (("STARTER", starter_complete), ("LINEUP", lineup_complete))
+        for side in ("away", "home") if not completeness[side]
+    ]
+    input_readiness = {
+        "scope": "BOTH_PROBABLE_STARTERS_AND_COMPLETE_BATTING_ORDERS_ONLY",
+        "ready": not missing_inputs,
+        "missing_reasons": missing_inputs,
         "model_p_eligible": False,
     }
 
@@ -169,6 +222,7 @@ def acquire_mlb_run_it_pregame(
         "source": SOURCE,
         "starters": starters,
         "lineups": lineup_lane,
+        "input_readiness": input_readiness,
         "injuries_scratches": injuries,
         "umpire": umpire,
         "statcast": statcast,
@@ -177,7 +231,8 @@ def acquire_mlb_run_it_pregame(
         "hybrid_dk": hybrid_dk,
         "unimplemented_lanes": [],
         "model_p_eligible": False,
-        "status": "AVAILABLE",
+        "acquisition_status": "AVAILABLE",
+        "status": "AVAILABLE" if input_readiness["ready"] else "PARTIAL",
     }
     payload["payload_sha256"] = canonical_json_sha256(payload)
     return payload
