@@ -7,6 +7,8 @@ from sportsedge.engine_registry import (
 )
 from sportsedge.generic_market_engine import generic_market_engine_adapter
 from sportsedge.manual_quote import validate_manual_quote
+from sportsedge.canonical_manual_mlb import _resolve_subject, CanonicalManualMLBError
+import io, json
 
 
 BASE = {
@@ -35,6 +37,33 @@ class ManualQuoteContractTests(unittest.TestCase):
         parsed = validate_manual_quote(dict(BASE, market_type="PITCHER_OUTS", subject_name="Cam Schlittler"))
         self.assertIsNone(parsed.subject_id)
         self.assertEqual(parsed.subject_name, "Cam Schlittler")
+
+    def test_subject_id_only_resolves_team(self):
+        row = validate_manual_quote(dict(BASE, market_type="BATTER_HITS", subject_id="571510"))
+        class Resp:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self): return json.dumps({"people":[{"id":571510,"fullName":"Matthew Boyd","currentTeam":{"id":112}}]}).encode()
+        pid, team = _resolve_subject(row, opener=lambda *a, **k: Resp())
+        self.assertEqual((pid, team), ("571510", 112))
+
+    def test_name_and_id_mismatch_is_row_resolvable_error(self):
+        row = validate_manual_quote(dict(BASE, market_type="PITCHER_OUTS", subject_id="650633", subject_name="Matthew Boyd"))
+        class Resp:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self): return json.dumps({"people":[{"id":571510,"fullName":"Matthew Boyd","currentTeam":{"id":112}}]}).encode()
+        with self.assertRaisesRegex(CanonicalManualMLBError, "MANUAL_SUBJECT_ID_NAME_MISMATCH"):
+            _resolve_subject(row, opener=lambda *a, **k: Resp())
+
+    def test_ambiguous_name_only_blocks_resolution(self):
+        row = validate_manual_quote(dict(BASE, market_type="BATTER_HITS", subject_name="Will Smith"))
+        class Resp:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self): return json.dumps({"people":[{"id":1,"fullName":"Will Smith"},{"id":2,"fullName":"Will Smith"}]}).encode()
+        with self.assertRaisesRegex(CanonicalManualMLBError, "found=2"):
+            _resolve_subject(row, opener=lambda *a, **k: Resp())
 
     def test_unknown_market_is_accepted_by_ingestion_but_rejected_by_engine_registry(self):
         parsed = validate_manual_quote(dict(BASE, market_type="SOME_FUTURE_MARKET"))
