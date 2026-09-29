@@ -2,16 +2,21 @@ name: auto-mlb
 
 on:
   workflow_dispatch:
-  # MLB is parked for the remainder of 2026. Keep manual dispatch and CI/push
-  # coverage, but do not spend Odds API credits on a timer or ordinary push.
+  # MLB paid acquisition remains parked from a timer by the frozen credit policy.
+  # A dispatch is still fully automatic once started: odds, model, context and card.
   push:
     branches: [main]
     paths:
       - 'sportsedge/**'
       - 'scripts/run_auto_mlb*.py'
+      - 'scripts/acquire_mlb_card_context.py'
+      - 'scripts/render_mlb_myspari_card.py'
       - 'config/**'
       - 'tests/test_auto_native_odds.py'
       - 'tests/test_mlb_run_machine.py'
+      - 'tests/test_mlb_bullpen_workload_source.py'
+      - 'tests/test_mlb_run_it_pregame.py'
+      - 'tests/test_mlb_context_card.py'
       - '.github/workflows/auto-mlb.yml'
 
 permissions:
@@ -61,6 +66,9 @@ jobs:
           tests.test_mlb_quote_source_coverage
           tests.test_mlb_run_machine
           tests.test_run_auto_mlb_resilient_machine
+          tests.test_mlb_bullpen_workload_source
+          tests.test_mlb_run_it_pregame
+          tests.test_mlb_context_card
           -v
       - name: Run canonical automated MLB machine
         if: github.event_name == 'workflow_dispatch'
@@ -76,6 +84,16 @@ jobs:
           SPORTSEDGE_PROVIDER_TOKEN: ${{ secrets.SPORTSEDGE_PROVIDER_TOKEN }}
           SPORTSEDGE_HISTORY_CACHE_DIR: .cache/sportsedge/mlb-history
         run: python scripts/run_auto_mlb_resilient.py --output artifacts/live_mlb_card.json
+      - name: Retrieve automated pregame context
+        if: always() && github.event_name == 'workflow_dispatch' && hashFiles('artifacts/live_mlb_card.json') != ''
+        run: PYTHONPATH=. python scripts/acquire_mlb_card_context.py --engine-output artifacts/live_mlb_card.json --out-dir artifacts/mlb_context
+      - name: Render SportsEdge phone card
+        if: always() && github.event_name == 'workflow_dispatch' && hashFiles('artifacts/live_mlb_card.json') != ''
+        run: >-
+          PYTHONPATH=. python scripts/render_mlb_myspari_card.py
+          --engine-output artifacts/live_mlb_card.json
+          --context-dir artifacts/mlb_context
+          --out-dir artifacts/mlb_myspari
       - name: Upload automated card evidence
         if: always() && github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -85,5 +103,7 @@ jobs:
             artifacts/live_mlb_card.json
             artifacts/live_game_odds.json
             artifacts/odds_http_diagnostics.json
+            artifacts/mlb_context/
+            artifacts/mlb_myspari/
           if-no-files-found: error
           retention-days: 14
