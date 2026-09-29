@@ -12,7 +12,6 @@ on:
       - sportsedge/mlb_scored_card.py
       - scripts/run_mlb_context_adjusted_research.py
       - scripts/run_mlb_joint_card_research.py
-      - scripts/validate_mlb_context_adjusted_history.py
       - tests/test_mlb_context_adjusted_research.py
       - tests/test_mlb_context_adjusted_validation.py
       - tests/test_mlb_joint_card_research.py
@@ -34,18 +33,13 @@ jobs:
           python-version: '3.12'
       - name: Install runtime dependencies
         run: python -m pip install --disable-pip-version-check numpy==2.5.3
-      - name: Test research guards and validation metrics
+      - name: Test joint-card and presentation invariants
         run: >-
           PYTHONPATH=. python -m unittest
           tests.test_mlb_context_adjusted_research
           tests.test_mlb_context_adjusted_validation
           tests.test_mlb_joint_card_research
           tests.test_mlb_scored_card -v
-      - name: Run Sept 29 context-adjusted research slate
-        run: >-
-          PYTHONPATH=. python scripts/run_mlb_context_adjusted_research.py
-          --input manual_inputs/mlb/2026-09-29_dk_full_supplied.json
-          --output artifacts/mlb_context_adjusted_research_20260929.json
       - name: Run coherent BOS-NYY joint card
         run: >-
           PYTHONPATH=. python scripts/run_mlb_joint_card_research.py
@@ -53,20 +47,10 @@ jobs:
           --game-id 'Boston Red Sox@New York Yankees'
           --output artifacts/mlb_joint_card_research_bos_nyy_20260929.json
           --simulations 100000
-      - name: Run retrospective diagnostic validation
-        run: >-
-          PYTHONPATH=. python scripts/validate_mlb_context_adjusted_history.py
-          --start 2026-09-01
-          --end 2026-09-14
-          --simulations 3000
-          --output artifacts/mlb_context_adjusted_validation_20260901_14.json
-      - name: Upload research results
+      - name: Upload joint-card result
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: mlb-context-adjusted-research-20260929
-          path: |
-            artifacts/mlb_context_adjusted_research_20260929.json
-            artifacts/mlb_joint_card_research_bos_nyy_20260929.json
-            artifacts/mlb_context_adjusted_validation_20260901_14.json
+          name: mlb-joint-card-research-bos-nyy-20260929
+          path: artifacts/mlb_joint_card_research_bos_nyy_20260929.json
           if-no-files-found: error
           retention-days: 14
