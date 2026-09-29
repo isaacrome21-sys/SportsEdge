@@ -67,3 +67,19 @@ def simulate_roster_events(game:NHLGamePaths, roles:list[NHLRosterEventRole], *,
     frozen_g={k:tuple(v) for k,v in goals.items()}; frozen_a={k:tuple(v) for k,v in assists.items()}
     points={k:tuple(g+a for g,a in zip(frozen_g[k],frozen_a[k])) for k in frozen_g}
     return NHLRosterEventPaths(frozen_g,frozen_a,points,int(seed),version)
+
+
+def roster_event_over(paths:NHLRosterEventPaths, *, player_id:str, stat:str, line:float)->tuple[float,float,float]:
+    """Return player goal/assist/point over win/push/loss mass from shared paths."""
+    if not math.isfinite(line): raise ValueError("line must be finite")
+    key=str(stat).strip().lower()
+    if key=="goals": mapping=paths.goals
+    elif key=="assists": mapping=paths.assists
+    elif key=="points": mapping=paths.points
+    else: raise ValueError("stat must be goals, assists, or points")
+    if player_id not in mapping: raise ValueError("player not present in roster event paths")
+    values=mapping[player_id]
+    if not values: raise ValueError("roster event paths are empty")
+    diff=[x-line for x in values]; n=len(diff)
+    wins=sum(x>0 for x in diff); pushes=sum(x==0 for x in diff)
+    return wins/n,pushes/n,(n-wins-pushes)/n

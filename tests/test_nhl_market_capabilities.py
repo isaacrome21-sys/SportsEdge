@@ -28,11 +28,18 @@ def test_coherent_period_and_player_markets_are_engine_backed():
         "PLAYER_SHOTS",
         "PLAYER_POINTS",
         "PLAYER_GOALS",
+        "PLAYER_ASSISTS",
         "GOALIE_SAVES",
         "PLAYER_BLOCKS",
         "PLAYER_HITS",
     ):
         assert capability_for(market).status == "REQUIRES_ENGINE"
+
+
+def test_assists_use_same_coherent_player_event_paths_as_goals_and_points():
+    assists = capability_for("PLAYER_ASSISTS")
+    assert "pit_player_role" in assists.required_state
+    assert "shared_player_event_paths" in assists.required_state
 
 
 def test_goalie_and_peripheral_markets_require_their_specific_shared_paths():
