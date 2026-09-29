@@ -19,12 +19,16 @@ on:
       - tests/test_mlb_context_card.py
       - scripts/render_mlb_myspari_card.py
       - tests/test_mlb_myspari_own_model.py
+      - sportsedge/mlb_lines_intake.py
+      - scripts/intake_mlb_lines_issue.py
+      - tests/test_mlb_lines_intake.py
       - tests/test_mlb_same_game_guard.py
       - tests/test_manual_quote_contract.py
       - tests/test_manual_mlb_live_guards.py
       - tests/fixtures/manual_mlb_snapshot_supported.json
       - manual_inputs/mlb/**
       - .github/workflows/manual-mlb-snapshot.yml
+      - .github/workflows/mlb-lines-issue.yml
   pull_request:
     paths:
       - sportsedge/manual_quote.py
@@ -37,14 +41,21 @@ on:
       - sportsedge/mlb_empirical_support.py
       - tests/test_mlb_empirical_support.py
       - sportsedge/mlb_myspari_own_model.py
+      - sportsedge/mlb_context_card.py
+      - scripts/acquire_mlb_card_context.py
+      - tests/test_mlb_context_card.py
       - scripts/render_mlb_myspari_card.py
       - tests/test_mlb_myspari_own_model.py
+      - sportsedge/mlb_lines_intake.py
+      - scripts/intake_mlb_lines_issue.py
+      - tests/test_mlb_lines_intake.py
       - tests/test_mlb_same_game_guard.py
       - tests/test_manual_quote_contract.py
       - tests/test_manual_mlb_live_guards.py
       - tests/fixtures/manual_mlb_snapshot_supported.json
       - manual_inputs/mlb/**
       - .github/workflows/manual-mlb-snapshot.yml
+      - .github/workflows/mlb-lines-issue.yml
   workflow_dispatch:
     inputs:
       input_path:
@@ -73,7 +84,7 @@ jobs:
       - name: Install runtime dependencies
         run: python -m pip install --disable-pip-version-check numpy==2.5.3
       - name: Verify canonical manual market contract and live guards
-        run: PYTHONPATH=. python -m unittest tests.test_manual_quote_contract tests.test_manual_mlb_live_guards tests.test_mlb_myspari_own_model tests.test_mlb_empirical_support tests.test_mlb_context_card tests.test_mlb_same_game_guard
+        run: PYTHONPATH=. python -m unittest tests.test_manual_quote_contract tests.test_manual_mlb_live_guards tests.test_mlb_myspari_own_model tests.test_mlb_empirical_support tests.test_mlb_context_card tests.test_mlb_same_game_guard tests.test_mlb_lines_intake
       - name: Resolve input
         id: resolve
         shell: bash
