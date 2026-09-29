@@ -24,18 +24,20 @@ def test_card_orders_actionable_by_confidence():
     ]
     card=build_mlb_scored_card(rows)
     assert [x["market"] for x in card]==["MONEYLINE","HITS","NRFI"]
-    assert card[0]["star_rating"]==3 and card[-1]["star_rating"]==0
+    assert card[0]["star_rating"]==4 and card[1]["star_rating"]==2 and card[-1]["star_rating"]==0
     assert card[0]["confidence_verified"] is True
 
 
-def test_star_rating_matches_public_tier_contract():
+def test_star_rating_matches_public_five_band_contract():
     rows=[
       _verified_row(market="TOTALS",score=94,model_p=.60,market_p=.52,ev=.10),
-      _verified_row(market="MONEYLINE",score=88,model_p=.59,market_p=.52,ev=.09),
-      _verified_row(market="RUN_LINE",score=87,model_p=.58,market_p=.52,ev=.08),
-      _verified_row(market="NRFI",score=82,model_p=.57,market_p=.52,ev=.07),
-      _verified_row(market="YRFI",score=81,model_p=.56,market_p=.52,ev=.06),
-      _verified_row(market="HITS",score=54,model_p=.55,market_p=.52,ev=.05),
+      _verified_row(market="MONEYLINE",score=90,model_p=.59,market_p=.52,ev=.09),
+      _verified_row(market="RUN_LINE",score=89,model_p=.58,market_p=.52,ev=.08),
+      _verified_row(market="NRFI",score=80,model_p=.57,market_p=.52,ev=.07),
+      _verified_row(market="YRFI",score=70,model_p=.56,market_p=.52,ev=.06),
+      _verified_row(market="HITS",score=60,model_p=.55,market_p=.52,ev=.05),
+      _verified_row(market="RBI",score=54,model_p=.55,market_p=.52,ev=.05),
+      _verified_row(market="RUNS",score=49,model_p=.55,market_p=.52,ev=.05),
     ]
     card=build_mlb_scored_card(rows)
     stars={row["market"]:row["star_rating"] for row in card}
@@ -45,7 +47,9 @@ def test_star_rating_matches_public_tier_contract():
         "RUN_LINE":4,
         "NRFI":4,
         "YRFI":3,
-        "HITS":3,
+        "HITS":2,
+        "RBI":1,
+        "RUNS":0,
     }
 
 
