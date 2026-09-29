@@ -33,6 +33,17 @@ def _price(values: Sequence[int], line: float, selection: str) -> tuple[float, f
     return ((over if side == "OVER" else under) / n, push / n)
 
 
+def _player_identity(row: Mapping[str, Any]) -> tuple[str, str]:
+    """Return stable market identity and the simulator's human-readable key."""
+    label = str(row.get("player") or "").strip()
+    if not label:
+        raise NflPropSimulationError("PLAYER_IDENTITY_REQUIRED")
+    stable = str(row.get("player_id") or label).strip()
+    if not stable:
+        raise NflPropSimulationError("PLAYER_IDENTITY_REQUIRED")
+    return stable, label
+
+
 def run_coherent_prop_estimates(
     *,
     game_id: str,
@@ -44,13 +55,25 @@ def run_coherent_prop_estimates(
     """Run coherent same-path props and return market-blind probability rows.
 
     Each team row requires team, qb, and an exhaustive skill_players pool (use an
-    explicit OTHER bucket when necessary). Game states must be upstream,
-    market-blind and have the same path count for both teams.
+    explicit OTHER bucket when necessary). A player may additionally carry a
+    stable ``player_id``. Market rows should use that ``player_id``; legacy rows
+    using ``player`` remain supported for deterministic historical fixtures.
     """
     if len(teams) != 2:
         raise NflPropSimulationError("TWO_TEAMS_REQUIRED")
     paths: dict[str, list[dict[str, Any]]] = {}
-    player_index: dict[str, tuple[str, str]] = {}
+    player_index: dict[str, tuple[str, str, str, str]] = {}
+    legacy_labels: dict[str, str] = {}
+
+    def register(payload: Mapping[str, Any], code: str, kind: str) -> None:
+        stable, label = _player_identity(payload)
+        if stable in player_index:
+            raise NflPropSimulationError("PLAYER_IDENTITY_DUPLICATE")
+        if label in legacy_labels and legacy_labels[label] != stable:
+            raise NflPropSimulationError("PLAYER_LABEL_DUPLICATE")
+        player_index[stable] = (code, kind, label, stable)
+        legacy_labels[label] = stable
+
     for i, team in enumerate(teams):
         code = str(team.get("team") or "").upper().strip()
         if not code or code in paths:
@@ -66,15 +89,11 @@ def run_coherent_prop_estimates(
             qb, skills, states, seed=int(seed) + i * 1000003
         )
         paths[code] = team_paths
-        qbn = str(qb.get("player") or "").strip()
-        if not qbn or qbn in player_index:
-            raise NflPropSimulationError("PLAYER_IDENTITY_DUPLICATE")
-        player_index[qbn] = (code, "qb")
-        for p in skills:
-            name = str(p.get("player") or "").strip()
-            if not name or name in player_index:
-                raise NflPropSimulationError("PLAYER_IDENTITY_DUPLICATE")
-            player_index[name] = (code, "player")
+        register(qb, code, "qb")
+        for payload in skills:
+            if not isinstance(payload, Mapping):
+                raise NflPropSimulationError(f"TEAM_PAYLOAD_INVALID:{code}")
+            register(payload, code, "player")
 
     counts = {len(v) for v in paths.values()}
     if len(counts) != 1:
@@ -82,26 +101,29 @@ def run_coherent_prop_estimates(
 
     out: list[dict[str, Any]] = []
     for row in markets:
-        player = str(row.get("player") or "").strip()
+        requested_id = str(row.get("player_id") or "").strip()
+        requested_label = str(row.get("player") or "").strip()
+        identity = requested_id or legacy_labels.get(requested_label, "")
         market = str(row.get("market") or "").strip()
         side = str(row.get("selection") or "").upper().strip()
-        if player not in player_index or market not in SUPPORTED:
+        if identity not in player_index or market not in SUPPORTED:
             raise NflPropSimulationError("PROP_IDENTITY_INVALID")
         try:
             line = float(row["line"])
         except (KeyError, TypeError, ValueError) as exc:
             raise NflPropSimulationError("PROP_LINE_INVALID") from exc
-        code, kind = player_index[player]
+        code, kind, draw_name, stable = player_index[identity]
         values: list[int] = []
         for path in paths[code]:
-            draw = path["qb"] if kind == "qb" else path["players"][player]
+            draw = path["qb"] if kind == "qb" else path["players"][draw_name]
             if market not in draw:
                 raise NflPropSimulationError(f"PROP_STAT_MISSING:{market}")
             values.append(int(draw[market]))
         p, push = _price(values, line, side)
         out.append({
             "game_id": str(game_id),
-            "player": player,
+            "player_id": stable,
+            "player": draw_name,
             "market": market,
             "selection": side,
             "line": line,
