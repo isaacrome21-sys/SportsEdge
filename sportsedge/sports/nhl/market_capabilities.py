@@ -68,9 +68,18 @@ _CAPABILITIES = {
         "PLAYER_GOALS", "REQUIRES_ENGINE", _GAME_STATE + ("pit_player_role", "shared_player_event_paths"),
         "Needs same-path player scoring events; team goal probability is insufficient.",
     ),
-    "GOALIE_SAVES": NHLMarketCapability("GOALIE_SAVES", "NO_ENGINE", ("opponent_team_shot_paths", "goalie_save_paths"), "No coherent goalie-save distribution is implemented yet."),
-    "PLAYER_BLOCKS": NHLMarketCapability("PLAYER_BLOCKS", "NO_ENGINE", ("pit_player_role", "shared_block_paths"), "No PIT-safe shared blocked-shot distribution is implemented yet."),
-    "PLAYER_HITS": NHLMarketCapability("PLAYER_HITS", "NO_ENGINE", ("pit_player_role", "shared_hit_paths"), "No PIT-safe shared hit distribution is implemented yet."),
+    "GOALIE_SAVES": NHLMarketCapability(
+        "GOALIE_SAVES", "REQUIRES_ENGINE", ("opponent_team_shot_paths", "goalie_save_paths", "goalie_state"),
+        "Needs opponent SOG paths plus versioned goalie save/start-share parameters and explicit starter state.",
+    ),
+    "PLAYER_BLOCKS": NHLMarketCapability(
+        "PLAYER_BLOCKS", "REQUIRES_ENGINE", ("pit_player_role", "shared_block_paths"),
+        "Needs versioned team block paths and active-roster block-role allocation.",
+    ),
+    "PLAYER_HITS": NHLMarketCapability(
+        "PLAYER_HITS", "REQUIRES_ENGINE", ("pit_player_role", "shared_hit_paths"),
+        "Needs versioned team hit paths and active-roster hit-role allocation.",
+    ),
 }
 
 

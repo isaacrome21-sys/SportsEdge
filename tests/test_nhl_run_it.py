@@ -20,8 +20,13 @@ def test_engine_backed_player_market_requires_probability():
     assert row.status=="NO_MODEL_PROBABILITY"
 
 
-def test_unsupported_market_is_explicit():
+def test_engine_backed_goalie_saves_requires_probability():
     row=run_it_row("GOALIE_SAVES","G1 OVER 27.5",None,None)
+    assert row.status=="NO_MODEL_PROBABILITY"
+
+
+def test_unregistered_market_is_explicitly_unsupported():
+    row=run_it_row("FIRST_GOAL_SCORER","P1",None,None)
     assert row.status=="UNSUPPORTED"
 
 
@@ -33,5 +38,5 @@ def test_binding_mismatch_rejected_and_scored_rows_rank_first():
     except ValueError:
         pass
     scored=run_it_row("TOTAL","OVER 6.5",OutcomeProbability(.55,0,.45),good)
-    unsupported=run_it_row("GOALIE_SAVES","G1 OVER 27.5",None,None)
-    assert rank_scored([unsupported,scored])[0] == scored
+    unscored=run_it_row("GOALIE_SAVES","G1 OVER 27.5",None,None)
+    assert rank_scored([unscored,scored])[0] == scored
