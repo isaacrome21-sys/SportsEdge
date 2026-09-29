@@ -64,6 +64,7 @@ jobs:
             tests.test_shared_game_engine \
             tests.test_f5_distribution \
             tests.test_mlb_f5_features \
+            tests.test_mlb_all_market_state_wiring \
             tests.test_f5_stage1_routing \
             tests.test_first_hr_order_engine \
             tests.test_pitcher_record_win_game_state \
