@@ -9,6 +9,7 @@ from urllib.request import urlopen
 from urllib.parse import quote_plus
 from zoneinfo import ZoneInfo
 
+from .mlb_empirical_support import support_evidence
 from .engine_registry import resolve_manual_market_type
 from .generic_card_pipeline import run_generic_card
 from .live_slate import LiveGame, TeamLineup
@@ -171,8 +172,16 @@ def run_canonical_manual_mlb(rows: Iterable[Mapping[str, Any]], *, opener=urlope
         resolutions.append({"market_type":row.market_type,"engine_market":market,"subject_id":subject_id,"subject_name":row.subject_name,"observed_at":row.observed_at.isoformat()})
     results = run_generic_card(games=[live],feature_rows=features,quotes=quotes,ingestion_now=captured,finalization_now=captured,
         registry_path=registry_path,edge_floor_config_path=edge_floor_config_path,kelly_multiplier=kelly_multiplier)
+    # Attach support evidence after pricing; engine inputs/outputs are unchanged.
+    feature_by_key = {(str(f["market"]), str(f["entity_id"])): f for f in features}
+    result_rows = [asdict(r) for r in results]
+    for result in result_rows:
+        feature = feature_by_key.get((str(result["market"]), str(result["entity_id"])), {})
+        evidence = support_evidence(feature, result)
+        if evidence is not None:
+            result["empirical_evidence"] = evidence
     return {"schema_version":2,"run_type":"CANONICAL_MANUAL_QUOTES","source":"MANUAL","observed_at_utc":captured.isoformat(),
         "snapshot_sha256":_sha(raw),"resolved_game":{"game_pk":int(g.game_pk),"away_team":g.away_name,"home_team":g.home_name,
         "scheduled_start_utc":parse_game_start(g.game_date).isoformat()},"market_resolution":resolutions,
         "feature_lineage":[{"market":f["market"],"entity_id":f["entity_id"],"source":f.get("source"),"source_subset_hash":f.get("source_subset_hash")} for f in features],
-        "lineup_membership_tier":"DK_PROP_LISTED","results":[asdict(r) for r in results] + blocked_subject_rows}
+        "lineup_membership_tier":"DK_PROP_LISTED","results":result_rows + blocked_subject_rows}

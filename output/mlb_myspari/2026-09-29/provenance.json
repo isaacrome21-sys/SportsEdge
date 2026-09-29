@@ -1,11 +1,23 @@
 {
-  "execution": "local live run, not GitHub Actions dispatch",
-  "code_commit": "013ec179b0056626b8b0fa2e4c2b76aaa75b47b5",
-  "merged_commit": "d95e5e67a5253249d5c7fee3785d2c339bdba6d3",
+  "code_commit": "8e622e6f2ad14a783385e62ff66eb3c018339a9f",
+  "execution": "local live rerun",
   "input_path": "manual_inputs/mlb/2026-09-29_dk_full_supplied.json",
   "input_rows": 17,
-  "quote_results": 34,
-  "priced_results": 34,
+  "engine_quote_results": 34,
+  "engine_raw_priced_results": 34,
+  "card_support_withheld": 6,
+  "card_supported_results": 28,
+  "context_note": "Context bundles reused from preceding run, original timestamps preserved",
+  "tests": {
+    "guard_workflow_suites": 40,
+    "broader_market_suites": 75
+  },
   "official": false,
-  "caveat": "Boyd raw outs probabilities are 1.0 / 0.0; empirical estimates are not calibrated certainty."
+  "missing_quotes": [
+    "NRFI",
+    "YRFI",
+    "batter props",
+    "pitcher props other than supplied outs"
+  ],
+  "model_validation": "unresolved; tests do not certify forecasting quality"
 }

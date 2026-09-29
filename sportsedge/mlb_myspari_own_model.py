@@ -14,6 +14,7 @@ from __future__ import annotations
 from math import isfinite
 from typing import Any, Mapping, Sequence
 
+from .mlb_empirical_support import empirical_guard_reason
 from .mlb_edge_score import ev_per_dollar, score_mlb_edge
 from .mlb_scored_card import build_mlb_scored_card
 
@@ -86,6 +87,7 @@ def myspari_rows(payload: Mapping[str, Any], *, quote_age_seconds: float = 0.0,
         opposite = _opposite(row, results)
         cond, push = _conditional_and_push(row)
         odds = row.get("american_odds")
+        guard_reason = empirical_guard_reason(row, cond)
         base = {
             "game_id": row.get("game_id"), "market": row.get("market"), "entity_id": row.get("entity_id"),
             "entity_name": (names or {}).get(str(row.get("entity_id")), ""),
@@ -93,8 +95,11 @@ def myspari_rows(payload: Mapping[str, Any], *, quote_age_seconds: float = 0.0,
             "engine_status": row.get("bet_status"), "engine_reason": row.get("reason"),
             "engine_version": row.get("engine_version"), "mc_paths": row.get("mc_paths"),
             "model_p_raw": row.get("model_p"), "push_p": push, "label": LABEL,
+            "empirical_evidence": row.get("empirical_evidence"),
+            "presentation_reason": guard_reason,
+            "presentation_priced": cond is not None and guard_reason is None,
         }
-        if cond is None:
+        if cond is None or guard_reason:
             scored = score_mlb_edge(model_available=False, american_odds=odds)
         else:
             scored = score_mlb_edge(
@@ -103,6 +108,8 @@ def myspari_rows(payload: Mapping[str, Any], *, quote_age_seconds: float = 0.0,
                 quote_age_seconds=quote_age_seconds, quote_ttl_seconds=quote_ttl_seconds, reliability=reliability,
             )
         scored_row = {k: getattr(scored, k) for k in scored.__dataclass_fields__}
+        if guard_reason:
+            scored_row["reason_codes"] = (guard_reason.split(":", 1)[0],)
         if push > 0 and scored_row.get("ev_per_dollar") is not None and row.get("model_p") is not None:
             scored_row["ev_per_dollar"] = ev_per_dollar(float(row["model_p"]), odds, push_p=push)
         price = _f(odds)
@@ -137,20 +144,23 @@ def render_markdown(rows: Sequence[Mapping[str, Any]], *, header: str, notes: Se
         odds_text = "—" if odds is None else f"{int(odds):+d}"
         fair_text = "—" if fair is None else f"{int(fair):+d}"
         ev_text = "—" if ev is None else f"{float(ev):+.3f}"
+        guarded = bool(r.get("presentation_reason"))
+        win_text = "—" if guarded else pct(r.get("model_p_raw"))
+        push_text = "—" if guarded else pct(r.get("push_p"))
         status_text = str(r.get("scored_status"))
         if PRICE_CEILING_REASON in (r.get("presentation_reason_codes") or ()):
             status_text += " (price > -165)"
         lines.append(
-            f"| {i} | {r.get('game_id')} | {_selection(r)} | {odds_text} | {pct(r.get('model_p_raw'))} | "
-            f"{pct(r.get('push_p')) if r.get('push_p') else '0'} | {pct(r.get('model_p'))} | {fair_text} | {pct(r.get('edge'))} | "
+            f"| {i} | {r.get('game_id')} | {_selection(r)} | {odds_text} | {win_text} | "
+            f"{push_text} | {pct(r.get('model_p'))} | {fair_text} | {pct(r.get('edge'))} | "
             f"{ev_text} | {r.get('confidence_score', 0)} | {status_text} |"
         )
     lines += ["", "_Win p = engine win probability; Push p = refund probability; Win p ex-push = Win p / (1 − Push p), "
               "the basis for Fair odds and Edge against the two-way no-vig price. EV/$ uses Win p with pushes refunded._"]
     blocked = [r for r in rows if r.get("scored_status") in {"BLOCKED", "NO_MODEL"}]
     if blocked:
-        lines += ["", "## Engine did not price"]
-        lines += [f"- {_selection(r)}: {r.get('engine_reason') or ', '.join(r.get('reason_codes') or ())}" for r in blocked]
+        lines += ["", "## Engine did not price", "_Includes empirical estimates withheld by the card support guard; raw engine output is preserved in JSON._"]
+        lines += [f"- {_selection(r)}: {r.get('presentation_reason') or r.get('engine_reason') or ', '.join(r.get('reason_codes') or ())}" for r in blocked]
     if notes:
         lines += ["", "## Notes", *[f"- {n}" for n in notes]]
     return "\n".join(lines) + "\n"
