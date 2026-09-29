@@ -103,6 +103,18 @@ def _resolve_subject(row: ManualQuote, *, opener=urlopen) -> tuple[str | None, i
         raise CanonicalManualMLBError(f"MANUAL_SUBJECT_TEAM_INVALID:{row.subject_name}")
     return str(person_id), team_id
 
+def _engine_market(row: ManualQuote) -> str:
+    """Resolve a manual row to its engine market.
+
+    A generic first-inning total is only the YRFI/NRFI contract at exactly 0.5 runs;
+    any other line is a different contract with no engine, so it fails closed.
+    """
+    if row.market_type == "FIRST_INNING_TOTAL":
+        if abs(float(row.line) - 0.5) > 1e-9:
+            raise CanonicalManualMLBError(f"NO_ENGINE_FOR_MARKET: FIRST_INNING_TOTAL line {row.line:g} (only 0.5 is YRFI/NRFI)")
+        return "YRFI"
+    return resolve_manual_market_type(row.market_type)
+
 def _side(market_type: str, side: str) -> str:
     s = side.upper()
     if market_type == "FIRST_INNING_TOTAL":
@@ -156,7 +168,7 @@ def run_canonical_manual_mlb(rows: Iterable[Mapping[str, Any]], *, opener=urlope
     quotes, features, resolutions, seen = [], [], [], set()
     blocked_subject_rows: list[dict[str, Any]] = []
     for row, (subject_id, subject_team_id), subject_error in zip(parsed, resolved_subjects, subject_errors):
-        market = resolve_manual_market_type(row.market_type)
+        market = _engine_market(row)
         if subject_error:
             entity = str(row.subject_id or row.subject_name or "UNRESOLVED")
             for side, price, line in ((row.side, row.price, row.line), (row.paired_side, row.paired_price, -row.line if row.market_type in {"RUN_LINE","FIRST_FIVE_RUN_LINE"} else row.line)):
