@@ -35,13 +35,14 @@ GAME = GameSnapshot(
 
 
 def _quote(market_type, *, subject_name=None):
+    moneyline = market_type == "MONEYLINE"
     raw = {
         "game_id": "Boston Red Sox@New York Yankees",
         "market_type": market_type,
-        "side": "OVER",
-        "line": 1.5,
+        "side": "AWAY" if moneyline else "OVER",
+        "line": 0.0 if moneyline else 1.5,
         "price": -110,
-        "paired_side": "UNDER",
+        "paired_side": "HOME" if moneyline else "UNDER",
         "paired_price": -110,
         "book": "draftkings",
         "observed_at": "2026-09-29T15:00:00-05:00",
