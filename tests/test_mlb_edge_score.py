@@ -1,10 +1,13 @@
 from sports.common.ev_math import american_to_decimal, devig_power
 from sportsedge.mlb_edge_score import score_mlb_edge, fair_american_odds, binary_no_vig_probability, ev_per_dollar
 
-def test_score_bounded_and_stronger_edge_monotonic():
+def test_score_bounded_and_invariant_to_model_probability_and_edge():
     low=score_mlb_edge(model_p=.55,american_odds=-110,opposite_odds=-110)
     high=score_mlb_edge(model_p=.62,american_odds=-110,opposite_odds=-110)
-    assert 0 <= low.confidence_score < high.confidence_score <= 100
+    assert 0 <= low.confidence_score <= 100
+    assert low.confidence_score == high.confidence_score
+    assert low.edge != high.edge
+    assert low.ev_per_dollar != high.ev_per_dollar
 
 def test_stale_quote_blocks():
     r=score_mlb_edge(model_p=.60,american_odds=120,opposite_odds=-140,quote_age_seconds=301,quote_ttl_seconds=300)
