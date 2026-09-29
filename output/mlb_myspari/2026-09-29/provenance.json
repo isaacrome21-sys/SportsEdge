@@ -1,0 +1,11 @@
+{
+  "execution": "local live run, not GitHub Actions dispatch",
+  "code_commit": "013ec179b0056626b8b0fa2e4c2b76aaa75b47b5",
+  "merged_commit": "d95e5e67a5253249d5c7fee3785d2c339bdba6d3",
+  "input_path": "manual_inputs/mlb/2026-09-29_dk_full_supplied.json",
+  "input_rows": 17,
+  "quote_results": 34,
+  "priced_results": 34,
+  "official": false,
+  "caveat": "Boyd raw outs probabilities are 1.0 / 0.0; empirical estimates are not calibrated certainty."
+}
