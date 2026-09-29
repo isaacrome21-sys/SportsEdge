@@ -8,7 +8,9 @@ from sportsedge.pitcher_joint_engine import price_pitcher_market
 
 class StubHistory(MLBGenericHistorySource):
     def __init__(self, rows):
+        from datetime import datetime, timezone
         self.rows = rows
+        self.retrieved_at = datetime(2026, 9, 29, 0, 0, tzinfo=timezone.utc)
     def player_rows(self, *, player_id, group, target_date):
         return self.rows
 
