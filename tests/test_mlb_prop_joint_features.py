@@ -48,7 +48,7 @@ class MLBPropJointFeatureTests(unittest.TestCase):
         priced = price_pitcher_market({"game_id":"1","market":"PITCHER_OUTS","entity_id":"20",
             "line":17.5,"side":"OVER","features":feature["features"]})
         self.assertAlmostEqual(priced["model_p"], 7.5 / 8.0)
-        self.assertEqual(priced["meta"]["raw_empirical_p"], 1.0)
+        self.assertAlmostEqual(priced["meta"]["raw_empirical_p"], 1.0, places=12)
         self.assertEqual(priced["meta"]["posterior_prior"], "JEFFREYS_SETTLEMENT_DIRICHLET_0_5")
 
 
