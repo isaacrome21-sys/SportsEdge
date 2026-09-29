@@ -68,6 +68,10 @@ _CAPABILITIES = {
         "PLAYER_GOALS", "REQUIRES_ENGINE", _GAME_STATE + ("pit_player_role", "shared_player_event_paths"),
         "Needs same-path player scoring events; team goal probability is insufficient.",
     ),
+    "PLAYER_ASSISTS": NHLMarketCapability(
+        "PLAYER_ASSISTS", "REQUIRES_ENGINE", _GAME_STATE + ("pit_player_role", "shared_player_event_paths"),
+        "Needs coherent same-path primary/secondary assist allocation from shared team goals.",
+    ),
     "GOALIE_SAVES": NHLMarketCapability(
         "GOALIE_SAVES", "REQUIRES_ENGINE", ("opponent_team_shot_paths", "goalie_save_paths", "goalie_state"),
         "Needs opponent SOG paths plus versioned goalie save/start-share parameters and explicit starter state.",
