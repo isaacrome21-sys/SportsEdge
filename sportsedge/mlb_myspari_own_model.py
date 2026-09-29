@@ -174,8 +174,13 @@ def _demote(row: dict[str, Any], reason: str, keeper: Mapping[str, Any]) -> None
 def apply_same_game_guard(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     by_game: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
-        if row.get("status") == "ACTIONABLE":
-            by_game.setdefault(str(row.get("game_id")), []).append(row)
+        if row.get("status") != "ACTIONABLE":
+            continue
+        game_id = row.get("game_id")
+        if game_id in {None, ""}:
+            # Fail neutral rather than treating unrelated unknown games as one game.
+            continue
+        by_game.setdefault(str(game_id), []).append(row)
     for game_rows in by_game.values():
         # 1) One run script per game: keep the direction holding the best-EV row.
         scripted = [r for r in game_rows if run_script_direction(r)]

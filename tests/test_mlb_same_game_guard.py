@@ -41,6 +41,14 @@ class SameGameGuardTest(unittest.TestCase):
         self.assertEqual(ml["status"], "PASS")
         self.assertIn(SAME_SIDE_STACK_REASON, ml["presentation_reason_codes"])
 
+    def test_missing_game_ids_are_fail_neutral(self):
+        high = _row("TOTALS", "OVER", 0.20, game=None)
+        quiet = _row("PITCHER_OUTS", "OVER", 0.30, game=None)
+        apply_same_game_guard([high, quiet])
+        self.assertEqual((high["status"], quiet["status"]), ("ACTIONABLE", "ACTIONABLE"))
+        self.assertNotIn("presentation_reason_codes", high)
+        self.assertNotIn("presentation_reason_codes", quiet)
+
     def test_other_games_and_pass_rows_untouched(self):
         a = _row("TOTALS", "OVER", 0.1, game="g1")
         b = _row("PITCHER_OUTS", "OVER", 0.2, game="g2")
