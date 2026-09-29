@@ -3,8 +3,8 @@ from __future__ import annotations
 from hashlib import sha256
 import json
 from typing import Any, Iterable, Mapping
-LANES=(("starters","Starters"),("lineups","Lineups"),("umpire","Umpire"),("weather_roof","Weather/roof"),("park_venue","Park/venue"),("statcast","Statcast"),("injuries_scratches","Injuries/scratches"))
-_HIGHLIGHTS={"umpire":("umpire_name","sample_gate","home_plate_games"),"weather_roof":("roof_state","temperature","wind_speed","wind_direction","precip_probability_pct","short_forecast"),"park_venue":("venue_name","roof_type","turf_type"),"statcast":("bound_pitcher_count","bound_hitter_count","window_start","window_end")}
+LANES=(("starters","Starters"),("lineups","Lineups"),("umpire","Umpire"),("weather_roof","Weather/roof"),("park_venue","Park/venue"),("statcast","Statcast"),("bullpen_workload","Bullpen workload"),("injuries_scratches","Injuries/scratches"))
+_HIGHLIGHTS={"umpire":("umpire_name","sample_gate","home_plate_games"),"weather_roof":("roof_state","temperature","wind_speed","wind_direction","precip_probability_pct","short_forecast"),"park_venue":("venue_name","roof_type","turf_type"),"statcast":("bound_pitcher_count","bound_hitter_count","window_start","window_end"),"bullpen_workload":("bullpen_pitches_24h","bullpen_pitches_48h","bullpen_pitches_72h","back_to_back_reliever_ids","high_usage_48h_reliever_ids")}
 def lane_sha256(lane:Any)->str:
  return sha256(json.dumps(lane,sort_keys=True,separators=(",",":"),default=str).encode()).hexdigest()
 def _find(obj,key):
@@ -24,6 +24,14 @@ def _starters(lane):
  for s in ("away","home"):
   q=p.get(s) if isinstance(p,Mapping) else None;n.append((q or {}).get("player_name") or (q or {}).get("player_id") or "TBD")
  return f"{n[0]} vs {n[1]}"
+def _bullpen(lane):
+ teams=lane.get("teams") or {}; parts=[]
+ for side in ("away","home"):
+  row=teams.get(side) if isinstance(teams,Mapping) else None
+  if not isinstance(row,Mapping):
+   parts.append(f"{side}=missing");continue
+  parts.append(f"{side}:24h {row.get('bullpen_pitches_24h','—')}p, 48h {row.get('bullpen_pitches_48h','—')}p, B2B {len(row.get('back_to_back_reliever_ids') or [])}")
+ return " | ".join(parts)
 def lane_line(key,label,bundle):
  lane=bundle.get(key)
  if not isinstance(lane,Mapping):return f"- {label}: NOT RETRIEVED this run"
@@ -31,6 +39,7 @@ def lane_line(key,label,bundle):
  if key=="starters":parts.append(_starters(lane))
  elif key=="lineups":
   c=lane.get("complete_by_side") or {};parts.append(f"official 9 posted — away {bool(c.get('away'))}, home {bool(c.get('home'))}")
+ elif key=="bullpen_workload":parts.append(_bullpen(lane))
  for field in _HIGHLIGHTS.get(key,()):
   v=_find(lane,field)
   if v not in (None,"",[]):parts.append(f"{field}={v}")
