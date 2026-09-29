@@ -15,7 +15,7 @@ on:
       - tests/test_mlb_joint_card_research.py
       - tests/test_mlb_scored_card.py
       - .github/workflows/mlb-context-adjusted-research.yml
-      - manual_inputs/mlb/2026-09-29_dk_run_corrected.json
+      - manual_inputs/mlb/2026-09-29_dk_full_supplied.json
   workflow_dispatch:
 
 permissions:
@@ -41,7 +41,7 @@ jobs:
       - name: Run Sept 29 context-adjusted research slate
         run: >-
           PYTHONPATH=. python scripts/run_mlb_context_adjusted_research.py
-          --input manual_inputs/mlb/2026-09-29_dk_run_corrected.json
+          --input manual_inputs/mlb/2026-09-29_dk_full_supplied.json
           --output artifacts/mlb_context_adjusted_research_20260929.json
       - name: Run retrospective diagnostic validation
         run: >-
