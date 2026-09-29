@@ -12,8 +12,8 @@ permissions:
   issues: write
 
 # GitHub treats issue-triggered workflows as low-trust and defaults their cache
-# token to read-only. Only the repository owner is allowed to run this job, and
-# the cached path contains public MLB history data only, so allow same-day writes.
+# token to read-only. Only the repository owner is allowed to run this job. The
+# caches contain only the pinned NumPy runtime and public MLB history data.
 cache-mode: write
 
 concurrency:
@@ -35,8 +35,20 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
+
+      # The live smoke showed NumPy installation taking ~3.7 seconds, while
+      # setup-python itself was ~0.2 seconds. Cache the installed cp312 package,
+      # not just pip's download cache, so warm phone runs skip installation.
+      - name: Restore phone runtime
+        id: runtime
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: .runtime-deps
+          key: mlb-lines-runtime-v1-${{ runner.os }}-${{ runner.arch }}-py312-numpy253
       - name: Install runtime dependencies
-        run: python -m pip install --disable-pip-version-check numpy==2.5.3
+        if: steps.runtime.outputs.cache-hit != 'true'
+        run: python -m pip install --disable-pip-version-check --target .runtime-deps numpy==2.5.3
+
       - name: Slate date
         id: day
         run: echo "date=$(TZ=America/Chicago date +%F)" >> "$GITHUB_OUTPUT"
@@ -57,7 +69,7 @@ jobs:
           OBSERVED: ${{ github.event.issue.updated_at }}
         run: |
           printf '%s' "$BODY" > issue_body.txt
-          if PYTHONPATH=. python scripts/intake_mlb_lines_issue.py --body-file issue_body.txt \
+          if PYTHONPATH=.runtime-deps:. python scripts/intake_mlb_lines_issue.py --body-file issue_body.txt \
                --observed-at "$OBSERVED" --issue "$ISSUE" > intake.out; then
             cat intake.out >> "$GITHUB_OUTPUT"
           else
@@ -68,11 +80,11 @@ jobs:
           fi
 
       - name: Run SportsEdge engines
-        run: PYTHONPATH=. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.intake.outputs.path }}" --run-date "${{ steps.intake.outputs.slate }}" --max-age-minutes 60 --output artifacts/manual_mlb_snapshot_card.json
+        run: PYTHONPATH=.runtime-deps:. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.intake.outputs.path }}" --run-date "${{ steps.intake.outputs.slate }}" --max-age-minutes 60 --output artifacts/manual_mlb_snapshot_card.json
 
       - name: Render card and reply now
         run: |
-          PYTHONPATH=. python scripts/render_mlb_myspari_card.py \
+          PYTHONPATH=.runtime-deps:. python scripts/render_mlb_myspari_card.py \
             --engine-output artifacts/manual_mlb_snapshot_card.json \
             --snapshot "${{ steps.intake.outputs.path }}" \
             --out-dir artifacts/mlb_myspari
@@ -82,8 +94,8 @@ jobs:
         continue-on-error: true
         timeout-minutes: 5
         run: |
-          PYTHONPATH=. python scripts/acquire_mlb_card_context.py --engine-output artifacts/manual_mlb_snapshot_card.json --out-dir artifacts/mlb_context
-          PYTHONPATH=. python scripts/render_mlb_myspari_card.py \
+          PYTHONPATH=.runtime-deps:. python scripts/acquire_mlb_card_context.py --engine-output artifacts/manual_mlb_snapshot_card.json --out-dir artifacts/mlb_context
+          PYTHONPATH=.runtime-deps:. python scripts/render_mlb_myspari_card.py \
             --engine-output artifacts/manual_mlb_snapshot_card.json \
             --snapshot "${{ steps.intake.outputs.path }}" \
             --context-dir artifacts/mlb_context \
