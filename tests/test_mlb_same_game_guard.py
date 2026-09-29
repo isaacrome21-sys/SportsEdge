@@ -1,6 +1,7 @@
 import unittest
 
 from sportsedge.mlb_myspari_own_model import (
+    OPPOSITE_TEAM_OUTCOME_REASON,
     SAME_SIDE_STACK_REASON,
     SCRIPT_CONFLICT_REASON,
     apply_same_game_guard,
@@ -8,9 +9,20 @@ from sportsedge.mlb_myspari_own_model import (
 )
 
 
-def _row(market, side, ev, game="g1", status="ACTIONABLE", line=0.0):
-    return {"game_id": game, "market": market, "side": side, "line": line,
-            "ev_per_dollar": ev, "status": status, "entity_id": game}
+def _row(market, side, ev, game="g1", status="ACTIONABLE", line=0.0,
+         score=50, entity=None, team_side=None, name=""):
+    return {
+        "game_id": game,
+        "market": market,
+        "side": side,
+        "line": line,
+        "ev_per_dollar": ev,
+        "confidence_score": score,
+        "status": status,
+        "entity_id": game if entity is None else entity,
+        "entity_name": name,
+        "team_side": team_side,
+    }
 
 
 class SameGameGuardTest(unittest.TestCase):
@@ -33,13 +45,45 @@ class SameGameGuardTest(unittest.TestCase):
         self.assertEqual(outs["status"], "PASS")
         self.assertIn(SCRIPT_CONFLICT_REASON, outs["presentation_reason_codes"])
 
-    def test_ml_and_run_line_same_team_is_one_bet(self):
-        ml = _row("MONEYLINE", "HOME", 0.136)
-        rl = _row("RUN_LINE", "HOME", 0.142, line=-1.5)
-        apply_same_game_guard([ml, rl])
-        self.assertEqual(rl["status"], "ACTIONABLE")
-        self.assertEqual(ml["status"], "PASS")
-        self.assertIn(SAME_SIDE_STACK_REASON, ml["presentation_reason_codes"])
+    def test_full_game_and_f5_same_team_collapse_to_one_outcome(self):
+        ml = _row("MONEYLINE", "AWAY", 0.04, score=96)
+        f5_ml = _row("F5_MONEYLINE", "AWAY", 0.06, score=56)
+        f5_rl = _row("F5_RUN_LINE", "AWAY", 0.08, line=0.5, score=56)
+        apply_same_game_guard([ml, f5_ml, f5_rl])
+        self.assertEqual(ml["status"], "ACTIONABLE")
+        self.assertEqual(f5_ml["status"], "PASS")
+        self.assertEqual(f5_rl["status"], "PASS")
+        self.assertIn(SAME_SIDE_STACK_REASON, f5_ml["presentation_reason_codes"])
+        self.assertIn(SAME_SIDE_STACK_REASON, f5_rl["presentation_reason_codes"])
+
+    def test_pitcher_win_opposite_team_conflicts_when_team_bound(self):
+        away_ml = _row("MONEYLINE", "AWAY", 0.04, score=96)
+        home_pitcher_win = _row(
+            "PITCHER_RECORD_WIN", "YES", 0.40, score=56,
+            entity="650633", team_side="HOME", name="Michael King",
+        )
+        apply_same_game_guard([away_ml, home_pitcher_win])
+        self.assertEqual(away_ml["status"], "ACTIONABLE")
+        self.assertEqual(home_pitcher_win["status"], "PASS")
+        self.assertIn(OPPOSITE_TEAM_OUTCOME_REASON, home_pitcher_win["presentation_reason_codes"])
+
+    def test_pitcher_win_same_team_is_duplicate_when_team_bound(self):
+        away_ml = _row("MONEYLINE", "AWAY", 0.04, score=96)
+        away_pitcher_win = _row(
+            "PITCHER_RECORD_WIN", "YES", 0.43, score=56,
+            entity="571510", team_side="AWAY", name="Matthew Boyd",
+        )
+        apply_same_game_guard([away_ml, away_pitcher_win])
+        self.assertEqual(away_ml["status"], "ACTIONABLE")
+        self.assertEqual(away_pitcher_win["status"], "PASS")
+        self.assertIn(SAME_SIDE_STACK_REASON, away_pitcher_win["presentation_reason_codes"])
+
+    def test_unbound_pitcher_win_fails_neutral(self):
+        away_ml = _row("MONEYLINE", "AWAY", 0.04, score=96)
+        pitcher_win = _row("PITCHER_RECORD_WIN", "YES", 0.43, score=56, entity="p1")
+        apply_same_game_guard([away_ml, pitcher_win])
+        self.assertEqual(away_ml["status"], "ACTIONABLE")
+        self.assertEqual(pitcher_win["status"], "ACTIONABLE")
 
     def test_other_games_and_pass_rows_untouched(self):
         a = _row("TOTALS", "OVER", 0.1, game="g1")

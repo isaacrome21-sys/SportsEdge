@@ -30,6 +30,23 @@ def _observed_at(payload: dict) -> datetime | None:
     return min(parsed) if parsed else None
 
 
+def _load_context_bundles(context_dir: str | None) -> tuple[list[dict], list[dict], dict[str, str]]:
+    if not context_dir:
+        return [], [], {}
+    ctx = Path(context_dir)
+    bundles = [json.loads(p.read_text()) for p in sorted(ctx.glob("*.json")) if p.name != "failures.json"]
+    failures = json.loads((ctx / "failures.json").read_text()) if (ctx / "failures.json").is_file() else []
+    team_sides: dict[str, str] = {}
+    for bundle in bundles:
+        probable = ((bundle.get("starters") or {}).get("probable_pitchers") or {})
+        for side in ("away", "home"):
+            pitcher = probable.get(side) or {}
+            player_id = pitcher.get("player_id")
+            if player_id not in {None, ""}:
+                team_sides[str(player_id)] = side.upper()
+    return bundles, failures, team_sides
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--engine-output", default="artifacts/manual_mlb_snapshot_card.json")
@@ -58,7 +75,8 @@ def main() -> int:
     observed = _observed_at(payload)
     age = max((now - observed).total_seconds(), 0.0) if observed else 0.0
 
-    rows = myspari_rows(payload, quote_age_seconds=age, names=names)
+    bundles, failures, team_sides = _load_context_bundles(args.context_dir)
+    rows = myspari_rows(payload, quote_age_seconds=age, names=names, team_sides=team_sides)
     games = payload.get("games") or ([{"resolved_game": payload.get("resolved_game")}] if payload.get("resolved_game") else [])
     notes = []
     for g in games:
@@ -85,9 +103,6 @@ def main() -> int:
     out.mkdir(parents=True, exist_ok=True)
     text = render_markdown(rows, header=f"SportsEdge MLB card ({MYSPARI_OWN_MODEL_VERSION})", notes=notes)
     if args.context_dir:
-        ctx = Path(args.context_dir)
-        bundles = [json.loads(p.read_text()) for p in sorted(ctx.glob("*.json")) if p.name != "failures.json"]
-        failures = json.loads((ctx / "failures.json").read_text()) if (ctx / "failures.json").is_file() else []
         text += "\n".join(context_section(bundles, failures=failures)) + "\n"
     (out / "card.md").write_text(text)
     (out / "card.json").write_text(json.dumps({"version": MYSPARI_OWN_MODEL_VERSION, "rows": rows}, indent=2, default=str))

@@ -80,7 +80,8 @@ def _conditional_and_push(row: Mapping[str, Any]) -> tuple[float | None, float]:
 
 def myspari_rows(payload: Mapping[str, Any], *, quote_age_seconds: float = 0.0,
                  quote_ttl_seconds: float = MANUAL_QUOTE_TTL_SECONDS,
-                 reliability: float = 0.6, names: Mapping[str, str] | None = None) -> list[dict[str, Any]]:
+                 reliability: float = 0.6, names: Mapping[str, str] | None = None,
+                 team_sides: Mapping[str, str] | None = None) -> list[dict[str, Any]]:
     results = [r for r in (payload.get("results") or []) if isinstance(r, Mapping)]
     out: list[dict[str, Any]] = []
     for row in results:
@@ -90,9 +91,11 @@ def myspari_rows(payload: Mapping[str, Any], *, quote_age_seconds: float = 0.0,
         guard_reason = empirical_guard_reason(row, cond)
         raw_paths = row.get("mc_paths", 0)
         n_paths = raw_paths if isinstance(raw_paths, int) and not isinstance(raw_paths, bool) and raw_paths >= 0 else 0
+        entity_id = str(row.get("entity_id"))
+        team_side = str((team_sides or {}).get(entity_id, "")).upper() or None
         base = {
             "game_id": row.get("game_id"), "market": row.get("market"), "entity_id": row.get("entity_id"),
-            "entity_name": (names or {}).get(str(row.get("entity_id")), ""),
+            "entity_name": (names or {}).get(entity_id, ""), "team_side": team_side,
             "line": row.get("line"), "side": row.get("side"), "american_odds": odds,
             "engine_status": row.get("bet_status"), "engine_reason": row.get("reason"),
             "engine_version": row.get("engine_version"), "mc_paths": n_paths,
@@ -125,10 +128,11 @@ def myspari_rows(payload: Mapping[str, Any], *, quote_age_seconds: float = 0.0,
 
 # --- Same-game script guard -------------------------------------------------
 # Presentation-only: never changes a probability. It stops one card from telling
-# two opposite stories about the same game (e.g. game Over + pitcher Outs Over),
-# and from listing the same team twice (ML + run line) as independent edges.
+# contradictory run scripts and from stacking correlated team-outcome bets across
+# full game, first five, and pitcher-to-record-win markets.
 SCRIPT_CONFLICT_REASON = "SAME_GAME_SCRIPT_CONFLICT"
 SAME_SIDE_STACK_REASON = "SAME_SIDE_STACK"
+OPPOSITE_TEAM_OUTCOME_REASON = "OPPOSITE_TEAM_OUTCOME_CONFLICT"
 _HIGH_RUNS_OVER = frozenset({
     "TOTALS", "TEAM_TOTALS", "F5_TOTALS", "F5_TEAM_TOTALS",
     "PITCHER_HITS_ALLOWED", "PITCHER_ER", "PITCHER_BB", "PITCHER_HITS_WALKS_ER",
@@ -138,7 +142,7 @@ _HIGH_RUNS_OVER = frozenset({
 })
 # Over on these means the pitcher went deep or dominated -> fewer runs.
 _LOW_RUNS_OVER = frozenset({"PITCHER_OUTS", "PITCHER_K"})
-_SIDE_MARKETS = frozenset({"MONEYLINE", "RUN_LINE"})
+_TEAM_OUTCOME_MARKETS = frozenset({"MONEYLINE", "RUN_LINE", "F5_MONEYLINE", "F5_RUN_LINE", "PITCHER_RECORD_WIN"})
 
 
 def run_script_direction(row: Mapping[str, Any]) -> int:
@@ -161,6 +165,29 @@ def run_script_direction(row: Mapping[str, Any]) -> int:
 def _ev(row: Mapping[str, Any]) -> float:
     ev = _f(row.get("ev_per_dollar"))
     return -1e9 if ev is None else ev
+
+
+def _team_outcome_side(row: Mapping[str, Any]) -> str | None:
+    """Return AWAY/HOME for team-outcome exposure, or None when it cannot be bound safely."""
+    market = str(row.get("market") or "").upper()
+    if market not in _TEAM_OUTCOME_MARKETS:
+        return None
+    side = str(row.get("side") or "").upper()
+    if market == "PITCHER_RECORD_WIN":
+        if side != "YES":
+            return None
+        team_side = str(row.get("team_side") or "").upper()
+        return team_side if team_side in {"AWAY", "HOME"} else None
+    return side if side in {"AWAY", "HOME"} else None
+
+
+def _outcome_guard_rank(row: Mapping[str, Any]) -> tuple[int, float]:
+    """Prefer stronger qualification evidence, then EV, when collapsing outcome exposure."""
+    try:
+        score = int(row.get("confidence_score") or 0)
+    except (TypeError, ValueError):
+        score = 0
+    return score, _ev(row)
 
 
 def _demote(row: dict[str, Any], reason: str, keeper: Mapping[str, Any]) -> None:
@@ -190,16 +217,18 @@ def apply_same_game_guard(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             for r in scripted:
                 if run_script_direction(r) != keep_dir:
                     _demote(r, SCRIPT_CONFLICT_REASON, keeper)
-        # 2) One side bet per team: ML and run line on the same team are one bet.
-        sides = [r for r in game_rows if r.get("status") == "ACTIONABLE"
-                 and str(r.get("market") or "").upper() in _SIDE_MARKETS]
-        for team in {str(r.get("side") or "").upper() for r in sides}:
-            same = [r for r in sides if str(r.get("side") or "").upper() == team]
-            if len(same) > 1:
-                keeper = max(same, key=_ev)
-                for r in same:
-                    if r is not keeper:
-                        _demote(r, SAME_SIDE_STACK_REASON, keeper)
+
+        # 2) One team-outcome exposure per game across full game, F5, and pitcher W.
+        # Pitcher W is included only when context has bound the pitcher to AWAY/HOME.
+        outcomes = [r for r in game_rows if r.get("status") == "ACTIONABLE" and _team_outcome_side(r)]
+        if len(outcomes) > 1:
+            keeper = max(outcomes, key=_outcome_guard_rank)
+            keep_team = _team_outcome_side(keeper)
+            for r in outcomes:
+                if r is keeper:
+                    continue
+                reason = SAME_SIDE_STACK_REASON if _team_outcome_side(r) == keep_team else OPPOSITE_TEAM_OUTCOME_REASON
+                _demote(r, reason, keeper)
     return rows
 
 
