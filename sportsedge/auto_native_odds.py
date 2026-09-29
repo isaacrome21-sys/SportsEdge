@@ -133,8 +133,16 @@ def run_auto_mlb_native_odds(
             results=quotes,
             source_failures=normalized_failures,
         ):
+            # Preserve concrete provider diagnostics in the keyring failure instead
+            # of collapsing every failure into a count. This is safe because API
+            # keys are never present in the normalized failure rows.
+            details = "; ".join(
+                f"{row.get('surface', 'UNKNOWN')}:{row.get('stage', 'UNKNOWN')}:{row.get('reason', 'UNKNOWN')}"
+                for row in normalized_failures[:6]
+            )
             raise RuntimeError(
-                f"NATIVE_ODDS_EMPTY_WITH_PROVIDER_FETCH_FAILURES:count={len(normalized_failures)}"
+                "NATIVE_ODDS_EMPTY_WITH_PROVIDER_FETCH_FAILURES:"
+                f"count={len(normalized_failures)}:details={details}"
             )
         return {"quotes": quotes, "failures": failures}
 
