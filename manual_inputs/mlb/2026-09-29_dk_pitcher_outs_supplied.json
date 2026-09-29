@@ -1,0 +1,74 @@
+{
+  "rows": [
+    {
+      "game_id": "Philadelphia Phillies@Atlanta Braves",
+      "market_type": "PITCHER_OUTS",
+      "subject_name": "Chris Sale",
+      "side": "OVER",
+      "line": 17.5,
+      "price": -171,
+      "paired_side": "UNDER",
+      "paired_price": 128,
+      "book": "draftkings",
+      "observed_at": "2026-09-28T20:41:39-05:00",
+      "first_pitch_at": "2026-09-29T13:00:00-05:00",
+      "source": "MANUAL"
+    },
+    {
+      "game_id": "Boston Red Sox@New York Yankees",
+      "market_type": "PITCHER_OUTS",
+      "subject_name": "Cam Schlittler",
+      "side": "OVER",
+      "line": 17.5,
+      "price": -117,
+      "paired_side": "UNDER",
+      "paired_price": -113,
+      "book": "draftkings",
+      "observed_at": "2026-09-28T20:41:39-05:00",
+      "first_pitch_at": "2026-09-29T19:00:00-05:00",
+      "source": "MANUAL"
+    },
+    {
+      "game_id": "Boston Red Sox@New York Yankees",
+      "market_type": "PITCHER_OUTS",
+      "subject_name": "Payton Tolle",
+      "side": "OVER",
+      "line": 17.5,
+      "price": -107,
+      "paired_side": "UNDER",
+      "paired_price": -124,
+      "book": "draftkings",
+      "observed_at": "2026-09-28T20:41:39-05:00",
+      "first_pitch_at": "2026-09-29T19:00:00-05:00",
+      "source": "MANUAL"
+    },
+    {
+      "game_id": "Chicago Cubs@San Diego Padres",
+      "market_type": "PITCHER_OUTS",
+      "subject_name": "Michael King",
+      "side": "OVER",
+      "line": 14.5,
+      "price": -150,
+      "paired_side": "UNDER",
+      "paired_price": 113,
+      "book": "draftkings",
+      "observed_at": "2026-09-28T20:41:39-05:00",
+      "first_pitch_at": "2026-09-29T21:00:00-05:00",
+      "source": "MANUAL"
+    },
+    {
+      "game_id": "Chicago Cubs@San Diego Padres",
+      "market_type": "PITCHER_OUTS",
+      "subject_name": "Matthew Boyd",
+      "side": "OVER",
+      "line": 13.5,
+      "price": -118,
+      "paired_side": "UNDER",
+      "paired_price": -113,
+      "book": "draftkings",
+      "observed_at": "2026-09-28T20:41:39-05:00",
+      "first_pitch_at": "2026-09-29T21:00:00-05:00",
+      "source": "MANUAL"
+    }
+  ]
+}
