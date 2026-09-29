@@ -2,20 +2,18 @@ name: auto-mlb
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '2,32 * * * *'
+  # MLB paid acquisition remains parked from a timer by the frozen credit policy.
+  # A dispatch is still fully automatic once started: odds, model, context and card.
   push:
     branches: [main]
     paths:
       - 'sportsedge/**'
       - 'scripts/run_auto_mlb*.py'
-      - 'scripts/mlb_postseason_schedule_gate.py'
       - 'scripts/acquire_mlb_card_context.py'
       - 'scripts/render_mlb_myspari_card.py'
       - 'config/**'
       - 'tests/test_auto_native_odds.py'
       - 'tests/test_mlb_run_machine.py'
-      - 'tests/test_mlb_postseason_schedule_gate.py'
       - 'tests/test_mlb_bullpen_workload_source.py'
       - 'tests/test_mlb_run_it_pregame.py'
       - 'tests/test_mlb_context_card.py'
@@ -38,26 +36,12 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
-      - name: Resolve bounded postseason paid-run gate
-        id: paid_gate
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ "${{ github.event_name }}" == "schedule" ]]; then
-            python scripts/mlb_postseason_schedule_gate.py
-          else
-            echo "due=true" >> "$GITHUB_OUTPUT"
-            echo "reason=NON_SCHEDULE_EVENT" >> "$GITHUB_OUTPUT"
-          fi
       - name: Install runtime dependencies
-        if: github.event_name != 'schedule' || steps.paid_gate.outputs.due == 'true'
         run: python -m pip install --disable-pip-version-check numpy==2.5.3
       - name: Resolve Chicago slate date
-        if: github.event_name != 'schedule' || steps.paid_gate.outputs.due == 'true'
         id: slate
         run: echo "date=$(TZ=America/Chicago date +%F)" >> "$GITHUB_OUTPUT"
       - name: Restore MLB history cache
-        if: github.event_name != 'schedule' || steps.paid_gate.outputs.due == 'true'
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: .cache/sportsedge/mlb-history
@@ -65,7 +49,6 @@ jobs:
           restore-keys: |
             sportsedge-mlb-history-v1-${{ runner.os }}-
       - name: Verify canonical MLB machine safety tests
-        if: github.event_name != 'schedule' || steps.paid_gate.outputs.due == 'true'
         run: >-
           python -m unittest
           tests.test_auto_runner
@@ -83,13 +66,12 @@ jobs:
           tests.test_mlb_quote_source_coverage
           tests.test_mlb_run_machine
           tests.test_run_auto_mlb_resilient_machine
-          tests.test_mlb_postseason_schedule_gate
           tests.test_mlb_bullpen_workload_source
           tests.test_mlb_run_it_pregame
           tests.test_mlb_context_card
           -v
       - name: Run canonical automated MLB machine
-        if: (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && steps.paid_gate.outputs.due == 'true'
+        if: github.event_name == 'workflow_dispatch'
         env:
           SPORTSEDGE_QUOTES_URL: ${{ secrets.SPORTSEDGE_QUOTES_URL }}
           SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
@@ -103,17 +85,17 @@ jobs:
           SPORTSEDGE_HISTORY_CACHE_DIR: .cache/sportsedge/mlb-history
         run: python scripts/run_auto_mlb_resilient.py --output artifacts/live_mlb_card.json
       - name: Retrieve automated pregame context
-        if: always() && hashFiles('artifacts/live_mlb_card.json') != ''
+        if: always() && github.event_name == 'workflow_dispatch' && hashFiles('artifacts/live_mlb_card.json') != ''
         run: PYTHONPATH=. python scripts/acquire_mlb_card_context.py --engine-output artifacts/live_mlb_card.json --out-dir artifacts/mlb_context
       - name: Render SportsEdge phone card
-        if: always() && hashFiles('artifacts/live_mlb_card.json') != ''
+        if: always() && github.event_name == 'workflow_dispatch' && hashFiles('artifacts/live_mlb_card.json') != ''
         run: >-
           PYTHONPATH=. python scripts/render_mlb_myspari_card.py
           --engine-output artifacts/live_mlb_card.json
           --context-dir artifacts/mlb_context
           --out-dir artifacts/mlb_myspari
       - name: Upload automated card evidence
-        if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && steps.paid_gate.outputs.due == 'true'
+        if: always() && github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: live-mlb-card
