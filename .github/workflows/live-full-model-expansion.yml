@@ -6,6 +6,9 @@ on:
     paths:
       - .github/workflows/live-full-model-expansion.yml
       - manual_inputs/mlb/2026-09-29_dk_fresh_1040.json
+      - manual_inputs/mlb/2026-09-29_full_market_chunks/**
+      - scripts/expand_mlb_full_market_chunks.py
+      - scripts/run_manual_mlb_full_all_markets.py
   workflow_dispatch:
 
 permissions:
@@ -33,7 +36,20 @@ jobs:
       - name: Verify fresh manual MLB path
         run: PYTHONPATH=. python -m unittest tests.test_manual_quote_contract tests.test_manual_mlb_live_guards tests.test_mlb_myspari_own_model tests.test_mlb_empirical_support
 
-      - name: Run SportsEdge on fresh supplied DK playoff board
+      - name: Expand complete supplied screenshot market board
+        run: >-
+          PYTHONPATH=. python scripts/expand_mlb_full_market_chunks.py
+          --input-dir manual_inputs/mlb/2026-09-29_full_market_chunks
+          --output artifacts/2026-09-29_dk_full_all_markets_1040.json
+
+      - name: Run SportsEdge full board — sides totals batter pitcher props
+        run: >-
+          PYTHONPATH=. python scripts/run_manual_mlb_full_all_markets.py
+          --input artifacts/2026-09-29_dk_full_all_markets_1040.json
+          --output artifacts/full_all_markets_card.json
+          --history-cache-dir .cache/mlb-history
+
+      - name: Run baseline paired board regression
         run: >-
           PYTHONPATH=. python scripts/run_manual_mlb_snapshot.py
           --input manual_inputs/mlb/2026-09-29_dk_fresh_1040.json
@@ -46,7 +62,7 @@ jobs:
         continue-on-error: true
         run: PYTHONPATH=. python scripts/acquire_mlb_card_context.py --engine-output artifacts/fresh_manual_mlb_card.json --out-dir artifacts/mlb_context
 
-      - name: Render SportsEdge fresh card
+      - name: Render baseline SportsEdge card
         if: always() && hashFiles('artifacts/fresh_manual_mlb_card.json') != ''
         continue-on-error: true
         run: >-
@@ -56,59 +72,24 @@ jobs:
           --context-dir artifacts/mlb_context
           --out-dir artifacts/mlb_myspari
 
-      - name: Run unified automatic LIVE RUN IT acquisition
-        id: unified
-        continue-on-error: true
-        env:
-          SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
-          SPORTSEDGE_ODDS_BOOKMAKERS: draftkings
-        shell: bash
-        run: |
-          set +e
-          python scripts/run_live_run_it.py --sports MLB,NFL,CFB --output artifacts/live_run_it.json 2>&1 | tee artifacts/live_acquisition.log
-          code=${PIPESTATUS[0]}
-          echo "$code" > artifacts/live_acquisition_exit_code.txt
-          if grep -q 'OUT_OF_USAGE_CREDITS' artifacts/live_acquisition.log artifacts/live_run_it.json 2>/dev/null; then
-            echo 'terminal_exhaustion=true' >> "$GITHUB_OUTPUT"
-          else
-            echo 'terminal_exhaustion=false' >> "$GITHUB_OUTPUT"
-          fi
-          exit 0
-
-      - name: Diagnose Odds API key slots
-        id: diagnostic
-        if: steps.unified.outputs.terminal_exhaustion != 'true'
-        continue-on-error: true
-        env:
-          SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
-          SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
-          SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
-          SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
-        shell: bash
+      - name: Summarize full all-market run
+        if: always() && hashFiles('artifacts/full_all_markets_card.json') != ''
         run: |
           python - <<'PY'
-          import json, os
-          from urllib.error import HTTPError, URLError
-          from urllib.parse import urlencode
-          from urllib.request import Request, urlopen
-          keys = [os.environ.get('SPORTSEDGE_ODDS_API_KEY', '').strip(), os.environ.get('SPORTSEDGE_ODDS_API_KEY_2', '').strip(), os.environ.get('SPORTSEDGE_ODDS_API_KEY_3', '').strip(), os.environ.get('SPORTSEDGE_ODDS_API_KEY_4', '').strip()]
-          out=[]
-          for i,key in enumerate(keys,1):
-              if not key:
-                  out.append({'slot':i,'ok':False,'error_code':'KEY_MISSING'}); continue
-              url='https://api.the-odds-api.com/v4/sports/baseball_mlb/odds?'+urlencode({'apiKey':key,'bookmakers':'draftkings','markets':'h2h','oddsFormat':'american','dateFormat':'iso'})
-              try:
-                  with urlopen(Request(url,headers={'Accept':'application/json'}),timeout=15) as r:
-                      data=json.loads(r.read().decode()); out.append({'slot':i,'ok':True,'quota_remaining':r.headers.get('x-requests-remaining'),'result_count':len(data) if isinstance(data,list) else None})
-              except HTTPError as e:
-                  body=e.read().decode('utf-8','replace')
-                  try: parsed=json.loads(body)
-                  except Exception: parsed={}
-                  out.append({'slot':i,'ok':False,'http_status':e.code,'error_code':parsed.get('error_code'),'message':parsed.get('message')})
-                  if parsed.get('error_code')=='OUT_OF_USAGE_CREDITS': break
-              except Exception as e: out.append({'slot':i,'ok':False,'error_code':type(e).__name__,'message':str(e)})
-          with open('artifacts/odds_diagnostic.json','w') as f: json.dump(out,f,indent=2)
-          print(json.dumps(out,indent=2))
+          import json, collections
+          p=json.load(open('artifacts/full_all_markets_card.json'))
+          rows=p.get('scored_rows') or []
+          action=[r for r in rows if r.get('status')=='ACTIONABLE']
+          out={
+            'input_counts':p.get('input_counts'),
+            'results':len(p.get('results') or []),
+            'scored_rows':len(rows),
+            'actionable':len(action),
+            'actionable_by_market':dict(collections.Counter(r.get('market') for r in action)),
+            'actionable_rows':action,
+          }
+          json.dump(out,open('artifacts/full_all_markets_summary.json','w'),indent=2,sort_keys=True)
+          print(json.dumps({k:v for k,v in out.items() if k!='actionable_rows'},indent=2))
           PY
 
       - name: Upload live card
