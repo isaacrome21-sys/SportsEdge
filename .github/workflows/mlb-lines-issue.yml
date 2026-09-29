@@ -11,13 +11,18 @@ permissions:
   contents: read
   issues: write
 
+# GitHub treats issue-triggered workflows as low-trust and defaults their cache
+# token to read-only. Only the repository owner is allowed to run this job, and
+# the cached path contains public MLB history data only, so allow same-day writes.
+cache-mode: write
+
 concurrency:
   group: mlb-lines-issue-${{ github.event.issue.number }}
   cancel-in-progress: true
 
 jobs:
   card:
-    if: contains(github.event.issue.labels.*.name, 'mlb-lines') || startsWith(github.event.issue.title, '[MLB LINES]')
+    if: github.actor == github.repository_owner && (contains(github.event.issue.labels.*.name, 'mlb-lines') || startsWith(github.event.issue.title, '[MLB LINES]'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
