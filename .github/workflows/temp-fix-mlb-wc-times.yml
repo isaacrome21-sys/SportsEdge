@@ -1,0 +1,44 @@
+name: temp-fix-mlb-wc-times
+
+on:
+  push:
+    branches:
+      - research/mlb-context-adjusted-runs-20260929
+    paths:
+      - .github/workflows/temp-fix-mlb-wc-times.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: research/mlb-context-adjusted-runs-20260929
+          fetch-depth: 0
+      - name: Correct Wild Card first-pitch timestamps and remove this workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('manual_inputs/mlb/2026-09-29_dk_full_supplied.json')
+          text = path.read_text(encoding='utf-8')
+          bos = text.count('2026-09-29T19:10:00-05:00')
+          chc = text.count('2026-09-29T21:10:00-05:00')
+          if bos == 0 or chc == 0:
+              raise SystemExit(f'expected 19:10 and 21:10 rows, got bos={bos} chc={chc}')
+          text = text.replace('2026-09-29T19:10:00-05:00', '2026-09-29T19:00:00-05:00')
+          text = text.replace('2026-09-29T21:10:00-05:00', '2026-09-29T21:00:00-05:00')
+          path.write_text(text, encoding='utf-8')
+          print(f'corrected first pitch timestamps: BOS/NYY rows={bos}, CHC/SD rows={chc}')
+          PY
+          rm .github/workflows/temp-fix-mlb-wc-times.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add manual_inputs/mlb/2026-09-29_dk_full_supplied.json .github/workflows/temp-fix-mlb-wc-times.yml
+          git diff --cached --check
+          git commit -m 'research: correct Wild Card first-pitch timestamps'
+          git push origin HEAD:research/mlb-context-adjusted-runs-20260929
