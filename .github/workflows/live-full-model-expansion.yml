@@ -1,6 +1,10 @@
 name: live-full-model-expansion
 
 on:
+  push:
+    branches: [sportsedge/live-mlb-20260929-full-model]
+    paths:
+      - .github/workflows/live-full-model-expansion.yml
   workflow_dispatch:
 
 permissions:
