@@ -1,7 +1,9 @@
 """NHL fair-price, EV and bettor-facing RUN IT score helpers.
 
-Scores are transparent presentation scores, not calibrated win probabilities or
-historical performance claims. Pricing preserves push mass.
+Price economics and the 0-100 presentation score are deliberately separate.
+Fair price and EV come from model outcome mass plus the offered quote. Score is an
+upstream qualification score only; odds, EV, edge and win probability never
+change it. Pricing preserves push mass.
 """
 from dataclasses import dataclass
 import math
@@ -36,8 +38,13 @@ class NHLPrice:
     fair_probability: float
     fair_american: int
     expected_value: float
-    edge_score: int
-    score_label: str = "TRANSPARENT_EV_SCORE_V1"
+    edge_score: float | None
+    score_label: str = "RUN_IT_SCORE_V2"
+
+    @property
+    def qualification_score(self) -> float | None:
+        """Explicit alias; retained edge_score field is compatibility-only."""
+        return self.edge_score
 
 
 def american_profit(odds: int) -> float:
@@ -54,16 +61,28 @@ def american_from_probability(probability: float) -> int:
     return int(round(100.0 * (1.0 - probability) / probability))
 
 
-def price_outcome(outcome: OutcomeProbability, quote: NHLQuote) -> NHLPrice:
+def _qualification_score(value: float | None) -> float | None:
+    if value is None:
+        return None
+    if type(value) not in (int, float) or not math.isfinite(value) or not 0.0 <= value <= 100.0:
+        raise ValueError("qualification_score must be finite and in [0, 100]")
+    return round(float(value), 1)
+
+
+def price_outcome(
+    outcome: OutcomeProbability,
+    quote: NHLQuote,
+    *,
+    qualification_score: float | None = None,
+) -> NHLPrice:
+    """Price an exact outcome without manufacturing a score from economics."""
     quote.validate()
     decisive = outcome.win + outcome.loss
     if decisive <= 0:
         raise ValueError("cannot price an all-push outcome")
     fair_probability = outcome.win / decisive
     ev = outcome.win * american_profit(quote.american_odds) - outcome.loss
-    # Presentation transform only: 50 is zero EV, each +1% unit EV adds 2 points.
-    # It is intentionally bounded and must never be presented as win probability.
-    score = int(round(max(0.0, min(100.0, 50.0 + 200.0 * ev))))
+    score = _qualification_score(qualification_score)
     return NHLPrice(
         outcome.win, outcome.push, outcome.loss, fair_probability,
         american_from_probability(fair_probability), ev, score,
