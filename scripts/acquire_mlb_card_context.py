@@ -10,10 +10,14 @@ def game_pks(payload):
  for g in games:
   pk=(g.get("resolved_game") or {}).get("game_pk")
   if pk is not None and int(pk) not in found:found.append(int(pk))
+ for row in payload.get("coverage_slots") or []:
+  try:pk=int(row.get("game_id"))
+  except (TypeError,ValueError):continue
+  if pk>0 and pk not in found:found.append(pk)
  for row in payload.get("results") or []:
   try:pk=int(row.get("game_id"))
   except (TypeError,ValueError):continue
-  if pk not in found:found.append(pk)
+  if pk>0 and pk not in found:found.append(pk)
  return found
 def main(argv=None,*,acquire=acquire_mlb_run_it_pregame):
  ap=argparse.ArgumentParser();ap.add_argument("--engine-output",default="artifacts/manual_mlb_snapshot_card.json");ap.add_argument("--out-dir",default="artifacts/mlb_context");args=ap.parse_args(argv)
