@@ -78,8 +78,13 @@ def discrete_kernel_pmf(
     n_eff = effective_sample_size(ws)
 
     # An observed 10-for-10 history is evidence of a high rate, not proof of a
-    # 100% event. The bandwidth floor prevents zero-width empirical tails.
-    bandwidth = max(0.35, 1.06 * sqrt(max(variance, 0.25)) * n_eff ** (-0.2))
+    # 100% event. The mean-dependent floor also keeps high-count degenerate
+    # samples from collapsing numerically to a point mass.
+    bandwidth = max(
+        0.35,
+        0.20 * sqrt(max(center_mean, 0.0) + 1.0),
+        1.06 * sqrt(max(variance, 0.25)) * n_eff ** (-0.2),
+    )
 
     if upper is None:
         upper = max(
