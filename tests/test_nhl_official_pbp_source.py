@@ -41,8 +41,6 @@ def _play(event_id, sort_order, time, kind, team=None, x=None, y=None, *,
 
 
 def _payload():
-    # The literal previous play matters. A faceoff/stoppage would break a
-    # rebound chain; the rush crosses from x=0 to attacking-frame x=70.
     return {
         "id": 2026020001,
         "homeTeam": {"id": 1},
@@ -84,9 +82,10 @@ def test_stages_shots_with_frozen_rebound_and_rush_context():
     assert first.is_rebound is False
     assert second.is_rebound is True
     assert second.is_rush is False
-    # Literal faceoff is the previous play, so the later shot is not rebound/rush.
+    # The literal faceoff breaks the rebound chain. Rush remains a pure
+    # short-window zone-transition proxy, matching the frozen public-repo rule.
     assert third.is_rebound is False
-    assert third.is_rush is False
+    assert third.is_rush is True
     assert second.is_goal is True
     assert first.strength_state == "EV"
     assert first.source_raw_sha256 == "a" * 64
