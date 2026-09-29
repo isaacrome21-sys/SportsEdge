@@ -12,6 +12,9 @@ on:
       - sportsedge/quote_bridge.py
       - scripts/run_manual_mlb_snapshot.py
       - sportsedge/mlb_myspari_own_model.py
+      - sportsedge/mlb_context_card.py
+      - scripts/acquire_mlb_card_context.py
+      - tests/test_mlb_context_card.py
       - scripts/render_mlb_myspari_card.py
       - tests/test_mlb_myspari_own_model.py
       - tests/test_manual_quote_contract.py
@@ -61,7 +64,7 @@ jobs:
       - name: Install runtime dependencies
         run: python -m pip install --disable-pip-version-check numpy==2.5.3
       - name: Verify canonical manual market contract and live guards
-        run: PYTHONPATH=. python -m unittest tests.test_manual_quote_contract tests.test_manual_mlb_live_guards tests.test_mlb_myspari_own_model
+        run: PYTHONPATH=. python -m unittest tests.test_manual_quote_contract tests.test_manual_mlb_live_guards tests.test_mlb_myspari_own_model tests.test_mlb_context_card
       - name: Resolve input
         id: resolve
         shell: bash
@@ -125,12 +128,18 @@ jobs:
         if: steps.resolve.outputs.live == 'true'
         run: PYTHONPATH=. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.resolve.outputs.path }}" --run-date "${{ steps.resolve.outputs.run_date }}" --max-age-minutes "${{ github.event.inputs.max_age_minutes || '60' }}" --output artifacts/manual_mlb_snapshot_card.json
 
+      - name: Retrieve pregame context (Statcast, umpire, weather/roof, park, lineups)
+        if: always() && hashFiles('artifacts/manual_mlb_snapshot_card.json') != ''
+        continue-on-error: true
+        run: PYTHONPATH=. python scripts/acquire_mlb_card_context.py --engine-output artifacts/manual_mlb_snapshot_card.json --out-dir artifacts/mlb_context
+
       - name: Render MySpariEdge-style card from SportsEdge engine output
         if: always() && hashFiles('artifacts/manual_mlb_snapshot_card.json') != ''
         run: |
           PYTHONPATH=. python scripts/render_mlb_myspari_card.py \
             --engine-output artifacts/manual_mlb_snapshot_card.json \
             --snapshot "${{ steps.resolve.outputs.path }}" \
+            --context-dir artifacts/mlb_context \
             --out-dir artifacts/mlb_myspari
           cat artifacts/mlb_myspari/card.md >> "$GITHUB_STEP_SUMMARY"
 
@@ -146,4 +155,5 @@ jobs:
           path: |
             artifacts/manual_mlb_snapshot_card.json
             artifacts/mlb_myspari/
+            artifacts/mlb_context/
           if-no-files-found: warn
