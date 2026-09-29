@@ -11,6 +11,9 @@ on:
       - sportsedge/generic_market_engine.py
       - sportsedge/quote_bridge.py
       - scripts/run_manual_mlb_snapshot.py
+      - sportsedge/mlb_myspari_own_model.py
+      - scripts/render_mlb_myspari_card.py
+      - tests/test_mlb_myspari_own_model.py
       - tests/test_manual_quote_contract.py
       - tests/test_manual_mlb_live_guards.py
       - tests/fixtures/manual_mlb_snapshot_supported.json
@@ -25,6 +28,9 @@ on:
       - sportsedge/generic_market_engine.py
       - sportsedge/quote_bridge.py
       - scripts/run_manual_mlb_snapshot.py
+      - sportsedge/mlb_myspari_own_model.py
+      - scripts/render_mlb_myspari_card.py
+      - tests/test_mlb_myspari_own_model.py
       - tests/test_manual_quote_contract.py
       - tests/test_manual_mlb_live_guards.py
       - tests/fixtures/manual_mlb_snapshot_supported.json
@@ -55,7 +61,7 @@ jobs:
       - name: Install runtime dependencies
         run: python -m pip install --disable-pip-version-check numpy==2.5.3
       - name: Verify canonical manual market contract and live guards
-        run: PYTHONPATH=. python -m unittest tests.test_manual_quote_contract tests.test_manual_mlb_live_guards
+        run: PYTHONPATH=. python -m unittest tests.test_manual_quote_contract tests.test_manual_mlb_live_guards tests.test_mlb_myspari_own_model
       - name: Resolve input
         id: resolve
         shell: bash
@@ -103,6 +109,15 @@ jobs:
         if: steps.resolve.outputs.live == 'true'
         run: PYTHONPATH=. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.resolve.outputs.path }}" --run-date "${{ steps.resolve.outputs.run_date }}" --max-age-minutes "${{ github.event.inputs.max_age_minutes || '60' }}" --output artifacts/manual_mlb_snapshot_card.json
 
+      - name: Render MySpariEdge-style card from SportsEdge engine output
+        if: always() && hashFiles('artifacts/manual_mlb_snapshot_card.json') != ''
+        run: |
+          PYTHONPATH=. python scripts/render_mlb_myspari_card.py \
+            --engine-output artifacts/manual_mlb_snapshot_card.json \
+            --snapshot "${{ steps.resolve.outputs.path }}" \
+            --out-dir artifacts/mlb_myspari
+          cat artifacts/mlb_myspari/card.md >> "$GITHUB_STEP_SUMMARY"
+
       - name: Assert main remains read-only
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: echo 'MANUAL_MLB_RESULT_ARTIFACT_ONLY_NO_DIRECT_MAIN_WRITE'
@@ -112,5 +127,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: manual-mlb-snapshot-card
-          path: artifacts/manual_mlb_snapshot_card.json
+          path: |
+            artifacts/manual_mlb_snapshot_card.json
+            artifacts/mlb_myspari/
           if-no-files-found: warn
