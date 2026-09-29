@@ -8,15 +8,32 @@ body:
       value: |
         One game header, then one market per line. Always give **both** prices, away/over/yes first.
         For run lines, include the away line sign; unsigned `1.5` is treated as `+1.5`.
+
+        Full-game, first-five, YRFI/NRFI, team totals, pitcher props, pitcher win, and batter props are accepted. Examples:
         ```
         Red Sox @ Yankees
-        ML +120 -145
+        ML +116 -140
         RL +1.5 -193 +159
-        Total 6 -112 -107
-        YRFI +135 -170
+        Total 6 -116 -104
+        YRFI +130 -165
         Yankees TT 3.5 +114 -145
-        Payton Tolle outs 16.5 +107 -135
+        F5 ML +100 -130
+        F5 RL +0.5 -145 +114
+        F5 Total 3.5 -110 -120
+        Yankees F5 TT 1.5 -154 +120
+        Cam Schlittler K 6.5 -149 +117
+        Cam Schlittler outs 17.5 -174 +130
+        Cam Schlittler win +159 -223
+        Payton Tolle hits+walks+er 7.5 +103 -137
+        Aaron Judge hits 1.5 +120 -150
+        Aaron Judge TB 1.5 +105 -135
+        Aaron Judge HR 0.5 +150 -200
+        Aaron Judge walks 0.5 -110 -120
+        Aaron Judge batter K 1.5 +125 -155
+        Aaron Judge first HR +550 -900
         ```
+
+        The issue time is only an **intake timestamp**, not a sportsbook timestamp. Unrecognized or one-sided lines fail closed instead of being guessed.
   - type: textarea
     id: lines
     attributes:
