@@ -35,7 +35,11 @@ class MLBPropRoutingCleanupTests(unittest.TestCase):
             "line": 3.5, "side": "OVER", "feature_source_hash": "a" * 64,
             "features": {"history_pool": [_joint_hitter_row(4) for _ in range(10)]},
         })
-        self.assertAlmostEqual(joint["model_p"], 1.0, delta=1e-12)
+        # Ten clearing games are strong evidence, not proof of certainty. The
+        # finite-sample joint engine keeps the 10/10 raw rate for audit while
+        # pricing the Jeffreys posterior predictive probability.
+        self.assertAlmostEqual(joint["model_p"], 10.5 / 11.0, delta=1e-12)
+        self.assertAlmostEqual(joint["meta"]["raw_empirical_p"], 1.0, delta=1e-12)
 
         legacy = {
             "build_hash": "b" * 64, "game_id": "g", "market": "HITS",
