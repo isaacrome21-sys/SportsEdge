@@ -14,7 +14,7 @@ from .engine_registry import resolve_manual_market_type
 from .generic_card_pipeline import run_generic_card
 from .live_slate import LiveGame, TeamLineup
 from .manual_quote import ManualQuote, validate_manual_quote
-from .mlb_generic_features import MLBGenericHistorySource
+from .mlb_all_market_features import EITHER_PITCHER_MARKETS, MLBAllMarketHistorySource
 from .mlb_history_cache import MLBHistoryCachedOpener
 from .mlb_source import fetch_schedule, parse_game_start
 from .quote_bridge import validate_canonical_quote
@@ -151,7 +151,7 @@ def run_canonical_manual_mlb(rows: Iterable[Mapping[str, Any]], *, opener=urlope
                     TeamLineup(g.away_id,"away",away_projected,(),False),TeamLineup(g.home_id,"home",home_projected,(),False),
                     g.game_number,g.double_header,g.venue_id,g.official_date,g.status)
     captured = max(r.observed_at for r in parsed).astimezone(timezone.utc)
-    hist = MLBGenericHistorySource(opener=MLBHistoryCachedOpener(target_date=captured.date(),cache_dir=history_cache_dir,opener=opener), retrieved_at=captured)
+    hist = MLBAllMarketHistorySource(opener=MLBHistoryCachedOpener(target_date=captured.date(),cache_dir=history_cache_dir,opener=opener), retrieved_at=captured)
     target_date = datetime.fromisoformat(str(g.official_date)).date() if g.official_date else captured.date()
     quotes, features, resolutions, seen = [], [], [], set()
     blocked_subject_rows: list[dict[str, Any]] = []
@@ -175,6 +175,11 @@ def run_canonical_manual_mlb(rows: Iterable[Mapping[str, Any]], *, opener=urlope
                 raise CanonicalManualMLBError(f"team_side HOME/AWAY required for {row.market_type}")
             feature_team_id = int(g.home_id if row.team_side == "HOME" else g.away_id)
             entity_id = str(feature_team_id)
+        elif market in EITHER_PITCHER_MARKETS:
+            if g.away_probable_pitcher_id is None or g.home_probable_pitcher_id is None:
+                raise CanonicalManualMLBError(f"both probable pitchers required for {row.market_type}")
+            entity_id = f"{int(g.away_probable_pitcher_id)}|{int(g.home_probable_pitcher_id)}"
+            feature_team_id = None
         else:
             entity_id = subject_id or str(g.game_pk)
         quotes.extend(_pair(row, market, entity_id, resolved_game_id=str(g.game_pk)))
@@ -182,7 +187,8 @@ def run_canonical_manual_mlb(rows: Iterable[Mapping[str, Any]], *, opener=urlope
         if key not in seen:
             seen.add(key)
             features.append(hist.feature_row(game_pk=g.game_pk,market=market,entity_id=entity_id,target_date=target_date,
-                away_team_id=int(g.away_id),home_team_id=int(g.home_id),player_id=int(subject_id) if subject_id else None,team_id=feature_team_id))
+                away_team_id=int(g.away_id),home_team_id=int(g.home_id),player_id=int(subject_id) if subject_id else None,
+                team_id=feature_team_id,away_pitcher_id=g.away_probable_pitcher_id,home_pitcher_id=g.home_probable_pitcher_id))
         resolutions.append({"market_type":row.market_type,"engine_market":market,"subject_id":subject_id,"subject_name":row.subject_name,
             "team_side":row.team_side,"entity_id":entity_id,"observed_at":row.observed_at.isoformat()})
     results = run_generic_card(games=[live],feature_rows=features,quotes=quotes,ingestion_now=captured,finalization_now=captured,
