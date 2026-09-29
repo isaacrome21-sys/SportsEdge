@@ -120,7 +120,82 @@ def myspari_rows(payload: Mapping[str, Any], *, quote_age_seconds: float = 0.0,
             scored_row["status"] = "PASS"
             scored_row["presentation_reason_codes"] = (PRICE_CEILING_REASON,)
         out.append({**scored_row, **base})
-    return build_mlb_scored_card(out)
+    return build_mlb_scored_card(apply_same_game_guard(out))
+
+
+# --- Same-game script guard -------------------------------------------------
+# Presentation-only: never changes a probability. It stops one card from telling
+# two opposite stories about the same game (e.g. game Over + pitcher Outs Over),
+# and from listing the same team twice (ML + run line) as independent edges.
+SCRIPT_CONFLICT_REASON = "SAME_GAME_SCRIPT_CONFLICT"
+SAME_SIDE_STACK_REASON = "SAME_SIDE_STACK"
+_HIGH_RUNS_OVER = frozenset({
+    "TOTALS", "TEAM_TOTALS", "F5_TOTALS", "F5_TEAM_TOTALS",
+    "PITCHER_HITS_ALLOWED", "PITCHER_ER", "PITCHER_BB", "PITCHER_HITS_WALKS_ER",
+    "EITHER_PITCHER_HITS_ALLOWED", "EITHER_PITCHER_ER", "EITHER_PITCHER_BB",
+    "HITS", "TOTAL_BASES", "RBI", "RUNS", "HOME_RUNS", "HITS_RUNS_RBIS", "RUNS_RBIS",
+    "EXTRA_BASE_HITS", "SINGLES", "DOUBLES",
+})
+# Over on these means the pitcher went deep or dominated -> fewer runs.
+_LOW_RUNS_OVER = frozenset({"PITCHER_OUTS", "PITCHER_K"})
+_SIDE_MARKETS = frozenset({"MONEYLINE", "RUN_LINE"})
+
+
+def run_script_direction(row: Mapping[str, Any]) -> int:
+    """+1 = needs runs, -1 = needs a quiet game, 0 = not a run-environment bet."""
+    market = str(row.get("market") or "").upper()
+    side = str(row.get("side") or "").upper()
+    if market in {"NRFI", "YRFI"}:
+        yes = side in {"YES", "", market}
+        return (1 if yes else -1) * (1 if market == "YRFI" else -1)
+    if side not in {"OVER", "UNDER"}:
+        return 0
+    sign = 1 if side == "OVER" else -1
+    if market in _HIGH_RUNS_OVER:
+        return sign
+    if market in _LOW_RUNS_OVER:
+        return -sign
+    return 0
+
+
+def _ev(row: Mapping[str, Any]) -> float:
+    ev = _f(row.get("ev_per_dollar"))
+    return -1e9 if ev is None else ev
+
+
+def _demote(row: dict[str, Any], reason: str, keeper: Mapping[str, Any]) -> None:
+    row["status"] = "PASS"
+    codes = tuple(row.get("presentation_reason_codes") or ())
+    if reason not in codes:
+        row["presentation_reason_codes"] = codes + (reason,)
+    row["guard_kept_instead"] = _selection(keeper)
+
+
+def apply_same_game_guard(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    by_game: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        if row.get("status") == "ACTIONABLE":
+            by_game.setdefault(str(row.get("game_id")), []).append(row)
+    for game_rows in by_game.values():
+        # 1) One run script per game: keep the direction holding the best-EV row.
+        scripted = [r for r in game_rows if run_script_direction(r)]
+        if {run_script_direction(r) for r in scripted} == {1, -1}:
+            keeper = max(scripted, key=_ev)
+            keep_dir = run_script_direction(keeper)
+            for r in scripted:
+                if run_script_direction(r) != keep_dir:
+                    _demote(r, SCRIPT_CONFLICT_REASON, keeper)
+        # 2) One side bet per team: ML and run line on the same team are one bet.
+        sides = [r for r in game_rows if r.get("status") == "ACTIONABLE"
+                 and str(r.get("market") or "").upper() in _SIDE_MARKETS]
+        for team in {str(r.get("side") or "").upper() for r in sides}:
+            same = [r for r in sides if str(r.get("side") or "").upper() == team]
+            if len(same) > 1:
+                keeper = max(same, key=_ev)
+                for r in same:
+                    if r is not keeper:
+                        _demote(r, SAME_SIDE_STACK_REASON, keeper)
+    return rows
 
 
 def _selection(row: Mapping[str, Any]) -> str:
@@ -153,6 +228,8 @@ def render_markdown(rows: Sequence[Mapping[str, Any]], *, header: str, notes: Se
         status_text = str(r.get("scored_status"))
         if PRICE_CEILING_REASON in (r.get("presentation_reason_codes") or ()):
             status_text += " (price > -165)"
+        if r.get("guard_kept_instead"):
+            status_text += f" (same game: kept {r['guard_kept_instead']})"
         lines.append(
             f"| {i} | {r.get('game_id')} | {_selection(r)} | {odds_text} | {win_text} | "
             f"{push_text} | {pct(r.get('model_p'))} | {fair_text} | {pct(r.get('edge'))} | "
