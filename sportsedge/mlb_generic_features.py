@@ -12,9 +12,17 @@ from urllib.request import Request, urlopen
 
 GENERIC_FEATURE_VERSION = "mlb_generic_feature_v2"
 PLAYER_COUNT_MARKETS = frozenset({
-    "HOME_RUNS", "RBI", "RUNS", "HITS_RUNS_RBIS", "SINGLES", "DOUBLES", "TRIPLES",
-    "BATTER_BB", "BATTER_K", "STOLEN_BASES", "PITCHER_K", "PITCHER_HITS_ALLOWED",
-    "PITCHER_BB", "PITCHER_ER", "PITCHER_OUTS",
+    "HOME_RUNS", "HITS", "TOTAL_BASES", "RBI", "RUNS", "HITS_RUNS_RBIS", "SINGLES", "DOUBLES", "TRIPLES",
+    "BATTER_BB", "BATTER_K", "STOLEN_BASES", "EXTRA_BASE_HITS", "RUNS_RBIS",
+    "PITCHER_K", "PITCHER_HITS_ALLOWED", "PITCHER_BB", "PITCHER_ER", "PITCHER_OUTS",
+    "PITCHER_HITS_WALKS_ER",
+})
+JOINT_HITTER_MARKETS = frozenset({
+    "HITS", "TOTAL_BASES", "RBI", "RUNS", "STOLEN_BASES", "BATTER_BB", "EXTRA_BASE_HITS",
+    "SINGLES", "DOUBLES", "TRIPLES", "BATTER_K", "HITS_RUNS_RBIS", "RUNS_RBIS",
+})
+JOINT_PITCHER_MARKETS = frozenset({
+    "PITCHER_K", "PITCHER_OUTS", "PITCHER_ER", "PITCHER_HITS_ALLOWED", "PITCHER_BB", "PITCHER_HITS_WALKS_ER",
 })
 PA_BOUNDED_BATTER_MARKETS = frozenset({"BATTER_K", "BATTER_BB", "SINGLES", "DOUBLES"})
 BINARY_MARKETS = frozenset({"PITCHER_RECORD_WIN", "FIRST_HOME_RUN"})
@@ -300,6 +308,61 @@ class MLBGenericHistorySource:
             values.append(value)
         return self._mean(values, minimum=5, window=10, name=f"pitcher:{market}")
 
+    def hitter_joint_history(self, *, player_id: int, target_date: date) -> list[dict[str, int]]:
+        rows = self.player_rows(player_id=player_id, group="hitting", target_date=target_date)[-30:]
+        out: list[dict[str, int]] = []
+        for row in rows:
+            s = row["stat"]
+            pa = _nonnegative_integer(s.get("plateAppearances"))
+            hits = _nonnegative_integer(s.get("hits"))
+            doubles = _nonnegative_integer(s.get("doubles"))
+            triples = _nonnegative_integer(s.get("triples"))
+            hrs = _nonnegative_integer(s.get("homeRuns"))
+            if None in {pa, hits, doubles, triples, hrs} or pa < 1 or pa > 9:
+                continue
+            singles = hits - doubles - triples - hrs
+            if singles < 0:
+                continue
+            walks = _nonnegative_integer(s.get("baseOnBalls", 0))
+            strikeouts = _nonnegative_integer(s.get("strikeOuts", 0))
+            rbi = _nonnegative_integer(s.get("rbi", 0))
+            runs = _nonnegative_integer(s.get("runs", 0))
+            sb = _nonnegative_integer(s.get("stolenBases", 0))
+            if None in {walks, strikeouts, rbi, runs, sb} or hits + walks > pa:
+                continue
+            out.append({
+                "plate_appearances": pa, "hits": hits, "singles": singles, "doubles": doubles,
+                "triples": triples, "home_runs": hrs, "total_bases": singles + 2*doubles + 3*triples + 4*hrs,
+                "rbi": rbi, "runs": runs, "stolen_bases": sb, "walks": walks,
+                "strikeouts": strikeouts, "extra_base_hits": doubles + triples + hrs,
+            })
+        if len(out) < 10:
+            raise MLBGenericFeatureError(f"hitter:joint: insufficient chronological sample {len(out)}<10")
+        return out
+
+    def pitcher_joint_history(self, *, player_id: int, target_date: date) -> list[dict[str, int]]:
+        rows = self.player_rows(player_id=player_id, group="pitching", target_date=target_date)
+        out: list[dict[str, int]] = []
+        for row in rows:
+            s = row["stat"]
+            if _number(s.get("gamesStarted", 0), "gamesStarted") < 1:
+                continue
+            try:
+                outs = int(_outs_from_ip(s.get("inningsPitched")))
+            except Exception:
+                continue
+            ks = _nonnegative_integer(s.get("strikeOuts", 0))
+            er = _nonnegative_integer(s.get("earnedRuns", 0))
+            hits = _nonnegative_integer(s.get("hits", 0))
+            walks = _nonnegative_integer(s.get("baseOnBalls", 0))
+            if None in {ks, er, hits, walks} or not 0 <= outs <= 27:
+                continue
+            out.append({"strikeouts": ks, "outs": outs, "earned_runs": er, "hits_allowed": hits, "walks_allowed": walks})
+        out = out[-10:]
+        if len(out) < 5:
+            raise MLBGenericFeatureError(f"pitcher:joint: insufficient chronological sample {len(out)}<5")
+        return out
+
     def pitcher_win_probability(self, *, player_id: int, target_date: date) -> float:
         rows = self.player_rows(player_id=player_id, group="pitching", target_date=target_date)
         starts = [r for r in rows if _number(r["stat"].get("gamesStarted", 0), "gamesStarted") >= 1]
@@ -329,7 +392,15 @@ class MLBGenericHistorySource:
         if market in PLAYER_COUNT_MARKETS:
             if player_id is None:
                 raise MLBGenericFeatureError("player_id required")
-            if market.startswith("PITCHER_"):
+            if market in JOINT_PITCHER_MARKETS:
+                pool = self.pitcher_joint_history(player_id=player_id, target_date=target_date)
+                base["features"] = {"history_pool": pool}
+                base["joint_feature_version"] = "mlb_pitcher_joint_history_v1"
+            elif market in JOINT_HITTER_MARKETS:
+                pool = self.hitter_joint_history(player_id=player_id, target_date=target_date)
+                base["features"] = {"history_pool": pool}
+                base["joint_feature_version"] = "mlb_hitter_joint_history_v1"
+            elif market.startswith("PITCHER_"):
                 base["expected_count"] = self.pitcher_expected(player_id=player_id, market=market, target_date=target_date)
             elif market in PA_BOUNDED_BATTER_MARKETS:
                 expected, projected_pa = self.batter_expected_and_pa(player_id=player_id, market=market, target_date=target_date)
