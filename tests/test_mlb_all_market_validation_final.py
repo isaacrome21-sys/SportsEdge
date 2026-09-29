@@ -3,7 +3,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 import unittest
 
-from sportsedge.engine_registry import engine_registry, resolve_manual_market_type
+from sportsedge.engine_registry import EngineDispatchError, engine_registry, resolve_manual_market_type
 from sportsedge.manual_quote import ManualQuoteError, validate_manual_quote
 from sportsedge.mlb_all_market_features import MLBAllMarketHistorySource
 from sportsedge.shared_game_engine import build_shared_game_engine_session
@@ -43,7 +43,21 @@ class MLBAllMarketValidationFinalTests(unittest.TestCase):
         self.assertEqual(resolve_manual_market_type("TEAM_TOTAL"), "TEAM_TOTALS")
         self.assertEqual(resolve_manual_market_type("GAME_TEAM_TOTAL"), "TEAM_TOTALS")
         self.assertEqual(resolve_manual_market_type("FIRST_FIVE_TEAM_TOTAL"), "F5_TEAM_TOTALS")
-        self.assertEqual(resolve_manual_market_type("FIRST_INNING_TOTAL"), "YRFI")
+        with self.assertRaises(EngineDispatchError):
+            resolve_manual_market_type("FIRST_INNING_TOTAL")
+
+    def test_first_inning_total_maps_to_yrfi_only_at_half_run(self):
+        from sportsedge.canonical_manual_mlb import CanonicalManualMLBError, _engine_market
+        from sportsedge.manual_quote import validate_manual_quote
+        base = {
+            "game_id": "1", "market_type": "FIRST_INNING_TOTAL", "side": "OVER", "line": 0.5,
+            "price": -110, "paired_side": "UNDER", "paired_price": -110, "book": "draftkings",
+            "observed_at": "2026-09-29T15:00:00+00:00", "first_pitch_at": "2026-09-29T23:00:00+00:00",
+            "source": "MANUAL",
+        }
+        self.assertEqual(_engine_market(validate_manual_quote(base)), "YRFI")
+        with self.assertRaises(CanonicalManualMLBError):
+            _engine_market(validate_manual_quote({**base, "line": 1.5}))
 
     def test_manual_quote_carries_canonical_team_side(self):
         base = {
@@ -90,7 +104,8 @@ class MLBAllMarketValidationFinalTests(unittest.TestCase):
 
     def test_team_total_integer_line_preserves_push_mass(self):
         engine = build_shared_game_engine_session(
-            simulator=simulate_game_distribution, _minimum_simulations_for_test=1000
+            simulator=lambda *args, **kwargs: simulate_game_distribution(*args, **kwargs),
+            _minimum_simulations_for_test=1000,
         )
         result = engine({
             "game_id": "99", "entity_id": "20", "away_mean_runs": 4.2, "home_mean_runs": 4.6,
