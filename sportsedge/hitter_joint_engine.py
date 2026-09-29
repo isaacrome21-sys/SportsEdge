@@ -1,9 +1,9 @@
-"""Coherent hitter prop challenger from strictly-prior game rows.
+"""Predictive hitter prop challenger from strictly-prior joint game rows.
 
-Every prior game is one joint state containing PA and all hitter counting outcomes.
-All individual and combination markets are marginals of the same weighted rows, so
-overlapping propositions cannot contradict one another. Optional matchup weights may
-reweight whole rows, but no market receives a separate predictive formula.
+Whole historical games remain the shared states for every hitter market. Existing
+price-independent matchup/park weights continue to reweight those rows, while a
+deterministic discrete kernel converts the finite weighted sample into a predictive
+count distribution instead of assigning zero probability to unseen tails.
 """
 from __future__ import annotations
 
@@ -12,7 +12,9 @@ import json
 from math import isfinite
 from typing import Any, Mapping, Sequence
 
-ENGINE_VERSION = "mlb_hitter_joint_empirical_v3"
+from .mlb_count_kernel import CountKernelError, discrete_kernel_pmf, price_from_pmf
+
+ENGINE_VERSION = "mlb_hitter_joint_empirical_kernel_v4"
 
 HITTER_MARKETS = frozenset({
     "HITS", "HOME_RUNS", "TOTAL_BASES", "RBI", "RUNS", "STOLEN_BASES", "BATTER_BB",
@@ -20,6 +22,7 @@ HITTER_MARKETS = frozenset({
     "HITS_RUNS_RBIS", "HITS_RUNS_STOLEN_BASES", "RUNS_RBIS",
     "HITS_STOLEN_BASES", "HITS_WALKS_STOLEN_BASES",
 })
+
 
 class HitterJointEngineError(ValueError):
     pass
@@ -102,13 +105,26 @@ def _value(row: Mapping[str, int], market: str) -> int:
         "EXTRA_BASE_HITS": "extra_base_hits", "SINGLES": "singles", "DOUBLES": "doubles",
         "TRIPLES": "triples", "BATTER_K": "strikeouts",
     }
-    if market in keys: return row[keys[market]]
-    if market == "HITS_RUNS_RBIS": return row["hits"] + row["runs"] + row["rbi"]
-    if market == "HITS_RUNS_STOLEN_BASES": return row["hits"] + row["runs"] + row["stolen_bases"]
-    if market == "RUNS_RBIS": return row["runs"] + row["rbi"]
-    if market == "HITS_STOLEN_BASES": return row["hits"] + row["stolen_bases"]
-    if market == "HITS_WALKS_STOLEN_BASES": return row["hits"] + row["walks"] + row["stolen_bases"]
+    if market in keys:
+        return row[keys[market]]
+    if market == "HITS_RUNS_RBIS":
+        return row["hits"] + row["runs"] + row["rbi"]
+    if market == "HITS_RUNS_STOLEN_BASES":
+        return row["hits"] + row["runs"] + row["stolen_bases"]
+    if market == "RUNS_RBIS":
+        return row["runs"] + row["rbi"]
+    if market == "HITS_STOLEN_BASES":
+        return row["hits"] + row["stolen_bases"]
+    if market == "HITS_WALKS_STOLEN_BASES":
+        return row["hits"] + row["walks"] + row["stolen_bases"]
     raise HitterJointEngineError(f"unsupported hitter market {market}")
+
+
+def _raw_price(values: Sequence[int], weights: Sequence[float], line: float, side: str) -> tuple[float, float]:
+    p_over = sum(w for v, w in zip(values, weights) if v > line)
+    p_under = sum(w for v, w in zip(values, weights) if v < line)
+    p_push = sum(w for v, w in zip(values, weights) if v == line) if float(line).is_integer() else 0.0
+    return (p_over if side == "OVER" else p_under), p_push
 
 
 def price_hitter_market(model_input: Mapping[str, Any]) -> dict[str, Any]:
@@ -122,19 +138,44 @@ def price_hitter_market(model_input: Mapping[str, Any]) -> dict[str, Any]:
     features = model_input.get("features")
     if not isinstance(features, Mapping):
         raise HitterJointEngineError("features required")
+
     pool = _normalize_pool(features.get("history_pool"))
     weights = _normalize_weights(features.get("history_weights"), len(pool))
     values = [_value(row, market) for row in pool]
-    p_over = sum(w for v, w in zip(values, weights) if v > line)
-    p_under = sum(w for v, w in zip(values, weights) if v < line)
-    p_push = sum(w for v, w in zip(values, weights) if v == line) if float(line).is_integer() else 0.0
-    if abs(p_over + p_under + p_push - 1.0) > 1e-12:
-        raise HitterJointEngineError("probability mass does not conserve")
-    digest = _sha({"engine": ENGINE_VERSION, "game_id": model_input.get("game_id"), "entity_id": model_input.get("entity_id"), "feature_source_hash": model_input.get("feature_source_hash"), "history_pool": pool, "history_weights": weights})
+    try:
+        pmf, predictive_meta = discrete_kernel_pmf(values, weights=weights, lower=0)
+        model_p, p_push = price_from_pmf(pmf, line=line, side=side)
+    except CountKernelError as exc:
+        raise HitterJointEngineError(str(exc)) from exc
+    raw_p, raw_push = _raw_price(values, weights, line, side)
+
+    digest = _sha({
+        "engine": ENGINE_VERSION,
+        "game_id": model_input.get("game_id"),
+        "entity_id": model_input.get("entity_id"),
+        "feature_source_hash": model_input.get("feature_source_hash"),
+        "history_pool": pool,
+        "history_weights": weights,
+    })
     return {
-        "game_id": model_input.get("game_id"), "market": market, "entity_id": model_input.get("entity_id"),
-        "line": line, "side": side, "model_p": p_over if side == "OVER" else p_under,
-        "push_p": p_push, "model_input_hash": digest, "engine_version": ENGINE_VERSION,
-        "seed_policy": "analytic_weighted_empirical_joint_game_rows", "mc_paths": 0,
-        "meta": {"history_games": len(pool), "shared_joint_rows": True, "weighted": features.get("history_weights") is not None},
+        "game_id": model_input.get("game_id"),
+        "market": market,
+        "entity_id": model_input.get("entity_id"),
+        "line": line,
+        "side": side,
+        "model_p": float(model_p),
+        "push_p": float(p_push),
+        "raw_empirical_p": float(raw_p),
+        "raw_empirical_push_p": float(raw_push),
+        "model_input_hash": digest,
+        "engine_version": ENGINE_VERSION,
+        "seed_policy": "analytic_discrete_kernel_weighted_joint_game_rows",
+        "mc_paths": 0,
+        "meta": {
+            "history_games": len(pool),
+            "shared_joint_rows": True,
+            "weighted": features.get("history_weights") is not None,
+            "predictive_smoothing": "gaussian_discrete_kernel",
+            "predictive": predictive_meta,
+        },
     }
