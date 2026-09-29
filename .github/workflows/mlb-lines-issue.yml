@@ -23,34 +23,31 @@ concurrency:
 jobs:
   card:
     if: github.actor == github.repository_owner && (contains(github.event.issue.labels.*.name, 'mlb-lines') || startsWith(github.event.issue.title, '[MLB LINES]'))
-    # Container-backed 1-vCPU runner is optimized for short issue automation and
-    # avoids the full VM provisioning cost seen in the phone-path smoke tests.
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       ISSUE: ${{ github.event.issue.number }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 1
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
 
-      - name: Verify slim Python runtime
-        run: |
-          python3 -c 'import sys; assert sys.version_info[:2] == (3, 12), sys.version'
-          python3 -m pip --version
-
-      # Keep the slim runtime cache separate from full-VM runners. First slim run
-      # installs once; warm issue runs restore the pinned cp312 package directly.
+      # The live smoke showed NumPy installation taking ~3.7 seconds, while
+      # setup-python itself was ~0.2 seconds. Cache the installed cp312 package,
+      # not just pip's download cache, so warm phone runs skip installation.
       - name: Restore phone runtime
         id: runtime
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: .runtime-deps
-          key: mlb-lines-runtime-v2-${{ runner.os }}-${{ runner.arch }}-slim-py312-numpy253
+          key: mlb-lines-runtime-v1-${{ runner.os }}-${{ runner.arch }}-py312-numpy253
       - name: Install runtime dependencies
         if: steps.runtime.outputs.cache-hit != 'true'
-        run: python3 -m pip install --disable-pip-version-check --target .runtime-deps numpy==2.5.3
+        run: python -m pip install --disable-pip-version-check --target .runtime-deps numpy==2.5.3
 
       - name: Slate date
         id: day
@@ -72,45 +69,43 @@ jobs:
           OBSERVED: ${{ github.event.issue.updated_at }}
         run: |
           printf '%s' "$BODY" > issue_body.txt
-          if PYTHONPATH=.runtime-deps:. python3 scripts/intake_mlb_lines_issue.py --body-file issue_body.txt \
+          if PYTHONPATH=.runtime-deps:. python scripts/intake_mlb_lines_issue.py --body-file issue_body.txt \
                --observed-at "$OBSERVED" --issue "$ISSUE" > intake.out; then
             cat intake.out >> "$GITHUB_OUTPUT"
           else
             { echo "Couldn't read these lines, so no card was run:"; echo; echo '```'; cat intake_error.txt; echo '```';
               echo; echo "Edit the issue to fix them and it will rerun."; } > comment.md
-            python3 scripts/post_github_issue_comment.py --issue "$ISSUE" --body-file comment.md
+            gh issue comment "$ISSUE" --body-file comment.md
             exit 1
           fi
 
       - name: Run SportsEdge engines
-        run: PYTHONPATH=.runtime-deps:. python3 scripts/run_manual_mlb_snapshot.py --input "${{ steps.intake.outputs.path }}" --run-date "${{ steps.intake.outputs.slate }}" --max-age-minutes 60 --output artifacts/manual_mlb_snapshot_card.json
+        run: PYTHONPATH=.runtime-deps:. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.intake.outputs.path }}" --run-date "${{ steps.intake.outputs.slate }}" --max-age-minutes 60 --output artifacts/manual_mlb_snapshot_card.json
 
       - name: Render card and reply now
         run: |
-          PYTHONPATH=.runtime-deps:. python3 scripts/render_mlb_myspari_card.py \
+          PYTHONPATH=.runtime-deps:. python scripts/render_mlb_myspari_card.py \
             --engine-output artifacts/manual_mlb_snapshot_card.json \
             --snapshot "${{ steps.intake.outputs.path }}" \
             --out-dir artifacts/mlb_myspari
-          python3 scripts/post_github_issue_comment.py --issue "$ISSUE" --body-file artifacts/mlb_myspari/card.md
+          gh issue comment "$ISSUE" --body-file artifacts/mlb_myspari/card.md
 
       - name: Retrieve pregame context (display only, after the card is posted)
         continue-on-error: true
         timeout-minutes: 5
         run: |
-          PYTHONPATH=.runtime-deps:. python3 scripts/acquire_mlb_card_context.py --engine-output artifacts/manual_mlb_snapshot_card.json --out-dir artifacts/mlb_context
-          PYTHONPATH=.runtime-deps:. python3 scripts/render_mlb_myspari_card.py \
+          PYTHONPATH=.runtime-deps:. python scripts/acquire_mlb_card_context.py --engine-output artifacts/manual_mlb_snapshot_card.json --out-dir artifacts/mlb_context
+          PYTHONPATH=.runtime-deps:. python scripts/render_mlb_myspari_card.py \
             --engine-output artifacts/manual_mlb_snapshot_card.json \
             --snapshot "${{ steps.intake.outputs.path }}" \
             --context-dir artifacts/mlb_context \
             --out-dir artifacts/mlb_myspari_ctx
-          python3 scripts/post_github_issue_comment.py --issue "$ISSUE" --body-file artifacts/mlb_myspari_ctx/card.md
+          gh issue comment "$ISSUE" --body-file artifacts/mlb_myspari_ctx/card.md
 
       - name: Report engine failure on the issue
         if: failure() && steps.intake.outcome == 'success'
         run: |
-          printf 'The card run failed after intake. Run log: %s/%s/actions/runs/%s\n' \
-            "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > failure_comment.txt
-          python3 scripts/post_github_issue_comment.py --issue "$ISSUE" --body-file failure_comment.txt
+          gh issue comment "$ISSUE" --body "The card run failed after intake. Run log: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
