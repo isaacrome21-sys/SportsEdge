@@ -22,6 +22,13 @@ from .quote_bridge import validate_canonical_quote
 class CanonicalManualMLBError(ValueError): pass
 
 CHICAGO_TZ = ZoneInfo("America/Chicago")
+TEAM_TOTAL_MARKETS = frozenset({"TEAM_TOTALS", "F5_TEAM_TOTALS"})
+PLAYER_MARKETS = frozenset({
+    "HOME_RUNS","HITS","TOTAL_BASES","RBI","RUNS","STOLEN_BASES","BATTER_BB","EXTRA_BASE_HITS",
+    "SINGLES","DOUBLES","TRIPLES","BATTER_K","HITS_RUNS_RBIS","HITS_RUNS_STOLEN_BASES","RUNS_RBIS",
+    "HITS_STOLEN_BASES","HITS_WALKS_STOLEN_BASES","PITCHER_K","PITCHER_OUTS","PITCHER_ER",
+    "PITCHER_HITS_ALLOWED","PITCHER_BB","PITCHER_HITS_WALKS_ER","FIRST_HOME_RUN","PITCHER_RECORD_WIN",
+})
 
 def _sha(v: Any) -> str:
     return hashlib.sha256(json.dumps(v, sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest()
@@ -159,17 +166,25 @@ def run_canonical_manual_mlb(rows: Iterable[Mapping[str, Any]], *, opener=urlope
             resolutions.append({"market_type":row.market_type,"engine_market":market,"subject_id":row.subject_id,"subject_name":row.subject_name,
                 "observed_at":row.observed_at.isoformat(),"resolution_status":"BLOCKED","reason":subject_error})
             continue
-        is_player_market = market in {"HOME_RUNS","HITS","TOTAL_BASES","RBI","RUNS","STOLEN_BASES","BATTER_BB","EXTRA_BASE_HITS","SINGLES","DOUBLES","TRIPLES","BATTER_K","HITS_RUNS_RBIS","RUNS_RBIS","PITCHER_K","PITCHER_OUTS","PITCHER_ER","PITCHER_HITS_ALLOWED","PITCHER_BB","PITCHER_HITS_WALKS_ER"}
+        is_player_market = market in PLAYER_MARKETS
         if is_player_market and not subject_id:
             raise CanonicalManualMLBError(f"subject_id or subject_name required for {row.market_type}")
-        entity_id = subject_id or str(g.game_pk)
+        feature_team_id = subject_team_id
+        if market in TEAM_TOTAL_MARKETS:
+            if row.team_side not in {"HOME", "AWAY"}:
+                raise CanonicalManualMLBError(f"team_side HOME/AWAY required for {row.market_type}")
+            feature_team_id = int(g.home_id if row.team_side == "HOME" else g.away_id)
+            entity_id = str(feature_team_id)
+        else:
+            entity_id = subject_id or str(g.game_pk)
         quotes.extend(_pair(row, market, entity_id, resolved_game_id=str(g.game_pk)))
         key = (market, entity_id)
         if key not in seen:
             seen.add(key)
             features.append(hist.feature_row(game_pk=g.game_pk,market=market,entity_id=entity_id,target_date=target_date,
-                away_team_id=int(g.away_id),home_team_id=int(g.home_id),player_id=int(subject_id) if subject_id else None,team_id=subject_team_id))
-        resolutions.append({"market_type":row.market_type,"engine_market":market,"subject_id":subject_id,"subject_name":row.subject_name,"observed_at":row.observed_at.isoformat()})
+                away_team_id=int(g.away_id),home_team_id=int(g.home_id),player_id=int(subject_id) if subject_id else None,team_id=feature_team_id))
+        resolutions.append({"market_type":row.market_type,"engine_market":market,"subject_id":subject_id,"subject_name":row.subject_name,
+            "team_side":row.team_side,"entity_id":entity_id,"observed_at":row.observed_at.isoformat()})
     results = run_generic_card(games=[live],feature_rows=features,quotes=quotes,ingestion_now=captured,finalization_now=captured,
         registry_path=registry_path,edge_floor_config_path=edge_floor_config_path,kelly_multiplier=kelly_multiplier)
     # Attach support evidence after pricing; engine inputs/outputs are unchanged.
