@@ -48,12 +48,15 @@ def _schedule_snapshot(snapshot) -> list[GameSnapshot] | None:
     if not isinstance(snapshot, dict) or "schedule_snapshot" not in snapshot:
         return None
     raw = snapshot.get("schedule_snapshot")
-    if not isinstance(raw, list) or not raw:
+    if not isinstance(raw, list) or not raw or any(not isinstance(item, dict) for item in raw):
         raise ValueError("MANUAL_SCHEDULE_SNAPSHOT_INVALID")
     try:
-        return [GameSnapshot(**item) for item in raw if isinstance(item, dict)]
+        games = [GameSnapshot(**item) for item in raw]
     except (TypeError, ValueError) as exc:
         raise ValueError("MANUAL_SCHEDULE_SNAPSHOT_INVALID") from exc
+    if not games:
+        raise ValueError("MANUAL_SCHEDULE_SNAPSHOT_INVALID")
+    return games
 
 
 def _run_canonical_rows(rows, *, history_cache_dir: str, schedule: list[GameSnapshot] | None = None) -> dict:
