@@ -3,7 +3,8 @@ from __future__ import annotations
 import hashlib,json
 from math import isfinite
 from typing import Any,Mapping,Sequence
-from .mlb_empirical_bayes import effective_sample_size,posterior_settlement_mass
+from .mlb_empirical_bayes import effective_sample_size,feasible_settlements,posterior_settlement_mass
+_UPPER_SUPPORT={"PITCHER_OUTS":27}
 ENGINE_VERSION="mlb_pitcher_joint_empirical_bayes_v3"
 PITCHER_MARKETS=frozenset({"PITCHER_K","PITCHER_OUTS","PITCHER_ER","PITCHER_HITS_ALLOWED","PITCHER_BB","PITCHER_HITS_WALKS_ER","EITHER_PITCHER_HITS_ALLOWED","EITHER_PITCHER_BB","EITHER_PITCHER_ER"})
 class PitcherJointEngineError(ValueError):pass
@@ -42,11 +43,11 @@ def _value(row:Mapping[str,int],market:str)->int:
     if market=="PITCHER_BB":return row["walks_allowed"]
     if market=="PITCHER_HITS_WALKS_ER":return row["hits_allowed"]+row["walks_allowed"]+row["earned_runs"]
     raise PitcherJointEngineError(f"unsupported single-pitcher market {market}")
-def _posterior(over:float,under:float,push:float,n:float,line:float)->dict[str,Any]:return posterior_settlement_mass(over_mass=over,under_mass=under,push_mass=push,effective_n=n,has_push=float(line).is_integer())
-def _price_values(values:Sequence[int],weights:Sequence[float],line:float,side:str)->tuple[float,float,dict[str,Any]]:
+def _posterior(over:float,under:float,push:float,n:float,line:float,market:str)->dict[str,Any]:return posterior_settlement_mass(over_mass=over,under_mass=under,push_mass=push,effective_n=n,has_push=float(line).is_integer(),feasible=feasible_settlements(line,lower=0,upper=_UPPER_SUPPORT.get(market)))
+def _price_values(values:Sequence[int],weights:Sequence[float],line:float,side:str,market:str)->tuple[float,float,dict[str,Any]]:
     over=sum(w for v,w in zip(values,weights) if v>line);under=sum(w for v,w in zip(values,weights) if v<line);push=sum(w for v,w in zip(values,weights) if v==line) if float(line).is_integer() else 0.0
     if abs(over+under+push-1.0)>1e-12:raise PitcherJointEngineError("probability mass does not conserve")
-    n_eff=effective_sample_size(weights,len(weights));post=_posterior(over,under,push,n_eff,line)
+    n_eff=effective_sample_size(weights,len(weights));post=_posterior(over,under,push,n_eff,line,market)
     return (post["p_over"] if side=="OVER" else post["p_under"]),post["p_push"],{"raw_empirical_p":over if side=="OVER" else under,"raw_push_p":push,"effective_history_starts":float(n_eff),"posterior_prior":post["prior"]}
 def price_pitcher_market(model_input:Mapping[str,Any])->dict[str,Any]:
     market=str(model_input.get("market","")).upper()
@@ -60,8 +61,8 @@ def price_pitcher_market(model_input:Mapping[str,Any])->dict[str,Any]:
         base={"EITHER_PITCHER_HITS_ALLOWED":"PITCHER_HITS_ALLOWED","EITHER_PITCHER_BB":"PITCHER_BB","EITHER_PITCHER_ER":"PITCHER_ER"}[market];states=[(_value(x,base),_value(y,base),wx*wy) for x,wx in zip(a,wa) for y,wy in zip(b,wb)]
         if side=="OVER":raw=sum(w for x,y,w in states if (x>line) or (y>line));raw_push=sum(w for x,y,w in states if not((x>line) or (y>line)) and ((x==line) or (y==line))) if float(line).is_integer() else 0.0
         else:raw=sum(w for x,y,w in states if (x<line) or (y<line));raw_push=sum(w for x,y,w in states if not((x<line) or (y<line)) and ((x==line) or (y==line))) if float(line).is_integer() else 0.0
-        raw_other=1.0-raw-raw_push;over,under=(raw,raw_other) if side=="OVER" else (raw_other,raw);eff=min(effective_sample_size(wa,len(wa)),effective_sample_size(wb,len(wb)));post=_posterior(over,under,raw_push,eff,line);p=post["p_over"] if side=="OVER" else post["p_under"];p_push=post["p_push"];meta={"raw_empirical_p":raw,"raw_push_p":raw_push,"effective_history_starts":float(eff),"posterior_prior":post["prior"],"weighted":features.get("pitcher_a_weights") is not None or features.get("pitcher_b_weights") is not None};identity_features={"pitcher_a_history":a,"pitcher_b_history":b,"pitcher_a_weights":wa,"pitcher_b_weights":wb}
+        raw_other=1.0-raw-raw_push;over,under=(raw,raw_other) if side=="OVER" else (raw_other,raw);eff=min(effective_sample_size(wa,len(wa)),effective_sample_size(wb,len(wb)));post=_posterior(over,under,raw_push,eff,line,base);p=post["p_over"] if side=="OVER" else post["p_under"];p_push=post["p_push"];meta={"raw_empirical_p":raw,"raw_push_p":raw_push,"effective_history_starts":float(eff),"posterior_prior":post["prior"],"weighted":features.get("pitcher_a_weights") is not None or features.get("pitcher_b_weights") is not None};identity_features={"pitcher_a_history":a,"pitcher_b_history":b,"pitcher_a_weights":wa,"pitcher_b_weights":wb}
     else:
-        pool=_normalize_pool(features.get("history_pool"),"history_pool");weights=_weights(features.get("history_weights"),len(pool),"history_weights");p,p_push,meta=_price_values([_value(r,market) for r in pool],weights,line,side);meta["weighted"]=features.get("history_weights") is not None;identity_features={"history_pool":pool,"history_weights":weights}
+        pool=_normalize_pool(features.get("history_pool"),"history_pool");weights=_weights(features.get("history_weights"),len(pool),"history_weights");p,p_push,meta=_price_values([_value(r,market) for r in pool],weights,line,side,market);meta["weighted"]=features.get("history_weights") is not None;identity_features={"history_pool":pool,"history_weights":weights}
     digest=_sha({"engine":ENGINE_VERSION,"game_id":model_input.get("game_id"),"entity_id":model_input.get("entity_id"),"feature_source_hash":model_input.get("feature_source_hash"),"features":identity_features})
     return {"game_id":model_input.get("game_id"),"market":market,"entity_id":model_input.get("entity_id"),"line":line,"side":side,"model_p":float(p),"push_p":float(p_push),"model_input_hash":digest,"engine_version":ENGINE_VERSION,"seed_policy":"analytic_empirical_bayes_joint_start_rows","mc_paths":0,"meta":meta}
