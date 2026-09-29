@@ -68,7 +68,7 @@ def build_hitter_joint_features(source:MLBGenericHistorySource,*,batter_id:int,t
     identity={"feature_version":FEATURE_VERSION,"batter_id":int(batter_id),"target_date":target_date.isoformat(),"history_pool":pool,"history_weights":weights,"context":context}
     return {"history_pool":pool,"history_weights":weights,"matchup":context,"feature_version":FEATURE_VERSION,"feature_source_hash":_sha(identity)}
 
-def build_pitcher_joint_features(source:MLBGenericHistorySource,*,pitcher_id:int,target_date:date,window:int=10)->dict[str,Any]:
+def build_pitcher_joint_features(source:MLBGenericHistorySource,*,pitcher_id:int,target_date:date,window:int=30)->dict[str,Any]:
     pitching=source.player_rows(player_id=pitcher_id,group="pitching",target_date=target_date);starts=[r for r in pitching if _number(r["stat"].get("gamesStarted",0),"gamesStarted")>=1][-window:]
     if len(starts)<5:raise MLBJointFeatureError(f"pitcher history insufficient {len(starts)}<5")
     pool=[]
@@ -76,5 +76,5 @@ def build_pitcher_joint_features(source:MLBGenericHistorySource,*,pitcher_id:int
         s=row["stat"];vals={"strikeouts":int(_number(s.get("strikeOuts",0),"strikeOuts")),"outs":int(_outs_from_ip(s.get("inningsPitched"))),"earned_runs":int(_number(s.get("earnedRuns",0),"earnedRuns")),"hits_allowed":int(_number(s.get("hits",0),"hits")),"walks_allowed":int(_number(s.get("baseOnBalls",0),"baseOnBalls"))}
         if not 0<=vals["outs"]<=27:raise MLBJointFeatureError("historical outs outside [0,27]")
         pool.append(vals)
-    identity={"feature_version":FEATURE_VERSION,"pitcher_id":int(pitcher_id),"target_date":target_date.isoformat(),"history_pool":pool}
-    return {"history_pool":pool,"feature_version":FEATURE_VERSION,"feature_source_hash":_sha(identity)}
+    identity={"feature_version":FEATURE_VERSION,"pitcher_id":int(pitcher_id),"target_date":target_date.isoformat(),"history_pool":pool,"pitcher_window":window,"recency_weighting":"engine_half_life_10_starts"}
+    return {"history_pool":pool,"feature_version":FEATURE_VERSION,"feature_source_hash":_sha(identity),"pitcher_window":window,"recency_weighting":"engine_half_life_10_starts"}
