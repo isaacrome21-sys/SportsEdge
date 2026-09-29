@@ -32,14 +32,19 @@ class NflverseRoleBridgeTests(unittest.TestCase):
             },
         ]
 
-    def test_builds_empirical_role_vectors_and_td_shares(self):
-        out = build_nflverse_prop_role_payloads(
-            game_id="target",
+    def _build(self, rows=None, **overrides):
+        kw = dict(
+            game_id="2026_03_CHI_X",
             kickoff="2026-09-28T23:00:00Z",
             observed_at="2026-09-28T20:00:00Z",
             source_uri="https://github.com/nflverse/nflverse-data",
-            player_rows=self._rows(),
+            player_rows=self._rows() if rows is None else rows,
         )
+        kw.update(overrides)
+        return build_nflverse_prop_role_payloads(**kw)
+
+    def test_builds_empirical_role_vectors_and_td_shares(self):
+        out = self._build()
         self.assertEqual(out["status"], "AVAILABLE")
         self.assertFalse(out["market_fields_in_payload"])
         players = {row["player_id"]: row for row in out["players"]}
@@ -55,33 +60,27 @@ class NflverseRoleBridgeTests(unittest.TestCase):
         self.assertAlmostEqual(wr["receiving_td_share"], 1.0)
         self.assertEqual(wr["pit_sample_games"], 2)
 
-    def test_rejects_target_game_leakage(self):
+    def test_rejects_target_week_row_from_rolling_source(self):
         rows = self._rows()
-        rows[0] = dict(rows[0], game_id="target")
-        with self.assertRaisesRegex(NFLContextError, "target-game"):
-            build_nflverse_prop_role_payloads(
-                game_id="target", kickoff="2026-09-28T23:00:00Z",
-                observed_at="2026-09-28T20:00:00Z",
-                source_uri="https://github.com/nflverse/nflverse-data", player_rows=rows,
-            )
+        rows[0] = dict(rows[0], week=3)
+        with self.assertRaisesRegex(NFLContextError, "not pre-target PIT data"):
+            self._build(rows)
+
+    def test_rejects_row_without_pit_markers(self):
+        rows = self._rows()
+        del rows[0]["week"]
+        with self.assertRaisesRegex(NFLContextError, "missing season/week PIT markers"):
+            self._build(rows)
 
     def test_rejects_market_contamination(self):
         rows = self._rows()
         rows[0] = dict(rows[0], sportsbook_price=-110)
         with self.assertRaisesRegex(NFLContextError, "market input forbidden"):
-            build_nflverse_prop_role_payloads(
-                game_id="target", kickoff="2026-09-28T23:00:00Z",
-                observed_at="2026-09-28T20:00:00Z",
-                source_uri="https://github.com/nflverse/nflverse-data", player_rows=rows,
-            )
+            self._build(rows)
 
     def test_rejects_post_kickoff_snapshot(self):
         with self.assertRaisesRegex(NFLContextError, "before kickoff"):
-            build_nflverse_prop_role_payloads(
-                game_id="target", kickoff="2026-09-28T23:00:00Z",
-                observed_at="2026-09-28T23:00:00Z",
-                source_uri="https://github.com/nflverse/nflverse-data", player_rows=self._rows(),
-            )
+            self._build(observed_at="2026-09-28T23:00:00Z")
 
 
 if __name__ == "__main__":
