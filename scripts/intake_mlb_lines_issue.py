@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -38,7 +39,11 @@ def main() -> int:
     slate = observed.date().isoformat()
     body = _body_lines(Path(args.body_file).read_text(encoding="utf-8"))
     try:
-        payload = build_input(body, observed_at=observed.isoformat(), schedule=fetch_schedule(slate))
+        schedule = fetch_schedule(slate)
+        payload = build_input(body, observed_at=observed.isoformat(), schedule=schedule)
+        # Reuse the exact live schedule response that bound the phone text to MLB games.
+        # This snapshot is run-local evidence only; it is not persisted as a cross-run cache.
+        payload["schedule_snapshot"] = [asdict(game) for game in schedule]
     except LinesIntakeError as exc:
         Path("intake_error.txt").write_text(str(exc), encoding="utf-8")
         print(f"INTAKE_FAILED: {exc}", file=sys.stderr)
