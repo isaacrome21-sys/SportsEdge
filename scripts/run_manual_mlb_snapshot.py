@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 from sportsedge.canonical_manual_mlb import run_canonical_manual_mlb
 from sportsedge.manual_mlb_snapshot import run_manual_mlb_snapshot
 from sportsedge.manual_quote import validate_manual_quote
+from sportsedge.mlb_source import GameSnapshot
 from sportsedge.runtime import parse_timestamp
 
 CHICAGO_TZ = ZoneInfo("America/Chicago")
@@ -43,16 +44,31 @@ def validate_live_rows(rows, *, run_date: str | None, max_age_minutes: int | Non
             raise ValueError(f"MANUAL_QUOTE_FROM_FUTURE row={index} game_id={quote.game_id}")
 
 
-def _run_canonical_rows(rows, *, history_cache_dir: str) -> dict:
+def _schedule_snapshot(snapshot) -> list[GameSnapshot] | None:
+    if not isinstance(snapshot, dict) or "schedule_snapshot" not in snapshot:
+        return None
+    raw = snapshot.get("schedule_snapshot")
+    if not isinstance(raw, list) or not raw or any(not isinstance(item, dict) for item in raw):
+        raise ValueError("MANUAL_SCHEDULE_SNAPSHOT_INVALID")
+    try:
+        games = [GameSnapshot(**item) for item in raw]
+    except (TypeError, ValueError) as exc:
+        raise ValueError("MANUAL_SCHEDULE_SNAPSHOT_INVALID") from exc
+    if not games:
+        raise ValueError("MANUAL_SCHEDULE_SNAPSHOT_INVALID")
+    return games
+
+
+def _run_canonical_rows(rows, *, history_cache_dir: str, schedule: list[GameSnapshot] | None = None) -> dict:
     grouped: dict[str, list] = {}
     for row in rows:
         grouped.setdefault(str(row.get("game_id")), []).append(row)
     if len(grouped) == 1:
-        return run_canonical_manual_mlb(rows, history_cache_dir=history_cache_dir)
+        return run_canonical_manual_mlb(rows, history_cache_dir=history_cache_dir, schedule=schedule)
     games = []
     results = []
     for game_id, game_rows in grouped.items():
-        payload = run_canonical_manual_mlb(game_rows, history_cache_dir=history_cache_dir)
+        payload = run_canonical_manual_mlb(game_rows, history_cache_dir=history_cache_dir, schedule=schedule)
         games.append({
             "input_game_id": game_id,
             "resolved_game": payload.get("resolved_game"),
@@ -87,10 +103,11 @@ def main() -> int:
         as_of = parse_timestamp(args.as_of) if args.as_of else datetime.now(timezone.utc)
         validate_live_rows(rows, run_date=args.run_date, max_age_minutes=args.max_age_minutes, as_of=as_of)
 
+    schedule = _schedule_snapshot(snapshot)
     if isinstance(snapshot, dict) and isinstance(snapshot.get("rows"), list):
-        payload = _run_canonical_rows(snapshot["rows"], history_cache_dir=args.history_cache_dir)
+        payload = _run_canonical_rows(snapshot["rows"], history_cache_dir=args.history_cache_dir, schedule=schedule)
     elif isinstance(snapshot, list):
-        payload = _run_canonical_rows(snapshot, history_cache_dir=args.history_cache_dir)
+        payload = _run_canonical_rows(snapshot, history_cache_dir=args.history_cache_dir, schedule=schedule)
     else:
         payload = run_manual_mlb_snapshot(snapshot, history_cache_dir=args.history_cache_dir)
     out = Path(args.output)

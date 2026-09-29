@@ -16,7 +16,7 @@ from .live_slate import LiveGame, TeamLineup
 from .manual_quote import ManualQuote, validate_manual_quote
 from .mlb_all_market_features import EITHER_PITCHER_MARKETS, MLBAllMarketHistorySource
 from .mlb_history_cache import MLBHistoryCachedOpener
-from .mlb_source import fetch_schedule, parse_game_start
+from .mlb_source import GameSnapshot, fetch_schedule, parse_game_start
 from .quote_bridge import validate_canonical_quote
 
 class CanonicalManualMLBError(ValueError): pass
@@ -42,8 +42,8 @@ def _schedule_date_for_quote(row: ManualQuote) -> str:
     # late-evening games do not roll into the following UTC calendar date.
     return row.first_pitch_at.astimezone(CHICAGO_TZ).date().isoformat()
 
-def _resolve_game(row: ManualQuote, opener=urlopen):
-    rows = fetch_schedule(_schedule_date_for_quote(row), opener=opener, now=row.observed_at)
+def _resolve_game(row: ManualQuote, opener=urlopen, schedule: Iterable[GameSnapshot] | None = None):
+    rows = list(schedule) if schedule is not None else fetch_schedule(_schedule_date_for_quote(row), opener=opener, now=row.observed_at)
     game_key = str(row.game_id).strip()
     matches = [g for g in rows if str(g.game_pk) == game_key]
     if not matches and "@" in game_key:
@@ -62,7 +62,23 @@ def _resolve_game(row: ManualQuote, opener=urlopen):
 def _norm_person(value: str) -> str:
     return "".join(ch.lower() for ch in str(value or "") if ch.isalnum())
 
-def _resolve_subject(row: ManualQuote, *, opener=urlopen) -> tuple[str | None, int | None]:
+def _resolve_subject(row: ManualQuote, *, opener=urlopen, game: GameSnapshot | None = None) -> tuple[str | None, int | None]:
+    # Pitcher props can bind directly to the probable-pitcher identity from the
+    # same live schedule response that resolved the game. Fall back to People API
+    # when the name does not match, preserving the existing fail-closed behavior.
+    if row.subject_name and row.market_type.startswith("PITCHER_") and game is not None:
+        target = _norm_person(row.subject_name)
+        probable = [
+            (game.away_probable_pitcher_id, game.away_probable_pitcher_name, game.away_id),
+            (game.home_probable_pitcher_id, game.home_probable_pitcher_name, game.home_id),
+        ]
+        matches = [item for item in probable if item[0] and item[1] and _norm_person(item[1]) == target]
+        if len(matches) == 1:
+            person_id, _, team_id = matches[0]
+            supplied = str(row.subject_id) if row.subject_id else None
+            if supplied is not None and supplied != str(person_id):
+                raise CanonicalManualMLBError(f"MANUAL_SUBJECT_ID_NAME_MISMATCH:{row.subject_name}")
+            return str(person_id), int(team_id)
     if not row.subject_name and row.subject_id:
         url = f"https://statsapi.mlb.com/api/v1/people/{quote_plus(str(row.subject_id))}?hydrate=currentTeam"
         try:
@@ -103,6 +119,25 @@ def _resolve_subject(row: ManualQuote, *, opener=urlopen) -> tuple[str | None, i
         raise CanonicalManualMLBError(f"MANUAL_SUBJECT_TEAM_INVALID:{row.subject_name}")
     return str(person_id), team_id
 
+def _resolve_subjects(rows: Iterable[ManualQuote], game: GameSnapshot, *, opener=urlopen):
+    resolved_subjects: list[tuple[str | None, int | None]] = []
+    subject_errors: list[str | None] = []
+    cache: dict[tuple[str | None, str], tuple[tuple[str | None, int | None], str | None]] = {}
+    for row in rows:
+        key = (str(row.subject_id) if row.subject_id else None, _norm_person(row.subject_name or ""))
+        if key not in cache:
+            try:
+                pid, tid = _resolve_subject(row, opener=opener, game=game)
+                if pid and tid is not None and tid not in {game.away_id, game.home_id}:
+                    raise CanonicalManualMLBError(f"MANUAL_SUBJECT_TEAM_NOT_IN_GAME:{row.subject_name or pid}")
+                cache[key] = ((pid, tid), None)
+            except CanonicalManualMLBError as exc:
+                cache[key] = ((None, None), str(exc))
+        resolved, error = cache[key]
+        resolved_subjects.append(resolved)
+        subject_errors.append(error)
+    return resolved_subjects, subject_errors
+
 def _engine_market(row: ManualQuote) -> str:
     """Resolve a manual row to its engine market.
 
@@ -136,25 +171,14 @@ def _pair(row: ManualQuote, market: str, entity_id: str, *, resolved_game_id: st
 
 def run_canonical_manual_mlb(rows: Iterable[Mapping[str, Any]], *, opener=urlopen, registry_path="config/deployments.json",
                              edge_floor_config_path="config/truth_gate_floors.json", kelly_multiplier=0.25,
-                             history_cache_dir: str|Path|None=None) -> dict[str, Any]:
+                             history_cache_dir: str|Path|None=None, schedule: Iterable[GameSnapshot] | None = None) -> dict[str, Any]:
     raw = list(rows)
     if not raw: raise CanonicalManualMLBError("manual rows must be non-empty")
     parsed = [validate_manual_quote(r) for r in raw]
     if len({r.game_id for r in parsed}) != 1: raise CanonicalManualMLBError("one game_id per run is required")
     if len({r.first_pitch_at for r in parsed}) != 1: raise CanonicalManualMLBError("all rows must share first_pitch_at")
-    g = _resolve_game(max(parsed, key=lambda r: r.observed_at), opener=opener)
-    resolved_subjects: list[tuple[str | None, int | None]] = []
-    subject_errors: list[str | None] = []
-    for row in parsed:
-        try:
-            pid, tid = _resolve_subject(row, opener=opener)
-            if pid and tid is not None and tid not in {g.away_id, g.home_id}:
-                raise CanonicalManualMLBError(f"MANUAL_SUBJECT_TEAM_NOT_IN_GAME:{row.subject_name or pid}")
-            resolved_subjects.append((pid, tid))
-            subject_errors.append(None)
-        except CanonicalManualMLBError as exc:
-            resolved_subjects.append((None, None))
-            subject_errors.append(str(exc))
+    g = _resolve_game(max(parsed, key=lambda r: r.observed_at), opener=opener, schedule=schedule)
+    resolved_subjects, subject_errors = _resolve_subjects(parsed, g, opener=opener)
     # This is only fallback membership evidence from the sportsbook's prop board.
     # It is not a projected batting order and carries no batting-slot information.
     away_projected = tuple(sorted({int(pid) for (pid, tid), row, err in zip(resolved_subjects, parsed, subject_errors) if not err and pid and tid == g.away_id and not row.market_type.startswith("PITCHER_")}))
