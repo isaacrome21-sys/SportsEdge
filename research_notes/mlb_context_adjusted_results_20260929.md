@@ -2,7 +2,7 @@
 
 Status: **NOT Model_P · NOT Truth Gate · NOT OFFICIAL**
 
-Workflow: `mlb-context-adjusted-research` run 1 (`36621510082`) completed successfully. Five research-guard tests passed before the live-slate rerun. This lane does not modify the production registry, promotion evidence, staking, or OFFICIAL authority.
+Workflow: `mlb-context-adjusted-research` has completed the live-slate rerun and a retrospective diagnostic validation. This lane does not modify the production registry, promotion evidence, staking, or OFFICIAL authority.
 
 ## What changed
 
@@ -11,32 +11,15 @@ The production manual full-game path uses each club's own last-30 runs scored as
 The research lane instead:
 
 - blends each offense's last-30 runs scored 50/50 with the opponent's last-30 runs allowed;
-- uses the current probable starter's strictly-prior starts to adjust only the expected share of the game represented by that starter's recent mean outs;
-- consumes NWS/roof context before simulation;
+- tests the current probable starter's strictly-prior starts as an adjustment to the expected share of the game represented by that starter's recent mean outs;
+- consumes NWS/roof context before simulation on the live slate;
 - applies no outdoor temperature adjustment when retractable-roof state is unknown;
 - treats 60–83 F as the neutral temperature band; the cold/warm sensitivity remains research-only and is not promotion evidence;
-- sends the adjusted means through the existing 100,000-path shared SportsEdge full-game distribution.
+- sends the adjusted means through the existing shared SportsEdge full-game distribution.
 
-## Adjusted run means
+## Sept. 29 live-slate diagnostic
 
-| Game | Away mean | Home mean | Total mean | Weather handling | Lineup status at research capture |
-|---|---:|---:|---:|---|---|
-| White Sox @ Astros | 3.593 | 4.267 | 7.860 | 91 F, retractable roof UNKNOWN → weather not applied | AVAILABLE |
-| Red Sox @ Yankees | 2.375 | 3.772 | 6.148 | 67 F open park → neutral temperature band | PARTIAL |
-| Cubs @ Padres | 3.843 | 4.287 | 8.131 | 73 F open park → neutral temperature band | MISSING |
-
-Starter evidence used:
-
-- Hagen Smith: only 1 prior start in the strict game-log contract, so starter adjustment failed neutral.
-- AJ Blubaugh: 3 prior starts, research ER/9 1.636, mean 11.0 outs.
-- Payton Tolle: 12 prior starts, research ER/9 2.898, mean 17.08 outs.
-- Cam Schlittler: 12 prior starts, research ER/9 1.528, mean 17.67 outs.
-- Matthew Boyd: 12 prior starts, research ER/9 3.737, mean 18.67 outs.
-- Michael King: 12 prior starts, research ER/9 3.014, mean 17.92 outs.
-
-## Previous card vs research rerun
-
-Probabilities below use the same selection and, for integer totals, compare conditional win probability excluding pushes.
+The context-fed rerun materially reduced the prior all-over shape. Examples:
 
 | Previous displayed selection | Previous | Research | Change |
 |---|---:|---:|---:|
@@ -54,14 +37,38 @@ Probabilities below use the same selection and, for integer totals, compare cond
 | Padres TT O3.5 -115 | 76.2% | 63.8% | -12.4 pts |
 | Cubs ML +103 | 51.3% | 43.6% | -7.7 pts |
 
-The over inflation shrank materially. Two examples that now change direction at the quoted board are White Sox/Astros O8 (research conditional 48.3%) and Red Sox TT O2.5 (research 44.8%); this demonstrates that the previous all-over card was highly sensitive to the offense-only run baseline.
+That proves the old card was highly sensitive to the offense-only run baseline. It does **not** prove that the full starter/weather transform is calibrated.
 
-## Remaining blockers
+## Retrospective holdout diagnostic: Sept. 1–14, 2026
 
-- This is a diagnostic model change, not calibrated SportsEdge Model_P.
-- The starter transform and temperature sensitivity require chronological holdout/calibration before any promotion.
-- Wind is not converted to a run multiplier because the run does not yet bind wind direction to verified home-plate/outfield orientation.
-- Houston's retractable roof remained UNKNOWN, so outdoor weather was correctly not applied.
-- BOS/NYY lineups were only PARTIAL and CHC/SD lineups MISSING at the research capture.
-- Public ML/RL presentation remains on hold while the engine rows still carry deployment/inference blockers; #1174 being merged is not itself evidence that those blockers cleared.
-- Correlated selections must be grouped into a single game-script cluster rather than presented as independent edges.
+Workflow run `36623832704` completed successfully. It evaluated 186 final regular-season games with 3,000 deterministic simulation paths per game/model. There were zero skipped games. Three versions were compared on the same games: offense-only, 50/50 offense/opponent-defense blend, and the full starter adjustment with weather held neutral.
+
+| Version | Binary Brier | Binary log loss | ECE | Total RMSE | Total MAE | Total mean error |
+|---|---:|---:|---:|---:|---:|---:|
+| Offense only | 0.2413 | 0.6802 | 0.0710 | 4.8123 | 3.6871 | -0.7344 |
+| Defense blend | **0.2329** | **0.6601** | **0.0552** | **4.7160** | **3.6336** | -0.7349 |
+| Starter adjusted | 0.2480 | 0.6969 | 0.0919 | 4.8974 | 3.8125 | -1.0947 |
+
+On this diagnostic window, the defense blend improved all three binary calibration/error metrics and total-run RMSE/MAE versus offense-only. The full starter transform then gave those gains back and was worse than both alternatives. It shifted the average predicted total down from 8.889 runs to 8.529 while the observed average was 9.624, increasing underprediction.
+
+The game-total over thresholds tell the same story. For the starter-adjusted version, mean predicted over probabilities vs observed frequencies were 75.1% vs 76.3% at 6.5, 60.8% vs 62.9% at 7.5, 51.3% vs 56.5% at 8.5, and 37.2% vs 47.8% at 9.5. The current starter adjustment is therefore **not promotion-ready** and should not be used to manufacture smaller edges simply because it fixes the Sept. 29 card aesthetically.
+
+## Evidence limits
+
+This validation is deliberately `DIAGNOSTIC_ONLY_PIT_EVIDENCE_INCOMPLETE`:
+
+- the historical probable-pitcher identities come from the current historical StatsAPI schedule field and are not archived proof of what was known at the original betting decision time;
+- the repository still lacks a historical point-in-time NWS forecast archive;
+- historical game-day retractable-roof state is not archived;
+- weather was therefore held neutral in the retrospective validation rather than leaked from postgame observations;
+- 31 of 33 starters per side were available in the initial three-day smoke test; in the 186-game window, 175 away and 177 home starters had sufficient strict-prior starts, with the rest failing neutral.
+
+## Current decision
+
+Keep the 50/50 offense/opponent-defense blend as the leading research candidate. Do **not** promote the current full-strength starter multiplier. Until a starter transform passes a separate chronological train/holdout test, pitcher information must remain labeled **context only** in public-facing output. Weather may affect the research run only when sourced before simulation and outdoor exposure is verified, but it also remains non-Model_P until historical PIT forecast/roof evidence is available.
+
+Public card output remains blocked from using this lane as a final card. The fixed disclosure is:
+
+**NOT Model_P · NOT Truth Gate · NOT OFFICIAL**
+
+Lineups/umpire confirmation status must be shown when not confirmed, ML/RL rows remain withheld while their deployment blockers are unresolved, and correlated rows must be grouped rather than presented as independent edges.
