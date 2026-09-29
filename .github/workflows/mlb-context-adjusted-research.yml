@@ -2,9 +2,7 @@ name: mlb-context-adjusted-research
 
 on:
   push:
-    branches:
-      - research/mlb-context-adjusted-runs-20260929
-      - fix/mlb-joint-card-runner-final-20260929
+    branches: [research/mlb-context-adjusted-runs-20260929]
     paths:
       - sportsedge/mlb_context_adjusted_research.py
       - sportsedge/mlb_context_adjusted_validation.py
