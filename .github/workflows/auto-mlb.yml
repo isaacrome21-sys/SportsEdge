@@ -4,8 +4,9 @@ on:
   workflow_dispatch:
   # MLB paid acquisition remains parked from a timer by the frozen credit policy.
   # A dispatch is still fully automatic once started: odds, model, context and card.
+  # This one-off run branch is an explicit manual execution path; main behavior is unchanged.
   push:
-    branches: [main]
+    branches: [main, run-live-mlb-20260929]
     paths:
       - 'sportsedge/**'
       - 'scripts/run_auto_mlb*.py'
@@ -71,7 +72,7 @@ jobs:
           tests.test_mlb_context_card
           -v
       - name: Run canonical automated MLB machine
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/run-live-mlb-20260929'
         env:
           SPORTSEDGE_QUOTES_URL: ${{ secrets.SPORTSEDGE_QUOTES_URL }}
           SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
@@ -85,17 +86,17 @@ jobs:
           SPORTSEDGE_HISTORY_CACHE_DIR: .cache/sportsedge/mlb-history
         run: python scripts/run_auto_mlb_resilient.py --output artifacts/live_mlb_card.json
       - name: Retrieve automated pregame context
-        if: always() && github.event_name == 'workflow_dispatch' && hashFiles('artifacts/live_mlb_card.json') != ''
+        if: always() && (github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/run-live-mlb-20260929') && hashFiles('artifacts/live_mlb_card.json') != ''
         run: PYTHONPATH=. python scripts/acquire_mlb_card_context.py --engine-output artifacts/live_mlb_card.json --out-dir artifacts/mlb_context
       - name: Render SportsEdge phone card
-        if: always() && github.event_name == 'workflow_dispatch' && hashFiles('artifacts/live_mlb_card.json') != ''
+        if: always() && (github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/run-live-mlb-20260929') && hashFiles('artifacts/live_mlb_card.json') != ''
         run: >-
           PYTHONPATH=. python scripts/render_mlb_myspari_card.py
           --engine-output artifacts/live_mlb_card.json
           --context-dir artifacts/mlb_context
           --out-dir artifacts/mlb_myspari
       - name: Upload automated card evidence
-        if: always() && github.event_name == 'workflow_dispatch'
+        if: always() && (github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/run-live-mlb-20260929')
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: live-mlb-card
