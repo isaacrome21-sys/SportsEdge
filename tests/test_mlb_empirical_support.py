@@ -27,7 +27,8 @@ class EmpiricalSupportTests(unittest.TestCase):
         before = copy.deepcopy(payload)
         rows = myspari_rows(payload)
         self.assertEqual(payload, before)
-        self.assertEqual({r["model_p_raw"] for r in rows}, {0., 1.})
+        self.assertEqual({r["raw_empirical_p"] for r in payload["results"]}, {0., 1.})
+        self.assertTrue(all(0.0 < float(r["model_p_raw"]) < 1.0 for r in rows))
         for row in rows:
             self.assertEqual(row["scored_status"], "NO_MODEL")
             for key in ("model_p", "estimate_p", "fair_odds", "edge", "ev_per_dollar"):
@@ -55,7 +56,7 @@ class EmpiricalSupportTests(unittest.TestCase):
     def test_sample_boundary_29_vs_30(self):
         for n, blocked in ((29, True), (30, False)):
             rows = myspari_rows(self.pair([18]*(n-3) + [12]*3))
-            # 26/29 is below 90%; use two losses for the 29-start tail.
+            # Use a 27/29 empirical tail at n=29; n=30 uses 27/30 exactly at 90%.
             if n == 29:
                 rows = myspari_rows(self.pair([18]*27 + [12]*2))
             self.assertEqual(all(r["scored_status"] == "NO_MODEL" for r in rows), blocked)
@@ -78,7 +79,7 @@ class EmpiricalSupportTests(unittest.TestCase):
     def test_hitter_tail_and_weighted_counts(self):
         payload = self.pair([18]*10)
         for row in payload["results"]:
-            row.update(engine_version="mlb_hitter_joint_empirical_v3", market="HOME_RUNS")
+            row.update(engine_version="mlb_hitter_joint_empirical_kernel_v4", market="HOME_RUNS")
             row["empirical_evidence"].update(sample_unit="games", weighted=True)
         text = render_markdown(myspari_rows(payload), header="guard")
         self.assertIn("prior games", text)
