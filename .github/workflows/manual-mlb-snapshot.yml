@@ -82,6 +82,8 @@ jobs:
 
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${DISPATCH_INPUT:-}" ]]; then
             INPUT="$DISPATCH_INPUT"
+          elif [[ "${{ github.event_name }}" == "push" ]] && CHANGED="$(git diff --name-only --diff-filter=AM HEAD~1 HEAD -- 'manual_inputs/mlb/*.json' 2>/dev/null | sort | tail -1)" && [[ -n "$CHANGED" ]]; then
+            INPUT="$CHANGED"
           else
             mapfile -t MATCHES < <(find manual_inputs/mlb -maxdepth 1 -type f -name "${RUN_DATE}*.json" | sort)
             [[ ${#MATCHES[@]} -gt 0 ]] || {
@@ -93,10 +95,19 @@ jobs:
 
           [[ -f "$INPUT" ]] || { echo "MANUAL_INPUT_NOT_FOUND: $INPUT" >&2; exit 1; }
           BASENAME="$(basename "$INPUT")"
-          [[ "$BASENAME" == "${RUN_DATE}"*.json ]] || {
-            echo "MANUAL_INPUT_FILENAME_DATE_MISMATCH: run_date=$RUN_DATE path=$INPUT" >&2
+          # The slate date comes from the file name, so a board for tomorrow can be
+          # priced tonight. Past slates are still refused, and the runner still
+          # enforces first_pitch == run date and not-yet-started games.
+          FILE_DATE="${BASENAME:0:10}"
+          [[ "$FILE_DATE" =~ ^20[0-9]{2}-[0-9]{2}-[0-9]{2}$ ]] || {
+            echo "MANUAL_INPUT_FILENAME_DATE_MISSING: path=$INPUT" >&2
             exit 1
           }
+          [[ ! "$FILE_DATE" < "$RUN_DATE" ]] || {
+            echo "MANUAL_INPUT_SLATE_IN_PAST: file_date=$FILE_DATE today=$RUN_DATE path=$INPUT" >&2
+            exit 1
+          }
+          RUN_DATE="$FILE_DATE"
           echo "path=$INPUT" >> "$GITHUB_OUTPUT"
           echo "run_date=$RUN_DATE" >> "$GITHUB_OUTPUT"
           echo "live=true" >> "$GITHUB_OUTPUT"
