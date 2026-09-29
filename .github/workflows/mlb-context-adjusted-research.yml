@@ -5,8 +5,11 @@ on:
     branches: [research/mlb-context-adjusted-runs-20260929]
     paths:
       - sportsedge/mlb_context_adjusted_research.py
+      - sportsedge/mlb_context_adjusted_validation.py
       - scripts/run_mlb_context_adjusted_research.py
+      - scripts/validate_mlb_context_adjusted_history.py
       - tests/test_mlb_context_adjusted_research.py
+      - tests/test_mlb_context_adjusted_validation.py
       - .github/workflows/mlb-context-adjusted-research.yml
       - manual_inputs/mlb/2026-09-29_dk_run_corrected.json
   workflow_dispatch:
@@ -24,17 +27,29 @@ jobs:
           python-version: '3.12'
       - name: Install runtime dependencies
         run: python -m pip install --disable-pip-version-check numpy==2.5.3
-      - name: Test research guards
-        run: PYTHONPATH=. python -m unittest tests.test_mlb_context_adjusted_research -v
+      - name: Test research guards and validation metrics
+        run: >-
+          PYTHONPATH=. python -m unittest
+          tests.test_mlb_context_adjusted_research
+          tests.test_mlb_context_adjusted_validation -v
       - name: Run Sept 29 context-adjusted research slate
         run: >-
           PYTHONPATH=. python scripts/run_mlb_context_adjusted_research.py
           --input manual_inputs/mlb/2026-09-29_dk_run_corrected.json
           --output artifacts/mlb_context_adjusted_research_20260929.json
-      - name: Upload research result
+      - name: Run retrospective diagnostic validation
+        run: >-
+          PYTHONPATH=. python scripts/validate_mlb_context_adjusted_history.py
+          --start 2026-09-20
+          --end 2026-09-22
+          --simulations 5000
+          --output artifacts/mlb_context_adjusted_validation_20260920_22.json
+      - name: Upload research results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: mlb-context-adjusted-research-20260929
-          path: artifacts/mlb_context_adjusted_research_20260929.json
+          path: |
+            artifacts/mlb_context_adjusted_research_20260929.json
+            artifacts/mlb_context_adjusted_validation_20260920_22.json
           if-no-files-found: error
           retention-days: 14
