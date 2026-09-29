@@ -59,7 +59,7 @@ def _obs(game_id: str, start: str, player: str, blocks: int, hits: int) -> NHLPl
         team_id="1",
         team_side="HOME",
         start_time_utc=start,
-        captured_at="2026-09-29T20:00:00+00:00",
+        captured_at="2027-01-01T00:00:00+00:00",
         hits=hits,
         blocks=blocks,
         toi_seconds=1200,
