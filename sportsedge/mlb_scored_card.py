@@ -44,19 +44,25 @@ def _verified_model_score(row: Mapping[str, Any]) -> bool:
 
 
 def _star_rating(*, score: int, status: str, verified: bool) -> int:
-    """Map the locked qualification score to the public card tier contract.
+    """Map verified qualification score to the public five-band star display.
 
-    Score B remains qualification-only; this function only controls presentation.
-    The card contract is: 88+ = 5 stars, 82-87 = 4 stars, <=81 = 3 stars.
-    Blocked, no-model, or unverified rows never receive stars.
+    Score B remains qualification-only; this function is presentation only.
+    90-100=5★, 80-89=4★, 70-79=3★, 60-69=2★, 50-59=1★,
+    below 50=0★. Blocked, no-model, or unverified rows always receive 0★.
     """
     if status in {"BLOCKED", "NO_MODEL"} or not verified:
         return 0
-    if score >= 88:
+    if score >= 90:
         return 5
-    if score >= 82:
+    if score >= 80:
         return 4
-    return 3
+    if score >= 70:
+        return 3
+    if score >= 60:
+        return 2
+    if score >= 50:
+        return 1
+    return 0
 
 
 def build_mlb_scored_card(rows: Sequence[Any], *, actionable_only: bool=False) -> list[dict[str, Any]]:
