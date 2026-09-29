@@ -14,7 +14,7 @@ def _game(game_id: str, start: str, *, home_sog: int, away_sog: int, home_goalie
         game_type=2,
         game_date=start[:10],
         start_time_utc=start,
-        captured_at="2026-09-29T20:00:00+00:00",
+        captured_at="2027-01-01T00:00:00+00:00",
         game_state="OFF",
         away_team_id="2",
         home_team_id="1",
