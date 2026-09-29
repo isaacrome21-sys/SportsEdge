@@ -2,9 +2,10 @@ from __future__ import annotations
 
 """Build coherent-prop role payloads from public nflverse player rows.
 
-Research plumbing only. The caller must provide rows captured before kickoff.
-Target-game rows and sportsbook/market fields are rejected. No Model_P, Truth
-Gate, promotion, staking, or OFFICIAL authority is created here.
+Research plumbing only. The caller must provide rows captured before kickoff and
+season/week markers proving every row predates the target game. Sportsbook/market
+fields are rejected. No Model_P, Truth Gate, promotion, staking, or OFFICIAL
+authority is created here.
 """
 
 from collections import defaultdict
@@ -45,6 +46,33 @@ def _assert_market_blind(obj: Any, path: str = "root") -> None:
             _assert_market_blind(value, f"{path}[{i}]")
 
 
+def _target_season_week(game_id: str) -> tuple[int, int]:
+    parts = str(game_id).split("_")
+    if len(parts) < 2:
+        raise NFLContextError("game_id must encode season and week")
+    try:
+        season, week = int(parts[0]), int(parts[1])
+    except ValueError as exc:
+        raise NFLContextError("game_id must encode numeric season and week") from exc
+    if season < 2000 or week < 1:
+        raise NFLContextError("game_id season/week out of range")
+    return season, week
+
+
+def _assert_rows_before_target(rows: Sequence[Mapping[str, Any]], *, target_season: int, target_week: int) -> None:
+    for i, row in enumerate(rows):
+        if not isinstance(row, Mapping):
+            raise NFLContextError(f"player_rows[{i}] must be a mapping")
+        if row.get("season") in (None, "") or row.get("week") in (None, ""):
+            raise NFLContextError(f"player_rows[{i}] missing season/week PIT markers")
+        try:
+            season, week = int(row["season"]), int(row["week"])
+        except (TypeError, ValueError) as exc:
+            raise NFLContextError(f"player_rows[{i}] has invalid season/week PIT markers") from exc
+        if season > target_season or (season == target_season and week >= target_week):
+            raise NFLContextError(f"player_rows[{i}] is not pre-target PIT data")
+
+
 def _number(value: Any, field: str) -> float:
     if value in (None, ""):
         return 0.0
@@ -65,11 +93,7 @@ def _row_sample_key(row: Mapping[str, Any], index: int) -> str:
     game = str(row.get("game_id") or "").strip()
     if game:
         return f"game:{game}"
-    season = str(row.get("season") or "").strip()
-    week = str(row.get("week") or row.get("week_num") or "").strip()
-    if season and week:
-        return f"week:{season}:{week}"
-    return f"row:{index}"
+    return f"week:{row['season']}:{row['week']}:{index}"
 
 
 def build_nflverse_prop_role_payloads(
@@ -80,7 +104,7 @@ def build_nflverse_prop_role_payloads(
     source_uri: str,
     player_rows: Sequence[Mapping[str, Any]],
 ) -> Mapping[str, Any]:
-    """Convert pre-kickoff nflverse rows into shared-simulator role payloads.
+    """Convert PIT-safe nflverse rows into shared-simulator role payloads.
 
     Volume features are per observed player-game/week. Rate features use the
     corresponding PIT aggregate denominator. TD shares are team-level shares of
@@ -88,8 +112,7 @@ def build_nflverse_prop_role_payloads(
     zero. These are transparent empirical research inputs, not fitted authority.
     """
     target = str(game_id).strip()
-    if not target:
-        raise NFLContextError("game_id required")
+    target_season, target_week = _target_season_week(target)
     if not str(source_uri).startswith("https://"):
         raise NFLContextError("source_uri must be https")
     kick = _utc(kickoff, "kickoff")
@@ -97,15 +120,13 @@ def build_nflverse_prop_role_payloads(
     if seen >= kick:
         raise NFLContextError("nflverse role snapshot must be observed before kickoff")
     _assert_market_blind(player_rows)
+    _assert_rows_before_target(player_rows, target_season=target_season, target_week=target_week)
 
     totals: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
     meta: dict[str, dict[str, str]] = {}
     samples: dict[str, set[str]] = defaultdict(set)
 
     for index, row in enumerate(player_rows):
-        row_game = str(row.get("game_id") or "").strip()
-        if row_game and row_game == target:
-            raise NFLContextError("target-game nflverse row forbidden")
         pid = str(row.get("player_id") or row.get("gsis_id") or "").strip()
         if not pid:
             continue
