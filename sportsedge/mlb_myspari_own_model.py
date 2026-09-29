@@ -163,9 +163,19 @@ def render_markdown(rows: Sequence[Mapping[str, Any]], *, header: str, notes: Se
               "Score is qualification-only (simulation sufficiency, quote freshness, push-mass quality); price, edge, EV and probability magnitude do not add Score points._"]
     blocked = [r for r in rows if r.get("scored_status") in {"BLOCKED", "NO_MODEL"}]
     if blocked:
-        lines += ["", "## Not card-eligible", "_Includes stale or incomplete market pairs plus empirical estimates withheld by the presentation support guard; raw engine output is preserved in JSON._"]
+        lines += ["", "## Engine did not price / not card-eligible", "_Includes stale or incomplete market pairs plus empirical estimates withheld by the presentation support guard; raw engine output is preserved in JSON._"]
         for r in blocked:
-            reason = r.get("presentation_reason") or ", ".join(r.get("reason_codes") or ()) or r.get("engine_reason") or "UNSPECIFIED_BLOCK"
+            presentation_reason = r.get("presentation_reason")
+            engine_reason = r.get("engine_reason")
+            reason_codes = r.get("reason_codes") or ()
+            if presentation_reason:
+                reason = presentation_reason
+            elif r.get("model_p_raw") is None and engine_reason:
+                reason = engine_reason
+            elif reason_codes:
+                reason = ", ".join(reason_codes)
+            else:
+                reason = engine_reason or "UNSPECIFIED_BLOCK"
             lines.append(f"- {_selection(r)}: {reason}")
     if notes:
         lines += ["", "## Notes", *[f"- {n}" for n in notes]]
