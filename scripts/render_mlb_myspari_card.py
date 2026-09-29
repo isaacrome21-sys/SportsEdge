@@ -76,6 +76,17 @@ def main() -> int:
     age = max((now - observed).total_seconds(), 0.0) if observed else 0.0
 
     bundles, failures, team_sides = _load_context_bundles(args.context_dir)
+    # Team-total entity IDs are team IDs, so bind them from canonical market
+    # resolution. Starter player IDs remain bound from the live context bundle.
+    # Unknown/missing bindings fail neutral inside the presentation guard.
+    for res in resolutions:
+        if not isinstance(res, dict):
+            continue
+        side = str(res.get("team_side") or "").upper()
+        entity_id = res.get("entity_id")
+        if side in {"AWAY", "HOME"} and entity_id not in {None, ""}:
+            team_sides.setdefault(str(entity_id), side)
+
     rows = myspari_rows(payload, quote_age_seconds=age, names=names, team_sides=team_sides)
     games = payload.get("games") or ([{"resolved_game": payload.get("resolved_game")}] if payload.get("resolved_game") else [])
     notes = []

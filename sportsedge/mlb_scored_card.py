@@ -13,6 +13,8 @@ from .mlb_edge_score import MLB_EDGE_SCORE_PROVENANCE
 
 _STATUS_ORDER={"ACTIONABLE":0,"PASS":1,"BLOCKED":2,"NO_MODEL":3}
 _UNVERIFIED_REASON="UNVERIFIED_CONFIDENCE_PROVENANCE"
+MIN_CARD_EV=0.02
+EV_FLOOR_REASON="BELOW_MIN_CARD_EV_2PCT"
 
 
 def _dict(row: Any) -> dict[str, Any]:
@@ -79,6 +81,12 @@ def build_mlb_scored_card(rows: Sequence[Any], *, actionable_only: bool=False) -
             reasons=list(row.get("presentation_reason_codes") or ())
             if _UNVERIFIED_REASON not in reasons:
                 reasons.append(_UNVERIFIED_REASON)
+            row["presentation_reason_codes"]=tuple(reasons)
+        if status=="ACTIONABLE" and ev is not None and float(ev) < MIN_CARD_EV:
+            status="PASS"
+            reasons=list(row.get("presentation_reason_codes") or ())
+            if EV_FLOOR_REASON not in reasons:
+                reasons.append(EV_FLOOR_REASON)
             row["presentation_reason_codes"]=tuple(reasons)
         if actionable_only and status!="ACTIONABLE":
             continue

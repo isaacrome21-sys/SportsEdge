@@ -4,9 +4,12 @@ from sportsedge.mlb_myspari_own_model import (
     OPPOSITE_TEAM_OUTCOME_REASON,
     SAME_SIDE_STACK_REASON,
     SCRIPT_CONFLICT_REASON,
+    TEAM_SCORING_CONFLICT_REASON,
     apply_same_game_guard,
+    myspari_rows,
     run_script_direction,
 )
+from sportsedge.mlb_scored_card import EV_FLOOR_REASON, MIN_CARD_EV
 
 
 def _row(market, side, ev, game="g1", status="ACTIONABLE", line=0.0,
@@ -25,6 +28,21 @@ def _row(market, side, ev, game="g1", status="ACTIONABLE", line=0.0,
     }
 
 
+def _engine_pair(p_over, over_odds, under_odds):
+    base = {
+        "game_id": "g",
+        "market": "TOTALS",
+        "entity_id": "g",
+        "line": 7.5,
+        "mc_paths": 100000,
+        "bet_status": "MODEL_CANDIDATE",
+    }
+    return [
+        {**base, "side": "OVER", "american_odds": over_odds, "model_p": p_over},
+        {**base, "side": "UNDER", "american_odds": under_odds, "model_p": 1 - p_over},
+    ]
+
+
 class SameGameGuardTest(unittest.TestCase):
     def test_directions_are_diagnostic_only(self):
         self.assertEqual(run_script_direction(_row("TOTALS", "OVER", 0.1)), 1)
@@ -35,19 +53,92 @@ class SameGameGuardTest(unittest.TestCase):
         self.assertEqual(run_script_direction(_row("YRFI", "YES", 0.1)), 1)
         self.assertEqual(run_script_direction(_row("MONEYLINE", "HOME", 0.1)), 0)
 
-    def test_cross_market_script_labels_do_not_demote_independent_rows(self):
+    def test_global_script_labels_no_longer_demote_independent_rows(self):
         over = _row("TOTALS", "OVER", 0.02, line=7.5)
-        tt_under = _row("TEAM_TOTALS", "UNDER", 0.30, line=3.5, entity="team-home")
-        outs = _row("PITCHER_OUTS", "OVER", 0.20, line=16.5, entity="pitcher-a")
-        strikeouts = _row("PITCHER_K", "OVER", 0.18, line=4.5, entity="pitcher-b")
-        walks = _row("PITCHER_BB", "OVER", 0.40, line=1.5, entity="pitcher-c")
-        apply_same_game_guard([over, tt_under, outs, strikeouts, walks])
-        self.assertEqual(
-            [over["status"], tt_under["status"], outs["status"], strikeouts["status"], walks["status"]],
-            ["ACTIONABLE"] * 5,
+        strikeouts = _row(
+            "PITCHER_K", "OVER", 0.18, line=4.5,
+            entity="pitcher-home", team_side="HOME",
         )
-        for row in (over, tt_under, outs, strikeouts, walks):
-            self.assertNotIn("guard_kept_instead", row)
+        walks = _row(
+            "PITCHER_BB", "OVER", 0.40, line=1.5,
+            entity="pitcher-away", team_side="AWAY",
+        )
+        apply_same_game_guard([over, strikeouts, walks])
+        self.assertEqual([over["status"], strikeouts["status"], walks["status"]], ["ACTIONABLE"] * 3)
+
+    def test_same_team_full_over_and_f5_under_conflict(self):
+        full_over = _row(
+            "TEAM_TOTALS", "OVER", 0.25, line=3.5, score=100,
+            entity="padres", team_side="HOME",
+        )
+        f5_under = _row(
+            "F5_TEAM_TOTALS", "UNDER", 0.04, line=1.5, score=60,
+            entity="padres", team_side="HOME",
+        )
+        apply_same_game_guard([full_over, f5_under])
+        self.assertEqual(full_over["status"], "ACTIONABLE")
+        self.assertEqual(f5_under["status"], "PASS")
+        self.assertIn(TEAM_SCORING_CONFLICT_REASON, f5_under["presentation_reason_codes"])
+
+    def test_team_total_over_conflicts_with_opposing_pitcher_outs_over(self):
+        yankees_over = _row(
+            "TEAM_TOTALS", "OVER", 0.30, line=3.5, score=100,
+            entity="yankees", team_side="HOME",
+        )
+        tolle_outs_over = _row(
+            "PITCHER_OUTS", "OVER", 0.20, line=16.5, score=60,
+            entity="tolle", team_side="AWAY", name="Payton Tolle",
+        )
+        apply_same_game_guard([yankees_over, tolle_outs_over])
+        self.assertEqual(yankees_over["status"], "ACTIONABLE")
+        self.assertEqual(tolle_outs_over["status"], "PASS")
+        self.assertIn(TEAM_SCORING_CONFLICT_REASON, tolle_outs_over["presentation_reason_codes"])
+
+    def test_pitcher_strikeout_over_does_not_conflict_with_team_or_game_over(self):
+        game_over = _row("TOTALS", "OVER", 0.12, line=7.5, score=100)
+        padres_over = _row(
+            "TEAM_TOTALS", "OVER", 0.18, line=3.5, score=100,
+            entity="padres", team_side="HOME",
+        )
+        king_k_over = _row(
+            "PITCHER_K", "OVER", 0.18, line=4.5, score=60,
+            entity="king", team_side="HOME", name="Michael King",
+        )
+        apply_same_game_guard([game_over, padres_over, king_k_over])
+        self.assertEqual([r["status"] for r in (game_over, padres_over, king_k_over)], ["ACTIONABLE"] * 3)
+
+    def test_same_direction_team_total_and_opposing_pitcher_allowance_can_coexist(self):
+        padres_over = _row(
+            "TEAM_TOTALS", "OVER", 0.18, line=3.5, score=100,
+            entity="padres", team_side="HOME",
+        )
+        boyd_hits_over = _row(
+            "PITCHER_HITS_ALLOWED", "OVER", 0.25, line=4.5, score=60,
+            entity="boyd", team_side="AWAY", name="Matthew Boyd",
+        )
+        apply_same_game_guard([padres_over, boyd_hits_over])
+        self.assertEqual(padres_over["status"], "ACTIONABLE")
+        self.assertEqual(boyd_hits_over["status"], "ACTIONABLE")
+
+    def test_team_total_does_not_conflict_with_own_pitcher_prop(self):
+        padres_over = _row(
+            "TEAM_TOTALS", "OVER", 0.18, line=3.5, score=100,
+            entity="padres", team_side="HOME",
+        )
+        king_outs_over = _row(
+            "PITCHER_OUTS", "OVER", 0.25, line=14.5, score=60,
+            entity="king", team_side="HOME", name="Michael King",
+        )
+        apply_same_game_guard([padres_over, king_outs_over])
+        self.assertEqual(padres_over["status"], "ACTIONABLE")
+        self.assertEqual(king_outs_over["status"], "ACTIONABLE")
+
+    def test_unbound_scoring_rows_fail_neutral(self):
+        team_over = _row("TEAM_TOTALS", "OVER", 0.18, line=3.5, score=100, entity="padres")
+        outs_over = _row("PITCHER_OUTS", "OVER", 0.25, line=14.5, score=60, entity="boyd")
+        apply_same_game_guard([team_over, outs_over])
+        self.assertEqual(team_over["status"], "ACTIONABLE")
+        self.assertEqual(outs_over["status"], "ACTIONABLE")
 
     def test_direct_opposite_same_contract_keeps_best_ev(self):
         over = _row("TOTALS", "OVER", 0.08, line=7.5)
@@ -118,6 +209,28 @@ class SameGameGuardTest(unittest.TestCase):
         b = _row("TOTALS", "UNDER", 0.2, game=None)
         apply_same_game_guard([a, b])
         self.assertEqual((a["status"], b["status"]), ("ACTIONABLE", "ACTIONABLE"))
+
+
+class CardEvFloorTest(unittest.TestCase):
+    def _over(self, rows):
+        return next(r for r in rows if r["side"] == "OVER")
+
+    def test_positive_edge_but_near_zero_return_is_not_a_play(self):
+        over = self._over(myspari_rows({"results": _engine_pair(0.546, -120, 100)}))
+        self.assertGreater(over["edge"], 0)
+        self.assertLess(over["ev_per_dollar"], MIN_CARD_EV)
+        self.assertEqual(over["scored_status"], "PASS")
+        self.assertIn(EV_FLOOR_REASON, over["presentation_reason_codes"])
+
+    def test_clear_return_stays_actionable(self):
+        over = self._over(myspari_rows({"results": _engine_pair(0.58, -102, -118)}))
+        self.assertGreaterEqual(over["ev_per_dollar"], MIN_CARD_EV)
+        self.assertEqual(over["scored_status"], "ACTIONABLE")
+
+    def test_floor_never_changes_probability_or_score(self):
+        over = self._over(myspari_rows({"results": _engine_pair(0.546, -120, 100)}))
+        self.assertAlmostEqual(over["model_p"], 0.546, places=9)
+        self.assertGreater(over["confidence_score"], 0)
 
 
 if __name__ == "__main__":
