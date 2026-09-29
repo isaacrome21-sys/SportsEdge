@@ -43,6 +43,22 @@ def _verified_model_score(row: Mapping[str, Any]) -> bool:
     return "POWER_V1_NO_VIG" in reasons
 
 
+def _star_rating(*, score: int, status: str, verified: bool) -> int:
+    """Map the locked qualification score to the public card tier contract.
+
+    Score B remains qualification-only; this function only controls presentation.
+    The card contract is: 88+ = 5 stars, 82-87 = 4 stars, <=81 = 3 stars.
+    Blocked, no-model, or unverified rows never receive stars.
+    """
+    if status in {"BLOCKED", "NO_MODEL"} or not verified:
+        return 0
+    if score >= 88:
+        return 5
+    if score >= 82:
+        return 4
+    return 3
+
+
 def build_mlb_scored_card(rows: Sequence[Any], *, actionable_only: bool=False) -> list[dict[str, Any]]:
     out=[]
     for raw in rows:
@@ -66,7 +82,7 @@ def build_mlb_scored_card(rows: Sequence[Any], *, actionable_only: bool=False) -
         row["scored_status"]=status
         row["edge_pct"]=None if edge is None else round(100*float(edge),2)
         row["ev_pct"]=None if ev is None else round(100*float(ev),2)
-        row["star_rating"]=0 if status in {"BLOCKED","NO_MODEL"} or not verified else min(5,max(1,(row["confidence_score"]+19)//20))
+        row["star_rating"]=_star_rating(score=row["confidence_score"], status=status, verified=verified)
         out.append(row)
     return sorted(out,key=lambda r:(_STATUS_ORDER.get(r["scored_status"],9),-r["confidence_score"],-(r["ev_per_dollar"] if r.get("ev_per_dollar") is not None else -999)))
 
