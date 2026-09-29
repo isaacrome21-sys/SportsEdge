@@ -11,7 +11,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Mapping, Sequence
 
 from .context_autopull import NFLContextError
 from .prop_opportunity_context import build_prop_opportunity_provider
@@ -69,12 +69,43 @@ def build_nflverse_prop_opportunity_provider(
     for rows in (snap_rows, player_rows, pbp_rows):
         _assert_market_blind(rows)
 
-    snaps: dict[str, dict[str, Any]] = {}
+    # Aggregate game-level snap rows instead of allowing the last row to win.
+    # nflverse/PFR snap counts are one row per player-game.
+    snap_acc: dict[str, dict[str, Any]] = {}
     for row in snap_rows:
         pid = str(row.get("player_id") or row.get("gsis_id") or "").strip()
         if not pid:
             continue
-        snaps[pid] = dict(row)
+        acc = snap_acc.setdefault(pid, {
+            "team": str(row.get("team") or "").upper(),
+            "position": str(row.get("position") or "").upper(),
+            "games": 0,
+            "offense_snaps": 0.0,
+            "offense_pct_sum": 0.0,
+            "offense_pct_n": 0,
+        })
+        acc["games"] += 1
+        raw_snaps = row.get("offense_snaps")
+        if raw_snaps not in (None, ""):
+            acc["offense_snaps"] += float(raw_snaps)
+        raw_pct = row.get("offense_pct")
+        if raw_pct not in (None, ""):
+            pct = float(raw_pct)
+            acc["offense_pct_sum"] += pct / 100.0 if pct > 1.0 else pct
+            acc["offense_pct_n"] += 1
+
+    snaps: dict[str, dict[str, Any]] = {}
+    for pid, acc in snap_acc.items():
+        snaps[pid] = {
+            "team": acc["team"],
+            "position": acc["position"],
+            "games": acc["games"],
+            "offense_snaps": acc["offense_snaps"],
+            "offense_pct": (
+                acc["offense_pct_sum"] / acc["offense_pct_n"]
+                if acc["offense_pct_n"] else None
+            ),
+        }
 
     stats: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
     meta: dict[str, dict[str, str]] = {}
@@ -110,7 +141,6 @@ def build_nflverse_prop_opportunity_provider(
         if not team or not position:
             continue
         vals = stats.get(pid, {})
-        off_snaps = s.get("offense_snaps")
         off_pct = s.get("offense_pct")
         snap_share = None
         if off_pct not in (None, ""):
