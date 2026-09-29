@@ -10,6 +10,8 @@ class MLBAcceptanceMatrixTests(unittest.TestCase):
     def test_exactly_all_38_catalog_markets_have_one_acceptance_family(self):
         out = build_acceptance_matrix()
         self.assertEqual(out["market_count"], 38)
+        self.assertEqual(out["surface_market_count"], 38)
+        self.assertTrue(out["inventory_complete"])
         markets = [row["market"] for row in out["markets"]]
         self.assertEqual(len(markets), len(set(markets)))
         self.assertEqual(len(markets), 38)
@@ -73,6 +75,62 @@ class MLBAcceptanceMatrixTests(unittest.TestCase):
         ]
         self.assertEqual(len(unmeasured), 10)
         self.assertTrue(all(not row["acceptance_complete"] for row in unmeasured))
+
+    def test_market_surface_is_exactly_anchored_to_catalog(self):
+        raw = json.loads(Path("config/mlb_market_surface.json").read_text())
+        raw["markets"] = raw["markets"][:-1]
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "surface.json"
+            path.write_text(json.dumps(raw))
+            with self.assertRaisesRegex(MLBAcceptanceMatrixError, "market surface coverage mismatch"):
+                build_acceptance_matrix(surface_path=path)
+
+    def test_market_surface_rejects_duplicate_market(self):
+        raw = json.loads(Path("config/mlb_market_surface.json").read_text())
+        raw["markets"].append(dict(raw["markets"][0]))
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "surface.json"
+            path.write_text(json.dumps(raw))
+            with self.assertRaisesRegex(MLBAcceptanceMatrixError, "duplicate market in market surface"):
+                build_acceptance_matrix(surface_path=path)
+
+    def test_every_market_exposes_validated_acquisition_contract(self):
+        out = build_acceptance_matrix()
+        for row in out["markets"]:
+            acquisition = row["current_state"]["acquisition"]
+            self.assertIn(acquisition["declared_availability"], {"AVAILABLE", "UNAVAILABLE"})
+            self.assertIsInstance(acquisition["provider_expected"], bool)
+            self.assertIsInstance(acquisition["retry_eligible"], bool)
+            self.assertTrue(acquisition["acquisition_route"])
+            self.assertTrue(acquisition["terminal_if_absent"])
+            self.assertIn("opens_minutes_before_first_pitch", acquisition["availability_window"])
+            self.assertIn("expected_by_minutes_before_first_pitch", acquisition["availability_window"])
+
+    def test_acceptance_blockers_are_fail_closed_and_match_completion(self):
+        out = build_acceptance_matrix()
+        for row in out["markets"]:
+            blockers = row["acceptance_blockers"]
+            self.assertIsInstance(blockers, list)
+            self.assertEqual(row["acceptance_complete"], not blockers, row["market"])
+            state = row["current_state"]
+            for gate, status in state["validation_status"].items():
+                blocker = f"VALIDATION:{gate}:{status}"
+                if status == "PASS":
+                    self.assertNotIn(blocker, blockers, row["market"])
+                else:
+                    self.assertIn(blocker, blockers, row["market"])
+
+    def test_summary_counts_partition_all_38_markets(self):
+        out = build_acceptance_matrix()
+        summary = out["summary"]
+        self.assertEqual(
+            summary["surface_declared_available"] + summary["surface_declared_unavailable"],
+            38,
+        )
+        self.assertEqual(
+            summary["acceptance_complete"] + summary["acceptance_blocked"],
+            38,
+        )
 
     def test_matrix_fails_if_a_catalog_market_is_unassigned(self):
         raw = json.loads(Path("config/mlb_acceptance_matrix.json").read_text())
