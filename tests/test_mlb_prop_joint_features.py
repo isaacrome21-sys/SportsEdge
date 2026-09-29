@@ -30,9 +30,11 @@ class MLBPropJointFeatureTests(unittest.TestCase):
         self.assertEqual(len(feature["features"]["history_pool"]), 12)
         priced = price_hitter_market({"game_id":"1","market":"TOTAL_BASES","entity_id":"10",
             "line":1.5,"side":"OVER","features":feature["features"]})
-        self.assertGreaterEqual(priced["model_p"], 0.0)
+        self.assertGreater(priced["model_p"], 0.0)
+        self.assertLess(priced["model_p"], 1.0)
+        self.assertEqual(priced["meta"]["posterior_prior"], "JEFFREYS_SETTLEMENT_DIRICHLET_0_5")
 
-    def test_pitcher_history_builds_joint_pool_accepted_by_engine(self):
+    def test_pitcher_history_builds_joint_pool_accepted_by_engine_without_certainty(self):
         rows = []
         for i in range(7):
             rows.append({"date": date(2026, 9, i + 1), "stat": {
@@ -45,7 +47,9 @@ class MLBPropJointFeatureTests(unittest.TestCase):
         self.assertEqual(len(feature["features"]["history_pool"]), 7)
         priced = price_pitcher_market({"game_id":"1","market":"PITCHER_OUTS","entity_id":"20",
             "line":17.5,"side":"OVER","features":feature["features"]})
-        self.assertEqual(priced["model_p"], 1.0)
+        self.assertAlmostEqual(priced["model_p"], 7.5 / 8.0)
+        self.assertAlmostEqual(priced["meta"]["raw_empirical_p"], 1.0, places=12)
+        self.assertEqual(priced["meta"]["posterior_prior"], "JEFFREYS_SETTLEMENT_DIRICHLET_0_5")
 
 
 if __name__ == "__main__":

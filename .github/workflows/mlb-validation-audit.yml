@@ -8,9 +8,22 @@ on:
       - 'scripts/enforce_mlb_replay_policy.py'
       - 'scripts/probe_mlb_settlement_semantics.py'
       - 'sportsedge/sports/mlb/replay_policy.py'
+      - 'sportsedge/mlb_acceptance_matrix.py'
+      - 'sportsedge/auto_joint_runner.py'
+      - 'sportsedge/manual_hybrid_joint_runner.py'
+      - 'sportsedge/mlb_joint_mode_bridge.py'
+      - 'sportsedge/unified_card.py'
       - 'tests/test_mlb_replay_policy_enforcement.py'
+      - 'tests/test_mlb_acceptance_matrix.py'
+      - 'tests/test_mlb_mode_parity.py'
       - 'config/mlb_validation_evidence.json'
       - 'config/mlb_replay_policy_v1.json'
+      - 'config/mlb_acceptance_matrix.json'
+      - 'config/mlb_market_catalog.json'
+      - 'config/mlb_market_surface.json'
+      - 'config/mlb_behavioral_disposition.json'
+      - 'config/mlb_feature_realization.json'
+      - 'config/deployments.json'
       - '.github/workflows/mlb-settlement-semantics.yml'
       - '.github/workflows/mlb-validation-audit.yml'
 
@@ -32,8 +45,14 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12.13'
+      - name: Install acceptance runtime dependencies
+        run: python -m pip install --disable-pip-version-check numpy==2.5.3
       - name: Verify frozen replay policy contract
         run: python -m unittest tests.test_mlb_replay_policy_enforcement -v
+      - name: Verify complete MLB market acceptance inventory
+        run: python -m unittest tests.test_mlb_acceptance_matrix -v
+      - name: Verify MLB manual hybrid automatic parity
+        run: python -m unittest tests.test_mlb_mode_parity -v
       - name: Prepare durable data worktree
         shell: bash
         run: |
