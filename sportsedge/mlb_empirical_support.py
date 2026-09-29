@@ -23,7 +23,6 @@ def support_evidence(feature: Mapping[str, Any], row: Mapping[str, Any]) -> dict
     pool = features.get("history_pool")
     if not isinstance(pool, list) or not pool:
         return None
-    # Reuse the engine's stat mapping, without calling or modifying its pricing.
     if str(row["engine_version"]).startswith("mlb_pitcher_"):
         from .pitcher_joint_engine import _value
         unit = "starts"
@@ -45,6 +44,7 @@ def support_evidence(feature: Mapping[str, Any], row: Mapping[str, Any]) -> dict
 
 
 def empirical_guard_reason(row: Mapping[str, Any], conditional_p: float | None) -> str | None:
+    """Withhold unsupported empirical tails independently of predictive smoothing."""
     if not is_empirical(row) or row.get("model_p") is None:
         return None
     evidence = row.get("empirical_evidence")
@@ -53,20 +53,33 @@ def empirical_guard_reason(row: Mapping[str, Any], conditional_p: float | None) 
     n = evidence.get("sample_size")
     if isinstance(n, bool) or not isinstance(n, int) or n <= 0 or not evidence.get("pool_sha256"):
         return "EMPIRICAL_SAMPLE_UNKNOWN: invalid or unbound engine pool evidence"
+    wins = evidence.get("wins")
+    pushes = evidence.get("pushes", 0)
+    if (isinstance(wins, bool) or not isinstance(wins, int) or not 0 <= wins <= n or
+            isinstance(pushes, bool) or not isinstance(pushes, int) or not 0 <= pushes <= n or
+            wins + pushes > n):
+        return "EMPIRICAL_SAMPLE_UNKNOWN: invalid engine pool counts"
+
     p = float(row["model_p"])
     if not isfinite(p) or not 0 <= p <= 1:
         return "EMPIRICAL_PROBABILITY_INVALID"
-    endpoint = any(value is not None and (abs(value) <= 1e-12 or abs(value - 1.0) <= 1e-12)
-                   for value in (p, conditional_p))
-    tail = min(p, conditional_p if conditional_p is not None else p) <= THIN_TAIL_CUTOFF + 1e-12 or max(p, conditional_p if conditional_p is not None else p) >= 1 - THIN_TAIL_CUTOFF - 1e-12
+    if conditional_p is not None and (not isfinite(float(conditional_p)) or not 0 <= float(conditional_p) <= 1):
+        return "EMPIRICAL_PROBABILITY_INVALID"
+
+    empirical_rate = wins / n
+    endpoint = abs(empirical_rate) <= 1e-12 or abs(empirical_rate - 1.0) <= 1e-12
+    tail = empirical_rate <= THIN_TAIL_CUTOFF + 1e-12 or empirical_rate >= 1 - THIN_TAIL_CUTOFF - 1e-12
     if not endpoint and not (n < MIN_TAIL_SAMPLE and tail):
         return None
+
     if endpoint:
         code = "EMPIRICAL_TAIL_UNSUPPORTED" if n < MIN_TAIL_SAMPLE else "EMPIRICAL_BOUNDARY_UNCALIBRATED"
     else:
         code = "EMPIRICAL_THIN_TAIL_UNSUPPORTED"
-    wins = evidence.get("wins")
-    count = f"{wins}/{n}" if isinstance(wins, int) and not isinstance(wins, bool) and 0 <= wins <= n else f"n={n}"
+    count = f"{wins}/{n}"
     unit = evidence.get("sample_unit", "observations")
     weighted = "; weighted estimate, counts are unweighted" if evidence.get("weighted") else ""
-    return f"{code}: {count} prior {unit} {str(row.get('side', '')).lower()} {row.get('line'):g}; raw p={p:.1%}{weighted}"
+    return (
+        f"{code}: {count} prior {unit} {str(row.get('side', '')).lower()} {row.get('line'):g}; "
+        f"empirical rate={empirical_rate:.1%}; model p={p:.1%}{weighted}"
+    )
