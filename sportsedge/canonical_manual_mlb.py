@@ -56,7 +56,21 @@ def _norm_person(value: str) -> str:
 
 def _resolve_subject(row: ManualQuote, *, opener=urlopen) -> tuple[str | None, int | None]:
     if not row.subject_name and row.subject_id:
-        return str(row.subject_id), None
+        url = f"https://statsapi.mlb.com/api/v1/people/{quote_plus(str(row.subject_id))}?hydrate=currentTeam"
+        try:
+            with opener(url, timeout=15) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except Exception as exc:
+            raise CanonicalManualMLBError(f"MANUAL_SUBJECT_LOOKUP_FAILED:{row.subject_id}") from exc
+        matches = payload.get("people", [])
+        if len(matches) != 1:
+            raise CanonicalManualMLBError(f"MANUAL_SUBJECT_RESOLUTION_FAILED:{row.subject_id}")
+        person = matches[0]
+        team = person.get("currentTeam") or {}
+        team_id = team.get("id")
+        if isinstance(team_id, bool) or not isinstance(team_id, int) or team_id <= 0:
+            raise CanonicalManualMLBError(f"MANUAL_SUBJECT_TEAM_INVALID:{row.subject_id}")
+        return str(row.subject_id), team_id
     if not row.subject_name:
         return None, None
     url = f"https://statsapi.mlb.com/api/v1/people/search?names={quote_plus(row.subject_name)}&active=true&sportIds=1&hydrate=currentTeam"
@@ -109,12 +123,22 @@ def run_canonical_manual_mlb(rows: Iterable[Mapping[str, Any]], *, opener=urlope
     if len({r.game_id for r in parsed}) != 1: raise CanonicalManualMLBError("one game_id per run is required")
     if len({r.first_pitch_at for r in parsed}) != 1: raise CanonicalManualMLBError("all rows must share first_pitch_at")
     g = _resolve_game(max(parsed, key=lambda r: r.observed_at), opener=opener)
-    resolved_subjects = [_resolve_subject(row, opener=opener) for row in parsed]
-    away_projected = tuple(sorted({int(pid) for (pid, tid), row in zip(resolved_subjects, parsed) if pid and tid == g.away_id and not row.market_type.startswith("PITCHER_")}))
-    home_projected = tuple(sorted({int(pid) for (pid, tid), row in zip(resolved_subjects, parsed) if pid and tid == g.home_id and not row.market_type.startswith("PITCHER_")}))
-    for (pid, tid), row in zip(resolved_subjects, parsed):
-        if pid and tid is not None and tid not in {g.away_id, g.home_id}:
-            raise CanonicalManualMLBError(f"MANUAL_SUBJECT_TEAM_NOT_IN_GAME:{row.subject_name or pid}")
+    resolved_subjects: list[tuple[str | None, int | None]] = []
+    subject_errors: list[str | None] = []
+    for row in parsed:
+        try:
+            pid, tid = _resolve_subject(row, opener=opener)
+            if pid and tid is not None and tid not in {g.away_id, g.home_id}:
+                raise CanonicalManualMLBError(f"MANUAL_SUBJECT_TEAM_NOT_IN_GAME:{row.subject_name or pid}")
+            resolved_subjects.append((pid, tid))
+            subject_errors.append(None)
+        except CanonicalManualMLBError as exc:
+            resolved_subjects.append((None, None))
+            subject_errors.append(str(exc))
+    # This is only fallback membership evidence from the sportsbook's prop board.
+    # It is not a projected batting order and carries no batting-slot information.
+    away_projected = tuple(sorted({int(pid) for (pid, tid), row, err in zip(resolved_subjects, parsed, subject_errors) if not err and pid and tid == g.away_id and not row.market_type.startswith("PITCHER_")}))
+    home_projected = tuple(sorted({int(pid) for (pid, tid), row, err in zip(resolved_subjects, parsed, subject_errors) if not err and pid and tid == g.home_id and not row.market_type.startswith("PITCHER_")}))
     live = LiveGame(g.game_pk,g.away_id,g.home_id,g.away_probable_pitcher_id,g.home_probable_pitcher_id,
                     TeamLineup(g.away_id,"away",away_projected,(),False),TeamLineup(g.home_id,"home",home_projected,(),False),
                     g.game_number,g.double_header,g.venue_id,g.official_date,g.status)
@@ -122,8 +146,18 @@ def run_canonical_manual_mlb(rows: Iterable[Mapping[str, Any]], *, opener=urlope
     hist = MLBGenericHistorySource(opener=MLBHistoryCachedOpener(target_date=captured.date(),cache_dir=history_cache_dir,opener=opener), retrieved_at=captured)
     target_date = datetime.fromisoformat(str(g.official_date)).date() if g.official_date else captured.date()
     quotes, features, resolutions, seen = [], [], [], set()
-    for row, (subject_id, subject_team_id) in zip(parsed, resolved_subjects):
+    blocked_subject_rows: list[dict[str, Any]] = []
+    for row, (subject_id, subject_team_id), subject_error in zip(parsed, resolved_subjects, subject_errors):
         market = resolve_manual_market_type(row.market_type)
+        if subject_error:
+            entity = str(row.subject_id or row.subject_name or "UNRESOLVED")
+            for side, price, line in ((row.side, row.price, row.line), (row.paired_side, row.paired_price, -row.line if row.market_type in {"RUN_LINE","FIRST_FIVE_RUN_LINE"} else row.line)):
+                blocked_subject_rows.append({"game_id":str(g.game_pk),"market":market,"entity_id":entity,"line":line,"side":_side(row.market_type, side),
+                    "american_odds":price,"model_p":None,"bet_status":"BLOCKED","reason":subject_error,"book_key":row.book,"sportsbook":row.book,
+                    "quote_retrieved_at":row.observed_at.isoformat()})
+            resolutions.append({"market_type":row.market_type,"engine_market":market,"subject_id":row.subject_id,"subject_name":row.subject_name,
+                "observed_at":row.observed_at.isoformat(),"resolution_status":"BLOCKED","reason":subject_error})
+            continue
         is_player_market = market in {"HOME_RUNS","HITS","TOTAL_BASES","RBI","RUNS","STOLEN_BASES","BATTER_BB","EXTRA_BASE_HITS","SINGLES","DOUBLES","TRIPLES","BATTER_K","HITS_RUNS_RBIS","RUNS_RBIS","PITCHER_K","PITCHER_OUTS","PITCHER_ER","PITCHER_HITS_ALLOWED","PITCHER_BB","PITCHER_HITS_WALKS_ER"}
         if is_player_market and not subject_id:
             raise CanonicalManualMLBError(f"subject_id or subject_name required for {row.market_type}")
@@ -141,4 +175,4 @@ def run_canonical_manual_mlb(rows: Iterable[Mapping[str, Any]], *, opener=urlope
         "snapshot_sha256":_sha(raw),"resolved_game":{"game_pk":int(g.game_pk),"away_team":g.away_name,"home_team":g.home_name,
         "scheduled_start_utc":parse_game_start(g.game_date).isoformat()},"market_resolution":resolutions,
         "feature_lineage":[{"market":f["market"],"entity_id":f["entity_id"],"source":f.get("source"),"source_subset_hash":f.get("source_subset_hash")} for f in features],
-        "results":[asdict(r) for r in results]}
+        "lineup_membership_tier":"DK_PROP_LISTED","results":[asdict(r) for r in results] + blocked_subject_rows}
