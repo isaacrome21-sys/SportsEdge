@@ -40,16 +40,16 @@ jobs:
       - name: Run retrospective diagnostic validation
         run: >-
           PYTHONPATH=. python scripts/validate_mlb_context_adjusted_history.py
-          --start 2026-09-20
-          --end 2026-09-22
-          --simulations 5000
-          --output artifacts/mlb_context_adjusted_validation_20260920_22.json
+          --start 2026-09-01
+          --end 2026-09-14
+          --simulations 3000
+          --output artifacts/mlb_context_adjusted_validation_20260901_14.json
       - name: Upload research results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: mlb-context-adjusted-research-20260929
           path: |
             artifacts/mlb_context_adjusted_research_20260929.json
-            artifacts/mlb_context_adjusted_validation_20260920_22.json
+            artifacts/mlb_context_adjusted_validation_20260901_14.json
           if-no-files-found: error
           retention-days: 14
