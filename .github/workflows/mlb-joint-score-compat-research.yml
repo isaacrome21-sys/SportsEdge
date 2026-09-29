@@ -1,0 +1,36 @@
+name: mlb-joint-score-compat-research
+
+on:
+  push:
+    branches: [research/mlb-score-compatible-pitcher-coupling-20260929]
+    paths:
+      - sportsedge/mlb_joint_card_coupled_research.py
+      - scripts/run_mlb_score_compatible_joint_research.py
+      - tests/test_mlb_joint_card_coupled_research.py
+      - .github/workflows/mlb-joint-score-compat-research.yml
+  pull_request:
+    paths:
+      - sportsedge/mlb_joint_card_coupled_research.py
+      - scripts/run_mlb_score_compatible_joint_research.py
+      - tests/test_mlb_joint_card_coupled_research.py
+      - .github/workflows/mlb-joint-score-compat-research.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  invariants:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Compile research runner
+        run: python -m py_compile sportsedge/mlb_joint_card_coupled_research.py scripts/run_mlb_score_compatible_joint_research.py
+      - name: Test score and pitcher path invariants
+        run: >-
+          PYTHONPATH=. python -m unittest
+          tests.test_mlb_joint_card_research
+          tests.test_mlb_joint_card_coupled_research -v
