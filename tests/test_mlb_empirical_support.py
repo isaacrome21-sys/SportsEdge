@@ -1,7 +1,7 @@
 import copy
 import unittest
 
-from sportsedge.mlb_empirical_support import support_evidence
+from sportsedge.mlb_empirical_support import empirical_guard_reason, support_evidence
 from sportsedge.mlb_myspari_own_model import myspari_rows, render_markdown
 from sportsedge.pitcher_joint_engine import price_pitcher_market
 
@@ -27,14 +27,16 @@ class EmpiricalSupportTests(unittest.TestCase):
         before = copy.deepcopy(payload)
         rows = myspari_rows(payload)
         self.assertEqual(payload, before)
-        self.assertEqual({r["model_p_raw"] for r in rows}, {0., 1.})
+        raw = sorted(r["model_p_raw"] for r in rows)
+        self.assertAlmostEqual(raw[0], .5 / 11.0)
+        self.assertAlmostEqual(raw[1], 10.5 / 11.0)
         for row in rows:
             self.assertEqual(row["scored_status"], "NO_MODEL")
             for key in ("model_p", "estimate_p", "fair_odds", "edge", "ev_per_dollar"):
                 self.assertIsNone(row[key])
             self.assertEqual(row["confidence_score"], 0)
             self.assertEqual(row["star_rating"], 0)
-            self.assertIn("EMPIRICAL_TAIL_UNSUPPORTED", row["presentation_reason"])
+            self.assertIn("EMPIRICAL_THIN_TAIL_UNSUPPORTED", row["presentation_reason"])
         text = render_markdown(rows, header="guard")
         self.assertIn("10/10 prior starts over 13.5", text)
         self.assertIn("0/10 prior starts under 13.5", text)
@@ -45,7 +47,7 @@ class EmpiricalSupportTests(unittest.TestCase):
         self.assertTrue(all(r["scored_status"] == "NO_MODEL" for r in rows))
         self.assertTrue(all("EMPIRICAL_THIN_TAIL_UNSUPPORTED" in r["presentation_reason"] for r in rows))
 
-    def test_middle_probabilities_are_unchanged(self):
+    def test_middle_probabilities_are_unchanged_by_presentation(self):
         for wins in (5, 6):
             payload = self.pair([18]*wins + [12]*(10-wins))
             rows = myspari_rows(payload)
@@ -55,7 +57,6 @@ class EmpiricalSupportTests(unittest.TestCase):
     def test_sample_boundary_29_vs_30(self):
         for n, blocked in ((29, True), (30, False)):
             rows = myspari_rows(self.pair([18]*(n-3) + [12]*3))
-            # 26/29 is below 90%; use two losses for the 29-start tail.
             if n == 29:
                 rows = myspari_rows(self.pair([18]*27 + [12]*2))
             self.assertEqual(all(r["scored_status"] == "NO_MODEL" for r in rows), blocked)
@@ -73,21 +74,23 @@ class EmpiricalSupportTests(unittest.TestCase):
             row.update(model_p=None, reason="STARTER_TBD")
         text = render_markdown(myspari_rows(payload), header="guard")
         self.assertIn("STARTER_TBD", text)
-        self.assertNotIn("EMPIRICAL_TAIL_UNSUPPORTED", text)
+        self.assertNotIn("EMPIRICAL_THIN_TAIL_UNSUPPORTED", text)
 
     def test_hitter_tail_and_weighted_counts(self):
         payload = self.pair([18]*10)
         for row in payload["results"]:
-            row.update(engine_version="mlb_hitter_joint_empirical_v3", market="HOME_RUNS")
+            row.update(engine_version="mlb_hitter_joint_empirical_bayes_v4", market="HOME_RUNS")
             row["empirical_evidence"].update(sample_unit="games", weighted=True)
         text = render_markdown(myspari_rows(payload), header="guard")
         self.assertIn("prior games", text)
         self.assertIn("counts are unweighted", text)
 
-    def test_no_epsilon_edge_for_large_sample_endpoint(self):
-        rows = myspari_rows(self.pair([18]*30))
-        self.assertTrue(all("EMPIRICAL_BOUNDARY_UNCALIBRATED" in r["presentation_reason"] for r in rows))
-        self.assertTrue(all(r["fair_odds"] is None for r in rows))
+    def test_large_sample_tail_is_finite_not_endpoint_blocked(self):
+        payload = self.pair([18]*30)
+        for row in payload["results"]:
+            self.assertGreater(row["model_p"], 0.0)
+            self.assertLess(row["model_p"], 1.0)
+            self.assertIsNone(empirical_guard_reason(row, row["model_p"]))
 
     def test_evidence_comes_from_exact_pool(self):
         payload = self.pair([18]*9 + [12])

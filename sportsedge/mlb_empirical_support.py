@@ -1,4 +1,4 @@
-"""Read-only empirical support evidence and presentation guard; no model changes."""
+"""Read-only empirical support evidence and presentation guard; no market-price inputs."""
 from __future__ import annotations
 
 import hashlib
@@ -23,7 +23,6 @@ def support_evidence(feature: Mapping[str, Any], row: Mapping[str, Any]) -> dict
     pool = features.get("history_pool")
     if not isinstance(pool, list) or not pool:
         return None
-    # Reuse the engine's stat mapping, without calling or modifying its pricing.
     if str(row["engine_version"]).startswith("mlb_pitcher_"):
         from .pitcher_joint_engine import _value
         unit = "starts"
@@ -58,15 +57,17 @@ def empirical_guard_reason(row: Mapping[str, Any], conditional_p: float | None) 
         return "EMPIRICAL_PROBABILITY_INVALID"
     endpoint = any(value is not None and (abs(value) <= 1e-12 or abs(value - 1.0) <= 1e-12)
                    for value in (p, conditional_p))
-    tail = min(p, conditional_p if conditional_p is not None else p) <= THIN_TAIL_CUTOFF + 1e-12 or max(p, conditional_p if conditional_p is not None else p) >= 1 - THIN_TAIL_CUTOFF - 1e-12
+    model_tail = min(p, conditional_p if conditional_p is not None else p) <= THIN_TAIL_CUTOFF + 1e-12 or max(p, conditional_p if conditional_p is not None else p) >= 1 - THIN_TAIL_CUTOFF - 1e-12
+    wins = evidence.get("wins")
+    raw_tail = isinstance(wins, int) and not isinstance(wins, bool) and 0 <= wins <= n and (wins / n <= THIN_TAIL_CUTOFF + 1e-12 or wins / n >= 1 - THIN_TAIL_CUTOFF - 1e-12)
+    tail = model_tail or raw_tail
     if not endpoint and not (n < MIN_TAIL_SAMPLE and tail):
         return None
     if endpoint:
         code = "EMPIRICAL_TAIL_UNSUPPORTED" if n < MIN_TAIL_SAMPLE else "EMPIRICAL_BOUNDARY_UNCALIBRATED"
     else:
         code = "EMPIRICAL_THIN_TAIL_UNSUPPORTED"
-    wins = evidence.get("wins")
     count = f"{wins}/{n}" if isinstance(wins, int) and not isinstance(wins, bool) and 0 <= wins <= n else f"n={n}"
     unit = evidence.get("sample_unit", "observations")
     weighted = "; weighted estimate, counts are unweighted" if evidence.get("weighted") else ""
-    return f"{code}: {count} prior {unit} {str(row.get('side', '')).lower()} {row.get('line'):g}; raw p={p:.1%}{weighted}"
+    return f"{code}: {count} prior {unit} {str(row.get('side', '')).lower()} {row.get('line'):g}; model p={p:.1%}{weighted}"
