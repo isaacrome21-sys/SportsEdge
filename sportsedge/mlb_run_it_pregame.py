@@ -11,6 +11,7 @@ import json
 from typing import Any, Callable, Iterable, Mapping, Sequence
 from urllib.request import Request, urlopen
 
+from .mlb_bullpen_workload_source import acquire_bullpen_workload
 from .mlb_dk_hybrid_source import acquire_dk_hybrid_quotes
 from .mlb_injury_scratch_source import acquire_injuries_and_scratches, confirmed_lineup_ids
 from .mlb_park_venue_source import acquire_park_venue_context
@@ -21,7 +22,7 @@ from .source_lineage import canonical_json_sha256
 from .statcast_daily_source import StatcastSnapshot
 
 LIVE_FEED_BASE = "https://statsapi.mlb.com/api/v1.1/game"
-SCHEMA_VERSION = "mlb_run_it_pregame_v3"
+SCHEMA_VERSION = "mlb_run_it_pregame_v4"
 SOURCE = "MLB_PUBLIC_PREGAME_BUNDLE"
 
 
@@ -133,6 +134,7 @@ def acquire_mlb_run_it_pregame(
     nws_points_payload: Mapping[str, Any] | None = None,
     nws_hourly_payload: Mapping[str, Any] | None = None,
     dk_quotes: Sequence[Mapping[str, Any]] | None = None,
+    bullpen_context: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     if as_of.tzinfo is None or as_of.utcoffset() is None:
         raise ValueError("as_of must be timezone-aware")
@@ -212,6 +214,9 @@ def acquire_mlb_run_it_pregame(
         points_payload=nws_points_payload,
         hourly_payload=nws_hourly_payload,
     )
+    bullpen = dict(bullpen_context) if bullpen_context is not None else acquire_bullpen_workload(
+        game_pk=int(game_pk), as_of=as_of, live_payload=live, opener=opener,
+    )
     hybrid_dk = acquire_dk_hybrid_quotes(quotes=dk_quotes, as_of=as_of)
 
     payload = {
@@ -228,6 +233,7 @@ def acquire_mlb_run_it_pregame(
         "statcast": statcast,
         "park_venue": park_venue,
         "weather_roof": weather_roof,
+        "bullpen_workload": bullpen,
         "hybrid_dk": hybrid_dk,
         "unimplemented_lanes": [],
         "model_p_eligible": False,
