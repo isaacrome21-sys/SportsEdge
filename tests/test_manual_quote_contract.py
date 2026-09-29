@@ -31,6 +31,11 @@ class ManualQuoteContractTests(unittest.TestCase):
                 parsed = validate_manual_quote(row)
                 self.assertEqual(parsed.market_type, market_type)
 
+    def test_player_subject_name_is_preserved_for_canonical_statsapi_resolution(self):
+        parsed = validate_manual_quote(dict(BASE, market_type="PITCHER_OUTS", subject_name="Cam Schlittler"))
+        self.assertIsNone(parsed.subject_id)
+        self.assertEqual(parsed.subject_name, "Cam Schlittler")
+
     def test_unknown_market_is_accepted_by_ingestion_but_rejected_by_engine_registry(self):
         parsed = validate_manual_quote(dict(BASE, market_type="SOME_FUTURE_MARKET"))
         self.assertEqual(parsed.market_type, "SOME_FUTURE_MARKET")

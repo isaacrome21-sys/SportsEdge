@@ -6,6 +6,7 @@ import hashlib, json
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 from urllib.request import urlopen
+from urllib.parse import quote_plus
 from zoneinfo import ZoneInfo
 
 from .engine_registry import resolve_manual_market_type
@@ -50,6 +51,36 @@ def _resolve_game(row: ManualQuote, opener=urlopen):
     if row.observed_at.astimezone(timezone.utc) >= scheduled: raise CanonicalManualMLBError("MANUAL_QUOTE_NOT_PREGAME")
     return g
 
+def _norm_person(value: str) -> str:
+    return "".join(ch.lower() for ch in str(value or "") if ch.isalnum())
+
+def _resolve_subject(row: ManualQuote, *, opener=urlopen) -> tuple[str | None, int | None]:
+    if not row.subject_name and row.subject_id:
+        return str(row.subject_id), None
+    if not row.subject_name:
+        return None, None
+    url = f"https://statsapi.mlb.com/api/v1/people/search?names={quote_plus(row.subject_name)}&active=true&sportIds=1&hydrate=currentTeam"
+    try:
+        with opener(url, timeout=15) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except Exception as exc:
+        raise CanonicalManualMLBError(f"MANUAL_SUBJECT_LOOKUP_FAILED:{row.subject_name}") from exc
+    target = _norm_person(row.subject_name)
+    matches = [p for p in payload.get("people", []) if _norm_person(p.get("fullName")) == target]
+    if len(matches) != 1:
+        raise CanonicalManualMLBError(f"MANUAL_SUBJECT_RESOLUTION_FAILED: subject_name={row.subject_name} found={len(matches)}")
+    person_id = matches[0].get("id")
+    if isinstance(person_id, bool) or not isinstance(person_id, int) or person_id <= 0:
+        raise CanonicalManualMLBError(f"MANUAL_SUBJECT_ID_INVALID:{row.subject_name}")
+    supplied = str(row.subject_id) if row.subject_id else None
+    if supplied is not None and supplied != str(person_id):
+        raise CanonicalManualMLBError(f"MANUAL_SUBJECT_ID_NAME_MISMATCH:{row.subject_name}")
+    team = matches[0].get("currentTeam") or {}
+    team_id = team.get("id")
+    if isinstance(team_id, bool) or (team_id is not None and (not isinstance(team_id, int) or team_id <= 0)):
+        raise CanonicalManualMLBError(f"MANUAL_SUBJECT_TEAM_INVALID:{row.subject_name}")
+    return str(person_id), team_id
+
 def _side(market_type: str, side: str) -> str:
     s = side.upper()
     if market_type == "FIRST_INNING_TOTAL":
@@ -78,24 +109,32 @@ def run_canonical_manual_mlb(rows: Iterable[Mapping[str, Any]], *, opener=urlope
     if len({r.game_id for r in parsed}) != 1: raise CanonicalManualMLBError("one game_id per run is required")
     if len({r.first_pitch_at for r in parsed}) != 1: raise CanonicalManualMLBError("all rows must share first_pitch_at")
     g = _resolve_game(max(parsed, key=lambda r: r.observed_at), opener=opener)
+    resolved_subjects = [_resolve_subject(row, opener=opener) for row in parsed]
+    away_projected = tuple(sorted({int(pid) for (pid, tid), row in zip(resolved_subjects, parsed) if pid and tid == g.away_id and not row.market_type.startswith("PITCHER_")}))
+    home_projected = tuple(sorted({int(pid) for (pid, tid), row in zip(resolved_subjects, parsed) if pid and tid == g.home_id and not row.market_type.startswith("PITCHER_")}))
+    for (pid, tid), row in zip(resolved_subjects, parsed):
+        if pid and tid is not None and tid not in {g.away_id, g.home_id}:
+            raise CanonicalManualMLBError(f"MANUAL_SUBJECT_TEAM_NOT_IN_GAME:{row.subject_name or pid}")
     live = LiveGame(g.game_pk,g.away_id,g.home_id,g.away_probable_pitcher_id,g.home_probable_pitcher_id,
-                    TeamLineup(g.away_id,"away",(),(),False),TeamLineup(g.home_id,"home",(),(),False),
+                    TeamLineup(g.away_id,"away",away_projected,(),False),TeamLineup(g.home_id,"home",home_projected,(),False),
                     g.game_number,g.double_header,g.venue_id,g.official_date,g.status)
     captured = max(r.observed_at for r in parsed).astimezone(timezone.utc)
     hist = MLBGenericHistorySource(opener=MLBHistoryCachedOpener(target_date=captured.date(),cache_dir=history_cache_dir,opener=opener), retrieved_at=captured)
     target_date = datetime.fromisoformat(str(g.official_date)).date() if g.official_date else captured.date()
     quotes, features, resolutions, seen = [], [], [], set()
-    for row in parsed:
+    for row, (subject_id, subject_team_id) in zip(parsed, resolved_subjects):
         market = resolve_manual_market_type(row.market_type)
-        entity_id = row.subject_id or str(g.game_pk)
-        if row.market_type.startswith("PITCHER_") and not row.subject_id: raise CanonicalManualMLBError(f"subject_id required for {row.market_type}")
+        is_player_market = market in {"HOME_RUNS","HITS","TOTAL_BASES","RBI","RUNS","STOLEN_BASES","BATTER_BB","EXTRA_BASE_HITS","SINGLES","DOUBLES","TRIPLES","BATTER_K","HITS_RUNS_RBIS","RUNS_RBIS","PITCHER_K","PITCHER_OUTS","PITCHER_ER","PITCHER_HITS_ALLOWED","PITCHER_BB","PITCHER_HITS_WALKS_ER"}
+        if is_player_market and not subject_id:
+            raise CanonicalManualMLBError(f"subject_id or subject_name required for {row.market_type}")
+        entity_id = subject_id or str(g.game_pk)
         quotes.extend(_pair(row, market, entity_id, resolved_game_id=str(g.game_pk)))
         key = (market, entity_id)
         if key not in seen:
             seen.add(key)
             features.append(hist.feature_row(game_pk=g.game_pk,market=market,entity_id=entity_id,target_date=target_date,
-                away_team_id=int(g.away_id),home_team_id=int(g.home_id),player_id=int(row.subject_id) if row.subject_id else None))
-        resolutions.append({"market_type":row.market_type,"engine_market":market,"subject_id":row.subject_id,"observed_at":row.observed_at.isoformat()})
+                away_team_id=int(g.away_id),home_team_id=int(g.home_id),player_id=int(subject_id) if subject_id else None,team_id=subject_team_id))
+        resolutions.append({"market_type":row.market_type,"engine_market":market,"subject_id":subject_id,"subject_name":row.subject_name,"observed_at":row.observed_at.isoformat()})
     results = run_generic_card(games=[live],feature_rows=features,quotes=quotes,ingestion_now=captured,finalization_now=captured,
         registry_path=registry_path,edge_floor_config_path=edge_floor_config_path,kelly_multiplier=kelly_multiplier)
     return {"schema_version":2,"run_type":"CANONICAL_MANUAL_QUOTES","source":"MANUAL","observed_at_utc":captured.isoformat(),
