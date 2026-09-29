@@ -210,7 +210,7 @@ def _selection(row: Mapping[str, Any]) -> str:
     line_text = "" if line is None or market in {"MONEYLINE", "F5_MONEYLINE", "NRFI", "YRFI"} else (
         f" {line:+g}" if market in _LINE_NEGATED else f" {line:g}"
     )
-    return " ".join(x for x in (str(who or ""), market.replace("_", " ").title() + " " + side.title() + line_text) if x).strip()
+    return " ".join(x for x in (str(who or ""), market.replace("_", " ").title(), side.title() + line_text) if x).strip()
 
 
 def render_markdown(rows: Sequence[Mapping[str, Any]], *, header: str, notes: Sequence[str] = ()) -> str:
