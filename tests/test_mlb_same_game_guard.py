@@ -5,8 +5,10 @@ from sportsedge.mlb_myspari_own_model import (
     SAME_SIDE_STACK_REASON,
     SCRIPT_CONFLICT_REASON,
     apply_same_game_guard,
+    myspari_rows,
     run_script_direction,
 )
+from sportsedge.mlb_scored_card import EV_FLOOR_REASON, MIN_CARD_EV
 
 
 def _row(market, side, ev, game="g1", status="ACTIONABLE", line=0.0,
@@ -23,6 +25,21 @@ def _row(market, side, ev, game="g1", status="ACTIONABLE", line=0.0,
         "entity_name": name,
         "team_side": team_side,
     }
+
+
+def _engine_pair(p_over, over_odds, under_odds):
+    base = {
+        "game_id": "g",
+        "market": "TOTALS",
+        "entity_id": "g",
+        "line": 7.5,
+        "mc_paths": 100000,
+        "bet_status": "MODEL_CANDIDATE",
+    }
+    return [
+        {**base, "side": "OVER", "american_odds": over_odds, "model_p": p_over},
+        {**base, "side": "UNDER", "american_odds": under_odds, "model_p": 1 - p_over},
+    ]
 
 
 class SameGameGuardTest(unittest.TestCase):
@@ -78,6 +95,29 @@ class SameGameGuardTest(unittest.TestCase):
         self.assertEqual(away_pitcher_win["status"], "PASS")
         self.assertIn(SAME_SIDE_STACK_REASON, away_pitcher_win["presentation_reason_codes"])
 
+    def test_exact_cubs_padres_outcome_stack_collapses_to_one_play(self):
+        # Sept. 29 board: Cubs ML/F5 ML/F5 +0.5, Boyd to win (Cubs), King to win (Padres).
+        # Current policy keeps the strongest qualification score first, then EV.
+        cubs_ml = _row("MONEYLINE", "AWAY", 0.036, score=96)
+        cubs_f5_ml = _row("F5_MONEYLINE", "AWAY", 0.008, score=56)
+        cubs_f5_rl = _row("F5_RUN_LINE", "AWAY", 0.007, line=0.5, score=56)
+        king_win = _row(
+            "PITCHER_RECORD_WIN", "YES", 0.051, score=56,
+            entity="650633", team_side="HOME", name="Michael King",
+        )
+        boyd_win = _row(
+            "PITCHER_RECORD_WIN", "YES", 0.073, score=56,
+            entity="571510", team_side="AWAY", name="Matthew Boyd",
+        )
+        rows = [cubs_ml, cubs_f5_ml, cubs_f5_rl, king_win, boyd_win]
+        apply_same_game_guard(rows)
+        self.assertEqual([r["status"] for r in rows].count("ACTIONABLE"), 1)
+        self.assertEqual(cubs_ml["status"], "ACTIONABLE")
+        self.assertIn(OPPOSITE_TEAM_OUTCOME_REASON, king_win["presentation_reason_codes"])
+        self.assertIn(SAME_SIDE_STACK_REASON, cubs_f5_ml["presentation_reason_codes"])
+        self.assertIn(SAME_SIDE_STACK_REASON, cubs_f5_rl["presentation_reason_codes"])
+        self.assertIn(SAME_SIDE_STACK_REASON, boyd_win["presentation_reason_codes"])
+
     def test_unbound_pitcher_win_fails_neutral(self):
         away_ml = _row("MONEYLINE", "AWAY", 0.04, score=96)
         pitcher_win = _row("PITCHER_RECORD_WIN", "YES", 0.43, score=56, entity="p1")
@@ -98,6 +138,28 @@ class SameGameGuardTest(unittest.TestCase):
         b = _row("PITCHER_OUTS", "OVER", 0.2, game=None)
         apply_same_game_guard([a, b])
         self.assertEqual((a["status"], b["status"]), ("ACTIONABLE", "ACTIONABLE"))
+
+
+class CardEvFloorTest(unittest.TestCase):
+    def _over(self, rows):
+        return next(r for r in rows if r["side"] == "OVER")
+
+    def test_positive_edge_but_near_zero_return_is_not_a_play(self):
+        over = self._over(myspari_rows({"results": _engine_pair(0.546, -120, 100)}))
+        self.assertGreater(over["edge"], 0)
+        self.assertLess(over["ev_per_dollar"], MIN_CARD_EV)
+        self.assertEqual(over["scored_status"], "PASS")
+        self.assertIn(EV_FLOOR_REASON, over["presentation_reason_codes"])
+
+    def test_clear_return_stays_actionable(self):
+        over = self._over(myspari_rows({"results": _engine_pair(0.58, -102, -118)}))
+        self.assertGreaterEqual(over["ev_per_dollar"], MIN_CARD_EV)
+        self.assertEqual(over["scored_status"], "ACTIONABLE")
+
+    def test_floor_never_changes_probability_or_score(self):
+        over = self._over(myspari_rows({"results": _engine_pair(0.546, -120, 100)}))
+        self.assertAlmostEqual(over["model_p"], 0.546, places=9)
+        self.assertGreater(over["confidence_score"], 0)
 
 
 if __name__ == "__main__":
