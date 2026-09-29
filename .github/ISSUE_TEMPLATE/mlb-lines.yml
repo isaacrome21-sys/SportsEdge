@@ -1,0 +1,26 @@
+name: MLB lines → card
+description: Paste DraftKings lines from your phone. SportsEdge prices them and replies here with the card.
+title: "[MLB LINES] "
+labels: ["mlb-lines"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        One game header, then one market per line. Always give **both** prices, away/over/yes first.
+        For run lines, include the away line sign; unsigned `1.5` is treated as `+1.5`.
+        ```
+        Red Sox @ Yankees
+        ML +120 -145
+        RL +1.5 -193 +159
+        Total 6 -112 -107
+        YRFI +135 -170
+        Yankees TT 3.5 +114 -145
+        Payton Tolle outs 16.5 +107 -135
+        ```
+  - type: textarea
+    id: lines
+    attributes:
+      label: Lines
+      render: text
+    validations:
+      required: true
