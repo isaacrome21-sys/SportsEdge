@@ -20,6 +20,9 @@ from .mlb_scored_card import build_mlb_scored_card
 MYSPARI_OWN_MODEL_VERSION = "MLB_MYSPARI_OWN_MODEL_V1"
 LABEL = "SportsEdge engine model_p shown MySpariEdge-style · NOT Truth Gate · NOT OFFICIAL"
 MANUAL_QUOTE_TTL_SECONDS = 6 * 3600.0
+# Favorites priced beyond this are never shown as ACTIONABLE (Isaac's -165 ceiling).
+MAX_FAVORITE_ODDS = -165
+PRICE_CEILING_REASON = "PRICE_BEYOND_MAX_FAVORITE_-165"
 _LINE_NEGATED = frozenset({"RUN_LINE", "F5_RUN_LINE"})
 _OPPOSITE = {"AWAY": "HOME", "HOME": "AWAY", "OVER": "UNDER", "UNDER": "OVER", "YES": "NO", "NO": "YES"}
 
@@ -102,6 +105,10 @@ def myspari_rows(payload: Mapping[str, Any], *, quote_age_seconds: float = 0.0,
         scored_row = {k: getattr(scored, k) for k in scored.__dataclass_fields__}
         if push > 0 and scored_row.get("ev_per_dollar") is not None and row.get("model_p") is not None:
             scored_row["ev_per_dollar"] = ev_per_dollar(float(row["model_p"]), odds, push_p=push)
+        price = _f(odds)
+        if scored_row.get("status") == "ACTIONABLE" and price is not None and price < MAX_FAVORITE_ODDS:
+            scored_row["status"] = "PASS"
+            scored_row["presentation_reason_codes"] = (PRICE_CEILING_REASON,)
         out.append({**scored_row, **base})
     return build_mlb_scored_card(out)
 
@@ -121,17 +128,25 @@ def render_markdown(rows: Sequence[Mapping[str, Any]], *, header: str, notes: Se
         return "—" if v is None else f"{100 * float(v):.1f}%"
 
     lines = [f"# {header}", "", f"_{LABEL}_", "",
-             "| # | Game | Pick | Odds | Model p | Fair | Edge | EV/$ | Score | Status |",
-             "|---|---|---|---|---|---|---|---|---|---|"]
+             "| # | Game | Pick | Odds | Win p | Push p | Win p ex-push | Fair | Edge | EV/$ | Score | Status |",
+             "|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for i, r in enumerate(rows, 1):
         fair = r.get("fair_odds")
         ev = r.get("ev_per_dollar")
         odds = _f(r.get("american_odds"))
+        odds_text = "—" if odds is None else f"{int(odds):+d}"
+        fair_text = "—" if fair is None else f"{int(fair):+d}"
+        ev_text = "—" if ev is None else f"{float(ev):+.3f}"
+        status_text = str(r.get("scored_status"))
+        if PRICE_CEILING_REASON in (r.get("presentation_reason_codes") or ()):
+            status_text += " (price > -165)"
         lines.append(
-            f"| {i} | {r.get('game_id')} | {_selection(r)} | {'—' if odds is None else f'{int(odds):+d}'} | "
-            f"{pct(r.get('model_p'))} | {'—' if fair is None else f'{int(fair):+d}'} | {pct(r.get('edge'))} | "
-            f"{'—' if ev is None else f'{float(ev):+.3f}'} | {r.get('confidence_score', 0)} | {r.get('scored_status')} |"
+            f"| {i} | {r.get('game_id')} | {_selection(r)} | {odds_text} | {pct(r.get('model_p_raw'))} | "
+            f"{pct(r.get('push_p')) if r.get('push_p') else '0'} | {pct(r.get('model_p'))} | {fair_text} | {pct(r.get('edge'))} | "
+            f"{ev_text} | {r.get('confidence_score', 0)} | {status_text} |"
         )
+    lines += ["", "_Win p = engine win probability; Push p = refund probability; Win p ex-push = Win p / (1 − Push p), "
+              "the basis for Fair odds and Edge against the two-way no-vig price. EV/$ uses Win p with pushes refunded._"]
     blocked = [r for r in rows if r.get("scored_status") in {"BLOCKED", "NO_MODEL"}]
     if blocked:
         lines += ["", "## Engine did not price"]
