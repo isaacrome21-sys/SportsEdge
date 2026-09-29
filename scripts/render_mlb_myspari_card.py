@@ -7,6 +7,7 @@ input snapshot (for optional subject_name labels) and writes card.md / card.json
 from __future__ import annotations
 
 import argparse
+import hashlib
 from datetime import datetime, timezone
 import json
 from pathlib import Path
@@ -64,6 +65,12 @@ def main() -> int:
         if rg:
             notes.append(f"{rg.get('game_pk')}: {rg.get('away_team')} @ {rg.get('home_team')}, first pitch {rg.get('scheduled_start_utc')}")
     notes.append(f"Lines observed {observed.isoformat() if observed else 'unknown'}; card built {now.isoformat(timespec='seconds')}.")
+    if args.snapshot and Path(args.snapshot).is_file():
+        raw = Path(args.snapshot).read_bytes()
+        snap_obj = json.loads(raw)
+        snap_rows = snap_obj.get("rows") if isinstance(snap_obj, dict) else snap_obj
+        notes.append(f"Input board: {args.snapshot} ({len(snap_rows or [])} rows, sha256 {hashlib.sha256(raw).hexdigest()[:12]}); "
+                     f"engine returned {len(payload.get('results') or [])} quote results.")
     notes.append("Probabilities are the SportsEdge engines' own model_p (engine_registry); this card only pairs, scores and ranks them.")
 
     out = Path(args.out_dir)

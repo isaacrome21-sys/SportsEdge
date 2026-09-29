@@ -1,4 +1,6 @@
 import json
+import os
+import textwrap
 from pathlib import Path
 import subprocess
 import sys
@@ -77,6 +79,93 @@ class OwnModelCardTests(unittest.TestCase):
                             "--out-dir", str(out), "--as-of", "2026-09-29T20:30:00+00:00"], check=True,
                            capture_output=True)
             self.assertIn("SportsEdge MLB card", (out / "card.md").read_text())
+
+
+class CeilingAndLabelTests(unittest.TestCase):
+    def test_heavy_favorite_never_actionable(self):
+        payload = {"results": [
+            _row("RUN_LINE", "AWAY", -206, 0.80, line=1.5, fair=0.66, edge=0.14),
+            _row("RUN_LINE", "HOME", 168, 0.20, line=-1.5, fair=0.34, edge=-0.14),
+        ]}
+        rows = myspari_rows(payload)
+        fav = next(r for r in rows if r["side"] == "AWAY")
+        self.assertEqual(fav["scored_status"], "PASS")
+        self.assertIn("price > -165", render_markdown(rows, header="t"))
+
+    def test_push_columns_explain_conditional_probability(self):
+        text = render_markdown(myspari_rows(PAYLOAD), header="t")
+        self.assertIn("Win p ex-push", text)
+        self.assertIn("| 10.0% |", text)  # the integer-total push mass is shown, not hidden
+
+    def test_input_board_note_names_the_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            engine = Path(tmp) / "engine.json"
+            engine.write_text(json.dumps(PAYLOAD))
+            snap = Path(tmp) / "2026-09-29_dk_full_supplied.json"
+            snap.write_text(json.dumps({"rows": [{}] * 17}))
+            out = Path(tmp) / "out"
+            subprocess.run([sys.executable, "scripts/render_mlb_myspari_card.py", "--engine-output", str(engine),
+                            "--snapshot", str(snap), "--out-dir", str(out), "--as-of", "2026-09-29T20:30:00+00:00"],
+                           check=True, capture_output=True)
+            self.assertIn("2026-09-29_dk_full_supplied.json (17 rows", (out / "card.md").read_text())
+
+
+class InputResolutionTests(unittest.TestCase):
+    def resolve(self, files, *, event="workflow_dispatch", selected="", git_script="exit 1"):
+        workflow = Path(".github/workflows/manual-mlb-snapshot.yml").read_text()
+        block = workflow.split("      - name: Resolve input", 1)[1].split("        run: |\n", 1)[1]
+        script = textwrap.dedent(block.split("\n      - name:", 1)[0])
+        script = script.replace('${{ github.event_name }}', event)
+        script = script.replace('RUN_DATE="$(TZ=America/Chicago date +%F)"', 'RUN_DATE="2026-09-28"')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for name in files:
+                path = root / "manual_inputs/mlb" / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text('{}')
+            (root / "bin").mkdir()
+            git = root / "bin/git"
+            git.write_text("#!/bin/bash\n" + git_script + "\n")
+            git.chmod(0o755)
+            output = root / "output"
+            env = dict(os.environ, GITHUB_OUTPUT=str(output), DISPATCH_INPUT=selected,
+                       EVENT_NAME=event, PUSH_BEFORE="old", PUSH_AFTER="new")
+            env["PATH"] = str(root / "bin") + os.pathsep + env["PATH"]
+            run = subprocess.run(["bash", "-c", script], cwd=root, env=env, capture_output=True, text=True)
+            return run, output.read_text() if output.exists() else ""
+
+    def test_same_day_fallback_is_ambiguous(self):
+        run, _ = self.resolve(["2026-09-29_full.json", "2026-09-29_latest.json"])
+        self.assertNotEqual(run.returncode, 0)
+        self.assertIn("AMBIGUOUS_MLB_SNAPSHOT", run.stderr)
+
+    def test_earliest_future_date_wins(self):
+        run, output = self.resolve(["2026-09-29_full.json", "2026-09-30_full.json"])
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertIn("path=manual_inputs/mlb/2026-09-29_full.json", output)
+
+    def test_dispatch_selects_full_board(self):
+        selected = "manual_inputs/mlb/2026-09-29_full.json"
+        run, output = self.resolve(["2026-09-29_full.json", "2026-09-29_latest.json"], selected=selected)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertIn("path=" + selected, output)
+
+    def test_push_diff_failure_is_not_a_fallback(self):
+        run, _ = self.resolve(["2026-09-29_full.json"], event="push")
+        self.assertNotEqual(run.returncode, 0)
+        self.assertIn("MLB_INPUT_DIFF_FAILED", run.stderr)
+
+    def test_multiple_changed_inputs_fail(self):
+        run, _ = self.resolve(["2026-09-29_full.json", "2026-09-29_latest.json"], event="push",
+            git_script="printf '%s\\n' manual_inputs/mlb/2026-09-29_full.json manual_inputs/mlb/2026-09-29_latest.json")
+        self.assertNotEqual(run.returncode, 0)
+        self.assertIn("AMBIGUOUS_CHANGED_MLB_SNAPSHOT", run.stderr)
+
+    def test_push_uses_event_range(self):
+        run, output = self.resolve(["2026-09-29_full.json", "2026-09-29_latest.json"], event="push",
+            git_script='[[ "$*" == *"old new"* ]] || exit 3; echo manual_inputs/mlb/2026-09-29_full.json')
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertIn("path=manual_inputs/mlb/2026-09-29_full.json", output)
 
 
 if __name__ == "__main__":

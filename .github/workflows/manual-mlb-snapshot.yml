@@ -58,6 +58,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          # Resolve the complete push range, including multi-commit pushes.
+          fetch-depth: 0
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
@@ -70,6 +73,9 @@ jobs:
         shell: bash
         env:
           DISPATCH_INPUT: ${{ github.event.inputs.input_path }}
+          EVENT_NAME: ${{ github.event_name }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_AFTER: ${{ github.sha }}
         run: |
           set -euo pipefail
           RUN_DATE="$(TZ=America/Chicago date +%F)"
@@ -85,20 +91,48 @@ jobs:
 
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${DISPATCH_INPUT:-}" ]]; then
             INPUT="$DISPATCH_INPUT"
-          elif [[ "${{ github.event_name }}" == "push" ]] && CHANGED="$(git diff --name-only --diff-filter=AM HEAD~1 HEAD -- 'manual_inputs/mlb/*.json' 2>/dev/null | sort | tail -1)" && [[ -n "$CHANGED" ]]; then
-            INPUT="$CHANGED"
           else
+            INPUT=""
+            if [[ "$EVENT_NAME" == "push" ]]; then
+              BASE="$PUSH_BEFORE"
+              if [[ "$BASE" =~ ^0+$ ]]; then
+                BASE="$(git hash-object -t tree /dev/null)"
+              fi
+              CHANGED="$(git diff --name-only --diff-filter=AM "$BASE" "$PUSH_AFTER" -- 'manual_inputs/mlb/*.json')" || {
+                echo "MLB_INPUT_DIFF_FAILED: $BASE..$PUSH_AFTER" >&2
+                exit 1
+              }
+              mapfile -t CHANGED_FILES < <(printf '%s\n' "$CHANGED" | sed '/^$/d')
+              if [[ ${#CHANGED_FILES[@]} -gt 1 ]]; then
+                echo "AMBIGUOUS_CHANGED_MLB_SNAPSHOT: ${CHANGED_FILES[*]} — dispatch with input_path" >&2
+                exit 1
+              elif [[ ${#CHANGED_FILES[@]} -eq 1 ]]; then
+                INPUT="${CHANGED_FILES[0]}"
+              fi
+            fi
+            if [[ -z "$INPUT" ]]; then
             mapfile -t MATCHES < <(find manual_inputs/mlb -maxdepth 1 -type f -name '20??-??-??*.json' | sort)
             [[ ${#MATCHES[@]} -gt 0 ]] || {
               echo "DATED_INPUT_NOT_LOADED: no dated manual_inputs/mlb snapshot" >&2
               exit 1
             }
-            INPUT=""
+            # Earliest current/future slate date wins; several files for that date is
+            # ambiguous and fails instead of silently taking the alphabetically last.
+            NEXT_DATE=""
             for CANDIDATE in "${MATCHES[@]}"; do
               CANDIDATE_DATE="$(basename "$CANDIDATE" | cut -c1-10)"
-              if [[ ! "$CANDIDATE_DATE" < "$RUN_DATE" ]]; then INPUT="$CANDIDATE"; fi
+              if [[ ! "$CANDIDATE_DATE" < "$RUN_DATE" ]] && [[ -z "$NEXT_DATE" || "$CANDIDATE_DATE" < "$NEXT_DATE" ]]; then
+                NEXT_DATE="$CANDIDATE_DATE"
+              fi
             done
-            [[ -n "$INPUT" ]] || { echo "NO_CURRENT_OR_FUTURE_MLB_SNAPSHOT" >&2; exit 1; }
+            [[ -n "$NEXT_DATE" ]] || { echo "NO_CURRENT_OR_FUTURE_MLB_SNAPSHOT" >&2; exit 1; }
+            mapfile -t SAME_DAY < <(printf '%s\n' "${MATCHES[@]}" | grep "/${NEXT_DATE}" )
+            if [[ ${#SAME_DAY[@]} -ne 1 ]]; then
+              echo "AMBIGUOUS_MLB_SNAPSHOT for ${NEXT_DATE}: ${SAME_DAY[*]} — dispatch with input_path to choose one" >&2
+              exit 1
+            fi
+            INPUT="${SAME_DAY[0]}"
+            fi
           fi
 
           [[ -f "$INPUT" ]] || { echo "MANUAL_INPUT_NOT_FOUND: $INPUT" >&2; exit 1; }
@@ -116,6 +150,7 @@ jobs:
             exit 1
           }
           RUN_DATE="$FILE_DATE"
+          echo "Resolved MLB snapshot: $INPUT (sha256 $(sha256sum "$INPUT" | cut -c1-12))"
           echo "path=$INPUT" >> "$GITHUB_OUTPUT"
           echo "run_date=$RUN_DATE" >> "$GITHUB_OUTPUT"
           echo "live=true" >> "$GITHUB_OUTPUT"
