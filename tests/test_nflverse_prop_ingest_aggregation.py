@@ -12,11 +12,11 @@ def test_multiple_snap_games_are_aggregated_not_last_row_wins():
         observed_at="2026-09-24T12:00:00Z",
         source_uri="https://github.com/nflverse/nflverse-data-archives/releases",
         snap_rows=[
-            {"player_id":"rb1","team":"CHI","position":"RB","offense_pct":60,"offense_snaps":36},
-            {"player_id":"rb1","team":"CHI","position":"RB","offense_pct":80,"offense_snaps":48},
+            {"season":2026,"week":1,"player_id":"rb1","team":"CHI","position":"RB","offense_pct":60,"offense_snaps":36},
+            {"season":2026,"week":2,"player_id":"rb1","team":"CHI","position":"RB","offense_pct":80,"offense_snaps":48},
         ],
         player_rows=[
-            {"player_id":"rb1","team":"CHI","position":"RB","carries":30,"targets":8},
+            {"season":2026,"week":2,"player_id":"rb1","team":"CHI","position":"RB","carries":30,"targets":8},
         ],
     )
     p = out["payload"]["players"][0]
