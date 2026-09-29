@@ -6,6 +6,7 @@ import hashlib, json
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 from urllib.request import urlopen
+from urllib.parse import quote_plus
 from zoneinfo import ZoneInfo
 
 from .engine_registry import resolve_manual_market_type
@@ -50,6 +51,29 @@ def _resolve_game(row: ManualQuote, opener=urlopen):
     if row.observed_at.astimezone(timezone.utc) >= scheduled: raise CanonicalManualMLBError("MANUAL_QUOTE_NOT_PREGAME")
     return g
 
+def _norm_person(value: str) -> str:
+    return "".join(ch.lower() for ch in str(value or "") if ch.isalnum())
+
+def _resolve_subject_id(row: ManualQuote, *, opener=urlopen) -> str | None:
+    if row.subject_id:
+        return str(row.subject_id)
+    if not row.subject_name:
+        return None
+    url = f"https://statsapi.mlb.com/api/v1/people/search?names={quote_plus(row.subject_name)}&active=true&sportIds=1"
+    try:
+        with opener(url, timeout=15) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except Exception as exc:
+        raise CanonicalManualMLBError(f"MANUAL_SUBJECT_LOOKUP_FAILED:{row.subject_name}") from exc
+    target = _norm_person(row.subject_name)
+    matches = [p for p in payload.get("people", []) if _norm_person(p.get("fullName")) == target]
+    if len(matches) != 1:
+        raise CanonicalManualMLBError(f"MANUAL_SUBJECT_RESOLUTION_FAILED: subject_name={row.subject_name} found={len(matches)}")
+    person_id = matches[0].get("id")
+    if isinstance(person_id, bool) or not isinstance(person_id, int) or person_id <= 0:
+        raise CanonicalManualMLBError(f"MANUAL_SUBJECT_ID_INVALID:{row.subject_name}")
+    return str(person_id)
+
 def _side(market_type: str, side: str) -> str:
     s = side.upper()
     if market_type == "FIRST_INNING_TOTAL":
@@ -87,15 +111,18 @@ def run_canonical_manual_mlb(rows: Iterable[Mapping[str, Any]], *, opener=urlope
     quotes, features, resolutions, seen = [], [], [], set()
     for row in parsed:
         market = resolve_manual_market_type(row.market_type)
-        entity_id = row.subject_id or str(g.game_pk)
-        if row.market_type.startswith("PITCHER_") and not row.subject_id: raise CanonicalManualMLBError(f"subject_id required for {row.market_type}")
+        subject_id = _resolve_subject_id(row, opener=opener)
+        is_player_market = market in {"HOME_RUNS","HITS","TOTAL_BASES","RBI","RUNS","STOLEN_BASES","BATTER_BB","EXTRA_BASE_HITS","SINGLES","DOUBLES","TRIPLES","BATTER_K","HITS_RUNS_RBIS","RUNS_RBIS","PITCHER_K","PITCHER_OUTS","PITCHER_ER","PITCHER_HITS_ALLOWED","PITCHER_BB","PITCHER_HITS_WALKS_ER"}
+        if is_player_market and not subject_id:
+            raise CanonicalManualMLBError(f"subject_id or subject_name required for {row.market_type}")
+        entity_id = subject_id or str(g.game_pk)
         quotes.extend(_pair(row, market, entity_id, resolved_game_id=str(g.game_pk)))
         key = (market, entity_id)
         if key not in seen:
             seen.add(key)
             features.append(hist.feature_row(game_pk=g.game_pk,market=market,entity_id=entity_id,target_date=target_date,
-                away_team_id=int(g.away_id),home_team_id=int(g.home_id),player_id=int(row.subject_id) if row.subject_id else None))
-        resolutions.append({"market_type":row.market_type,"engine_market":market,"subject_id":row.subject_id,"observed_at":row.observed_at.isoformat()})
+                away_team_id=int(g.away_id),home_team_id=int(g.home_id),player_id=int(subject_id) if subject_id else None))
+        resolutions.append({"market_type":row.market_type,"engine_market":market,"subject_id":subject_id,"subject_name":row.subject_name,"observed_at":row.observed_at.isoformat()})
     results = run_generic_card(games=[live],feature_rows=features,quotes=quotes,ingestion_now=captured,finalization_now=captured,
         registry_path=registry_path,edge_floor_config_path=edge_floor_config_path,kelly_multiplier=kelly_multiplier)
     return {"schema_version":2,"run_type":"CANONICAL_MANUAL_QUOTES","source":"MANUAL","observed_at_utc":captured.isoformat(),
