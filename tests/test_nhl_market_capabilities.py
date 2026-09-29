@@ -22,15 +22,32 @@ def test_regulation_market_is_distinct_from_final_moneyline():
 
 
 def test_coherent_period_and_player_markets_are_engine_backed():
-    for market in ("PERIOD_MONEYLINE", "PERIOD_TOTAL", "PLAYER_SHOTS", "PLAYER_POINTS", "PLAYER_GOALS"):
-        cap = capability_for(market)
-        assert cap.status == "REQUIRES_ENGINE"
-        assert "shared_regulation_goal_paths" in cap.required_state
+    for market in (
+        "PERIOD_MONEYLINE",
+        "PERIOD_TOTAL",
+        "PLAYER_SHOTS",
+        "PLAYER_POINTS",
+        "PLAYER_GOALS",
+        "GOALIE_SAVES",
+        "PLAYER_BLOCKS",
+        "PLAYER_HITS",
+    ):
+        assert capability_for(market).status == "REQUIRES_ENGINE"
 
 
-def test_unmodeled_goalie_and_counting_props_fail_closed():
-    for market in ("GOALIE_SAVES", "PLAYER_BLOCKS", "PLAYER_HITS"):
-        assert capability_for(market).status == "NO_ENGINE"
+def test_goalie_and_peripheral_markets_require_their_specific_shared_paths():
+    saves = capability_for("GOALIE_SAVES")
+    assert "opponent_team_shot_paths" in saves.required_state
+    assert "goalie_save_paths" in saves.required_state
+    assert "goalie_state" in saves.required_state
+
+    blocks = capability_for("PLAYER_BLOCKS")
+    assert "pit_player_role" in blocks.required_state
+    assert "shared_block_paths" in blocks.required_state
+
+    hits = capability_for("PLAYER_HITS")
+    assert "pit_player_role" in hits.required_state
+    assert "shared_hit_paths" in hits.required_state
 
 
 def test_unknown_market_fails_closed():
