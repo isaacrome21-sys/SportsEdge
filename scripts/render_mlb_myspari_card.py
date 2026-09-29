@@ -41,10 +41,11 @@ def main() -> int:
 
     payload = json.loads(Path(args.engine_output).read_text())
     names: dict[str, str] = {}
+    snap_rows = []
     if args.snapshot and Path(args.snapshot).is_file():
         snap = json.loads(Path(args.snapshot).read_text())
-        rows = snap.get("rows") if isinstance(snap, dict) else snap
-        for row in rows or []:
+        snap_rows = snap.get("rows") if isinstance(snap, dict) else snap
+        for row in snap_rows or []:
             if isinstance(row, dict) and row.get("subject_id") and row.get("subject_name"):
                 names[str(row["subject_id"])] = str(row["subject_name"])
     resolutions = list(payload.get("market_resolution") or [])
@@ -67,10 +68,17 @@ def main() -> int:
     notes.append(f"Lines observed {observed.isoformat() if observed else 'unknown'}; card built {now.isoformat(timespec='seconds')}.")
     if args.snapshot and Path(args.snapshot).is_file():
         raw = Path(args.snapshot).read_bytes()
-        snap_obj = json.loads(raw)
-        snap_rows = snap_obj.get("rows") if isinstance(snap_obj, dict) else snap_obj
         notes.append(f"Input board: {args.snapshot} ({len(snap_rows or [])} rows, sha256 {hashlib.sha256(raw).hexdigest()[:12]}); "
                      f"engine returned {len(payload.get('results') or [])} quote results.")
+        timestamp_sources = sorted({
+            str(row.get("timestamp_source"))
+            for row in (snap_rows or [])
+            if isinstance(row, dict) and row.get("timestamp_source")
+        })
+        if timestamp_sources == ["INTAKE_STAMPED"]:
+            notes.append("Timestamp provenance: INTAKE_STAMPED at GitHub issue intake/edit time; not a sportsbook timestamp.")
+        elif timestamp_sources:
+            notes.append(f"Timestamp provenance: {', '.join(timestamp_sources)}.")
     notes.append("Probabilities are the SportsEdge engines' own model_p (engine_registry); this card only pairs, scores and ranks them.")
 
     out = Path(args.out_dir)
