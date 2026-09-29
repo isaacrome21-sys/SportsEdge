@@ -2,8 +2,8 @@
 
 This module deliberately does not create a second behavioral/evidence registry.
 Acceptance requirements live in config/mlb_acceptance_matrix.json; current state is
-read from the canonical catalog, deployment, behavioral, feature-realization, and
-validation-evidence registries at runtime.
+read from the canonical catalog, acquisition surface, deployment, behavioral,
+feature-realization, and validation-evidence registries at runtime.
 """
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from .engine_registry import engine_registry
 
 DEFAULT_MATRIX = Path("config/mlb_acceptance_matrix.json")
 DEFAULT_CATALOG = Path("config/mlb_market_catalog.json")
+DEFAULT_SURFACE = Path("config/mlb_market_surface.json")
 DEFAULT_DEPLOYMENTS = Path("config/deployments.json")
 DEFAULT_BEHAVIORAL = Path("config/mlb_behavioral_disposition.json")
 DEFAULT_VALIDATION = Path("config/mlb_validation_evidence.json")
@@ -44,6 +45,52 @@ def _catalog_markets(payload: Mapping[str, Any]) -> set[str]:
             elif isinstance(row, Mapping) and row.get("market"):
                 markets.add(str(row["market"]))
     return markets
+
+
+def _surface_index(payload: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    rows = payload.get("markets")
+    if not isinstance(rows, list) or not rows:
+        raise MLBAcceptanceMatrixError("market surface requires markets list")
+
+    index: dict[str, dict[str, Any]] = {}
+    for raw in rows:
+        if not isinstance(raw, Mapping):
+            raise MLBAcceptanceMatrixError("market surface rows must be objects")
+        market = str(raw.get("market") or "").strip()
+        if not market:
+            raise MLBAcceptanceMatrixError("market surface row requires market")
+        if market in index:
+            raise MLBAcceptanceMatrixError(f"duplicate market in market surface: {market}")
+
+        scope = str(raw.get("scope") or "").strip()
+        route = str(raw.get("acquisition_route") or "").strip()
+        terminal = str(raw.get("terminal_if_absent") or "").strip()
+        availability = str(raw.get("declared_availability") or "").upper()
+        window = raw.get("availability_window")
+        if not scope or not route or not terminal:
+            raise MLBAcceptanceMatrixError(f"incomplete acquisition contract for {market}")
+        if not isinstance(raw.get("provider_expected"), bool):
+            raise MLBAcceptanceMatrixError(f"provider_expected must be boolean for {market}")
+        if not isinstance(raw.get("retry_eligible"), bool):
+            raise MLBAcceptanceMatrixError(f"retry_eligible must be boolean for {market}")
+        if availability not in {"AVAILABLE", "UNAVAILABLE"}:
+            raise MLBAcceptanceMatrixError(
+                f"invalid declared_availability for {market}: {availability or 'MISSING'}"
+            )
+        if not isinstance(window, Mapping):
+            raise MLBAcceptanceMatrixError(f"availability_window must be object for {market}")
+        for field in (
+            "opens_minutes_before_first_pitch",
+            "expected_by_minutes_before_first_pitch",
+        ):
+            value = window.get(field)
+            if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+                raise MLBAcceptanceMatrixError(
+                    f"{field} must be a non-negative integer for {market}"
+                )
+
+        index[market] = dict(raw)
+    return index
 
 
 def _family_index(matrix: Mapping[str, Any]) -> tuple[dict[str, str], dict[str, dict[str, Any]]]:
@@ -146,10 +193,37 @@ def _historical_pit_pass(raw: Any) -> bool:
     return True
 
 
+def _acceptance_blockers(
+    *,
+    runtime_engine: bool,
+    registered: bool,
+    eligible: bool,
+    behavioral_status: str,
+    realization_status: str,
+    gate_status: Mapping[str, str],
+) -> list[str]:
+    blockers: list[str] = []
+    if not runtime_engine:
+        blockers.append("RUNTIME_ENGINE_MISSING")
+    if not registered:
+        blockers.append("DEPLOYMENT_REGISTRATION_MISSING")
+    if not eligible:
+        blockers.append("DEPLOYMENT_NOT_ELIGIBLE")
+    if behavioral_status != "KEEP_MEASURED":
+        blockers.append(f"BEHAVIORAL:{behavioral_status}")
+    if realization_status != "COMPLETE":
+        blockers.append(f"FEATURE_REALIZATION:{realization_status}")
+    for gate, status in gate_status.items():
+        if status != "PASS":
+            blockers.append(f"VALIDATION:{gate}:{status}")
+    return blockers
+
+
 def build_acceptance_matrix(
     *,
     matrix_path: str | Path = DEFAULT_MATRIX,
     catalog_path: str | Path = DEFAULT_CATALOG,
+    surface_path: str | Path = DEFAULT_SURFACE,
     deployments_path: str | Path = DEFAULT_DEPLOYMENTS,
     behavioral_path: str | Path = DEFAULT_BEHAVIORAL,
     validation_path: str | Path = DEFAULT_VALIDATION,
@@ -157,6 +231,7 @@ def build_acceptance_matrix(
 ) -> dict[str, Any]:
     matrix = _load(matrix_path)
     catalog = _load(catalog_path)
+    surface = _load(surface_path)
     deployments = _load(deployments_path)
     behavioral = _load(behavioral_path)
     validation = _load(validation_path)
@@ -169,6 +244,16 @@ def build_acceptance_matrix(
     catalog_markets = _catalog_markets(catalog)
     if not catalog_markets:
         raise MLBAcceptanceMatrixError("catalog contains no markets")
+
+    surface_by_market = _surface_index(surface)
+    surface_markets = set(surface_by_market)
+    if surface_markets != catalog_markets:
+        missing = sorted(catalog_markets - surface_markets)
+        extra = sorted(surface_markets - catalog_markets)
+        raise MLBAcceptanceMatrixError(
+            f"market surface coverage mismatch missing={missing} extra={extra}"
+        )
+
     family_by_market, family_defs = _family_index(matrix)
     assigned = set(family_by_market)
     if assigned != catalog_markets:
@@ -206,6 +291,7 @@ def build_acceptance_matrix(
     for market in sorted(catalog_markets):
         family = family_by_market[market]
         family_def = family_defs[family]
+        surface_row = dict(surface_by_market[market])
         dep = dict(dep_markets[market])
         beh = dict(beh_markets[market])
         val = dict(val_markets[market])
@@ -217,10 +303,18 @@ def build_acceptance_matrix(
             gate_name = str(gate)
             raw = val.get(gate)
             if gate_name == "historical_point_in_time":
-                raw_status = str(raw.get("status", "MISSING") if isinstance(raw, Mapping) else raw or "MISSING").upper()
-                status = "PASS" if _historical_pit_pass(raw) else ("INVALID_PIT_BINDING" if raw_status == "PASS" else raw_status)
+                raw_status = str(
+                    raw.get("status", "MISSING") if isinstance(raw, Mapping) else raw or "MISSING"
+                ).upper()
+                status = (
+                    "PASS"
+                    if _historical_pit_pass(raw)
+                    else ("INVALID_PIT_BINDING" if raw_status == "PASS" else raw_status)
+                )
             else:
-                status = str(raw.get("status", "MISSING") if isinstance(raw, Mapping) else raw or "MISSING").upper()
+                status = str(
+                    raw.get("status", "MISSING") if isinstance(raw, Mapping) else raw or "MISSING"
+                ).upper()
             gate_status[gate_name] = status
             if status != "PASS":
                 missing_gates.append(gate_name)
@@ -229,10 +323,15 @@ def build_acceptance_matrix(
         realization_status = str(real.get("status", "UNVERIFIED")).upper()
         runtime_engine = market in engines
         registered = market in dep_markets
-        validation_complete = not missing_gates
-        behavioral_complete = behavioral_status == "KEEP_MEASURED"
-        realization_complete = realization_status == "COMPLETE"
         eligible = dep.get("eligible") is True
+        blockers = _acceptance_blockers(
+            runtime_engine=runtime_engine,
+            registered=registered,
+            eligible=eligible,
+            behavioral_status=behavioral_status,
+            realization_status=realization_status,
+            gate_status=gate_status,
+        )
 
         rows.append({
             "market": market,
@@ -253,28 +352,49 @@ def build_acceptance_matrix(
                 "feature_realization_status": realization_status,
                 "validation_status": gate_status,
                 "validation_missing": missing_gates,
+                "acquisition": {
+                    "scope": str(surface_row["scope"]),
+                    "provider_expected": bool(surface_row["provider_expected"]),
+                    "retry_eligible": bool(surface_row["retry_eligible"]),
+                    "terminal_if_absent": str(surface_row["terminal_if_absent"]),
+                    "acquisition_route": str(surface_row["acquisition_route"]),
+                    "declared_availability": str(surface_row["declared_availability"]).upper(),
+                    "availability_window": dict(surface_row["availability_window"]),
+                },
             },
-            "acceptance_complete": bool(
-                runtime_engine
-                and registered
-                and eligible
-                and behavioral_complete
-                and realization_complete
-                and validation_complete
-            ),
+            "acceptance_blockers": blockers,
+            "acceptance_complete": not blockers,
         })
 
+    declared_available = sum(
+        r["current_state"]["acquisition"]["declared_availability"] == "AVAILABLE" for r in rows
+    )
+    provider_expected = sum(
+        bool(r["current_state"]["acquisition"]["provider_expected"]) for r in rows
+    )
     return {
         "schema_version": 1,
         "policy": dict(matrix.get("policy") or {}),
         "dimensions": [str(x) for x in dimensions],
+        "inventory_complete": True,
         "market_count": len(rows),
+        "surface_market_count": len(surface_by_market),
         "markets": rows,
         "summary": {
+            "surface_provider_expected": provider_expected,
+            "surface_declared_available": declared_available,
+            "surface_declared_unavailable": len(rows) - declared_available,
             "runtime_engine_present": sum(bool(r["current_state"]["runtime_engine"]) for r in rows),
-            "behaviorally_measured": sum(r["current_state"]["behavioral_status"] == "KEEP_MEASURED" for r in rows),
-            "feature_realization_complete": sum(r["current_state"]["feature_realization_status"] == "COMPLETE" for r in rows),
-            "validation_complete": sum(not r["current_state"]["validation_missing"] for r in rows),
+            "behaviorally_measured": sum(
+                r["current_state"]["behavioral_status"] == "KEEP_MEASURED" for r in rows
+            ),
+            "feature_realization_complete": sum(
+                r["current_state"]["feature_realization_status"] == "COMPLETE" for r in rows
+            ),
+            "validation_complete": sum(
+                not r["current_state"]["validation_missing"] for r in rows
+            ),
             "acceptance_complete": sum(bool(r["acceptance_complete"]) for r in rows),
+            "acceptance_blocked": sum(not r["acceptance_complete"] for r in rows),
         },
     }
