@@ -85,12 +85,17 @@ jobs:
           elif [[ "${{ github.event_name }}" == "push" ]] && CHANGED="$(git diff --name-only --diff-filter=AM HEAD~1 HEAD -- 'manual_inputs/mlb/*.json' 2>/dev/null | sort | tail -1)" && [[ -n "$CHANGED" ]]; then
             INPUT="$CHANGED"
           else
-            mapfile -t MATCHES < <(find manual_inputs/mlb -maxdepth 1 -type f -name "${RUN_DATE}*.json" | sort)
+            mapfile -t MATCHES < <(find manual_inputs/mlb -maxdepth 1 -type f -name '20??-??-??*.json' | sort)
             [[ ${#MATCHES[@]} -gt 0 ]] || {
-              echo "TODAY_INPUT_NOT_LOADED: no manual_inputs/mlb/${RUN_DATE}*.json" >&2
+              echo "DATED_INPUT_NOT_LOADED: no dated manual_inputs/mlb snapshot" >&2
               exit 1
             }
-            INPUT="${MATCHES[-1]}"
+            INPUT=""
+            for CANDIDATE in "${MATCHES[@]}"; do
+              CANDIDATE_DATE="$(basename "$CANDIDATE" | cut -c1-10)"
+              if [[ ! "$CANDIDATE_DATE" < "$RUN_DATE" ]]; then INPUT="$CANDIDATE"; fi
+            done
+            [[ -n "$INPUT" ]] || { echo "NO_CURRENT_OR_FUTURE_MLB_SNAPSHOT" >&2; exit 1; }
           fi
 
           [[ -f "$INPUT" ]] || { echo "MANUAL_INPUT_NOT_FOUND: $INPUT" >&2; exit 1; }
