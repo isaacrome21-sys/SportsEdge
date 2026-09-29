@@ -1,0 +1,40 @@
+name: audit-mlb-game-engine-recent
+
+on:
+  push:
+    branches: [audit/mlb-game-engine-recent-20260929]
+    paths:
+      - scripts/audit_mlb_game_engine_recent.py
+      - .github/workflows/audit-mlb-game-engine-recent.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: ${{ github.workspace }}
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Run strict-prior recent MLB game-engine audit
+        run: >-
+          python scripts/audit_mlb_game_engine_recent.py
+          --start 2026-09-01
+          --end 2026-09-27
+          --max-games 250
+          --simulations 100000
+          --output artifacts/mlb_game_engine_recent_audit.json
+      - name: Upload audit artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mlb-game-engine-recent-audit
+          path: artifacts/mlb_game_engine_recent_audit.json
+          if-no-files-found: error
