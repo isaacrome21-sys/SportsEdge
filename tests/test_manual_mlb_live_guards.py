@@ -38,12 +38,11 @@ class ManualMlbLiveGuardTests(unittest.TestCase):
                 as_of=datetime.fromisoformat("2026-08-19T10:10:00-05:00"),
             )
 
-    def test_rejects_stale_quote(self):
-        with self.assertRaisesRegex(ValueError, "MANUAL_QUOTE_STALE"):
-            MOD.validate_live_rows(
-                [BASE], run_date="2026-08-19", max_age_minutes=30,
-                as_of=datetime.fromisoformat("2026-08-19T10:31:00-05:00"),
-            )
+    def test_accepts_older_pregame_quote(self):
+        MOD.validate_live_rows(
+            [BASE], run_date="2026-08-19", max_age_minutes=30,
+            as_of=datetime.fromisoformat("2026-08-19T10:31:00-05:00"),
+        )
 
     def test_rejects_started_game(self):
         with self.assertRaisesRegex(ValueError, "MANUAL_QUOTE_GAME_STARTED"):

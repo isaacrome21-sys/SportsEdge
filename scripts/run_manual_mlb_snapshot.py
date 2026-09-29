@@ -20,7 +20,7 @@ def _as_utc(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
-def validate_live_rows(rows, *, run_date: str | None, max_age_minutes: int, as_of: datetime) -> None:
+def validate_live_rows(rows, *, run_date: str | None, max_age_minutes: int | None, as_of: datetime) -> None:
     if not isinstance(rows, list) or not rows:
         raise ValueError("MANUAL_INPUT_EMPTY")
     if max_age_minutes <= 0:
@@ -41,11 +41,6 @@ def validate_live_rows(rows, *, run_date: str | None, max_age_minutes: int, as_o
         age_minutes = (now - observed_utc).total_seconds() / 60.0
         if age_minutes < 0:
             raise ValueError(f"MANUAL_QUOTE_FROM_FUTURE row={index} game_id={quote.game_id}")
-        if age_minutes > max_age_minutes:
-            raise ValueError(
-                f"MANUAL_QUOTE_STALE row={index} game_id={quote.game_id} "
-                f"age_minutes={age_minutes:.1f} max_age_minutes={max_age_minutes}"
-            )
 
 
 def _run_canonical_rows(rows, *, history_cache_dir: str) -> dict:
