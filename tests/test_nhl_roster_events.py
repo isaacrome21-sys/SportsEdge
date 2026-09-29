@@ -1,5 +1,5 @@
 from sportsedge.sports.nhl.simulation import NHLGamePaths
-from sportsedge.sports.nhl.roster_events import NHLRosterEventRole,simulate_roster_events
+from sportsedge.sports.nhl.roster_events import NHLRosterEventRole,simulate_roster_events,roster_event_over
 
 def role(pid,g=1,a=1):
     return NHLRosterEventRole(pid,"HOME","2026-10-01T12:00:00Z","fixture","v1",g,a,a,"CONFIRMED")
@@ -21,6 +21,13 @@ def test_assists_are_distinct_from_scorer_and_each_other_by_construction():
     for i,total in enumerate(game().home_regulation):
         assert sum(v[i] for v in x.assists.values())<=2*total
         assert all(x.points[p][i]==x.goals[p][i]+x.assists[p][i] for p in x.goals)
+
+def test_roster_event_over_supports_assists_and_preserves_mass():
+    roles=[role("a"),role("b"),role("c")]
+    x=simulate_roster_events(game(),roles,team="HOME",version="v1",seed=17)
+    for stat in ("goals","assists","points"):
+        win,push,loss=roster_event_over(x,player_id="a",stat=stat,line=1.0)
+        assert abs(win+push+loss-1.0)<1e-12
 
 def test_rejects_duplicate_or_mixed_team_roles():
     import pytest
