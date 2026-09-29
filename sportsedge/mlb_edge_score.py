@@ -6,7 +6,8 @@ display-only and cannot change the score. Governance/Truth Gate remains separate
 
 Locked Score rule B: odds, no-vig probability, edge, EV, and the magnitude of the
 model probability never contribute points. Score reflects only operational/model
-qualification: simulation-path sufficiency, quote freshness, and push-mass quality.
+qualification: simulation-path sufficiency, quote freshness, push-mass quality,
+and a zero-reliability hard stop.
 """
 from __future__ import annotations
 from dataclasses import dataclass
@@ -141,5 +142,7 @@ def score_mlb_edge(
         raise MLBEdgeScoreError("MODEL_RELIABILITY_OUT_OF_RANGE")
     score = qualification_score(n_paths=n_paths, quote_age_seconds=quote_age_seconds,
                                 quote_ttl_seconds=quote_ttl_seconds, push_p=push_p)
+    if rel == 0.0:
+        score = 0
     status = "ACTIONABLE" if ev > min_actionable_ev and edge > 0 and rel > 0 else "PASS"
     return MLBScoredEdge(status, score, p, p, market_p, fair_american_odds(p), edge, ev, tuple(reasons))
