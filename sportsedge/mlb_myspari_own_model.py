@@ -123,11 +123,14 @@ def myspari_rows(payload: Mapping[str, Any], *, quote_age_seconds: float = 0.0,
     return build_mlb_scored_card(apply_same_game_guard(out))
 
 
-# --- Same-game script guard -------------------------------------------------
-# Presentation-only: never changes a probability. It stops one card from telling
-# two opposite stories about the same game (e.g. game Over + pitcher Outs Over),
-# and from listing the same team twice (ML + run line) as independent edges.
-SCRIPT_CONFLICT_REASON = "SAME_GAME_SCRIPT_CONFLICT"
+# --- Same-game guard --------------------------------------------------------
+# Presentation-only: never changes a probability. The guard now handles only
+# objectively contradictory selections on the exact same contract and duplicate
+# same-team side exposure (ML + run line). It does NOT infer a contradiction from
+# a coarse narrative such as "high-runs" versus "low-runs" across different
+# markets or players; those outcomes can coexist in baseball and must remain
+# independently card-eligible when their own model rows qualify.
+SCRIPT_CONFLICT_REASON = "SAME_GAME_DIRECT_CONFLICT"
 SAME_SIDE_STACK_REASON = "SAME_SIDE_STACK"
 _HIGH_RUNS_OVER = frozenset({
     "TOTALS", "TEAM_TOTALS", "F5_TOTALS", "F5_TEAM_TOTALS",
@@ -136,13 +139,17 @@ _HIGH_RUNS_OVER = frozenset({
     "HITS", "TOTAL_BASES", "RBI", "RUNS", "HOME_RUNS", "HITS_RUNS_RBIS", "RUNS_RBIS",
     "EXTRA_BASE_HITS", "SINGLES", "DOUBLES",
 })
-# Over on these means the pitcher went deep or dominated -> fewer runs.
 _LOW_RUNS_OVER = frozenset({"PITCHER_OUTS", "PITCHER_K"})
 _SIDE_MARKETS = frozenset({"MONEYLINE", "RUN_LINE"})
 
 
 def run_script_direction(row: Mapping[str, Any]) -> int:
-    """+1 = needs runs, -1 = needs a quiet game, 0 = not a run-environment bet."""
+    """Diagnostic only: +1 run-seeking, -1 run-suppressing, 0 neutral.
+
+    This label is intentionally not used to demote card rows. It is retained for
+    diagnostics/backward compatibility only because cross-market script labels do
+    not establish a logical contradiction.
+    """
     market = str(row.get("market") or "").upper()
     side = str(row.get("side") or "").upper()
     if market in {"NRFI", "YRFI"}:
@@ -171,6 +178,26 @@ def _demote(row: dict[str, Any], reason: str, keeper: Mapping[str, Any]) -> None
     row["guard_kept_instead"] = _selection(keeper)
 
 
+def _direct_opposites(left: Mapping[str, Any], right: Mapping[str, Any]) -> bool:
+    """True only when two rows are opposite sides of the same exact contract."""
+    if str(left.get("game_id")) != str(right.get("game_id")):
+        return False
+    if str(left.get("market") or "").upper() != str(right.get("market") or "").upper():
+        return False
+    if str(left.get("entity_id")) != str(right.get("entity_id")):
+        return False
+    left_side = str(left.get("side") or "").upper()
+    if _OPPOSITE.get(left_side) != str(right.get("side") or "").upper():
+        return False
+    left_line = _f(left.get("line"))
+    right_line = _f(right.get("line"))
+    market = str(left.get("market") or "").upper()
+    want_right = -left_line if (left_line is not None and market in _LINE_NEGATED) else left_line
+    if (want_right is None) != (right_line is None):
+        return False
+    return want_right is None or abs(right_line - want_right) <= 1e-9
+
+
 def apply_same_game_guard(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     by_game: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
@@ -181,16 +208,24 @@ def apply_same_game_guard(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             # Fail neutral rather than treating unrelated unknown games as one game.
             continue
         by_game.setdefault(str(game_id), []).append(row)
+
     for game_rows in by_game.values():
-        # 1) One run script per game: keep the direction holding the best-EV row.
-        scripted = [r for r in game_rows if run_script_direction(r)]
-        if {run_script_direction(r) for r in scripted} == {1, -1}:
-            keeper = max(scripted, key=_ev)
-            keep_dir = run_script_direction(keeper)
-            for r in scripted:
-                if run_script_direction(r) != keep_dir:
-                    _demote(r, SCRIPT_CONFLICT_REASON, keeper)
-        # 2) One side bet per team: ML and run line on the same team are one bet.
+        # 1) Exact contract contradictions only. Cross-market/player narrative
+        # directions are intentionally not conflicts.
+        for idx, left in enumerate(game_rows):
+            if left.get("status") != "ACTIONABLE":
+                continue
+            for right in game_rows[idx + 1:]:
+                if right.get("status") != "ACTIONABLE" or not _direct_opposites(left, right):
+                    continue
+                keeper = max((left, right), key=_ev)
+                loser = right if keeper is left else left
+                _demote(loser, SCRIPT_CONFLICT_REASON, keeper)
+                if loser is left:
+                    break
+
+        # 2) One side bet per team: ML and run line on the same team are duplicate
+        # directional exposure, so keep the stronger EV row.
         sides = [r for r in game_rows if r.get("status") == "ACTIONABLE"
                  and str(r.get("market") or "").upper() in _SIDE_MARKETS]
         for team in {str(r.get("side") or "").upper() for r in sides}:
