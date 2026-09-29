@@ -42,6 +42,7 @@ class SameGameGuardTest(unittest.TestCase):
         self.assertIn(SAME_SIDE_STACK_REASON, ml["presentation_reason_codes"])
 
     def test_missing_game_ids_are_fail_neutral(self):
+        # Unknown game identity must never create a synthetic shared same-game bucket.
         high = _row("TOTALS", "OVER", 0.20, game=None)
         quiet = _row("PITCHER_OUTS", "OVER", 0.30, game=None)
         apply_same_game_guard([high, quiet])
