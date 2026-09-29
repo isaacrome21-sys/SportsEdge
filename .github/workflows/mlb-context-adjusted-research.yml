@@ -6,10 +6,14 @@ on:
     paths:
       - sportsedge/mlb_context_adjusted_research.py
       - sportsedge/mlb_context_adjusted_validation.py
+      - sportsedge/mlb_joint_card_research.py
+      - sportsedge/mlb_scored_card.py
       - scripts/run_mlb_context_adjusted_research.py
       - scripts/validate_mlb_context_adjusted_history.py
       - tests/test_mlb_context_adjusted_research.py
       - tests/test_mlb_context_adjusted_validation.py
+      - tests/test_mlb_joint_card_research.py
+      - tests/test_mlb_scored_card.py
       - .github/workflows/mlb-context-adjusted-research.yml
       - manual_inputs/mlb/2026-09-29_dk_run_corrected.json
   workflow_dispatch:
@@ -31,7 +35,9 @@ jobs:
         run: >-
           PYTHONPATH=. python -m unittest
           tests.test_mlb_context_adjusted_research
-          tests.test_mlb_context_adjusted_validation -v
+          tests.test_mlb_context_adjusted_validation
+          tests.test_mlb_joint_card_research
+          tests.test_mlb_scored_card -v
       - name: Run Sept 29 context-adjusted research slate
         run: >-
           PYTHONPATH=. python scripts/run_mlb_context_adjusted_research.py
