@@ -4,6 +4,11 @@ from sportsedge.hitter_joint_engine import price_hitter_market, HitterJointEngin
 from sportsedge.pitcher_joint_engine import price_pitcher_market, PitcherJointEngineError
 
 
+def jeffreys(wins, n):
+    """Posterior predictive for a half-point line: (wins + 0.5) / (n + 1)."""
+    return (wins + 0.5) / (n + 1.0)
+
+
 def hrow(pa, s, d, t, hr, rbi, runs, sb, bb, k):
     hits=s+d+t+hr
     return {"plate_appearances":pa,"hits":hits,"singles":s,"doubles":d,"triples":t,"home_runs":hr,"total_bases":s+2*d+3*t+4*hr,"rbi":rbi,"runs":runs,"stolen_bases":sb,"walks":bb,"strikeouts":k,"extra_base_hits":d+t+hr}
@@ -25,11 +30,11 @@ class HitterJointCoherenceTests(unittest.TestCase):
         hr=price_hitter_market(self._base("HOME_RUNS"))["model_p"];xbh=price_hitter_market(self._base("EXTRA_BASE_HITS"))["model_p"];hit=price_hitter_market(self._base("HITS"))["model_p"]
         self.assertLessEqual(hr,xbh);self.assertLessEqual(xbh,hit)
     def test_combo_is_exact_arithmetic_on_same_rows(self):
-        result=price_hitter_market(self._base("HITS_RUNS_RBIS",line=2.5))["model_p"];expected=sum((r["hits"]+r["runs"]+r["rbi"])>2.5 for r in self.POOL)/len(self.POOL);self.assertAlmostEqual(result,expected)
+        result=price_hitter_market(self._base("HITS_RUNS_RBIS",line=2.5))["model_p"];expected=jeffreys(sum((r["hits"]+r["runs"]+r["rbi"])>2.5 for r in self.POOL),len(self.POOL));self.assertAlmostEqual(result,expected)
     def test_multi_rbi_game_is_supported(self):
-        result=price_hitter_market(self._base("RBI",line=2.5))["model_p"];self.assertAlmostEqual(result,sum(r["rbi"]>2.5 for r in self.POOL)/len(self.POOL))
+        result=price_hitter_market(self._base("RBI",line=2.5))["model_p"];self.assertAlmostEqual(result,jeffreys(sum(r["rbi"]>2.5 for r in self.POOL),len(self.POOL)))
     def test_hit_type_markets_share_same_rows(self):
-        singles=price_hitter_market(self._base("SINGLES"))["model_p"];self.assertAlmostEqual(singles,sum(r["singles"]>0.5 for r in self.POOL)/len(self.POOL));ks=price_hitter_market(self._base("BATTER_K"))["model_p"];self.assertAlmostEqual(ks,sum(r["strikeouts"]>0.5 for r in self.POOL)/len(self.POOL))
+        singles=price_hitter_market(self._base("SINGLES"))["model_p"];self.assertAlmostEqual(singles,jeffreys(sum(r["singles"]>0.5 for r in self.POOL),len(self.POOL)));ks=price_hitter_market(self._base("BATTER_K"))["model_p"];self.assertAlmostEqual(ks,jeffreys(sum(r["strikeouts"]>0.5 for r in self.POOL),len(self.POOL)))
     def test_cross_market_latent_hash_is_identical(self):
         self.assertEqual(price_hitter_market(self._base("HITS"))["model_input_hash"],price_hitter_market(self._base("TOTAL_BASES"))["model_input_hash"])
     def test_quote_side_does_not_change_model_identity(self):
@@ -46,7 +51,7 @@ class PitcherJointCoherenceTests(unittest.TestCase):
         return {"game_id":"g1","market":market,"entity_id":"p1","line":line,"side":side,"feature_source_hash":"b"*64,"features":{"history_pool":self.POOL}}
     def test_outs_support_is_physically_bounded(self):self.assertEqual(price_pitcher_market(self._base("PITCHER_OUTS",27.0))["model_p"],0.0)
     def test_combined_pitcher_prop_uses_same_rows(self):
-        result=price_pitcher_market(self._base("PITCHER_HITS_WALKS_ER",8.5))["model_p"];expected=sum((r["hits_allowed"]+r["walks_allowed"]+r["earned_runs"])>8.5 for r in self.POOL)/len(self.POOL);self.assertAlmostEqual(result,expected)
+        result=price_pitcher_market(self._base("PITCHER_HITS_WALKS_ER",8.5))["model_p"];expected=jeffreys(sum((r["hits_allowed"]+r["walks_allowed"]+r["earned_runs"])>8.5 for r in self.POOL),len(self.POOL));self.assertAlmostEqual(result,expected)
     def test_cross_market_latent_hash_is_identical(self):
         k=price_pitcher_market(self._base("PITCHER_K",5.5))["model_input_hash"];outs=price_pitcher_market(self._base("PITCHER_OUTS",17.5))["model_input_hash"];er=price_pitcher_market(self._base("PITCHER_ER",2.5))["model_input_hash"];self.assertEqual(k,outs);self.assertEqual(outs,er)
     def test_invalid_historical_outs_fail_closed(self):
@@ -54,5 +59,14 @@ class PitcherJointCoherenceTests(unittest.TestCase):
         with self.assertRaises(PitcherJointEngineError):price_pitcher_market(model)
     def test_integer_push_conserves_probability(self):
         over=price_pitcher_market(self._base("PITCHER_ER",2.0,"OVER"));under=price_pitcher_market(self._base("PITCHER_ER",2.0,"UNDER"));self.assertAlmostEqual(over["model_p"]+under["model_p"]+over["push_p"],1.0)
+
+    def test_physically_impossible_settlements_get_no_prior_mass(self):
+        self.assertEqual(price_pitcher_market(self._base("PITCHER_OUTS",27.0))["model_p"],0.0)
+        self.assertEqual(price_pitcher_market(self._base("PITCHER_ER",0.0,"UNDER"))["model_p"],0.0)
+        self.assertGreater(price_pitcher_market(self._base("PITCHER_OUTS",26.5))["model_p"],0.0)
+        under=price_pitcher_market(self._base("PITCHER_OUTS",27.0,"UNDER"))
+        self.assertAlmostEqual(under["model_p"]+under["push_p"],1.0)
+    def test_unseen_possible_tail_is_finite_not_zero(self):
+        self.assertAlmostEqual(price_pitcher_market(self._base("PITCHER_K",9.5))["model_p"],jeffreys(0,len(self.POOL)))
 
 if __name__=="__main__":unittest.main()
