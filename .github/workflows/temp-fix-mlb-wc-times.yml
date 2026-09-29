@@ -41,4 +41,13 @@ jobs:
           git add manual_inputs/mlb/2026-09-29_dk_full_supplied.json .github/workflows/temp-fix-mlb-wc-times.yml
           git diff --cached --check
           git commit -m 'research: correct Wild Card first-pitch timestamps'
-          git push origin HEAD:research/mlb-context-adjusted-runs-20260929
+          for attempt in 1 2 3 4 5; do
+            if git push origin HEAD:research/mlb-context-adjusted-runs-20260929; then
+              exit 0
+            fi
+            echo "push raced with another writer; rebasing (attempt $attempt)"
+            git fetch origin research/mlb-context-adjusted-runs-20260929
+            git rebase origin/research/mlb-context-adjusted-runs-20260929
+          done
+          echo 'failed to publish timestamp correction after 5 attempts' >&2
+          exit 1
