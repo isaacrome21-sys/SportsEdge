@@ -88,12 +88,14 @@ def myspari_rows(payload: Mapping[str, Any], *, quote_age_seconds: float = 0.0,
         cond, push = _conditional_and_push(row)
         odds = row.get("american_odds")
         guard_reason = empirical_guard_reason(row, cond)
+        raw_paths = row.get("mc_paths", 0)
+        n_paths = raw_paths if isinstance(raw_paths, int) and not isinstance(raw_paths, bool) and raw_paths >= 0 else 0
         base = {
             "game_id": row.get("game_id"), "market": row.get("market"), "entity_id": row.get("entity_id"),
             "entity_name": (names or {}).get(str(row.get("entity_id")), ""),
             "line": row.get("line"), "side": row.get("side"), "american_odds": odds,
             "engine_status": row.get("bet_status"), "engine_reason": row.get("reason"),
-            "engine_version": row.get("engine_version"), "mc_paths": row.get("mc_paths"),
+            "engine_version": row.get("engine_version"), "mc_paths": n_paths,
             "model_p_raw": row.get("model_p"), "push_p": push, "label": LABEL,
             "empirical_evidence": row.get("empirical_evidence"),
             "presentation_reason": guard_reason,
@@ -105,7 +107,8 @@ def myspari_rows(payload: Mapping[str, Any], *, quote_age_seconds: float = 0.0,
             scored = score_mlb_edge(
                 estimate_p=min(max(cond, 1e-6), 1 - 1e-6), american_odds=odds,
                 opposite_odds=None if opposite is None else opposite.get("american_odds"),
-                quote_age_seconds=quote_age_seconds, quote_ttl_seconds=quote_ttl_seconds, reliability=reliability,
+                quote_age_seconds=quote_age_seconds, quote_ttl_seconds=quote_ttl_seconds,
+                reliability=reliability, n_paths=n_paths, push_p=push,
             )
         scored_row = {k: getattr(scored, k) for k in scored.__dataclass_fields__}
         if guard_reason:
@@ -156,11 +159,14 @@ def render_markdown(rows: Sequence[Mapping[str, Any]], *, header: str, notes: Se
             f"{ev_text} | {r.get('confidence_score', 0)} | {status_text} |"
         )
     lines += ["", "_Win p = engine win probability; Push p = refund probability; Win p ex-push = Win p / (1 − Push p), "
-              "the basis for Fair odds and Edge against the two-way no-vig price. EV/$ uses Win p with pushes refunded._"]
+              "the basis for Fair odds and Edge against the two-way no-vig price. EV/$ uses Win p with pushes refunded. "
+              "Score is qualification-only (simulation sufficiency, quote freshness, push-mass quality); price, edge, EV and probability magnitude do not add Score points._"]
     blocked = [r for r in rows if r.get("scored_status") in {"BLOCKED", "NO_MODEL"}]
     if blocked:
-        lines += ["", "## Engine did not price", "_Includes empirical estimates withheld by the card support guard; raw engine output is preserved in JSON._"]
-        lines += [f"- {_selection(r)}: {r.get('presentation_reason') or r.get('engine_reason') or ', '.join(r.get('reason_codes') or ())}" for r in blocked]
+        lines += ["", "## Not card-eligible", "_Includes stale or incomplete market pairs plus empirical estimates withheld by the presentation support guard; raw engine output is preserved in JSON._"]
+        for r in blocked:
+            reason = r.get("presentation_reason") or ", ".join(r.get("reason_codes") or ()) or r.get("engine_reason") or "UNSPECIFIED_BLOCK"
+            lines.append(f"- {_selection(r)}: {reason}")
     if notes:
         lines += ["", "## Notes", *[f"- {n}" for n in notes]]
     return "\n".join(lines) + "\n"
