@@ -27,6 +27,7 @@ class ManualQuote:
     source: str
     subject_id: str | None = None
     subject_name: str | None = None
+    team_side: str | None = None
 
 
 def _text(value: Any, name: str) -> str:
@@ -74,6 +75,10 @@ def validate_manual_quote(raw: Mapping[str, Any]) -> ManualQuote:
         raise ManualQuoteError("manual lane requires source=MANUAL")
     subject = raw.get("subject_id")
     subject_name = raw.get("subject_name")
+    raw_team_side = raw.get("team_side")
+    team_side = None if raw_team_side in (None, "") else str(raw_team_side).strip().upper()
+    if team_side is not None and team_side not in {"HOME", "AWAY"}:
+        raise ManualQuoteError("team_side must be HOME or AWAY")
     return ManualQuote(
         game_id=_text(raw.get("game_id"), "game_id"),
         market_type=_text(raw.get("market_type"), "market_type").upper(),
@@ -88,4 +93,5 @@ def validate_manual_quote(raw: Mapping[str, Any]) -> ManualQuote:
         source=source,
         subject_id=None if subject in (None, "") else str(subject),
         subject_name=None if subject_name in (None, "") else str(subject_name).strip(),
+        team_side=team_side,
     )

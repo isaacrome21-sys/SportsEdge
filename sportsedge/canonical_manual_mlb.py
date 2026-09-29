@@ -14,7 +14,7 @@ from .engine_registry import resolve_manual_market_type
 from .generic_card_pipeline import run_generic_card
 from .live_slate import LiveGame, TeamLineup
 from .manual_quote import ManualQuote, validate_manual_quote
-from .mlb_generic_features import MLBGenericHistorySource
+from .mlb_all_market_features import EITHER_PITCHER_MARKETS, MLBAllMarketHistorySource
 from .mlb_history_cache import MLBHistoryCachedOpener
 from .mlb_source import fetch_schedule, parse_game_start
 from .quote_bridge import validate_canonical_quote
@@ -22,6 +22,13 @@ from .quote_bridge import validate_canonical_quote
 class CanonicalManualMLBError(ValueError): pass
 
 CHICAGO_TZ = ZoneInfo("America/Chicago")
+TEAM_TOTAL_MARKETS = frozenset({"TEAM_TOTALS", "F5_TEAM_TOTALS"})
+PLAYER_MARKETS = frozenset({
+    "HOME_RUNS","HITS","TOTAL_BASES","RBI","RUNS","STOLEN_BASES","BATTER_BB","EXTRA_BASE_HITS",
+    "SINGLES","DOUBLES","TRIPLES","BATTER_K","HITS_RUNS_RBIS","HITS_RUNS_STOLEN_BASES","RUNS_RBIS",
+    "HITS_STOLEN_BASES","HITS_WALKS_STOLEN_BASES","PITCHER_K","PITCHER_OUTS","PITCHER_ER",
+    "PITCHER_HITS_ALLOWED","PITCHER_BB","PITCHER_HITS_WALKS_ER","FIRST_HOME_RUN","PITCHER_RECORD_WIN",
+})
 
 def _sha(v: Any) -> str:
     return hashlib.sha256(json.dumps(v, sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest()
@@ -96,6 +103,18 @@ def _resolve_subject(row: ManualQuote, *, opener=urlopen) -> tuple[str | None, i
         raise CanonicalManualMLBError(f"MANUAL_SUBJECT_TEAM_INVALID:{row.subject_name}")
     return str(person_id), team_id
 
+def _engine_market(row: ManualQuote) -> str:
+    """Resolve a manual row to its engine market.
+
+    A generic first-inning total is only the YRFI/NRFI contract at exactly 0.5 runs;
+    any other line is a different contract with no engine, so it fails closed.
+    """
+    if row.market_type == "FIRST_INNING_TOTAL":
+        if abs(float(row.line) - 0.5) > 1e-9:
+            raise CanonicalManualMLBError(f"NO_ENGINE_FOR_MARKET: FIRST_INNING_TOTAL line {row.line:g} (only 0.5 is YRFI/NRFI)")
+        return "YRFI"
+    return resolve_manual_market_type(row.market_type)
+
 def _side(market_type: str, side: str) -> str:
     s = side.upper()
     if market_type == "FIRST_INNING_TOTAL":
@@ -144,12 +163,12 @@ def run_canonical_manual_mlb(rows: Iterable[Mapping[str, Any]], *, opener=urlope
                     TeamLineup(g.away_id,"away",away_projected,(),False),TeamLineup(g.home_id,"home",home_projected,(),False),
                     g.game_number,g.double_header,g.venue_id,g.official_date,g.status)
     captured = max(r.observed_at for r in parsed).astimezone(timezone.utc)
-    hist = MLBGenericHistorySource(opener=MLBHistoryCachedOpener(target_date=captured.date(),cache_dir=history_cache_dir,opener=opener), retrieved_at=captured)
+    hist = MLBAllMarketHistorySource(opener=MLBHistoryCachedOpener(target_date=captured.date(),cache_dir=history_cache_dir,opener=opener), retrieved_at=captured)
     target_date = datetime.fromisoformat(str(g.official_date)).date() if g.official_date else captured.date()
     quotes, features, resolutions, seen = [], [], [], set()
     blocked_subject_rows: list[dict[str, Any]] = []
     for row, (subject_id, subject_team_id), subject_error in zip(parsed, resolved_subjects, subject_errors):
-        market = resolve_manual_market_type(row.market_type)
+        market = _engine_market(row)
         if subject_error:
             entity = str(row.subject_id or row.subject_name or "UNRESOLVED")
             for side, price, line in ((row.side, row.price, row.line), (row.paired_side, row.paired_price, -row.line if row.market_type in {"RUN_LINE","FIRST_FIVE_RUN_LINE"} else row.line)):
@@ -159,17 +178,31 @@ def run_canonical_manual_mlb(rows: Iterable[Mapping[str, Any]], *, opener=urlope
             resolutions.append({"market_type":row.market_type,"engine_market":market,"subject_id":row.subject_id,"subject_name":row.subject_name,
                 "observed_at":row.observed_at.isoformat(),"resolution_status":"BLOCKED","reason":subject_error})
             continue
-        is_player_market = market in {"HOME_RUNS","HITS","TOTAL_BASES","RBI","RUNS","STOLEN_BASES","BATTER_BB","EXTRA_BASE_HITS","SINGLES","DOUBLES","TRIPLES","BATTER_K","HITS_RUNS_RBIS","RUNS_RBIS","PITCHER_K","PITCHER_OUTS","PITCHER_ER","PITCHER_HITS_ALLOWED","PITCHER_BB","PITCHER_HITS_WALKS_ER"}
+        is_player_market = market in PLAYER_MARKETS
         if is_player_market and not subject_id:
             raise CanonicalManualMLBError(f"subject_id or subject_name required for {row.market_type}")
-        entity_id = subject_id or str(g.game_pk)
+        feature_team_id = subject_team_id
+        if market in TEAM_TOTAL_MARKETS:
+            if row.team_side not in {"HOME", "AWAY"}:
+                raise CanonicalManualMLBError(f"team_side HOME/AWAY required for {row.market_type}")
+            feature_team_id = int(g.home_id if row.team_side == "HOME" else g.away_id)
+            entity_id = str(feature_team_id)
+        elif market in EITHER_PITCHER_MARKETS:
+            if g.away_probable_pitcher_id is None or g.home_probable_pitcher_id is None:
+                raise CanonicalManualMLBError(f"both probable pitchers required for {row.market_type}")
+            entity_id = f"{int(g.away_probable_pitcher_id)}|{int(g.home_probable_pitcher_id)}"
+            feature_team_id = None
+        else:
+            entity_id = subject_id or str(g.game_pk)
         quotes.extend(_pair(row, market, entity_id, resolved_game_id=str(g.game_pk)))
         key = (market, entity_id)
         if key not in seen:
             seen.add(key)
             features.append(hist.feature_row(game_pk=g.game_pk,market=market,entity_id=entity_id,target_date=target_date,
-                away_team_id=int(g.away_id),home_team_id=int(g.home_id),player_id=int(subject_id) if subject_id else None,team_id=subject_team_id))
-        resolutions.append({"market_type":row.market_type,"engine_market":market,"subject_id":subject_id,"subject_name":row.subject_name,"observed_at":row.observed_at.isoformat()})
+                away_team_id=int(g.away_id),home_team_id=int(g.home_id),player_id=int(subject_id) if subject_id else None,
+                team_id=feature_team_id,away_pitcher_id=g.away_probable_pitcher_id,home_pitcher_id=g.home_probable_pitcher_id))
+        resolutions.append({"market_type":row.market_type,"engine_market":market,"subject_id":subject_id,"subject_name":row.subject_name,
+            "team_side":row.team_side,"entity_id":entity_id,"observed_at":row.observed_at.isoformat()})
     results = run_generic_card(games=[live],feature_rows=features,quotes=quotes,ingestion_now=captured,finalization_now=captured,
         registry_path=registry_path,edge_floor_config_path=edge_floor_config_path,kelly_multiplier=kelly_multiplier)
     # Attach support evidence after pricing; engine inputs/outputs are unchanged.

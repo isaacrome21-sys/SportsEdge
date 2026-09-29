@@ -7,7 +7,7 @@
   "promotion_eligible_by_artifact_alone": false,
   "doctrine": "This artifact identifies the executable predictive methodology only. It does not create evidence, eligibility, calibration, a market probability, or OFFICIAL status.",
   "files": {
-    "sportsedge/engine_registry.py": "88cd8cfcb6c36e3fff380ee68a6e6ef509099584",
+    "sportsedge/engine_registry.py": "260e6129b5a39e2f4cf36ee535c27b9520bb9e33",
     "sportsedge/generic_market_engine.py": "c11e28182097fd8184eb450fa43d755eec36b393",
     "sportsedge/shared_game_engine.py": "8a140b787deb7c8b25a102733defaf142e9d371c",
     "sportsedge/shared_f5_engine.py": "d1ea46d5701008fe1bf81f679591d85cbc7291bd",
