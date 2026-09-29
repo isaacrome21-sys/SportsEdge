@@ -2,7 +2,7 @@ name: manual-mlb-snapshot
 
 on:
   push:
-    branches: [main, feat/manual-mlb-snapshot-runner, sportsedge/stage0-coverage-health-v2]
+    branches: [main, feat/manual-mlb-snapshot-runner, sportsedge/stage0-coverage-health-v2, feature/mlb-no-quote-age-block]
     paths:
       - sportsedge/manual_quote.py
       - sportsedge/canonical_manual_mlb.py
