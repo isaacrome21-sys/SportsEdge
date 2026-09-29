@@ -123,17 +123,23 @@ def myspari_rows(payload: Mapping[str, Any], *, quote_age_seconds: float = 0.0,
             scored_row["status"] = "PASS"
             scored_row["presentation_reason_codes"] = (PRICE_CEILING_REASON,)
         out.append({**scored_row, **base})
-    return build_mlb_scored_card(apply_same_game_guard(out))
+
+    # Apply card-level eligibility (including the 2% model-return floor) before
+    # same-game conflict selection so a row that cannot make the card cannot
+    # suppress a row that can.
+    scored = build_mlb_scored_card(out)
+    return build_mlb_scored_card(apply_same_game_guard(scored))
 
 
 # --- Same-game guard --------------------------------------------------------
-# Presentation-only: never changes a probability. It blocks only objective
-# contradictions and duplicate team-outcome exposure. It does not let a coarse
-# "high-runs" / "low-runs" narrative suppress otherwise qualified markets or
-# player props, because those outcomes can coexist in baseball.
+# Presentation-only: never changes a probability. It blocks exact contract
+# contradictions, duplicate team-outcome exposure, and a deliberately narrow
+# one-team scoring conflict. The old global high-runs/low-runs narrative is not
+# used: game totals and strikeout props, for example, may coexist.
 SCRIPT_CONFLICT_REASON = "SAME_GAME_DIRECT_CONFLICT"
 SAME_SIDE_STACK_REASON = "SAME_SIDE_STACK"
 OPPOSITE_TEAM_OUTCOME_REASON = "OPPOSITE_TEAM_OUTCOME_CONFLICT"
+TEAM_SCORING_CONFLICT_REASON = "SAME_TEAM_SCORING_CONFLICT"
 _HIGH_RUNS_OVER = frozenset({
     "TOTALS", "TEAM_TOTALS", "F5_TOTALS", "F5_TEAM_TOTALS",
     "PITCHER_HITS_ALLOWED", "PITCHER_ER", "PITCHER_BB", "PITCHER_HITS_WALKS_ER",
@@ -143,14 +149,17 @@ _HIGH_RUNS_OVER = frozenset({
 })
 _LOW_RUNS_OVER = frozenset({"PITCHER_OUTS", "PITCHER_K"})
 _TEAM_OUTCOME_MARKETS = frozenset({"MONEYLINE", "RUN_LINE", "F5_MONEYLINE", "F5_RUN_LINE", "PITCHER_RECORD_WIN"})
+_TEAM_SCORING_MARKETS = frozenset({"TEAM_TOTALS", "F5_TEAM_TOTALS"})
+_PITCHER_RUN_ALLOWANCE_MARKETS = frozenset({"PITCHER_HITS_ALLOWED", "PITCHER_ER", "PITCHER_BB", "PITCHER_HITS_WALKS_ER"})
+_PITCHER_RUN_SUPPRESSION_MARKETS = frozenset({"PITCHER_OUTS"})
 
 
 def run_script_direction(row: Mapping[str, Any]) -> int:
     """Diagnostic only: +1 run-seeking, -1 run-suppressing, 0 neutral.
 
-    This label is intentionally not used to demote card rows. It remains available
-    for diagnostics/backward compatibility, but a cross-market narrative is not a
-    logical contradiction.
+    This label is intentionally not used as a global card rule. It remains for
+    diagnostics/backward compatibility; the active scoring rule below is team-
+    bound and excludes strikeouts and game totals.
     """
     market = str(row.get("market") or "").upper()
     side = str(row.get("side") or "").upper()
@@ -172,6 +181,10 @@ def _ev(row: Mapping[str, Any]) -> float:
     return -1e9 if ev is None else ev
 
 
+def _is_actionable(row: Mapping[str, Any]) -> bool:
+    return str(row.get("scored_status") or row.get("status") or "").upper() == "ACTIONABLE"
+
+
 def _team_outcome_side(row: Mapping[str, Any]) -> str | None:
     """Return AWAY/HOME for team-outcome exposure, or None when it cannot be bound safely."""
     market = str(row.get("market") or "").upper()
@@ -187,7 +200,7 @@ def _team_outcome_side(row: Mapping[str, Any]) -> str | None:
 
 
 def _outcome_guard_rank(row: Mapping[str, Any]) -> tuple[int, float]:
-    """Prefer stronger qualification evidence, then EV, when collapsing outcome exposure."""
+    """Prefer stronger qualification evidence, then EV, when collapsing exposure."""
     try:
         score = int(row.get("confidence_score") or 0)
     except (TypeError, ValueError):
@@ -197,6 +210,8 @@ def _outcome_guard_rank(row: Mapping[str, Any]) -> tuple[int, float]:
 
 def _demote(row: dict[str, Any], reason: str, keeper: Mapping[str, Any]) -> None:
     row["status"] = "PASS"
+    if "scored_status" in row:
+        row["scored_status"] = "PASS"
     codes = tuple(row.get("presentation_reason_codes") or ())
     if reason not in codes:
         row["presentation_reason_codes"] = codes + (reason,)
@@ -223,10 +238,72 @@ def _direct_opposites(left: Mapping[str, Any], right: Mapping[str, Any]) -> bool
     return want_right is None or abs(right_line - want_right) <= 1e-9
 
 
+def _team_side(row: Mapping[str, Any]) -> str | None:
+    side = str(row.get("team_side") or "").upper()
+    return side if side in {"AWAY", "HOME"} else None
+
+
+def _other_team(side: str | None) -> str | None:
+    return {"AWAY": "HOME", "HOME": "AWAY"}.get(str(side or "").upper())
+
+
+def _team_scoring_direction(row: Mapping[str, Any]) -> int:
+    """Direction for the runs scored by the team this row is bound to.
+
+    +1 means more runs for that team, -1 means fewer. Strikeouts intentionally
+    return 0: a K over can coexist with an over/game-over thesis and is not used
+    by this narrow guard.
+    """
+    market = str(row.get("market") or "").upper()
+    side = str(row.get("side") or "").upper()
+    if side not in {"OVER", "UNDER"}:
+        return 0
+    sign = 1 if side == "OVER" else -1
+    if market in _TEAM_SCORING_MARKETS:
+        return sign
+    if market in _PITCHER_RUN_ALLOWANCE_MARKETS:
+        return sign
+    if market in _PITCHER_RUN_SUPPRESSION_MARKETS:
+        return -sign
+    return 0
+
+
+def _same_team_scoring_conflict(left: Mapping[str, Any], right: Mapping[str, Any]) -> bool:
+    """Narrow conflict: one team's totals vs its own opposite period or opposing starter.
+
+    Examples intentionally caught:
+    - Padres full-game TT Over vs Padres F5 TT Under.
+    - Yankees TT Over vs the opposing starter Outs Over.
+
+    Game totals, YRFI/NRFI, hitter props, and pitcher strikeouts are not part of
+    this rule. Unknown team binding fails neutral.
+    """
+    lm = str(left.get("market") or "").upper()
+    rm = str(right.get("market") or "").upper()
+    ls, rs = _team_side(left), _team_side(right)
+    if ls is None or rs is None:
+        return False
+
+    ld, rd = _team_scoring_direction(left), _team_scoring_direction(right)
+    if ld == 0 or rd == 0 or ld == rd:
+        return False
+
+    # Same team's full-game/F5 totals pointing opposite ways.
+    if lm in _TEAM_SCORING_MARKETS and rm in _TEAM_SCORING_MARKETS:
+        return ls == rs
+
+    # A team's total against the opposing starter's run-sensitive prop.
+    if lm in _TEAM_SCORING_MARKETS and (rm in _PITCHER_RUN_ALLOWANCE_MARKETS or rm in _PITCHER_RUN_SUPPRESSION_MARKETS):
+        return rs == _other_team(ls)
+    if rm in _TEAM_SCORING_MARKETS and (lm in _PITCHER_RUN_ALLOWANCE_MARKETS or lm in _PITCHER_RUN_SUPPRESSION_MARKETS):
+        return ls == _other_team(rs)
+    return False
+
+
 def apply_same_game_guard(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     by_game: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
-        if row.get("status") != "ACTIONABLE":
+        if not _is_actionable(row):
             continue
         game_id = row.get("game_id")
         if game_id in {None, ""}:
@@ -235,13 +312,12 @@ def apply_same_game_guard(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         by_game.setdefault(str(game_id), []).append(row)
 
     for game_rows in by_game.values():
-        # 1) Exact contract contradictions only. Cross-market/player script labels
-        # are intentionally not conflicts.
+        # 1) Exact contract contradictions.
         for idx, left in enumerate(game_rows):
-            if left.get("status") != "ACTIONABLE":
+            if not _is_actionable(left):
                 continue
             for right in game_rows[idx + 1:]:
-                if right.get("status") != "ACTIONABLE" or not _direct_opposites(left, right):
+                if not _is_actionable(right) or not _direct_opposites(left, right):
                     continue
                 keeper = max((left, right), key=_ev)
                 loser = right if keeper is left else left
@@ -249,9 +325,22 @@ def apply_same_game_guard(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 if loser is left:
                     break
 
-        # 2) One team-outcome exposure per game across full game, F5, and pitcher W.
+        # 2) Narrow team-scoring conflicts only. Prefer qualification score, then EV.
+        for idx, left in enumerate(game_rows):
+            if not _is_actionable(left):
+                continue
+            for right in game_rows[idx + 1:]:
+                if not _is_actionable(right) or not _same_team_scoring_conflict(left, right):
+                    continue
+                keeper = max((left, right), key=_outcome_guard_rank)
+                loser = right if keeper is left else left
+                _demote(loser, TEAM_SCORING_CONFLICT_REASON, keeper)
+                if loser is left:
+                    break
+
+        # 3) One team-outcome exposure per game across full game, F5, and pitcher W.
         # Pitcher W is included only when context has bound the pitcher to AWAY/HOME.
-        outcomes = [r for r in game_rows if r.get("status") == "ACTIONABLE" and _team_outcome_side(r)]
+        outcomes = [r for r in game_rows if _is_actionable(r) and _team_outcome_side(r)]
         if len(outcomes) > 1:
             keeper = max(outcomes, key=_outcome_guard_rank)
             keep_team = _team_outcome_side(keeper)
