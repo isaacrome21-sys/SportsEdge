@@ -41,6 +41,48 @@ def _assert_market_blind(obj: Any, path: str = "root") -> None:
             _assert_market_blind(value, f"{path}[{i}]")
 
 
+def _target_season_week(game_id: str) -> tuple[int, int]:
+    parts = str(game_id).split("_")
+    if len(parts) < 2:
+        raise NFLContextError("game_id must encode season and week")
+    try:
+        season = int(parts[0])
+        week = int(parts[1])
+    except ValueError as exc:
+        raise NFLContextError("game_id must encode numeric season and week") from exc
+    if season < 2000 or week < 1:
+        raise NFLContextError("game_id season/week out of range")
+    return season, week
+
+
+def _assert_rows_before_target(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    label: str,
+    target_season: int,
+    target_week: int,
+) -> None:
+    """Reject rows that cannot be proven to predate the target game.
+
+    nflverse rolling files can contain games completed after a historical target.
+    Every consumed row therefore needs explicit season/week markers. Rows from a
+    later season, the target week, or a later week fail closed instead of being
+    silently ignored.
+    """
+    for i, row in enumerate(rows):
+        if not isinstance(row, Mapping):
+            raise NFLContextError(f"{label}[{i}] must be a mapping")
+        if row.get("season") in (None, "") or row.get("week") in (None, ""):
+            raise NFLContextError(f"{label}[{i}] missing season/week PIT markers")
+        try:
+            season = int(row["season"])
+            week = int(row["week"])
+        except (TypeError, ValueError) as exc:
+            raise NFLContextError(f"{label}[{i}] has invalid season/week PIT markers") from exc
+        if season > target_season or (season == target_season and week >= target_week):
+            raise NFLContextError(f"{label}[{i}] is not pre-target PIT data")
+
+
 def _source_sha(rows: Sequence[Mapping[str, Any]]) -> str:
     raw = json.dumps(list(rows), sort_keys=True, separators=(",", ":"), default=str).encode()
     return sha256(raw).hexdigest()
@@ -58,16 +100,24 @@ def build_nflverse_prop_opportunity_provider(
 ) -> Mapping[str, Any]:
     """Build a hash-bound opportunity provider from already-fetched nflverse rows.
 
-    Inputs MUST be snapshotted before kickoff. Callers should persist the exact
-    raw source bytes separately; this adapter hashes the normalized rows as an
-    additional deterministic binding.
+    Inputs MUST be snapshotted before kickoff. Each consumed row must also carry
+    season/week markers proving it predates the target game. Callers should
+    persist the exact raw source bytes separately; this adapter hashes the
+    normalized rows as an additional deterministic binding.
     """
     kick = _utc(kickoff, "kickoff")
     seen = _utc(observed_at, "observed_at")
     if seen >= kick:
         raise NFLContextError("nflverse prop snapshot must be observed before kickoff")
-    for rows in (snap_rows, player_rows, pbp_rows):
+    target_season, target_week = _target_season_week(game_id)
+    for label, rows in (("snap_rows", snap_rows), ("player_rows", player_rows), ("pbp_rows", pbp_rows)):
         _assert_market_blind(rows)
+        _assert_rows_before_target(
+            rows,
+            label=label,
+            target_season=target_season,
+            target_week=target_week,
+        )
 
     # Aggregate game-level snap rows instead of allowing the last row to win.
     # nflverse/PFR snap counts are one row per player-game.
