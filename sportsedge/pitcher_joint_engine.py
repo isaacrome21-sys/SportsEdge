@@ -93,7 +93,12 @@ def _pool_weights(pool: Sequence[Mapping[str, Any]], explicit: Any = None) -> li
         embedded = [row.get("_weight") for row in pool]
         if all(value is not None for value in embedded):
             return normalize_weights([float(value) for value in embedded], len(pool))
-        return normalize_weights(None, len(pool))
+        # Strictly-prior recency weighting: newest start has weight 1.0 and
+        # influence halves every 10 starts. This is workload/form weighting,
+        # not sportsbook information.
+        n = len(pool)
+        recency = [0.5 ** ((n - 1 - i) / 10.0) for i in range(n)]
+        return normalize_weights(recency, n)
     except CountKernelError as exc:
         raise PitcherJointEngineError(str(exc)) from exc
 
