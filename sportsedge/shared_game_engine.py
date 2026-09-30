@@ -16,8 +16,6 @@ from .v7_distribution import (
     DEFAULT_EXTRA_HALF_INNING_MEAN,
     DEFAULT_FIRST_INNING_DISPERSION_R,
     DEFAULT_FIRST_INNING_SHARE,
-    DEFAULT_FULL_GAME_DISPERSION_R,
-    FULL_GAME_MODE_SHARED_GAMMA_POISSON,
     V7_DISTRIBUTION_VERSION,
     GameDistribution,
     simulate_game_distribution,
@@ -64,8 +62,6 @@ def score_distribution_sha256(distribution: GameDistribution) -> str:
         "version": V7_DISTRIBUTION_VERSION,
         "simulations": int(distribution.simulations),
         "seed_policy": str(distribution.seed_policy),
-        "full_game_distribution_mode": str(distribution.full_game_distribution_mode),
-        "full_game_dispersion_r": distribution.full_game_dispersion_r,
         "joint_score_pmf": distribution.joint_score_pmf,
     })
 
@@ -113,8 +109,6 @@ def build_shared_game_engine_session(
             "away_mean_runs": away_mean,
             "home_mean_runs": home_mean,
             "feature_source_hash": feature_source_hash,
-            "full_game_distribution_mode": FULL_GAME_MODE_SHARED_GAMMA_POISSON,
-            "full_game_dispersion_r": DEFAULT_FULL_GAME_DISPERSION_R,
         }
         game_build_hash = canonical_json_sha256(stochastic_identity)
         model_input_hash = canonical_json_sha256({
@@ -130,9 +124,6 @@ def build_shared_game_engine_session(
                 total_line=0.0,
                 simulations=simulations,
                 build_hash=game_build_hash,
-                shared_game_sigma=0.0,
-                team_sigma=0.0,
-                full_game_dispersion_r=DEFAULT_FULL_GAME_DISPERSION_R,
                 first_inning_share=DEFAULT_FIRST_INNING_SHARE,
                 first_inning_dispersion_r=DEFAULT_FIRST_INNING_DISPERSION_R,
                 extra_half_inning_mean=DEFAULT_EXTRA_HALF_INNING_MEAN,
@@ -167,8 +158,6 @@ def build_shared_game_engine_session(
             "engine_version": V7_DISTRIBUTION_VERSION,
             "seed_policy": distribution.seed_policy,
             "mc_paths": distribution.simulations,
-            "full_game_distribution_mode": distribution.full_game_distribution_mode,
-            "full_game_dispersion_r": distribution.full_game_dispersion_r,
         }
 
     return engine
