@@ -62,15 +62,16 @@ class OwnModelCardTests(unittest.TestCase):
         self.assertIsNone(hits["edge"])
 
     def test_real_issue1273_empirical_pitcher_row_prints_lean(self):
-        # Fixture values copied from the real #1273 Gausman O14.5 emitted row.
-        # Deliberately uses the observed legacy empirical version rather than an imported constant.
+        # Regression shape is based on the real #1273 Gausman O14.5 row.
+        # engine_version is copied verbatim from pre-#1278 acceptance artifact run 36716190139;
+        # fixture-only evidence hashes remain synthetic.
         payload = {"results": [
             {**_row("PITCHER_OUTS", "OVER", 107, 0.682, line=14.5, entity="592332", fair=0.447, edge=0.235),
-             "engine_version": "mlb_pitcher_joint_empirical_v2",
+             "engine_version": "mlb_pitcher_joint_empirical_bayes_v3",
              "empirical_evidence": {"sample_size": 10, "sample_unit": "starts", "wins": 7, "pushes": 0,
                                     "weighted": False, "pool_sha256": "issue1273"}},
             {**_row("PITCHER_OUTS", "UNDER", -141, 0.318, line=14.5, entity="592332", fair=0.553, edge=-0.235),
-             "engine_version": "mlb_pitcher_joint_empirical_v2",
+             "engine_version": "mlb_pitcher_joint_empirical_bayes_v3",
              "empirical_evidence": {"sample_size": 10, "sample_unit": "starts", "wins": 3, "pushes": 0,
                                     "weighted": False, "pool_sha256": "issue1273"}},
         ]}
@@ -82,19 +83,19 @@ class OwnModelCardTests(unittest.TestCase):
     def test_real_shaped_burke_below_floor_stays_pass_while_gausman_is_lean(self):
         payload = {"results": [
             {**_row("PITCHER_OUTS", "OVER", -143, 0.591, line=14.5, entity="657048", fair=0.556, edge=0.035),
-             "engine_version": "mlb_pitcher_joint_empirical_v2",
+             "engine_version": "mlb_pitcher_joint_empirical_bayes_v3",
              "empirical_evidence": {"sample_size": 10, "sample_unit": "starts", "wins": 6, "pushes": 0,
                                     "weighted": False, "pool_sha256": "burke1273"}},
             {**_row("PITCHER_OUTS", "UNDER", 108, 0.409, line=14.5, entity="657048", fair=0.444, edge=-0.035),
-             "engine_version": "mlb_pitcher_joint_empirical_v2",
+             "engine_version": "mlb_pitcher_joint_empirical_bayes_v3",
              "empirical_evidence": {"sample_size": 10, "sample_unit": "starts", "wins": 4, "pushes": 0,
                                     "weighted": False, "pool_sha256": "burke1273"}},
             {**_row("PITCHER_OUTS", "OVER", 107, 0.682, line=14.5, entity="592332", fair=0.447, edge=0.235),
-             "engine_version": "mlb_pitcher_joint_empirical_v2",
+             "engine_version": "mlb_pitcher_joint_empirical_bayes_v3",
              "empirical_evidence": {"sample_size": 10, "sample_unit": "starts", "wins": 7, "pushes": 0,
                                     "weighted": False, "pool_sha256": "gausman1273"}},
             {**_row("PITCHER_OUTS", "UNDER", -141, 0.318, line=14.5, entity="592332", fair=0.553, edge=-0.235),
-             "engine_version": "mlb_pitcher_joint_empirical_v2",
+             "engine_version": "mlb_pitcher_joint_empirical_bayes_v3",
              "empirical_evidence": {"sample_size": 10, "sample_unit": "starts", "wins": 3, "pushes": 0,
                                     "weighted": False, "pool_sha256": "gausman1273"}},
         ]}
