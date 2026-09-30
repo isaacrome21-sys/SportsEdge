@@ -14,9 +14,10 @@ from __future__ import annotations
 from math import isfinite
 from typing import Any, Mapping, Sequence
 
-from .mlb_empirical_support import empirical_guard_reason
+from .mlb_empirical_support import empirical_guard_reason, is_empirical
 from .mlb_edge_score import ev_per_dollar, score_mlb_edge
-from .mlb_scored_card import build_mlb_scored_card
+from .mlb_scored_card import EMPIRICAL_SIDE_CONFLICT_REASON, EV_FLOOR_REASON, build_mlb_scored_card
+from .pitcher_record_win_engine import PITCHER_RECORD_WIN_ENGINE_VERSION
 
 MYSPARI_OWN_MODEL_VERSION = "MLB_MYSPARI_OWN_MODEL_V1"
 LABEL = "SportsEdge engine model_p shown MySpariEdge-style · NOT Truth Gate · NOT OFFICIAL"
@@ -24,8 +25,46 @@ MANUAL_QUOTE_TTL_SECONDS = 6 * 3600.0
 # Favorites priced beyond this are never shown as ACTIONABLE (Isaac's -165 ceiling).
 MAX_FAVORITE_ODDS = -165
 PRICE_CEILING_REASON = "PRICE_BEYOND_MAX_FAVORITE_-165"
+EMPIRICAL_PROP_LEAN_REASON = "EMPIRICAL_PROP_LEAN_ONLY"
+CANDIDATE_ENGINE_LEAN_REASON = "CANDIDATE_ENGINE_LEAN_ONLY"
+# Engines that declare themselves unvalidated candidates may be shown, but only
+# as a LEAN: never a core ACTIONABLE play. Probabilities are unchanged.
+LEAN_ONLY_ENGINE_VERSIONS = frozenset({PITCHER_RECORD_WIN_ENGINE_VERSION})
 _LINE_NEGATED = frozenset({"RUN_LINE", "F5_RUN_LINE"})
 _OPPOSITE = {"AWAY": "HOME", "HOME": "AWAY", "OVER": "UNDER", "UNDER": "OVER", "YES": "NO", "NO": "YES"}
+
+
+def _lean_reason(row: Mapping[str, Any]) -> str | None:
+    """Reason a row may print at most LEAN, or None for a core-eligible row."""
+    if is_empirical(row):
+        return EMPIRICAL_PROP_LEAN_REASON
+    if str(row.get("engine_version") or "") in LEAN_ONLY_ENGINE_VERSIONS:
+        return CANDIDATE_ENGINE_LEAN_REASON
+    return None
+
+
+def team_entity_names(payload: Mapping[str, Any]) -> dict[str, str]:
+    """Display names for team-bound entity ids (team totals) from the resolved game.
+
+    Team-total rows use the team id as entity id, so without this the card prints
+    the bare id (e.g. "144 Team Totals"). Presentation only.
+    """
+    games = [g for g in (payload.get("games") or []) if isinstance(g, Mapping)]
+    if isinstance(payload.get("resolved_game"), Mapping):
+        games.append({"resolved_game": payload["resolved_game"],
+                      "market_resolution": payload.get("market_resolution") or []})
+    out: dict[str, str] = {}
+    for game in games:
+        resolved = game.get("resolved_game") or {}
+        for res in game.get("market_resolution") or []:
+            if not isinstance(res, Mapping) or res.get("subject_name"):
+                continue
+            side = str(res.get("team_side") or "").upper()
+            team = resolved.get("home_team") if side == "HOME" else resolved.get("away_team") if side == "AWAY" else None
+            entity_id = res.get("entity_id")
+            if team and entity_id not in (None, ""):
+                out.setdefault(str(entity_id), str(team))
+    return out
 
 
 def _f(value: Any) -> float | None:
@@ -124,10 +163,40 @@ def myspari_rows(payload: Mapping[str, Any], *, quote_age_seconds: float = 0.0,
             scored_row["presentation_reason_codes"] = (PRICE_CEILING_REASON,)
         out.append({**scored_row, **base})
 
-    # Apply card-level eligibility (including the 2% model-return floor) before
-    # same-game conflict selection so a row that cannot make the card cannot
-    # suppress a row that can.
+    # First apply every ordinary ACTIONABLE eligibility gate, including the 2%
+    # EV floor. Empirical rows must not escape a gate merely because their final
+    # presentation status is LEAN.
     scored = build_mlb_scored_card(out)
+
+    # Evaluate same-game eligibility on a disposable copy while empirical rows
+    # are still ACTIONABLE. We only carry an empirical row's own demotion back;
+    # an empirical presentation lean must never suppress a non-empirical play.
+    guard_probe = apply_same_game_guard([dict(row) for row in scored])
+    empirical_guard_status = {
+        (str(row.get("game_id")), str(row.get("market")), str(row.get("entity_id")),
+         str(row.get("side")), str(row.get("line"))): row.get("scored_status")
+        for row in guard_probe if _lean_reason(row)
+    }
+
+    for row in scored:
+        lean_reason = _lean_reason(row)
+        if row.get("scored_status") != "ACTIONABLE" or not lean_reason:
+            continue
+        key = (str(row.get("game_id")), str(row.get("market")), str(row.get("entity_id")),
+               str(row.get("side")), str(row.get("line")))
+        if empirical_guard_status.get(key) != "ACTIONABLE":
+            row["status"] = "PASS"
+            row["scored_status"] = "PASS"
+            continue
+        row["status"] = "LEAN"
+        row["scored_status"] = "LEAN"
+        row["star_rating"] = 0
+        codes = tuple(row.get("presentation_reason_codes") or ())
+        if lean_reason not in codes:
+            row["presentation_reason_codes"] = codes + (lean_reason,)
+
+    # Real same-game selection sees LEAN rows as non-actionable, so they cannot
+    # knock an ACTIONABLE side/total (or any other core play) off the card.
     return build_mlb_scored_card(apply_same_game_guard(scored))
 
 
@@ -379,9 +448,14 @@ def render_markdown(rows: Sequence[Mapping[str, Any]], *, header: str, notes: Se
         guarded = bool(r.get("presentation_reason"))
         win_text = "—" if guarded else pct(r.get("model_p_raw"))
         push_text = "—" if guarded else pct(r.get("push_p"))
+        codes = tuple(r.get("presentation_reason_codes") or ())
         status_text = str(r.get("scored_status"))
-        if PRICE_CEILING_REASON in (r.get("presentation_reason_codes") or ()):
+        if PRICE_CEILING_REASON in codes:
             status_text += " (price > -165)"
+        if EV_FLOOR_REASON in codes:
+            status_text += " (EV < 2%)"
+        if EMPIRICAL_SIDE_CONFLICT_REASON in codes:
+            status_text += " (prop opposes side play)"
         if r.get("guard_kept_instead"):
             status_text += f" (same game: kept {r['guard_kept_instead']})"
         lines.append(

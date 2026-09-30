@@ -4,44 +4,16 @@ from __future__ import annotations
 import argparse, json
 from datetime import datetime, timezone
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
-from sportsedge.canonical_manual_mlb import run_canonical_manual_mlb
+from sportsedge.canonical_manual_mlb import CanonicalManualMLBError, run_canonical_manual_mlb
 from sportsedge.manual_mlb_snapshot import run_manual_mlb_snapshot
-from sportsedge.manual_quote import validate_manual_quote
+from sportsedge.manual_quote_live import partition_live_rows, validate_live_rows
+from sportsedge.mlb_schedule_filter import filter_schedule_to_game_pk
 from sportsedge.mlb_source import GameSnapshot
 from sportsedge.runtime import parse_timestamp
 
-CHICAGO_TZ = ZoneInfo("America/Chicago")
-
-
-def _as_utc(value: datetime) -> datetime:
-    if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
-
-
-def validate_live_rows(rows, *, run_date: str | None, max_age_minutes: int | None, as_of: datetime) -> None:
-    if not isinstance(rows, list) or not rows:
-        raise ValueError("MANUAL_INPUT_EMPTY")
-    if max_age_minutes <= 0:
-        raise ValueError("MANUAL_MAX_AGE_INVALID")
-    now = _as_utc(as_of)
-    for index, raw in enumerate(rows):
-        quote = validate_manual_quote(raw)
-        first_pitch_utc = _as_utc(quote.first_pitch_at)
-        first_pitch_ct_date = first_pitch_utc.astimezone(CHICAGO_TZ).date().isoformat()
-        if run_date and first_pitch_ct_date != run_date:
-            raise ValueError(
-                f"MANUAL_INPUT_DATE_MISMATCH row={index} expected={run_date} "
-                f"first_pitch_date_ct={first_pitch_ct_date}"
-            )
-        if first_pitch_utc <= now:
-            raise ValueError(f"MANUAL_QUOTE_GAME_STARTED row={index} game_id={quote.game_id}")
-        observed_utc = _as_utc(quote.observed_at)
-        age_minutes = (now - observed_utc).total_seconds() / 60.0
-        if age_minutes < 0:
-            raise ValueError(f"MANUAL_QUOTE_FROM_FUTURE row={index} game_id={quote.game_id}")
+# Re-export for tests.test_manual_mlb_live_guards (loads this file as a module).
+validate_live_rows = validate_live_rows
 
 
 def _schedule_snapshot(snapshot) -> list[GameSnapshot] | None:
@@ -59,16 +31,41 @@ def _schedule_snapshot(snapshot) -> list[GameSnapshot] | None:
     return games
 
 
-def _run_canonical_rows(rows, *, history_cache_dir: str, schedule: list[GameSnapshot] | None = None) -> dict:
+def _empty_payload() -> dict:
+    return {
+        "schema_version": 2,
+        "run_type": "CANONICAL_MANUAL_QUOTES_MULTI_GAME",
+        "source": "MANUAL",
+        "games": [],
+        "results": [],
+    }
+
+
+def _price_game(game_rows, *, history_cache_dir: str, schedule: list[GameSnapshot] | None):
+    if schedule is None:
+        return run_canonical_manual_mlb(game_rows, history_cache_dir=history_cache_dir, schedule=None)
+    game_pk = game_rows[0].get("game_pk") if game_rows else None
+    if game_pk in (None, ""):
+        raise CanonicalManualMLBError("GAME_UNBOUND")
+    scoped = filter_schedule_to_game_pk(schedule, game_pk)
+    return run_canonical_manual_mlb(game_rows, history_cache_dir=history_cache_dir, schedule=scoped)
+
+
+def _run_canonical_rows(rows, *, history_cache_dir: str, schedule: list[GameSnapshot] | None = None):
     grouped: dict[str, list] = {}
     for row in rows:
         grouped.setdefault(str(row.get("game_id")), []).append(row)
-    if len(grouped) == 1:
-        return run_canonical_manual_mlb(rows, history_cache_dir=history_cache_dir, schedule=schedule)
     games = []
     results = []
+    blocked: list[dict] = []
+    last_ok = None
     for game_id, game_rows in grouped.items():
-        payload = run_canonical_manual_mlb(game_rows, history_cache_dir=history_cache_dir, schedule=schedule)
+        try:
+            payload = _price_game(game_rows, history_cache_dir=history_cache_dir, schedule=schedule)
+        except (CanonicalManualMLBError, ValueError) as exc:
+            blocked.append({"game_id": game_id, "reason": str(exc)})
+            continue
+        last_ok = payload
         games.append({
             "input_game_id": game_id,
             "resolved_game": payload.get("resolved_game"),
@@ -77,13 +74,15 @@ def _run_canonical_rows(rows, *, history_cache_dir: str, schedule: list[GameSnap
             "feature_lineage": payload.get("feature_lineage", []),
         })
         results.extend(payload.get("results", []))
+    if len(grouped) == 1 and not blocked and last_ok is not None:
+        return last_ok, blocked
     return {
         "schema_version": 2,
         "run_type": "CANONICAL_MANUAL_QUOTES_MULTI_GAME",
         "source": "MANUAL",
         "games": games,
         "results": results,
-    }
+    }, blocked
 
 
 def main() -> int:
@@ -98,18 +97,28 @@ def main() -> int:
     args = p.parse_args()
 
     snapshot = json.loads(Path(args.input).read_text())
-    rows = snapshot.get("rows") if isinstance(snapshot, dict) else snapshot if isinstance(snapshot, list) else None
-    if rows is not None and not args.allow_stale:
+    raw_rows = snapshot.get("rows") if isinstance(snapshot, dict) else snapshot if isinstance(snapshot, list) else None
+    blocked: list[dict] = []
+    notes: list[dict] = []
+    rows = raw_rows
+    if raw_rows is not None and not args.allow_stale:
         as_of = parse_timestamp(args.as_of) if args.as_of else datetime.now(timezone.utc)
-        validate_live_rows(rows, run_date=args.run_date, max_age_minutes=args.max_age_minutes, as_of=as_of)
+        rows, blocked, notes = partition_live_rows(
+            raw_rows, run_date=args.run_date, max_age_minutes=args.max_age_minutes, as_of=as_of,
+        )
 
     schedule = _schedule_snapshot(snapshot)
-    if isinstance(snapshot, dict) and isinstance(snapshot.get("rows"), list):
-        payload = _run_canonical_rows(snapshot["rows"], history_cache_dir=args.history_cache_dir, schedule=schedule)
-    elif isinstance(snapshot, list):
-        payload = _run_canonical_rows(snapshot, history_cache_dir=args.history_cache_dir, schedule=schedule)
+    extra_blocked: list[dict] = []
+    if rows:
+        payload, extra_blocked = _run_canonical_rows(
+            rows, history_cache_dir=args.history_cache_dir, schedule=schedule,
+        )
+    elif raw_rows is not None:
+        payload = _empty_payload()
     else:
         payload = run_manual_mlb_snapshot(snapshot, history_cache_dir=args.history_cache_dir)
+    payload["blocked"] = list(blocked) + list(extra_blocked)
+    payload["quote_notes"] = notes
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n")
