@@ -1,0 +1,30 @@
+name: NFL lines → card
+description: Paste DraftKings lines from your phone. SportsEdge prices them and replies here with the card.
+title: "[NFL LINES] "
+labels: ["nfl-lines"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        One game header, then one market per line. Always give **both** prices.
+        Away / over first.
+
+        Attempt 9 on this card prices **non-integer spreads and totals only**.
+        Moneyline, integer 3/7 lines, team totals, halves, quarters, and props
+        come back `NO_MODEL` until their own math is locked.
+
+        ```
+        Chiefs @ Ravens
+        Spread +3.5 -110 -110
+        Total 47.5 -108 -112
+        ```
+
+        The issue time is an intake timestamp, not a sportsbook timestamp.
+        One-sided lines fail closed.
+  - type: textarea
+    id: lines
+    attributes:
+      label: Lines
+      render: text
+    validations:
+      required: true
