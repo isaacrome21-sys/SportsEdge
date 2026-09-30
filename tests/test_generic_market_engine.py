@@ -9,6 +9,7 @@ from sportsedge.generic_market_engine import (
 )
 from sportsedge.hitter_joint_engine import HITTER_MARKETS
 from sportsedge.pitcher_joint_engine import PITCHER_MARKETS
+from sportsedge.v7_distribution import FULL_GAME_MODE_SHARED_GAMMA_POISSON
 
 
 class GenericMarketEngineTests(unittest.TestCase):
@@ -176,14 +177,21 @@ class GenericMarketEngineTests(unittest.TestCase):
         self.assertGreater(out["model_p"], 0.48)
         self.assertLess(out["model_p"], 0.59)
 
-    def test_v7_extras_candidate_removes_old_under_bias_direction(self):
+    def test_stage1_totals_use_promoted_full_game_dispersion(self):
+        """Mean 8.6 vs line 8.5: over-rate stays near half under wider dispersion.
+
+        The old lognormal test required model_p > 0.50 to catch under-bias from
+        a too-narrow distribution. The promoted Gamma-Poisson is wider, so the
+        same inputs land near 0.5; lock mode + a plausible band instead.
+        """
         out = generic_market_engine_adapter({
             "game_id": "g1", "market": "TOTALS", "entity_id": "game",
             "line": 8.5, "side": "OVER", "away_mean_runs": 4.3,
             "home_mean_runs": 4.3, "simulations": 12000,
         })
-        self.assertGreater(out["model_p"], 0.50)
-        self.assertLess(out["model_p"], 0.57)
+        self.assertEqual(out["full_game_distribution_mode"], FULL_GAME_MODE_SHARED_GAMMA_POISSON)
+        self.assertGreater(out["model_p"], 0.42)
+        self.assertLess(out["model_p"], 0.58)
 
     def test_missing_model_feature_fails_closed(self):
         with self.assertRaises(Exception):
