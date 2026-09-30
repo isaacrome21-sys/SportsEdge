@@ -11,7 +11,6 @@ from sportsedge.sports.nhl.rate_model import NHLRateParameters
 
 FREEZE_PATH = Path(__file__).resolve().parents[1] / "artifacts" / "nhl" / "nhl_rate_v1_freeze.json"
 
-# 2025-26 REG official score endpoint. gf60, ga60, sf60, sa60.
 PRIORS_BY_ABBREV = {
     "ANA": (3.329268, 3.512195, 30.804878, 28.365854),
     "BOS": (3.317073, 3.048780, 27.024390, 29.695122),
@@ -43,10 +42,9 @@ PRIORS_BY_ABBREV = {
     "UTA": (3.268293, 2.926829, 27.707317, 26.146341),
     "VAN": (2.634146, 3.853659, 25.963415, 29.817073),
     "VGK": (3.231707, 3.048780, 28.987805, 24.390244),
-    "WPG": (2.817073, 2.170732, 26.365854, 27.768293),
+    "WPG": (2.817073, 3.170732, 26.365854, 27.768293),
     "WSH": (3.207317, 2.975610, 28.048780, 28.134146),
 }
-# Fix WPG ga60 typo above after verify — recompute from source file if needed.
 
 ALIASES = {
     "RANGERS": "NYR", "NY RANGERS": "NYR", "NEW YORK RANGERS": "NYR",
@@ -61,7 +59,7 @@ ALIASES = {
     "CAPITALS": "WSH", "WASHINGTON": "WSH",
     "HURRICANES": "CAR", "CAROLINA": "CAR",
     "JACKETS": "CBJ", "BLUE JACKETS": "CBJ", "COLUMBUS": "CBJ",
-    "ISLANDERS": "NYI", "NY ISLANDERS": "NYI",
+    "ISLANDERS": "NYI", "NY ISLANDERS": "NYI", "NEW YORK ISLANDERS": "NYI",
     "DEVILS": "NJD", "NEW JERSEY": "NJD",
     "FLYERS": "PHI", "PHILADELPHIA": "PHI",
     "PENGUINS": "PIT", "PITTSBURGH": "PIT",
@@ -72,7 +70,6 @@ ALIASES = {
     "JETS": "WPG", "WINNIPEG": "WPG",
     "AVALANCHE": "COL", "COLORADO": "COL",
     "STARS": "DAL", "DALLAS": "DAL",
-    "BLUES": "STL",
     "OILERS": "EDM", "EDMONTON": "EDM",
     "FLAMES": "CGY", "CALGARY": "CGY",
     "CANUCKS": "VAN", "VANCOUVER": "VAN",
@@ -92,13 +89,11 @@ def load_freeze() -> NHLRateParameters:
 
 
 def resolve_team(name: str) -> str | None:
-    token = str(name or "").strip().upper()
-    token = token.replace(".", " ")
+    token = str(name or "").strip().upper().replace(".", " ")
     if token in PRIORS_BY_ABBREV:
         return token
     if token in ALIASES:
         return ALIASES[token]
-    # last word: "NY Rangers" -> RANGERS
     parts = token.split()
     if parts and parts[-1] in ALIASES:
         return ALIASES[parts[-1]]
