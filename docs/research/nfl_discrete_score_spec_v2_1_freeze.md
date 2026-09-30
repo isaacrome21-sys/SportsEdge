@@ -1,23 +1,22 @@
 # NFL discrete v2.1 — family B frozen (2021–2024)
 
-Accepted to land the SHA before Thursday Night Football. Research only.
-Attempt 9 stays the live `.5` owner. No phone-card pricing. No M2 bytes.
+Research only. Attempt 9 stays the live `.5` owner. No phone-card pricing.
 
-## Frozen identity
+## Reproducible fit
 
-- File: `config/nfl_discrete_v2_freeze.json`
-- Family **B**: independent NB scores + lifts on exact margins `{0, ±3, ±7}`
-- Fit: NFL REG 2021–2024, n=1087, nflverse `schedules/games.csv`
-- `nb_r_home` = 6.998171678749732
-- `nb_r_away` = 6.502332860154674
-- lifts: `0` = 0.14, `|3|` = 2.7, `|7|` = 1.5
-- Home-win-rate baseline (ties not home wins): **0.5400183992640294**
+- Source bytes: `data/nfl_discrete_v2/games_2021_2024_reg.csv`
+- `source_sha256` is the sha256 of those exact bytes.
+- Regenerator: `sportsedge/sports/nfl/discrete_v2_fit.py`
+- Test `test_fit_rebuilds_freeze_sha` rebuilds the JSON and matches `artifact_sha256`.
+- Seasons other than 2021–2024 REG fail the fit loader.
 
-SHA is the canonical dump of the JSON without `artifact_sha256`.
+## Locked evaluator (before W4)
 
-## Holdout
+- `config/nfl_discrete_v2_eval_freeze.json`
+- Mapping: `home = (total + margin) / 2`, `away = (total - margin) / 2`, clip (0.5, 70)
+- Gates: Brier vs 0.5400183992640294; slope 0.70–1.30; intercept ±0.10;
+  P(|margin| ∈ {3,7,10}) and P(total = k) for k=30..60 within 3pp;
+  n < 80 → INSUFFICIENT.
+- Code: `sportsedge/sports/nfl/discrete_v2_eval.py`
 
-If this freeze is on main before the first 2026 W4 kickoff: **W4–W12**.
-If it misses: **W5–W13**. Min n = 80 or `INSUFFICIENT`. One look. No retune.
-
-Gates stay as #1245 v2.1 (outcome frequencies only).
+Holdout is 2026 REG W4–W12 if this freeze is on main before first W4 kickoff.

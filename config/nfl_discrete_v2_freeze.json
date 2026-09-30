@@ -7,8 +7,8 @@
     "seasons": [2021, 2022, 2023, 2024],
     "game_type": "REG",
     "n_games": 1087,
-    "source": "nflverse schedules games.csv",
-    "source_sha256_release_note": "f3f8613f47dc9568f61506723d819ecac75c5b526de49884dc18d678c69de062"
+    "source": "data/nfl_discrete_v2/games_2021_2024_reg.csv",
+    "source_sha256": "5932f2a57647e979557e882477a3f9d889181489abe3c4e678589ccbbe16e371"
   },
   "holdout": {
     "if_sha_before_2026_10_01_w4_kickoff": {
@@ -28,7 +28,7 @@
     "grid_max": 70,
     "nb_r_home": 6.998171678749732,
     "nb_r_away": 6.502332860154674,
-    "margin_lifts": {"0": 0.14, "abs_3": 2.7, "abs_7": 1.5},
+    "margin_lifts": {"0": 0.13999999999999999, "abs_3": 2.7, "abs_7": 1.5},
     "lift_fit_location": {
       "mean_home_score": 23.41674333026679,
       "mean_away_score": 21.35602575896964
@@ -39,7 +39,7 @@
     "tie_rate": 0.0027598896044158236,
     "p_abs_margin_3": 0.1453541858325667,
     "p_abs_margin_7": 0.07267709291628335,
-    "p_abs_margin_10": 0.05059797608095768
+    "p_abs_margin_10": 0.050597976080956765
   },
   "authority": {
     "creates_model_p": false,
@@ -48,5 +48,5 @@
     "official": false
   },
   "notes": "Family B frozen on 2021-2024 only. Do not look at 2025 or 2026 W1-W3 for retune. Attempt 9 and M2 bytes untouched.",
-  "artifact_sha256": "3875334c48686c6ac8f9863ab71b2e7c2d867a94b555e3020974ef9efc6ba1b2"
+  "artifact_sha256": "27fa868532da4a1460ef956c024e452043d49d0a7b9887ba6fe505782296f3a6"
 }
