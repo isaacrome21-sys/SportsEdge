@@ -123,21 +123,41 @@ def myspari_rows(payload: Mapping[str, Any], *, quote_age_seconds: float = 0.0,
         if scored_row.get("status") == "ACTIONABLE" and price is not None and price < MAX_FAVORITE_ODDS:
             scored_row["status"] = "PASS"
             scored_row["presentation_reason_codes"] = (PRICE_CEILING_REASON,)
-        merged = {**scored_row, **base}
-        # Any empirical prop is presentation-only as a LEAN. This reuses the
-        # exact shared predicate used by the empirical thin-tail support guard.
-        # Probabilities, economics, support guards, and engine tuning are unchanged.
-        if merged.get("status") == "ACTIONABLE" and is_empirical(merged):
-            merged["status"] = "LEAN"
-            codes = tuple(merged.get("presentation_reason_codes") or ())
-            if EMPIRICAL_PROP_LEAN_REASON not in codes:
-                merged["presentation_reason_codes"] = codes + (EMPIRICAL_PROP_LEAN_REASON,)
-        out.append(merged)
+        out.append({**scored_row, **base})
 
-    # Apply card-level eligibility (including the 2% model-return floor) before
-    # same-game conflict selection so a row that cannot make the card cannot
-    # suppress a row that can.
+    # First apply every ordinary ACTIONABLE eligibility gate, including the 2%
+    # EV floor. Empirical rows must not escape a gate merely because their final
+    # presentation status is LEAN.
     scored = build_mlb_scored_card(out)
+
+    # Evaluate same-game eligibility on a disposable copy while empirical rows
+    # are still ACTIONABLE. We only carry an empirical row's own demotion back;
+    # an empirical presentation lean must never suppress a non-empirical play.
+    guard_probe = apply_same_game_guard([dict(row) for row in scored])
+    empirical_guard_status = {
+        (str(row.get("game_id")), str(row.get("market")), str(row.get("entity_id")),
+         str(row.get("side")), str(row.get("line"))): row.get("scored_status")
+        for row in guard_probe if is_empirical(row)
+    }
+
+    for row in scored:
+        if row.get("scored_status") != "ACTIONABLE" or not is_empirical(row):
+            continue
+        key = (str(row.get("game_id")), str(row.get("market")), str(row.get("entity_id")),
+               str(row.get("side")), str(row.get("line")))
+        if empirical_guard_status.get(key) != "ACTIONABLE":
+            row["status"] = "PASS"
+            row["scored_status"] = "PASS"
+            continue
+        row["status"] = "LEAN"
+        row["scored_status"] = "LEAN"
+        row["star_rating"] = 0
+        codes = tuple(row.get("presentation_reason_codes") or ())
+        if EMPIRICAL_PROP_LEAN_REASON not in codes:
+            row["presentation_reason_codes"] = codes + (EMPIRICAL_PROP_LEAN_REASON,)
+
+    # Real same-game selection sees LEAN rows as non-actionable, so they cannot
+    # knock an ACTIONABLE side/total (or any other core play) off the card.
     return build_mlb_scored_card(apply_same_game_guard(scored))
 
 
