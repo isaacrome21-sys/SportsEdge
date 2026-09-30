@@ -14,7 +14,8 @@ from __future__ import annotations
 from math import isfinite
 from typing import Any, Mapping, Sequence
 
-from .mlb_empirical_support import empirical_guard_reason\nfrom .pitcher_joint_engine import ENGINE_VERSION as PITCHER_JOINT_ENGINE_VERSION
+from .mlb_empirical_support import empirical_guard_reason
+from .pitcher_joint_engine import ENGINE_VERSION as PITCHER_JOINT_ENGINE_VERSION
 from .mlb_edge_score import ev_per_dollar, score_mlb_edge
 from .mlb_scored_card import build_mlb_scored_card
 
@@ -424,4 +425,6 @@ def render_markdown(rows: Sequence[Mapping[str, Any]], *, header: str, notes: Se
             lines.append(f"- {_selection(r)}: {reason}")
     if notes:
         lines += ["", "## Notes", *[f"- {n}" for n in notes]]
-    return "\n".join(lines) + "\n"
+    return "
+".join(lines) + "
+"
