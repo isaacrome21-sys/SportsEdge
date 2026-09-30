@@ -54,6 +54,58 @@ Scored with shipped Stage-1 Gamma-Poisson (`r = 5.217229403204152`).
 3. **Starter is not the full game.** ~55–60% of outs; bullpen should remain at
    team level. Adjust only the starter share.
 
+## Starter identity decision (locked before numbers)
+
+The repo has **no** pregame point-in-time starter archive (#1183). Historical
+StatsAPI schedule probable-pitcher fields resolve to who started, not who was
+announced beforehand.
+
+**Decision for v2 August gate:** use **actual starters** as a stand-in for the
+pregame announced starter.
+
+- Pregame scratches / late changes are a few percent of games; the bias is
+  accepted and disclosed.
+- Every evaluation receipt must set
+  `starter_identity_source = ACTUAL_STARTER_STAND_IN_NO_PREGAME_PIT_ARCHIVE`
+  and `starter_identity_pit_verified = false`.
+- This **does not** block the August promotion gate for v2. A pass is still
+  provisional: production adoption requires either (a) a forward PIT archive
+  that confirms the same effect, or (b) an explicit ops acceptance of the
+  stand-in bias.
+- Weather remains neutral (no PIT forecast archive).
+
+Deciding this after reading August numbers is forbidden.
+
+## Constants: source of `k` and residual scaling (locked before numbers)
+
+No free parameters are fit on August or on Sept 2026.
+
+| Symbol | Value | Source |
+|---|---:|---|
+| League RA9 proxy | 4.50 | First principles: ~4.5 runs/game league scoring environment, treated as RA9 scale for residual units |
+| Residual scale | residual / 4.50 | First principles: convert RA9 residual to fractional game effect |
+| `k` | 1.0 | First principles: residual already in run units; no extra gain |
+| Shrinkage prior τ (IP) | 50.0 | First principles: mid of the 40–60 IP band declared earlier |
+| Default innings share `w` | 0.55 | First principles: ~5 IP starter |
+| `w` clip | [0.45, 0.65] | First principles |
+
+**Rate → RA9 mapping (fixed, not fit):**
+
+```
+starter_ra9_hat = 4.50
+    + 12.0 * (BB_rate - league_BB_rate)
+    -  9.0 * (K_rate  - league_K_rate)
+    + 15.0 * (HR_rate - league_HR_rate)
+```
+
+Coefficients are order-of-magnitude FIP-style weights, fixed a priori. League
+rates are computed from **2026-06-01 → 2026-07-31** starter innings only
+(named fit window for league averages — not for `k`). June–July must not
+include August games.
+
+If implementation needs any additional constant, it must be added to this table
+in a commit **before** the August run. Silent defaults are not allowed.
+
 ## v2 candidate definition (locked)
 
 ### A. Team shell (same as production)
@@ -63,43 +115,32 @@ with offense-only or raw team averages.
 
 ### B. Residual starter effect (not a second full-game multiplier)
 
-For the pitcher expected to start against team T:
+For the pitcher who **actually started** (stand-in identity above) against team T:
 
-1. Build a **stabilized starter run-prevention residual** relative to the
-   **team’s recent runs-allowed mean**, not relative to league alone:
-   - Use innings-weighted K%, BB%, HR% (or K-BB and HR rates) from prior starts
-     strictly before the evaluation game’s date.
-   - Map rates → expected runs allowed per 9 via a fixed, predeclared mapping
-     (no fit on the evaluation window).
-   - Residual: `starter_ra9_hat - team_runs_against_per_game_scaled_to_ra9`
-     (exact scaling constants declared in implementation commit).
-2. **Shrinkage:** posterior mean toward 0 residual with prior strength equivalent
-   to at least ~40–60 IP (exact τ locked in implementation commit). Few-start
-   pitchers barely move the mean.
-3. **Innings share:** `w = clip(expected_starter_outs / 27, 0.45, 0.65)` from
-   prior mean outs, default 0.55 if unknown. Only fraction `w` of the team’s
-   allowed runs is shifted by the residual; `(1-w)` stays at the team shell.
+1. Innings-weighted K / BB / HR rates from prior starts strictly before the
+   evaluation game’s date → `starter_ra9_hat` via the fixed mapping above.
+2. Residual vs team: `starter_ra9_hat - team_runs_against_mean_as_ra9`
+   (team RA scaled with the same 4.50 league proxy).
+3. Shrink residual toward 0 with τ = 50 IP effective prior.
+4. `w = clip(mean_prior_outs / 27, 0.45, 0.65)` (default 0.55).
 
-Opponent scoring mean becomes:
+Opponent scoring mean:
 
 ```
 shell = defense_blend component for that side
-adjusted = shell * (1 + w * k * residual_scaled)
+fractional = (shrunk_residual / 4.50) * k   # k = 1.0
+adjusted = shell * (1 + w * fractional)
+adjusted = max(0.05, adjusted)
 ```
-
-where `k` and residual scaling are fixed constants chosen **before** looking at
-the evaluation window (implementation commit must print them and hash the
-config). No grid search on the evaluation window.
 
 ### C. Explicit non-goals for v2
 
-- No weather fit (still neutral unless PIT forecast archive exists).
+- No weather fit.
 - No re-tuning of full-game dispersion.
-- No use of postgame starter identity; if PIT starter archive is missing, the
-  run remains diagnostic and cannot promote.
 - No third attempt of the **v1 multiplier** design.
+- No fitting of `k` or FIP-style coefficients on August or September 2026.
 
-## Promotion gate (unchanged)
+## Promotion gate
 
 On **2026-08-01 → 2026-08-31** only:
 
@@ -112,6 +153,9 @@ mean error) are descriptive.
 
 If either gate fails, production stays on defense blend.
 
+A gate pass is **provisional production authority** subject to the starter
+identity caveat above (forward PIT archive or explicit ops acceptance).
+
 ### One-shot rule
 
 **August is scored once.** Publish the v2 numbers; if the gate fails, v2 is
@@ -121,8 +165,9 @@ tuning on the test set.
 
 ## Implementation order
 
-1. This document (done), with August pre-registered and one-shot (done).
-2. Implementation commit with frozen constants + unit tests for residual/
+1. This document (done): August pre-registered, one-shot, identity decision,
+   constant sources closed.
+2. Implementation commit with the table above hashed + unit tests for residual /
    shrinkage / share math only.
 3. Run evaluation on August **once**; publish numbers; promote only on a clear
-   gate pass.
+   gate pass under the identity caveat.
