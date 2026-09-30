@@ -7,6 +7,8 @@ from typing import Any
 from .mlb_lines_intake import LinesIntakeError, _match_team, parse_lines
 from .mlb_source import GameSnapshot, parse_game_start
 
+ROW_BINDS = ("AMBIGUOUS_GAME", "GAME_NOT_PREGAME")
+
 
 def resolve_game(away: str, home: str, schedule: list[GameSnapshot], *, now: datetime) -> GameSnapshot:
     hits = [
@@ -25,6 +27,24 @@ def resolve_game(away: str, home: str, schedule: list[GameSnapshot], *, now: dat
     raise LinesIntakeError(f"GAME_NOT_PREGAME: '{away} @ {home}'")
 
 
+def _unbound_row(row, *, observed_at: str, book: str, reason: str) -> dict[str, Any]:
+    return {
+        "game_id": f"{row.away}@{row.home}",
+        "market_type": row.market_type,
+        "side": row.side,
+        "line": row.line,
+        "price": row.price,
+        "paired_side": row.paired_side,
+        "paired_price": row.paired_price,
+        "book": book,
+        "observed_at": observed_at,
+        "first_pitch_at": None,
+        "source": "MANUAL",
+        "timestamp_source": "INTAKE_STAMPED",
+        "bind_status": reason,
+    }
+
+
 def build_bound_input(
     text: str,
     *,
@@ -38,23 +58,10 @@ def build_bound_input(
         try:
             game = resolve_game(row.away, row.home, schedule, now=now)
         except LinesIntakeError as exc:
-            if not str(exc).startswith("AMBIGUOUS_GAME"):
+            reason = str(exc).split(":", 1)[0]
+            if reason not in ROW_BINDS:
                 raise
-            out.append({
-                "game_id": f"{row.away}@{row.home}",
-                "market_type": row.market_type,
-                "side": row.side,
-                "line": row.line,
-                "price": row.price,
-                "paired_side": row.paired_side,
-                "paired_price": row.paired_price,
-                "book": book,
-                "observed_at": observed_at,
-                "first_pitch_at": now.isoformat(),
-                "source": "MANUAL",
-                "timestamp_source": "INTAKE_STAMPED",
-                "bind_status": "AMBIGUOUS_GAME",
-            })
+            out.append(_unbound_row(row, observed_at=observed_at, book=book, reason=reason))
             continue
         out.append({
             "game_id": f"{game.away_name}@{game.home_name}",
