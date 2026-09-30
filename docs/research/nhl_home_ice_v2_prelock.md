@@ -1,48 +1,42 @@
-# NHL home-ice v2 + OT/SO audit (pre-lock)
+# NHL rate v2 pre-lock (home ice + regulation-only)
 
 Written 2026-09-29. Do not score the new window yet.
 
 ## Review of #1249 / #1253
 
-| Market | Pred | Obs | Gap | Call |
+| Market | Pred | Obs | Gap | Ship now |
 |---|---:|---:|---:|---|
-| Home win | 56.4% | 52.2% | 4.27 pp | **NO_MODEL** until refit |
-| Over 5.5 | 56.1% | 57.5% | 1.31 pp | price |
-| Over 6.5 | 45.3% | 46.9% | 1.67 pp | price |
+| Home win | 56.4% | 52.2% | 4.27 pp | **NO_MODEL** |
+| Over 5.5 | 56.1% | 57.5% | 1.31 pp | price **as validated** |
+| Over 6.5 | 45.3% | 46.9% | 1.67 pp | price **as validated** |
 | PL −1.5 | 32.6% | 30.1% | 2.44 pp | lean only |
 
-1,302 scored games. 4.27 pp on home win is ~3× binomial noise. Real bias, not the gate.
+1,302 scored games. 4.27 pp on home win is ~3× binomial noise.
 
-## OT / SO double count (confirmed)
+## Ship the double-count totals, do not quiet-fix
+
+The 1.3–1.7 pp totals result is from the version that **fits on final scores and then adds OT/SO again**. That is the validated owner. Shipping totals means shipping that exact path. Do not remove the double-count and keep calling #1249 the totals validation.
 
 2025-26 REG official `/v1/score` (n=1,312):
 
 - REG 986 / OT 207 (15.8%) / SO 119 (9.1%)
-- Mean **final** goals 6.25
-- Mean **regulation** goals ~6.01
-- SO dummy goals in the final score: 119
+- Mean **final** goals 6.25 vs **regulation** ~6.01
 
-`gameOutcome.lastPeriodType` is REG / OT / SO. The `goals[]` list tags periodType. Final `homeTeam.score` includes the shootout winner goal.
+## Brier vs naive (constant-p bound)
 
-Rate v1 was fit on those **final** scores, then the card sim treats the fitted λ as regulation and **adds OT/SO again** when tied. Extra ~0.25 goals are in the mean twice. Totals still landed inside 2 pp; moneyline did not.
+If the model were a constant 56.4% home: Brier 0.251 vs coin 0.250 vs 2024-25 home rate 0.251. No ML skill.
 
-Next fit uses regulation goals only (drop OT goals and the SO dummy).
+## v2 window (unused — locked before any 2026-27 game)
 
-## Brier vs naive (constant-p bound from the published rates)
+The October fit changes **every** λ, so it moves moneyline, puck line, and totals together.
 
-Per-game vectors were not re-run this pass. If the model were a constant 56.4% home:
+- **Fit:** 2024-25 REG, **regulation goals only** (drop OT goals and the SO dummy). Home-ice free. Same sim as production after the fit (no second OT/SO add on a final-score mean).
+- **Validate once:** 2026-27 REG `2026-10-08` through `2026-10-31`.
+- **Score all three, one look:**
+  - moneyline home-win |gap| and Brier vs coin and vs 2024-25 home-win rate
+  - puck line −1.5 |gap|
+  - totals 5.5 and 6.5 |gap| and Brier
+- **Pass:** ML |gap| ≤ 2.0 pp **and** ML Brier beats both naives **and** neither totals line gets worse than the shipped #1249 gaps by more than 1.0 pp.
+- Fail → new window. No second look at Oct 2026. Shipped totals stay on the double-count owner until a pass.
 
-- model 0.251
-- coin 0.250
-- 2024-25 home rate 55.9% → 0.251
-
-So “within 5 points” did not show skill on moneyline. Promotion of ML is blocked.
-
-## Home-ice v2 window (unused — write now, score once)
-
-- **Fit:** 2024-25 REG, regulation goals only, home-ice term free.
-- **Validate once:** 2026-27 REG `2026-10-08` through `2026-10-31` (opening weeks). 2025-26 is spent.
-- **Pass:** home-win |gap| ≤ 2.0 pp and Brier better than both a coin and the 2024-25 home-win rate, on that window only.
-- Fail → new window, no second look at Oct 2026.
-
-#1253 may price totals. Puck line stays a lean. Moneyline stays `NO_MODEL:HOME_ICE_UNVALIDATED` until v2 passes.
+2025-26 is spent.
