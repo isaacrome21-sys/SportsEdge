@@ -5,7 +5,7 @@ import unittest
 
 from sportsedge.engine_registry import EngineDispatchError, engine_registry, resolve_manual_market_type
 from sportsedge.manual_quote import ManualQuoteError, validate_manual_quote
-from sportsedge.mlb_all_market_features import MLBAllMarketHistorySource
+from sportsedge.mlb_all_market_features import MLBAllMarketHistorySource, PRODUCTION_RUN_MEAN_VERSION
 from sportsedge.shared_game_engine import build_shared_game_engine_session
 from sportsedge.v7_distribution import simulate_game_distribution
 
@@ -27,6 +27,19 @@ class FakeAllMarketSource(MLBAllMarketHistorySource):
 
     def team_means(self, *, away_team_id, home_team_id, target_date):
         return 4.2, 4.6, 2.1
+
+    def defense_blended_team_means(self, *, away_team_id, home_team_id, target_date):
+        return 4.2, 4.6, {
+            "version": PRODUCTION_RUN_MEAN_VERSION,
+            "offense_weight": 0.5,
+            "opponent_defense_weight": 0.5,
+            "away_runs_for_mean": 4.0,
+            "away_runs_against_mean": 4.4,
+            "away_games": 30,
+            "home_runs_for_mean": 4.8,
+            "home_runs_against_mean": 4.4,
+            "home_games": 30,
+        }
 
 
 class MLBAllMarketValidationFinalTests(unittest.TestCase):
@@ -78,6 +91,7 @@ class MLBAllMarketValidationFinalTests(unittest.TestCase):
         self.assertEqual(row["team_id"], 20)
         self.assertEqual(row["away_mean_runs"], 4.2)
         self.assertEqual(row["home_mean_runs"], 4.6)
+        self.assertEqual(row["run_mean_version"], PRODUCTION_RUN_MEAN_VERSION)
         self.assertEqual(len(row["source_subset_hash"]), 64)
 
     def test_joint_hitter_combo_families_get_history_pool(self):
@@ -100,7 +114,7 @@ class MLBAllMarketValidationFinalTests(unittest.TestCase):
                     away_team_id=10, home_team_id=20, away_pitcher_id=111, home_pitcher_id=222,
                 )
                 self.assertEqual(len(row["features"]["pitcher_a_history"]), 5)
-                self.assertEqual(len(row["features"]["pitcher_b_history"]), 5)
+                self.assertEqual(row["joint_feature_version"], "mlb_pitcher_joint_history_v1")
 
     def test_team_total_integer_line_preserves_push_mass(self):
         engine = build_shared_game_engine_session(

@@ -8,9 +8,11 @@ sportsbook price is used to create Model_P.
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
+from statistics import fmean
 from types import SimpleNamespace
 from typing import Any, Mapping
+from urllib.parse import urlencode
 
 from .mlb_f5_features import MLBF5HistorySource
 from .mlb_generic_features import (
@@ -19,6 +21,7 @@ from .mlb_generic_features import (
     MLBGenericFeatureError,
     MLBGenericHistorySource,
     _digest,
+    _read_json,
 )
 from .pitcher_record_win_engine import build_pitcher_record_win_features
 
@@ -38,6 +41,10 @@ _F5_FEATURE_KEYS = (
     "home_f5_runs_for",
     "home_f5_runs_against",
 )
+
+PRODUCTION_RUN_MEAN_VERSION = "mlb_offense_opponent_defense_50_50_v1"
+_PRODUCTION_RUN_BLEND_MARKETS = frozenset({"MONEYLINE", "RUN_LINE", "TOTALS"})
+_RUN_BLEND_SOURCE = "MLB_STATSAPI_STRICT_PRIOR_OFFENSE_DEFENSE_50_50"
 
 
 def _base(source: MLBGenericHistorySource, *, game_pk: int, market: str, entity_id: str) -> dict[str, Any]:
@@ -99,6 +106,116 @@ class _StatsAPIF5ShapeAdapter(MLBF5HistorySource):
 class MLBAllMarketHistorySource(MLBGenericHistorySource):
     """Feature source with explicit support for every empirical catalog family."""
 
+    def _team_run_profile(
+        self,
+        *,
+        team_id: int,
+        target_date: date,
+        window: int = 30,
+        minimum: int = 10,
+    ) -> tuple[float, float, int]:
+        """Strict-prior recent runs scored and allowed for the production 50/50 blend."""
+        if window < minimum or minimum < 1:
+            raise MLBGenericFeatureError("invalid production run-profile window/minimum")
+        cache = self.__dict__.setdefault("_production_run_profile_cache", {})
+        key = (int(team_id), target_date, int(window), int(minimum))
+        if key in cache:
+            return cache[key]
+
+        start_date = target_date - timedelta(days=180)
+        end_date = target_date - timedelta(days=1)
+        query = urlencode({
+            "sportId": 1,
+            "teamId": int(team_id),
+            "gameType": "R",
+            "startDate": start_date.isoformat(),
+            "endDate": end_date.isoformat(),
+        })
+        payload = _read_json(
+            f"https://statsapi.mlb.com/api/v1/schedule?{query}",
+            opener=self.opener,
+        )
+        rows: list[tuple[str, int, int]] = []
+        for block in payload.get("dates") or []:
+            if not isinstance(block, Mapping):
+                continue
+            for game in block.get("games") or []:
+                if not isinstance(game, Mapping):
+                    continue
+                status = game.get("status") or {}
+                if not isinstance(status, Mapping) or str(status.get("abstractGameState") or "") != "Final":
+                    continue
+                official = str(game.get("officialDate") or block.get("date") or "")[:10]
+                if not official or official >= target_date.isoformat():
+                    continue
+                teams = game.get("teams") or {}
+                if not isinstance(teams, Mapping):
+                    continue
+                away = teams.get("away") or {}
+                home = teams.get("home") or {}
+                if not isinstance(away, Mapping) or not isinstance(home, Mapping):
+                    continue
+                away_team = away.get("team") or {}
+                home_team = home.get("team") or {}
+                try:
+                    away_id = int(away_team.get("id"))
+                    home_id = int(home_team.get("id"))
+                    away_score = int(away.get("score"))
+                    home_score = int(home.get("score"))
+                except (TypeError, ValueError):
+                    continue
+                if min(away_score, home_score) < 0:
+                    continue
+                if int(team_id) == away_id:
+                    rows.append((official, away_score, home_score))
+                elif int(team_id) == home_id:
+                    rows.append((official, home_score, away_score))
+
+        rows.sort(key=lambda row: row[0])
+        rows = rows[-window:]
+        if len(rows) < minimum:
+            raise MLBGenericFeatureError(
+                f"team:{team_id}: insufficient run-profile sample {len(rows)}<{minimum}"
+            )
+        result = (
+            float(fmean(float(row[1]) for row in rows)),
+            float(fmean(float(row[2]) for row in rows)),
+            len(rows),
+        )
+        cache[key] = result
+        return result
+
+    def defense_blended_team_means(
+        self,
+        *,
+        away_team_id: int,
+        home_team_id: int,
+        target_date: date,
+    ) -> tuple[float, float, dict[str, Any]]:
+        """Promoted #1183 blend: 50% team offense + 50% opponent run prevention."""
+        away_for, away_against, away_games = self._team_run_profile(
+            team_id=int(away_team_id),
+            target_date=target_date,
+        )
+        home_for, home_against, home_games = self._team_run_profile(
+            team_id=int(home_team_id),
+            target_date=target_date,
+        )
+        away_mean = 0.5 * away_for + 0.5 * home_against
+        home_mean = 0.5 * home_for + 0.5 * away_against
+        components = {
+            "version": PRODUCTION_RUN_MEAN_VERSION,
+            "offense_weight": 0.5,
+            "opponent_defense_weight": 0.5,
+            "away_runs_for_mean": away_for,
+            "away_runs_against_mean": away_against,
+            "away_games": away_games,
+            "home_runs_for_mean": home_for,
+            "home_runs_against_mean": home_against,
+            "home_games": home_games,
+        }
+        return float(away_mean), float(home_mean), components
+
     def feature_row(
         self,
         *,
@@ -131,7 +248,7 @@ class MLBAllMarketHistorySource(MLBGenericHistorySource):
             selected = int(team_id)
             if selected not in {int(away_team_id), int(home_team_id)}:
                 raise MLBGenericFeatureError("TEAM_TOTALS team_id not in game")
-            away_runs, home_runs, _ = self.team_means(
+            away_runs, home_runs, components = self.defense_blended_team_means(
                 away_team_id=int(away_team_id),
                 home_team_id=int(home_team_id),
                 target_date=target_date,
@@ -140,6 +257,23 @@ class MLBAllMarketHistorySource(MLBGenericHistorySource):
             row["team_id"] = selected
             row["away_mean_runs"] = away_runs
             row["home_mean_runs"] = home_runs
+            row["run_mean_version"] = PRODUCTION_RUN_MEAN_VERSION
+            row["run_mean_components"] = components
+            row["source"] = _RUN_BLEND_SOURCE
+            return _seal(row)
+
+        if market in _PRODUCTION_RUN_BLEND_MARKETS:
+            away_runs, home_runs, components = self.defense_blended_team_means(
+                away_team_id=int(away_team_id),
+                home_team_id=int(home_team_id),
+                target_date=target_date,
+            )
+            row = _base(self, game_pk=game_pk, market=market, entity_id=entity_id)
+            row["away_mean_runs"] = away_runs
+            row["home_mean_runs"] = home_runs
+            row["run_mean_version"] = PRODUCTION_RUN_MEAN_VERSION
+            row["run_mean_components"] = components
+            row["source"] = _RUN_BLEND_SOURCE
             return _seal(row)
 
         if market in EITHER_PITCHER_MARKETS:
