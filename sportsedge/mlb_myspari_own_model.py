@@ -424,6 +424,4 @@ def render_markdown(rows: Sequence[Mapping[str, Any]], *, header: str, notes: Se
             lines.append(f"- {_selection(r)}: {reason}")
     if notes:
         lines += ["", "## Notes", *[f"- {n}" for n in notes]]
-    return "
-".join(lines) + "
-"
+    return "\n".join(lines) + "\n"
