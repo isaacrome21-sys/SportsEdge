@@ -203,8 +203,13 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
         DEFAULT_FIRST_INNING_SHARE,
         DEFAULT_FULL_GAME_DISPERSION_R,
         FIRST_INNING_MODEL_VERSION,
+        FULL_GAME_MODE_INDEPENDENT_NB,
         FULL_GAME_MODE_SHARED_GAMMA_POISSON,
         V7_DISTRIBUTION_VERSION,
+        V8_INDEPENDENT_DISTRIBUTION_VERSION,
+        V8_INDEPENDENT_EXTRA_HALF_INNING_MEAN,
+        V8_INDEPENDENT_TEAM_DISPERSION_R,
+        calibrated_full_game_means,
         first_inning_probabilities,
         simulate_game_distribution,
     )
@@ -262,26 +267,27 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
     total_line = line if market == "TOTALS" else _finite(model_input.get("total_line", 0.0), "total_line", lower=0.0)
     simulations = int(model_input.get("simulations", V8_PRIMARY_GAME_DEFAULT_SIMULATIONS))
     game_build_hash = _canonical_json_sha256({
-        "engine": V7_DISTRIBUTION_VERSION,
+        "engine": V8_INDEPENDENT_DISTRIBUTION_VERSION,
         "game_id": model_input.get("game_id"),
         "away_mean_runs": away_mean,
         "home_mean_runs": home_mean,
         "feature_source_hash": model_input.get("feature_source_hash"),
-        "full_game_distribution_mode": FULL_GAME_MODE_SHARED_GAMMA_POISSON,
-        "full_game_dispersion_r": DEFAULT_FULL_GAME_DISPERSION_R,
+        "full_game_distribution_mode": FULL_GAME_MODE_INDEPENDENT_NB,
+        "full_game_dispersion_r": V8_INDEPENDENT_TEAM_DISPERSION_R,
     })
+    sim_away_mean, sim_home_mean = calibrated_full_game_means(away_mean, home_mean)
     result = simulate_game_distribution(
-        away_mean_runs=away_mean,
-        home_mean_runs=home_mean,
+        away_mean_runs=sim_away_mean,
+        home_mean_runs=sim_home_mean,
         total_line=total_line,
         simulations=simulations,
         build_hash=game_build_hash,
         shared_game_sigma=0.0,
         team_sigma=0.0,
-        full_game_dispersion_r=DEFAULT_FULL_GAME_DISPERSION_R,
+        team_dispersion_r=V8_INDEPENDENT_TEAM_DISPERSION_R,
         first_inning_share=DEFAULT_FIRST_INNING_SHARE,
         first_inning_dispersion_r=DEFAULT_FIRST_INNING_DISPERSION_R,
-        extra_half_inning_mean=DEFAULT_EXTRA_HALF_INNING_MEAN,
+        extra_half_inning_mean=V8_INDEPENDENT_EXTRA_HALF_INNING_MEAN,
     )
     states = _joint_states(result.joint_score_pmf)
     p_push = 0.0
@@ -331,7 +337,7 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
         raise GenericMarketEngineError("game probability mass invalid")
     out = _base_output(model_input, p, model_hash=result.result_sha256)
     out["mc_paths"] = result.simulations
-    out["engine_version"] = V7_DISTRIBUTION_VERSION
+    out["engine_version"] = V8_INDEPENDENT_DISTRIBUTION_VERSION
     out["seed_policy"] = result.seed_policy
     out["push_p"] = float(p_push)
     out["full_game_distribution_mode"] = result.full_game_distribution_mode

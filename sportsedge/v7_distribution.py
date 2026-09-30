@@ -23,6 +23,32 @@ LEGACY_SHARED_GAME_SIGMA = 0.12
 LEGACY_TEAM_SIGMA = 0.08
 FULL_GAME_MODE_SHARED_GAMMA_POISSON = "SHARED_GAMMA_POISSON"
 FULL_GAME_MODE_LEGACY_LOGNORMAL = "LEGACY_LOGNORMAL"
+FULL_GAME_MODE_INDEPENDENT_NB = "INDEPENDENT_TEAM_NB"
+
+# Independent per-team negative binomial (audit fix B, 2026-09-30).
+# Fit on strict-prior 2026 regular-season games Apr 6-Aug 31 (1,917 games) by
+# final-score log-likelihood; validated on Sep 1-27 (360 held-out games):
+#   score log-lik -4.915 -> -4.768, ML log-loss 0.6934 -> 0.6884,
+#   RL Brier 0.2308 -> 0.2262, extras 14.5% -> 9.9% (actual 6.8%),
+#   1-run 39.2% -> 27.3% (actual 29.2%), total SD 4.93 -> 4.64 (actual 4.40).
+# Real MLB team scores are ~uncorrelated (2026: r=-0.01); the shared pace
+# multiplier forced r~0.46 and doubled regulation ties.
+V8_INDEPENDENT_TEAM_DISPERSION_R = 3.1311081685642352
+V8_INDEPENDENT_EXTRA_HALF_INNING_MEAN = 0.7541092756530898
+V8_INDEPENDENT_MEAN_SHRINK = 0.542290389653124
+V8_INDEPENDENT_LEAGUE_MEAN_RUNS = 4.467617206379893
+V8_INDEPENDENT_HOME_FIELD_LOG = 0.01590580432952852
+V8_INDEPENDENT_DISTRIBUTION_VERSION = "mlb_v7_distribution_v5_independent_team_nb"
+
+
+def calibrated_full_game_means(away_mean_runs: float, home_mean_runs: float) -> tuple[float, float]:
+    """Shrink noisy 30-game team means toward the league and apply home field."""
+    shrink = V8_INDEPENDENT_MEAN_SHRINK
+    league = V8_INDEPENDENT_LEAGUE_MEAN_RUNS
+    away = shrink * float(away_mean_runs) + (1.0 - shrink) * league
+    home = shrink * float(home_mean_runs) + (1.0 - shrink) * league
+    half = V8_INDEPENDENT_HOME_FIELD_LOG / 2.0
+    return away * exp(-half), home * exp(half)
 
 
 class V7DistributionError(ValueError):
@@ -159,6 +185,7 @@ def simulate_game_distribution(
     first_inning_share: Any = DEFAULT_FIRST_INNING_SHARE,
     first_inning_dispersion_r: Any = DEFAULT_FIRST_INNING_DISPERSION_R,
     extra_half_inning_mean: Any = DEFAULT_EXTRA_HALF_INNING_MEAN,
+    team_dispersion_r: Any | None = None,
 ) -> GameDistribution:
     away_mean = _finite_positive(away_mean_runs, "away_mean_runs")
     home_mean = _finite_positive(home_mean_runs, "home_mean_runs")
@@ -168,15 +195,19 @@ def simulate_game_distribution(
     dispersion_r = None if full_game_dispersion_r is None else _finite_positive(
         full_game_dispersion_r, "full_game_dispersion_r"
     )
-    if dispersion_r is not None and (shared_sigma != 0.0 or idio_sigma != 0.0):
+    team_r = None if team_dispersion_r is None else _finite_positive(team_dispersion_r, "team_dispersion_r")
+    if (dispersion_r is not None or team_r is not None) and (shared_sigma != 0.0 or idio_sigma != 0.0):
         raise V7DistributionError(
             "full_game_dispersion_r cannot be stacked with shared_game_sigma/team_sigma; pass both sigmas as 0"
         )
-    distribution_mode = (
-        FULL_GAME_MODE_SHARED_GAMMA_POISSON
-        if dispersion_r is not None
-        else FULL_GAME_MODE_LEGACY_LOGNORMAL
-    )
+    if dispersion_r is not None and team_r is not None:
+        raise V7DistributionError("pass full_game_dispersion_r or team_dispersion_r, not both")
+    if team_r is not None:
+        distribution_mode = FULL_GAME_MODE_INDEPENDENT_NB
+    elif dispersion_r is not None:
+        distribution_mode = FULL_GAME_MODE_SHARED_GAMMA_POISSON
+    else:
+        distribution_mode = FULL_GAME_MODE_LEGACY_LOGNORMAL
     fi_share = _finite_positive(first_inning_share, "first_inning_share")
     fi_r = _finite_positive(first_inning_dispersion_r, "first_inning_dispersion_r")
     extras_mean = _finite_positive(extra_half_inning_mean, "extra_half_inning_mean")
@@ -215,7 +246,12 @@ def simulate_game_distribution(
     score_counts: dict[tuple[int, int], int] = {}
 
     for _ in range(simulations):
-        if dispersion_r is not None:
+        if team_r is not None:
+            # Independent per-team gamma frailty: each side's runs are
+            # negative binomial with its own over-dispersion; no shared pace.
+            away_lam = away_mean * rng.gammavariate(team_r, 1.0 / team_r)
+            home_lam = home_mean * rng.gammavariate(team_r, 1.0 / team_r)
+        elif dispersion_r is not None:
             # One shared mean-one pace multiplier widens the game-total
             # distribution while preserving each team's unconditional run mean.
             pace = rng.gammavariate(dispersion_r, 1.0 / dispersion_r)
@@ -234,7 +270,8 @@ def simulate_game_distribution(
             regulation_ties += 1
             away_runs, home_runs = _resolve_extras(
                 rng, away_runs, home_runs,
-                away_lam=away_lam, home_lam=home_lam,
+                away_lam=away_mean if team_r is not None else away_lam,
+                home_lam=home_mean if team_r is not None else home_lam,
                 extra_half_inning_mean=extras_mean,
             )
 
@@ -284,7 +321,7 @@ def simulate_game_distribution(
         "extra_half_inning_mean": extras_mean,
         "joint_score_pmf": joint_score_pmf,
         "full_game_distribution_mode": distribution_mode,
-        "full_game_dispersion_r": dispersion_r,
+        "full_game_dispersion_r": team_r if team_r is not None else dispersion_r,
         "shared_game_sigma": shared_sigma,
         "team_sigma": idio_sigma,
     }

@@ -76,3 +76,32 @@ def test_two_future_starts_binds_earliest() -> None:
     payload = build_bound_input(text, observed_at=now.isoformat(), schedule=[today, tomorrow])
     assert payload["rows"][0]["first_pitch_at"].startswith("2026-09-30")
     assert payload["rows"][0].get("bind_status") is None
+
+
+def test_bound_input_keeps_pitcher_name_and_team_side() -> None:
+    game = _snap(849841, "2026-09-30T18:00:00+00:00")
+    now = datetime(2026, 9, 30, 10, 50, tzinfo=timezone.utc)
+    text = (
+        "Phillies @ Braves\n"
+        "ML +152 -180\n"
+        "YRFI +105 -135\n"
+        "Cristopher Sanchez outs 17.5 -174 +130\n"
+        "Braves TT 3.5 -110 -120\n"
+    )
+    payload = build_bound_input(text, observed_at=now.isoformat(), schedule=[game])
+    by_type = {row["market_type"]: row for row in payload["rows"]}
+    assert by_type["PITCHER_OUTS"]["subject_name"] == "Cristopher Sanchez"
+    assert by_type["PITCHER_OUTS"]["game_pk"] == 849841
+    assert "subject_name" not in by_type["MONEYLINE"]
+    assert by_type["FIRST_INNING_TOTAL"]["line"] == 0.5
+    assert by_type["TEAM_TOTAL"]["team_side"] == "HOME"
+
+
+def test_unbound_row_keeps_pitcher_name() -> None:
+    started = _snap(1, "2026-09-29T17:00:00+00:00")
+    now = datetime(2026, 9, 30, 10, 50, tzinfo=timezone.utc)
+    text = "Phillies @ Braves\nCristopher Sanchez outs 17.5 -174 +130\n"
+    payload = build_bound_input(text, observed_at=now.isoformat(), schedule=[started])
+    row = payload["rows"][0]
+    assert row["bind_status"] == "GAME_NOT_PREGAME"
+    assert row["subject_name"] == "Cristopher Sanchez"

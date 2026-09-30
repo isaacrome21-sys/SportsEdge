@@ -16,6 +16,7 @@ from .live_slate import LiveGame, TeamLineup
 from .manual_quote import ManualQuote, validate_manual_quote
 from .mlb_all_market_features import EITHER_PITCHER_MARKETS, MLBAllMarketHistorySource
 from .mlb_history_cache import MLBHistoryCachedOpener
+from .mlb_pitcher_subject import resolve_pitcher_subject
 from .mlb_source import GameSnapshot, fetch_schedule, parse_game_start
 from .quote_bridge import validate_canonical_quote
 
@@ -75,23 +76,23 @@ def _resolve_game(row: ManualQuote, opener=urlopen, schedule: Iterable[GameSnaps
 def _norm_person(value: str) -> str:
     return "".join(ch.lower() for ch in str(value or "") if ch.isalnum())
 
+def _is_named_pitcher_market(market_type: str) -> bool:
+    return market_type.startswith("PITCHER_") and not market_type.startswith("EITHER_")
+
+
 def _resolve_subject(row: ManualQuote, *, opener=urlopen, game: GameSnapshot | None = None) -> tuple[str | None, int | None]:
-    # Pitcher props can bind directly to the probable-pitcher identity from the
-    # same live schedule response that resolved the game. Fall back to People API
-    # when the name does not match, preserving the existing fail-closed behavior.
-    if row.subject_name and row.market_type.startswith("PITCHER_") and game is not None:
-        target = _norm_person(row.subject_name)
-        probable = [
-            (game.away_probable_pitcher_id, game.away_probable_pitcher_name, game.away_id),
-            (game.home_probable_pitcher_id, game.home_probable_pitcher_name, game.home_id),
-        ]
-        matches = [item for item in probable if item[0] and item[1] and _norm_person(item[1]) == target]
-        if len(matches) == 1:
-            person_id, _, team_id = matches[0]
-            supplied = str(row.subject_id) if row.subject_id else None
-            if supplied is not None and supplied != str(person_id):
-                raise CanonicalManualMLBError(f"MANUAL_SUBJECT_ID_NAME_MISMATCH:{row.subject_name}")
-            return str(person_id), int(team_id)
+    # Named pitcher props bind only to the posted probable starters. No People
+    # API fallback — a non-starter is SUBJECT_UNRESOLVED, not a silent lookup.
+    if _is_named_pitcher_market(row.market_type):
+        if game is None:
+            raise CanonicalManualMLBError(f"SUBJECT_UNRESOLVED:{row.subject_name or row.subject_id or ''}".rstrip(":"))
+        try:
+            return resolve_pitcher_subject(row, game)
+        except ValueError as exc:
+            msg = str(exc)
+            if msg.startswith("SUBJECT_UNRESOLVED") or msg.startswith("MANUAL_SUBJECT_ID_NAME_MISMATCH"):
+                raise CanonicalManualMLBError(msg) from exc
+            raise CanonicalManualMLBError(f"SUBJECT_UNRESOLVED:{row.subject_name or ''}") from exc
     if not row.subject_name and row.subject_id:
         url = f"https://statsapi.mlb.com/api/v1/people/{quote_plus(str(row.subject_id))}?hydrate=currentTeam"
         try:
