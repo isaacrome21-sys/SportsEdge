@@ -108,22 +108,18 @@ def build_shared_game_engine_session(
         )
         feature_source_hash = model_input.get("feature_source_hash")
 
-        # RNG identity is bound only to substantive model state. Provenance still
-        # belongs in model_input_hash for auditability, but a new fetch timestamp
-        # or equivalent source-receipt hash must not change Monte Carlo numbers
-        # when the modeled game state itself is unchanged.
         stochastic_identity = {
             "engine": V7_DISTRIBUTION_VERSION,
             "game_id": game_id,
             "away_mean_runs": away_mean,
             "home_mean_runs": home_mean,
+            "feature_source_hash": feature_source_hash,
             "full_game_distribution_mode": FULL_GAME_MODE_SHARED_GAMMA_POISSON,
             "full_game_dispersion_r": V8_PRIMARY_FULL_GAME_DISPERSION_R,
         }
         game_build_hash = canonical_json_sha256(stochastic_identity)
         model_input_hash = canonical_json_sha256({
             **stochastic_identity,
-            "feature_source_hash": feature_source_hash,
             "simulations": simulations,
         })
 
