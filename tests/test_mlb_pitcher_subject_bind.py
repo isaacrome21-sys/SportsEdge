@@ -95,6 +95,13 @@ def test_probable_starter_resolves_to_id() -> None:
     assert team_id == 143
 
 
+def test_unaccented_manual_name_matches_accented_probable_starter() -> None:
+    row = validate_manual_quote(_quote("PITCHER_OUTS", "Cristopher Sanchez", 17.5, -174, 130))
+    person_id, team_id = resolve_pitcher_subject(row, _game())
+    assert person_id == "661563"
+    assert team_id == 143
+
+
 def test_non_starter_is_subject_unresolved() -> None:
     row = validate_manual_quote(_quote(K_MANUAL, "Zack Wheeler", 5.5, -110, -110))
     with pytest.raises(ValueError, match="SUBJECT_UNRESOLVED"):
