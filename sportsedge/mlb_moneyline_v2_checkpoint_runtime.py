@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from collections import defaultdict
 from datetime import datetime, timezone
 import json
 from pathlib import Path
@@ -39,22 +40,60 @@ def evaluate_v2_checkpoints(
     """Evaluate fixed checkpoints after binding rows to the active code artifact.
 
     ``slate_date`` is validated as the UTC event-start date before it can affect
-    CR1 clustering. Every row must also bind to the currently verified model
-    artifact, so a model-surface change starts a new evidence clock rather than
-    silently pooling old and new predictions.
+    CR1 clustering.
+
+    Rows are **split** by ``model_artifact_sha256`` rather than rejected on
+    mismatch:
+
+    - **Current-hash rows** form the active evidence clock (starts empty after a
+      model-surface change).
+    - **Older-hash rows** are reported as closed under the prior engine and are
+      never pooled into the active clock.
+
+    This keeps historical evidence honest when the Stage-1 surface changes
+    (e.g. full-game dispersion promotion) without mixing two models in one
+    checkpoint sample.
     """
     rows = [dict(row) for row in evidence_rows]
     active_artifact = mlb_model_artifact_sha256()
+
+    current_rows: list[dict[str, Any]] = []
+    closed_by_hash: dict[str, list[dict[str, Any]]] = defaultdict(list)
+
     for row in rows:
-        if str(row.get("model_artifact_sha256") or "") != active_artifact:
-            raise MLBMoneylineV2CheckpointError("model artifact binding mismatch")
         start = _utc(row.get("event_start_ts"), "event_start_ts")
         if str(row.get("slate_date") or "") != start.date().isoformat():
             raise MLBMoneylineV2CheckpointError("slate_date must equal UTC event-start date")
+        row_hash = str(row.get("model_artifact_sha256") or "")
+        if not row_hash:
+            raise MLBMoneylineV2CheckpointError("model_artifact_sha256 required on evidence row")
+        if row_hash == active_artifact:
+            current_rows.append(row)
+        else:
+            closed_by_hash[row_hash].append(row)
 
     lane = dict(binding or load_forward_lane_binding())
     lane["model_artifact_sha256"] = active_artifact
-    return _evaluate_v2_checkpoints(rows, binding=lane, policy_path=policy_path)
+    report = _evaluate_v2_checkpoints(current_rows, binding=lane, policy_path=policy_path)
+
+    closed_sections = []
+    for prior_hash, prior_rows in sorted(closed_by_hash.items()):
+        closed_sections.append({
+            "status": "CLOSED_UNDER_PRIOR_ENGINE",
+            "model_artifact_sha256": prior_hash,
+            "row_count": len(prior_rows),
+            "label": (
+                "Immutable evidence from a prior model surface; not pooled into "
+                "the active moneyline v2 checkpoint clock."
+            ),
+        })
+
+    report["active_model_artifact_sha256"] = active_artifact
+    report["active_clock_row_count"] = len(current_rows)
+    report["closed_prior_engine_sections"] = closed_sections
+    report["closed_prior_engine_row_count"] = sum(section["row_count"] for section in closed_sections)
+    report["prior_engine_rows_excluded_from_active_clock"] = True
+    return report
 
 
 def load_evidence_tree(root: str | Path = DEFAULT_EVIDENCE_ROOT) -> list[dict[str, Any]]:
