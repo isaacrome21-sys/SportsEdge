@@ -3,6 +3,34 @@
 **Status:** specification locked in writing. No code, fit, or evaluation on a
 held-out window until this document is treated as the candidate definition.
 
+## Pre-score unit correction — 2026-09-29
+
+Before the one-shot August window was scored, review found a unit mismatch in
+the pre-locked FIP-style coefficients. The implementation stores K / BB / HR
+rates **per out**, while standard FIP weights are expressed per inning:
+
+```
+(13 * HR + 3 * BB - 2 * K) / IP
+```
+
+Since `1 IP = 3 outs`, the equivalent weights for rates stored per out are:
+
+```
+HR = 39
+BB = 9
+K  = 6
+```
+
+The original pre-lock values `HR=15`, `BB=12`, `K=9` were therefore a unit
+error, not fitted parameters. They are superseded **before any August score was
+computed**. This amendment is a first-principles unit correction, not tuning on
+the held-out set. All other constants, windows, identity policy, gate criteria,
+and the 4.50 league RA9 proxy remain unchanged.
+
+Corrected constants receipt:
+
+`constants_sha256 = 1b1b9ed6900654e69c23b5daaf9729d85bdfec4ffa72bc921498737e2ec9c065`
+
 ## Failed prior attempts (do not re-use these windows for tuning)
 
 - Existing `context_adjusted_means` starter multiplier vs defense blend on
@@ -102,19 +130,19 @@ No free parameters are fit on August or on Sept 2026.
 | Default innings share `w` | 0.55 | First principles: ~5 IP starter |
 | `w` clip | [0.45, 0.65] | First principles |
 
-**Rate → RA9 mapping (fixed, not fit):**
+**Rate → RA9 mapping (fixed, not fit; unit-corrected before August scoring):**
 
 ```
 starter_ra9_hat = 4.50
-    + 12.0 * (BB_rate - league_BB_rate)
-    -  9.0 * (K_rate  - league_K_rate)
-    + 15.0 * (HR_rate - league_HR_rate)
+    +  9.0 * (BB_rate - league_BB_rate)
+    -  6.0 * (K_rate  - league_K_rate)
+    + 39.0 * (HR_rate - league_HR_rate)
 ```
 
-Coefficients are order-of-magnitude FIP-style weights, fixed a priori. League
-rates are computed from **2026-06-01 → 2026-07-31** starter innings only
-(named fit window for league averages — not for `k`). June–July must not
-include August games.
+These are the standard FIP event weights converted from per-inning form to the
+per-out rates used by the implementation. League rates are computed from
+**2026-06-01 → 2026-07-31** starter innings only (named fit window for league
+averages — not for `k`). June–July must not include August games.
 
 If implementation needs any additional constant, it must be added to this table
 in a commit **before** the August run. Silent defaults are not allowed.
