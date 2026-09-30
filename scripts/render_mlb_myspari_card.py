@@ -15,6 +15,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from sportsedge.mlb_card_blocked import blocked_notes  # noqa: E402
 from sportsedge.mlb_context_card import context_section  # noqa: E402
 from sportsedge.mlb_myspari_own_model import MYSPARI_OWN_MODEL_VERSION, myspari_rows, render_markdown  # noqa: E402
 
@@ -105,6 +106,7 @@ def main() -> int:
         rg = g.get("resolved_game") or {}
         if rg:
             notes.append(f"{rg.get('game_pk')}: {rg.get('away_team')} @ {rg.get('home_team')}, first pitch {rg.get('scheduled_start_utc')}")
+    notes.extend(blocked_notes(payload))
     notes.append(f"Lines observed {observed.isoformat() if observed else 'unknown'}; card built {now.isoformat(timespec='seconds')}.")
     if args.snapshot and Path(args.snapshot).is_file():
         raw = Path(args.snapshot).read_bytes()
@@ -120,6 +122,7 @@ def main() -> int:
         elif timestamp_sources:
             notes.append(f"Timestamp provenance: {', '.join(timestamp_sources)}.")
     notes.append("Probabilities are the SportsEdge engines' own model_p (engine_registry); this card only pairs, scores and ranks them.")
+    notes.append("NOT Truth Gate / NOT OFFICIAL. Unpriceable = NO_MODEL.")
 
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
