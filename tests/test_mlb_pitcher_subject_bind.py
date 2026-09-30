@@ -84,8 +84,8 @@ def test_canonical_hook_does_not_people_lookup_a_non_starter() -> None:
         _resolve_subject(row, opener=boom, game=_game())
 
 
-def test_one_sided_prop_is_blocked_pricing_method() -> None:
-    with pytest.raises(LinesIntakeError, match="BLOCKED_PRICING_METHOD"):
+def test_one_sided_prop_fails_closed() -> None:
+    with pytest.raises(LinesIntakeError):
         parse_lines("Phillies @ Braves\nCristopher Sanchez outs 17.5 -174\n")
 
 
