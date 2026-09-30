@@ -23,6 +23,13 @@ from .mlb_generic_features import (
     _digest,
     _read_json,
 )
+from .mlb_starter_effect import (
+    STARTER_EFFECT_VERSION,
+    STARTER_PRIOR_STARTS,
+    apply_starter_effects,
+    starter_residual_history,
+    starter_run_effect,
+)
 from .pitcher_record_win_engine import build_pitcher_record_win_features
 
 JOINT_HITTER_COMBO_MARKETS = frozenset({
@@ -216,6 +223,61 @@ class MLBAllMarketHistorySource(MLBGenericHistorySource):
         }
         return float(away_mean), float(home_mean), components
 
+    def starter_run_effects(
+        self,
+        *,
+        away_pitcher_id: int | None,
+        home_pitcher_id: int | None,
+        target_date: date,
+    ) -> dict[str, Any]:
+        """Strict-prior shrunk run effect of each probable starter (audit fix D)."""
+        cache = self.__dict__.setdefault("_starter_residual_cache", {})
+        if target_date not in cache:
+            query = urlencode({
+                "sportId": 1,
+                "gameType": "R",
+                "startDate": (target_date - timedelta(days=240)).isoformat(),
+                "endDate": (target_date - timedelta(days=1)).isoformat(),
+                "hydrate": "probablePitcher",
+                "fields": "dates,date,games,gamePk,officialDate,status,abstractGameState,"
+                          "teams,away,home,score,team,id,probablePitcher",
+            })
+            payload = _read_json(f"https://statsapi.mlb.com/api/v1/schedule?{query}", opener=self.opener)
+            cache[target_date] = starter_residual_history(payload, target_date)
+        residuals = cache[target_date]
+        away = starter_run_effect(residuals, away_pitcher_id, prior_starts=STARTER_PRIOR_STARTS)
+        home = starter_run_effect(residuals, home_pitcher_id, prior_starts=STARTER_PRIOR_STARTS)
+        return {"version": STARTER_EFFECT_VERSION, "away_starter": away, "home_starter": home}
+
+    def _attach_starter_effects(self, row: dict[str, Any], *, away_pitcher_id, home_pitcher_id, target_date: date) -> None:
+        if away_pitcher_id is None and home_pitcher_id is None:
+            return
+        try:
+            effects = self.starter_run_effects(
+                away_pitcher_id=None if away_pitcher_id is None else int(away_pitcher_id),
+                home_pitcher_id=None if home_pitcher_id is None else int(home_pitcher_id),
+                target_date=target_date,
+            )
+        except MLBGenericFeatureError:
+            # History fetch failed: price on the validated no-starter distribution.
+            row["starter_effect_components"] = {"version": STARTER_EFFECT_VERSION, "status": "UNAVAILABLE"}
+            return
+        away_effect = effects["away_starter"]["effect_runs"]
+        home_effect = effects["home_starter"]["effect_runs"]
+        blend_away, blend_home = row["away_mean_runs"], row["home_mean_runs"]
+        row["away_mean_runs"], row["home_mean_runs"] = apply_starter_effects(
+            blend_away,
+            blend_home,
+            away_starter_effect_runs=away_effect,
+            home_starter_effect_runs=home_effect,
+        )
+        row["run_mean_version"] = f"{PRODUCTION_RUN_MEAN_VERSION}+{STARTER_EFFECT_VERSION}"
+        row["starter_effect_components"] = {
+            **effects,
+            "defense_blend_away_mean_runs": blend_away,
+            "defense_blend_home_mean_runs": blend_home,
+        }
+
     def feature_row(
         self,
         *,
@@ -260,6 +322,7 @@ class MLBAllMarketHistorySource(MLBGenericHistorySource):
             row["run_mean_version"] = PRODUCTION_RUN_MEAN_VERSION
             row["run_mean_components"] = components
             row["source"] = _RUN_BLEND_SOURCE
+            self._attach_starter_effects(row, away_pitcher_id=away_pitcher_id, home_pitcher_id=home_pitcher_id, target_date=target_date)
             return _seal(row)
 
         if market in _PRODUCTION_RUN_BLEND_MARKETS:
@@ -274,6 +337,7 @@ class MLBAllMarketHistorySource(MLBGenericHistorySource):
             row["run_mean_version"] = PRODUCTION_RUN_MEAN_VERSION
             row["run_mean_components"] = components
             row["source"] = _RUN_BLEND_SOURCE
+            self._attach_starter_effects(row, away_pitcher_id=away_pitcher_id, home_pitcher_id=home_pitcher_id, target_date=target_date)
             return _seal(row)
 
         if market in EITHER_PITCHER_MARKETS:
