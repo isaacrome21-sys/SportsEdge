@@ -52,6 +52,19 @@ def _resolve_game(row: ManualQuote, opener=urlopen, schedule: Iterable[GameSnaps
             g for g in rows
             if _norm_team(g.away_name) == away_key and _norm_team(g.home_name) == home_key
         ]
+    # Two-day schedule snapshots can list the same matchup twice. Bind the row
+    # that already carries first_pitch_at from intake; else earliest unplayed.
+    if len(matches) > 1:
+        fp = row.first_pitch_at.astimezone(timezone.utc)
+        timed = [g for g in matches if abs((parse_game_start(g.game_date) - fp).total_seconds()) <= 120]
+        if timed:
+            matches = timed
+        else:
+            now = row.observed_at.astimezone(timezone.utc)
+            future = [g for g in matches if parse_game_start(g.game_date) > now]
+            future.sort(key=lambda g: parse_game_start(g.game_date))
+            if len(future) == 1:
+                matches = future
     if len(matches) != 1: raise CanonicalManualMLBError(f"MANUAL_GAME_RESOLUTION_FAILED: game_id={row.game_id} found={len(matches)}")
     g = matches[0]
     scheduled = parse_game_start(g.game_date)
