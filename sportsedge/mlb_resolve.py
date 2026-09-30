@@ -20,10 +20,8 @@ def resolve_game(away: str, home: str, schedule: list[GameSnapshot], *, now: dat
         raise LinesIntakeError(f"GAME_NOT_FOUND: '{away} @ {home}' matched 0 games on this slate")
     future = [game for game in hits if parse_game_start(game.game_date) > now]
     future.sort(key=lambda game: parse_game_start(game.game_date))
-    if len(future) == 1:
+    if future:
         return future[0]
-    if len(future) > 1:
-        raise LinesIntakeError(f"AMBIGUOUS_GAME: '{away} @ {home}' matched {len(future)} pregame starts")
     raise LinesIntakeError(f"GAME_NOT_PREGAME: '{away} @ {home}'")
 
 

@@ -29,6 +29,14 @@ def test_same_matchup_picks_unplayed_day_two() -> None:
     assert game.game_pk == 2
 
 
+def test_two_unplayed_same_matchup_picks_earliest() -> None:
+    day1 = _snap(1, "2026-09-30T17:00:00+00:00")
+    day2 = _snap(2, "2026-10-01T17:00:00+00:00")
+    now = datetime(2026, 9, 30, 5, 44, tzinfo=timezone.utc)
+    game = resolve_game("Phillies", "Braves", [day1, day2], now=now)
+    assert game.game_pk == 1
+
+
 def test_started_and_pregame_no_exception() -> None:
     started = _snap(1, "2026-09-29T17:00:00+00:00", "Chicago White Sox", "Houston Astros")
     live = _snap(2, "2026-09-30T17:00:00+00:00")
