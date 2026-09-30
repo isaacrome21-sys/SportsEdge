@@ -24,10 +24,13 @@ INNINGS_SHARE_LO = 0.45
 INNINGS_SHARE_HI = 0.65
 MIN_MEAN_RUNS = 0.05
 
-# FIP-style rate → RA9 weights (a priori; not fit on Aug/Sep 2026)
-BB_COEF = 12.0
-K_COEF = 9.0
-HR_COEF = 15.0
+# Standard FIP weights are 13 HR + 3 BB - 2 K per inning. The profiles below
+# store rates per out, and 1 IP = 3 outs, so the unit-correct per-out weights
+# are 39 HR + 9 BB - 6 K. This correction was made before the one-shot August
+# evaluation and is documented in mlb_starter_spec_v2_prelock.md.
+BB_COEF = 9.0
+K_COEF = 6.0
+HR_COEF = 39.0
 
 STARTER_IDENTITY_SOURCE = "ACTUAL_STARTER_STAND_IN_NO_PREGAME_PIT_ARCHIVE"
 
