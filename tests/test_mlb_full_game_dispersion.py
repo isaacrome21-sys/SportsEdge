@@ -6,7 +6,6 @@ from scripts.audit_mlb_game_engine_dispersion import (
     _fit_dispersion_r,
     _line_prob,
 )
-from sportsedge.v7_distribution import simulate_game_distribution
 
 
 def _total_moments(pmf: dict[str, float]) -> tuple[float, float]:
@@ -36,35 +35,37 @@ class MLBFullGameDispersionAuditTests(unittest.TestCase):
         self.assertAlmostEqual(float(fit["raw_r"]), 8.0, places=12)
         self.assertAlmostEqual(float(fit["locked_r"]), 8.0, places=12)
 
-    def test_candidate_is_deterministic_mean_preserving_and_more_disperse(self):
-        baseline = simulate_game_distribution(
-            away_mean_runs=4.2,
-            home_mean_runs=4.4,
-            total_line=0.0,
-            simulations=30000,
-            seed=22,
-        )
+    def test_candidate_keeps_mean_and_widens_spread(self):
+        away_mean = 4.2
+        home_mean = 4.4
+        input_total = away_mean + home_mean
+        dispersion_r = 5.217229403204152
         candidate = _candidate_pmf(
-            away_mean=4.2,
-            home_mean=4.4,
-            dispersion_r=5.217229403204152,
+            away_mean=away_mean,
+            home_mean=home_mean,
+            dispersion_r=dispersion_r,
             simulations=30000,
             identity="unit-test",
         )
         repeat = _candidate_pmf(
-            away_mean=4.2,
-            home_mean=4.4,
-            dispersion_r=5.217229403204152,
+            away_mean=away_mean,
+            home_mean=home_mean,
+            dispersion_r=dispersion_r,
             simulations=30000,
             identity="unit-test",
         )
 
         self.assertEqual(candidate, repeat)
         self.assertAlmostEqual(sum(candidate.values()), 1.0, places=12)
-        baseline_mean, baseline_variance = _total_moments(baseline.joint_score_pmf)
+
         candidate_mean, candidate_variance = _total_moments(candidate)
-        self.assertAlmostEqual(candidate_mean, baseline_mean, delta=0.25)
-        self.assertGreater(candidate_variance, baseline_variance * 1.20)
+        # Mean-preserving: sampled total mean tracks the input means.
+        self.assertAlmostEqual(candidate_mean, input_total, delta=0.20)
+        # Shared Gamma-Poisson: Var(T) = mu + mu^2 / r > Poisson mu.
+        poisson_variance = input_total
+        theoretical_variance = input_total + (input_total ** 2) / dispersion_r
+        self.assertGreater(candidate_variance, poisson_variance * 1.20)
+        self.assertAlmostEqual(candidate_variance, theoretical_variance, delta=0.75)
 
     def test_candidate_readouts_cover_frozen_reference_lines(self):
         pmf = _candidate_pmf(
