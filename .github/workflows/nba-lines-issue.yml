@@ -1,0 +1,51 @@
+name: nba-lines-issue
+
+on:
+  issues:
+    types: [opened, edited]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: nba-lines-issue-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  card:
+    if: github.actor == github.repository_owner && (contains(github.event.issue.labels.*.name, 'nba-lines') || startsWith(github.event.issue.title, '[NBA LINES]'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ISSUE: ${{ github.event.issue.number }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Transcribe lines from the issue
+        id: intake
+        env:
+          BODY: ${{ github.event.issue.body }}
+          OBSERVED: ${{ github.event.issue.updated_at }}
+        run: |
+          printf '%s' "$BODY" > issue_body.txt
+          if PYTHONPATH=. python scripts/intake_nba_lines_issue.py --body-file issue_body.txt \
+               --observed-at "$OBSERVED" --issue "$ISSUE" > intake.out; then
+            cat intake.out >> "$GITHUB_OUTPUT"
+          else
+            { echo "Couldn't read these lines, so no card was run:"; echo; echo '```'; cat intake_error.txt; echo '```'; } > fail.md
+            gh issue comment "$ISSUE" --body-file fail.md
+            exit 1
+          fi
+      - name: Render PRE-CONTEXT NO_MODEL card
+        run: |
+          PYTHONPATH=. python scripts/render_nba_myspari_card.py \
+            --snapshot "${{ steps.intake.outputs.path }}" \
+            --pre-context \
+            --out-dir artifacts/nba_myspari
+          gh issue comment "$ISSUE" --body-file artifacts/nba_myspari/card.md
