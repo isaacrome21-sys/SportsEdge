@@ -5,6 +5,9 @@ on:
     branches: [research/mlb-dispersion-precontext-20260929]
     paths:
       - scripts/audit_mlb_game_engine_dispersion.py
+      - scripts/verify_mlb_full_game_dispersion_production.py
+      - sportsedge/v7_distribution.py
+      - sportsedge/shared_game_engine.py
       - .github/workflows/audit-mlb-game-engine-dispersion.yml
   workflow_dispatch:
 
@@ -15,7 +18,7 @@ env:
   PYTHONPATH: ${{ github.workspace }}
 
 jobs:
-  audit:
+  verify-production:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -25,21 +28,21 @@ jobs:
           python-version: '3.12'
       - name: Install runtime dependency
         run: python -m pip install --disable-pip-version-check numpy==2.5.3
-      - name: Compile audit
-        run: python -m py_compile scripts/audit_mlb_game_engine_dispersion.py
-      - name: Run strict-prior production-mean dispersion audit
+      - name: Compile audit and production verifier
+        run: python -m py_compile scripts/audit_mlb_game_engine_dispersion.py scripts/verify_mlb_full_game_dispersion_production.py sportsedge/v7_distribution.py sportsedge/shared_game_engine.py
+      - name: Verify frozen dispersion with exact production simulator
         run: >-
-          python scripts/audit_mlb_game_engine_dispersion.py
+          python scripts/verify_mlb_full_game_dispersion_production.py
           --start 2026-09-01
           --end 2026-09-27
           --validation-start 2026-09-15
           --max-games 250
           --simulations 100000
-          --output artifacts/mlb_game_engine_dispersion_audit.json
-      - name: Upload audit artifact
+          --output artifacts/mlb_full_game_dispersion_production_verify.json
+      - name: Upload verification artifact
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: mlb-game-engine-dispersion-audit
-          path: artifacts/mlb_game_engine_dispersion_audit.json
+          name: mlb-full-game-dispersion-production-verify
+          path: artifacts/mlb_full_game_dispersion_production_verify.json
           if-no-files-found: error
