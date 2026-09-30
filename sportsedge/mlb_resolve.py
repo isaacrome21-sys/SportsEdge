@@ -30,6 +30,7 @@ def resolve_game(away: str, home: str, schedule: list[GameSnapshot], *, now: dat
 def _unbound_row(row, *, observed_at: str, book: str, reason: str) -> dict[str, Any]:
     return {
         "game_id": f"{row.away}@{row.home}",
+        "game_pk": None,
         "market_type": row.market_type,
         "side": row.side,
         "line": row.line,
@@ -65,6 +66,7 @@ def build_bound_input(
             continue
         out.append({
             "game_id": f"{game.away_name}@{game.home_name}",
+            "game_pk": int(game.game_pk),
             "market_type": row.market_type,
             "side": row.side,
             "line": row.line,
