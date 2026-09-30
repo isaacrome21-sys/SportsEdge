@@ -29,6 +29,8 @@ from sportsedge.mlb_starter_v2 import (
 )
 from sportsedge.source_lineage import canonical_json_sha256
 
+EXPECTED_CONSTANTS_SHA256 = "1b1b9ed6900654e69c23b5daaf9729d85bdfec4ffa72bc921498737e2ec9c065"
+
 
 class StarterV2ConstantsTests(unittest.TestCase):
     def test_prelock_values(self):
@@ -38,15 +40,17 @@ class StarterV2ConstantsTests(unittest.TestCase):
         self.assertEqual(DEFAULT_INNINGS_SHARE, 0.55)
         self.assertEqual(INNINGS_SHARE_LO, 0.45)
         self.assertEqual(INNINGS_SHARE_HI, 0.65)
-        self.assertEqual(BB_COEF, 12.0)
-        self.assertEqual(K_COEF, 9.0)
-        self.assertEqual(HR_COEF, 15.0)
+        # Unit-correct standard FIP weights for rates stored per out:
+        # (13 HR + 3 BB - 2 K) / IP => 39 HR + 9 BB - 6 K per out.
+        self.assertEqual(BB_COEF, 9.0)
+        self.assertEqual(K_COEF, 6.0)
+        self.assertEqual(HR_COEF, 39.0)
         self.assertEqual(CONSTANTS["league_rate_window"], {"start": "2026-06-01", "end": "2026-07-31"})
         self.assertEqual(CONSTANTS["evaluation_window"], {"start": "2026-08-01", "end": "2026-08-31"})
 
     def test_constants_hash_stable(self):
         self.assertEqual(CONSTANTS_SHA256, canonical_json_sha256(CONSTANTS))
-        self.assertEqual(len(CONSTANTS_SHA256), 64)
+        self.assertEqual(CONSTANTS_SHA256, EXPECTED_CONSTANTS_SHA256)
         receipt = constants_receipt()
         self.assertEqual(receipt["constants_sha256"], CONSTANTS_SHA256)
 
@@ -63,6 +67,31 @@ class StarterV2MathTests(unittest.TestCase):
             league=self.league,
         )
         self.assertAlmostEqual(hat, LEAGUE_RA9_PROXY, places=12)
+
+    def test_fip_unit_conversion_per_out(self):
+        # One extra event per 9 innings = one event per 27 outs.
+        one_per_nine = 1.0 / 27.0
+        hr_hat = starter_ra9_hat(
+            k_rate=self.league.k_rate,
+            bb_rate=self.league.bb_rate,
+            hr_rate=self.league.hr_rate + one_per_nine,
+            league=self.league,
+        )
+        bb_hat = starter_ra9_hat(
+            k_rate=self.league.k_rate,
+            bb_rate=self.league.bb_rate + one_per_nine,
+            hr_rate=self.league.hr_rate,
+            league=self.league,
+        )
+        k_hat = starter_ra9_hat(
+            k_rate=self.league.k_rate + one_per_nine,
+            bb_rate=self.league.bb_rate,
+            hr_rate=self.league.hr_rate,
+            league=self.league,
+        )
+        self.assertAlmostEqual(hr_hat - LEAGUE_RA9_PROXY, 13.0 / 9.0, places=12)
+        self.assertAlmostEqual(bb_hat - LEAGUE_RA9_PROXY, 3.0 / 9.0, places=12)
+        self.assertAlmostEqual(k_hat - LEAGUE_RA9_PROXY, -2.0 / 9.0, places=12)
 
     def test_high_k_lowers_ra9(self):
         hat = starter_ra9_hat(
