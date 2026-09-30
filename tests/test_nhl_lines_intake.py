@@ -4,7 +4,16 @@ from __future__ import annotations
 import unittest
 
 from sportsedge.nhl_lines_intake import NhlLinesIntakeError, parse_nhl_lines
-from scripts.render_nhl_myspari_card import NO_OWNER, reason_for
+from sportsedge.sports.nhl.market_capabilities import capability_for
+
+NO_OWNER = "NO_MODEL:FROZEN_OWNER_MISSING"
+
+
+def reason_for(market: str) -> str:
+    cap = capability_for(market)
+    if cap.status == "NO_ENGINE":
+        return f"NO_MODEL:{cap.reason}"
+    return NO_OWNER
 
 
 class IntakeTests(unittest.TestCase):
