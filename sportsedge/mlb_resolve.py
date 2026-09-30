@@ -23,6 +23,11 @@ def resolve_game(away: str, home: str, schedule: list[GameSnapshot], *, now: dat
     if len(future) == 1:
         return future[0]
     if len(future) > 1:
+        dates = {parse_game_start(game.game_date).date() for game in future}
+        # Same-day doubleheader stays AMBIGUOUS. A two-day series snapshot is
+        # the next unplayed start, not two guesses on one slate.
+        if len(dates) > 1:
+            return future[0]
         raise LinesIntakeError(f"AMBIGUOUS_GAME: '{away} @ {home}' matched {len(future)} pregame starts")
     raise LinesIntakeError(f"GAME_NOT_PREGAME: '{away} @ {home}'")
 
