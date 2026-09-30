@@ -111,6 +111,9 @@ def main() -> int:
     age = max((now - observed).total_seconds(), 0.0) if observed else 0.0
 
     bundles, failures, team_sides = _load_context_bundles(args.context_dir)
+    # Team-total entity IDs are team IDs, so bind them from canonical market
+    # resolution. Starter player IDs remain bound from the live context bundle.
+    # Unknown/missing bindings fail neutral inside the presentation guard.
     for res in resolutions:
         if not isinstance(res, dict):
             continue
