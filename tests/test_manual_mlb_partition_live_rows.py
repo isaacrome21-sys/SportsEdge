@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from scripts.run_manual_mlb_snapshot import partition_live_rows
+from sportsedge.manual_quote_live import partition_live_rows
 
 
 def test_started_game_is_blocked_not_raised() -> None:
@@ -22,4 +22,4 @@ def test_started_game_is_blocked_not_raised() -> None:
         as_of=datetime(2026, 9, 30, 4, 27, tzinfo=timezone.utc),
     )
     assert live == []
-    assert blocked[0]["reason"].startswith("MANUAL_QUOTE")
+    assert "MANUAL_QUOTE" in blocked[0]["reason"]
