@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sportsedge.mlb_card_blocked import blocked_notes  # noqa: E402
 from sportsedge.mlb_context_card import context_section  # noqa: E402
-from sportsedge.mlb_myspari_own_model import MYSPARI_OWN_MODEL_VERSION, myspari_rows, render_markdown  # noqa: E402
+from sportsedge.mlb_myspari_own_model import MYSPARI_OWN_MODEL_VERSION, myspari_rows, render_markdown, team_entity_names  # noqa: E402
 from sportsedge.mlb_quote_move_guard import apply_quote_move_guard  # noqa: E402
 
 
@@ -106,6 +106,8 @@ def main() -> int:
     for res in resolutions:
         if isinstance(res, dict) and res.get("subject_id") and res.get("subject_name"):
             names.setdefault(str(res["subject_id"]), str(res["subject_name"]))
+    for entity_id, team in team_entity_names(payload).items():
+        names.setdefault(entity_id, team)
     now = datetime.fromisoformat(args.as_of) if args.as_of else datetime.now(timezone.utc)
     observed = _observed_at(payload)
     age = max((now - observed).total_seconds(), 0.0) if observed else 0.0
