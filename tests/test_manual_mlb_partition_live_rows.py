@@ -2,24 +2,50 @@ from datetime import datetime, timezone
 
 from sportsedge.manual_quote_live import partition_live_rows
 
+AS_OF = datetime(2026, 9, 30, 4, 27, tzinfo=timezone.utc)
 
-def test_started_game_is_blocked_not_raised() -> None:
-    rows = [{
-        "game_id": "Padres@Dodgers",
+
+def _row(**overrides):
+    base = {
+        "game_id": "Philadelphia Phillies@Atlanta Braves",
         "market_type": "MONEYLINE",
         "side": "AWAY",
         "line": 0,
-        "price": 105,
+        "price": -117,
         "paired_side": "HOME",
-        "paired_price": -125,
+        "paired_price": -103,
         "book": "draftkings",
-        "observed_at": "2026-09-30T04:27:25+00:00",
-        "first_pitch_at": "2026-09-29T16:00:00+00:00",
+        "observed_at": "2026-09-29T16:00:00+00:00",
+        "first_pitch_at": "2026-09-30T17:00:00+00:00",
         "source": "MANUAL",
-    }]
-    live, blocked = partition_live_rows(
-        rows, run_date="2026-09-29", max_age_minutes=60,
-        as_of=datetime(2026, 9, 30, 4, 27, tzinfo=timezone.utc),
-    )
+    }
+    base.update(overrides)
+    return base
+
+
+def test_game_started_with_valid_pregame_observed() -> None:
+    rows = [_row(
+        observed_at="2026-09-29T16:00:00+00:00",
+        first_pitch_at="2026-09-30T03:00:00+00:00",
+    )]
+    live, blocked = partition_live_rows(rows, run_date="2026-09-29", max_age_minutes=60, as_of=AS_OF)
     assert live == []
-    assert "MANUAL_QUOTE" in blocked[0]["reason"]
+    assert blocked[0]["reason"].startswith("MANUAL_QUOTE_GAME_STARTED")
+
+
+def test_date_mismatch() -> None:
+    rows = [_row(first_pitch_at="2026-10-02T17:00:00+00:00")]
+    live, blocked = partition_live_rows(rows, run_date="2026-09-29", max_age_minutes=60, as_of=AS_OF)
+    assert live == []
+    assert "DATE_MISMATCH" in blocked[0]["reason"]
+
+
+def test_mixed_live_and_blocked() -> None:
+    good = _row()
+    bad = _row(
+        game_id="Chicago White Sox@Houston Astros",
+        first_pitch_at="2026-09-30T03:00:00+00:00",
+    )
+    live, blocked = partition_live_rows([bad, good], run_date="2026-09-29", max_age_minutes=60, as_of=AS_OF)
+    assert [r["game_id"] for r in live] == [good["game_id"]]
+    assert blocked[0]["reason"].startswith("MANUAL_QUOTE_GAME_STARTED")
