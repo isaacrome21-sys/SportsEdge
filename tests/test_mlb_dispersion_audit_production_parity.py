@@ -4,6 +4,9 @@ The held-out audit validated scripts/audit_mlb_game_engine_dispersion._candidate
 Production ships the same shape through sportsedge.v7_distribution.simulate_game_distribution
 with full_game_dispersion_r. This test requires their total-run line probabilities to
 agree within simulation noise for the same inputs and frozen r.
+
+At 40k paths, Monte Carlo SE on a ~0.5 probability is ~0.25pp; a 1pp allowance
+is several SEs and still far tighter than the audit win (7.6 → 1.4pp).
 """
 from __future__ import annotations
 
@@ -51,8 +54,8 @@ class AuditProductionDispersionParityTests(unittest.TestCase):
             with self.subTest(line=line):
                 self.assertAlmostEqual(a_over + a_under + a_push, 1.0, places=10)
                 self.assertAlmostEqual(p_over + p_under + p_push, 1.0, places=10)
-                self.assertAlmostEqual(a_over, p_over, delta=0.025)
-                self.assertAlmostEqual(a_under, p_under, delta=0.025)
+                self.assertAlmostEqual(a_over, p_over, delta=0.01)
+                self.assertAlmostEqual(a_under, p_under, delta=0.01)
 
 
 if __name__ == "__main__":
