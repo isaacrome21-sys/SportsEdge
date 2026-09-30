@@ -23,6 +23,8 @@ DEFAULT_INNINGS_SHARE = 0.55
 INNINGS_SHARE_LO = 0.45
 INNINGS_SHARE_HI = 0.65
 MIN_MEAN_RUNS = 0.05
+STARTER_PROFILE_WINDOW_STARTS = 12
+STARTER_PROFILE_MINIMUM_STARTS = 3
 
 # Standard FIP weights are 13 HR + 3 BB - 2 K per inning. The profiles below
 # store rates per out, and 1 IP = 3 outs, so the unit-correct per-out weights
@@ -45,6 +47,8 @@ CONSTANTS: dict[str, Any] = {
     "k_coef": K_COEF,
     "hr_coef": HR_COEF,
     "min_mean_runs": MIN_MEAN_RUNS,
+    "starter_profile_window_starts": STARTER_PROFILE_WINDOW_STARTS,
+    "starter_profile_minimum_starts": STARTER_PROFILE_MINIMUM_STARTS,
     "league_rate_window": {"start": "2026-06-01", "end": "2026-07-31"},
     "evaluation_window": {"start": "2026-08-01", "end": "2026-08-31"},
     "starter_identity_source": STARTER_IDENTITY_SOURCE,
@@ -112,7 +116,6 @@ def shrink_residual(*, residual: float, observed_ip: float) -> float:
         raise StarterV2Error("residual invalid")
     if not isfinite(observed_ip) or observed_ip < 0:
         raise StarterV2Error("observed_ip invalid")
-    # weight = n / (n + τ); prior mean 0
     return residual * (observed_ip / (observed_ip + SHRINKAGE_PRIOR_IP))
 
 
@@ -159,8 +162,7 @@ def adjust_shell_mean(
         hr_rate=float(starter.hr_rate),
         league=league,
     )
-    # Team RA per game treated on same RA9 proxy scale as pre-lock.
-    team_ra9 = float(team_runs_against_mean) * (9.0 / 9.0)  # already per-game ≈ RA9 units
+    team_ra9 = float(team_runs_against_mean) * (9.0 / 9.0)
     residual = ra9_hat - team_ra9
     observed_ip = float(starter.total_outs) / 3.0
     shrunk = shrink_residual(residual=residual, observed_ip=observed_ip)
@@ -201,7 +203,6 @@ def starter_v2_means(
     away_shell = defense_blend_shell(away_runs_for=away_runs_for, home_runs_against=home_runs_against)
     home_shell = defense_blend_shell(away_runs_for=home_runs_for, home_runs_against=away_runs_against)
 
-    # Away scoring faces home starter; home scoring faces away starter.
     away_adj = adjust_shell_mean(
         shell=away_shell,
         starter=home_starter,
@@ -239,8 +240,8 @@ def peripheral_profile_from_start_rows(
     *,
     player_id: int,
     rows: list[Mapping[str, Any]],
-    window: int = 12,
-    minimum: int = 3,
+    window: int = STARTER_PROFILE_WINDOW_STARTS,
+    minimum: int = STARTER_PROFILE_MINIMUM_STARTS,
 ) -> StarterPeripheralProfile:
     """Build profile from prior start dicts with outs, so, bb, hr keys."""
     starts: list[tuple[float, float, float, float]] = []
@@ -263,7 +264,6 @@ def peripheral_profile_from_start_rows(
     total_outs = sum(r[0] for r in starts)
     if total_outs <= 0:
         return StarterPeripheralProfile(int(player_id), len(starts), 0.0, None, None, None, None, "ZERO_PRIOR_OUTS")
-    # Rate per out (batters-faced proxy unavailable → per-out rates)
     k_rate = sum(r[1] for r in starts) / total_outs
     bb_rate = sum(r[2] for r in starts) / total_outs
     hr_rate = sum(r[3] for r in starts) / total_outs
