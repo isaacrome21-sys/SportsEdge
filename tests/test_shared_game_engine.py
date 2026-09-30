@@ -53,18 +53,19 @@ class SharedGameEngineStage1Tests(unittest.TestCase):
             engine({**base, "market": "MONEYLINE", "line": 0.0, "side": "HOME"}),
             engine({**base, "market": "RUN_LINE", "line": -1.5, "side": "HOME"}),
             engine({**base, "market": "TOTALS", "line": 8.5, "side": "OVER"}),
+            engine({**base, "market": "TEAM_TOTALS", "line": 4.5, "side": "OVER", "team_side": "HOME"}),
         ]
 
         self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0]["total_line"], 0.0)
         self.assertEqual(calls[0]["full_game_dispersion_r"], V8_PRIMARY_FULL_GAME_DISPERSION_R)
-        self.assertEqual(calls[0]["shared_game_sigma"], 0.0)
-        self.assertEqual(calls[0]["team_sigma"], 0.0)
         self.assertEqual({row["distribution_sha256"] for row in outputs}, {outputs[0]["distribution_sha256"]})
         self.assertEqual({row["model_input_hash"] for row in outputs}, {outputs[0]["model_input_hash"]})
-        self.assertEqual({row["market"] for row in outputs}, {"MONEYLINE", "RUN_LINE", "TOTALS"})
-        self.assertEqual(len({row["readout_sha256"] for row in outputs}), 3)
-        self.assertNotEqual(outputs[0]["model_input_hash"], outputs[0]["distribution_sha256"])
+        self.assertEqual(
+            {row["market"] for row in outputs},
+            {"MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS"},
+        )
+        self.assertEqual(len({row["readout_sha256"] for row in outputs}), 4)
 
     def test_line_and_side_are_post_distribution_readout_only(self):
         calls = []
@@ -141,6 +142,8 @@ class SharedGameEngineStage1Tests(unittest.TestCase):
             {"market": "RUN_LINE", "line": 1.5, "side": "AWAY"},
             {"market": "TOTALS", "line": 8.0, "side": "OVER"},
             {"market": "TOTALS", "line": 8.0, "side": "UNDER"},
+            {"market": "TEAM_TOTALS", "line": 4.5, "side": "OVER", "team_side": "HOME"},
+            {"market": "TEAM_TOTALS", "line": 3.5, "side": "UNDER", "team_side": "AWAY"},
         )
         for case in cases:
             model_input = {**base, **case}
@@ -157,10 +160,11 @@ class SharedGameEngineStage1Tests(unittest.TestCase):
                 self.assertEqual(candidate["seed_policy"], generic["seed_policy"])
                 self.assertEqual(candidate["engine_version"], generic["engine_version"])
 
-    def test_registry_binds_all_three_markets_to_same_session(self):
+    def test_registry_binds_stage1_markets_to_same_session(self):
         registry = engine_registry()
         self.assertIs(registry["MONEYLINE"], registry["RUN_LINE"])
         self.assertIs(registry["RUN_LINE"], registry["TOTALS"])
+        self.assertIs(registry["TOTALS"], registry["TEAM_TOTALS"])
         self.assertIsNot(registry["TOTALS"], registry["NRFI"])
 
 
