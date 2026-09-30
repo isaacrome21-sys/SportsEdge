@@ -110,8 +110,13 @@ def evaluate_holdout(
     for row in rows:
         _require_holdout_row(row, window)
     n = len(rows)
+    sha_fields = {
+        "freeze_sha256": str(art["artifact_sha256"]),
+        "eval_sha256": str(ev["artifact_sha256"]),
+        "phone_card": False,
+    }
     if n < min_n:
-        return {"status": "INSUFFICIENT", "n": n, "min_n": min_n, "pass": False, "holdout": window}
+        return {"status": "INSUFFICIENT", "n": n, "min_n": min_n, "pass": False, "holdout": window, **sha_fields}
     p_hats: list[float] = []
     y: list[int] = []
     pred_m = {k: 0.0 for k in margin_keys}
@@ -167,7 +172,5 @@ def evaluate_holdout(
         "gate_integer_totals": gate_totals,
         "totals_range": [total_lo, total_hi],
         "pass": passed,
-        "phone_card": False,
-        "freeze_sha256": str(art["artifact_sha256"]),
-        "eval_sha256": str(ev["artifact_sha256"]),
+        **sha_fields,
     }
