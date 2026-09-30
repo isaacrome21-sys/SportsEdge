@@ -24,12 +24,20 @@ K  = 6
 The original pre-lock values `HR=15`, `BB=12`, `K=9` were therefore a unit
 error, not fitted parameters. They are superseded **before any August score was
 computed**. This amendment is a first-principles unit correction, not tuning on
-the held-out set. All other constants, windows, identity policy, gate criteria,
-and the 4.50 league RA9 proxy remain unchanged.
+the held-out set. All other substantive constants, windows, identity policy,
+gate criteria, and the 4.50 league RA9 proxy remain unchanged.
 
-Corrected constants receipt:
+## Pre-score implementation-default receipt — 2026-09-29
 
-`constants_sha256 = 1b1b9ed6900654e69c23b5daaf9729d85bdfec4ffa72bc921498737e2ec9c065`
+Review also found that the already-implemented pure profile builder had two
+explicit defaults that were not copied into the written constants table:
+`window=12` prior starts and `minimum=3` prior starts. No August result had been
+computed. The values themselves are **not changed**; this amendment records the
+existing implementation so there are no silent candidate constants.
+
+Final pre-score constants receipt:
+
+`constants_sha256 = c349df6bbb38c8507440e86421649100ae88a636adc683d975fe6853dbd0158c`
 
 ## Failed prior attempts (do not re-use these windows for tuning)
 
@@ -129,6 +137,8 @@ No free parameters are fit on August or on Sept 2026.
 | Shrinkage prior τ (IP) | 50.0 | First principles: mid of the 40–60 IP band declared earlier |
 | Default innings share `w` | 0.55 | First principles: ~5 IP starter |
 | `w` clip | [0.45, 0.65] | First principles |
+| Starter profile window | 12 prior starts | Existing implementation default, recorded before August scoring |
+| Starter profile minimum | 3 prior starts | Existing implementation default, recorded before August scoring |
 
 **Rate → RA9 mapping (fixed, not fit; unit-corrected before August scoring):**
 
@@ -159,8 +169,9 @@ with offense-only or raw team averages.
 
 For the pitcher who **actually started** (stand-in identity above) against team T:
 
-1. Innings-weighted K / BB / HR rates from prior starts strictly before the
-   evaluation game’s date → `starter_ra9_hat` via the fixed mapping above.
+1. Innings-weighted K / BB / HR rates from the 12 prior starts strictly before
+   the evaluation game’s date, requiring at least 3 → `starter_ra9_hat` via the
+   fixed mapping above.
 2. Residual vs team: `starter_ra9_hat - team_runs_against_mean_as_ra9`
    (team RA scaled with the same 4.50 league proxy).
 3. Shrink residual toward 0 with τ = 50 IP effective prior.
@@ -210,7 +221,7 @@ tuning on the test set.
 
 1. This document (done): August pre-registered, one-shot, identity decision,
    archive coverage noted, constant sources closed, FIP unit correction recorded,
-   4.50 assumed not measured.
+   4.50 assumed not measured, profile defaults explicitly receipted.
 2. Implementation commit with the table above hashed + unit tests for residual /
    shrinkage / share math only.
 3. Run evaluation on August **once**; publish numbers; promote only on a clear
