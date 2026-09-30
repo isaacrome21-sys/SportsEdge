@@ -132,10 +132,8 @@ class CeilingAndLabelTests(unittest.TestCase):
 class InputResolutionTests(unittest.TestCase):
     def resolve(self, files, *, event="workflow_dispatch", selected="", git_script="exit 1"):
         workflow = Path(".github/workflows/manual-mlb-snapshot.yml").read_text()
-        block = workflow.split("      - name: Resolve input", 1)[1].split("        run: |
-", 1)[1]
-        script = textwrap.dedent(block.split("
-      - name:", 1)[0])
+        block = workflow.split("      - name: Resolve input", 1)[1].split("        run: |\n", 1)[1]
+        script = textwrap.dedent(block.split("\n      - name:", 1)[0])
         script = script.replace('${{ github.event_name }}', event)
         script = script.replace('RUN_DATE="$(TZ=America/Chicago date +%F)"', 'RUN_DATE="2026-09-28"')
         with tempfile.TemporaryDirectory() as tmp:
@@ -146,9 +144,7 @@ class InputResolutionTests(unittest.TestCase):
                 path.write_text('{}')
             (root / "bin").mkdir()
             git = root / "bin/git"
-            git.write_text("#!/bin/bash
-" + git_script + "
-")
+            git.write_text("#!/bin/bash\n" + git_script + "\n")
             git.chmod(0o755)
             output = root / "output"
             env = dict(os.environ, GITHUB_OUTPUT=str(output), DISPATCH_INPUT=selected,
@@ -180,8 +176,7 @@ class InputResolutionTests(unittest.TestCase):
 
     def test_multiple_changed_inputs_fail(self):
         run, _ = self.resolve(["2026-09-29_full.json", "2026-09-29_latest.json"], event="push",
-            git_script="printf '%s\
-' manual_inputs/mlb/2026-09-29_full.json manual_inputs/mlb/2026-09-29_latest.json")
+            git_script="printf '%s\\n' manual_inputs/mlb/2026-09-29_full.json manual_inputs/mlb/2026-09-29_latest.json")
         self.assertNotEqual(run.returncode, 0)
         self.assertIn("AMBIGUOUS_CHANGED_MLB_SNAPSHOT", run.stderr)
 
