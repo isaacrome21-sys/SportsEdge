@@ -73,9 +73,6 @@ def test_1256_shape_prices_bound_pk_and_isolates_forced_error(monkeypatch) -> No
         _row("Chicago White Sox@Houston Astros", 303, "2026-09-30T23:00:00+00:00"),
     ]
     payload, blocked = MOD._run_canonical_rows(rows, history_cache_dir=".", schedule=schedule)
-    assert payload["resolved_game"]["game_pk"] == 202 or any(
-        g.get("resolved_game", {}).get("game_pk") == 202 for g in payload.get("games", [])
-    )
     priced_pks = []
     if payload.get("resolved_game"):
         priced_pks.append(payload["resolved_game"]["game_pk"])
@@ -83,3 +80,25 @@ def test_1256_shape_prices_bound_pk_and_isolates_forced_error(monkeypatch) -> No
     assert 202 in priced_pks
     assert 101 not in priced_pks
     assert any(item["reason"] == "FORCED_FAIL" for item in blocked)
+
+
+def test_no_game_pk_without_snapshot_uses_old_path(monkeypatch) -> None:
+    seen = {}
+
+    def fake_run(rows, *, history_cache_dir, schedule):
+        seen["schedule"] = schedule
+        seen["game_pk"] = rows[0].get("game_pk")
+        return {
+            "resolved_game": {"game_pk": 999, "away_team": "A", "home_team": "B"},
+            "observed_at_utc": "2026-09-30T04:47:41+00:00",
+            "market_resolution": [],
+            "feature_lineage": [],
+            "results": [{"ok": True}],
+        }
+
+    monkeypatch.setattr(MOD, "run_canonical_manual_mlb", fake_run)
+    rows = [_row("Philadelphia Phillies@Atlanta Braves", None, "2026-09-30T17:20:00+00:00")]
+    payload, blocked = MOD._run_canonical_rows(rows, history_cache_dir=".", schedule=None)
+    assert blocked == []
+    assert seen["schedule"] is None
+    assert payload.get("resolved_game", {}).get("game_pk") == 999
