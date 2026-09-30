@@ -4,6 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from sportsedge.nfl_team_aliases import NflTeamAliasError, resolve_team
+
 
 class NflLinesIntakeError(ValueError):
     pass
@@ -43,7 +45,10 @@ def _header(line: str) -> tuple[str, str] | None:
     away, home = [part.strip() for part in line.split("@", 1)]
     if not away or not home:
         raise NflLinesIntakeError(f"NFL_INTAKE_HEADER_INVALID:{line}")
-    return away, home
+    try:
+        return resolve_team(away), resolve_team(home)
+    except NflTeamAliasError as exc:
+        raise NflLinesIntakeError(str(exc)) from exc
 
 
 def parse_nfl_lines(body: str) -> list[NflGameTicket]:
