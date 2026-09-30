@@ -1,4 +1,4 @@
-"""Fail-closed Attempt 9 live rules: no fallback, no integer lines."""
+"""Fail-closed Attempt 9 live rules: no fallback, no integer lines, no spreads."""
 from __future__ import annotations
 
 from datetime import date
@@ -8,6 +8,7 @@ from sportsedge.nfl_attempt9_live_forecast import (
     NO_MODEL_HISTORY,
     NO_MODEL_INTEGER,
     NO_MODEL_MONEYLINE,
+    NO_MODEL_SPREAD,
     load_runtime,
     market_eligibility,
     raw_forecasts,
@@ -20,12 +21,15 @@ class EligibilityTests(unittest.TestCase):
     def test_moneyline_blocked(self):
         self.assertEqual(market_eligibility("moneyline", None), NO_MODEL_MONEYLINE)
 
-    def test_integer_spread_blocked(self):
-        self.assertEqual(market_eligibility("spread", 3.0), NO_MODEL_INTEGER)
-        self.assertEqual(market_eligibility("spread", -7.0), NO_MODEL_INTEGER)
+    def test_all_spreads_blocked(self):
+        self.assertEqual(market_eligibility("spread", 3.0), NO_MODEL_SPREAD)
+        self.assertEqual(market_eligibility("spread", -7.0), NO_MODEL_SPREAD)
+        self.assertEqual(market_eligibility("spread", -3.5), NO_MODEL_SPREAD)
 
-    def test_half_point_spread_open(self):
-        self.assertIsNone(market_eligibility("spread", -3.5))
+    def test_integer_total_blocked(self):
+        self.assertEqual(market_eligibility("total", 47.0), NO_MODEL_INTEGER)
+
+    def test_half_point_total_open(self):
         self.assertIsNone(market_eligibility("total", 47.5))
 
 
