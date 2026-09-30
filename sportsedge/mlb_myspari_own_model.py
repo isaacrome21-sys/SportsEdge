@@ -14,7 +14,7 @@ from __future__ import annotations
 from math import isfinite
 from typing import Any, Mapping, Sequence
 
-from .mlb_empirical_support import empirical_guard_reason
+from .mlb_empirical_support import empirical_guard_reason\nfrom .pitcher_joint_engine import ENGINE_VERSION as PITCHER_JOINT_ENGINE_VERSION
 from .mlb_edge_score import ev_per_dollar, score_mlb_edge
 from .mlb_scored_card import build_mlb_scored_card
 
@@ -130,7 +130,7 @@ def myspari_rows(payload: Mapping[str, Any], *, quote_age_seconds: float = 0.0,
         if (
             merged.get("status") == "ACTIONABLE"
             and str(merged.get("market") or "").upper() == "PITCHER_OUTS"
-            and str(merged.get("engine_version") or "").startswith("mlb_pitcher_joint_empirical_")
+            and str(merged.get("engine_version") or "") == PITCHER_JOINT_ENGINE_VERSION
         ):
             merged["status"] = "LEAN"
             codes = tuple(merged.get("presentation_reason_codes") or ())
