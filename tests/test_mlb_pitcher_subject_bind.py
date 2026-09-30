@@ -7,6 +7,10 @@ from sportsedge.mlb_source import GameSnapshot
 from sportsedge.manual_quote import validate_manual_quote
 import pytest
 
+# Phone intake emits PITCHER_STRIKEOUTS; the engine market is PITCHER_K.
+K_MANUAL = "PITCHER_STRIKEOUTS"
+K_ENGINE = "PITCHER_K"
+
 
 def _game() -> GameSnapshot:
     return GameSnapshot(
@@ -26,8 +30,8 @@ def _game() -> GameSnapshot:
     )
 
 
-def _quote(market_type: str, name: str, line: float, price: int, paired_price: int) -> dict:
-    return {
+def _quote(market_type: str, name: str, line: float, price: int, paired_price: int, subject_id: str | None = None) -> dict:
+    row = {
         "game_id": "Philadelphia Phillies@Atlanta Braves",
         "market_type": market_type,
         "side": "OVER",
@@ -41,6 +45,9 @@ def _quote(market_type: str, name: str, line: float, price: int, paired_price: i
         "source": "MANUAL",
         "subject_name": name,
     }
+    if subject_id is not None:
+        row["subject_id"] = subject_id
+    return row
 
 
 def test_outs_and_k_names_survive_bind() -> None:
@@ -54,12 +61,13 @@ Tyler Mahle k 5.5 -110 -110
         schedule=[_game()],
     )
     outs = next(r for r in bound["rows"] if resolve_manual_market_type(r["market_type"]) == "PITCHER_OUTS")
-    ks = next(r for r in bound["rows"] if resolve_manual_market_type(r["market_type"]) == "PITCHER_K")
+    ks = next(r for r in bound["rows"] if resolve_manual_market_type(r["market_type"]) == K_ENGINE)
     assert outs["subject_name"] == "Cristopher Sanchez"
     assert ks["subject_name"] == "Tyler Mahle"
     assert outs["paired_side"] == "UNDER" and ks["paired_side"] == "UNDER"
     parsed = parse_lines(text)
-    assert {resolve_manual_market_type(r.market_type) for r in parsed} == {"PITCHER_OUTS", "PITCHER_K"}
+    assert {r.market_type for r in parsed} == {"PITCHER_OUTS", K_MANUAL}
+    assert {resolve_manual_market_type(r.market_type) for r in parsed} == {"PITCHER_OUTS", K_ENGINE}
 
 
 def test_two_sided_prop_still_parses() -> None:
@@ -67,6 +75,17 @@ def test_two_sided_prop_still_parses() -> None:
     assert len(rows) == 1
     assert rows[0].price == -174 and rows[0].paired_price == 130
     assert rows[0].paired_side == "UNDER"
+    assert rows[0].market_type == "PITCHER_OUTS"
+
+
+def test_two_sided_k_still_parses() -> None:
+    rows = parse_lines("Phillies @ Braves\nTyler Mahle k 5.5 -110 -110\n")
+    assert len(rows) == 1
+    assert rows[0].market_type == K_MANUAL
+    assert resolve_manual_market_type(rows[0].market_type) == K_ENGINE
+    assert rows[0].price == -110 and rows[0].paired_price == -110
+    assert rows[0].paired_side == "UNDER"
+    assert rows[0].subject_name == "Tyler Mahle"
 
 
 def test_probable_starter_resolves_to_id() -> None:
@@ -77,7 +96,7 @@ def test_probable_starter_resolves_to_id() -> None:
 
 
 def test_non_starter_is_subject_unresolved() -> None:
-    row = validate_manual_quote(_quote("PITCHER_K", "Zack Wheeler", 5.5, -110, -110))
+    row = validate_manual_quote(_quote(K_MANUAL, "Zack Wheeler", 5.5, -110, -110))
     with pytest.raises(ValueError, match="SUBJECT_UNRESOLVED"):
         resolve_pitcher_subject(row, _game())
 
@@ -92,9 +111,26 @@ def test_canonical_hook_does_not_people_lookup_a_non_starter() -> None:
         _resolve_subject(row, opener=boom, game=_game())
 
 
+def test_starter_name_wrong_id_is_mismatch() -> None:
+    row = validate_manual_quote(
+        _quote("PITCHER_OUTS", "Cristopher Sanchez", 17.5, -174, 130, subject_id="650633")
+    )
+
+    def boom(*_a, **_k):
+        raise AssertionError("People API must not run for pitcher props")
+
+    with pytest.raises(CanonicalManualMLBError, match="MANUAL_SUBJECT_ID_NAME_MISMATCH"):
+        _resolve_subject(row, opener=boom, game=_game())
+
+
 def test_one_sided_prop_is_blocked_pricing_method() -> None:
     with pytest.raises(LinesIntakeError, match="BLOCKED_PRICING_METHOD"):
         parse_lines("Phillies @ Braves\nCristopher Sanchez outs 17.5 -174\n")
+
+
+def test_one_sided_k_is_blocked_pricing_method() -> None:
+    with pytest.raises(LinesIntakeError, match="BLOCKED_PRICING_METHOD"):
+        parse_lines("Phillies @ Braves\nTyler Mahle k 5.5 -110\n")
 
 
 def test_outs_and_k_names_survive_to_pricer(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -118,7 +154,7 @@ def test_outs_and_k_names_survive_to_pricer(monkeypatch: pytest.MonkeyPatch) -> 
     payload = run_canonical_manual_mlb(
         [
             _quote("PITCHER_OUTS", "Cristopher Sanchez", 17.5, -174, 130),
-            _quote("PITCHER_K", "Tyler Mahle", 5.5, -110, -110),
+            _quote(K_MANUAL, "Tyler Mahle", 5.5, -110, -110),
         ],
         schedule=[_game()],
         opener=lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("no network")),
@@ -127,7 +163,7 @@ def test_outs_and_k_names_survive_to_pricer(monkeypatch: pytest.MonkeyPatch) -> 
     assert names["Cristopher Sanchez"]["subject_id"] == "661563"
     assert names["Cristopher Sanchez"]["engine_market"] == "PITCHER_OUTS"
     assert names["Tyler Mahle"]["subject_id"] == "641835"
-    assert names["Tyler Mahle"]["engine_market"] == "PITCHER_K"
+    assert names["Tyler Mahle"]["engine_market"] == K_ENGINE
     entities = {q["entity_id"] for q in seen["quotes"]}
     assert entities == {"661563", "641835"}
     assert all(q.get("entity_id") for q in seen["quotes"])
