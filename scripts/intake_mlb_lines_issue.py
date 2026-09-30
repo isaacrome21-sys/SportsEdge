@@ -13,7 +13,8 @@ from zoneinfo import ZoneInfo
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sportsedge.mlb_issue_body import IssueLinesError, extract_issue_lines  # noqa: E402
-from sportsedge.mlb_lines_intake import LinesIntakeError, build_input  # noqa: E402
+from sportsedge.mlb_lines_intake import LinesIntakeError  # noqa: E402
+from sportsedge.mlb_resolve import build_bound_input  # noqa: E402
 from sportsedge.mlb_source import fetch_schedule  # noqa: E402
 
 CHICAGO = ZoneInfo("America/Chicago")
@@ -36,10 +37,9 @@ def main() -> int:
         print(f"INTAKE_FAILED: {exc}", file=sys.stderr)
         return 2
     try:
-        # Phone issues opened late CT bind tomorrow's games. Fetch both days.
         nxt = (observed.date() + timedelta(days=1)).isoformat()
         schedule = list(fetch_schedule(slate)) + list(fetch_schedule(nxt))
-        payload = build_input(body, observed_at=observed.isoformat(), schedule=schedule)
+        payload = build_bound_input(body, observed_at=observed.isoformat(), schedule=schedule)
         # Reuse the exact live schedule response that bound the phone text to MLB games.
         # This snapshot is run-local evidence only; it is not persisted as a cross-run cache.
         payload["schedule_snapshot"] = [asdict(game) for game in schedule]

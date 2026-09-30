@@ -29,6 +29,10 @@ def partition_live_rows(rows, *, run_date: str | None, max_age_minutes: int | No
     blocked: list[dict] = []
     for index, raw in enumerate(rows):
         game_id = str((raw or {}).get("game_id") or "")
+        bind = str((raw or {}).get("bind_status") or "")
+        if bind:
+            blocked.append({"row": index, "game_id": game_id, "reason": bind})
+            continue
         try:
             quote = validate_manual_quote(raw)
         except ManualQuoteError as exc:
