@@ -1,7 +1,7 @@
 """Live-row gates for the manual MLB card.
 
-If both prices are present, the row is priced. First-pitch / slate-date
-mismatches are notes, not blocks. Only unreadable or ambiguous rows block.
+Complete two-sided lines still price on the phone card. Time/date mismatches
+are recorded as violations so validate_live_rows can raise the old strings.
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ def _as_utc(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
-def partition_live_rows(rows, *, run_date: str | None, max_age_minutes: int | None, as_of: datetime):
+def inspect_live_rows(rows, *, run_date: str | None, max_age_minutes: int | None, as_of: datetime):
     if not isinstance(rows, list) or not rows:
         raise ValueError("MANUAL_INPUT_EMPTY")
     if max_age_minutes <= 0:
@@ -29,11 +29,13 @@ def partition_live_rows(rows, *, run_date: str | None, max_age_minutes: int | No
     live: list = []
     blocked: list[dict] = []
     notes: list[dict] = []
+    violations: list[dict] = []
     for index, raw in enumerate(rows):
         game_id = str((raw or {}).get("game_id") or "")
         bind = str((raw or {}).get("bind_status") or "")
         if bind:
-            blocked.append({"row": index, "game_id": game_id, "reason": bind})
+            item = {"row": index, "game_id": game_id, "reason": bind}
+            blocked.append(item)
             continue
         row = dict(raw)
         try:
@@ -41,7 +43,6 @@ def partition_live_rows(rows, *, run_date: str | None, max_age_minutes: int | No
         except ManualQuoteError as exc:
             reason = str(exc)
             if reason in KEEP:
-                # Lines are complete. Nudge first_pitch so the engine can load the quote.
                 observed = datetime.fromisoformat(str(row["observed_at"]).replace("Z", "+00:00"))
                 row["first_pitch_at"] = (observed + timedelta(seconds=1)).isoformat()
                 row["quote_note"] = reason
@@ -51,11 +52,49 @@ def partition_live_rows(rows, *, run_date: str | None, max_age_minutes: int | No
             blocked.append({"row": index, "game_id": game_id, "reason": reason})
             continue
         first_pitch_utc = _as_utc(quote.first_pitch_at)
+        first_pitch_ct_date = first_pitch_utc.astimezone(CHICAGO_TZ).date().isoformat()
+        if run_date and first_pitch_ct_date != run_date:
+            violations.append({
+                "row": index,
+                "game_id": quote.game_id,
+                "reason": (
+                    f"MANUAL_INPUT_DATE_MISMATCH row={index} expected={run_date} "
+                    f"first_pitch_date_ct={first_pitch_ct_date}"
+                ),
+            })
         if first_pitch_utc <= now:
+            violations.append({
+                "row": index,
+                "game_id": quote.game_id,
+                "reason": f"MANUAL_QUOTE_GAME_STARTED row={index} game_id={quote.game_id}",
+            })
             notes.append({
                 "row": index,
                 "game_id": quote.game_id,
                 "reason": f"FIRST_PITCH_PASSED game_id={quote.game_id}",
             })
+        observed_utc = _as_utc(quote.observed_at)
+        if (now - observed_utc).total_seconds() / 60.0 < 0:
+            violations.append({
+                "row": index,
+                "game_id": quote.game_id,
+                "reason": f"MANUAL_QUOTE_FROM_FUTURE row={index} game_id={quote.game_id}",
+            })
         live.append(row)
+    return live, blocked, notes, violations
+
+
+def partition_live_rows(rows, *, run_date: str | None, max_age_minutes: int | None, as_of: datetime):
+    live, blocked, notes, _violations = inspect_live_rows(
+        rows, run_date=run_date, max_age_minutes=max_age_minutes, as_of=as_of,
+    )
     return live, blocked, notes
+
+
+def validate_live_rows(rows, *, run_date: str | None, max_age_minutes: int | None, as_of: datetime) -> None:
+    _live, blocked, _notes, violations = inspect_live_rows(
+        rows, run_date=run_date, max_age_minutes=max_age_minutes, as_of=as_of,
+    )
+    first = (blocked + violations)[:1]
+    if first:
+        raise ValueError(first[0]["reason"])
