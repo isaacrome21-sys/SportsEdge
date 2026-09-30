@@ -38,6 +38,13 @@ class ManualQuoteContractTests(unittest.TestCase):
         self.assertIsNone(parsed.subject_id)
         self.assertEqual(parsed.subject_name, "Cam Schlittler")
 
+    def test_pitcher_name_without_game_is_subject_unresolved(self):
+        row = validate_manual_quote(dict(BASE, market_type="PITCHER_OUTS", subject_id="650633", subject_name="Matthew Boyd"))
+        def boom(*_a, **_k):
+            raise AssertionError("People API must not run for pitcher props")
+        with self.assertRaisesRegex(CanonicalManualMLBError, "SUBJECT_UNRESOLVED"):
+            _resolve_subject(row, opener=boom)
+
     def test_subject_id_only_resolves_team(self):
         row = validate_manual_quote(dict(BASE, market_type="BATTER_HITS", subject_id="571510"))
         class Resp:

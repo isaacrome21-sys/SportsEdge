@@ -1,4 +1,5 @@
 from sportsedge.canonical_manual_mlb import CanonicalManualMLBError, _resolve_subject, run_canonical_manual_mlb
+from sportsedge.engine_registry import resolve_manual_market_type
 from sportsedge.mlb_lines_intake import LinesIntakeError, parse_lines
 from sportsedge.mlb_pitcher_subject import resolve_pitcher_subject
 from sportsedge.mlb_resolve import build_bound_input
@@ -52,13 +53,20 @@ Tyler Mahle k 5.5 -110 -110
         observed_at="2026-09-30T10:47:51+00:00",
         schedule=[_game()],
     )
-    outs = next(r for r in bound["rows"] if r["market_type"] == "PITCHER_OUTS")
-    ks = next(r for r in bound["rows"] if r["market_type"] == "PITCHER_STRIKEOUTS")
+    outs = next(r for r in bound["rows"] if resolve_manual_market_type(r["market_type"]) == "PITCHER_OUTS")
+    ks = next(r for r in bound["rows"] if resolve_manual_market_type(r["market_type"]) == "PITCHER_K")
     assert outs["subject_name"] == "Cristopher Sanchez"
     assert ks["subject_name"] == "Tyler Mahle"
     assert outs["paired_side"] == "UNDER" and ks["paired_side"] == "UNDER"
     parsed = parse_lines(text)
-    assert {r.market_type for r in parsed} == {"PITCHER_OUTS", "PITCHER_STRIKEOUTS"}
+    assert {resolve_manual_market_type(r.market_type) for r in parsed} == {"PITCHER_OUTS", "PITCHER_K"}
+
+
+def test_two_sided_prop_still_parses() -> None:
+    rows = parse_lines("Phillies @ Braves\nCristopher Sanchez outs 17.5 -174 +130\n")
+    assert len(rows) == 1
+    assert rows[0].price == -174 and rows[0].paired_price == 130
+    assert rows[0].paired_side == "UNDER"
 
 
 def test_probable_starter_resolves_to_id() -> None:
@@ -84,8 +92,8 @@ def test_canonical_hook_does_not_people_lookup_a_non_starter() -> None:
         _resolve_subject(row, opener=boom, game=_game())
 
 
-def test_one_sided_prop_fails_closed() -> None:
-    with pytest.raises(LinesIntakeError):
+def test_one_sided_prop_is_blocked_pricing_method() -> None:
+    with pytest.raises(LinesIntakeError, match="BLOCKED_PRICING_METHOD"):
         parse_lines("Phillies @ Braves\nCristopher Sanchez outs 17.5 -174\n")
 
 
@@ -110,7 +118,7 @@ def test_outs_and_k_names_survive_to_pricer(monkeypatch: pytest.MonkeyPatch) -> 
     payload = run_canonical_manual_mlb(
         [
             _quote("PITCHER_OUTS", "Cristopher Sanchez", 17.5, -174, 130),
-            _quote("PITCHER_STRIKEOUTS", "Tyler Mahle", 5.5, -110, -110),
+            _quote("PITCHER_K", "Tyler Mahle", 5.5, -110, -110),
         ],
         schedule=[_game()],
         opener=lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("no network")),
