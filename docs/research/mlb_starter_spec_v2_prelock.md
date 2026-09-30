@@ -56,25 +56,38 @@ Scored with shipped Stage-1 Gamma-Poisson (`r = 5.217229403204152`).
 
 ## Starter identity decision (locked before numbers)
 
-The repo has **no** pregame point-in-time starter archive (#1183). Historical
-StatsAPI schedule probable-pitcher fields resolve to who started, not who was
-announced beforehand.
+### Archive reality
 
-**Decision for v2 August gate:** use **actual starters** as a stand-in for the
-pregame announced starter.
+- A **pregame** starter archive **does** exist: workflow
+  `mlb-pit-lineup-starter-archive.yml` (every 15 minutes, March–October) writes
+  to the `data` branch.
+- **Coverage starts 2026-09-13.** There are **no** August snapshots. Actual
+  starters are the only option for the August gate.
+- Historical StatsAPI schedule probable-pitcher fields are not a substitute for
+  those snapshots; they resolve toward who started.
+
+### Decision for v2 August gate
+
+Use **actual starters** as a stand-in for the pregame announced starter.
 
 - Pregame scratches / late changes are a few percent of games; the bias is
   accepted and disclosed.
 - Every evaluation receipt must set
   `starter_identity_source = ACTUAL_STARTER_STAND_IN_NO_PREGAME_PIT_ARCHIVE`
   and `starter_identity_pit_verified = false`.
-- This **does not** block the August promotion gate for v2. A pass is still
-  provisional: production adoption requires either (a) a forward PIT archive
-  that confirms the same effect, or (b) an explicit ops acceptance of the
-  stand-in bias.
-- Weather remains neutral (no PIT forecast archive).
+- This **does not** block the August promotion gate for v2. A pass is
+  **provisional**.
 
-Deciding this after reading August numbers is forbidden.
+### Path from provisional → full authority
+
+The forward archive is already running. Clean pregame confirmation cannot use
+Sept 13–27 for the promotion decision (barred windows). Full authority waits on
+**playoff and/or next-season** PIT-bound evidence that the same residual effect
+holds, or on explicit ops acceptance of the stand-in bias.
+
+Weather remains neutral (no PIT forecast archive).
+
+Deciding identity policy after reading August numbers is forbidden.
 
 ## Constants: source of `k` and residual scaling (locked before numbers)
 
@@ -153,8 +166,9 @@ mean error) are descriptive.
 
 If either gate fails, production stays on defense blend.
 
-A gate pass is **provisional production authority** subject to the starter
-identity caveat above (forward PIT archive or explicit ops acceptance).
+A gate pass is **provisional production authority**. Full authority waits on
+PIT-bound confirmation from the running archive outside barred windows
+(playoffs / next season) or explicit ops acceptance of the stand-in.
 
 ### One-shot rule
 
@@ -166,7 +180,7 @@ tuning on the test set.
 ## Implementation order
 
 1. This document (done): August pre-registered, one-shot, identity decision,
-   constant sources closed.
+   archive coverage noted, constant sources closed.
 2. Implementation commit with the table above hashed + unit tests for residual /
    shrinkage / share math only.
 3. Run evaluation on August **once**; publish numbers; promote only on a clear
