@@ -11,8 +11,18 @@
   },
   "holdout": {
     "season": 2026,
-    "weeks": [4, 5, 6, 7, 8, 9, 10, 11, 12],
-    "game_type": "REG"
+    "game_type": "REG",
+    "active": "if_sha_before_2026_10_01_w4_kickoff",
+    "if_sha_before_2026_10_01_w4_kickoff": {
+      "weeks": [4, 5, 6, 7, 8, 9, 10, 11, 12],
+      "season": 2026,
+      "game_type": "REG"
+    },
+    "if_sha_misses_kickoff": {
+      "weeks": [5, 6, 7, 8, 9, 10, 11, 12, 13],
+      "season": 2026,
+      "game_type": "REG"
+    }
   },
   "min_n": 80,
   "insufficient_status": "INSUFFICIENT",
@@ -22,12 +32,12 @@
     "calibration_intercept_abs": 0.1,
     "outcome_freq_tolerance": 0.03,
     "margin_keys": [3, 7, 10],
-    "integer_totals": {"lo": 30, "hi": 60}
+    "integer_totals": {"lo": 40, "hi": 51}
   },
   "authority": {
     "phone_card": false,
     "retune": false,
     "second_look": false
   },
-  "artifact_sha256": "9f01c479500923333fc6fe4abfa79bbff1ec087a8af3336701c1283fcd342c09"
+  "artifact_sha256": "1f1495164ee0df22747e6fd1c9aa46c8e6b36490456f7f261263e972c0dda923"
 }
