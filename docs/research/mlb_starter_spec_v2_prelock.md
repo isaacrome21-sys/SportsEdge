@@ -1,3 +1,104 @@
+# Starter component v2 — pre-lock specification
+
+**Status:** specification locked in writing. No code, fit, or evaluation on a
+held-out window until this document is treated as the candidate definition.
+
+## Failed prior attempts (do not re-use these windows for tuning)
+
+- Existing `context_adjusted_means` starter multiplier vs defense blend on
+  **2026-09-15 → 2026-09-27** (174 games): mean |gap| 2.62 vs 1.38; Brier 0.242
+  vs 0.236. **FAIL.** Documented in
+  `mlb_starter_vs_defense_heldout_results_20260915_27.md`.
+- That window has now judged **two** starter attempts. It is **burned for
+  tuning**. A later pass on Sept 15–27 alone is not promotion evidence.
+
+## Pre-registered evaluation window for v2
+
+**Primary gate (locked): 2026-08-01 → 2026-08-31** (full August regular season).
+
+Nobody has tuned a starter candidate on this stretch. It is large enough to
+judge means and line calibration.
+
+### Explicitly off-limits for the v2 promotion gate
+
+| Window | Why barred |
+|---|---|
+| 2026-09-01 → 2026-09-14 | Full-game dispersion `r` was **fit** here (#1236 / #1238) |
+| 2026-09-15 → 2026-09-27 | Burned by two prior starter attempts |
+| 2026-09-28 onward | Regular season is over; only a few playoff games — not enough n |
+
+Sept 15–27 (and optionally Sept 1–14) may appear only as **secondary**
+descriptive checks after the August gate is scored. They never decide promotion.
+
+Playoff games are out of scope for v2 promotion; treat postseason totals as
+small leans until a separate postseason window exists.
+
+## Production baseline (unchanged)
+
+Defense blend only:
+
+```
+away_mean = 0.5 * away.runs_for + 0.5 * home.runs_against
+home_mean = 0.5 * home.runs_for + 0.5 * away.runs_against
+```
+
+Scored with shipped Stage-1 Gamma-Poisson (`r = 5.217229403204152`).
+
+## Diagnosed failure modes of v1 multiplier
+
+1. **Double-counting the starter.** Team runs-allowed already embeds recent
+   starter performance. Multiplying again stacks the same signal twice —
+   consistent with lower mean bias but worse absolute / line error.
+2. **ERA over a few starts is noise.** Prefer peripherals that stabilize with
+   fewer innings: K, BB, HR allowed (rate form), with strong shrinkage to league.
+3. **Starter is not the full game.** ~55–60% of outs; bullpen should remain at
+   team level. Adjust only the starter share.
+
+## v2 candidate definition (locked)
+
+### A. Team shell (same as production)
+
+Keep the defense-blend shell as the game-level baseline. Do **not** replace it
+with offense-only or raw team averages.
+
+### B. Residual starter effect (not a second full-game multiplier)
+
+For the pitcher expected to start against team T:
+
+1. Build a **stabilized starter run-prevention residual** relative to the
+   **team’s recent runs-allowed mean**, not relative to league alone:
+   - Use innings-weighted K%, BB%, HR% (or K-BB and HR rates) from prior starts
+     strictly before the evaluation game’s date.
+   - Map rates → expected runs allowed per 9 via a fixed, predeclared mapping
+     (no fit on the evaluation window).
+   - Residual: `starter_ra9_hat - team_runs_against_per_game_scaled_to_ra9`
+     (exact scaling constants declared in implementation commit).
+2. **Shrinkage:** posterior mean toward 0 residual with prior strength equivalent
+   to at least ~40–60 IP (exact τ locked in implementation commit). Few-start
+   pitchers barely move the mean.
+3. **Innings share:** `w = clip(expected_starter_outs / 27, 0.45, 0.65)` from
+   prior mean outs, default 0.55 if unknown. Only fraction `w` of the team’s
+   allowed runs is shifted by the residual; `(1-w)` stays at the team shell.
+
+Opponent scoring mean becomes:
+
+```
+shell = defense_blend component for that side
+adjusted = shell * (1 + w * k * residual_scaled)
+```
+
+where `k` and residual scaling are fixed constants chosen **before** looking at
+the evaluation window (implementation commit must print them and hash the
+config). No grid search on the evaluation window.
+
+### C. Explicit non-goals for v2
+
+- No weather fit (still neutral unless PIT forecast archive exists).
+- No re-tuning of full-game dispersion.
+- No use of postgame starter identity; if PIT starter archive is missing, the
+  run remains diagnostic and cannot promote.
+- No third attempt of the **v1 multiplier** design.
+
 ## Promotion gate (unchanged)
 
 On **2026-08-01 → 2026-08-31** only:
@@ -17,3 +118,11 @@ If either gate fails, production stays on defense blend.
 dead. A tweaked v3 does **not** get a second look at August — it needs a new,
 unused pre-registered window. Re-running August after changing constants is
 tuning on the test set.
+
+## Implementation order
+
+1. This document (done), with August pre-registered and one-shot (done).
+2. Implementation commit with frozen constants + unit tests for residual/
+   shrinkage / share math only.
+3. Run evaluation on August **once**; publish numbers; promote only on a clear
+   gate pass.
