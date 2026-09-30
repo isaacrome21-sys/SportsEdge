@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import Any
 import json
 
-SNAPSHOT = Path(__file__).resolve().parents[3] / "data" / "nfl_discrete_v2" / "scores_2021_2024_reg.json"
+from sportsedge.sports.nfl.discrete_v2_source import SNAPSHOT, snapshot_bytes, snapshot_sha256
+
 FREEZE_PATH = Path(__file__).resolve().parents[3] / "config" / "nfl_discrete_v2_freeze.json"
 SEASONS = {2021, 2022, 2023, 2024}
 GRID_MAX = 70
@@ -23,12 +24,8 @@ def canonical_sha256(value: dict[str, Any]) -> str:
     return sha256(raw).hexdigest()
 
 
-def snapshot_sha256(path: Path | None = None) -> str:
-    return sha256((path or SNAPSHOT).read_bytes()).hexdigest()
-
-
 def load_fit_games(path: Path | None = None) -> list[tuple[int, int]]:
-    payload = json.loads((path or SNAPSHOT).read_text())
+    payload = json.loads(snapshot_bytes(path))
     rows: list[tuple[int, int]] = []
     for season, _week, home, away in payload:
         season = int(season)
