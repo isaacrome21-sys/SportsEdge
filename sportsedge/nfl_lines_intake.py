@@ -27,9 +27,7 @@ class NflGameTicket:
 
 
 def _american(token: str) -> int:
-    text = token.strip().replace(“+”, "+")
-    if text.endswith((".0",)): 
-        text = text[:-2]
+    text = token.strip()
     try:
         value = int(float(text))
     except ValueError as exc:
