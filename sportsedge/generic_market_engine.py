@@ -261,13 +261,12 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
     # as Stage-1 shared_game_engine. F5 remains fail-closed above.
     total_line = line if market == "TOTALS" else _finite(model_input.get("total_line", 0.0), "total_line", lower=0.0)
     simulations = int(model_input.get("simulations", V8_PRIMARY_GAME_DEFAULT_SIMULATIONS))
-    # Keep RNG identity tied to substantive model state, not source-receipt
-    # metadata. Provenance remains available on the caller/model-input surface.
     game_build_hash = _canonical_json_sha256({
         "engine": V7_DISTRIBUTION_VERSION,
         "game_id": model_input.get("game_id"),
         "away_mean_runs": away_mean,
         "home_mean_runs": home_mean,
+        "feature_source_hash": model_input.get("feature_source_hash"),
         "full_game_distribution_mode": FULL_GAME_MODE_SHARED_GAMMA_POISSON,
         "full_game_dispersion_r": DEFAULT_FULL_GAME_DISPERSION_R,
     })

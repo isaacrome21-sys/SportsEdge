@@ -108,7 +108,7 @@ class SharedGameEngineStage1Tests(unittest.TestCase):
         self.assertNotEqual(neutral.result_sha256, market_line.result_sha256)
         self.assertEqual(score_distribution_sha256(neutral), score_distribution_sha256(market_line))
 
-    def test_distinct_feature_provenance_preserves_distribution_when_features_unchanged(self):
+    def test_distinct_feature_provenance_forces_new_distribution(self):
         calls = []
 
         def counting_simulator(**kwargs):
@@ -123,8 +123,7 @@ class SharedGameEngineStage1Tests(unittest.TestCase):
         second = engine({**base, "feature_source_hash": "source-v2", "market": "MONEYLINE", "line": 0.0, "side": "HOME"})
         self.assertEqual(len(calls), 2)
         self.assertNotEqual(first["model_input_hash"], second["model_input_hash"])
-        self.assertEqual(first["distribution_sha256"], second["distribution_sha256"])
-        self.assertEqual(first["model_p"], second["model_p"])
+        self.assertNotEqual(first["distribution_sha256"], second["distribution_sha256"])
 
     def test_stage1_readouts_match_generic_path_under_promoted_dispersion(self):
         """Shared engine and generic adapter must price Stage-1 markets the same."""
