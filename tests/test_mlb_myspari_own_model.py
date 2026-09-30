@@ -7,7 +7,7 @@ import sys
 import tempfile
 import unittest
 
-from sportsedge.mlb_myspari_own_model import LABEL, myspari_rows, render_markdown
+from sportsedge.mlb_myspari_own_model import LABEL, myspari_rows, render_markdown\nfrom sportsedge.pitcher_joint_engine import ENGINE_VERSION as PITCHER_JOINT_ENGINE_VERSION
 
 
 def _row(market, side, odds, model_p, *, line=None, entity="777", fair=None, edge=None, status="MODEL_CANDIDATE"):
@@ -64,11 +64,11 @@ class OwnModelCardTests(unittest.TestCase):
     def test_empirical_pitcher_outs_can_never_print_actionable(self):
         payload = {"results": [
             {**_row("PITCHER_OUTS", "OVER", -110, 7.5 / 11.0, line=17.5, entity="661563", fair=0.50, edge=7.5 / 11.0 - 0.50),
-             "engine_version": "mlb_pitcher_joint_empirical_v2",
+             "engine_version": PITCHER_JOINT_ENGINE_VERSION,
              "empirical_evidence": {"sample_size": 10, "sample_unit": "starts", "wins": 7, "pushes": 0,
                                     "weighted": False, "pool_sha256": "abc"}},
             {**_row("PITCHER_OUTS", "UNDER", -110, 3.5 / 11.0, line=17.5, entity="661563", fair=0.50, edge=3.5 / 11.0 - 0.50),
-             "engine_version": "mlb_pitcher_joint_empirical_v2",
+             "engine_version": PITCHER_JOINT_ENGINE_VERSION,
              "empirical_evidence": {"sample_size": 10, "sample_unit": "starts", "wins": 3, "pushes": 0,
                                     "weighted": False, "pool_sha256": "abc"}},
         ]}
