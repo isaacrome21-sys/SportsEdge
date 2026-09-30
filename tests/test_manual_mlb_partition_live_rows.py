@@ -23,29 +23,30 @@ def _row(**overrides):
     return base
 
 
-def test_game_started_with_valid_pregame_observed() -> None:
+def test_complete_lines_price_after_first_pitch() -> None:
+    rows = [_row(
+        observed_at="2026-09-30T04:27:25+00:00",
+        first_pitch_at="2026-09-29T16:00:00+00:00",
+    )]
+    live, blocked, notes = partition_live_rows(rows, run_date="2026-09-29", max_age_minutes=60, as_of=AS_OF)
+    assert blocked == []
+    assert live
+    assert notes[0]["reason"] == "MANUAL_QUOTE_NOT_PREGAME"
+
+
+def test_started_game_with_valid_observed_still_prices() -> None:
     rows = [_row(
         observed_at="2026-09-29T16:00:00+00:00",
         first_pitch_at="2026-09-30T03:00:00+00:00",
     )]
-    live, blocked = partition_live_rows(rows, run_date="2026-09-29", max_age_minutes=60, as_of=AS_OF)
+    live, blocked, notes = partition_live_rows(rows, run_date="2026-09-29", max_age_minutes=60, as_of=AS_OF)
+    assert blocked == []
+    assert len(live) == 1
+    assert notes and "FIRST_PITCH_PASSED" in notes[0]["reason"]
+
+
+def test_ambiguous_bind_still_blocks() -> None:
+    rows = [_row(bind_status="AMBIGUOUS_GAME")]
+    live, blocked, _notes = partition_live_rows(rows, run_date="2026-09-29", max_age_minutes=60, as_of=AS_OF)
     assert live == []
-    assert blocked[0]["reason"].startswith("MANUAL_QUOTE_GAME_STARTED")
-
-
-def test_date_mismatch() -> None:
-    rows = [_row(first_pitch_at="2026-10-02T17:00:00+00:00")]
-    live, blocked = partition_live_rows(rows, run_date="2026-09-29", max_age_minutes=60, as_of=AS_OF)
-    assert live == []
-    assert "DATE_MISMATCH" in blocked[0]["reason"]
-
-
-def test_mixed_live_and_blocked() -> None:
-    good = _row()
-    bad = _row(
-        game_id="Chicago White Sox@Houston Astros",
-        first_pitch_at="2026-09-30T03:00:00+00:00",
-    )
-    live, blocked = partition_live_rows([bad, good], run_date="2026-09-29", max_age_minutes=60, as_of=AS_OF)
-    assert [r["game_id"] for r in live] == [good["game_id"]]
-    assert blocked[0]["reason"].startswith("MANUAL_QUOTE_GAME_STARTED")
+    assert blocked[0]["reason"] == "AMBIGUOUS_GAME"

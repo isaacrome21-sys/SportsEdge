@@ -78,10 +78,11 @@ def main() -> int:
     snapshot = json.loads(Path(args.input).read_text())
     raw_rows = snapshot.get("rows") if isinstance(snapshot, dict) else snapshot if isinstance(snapshot, list) else None
     blocked: list[dict] = []
+    notes: list[dict] = []
     rows = raw_rows
     if raw_rows is not None and not args.allow_stale:
         as_of = parse_timestamp(args.as_of) if args.as_of else datetime.now(timezone.utc)
-        rows, blocked = partition_live_rows(
+        rows, blocked, notes = partition_live_rows(
             raw_rows, run_date=args.run_date, max_age_minutes=args.max_age_minutes, as_of=as_of,
         )
 
@@ -89,11 +90,11 @@ def main() -> int:
     if rows:
         payload = _run_canonical_rows(rows, history_cache_dir=args.history_cache_dir, schedule=schedule)
     elif raw_rows is not None:
-        # All rows blocked, dict or list snapshot. Do not re-run the unfiltered input.
         payload = _empty_payload()
     else:
         payload = run_manual_mlb_snapshot(snapshot, history_cache_dir=args.history_cache_dir)
     payload["blocked"] = blocked
+    payload["quote_notes"] = notes
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n")
