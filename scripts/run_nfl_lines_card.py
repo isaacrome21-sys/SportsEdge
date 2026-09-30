@@ -7,6 +7,7 @@ from datetime import date
 from pathlib import Path
 import json
 
+from sports.common.ev_math import devig
 from sportsedge.nfl_attempt9_live_forecast import (
     load_model_p,
     load_runtime,
@@ -14,9 +15,8 @@ from sportsedge.nfl_attempt9_live_forecast import (
     raw_forecasts,
     recency_features,
 )
+from sportsedge.nfl_run_it_scoring import qualification_role_score
 from sportsedge.sports.nfl.attempt9_model_p import model_probability
-from sportsedge.devig import power_devig
-from sportsedge.nfl_run_it_scoring import american_from_probability, qualification_role_score
 from sportsedge.truth_gate import american_to_decimal
 
 
@@ -52,7 +52,6 @@ def main() -> int:
                 continue
             assert forecast is not None
             pred = forecast["margin"] if raw["market"] == "spread" else forecast["total"]
-            # Away spread line is pasted as the away handicap; convert to home handicap.
             line = float(raw["line"])
             home_line = -line if raw["market"] == "spread" else line
             home_or_over = model_probability(
@@ -69,7 +68,10 @@ def main() -> int:
                 line=home_line,
                 selection="away" if raw["market"] == "spread" else "under",
             )
-            no_vig = power_devig(raw["away_or_over_price"], raw["home_or_under_price"])
+            no_vig = devig([
+                american_to_decimal(raw["away_or_over_price"]),
+                american_to_decimal(raw["home_or_under_price"]),
+            ])
             candidates = [
                 {
                     "selection": game["away"] if raw["market"] == "spread" else "Over",
