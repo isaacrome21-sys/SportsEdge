@@ -1,12 +1,14 @@
-"""Bind phone matchups to the earliest game that has not started."""
+"""Bind phone matchups to the earliest unplayed start across days."""
 from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from .mlb_lines_intake import LinesIntakeError, _match_team, parse_lines
 from .mlb_source import GameSnapshot, parse_game_start
 
+CHICAGO_TZ = ZoneInfo("America/Chicago")
 ROW_BINDS = ("AMBIGUOUS_GAME", "GAME_NOT_PREGAME")
 
 
@@ -20,18 +22,24 @@ def resolve_game(away: str, home: str, schedule: list[GameSnapshot], *, now: dat
         raise LinesIntakeError(f"GAME_NOT_FOUND: '{away} @ {home}' matched 0 games on this slate")
     future = [game for game in hits if parse_game_start(game.game_date) > now]
     future.sort(key=lambda game: parse_game_start(game.game_date))
-    if future:
-        # Two-day schedule (today+tomorrow) lists the same series twice.
-        # Bind the earliest start that has not begun. Same-day DH also
-        # takes the first unplayed game; later games stay unbound until
-        # that start is no longer future.
-        return future[0]
-    raise LinesIntakeError(f"GAME_NOT_PREGAME: '{away} @ {home}'")
+    if not future:
+        raise LinesIntakeError(f"GAME_NOT_PREGAME: '{away} @ {home}'")
+    same_day = [
+        game for game in future
+        if parse_game_start(game.game_date).astimezone(CHICAGO_TZ).date()
+        == parse_game_start(future[0].game_date).astimezone(CHICAGO_TZ).date()
+    ]
+    if len(same_day) > 1:
+        raise LinesIntakeError(
+            f"AMBIGUOUS_GAME: '{away} @ {home}' matched {len(same_day)} pregame starts"
+        )
+    return future[0]
 
 
 def _unbound_row(row, *, observed_at: str, book: str, reason: str) -> dict[str, Any]:
     return {
         "game_id": f"{row.away}@{row.home}",
+        "game_pk": None,
         "market_type": row.market_type,
         "side": row.side,
         "line": row.line,
@@ -67,6 +75,7 @@ def build_bound_input(
             continue
         out.append({
             "game_id": f"{game.away_name}@{game.home_name}",
+            "game_pk": int(game.game_pk),
             "market_type": row.market_type,
             "side": row.side,
             "line": row.line,
