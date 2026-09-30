@@ -123,7 +123,7 @@ No free parameters are fit on August or on Sept 2026.
 
 | Symbol | Value | Source |
 |---|---:|---|
-| League RA9 proxy | 4.50 | First principles: ~4.5 runs/game league scoring environment, treated as RA9 scale for residual units |
+| League RA9 proxy | 4.50 | **Assumed**, not measured. First-principles ~4.5 runs/team-game scale for residual units. June–July is used only for league *rate* averages (K/BB/HR per out), not for this proxy. Measuring RPG from June–July would change a frozen constant; v2 keeps 4.50 explicitly as an assumption. |
 | Residual scale | residual / 4.50 | First principles: convert RA9 residual to fractional game effect |
 | `k` | 1.0 | First principles: residual already in run units; no extra gain |
 | Shrinkage prior τ (IP) | 50.0 | First principles: mid of the 40–60 IP band declared earlier |
@@ -142,7 +142,8 @@ starter_ra9_hat = 4.50
 These are the standard FIP event weights converted from per-inning form to the
 per-out rates used by the implementation. League rates are computed from
 **2026-06-01 → 2026-07-31** starter innings only (named fit window for league
-averages — not for `k`). June–July must not include August games.
+averages — not for `k` and not for the 4.50 RA9 proxy). June–July must not
+include August games.
 
 If implementation needs any additional constant, it must be added to this table
 in a commit **before** the August run. Silent defaults are not allowed.
@@ -208,7 +209,8 @@ tuning on the test set.
 ## Implementation order
 
 1. This document (done): August pre-registered, one-shot, identity decision,
-   archive coverage noted, constant sources closed.
+   archive coverage noted, constant sources closed, FIP unit correction recorded,
+   4.50 assumed not measured.
 2. Implementation commit with the table above hashed + unit tests for residual /
    shrinkage / share math only.
 3. Run evaluation on August **once**; publish numbers; promote only on a clear
