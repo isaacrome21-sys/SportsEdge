@@ -16,7 +16,7 @@ from typing import Any, Mapping, Sequence
 
 from .mlb_empirical_support import empirical_guard_reason, is_empirical
 from .mlb_edge_score import ev_per_dollar, score_mlb_edge
-from .mlb_scored_card import build_mlb_scored_card
+from .mlb_scored_card import EMPIRICAL_SIDE_CONFLICT_REASON, EV_FLOOR_REASON, build_mlb_scored_card
 
 MYSPARI_OWN_MODEL_VERSION = "MLB_MYSPARI_OWN_MODEL_V1"
 LABEL = "SportsEdge engine model_p shown MySpariEdge-style · NOT Truth Gate · NOT OFFICIAL"
@@ -409,9 +409,14 @@ def render_markdown(rows: Sequence[Mapping[str, Any]], *, header: str, notes: Se
         guarded = bool(r.get("presentation_reason"))
         win_text = "—" if guarded else pct(r.get("model_p_raw"))
         push_text = "—" if guarded else pct(r.get("push_p"))
+        codes = tuple(r.get("presentation_reason_codes") or ())
         status_text = str(r.get("scored_status"))
-        if PRICE_CEILING_REASON in (r.get("presentation_reason_codes") or ()):
+        if PRICE_CEILING_REASON in codes:
             status_text += " (price > -165)"
+        if EV_FLOOR_REASON in codes:
+            status_text += " (EV < 2%)"
+        if EMPIRICAL_SIDE_CONFLICT_REASON in codes:
+            status_text += " (prop opposes side play)"
         if r.get("guard_kept_instead"):
             status_text += f" (same game: kept {r['guard_kept_instead']})"
         lines.append(
