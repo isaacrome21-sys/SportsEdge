@@ -25,6 +25,14 @@ def _ev(estimate_p: float, price: int) -> float:
     return estimate_p * dec - 1.0
 
 
+def _history_rows(raw: object) -> list:
+    if isinstance(raw, list):
+        return raw
+    if isinstance(raw, dict) and isinstance(raw.get("games"), list):
+        return raw["games"]
+    return []
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--input", required=True)
@@ -32,7 +40,7 @@ def main() -> int:
     ap.add_argument("--output", required=True)
     args = ap.parse_args()
     ticket = json.loads(Path(args.input).read_text(encoding="utf-8"))
-    history = json.loads(Path(args.history).read_text(encoding="utf-8")) if args.history else []
+    history = _history_rows(json.loads(Path(args.history).read_text(encoding="utf-8")) if args.history else [])
     runtime = load_runtime()
     artifact = load_model_p()
     asof = date.fromisoformat(str(ticket.get("slate") or date.today().isoformat()))
