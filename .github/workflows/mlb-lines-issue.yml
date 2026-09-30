@@ -82,15 +82,16 @@ jobs:
       - name: Run SportsEdge engines
         run: PYTHONPATH=.runtime-deps:. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.intake.outputs.path }}" --run-date "${{ steps.intake.outputs.slate }}" --max-age-minutes 60 --output artifacts/manual_mlb_snapshot_card.json
 
-      - name: Render card and reply now
+      - name: Render PRE-CONTEXT result and reply now
         run: |
           PYTHONPATH=.runtime-deps:. python scripts/render_mlb_myspari_card.py \
             --engine-output artifacts/manual_mlb_snapshot_card.json \
             --snapshot "${{ steps.intake.outputs.path }}" \
+            --pre-context \
             --out-dir artifacts/mlb_myspari
           gh issue comment "$ISSUE" --body-file artifacts/mlb_myspari/card.md
 
-      - name: Retrieve pregame context (display only, after the card is posted)
+      - name: Retrieve pregame context and post final card
         continue-on-error: true
         timeout-minutes: 5
         run: |
