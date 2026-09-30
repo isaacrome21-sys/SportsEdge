@@ -11,7 +11,7 @@ from typing import Any, Mapping, Sequence
 
 from .mlb_edge_score import MLB_EDGE_SCORE_PROVENANCE
 
-_STATUS_ORDER={"ACTIONABLE":0,"PASS":1,"BLOCKED":2,"NO_MODEL":3}
+_STATUS_ORDER={"ACTIONABLE":0,"LEAN":1,"PASS":2,"BLOCKED":3,"NO_MODEL":4}
 _UNVERIFIED_REASON="UNVERIFIED_CONFIDENCE_PROVENANCE"
 MIN_CARD_EV=0.02
 EV_FLOOR_REASON="BELOW_MIN_CARD_EV_2PCT"
@@ -52,7 +52,7 @@ def _star_rating(*, score: int, status: str, verified: bool) -> int:
     88+ = 5 stars, 82-87 = 4 stars, and any verified score <=81 = 3 stars.
     Blocked, no-model, or unverified rows always receive 0 stars.
     """
-    if status in {"BLOCKED", "NO_MODEL"} or not verified:
+    if status in {"LEAN", "BLOCKED", "NO_MODEL"} or not verified:
         return 0
     if score >= 88:
         return 5

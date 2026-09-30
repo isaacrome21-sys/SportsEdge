@@ -15,6 +15,7 @@ from math import isfinite
 from typing import Any, Mapping, Sequence
 
 from .mlb_empirical_support import empirical_guard_reason
+from .pitcher_joint_engine import ENGINE_VERSION as PITCHER_JOINT_ENGINE_VERSION
 from .mlb_edge_score import ev_per_dollar, score_mlb_edge
 from .mlb_scored_card import build_mlb_scored_card
 
@@ -24,6 +25,7 @@ MANUAL_QUOTE_TTL_SECONDS = 6 * 3600.0
 # Favorites priced beyond this are never shown as ACTIONABLE (Isaac's -165 ceiling).
 MAX_FAVORITE_ODDS = -165
 PRICE_CEILING_REASON = "PRICE_BEYOND_MAX_FAVORITE_-165"
+EMPIRICAL_PITCHER_OUTS_LEAN_REASON = "EMPIRICAL_PITCHER_OUTS_LEAN_ONLY"
 _LINE_NEGATED = frozenset({"RUN_LINE", "F5_RUN_LINE"})
 _OPPOSITE = {"AWAY": "HOME", "HOME": "AWAY", "OVER": "UNDER", "UNDER": "OVER", "YES": "NO", "NO": "YES"}
 
@@ -122,7 +124,20 @@ def myspari_rows(payload: Mapping[str, Any], *, quote_age_seconds: float = 0.0,
         if scored_row.get("status") == "ACTIONABLE" and price is not None and price < MAX_FAVORITE_ODDS:
             scored_row["status"] = "PASS"
             scored_row["presentation_reason_codes"] = (PRICE_CEILING_REASON,)
-        out.append({**scored_row, **base})
+        merged = {**scored_row, **base}
+        # Empirical pitcher-outs estimates are a research lean only. They may be
+        # displayed with their unchanged probability/economics, but never promoted
+        # to a core ACTIONABLE play from a small recent-start bootstrap.
+        if (
+            merged.get("status") == "ACTIONABLE"
+            and str(merged.get("market") or "").upper() == "PITCHER_OUTS"
+            and str(merged.get("engine_version") or "") == PITCHER_JOINT_ENGINE_VERSION
+        ):
+            merged["status"] = "LEAN"
+            codes = tuple(merged.get("presentation_reason_codes") or ())
+            if EMPIRICAL_PITCHER_OUTS_LEAN_REASON not in codes:
+                merged["presentation_reason_codes"] = codes + (EMPIRICAL_PITCHER_OUTS_LEAN_REASON,)
+        out.append(merged)
 
     # Apply card-level eligibility (including the 2% model-return floor) before
     # same-game conflict selection so a row that cannot make the card cannot
