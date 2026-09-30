@@ -1,0 +1,25 @@
+name: NBA lines → card
+description: Paste DraftKings NBA lines from your phone. SportsEdge replies here. Until a frozen owner exists the card is NO_MODEL.
+title: "[NBA LINES] "
+labels: ["nba-lines"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        One game header, then both prices. Away / over first.
+
+        ```
+        Celtics @ Knicks
+        ML +110 -130
+        Spread +3.5 -110 -110
+        Total 224.5 -108 -112
+        ```
+
+        Player props stay `NO_MODEL` until a usage engine is frozen.
+  - type: textarea
+    id: lines
+    attributes:
+      label: Lines
+      render: text
+    validations:
+      required: true
