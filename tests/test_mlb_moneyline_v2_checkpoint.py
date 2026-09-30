@@ -172,10 +172,22 @@ class MLBMoneylineV2CheckpointTests(unittest.TestCase):
             evaluate_v2_checkpoints([row])
 
     def test_model_artifact_change_starts_new_clock(self):
-        row = self._row(0)
-        row["model_artifact_sha256"] = "0" * 64
-        with self.assertRaisesRegex(MLBMoneylineV2CheckpointError, "model artifact binding mismatch"):
-            evaluate_v2_checkpoints([row])
+        """Prior-hash rows close under the old engine; active clock stays empty."""
+        prior = self._row(0)
+        prior["model_artifact_sha256"] = "0" * 64
+        current = self._row(1)
+        report = evaluate_v2_checkpoints([prior, current])
+        self.assertEqual(report["active_clock_row_count"], 1)
+        self.assertEqual(report["closed_prior_engine_row_count"], 1)
+        self.assertTrue(report["prior_engine_rows_excluded_from_active_clock"])
+        self.assertEqual(len(report["closed_prior_engine_sections"]), 1)
+        self.assertEqual(
+            report["closed_prior_engine_sections"][0]["model_artifact_sha256"],
+            "0" * 64,
+        )
+        self.assertEqual(report["closed_prior_engine_sections"][0]["status"], "CLOSED_UNDER_PRIOR_ENGINE")
+        # Active evaluator only sees the current-hash row.
+        self.assertEqual(report["total_valid_v2_graded_bets"], 1)
 
     def test_slate_date_must_equal_utc_event_start_date(self):
         row = self._row(0)

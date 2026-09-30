@@ -15,6 +15,11 @@ GENERIC_ENGINE_VERSION = "mlb_full_market_runtime_v2"
 PA_BOUNDED_ENGINE_VERSION = "mlb_pa_bounded_count_v1"
 V8_PRIMARY_GAME_DEFAULT_SIMULATIONS = 100000
 
+# Full-game Stage-1 markets that share the V7 score distribution with the
+# shared_game_engine path. F5 is fail-closed (state model rebuild). NRFI/YRFI
+# stay on the separate analytic first-inning model.
+STAGE1_FULL_GAME_MARKETS = frozenset({"MONEYLINE", "RUN_LINE", "TOTALS"})
+
 GAME_MARKETS = {
     "MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS", "NRFI", "YRFI",
     "F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS", "F5_TEAM_TOTALS",
@@ -196,7 +201,9 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
         DEFAULT_EXTRA_HALF_INNING_MEAN,
         DEFAULT_FIRST_INNING_DISPERSION_R,
         DEFAULT_FIRST_INNING_SHARE,
+        DEFAULT_FULL_GAME_DISPERSION_R,
         FIRST_INNING_MODEL_VERSION,
+        FULL_GAME_MODE_SHARED_GAMMA_POISSON,
         V7_DISTRIBUTION_VERSION,
         first_inning_probabilities,
         simulate_game_distribution,
@@ -252,16 +259,28 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
         out["push_p"] = 0.0
         return out
 
+    # MONEYLINE / RUN_LINE / TOTALS: same frozen full-game dispersion as Stage-1
+    # shared_game_engine. F5 remains fail-closed above.
     total_line = line if market == "TOTALS" else _finite(model_input.get("total_line", 0.0), "total_line", lower=0.0)
     simulations = int(model_input.get("simulations", V8_PRIMARY_GAME_DEFAULT_SIMULATIONS))
     game_build_hash = _canonical_json_sha256({
-        "engine": V7_DISTRIBUTION_VERSION, "game_id": model_input.get("game_id"),
-        "away_mean_runs": away_mean, "home_mean_runs": home_mean,
+        "engine": V7_DISTRIBUTION_VERSION,
+        "game_id": model_input.get("game_id"),
+        "away_mean_runs": away_mean,
+        "home_mean_runs": home_mean,
         "feature_source_hash": model_input.get("feature_source_hash"),
+        "full_game_distribution_mode": FULL_GAME_MODE_SHARED_GAMMA_POISSON,
+        "full_game_dispersion_r": DEFAULT_FULL_GAME_DISPERSION_R,
     })
     result = simulate_game_distribution(
-        away_mean_runs=away_mean, home_mean_runs=home_mean, total_line=total_line,
-        simulations=simulations, build_hash=game_build_hash,
+        away_mean_runs=away_mean,
+        home_mean_runs=home_mean,
+        total_line=total_line,
+        simulations=simulations,
+        build_hash=game_build_hash,
+        shared_game_sigma=0.0,
+        team_sigma=0.0,
+        full_game_dispersion_r=DEFAULT_FULL_GAME_DISPERSION_R,
         first_inning_share=DEFAULT_FIRST_INNING_SHARE,
         first_inning_dispersion_r=DEFAULT_FIRST_INNING_DISPERSION_R,
         extra_half_inning_mean=DEFAULT_EXTRA_HALF_INNING_MEAN,
@@ -303,6 +322,8 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
     out["engine_version"] = V7_DISTRIBUTION_VERSION
     out["seed_policy"] = result.seed_policy
     out["push_p"] = float(p_push)
+    out["full_game_distribution_mode"] = result.full_game_distribution_mode
+    out["full_game_dispersion_r"] = result.full_game_dispersion_r
     return out
 
 

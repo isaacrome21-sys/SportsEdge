@@ -8,11 +8,21 @@ from typing import Any
 from .identity_rng import candidate_rng, validate_build_hash
 from .source_lineage import canonical_json_sha256
 
-V7_DISTRIBUTION_VERSION = "mlb_v7_distribution_v3_rng_provenance"
+V7_DISTRIBUTION_VERSION = "mlb_v7_distribution_v4_full_game_dispersion"
 FIRST_INNING_MODEL_VERSION = "mlb_first_inning_nb_v1_candidate"
 DEFAULT_FIRST_INNING_SHARE = 0.118
 DEFAULT_FIRST_INNING_DISPERSION_R = 0.35
 DEFAULT_EXTRA_HALF_INNING_MEAN = 0.55
+
+# Frozen from the strict-prior Sep 1-14 tuning slice
+# (scripts/audit_mlb_game_engine_dispersion.py) and validated on Sep 15-27.
+# Stage-1 production game markets opt in explicitly. Direct low-level callers
+# retain the legacy lognormal mode unless they pass full_game_dispersion_r.
+DEFAULT_FULL_GAME_DISPERSION_R = 5.217229403204152
+LEGACY_SHARED_GAME_SIGMA = 0.12
+LEGACY_TEAM_SIGMA = 0.08
+FULL_GAME_MODE_SHARED_GAMMA_POISSON = "SHARED_GAMMA_POISSON"
+FULL_GAME_MODE_LEGACY_LOGNORMAL = "LEGACY_LOGNORMAL"
 
 
 class V7DistributionError(ValueError):
@@ -42,6 +52,10 @@ class GameDistribution:
     extra_half_inning_mean: float
     joint_score_pmf: dict[str, float]
     result_sha256: str
+    full_game_distribution_mode: str = FULL_GAME_MODE_LEGACY_LOGNORMAL
+    full_game_dispersion_r: float | None = None
+    shared_game_sigma: float = LEGACY_SHARED_GAME_SIGMA
+    team_sigma: float = LEGACY_TEAM_SIGMA
 
 
 def _finite_positive(value: Any, field: str, *, allow_zero: bool = False) -> float:
@@ -139,8 +153,9 @@ def simulate_game_distribution(
     simulations: int = 50000,
     seed: int | None = None,
     build_hash: str | None = None,
-    shared_game_sigma: Any = 0.12,
-    team_sigma: Any = 0.08,
+    shared_game_sigma: Any = LEGACY_SHARED_GAME_SIGMA,
+    team_sigma: Any = LEGACY_TEAM_SIGMA,
+    full_game_dispersion_r: Any | None = None,
     first_inning_share: Any = DEFAULT_FIRST_INNING_SHARE,
     first_inning_dispersion_r: Any = DEFAULT_FIRST_INNING_DISPERSION_R,
     extra_half_inning_mean: Any = DEFAULT_EXTRA_HALF_INNING_MEAN,
@@ -150,6 +165,18 @@ def simulate_game_distribution(
     total = _finite_positive(total_line, "total_line", allow_zero=True)
     shared_sigma = _finite_positive(shared_game_sigma, "shared_game_sigma", allow_zero=True)
     idio_sigma = _finite_positive(team_sigma, "team_sigma", allow_zero=True)
+    dispersion_r = None if full_game_dispersion_r is None else _finite_positive(
+        full_game_dispersion_r, "full_game_dispersion_r"
+    )
+    if dispersion_r is not None and (shared_sigma != 0.0 or idio_sigma != 0.0):
+        raise V7DistributionError(
+            "full_game_dispersion_r cannot be stacked with shared_game_sigma/team_sigma; pass both sigmas as 0"
+        )
+    distribution_mode = (
+        FULL_GAME_MODE_SHARED_GAMMA_POISSON
+        if dispersion_r is not None
+        else FULL_GAME_MODE_LEGACY_LOGNORMAL
+    )
     fi_share = _finite_positive(first_inning_share, "first_inning_share")
     fi_r = _finite_positive(first_inning_dispersion_r, "first_inning_dispersion_r")
     extras_mean = _finite_positive(extra_half_inning_mean, "extra_half_inning_mean")
@@ -188,11 +215,18 @@ def simulate_game_distribution(
     score_counts: dict[tuple[int, int], int] = {}
 
     for _ in range(simulations):
-        shared = rng.gauss(0.0, shared_sigma)
-        away_noise = rng.gauss(0.0, idio_sigma)
-        home_noise = rng.gauss(0.0, idio_sigma)
-        away_lam = away_mean * exp(shared + away_noise - 0.5 * (shared_sigma ** 2 + idio_sigma ** 2))
-        home_lam = home_mean * exp(shared + home_noise - 0.5 * (shared_sigma ** 2 + idio_sigma ** 2))
+        if dispersion_r is not None:
+            # One shared mean-one pace multiplier widens the game-total
+            # distribution while preserving each team's unconditional run mean.
+            pace = rng.gammavariate(dispersion_r, 1.0 / dispersion_r)
+            away_lam = away_mean * pace
+            home_lam = home_mean * pace
+        else:
+            shared = rng.gauss(0.0, shared_sigma)
+            away_noise = rng.gauss(0.0, idio_sigma)
+            home_noise = rng.gauss(0.0, idio_sigma)
+            away_lam = away_mean * exp(shared + away_noise - 0.5 * (shared_sigma ** 2 + idio_sigma ** 2))
+            home_lam = home_mean * exp(shared + home_noise - 0.5 * (shared_sigma ** 2 + idio_sigma ** 2))
         away_runs = _poisson(rng, away_lam)
         home_runs = _poisson(rng, home_lam)
 
@@ -249,6 +283,10 @@ def simulate_game_distribution(
         "first_inning_dispersion_r": fi_r,
         "extra_half_inning_mean": extras_mean,
         "joint_score_pmf": joint_score_pmf,
+        "full_game_distribution_mode": distribution_mode,
+        "full_game_dispersion_r": dispersion_r,
+        "shared_game_sigma": shared_sigma,
+        "team_sigma": idio_sigma,
     }
     digest = canonical_json_sha256(raw)
     return GameDistribution(**{k: raw[k] for k in raw if k != "version"}, result_sha256=digest)

@@ -9,6 +9,7 @@ from sportsedge.generic_market_engine import (
 )
 from sportsedge.hitter_joint_engine import HITTER_MARKETS
 from sportsedge.pitcher_joint_engine import PITCHER_MARKETS
+from sportsedge.v7_distribution import DEFAULT_FULL_GAME_DISPERSION_R, FULL_GAME_MODE_SHARED_GAMMA_POISSON
 
 
 class GenericMarketEngineTests(unittest.TestCase):
@@ -176,14 +177,20 @@ class GenericMarketEngineTests(unittest.TestCase):
         self.assertGreater(out["model_p"], 0.48)
         self.assertLess(out["model_p"], 0.59)
 
-    def test_v7_extras_candidate_removes_old_under_bias_direction(self):
+    def test_stage1_totals_use_promoted_full_game_dispersion(self):
+        """Pin over 8.5 under frozen r for mean 4.3/4.3.
+
+        Independent 100k reference under r = DEFAULT_FULL_GAME_DISPERSION_R gives
+        P(over 8.5) ≈ 0.481. Allow ±1 pp so a distribution change still fails CI.
+        """
         out = generic_market_engine_adapter({
             "game_id": "g1", "market": "TOTALS", "entity_id": "game",
             "line": 8.5, "side": "OVER", "away_mean_runs": 4.3,
             "home_mean_runs": 4.3, "simulations": 12000,
         })
-        self.assertGreater(out["model_p"], 0.50)
-        self.assertLess(out["model_p"], 0.57)
+        self.assertEqual(out["full_game_distribution_mode"], FULL_GAME_MODE_SHARED_GAMMA_POISSON)
+        self.assertEqual(out["full_game_dispersion_r"], DEFAULT_FULL_GAME_DISPERSION_R)
+        self.assertAlmostEqual(out["model_p"], 0.481, delta=0.01)
 
     def test_missing_model_feature_fails_closed(self):
         with self.assertRaises(Exception):
