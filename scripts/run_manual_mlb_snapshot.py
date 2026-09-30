@@ -42,6 +42,8 @@ def _empty_payload() -> dict:
 
 
 def _price_game(game_rows, *, history_cache_dir: str, schedule: list[GameSnapshot] | None):
+    if schedule is None:
+        return run_canonical_manual_mlb(game_rows, history_cache_dir=history_cache_dir, schedule=None)
     game_pk = game_rows[0].get("game_pk") if game_rows else None
     if game_pk in (None, ""):
         raise CanonicalManualMLBError("GAME_UNBOUND")
