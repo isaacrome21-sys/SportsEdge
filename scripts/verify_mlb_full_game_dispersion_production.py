@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Verify the frozen MLB full-game dispersion with the production simulator.
+"""Verify the audit-only MLB full-game dispersion candidate against production baseline.
 
-The tuning slice only re-derives the frozen r from strict-prior production means
-and final scores. The later validation slice then compares the legacy production
-simulator against the exact new production Gamma-Poisson code path. No prices are
-used.
+Does not modify production shared_game_engine / v7_distribution. Baseline uses the
+current main simulate_game_distribution path. Candidate uses the audit script's
+local Gamma-Poisson PMF. No prices are used.
 """
 from __future__ import annotations
 
@@ -16,6 +15,7 @@ from pathlib import Path
 from scripts.audit_mlb_game_engine_dispersion import (
     REFERENCE_LINES,
     _binary_summary,
+    _candidate_pmf,
     _fit_dispersion_r,
     _line_prob,
     _schedule,
@@ -24,11 +24,10 @@ from scripts.audit_mlb_game_engine_dispersion import (
 from sportsedge.mlb_all_market_features import MLBAllMarketHistorySource, PRODUCTION_RUN_MEAN_VERSION
 from sportsedge.source_lineage import canonical_json_sha256
 from sportsedge.v7_distribution import (
-    DEFAULT_FULL_GAME_DISPERSION_R,
-    FULL_GAME_MODE_LEGACY_LOGNORMAL,
-    FULL_GAME_MODE_SHARED_GAMMA_POISSON,
-    LEGACY_SHARED_GAME_SIGMA,
-    LEGACY_TEAM_SIGMA,
+    DEFAULT_EXTRA_HALF_INNING_MEAN,
+    DEFAULT_FIRST_INNING_DISPERSION_R,
+    DEFAULT_FIRST_INNING_SHARE,
+    V7_DISTRIBUTION_VERSION,
     simulate_game_distribution,
 )
 
@@ -99,59 +98,56 @@ def main() -> int:
     tuning = [row for row in rows if date.fromisoformat(row["official_date"]) < validation_start]
     validation = [row for row in rows if date.fromisoformat(row["official_date"]) >= validation_start]
     fit = _fit_dispersion_r(tuning)
-    if abs(float(fit["locked_r"]) - DEFAULT_FULL_GAME_DISPERSION_R) > 1e-12:
-        raise SystemExit(
-            f"frozen production r drifted: fit={fit['locked_r']} production={DEFAULT_FULL_GAME_DISPERSION_R}"
-        )
+    locked_r = float(fit["locked_r"])
 
     for index, row in enumerate(validation, 1):
-        common = dict(
-            away_mean_runs=row["away_mean"],
-            home_mean_runs=row["home_mean"],
+        away_mean = row["away_mean"]
+        home_mean = row["home_mean"]
+        baseline = simulate_game_distribution(
+            away_mean_runs=away_mean,
+            home_mean_runs=home_mean,
             total_line=0.0,
             simulations=args.simulations,
+            build_hash=canonical_json_sha256({
+                "engine": V7_DISTRIBUTION_VERSION,
+                "verify": "baseline",
+                "game_pk": row["game_pk"],
+            }),
+            first_inning_share=DEFAULT_FIRST_INNING_SHARE,
+            first_inning_dispersion_r=DEFAULT_FIRST_INNING_DISPERSION_R,
+            extra_half_inning_mean=DEFAULT_EXTRA_HALF_INNING_MEAN,
         )
-        legacy = simulate_game_distribution(
-            **common,
-            build_hash=canonical_json_sha256({"verify": "legacy", "game_pk": row["game_pk"]}),
-            shared_game_sigma=LEGACY_SHARED_GAME_SIGMA,
-            team_sigma=LEGACY_TEAM_SIGMA,
-            full_game_dispersion_r=None,
+        candidate_pmf = _candidate_pmf(
+            away_mean=away_mean,
+            home_mean=home_mean,
+            dispersion_r=locked_r,
+            simulations=args.simulations,
+            identity=str(row["game_pk"]),
         )
-        candidate = simulate_game_distribution(
-            **common,
-            build_hash=canonical_json_sha256({"verify": "production", "game_pk": row["game_pk"]}),
-            shared_game_sigma=0.0,
-            team_sigma=0.0,
-            full_game_dispersion_r=DEFAULT_FULL_GAME_DISPERSION_R,
-        )
-        if legacy.full_game_distribution_mode != FULL_GAME_MODE_LEGACY_LOGNORMAL:
-            raise SystemExit("legacy verification path did not select legacy mode")
-        if candidate.full_game_distribution_mode != FULL_GAME_MODE_SHARED_GAMMA_POISSON:
-            raise SystemExit("production verification path did not select Gamma-Poisson mode")
-        row["legacy"] = {}
-        row["production"] = {}
+        row["baseline"] = {}
+        row["candidate"] = {}
         for line in REFERENCE_LINES:
-            l_over, l_under, _ = _line_prob(legacy.joint_score_pmf, line)
-            p_over, p_under, _ = _line_prob(candidate.joint_score_pmf, line)
-            row["legacy"][str(line)] = l_over / (l_over + l_under)
-            row["production"][str(line)] = p_over / (p_over + p_under)
+            l_over, l_under, _ = _line_prob(baseline.joint_score_pmf, line)
+            c_over, c_under, _ = _line_prob(candidate_pmf, line)
+            row["baseline"][str(line)] = l_over / (l_over + l_under) if (l_over + l_under) > 0 else None
+            row["candidate"][str(line)] = c_over / (c_over + c_under) if (c_over + c_under) > 0 else None
         print(f"[{index}/{len(validation)}] {row['game_pk']} verified")
 
-    baseline = _summaries(validation, "legacy")
-    production = _summaries(validation, "production")
-    baseline_score = _score_distribution(baseline)
-    production_score = _score_distribution(production)
+    baseline_lines = _summaries(validation, "baseline")
+    candidate_lines = _summaries(validation, "candidate")
+    baseline_score = _score_distribution(baseline_lines)
+    candidate_score = _score_distribution(candidate_lines)
     checks = {
-        "production_closes_9_5_calibration_gap": abs(float(production["9.5"]["calibration_gap_pp"])) < abs(float(baseline["9.5"]["calibration_gap_pp"])),
-        "production_improves_mean_abs_calibration_gap": float(production_score["mean_abs_calibration_gap_pp"]) < float(baseline_score["mean_abs_calibration_gap_pp"]),
-        "production_noninferior_mean_brier": float(production_score["mean_brier"]) <= float(baseline_score["mean_brier"]),
+        "candidate_closes_9_5_calibration_gap": abs(float(candidate_lines["9.5"]["calibration_gap_pp"])) < abs(float(baseline_lines["9.5"]["calibration_gap_pp"])),
+        "candidate_improves_mean_abs_calibration_gap": float(candidate_score["mean_abs_calibration_gap_pp"]) < float(baseline_score["mean_abs_calibration_gap_pp"]),
+        "candidate_noninferior_mean_brier": float(candidate_score["mean_brier"]) <= float(baseline_score["mean_brier"]),
     }
-    checks["production_passes_all_three"] = all(checks.values())
+    checks["candidate_passes_all_three"] = all(checks.values())
 
     payload = {
         "schema_version": 1,
-        "verification": "MLB_FULL_GAME_DISPERSION_PRODUCTION_VERIFY_V1",
+        "verification": "MLB_FULL_GAME_DISPERSION_AUDIT_VERIFY_V1",
+        "note": "Candidate is audit-only; production shared_game_engine and v7_distribution are unchanged.",
         "production_mean_version": PRODUCTION_RUN_MEAN_VERSION,
         "period": {"start": start.isoformat(), "end": end.isoformat()},
         "validation_start": validation_start.isoformat(),
@@ -162,11 +158,11 @@ def main() -> int:
         "failures": failures,
         "simulations_per_game_per_distribution": args.simulations,
         "dispersion_fit": fit,
-        "frozen_production_r": DEFAULT_FULL_GAME_DISPERSION_R,
-        "legacy": baseline,
-        "production": production,
-        "legacy_score": baseline_score,
-        "production_score": production_score,
+        "locked_candidate_r": locked_r,
+        "baseline": baseline_lines,
+        "candidate": candidate_lines,
+        "baseline_score": baseline_score,
+        "candidate_score": candidate_score,
         "checks": checks,
     }
     out = Path(args.output)
@@ -175,12 +171,11 @@ def main() -> int:
     print(json.dumps({
         "output": str(out),
         "dispersion_fit": fit,
-        "legacy": baseline,
-        "production": production,
+        "baseline": baseline_lines,
+        "candidate": candidate_lines,
         "checks": checks,
     }, indent=2))
-    if not checks["production_passes_all_three"]:
-        raise SystemExit("production dispersion failed frozen validation checks")
+    # Research gate only: do not fail the job on candidate performance; numbers are the product.
     return 0
 
 
