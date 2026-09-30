@@ -8,12 +8,14 @@ from __future__ import annotations
 import argparse
 from datetime import date, datetime, timezone
 import json
+import time
 from pathlib import Path
 from typing import Any, Mapping
+from urllib.error import URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from sportsedge.mlb_context_adjusted_research import recent_team_run_profile
+from sportsedge.mlb_context_adjusted_research import TeamRunProfile, recent_team_run_profile
 from sportsedge.mlb_context_adjusted_validation import (
     GAME_TOTAL_LINES,
     actual_events,
@@ -38,13 +40,30 @@ LEAGUE_END = date(2026, 7, 31)
 USER_AGENT = "SportsEdge-StarterV2-Research/1.0"
 
 
-def _get(url: str) -> Mapping[str, Any]:
-    req = Request(url, headers={"Accept": "application/json", "User-Agent": USER_AGENT})
-    with urlopen(req, timeout=30) as response:
-        payload = json.loads(response.read().decode("utf-8"))
-    if not isinstance(payload, Mapping):
-        raise RuntimeError(f"not object: {url}")
-    return payload
+def _get(url: str, *, attempts: int = 5) -> Mapping[str, Any]:
+    last: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            req = Request(url, headers={"Accept": "application/json", "User-Agent": USER_AGENT})
+            with urlopen(req, timeout=45) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+            if not isinstance(payload, Mapping):
+                raise RuntimeError(f"not object: {url}")
+            return payload
+        except (URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+            last = exc
+            time.sleep(min(8.0, 0.75 * attempt))
+    raise RuntimeError(f"FETCH_FAILED:{url}:{type(last).__name__}:{last}") from last
+
+
+def _starter_id(side: Mapping[str, Any]) -> int | None:
+    probable = side.get("probablePitcher")
+    if isinstance(probable, Mapping) and probable.get("id") not in (None, ""):
+        try:
+            return int(probable["id"])
+        except (TypeError, ValueError):
+            return None
+    return None
 
 
 def _schedule(start: date, end: date) -> list[dict[str, Any]]:
@@ -53,6 +72,7 @@ def _schedule(start: date, end: date) -> list[dict[str, Any]]:
         "gameType": "R",
         "startDate": start.isoformat(),
         "endDate": end.isoformat(),
+        "hydrate": "probablePitcher",
     })
     payload = _get(f"https://statsapi.mlb.com/api/v1/schedule?{query}")
     games: list[dict[str, Any]] = []
@@ -83,44 +103,12 @@ def _schedule(start: date, end: date) -> list[dict[str, Any]]:
                     "home_id": int(home_team["id"]),
                     "away_runs": int(away["score"]),
                     "home_runs": int(home["score"]),
+                    "away_starter_id": _starter_id(away),
+                    "home_starter_id": _starter_id(home),
                 })
             except (KeyError, TypeError, ValueError):
                 continue
     return games
-
-
-def _boxscore_starters(game_pk: int, cache: dict[int, tuple[int | None, int | None]]) -> tuple[int | None, int | None]:
-    if game_pk in cache:
-        return cache[game_pk]
-    try:
-        box = _get(f"https://statsapi.mlb.com/api/v1/game/{game_pk}/boxscore")
-    except Exception:
-        cache[game_pk] = (None, None)
-        return cache[game_pk]
-    teams = box.get("teams") if isinstance(box.get("teams"), Mapping) else {}
-    out: list[int | None] = []
-    for side in ("away", "home"):
-        side_obj = teams.get(side) if isinstance(teams, Mapping) else None
-        starter_id = None
-        if isinstance(side_obj, Mapping):
-            players = side_obj.get("players") if isinstance(side_obj.get("players"), Mapping) else {}
-            for player in players.values() if isinstance(players, Mapping) else []:
-                if not isinstance(player, Mapping):
-                    continue
-                person = player.get("person") if isinstance(player.get("person"), Mapping) else {}
-                stats = player.get("stats") if isinstance(player.get("stats"), Mapping) else {}
-                pitching = stats.get("pitching") if isinstance(stats, Mapping) else {}
-                if not isinstance(pitching, Mapping):
-                    continue
-                try:
-                    if float(pitching.get("gamesStarted") or 0) >= 1:
-                        starter_id = int(person.get("id"))
-                        break
-                except (TypeError, ValueError):
-                    continue
-        out.append(starter_id)
-    cache[game_pk] = (out[0], out[1])
-    return cache[game_pk]
 
 
 def _start_rows(history: MLBGenericHistorySource, player_id: int, target_date: date) -> list[dict[str, Any]]:
@@ -145,19 +133,22 @@ def _start_rows(history: MLBGenericHistorySource, player_id: int, target_date: d
     return out
 
 
-def _league_baseline(history: MLBGenericHistorySource, june_july: list[dict[str, Any]], box_cache: dict[int, tuple[int | None, int | None]]) -> LeagueRateBaseline:
+def _league_baseline(history: MLBGenericHistorySource, june_july: list[dict[str, Any]]) -> LeagueRateBaseline:
     starter_ids: set[int] = set()
     for game in june_july:
-        away_id, home_id = _boxscore_starters(int(game["game_pk"]), box_cache)
-        if away_id:
-            starter_ids.add(int(away_id))
-        if home_id:
-            starter_ids.add(int(home_id))
+        if game.get("away_starter_id"):
+            starter_ids.add(int(game["away_starter_id"]))
+        if game.get("home_starter_id"):
+            starter_ids.add(int(game["home_starter_id"]))
     total_outs = total_k = total_bb = total_hr = 0.0
-    # Use Aug 1 as exclusive end so June-July starts only.
     cutoff = date(2026, 8, 1)
-    for player_id in sorted(starter_ids):
-        for row in _start_rows(history, player_id, cutoff):
+    for index, player_id in enumerate(sorted(starter_ids), 1):
+        try:
+            rows = _start_rows(history, player_id, cutoff)
+        except Exception as exc:
+            print(f"league starter skip {player_id}: {type(exc).__name__}", flush=True)
+            continue
+        for row in rows:
             row_date = row.get("date")
             if not isinstance(row_date, date):
                 continue
@@ -167,6 +158,8 @@ def _league_baseline(history: MLBGenericHistorySource, june_july: list[dict[str,
             total_k += float(row["strikeouts"])
             total_bb += float(row["walks"])
             total_hr += float(row["home_runs"])
+        if index % 25 == 0:
+            print(f"league pitchers {index}/{len(starter_ids)} outs={total_outs:.0f}", flush=True)
     if total_outs <= 0:
         raise RuntimeError("LEAGUE_RATES_EMPTY")
     return LeagueRateBaseline(
@@ -193,21 +186,31 @@ def _prediction(game_pk: int, label: str, away_mean: float, home_mean: float, si
 
 def run(*, simulations: int) -> dict[str, Any]:
     retrieved_at = datetime.now(timezone.utc)
+    print("loading schedules", flush=True)
     august = _schedule(EVAL_START, EVAL_END)
     june_july = _schedule(LEAGUE_START, LEAGUE_END)
+    print(f"august={len(august)} june_july={len(june_july)}", flush=True)
     history = MLBGenericHistorySource(retrieved_at=retrieved_at)
-    box_cache: dict[int, tuple[int | None, int | None]] = {}
-    league = _league_baseline(history, june_july, box_cache)
+    league = _league_baseline(history, june_july)
+    print(f"league outs={league.total_outs:.0f} k={league.k_rate:.4f} bb={league.bb_rate:.4f} hr={league.hr_rate:.4f}", flush=True)
+    team_cache: dict[tuple[int, date], TeamRunProfile] = {}
     included: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []
     for index, game in enumerate(august, 1):
-        away_starter_id, home_starter_id = _boxscore_starters(int(game["game_pk"]), box_cache)
+        away_starter_id = game.get("away_starter_id")
+        home_starter_id = game.get("home_starter_id")
         if not away_starter_id or not home_starter_id:
             skipped.append({"game_pk": game["game_pk"], "date": game["date"].isoformat(), "reason": "ACTUAL_STARTER_MISSING"})
             continue
         try:
-            away = recent_team_run_profile(team_id=int(game["away_id"]), target_date=game["date"])
-            home = recent_team_run_profile(team_id=int(game["home_id"]), target_date=game["date"])
+            away_key = (int(game["away_id"]), game["date"])
+            home_key = (int(game["home_id"]), game["date"])
+            if away_key not in team_cache:
+                team_cache[away_key] = recent_team_run_profile(team_id=away_key[0], target_date=away_key[1])
+            if home_key not in team_cache:
+                team_cache[home_key] = recent_team_run_profile(team_id=home_key[0], target_date=home_key[1])
+            away = team_cache[away_key]
+            home = team_cache[home_key]
             away_rows = _start_rows(history, int(away_starter_id), game["date"])
             home_rows = _start_rows(history, int(home_starter_id), game["date"])
             away_starter = peripheral_profile_from_start_rows(player_id=int(away_starter_id), rows=away_rows)
@@ -301,6 +304,7 @@ def run(*, simulations: int) -> dict[str, Any]:
         "skipped": skipped,
         "blockers": [
             "ACTUAL_STARTER_STAND_IN_NO_PREGAME_PIT_ARCHIVE",
+            "HISTORICAL_SCHEDULE_PROBABLE_PITCHER_FIELD",
             "HISTORICAL_PIT_WEATHER_FORECAST_ARCHIVE_MISSING",
         ],
     }
