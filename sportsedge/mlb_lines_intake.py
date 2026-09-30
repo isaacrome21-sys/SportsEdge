@@ -209,6 +209,22 @@ def parse_lines(text: str) -> list[ParsedRow]:
             rows.append(ParsedRow(away, home, _PLAYER_STATS[alias], "OVER", float(match[3]), _price(match[4]), "UNDER", _price(match[5]), subject_name=match[1].strip()))
             continue
 
+        match = re.fullmatch(rf"either\s+pitcher\s+({either_stats})\s+{_NUM}\s+{_PRICE}$", line, flags=re.I)
+        if match:
+            errors.append(
+                f"line {n}: BLOCKED_PRICING_METHOD: '{line}' "
+                "(props require paired Over/Under at the same line)"
+            )
+            continue
+
+        match = re.fullmatch(rf"(.+?)\s+({player_stats})\s+{_NUM}\s+{_PRICE}$", line, flags=re.I)
+        if match:
+            errors.append(
+                f"line {n}: BLOCKED_PRICING_METHOD: '{line}' "
+                "(props require paired Over/Under at the same line)"
+            )
+            continue
+
         errors.append(
             f"line {n}: couldn't read '{line}' (use a supported market and both prices; "
             "for run lines include the away line sign, e.g. 'RL +1.5 -190 +160' or 'RL -1.5 +160 -190')"
