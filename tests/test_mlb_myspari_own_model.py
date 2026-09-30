@@ -61,6 +61,24 @@ class OwnModelCardTests(unittest.TestCase):
         self.assertEqual(hits["scored_status"], "NO_MODEL")
         self.assertIsNone(hits["edge"])
 
+    def test_empirical_pitcher_outs_can_never_print_actionable(self):
+        payload = {"results": [
+            {**_row("PITCHER_OUTS", "OVER", -110, 7.5 / 11.0, line=17.5, entity="661563", fair=0.50, edge=7.5 / 11.0 - 0.50),
+             "engine_version": "mlb_pitcher_joint_empirical_v2",
+             "empirical_evidence": {"sample_size": 10, "sample_unit": "starts", "wins": 7, "pushes": 0,
+                                    "weighted": False, "pool_sha256": "abc"}},
+            {**_row("PITCHER_OUTS", "UNDER", -110, 3.5 / 11.0, line=17.5, entity="661563", fair=0.50, edge=3.5 / 11.0 - 0.50),
+             "engine_version": "mlb_pitcher_joint_empirical_v2",
+             "empirical_evidence": {"sample_size": 10, "sample_unit": "starts", "wins": 3, "pushes": 0,
+                                    "weighted": False, "pool_sha256": "abc"}},
+        ]}
+        rows = myspari_rows(payload)
+        over = next(r for r in rows if r["side"] == "OVER")
+        self.assertEqual(over["scored_status"], "LEAN")
+        self.assertNotEqual(over["scored_status"], "ACTIONABLE")
+        self.assertEqual(over["star_rating"], 0)
+        self.assertIn("EMPIRICAL_PITCHER_OUTS_LEAN_ONLY", over["presentation_reason_codes"])
+
     def test_missing_opposite_side_blocks(self):
         payload = {"results": [_row("MONEYLINE", "AWAY", 120, 0.5, fair=0.44, edge=0.06)]}
         rows = myspari_rows(payload)
