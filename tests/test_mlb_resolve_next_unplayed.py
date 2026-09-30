@@ -64,3 +64,15 @@ def test_canonical_resolve_uses_first_pitch_when_two_days() -> None:
     })
     game = _resolve_game(row, schedule=[day1, day2])
     assert game.game_pk == 2
+
+
+def test_two_future_starts_binds_earliest() -> None:
+    today = _snap(2, "2026-09-30T23:20:00+00:00")
+    tomorrow = _snap(3, "2026-10-01T23:20:00+00:00")
+    now = datetime(2026, 9, 30, 5, 44, tzinfo=timezone.utc)
+    game = resolve_game("Phillies", "Braves", [today, tomorrow], now=now)
+    assert game.game_pk == 2
+    text = "Phillies @ Braves\nML -117 -103\n"
+    payload = build_bound_input(text, observed_at=now.isoformat(), schedule=[today, tomorrow])
+    assert payload["rows"][0]["first_pitch_at"].startswith("2026-09-30")
+    assert payload["rows"][0].get("bind_status") is None
