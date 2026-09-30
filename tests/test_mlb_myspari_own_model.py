@@ -79,6 +79,33 @@ class OwnModelCardTests(unittest.TestCase):
         self.assertEqual(over["star_rating"], 0)
         self.assertIn("EMPIRICAL_PROP_LEAN_ONLY", over["presentation_reason_codes"])
 
+    def test_real_shaped_burke_below_floor_stays_pass_while_gausman_is_lean(self):
+        payload = {"results": [
+            {**_row("PITCHER_OUTS", "OVER", -143, 0.591, line=14.5, entity="657048", fair=0.556, edge=0.035),
+             "engine_version": "mlb_pitcher_joint_empirical_v2",
+             "empirical_evidence": {"sample_size": 10, "sample_unit": "starts", "wins": 6, "pushes": 0,
+                                    "weighted": False, "pool_sha256": "burke1273"}},
+            {**_row("PITCHER_OUTS", "UNDER", 108, 0.409, line=14.5, entity="657048", fair=0.444, edge=-0.035),
+             "engine_version": "mlb_pitcher_joint_empirical_v2",
+             "empirical_evidence": {"sample_size": 10, "sample_unit": "starts", "wins": 4, "pushes": 0,
+                                    "weighted": False, "pool_sha256": "burke1273"}},
+            {**_row("PITCHER_OUTS", "OVER", 107, 0.682, line=14.5, entity="592332", fair=0.447, edge=0.235),
+             "engine_version": "mlb_pitcher_joint_empirical_v2",
+             "empirical_evidence": {"sample_size": 10, "sample_unit": "starts", "wins": 7, "pushes": 0,
+                                    "weighted": False, "pool_sha256": "gausman1273"}},
+            {**_row("PITCHER_OUTS", "UNDER", -141, 0.318, line=14.5, entity="592332", fair=0.553, edge=-0.235),
+             "engine_version": "mlb_pitcher_joint_empirical_v2",
+             "empirical_evidence": {"sample_size": 10, "sample_unit": "starts", "wins": 3, "pushes": 0,
+                                    "weighted": False, "pool_sha256": "gausman1273"}},
+        ]}
+        rows = myspari_rows(payload)
+        burke = next(r for r in rows if r["entity_id"] == "657048" and r["side"] == "OVER")
+        gausman = next(r for r in rows if r["entity_id"] == "592332" and r["side"] == "OVER")
+        self.assertEqual(burke["scored_status"], "PASS")
+        self.assertIn("BELOW_MIN_CARD_EV_2PCT", burke["presentation_reason_codes"])
+        self.assertEqual(gausman["scored_status"], "LEAN")
+        self.assertEqual(gausman["star_rating"], 0)
+
     def test_empirical_batter_prop_prints_lean(self):
         payload = {"results": [
             {**_row("HITS", "OVER", 110, 0.60, line=0.5, entity="999", fair=0.48, edge=0.12),
