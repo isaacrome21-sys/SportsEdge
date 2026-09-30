@@ -28,15 +28,16 @@ If the model were a constant 56.4% home: Brier 0.251 vs coin 0.250 vs 2024-25 ho
 
 ## v2 window (unused — locked before any 2026-27 game)
 
-The October fit changes **every** λ, so it moves moneyline, puck line, and totals together.
+The regulation-only fit changes **every** λ, so it moves moneyline, puck line, and totals together.
 
 - **Fit:** 2024-25 REG, **regulation goals only** (drop OT goals and the SO dummy). Home-ice free. Same sim as production after the fit (no second OT/SO add on a final-score mean).
-- **Validate once:** 2026-27 REG `2026-10-08` through `2026-10-31`.
-- **Score all three, one look:**
+- **Validate once:** 2026-27 REG `2026-10-08` through `2026-11-30` (~350–400 games). Oct 8–31 alone is only ~180–200 games (±3.5 pp noise), too close to the 4-point home bias to decide.
+- **October snapshot:** numbers through Oct 31 may be posted as a first read. They do not pass, fail, or retune. The one-shot verdict is November 30.
+- **Score all three, one look, on the full window:**
   - moneyline home-win |gap| and Brier vs coin and vs 2024-25 home-win rate
   - puck line −1.5 |gap|
   - totals 5.5 and 6.5 |gap| and Brier
 - **Pass:** ML |gap| ≤ 2.0 pp **and** ML Brier beats both naives **and** neither totals line gets worse than the shipped #1249 gaps by more than 1.0 pp.
-- Fail → new window. No second look at Oct 2026. Shipped totals stay on the double-count owner until a pass.
+- Fail → new window. No second look at Oct–Nov 2026. Shipped totals stay on the double-count owner until a pass.
 
 2025-26 is spent.
