@@ -122,20 +122,21 @@ def test_heldout_gate_does_not_pass_candidate_that_only_improves_tail():
             "target_at_utc": "2026-09-30T19:00:00Z",
             "prior_max_at_utc": "2026-09-29T19:00:00Z",
             "baseline_p": 0.50,
-            "candidate_p": 0.99,
+            "candidate_p": 0.89,
             "outcome": 1,
         },
         {
             "target_at_utc": "2026-09-30T20:00:00Z",
             "prior_max_at_utc": "2026-09-29T20:00:00Z",
             "baseline_p": 0.50,
-            "candidate_p": 0.99,
+            "candidate_p": 0.89,
             "outcome": 0,
         },
     ]
 
     result = evaluate_heldout_rows(rows)
 
+    assert result["tail_n"] == 1
     assert result["tail_candidate_brier"] < result["tail_baseline_brier"]
     assert result["candidate_brier"] > result["baseline_brier"]
     assert result["passes_research_gate"] is False
