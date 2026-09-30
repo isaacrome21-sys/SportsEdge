@@ -1,0 +1,16 @@
+{
+  "schema_version": "SPORTSEDGE_MLB_QUOTE_MOVE_GUARD_V1",
+  "freeze_status": "FROZEN",
+  "card_status": "NEEDS_CONFIRM",
+  "reason": "QUOTE_MOVE_NEEDS_CONFIRM",
+  "authority": {
+    "blocks_pricing": false,
+    "changes_model_p": false,
+    "phone_card": true
+  },
+  "thresholds": {
+    "ml_american_cents": 40,
+    "total_runs": 1.0,
+    "rl_favorite_flip": true
+  }
+}

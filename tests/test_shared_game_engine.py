@@ -4,12 +4,19 @@ from sportsedge.engine_registry import engine_registry
 from sportsedge.generic_market_engine import generic_market_engine_adapter
 from sportsedge.shared_game_engine import (
     SharedGameEngineError,
+    V8_PRIMARY_DISTRIBUTION_VERSION,
     V8_PRIMARY_FULL_GAME_DISPERSION_R,
     V8_PRIMARY_GAME_MIN_SIMULATIONS,
+    V8_PRIMARY_TEAM_DISPERSION_R,
     build_shared_game_engine_session,
     score_distribution_sha256,
 )
-from sportsedge.v7_distribution import FULL_GAME_MODE_SHARED_GAMMA_POISSON, simulate_game_distribution
+from sportsedge.v7_distribution import (
+    FULL_GAME_MODE_INDEPENDENT_NB,
+    V8_INDEPENDENT_EXTRA_HALF_INNING_MEAN,
+    calibrated_full_game_means,
+    simulate_game_distribution,
+)
 
 
 class SharedGameEngineStage1Tests(unittest.TestCase):
@@ -58,7 +65,9 @@ class SharedGameEngineStage1Tests(unittest.TestCase):
 
         self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0]["total_line"], 0.0)
-        self.assertEqual(calls[0]["full_game_dispersion_r"], V8_PRIMARY_FULL_GAME_DISPERSION_R)
+        self.assertNotIn("full_game_dispersion_r", calls[0])
+        self.assertEqual(calls[0]["team_dispersion_r"], V8_PRIMARY_TEAM_DISPERSION_R)
+        self.assertEqual(calls[0]["extra_half_inning_mean"], V8_INDEPENDENT_EXTRA_HALF_INNING_MEAN)
         self.assertEqual({row["distribution_sha256"] for row in outputs}, {outputs[0]["distribution_sha256"]})
         self.assertEqual({row["model_input_hash"] for row in outputs}, {outputs[0]["model_input_hash"]})
         self.assertEqual(
@@ -99,7 +108,7 @@ class SharedGameEngineStage1Tests(unittest.TestCase):
             "build_hash": "a" * 64,
             "shared_game_sigma": 0.0,
             "team_sigma": 0.0,
-            "full_game_dispersion_r": V8_PRIMARY_FULL_GAME_DISPERSION_R,
+            "team_dispersion_r": V8_PRIMARY_TEAM_DISPERSION_R,
         }
         neutral = simulate_game_distribution(total_line=0.0, **kwargs)
         market_line = simulate_game_distribution(total_line=8.5, **kwargs)
@@ -150,10 +159,11 @@ class SharedGameEngineStage1Tests(unittest.TestCase):
             generic = generic_market_engine_adapter(model_input)
             candidate = shared(model_input)
             with self.subTest(case=case):
-                self.assertEqual(candidate["full_game_distribution_mode"], FULL_GAME_MODE_SHARED_GAMMA_POISSON)
-                self.assertEqual(candidate["full_game_dispersion_r"], V8_PRIMARY_FULL_GAME_DISPERSION_R)
-                self.assertEqual(generic["full_game_distribution_mode"], FULL_GAME_MODE_SHARED_GAMMA_POISSON)
-                self.assertEqual(generic["full_game_dispersion_r"], V8_PRIMARY_FULL_GAME_DISPERSION_R)
+                self.assertEqual(candidate["full_game_distribution_mode"], FULL_GAME_MODE_INDEPENDENT_NB)
+                self.assertEqual(candidate["full_game_dispersion_r"], V8_PRIMARY_TEAM_DISPERSION_R)
+                self.assertEqual(generic["full_game_distribution_mode"], FULL_GAME_MODE_INDEPENDENT_NB)
+                self.assertEqual(generic["full_game_dispersion_r"], V8_PRIMARY_TEAM_DISPERSION_R)
+                self.assertEqual(candidate["engine_version"], V8_PRIMARY_DISTRIBUTION_VERSION)
                 self.assertAlmostEqual(candidate["model_p"], generic["model_p"], places=15)
                 self.assertAlmostEqual(candidate["push_p"], generic["push_p"], places=15)
                 self.assertEqual(candidate["mc_paths"], generic["mc_paths"])
@@ -166,6 +176,37 @@ class SharedGameEngineStage1Tests(unittest.TestCase):
         self.assertIs(registry["RUN_LINE"], registry["TOTALS"])
         self.assertIs(registry["TOTALS"], registry["TEAM_TOTALS"])
         self.assertIsNot(registry["TOTALS"], registry["NRFI"])
+
+    def test_independent_distribution_matches_2026_game_shape(self):
+        """Independent team NB keeps team scores ~uncorrelated and ties realistic."""
+        away, home = calibrated_full_game_means(4.4, 4.4)
+        self.assertLess(away, home)  # home field
+        dist = simulate_game_distribution(
+            away_mean_runs=away, home_mean_runs=home, total_line=8.5, simulations=40000,
+            seed=7, shared_game_sigma=0.0, team_sigma=0.0,
+            team_dispersion_r=V8_PRIMARY_TEAM_DISPERSION_R,
+            extra_half_inning_mean=V8_INDEPENDENT_EXTRA_HALF_INNING_MEAN,
+        )
+        self.assertEqual(dist.full_game_distribution_mode, FULL_GAME_MODE_INDEPENDENT_NB)
+        # 2026: extras 6.8-9%, shared-pace model gave ~14.5%.
+        self.assertLess(dist.regulation_tie_probability, 0.115)
+        self.assertGreater(dist.regulation_tie_probability, 0.07)
+        self.assertGreater(dist.home_win_probability, 0.5)
+        self.assertLess(dist.home_win_probability, 0.53)
+        pmf = {tuple(map(int, k.split(","))): v for k, v in dist.joint_score_pmf.items()}
+        ea = sum(a * p for (a, _), p in pmf.items()); eh = sum(h * p for (_, h), p in pmf.items())
+        cov = sum((a - ea) * (h - eh) * p for (a, h), p in pmf.items())
+        va = sum((a - ea) ** 2 * p for (a, _), p in pmf.items()); vh = sum((h - eh) ** 2 * p for (_, h), p in pmf.items())
+        self.assertLess(abs(cov / (va * vh) ** 0.5), 0.1)
+
+    def test_shared_and_independent_modes_are_exclusive(self):
+        with self.assertRaises(Exception):
+            simulate_game_distribution(
+                away_mean_runs=4.0, home_mean_runs=4.0, total_line=8.5, simulations=1000, seed=1,
+                shared_game_sigma=0.0, team_sigma=0.0,
+                full_game_dispersion_r=V8_PRIMARY_FULL_GAME_DISPERSION_R,
+                team_dispersion_r=V8_PRIMARY_TEAM_DISPERSION_R,
+            )
 
 
 if __name__ == "__main__":

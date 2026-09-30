@@ -1,8 +1,12 @@
 from sportsedge.mlb_edge_score import MLB_EDGE_SCORE_PROVENANCE
-from sportsedge.mlb_scored_card import build_mlb_scored_card, top_mlb_edges
+from sportsedge.mlb_scored_card import (
+    EMPIRICAL_SIDE_CONFLICT_REASON,
+    build_mlb_scored_card,
+    top_mlb_edges,
+)
 
 
-def _verified_row(*, market, score, model_p, market_p, ev):
+def _verified_row(*, market, score, model_p, market_p, ev, **extra):
     return {
         "market": market,
         "scored_status": "ACTIONABLE",
@@ -13,6 +17,7 @@ def _verified_row(*, market, score, model_p, market_p, ev):
         "ev_per_dollar": ev,
         "reason_codes": ("POWER_V1_NO_VIG",),
         "confidence_provenance": MLB_EDGE_SCORE_PROVENANCE,
+        **extra,
     }
 
 
@@ -49,6 +54,67 @@ def test_star_rating_matches_locked_phone_card_contract():
         "HITS":3,
         "RBI":3,
     }
+
+
+def test_empirical_pitcher_prop_opposing_actionable_side_passes():
+    rows=[
+        _verified_row(
+            market="MONEYLINE",score=100,model_p=.60,market_p=.50,ev=.20,
+            game_id="g",entity_id="g",side="AWAY",
+        ),
+        _verified_row(
+            market="PITCHER_OUTS",score=60,model_p=.68,market_p=.45,ev=.40,
+            game_id="g",entity_id="p-home",side="OVER",team_side="HOME",
+            engine_version="mlb_pitcher_joint_empirical_bayes_v3",
+        ),
+        _verified_row(
+            market="PITCHER_OUTS",score=60,model_p=.68,market_p=.45,ev=.40,
+            game_id="g",entity_id="p-away",side="OVER",team_side="AWAY",
+            engine_version="mlb_pitcher_joint_empirical_bayes_v3",
+        ),
+    ]
+    card=build_mlb_scored_card(rows)
+    by_entity={row.get("entity_id"):row for row in card}
+    assert by_entity["g"]["scored_status"]=="ACTIONABLE"
+    assert by_entity["p-home"]["scored_status"]=="PASS"
+    assert EMPIRICAL_SIDE_CONFLICT_REASON in by_entity["p-home"]["presentation_reason_codes"]
+    assert by_entity["p-away"]["scored_status"]=="ACTIONABLE"
+
+
+def test_empirical_hitter_prop_opposing_actionable_side_passes():
+    rows=[
+        _verified_row(
+            market="RUN_LINE",score=100,model_p=.60,market_p=.50,ev=.20,
+            game_id="g",entity_id="g",side="AWAY",line=-1.5,
+        ),
+        _verified_row(
+            market="HITS",score=60,model_p=.62,market_p=.50,ev=.24,
+            game_id="g",entity_id="h-home",side="OVER",team_side="HOME",line=.5,
+            engine_version="mlb_hitter_joint_empirical_bayes_v4",
+        ),
+    ]
+    card=build_mlb_scored_card(rows)
+    hitter=next(row for row in card if row.get("entity_id")=="h-home")
+    assert hitter["scored_status"]=="PASS"
+    assert EMPIRICAL_SIDE_CONFLICT_REASON in hitter["presentation_reason_codes"]
+
+
+def test_unbound_empirical_prop_fails_neutral_against_side():
+    rows=[
+        _verified_row(
+            market="MONEYLINE",score=100,model_p=.60,market_p=.50,ev=.20,
+            game_id="g",entity_id="g",side="AWAY",
+        ),
+        _verified_row(
+            market="PITCHER_OUTS",score=60,model_p=.68,market_p=.45,ev=.40,
+            game_id="g",entity_id="p",side="OVER",team_side=None,
+            engine_version="mlb_pitcher_joint_empirical_bayes_v3",
+        ),
+    ]
+    card=build_mlb_scored_card(rows)
+    prop=next(row for row in card if row.get("entity_id")=="p")
+    assert prop["scored_status"]=="ACTIONABLE"
+    assert EMPIRICAL_SIDE_CONFLICT_REASON not in (prop.get("presentation_reason_codes") or ())
 
 
 def test_top_edges_never_promotes_pass_or_blocked():
