@@ -16,6 +16,8 @@ from sportsedge.mlb_starter_v2 import (
     LEAGUE_RA9_PROXY,
     SHRINKAGE_PRIOR_IP,
     SPEC_VERSION,
+    STARTER_PROFILE_MINIMUM_STARTS,
+    STARTER_PROFILE_WINDOW_STARTS,
     LeagueRateBaseline,
     StarterPeripheralProfile,
     adjust_shell_mean,
@@ -29,7 +31,7 @@ from sportsedge.mlb_starter_v2 import (
 )
 from sportsedge.source_lineage import canonical_json_sha256
 
-EXPECTED_CONSTANTS_SHA256 = "1b1b9ed6900654e69c23b5daaf9729d85bdfec4ffa72bc921498737e2ec9c065"
+EXPECTED_CONSTANTS_SHA256 = "c349df6bbb38c8507440e86421649100ae88a636adc683d975fe6853dbd0158c"
 
 
 class StarterV2ConstantsTests(unittest.TestCase):
@@ -40,11 +42,13 @@ class StarterV2ConstantsTests(unittest.TestCase):
         self.assertEqual(DEFAULT_INNINGS_SHARE, 0.55)
         self.assertEqual(INNINGS_SHARE_LO, 0.45)
         self.assertEqual(INNINGS_SHARE_HI, 0.65)
-        # Unit-correct standard FIP weights for rates stored per out:
-        # (13 HR + 3 BB - 2 K) / IP => 39 HR + 9 BB - 6 K per out.
+        self.assertEqual(STARTER_PROFILE_WINDOW_STARTS, 12)
+        self.assertEqual(STARTER_PROFILE_MINIMUM_STARTS, 3)
         self.assertEqual(BB_COEF, 9.0)
         self.assertEqual(K_COEF, 6.0)
         self.assertEqual(HR_COEF, 39.0)
+        self.assertEqual(CONSTANTS["starter_profile_window_starts"], 12)
+        self.assertEqual(CONSTANTS["starter_profile_minimum_starts"], 3)
         self.assertEqual(CONSTANTS["league_rate_window"], {"start": "2026-06-01", "end": "2026-07-31"})
         self.assertEqual(CONSTANTS["evaluation_window"], {"start": "2026-08-01", "end": "2026-08-31"})
 
@@ -69,7 +73,6 @@ class StarterV2MathTests(unittest.TestCase):
         self.assertAlmostEqual(hat, LEAGUE_RA9_PROXY, places=12)
 
     def test_fip_unit_conversion_per_out(self):
-        # One extra event per 9 innings = one event per 27 outs.
         one_per_nine = 1.0 / 27.0
         hr_hat = starter_ra9_hat(
             k_rate=self.league.k_rate,
@@ -109,24 +112,18 @@ class StarterV2MathTests(unittest.TestCase):
         self.assertAlmostEqual(shrink_residual(residual=2.0, observed_ip=1e9), 2.0, places=6)
 
     def test_shrinkage_at_prior(self):
-        # n = τ → half residual
         self.assertAlmostEqual(shrink_residual(residual=2.0, observed_ip=50.0), 1.0, places=12)
 
     def test_innings_share_default_and_clip(self):
         self.assertEqual(innings_share(None), DEFAULT_INNINGS_SHARE)
         self.assertEqual(innings_share(0.0), DEFAULT_INNINGS_SHARE)
-        self.assertAlmostEqual(innings_share(14.85), 0.55, places=12)  # 14.85/27 = 0.55
-        self.assertEqual(innings_share(5.0), INNINGS_SHARE_LO)  # below clip
+        self.assertAlmostEqual(innings_share(14.85), 0.55, places=12)
+        self.assertEqual(innings_share(5.0), INNINGS_SHARE_LO)
         self.assertEqual(innings_share(27.0), INNINGS_SHARE_HI)
 
     def test_neutral_starter_leaves_shell(self):
         starter = StarterPeripheralProfile(1, 0, 0.0, None, None, None, None, "INSUFFICIENT_PRIOR_STARTS")
-        out = adjust_shell_mean(
-            shell=4.2,
-            starter=starter,
-            team_runs_against_mean=4.5,
-            league=self.league,
-        )
+        out = adjust_shell_mean(shell=4.2, starter=starter, team_runs_against_mean=4.5, league=self.league)
         self.assertFalse(out["applied"])
         self.assertEqual(out["adjusted_mean"], 4.2)
 
@@ -134,26 +131,8 @@ class StarterV2MathTests(unittest.TestCase):
         self.assertAlmostEqual(defense_blend_shell(away_runs_for=5.0, home_runs_against=4.0), 4.5)
 
     def test_v2_means_structure(self):
-        available = StarterPeripheralProfile(
-            player_id=99,
-            starts=5,
-            total_outs=75.0,
-            k_rate=0.30,
-            bb_rate=0.08,
-            hr_rate=0.03,
-            mean_outs=15.0,
-            status="AVAILABLE",
-        )
-        weak = StarterPeripheralProfile(
-            player_id=100,
-            starts=5,
-            total_outs=75.0,
-            k_rate=0.18,
-            bb_rate=0.14,
-            hr_rate=0.06,
-            mean_outs=15.0,
-            status="AVAILABLE",
-        )
+        available = StarterPeripheralProfile(99, 5, 75.0, 0.30, 0.08, 0.03, 15.0, "AVAILABLE")
+        weak = StarterPeripheralProfile(100, 5, 75.0, 0.18, 0.14, 0.06, 15.0, "AVAILABLE")
         result = starter_v2_means(
             away_runs_for=4.5,
             away_runs_against=4.5,
@@ -166,9 +145,7 @@ class StarterV2MathTests(unittest.TestCase):
         self.assertEqual(result["research_version"], SPEC_VERSION)
         self.assertEqual(result["constants_sha256"], CONSTANTS_SHA256)
         self.assertFalse(result["starter_identity_pit_verified"])
-        # Facing weak home starter → away mean should rise vs shell
         self.assertGreater(result["away_mean_runs"], result["away_shell"])
-        # Facing available (good) away starter → home mean should fall vs shell
         self.assertLess(result["home_mean_runs"], result["home_shell"])
 
     def test_peripheral_profile_from_rows(self):
