@@ -19,6 +19,9 @@ from sportsedge.mlb_context_card import context_section  # noqa: E402
 from sportsedge.mlb_myspari_own_model import MYSPARI_OWN_MODEL_VERSION, myspari_rows, render_markdown  # noqa: E402
 
 
+PRE_CONTEXT_STATUS = "PRE-CONTEXT · NOT FINAL"
+
+
 def _observed_at(payload: dict) -> datetime | None:
     stamps = [payload.get("observed_at_utc")] + [g.get("observed_at_utc") for g in payload.get("games") or []]
     parsed = []
@@ -54,7 +57,15 @@ def main() -> int:
     ap.add_argument("--out-dir", default="artifacts/mlb_myspari")
     ap.add_argument("--as-of", help="override now (tests)")
     ap.add_argument("--context-dir", help="dir of pregame context bundles retrieved this run")
+    ap.add_argument(
+        "--pre-context",
+        action="store_true",
+        help="mark this render as PRE-CONTEXT · NOT FINAL; only the context-bound render is the card",
+    )
     args = ap.parse_args()
+
+    if args.pre_context and args.context_dir:
+        raise SystemExit("--pre-context cannot be combined with --context-dir")
 
     payload = json.loads(Path(args.engine_output).read_text())
     names: dict[str, str] = {}
@@ -112,11 +123,20 @@ def main() -> int:
 
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    text = render_markdown(rows, header=f"SportsEdge MLB card ({MYSPARI_OWN_MODEL_VERSION})", notes=notes)
+    if args.pre_context:
+        display_rows = [dict(row, scored_status=PRE_CONTEXT_STATUS) for row in rows]
+        header = f"SportsEdge MLB {PRE_CONTEXT_STATUS} ({MYSPARI_OWN_MODEL_VERSION})"
+        phase = "PRE_CONTEXT_NOT_FINAL"
+    else:
+        display_rows = rows
+        header = f"SportsEdge MLB card ({MYSPARI_OWN_MODEL_VERSION})"
+        phase = "CONTEXT_BOUND_CARD" if args.context_dir else "CARD"
+
+    text = render_markdown(display_rows, header=header, notes=notes)
     if args.context_dir:
         text += "\n".join(context_section(bundles, failures=failures)) + "\n"
     (out / "card.md").write_text(text)
-    (out / "card.json").write_text(json.dumps({"version": MYSPARI_OWN_MODEL_VERSION, "rows": rows}, indent=2, default=str))
+    (out / "card.json").write_text(json.dumps({"version": MYSPARI_OWN_MODEL_VERSION, "phase": phase, "rows": rows}, indent=2, default=str))
     print(text)
     return 0
 
