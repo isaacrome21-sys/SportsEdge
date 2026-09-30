@@ -7,8 +7,8 @@
     "seasons": [2021, 2022, 2023, 2024],
     "game_type": "REG",
     "n_games": 1087,
-    "source": "data/nfl_discrete_v2/games_2021_2024_reg.csv",
-    "source_sha256": "5932f2a57647e979557e882477a3f9d889181489abe3c4e678589ccbbe16e371"
+    "source": "data/nfl_discrete_v2/scores_2021_2024_reg.json",
+    "source_sha256": "90a2ed9d0e77e06ede6d9c9d1c7dc8c36b210c327062a48eb2dd2d6e14629477"
   },
   "holdout": {
     "if_sha_before_2026_10_01_w4_kickoff": {
@@ -48,5 +48,5 @@
     "official": false
   },
   "notes": "Family B frozen on 2021-2024 only. Do not look at 2025 or 2026 W1-W3 for retune. Attempt 9 and M2 bytes untouched.",
-  "artifact_sha256": "27fa868532da4a1460ef956c024e452043d49d0a7b9887ba6fe505782296f3a6"
+  "artifact_sha256": "1302586dac1774f849b634dd09d0c065fbbed992b0cb11e78c491b3cea899ec3"
 }
