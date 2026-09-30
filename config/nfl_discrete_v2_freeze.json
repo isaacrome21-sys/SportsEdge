@@ -47,5 +47,6 @@
     "truth_gate": false,
     "official": false
   },
-  "notes": "Family B frozen on 2021-2024 only. Do not look at 2025 or 2026 W1-W3 for retune. Attempt 9 and M2 bytes untouched."
+  "notes": "Family B frozen on 2021-2024 only. Do not look at 2025 or 2026 W1-W3 for retune. Attempt 9 and M2 bytes untouched.",
+  "artifact_sha256": "3875334c48686c6ac8f9863ab71b2e7c2d867a94b555e3020974ef9efc6ba1b2"
 }
