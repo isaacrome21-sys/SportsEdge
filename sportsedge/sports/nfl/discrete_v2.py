@@ -15,6 +15,8 @@ import json
 FREEZE_PATH = Path(__file__).resolve().parents[3] / "config" / "nfl_discrete_v2_freeze.json"
 SCHEMA = "SPORTSEDGE_NFL_DISCRETE_V2_FREEZE_V1"
 FAMILY = "B_INDEPENDENT_NB_PLUS_MARGIN_SPIKES_0_3_7"
+MEAN_FLOOR = 0.5
+MEAN_CEILING = 70.0
 
 
 def canonical_sha256(value: Mapping[str, Any]) -> str:
@@ -37,6 +39,20 @@ def load_freeze(path: Path | None = None) -> dict[str, Any]:
     if expected != actual:
         raise ValueError(f"NFL_DISCRETE_V2_SHA_MISMATCH:{actual}")
     return artifact
+
+
+def means_from_attempt9(margin: float, total: float) -> dict[str, float]:
+    """Locked map: Attempt 9 raw home margin + total -> NB means.
+
+    home = (total + margin) / 2
+    away = (total - margin) / 2
+    Clipped to (0.5, 70) so the NB grid is defined. No other transform.
+    """
+    home = (float(total) + float(margin)) / 2.0
+    away = (float(total) - float(margin)) / 2.0
+    home = min(MEAN_CEILING, max(MEAN_FLOOR, home))
+    away = min(MEAN_CEILING, max(MEAN_FLOOR, away))
+    return {"mean_home": home, "mean_away": away}
 
 
 def _nb_logpmf(k: int, mu: float, r: float) -> float:
@@ -84,6 +100,15 @@ def margin_mass(grid: list[list[float]], abs_margin: int) -> float:
     for h, row in enumerate(grid):
         for a, p in enumerate(row):
             if abs(h - a) == abs_margin:
+                out += p
+    return out
+
+
+def total_mass(grid: list[list[float]], points: int) -> float:
+    out = 0.0
+    for h, row in enumerate(grid):
+        for a, p in enumerate(row):
+            if h + a == points:
                 out += p
     return out
 
