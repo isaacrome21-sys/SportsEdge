@@ -2,6 +2,7 @@
 
 Does not invent a fallback mean. Short history is NO_MODEL.
 Integer market thresholds stay blocked in the probability wrapper.
+Spreads stay off the card until a discrete score/margin model is validated.
 """
 from __future__ import annotations
 
@@ -31,6 +32,7 @@ NO_MODEL_MONEYLINE = "NO_MODEL:UNSUPPORTED_V1_NO_TIE_MASS_MODEL"
 NO_MODEL_INTEGER = "NO_MODEL:NFL_ATTEMPT9_MODEL_P_PUSH_MODEL_REQUIRED_FOR_INTEGER_LINE"
 NO_MODEL_HISTORY = "NO_MODEL:INSUFFICIENT_PRIOR_GAMES"
 NO_MODEL_MARKET = "NO_MODEL:MARKET_NOT_ON_ATTEMPT9_CARD"
+NO_MODEL_SPREAD = "NO_MODEL:SPREAD_HELD_FOR_DISCRETE_MARGIN_VALIDATION"
 
 
 class NflAttempt9LiveError(ValueError):
@@ -121,11 +123,13 @@ def market_eligibility(market: str, line: float | None) -> str | None:
     key = str(market).strip().lower()
     if key in {"moneyline", "ml"}:
         return NO_MODEL_MONEYLINE
+    if key in {"spread", "rl", "line"}:
+        return NO_MODEL_SPREAD
     if key in {"team_total", "1h_moneyline", "1h_spread", "1h_total", "2h_moneyline",
                "2h_spread", "2h_total", "quarter_moneyline", "quarter_spread",
                "quarter_total", "alt_spread", "alt_total", "player_prop"}:
         return NO_MODEL_MARKET
-    if key not in {"spread", "total"}:
+    if key != "total":
         return NO_MODEL_MARKET
     if line is None or is_integer_line(float(line)):
         return NO_MODEL_INTEGER
