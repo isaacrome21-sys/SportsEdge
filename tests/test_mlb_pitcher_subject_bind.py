@@ -1,12 +1,9 @@
-from datetime import datetime, timezone
-
-import pytest
-
-from sportsedge.canonical_manual_mlb import CanonicalManualMLBError, _resolve_subject
 from sportsedge.mlb_lines_intake import parse_lines
+from sportsedge.mlb_pitcher_subject import resolve_pitcher_subject
 from sportsedge.mlb_resolve import build_bound_input
 from sportsedge.mlb_source import GameSnapshot
 from sportsedge.manual_quote import validate_manual_quote
+import pytest
 
 
 def _game() -> GameSnapshot:
@@ -60,7 +57,7 @@ def test_probable_starter_resolves_to_id() -> None:
         "source": "MANUAL",
         "subject_name": "Cristopher Sanchez",
     })
-    person_id, team_id = _resolve_subject(row, game=_game())
+    person_id, team_id = resolve_pitcher_subject(row, _game())
     assert person_id == "661563"
     assert team_id == 143
 
@@ -80,5 +77,5 @@ def test_non_starter_is_subject_unresolved() -> None:
         "source": "MANUAL",
         "subject_name": "Zack Wheeler",
     })
-    with pytest.raises(CanonicalManualMLBError, match="SUBJECT_UNRESOLVED"):
-        _resolve_subject(row, game=_game())
+    with pytest.raises(ValueError, match="SUBJECT_UNRESOLVED"):
+        resolve_pitcher_subject(row, _game())
