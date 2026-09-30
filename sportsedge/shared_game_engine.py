@@ -17,16 +17,24 @@ from .v7_distribution import (
     DEFAULT_FIRST_INNING_DISPERSION_R,
     DEFAULT_FIRST_INNING_SHARE,
     DEFAULT_FULL_GAME_DISPERSION_R,
+    FULL_GAME_MODE_INDEPENDENT_NB,
     FULL_GAME_MODE_SHARED_GAMMA_POISSON,
     V7_DISTRIBUTION_VERSION,
+    V8_INDEPENDENT_DISTRIBUTION_VERSION,
+    V8_INDEPENDENT_EXTRA_HALF_INNING_MEAN,
+    V8_INDEPENDENT_TEAM_DISPERSION_R,
     GameDistribution,
+    calibrated_full_game_means,
     simulate_game_distribution,
 )
 
 STAGE1_GAME_MARKETS = frozenset({"MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS"})
 V8_PRIMARY_GAME_DEFAULT_SIMULATIONS = 100000
 V8_PRIMARY_GAME_MIN_SIMULATIONS = 100000
-V8_PRIMARY_FULL_GAME_DISPERSION_R = DEFAULT_FULL_GAME_DISPERSION_R
+V8_PRIMARY_FULL_GAME_DISPERSION_R = DEFAULT_FULL_GAME_DISPERSION_R  # legacy shared-pace mode
+V8_PRIMARY_DISTRIBUTION_VERSION = V8_INDEPENDENT_DISTRIBUTION_VERSION
+V8_PRIMARY_FULL_GAME_MODE = FULL_GAME_MODE_INDEPENDENT_NB
+V8_PRIMARY_TEAM_DISPERSION_R = V8_INDEPENDENT_TEAM_DISPERSION_R
 
 
 class SharedGameEngineError(ValueError):
@@ -62,7 +70,7 @@ def score_distribution_sha256(distribution: GameDistribution) -> str:
     if not isinstance(distribution, GameDistribution):
         raise SharedGameEngineError("distribution must be GameDistribution")
     return canonical_json_sha256({
-        "version": V7_DISTRIBUTION_VERSION,
+        "version": V8_PRIMARY_DISTRIBUTION_VERSION,
         "simulations": int(distribution.simulations),
         "seed_policy": str(distribution.seed_policy),
         "full_game_distribution_mode": str(distribution.full_game_distribution_mode),
@@ -107,15 +115,16 @@ def build_shared_game_engine_session(
             minimum=minimum_simulations,
         )
         feature_source_hash = model_input.get("feature_source_hash")
+        sim_away_mean, sim_home_mean = calibrated_full_game_means(away_mean, home_mean)
 
         stochastic_identity = {
-            "engine": V7_DISTRIBUTION_VERSION,
+            "engine": V8_PRIMARY_DISTRIBUTION_VERSION,
             "game_id": game_id,
             "away_mean_runs": away_mean,
             "home_mean_runs": home_mean,
             "feature_source_hash": feature_source_hash,
-            "full_game_distribution_mode": FULL_GAME_MODE_SHARED_GAMMA_POISSON,
-            "full_game_dispersion_r": V8_PRIMARY_FULL_GAME_DISPERSION_R,
+            "full_game_distribution_mode": V8_PRIMARY_FULL_GAME_MODE,
+            "full_game_dispersion_r": V8_PRIMARY_TEAM_DISPERSION_R,
         }
         game_build_hash = canonical_json_sha256(stochastic_identity)
         model_input_hash = canonical_json_sha256({
@@ -126,17 +135,17 @@ def build_shared_game_engine_session(
         cached = cache.get(model_input_hash)
         if cached is None:
             distribution = simulator(
-                away_mean_runs=away_mean,
-                home_mean_runs=home_mean,
+                away_mean_runs=sim_away_mean,
+                home_mean_runs=sim_home_mean,
                 total_line=0.0,
                 simulations=simulations,
                 build_hash=game_build_hash,
                 shared_game_sigma=0.0,
                 team_sigma=0.0,
-                full_game_dispersion_r=V8_PRIMARY_FULL_GAME_DISPERSION_R,
+                team_dispersion_r=V8_PRIMARY_TEAM_DISPERSION_R,
                 first_inning_share=DEFAULT_FIRST_INNING_SHARE,
                 first_inning_dispersion_r=DEFAULT_FIRST_INNING_DISPERSION_R,
-                extra_half_inning_mean=DEFAULT_EXTRA_HALF_INNING_MEAN,
+                extra_half_inning_mean=V8_INDEPENDENT_EXTRA_HALF_INNING_MEAN,
             )
             distribution_sha256 = score_distribution_sha256(distribution)
             cache[model_input_hash] = (distribution, distribution_sha256)
@@ -165,7 +174,7 @@ def build_shared_game_engine_session(
             "distribution_sha256": distribution_sha256,
             "readout_sha256": readout.readout_sha256,
             "readout_version": readout.readout_version,
-            "engine_version": V7_DISTRIBUTION_VERSION,
+            "engine_version": V8_PRIMARY_DISTRIBUTION_VERSION,
             "seed_policy": distribution.seed_policy,
             "mc_paths": distribution.simulations,
             "full_game_distribution_mode": distribution.full_game_distribution_mode,

@@ -61,6 +61,84 @@ class OwnModelCardTests(unittest.TestCase):
         self.assertEqual(hits["scored_status"], "NO_MODEL")
         self.assertIsNone(hits["edge"])
 
+    def test_real_issue1273_empirical_pitcher_row_prints_lean(self):
+        # Regression shape is based on the real #1273 Gausman O14.5 row.
+        # engine_version is copied verbatim from pre-#1278 acceptance artifact run 36716190139;
+        # fixture-only evidence hashes remain synthetic.
+        payload = {"results": [
+            {**_row("PITCHER_OUTS", "OVER", 107, 0.682, line=14.5, entity="592332", fair=0.447, edge=0.235),
+             "engine_version": "mlb_pitcher_joint_empirical_bayes_v3",
+             "empirical_evidence": {"sample_size": 10, "sample_unit": "starts", "wins": 7, "pushes": 0,
+                                    "weighted": False, "pool_sha256": "issue1273"}},
+            {**_row("PITCHER_OUTS", "UNDER", -141, 0.318, line=14.5, entity="592332", fair=0.553, edge=-0.235),
+             "engine_version": "mlb_pitcher_joint_empirical_bayes_v3",
+             "empirical_evidence": {"sample_size": 10, "sample_unit": "starts", "wins": 3, "pushes": 0,
+                                    "weighted": False, "pool_sha256": "issue1273"}},
+        ]}
+        over = next(r for r in myspari_rows(payload) if r["side"] == "OVER")
+        self.assertEqual(over["scored_status"], "LEAN")
+        self.assertEqual(over["star_rating"], 0)
+        self.assertIn("EMPIRICAL_PROP_LEAN_ONLY", over["presentation_reason_codes"])
+
+    def test_real_shaped_burke_below_floor_stays_pass_while_gausman_is_lean(self):
+        payload = {"results": [
+            {**_row("PITCHER_OUTS", "OVER", -143, 0.591, line=14.5, entity="657048", fair=0.556, edge=0.035),
+             "engine_version": "mlb_pitcher_joint_empirical_bayes_v3",
+             "empirical_evidence": {"sample_size": 10, "sample_unit": "starts", "wins": 6, "pushes": 0,
+                                    "weighted": False, "pool_sha256": "burke1273"}},
+            {**_row("PITCHER_OUTS", "UNDER", 108, 0.409, line=14.5, entity="657048", fair=0.444, edge=-0.035),
+             "engine_version": "mlb_pitcher_joint_empirical_bayes_v3",
+             "empirical_evidence": {"sample_size": 10, "sample_unit": "starts", "wins": 4, "pushes": 0,
+                                    "weighted": False, "pool_sha256": "burke1273"}},
+            {**_row("PITCHER_OUTS", "OVER", 107, 0.682, line=14.5, entity="592332", fair=0.447, edge=0.235),
+             "engine_version": "mlb_pitcher_joint_empirical_bayes_v3",
+             "empirical_evidence": {"sample_size": 10, "sample_unit": "starts", "wins": 7, "pushes": 0,
+                                    "weighted": False, "pool_sha256": "gausman1273"}},
+            {**_row("PITCHER_OUTS", "UNDER", -141, 0.318, line=14.5, entity="592332", fair=0.553, edge=-0.235),
+             "engine_version": "mlb_pitcher_joint_empirical_bayes_v3",
+             "empirical_evidence": {"sample_size": 10, "sample_unit": "starts", "wins": 3, "pushes": 0,
+                                    "weighted": False, "pool_sha256": "gausman1273"}},
+        ]}
+        rows = myspari_rows(payload)
+        burke = next(r for r in rows if r["entity_id"] == "657048" and r["side"] == "OVER")
+        gausman = next(r for r in rows if r["entity_id"] == "592332" and r["side"] == "OVER")
+        self.assertEqual(burke["scored_status"], "PASS")
+        self.assertIn("BELOW_MIN_CARD_EV_2PCT", burke["presentation_reason_codes"])
+        self.assertEqual(gausman["scored_status"], "LEAN")
+        self.assertEqual(gausman["star_rating"], 0)
+
+    def test_empirical_batter_prop_prints_lean(self):
+        payload = {"results": [
+            {**_row("HITS", "OVER", 110, 0.60, line=0.5, entity="999", fair=0.48, edge=0.12),
+             "engine_version": "mlb_hitter_joint_empirical_v2",
+             "empirical_evidence": {"sample_size": 20, "sample_unit": "games", "wins": 12, "pushes": 0,
+                                    "weighted": False, "pool_sha256": "hitter"}},
+            {**_row("HITS", "UNDER", -130, 0.40, line=0.5, entity="999", fair=0.52, edge=-0.12),
+             "engine_version": "mlb_hitter_joint_empirical_v2",
+             "empirical_evidence": {"sample_size": 20, "sample_unit": "games", "wins": 8, "pushes": 0,
+                                    "weighted": False, "pool_sha256": "hitter"}},
+        ]}
+        over = next(r for r in myspari_rows(payload) if r["side"] == "OVER")
+        self.assertEqual(over["scored_status"], "LEAN")
+        self.assertEqual(over["star_rating"], 0)
+        self.assertIn("EMPIRICAL_PROP_LEAN_ONLY", over["presentation_reason_codes"])
+
+    def test_non_empirical_game_markets_are_untouched(self):
+        before = [
+            _row("MONEYLINE", "AWAY", 120, 0.50, fair=0.44, edge=0.06),
+            _row("MONEYLINE", "HOME", -142, 0.50, fair=0.56, edge=-0.06),
+            _row("RUN_LINE", "AWAY", -165, 0.66, line=1.5, fair=0.60, edge=0.06),
+            _row("RUN_LINE", "HOME", 140, 0.34, line=-1.5, fair=0.40, edge=-0.06),
+            _row("TOTALS", "UNDER", -110, 0.45, line=7.0, fair=0.46, edge=0.04),
+            _row("TOTALS", "OVER", -110, 0.45, line=7.0, fair=0.54, edge=-0.04),
+        ]
+        rows = myspari_rows({"results": before})
+        for row in rows:
+            self.assertNotEqual(row["scored_status"], "LEAN")
+            source = next(x for x in before if x["market"] == row["market"] and x["side"] == row["side"])
+            self.assertEqual(row["model_p_raw"], source["model_p"])
+            self.assertEqual(row["engine_version"], "shared_game_v8")
+
     def test_missing_opposite_side_blocks(self):
         payload = {"results": [_row("MONEYLINE", "AWAY", 120, 0.5, fair=0.44, edge=0.06)]}
         rows = myspari_rows(payload)

@@ -15,8 +15,10 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from sportsedge.mlb_card_blocked import blocked_notes  # noqa: E402
 from sportsedge.mlb_context_card import context_section  # noqa: E402
-from sportsedge.mlb_myspari_own_model import MYSPARI_OWN_MODEL_VERSION, myspari_rows, render_markdown  # noqa: E402
+from sportsedge.mlb_myspari_own_model import MYSPARI_OWN_MODEL_VERSION, myspari_rows, render_markdown, team_entity_names  # noqa: E402
+from sportsedge.mlb_quote_move_guard import apply_quote_move_guard  # noqa: E402
 
 
 PRE_CONTEXT_STATUS = "PRE-CONTEXT · NOT FINAL"
@@ -50,10 +52,32 @@ def _load_context_bundles(context_dir: str | None) -> tuple[list[dict], list[dic
     return bundles, failures, team_sides
 
 
+def _prior_rows(snapshot_path: str | None, extra: str | None) -> list[dict]:
+    paths: list[Path] = []
+    if extra:
+        paths.append(Path(extra))
+    if snapshot_path:
+        current = Path(snapshot_path)
+        if current.parent.is_dir():
+            paths.extend(sorted(p for p in current.parent.glob("*.json") if p.resolve() != current.resolve()))
+    rows: list[dict] = []
+    seen: set[str] = set()
+    for path in paths:
+        if not path.is_file() or str(path) in seen:
+            continue
+        seen.add(str(path))
+        raw = json.loads(path.read_text())
+        chunk = raw.get("rows") if isinstance(raw, dict) else raw
+        if isinstance(chunk, list):
+            rows.extend(item for item in chunk if isinstance(item, dict))
+    return rows
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--engine-output", default="artifacts/manual_mlb_snapshot_card.json")
     ap.add_argument("--snapshot", help="input snapshot JSON (for subject_name labels)")
+    ap.add_argument("--prior-snapshot", help="earlier same-game board used only for NEEDS_CONFIRM")
     ap.add_argument("--out-dir", default="artifacts/mlb_myspari")
     ap.add_argument("--as-of", help="override now (tests)")
     ap.add_argument("--context-dir", help="dir of pregame context bundles retrieved this run")
@@ -82,6 +106,8 @@ def main() -> int:
     for res in resolutions:
         if isinstance(res, dict) and res.get("subject_id") and res.get("subject_name"):
             names.setdefault(str(res["subject_id"]), str(res["subject_name"]))
+    for entity_id, team in team_entity_names(payload).items():
+        names.setdefault(entity_id, team)
     now = datetime.fromisoformat(args.as_of) if args.as_of else datetime.now(timezone.utc)
     observed = _observed_at(payload)
     age = max((now - observed).total_seconds(), 0.0) if observed else 0.0
@@ -99,12 +125,14 @@ def main() -> int:
             team_sides.setdefault(str(entity_id), side)
 
     rows = myspari_rows(payload, quote_age_seconds=age, names=names, team_sides=team_sides)
+    rows = apply_quote_move_guard(rows, _prior_rows(args.snapshot, args.prior_snapshot))
     games = payload.get("games") or ([{"resolved_game": payload.get("resolved_game")}] if payload.get("resolved_game") else [])
     notes = []
     for g in games:
         rg = g.get("resolved_game") or {}
         if rg:
             notes.append(f"{rg.get('game_pk')}: {rg.get('away_team')} @ {rg.get('home_team')}, first pitch {rg.get('scheduled_start_utc')}")
+    notes.extend(blocked_notes(payload))
     notes.append(f"Lines observed {observed.isoformat() if observed else 'unknown'}; card built {now.isoformat(timespec='seconds')}.")
     if args.snapshot and Path(args.snapshot).is_file():
         raw = Path(args.snapshot).read_bytes()
@@ -120,6 +148,9 @@ def main() -> int:
         elif timestamp_sources:
             notes.append(f"Timestamp provenance: {', '.join(timestamp_sources)}.")
     notes.append("Probabilities are the SportsEdge engines' own model_p (engine_registry); this card only pairs, scores and ranks them.")
+    notes.append("NOT Truth Gate / NOT OFFICIAL. Unpriceable = NO_MODEL.")
+    if any("QUOTE_MOVE_NEEDS_CONFIRM" in (r.get("presentation_reason_codes") or ()) for r in rows):
+        notes.append("NEEDS_CONFIRM: a price moved past the frozen screenshot-misread thresholds vs an earlier same-game board. Look twice. Model_p is unchanged.")
 
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
