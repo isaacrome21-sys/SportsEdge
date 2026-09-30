@@ -6,25 +6,17 @@ import argparse
 import json
 import sys
 from dataclasses import asdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from sportsedge.mlb_issue_body import IssueLinesError, extract_issue_lines  # noqa: E402
 from sportsedge.mlb_lines_intake import LinesIntakeError, build_input  # noqa: E402
 from sportsedge.mlb_source import fetch_schedule  # noqa: E402
 
 CHICAGO = ZoneInfo("America/Chicago")
-
-
-def _body_lines(body: str) -> str:
-    # Issue forms wrap the textarea under a "### Lines" heading.
-    marker = "### Lines"
-    if marker in body:
-        body = body.split(marker, 1)[1]
-        body = body.split("\n### ", 1)[0]
-    return body.replace("```text", "").replace("```", "")
 
 
 def main() -> int:
@@ -37,9 +29,16 @@ def main() -> int:
 
     observed = datetime.fromisoformat(args.observed_at.replace("Z", "+00:00")).astimezone(CHICAGO)
     slate = observed.date().isoformat()
-    body = _body_lines(Path(args.body_file).read_text(encoding="utf-8"))
     try:
-        schedule = fetch_schedule(slate)
+        body = extract_issue_lines(Path(args.body_file).read_text(encoding="utf-8"))
+    except IssueLinesError as exc:
+        Path("intake_error.txt").write_text(str(exc), encoding="utf-8")
+        print(f"INTAKE_FAILED: {exc}", file=sys.stderr)
+        return 2
+    try:
+        # Phone issues opened late CT bind tomorrow's games. Fetch both days.
+        nxt = (observed.date() + timedelta(days=1)).isoformat()
+        schedule = list(fetch_schedule(slate)) + list(fetch_schedule(nxt))
         payload = build_input(body, observed_at=observed.isoformat(), schedule=schedule)
         # Reuse the exact live schedule response that bound the phone text to MLB games.
         # This snapshot is run-local evidence only; it is not persisted as a cross-run cache.
