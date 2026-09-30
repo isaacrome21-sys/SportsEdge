@@ -5,9 +5,10 @@ import argparse, json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from sportsedge.canonical_manual_mlb import run_canonical_manual_mlb
+from sportsedge.canonical_manual_mlb import CanonicalManualMLBError, run_canonical_manual_mlb
 from sportsedge.manual_mlb_snapshot import run_manual_mlb_snapshot
 from sportsedge.manual_quote_live import partition_live_rows, validate_live_rows
+from sportsedge.mlb_schedule_filter import filter_schedule_to_game_pk
 from sportsedge.mlb_source import GameSnapshot
 from sportsedge.runtime import parse_timestamp
 
@@ -40,16 +41,31 @@ def _empty_payload() -> dict:
     }
 
 
-def _run_canonical_rows(rows, *, history_cache_dir: str, schedule: list[GameSnapshot] | None = None) -> dict:
+def _price_game(game_rows, *, history_cache_dir: str, schedule: list[GameSnapshot] | None):
+    if schedule is None:
+        return run_canonical_manual_mlb(game_rows, history_cache_dir=history_cache_dir, schedule=None)
+    game_pk = game_rows[0].get("game_pk") if game_rows else None
+    if game_pk in (None, ""):
+        raise CanonicalManualMLBError("GAME_UNBOUND")
+    scoped = filter_schedule_to_game_pk(schedule, game_pk)
+    return run_canonical_manual_mlb(game_rows, history_cache_dir=history_cache_dir, schedule=scoped)
+
+
+def _run_canonical_rows(rows, *, history_cache_dir: str, schedule: list[GameSnapshot] | None = None):
     grouped: dict[str, list] = {}
     for row in rows:
         grouped.setdefault(str(row.get("game_id")), []).append(row)
-    if len(grouped) == 1:
-        return run_canonical_manual_mlb(rows, history_cache_dir=history_cache_dir, schedule=schedule)
     games = []
     results = []
+    blocked: list[dict] = []
+    last_ok = None
     for game_id, game_rows in grouped.items():
-        payload = run_canonical_manual_mlb(game_rows, history_cache_dir=history_cache_dir, schedule=schedule)
+        try:
+            payload = _price_game(game_rows, history_cache_dir=history_cache_dir, schedule=schedule)
+        except (CanonicalManualMLBError, ValueError) as exc:
+            blocked.append({"game_id": game_id, "reason": str(exc)})
+            continue
+        last_ok = payload
         games.append({
             "input_game_id": game_id,
             "resolved_game": payload.get("resolved_game"),
@@ -58,13 +74,15 @@ def _run_canonical_rows(rows, *, history_cache_dir: str, schedule: list[GameSnap
             "feature_lineage": payload.get("feature_lineage", []),
         })
         results.extend(payload.get("results", []))
+    if len(grouped) == 1 and not blocked and last_ok is not None:
+        return last_ok, blocked
     return {
         "schema_version": 2,
         "run_type": "CANONICAL_MANUAL_QUOTES_MULTI_GAME",
         "source": "MANUAL",
         "games": games,
         "results": results,
-    }
+    }, blocked
 
 
 def main() -> int:
@@ -90,13 +108,16 @@ def main() -> int:
         )
 
     schedule = _schedule_snapshot(snapshot)
+    extra_blocked: list[dict] = []
     if rows:
-        payload = _run_canonical_rows(rows, history_cache_dir=args.history_cache_dir, schedule=schedule)
+        payload, extra_blocked = _run_canonical_rows(
+            rows, history_cache_dir=args.history_cache_dir, schedule=schedule,
+        )
     elif raw_rows is not None:
         payload = _empty_payload()
     else:
         payload = run_manual_mlb_snapshot(snapshot, history_cache_dir=args.history_cache_dir)
-    payload["blocked"] = blocked
+    payload["blocked"] = list(blocked) + list(extra_blocked)
     payload["quote_notes"] = notes
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
