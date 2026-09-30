@@ -35,10 +35,10 @@ class MLBFullGameDispersionAuditTests(unittest.TestCase):
         self.assertAlmostEqual(float(fit["raw_r"]), 8.0, places=12)
         self.assertAlmostEqual(float(fit["locked_r"]), 8.0, places=12)
 
-    def test_candidate_keeps_mean_and_widens_spread(self):
+    def test_candidate_is_deterministic_and_overdispersed(self):
         away_mean = 4.2
         home_mean = 4.4
-        input_total = away_mean + home_mean
+        regulation_input_total = away_mean + home_mean
         dispersion_r = 5.217229403204152
         candidate = _candidate_pmf(
             away_mean=away_mean,
@@ -59,13 +59,14 @@ class MLBFullGameDispersionAuditTests(unittest.TestCase):
         self.assertAlmostEqual(sum(candidate.values()), 1.0, places=12)
 
         candidate_mean, candidate_variance = _total_moments(candidate)
-        # Mean-preserving: sampled total mean tracks the input means.
-        self.assertAlmostEqual(candidate_mean, input_total, delta=0.20)
-        # Shared Gamma-Poisson: Var(T) = mu + mu^2 / r > Poisson mu.
-        poisson_variance = input_total
-        theoretical_variance = input_total + (input_total ** 2) / dispersion_r
-        self.assertGreater(candidate_variance, poisson_variance * 1.20)
-        self.assertAlmostEqual(candidate_variance, theoretical_variance, delta=0.75)
+        # The Gamma-Poisson latent pace is mean-preserving before tie resolution.
+        # The final-score PMF then adds extra-innings runs on regulation ties, so
+        # its mean is expected to sit modestly above the regulation input mean.
+        self.assertGreater(candidate_mean, regulation_input_total)
+        self.assertLess(candidate_mean, regulation_input_total + 0.60)
+        # The final-score distribution must remain clearly over-dispersed rather
+        # than collapsing back toward a Poisson variance near its mean.
+        self.assertGreater(candidate_variance, candidate_mean * 1.20)
 
     def test_candidate_readouts_cover_frozen_reference_lines(self):
         pmf = _candidate_pmf(
