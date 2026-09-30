@@ -72,3 +72,28 @@ def test_evaluator_rejects_pre_holdout_games() -> None:
         evaluate_holdout([_game(season=2025, week=4)])
     with pytest.raises(ValueError, match="NFL_DISCRETE_V2_EVAL_HOLDOUT_LEAK"):
         evaluate_holdout([_game(week=13)])
+
+
+def test_evaluator_accepts_on_disk_dicts() -> None:
+    art = load_freeze()
+    ev = load_eval_freeze()
+    out = evaluate_holdout([_game() for _ in range(79)], freeze=art, eval_freeze=ev)
+    assert out["status"] == "INSUFFICIENT"
+    assert out["freeze_sha256"] == art["artifact_sha256"]
+    assert out["eval_sha256"] == ev["artifact_sha256"]
+
+
+def test_evaluator_rejects_mutated_passed_dicts() -> None:
+    art = dict(load_freeze())
+    art["shape"] = dict(art["shape"])
+    art["shape"]["nb_r_home"] = float(art["shape"]["nb_r_home"]) + 0.01
+    with pytest.raises(ValueError, match="NFL_DISCRETE_V2_SHA_MISMATCH"):
+        evaluate_holdout([_game() for _ in range(79)], freeze=art)
+    ev = dict(load_eval_freeze())
+    ev["min_n"] = 46
+    with pytest.raises(ValueError, match="NFL_DISCRETE_V2_EVAL_SHA_MISMATCH"):
+        evaluate_holdout([_game() for _ in range(79)], eval_freeze=ev)
+    stale = dict(load_eval_freeze())
+    stale["artifact_sha256"] = "0" * 64
+    with pytest.raises(ValueError, match="NFL_DISCRETE_V2_EVAL_SHA_MISMATCH"):
+        evaluate_holdout([_game() for _ in range(79)], eval_freeze=stale)

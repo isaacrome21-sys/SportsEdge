@@ -1,12 +1,13 @@
 """Frozen holdout evaluator for NFL discrete v2. Locked before W4.
 
 Every gate is read from config/nfl_discrete_v2_eval_freeze.json.
+Dicts passed into evaluate_holdout must hash to the on-disk freeze.
 """
 from __future__ import annotations
 
 from hashlib import sha256
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence
 import json
 
 from sportsedge.sports.nfl.discrete_v2 import (
@@ -38,6 +39,24 @@ def load_eval_freeze(path: Path | None = None) -> dict[str, Any]:
     if expected != actual:
         raise ValueError(f"NFL_DISCRETE_V2_EVAL_SHA_MISMATCH:{actual}")
     return artifact
+
+
+def _require_passed_freeze(
+    passed: Mapping[str, Any] | None,
+    loader: Callable[[], Mapping[str, Any]],
+    mismatch_code: str,
+) -> Mapping[str, Any]:
+    """Passed freeze/eval dicts must recompute to the on-disk artifact SHA."""
+    disk = loader()
+    expected = str(disk.get("artifact_sha256") or "").lower()
+    if passed is None:
+        return disk
+    payload = dict(passed)
+    embedded = str(payload.pop("artifact_sha256", "") or "").lower()
+    actual = canonical_sha256(payload)
+    if not expected or embedded != expected or actual != expected:
+        raise ValueError(f"{mismatch_code}:{actual}")
+    return dict(passed)
 
 
 def active_holdout(ev: Mapping[str, Any]) -> dict[str, Any]:
@@ -73,8 +92,8 @@ def evaluate_holdout(
     freeze: Mapping[str, Any] | None = None,
     eval_freeze: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    art = freeze or load_freeze()
-    ev = eval_freeze or load_eval_freeze()
+    art = _require_passed_freeze(freeze, load_freeze, "NFL_DISCRETE_V2_SHA_MISMATCH")
+    ev = _require_passed_freeze(eval_freeze, load_eval_freeze, "NFL_DISCRETE_V2_EVAL_SHA_MISMATCH")
     gates = ev["gates"]
     min_n = int(ev["min_n"])
     baseline = float(gates["brier_vs_home_win_baseline"])
@@ -149,4 +168,6 @@ def evaluate_holdout(
         "totals_range": [total_lo, total_hi],
         "pass": passed,
         "phone_card": False,
+        "freeze_sha256": str(art["artifact_sha256"]),
+        "eval_sha256": str(ev["artifact_sha256"]),
     }
