@@ -18,13 +18,7 @@ def test_render_includes_priced_rows_and_blocked_line() -> None:
         "results": [{"ok": True}],
         "games": [{"resolved_game": {"away_team": "Phillies", "home_team": "Braves"}}],
     }
-    priced = [{
-        "market": "MONEYLINE",
-        "selection": "Phillies",
-        "model_p": 0.52,
-        "price": -117,
-        "status": "PASS",
-    }]
+    priced = [{"game_id": "Phillies@Braves", "market": "MONEYLINE", "side": "AWAY"}]
     text = render_markdown(priced, header="SportsEdge MLB card", notes=blocked_notes(payload))
-    assert "Phillies" in text
+    assert "Phillies@Braves" in text
     assert "BLOCKED White Sox@Astros: GAME_NOT_PREGAME" in text
