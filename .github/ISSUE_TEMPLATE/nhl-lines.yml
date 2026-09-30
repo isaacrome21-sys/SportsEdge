@@ -1,0 +1,25 @@
+name: NHL lines → card
+description: Paste DraftKings NHL lines from your phone. SportsEdge replies here. Until a frozen owner exists the card is NO_MODEL.
+title: "[NHL LINES] "
+labels: ["nhl-lines"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        One game header, then both prices. Away / over first.
+
+        ```
+        Rangers @ Bruins
+        ML +124 -148
+        PL +1.5 -180 +150
+        Total 5.5 -110 -110
+        ```
+
+        Goal, point, and assist props are `NO_MODEL` on purpose.
+  - type: textarea
+    id: lines
+    attributes:
+      label: Lines
+      render: text
+    validations:
+      required: true
