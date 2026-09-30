@@ -23,7 +23,8 @@ LABEL = "SportsEdge engine model_p shown MySpariEdge-style · NOT Truth Gate · 
 MANUAL_QUOTE_TTL_SECONDS = 6 * 3600.0
 # Favorites priced beyond this are never shown as ACTIONABLE (Isaac's -165 ceiling).
 MAX_FAVORITE_ODDS = -165
-PRICE_CEILING_REASON = "PRICE_BEYOND_MAX_FAVORITE_-165"\nEMPIRICAL_PITCHER_OUTS_LEAN_REASON = "EMPIRICAL_PITCHER_OUTS_LEAN_ONLY"
+PRICE_CEILING_REASON = "PRICE_BEYOND_MAX_FAVORITE_-165"
+EMPIRICAL_PITCHER_OUTS_LEAN_REASON = "EMPIRICAL_PITCHER_OUTS_LEAN_ONLY"
 _LINE_NEGATED = frozenset({"RUN_LINE", "F5_RUN_LINE"})
 _OPPOSITE = {"AWAY": "HOME", "HOME": "AWAY", "OVER": "UNDER", "UNDER": "OVER", "YES": "NO", "NO": "YES"}
 
@@ -122,7 +123,20 @@ def myspari_rows(payload: Mapping[str, Any], *, quote_age_seconds: float = 0.0,
         if scored_row.get("status") == "ACTIONABLE" and price is not None and price < MAX_FAVORITE_ODDS:
             scored_row["status"] = "PASS"
             scored_row["presentation_reason_codes"] = (PRICE_CEILING_REASON,)
-        merged = {**scored_row, **base}\n        # Empirical pitcher-outs estimates are a research lean only. They may be\n        # displayed with their unchanged probability/economics, but never promoted\n        # to a core ACTIONABLE play from a small recent-start bootstrap.\n        if (\n            merged.get("status") == "ACTIONABLE"\n            and str(merged.get("market") or "").upper() == "PITCHER_OUTS"\n            and str(merged.get("engine_version") or "").startswith("mlb_pitcher_joint_empirical_")\n        ):\n            merged["status"] = "LEAN"\n            codes = tuple(merged.get("presentation_reason_codes") or ())\n            if EMPIRICAL_PITCHER_OUTS_LEAN_REASON not in codes:\n                merged["presentation_reason_codes"] = codes + (EMPIRICAL_PITCHER_OUTS_LEAN_REASON,)\n        out.append(merged)
+        merged = {**scored_row, **base}
+        # Empirical pitcher-outs estimates are a research lean only. They may be
+        # displayed with their unchanged probability/economics, but never promoted
+        # to a core ACTIONABLE play from a small recent-start bootstrap.
+        if (
+            merged.get("status") == "ACTIONABLE"
+            and str(merged.get("market") or "").upper() == "PITCHER_OUTS"
+            and str(merged.get("engine_version") or "").startswith("mlb_pitcher_joint_empirical_")
+        ):
+            merged["status"] = "LEAN"
+            codes = tuple(merged.get("presentation_reason_codes") or ())
+            if EMPIRICAL_PITCHER_OUTS_LEAN_REASON not in codes:
+                merged["presentation_reason_codes"] = codes + (EMPIRICAL_PITCHER_OUTS_LEAN_REASON,)
+        out.append(merged)
 
     # Apply card-level eligibility (including the 2% model-return floor) before
     # same-game conflict selection so a row that cannot make the card cannot
@@ -410,4 +424,6 @@ def render_markdown(rows: Sequence[Mapping[str, Any]], *, header: str, notes: Se
             lines.append(f"- {_selection(r)}: {reason}")
     if notes:
         lines += ["", "## Notes", *[f"- {n}" for n in notes]]
-    return "\n".join(lines) + "\n"
+    return "
+".join(lines) + "
+"
