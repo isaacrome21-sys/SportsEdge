@@ -36,8 +36,26 @@ def resolve_game(away: str, home: str, schedule: list[GameSnapshot], *, now: dat
     return future[0]
 
 
+def _player_fields(row, game: GameSnapshot | None = None) -> dict[str, Any]:
+    extra: dict[str, Any] = {}
+    if row.subject_name:
+        extra["subject_name"] = row.subject_name
+    if row.team:
+        if game is None:
+            extra["team"] = row.team
+        elif _match_team(row.team, [game.home_name]):
+            extra["team_side"] = "HOME"
+        elif _match_team(row.team, [game.away_name]):
+            extra["team_side"] = "AWAY"
+        else:
+            raise LinesIntakeError(
+                f"TEAM_NOT_IN_GAME: '{row.team}' in {game.away_name} @ {game.home_name}"
+            )
+    return extra
+
+
 def _unbound_row(row, *, observed_at: str, book: str, reason: str) -> dict[str, Any]:
-    return {
+    record = {
         "game_id": f"{row.away}@{row.home}",
         "game_pk": None,
         "market_type": row.market_type,
@@ -53,6 +71,8 @@ def _unbound_row(row, *, observed_at: str, book: str, reason: str) -> dict[str, 
         "timestamp_source": "INTAKE_STAMPED",
         "bind_status": reason,
     }
+    record.update(_player_fields(row))
+    return record
 
 
 def build_bound_input(
@@ -73,7 +93,7 @@ def build_bound_input(
                 raise
             out.append(_unbound_row(row, observed_at=observed_at, book=book, reason=reason))
             continue
-        out.append({
+        record = {
             "game_id": f"{game.away_name}@{game.home_name}",
             "game_pk": int(game.game_pk),
             "market_type": row.market_type,
@@ -87,5 +107,7 @@ def build_bound_input(
             "first_pitch_at": parse_game_start(game.game_date).isoformat(),
             "source": "MANUAL",
             "timestamp_source": "INTAKE_STAMPED",
-        })
+        }
+        record.update(_player_fields(row, game))
+        out.append(record)
     return {"rows": out}
