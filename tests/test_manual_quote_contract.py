@@ -48,7 +48,7 @@ class ManualQuoteContractTests(unittest.TestCase):
         self.assertEqual((pid, team), ("571510", 112))
 
     def test_name_and_id_mismatch_is_row_resolvable_error(self):
-        row = validate_manual_quote(dict(BASE, market_type="PITCHER_OUTS", subject_id="650633", subject_name="Matthew Boyd"))
+        row = validate_manual_quote(dict(BASE, market_type="BATTER_HITS", subject_id="650633", subject_name="Matthew Boyd"))
         class Resp:
             def __enter__(self): return self
             def __exit__(self, *a): return False
