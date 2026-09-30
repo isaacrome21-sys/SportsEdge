@@ -1,14 +1,14 @@
 import unittest
 
 from sportsedge.engine_registry import engine_registry
-from sportsedge.generic_market_engine import generic_market_engine_adapter
 from sportsedge.shared_game_engine import (
     SharedGameEngineError,
+    V8_PRIMARY_FULL_GAME_DISPERSION_R,
     V8_PRIMARY_GAME_MIN_SIMULATIONS,
     build_shared_game_engine_session,
     score_distribution_sha256,
 )
-from sportsedge.v7_distribution import simulate_game_distribution
+from sportsedge.v7_distribution import SHARED_GAMMA_POISSON, simulate_game_distribution
 
 
 class SharedGameEngineStage1Tests(unittest.TestCase):
@@ -117,8 +117,11 @@ class SharedGameEngineStage1Tests(unittest.TestCase):
         self.assertNotEqual(first["model_input_hash"], second["model_input_hash"])
         self.assertNotEqual(first["distribution_sha256"], second["distribution_sha256"])
 
-    def test_stage1_readouts_match_incumbent_probabilities(self):
+    def test_stage1_readouts_use_promoted_full_game_dispersion(self):
+        calls = []
+
         def test_simulator(**kwargs):
+            calls.append(dict(kwargs))
             return simulate_game_distribution(**kwargs)
 
         shared = build_shared_game_engine_session(
@@ -133,16 +136,23 @@ class SharedGameEngineStage1Tests(unittest.TestCase):
             {"market": "TOTALS", "line": 8.0, "side": "OVER"},
             {"market": "TOTALS", "line": 8.0, "side": "UNDER"},
         )
+        outputs = []
         for case in cases:
-            model_input = {**base, **case}
-            incumbent = generic_market_engine_adapter(model_input)
-            candidate = shared(model_input)
+            candidate = shared({**base, **case})
+            outputs.append(candidate)
             with self.subTest(case=case):
-                self.assertAlmostEqual(candidate["model_p"], incumbent["model_p"], places=15)
-                self.assertAlmostEqual(candidate["push_p"], incumbent["push_p"], places=15)
-                self.assertEqual(candidate["mc_paths"], incumbent["mc_paths"])
-                self.assertEqual(candidate["seed_policy"], incumbent["seed_policy"])
-                self.assertEqual(candidate["engine_version"], incumbent["engine_version"])
+                self.assertEqual(candidate["full_game_distribution_mode"], SHARED_GAMMA_POISSON)
+                self.assertEqual(candidate["full_game_dispersion_r"], V8_PRIMARY_FULL_GAME_DISPERSION_R)
+                self.assertGreaterEqual(candidate["model_p"], 0.0)
+                self.assertLessEqual(candidate["model_p"], 1.0)
+                self.assertGreaterEqual(candidate["push_p"], 0.0)
+                self.assertLessEqual(candidate["push_p"], 1.0)
+
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0]["shared_game_sigma"], 0.0)
+        self.assertEqual(calls[0]["team_sigma"], 0.0)
+        self.assertEqual(calls[0]["full_game_dispersion_r"], V8_PRIMARY_FULL_GAME_DISPERSION_R)
+        self.assertEqual({row["distribution_sha256"] for row in outputs}, {outputs[0]["distribution_sha256"]})
 
     def test_registry_binds_all_three_markets_to_same_session(self):
         registry = engine_registry()
