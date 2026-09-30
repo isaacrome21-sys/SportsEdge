@@ -12,6 +12,18 @@ def test_all_blocked_is_visible() -> None:
     assert notes[-1].startswith("ALL_BLOCKED")
 
 
+def test_empty_rendered_card_includes_all_blocked() -> None:
+    payload = {
+        "blocked": [{"game_id": "Phillies@Braves", "reason": "AMBIGUOUS_GAME"}],
+        "results": [],
+        "games": [],
+    }
+    text = render_markdown([], header="SportsEdge MLB card", notes=blocked_notes(payload))
+    assert "| Game |" in text or "Game" in text
+    assert "BLOCKED Phillies@Braves: AMBIGUOUS_GAME" in text
+    assert "ALL_BLOCKED: no priced rows. This is not a pass." in text
+
+
 def test_render_includes_priced_rows_and_blocked_line() -> None:
     payload = {
         "blocked": [{"game_id": "White Sox@Astros", "reason": "GAME_NOT_PREGAME"}],
@@ -22,3 +34,4 @@ def test_render_includes_priced_rows_and_blocked_line() -> None:
     text = render_markdown(priced, header="SportsEdge MLB card", notes=blocked_notes(payload))
     assert "Phillies@Braves" in text
     assert "BLOCKED White Sox@Astros: GAME_NOT_PREGAME" in text
+    assert "ALL_BLOCKED" not in text
