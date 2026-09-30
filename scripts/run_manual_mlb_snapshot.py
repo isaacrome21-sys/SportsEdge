@@ -4,12 +4,45 @@ from __future__ import annotations
 import argparse, json
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from sportsedge.canonical_manual_mlb import run_canonical_manual_mlb
 from sportsedge.manual_mlb_snapshot import run_manual_mlb_snapshot
+from sportsedge.manual_quote import validate_manual_quote
 from sportsedge.manual_quote_live import partition_live_rows
 from sportsedge.mlb_source import GameSnapshot
 from sportsedge.runtime import parse_timestamp
+
+CHICAGO_TZ = ZoneInfo("America/Chicago")
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def validate_live_rows(rows, *, run_date: str | None, max_age_minutes: int | None, as_of: datetime) -> None:
+    """Strict live gates used by run-snapshot regression tests."""
+    if not isinstance(rows, list) or not rows:
+        raise ValueError("MANUAL_INPUT_EMPTY")
+    if max_age_minutes <= 0:
+        raise ValueError("MANUAL_MAX_AGE_INVALID")
+    now = _as_utc(as_of)
+    for index, raw in enumerate(rows):
+        quote = validate_manual_quote(raw)
+        first_pitch_utc = _as_utc(quote.first_pitch_at)
+        first_pitch_ct_date = first_pitch_utc.astimezone(CHICAGO_TZ).date().isoformat()
+        if run_date and first_pitch_ct_date != run_date:
+            raise ValueError(
+                f"MANUAL_INPUT_DATE_MISMATCH row={index} expected={run_date} "
+                f"first_pitch_date_ct={first_pitch_ct_date}"
+            )
+        if first_pitch_utc <= now:
+            raise ValueError(f"MANUAL_QUOTE_GAME_STARTED row={index} game_id={quote.game_id}")
+        observed_utc = _as_utc(quote.observed_at)
+        if (now - observed_utc).total_seconds() / 60.0 < 0:
+            raise ValueError(f"MANUAL_QUOTE_FROM_FUTURE row={index} game_id={quote.game_id}")
 
 
 def _schedule_snapshot(snapshot) -> list[GameSnapshot] | None:
