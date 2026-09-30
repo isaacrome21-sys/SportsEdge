@@ -12,18 +12,26 @@ held-out window until this document is treated as the candidate definition.
 - That window has now judged **two** starter attempts. It is **burned for
   tuning**. A later pass on Sept 15–27 alone is not promotion evidence.
 
-## Allowed evaluation windows for v2
+## Pre-registered evaluation window for v2
 
-Pick **one** pre-registered window that does **not** include 2026-09-15..27 as
-the sole decision sample:
+**Primary gate (locked): 2026-08-01 → 2026-08-31** (full August regular season).
 
-- **Forward:** 2026-09-28 onward (regular season / early postseason — note
-  postseason caution separately), or
-- **Earlier regular season:** a contiguous stretch before 2026-09-15 (e.g.
-  August or early September), fixed in the run receipt before numbers are read.
+Nobody has tuned a starter candidate on this stretch. It is large enough to
+judge means and line calibration.
 
-Sept 15–27 may appear only as a **secondary** descriptive check, never as the
-promotion gate for v2.
+### Explicitly off-limits for the v2 promotion gate
+
+| Window | Why barred |
+|---|---|
+| 2026-09-01 → 2026-09-14 | Full-game dispersion `r` was **fit** here (#1236 / #1238) |
+| 2026-09-15 → 2026-09-27 | Burned by two prior starter attempts |
+| 2026-09-28 onward | Regular season is over; only a few playoff games — not enough n |
+
+Sept 15–27 (and optionally Sept 1–14) may appear only as **secondary**
+descriptive checks after the August gate is scored. They never decide promotion.
+
+Playoff games are out of scope for v2 promotion; treat postseason totals as
+small leans until a separate postseason window exists.
 
 ## Production baseline (unchanged)
 
@@ -93,7 +101,7 @@ config). No grid search on the evaluation window.
 
 ## Promotion gate (unchanged)
 
-On the **pre-registered** window only:
+On **2026-08-01 → 2026-08-31** only:
 
 1. Mean absolute calibration gap on game totals 6.5 / 7.5 / 8.5 / 9.5 improves
    vs defense blend, and
@@ -106,8 +114,8 @@ If either gate fails, production stays on defense blend.
 
 ## Implementation order
 
-1. This document (done).
+1. This document (done), with August pre-registered (done).
 2. Implementation commit with frozen constants + unit tests for residual/
    shrinkage / share math only.
-3. Pre-register evaluation window in a one-line receipt commit.
-4. Run evaluation; publish numbers; promote only on a clear gate pass.
+3. Run evaluation on August only; publish numbers; promote only on a clear gate
+   pass.
