@@ -18,7 +18,7 @@ V8_PRIMARY_GAME_DEFAULT_SIMULATIONS = 100000
 # Full-game Stage-1 markets that share the V7 score distribution with the
 # shared_game_engine path. F5 is fail-closed (state model rebuild). NRFI/YRFI
 # stay on the separate analytic first-inning model.
-STAGE1_FULL_GAME_MARKETS = frozenset({"MONEYLINE", "RUN_LINE", "TOTALS"})
+STAGE1_FULL_GAME_MARKETS = frozenset({"MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS"})
 
 GAME_MARKETS = {
     "MONEYLINE", "RUN_LINE", "TOTALS", "TEAM_TOTALS", "NRFI", "YRFI",
@@ -33,7 +33,7 @@ PA_BOUNDED_COUNT_MARKETS = {"BATTER_K", "BATTER_BB", "SINGLES", "DOUBLES"}
 BINARY_MARKETS = {"PITCHER_RECORD_WIN", "FIRST_HOME_RUN"}
 
 FAIL_CLOSED_MARKETS = {
-    "TEAM_TOTALS", "F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS", "F5_TEAM_TOTALS",
+    "F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS", "F5_TEAM_TOTALS",
     "PITCHER_OUTS", "HITS_RUNS_RBIS", "FIRST_HOME_RUN",
     "PITCHER_ER", "RBI", "PITCHER_RECORD_WIN",
 }
@@ -213,8 +213,6 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
     if market not in GAME_MARKETS:
         raise GenericMarketEngineError("game adapter received non-game market")
     if market in FAIL_CLOSED_MARKETS:
-        if market == "TEAM_TOTALS":
-            raise GenericMarketEngineError("TEAM_TOTALS_SHARED_GAME_ENGINE_REQUIRED")
         raise GenericMarketEngineError(f"{market}_STATE_MODEL_REBUILD_REQUIRED")
 
     away_mean = _finite(model_input.get("away_mean_runs"), "away_mean_runs", lower=0.000001)
@@ -259,8 +257,8 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
         out["push_p"] = 0.0
         return out
 
-    # MONEYLINE / RUN_LINE / TOTALS: same frozen full-game dispersion as Stage-1
-    # shared_game_engine. F5 remains fail-closed above.
+    # MONEYLINE / RUN_LINE / TOTALS / TEAM_TOTALS: same frozen full-game dispersion
+    # as Stage-1 shared_game_engine. F5 remains fail-closed above.
     total_line = line if market == "TOTALS" else _finite(model_input.get("total_line", 0.0), "total_line", lower=0.0)
     simulations = int(model_input.get("simulations", V8_PRIMARY_GAME_DEFAULT_SIMULATIONS))
     game_build_hash = _canonical_json_sha256({
@@ -312,6 +310,20 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
         else:
             raise GenericMarketEngineError("totals side must be OVER or UNDER")
         p_push = sum(prob for away, home, prob in states if abs((away + home) - line) < 1e-12)
+    elif market == "TEAM_TOTALS":
+        team_side = str(model_input.get("team_side", "")).upper()
+        if team_side not in {"HOME", "AWAY"}:
+            raise GenericMarketEngineError("team_side must be HOME or AWAY")
+        if side not in {"OVER", "UNDER"}:
+            raise GenericMarketEngineError("team-total side must be OVER or UNDER")
+        if line < 0:
+            raise GenericMarketEngineError("team-total line must be >= 0")
+        values = [home if team_side == "HOME" else away for away, home, _ in states]
+        if side == "OVER":
+            p = sum(prob for (_, _, prob), value in zip(states, values) if value > line)
+        else:
+            p = sum(prob for (_, _, prob), value in zip(states, values) if value < line)
+        p_push = sum(prob for (_, _, prob), value in zip(states, values) if abs(value - line) < 1e-12)
     else:
         raise GenericMarketEngineError(f"unsupported game market {market}")
 
@@ -324,6 +336,8 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
     out["push_p"] = float(p_push)
     out["full_game_distribution_mode"] = result.full_game_distribution_mode
     out["full_game_dispersion_r"] = result.full_game_dispersion_r
+    if market == "TEAM_TOTALS":
+        out["team_side"] = str(model_input.get("team_side", "")).upper()
     return out
 
 
