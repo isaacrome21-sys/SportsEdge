@@ -41,3 +41,26 @@ def test_started_and_pregame_no_exception() -> None:
     priced = [row for row in payload["rows"] if not row.get("bind_status")]
     assert len(priced) == 1
     assert priced[0]["first_pitch_at"].startswith("2026-09-30")
+
+
+def test_canonical_resolve_uses_first_pitch_when_two_days() -> None:
+    from sportsedge.canonical_manual_mlb import _resolve_game
+    from sportsedge.manual_quote import validate_manual_quote
+
+    day1 = _snap(1, "2026-09-29T17:00:00+00:00")
+    day2 = _snap(2, "2026-09-30T17:00:00+00:00")
+    row = validate_manual_quote({
+        "game_id": "Philadelphia Phillies@Atlanta Braves",
+        "market_type": "MONEYLINE",
+        "side": "AWAY",
+        "line": 0,
+        "price": -117,
+        "paired_side": "HOME",
+        "paired_price": -103,
+        "book": "draftkings",
+        "observed_at": "2026-09-30T04:47:41+00:00",
+        "first_pitch_at": "2026-09-30T17:00:00+00:00",
+        "source": "MANUAL",
+    })
+    game = _resolve_game(row, schedule=[day1, day2])
+    assert game.game_pk == 2
