@@ -1,6 +1,7 @@
 import unittest
 
 from sportsedge.engine_registry import engine_registry
+from sportsedge.generic_market_engine import generic_market_engine_adapter
 from sportsedge.shared_game_engine import (
     SharedGameEngineError,
     V8_PRIMARY_FULL_GAME_DISPERSION_R,
@@ -123,11 +124,10 @@ class SharedGameEngineStage1Tests(unittest.TestCase):
         self.assertNotEqual(first["model_input_hash"], second["model_input_hash"])
         self.assertNotEqual(first["distribution_sha256"], second["distribution_sha256"])
 
-    def test_stage1_readouts_use_promoted_full_game_dispersion(self):
-        calls = []
+    def test_stage1_readouts_match_generic_path_under_promoted_dispersion(self):
+        """Shared engine and generic adapter must price Stage-1 markets the same."""
 
         def test_simulator(**kwargs):
-            calls.append(dict(kwargs))
             return simulate_game_distribution(**kwargs)
 
         shared = build_shared_game_engine_session(
@@ -142,23 +142,20 @@ class SharedGameEngineStage1Tests(unittest.TestCase):
             {"market": "TOTALS", "line": 8.0, "side": "OVER"},
             {"market": "TOTALS", "line": 8.0, "side": "UNDER"},
         )
-        outputs = []
         for case in cases:
-            candidate = shared({**base, **case})
-            outputs.append(candidate)
+            model_input = {**base, **case}
+            generic = generic_market_engine_adapter(model_input)
+            candidate = shared(model_input)
             with self.subTest(case=case):
                 self.assertEqual(candidate["full_game_distribution_mode"], FULL_GAME_MODE_SHARED_GAMMA_POISSON)
                 self.assertEqual(candidate["full_game_dispersion_r"], V8_PRIMARY_FULL_GAME_DISPERSION_R)
-                self.assertGreaterEqual(candidate["model_p"], 0.0)
-                self.assertLessEqual(candidate["model_p"], 1.0)
-                self.assertGreaterEqual(candidate["push_p"], 0.0)
-                self.assertLessEqual(candidate["push_p"], 1.0)
-
-        self.assertEqual(len(calls), 1)
-        self.assertEqual(calls[0]["shared_game_sigma"], 0.0)
-        self.assertEqual(calls[0]["team_sigma"], 0.0)
-        self.assertEqual(calls[0]["full_game_dispersion_r"], V8_PRIMARY_FULL_GAME_DISPERSION_R)
-        self.assertEqual({row["distribution_sha256"] for row in outputs}, {outputs[0]["distribution_sha256"]})
+                self.assertEqual(generic["full_game_distribution_mode"], FULL_GAME_MODE_SHARED_GAMMA_POISSON)
+                self.assertEqual(generic["full_game_dispersion_r"], V8_PRIMARY_FULL_GAME_DISPERSION_R)
+                self.assertAlmostEqual(candidate["model_p"], generic["model_p"], places=15)
+                self.assertAlmostEqual(candidate["push_p"], generic["push_p"], places=15)
+                self.assertEqual(candidate["mc_paths"], generic["mc_paths"])
+                self.assertEqual(candidate["seed_policy"], generic["seed_policy"])
+                self.assertEqual(candidate["engine_version"], generic["engine_version"])
 
     def test_registry_binds_all_three_markets_to_same_session(self):
         registry = engine_registry()
