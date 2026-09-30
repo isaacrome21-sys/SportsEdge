@@ -33,6 +33,10 @@ def _market(row: Mapping[str, Any]) -> str:
     return str(row.get("market") or row.get("market_type") or "").upper()
 
 
+def _side(row: Mapping[str, Any]) -> str:
+    return str(row.get("side") or "").upper()
+
+
 def _game_key(row: Mapping[str, Any]) -> str:
     pk = row.get("game_pk")
     if pk not in (None, ""):
@@ -44,11 +48,18 @@ def _price(row: Mapping[str, Any]) -> float | None:
     return _f(row.get("american_odds") if row.get("american_odds") is not None else row.get("price"))
 
 
-def _index_prior(prior: Sequence[Mapping[str, Any]]) -> dict[tuple[str, str], Mapping[str, Any]]:
-    out: dict[tuple[str, str], Mapping[str, Any]] = {}
+def american_cents(current: float, previous: float) -> float:
+    """American-odds distance in cents. −105 → +105 is 10, not 210."""
+    if current * previous >= 0:
+        return abs(current - previous)
+    return abs(abs(current) + abs(previous) - 200.0)
+
+
+def _index_prior(prior: Sequence[Mapping[str, Any]]) -> dict[tuple[str, str, str], Mapping[str, Any]]:
+    out: dict[tuple[str, str, str], Mapping[str, Any]] = {}
     for row in prior:
-        key = (_game_key(row), _market(row))
-        if not key[0] or not key[1]:
+        key = (_game_key(row), _market(row), _side(row))
+        if not key[0] or not key[1] or not key[2]:
             continue
         out[key] = row
     return out
@@ -58,11 +69,13 @@ def move_reason(current: Mapping[str, Any], previous: Mapping[str, Any], thresho
     market = _market(current)
     if market != _market(previous):
         return None
+    if _side(current) and _side(previous) and _side(current) != _side(previous):
+        return None
     if market in {"MONEYLINE", "F5_MONEYLINE"}:
         new_p, old_p = _price(current), _price(previous)
         if new_p is None or old_p is None:
             return None
-        if abs(new_p - old_p) >= float(thresholds["ml_american_cents"]):
+        if american_cents(new_p, old_p) >= float(thresholds["ml_american_cents"]):
             return REASON
         return None
     if market in {"TOTALS", "TEAM_TOTALS", "F5_TOTALS"}:
@@ -76,7 +89,6 @@ def move_reason(current: Mapping[str, Any], previous: Mapping[str, Any], thresho
         new_l, old_l = _f(current.get("line")), _f(previous.get("line"))
         if new_l is None or old_l is None:
             return None
-        # Away-listed line sign flip = favorite flipped.
         if new_l * old_l < 0:
             return REASON
     return None
@@ -94,7 +106,7 @@ def apply_quote_move_guard(
     thresholds = cfg["thresholds"]
     lookup = _index_prior(prior)
     for row in rows:
-        previous = lookup.get((_game_key(row), _market(row)))
+        previous = lookup.get((_game_key(row), _market(row), _side(row)))
         if previous is None:
             continue
         reason = move_reason(row, previous, thresholds)
