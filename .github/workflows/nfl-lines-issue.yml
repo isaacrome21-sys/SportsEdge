@@ -53,10 +53,14 @@ jobs:
             gh issue comment "$ISSUE" --body-file fail.md
             exit 1
           fi
+      - name: Pull timestamped nflverse history
+        run: |
+          PYTHONPATH=.runtime-deps:. python scripts/fetch_nflverse_games.py --output artifacts/nflverse_games.json
       - name: Price with frozen Attempt 9
         run: |
           PYTHONPATH=.runtime-deps:. python scripts/run_nfl_lines_card.py \
             --input "${{ steps.intake.outputs.path }}" \
+            --history artifacts/nflverse_games.json \
             --output artifacts/nfl_phone_card.json
       - name: Render PRE-CONTEXT and reply
         run: |
