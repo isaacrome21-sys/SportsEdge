@@ -1,12 +1,16 @@
 name: MLB auto grade
 
 on:
-  schedule:
-    - cron: "17 * * * *"
+  # The repo's frozen cron policy permits timers only for PIT-sensitive evidence.
+  # This grading workflow therefore follows the already-approved hourly MLB
+  # settlement timer instead of adding a second cron.
+  workflow_run:
+    workflows: ["mlb-moneyline-forward-settlement"]
+    types: [completed]
   workflow_dispatch:
     inputs:
       issue_number:
-        description: "Optional [MLB LINES] issue number; blank scans open MLB line issues"
+        description: "Optional [MLB LINES] issue number; blank scans MLB line issues"
         required: false
         type: string
 
@@ -26,6 +30,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 0
+          ref: main
 
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
@@ -54,7 +59,7 @@ jobs:
           if [ -n "${REQUESTED_ISSUE:-}" ]; then
             issues="$REQUESTED_ISSUE"
           else
-            issues="$(gh issue list --state open --limit 100 --json number,title --jq '.[] | select(.title | startswith("[MLB LINES]")) | .number')"
+            issues="$(gh issue list --state all --limit 100 --json number,title --jq '.[] | select(.title | startswith("[MLB LINES]")) | .number')"
           fi
           if [ -z "$issues" ]; then
             echo "No MLB line issues to grade."
