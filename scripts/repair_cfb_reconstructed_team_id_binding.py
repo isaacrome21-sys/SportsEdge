@@ -105,8 +105,9 @@ def main() -> int:
     through_week: int,
     *,
     alias_index: Mapping[str, str],
-    id_index: Mapping[str, str],
+    id_index: Mapping[str, str] | None = None,
 ) -> dict[str, float]:
+    id_index = id_index or {}
     out: dict[str, float] = {}
     for row in games:
         if row.get("completed") is not True:
