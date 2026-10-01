@@ -12,18 +12,23 @@ source that produced the blocked pre-evaluation run, then writes a focused unit 
 """
 from __future__ import annotations
 
-from hashlib import sha256
+from hashlib import sha1, sha256
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGET = ROOT / "scripts/acquire_cfb_reconstructed_selection.py"
 TEST = ROOT / "tests/test_cfb_reconstructed_identity_alias.py"
-EXPECTED_ORIGINAL_SHA256 = "22e0b57d3a97cdf489005e887b81aa0260d4b3ba39e756f5949f0408f3053108"
+EXPECTED_ORIGINAL_GIT_BLOB_SHA1 = "c448a3c28ef85d9e294c1cee81e61e19c37173c0"
 PATCH_MARKER = "CFB_RECONSTRUCTED_IDENTITY_ALIAS_V1"
 
 
 def _sha(text: str) -> str:
     return sha256(text.encode("utf-8")).hexdigest()
+
+
+def _git_blob_sha(text: str) -> str:
+    raw = text.encode("utf-8")
+    return sha1(f"blob {len(raw)}\0".encode("ascii") + raw).hexdigest()
 
 
 def _replace_once(text: str, old: str, new: str, label: str) -> str:
@@ -38,9 +43,9 @@ def main() -> int:
     if PATCH_MARKER in text:
         print("CFB_RECONSTRUCTED_IDENTITY_REPAIR_ALREADY_APPLIED")
         return 0
-    actual = _sha(text)
-    if actual != EXPECTED_ORIGINAL_SHA256:
-        raise SystemExit(f"CFB_IDENTITY_REPAIR_SOURCE_SHA_MISMATCH:{actual}")
+    actual = _git_blob_sha(text)
+    if actual != EXPECTED_ORIGINAL_GIT_BLOB_SHA1:
+        raise SystemExit(f"CFB_IDENTITY_REPAIR_SOURCE_BLOB_MISMATCH:{actual}")
 
     text = _replace_once(
         text,
