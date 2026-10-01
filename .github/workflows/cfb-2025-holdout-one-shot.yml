@@ -29,6 +29,14 @@ jobs:
       - name: Install holdout runtime
         run: python -m pip install numpy
 
+      - name: Restore verified reconstructed provider cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ runner.temp }}/cfb_holdout/cache
+          key: cfb-reconstructed-selection-v1-${{ hashFiles('config/cfb_cfbd_reconstructed_selection_budget_v1.json') }}-${{ github.run_id }}
+          restore-keys: |
+            cfb-reconstructed-selection-v1-${{ hashFiles('config/cfb_cfbd_reconstructed_selection_budget_v1.json') }}-
+
       - name: Apply and persist pre-evaluation acquisition repairs
         run: |
           set -euo pipefail
@@ -65,6 +73,7 @@ jobs:
             --public-out "$RUNNER_TEMP/cfb_holdout/preflight_public.json"
 
       - name: Acquire frozen reconstructed football inputs privately
+        id: acquire
         run: |
           set -euo pipefail
           python scripts/acquire_cfb_reconstructed_selection.py \
@@ -72,6 +81,13 @@ jobs:
             --private-cache-root "$RUNNER_TEMP/cfb_holdout/cache" \
             --private-payload-out "$RUNNER_TEMP/cfb_holdout/acquisition.json" \
             --public-attestation-out "$RUNNER_TEMP/cfb_holdout/acquisition_public.json"
+
+      - name: Save verified reconstructed provider cache
+        if: ${{ always() && steps.acquire.outcome != 'skipped' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ runner.temp }}/cfb_holdout/cache
+          key: cfb-reconstructed-selection-v1-${{ hashFiles('config/cfb_cfbd_reconstructed_selection_budget_v1.json') }}-${{ github.run_id }}
 
       - name: Materialize strictly prior game feature rows privately
         run: |
