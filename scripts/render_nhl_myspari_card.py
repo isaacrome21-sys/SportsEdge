@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NHL phone card. Frozen rate v1 prices totals (and puck line as lean). ML held."""
+"""NHL phone card. Frozen rate v1 prices supported totals (and puck line as lean)."""
 from __future__ import annotations
 
 import argparse
@@ -14,6 +14,8 @@ FOOTER = "NOT Model_P / NOT Truth Gate / NOT OFFICIAL"
 PRICED = {"PUCK_LINE", "TOTAL"}
 FLOOR = 0.02
 ML_HOLD = "NO_MODEL:HOME_ICE_UNVALIDATED"
+TOTAL_LINE_HOLD = "NO_MODEL:TOTAL_LINE_UNSUPPORTED_PUSH_OR_GRID"
+SUPPORTED_TOTAL_KEYS = {5.5: "over_5_5", 6.5: "over_6_5"}
 
 
 def _label(model_p: float | None, odds: int | None) -> str:
@@ -24,6 +26,19 @@ def _label(model_p: float | None, odds: int | None) -> str:
     ret = ev_return(model_p, odds)
     tag = "PLAY" if ret >= FLOOR else "PASS"
     return f"model_p={model_p:.3f} ret={ret:+.1%} {tag}"
+
+
+def _supported_total_key(line) -> str | None:
+    """Bind only to total events actually emitted by the frozen v1 simulation.
+
+    Whole-number totals require explicit push mass. Other half-point lines require
+    their own simulated event rather than borrowing 5.5 or 6.5 probabilities.
+    """
+    try:
+        value = float(line)
+    except (TypeError, ValueError):
+        return None
+    return SUPPORTED_TOTAL_KEYS.get(value)
 
 
 def price_row(market: str, line, away_odds, home_odds, sim: dict | None) -> str:
@@ -37,7 +52,9 @@ def price_row(market: str, line, away_odds, home_odds, sim: dict | None) -> str:
     if sim is None:
         return "NO_MODEL:TEAM_PRIOR_MISSING"
     if market == "TOTAL":
-        key = "over_5_5" if line is not None and float(line) <= 6.0 else "over_6_5"
+        key = _supported_total_key(line)
+        if key is None:
+            return TOTAL_LINE_HOLD
         over_p = sim[key]
         return f"over {_label(over_p, away_odds)} | under {_label(1.0 - over_p, home_odds)}"
     if market == "PUCK_LINE":
@@ -70,7 +87,10 @@ def main() -> int:
             )
             lines.append(f"- {row.get('raw') or row.get('market')}: {priced}")
         lines.append("")
-    lines.append("Owner: NHL_RATE_V1 totals only. ML held (home-ice bias). Props NO_MODEL.")
+    lines.append(
+        "Owner: NHL_RATE_V1 totals 5.5/6.5 only. Whole-number/other totals fail closed; "
+        "ML held (home-ice bias). Props NO_MODEL."
+    )
     lines.append(FOOTER)
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
