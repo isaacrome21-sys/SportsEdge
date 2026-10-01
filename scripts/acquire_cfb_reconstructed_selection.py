@@ -326,6 +326,34 @@ def _fetch_public_weather(
 
 
 CFB_RECONSTRUCTED_IDENTITY_ALIAS_V1 = "FBS_MEMBERSHIP_ALIAS_CANONICAL_V1"
+CFB_RECONSTRUCTED_TEAM_ID_BINDING_V1 = "CFBD_TEAM_ID_FIRST_ALIAS_FALLBACK_V1"
+
+
+def _membership_id_index(rows: Sequence[Mapping[str, Any]]) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for row in rows:
+        team_id = str(row.get("id") or "").strip()
+        school = str(row.get("school") or "").strip()
+        if team_id and school:
+            prior = out.get(team_id)
+            if prior is not None and prior != school:
+                raise CFBAcquisitionError(f"CFB_MEMBERSHIP_TEAM_ID_COLLISION:{team_id}")
+            out[team_id] = school
+    return out
+
+
+def _canonical_game_team(
+    row: Mapping[str, Any],
+    *,
+    team_key: str,
+    id_key: str,
+    alias_index: Mapping[str, str],
+    id_index: Mapping[str, str],
+) -> str | None:
+    team_id = str(row.get(id_key) or "").strip()
+    if team_id and team_id in id_index:
+        return str(id_index[team_id])
+    return _canonical_team_or_none(row.get(team_key), alias_index)
 
 
 def _canonical_team_or_none(name: object, alias_index: Mapping[str, str]) -> str | None:
@@ -345,7 +373,9 @@ def _points_by_team(
     through_week: int,
     *,
     alias_index: Mapping[str, str],
+    id_index: Mapping[str, str] | None = None,
 ) -> dict[str, float]:
+    id_index = id_index or {}
     out: dict[str, float] = {}
     for row in games:
         if row.get("completed") is not True:
@@ -356,8 +386,17 @@ def _points_by_team(
             continue
         if week > through_week:
             continue
-        for team_key, points_key in (("homeTeam", "homePoints"), ("awayTeam", "awayPoints")):
-            team = _canonical_team_or_none(row.get(team_key), alias_index)
+        for team_key, id_key, points_key in (
+            ("homeTeam", "homeId", "homePoints"),
+            ("awayTeam", "awayId", "awayPoints"),
+        ):
+            team = _canonical_game_team(
+                row,
+                team_key=team_key,
+                id_key=id_key,
+                alias_index=alias_index,
+                id_index=id_index,
+            )
             points = row.get(points_key)
             if team is not None and points is not None:
                 out[team] = out.get(team, 0.0) + float(points)
@@ -610,11 +649,16 @@ def _build_private_payload(
     games: list[dict[str, Any]] = []
     for season in range(2015, 2026):
         alias_index = build_team_alias_index(membership_by_season[season])
+        id_index = _membership_id_index(membership_by_season[season])
         for row in games_by_season[season]:
             if row.get("completed") is not True:
                 continue
-            home = _canonical_team_or_none(row.get("homeTeam"), alias_index)
-            away = _canonical_team_or_none(row.get("awayTeam"), alias_index)
+            home = _canonical_game_team(
+                row, team_key="homeTeam", id_key="homeId", alias_index=alias_index, id_index=id_index
+            )
+            away = _canonical_game_team(
+                row, team_key="awayTeam", id_key="awayId", alias_index=alias_index, id_index=id_index
+            )
             if home is None or away is None:
                 continue
             if row.get("homePoints") is None or row.get("awayPoints") is None:
@@ -662,8 +706,12 @@ def _build_private_payload(
         # both scores and advanced rows through the target season's authoritative
         # FBS membership aliases; no extra provider call is needed for 2014.
         alias_index = build_team_alias_index(membership_by_season[season + 1])
+        id_index = _membership_id_index(membership_by_season[season + 1])
         points = _points_by_team(
-            games_by_season[season], through_week=99, alias_index=alias_index
+            games_by_season[season],
+            through_week=99,
+            alias_index=alias_index,
+            id_index=id_index,
         )
         for raw in advanced:
             if isinstance(raw, Mapping):
@@ -684,12 +732,16 @@ def _build_private_payload(
 
     for season in range(2015, 2026):
         alias_index = build_team_alias_index(membership_by_season[season])
+        id_index = _membership_id_index(membership_by_season[season])
         for end_week in range(1, 20):
             advanced, meta = by_identity[("/stats/season/advanced", season, end_week)]
             if not isinstance(advanced, list):
                 raise CFBAcquisitionError(f"CFB_ACQUISITION_ADVANCED_NOT_LIST:{season}:{end_week}")
             points = _points_by_team(
-                games_by_season[season], through_week=end_week, alias_index=alias_index
+                games_by_season[season],
+                through_week=end_week,
+                alias_index=alias_index,
+                id_index=id_index,
             )
             for raw in advanced:
                 if isinstance(raw, Mapping):
