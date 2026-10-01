@@ -166,6 +166,15 @@ def build_scored_board(rows, *, now, quote_ttl_seconds=300, estimate_ttl_seconds
     for rank, row in enumerate(ranked, 1):
         row['rank'] = rank
     valued = [r for r in output if r['expected_profit_per_unit'] is not None]
+    try:
+        input_sha256 = canonical_json_sha256(rows)
+        input_hash_status = "OK"
+    except ValueError:
+        # Individual malformed rows already fail closed above. Audit hashing must
+        # not turn a rejected non-canonical value (for example inf/NaN) into a
+        # whole-board exception.
+        input_sha256 = None
+        input_hash_status = "NON_CANONICAL_INPUT"
     return {"schema": VERSION, "as_of": now.isoformat(),
             "authority_label": AUTHORITY_LABEL, "official": False,
             "score_description": SCORE_DESCRIPTION,
@@ -176,7 +185,8 @@ def build_scored_board(rows, *, now, quote_ttl_seconds=300, estimate_ttl_seconds
                 "including pushes. No-vig edge is unavailable without a paired market."),
             "submitted_rows": len(rows), "valued_rows": len(valued),
             "scored_rows": len(ranked), "rows": output,
-            "audit": {"input_sha256": canonical_json_sha256(rows),
+            "audit": {"input_sha256": input_sha256,
+                      "input_hash_status": input_hash_status,
                       "quote_ttl_seconds": quote_ttl_seconds,
                       "estimate_ttl_seconds": estimate_ttl_seconds,
                       "source_verification": "CALLER_ATTESTED",
