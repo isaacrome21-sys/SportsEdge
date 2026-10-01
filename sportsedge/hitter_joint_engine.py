@@ -4,7 +4,7 @@ import hashlib,json
 from math import isfinite
 from typing import Any,Mapping,Sequence
 from .mlb_empirical_bayes import effective_sample_size,feasible_settlements,posterior_settlement_mass
-ENGINE_VERSION="mlb_hitter_joint_empirical_bayes_v4"
+ENGINE_VERSION="mlb_hitter_joint_empirical_bayes_v5"
 HITTER_MARKETS=frozenset({"HITS","HOME_RUNS","TOTAL_BASES","RBI","RUNS","STOLEN_BASES","BATTER_BB","EXTRA_BASE_HITS","SINGLES","DOUBLES","TRIPLES","BATTER_K","HITS_RUNS_RBIS","HITS_RUNS_STOLEN_BASES","RUNS_RBIS","HITS_STOLEN_BASES","HITS_WALKS_STOLEN_BASES"})
 class HitterJointEngineError(ValueError):pass
 def _f(v:Any,name:str,lo:float=0.0)->float:
