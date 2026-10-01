@@ -1,0 +1,85 @@
+name: cfb-2025-holdout-one-shot
+
+on:
+  push:
+    branches:
+      - 'grok/cfb/freeze-2025-holdout'
+    paths:
+      - 'artifacts/cfb/cfb_2025_holdout.run'
+
+permissions:
+  contents: write
+
+jobs:
+  holdout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      PYTHONPATH: .
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: '.python-version'
+
+      - name: Install holdout runtime
+        run: python -m pip install numpy
+
+      - name: Verify freeze and anti-leak tests
+        run: python -m unittest tests.test_cfb_freeze_v1
+
+      - name: Verify CFBD provider before historical acquisition
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/cfb_holdout"
+          python scripts/preflight_cfb_reconstructed_selection.py \
+            --private-out "$RUNNER_TEMP/cfb_holdout/preflight_private.json" \
+            --public-out "$RUNNER_TEMP/cfb_holdout/preflight_public.json"
+
+      - name: Acquire frozen reconstructed football inputs privately
+        run: |
+          set -euo pipefail
+          python scripts/acquire_cfb_reconstructed_selection.py \
+            --private-preflight "$RUNNER_TEMP/cfb_holdout/preflight_private.json" \
+            --private-cache-root "$RUNNER_TEMP/cfb_holdout/cache" \
+            --private-payload-out "$RUNNER_TEMP/cfb_holdout/acquisition.json" \
+            --public-attestation-out "$RUNNER_TEMP/cfb_holdout/acquisition_public.json"
+
+      - name: Materialize strictly prior game feature rows privately
+        run: |
+          set -euo pipefail
+          python scripts/materialize_cfb_reconstructed_selection.py \
+            --private-input "$RUNNER_TEMP/cfb_holdout/acquisition.json" \
+            --bundle-out "$RUNNER_TEMP/cfb_holdout/selection_bundle.json" \
+            --source-manifest-out "$RUNNER_TEMP/cfb_holdout/source_manifest.json" \
+            --private-rows-out "$RUNNER_TEMP/cfb_holdout/rows.json"
+
+      - name: Fetch CFBD 2025 last-stored lines privately
+        run: |
+          set -euo pipefail
+          python scripts/fetch_cfb_2025_lines.py \
+            --out "$RUNNER_TEMP/cfb_holdout/lines.json"
+
+      - name: Consume the one 2025 holdout
+        run: |
+          set -euo pipefail
+          test ! -e artifacts/cfb/cfb_2025_holdout_result.json
+          python scripts/cfb_2025_holdout.py \
+            --rows "$RUNNER_TEMP/cfb_holdout/rows.json" \
+            --lines "$RUNNER_TEMP/cfb_holdout/lines.json" \
+            --freeze config/cfb_freeze_v1.json \
+            --out artifacts/cfb/cfb_2025_holdout_result.json \
+            --confirm RUN_2025_HOLDOUT_ONCE
+
+      - name: Persist the immutable public result on the PR branch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add artifacts/cfb/cfb_2025_holdout_result.json
+          git commit -m "research(cfb): record one-shot 2025 holdout"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
