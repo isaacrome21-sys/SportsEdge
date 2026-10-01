@@ -1,3 +1,5 @@
 pr: 1301
 preregister_commit: cd7101e1e0bf073d10b9c654a25ea4beb8903cc1
 confirm: RUN_2025_HOLDOUT_ONCE
+retry_reason: run_36853200294_blocked_before_materialization_lines_or_evaluation
+identity_repair: FBS_MEMBERSHIP_ALIAS_CANONICAL_V1
