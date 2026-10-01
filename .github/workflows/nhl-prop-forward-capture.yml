@@ -1,0 +1,53 @@
+name: NHL prop forward receipt capture
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_payload_b64:
+        description: "Base64 of the exact JSON model payload; must contain precomputed candidate + MARKET_BLIND baseline probabilities"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out requested ref
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+
+      - name: Decode exact source payload
+        env:
+          SOURCE_PAYLOAD_B64: ${{ inputs.source_payload_b64 }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$SOURCE_PAYLOAD_B64" | base64 --decode > "$RUNNER_TEMP/nhl-prop-source.json"
+
+      - name: Capture pre-puck prediction receipts
+        env:
+          PYTHONPATH: .
+        run: |
+          set -euo pipefail
+          python scripts/capture_nhl_prop_forward.py \
+            --source "$RUNNER_TEMP/nhl-prop-source.json" \
+            --output "$RUNNER_TEMP/nhl-prop-predictions.jsonl" \
+            | tee "$RUNNER_TEMP/nhl-prop-capture-summary.json"
+
+      - name: Upload immutable evidence artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nhl-prop-forward-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/nhl-prop-source.json
+            ${{ runner.temp }}/nhl-prop-predictions.jsonl
+            ${{ runner.temp }}/nhl-prop-capture-summary.json
+          if-no-files-found: error
+          retention-days: 90
