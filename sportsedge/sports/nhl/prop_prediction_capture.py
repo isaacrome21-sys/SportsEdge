@@ -68,6 +68,15 @@ def _source_rows(source_bytes: bytes) -> list[Mapping[str, object]]:
     return rows
 
 
+def _validated_prediction(
+    mapping: Mapping[str, object], *, context: str
+) -> PredictionReceipt:
+    try:
+        return prediction_from_mapping(mapping)
+    except NHLPropForwardValidationError as exc:
+        raise NHLPropPredictionCaptureError(f"{context}: {exc}") from exc
+
+
 def receipts_from_source(
     source_bytes: bytes,
     *,
@@ -116,7 +125,7 @@ def receipts_from_source(
             "model_version": row["model_version"],
             "source_sha256": source_sha256,
         }
-        receipt = prediction_from_mapping(mapping)
+        receipt = _validated_prediction(mapping, context=f"predictions[{index}]")
         if receipt.key in seen:
             raise NHLPropPredictionCaptureError(
                 f"duplicate prediction key inside source payload: {receipt.key}"
@@ -144,7 +153,9 @@ def _read_existing(path: Path) -> tuple[str, list[PredictionReceipt]]:
             raise NHLPropPredictionCaptureError(
                 f"{path}:{number}: existing receipt must be an object"
             )
-        receipts.append(prediction_from_mapping(value))
+        receipts.append(
+            _validated_prediction(value, context=f"{path}:{number}")
+        )
     keys = [receipt.key for receipt in receipts]
     if len(keys) != len(set(keys)):
         raise NHLPropPredictionCaptureError("existing receipt file contains duplicate keys")
@@ -158,7 +169,10 @@ def append_receipts(path: Path, receipts: Iterable[PredictionReceipt]) -> int:
     if not pending:
         raise NHLPropPredictionCaptureError("no receipts to append")
     for receipt in pending:
-        receipt.validate()
+        try:
+            receipt.validate()
+        except NHLPropForwardValidationError as exc:
+            raise NHLPropPredictionCaptureError(f"invalid pending receipt: {exc}") from exc
 
     original, existing = _read_existing(path)
     existing_keys = {receipt.key for receipt in existing}
