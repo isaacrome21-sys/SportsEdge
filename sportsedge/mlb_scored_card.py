@@ -17,6 +17,12 @@ _UNVERIFIED_REASON="UNVERIFIED_CONFIDENCE_PROVENANCE"
 MIN_CARD_EV=0.02
 EV_FLOOR_REASON="BELOW_MIN_CARD_EV_2PCT"
 EMPIRICAL_SIDE_CONFLICT_REASON="EMPIRICAL_SIDE_CONFLICT"
+# Presentation-only plausibility guard. A >=10 percentage-point gap between the
+# model's push-conditioned probability and the paired-book no-vig probability is
+# large enough to demand a line/input confirmation before the row can print as a
+# normal play. Model_P is preserved unchanged for audit.
+MAX_UNCONFIRMED_EDGE=0.10
+EXTREME_EDGE_REASON="EXTREME_MODEL_MARKET_GAP_NEEDS_CONFIRM"
 _TEAM_OUTCOME_MARKETS=frozenset({"MONEYLINE","RUN_LINE","F5_MONEYLINE","F5_RUN_LINE"})
 _EMPIRICAL_OWN_TEAM_OVER=frozenset({
     "PITCHER_K","PITCHER_OUTS",
@@ -170,6 +176,19 @@ def build_mlb_scored_card(rows: Sequence[Any], *, actionable_only: bool=False) -
             if EV_FLOOR_REASON not in reasons:
                 reasons.append(EV_FLOOR_REASON)
             row["presentation_reason_codes"]=tuple(reasons)
+        extreme_edge=False
+        if verified and edge is not None:
+            try:
+                extreme_edge=abs(float(edge)) >= MAX_UNCONFIRMED_EDGE
+            except (TypeError, ValueError):
+                extreme_edge=False
+        if status=="ACTIONABLE" and extreme_edge:
+            status="PASS"
+            reasons=list(row.get("presentation_reason_codes") or ())
+            if EXTREME_EDGE_REASON not in reasons:
+                reasons.append(EXTREME_EDGE_REASON)
+            row["presentation_reason_codes"]=tuple(reasons)
+        row["extreme_edge_needs_confirm"]=bool(extreme_edge)
         row["confidence_score"]=max(0,min(100,score))
         row["confidence_provenance"]=str(row.get("confidence_provenance") or "UNVERIFIED").strip().upper()
         row["confidence_verified"]=verified
