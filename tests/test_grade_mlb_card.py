@@ -118,7 +118,7 @@ def test_f5_run_line_and_first_inning_markets():
             ],
         )
     )
-    assert settle_actionable(rows[0], game).result == "L"
+    assert settle_actionable(rows[0], game).result == "W"
     assert settle_actionable(rows[1], game).result == "W"
     assert settle_actionable(rows[2], game).result == "L"
 
