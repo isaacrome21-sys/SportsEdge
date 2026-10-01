@@ -139,7 +139,7 @@ def simulate_matchup(away: str, home: str, *, n: int = 8000, seed: int = 1) -> d
         return None
     params = load_freeze()
     lh = _lam(params, _row(h, a, home=True))
-    la = _lam(params, _row(h, a, home=False))
+    la = _lam(params, _row(a, h, home=False))
     rng = random.Random(seed)
     hw = aw = ov55 = ov65 = pl = 0
     for _ in range(n):
