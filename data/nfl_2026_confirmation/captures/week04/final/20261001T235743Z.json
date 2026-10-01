@@ -1,0 +1,85 @@
+{
+  "capture_kind": "FINAL",
+  "week": 4,
+  "book": "draftkings",
+  "markets": [
+    "spreads",
+    "totals"
+  ],
+  "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
+  "run_started_utc": "2026-10-01T23:57:42.814282+00:00",
+  "retrieved_at_utc": "2026-10-01T23:57:43Z",
+  "hashes": {
+    "policy_path": "config/nfl_research_search_policy_v1.json",
+    "policy_sha256": "f81e5bb1f10440adb50e0fc1e9bd0f204ab008147c31ad62d8601bf75c2529ba",
+    "config_sha256": "883e6b3df15745847d5424c40b80cc6fc88916b62594e29c5afcac0fc1f6e842",
+    "script_sha256": "0f1a32f96f94840e39161e5f4b133f703d1da40b693889b6c28a181ec408c241",
+    "workflow_sha256": "f51f1b3c668f08e19681816f13efc30cee2375c2da23152f98c035c8041fb04a"
+  },
+  "run": {
+    "github_run_id": "36943512208",
+    "github_run_attempt": "1",
+    "github_sha": "64be4ba84a0ef559efba872342ce32c920a8ca09",
+    "github_event_name": "schedule"
+  },
+  "schedule": {
+    "source": "nflverse/nfldata data/games.csv",
+    "sha256": "0e042fad55a55177308f59066e5e16b29b31077aa62eebeff3e3fe52c69355fb",
+    "matching_semantics": "KICKOFF_UTC_MULTIPLICITY",
+    "expected_kickoffs": {
+      "2026-10-02T00:15:00Z": 1
+    },
+    "expected_game_count": 1
+  },
+  "transport": {
+    "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
+    "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/88808/categories/492",
+    "transport_host": "sportsbook-nash.draftkings.com",
+    "observed_at_utc": "2026-10-01T23:57:43.267332Z",
+    "timestamp_semantics": "SPORTSEDGE_HTTP_RESPONSE_RECEIPT_UPPER_BOUND",
+    "provider_quote_timestamp_available": false,
+    "raw_sha256": "41fb6e5acd6925eb1a32dcfd1f5c3cc6515bb4b9942038ba665c6da30a3bacb1",
+    "raw_relative_path": "data/nfl_2026_confirmation/captures/raw/draftkings-direct/41fb6e5acd6925eb1a32dcfd1f5c3cc6515bb4b9942038ba665c6da30a3bacb1.json",
+    "attempts": [
+      {
+        "attempt": 1,
+        "host": "sportsbook-nash.draftkings.com",
+        "result_class": "OK",
+        "received_at_utc": "2026-10-01T23:57:43.267332Z"
+      }
+    ],
+    "adapter_module_sha256": "76fe056b668ce71db9d1424f4049bc1be9f3e3c69d78b758353ecca141e25b1d",
+    "github_sha": "64be4ba84a0ef559efba872342ce32c920a8ca09"
+  },
+  "games": [
+    {
+      "event_id": "34118083",
+      "home_team": "CLE Browns",
+      "away_team": "PIT Steelers",
+      "commence_time": "2026-10-02T00:15:00Z",
+      "week": 4,
+      "book": "draftkings",
+      "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
+      "book_last_update": null,
+      "observed_at_utc": "2026-10-01T23:57:43.267332Z",
+      "spread": {
+        "status": "OK",
+        "market_last_update": null,
+        "home_point": 2.5,
+        "home_price": 100,
+        "away_point": -2.5,
+        "away_price": -120
+      },
+      "total": {
+        "status": "OK",
+        "market_last_update": null,
+        "point": 38.5,
+        "over_price": -105,
+        "under_price": -115
+      },
+      "target_utc": "2026-10-01T23:45:00+00:00",
+      "minutes_before_kickoff": 17.28
+    }
+  ],
+  "lock_status": "MATCH"
+}
