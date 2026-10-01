@@ -31,7 +31,12 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from sportsedge.sports.cfb.source import normalize_advanced_team_metrics
+from sportsedge.sports.cfb.source import (
+    CFBSourceError,
+    bind_provider_team,
+    build_team_alias_index,
+    normalize_advanced_team_metrics,
+)
 from sportsedge.sports.cfb.venue_coordinates import venue_indexes
 
 CONFIG = ROOT / "config/cfb_cfbd_reconstructed_selection_budget_v1.json"
@@ -320,7 +325,27 @@ def _fetch_public_weather(
     raise CFBAcquisitionError(f"CFB_OPEN_METEO_FETCH_FAILED:{type(last).__name__}") from last
 
 
-def _points_by_team(games: list[Mapping[str, Any]], through_week: int) -> dict[str, float]:
+CFB_RECONSTRUCTED_IDENTITY_ALIAS_V1 = "FBS_MEMBERSHIP_ALIAS_CANONICAL_V1"
+
+
+def _canonical_team_or_none(name: object, alias_index: Mapping[str, str]) -> str | None:
+    text = str(name or "").strip()
+    if not text:
+        return None
+    try:
+        return bind_provider_team(text, alias_index)
+    except CFBSourceError:
+        # /games?classification=fbs may include a non-FBS opponent. Only the FBS
+        # identity is needed for the advanced-stat points denominator contract.
+        return None
+
+
+def _points_by_team(
+    games: list[Mapping[str, Any]],
+    through_week: int,
+    *,
+    alias_index: Mapping[str, str],
+) -> dict[str, float]:
     out: dict[str, float] = {}
     for row in games:
         if row.get("completed") is not True:
@@ -332,9 +357,9 @@ def _points_by_team(games: list[Mapping[str, Any]], through_week: int) -> dict[s
         if week > through_week:
             continue
         for team_key, points_key in (("homeTeam", "homePoints"), ("awayTeam", "awayPoints")):
-            team = str(row.get(team_key) or "").strip()
+            team = _canonical_team_or_none(row.get(team_key), alias_index)
             points = row.get(points_key)
-            if team and points is not None:
+            if team is not None and points is not None:
                 out[team] = out.get(team, 0.0) + float(points)
     return out
 
@@ -345,6 +370,31 @@ def _membership_set(rows: list[Mapping[str, Any]]) -> set[str]:
         for row in rows
         if str(row.get("school") or "").strip()
     }
+
+
+def _canonical_advanced_row(
+    raw: Mapping[str, Any],
+    *,
+    alias_index: Mapping[str, str],
+    allow_outside_membership: bool,
+) -> dict[str, Any] | None:
+    provider_team = str(raw.get("team") or "").strip()
+    if not provider_team:
+        raise CFBAcquisitionError("CFB_ACQUISITION_ADVANCED_TEAM_MISSING")
+    try:
+        canonical = bind_provider_team(provider_team, alias_index)
+    except CFBSourceError as exc:
+        if allow_outside_membership:
+            # Prior-year fallback rows are needed only for teams that are FBS in
+            # the target season. A team outside next season's membership cannot
+            # be selected as a week-1 prior and is intentionally discarded.
+            return None
+        raise CFBAcquisitionError(
+            f"CFB_ACQUISITION_ADVANCED_TEAM_UNRESOLVED:{provider_team}"
+        ) from exc
+    row = dict(raw)
+    row["team"] = canonical
+    return row
 
 
 def _dt(value: object, code: str) -> datetime:
@@ -559,13 +609,13 @@ def _build_private_payload(
 
     games: list[dict[str, Any]] = []
     for season in range(2015, 2026):
-        membership = _membership_set(membership_by_season[season])
+        alias_index = build_team_alias_index(membership_by_season[season])
         for row in games_by_season[season]:
             if row.get("completed") is not True:
                 continue
-            home = str(row.get("homeTeam") or "").strip()
-            away = str(row.get("awayTeam") or "").strip()
-            if home not in membership or away not in membership:
+            home = _canonical_team_or_none(row.get("homeTeam"), alias_index)
+            away = _canonical_team_or_none(row.get("awayTeam"), alias_index)
+            if home is None or away is None:
                 continue
             if row.get("homePoints") is None or row.get("awayPoints") is None:
                 raise CFBAcquisitionError(f"CFB_ACQUISITION_COMPLETED_SCORE_MISSING:{row.get('id')}")
@@ -608,11 +658,24 @@ def _build_private_payload(
         advanced, meta = by_identity[("/stats/season/advanced", season, None)]
         if not isinstance(advanced, list):
             raise CFBAcquisitionError(f"CFB_ACQUISITION_ADVANCED_NOT_LIST:{season}:prior")
-        points = _points_by_team(games_by_season[season], through_week=99)
+        # A season-S prior is consumed only by season S+1 week 1. Canonicalize
+        # both scores and advanced rows through the target season's authoritative
+        # FBS membership aliases; no extra provider call is needed for 2014.
+        alias_index = build_team_alias_index(membership_by_season[season + 1])
+        points = _points_by_team(
+            games_by_season[season], through_week=99, alias_index=alias_index
+        )
         for raw in advanced:
             if isinstance(raw, Mapping):
-                metrics.append(normalize_advanced_team_metrics(
+                canonical_raw = _canonical_advanced_row(
                     raw,
+                    alias_index=alias_index,
+                    allow_outside_membership=True,
+                )
+                if canonical_raw is None:
+                    continue
+                metrics.append(normalize_advanced_team_metrics(
+                    canonical_raw,
                     through_week=99,
                     feature_asof_ts=str(meta["retrieved_at_utc"]),
                     season_points=points,
@@ -620,15 +683,25 @@ def _build_private_payload(
                 ).to_dict())
 
     for season in range(2015, 2026):
+        alias_index = build_team_alias_index(membership_by_season[season])
         for end_week in range(1, 20):
             advanced, meta = by_identity[("/stats/season/advanced", season, end_week)]
             if not isinstance(advanced, list):
                 raise CFBAcquisitionError(f"CFB_ACQUISITION_ADVANCED_NOT_LIST:{season}:{end_week}")
-            points = _points_by_team(games_by_season[season], through_week=end_week)
+            points = _points_by_team(
+                games_by_season[season], through_week=end_week, alias_index=alias_index
+            )
             for raw in advanced:
                 if isinstance(raw, Mapping):
-                    metrics.append(normalize_advanced_team_metrics(
+                    canonical_raw = _canonical_advanced_row(
                         raw,
+                        alias_index=alias_index,
+                        allow_outside_membership=False,
+                    )
+                    if canonical_raw is None:
+                        raise CFBAcquisitionError("CFB_ACQUISITION_CURRENT_TEAM_FILTERED_UNEXPECTEDLY")
+                    metrics.append(normalize_advanced_team_metrics(
+                        canonical_raw,
                         through_week=end_week,
                         feature_asof_ts=str(meta["retrieved_at_utc"]),
                         season_points=points,
