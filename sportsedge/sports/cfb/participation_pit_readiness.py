@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import gzip
 from hashlib import sha256
 import json
 from pathlib import Path
 from typing import Any, Mapping
 
+from .participation_storage import STORAGE_CONTRACT
 from .participation_source_capture import (
     PARTICIPATION_CAPTURE_CONTRACT,
     PARTICIPATION_DATASETS,
@@ -68,6 +70,25 @@ def _load_json(path: Path, code: str) -> dict[str, Any]:
 def _file_sha256(path: Path) -> str:
     digest = sha256()
     with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _source_sha256(path: Path, *, storage_encoding: str) -> str:
+    """Hash the canonical upstream bytes, regardless of reversible at-rest storage."""
+    digest = sha256()
+    if storage_encoding == "identity":
+        opener = path.open
+        kwargs = {"mode": "rb"}
+    elif storage_encoding == "gzip":
+        opener = gzip.open
+        kwargs = {"mode": "rb"}
+    else:
+        raise CFBParticipationPITError(
+            f"CFB_PARTICIPATION_STORAGE_ENCODING_UNSUPPORTED:{storage_encoding}"
+        )
+    with opener(**kwargs) as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
@@ -246,7 +267,38 @@ def audit_cfb_participation_snapshot(
         if not cache_path.is_file() or not manifest_path.is_file():
             blockers.append(f"CFB_PARTICIPATION_SOURCE_BYTES_MISSING:{dataset}")
             continue
-        if _file_sha256(cache_path) != content_sha:
+
+        storage_encoding = str(row.get("storage_encoding") or "identity").strip().lower()
+        if storage_encoding not in {"identity", "gzip"}:
+            blockers.append(
+                f"CFB_PARTICIPATION_STORAGE_ENCODING_UNSUPPORTED:{dataset}:{storage_encoding}"
+            )
+            continue
+        if storage_encoding == "gzip":
+            if row.get("storage_contract") != STORAGE_CONTRACT:
+                blockers.append(f"CFB_PARTICIPATION_STORAGE_CONTRACT_INVALID:{dataset}")
+                continue
+            try:
+                stored_sha = _hex(
+                    row.get("stored_content_sha256"),
+                    64,
+                    f"CFB_PARTICIPATION_STORED_SHA_INVALID:{dataset}",
+                )
+            except CFBParticipationPITError as exc:
+                blockers.append(str(exc))
+                continue
+            if _file_sha256(cache_path) != stored_sha:
+                blockers.append(f"CFB_PARTICIPATION_STORED_HASH_MISMATCH:{dataset}")
+                continue
+        try:
+            canonical_source_sha = _source_sha256(
+                cache_path,
+                storage_encoding=storage_encoding,
+            )
+        except (OSError, EOFError, gzip.BadGzipFile, CFBParticipationPITError):
+            blockers.append(f"CFB_PARTICIPATION_STORED_SOURCE_UNREADABLE:{dataset}")
+            continue
+        if canonical_source_sha != content_sha:
             blockers.append(f"CFB_PARTICIPATION_CONTENT_HASH_MISMATCH:{dataset}")
             continue
         try:
@@ -310,6 +362,28 @@ def audit_cfb_participation_snapshot(
         if str(manifest.get("cache_relative_path") or "") != cache_rel:
             blockers.append(f"CFB_PARTICIPATION_MANIFEST_CACHE_PATH_MISMATCH:{dataset}")
             continue
+        manifest_storage_encoding = str(
+            manifest.get("storage_encoding") or "identity"
+        ).strip().lower()
+        if manifest_storage_encoding != storage_encoding:
+            blockers.append(f"CFB_PARTICIPATION_MANIFEST_STORAGE_ENCODING_MISMATCH:{dataset}")
+            continue
+        if storage_encoding == "gzip":
+            if manifest.get("storage_contract") != STORAGE_CONTRACT:
+                blockers.append(f"CFB_PARTICIPATION_MANIFEST_STORAGE_CONTRACT_INVALID:{dataset}")
+                continue
+            for field in ("stored_content_sha256", "stored_size_bytes", "uncompressed_size_bytes"):
+                if manifest.get(field) != row.get(field):
+                    blockers.append(
+                        f"CFB_PARTICIPATION_MANIFEST_STORAGE_FIELD_MISMATCH:{dataset}:{field}"
+                    )
+                    break
+            else:
+                pass
+            if blockers and blockers[-1].startswith(
+                f"CFB_PARTICIPATION_MANIFEST_STORAGE_FIELD_MISMATCH:{dataset}:"
+            ):
+                continue
         if str(asset.get("asset_name") or "") != str(row.get("asset_name") or ""):
             blockers.append(f"CFB_PARTICIPATION_ASSET_NAME_MISMATCH:{dataset}")
             continue
