@@ -36,6 +36,10 @@ def materialize_native_candidate_inputs(*, games:Sequence[Mapping[str,Any]], sna
         except (KeyError,TypeError,ValueError) as exc:
             raise SDVMaterializationError("CFB_SDV_GAME_IDENTITY_INVALID") from exc
         if week == 1:
+            if season == 2015:
+                # Frozen acquisition starts in 2015; do not reach into 2014 after preregistration.
+                # This boundary row has no admissible prior-season predictive state.
+                continue
             home=prior_idx.get((home_id,season-1)); away=prior_idx.get((away_id,season-1))
             if home is None or away is None:
                 raise SDVMaterializationError(f"CFB_SDV_PRIOR_SEASON_SNAPSHOT_REQUIRED:{raw.get('game_id')}")
