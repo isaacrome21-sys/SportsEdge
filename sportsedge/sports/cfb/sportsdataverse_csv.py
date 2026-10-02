@@ -8,7 +8,7 @@ from .sportsdataverse_receipts import AssetReceipt
 class SDVCSVError(ValueError): pass
 
 REQUIRED={
- "cfb_schedules":{"game_id","season","week","season_type","fbs_game","completed","start_date","neutral_site","venue_id","home_id","away_id","home_points","away_points"},
+ "cfb_schedules":{"game_id","season","week","season_type","fbs_game","completed","start_date","neutral_site","venue_id","venue","home_id","away_id","home_points","away_points"},
  "espn_cfb_adv_team":{"game_id","season","week","pos_team","EPA_rushing_per_play","EPA_passing_per_play","EPA_explosive_rate"},
  "espn_cfb_adv_situational":{"game_id","season","week","pos_team","EPA_success_rate","EPA_standard_down_per_play","EPA_success_passing_down_rate"},
  "espn_cfb_adv_drives":{"game_id","season","pos_team","avg_field_position"},
