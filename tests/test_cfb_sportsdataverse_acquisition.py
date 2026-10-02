@@ -11,7 +11,7 @@ def test_frozen_plan_is_44_public_nonbetting_assets():
 
 def test_asset_urls_match_upstream_cfbfastr_release_contract():
     assert asset("cfb_schedules",2015).url.endswith(
-      "/cfb_schedules/cfb_schedules_2015.csv")
+      "/cfb_schedules/cfb_schedules_2015.csv.gz")
     assert asset("espn_cfb_adv_team",2025).url.endswith(
       "/espn_cfb_adv_team/adv_team_2025.csv")
     assert asset("espn_cfb_adv_drives",2025).url.endswith(

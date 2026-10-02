@@ -1,6 +1,6 @@
 """Deterministic stdlib CSV parser for frozen SportsDataverse CFB assets."""
 from __future__ import annotations
-import csv,io,hashlib
+import csv,gzip,io,hashlib
 from typing import Mapping
 from .sportsdataverse_converted import bind_parsed_rows,ParsedReceipt
 from .sportsdataverse_receipts import AssetReceipt
@@ -8,7 +8,7 @@ from .sportsdataverse_receipts import AssetReceipt
 class SDVCSVError(ValueError): pass
 
 REQUIRED={
- "cfb_schedules":{"game_id","season","week","season_type","fbs_game","home_id","away_id","home_points","away_points"},
+ "cfb_schedules":{"game_id","season","week","season_type","fbs_game","completed","start_date","neutral_site","venue_id","home_id","away_id","home_points","away_points"},
  "espn_cfb_adv_team":{"game_id","season","week","pos_team","EPA_rushing_per_play","EPA_passing_per_play","EPA_explosive_rate"},
  "espn_cfb_adv_situational":{"game_id","season","week","pos_team","EPA_success_rate","EPA_standard_down_per_play","EPA_success_passing_down_rate"},
  "espn_cfb_adv_drives":{"game_id","season","pos_team","avg_field_position"},
@@ -19,7 +19,11 @@ def parse_csv(raw:bytes,*,dataset:str,season:int,source_url:str,raw_csv_sha256:s
  if dataset not in REQUIRED: raise SDVCSVError("CFB_SDV_CSV_DATASET_NOT_FROZEN:"+dataset)
  actual_sha256=hashlib.sha256(raw).hexdigest()
  if actual_sha256 != raw_csv_sha256: raise SDVCSVError("CFB_SDV_CSV_RAW_HASH_MISMATCH")
- try: text=raw.decode("utf-8-sig")
+ payload=raw
+ if raw.startswith(bytes((0x1F,0x8B))):
+  try: payload=gzip.decompress(raw)
+  except (OSError,EOFError) as e: raise SDVCSVError("CFB_SDV_CSV_GZIP_INVALID") from e
+ try: text=payload.decode("utf-8-sig")
  except UnicodeDecodeError as e: raise SDVCSVError("CFB_SDV_CSV_UTF8_REQUIRED") from e
  reader=csv.DictReader(io.StringIO(text,newline=""))
  fields=reader.fieldnames or []

@@ -1,7 +1,6 @@
 """Pinned public SportsDataverse acquisition plan for frozen CFB history.
 
-This module only constructs and validates source identities. Network I/O and RDS
-parsing belong to the runner so tests remain deterministic.
+This module only constructs and validates source identities. Network I/O and CSV transport parsing belong to the runner so tests remain deterministic.
 """
 from __future__ import annotations
 from dataclasses import dataclass, asdict
@@ -11,7 +10,7 @@ SOURCE_REPO="sportsdataverse/sportsdataverse-data"
 UPSTREAM_LOADER_REPO="sportsdataverse/cfbfastR"
 
 _ASSETS={
- "cfb_schedules":("cfb_schedules","cfb_schedules_{season}.csv"),
+ "cfb_schedules":("cfb_schedules","cfb_schedules_{season}.csv.gz"),
  "espn_cfb_adv_team":("espn_cfb_adv_team","adv_team_{season}.csv"),
  "espn_cfb_adv_drives":("espn_cfb_adv_drives","adv_drives_{season}.csv"),
  "espn_cfb_adv_situational":("espn_cfb_adv_situational","adv_situational_{season}.csv"),

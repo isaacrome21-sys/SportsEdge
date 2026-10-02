@@ -104,6 +104,19 @@ def materialize_native_candidate_inputs(
             home_id, away_id = int(raw["home_id"]), int(raw["away_id"])
         except (KeyError, TypeError, ValueError) as exc:
             raise SDVMaterializationError("CFB_SDV_GAME_IDENTITY_INVALID") from exc
+        neutral_raw = raw.get("neutral_site")
+        if type(neutral_raw) is bool:
+            neutral_site = neutral_raw
+        else:
+            token = str(neutral_raw or "").strip().lower()
+            if token in {"true", "1", "t"}:
+                neutral_site = True
+            elif token in {"false", "0", "f"}:
+                neutral_site = False
+            else:
+                raise SDVMaterializationError(
+                    f"CFB_SDV_NEUTRAL_SITE_REQUIRED:{raw.get('game_id')}"
+                )
 
         if week == 1:
             if season == 2015:
@@ -174,6 +187,7 @@ def materialize_native_candidate_inputs(
             "week": week,
             "home_id": home_id,
             "away_id": away_id,
+            "neutral_site": neutral_site,
             # Authoritative pregame snapshot (all four families read this)
             "home_metrics": home_metrics,
             "away_metrics": away_metrics,
