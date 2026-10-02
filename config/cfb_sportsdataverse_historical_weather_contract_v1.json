@@ -48,7 +48,17 @@
     "roof_field": "roof_type",
     "indoor_rule": "roof_type IN {dome,retractable}",
     "missing_venue_policy": "FAIL_CLOSED",
-    "missing_coordinates_policy": "FAIL_CLOSED"
+    "missing_coordinates_policy": "FAIL_CLOSED",
+    "fallback_join": {
+      "schedule_field": "venue",
+      "snapshot_fields": [
+        "name",
+        "aliases"
+      ],
+      "normalization": "UNICODE_PRESERVING_CASEFOLD_TRIM_COLLAPSE_WHITESPACE",
+      "match_rule": "EXACT_NORMALIZED_NAME_OR_ALIAS_ONLY_WHEN_CFBD_VENUE_ID_NOT_BOUND",
+      "ambiguous_name_policy": "FAIL_CLOSED"
+    }
   },
   "provider": {
     "source_id": "OPEN_METEO_ARCHIVE_V1",
