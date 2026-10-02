@@ -42,7 +42,11 @@ def _number(value: Any, field: str) -> float:
     return out
 
 
-def venue_index(raw: bytes) -> dict[int, dict[str, Any]]:
+def _venue_name(value: Any) -> str:
+    return " ".join(str(value or "").strip().casefold().split())
+
+
+def venue_indexes(raw: bytes) -> tuple[dict[int, dict[str, Any]], dict[str, dict[str, Any]]]:
     if sha256(raw).hexdigest() != VENUE_SOURCE_SHA256:
         raise SDVWeatherTransportError("CFB_SDV_VENUE_SOURCE_HASH_MISMATCH")
     try:
@@ -51,49 +55,100 @@ def venue_index(raw: bytes) -> dict[int, dict[str, Any]]:
         raise SDVWeatherTransportError("CFB_SDV_VENUE_SOURCE_UTF8_REQUIRED") from exc
     reader = csv.DictReader(io.StringIO(text))
     fields = set(reader.fieldnames or ())
-    required = {"cfbd_venue_id", "lat", "lon", "roof_type"}
+    required = {"stadium_id", "name", "aliases", "cfbd_venue_id", "lat", "lon", "roof_type"}
     missing = sorted(required - fields)
     if missing:
         raise SDVWeatherTransportError(
             "CFB_SDV_VENUE_SOURCE_COLUMNS_MISSING:" + ",".join(missing)
         )
-    out: dict[int, dict[str, Any]] = {}
+    by_id: dict[int, dict[str, Any]] = {}
+    by_name: dict[str, dict[str, Any]] = {}
+    ambiguous_names: set[str] = set()
+    row_count = 0
     for row in reader:
-        raw_id = str(row.get("cfbd_venue_id") or "").strip()
-        if not raw_id:
-            continue
-        try:
-            venue_id = int(float(raw_id))
-        except ValueError as exc:
-            raise SDVWeatherTransportError("CFB_SDV_VENUE_ID_INVALID") from exc
-        lat = _number(row.get("lat"), f"venue.{venue_id}.lat")
-        lon = _number(row.get("lon"), f"venue.{venue_id}.lon")
+        row_count += 1
+        stadium_id = str(row.get("stadium_id") or "").strip()
+        name = str(row.get("name") or "").strip()
+        if not stadium_id or not name:
+            raise SDVWeatherTransportError("CFB_SDV_VENUE_IDENTITY_REQUIRED")
+        lat = _number(row.get("lat"), f"venue.{stadium_id}.lat")
+        lon = _number(row.get("lon"), f"venue.{stadium_id}.lon")
         if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
             raise SDVWeatherTransportError(
-                f"CFB_SDV_VENUE_COORDINATES_INVALID:{venue_id}"
+                f"CFB_SDV_VENUE_COORDINATES_INVALID:{stadium_id}"
             )
         roof = str(row.get("roof_type") or "").strip().lower()
         if roof not in {"open", "dome", "retractable"}:
             raise SDVWeatherTransportError(
-                f"CFB_SDV_VENUE_ROOF_TYPE_INVALID:{venue_id}:{roof}"
+                f"CFB_SDV_VENUE_ROOF_TYPE_INVALID:{stadium_id}:{roof}"
             )
+        raw_id = str(row.get("cfbd_venue_id") or "").strip()
+        cfbd_id = None
+        if raw_id:
+            try:
+                cfbd_id = int(float(raw_id))
+            except ValueError as exc:
+                raise SDVWeatherTransportError("CFB_SDV_VENUE_ID_INVALID") from exc
         normalized = {
-            "venue_id": venue_id,
+            "stadium_id": stadium_id,
+            "venue_id": cfbd_id,
+            "name": name,
             "latitude": lat,
             "longitude": lon,
             "game_indoor": roof in {"dome", "retractable"},
             "roof_type": roof,
         }
-        prior = out.get(venue_id)
-        if prior is not None and prior != normalized:
-            raise SDVWeatherTransportError(
-                f"CFB_SDV_VENUE_DUPLICATE_CONFLICT:{venue_id}"
-            )
-        out[venue_id] = normalized
-    if not out:
-        raise SDVWeatherTransportError("CFB_SDV_VENUE_SOURCE_EMPTY")
-    return out
+        if cfbd_id is not None:
+            prior = by_id.get(cfbd_id)
+            if prior is not None and prior != normalized:
+                raise SDVWeatherTransportError(
+                    f"CFB_SDV_VENUE_DUPLICATE_CONFLICT:{cfbd_id}"
+                )
+            by_id[cfbd_id] = normalized
 
+        names = [name]
+        names.extend(
+            token.strip()
+            for token in str(row.get("aliases") or "").split("|")
+            if token.strip()
+        )
+        for candidate in names:
+            key = _venue_name(candidate)
+            if not key:
+                continue
+            prior = by_name.get(key)
+            if prior is None:
+                by_name[key] = normalized
+            elif prior["stadium_id"] != stadium_id:
+                ambiguous_names.add(key)
+    for key in ambiguous_names:
+        by_name.pop(key, None)
+    if row_count == 0 or not by_name:
+        raise SDVWeatherTransportError("CFB_SDV_VENUE_SOURCE_EMPTY")
+    return by_id, by_name
+
+
+def venue_index(raw: bytes) -> dict[int, dict[str, Any]]:
+    return venue_indexes(raw)[0]
+
+
+def resolve_venue(
+    *,
+    by_id: Mapping[int, Mapping[str, Any]],
+    by_name: Mapping[str, Mapping[str, Any]],
+    venue_id: int,
+    venue_name: str,
+) -> tuple[dict[str, Any], str]:
+    found = by_id.get(int(venue_id))
+    if found is not None:
+        return dict(found), "CFBD_VENUE_ID"
+    key = _venue_name(venue_name)
+    found = by_name.get(key)
+    if found is None:
+        raise SDVWeatherTransportError(
+            f"CFB_SDV_HISTORICAL_VENUE_UNRESOLVED:{venue_id}:{venue_name}"
+        )
+    return dict(found), "PINNED_EXACT_NAME_OR_ALIAS"
 
 def request_params(
     *,
@@ -195,6 +250,8 @@ __all__ = [
     "VENUE_SOURCE_URL",
     "kickoff_date",
     "request_params",
+    "resolve_venue",
     "select_kickoff_hour",
     "venue_index",
+    "venue_indexes",
 ]
