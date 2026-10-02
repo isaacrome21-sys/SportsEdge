@@ -24,6 +24,7 @@ from pathlib import Path
 import sys
 import time
 from typing import Any, Callable, Mapping, Sequence
+from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -200,13 +201,29 @@ def _store_cache(*, cache_root: Path, query_sha: str, raw: bytes, meta: Mapping[
     meta_path.write_text(json.dumps(dict(meta), indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def _retry_delay_seconds(exc: Exception, attempt: int) -> float:
+    if isinstance(exc, HTTPError):
+        raw = exc.headers.get("Retry-After") if exc.headers is not None else None
+        if raw is not None:
+            try:
+                return max(0.0, min(60.0, float(raw)))
+            except (TypeError, ValueError):
+                pass
+    return float(min(30, 2 ** (attempt - 1)))
+
+
+def _http_retriable(exc: HTTPError) -> bool:
+    return int(exc.code) in {408, 425, 429, 500, 502, 503, 504}
+
+
 def _fetch_one(
     item: Mapping[str, Any],
     *,
     api_key: str,
     cache_root: Path,
     opener: Callable = urlopen,
-    max_attempts: int = 3,
+    max_attempts: int = 6,
+    sleeper: Callable[[float], None] = time.sleep,
 ) -> tuple[Any, dict[str, Any], bool]:
     query_sha = str(item["query_sha256"])
     cached = _load_verified_cache(cache_root=cache_root, query_sha=query_sha)
@@ -241,8 +258,16 @@ def _fetch_one(
             return decoded, meta, False
         except Exception as exc:
             last = exc
+            if isinstance(exc, HTTPError) and not _http_retriable(exc):
+                break
             if attempt < max_attempts:
-                time.sleep(2 ** (attempt - 1))
+                sleeper(_retry_delay_seconds(exc, attempt))
+    if isinstance(last, HTTPError):
+        params = item.get("params") or {}
+        raise CFBAcquisitionError(
+            f"CFB_ACQUISITION_FETCH_FAILED:{item['endpoint']}:HTTP_{last.code}:"
+            f"year={params.get('year')}:endWeek={params.get('endWeek')}"
+        ) from last
     raise CFBAcquisitionError(
         f"CFB_ACQUISITION_FETCH_FAILED:{item['endpoint']}:{type(last).__name__}"
     ) from last
@@ -295,7 +320,8 @@ def _fetch_public_weather(
     *,
     cache_root: Path,
     opener: Callable = urlopen,
-    max_attempts: int = 3,
+    max_attempts: int = 6,
+    sleeper: Callable[[float], None] = time.sleep,
 ) -> tuple[Any, dict[str, Any], bool]:
     query_sha = str(item["query_sha256"])
     cached = _load_verified_cache(cache_root=cache_root, query_sha=query_sha)
@@ -325,8 +351,12 @@ def _fetch_public_weather(
             return decoded, meta, False
         except Exception as exc:
             last = exc
+            if isinstance(exc, HTTPError) and not _http_retriable(exc):
+                break
             if attempt < max_attempts:
-                time.sleep(2 ** (attempt - 1))
+                sleeper(_retry_delay_seconds(exc, attempt))
+    if isinstance(last, HTTPError):
+        raise CFBAcquisitionError(f"CFB_OPEN_METEO_FETCH_FAILED:HTTP_{last.code}") from last
     raise CFBAcquisitionError(f"CFB_OPEN_METEO_FETCH_FAILED:{type(last).__name__}") from last
 
 
