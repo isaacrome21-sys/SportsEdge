@@ -10,11 +10,14 @@ on:
       - 'sportsedge/sports/cfb/participation_model.py'
       - 'sportsedge/sports/cfb/participation_source_capture.py'
       - 'sportsedge/sports/cfb/participation_pit_readiness.py'
+      - 'sportsedge/sports/cfb/participation_persistence.py'
       - 'sportsedge/football_prop_surface.py'
       - 'scripts/cache_cfb_participation_sources.py'
+      - 'scripts/pack_cfb_participation_snapshot.py'
       - 'tests/test_cfb_participation_model.py'
       - 'tests/test_cfb_participation_source_capture.py'
       - 'tests/test_cfb_participation_pit_readiness.py'
+      - 'tests/test_cfb_participation_persistence.py'
       - 'tests/test_football_prop_runtime_truth.py'
       - '.github/workflows/cfb-participation-contract.yml'
       - '.github/workflows/cfb-forward-participation-capture.yml'
@@ -27,11 +30,14 @@ on:
       - 'sportsedge/sports/cfb/participation_model.py'
       - 'sportsedge/sports/cfb/participation_source_capture.py'
       - 'sportsedge/sports/cfb/participation_pit_readiness.py'
+      - 'sportsedge/sports/cfb/participation_persistence.py'
       - 'sportsedge/football_prop_surface.py'
       - 'scripts/cache_cfb_participation_sources.py'
+      - 'scripts/pack_cfb_participation_snapshot.py'
       - 'tests/test_cfb_participation_model.py'
       - 'tests/test_cfb_participation_source_capture.py'
       - 'tests/test_cfb_participation_pit_readiness.py'
+      - 'tests/test_cfb_participation_persistence.py'
       - 'tests/test_football_prop_runtime_truth.py'
       - '.github/workflows/cfb-participation-contract.yml'
       - '.github/workflows/cfb-forward-participation-capture.yml'
@@ -56,11 +62,14 @@ jobs:
           sportsedge/sports/cfb/participation_model.py
           sportsedge/sports/cfb/participation_source_capture.py
           sportsedge/sports/cfb/participation_pit_readiness.py
+          sportsedge/sports/cfb/participation_persistence.py
           sportsedge/football_prop_surface.py
           scripts/cache_cfb_participation_sources.py
+          scripts/pack_cfb_participation_snapshot.py
           tests/test_cfb_participation_model.py
           tests/test_cfb_participation_source_capture.py
           tests/test_cfb_participation_pit_readiness.py
+          tests/test_cfb_participation_persistence.py
           tests/test_football_prop_runtime_truth.py
       - name: Run CFB participation contract tests
         run: >-
@@ -68,6 +77,7 @@ jobs:
           tests/test_cfb_participation_model.py
           tests/test_cfb_participation_source_capture.py
           tests/test_cfb_participation_pit_readiness.py
+          tests/test_cfb_participation_persistence.py
           tests/test_football_prop_runtime_truth.py
       - name: Assert checked-in CFB prop state remains NO_ENGINE for the structural reason
         run: |
