@@ -1,0 +1,14 @@
+{
+  "label": "context_not_model",
+  "pulled_at_utc": "2026-09-30T06:15:52Z",
+  "source": "basketball-reference",
+  "url": "https://www.basketball-reference.com/leagues/NBA_2026.html",
+  "http_status": 200,
+  "provider_last_modified": "Wed, 30 Sep 2026 05:37:24 GMT",
+  "title": "2025-26 NBA Season Summary | Basketball-Reference.com",
+  "html_bytes": 811544,
+  "team_count": 30,
+  "sample_teams": ["ATL", "BOS", "BRK", "CHI", "CHO", "CLE", "DAL", "DEN"],
+  "prices_games": false,
+  "touches_production_engines": false
+}
