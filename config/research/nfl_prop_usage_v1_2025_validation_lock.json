@@ -1,0 +1,81 @@
+{
+  "schema": "SPORTSEDGE_NFL_PROP_USAGE_V1_2025_VALIDATION_LOCK",
+  "status": "FROZEN_BEFORE_2025_OUTCOME_ACCESS",
+  "frozen_date": "2026-10-02",
+  "fit_identity": {
+    "owner_pr": 1348,
+    "head_sha": "dfe1914d6c5b70e727c17273dabd0bb033dc816d",
+    "workflow_run_id": 36962280655,
+    "workflow_artifact_id": 11208336341,
+    "workflow_artifact_digest": "sha256:4eb92be476a88b795f849e7f14d95258131e42c40f30dfce19d2bb373b613cf3",
+    "fit_artifact_sha256": "ef38c7101da0977f27b71a7cbbe40321149ee2e0fda3bb8371f04d8423c9c555",
+    "attempt9_runtime_binding_sha256": "3ebce8f1ae0ec2efeffb4d145b898af9919d755a6028519ad98e41b5fb683ed0",
+    "development_seasons": [2021, 2022, 2023, 2024]
+  },
+  "source_identity": {
+    "owner_pr": 1338,
+    "head_sha": "438147dc660b9b62d54ad08511a441a7375cc650",
+    "workflow_run_id": 36963125590,
+    "workflow_artifact_id": 11209170460,
+    "workflow_artifact_digest": "sha256:61f1c05bb6e06285a0f4bf0c1938d006b84eabf2635f1c7ad03837c1864c0332",
+    "props_rows_sha256": "ad229c95138875440e4d37addb208dfa9829ea1f58386357bee29702b25621fd",
+    "props_rows_extra_sha256": "812490cb635d2c49b150f03152e9d18ceaa713687cb74a35bbfe20d4f7e331d0",
+    "depth_source_sha256": "6a147ed7edb1325e9e3cf242927c888368ef238ad23eb305f69adf5f812bce7a",
+    "pre_kick_inactive_audit_sha256": "67c2b5e598dfa3dfe4ff0f0d1f9e312cf4a5facc34fb0306f242466deda93623",
+    "source_audit_sha256": "ee2de204bfb7e3ef1a5e5d054a448bc761e91acffa8717f252b635d585691560",
+    "admitted_regular_season_games_with_strict_prekick_inactives": 52,
+    "admitted_inactive_player_entries": 652
+  },
+  "validation_window": {
+    "season": 2025,
+    "season_type": "REG",
+    "one_look": true,
+    "status": "UNSPENT",
+    "post_result_retune": false,
+    "second_look": false
+  },
+  "cohort": {
+    "market_source": "DRAFTKINGS_LAST_PRE_KICK",
+    "market_lead_minutes": {"exclusive_min": 0, "inclusive_max": 15},
+    "paired_over_under_required": true,
+    "markets": ["passing_yards", "rushing_yards", "receiving_yards"],
+    "strict_prekick_inactive_game_required": true,
+    "player_must_not_be_in_official_inactive_list": true,
+    "latest_depth_snapshot_at_or_before_kickoff_required": true,
+    "qb_rule": "PLAYER_MUST_BE_UNIQUE_POS_RANK_1_QB",
+    "skill_rule": "PLAYER_MUST_APPEAR_IN_LATEST_PIT_DEPTH_SNAPSHOT",
+    "minimum_same_season_prior_player_appearances": 3,
+    "attempt9_team_environment_required": true,
+    "missing_or_ambiguous_evidence": "ZERO_MODEL_ROWS",
+    "no_sample_filling": true
+  },
+  "probability": {
+    "candidate": "NORMAL_QUANTITY_RESIDUAL_FROM_FIT_ARTIFACT",
+    "market_line_used_only_after_projection_is_built": true,
+    "integer_line_behavior": "FAIL_CLOSED",
+    "observed_over": "ACTUAL_STRICTLY_GREATER_THAN_LINE"
+  },
+  "gates": {
+    "calibration_metric": "ABS_MEAN_P_OVER_MINUS_OBSERVED_OVER_RATE",
+    "calibration_max": 0.06,
+    "required_scopes": ["passing_yards", "rushing_yards", "receiving_yards", "pooled"],
+    "brier_rule": "CANDIDATE_POOLED_BRIER_LE_DEVELOPMENT_POSITION_MARKET_BASELINE_POOLED_BRIER",
+    "zero_rows_when_inactive_evidence_missing": true,
+    "all_must_pass": true
+  },
+  "reporting": {
+    "report_n_by_market": true,
+    "report_n_pooled": true,
+    "minimum_n_gate": null,
+    "reason": "No minimum validation sample size was frozen in the original V1 prelock; do not invent one after source audit."
+  },
+  "authority": {
+    "research_only": true,
+    "creates_model_p": false,
+    "truth_gate": false,
+    "official": false,
+    "promotion": false,
+    "staking": false,
+    "backfill": false
+  }
+}
