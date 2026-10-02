@@ -18,7 +18,10 @@ from zoneinfo import ZoneInfo
 
 import numpy as np
 
-from scripts.build_nfl_attempt9_runtime_artifact import reconstruct as reconstruct_attempt9
+try:
+    from scripts.build_nfl_attempt9_runtime_artifact import reconstruct as reconstruct_attempt9
+except ModuleNotFoundError:
+    from build_nfl_attempt9_runtime_artifact import reconstruct as reconstruct_attempt9
 
 ROOT = Path(__file__).resolve().parents[1]
 PRELOCK_PATH = ROOT / "config/research/nfl_play_level_attempt1_prelock_v1.json"
@@ -28,6 +31,15 @@ PBP_URL = "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_
 DEPTH_URL = "https://github.com/nflverse/nflverse-data/releases/download/depth_charts/depth_charts_{season}.csv"
 EASTERN = ZoneInfo("America/New_York")
 TEAM_ALIASES = {"LA": "LAR", "STL": "LAR", "SD": "LAC", "OAK": "LV", "WSH": "WAS", "JAC": "JAX"}
+ZERO_AUTHORITY = {
+    "creates_model_p": False,
+    "promotion_authority": False,
+    "truth_gate_authority": False,
+    "official_authority": False,
+    "staking_authority": False,
+    "changes_2026_owner": False,
+}
+
 FEATURE_NAMES = (
     "off_epa_per_play",
     "def_epa_allowed_per_play",
@@ -581,7 +593,7 @@ def evaluate(dev_rows: list[dict[str, Any]], val_rows: list[dict[str, Any]], cfg
     if len(dev_rows) < min_dev:
         raise ValueError(f"NFL_ATTEMPT1_DEV_COVERAGE_INSUFFICIENT:{len(dev_rows)}:{min_dev}")
     if len(val_rows) < min_val:
-        return {"status": "INSUFFICIENT_VALIDATION_SOURCE_COVERAGE", "pass": False, "n_development": len(dev_rows), "n_validation": len(val_rows), "minimum_validation": min_val, "attempt_spent": True}
+        return {"status": "INSUFFICIENT_VALIDATION_SOURCE_COVERAGE", "pass": False, "n_development": len(dev_rows), "n_validation": len(val_rows), "minimum_validation": min_val, "attempt_spent": True, "authority": dict(ZERO_AUTHORITY)}
 
     grid = [float(x) for x in cfg["fit"]["ridge_alpha_grid"]]
     am, cvm = select_alpha(dev_rows, "margin", grid)
@@ -634,6 +646,7 @@ def evaluate(dev_rows: list[dict[str, Any]], val_rows: list[dict[str, Any]], cfg
             "n_validation": len(val_rows),
             "spread": spread,
             "total": total,
+            "authority": dict(ZERO_AUTHORITY),
         }
 
     rmse = {
@@ -692,14 +705,7 @@ def evaluate(dev_rows: list[dict[str, Any]], val_rows: list[dict[str, Any]], cfg
             "rmse_not_worse": rmse["margin_candidate"] <= rmse["margin_attempt9"] and rmse["total_candidate"] <= rmse["total_attempt9"],
             "calibration": cal_ok,
         },
-        "authority": {
-            "creates_model_p": False,
-            "promotion_authority": False,
-            "truth_gate_authority": False,
-            "official_authority": False,
-            "staking_authority": False,
-            "changes_2026_owner": False,
-        },
+        "authority": dict(ZERO_AUTHORITY),
     }
 
 
