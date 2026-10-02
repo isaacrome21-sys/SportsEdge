@@ -191,6 +191,9 @@ def test_unified_phone_card_prices_ml_spread_total_team_total_and_qb_rb_wr_props
     spread = [row for row in rows if row["market"] == "spread"]
     assert spread[0]["line"] == 3.5
     assert spread[1]["line"] == -3.5
+    assert spread[0]["push_p"] == 0.0
+    assert spread[1]["push_p"] == 0.0
+    assert spread[0]["estimate_p"] + spread[1]["estimate_p"] == pytest.approx(1.0)
     assert game["engine"]["workload_coupling"]["lead_trail_pass_rush_adjustment"] is False
 
 
