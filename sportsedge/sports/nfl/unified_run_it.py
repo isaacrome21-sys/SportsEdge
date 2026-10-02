@@ -20,6 +20,7 @@ from sportsedge.nfl_run_it import normalize_quote
 from sportsedge.nfl_run_it_scored import run_it_scored
 from sportsedge.nfl_td_run_it_score_b import run_td_board
 from sportsedge.sports.nfl.discrete_v2 import load_freeze, means_from_attempt9, score_grid
+from sportsedge.sports.nfl.unified_auto_roles import build_unified_team_models_from_nflverse
 from sportsedge.sports.nfl.unified_market_engine import (
     TD_PROP_MARKETS,
     run_unified_nfl_model,
@@ -391,4 +392,76 @@ def run_unified_nfl_run_it(
     }
 
 
-__all__ = ["SCHEMA", "UnifiedNflRunItError", "run_unified_nfl_run_it"]
+def run_unified_nfl_run_it_from_nflverse(
+    *,
+    game_id: str,
+    home_team: str,
+    away_team: str,
+    kickoff: Any,
+    observed_at: Any,
+    source_binding: Mapping[str, Any],
+    player_rows: Sequence[Mapping[str, Any]],
+    depth_rows: Sequence[Mapping[str, Any]],
+    depth_source_uri: str,
+    depth_source_sha256: str,
+    attempt9_margin: float,
+    attempt9_total: float,
+    game_quotes: Sequence[Mapping[str, Any]],
+    prop_quotes: Sequence[Mapping[str, Any]] = (),
+    td_quotes: Sequence[Mapping[str, Any]] = (),
+    qualification_snapshots: Sequence[Mapping[str, Any]] = (),
+    scoring_prior: Any = None,
+    as_of: Any,
+    edge_floor: float = 0.02,
+    executable_book: str = "draftkings",
+    n_sims: int = 20000,
+    seed: int = 21,
+) -> dict[str, Any]:
+    """One-call PIT nflverse roles/depth -> unified NFL RUN IT."""
+    assembled = build_unified_team_models_from_nflverse(
+        game_id=game_id,
+        kickoff=kickoff,
+        observed_at=observed_at,
+        source_binding=source_binding,
+        player_rows=player_rows,
+        depth_rows=depth_rows,
+        depth_source_uri=depth_source_uri,
+        depth_source_sha256=depth_source_sha256,
+        as_of=as_of,
+        home_team=home_team,
+        away_team=away_team,
+    )
+    out = run_unified_nfl_run_it(
+        game_id=game_id,
+        home_team=home_team,
+        away_team=away_team,
+        attempt9_margin=attempt9_margin,
+        attempt9_total=attempt9_total,
+        game_quotes=game_quotes,
+        prop_quotes=prop_quotes,
+        td_quotes=td_quotes,
+        qualification_snapshots=qualification_snapshots,
+        home_model=assembled["home_model"],
+        away_model=assembled["away_model"],
+        scoring_prior=scoring_prior,
+        as_of=as_of,
+        edge_floor=edge_floor,
+        executable_book=executable_book,
+        n_sims=n_sims,
+        seed=seed,
+    )
+    out["auto_roles"] = {
+        "status": assembled["status"],
+        "starter_qb_id_by_team": assembled["starter_qb_id_by_team"],
+        "depth_snapshot_asof_by_team": assembled["depth_snapshot_asof_by_team"],
+        "provenance": assembled["provenance"],
+    }
+    return out
+
+
+__all__ = [
+    "SCHEMA",
+    "UnifiedNflRunItError",
+    "run_unified_nfl_run_it",
+    "run_unified_nfl_run_it_from_nflverse",
+]
