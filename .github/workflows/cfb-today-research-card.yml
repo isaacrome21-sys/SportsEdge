@@ -1,0 +1,122 @@
+name: cfb today research card
+
+on:
+  workflow_dispatch:
+    inputs:
+      usage_json:
+        description: Optional CFB_PROP_USAGE_INPUT_V1 JSON. Required for player-prop LEANs.
+        required: false
+        type: string
+      game_model_artifact_json:
+        description: Optional hash-valid CFB joint-model artifact JSON for model-based game LEANs.
+        required: false
+        type: string
+      game_board_json:
+        description: Optional manual cross-book game board JSON. Blank uses configured odds provider.
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  research-card:
+    concurrency:
+      group: sportsedge-paid-odds-api
+      cancel-in-progress: false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+      SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+      SPORTSEDGE_CFBD_API_KEY: ${{ secrets.SPORTSEDGE_CFBD_API_KEY }}
+      CFB_PAPER_BOARD_JSON: ${{ inputs.game_board_json }}
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Install test/runtime dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-test.txt
+
+      - name: Build exact-line game market context
+        run: |
+          python scripts/run_cfb_paper_market.py             --output artifacts/cfb/cfb_paper_market_card.json
+
+      - name: Materialize optional game-model artifact
+        env:
+          GAME_MODEL_ARTIFACT_JSON: ${{ inputs.game_model_artifact_json }}
+        run: |
+          if [ -n "$GAME_MODEL_ARTIFACT_JSON" ]; then
+            mkdir -p artifacts/cfb
+            printf '%s' "$GAME_MODEL_ARTIFACT_JSON" > artifacts/cfb/cfb_game_model_candidate.json
+            python scripts/run_cfb_game_model_candidate.py               --model-artifact artifacts/cfb/cfb_game_model_candidate.json               --output artifacts/run_it/cfb_game_model_candidate.json || true
+          else
+            echo "No game-model artifact supplied; final card will use PAPER game context."
+          fi
+
+      - name: Materialize optional PIT usage input
+        env:
+          USAGE_JSON: ${{ inputs.usage_json }}
+        run: |
+          if [ -n "$USAGE_JSON" ]; then
+            mkdir -p artifacts/cfb
+            printf '%s' "$USAGE_JSON" > artifacts/cfb/cfb_prop_usage_input.json
+            python scripts/build_cfb_prop_live_features.py               --usage-input artifacts/cfb/cfb_prop_usage_input.json               --output artifacts/football/cfb_prop_live_features.json
+          else
+            echo "No PIT usage input supplied; prop lane remains unavailable."
+          fi
+
+      - name: Run frozen CFB prop research candidate
+        if: ${{ inputs.usage_json != '' }}
+        run: |
+          python scripts/run_cfb_prop_model_candidate.py             --live-features artifacts/football/cfb_prop_live_features.json             --output artifacts/run_it/cfb_prop_model_candidate.json || true
+
+      - name: Build same-day research card
+        run: |
+          ARGS="--paper-market-card artifacts/cfb/cfb_paper_market_card.json"
+          if [ -f artifacts/run_it/cfb_game_model_candidate.json ]; then
+            ARGS="$ARGS --game-model-report artifacts/run_it/cfb_game_model_candidate.json"
+          fi
+          if [ -f artifacts/run_it/cfb_prop_model_candidate.json ]; then
+            ARGS="$ARGS --prop-report artifacts/run_it/cfb_prop_model_candidate.json"
+          fi
+          python scripts/build_cfb_today_research_card.py $ARGS             --output artifacts/run_it/cfb_today_research_card.json
+
+      - name: Assert zero production authority
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path("artifacts/run_it/cfb_today_research_card.json").read_text())
+          assert p["summary"]["official_bets"] == 0
+          assert p["governance"]["research_only"] is True
+          assert p["governance"]["promotion_authority"] is False
+          assert p["governance"]["official_authority"] is False
+          for row in p["rows"]:
+              assert row["official_eligible"] is False
+              if row["display_status"] == "PAPER":
+                  assert row["model_p"] is None
+          print(
+              "CFB_TODAY_RESEARCH_ZERO_AUTHORITY "
+              f"game_lane={p['game_lane']} prop_lane={p['prop_lane']} "
+              f"rows={p['summary']['game_rows'] + p['summary']['prop_rows']}"
+          )
+          PY
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cfb-today-research-card
+          path: |
+            artifacts/cfb/cfb_paper_market_card.json
+            artifacts/cfb/cfb_game_model_candidate.json
+            artifacts/football/cfb_prop_live_features.json
+            artifacts/run_it/cfb_game_model_candidate.json
+            artifacts/run_it/cfb_prop_model_candidate.json
+            artifacts/run_it/cfb_today_research_card.json
+          if-no-files-found: warn
+          retention-days: 14

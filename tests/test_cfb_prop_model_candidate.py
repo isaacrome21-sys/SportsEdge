@@ -28,6 +28,7 @@ class CFBPropModelCandidateTests(unittest.TestCase):
         out = CANDIDATE._candidateize(report)
         row = out["results"][0]
         self.assertEqual(row["decision_tier"], "MODEL_CANDIDATE")
+        self.assertEqual(row["presentation_label"], "LEAN")
         self.assertEqual(row["bet_status"], "BLOCKED")
         self.assertFalse(row["official_eligible"])
         self.assertFalse(row["promotion_authority"])
@@ -44,6 +45,7 @@ class CFBPropModelCandidateTests(unittest.TestCase):
         }
         out = CANDIDATE._candidateize(report)
         self.assertEqual(out["results"][0]["model_candidate_status"], "BLOCKED")
+        self.assertEqual(out["results"][0]["presentation_label"], "NO_PLAY")
         self.assertEqual(out["summary"]["model_candidate_rows"], 0)
 
 
@@ -66,6 +68,29 @@ class CFBPropModelCandidateTests(unittest.TestCase):
         self.assertEqual(row["bet_status"], "BLOCKED")
         self.assertFalse(row["official_eligible"])
         self.assertEqual(out["summary"]["model_candidate_rows"], 1)
+
+
+    def test_network_odds_requires_key_after_live_game_identity_exists(self):
+        live = {"games": [{"provider_event_id": "evt-1"}]}
+        original = CANDIDATE.os.environ.copy()
+        try:
+            for name in (
+                "SPORTSEDGE_ODDS_API_KEY", "SPORTSEDGE_ODDS_API_KEY_2",
+                "SPORTSEDGE_ODDS_API_KEY_3", "SPORTSEDGE_ODDS_API_KEY_4",
+                "ODDS_API_KEY",
+            ):
+                CANDIDATE.os.environ.pop(name, None)
+            with self.assertRaisesRegex(
+                CANDIDATE.CFBPropCandidateError,
+                "CFB_PROP_CANDIDATE_ODDS_API_KEY_REQUIRED",
+            ):
+                CANDIDATE._network_odds(
+                    live=live,
+                    current=CANDIDATE.datetime(2026, 10, 2, tzinfo=CANDIDATE.timezone.utc),
+                )
+        finally:
+            CANDIDATE.os.environ.clear()
+            CANDIDATE.os.environ.update(original)
 
     def test_bettor_facing_cfb_surface_remains_no_engine(self):
         surface = json.loads(

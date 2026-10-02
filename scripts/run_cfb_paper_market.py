@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""CFB market-consensus PAPER card.
+"""CFB cross-book PAPER card for moneyline, spread, and total.
 
-This is deliberately not a predictive model. It compares DraftKings prices with a
-cross-book no-vig consensus and emits research-only paper candidates when DK is
-materially better than consensus. It creates no Model_P, Truth Gate, promotion,
-eligibility, staking, evidence-clock, backfill, or OFFICIAL authority.
+This is deliberately not a predictive model. It compares DraftKings offers with
+same-market, same-threshold cross-book no-vig consensus and emits research-only
+paper candidates when DK is materially better than consensus. It creates no
+Model_P, Truth Gate, promotion, eligibility, staking, evidence-clock, backfill,
+or OFFICIAL authority.
 
-Market input can come from the configured odds provider or from a manually supplied
-JSON board using the same event/bookmaker shape. If neither is available, the runner
-still emits a durable zero-authority PAPER artifact with an explicit input blocker
-instead of failing before the governance assertions can run.
+Spread/total comparisons are line-identity strict: a peer price contributes only
+when it offers the exact same threshold as DraftKings. A different line is not
+converted, interpolated, or treated as equivalent.
 """
 from __future__ import annotations
 
@@ -17,18 +17,23 @@ import argparse
 import json
 import os
 from datetime import datetime, timezone
+from math import isfinite
 from pathlib import Path
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 ODDS_URL = "https://api.the-odds-api.com/v4/sports/americanfootball_ncaaf/odds"
 BOOKS = ("draftkings", "fanduel", "betmgm", "caesars")
+SUPPORTED = ("h2h", "spreads", "totals")
+MARKET_NAME = {"h2h": "MONEYLINE", "spreads": "SPREAD", "totals": "TOTAL"}
 # Governance contract sentinels retained for the repository text guard:
 # "status":"PAPER_ONLY" "model_p":None "official":False
 
 
 def implied(a):
     a = float(a)
+    if not isfinite(a) or (-100.0 < a < 100.0):
+        raise ValueError("CFB_PAPER_AMERICAN_ODDS_INVALID")
     return 100 / (100 + a) if a > 0 else (-a) / ((-a) + 100)
 
 
@@ -37,7 +42,7 @@ def fetch(key):
         {
             "apiKey": key,
             "regions": "us",
-            "markets": "h2h,spreads,totals",
+            "markets": ",".join(SUPPORTED),
             "oddsFormat": "american",
             "bookmakers": ",".join(BOOKS),
         }
@@ -74,14 +79,90 @@ def load_events(key, input_json=None, inline_json=None):
     return [], "MARKET_INPUT_UNAVAILABLE", "BLOCKED_NO_MARKET_INPUT"
 
 
-def pair_probs(outcomes):
+def _point(outcome):
+    value = outcome.get("point")
+    if value is None:
+        return None
+    point = float(value)
+    if not isfinite(point):
+        raise ValueError("CFB_PAPER_MARKET_POINT_INVALID")
+    return point
+
+
+def _pair_identity(market_key, outcomes):
+    if len(outcomes) != 2:
+        return None
+    names = [str(x.get("name") or "").strip() for x in outcomes]
+    if market_key == "h2h":
+        if len(set(names)) != 2 or any(not x for x in names):
+            return None
+        return "H2H"
+    points = [_point(x) for x in outcomes]
+    if market_key == "totals":
+        if {x.lower() for x in names} != {"over", "under"}:
+            return None
+        if points[0] is None or points[1] is None or abs(points[0] - points[1]) > 1e-9:
+            return None
+        return points[0]
+    if market_key == "spreads":
+        if len(set(names)) != 2 or any(not x for x in names):
+            return None
+        if points[0] is None or points[1] is None or abs(points[0] + points[1]) > 1e-9:
+            return None
+        return "TEAM_POINTS"
+    return None
+
+
+def pair_probs(market_key, outcomes):
+    identity = _pair_identity(market_key, outcomes)
+    if identity is None:
+        return None
     if len(outcomes) != 2:
         return None
     ps = [implied(x["price"]) for x in outcomes]
-    s = sum(ps)
-    if s <= 0:
+    total = sum(ps)
+    if total <= 0:
         return None
-    return {str(o["name"]): p / s for o, p in zip(outcomes, ps)}
+    rows = []
+    for outcome, p in zip(outcomes, ps):
+        rows.append(
+            {
+                "name": str(outcome.get("name") or "").strip(),
+                "point": _point(outcome),
+                "price": float(outcome["price"]),
+                "no_vig_p": p / total,
+            }
+        )
+    return rows
+
+
+def _selection_key(market_key, row):
+    name = str(row["name"])
+    point = row.get("point")
+    if market_key == "h2h":
+        return (name, None)
+    return (name.lower() if market_key == "totals" else name, float(point))
+
+
+def _book_markets(event):
+    out = {}
+    for book in event.get("bookmakers", []):
+        if not isinstance(book, dict):
+            continue
+        book_key = str(book.get("key") or "").strip().lower()
+        markets = {}
+        for market in book.get("markets", []):
+            if not isinstance(market, dict):
+                continue
+            market_key = str(market.get("key") or "").strip().lower()
+            if market_key not in SUPPORTED:
+                continue
+            paired = pair_probs(market_key, market.get("outcomes", []))
+            if paired:
+                markets[market_key] = paired
+        if markets:
+            out[book_key] = markets
+    return out
 
 
 def build_payload(events, min_edge, now, market_input_source, input_status):
@@ -91,63 +172,84 @@ def build_payload(events, min_edge, now, market_input_source, input_status):
             start = datetime.fromisoformat(str(event["commence_time"]).replace("Z", "+00:00"))
         except (KeyError, TypeError, ValueError):
             continue
-        if start <= now:
+        if start.tzinfo is None or start <= now:
             continue
-        grouped = {}
-        for bk in event.get("bookmakers", []):
-            for market in bk.get("markets", []):
-                if market.get("key") != "h2h":
-                    continue
-                probs = pair_probs(market.get("outcomes", []))
-                if probs:
-                    grouped[bk.get("key")] = {
-                        "outcomes": market["outcomes"],
-                        "probs": probs,
-                    }
-        dk = grouped.get("draftkings")
-        peers = [value for key, value in grouped.items() if key != "draftkings"]
-        if not dk or len(peers) < 2:
+
+        books = _book_markets(event)
+        dk = books.get("draftkings")
+        if not dk:
             continue
-        for outcome in dk["outcomes"]:
-            name = str(outcome["name"])
-            vals = [peer["probs"].get(name) for peer in peers if name in peer["probs"]]
-            if len(vals) < 2:
+
+        for market_key in SUPPORTED:
+            dk_rows = dk.get(market_key)
+            if not dk_rows:
                 continue
-            consensus = sum(vals) / len(vals)
-            price = float(outcome["price"])
-            raw = implied(price)
-            decimal = 1 + (100 / abs(price) if price < 0 else price / 100)
-            ev_per_dollar = consensus * (decimal - 1) - (1 - consensus)
-            edge = consensus - raw
-            if edge >= min_edge and ev_per_dollar > 0:
+            for dk_row in dk_rows:
+                selection_key = _selection_key(market_key, dk_row)
+                peer_probabilities = []
+                peer_books = []
+                for peer_key, peer_markets in books.items():
+                    if peer_key == "draftkings":
+                        continue
+                    for peer_row in peer_markets.get(market_key, []):
+                        if _selection_key(market_key, peer_row) == selection_key:
+                            peer_probabilities.append(float(peer_row["no_vig_p"]))
+                            peer_books.append(peer_key)
+                            break
+                if len(peer_probabilities) < 2:
+                    continue
+
+                consensus = sum(peer_probabilities) / len(peer_probabilities)
+                price = float(dk_row["price"])
+                raw = implied(price)
+                decimal = 1 + (100 / abs(price) if price < 0 else price / 100)
+                ev_per_dollar = consensus * (decimal - 1) - (1 - consensus)
+                edge = consensus - raw
+                if edge < float(min_edge) or ev_per_dollar <= 0:
+                    continue
+
+                side = str(dk_row["name"])
+                line = dk_row.get("point")
                 candidates.append(
                     {
                         "game_id": str(event.get("id")),
                         "away_team": event.get("away_team"),
                         "home_team": event.get("home_team"),
                         "commence_time": event.get("commence_time"),
-                        "market": "MONEYLINE",
-                        "side": name,
+                        "market": MARKET_NAME[market_key],
+                        "side": side,
+                        "line": None if line is None else float(line),
                         "draftkings_odds": price,
                         "market_consensus_no_vig_p": consensus,
                         "draftkings_raw_implied_p": raw,
                         "market_consensus_edge": edge,
                         "market_consensus_ev_per_dollar": ev_per_dollar,
-                        "peer_books_used": len(vals),
+                        "peer_books_used": len(peer_probabilities),
+                        "peer_book_keys": sorted(peer_books),
+                        "line_identity_rule": "EXACT_THRESHOLD_ONLY",
                         "status": "PAPER_MARKET_CONSENSUS_ONLY",
                         "model_p": None,
                         "truth_gate": False,
                         "official": False,
                     }
                 )
-    candidates.sort(key=lambda x: x["market_consensus_ev_per_dollar"], reverse=True)
+
+    candidates.sort(
+        key=lambda x: (
+            -float(x["market_consensus_ev_per_dollar"]),
+            str(x["game_id"]),
+            str(x["market"]),
+            str(x["side"]),
+        )
+    )
     return {
-        "schema": "CFB_PAPER_MARKET_CARD_V2",
+        "schema": "CFB_PAPER_MARKET_CARD_V3",
         "generated_at_utc": now.isoformat(),
         "status": "PAPER_ONLY",
         "input_status": input_status,
         "market_input_source": market_input_source,
-        "method": "CROSS_BOOK_NO_VIG_CONSENSUS_V1",
+        "method": "CROSS_BOOK_NO_VIG_CONSENSUS_EXACT_LINE_V2",
+        "markets": ["MONEYLINE", "SPREAD", "TOTAL"],
         "min_edge": min_edge,
         "candidates": candidates,
         "authority": {
@@ -189,6 +291,7 @@ def main():
                 "input_status": input_status,
                 "market_input_source": source,
                 "candidate_count": len(payload["candidates"]),
+                "markets": payload["markets"],
                 "output": str(out),
             },
             sort_keys=True,

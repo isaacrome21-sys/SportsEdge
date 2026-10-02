@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import json
+import os
 from math import isfinite
 from pathlib import Path
 import sys
@@ -20,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from sportsedge.football_prop_odds_source import build_odds_snapshot, fetch_event_prop_odds
 from sportsedge.football_prop_run_machine import FootballPropRunError
 from sportsedge.football_prop_extended_run_machine import run_football_extended_props
 from sportsedge.sports.cfb.prop_bundle import CFBPropBundleError, load_cfb_prop_artifact_bundle
@@ -84,6 +86,46 @@ def _load_frozen_model(freeze_path: Path, bundle_path: Path) -> tuple[dict, str,
     return artifact, expected_sha, attestation
 
 
+
+def _odds_keys() -> list[str]:
+    keys = [
+        str(os.environ.get(name) or "").strip()
+        for name in (
+            "SPORTSEDGE_ODDS_API_KEY",
+            "SPORTSEDGE_ODDS_API_KEY_2",
+            "SPORTSEDGE_ODDS_API_KEY_3",
+            "SPORTSEDGE_ODDS_API_KEY_4",
+            "ODDS_API_KEY",
+        )
+    ]
+    keys = [key for key in keys if key]
+    if not keys:
+        raise CFBPropCandidateError("CFB_PROP_CANDIDATE_ODDS_API_KEY_REQUIRED")
+    return keys
+
+
+def _network_odds(*, live: dict, current: datetime) -> dict:
+    games = live.get("games")
+    if not isinstance(games, list) or not games:
+        raise CFBPropCandidateError("CFB_PROP_CANDIDATE_LIVE_GAMES_REQUIRED")
+    keys = _odds_keys()
+    events: list[dict] = []
+    seen: set[str] = set()
+    for game in games:
+        if not isinstance(game, dict):
+            raise CFBPropCandidateError("CFB_PROP_CANDIDATE_LIVE_GAME_INVALID")
+        event_id = str(game.get("provider_event_id") or "").strip()
+        if not event_id:
+            raise CFBPropCandidateError("CFB_PROP_CANDIDATE_PROVIDER_EVENT_ID_REQUIRED")
+        if event_id in seen:
+            continue
+        seen.add(event_id)
+        fetched = fetch_event_prop_odds(keys, sport="CFB", event_id=event_id)
+        if not isinstance(fetched.value, dict):
+            raise CFBPropCandidateError("CFB_PROP_CANDIDATE_ODDS_PROVIDER_PAYLOAD_INVALID")
+        events.append(dict(fetched.value))
+    return build_odds_snapshot(events, observed_at=current)
+
 def _candidateize(report: dict) -> dict:
     candidate_rows = 0
     stale_rows = 0
@@ -102,11 +144,13 @@ def _candidateize(report: dict) -> dict:
         market_comparable = row.get("fair_market_p") is not None or one_sided
         if genuine and market_comparable and row.get("ev_per_dollar") is not None:
             row["decision_tier"] = "MODEL_CANDIDATE"
+            row["presentation_label"] = "LEAN"
             row["model_candidate_status"] = "READY"
             row["reason"] = "CFB_PROP_RESEARCH_ONLY_INDEPENDENT_VALIDATION_REQUIRED"
             candidate_rows += 1
         else:
             row["decision_tier"] = "NO_ACTIONABLE_CANDIDATE"
+            row["presentation_label"] = "NO_PLAY"
             row["model_candidate_status"] = "BLOCKED"
             if "STALE" in str(row.get("reason") or ""):
                 stale_rows += 1
@@ -150,7 +194,11 @@ def main() -> int:
             args.freeze_registry, args.model_artifact
         )
         live = _json(args.live_features, "CFB_PROP_CANDIDATE_LIVE_FEATURES_REQUIRED")
-        odds = _json(args.odds_snapshot, "CFB_PROP_CANDIDATE_ODDS_SNAPSHOT_REQUIRED")
+        odds = (
+            _json(args.odds_snapshot, "CFB_PROP_CANDIDATE_ODDS_SNAPSHOT_REQUIRED")
+            if args.odds_snapshot.is_file()
+            else _network_odds(live=live, current=current)
+        )
         report = run_football_extended_props(
             sport="CFB",
             now=current,
@@ -177,6 +225,7 @@ def main() -> int:
                 "bettor_facing_engine_surface_unchanged": True,
                 "market_prices_can_create_model_p": False,
                 "usage_can_be_synthesized": False,
+                "network_odds_allowed_only_after_live_features": True,
             },
         }
         args.output.parent.mkdir(parents=True, exist_ok=True)
