@@ -14,7 +14,7 @@
     "no_2026_forward_outcomes": true
   },
   "allowed_predictive_datasets": [
-    "espn_cfb_schedules",
+    "cfb_schedules",
     "espn_cfb_adv_team",
     "espn_cfb_adv_drives",
     "espn_cfb_adv_situational",

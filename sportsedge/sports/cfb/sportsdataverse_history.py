@@ -11,7 +11,7 @@ from typing import Iterable, Mapping, Any
 
 SOURCE_CONTRACT = "SPORTSDATAVERSE_ESPN_CFB_ADV_V1|RECONSTRUCTED_PRIOR_WEEK_V1"
 ALLOWED_DATASETS = frozenset({
-    "espn_cfb_schedules", "espn_cfb_adv_team", "espn_cfb_adv_drives",
+    "cfb_schedules", "espn_cfb_adv_team", "espn_cfb_adv_drives",
     "espn_cfb_adv_situational", "espn_cfb_team_box",
 })
 PROHIBITED_DATASETS = frozenset({"espn_cfb_betting"})
@@ -62,6 +62,23 @@ def validate_dataset(dataset: str, rows: Iterable[Mapping[str, Any]]) -> list[Ma
     return out
 
 
+def regular_fbs_schedule_rows(rows: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    """Return only frozen regular-season FBS-vs-FBS games using upstream scope flags."""
+    out=[]
+    for row in validate_dataset("cfb_schedules", rows):
+        if "season_type" not in row:
+            raise SportsDataverseHistoryError("CFB_SDV_SEASON_TYPE_REQUIRED")
+        if "fbs_game" not in row or row["fbs_game"] is None:
+            raise SportsDataverseHistoryError("CFB_SDV_FBS_GAME_FLAG_REQUIRED")
+        season_type=str(row["season_type"]).strip().lower()
+        if season_type not in {"regular","2"}:
+            continue
+        raw=row["fbs_game"]
+        is_fbs = raw is True or str(raw).strip().lower() in {"true","1","t"}
+        if is_fbs:
+            out.append(row)
+    return out
+
 def attach_drive_time(
     drive_rows: Iterable[Mapping[str, Any]],
     schedule_rows: Iterable[Mapping[str, Any]],
@@ -110,7 +127,7 @@ def build_team_snapshots(
     """
     if target_season >= 2026:
         raise SportsDataverseHistoryError("CFB_SDV_TARGET_OUTCOME_SEASON_PROHIBITED")
-    schedules = validate_dataset("espn_cfb_schedules", schedule_rows)
+    schedules = validate_dataset("cfb_schedules", schedule_rows)
     team = validate_dataset("espn_cfb_adv_team", adv_team_rows)
     situ = validate_dataset("espn_cfb_adv_situational", adv_situational_rows)
     drives = validate_dataset("espn_cfb_adv_drives", adv_drive_rows)
@@ -195,7 +212,7 @@ def build_season_week_snapshots(
     """
     if not 2015 <= int(season) <= 2025:
         raise SportsDataverseHistoryError("CFB_SDV_SEASON_OUTSIDE_FROZEN_WINDOW")
-    schedules = validate_dataset("espn_cfb_schedules", schedule_rows)
+    schedules = validate_dataset("cfb_schedules", schedule_rows)
     season_weeks = sorted({
         int(r["week"]) for r in schedules
         if int(r["season"]) == int(season) and int(r["week"]) >= 1
@@ -230,7 +247,7 @@ def build_prior_season_fallback_snapshots(
     prior=int(target_season)-1
     if not 2015 <= prior <= 2025 or not 2016 <= int(target_season) <= 2026:
         raise SportsDataverseHistoryError("CFB_SDV_PRIOR_FALLBACK_OUTSIDE_WINDOW")
-    schedules=validate_dataset("espn_cfb_schedules",schedule_rows)
+    schedules=validate_dataset("cfb_schedules",schedule_rows)
     weeks=[int(r["week"]) for r in schedules if int(r["season"])==prior]
     if not weeks:
         raise SportsDataverseHistoryError(f"CFB_SDV_PRIOR_FALLBACK_SEASON_EMPTY:{prior}")
