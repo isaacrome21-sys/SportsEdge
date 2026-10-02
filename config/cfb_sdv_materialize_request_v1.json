@@ -1,0 +1,14 @@
+{
+  "schema": "CFB_SDV_MATERIALIZE_REQUEST_V1",
+  "mode": "ZERO_ATTEMPT_PUBLIC_TRAINING_MATERIALIZATION",
+  "requested_after_main_sha": "0b13fea65e024ac52116dc72946ce8bda5c4d47f",
+  "expected_hash_binding": {
+    "code_manifest_sha256": "e202e37d4c057f5104289f50af72f13baa01260a82ec70a839f47b91bfef06f2",
+    "config_bundle_sha256": "02cd18a71b5bf527c4c2d07a78b966444a4aecc0f06859ccf6cc87104625ee01"
+  },
+  "consume_candidate_attempts": false,
+  "run_candidate_evaluation": false,
+  "model_p_created": false,
+  "promotion_authority": false,
+  "official_authority": false
+}

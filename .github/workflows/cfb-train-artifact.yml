@@ -2,6 +2,10 @@ name: cfb train artifact
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'config/cfb_sdv_materialize_request_v1.json'
   pull_request:
     paths:
       - 'config/cfb_sportsdataverse_candidate_prereg_v1.json'
@@ -80,7 +84,7 @@ jobs:
 
   materialize:
     name: Materialize public SDV training rows
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     needs: contract
     runs-on: ubuntu-24.04
     timeout-minutes: 120
@@ -95,6 +99,30 @@ jobs:
 
       - name: Install runtime
         run: python -m pip install --disable-pip-version-check -r requirements-test.txt
+
+      - name: Validate explicit main-push materialization request
+        if: github.event_name == 'push'
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          request=json.loads(Path('config/cfb_sdv_materialize_request_v1.json').read_text())
+          prereg=json.loads(Path('config/cfb_sportsdataverse_candidate_prereg_v1.json').read_text())
+          if request.get('schema') != 'CFB_SDV_MATERIALIZE_REQUEST_V1':
+              raise SystemExit('CFB_SDV_MATERIALIZE_REQUEST_SCHEMA_INVALID')
+          if request.get('mode') != 'ZERO_ATTEMPT_PUBLIC_TRAINING_MATERIALIZATION':
+              raise SystemExit('CFB_SDV_MATERIALIZE_REQUEST_MODE_INVALID')
+          if request.get('consume_candidate_attempts') is not False:
+              raise SystemExit('CFB_SDV_MATERIALIZE_REQUEST_ATTEMPT_CONSUMPTION_FORBIDDEN')
+          if request.get('run_candidate_evaluation') is not False:
+              raise SystemExit('CFB_SDV_MATERIALIZE_REQUEST_EVALUATION_FORBIDDEN')
+          expected=request.get('expected_hash_binding') or {}
+          actual=prereg.get('hash_binding') or {}
+          if expected != actual:
+              raise SystemExit('CFB_SDV_MATERIALIZE_REQUEST_HASH_BINDING_MISMATCH')
+          print('CFB_SDV_MAIN_PUSH_MATERIALIZATION_REQUEST_OK')
+          PY
 
       - name: Verify frozen prereg binding before source acquisition
         run: |
