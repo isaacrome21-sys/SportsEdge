@@ -177,3 +177,42 @@ def build_team_snapshots(
             net_field_position=-_mean(d, "avg_field_position"),
         ))
     return snapshots
+
+
+def build_season_week_snapshots(
+    *,
+    adv_team_rows: Iterable[Mapping[str, Any]],
+    adv_situational_rows: Iterable[Mapping[str, Any]],
+    adv_drive_rows: Iterable[Mapping[str, Any]],
+    schedule_rows: Iterable[Mapping[str, Any]],
+    season: int,
+) -> list[TeamSnapshot]:
+    """Materialize every available pregame weekly snapshot for one historical season.
+
+    Snapshot for target week W contains only games from weeks < W. Empty week-1
+    current-season state is intentionally omitted; callers must use the separately
+    frozen prior-season fallback policy.
+    """
+    if not 2015 <= int(season) <= 2025:
+        raise SportsDataverseHistoryError("CFB_SDV_SEASON_OUTSIDE_FROZEN_WINDOW")
+    schedules = validate_dataset("espn_cfb_schedules", schedule_rows)
+    season_weeks = sorted({
+        int(r["week"]) for r in schedules
+        if int(r["season"]) == int(season) and int(r["week"]) >= 1
+    })
+    out: list[TeamSnapshot] = []
+    for target_week in season_weeks:
+        if target_week <= 1:
+            continue
+        out.extend(build_team_snapshots(
+            adv_team_rows=adv_team_rows,
+            adv_situational_rows=adv_situational_rows,
+            adv_drive_rows=adv_drive_rows,
+            schedule_rows=schedules,
+            target_season=int(season),
+            target_week=target_week,
+        ))
+    keys=[(x.team_id,x.season,x.through_week) for x in out]
+    if len(keys) != len(set(keys)):
+        raise SportsDataverseHistoryError("CFB_SDV_WEEKLY_SNAPSHOT_DUPLICATE")
+    return sorted(out,key=lambda x:(x.season,x.through_week,x.team_id))
