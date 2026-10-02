@@ -11,6 +11,10 @@ from sportsedge.sports.cfb.participation_pit_readiness import (
     SNAPSHOT_SCHEMA,
     audit_cfb_participation_snapshot,
 )
+from sportsedge.sports.cfb.participation_storage import (
+    STORAGE_CONTRACT,
+    pack_participation_snapshot,
+)
 from sportsedge.sports.cfb.participation_source_capture import (
     PARTICIPATION_CAPTURE_CONTRACT,
     PBP_PREDICTIVE_COLUMNS,
@@ -178,6 +182,76 @@ class CFBParticipationPITReadinessTests(unittest.TestCase):
             report = audit_cfb_participation_snapshot(path)
             self.assertFalse(report["participation_source_asof_ready"])
             self.assertTrue(any("CONTENT_HASH_MISMATCH" in code for code in report["blockers"]))
+
+    def test_packed_gzip_snapshot_remains_source_ready(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            path = self._fixture(root)
+            result = pack_participation_snapshot(
+                path,
+                threshold_bytes=1,
+                max_stored_bytes=1024 * 1024,
+            )
+            self.assertEqual(result["status"], "PACKED_FOR_GIT_PERSISTENCE")
+            self.assertEqual(result["packed_asset_count"], 4)
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(payload["storage_contract"], STORAGE_CONTRACT)
+            for row in payload["assets"]:
+                self.assertEqual(row["storage_encoding"], "gzip")
+                self.assertEqual(row["storage_contract"], STORAGE_CONTRACT)
+                self.assertTrue(row["cache_relative_path"].endswith(".gz"))
+                stored = (
+                    root
+                    / "artifacts/cfb_forward_participation/source"
+                    / row["cache_relative_path"]
+                )
+                self.assertTrue(stored.is_file())
+
+            report = audit_cfb_participation_snapshot(path)
+            self.assertTrue(report["participation_source_asof_ready"])
+            self.assertEqual(report["blockers"], [])
+            self.assertEqual(report["verified_asset_count"], 4)
+
+    def test_tampered_packed_bytes_block(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            path = self._fixture(root)
+            pack_participation_snapshot(
+                path,
+                threshold_bytes=1,
+                max_stored_bytes=1024 * 1024,
+            )
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            rel = payload["assets"][0]["cache_relative_path"]
+            stored = root / "artifacts/cfb_forward_participation/source" / rel
+            stored.write_bytes(stored.read_bytes() + b"tamper")
+            report = audit_cfb_participation_snapshot(path)
+            self.assertFalse(report["participation_source_asof_ready"])
+            self.assertTrue(any("STORED_HASH_MISMATCH" in code for code in report["blockers"]))
+
+    def test_packing_is_deterministic_for_identical_source_bytes(self):
+        with tempfile.TemporaryDirectory() as first_td, tempfile.TemporaryDirectory() as second_td:
+            first_path = self._fixture(Path(first_td))
+            second_path = self._fixture(Path(second_td))
+            first = pack_participation_snapshot(
+                first_path,
+                threshold_bytes=1,
+                max_stored_bytes=1024 * 1024,
+            )
+            second = pack_participation_snapshot(
+                second_path,
+                threshold_bytes=1,
+                max_stored_bytes=1024 * 1024,
+            )
+            first_hashes = {
+                row["dataset"]: row["stored_content_sha256"]
+                for row in first["packed_assets"]
+            }
+            second_hashes = {
+                row["dataset"]: row["stored_content_sha256"]
+                for row in second["packed_assets"]
+            }
+            self.assertEqual(first_hashes, second_hashes)
 
     def test_tampered_pbp_projection_blocks(self):
         with tempfile.TemporaryDirectory() as td:
