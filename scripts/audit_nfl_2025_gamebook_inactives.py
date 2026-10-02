@@ -124,7 +124,7 @@ def _extract_inactive_evidence(raw: bytes, temp: Path) -> dict[str, object]:
     path = temp / "gamebook.pdf"
     path.write_bytes(raw)
     reader = PdfReader(str(path))
-    pages_with_inactive: list[int] = []
+    pages_with_not_active: list[int] = []
     contexts: list[str] = []
     total_matches = 0
     for index, page in enumerate(reader.pages):
@@ -132,7 +132,7 @@ def _extract_inactive_evidence(raw: bytes, temp: Path) -> dict[str, object]:
         matches = list(INACTIVE_RE.finditer(text))
         if not matches:
             continue
-        pages_with_inactive.append(index + 1)
+        pages_with_not_active.append(index + 1)
         total_matches += len(matches)
         for match in matches[:3]:
             start = max(0, match.start() - 160)
@@ -144,10 +144,10 @@ def _extract_inactive_evidence(raw: bytes, temp: Path) -> dict[str, object]:
             break
     return {
         "page_count": len(reader.pages),
-        "inactive_token_count": int(total_matches),
-        "pages_with_inactive": pages_with_inactive,
+        "not_active_token_count": int(total_matches),
+        "pages_with_not_active": pages_with_not_active,
         "sample_contexts": contexts[:6],
-        "explicit_inactive_section": bool(total_matches),
+        "explicit_not_active_section": bool(total_matches),
     }
 
 
@@ -186,9 +186,9 @@ def run(out_path: Path) -> dict[str, object]:
                         "status_code": "MISSING_GAMEBOOK_URL",
                         "pdf_sha256": None,
                         "pdf_bytes": 0,
-                        "explicit_inactive_section": False,
-                        "inactive_token_count": 0,
-                        "pages_with_inactive": [],
+                        "explicit_not_active_section": False,
+                        "not_active_token_count": 0,
+                        "pages_with_not_active": [],
                         "sample_contexts": [],
                     }
                 )
@@ -212,16 +212,16 @@ def run(out_path: Path) -> dict[str, object]:
                         "error": str(exc),
                         "pdf_sha256": None,
                         "pdf_bytes": 0,
-                        "explicit_inactive_section": False,
-                        "inactive_token_count": 0,
-                        "pages_with_inactive": [],
+                        "explicit_not_active_section": False,
+                        "not_active_token_count": 0,
+                        "pages_with_not_active": [],
                         "sample_contexts": [],
                     }
                 )
             audits.append(entry)
 
     available = [g for g in audits if g["status_code"] == "OK"]
-    explicit = [g for g in available if g["explicit_inactive_section"]]
+    explicit = [g for g in available if g["explicit_not_active_section"]]
     report = {
         "schema": "SPORTSEDGE_NFL_2025_GAMEBOOK_INACTIVE_AUDIT_V1",
         "status": "SOURCE_AUDIT_ONLY_NO_PROP_SCORING",
@@ -232,9 +232,9 @@ def run(out_path: Path) -> dict[str, object]:
         "n_games": len(audits),
         "n_gamebook_urls": sum(bool(g.get("gamebook_url")) for g in audits),
         "n_gamebooks_downloaded": len(available),
-        "n_explicit_inactive_sections": len(explicit),
+        "n_explicit_not_active_sections": len(explicit),
         "coverage_fraction": (len(explicit) / len(audits)) if audits else 0.0,
-        "all_games_have_explicit_inactive_section": bool(audits)
+        "all_games_have_explicit_not_active_section": bool(audits)
         and len(explicit) == len(audits),
         "games": audits,
         "interpretation": {
@@ -263,10 +263,10 @@ def run(out_path: Path) -> dict[str, object]:
                 "n_games": report["n_games"],
                 "n_gamebook_urls": report["n_gamebook_urls"],
                 "n_gamebooks_downloaded": report["n_gamebooks_downloaded"],
-                "n_explicit_inactive_sections": report["n_explicit_inactive_sections"],
+                "n_explicit_not_active_sections": report["n_explicit_not_active_sections"],
                 "coverage_fraction": report["coverage_fraction"],
-                "all_games_have_explicit_inactive_section": report[
-                    "all_games_have_explicit_inactive_section"
+                "all_games_have_explicit_not_active_section": report[
+                    "all_games_have_explicit_not_active_section"
                 ],
                 "failures": [
                     {
@@ -276,7 +276,7 @@ def run(out_path: Path) -> dict[str, object]:
                         "status_code": g["status_code"],
                     }
                     for g in audits
-                    if not g["explicit_inactive_section"]
+                    if not g["explicit_not_active_section"]
                 ][:30],
                 "sample_contexts": [
                     {
