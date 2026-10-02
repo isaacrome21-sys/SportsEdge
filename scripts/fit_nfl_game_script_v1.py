@@ -15,8 +15,13 @@ from hashlib import sha256
 import json
 from pathlib import Path
 import shutil
+import sys
 import tempfile
 from urllib.request import Request, urlopen
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from sportsedge.research.nfl_game_script_fit import (
     DEVELOPMENT_SEASONS,
