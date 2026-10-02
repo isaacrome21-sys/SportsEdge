@@ -234,6 +234,74 @@ class MachineTests(unittest.TestCase):
         declared=next(row for row in surface["markets"] if row["market"]=="team_total")
         self.assertEqual(declared["engine_state_by_sport"]["CFB"],"IMPLEMENTED")
 
+    def test_alternate_spread_and_total_reuse_same_joint_distribution(self):
+        ts = (NOW-timedelta(seconds=20)).isoformat()
+        base = dict(
+            game_id="1001",
+            period="FG",
+            entity_id="1001",
+            book_key="draftkings",
+            sportsbook="DraftKings",
+            retrieved_at=ts,
+            is_alternate=True,
+        )
+        alternate = [
+            CFBQuote(market="ALTERNATE_SPREAD", side="HOME", line=-6.5,
+                     american_odds=125, offer_id="ash", **base),
+            CFBQuote(market="ALTERNATE_SPREAD", side="AWAY", line=-6.5,
+                     american_odds=-145, offer_id="asa", **base),
+            CFBQuote(market="ALTERNATE_TOTAL", side="OVER", line=52.5,
+                     american_odds=110, offer_id="ato", **base),
+            CFBQuote(market="ALTERNATE_TOTAL", side="UNDER", line=52.5,
+                     american_odds=-130, offer_id="atu", **base),
+        ]
+        report = self.manual(
+            mode="MANUAL",
+            season=2026,
+            week=1,
+            model=model(),
+            now=NOW,
+            games=self.games,
+            metrics=self.metrics,
+            quotes=[*self.q, *alternate],
+            n_paths=500,
+            root_seed=44,
+        )
+        alt_rows = [
+            row for row in report.results
+            if row.market in {"ALTERNATE_SPREAD", "ALTERNATE_TOTAL"}
+        ]
+        self.assertEqual(len(alt_rows), 4)
+        self.assertTrue(all(row.engine_status == "PRICED" for row in alt_rows))
+        self.assertTrue(all(
+            row.bet_status == "BLOCKED"
+            and row.reason == "CFB_PROMOTION_EVIDENCE_REQUIRED"
+            for row in alt_rows
+        ))
+        self.assertEqual(len({row.distribution_sha256 for row in report.results}), 1)
+        self.assertEqual(len({row.seed for row in report.results}), 1)
+
+        for market in ("ALTERNATE_SPREAD", "ALTERNATE_TOTAL"):
+            rows = [row for row in alt_rows if row.market == market]
+            self.assertEqual(len(rows), 2)
+            self.assertAlmostEqual(
+                sum(float(row.fair_market_p) for row in rows),
+                1.0,
+                places=12,
+            )
+
+    def test_market_surface_marks_cfb_alternate_lines_implemented(self):
+        surface = json.loads(Path("config/football_market_surface.json").read_text())
+        states = {
+            row["market"]: row["engine_state_by_sport"]["CFB"]
+            for row in surface["markets"]
+            if row["market"] in {"alternate_spread", "alternate_total"}
+        }
+        self.assertEqual(states, {
+            "alternate_spread": "IMPLEMENTED",
+            "alternate_total": "IMPLEMENTED",
+        })
+
     def test_no_engine_never_becomes_pass(self):
         surface=json.loads(Path("config/football_market_surface.json").read_text())
         declared=next(row for row in surface["markets"] if row["market"]=="first_half_total")
