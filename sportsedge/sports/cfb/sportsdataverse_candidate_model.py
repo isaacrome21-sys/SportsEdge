@@ -73,6 +73,6 @@ def fit_native_score_model(rows:Sequence[Mapping[str,Any]],*,family:str,ridge_al
  raw=np.asarray([feature_vector(family,r,constants) for r in rows],dtype=float)
  means=raw.mean(axis=0); scales=raw.std(axis=0); scales=np.where(scales>1e-12,scales,1.0)
  x=np.column_stack((np.ones(len(rows)),(raw-means)/scales))
- hy=np.asarray([_num(r.get("home_score"),"home_score") for r in rows]); ay=np.asarray([_num(r.get("away_score"),"away_score") for r in rows])
+ hy=np.asarray([_num(r.get("home_points"),"home_points") for r in rows]); ay=np.asarray([_num(r.get("away_points"),"away_points") for r in rows])
  return NativeScoreModel(family,feature_names(family),tuple(map(float,means)),tuple(map(float,scales)),
  tuple(map(float,_ridge(x,hy,float(ridge_alpha)))),tuple(map(float,_ridge(x,ay,float(ridge_alpha)))),float(ridge_alpha))
