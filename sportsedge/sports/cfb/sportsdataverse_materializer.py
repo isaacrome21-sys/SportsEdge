@@ -13,19 +13,34 @@ FEATURES=(
 
 class SDVMaterializationError(ValueError): pass
 
-def materialize_native_candidate_inputs(*, games:Sequence[Mapping[str,Any]], snapshots:Sequence[TeamSnapshot]) -> list[dict[str,Any]]:
-    """Attach only pre-game snapshots. Scores/outcomes are deliberately ignored."""
+def materialize_native_candidate_inputs(*, games:Sequence[Mapping[str,Any]], snapshots:Sequence[TeamSnapshot], prior_season_snapshots:Sequence[TeamSnapshot]=()) -> list[dict[str,Any]]:
+    """Attach only pre-game snapshots. Scores/outcomes are deliberately ignored.
+
+    Week 1 must use the latest supplied prior-season snapshot for that team.
+    Later weeks require the exact current-season through-week W-1 snapshot.
+    """
     idx={(s.team_id,s.season,s.through_week):s for s in snapshots}
+    prior_idx={}
+    for s in prior_season_snapshots:
+        key=(s.team_id,s.season)
+        existing=prior_idx.get(key)
+        if existing is None or s.through_week > existing.through_week:
+            prior_idx[key]=s
     out=[]
     for raw in sorted(games,key=lambda r:(int(r["season"]),int(r["week"]),int(r["game_id"]))):
         season,week=int(raw["season"]),int(raw["week"])
         if season >= 2026: raise SDVMaterializationError("CFB_SDV_2026_OUTCOMES_PROHIBITED")
-        if week <= 1: raise SDVMaterializationError("CFB_SDV_PRIOR_SEASON_SNAPSHOT_REQUIRED")
+        if week < 1: raise SDVMaterializationError("CFB_SDV_WEEK_INVALID")
         try:
             home_id,away_id=int(raw["home_id"]),int(raw["away_id"])
         except (KeyError,TypeError,ValueError) as exc:
             raise SDVMaterializationError("CFB_SDV_GAME_IDENTITY_INVALID") from exc
-        home=idx.get((home_id,season,week-1)); away=idx.get((away_id,season,week-1))
+        if week == 1:
+            home=prior_idx.get((home_id,season-1)); away=prior_idx.get((away_id,season-1))
+            if home is None or away is None:
+                raise SDVMaterializationError(f"CFB_SDV_PRIOR_SEASON_SNAPSHOT_REQUIRED:{raw.get('game_id')}")
+        else:
+            home=idx.get((home_id,season,week-1)); away=idx.get((away_id,season,week-1))
         if home is None or away is None:
             raise SDVMaterializationError(f"CFB_SDV_PREGAME_SNAPSHOT_MISSING:{raw.get('game_id')}")
         if home.source_contract != SOURCE_CONTRACT or away.source_contract != SOURCE_CONTRACT:
