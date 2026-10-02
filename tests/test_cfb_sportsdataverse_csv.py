@@ -28,3 +28,13 @@ def test_schedule_requires_game_identity_and_labels():
         assert "home_id" in str(e)
     else:
         raise AssertionError("expected fail closed")
+
+
+def test_raw_hash_mismatch_fails_closed():
+    raw=b"game_id,season,week,season_type,fbs_game,home_id,away_id,home_score,away_score\n1,2025,1,2,true,10,20,21,14\n"
+    try:
+        parse_csv(raw,dataset="cfb_schedules",season=2025,source_url="x",raw_csv_sha256="0"*64)
+    except SDVCSVError as e:
+        assert str(e)=="CFB_SDV_CSV_RAW_HASH_MISMATCH"
+    else:
+        raise AssertionError("expected raw hash mismatch")
