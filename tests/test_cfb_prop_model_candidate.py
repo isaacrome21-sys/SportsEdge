@@ -70,6 +70,59 @@ class CFBPropModelCandidateTests(unittest.TestCase):
         self.assertEqual(out["summary"]["model_candidate_rows"], 1)
 
 
+    def test_proxy_odds_blocks_unresolved_player_without_poisoning_known_player(self):
+        live = {
+            "games": [{
+                "provider_event_id": "evt-1",
+                "home_usage": {"players": [
+                    {"player_name": "Known Quarterback"},
+                ]},
+                "away_usage": {"players": [
+                    {"player_name": "Known Runner"},
+                ]},
+            }],
+        }
+        odds = {
+            "observed_at": "2026-10-02T14:00:00+00:00",
+            "events": [{
+                "id": "evt-1",
+                "bookmakers": [{
+                    "key": "draftkings",
+                    "markets": [{
+                        "key": "player_pass_yds",
+                        "outcomes": [
+                            {"name": "Over", "description": "Known Quarterback", "price": -110, "point": 250.5},
+                            {"name": "Under", "description": "Known Quarterback", "price": -110, "point": 250.5},
+                            {"name": "Over", "description": "Jo Silver", "price": -110, "point": 199.5},
+                            {"name": "Under", "description": "Jo Silver", "price": -110, "point": 199.5},
+                        ],
+                    }],
+                }],
+            }],
+        }
+        filtered, blocks = CANDIDATE._filter_proxy_odds_by_live_identity(
+            odds, live=live
+        )
+        outcomes = filtered["events"][0]["bookmakers"][0]["markets"][0]["outcomes"]
+        self.assertEqual(
+            [row["description"] for row in outcomes],
+            ["Known Quarterback", "Known Quarterback"],
+        )
+        self.assertEqual(len(blocks), 2)
+        self.assertTrue(all(row["player_name"] == "Jo Silver" for row in blocks))
+        self.assertTrue(all(row["model_p"] is None for row in blocks))
+        self.assertTrue(all(row["official_eligible"] is False for row in blocks))
+        self.assertEqual(
+            len(odds["events"][0]["bookmakers"][0]["markets"][0]["outcomes"]),
+            4,
+        )
+
+    def test_proxy_network_scope_excludes_kicker_and_defender_markets(self):
+        self.assertIn("player_pass_yds", CANDIDATE.CFB_PROXY_PROVIDER_MARKETS)
+        self.assertIn("player_anytime_td", CANDIDATE.CFB_PROXY_PROVIDER_MARKETS)
+        self.assertNotIn("player_field_goals", CANDIDATE.CFB_PROXY_PROVIDER_MARKETS)
+        self.assertNotIn("player_sacks", CANDIDATE.CFB_PROXY_PROVIDER_MARKETS)
+
     def test_network_odds_requires_key_after_live_game_identity_exists(self):
         live = {"games": [{"provider_event_id": "evt-1"}]}
         original = CANDIDATE.os.environ.copy()
