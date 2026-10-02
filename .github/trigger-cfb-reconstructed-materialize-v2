@@ -4,3 +4,4 @@ requested_utc=2026-10-02
 requested_reason=persist_redacted_reconstructed_selection_readiness
 no_evaluation_attempt=true
 no_backfill=true
+request_nonce=20261002T0334Z
