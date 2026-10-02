@@ -9,6 +9,8 @@ import json
 
 from sports.common.ev_math import devig
 from sportsedge.nfl_attempt9_live_forecast import (
+    NO_MODEL_SPREAD,
+    is_integer_line,
     load_model_p,
     load_runtime,
     market_eligibility,
@@ -52,9 +54,23 @@ def main() -> int:
         picks = []
         for raw in game.get("markets") or []:
             blocked = market_eligibility(raw["market"], raw.get("line"))
+            validation_hold = None
             if blocked:
-                markets.append({**raw, "no_model": blocked})
-                continue
+                # Half-point spreads do have a frozen Attempt-9 probability
+                # readout. Keep the betting gate closed, but expose the priced
+                # side/edge as a validation-held lean instead of mislabeling it
+                # as NO_MODEL. Integer spreads still require a discrete push
+                # model and remain fail-closed.
+                line_value = raw.get("line")
+                if (
+                    blocked == NO_MODEL_SPREAD
+                    and line_value is not None
+                    and not is_integer_line(float(line_value))
+                ):
+                    validation_hold = blocked
+                else:
+                    markets.append({**raw, "no_model": blocked})
+                    continue
             if not feat.get("ok"):
                 markets.append({**raw, "no_model": feat["reason"]})
                 continue
@@ -97,10 +113,9 @@ def main() -> int:
                 },
             ]
             qualified = []
+            evaluated = []
             for cand in candidates:
                 ev = _ev(cand["estimate_p"], cand["price_american"])
-                if ev < 0.02:
-                    continue
                 cand["ev_per_dollar"] = ev
                 cand["edge_probability_points"] = cand["estimate_p"] - cand["market_no_vig_p"]
                 cand["score_0_100"] = qualification_role_score({
@@ -113,11 +128,26 @@ def main() -> int:
                     "shared_simulation_ready": False,
                     "market_binding_ready": True,
                 })
-                qualified.append(cand)
+                evaluated.append(cand)
+                if ev >= 0.02:
+                    qualified.append(cand)
             pick = max(qualified, key=lambda c: (c["ev_per_dollar"], c["edge_probability_points"])) if qualified else None
-            row = {**raw, "no_model": None, "pick": pick}
+            if validation_hold:
+                held_pick = max(
+                    evaluated,
+                    key=lambda c: (c["ev_per_dollar"], c["edge_probability_points"]),
+                )
+                row = {
+                    **raw,
+                    "no_model": None,
+                    "pick": None,
+                    "validation_hold": validation_hold,
+                    "held_pick": held_pick,
+                }
+            else:
+                row = {**raw, "no_model": None, "pick": pick}
             markets.append(row)
-            if pick:
+            if pick and not validation_hold:
                 picks.append(pick)
         games_out.append({**game, "markets": markets, "picks": picks, "features": feat})
     payload = {
