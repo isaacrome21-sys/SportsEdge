@@ -151,8 +151,7 @@ def main()->int:
     receipts=[receipt_row for _,_,receipt_row in weather_parts]
 
     args.weather_out.parent.mkdir(parents=True,exist_ok=True)
-    args.weather_recepts_parent = args.weather_receipts_out.parent
-    args.weather_recepts_parent.mkdir(parents=True,exist_ok=True)
+    args.weather_receipts_out.parent.mkdir(parents=True,exist_ok=True)
     args.weather_out.write_text(
         json.dumps(weather,indent=2,sort_keys=True)+"\n",
         encoding="utf-8",
