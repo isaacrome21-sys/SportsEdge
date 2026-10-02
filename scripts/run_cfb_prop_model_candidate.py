@@ -4,7 +4,7 @@
 This entrypoint deliberately bypasses bettor-facing engine authority. It can emit
 research MODEL_CANDIDATE probabilities only after the frozen artifact, frozen
 predictive code surface, fresh PIT live features, and a pregame odds snapshot all
-validate. It has no evidence/certification/floor promotion path and forcibly
+validate. These are research candidate probabilities, not production Model_P authority. It has no evidence/certification/floor promotion path and forcibly
 blocks every betting decision.
 """
 from __future__ import annotations
@@ -98,7 +98,9 @@ def _candidateize(report: dict) -> dict:
         row["official_eligible"] = False
         row["bet_status"] = "BLOCKED"
         row["promotion_authority"] = False
-        if genuine and row.get("fair_market_p") is not None and row.get("ev_per_dollar") is not None:
+        one_sided = row.get("market_no_vig_p_status") == "UNAVAILABLE_ONE_SIDED"
+        market_comparable = row.get("fair_market_p") is not None or one_sided
+        if genuine and market_comparable and row.get("ev_per_dollar") is not None:
             row["decision_tier"] = "MODEL_CANDIDATE"
             row["model_candidate_status"] = "READY"
             row["reason"] = "CFB_PROP_RESEARCH_ONLY_INDEPENDENT_VALIDATION_REQUIRED"
