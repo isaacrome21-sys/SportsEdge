@@ -11,11 +11,40 @@ import json
 from typing import Any, Mapping, Sequence
 
 from .altitude_features import CFBAltitudeFeatureError, altitude_delta_ft
-from .altitude_snapshot import verify_frozen_binding
+from .altitude_snapshot import canonical_jsonl, verify_frozen_binding
 
 
 class CFBAltitudeDatasetError(ValueError):
     pass
+
+
+_BANNED_MARKET_KEYS = frozenset({
+    "spread", "spread_line", "total", "total_line", "line", "price",
+    "american_odds", "decimal_odds", "implied_probability", "implied_prob",
+    "market_probability", "novig_prob", "no_vig_prob", "book", "sportsbook",
+    "closing_line", "closing_price", "home_moneyline", "away_moneyline", "odds",
+    "ticket_pct", "ticket_percentage", "handle_pct", "handle_percentage",
+    "rlm", "steam", "handicapper_pick",
+})
+
+
+def _assert_market_blind(value: Any, *, path: str) -> None:
+    if isinstance(value, Mapping):
+        for key, child in value.items():
+            normalized = str(key).strip().lower()
+            if (
+                normalized in _BANNED_MARKET_KEYS
+                or "implied_prob" in normalized
+                or "no_vig" in normalized
+                or "novig" in normalized
+            ):
+                raise CFBAltitudeDatasetError(
+                    f"ALTITUDE_DATASET_MARKET_DATA_PROHIBITED:{path}.{key}"
+                )
+            _assert_market_blind(child, path=f"{path}.{key}")
+    elif isinstance(value, (list, tuple)):
+        for index, child in enumerate(value):
+            _assert_market_blind(child, path=f"{path}[{index}]")
 
 
 def _canonical_sha256(value: Any) -> str:
@@ -96,7 +125,16 @@ def build_altitude_dataset_manifest(
     frozen = verify_frozen_binding(manifest=snapshot_manifest, binding=frozen_snapshot_binding)
     if frozen.get("status") != "FROZEN_STATIC_SOURCE_BINDING_VERIFIED_NO_EVALUATION":
         raise CFBAltitudeDatasetError("ALTITUDE_DATASET_SNAPSHOT_BINDING_NOT_VERIFIED")
+    try:
+        snapshot_bytes = canonical_jsonl(snapshot_records)
+    except Exception as exc:
+        raise CFBAltitudeDatasetError("ALTITUDE_DATASET_SNAPSHOT_CANONICALIZATION_FAILED") from exc
+    actual_snapshot_sha = sha256(snapshot_bytes).hexdigest()
+    if actual_snapshot_sha != str(snapshot_manifest.get("content_sha256") or "").lower():
+        raise CFBAltitudeDatasetError("ALTITUDE_DATASET_SNAPSHOT_RECORDS_HASH_MISMATCH")
 
+    _assert_market_blind(baseline_rows, path="baseline_rows")
+    _assert_market_blind(game_metadata_rows, path="game_metadata_rows")
     teams, venues = _snapshot_indexes(snapshot_records)
     metadata: dict[str, dict[str, Any]] = {}
     for raw in game_metadata_rows:
