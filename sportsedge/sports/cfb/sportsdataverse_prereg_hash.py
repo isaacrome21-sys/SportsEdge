@@ -5,6 +5,9 @@ from typing import Mapping
 
 CODE_PATHS=(
  "sportsedge/sports/cfb/sportsdataverse_candidate_families.py",
+ "sportsedge/sports/cfb/sportsdataverse_candidate_model.py",
+ "sportsedge/sports/cfb/sportsdataverse_bakeoff.py",
+ "sportsedge/sports/cfb/sportsdataverse_weather.py",
  "sportsedge/sports/cfb/sportsdataverse_history.py",
  "sportsedge/sports/cfb/sportsdataverse_manifest.py",
  "sportsedge/sports/cfb/sportsdataverse_materializer.py",
@@ -12,7 +15,6 @@ CODE_PATHS=(
 )
 CONFIG_PATHS=(
  "config/cfb_sportsdataverse_source_contract_v1.json",
- "config/cfb_sportsdataverse_candidate_prereg_v1.json",
 )
 class SDVPreregHashError(ValueError): pass
 
@@ -29,7 +31,7 @@ def code_manifest_sha256(files:Mapping[str,str])->str:
     return bundle_sha256(files,CODE_PATHS)
 
 def config_bundle_sha256(files:Mapping[str,str])->str:
-    # Caller must supply the exact frozen prereg bytes; do not self-modify them.
+    # Hash only external immutable config; the prereg stores this digest and cannot hash itself.
     return bundle_sha256(files,CONFIG_PATHS)
 
 def verify(expected_code:str, expected_config:str, files:Mapping[str,str])->None:

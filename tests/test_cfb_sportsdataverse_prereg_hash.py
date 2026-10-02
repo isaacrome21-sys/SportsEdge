@@ -20,3 +20,7 @@ def test_missing_or_changed_input_fails_closed():
     f=files(); del f[CONFIG_PATHS[0]]
     with pytest.raises(SDVPreregHashError,match="HASH_INPUT_MISSING"):
         config_bundle_sha256(f)
+
+def test_evaluated_code_is_inside_code_manifest():
+    assert "sportsedge/sports/cfb/sportsdataverse_candidate_model.py" in CODE_PATHS
+    assert "sportsedge/sports/cfb/sportsdataverse_bakeoff.py" in CODE_PATHS
