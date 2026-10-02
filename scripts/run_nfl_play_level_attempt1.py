@@ -7,6 +7,7 @@ import gzip
 import io
 import json
 import math
+import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -15,6 +16,10 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 import numpy as np
 
@@ -25,7 +30,6 @@ try:
 except ModuleNotFoundError:
     from build_nfl_attempt9_runtime_artifact import reconstruct as reconstruct_attempt9
 
-ROOT = Path(__file__).resolve().parents[1]
 PRELOCK_PATH = ROOT / "config/research/nfl_play_level_attempt1_prelock_v1.json"
 IMPL_PATH = ROOT / "config/research/nfl_play_level_attempt1_implementation_v2.json"
 SOURCE_CONFIG = ROOT / "config/public_training_sources_v1.json"
