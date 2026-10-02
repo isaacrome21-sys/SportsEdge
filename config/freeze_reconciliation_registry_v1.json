@@ -73,7 +73,12 @@
         "config/nfl_m2_freeze.json",
         "config/nfl_promotion_source_freeze_v1.json"
       ],
-      "disposition": null,
+      "disposition": {
+        "state": "REVOKED",
+        "revoked_at": "2026-10-02T10:42:28Z",
+        "prior_forward_clock_invalidated": true,
+        "reason": "PR_1358_CHANGED_COVERED_FOOTBALL_NFL_PROMOTION_EVIDENCE_WORKFLOW_DEPENDENCY_BYTES; PRIOR_FREEZE_CONTENT_IDENTITY_NO_LONGER_MATCHES; REVOKED_FAIL_CLOSED_NO_AUTHORITY"
+      },
       "freeze_sha": "564e5567acf63adbf750e033df08a8c368f6884d"
     },
     {
@@ -236,7 +241,12 @@
         "tests/test_promotion",
         "tests/test_truth_gate"
       ],
-      "disposition": null,
+      "disposition": {
+        "state": "REVOKED",
+        "revoked_at": "2026-10-02T10:42:28Z",
+        "prior_forward_clock_invalidated": true,
+        "reason": "PR_1358_CHANGED_COVERED_FOOTBALL_NFL_PROMOTION_EVIDENCE_WORKFLOW_DEPENDENCY_BYTES; PRIOR_FREEZE_CONTENT_IDENTITY_NO_LONGER_MATCHES; REVOKED_FAIL_CLOSED_NO_AUTHORITY"
+      },
       "freeze_sha": "564e5567acf63adbf750e033df08a8c368f6884d"
     },
     {
@@ -1029,10 +1039,16 @@
       "merge_sha": "706ae22c569e62b11754bc8795051ef33ac93101",
       "pr": 1075,
       "note": "MLB postseason joint paths and research market scope"
+    },
+    {
+      "delta_id": "PR_1358_FRESH_VALIDATION_GOVERNANCE",
+      "merge_sha": "8e85998880b1ed78d89c77895089bbacd4c6b06f",
+      "pr": 1358,
+      "note": "Fresh validation governance plus covered NFL promotion-evidence workflow dependency change; affected freezes revoked fail-closed."
     }
   ],
-  "inventory_block_reason": "MACHINE_AUDIT_REQUIRED_ZERO_UNMAPPED_GOVERNANCE_SURFACES_BEFORE_TRUE",
+  "inventory_block_reason": "Bundle inventory remains intentionally incomplete; PR_1358 boundary is registered and covered-drift bundles are revoked fail-closed.",
   "issue": 686,
-  "reconciled_through_sha": "706ae22c569e62b11754bc8795051ef33ac93101",
+  "reconciled_through_sha": "8e85998880b1ed78d89c77895089bbacd4c6b06f",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
