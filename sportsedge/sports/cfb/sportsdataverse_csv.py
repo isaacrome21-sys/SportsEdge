@@ -1,6 +1,6 @@
 """Deterministic stdlib CSV parser for frozen SportsDataverse CFB assets."""
 from __future__ import annotations
-import csv,io
+import csv,io,hashlib
 from typing import Mapping
 from .sportsdataverse_converted import bind_parsed_rows,ParsedReceipt
 from .sportsdataverse_receipts import AssetReceipt
@@ -17,6 +17,8 @@ MARKET_TOKENS=("spread","moneyline","money_line","over_under","betting","odds")
 
 def parse_csv(raw:bytes,*,dataset:str,season:int,source_url:str,raw_csv_sha256:str)->tuple[list[dict[str,str]],ParsedReceipt]:
  if dataset not in REQUIRED: raise SDVCSVError("CFB_SDV_CSV_DATASET_NOT_FROZEN:"+dataset)
+ actual_sha256=hashlib.sha256(raw).hexdigest()
+ if actual_sha256 != raw_csv_sha256: raise SDVCSVError("CFB_SDV_CSV_RAW_HASH_MISMATCH")
  try: text=raw.decode("utf-8-sig")
  except UnicodeDecodeError as e: raise SDVCSVError("CFB_SDV_CSV_UTF8_REQUIRED") from e
  reader=csv.DictReader(io.StringIO(text,newline=""))
