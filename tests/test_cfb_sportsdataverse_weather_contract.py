@@ -18,7 +18,7 @@ def test_missing_weather_cannot_enter_bakeoff():
 
 def test_frozen_weather_provider_is_public_and_venue_bound():
  contract=json.loads(Path("config/cfb_sportsdataverse_historical_weather_contract_v1.json").read_text())
- assert contract["join_identity"]==["game_id","venue_id","start_date"]
+ assert contract["join_identity"]==["game_id","venue_id","venue","start_date"]
  assert contract["provider"]["source_id"]=="OPEN_METEO_ARCHIVE_V1"
  assert contract["provider"]["selection"]=="NEAREST_KICKOFF_HOUR_NO_INTERPOLATION"
  assert contract["provider"]["missing_hour_policy"]=="FAIL_CLOSED"
