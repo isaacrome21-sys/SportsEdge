@@ -1,0 +1,24 @@
+{
+  "schema_version": "FRESH_WINDOW_PREREGISTRATION_V1",
+  "window_id": "FRESH_PROP_TEAM_TOTAL_WINDOW_V1",
+  "state": "CLOSED_NO_SOURCES",
+  "opens_when": "A new PIT feature snapshot, paired quotes, and settlements exist and are bound to a code SHA that is not the spent 2025 attempt.",
+  "forbidden": {
+    "window_ids": ["NFL_PROP_USAGE_V1_2025"],
+    "seasons": [2025],
+    "actions": ["reuse", "retry", "retune", "score", "promote"]
+  },
+  "required_sources": [
+    "pit_feature_snapshot",
+    "paired_pregame_quotes",
+    "same_book_pregame_close",
+    "settlement"
+  ],
+  "markets": {
+    "mlb_props": {"lane": "RESEARCH_OR_LEAN", "inherits_full_game": false},
+    "nfl_team_totals": {"engine_state": "NO_ENGINE", "requires_path_conservation": true},
+    "nfl_player_props": {"engine_state": "NO_ENGINE", "anytime_td": "NO_MODEL"}
+  },
+  "scoring_allowed": false,
+  "promotion_allowed": false
+}
