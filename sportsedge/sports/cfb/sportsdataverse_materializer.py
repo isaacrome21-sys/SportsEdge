@@ -7,8 +7,8 @@ Emits the full dual-snapshot row contract required by all four candidate familie
                                                   or same as prior for week-1 rows
 
 Fail-closed policy:
-  Week 1, season 2015: row skipped (no 2014 data in frozen window).
-  Week 1, season 2016+: prior-season snapshot REQUIRED; raises on missing.
+  Week 0/1, season 2015: row skipped (no 2014 data in frozen window).
+  Week 0/1, season 2016+: prior-season snapshot REQUIRED; raises on missing.
   Week 2+: BOTH current-season W-1 AND prior-season snapshot REQUIRED;
             raises on either missing. Silent substitution is prohibited because
             it would silently alter the registered model definition for the three
@@ -60,10 +60,10 @@ def materialize_native_candidate_inputs(
 ) -> list[dict[str, Any]]:
     """Attach only pre-game snapshots. Scores/outcomes are deliberately ignored.
 
-    Week 1 (season >= 2016): uses prior-season final snapshot as the authoritative
+    Week 0/1 (season >= 2016): uses prior-season final snapshot as the authoritative
     pregame state (sample_source=PRIOR_SEASON_FALLBACK). Missing prior snapshot raises.
 
-    Week 1 (season == 2015): skipped -- no 2014 data in frozen acquisition window.
+    Week 0/1 (season == 2015): skipped -- no 2014 data in frozen acquisition window.
 
     Week 2+: authoritative snapshot is current-season through_week W-1
     (sample_source=CURRENT_SEASON_PRIOR_WEEKS). BOTH the current snapshot AND the
@@ -98,7 +98,7 @@ def materialize_native_candidate_inputs(
         season, week = int(raw["season"]), int(raw["week"])
         if season >= 2026:
             raise SDVMaterializationError("CFB_SDV_2026_OUTCOMES_PROHIBITED")
-        if week < 1:
+        if week < 0:
             raise SDVMaterializationError("CFB_SDV_WEEK_INVALID")
         try:
             home_id, away_id = int(raw["home_id"]), int(raw["away_id"])
@@ -118,13 +118,13 @@ def materialize_native_candidate_inputs(
                     f"CFB_SDV_NEUTRAL_SITE_REQUIRED:{raw.get('game_id')}"
                 )
 
-        if week == 1:
+        if week <= 1:
             if season == 2015:
                 # Frozen acquisition starts in 2015; no prior-season (2014) data.
                 # This boundary condition has no admissible predictive state.
                 continue
 
-            # Week 1, season >= 2016: prior-season snapshot required.
+            # Week 0/1, season >= 2016: prior-season snapshot required.
             home_prior_snap = prior_idx.get((home_id, season - 1))
             away_prior_snap = prior_idx.get((away_id, season - 1))
             if home_prior_snap is None or away_prior_snap is None:
@@ -136,7 +136,7 @@ def materialize_native_candidate_inputs(
                away_prior_snap.source_contract != SOURCE_CONTRACT:
                 raise SDVMaterializationError("CFB_SDV_SOURCE_CONTRACT_MISMATCH")
 
-            # Week 1: authoritative snapshot IS the prior-season fallback.
+            # Week 0/1: authoritative snapshot IS the prior-season fallback.
             # No in-season sample exists yet, so current == prior for dual fields.
             home_snap = home_prior_snap
             away_snap = away_prior_snap
