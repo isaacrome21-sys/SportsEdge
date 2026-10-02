@@ -185,7 +185,7 @@ def probe_line_source(market: str, path: str) -> dict:
             "season","week","event_id/game_id","player/player_name","line",
             "over_price","under_price","requested_snapshot_time/snapshot_ts","commence_time/kickoff"
         ],
-        "outcome_columns_used": false
+        "outcome_columns_used": False
     }
 
 def schedule_team_weeks() -> tuple[set[tuple[int,str]], dict]:
@@ -316,8 +316,8 @@ def main() -> int:
     result = {
         "schema": "SPORTSEDGE_NFL_PROP_USAGE_V1_SOURCE_PROBE",
         "status": "SOURCE_ADMISSION_PASS" if line_gate and inactive_gate else "SOURCE_ADMISSION_FAIL",
-        "model_scoring_performed": false,
-        "validation_outcomes_read": false,
+        "model_scoring_performed": False,
+        "validation_outcomes_read": False,
         "line_gate_passed": line_gate,
         "inactive_gate_passed": inactive_gate,
         "line_sources": lines,
@@ -335,7 +335,7 @@ def main() -> int:
         "market_rows": {r["market"]: r["rows_2025"] for r in lines},
         "inactive_coverage": inactives["coverage"],
         "missing_team_weeks": len(inactives["missing_team_weeks"]),
-        "model_scoring_performed": false
+        "model_scoring_performed": False
     }, sort_keys=True))
     return 0
 
