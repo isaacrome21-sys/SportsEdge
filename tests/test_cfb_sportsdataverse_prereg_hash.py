@@ -21,6 +21,13 @@ def test_missing_or_changed_input_fails_closed():
     with pytest.raises(SDVPreregHashError,match="HASH_INPUT_MISSING"):
         config_bundle_sha256(f)
 
-def test_evaluated_code_is_inside_code_manifest():
-    assert "sportsedge/sports/cfb/sportsdataverse_candidate_model.py" in CODE_PATHS
-    assert "sportsedge/sports/cfb/sportsdataverse_bakeoff.py" in CODE_PATHS
+def test_evaluated_and_materialization_code_is_inside_code_manifest():
+    required={
+        ".github/workflows/cfb-sdv-materialize-training.yml",
+        "scripts/acquire_cfb_sportsdataverse_training_inputs.py",
+        "scripts/materialize_cfb_sportsdataverse_training.py",
+        "sportsedge/sports/cfb/sportsdataverse_pipeline.py",
+        "sportsedge/sports/cfb/sportsdataverse_candidate_model.py",
+        "sportsedge/sports/cfb/sportsdataverse_bakeoff.py",
+    }
+    assert required.issubset(set(CODE_PATHS))
