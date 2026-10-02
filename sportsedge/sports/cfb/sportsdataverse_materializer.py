@@ -214,8 +214,8 @@ def materialize_native_candidate_inputs(
             "home_current_metrics": home_current_metrics,
             "away_current_metrics": away_current_metrics,
             # Convenience pass-through for GAMES_IN_SAMPLE_FEATURE family
-            "home_games_in_sample": home_snap.games_in_sample,
-            "away_games_in_sample": away_snap.games_in_sample,
+            "home_games_in_sample": 0 if week <= 1 else home_snap.games_in_sample,
+            "away_games_in_sample": 0 if week <= 1 else away_snap.games_in_sample,
             "source_contract": SOURCE_CONTRACT,
             "provenance_class": "RECONSTRUCTED_HISTORICAL_NOT_PIT",
         })
