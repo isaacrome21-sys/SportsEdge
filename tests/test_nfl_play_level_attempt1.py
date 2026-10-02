@@ -61,8 +61,11 @@ def _schedule(n=8):
 
 
 def _depth():
-    stamp = datetime(2016, 8, 1, 12, 0, tzinfo=EASTERN)
-    return {"H": [(stamp, "QB-H")], "A": [(stamp, "QB-A")]}
+    stamp = datetime(2016, 8, 1, 12, 0, tzinfo=EASTERN).isoformat()
+    return [
+        {"dt": stamp, "team": "H", "pos_abb": "QB", "pos_rank": 1, "gsis_id": "QB-H"},
+        {"dt": stamp, "team": "A", "pos_abb": "QB", "pos_rank": 1, "gsis_id": "QB-A"},
+    ]
 
 
 def _pbp(n=8, game6_shift=0.0):
@@ -82,16 +85,26 @@ def test_half_point_contract():
 
 def test_starter_is_latest_unique_pit_snapshot():
     kickoff = datetime(2024, 10, 1, 20, 0, tzinfo=EASTERN)
-    depth = {
-        "H": [
-            (kickoff - timedelta(days=2), "OLD"),
-            (kickoff - timedelta(hours=2), "NEW"),
-            (kickoff + timedelta(hours=1), "FUTURE"),
-        ]
-    }
-    assert starter_at(depth, "H", kickoff) == "NEW"
-    depth["H"].append((kickoff - timedelta(hours=2), "AMBIG"))
-    assert starter_at(depth, "H", kickoff) is None
+    game = {"season": 2025, "week": 4, "kickoff": kickoff}
+    depth = [
+        {"dt": (kickoff - timedelta(days=2)).isoformat(), "team": "H", "pos_abb": "QB", "pos_rank": 1, "gsis_id": "OLD"},
+        {"dt": (kickoff - timedelta(hours=2)).isoformat(), "team": "H", "pos_abb": "QB", "pos_rank": 1, "gsis_id": "NEW"},
+        {"dt": (kickoff + timedelta(hours=1)).isoformat(), "team": "H", "pos_abb": "QB", "pos_rank": 1, "gsis_id": "FUTURE"},
+    ]
+    assert starter_at(depth, "H", game) == "NEW"
+    depth.append({"dt": (kickoff - timedelta(hours=2)).isoformat(), "team": "H", "pos_abb": "QB", "pos_rank": 1, "gsis_id": "AMBIG"})
+    assert starter_at(depth, "H", game) is None
+
+
+def test_starter_reuses_merged_weekly_historical_depth_contract():
+    kickoff = datetime(2021, 9, 19, 13, 0, tzinfo=EASTERN)
+    game = {"season": 2021, "week": 2, "kickoff": kickoff}
+    depth = [
+        {"season": 2021, "week": 1, "club_code": "H", "game_type": "REG", "depth_team": 1, "position": "QB", "depth_position": "QB", "gsis_id": "OLD"},
+        {"season": 2021, "week": 2, "club_code": "H", "game_type": "REG", "depth_team": 1, "position": "QB", "depth_position": "QB", "gsis_id": "CURRENT"},
+        {"season": 2021, "week": 3, "club_code": "H", "game_type": "REG", "depth_team": 1, "position": "QB", "depth_position": "QB", "gsis_id": "FUTURE"},
+    ]
+    assert starter_at(depth, "H", game) == "CURRENT"
 
 
 def test_target_game_pbp_cannot_enter_its_own_features():
