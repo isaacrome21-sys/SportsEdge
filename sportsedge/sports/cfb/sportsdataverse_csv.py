@@ -20,7 +20,7 @@ def parse_csv(raw:bytes,*,dataset:str,season:int,source_url:str,raw_csv_sha256:s
  actual_sha256=hashlib.sha256(raw).hexdigest()
  if actual_sha256 != raw_csv_sha256: raise SDVCSVError("CFB_SDV_CSV_RAW_HASH_MISMATCH")
  payload=raw
- if raw[:2]==b"\\x1f\\x8b":
+ if raw.startswith(bytes((0x1F,0x8B))):
   try: payload=gzip.decompress(raw)
   except (OSError,EOFError) as e: raise SDVCSVError("CFB_SDV_CSV_GZIP_INVALID") from e
  try: text=payload.decode("utf-8-sig")
