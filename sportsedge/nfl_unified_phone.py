@@ -16,6 +16,7 @@ from sportsedge.nfl_attempt9_live_forecast import (
     recency_features,
 )
 from sportsedge.nfl_run_it_scoring import price_run_it_pick
+from sportsedge.nfl_scoring_composition_fit import ScoringCompositionPrior
 from sportsedge.sports.nfl.live_role_source import build_live_team_model
 from sportsedge.sports.nfl.unified_market_engine import run_unified_nfl_model
 from sportsedge.truth_gate import american_to_decimal
@@ -260,6 +261,7 @@ def build_unified_phone_card(
     injury_rows: Sequence[Mapping[str, Any]] = (),
     injury_source_ready: bool = False,
     runtime: Mapping[str, Any] | None = None,
+    scoring_prior: ScoringCompositionPrior | None = None,
     n_sims: int = 20000,
     seed: int = 21,
 ) -> dict[str, Any]:
@@ -468,7 +470,7 @@ def build_unified_phone_card(
             prop_markets=prop_requests,
             home_model=home_model,
             away_model=away_model,
-            scoring_prior=None,
+            scoring_prior=scoring_prior,
             n_sims=int(n_sims),
             seed=int(seed) + game_index,
         )
