@@ -6,6 +6,7 @@ on:
     paths:
       - 'config/research/nfl_play_level_attempt1_prelock_v1.json'
       - 'config/research/nfl_play_level_attempt1_implementation_v1.json'
+      - 'config/research/nfl_play_level_attempt1_implementation_v2.json'
       - 'scripts/run_nfl_play_level_attempt1.py'
       - 'tests/test_nfl_play_level_attempt1.py'
       - '.github/workflows/nfl-play-level-attempt1-one-shot.yml'
