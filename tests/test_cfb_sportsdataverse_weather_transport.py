@@ -17,3 +17,27 @@ def test_indoor_does_not_require_weather_payload():
 def test_missing_hour_fails_closed():
  with pytest.raises(SDVWeatherTransportError,match="KICKOFF_HOUR_MISSING"):
   select_kickoff_hour({"hourly":{"time":[],"temperature_2m":[],"wind_speed_10m":[]}},game_id=1,kickoff_utc="2025-09-07T00:20:00Z",game_indoor=False)
+
+
+def test_batch_request_and_response_mapping_are_request_order_deterministic():
+ locations=[
+  {"venue_id":10,"latitude":40.0,"longitude":-88.0},
+  {"venue_id":20,"latitude":41.0,"longitude":-89.0},
+ ]
+ p=batch_request_params(locations=locations,start_date="2025-09-01",end_date="2025-12-01",max_locations=50)
+ assert p["latitude"]=="40.0,41.0" and p["longitude"]=="-88.0,-89.0"
+ payload=[
+  {"hourly":{"time":[],"temperature_2m":[],"wind_speed_10m":[]}},
+  {"hourly":{"time":[],"temperature_2m":[],"wind_speed_10m":[]}},
+ ]
+ mapped=map_batch_payload(payload,locations=locations)
+ assert list(mapped)==[10,20]
+ assert mapped[10] is payload[0] and mapped[20] is payload[1]
+
+
+def test_batch_size_fails_closed():
+ with pytest.raises(SDVWeatherTransportError,match="BATCH_TOO_LARGE"):
+  batch_request_params(
+   locations=[{"venue_id":1,"latitude":40.0,"longitude":-88.0},{"venue_id":2,"latitude":41.0,"longitude":-89.0}],
+   start_date="2025-09-01",end_date="2025-09-02",max_locations=1,
+  )

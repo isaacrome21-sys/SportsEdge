@@ -70,7 +70,7 @@ def materialize_equal_weight_hard_switch(row: Mapping[str, Any]) -> dict[str, An
     """Validate and return the frozen baseline candidate row.
 
     Source switch:
-    * Week 1 -> immediately prior season, PRIOR_SEASON_FALLBACK.
+    * Week 0/1 -> immediately prior season, PRIOR_SEASON_FALLBACK.
     * Week 2+ -> same season through exactly week-1, CURRENT_SEASON_PRIOR_WEEKS.
 
     "Equal weight" means this family adds no candidate-specific feature weights:
@@ -87,7 +87,7 @@ def materialize_equal_weight_hard_switch(row: Mapping[str, Any]) -> dict[str, An
         week = int(row["week"])
     except (KeyError, TypeError, ValueError) as exc:
         raise CFBCandidateFamilyError("CFB_CANDIDATE_SEASON_WEEK_INVALID") from exc
-    if week < 1:
+    if week < 0:
         raise CFBCandidateFamilyError("CFB_CANDIDATE_WEEK_INVALID")
 
     for side in ("home", "away"):
@@ -101,10 +101,10 @@ def materialize_equal_weight_hard_switch(row: Mapping[str, Any]) -> dict[str, An
             ) from exc
         source = str(metrics.get("sample_source") or "").upper()
 
-        if week == 1:
+        if week <= 1:
             if source != "PRIOR_SEASON_FALLBACK" or metric_season != season - 1:
                 raise CFBCandidateFamilyError(
-                    f"CFB_CANDIDATE_WEEK1_PRIOR_SEASON_SWITCH_INVALID:{side}"
+                    f"CFB_CANDIDATE_EARLY_PRIOR_SEASON_SWITCH_INVALID:{side}"
                 )
         else:
             if (

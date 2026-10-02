@@ -39,9 +39,16 @@ def test_week1_uses_latest_explicit_prior_season_snapshot():
       snapshots=[],
       prior_season_snapshots=[prior_snap(1,13),prior_snap(1,14),prior_snap(2,14)],
     )
-    assert rows[0]["home_games_in_sample"]==12
-    assert rows[0]["away_games_in_sample"]==12
-    assert "home_score" not in rows[0]
+    row=rows[0]
+    assert row["home_metrics"]["through_week"]==14
+    assert row["home_prior_metrics"]["through_week"]==14
+    assert row["home_prior_metrics"]["games_in_sample"]==12
+    assert row["away_prior_metrics"]["games_in_sample"]==12
+    assert row["home_games_in_sample"]==12
+    assert row["away_games_in_sample"]==12
+    assert row["home_current_metrics"]["games_in_sample"]==0
+    assert row["away_current_metrics"]["games_in_sample"]==0
+    assert "home_score" not in row
 
 def test_week1_fails_closed_without_prior_season_snapshot():
     with pytest.raises(SDVMaterializationError,match="PRIOR_SEASON_SNAPSHOT_REQUIRED"):
@@ -71,3 +78,31 @@ def test_materializer_preserves_neutral_site_and_rejects_missing_flag():
           snapshots=[],
           prior_season_snapshots=[prior_snap(1),prior_snap(2)],
         )
+
+
+def test_week0_uses_prior_values_but_zero_current_sample_size():
+    p1=prior_snap(1); p2=prior_snap(2)
+    rows=materialize_native_candidate_inputs(
+      games=[{"game_id":2,"season":2025,"week":0,"home_id":1,"away_id":2,"neutral_site":False}],
+      snapshots=[],
+      prior_season_snapshots=[p1,p2],
+    )
+    assert len(rows)==1
+    row=rows[0]
+    assert row["home_metrics"]["sample_source"]=="PRIOR_SEASON_FALLBACK"
+    assert row["home_current_metrics"]["season"]==2025
+    assert row["home_current_metrics"]["through_week"]==-1
+    assert row["home_current_metrics"]["games_in_sample"]==0
+    assert row["away_current_metrics"]["games_in_sample"]==0
+    assert row["home_games_in_sample"]==12
+    assert row["away_games_in_sample"]==12
+
+
+def test_week1_current_placeholder_has_zero_current_sample_size():
+    rows=materialize_native_candidate_inputs(
+      games=[{"game_id":3,"season":2025,"week":1,"home_id":1,"away_id":2,"neutral_site":False}],
+      snapshots=[],
+      prior_season_snapshots=[prior_snap(1),prior_snap(2)],
+    )
+    assert rows[0]["home_current_metrics"]["games_in_sample"]==0
+    assert rows[0]["away_current_metrics"]["games_in_sample"]==0

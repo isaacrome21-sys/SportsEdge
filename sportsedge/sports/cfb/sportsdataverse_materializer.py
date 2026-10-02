@@ -7,8 +7,8 @@ Emits the full dual-snapshot row contract required by all four candidate familie
                                                   or same as prior for week-1 rows
 
 Fail-closed policy:
-  Week 1, season 2015: row skipped (no 2014 data in frozen window).
-  Week 1, season 2016+: prior-season snapshot REQUIRED; raises on missing.
+  Week 0/1, season 2015: row skipped (no 2014 data in frozen window).
+  Week 0/1, season 2016+: prior-season snapshot REQUIRED; raises on missing.
   Week 2+: BOTH current-season W-1 AND prior-season snapshot REQUIRED;
             raises on either missing. Silent substitution is prohibited because
             it would silently alter the registered model definition for the three
@@ -52,6 +52,20 @@ def _snapshot_to_metrics(snap: TeamSnapshot, sample_source: str) -> dict[str, An
     return out
 
 
+def _early_current_metrics(snap: TeamSnapshot, *, season: int, week: int) -> dict[str, Any]:
+    """Represent an empty current-season sample without inventing metric values.
+
+    The metric values are carried from the prior-season fallback so blend/switch
+    families have numeric inputs, while games_in_sample is exactly zero. Families
+    that key on sample size therefore fall back to prior values deterministically.
+    """
+    out = _snapshot_to_metrics(snap, "CURRENT_SEASON_EMPTY_PRIOR_VALUES")
+    out["season"] = int(season)
+    out["through_week"] = int(week) - 1
+    out["games_in_sample"] = 0
+    return out
+
+
 def materialize_native_candidate_inputs(
     *,
     games: Sequence[Mapping[str, Any]],
@@ -60,10 +74,10 @@ def materialize_native_candidate_inputs(
 ) -> list[dict[str, Any]]:
     """Attach only pre-game snapshots. Scores/outcomes are deliberately ignored.
 
-    Week 1 (season >= 2016): uses prior-season final snapshot as the authoritative
+    Week 0/1 (season >= 2016): uses prior-season final snapshot as the authoritative
     pregame state (sample_source=PRIOR_SEASON_FALLBACK). Missing prior snapshot raises.
 
-    Week 1 (season == 2015): skipped -- no 2014 data in frozen acquisition window.
+    Week 0/1 (season == 2015): skipped -- no 2014 data in frozen acquisition window.
 
     Week 2+: authoritative snapshot is current-season through_week W-1
     (sample_source=CURRENT_SEASON_PRIOR_WEEKS). BOTH the current snapshot AND the
@@ -74,9 +88,8 @@ def materialize_native_candidate_inputs(
     All four candidate families receive:
       home_metrics / away_metrics               -- authoritative pregame snapshot
       home_prior_metrics / away_prior_metrics   -- prior-season final snapshot
-      home_current_metrics / away_current_metrics -- in-season W-1 (or same as prior
-                                                      for week-1 rows where no current
-                                                      in-season sample exists yet)
+      home_current_metrics / away_current_metrics -- in-season W-1; Week 0/1 carries
+                                                      prior values with games_in_sample=0
     """
     # Index current-season snapshots: (team_id, season, through_week) -> TeamSnapshot
     idx: dict[tuple[int, int, int], TeamSnapshot] = {
@@ -98,7 +111,7 @@ def materialize_native_candidate_inputs(
         season, week = int(raw["season"]), int(raw["week"])
         if season >= 2026:
             raise SDVMaterializationError("CFB_SDV_2026_OUTCOMES_PROHIBITED")
-        if week < 1:
+        if week < 0:
             raise SDVMaterializationError("CFB_SDV_WEEK_INVALID")
         try:
             home_id, away_id = int(raw["home_id"]), int(raw["away_id"])
@@ -118,13 +131,13 @@ def materialize_native_candidate_inputs(
                     f"CFB_SDV_NEUTRAL_SITE_REQUIRED:{raw.get('game_id')}"
                 )
 
-        if week == 1:
+        if week <= 1:
             if season == 2015:
                 # Frozen acquisition starts in 2015; no prior-season (2014) data.
                 # This boundary condition has no admissible predictive state.
                 continue
 
-            # Week 1, season >= 2016: prior-season snapshot required.
+            # Week 0/1, season >= 2016: prior-season snapshot required.
             home_prior_snap = prior_idx.get((home_id, season - 1))
             away_prior_snap = prior_idx.get((away_id, season - 1))
             if home_prior_snap is None or away_prior_snap is None:
@@ -136,8 +149,8 @@ def materialize_native_candidate_inputs(
                away_prior_snap.source_contract != SOURCE_CONTRACT:
                 raise SDVMaterializationError("CFB_SDV_SOURCE_CONTRACT_MISMATCH")
 
-            # Week 1: authoritative snapshot IS the prior-season fallback.
-            # No in-season sample exists yet, so current == prior for dual fields.
+            # Week 0/1: authoritative snapshot IS the prior-season fallback.
+            # No in-season sample exists yet. Current-value placeholders use\n            # prior values, but their sample size is explicitly zero below.
             home_snap = home_prior_snap
             away_snap = away_prior_snap
             home_current_snap = home_prior_snap
@@ -178,8 +191,12 @@ def materialize_native_candidate_inputs(
         away_metrics = _snapshot_to_metrics(away_snap, away_sample_source)
         home_prior_metrics = _snapshot_to_metrics(home_prior_snap, "PRIOR_SEASON_FALLBACK")
         away_prior_metrics = _snapshot_to_metrics(away_prior_snap, "PRIOR_SEASON_FALLBACK")
-        home_current_metrics = _snapshot_to_metrics(home_current_snap, home_sample_source)
-        away_current_metrics = _snapshot_to_metrics(away_current_snap, away_sample_source)
+        if week <= 1:
+            home_current_metrics = _early_current_metrics(home_prior_snap, season=season, week=week)
+            away_current_metrics = _early_current_metrics(away_prior_snap, season=season, week=week)
+        else:
+            home_current_metrics = _snapshot_to_metrics(home_current_snap, home_sample_source)
+            away_current_metrics = _snapshot_to_metrics(away_current_snap, away_sample_source)
 
         out.append({
             "game_id": str(raw["game_id"]),

@@ -19,6 +19,37 @@ def request_params(*,latitude:float,longitude:float,kickoff_utc:str)->dict[str,A
  return {"latitude":float(latitude),"longitude":float(longitude),"start_date":day.isoformat(),"end_date":(day+timedelta(days=1)).isoformat(),
          "hourly":",".join(HOURLY),"temperature_unit":"fahrenheit","wind_speed_unit":"mph","timezone":"UTC"}
 
+
+def batch_request_params(*, locations:Sequence[Mapping[str,Any]],start_date:str,end_date:str,max_locations:int=50)->dict[str,Any]:
+ if not locations: raise SDVWeatherTransportError("CFB_SDV_WEATHER_BATCH_LOCATIONS_REQUIRED")
+ if len(locations)>int(max_locations): raise SDVWeatherTransportError("CFB_SDV_WEATHER_BATCH_TOO_LARGE")
+ try:
+  start=datetime.fromisoformat(str(start_date)).date(); end=datetime.fromisoformat(str(end_date)).date()
+ except Exception as e: raise SDVWeatherTransportError("CFB_SDV_WEATHER_BATCH_DATE_INVALID") from e
+ if end<start: raise SDVWeatherTransportError("CFB_SDV_WEATHER_BATCH_DATE_ORDER_INVALID")
+ lats=[]; lons=[]
+ for row in locations:
+  try: lat=float(row["latitude"]); lon=float(row["longitude"])
+  except (KeyError,TypeError,ValueError) as e: raise SDVWeatherTransportError("CFB_SDV_WEATHER_BATCH_COORDINATE_INVALID") from e
+  if not (-90<=lat<=90 and -180<=lon<=180): raise SDVWeatherTransportError("CFB_SDV_WEATHER_BATCH_COORDINATE_RANGE_INVALID")
+  lats.append(str(lat)); lons.append(str(lon))
+ return {"latitude":",".join(lats),"longitude":",".join(lons),"start_date":start.isoformat(),"end_date":end.isoformat(),
+         "hourly":",".join(HOURLY),"temperature_unit":"fahrenheit","wind_speed_unit":"mph","timezone":"UTC"}
+
+def map_batch_payload(payload:Any,*,locations:Sequence[Mapping[str,Any]])->dict[int,Mapping[str,Any]]:
+ if len(locations)==1 and isinstance(payload,Mapping): rows=[payload]
+ elif isinstance(payload,list): rows=payload
+ else: raise SDVWeatherTransportError("CFB_SDV_WEATHER_BATCH_PAYLOAD_INVALID")
+ if len(rows)!=len(locations): raise SDVWeatherTransportError("CFB_SDV_WEATHER_BATCH_RESPONSE_LENGTH_MISMATCH")
+ out={}
+ for location,row in zip(locations,rows):
+  if not isinstance(row,Mapping): raise SDVWeatherTransportError("CFB_SDV_WEATHER_BATCH_RESPONSE_ROW_INVALID")
+  try: venue_id=int(location["venue_id"])
+  except (KeyError,TypeError,ValueError) as e: raise SDVWeatherTransportError("CFB_SDV_WEATHER_BATCH_VENUE_ID_INVALID") from e
+  if venue_id in out: raise SDVWeatherTransportError("CFB_SDV_WEATHER_BATCH_VENUE_DUPLICATE")
+  out[venue_id]=row
+ return out
+
 def select_kickoff_hour(payload:Mapping[str,Any],*,game_id:int,kickoff_utc:str,game_indoor:bool)->dict[str,Any]:
  if type(game_indoor) is not bool: raise SDVWeatherTransportError("CFB_SDV_WEATHER_INDOOR_FLAG_REQUIRED")
  if game_indoor:

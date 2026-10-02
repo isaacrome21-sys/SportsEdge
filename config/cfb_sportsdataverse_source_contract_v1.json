@@ -14,7 +14,20 @@
     "end_season": 2025,
     "season_type": "REGULAR",
     "classification": "FBS",
-    "no_2026_forward_outcomes": true
+    "no_2026_forward_outcomes": true,
+    "evaluation_start_season": 2016,
+    "acquisition_support_only_seasons": [
+      2015
+    ],
+    "row_eligibility": {
+      "rule": "COMMON_SCOREABLE_SURFACE_V1",
+      "week_2_plus": "REQUIRE_BOTH_TEAMS_CURRENT_SEASON_THROUGH_W_MINUS_1_AND_PRIOR_SEASON_FINAL_SNAPSHOT",
+      "missing_required_snapshot": "EXCLUDE_ROW_WITH_EXPLICIT_REASON_BEFORE_WEATHER_AND_LABEL_BINDING",
+      "weather_missing_after_snapshot_eligibility": "FAIL_CLOSED",
+      "purpose": "Keep all four preregistered candidate families on the same outcome-blind scoreable row surface.",
+      "week_0_or_1": "REQUIRE_BOTH_TEAMS_PRIOR_SEASON_FINAL_SNAPSHOT",
+      "early_current_sample_semantics": "WEEK_0_OR_1_PRIOR_VALUES_WITH_CURRENT_GAMES_IN_SAMPLE_ZERO"
+    }
   },
   "allowed_predictive_datasets": [
     "cfb_schedules",
