@@ -45,6 +45,7 @@ def test_window_job_is_open_meteo_and_receipted(monkeypatch):
     rows,receipt=acquire._window_job(
         season=2025,
         venue={
+            "stadium_id":"test-stadium",
             "venue_id":123,
             "latitude":40.0,
             "longitude":-88.0,
@@ -61,5 +62,6 @@ def test_window_job_is_open_meteo_and_receipted(monkeypatch):
     assert "Authorization" not in seen["headers"]
     assert rows[0]["game_id"]==11
     assert receipt["season"]==2025
-    assert receipt["venue_id"]==123
+    assert receipt["stadium_id"]=="test-stadium"
+    assert receipt["cfbd_venue_id"]==123
     assert receipt["source_id"]=="OPEN_METEO_ARCHIVE_V1"
