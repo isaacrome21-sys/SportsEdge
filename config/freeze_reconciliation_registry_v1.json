@@ -1051,10 +1051,16 @@
       "merge_sha": "b097cfeb7a6c4eee13e5ac7defc584ee25183280",
       "pr": 1368,
       "note": "Registers merged CFB MLB-style research-card parity on current main. Covered CFB prop test bytes changed only inside an already-REVOKED CFB prop freeze; no Model_P, Truth Gate, promotion, staking, evidence-clock, or OFFICIAL authority is restored or created."
+    },
+    {
+      "delta_id": "PR_1371_CFB_TODAY_RUNTIME_PARITY",
+      "merge_sha": "03692b1c42f6c5cad8ffd1566b82fd24c9fcb460",
+      "pr": 1371,
+      "note": "Registers merged same-day CFB research-card runtime. Its covered CFB prop test change remains inside the already-REVOKED CFB prop freeze. No Model_P, Truth Gate, promotion, staking, evidence-clock, backfill, or OFFICIAL authority is restored or created."
     }
   ],
   "inventory_block_reason": "Bundle inventory remains intentionally incomplete; PR_1358 boundary is registered and covered-drift bundles are revoked fail-closed.",
   "issue": 686,
-  "reconciled_through_sha": "b097cfeb7a6c4eee13e5ac7defc584ee25183280",
+  "reconciled_through_sha": "03692b1c42f6c5cad8ffd1566b82fd24c9fcb460",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
