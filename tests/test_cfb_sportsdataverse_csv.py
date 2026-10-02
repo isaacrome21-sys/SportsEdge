@@ -1,4 +1,4 @@
-import hashlib,pytest
+import gzip,hashlib,pytest
 from sportsedge.sports.cfb.sportsdataverse_csv import *
 
 def _parse(s,d="cfb_schedules"):
@@ -38,3 +38,17 @@ def test_raw_hash_mismatch_fails_closed():
         assert str(e)=="CFB_SDV_CSV_RAW_HASH_MISMATCH"
     else:
         raise AssertionError("expected raw hash mismatch")
+
+
+def test_gzip_schedule_transport_preserves_raw_receipt_hash():
+    plain=b"game_id,season,week,season_type,fbs_game,home_id,away_id,home_points,away_points\n1,2025,1,2,true,10,20,21,14\n"
+    raw=gzip.compress(plain,mtime=0)
+    rows,receipt=parse_csv(
+        raw,
+        dataset="cfb_schedules",
+        season=2025,
+        source_url="https://example.test/cfb_schedules_2025.csv.gz",
+        raw_csv_sha256=hashlib.sha256(raw).hexdigest(),
+    )
+    assert rows[0]["game_id"]=="1"
+    assert receipt.raw_csv_sha256==hashlib.sha256(raw).hexdigest()
