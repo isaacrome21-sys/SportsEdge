@@ -230,7 +230,12 @@ def build_season_week_snapshots(
     """
     if not 2015 <= int(season) <= 2025:
         raise SportsDataverseHistoryError("CFB_SDV_SEASON_OUTSIDE_FROZEN_WINDOW")
-    schedules = regular_fbs_schedule_rows(schedule_rows)
+    # Preserve the full published schedule for provenance validation inside
+    # build_team_snapshots. Only the modeling surface is restricted to regular
+    # FBS-vs-FBS games. Passing the already-filtered slice would falsely classify
+    # legitimate postseason/FCS advanced rows as missing from the source schedule.
+    schedule_all = validate_dataset("cfb_schedules", schedule_rows)
+    schedules = regular_fbs_schedule_rows(schedule_all)
     season_weeks = sorted({
         int(r["week"]) for r in schedules
         if int(r["season"]) == int(season) and int(r["week"]) >= 1
@@ -243,7 +248,7 @@ def build_season_week_snapshots(
             adv_team_rows=adv_team_rows,
             adv_situational_rows=adv_situational_rows,
             adv_drive_rows=adv_drive_rows,
-            schedule_rows=schedules,
+            schedule_rows=schedule_all,
             target_season=int(season),
             target_week=target_week,
         ))
@@ -265,7 +270,8 @@ def build_prior_season_fallback_snapshots(
     prior=int(target_season)-1
     if not 2015 <= prior <= 2025 or not 2016 <= int(target_season) <= 2026:
         raise SportsDataverseHistoryError("CFB_SDV_PRIOR_FALLBACK_OUTSIDE_WINDOW")
-    schedules=regular_fbs_schedule_rows(schedule_rows)
+    schedule_all=validate_dataset("cfb_schedules", schedule_rows)
+    schedules=regular_fbs_schedule_rows(schedule_all)
     weeks=[int(r["week"]) for r in schedules if int(r["season"])==prior]
     if not weeks:
         raise SportsDataverseHistoryError(f"CFB_SDV_PRIOR_FALLBACK_SEASON_EMPTY:{prior}")
@@ -275,7 +281,7 @@ def build_prior_season_fallback_snapshots(
         adv_team_rows=adv_team_rows,
         adv_situational_rows=adv_situational_rows,
         adv_drive_rows=adv_drive_rows,
-        schedule_rows=schedules,
+        schedule_rows=schedule_all,
         target_season=prior,
         target_week=max(weeks)+1,
     )
