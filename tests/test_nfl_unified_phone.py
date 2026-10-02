@@ -201,11 +201,11 @@ def test_score_is_qualification_only_when_price_changes():
 
     a = build_unified_phone_card(
         base, history=history(), schedule_games=schedule(), depth_rows=depth(),
-        player_rows=player_stats(), runtime=runtime(), n_sims=300, seed=9,
+        player_rows=player_stats(), injury_source_ready=True, runtime=runtime(), n_sims=300, seed=9,
     )
     b = build_unified_phone_card(
         shifted, history=history(), schedule_games=schedule(), depth_rows=depth(),
-        player_rows=player_stats(), runtime=runtime(), n_sims=300, seed=9,
+        player_rows=player_stats(), injury_source_ready=True, runtime=runtime(), n_sims=300, seed=9,
     )
     a_prop = [row for row in a["rows"] if row["market"] == "passing_yards"]
     b_prop = [row for row in b["rows"] if row["market"] == "passing_yards"]
@@ -219,7 +219,7 @@ def test_price_ceiling_blocks_straight_card_but_preserves_model_probability():
     board["games"][0]["markets"][0]["home_or_under_price"] = -180
     out = build_unified_phone_card(
         board, history=history(), schedule_games=schedule(), depth_rows=depth(),
-        player_rows=player_stats(), runtime=runtime(), n_sims=300, seed=12,
+        player_rows=player_stats(), injury_source_ready=True, runtime=runtime(), n_sims=300, seed=12,
     )
     home_ml = next(
         row for row in out["rows"]
@@ -239,7 +239,7 @@ def test_td_prop_is_explicit_no_model_until_scoring_prior_is_bound():
     )
     out = build_unified_phone_card(
         board, history=history(), schedule_games=schedule(), depth_rows=depth(),
-        player_rows=player_stats(), runtime=runtime(), n_sims=250, seed=4,
+        player_rows=player_stats(), injury_source_ready=True, runtime=runtime(), n_sims=250, seed=4,
     )
     assert len(out["rows"]) == 2
     assert all(row["status"] == "NO_MODEL" for row in out["rows"])
@@ -260,7 +260,7 @@ def test_out_player_prop_fails_exact_player_match_without_poisoning_game_markets
     )
     out = build_unified_phone_card(
         board, history=history(), schedule_games=schedule(), depth_rows=depth(),
-        player_rows=player_stats(), injury_rows=injuries, runtime=runtime(),
+        player_rows=player_stats(), injury_rows=injuries, injury_source_ready=True, runtime=runtime(),
         n_sims=250, seed=8,
     )
     totals = [row for row in out["rows"] if row["market"] == "total"]
@@ -268,3 +268,23 @@ def test_out_player_prop_fails_exact_player_match_without_poisoning_game_markets
     assert all(row["status"] == "PRICED" for row in totals)
     assert all(row["status"] == "NO_MODEL" for row in props)
     assert all("PROP_PLAYER_EXACT_MATCH_REQUIRED" in row["reason"] for row in props)
+
+
+def test_live_prop_board_fails_closed_when_injury_source_is_not_ready():
+    board = ticket(
+        """
+        Chiefs @ Ravens
+        Total 47.5 -110 -110
+        Prop "Lamar Jackson" PassYards 249.5 -110 -110
+        """
+    )
+    out = build_unified_phone_card(
+        board, history=history(), schedule_games=schedule(), depth_rows=depth(),
+        player_rows=player_stats(), injury_source_ready=False, runtime=runtime(),
+        n_sims=200, seed=6,
+    )
+    totals = [row for row in out["rows"] if row["market"] == "total"]
+    props = [row for row in out["rows"] if row["market"] == "passing_yards"]
+    assert all(row["status"] == "PRICED" for row in totals)
+    assert all(row["status"] == "NO_MODEL" for row in props)
+    assert all(row["reason"] == "INJURY_SOURCE_REQUIRED_FOR_LIVE_PROPS" for row in props)
