@@ -10,8 +10,10 @@ on:
       - 'sportsedge/sports/cfb/participation_model.py'
       - 'sportsedge/sports/cfb/participation_source_capture.py'
       - 'sportsedge/sports/cfb/participation_pit_readiness.py'
+      - 'sportsedge/sports/cfb/participation_storage.py'
       - 'sportsedge/football_prop_surface.py'
       - 'scripts/cache_cfb_participation_sources.py'
+      - 'scripts/pack_cfb_participation_snapshot.py'
       - 'tests/test_cfb_participation_model.py'
       - 'tests/test_cfb_participation_source_capture.py'
       - 'tests/test_cfb_participation_pit_readiness.py'
@@ -27,8 +29,10 @@ on:
       - 'sportsedge/sports/cfb/participation_model.py'
       - 'sportsedge/sports/cfb/participation_source_capture.py'
       - 'sportsedge/sports/cfb/participation_pit_readiness.py'
+      - 'sportsedge/sports/cfb/participation_storage.py'
       - 'sportsedge/football_prop_surface.py'
       - 'scripts/cache_cfb_participation_sources.py'
+      - 'scripts/pack_cfb_participation_snapshot.py'
       - 'tests/test_cfb_participation_model.py'
       - 'tests/test_cfb_participation_source_capture.py'
       - 'tests/test_cfb_participation_pit_readiness.py'
@@ -56,8 +60,10 @@ jobs:
           sportsedge/sports/cfb/participation_model.py
           sportsedge/sports/cfb/participation_source_capture.py
           sportsedge/sports/cfb/participation_pit_readiness.py
+          sportsedge/sports/cfb/participation_storage.py
           sportsedge/football_prop_surface.py
           scripts/cache_cfb_participation_sources.py
+          scripts/pack_cfb_participation_snapshot.py
           tests/test_cfb_participation_model.py
           tests/test_cfb_participation_source_capture.py
           tests/test_cfb_participation_pit_readiness.py
