@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "contract": "CFB_2025_LAST_STORED_CLOSE_HOLDOUT_V1",
+  "sport": "CFB",
+  "model_family": "CFB_JOINT_MODEL_V1",
+  "model_id": "cfb_joint_ridge_residual_v1",
+  "lock_class": "CANDIDATE_LOCKED_FOR_HOLDOUT",
+  "status": "HOLD_PENDING",
+  "close_source": "CFBD",
+  "close_semantics": "LAST_STORED_CLOSE_NOT_TIMESTAMPED_SNAPSHOT",
+  "close_source_doc": "docs/CFB_1070_CLOSE_VS_SNAPSHOT.md",
+  "holdout_season": 2025,
+  "fit_max_season": 2024,
+  "feature_semantics": "AS_OF_WEEK_MATCHED_V1",
+  "training_provenance_class": "RECONSTRUCTED_HISTORICAL_NOT_PIT",
+  "promotion_authority": false,
+  "evidence_clock_authority": false,
+  "model_p_authority": false,
+  "official_bet_authority": false,
+  "saturday_pricing_allowed": false,
+  "phone_card_status": "NO_MODEL:CFB_2025_HOLDOUT_INCOMPLETE",
+  "do_not_merge_as_pricing_card": 1251,
+  "pass_rule": {
+    "min_ats_graded": 200,
+    "min_high_confidence_ats": 40,
+    "high_confidence_edge_floor": 0.08,
+    "high_confidence_ats_min_hit": 0.52,
+    "contamination_allowed": false
+  },
+  "blocker": "CFB_2025_HOLDOUT_BUNDLE_NOT_MATERIALIZED",
+  "notes": [
+    "This lock freezes the current joint family identity for a 2025 holdout. It does not freeze config/cfb_game_model_freeze.json and does not grant Model_P.",
+    "CFBD historical lines are last-stored closes, not timed snapshots. CLV vs a decision-time quote is not claimed.",
+    "Saturday week-6 cards stay NO_MODEL until HOLD_PASS and a separate promotion decision."
+  ]
+}
