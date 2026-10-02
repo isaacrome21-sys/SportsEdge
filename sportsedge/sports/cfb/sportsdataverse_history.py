@@ -74,9 +74,13 @@ def regular_fbs_schedule_rows(rows: Iterable[Mapping[str, Any]]) -> list[Mapping
         if season_type not in {"regular","2"}:
             continue
         raw=row["fbs_game"]
-        is_fbs = raw is True or str(raw).strip().lower() in {"true","1","t"}
-        if is_fbs:
+        token = str(raw).strip().lower()
+        if raw is True or token in {"true","1","t"}:
             out.append(row)
+        elif raw is False or token in {"false","0","f"}:
+            continue
+        else:
+            raise SportsDataverseHistoryError("CFB_SDV_FBS_GAME_FLAG_INVALID:"+token)
     return out
 
 def attach_drive_time(
@@ -132,6 +136,12 @@ def build_team_snapshots(
     team = validate_dataset("espn_cfb_adv_team", adv_team_rows)
     situ = validate_dataset("espn_cfb_adv_situational", adv_situational_rows)
     drives = validate_dataset("espn_cfb_adv_drives", adv_drive_rows)
+    all_schedule_ids = {int(r["game_id"]) for r in validate_dataset("cfb_schedules", schedule_rows)}
+    observed_ids = {int(r["game_id"]) for r in team + situ + drives}
+    unknown_ids = sorted(observed_ids - all_schedule_ids)
+    if unknown_ids:
+        raise SportsDataverseHistoryError("CFB_SDV_ADV_GAME_MISSING_SCHEDULE:"+",".join(map(str,unknown_ids[:20])))
+    drives = [r for r in drives if int(r["game_id"]) in allowed_game_ids]
     drives = attach_drive_time(drives, schedules)
 
     def in_scope(r: Mapping[str, Any]) -> bool:
