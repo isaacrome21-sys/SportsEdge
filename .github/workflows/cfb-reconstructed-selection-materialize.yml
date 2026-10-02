@@ -109,6 +109,8 @@ jobs:
     needs: contract
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    permissions:
+      contents: write
     env:
       CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
       PYTHONPATH: .
@@ -184,6 +186,7 @@ jobs:
             --private-input "$RUNNER_TEMP/cfb_reconstructed_acquisition_payload.json" \
             --bundle-out artifacts/cfb/selection_bundle_manifest.json \
             --source-manifest-out artifacts/cfb/reconstructed_source_manifest.json \
+            --acquisition-manifest-out artifacts/cfb/acquisition_manifest.json \
             --private-rows-out "$RUNNER_TEMP/cfb_reconstructed_selection_rows.json"
 
       - name: Run frozen all-four candidate bakeoff exactly once when explicitly confirmed
@@ -259,6 +262,7 @@ jobs:
           paths = [
               Path('artifacts/cfb/cfbd_reconstructed_selection_preflight_public.json'),
               Path('artifacts/cfb/cfb_reconstructed_acquisition_public.json'),
+              Path('artifacts/cfb/acquisition_manifest.json'),
               Path('artifacts/cfb/selection_bundle_manifest.json'),
               Path('artifacts/cfb/candidate_bakeoff_result.json'),
               Path('artifacts/cfb/cfb_selected_candidate_model_proposal.json'),
@@ -285,6 +289,32 @@ jobs:
           print(json.dumps({'status': 'ZERO_AUTHORITY_PUBLIC_OUTPUTS_OK'}, sort_keys=True))
           PY
 
+      - name: Persist public reconstructed-selection readiness to data branch
+        if: steps.preflight.outputs.state == 'VERIFIED_BEFORE_FIRST_REPLAY_CALL'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s artifacts/cfb/acquisition_manifest.json
+          test -s artifacts/cfb/selection_bundle_manifest.json
+          test -s artifacts/cfb/reconstructed_source_manifest.json
+          git fetch --no-tags origin data:data
+          rm -rf _cfb_data
+          git worktree add _cfb_data data
+          target='_cfb_data/history/cfb/reconstructed-selection'
+          mkdir -p "$target"
+          cp artifacts/cfb/acquisition_manifest.json "$target/acquisition_manifest.json"
+          cp artifacts/cfb/selection_bundle_manifest.json "$target/selection_bundle_manifest.json"
+          cp artifacts/cfb/reconstructed_source_manifest.json "$target/reconstructed_source_manifest.json"
+          git -C _cfb_data config user.name 'SportsEdge CFB automation'
+          git -C _cfb_data config user.email 'actions@github.com'
+          git -C _cfb_data add history/cfb/reconstructed-selection
+          if git -C _cfb_data diff --cached --quiet; then
+            echo 'CFB_RECONSTRUCTED_DATA_BRANCH_ALREADY_CURRENT'
+          else
+            git -C _cfb_data commit -m 'data: persist CFB reconstructed selection readiness'
+            git -C _cfb_data push origin HEAD:data
+          fi
+
       - name: Upload public reconstructed-selection attestations and model proposal only
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -293,6 +323,7 @@ jobs:
           path: |
             artifacts/cfb/cfbd_reconstructed_selection_preflight_public.json
             artifacts/cfb/cfb_reconstructed_acquisition_public.json
+            artifacts/cfb/acquisition_manifest.json
             artifacts/cfb/selection_bundle_manifest.json
             artifacts/cfb/reconstructed_source_manifest.json
             artifacts/cfb/candidate_bakeoff_result.json
