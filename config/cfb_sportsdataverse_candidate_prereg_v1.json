@@ -85,5 +85,16 @@
   "hash_binding": {
     "code_manifest_sha256": "85cb695deb63ad3584208f73d422f7bf9d7575ab4d04f7f047656e073cf1ad40",
     "config_bundle_sha256": "dbc93a46db6c284676a5785c7a12c63230422c57b3be4b196e0dd91d2c015d12"
+  },
+  "candidate_selection_policy": {
+    "metric": "JOINT_HOME_AWAY_SCORE_RMSE",
+    "tie_break": "LOWEST_RMSE_THEN_FROZEN_FAMILY_ORDER",
+    "family_order": [
+      "EQUAL_WEIGHT_HARD_SWITCH",
+      "RELIABILITY_WEIGHTED_HARD_SWITCH",
+      "PRIOR_CURRENT_BLEND",
+      "GAMES_IN_SAMPLE_FEATURE"
+    ],
+    "post_result_override_allowed": false
   }
 }
