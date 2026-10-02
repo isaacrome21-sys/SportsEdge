@@ -5,6 +5,8 @@ from typing import Mapping
 
 CODE_PATHS=(
  "sportsedge/sports/cfb/sportsdataverse_candidate_families.py",
+ "sportsedge/sports/cfb/sportsdataverse_candidate_model.py",
+ "sportsedge/sports/cfb/sportsdataverse_bakeoff.py",
  "sportsedge/sports/cfb/sportsdataverse_history.py",
  "sportsedge/sports/cfb/sportsdataverse_manifest.py",
  "sportsedge/sports/cfb/sportsdataverse_materializer.py",
