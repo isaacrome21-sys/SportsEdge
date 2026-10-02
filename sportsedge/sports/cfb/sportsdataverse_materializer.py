@@ -150,7 +150,7 @@ def materialize_native_candidate_inputs(
                 raise SDVMaterializationError("CFB_SDV_SOURCE_CONTRACT_MISMATCH")
 
             # Week 0/1: authoritative snapshot IS the prior-season fallback.
-            # No in-season sample exists yet, so current == prior for dual fields.
+            # No in-season sample exists yet. Current-value placeholders use\n            # prior values, but their sample size is explicitly zero below.
             home_snap = home_prior_snap
             away_snap = away_prior_snap
             home_current_snap = home_prior_snap
