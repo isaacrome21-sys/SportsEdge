@@ -27,7 +27,7 @@ is automatic. Nothing moves context → model without a one-shot holdout.
 
 | Sport | Finish | Now |
 |---|---|---|
-| MLB | Full game, F5, NRFI/YRFI, TT, starter-aware, pitcher/batter props | Game markets live (V7 + dispersion). Starter v2 not promoted. Props on #1243. F5 still fail-closed. |
+| MLB | Full game, F5, NRFI/YRFI, TT, starter-aware, pitcher/batter props | Sides, game totals, team totals, and player props price from the registry (`mlb_props_side_totals`). Either-pitcher mass dust clamped. F5 still fail-closed on `grok/mlb/f5-card`. Not OFFICIAL. |
 | NFL | ML, all spreads incl. 3/7, totals, TT, halves/quarters, usage props | Phone card live. **`.5` totals only.** Discrete v1 **failed** 2025 push gate. Props #1250 pre-lock. |
 | CFB | Same markets, FCS/altitude/neutral handled | UNFROZEN. `[CFB LINES]` is `NO_MODEL` (#1251). New unused window required. |
 | NHL | ML, PL, totals, periods, SOG/G/A on confirmed goalie | Rate v1 **passed** 2025–26. Card still `NO_MODEL` until promotion. Goal/point props unsupported. |
