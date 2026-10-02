@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from urllib.error import HTTPError
 
 from scripts.acquire_cfb_reconstructed_selection import (
     CFBAcquisitionError,
@@ -118,6 +119,61 @@ class TestCFBReconstructedSelectionAcquisition(unittest.TestCase):
             self.assertTrue(cached)
             self.assertEqual(payload, [{"id": 1}])
             self.assertEqual(returned_meta["query_sha256"], q)
+
+    def test_cfbd_retries_429_and_honors_verified_success(self):
+        item = build_request_plan(self.config)[0]
+        calls = {"count": 0}
+        sleeps = []
+
+        class Response:
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def read(self):
+                return b'[{"id":1}]'
+
+        def opener(req, timeout=30):
+            calls["count"] += 1
+            if calls["count"] < 3:
+                raise HTTPError(req.full_url, 429, "rate limited", {"Retry-After": "0"}, None)
+            return Response()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            payload, meta, cached = _fetch_one(
+                item,
+                api_key="key",
+                cache_root=Path(tmp),
+                opener=opener,
+                sleeper=sleeps.append,
+            )
+        self.assertFalse(cached)
+        self.assertEqual(payload, [{"id": 1}])
+        self.assertEqual(calls["count"], 3)
+        self.assertEqual(sleeps, [0.0, 0.0])
+        self.assertEqual(meta["query_sha256"], item["query_sha256"])
+
+    def test_cfbd_nonretriable_http_error_fails_once_with_request_identity(self):
+        item = build_request_plan(self.config)[0]
+        calls = {"count": 0}
+
+        def opener(req, timeout=30):
+            calls["count"] += 1
+            raise HTTPError(req.full_url, 400, "bad request", {}, None)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(
+                CFBAcquisitionError,
+                r"HTTP_400:year=2014:endWeek=None",
+            ):
+                _fetch_one(
+                    item,
+                    api_key="key",
+                    cache_root=Path(tmp),
+                    opener=opener,
+                    sleeper=lambda _: None,
+                )
+        self.assertEqual(calls["count"], 1)
 
     def test_acquisition_venue_index_accepts_provider_shapes_and_skips_unusable_rows(self):
         rows = [
