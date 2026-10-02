@@ -1,0 +1,105 @@
+{
+  "schema": "SPORTSEDGE_NFL_PLAY_LEVEL_ATTEMPT1_IMPLEMENTATION_FREEZE_V1",
+  "status": "FROZEN_IMPLEMENTATION_BEFORE_2024_LOOK",
+  "frozen_date": "2026-10-01",
+  "attempt_id": "NFL_PLAY_LEVEL_EPA_CPOE_G1_ATTEMPT_1",
+  "sources": {
+    "schedule_results_lines": "PINNED nflverse/nfldata games.csv from config/public_training_sources_v1.json",
+    "play_by_play_url_pattern": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_{season}.csv.gz",
+    "depth_chart_url_pattern": "https://github.com/nflverse/nflverse-data/releases/download/depth_charts/depth_charts_{season}.csv",
+    "development_pbp_depth_seasons": [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023],
+    "validation_pbp_depth_season": 2024,
+    "raw_asset_sha256_recorded_in_one_shot_receipt": true
+  },
+  "strict_pit": {
+    "target_game_updates_history_only_after_feature_row": true,
+    "depth_starter": "latest unique pos_abb=QB,pos_rank=1 gsis_id with dt <= target kickoff",
+    "depth_missing_or_ambiguous": "FAIL_GAME_ROW_CLOSED",
+    "kickoff_timezone": "America/New_York because nflverse gametime is Eastern",
+    "target_game_player_participation_may_infer_starter": false,
+    "same_game_pbp_may_enter_features": false
+  },
+  "play_filter": {
+    "include": "qb_dropback=1 OR rush_attempt=1",
+    "exclude_if_any": ["no_play=1", "two_point_attempt=1", "qb_kneel=1"],
+    "rush_excludes_qb_spike": true,
+    "epa_required": true,
+    "pass_epa": "qb_epa when finite else epa",
+    "success": "nflverse success when finite else indicator(epa>0)"
+  },
+  "neutral_pass_oe_definition": {
+    "down": [1, 2],
+    "quarters": [1, 2, 3],
+    "absolute_preplay_score_differential_max": 8,
+    "half_seconds_remaining_strictly_greater_than": 120,
+    "requires_finite_xpass": true,
+    "value": "nflverse pass_oe"
+  },
+  "team_features": {
+    "lookback_games": 8,
+    "decay_per_older_game": 0.85,
+    "minimum_prior_team_games": 4,
+    "cross_season_carry": true,
+    "missing_feature_game_causes_target_row_failure": true
+  },
+  "qb_features": {
+    "minimum_prior_dropbacks": 20,
+    "pseudo_dropbacks": 100,
+    "prior": "expanding pooled QB mean from strictly-prior development-window plays; for 2024 the prior entering the first validation game contains only 2016-2023 and updates only after each 2024 target row is built",
+    "epa_numerator": "qb_epa sum",
+    "cpoe_numerator": "cpoe sum over nonmissing cpoe plays"
+  },
+  "fit": {
+    "targets": ["HOME_MARGIN", "GAME_TOTAL"],
+    "residual_baseline": "frozen Attempt9 raw mean",
+    "margin_features": "home minus away feature vector",
+    "total_features": "home plus away feature vector",
+    "ridge_alpha_grid": [0.1, 1.0, 10.0, 100.0],
+    "alpha_selection": "separate per target by pooled RMSE over expanding validation seasons 2019-2023, train seasons strictly earlier",
+    "standardization": "fit on each training fold only",
+    "candidate_probability_sigma": "sample SD of 2019-2023 expanding-fold out-of-fold residuals",
+    "attempt9_probability_sigma": "sample SD of frozen Attempt9 residuals on complete 2016-2023 development rows"
+  },
+  "evaluation": {
+    "season": 2024,
+    "game_type": "REG",
+    "spread_line_convention": "nflverse positive spread_line means home favored; home-cover threshold is margin > spread_line",
+    "market_rows": "half-point spread and half-point total only",
+    "probability": "uncalibrated normal threshold probability using development-only sigma",
+    "log_loss_clip": 1e-12,
+    "calibration": "logistic recalibration logit(y) = intercept + slope*logit(p), Newton solve",
+    "ece": "10 equal-width probability bins"
+  },
+  "sample_requirements": {
+    "minimum_development_games": 800,
+    "minimum_validation_games": 180,
+    "minimum_half_point_rows_per_market": 150
+  },
+  "validation_pass_rules": {
+    "pooled_log_loss_must_beat_attempt9": true,
+    "market_log_loss_max_regression": 0.002,
+    "at_least_one_market_log_loss_improvement_min": 0.005,
+    "margin_rmse_must_not_worsen": true,
+    "total_rmse_must_not_worsen": true,
+    "calibration_slope_min": 0.9,
+    "calibration_slope_max": 1.1,
+    "calibration_intercept_abs_max": 0.03,
+    "ece_max": 0.025
+  },
+  "one_shot_discipline": {
+    "development_preflight_occurs_before_first_2024_pbp_or_depth_fetch": true,
+    "first_2024_access_spends_attempt1": true,
+    "source_insufficiency_after_2024_access_spends_attempt1": true,
+    "no_retune_on_2024": true,
+    "2025_not_loaded_by_attempt1_runner": true
+  },
+  "authority": {
+    "changes_production_model": false,
+    "creates_model_p": false,
+    "promotion_authority": false,
+    "truth_gate_authority": false,
+    "official_authority": false,
+    "staking_authority": false,
+    "changes_2026_owner": false
+  }
+}
