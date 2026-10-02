@@ -13,7 +13,7 @@ class SDVNativeBakeoffError(ValueError): pass
 
 def _rmse(pred,rows):
  if len(pred)!=len(rows) or not rows: raise SDVNativeBakeoffError("CFB_SDV_BAKEOFF_SCORE_ROWS_INVALID")
- return sqrt(sum((h-float(r["home_score"]))**2+(a-float(r["away_score"]))**2 for (h,a),r in zip(pred,rows))/(2*len(rows)))
+ return sqrt(sum((h-float(r["home_points"]))**2+(a-float(r["away_points"]))**2 for (h,a),r in zip(pred,rows))/(2*len(rows)))
 
 def _constants(config,family):
  c=config["candidates"].get(family)
