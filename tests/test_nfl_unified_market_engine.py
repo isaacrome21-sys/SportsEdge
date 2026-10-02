@@ -106,6 +106,25 @@ def test_integer_spread_and_total_keep_real_push_mass():
     assert total["loss_p"] == pytest.approx(0.10)
 
 
+def test_away_spread_line_is_applied_to_away_team_not_home_team():
+    grid = [
+        [0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0, 0.0],  # home wins 3-0
+    ]
+    away_plus_three = price_game_market(
+        grid, {"market": "spread", "selection": "away", "line": 3.0}
+    )
+    away_plus_three_half = price_game_market(
+        grid, {"market": "spread", "selection": "away", "line": 3.5}
+    )
+    assert away_plus_three["push_p"] == pytest.approx(1.0)
+    assert away_plus_three["estimate_p"] == pytest.approx(0.0)
+    assert away_plus_three_half["estimate_p"] == pytest.approx(1.0)
+    assert away_plus_three_half["push_p"] == pytest.approx(0.0)
+
+
 def test_team_total_comes_from_same_score_grid():
     home_over = price_game_market(
         tiny_grid(),
