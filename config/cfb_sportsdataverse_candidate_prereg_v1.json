@@ -64,10 +64,10 @@
     ],
     "row_eligibility": {
       "rule": "COMMON_SCOREABLE_SURFACE_V1",
-      "week_1": "REQUIRE_BOTH_TEAMS_PRIOR_SEASON_FINAL_SNAPSHOT",
       "week_2_plus": "REQUIRE_BOTH_TEAMS_CURRENT_SEASON_THROUGH_W_MINUS_1_AND_PRIOR_SEASON_FINAL_SNAPSHOT",
       "missing_required_snapshot": "EXCLUDE_ROW_WITH_EXPLICIT_REASON_BEFORE_WEATHER_AND_LABEL_BINDING",
-      "weather_missing_after_snapshot_eligibility": "FAIL_CLOSED"
+      "weather_missing_after_snapshot_eligibility": "FAIL_CLOSED",
+      "week_0_or_1": "REQUIRE_BOTH_TEAMS_PRIOR_SEASON_FINAL_SNAPSHOT"
     }
   },
   "hyperparameter_policy": {
