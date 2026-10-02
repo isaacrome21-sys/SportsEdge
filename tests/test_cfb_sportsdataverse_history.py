@@ -104,3 +104,38 @@ def test_prior_season_fallback_uses_all_prior_games_only():
         schedule_rows=schedules,target_season=2026)
     assert [(s.team_id,s.season,s.games_in_sample) for s in snaps] == [(10,2025,3),(20,2025,3)]
     assert all(s.through_week==3 for s in snaps)
+
+
+def test_snapshot_wrappers_validate_against_full_schedule_before_scope_filter():
+    regular=[_rows(1,101),_rows(2,102)]
+    postseason=_rows(3,999)
+    team=[]; situ=[]; drives=[]; schedules=[]
+    for r in regular:
+        team.extend([r[0],r[4]])
+        situ.extend([r[1],r[5]])
+        drives.extend([r[2],r[6]])
+        schedules.append(r[3])
+    team.extend([postseason[0],postseason[4]])
+    situ.extend([postseason[1],postseason[5]])
+    drives.extend([postseason[2],postseason[6]])
+    schedules.append({**postseason[3],"season_type":"postseason"})
+
+    snaps=build_season_week_snapshots(
+        adv_team_rows=team,
+        adv_situational_rows=situ,
+        adv_drive_rows=drives,
+        schedule_rows=schedules,
+        season=2025,
+    )
+    assert [(s.team_id,s.through_week,s.games_in_sample) for s in snaps] == [
+        (10,1,1),(20,1,1)
+    ]
+
+    prior=build_prior_season_fallback_snapshots(
+        adv_team_rows=team,
+        adv_situational_rows=situ,
+        adv_drive_rows=drives,
+        schedule_rows=schedules,
+        target_season=2026,
+    )
+    assert [(s.team_id,s.games_in_sample) for s in prior] == [(10,2),(20,2)]
