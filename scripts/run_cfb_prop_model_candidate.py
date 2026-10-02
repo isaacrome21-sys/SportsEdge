@@ -126,7 +126,7 @@ def _network_odds(*, live: dict, current: datetime) -> dict:
         events.append(dict(fetched.value))
     return build_odds_snapshot(events, observed_at=current)
 
-def _candidateize(report: dict) -> dict:
+def _candidateize(report: dict, *, proxy_usage: bool = False) -> dict:
     candidate_rows = 0
     stale_rows = 0
     for row in report.get("results", []):
@@ -146,11 +146,17 @@ def _candidateize(report: dict) -> dict:
             row["decision_tier"] = "MODEL_CANDIDATE"
             row["presentation_label"] = "LEAN"
             row["model_candidate_status"] = "READY"
-            row["reason"] = "CFB_PROP_RESEARCH_ONLY_INDEPENDENT_VALIDATION_REQUIRED"
+            row["usage_input_class"] = "RESEARCH_PROXY" if proxy_usage else "OBSERVED_USAGE_INPUT"
+            row["reason"] = (
+                "CFB_PROP_RESEARCH_PROXY_USAGE_INDEPENDENT_VALIDATION_REQUIRED"
+                if proxy_usage
+                else "CFB_PROP_RESEARCH_ONLY_INDEPENDENT_VALIDATION_REQUIRED"
+            )
             candidate_rows += 1
         else:
             row["decision_tier"] = "NO_ACTIONABLE_CANDIDATE"
             row["presentation_label"] = "NO_PLAY"
+            row["usage_input_class"] = "RESEARCH_PROXY" if proxy_usage else "OBSERVED_USAGE_INPUT"
             row["model_candidate_status"] = "BLOCKED"
             if "STALE" in str(row.get("reason") or ""):
                 stale_rows += 1
@@ -172,6 +178,8 @@ def _candidateize(report: dict) -> dict:
         "evidence_registry_consumed": False,
         "certification_registry_consumed": False,
         "frozen_edge_floor_can_promote": False,
+        "research_proxy_usage": bool(proxy_usage),
+        "production_eligible": False,
     }
     return report
 
@@ -194,6 +202,10 @@ def main() -> int:
             args.freeze_registry, args.model_artifact
         )
         live = _json(args.live_features, "CFB_PROP_CANDIDATE_LIVE_FEATURES_REQUIRED")
+        live_governance = live.get("governance") if isinstance(live.get("governance"), dict) else {}
+        proxy_usage = live_governance.get("research_proxy_usage") is True
+        if proxy_usage and live.get("schema_version") != "CFB_PROP_RESEARCH_PROXY_LIVE_FEATURES_V1":
+            raise CFBPropCandidateError("CFB_PROP_PROXY_USAGE_SCHEMA_INVALID")
         odds = (
             _json(args.odds_snapshot, "CFB_PROP_CANDIDATE_ODDS_SNAPSHOT_REQUIRED")
             if args.odds_snapshot.is_file()
@@ -211,7 +223,7 @@ def main() -> int:
             n_paths=int(args.n_paths),
             book_key=str(args.bookmaker),
         )
-        report = _candidateize(report)
+        report = _candidateize(report, proxy_usage=proxy_usage)
         payload = {
             "schema_version": "CFB_PROP_MODEL_CANDIDATE_RUN_V1",
             "status": "SUCCESS" if report["summary"]["model_candidate_rows"] else "BLOCKED",
@@ -226,6 +238,8 @@ def main() -> int:
                 "market_prices_can_create_model_p": False,
                 "usage_can_be_synthesized": False,
                 "network_odds_allowed_only_after_live_features": True,
+                "research_proxy_usage": bool(proxy_usage),
+                "production_eligible": False,
             },
         }
         args.output.parent.mkdir(parents=True, exist_ok=True)

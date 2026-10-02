@@ -1,0 +1,83 @@
+name: cfb auto proxy live smoke
+
+on:
+  push:
+    branches:
+      - cfb/auto-proxy-usage-v1
+
+permissions:
+  contents: read
+
+jobs:
+  live-smoke:
+    concurrency:
+      group: sportsedge-paid-odds-api
+      cancel-in-progress: false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+      SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+      SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
+      SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
+      SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+      SPORTSEDGE_CFBD_API_KEY: ${{ secrets.SPORTSEDGE_CFBD_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - run: python -m pip install --disable-pip-version-check -r requirements-test.txt
+
+      - name: Build current market-blind proxy features
+        run: |
+          python scripts/build_cfb_research_proxy_live_features.py \
+            --horizon-hours 24 \
+            --output artifacts/football/cfb_prop_live_features.json
+
+      - name: Run current prop research smoke
+        run: |
+          python scripts/run_cfb_prop_model_candidate.py \
+            --live-features artifacts/football/cfb_prop_live_features.json \
+            --n-paths 1500 \
+            --output artifacts/run_it/cfb_prop_model_candidate.json || true
+
+      - name: Summarize without escalating authority
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          live=json.loads(Path("artifacts/football/cfb_prop_live_features.json").read_text())
+          assert live["governance"]["research_proxy_usage"] is True
+          assert live["governance"]["sportsbook_prices_consumed"] is False
+          assert live["governance"]["production_eligible"] is False
+
+          out={"games": len(live["games"]), "blocked_games": len(live["blocked_games"])}
+          p=Path("artifacts/run_it/cfb_prop_model_candidate.json")
+          if p.exists():
+              prop=json.loads(p.read_text())
+              out["prop_status"]=prop.get("status")
+              report=prop.get("report") or {}
+              out["candidate_rows"]=(report.get("summary") or {}).get("model_candidate_rows",0)
+              out["official_bets"]=(report.get("summary") or {}).get("official_bets",0)
+              assert out["official_bets"] == 0
+          else:
+              out["prop_status"]="NO_OUTPUT"
+              out["candidate_rows"]=0
+              out["official_bets"]=0
+          print(json.dumps(out, sort_keys=True))
+          PY
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cfb-auto-proxy-live-smoke
+          path: |
+            artifacts/football/cfb_prop_live_features.json
+            artifacts/run_it/cfb_prop_model_candidate.json
+          if-no-files-found: warn
+          retention-days: 2
