@@ -1,6 +1,6 @@
-CFB_RECONSTRUCTED_MATERIALIZE_REQUEST_V2
+CFB_RECONSTRUCTED_MATERIALIZE_REQUEST_V3
 requested_mode=MATERIALIZE_ONLY
 requested_utc=2026-10-02
-requested_reason=continue_cfb_model_selection_readiness
+requested_reason=persist_redacted_reconstructed_selection_readiness
 no_evaluation_attempt=true
 no_backfill=true
