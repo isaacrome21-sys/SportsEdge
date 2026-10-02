@@ -1,4 +1,4 @@
-from sportsedge.sports.cfb.candidate_families import (
+from sportsedge.sports.cfb.sportsdataverse_candidate_families import (
     materialize_candidate_row,
 )
 
