@@ -1071,7 +1071,7 @@
       "note": "Registers merged row-level CFB sportsbook player-identity isolation in the research candidate lane. Covered CFB prop test bytes remain inside the already-REVOKED CFB prop freeze; the adapter change creates no Model_P, Truth Gate, promotion, staking, evidence-clock, or OFFICIAL authority."
     }
   ],
-  "inventory_block_reason": "Bundle inventory remains intentionally incomplete; current main through PR_1374 is registered and covered-drift bundles remain revoked fail-closed.",
+  "inventory_block_reason": "Bundle inventory remains intentionally incomplete; current main through PR_1374 is registered, affected covered freezes remain revoked fail-closed, and this reconciliation grants zero model or betting authority.",
   "issue": 686,
   "reconciled_through_sha": "e0d5d452fb162761fdce16058d2839fd85e4337d",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
