@@ -1,0 +1,38 @@
+{
+  "schema": "SPORTSEDGE_NFL_PROP_USAGE_V1_2025_VALIDATION_DISPOSITION",
+  "status": "WINDOW_SPENT_TECHNICAL_FAILURE_NO_MODEL_SCORE",
+  "adjudicated_date": "2026-10-02",
+  "candidate": {
+    "fit_artifact_sha256": "ef38c7101da0977f27b71a7cbbe40321149ee2e0fda3bb8371f04d8423c9c555",
+    "unchanged_after_failure": true
+  },
+  "one_look": {
+    "workflow_run_id": 36976714292,
+    "head_sha": "b531aa965a0c3ed17a167f3c028d987376942170",
+    "artifact_id": 11213747098,
+    "artifact_digest": "sha256:432886b51b40a8a5d0edcb08e5552d7760bb8b7a4cfe8d1f21cd2c06b6920f07",
+    "spend_receipt_status": "VALIDATION_WINDOW_SPENT_BEFORE_TARGET_SOURCE_ACCESS",
+    "spent_at": "2026-10-02T07:05:31.420015+00:00",
+    "failure_status": "VALIDATION_WINDOW_SPENT_TECHNICAL_FAILURE",
+    "error": "HTTP Error 404: Not Found",
+    "model_scoring_completed": false,
+    "calibration_computed": false,
+    "brier_computed": false
+  },
+  "governance": {
+    "2025_reusable": false,
+    "retry_2025": false,
+    "retune_on_2025": false,
+    "statistical_pass_claimed": false,
+    "statistical_fail_claimed": false,
+    "next_validation_requires_fresh_predeclared_window": true
+  },
+  "authority": {
+    "creates_model_p": false,
+    "truth_gate": false,
+    "official": false,
+    "promotion": false,
+    "staking": false,
+    "backfill": false
+  }
+}
