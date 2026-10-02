@@ -1,0 +1,36 @@
+{
+  "schema": "CFB_SPORTSDATAVERSE_HISTORICAL_WEATHER_CONTRACT_V1",
+  "status": "FROZEN_BEFORE_FIRST_EVALUATION",
+  "purpose": "CONTEXT_FEATURES_ONLY",
+  "schedule_source": "cfb_schedules",
+  "join_identity": [
+    "game_id",
+    "start_date"
+  ],
+  "required_output": [
+    "game_id",
+    "game_indoor",
+    "wind_speed",
+    "temperature"
+  ],
+  "semantics": {
+    "indoor": "BOOLEAN_VENUE_CLASSIFICATION",
+    "wind_speed": "KICKOFF_HOURLY_WIND_SPEED_MPH",
+    "temperature": "KICKOFF_HOURLY_TEMPERATURE_F",
+    "indoor_weather": "WIND_AND_TEMPERATURE_MAY_BE_NULL_ONLY_WHEN_GAME_INDOOR_TRUE"
+  },
+  "prohibited": [
+    "MARKET_DATA",
+    "BETTING_DATA",
+    "2026_REALIZED_OUTCOMES",
+    "IMPUTED_WEATHER"
+  ],
+  "completeness": "EVERY_EVALUATED_HISTORICAL_GAME_MUST_BIND_OR_EVALUATION_FAILS_CLOSED",
+  "governance": {
+    "evaluation_performed": false,
+    "attempt_consumed": false,
+    "model_p_created": false,
+    "promotion_authority": false,
+    "official_authority": false
+  }
+}
