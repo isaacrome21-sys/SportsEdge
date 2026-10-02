@@ -40,6 +40,19 @@ def main() -> int:
                 f"  Score-B {pick.get('score_0_100', '—')}"
                 f"  EV {pick.get('ev_per_dollar', 0):+.3f}"
             )
+        research = game.get("research_readout") or []
+        if research:
+            lines.append("  research readout (not Attempt-9, not official):")
+            for row in research:
+                if row.get("no_model"):
+                    label = f"{row.get('subject') or ''} {row.get('market')}".strip()
+                    lines.append(f"  - {label}: {row['no_model']}")
+                    continue
+                bits = ", ".join(
+                    f"{side['selection']} {side.get('line', '')} p={side['model_p']:.3f}"
+                    for side in row.get("sides") or []
+                )
+                lines.append(f"  - {row.get('market')}: {bits}")
         lines.append("")
     if not any(g.get("picks") for g in engine.get("games") or []):
         if engine.get("empty_reason"):

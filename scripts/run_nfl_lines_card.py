@@ -16,6 +16,7 @@ from sportsedge.nfl_attempt9_live_forecast import (
     recency_features,
 )
 from sportsedge.nfl_run_it_scoring import qualification_role_score
+from sportsedge.nfl_props_side_totals import research_game_readout
 from sportsedge.sports.nfl.attempt9_model_p import model_probability
 from sportsedge.truth_gate import american_to_decimal
 
@@ -119,7 +120,8 @@ def main() -> int:
             markets.append(row)
             if pick:
                 picks.append(pick)
-        games_out.append({**game, "markets": markets, "picks": picks, "features": feat})
+        research = research_game_readout(forecast, game.get("markets") or []) if forecast else []
+        games_out.append({**game, "markets": markets, "picks": picks, "features": feat, "research_readout": research})
     payload = {
         "sport": "NFL",
         "context_bound": False,

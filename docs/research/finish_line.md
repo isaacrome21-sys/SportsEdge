@@ -28,7 +28,7 @@ is automatic. Nothing moves context → model without a one-shot holdout.
 | Sport | Finish | Now |
 |---|---|---|
 | MLB | Full game, F5, NRFI/YRFI, TT, starter-aware, pitcher/batter props | Game markets live (V7 + dispersion). Starter v2 not promoted. Props on #1243. F5 still fail-closed. |
-| NFL | ML, all spreads incl. 3/7, totals, TT, halves/quarters, usage props | Phone card live. **`.5` totals only.** Discrete v1 **failed** 2025 push gate. Props #1250 pre-lock. |
+| NFL | ML, all spreads incl. 3/7, totals, TT, halves/quarters, usage props | Attempt-9 phone picks unchanged. Research readout now prices ML/spread/total/team total from the frozen score grid. Props parse and stay `NO_MODEL` until a role bundle. Not OFFICIAL. |
 | CFB | Same markets, FCS/altitude/neutral handled | UNFROZEN. `[CFB LINES]` is `NO_MODEL` (#1251). New unused window required. |
 | NHL | ML, PL, totals, periods, SOG/G/A on confirmed goalie | Rate v1 **passed** 2025–26. Card still `NO_MODEL` until promotion. Goal/point props unsupported. |
 | NBA | ML, spread, totals, halves/quarters, PTS/REB/AST from minutes | Engine in-tree. `[NBA LINES]` is `NO_MODEL` (#1251). Freeze + holdout remain. |

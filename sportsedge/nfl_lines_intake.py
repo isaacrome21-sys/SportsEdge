@@ -18,6 +18,8 @@ class NflMarketLine:
     away_or_over_price: int
     home_or_under_price: int
     raw: str
+    team_side: str | None = None
+    subject: str | None = None
 
 
 @dataclass
@@ -84,6 +86,26 @@ def parse_nfl_lines(body: str) -> list[NflGameTicket]:
                 raise NflLinesIntakeError(f"NFL_INTAKE_ONE_SIDED_OR_MALFORMED:{line}")
             current.markets.append(NflMarketLine("total", float(parts[1]), _american(parts[2]), _american(parts[3]), line))
             continue
+        if kind in {"tt", "teamtotal"} or (kind == "team" and len(parts) > 1 and parts[1].lower() == "total"):
+            offset = 2 if kind == "team" else 1
+            if len(parts) != offset + 4:
+                raise NflLinesIntakeError(f"NFL_INTAKE_ONE_SIDED_OR_MALFORMED:{line}")
+            side = parts[offset].lower()
+            if side not in {"away", "home"}:
+                raise NflLinesIntakeError(f"NFL_INTAKE_TEAM_TOTAL_SIDE_INVALID:{line}")
+            current.markets.append(NflMarketLine(
+                "team_total", float(parts[offset + 1]), _american(parts[offset + 2]),
+                _american(parts[offset + 3]), line, team_side=side,
+            ))
+            continue
+        if kind == "prop":
+            if len(parts) != 6:
+                raise NflLinesIntakeError(f"NFL_INTAKE_ONE_SIDED_OR_MALFORMED:{line}")
+            current.markets.append(NflMarketLine(
+                parts[2].lower(), float(parts[3]), _american(parts[4]),
+                _american(parts[5]), line, subject=parts[1],
+            ))
+            continue
         raise NflLinesIntakeError(f"NFL_INTAKE_UNRECOGNIZED:{line}")
     if not games:
         raise NflLinesIntakeError("NFL_INTAKE_NO_GAMES")
@@ -106,6 +128,8 @@ def tickets_to_dict(tickets: list[NflGameTicket], *, observed_at: str) -> dict[s
                         "away_or_over_price": m.away_or_over_price,
                         "home_or_under_price": m.home_or_under_price,
                         "raw": m.raw,
+                        "team_side": m.team_side,
+                        "subject": m.subject,
                     }
                     for m in g.markets
                 ],
