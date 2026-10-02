@@ -1069,10 +1069,28 @@
       "merge_sha": "e0d5d452fb162761fdce16058d2839fd85e4337d",
       "pr": 1374,
       "note": "Registers merged row-level CFB sportsbook player-identity isolation in the research candidate lane. Covered CFB prop test bytes remain inside the already-REVOKED CFB prop freeze; the adapter change creates no Model_P, Truth Gate, promotion, staking, evidence-clock, or OFFICIAL authority."
+    },
+    {
+      "delta_id": "PR_1365_RECONCILIATION_RELEASE_MERGE",
+      "merge_sha": "38dcf88b3bc0c3bec5ba56a9d678e8ddf7a96b01",
+      "pr": 1365,
+      "note": "Registers the reconciliation-only merge that advanced main after the PR_1374 boundary. Zero model, validation, promotion, staking, Truth Gate, or OFFICIAL authority is created."
+    },
+    {
+      "delta_id": "PR_1376_CFB_RECONSTRUCTED_MATERIALIZATION_TRIGGER",
+      "merge_sha": "1a67d754d08f010bddea94c2a814fb3dc90f0e42",
+      "pr": 1376,
+      "note": "Registers the guarded CFB reconstructed-selection materialization trigger. The run remained fail-closed at provider preflight with no historical replay calls and no validation attempt consumed; no Model_P or betting authority is created."
+    },
+    {
+      "delta_id": "PR_1377_NFL_UNIFIED_CARD",
+      "merge_sha": "4a132b1a68f4e84ee00499dabb3520199aac4948",
+      "pr": 1377,
+      "note": "Registers the merged NFL unified MLB-style card/runtime surface. Reconciliation determines any covered-bundle impact; this provenance record grants no model, validation, promotion, staking, Truth Gate, or OFFICIAL authority."
     }
   ],
-  "inventory_block_reason": "Bundle inventory remains intentionally incomplete; current main through PR_1374 is registered, affected covered freezes remain revoked fail-closed, and this reconciliation grants zero model or betting authority.",
+  "inventory_block_reason": "Bundle inventory remains intentionally incomplete; current main through PR_1377 is registered, affected covered freezes remain fail-closed, and this reconciliation grants zero model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "e0d5d452fb162761fdce16058d2839fd85e4337d",
+  "reconciled_through_sha": "4a132b1a68f4e84ee00499dabb3520199aac4948",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
