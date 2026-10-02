@@ -7,6 +7,7 @@ from __future__ import annotations
 from math import sqrt
 from typing import Any,Mapping,Sequence
 from .sportsdataverse_candidate_model import FAMILIES,fit_native_score_model
+from .sportsdataverse_weather import require_complete_weather
 
 class SDVNativeBakeoffError(ValueError): pass
 
@@ -42,6 +43,7 @@ def evaluate_native_candidates(rows:Sequence[Mapping[str,Any]],config:Mapping[st
  data=[dict(r) for r in rows]
  if not data: raise SDVNativeBakeoffError("CFB_SDV_BAKEOFF_ROWS_EMPTY")
  if any(int(r["season"])>=2026 for r in data): raise SDVNativeBakeoffError("CFB_SDV_2026_OUTCOMES_PROHIBITED")
+ require_complete_weather(data)
  hp=config["hyperparameter_policy"]; grid=[float(x) for x in hp["ridge_alpha_grid"]]
  seasons=sorted({int(r["season"]) for r in data})
  # Need at least three earlier seasons so nested alpha selection is genuinely temporal.
