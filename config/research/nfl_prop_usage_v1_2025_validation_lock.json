@@ -1,6 +1,6 @@
 {
   "schema": "SPORTSEDGE_NFL_PROP_USAGE_V1_2025_VALIDATION_LOCK",
-  "status": "FROZEN_BEFORE_2025_OUTCOME_ACCESS",
+  "status": "SPENT_TECHNICAL_FAILURE_NO_MODEL_SCORE",
   "frozen_date": "2026-10-02",
   "fit_identity": {
     "owner_pr": 1348,
@@ -41,9 +41,18 @@
     "season": 2025,
     "season_type": "REG",
     "one_look": true,
-    "status": "UNSPENT",
+    "status": "SPENT_TECHNICAL_FAILURE",
     "post_result_retune": false,
-    "second_look": false
+    "second_look": false,
+    "spent_at": "2026-10-02T07:05:31.420015+00:00",
+    "workflow_run_id": 36976714292,
+    "workflow_head_sha": "b531aa965a0c3ed17a167f3c028d987376942170",
+    "workflow_artifact_id": 11213747098,
+    "workflow_artifact_digest": "sha256:432886b51b40a8a5d0edcb08e5552d7760bb8b7a4cfe8d1f21cd2c06b6920f07",
+    "disposition": "HTTP_404_PLAYER_STATS_SOURCE_AFTER_PRECOMMITTED_SPEND_RECEIPT",
+    "model_scoring_completed": false,
+    "statistical_result": null,
+    "reusable": false
   },
   "cohort": {
     "market_source": "DRAFTKINGS_LAST_PRE_KICK",
@@ -106,6 +115,7 @@
     "games_uri": "https://github.com/nflverse/nflverse-data/releases/download/schedules/games.csv",
     "role": "PLAYER_STATS_2025_IS_OPENED_ONLY_BY_THE_ONE_LOOK_RUNNER_FOR_STRICTLY_PRIOR_FEATURES_AND_TARGET_OUTCOMES",
     "exact_bytes_recorded_at_first_and_only_access": true,
-    "market_features_from_these_sources": false
+    "market_features_from_these_sources": false,
+    "player_stats_2025_uri_status": "HTTP_404_AT_FIRST_AND_ONLY_ATTEMPT"
   }
 }
