@@ -17,6 +17,9 @@ permissions:
 
 jobs:
   research-card:
+    concurrency:
+      group: sportsedge-paid-odds-api
+      cancel-in-progress: false
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
