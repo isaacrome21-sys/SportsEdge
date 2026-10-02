@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run frozen CFB offensive prop simulation as a research-only Model_P lane.
+"""Run frozen CFB shared-path prop simulation as a research-only candidate lane.
 
 This entrypoint deliberately bypasses bettor-facing engine authority. It can emit
 research MODEL_CANDIDATE probabilities only after the frozen artifact, frozen
@@ -20,7 +20,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from sportsedge.football_prop_run_machine import FootballPropRunError\nfrom sportsedge.football_prop_extended_run_machine import run_football_extended_props
+from sportsedge.football_prop_run_machine import FootballPropRunError
+from sportsedge.football_prop_extended_run_machine import run_football_extended_props
 from sportsedge.sports.cfb.prop_bundle import CFBPropBundleError, load_cfb_prop_artifact_bundle
 from sportsedge.sports.nfl.prop_code_surface import (
     CFBPropCodeSurfaceError,
@@ -148,7 +149,7 @@ def main() -> int:
         )
         live = _json(args.live_features, "CFB_PROP_CANDIDATE_LIVE_FEATURES_REQUIRED")
         odds = _json(args.odds_snapshot, "CFB_PROP_CANDIDATE_ODDS_SNAPSHOT_REQUIRED")
-        report = run_football_props(
+        report = run_football_extended_props(
             sport="CFB",
             now=current,
             artifact_payload=artifact,
