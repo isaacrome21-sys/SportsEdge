@@ -258,8 +258,6 @@ def _predictive_surface(
                 f"CFB_SDV_MATERIALIZED_ROW_COUNT_INVALID:{game.get('game_id')}:{len(material)}"
             )
         rows.append(material[0])
-    if not rows:
-        raise SDVTrainingMaterializerError("CFB_SDV_COMMON_SCOREABLE_SURFACE_EMPTY")
     return rows, exclusions
 
 
@@ -419,6 +417,8 @@ def build_training_bundle(*, cache_root: Path) -> dict[str, Any]:
         current_snapshots=current,
         prior_snapshots=prior,
     )
+    if not predictive:
+        raise SDVTrainingMaterializerError("CFB_SDV_COMMON_SCOREABLE_SURFACE_EMPTY")
 
     schedule_by_game = {str(row["game_id"]): row for row in games}
     venues, venue_attestation = _venue_source(weather_contract, cache_root)
