@@ -80,6 +80,32 @@ class CFBModelArtifactAndAutoCLITests(unittest.TestCase):
         )
         self.assertEqual(week, 2)
 
+
+    def test_auto_week_discovery_uses_one_season_schedule_fetch_in_production_path(self):
+        from datetime import datetime, timezone
+
+        calls = {"count": 0}
+
+        def season_discoverer(**kwargs):
+            calls["count"] += 1
+            self.assertEqual(kwargs["season"], 2026)
+            self.assertEqual(kwargs["cfbd_api_key"], "key")
+            return {
+                "games": [
+                    {"week": 3, "kickoff_ts": "2026-09-12T17:00:00+00:00"},
+                    {"week": 2, "kickoff_ts": "2026-09-05T17:00:00+00:00"},
+                ]
+            }
+
+        week = discover_cfb_week(
+            season=2026,
+            now=datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc),
+            cfbd_api_key="key",
+            season_discoverer=season_discoverer,
+        )
+        self.assertEqual(week, 2)
+        self.assertEqual(calls["count"], 1)
+
     def test_direct_cli_missing_artifact_is_explicit_blocker_without_network(self):
         with TemporaryDirectory() as tmp:
             out = Path(tmp) / "card.json"
