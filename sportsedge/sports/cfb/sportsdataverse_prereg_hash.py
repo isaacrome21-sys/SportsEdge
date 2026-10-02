@@ -12,6 +12,7 @@ CODE_PATHS=(
  "sportsedge/sports/cfb/sportsdataverse_bakeoff.py",
  "sportsedge/sports/cfb/sportsdataverse_weather.py",
  "sportsedge/sports/cfb/sportsdataverse_weather_receipts.py",
+ "sportsedge/sports/cfb/sportsdataverse_weather_transport.py",
  "sportsedge/sports/cfb/sportsdataverse_history.py",
  "sportsedge/sports/cfb/sportsdataverse_manifest.py",
  "sportsedge/sports/cfb/sportsdataverse_materializer.py",
