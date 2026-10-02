@@ -1,0 +1,172 @@
+name: cfb-sdv-materialize-training
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cfb-sdv-training-materialization
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      PYTHONPATH: .
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: '.python-version'
+
+      - name: Verify frozen prereg binding and zero-attempt state
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, subprocess
+          from pathlib import Path
+          p=json.loads(Path('config/cfb_sportsdataverse_candidate_prereg_v1.json').read_text())
+          g=p['governance']
+          assert g['attempts_consumed']==0
+          assert g['evaluation_performed'] is False
+          assert g['model_p_created'] is False
+          assert g['promotion_authority'] is False
+          assert g['official_authority'] is False
+          h=p['hash_binding']
+          subprocess.run([
+              'python','scripts/cfb_sportsdataverse_prereg_hash.py',
+              '--verify-code',h['code_manifest_sha256'],
+              '--verify-config',h['config_bundle_sha256'],
+          ],check=True)
+          print('CFB_SDV_PREREG_ZERO_ATTEMPT_BINDING_OK')
+          PY
+
+      - name: Require football-data credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${CFBD_API_KEY:-}" ]; then
+            echo 'CFB_SDV_CFBD_API_KEY_REQUIRED'
+            exit 2
+          fi
+          echo 'CFB_SDV_CFBD_API_KEY_PRESENT'
+
+      - name: Acquire frozen SportsDataverse assets and historical weather
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/cfb
+          python scripts/acquire_cfb_sportsdataverse_training_inputs.py \
+            --asset-root "$RUNNER_TEMP/cfb_sdv_assets" \
+            --weather-out "$RUNNER_TEMP/cfb_sdv_weather.json" \
+            --weather-receipts-out artifacts/cfb/sportsdataverse_weather_receipts.json
+
+      - name: Materialize leakage-safe training rows
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/materialize_cfb_sportsdataverse_training.py \
+            --asset-root "$RUNNER_TEMP/cfb_sdv_assets" \
+            --weather-json "$RUNNER_TEMP/cfb_sdv_weather.json" \
+            --rows-out artifacts/cfb/training_rows.json \
+            --manifest-out artifacts/cfb/training_rows_manifest.json \
+            --receipts-out artifacts/cfb/source_receipts.json
+
+      - name: Assert materialization has zero evaluation authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          rows=json.loads(Path('artifacts/cfb/training_rows.json').read_text())
+          manifest=json.loads(Path('artifacts/cfb/training_rows_manifest.json').read_text())
+          receipts=json.loads(Path('artifacts/cfb/source_receipts.json').read_text())
+          weather=json.loads(Path('artifacts/cfb/sportsdataverse_weather_receipts.json').read_text())
+
+          assert rows and isinstance(rows,list)
+          assert {int(r['season']) for r in rows}==set(range(2016,2026))
+          assert all(int(r['season'])<2026 for r in rows)
+          assert all(r.get('weather_status')=='WEATHER_BOUND' for r in rows)
+          assert all(type(r.get('neutral_site')) is bool for r in rows)
+
+          banned={
+              'spread','spread_line','total','total_line','price','american_odds',
+              'decimal_odds','implied_probability','market_probability',
+              'novig_prob','no_vig_prob','book','sportsbook','closing_line',
+              'closing_price','home_moneyline','away_moneyline','odds',
+          }
+          def scan(value,path='root'):
+              if isinstance(value,dict):
+                  for key,child in value.items():
+                      low=str(key).strip().lower()
+                      if low in banned or 'implied_prob' in low or 'no_vig' in low or 'novig' in low:
+                          raise AssertionError(f'CFB_SDV_MARKET_FIELD_PROHIBITED:{path}.{key}')
+                      scan(child,f'{path}.{key}')
+              elif isinstance(value,list):
+                  for i,child in enumerate(value):
+                      scan(child,f'{path}[{i}]')
+          scan(rows)
+
+          for payload in (manifest,receipts,weather):
+              gov=payload.get('governance') or {}
+              assert gov.get('attempts_consumed')==0
+              assert gov.get('evaluation_performed') is False
+              assert gov.get('model_p_created') is False
+              assert gov.get('promotion_authority') is False
+              assert gov.get('official_authority') is False
+
+          assert manifest['training_window']['source_start_season']==2015
+          assert manifest['training_window']['first_candidate_row_season']==2016
+          print(
+              'CFB_SDV_TRAINING_ROWS_MATERIALIZED_ZERO_AUTHORITY '
+              f"rows={len(rows)} rows_sha256={manifest['rows_sha256']}"
+          )
+          PY
+
+      - name: Persist immutable materialization evidence to data branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin data:data
+          rm -rf _cfb_data
+          git worktree add _cfb_data data
+          target='_cfb_data/history/cfb/sportsdataverse-selection'
+          mkdir -p "$target"
+          cp artifacts/cfb/training_rows.json "$target/training_rows.json"
+          cp artifacts/cfb/training_rows_manifest.json "$target/training_rows_manifest.json"
+          cp artifacts/cfb/source_receipts.json "$target/source_receipts.json"
+          cp artifacts/cfb/sportsdataverse_weather_receipts.json "$target/weather_receipts.json"
+
+          git -C _cfb_data config user.name 'SportsEdge CFB automation'
+          git -C _cfb_data config user.email 'actions@github.com'
+          git -C _cfb_data add history/cfb/sportsdataverse-selection
+          if git -C _cfb_data diff --cached --quiet; then
+            echo 'CFB_SDV_DATA_BRANCH_ALREADY_CURRENT'
+          else
+            git -C _cfb_data commit -m 'data: materialize frozen CFB SportsDataverse training rows'
+            git -C _cfb_data push origin HEAD:data
+          fi
+
+      - name: Upload materialization evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cfb-sdv-training-materialization
+          path: |
+            artifacts/cfb/training_rows.json
+            artifacts/cfb/training_rows_manifest.json
+            artifacts/cfb/source_receipts.json
+            artifacts/cfb/sportsdataverse_weather_receipts.json
+          if-no-files-found: warn
+          retention-days: 30
