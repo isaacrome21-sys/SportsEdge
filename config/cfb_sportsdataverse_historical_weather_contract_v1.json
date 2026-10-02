@@ -4,7 +4,9 @@
   "purpose": "CONTEXT_FEATURES_ONLY",
   "schedule_source": "cfb_schedules",
   "join_identity": [
-    "game_id"
+    "game_id",
+    "venue_id",
+    "start_date"
   ],
   "required_output": [
     "game_id",
@@ -13,10 +15,10 @@
     "temperature"
   ],
   "semantics": {
-    "indoor": "CFBD_GAME_INDOORS_BOOLEAN",
-    "wind_speed": "CFBD_GAME_WEATHER_WIND_SPEED_MPH",
-    "temperature": "CFBD_GAME_WEATHER_TEMPERATURE_F",
-    "indoor_weather": "WIND_AND_TEMPERATURE_MAY_BE_NULL_ONLY_WHEN_GAME_INDOOR_TRUE"
+    "indoor": "PINNED_VENUE_ROOF_TYPE_DOME_OR_RETRACTABLE",
+    "wind_speed": "OPEN_METEO_ARCHIVE_NEAREST_KICKOFF_HOUR_WIND_SPEED_MPH",
+    "temperature": "OPEN_METEO_ARCHIVE_NEAREST_KICKOFF_HOUR_TEMPERATURE_F",
+    "indoor_weather": "WIND_AND_TEMPERATURE_NULL_ONLY_WHEN_STATIC_VENUE_CLASSIFICATION_IS_INDOOR"
   },
   "prohibited": [
     "MARKET_DATA",
@@ -24,7 +26,7 @@
     "2026_REALIZED_OUTCOMES",
     "IMPUTED_WEATHER"
   ],
-  "completeness": "EVERY_EVALUATED_HISTORICAL_GAME_MUST_BIND_OR_EVALUATION_FAILS_CLOSED",
+  "completeness": "EVERY_EVALUATED_HISTORICAL_GAME_MUST_BIND_TO_A_PINNED_VENUE_AND_WEATHER_ROW_OR_MATERIALIZATION_FAILS_CLOSED",
   "governance": {
     "evaluation_performed": false,
     "attempt_consumed": false,
@@ -32,23 +34,34 @@
     "promotion_authority": false,
     "official_authority": false
   },
+  "venue_metadata": {
+    "source_repository": "mslade50/football_weather",
+    "source_commit_sha": "aea8274b8c2035372d19d8a509423b0645b7bfe9",
+    "source_path": "data/stadiums.csv",
+    "source_git_blob_sha1": "cd1babd57d6457c502dd116036058d03e2968d32",
+    "source_content_sha256": "aa9599316d015eb10bf019c2fae937c09140061f9940b29dde884030183820f2",
+    "join_field": "cfbd_venue_id",
+    "coordinate_fields": [
+      "lat",
+      "lon"
+    ],
+    "roof_field": "roof_type",
+    "indoor_rule": "roof_type IN {dome,retractable}",
+    "missing_venue_policy": "FAIL_CLOSED",
+    "missing_coordinates_policy": "FAIL_CLOSED"
+  },
   "provider": {
-    "source_id": "CFBD_GAMES_WEATHER_V1",
-    "endpoint": "https://api.collegefootballdata.com/games/weather",
-    "request_scope": "ONE_REGULAR_SEASON_AT_A_TIME_2015_2025",
-    "query_parameters": [
-      "year",
-      "seasonType=regular",
-      "classification=fbs"
+    "source_id": "OPEN_METEO_ARCHIVE_V1",
+    "endpoint": "https://archive-api.open-meteo.com/v1/archive",
+    "request_scope": "ONE_OUTDOOR_VENUE_SEASON_WINDOW_AT_A_TIME_2016_2025",
+    "hourly_variables": [
+      "temperature_2m",
+      "wind_speed_10m"
     ],
-    "fields": [
-      "id",
-      "gameIndoors",
-      "windSpeed",
-      "temperature"
-    ],
-    "join": "DIRECT_GAME_ID_TO_FROZEN_CFB_SCHEDULE",
-    "missing_game_policy": "FAIL_CLOSED",
-    "interpolation": false
+    "timezone": "UTC",
+    "temperature_unit": "fahrenheit",
+    "wind_speed_unit": "mph",
+    "selection": "NEAREST_KICKOFF_HOUR_NO_INTERPOLATION",
+    "missing_hour_policy": "FAIL_CLOSED"
   }
 }
