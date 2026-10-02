@@ -27,6 +27,17 @@ def main() -> int:
     for game in engine.get("games") or []:
         lines.append(f"{game.get('away')} @ {game.get('home')}")
         for row in game.get("markets") or []:
+            held = row.get("held_pick")
+            validation_hold = row.get("validation_hold")
+            if held and validation_hold:
+                lines.append(
+                    f"- {held['selection']} {held.get('line', '')} @ {held['price_american']}"
+                    f"  Model {held.get('estimate_p', 0) * 100:.1f}%"
+                    f"  Edge {held.get('edge_probability_points', 0) * 100:+.1f}pp"
+                    f"  EV {held.get('ev_per_dollar', 0):+.3f}"
+                    f"  VALIDATION HOLD"
+                )
+                continue
             reason = row.get("no_model") or market_eligibility(row.get("market"), row.get("line"))
             if reason:
                 lines.append(f"- {row.get('raw') or row.get('market')}: {reason}")
