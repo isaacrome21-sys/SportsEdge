@@ -10,14 +10,14 @@ def test_frozen_plan_is_44_public_nonbetting_assets():
     assert not any("betting" in x.dataset or "betting" in x.url for x in plan)
 
 def test_asset_urls_match_upstream_cfbfastr_release_contract():
-    assert asset("cfb_schedules",2015).url.endswith(
-      "/cfb_schedules/cfb_schedules_2015.csv")
+    assert asset("espn_cfb_schedules",2015).url.endswith(
+      "/espn_cfb_schedules/cfb_schedule_2015.rds")
     assert asset("espn_cfb_adv_team",2025).url.endswith(
-      "/espn_cfb_adv_team/adv_team_2025.csv")
+      "/espn_cfb_adv_team/adv_team_2025.rds")
     assert asset("espn_cfb_adv_drives",2025).url.endswith(
-      "/espn_cfb_adv_drives/adv_drives_2025.csv")
+      "/espn_cfb_adv_drives/adv_drives_2025.rds")
     assert asset("espn_cfb_adv_situational",2025).url.endswith(
-      "/espn_cfb_adv_situational/adv_situational_2025.csv")
+      "/espn_cfb_adv_situational/adv_situational_2025.rds")
 
 def test_betting_and_unregistered_sources_fail_closed():
     with pytest.raises(SDVAcquisitionError,match="BETTING_DATASET_PROHIBITED"):
