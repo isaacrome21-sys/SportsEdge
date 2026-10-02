@@ -361,8 +361,8 @@ def build_unified_phone_card(
                 away_line = float(raw["line"])
                 home_handicap = -away_line
                 specs = [
-                    ({"market": "spread", "selection": "away", "line": home_handicap}, away, away_line),
-                    ({"market": "spread", "selection": "home", "line": home_handicap}, home, -away_line),
+                    ({"market": "spread", "selection": "away", "line": away_line}, away, away_line),
+                    ({"market": "spread", "selection": "home", "line": home_handicap}, home, home_handicap),
                 ]
                 for side_index, (request, label, display_line) in enumerate(specs):
                     game_requests.append(request)
