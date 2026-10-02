@@ -169,6 +169,7 @@ def test_unified_phone_card_prices_ml_spread_total_team_total_and_qb_rb_wr_props
         schedule_games=schedule(),
         depth_rows=depth(),
         player_rows=player_stats(),
+        injury_source_ready=True,
         runtime=runtime(),
         n_sims=600,
         seed=44,
