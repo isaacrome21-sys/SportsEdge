@@ -132,3 +132,27 @@ def test_jsonld_timestamp_preferred_and_timezone_aware():
     assert published.isoformat() == "2025-09-08T18:53:00-04:00"
     assert modified is not None
     assert modified.isoformat() == "2025-09-08T19:01:00-04:00"
+
+
+def test_postseason_article_without_week_identity_is_rejected():
+    doc = soup(
+        """
+        <html><body>
+        <h1>Wild Card Weekend Sunday inactives: Bills at Jaguars</h1>
+        <p>Published: Jan 11, 2026 at 06:00 PM</p>
+        <ul><li>WHEN: 8:00 p.m. ET</li></ul>
+        <h3>BILLS</h3><ul><li>WR Player One</li></ul>
+        <h3>JAGUARS</h3><ul><li>CB Player Two</li></ul>
+        </body></html>
+        """
+    )
+    published, modified = article_timestamps(doc)
+    week, games = parse_games(
+        doc,
+        published=published,
+        modified=modified,
+        source_url="https://amp.nfl.com/news/test",
+    )
+    assert week is None
+    assert games[0]["admissible"] is False
+    assert games[0]["reason"] == "REGULAR_SEASON_WEEK_1_18_REQUIRED"
