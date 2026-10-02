@@ -16,7 +16,6 @@ jobs:
     timeout-minutes: 60
     env:
       PYTHONPATH: .
-      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -50,17 +49,7 @@ jobs:
           print('CFB_SDV_PREREG_ZERO_ATTEMPT_BINDING_OK')
           PY
 
-      - name: Require football-data credential
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -z "${CFBD_API_KEY:-}" ]; then
-            echo 'CFB_SDV_CFBD_API_KEY_REQUIRED'
-            exit 2
-          fi
-          echo 'CFB_SDV_CFBD_API_KEY_PRESENT'
-
-      - name: Acquire frozen SportsDataverse assets and historical weather
+      - name: Acquire frozen public SportsDataverse assets and historical weather
         shell: bash
         run: |
           set -euo pipefail
