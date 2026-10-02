@@ -366,7 +366,9 @@ def parse_games(
             )
             entry["inactive_by_team"][team] = names
 
-        if cutoff > kickoff:
+        if week is None:
+            entry["reason"] = "REGULAR_SEASON_WEEK_1_18_REQUIRED"
+        elif cutoff > kickoff:
             entry["reason"] = "ARTICLE_FINAL_TIMESTAMP_AFTER_KICKOFF"
         elif any(not entry["inactive_by_team"].get(row["team"]) for row in entry["teams"]):
             entry["reason"] = "BOTH_TEAM_INACTIVE_LISTS_REQUIRED"
