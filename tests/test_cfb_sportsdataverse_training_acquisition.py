@@ -3,41 +3,63 @@ import json
 import scripts.acquire_cfb_sportsdataverse_training_inputs as acquire
 
 
-def test_weather_acquisition_is_season_scoped_cfbd_and_receipted(monkeypatch):
-    seen={}
-    payload=[
-        {"id":11,"gameIndoors":False,"windSpeed":7,"temperature":71},
-        {"id":12,"gameIndoors":True,"windSpeed":None,"temperature":None},
-    ]
-    raw=json.dumps(payload).encode("utf-8")
+def test_acquisition_source_contains_no_api_secret_or_sportsbook_dependency():
+    source=open(
+        "scripts/acquire_cfb_sportsdataverse_training_inputs.py",
+        encoding="utf-8",
+    ).read()
+    workflow=open(
+        ".github/workflows/cfb-sdv-materialize-training.yml",
+        encoding="utf-8",
+    ).read()
+    for token in (
+        "CFBD_API_KEY",
+        "SPORTSEDGE_CFBD_API_KEY",
+        "SPORTSEDGE_ODDS_API_KEY",
+        "ODDS_API_KEY",
+        "the-odds-api",
+    ):
+        assert token.lower() not in source.lower()
+        assert token.lower() not in workflow.lower()
+    assert "OPEN_METEO_ARCHIVE_V1" in open(
+        "config/cfb_sportsdataverse_historical_weather_contract_v1.json",
+        encoding="utf-8",
+    ).read()
 
-    def fake_get(url,*,headers=None,attempts=3):
+
+def test_window_job_is_open_meteo_and_receipted(monkeypatch):
+    seen={}
+    payload={"hourly":{
+        "time":["2025-09-06T19:00","2025-09-06T20:00"],
+        "temperature_2m":[71,70],
+        "wind_speed_10m":[7,8],
+    }}
+    raw=json.dumps(payload).encode()
+
+    def fake_get(url,*,headers=None,attempts=4):
         seen["url"]=url
         seen["headers"]=dict(headers or {})
         return raw
 
     monkeypatch.setattr(acquire,"_get",fake_get)
-    season,rows,receipt=acquire._weather_for_season(
+    rows,receipt=acquire._window_job(
         season=2025,
-        game_ids=[11,12],
-        api_key="secret",
+        venue={
+            "venue_id":123,
+            "latitude":40.0,
+            "longitude":-88.0,
+            "game_indoor":False,
+        },
+        games=[{
+            "game_id":11,
+            "season":2025,
+            "venue_id":123,
+            "start_date":"2025-09-06T19:20:00Z",
+        }],
     )
-    assert season==2025
-    assert "year=2025" in seen["url"]
-    assert "seasonType=regular" in seen["url"]
-    assert "classification=fbs" in seen["url"]
-    assert seen["headers"]["Authorization"]=="Bearer secret"
-    assert [r["game_id"] for r in rows]==[11,12]
+    assert "archive-api.open-meteo.com" in seen["url"]
+    assert "Authorization" not in seen["headers"]
+    assert rows[0]["game_id"]==11
     assert receipt["season"]==2025
-    assert receipt["source_id"]=="CFBD_GAMES_WEATHER_V1"
-    assert receipt["row_count"]==2
-
-
-def test_acquisition_source_contains_no_sportsbook_dependency():
-    source=open(
-        "scripts/acquire_cfb_sportsdataverse_training_inputs.py",
-        encoding="utf-8",
-    ).read()
-    assert "SPORTSEDGE_ODDS_API_KEY" not in source
-    assert "ODDS_API_KEY" not in source
-    assert "the-odds-api" not in source.lower()
+    assert receipt["venue_id"]==123
+    assert receipt["source_id"]=="OPEN_METEO_ARCHIVE_V1"
