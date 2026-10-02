@@ -216,6 +216,19 @@ class MachineTests(unittest.TestCase):
             self.manual(mode="MANUAL",season=2026,week=1,model=model(),now=NOW,
                         games=self.games,metrics=self.metrics,quotes=bad,n_paths=50)
 
+
+    def test_team_total_invalid_side_fails_closed(self):
+        ts=(NOW-timedelta(seconds=20)).isoformat()
+        bad=[
+            CFBQuote(game_id="1001",period="FG",market="TEAM_TOTAL",entity_id="Alpha State",side="HOME",line=27.5,
+                     american_odds=-110,book_key="draftkings",sportsbook="DraftKings",retrieved_at=ts,offer_id="badside1",is_alternate=False),
+            CFBQuote(game_id="1001",period="FG",market="TEAM_TOTAL",entity_id="Alpha State",side="AWAY",line=27.5,
+                     american_odds=-110,book_key="draftkings",sportsbook="DraftKings",retrieved_at=ts,offer_id="badside2",is_alternate=False),
+        ]
+        with self.assertRaisesRegex(CFBRunMachineError,"CFB_TEAM_TOTAL_SIDE_INVALID"):
+            self.manual(mode="MANUAL",season=2026,week=1,model=model(),now=NOW,
+                        games=self.games,metrics=self.metrics,quotes=bad,n_paths=50)
+
     def test_market_surface_marks_cfb_team_total_implemented(self):
         surface=json.loads(Path("config/football_market_surface.json").read_text())
         declared=next(row for row in surface["markets"] if row["market"]=="team_total")
