@@ -258,6 +258,7 @@ def build_unified_phone_card(
     depth_rows: Sequence[Mapping[str, Any]] = (),
     player_rows: Sequence[Mapping[str, Any]] = (),
     injury_rows: Sequence[Mapping[str, Any]] = (),
+    injury_source_ready: bool = False,
     runtime: Mapping[str, Any] | None = None,
     n_sims: int = 20000,
     seed: int = 21,
@@ -303,7 +304,9 @@ def build_unified_phone_card(
         prop_inputs = [row for row in markets if str(row.get("player") or "").strip()]
         home_model = away_model = None
         role_error = None
-        if prop_inputs:
+        if prop_inputs and not injury_source_ready:
+            role_error = "INJURY_SOURCE_REQUIRED_FOR_LIVE_PROPS"
+        elif prop_inputs:
             try:
                 home_model = build_live_team_model(
                     team=home,
@@ -501,7 +504,7 @@ def build_unified_phone_card(
                 side_index=meta["side_index"], display_selection=meta["display_selection"],
                 display_line=meta["display_line"], price=meta["price"],
                 market_no_vig_p=meta["market_no_vig_p"],
-                qualification_flags=_prop_flags(injury_ready=bool(injury_rows)),
+                qualification_flags=_prop_flags(injury_ready=bool(injury_source_ready)),
                 raw=meta["raw"],
             ))
 
@@ -536,6 +539,7 @@ def build_unified_phone_card(
             "ev_floor": EV_FLOOR,
             "straight_price_ceiling": MAX_STRAIGHT_PRICE,
             "score_uses_price_edge_ev": False,
+            "live_props_require_injury_source": True,
         },
         "authority": {
             "research_only": True,
