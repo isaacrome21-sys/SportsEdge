@@ -198,6 +198,18 @@ def build_nflverse_prop_role_payloads(
             "pit_sample_games": n,
         })
 
+    team_scoring: dict[str, dict[str, float | None]] = {}
+    for team in sorted(set(team_recv_tds) | set(team_rush_tds)):
+        passing = float(team_recv_tds[team])
+        rushing = float(team_rush_tds[team])
+        total_tds = passing + rushing
+        team_scoring[team] = {
+            "passing_tds": passing,
+            "rushing_tds": rushing,
+            "total_tds": total_tds,
+            "pass_td_share": (passing / total_tds) if total_tds > 0 else None,
+        }
+
     normalized = json.dumps(list(player_rows), sort_keys=True, separators=(",", ":"), default=str).encode()
     return {
         "status": "AVAILABLE" if payloads else "MISSING",
@@ -207,6 +219,7 @@ def build_nflverse_prop_role_payloads(
         "source_raw_sha256": source_binding["raw_sha256"],
         "normalized_rows_sha256": sha256(normalized).hexdigest(),
         "players": payloads,
+        "team_scoring": team_scoring,
         "market_fields_in_payload": False,
         "authority": "RESEARCH_ONLY / NOT Model_P / NOT Truth Gate / NOT OFFICIAL",
     }
