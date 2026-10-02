@@ -4,7 +4,7 @@ Transport is intentionally narrow: callers provide a venue coordinate and UTC ki
 The returned hourly observation is selected deterministically and is never interpolated.
 """
 from __future__ import annotations
-from datetime import datetime,timezone
+from datetime import datetime,timezone,timedelta
 from typing import Any,Mapping,Sequence
 
 class SDVWeatherTransportError(ValueError): pass
@@ -15,8 +15,8 @@ HOURLY=("temperature_2m","wind_speed_10m")
 
 def request_params(*,latitude:float,longitude:float,kickoff_utc:str)->dict[str,Any]:
  dt=_utc(kickoff_utc)
- day=dt.date().isoformat()
- return {"latitude":float(latitude),"longitude":float(longitude),"start_date":day,"end_date":day,
+ day=dt.date()
+ return {"latitude":float(latitude),"longitude":float(longitude),"start_date":day.isoformat(),"end_date":(day+timedelta(days=1)).isoformat(),
          "hourly":",".join(HOURLY),"temperature_unit":"fahrenheit","wind_speed_unit":"mph","timezone":"UTC"}
 
 def select_kickoff_hour(payload:Mapping[str,Any],*,game_id:int,kickoff_utc:str,game_indoor:bool)->dict[str,Any]:
@@ -28,7 +28,7 @@ def select_kickoff_hour(payload:Mapping[str,Any],*,game_id:int,kickoff_utc:str,g
  times=list(hourly.get("time") or []); temps=list(hourly.get("temperature_2m") or []); winds=list(hourly.get("wind_speed_10m") or [])
  if not (len(times)==len(temps)==len(winds)): raise SDVWeatherTransportError("CFB_SDV_WEATHER_HOURLY_LENGTH_MISMATCH")
  target=_utc(kickoff_utc)
- if target.minute>=30: target=target.replace(minute=0,second=0,microsecond=0).replace(hour=(target.hour+1)%24)
+ if target.minute>=30: target=target.replace(minute=0,second=0,microsecond=0)+timedelta(hours=1)
  else: target=target.replace(minute=0,second=0,microsecond=0)
  # Open-Meteo UTC hourly strings omit offset.
  key=target.strftime("%Y-%m-%dT%H:%M")
