@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import hashlib, json
 from pathlib import Path
 from typing import Any, Iterable, Mapping
+import unicodedata
 from urllib.request import urlopen
 from urllib.parse import quote_plus
 from zoneinfo import ZoneInfo
@@ -30,6 +31,7 @@ PLAYER_MARKETS = frozenset({
     "HITS_STOLEN_BASES","HITS_WALKS_STOLEN_BASES","PITCHER_K","PITCHER_OUTS","PITCHER_ER",
     "PITCHER_HITS_ALLOWED","PITCHER_BB","PITCHER_HITS_WALKS_ER","FIRST_HOME_RUN","PITCHER_RECORD_WIN",
 })
+_PERSON_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
 
 def _sha(v: Any) -> str:
     return hashlib.sha256(json.dumps(v, sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest()
@@ -73,8 +75,48 @@ def _resolve_game(row: ManualQuote, opener=urlopen, schedule: Iterable[GameSnaps
     if row.observed_at.astimezone(timezone.utc) >= scheduled: raise CanonicalManualMLBError("MANUAL_QUOTE_NOT_PREGAME")
     return g
 
+def _person_tokens(value: str) -> tuple[str, ...]:
+    # Sportsbooks routinely omit suffixes (Jr./Sr.) and accents while MLB's
+    # People API returns the canonical display name. Normalize only those
+    # presentation differences; team membership still disambiguates identities.
+    decomposed = unicodedata.normalize("NFKD", str(value or ""))
+    folded = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+    tokens: list[str] = []
+    for raw in folded.replace(".", " ").replace("-", " ").split():
+        token = "".join(ch.lower() for ch in raw if ch.isalnum())
+        if token:
+            tokens.append(token)
+    while tokens and tokens[-1] in _PERSON_SUFFIXES:
+        tokens.pop()
+    return tuple(tokens)
+
 def _norm_person(value: str) -> str:
-    return "".join(ch.lower() for ch in str(value or "") if ch.isalnum())
+    return "".join(_person_tokens(value))
+
+def _person_team_id(person: Mapping[str, Any]) -> int | None:
+    team = person.get("currentTeam") or {}
+    if not isinstance(team, Mapping):
+        return None
+    team_id = team.get("id")
+    if isinstance(team_id, bool) or not isinstance(team_id, int) or team_id <= 0:
+        return None
+    return int(team_id)
+
+def _subject_name_matches(
+    people: Iterable[Mapping[str, Any]],
+    subject_name: str,
+    *,
+    game: GameSnapshot | None,
+) -> list[Mapping[str, Any]]:
+    target = _norm_person(subject_name)
+    matches = [p for p in people if isinstance(p, Mapping) and _norm_person(p.get("fullName")) == target]
+    if game is None or len(matches) <= 1:
+        return matches
+    game_team_ids = {int(game.away_id), int(game.home_id)}
+    in_game = [p for p in matches if _person_team_id(p) in game_team_ids]
+    # Only narrow when the game provides a unique identity. If it does not,
+    # preserve the full ambiguous set so the caller fails closed.
+    return in_game if len(in_game) == 1 else matches
 
 def _is_named_pitcher_market(market_type: str) -> bool:
     return market_type.startswith("PITCHER_") and not market_type.startswith("EITHER_")
@@ -117,8 +159,8 @@ def _resolve_subject(row: ManualQuote, *, opener=urlopen, game: GameSnapshot | N
             payload = json.loads(response.read().decode("utf-8"))
     except Exception as exc:
         raise CanonicalManualMLBError(f"MANUAL_SUBJECT_LOOKUP_FAILED:{row.subject_name}") from exc
-    target = _norm_person(row.subject_name)
-    matches = [p for p in payload.get("people", []) if _norm_person(p.get("fullName")) == target]
+    people = payload.get("people", [])
+    matches = _subject_name_matches(people if isinstance(people, list) else [], row.subject_name, game=game)
     if len(matches) != 1:
         raise CanonicalManualMLBError(f"MANUAL_SUBJECT_RESOLUTION_FAILED: subject_name={row.subject_name} found={len(matches)}")
     person_id = matches[0].get("id")

@@ -10,6 +10,10 @@ permissions:
   contents: read
   actions: write
 
+concurrency:
+  group: cfb-reconstructed-materialize-push-bridge
+  cancel-in-progress: false
+
 jobs:
   dispatch-materialize-only:
     runs-on: ubuntu-latest
@@ -19,6 +23,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          active="$(
+            gh run list \
+              --repo "${{ github.repository }}" \
+              --workflow cfb-reconstructed-selection-materialize.yml \
+              --limit 20 \
+              --json status \
+              --jq '[.[] | select(.status == "queued" or .status == "in_progress")] | length'
+          )"
+          if [[ "$active" -gt 0 ]]; then
+            echo "CFB_RECONSTRUCTED_MATERIALIZE_DISPATCH_SKIPPED active_runs=$active"
+            exit 0
+          fi
           gh workflow run cfb-reconstructed-selection-materialize.yml \
             --repo "${{ github.repository }}" \
             --ref main \

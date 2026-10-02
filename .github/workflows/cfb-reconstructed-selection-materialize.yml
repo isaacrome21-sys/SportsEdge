@@ -105,6 +105,9 @@ jobs:
 
   materialize:
     name: CFB reconstructed-selection guarded materialization
+    concurrency:
+      group: cfb-reconstructed-selection-materialize
+      cancel-in-progress: false
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch'
     needs: contract
     runs-on: ubuntu-latest
