@@ -1,0 +1,99 @@
+{
+  "schema": "SPORTSEDGE_NFL_GAME_SCRIPT_V2_2025_VALIDATION_LOCK",
+  "status": "FROZEN_BEFORE_2025_ACCESS",
+  "frozen_date": "2026-10-01",
+  "canonical_fit": {
+    "owner_pr": 1323,
+    "fit_head_sha": "0643f6761e4670a82fd095935a4c814258e755c7",
+    "workflow_run_id": 36957534051,
+    "workflow_artifact_id": 11206343189,
+    "artifact_sha256": "8452beb9f37afd4ac6dac3a6860824fd47c4adfa352b21d25ddcf6223135972a",
+    "prelock_sha256": "46ce62a0807976141e392ff84817a79f3aa68edb762a9c0b46c4af125b71c4f8",
+    "selected_alpha": 10.0,
+    "n_team_games": 2560,
+    "fit_seasons": [2011, 2012, 2013, 2014, 2015],
+    "source_sha256": {
+      "2011": "25437bb3aaf4e74caec04a9a232e46b515382c54f9daaa52ed245842994c8d97",
+      "2012": "bead7fb38e7a72e34fb9401c337c7e6322ef699aa70dbc79de9c8500d4797860",
+      "2013": "33f96de712a82cc772cfb882fcb5016b985c68647fdb7e78f642de2f9c7f9b22",
+      "2014": "2125097012bb7ab743a07322484d77c66f0fd32fdcc4fe6ed51414cf15f27ff8",
+      "2015": "a6f608f40e762766526e62d44f9e2916596c69bcd2c18088e9571f41bb4f6f00"
+    },
+    "pass_model": {
+      "alpha": 10.0,
+      "coef": [
+        1.0034719588114527,
+        0.0488618789619323,
+        -0.11134769993715932,
+        -0.03598796221184467,
+        -0.0666838989349771,
+        0.04865507561574367,
+        0.03774768501792563
+      ],
+      "means": [0.0, 0.0, 15.526171875, 10.075, 5.923046875, 3.075, 1.526171875],
+      "scales": [1.0, 15.185699481749268, 12.758793635487603, 11.133381674046749, 8.956575801697474, 6.685209888253322, 4.519672558157171]
+    },
+    "rush_model": {
+      "alpha": 10.0,
+      "coef": [
+        1.0047442755776637,
+        0.005598569615311554,
+        0.14563649464152387,
+        0.09237158448878949,
+        -0.07625746549508183,
+        -0.002692095769503161,
+        -0.04316716939778773
+      ],
+      "means": [0.0, 0.0, 15.526171875, 10.075, 5.923046875, 3.075, 1.526171875],
+      "scales": [1.0, 15.185699481749268, 12.758793635487603, 11.133381674046749, 8.956575801697474, 6.685209888253322, 4.519672558157171]
+    }
+  },
+  "validation_source": {
+    "provider": "nflverse",
+    "season": 2025,
+    "season_type": "REG",
+    "uri": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2025.csv",
+    "exact_raw_sha256_required": true,
+    "retrieved_at_required": true,
+    "market_columns_allowed": false
+  },
+  "pregame_baseline": {
+    "history_scope": "2025_REGULAR_SEASON_ONLY",
+    "prior_team_games": 8,
+    "first_team_games_unscored": 8,
+    "decay": 0.85,
+    "most_recent_age": 0,
+    "weight_formula": "0.85^age",
+    "cross_season_carry": false,
+    "future_rows_allowed": false
+  },
+  "script_application": {
+    "margin_input": "REALIZED_FINAL_TEAM_MARGIN_FOR_HELDOUT_JOINT_DISTRIBUTION_TEST_ONLY",
+    "pass_prediction": "PREGAME_PASS_BASELINE_TIMES_FROZEN_V2_PASS_MULTIPLIER",
+    "rush_prediction": "PREGAME_RUSH_BASELINE_TIMES_FROZEN_V2_RUSH_MULTIPLIER",
+    "baseline_comparator": "PREGAME_BASELINE_WITH_MULTIPLIER_1.0"
+  },
+  "gates": {
+    "primary_metric": "EQUAL_WEIGHT_MEAN_OF_PASS_AND_RUSH_MAE",
+    "combined_mae_relative_improvement_min": 0.01,
+    "pass_mae_must_not_worsen": true,
+    "rush_mae_must_not_worsen": true,
+    "pass_mean_error_abs_max_plays": 1.5,
+    "rush_mean_error_abs_max_plays": 1.5,
+    "all_must_pass": true
+  },
+  "one_look": {
+    "validation_window_spent_on_2025_source_access": true,
+    "no_post_result_retune": true,
+    "no_second_2025_look": true
+  },
+  "authority": {
+    "changes_attempt9_owner": false,
+    "creates_model_p": false,
+    "truth_gate_authority": false,
+    "official_authority": false,
+    "promotion_authority": false,
+    "staking_authority": false,
+    "backfill_authority": false
+  }
+}
