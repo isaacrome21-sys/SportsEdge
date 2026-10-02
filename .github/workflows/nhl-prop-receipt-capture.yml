@@ -1,0 +1,58 @@
+name: NHL prop prospective receipt capture
+
+on:
+  workflow_dispatch:
+    inputs:
+      receipt_json:
+        description: "Fresh pre-puck NHL prop receipt JSON"
+        required: true
+        type: string
+  pull_request:
+    paths:
+      - 'sportsedge/sports/nhl/prop_receipt_capture.py'
+      - 'scripts/capture_nhl_prop_receipt.py'
+      - 'tests/test_nhl_prop_receipt_capture.py'
+      - '.github/workflows/nhl-prop-receipt-capture.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nhl-prop-forward-receipt
+  cancel-in-progress: false
+
+jobs:
+  validate-and-capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Verify fail-closed receipt contract
+        run: |
+          python3 -m py_compile \
+            sportsedge/sports/nhl/prop_receipt_capture.py \
+            scripts/capture_nhl_prop_receipt.py
+          python3 -m unittest -q tests.test_nhl_prop_receipt_capture
+
+      - name: Capture fresh pre-puck receipt
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RECEIPT_JSON: ${{ inputs.receipt_json }}
+        run: |
+          set -euo pipefail
+          python3 scripts/capture_nhl_prop_receipt.py \
+            --json "$RECEIPT_JSON" \
+            --output-root data/nhl_2026_prop_forward/receipts
+
+      - name: Persist receipt create-only to data branch
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          python3 scripts/persist_forward_evidence_data_branch.py \
+            --path data/nhl_2026_prop_forward/receipts \
+            --branch data \
+            --worktree "$RUNNER_TEMP/nhl-prop-forward-data" \
+            --message 'evidence: persist prospective NHL prop receipt'
