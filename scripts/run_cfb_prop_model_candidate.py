@@ -99,11 +99,13 @@ def _candidateize(report: dict) -> dict:
         row["promotion_authority"] = False
         if genuine and row.get("fair_market_p") is not None and row.get("ev_per_dollar") is not None:
             row["decision_tier"] = "MODEL_CANDIDATE"
+            row["presentation_label"] = "LEAN"
             row["model_candidate_status"] = "READY"
             row["reason"] = "CFB_PROP_RESEARCH_ONLY_INDEPENDENT_VALIDATION_REQUIRED"
             candidate_rows += 1
         else:
             row["decision_tier"] = "NO_ACTIONABLE_CANDIDATE"
+            row["presentation_label"] = "NO_PLAY"
             row["model_candidate_status"] = "BLOCKED"
             if "STALE" in str(row.get("reason") or ""):
                 stale_rows += 1
