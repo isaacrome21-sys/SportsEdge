@@ -95,10 +95,16 @@ def _evaluated_games(schedules: list[dict]) -> list[dict]:
         if not _strict_true(raw.get("completed")):
             continue
         gid = int(raw["game_id"])
-        try:
-            venue_id = int(float(str(raw.get("venue_id") or "").strip()))
-        except ValueError as exc:
-            raise RuntimeError(f"CFB_SDV_VENUE_ID_REQUIRED:{gid}") from exc
+        raw_venue_id = str(raw.get("venue_id") or "").strip()
+        venue_id = None
+        if raw_venue_id:
+            try:
+                venue_id = int(float(raw_venue_id))
+            except ValueError as exc:
+                raise RuntimeError(f"CFB_SDV_VENUE_ID_INVALID:{gid}") from exc
+        venue_name = str(raw.get("venue") or "").strip()
+        if venue_id is None and not venue_name:
+            raise RuntimeError(f"CFB_SDV_VENUE_IDENTITY_REQUIRED:{gid}")
         kickoff = str(raw.get("start_date") or "").strip()
         if not kickoff:
             raise RuntimeError(f"CFB_SDV_START_DATE_REQUIRED:{gid}")
@@ -106,7 +112,7 @@ def _evaluated_games(schedules: list[dict]) -> list[dict]:
             "game_id": gid,
             "season": season,
             "venue_id": venue_id,
-            "venue_name": str(raw.get("venue") or "").strip(),
+            "venue_name": venue_name,
             "start_date": kickoff,
         })
     if not out:
@@ -165,7 +171,7 @@ def _historical_weather(*, games: list[dict], venue_raw: bytes, workers: int):
             venue, resolution = resolve_venue(
                 by_id=by_id,
                 by_name=by_name,
-                venue_id=int(game["venue_id"]),
+                venue_id=game.get("venue_id"),
                 venue_name=str(game.get("venue_name") or ""),
             )
         except Exception as exc:
