@@ -1,0 +1,29 @@
+{
+  "policy_id": "FOOTBALL_NFL_FORWARD_CLV_PROVIDER_POLICY_V1",
+  "provider": "the_odds_api",
+  "sport_key": "americanfootball_nfl",
+  "bookmakers": ["draftkings"],
+  "request_profiles": {
+    "decision": {
+      "endpoint_scope": "sport_bulk",
+      "markets": ["h2h", "spreads", "totals"],
+      "regions": ["us"],
+      "credits_per_call": 3,
+      "minimum_remaining_before_call": 79
+    },
+    "close": {
+      "endpoint_scope": "event",
+      "markets": ["h2h", "spreads", "totals", "alternate_spreads", "alternate_totals"],
+      "regions": ["us"],
+      "credits_per_call": 5,
+      "minimum_remaining_before_call": 81
+    }
+  },
+  "provider_budget_path": "config/nfl_2026_provider_budget_v1.json",
+  "reserve_role": "guarded_lower_priority",
+  "reserve_rule": "minimum_remaining_before_call = 76 + credits_per_call",
+  "runtime_binding": {
+    "request_builder": "sportsedge/sports/nfl/odds_source.py:build_nfl_odds_url",
+    "workflow": ".github/workflows/football-nfl-forward-clv-collection.yml"
+  }
+}
