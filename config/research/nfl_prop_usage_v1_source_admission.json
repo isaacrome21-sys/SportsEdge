@@ -1,0 +1,69 @@
+{
+  "schema": "SPORTSEDGE_NFL_PROP_USAGE_V1_SOURCE_ADMISSION",
+  "status": "FROZEN_BEFORE_2025_MODEL_SCORING",
+  "frozen_date": "2026-10-02",
+  "supersedes_pr": 1250,
+  "fit_window": {
+    "seasons": [2021, 2022, 2023, 2024],
+    "season_type": "REG"
+  },
+  "validation_window": {
+    "season": 2025,
+    "season_type": "REG",
+    "one_look": true,
+    "model_scoring_spent": false
+  },
+  "market_gate": {
+    "markets": ["player_pass_yds", "player_rush_yds", "player_reception_yds"],
+    "line_selection": "LATEST_STRICTLY_PRE_KICKOFF_SNAPSHOT_PER_PLAYER_EVENT_MARKET",
+    "sportsbook": "fanduel",
+    "allow_postkickoff_snapshot": false,
+    "allow_actual_value_as_model_input": false,
+    "allow_hit_over_as_model_input": false
+  },
+  "historical_line_source": {
+    "repository": "firstandthirty/nfl-tools",
+    "commit": "38af9f64b42d2817dc172af637abebe2b7799194",
+    "files": {
+      "player_pass_yds": "player_props/data/processed/fanduel_pass_yds_history.csv",
+      "player_rush_yds": "player_props/data/analysis/rush_yds_market_analysis_rows.csv",
+      "player_reception_yds": "player_props/data/analysis/reception_yds_market_analysis_rows.csv"
+    },
+    "private_research_only": true,
+    "redistribution": false
+  },
+  "inactive_source": {
+    "provider": "NFL.com official inactive reports",
+    "article_discovery": "https://www.nfl.com/sitemap/html/articles/{year}/{month}",
+    "article_host": "https://amp.nfl.com",
+    "live_endpoint": "https://www.nfl.com/inactives/",
+    "semantic_rule": "inactive identity is a fixed pre-kickoff fact; article publication timestamp is not a model feature",
+    "required_2025_schedule_team_week_coverage": 1.0
+  },
+  "schedule_source": {
+    "uri": "https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv",
+    "season": 2025,
+    "season_type": "REG"
+  },
+  "lineup_rule": {
+    "inactive_list_required": true,
+    "starter_identity_required": true,
+    "starter_source_for_validation": "PIT depth chart snapshot at or before target kickoff",
+    "no_inactive_or_starter_evidence": "ZERO_MODEL_ROWS"
+  },
+  "frozen_validation_gates": {
+    "mean_abs_predicted_over_minus_observed_max": 0.06,
+    "brier_not_worse_than_position_mean_baseline": true,
+    "zero_rows_when_inactive_list_missing": true,
+    "all_must_pass": true
+  },
+  "authority": {
+    "research_only": true,
+    "creates_model_p": false,
+    "truth_gate_authority": false,
+    "official_authority": false,
+    "promotion_authority": false,
+    "staking_authority": false,
+    "backfill_authority": false
+  }
+}
