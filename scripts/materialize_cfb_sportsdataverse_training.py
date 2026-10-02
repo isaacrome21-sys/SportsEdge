@@ -429,7 +429,12 @@ def build_training_bundle(*, cache_root: Path) -> dict[str, Any]:
         weather_contract=weather_contract,
         cache_root=cache_root,
     )
-    labels = [schedule_by_game[str(row["game_id"])] for row in weather_bound]
+    labels = []
+    for row in weather_bound:
+        source = dict(schedule_by_game[str(row["game_id"])])
+        source["home_points"] = int(float(source["home_points"]))
+        source["away_points"] = int(float(source["away_points"]))
+        labels.append(source)
     training_rows = attach_training_labels(
         predictive_rows=weather_bound,
         completed_games=labels,
