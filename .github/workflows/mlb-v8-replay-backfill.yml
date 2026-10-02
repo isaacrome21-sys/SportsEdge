@@ -91,9 +91,11 @@ jobs:
             "${extra[@]}" \
             | tee artifacts/mlb_v8_backfill_result.json
 
-      - name: Build deterministic replay manifest and PIT gap report
+      - name: Build deterministic replay manifest, PIT gap report, and receipt
         if: always() && steps.collect.outcome != 'skipped'
-        run: python scripts/build_mlb_v8_replay_archive.py
+        run: |
+          python scripts/build_mlb_v8_replay_archive.py
+          python scripts/build_mlb_v8_replay_receipt.py
 
       - name: Upload exact backfill evidence
         if: always()

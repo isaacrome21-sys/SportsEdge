@@ -20,6 +20,7 @@ SPORT_KEY = "americanfootball_ncaaf"
 DECISION_TARGET_MINUTES = 60.0
 CLOSE_TARGET_MINUTES = 5.0
 WEATHER_TARGET_MINUTES = 15.0
+TARGET_DIRECTION = "EARLY_ONLY_AT_OR_BEFORE_TARGET"
 
 
 class CFBForwardEvidenceError(RuntimeError):
@@ -84,13 +85,19 @@ def _verify_raw(root: Path, rel_value: Any, expected_value: Any) -> str | None:
     return None
 
 
-def _nearest(rows: list[dict[str, Any]], target: float) -> dict[str, Any] | None:
-    if not rows:
+def _nearest_early(rows: list[dict[str, Any]], target: float) -> dict[str, Any] | None:
+    """Choose the closest observation at or before a frozen target, never after it.
+
+    lead_minutes is measured backward from kickoff, so values greater than or equal
+    to the target are on-time/early. Smaller values are post-target and ineligible.
+    """
+    eligible = [row for row in rows if float(row["lead_minutes"]) >= target]
+    if not eligible:
         return None
     return min(
-        rows,
+        eligible,
         key=lambda row: (
-            abs(float(row["lead_minutes"]) - target),
+            float(row["lead_minutes"]) - target,
             str(row["captured_at"]),
             str(row.get("capture_id") or row.get("observation_id") or ""),
         ),
@@ -201,18 +208,29 @@ def audit_cfb_forward_market_weather_evidence(
     units: list[dict[str, Any]] = []
     for identity, candidate_groups in sorted(by_identity.items()):
         event_id, book, market = identity
-        decision = _nearest([g for g in candidate_groups if g["window"] == "decision"], DECISION_TARGET_MINUTES)
-        close = _nearest([g for g in candidate_groups if g["window"] in {"close", "t0_prestart"}], CLOSE_TARGET_MINUTES)
-        if decision is None or close is None:
+        decision_candidates = [g for g in candidate_groups if g["window"] == "decision"]
+        close_candidates = [g for g in candidate_groups if g["window"] in {"close", "t0_prestart"}]
+        decision = _nearest_early(decision_candidates, DECISION_TARGET_MINUTES)
+        close = _nearest_early(close_candidates, CLOSE_TARGET_MINUTES)
+        if decision is None:
+            if decision_candidates:
+                market_errors.append(f"PAIR:{event_id}:{book}:{market}:DECISION_TARGET_LATE_ONLY")
+            continue
+        if close is None:
+            if close_candidates:
+                market_errors.append(f"PAIR:{event_id}:{book}:{market}:CLOSE_TARGET_LATE_ONLY")
             continue
         if decision["captured_at"] >= close["captured_at"] or decision["team_pair"] != close["team_pair"]:
             market_errors.append(f"PAIR:{event_id}:{book}:{market}:PAIR_BINDING_INVALID"); continue
-        weather = _nearest([
+        weather_candidates = [
             w for w in weather_valid
             if w["team_pair"] == close["team_pair"]
             and abs((w["commence_time"] - close["commence_time"]).total_seconds()) <= 900
-        ], WEATHER_TARGET_MINUTES)
+        ]
+        weather = _nearest_early(weather_candidates, WEATHER_TARGET_MINUTES)
         if weather is None:
+            if weather_candidates:
+                weather_errors.append(f"PAIR:{event_id}:{book}:{market}:WEATHER_TARGET_LATE_ONLY")
             continue
         units.append({
             "event_id": event_id, "book": book, "market": market,
@@ -222,7 +240,8 @@ def audit_cfb_forward_market_weather_evidence(
                 "decision_target_minutes": DECISION_TARGET_MINUTES,
                 "close_target_minutes": CLOSE_TARGET_MINUTES,
                 "weather_target_minutes": WEATHER_TARGET_MINUTES,
-                "tie_break": "captured_at_then_identity_ascending",
+                "target_direction": TARGET_DIRECTION,
+                "tie_break": "closest_early_then_captured_at_then_identity_ascending",
             },
             "decision": {"capture_id": decision["capture_id"], "lead_minutes": decision["lead_minutes"], "raw_sha256": decision["raw_sha256"], "raw_path": decision["raw_path"]},
             "close": {"capture_id": close["capture_id"], "lead_minutes": close["lead_minutes"], "raw_sha256": close["raw_sha256"], "raw_path": close["raw_path"]},
@@ -242,6 +261,7 @@ def audit_cfb_forward_market_weather_evidence(
     ready = bool(units)
     return {
         "contract": CONTRACT,
+        "target_direction": TARGET_DIRECTION,
         "status": "READY_FOR_FUTURE_PIT_BUNDLE_BINDING" if ready else "BLOCKED_PROSPECTIVE_EVIDENCE_INCOMPLETE",
         "market_weather_evidence_ready": ready,
         "paired_market_identity_count": len(by_identity),
