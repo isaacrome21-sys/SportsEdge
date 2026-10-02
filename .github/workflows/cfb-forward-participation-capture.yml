@@ -47,7 +47,9 @@ jobs:
           sportsedge/sports/cfb/historical_release.py
           sportsedge/sports/cfb/participation_source_capture.py
           sportsedge/sports/cfb/participation_pit_readiness.py
+          sportsedge/sports/cfb/participation_persistence.py
           scripts/cache_cfb_participation_sources.py
+          scripts/pack_cfb_participation_snapshot.py
 
       - name: Snapshot prospective participation source bytes
         run: |
@@ -231,6 +233,15 @@ jobs:
           print(json.dumps(report, sort_keys=True))
           PY
 
+      - name: Pack capture into Git-safe deterministic storage
+        run: |
+          set -euo pipefail
+          python scripts/pack_cfb_participation_snapshot.py pack \
+            --capture-root artifacts/cfb_forward_participation \
+            --output-root artifacts/cfb_forward_participation_persisted
+          python scripts/pack_cfb_participation_snapshot.py audit \
+            --persisted-root artifacts/cfb_forward_participation_persisted
+
       - name: Persist immutable participation snapshot on data branch
         env:
           DATA_BRANCH: data
@@ -244,8 +255,7 @@ jobs:
           dest="$worktree_dir/history/cfb/forward-participation/${capture_id}"
           test ! -e "$dest" || { echo "CFB_FORWARD_PARTICIPATION_CAPTURE_ID_COLLISION:${capture_id}" >&2; exit 1; }
           mkdir -p "$dest"
-          cp -a artifacts/cfb_forward_participation/source "$dest/source"
-          cp -a artifacts/cfb_forward_participation/capture "$dest/capture"
+          cp -a artifacts/cfb_forward_participation_persisted/. "$dest/"
           cd "$worktree_dir"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -257,6 +267,6 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: cfb-forward-participation-${{ env.CAPTURE_GIT_SHA }}-${{ github.run_id }}
-          path: artifacts/cfb_forward_participation/**
+          path: artifacts/cfb_forward_participation_persisted/**
           if-no-files-found: error
           retention-days: 30
