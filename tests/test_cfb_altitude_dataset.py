@@ -8,6 +8,7 @@ from sportsedge.sports.cfb.altitude_dataset import (
     CFBAltitudeDatasetError,
     build_altitude_dataset_manifest,
 )
+from sportsedge.sports.cfb.altitude_snapshot import canonical_jsonl
 
 
 def _snapshot_records():
@@ -21,6 +22,7 @@ def _snapshot_records():
 
 
 def _snapshot_manifest_and_binding():
+    snapshot_sha = sha256(canonical_jsonl(_snapshot_records())).hexdigest()
     manifest = {
         "source_provider": "CollegeFootballData",
         "source_schema_commit_sha": "06dbcb5a7977470c3b6296f1f18c9df64676876f",
@@ -29,7 +31,7 @@ def _snapshot_manifest_and_binding():
         "source_mirror_path": "data.csv",
         "source_mirror_git_blob_sha1": "2" * 40,
         "source_content_sha256": "3" * 64,
-        "content_sha256": "4" * 64,
+        "content_sha256": snapshot_sha,
         "record_count": 5,
         "stats": {
             "source_rows": 2,
@@ -159,6 +161,34 @@ def test_game_identity_mismatch_fails_closed():
         build_altitude_dataset_manifest(
             baseline_rows=[_baseline()],
             game_metadata_rows=[_meta(game_id="g2")],
+            snapshot_records=_snapshot_records(),
+            snapshot_manifest=manifest,
+            frozen_snapshot_binding=binding,
+        )
+
+
+def test_snapshot_rows_must_match_frozen_snapshot_hash():
+    manifest, binding = _snapshot_manifest_and_binding()
+    rows = _snapshot_records()
+    rows[-1] = {**rows[-1], "elevation_ft": 123.0}
+    with pytest.raises(CFBAltitudeDatasetError, match="SNAPSHOT_RECORDS_HASH_MISMATCH"):
+        build_altitude_dataset_manifest(
+            baseline_rows=[_baseline()],
+            game_metadata_rows=[_meta()],
+            snapshot_records=rows,
+            snapshot_manifest=manifest,
+            frozen_snapshot_binding=binding,
+        )
+
+
+def test_market_data_is_prohibited_from_altitude_selection_dataset():
+    manifest, binding = _snapshot_manifest_and_binding()
+    row = _baseline()
+    row["spread_line"] = -3.5
+    with pytest.raises(CFBAltitudeDatasetError, match="MARKET_DATA_PROHIBITED"):
+        build_altitude_dataset_manifest(
+            baseline_rows=[row],
+            game_metadata_rows=[_meta()],
             snapshot_records=_snapshot_records(),
             snapshot_manifest=manifest,
             frozen_snapshot_binding=binding,
