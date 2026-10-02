@@ -1,61 +1,84 @@
+import hashlib
+import json
+
 import pytest
 from sportsedge.sports.cfb.sportsdataverse_weather_transport import *
 
 
-def test_request_is_frozen_regular_fbs_season():
-    p=request_params(season=2025)
-    assert p=={"year":2025,"seasonType":"regular","classification":"fbs"}
-    with pytest.raises(SDVWeatherTransportError,match="OUTSIDE_FROZEN_WINDOW"):
-        request_params(season=2026)
+def _venue_csv():
+    return (
+        "stadium_id,name,aliases,city,state,country,lat,lon,elevation_m,timezone,"
+        "orientation_deg,orientation_bucket,orientation_src,roof_type,surface,"
+        "capacity,year_built,avg_wind_static,wind_vol_static,wind_impact_static,"
+        "weakest_wind_effect,avg_wind_sep,avg_wind_oct,avg_wind_nov,avg_wind_dec,"
+        "avg_wind_jan,avg_temp_f,wikidata_qid,osm_way_id,cfbd_venue_id,espn_venue_id,"
+        "nflverse_stadium_id,needs_review,elev_src,latlon_src,review_note\n"
+        "x,Test Stadium,,,,US,40.0,-88.0,,,,,,open,,,,,,,,,,,,,,,,123,,,,,,\n"
+        "y,Dome,,,,US,41.0,-87.0,,,,,,dome,,,,,,,,,,,,,,,,124,,,,,,\n"
+    ).encode()
 
 
-def test_normalize_outdoor_and_indoor_weather():
-    rows=normalize_season_weather(
-        [
-            {"id":1,"gameIndoors":False,"temperature":70,"windSpeed":8},
-            {"id":2,"gameIndoors":True,"temperature":65,"windSpeed":4},
-            {"id":999,"gameIndoors":False,"temperature":80,"windSpeed":3},
-        ],
-        season=2025,
-        evaluated_game_ids=[1,2],
+def test_venue_index_requires_pinned_hash(monkeypatch):
+    raw=_venue_csv()
+    monkeypatch.setattr(
+        "sportsedge.sports.cfb.sportsdataverse_weather_transport.VENUE_SOURCE_SHA256",
+        hashlib.sha256(raw).hexdigest(),
     )
-    assert rows==[
-        {"game_id":1,"game_indoor":False,"wind_speed":8.0,"temperature":70.0},
-        {"game_id":2,"game_indoor":True,"wind_speed":None,"temperature":None},
-    ]
+    idx=venue_index(raw)
+    assert idx[123]["game_indoor"] is False
+    assert idx[124]["game_indoor"] is True
+    with pytest.raises(SDVWeatherTransportError,match="HASH_MISMATCH"):
+        venue_index(raw+b"x")
 
 
-def test_missing_evaluated_game_fails_closed():
-    with pytest.raises(SDVWeatherTransportError,match="HISTORICAL_WEATHER_INCOMPLETE"):
-        normalize_season_weather(
-            [{"id":1,"gameIndoors":False,"temperature":70,"windSpeed":8}],
-            season=2025,
-            evaluated_game_ids=[1,2],
-        )
+def test_request_is_fixed_open_meteo_contract():
+    p=request_params(
+        latitude=40.0,
+        longitude=-88.0,
+        start_date="2025-09-06",
+        end_date="2025-09-07",
+    )
+    assert p["timezone"]=="UTC"
+    assert p["temperature_unit"]=="fahrenheit"
+    assert p["wind_speed_unit"]=="mph"
+    assert p["hourly"]=="temperature_2m,wind_speed_10m"
 
 
-def test_outdoor_weather_requires_numeric_fields():
-    with pytest.raises(SDVWeatherTransportError,match="windSpeed"):
-        normalize_season_weather(
-            [{"id":1,"gameIndoors":False,"temperature":70,"windSpeed":None}],
-            season=2025,
-            evaluated_game_ids=[1],
-        )
+def test_select_nearest_hour_without_interpolation():
+    payload={"hourly":{
+        "time":["2025-09-07T00:00","2025-09-07T01:00"],
+        "temperature_2m":[70,69],
+        "wind_speed_10m":[8,9],
+    }}
+    r=select_kickoff_hour(
+        payload,
+        game_id=1,
+        kickoff_utc="2025-09-07T00:20:00Z",
+        game_indoor=False,
+    )
+    assert r["temperature"]==70 and r["wind_speed"]==8
 
 
-def test_indoor_flag_and_duplicates_fail_closed():
-    with pytest.raises(SDVWeatherTransportError,match="INDOOR_FLAG_REQUIRED"):
-        normalize_season_weather(
-            [{"id":1,"gameIndoors":None}],
-            season=2025,
-            evaluated_game_ids=[1],
-        )
-    with pytest.raises(SDVWeatherTransportError,match="DUPLICATE_GAME"):
-        normalize_season_weather(
-            [
-                {"id":1,"gameIndoors":True},
-                {"id":1,"gameIndoors":True},
-            ],
-            season=2025,
-            evaluated_game_ids=[1],
+def test_indoor_requires_no_weather_payload():
+    r=select_kickoff_hour(
+        {},
+        game_id=1,
+        kickoff_utc="2025-09-07T00:20:00Z",
+        game_indoor=True,
+    )
+    assert r=={
+        "game_id":1,
+        "game_indoor":True,
+        "wind_speed":None,
+        "temperature":None,
+    }
+
+
+def test_missing_hour_fails_closed():
+    with pytest.raises(SDVWeatherTransportError,match="KICKOFF_HOUR_MISSING"):
+        select_kickoff_hour(
+            {"hourly":{"time":[],"temperature_2m":[],"wind_speed_10m":[]}},
+            game_id=1,
+            kickoff_utc="2025-09-07T00:20:00Z",
+            game_indoor=False,
         )
