@@ -57,7 +57,10 @@
     "end_season": 2025,
     "season_type": "REGULAR",
     "classification": "FBS",
-    "no_2026_forward_outcomes": true
+    "no_2026_forward_outcomes": true,
+    "bootstrap_source_season": 2015,
+    "first_candidate_row_season": 2016,
+    "bootstrap_reason": "2014_PRIOR_SEASON_STATE_UNAVAILABLE_FOR_DUAL_SNAPSHOT_FAMILIES"
   },
   "hyperparameter_policy": {
     "mode": "TEMPORAL_NESTED_EXPANDING_SEASON",
