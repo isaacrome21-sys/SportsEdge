@@ -153,3 +153,28 @@ def test_fit_runner_never_resolves_frozen_attempt9_coefficients_again():
     assert "attempt9_runtime.EXPECTED_COEFFICIENTS" in text
     assert "PROP_V1_ATTEMPT9_FIXED_BETA_PREDICTION_SHA_MISMATCH" in text
     assert "subprocess.run" not in text
+
+
+def test_nflverse_recent_team_alias_is_accepted():
+    aliased = rows()
+    for row in aliased:
+        row["recent_team"] = row.pop("team")
+    artifact = fit_prop_usage_v1(
+        aliased, env(),
+        source_receipts=receipt(),
+        attempt9_artifact_sha256="b" * 64,
+    )
+    validate_artifact(artifact)
+    assert artifact["validation_season_accessed"] is False
+
+
+def test_missing_both_team_fields_fails_closed():
+    bad = rows()
+    bad[0] = dict(bad[0])
+    bad[0].pop("team")
+    with pytest.raises(NflPropUsageV1FitError, match="team_or_recent_team"):
+        fit_prop_usage_v1(
+            bad, env(),
+            source_receipts=receipt(),
+            attempt9_artifact_sha256="b" * 64,
+        )
