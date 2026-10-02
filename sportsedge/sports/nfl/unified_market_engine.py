@@ -311,7 +311,7 @@ def _team_needs_td(requests: Sequence[Mapping[str, Any]], side: str) -> bool:
 def _simulate_team(
     *,
     side: str,
-    team_model: Mapping[str, Any],
+    team_model: Mapping[str, Any] | None,
     score_paths: Sequence[Mapping[str, Any]],
     expected_total: float,
     needs_td: bool,
@@ -472,7 +472,7 @@ def run_unified_nfl_model(
         try:
             team_paths[side] = _simulate_team(
                 side=side,
-                team_model=model or {},
+                team_model=model,
                 score_paths=score_paths if needs_td_for_sim else sampled,
                 expected_total=total,
                 needs_td=needs_td_for_sim,
