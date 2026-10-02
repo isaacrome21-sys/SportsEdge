@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv,io
 from typing import Mapping
 from .sportsdataverse_converted import bind_parsed_rows,ParsedReceipt
+from .sportsdataverse_receipts import AssetReceipt
 
 class SDVCSVError(ValueError): pass
 
@@ -38,5 +39,6 @@ def parse_csv(raw:bytes,*,dataset:str,season:int,source_url:str,raw_csv_sha256:s
   if row_season!=int(season): raise SDVCSVError(f"CFB_SDV_CSV_SEASON_MISMATCH:{n}")
   rows.append(clean)
  if not rows: raise SDVCSVError("CFB_SDV_CSV_ROWS_REQUIRED")
- receipt=bind_parsed_rows(rows,dataset=dataset,season=season,source_url=source_url,raw_csv_sha256=raw_csv_sha256)
+ parent=AssetReceipt(dataset,int(season),source_url,len(raw),raw_csv_sha256)
+ receipt=bind_parsed_rows(parent,rows)
  return rows,receipt
