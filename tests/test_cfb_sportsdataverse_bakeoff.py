@@ -24,6 +24,8 @@ def test_native_bakeoff_is_expanding_season_and_all_four_families():
  r=evaluate_native_candidates(rows(),CFG)
  assert r["outer_validation_seasons"]==[2018,2019,2020]
  assert set(r["observed"])==set(CFG["candidates"])
+ assert r["selected_family"] in CFG["candidates"]
+ assert r["selection_tie_break"]=="LOWEST_RMSE_THEN_FROZEN_FAMILY_ORDER"
  assert all(v["folds"][0]["season"]==2018 for v in r["observed"].values())
  assert r["authority"]["model_p_created"] is False
 
