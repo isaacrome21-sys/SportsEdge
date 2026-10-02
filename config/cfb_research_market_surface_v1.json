@@ -1,0 +1,67 @@
+{
+  "schema_version": "CFB_RESEARCH_MARKET_SURFACE_V1",
+  "sport": "CFB",
+  "status": "MLB_PARITY_RESEARCH_READOUT",
+  "authority": "Research/display inventory only. This file does not change config/football_market_surface.json, config/football_prop_engine_surface.json, Model_P authority, Truth Gate, promotion, staking, or OFFICIAL eligibility.",
+  "game_markets": {
+    "MONEYLINE": {"runtime": "CANONICAL_GAME_ENGINE", "research_card": true},
+    "SPREAD": {"runtime": "CANONICAL_GAME_ENGINE", "research_card": true},
+    "TOTAL": {"runtime": "CANONICAL_GAME_ENGINE", "research_card": true},
+    "TEAM_TOTAL": {"runtime": "CANONICAL_GAME_ENGINE", "research_card": true}
+  },
+  "player_prop_candidate_markets": [
+    "player_pass_attempts",
+    "player_pass_completions",
+    "player_pass_interceptions",
+    "player_pass_longest_completion",
+    "player_pass_rush_yds",
+    "player_pass_tds",
+    "player_pass_yds",
+    "player_receptions",
+    "player_reception_longest",
+    "player_reception_tds",
+    "player_reception_yds",
+    "player_rush_attempts",
+    "player_rush_longest",
+    "player_rush_reception_tds",
+    "player_rush_reception_yds",
+    "player_rush_tds",
+    "player_rush_yds",
+    "player_anytime_td",
+    "player_tds_over",
+    "player_field_goals",
+    "player_kicking_points",
+    "player_pats",
+    "player_sacks",
+    "player_solo_tackles",
+    "player_tackles_assists",
+    "player_defensive_interceptions"
+  ],
+  "player_prop_lane": {
+    "runtime": "FROZEN_ARTIFACT_SHARED_PATH_RESEARCH_CANDIDATE",
+    "requires_fresh_pit_usage": true,
+    "requires_pregame_quote": true,
+    "requires_player_identity": true,
+    "requires_kicker_context_when_offered": true,
+    "requires_defender_context_when_offered": true,
+    "official_eligible": false,
+    "production_engine_state": "NO_ENGINE",
+    "independent_validation_required": true
+  },
+  "unsupported_or_not_promoted": {
+    "first_td": "NO_ENGINE",
+    "last_td": "NO_ENGINE",
+    "returner_td_identity": "NO_ENGINE",
+    "first_half": "NO_ENGINE",
+    "second_half": "NO_ENGINE",
+    "quarters": "NO_ENGINE"
+  },
+  "governance": {
+    "research_only": true,
+    "market_prices_can_create_model_probability": false,
+    "capper_or_consensus_can_create_model_probability": false,
+    "usage_can_be_synthesized": false,
+    "promotion_authority": false,
+    "official_authority": false
+  }
+}
