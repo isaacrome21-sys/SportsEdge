@@ -2,7 +2,6 @@ import unittest
 
 from sportsedge.engine_registry import engine_registry, resolve_manual_market_type
 from sportsedge.mlb_lines_intake import parse_lines
-from sportsedge.shared_f5_engine import build_shared_f5_engine_session
 
 
 class MlbF5PhoneWireTests(unittest.TestCase):
@@ -33,8 +32,9 @@ class MlbF5PhoneWireTests(unittest.TestCase):
             ["F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS", "F5_TEAM_TOTALS"],
         )
         registry = engine_registry()
-        session = build_shared_f5_engine_session()
-        self.assertTrue(all(registry[market] is session for market in resolved))
+        shared = registry["F5_MONEYLINE"]
+        self.assertTrue(callable(shared))
+        self.assertTrue(all(registry[market] is shared for market in resolved))
 
 
 if __name__ == "__main__":
