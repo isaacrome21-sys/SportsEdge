@@ -5,8 +5,9 @@ import subprocess
 import sys
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
-from scripts.run_cfb_auto import discover_cfb_week
+from scripts.run_cfb_auto import _credentials, _manual_board, discover_cfb_week
 from sportsedge.sports.cfb.joint_model import CFB_FEATURE_CONTRACT, CFB_JOINT_MODEL_ID, CFBJointScoreModel
 from sportsedge.sports.cfb.model_artifact import (
     CFBModelArtifactError,
@@ -106,12 +107,26 @@ class CFBModelArtifactAndAutoCLITests(unittest.TestCase):
         self.assertEqual(week, 2)
         self.assertEqual(calls["count"], 1)
 
+    def test_auto_uses_manual_board_without_sportsbook_api_secret(self):
+        with patch.dict(os.environ, {"CFBD_API_KEY": "cfbd"}, clear=True):
+            self.assertEqual(_credentials(), "cfbd")
+        self.assertEqual(_manual_board('[{"id":"evt1"}]'), [{"id": "evt1"}])
+        with self.assertRaisesRegex(Exception, "CFB_AUTO_MANUAL_BOARD_REQUIRED"):
+            _manual_board("")
+
+        script = Path("scripts/run_cfb_auto.py").read_text(encoding="utf-8")
+        workflow = Path(".github/workflows/cfb-auto.yml").read_text(encoding="utf-8")
+        self.assertNotIn("SPORTSEDGE_ODDS_API_KEY", script)
+        self.assertNotIn("SPORTSEDGE_ODDS_API_KEY", workflow)
+        self.assertNotIn("fetch_the_odds_api_quotes", script)
+        self.assertIn("CFB_MANUAL_BOARD_JSON", script)
+        self.assertIn("CFB_MANUAL_BOARD_JSON", workflow)
+
     def test_direct_cli_missing_artifact_is_explicit_blocker_without_network(self):
         with TemporaryDirectory() as tmp:
             out = Path(tmp) / "card.json"
             env = dict(os.environ)
             env["SPORTSEDGE_CFBD_API_KEY"] = "fake"
-            env["SPORTSEDGE_ODDS_API_KEY"] = "fake"
             proc = subprocess.run(
                 [
                     sys.executable,
