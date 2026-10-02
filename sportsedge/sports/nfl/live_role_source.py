@@ -169,6 +169,41 @@ def _player_id(row: Mapping[str, Any]) -> str:
     return str(row.get("gsis_id") or row.get("player_id") or "").strip()
 
 
+def _pit_injury_statuses(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    team: str,
+    target_season: int,
+    target_week: int,
+    as_of: datetime,
+) -> dict[str, str]:
+    """Latest report status known by the PIT timestamp for this team/week."""
+    latest: dict[str, tuple[datetime, str]] = {}
+    for raw in rows:
+        try:
+            season = int(float(raw.get("season")))
+            week = int(float(raw.get("week")))
+        except (TypeError, ValueError):
+            continue
+        if season != target_season or week != target_week:
+            continue
+        if _team(raw.get("team")) != team:
+            continue
+        pid = str(raw.get("gsis_id") or raw.get("player_id") or "").strip()
+        if not pid or raw.get("date_modified") in (None, ""):
+            continue
+        modified = _utc(raw.get("date_modified"), "injury date_modified")
+        if modified > as_of:
+            continue
+        status = str(raw.get("report_status") or "").strip().upper()
+        if status not in {"", "OUT", "INACTIVE", "DOUBTFUL", "QUESTIONABLE", "PROBABLE", "ACTIVE"}:
+            raise NFLContextError(f"injury report status unsupported:{status}")
+        prior = latest.get(pid)
+        if prior is None or modified > prior[0]:
+            latest[pid] = (modified, status or "MISSING")
+    return {pid: status for pid, (_stamp, status) in latest.items()}
+
+
 def _weighted_rows(
     rows: Sequence[Mapping[str, Any]],
     *,
@@ -271,6 +306,7 @@ def build_live_team_model(
     observed_at: Any,
     depth_rows: Sequence[Mapping[str, Any]],
     player_rows: Sequence[Mapping[str, Any]],
+    injury_rows: Sequence[Mapping[str, Any]] = (),
     lookback_games: int = DEFAULT_LOOKBACK_GAMES,
     decay: float = DEFAULT_DECAY,
 ) -> dict[str, Any]:
@@ -286,9 +322,18 @@ def build_live_team_model(
         raise NFLContextError("decay must be in (0,1]")
     _assert_market_blind(depth_rows)
     _assert_market_blind(player_rows)
+    _assert_market_blind(injury_rows)
 
     prior = _prior_rows(player_rows, target_season=int(target_season), target_week=int(target_week))
     depth_at, snapshot = _latest_depth_snapshot(depth_rows, team=team_id, as_of=seen)
+    injury_status = _pit_injury_statuses(
+        injury_rows,
+        team=team_id,
+        target_season=int(target_season),
+        target_week=int(target_week),
+        as_of=seen,
+    )
+    unavailable = {pid for pid, status in injury_status.items() if status in {"OUT", "INACTIVE"}}
 
     qb_rows = [
         row for row in snapshot
@@ -297,6 +342,8 @@ def build_live_team_model(
     if len(qb_rows) != 1:
         raise NFLContextError(f"exactly one PIT starting QB required:{team_id}")
     qb_id = _player_id(qb_rows[0])
+    if qb_id in unavailable:
+        raise NFLContextError(f"PIT starting QB unavailable:{team_id}:{qb_id}")
     qb_name = str(qb_rows[0].get("player_name") or qb_id).strip()
     qb_hist = [row for row in prior if str(row.get("player_id") or "").strip() == qb_id]
     qb = _role_from_history(
@@ -314,6 +361,8 @@ def build_live_team_model(
         rank = _rank(row)
         pid = _player_id(row)
         if pos not in SKILL_POSITIONS or pid == "" or rank is None or rank > 3:
+            continue
+        if pid in unavailable:
             continue
         skill_depth[pid] = dict(row)
 
@@ -414,6 +463,8 @@ def build_live_team_model(
             "depth_as_of": depth_at.isoformat(),
             "depth_rows_sha256": _hash_rows(snapshot),
             "player_rows_sha256": _hash_rows(prior),
+            "injury_rows_sha256": _hash_rows(injury_rows),
+            "injury_status_by_player": dict(sorted(injury_status.items())),
             "target_season": int(target_season),
             "target_week": int(target_week),
             "lookback_games": int(lookback_games),
@@ -423,6 +474,7 @@ def build_live_team_model(
             "research_only": True,
             "market_fields_used": False,
             "post_kickoff_role_inference": False,
+            "out_inactive_players_excluded": True,
             "creates_model_p": False,
             "truth_gate_authority": False,
             "official_authority": False,
