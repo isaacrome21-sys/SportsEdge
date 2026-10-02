@@ -1,4 +1,6 @@
-import pytest\n\nfrom sportsedge.sports.nfl.unified_run_it import run_unified_nfl_run_it
+import pytest
+
+from sportsedge.sports.nfl.unified_run_it import run_unified_nfl_run_it
 
 
 AS_OF = "2026-10-01T23:00:30Z"
