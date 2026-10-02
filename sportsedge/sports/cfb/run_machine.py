@@ -13,9 +13,9 @@ The canonical boundary also enforces point-in-time safety: the game must still b
 pregame, feature snapshots may not come from the future or from the target week,
 and sportsbook quotes must be observed before both ``now`` and kickoff.
 
-This foundation prices full-game MONEYLINE / SPREAD / TOTAL / TEAM_TOTAL. Other
-declared football markets remain explicit NO_ENGINE until their required period/player
-state is actually modeled. New CFB pricing remains BLOCKED from official betting until
+This foundation prices full-game MONEYLINE / SPREAD / TOTAL / TEAM_TOTAL plus
+alternate spreads/totals from the same joint paths. Other declared football markets
+remain explicit NO_ENGINE until their required period/player state is actually modeled. New CFB pricing remains BLOCKED from official betting until
 promotion evidence and a frozen production edge floor exist.
 """
 from __future__ import annotations
@@ -41,7 +41,14 @@ from .source import (
 VALID_MODES = frozenset({"AUTO_SELECT", "MANUAL", "HYBRID", "AUTOMATIC"})
 CFB_MACHINE_VERSION = "CFB_RUN_MACHINE_V1"
 DEFAULT_QUOTE_TTL_SECONDS = 180
-SUPPORTED_PRICED_MARKETS = frozenset({*SUPPORTED_GAME_MARKETS, "TEAM_TOTAL"})
+SPREAD_MARKETS = frozenset({"SPREAD", "ALTERNATE_SPREAD"})
+TOTAL_MARKETS = frozenset({"TOTAL", "ALTERNATE_TOTAL"})
+SUPPORTED_PRICED_MARKETS = frozenset({
+    *SUPPORTED_GAME_MARKETS,
+    "TEAM_TOTAL",
+    *SPREAD_MARKETS,
+    *TOTAL_MARKETS,
+})
 
 
 class CFBRunMachineError(ValueError):
@@ -227,9 +234,18 @@ def _game_row(game: CFBGame, metrics: Mapping[str, CFBTeamMetrics]) -> dict[str,
 
 
 def _readout_probability(readouts: Mapping[str, Any], market: str, side: str) -> tuple[float, float]:
-    if market == "MONEYLINE": return float(readouts["moneyline"][side.lower()]), 0.0
-    if market == "SPREAD": return float(readouts["spread"][side.lower()]), float(readouts["spread"]["push"])
-    if market == "TOTAL": return float(readouts["total"][side.lower()]), float(readouts["total"]["push"])
+    if market == "MONEYLINE":
+        if side not in {"HOME", "AWAY"}:
+            raise CFBRunMachineError(f"CFB_MONEYLINE_SIDE_INVALID:{side or 'MISSING'}")
+        return float(readouts["moneyline"][side.lower()]), 0.0
+    if market in SPREAD_MARKETS:
+        if side not in {"HOME", "AWAY"}:
+            raise CFBRunMachineError(f"CFB_SPREAD_SIDE_INVALID:{side or 'MISSING'}")
+        return float(readouts["spread"][side.lower()]), float(readouts["spread"]["push"])
+    if market in TOTAL_MARKETS:
+        if side not in {"OVER", "UNDER"}:
+            raise CFBRunMachineError(f"CFB_TOTAL_SIDE_INVALID:{side or 'MISSING'}")
+        return float(readouts["total"][side.lower()]), float(readouts["total"]["push"])
     raise CFBRunMachineError(f"CFB_NO_ENGINE:{market}")
 
 
@@ -304,8 +320,8 @@ def _run_canonical(*, mode: str, season: int, week: int, now: datetime, model: C
         else:
             readouts = price_cfb_game_markets(
                 distribution,
-                spread_line=line if market == "SPREAD" else 0.0,
-                total_line=line if market == "TOTAL" else 0.0,
+                spread_line=line if market in SPREAD_MARKETS else 0.0,
+                total_line=line if market in TOTAL_MARKETS else 0.0,
             )
         valid_pair = len(pair) == 2 and _complements(str(pair[0]["side"]), str(pair[1]["side"]))
         raws = [_raw_implied(float(q["american_odds"])) for q in pair] if valid_pair else []
