@@ -127,11 +127,19 @@ def build_team_snapshots(
     """
     if target_season >= 2026:
         raise SportsDataverseHistoryError("CFB_SDV_TARGET_OUTCOME_SEASON_PROHIBITED")
-    schedules = validate_dataset("cfb_schedules", schedule_rows)
+    schedules = regular_fbs_schedule_rows(schedule_rows)
+    allowed_game_ids = {int(r["game_id"]) for r in schedules}
     team = validate_dataset("espn_cfb_adv_team", adv_team_rows)
     situ = validate_dataset("espn_cfb_adv_situational", adv_situational_rows)
     drives = validate_dataset("espn_cfb_adv_drives", adv_drive_rows)
     drives = attach_drive_time(drives, schedules)
+
+    def in_scope(r: Mapping[str, Any]) -> bool:
+        return int(r["game_id"]) in allowed_game_ids
+
+    team = [r for r in team if in_scope(r)]
+    situ = [r for r in situ if in_scope(r)]
+    drives = [r for r in drives if in_scope(r)]
 
     def eligible(r: Mapping[str, Any]) -> bool:
         return int(r["season"]) == target_season and int(r["week"]) < target_week
@@ -212,7 +220,7 @@ def build_season_week_snapshots(
     """
     if not 2015 <= int(season) <= 2025:
         raise SportsDataverseHistoryError("CFB_SDV_SEASON_OUTSIDE_FROZEN_WINDOW")
-    schedules = validate_dataset("cfb_schedules", schedule_rows)
+    schedules = regular_fbs_schedule_rows(schedule_rows)
     season_weeks = sorted({
         int(r["week"]) for r in schedules
         if int(r["season"]) == int(season) and int(r["week"]) >= 1
@@ -247,7 +255,7 @@ def build_prior_season_fallback_snapshots(
     prior=int(target_season)-1
     if not 2015 <= prior <= 2025 or not 2016 <= int(target_season) <= 2026:
         raise SportsDataverseHistoryError("CFB_SDV_PRIOR_FALLBACK_OUTSIDE_WINDOW")
-    schedules=validate_dataset("cfb_schedules",schedule_rows)
+    schedules=regular_fbs_schedule_rows(schedule_rows)
     weeks=[int(r["week"]) for r in schedules if int(r["season"])==prior]
     if not weeks:
         raise SportsDataverseHistoryError(f"CFB_SDV_PRIOR_FALLBACK_SEASON_EMPTY:{prior}")

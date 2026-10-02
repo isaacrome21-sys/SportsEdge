@@ -50,7 +50,7 @@
     },
     "defense_allowed_semantics": "SAME_GAME_OPPONENT_OFFENSE_METRICS_JOINED_BY_GAME_ID",
     "temporal_cutoff": "ONLY_ROWS_WITH_WEEK_LT_TARGET_WEEK",
-    "adv_drives_time_rule": "JOIN_GAME_ID_TO_ESPN_CFB_SCHEDULES_BEFORE_WEEK_FILTER"
+    "adv_drives_time_rule": "JOIN_GAME_ID_TO_CFB_SCHEDULES_BEFORE_WEEK_FILTER"
   },
   "training_window": {
     "start_season": 2015,

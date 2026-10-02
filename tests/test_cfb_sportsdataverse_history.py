@@ -13,7 +13,7 @@ def _rows(week, game_id=1):
           "EPA_success_rate":0.4,"EPA_standard_down_per_play":0.15,
           "EPA_success_passing_down_rate":0.35}
     drive={"game_id":game_id,"season":2025,"pos_team":10,"avg_field_position":70.0-week}
-    sched={"game_id":game_id,"season":2025,"week":week}
+    sched={"game_id":game_id,"season":2025,"week":week,"season_type":"regular","fbs_game":True}
     opp_team={**team,"pos_team":20,"EPA_rushing_per_play":-0.05*week,"EPA_passing_per_play":0.03*week}
     opp_situ={**situ,"pos_team":20,"EPA_success_rate":0.3}
     opp_drive={**drive,"pos_team":20,"avg_field_position":72.0-week}
