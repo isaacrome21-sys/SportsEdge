@@ -204,13 +204,15 @@ def build_attempt9_team_environment(
 def normalize_player_rows(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     required = {
-        "season", "week", "season_type", "player_id", "position", "team",
+        "season", "week", "season_type", "player_id", "position",
         "attempts", "passing_yards", "carries", "rushing_yards", "targets", "receiving_yards",
     }
     for raw in rows:
-        if not required.issubset(raw):
-            missing = sorted(required - set(raw))
+        missing = sorted(required - set(raw))
+        if missing:
             raise NflPropUsageV1FitError("PLAYER_STATS_COLUMNS_MISSING:" + ",".join(missing))
+        if "team" not in raw and "recent_team" not in raw:
+            raise NflPropUsageV1FitError("PLAYER_STATS_COLUMNS_MISSING:team_or_recent_team")
         season = _int(raw.get("season"), "player.season")
         if season not in DEV_SEASONS:
             raise NflPropUsageV1FitError(f"PROP_V1_FIT_ROW_OUTSIDE_DEVELOPMENT:{season}")
@@ -218,7 +220,7 @@ def normalize_player_rows(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, A
             continue
         pid = str(raw.get("player_id") or "").strip()
         pos = str(raw.get("position") or "").strip().upper()
-        team = _team(raw.get("team"))
+        team = _team(raw.get("team") or raw.get("recent_team"))
         if not pid or not pos or not team:
             continue
         out.append({
