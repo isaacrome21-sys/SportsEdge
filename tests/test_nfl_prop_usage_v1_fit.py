@@ -1,3 +1,4 @@
+from pathlib import Path
 import copy
 
 import pytest
@@ -145,3 +146,10 @@ def test_artifact_tamper_fails_closed():
     bad["markets"]["passing_yards"]["selected"]["decay"] = 0.123
     with pytest.raises(NflPropUsageV1FitError, match="ARTIFACT_SHA_MISMATCH"):
         validate_artifact(bad)
+
+
+def test_fit_runner_never_resolves_frozen_attempt9_coefficients_again():
+    text = Path("scripts/fit_nfl_prop_usage_v1.py").read_text()
+    assert "attempt9_runtime.EXPECTED_COEFFICIENTS" in text
+    assert "PROP_V1_ATTEMPT9_FIXED_BETA_PREDICTION_SHA_MISMATCH" in text
+    assert "subprocess.run" not in text
