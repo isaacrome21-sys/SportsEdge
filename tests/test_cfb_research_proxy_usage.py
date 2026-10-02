@@ -145,3 +145,19 @@ def test_missing_target_pool_is_not_filled_with_fake_share():
     normalized = normalize_cfbd_usage_rows(rows, season=2026)
     with pytest.raises(CFBResearchProxyUsageError, match="TARGET_POOL_EMPTY"):
         build_team_proxy_usage(normalized, team="Home")
+
+
+def test_exact_duplicate_provider_usage_row_is_collapsed():
+    rows = _usage("Home")
+    rows.append(dict(rows[0], usage=dict(rows[0]["usage"])))
+    normalized = normalize_cfbd_usage_rows(rows, season=2026)
+    assert len(normalized) == 4
+
+
+def test_conflicting_duplicate_provider_usage_row_fails_closed():
+    rows = _usage("Home")
+    duplicate = dict(rows[0], usage=dict(rows[0]["usage"]))
+    duplicate["usage"]["overall"] = 0.52
+    rows.append(duplicate)
+    with pytest.raises(CFBResearchProxyUsageError, match="DUPLICATE_CONFLICT"):
+        normalize_cfbd_usage_rows(rows, season=2026)
