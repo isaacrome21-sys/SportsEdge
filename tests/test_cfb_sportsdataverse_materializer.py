@@ -12,10 +12,10 @@ def snap(team):
 
 def test_materializer_ignores_realized_scores_and_is_pregame_only():
     base={"game_id":9,"season":2025,"week":3,"home_id":1,"away_id":2}
-    a=materialize_native_candidate_inputs(games=[{**base,"home_score":99,"away_score":0}],snapshots=[snap(1),snap(2)])
-    b=materialize_native_candidate_inputs(games=[{**base,"home_score":0,"away_score":99}],snapshots=[snap(2),snap(1)])
+    a=materialize_native_candidate_inputs(games=[{**base,"home_points":99,"away_points":0}],snapshots=[snap(1),snap(2)],prior_season_snapshots=[prior_snap(1),prior_snap(2)])
+    b=materialize_native_candidate_inputs(games=[{**base,"home_points":0,"away_points":99}],snapshots=[snap(2),snap(1)],prior_season_snapshots=[prior_snap(1),prior_snap(2)])
     assert a==b
-    assert "home_score" not in a[0] and "away_score" not in a[0]
+    assert "home_points" not in a[0] and "away_points" not in a[0]
     assert a[0]["provenance_class"]=="RECONSTRUCTED_HISTORICAL_NOT_PIT"
 
 def test_materializer_requires_exact_prior_week_snapshot():

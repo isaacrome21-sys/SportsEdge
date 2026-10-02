@@ -10,7 +10,7 @@ def attach_training_labels(*, predictive_rows:Sequence[Mapping[str,Any]], comple
         try:
             season=int(game["season"]); week=int(game["week"]); gid=str(game["game_id"])
             home_id=int(game["home_id"]); away_id=int(game["away_id"])
-            hs=int(game["home_score"]); aws=int(game["away_score"])
+            hs=int(game["home_points"]); aws=int(game["away_points"])
         except (KeyError,TypeError,ValueError) as exc:
             raise SDVTrainingRowError("CFB_SDV_LABEL_GAME_INVALID") from exc
         if season >= 2026:
@@ -29,7 +29,7 @@ def attach_training_labels(*, predictive_rows:Sequence[Mapping[str,Any]], comple
         home_id,away_id,hs,aws=label
         if int(row["home_id"])!=home_id or int(row["away_id"])!=away_id:
             raise SDVTrainingRowError(f"CFB_SDV_LABEL_IDENTITY_MISMATCH:{row.get('game_id')}")
-        out.append({**dict(row),"home_score":hs,"away_score":aws})
+        out.append({**dict(row),"home_points":hs,"away_points":aws})
     if len(out)!=len(labels):
         used={(int(r["season"]),int(r["week"]),str(r["game_id"])) for r in predictive_rows}
         extra=set(labels)-used

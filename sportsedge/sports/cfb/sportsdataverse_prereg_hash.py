@@ -5,6 +5,7 @@ from typing import Mapping
 
 CODE_PATHS=(
  "scripts/cfb_sportsdataverse_prereg_hash.py",
+ "scripts/run_cfb_sportsdataverse_bakeoff.py",
  "sportsedge/sports/cfb/sportsdataverse_acquisition.py",
  "sportsedge/sports/cfb/sportsdataverse_receipts.py",
  "sportsedge/sports/cfb/sportsdataverse_converted.py",

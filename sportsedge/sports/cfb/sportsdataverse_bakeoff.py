@@ -13,7 +13,7 @@ class SDVNativeBakeoffError(ValueError): pass
 
 def _rmse(pred,rows):
  if len(pred)!=len(rows) or not rows: raise SDVNativeBakeoffError("CFB_SDV_BAKEOFF_SCORE_ROWS_INVALID")
- return sqrt(sum((h-float(r["home_score"]))**2+(a-float(r["away_score"]))**2 for (h,a),r in zip(pred,rows))/(2*len(rows)))
+ return sqrt(sum((h-float(r["home_points"]))**2+(a-float(r["away_points"]))**2 for (h,a),r in zip(pred,rows))/(2*len(rows)))
 
 def _constants(config,family):
  c=config["candidates"].get(family)
@@ -40,6 +40,9 @@ def _choose_alpha(rows,family,grid,outer_season,constants):
  return min(scored,key=lambda x:(x[0],x[1]))[1]
 
 def evaluate_native_candidates(rows:Sequence[Mapping[str,Any]],config:Mapping[str,Any])->dict[str,Any]:
+ policy=config.get("candidate_selection_policy") or {}
+ if policy.get("metric")!="JOINT_HOME_AWAY_SCORE_RMSE" or policy.get("tie_break")!="LOWEST_RMSE_THEN_FROZEN_FAMILY_ORDER" or list(policy.get("family_order") or [])!=list(FAMILIES) or policy.get("post_result_override_allowed") is not False:
+  raise SDVNativeBakeoffError("CFB_SDV_CANDIDATE_SELECTION_POLICY_MISMATCH")
  data=[dict(r) for r in rows]
  if not data: raise SDVNativeBakeoffError("CFB_SDV_BAKEOFF_ROWS_EMPTY")
  if any(int(r["season"])>=2026 for r in data): raise SDVNativeBakeoffError("CFB_SDV_2026_OUTCOMES_PROHIBITED")
