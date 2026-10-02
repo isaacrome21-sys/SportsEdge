@@ -1,6 +1,9 @@
 name: nfl-game-script-v2-fit
 
 on:
+  push:
+    branches:
+      - 'grok/nfl/game-script-v2-fit'
   pull_request:
     paths:
       - 'config/research/nfl_game_script_v2_prelock.json'
