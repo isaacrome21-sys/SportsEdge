@@ -12,7 +12,8 @@ from sportsedge.sports.cfb.joint_model import (
     CFBJointScoreModel, CFBModelError, CFB_FEATURE_CONTRACT, CFB_JOINT_MODEL_ID,
     _feature_names, price_cfb_game_markets, simulate_cfb_joint_distribution,
 )
-from sportsedge.sports.cfb.run_machine import run_cfb_machine
+from sportsedge.sports.cfb.run_machine import CFBRunMachineError, run_cfb_machine
+from sportsedge.sports.cfb.team_total_readout import price_cfb_team_total
 from sportsedge.sports.cfb.source import (
     CFBGame, CFBQuote, CFBSourceError, CFBTeamMetrics, attach_weather,
     bind_provider_team, build_team_alias_index, parse_the_odds_api_quotes,
@@ -122,6 +123,18 @@ class JointModelTests(unittest.TestCase):
         self.assertNotEqual(p1["spread"]["home"],p2["spread"]["home"])
         self.assertNotEqual(p1["total"]["over"],p2["total"]["over"])
 
+
+    def test_team_total_readout_uses_team_score_only(self):
+        dist=simulate_cfb_joint_distribution(model(),row(),seed=33,n_paths=400)
+        digest=sha256(json.dumps(dist,sort_keys=True).encode()).hexdigest()
+        home=price_cfb_team_total(dist,team_side="HOME",line=27.5)
+        away=price_cfb_team_total(dist,team_side="AWAY",line=20.5)
+        self.assertEqual(digest,sha256(json.dumps(dist,sort_keys=True).encode()).hexdigest())
+        self.assertAlmostEqual(home["over"]+home["under"]+home["push"],1.0,places=12)
+        self.assertAlmostEqual(away["over"]+away["under"]+away["push"],1.0,places=12)
+        self.assertEqual(home["team_side"],"HOME")
+        self.assertEqual(away["team_side"],"AWAY")
+
     def test_cfb_empirical_overtime_resolves_ties_and_missing_profile_blocks(self):
         tied=replace(model(24,24,True),residual_pairs=((0.0,0.0),))
         dist=simulate_cfb_joint_distribution(tied,row(),seed=7,n_paths=100)
@@ -164,6 +177,49 @@ class MachineTests(unittest.TestCase):
             self.assertEqual(len({x.hold for x in xs}),1)
         self.assertTrue(all(x.engine_status=="PRICED" and x.bet_status=="BLOCKED" for x in r.results))
         self.assertTrue(all(x.reason=="CFB_PROMOTION_EVIDENCE_REQUIRED" for x in r.results))
+
+
+    def test_full_game_team_totals_are_priced_from_same_joint_distribution(self):
+        ts=(NOW-timedelta(seconds=20)).isoformat()
+        tt=[
+            CFBQuote(game_id="1001",period="FG",market="TEAM_TOTAL",entity_id="Alpha State",side="OVER",line=27.5,
+                     american_odds=-110,book_key="draftkings",sportsbook="DraftKings",retrieved_at=ts,offer_id="ttho",is_alternate=False),
+            CFBQuote(game_id="1001",period="FG",market="TEAM_TOTAL",entity_id="Alpha State",side="UNDER",line=27.5,
+                     american_odds=-110,book_key="draftkings",sportsbook="DraftKings",retrieved_at=ts,offer_id="tthu",is_alternate=False),
+            CFBQuote(game_id="1001",period="FG",market="TEAM_TOTAL",entity_id="Beta Tech",side="OVER",line=20.5,
+                     american_odds=-105,book_key="draftkings",sportsbook="DraftKings",retrieved_at=ts,offer_id="ttao",is_alternate=False),
+            CFBQuote(game_id="1001",period="FG",market="TEAM_TOTAL",entity_id="Beta Tech",side="UNDER",line=20.5,
+                     american_odds=-115,book_key="draftkings",sportsbook="DraftKings",retrieved_at=ts,offer_id="ttau",is_alternate=False),
+        ]
+        report=self.manual(mode="MANUAL",season=2026,week=1,model=model(),now=NOW,
+                           games=self.games,metrics=self.metrics,quotes=[*self.q,*tt],n_paths=500,root_seed=44)
+        team_rows=[x for x in report.results if x.market=="TEAM_TOTAL"]
+        self.assertEqual(len(team_rows),4)
+        self.assertTrue(all(x.engine_status=="PRICED" for x in team_rows))
+        self.assertTrue(all(x.bet_status=="BLOCKED" and x.reason=="CFB_PROMOTION_EVIDENCE_REQUIRED" for x in team_rows))
+        self.assertEqual(len({x.distribution_sha256 for x in report.results}),1)
+        self.assertEqual(len({x.seed for x in report.results}),1)
+        for entity in ("Alpha State","Beta Tech"):
+            rows=[x for x in team_rows if x.offer_id.startswith("tth") ] if entity=="Alpha State" else [x for x in team_rows if x.offer_id.startswith("tta")]
+            self.assertEqual(len(rows),2)
+            self.assertAlmostEqual(sum(x.fair_market_p for x in rows),1.0,places=12)
+
+    def test_team_total_unknown_entity_fails_closed(self):
+        ts=(NOW-timedelta(seconds=20)).isoformat()
+        bad=[
+            CFBQuote(game_id="1001",period="FG",market="TEAM_TOTAL",entity_id="Unknown Team",side="OVER",line=20.5,
+                     american_odds=-110,book_key="draftkings",sportsbook="DraftKings",retrieved_at=ts,offer_id="bad1",is_alternate=False),
+            CFBQuote(game_id="1001",period="FG",market="TEAM_TOTAL",entity_id="Unknown Team",side="UNDER",line=20.5,
+                     american_odds=-110,book_key="draftkings",sportsbook="DraftKings",retrieved_at=ts,offer_id="bad2",is_alternate=False),
+        ]
+        with self.assertRaisesRegex(CFBRunMachineError,"CFB_TEAM_TOTAL_ENTITY_UNRESOLVED"):
+            self.manual(mode="MANUAL",season=2026,week=1,model=model(),now=NOW,
+                        games=self.games,metrics=self.metrics,quotes=bad,n_paths=50)
+
+    def test_market_surface_marks_cfb_team_total_implemented(self):
+        surface=json.loads(Path("config/football_market_surface.json").read_text())
+        declared=next(row for row in surface["markets"] if row["market"]=="team_total")
+        self.assertEqual(declared["engine_state_by_sport"]["CFB"],"IMPLEMENTED")
 
     def test_no_engine_never_becomes_pass(self):
         surface=json.loads(Path("config/football_market_surface.json").read_text())
