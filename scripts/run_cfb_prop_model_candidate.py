@@ -10,6 +10,7 @@ blocks every betting decision.
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 from datetime import datetime, timezone
 import json
 import os
@@ -23,7 +24,11 @@ if str(ROOT) not in sys.path:
 
 from sportsedge.football_prop_odds_source import build_odds_snapshot, fetch_event_prop_odds
 from sportsedge.football_prop_run_machine import FootballPropRunError
-from sportsedge.football_prop_extended_run_machine import run_football_extended_props
+from sportsedge.football_prop_extended_run_machine import (
+    OFFENSIVE_OU_MARKETS,
+    SCORER_MARKETS,
+    run_football_extended_props,
+)
 from sportsedge.sports.cfb.prop_bundle import CFBPropBundleError, load_cfb_prop_artifact_bundle
 from sportsedge.sports.nfl.prop_code_surface import (
     CFBPropCodeSurfaceError,
@@ -35,6 +40,7 @@ DEFAULT_BUNDLE = ROOT / "artifacts/football/cfb_prop_artifact_bundle_v1.json"
 DEFAULT_FEATURES = ROOT / "artifacts/football/cfb_prop_live_features.json"
 DEFAULT_ODDS = ROOT / "artifacts/football/cfb_prop_odds_snapshot.json"
 DEFAULT_OUTPUT = ROOT / "artifacts/run_it/cfb_prop_model_candidate.json"
+CFB_PROXY_PROVIDER_MARKETS = tuple(sorted(set(OFFENSIVE_OU_MARKETS) | set(SCORER_MARKETS)))
 
 
 class CFBPropCandidateError(ValueError):
@@ -104,7 +110,9 @@ def _odds_keys() -> list[str]:
     return keys
 
 
-def _network_odds(*, live: dict, current: datetime) -> dict:
+def _network_odds(
+    *, live: dict, current: datetime, markets: tuple[str, ...] | None = None
+) -> dict:
     games = live.get("games")
     if not isinstance(games, list) or not games:
         raise CFBPropCandidateError("CFB_PROP_CANDIDATE_LIVE_GAMES_REQUIRED")
@@ -120,11 +128,121 @@ def _network_odds(*, live: dict, current: datetime) -> dict:
         if event_id in seen:
             continue
         seen.add(event_id)
-        fetched = fetch_event_prop_odds(keys, sport="CFB", event_id=event_id)
+        fetched = fetch_event_prop_odds(
+            keys, sport="CFB", event_id=event_id, markets=markets
+        )
         if not isinstance(fetched.value, dict):
             raise CFBPropCandidateError("CFB_PROP_CANDIDATE_ODDS_PROVIDER_PAYLOAD_INVALID")
         events.append(dict(fetched.value))
     return build_odds_snapshot(events, observed_at=current)
+
+def _norm_player_name(value: object) -> str:
+    return " ".join(str(value or "").strip().lower().split())
+
+
+def _proxy_event_player_names(live: dict) -> dict[str, set[str]]:
+    games = live.get("games")
+    if not isinstance(games, list):
+        raise CFBPropCandidateError("CFB_PROP_CANDIDATE_LIVE_GAMES_REQUIRED")
+    out: dict[str, set[str]] = {}
+    for game in games:
+        if not isinstance(game, dict):
+            raise CFBPropCandidateError("CFB_PROP_CANDIDATE_LIVE_GAME_INVALID")
+        event_id = str(game.get("provider_event_id") or "").strip()
+        if not event_id:
+            raise CFBPropCandidateError("CFB_PROP_CANDIDATE_PROVIDER_EVENT_ID_REQUIRED")
+        names: set[str] = set()
+        for usage_field in ("home_usage", "away_usage"):
+            usage = game.get(usage_field)
+            if not isinstance(usage, dict):
+                continue
+            players = usage.get("players")
+            if not isinstance(players, list):
+                continue
+            for player in players:
+                if not isinstance(player, dict):
+                    continue
+                key = _norm_player_name(player.get("player_name"))
+                if key:
+                    names.add(key)
+        if not names:
+            raise CFBPropCandidateError(
+                f"CFB_PROP_CANDIDATE_PROXY_PLAYER_NAMES_EMPTY:{event_id}"
+            )
+        prior = out.get(event_id)
+        if prior is not None and prior != names:
+            raise CFBPropCandidateError(
+                f"CFB_PROP_CANDIDATE_PROXY_EVENT_DUPLICATE_CONFLICT:{event_id}"
+            )
+        out[event_id] = names
+    return out
+
+
+def _filter_proxy_odds_by_live_identity(
+    odds: dict, *, live: dict
+) -> tuple[dict, list[dict]]:
+    """Fail closed per unmatched sportsbook player before the frozen engine."""
+    filtered = deepcopy(odds)
+    allowed_by_event = _proxy_event_player_names(live)
+    blocks: list[dict] = []
+    events = filtered.get("events")
+    if not isinstance(events, list):
+        raise CFBPropCandidateError("CFB_PROP_CANDIDATE_ODDS_EVENTS_REQUIRED")
+    supported = set(CFB_PROXY_PROVIDER_MARKETS)
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        event_id = str(event.get("id") or "").strip()
+        allowed = allowed_by_event.get(event_id)
+        if allowed is None:
+            continue
+        books = event.get("bookmakers")
+        if not isinstance(books, list):
+            continue
+        for book in books:
+            if not isinstance(book, dict):
+                continue
+            markets = book.get("markets")
+            if not isinstance(markets, list):
+                continue
+            for market in markets:
+                if not isinstance(market, dict):
+                    continue
+                provider_market = str(market.get("key") or "").strip()
+                if provider_market not in supported:
+                    continue
+                outcomes = market.get("outcomes")
+                if not isinstance(outcomes, list):
+                    continue
+                kept = []
+                for outcome in outcomes:
+                    if not isinstance(outcome, dict):
+                        kept.append(outcome)
+                        continue
+                    player_name = str(outcome.get("description") or "").strip()
+                    if _norm_player_name(player_name) in allowed:
+                        kept.append(outcome)
+                        continue
+                    blocks.append({
+                        "sport": "CFB",
+                        "provider_event_id": event_id,
+                        "bookmaker": str(book.get("key") or "").strip() or None,
+                        "provider_market": provider_market,
+                        "player_name": player_name or None,
+                        "side": str(outcome.get("name") or "").strip() or None,
+                        "line": outcome.get("point"),
+                        "american_odds": outcome.get("price"),
+                        "model_p": None,
+                        "bet_status": "BLOCKED",
+                        "official_eligible": False,
+                        "reason": (
+                            "FOOTBALL_PROP_PLAYER_NAME_UNRESOLVED:"
+                            + (player_name or "MISSING")
+                        ),
+                    })
+                market["outcomes"] = kept
+    return filtered, blocks
+
 
 def _candidateize(report: dict, *, proxy_usage: bool = False) -> dict:
     candidate_rows = 0
@@ -209,8 +327,17 @@ def main() -> int:
         odds = (
             _json(args.odds_snapshot, "CFB_PROP_CANDIDATE_ODDS_SNAPSHOT_REQUIRED")
             if args.odds_snapshot.is_file()
-            else _network_odds(live=live, current=current)
+            else _network_odds(
+                live=live,
+                current=current,
+                markets=CFB_PROXY_PROVIDER_MARKETS if proxy_usage else None,
+            )
         )
+        identity_blocks: list[dict] = []
+        if proxy_usage:
+            odds, identity_blocks = _filter_proxy_odds_by_live_identity(
+                odds, live=live
+            )
         report = run_football_extended_props(
             sport="CFB",
             now=current,
@@ -224,6 +351,8 @@ def main() -> int:
             book_key=str(args.bookmaker),
         )
         report = _candidateize(report, proxy_usage=proxy_usage)
+        report["identity_blocks"] = identity_blocks
+        report.setdefault("summary", {})["identity_blocks"] = len(identity_blocks)
         payload = {
             "schema_version": "CFB_PROP_MODEL_CANDIDATE_RUN_V1",
             "status": "SUCCESS" if report["summary"]["model_candidate_rows"] else "BLOCKED",
@@ -239,6 +368,10 @@ def main() -> int:
                 "usage_can_be_synthesized": False,
                 "network_odds_allowed_only_after_live_features": True,
                 "research_proxy_usage": bool(proxy_usage),
+                "research_proxy_provider_markets": (
+                    list(CFB_PROXY_PROVIDER_MARKETS) if proxy_usage else None
+                ),
+                "unresolved_provider_player_rows_fail_closed_before_frozen_engine": bool(proxy_usage),
                 "production_eligible": False,
             },
         }
