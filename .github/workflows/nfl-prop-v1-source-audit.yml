@@ -83,9 +83,9 @@ jobs:
                   "n_games": g["n_games"],
                   "n_gamebook_urls": g["n_gamebook_urls"],
                   "n_gamebooks_downloaded": g["n_gamebooks_downloaded"],
-                  "n_explicit_inactive_sections": g["n_explicit_inactive_sections"],
+                  "n_explicit_not_active_sections": g["n_explicit_not_active_sections"],
                   "coverage_fraction": g["coverage_fraction"],
-                  "all_games_have_explicit_inactive_section": g["all_games_have_explicit_inactive_section"],
+                  "all_games_have_explicit_not_active_section": g["all_games_have_explicit_not_active_section"],
                   "validation_window_spent": g["authority"]["validation_window_spent"],
               },
           }, sort_keys=True))
