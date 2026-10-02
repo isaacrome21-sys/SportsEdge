@@ -28,3 +28,24 @@ def test_materializer_rejects_2026():
     with pytest.raises(SDVMaterializationError,match="2026_OUTCOMES"):
         materialize_native_candidate_inputs(
           games=[{"game_id":9,"season":2026,"week":3,"home_id":1,"away_id":2}],snapshots=[])
+
+def prior_snap(team, through_week=14):
+    s=snap(team)
+    return TeamSnapshot(**{**s.__dict__,"season":2024,"through_week":through_week,"games_in_sample":12})
+
+def test_week1_uses_latest_explicit_prior_season_snapshot():
+    rows=materialize_native_candidate_inputs(
+      games=[{"game_id":1,"season":2025,"week":1,"home_id":1,"away_id":2,"home_score":50,"away_score":0}],
+      snapshots=[],
+      prior_season_snapshots=[prior_snap(1,13),prior_snap(1,14),prior_snap(2,14)],
+    )
+    assert rows[0]["home_games_in_sample"]==12
+    assert rows[0]["away_games_in_sample"]==12
+    assert "home_score" not in rows[0]
+
+def test_week1_fails_closed_without_prior_season_snapshot():
+    with pytest.raises(SDVMaterializationError,match="PRIOR_SEASON_SNAPSHOT_REQUIRED"):
+        materialize_native_candidate_inputs(
+          games=[{"game_id":1,"season":2025,"week":1,"home_id":1,"away_id":2}],
+          snapshots=[],prior_season_snapshots=[prior_snap(1)],
+        )
