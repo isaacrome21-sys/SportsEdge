@@ -57,9 +57,7 @@ jobs:
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: .cache/mlb-history
-          key: mlb-lines-history-v1-${{ runner.os }}-${{ steps.day.outputs.date }}-${{ github.run_id }}
-          restore-keys: |
-            mlb-lines-history-v1-${{ runner.os }}-${{ steps.day.outputs.date }}-
+          key: mlb-lines-history-v2-${{ runner.os }}-${{ steps.day.outputs.date }}
 
       - name: Transcribe lines from the issue
         id: intake
@@ -80,7 +78,10 @@ jobs:
           fi
 
       - name: Run SportsEdge engines
-        run: PYTHONPATH=.runtime-deps:. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.intake.outputs.path }}" --run-date "${{ steps.intake.outputs.slate }}" --max-age-minutes 60 --output artifacts/manual_mlb_snapshot_card.json
+        run: |
+          started=$(date +%s)
+          PYTHONPATH=.runtime-deps:. python scripts/run_manual_mlb_snapshot.py --input "${{ steps.intake.outputs.path }}" --run-date "${{ steps.intake.outputs.slate }}" --max-age-minutes 60 --output artifacts/manual_mlb_snapshot_card.json
+          echo "mlb_engine_seconds=$(( $(date +%s) - started ))"
 
       - name: Render PRE-CONTEXT result and reply now
         run: |
@@ -95,7 +96,7 @@ jobs:
         continue-on-error: true
         timeout-minutes: 5
         run: |
-          PYTHONPATH=.runtime-deps:. python scripts/acquire_mlb_card_context.py --engine-output artifacts/manual_mlb_snapshot_card.json --out-dir artifacts/mlb_context
+          PYTHONPATH=.runtime-deps:. python scripts/acquire_mlb_card_context.py --engine-output artifacts/manual_mlb_snapshot_card.json --out-dir artifacts/mlb_context --workers 6
           PYTHONPATH=.runtime-deps:. python scripts/render_mlb_myspari_card.py \
             --engine-output artifacts/manual_mlb_snapshot_card.json \
             --snapshot "${{ steps.intake.outputs.path }}" \
