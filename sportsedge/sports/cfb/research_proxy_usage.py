@@ -167,9 +167,8 @@ def fetch_odds_event_identities(
 def normalize_cfbd_usage_rows(
     rows: Iterable[Mapping[str, Any]], *, season: int
 ) -> list[dict[str, Any]]:
-    """Validate only the documented CFBD usage identity + overall/pass/rush fields."""
-    out: list[dict[str, Any]] = []
-    seen: set[tuple[str, str]] = set()
+    """Validate documented CFBD usage fields and collapse exact duplicate rows."""
+    by_player: dict[tuple[str, str], dict[str, Any]] = {}
     for raw in rows:
         if not isinstance(raw, Mapping):
             continue
@@ -192,12 +191,6 @@ def normalize_cfbd_usage_rows(
             or not isinstance(usage, Mapping)
         ):
             continue
-        key = (team.casefold(), player_id)
-        if key in seen:
-            raise CFBResearchProxyUsageError(
-                f"CFB_PROXY_USAGE_PLAYER_DUPLICATE:{team}:{player_id}"
-            )
-        seen.add(key)
         overall = _share(
             usage.get("overall"),
             f"CFB_PROXY_USAGE_OVERALL_INVALID:{team}:{player_id}",
@@ -212,17 +205,26 @@ def normalize_cfbd_usage_rows(
         )
         if max(overall, pass_usage, rush_usage) <= 0:
             continue
-        out.append(
-            {
-                "player_id": player_id,
-                "player_name": name,
-                "position": position,
-                "team": team,
-                "usage_overall": overall,
-                "usage_pass": pass_usage,
-                "usage_rush": rush_usage,
-            }
-        )
+        normalized = {
+            "player_id": player_id,
+            "player_name": name,
+            "position": position,
+            "team": team,
+            "usage_overall": overall,
+            "usage_pass": pass_usage,
+            "usage_rush": rush_usage,
+        }
+        key = (team.casefold(), player_id)
+        prior = by_player.get(key)
+        if prior is None:
+            by_player[key] = normalized
+        elif prior != normalized:
+            raise CFBResearchProxyUsageError(
+                f"CFB_PROXY_USAGE_PLAYER_DUPLICATE_CONFLICT:{team}:{player_id}"
+            )
+        # Exact provider duplicates are content-neutral and are collapsed.
+
+    out = list(by_player.values())
     if not out:
         raise CFBResearchProxyUsageError("CFB_PROXY_USAGE_NORMALIZED_EMPTY")
     return out
