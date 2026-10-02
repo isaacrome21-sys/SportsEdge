@@ -23,8 +23,9 @@ def receipt(asset:Asset,payload:bytes)->AssetReceipt:
 
 def validate_receipts(plan:Iterable[Asset],receipts:Iterable[AssetReceipt])->None:
  expected={(a.dataset,a.season,a.url) for a in plan}
- got={(r.dataset,r.season,r.url) for r in receipts}
- if len(got)!=len(list(receipts)): raise SDVReceiptError("CFB_SDV_RECEIPT_DUPLICATE")
+ rs=list(receipts)
+ got={(r.dataset,r.season,r.url) for r in rs}
+ if len(got)!=len(rs): raise SDVReceiptError("CFB_SDV_RECEIPT_DUPLICATE")
  if got!=expected:
   missing=sorted(expected-got); extra=sorted(got-expected)
   raise SDVReceiptError(f"CFB_SDV_RECEIPT_COVERAGE_MISMATCH:missing={missing[:3]}:extra={extra[:3]}")
