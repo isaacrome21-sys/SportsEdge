@@ -2,9 +2,9 @@
 """Fail-closed automatic CFB entrypoint for the canonical SportsEdge run machine.
 
 The script never trains a model. It requires a registry-bound frozen CFB joint-model
-artifact and the existing CFBD/Odds credentials, discovers the next FBS regular-
-season week when one is not explicitly supplied, then calls the canonical runtime.
-Objective context is a sidecar and never substitutes for Model_P or evidence.
+artifact, CFBD football-data credentials, and a caller-supplied sportsbook board
+transcribed from the user's screenshots. It never fetches sportsbook prices from an
+odds API. Objective context is a sidecar and never substitutes for Model_P or evidence.
 """
 from __future__ import annotations
 
@@ -36,7 +36,16 @@ from sportsedge.sports.cfb.model_artifact import (
 )
 from sportsedge.sports.cfb.paths import DEFAULT_CFB_MODEL_ARTIFACT_PATH
 from sportsedge.sports.cfb.run_machine import run_it_cfb
-from sportsedge.sports.cfb.source import CFBGame
+from sportsedge.sports.cfb.source import (
+    CFBGame,
+    attach_weather,
+    build_team_alias_index,
+    fetch_cfbd_games,
+    fetch_cfbd_team_metrics,
+    fetch_cfbd_teams,
+    fetch_cfbd_weather,
+    parse_the_odds_api_quotes,
+)
 
 
 class CFBAutoError(ValueError):
@@ -115,14 +124,26 @@ def discover_cfb_week(
     return candidates[0][1]
 
 
-def _credentials() -> tuple[str, str]:
+def _credentials() -> str:
     cfbd = str(os.environ.get("SPORTSEDGE_CFBD_API_KEY") or os.environ.get("CFBD_API_KEY") or "").strip()
-    odds = str(os.environ.get("SPORTSEDGE_ODDS_API_KEY") or os.environ.get("ODDS_API_KEY") or "").strip()
     if not cfbd:
         raise CFBAutoError("CFB_AUTO_CFBD_API_KEY_REQUIRED")
-    if not odds:
-        raise CFBAutoError("CFB_AUTO_ODDS_API_KEY_REQUIRED")
-    return cfbd, odds
+    return cfbd
+
+
+def _manual_board(raw: str | None) -> list[dict]:
+    text = str(raw or "").strip()
+    if not text:
+        raise CFBAutoError("CFB_AUTO_MANUAL_BOARD_REQUIRED")
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise CFBAutoError("CFB_AUTO_MANUAL_BOARD_JSON_INVALID") from exc
+    if not isinstance(payload, list) or not payload:
+        raise CFBAutoError("CFB_AUTO_MANUAL_BOARD_ARRAY_REQUIRED")
+    if not all(isinstance(row, dict) for row in payload):
+        raise CFBAutoError("CFB_AUTO_MANUAL_BOARD_EVENT_INVALID")
+    return payload
 
 
 def _model(path: Path, *, repo_root: Path):
@@ -178,6 +199,53 @@ def _write(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
+def _run_manual_model(
+    *,
+    current: datetime,
+    season: int,
+    week: int,
+    model,
+    cfbd_key: str,
+    manual_events: list[dict],
+    bookmakers: tuple[str, ...],
+    root_seed: int,
+    n_paths: int,
+):
+    team_rows = fetch_cfbd_teams(season=season, cfbd_api_key=cfbd_key)
+    games = fetch_cfbd_games(season=season, week=week, cfbd_api_key=cfbd_key)
+    games = attach_weather(
+        games,
+        fetch_cfbd_weather(season=season, week=week, cfbd_api_key=cfbd_key),
+    )
+    metrics = fetch_cfbd_team_metrics(
+        season=season,
+        week=week,
+        cfbd_api_key=cfbd_key,
+        now=current,
+    )
+    quotes = parse_the_odds_api_quotes(
+        manual_events,
+        games=games,
+        alias_index=build_team_alias_index(team_rows),
+        bookmakers=bookmakers,
+    )
+    if not quotes:
+        raise CFBAutoError("CFB_AUTO_MANUAL_BOARD_NO_MATCHING_QUOTES")
+    return run_it_cfb(
+        mode="MANUAL",
+        season=season,
+        week=week,
+        model=model,
+        now=current,
+        games=games,
+        metrics=metrics,
+        quotes=quotes,
+        fbs_team_rows=team_rows,
+        root_seed=root_seed,
+        n_paths=n_paths,
+    )
+
+
 def _run_model_and_context(
     *,
     current: datetime,
@@ -185,17 +253,12 @@ def _run_model_and_context(
     week: int,
     model,
     cfbd_key: str,
-    odds_key: str,
+    manual_events: list[dict],
     bookmakers: tuple[str, ...],
     root_seed: int,
     n_paths: int,
 ):
-    """Run the betting model and non-authoritative context sidecar concurrently.
-
-    The two lanes are independent by contract: objective context cannot create
-    Model_P or betting authority, so waiting for it before starting the model only
-    adds latency.
-    """
+    """Run the model from screenshot-supplied prices and objective context in parallel."""
     with ThreadPoolExecutor(max_workers=2, thread_name_prefix="cfb-fast") as pool:
         context_future = pool.submit(
             _objective_context,
@@ -204,14 +267,13 @@ def _run_model_and_context(
             cfbd_key=cfbd_key,
         )
         report_future = pool.submit(
-            run_it_cfb,
-            mode="AUTOMATIC",
+            _run_manual_model,
+            current=current,
             season=season,
             week=week,
             model=model,
-            now=current,
-            cfbd_api_key=cfbd_key,
-            odds_api_key=odds_key,
+            cfbd_key=cfbd_key,
+            manual_events=manual_events,
             bookmakers=bookmakers,
             root_seed=root_seed,
             n_paths=n_paths,
@@ -220,12 +282,15 @@ def _run_model_and_context(
         context_status, objective_context, context_error = context_future.result()
     return report, context_status, objective_context, context_error
 
-
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--season", type=int)
     parser.add_argument("--week", type=int)
     parser.add_argument("--asof")
+    parser.add_argument(
+        "--board-json",
+        help="Manual sportsbook board JSON transcribed from screenshots; same event/bookmaker shape accepted by the quote parser.",
+    )
     parser.add_argument("--model-artifact", type=Path, default=DEFAULT_CFB_MODEL_ARTIFACT_PATH)
     parser.add_argument("--bookmaker", action="append", dest="bookmakers")
     parser.add_argument("--n-paths", type=int, default=20000)
@@ -236,7 +301,8 @@ def main() -> int:
     root = _REPO_ROOT
     current = _utc(args.asof)
     try:
-        cfbd_key, odds_key = _credentials()
+        cfbd_key = _credentials()
+        manual_events = _manual_board(args.board_json or os.environ.get("CFB_MANUAL_BOARD_JSON"))
         model, artifact, registry = _model(args.model_artifact, repo_root=root)
         season = int(args.season if args.season is not None else current.year)
         week = int(args.week) if args.week is not None else discover_cfb_week(
@@ -251,7 +317,7 @@ def main() -> int:
             week=week,
             model=model,
             cfbd_key=cfbd_key,
-            odds_key=odds_key,
+            manual_events=manual_events,
             bookmakers=tuple(args.bookmakers or ["draftkings"]),
             root_seed=int(args.root_seed),
             n_paths=int(args.n_paths),
@@ -260,6 +326,8 @@ def main() -> int:
         payload = {
             "schema_version": "CFB_AUTO_RUN_V1",
             "status": "SUCCESS",
+            "run_status": report.run_status,
+            "market_input_source": "MANUAL_SCREENSHOT_BOARD",
             "season": season,
             "week": week,
             "model_artifact_sha256": artifact["artifact_sha256"],
@@ -282,6 +350,8 @@ def main() -> int:
                 "fail_closed": True,
                 "context_failure_is_scoped": True,
                 "training_source_env_override_allowed": False,
+                "sportsbook_api_used": False,
+                "manual_market_board_required": True,
             },
         }
         _write(args.output, payload)
@@ -306,6 +376,8 @@ def main() -> int:
                 "promotion_changed": False,
                 "truth_gate_changed": False,
                 "fail_closed": True,
+                "sportsbook_api_used": False,
+                "manual_market_board_required": True,
             },
         }
         _write(args.output, payload)
