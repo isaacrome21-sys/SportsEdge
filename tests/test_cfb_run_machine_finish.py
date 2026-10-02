@@ -234,6 +234,46 @@ class MachineTests(unittest.TestCase):
         declared=next(row for row in surface["markets"] if row["market"]=="team_total")
         self.assertEqual(declared["engine_state_by_sport"]["CFB"],"IMPLEMENTED")
 
+
+    def test_alternate_spread_and_total_reuse_joint_distribution_and_are_monotone(self):
+        ts=(NOW-timedelta(seconds=20)).isoformat()
+        alts=[
+            CFBQuote(game_id="1001",period="FG",market="ALTERNATE_SPREAD",entity_id="1001",side="HOME",line=-7.5,
+                     american_odds=120,book_key="draftkings",sportsbook="DraftKings",retrieved_at=ts,offer_id="ash",is_alternate=True),
+            CFBQuote(game_id="1001",period="FG",market="ALTERNATE_SPREAD",entity_id="1001",side="AWAY",line=-7.5,
+                     american_odds=-145,book_key="draftkings",sportsbook="DraftKings",retrieved_at=ts,offer_id="asa",is_alternate=True),
+            CFBQuote(game_id="1001",period="FG",market="ALTERNATE_TOTAL",entity_id="1001",side="OVER",line=45.5,
+                     american_odds=-145,book_key="draftkings",sportsbook="DraftKings",retrieved_at=ts,offer_id="ato",is_alternate=True),
+            CFBQuote(game_id="1001",period="FG",market="ALTERNATE_TOTAL",entity_id="1001",side="UNDER",line=45.5,
+                     american_odds=120,book_key="draftkings",sportsbook="DraftKings",retrieved_at=ts,offer_id="atu",is_alternate=True),
+        ]
+        report=self.manual(mode="MANUAL",season=2026,week=1,model=model(),now=NOW,
+                           games=self.games,metrics=self.metrics,quotes=[*self.q,*alts],n_paths=1000,root_seed=44)
+        alt_rows=[x for x in report.results if x.market.startswith("ALTERNATE_")]
+        self.assertEqual(len(alt_rows),4)
+        self.assertTrue(all(x.engine_status=="PRICED" for x in alt_rows))
+        self.assertTrue(all(x.bet_status=="BLOCKED" and x.reason=="CFB_PROMOTION_EVIDENCE_REQUIRED" for x in alt_rows))
+        self.assertEqual(len({x.distribution_sha256 for x in report.results}),1)
+        self.assertEqual(len({x.seed for x in report.results}),1)
+
+        standard_home=next(x for x in report.results if x.market=="SPREAD" and x.side=="HOME")
+        alternate_home=next(x for x in report.results if x.market=="ALTERNATE_SPREAD" and x.side=="HOME")
+        self.assertGreaterEqual(standard_home.model_p, alternate_home.model_p)
+
+        standard_over=next(x for x in report.results if x.market=="TOTAL" and x.side=="OVER")
+        alternate_over=next(x for x in report.results if x.market=="ALTERNATE_TOTAL" and x.side=="OVER")
+        self.assertGreaterEqual(alternate_over.model_p, standard_over.model_p)
+
+        for market in ("ALTERNATE_SPREAD","ALTERNATE_TOTAL"):
+            rows=[x for x in alt_rows if x.market==market]
+            self.assertAlmostEqual(sum(x.fair_market_p for x in rows),1.0,places=12)
+
+    def test_market_surface_marks_cfb_alternate_lines_implemented(self):
+        surface=json.loads(Path("config/football_market_surface.json").read_text())
+        for market in ("alternate_spread","alternate_total"):
+            declared=next(row for row in surface["markets"] if row["market"]==market)
+            self.assertEqual(declared["engine_state_by_sport"]["CFB"],"IMPLEMENTED")
+
     def test_no_engine_never_becomes_pass(self):
         surface=json.loads(Path("config/football_market_surface.json").read_text())
         declared=next(row for row in surface["markets"] if row["market"]=="first_half_total")
