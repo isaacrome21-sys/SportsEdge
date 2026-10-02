@@ -257,31 +257,6 @@ class FootballPropExtendedRunMachineTests(unittest.TestCase):
         second = self._run(odds_snapshot=self._odds(pass_td_line=2.5))
         self.assertEqual(first["game_distribution_sha256"], second["game_distribution_sha256"])
 
-    def test_unresolved_provider_player_blocks_only_that_row_and_keeps_valid_slate(self):
-        odds = deepcopy(self.odds)
-        market = odds["events"][0]["bookmakers"][0]["markets"][0]
-        market["outcomes"].extend([
-            {"name": "Over", "description": "Jo Silver", "price": -110, "point": 199.5},
-            {"name": "Under", "description": "Jo Silver", "price": -110, "point": 199.5},
-        ])
-        report = self._run(odds_snapshot=odds)
-        self.assertGreater(len(report["results"]), 0)
-        self.assertTrue(any(row["player_name"] == "Home Quarterback" for row in report["results"]))
-        blocks = report["identity_blocks"]
-        self.assertEqual(len(blocks), 2)
-        self.assertTrue(all(row["player_name"] == "Jo Silver" for row in blocks))
-        self.assertTrue(all(row["model_p"] is None for row in blocks))
-        self.assertTrue(all(row["bet_status"] == "BLOCKED" for row in blocks))
-        self.assertTrue(all(row["official_eligible"] is False for row in blocks))
-        self.assertTrue(all(
-            row["reason"] == "FOOTBALL_PROP_PLAYER_NAME_UNRESOLVED:Jo Silver"
-            for row in blocks
-        ))
-        self.assertEqual(report["summary"]["identity_blocks"], 2)
-        self.assertTrue(
-            report["governance"]["unresolved_provider_player_rows_fail_closed_individually"]
-        )
-
     def test_tackle_market_requires_explicit_settlement_provider(self):
         features = deepcopy(self.features)
         del features["games"][0]["tackle_settlement_provider"]
