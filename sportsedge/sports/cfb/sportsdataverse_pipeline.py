@@ -22,7 +22,8 @@ from .sportsdataverse_weather import bind_historical_weather, require_complete_w
 from .sportsdataverse_weather_transport import SOURCE_ID as WEATHER_SOURCE_ID
 
 TRAINING_BUNDLE_SCHEMA = "CFB_SPORTSDATAVERSE_TRAINING_ROWS_V1"
-FROZEN_START_SEASON = 2015
+FROZEN_SOURCE_START_SEASON = 2015
+FROZEN_ROW_START_SEASON = 2016
 FROZEN_END_SEASON = 2025
 
 
@@ -60,7 +61,7 @@ def _completed_fbs_games(
             raise SDVTrainingPipelineError(
                 f"CFB_SDV_SCHEDULE_SEASON_WEEK_INVALID:{gid}"
             ) from exc
-        if not FROZEN_START_SEASON <= season <= FROZEN_END_SEASON:
+        if not FROZEN_SOURCE_START_SEASON <= season <= FROZEN_END_SEASON:
             raise SDVTrainingPipelineError(
                 f"CFB_SDV_SCHEDULE_SEASON_OUTSIDE_FROZEN_WINDOW:{gid}:{season}"
             )
@@ -111,7 +112,7 @@ def materialize_training_rows(
         raise SDVTrainingPipelineError("CFB_SDV_COMPLETED_FBS_GAMES_EMPTY")
 
     predictive: list[dict[str, Any]] = []
-    for season in range(FROZEN_START_SEASON, FROZEN_END_SEASON + 1):
+    for season in range(FROZEN_ROW_START_SEASON, FROZEN_END_SEASON + 1):
         season_games = [row for row in completed if int(row["season"]) == season]
         if not season_games:
             raise SDVTrainingPipelineError(f"CFB_SDV_SEASON_GAMES_EMPTY:{season}")
@@ -122,15 +123,13 @@ def materialize_training_rows(
             schedule_rows=schedules,
             season=season,
         )
-        prior = []
-        if season > FROZEN_START_SEASON:
-            prior = build_prior_season_fallback_snapshots(
-                adv_team_rows=adv_team_rows,
-                adv_situational_rows=adv_situational_rows,
-                adv_drive_rows=adv_drive_rows,
-                schedule_rows=schedules,
-                target_season=season,
-            )
+        prior = build_prior_season_fallback_snapshots(
+            adv_team_rows=adv_team_rows,
+            adv_situational_rows=adv_situational_rows,
+            adv_drive_rows=adv_drive_rows,
+            schedule_rows=schedules,
+            target_season=season,
+        )
         predictive.extend(
             materialize_native_candidate_inputs(
                 games=season_games,
@@ -170,7 +169,7 @@ def training_manifest(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     if not material:
         raise SDVTrainingPipelineError("CFB_SDV_TRAINING_ROWS_EMPTY")
     seasons = sorted({int(row["season"]) for row in material})
-    if seasons[0] != FROZEN_START_SEASON or seasons[-1] != FROZEN_END_SEASON:
+    if seasons[0] != FROZEN_ROW_START_SEASON or seasons[-1] != FROZEN_END_SEASON:
         raise SDVTrainingPipelineError("CFB_SDV_TRAINING_SEASON_COVERAGE_INVALID")
     ids = [str(row["game_id"]) for row in material]
     if len(ids) != len(set(ids)):
@@ -182,7 +181,8 @@ def training_manifest(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "source_contract": SOURCE_CONTRACT,
         "weather_source_id": WEATHER_SOURCE_ID,
         "training_window": {
-            "start_season": FROZEN_START_SEASON,
+            "source_start_season": FROZEN_SOURCE_START_SEASON,
+            "first_candidate_row_season": FROZEN_ROW_START_SEASON,
             "end_season": FROZEN_END_SEASON,
             "season_type": "REGULAR",
             "classification": "FBS",
@@ -205,7 +205,8 @@ def training_manifest(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 
 __all__ = [
     "FROZEN_END_SEASON",
-    "FROZEN_START_SEASON",
+    "FROZEN_ROW_START_SEASON",
+    "FROZEN_SOURCE_START_SEASON",
     "SDVTrainingPipelineError",
     "TRAINING_BUNDLE_SCHEMA",
     "materialize_training_rows",
