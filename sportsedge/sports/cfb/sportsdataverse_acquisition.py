@@ -11,10 +11,10 @@ SOURCE_REPO="sportsdataverse/sportsdataverse-data"
 UPSTREAM_LOADER_REPO="sportsdataverse/cfbfastR"
 
 _ASSETS={
- "cfb_schedules":("cfb_schedules","cfb_schedules_{season}.csv"),
- "espn_cfb_adv_team":("espn_cfb_adv_team","adv_team_{season}.csv"),
- "espn_cfb_adv_drives":("espn_cfb_adv_drives","adv_drives_{season}.csv"),
- "espn_cfb_adv_situational":("espn_cfb_adv_situational","adv_situational_{season}.csv"),
+ "espn_cfb_schedules":("espn_cfb_schedules","cfb_schedule_{season}.rds"),
+ "espn_cfb_adv_team":("espn_cfb_adv_team","adv_team_{season}.rds"),
+ "espn_cfb_adv_drives":("espn_cfb_adv_drives","adv_drives_{season}.rds"),
+ "espn_cfb_adv_situational":("espn_cfb_adv_situational","adv_situational_{season}.rds"),
 }
 PROHIBITED={"espn_cfb_betting"}
 
