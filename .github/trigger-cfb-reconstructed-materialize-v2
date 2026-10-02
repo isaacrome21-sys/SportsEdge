@@ -1,7 +1,7 @@
-CFB_RECONSTRUCTED_MATERIALIZE_REQUEST_V3
+CFB_RECONSTRUCTED_MATERIALIZE_REQUEST_V5
 requested_mode=MATERIALIZE_ONLY
 requested_utc=2026-10-02
-requested_reason=persist_redacted_reconstructed_selection_readiness
+requested_reason=cfb_mlb_parity_materialize_selection_inputs_after_reconciliation
 no_evaluation_attempt=true
 no_backfill=true
-request_nonce=20261002T0334Z
+request_nonce=20261002T0947ET
