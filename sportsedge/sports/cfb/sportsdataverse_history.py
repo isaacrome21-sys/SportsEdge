@@ -34,6 +34,9 @@ class TeamSnapshot:
     off_ppa_rush: float
     off_ppa_dropback: float
     off_success_rate: float
+    def_ppa_rush_allowed: float
+    def_ppa_dropback_allowed: float
+    def_success_rate_allowed: float
     standard_down_ppa: float
     passing_down_success_rate: float
     explosive_rate: float
@@ -127,6 +130,16 @@ def build_team_snapshots(
     for r in situ: sg[int(r["pos_team"])].append(r)
     for r in drives: dg[int(r["pos_team"])].append(r)
 
+    # Defensive EPA/success allowed is defined from the opponent offense in the
+    # same game. This preserves the exact upstream EPA semantics instead of
+    # relabeling adv_defensive havoc/tackle fields as EPA allowed.
+    opponent_by_game_team: dict[tuple[int, int], Mapping[str, Any]] = {}
+    situ_by_game_team: dict[tuple[int, int], Mapping[str, Any]] = {}
+    for r in team:
+        opponent_by_game_team[(int(r["game_id"]), int(r["pos_team"]))] = r
+    for r in situ:
+        situ_by_game_team[(int(r["game_id"]), int(r["pos_team"]))] = r
+
     snapshots = []
     for team_id in sorted(tg):
         t, s, d = tg[team_id], sg.get(team_id, []), dg.get(team_id, [])
@@ -135,6 +148,18 @@ def build_team_snapshots(
         game_ids = {int(r["game_id"]) for r in t}
         if {int(r["game_id"]) for r in s} != game_ids or {int(r["game_id"]) for r in d} != game_ids:
             raise SportsDataverseHistoryError(f"CFB_SDV_JOIN_COVERAGE_MISMATCH:{team_id}")
+        opp_team_rows = []
+        opp_situ_rows = []
+        for row in t:
+            game_id = int(row["game_id"])
+            opponents = [x for (gid, tid), x in opponent_by_game_team.items()
+                         if gid == game_id and tid != team_id]
+            opp_situ = [x for (gid, tid), x in situ_by_game_team.items()
+                        if gid == game_id and tid != team_id]
+            if len(opponents) != 1 or len(opp_situ) != 1:
+                raise SportsDataverseHistoryError(f"CFB_SDV_OPPONENT_JOIN_MISMATCH:{game_id}:{team_id}")
+            opp_team_rows.extend(opponents)
+            opp_situ_rows.extend(opp_situ)
         snapshots.append(TeamSnapshot(
             team_id=team_id,
             season=target_season,
@@ -143,6 +168,9 @@ def build_team_snapshots(
             off_ppa_rush=_mean(t, "EPA_rushing_per_play"),
             off_ppa_dropback=_mean(t, "EPA_passing_per_play"),
             off_success_rate=_mean(s, "EPA_success_rate"),
+            def_ppa_rush_allowed=_mean(opp_team_rows, "EPA_rushing_per_play"),
+            def_ppa_dropback_allowed=_mean(opp_team_rows, "EPA_passing_per_play"),
+            def_success_rate_allowed=_mean(opp_situ_rows, "EPA_success_rate"),
             standard_down_ppa=_mean(s, "EPA_standard_down_per_play"),
             passing_down_success_rate=_mean(s, "EPA_success_passing_down_rate"),
             explosive_rate=_mean(t, "EPA_explosive_rate"),
