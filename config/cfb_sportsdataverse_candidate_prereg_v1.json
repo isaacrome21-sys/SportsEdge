@@ -83,7 +83,7 @@
     "official_authority": false
   },
   "hash_binding": {
-    "code_manifest_sha256": "c093699c36fdb53bdb5f76922375135460c839ac5cc7abae11d60d6b20f59fb9",
+    "code_manifest_sha256": "52e5b3760033f99dfe35e72bf79191ee2244fbfa557f9be37591efec2d4f5471",
     "config_bundle_sha256": "dbc93a46db6c284676a5785c7a12c63230422c57b3be4b196e0dd91d2c015d12"
   },
   "candidate_selection_policy": {
