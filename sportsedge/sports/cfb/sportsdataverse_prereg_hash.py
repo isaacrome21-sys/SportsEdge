@@ -5,6 +5,8 @@ from typing import Mapping
 
 CODE_PATHS=(
  "scripts/cfb_sportsdataverse_prereg_hash.py",
+ "scripts/acquire_cfb_sportsdataverse_training_inputs.py",
+ "scripts/materialize_cfb_sportsdataverse_training.py",
  "scripts/run_cfb_sportsdataverse_bakeoff.py",
  "sportsedge/sports/cfb/sportsdataverse_acquisition.py",
  "sportsedge/sports/cfb/sportsdataverse_receipts.py",
@@ -19,6 +21,7 @@ CODE_PATHS=(
  "sportsedge/sports/cfb/sportsdataverse_history.py",
  "sportsedge/sports/cfb/sportsdataverse_manifest.py",
  "sportsedge/sports/cfb/sportsdataverse_materializer.py",
+ "sportsedge/sports/cfb/sportsdataverse_pipeline.py",
  "sportsedge/sports/cfb/sportsdataverse_training_rows.py",
 )
 CONFIG_PATHS=(
