@@ -19,12 +19,13 @@ jobs:
       - name: Install source-audit dependencies
         run: >-
           python -m pip install --disable-pip-version-check
-          pandas==2.3.3 pyarrow==21.0.0 requests==2.32.5 pyreadr==0.5.3 pypdf==6.1.1
+          pandas==2.3.3 pyarrow==21.0.0 requests==2.32.5 pyreadr==0.5.3 beautifulsoup4==4.13.5 pytest==9.1.1
 
       - name: Compile source audits
         run: |
           python -m py_compile scripts/audit_nfl_prop_v1_sources.py
-          python -m py_compile scripts/audit_nfl_2025_gamebook_inactives.py
+          python -m py_compile scripts/audit_nfl_2025_prekick_inactive_articles.py
+          python -m py_compile tests/test_nfl_prop_v1_inactive_articles.py
 
       - name: Assert source-only boundary
         run: |
@@ -41,18 +42,25 @@ jobs:
           for token in forbidden:
               if token in p:
                   raise SystemExit(f"PROP_SOURCE_AUDIT_MODEL_SCORING_TOKEN:{token}")
+          q = Path("scripts/audit_nfl_2025_prekick_inactive_articles.py").read_text()
+          for token in forbidden:
+              if token in q:
+                  raise SystemExit(f"PROP_INACTIVE_AUDIT_MODEL_SCORING_TOKEN:{token}")
           print("NFL_PROP_V1_SOURCE_ONLY_BOUNDARY_OK")
           PY
+
+      - name: Test inactive article timestamp gate before source access
+        run: python -m pytest -q tests/test_nfl_prop_v1_inactive_articles.py
 
       - name: Audit immutable 2025 prop tape and lineup sources
         run: >-
           python scripts/audit_nfl_prop_v1_sources.py
           --out artifacts/nfl_prop_v1_source_audit/source_audit.json
 
-      - name: Audit official 2025 NFL gamebooks for inactive lists
+      - name: Audit timestamped official NFL.com pre-kick inactive articles
         run: >-
-          python scripts/audit_nfl_2025_gamebook_inactives.py
-          --out artifacts/nfl_prop_v1_source_audit/gamebook_inactive_audit.json
+          python scripts/audit_nfl_2025_prekick_inactive_articles.py
+          --out artifacts/nfl_prop_v1_source_audit/prekick_inactive_article_audit.json
 
       - name: Summarize admission result
         run: |
@@ -60,7 +68,7 @@ jobs:
           import json
           from pathlib import Path
           r = json.loads(Path("artifacts/nfl_prop_v1_source_audit/source_audit.json").read_text())
-          g = json.loads(Path("artifacts/nfl_prop_v1_source_audit/gamebook_inactive_audit.json").read_text())
+          g = json.loads(Path("artifacts/nfl_prop_v1_source_audit/prekick_inactive_article_audit.json").read_text())
           if r["status"] != "SOURCE_AUDIT_ONLY_NO_2025_MODEL_SCORING":
               raise SystemExit("PROP_SOURCE_AUDIT_STATUS_INVALID")
           if r["capability"]["frozen_2025_validation_window_spent"] is not False:
@@ -79,13 +87,13 @@ jobs:
                   "qb_rank1_teams": r["depth_chart_source"].get("qb_rank1_teams"),
               },
               "receipts": r["receipts"],
-              "gamebook_inactive_source": {
-                  "n_games": g["n_games"],
-                  "n_gamebook_urls": g["n_gamebook_urls"],
-                  "n_gamebooks_downloaded": g["n_gamebooks_downloaded"],
-                  "n_explicit_not_active_sections": g["n_explicit_not_active_sections"],
-                  "coverage_fraction": g["coverage_fraction"],
-                  "all_games_have_explicit_not_active_section": g["all_games_have_explicit_not_active_section"],
+              "prekick_inactive_article_source": {
+                  "n_article_urls_discovered": g["n_article_urls_discovered"],
+                  "n_articles_parsed": g["n_articles_parsed"],
+                  "n_game_blocks": g["n_game_blocks"],
+                  "n_admissible_games": g["n_admissible_games"],
+                  "n_admissible_inactive_player_entries": g["n_admissible_inactive_player_entries"],
+                  "rejection_counts": g["rejection_counts"],
                   "validation_window_spent": g["authority"]["validation_window_spent"],
               },
           }, sort_keys=True))
@@ -96,6 +104,6 @@ jobs:
           name: nfl-prop-v1-source-audit-${{ github.sha }}
           path: |
             artifacts/nfl_prop_v1_source_audit/source_audit.json
-            artifacts/nfl_prop_v1_source_audit/gamebook_inactive_audit.json
+            artifacts/nfl_prop_v1_source_audit/prekick_inactive_article_audit.json
           if-no-files-found: error
           retention-days: 30
