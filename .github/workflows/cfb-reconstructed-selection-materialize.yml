@@ -262,6 +262,7 @@ jobs:
           paths = [
               Path('artifacts/cfb/cfbd_reconstructed_selection_preflight_public.json'),
               Path('artifacts/cfb/cfb_reconstructed_acquisition_public.json'),
+              Path('artifacts/cfb/acquisition_manifest.json'),
               Path('artifacts/cfb/selection_bundle_manifest.json'),
               Path('artifacts/cfb/candidate_bakeoff_result.json'),
               Path('artifacts/cfb/cfb_selected_candidate_model_proposal.json'),
