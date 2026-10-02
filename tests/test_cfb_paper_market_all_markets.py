@@ -55,12 +55,12 @@ def _event():
                         {"name": "Home", "price": -115},
                     ]},
                     {"key": "spreads", "outcomes": [
-                        {"name": "Away", "point": 3.5, "price": -105},
-                        {"name": "Home", "point": -3.5, "price": -115},
+                        {"name": "Away", "point": 3.5, "price": -110},
+                        {"name": "Home", "point": -3.5, "price": -110},
                     ]},
                     {"key": "totals", "outcomes": [
-                        {"name": "Over", "point": 49.5, "price": -105},
-                        {"name": "Under", "point": 49.5, "price": -115},
+                        {"name": "Over", "point": 49.5, "price": -110},
+                        {"name": "Under", "point": 49.5, "price": -110},
                     ]},
                 ],
             },
