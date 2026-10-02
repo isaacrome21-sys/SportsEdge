@@ -139,3 +139,42 @@ def test_snapshot_wrappers_validate_against_full_schedule_before_scope_filter():
         target_season=2026,
     )
     assert [(s.team_id,s.games_in_sample) for s in prior] == [(10,2),(20,2)]
+
+
+def test_current_assets_use_pos_team_id_while_pos_team_is_readable_name():
+    r1=_rows(1,101); r2=_rows(2,102)
+    team=[]; situ=[]; drives=[]; schedules=[]
+    names={10:"Minnesota Golden Gophers",20:"Wisconsin Badgers"}
+    for r in (r1,r2):
+        for source,target in ((r[0],team),(r[4],team),(r[1],situ),(r[5],situ),(r[2],drives),(r[6],drives)):
+            row=dict(source)
+            team_id=int(row["pos_team"])
+            row["pos_team_id"]=str(team_id)
+            row["pos_team"]=names[team_id]
+            target.append(row)
+        schedules.append(r[3])
+    snaps=build_team_snapshots(
+        adv_team_rows=team,
+        adv_situational_rows=situ,
+        adv_drive_rows=drives,
+        schedule_rows=schedules,
+        target_season=2025,
+        target_week=3,
+    )
+    assert [(s.team_id,s.games_in_sample) for s in snaps] == [(10,2),(20,2)]
+
+
+def test_current_asset_name_without_numeric_pos_team_id_fails_closed():
+    t,s,d,sch,ot,os,od=_rows(1,101)
+    bad=[]
+    for row in (t,ot):
+        x=dict(row); x["pos_team"]="Minnesota Golden Gophers"; x.pop("pos_team_id",None); bad.append(x)
+    with pytest.raises(SportsDataverseHistoryError,match="POS_TEAM_ID_INVALID"):
+        build_team_snapshots(
+            adv_team_rows=bad,
+            adv_situational_rows=[s,os],
+            adv_drive_rows=[d,od],
+            schedule_rows=[sch],
+            target_season=2025,
+            target_week=2,
+        )
