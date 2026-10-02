@@ -19,7 +19,7 @@ def test_wrong_season_fails():
 
 
 def test_schedule_requires_game_identity_and_labels():
-    raw=b"game_id,season,week,season_type,fbs_game,home_id,away_id,home_points,away_points\n1,2025,1,2,true,10,20,21,14\n"
+    raw=b"game_id,season,week,season_type,fbs_game\n1,2025,1,2,true\n"
     import hashlib
     try:
         parse_csv(raw,dataset="cfb_schedules",season=2025,source_url="x",raw_csv_sha256=hashlib.sha256(raw).hexdigest())
