@@ -47,7 +47,9 @@ jobs:
           sportsedge/sports/cfb/historical_release.py
           sportsedge/sports/cfb/participation_source_capture.py
           sportsedge/sports/cfb/participation_pit_readiness.py
+          sportsedge/sports/cfb/participation_storage.py
           scripts/cache_cfb_participation_sources.py
+          scripts/pack_cfb_participation_snapshot.py
 
       - name: Snapshot prospective participation source bytes
         run: |
@@ -229,6 +231,45 @@ jobs:
           if report.get('pbp_raw_market_data_present') is not True or report.get('pbp_predictive_projection_required') is not True:
               raise SystemExit('CFB_FORWARD_PARTICIPATION_PBP_FIREWALL_NOT_ENFORCED')
           print(json.dumps(report, sort_keys=True))
+          PY
+
+      - name: Pack large source bytes for Git-safe persistence
+        run: |
+          set -euo pipefail
+          python scripts/pack_cfb_participation_snapshot.py \
+            --classification artifacts/cfb_forward_participation/capture/classification.json
+
+      - name: Re-validate packed participation snapshot
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from sportsedge.sports.cfb.participation_pit_readiness import audit_cfb_participation_snapshot
+
+          path = Path('artifacts/cfb_forward_participation/capture/classification.json')
+          payload = json.loads(path.read_text(encoding='utf-8'))
+          report = audit_cfb_participation_snapshot(path)
+          if report.get('participation_source_asof_ready') is not True:
+              raise SystemExit(
+                  'CFB_FORWARD_PARTICIPATION_PACKED_BINDING_INVALID:'
+                  + json.dumps(report, sort_keys=True)
+              )
+          if report.get('blockers') != []:
+              raise SystemExit(
+                  'CFB_FORWARD_PARTICIPATION_PACKED_BLOCKERS:'
+                  + json.dumps(report.get('blockers'), sort_keys=True)
+              )
+          if payload.get('storage_is_reversible') is not True:
+              raise SystemExit('CFB_FORWARD_PARTICIPATION_STORAGE_NOT_REVERSIBLE')
+          if payload.get('storage_changes_predictive_content') is not False:
+              raise SystemExit('CFB_FORWARD_PARTICIPATION_STORAGE_CONTENT_DRIFT')
+          print(json.dumps({
+              'status': 'CFB_FORWARD_PARTICIPATION_PACKED_AND_VERIFIED',
+              'packed_asset_count': payload.get('storage_packed_asset_count'),
+              'verified_asset_count': report.get('verified_asset_count'),
+              'model_p_created': False,
+              'promotion_authority': False,
+          }, sort_keys=True))
           PY
 
       - name: Persist immutable participation snapshot on data branch
