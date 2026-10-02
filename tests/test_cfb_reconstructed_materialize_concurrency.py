@@ -9,7 +9,8 @@ BRIDGE = ROOT / ".github/workflows/cfb-reconstructed-materialize-push-bridge.yml
 def test_provider_consuming_materialization_is_serialized() -> None:
     text = MATERIALIZE.read_text(encoding="utf-8")
     materialize = text.split("  materialize:", 1)[1]
-    assert "group: cfb-reconstructed-selection-materialize-runtime" in materialize
+    assert "concurrency:" in materialize
+    assert "group: cfb-reconstructed-selection-materialize" in materialize
     assert "cancel-in-progress: false" in materialize
 
 

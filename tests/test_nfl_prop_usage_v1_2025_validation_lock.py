@@ -3,14 +3,20 @@ from pathlib import Path
 
 LOCK = Path("config/research/nfl_prop_usage_v1_2025_validation_lock.json")
 
+
 def test_lock_binds_exact_fit_and_source_artifacts():
     cfg = json.loads(LOCK.read_text())
-    assert cfg["status"] == "FROZEN_BEFORE_2025_OUTCOME_ACCESS"
+    assert cfg["status"] == "SPENT_TECHNICAL_FAILURE_NO_MODEL_SCORE"
     assert cfg["fit_identity"]["head_sha"] == "dfe1914d6c5b70e727c17273dabd0bb033dc816d"
     assert cfg["fit_identity"]["fit_artifact_sha256"] == "ef38c7101da0977f27b71a7cbbe40321149ee2e0fda3bb8371f04d8423c9c555"
     assert cfg["source_identity"]["head_sha"] == "438147dc660b9b62d54ad08511a441a7375cc650"
     assert cfg["source_identity"]["admitted_regular_season_games_with_strict_prekick_inactives"] == 52
-    assert cfg["validation_window"]["status"] == "UNSPENT"
+    window = cfg["validation_window"]
+    assert window["status"] == "SPENT_TECHNICAL_FAILURE"
+    assert window["reusable"] is False
+    assert window["model_scoring_completed"] is False
+    assert window["statistical_result"] is None
+
 
 def test_lock_preserves_frozen_gates_and_fail_closed_cohort():
     cfg = json.loads(LOCK.read_text())
