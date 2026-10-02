@@ -13,9 +13,9 @@ The canonical boundary also enforces point-in-time safety: the game must still b
 pregame, feature snapshots may not come from the future or from the target week,
 and sportsbook quotes must be observed before both ``now`` and kickoff.
 
-This foundation prices full-game MONEYLINE / SPREAD / TOTAL only. Other declared
-football markets remain explicit NO_ENGINE until their required period/player state
-is actually modeled. New CFB pricing remains BLOCKED from official betting until
+This foundation prices full-game MONEYLINE / SPREAD / TOTAL / TEAM_TOTAL. Other
+declared football markets remain explicit NO_ENGINE until their required period/player
+state is actually modeled. New CFB pricing remains BLOCKED from official betting until
 promotion evidence and a frozen production edge floor exist.
 """
 from __future__ import annotations
@@ -31,6 +31,7 @@ from urllib.request import urlopen
 from .classification_policy import assert_fbs_only_games
 from .scorecard import build_scorecard
 from .joint_model import CFBJointScoreModel, CFB_SEED_POLICY, price_cfb_game_markets, simulate_cfb_joint_distribution
+from .team_total_readout import price_cfb_team_total
 from .source import (
     CFBGame, CFBQuote, CFBTeamMetrics, SUPPORTED_GAME_MARKETS, attach_weather,
     build_team_alias_index, fetch_cfbd_games, fetch_cfbd_team_metrics, fetch_cfbd_teams,
@@ -40,6 +41,7 @@ from .source import (
 VALID_MODES = frozenset({"AUTO_SELECT", "MANUAL", "HYBRID", "AUTOMATIC"})
 CFB_MACHINE_VERSION = "CFB_RUN_MACHINE_V1"
 DEFAULT_QUOTE_TTL_SECONDS = 180
+SUPPORTED_PRICED_MARKETS = frozenset({*SUPPORTED_GAME_MARKETS, "TEAM_TOTAL"})
 
 
 class CFBRunMachineError(ValueError):
@@ -158,8 +160,14 @@ def _complements(a: str, b: str) -> bool:
     return {a, b} in ({"HOME", "AWAY"}, {"OVER", "UNDER"})
 
 
-def _pair_key(q: Mapping[str, Any]) -> tuple[str, str, float, str]:
-    return str(q.get("game_id") or ""), str(q.get("market") or "").upper(), float(q.get("line", 0.0)), str(q.get("book_key") or "")
+def _pair_key(q: Mapping[str, Any]) -> tuple[str, str, float, str, str]:
+    return (
+        str(q.get("game_id") or ""),
+        str(q.get("market") or "").upper(),
+        float(q.get("line", 0.0)),
+        str(q.get("book_key") or ""),
+        str(q.get("entity_id") or ""),
+    )
 
 
 def _distribution_hash(rows: Sequence[Mapping[str, Any]]) -> str:
@@ -254,14 +262,14 @@ def _run_canonical(*, mode: str, season: int, week: int, now: datetime, model: C
     assert_fbs_only_games(games, fbs_team_rows=fbs_team_rows)
     model_sha = model.artifact_sha256(); game_map = {g.game_id: g for g in games}; quote_rows = [_quote_dict(q) for q in quotes]
     distributions = {}; dist_hashes = {}; seeds = {}
-    supported_game_ids = sorted({str(q.get("game_id") or "") for q in quote_rows if str(q.get("market") or "").upper() in SUPPORTED_GAME_MARKETS})
+    supported_game_ids = sorted({str(q.get("game_id") or "") for q in quote_rows if str(q.get("market") or "").upper() in SUPPORTED_PRICED_MARKETS})
     for gid in supported_game_ids:
         game = game_map.get(gid)
         if game is None: raise CFBRunMachineError(f"CFB_QUOTE_GAME_UNRESOLVED:{gid}")
         _validate_game_pit(game, metrics, current=current)
         start = _timestamp(game.start_ts, f"CFB_GAME_START_INVALID:{gid}")
         for q in quote_rows:
-            if str(q.get("game_id") or "") != gid or str(q.get("market") or "").upper() not in SUPPORTED_GAME_MARKETS:
+            if str(q.get("game_id") or "") != gid or str(q.get("market") or "").upper() not in SUPPORTED_PRICED_MARKETS:
                 continue
             qt = _quote_time(q.get("retrieved_at"))
             if qt > current:
@@ -273,18 +281,43 @@ def _run_canonical(*, mode: str, season: int, week: int, now: datetime, model: C
         distributions[gid] = path; dist_hashes[gid] = _distribution_hash(path); seeds[gid] = seed
     groups = {}; results = []
     for q in quote_rows:
-        if q["market"] not in SUPPORTED_GAME_MARKETS:
+        if q["market"] not in SUPPORTED_PRICED_MARKETS:
             results.append(_blocked_no_engine(q)); continue
         groups.setdefault(_pair_key(q), []).append(q)
     for key in sorted(groups):
-        pair = groups[key]; gid, market, line, _book = key; distribution = distributions[gid]
-        readouts = price_cfb_game_markets(distribution, spread_line=line if market == "SPREAD" else 0.0,
-                                          total_line=line if market == "TOTAL" else 0.0)
+        pair = groups[key]; gid, market, line, _book, entity_id = key; distribution = distributions[gid]
+        game = game_map[gid]
+        if market == "TEAM_TOTAL":
+            if entity_id == game.home_team:
+                team_side = "HOME"
+            elif entity_id == game.away_team:
+                team_side = "AWAY"
+            else:
+                raise CFBRunMachineError(
+                    f"CFB_TEAM_TOTAL_ENTITY_UNRESOLVED:{gid}:{entity_id or 'MISSING'}"
+                )
+            readouts = {"team_total": price_cfb_team_total(
+                distribution,
+                team_side=team_side,
+                line=line,
+            )}
+        else:
+            readouts = price_cfb_game_markets(
+                distribution,
+                spread_line=line if market == "SPREAD" else 0.0,
+                total_line=line if market == "TOTAL" else 0.0,
+            )
         valid_pair = len(pair) == 2 and _complements(str(pair[0]["side"]), str(pair[1]["side"]))
         raws = [_raw_implied(float(q["american_odds"])) for q in pair] if valid_pair else []
         implied_sum = sum(raws) if raws else 0.0; hold = implied_sum - 1.0 if valid_pair else None
         for idx, q in enumerate(pair):
-            side = str(q["side"]); model_p, push_p = _readout_probability(readouts, market, side)
+            side = str(q["side"])
+            if market == "TEAM_TOTAL":
+                team_total = readouts["team_total"]
+                model_p = float(team_total[side.lower()])
+                push_p = float(team_total["push"])
+            else:
+                model_p, push_p = _readout_probability(readouts, market, side)
             reason = "CFB_PROMOTION_EVIDENCE_REQUIRED"; fair = raw_p = edge = ev = None
             if not valid_pair or implied_sum <= 0.0: reason = "PAIRED_PRICE_REQUIRED_FOR_DEVIG"
             else:
