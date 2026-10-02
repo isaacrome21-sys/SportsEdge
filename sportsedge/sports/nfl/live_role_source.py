@@ -206,6 +206,7 @@ def _role_from_history(
     position: str,
     lookback_games: int,
     decay: float,
+    player_id: str | None = None,
 ) -> dict[str, Any]:
     weighted = _weighted_rows(rows, lookback_games=lookback_games, decay=decay)
     if not weighted:
@@ -224,6 +225,7 @@ def _role_from_history(
     }
     return {
         "player": name,
+        "player_id": player_id,
         "position": position,
         "role_prior": role,
         "trailing": {},
@@ -233,15 +235,18 @@ def _role_from_history(
     }
 
 
-def _weighted_td_sum(
-    rows: Sequence[Mapping[str, Any]],
-    *,
-    field: str,
-    lookback_games: int,
-    decay: float,
-) -> float:
-    weighted = _weighted_rows(rows, lookback_games=lookback_games, decay=decay)
-    return sum(w * _number(row.get(field), field) for w, row in weighted)
+def _aggregate_week_rows(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Aggregate arbitrary player rows to one count row per season/week."""
+    grouped: dict[tuple[int, int], dict[str, Any]] = {}
+    for row in rows:
+        key = (int(row["_season"]), int(row["_week"]))
+        agg = grouped.setdefault(
+            key,
+            {"_season": key[0], "_week": key[1], **{field: 0.0 for field in COUNT_FIELDS}},
+        )
+        for field in COUNT_FIELDS:
+            agg[field] += _number(row.get(field), field)
+    return [grouped[key] for key in sorted(grouped)]
 
 
 def _team_week_rows(
@@ -250,16 +255,11 @@ def _team_week_rows(
     team: str,
     lookback_games: int,
 ) -> list[dict[str, Any]]:
-    grouped: dict[tuple[int, int], dict[str, Any]] = {}
-    for row in rows:
-        if _team(row.get("recent_team") or row.get("team")) != team:
-            continue
-        key = (int(row["_season"]), int(row["_week"]))
-        agg = grouped.setdefault(key, {"_season": key[0], "_week": key[1], **{field: 0.0 for field in COUNT_FIELDS}})
-        for field in COUNT_FIELDS:
-            agg[field] += _number(row.get(field), field)
-    ordered = [grouped[key] for key in sorted(grouped)]
-    return ordered[-lookback_games:]
+    filtered = [
+        row for row in rows
+        if _team(row.get("recent_team") or row.get("team")) == team
+    ]
+    return _aggregate_week_rows(filtered)[-lookback_games:]
 
 
 def build_live_team_model(
@@ -305,6 +305,7 @@ def build_live_team_model(
         position="QB",
         lookback_games=int(lookback_games),
         decay=float(decay),
+        player_id=qb_id,
     )
 
     skill_depth: dict[str, dict[str, Any]] = {}
@@ -331,6 +332,7 @@ def build_live_team_model(
             position=pos,
             lookback_games=int(lookback_games),
             decay=float(decay),
+            player_id=pid,
         ))
         selected_ids.add(pid)
 
@@ -346,49 +348,59 @@ def build_live_team_model(
 
     team_recv_tds = sum(w * _number(row.get("receiving_tds"), "receiving_tds") for w, row in weighted_team)
     current_team_prior = [row for row in prior if _team(row.get("recent_team") or row.get("team")) == team_id]
+    week_weights = {
+        (int(row["_season"]), int(row["_week"])): float(weight)
+        for weight, row in weighted_team
+    }
 
     def current_td_share(pid: str, field: str, denominator: float) -> float:
-        rows = [row for row in current_team_prior if str(row.get("player_id") or "").strip() == pid]
-        value = _weighted_td_sum(rows, field=field, lookback_games=int(lookback_games), decay=float(decay)) if rows else 0.0
-        return value / denominator if denominator > 0 else 0.0
+        if denominator <= 0:
+            return 0.0
+        value = 0.0
+        for row in current_team_prior:
+            if str(row.get("player_id") or "").strip() != pid:
+                continue
+            weight = week_weights.get((int(row["_season"]), int(row["_week"])))
+            if weight is not None:
+                value += weight * _number(row.get(field), field)
+        share = value / denominator
+        if share < -1e-12 or share > 1.0 + 1e-12:
+            raise NFLContextError(f"TD share out of range:{pid}:{field}")
+        return min(1.0, max(0.0, share))
 
     qb["receiving_td_share"] = 0.0
     qb["rushing_td_share"] = current_td_share(qb_id, "rushing_tds", team_rush_tds)
 
     for skill in skills:
-        name = skill["player"]
-        pid = next(
-            (pid for pid, depth in skill_depth.items() if str(depth.get("player_name") or "").strip() == name),
-            None,
-        )
-        if pid is None:
-            # Name mismatch cannot create an inferred identity.
-            raise NFLContextError(f"skill identity binding missing:{name}")
+        pid = str(skill.get("player_id") or "").strip()
+        if not pid or pid not in skill_depth:
+            raise NFLContextError(f"skill identity binding missing:{skill.get('player')}")
         skill["receiving_td_share"] = current_td_share(pid, "receiving_tds", team_recv_tds)
         skill["rushing_td_share"] = current_td_share(pid, "rushing_tds", team_rush_tds)
 
-    # Residual observed team usage gets an explicit OTHER bucket instead of
-    # silently renormalizing the named players to 100%.
+    # Residual observed team usage gets one team-week-aggregated OTHER bucket.
+    # This prevents multiple residual players in a week from diluting volume by
+    # accidentally counting each player row as a separate game.
     residual_rows = [
         row for row in current_team_prior
         if str(row.get("player_id") or "").strip() not in selected_ids | {qb_id}
     ]
-    if residual_rows:
+    residual_week_rows = _aggregate_week_rows(residual_rows)
+    if residual_week_rows:
         other = _role_from_history(
-            residual_rows,
+            residual_week_rows,
             name=f"{team_id}_OTHER",
             position="OTHER",
             lookback_games=int(lookback_games),
             decay=float(decay),
+            player_id=f"{team_id}:OTHER",
         )
-        other["receiving_td_share"] = (
-            max(0.0, 1.0 - sum(float(row["receiving_td_share"]) for row in skills))
-            if team_recv_tds > 0 else 0.0
-        )
-        other["rushing_td_share"] = (
-            max(0.0, 1.0 - float(qb["rushing_td_share"]) - sum(float(row["rushing_td_share"]) for row in skills))
-            if team_rush_tds > 0 else 0.0
-        )
+        selected_recv = sum(float(row["receiving_td_share"]) for row in skills)
+        selected_rush = float(qb["rushing_td_share"]) + sum(float(row["rushing_td_share"]) for row in skills)
+        if selected_recv > 1.0 + 1e-9 or selected_rush > 1.0 + 1e-9:
+            raise NFLContextError("selected TD shares exceed team mass")
+        other["receiving_td_share"] = max(0.0, 1.0 - selected_recv) if team_recv_tds > 0 else 0.0
+        other["rushing_td_share"] = max(0.0, 1.0 - selected_rush) if team_rush_tds > 0 else 0.0
         skills.append(other)
 
     return {
