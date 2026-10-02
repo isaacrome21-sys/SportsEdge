@@ -255,6 +255,42 @@ def test_missing_current_qb_history_fails_instead_of_borrowing_old_starter():
         build(player_rows=rows)
 
 
+def injury_row(player_id, status, *, modified="2026-10-01T17:00:00Z"):
+    return {
+        "season": 2026,
+        "week": 4,
+        "team": "CHI",
+        "gsis_id": player_id,
+        "report_status": status,
+        "date_modified": modified,
+    }
+
+
+def test_out_skill_player_is_removed_and_future_injury_update_is_ignored():
+    out = build(injury_rows=[
+        injury_row("wr1", "Out"),
+        injury_row("wr2", "Out", modified="2026-10-02T18:00:00Z"),
+    ])
+    names = {row["player"] for row in out["skill_players"]}
+    assert "WR One" not in names
+    assert "WR Two" in names
+    assert out["authority"]["out_inactive_players_excluded"] is True
+    assert out["source"]["injury_status_by_player"]["wr1"] == "OUT"
+    assert "wr2" not in out["source"]["injury_status_by_player"]
+
+
+def test_out_starting_qb_fails_closed():
+    with pytest.raises(NFLContextError, match="PIT starting QB unavailable"):
+        build(injury_rows=[injury_row("qb1", "OUT")])
+
+
+def test_injury_market_contamination_fails_closed():
+    row = injury_row("wr1", "OUT")
+    row["market_price"] = -110
+    with pytest.raises(NFLContextError, match="market input forbidden"):
+        build(injury_rows=[row])
+
+
 class FakeResponse:
     def __init__(self, raw):
         self.raw = raw
