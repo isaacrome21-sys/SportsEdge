@@ -46,6 +46,27 @@ class CFBPropModelCandidateTests(unittest.TestCase):
         self.assertEqual(out["results"][0]["model_candidate_status"], "BLOCKED")
         self.assertEqual(out["summary"]["model_candidate_rows"], 0)
 
+
+    def test_one_sided_anytime_td_can_be_research_candidate_without_fair_market_p(self):
+        report = {
+            "results": [{
+                "provider_market": "player_anytime_td", "model_p": 0.42,
+                "fair_market_p": None,
+                "market_no_vig_p_status": "UNAVAILABLE_ONE_SIDED",
+                "ev_per_dollar": 0.05,
+                "quote_fresh": True,
+                "bet_status": "BLOCKED", "official_eligible": False,
+            }],
+            "summary": {"official_bets": 0}, "governance": {},
+        }
+        out = CANDIDATE._candidateize(report)
+        row = out["results"][0]
+        self.assertEqual(row["model_candidate_status"], "READY")
+        self.assertEqual(row["decision_tier"], "MODEL_CANDIDATE")
+        self.assertEqual(row["bet_status"], "BLOCKED")
+        self.assertFalse(row["official_eligible"])
+        self.assertEqual(out["summary"]["model_candidate_rows"], 1)
+
     def test_bettor_facing_cfb_surface_remains_no_engine(self):
         surface = json.loads(
             (ROOT / "config/football_prop_engine_surface.json").read_text(encoding="utf-8")
