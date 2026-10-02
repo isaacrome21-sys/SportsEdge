@@ -1,0 +1,23 @@
+name: CFB lines → card
+description: Paste DraftKings CFB lines from your phone. SportsEdge replies here. CFB is paused / UNFROZEN, so the card is NO_MODEL.
+title: "[CFB LINES] "
+labels: ["cfb-lines"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        One game header, then both prices. Away / over first.
+
+        ```
+        Ohio State @ Penn State
+        ML +150 -180
+        Spread +6.5 -110 -110
+        Total 48.5 -108 -112
+        ```
+  - type: textarea
+    id: lines
+    attributes:
+      label: Lines
+      render: text
+    validations:
+      required: true
