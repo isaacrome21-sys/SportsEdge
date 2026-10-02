@@ -1,7 +1,7 @@
 import pytest
 
 from sportsedge.sports.cfb.sportsdataverse_history import (
-    SportsDataverseHistoryError, attach_drive_time, build_team_snapshots, build_season_week_snapshots, validate_dataset,
+    SportsDataverseHistoryError, attach_drive_time, build_team_snapshots, build_season_week_snapshots, build_prior_season_fallback_snapshots, validate_dataset,
 )
 
 
@@ -91,3 +91,16 @@ def test_season_week_snapshots_reject_outside_frozen_window():
         build_season_week_snapshots(
             adv_team_rows=[],adv_situational_rows=[],adv_drive_rows=[],
             schedule_rows=[],season=2026)
+
+
+def test_prior_season_fallback_uses_all_prior_games_only():
+    rows=[_rows(1,101),_rows(2,102),_rows(3,103)]
+    team=[]; situ=[]; drives=[]; schedules=[]
+    for r in rows:
+        team.extend([r[0],r[4]]); situ.extend([r[1],r[5]])
+        drives.extend([r[2],r[6]]); schedules.append(r[3])
+    snaps=build_prior_season_fallback_snapshots(
+        adv_team_rows=team,adv_situational_rows=situ,adv_drive_rows=drives,
+        schedule_rows=schedules,target_season=2026)
+    assert [(s.team_id,s.season,s.games_in_sample) for s in snaps] == [(10,2025,3),(20,2025,3)]
+    assert all(s.through_week==3 for s in snaps)
