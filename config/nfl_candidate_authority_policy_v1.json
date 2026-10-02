@@ -1,0 +1,58 @@
+{
+  "schema_version": "SPORTSEDGE_NFL_CANDIDATE_AUTHORITY_POLICY_V1",
+  "policy_status": "DRAFT_PRE_EVIDENCE_HUMAN_REVIEW_REQUIRED",
+  "run_it_model_selection_requires": [
+    "candidate_status=PROMOTED",
+    "promotion_authority=true",
+    "model_p_authority=true",
+    "frozen_artifact_binding=true",
+    "truth_gate_authorized=true"
+  ],
+  "non_authorized_candidate_states": [
+    "UNTESTED",
+    "RESEARCH_ONLY",
+    "PAPER",
+    "REJECTED",
+    "FAILED",
+    "REJECTED_FROZEN_ATTEMPT",
+    "BLOCKED_MATH",
+    "BLOCKED_CALIBRATION",
+    "BLOCKED_PREDICTIVE"
+  ],
+  "non_authorized_behavior": {
+    "may_drive_run_it_bet_direction": false,
+    "may_create_bettor_facing_model_p": false,
+    "may_create_official_play": false,
+    "may_size_stake": false,
+    "paper_only": true,
+    "stake_units": 0.0
+  },
+  "authorized_model_behavior": {
+    "model_authority_only": true,
+    "may_size_stake": false,
+    "stake_units": null,
+    "staking_requires_separate_current_price_edge_risk_policy": true
+  },
+  "reserved_2026_stream": {
+    "role": "PROSPECTIVE_FORWARD_EVIDENCE",
+    "may_tune_candidate": false,
+    "may_select_candidate_architecture": false,
+    "may_select_hyperparameters": false,
+    "may_change_feature_policy": false,
+    "may_change_thresholds": false,
+    "may_relabel_failed_candidate_as_actionable": false,
+    "allowed_uses": [
+      "FIRST_WRITE_PREDICTION_CAPTURE",
+      "OBJECTIVE_OUTCOME_CAPTURE",
+      "FORWARD_CLV_CAPTURE",
+      "PREDECLARED_FIXED_CHECKPOINT_EVALUATION"
+    ]
+  },
+  "run_it_when_no_authorized_model": {
+    "mode": "MARKET_CONTEXT_ONLY",
+    "model_pick": null,
+    "model_p": null,
+    "truth_gate": "UNAVAILABLE",
+    "footer": "MARKET-CONTEXT ONLY / NOT Model_P / NOT Truth Gate / NOT OFFICIAL / NOT CERTIFIED"
+  }
+}
