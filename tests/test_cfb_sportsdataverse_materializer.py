@@ -51,7 +51,7 @@ def test_week1_fails_closed_without_prior_season_snapshot():
         )
 
 def test_2015_week1_is_excluded_at_frozen_acquisition_boundary():
-    prior=_snap(1,2014,14,1.0)
+    prior=TeamSnapshot(**{**snap(1).__dict__,"season":2014,"through_week":14,"games_in_sample":12})
     rows=materialize_native_candidate_inputs(
       games=[{"game_id":"2015-1","season":2015,"week":1,"home_id":1,"away_id":1,"home_score":99,"away_score":0}],
       snapshots=[],prior_season_snapshots=[prior])
