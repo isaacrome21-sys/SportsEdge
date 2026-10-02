@@ -4,6 +4,7 @@ import hashlib,json
 from typing import Mapping
 
 CODE_PATHS=(
+ ".github/workflows/cfb-sdv-materialize-training.yml",
  "scripts/cfb_sportsdataverse_prereg_hash.py",
  "scripts/acquire_cfb_sportsdataverse_training_inputs.py",
  "scripts/materialize_cfb_sportsdataverse_training.py",
