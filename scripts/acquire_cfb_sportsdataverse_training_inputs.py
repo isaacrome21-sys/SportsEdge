@@ -60,14 +60,16 @@ def _download_asset(item,root:Path):
     path=root/item.filename
     path.write_bytes(raw)
     rr=receipt(item,raw)
-    rows,pr=parse_csv(
-        raw,
-        dataset=item.dataset,
-        season=item.season,
-        source_url=item.url,
-        raw_csv_sha256=rr.sha256,
-    )
-    return item,rr,pr,rows
+    schedule_rows=None
+    if item.dataset=="cfb_schedules":
+        schedule_rows,_=parse_csv(
+            raw,
+            dataset=item.dataset,
+            season=item.season,
+            source_url=item.url,
+            raw_csv_sha256=rr.sha256,
+        )
+    return item,rr,schedule_rows
 
 
 def _weather_for_season(*,season:int,game_ids:list[int],api_key:str):
@@ -118,8 +120,10 @@ def main()->int:
     validate_receipts(plan,[x[1] for x in acquired])
 
     schedules=[]
-    for item,_,_,rows in acquired:
+    for item,_,rows in acquired:
         if item.dataset=="cfb_schedules":
+            if rows is None:
+                raise SystemExit(f"CFB_SDV_SCHEDULE_PARSE_MISSING:{item.season}")
             schedules.extend(rows)
     scoped=regular_fbs_schedule_rows(schedules)
     game_ids_by_season={}
