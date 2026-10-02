@@ -179,6 +179,36 @@ class MachineTests(unittest.TestCase):
         self.assertTrue(all(x.reason=="CFB_PROMOTION_EVIDENCE_REQUIRED" for x in r.results))
 
 
+    def test_alternate_spreads_and_totals_price_from_same_joint_distribution(self):
+        ts=(NOW-timedelta(seconds=20)).isoformat()
+        alt=[
+            CFBQuote(game_id="1001",period="FG",market="ALTERNATE_SPREAD",entity_id="1001",side="HOME",line=-7.5,
+                     american_odds=120,book_key="draftkings",sportsbook="DraftKings",retrieved_at=ts,offer_id="ash",is_alternate=True),
+            CFBQuote(game_id="1001",period="FG",market="ALTERNATE_SPREAD",entity_id="1001",side="AWAY",line=-7.5,
+                     american_odds=-145,book_key="draftkings",sportsbook="DraftKings",retrieved_at=ts,offer_id="asa",is_alternate=True),
+            CFBQuote(game_id="1001",period="FG",market="ALTERNATE_TOTAL",entity_id="1001",side="OVER",line=55.5,
+                     american_odds=115,book_key="draftkings",sportsbook="DraftKings",retrieved_at=ts,offer_id="ato",is_alternate=True),
+            CFBQuote(game_id="1001",period="FG",market="ALTERNATE_TOTAL",entity_id="1001",side="UNDER",line=55.5,
+                     american_odds=-140,book_key="draftkings",sportsbook="DraftKings",retrieved_at=ts,offer_id="atu",is_alternate=True),
+        ]
+        report=self.manual(mode="MANUAL",season=2026,week=1,model=model(),now=NOW,
+                           games=self.games,metrics=self.metrics,quotes=[*self.q,*alt],n_paths=500,root_seed=44)
+        alt_rows=[x for x in report.results if x.market in {"ALTERNATE_SPREAD","ALTERNATE_TOTAL"}]
+        self.assertEqual(len(alt_rows),4)
+        self.assertTrue(all(x.engine_status=="PRICED" for x in alt_rows))
+        self.assertTrue(all(x.bet_status=="BLOCKED" and x.reason=="CFB_PROMOTION_EVIDENCE_REQUIRED" for x in alt_rows))
+        self.assertEqual(len({x.distribution_sha256 for x in report.results}),1)
+        self.assertEqual(len({x.seed for x in report.results}),1)
+        for market in ("ALTERNATE_SPREAD","ALTERNATE_TOTAL"):
+            rows=[x for x in alt_rows if x.market==market]
+            self.assertAlmostEqual(sum(x.fair_market_p for x in rows),1.0,places=12)
+
+    def test_market_surface_marks_cfb_alternates_implemented(self):
+        surface=json.loads(Path("config/football_market_surface.json").read_text())
+        for market in ("alternate_spread","alternate_total"):
+            declared=next(row for row in surface["markets"] if row["market"]==market)
+            self.assertEqual(declared["engine_state_by_sport"]["CFB"],"IMPLEMENTED")
+
     def test_full_game_team_totals_are_priced_from_same_joint_distribution(self):
         ts=(NOW-timedelta(seconds=20)).isoformat()
         tt=[
