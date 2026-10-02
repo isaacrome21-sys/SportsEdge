@@ -216,3 +216,32 @@ def build_season_week_snapshots(
     if len(keys) != len(set(keys)):
         raise SportsDataverseHistoryError("CFB_SDV_WEEKLY_SNAPSHOT_DUPLICATE")
     return sorted(out,key=lambda x:(x.season,x.through_week,x.team_id))
+
+
+def build_prior_season_fallback_snapshots(
+    *,
+    adv_team_rows: Iterable[Mapping[str, Any]],
+    adv_situational_rows: Iterable[Mapping[str, Any]],
+    adv_drive_rows: Iterable[Mapping[str, Any]],
+    schedule_rows: Iterable[Mapping[str, Any]],
+    target_season: int,
+) -> list[TeamSnapshot]:
+    """Build one prior-season fallback snapshot per team for target_season week 1."""
+    prior=int(target_season)-1
+    if not 2015 <= prior <= 2025 or not 2016 <= int(target_season) <= 2026:
+        raise SportsDataverseHistoryError("CFB_SDV_PRIOR_FALLBACK_OUTSIDE_WINDOW")
+    schedules=validate_dataset("espn_cfb_schedules",schedule_rows)
+    weeks=[int(r["week"]) for r in schedules if int(r["season"])==prior]
+    if not weeks:
+        raise SportsDataverseHistoryError(f"CFB_SDV_PRIOR_FALLBACK_SEASON_EMPTY:{prior}")
+    # target_week is one past the largest observed week, therefore every prior
+    # season game is strictly earlier than the synthetic cutoff.
+    snaps=build_team_snapshots(
+        adv_team_rows=adv_team_rows,
+        adv_situational_rows=adv_situational_rows,
+        adv_drive_rows=adv_drive_rows,
+        schedule_rows=schedules,
+        target_season=prior,
+        target_week=max(weeks)+1,
+    )
+    return sorted(snaps,key=lambda x:x.team_id)
