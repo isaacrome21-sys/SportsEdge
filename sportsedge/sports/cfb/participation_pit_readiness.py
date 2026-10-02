@@ -79,16 +79,14 @@ def _source_sha256(path: Path, *, storage_encoding: str) -> str:
     """Hash the canonical upstream bytes, regardless of reversible at-rest storage."""
     digest = sha256()
     if storage_encoding == "identity":
-        opener = path.open
-        kwargs = {"mode": "rb"}
+        handle = path.open("rb")
     elif storage_encoding == "gzip":
-        opener = gzip.open
-        kwargs = {"mode": "rb"}
+        handle = gzip.open(path, "rb")
     else:
         raise CFBParticipationPITError(
             f"CFB_PARTICIPATION_STORAGE_ENCODING_UNSUPPORTED:{storage_encoding}"
         )
-    with opener(**kwargs) as handle:
+    with handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
