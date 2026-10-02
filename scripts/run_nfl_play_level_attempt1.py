@@ -18,6 +18,8 @@ from zoneinfo import ZoneInfo
 
 import numpy as np
 
+from sportsedge.sports.nfl.m2_history_features import select_starting_qb
+
 try:
     from scripts.build_nfl_attempt9_runtime_artifact import reconstruct as reconstruct_attempt9
 except ModuleNotFoundError:
@@ -25,7 +27,7 @@ except ModuleNotFoundError:
 
 ROOT = Path(__file__).resolve().parents[1]
 PRELOCK_PATH = ROOT / "config/research/nfl_play_level_attempt1_prelock_v1.json"
-IMPL_PATH = ROOT / "config/research/nfl_play_level_attempt1_implementation_v1.json"
+IMPL_PATH = ROOT / "config/research/nfl_play_level_attempt1_implementation_v2.json"
 SOURCE_CONFIG = ROOT / "config/public_training_sources_v1.json"
 PBP_URL = "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_{season}.csv.gz"
 DEPTH_URL = "https://github.com/nflverse/nflverse-data/releases/download/depth_charts/depth_charts_{season}.csv"
@@ -289,37 +291,41 @@ def parse_pbp_seasons(seasons: Iterable[int]) -> tuple[dict[str, dict[str, dict[
     return out, hashes
 
 
-def parse_depth_seasons(seasons: Iterable[int]) -> tuple[dict[str, list[tuple[datetime, str]]], dict[str, str]]:
-    by_team: dict[str, list[tuple[datetime, str]]] = defaultdict(list)
+def parse_depth_seasons(seasons: Iterable[int]) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    """Load raw depth rows for the already-audited M2 dual historical/modern resolver."""
+    rows: list[dict[str, Any]] = []
     hashes: dict[str, str] = {}
     for season in seasons:
         url = DEPTH_URL.format(season=int(season))
         raw = _fetch(url)
         hashes[str(season)] = sha256(raw).hexdigest()
-        for row in _csv_rows(raw):
-            if str(row.get("pos_abb") or "").strip().upper() != "QB":
-                continue
-            rank = _int(row.get("pos_rank"))
-            if rank != 1:
-                continue
-            stamp = _depth_time(row.get("dt"))
-            team = _team(row.get("team") or row.get("club_code"))
-            player = str(row.get("gsis_id") or "").strip()
-            if stamp is None or not team or not player:
-                continue
-            by_team[team].append((stamp, player))
-    for team in by_team:
-        by_team[team].sort(key=lambda item: (item[0], item[1]))
-    return by_team, hashes
+        for raw_row in _csv_rows(raw):
+            row = dict(raw_row)
+            if row.get("season") in (None, ""):
+                row["season"] = str(int(season))
+            if row.get("team") not in (None, ""):
+                row["team"] = _team(row.get("team"))
+            if row.get("club_code") not in (None, ""):
+                row["club_code"] = _team(row.get("club_code"))
+            rows.append(row)
+    return rows, hashes
 
 
-def starter_at(depth: Mapping[str, list[tuple[datetime, str]]], team: str, kickoff: datetime) -> str | None:
-    eligible = [(stamp, player) for stamp, player in depth.get(team, []) if stamp <= kickoff]
-    if not eligible:
+def starter_at(depth: Iterable[Mapping[str, Any]], team: str, game: Mapping[str, Any]) -> str | None:
+    """Delegate QB identity to the merged production-M2 PIT depth contract."""
+    week = game.get("week")
+    if week is None:
         return None
-    latest = max(stamp for stamp, _ in eligible)
-    players = sorted({player for stamp, player in eligible if stamp == latest})
-    return players[0] if len(players) == 1 else None
+    try:
+        return select_starting_qb(
+            depth,
+            team=_team(team),
+            season=int(game["season"]),
+            week=int(week),
+            game_start_ts=game["kickoff"],
+        )
+    except ValueError:
+        return None
 
 
 def load_schedule() -> tuple[list[dict[str, Any]], str]:
@@ -407,7 +413,7 @@ def _shrunk_qb(qb_hist: Mapping[str, list[float]], starter: str, prior_epa: floa
 def build_rows(
     schedule: list[dict[str, Any]],
     pbp: Mapping[str, Mapping[str, Mapping[str, Any]]],
-    depth: Mapping[str, list[tuple[datetime, str]]],
+    depth: Iterable[Mapping[str, Any]],
     attempt9: Mapping[str, Any],
     seasons: set[int],
 ) -> list[dict[str, Any]]:
@@ -429,8 +435,8 @@ def build_rows(
             a9 = (_apply_attempt9(attempt9, f, "margin"), _apply_attempt9(attempt9, f, "total"))
 
         if game["season"] in seasons and a9 is not None and game_id in pbp and pool_db >= 100 and pool_cpoe_n >= 100:
-            hs = starter_at(depth, home, game["kickoff"])
-            aws = starter_at(depth, away, game["kickoff"])
+            hs = starter_at(depth, home, game)
+            aws = starter_at(depth, away, game)
             if hs and aws:
                 prior_epa = pool_epa / pool_db
                 prior_cpoe = pool_cpoe / pool_cpoe_n
@@ -724,19 +730,22 @@ def run() -> dict[str, Any]:
     dev_rows = build_rows(schedule, dev_pbp, dev_depth, attempt9, set(range(2016, 2024)))
     dev_schedule = [g for g in schedule if 2016 <= g["season"] <= 2023]
     dev_pbp_matches = sum(1 for g in dev_schedule if g["game_id"] in dev_pbp)
-    dev_depth_records = sum(len(v) for v in dev_depth.values())
+    dev_depth_records = len(dev_depth)
+    dev_depth_weekly_rows = sum(1 for row in dev_depth if row.get("week") not in (None, ""))
+    dev_depth_timestamped_rows = sum(1 for row in dev_depth if row.get("dt") not in (None, ""))
     dev_both_starters = sum(
         1 for g in dev_schedule
-        if starter_at(dev_depth, g["home"], g["kickoff"])
-        and starter_at(dev_depth, g["away"], g["kickoff"])
+        if starter_at(dev_depth, g["home"], g)
+        and starter_at(dev_depth, g["away"], g)
     )
     print(json.dumps({
         "phase": "DEVELOPMENT_PREFLIGHT_ONLY_NO_2024_ACCESS",
         "schedule_games_2016_2023": len(dev_schedule),
         "pbp_complete_games": len(dev_pbp),
         "schedule_pbp_matches": dev_pbp_matches,
-        "depth_teams": len(dev_depth),
-        "depth_rank1_qb_records_with_dt": dev_depth_records,
+        "depth_rows": dev_depth_records,
+        "depth_weekly_rows": dev_depth_weekly_rows,
+        "depth_timestamped_rows": dev_depth_timestamped_rows,
         "games_with_both_pit_starters": dev_both_starters,
         "eligible_development_rows": len(dev_rows),
     }, sort_keys=True), flush=True)
@@ -748,12 +757,7 @@ def run() -> dict[str, Any]:
     val_depth, val_depth_sha = parse_depth_seasons([2024])
     all_pbp = dict(dev_pbp)
     all_pbp.update(val_pbp)
-    all_depth: dict[str, list[tuple[datetime, str]]] = defaultdict(list)
-    for source in (dev_depth, val_depth):
-        for team, items in source.items():
-            all_depth[team].extend(items)
-    for team in all_depth:
-        all_depth[team].sort(key=lambda item: (item[0], item[1]))
+    all_depth = [*dev_depth, *val_depth]
 
     rows = build_rows(schedule, all_pbp, all_depth, attempt9, set(range(2016, 2025)))
     dev_rows = [r for r in rows if 2016 <= r["season"] <= 2023]
