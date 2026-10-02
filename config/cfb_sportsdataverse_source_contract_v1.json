@@ -3,8 +3,11 @@
   "status": "FROZEN_BEFORE_FIRST_EVALUATION",
   "source_identity": "SPORTSDATAVERSE_ESPN_CFB_ADV_V1|RECONSTRUCTED_PRIOR_WEEK_V1",
   "upstream": {
-    "repository": "sportsdataverse/cfbfastR-cfb-data",
-    "provenance": "ESPN_DERIVED_RESHAPED_ENRICHED_GAME_DATA"
+    "build_repository": "sportsdataverse/cfbfastR-cfb-data",
+    "release_repository": "sportsdataverse/sportsdataverse-data",
+    "loader_repository": "sportsdataverse/cfbfastR",
+    "provenance": "ESPN_DERIVED_RESHAPED_ENRICHED_GAME_DATA",
+    "release_transport": "GITHUB_RELEASE_ASSETS"
   },
   "training_window": {
     "start_season": 2015,
@@ -17,8 +20,7 @@
     "cfb_schedules",
     "espn_cfb_adv_team",
     "espn_cfb_adv_drives",
-    "espn_cfb_adv_situational",
-    "espn_cfb_team_box"
+    "espn_cfb_adv_situational"
   ],
   "prohibited_datasets": [
     "espn_cfb_betting"

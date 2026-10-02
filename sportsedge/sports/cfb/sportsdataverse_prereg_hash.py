@@ -4,9 +4,11 @@ import hashlib,json
 from typing import Mapping
 
 CODE_PATHS=(
+ "scripts/cfb_sportsdataverse_prereg_hash.py",
  "sportsedge/sports/cfb/sportsdataverse_acquisition.py",
  "sportsedge/sports/cfb/sportsdataverse_receipts.py",
  "sportsedge/sports/cfb/sportsdataverse_converted.py",
+ "sportsedge/sports/cfb/sportsdataverse_csv.py",
  "sportsedge/sports/cfb/sportsdataverse_candidate_families.py",
  "sportsedge/sports/cfb/sportsdataverse_candidate_model.py",
  "sportsedge/sports/cfb/sportsdataverse_bakeoff.py",

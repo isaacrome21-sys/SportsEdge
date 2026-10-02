@@ -62,7 +62,9 @@ def evaluate_native_candidates(rows:Sequence[Mapping[str,Any]],config:Mapping[st
                  "alpha_at_grid_boundary":alpha in (grid[0],grid[-1])})
    all_pred.extend(pred); all_rows.extend(va)
   observed[family]={"selection_metric":_rmse(all_pred,all_rows),"folds":folds}
+ selected=min(FAMILIES,key=lambda family:(observed[family]["selection_metric"],FAMILIES.index(family)))
  return {"schema":"CFB_SPORTSDATAVERSE_NATIVE_BAKEOFF_RESULT_V1",
          "selection_metric":"JOINT_HOME_AWAY_SCORE_RMSE","outer_validation_seasons":outer,
+         "selected_family":selected,"selection_tie_break":"LOWEST_RMSE_THEN_FROZEN_FAMILY_ORDER",
          "observed":observed,"authority":{"model_p_created":False,"promotion_authority":False,
          "staking_authority":False,"truth_gate_authority":False,"official_authority":False}}
