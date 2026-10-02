@@ -10,5 +10,7 @@
   "run_candidate_evaluation": false,
   "model_p_created": false,
   "promotion_authority": false,
-  "official_authority": false
+  "official_authority": false,
+  "request_revision": 2,
+  "retry_reason": "PYTHONPATH_REQUIRED_FOR_PREREG_HASH_SCRIPT"
 }
