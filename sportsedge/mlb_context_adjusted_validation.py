@@ -3,6 +3,10 @@
 This module has no promotion authority. It compares score distributions without
 using sportsbook prices and deliberately keeps point-in-time evidence status
 separate from predictive metrics.
+
+Scoring uses the production Stage-1 full-game dispersion (shared Gamma-Poisson
+with frozen r) so mean-component comparisons are not confounded by the old
+narrow lognormal.
 """
 from __future__ import annotations
 
@@ -11,9 +15,13 @@ from statistics import fmean
 from typing import Any, Iterable, Mapping
 
 from .source_lineage import canonical_json_sha256
-from .v7_distribution import simulate_game_distribution
+from .v7_distribution import (
+    DEFAULT_FULL_GAME_DISPERSION_R,
+    FULL_GAME_MODE_SHARED_GAMMA_POISSON,
+    simulate_game_distribution,
+)
 
-VALIDATION_VERSION = "mlb_context_adjusted_validation_v1"
+VALIDATION_VERSION = "mlb_context_adjusted_validation_v2_stage1_dispersion"
 GAME_TOTAL_LINES = (6.5, 7.5, 8.5, 9.5)
 TEAM_TOTAL_LINES = (2.5, 3.5, 4.5, 5.5)
 
@@ -66,7 +74,14 @@ def continuous_metrics(predicted: Iterable[float], actual: Iterable[float]) -> d
     }
 
 
-def distribution_event_probabilities(*, game_id: str, away_mean_runs: float, home_mean_runs: float, model_label: str, simulations: int = 20000) -> dict[str, float]:
+def distribution_event_probabilities(
+    *,
+    game_id: str,
+    away_mean_runs: float,
+    home_mean_runs: float,
+    model_label: str,
+    simulations: int = 20000,
+) -> dict[str, float]:
     if simulations < 1000:
         raise MLBContextAdjustedValidationError("simulations must be >= 1000")
     identity = canonical_json_sha256({
@@ -76,6 +91,8 @@ def distribution_event_probabilities(*, game_id: str, away_mean_runs: float, hom
         "away_mean_runs": float(away_mean_runs),
         "home_mean_runs": float(home_mean_runs),
         "simulations": int(simulations),
+        "full_game_distribution_mode": FULL_GAME_MODE_SHARED_GAMMA_POISSON,
+        "full_game_dispersion_r": DEFAULT_FULL_GAME_DISPERSION_R,
     })
     distribution = simulate_game_distribution(
         away_mean_runs=float(away_mean_runs),
@@ -83,6 +100,9 @@ def distribution_event_probabilities(*, game_id: str, away_mean_runs: float, hom
         total_line=0.0,
         simulations=int(simulations),
         build_hash=identity,
+        shared_game_sigma=0.0,
+        team_sigma=0.0,
+        full_game_dispersion_r=DEFAULT_FULL_GAME_DISPERSION_R,
     )
     probabilities: dict[str, float] = {}
     for key, probability in distribution.joint_score_pmf.items():

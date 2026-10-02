@@ -1,0 +1,53 @@
+name: mlb-starter-v2-august-once
+
+on:
+  push:
+    branches:
+      - 'research/mlb-starter-vs-defense-heldout'
+    paths:
+      - 'research/mlb_starter_v2_august_run.once'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mlb-starter-v2-august-once
+  cancel-in-progress: false
+
+jobs:
+  august-one-shot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12.13'
+      - name: Install frozen runtime
+        run: python -m pip install --disable-pip-version-check numpy==2.5.3
+      - name: Verify one-shot marker and frozen contracts
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          expected='constants_sha256=c349df6bbb38c8507440e86421649100ae88a636adc683d975fe6853dbd0158c evaluation_config_sha256=135d3ee52b334143008f5482fba705521ddfa21484758f05080c0c237beb8801 one_shot=2026-08'
+          actual="$(tr '\n' ' ' < research/mlb_starter_v2_august_run.once | sed 's/  */ /g; s/ $//')"
+          test "$actual" = "$expected"
+          python -m unittest tests.test_mlb_starter_v2 tests.test_mlb_starter_v2_evaluation -v
+      - name: Score August exactly once
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/mlb_starter_v2_august
+          python scripts/evaluate_mlb_starter_v2_august_once.py \
+            --output-json artifacts/mlb_starter_v2_august/result.json \
+            --output-md artifacts/mlb_starter_v2_august/result.md
+      - name: Upload immutable result receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mlb-starter-v2-august-one-shot
+          path: artifacts/mlb_starter_v2_august/
+          if-no-files-found: warn
+          retention-days: 90
