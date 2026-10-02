@@ -13,10 +13,11 @@ The canonical boundary also enforces point-in-time safety: the game must still b
 pregame, feature snapshots may not come from the future or from the target week,
 and sportsbook quotes must be observed before both ``now`` and kickoff.
 
-This foundation prices full-game MONEYLINE / SPREAD / TOTAL only. Other declared
-football markets remain explicit NO_ENGINE until their required period/player state
-is actually modeled. New CFB pricing remains BLOCKED from official betting until
-promotion evidence and a frozen production edge floor exist.
+This foundation prices full-game MONEYLINE / SPREAD / TOTAL plus readout-only
+TEAM_TOTAL / ALTERNATE_SPREAD / ALTERNATE_TOTAL markets from the exact same frozen
+joint final-score distribution. Period and player markets remain explicit NO_ENGINE
+until their required state is modeled. New CFB pricing remains BLOCKED from official
+betting until promotion evidence and a frozen production edge floor exist.
 """
 from __future__ import annotations
 
@@ -40,6 +41,8 @@ from .source import (
 VALID_MODES = frozenset({"AUTO_SELECT", "MANUAL", "HYBRID", "AUTOMATIC"})
 CFB_MACHINE_VERSION = "CFB_RUN_MACHINE_V1"
 DEFAULT_QUOTE_TTL_SECONDS = 180
+DERIVATIVE_GAME_MARKETS = frozenset({"TEAM_TOTAL", "ALTERNATE_SPREAD", "ALTERNATE_TOTAL"})
+RUNTIME_GAME_MARKETS = frozenset(SUPPORTED_GAME_MARKETS) | DERIVATIVE_GAME_MARKETS
 
 
 class CFBRunMachineError(ValueError):
@@ -71,6 +74,7 @@ class CFBMachineResult:
     sportsbook: str | None
     quote_retrieved_at: str | None
     offer_id: str | None
+    entity_id: str | None = None
     scorecard: dict[str, float | int | str] | None = None
 
 
@@ -158,8 +162,14 @@ def _complements(a: str, b: str) -> bool:
     return {a, b} in ({"HOME", "AWAY"}, {"OVER", "UNDER"})
 
 
-def _pair_key(q: Mapping[str, Any]) -> tuple[str, str, float, str]:
-    return str(q.get("game_id") or ""), str(q.get("market") or "").upper(), float(q.get("line", 0.0)), str(q.get("book_key") or "")
+def _pair_key(q: Mapping[str, Any]) -> tuple[str, str, str, float, str]:
+    return (
+        str(q.get("game_id") or ""),
+        str(q.get("market") or "").upper(),
+        str(q.get("entity_id") or ""),
+        float(q.get("line", 0.0)),
+        str(q.get("book_key") or ""),
+    )
 
 
 def _distribution_hash(rows: Sequence[Mapping[str, Any]]) -> str:
@@ -218,10 +228,60 @@ def _game_row(game: CFBGame, metrics: Mapping[str, CFBTeamMetrics]) -> dict[str,
             "home_metrics": home.to_dict(), "away_metrics": away.to_dict(), "weather": dict(game.weather)}
 
 
-def _readout_probability(readouts: Mapping[str, Any], market: str, side: str) -> tuple[float, float]:
-    if market == "MONEYLINE": return float(readouts["moneyline"][side.lower()]), 0.0
-    if market == "SPREAD": return float(readouts["spread"][side.lower()]), float(readouts["spread"]["push"])
-    if market == "TOTAL": return float(readouts["total"][side.lower()]), float(readouts["total"]["push"])
+def _team_total_probability(
+    distribution: Sequence[Mapping[str, Any]],
+    *,
+    game: CFBGame,
+    entity_id: str,
+    side: str,
+    line: float,
+) -> tuple[float, float]:
+    entity = str(entity_id or "").strip()
+    upper = entity.upper()
+    if entity == game.home_team or upper == "HOME":
+        score_key = "home_score"
+    elif entity == game.away_team or upper == "AWAY":
+        score_key = "away_score"
+    else:
+        raise CFBRunMachineError(
+            f"CFB_TEAM_TOTAL_ENTITY_UNRESOLVED:{game.game_id}:{entity or 'MISSING'}"
+        )
+    if side not in {"OVER", "UNDER"}:
+        raise CFBRunMachineError(f"CFB_TEAM_TOTAL_SIDE_INVALID:{side}")
+    scores = [float(row[score_key]) for row in distribution]
+    if not scores:
+        raise CFBRunMachineError("CFB_DISTRIBUTION_EMPTY")
+    n = float(len(scores))
+    over = sum(value > line for value in scores) / n
+    under = sum(value < line for value in scores) / n
+    push = sum(value == line for value in scores) / n
+    return (over if side == "OVER" else under), push
+
+
+def _readout_probability(
+    *,
+    distribution: Sequence[Mapping[str, Any]],
+    readouts: Mapping[str, Any],
+    game: CFBGame,
+    market: str,
+    entity_id: str,
+    side: str,
+    line: float,
+) -> tuple[float, float]:
+    if market == "MONEYLINE":
+        return float(readouts["moneyline"][side.lower()]), 0.0
+    if market in {"SPREAD", "ALTERNATE_SPREAD"}:
+        return float(readouts["spread"][side.lower()]), float(readouts["spread"]["push"])
+    if market in {"TOTAL", "ALTERNATE_TOTAL"}:
+        return float(readouts["total"][side.lower()]), float(readouts["total"]["push"])
+    if market == "TEAM_TOTAL":
+        return _team_total_probability(
+            distribution,
+            game=game,
+            entity_id=entity_id,
+            side=side,
+            line=line,
+        )
     raise CFBRunMachineError(f"CFB_NO_ENGINE:{market}")
 
 
@@ -234,7 +294,8 @@ def _blocked_no_engine(q: Mapping[str, Any]) -> CFBMachineResult:
         bet_status="BLOCKED", engine_status="NO_ENGINE", reason="NO_ENGINE", model_artifact_sha256=None,
         distribution_sha256=None, seed=None, seed_policy=None, book_key=str(q.get("book_key") or "") or None,
         sportsbook=str(q.get("sportsbook") or "") or None, quote_retrieved_at=str(q.get("retrieved_at") or "") or None,
-        offer_id=str(q.get("offer_id") or "") or None, scorecard=None)
+        offer_id=str(q.get("offer_id") or "") or None,
+        entity_id=str(q.get("entity_id") or "") or None, scorecard=None)
 
 
 def _summary(results: Sequence[CFBMachineResult]) -> dict[str, Any]:
@@ -254,14 +315,18 @@ def _run_canonical(*, mode: str, season: int, week: int, now: datetime, model: C
     assert_fbs_only_games(games, fbs_team_rows=fbs_team_rows)
     model_sha = model.artifact_sha256(); game_map = {g.game_id: g for g in games}; quote_rows = [_quote_dict(q) for q in quotes]
     distributions = {}; dist_hashes = {}; seeds = {}
-    supported_game_ids = sorted({str(q.get("game_id") or "") for q in quote_rows if str(q.get("market") or "").upper() in SUPPORTED_GAME_MARKETS})
+    supported_game_ids = sorted({
+        str(q.get("game_id") or "")
+        for q in quote_rows
+        if str(q.get("market") or "").upper() in RUNTIME_GAME_MARKETS
+    })
     for gid in supported_game_ids:
         game = game_map.get(gid)
         if game is None: raise CFBRunMachineError(f"CFB_QUOTE_GAME_UNRESOLVED:{gid}")
         _validate_game_pit(game, metrics, current=current)
         start = _timestamp(game.start_ts, f"CFB_GAME_START_INVALID:{gid}")
         for q in quote_rows:
-            if str(q.get("game_id") or "") != gid or str(q.get("market") or "").upper() not in SUPPORTED_GAME_MARKETS:
+            if str(q.get("game_id") or "") != gid or str(q.get("market") or "").upper() not in RUNTIME_GAME_MARKETS:
                 continue
             qt = _quote_time(q.get("retrieved_at"))
             if qt > current:
@@ -273,18 +338,33 @@ def _run_canonical(*, mode: str, season: int, week: int, now: datetime, model: C
         distributions[gid] = path; dist_hashes[gid] = _distribution_hash(path); seeds[gid] = seed
     groups = {}; results = []
     for q in quote_rows:
-        if q["market"] not in SUPPORTED_GAME_MARKETS:
+        if q["market"] not in RUNTIME_GAME_MARKETS:
             results.append(_blocked_no_engine(q)); continue
         groups.setdefault(_pair_key(q), []).append(q)
     for key in sorted(groups):
-        pair = groups[key]; gid, market, line, _book = key; distribution = distributions[gid]
-        readouts = price_cfb_game_markets(distribution, spread_line=line if market == "SPREAD" else 0.0,
-                                          total_line=line if market == "TOTAL" else 0.0)
+        pair = groups[key]
+        gid, market, entity_id, line, _book = key
+        distribution = distributions[gid]
+        game = game_map[gid]
+        readouts = price_cfb_game_markets(
+            distribution,
+            spread_line=line if market in {"SPREAD", "ALTERNATE_SPREAD"} else 0.0,
+            total_line=line if market in {"TOTAL", "ALTERNATE_TOTAL"} else 0.0,
+        )
         valid_pair = len(pair) == 2 and _complements(str(pair[0]["side"]), str(pair[1]["side"]))
         raws = [_raw_implied(float(q["american_odds"])) for q in pair] if valid_pair else []
         implied_sum = sum(raws) if raws else 0.0; hold = implied_sum - 1.0 if valid_pair else None
         for idx, q in enumerate(pair):
-            side = str(q["side"]); model_p, push_p = _readout_probability(readouts, market, side)
+            side = str(q["side"])
+            model_p, push_p = _readout_probability(
+                distribution=distribution,
+                readouts=readouts,
+                game=game,
+                market=market,
+                entity_id=entity_id,
+                side=side,
+                line=line,
+            )
             reason = "CFB_PROMOTION_EVIDENCE_REQUIRED"; fair = raw_p = edge = ev = None
             if not valid_pair or implied_sum <= 0.0: reason = "PAIRED_PRICE_REQUIRED_FOR_DEVIG"
             else:
@@ -311,8 +391,19 @@ def _run_canonical(*, mode: str, season: int, week: int, now: datetime, model: C
                 bet_status="BLOCKED", engine_status="PRICED", reason=reason, model_artifact_sha256=model_sha,
                 distribution_sha256=dist_hashes[gid], seed=seeds[gid], seed_policy=CFB_SEED_POLICY,
                 book_key=str(q.get("book_key") or "") or None, sportsbook=str(q.get("sportsbook") or "") or None,
-                quote_retrieved_at=qt.isoformat(), offer_id=str(q.get("offer_id") or "") or None, scorecard=scorecard))
-    ordered = tuple(sorted(results, key=lambda r: (r.game_id, r.market, r.book_key or "", r.line or 0.0, r.side)))
+                quote_retrieved_at=qt.isoformat(), offer_id=str(q.get("offer_id") or "") or None,
+                entity_id=str(q.get("entity_id") or "") or None, scorecard=scorecard))
+    ordered = tuple(sorted(
+        results,
+        key=lambda r: (
+            r.game_id,
+            r.market,
+            r.entity_id or "",
+            r.book_key or "",
+            r.line or 0.0,
+            r.side,
+        ),
+    ))
     if not ordered:
         status = "BLOCKED"
     elif source_failures:
