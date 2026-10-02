@@ -313,6 +313,10 @@ def _run_canonical(*, mode: str, season: int, week: int, now: datetime, model: C
         for idx, q in enumerate(pair):
             side = str(q["side"])
             if market == "TEAM_TOTAL":
+                if side not in {"OVER", "UNDER"}:
+                    raise CFBRunMachineError(
+                        f"CFB_TEAM_TOTAL_SIDE_INVALID:{gid}:{entity_id}:{side or 'MISSING'}"
+                    )
                 team_total = readouts["team_total"]
                 model_p = float(team_total[side.lower()])
                 push_p = float(team_total["push"])
