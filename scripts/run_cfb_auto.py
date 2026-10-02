@@ -302,8 +302,8 @@ def main() -> int:
     current = _utc(args.asof)
     try:
         cfbd_key = _credentials()
-        manual_events = _manual_board(args.board_json or os.environ.get("CFB_MANUAL_BOARD_JSON"))
         model, artifact, registry = _model(args.model_artifact, repo_root=root)
+        manual_events = _manual_board(args.board_json or os.environ.get("CFB_MANUAL_BOARD_JSON"))
         season = int(args.season if args.season is not None else current.year)
         week = int(args.week) if args.week is not None else discover_cfb_week(
             season=season,
