@@ -108,6 +108,30 @@ def attach_drive_time(
     return out
 
 
+
+
+def _pos_team_id(row: Mapping[str, Any]) -> int:
+    """Resolve current and legacy SportsDataverse team identity without name joins.
+
+    Current advanced assets carry numeric `pos_team_id` plus a readable name in
+    `pos_team`. Older frozen assets place the numeric ESPN id directly in
+    `pos_team`. Numeric identity is mandatory; names are never used as join keys.
+    """
+    raw = row.get("pos_team_id")
+    if raw is None or str(raw).strip() == "":
+        raw = row.get("pos_team")
+    try:
+        value = int(float(str(raw).strip()))
+    except (TypeError, ValueError) as exc:
+        raise SportsDataverseHistoryError(
+            f"CFB_SDV_POS_TEAM_ID_INVALID:{row.get('game_id')}:{raw}"
+        ) from exc
+    if value <= 0:
+        raise SportsDataverseHistoryError(
+            f"CFB_SDV_POS_TEAM_ID_INVALID:{row.get('game_id')}:{raw}"
+        )
+    return value
+
 def _mean(rows: list[Mapping[str, Any]], key: str) -> float:
     vals = [float(r[key]) for r in rows if r.get(key) is not None]
     if not vals:
@@ -161,9 +185,9 @@ def build_team_snapshots(
     tg: dict[int, list[Mapping[str, Any]]] = defaultdict(list)
     sg: dict[int, list[Mapping[str, Any]]] = defaultdict(list)
     dg: dict[int, list[Mapping[str, Any]]] = defaultdict(list)
-    for r in team: tg[int(r["pos_team"])].append(r)
-    for r in situ: sg[int(r["pos_team"])].append(r)
-    for r in drives: dg[int(r["pos_team"])].append(r)
+    for r in team: tg[_pos_team_id(r)].append(r)
+    for r in situ: sg[_pos_team_id(r)].append(r)
+    for r in drives: dg[_pos_team_id(r)].append(r)
 
     # Defensive EPA/success allowed is defined from the opponent offense in the
     # same game. This preserves the exact upstream EPA semantics instead of
@@ -171,9 +195,9 @@ def build_team_snapshots(
     opponent_by_game_team: dict[tuple[int, int], Mapping[str, Any]] = {}
     situ_by_game_team: dict[tuple[int, int], Mapping[str, Any]] = {}
     for r in team:
-        opponent_by_game_team[(int(r["game_id"]), int(r["pos_team"]))] = r
+        opponent_by_game_team[(int(r["game_id"]), _pos_team_id(r))] = r
     for r in situ:
-        situ_by_game_team[(int(r["game_id"]), int(r["pos_team"]))] = r
+        situ_by_game_team[(int(r["game_id"]), _pos_team_id(r))] = r
 
     snapshots = []
     for team_id in sorted(tg):
