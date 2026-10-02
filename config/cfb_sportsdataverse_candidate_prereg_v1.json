@@ -1,0 +1,80 @@
+{
+  "schema": "CFB_SPORTSDATAVERSE_CANDIDATE_PREREG_V1",
+  "status": "FROZEN_BEFORE_FIRST_EVALUATION",
+  "source_contract_identity": "SPORTSDATAVERSE_ESPN_CFB_ADV_V1|RECONSTRUCTED_PRIOR_WEEK_V1",
+  "candidates": {
+    "EQUAL_WEIGHT_HARD_SWITCH": {
+      "constants": {}
+    },
+    "RELIABILITY_WEIGHTED_HARD_SWITCH": {
+      "constants": {
+        "min_current_games": 3
+      }
+    },
+    "PRIOR_CURRENT_BLEND": {
+      "constants": {
+        "prior_equivalent_games": 4
+      }
+    },
+    "GAMES_IN_SAMPLE_FEATURE": {
+      "constants": {
+        "games_in_sample_cap": 12,
+        "normalization_divisor": 12
+      }
+    }
+  },
+  "feature_contract": {
+    "team_metrics": [
+      "off_ppa_rush",
+      "off_ppa_dropback",
+      "def_ppa_rush_allowed",
+      "def_ppa_dropback_allowed",
+      "off_success_rate",
+      "def_success_rate_allowed",
+      "standard_down_ppa",
+      "passing_down_success_rate",
+      "eckel_rate",
+      "points_per_eckel",
+      "points_per_drive",
+      "net_field_position",
+      "explosive_rate"
+    ],
+    "contextual": [
+      "home_field",
+      "indoors",
+      "wind_speed",
+      "temperature"
+    ],
+    "market_features_prohibited": true
+  },
+  "training_window": {
+    "start_season": 2015,
+    "end_season": 2025,
+    "season_type": "REGULAR",
+    "classification": "FBS",
+    "no_2026_forward_outcomes": true
+  },
+  "hyperparameter_policy": {
+    "mode": "TEMPORAL_NESTED_EXPANDING_SEASON",
+    "ridge_alpha_grid": [
+      0.1,
+      1,
+      3,
+      10,
+      30,
+      100,
+      300
+    ],
+    "selection_metric": "JOINT_HOME_AWAY_SCORE_RMSE",
+    "tie_break": "LOWEST_MEAN_RMSE_THEN_LOWEST_ALPHA",
+    "inner_folds_must_precede_outer_validation_season": true,
+    "post_result_retuning_allowed": false
+  },
+  "governance": {
+    "attempts_consumed": 0,
+    "evaluation_performed": false,
+    "model_p_created": false,
+    "promotion_authority": false,
+    "official_authority": false
+  }
+}
