@@ -28,7 +28,7 @@ def test_game_script_v2_uses_fresh_fit_window_and_keeps_2025_clean():
     assert failed_v1["reuse_v1_fit_window_for_v2_fit"] is False
 
     model = cfg["model"]
-    assert model["fixed_knots"] if "fixed_knots" in model else model["basis"]["fixed_knots"] == [-14, -7, 0, 7, 14]
+    assert model["basis"]["fixed_knots"] == [-14, -7, 0, 7, 14]
     assert model["monotonic_constraint"] is False
     assert model["post_fit_clipping"] is False
 
