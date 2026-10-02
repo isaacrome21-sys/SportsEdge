@@ -5,6 +5,7 @@ from sportsedge.sports.nfl.unified_auto_roles import (
     assemble_unified_team_models,
     build_unified_team_models_from_nflverse,
 )
+from sportsedge.sports.nfl.unified_run_it import run_unified_nfl_run_it_from_nflverse
 
 
 def binding():
@@ -186,3 +187,91 @@ def test_role_bundle_cannot_be_newer_than_assembly_asof():
 def test_invalid_depth_provenance_fails_closed():
     with pytest.raises(NFLContextError, match="depth source_sha256 invalid"):
         build(depth_source_sha256="not-a-sha")
+
+
+def _qualification(market, selection):
+    return {
+        "game_id": "2026_03_GB_CHI",
+        "market": market,
+        "selection": selection,
+        "captured_at": "2026-09-28T20:29:00Z",
+        "kickoff_at": "2026-09-28T23:00:00Z",
+        "source_version": "nfl-unified-auto-v1",
+        "feature_digest": "abc123",
+        "model_ready": True,
+        "pit_safe": True,
+        "role_stable": True,
+        "usage_supported": True,
+        "matchup_supported": True,
+        "injury_context_ready": True,
+        "shared_simulation_ready": True,
+        "market_binding_ready": True,
+    }
+
+
+def test_raw_nflverse_inputs_flow_into_game_and_qb_prop_boards():
+    game_quotes = [
+        {
+            "game_id": "2026_03_GB_CHI", "home": "CHI", "away": "GB",
+            "market": "moneyline", "selection": "CHI", "price_american": 120,
+            "book": "draftkings", "retrieved_at": "2026-09-28T20:30:00Z",
+        },
+        {
+            "game_id": "2026_03_GB_CHI", "home": "CHI", "away": "GB",
+            "market": "moneyline", "selection": "GB", "price_american": -140,
+            "book": "draftkings", "retrieved_at": "2026-09-28T20:30:00Z",
+        },
+    ]
+    prop_quotes = []
+    for book in ("draftkings", "fanduel", "betmgm"):
+        prop_quotes.extend([
+            {
+                "game_id": "2026_03_GB_CHI", "player": "CHI QB1",
+                "market": "passing_yards", "selection": "OVER", "line": 100.5,
+                "book": book, "price_american": 110,
+                "retrieved_at": "2026-09-28T20:30:00Z",
+            },
+            {
+                "game_id": "2026_03_GB_CHI", "player": "CHI QB1",
+                "market": "passing_yards", "selection": "UNDER", "line": 100.5,
+                "book": book, "price_american": -130,
+                "retrieved_at": "2026-09-28T20:30:00Z",
+            },
+        ])
+
+    out = run_unified_nfl_run_it_from_nflverse(
+        game_id="2026_03_GB_CHI",
+        home_team="CHI",
+        away_team="GB",
+        kickoff="2026-09-28T23:00:00Z",
+        observed_at="2026-09-28T20:00:00Z",
+        source_binding=binding(),
+        player_rows=player_rows(),
+        depth_rows=depth_rows(),
+        depth_source_uri="https://github.com/nflverse/nflverse-data/releases/download/depth_charts/depth_charts_2026.csv",
+        depth_source_sha256="b" * 64,
+        attempt9_margin=6.0,
+        attempt9_total=44.0,
+        game_quotes=game_quotes,
+        prop_quotes=prop_quotes,
+        qualification_snapshots=[
+            _qualification("moneyline", "CHI"),
+            _qualification("moneyline", "GB"),
+            _qualification("passing_yards", "CHI QB1"),
+        ],
+        as_of="2026-09-28T20:30:30Z",
+        edge_floor=0.0,
+        n_sims=400,
+        seed=17,
+    )
+
+    assert out["auto_roles"]["status"] == "AVAILABLE"
+    assert out["auto_roles"]["starter_qb_id_by_team"]["CHI"] == "chi_qb1"
+    assert out["game_card"]["picks"]
+    qb_rows = [
+        row for row in out["prop_board"]
+        if row["player"] == "CHI QB1" and row["market"] == "passing_yards"
+    ]
+    assert qb_rows
+    assert qb_rows[0]["status"] == "OK"
+    assert qb_rows[0]["score_0_100"] == 100
