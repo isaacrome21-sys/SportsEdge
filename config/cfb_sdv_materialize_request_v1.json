@@ -1,9 +1,9 @@
 {
   "schema": "CFB_SDV_MATERIALIZE_REQUEST_V1",
   "mode": "ZERO_ATTEMPT_PUBLIC_TRAINING_MATERIALIZATION",
-  "requested_after_main_sha": "0b13fea65e024ac52116dc72946ce8bda5c4d47f",
+  "requested_after_main_sha": "aaf15d4874ff558d4d2639dc695543293ff39b18",
   "expected_hash_binding": {
-    "code_manifest_sha256": "e202e37d4c057f5104289f50af72f13baa01260a82ec70a839f47b91bfef06f2",
+    "code_manifest_sha256": "d69db3d752f9a0c4380fb740438526319c6eaa3718ef6e952cac4c53a56dda00",
     "config_bundle_sha256": "02cd18a71b5bf527c4c2d07a78b966444a4aecc0f06859ccf6cc87104625ee01"
   },
   "consume_candidate_attempts": false,
@@ -11,6 +11,6 @@
   "model_p_created": false,
   "promotion_authority": false,
   "official_authority": false,
-  "request_revision": 2,
-  "retry_reason": "PYTHONPATH_REQUIRED_FOR_PREREG_HASH_SCRIPT"
+  "request_revision": 3,
+  "retry_reason": "FULL_SCHEDULE_PROVENANCE_FIX"
 }
