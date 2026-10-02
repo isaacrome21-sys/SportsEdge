@@ -121,7 +121,7 @@ def player_rows():
     # A former starter has data but is not the current PIT depth-chart QB.
     rows.append(
         _stat(
-            "oldqb", "Old QB", "QB", 1,
+            "oldqb", "Old QB", "QB", 1, team="GB",
             attempts=50, completions=40, passing_yards=450, passing_tds=5,
         )
     )
