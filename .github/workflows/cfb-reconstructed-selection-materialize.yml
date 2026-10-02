@@ -39,7 +39,9 @@ on:
       - 'tests/test_cfb_reconstructed_selection_acquisition.py'
       - 'tests/test_cfb_reconstructed_selection_materializer.py'
       - 'tests/test_cfb_selected_candidate_artifact_builder.py'
+      - 'tests/test_cfb_reconstructed_materialize_concurrency.py'
       - '.github/workflows/cfb-reconstructed-selection-materialize.yml'
+      - '.github/workflows/cfb-reconstructed-materialize-push-bridge.yml'
 
 permissions:
   contents: read
@@ -107,6 +109,9 @@ jobs:
     name: CFB reconstructed-selection guarded materialization
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch'
     needs: contract
+    concurrency:
+      group: cfb-reconstructed-selection-materialize-runtime
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
