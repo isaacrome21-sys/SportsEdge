@@ -1,44 +1,103 @@
 """Frozen historical weather transport for the CFB SportsDataverse lane.
 
-Transport is intentionally narrow: callers provide a venue coordinate and UTC kickoff.
-The returned hourly observation is selected deterministically and is never interpolated.
+The transport is season-scoped and game-id keyed. It normalizes CFBD's published
+`/games/weather` rows into the exact three contextual fields consumed by the
+SportsDataverse candidate model. Missing evaluated games fail closed; no market
+data, interpolation, or weather imputation is permitted.
 """
 from __future__ import annotations
-from datetime import datetime,timezone,timedelta
-from typing import Any,Mapping,Sequence
 
-class SDVWeatherTransportError(ValueError): pass
+from math import isfinite
+from typing import Any, Mapping, Sequence
 
-SOURCE_ID="OPEN_METEO_ARCHIVE_V1"
-BASE_URL="https://archive-api.open-meteo.com/v1/archive"
-HOURLY=("temperature_2m","wind_speed_10m")
+class SDVWeatherTransportError(ValueError):
+    pass
 
-def request_params(*,latitude:float,longitude:float,kickoff_utc:str)->dict[str,Any]:
- dt=_utc(kickoff_utc)
- day=dt.date()
- return {"latitude":float(latitude),"longitude":float(longitude),"start_date":day.isoformat(),"end_date":(day+timedelta(days=1)).isoformat(),
-         "hourly":",".join(HOURLY),"temperature_unit":"fahrenheit","wind_speed_unit":"mph","timezone":"UTC"}
+SOURCE_ID = "CFBD_GAMES_WEATHER_V1"
+BASE_URL = "https://api.collegefootballdata.com/games/weather"
 
-def select_kickoff_hour(payload:Mapping[str,Any],*,game_id:int,kickoff_utc:str,game_indoor:bool)->dict[str,Any]:
- if type(game_indoor) is not bool: raise SDVWeatherTransportError("CFB_SDV_WEATHER_INDOOR_FLAG_REQUIRED")
- if game_indoor:
-  return {"game_id":int(game_id),"game_indoor":True,"wind_speed":None,"temperature":None}
- hourly=payload.get("hourly")
- if not isinstance(hourly,Mapping): raise SDVWeatherTransportError("CFB_SDV_WEATHER_HOURLY_REQUIRED")
- times=list(hourly.get("time") or []); temps=list(hourly.get("temperature_2m") or []); winds=list(hourly.get("wind_speed_10m") or [])
- if not (len(times)==len(temps)==len(winds)): raise SDVWeatherTransportError("CFB_SDV_WEATHER_HOURLY_LENGTH_MISMATCH")
- target=_utc(kickoff_utc)
- if target.minute>=30: target=target.replace(minute=0,second=0,microsecond=0)+timedelta(hours=1)
- else: target=target.replace(minute=0,second=0,microsecond=0)
- # Open-Meteo UTC hourly strings omit offset.
- key=target.strftime("%Y-%m-%dT%H:%M")
- if key not in times: raise SDVWeatherTransportError("CFB_SDV_WEATHER_KICKOFF_HOUR_MISSING")
- i=times.index(key)
- if temps[i] is None or winds[i] is None: raise SDVWeatherTransportError("CFB_SDV_WEATHER_KICKOFF_VALUES_MISSING")
- return {"game_id":int(game_id),"game_indoor":False,"wind_speed":float(winds[i]),"temperature":float(temps[i])}
 
-def _utc(value:str)->datetime:
- try: dt=datetime.fromisoformat(value.replace("Z","+00:00"))
- except Exception as e: raise SDVWeatherTransportError("CFB_SDV_WEATHER_KICKOFF_INVALID") from e
- if dt.tzinfo is None: raise SDVWeatherTransportError("CFB_SDV_WEATHER_KICKOFF_TZ_REQUIRED")
- return dt.astimezone(timezone.utc)
+def request_params(*, season: int) -> dict[str, Any]:
+    year = int(season)
+    if not 2015 <= year <= 2025:
+        raise SDVWeatherTransportError("CFB_SDV_WEATHER_SEASON_OUTSIDE_FROZEN_WINDOW")
+    return {
+        "year": year,
+        "seasonType": "regular",
+        "classification": "fbs",
+    }
+
+
+def _number(value: Any, field: str, game_id: int) -> float:
+    try:
+        out = float(value)
+    except (TypeError, ValueError) as exc:
+        raise SDVWeatherTransportError(
+            f"CFB_SDV_WEATHER_FIELD_INVALID:{game_id}:{field}"
+        ) from exc
+    if not isfinite(out):
+        raise SDVWeatherTransportError(
+            f"CFB_SDV_WEATHER_FIELD_INVALID:{game_id}:{field}"
+        )
+    return out
+
+
+def normalize_season_weather(
+    payload: Sequence[Mapping[str, Any]],
+    *,
+    season: int,
+    evaluated_game_ids: Sequence[int],
+) -> list[dict[str, Any]]:
+    """Normalize one season and require complete coverage for evaluated games."""
+    request_params(season=season)
+    if not isinstance(payload, Sequence) or isinstance(payload, (str, bytes, bytearray)):
+        raise SDVWeatherTransportError("CFB_SDV_WEATHER_PAYLOAD_LIST_REQUIRED")
+    required = {int(x) for x in evaluated_game_ids}
+    if not required:
+        return []
+
+    rows: dict[int, dict[str, Any]] = {}
+    for raw in payload:
+        if not isinstance(raw, Mapping):
+            raise SDVWeatherTransportError("CFB_SDV_WEATHER_ROW_MAPPING_REQUIRED")
+        try:
+            game_id = int(raw.get("id"))
+        except (TypeError, ValueError) as exc:
+            raise SDVWeatherTransportError("CFB_SDV_WEATHER_GAME_ID_INVALID") from exc
+        if game_id not in required:
+            continue
+        if game_id in rows:
+            raise SDVWeatherTransportError(f"CFB_SDV_WEATHER_DUPLICATE_GAME:{game_id}")
+        indoor = raw.get("gameIndoors")
+        if type(indoor) is not bool:
+            raise SDVWeatherTransportError(
+                f"CFB_SDV_WEATHER_INDOOR_FLAG_REQUIRED:{game_id}"
+            )
+        if indoor:
+            wind = None
+            temperature = None
+        else:
+            wind = _number(raw.get("windSpeed"), "windSpeed", game_id)
+            temperature = _number(raw.get("temperature"), "temperature", game_id)
+        rows[game_id] = {
+            "game_id": game_id,
+            "game_indoor": indoor,
+            "wind_speed": wind,
+            "temperature": temperature,
+        }
+
+    missing = sorted(required - set(rows))
+    if missing:
+        raise SDVWeatherTransportError(
+            "CFB_SDV_HISTORICAL_WEATHER_INCOMPLETE:" + ",".join(map(str, missing[:20]))
+        )
+    return [rows[gid] for gid in sorted(rows)]
+
+
+__all__ = [
+    "BASE_URL",
+    "SOURCE_ID",
+    "SDVWeatherTransportError",
+    "normalize_season_weather",
+    "request_params",
+]
