@@ -157,7 +157,7 @@
       ],
       "engine_state_by_sport": {
         "NFL": "NO_ENGINE",
-        "CFB": "NO_ENGINE"
+        "CFB": "IMPLEMENTED"
       }
     },
     {
@@ -168,7 +168,7 @@
       ],
       "engine_state_by_sport": {
         "NFL": "NO_ENGINE",
-        "CFB": "NO_ENGINE"
+        "CFB": "IMPLEMENTED"
       }
     },
     {
