@@ -722,6 +722,24 @@ def run() -> dict[str, Any]:
     dev_pbp, dev_pbp_sha = parse_pbp_seasons(range(2016, 2024))
     dev_depth, dev_depth_sha = parse_depth_seasons(range(2016, 2024))
     dev_rows = build_rows(schedule, dev_pbp, dev_depth, attempt9, set(range(2016, 2024)))
+    dev_schedule = [g for g in schedule if 2016 <= g["season"] <= 2023]
+    dev_pbp_matches = sum(1 for g in dev_schedule if g["game_id"] in dev_pbp)
+    dev_depth_records = sum(len(v) for v in dev_depth.values())
+    dev_both_starters = sum(
+        1 for g in dev_schedule
+        if starter_at(dev_depth, g["home"], g["kickoff"])
+        and starter_at(dev_depth, g["away"], g["kickoff"])
+    )
+    print(json.dumps({
+        "phase": "DEVELOPMENT_PREFLIGHT_ONLY_NO_2024_ACCESS",
+        "schedule_games_2016_2023": len(dev_schedule),
+        "pbp_complete_games": len(dev_pbp),
+        "schedule_pbp_matches": dev_pbp_matches,
+        "depth_teams": len(dev_depth),
+        "depth_rank1_qb_records_with_dt": dev_depth_records,
+        "games_with_both_pit_starters": dev_both_starters,
+        "eligible_development_rows": len(dev_rows),
+    }, sort_keys=True), flush=True)
     min_dev = int(cfg["sample_requirements"]["minimum_development_games"])
     if len(dev_rows) < min_dev:
         raise ValueError(f"NFL_ATTEMPT1_DEV_PREFLIGHT_INSUFFICIENT:{len(dev_rows)}:{min_dev}")
