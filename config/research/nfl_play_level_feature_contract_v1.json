@@ -1,0 +1,61 @@
+{
+  "schema": "NFL_PLAY_LEVEL_FEATURE_CONTRACT_V1",
+  "status": "RESEARCH_ONLY_ADOPTED",
+  "created_date": "2026-09-12",
+  "purpose": "Add PIT-safe lagged play-level efficiency features for future NFL candidate generations without reopening an exposed final holdout or creating production Model_P authority.",
+  "source_family": "nflverse play-by-play plus existing SportsEdge schedule/participation/depth inputs",
+  "allowed_feature_families": {
+    "offense": [
+      "lagged_epa_per_play",
+      "lagged_pass_epa_per_play",
+      "lagged_rush_epa_per_play",
+      "lagged_success_rate",
+      "lagged_explosive_play_rate",
+      "lagged_early_down_pass_rate",
+      "lagged_red_zone_td_rate",
+      "lagged_sack_rate_allowed",
+      "lagged_turnover_rate",
+      "lagged_qb_cpoe"
+    ],
+    "defense": [
+      "lagged_epa_allowed_per_play",
+      "lagged_pass_epa_allowed_per_play",
+      "lagged_rush_epa_allowed_per_play",
+      "lagged_success_rate_allowed",
+      "lagged_explosive_play_rate_allowed",
+      "lagged_pressure_or_sack_rate_when_pit_available",
+      "lagged_turnover_forced_rate"
+    ],
+    "pace_and_situation": [
+      "lagged_neutral_seconds_per_play",
+      "lagged_neutral_pass_rate",
+      "lagged_fourth_down_aggression"
+    ]
+  },
+  "pit_rules": {
+    "pregame_only": true,
+    "feature_cutoff": "strictly_before_target_kickoff",
+    "target_game_plays_forbidden": true,
+    "future_season_rows_forbidden": true,
+    "rolling_windows_must_shift_one_game": true,
+    "season_to_date_aggregates_must_exclude_target_game": true,
+    "market_spread_or_total_as_model_feature": false,
+    "closing_line_as_model_feature": false
+  },
+  "research_window": {
+    "development_seasons": [2021, 2022, 2023],
+    "validation_season": 2024,
+    "2025_status": "EXPOSED_BY_PRIOR_GENERATIONS_NOT_FRESH_FINAL_HOLDOUT",
+    "2026_status": "PROSPECTIVE_INCOMPLETE_DO_NOT_USE_AS_RETROSPECTIVE_HOLDOUT_YET"
+  },
+  "candidate_generation_rule": "A future candidate may use these families only after a new preregistration freezes the exact features, transformations, missingness policy, model family, calibrator family, and attempt number before evaluation.",
+  "governance": {
+    "research_only": true,
+    "promotion_changed": false,
+    "truth_gate_changed": false,
+    "eligible_changed": false,
+    "model_p_created": false,
+    "production_m2_freeze_changed": false,
+    "nfl_props_enabled": false
+  }
+}
