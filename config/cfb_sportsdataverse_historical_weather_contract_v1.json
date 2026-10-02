@@ -43,6 +43,30 @@
     "timezone": "UTC",
     "temperature_unit": "fahrenheit",
     "wind_speed_unit": "mph",
-    "selection": "NEAREST_KICKOFF_HOUR_NO_INTERPOLATION"
+    "selection": "NEAREST_KICKOFF_HOUR_NO_INTERPOLATION",
+    "batch_transport": {
+      "multiple_coordinates_allowed": true,
+      "response_mapping": "REQUEST_ORDER",
+      "max_locations_per_request": 50,
+      "batching_changes_selected_weather_values": false
+    }
+  },
+  "venue_coordinate_source": {
+    "source_provider": "CollegeFootballData public venue export mirror",
+    "repository": "joeornstein/political-analysis-in-R",
+    "commit_sha": "a64850e3659c4b04f6e1fb08d141971a3137651e",
+    "path": "data/college-football/data.csv",
+    "git_blob_sha1": "d91980a6444cfaf12606c5132868c8dbb1b0cda7",
+    "content_sha256": "c73d798d48ab25c040c4dc87ba581e520b8f6cdab97d7b2ff67f128de5db7090",
+    "row_count": 803,
+    "required_fields": [
+      "id",
+      "name",
+      "location.x",
+      "location.y",
+      "dome"
+    ],
+    "join_rule": "CFB_SCHEDULES_VENUE_ID_TO_PINNED_VENUE_ID",
+    "missing_or_invalid_referenced_venue": "FAIL_CLOSED_NO_GEOCODING_NO_IMPUTATION"
   }
 }
