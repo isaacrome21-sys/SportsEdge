@@ -50,11 +50,15 @@ def test_week1_fails_closed_without_prior_season_snapshot():
           snapshots=[],prior_season_snapshots=[prior_snap(1)],
         )
 
-def test_2015_week1_is_excluded_at_frozen_acquisition_boundary():
-    prior=TeamSnapshot(**{**snap(1).__dict__,"season":2014,"through_week":14,"games_in_sample":12})
+def test_all_2015_games_are_bootstrap_only_at_frozen_acquisition_boundary():
     rows=materialize_native_candidate_inputs(
-      games=[{"game_id":201501,"season":2015,"week":1,"home_id":1,"away_id":1,"neutral_site":False,"home_score":99,"away_score":0}],
-      snapshots=[],prior_season_snapshots=[prior])
+      games=[
+        {"game_id":201501,"season":2015,"week":1,"home_id":1,"away_id":2,"neutral_site":False},
+        {"game_id":201502,"season":2015,"week":2,"home_id":1,"away_id":2,"neutral_site":False},
+      ],
+      snapshots=[snap(1),snap(2)],
+      prior_season_snapshots=[],
+    )
     assert rows==[]
 
 
