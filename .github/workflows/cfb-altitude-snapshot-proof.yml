@@ -10,6 +10,7 @@ on:
       - "sportsedge/sports/cfb/altitude_features.py"
       - "sportsedge/sports/cfb/altitude_dataset.py"
       - "scripts/materialize_cfb_altitude_snapshot.py"
+      - "scripts/build_cfb_altitude_dataset_manifest.py"
       - "tests/test_cfb_altitude_snapshot.py"
       - "tests/test_cfb_altitude_features.py"
       - "tests/test_cfb_altitude_dataset.py"
@@ -34,7 +35,7 @@ jobs:
         run: python -m pip install --disable-pip-version-check -r requirements-test.txt
       - name: Test altitude snapshot and feature construction
         run: |
-          python -m pytest -q tests/test_cfb_altitude_prereg.py tests/test_cfb_altitude_snapshot.py tests/test_cfb_altitude_features.py tests/test_cfb_altitude_dataset.py
+          python -m pytest -q tests/test_cfb_altitude_prereg.py tests/test_cfb_altitude_snapshot.py tests/test_cfb_altitude_features.py tests/test_cfb_altitude_dataset.py tests/test_cfb_altitude_dataset.py
       - name: Materialize and verify frozen free-source snapshot
         run: |
           python scripts/materialize_cfb_altitude_snapshot.py --output-dir _proof/cfb_altitude
