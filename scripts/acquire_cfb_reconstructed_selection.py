@@ -115,7 +115,8 @@ def _request(endpoint: str, params: Mapping[str, Any], provider_contract: str) -
 def _current_end_weeks(config: Mapping[str, Any]) -> range:
     """Return the exact frozen current-season endWeek surface."""
     try:
-        except (KeyError, TypeError, ValueError) as exc:
+        max_week = int(config["max_regular_week_planning_bound"])
+    except (KeyError, TypeError, ValueError) as exc:
         raise CFBAcquisitionError("CFB_ACQUISITION_MAX_WEEK_INVALID") from exc
     if max_week < 2:
         raise CFBAcquisitionError("CFB_ACQUISITION_MAX_WEEK_INVALID")
