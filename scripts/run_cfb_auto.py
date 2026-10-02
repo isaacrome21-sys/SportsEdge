@@ -9,17 +9,20 @@ Objective context is a sidecar and never substitutes for Model_P or evidence.
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
 import sys
+from time import perf_counter
 from typing import Callable, Sequence
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from sportsedge.sports.cfb.auto_slate import discover_cfb_auto_games
 from sportsedge.sports.cfb.full_auto import build_cfb_full_auto_slate
 from sportsedge.sports.cfb.game_freeze import (
     CFBGameFreezeError,
@@ -33,7 +36,7 @@ from sportsedge.sports.cfb.model_artifact import (
 )
 from sportsedge.sports.cfb.paths import DEFAULT_CFB_MODEL_ARTIFACT_PATH
 from sportsedge.sports.cfb.run_machine import run_it_cfb
-from sportsedge.sports.cfb.source import CFBGame, fetch_cfbd_games
+from sportsedge.sports.cfb.source import CFBGame
 
 
 class CFBAutoError(ValueError):
@@ -69,19 +72,43 @@ def discover_cfb_week(
     season: int,
     now: datetime,
     cfbd_api_key: str,
-    game_fetcher: Callable[..., Sequence[CFBGame]] = fetch_cfbd_games,
+    game_fetcher: Callable[..., Sequence[CFBGame]] | None = None,
+    season_discoverer: Callable[..., dict] = discover_cfb_auto_games,
     max_week: int = 16,
 ) -> int:
-    """Return the earliest regular-season FBS week with a future kickoff."""
+    """Return the earliest regular-season FBS week with a future kickoff.
+
+    Production uses one season-schedule fetch instead of probing every week
+    individually. game_fetcher remains an injectable compatibility path for
+    deterministic tests and callers that already own week-scoped snapshots.
+    """
     if max_week < 0:
         raise CFBAutoError("CFB_AUTO_MAX_WEEK_INVALID")
     candidates: list[tuple[datetime, int]] = []
-    for week in range(0, int(max_week) + 1):
-        games = game_fetcher(season=int(season), week=week, cfbd_api_key=cfbd_api_key)
-        for game in games:
-            start = _dt(game.start_ts)
+
+    if game_fetcher is not None:
+        for week in range(0, int(max_week) + 1):
+            games = game_fetcher(season=int(season), week=week, cfbd_api_key=cfbd_api_key)
+            for game in games:
+                start = _dt(game.start_ts)
+                if start > now:
+                    candidates.append((start, int(game.week)))
+    else:
+        plan = season_discoverer(
+            as_of=now,
+            cfbd_api_key=cfbd_api_key,
+            season=int(season),
+            min_lead_minutes=0,
+            horizon_minutes=(int(max_week) + 1) * 7 * 24 * 60,
+        )
+        for game in plan.get("games") or []:
+            week = int(game.get("week"))
+            if week < 0 or week > int(max_week):
+                continue
+            start = _dt(str(game.get("kickoff_ts") or ""))
             if start > now:
-                candidates.append((start, int(game.week)))
+                candidates.append((start, week))
+
     if not candidates:
         raise CFBAutoError("CFB_AUTO_NO_FUTURE_FBS_WEEK")
     candidates.sort(key=lambda row: (row[0], row[1]))
@@ -151,6 +178,48 @@ def _write(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
+def _run_model_and_context(
+    *,
+    current: datetime,
+    season: int,
+    week: int,
+    model,
+    cfbd_key: str,
+    odds_key: str,
+    bookmakers: tuple[str, ...],
+    root_seed: int,
+    n_paths: int,
+):
+    """Run the betting model and non-authoritative context sidecar concurrently.
+
+    The two lanes are independent by contract: objective context cannot create
+    Model_P or betting authority, so waiting for it before starting the model only
+    adds latency.
+    """
+    with ThreadPoolExecutor(max_workers=2, thread_name_prefix="cfb-fast") as pool:
+        context_future = pool.submit(
+            _objective_context,
+            current=current,
+            season=season,
+            cfbd_key=cfbd_key,
+        )
+        report_future = pool.submit(
+            run_it_cfb,
+            mode="AUTOMATIC",
+            season=season,
+            week=week,
+            model=model,
+            now=current,
+            cfbd_api_key=cfbd_key,
+            odds_api_key=odds_key,
+            bookmakers=bookmakers,
+            root_seed=root_seed,
+            n_paths=n_paths,
+        )
+        report = report_future.result()
+        context_status, objective_context, context_error = context_future.result()
+    return report, context_status, objective_context, context_error
+
 
 def main() -> int:
     parser = argparse.ArgumentParser()
@@ -175,23 +244,19 @@ def main() -> int:
             now=current,
             cfbd_api_key=cfbd_key,
         )
-        context_status, objective_context, context_error = _objective_context(
+        started = perf_counter()
+        report, context_status, objective_context, context_error = _run_model_and_context(
             current=current,
-            season=season,
-            cfbd_key=cfbd_key,
-        )
-        report = run_it_cfb(
-            mode="AUTOMATIC",
             season=season,
             week=week,
             model=model,
-            now=current,
-            cfbd_api_key=cfbd_key,
-            odds_api_key=odds_key,
+            cfbd_key=cfbd_key,
+            odds_key=odds_key,
             bookmakers=tuple(args.bookmakers or ["draftkings"]),
             root_seed=int(args.root_seed),
             n_paths=int(args.n_paths),
         )
+        elapsed_seconds = round(perf_counter() - started, 3)
         payload = {
             "schema_version": "CFB_AUTO_RUN_V1",
             "status": "SUCCESS",
@@ -205,6 +270,10 @@ def main() -> int:
             "objective_context_error": context_error,
             "objective_context": objective_context,
             "report": report.to_dict(),
+            "runtime": {
+                "model_and_context_parallel": True,
+                "elapsed_seconds": elapsed_seconds,
+            },
             "governance": {
                 "model_fit_performed": False,
                 "objective_context_is_model_p": False,
@@ -222,6 +291,7 @@ def main() -> int:
             "week": week,
             "run_status": report.run_status,
             "objective_context_status": context_status,
+            "elapsed_seconds": elapsed_seconds,
             "output": str(args.output),
         }, sort_keys=True))
         return 0
