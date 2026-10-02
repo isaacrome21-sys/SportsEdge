@@ -13,14 +13,28 @@ from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
 
 from bs4 import BeautifulSoup, Tag
+import pandas as pd
 
 UA = "SportsEdge-NFL-prop-v1-source-admission/1.0"
-LINE_REPO = "firstandthirty/nfl-tools"
-LINE_COMMIT = "38af9f64b42d2817dc172af637abebe2b7799194"
-LINE_FILES = {
-    "player_pass_yds": "player_props/data/processed/fanduel_pass_yds_history.csv",
-    "player_rush_yds": "player_props/data/analysis/rush_yds_market_analysis_rows.csv",
-    "player_reception_yds": "player_props/data/analysis/reception_yds_market_analysis_rows.csv",
+LINE_COMMIT = "5133c1b7ff56608cd1c2924d60512a6f33eaf99d"
+LINE_URL = (
+    "https://raw.githubusercontent.com/gcampb41/nfl_data-/"
+    + LINE_COMMIT
+    + "/data/processed/football/nfl/player_props/2025.parquet"
+)
+BOOKS = {68: "draftkings", 69: "fanduel"}
+FULL_GAME_PERIODS = {
+    "0", "0.0", "game", "full", "fullgame", "full_game", "full game", "event", "match", "all"
+}
+MARKET_BET_TYPES = {
+    "player_pass_yds": {
+        "passing_yards", "player_pass_yds", "player_passing_yards", "pass_yards",
+        "core_bet_type_9_passing_yards",
+    },
+    "player_rush_yds": {"rushing_yards", "player_rush_yds", "rush_yards"},
+    "player_reception_yds": {
+        "receiving_yards", "player_reception_yds", "player_receiving_yards", "rec_yards",
+    },
 }
 SCHEDULE_URL = "https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv"
 SEASON_MONTHS = [(2025, 9), (2025, 10), (2025, 11), (2025, 12), (2026, 1)]
@@ -118,75 +132,107 @@ def _first(row: dict[str, str], names: tuple[str, ...]) -> str:
             return str(row[key])
     return ""
 
-def probe_line_source(market: str, path: str) -> dict:
-    url = f"https://raw.githubusercontent.com/{LINE_REPO}/{LINE_COMMIT}/{path}"
-    raw, final = fetch(url, timeout=90)
-    text = raw.decode("utf-8-sig")
-    reader = csv.DictReader(io.StringIO(text))
-    fields = {str(x) for x in (reader.fieldnames or [])}
-    if not fields:
-        raise ProbeError(f"LINE_SCHEMA_EMPTY:{market}")
+def _norm_text_series(series):
+    return series.astype("string").fillna("").str.strip().str.lower()
 
-    rows_2025 = 0
-    strictly_prekick = 0
-    weeks: set[int] = set()
-    player_events: set[tuple[str, str]] = set()
-    snapshots: dict[tuple[str, str], datetime] = {}
+def probe_line_archive() -> list[dict]:
+    raw, final = fetch(LINE_URL, timeout=90)
+    try:
+        frame = pd.read_parquet(io.BytesIO(raw))
+    except Exception as exc:
+        raise ProbeError(f"LINE_PARQUET_READ_FAILED:{type(exc).__name__}:{exc}") from exc
+    frame.columns = [str(x).strip().lower() for x in frame.columns]
+    required = {"bet_type", "book_id", "side", "value", "week", "period"}
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise ProbeError("LINE_SCHEMA_MISSING:" + ",".join(missing))
 
-    for row in reader:
-        season_raw = _first(row, ("season", "season_guess", "season_str"))
-        try:
-            season = int(float(season_raw))
-        except (TypeError, ValueError):
-            continue
-        if season != 2025:
-            continue
-        rows_2025 += 1
+    if "season" in frame.columns:
+        season = pd.to_numeric(frame["season"], errors="coerce")
+        frame = frame.loc[season.eq(2025)].copy()
+    week = pd.to_numeric(frame["week"], errors="coerce")
+    frame = frame.loc[week.between(1, 18, inclusive="both")].copy()
+    frame["week"] = pd.to_numeric(frame["week"], errors="coerce").astype("Int64")
+    if frame.empty:
+        raise ProbeError("NO_2025_LINE_ROWS")
 
-        week_raw = _first(row, ("week", "week_guess_numeric", "week_guess", "week_str"))
-        try:
-            week = int(float(week_raw))
-            if 1 <= week <= 18:
-                weeks.add(week)
-        except (TypeError, ValueError):
-            pass
+    period = _norm_text_series(frame["period"]).str.replace(r"\s+", " ", regex=True)
+    frame = frame.loc[period.isin(FULL_GAME_PERIODS)].copy()
+    if frame.empty:
+        raise ProbeError("NO_FULL_GAME_PROP_ROWS")
 
-        player = _first(row, ("player", "player_name"))
-        event = _first(row, ("event_id", "game_id"))
-        if player and event:
-            player_events.add((player, event))
+    frame["book_id"] = pd.to_numeric(frame["book_id"], errors="coerce")
+    frame = frame.loc[frame["book_id"].isin(BOOKS)].copy()
+    frame["book"] = frame["book_id"].map(BOOKS)
+    if frame.empty:
+        raise ProbeError("NO_DK_FD_PROP_ROWS")
 
-        snapshot = parse_timestamp(_first(row, ("requested_snapshot_time", "snapshot_ts", "captured_at")))
-        kickoff = parse_timestamp(_first(row, ("commence_time", "kickoff", "kickoff_at")))
-        if snapshot is not None and kickoff is not None and snapshot < kickoff:
-            strictly_prekick += 1
-            key = (player, event)
-            prev = snapshots.get(key)
-            if prev is None or snapshot > prev:
-                snapshots[key] = snapshot
-
-    if rows_2025 <= 0:
-        raise ProbeError(f"NO_2025_LINE_ROWS:{market}")
-    if strictly_prekick <= 0:
-        raise ProbeError(f"NO_PROVEN_PREKICK_ROWS:{market}")
-
-    return {
-        "market": market,
-        "source_url": final,
-        "raw_sha256": digest(raw),
-        "raw_bytes": len(raw),
-        "fields": sorted(fields),
-        "rows_2025": rows_2025,
-        "weeks_2025": sorted(weeks),
-        "unique_player_events_2025": len(player_events),
-        "strictly_prekick_rows_2025": strictly_prekick,
-        "latest_prekick_player_events_2025": len(snapshots),
-        "model_input_columns": [
-            "season","week","event_id/game_id","player/player_name","line",
-            "over_price","under_price","requested_snapshot_time/snapshot_ts","commence_time/kickoff"
-        ],
-        "outcome_columns_used": False
+    bet = _norm_text_series(frame["bet_type"])
+    type_to_market = {
+        bet_type: market
+        for market, bet_types in MARKET_BET_TYPES.items()
+        for bet_type in bet_types
     }
+    frame["market"] = bet.map(type_to_market)
+    frame = frame.loc[frame["market"].notna()].copy()
+
+    side = _norm_text_series(frame["side"])
+    frame["side_norm"] = side.map({"over": "OVER", "o": "OVER", "under": "UNDER", "u": "UNDER"}).fillna("")
+    frame["line"] = pd.to_numeric(frame["value"], errors="coerce")
+    frame = frame.loc[frame["side_norm"].ne("") & frame["line"].notna() & frame["line"].gt(0)].copy()
+
+    name_col = next(
+        (col for col in ("join_name", "player_name", "player", "name", "full_name") if col in frame.columns),
+        None,
+    )
+    id_col = next(
+        (col for col in ("player_id", "gsis_id", "player_gsis_id") if col in frame.columns),
+        None,
+    )
+    if name_col is None and id_col is None:
+        raise ProbeError("LINE_PLAYER_IDENTITY_MISSING")
+    frame["player_identity"] = (
+        frame[id_col].astype("string").fillna("").str.strip()
+        if id_col is not None
+        else frame[name_col].astype("string").fillna("").str.strip()
+    )
+    if name_col is not None:
+        fallback = frame[name_col].astype("string").fillna("").str.strip()
+        frame["player_identity"] = frame["player_identity"].where(frame["player_identity"].ne(""), fallback)
+    frame = frame.loc[frame["player_identity"].ne("")].copy()
+
+    source_fields = sorted(str(x) for x in frame.columns)
+    results: list[dict] = []
+    for market in MARKET_BET_TYPES:
+        m = frame.loc[frame["market"].eq(market)].copy()
+        if m.empty:
+            raise ProbeError(f"NO_2025_LINE_ROWS:{market}")
+        weeks = sorted(int(x) for x in m["week"].dropna().unique())
+        group_cols = ["week", "market", "player_identity", "book", "line"]
+        paired = 0
+        unique_groups = 0
+        for _, g in m.groupby(group_cols, dropna=False):
+            unique_groups += 1
+            sides = set(g["side_norm"].astype(str))
+            if {"OVER", "UNDER"}.issubset(sides):
+                paired += 1
+        if paired <= 0:
+            raise ProbeError(f"NO_PAIRED_PROP_ROWS:{market}")
+        results.append({
+            "market": market,
+            "source_url": final,
+            "raw_sha256": digest(raw),
+            "raw_bytes": len(raw),
+            "rows_2025": int(len(m)),
+            "weeks_2025": weeks,
+            "books": sorted(str(x) for x in m["book"].dropna().unique()),
+            "unique_player_market_book_line_groups": int(unique_groups),
+            "paired_player_market_book_line_groups": int(paired),
+            "line_definition": "ACTION_NETWORK_ARCHIVE_LATEST_PER_BOOK_FULL_GAME_PROP",
+            "source_fields": source_fields,
+            "outcome_columns_used": False,
+        })
+    return results
 
 def schedule_team_weeks() -> tuple[set[tuple[int,str]], dict]:
     raw, final = fetch(SCHEDULE_URL, timeout=90)
@@ -298,14 +344,13 @@ def main() -> int:
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
-    lines = [probe_line_source(m, p) for m,p in LINE_FILES.items()]
+    lines = probe_line_archive()
     expected, schedule_receipt = schedule_team_weeks()
     inactives = inactive_coverage(expected)
 
     line_gate = all(
         row["rows_2025"] > 0
-        and row["strictly_prekick_rows_2025"] > 0
-        and row["latest_prekick_player_events_2025"] > 0
+        and row["paired_player_market_book_line_groups"] > 0
         for row in lines
     )
     inactive_gate = (
