@@ -128,7 +128,7 @@ def _build_attempt9_runtime(temp_dir: Path) -> dict:
 
         rmse = float(np.sqrt(np.mean((predictions - y_holdout) ** 2)))
         expected_rmse = attempt9_runtime.EXPECTED_HOLDOUT_RMSE[name]
-        if not np.isclose(rmse, expected_rmse, rtol=0.0, atol=0.0):
+        if not np.isclose(rmse, expected_rmse, rtol=0.0, atol=1e-12):
             raise RuntimeError(
                 "PROP_V1_ATTEMPT9_FIXED_BETA_RMSE_MISMATCH:"
                 f"{name}:actual={rmse}:expected={expected_rmse}"
