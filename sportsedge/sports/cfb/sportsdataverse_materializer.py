@@ -52,6 +52,20 @@ def _snapshot_to_metrics(snap: TeamSnapshot, sample_source: str) -> dict[str, An
     return out
 
 
+def _early_current_metrics(snap: TeamSnapshot, *, season: int, week: int) -> dict[str, Any]:
+    """Represent an empty current-season sample without inventing metric values.
+
+    The metric values are carried from the prior-season fallback so blend/switch
+    families have numeric inputs, while games_in_sample is exactly zero. Families
+    that key on sample size therefore fall back to prior values deterministically.
+    """
+    out = _snapshot_to_metrics(snap, "CURRENT_SEASON_EMPTY_PRIOR_VALUES")
+    out["season"] = int(season)
+    out["through_week"] = int(week) - 1
+    out["games_in_sample"] = 0
+    return out
+
+
 def materialize_native_candidate_inputs(
     *,
     games: Sequence[Mapping[str, Any]],
@@ -74,9 +88,8 @@ def materialize_native_candidate_inputs(
     All four candidate families receive:
       home_metrics / away_metrics               -- authoritative pregame snapshot
       home_prior_metrics / away_prior_metrics   -- prior-season final snapshot
-      home_current_metrics / away_current_metrics -- in-season W-1 (or same as prior
-                                                      for week-1 rows where no current
-                                                      in-season sample exists yet)
+      home_current_metrics / away_current_metrics -- in-season W-1; Week 0/1 carries
+                                                      prior values with games_in_sample=0
     """
     # Index current-season snapshots: (team_id, season, through_week) -> TeamSnapshot
     idx: dict[tuple[int, int, int], TeamSnapshot] = {
@@ -178,8 +191,12 @@ def materialize_native_candidate_inputs(
         away_metrics = _snapshot_to_metrics(away_snap, away_sample_source)
         home_prior_metrics = _snapshot_to_metrics(home_prior_snap, "PRIOR_SEASON_FALLBACK")
         away_prior_metrics = _snapshot_to_metrics(away_prior_snap, "PRIOR_SEASON_FALLBACK")
-        home_current_metrics = _snapshot_to_metrics(home_current_snap, home_sample_source)
-        away_current_metrics = _snapshot_to_metrics(away_current_snap, away_sample_source)
+        if week <= 1:
+            home_current_metrics = _early_current_metrics(home_prior_snap, season=season, week=week)
+            away_current_metrics = _early_current_metrics(away_prior_snap, season=season, week=week)
+        else:
+            home_current_metrics = _snapshot_to_metrics(home_current_snap, home_sample_source)
+            away_current_metrics = _snapshot_to_metrics(away_current_snap, away_sample_source)
 
         out.append({
             "game_id": str(raw["game_id"]),
