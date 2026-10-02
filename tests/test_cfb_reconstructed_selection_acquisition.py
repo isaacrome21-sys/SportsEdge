@@ -7,6 +7,7 @@ import unittest
 
 from scripts.acquire_cfb_reconstructed_selection import (
     CFBAcquisitionError,
+    _current_end_weeks,
     WEATHER_CONTRACT,
     _fetch_one,
     _hourly_index,
@@ -40,6 +41,12 @@ class TestCFBReconstructedSelectionAcquisition(unittest.TestCase):
         self.assertEqual(counts["/venues"], 1)
         self.assertEqual(counts["/stats/season/advanced"], 176)
         self.assertNotIn("/games/weather", counts)
+
+    def test_current_end_week_surface_is_single_source_of_truth(self):
+        self.assertEqual(list(_current_end_weeks(self.config)), list(range(1, 16)))
+        mutated = dict(self.config)
+        mutated["max_regular_week_planning_bound"] = 10
+        self.assertEqual(list(_current_end_weeks(mutated)), list(range(1, 10)))
 
     def test_advanced_plan_includes_2014_prior_and_stops_at_contract_week_16(self):
         plan = build_request_plan(self.config)
