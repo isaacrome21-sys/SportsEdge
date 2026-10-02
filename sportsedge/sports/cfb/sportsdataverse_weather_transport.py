@@ -136,12 +136,20 @@ def resolve_venue(
     *,
     by_id: Mapping[int, Mapping[str, Any]],
     by_name: Mapping[str, Mapping[str, Any]],
-    venue_id: int,
+    venue_id: Any,
     venue_name: str,
 ) -> tuple[dict[str, Any], str]:
-    found = by_id.get(int(venue_id))
-    if found is not None:
-        return dict(found), "CFBD_VENUE_ID"
+    raw_id = str(venue_id or "").strip()
+    if raw_id:
+        try:
+            numeric_id = int(float(raw_id))
+        except ValueError as exc:
+            raise SDVWeatherTransportError(
+                f"CFB_SDV_HISTORICAL_VENUE_ID_INVALID:{venue_id}"
+            ) from exc
+        found = by_id.get(numeric_id)
+        if found is not None:
+            return dict(found), "CFBD_VENUE_ID"
     key = _venue_name(venue_name)
     found = by_name.get(key)
     if found is None:
