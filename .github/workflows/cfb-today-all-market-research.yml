@@ -11,6 +11,10 @@ on:
         description: Optional manual cross-book game board JSON. Blank uses configured Odds API.
         required: false
         type: string
+      game_model_artifact_json:
+        description: Optional hash-valid CFB joint-model artifact JSON for model-based game LEANs.
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -39,6 +43,20 @@ jobs:
       - name: Build game-market PAPER board
         run: python scripts/run_cfb_paper_market.py --output artifacts/cfb/cfb_paper_market_card.json
 
+      - name: Materialize optional research game-model artifact
+        env:
+          GAME_MODEL_ARTIFACT_JSON: ${{ inputs.game_model_artifact_json }}
+        run: |
+          if [ -n "$GAME_MODEL_ARTIFACT_JSON" ]; then
+            mkdir -p artifacts/cfb
+            printf '%s' "$GAME_MODEL_ARTIFACT_JSON" > artifacts/cfb/cfb_game_model_candidate.json
+            python scripts/run_cfb_game_model_candidate.py \
+              --model-artifact artifacts/cfb/cfb_game_model_candidate.json \
+              --output artifacts/run_it/cfb_game_model_candidate.json || true
+          else
+            echo "No research game-model artifact supplied; game lane will use PAPER consensus."
+          fi
+
       - name: Materialize optional PIT usage input
         env:
           USAGE_JSON: ${{ inputs.usage_json }}
@@ -59,6 +77,9 @@ jobs:
       - name: Build unified fail-closed research board
         run: |
           ARGS="--paper-market-card artifacts/cfb/cfb_paper_market_card.json"
+          if [ -f artifacts/run_it/cfb_game_model_candidate.json ]; then
+            ARGS="$ARGS --game-model-report artifacts/run_it/cfb_game_model_candidate.json"
+          fi
           if [ -f artifacts/run_it/cfb_prop_model_candidate.json ]; then
             ARGS="$ARGS --prop-candidate-report artifacts/run_it/cfb_prop_model_candidate.json"
           fi
@@ -86,7 +107,9 @@ jobs:
           name: cfb-all-market-research-card
           path: |
             artifacts/cfb/cfb_paper_market_card.json
+            artifacts/cfb/cfb_game_model_candidate.json
             artifacts/football/cfb_prop_live_features.json
+            artifacts/run_it/cfb_game_model_candidate.json
             artifacts/run_it/cfb_prop_model_candidate.json
             artifacts/run_it/cfb_all_market_research.json
           if-no-files-found: warn
