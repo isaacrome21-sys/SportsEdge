@@ -172,7 +172,6 @@ def _ou_offers(
     current: datetime,
     quote_ttl_seconds: int,
     name_maps: Mapping[str, Mapping[str, str]],
-    identity_blocks: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     offers: list[dict[str, Any]] = []
     for row in _market_rows(event, book_key):
@@ -200,25 +199,7 @@ def _ou_offers(
             side = str(raw.get("name") or "").strip().upper()
             if side not in {"OVER", "UNDER"}:
                 continue
-            try:
-                player_id, player_name = _player_id(names, raw)
-            except FootballPropRunError as exc:
-                if not str(exc).startswith("FOOTBALL_PROP_PLAYER_NAME_UNRESOLVED:"):
-                    raise
-                if identity_blocks is not None:
-                    identity_blocks.append({
-                        "family": family,
-                        "provider_market": key,
-                        "player_name": str(raw.get("description") or "").strip() or None,
-                        "side": side,
-                        "line": raw.get("point"),
-                        "american_odds": raw.get("price"),
-                        "model_p": None,
-                        "bet_status": "BLOCKED",
-                        "official_eligible": False,
-                        "reason": str(exc),
-                    })
-                continue
+            player_id, player_name = _player_id(names, raw)
             line = _finite(raw.get("point"), f"FOOTBALL_PROP_LINE_INVALID:{key}")
             price = _finite(raw.get("price"), f"FOOTBALL_PROP_PRICE_INVALID:{key}")
             american_to_decimal(price)
@@ -262,7 +243,6 @@ def _scorer_offers(
     current: datetime,
     quote_ttl_seconds: int,
     offensive_names: Mapping[str, str],
-    identity_blocks: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     offers: list[dict[str, Any]] = []
     for row in _market_rows(event, book_key):
@@ -292,25 +272,7 @@ def _scorer_offers(
                     continue
                 side = raw_side
                 line = _finite(raw.get("point"), f"FOOTBALL_PROP_LINE_INVALID:{key}")
-            try:
-                player_id, player_name = _player_id(offensive_names, raw)
-            except FootballPropRunError as exc:
-                if not str(exc).startswith("FOOTBALL_PROP_PLAYER_NAME_UNRESOLVED:"):
-                    raise
-                if identity_blocks is not None:
-                    identity_blocks.append({
-                        "family": "SCORER",
-                        "provider_market": key,
-                        "player_name": str(raw.get("description") or "").strip() or None,
-                        "side": side,
-                        "line": line,
-                        "american_odds": raw.get("price"),
-                        "model_p": None,
-                        "bet_status": "BLOCKED",
-                        "official_eligible": False,
-                        "reason": str(exc),
-                    })
-                continue
+            player_id, player_name = _player_id(offensive_names, raw)
             price = _finite(raw.get("price"), f"FOOTBALL_PROP_PRICE_INVALID:{key}")
             american_to_decimal(price)
             bucket_key = (player_id, line)
@@ -524,7 +486,6 @@ def run_football_extended_props(
     devig_policy = require_frozen_devig_policy(config=load_edge_floor_config(floor_path))
 
     results: list[dict[str, Any]] = []
-    identity_blocks: list[dict[str, Any]] = []
     distribution_hashes: dict[str, str] = {}
     for game in games:
         game_id = str(game["game_id"])
@@ -571,7 +532,6 @@ def run_football_extended_props(
             "KICKER": kicker_names,
             "DEFENSE": defender_names,
         }
-        identity_block_start = len(identity_blocks)
         ou_offers = _ou_offers(
             event=event,
             book_key=book_key,
@@ -579,7 +539,6 @@ def run_football_extended_props(
             current=current,
             quote_ttl_seconds=quote_ttl_seconds,
             name_maps=name_maps,
-            identity_blocks=identity_blocks,
         )
         scorer_offers = _scorer_offers(
             event=event,
@@ -588,15 +547,7 @@ def run_football_extended_props(
             current=current,
             quote_ttl_seconds=quote_ttl_seconds,
             offensive_names=offensive_names,
-            identity_blocks=identity_blocks,
         )
-        for block in identity_blocks[identity_block_start:]:
-            block.update({
-                "sport": resolved,
-                "game_id": game_id,
-                "provider_event_id": event_id,
-                "bookmaker": book_key,
-            })
         if not ou_offers and not scorer_offers:
             continue
 
@@ -818,11 +769,9 @@ def run_football_extended_props(
         "n_paths": n_paths,
         "game_distribution_sha256": distribution_hashes,
         "results": results,
-        "identity_blocks": identity_blocks,
         "summary": {
             "games_modeled": len(distribution_hashes),
             "decisions": len(results),
-            "identity_blocks": len(identity_blocks),
             "official_bets": 0,
         },
         "governance": {
@@ -834,7 +783,6 @@ def run_football_extended_props(
             "sportsbook_used_to_create_model_p": False,
             "one_sided_market_opposite_price_invented": False,
             "one_sided_model_p_plus_offered_price_ev_enabled": True,
-            "unresolved_provider_player_rows_fail_closed_individually": True,
             "promotion_changed": False,
             "eligible_changed": False,
             "official_bets_allowed": False,
