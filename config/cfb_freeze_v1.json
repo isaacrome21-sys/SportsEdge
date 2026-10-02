@@ -1,0 +1,34 @@
+{
+  "base_commit_sha": "64be4ba84a0ef559efba872342ce32c920a8ca09",
+  "engine_files": [
+    {
+      "blob_sha": "ff91ad867a5240d7f1cd90c707d29d534bde8dd2",
+      "path": "sportsedge/sports/cfb/joint_model.py"
+    },
+    {
+      "blob_sha": "d458eadf4d971252613fd0276851a4b0f94b8cd2",
+      "path": "sportsedge/sports/cfb/run_machine.py"
+    }
+  ],
+  "engine_version": "cfb_joint_ridge_residual_v1",
+  "feature_contract": "CFB_JOINT_GAME_FEATURES_V1",
+  "freeze_id": "cfb_freeze_v1",
+  "holdout_policy": "ONE_SHOT_2025_REGULAR_FBS_PRE2025_TRAINING",
+  "model_logic_or_weight_changes": false,
+  "parameters": {
+    "quote_ttl_seconds": 180,
+    "ridge_alpha": 10.0,
+    "root_seed": 20260826,
+    "seed_policy": "EXPLICIT_NUMPY_PCG64_V1",
+    "simulation_paths": 20000
+  },
+  "run_machine_version": "CFB_RUN_MACHINE_V1",
+  "schema_version": 1,
+  "training_window": {
+    "classification": "fbs",
+    "holdout_season": 2025,
+    "max_season": 2024,
+    "min_season": 2015,
+    "season_type": "regular"
+  }
+}
