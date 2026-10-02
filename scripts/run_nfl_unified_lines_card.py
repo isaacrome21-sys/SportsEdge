@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 
 from sportsedge.nfl_unified_phone import build_unified_phone_card
+from sportsedge.nfl_scoring_composition_artifact import load_prior_file
 from sportsedge.sports.nfl.auto_slate import discover_nfl_auto_games
 from sportsedge.sports.nfl.context_autopull import NFLContextError
 from sportsedge.sports.nfl.full_auto import fetch_nflverse_depth_charts
@@ -40,6 +41,7 @@ def main() -> int:
     ap.add_argument("--n-sims", type=int, default=20000)
     ap.add_argument("--seed", type=int, default=21)
     ap.add_argument("--horizon-days", type=int, default=10)
+    ap.add_argument("--scoring-prior")
     args = ap.parse_args()
 
     ticket = _read(args.input)
@@ -105,6 +107,8 @@ def main() -> int:
                 source_status["injuries"] = "AVAILABLE"
                 injury_source_ready = True
 
+    scoring_prior = load_prior_file(args.scoring_prior) if args.scoring_prior else None
+
     payload = build_unified_phone_card(
         ticket,
         history=history,
@@ -113,6 +117,7 @@ def main() -> int:
         player_rows=player_rows,
         injury_rows=injury_rows,
         injury_source_ready=injury_source_ready,
+        scoring_prior=scoring_prior,
         n_sims=int(args.n_sims),
         seed=int(args.seed),
     )
