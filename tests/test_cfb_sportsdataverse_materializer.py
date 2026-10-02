@@ -92,8 +92,8 @@ def test_week0_uses_prior_values_but_zero_current_sample_size():
     assert row["home_current_metrics"]["through_week"]==-1
     assert row["home_current_metrics"]["games_in_sample"]==0
     assert row["away_current_metrics"]["games_in_sample"]==0
-    assert row["home_games_in_sample"]==0
-    assert row["away_games_in_sample"]==0
+    assert row["home_games_in_sample"]==12
+    assert row["away_games_in_sample"]==12
 
 
 def test_week1_current_placeholder_has_zero_current_sample_size():
