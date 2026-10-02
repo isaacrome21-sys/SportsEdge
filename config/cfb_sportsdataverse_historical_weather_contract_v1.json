@@ -32,5 +32,17 @@
     "model_p_created": false,
     "promotion_authority": false,
     "official_authority": false
+  },
+  "provider": {
+    "source_id": "OPEN_METEO_ARCHIVE_V1",
+    "endpoint": "https://archive-api.open-meteo.com/v1/archive",
+    "hourly_variables": [
+      "temperature_2m",
+      "wind_speed_10m"
+    ],
+    "timezone": "UTC",
+    "temperature_unit": "fahrenheit",
+    "wind_speed_unit": "mph",
+    "selection": "NEAREST_KICKOFF_HOUR_NO_INTERPOLATION"
   }
 }
