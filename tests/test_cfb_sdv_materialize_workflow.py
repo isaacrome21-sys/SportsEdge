@@ -8,7 +8,8 @@ def test_sdv_materialization_workflow_is_zero_attempt_only():
     assert "scripts/materialize_cfb_sportsdataverse_training.py" in text
     assert "history/cfb/sportsdataverse-selection" in text
     assert "training_rows.json" in text
-    assert "CFBD_API_KEY" in text
+    assert "CFBD_API_KEY" not in text
+    assert "SPORTSEDGE_CFBD_API_KEY" not in text
     assert "SPORTSEDGE_ODDS_API_KEY" not in text
     assert "ODDS_API_KEY" not in text
     assert "run_cfb_sportsdataverse_bakeoff.py" not in text
