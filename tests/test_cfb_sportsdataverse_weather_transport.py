@@ -99,3 +99,12 @@ def test_exact_name_fallback_resolves_when_cfbd_id_is_not_bound(monkeypatch):
     )
     assert venue["stadium_id"]=="x"
     assert resolution=="PINNED_EXACT_NAME_OR_ALIAS"
+
+    venue,resolution=resolve_venue(
+        by_id=by_id,
+        by_name=by_name,
+        venue_id=None,
+        venue_name="Test Stadium",
+    )
+    assert venue["stadium_id"]=="x"
+    assert resolution=="PINNED_EXACT_NAME_OR_ALIAS"
