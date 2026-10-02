@@ -12,7 +12,7 @@ from sportsedge.sports.cfb.joint_model import (
     CFBJointScoreModel, CFBModelError, CFB_FEATURE_CONTRACT, CFB_JOINT_MODEL_ID,
     _feature_names, price_cfb_game_markets, simulate_cfb_joint_distribution,
 )
-from sportsedge.sports.cfb.run_machine import run_cfb_machine
+from sportsedge.sports.cfb.run_machine import CFBRunMachineError, run_cfb_machine
 from sportsedge.sports.cfb.source import (
     CFBGame, CFBQuote, CFBSourceError, CFBTeamMetrics, attach_weather,
     bind_provider_team, build_team_alias_index, parse_the_odds_api_quotes,
@@ -181,6 +181,91 @@ class MachineTests(unittest.TestCase):
         r=self.manual(mode="MANUAL",season=2026,week=1,model=model(),now=NOW,games=self.games,metrics=self.metrics,quotes=stale,n_paths=20)
         self.assertTrue(all(x.engine_status=="PRICED" and x.reason=="CFB_QUOTE_STALE" for x in r.results))
         self.assertTrue(all(x.fair_market_p is None for x in r.results))
+
+    def test_full_game_derivatives_price_from_same_joint_distribution(self):
+        ts = (NOW-timedelta(seconds=20)).isoformat()
+        base = dict(
+            game_id="1001",
+            period="FG",
+            book_key="draftkings",
+            sportsbook="DraftKings",
+            retrieved_at=ts,
+            is_alternate=False,
+        )
+        derivative_quotes = [
+            CFBQuote(market="ALTERNATE_SPREAD", side="HOME", line=-6.5, american_odds=125,
+                     entity_id="1001", offer_id="ash", **base),
+            CFBQuote(market="ALTERNATE_SPREAD", side="AWAY", line=-6.5, american_odds=-145,
+                     entity_id="1001", offer_id="asa", **base),
+            CFBQuote(market="ALTERNATE_TOTAL", side="OVER", line=52.5, american_odds=110,
+                     entity_id="1001", offer_id="ato", **base),
+            CFBQuote(market="ALTERNATE_TOTAL", side="UNDER", line=52.5, american_odds=-130,
+                     entity_id="1001", offer_id="atu", **base),
+            CFBQuote(market="TEAM_TOTAL", side="OVER", line=27.5, american_odds=-105,
+                     entity_id="Alpha State", offer_id="tto", **base),
+            CFBQuote(market="TEAM_TOTAL", side="UNDER", line=27.5, american_odds=-115,
+                     entity_id="Alpha State", offer_id="ttu", **base),
+        ]
+        report = self.manual(
+            mode="MANUAL",
+            season=2026,
+            week=1,
+            model=model(),
+            now=NOW,
+            games=self.games,
+            metrics=self.metrics,
+            quotes=derivative_quotes,
+            n_paths=500,
+            root_seed=44,
+        )
+        self.assertEqual(
+            {row.market for row in report.results},
+            {"ALTERNATE_SPREAD", "ALTERNATE_TOTAL", "TEAM_TOTAL"},
+        )
+        self.assertTrue(all(row.engine_status == "PRICED" for row in report.results))
+        self.assertTrue(all(row.bet_status == "BLOCKED" for row in report.results))
+        self.assertTrue(all(row.reason == "CFB_PROMOTION_EVIDENCE_REQUIRED" for row in report.results))
+        self.assertEqual(len({row.distribution_sha256 for row in report.results}), 1)
+        team_rows = [row for row in report.results if row.market == "TEAM_TOTAL"]
+        self.assertEqual({row.entity_id for row in team_rows}, {"Alpha State"})
+        self.assertAlmostEqual(
+            sum(float(row.model_p) for row in team_rows) + float(team_rows[0].push_p),
+            1.0,
+            places=12,
+        )
+
+    def test_team_total_unknown_entity_fails_closed(self):
+        ts = (NOW-timedelta(seconds=20)).isoformat()
+        bad = [
+            CFBQuote(
+                game_id="1001", period="FG", market="TEAM_TOTAL",
+                entity_id="Unknown State", side="OVER", line=27.5,
+                american_odds=-110, book_key="draftkings", sportsbook="DraftKings",
+                retrieved_at=ts, offer_id="bad-o", is_alternate=False,
+            ),
+            CFBQuote(
+                game_id="1001", period="FG", market="TEAM_TOTAL",
+                entity_id="Unknown State", side="UNDER", line=27.5,
+                american_odds=-110, book_key="draftkings", sportsbook="DraftKings",
+                retrieved_at=ts, offer_id="bad-u", is_alternate=False,
+            ),
+        ]
+        with self.assertRaisesRegex(
+            CFBRunMachineError,
+            "CFB_TEAM_TOTAL_ENTITY_UNRESOLVED:1001:Unknown State",
+        ):
+            self.manual(
+                mode="MANUAL",
+                season=2026,
+                week=1,
+                model=model(),
+                now=NOW,
+                games=self.games,
+                metrics=self.metrics,
+                quotes=bad,
+                n_paths=50,
+                root_seed=44,
+            )
 
     def test_manual_requires_frozen_fbs_membership(self):
         with self.assertRaisesRegex(Exception,"CFB_MANUAL_FBS_MEMBERSHIP_REQUIRED"):
