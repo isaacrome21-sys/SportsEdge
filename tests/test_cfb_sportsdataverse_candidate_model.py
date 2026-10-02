@@ -24,3 +24,14 @@ def test_all_four_native_families_have_finite_vectors_without_legacy_metrics():
   assert np.all(np.isfinite(v))
   assert len(v)==len(feature_names(family))
   assert not any(x in feature_names(family) for x in ("home_eckel_rate","home_points_per_eckel","home_points_per_drive"))
+
+
+def test_week0_equal_weight_uses_prior_fallback_contract():
+ r=row()
+ r["week"]=0
+ r["home_metrics"]=prior(.05)
+ r["away_metrics"]=prior(.15)
+ r["home_current_metrics"]={**prior(.05),"season":2025,"through_week":-1,"games_in_sample":0,"sample_source":"CURRENT_SEASON_EMPTY_PRIOR_VALUES"}
+ r["away_current_metrics"]={**prior(.15),"season":2025,"through_week":-1,"games_in_sample":0,"sample_source":"CURRENT_SEASON_EMPTY_PRIOR_VALUES"}
+ v=feature_vector("EQUAL_WEIGHT_HARD_SWITCH",r,{})
+ assert np.all(np.isfinite(v))
