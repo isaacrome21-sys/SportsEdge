@@ -38,8 +38,9 @@ from sportsedge.sports.cfb.sportsdataverse_weather_transport import (
     VENUE_SOURCE_URL,
     kickoff_date,
     request_params,
+    resolve_venue,
     select_kickoff_hour,
-    venue_index,
+    venue_indexes,
 )
 
 UA = "SportsEdge-CFB-SDV/1"
@@ -105,6 +106,7 @@ def _evaluated_games(schedules: list[dict]) -> list[dict]:
             "game_id": gid,
             "season": season,
             "venue_id": venue_id,
+            "venue_name": str(raw.get("venue") or "").strip(),
             "start_date": kickoff,
         })
     if not out:
@@ -145,25 +147,33 @@ def _window_job(*, season: int, venue: dict, games: list[dict]):
     bound = bind_weather_rows(raw, rows, source_id=WEATHER_SOURCE_ID)
     return rows, {
         "season": season,
-        "venue_id": int(venue["venue_id"]),
+        "stadium_id": str(venue["stadium_id"]),
+        "cfbd_venue_id": venue.get("venue_id"),
         "request": params,
         **bound.to_dict(),
     }
 
 
 def _historical_weather(*, games: list[dict], venue_raw: bytes, workers: int):
-    venues = venue_index(venue_raw)
+    by_id, by_name = venue_indexes(venue_raw)
     rows: list[dict] = []
-    grouped: dict[tuple[int, int], list[dict]] = {}
-    missing_venues = []
+    grouped: dict[tuple[int, str], dict] = {}
+    resolutions = {"CFBD_VENUE_ID": 0, "PINNED_EXACT_NAME_OR_ALIAS": 0}
 
     for game in games:
-        venue = venues.get(int(game["venue_id"]))
-        if venue is None:
-            missing_venues.append(
-                f"{game['game_id']}:{game['venue_id']}"
+        try:
+            venue, resolution = resolve_venue(
+                by_id=by_id,
+                by_name=by_name,
+                venue_id=int(game["venue_id"]),
+                venue_name=str(game.get("venue_name") or ""),
             )
-            continue
+        except Exception as exc:
+            raise RuntimeError(
+                "CFB_SDV_HISTORICAL_VENUE_INCOMPLETE:"
+                f"{game['game_id']}:{game['venue_id']}:{game.get('venue_name','')}"
+            ) from exc
+        resolutions[resolution] = resolutions.get(resolution, 0) + 1
         if venue["game_indoor"]:
             rows.append(
                 select_kickoff_hour(
@@ -174,24 +184,19 @@ def _historical_weather(*, games: list[dict], venue_raw: bytes, workers: int):
                 )
             )
         else:
-            grouped.setdefault(
-                (int(game["season"]), int(game["venue_id"])), []
-            ).append(game)
-
-    if missing_venues:
-        raise RuntimeError(
-            "CFB_SDV_HISTORICAL_VENUE_INCOMPLETE:" + ",".join(missing_venues[:20])
-        )
+            key = (int(game["season"]), str(venue["stadium_id"]))
+            bucket = grouped.setdefault(key, {"venue": venue, "games": []})
+            bucket["games"].append(game)
 
     jobs = []
     with ThreadPoolExecutor(max_workers=max(1, int(workers))) as pool:
-        for (season, venue_id), group in sorted(grouped.items()):
+        for (season, _stadium_id), bucket in sorted(grouped.items()):
             jobs.append(
                 pool.submit(
                     _window_job,
                     season=season,
-                    venue=venues[venue_id],
-                    games=group,
+                    venue=bucket["venue"],
+                    games=bucket["games"],
                 )
             )
         receipts = []
@@ -212,7 +217,11 @@ def _historical_weather(*, games: list[dict], venue_raw: bytes, workers: int):
             "CFB_SDV_HISTORICAL_WEATHER_COVERAGE_MISMATCH:"
             f"missing={missing[:20]}:extra={extra[:20]}"
         )
-    return rows, sorted(receipts, key=lambda r: (r["season"], r["venue_id"]))
+    return (
+        rows,
+        sorted(receipts, key=lambda r: (r["season"], r["stadium_id"])),
+        resolutions,
+    )
 
 
 def main() -> int:
@@ -246,7 +255,7 @@ def main() -> int:
     if sha256(venue_raw).hexdigest() != VENUE_SOURCE_SHA256:
         raise SystemExit("CFB_SDV_VENUE_SOURCE_HASH_MISMATCH")
 
-    weather, window_receipts = _historical_weather(
+    weather, window_receipts, venue_resolutions = _historical_weather(
         games=games,
         venue_raw=venue_raw,
         workers=args.weather_workers,
@@ -271,6 +280,7 @@ def main() -> int:
                 "byte_count": len(venue_raw),
             },
             "outdoor_windows": window_receipts,
+            "venue_resolution_counts": venue_resolutions,
             "normalized_row_count": len(weather),
             "normalized_rows_sha256": sha256(
                 json.dumps(
