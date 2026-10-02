@@ -67,6 +67,69 @@ class TestCFBAcquisitionReadiness(unittest.TestCase):
         self.assertIn("CACHE_RESPONSE_SHA256_INVALID:0", out["blockers"])
         self.assertIn("CACHE_RETRIEVAL_TIMESTAMP_MISSING:0", out["blockers"])
 
+
+    def public_verified(self):
+        return {
+            "schema": "CFB_RECONSTRUCTED_ACQUISITION_READINESS_PUBLIC_V1",
+            "status": "ACQUISITION_COMPLETE_READY_FOR_SELECTION",
+            "account_info_verified": True,
+            "tier_quota_mapping_verified": True,
+            "call_plan_fits_verified_quota": True,
+            "planned_new_calls": 100,
+            "retry_reserve_calls": 25,
+            "verified_cache_reuse": True,
+            "resume_from_verified_cache": True,
+            "restart_from_2015": False,
+            "retry_backoff": True,
+            "source_manifest_sha256": "c" * 64,
+            "preflight_proof_sha256": "d" * 64,
+            "cache_manifest": [
+                cache_entry(),
+                {
+                    "endpoint": "/venues",
+                    "season": None,
+                    "end_week": None,
+                    "provider_contract": "CFBD_VENUES_LOCATION_DOME_V1",
+                    "query_sha256": "e" * 64,
+                    "response_sha256": "f" * 64,
+                    "retrieved_at_utc": "2026-09-12T20:00:00+00:00",
+                },
+            ],
+            "authority": {
+                "attempt_consumed": False,
+                "evaluation_performed": False,
+                "historical_pit_created": False,
+                "model_p_created": False,
+                "truth_gate_authority": False,
+                "promotion_authority": False,
+                "staking_authority": False,
+                "eligibility_changed": False,
+                "official_authority": False,
+                "backfill": False,
+            },
+        }
+
+    def test_redacted_public_proof_allows_readiness_without_exposing_quota_values(self):
+        out = audit_cfb_acquisition_readiness(self.policy(), self.public_verified())
+        self.assertEqual(out["status"], "READY_FOR_HISTORICAL_REPLAY")
+        self.assertEqual(out["blockers"], [])
+        self.assertTrue(out["public_proof"])
+        self.assertIsNone(out["monthly_quota"])
+        self.assertIsNone(out["remaining_quota"])
+        self.assertEqual(out["verified_cache_entries"], 2)
+
+    def test_redacted_public_proof_fails_closed_on_unverified_quota_fit(self):
+        manifest = self.public_verified()
+        manifest["call_plan_fits_verified_quota"] = False
+        out = audit_cfb_acquisition_readiness(self.policy(), manifest)
+        self.assertIn("CALL_PLAN_QUOTA_FIT_UNVERIFIED", out["blockers"])
+
+    def test_redacted_public_proof_rejects_authority_leak(self):
+        manifest = self.public_verified()
+        manifest["authority"]["promotion_authority"] = True
+        out = audit_cfb_acquisition_readiness(self.policy(), manifest)
+        self.assertIn("PUBLIC_ACQUISITION_AUTHORITY_LEAK", out["blockers"])
+
     def test_full_restart_from_2015_is_explicitly_blocked(self):
         manifest = self.verified()
         manifest["restart_from_2015"] = True
