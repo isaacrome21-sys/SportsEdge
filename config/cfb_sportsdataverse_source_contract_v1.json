@@ -1,0 +1,43 @@
+{
+  "schema": "CFB_SPORTSDATAVERSE_SOURCE_CONTRACT_V1",
+  "status": "FROZEN_BEFORE_FIRST_EVALUATION",
+  "source_identity": "SPORTSDATAVERSE_ESPN_CFB_ADV_V1|RECONSTRUCTED_PRIOR_WEEK_V1",
+  "upstream": {
+    "repository": "sportsdataverse/cfbfastR-cfb-data",
+    "provenance": "ESPN_DERIVED_RESHAPED_ENRICHED_GAME_DATA"
+  },
+  "training_window": {
+    "start_season": 2015,
+    "end_season": 2025,
+    "season_type": "REGULAR",
+    "classification": "FBS",
+    "no_2026_forward_outcomes": true
+  },
+  "allowed_predictive_datasets": [
+    "espn_cfb_schedules",
+    "espn_cfb_adv_team",
+    "espn_cfb_adv_drives",
+    "espn_cfb_adv_situational",
+    "espn_cfb_team_box"
+  ],
+  "prohibited_datasets": [
+    "espn_cfb_betting"
+  ],
+  "market_data_in_predictive_features": false,
+  "reconstructed_history_is_pit_evidence": false,
+  "temporal_rule": "FOR_GAME_WEEK_W_USE_ONLY_PRIOR_SEASON_OR_CURRENT_SEASON_GAMES_WITH_WEEK_LT_W",
+  "candidate_families": [
+    "EQUAL_WEIGHT_HARD_SWITCH",
+    "RELIABILITY_WEIGHTED_HARD_SWITCH",
+    "PRIOR_CURRENT_BLEND",
+    "GAMES_IN_SAMPLE_FEATURE"
+  ],
+  "evaluation": "TEMPORAL_NESTED_EXPANDING_SEASON",
+  "governance": {
+    "evaluation_performed": false,
+    "attempt_consumed": false,
+    "model_p_created": false,
+    "promotion_authority": false,
+    "official_authority": false
+  }
+}
