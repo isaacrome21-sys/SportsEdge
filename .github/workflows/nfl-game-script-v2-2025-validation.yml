@@ -1,0 +1,129 @@
+name: nfl-game-script-v2-2025-validation
+
+on:
+  push:
+    branches:
+      - 'grok/nfl/game-script-v2-2025-validation'
+    paths:
+      - '.github/nfl_game_script_v2_2025_validation_once'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      EVIDENCE_GIT_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EVIDENCE_GIT_SHA }}
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Install frozen test dependency
+        run: python -m pip install --disable-pip-version-check pytest==9.1.1
+
+      - name: Compile one-look validation surface
+        run: |
+          python -m py_compile \
+            sportsedge/research/nfl_game_script_v2_validate_2025.py \
+            scripts/validate_nfl_game_script_v2_2025.py \
+            tests/test_nfl_game_script_v2_validate_2025.py
+
+      - name: Run all validation contracts before 2025 access
+        run: >-
+          python -m pytest -q
+          tests/test_nfl_game_script_v2_prelock.py
+          tests/test_nfl_game_script_v2_fit.py
+          tests/test_nfl_game_script_v2_validate_2025.py
+
+      - name: Assert canonical fit and one-look lock before 2025 access
+        run: |
+          python - <<'PY'
+          from sportsedge.research.nfl_game_script_v2_validate_2025 import (
+              CANONICAL_ARTIFACT_SHA256,
+              CANONICAL_FIT_HEAD,
+              load_validation_lock,
+          )
+          cfg = load_validation_lock()
+          assert CANONICAL_ARTIFACT_SHA256 == "8452beb9f37afd4ac6dac3a6860824fd47c4adfa352b21d25ddcf6223135972a"
+          assert CANONICAL_FIT_HEAD == "0643f6761e4670a82fd095935a4c814258e755c7"
+          assert cfg["status"] == "FROZEN_BEFORE_2025_ACCESS"
+          assert cfg["one_look"]["no_second_2025_look"] is True
+          assert cfg["pregame_baseline"]["history_scope"] == "2025_REGULAR_SEASON_ONLY"
+          assert cfg["pregame_baseline"]["cross_season_carry"] is False
+          print("NFL_GAME_SCRIPT_V2_2025_ONE_LOOK_LOCK_OK")
+          PY
+
+      - name: Spend single frozen 2025 validation look
+        run: >-
+          python scripts/validate_nfl_game_script_v2_2025.py
+          --out artifacts/nfl_game_script_v2/nfl_game_script_v2_2025_validation.json
+          --summary-out artifacts/nfl_game_script_v2/nfl_game_script_v2_2025_validation_summary.json
+
+      - name: Enforce completed one-look result and research-only authority
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          result = json.loads(
+              Path(
+                  "artifacts/nfl_game_script_v2/"
+                  "nfl_game_script_v2_2025_validation.json"
+              ).read_text()
+          )
+          summary = json.loads(
+              Path(
+                  "artifacts/nfl_game_script_v2/"
+                  "nfl_game_script_v2_2025_validation_summary.json"
+              ).read_text()
+          )
+
+          if result.get("status") not in {"VALIDATION_PASS", "VALIDATION_FAIL"}:
+              raise SystemExit("NFL_GAME_SCRIPT_V2_2025_STATUS_INVALID")
+          if result.get("validation_window_spent") is not True:
+              raise SystemExit("NFL_GAME_SCRIPT_V2_2025_WINDOW_NOT_SPENT")
+          if result.get("canonical_fit_artifact_sha256") != "8452beb9f37afd4ac6dac3a6860824fd47c4adfa352b21d25ddcf6223135972a":
+              raise SystemExit("NFL_GAME_SCRIPT_V2_2025_FIT_IDENTITY_DRIFT")
+          if not result.get("source_receipt", {}).get("raw_sha256"):
+              raise SystemExit("NFL_GAME_SCRIPT_V2_2025_SOURCE_RECEIPT_MISSING")
+          if summary.get("validation_season") != 2025:
+              raise SystemExit("NFL_GAME_SCRIPT_V2_2025_SEASON_INVALID")
+          if summary.get("passed") is not result["metrics"]["passed"]:
+              raise SystemExit("NFL_GAME_SCRIPT_V2_2025_SUMMARY_DRIFT")
+
+          authority = result.get("authority") or {}
+          for field in (
+              "changes_attempt9_owner",
+              "creates_model_p",
+              "truth_gate_authority",
+              "official_authority",
+              "promotion_authority",
+              "staking_authority",
+          ):
+              if authority.get(field) is not False:
+                  raise SystemExit(f"NFL_GAME_SCRIPT_V2_2025_FORBIDDEN_AUTHORITY:{field}")
+
+          print(json.dumps({
+              "status": summary["status"],
+              "validation_window_spent": True,
+              "n_evaluated_team_games": summary["n_evaluated_team_games"],
+              "baseline": summary["baseline"],
+              "scripted": summary["scripted"],
+              "combined_mae_relative_improvement": summary["combined_mae_relative_improvement"],
+              "gates": summary["gates"],
+              "passed": summary["passed"],
+          }, sort_keys=True))
+          PY
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nfl-game-script-v2-2025-validation-${{ env.EVIDENCE_GIT_SHA }}
+          path: |
+            artifacts/nfl_game_script_v2/nfl_game_script_v2_2025_validation.json
+            artifacts/nfl_game_script_v2/nfl_game_script_v2_2025_validation_summary.json
+          if-no-files-found: error
+          retention-days: 90
