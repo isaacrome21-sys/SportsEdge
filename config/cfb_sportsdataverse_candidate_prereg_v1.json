@@ -81,5 +81,9 @@
     "model_p_created": false,
     "promotion_authority": false,
     "official_authority": false
+  },
+  "hash_binding": {
+    "code_manifest_sha256": "85cb695deb63ad3584208f73d422f7bf9d7575ab4d04f7f047656e073cf1ad40",
+    "config_bundle_sha256": "dbc93a46db6c284676a5785c7a12c63230422c57b3be4b196e0dd91d2c015d12"
   }
 }
