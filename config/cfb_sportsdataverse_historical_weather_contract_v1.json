@@ -4,8 +4,7 @@
   "purpose": "CONTEXT_FEATURES_ONLY",
   "schedule_source": "cfb_schedules",
   "join_identity": [
-    "game_id",
-    "start_date"
+    "game_id"
   ],
   "required_output": [
     "game_id",
@@ -14,9 +13,9 @@
     "temperature"
   ],
   "semantics": {
-    "indoor": "BOOLEAN_VENUE_CLASSIFICATION",
-    "wind_speed": "KICKOFF_HOURLY_WIND_SPEED_MPH",
-    "temperature": "KICKOFF_HOURLY_TEMPERATURE_F",
+    "indoor": "CFBD_GAME_INDOORS_BOOLEAN",
+    "wind_speed": "CFBD_GAME_WEATHER_WIND_SPEED_MPH",
+    "temperature": "CFBD_GAME_WEATHER_TEMPERATURE_F",
     "indoor_weather": "WIND_AND_TEMPERATURE_MAY_BE_NULL_ONLY_WHEN_GAME_INDOOR_TRUE"
   },
   "prohibited": [
@@ -34,15 +33,22 @@
     "official_authority": false
   },
   "provider": {
-    "source_id": "OPEN_METEO_ARCHIVE_V1",
-    "endpoint": "https://archive-api.open-meteo.com/v1/archive",
-    "hourly_variables": [
-      "temperature_2m",
-      "wind_speed_10m"
+    "source_id": "CFBD_GAMES_WEATHER_V1",
+    "endpoint": "https://api.collegefootballdata.com/games/weather",
+    "request_scope": "ONE_REGULAR_SEASON_AT_A_TIME_2015_2025",
+    "query_parameters": [
+      "year",
+      "seasonType=regular",
+      "classification=fbs"
     ],
-    "timezone": "UTC",
-    "temperature_unit": "fahrenheit",
-    "wind_speed_unit": "mph",
-    "selection": "NEAREST_KICKOFF_HOUR_NO_INTERPOLATION"
+    "fields": [
+      "id",
+      "gameIndoors",
+      "windSpeed",
+      "temperature"
+    ],
+    "join": "DIRECT_GAME_ID_TO_FROZEN_CFB_SCHEDULE",
+    "missing_game_policy": "FAIL_CLOSED",
+    "interpolation": false
   }
 }
