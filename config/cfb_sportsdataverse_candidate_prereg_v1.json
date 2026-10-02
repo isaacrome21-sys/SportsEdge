@@ -33,11 +33,8 @@
       "def_success_rate_allowed",
       "standard_down_ppa",
       "passing_down_success_rate",
-      "eckel_rate",
-      "points_per_eckel",
-      "points_per_drive",
-      "net_field_position",
-      "explosive_rate"
+      "explosive_rate",
+      "net_field_position"
     ],
     "contextual": [
       "home_field",
@@ -45,7 +42,15 @@
       "wind_speed",
       "temperature"
     ],
-    "market_features_prohibited": true
+    "market_features_prohibited": true,
+    "excluded_unverified_legacy_metrics": {
+      "eckel_rate": "NO_DIRECT_PER_GAME_SPORTSDATAVERSE_FIELD_VERIFIED",
+      "points_per_eckel": "NO_DIRECT_PER_GAME_SPORTSDATAVERSE_FIELD_VERIFIED",
+      "points_per_drive": "NO_DIRECT_PER_GAME_SPORTSDATAVERSE_FIELD_VERIFIED"
+    },
+    "defense_allowed_semantics": "SAME_GAME_OPPONENT_OFFENSE_METRICS_JOINED_BY_GAME_ID",
+    "temporal_cutoff": "ONLY_ROWS_WITH_WEEK_LT_TARGET_WEEK",
+    "adv_drives_time_rule": "JOIN_GAME_ID_TO_ESPN_CFB_SCHEDULES_BEFORE_WEEK_FILTER"
   },
   "training_window": {
     "start_season": 2015,
