@@ -130,17 +130,10 @@ def materialize_candidate_row(
     Unknown/unimplemented families fail closed. Supplying constants to the
     baseline is also rejected so no hidden tuning can enter the baseline bytes.
     """
-    constants = dict(constants or {})
     if family == FAMILY_EQUAL_WEIGHT_HARD_SWITCH:
-        if constants:
+        if constants not in (None, {}):
             raise CFBCandidateFamilyError("CFB_EQUAL_WEIGHT_BASELINE_CONSTANTS_PROHIBITED")
         return materialize_equal_weight_hard_switch(row)
-    if family == FAMILY_RELIABILITY_WEIGHTED_HARD_SWITCH:
-        return materialize_reliability_weighted_hard_switch(row, min_current_games=int(constants.get("min_current_games", 3)))
-    if family == FAMILY_PRIOR_CURRENT_BLEND:
-        return materialize_prior_current_blend(row, prior_equivalent_games=float(constants.get("prior_equivalent_games", 4.0)))
-    if family == FAMILY_GAMES_IN_SAMPLE_FEATURE:
-        return materialize_games_in_sample_feature(row, cap=int(constants.get("games_in_sample_cap", 12)), divisor=int(constants.get("normalization_divisor", 12)))
     raise CFBCandidateFamilyError(f"CFB_CANDIDATE_FAMILY_UNIMPLEMENTED:{family}")
 
 
@@ -152,62 +145,3 @@ __all__ = [
     "materialize_candidate_row",
     "materialize_equal_weight_hard_switch",
 ]
-
-
-def _dual_metrics(row: Mapping[str, Any], side: str) -> tuple[Mapping[str, Any], Mapping[str, Any], int]:
-    prior = row.get(f"{side}_prior_metrics")
-    current = row.get(f"{side}_current_metrics")
-    if not isinstance(prior, Mapping) or not isinstance(current, Mapping):
-        raise CFBCandidateFamilyError(f"CFB_CANDIDATE_DUAL_SNAPSHOT_REQUIRED:{side}")
-    missing = [key for key in TEAM_METRIC_KEYS if key not in prior or key not in current]
-    if missing:
-        raise CFBCandidateFamilyError(f"CFB_CANDIDATE_DUAL_METRIC_FIELDS_MISSING:{side}:{','.join(missing)}")
-    try:
-        games = int(current.get("games_in_sample", 0))
-    except (TypeError, ValueError) as exc:
-        raise CFBCandidateFamilyError(f"CFB_CANDIDATE_GAMES_IN_SAMPLE_INVALID:{side}") from exc
-    if games < 0:
-        raise CFBCandidateFamilyError(f"CFB_CANDIDATE_GAMES_IN_SAMPLE_INVALID:{side}")
-    return prior, current, games
-
-
-def _replace_metrics(row: Mapping[str, Any], chooser) -> dict[str, Any]:
-    out = deepcopy(dict(row))
-    _assert_market_blind({k: v for k, v in out.items() if k not in {"home_score","away_score","regulation_home_score","regulation_away_score"}})
-    for side in ("home", "away"):
-        prior, current, games = _dual_metrics(out, side)
-        chosen = dict(chooser(prior, current, games))
-        chosen["games_in_sample"] = games
-        out[f"{side}_metrics"] = chosen
-    return out
-
-
-def materialize_reliability_weighted_hard_switch(row: Mapping[str, Any], *, min_current_games: int = 3) -> dict[str, Any]:
-    if min_current_games != 3:
-        raise CFBCandidateFamilyError("CFB_RELIABILITY_CONSTANT_MISMATCH")
-    return _replace_metrics(row, lambda prior, current, games: current if games >= min_current_games else prior)
-
-
-def materialize_prior_current_blend(row: Mapping[str, Any], *, prior_equivalent_games: float = 4.0) -> dict[str, Any]:
-    if float(prior_equivalent_games) != 4.0:
-        raise CFBCandidateFamilyError("CFB_BLEND_CONSTANT_MISMATCH")
-    def choose(prior, current, games):
-        w = games / (games + prior_equivalent_games)
-        out = dict(current)
-        for key in TEAM_METRIC_KEYS:
-            out[key] = w * float(current[key]) + (1.0 - w) * float(prior[key])
-        return out
-    return _replace_metrics(row, choose)
-
-
-def materialize_games_in_sample_feature(row: Mapping[str, Any], *, cap: int = 12, divisor: int = 12) -> dict[str, Any]:
-    if cap != 12 or divisor != 12:
-        raise CFBCandidateFamilyError("CFB_GAMES_IN_SAMPLE_CONSTANT_MISMATCH")
-    out = _replace_metrics(row, lambda prior, current, games: current if games > 0 else prior)
-    for side in ("home", "away"):
-        games = int(out[f"{side}_metrics"]["games_in_sample"])
-        out[f"{side}_games_in_sample_feature"] = min(games, cap) / float(divisor)
-    return out
-
-
-
