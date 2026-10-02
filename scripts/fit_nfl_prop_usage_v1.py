@@ -9,9 +9,11 @@ from hashlib import sha256
 import io
 import json
 from pathlib import Path
-import subprocess
 import sys
 import tempfile
+
+import numpy as np
+
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,6 +27,7 @@ from sportsedge.research.nfl_prop_usage_v1_fit import (
     load_freeze,
     validate_artifact,
 )
+from scripts import build_nfl_attempt9_runtime_artifact as attempt9_runtime
 
 GAMES_URL = "https://github.com/nflverse/nflverse-data/releases/download/schedules/games.csv"
 PLAYER_URL = (
@@ -58,23 +61,140 @@ def _csv_rows(raw: bytes) -> list[dict[str, str]]:
 
 
 def _build_attempt9_runtime(temp_dir: Path) -> dict:
-    output = temp_dir / "attempt9.json"
-    subprocess.run(
+    """Materialize frozen Attempt-9 without re-solving its ridge coefficients.
+
+    The original selected coefficients and holdout prediction hashes are frozen
+    in build_nfl_attempt9_runtime_artifact.py / public_training_sources_v1.json.
+    Re-solving the same ridge system can differ in the last ULP across hosted
+    runner CPU/SIMD surfaces. This adapter instead injects the exact frozen
+    coefficients and still requires the original holdout prediction SHA256 and
+    RMSE to reproduce exactly before the prop fit may proceed.
+    """
+    source_config = ROOT / "config" / "public_training_sources_v1.json"
+    config = json.loads(source_config.read_text())
+    source = config["sources"]["nfl_attempt9"]
+
+    raw, source_receipt = _fetch(source["raw_url"])
+    if source_receipt["sha256"] != source["expected_sha256"]:
+        raise RuntimeError(
+            "PROP_V1_ATTEMPT9_SOURCE_SHA_MISMATCH:"
+            f"{source_receipt['sha256']}:{source['expected_sha256']}"
+        )
+
+    games = attempt9_runtime.parse_games(raw)
+    x, margin, total, dates = attempt9_runtime.build_features(games)
+    if len(games) != 2560 or len(x) != 2467:
+        raise RuntimeError(
+            f"PROP_V1_ATTEMPT9_ROWCOUNT_MISMATCH:{len(games)}:{len(x)}"
+        )
+
+    holdout = np.asarray(
         [
-            sys.executable,
-            str(ROOT / "scripts" / "build_nfl_attempt9_runtime_artifact.py"),
-            "--output",
-            str(output),
+            attempt9_runtime.HOLDOUT_START <= int(date[:4]) <= attempt9_runtime.HOLDOUT_END
+            for date in dates
         ],
-        cwd=ROOT,
-        check=True,
+        dtype=bool,
     )
-    artifact = json.loads(output.read_text())
-    if artifact.get("status") != "RECONSTRUCTED_FROZEN_OWNER_RUNTIME_NOT_MODEL_P":
-        raise RuntimeError("PROP_V1_ATTEMPT9_RUNTIME_STATUS_INVALID")
-    digest = str(artifact.get("artifact_sha256") or "")
-    if len(digest) != 64:
-        raise RuntimeError("PROP_V1_ATTEMPT9_RUNTIME_SHA_MISSING")
+    if int(holdout.sum()) != attempt9_runtime.EXPECTED_HOLDOUT_COUNT:
+        raise RuntimeError(
+            f"PROP_V1_ATTEMPT9_HOLDOUT_COUNT_MISMATCH:{int(holdout.sum())}"
+        )
+
+    targets: dict[str, object] = {}
+    for name, y in (("margin", margin), ("total", total)):
+        x_train = x[~holdout]
+        y_train = y[~holdout]
+        x_holdout = x[holdout]
+        y_holdout = y[holdout]
+
+        mean = x_train.mean(axis=0)
+        std = x_train.std(axis=0)
+        std[std == 0] = 1.0
+        scaled_train = (x_train - mean) / std
+        scaled_holdout = (x_holdout - mean) / std
+
+        beta = np.asarray(attempt9_runtime.EXPECTED_COEFFICIENTS[name], dtype=float)
+        intercept = float(
+            y_train.mean() - scaled_train.mean(axis=0) @ beta
+        )
+        predictions = scaled_holdout @ beta + intercept
+        prediction_sha = attempt9_runtime._prediction_sha(predictions)
+        expected_prediction_sha = source["holdout_prediction_sha256"][name]
+        if prediction_sha != expected_prediction_sha:
+            raise RuntimeError(
+                "PROP_V1_ATTEMPT9_FIXED_BETA_PREDICTION_SHA_MISMATCH:"
+                f"{name}:actual={prediction_sha}:expected={expected_prediction_sha}"
+            )
+
+        rmse = float(np.sqrt(np.mean((predictions - y_holdout) ** 2)))
+        expected_rmse = attempt9_runtime.EXPECTED_HOLDOUT_RMSE[name]
+        if not np.isclose(rmse, expected_rmse, rtol=0.0, atol=0.0):
+            raise RuntimeError(
+                "PROP_V1_ATTEMPT9_FIXED_BETA_RMSE_MISMATCH:"
+                f"{name}:actual={rmse}:expected={expected_rmse}"
+            )
+
+        targets[name] = {
+            "alpha": float(attempt9_runtime.TARGETS[name]),
+            "feature_mean": [float(value) for value in mean],
+            "feature_std": [float(value) for value in std],
+            "coefficients": [float(value) for value in beta],
+            "coefficient_json": attempt9_runtime._float_list_json(beta),
+            "intercept": intercept,
+            "holdout_count": int(len(predictions)),
+            "holdout_rmse": rmse,
+            "holdout_prediction_sha256": prediction_sha,
+        }
+
+    artifact = {
+        "schema_version": "SPORTSEDGE_NFL_ATTEMPT9_RUNTIME_ARTIFACT_V1",
+        "status": "RECONSTRUCTED_FROZEN_OWNER_RUNTIME_NOT_MODEL_P",
+        "candidate": {
+            "selected_attempt": 9,
+            "feature_set": "exponential_recency_weighted_baseline",
+            "decay": attempt9_runtime.DECAY,
+            "training_seasons": [2010, 2016],
+            "historical_holdout_seasons": [2017, 2019],
+            "feature_names": attempt9_runtime.FEATURE_NAMES,
+        },
+        "source": {
+            "repository": source["repository"],
+            "commit": source["commit"],
+            "path": source["path"],
+            "sha256": source_receipt["sha256"],
+        },
+        "frozen_selection_provenance": {
+            "derivation_commit": source["derivation_commit"],
+            "actions_run_id": source["actions_run_id"],
+            "actions_artifact_id": source["actions_artifact_id"],
+            "actions_artifact_digest": source["actions_artifact_digest"],
+            "report_content_sha256": source["report_content_sha256"],
+        },
+        "runtime": {
+            "historical_numeric_environment": source["historical_numeric_environment"],
+            "reconstruction_method": "FROZEN_EXACT_COEFFICIENTS_NO_RIDGE_RESOLVE",
+            "targets": targets,
+        },
+        "authority": {
+            "creates_model_p": False,
+            "promotion_authority": False,
+            "truth_gate_pass": False,
+            "official_authority": False,
+            "staking_authority": False,
+            "market_prices_used_as_features": False,
+        },
+        "use": (
+            "PROP_V1_DEVELOPMENT_TEAM_SCORING_ENVIRONMENT_ONLY;"
+            "2025_VALIDATION_UNTOUCHED"
+        ),
+    }
+    canonical = json.dumps(
+        artifact, sort_keys=True, separators=(",", ":"), default=str
+    ).encode("utf-8")
+    artifact["artifact_sha256"] = sha256(canonical).hexdigest()
+
+    output = temp_dir / "attempt9.json"
+    output.write_text(json.dumps(artifact, indent=2, sort_keys=True) + "\n")
     return artifact
 
 
