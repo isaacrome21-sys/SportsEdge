@@ -6,7 +6,17 @@
   "supersedes_failed_candidate": {
     "candidate": "NFL_GAME_SCRIPT_V1",
     "reason": "V1 failed its predeclared fit-support gate because TIE had 18 team-games versus minimum 100.",
-    "v1_fit_window_exposed": [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024],
+    "v1_fit_window_exposed": [
+      2016,
+      2017,
+      2018,
+      2019,
+      2020,
+      2021,
+      2022,
+      2023,
+      2024
+    ],
     "v1_validation_2025_accessed": false,
     "reuse_v1_fit_window_for_v2_fit": false
   },
@@ -33,13 +43,29 @@
     ]
   },
   "fit_window": {
-    "seasons": [2011, 2012, 2013, 2014, 2015],
+    "seasons": [
+      2011,
+      2012,
+      2013,
+      2014,
+      2015
+    ],
     "season_type": "REG",
     "postseason_included": false,
     "reason": "Fresh development window not used by failed V1 and recent enough to avoid early-era PBP instability."
   },
   "excluded_from_v2_fit_or_selection": {
-    "seasons": [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024],
+    "seasons": [
+      2016,
+      2017,
+      2018,
+      2019,
+      2020,
+      2021,
+      2022,
+      2023,
+      2024
+    ],
     "reason": "Exposed by failed V1 development fit."
   },
   "validation_window": {
@@ -66,7 +92,10 @@
   },
   "model": {
     "family": "RIDGE_ON_FIXED_PIECEWISE_LINEAR_MARGIN_BASIS",
-    "target_outputs": ["PASS_MULTIPLIER", "RUSH_MULTIPLIER"],
+    "target_outputs": [
+      "PASS_MULTIPLIER",
+      "RUSH_MULTIPLIER"
+    ],
     "margin_input": "TEAM_FINAL_MARGIN",
     "basis": {
       "type": "HINGE_LINEAR",
@@ -79,16 +108,31 @@
         "max(0, margin - 7)",
         "max(0, margin - 14)"
       ],
-      "fixed_knots": [-14, -7, 0, 7, 14]
+      "fixed_knots": [
+        -14,
+        -7,
+        0,
+        7,
+        14
+      ]
     },
     "standardization": "TRAINING_FOLD_ONLY",
-    "ridge_alpha_grid": [0.1, 1.0, 10.0, 100.0],
+    "ridge_alpha_grid": [
+      0.1,
+      1,
+      10,
+      100
+    ],
     "alpha_selection": "LEAVE_ONE_SEASON_OUT_CV_ON_2011_2015_ONLY",
     "selection_metric": "EQUAL_WEIGHT_MEAN_OF_PASS_RATIO_AND_RUSH_RATIO_MAE",
     "monotonic_constraint": false,
     "post_fit_clipping": false,
-    "downstream_multiplier_range": [0.4, 1.8],
-    "out_of_range_behavior": "FAIL_CLOSED"
+    "downstream_multiplier_range": [
+      0.4,
+      1.8
+    ],
+    "out_of_range_behavior": "FAIL_CLOSED",
+    "alpha_tie_break": "SMALLEST_ALPHA"
   },
   "validation_application": {
     "pregame_baseline": "STRICTLY_PRIOR_8_TEAM_GAMES_EXP_DECAY_0.85",
