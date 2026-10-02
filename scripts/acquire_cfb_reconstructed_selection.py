@@ -111,6 +111,16 @@ def _request(endpoint: str, params: Mapping[str, Any], provider_contract: str) -
     return {**identity, "query_sha256": _sha(_canonical_bytes(identity))}
 
 
+def _current_end_weeks(config: Mapping[str, Any]) -> range:
+    """Return the exact frozen current-season endWeek surface."""
+    try:
+        except (KeyError, TypeError, ValueError) as exc:
+        raise CFBAcquisitionError("CFB_ACQUISITION_MAX_WEEK_INVALID") from exc
+    if max_week < 2:
+        raise CFBAcquisitionError("CFB_ACQUISITION_MAX_WEEK_INVALID")
+    return range(1, max_week)
+
+
 def build_request_plan(config: Mapping[str, Any]) -> list[dict[str, Any]]:
     """Build only the quota-bearing CFBD request plan."""
     start = int(config["selection_start_season"])
@@ -143,7 +153,7 @@ def build_request_plan(config: Mapping[str, Any]) -> list[dict[str, Any]]:
             "CFBD_STATS_SEASON_ADVANCED_ENDWEEK_V1",
         ))
     for season in range(start, end + 1):
-        for end_week in range(1, max_week):
+        for end_week in _current_end_weeks(config):
             out.append(_request(
                 "/stats/season/advanced",
                 {
@@ -620,7 +630,7 @@ def _build_private_payload(
                 ).to_dict())
 
     for season in range(2015, 2026):
-        for end_week in range(1, 20):
+        for end_week in _current_end_weeks(config):
             advanced, meta = by_identity[("/stats/season/advanced", season, end_week)]
             if not isinstance(advanced, list):
                 raise CFBAcquisitionError(f"CFB_ACQUISITION_ADVANCED_NOT_LIST:{season}:{end_week}")
