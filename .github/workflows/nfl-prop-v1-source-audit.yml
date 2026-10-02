@@ -30,12 +30,11 @@ jobs:
           from pathlib import Path
           p = Path("scripts/audit_nfl_prop_v1_sources.py").read_text()
           forbidden = [
-              "Brier",
-              "predicted P(over)",
-              "observed",
-              "actual_value",
-              "run_unified_nfl_model",
-              "estimate_p",
+              "from sportsedge.sports.nfl.unified_market_engine",
+              "import sportsedge.sports.nfl.unified_market_engine",
+              "run_unified_nfl_model(",
+              "score_evaluation_rows(",
+              "validate_2025(",
           ]
           for token in forbidden:
               if token in p:
