@@ -34,6 +34,7 @@ from .live_slate import LiveGame
 from .manual_hybrid_joint_runner import run_manual_hybrid_joint_mlb
 from .prediction_journal import normalize_legacy_block_reason
 from .mlb_edge_score import score_mlb_edge
+from .mlb_full_board import build_mlb_full_board
 from .mlb_market_dispositions import market_dispositions
 from .mlb_quote_pairing import pair_opposite_odds
 from .mlb_input_readiness import scored_input_readiness
@@ -229,6 +230,7 @@ def _summary(results: Sequence[MLBMachineResult]) -> dict[str, Any]:
         "official_bets": statuses.get("OFFICIAL_BET", 0),
         "blocked": statuses.get("BLOCKED", 0),
         "scored_market_dispositions": market_dispositions([asdict(x) for x in results]),
+        "full_board": build_mlb_full_board([asdict(x) for x in results]),
     }
 
 
