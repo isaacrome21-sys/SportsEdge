@@ -37,6 +37,7 @@ jobs:
           python -m pytest -q tests/test_nfl_play_level_attempt1.py
       - name: Spend Attempt 1 one-shot 2024 research validation
         run: |
+          set -o pipefail
           mkdir -p artifacts/nfl-play-level-attempt1
           python scripts/run_nfl_play_level_attempt1.py             --output artifacts/nfl-play-level-attempt1/result.json             | tee artifacts/nfl-play-level-attempt1/stdout.jsonl
       - name: Assert result authority stays zero
