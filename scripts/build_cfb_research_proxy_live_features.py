@@ -39,22 +39,28 @@ def _utc(value: str | None) -> datetime:
     return out.astimezone(timezone.utc)
 
 
-def _credentials() -> tuple[str, str]:
+def _credentials() -> tuple[str, list[str]]:
     cfbd = str(
         os.environ.get("SPORTSEDGE_CFBD_API_KEY")
         or os.environ.get("CFBD_API_KEY")
         or ""
     ).strip()
-    odds = str(
-        os.environ.get("SPORTSEDGE_ODDS_API_KEY")
-        or os.environ.get("ODDS_API_KEY")
-        or ""
-    ).strip()
+    odds_keys = [
+        str(os.environ.get(name) or "").strip()
+        for name in (
+            "SPORTSEDGE_ODDS_API_KEY",
+            "SPORTSEDGE_ODDS_API_KEY_2",
+            "SPORTSEDGE_ODDS_API_KEY_3",
+            "SPORTSEDGE_ODDS_API_KEY_4",
+            "ODDS_API_KEY",
+        )
+    ]
+    odds_keys = list(dict.fromkeys(key for key in odds_keys if key))
     if not cfbd:
         raise CFBResearchProxyUsageError("CFB_PROXY_CFBD_API_KEY_REQUIRED")
-    if not odds:
+    if not odds_keys:
         raise CFBResearchProxyUsageError("CFB_PROXY_ODDS_API_KEY_REQUIRED")
-    return cfbd, odds
+    return cfbd, odds_keys
 
 
 def _allowed_model_teams(path: Path | None) -> set[str] | None:
@@ -96,7 +102,7 @@ def main() -> int:
     args = ap.parse_args()
     now = _utc(args.asof)
     try:
-        cfbd_key, odds_key = _credentials()
+        cfbd_key, odds_keys = _credentials()
         season = int(args.season if args.season is not None else now.year)
         week = int(args.week) if args.week is not None else discover_cfb_week(
             season=season,
@@ -114,7 +120,7 @@ def main() -> int:
             season=season, cfbd_api_key=cfbd_key
         )
         # Provider identity only: event id/name/start, never price or line.
-        provider_events = fetch_odds_event_identities(api_key=odds_key)
+        provider_events = fetch_odds_event_identities(api_keys=odds_keys)
         live = build_research_proxy_live_features(
             games=games,
             team_rows=team_rows,
