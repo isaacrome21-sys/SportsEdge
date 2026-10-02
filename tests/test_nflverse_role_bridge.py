@@ -47,6 +47,9 @@ class NflverseRoleBridgeTests(unittest.TestCase):
         self.assertAlmostEqual(wr["role_prior"]["targets"], 9.0)
         self.assertAlmostEqual(wr["role_prior"]["catch_rate"], 12 / 18)
         self.assertAlmostEqual(wr["receiving_td_share"], 1.0)
+        self.assertAlmostEqual(out["team_scoring"]["CHI"]["passing_tds"], 2.0)
+        self.assertAlmostEqual(out["team_scoring"]["CHI"]["rushing_tds"], 1.0)
+        self.assertAlmostEqual(out["team_scoring"]["CHI"]["pass_td_share"], 2 / 3)
 
     def test_rejects_target_week_row(self):
         rows = self._rows()

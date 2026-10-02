@@ -4,7 +4,7 @@ import hashlib,json
 from math import isfinite
 from typing import Any,Mapping,Sequence
 from .mlb_empirical_bayes import effective_sample_size,feasible_settlements,posterior_settlement_mass
-ENGINE_VERSION="mlb_hitter_joint_empirical_bayes_v4"
+ENGINE_VERSION="mlb_hitter_joint_empirical_bayes_v5"
 HITTER_MARKETS=frozenset({"HITS","HOME_RUNS","TOTAL_BASES","RBI","RUNS","STOLEN_BASES","BATTER_BB","EXTRA_BASE_HITS","SINGLES","DOUBLES","TRIPLES","BATTER_K","HITS_RUNS_RBIS","HITS_RUNS_STOLEN_BASES","RUNS_RBIS","HITS_STOLEN_BASES","HITS_WALKS_STOLEN_BASES"})
 class HitterJointEngineError(ValueError):pass
 def _f(v:Any,name:str,lo:float=0.0)->float:
@@ -31,7 +31,9 @@ def _normalize_pool(raw:Any)->list[dict[str,int]]:
         if row["singles"]+row["doubles"]+row["triples"]+row["home_runs"]!=row["hits"]:raise HitterJointEngineError(f"history_pool[{i}] hit-type sum mismatch")
         if row["doubles"]+row["triples"]+row["home_runs"]!=row["extra_base_hits"]:raise HitterJointEngineError(f"history_pool[{i}] XBH arithmetic mismatch")
         if row["singles"]+2*row["doubles"]+3*row["triples"]+4*row["home_runs"]!=row["total_bases"]:raise HitterJointEngineError(f"history_pool[{i}] total-base arithmetic mismatch")
-        if row["runs"]>pa or row["rbi"]>4*pa:raise HitterJointEngineError(f"history_pool[{i}] violates run/RBI support")
+        # A player can enter as a pinch runner, score, and later record plate
+        # appearances. That makes runs == PA + 1 legal; larger gaps are not.
+        if row["runs"]>pa+1 or row["rbi"]>4*pa:raise HitterJointEngineError(f"history_pool[{i}] violates run/RBI support")
         rows.append(row)
     if len(rows)<10:raise HitterJointEngineError(f"history_pool requires at least 10 prior games; got {len(rows)}")
     return rows
