@@ -21,6 +21,8 @@ from typing import Any, Callable, Iterable, Mapping, Sequence
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from sportsedge.odds_keyring import OddsKeyringError, fetch_with_key_failover
+
 from .source import (
     CFBGame,
     _auth,
@@ -97,42 +99,47 @@ def fetch_cfbd_player_usage(
 
 def fetch_odds_event_identities(
     *,
-    api_key: str,
+    api_keys: Sequence[str],
     opener: Callable = urlopen,
 ) -> list[dict[str, Any]]:
     """Fetch provider event identity only; no market, line, price, or consensus."""
-    key = str(api_key or "").strip()
-    if not key:
-        raise CFBResearchProxyUsageError("CFB_PROXY_ODDS_API_KEY_REQUIRED")
-    url = ODDS_EVENTS_URL + "?" + urlencode(
-        {"apiKey": key, "dateFormat": "iso"}
-    )
-    try:
-        with opener(
-            Request(
-                url,
-                headers={
-                    "Accept": "application/json",
-                    "User-Agent": "SportsEdge-CFB-Proxy-Usage/1",
-                },
-            ),
-            timeout=20,
-        ) as response:
-            raw = response.read()
-    except Exception as exc:
-        raise CFBResearchProxyUsageError(
-            f"CFB_PROXY_EVENT_IDENTITY_FETCH_FAILED:{type(exc).__name__}"
-        ) from exc
-    try:
-        payload = json.loads(raw.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise CFBResearchProxyUsageError(
-            "CFB_PROXY_EVENT_IDENTITY_JSON_INVALID"
-        ) from exc
-    if not isinstance(payload, list):
-        raise CFBResearchProxyUsageError(
-            "CFB_PROXY_EVENT_IDENTITY_RESPONSE_NOT_LIST"
+    def _fetch(key: str) -> Any:
+        url = ODDS_EVENTS_URL + "?" + urlencode(
+            {"apiKey": key, "dateFormat": "iso"}
         )
+        try:
+            with opener(
+                Request(
+                    url,
+                    headers={
+                        "Accept": "application/json",
+                        "User-Agent": "SportsEdge-CFB-Proxy-Usage/1",
+                    },
+                ),
+                timeout=20,
+            ) as response:
+                raw = response.read()
+        except Exception as exc:
+            raise CFBResearchProxyUsageError(
+                f"CFB_PROXY_EVENT_IDENTITY_FETCH_FAILED:{type(exc).__name__}"
+            ) from exc
+        try:
+            payload = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise CFBResearchProxyUsageError(
+                "CFB_PROXY_EVENT_IDENTITY_JSON_INVALID"
+            ) from exc
+        if not isinstance(payload, list):
+            raise CFBResearchProxyUsageError(
+                "CFB_PROXY_EVENT_IDENTITY_RESPONSE_NOT_LIST"
+            )
+        return payload
+
+    try:
+        payload = fetch_with_key_failover(api_keys, _fetch).value
+    except OddsKeyringError as exc:
+        raise CFBResearchProxyUsageError(str(exc)) from exc
+
     out = []
     for row in payload:
         if not isinstance(row, Mapping):
