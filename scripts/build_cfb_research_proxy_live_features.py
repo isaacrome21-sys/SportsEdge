@@ -19,6 +19,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.run_cfb_auto import discover_cfb_week
+from sportsedge.sports.cfb.prop_bundle import load_cfb_prop_artifact_bundle
 from sportsedge.sports.cfb.research_proxy_usage import (
     CFBResearchProxyUsageError,
     build_research_proxy_live_features,
@@ -60,7 +61,10 @@ def _allowed_model_teams(path: Path | None) -> set[str] | None:
     if path is None:
         return None
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload = load_cfb_prop_artifact_bundle(
+            root=ROOT,
+            bundle_path=path,
+        )
     except Exception as exc:
         raise CFBResearchProxyUsageError(
             "CFB_PROXY_MODEL_ARTIFACT_UNREADABLE"
