@@ -82,3 +82,20 @@ def test_missing_hour_fails_closed():
             kickoff_utc="2025-09-07T00:20:00Z",
             game_indoor=False,
         )
+
+
+def test_exact_name_fallback_resolves_when_cfbd_id_is_not_bound(monkeypatch):
+    raw=_venue_csv()
+    monkeypatch.setattr(
+        "sportsedge.sports.cfb.sportsdataverse_weather_transport.VENUE_SOURCE_SHA256",
+        hashlib.sha256(raw).hexdigest(),
+    )
+    by_id,by_name=venue_indexes(raw)
+    venue,resolution=resolve_venue(
+        by_id=by_id,
+        by_name=by_name,
+        venue_id=999999,
+        venue_name="  Test   Stadium ",
+    )
+    assert venue["stadium_id"]=="x"
+    assert resolution=="PINNED_EXACT_NAME_OR_ALIAS"
