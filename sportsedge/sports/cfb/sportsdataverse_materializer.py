@@ -7,7 +7,8 @@ Emits the full dual-snapshot row contract required by all four candidate familie
                                                   or same as prior for week-1 rows
 
 Fail-closed policy:
-  Week 1, season 2015: row skipped (no 2014 data in frozen window).
+  Season 2015: bootstrap/source history only; no candidate row can be emitted
+  because the dual-snapshot families would require unavailable 2014 state.
   Week 1, season 2016+: prior-season snapshot REQUIRED; raises on missing.
   Week 2+: BOTH current-season W-1 AND prior-season snapshot REQUIRED;
             raises on either missing. Silent substitution is prohibited because
@@ -63,9 +64,11 @@ def materialize_native_candidate_inputs(
     Week 1 (season >= 2016): uses prior-season final snapshot as the authoritative
     pregame state (sample_source=PRIOR_SEASON_FALLBACK). Missing prior snapshot raises.
 
-    Week 1 (season == 2015): skipped -- no 2014 data in frozen acquisition window.
+    Season 2015: skipped for candidate rows -- the frozen acquisition starts in
+    2015, so no game in that season can satisfy the dual-snapshot 2014-prior-state
+    requirement. 2015 remains source history for 2016 prior-season fallbacks.
 
-    Week 2+: authoritative snapshot is current-season through_week W-1
+    Week 2+ (season >= 2016): authoritative snapshot is current-season through_week W-1
     (sample_source=CURRENT_SEASON_PRIOR_WEEKS). BOTH the current snapshot AND the
     prior-season snapshot MUST be present. Missing either raises -- silent substitution
     is prohibited because it would silently alter the registered model definition for
@@ -118,12 +121,13 @@ def materialize_native_candidate_inputs(
                     f"CFB_SDV_NEUTRAL_SITE_REQUIRED:{raw.get('game_id')}"
                 )
 
-        if week == 1:
-            if season == 2015:
-                # Frozen acquisition starts in 2015; no prior-season (2014) data.
-                # This boundary condition has no admissible predictive state.
-                continue
+        if season == 2015:
+            # Frozen acquisition starts in 2015; all four registered families share
+            # one population, and three require a prior-season snapshot. 2015 is
+            # therefore bootstrap/source history only, never a candidate row.
+            continue
 
+        if week == 1:
             # Week 1, season >= 2016: prior-season snapshot required.
             home_prior_snap = prior_idx.get((home_id, season - 1))
             away_prior_snap = prior_idx.get((away_id, season - 1))
