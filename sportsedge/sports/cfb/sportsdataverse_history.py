@@ -62,26 +62,22 @@ def validate_dataset(dataset: str, rows: Iterable[Mapping[str, Any]]) -> list[Ma
     return out
 
 
-def regular_fbs_schedule_rows(
-    rows: Iterable[Mapping[str, Any]], *, fbs_team_ids: Iterable[int]
-) -> list[Mapping[str, Any]]:
-    """Return only frozen regular-season FBS-vs-FBS games; fail closed on scope metadata."""
-    allowed={int(x) for x in fbs_team_ids}
-    if not allowed:
-        raise SportsDataverseHistoryError("CFB_SDV_FBS_ALLOWLIST_REQUIRED")
+def regular_fbs_schedule_rows(rows: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    """Return only frozen regular-season FBS-vs-FBS games using upstream scope flags."""
     out=[]
     for row in validate_dataset("espn_cfb_schedules", rows):
         if "season_type" not in row:
             raise SportsDataverseHistoryError("CFB_SDV_SEASON_TYPE_REQUIRED")
+        if "fbs_game" not in row or row["fbs_game"] is None:
+            raise SportsDataverseHistoryError("CFB_SDV_FBS_GAME_FLAG_REQUIRED")
         season_type=str(row["season_type"]).strip().lower()
         if season_type not in {"regular","2"}:
             continue
-        if "home_id" not in row or "away_id" not in row:
-            raise SportsDataverseHistoryError("CFB_SDV_SCHEDULE_TEAM_IDS_REQUIRED")
-        if int(row["home_id"]) in allowed and int(row["away_id"]) in allowed:
+        raw=row["fbs_game"]
+        is_fbs = raw is True or str(raw).strip().lower() in {"true","1","t"}
+        if is_fbs:
             out.append(row)
     return out
-
 
 def attach_drive_time(
     drive_rows: Iterable[Mapping[str, Any]],
