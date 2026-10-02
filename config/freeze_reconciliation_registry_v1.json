@@ -1057,10 +1057,22 @@
       "merge_sha": "03692b1c42f6c5cad8ffd1566b82fd24c9fcb460",
       "pr": 1371,
       "note": "Registers merged same-day CFB research-card runtime. Its covered CFB prop test change remains inside the already-REVOKED CFB prop freeze. No Model_P, Truth Gate, promotion, staking, evidence-clock, backfill, or OFFICIAL authority is restored or created."
+    },
+    {
+      "delta_id": "PR_1372_CFB_AUTO_PROXY_USAGE",
+      "merge_sha": "3bf02bdb9c489f1112677fc5d4113f3aa961b2eb",
+      "pr": 1372,
+      "note": "Registers merged automatic same-day CFB research proxy usage before prop prices. Covered CFB prop test changes remain inside the already-REVOKED CFB prop freeze. No Model_P, Truth Gate, promotion, staking, evidence-clock, backfill, or OFFICIAL authority is restored or created."
+    },
+    {
+      "delta_id": "PR_1374_CFB_PROP_IDENTITY_ISOLATION",
+      "merge_sha": "e0d5d452fb162761fdce16058d2839fd85e4337d",
+      "pr": 1374,
+      "note": "Registers merged row-level CFB sportsbook player-identity isolation in the research candidate lane. Covered CFB prop test bytes remain inside the already-REVOKED CFB prop freeze; the adapter change creates no Model_P, Truth Gate, promotion, staking, evidence-clock, or OFFICIAL authority."
     }
   ],
-  "inventory_block_reason": "Bundle inventory remains intentionally incomplete; PR_1358 boundary is registered and covered-drift bundles are revoked fail-closed.",
+  "inventory_block_reason": "Bundle inventory remains intentionally incomplete; current main through PR_1374 is registered, affected covered freezes remain revoked fail-closed, and this reconciliation grants zero model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "03692b1c42f6c5cad8ffd1566b82fd24c9fcb460",
+  "reconciled_through_sha": "e0d5d452fb162761fdce16058d2839fd85e4337d",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
