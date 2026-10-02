@@ -135,12 +135,11 @@ def price_game_market(
         line = _num(request.get("line"), "line")
 
         def verdict(home: int, away: int) -> int:
-            home_result = (home - away) + line
-            if abs(home_result) <= 1e-12:
+            selected_margin = (home - away) if selection == "home" else (away - home)
+            selected_result = selected_margin + line
+            if abs(selected_result) <= 1e-12:
                 return 0
-            home_cover = home_result > 0
-            selected_cover = home_cover if selection == "home" else not home_cover
-            return 1 if selected_cover else -1
+            return 1 if selected_result > 0 else -1
 
     elif market == "total":
         if selection not in {"over", "under"}:
