@@ -15,7 +15,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install source-probe dependencies
-        run: python -m pip install --disable-pip-version-check beautifulsoup4==4.14.2 pytest==9.1.1
+        run: python -m pip install --disable-pip-version-check beautifulsoup4==4.14.2 pandas==2.3.3 pyarrow==21.0.0 pytest==9.1.1
       - name: Compile and test before network access
         run: |
           python -m py_compile scripts/probe_nfl_prop_usage_v1_sources.py tests/test_nfl_prop_usage_v1_source_admission.py
