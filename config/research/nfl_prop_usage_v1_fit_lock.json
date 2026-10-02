@@ -1,0 +1,197 @@
+{
+  "schema": "SPORTSEDGE_NFL_PROP_USAGE_V1_FIT_LOCK",
+  "status": "FROZEN_BEFORE_2025_PROP_OUTCOME_ACCESS",
+  "frozen_date": "2026-10-01",
+  "owner_prelock": {
+    "pr": 1250,
+    "path": "docs/research/nfl_prop_usage_v1_prelock.md"
+  },
+  "role": "RESEARCH_ONLY",
+  "development": {
+    "seasons": [
+      2021,
+      2022,
+      2023,
+      2024
+    ],
+    "season_type": "REG",
+    "source": "nflverse weekly player stats",
+    "uri_template": "https://github.com/nflverse/nflverse-data/releases/download/stats_player/stats_player_week_{season}.csv",
+    "exact_raw_sha256_required": true,
+    "market_data_in_fit": false
+  },
+  "model": {
+    "family": "FIXED_VOLUME_EFFICIENCY_MONTE_CARLO_V1",
+    "positions": [
+      "QB",
+      "RB",
+      "WR",
+      "TE"
+    ],
+    "player_history": {
+      "lookback_appearances": 8,
+      "decay": 0.85,
+      "cross_season_carry": true,
+      "strictly_prior": true,
+      "minimum_prior_appearances": 3
+    },
+    "prior": {
+      "identity": "PREVIOUS_SEASON_POSITION_REGULAR_SEASON",
+      "target_season_minus_one": true,
+      "rookie_fallback": "POSITION_PRIOR_ONLY"
+    },
+    "primitives": {
+      "passing_yards": [
+        "pass_attempts",
+        "completion_rate",
+        "yards_per_completion"
+      ],
+      "rushing_yards": [
+        "rush_attempts",
+        "yards_per_carry"
+      ],
+      "receiving_yards": [
+        "targets",
+        "catch_rate",
+        "yards_per_reception"
+      ]
+    },
+    "shrinkage": {
+      "count_equivalent_games": 4,
+      "completion_rate_pseudo_attempts": 60,
+      "catch_rate_pseudo_targets": 30,
+      "yards_per_completion_pseudo_completions": 40,
+      "yards_per_carry_pseudo_carries": 40,
+      "yards_per_reception_pseudo_receptions": 30,
+      "tuned_on_2025": false,
+      "hyperparameter_search": false
+    },
+    "simulation": {
+      "n_sims": 20000,
+      "volume_family": "POISSON",
+      "completion_family": "BINOMIAL",
+      "reception_family": "BINOMIAL",
+      "yard_event_family": "GAMMA",
+      "gamma_shape": 2,
+      "deterministic_seed": "SHA256(game_id|player_id|market|candidate_id) first 64 bits",
+      "candidate_id": "NFL_PROP_USAGE_V1_FIXED_20261001"
+    },
+    "market_scopes": {
+      "player_pass_yds": [
+        "QB"
+      ],
+      "player_rush_yds": [
+        "QB",
+        "RB"
+      ],
+      "player_reception_yds": [
+        "RB",
+        "WR",
+        "TE"
+      ]
+    }
+  },
+  "market_binding": {
+    "provider": "DraftKings",
+    "source_repo": "emets393/new-wagerproof",
+    "source_commit": "d3fbfe1bece2f095e775f08d476cc5936ba37e13",
+    "files": {
+      "props_rows": {
+        "sha256": "ad229c95138875440e4d37addb208dfa9829ea1f58386357bee29702b25621fd"
+      },
+      "props_rows_extra": {
+        "sha256": "812490cb635d2c49b150f03152e9d18ceaa713687cb74a35bbfe20d4f7e331d0"
+      }
+    },
+    "season": 2025,
+    "season_type": "REG",
+    "weeks": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18
+    ],
+    "selection": "LAST_PRE_KICKOFF_SNAPSHOT",
+    "lead_minutes": {
+      "gt": 0,
+      "lte": 15
+    },
+    "paired_over_under_required": true,
+    "book_required": "draftkings",
+    "line_used_for_grading_only": true
+  },
+  "lineup_gate": {
+    "source": "OFFICIAL_NFL_GAMEBOOK_PLUS_TIMESTAMPED_NFLVERSE_DEPTH",
+    "official_gamebook_not_active_required": true,
+    "gamebook_role": "HISTORICAL_ELIGIBILITY_GROUND_TRUTH_ONLY",
+    "gamebook_not_forward_capture": true,
+    "qb_pass_yards_requires_starting_qb": true,
+    "qb_starter_depth_dt_before_close_required": true,
+    "no_postgame_participation_inference": true,
+    "missing_or_unparseable_gamebook": "DROP_GAME_ZERO_ROWS",
+    "missing_qb_starter_receipt": "DROP_QB_PASS_ROWS"
+  },
+  "validation": {
+    "season": 2025,
+    "season_type": "REG",
+    "one_look": true,
+    "outcome_access_before_lock": false,
+    "metrics": {
+      "calibration": {
+        "definition": "10_EQUAL_WIDTH_BIN_ECE_OF_P_OVER_VS_OBSERVED_OVER",
+        "pooled_markets": [
+          "player_pass_yds",
+          "player_rush_yds",
+          "player_reception_yds"
+        ],
+        "max": 0.06
+      },
+      "brier": {
+        "candidate": "POOLED_ALL_ELIGIBLE_ROWS",
+        "comparator": "POSITION_MARKET_BASELINE_2021_2024_ONLY",
+        "pass_rule": "CANDIDATE_BRIER_LE_BASELINE_BRIER"
+      },
+      "inactive_missing": {
+        "pass_rule": "ZERO_ROWS_EMITTED_WHEN_OFFICIAL_NOT_ACTIVE_LIST_MISSING"
+      }
+    },
+    "baseline": {
+      "family": "POSITION_MARKET_ZERO_INFLATED_NORMAL",
+      "fit_seasons": [
+        2021,
+        2022,
+        2023,
+        2024
+      ],
+      "no_player_history": true,
+      "no_2025_fit": true
+    },
+    "all_gates_must_pass": true,
+    "failure_spends_window": true,
+    "no_post_result_retune": true,
+    "no_second_2025_look": true
+  },
+  "authority": {
+    "changes_attempt9_owner": false,
+    "creates_model_p": false,
+    "truth_gate": false,
+    "official": false,
+    "promotion": false,
+    "staking": false,
+    "backfill": false
+  }
+}
