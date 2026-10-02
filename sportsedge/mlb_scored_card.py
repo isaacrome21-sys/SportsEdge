@@ -177,7 +177,7 @@ def build_mlb_scored_card(rows: Sequence[Any], *, actionable_only: bool=False) -
                 reasons.append(EV_FLOOR_REASON)
             row["presentation_reason_codes"]=tuple(reasons)
         extreme_edge=False
-        if verified and edge is not None:
+        if verified and not is_empirical(row) and edge is not None:
             try:
                 extreme_edge=abs(float(edge)) >= MAX_UNCONFIRMED_EDGE
             except (TypeError, ValueError):
