@@ -96,7 +96,7 @@ def _pair_identity(market_key, outcomes):
     if market_key == "h2h":
         if len(set(names)) != 2 or any(not x for x in names):
             return None
-        return None
+        return "H2H"
     points = [_point(x) for x in outcomes]
     if market_key == "totals":
         if {x.lower() for x in names} != {"over", "under"}:
@@ -115,7 +115,7 @@ def _pair_identity(market_key, outcomes):
 
 def pair_probs(market_key, outcomes):
     identity = _pair_identity(market_key, outcomes)
-    if market_key != "h2h" and identity is None:
+    if identity is None:
         return None
     if len(outcomes) != 2:
         return None
