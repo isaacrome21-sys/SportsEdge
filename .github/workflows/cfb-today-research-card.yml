@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       usage_json:
-        description: Optional CFB_PROP_USAGE_INPUT_V1 JSON. Required for player-prop LEANs.
+        description: Optional strict CFB_PROP_USAGE_INPUT_V1 JSON. Blank attempts an automatic research proxy.
         required: false
         type: string
       game_model_artifact_json:
@@ -25,10 +25,13 @@ jobs:
       group: sportsedge-paid-odds-api
       cancel-in-progress: false
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 25
     env:
       ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
       SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+      SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
+      SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
+      SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
       CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
       SPORTSEDGE_CFBD_API_KEY: ${{ secrets.SPORTSEDGE_CFBD_API_KEY }}
       CFB_PAPER_BOARD_JSON: ${{ inputs.game_board_json }}
@@ -43,9 +46,30 @@ jobs:
       - name: Install test/runtime dependencies
         run: python -m pip install --disable-pip-version-check -r requirements-test.txt
 
+      # Player-football state is built before any prop price is fetched.
+      - name: Materialize strict PIT usage input when supplied
+        if: ${{ inputs.usage_json != '' }}
+        env:
+          USAGE_JSON: ${{ inputs.usage_json }}
+        run: |
+          mkdir -p artifacts/cfb
+          printf '%s' "$USAGE_JSON" > artifacts/cfb/cfb_prop_usage_input.json
+          python scripts/build_cfb_prop_live_features.py \
+            --usage-input artifacts/cfb/cfb_prop_usage_input.json \
+            --output artifacts/football/cfb_prop_live_features.json
+
+      - name: Build automatic market-blind research proxy usage
+        if: ${{ inputs.usage_json == '' }}
+        run: |
+          python scripts/build_cfb_research_proxy_live_features.py \
+            --horizon-hours 24 \
+            --output artifacts/football/cfb_prop_live_features.json || true
+
+      # Game-market context is independent of the player-usage builder above.
       - name: Build exact-line game market context
         run: |
-          python scripts/run_cfb_paper_market.py             --output artifacts/cfb/cfb_paper_market_card.json
+          python scripts/run_cfb_paper_market.py \
+            --output artifacts/cfb/cfb_paper_market_card.json
 
       - name: Materialize optional game-model artifact
         env:
@@ -54,27 +78,23 @@ jobs:
           if [ -n "$GAME_MODEL_ARTIFACT_JSON" ]; then
             mkdir -p artifacts/cfb
             printf '%s' "$GAME_MODEL_ARTIFACT_JSON" > artifacts/cfb/cfb_game_model_candidate.json
-            python scripts/run_cfb_game_model_candidate.py               --model-artifact artifacts/cfb/cfb_game_model_candidate.json               --output artifacts/run_it/cfb_game_model_candidate.json || true
+            python scripts/run_cfb_game_model_candidate.py \
+              --model-artifact artifacts/cfb/cfb_game_model_candidate.json \
+              --output artifacts/run_it/cfb_game_model_candidate.json || true
           else
             echo "No game-model artifact supplied; final card will use PAPER game context."
           fi
 
-      - name: Materialize optional PIT usage input
-        env:
-          USAGE_JSON: ${{ inputs.usage_json }}
-        run: |
-          if [ -n "$USAGE_JSON" ]; then
-            mkdir -p artifacts/cfb
-            printf '%s' "$USAGE_JSON" > artifacts/cfb/cfb_prop_usage_input.json
-            python scripts/build_cfb_prop_live_features.py               --usage-input artifacts/cfb/cfb_prop_usage_input.json               --output artifacts/football/cfb_prop_live_features.json
-          else
-            echo "No PIT usage input supplied; prop lane remains unavailable."
-          fi
-
+      # Prop prices are acquired only after a usage/live-feature file exists.
       - name: Run frozen CFB prop research candidate
-        if: ${{ inputs.usage_json != '' }}
         run: |
-          python scripts/run_cfb_prop_model_candidate.py             --live-features artifacts/football/cfb_prop_live_features.json             --output artifacts/run_it/cfb_prop_model_candidate.json || true
+          if [ -f artifacts/football/cfb_prop_live_features.json ]; then
+            python scripts/run_cfb_prop_model_candidate.py \
+              --live-features artifacts/football/cfb_prop_live_features.json \
+              --output artifacts/run_it/cfb_prop_model_candidate.json || true
+          else
+            echo "No valid CFB prop live-feature snapshot; prop lane stays blocked."
+          fi
 
       - name: Build same-day research card
         run: |
@@ -85,26 +105,41 @@ jobs:
           if [ -f artifacts/run_it/cfb_prop_model_candidate.json ]; then
             ARGS="$ARGS --prop-report artifacts/run_it/cfb_prop_model_candidate.json"
           fi
-          python scripts/build_cfb_today_research_card.py $ARGS             --output artifacts/run_it/cfb_today_research_card.json
+          python scripts/build_cfb_today_research_card.py $ARGS \
+            --output artifacts/run_it/cfb_today_research_card.json
 
       - name: Assert zero production authority
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
-          p=json.loads(Path("artifacts/run_it/cfb_today_research_card.json").read_text())
-          assert p["summary"]["official_bets"] == 0
-          assert p["governance"]["research_only"] is True
-          assert p["governance"]["promotion_authority"] is False
-          assert p["governance"]["official_authority"] is False
-          for row in p["rows"]:
+
+          card = json.loads(
+              Path("artifacts/run_it/cfb_today_research_card.json").read_text()
+          )
+          assert card["summary"]["official_bets"] == 0
+          assert card["governance"]["research_only"] is True
+          assert card["governance"]["promotion_authority"] is False
+          assert card["governance"]["official_authority"] is False
+          for row in card["rows"]:
               assert row["official_eligible"] is False
               if row["display_status"] == "PAPER":
                   assert row["model_p"] is None
+
+          feature_path = Path("artifacts/football/cfb_prop_live_features.json")
+          if feature_path.is_file():
+              live = json.loads(feature_path.read_text())
+              gov = live.get("governance") or {}
+              if gov.get("research_proxy_usage") is True:
+                  assert gov["sportsbook_prices_consumed"] is False
+                  assert gov["production_eligible"] is False
+                  assert gov["promotion_authority"] is False
+                  assert gov["official_eligible"] is False
+
           print(
               "CFB_TODAY_RESEARCH_ZERO_AUTHORITY "
-              f"game_lane={p['game_lane']} prop_lane={p['prop_lane']} "
-              f"rows={p['summary']['game_rows'] + p['summary']['prop_rows']}"
+              f"game_lane={card['game_lane']} prop_lane={card['prop_lane']} "
+              f"rows={card['summary']['game_rows'] + card['summary']['prop_rows']}"
           )
           PY
 
@@ -114,6 +149,7 @@ jobs:
           path: |
             artifacts/cfb/cfb_paper_market_card.json
             artifacts/cfb/cfb_game_model_candidate.json
+            artifacts/cfb/cfb_prop_usage_input.json
             artifacts/football/cfb_prop_live_features.json
             artifacts/run_it/cfb_game_model_candidate.json
             artifacts/run_it/cfb_prop_model_candidate.json
