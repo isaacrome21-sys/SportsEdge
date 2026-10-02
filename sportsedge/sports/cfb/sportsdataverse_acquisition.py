@@ -1,7 +1,6 @@
 """Pinned public SportsDataverse acquisition plan for frozen CFB history.
 
-This module only constructs and validates source identities. Network I/O and RDS
-parsing belong to the runner so tests remain deterministic.
+This module only constructs and validates source identities. Network I/O and CSV transport parsing belong to the runner so tests remain deterministic.
 """
 from __future__ import annotations
 from dataclasses import dataclass, asdict
