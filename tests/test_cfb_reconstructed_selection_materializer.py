@@ -9,6 +9,7 @@ from sportsedge.sports.cfb.reconstructed_selection import (
     materialize_reconstructed_selection_rows,
 )
 from sportsedge.sports.cfb.source import CFBTeamMetrics
+from scripts.materialize_cfb_reconstructed_selection import _public_acquisition_readiness
 
 
 def metric(team: str, season: int, through_week: int, source: str) -> CFBTeamMetrics:
@@ -101,6 +102,49 @@ class TestCFBReconstructedSelectionMaterializer(unittest.TestCase):
                 weather_by_game=self.weather,
                 fbs_membership_by_season={2015: [{"school": "Home"}]},
             )
+
+
+    def test_public_acquisition_readiness_redacts_quota_values_and_binds_hashes(self):
+        preflight = {
+            "status": "VERIFIED_BEFORE_FIRST_REPLAY_CALL",
+            "active_cfbd_tier": "STANDARD",
+            "patron_level": 1,
+            "monthly_quota": 1000,
+            "remaining_quota": 800,
+            "planned_new_calls": 100,
+            "retry_reserve_calls": 25,
+            "verified_cache_reuse": True,
+            "resume_from_verified_cache": True,
+            "restart_from_2015": False,
+            "retry_backoff": True,
+        }
+        source_manifest = {
+            "responses": [
+                {
+                    "endpoint": "/stats/season/advanced",
+                    "season": 2025,
+                    "end_week": 3,
+                    "provider_contract": "CFBD_STATS_SEASON_ADVANCED_ENDWEEK_V1",
+                    "query_sha256": "a" * 64,
+                    "response_sha256": "b" * 64,
+                    "retrieved_at_utc": "2026-10-01T12:00:00+00:00",
+                }
+            ]
+        }
+        proof = _public_acquisition_readiness(
+            preflight=preflight,
+            source_manifest=source_manifest,
+        )
+        self.assertEqual(
+            proof["status"],
+            "ACQUISITION_COMPLETE_READY_FOR_SELECTION",
+        )
+        self.assertTrue(proof["quota_values_redacted"])
+        self.assertNotIn("monthly_quota", proof)
+        self.assertNotIn("remaining_quota", proof)
+        self.assertEqual(len(proof["source_manifest_sha256"]), 64)
+        self.assertEqual(len(proof["preflight_proof_sha256"]), 64)
+        self.assertFalse(any(proof["authority"].values()))
 
     def test_bundle_manifest_is_selection_only_zero_authority(self):
         rows = [
