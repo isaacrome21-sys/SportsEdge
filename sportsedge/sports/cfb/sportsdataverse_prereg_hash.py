@@ -11,6 +11,7 @@ CODE_PATHS=(
  "sportsedge/sports/cfb/sportsdataverse_candidate_model.py",
  "sportsedge/sports/cfb/sportsdataverse_bakeoff.py",
  "sportsedge/sports/cfb/sportsdataverse_weather.py",
+ "sportsedge/sports/cfb/sportsdataverse_weather_receipts.py",
  "sportsedge/sports/cfb/sportsdataverse_history.py",
  "sportsedge/sports/cfb/sportsdataverse_manifest.py",
  "sportsedge/sports/cfb/sportsdataverse_materializer.py",
@@ -18,6 +19,7 @@ CODE_PATHS=(
 )
 CONFIG_PATHS=(
  "config/cfb_sportsdataverse_source_contract_v1.json",
+ "config/cfb_sportsdataverse_historical_weather_contract_v1.json",
 )
 class SDVPreregHashError(ValueError): pass
 
