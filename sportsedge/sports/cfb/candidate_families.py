@@ -151,7 +151,10 @@ __all__ = [
     "TEAM_METRIC_KEYS",
     "materialize_candidate_row",
     "materialize_equal_weight_hard_switch",
-]def _dual_metrics(row: Mapping[str, Any], side: str) -> tuple[Mapping[str, Any], Mapping[str, Any], int]:
+]
+
+
+def _dual_metrics(row: Mapping[str, Any], side: str) -> tuple[Mapping[str, Any], Mapping[str, Any], int]:
     prior = row.get(f"{side}_prior_metrics")
     current = row.get(f"{side}_current_metrics")
     if not isinstance(prior, Mapping) or not isinstance(current, Mapping):
