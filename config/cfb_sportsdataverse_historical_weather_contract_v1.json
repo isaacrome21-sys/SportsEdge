@@ -6,6 +6,7 @@
   "join_identity": [
     "game_id",
     "venue_id",
+    "venue",
     "start_date"
   ],
   "required_output": [
