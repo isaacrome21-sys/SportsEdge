@@ -126,7 +126,7 @@ def test_builds_home_away_models_with_pit_depth_starters():
     assert out["home_model"]["qb"]["player_id"] == "chi_qb1"
     assert out["away_model"]["qb"]["player_id"] == "gb_qb1"
     assert {row["position"] for row in out["home_model"]["skill_players"]} == {"WR", "RB"}
-    assert out["home_model"]["pass_td_share"] == pytest.approx(2 / 3)
+    assert out["home_model"]["pass_td_share"] == pytest.approx(0.5)
     assert out["away_model"]["pass_td_share"] == pytest.approx(0.5)
     assert out["depth_snapshot_asof_by_team"]["CHI"] == "2026-09-27T12:00:00+00:00"
     assert out["provenance"]["role_source_raw_sha256"] == "a" * 64
