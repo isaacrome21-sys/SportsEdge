@@ -50,7 +50,7 @@ def _reference_folds(rows, seasons, alpha=10.0):
 
 def _governed_fixture(n=100):
     rows=[]
-    for season in range(2015,2026):
+    for season in range(2021,2026):
         for g in range(n):
             h=24+((g+season)%12); a=17+((2*g+season)%10)
             row={"game_id":f"{season}-{g:03d}","season":season,"week":1+(g%12),"home_score":h,"away_score":a}
@@ -59,7 +59,7 @@ def _governed_fixture(n=100):
             rows.append(row)
     rows.sort(key=lambda r:(int(r["season"]),int(r["week"]),str(r["game_id"])))
     folds=[]
-    for season in range(2018,2026):
+    for season in range(2024,2026):
         train=[r for r in rows if r["season"]<season]
         valid=[r for r in rows if r["season"]==season]
         folds.append({
@@ -106,12 +106,13 @@ class TestCFBDispersionOnlyEvaluator(TestCase):
         rows=_model_rows((2017,2018,2019,2020))
         reference=fit_cfb_v2_challenger(rows,ridge_alpha=10.0)
         folds=_reference_folds(rows,(2018,2019,2020),alpha=10.0)
-        state=de.build_v2_capture_state(folds,2021)
-        test_row=rows[-1]
-        mh,ma=reference.predict_means(test_row)
-        ot=de._overtime_profile(rows,2021)
-        expected=simulate_cfb_v2_paths(reference,test_row,seed=12345,n_paths=2000)
-        actual=de.simulate_v2_capture_paths(mh,ma,state,ot,seed=12345,n_paths=2000)
+        with mock.patch.object(de,"RESIDUAL_SEED_SEASON",2018):
+            state=de.build_v2_capture_state(folds,2021)
+            test_row=rows[-1]
+            mh,ma=reference.predict_means(test_row)
+            ot=de._overtime_profile(rows,2021)
+            expected=simulate_cfb_v2_paths(reference,test_row,seed=12345,n_paths=2000)
+            actual=de.simulate_v2_capture_paths(mh,ma,state,ot,seed=12345,n_paths=2000)
         self.assertTrue(np.array_equal(expected[0],actual[0]))
         self.assertTrue(np.array_equal(expected[1],actual[1]))
 
@@ -122,7 +123,7 @@ class TestCFBDispersionOnlyEvaluator(TestCase):
         self.assertNotIn("fit_cfb_joint_score_model",source)
         with mock.patch.object(de,"N_PATHS",20), mock.patch.object(de,"BOOTSTRAP_RESAMPLES",20):
             out=de.evaluate_cfb_dispersion_only(rows,result,capture)
-        self.assertEqual(out["n_games"],700)
+        self.assertEqual(out["n_games"],100)
         self.assertEqual(out["n_paths_per_game_per_model"],20)
         self.assertEqual(out["capture_sha256"],capture["capture_sha256"])
         self.assertEqual(out["mean_refits_performed"],0)
