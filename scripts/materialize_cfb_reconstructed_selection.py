@@ -180,7 +180,7 @@ def _public_acquisition_readiness(
         "retry_reserve_calls": retry,
         "verified_cache_reuse": preflight.get("verified_cache_reuse"),
         "resume_from_verified_cache": preflight.get("resume_from_verified_cache"),
-        "restart_from_2015": preflight.get("restart_from_2015"),
+        "restart_from_selection_start": preflight.get("restart_from_selection_start"),
         "retry_backoff": preflight.get("retry_backoff"),
     }
     return {
@@ -193,7 +193,7 @@ def _public_acquisition_readiness(
         "retry_reserve_calls": retry,
         "verified_cache_reuse": preflight.get("verified_cache_reuse") is True,
         "resume_from_verified_cache": preflight.get("resume_from_verified_cache") is True,
-        "restart_from_2015": bool(preflight.get("restart_from_2015")),
+        "restart_from_selection_start": bool(preflight.get("restart_from_selection_start")),
         "retry_backoff": preflight.get("retry_backoff") is True,
         "source_manifest_sha256": canonical_sha256(source_manifest),
         "preflight_proof_sha256": canonical_sha256(private_proof),
