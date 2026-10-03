@@ -119,6 +119,15 @@ def evaluate_account(info: Mapping[str, Any], config: Mapping[str, Any]) -> tupl
     if not weather_transport_ready:
         blockers.append("CFB_RECONSTRUCTED_WEATHER_TRANSPORT_CONTRACT_INVALID")
 
+    try:
+        selection_start = int(config["selection_start_season"])
+        selection_end = int(config["selection_end_season"])
+        prior_fallback = int(config["prior_fallback_season"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise CFBProviderPreflightError("CFB_CFBD_PREFLIGHT_SELECTION_WINDOW_INVALID") from exc
+    if prior_fallback != selection_start - 1 or selection_end < selection_start:
+        raise CFBProviderPreflightError("CFB_CFBD_PREFLIGHT_SELECTION_WINDOW_INVALID")
+
     plan = config.get("planned_new_calls_upper_bound") or {}
     planned = int(plan.get("total", -1))
     reserve = int(config.get("retry_reserve_calls", -1))
@@ -159,6 +168,9 @@ def evaluate_account(info: Mapping[str, Any], config: Mapping[str, Any]) -> tupl
         "patron_level": patron_level,
         "monthly_quota": monthly_quota,
         "remaining_quota": remaining,
+        "selection_start_season": selection_start,
+        "selection_end_season": selection_end,
+        "prior_fallback_season": prior_fallback,
         "planned_new_calls": planned,
         "retry_reserve_calls": reserve,
         "cfbd_weather_entitled": patron_level >= 1,
@@ -182,6 +194,8 @@ def evaluate_account(info: Mapping[str, Any], config: Mapping[str, Any]) -> tupl
         "cfbd_weather_required_for_selection": False,
         "weather_source_contract": weather_contract,
         "weather_transport_ready": weather_transport_ready,
+        "frozen_selection_window": [selection_start, selection_end],
+        "prior_fallback_season": prior_fallback,
         "call_plan_fits": call_plan_fits,
         "capacity_bands": capacity_bands,
         "historical_replay_calls_performed": 0,
