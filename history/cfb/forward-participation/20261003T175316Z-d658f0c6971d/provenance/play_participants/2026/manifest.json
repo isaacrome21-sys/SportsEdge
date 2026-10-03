@@ -1,0 +1,30 @@
+{
+  "asset": {
+    "asset_id": 607477606,
+    "asset_name": "play_participants_2026.csv",
+    "browser_download_url": "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_cfb_play_participants/play_participants_2026.csv",
+    "dataset": "play_participants",
+    "release_id": 334089571,
+    "release_tag": "espn_cfb_play_participants",
+    "release_updated_at": "2026-10-03T15:26:39Z",
+    "season": 2026,
+    "sha256": "8fea17acecd7e53ebc6b9b4ac3f154e8751b6495196671114aad658f52bc0529",
+    "size": 15510930,
+    "usage": "PREDICTIVE_PARTICIPATION_INPUT"
+  },
+  "cache_relative_path": "play_participants/2026/play_participants_2026.csv",
+  "cache_reused": false,
+  "content_sha256": "8fea17acecd7e53ebc6b9b4ac3f154e8751b6495196671114aad658f52bc0529",
+  "contract": "CFB_PARTICIPATION_SOURCE_CAPTURE_V2",
+  "manifest_sha256": "c0e4e9b282c5a4ec06be169ad99bb889ea016a4051b6ab7d753cbc43571b770d",
+  "market_role": "PREDICTIVE_PARTICIPATION_INPUT",
+  "model_p_created": false,
+  "point_in_time_from_retrieval_forward": true,
+  "predictive_projection": null,
+  "promotion_authority": false,
+  "raw_market_data_present": false,
+  "raw_predictive_input_allowed": true,
+  "retrieved_at": "2026-10-03T17:53:12.629501+00:00",
+  "retroactive_point_in_time_claim": false,
+  "row_count": 53908
+}
