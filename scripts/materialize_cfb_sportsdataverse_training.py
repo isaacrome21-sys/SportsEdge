@@ -42,6 +42,7 @@ from sportsedge.sports.cfb.sportsdataverse_prereg_hash import CODE_PATHS, CONFIG
 from sportsedge.sports.cfb.sportsdataverse_receipts import receipt, validate_receipts
 from sportsedge.sports.cfb.sportsdataverse_training_rows import attach_training_labels
 from sportsedge.sports.cfb.sportsdataverse_venue_source import (
+    apply_pinned_venue_supplements,
     parse_pinned_venues,
     venue_source_attestation,
 )
@@ -347,12 +348,18 @@ def _venue_source(weather_contract: Mapping[str, Any], cache_root: Path):
         expected_git_blob_sha1=str(cfg.get("git_blob_sha1") or ""),
         expected_row_count=int(cfg.get("row_count") or 0),
     )
+    pinned_usable_rows=len(venues)
+    supplements=cfg.get("supplements") or []
+    venues=apply_pinned_venue_supplements(venues,supplements)
     return venues, {
-        **venue_source_attestation(raw, usable_rows=len(venues)),
+        **venue_source_attestation(raw, usable_rows=pinned_usable_rows),
         "repository": repo,
         "commit_sha": commit,
         "path": path,
         "url": url,
+        "supplements": supplements,
+        "supplement_count": len(supplements),
+        "combined_usable_rows": len(venues),
     }
 
 
