@@ -198,6 +198,32 @@ def build_team_snapshots(
     situ = [r for r in situ if eligible(r)]
     drives = [r for r in drives if eligible(r)]
 
+    # The public advanced feeds are not perfectly coextensive. Build one
+    # deterministic, market-blind common-complete game surface before any team
+    # aggregation: a game is usable only when the same two numeric team IDs are
+    # present in team, situational, and drive feeds. An incomplete game is
+    # excluded symmetrically for both teams; no value is imputed or name-joined.
+    def ids_by_game(rows: list[Mapping[str, Any]]) -> dict[int, set[int]]:
+        out: dict[int, set[int]] = defaultdict(set)
+        for row in rows:
+            out[int(row["game_id"])].add(_pos_team_id(row))
+        return out
+
+    team_ids = ids_by_game(team)
+    situ_ids = ids_by_game(situ)
+    drive_ids = ids_by_game(drives)
+    observed_game_ids = set(team_ids) | set(situ_ids) | set(drive_ids)
+    complete_game_ids = {
+        game_id
+        for game_id in observed_game_ids
+        if len(team_ids.get(game_id, set())) == 2
+        and team_ids.get(game_id, set()) == situ_ids.get(game_id, set())
+        and team_ids.get(game_id, set()) == drive_ids.get(game_id, set())
+    }
+    team = [r for r in team if int(r["game_id"]) in complete_game_ids]
+    situ = [r for r in situ if int(r["game_id"]) in complete_game_ids]
+    drives = [r for r in drives if int(r["game_id"]) in complete_game_ids]
+
     tg: dict[int, list[Mapping[str, Any]]] = defaultdict(list)
     sg: dict[int, list[Mapping[str, Any]]] = defaultdict(list)
     dg: dict[int, list[Mapping[str, Any]]] = defaultdict(list)
@@ -219,10 +245,10 @@ def build_team_snapshots(
     for team_id in sorted(tg):
         t, s, d = tg[team_id], sg.get(team_id, []), dg.get(team_id, [])
         if not s or not d:
-            raise SportsDataverseHistoryError(f"CFB_SDV_JOIN_COVERAGE_MISSING:{team_id}")
+            raise SportsDataverseHistoryError(f"CFB_SDV_COMMON_COMPLETE_SURFACE_INTERNAL_MISSING:{team_id}")
         game_ids = {int(r["game_id"]) for r in t}
         if {int(r["game_id"]) for r in s} != game_ids or {int(r["game_id"]) for r in d} != game_ids:
-            raise SportsDataverseHistoryError(f"CFB_SDV_JOIN_COVERAGE_MISMATCH:{team_id}")
+            raise SportsDataverseHistoryError(f"CFB_SDV_COMMON_COMPLETE_SURFACE_INTERNAL_MISMATCH:{team_id}")
         opp_team_rows = []
         opp_situ_rows = []
         for row in t:
