@@ -235,7 +235,8 @@ def _summary(results: Sequence[MLBMachineResult]) -> dict[str, Any]:
         "side_rows": board["summary"]["side_rows"],
         "total_rows": board["summary"]["total_rows"],
         "prop_rows": board["summary"]["prop_rows"],
-        "catalog_complete": board["summary"]["side_rows"] >= 4 and board["summary"]["total_rows"] >= 6 and board["summary"]["prop_rows"] >= 20 and board["summary"]["catalog_markets"] >= 38,
+        "both_sides": board["summary"]["both_sides"],
+        "catalog_complete": board["summary"]["both_sides"] is True and board["summary"]["side_rows"] >= 8 and board["summary"]["total_rows"] >= 12 and board["summary"]["prop_rows"] >= 40 and board["summary"]["catalog_markets"] >= 38,
     }
 
 

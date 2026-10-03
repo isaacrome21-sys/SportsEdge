@@ -16,7 +16,7 @@ from sportsedge.football_prop_extended_run_machine import PROVIDER_MARKETS
 from sportsedge.sports.cfb.team_total_readout import price_cfb_team_total
 from sportsedge.sports.nfl.team_totals import price_nfl_team_totals
 
-SCHEMA_VERSION = "FOOTBALL_FULL_BOARD_V2"
+SCHEMA_VERSION = "FOOTBALL_FULL_BOARD_V3"
 DEFAULT_SURFACE = Path("config/football_market_surface.json")
 _PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 
@@ -130,8 +130,9 @@ def _row(
         "family": raw.get("family"),
         "game_id": raw.get("game_id"),
         "entity_id": raw.get("entity_id") or raw.get("player_id") or raw.get("team_side"),
-        "selection": raw.get("selection") or raw.get("side") or raw.get("player_name"),
+        "selection": raw.get("selection") or raw.get("side") or raw.get("quoted_side") or raw.get("player_name"),
         "line": raw.get("line"),
+        "opposite_odds": raw.get("opposite_odds"),
         "american_odds": raw.get("american_odds") or raw.get("price_american"),
         "model_p": model_p,
         "engine_state": engine_state,
@@ -170,7 +171,7 @@ def _price_team_totals(
             side = str(request.get("quoted_side") or "OVER").upper()
             rows.append(_row(
                 sport=sport, lane="TOTAL", market="team_total",
-                raw={**dict(request), "model_p": priced[key][side.lower()], "family": "game"},
+                raw={**dict(request), "side": side, "model_p": priced[key][side.lower()], "family": "game"},
                 presentation="LEAN",
                 reason="TEAM_TOTAL_DERIVATIVE_NOT_PROMOTION",
                 engine_state=engine_state,
@@ -185,7 +186,7 @@ def _price_team_totals(
         side = str(request.get("quoted_side") or "OVER").upper()
         rows.append(_row(
             sport=sport, lane="TOTAL", market="team_total",
-            raw={**dict(request), "model_p": priced[side.lower()], "family": "game"},
+            raw={**dict(request), "side": side, "model_p": priced[side.lower()], "family": "game"},
             presentation="LEAN",
             reason="TEAM_TOTAL_DERIVATIVE_NOT_PROMOTION",
             engine_state=engine_state,
@@ -234,7 +235,7 @@ def _price_period(
         sport=sport,
         lane=family_for(market),
         market=market,
-        raw={**dict(request), "model_p": model_p, "family": "game"},
+        raw={**dict(request), "side": side, "model_p": model_p, "family": "game"},
         presentation="LEAN",
         reason="PERIOD_DERIVATIVE_NOT_PROMOTION",
         engine_state=engine_state,
@@ -247,6 +248,57 @@ def _field(raw: Any, name: str) -> Any:
         return raw.get(name)
     return getattr(raw, name, None)
 
+
+
+def pair_sides(market: str, lane: str = "") -> tuple[str, str]:
+    key = str(market or "").strip().lower()
+    if key in SIDE_MARKETS or lane == "SIDE":
+        return ("HOME", "AWAY")
+    if key in {"anytime_td", "player_anytime_td"} or lane == "SITUATIONAL":
+        return ("YES", "NO")
+    return ("OVER", "UNDER")
+
+
+def _selection(row: Mapping[str, Any]) -> str:
+    return str(row.get("selection") or row.get("side") or "").strip().upper()
+
+
+def _with_complements(sport: str, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Append the unquoted side. Does not invent a probability."""
+    grouped: dict[tuple[Any, ...], set[str]] = {}
+    templates: dict[tuple[Any, ...], dict[str, Any]] = {}
+    for row in rows:
+        key = (
+            row.get("market"),
+            row.get("game_id"),
+            row.get("entity_id"),
+            row.get("line"),
+            row.get("provider_market"),
+        )
+        grouped.setdefault(key, set()).add(_selection(row))
+        templates.setdefault(key, row)
+    extra: list[dict[str, Any]] = []
+    for key, present in grouped.items():
+        template = templates[key]
+        left, right = pair_sides(str(template.get("market") or ""), str(template.get("lane") or ""))
+        for side in (left, right):
+            if side in present:
+                continue
+            complement = dict(template)
+            complement["selection"] = side
+            complement["model_p"] = None
+            complement["american_odds"] = template.get("opposite_odds")
+            complement["presentation"] = "BLOCKED"
+            complement["reason"] = "COMPLEMENT_SIDE_NOT_QUOTED"
+            complement["research_only"] = True
+            complement["official_eligible"] = False
+            extra.append(complement)
+            present.add(side)
+    return rows + extra
+
+
+def emit_all_props_side_totals(**kwargs: Any) -> dict[str, Any]:
+    return build_football_full_board(**kwargs)
 
 def board_from_machine_results(
     sport: str,
@@ -402,22 +454,28 @@ def build_football_full_board(
         if market in seen:
             continue
         engine_state = _engine_state(resolved, spec)
-        emitted.append(_row(
-            sport=resolved,
-            lane=family_for(market, str(spec.get("family") or "")),
-            market=market,
-            raw={"family": spec.get("family")},
-            presentation="BLOCKED",
-            reason="NO_ENGINE" if engine_state == "NO_ENGINE" else "NO_QUOTE_OR_ENGINE_ROW",
-            engine_state=engine_state,
-        ))
+        lane = family_for(market, str(spec.get("family") or ""))
+        reason = "NO_ENGINE" if engine_state == "NO_ENGINE" else "NO_QUOTE_OR_ENGINE_ROW"
+        for side in pair_sides(market, lane):
+            emitted.append(_row(
+                sport=resolved,
+                lane=lane,
+                market=market,
+                raw={"family": spec.get("family"), "side": side},
+                presentation="BLOCKED",
+                reason=reason,
+                engine_state=engine_state,
+            ))
     for market in sorted(PROVIDER_MARKETS):
         if market in seen or PROVIDER_TO_SURFACE.get(market) in seen:
             continue
-        emitted.append(_row(
-            sport=resolved, lane="PROP", market=market, raw={"provider_market": market, "family": "prop"},
-            presentation="BLOCKED", reason="NO_QUOTE_OR_ENGINE_ROW", engine_state="NO_ENGINE",
-        ))
+        for side in pair_sides(market, "PROP"):
+            emitted.append(_row(
+                sport=resolved, lane="PROP", market=market,
+                raw={"provider_market": market, "family": "prop", "side": side},
+                presentation="BLOCKED", reason="NO_QUOTE_OR_ENGINE_ROW", engine_state="NO_ENGINE",
+            ))
+    emitted = _with_complements(resolved, emitted)
     return {
         "schema_version": SCHEMA_VERSION,
         "sport": resolved,
@@ -433,6 +491,10 @@ def build_football_full_board(
             "prop_rows": sum(1 for row in emitted if row["lane"] == "PROP"),
             "situational_rows": sum(1 for row in emitted if row["lane"] == "SITUATIONAL"),
             "priced_rows": sum(1 for row in emitted if row["model_p"] is not None),
+            "both_sides": all(
+                {str(row.get("selection") or "") for row in emitted if row["market"] == spec["market"]} >= set(pair_sides(str(spec["market"]), family_for(str(spec["market"]), str(spec.get("family") or ""))))
+                for spec in specs
+            ),
             "official_bets": 0,
         },
         "rows": emitted,

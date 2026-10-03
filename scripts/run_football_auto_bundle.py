@@ -194,6 +194,7 @@ def main() -> int:
         "side_rows": full_board["summary"]["side_rows"],
         "total_rows": full_board["summary"]["total_rows"],
         "prop_rows": full_board["summary"]["prop_rows"],
+        "both_sides": full_board["summary"].get("both_sides"),
         "output": str(args.output),
     }, sort_keys=True))
     return 2 if status == "BLOCKED" else 0
