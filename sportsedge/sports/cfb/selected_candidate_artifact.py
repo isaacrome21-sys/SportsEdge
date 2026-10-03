@@ -26,10 +26,13 @@ CFB_SELECTED_CANDIDATE_CODE_SURFACE = (
     "sportsedge/sports/cfb/candidate_model_v2.py",
     "sportsedge/sports/cfb/selected_candidate_model.py",
     "sportsedge/sports/cfb/selected_candidate_artifact.py",
+    "sportsedge/sports/cfb/candidate_live_source.py",
     "sportsedge/sports/cfb/selected_candidate_runtime.py",
+    "sportsedge/sports/cfb/game_freeze.py",
     "sportsedge/sports/cfb/run_machine.py",
     "sportsedge/sports/cfb/source.py",
     "sportsedge/sports/cfb/classification_policy.py",
+    "scripts/run_cfb_auto.py",
 )
 
 
