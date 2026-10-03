@@ -25,6 +25,8 @@ from .source import CFBGame, CFBTeamMetrics
 
 CFB_RECONSTRUCTED_SELECTION_MATERIALIZER_VERSION = "CFB_RECONSTRUCTED_SELECTION_V1"
 RECONSTRUCTED_PROVENANCE = "RECONSTRUCTED_HISTORICAL_NOT_PIT"
+SELECTION_START_SEASON = 2021
+SELECTION_END_SEASON = 2025
 
 _BANNED_GAME_KEYS = {
     "spread", "spread_line", "total", "total_line", "line", "price",
@@ -110,7 +112,7 @@ def _game(raw: Mapping[str, Any]) -> CFBGame:
         raise CFBReconstructedSelectionError(
             "CFB_RECONSTRUCTED_GAME_SEASON_WEEK_INVALID"
         ) from exc
-    if not 2015 <= season <= 2025 or week < 1:
+    if not SELECTION_START_SEASON <= season <= SELECTION_END_SEASON or week < 1:
         raise CFBReconstructedSelectionError(
             "CFB_RECONSTRUCTED_GAME_OUTSIDE_FROZEN_WINDOW"
         )
@@ -306,7 +308,7 @@ def build_selection_bundle_manifest(
         raise CFBReconstructedSelectionError("CFB_RECONSTRUCTED_WEATHER_CONTRACT_MISSING")
 
     seasons = sorted({int(row["season"]) for row in rows})
-    if not seasons or seasons[0] != 2015 or seasons[-1] != 2025:
+    if not seasons or seasons[0] != SELECTION_START_SEASON or seasons[-1] != SELECTION_END_SEASON:
         raise CFBReconstructedSelectionError("CFB_RECONSTRUCTED_SELECTION_WINDOW_INCOMPLETE")
     if any(season == 2026 for season in seasons):
         raise CFBReconstructedSelectionError("CFB_RECONSTRUCTED_2026_OUTCOME_PROHIBITED")
@@ -321,8 +323,8 @@ def build_selection_bundle_manifest(
         "provider_metric_model_vintage": policy.get("provider_metric_model_vintage"),
         "provider_metric_materialization_mode": policy.get("provider_metric_materialization_mode"),
         "materializer_contract": CFB_RECONSTRUCTED_SELECTION_MATERIALIZER_VERSION,
-        "start_season": 2015,
-        "end_season": 2025,
+        "start_season": SELECTION_START_SEASON,
+        "end_season": SELECTION_END_SEASON,
         "no_2026_forward_outcomes": True,
         "market_data_in_predictive_features": False,
         "weather_provenance_class": RECONSTRUCTED_PROVENANCE,
@@ -347,6 +349,8 @@ def build_selection_bundle_manifest(
 __all__ = [
     "CFB_RECONSTRUCTED_SELECTION_MATERIALIZER_VERSION",
     "RECONSTRUCTED_PROVENANCE",
+    "SELECTION_START_SEASON",
+    "SELECTION_END_SEASON",
     "CFBReconstructedSelectionError",
     "canonical_sha256",
     "materialize_reconstructed_selection_rows",
