@@ -116,10 +116,14 @@ ALIASES = {
 }
 
 
-def _n(name: str) -> str:
+def _raw(name: str) -> str:
     import re
     t = re.sub(r"[^a-z0-9() ]", " ", str(name).lower())
-    t = " ".join(t.split())
+    return " ".join(t.split())
+
+
+def _n(name: str) -> str:
+    t = _raw(name)
     return ALIASES.get(t, t)
 
 
@@ -149,9 +153,14 @@ def resolve_game(row: dict, games: list):
         hit = [g for g in games if str(g.game_id) == str(row["game_id"])]
     else:
         a, h = _n(row.get("away", "")), _n(row.get("home", ""))
-        def m(want, have):
-            have = _n(have)
-            return have == want or have.replace("(", "").replace(")", "") == want.replace("(", "").replace(")", "")
+        ra, rh = _raw(row.get("away", "")), _raw(row.get("home", ""))
+        def m(want, have, raw_want=None):
+            strip = lambda x: x.replace("(", "").replace(")", "")
+            cands = {strip(_n(have)), strip(_raw(have))}
+            wants = {strip(want)} | ({strip(raw_want)} if raw_want else set())
+            return bool(cands & wants)
+        _m = m
+        m = lambda want, have: _m(want, have, ra if want == a else rh if want == h else None)
         hit = [g for g in games if m(a, g.away_team) and m(h, g.home_team)]
         if not hit:  # neutral-site listings can flip home/away
             hit = [g for g in games if m(a, g.home_team) and m(h, g.away_team)]
@@ -209,10 +218,6 @@ def build_rows(board: list, season: int, week: int, asof):
     neutral = {"game_indoor": False, "wind_speed": 6.89, "temperature": 64.6, "fallback": "TRAINING_MEAN"}
     games = attach_weather(raw_games, {g.game_id: weather.get(g.game_id) or neutral for g in raw_games})
     snaps = fetch_cfbd_candidate_metric_snapshots(season=season, week=week, cfbd_api_key=key, now=now)
-    try:
-        print("SNAPSHOTS", len(snaps), "sample:", list(snaps)[:3] if not isinstance(snaps, dict) else list(snaps.keys())[:3])
-    except Exception:
-        pass
     rows = []
     unresolved = []
     for row in board:
@@ -261,7 +266,8 @@ def main() -> int:
     results = []
     for row in build_rows(board, args.season, args.week, args.asof):
         try:
-            home, away = score_selected_game(model, row)
+            blind = {k: v for k, v in row.items() if k != "quotes"}  # model is market-blind
+            home, away = score_selected_game(model, blind)
         except Exception as exc:
             print("SKIPPED CFB_SDV_SCORE_FAILED", row.get("away_team"), "@", row.get("home_team"), exc)
             continue
