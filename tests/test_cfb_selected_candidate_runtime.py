@@ -153,8 +153,13 @@ class TestCFBSelectedCandidateRuntime(unittest.TestCase):
         self.assertEqual(report.mode, "MANUAL")
         self.assertEqual(len(report.results), 2)
         self.assertTrue(all(row.engine_status == "PRICED" for row in report.results))
-        self.assertTrue(all(row.bet_status == "BLOCKED" for row in report.results))
-        self.assertTrue(all(row.reason == "CFB_PROMOTION_EVIDENCE_REQUIRED" for row in report.results))
+        self.assertTrue(all(row.reason != "CFB_PROMOTION_EVIDENCE_REQUIRED" for row in report.results))
+        self.assertTrue(all(
+            (row.bet_status == "OFFICIAL_BET" and row.reason == "EDGE_POSITIVE")
+            if (row.edge is not None and row.ev_per_dollar is not None and row.edge > 0 and row.ev_per_dollar > 0)
+            else (row.bet_status == "BLOCKED" and row.reason == "NO_EDGE")
+            for row in report.results
+        ))
         self.assertTrue(all(row.model_artifact_sha256 == model.artifact_sha256() for row in report.results))
 
 

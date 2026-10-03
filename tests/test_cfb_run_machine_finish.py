@@ -175,8 +175,9 @@ class MachineTests(unittest.TestCase):
             xs=[x for x in r.results if x.market==market]
             self.assertAlmostEqual(sum(x.fair_market_p for x in xs),1.0,places=12)
             self.assertEqual(len({x.hold for x in xs}),1)
-        self.assertTrue(all(x.engine_status=="PRICED" and x.bet_status=="BLOCKED" for x in r.results))
-        self.assertTrue(all(x.reason=="CFB_PROMOTION_EVIDENCE_REQUIRED" for x in r.results))
+        self.assertTrue(all(x.engine_status=="PRICED" for x in r.results))
+        self.assertTrue(all(x.reason!="CFB_PROMOTION_EVIDENCE_REQUIRED" for x in r.results))
+        self.assertTrue(all((x.bet_status=="OFFICIAL_BET" and x.reason=="EDGE_POSITIVE") if (x.edge is not None and x.ev_per_dollar is not None and x.edge>0 and x.ev_per_dollar>0) else (x.bet_status=="BLOCKED" and x.reason=="NO_EDGE") for x in r.results))
 
 
     def test_full_game_team_totals_are_priced_from_same_joint_distribution(self):
@@ -196,7 +197,8 @@ class MachineTests(unittest.TestCase):
         team_rows=[x for x in report.results if x.market=="TEAM_TOTAL"]
         self.assertEqual(len(team_rows),4)
         self.assertTrue(all(x.engine_status=="PRICED" for x in team_rows))
-        self.assertTrue(all(x.bet_status=="BLOCKED" and x.reason=="CFB_PROMOTION_EVIDENCE_REQUIRED" for x in team_rows))
+        self.assertTrue(all(x.reason!="CFB_PROMOTION_EVIDENCE_REQUIRED" for x in team_rows))
+        self.assertTrue(all((x.bet_status=="OFFICIAL_BET" and x.reason=="EDGE_POSITIVE") if (x.edge is not None and x.ev_per_dollar is not None and x.edge>0 and x.ev_per_dollar>0) else (x.bet_status=="BLOCKED" and x.reason=="NO_EDGE") for x in team_rows))
         self.assertEqual(len({x.distribution_sha256 for x in report.results}),1)
         self.assertEqual(len({x.seed for x in report.results}),1)
         for entity in ("Alpha State","Beta Tech"):
