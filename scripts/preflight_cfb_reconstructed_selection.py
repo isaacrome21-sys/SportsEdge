@@ -125,7 +125,14 @@ def evaluate_account(info: Mapping[str, Any], config: Mapping[str, Any]) -> tupl
     if planned < 0 or reserve < 0:
         raise CFBProviderPreflightError("CFB_CFBD_PREFLIGHT_BUDGET_INVALID")
     call_plan_fits = remaining >= planned + reserve
+    advanced_only = int(plan.get("advanced_metrics", -1))
+    if advanced_only < 0 or advanced_only > planned:
+        raise CFBProviderPreflightError("CFB_CFBD_PREFLIGHT_ADVANCED_BUDGET_INVALID")
     capacity_bands = {
+        "advanced_metrics_only": remaining >= advanced_only,
+        "advanced_plus_4": remaining >= advanced_only + 4,
+        "advanced_plus_10": remaining >= advanced_only + 10,
+        "advanced_plus_20": remaining >= advanced_only + 20,
         "plan_only": remaining >= planned,
         "reserve_10": remaining >= planned + 10,
         "reserve_20": remaining >= planned + 20,
