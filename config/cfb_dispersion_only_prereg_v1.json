@@ -6,7 +6,7 @@
   "bindings": {
     "parent_policy": {
       "path": "config/cfb_model_selection_policy_v1.json",
-      "git_blob": "e82f72f77687ca5afc1f058de11d63aa1e24a006",
+      "git_blob": "4ecb13a8295f98e7886e860ebda0fc4ba85dfbef",
       "required_schema": "CFB_MODEL_SELECTION_POLICY_V1",
       "required_status": "FROZEN_BEFORE_CANDIDATE_EVALUATION"
     },
