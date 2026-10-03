@@ -54,10 +54,10 @@ def season_starters(season: int) -> list[int]:
     return sorted(ids)
 
 
-def fetch_starts(cache: Path, workers: int) -> list[R.Start]:
+def fetch_starts(cache: Path, workers: int, seasons=SEASONS) -> list[R.Start]:
     cache.mkdir(parents=True, exist_ok=True)
     jobs = []
-    for season in SEASONS:
+    for season in seasons:
         for pid in season_starters(season):
             jobs.append((pid, season))
 
@@ -167,13 +167,47 @@ def run(starts: list[R.Start]) -> tuple[dict, str]:
     return result, "\n".join(L) + "\n"
 
 
+def build_pool_artifact(starts: list[R.Start], season: int) -> dict:
+    """Frozen league_short prior for season ``season`` (used for games in season+1)."""
+    window = R.prior_window_counts(starts)
+    short = [s for s in starts if s.season == season and len(window.get(s, ())) < R.MIN_PRODUCTION_STARTS]
+    if len(short) < 100:
+        raise RuntimeError(f"league_short pool for {season} too small: {len(short)}")
+    outs: dict[str, int] = {}
+    ks: dict[str, int] = {}
+    for s in short:
+        outs[str(s.outs)] = outs.get(str(s.outs), 0) + 1
+        ks[str(s.k)] = ks.get(str(s.k), 0) + 1
+    order = lambda d: {k: d[k] for k in sorted(d, key=int)}  # noqa: E731
+    return {
+        "schema": "MLB_PITCHER_PRIOR_POOL_V1", "pool": "league_short", "season": int(season),
+        "definition": "regular-season starts in `season` made when the pitcher had <5 prior starts in seasons season-1..season (production window)",
+        "starts": len(short), "counts": {"outs": order(outs), "strikeouts": order(ks)},
+        "source": "MLB StatsAPI people/{id}/stats gameLog group=pitching gameType=R",
+        "built_by": "scripts/research_mlb_pitcher_prior_fallback.py --emit-pool",
+        "validation": "#1495 (pre-registration sha256 " + R.prereg_sha256() + ")",
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--cache", type=Path, default=Path(".cache/mlb-prior-research"))
     ap.add_argument("--out-dir", type=Path, default=Path("artifacts/mlb_prior_research"))
     ap.add_argument("--workers", type=int, default=16)
+    ap.add_argument("--emit-pool", type=int, help="build the frozen league_short prior artifact for this season")
     args = ap.parse_args(argv)
     t0 = time.time()
+    if args.emit_pool:
+        season = args.emit_pool
+        artifact = build_pool_artifact(fetch_starts(args.cache, args.workers, seasons=(season - 1, season)), season)
+        text = json.dumps(artifact, indent=2) + "\n"
+        args.out_dir.mkdir(parents=True, exist_ok=True)
+        (args.out_dir / f"mlb_pitcher_prior_league_short_{season}.json").write_text(text)
+        md = (f"## MLB few-starts prior pool artifact ({season})\n\nCommit as `config/mlb_pitcher_prior_league_short_{season}.json` "
+              f"(used for {season + 1} games). Research output only; nothing is priced until committed.\n\n```json\n{text}```\n")
+        (args.out_dir / "report.md").write_text(md)
+        print(md)
+        return 0
     starts = fetch_starts(args.cache, args.workers)
     result, md = run(starts)
     md += f"\n_runtime {time.time() - t0:.0f}s_\n"
