@@ -1,4 +1,4 @@
-from scripts.materialize_cfb_sportsdataverse_training import _predictive_surface, _unmatched_advanced_game_ids
+from scripts.materialize_cfb_sportsdataverse_training import _predictive_surface, _unmatched_advanced_game_ids, _scope_advanced_to_schedule
 from sportsedge.sports.cfb.sportsdataverse_history import TeamSnapshot
 
 
@@ -50,3 +50,17 @@ def test_unmatched_advanced_game_ids_are_inventoryable():
         "espn_cfb_adv_drives":[{"game_id":"9","season":"2025"}],
     }
     assert _unmatched_advanced_game_ids(datasets)==[9]
+
+
+def test_inventoried_unmatched_advanced_rows_are_scoped_before_history_builder():
+    datasets={
+        "cfb_schedules":[{"game_id":"1","season":"2025","week":"1","season_type":"regular","fbs_game":"true"}],
+        "espn_cfb_adv_team":[{"game_id":"1","season":"2025"},{"game_id":"9","season":"2025"}],
+        "espn_cfb_adv_situational":[{"game_id":"1","season":"2025"},{"game_id":"9","season":"2025"}],
+        "espn_cfb_adv_drives":[{"game_id":"1","season":"2025"},{"game_id":"9","season":"2025"}],
+    }
+    scoped=_scope_advanced_to_schedule(datasets, unmatched_game_ids=[9])
+    assert [r["game_id"] for r in scoped["espn_cfb_adv_team"]]==["1"]
+    assert [r["game_id"] for r in scoped["espn_cfb_adv_situational"]]==["1"]
+    assert [r["game_id"] for r in scoped["espn_cfb_adv_drives"]]==["1"]
+    assert datasets["espn_cfb_adv_team"][-1]["game_id"]=="9"
