@@ -81,6 +81,19 @@
           "TICKETMASTER_LEVIS_STADIUM_NO_ROOF_OVER_BOWL"
         ],
         "purpose": "RESOLVE_PINNED_CFBD_EXPORT_COORDINATE_GAP_FOR_REFERENCED_HISTORICAL_CFB_VENUE"
+      },
+      {
+        "venue_id": 2031,
+        "name": "Pitbull Stadium",
+        "latitude": 25.7525,
+        "longitude": -80.37778,
+        "game_indoor": false,
+        "source_identities": [
+          "WIKIPEDIA_PITBULL_STADIUM_COORDINATE_LOCATION_25_45_9_N_80_22_40_W",
+          "ESPN_GAME_401640981_HOME_FIU_VS_LOUISIANA_TECH_2024_09_28",
+          "PINNED_CFBD_EXPORT_HAS_NO_VENUE_ID_2031"
+        ],
+        "purpose": "RESOLVE_PINNED_CFBD_EXPORT_MISSING_REFERENCED_HISTORICAL_CFB_VENUE"
       }
     ]
   }
