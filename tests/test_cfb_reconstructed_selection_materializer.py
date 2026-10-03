@@ -41,9 +41,9 @@ class TestCFBReconstructedSelectionMaterializer(unittest.TestCase):
         self.games = [
             {
                 "game_id": "1",
-                "season": 2015,
+                "season": 2021,
                 "week": 1,
-                "start_ts": "2015-09-05T17:00:00+00:00",
+                "start_ts": "2021-09-04T17:00:00+00:00",
                 "home_team": "Home",
                 "away_team": "Away",
                 "neutral_site": False,
@@ -52,8 +52,8 @@ class TestCFBReconstructedSelectionMaterializer(unittest.TestCase):
             }
         ]
         self.metrics = [
-            metric("Home", 2014, 99, "PRIOR_SEASON_FALLBACK"),
-            metric("Away", 2014, 99, "PRIOR_SEASON_FALLBACK"),
+            metric("Home", 2020, 99, "PRIOR_SEASON_FALLBACK"),
+            metric("Away", 2020, 99, "PRIOR_SEASON_FALLBACK"),
         ]
         self.weather = {
             "1": {
@@ -64,7 +64,7 @@ class TestCFBReconstructedSelectionMaterializer(unittest.TestCase):
                 "temperature": 72.0,
             }
         }
-        self.membership = {2015: [{"school": "Home"}, {"school": "Away"}]}
+        self.membership = {2021: [{"school": "Home"}, {"school": "Away"}]}
 
     def test_reconstructed_timestamp_after_old_kickoff_is_not_mislabeled_pit(self):
         rows = materialize_reconstructed_selection_rows(
@@ -78,7 +78,7 @@ class TestCFBReconstructedSelectionMaterializer(unittest.TestCase):
         self.assertFalse(rows[0]["historical_pit_created"])
         self.assertEqual(rows[0]["home_current_metrics"]["team"], "Home")
         self.assertEqual(rows[0]["home_current_metrics"]["games_in_sample"], 0)
-        self.assertEqual(rows[0]["home_prior_metrics"]["season"], 2014)
+        self.assertEqual(rows[0]["home_prior_metrics"]["season"], 2020)
         self.assertEqual(rows[0]["weather"]["provenance_class"], RECONSTRUCTED_PROVENANCE)
 
     def test_market_data_is_rejected(self):
@@ -100,7 +100,7 @@ class TestCFBReconstructedSelectionMaterializer(unittest.TestCase):
                 games=self.games,
                 metrics=self.metrics,
                 weather_by_game=self.weather,
-                fbs_membership_by_season={2015: [{"school": "Home"}]},
+                fbs_membership_by_season={2021: [{"school": "Home"}]},
             )
 
 
@@ -154,7 +154,7 @@ class TestCFBReconstructedSelectionMaterializer(unittest.TestCase):
                 "provenance_class": RECONSTRUCTED_PROVENANCE,
                 "historical_pit_created": False,
             }
-            for season in range(2015, 2026)
+            for season in range(2021, 2026)
         ]
         policy = {
             "feature_semantics": "AS_OF_WEEK_MATCHED_V1",
@@ -171,7 +171,7 @@ class TestCFBReconstructedSelectionMaterializer(unittest.TestCase):
             weather_source_contract="CFBD_GAMES_WEATHER_RECONSTRUCTED_CURRENT_PROVIDER_VINTAGE",
         )
         self.assertEqual(manifest["status"], "READY_FOR_CANDIDATE_EVALUATION")
-        self.assertEqual(manifest["start_season"], 2015)
+        self.assertEqual(manifest["start_season"], 2021)
         self.assertEqual(manifest["end_season"], 2025)
         self.assertFalse(manifest["historical_pit_created"])
         self.assertFalse(manifest["attempt_consumed"])
