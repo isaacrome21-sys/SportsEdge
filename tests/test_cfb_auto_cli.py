@@ -1,3 +1,4 @@
+from hashlib import sha256
 import json
 import os
 from pathlib import Path
@@ -7,7 +8,7 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-from scripts.run_cfb_auto import _credentials, _manual_board, discover_cfb_week
+from scripts.run_cfb_auto import _credentials, _manual_board, _model as load_auto_model, discover_cfb_week
 from sportsedge.sports.cfb.joint_model import CFB_FEATURE_CONTRACT, CFB_JOINT_MODEL_ID, CFBJointScoreModel
 from sportsedge.sports.cfb.model_artifact import (
     CFBModelArtifactError,
@@ -15,6 +16,14 @@ from sportsedge.sports.cfb.model_artifact import (
     load_cfb_model_artifact,
 )
 from sportsedge.sports.cfb.source import CFBGame
+from sportsedge.sports.cfb.candidate_model_v2 import candidate_feature_names
+from sportsedge.sports.cfb.candidate_registry_v2 import EQUAL
+from sportsedge.sports.cfb.selected_candidate_artifact import build_cfb_selected_candidate_artifact
+from sportsedge.sports.cfb.selected_candidate_model import (
+    CFB_SELECTED_CANDIDATE_FEATURE_CONTRACT,
+    CFB_SELECTED_CANDIDATE_MODEL_ID,
+    CFBSelectedCandidateScoreModel,
+)
 
 
 class CFBModelArtifactAndAutoCLITests(unittest.TestCase):
@@ -121,6 +130,66 @@ class CFBModelArtifactAndAutoCLITests(unittest.TestCase):
         self.assertNotIn("fetch_the_odds_api_quotes", script)
         self.assertIn("CFB_MANUAL_BOARD_JSON", script)
         self.assertIn("CFB_MANUAL_BOARD_JSON", workflow)
+
+    def test_auto_loader_accepts_registry_bound_selected_candidate_artifact(self):
+        names = candidate_feature_names(EQUAL)
+        model = CFBSelectedCandidateScoreModel(
+            model_id=CFB_SELECTED_CANDIDATE_MODEL_ID,
+            feature_contract=CFB_SELECTED_CANDIDATE_FEATURE_CONTRACT,
+            family=EQUAL,
+            feature_names=names,
+            feature_means=tuple(0.0 for _ in names),
+            feature_scales=tuple(1.0 for _ in names),
+            home_coefficients=tuple([24.0] + [0.0 for _ in names]),
+            away_coefficients=tuple([21.0] + [0.0 for _ in names]),
+            residual_pairs=((1.0, -1.0), (-1.0, 1.0)),
+            overtime_deltas=((7, 0), (0, 7)),
+            train_seasons=(2024, 2025),
+            ridge_alpha=10.0,
+        )
+        code_sha = "a" * 64
+        source_sha = "b" * 64
+        artifact = build_cfb_selected_candidate_artifact(
+            model,
+            model_code_sha256=code_sha,
+            training_source_sha256=source_sha,
+            selection_result_sha256="c" * 64,
+        )
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "models").mkdir()
+            (root / "config").mkdir()
+            path = root / "models/cfb_joint_v1.json"
+            raw = (json.dumps(artifact, indent=2, sort_keys=True) + "\n").encode()
+            path.write_bytes(raw)
+            registry = {
+                "schema_version": 1,
+                "sport": "CFB",
+                "status": "FROZEN",
+                "artifact_path": "models/cfb_joint_v1.json",
+                "artifact_sha256": artifact["artifact_sha256"],
+                "artifact_file_sha256": sha256(raw).hexdigest(),
+                "model_code_sha256": code_sha,
+                "training_source_sha256": source_sha,
+                "source_manifest_sha256": "d" * 64,
+                "predictive_code_manifest_sha256": "e" * 64,
+                "acquisition_code_manifest_sha256": "f" * 64,
+                "fit_max_season": 2025,
+                "promotion_authority": False,
+                "evidence_clock_authority": False,
+            }
+            (root / "config/cfb_game_model_freeze.json").write_text(
+                json.dumps(registry, indent=2, sort_keys=True) + "\n"
+            )
+            with patch(
+                "scripts.run_cfb_auto.cfb_selected_candidate_code_surface_sha256",
+                return_value=code_sha,
+            ):
+                loaded, payload, frozen, runtime = load_auto_model(path, repo_root=root)
+            self.assertEqual(runtime, "SELECTED_CANDIDATE")
+            self.assertEqual(loaded.family, EQUAL)
+            self.assertEqual(payload["artifact_sha256"], artifact["artifact_sha256"])
+            self.assertEqual(frozen["training_source_sha256"], source_sha)
 
     def test_direct_cli_missing_artifact_is_explicit_blocker_without_network(self):
         with TemporaryDirectory() as tmp:
