@@ -9,7 +9,7 @@ from scripts.preflight_cfb_reconstructed_selection import evaluate_account, fetc
 CONFIG = {
     "standard_tier_monthly_quotas": {"0": 1000, "1": 5000, "2": 30000, "3": 75000, "4": 125000, "5": 200000, "6": 500000},
     "tier_labels": {"0": "FREE", "1": "TIER_1", "2": "TIER_2", "3": "TIER_3", "4": "TIER_4", "5": "TIER_5", "6": "TIER_6"},
-    "planned_new_calls_upper_bound": {"total": 200},
+    "planned_new_calls_upper_bound": {"advanced_metrics": 176, "total": 200},
     "retry_reserve_calls": 50,
     "weather_reconstruction": {
         "contract": "CFBD_VENUES_OPEN_METEO_ERA5_RECONSTRUCTED_CURRENT_PROVIDER_VINTAGE",
@@ -68,6 +68,10 @@ class TestCFBReconstructedSelectionPreflight(unittest.TestCase):
     def test_capacity_bands_redact_exact_remaining_quota(self):
         _, public = evaluate_account({"patronLevel": 1, "remainingCalls": 223}, CONFIG)
         self.assertEqual(public["capacity_bands"], {
+            "advanced_metrics_only": True,
+            "advanced_plus_4": True,
+            "advanced_plus_10": True,
+            "advanced_plus_20": True,
             "plan_only": True,
             "reserve_10": True,
             "reserve_20": True,
@@ -109,3 +113,13 @@ class TestCFBReconstructedSelectionPreflight(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+    def test_advanced_only_band_can_fit_when_full_plan_does_not(self):
+        _, public = evaluate_account({"patronLevel": 1, "remainingCalls": 180}, CONFIG)
+        self.assertTrue(public["capacity_bands"]["advanced_metrics_only"])
+        self.assertTrue(public["capacity_bands"]["advanced_plus_4"])
+        self.assertFalse(public["capacity_bands"]["advanced_plus_10"])
+        self.assertFalse(public["capacity_bands"]["plan_only"])
+        self.assertFalse(public["call_plan_fits"])
+        self.assertNotIn("remaining_quota", public)
