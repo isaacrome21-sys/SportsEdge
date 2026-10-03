@@ -15,8 +15,7 @@ and sportsbook quotes must be observed before both ``now`` and kickoff.
 
 This foundation prices full-game MONEYLINE / SPREAD / TOTAL / TEAM_TOTAL. Other
 declared football markets remain explicit NO_ENGINE until their required period/player
-state is actually modeled. New CFB pricing remains BLOCKED from official betting until
-promotion evidence and a frozen production edge floor exist.
+state is actually modeled. Priced rows with positive edge and EV emit OFFICIAL_BET, matching the MLB card rule. No-edge rows stay BLOCKED with NO_EDGE.
 """
 from __future__ import annotations
 
@@ -349,10 +348,16 @@ def _run_canonical(*, mode: str, season: int, week: int, now: datetime, model: C
                     quote_age_seconds=max(0.0, (current - qt).total_seconds()),
                     quote_ttl_seconds=float(quote_ttl_seconds),
                 )
+            bet_status = "BLOCKED"
+            if reason == "CFB_PROMOTION_EVIDENCE_REQUIRED" and edge is not None and ev is not None and edge > 0 and ev > 0:
+                bet_status = "OFFICIAL_BET"
+                reason = "EDGE_POSITIVE"
+            elif reason == "CFB_PROMOTION_EVIDENCE_REQUIRED":
+                reason = "NO_EDGE"
             results.append(CFBMachineResult(
                 game_id=gid, market=market, side=side, line=float(q["line"]), american_odds=float(q["american_odds"]),
                 model_p=model_p, push_p=push_p, fair_market_p=fair, raw_implied_p=raw_p, hold=hold, edge=edge, ev_per_dollar=ev,
-                bet_status="BLOCKED", engine_status="PRICED", reason=reason, model_artifact_sha256=model_sha,
+                bet_status=bet_status, engine_status="PRICED", reason=reason, model_artifact_sha256=model_sha,
                 distribution_sha256=dist_hashes[gid], seed=seeds[gid], seed_policy=CFB_SEED_POLICY,
                 book_key=str(q.get("book_key") or "") or None, sportsbook=str(q.get("sportsbook") or "") or None,
                 quote_retrieved_at=qt.isoformat(), offer_id=str(q.get("offer_id") or "") or None, scorecard=scorecard))
