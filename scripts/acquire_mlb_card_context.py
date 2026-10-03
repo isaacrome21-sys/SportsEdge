@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 import json
 import sys
 from datetime import datetime, timezone
@@ -11,6 +12,25 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sportsedge.mlb_run_it_pregame import acquire_mlb_run_it_pregame
+from sportsedge.statcast_daily_source import StatcastSourceError, fetch_daily_statcast
+
+
+def shared_statcast_snapshot(*, fetch=fetch_daily_statcast, attempts=2, now=None):
+    """Fetch the slate-wide 30-day Statcast window once for all games.
+
+    Each game used to download the same large Savant CSV independently and in
+    parallel, which timed out (#1457, Padres-Brewers). One shared fetch with a
+    retry; on failure return (None, reason) and each game's Statcast lane
+    degrades to SOURCE_FAILED without dropping its other lanes.
+    """
+    now = now or datetime.now(timezone.utc)
+    last = None
+    for _ in range(max(1, attempts)):
+        try:
+            return fetch(now=now), None
+        except StatcastSourceError as exc:
+            last = str(exc)
+    return None, last
 
 
 def game_pks(payload):
@@ -68,6 +88,13 @@ def main(argv=None, *, acquire=acquire_mlb_run_it_pregame):
     out.mkdir(parents=True, exist_ok=True)
     pks = game_pks(payload)
     failures = []
+    if acquire is acquire_mlb_run_it_pregame and pks:
+        snapshot, statcast_error = shared_statcast_snapshot()
+        if snapshot is not None:
+            acquire = partial(acquire_mlb_run_it_pregame, statcast_snapshot=snapshot)
+        else:
+            print(f"shared Statcast fetch failed ({statcast_error}); per-game lanes will report SOURCE_FAILED")
+            acquire = partial(acquire_mlb_run_it_pregame, statcast_unavailable_reason=statcast_error)
 
     if args.workers == 1 or len(pks) <= 1:
         results = [_acquire_one(pk, acquire) for pk in pks]
