@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import math
-import random
 from functools import lru_cache
 from pathlib import Path
 
@@ -120,57 +119,89 @@ def _lam(params: NHLRateParameters, features: tuple[float, ...]) -> float:
     return math.exp(max(-8.0, min(4.0, eta)))
 
 
-def _poisson(rng: random.Random, mean: float) -> int:
-    if mean <= 0:
-        return 0
-    limit = math.exp(-mean)
-    prod = 1.0
-    k = 0
-    while prod > limit:
-        k += 1
-        prod *= rng.random()
-    return k - 1
+def _pois_pmf(mean: float, kmax: int = 20) -> list[float]:
+    out = [math.exp(-mean)]
+    for k in range(1, kmax + 1):
+        out.append(out[-1] * mean / k)
+    return out
 
 
-def simulate_matchup(away: str, home: str, *, n: int = 8000, seed: int = 1) -> dict[str, float] | None:
+def final_score_distribution(away: str, home: str) -> dict | None:
+    """Exact final (home, away) goal distribution incl. the OT/SO winner goal.
+
+    Regulation goals are independent Poisson. A regulation tie adds one goal
+    to a coin-flip winner (DK totals and puck lines count the OT/SO winner).
+    """
     a = resolve_team(away)
     h = resolve_team(home)
     if a is None or h is None:
         return None
     params = load_freeze()
     lh = _lam(params, _row(h, a, home=True))
-    la = _lam(params, _row(h, a, home=False))
-    rng = random.Random(seed)
-    hw = aw = ov55 = ov65 = pl = 0
-    for _ in range(n):
-        hg = _poisson(rng, lh)
-        ag = _poisson(rng, la)
-        fh, fa = hg, ag
-        if hg == ag:
-            if rng.random() < 0.5:
-                fh += 1
+    la = _lam(params, _row(a, h, home=False))
+    ph, pa = _pois_pmf(lh), _pois_pmf(la)
+    dist: dict[tuple[int, int], float] = {}
+    for i, pi in enumerate(ph):
+        for j, pj in enumerate(pa):
+            p = pi * pj
+            if i == j:
+                dist[(i + 1, j)] = dist.get((i + 1, j), 0.0) + 0.5 * p
+                dist[(i, j + 1)] = dist.get((i, j + 1), 0.0) + 0.5 * p
             else:
-                fa += 1
-        if fh > fa:
-            hw += 1
-        elif fa > fh:
-            aw += 1
-        tot = fh + fa
-        if tot > 5.5:
-            ov55 += 1
-        if tot > 6.5:
-            ov65 += 1
-        if (fh - fa) > 1.5:
-            pl += 1
+                dist[(i, j)] = dist.get((i, j), 0.0) + p
+    z = sum(dist.values())
+    return {"home_lambda": lh, "away_lambda": la, "dist": {k: v / z for k, v in dist.items()}}
+
+
+def total_probs(fsd: dict, line: float) -> tuple[float, float, float]:
+    """(over, push, under) for a full-game total line."""
+    over = push = under = 0.0
+    for (hg, ag), p in fsd["dist"].items():
+        t = hg + ag
+        if t > line:
+            over += p
+        elif t < line:
+            under += p
+        else:
+            push += p
+    return over, push, under
+
+
+def puck_line_probs(fsd: dict, away_line: float) -> tuple[float, float, float]:
+    """(away_cover, push, home_cover) where away gets `away_line` (e.g. +1.5)."""
+    away = push = home = 0.0
+    for (hg, ag), p in fsd["dist"].items():
+        margin = ag - hg + away_line
+        if margin > 0:
+            away += p
+        elif margin < 0:
+            home += p
+        else:
+            push += p
+    return away, push, home
+
+
+def simulate_matchup(away: str, home: str, *, n: int = 8000, seed: int = 1) -> dict[str, float] | None:
+    """Backward-compatible summary (exact; n/seed ignored)."""
+    fsd = final_score_distribution(away, home)
+    if fsd is None:
+        return None
+    hw = sum(p for (hg, ag), p in fsd["dist"].items() if hg > ag)
     return {
-        "home_win": hw / n,
-        "away_win": aw / n,
-        "over_5_5": ov55 / n,
-        "over_6_5": ov65 / n,
-        "home_pl_minus_1_5": pl / n,
-        "home_lambda": lh,
-        "away_lambda": la,
+        "home_win": hw,
+        "away_win": 1.0 - hw,
+        "over_5_5": total_probs(fsd, 5.5)[0],
+        "over_6_5": total_probs(fsd, 6.5)[0],
+        "home_pl_minus_1_5": puck_line_probs(fsd, 1.5)[2],
+        "home_lambda": fsd["home_lambda"],
+        "away_lambda": fsd["away_lambda"],
     }
+
+
+def no_vig(price_a: int, price_b: int) -> tuple[float, float]:
+    ia = 1.0 / american_to_decimal(price_a)
+    ib = 1.0 / american_to_decimal(price_b)
+    return ia / (ia + ib), ib / (ia + ib)
 
 
 def american_to_decimal(odds: int) -> float:
@@ -179,5 +210,6 @@ def american_to_decimal(odds: int) -> float:
     return 1.0 + 100.0 / abs(odds)
 
 
-def ev_return(model_p: float, odds: int) -> float:
-    return model_p * american_to_decimal(odds) - 1.0
+def ev_return(model_p: float, odds: int, push_p: float = 0.0) -> float:
+    """Expected return per $1; a push refunds the stake."""
+    return model_p * american_to_decimal(odds) + push_p - 1.0
