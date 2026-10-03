@@ -1,0 +1,92 @@
+name: cfb-lines-issue
+
+# Phone -> CFB card: open an issue titled "[CFB LINES] ..." whose body has
+#   season: 2026
+#   week: 6
+# and a ```json fenced board (same format as cfb-sdv-card). The card is posted
+# back as an issue comment. Owner only.
+on:
+  issues:
+    types: [opened, edited]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: cfb-lines-issue-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  card:
+    if: github.actor == github.repository_owner && startsWith(github.event.issue.title, '[CFB LINES]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: .
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ISSUE: ${{ github.event.issue.number }}
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: '.python-version'
+      - run: python -m pip install --disable-pip-version-check -r requirements-test.txt
+      - name: Read issue body
+        id: intake
+        env:
+          BODY: ${{ github.event.issue.body }}
+        run: |
+          python - <<'PY'
+          import os, re, json
+          body = os.environ["BODY"]
+          season = re.search(r"season:\s*(\d{4})", body, re.I)
+          week = re.search(r"week:\s*(\d+)", body, re.I)
+          fence = re.search(r"```(?:json)?\s*(.*?)```", body, re.S)
+          if not (season and week and fence):
+              raise SystemExit("CFB_ISSUE_NEEDS_season_week_and_fenced_board")
+          board = json.loads(fence.group(1))
+          open("board.json", "w").write(json.dumps(board))
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"season={season.group(1)}\nweek={week.group(1)}\n")
+          PY
+      - name: Run card
+        run: |
+          set -o pipefail
+          python scripts/run_cfb_sdv_card_v2.py --board-json "$(cat board.json)" \
+            --season "${{ steps.intake.outputs.season }}" --week "${{ steps.intake.outputs.week }}" \
+            > card.txt 2>&1
+      - name: Post card
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          lines = ["# SportsEdge CFB card", ""]
+          p = Path("artifacts/run_it/cfb_sdv_card.json")
+          if p.exists():
+              card = json.loads(p.read_text())
+              rows = [r for r in card["results"] if "edge" in r]
+              def fmt(r):
+                  ln = "" if r["line"] in (None, "") else (f" {r['line']:+g}" if r["market"] == "SPREAD" else f" {r['line']:g}")
+                  return (f"| {r['matchup']} | {r['market'].title()} {r['side'].title()}{ln} | {r['american_odds']:+.0f} | "
+                          f"{r['model_p']*100:.1f}% | {r['market_p']*100:.1f}% | {r['edge']*100:+.1f}% | {r['bet_status']} |")
+              hdr = ["| Game | Pick | Odds | Model | Market | Edge | Status |", "|---|---|---|---|---|---|---|"]
+              bets = [r for r in rows if r["bet_status"] == "BET"]
+              lines += [f"**{len(bets)} bets** (edge >= {card['edge_floor']*100:.0f}% vs no-vig, one side + one total per game)", ""]
+              lines += hdr + [fmt(r) for r in bets] + [""]
+              lines += ["<details><summary>All priced rows</summary>", ""] + hdr + [fmt(r) for r in rows] + ["", "</details>"]
+              proj = {}
+              for r in rows:
+                  proj[r["matchup"]] = (r["away_mean"], r["home_mean"])
+              lines += ["", "**Projected scores (away-home):** " + "; ".join(f"{k} {a:.1f}-{h:.1f}" for k, (a, h) in proj.items())]
+          log = Path("card.txt").read_text() if Path("card.txt").exists() else ""
+          skipped = [l for l in log.splitlines() if l.startswith("SKIPPED") or "CFB_SDV_" in l]
+          if skipped:
+              lines += ["", "**Not priced:**", "```"] + skipped + ["```"]
+          if not p.exists():
+              lines += ["", "Run failed:", "```", log[-3000:], "```"]
+          Path("comment.md").write_text("\n".join(lines))
+          PY
+          gh issue comment "$ISSUE" --body-file comment.md
