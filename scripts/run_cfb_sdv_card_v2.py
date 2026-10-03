@@ -11,6 +11,11 @@ Board JSON: a list of
               {"market": "SPREAD", "side": "HOME"|"AWAY", "line": -7.5, "american_odds": -110},
               {"market": "TOTAL", "side": "OVER"|"UNDER", "line": 52.5, "american_odds": -110}]}
 SPREAD line is the handicap for the quoted side.
+
+Compact phone form is also accepted (game_id optional, resolved by team name):
+  {"away": "Michigan", "home": "Minnesota", "ml": [-225, 185],
+   "spread": [-6, -110, -110], "total": [43.5, -105, -115]}
+spread = [away line, away price, home price]; total = [line, over price, under price].
 """
 from __future__ import annotations
 
@@ -104,6 +109,57 @@ def price_game(game_id, home: float, away: float, quotes: list) -> list:
     return out
 
 
+ALIASES = {
+    "mississippi": "ole miss", "umass": "massachusetts", "miami oh": "miami (oh)",
+    "uconn": "connecticut", "north dakota st": "north dakota state",
+    "nc state": "nc state", "usf": "south florida", "fiu": "florida international",
+}
+
+
+def _n(name: str) -> str:
+    import re
+    t = re.sub(r"[^a-z0-9() ]", " ", str(name).lower())
+    t = " ".join(t.split())
+    return ALIASES.get(t, t)
+
+
+def expand_compact(row: dict) -> dict:
+    if "quotes" in row:
+        return row
+    q = []
+    if row.get("ml"):
+        a, h = row["ml"]
+        q += [{"market": "MONEYLINE", "side": "AWAY", "american_odds": a},
+              {"market": "MONEYLINE", "side": "HOME", "american_odds": h}]
+    if row.get("spread"):
+        line, a, h = row["spread"]
+        q += [{"market": "SPREAD", "side": "AWAY", "line": float(line), "american_odds": a},
+              {"market": "SPREAD", "side": "HOME", "line": -float(line), "american_odds": h}]
+    if row.get("total"):
+        line, o, u = row["total"]
+        q += [{"market": "TOTAL", "side": "OVER", "line": float(line), "american_odds": o},
+              {"market": "TOTAL", "side": "UNDER", "line": float(line), "american_odds": u}]
+    out = dict(row)
+    out["quotes"] = q
+    return out
+
+
+def resolve_game(row: dict, games: list):
+    if row.get("game_id") is not None:
+        hit = [g for g in games if str(g.game_id) == str(row["game_id"])]
+    else:
+        a, h = _n(row.get("away", "")), _n(row.get("home", ""))
+        def m(want, have):
+            have = _n(have)
+            return have == want or have.replace("(", "").replace(")", "") == want.replace("(", "").replace(")", "")
+        hit = [g for g in games if m(a, g.away_team) and m(h, g.home_team)]
+        if not hit:  # neutral-site listings can flip home/away
+            hit = [g for g in games if m(a, g.home_team) and m(h, g.away_team)]
+    if len(hit) != 1:
+        raise SystemExit(f"CFB_SDV_GAME_UNRESOLVED:{row.get('game_id') or (row.get('away'), row.get('home'))}:{len(hit)}")
+    return hit[0]
+
+
 def build_rows(board: list, season: int, week: int, asof):
     from sportsedge.sports.cfb.candidate_live_source import (
         attach_candidate_snapshots_to_game_row,
@@ -120,12 +176,15 @@ def build_rows(board: list, season: int, week: int, asof):
         fetch_cfbd_weather(season=season, week=week, cfbd_api_key=key),
     )
     snaps = fetch_cfbd_candidate_metric_snapshots(season=season, week=week, cfbd_api_key=key, now=now)
-    by_id = {g.game_id: g for g in games}
     rows = []
+    unresolved = []
     for row in board:
-        game = by_id.get(str(row.get("game_id")))
-        if game is None:
-            raise SystemExit("CFB_SDV_GAME_UNRESOLVED:" + str(row.get("game_id")))
+        row = expand_compact(row)
+        try:
+            game = resolve_game(row, games)
+        except SystemExit as exc:
+            unresolved.append(str(exc))
+            continue
         base = {
             "game_id": game.game_id,
             "home_team": game.home_team,
@@ -136,6 +195,10 @@ def build_rows(board: list, season: int, week: int, asof):
         }
         rows.append(attach_candidate_snapshots_to_game_row(
             base, home_team=game.home_team, away_team=game.away_team, snapshots=snaps))
+    for u in unresolved:
+        print("SKIPPED", u)
+    if not rows:
+        raise SystemExit("CFB_SDV_NO_GAMES_RESOLVED")
     return rows
 
 
