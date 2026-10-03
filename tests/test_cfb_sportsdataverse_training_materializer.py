@@ -44,17 +44,20 @@ def test_missing_week2_current_snapshot_is_explicit_exclusion():
 
 def test_incomplete_advanced_join_game_is_explicitly_scoped_out():
     datasets={
-        "cfb_schedules":[],
+        "cfb_schedules":[
+            {"game_id":"1","season":"2025","week":"1"},
+            {"game_id":"2","season":"2025","week":"2"},
+        ],
         "espn_cfb_adv_team":[
-            {"game_id":"1","season":"2025","pos_team":"10"},
-            {"game_id":"1","season":"2025","pos_team":"20"},
-            {"game_id":"2","season":"2025","pos_team":"10"},
-            {"game_id":"2","season":"2025","pos_team":"20"},
+            {"game_id":"1","season":"2025","week":"1","pos_team":"10"},
+            {"game_id":"1","season":"2025","week":"1","pos_team":"20"},
+            {"game_id":"2","season":"2025","week":"2","pos_team":"10"},
+            {"game_id":"2","season":"2025","week":"2","pos_team":"20"},
         ],
         "espn_cfb_adv_situational":[
-            {"game_id":"1","season":"2025","pos_team":"10"},
-            {"game_id":"1","season":"2025","pos_team":"20"},
-            {"game_id":"2","season":"2025","pos_team":"10"},
+            {"game_id":"1","season":"2025","week":"1","pos_team":"10"},
+            {"game_id":"1","season":"2025","week":"1","pos_team":"20"},
+            {"game_id":"2","season":"2025","week":"2","pos_team":"10"},
         ],
         "espn_cfb_adv_drives":[
             {"game_id":"1","season":"2025","pos_team":"10"},
@@ -66,13 +69,41 @@ def test_incomplete_advanced_join_game_is_explicitly_scoped_out():
     scoped,excluded=_scope_complete_advanced_join_games(datasets)
     assert excluded==[{
         "game_id":"2",
-        "reason":"CFB_SDV_INCOMPLETE_ADVANCED_JOIN",
-        "team_ids_by_dataset":{
-            "espn_cfb_adv_team":[10,20],
-            "espn_cfb_adv_situational":[10],
-            "espn_cfb_adv_drives":[10,20],
+        "reason":"CFB_SDV_INCOMPLETE_OR_TEMPORALLY_INCONSISTENT_ADVANCED_JOIN",
+        "row_identity_by_dataset":{
+            "espn_cfb_adv_team":[[10,2025,2],[20,2025,2]],
+            "espn_cfb_adv_situational":[[10,2025,2]],
+            "espn_cfb_adv_drives":[[10,2025,2],[20,2025,2]],
         },
+        "schedule_season_week":[2025,2],
     }]
     for dataset in ("espn_cfb_adv_team","espn_cfb_adv_situational","espn_cfb_adv_drives"):
         assert {row["game_id"] for row in scoped[dataset]}=={"1"}
     assert {row["game_id"] for row in datasets["espn_cfb_adv_team"]}=={"1","2"}
+
+
+def test_temporal_disagreement_is_scoped_out_before_snapshot_filtering():
+    datasets={
+        "cfb_schedules":[{"game_id":"7","season":"2025","week":"4"}],
+        "espn_cfb_adv_team":[
+            {"game_id":"7","season":"2025","week":"4","pos_team":"10"},
+            {"game_id":"7","season":"2025","week":"4","pos_team":"20"},
+        ],
+        "espn_cfb_adv_situational":[
+            {"game_id":"7","season":"2025","week":"4","pos_team":"10"},
+            {"game_id":"7","season":"2025","week":"5","pos_team":"20"},
+        ],
+        "espn_cfb_adv_drives":[
+            {"game_id":"7","season":"2025","pos_team":"10"},
+            {"game_id":"7","season":"2025","pos_team":"20"},
+        ],
+    }
+    scoped,excluded=_scope_complete_advanced_join_games(datasets)
+    assert excluded[0]["game_id"]=="7"
+    assert excluded[0]["reason"]=="CFB_SDV_INCOMPLETE_OR_TEMPORALLY_INCONSISTENT_ADVANCED_JOIN"
+    assert excluded[0]["schedule_season_week"]==[2025,4]
+    assert excluded[0]["row_identity_by_dataset"]["espn_cfb_adv_situational"]==[
+        [10,2025,4],[20,2025,5]
+    ]
+    for dataset in ("espn_cfb_adv_team","espn_cfb_adv_situational","espn_cfb_adv_drives"):
+        assert scoped[dataset]==[]
