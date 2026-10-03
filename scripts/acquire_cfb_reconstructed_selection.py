@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Acquire the frozen 2015-2025 reconstructed CFB selection inputs.
+"""Acquire the frozen quota-safe reconstructed CFB selection inputs.
 
 CFBD supplies games, FBS membership, venue metadata, and advanced metrics. Historical
 weather is reconstructed from CFBD venue coordinates plus Open-Meteo ERA5 reanalysis
@@ -581,14 +581,20 @@ def _build_private_payload(
         end_week = int(params["endWeek"]) if "endWeek" in params else None
         by_identity[(str(item["endpoint"]), year, end_week)] = fetched[str(item["query_sha256"])]
 
+    selection_start = int(config["selection_start_season"])
+    selection_end = int(config["selection_end_season"])
+    prior_fallback = int(config["prior_fallback_season"])
+    if prior_fallback != selection_start - 1 or selection_end < selection_start:
+        raise CFBAcquisitionError("CFB_ACQUISITION_SELECTION_WINDOW_INVALID")
+
     games_by_season: dict[int, list[Mapping[str, Any]]] = {}
     membership_by_season: dict[int, list[Mapping[str, Any]]] = {}
-    for season in range(2014, 2026):
+    for season in range(prior_fallback, selection_end + 1):
         raw, _meta = by_identity[("/games", season, None)]
         if not isinstance(raw, list):
             raise CFBAcquisitionError(f"CFB_ACQUISITION_GAMES_NOT_LIST:{season}")
         games_by_season[season] = [dict(row) for row in raw if isinstance(row, Mapping)]
-    for season in range(2015, 2026):
+    for season in range(selection_start, selection_end + 1):
         raw, _meta = by_identity[("/teams/fbs", season, None)]
         if not isinstance(raw, list):
             raise CFBAcquisitionError(f"CFB_ACQUISITION_MEMBERSHIP_NOT_LIST:{season}")
@@ -599,7 +605,7 @@ def _build_private_payload(
         raise CFBAcquisitionError("CFB_ACQUISITION_VENUES_NOT_LIST")
 
     games: list[dict[str, Any]] = []
-    for season in range(2015, 2026):
+    for season in range(selection_start, selection_end + 1):
         membership = _membership_set(membership_by_season[season])
         for row in games_by_season[season]:
             if row.get("completed") is not True:
@@ -645,7 +651,7 @@ def _build_private_payload(
     )
 
     metrics: list[dict[str, Any]] = []
-    for season in range(2014, 2025):
+    for season in range(prior_fallback, selection_end):
         advanced, meta = by_identity[("/stats/season/advanced", season, None)]
         if not isinstance(advanced, list):
             raise CFBAcquisitionError(f"CFB_ACQUISITION_ADVANCED_NOT_LIST:{season}:prior")
@@ -660,7 +666,7 @@ def _build_private_payload(
                     sample_source="PRIOR_SEASON_FALLBACK",
                 ).to_dict())
 
-    for season in range(2015, 2026):
+    for season in range(selection_start, selection_end + 1):
         for end_week in _current_end_weeks(config):
             advanced, meta = by_identity[("/stats/season/advanced", season, end_week)]
             if not isinstance(advanced, list):
