@@ -484,9 +484,6 @@ def _pair_economics(
 
 
 def _summary(results: Sequence[NFLMachineResult]) -> dict[str, Any]:
-    from sportsedge.football_full_board import board_from_machine_results
-
-    board = board_from_machine_results("NFL", results)
     return {
         "quote_count": len(results),
         "priced": sum(row.engine_status == "PRICED" for row in results),
@@ -495,10 +492,6 @@ def _summary(results: Sequence[NFLMachineResult]) -> dict[str, Any]:
         "official_bets": sum(row.bet_status == "OFFICIAL_BET" for row in results),
         "markets_seen": sorted({row.market for row in results}),
         "games_seen": sorted({row.game_id for row in results}),
-        "full_board": board,
-        "side_rows": board["summary"]["side_rows"],
-        "total_rows": board["summary"]["total_rows"],
-        "prop_rows": board["summary"]["prop_rows"],
     }
 
 
