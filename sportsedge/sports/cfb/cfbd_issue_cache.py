@@ -6,7 +6,7 @@ repo contents, and the CFBD free tier rate-limits (HTTP 429). Each cached item
 
     CFBCACHE <name> <base64(gzip(json))>
 
-e.g. ``lines_2019``, ``talent_2021``, ``returning_2021``, ``sp_2020``.
+e.g. ``lines_2019``, ``talent_2021``, ``returning_2021``, ``sp_2020`` or a trusted live-week bundle such as ``live_2026_w5``.
 Loading reads every comment once via ``gh api``; only missing items are fetched
 from CFBD, with a per-run call budget, a pause between calls, and an immediate
 stop on the first 429 so the monthly quota is not burned.
