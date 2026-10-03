@@ -229,6 +229,7 @@ def _run_manual_model(
     season: int,
     week: int,
     model,
+    model_artifact_sha256: str,
     cfbd_key: str,
     manual_events: list[dict],
     bookmakers: tuple[str, ...],
@@ -268,7 +269,7 @@ def _run_manual_model(
             fbs_team_rows=team_rows,
             root_seed=root_seed,
             n_paths=n_paths,
-            frozen_artifact_sha256=getattr(model, "_frozen_artifact_sha256", None),
+            frozen_artifact_sha256=model_artifact_sha256,
         )
     metrics = fetch_cfbd_team_metrics(
         season=season,
@@ -297,6 +298,7 @@ def _run_model_and_context(
     season: int,
     week: int,
     model,
+    model_artifact_sha256: str,
     cfbd_key: str,
     manual_events: list[dict],
     bookmakers: tuple[str, ...],
@@ -317,6 +319,7 @@ def _run_model_and_context(
             season=season,
             week=week,
             model=model,
+            model_artifact_sha256=model_artifact_sha256,
             cfbd_key=cfbd_key,
             manual_events=manual_events,
             bookmakers=bookmakers,
@@ -348,8 +351,6 @@ def main() -> int:
     try:
         cfbd_key = _credentials()
         model, artifact, registry = _model(args.model_artifact, repo_root=root)
-        if isinstance(model, CFBSelectedCandidateScoreModel):
-            object.__setattr__(model, "_frozen_artifact_sha256", artifact["artifact_sha256"])
         manual_events = _manual_board(args.board_json or os.environ.get("CFB_MANUAL_BOARD_JSON"))
         season = int(args.season if args.season is not None else current.year)
         week = int(args.week) if args.week is not None else discover_cfb_week(
@@ -363,6 +364,7 @@ def main() -> int:
             season=season,
             week=week,
             model=model,
+            model_artifact_sha256=artifact["artifact_sha256"],
             cfbd_key=cfbd_key,
             manual_events=manual_events,
             bookmakers=tuple(args.bookmakers or ["draftkings"]),
