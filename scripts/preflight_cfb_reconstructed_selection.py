@@ -125,6 +125,14 @@ def evaluate_account(info: Mapping[str, Any], config: Mapping[str, Any]) -> tupl
     if planned < 0 or reserve < 0:
         raise CFBProviderPreflightError("CFB_CFBD_PREFLIGHT_BUDGET_INVALID")
     call_plan_fits = remaining >= planned + reserve
+    capacity_bands = {
+        "plan_only": remaining >= planned,
+        "reserve_10": remaining >= planned + 10,
+        "reserve_20": remaining >= planned + 20,
+        "reserve_30": remaining >= planned + 30,
+        "reserve_40": remaining >= planned + 40,
+        "reserve_50": remaining >= planned + 50,
+    }
     if not call_plan_fits:
         blockers.append("CFBD_REPLAY_PLAN_EXCEEDS_REMAINING_QUOTA")
 
@@ -160,6 +168,7 @@ def evaluate_account(info: Mapping[str, Any], config: Mapping[str, Any]) -> tupl
         "weather_source_contract": weather_contract,
         "weather_transport_ready": weather_transport_ready,
         "call_plan_fits": call_plan_fits,
+        "capacity_bands": capacity_bands,
         "historical_replay_calls_performed": 0,
         "blockers": blockers,
         "authority": _zero_authority(),
