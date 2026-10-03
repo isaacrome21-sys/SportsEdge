@@ -171,7 +171,35 @@ def build_rows(board: list, season: int, week: int, asof):
     if not key:
         raise SystemExit("CFB_SDV_CFBD_API_KEY_REQUIRED")
     now = datetime.fromisoformat(asof.replace("Z", "+00:00")) if asof else datetime.now(timezone.utc)
+    def count_hits(games_):
+        n = 0
+        for r in board:
+            try:
+                resolve_game(expand_compact(r), games_)
+                n += 1
+            except SystemExit:
+                pass
+        return n
+
     raw_games = fetch_cfbd_games(season=season, week=week, cfbd_api_key=key)
+    if count_hits(raw_games) == 0:
+        best = (0, week, raw_games)
+        for w in range(1, 17):
+            if w == week:
+                continue
+            try:
+                g = fetch_cfbd_games(season=season, week=w, cfbd_api_key=key)
+            except Exception:
+                continue
+            h = count_hits(g)
+            if h > best[0]:
+                best = (h, w, g)
+        if best[0] == 0:
+            sample = [(g.away_team, g.home_team) for g in raw_games[:15]]
+            print("CFB_SDV_WEEK_SEARCH_FAILED sample week", week, "games:", sample)
+        else:
+            print(f"WEEK_AUTO_CORRECTED {week} -> {best[1]} ({best[0]} games matched)")
+            week, raw_games = best[1], best[2]
     try:
         weather = fetch_cfbd_weather(season=season, week=week, cfbd_api_key=key)
     except Exception as exc:  # CFBD weather is a paid tier; free keys get 401
