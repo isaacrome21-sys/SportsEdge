@@ -327,6 +327,12 @@ def main() -> int:
     from sportsedge.sports.cfb.sdv_selected_fit import load_selected_sdv_fit, score_selected_game
 
     board = json.loads(args.board_json)
+    if isinstance(board, dict) and board.get("backtest") == "residual":
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("cfb_rf", ROOT / "scripts" / "backtest_cfb_residual_features.py")
+        rf = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(rf)
+        return rf.main([])
     if isinstance(board, dict) and board.get("backtest"):
         # Phone-issue hook: run the leave-one-season-out backtest vs CFBD closing lines.
         import importlib.util
