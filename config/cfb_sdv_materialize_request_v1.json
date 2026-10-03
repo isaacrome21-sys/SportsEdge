@@ -1,9 +1,9 @@
 {
   "schema": "CFB_SDV_MATERIALIZE_REQUEST_V1",
   "mode": "ZERO_ATTEMPT_PUBLIC_TRAINING_MATERIALIZATION",
-  "requested_after_main_sha": "08b5685d3882c0a1dba26d1f62f23f2e3948d645",
+  "requested_after_main_sha": "9545510bc33d474c8e753aac7a0defc417cc8b3b",
   "expected_hash_binding": {
-    "code_manifest_sha256": "5d058b38840a15bddf417d7619ae30748c89884c79cf9cf20f960bfc4c375f5b",
+    "code_manifest_sha256": "496e1cfb440349986ec9f67ef71f99cd8061ac695c2fc9888aba06a33387c4c9",
     "config_bundle_sha256": "02cd18a71b5bf527c4c2d07a78b966444a4aecc0f06859ccf6cc87104625ee01"
   },
   "consume_candidate_attempts": false,
@@ -11,6 +11,6 @@
   "model_p_created": false,
   "promotion_authority": false,
   "official_authority": false,
-  "request_revision": 4,
-  "retry_reason": "POS_TEAM_ID_IDENTITY_SCHEMA_FIX"
+  "request_revision": 5,
+  "retry_reason": "BLANK_NUMERIC_SOURCE_CELL_FIX"
 }
