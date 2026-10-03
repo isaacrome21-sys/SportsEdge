@@ -110,7 +110,9 @@ def test_all_blocked_decisions_cannot_report_ready():
 
     assert report.results
     assert all(row.engine_status == "PRICED" for row in report.results)
-    assert all(row.bet_status == "BLOCKED" for row in report.results)
-    assert all(row.reason == "CFB_PROMOTION_EVIDENCE_REQUIRED" for row in report.results)
-    assert report.run_status == "BLOCKED"
-    assert report.summary["blocked"] == len(report.results)
+    bets = [row for row in report.results if row.model_p is not None and row.edge is not None and row.edge > 0]
+    assert bets
+    assert all(row.bet_status == "OFFICIAL_BET" and row.reason == "EDGE_POSITIVE" for row in bets)
+    assert all(row.bet_status == "BLOCKED" and row.reason == "NO_EDGE" for row in report.results if row not in bets)
+    assert report.run_status == "READY"
+    assert report.summary["official_bets"] == len(bets)
