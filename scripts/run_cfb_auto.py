@@ -30,10 +30,20 @@ from sportsedge.sports.cfb.game_freeze import (
     verify_frozen_cfb_game_artifact,
 )
 from sportsedge.sports.cfb.model_artifact import (
+    CFB_MODEL_ARTIFACT_SCHEMA,
     CFBModelArtifactError,
     cfb_model_code_surface_sha256,
     load_cfb_model_artifact,
 )
+from sportsedge.sports.cfb.selected_candidate_artifact import (
+    CFB_SELECTED_CANDIDATE_ARTIFACT_SCHEMA,
+    CFBSelectedCandidateArtifactError,
+    cfb_selected_candidate_code_surface_sha256,
+    load_cfb_selected_candidate_artifact,
+)
+from sportsedge.sports.cfb.selected_candidate_model import CFBSelectedCandidateScoreModel
+from sportsedge.sports.cfb.candidate_live_source import fetch_cfbd_candidate_metric_snapshots
+from sportsedge.sports.cfb.selected_candidate_runtime import run_selected_candidate_cfb_machine
 from sportsedge.sports.cfb.paths import DEFAULT_CFB_MODEL_ARTIFACT_PATH
 from sportsedge.sports.cfb.run_machine import run_it_cfb
 from sportsedge.sports.cfb.source import (
@@ -164,17 +174,31 @@ def _model(path: Path, *, repo_root: Path):
         payload = json.loads(raw.decode("utf-8"))
     except Exception as exc:
         raise CFBAutoError("CFB_AUTO_MODEL_ARTIFACT_UNREADABLE") from exc
-    code_sha = cfb_model_code_surface_sha256(repo_root)
+    schema = str(payload.get("schema_version") or "")
+    if schema == CFB_SELECTED_CANDIDATE_ARTIFACT_SCHEMA:
+        code_sha = cfb_selected_candidate_code_surface_sha256(repo_root)
+    elif schema == CFB_MODEL_ARTIFACT_SCHEMA:
+        code_sha = cfb_model_code_surface_sha256(repo_root)
+    else:
+        raise CFBAutoError("CFB_AUTO_MODEL_ARTIFACT_SCHEMA_UNSUPPORTED")
     if code_sha != registry["model_code_sha256"]:
         raise CFBAutoError("CFB_AUTO_MODEL_CODE_SHA256_REGISTRY_MISMATCH")
     try:
         verify_frozen_cfb_game_artifact(payload, artifact_bytes=raw, registry=registry)
-        model = load_cfb_model_artifact(
-            payload,
-            expected_model_code_sha256=registry["model_code_sha256"],
-            expected_training_source_sha256=registry["training_source_sha256"],
-        )
-    except (CFBModelArtifactError, CFBGameFreezeError) as exc:
+        if schema == CFB_SELECTED_CANDIDATE_ARTIFACT_SCHEMA:
+            model = load_cfb_selected_candidate_artifact(
+                payload,
+                expected_model_code_sha256=registry["model_code_sha256"],
+                expected_training_source_sha256=registry["training_source_sha256"],
+                expected_selection_result_sha256=registry.get("selection_result_sha256"),
+            )
+        else:
+            model = load_cfb_model_artifact(
+                payload,
+                expected_model_code_sha256=registry["model_code_sha256"],
+                expected_training_source_sha256=registry["training_source_sha256"],
+            )
+    except (CFBModelArtifactError, CFBSelectedCandidateArtifactError, CFBGameFreezeError) as exc:
         raise CFBAutoError(str(exc)) from exc
     return model, payload, registry
 
@@ -217,12 +241,6 @@ def _run_manual_model(
         games,
         fetch_cfbd_weather(season=season, week=week, cfbd_api_key=cfbd_key),
     )
-    metrics = fetch_cfbd_team_metrics(
-        season=season,
-        week=week,
-        cfbd_api_key=cfbd_key,
-        now=current,
-    )
     quotes = parse_the_odds_api_quotes(
         manual_events,
         games=games,
@@ -231,6 +249,33 @@ def _run_manual_model(
     )
     if not quotes:
         raise CFBAutoError("CFB_AUTO_MANUAL_BOARD_NO_MATCHING_QUOTES")
+    if isinstance(model, CFBSelectedCandidateScoreModel):
+        snapshots = fetch_cfbd_candidate_metric_snapshots(
+            season=season,
+            week=week,
+            cfbd_api_key=cfbd_key,
+            now=current,
+        )
+        return run_selected_candidate_cfb_machine(
+            mode="MANUAL",
+            season=season,
+            week=week,
+            model=model,
+            now=current,
+            games=games,
+            candidate_snapshots=snapshots,
+            quotes=quotes,
+            fbs_team_rows=team_rows,
+            root_seed=root_seed,
+            n_paths=n_paths,
+            frozen_artifact_sha256=getattr(model, "_frozen_artifact_sha256", None),
+        )
+    metrics = fetch_cfbd_team_metrics(
+        season=season,
+        week=week,
+        cfbd_api_key=cfbd_key,
+        now=current,
+    )
     return run_it_cfb(
         mode="MANUAL",
         season=season,
@@ -303,6 +348,8 @@ def main() -> int:
     try:
         cfbd_key = _credentials()
         model, artifact, registry = _model(args.model_artifact, repo_root=root)
+        if isinstance(model, CFBSelectedCandidateScoreModel):
+            object.__setattr__(model, "_frozen_artifact_sha256", artifact["artifact_sha256"])
         manual_events = _manual_board(args.board_json or os.environ.get("CFB_MANUAL_BOARD_JSON"))
         season = int(args.season if args.season is not None else current.year)
         week = int(args.week) if args.week is not None else discover_cfb_week(
