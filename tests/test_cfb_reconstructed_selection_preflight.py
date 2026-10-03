@@ -72,6 +72,12 @@ class TestCFBReconstructedSelectionPreflight(unittest.TestCase):
             "advanced_plus_4": True,
             "advanced_plus_10": True,
             "advanced_plus_20": True,
+            "recent_10_seasons_advanced": True,
+            "recent_9_seasons_advanced": True,
+            "recent_8_seasons_advanced": True,
+            "recent_7_seasons_advanced": True,
+            "recent_6_seasons_advanced": True,
+            "recent_5_seasons_advanced": True,
             "plan_only": True,
             "reserve_10": True,
             "reserve_20": True,
@@ -109,6 +115,18 @@ class TestCFBReconstructedSelectionPreflight(unittest.TestCase):
         self.assertEqual(seen["url"], "https://api.collegefootballdata.com/info")
         self.assertEqual(seen["authorization"], "Bearer secret-key")
         self.assertEqual(seen["timeout"], 20)
+
+
+    def test_recent_window_capacity_bands_are_monotone_and_redacted(self):
+        _, public = evaluate_account({"patronLevel": 1, "remainingCalls": 115}, CONFIG)
+        bands = public["capacity_bands"]
+        self.assertFalse(bands["recent_10_seasons_advanced"])
+        self.assertFalse(bands["recent_9_seasons_advanced"])
+        self.assertFalse(bands["recent_8_seasons_advanced"])
+        self.assertTrue(bands["recent_7_seasons_advanced"])
+        self.assertTrue(bands["recent_6_seasons_advanced"])
+        self.assertTrue(bands["recent_5_seasons_advanced"])
+        self.assertNotIn("remaining_quota", public)
 
 
     def test_advanced_only_band_can_fit_when_full_plan_does_not(self):

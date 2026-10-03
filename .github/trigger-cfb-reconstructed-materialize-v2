@@ -1,7 +1,7 @@
-CFB_RECONSTRUCTED_MATERIALIZE_REQUEST_V8
+CFB_RECONSTRUCTED_MATERIALIZE_REQUEST_V9
 requested_mode=MATERIALIZE_ONLY
 requested_utc=2026-10-03
-requested_reason=measure_redacted_advanced_only_replay_capacity
+requested_reason=measure_redacted_recent_window_replay_capacity
 no_evaluation_attempt=true
 no_backfill=true
-request_nonce=20261003T714394cb
+request_nonce=20261003Tbe1e79cc
