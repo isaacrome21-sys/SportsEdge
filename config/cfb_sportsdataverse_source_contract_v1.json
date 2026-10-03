@@ -33,9 +33,10 @@
           "espn_cfb_adv_situational",
           "espn_cfb_adv_drives"
         ],
-        "identity": "GAME_ID_PLUS_NUMERIC_POS_TEAM_ID",
-        "rule": "REQUIRE_IDENTICAL_TWO_TEAM_SET_ACROSS_REQUIRED_DATASETS",
-        "incomplete_game": "EXCLUDE_FROM_FEATURE_HISTORY_WITH_EXPLICIT_PROVENANCE_BEFORE_SNAPSHOT_AGGREGATION"
+        "identity": "GAME_ID_PLUS_NUMERIC_POS_TEAM_ID_PLUS_SEASON_PLUS_WEEK",
+        "drive_time_source": "CANONICAL_CFB_SCHEDULE_BY_GAME_ID",
+        "rule": "REQUIRE_IDENTICAL_TWO_TEAM_TEMPORAL_IDENTITY_ACROSS_REQUIRED_DATASETS",
+        "incomplete_or_temporally_inconsistent_game": "EXCLUDE_FROM_FEATURE_HISTORY_WITH_EXPLICIT_PROVENANCE_BEFORE_SNAPSHOT_AGGREGATION"
       }
     }
   },
