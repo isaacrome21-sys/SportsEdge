@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "sport": "CFB",
-  "model_family": "CFB_JOINT_MODEL_V1",
+  "model_family": "CFB_SELECTED_CANDIDATE_MODEL_V1",
   "status": "UNFROZEN",
   "artifact_path": "models/cfb_joint_v1.json",
   "artifact_sha256": null,
@@ -34,6 +34,10 @@
     "Because current-provider metric vintage may incorporate later information, historical holdout absolute score levels are engineering/model-selection diagnostics rather than unbiased historical generalization evidence. Shared provider-vintage contamination does not prove candidate ranking is unbiased.",
     "A frozen artifact under this registry grants no promotion authority and no historical validation claim; forward evidence must begin prospectively under the active promotion evidence policy.",
     "Synthetic fixture artifacts and CI determinism fixtures are prohibited as freeze evidence.",
-    "Runtime must fail closed while status is UNFROZEN."
-  ]
+    "Runtime must fail closed while status is UNFROZEN.",
+    "The production freeze is preregistered to the selected-candidate artifact schema and canonical selected-candidate runtime before candidate evaluation; activation may only bind exact post-bakeoff proposal/manifests without retuning."
+  ],
+  "artifact_schema_required": "CFB_SELECTED_CANDIDATE_MODEL_ARTIFACT_V1",
+  "runtime_contract_required": "CFB_SELECTED_CANDIDATE_CANONICAL_RUNTIME_V1",
+  "activation_builder": "scripts/activate_cfb_selected_candidate_freeze.py"
 }
