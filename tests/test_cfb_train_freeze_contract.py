@@ -33,6 +33,15 @@ class CFBTrainFreezeContractTests(unittest.TestCase):
         self.assertIn('CONSUME_ALL_FOUR_CFB_ATTEMPTS', text)
         self.assertIn('CFB_TRAIN_FREEZE_PREFLIGHT_ONLY', text)
         self.assertIn('CFB_TRAIN_FREEZE_EVALUATION_CONFIRMATION_ACCEPTED', text)
+        self.assertIn('activate_cfb_selected_candidate_freeze.py', text)
+
+    def test_evaluation_workflow_persists_public_winner_and_model_proposal_evidence(self):
+        text = (ROOT / '.github/workflows/cfb-reconstructed-selection-materialize.yml').read_text()
+        self.assertIn('candidate_bakeoff_result.json', text)
+        self.assertIn('cfb_selected_candidate_model_proposal.json', text)
+        self.assertIn('cfb_selected_candidate_model_build_attestation.json', text)
+        self.assertNotIn('cp "$RUNNER_TEMP/cfb_reconstructed_selection_rows.json"', text)
+        self.assertNotIn('cp "$RUNNER_TEMP/cfb_candidate_bakeoff_private_capture.json"', text)
 
 
 if __name__ == '__main__':

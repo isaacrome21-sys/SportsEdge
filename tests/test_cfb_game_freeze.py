@@ -19,6 +19,9 @@ class CFBGameFreezeTests(unittest.TestCase):
     def test_committed_registry_is_explicitly_unfrozen(self):
         payload = json.loads((ROOT / "config/cfb_game_model_freeze.json").read_text())
         self.assertEqual(payload["status"], "UNFROZEN")
+        self.assertEqual(payload["model_family"], "CFB_SELECTED_CANDIDATE_MODEL_V1")
+        self.assertEqual(payload["artifact_schema_required"], "CFB_SELECTED_CANDIDATE_MODEL_ARTIFACT_V1")
+        self.assertEqual(payload["runtime_contract_required"], "CFB_SELECTED_CANDIDATE_CANONICAL_RUNTIME_V1")
         self.assertEqual(payload["blocker"], "CFB_RECONSTRUCTED_TRAINING_AND_SELECTION_NOT_COMPLETE")
         self.assertFalse(payload["promotion_authority"])
         self.assertFalse(payload["evidence_clock_authority"])
@@ -36,6 +39,9 @@ class CFBGameFreezeTests(unittest.TestCase):
                 "schema_version": 1,
                 "sport": "CFB",
                 "status": "FROZEN",
+                "model_family": "CFB_SELECTED_CANDIDATE_MODEL_V1",
+                "artifact_schema_required": "CFB_SELECTED_CANDIDATE_MODEL_ARTIFACT_V1",
+                "runtime_contract_required": "CFB_SELECTED_CANDIDATE_CANONICAL_RUNTIME_V1",
                 "artifact_path": "models/cfb_joint_v1.json",
                 "artifact_sha256": "a" * 64,
                 "artifact_file_sha256": "b" * 64,
