@@ -1,7 +1,7 @@
-CFB_RECONSTRUCTED_MATERIALIZE_REQUEST_V6
+CFB_RECONSTRUCTED_MATERIALIZE_REQUEST_V7
 requested_mode=MATERIALIZE_ONLY
 requested_utc=2026-10-03
-requested_reason=finish_cfb_serving_lane_zero_attempt_materialization
+requested_reason=measure_redacted_replay_capacity_after_band_diagnostic
 no_evaluation_attempt=true
 no_backfill=true
-request_nonce=20261003T81832f6f
+request_nonce=20261003T1f7607cd
