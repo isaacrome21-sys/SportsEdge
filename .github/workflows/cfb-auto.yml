@@ -115,13 +115,26 @@ jobs:
               f"rows={len(rows)} bets={bets} run_status={card['run_status']} "
               "market_source=MANUAL_SCREENSHOT_BOARD"
           )
+          summary = card.get("summary") or {}
+          if summary.get("both_sides") is not True or summary.get("catalog_complete") is not True:
+              raise SystemExit("CFB_AUTO_PROP_SIDE_TOTAL_INCOMPLETE")
+          if int(summary.get("prop_rows") or 0) < 40 or int(summary.get("side_rows") or 0) < 16 or int(summary.get("total_rows") or 0) < 10:
+              raise SystemExit("CFB_AUTO_PROP_SIDE_TOTAL_COVERAGE")
           PY
+
+      - name: Render CFB both-side board
+        if: always() && steps.run.outputs.card_path != ''
+        env:
+          CARD_PATH: ${{ steps.run.outputs.card_path }}
+        run: python scripts/render_football_board_card.py --engine-output "$CARD_PATH" --out-dir artifacts/cfb_myspari
 
       - name: Upload CFB auto card
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: cfb-auto-card
-          path: artifacts/run_it/cfb_auto_card_*.json
+          path: |
+            artifacts/run_it/cfb_auto_card_*.json
+            artifacts/cfb_myspari/
           if-no-files-found: error
           retention-days: 14

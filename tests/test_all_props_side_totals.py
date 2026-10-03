@@ -204,3 +204,15 @@ def test_football_maps_remaining_prop_families_to_both_sides():
     assert sacks == {"OVER", "UNDER"}
     assert board["summary"]["both_sides"] is True
     assert board["official_authority"] is False
+
+
+def test_mlb_empty_board_lists_both_sides_of_every_catalog_market():
+    from sportsedge.mlb_full_board import catalog_complete
+
+    board = emit_all_props_side_totals([])
+    assert catalog_complete(board["summary"]) is True
+    assert board["summary"]["catalog_markets"] >= 38
+    for market in catalog_markets():
+        sides = {row["side"] for row in board["rows"] if row["market"] == market}
+        assert set(pair_sides(market)) <= sides
+        assert all(row["official_eligible"] is False for row in board["rows"] if row["market"] == market)

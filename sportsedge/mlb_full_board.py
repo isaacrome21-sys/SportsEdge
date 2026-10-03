@@ -150,6 +150,17 @@ def _complement_row(market: str, raw: Mapping[str, Any], side: str) -> dict[str,
     }
 
 
+def catalog_complete(summary: Mapping[str, Any]) -> bool:
+    """True only when every catalog prop, side, and total has both sides."""
+    return (
+        summary.get("both_sides") is True
+        and int(summary.get("catalog_markets") or 0) >= 38
+        and int(summary.get("side_rows") or 0) >= 8
+        and int(summary.get("total_rows") or 0) >= 12
+        and int(summary.get("prop_rows") or 0) >= 40
+    )
+
+
 def emit_all_props_side_totals(
     rows: Sequence[Mapping[str, Any]],
     *,

@@ -382,6 +382,7 @@ def main() -> int:
         report_payload = report.to_dict()
         board = (report_payload.get("summary") or {}).get("full_board") or {}
         board_summary = board.get("summary") or {}
+        from sportsedge.football_full_board import catalog_complete
         payload = {
             "schema_version": "CFB_AUTO_RUN_V1",
             "status": "SUCCESS",
@@ -392,7 +393,7 @@ def main() -> int:
                 "side_rows": board_summary.get("side_rows"),
                 "total_rows": board_summary.get("total_rows"),
                 "prop_rows": board_summary.get("prop_rows"),
-                "catalog_complete": board_summary.get("both_sides") is True and (board_summary.get("side_rows") or 0) >= 2 and (board_summary.get("total_rows") or 0) >= 2 and (board_summary.get("prop_rows") or 0) >= 2,
+                "catalog_complete": catalog_complete(board_summary),
             },
             "market_input_source": "MANUAL_SCREENSHOT_BOARD",
             "season": season,
@@ -439,7 +440,7 @@ def main() -> int:
         }, sort_keys=True))
         return 0
     except (CFBAutoError, ValueError) as exc:
-        from sportsedge.football_full_board import board_from_machine_results
+        from sportsedge.football_full_board import board_from_machine_results, catalog_complete
         board = board_from_machine_results("CFB", [])
         payload = {
             "schema_version": "CFB_AUTO_RUN_V1",
@@ -452,7 +453,7 @@ def main() -> int:
                 "side_rows": board["summary"]["side_rows"],
                 "total_rows": board["summary"]["total_rows"],
                 "prop_rows": board["summary"]["prop_rows"],
-                "catalog_complete": board["summary"]["both_sides"] is True and board["summary"]["side_rows"] >= 2 and board["summary"]["total_rows"] >= 2 and board["summary"]["prop_rows"] >= 2,
+                "catalog_complete": catalog_complete(board["summary"]),
             },
             "report": board,
             "governance": {
