@@ -1,4 +1,8 @@
-from scripts.materialize_cfb_sportsdataverse_training import _predictive_surface, _scope_complete_advanced_join_games
+from scripts.materialize_cfb_sportsdataverse_training import (
+    _predictive_surface,
+    _scope_complete_advanced_join_games,
+    _unresolved_venue_bindings,
+)
 from sportsedge.sports.cfb.sportsdataverse_history import TeamSnapshot
 
 
@@ -107,3 +111,28 @@ def test_temporal_disagreement_is_scoped_out_before_snapshot_filtering():
     ]
     for dataset in ("espn_cfb_adv_team","espn_cfb_adv_situational","espn_cfb_adv_drives"):
         assert scoped[dataset]==[]
+
+
+def test_unresolved_venue_bindings_reports_all_missing_ids_in_stable_order():
+    rows=[
+        {"game_id":"20"},
+        {"game_id":"10"},
+        {"game_id":"30"},
+    ]
+    schedules={
+        "10":{"game_id":"10","venue_id":"2031","venue":"Pitbull Stadium"},
+        "20":{"game_id":"20","venue_id":"9999","venue":"Missing B"},
+        "30":{"game_id":"30","venue_id":"218","venue":"FIU Stadium"},
+    }
+    venues={
+        218:{"venue_id":218,"name":"FIU Stadium","latitude":25.75,"longitude":-80.38,"game_indoor":False},
+    }
+    unresolved=_unresolved_venue_bindings(
+        predictive_rows=rows,
+        schedule_by_game=schedules,
+        venues=venues,
+    )
+    assert unresolved==[
+        {"game_id":"10","venue_id":2031,"venue_name":"Pitbull Stadium"},
+        {"game_id":"20","venue_id":9999,"venue_name":"Missing B"},
+    ]

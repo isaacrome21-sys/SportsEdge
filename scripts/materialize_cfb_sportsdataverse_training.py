@@ -42,6 +42,7 @@ from sportsedge.sports.cfb.sportsdataverse_prereg_hash import CODE_PATHS, CONFIG
 from sportsedge.sports.cfb.sportsdataverse_receipts import receipt, validate_receipts
 from sportsedge.sports.cfb.sportsdataverse_training_rows import attach_training_labels
 from sportsedge.sports.cfb.sportsdataverse_venue_source import (
+    apply_pinned_venue_aliases,
     apply_pinned_venue_supplements,
     parse_pinned_venues,
     venue_source_attestation,
@@ -351,6 +352,8 @@ def _venue_source(weather_contract: Mapping[str, Any], cache_root: Path):
     pinned_usable_rows=len(venues)
     supplements=cfg.get("supplements") or []
     venues=apply_pinned_venue_supplements(venues,supplements)
+    aliases=cfg.get("aliases") or []
+    venues=apply_pinned_venue_aliases(venues,aliases)
     return venues, {
         **venue_source_attestation(raw, usable_rows=pinned_usable_rows),
         "repository": repo,
@@ -359,6 +362,8 @@ def _venue_source(weather_contract: Mapping[str, Any], cache_root: Path):
         "url": url,
         "supplements": supplements,
         "supplement_count": len(supplements),
+        "aliases": aliases,
+        "alias_count": len(aliases),
         "combined_usable_rows": len(venues),
     }
 
@@ -380,6 +385,32 @@ def _weather_request(params: Mapping[str, Any], cache_root: Path) -> tuple[Any, 
     }
 
 
+def _unresolved_venue_bindings(
+    *,
+    predictive_rows: list[dict[str, Any]],
+    schedule_by_game: Mapping[str, Mapping[str, Any]],
+    venues: Mapping[int, Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    unresolved=[]
+    for row in predictive_rows:
+        gid=str(row["game_id"])
+        schedule=schedule_by_game.get(gid)
+        if not isinstance(schedule, Mapping):
+            raise SDVTrainingMaterializerError(f"CFB_SDV_SCHEDULE_BINDING_MISSING:{gid}")
+        raw=str(schedule.get("venue_id") or "").strip()
+        try:
+            venue_id=int(raw)
+        except ValueError as exc:
+            raise SDVTrainingMaterializerError(f"CFB_SDV_VENUE_ID_REQUIRED:{gid}") from exc
+        if not isinstance(venues.get(venue_id), Mapping):
+            unresolved.append({
+                "game_id":gid,
+                "venue_id":venue_id,
+                "venue_name":str(schedule.get("venue") or "").strip() or None,
+            })
+    return sorted(unresolved,key=lambda row:(int(row["venue_id"]),str(row["game_id"])))
+
+
 def _attach_weather(
     *,
     predictive_rows: list[dict[str, Any]],
@@ -392,6 +423,19 @@ def _attach_weather(
     max_locations = int(batch_cfg.get("max_locations_per_request") or 50)
     if batch_cfg.get("multiple_coordinates_allowed") is not True or batch_cfg.get("response_mapping") != "REQUEST_ORDER":
         raise SDVTrainingMaterializerError("CFB_SDV_WEATHER_BATCH_CONTRACT_INVALID")
+
+    unresolved=_unresolved_venue_bindings(
+        predictive_rows=predictive_rows,
+        schedule_by_game=schedule_by_game,
+        venues=venues,
+    )
+    if unresolved:
+        raise SDVTrainingMaterializerError(
+            "CFB_SDV_REFERENCED_VENUES_UNRESOLVED:"
+            + _canonical_sha(unresolved)
+            + ":"
+            + json.dumps(unresolved[:50],sort_keys=True,separators=(",",":"))
+        )
 
     row_context: dict[str, dict[str, Any]] = {}
     outdoor_by_season: dict[int, set[int]] = defaultdict(set)
