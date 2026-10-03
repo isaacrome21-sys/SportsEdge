@@ -1,16 +1,16 @@
 {
   "schema": "CFB_SDV_MATERIALIZE_REQUEST_V1",
   "mode": "ZERO_ATTEMPT_PUBLIC_TRAINING_MATERIALIZATION",
-  "requested_after_main_sha": "5c2430270f7c14bf2b12a2f7446be2fe8c48dc76",
+  "requested_after_main_sha": "f6485f1278b54a6d01f9382dc4d3aff0d7252cc0",
   "expected_hash_binding": {
-    "code_manifest_sha256": "21394b1230f71e43188c63fa0ac898fa385dbc7af06990f618645210d891ce35",
-    "config_bundle_sha256": "40b479cddb72fa682661786d11762a57b3c42f89a032913a239c33bbf7853772"
+    "code_manifest_sha256": "a8e79216577981e2c815cc6c5ab29636b4029e68657509c19d5fe4b1b8003e81",
+    "config_bundle_sha256": "3a5a5b7861551c1da2e891b245fb01d772e4b1dd68eb2e999ed4ed1785127f98"
   },
   "consume_candidate_attempts": false,
   "run_candidate_evaluation": false,
   "model_p_created": false,
   "promotion_authority": false,
   "official_authority": false,
-  "request_revision": 9,
-  "retry_reason": "EXPLICIT_HASH_BOUND_VENUE_5960_SUPPLEMENT"
+  "request_revision": 10,
+  "retry_reason": "VENUE_2031_PITBULL_STADIUM_SUPPLEMENT"
 }
