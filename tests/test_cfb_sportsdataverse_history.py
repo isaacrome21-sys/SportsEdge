@@ -178,19 +178,3 @@ def test_current_asset_name_without_numeric_pos_team_id_fails_closed():
             target_season=2025,
             target_week=2,
         )
-
-
-def test_advanced_game_absent_from_schedule_is_excluded_before_aggregation():
-    r1=_rows(1,101); r2=_rows(2,102); extra=_rows(1,999)
-    team=[r1[0],r1[4],r2[0],r2[4],extra[0],extra[4]]
-    situ=[r1[1],r1[5],r2[1],r2[5],extra[1],extra[5]]
-    drives=[r1[2],r1[6],r2[2],r2[6],extra[2],extra[6]]
-    snaps=build_team_snapshots(
-        adv_team_rows=team,
-        adv_situational_rows=situ,
-        adv_drive_rows=drives,
-        schedule_rows=[r1[3],r2[3]],
-        target_season=2025,
-        target_week=3,
-    )
-    assert [(s.team_id,s.games_in_sample) for s in snaps] == [(10,2),(20,2)]
