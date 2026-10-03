@@ -154,3 +154,21 @@ def test_football_emits_both_sides_of_remaining_prop_families():
     assert props["UNDER"]["american_odds"] == -150
     assert quoted["summary"]["both_sides"] is True
     assert quoted["official_authority"] is False
+
+
+def test_nfl_auto_payload_attaches_board_without_editing_frozen_script():
+    from pathlib import Path
+    from sportsedge.nfl_both_side_summary import attach_nfl_auto_payload
+
+    script = Path("scripts/run_nfl_auto.py").read_text(encoding="utf-8")
+    assert "attach_nfl_both_sides" not in script
+    assert "nfl_both_side_summary" not in script
+    attached = attach_nfl_auto_payload({
+        "schema_version": "NFL_AUTO_RUN_V2",
+        "status": "BLOCKED",
+        "report": {"results": [], "summary": {}},
+    })
+    assert attached["summary"]["both_sides"] is True
+    assert attached["summary"]["catalog_complete"] is True
+    assert attached["summary"]["prop_rows"] >= 2
+    assert attached["report"]["summary"]["full_board"]["official_authority"] is False

@@ -195,6 +195,7 @@ def main() -> int:
         "total_rows": full_board["summary"]["total_rows"],
         "prop_rows": full_board["summary"]["prop_rows"],
         "both_sides": full_board["summary"].get("both_sides"),
+        "catalog_complete": full_board["summary"].get("both_sides") is True and full_board["summary"]["side_rows"] >= 2 and full_board["summary"]["total_rows"] >= 2 and full_board["summary"]["prop_rows"] >= 2,
         "output": str(args.output),
     }, sort_keys=True))
     return 2 if status == "BLOCKED" else 0
