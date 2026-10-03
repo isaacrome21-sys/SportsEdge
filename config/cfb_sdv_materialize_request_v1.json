@@ -11,6 +11,6 @@
   "model_p_created": false,
   "promotion_authority": false,
   "official_authority": false,
-  "request_revision": 6,
-  "retry_reason": "ADVANCED_JOIN_COVERAGE_POLICY_AND_PROVENANCE"
+  "request_revision": 7,
+  "retry_reason": "ADVANCED_JOIN_COVERAGE_POLICY_AND_PROVENANCE_PR_CI_REFRESH"
 }
