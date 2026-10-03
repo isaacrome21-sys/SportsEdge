@@ -9,8 +9,8 @@ from scripts.preflight_cfb_reconstructed_selection import evaluate_account, fetc
 CONFIG = {
     "standard_tier_monthly_quotas": {"0": 1000, "1": 5000, "2": 30000, "3": 75000, "4": 125000, "5": 200000, "6": 500000},
     "tier_labels": {"0": "FREE", "1": "TIER_1", "2": "TIER_2", "3": "TIER_3", "4": "TIER_4", "5": "TIER_5", "6": "TIER_6"},
-    "planned_new_calls_upper_bound": {"advanced_metrics": 176, "total": 200},
-    "retry_reserve_calls": 50,
+    "planned_new_calls_upper_bound": {"advanced_metrics": 80, "total": 92},
+    "retry_reserve_calls": 3,
     "weather_reconstruction": {
         "contract": "CFBD_VENUES_OPEN_METEO_ERA5_RECONSTRUCTED_CURRENT_PROVIDER_VINTAGE",
         "venue_endpoint": "/venues",
@@ -39,8 +39,8 @@ class TestCFBReconstructedSelectionPreflight(unittest.TestCase):
         self.assertEqual(private["status"], "VERIFIED_BEFORE_FIRST_REPLAY_CALL")
         self.assertEqual(private["active_cfbd_tier"], "TIER_1")
         self.assertEqual(private["monthly_quota"], 5000)
-        self.assertEqual(private["planned_new_calls"], 200)
-        self.assertEqual(private["retry_reserve_calls"], 50)
+        self.assertEqual(private["planned_new_calls"], 92)
+        self.assertEqual(private["retry_reserve_calls"], 3)
         self.assertTrue(public["call_plan_fits"])
         self.assertTrue(public["weather_transport_ready"])
         self.assertFalse(public["cfbd_weather_required_for_selection"])
@@ -56,12 +56,12 @@ class TestCFBReconstructedSelectionPreflight(unittest.TestCase):
         self.assertEqual(private["historical_replay_calls_performed"], 0)
 
     def test_remaining_quota_must_cover_plan_and_retry_reserve(self):
-        private, _ = evaluate_account({"patronLevel": 1, "remainingCalls": 249}, CONFIG)
+        private, _ = evaluate_account({"patronLevel": 1, "remainingCalls": 94}, CONFIG)
         self.assertIn("CFBD_REPLAY_PLAN_EXCEEDS_REMAINING_QUOTA", private["blockers"])
         self.assertEqual(private["status"], "BLOCKED_PROVIDER_PREFLIGHT")
 
     def test_exact_plan_plus_reserve_is_admissible(self):
-        private, _ = evaluate_account({"patronLevel": 1, "remainingCalls": 250}, CONFIG)
+        private, _ = evaluate_account({"patronLevel": 1, "remainingCalls": 95}, CONFIG)
         self.assertEqual(private["status"], "VERIFIED_BEFORE_FIRST_REPLAY_CALL")
 
 
@@ -81,9 +81,9 @@ class TestCFBReconstructedSelectionPreflight(unittest.TestCase):
             "plan_only": True,
             "reserve_10": True,
             "reserve_20": True,
-            "reserve_30": False,
-            "reserve_40": False,
-            "reserve_50": False,
+            "reserve_30": True,
+            "reserve_40": True,
+            "reserve_50": True,
         })
         self.assertNotIn("remaining_quota", public)
 
@@ -130,7 +130,7 @@ class TestCFBReconstructedSelectionPreflight(unittest.TestCase):
 
 
     def test_advanced_only_band_can_fit_when_full_plan_does_not(self):
-        _, public = evaluate_account({"patronLevel": 1, "remainingCalls": 180}, CONFIG)
+        _, public = evaluate_account({"patronLevel": 1, "remainingCalls": 85}, CONFIG)
         self.assertTrue(public["capacity_bands"]["advanced_metrics_only"])
         self.assertTrue(public["capacity_bands"]["advanced_plus_4"])
         self.assertFalse(public["capacity_bands"]["advanced_plus_10"])
