@@ -16,18 +16,21 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class CFBGameFreezeTests(unittest.TestCase):
-    def test_committed_registry_is_explicitly_unfrozen(self):
+    def test_committed_registry_is_either_fail_closed_or_validly_frozen(self):
         payload = json.loads((ROOT / "config/cfb_game_model_freeze.json").read_text())
-        self.assertEqual(payload["status"], "UNFROZEN")
-        self.assertEqual(payload["blocker"], "CFB_RECONSTRUCTED_TRAINING_AND_SELECTION_NOT_COMPLETE")
+        self.assertIn(payload["status"], {"UNFROZEN", "FROZEN"})
         self.assertFalse(payload["promotion_authority"])
         self.assertFalse(payload["evidence_clock_authority"])
-        self.assertIsNone(payload["artifact_sha256"])
-        self.assertIsNone(payload["artifact_file_sha256"])
+        if payload["status"] == "UNFROZEN":
+            self.assertEqual(payload["blocker"], "CFB_RECONSTRUCTED_TRAINING_AND_SELECTION_NOT_COMPLETE")
+            self.assertIsNone(payload["artifact_sha256"])
+            self.assertIsNone(payload["artifact_file_sha256"])
+            with self.assertRaisesRegex(CFBGameFreezeError, "CFB_RECONSTRUCTED_TRAINING_AND_SELECTION_NOT_COMPLETE"):
+                load_cfb_game_freeze(ROOT / "config/cfb_game_model_freeze.json")
+        else:
+            row = load_cfb_game_freeze(ROOT / "config/cfb_game_model_freeze.json")
+            self.assertEqual(row["status"], "FROZEN")
 
-    def test_unfrozen_registry_fails_closed(self):
-        with self.assertRaisesRegex(CFBGameFreezeError, "CFB_RECONSTRUCTED_TRAINING_AND_SELECTION_NOT_COMPLETE"):
-            load_cfb_game_freeze(ROOT / "config/cfb_game_model_freeze.json")
 
     def test_frozen_registry_requires_all_identity_hashes(self):
         with tempfile.TemporaryDirectory() as td:
@@ -50,6 +53,38 @@ class CFBGameFreezeTests(unittest.TestCase):
             }))
             row = load_cfb_game_freeze(path)
             self.assertEqual(row["fit_max_season"], 2025)
+
+    def test_selected_frozen_registry_requires_selection_and_evidence_hashes(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "freeze.json"
+            payload = {
+                "schema_version": 1,
+                "sport": "CFB",
+                "status": "FROZEN",
+                "model_family": "CFB_SELECTED_CANDIDATE_MODEL_V1",
+                "candidate_family": "PRIOR_CURRENT_BLEND",
+                "artifact_path": "models/cfb_joint_v1.json",
+                "artifact_sha256": "a" * 64,
+                "artifact_file_sha256": "b" * 64,
+                "model_code_sha256": "c" * 64,
+                "training_source_sha256": "d" * 64,
+                "source_manifest_sha256": "e" * 64,
+                "predictive_code_manifest_sha256": "f" * 64,
+                "acquisition_code_manifest_sha256": "1" * 64,
+                "selection_result_sha256": "2" * 64,
+                "freeze_evidence_file_sha256": "3" * 64,
+                "fit_max_season": 2025,
+                "provenance_class": "RECONSTRUCTED_HISTORICAL_NOT_PIT",
+                "promotion_authority": False,
+                "evidence_clock_authority": False,
+            }
+            path.write_text(json.dumps(payload))
+            row = load_cfb_game_freeze(path)
+            self.assertEqual(row["selection_result_sha256"], "2" * 64)
+            payload["selection_result_sha256"] = None
+            path.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(CFBGameFreezeError, "SELECTION_RESULT_SHA_INVALID"):
+                load_cfb_game_freeze(path)
 
     def test_exact_file_and_internal_artifact_identity_are_separate(self):
         payload = {
