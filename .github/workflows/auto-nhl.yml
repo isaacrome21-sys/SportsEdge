@@ -1,0 +1,85 @@
+name: auto-nhl
+
+on:
+  workflow_dispatch:
+    inputs:
+      board_json:
+        description: "User-supplied NHL board JSON. Required; no sportsbook API is used."
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auto-nhl
+  cancel-in-progress: false
+
+jobs:
+  card:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NHL_MANUAL_BOARD_JSON: ${{ inputs.board_json }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Run NHL card against user-supplied lines
+        id: run
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/nhl_myspari
+          set +e
+          python scripts/run_auto_nhl_resilient.py --output artifacts/live_nhl_card.json
+          rc=$?
+          set -e
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+
+      - name: Assert manual-line card contract
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path("artifacts/live_nhl_card.json")
+          if not path.is_file():
+              raise SystemExit("NHL_AUTO_CARD_MISSING")
+          card = json.loads(path.read_text())
+          gov = card.get("governance") or {}
+          if gov.get("sportsbook_api_used") is not False or gov.get("odds_api_called") is not False:
+              raise SystemExit("NHL_AUTO_ODDS_API_GUARD_FAILED")
+          if gov.get("manual_market_board_required") is not True or gov.get("lines_invented") is not False:
+              raise SystemExit("NHL_AUTO_MANUAL_BOARD_GUARD_FAILED")
+          if card.get("market_input_source") != "MANUAL_SCREENSHOT_BOARD":
+              raise SystemExit("NHL_AUTO_MARKET_SOURCE_INVALID")
+          funnel = card.get("funnel") or {}
+          if int(funnel.get("odds_rows_fetched") or 0) == 0 or card.get("run_status") == "BLOCKED_NO_ODDS":
+              raise SystemExit("NHL_AUTO_ZERO_QUOTES")
+          rows = card.get("results") or []
+          bets = [row for row in rows if row.get("model_p") is not None and row.get("edge") is not None and float(row["edge"]) > 0]
+          if any(row.get("bet_status") == "OFFICIAL_BET" or row.get("reason") == "CFB_PROMOTION_EVIDENCE_REQUIRED" for row in rows):
+              raise SystemExit("NHL_AUTO_FORCED_BLOCK_OR_OFFICIAL")
+          if int(funnel.get("bets_emitted") or 0) != len(bets):
+              raise SystemExit("NHL_AUTO_BET_EMIT_MISMATCH")
+          print(f"NHL_AUTO_CARD_OK rows={len(rows)} bets={len(bets)} run_status={card['run_status']}")
+          PY
+
+      - name: Render NHL phone card
+        if: always() && hashFiles('artifacts/live_nhl_card.json') != ''
+        run: python scripts/render_nhl_auto_card.py --engine-output artifacts/live_nhl_card.json --out-dir artifacts/nhl_myspari
+
+      - name: Upload NHL auto card
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: live-nhl-card
+          path: |
+            artifacts/live_nhl_card.json
+            artifacts/nhl_myspari/
+          if-no-files-found: error
+          retention-days: 14
