@@ -5,6 +5,16 @@ The script never trains a model. It requires a registry-bound frozen CFB joint-m
 artifact, CFBD football-data credentials, and a caller-supplied sportsbook board
 transcribed from the user's screenshots. It never fetches sportsbook prices from an
 odds API. Objective context is a sidecar and never substitutes for Model_P or evidence.
+
+CFBD rate-limit (HTTP 429) handling
+------------------------------------
+CFBD live fetches inside _run_manual_model are wrapped with _cfbd_fetch_with_retry().
+Up to 3 attempts with exponential backoff (2s, 4s). If all attempts are exhausted a
+CFBSourceThrottleError is raised. main() catches this separately from hard governance
+errors and writes a BLOCKED payload with cfbd_source_status=STALE_CFBD_429 so ops can
+distinguish a transient throttle from a real model/governance failure. The run still
+blocks — no fabricated features are ever substituted — but with a structured error code
+rather than an unhandled exception traceback.
 """
 from __future__ import annotations
 
@@ -15,8 +25,9 @@ import json
 import os
 from pathlib import Path
 import sys
+import time
 from time import perf_counter
-from typing import Callable, Sequence
+from typing import Callable, Sequence, TypeVar
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
@@ -56,10 +67,80 @@ from sportsedge.sports.cfb.source import (
     parse_the_odds_api_quotes,
 )
 
+# ---------------------------------------------------------------------------
+# Error hierarchy
+# ---------------------------------------------------------------------------
 
 class CFBAutoError(ValueError):
     pass
 
+
+class CFBSourceThrottleError(CFBAutoError):
+    """CFBD returned HTTP 429 (rate-limit) and all retry attempts were exhausted."""
+
+
+# ---------------------------------------------------------------------------
+# CFBD fetch retry wrapper
+# ---------------------------------------------------------------------------
+
+_T = TypeVar("_T")
+
+_CFBD_MAX_ATTEMPTS = 3
+_CFBD_BACKOFF_BASE = 2.0   # seconds; attempt n sleeps base * 2^(n-1): 2s, 4s
+_CFBD_BACKOFF_MAX = 10.0   # hard ceiling on any single sleep
+
+
+def _cfbd_fetch_with_retry(fn: Callable[[], _T], *, label: str) -> _T:
+    """Call fn() up to _CFBD_MAX_ATTEMPTS times, retrying on 429 or network errors.
+
+    Parameters
+    ----------
+    fn:
+        Zero-argument callable wrapping the CFBD fetch (use functools.partial or
+        a lambda to bind arguments before passing).
+    label:
+        Short string identifying which fetch is being retried (for error messages).
+
+    Raises
+    ------
+    CFBSourceThrottleError
+        When all attempts are exhausted due to HTTP 429 responses.
+    CFBAutoError
+        Re-raised immediately for any non-throttle exception on the first attempt;
+        subsequent attempts only retry on 429 / connection-level errors.
+    """
+    last_exc: Exception | None = None
+    for attempt in range(1, _CFBD_MAX_ATTEMPTS + 1):
+        try:
+            return fn()
+        except Exception as exc:
+            exc_str = str(exc)
+            is_throttle = (
+                "429" in exc_str
+                or "Too Many Requests" in exc_str
+                or "rate limit" in exc_str.lower()
+            )
+            is_network = (
+                "ConnectionError" in type(exc).__name__
+                or "Timeout" in type(exc).__name__
+                or "ConnectTimeout" in type(exc).__name__
+                or "ReadTimeout" in type(exc).__name__
+            )
+            if not (is_throttle or is_network):
+                # Hard failure — not a transient HTTP issue; raise immediately.
+                raise
+            last_exc = exc
+            if attempt < _CFBD_MAX_ATTEMPTS:
+                sleep_s = min(_CFBD_BACKOFF_BASE * (2 ** (attempt - 1)), _CFBD_BACKOFF_MAX)
+                time.sleep(sleep_s)
+    raise CFBSourceThrottleError(
+        f"CFB_AUTO_CFBD_THROTTLE:{label}:exhausted {_CFBD_MAX_ATTEMPTS} attempts — {last_exc}"
+    ) from last_exc
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 def _utc(value: str | None) -> datetime:
     if not value:
@@ -224,6 +305,11 @@ def _write(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
+
+# ---------------------------------------------------------------------------
+# Core model runner — CFBD fetches wrapped with retry
+# ---------------------------------------------------------------------------
+
 def _run_manual_model(
     *,
     current: datetime,
@@ -238,12 +324,29 @@ def _run_manual_model(
     root_seed: int,
     n_paths: int,
 ):
-    team_rows = fetch_cfbd_teams(season=season, cfbd_api_key=cfbd_key)
-    games = fetch_cfbd_games(season=season, week=week, cfbd_api_key=cfbd_key)
-    games = attach_weather(
-        games,
-        fetch_cfbd_weather(season=season, week=week, cfbd_api_key=cfbd_key),
+    """Run the CFB model against the manual board.
+
+    All CFBD network fetches are wrapped with _cfbd_fetch_with_retry() so a
+    transient HTTP 429 triggers exponential backoff rather than immediately
+    killing the run. A CFBSourceThrottleError is raised if all retries are
+    exhausted; the caller (main) catches it separately from hard governance
+    errors and emits a structured BLOCKED payload.
+    """
+    import functools
+
+    team_rows = _cfbd_fetch_with_retry(
+        functools.partial(fetch_cfbd_teams, season=season, cfbd_api_key=cfbd_key),
+        label="fetch_cfbd_teams",
     )
+    games = _cfbd_fetch_with_retry(
+        functools.partial(fetch_cfbd_games, season=season, week=week, cfbd_api_key=cfbd_key),
+        label="fetch_cfbd_games",
+    )
+    weather = _cfbd_fetch_with_retry(
+        functools.partial(fetch_cfbd_weather, season=season, week=week, cfbd_api_key=cfbd_key),
+        label="fetch_cfbd_weather",
+    )
+    games = attach_weather(games, weather)
     quotes = parse_the_odds_api_quotes(
         manual_events,
         games=games,
@@ -253,11 +356,15 @@ def _run_manual_model(
     if not quotes:
         raise CFBAutoError("CFB_AUTO_MANUAL_BOARD_NO_MATCHING_QUOTES")
     if model_runtime == "SELECTED_CANDIDATE":
-        snapshots = fetch_cfbd_candidate_metric_snapshots(
-            season=season,
-            week=week,
-            cfbd_api_key=cfbd_key,
-            now=current,
+        snapshots = _cfbd_fetch_with_retry(
+            functools.partial(
+                fetch_cfbd_candidate_metric_snapshots,
+                season=season,
+                week=week,
+                cfbd_api_key=cfbd_key,
+                now=current,
+            ),
+            label="fetch_cfbd_candidate_metric_snapshots",
         )
         return run_selected_candidate_cfb_machine(
             mode="MANUAL",
@@ -275,11 +382,15 @@ def _run_manual_model(
         )
     if model_runtime != "LEGACY_JOINT":
         raise CFBAutoError("CFB_AUTO_MODEL_RUNTIME_UNSUPPORTED")
-    metrics = fetch_cfbd_team_metrics(
-        season=season,
-        week=week,
-        cfbd_api_key=cfbd_key,
-        now=current,
+    metrics = _cfbd_fetch_with_retry(
+        functools.partial(
+            fetch_cfbd_team_metrics,
+            season=season,
+            week=week,
+            cfbd_api_key=cfbd_key,
+            now=current,
+        ),
+        label="fetch_cfbd_team_metrics",
     )
     return run_it_cfb(
         mode="MANUAL",
@@ -332,9 +443,14 @@ def _run_model_and_context(
             root_seed=root_seed,
             n_paths=n_paths,
         )
-        report = report_future.result()
+        report = report_future.result()  # raises CFBSourceThrottleError here if exhausted
         context_status, objective_context, context_error = context_future.result()
     return report, context_status, objective_context, context_error
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
 
 def main() -> int:
     parser = argparse.ArgumentParser()
@@ -439,6 +555,44 @@ def main() -> int:
             "output": str(args.output),
         }, sort_keys=True))
         return 0
+
+    except CFBSourceThrottleError as exc:
+        # CFBD returned 429 and all retries were exhausted. This is a data-source
+        # infrastructure failure, not a governance or model failure. Emit a structured
+        # BLOCKED payload with a distinct blocker code so ops can distinguish a transient
+        # throttle from a hard governance error.
+        from sportsedge.football_full_board import board_from_machine_results, catalog_complete
+        board = board_from_machine_results("CFB", [])
+        payload = {
+            "schema_version": "CFB_AUTO_RUN_V1",
+            "status": "BLOCKED",
+            "blocker": "CFB_AUTO_CFBD_THROTTLE",
+            "cfbd_source_status": "STALE_CFBD_429",
+            "cfbd_source_error": str(exc),
+            "generated_at_utc": current.isoformat(),
+            "full_board": board,
+            "summary": {
+                "both_sides": board["summary"]["both_sides"],
+                "side_rows": board["summary"]["side_rows"],
+                "total_rows": board["summary"]["total_rows"],
+                "prop_rows": board["summary"]["prop_rows"],
+                "catalog_complete": catalog_complete(board["summary"]),
+            },
+            "report": board,
+            "governance": {
+                "model_fit_performed": False,
+                "promotion_changed": False,
+                "truth_gate_changed": False,
+                "fail_closed": True,
+                "context_failure_is_scoped": True,
+                "sportsbook_api_used": False,
+                "manual_market_board_required": True,
+            },
+        }
+        _write(args.output, payload)
+        print(json.dumps(payload, sort_keys=True))
+        return 2
+
     except (CFBAutoError, ValueError) as exc:
         from sportsedge.football_full_board import board_from_machine_results, catalog_complete
         board = board_from_machine_results("CFB", [])
