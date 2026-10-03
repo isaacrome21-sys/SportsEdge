@@ -209,6 +209,10 @@ def build_rows(board: list, season: int, week: int, asof):
     neutral = {"game_indoor": False, "wind_speed": 6.89, "temperature": 64.6, "fallback": "TRAINING_MEAN"}
     games = attach_weather(raw_games, {g.game_id: weather.get(g.game_id) or neutral for g in raw_games})
     snaps = fetch_cfbd_candidate_metric_snapshots(season=season, week=week, cfbd_api_key=key, now=now)
+    try:
+        print("SNAPSHOTS", len(snaps), "sample:", list(snaps)[:3] if not isinstance(snaps, dict) else list(snaps.keys())[:3])
+    except Exception:
+        pass
     rows = []
     unresolved = []
     for row in board:
@@ -226,8 +230,11 @@ def build_rows(board: list, season: int, week: int, asof):
             "weather": dict(game.weather or {}),
             "quotes": row.get("quotes") or [],
         }
-        rows.append(attach_candidate_snapshots_to_game_row(
-            base, home_team=game.home_team, away_team=game.away_team, snapshots=snaps))
+        try:
+            rows.append(attach_candidate_snapshots_to_game_row(
+                base, home_team=game.home_team, away_team=game.away_team, snapshots=snaps))
+        except Exception as exc:  # e.g. FCS opponent with no CFBD advanced stats
+            unresolved.append(f"CFB_SDV_SNAPSHOT_MISSING:{game.away_team} @ {game.home_team}:{exc}")
     for u in unresolved:
         print("SKIPPED", u)
     if not rows:
@@ -253,7 +260,11 @@ def main() -> int:
     model = load_selected_sdv_fit(args.fit)
     results = []
     for row in build_rows(board, args.season, args.week, args.asof):
-        home, away = score_selected_game(model, row)
+        try:
+            home, away = score_selected_game(model, row)
+        except Exception as exc:
+            print("SKIPPED CFB_SDV_SCORE_FAILED", row.get("away_team"), "@", row.get("home_team"), exc)
+            continue
         priced = price_game(row["game_id"], home, away, row.get("quotes") or [])
         for r in priced:
             r["matchup"] = f"{row.get('away_team')} @ {row.get('home_team')}"
