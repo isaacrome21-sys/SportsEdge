@@ -33,7 +33,7 @@ def _metrics(season: int, through_week: int, source: str, value: float, games: i
 
 
 def _row(i: int):
-    season = 2015 + (i % 11)
+    season = 2021 + (i % 5)
     week = 1 if i < 4 else 3 + (i % 6)
     games = max(0, week - 1)
     prior_h = _metrics(season - 1, 99, "PRIOR_SEASON_FALLBACK", 0.10 + i * 0.001, 0)
