@@ -1,4 +1,4 @@
-from scripts.materialize_cfb_sportsdataverse_training import _predictive_surface
+from scripts.materialize_cfb_sportsdataverse_training import _predictive_surface, _unmatched_advanced_game_ids
 from sportsedge.sports.cfb.sportsdataverse_history import TeamSnapshot
 
 
@@ -40,3 +40,13 @@ def test_missing_week2_current_snapshot_is_explicit_exclusion():
     assert rows==[]
     assert exclusions[0]["game_id"]=="3"
     assert exclusions[0]["reason"]=="CFB_SDV_PREGAME_SNAPSHOT_MISSING"
+
+
+def test_unmatched_advanced_game_ids_are_inventoryable():
+    datasets={
+        "cfb_schedules":[{"game_id":"1","season":"2025","week":"1","season_type":"regular","fbs_game":"true"}],
+        "espn_cfb_adv_team":[{"game_id":"1","season":"2025"},{"game_id":"9","season":"2025"}],
+        "espn_cfb_adv_situational":[{"game_id":"9","season":"2025"}],
+        "espn_cfb_adv_drives":[{"game_id":"9","season":"2025"}],
+    }
+    assert _unmatched_advanced_game_ids(datasets)==[9]
