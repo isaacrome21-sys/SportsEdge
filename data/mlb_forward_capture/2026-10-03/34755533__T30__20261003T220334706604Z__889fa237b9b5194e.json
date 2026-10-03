@@ -1,0 +1,43 @@
+{
+  "adapter_module_sha256": "bd139dd34c13c9bf8c4e5abb90f7cd3efe4a45597fdd1e3add0edc32d8ee68b2",
+  "attempts": [
+    {
+      "attempt": 1,
+      "host": "sportsbook-nash.draftkings.com",
+      "received_at_utc": "2026-10-03T22:03:34.706604Z",
+      "result_class": "OK"
+    }
+  ],
+  "away_team": "NY Yankees",
+  "book_last_update": null,
+  "capture_module_sha256": "8171f9049a562078350de1634d2cf08938dfa76c08f651c67c941bb6ebbc563a",
+  "capture_observation_id": "34755533__T30__20261003T220334706604Z__889fa237b9b5194e",
+  "capture_window": "T30",
+  "captured_at_utc": "2026-10-03T22:03:34.706604Z",
+  "evidence_disposition": "FORWARD_CAPTURE_PARTIAL",
+  "home_team": "TB Rays",
+  "minutes_before_start": 26.42,
+  "model_artifact_grants_promotion": false,
+  "model_artifact_sha256": "f5d912aba18cf9050665a0553181469295b280b206195f2fe640ee851a102a11",
+  "moneyline": {
+    "away_price_american": 119,
+    "home_price_american": -143,
+    "status": "OK"
+  },
+  "observed_at_utc": "2026-10-03T22:03:34.706604Z",
+  "pit_basis": "OBSERVED_AT_UTC_VS_SCHEDULED_START_UTC",
+  "promotion_authority": false,
+  "provider": "DRAFTKINGS_DIRECT_WEB",
+  "provider_event_id": "34755533",
+  "provider_quote_timestamp_available": false,
+  "quote_side_skew_seconds": 0,
+  "quote_synchronization": "SINGLE_PAYLOAD_BOTH_SIDES",
+  "quote_synchronization_note": "Structural same-payload synchronization: both sides arrived in one response. This is NOT two independently timestamped quotes measured at zero seconds of skew.",
+  "raw_sha256": "889fa237b9b5194efd535e50b86d504a3a591aaebd41da587db059f47ee6f798",
+  "scheduled_start_utc": "2026-10-03T22:30:00Z",
+  "source_class": "DRAFTKINGS_DIRECT_WEB_V1",
+  "source_uri": "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusnj/v1/leagues/84240/categories/493",
+  "sport_key": "baseball_mlb",
+  "sportsbook": "draftkings",
+  "transport_host": "sportsbook-nash.draftkings.com"
+}
