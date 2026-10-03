@@ -56,6 +56,15 @@ PROVIDER_TO_SURFACE = {
     "player_sacks": "player_sacks",
     "player_tackles_assists": "tackles_assists",
     "player_defensive_interceptions": "player_interceptions",
+    "player_targets": "targets",
+    "player_reception_targets": "targets",
+    "player_first_td": "first_td",
+    "player_1st_td": "first_td",
+    "player_two_plus_td": "two_plus_td",
+    "player_2plus_tds": "two_plus_td",
+    "player_qb_rush_yds": "rush_yards",
+    "team_sacks": "team_sacks",
+    "team_turnovers": "team_turnovers",
 }
 PERIOD_MARKETS = {
     "first_half_moneyline": ("first_half", "moneyline"),
@@ -278,6 +287,20 @@ def _with_complements(sport: str, rows: list[dict[str, Any]]) -> list[dict[str, 
     """Append the unquoted side. Price it only from a supplied opposite quote."""
     from sportsedge.both_side_pricing import complement_model_p
 
+    from sportsedge.both_side_pricing import attach_sibling_quotes
+
+    rows = attach_sibling_quotes(
+        rows,
+        group_key=lambda row: (
+            row.get("market"),
+            row.get("game_id"),
+            row.get("entity_id"),
+            row.get("team_side"),
+            row.get("line"),
+            row.get("provider_market"),
+        ),
+        side_of=_selection,
+    )
     grouped: dict[tuple[Any, ...], set[str]] = {}
     templates: dict[tuple[Any, ...], dict[str, Any]] = {}
     for row in rows:

@@ -97,3 +97,37 @@ def complement_model_p(raw: Mapping[str, Any], *, market: str = "") -> float | N
     if _half_line(raw.get("line")):
         return round(1.0 - model_p, 10)
     return None
+
+
+def attach_sibling_quotes(rows, *, group_key, side_of):
+    """Copy a unique sibling quote onto a row that has no opposite price.
+
+    This does not invent a price. A sibling is used only when exactly one other
+    row shares the market identity and carries american odds. Model_P is copied
+    only when that sibling already has one.
+    """
+    material = [dict(row) for row in rows if isinstance(row, Mapping)]
+    for row in material:
+        if row.get("opposite_odds") is not None:
+            continue
+        key = group_key(row)
+        side = side_of(row)
+        matches = []
+        for other in material:
+            if other is row or group_key(other) != key:
+                continue
+            other_side = side_of(other)
+            if not other_side or other_side == side or other.get("american_odds") is None:
+                continue
+            matches.append(other)
+        if len(matches) != 1:
+            continue
+        sibling = matches[0]
+        row["opposite_odds"] = sibling.get("american_odds")
+        if row.get("opposite_model_p") is None and sibling.get("model_p") is not None:
+            row["opposite_model_p"] = sibling.get("model_p")
+        if row.get("push_p") is None and sibling.get("push_p") is not None:
+            row["push_p"] = sibling.get("push_p")
+        if row.get("count_pmf") is None and sibling.get("count_pmf") is not None:
+            row["count_pmf"] = sibling.get("count_pmf")
+    return material

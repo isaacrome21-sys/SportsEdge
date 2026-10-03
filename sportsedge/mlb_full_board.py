@@ -171,12 +171,26 @@ def build_mlb_full_board(
     markets = tuple(str(market).upper() for market in catalog) if catalog is not None else catalog_markets()
     if not markets:
         raise MLBFullBoardError("MLB_FULL_BOARD_CATALOG_REQUIRED")
-    emitted: list[dict[str, Any]] = []
-    seen: set[str] = set()
+    from sportsedge.both_side_pricing import attach_sibling_quotes
+
     for raw in rows:
         if not isinstance(raw, Mapping):
             raise MLBFullBoardError("MLB_FULL_BOARD_ROW_INVALID")
-        market = str(raw.get("market") or raw.get("engine_market") or "").strip().upper()
+
+    def _market_name(raw: Mapping[str, Any]) -> str:
+        return str(raw.get("market") or raw.get("engine_market") or "").strip().upper()
+
+    paired = attach_sibling_quotes(
+        [raw for raw in rows if isinstance(raw, Mapping)],
+        group_key=lambda raw: _group_key(_market_name(raw), raw),
+        side_of=_side_name,
+    )
+    emitted: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for raw in paired:
+        if not isinstance(raw, Mapping):
+            raise MLBFullBoardError("MLB_FULL_BOARD_ROW_INVALID")
+        market = _market_name(raw)
         if not market or market == "UNKNOWN":
             continue
         seen.add(market)

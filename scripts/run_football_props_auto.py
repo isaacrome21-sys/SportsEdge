@@ -276,7 +276,7 @@ def main() -> int:
             },
         }
         _write(output, payload)
-        print(json.dumps({"status": "SUCCESS", "sport": sport, "output": str(output)}, sort_keys=True))
+        print(json.dumps({"status": "SUCCESS", "sport": sport, "both_sides": payload["full_board"]["summary"].get("both_sides"), "prop_rows": payload["full_board"]["summary"].get("prop_rows"), "output": str(output)}, sort_keys=True))
         return 0
     except (FootballPropAutoError, FootballPropRunError, ValueError) as exc:
         from sportsedge.football_full_board import board_from_machine_results

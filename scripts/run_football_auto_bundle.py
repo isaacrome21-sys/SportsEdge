@@ -116,7 +116,13 @@ def main() -> int:
     lower = sport.lower()
     game_out = ROOT / f"artifacts/run_it/{lower}_game_card.json"
     prop_out = ROOT / f"artifacts/run_it/{lower}_prop_card.json"
-    game_cmd = [sys.executable, str(ROOT / f"scripts/run_{lower}_auto.py"), "--output", str(game_out)]
+    if sport == "NFL":
+        # Frozen scripts/run_nfl_auto.py stays on the M2 code surface. The sidecar
+        # runs it, then attaches both sides of every prop, side, and total.
+        game_script = ROOT / "scripts/emit_nfl_both_side_board.py"
+    else:
+        game_script = ROOT / f"scripts/run_{lower}_auto.py"
+    game_cmd = [sys.executable, str(game_script), "--output", str(game_out)]
     prop_cmd = [
         sys.executable, str(ROOT / "scripts/run_football_props_auto.py"),
         "--sport", sport, "--output", str(prop_out),

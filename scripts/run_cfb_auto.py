@@ -379,10 +379,21 @@ def main() -> int:
             n_paths=int(args.n_paths),
         )
         elapsed_seconds = round(perf_counter() - started, 3)
+        report_payload = report.to_dict()
+        board = (report_payload.get("summary") or {}).get("full_board") or {}
+        board_summary = board.get("summary") or {}
         payload = {
             "schema_version": "CFB_AUTO_RUN_V1",
             "status": "SUCCESS",
             "run_status": report.run_status,
+            "full_board": board,
+            "summary": {
+                "both_sides": board_summary.get("both_sides"),
+                "side_rows": board_summary.get("side_rows"),
+                "total_rows": board_summary.get("total_rows"),
+                "prop_rows": board_summary.get("prop_rows"),
+                "catalog_complete": board_summary.get("both_sides") is True and (board_summary.get("side_rows") or 0) >= 2 and (board_summary.get("total_rows") or 0) >= 2 and (board_summary.get("prop_rows") or 0) >= 2,
+            },
             "market_input_source": "MANUAL_SCREENSHOT_BOARD",
             "season": season,
             "week": week,
@@ -394,7 +405,7 @@ def main() -> int:
             "objective_context_status": context_status,
             "objective_context_error": context_error,
             "objective_context": objective_context,
-            "report": report.to_dict(),
+            "report": report_payload,
             "runtime": {
                 "model_and_context_parallel": True,
                 "elapsed_seconds": elapsed_seconds,
@@ -418,18 +429,32 @@ def main() -> int:
             "week": week,
             "run_status": report.run_status,
             "objective_context_status": context_status,
+            "both_sides": payload["summary"]["both_sides"],
+            "side_rows": payload["summary"]["side_rows"],
+            "total_rows": payload["summary"]["total_rows"],
+            "prop_rows": payload["summary"]["prop_rows"],
+            "catalog_complete": payload["summary"]["catalog_complete"],
             "elapsed_seconds": elapsed_seconds,
             "output": str(args.output),
         }, sort_keys=True))
         return 0
     except (CFBAutoError, ValueError) as exc:
         from sportsedge.football_full_board import board_from_machine_results
+        board = board_from_machine_results("CFB", [])
         payload = {
             "schema_version": "CFB_AUTO_RUN_V1",
             "status": "BLOCKED",
             "blocker": str(exc),
             "generated_at_utc": current.isoformat(),
-            "report": board_from_machine_results("CFB", []),
+            "full_board": board,
+            "summary": {
+                "both_sides": board["summary"]["both_sides"],
+                "side_rows": board["summary"]["side_rows"],
+                "total_rows": board["summary"]["total_rows"],
+                "prop_rows": board["summary"]["prop_rows"],
+                "catalog_complete": board["summary"]["both_sides"] is True and board["summary"]["side_rows"] >= 2 and board["summary"]["total_rows"] >= 2 and board["summary"]["prop_rows"] >= 2,
+            },
+            "report": board,
             "governance": {
                 "model_fit_performed": False,
                 "promotion_changed": False,

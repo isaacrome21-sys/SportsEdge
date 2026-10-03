@@ -172,3 +172,35 @@ def test_nfl_auto_payload_attaches_board_without_editing_frozen_script():
     assert attached["summary"]["catalog_complete"] is True
     assert attached["summary"]["prop_rows"] >= 2
     assert attached["report"]["summary"]["full_board"]["official_authority"] is False
+
+
+def test_mlb_pairs_sibling_quote_without_timestamp():
+    board = emit_all_props_side_totals([
+        {"market": "HITS", "entity_id": "batter", "game_id": "1", "side": "OVER", "line": 1.5, "model_p": 0.57, "american_odds": -110},
+        {"market": "HITS", "entity_id": "batter", "game_id": "1", "side": "UNDER", "line": 1.5, "model_p": 0.43, "american_odds": -110},
+    ])
+    hits = {row["side"]: row for row in board["rows"] if row["market"] == "HITS" and row["entity_id"] == "batter"}
+    assert set(hits) >= {"OVER", "UNDER"}
+    assert hits["OVER"]["model_p"] == 0.57
+    assert hits["UNDER"]["model_p"] == 0.43
+    assert hits["UNDER"]["official_eligible"] is False
+
+
+def test_football_maps_remaining_prop_families_to_both_sides():
+    board = emit_football(
+        sport="NFL",
+        prop_rows=[
+            {"provider_market": "player_targets", "entity_id": "wr", "side": "OVER", "line": 6.5, "model_p": 0.52, "american_odds": -115, "opposite_odds": -105},
+            {"provider_market": "player_first_td", "entity_id": "rb", "side": "OVER", "line": 0.5, "model_p": 0.22, "american_odds": 250, "opposite_odds": -320},
+            {"provider_market": "team_sacks", "entity_id": "home", "side": "OVER", "line": 2.5, "model_p": 0.48, "american_odds": -110, "opposite_odds": -110},
+        ],
+    )
+    targets = {row["selection"]: row for row in board["rows"] if row["market"] == "targets" and row["entity_id"] == "wr"}
+    assert targets["UNDER"]["model_p"] == 0.48
+    assert targets["UNDER"]["reason"] == "COMPLEMENT_PRICED_FROM_QUOTED_SIDE"
+    first = {row["selection"] for row in board["rows"] if row["market"] == "first_td"}
+    sacks = {row["selection"] for row in board["rows"] if row["market"] == "team_sacks"}
+    assert first == {"OVER", "UNDER"}
+    assert sacks == {"OVER", "UNDER"}
+    assert board["summary"]["both_sides"] is True
+    assert board["official_authority"] is False
