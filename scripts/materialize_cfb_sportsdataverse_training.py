@@ -31,6 +31,7 @@ from sportsedge.sports.cfb.sportsdataverse_history import (
     build_prior_season_fallback_snapshots,
     build_season_week_snapshots,
     regular_fbs_schedule_rows,
+    validate_dataset,
 )
 from sportsedge.sports.cfb.sportsdataverse_materializer import (
     SDVMaterializationError,
@@ -192,6 +193,20 @@ def _completed_regular_fbs_games(schedule_rows: list[Mapping[str, Any]]) -> list
             ) from exc
         out.append(dict(row))
     return sorted(out, key=lambda r: (int(r["season"]), int(r["week"]), int(r["game_id"])))
+
+
+def _unmatched_advanced_game_ids(datasets: Mapping[str, list[dict[str, str]]]) -> list[int]:
+    schedule_ids = {
+        int(row["game_id"])
+        for row in validate_dataset("cfb_schedules", datasets["cfb_schedules"])
+    }
+    observed = set()
+    for dataset in ("espn_cfb_adv_team", "espn_cfb_adv_situational", "espn_cfb_adv_drives"):
+        observed.update(
+            int(row["game_id"])
+            for row in validate_dataset(dataset, datasets[dataset])
+        )
+    return sorted(observed - schedule_ids)
 
 
 def _snapshots(datasets: Mapping[str, list[dict[str, str]]]):
@@ -411,6 +426,7 @@ def build_training_bundle(*, cache_root: Path) -> dict[str, Any]:
     prereg, weather_contract = _verify_prereg()
     datasets, raw_receipts, parsed_receipts = _acquire_sdv(cache_root)
     games = _completed_regular_fbs_games(datasets["cfb_schedules"])
+    unmatched_advanced_game_ids = _unmatched_advanced_game_ids(datasets)
     current, prior = _snapshots(datasets)
     predictive, exclusions = _predictive_surface(
         games=games,
@@ -472,6 +488,10 @@ def build_training_bundle(*, cache_root: Path) -> dict[str, Any]:
         "historical_weather_rows_sha256": _canonical_sha(weather_rows),
         "raw_asset_receipts_sha256": _canonical_sha(raw_receipts),
         "parsed_asset_receipts_sha256": _canonical_sha(parsed_receipts),
+        "unmatched_advanced_game_ids": len(unmatched_advanced_game_ids),
+        "unmatched_advanced_game_ids_sha256": _canonical_sha(unmatched_advanced_game_ids),
+        "unmatched_advanced_game_id_sample": unmatched_advanced_game_ids[:50],
+        "unmatched_advanced_game_policy": "EXCLUDE_BEFORE_SCOPE_OR_FEATURE_AGGREGATION",
         "venue_source": venue_attestation,
         "weather": weather_attestation,
         "prereg_hash_binding": dict(prereg["hash_binding"]),
