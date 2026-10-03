@@ -15,7 +15,12 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from sportsedge.sports.cfb.candidate_live_source import (
+    attach_candidate_snapshots_to_game_row,
+    fetch_cfbd_candidate_metric_snapshots,
+)
 from sportsedge.sports.cfb.sdv_selected_fit import load_selected_sdv_fit, score_selected_game
+from sportsedge.sports.cfb.source import attach_weather, fetch_cfbd_games, fetch_cfbd_weather
 
 # Bakeoff run 37093707442 joint RMSE for PRIOR_CURRENT_BLEND.
 RESIDUAL_SIGMA = 12.018
@@ -39,9 +44,38 @@ def main() -> int:
     parser.add_argument("--board", type=Path, required=True)
     parser.add_argument("--fit", type=Path, default=ROOT / "config/cfb_sdv_prior_current_blend_fit_v1.json")
     parser.add_argument("--output", type=Path, default=Path("artifacts/run_it/cfb_sdv_card.json"))
+    parser.add_argument("--season", type=int)
+    parser.add_argument("--week", type=int)
+    parser.add_argument("--asof")
     args = parser.parse_args()
     model = load_selected_sdv_fit(args.fit)
     rows = json.loads(args.board.read_text(encoding="utf-8"))
+    if args.season is not None and args.week is not None:
+        import os
+        from datetime import datetime, timezone
+        key = os.environ.get("CFBD_API_KEY") or os.environ.get("SPORTSEDGE_CFBD_API_KEY") or ""
+        if not key:
+            raise SystemExit("CFB_SDV_CFBD_API_KEY_REQUIRED")
+        now = datetime.fromisoformat(args.asof.replace("Z", "+00:00")) if args.asof else datetime.now(timezone.utc)
+        games = attach_weather(
+            fetch_cfbd_games(season=args.season, week=args.week, cfbd_api_key=key),
+            fetch_cfbd_weather(season=args.season, week=args.week, cfbd_api_key=key),
+        )
+        snaps = fetch_cfbd_candidate_metric_snapshots(season=args.season, week=args.week, cfbd_api_key=key, now=now)
+        by_id = {g.game_id: g for g in games}
+        built = []
+        for row in rows:
+            game = by_id.get(str(row.get("game_id")))
+            if game is None:
+                raise SystemExit("CFB_SDV_GAME_UNRESOLVED:" + str(row.get("game_id")))
+            base = {
+                "game_id": game.game_id,
+                "neutral_site": bool(game.neutral_site),
+                "weather": dict(game.weather or {}),
+                "quotes": row.get("quotes") or [],
+            }
+            built.append(attach_candidate_snapshots_to_game_row(base, home_team=game.home_team, away_team=game.away_team, snapshots=snaps))
+        rows = built
     if not isinstance(rows, list) or not rows:
         raise SystemExit("CFB_SDV_BOARD_ARRAY_REQUIRED")
     results = []
