@@ -11,6 +11,11 @@ Board JSON: a list of
               {"market": "SPREAD", "side": "HOME"|"AWAY", "line": -7.5, "american_odds": -110},
               {"market": "TOTAL", "side": "OVER"|"UNDER", "line": 52.5, "american_odds": -110}]}
 SPREAD line is the handicap for the quoted side.
+
+Compact phone form is also accepted (game_id optional, resolved by team name):
+  {"away": "Michigan", "home": "Minnesota", "ml": [-225, 185],
+   "spread": [-6, -110, -110], "total": [43.5, -105, -115]}
+spread = [away line, away price, home price]; total = [line, over price, under price].
 """
 from __future__ import annotations
 
@@ -104,6 +109,98 @@ def price_game(game_id, home: float, away: float, quotes: list) -> list:
     return out
 
 
+ALIASES = {
+    "mississippi": "ole miss", "umass": "massachusetts", "miami oh": "miami (oh)",
+    "uconn": "connecticut", "north dakota st": "north dakota state",
+    "nc state": "nc state", "usf": "south florida", "fiu": "florida international",
+}
+
+
+def _raw(name: str) -> str:
+    import re
+    t = re.sub(r"[^a-z0-9() ]", " ", str(name).lower())
+    return " ".join(t.split())
+
+
+def _n(name: str) -> str:
+    t = _raw(name)
+    return ALIASES.get(t, t)
+
+
+def expand_compact(row: dict) -> dict:
+    if "quotes" in row:
+        return row
+    q = []
+    if row.get("ml"):
+        a, h = row["ml"]
+        q += [{"market": "MONEYLINE", "side": "AWAY", "american_odds": a},
+              {"market": "MONEYLINE", "side": "HOME", "american_odds": h}]
+    if row.get("spread"):
+        line, a, h = row["spread"]
+        q += [{"market": "SPREAD", "side": "AWAY", "line": float(line), "american_odds": a},
+              {"market": "SPREAD", "side": "HOME", "line": -float(line), "american_odds": h}]
+    if row.get("total"):
+        line, o, u = row["total"]
+        q += [{"market": "TOTAL", "side": "OVER", "line": float(line), "american_odds": o},
+              {"market": "TOTAL", "side": "UNDER", "line": float(line), "american_odds": u}]
+    out = dict(row)
+    out["quotes"] = q
+    return out
+
+
+def resolve_game(row: dict, games: list):
+    if row.get("game_id") is not None:
+        hit = [g for g in games if str(g.game_id) == str(row["game_id"])]
+    else:
+        a, h = _n(row.get("away", "")), _n(row.get("home", ""))
+        ra, rh = _raw(row.get("away", "")), _raw(row.get("home", ""))
+        def m(want, have, raw_want=None):
+            strip = lambda x: x.replace("(", "").replace(")", "")
+            cands = {strip(_n(have)), strip(_raw(have))}
+            wants = {strip(want)} | ({strip(raw_want)} if raw_want else set())
+            return bool(cands & wants)
+        _m = m
+        m = lambda want, have: _m(want, have, ra if want == a else rh if want == h else None)
+        hit = [g for g in games if m(a, g.away_team) and m(h, g.home_team)]
+        if not hit:  # neutral-site listings can flip home/away
+            hit = [g for g in games if m(a, g.home_team) and m(h, g.away_team)]
+    if len(hit) != 1:
+        raise SystemExit(f"CFB_SDV_GAME_UNRESOLVED:{row.get('game_id') or (row.get('away'), row.get('home'))}:{len(hit)}")
+    return hit[0]
+
+
+# Live CFBD fields that are NOT on the training scale (training = SportsDataverse):
+#   explosive_rate: training = share of explosive plays (~0.075); live = CFBD
+#     'explosiveness' (avg EPA of successful plays, ~1.2) -> ~100 SD off.
+#   net_field_position: training = -avg drive field position (~-69); live =
+#     offense minus defense average start (~0) -> ~14 SD off.
+# Until the live source is rebuilt, pin both to their training means (zero effect).
+TRAINING_MEANS = {"explosive_rate": 0.0755, "net_field_position": -69.355}
+
+
+def neutralize_mismatched_metrics(snaps) -> None:
+    for team_snap in snaps.values():
+        for side in ("prior", "current"):
+            m = team_snap.get(side)
+            if isinstance(m, dict):
+                m.update(TRAINING_MEANS)
+
+
+# Sanity band: a projection outside this means the inputs are broken -> PASS.
+MAX_TEAM_POINTS = 75.0
+MAX_TOTAL_GAP = 25.0
+
+
+def projection_sane(home: float, away: float, quotes: list) -> bool:
+    if not (0.0 <= home <= MAX_TEAM_POINTS and 0.0 <= away <= MAX_TEAM_POINTS):
+        return False
+    for q in quotes:
+        if str(q.get("market", "")).upper() == "TOTAL" and q.get("line") is not None:
+            if abs((home + away) - float(q["line"])) > MAX_TOTAL_GAP:
+                return False
+    return True
+
+
 def build_rows(board: list, season: int, week: int, asof):
     from sportsedge.sports.cfb.candidate_live_source import (
         attach_candidate_snapshots_to_game_row,
@@ -115,17 +212,54 @@ def build_rows(board: list, season: int, week: int, asof):
     if not key:
         raise SystemExit("CFB_SDV_CFBD_API_KEY_REQUIRED")
     now = datetime.fromisoformat(asof.replace("Z", "+00:00")) if asof else datetime.now(timezone.utc)
-    games = attach_weather(
-        fetch_cfbd_games(season=season, week=week, cfbd_api_key=key),
-        fetch_cfbd_weather(season=season, week=week, cfbd_api_key=key),
-    )
+    def count_hits(games_):
+        n = 0
+        for r in board:
+            try:
+                resolve_game(expand_compact(r), games_)
+                n += 1
+            except SystemExit:
+                pass
+        return n
+
+    raw_games = fetch_cfbd_games(season=season, week=week, cfbd_api_key=key)
+    if count_hits(raw_games) == 0:
+        best = (0, week, raw_games)
+        for w in range(1, 17):
+            if w == week:
+                continue
+            try:
+                g = fetch_cfbd_games(season=season, week=w, cfbd_api_key=key)
+            except Exception:
+                continue
+            h = count_hits(g)
+            if h > best[0]:
+                best = (h, w, g)
+        if best[0] == 0:
+            sample = [(g.away_team, g.home_team) for g in raw_games[:15]]
+            print("CFB_SDV_WEEK_SEARCH_FAILED sample week", week, "games:", sample)
+        else:
+            print(f"WEEK_AUTO_CORRECTED {week} -> {best[1]} ({best[0]} games matched)")
+            week, raw_games = best[1], best[2]
+    try:
+        weather = fetch_cfbd_weather(season=season, week=week, cfbd_api_key=key)
+    except Exception as exc:  # CFBD weather is a paid tier; free keys get 401
+        print("WEATHER_NEUTRAL_FALLBACK", type(exc).__name__, str(exc)[:120])
+        weather = {}
+    # Missing weather -> training-mean wind/temp, outdoor: zero standardized weather effect.
+    neutral = {"game_indoor": False, "wind_speed": 6.89, "temperature": 64.6, "fallback": "TRAINING_MEAN"}
+    games = attach_weather(raw_games, {g.game_id: weather.get(g.game_id) or neutral for g in raw_games})
     snaps = fetch_cfbd_candidate_metric_snapshots(season=season, week=week, cfbd_api_key=key, now=now)
-    by_id = {g.game_id: g for g in games}
+    neutralize_mismatched_metrics(snaps)
     rows = []
+    unresolved = []
     for row in board:
-        game = by_id.get(str(row.get("game_id")))
-        if game is None:
-            raise SystemExit("CFB_SDV_GAME_UNRESOLVED:" + str(row.get("game_id")))
+        row = expand_compact(row)
+        try:
+            game = resolve_game(row, games)
+        except SystemExit as exc:
+            unresolved.append(str(exc))
+            continue
         base = {
             "game_id": game.game_id,
             "home_team": game.home_team,
@@ -134,8 +268,15 @@ def build_rows(board: list, season: int, week: int, asof):
             "weather": dict(game.weather or {}),
             "quotes": row.get("quotes") or [],
         }
-        rows.append(attach_candidate_snapshots_to_game_row(
-            base, home_team=game.home_team, away_team=game.away_team, snapshots=snaps))
+        try:
+            rows.append(attach_candidate_snapshots_to_game_row(
+                base, home_team=game.home_team, away_team=game.away_team, snapshots=snaps))
+        except Exception as exc:  # e.g. FCS opponent with no CFBD advanced stats
+            unresolved.append(f"CFB_SDV_SNAPSHOT_MISSING:{game.away_team} @ {game.home_team}:{exc}")
+    for u in unresolved:
+        print("SKIPPED", u)
+    if not rows:
+        raise SystemExit("CFB_SDV_NO_GAMES_RESOLVED")
     return rows
 
 
@@ -157,7 +298,15 @@ def main() -> int:
     model = load_selected_sdv_fit(args.fit)
     results = []
     for row in build_rows(board, args.season, args.week, args.asof):
-        home, away = score_selected_game(model, row)
+        try:
+            blind = {k: v for k, v in row.items() if k != "quotes"}  # model is market-blind
+            home, away = score_selected_game(model, blind)
+        except Exception as exc:
+            print("SKIPPED CFB_SDV_SCORE_FAILED", row.get("away_team"), "@", row.get("home_team"), exc)
+            continue
+        if not projection_sane(home, away, row.get("quotes") or []):
+            print(f"SKIPPED CFB_SDV_PROJECTION_INSANE {row.get('away_team')} @ {row.get('home_team')} {away:.1f}-{home:.1f}")
+            continue
         priced = price_game(row["game_id"], home, away, row.get("quotes") or [])
         for r in priced:
             r["matchup"] = f"{row.get('away_team')} @ {row.get('home_team')}"
