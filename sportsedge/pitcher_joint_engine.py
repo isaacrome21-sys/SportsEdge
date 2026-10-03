@@ -15,7 +15,7 @@ def _f(v:Any,name:str,lo:float=0.0)->float:
     if not isfinite(x) or x<lo:raise PitcherJointEngineError(f"{name} invalid")
     return x
 def _sha(v:Any)->str:return hashlib.sha256(json.dumps(v,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()).hexdigest()
-def _normalize_pool(raw:Any,name:str)->list[dict[str,int]]:
+def _normalize_pool(raw:Any,name:str,minimum:int=5)->list[dict[str,int]]:
     if not isinstance(raw,Sequence) or isinstance(raw,(str,bytes)):raise PitcherJointEngineError(f"{name} must be a sequence")
     rows=[];required=("strikeouts","outs","earned_runs","hits_allowed","walks_allowed")
     for i,item in enumerate(raw):
@@ -27,7 +27,7 @@ def _normalize_pool(raw:Any,name:str)->list[dict[str,int]]:
             row[key]=int(x)
         if not 0<=row["outs"]<=27:raise PitcherJointEngineError(f"{name}[{i}].outs outside [0,27]")
         rows.append(row)
-    if len(rows)<5:raise PitcherJointEngineError(f"{name} requires at least 5 prior starts")
+    if len(rows)<minimum:raise PitcherJointEngineError(f"{name} requires at least {minimum} prior starts")
     return rows
 def _weights(raw:Any,n:int,name:str)->list[float]:
     if raw is None:return [1.0/n]*n
@@ -49,6 +49,36 @@ def _price_values(values:Sequence[int],weights:Sequence[float],line:float,side:s
     if abs(over+under+push-1.0)>1e-12:raise PitcherJointEngineError("probability mass does not conserve")
     n_eff=effective_sample_size(weights,len(weights));post=_posterior(over,under,push,n_eff,line,market)
     return (post["p_over"] if side=="OVER" else post["p_under"]),post["p_push"],{"raw_empirical_p":over if side=="OVER" else under,"raw_push_p":push,"effective_history_starts":float(n_eff),"posterior_prior":post["prior"]}
+_FALLBACK_STAT={"PITCHER_OUTS":"outs","PITCHER_K":"strikeouts"}
+def _price_prior_fallback(features:Mapping[str,Any],line:float,side:str,market:str)->tuple[float,float,dict[str,Any],dict[str,Any]]:
+    """Validated few-starts fallback (#1495): own k in 1..4 blended with m prior pseudo-starts, n = k + m."""
+    fb=features.get("prior_fallback")
+    if not isinstance(fb,Mapping):raise PitcherJointEngineError("prior_fallback must be object")
+    if market not in _FALLBACK_STAT or fb.get("market")!=market:raise PitcherJointEngineError(f"PRIOR_FALLBACK_NOT_VALIDATED_FOR_{market}")
+    if float(line).is_integer():raise PitcherJointEngineError("PRIOR_FALLBACK_HALF_LINES_ONLY")
+    if features.get("history_weights") is not None:raise PitcherJointEngineError("prior_fallback does not accept history_weights")
+    pool=_normalize_pool(features.get("history_pool"),"history_pool",minimum=1)
+    if len(pool)>4:raise PitcherJointEngineError("prior_fallback requires 1..4 own starts")
+    m=_f(fb.get("pseudo_starts"),"prior_fallback.pseudo_starts")
+    if m<=0:raise PitcherJointEngineError("prior_fallback.pseudo_starts must be positive")
+    counts=fb.get("counts")
+    if not isinstance(counts,Mapping) or not counts:raise PitcherJointEngineError("prior_fallback.counts required")
+    table={}
+    for key,val in counts.items():
+        v=_f(key,"prior_fallback.counts key");c=_f(val,"prior_fallback.counts value")
+        if int(v)!=v or int(c)!=c:raise PitcherJointEngineError("prior_fallback.counts must be integers")
+        table[int(v)]=table.get(int(v),0)+int(c)
+    total=sum(table.values())
+    if total<=0:raise PitcherJointEngineError("prior_fallback.counts empty")
+    if market=="PITCHER_OUTS" and any(v>27 for v in table):raise PitcherJointEngineError("prior_fallback outs outside [0,27]")
+    own=[_value(r,market) for r in pool];k=len(own)
+    prior_over=sum(c for v,c in table.items() if v>line)/total
+    own_over=sum(1 for v in own if v>line)
+    over=(own_over+m*prior_over)/(k+m);under=1.0-over;n=k+m
+    post=_posterior(over,under,0.0,n,line,market)
+    meta={"raw_empirical_p":over if side=="OVER" else under,"raw_push_p":0.0,"effective_history_starts":float(n),"posterior_prior":post["prior"],"prior_fallback":{"own_starts":k,"pseudo_starts":m,"pool":fb.get("pool"),"season":fb.get("season"),"artifact_sha256":fb.get("artifact_sha256")}}
+    identity={"history_pool":pool,"prior_fallback":{"market":market,"pseudo_starts":m,"counts":{str(v):table[v] for v in sorted(table)},"pool":fb.get("pool"),"season":fb.get("season"),"artifact_sha256":fb.get("artifact_sha256")}}
+    return (post["p_over"] if side=="OVER" else post["p_under"]),post["p_push"],meta,identity
 def price_pitcher_market(model_input:Mapping[str,Any])->dict[str,Any]:
     market=str(model_input.get("market","")).upper()
     if market not in PITCHER_MARKETS:raise PitcherJointEngineError(f"unsupported pitcher market {market}")
@@ -62,6 +92,8 @@ def price_pitcher_market(model_input:Mapping[str,Any])->dict[str,Any]:
         if side=="OVER":raw=sum(w for x,y,w in states if (x>line) or (y>line));raw_push=sum(w for x,y,w in states if not((x>line) or (y>line)) and ((x==line) or (y==line))) if float(line).is_integer() else 0.0
         else:raw=sum(w for x,y,w in states if (x<line) or (y<line));raw_push=sum(w for x,y,w in states if not((x<line) or (y<line)) and ((x==line) or (y==line))) if float(line).is_integer() else 0.0
         raw_other=1.0-raw-raw_push;over,under=(raw,raw_other) if side=="OVER" else (raw_other,raw);eff=min(effective_sample_size(wa,len(wa)),effective_sample_size(wb,len(wb)));post=_posterior(over,under,raw_push,eff,line,base);p=post["p_over"] if side=="OVER" else post["p_under"];p_push=post["p_push"];meta={"raw_empirical_p":raw,"raw_push_p":raw_push,"effective_history_starts":float(eff),"posterior_prior":post["prior"],"weighted":features.get("pitcher_a_weights") is not None or features.get("pitcher_b_weights") is not None};identity_features={"pitcher_a_history":a,"pitcher_b_history":b,"pitcher_a_weights":wa,"pitcher_b_weights":wb}
+    elif features.get("prior_fallback") is not None:
+        p,p_push,meta,identity_features=_price_prior_fallback(features,line,side,market);meta["weighted"]=True
     else:
         pool=_normalize_pool(features.get("history_pool"),"history_pool");weights=_weights(features.get("history_weights"),len(pool),"history_weights");p,p_push,meta=_price_values([_value(r,market) for r in pool],weights,line,side,market);meta["weighted"]=features.get("history_weights") is not None;identity_features={"history_pool":pool,"history_weights":weights}
     digest=_sha({"engine":ENGINE_VERSION,"game_id":model_input.get("game_id"),"entity_id":model_input.get("entity_id"),"feature_source_hash":model_input.get("feature_source_hash"),"features":identity_features})

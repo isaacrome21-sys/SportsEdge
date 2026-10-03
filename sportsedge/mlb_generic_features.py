@@ -341,6 +341,13 @@ class MLBGenericHistorySource:
         return out
 
     def pitcher_joint_history(self, *, player_id: int, target_date: date) -> list[dict[str, int]]:
+        out = self.pitcher_joint_rows(player_id=player_id, target_date=target_date)
+        if len(out) < 5:
+            raise MLBGenericFeatureError(f"pitcher:joint: insufficient chronological sample {len(out)}<5")
+        return out
+
+    def pitcher_joint_rows(self, *, player_id: int, target_date: date) -> list[dict[str, int]]:
+        """Last <=10 strictly-prior regular-season starts, without a minimum-size gate."""
         rows = self.player_rows(player_id=player_id, group="pitching", target_date=target_date)
         out: list[dict[str, int]] = []
         for row in rows:
@@ -358,10 +365,7 @@ class MLBGenericHistorySource:
             if None in {ks, er, hits, walks} or not 0 <= outs <= 27:
                 continue
             out.append({"strikeouts": ks, "outs": outs, "earned_runs": er, "hits_allowed": hits, "walks_allowed": walks})
-        out = out[-10:]
-        if len(out) < 5:
-            raise MLBGenericFeatureError(f"pitcher:joint: insufficient chronological sample {len(out)}<5")
-        return out
+        return out[-10:]
 
     def pitcher_win_probability(self, *, player_id: int, target_date: date) -> float:
         rows = self.player_rows(player_id=player_id, group="pitching", target_date=target_date)
@@ -393,9 +397,26 @@ class MLBGenericHistorySource:
             if player_id is None:
                 raise MLBGenericFeatureError("player_id required")
             if market in JOINT_PITCHER_MARKETS:
-                pool = self.pitcher_joint_history(player_id=player_id, target_date=target_date)
-                base["features"] = {"history_pool": pool}
-                base["joint_feature_version"] = "mlb_pitcher_joint_history_v1"
+                try:
+                    pool = self.pitcher_joint_history(player_id=player_id, target_date=target_date)
+                    base["features"] = {"history_pool": pool}
+                    base["joint_feature_version"] = "mlb_pitcher_joint_history_v1"
+                except MLBGenericFeatureError:
+                    # Validated few-starts fallback (#1482/#1495): PITCHER_OUTS/PITCHER_K with
+                    # 1..4 own starts, shrunk toward the frozen prior-season league_short pool.
+                    # Anything else (k=0, other markets, no shipped prior) stays BLOCKED.
+                    from .mlb_pitcher_prior import FALLBACK_MARKETS, MAX_OWN_STARTS, MIN_OWN_STARTS, PitcherPriorError, fallback_features, prior_for
+                    try:
+                        prior = prior_for(target_date) if market in FALLBACK_MARKETS else None
+                    except (PitcherPriorError, ValueError, KeyError) as exc:
+                        raise MLBGenericFeatureError(f"pitcher:prior_fallback: invalid prior artifact: {exc}") from exc
+                    if prior is None:
+                        raise
+                    own = self.pitcher_joint_rows(player_id=player_id, target_date=target_date)
+                    if not MIN_OWN_STARTS <= len(own) <= MAX_OWN_STARTS:
+                        raise
+                    base["features"] = fallback_features(own, market, prior)
+                    base["joint_feature_version"] = "mlb_pitcher_joint_history_prior_fallback_v1"
             elif market in JOINT_HITTER_MARKETS:
                 pool = self.hitter_joint_history(player_id=player_id, target_date=target_date)
                 base["features"] = {"history_pool": pool}

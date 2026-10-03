@@ -33,7 +33,17 @@ def support_evidence(feature: Mapping[str, Any], row: Mapping[str, Any]) -> dict
     line = float(row["line"])
     over = sum(value > line for value in values)
     under = sum(value < line for value in values)
-    return {
+    fallback = features.get("prior_fallback")
+    extra: dict[str, Any] = {}
+    if isinstance(fallback, Mapping):
+        # Validated few-starts fallback (#1495): the estimate is own starts blended with
+        # pseudo-starts from a frozen prior pool, so raw own counts are not the estimate.
+        extra["prior_fallback"] = {
+            "own_starts": len(pool), "pseudo_starts": fallback.get("pseudo_starts"),
+            "pool": fallback.get("pool"), "season": fallback.get("season"),
+            "artifact_sha256": fallback.get("artifact_sha256"),
+        }
+    return {**extra,
         "sample_size": len(pool), "sample_unit": unit,
         "wins": over if row["side"] == "OVER" else under,
         "pushes": sum(value == line for value in values),
@@ -59,7 +69,8 @@ def empirical_guard_reason(row: Mapping[str, Any], conditional_p: float | None) 
                    for value in (p, conditional_p))
     model_tail = min(p, conditional_p if conditional_p is not None else p) <= THIN_TAIL_CUTOFF + 1e-12 or max(p, conditional_p if conditional_p is not None else p) >= 1 - THIN_TAIL_CUTOFF - 1e-12
     wins = evidence.get("wins")
-    raw_tail = isinstance(wins, int) and not isinstance(wins, bool) and 0 <= wins <= n and (wins / n <= THIN_TAIL_CUTOFF + 1e-12 or wins / n >= 1 - THIN_TAIL_CUTOFF - 1e-12)
+    # A prior-fallback estimate is not the raw own-start fraction, so only the model tail applies.
+    raw_tail = not isinstance(evidence.get("prior_fallback"), Mapping) and isinstance(wins, int) and not isinstance(wins, bool) and 0 <= wins <= n and (wins / n <= THIN_TAIL_CUTOFF + 1e-12 or wins / n >= 1 - THIN_TAIL_CUTOFF - 1e-12)
     tail = model_tail or raw_tail
     if not endpoint and not (n < MIN_TAIL_SAMPLE and tail):
         return None
