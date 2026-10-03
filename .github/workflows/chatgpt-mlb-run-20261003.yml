@@ -1,0 +1,94 @@
+name: chatgpt-mlb-run-20261003
+
+on:
+  push:
+    branches:
+      - run/mlb-20261003-chatgpt
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sportsedge-paid-odds-api
+  cancel-in-progress: false
+
+jobs:
+  run-card:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Install runtime dependencies
+        run: python -m pip install --disable-pip-version-check numpy==2.5.3
+      - name: Resolve Chicago slate date
+        id: slate
+        run: echo "date=$(TZ=America/Chicago date +%F)" >> "$GITHUB_OUTPUT"
+      - name: Restore MLB history cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: .cache/sportsedge/mlb-history
+          key: sportsedge-mlb-history-v1-${{ runner.os }}-${{ steps.slate.outputs.date }}
+          restore-keys: |
+            sportsedge-mlb-history-v1-${{ runner.os }}-
+      - name: Verify canonical MLB machine safety tests
+        run: >-
+          python -m unittest
+          tests.test_auto_runner
+          tests.test_odds_api_source
+          tests.test_odds_event_snapshot
+          tests.test_auto_native_odds
+          tests.test_mlb_hits_features
+          tests.test_mlb_total_bases_features
+          tests.test_mlb_history_cache
+          tests.test_odds_keyring
+          tests.test_live_odds_failover
+          tests.test_game_odds_source_unittest
+          tests.test_additional_mlb_odds_source
+          tests.test_additional_binary_quote_provenance
+          tests.test_mlb_quote_source_coverage
+          tests.test_mlb_run_machine
+          tests.test_run_auto_mlb_resilient_machine
+          tests.test_mlb_bullpen_workload_source
+          tests.test_mlb_run_it_pregame
+          tests.test_mlb_context_card
+          -v
+      - name: Run canonical automated MLB machine
+        env:
+          SPORTSEDGE_QUOTES_URL: ${{ secrets.SPORTSEDGE_QUOTES_URL }}
+          SPORTSEDGE_ODDS_API_KEY: ${{ secrets.SPORTSEDGE_ODDS_API_KEY }}
+          SPORTSEDGE_ODDS_API_KEY_2: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_2 }}
+          SPORTSEDGE_ODDS_API_KEY_3: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_3 }}
+          SPORTSEDGE_ODDS_API_KEY_4: ${{ secrets.SPORTSEDGE_ODDS_API_KEY_4 }}
+          SPORTSEDGE_ODDS_BOOKMAKERS: draftkings
+          SPORTSEDGE_FEATURES_URL: ${{ secrets.SPORTSEDGE_FEATURES_URL }}
+          SPORTSEDGE_PROJECTED_LINEUPS_URL: ${{ secrets.SPORTSEDGE_PROJECTED_LINEUPS_URL }}
+          SPORTSEDGE_PROVIDER_TOKEN: ${{ secrets.SPORTSEDGE_PROVIDER_TOKEN }}
+          SPORTSEDGE_HISTORY_CACHE_DIR: .cache/sportsedge/mlb-history
+        run: python scripts/run_auto_mlb_resilient.py --output artifacts/live_mlb_card.json
+      - name: Retrieve automated pregame context
+        if: always() && hashFiles('artifacts/live_mlb_card.json') != ''
+        run: PYTHONPATH=. python scripts/acquire_mlb_card_context.py --engine-output artifacts/live_mlb_card.json --out-dir artifacts/mlb_context
+      - name: Render SportsEdge phone card
+        if: always() && hashFiles('artifacts/live_mlb_card.json') != ''
+        run: >-
+          PYTHONPATH=. python scripts/render_mlb_myspari_card.py
+          --engine-output artifacts/live_mlb_card.json
+          --context-dir artifacts/mlb_context
+          --out-dir artifacts/mlb_myspari
+      - name: Upload automated card evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: live-mlb-card
+          path: |
+            artifacts/live_mlb_card.json
+            artifacts/live_game_odds.json
+            artifacts/odds_http_diagnostics.json
+            artifacts/mlb_context/
+            artifacts/mlb_myspari/
+          if-no-files-found: error
+          retention-days: 2
