@@ -30,12 +30,21 @@ from sportsedge.sports.cfb.game_freeze import (
     verify_frozen_cfb_game_artifact,
 )
 from sportsedge.sports.cfb.model_artifact import (
+    CFB_MODEL_ARTIFACT_SCHEMA,
     CFBModelArtifactError,
     cfb_model_code_surface_sha256,
     load_cfb_model_artifact,
 )
 from sportsedge.sports.cfb.paths import DEFAULT_CFB_MODEL_ARTIFACT_PATH
 from sportsedge.sports.cfb.run_machine import run_it_cfb
+from sportsedge.sports.cfb.candidate_live_source import fetch_cfbd_candidate_metric_snapshots
+from sportsedge.sports.cfb.selected_candidate_artifact import (
+    CFB_SELECTED_CANDIDATE_ARTIFACT_SCHEMA,
+    CFBSelectedCandidateArtifactError,
+    cfb_selected_candidate_code_surface_sha256,
+    load_cfb_selected_candidate_artifact,
+)
+from sportsedge.sports.cfb.selected_candidate_runtime import run_selected_candidate_cfb_machine
 from sportsedge.sports.cfb.source import (
     CFBGame,
     attach_weather,
@@ -148,8 +157,6 @@ def _manual_board(raw: str | None) -> list[dict]:
 
 def _model(path: Path, *, repo_root: Path):
     """Load only an artifact authorized by the committed freeze registry."""
-    # Preserve the most local blocker first: if the canonical artifact does not
-    # exist, no registry lookup can make the runtime usable.
     if not path.is_file():
         raise CFBAutoError("CFB_AUTO_FROZEN_MODEL_ARTIFACT_REQUIRED")
     try:
@@ -164,19 +171,37 @@ def _model(path: Path, *, repo_root: Path):
         payload = json.loads(raw.decode("utf-8"))
     except Exception as exc:
         raise CFBAutoError("CFB_AUTO_MODEL_ARTIFACT_UNREADABLE") from exc
-    code_sha = cfb_model_code_surface_sha256(repo_root)
-    if code_sha != registry["model_code_sha256"]:
-        raise CFBAutoError("CFB_AUTO_MODEL_CODE_SHA256_REGISTRY_MISMATCH")
+
+    schema = str(payload.get("schema_version") or "")
     try:
         verify_frozen_cfb_game_artifact(payload, artifact_bytes=raw, registry=registry)
-        model = load_cfb_model_artifact(
-            payload,
-            expected_model_code_sha256=registry["model_code_sha256"],
-            expected_training_source_sha256=registry["training_source_sha256"],
-        )
-    except (CFBModelArtifactError, CFBGameFreezeError) as exc:
+        if schema == CFB_SELECTED_CANDIDATE_ARTIFACT_SCHEMA:
+            code_sha = cfb_selected_candidate_code_surface_sha256(repo_root)
+            if code_sha != registry["model_code_sha256"]:
+                raise CFBAutoError("CFB_AUTO_MODEL_CODE_SHA256_REGISTRY_MISMATCH")
+            model = load_cfb_selected_candidate_artifact(
+                payload,
+                expected_model_code_sha256=registry["model_code_sha256"],
+                expected_training_source_sha256=registry["training_source_sha256"],
+            )
+            return model, payload, registry, "SELECTED_CANDIDATE"
+        if schema == CFB_MODEL_ARTIFACT_SCHEMA:
+            code_sha = cfb_model_code_surface_sha256(repo_root)
+            if code_sha != registry["model_code_sha256"]:
+                raise CFBAutoError("CFB_AUTO_MODEL_CODE_SHA256_REGISTRY_MISMATCH")
+            model = load_cfb_model_artifact(
+                payload,
+                expected_model_code_sha256=registry["model_code_sha256"],
+                expected_training_source_sha256=registry["training_source_sha256"],
+            )
+            return model, payload, registry, "LEGACY_JOINT"
+        raise CFBAutoError("CFB_AUTO_MODEL_ARTIFACT_SCHEMA_UNSUPPORTED")
+    except (
+        CFBModelArtifactError,
+        CFBSelectedCandidateArtifactError,
+        CFBGameFreezeError,
+    ) as exc:
         raise CFBAutoError(str(exc)) from exc
-    return model, payload, registry
 
 
 def _objective_context(*, current: datetime, season: int, cfbd_key: str) -> tuple[str, dict | None, str | None]:
@@ -205,6 +230,8 @@ def _run_manual_model(
     season: int,
     week: int,
     model,
+    model_runtime: str,
+    frozen_artifact_sha256: str,
     cfbd_key: str,
     manual_events: list[dict],
     bookmakers: tuple[str, ...],
@@ -217,12 +244,6 @@ def _run_manual_model(
         games,
         fetch_cfbd_weather(season=season, week=week, cfbd_api_key=cfbd_key),
     )
-    metrics = fetch_cfbd_team_metrics(
-        season=season,
-        week=week,
-        cfbd_api_key=cfbd_key,
-        now=current,
-    )
     quotes = parse_the_odds_api_quotes(
         manual_events,
         games=games,
@@ -231,6 +252,35 @@ def _run_manual_model(
     )
     if not quotes:
         raise CFBAutoError("CFB_AUTO_MANUAL_BOARD_NO_MATCHING_QUOTES")
+    if model_runtime == "SELECTED_CANDIDATE":
+        snapshots = fetch_cfbd_candidate_metric_snapshots(
+            season=season,
+            week=week,
+            cfbd_api_key=cfbd_key,
+            now=current,
+        )
+        return run_selected_candidate_cfb_machine(
+            mode="MANUAL",
+            season=season,
+            week=week,
+            model=model,
+            now=current,
+            games=games,
+            candidate_snapshots=snapshots,
+            quotes=quotes,
+            fbs_team_rows=team_rows,
+            root_seed=root_seed,
+            n_paths=n_paths,
+            frozen_artifact_sha256=frozen_artifact_sha256,
+        )
+    if model_runtime != "LEGACY_JOINT":
+        raise CFBAutoError("CFB_AUTO_MODEL_RUNTIME_UNSUPPORTED")
+    metrics = fetch_cfbd_team_metrics(
+        season=season,
+        week=week,
+        cfbd_api_key=cfbd_key,
+        now=current,
+    )
     return run_it_cfb(
         mode="MANUAL",
         season=season,
@@ -252,6 +302,8 @@ def _run_model_and_context(
     season: int,
     week: int,
     model,
+    model_runtime: str,
+    frozen_artifact_sha256: str,
     cfbd_key: str,
     manual_events: list[dict],
     bookmakers: tuple[str, ...],
@@ -272,6 +324,8 @@ def _run_model_and_context(
             season=season,
             week=week,
             model=model,
+            model_runtime=model_runtime,
+            frozen_artifact_sha256=frozen_artifact_sha256,
             cfbd_key=cfbd_key,
             manual_events=manual_events,
             bookmakers=bookmakers,
@@ -302,7 +356,7 @@ def main() -> int:
     current = _utc(args.asof)
     try:
         cfbd_key = _credentials()
-        model, artifact, registry = _model(args.model_artifact, repo_root=root)
+        model, artifact, registry, model_runtime = _model(args.model_artifact, repo_root=root)
         manual_events = _manual_board(args.board_json or os.environ.get("CFB_MANUAL_BOARD_JSON"))
         season = int(args.season if args.season is not None else current.year)
         week = int(args.week) if args.week is not None else discover_cfb_week(
@@ -316,6 +370,8 @@ def main() -> int:
             season=season,
             week=week,
             model=model,
+            model_runtime=model_runtime,
+            frozen_artifact_sha256=artifact["artifact_sha256"],
             cfbd_key=cfbd_key,
             manual_events=manual_events,
             bookmakers=tuple(args.bookmakers or ["draftkings"]),
@@ -334,6 +390,7 @@ def main() -> int:
             "model_code_sha256": artifact["model_code_sha256"],
             "training_source_sha256": artifact["training_source_sha256"],
             "game_freeze_registry_sha256": registry["registry_sha256"],
+            "model_runtime": model_runtime,
             "objective_context_status": context_status,
             "objective_context_error": context_error,
             "objective_context": objective_context,
