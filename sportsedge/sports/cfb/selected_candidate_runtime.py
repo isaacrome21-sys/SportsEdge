@@ -53,6 +53,7 @@ class CFBSelectedCandidateRuntimeAdapter:
 
     selected_model: CFBSelectedCandidateScoreModel
     candidate_rows_by_game_id: Mapping[str, Mapping[str, Any]]
+    frozen_artifact_sha256: str | None = None
 
     model_id: str = CFB_JOINT_MODEL_ID
     feature_contract: str = CFB_FEATURE_CONTRACT
@@ -66,6 +67,13 @@ class CFBSelectedCandidateRuntimeAdapter:
         return self.selected_model.overtime_deltas
 
     def artifact_sha256(self) -> str:
+        if self.frozen_artifact_sha256 is not None:
+            token = str(self.frozen_artifact_sha256).strip().lower()
+            if len(token) != 64 or any(ch not in "0123456789abcdef" for ch in token):
+                raise CFBSelectedCandidateRuntimeError(
+                    "CFB_SELECTED_RUNTIME_FROZEN_ARTIFACT_SHA_INVALID"
+                )
+            return token
         return self.selected_model.artifact_sha256()
 
     def predict_means(self, row: Mapping[str, Any]) -> tuple[float, float]:
@@ -127,6 +135,7 @@ def build_selected_candidate_runtime_adapter(
     model: CFBSelectedCandidateScoreModel,
     games: Sequence[CFBGame],
     candidate_snapshots: Mapping[str, Mapping[str, Mapping[str, Any]]],
+    frozen_artifact_sha256: str | None = None,
 ) -> tuple[CFBSelectedCandidateRuntimeAdapter, dict[str, CFBTeamMetrics]]:
     if not isinstance(model, CFBSelectedCandidateScoreModel):
         raise CFBSelectedCandidateRuntimeError("CFB_SELECTED_RUNTIME_MODEL_REQUIRED")
@@ -154,7 +163,11 @@ def build_selected_candidate_runtime_adapter(
         )
     if not rows:
         raise CFBSelectedCandidateRuntimeError("CFB_SELECTED_RUNTIME_GAMES_EMPTY")
-    return CFBSelectedCandidateRuntimeAdapter(model, rows), current_metrics
+    return CFBSelectedCandidateRuntimeAdapter(
+        model,
+        rows,
+        frozen_artifact_sha256=frozen_artifact_sha256,
+    ), current_metrics
 
 
 def run_selected_candidate_cfb_machine(
@@ -180,6 +193,7 @@ def run_selected_candidate_cfb_machine(
     weather_fetcher=fetch_cfbd_weather,
     candidate_metric_fetcher=fetch_cfbd_candidate_metric_snapshots,
     odds_fetcher=fetch_the_odds_api_quotes,
+    frozen_artifact_sha256: str | None = None,
 ) -> CFBMachineReport:
     """Serve one already-selected family through the canonical CFB run machine.
 
@@ -254,6 +268,7 @@ def run_selected_candidate_cfb_machine(
         model=model,
         games=canonical_games,
         candidate_snapshots=snapshots,
+        frozen_artifact_sha256=frozen_artifact_sha256,
     )
     report = run_cfb_machine(
         mode="MANUAL",
