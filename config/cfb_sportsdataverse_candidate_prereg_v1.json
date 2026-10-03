@@ -96,7 +96,7 @@
   },
   "hash_binding": {
     "code_manifest_sha256": "21394b1230f71e43188c63fa0ac898fa385dbc7af06990f618645210d891ce35",
-    "config_bundle_sha256": "40b479cddb72fa682661786d11762a57b3c42f89a032913a239c33bbf7853772"
+    "config_bundle_sha256": "09dd031f13f34eab92bf0f0051fcb8fa5fd84bba9eacb0d116e38dd81bd607ce"
   },
   "candidate_selection_policy": {
     "metric": "JOINT_HOME_AWAY_SCORE_RMSE",
