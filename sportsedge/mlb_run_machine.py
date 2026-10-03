@@ -34,7 +34,7 @@ from .live_slate import LiveGame
 from .manual_hybrid_joint_runner import run_manual_hybrid_joint_mlb
 from .prediction_journal import normalize_legacy_block_reason
 from .mlb_edge_score import score_mlb_edge
-from .mlb_full_board import build_mlb_full_board
+from .mlb_full_board import build_mlb_full_board, emit_all_props_side_totals
 from .mlb_market_dispositions import market_dispositions
 from .mlb_quote_pairing import pair_opposite_odds
 from .mlb_input_readiness import scored_input_readiness
@@ -220,7 +220,9 @@ def _summary(results: Sequence[MLBMachineResult]) -> dict[str, Any]:
             markets.add(row.market)
         if row.model_p is not None:
             model_priced += 1
-    board = build_mlb_full_board([asdict(x) for x in results])
+    payload = [asdict(x) for x in results]
+    board = build_mlb_full_board(payload)
+    complete = emit_all_props_side_totals(payload)
     return {
         "quote_count": len(results),
         "markets_seen": sorted(markets),
@@ -230,12 +232,13 @@ def _summary(results: Sequence[MLBMachineResult]) -> dict[str, Any]:
         "bet_status_counts": statuses,
         "official_bets": statuses.get("OFFICIAL_BET", 0),
         "blocked": statuses.get("BLOCKED", 0),
-        "scored_market_dispositions": market_dispositions([asdict(x) for x in results]),
+        "scored_market_dispositions": market_dispositions(payload),
         "full_board": board,
-        "side_rows": board["summary"]["side_rows"],
-        "total_rows": board["summary"]["total_rows"],
-        "prop_rows": board["summary"]["prop_rows"],
-        "catalog_complete": board["summary"]["side_rows"] >= 4 and board["summary"]["total_rows"] >= 6 and board["summary"]["prop_rows"] >= 20 and board["summary"]["catalog_markets"] >= 38,
+        "all_props_side_totals": complete,
+        "side_rows": complete["summary"]["side_rows"],
+        "total_rows": complete["summary"]["total_rows"],
+        "prop_rows": complete["summary"]["prop_rows"],
+        "catalog_complete": complete["summary"]["both_sides"] and complete["summary"]["side_rows"] >= 8 and complete["summary"]["total_rows"] >= 12 and complete["summary"]["prop_rows"] >= 40 and complete["summary"]["catalog_markets"] >= 38,
     }
 
 

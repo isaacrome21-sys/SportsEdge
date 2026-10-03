@@ -161,3 +161,154 @@ def build_mlb_full_board(
         "summary": summary,
         "rows": emitted,
     }
+
+
+_SIDE_PAIRS = {
+    "MONEYLINE": ("HOME", "AWAY"),
+    "RUN_LINE": ("HOME", "AWAY"),
+    "F5_MONEYLINE": ("HOME", "AWAY"),
+    "F5_RUN_LINE": ("HOME", "AWAY"),
+}
+_TOTAL_PAIRS = {
+    "TOTALS": ("OVER", "UNDER"),
+    "TEAM_TOTALS": ("OVER", "UNDER"),
+    "F5_TOTALS": ("OVER", "UNDER"),
+    "F5_TEAM_TOTALS": ("OVER", "UNDER"),
+    "NRFI": ("YES", "NO"),
+    "YRFI": ("YES", "NO"),
+}
+
+
+def _pair_sides(market: str) -> tuple[str, str]:
+    key = str(market or "").strip().upper()
+    if key in _SIDE_PAIRS:
+        return _SIDE_PAIRS[key]
+    if key in _TOTAL_PAIRS:
+        return _TOTAL_PAIRS[key]
+    return ("OVER", "UNDER")
+
+
+def _group_key(row: Mapping[str, Any]) -> tuple[str, str, str, str, str]:
+    line = row.get("line")
+    line_key = "" if line is None else str(line)
+    return (
+        str(row.get("market") or "").strip().upper(),
+        str(row.get("game_id") or ""),
+        str(row.get("entity_id") or row.get("team_side") or ""),
+        line_key,
+        str(row.get("team_side") or ""),
+    )
+
+
+def emit_all_props_side_totals(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    catalog_path: str | Path = DEFAULT_CATALOG,
+) -> dict[str, Any]:
+    """Emit both sides of every quoted prop, side, and total.
+
+    A quoted side keeps its model probability. The missing complement is explicit
+    and research-only. Catalog families with no quote stay blockers. This does
+    not create Model_P, Truth Gate, or official authority.
+    """
+    markets = catalog_markets(catalog_path)
+    grouped: dict[tuple[str, str, str, str, str], dict[str, Mapping[str, Any]]] = {}
+    order: list[tuple[str, str, str, str, str]] = []
+    for raw in rows:
+        if not isinstance(raw, Mapping):
+            raise MLBFullBoardError("MLB_ALL_SIDES_ROW_INVALID")
+        market = str(raw.get("market") or raw.get("engine_market") or "").strip().upper()
+        if not market or market == "UNKNOWN":
+            continue
+        key = _group_key({**dict(raw), "market": market})
+        side = str(raw.get("side") or raw.get("selection") or "").strip().upper()
+        if key not in grouped:
+            grouped[key] = {}
+            order.append(key)
+        if side:
+            grouped[key][side] = raw
+    emitted: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for key in order:
+        market = key[0]
+        seen.add(market)
+        present = grouped[key]
+        left, right = _pair_sides(market)
+        for side in (left, right):
+            raw = present.get(side)
+            if raw is None:
+                donor = next(iter(present.values()))
+                model_p = _number(donor.get("model_p") if donor.get("model_p") is not None else donor.get("research_p"))
+                complement = None if model_p is None else max(0.0, 1.0 - model_p)
+                emitted.append({
+                    "lane": family_for(market),
+                    "market": market,
+                    "game_id": donor.get("game_id"),
+                    "entity_id": _entity(donor),
+                    "team_side": donor.get("team_side"),
+                    "side": side,
+                    "line": donor.get("line"),
+                    "american_odds": donor.get("opposite_odds"),
+                    "model_p": complement,
+                    "research_only": True,
+                    "official_eligible": False,
+                    "presentation": "NO_QUOTE" if donor.get("opposite_odds") is None else "COMPLEMENT",
+                    "reason": "COMPLEMENT_SIDE_NOT_QUOTED",
+                })
+                continue
+            model_p = _number(raw.get("model_p") if raw.get("model_p") is not None else raw.get("research_p"))
+            emitted.append({
+                "lane": family_for(market),
+                "market": market,
+                "game_id": raw.get("game_id"),
+                "entity_id": _entity(raw),
+                "team_side": raw.get("team_side"),
+                "side": side,
+                "line": raw.get("line"),
+                "american_odds": raw.get("american_odds") or raw.get("price_american"),
+                "model_p": model_p,
+                "research_only": True,
+                "official_eligible": False,
+                "presentation": _presentation(raw, model_p),
+                "reason": raw.get("reason") or raw.get("card_reason") or raw.get("score_reason") or "RESEARCH_ROW",
+            })
+    for market in markets:
+        if market in seen:
+            continue
+        left, right = _pair_sides(market)
+        for side in (left, right):
+            emitted.append({
+                "lane": family_for(market),
+                "market": market,
+                "game_id": None,
+                "entity_id": None,
+                "team_side": None,
+                "side": side,
+                "line": None,
+                "american_odds": None,
+                "model_p": None,
+                "research_only": True,
+                "official_eligible": False,
+                "presentation": "BLOCKED",
+                "reason": "NO_QUOTE_OR_ENGINE_ROW",
+            })
+    return {
+        "schema_version": "MLB_ALL_PROPS_SIDE_TOTALS_V1",
+        "authority": "PRESENTATION_ONLY",
+        "model_p_authority": False,
+        "truth_gate_authority": False,
+        "official_authority": False,
+        "summary": {
+            "catalog_markets": len(markets),
+            "quoted_groups": len(order),
+            "side_rows": sum(1 for row in emitted if row["lane"] == "SIDE"),
+            "total_rows": sum(1 for row in emitted if row["lane"] == "TOTAL"),
+            "prop_rows": sum(1 for row in emitted if row["lane"] == "PROP"),
+            "both_sides": all(
+                {row["side"] for row in emitted if row["market"] == market} >= set(_pair_sides(market))
+                for market in markets
+            ),
+            "official_bets": 0,
+        },
+        "rows": emitted,
+    }
