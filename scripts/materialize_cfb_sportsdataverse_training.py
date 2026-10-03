@@ -208,31 +208,52 @@ def _scope_complete_advanced_join_games(
         dataset: [dict(row) for row in validate_dataset(dataset, datasets[dataset])]
         for dataset in required
     }
-    teams_by_dataset: dict[str, dict[int, set[int]]] = {}
+    schedule_index: dict[int, tuple[int, int]] = {}
+    for row in validate_dataset("cfb_schedules", datasets["cfb_schedules"]):
+        game_id = int(row["game_id"])
+        stamp = (int(row["season"]), int(row["week"]))
+        prior = schedule_index.get(game_id)
+        if prior is not None and prior != stamp:
+            raise SDVTrainingMaterializerError(
+                f"CFB_SDV_ADVANCED_JOIN_SCHEDULE_TIME_AMBIGUOUS:{game_id}"
+            )
+        schedule_index[game_id] = stamp
+
+    identities_by_dataset: dict[str, dict[int, set[tuple[int, int, int]]]] = {}
     all_game_ids: set[int] = set()
     for dataset, rows in validated.items():
-        by_game: dict[int, set[int]] = defaultdict(set)
+        by_game: dict[int, set[tuple[int, int, int]]] = defaultdict(set)
         for row in rows:
             game_id = int(row["game_id"])
-            by_game[game_id].add(_pos_team_id(row))
+            if game_id not in schedule_index:
+                raise SDVTrainingMaterializerError(
+                    f"CFB_SDV_ADVANCED_JOIN_SCHEDULE_ID_MISSING:{game_id}"
+                )
+            schedule_season, schedule_week = schedule_index[game_id]
+            if dataset == "espn_cfb_adv_drives":
+                season, week = schedule_season, schedule_week
+            else:
+                season, week = int(row["season"]), int(row["week"])
+            by_game[game_id].add((_pos_team_id(row), season, week))
             all_game_ids.add(game_id)
-        teams_by_dataset[dataset] = by_game
+        identities_by_dataset[dataset] = by_game
 
     keep: set[int] = set()
     exclusions: list[dict[str, Any]] = []
     for game_id in sorted(all_game_ids):
         identities = {
-            dataset: sorted(teams_by_dataset[dataset].get(game_id, set()))
+            dataset: [list(value) for value in sorted(identities_by_dataset[dataset].get(game_id, set()))]
             for dataset in required
         }
-        team_sets = [tuple(identities[dataset]) for dataset in required]
-        if len(team_sets[0]) == 2 and all(value == team_sets[0] for value in team_sets[1:]):
+        identity_sets = [tuple(tuple(value) for value in identities[dataset]) for dataset in required]
+        if len(identity_sets[0]) == 2 and all(value == identity_sets[0] for value in identity_sets[1:]):
             keep.add(game_id)
             continue
         exclusions.append({
             "game_id": str(game_id),
-            "reason": "CFB_SDV_INCOMPLETE_ADVANCED_JOIN",
-            "team_ids_by_dataset": identities,
+            "reason": "CFB_SDV_INCOMPLETE_OR_TEMPORALLY_INCONSISTENT_ADVANCED_JOIN",
+            "row_identity_by_dataset": identities,
+            "schedule_season_week": list(schedule_index[game_id]),
         })
 
     scoped = {name: list(rows) for name, rows in datasets.items()}
@@ -525,7 +546,7 @@ def build_training_bundle(*, cache_root: Path) -> dict[str, Any]:
         "parsed_asset_receipts_sha256": _canonical_sha(parsed_receipts),
         "advanced_join_exclusions": len(advanced_join_exclusions),
         "advanced_join_exclusions_sha256": _canonical_sha(advanced_join_exclusions),
-        "advanced_join_policy": "REQUIRE_IDENTICAL_TWO_TEAM_SET_ACROSS_TEAM_SITUATIONAL_DRIVE_DATASETS",
+        "advanced_join_policy": "REQUIRE_IDENTICAL_TWO_TEAM_SEASON_WEEK_IDENTITY_ACROSS_TEAM_SITUATIONAL_DRIVE_DATASETS_USING_SCHEDULE_TIME_FOR_DRIVES",
         "venue_source": venue_attestation,
         "weather": weather_attestation,
         "prereg_hash_binding": dict(prereg["hash_binding"]),
