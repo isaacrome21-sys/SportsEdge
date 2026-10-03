@@ -14,6 +14,9 @@ from typing import Any, Mapping
 _SHA64 = re.compile(r"^[0-9a-f]{64}$")
 CFB_GAME_FREEZE_SCHEMA_VERSION = 1
 CFB_GAME_FREEZE_PATH = Path("config/cfb_game_model_freeze.json")
+CFB_GAME_FREEZE_MODEL_FAMILY = "CFB_SELECTED_CANDIDATE_MODEL_V1"
+CFB_GAME_FREEZE_ARTIFACT_SCHEMA = "CFB_SELECTED_CANDIDATE_MODEL_ARTIFACT_V1"
+CFB_GAME_FREEZE_RUNTIME_CONTRACT = "CFB_SELECTED_CANDIDATE_CANONICAL_RUNTIME_V1"
 
 
 class CFBGameFreezeError(ValueError):
@@ -59,6 +62,12 @@ def load_cfb_game_freeze(path: str | Path = CFB_GAME_FREEZE_PATH) -> dict[str, A
     artifact_path = str(row.get("artifact_path") or "").strip()
     if artifact_path != "models/cfb_joint_v1.json":
         raise CFBGameFreezeError("CFB_GAME_FREEZE_ARTIFACT_PATH_INVALID")
+    if row.get("model_family") != CFB_GAME_FREEZE_MODEL_FAMILY:
+        raise CFBGameFreezeError("CFB_GAME_FREEZE_MODEL_FAMILY_INVALID")
+    if row.get("artifact_schema_required") != CFB_GAME_FREEZE_ARTIFACT_SCHEMA:
+        raise CFBGameFreezeError("CFB_GAME_FREEZE_ARTIFACT_SCHEMA_INVALID")
+    if row.get("runtime_contract_required") != CFB_GAME_FREEZE_RUNTIME_CONTRACT:
+        raise CFBGameFreezeError("CFB_GAME_FREEZE_RUNTIME_CONTRACT_INVALID")
     try:
         fit_max = int(row.get("fit_max_season"))
     except (TypeError, ValueError) as exc:
@@ -90,6 +99,9 @@ def verify_frozen_cfb_game_artifact(
 
 __all__ = [
     "CFB_GAME_FREEZE_PATH",
+    "CFB_GAME_FREEZE_MODEL_FAMILY",
+    "CFB_GAME_FREEZE_ARTIFACT_SCHEMA",
+    "CFB_GAME_FREEZE_RUNTIME_CONTRACT",
     "CFBGameFreezeError",
     "load_cfb_game_freeze",
     "verify_frozen_cfb_game_artifact",

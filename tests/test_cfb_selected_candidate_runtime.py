@@ -113,6 +113,17 @@ class TestCFBSelectedCandidateRuntime(unittest.TestCase):
                 self.assertEqual(direct, canonical)
                 self.assertEqual(adapter.artifact_sha256(), model.artifact_sha256())
 
+    def test_frozen_wrapper_artifact_identity_drives_canonical_seed_identity(self):
+        model = fit_cfb_selected_candidate_score_model(self.rows, family=EQUAL, ridge_alpha=10.0)
+        frozen_sha = "f" * 64
+        adapter, _ = build_selected_candidate_runtime_adapter(
+            model=model,
+            games=[self.game],
+            candidate_snapshots=self.snapshots,
+            frozen_artifact_sha256=frozen_sha,
+        )
+        self.assertEqual(adapter.artifact_sha256(), frozen_sha)
+
     def test_manual_selected_runtime_uses_canonical_market_machine_and_stays_blocked(self):
         model = fit_cfb_selected_candidate_score_model(self.rows, family=GAMES, ridge_alpha=10.0)
         quotes = [
