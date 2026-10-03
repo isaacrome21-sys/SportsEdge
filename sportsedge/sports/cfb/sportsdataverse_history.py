@@ -163,8 +163,15 @@ def build_team_snapshots(
     all_schedule_ids = {int(r["game_id"]) for r in validate_dataset("cfb_schedules", schedule_rows)}
     observed_ids = {int(r["game_id"]) for r in team + situ + drives}
     unknown_ids = sorted(observed_ids - all_schedule_ids)
+    # SportsDataverse advanced releases can contain upstream ESPN games absent
+    # from the canonical yearly schedule asset. They cannot be temporally or
+    # FBS-scope validated, so they are excluded before any feature aggregation.
+    # Callers that persist provenance must inventory these IDs separately.
     if unknown_ids:
-        raise SportsDataverseHistoryError("CFB_SDV_ADV_GAME_MISSING_SCHEDULE:"+",".join(map(str,unknown_ids[:20])))
+        unknown = set(unknown_ids)
+        team = [r for r in team if int(r["game_id"]) not in unknown]
+        situ = [r for r in situ if int(r["game_id"]) not in unknown]
+        drives = [r for r in drives if int(r["game_id"]) not in unknown]
     drives = [r for r in drives if int(r["game_id"]) in allowed_game_ids]
     drives = attach_drive_time(drives, schedules)
 
