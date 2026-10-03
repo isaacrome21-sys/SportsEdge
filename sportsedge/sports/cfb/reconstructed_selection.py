@@ -308,7 +308,8 @@ def build_selection_bundle_manifest(
         raise CFBReconstructedSelectionError("CFB_RECONSTRUCTED_WEATHER_CONTRACT_MISSING")
 
     seasons = sorted({int(row["season"]) for row in rows})
-    if not seasons or seasons[0] != SELECTION_START_SEASON or seasons[-1] != SELECTION_END_SEASON:
+    expected_seasons = list(range(SELECTION_START_SEASON, SELECTION_END_SEASON + 1))
+    if seasons != expected_seasons:
         raise CFBReconstructedSelectionError("CFB_RECONSTRUCTED_SELECTION_WINDOW_INCOMPLETE")
     if any(season == 2026 for season in seasons):
         raise CFBReconstructedSelectionError("CFB_RECONSTRUCTED_2026_OUTCOME_PROHIBITED")
