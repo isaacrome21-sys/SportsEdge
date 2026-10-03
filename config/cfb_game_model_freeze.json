@@ -35,5 +35,8 @@
     "A frozen artifact under this registry grants no promotion authority and no historical validation claim; forward evidence must begin prospectively under the active promotion evidence policy.",
     "Synthetic fixture artifacts and CI determinism fixtures are prohibited as freeze evidence.",
     "Runtime must fail closed while status is UNFROZEN."
-  ]
+  ],
+  "selection_result_sha256": null,
+  "freeze_evidence_file_sha256": null,
+  "candidate_family": null
 }
