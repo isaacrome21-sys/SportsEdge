@@ -20,6 +20,16 @@ from sportsedge.sports.nfl.attempt9_model_p import model_probability
 from sportsedge.truth_gate import american_to_decimal
 
 
+# Markets whose card-legal model has beaten breakeven (52.4% at -110) in an
+# out-of-sample backtest vs closing lines. Anything else is shown as a
+# no-edge LEAN for tracking only and never counted as a pick/bet.
+BET_PROVEN_MARKETS: frozenset[str] = frozenset()
+LEAN_REASON = {
+    "total": "LEAN_ONLY:NO_PROVEN_EDGE (Attempt 9 totals 49.7% OOS 2018,2020-25 vs close)",
+}
+DEFAULT_LEAN_REASON = "LEAN_ONLY:NO_PROVEN_EDGE (market not backtest-proven)"
+
+
 def _ev(estimate_p: float, price: int) -> float:
     dec = american_to_decimal(price)
     return estimate_p * dec - 1.0
@@ -50,6 +60,7 @@ def main() -> int:
         forecast = raw_forecasts(runtime, feat["vector"]) if feat.get("ok") else None
         markets = []
         picks = []
+        leans = []
         for raw in game.get("markets") or []:
             blocked = market_eligibility(raw["market"], raw.get("line"))
             if blocked:
@@ -115,16 +126,26 @@ def main() -> int:
                 })
                 qualified.append(cand)
             pick = max(qualified, key=lambda c: (c["ev_per_dollar"], c["edge_probability_points"])) if qualified else None
-            row = {**raw, "no_model": None, "pick": pick}
+            if raw["market"] in BET_PROVEN_MARKETS:
+                row = {**raw, "no_model": None, "pick": pick, "lean": None}
+                if pick:
+                    picks.append(pick)
+            else:
+                if pick:
+                    pick = {**pick, "lean_only": True, "lean_reason": LEAN_REASON.get(raw["market"], DEFAULT_LEAN_REASON)}
+                    leans.append(pick)
+                row = {**raw, "no_model": None, "pick": None, "lean": pick}
             markets.append(row)
-            if pick:
-                picks.append(pick)
-        games_out.append({**game, "markets": markets, "picks": picks, "features": feat})
+        games_out.append({**game, "markets": markets, "picks": picks, "leans": leans, "features": feat})
     payload = {
         "sport": "NFL",
         "context_bound": False,
         "games": games_out,
-        "empty_reason": None if any(g["picks"] for g in games_out) else "Nothing looks strong enough, or every market is NO_MODEL.",
+        "bet_proven_markets": sorted(BET_PROVEN_MARKETS),
+        "empty_reason": None if any(g["picks"] for g in games_out) else (
+            "No bets: no NFL market on this card has beaten breakeven out of sample yet. "
+            "Leans are tracking-only, not bets."
+        ),
         "authority_footer": "NOT Model_P / NOT Truth Gate / NOT OFFICIAL",
     }
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
