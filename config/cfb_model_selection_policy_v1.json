@@ -54,11 +54,11 @@
     "estimated_call_plan_must_fit_verified_remaining_quota_with_retry_reserve": true,
     "verified_cache_reuse_required": true,
     "resume_from_verified_cache_required": true,
-    "partial_restart_from_2015_prohibited_when_verified_cache_exists": true,
     "raw_response_hash_required": true,
     "retrieval_timestamp_required": true,
     "retry_backoff_required": true,
-    "rule": "Do not start historical CFBD acquisition from an assumed public tier. Bind the run to the account's verified active tier, monthly quota, remaining quota if available, and an explicit call-budget plan. Cache identity must include endpoint, season, endWeek, query parameters, provider contract, and response SHA so completed slices survive interruption and retries."
+    "rule": "Do not start historical CFBD acquisition from an assumed public tier. Bind the run to the account's verified active tier, monthly quota, remaining quota if available, and an explicit call-budget plan. Cache identity must include endpoint, season, endWeek, query parameters, provider contract, and response SHA so completed slices survive interruption and retries.",
+    "partial_restart_from_selection_start_prohibited_when_verified_cache_exists": true
   },
   "freeze_once_rule": "Do not activate FOOTBALL_FORWARD_CAPTURE_V2 until the selected candidate has a hash-bound artifact, feature/source contracts, acquisition and predictive code manifests, and the freeze registry is FROZEN on refs/heads/main. If a candidate wins under the frozen selection rules and clears the null threshold, adverse declared diagnostics must be recorded in provenance but do not authorize withholding the freeze. Any later model-artifact or feature-semantics change restarts the V2 evidence clock under PROMOTION_EVIDENCE_POLICY_V2.",
   "governance": {
@@ -67,5 +67,12 @@
     "model_p_created": false,
     "historical_pit_created": false,
     "official_bet_authorized": false
+  },
+  "quota_driven_training_window_rule": {
+    "status": "FROZEN_BEFORE_FIRST_EVALUATION",
+    "rule": "If the originally preregistered full window cannot fit verified provider quota before any candidate evaluation, select the longest recent contiguous window whose full source plan plus an explicit retry reserve is guaranteed by redacted capacity evidence. Refreeze candidate specs, evaluator folds, final-fit policy, and all affected hashes before acquisition/evaluation.",
+    "performance_results_may_influence_window": false,
+    "candidate_results_may_be_inspected_before_window_freeze": false,
+    "attempts_consumed_if_applied_before_first_evaluation": 0
   }
 }
