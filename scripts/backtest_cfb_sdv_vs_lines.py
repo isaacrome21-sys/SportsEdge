@@ -81,6 +81,7 @@ def fetch_lines(seasons, key: str) -> dict:
                 except (TypeError, ValueError):
                     return None
             out[str(g.get("id"))] = {"spread": spread, "total": total, "provider": pick.get("provider"),
+                                     "home": g.get("homeTeam"), "away": g.get("awayTeam"),
                                      "spread_open": _f(pick.get("spreadOpen")),
                                      "total_open": _f(pick.get("overUnderOpen"))}
     return out
