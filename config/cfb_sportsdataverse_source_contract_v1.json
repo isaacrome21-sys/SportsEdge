@@ -26,7 +26,17 @@
       "weather_missing_after_snapshot_eligibility": "FAIL_CLOSED",
       "purpose": "Keep all four preregistered candidate families on the same outcome-blind scoreable row surface.",
       "week_0_or_1": "REQUIRE_BOTH_TEAMS_PRIOR_SEASON_FINAL_SNAPSHOT",
-      "early_current_sample_semantics": "WEEK_0_OR_1_PRIOR_VALUES_WITH_CURRENT_GAMES_IN_SAMPLE_ZERO"
+      "early_current_sample_semantics": "WEEK_0_OR_1_PRIOR_VALUES_WITH_CURRENT_GAMES_IN_SAMPLE_ZERO",
+      "advanced_join_coverage": {
+        "required_datasets": [
+          "espn_cfb_adv_team",
+          "espn_cfb_adv_situational",
+          "espn_cfb_adv_drives"
+        ],
+        "identity": "GAME_ID_PLUS_NUMERIC_POS_TEAM_ID",
+        "rule": "REQUIRE_IDENTICAL_TWO_TEAM_SET_ACROSS_REQUIRED_DATASETS",
+        "incomplete_game": "EXCLUDE_FROM_FEATURE_HISTORY_WITH_EXPLICIT_PROVENANCE_BEFORE_SNAPSHOT_AGGREGATION"
+      }
     }
   },
   "allowed_predictive_datasets": [

@@ -28,9 +28,11 @@ from sportsedge.sports.cfb.sportsdataverse_acquisition import acquisition_plan
 from sportsedge.sports.cfb.sportsdataverse_candidate_model import FAMILIES, feature_vector
 from sportsedge.sports.cfb.sportsdataverse_csv import parse_csv
 from sportsedge.sports.cfb.sportsdataverse_history import (
+    _pos_team_id,
     build_prior_season_fallback_snapshots,
     build_season_week_snapshots,
     regular_fbs_schedule_rows,
+    validate_dataset,
 )
 from sportsedge.sports.cfb.sportsdataverse_materializer import (
     SDVMaterializationError,
@@ -192,6 +194,54 @@ def _completed_regular_fbs_games(schedule_rows: list[Mapping[str, Any]]) -> list
             ) from exc
         out.append(dict(row))
     return sorted(out, key=lambda r: (int(r["season"]), int(r["week"]), int(r["game_id"])))
+
+
+def _scope_complete_advanced_join_games(
+    datasets: Mapping[str, list[dict[str, str]]],
+) -> tuple[dict[str, list[dict[str, str]]], list[dict[str, Any]]]:
+    required = (
+        "espn_cfb_adv_team",
+        "espn_cfb_adv_situational",
+        "espn_cfb_adv_drives",
+    )
+    validated = {
+        dataset: [dict(row) for row in validate_dataset(dataset, datasets[dataset])]
+        for dataset in required
+    }
+    teams_by_dataset: dict[str, dict[int, set[int]]] = {}
+    all_game_ids: set[int] = set()
+    for dataset, rows in validated.items():
+        by_game: dict[int, set[int]] = defaultdict(set)
+        for row in rows:
+            game_id = int(row["game_id"])
+            by_game[game_id].add(_pos_team_id(row))
+            all_game_ids.add(game_id)
+        teams_by_dataset[dataset] = by_game
+
+    keep: set[int] = set()
+    exclusions: list[dict[str, Any]] = []
+    for game_id in sorted(all_game_ids):
+        identities = {
+            dataset: sorted(teams_by_dataset[dataset].get(game_id, set()))
+            for dataset in required
+        }
+        team_sets = [tuple(identities[dataset]) for dataset in required]
+        if len(team_sets[0]) == 2 and all(value == team_sets[0] for value in team_sets[1:]):
+            keep.add(game_id)
+            continue
+        exclusions.append({
+            "game_id": str(game_id),
+            "reason": "CFB_SDV_INCOMPLETE_ADVANCED_JOIN",
+            "team_ids_by_dataset": identities,
+        })
+
+    scoped = {name: list(rows) for name, rows in datasets.items()}
+    for dataset in required:
+        scoped[dataset] = [
+            row for row in validated[dataset]
+            if int(row["game_id"]) in keep
+        ]
+    return scoped, exclusions
 
 
 def _snapshots(datasets: Mapping[str, list[dict[str, str]]]):
@@ -411,7 +461,8 @@ def build_training_bundle(*, cache_root: Path) -> dict[str, Any]:
     prereg, weather_contract = _verify_prereg()
     datasets, raw_receipts, parsed_receipts = _acquire_sdv(cache_root)
     games = _completed_regular_fbs_games(datasets["cfb_schedules"])
-    current, prior = _snapshots(datasets)
+    scoped_datasets, advanced_join_exclusions = _scope_complete_advanced_join_games(datasets)
+    current, prior = _snapshots(scoped_datasets)
     predictive, exclusions = _predictive_surface(
         games=games,
         current_snapshots=current,
@@ -472,6 +523,9 @@ def build_training_bundle(*, cache_root: Path) -> dict[str, Any]:
         "historical_weather_rows_sha256": _canonical_sha(weather_rows),
         "raw_asset_receipts_sha256": _canonical_sha(raw_receipts),
         "parsed_asset_receipts_sha256": _canonical_sha(parsed_receipts),
+        "advanced_join_exclusions": len(advanced_join_exclusions),
+        "advanced_join_exclusions_sha256": _canonical_sha(advanced_join_exclusions),
+        "advanced_join_policy": "REQUIRE_IDENTICAL_TWO_TEAM_SET_ACROSS_TEAM_SITUATIONAL_DRIVE_DATASETS",
         "venue_source": venue_attestation,
         "weather": weather_attestation,
         "prereg_hash_binding": dict(prereg["hash_binding"]),
@@ -495,6 +549,7 @@ def build_training_bundle(*, cache_root: Path) -> dict[str, Any]:
         "historical_weather": weather_rows,
         "raw_asset_receipts": raw_receipts,
         "parsed_asset_receipts": parsed_receipts,
+        "advanced_join_exclusions": advanced_join_exclusions,
         "manifest": manifest,
     }
 
@@ -516,6 +571,7 @@ def main(argv: list[str] | None = None) -> int:
     _write(args.out_dir / "historical_weather.json", bundle["historical_weather"])
     _write(args.out_dir / "raw_asset_receipts.json", bundle["raw_asset_receipts"])
     _write(args.out_dir / "parsed_asset_receipts.json", bundle["parsed_asset_receipts"])
+    _write(args.out_dir / "advanced_join_exclusions.json", bundle["advanced_join_exclusions"])
     _write(args.out_dir / "training_manifest.json", bundle["manifest"])
 
     print(json.dumps({

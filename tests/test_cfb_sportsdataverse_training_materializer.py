@@ -1,4 +1,4 @@
-from scripts.materialize_cfb_sportsdataverse_training import _predictive_surface
+from scripts.materialize_cfb_sportsdataverse_training import _predictive_surface, _scope_complete_advanced_join_games
 from sportsedge.sports.cfb.sportsdataverse_history import TeamSnapshot
 
 
@@ -40,3 +40,39 @@ def test_missing_week2_current_snapshot_is_explicit_exclusion():
     assert rows==[]
     assert exclusions[0]["game_id"]=="3"
     assert exclusions[0]["reason"]=="CFB_SDV_PREGAME_SNAPSHOT_MISSING"
+
+
+def test_incomplete_advanced_join_game_is_explicitly_scoped_out():
+    datasets={
+        "cfb_schedules":[],
+        "espn_cfb_adv_team":[
+            {"game_id":"1","season":"2025","pos_team":"10"},
+            {"game_id":"1","season":"2025","pos_team":"20"},
+            {"game_id":"2","season":"2025","pos_team":"10"},
+            {"game_id":"2","season":"2025","pos_team":"20"},
+        ],
+        "espn_cfb_adv_situational":[
+            {"game_id":"1","season":"2025","pos_team":"10"},
+            {"game_id":"1","season":"2025","pos_team":"20"},
+            {"game_id":"2","season":"2025","pos_team":"10"},
+        ],
+        "espn_cfb_adv_drives":[
+            {"game_id":"1","season":"2025","pos_team":"10"},
+            {"game_id":"1","season":"2025","pos_team":"20"},
+            {"game_id":"2","season":"2025","pos_team":"10"},
+            {"game_id":"2","season":"2025","pos_team":"20"},
+        ],
+    }
+    scoped,excluded=_scope_complete_advanced_join_games(datasets)
+    assert excluded==[{
+        "game_id":"2",
+        "reason":"CFB_SDV_INCOMPLETE_ADVANCED_JOIN",
+        "team_ids_by_dataset":{
+            "espn_cfb_adv_team":[10,20],
+            "espn_cfb_adv_situational":[10],
+            "espn_cfb_adv_drives":[10,20],
+        },
+    }]
+    for dataset in ("espn_cfb_adv_team","espn_cfb_adv_situational","espn_cfb_adv_drives"):
+        assert {row["game_id"] for row in scoped[dataset]}=={"1"}
+    assert {row["game_id"] for row in datasets["espn_cfb_adv_team"]}=={"1","2"}
