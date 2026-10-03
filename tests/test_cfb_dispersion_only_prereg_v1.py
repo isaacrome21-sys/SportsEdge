@@ -68,7 +68,7 @@ class TestCFBDispersionOnlyPreregV1(TestCase):
         self.assertEqual(evaluator.BOOTSTRAP_SEED, boot["seed"])
         self.assertEqual(evaluator.BOOTSTRAP_RESAMPLES, boot["resamples"])
         self.assertEqual(list(evaluator.SCORING_SEASONS), list(range(folds["first_scored_dispersion_season"], folds["last_scored_dispersion_season"] + 1)))
-        self.assertEqual(evaluator.RESIDUAL_SEED_SEASON, 2018)
+        self.assertEqual(evaluator.RESIDUAL_SEED_SEASON, 2024)
         self.assertEqual(tuple(evaluator.KEY_MARGINS), (3, 7))
 
     def test_decision_has_zero_model_or_betting_authority(self):
