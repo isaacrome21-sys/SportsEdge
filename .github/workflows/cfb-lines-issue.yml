@@ -26,7 +26,7 @@ jobs:
       PYTHONPATH: .
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       ISSUE: ${{ github.event.issue.number }}
-      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+      CFBD_API_KEY: ${{ secrets.SPORTSEDGE_CFBD_API_KEY || secrets.CFBD_API_KEY }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
