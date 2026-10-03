@@ -95,3 +95,24 @@ def test_intake_research_directive_parsing():
     assert intake.research_directive("Guardians -150 / White Sox +130") is None
     with pytest.raises(intake.IssueLinesError):
         intake.research_directive("RESEARCH nope")
+
+
+def test_pool_artifact_counts_only_short_history_starts():
+    script = _load("prior_fb_pool", "scripts/research_mlb_pitcher_prior_fallback.py")
+    rnd = random.Random(4)
+    starts = []
+    for pid in range(1, 150):
+        n = 8 if pid % 2 else 2  # odd pitchers: 8 starts -> only their first 5 are "short"
+        for g in range(n):
+            starts.append(R.Start(pid, 2025, f"2025-05-{1 + g:02d}", pid * 10 + g, 1, rnd.randint(3, 20), rnd.randint(0, 9)))
+    art = script.build_pool_artifact(starts, 2025)
+    expected = sum(min(8 if p % 2 else 2, 5) for p in range(1, 150))
+    assert art["starts"] == expected
+    assert sum(art["counts"]["outs"].values()) == expected == sum(art["counts"]["strikeouts"].values())
+    assert art["schema"] == "MLB_PITCHER_PRIOR_POOL_V1" and art["season"] == 2025
+
+
+def test_intake_knows_pool_directive():
+    intake = _load("intake_mlb2", "scripts/intake_mlb_lines_issue.py")
+    assert intake.research_directive("RESEARCH pitcher_prior_pool") == "pitcher_prior_pool"
+    assert intake.RESEARCH_DIRECTIVES["pitcher_prior_pool"][1:] == ["--emit-pool", "2025"]

@@ -23,7 +23,8 @@ CHICAGO = ZoneInfo("America/Chicago")
 # a fenced body whose first line is "RESEARCH <name>" runs a pre-registered
 # validation and posts its report on the issue. No lines are read and no card is run.
 RESEARCH_DIRECTIVES = {
-    "pitcher_prior_fallback": "scripts/research_mlb_pitcher_prior_fallback.py",
+    "pitcher_prior_fallback": ["scripts/research_mlb_pitcher_prior_fallback.py"],
+    "pitcher_prior_pool": ["scripts/research_mlb_pitcher_prior_fallback.py", "--emit-pool", "2025"],
 }
 
 
@@ -45,7 +46,8 @@ def run_research(name: str, issue: str) -> int:
     root = Path(__file__).resolve().parents[1]
     out_dir = Path("artifacts") / f"mlb_research_{name}"
     try:
-        proc = subprocess.run([sys.executable, str(root / RESEARCH_DIRECTIVES[name]), "--out-dir", str(out_dir)],
+        script, *extra = RESEARCH_DIRECTIVES[name]
+        proc = subprocess.run([sys.executable, str(root / script), *extra, "--out-dir", str(out_dir)],
                               capture_output=True, text=True, timeout=11 * 60)
         if proc.returncode != 0:
             raise RuntimeError((proc.stderr or proc.stdout)[-3000:])
