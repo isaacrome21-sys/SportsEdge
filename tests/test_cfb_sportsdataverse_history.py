@@ -58,13 +58,32 @@ def test_target_week_is_excluded_and_aggregation_is_deterministic():
     assert snap[0].def_success_rate_allowed == pytest.approx(0.30)
 
 
-def test_join_coverage_mismatch_fails_closed():
+def test_incomplete_advanced_game_is_excluded_symmetrically():
+    r1=_rows(1,101); r2=_rows(2,102)
+    # Game 101 is missing one required situational row. The whole game must be
+    # excluded for both teams rather than creating asymmetric sample windows.
+    snaps=build_team_snapshots(
+        adv_team_rows=[r1[0],r1[4],r2[0],r2[4]],
+        adv_situational_rows=[r1[5],r2[1],r2[5]],
+        adv_drive_rows=[r1[2],r1[6],r2[2],r2[6]],
+        schedule_rows=[r1[3],r2[3]],
+        target_season=2025,target_week=3,
+    )
+    assert [(s.team_id,s.games_in_sample) for s in snaps] == [(10,1),(20,1)]
+    assert snaps[0].off_ppa_rush == pytest.approx(0.2)
+    assert snaps[1].off_ppa_rush == pytest.approx(-0.1)
+
+
+def test_no_common_complete_games_yields_no_snapshot_without_imputation():
     t,s,d,sch,ot,os,od=_rows(1,101)
-    with pytest.raises(SportsDataverseHistoryError, match="JOIN_COVERAGE"):
-        build_team_snapshots(
-            adv_team_rows=[t],adv_situational_rows=[s],adv_drive_rows=[],
-            schedule_rows=[sch],target_season=2025,target_week=2,
-        )
+    snaps=build_team_snapshots(
+        adv_team_rows=[t,ot],
+        adv_situational_rows=[s,os],
+        adv_drive_rows=[],
+        schedule_rows=[sch],
+        target_season=2025,target_week=2,
+    )
+    assert snaps == []
 
 
 def test_season_week_snapshots_are_pregame_and_deterministic():
