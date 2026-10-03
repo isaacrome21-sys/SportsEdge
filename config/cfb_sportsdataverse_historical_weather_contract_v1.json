@@ -67,6 +67,21 @@
       "dome"
     ],
     "join_rule": "CFB_SCHEDULES_VENUE_ID_TO_PINNED_VENUE_ID",
-    "missing_or_invalid_referenced_venue": "FAIL_CLOSED_NO_GEOCODING_NO_IMPUTATION"
+    "missing_or_invalid_referenced_venue": "FAIL_CLOSED_AFTER_EXPLICIT_HASH_BOUND_SUPPLEMENTS_NO_GEOCODING_NO_IMPUTATION",
+    "supplement_policy": "EXPLICIT_HASH_BOUND_CONTEXT_ONLY_NO_OVERRIDE_NO_GEOCODING",
+    "supplements": [
+      {
+        "venue_id": 5960,
+        "name": "Levi's Stadium",
+        "latitude": 37.4033889,
+        "longitude": -121.97,
+        "game_indoor": false,
+        "source_identities": [
+          "WIKIDATA_Q7419343_COORDINATE_LOCATION_37_24_12.2_N_121_58_12.0_W",
+          "TICKETMASTER_LEVIS_STADIUM_NO_ROOF_OVER_BOWL"
+        ],
+        "purpose": "RESOLVE_PINNED_CFBD_EXPORT_COORDINATE_GAP_FOR_REFERENCED_HISTORICAL_CFB_VENUE"
+      }
+    ]
   }
 }
