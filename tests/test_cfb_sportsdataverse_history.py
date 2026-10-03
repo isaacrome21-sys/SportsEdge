@@ -1,7 +1,7 @@
 import pytest
 
 from sportsedge.sports.cfb.sportsdataverse_history import (
-    SportsDataverseHistoryError, attach_drive_time, build_team_snapshots, build_season_week_snapshots, build_prior_season_fallback_snapshots, validate_dataset,
+    SportsDataverseHistoryError, _mean, attach_drive_time, build_team_snapshots, build_season_week_snapshots, build_prior_season_fallback_snapshots, validate_dataset,
 )
 
 
@@ -178,3 +178,19 @@ def test_current_asset_name_without_numeric_pos_team_id_fails_closed():
             target_season=2025,
             target_week=2,
         )
+
+
+def test_blank_numeric_cells_are_missing_but_valid_values_remain_scoreable():
+    rows=[
+        {"EPA_passing_per_play":""},
+        {"EPA_passing_per_play":"   "},
+        {"EPA_passing_per_play":"0.25"},
+    ]
+    assert _mean(rows,"EPA_passing_per_play") == pytest.approx(0.25)
+    with pytest.raises(SportsDataverseHistoryError,match="REQUIRED_METRIC_MISSING"):
+        _mean([{"EPA_passing_per_play":""},{"EPA_passing_per_play":None}],"EPA_passing_per_play")
+
+
+def test_nonblank_nonnumeric_metric_fails_closed():
+    with pytest.raises(SportsDataverseHistoryError,match="REQUIRED_METRIC_INVALID"):
+        _mean([{"EPA_passing_per_play":"not-a-number"}],"EPA_passing_per_play")
