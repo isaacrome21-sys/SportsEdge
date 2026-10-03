@@ -37,7 +37,7 @@ class CFBSelectedCandidateFreezeActivationTests(unittest.TestCase):
             away_coefficients=tuple([21.0]+[0.0 for _ in names]),
             residual_pairs=((1.0,-1.0),(-1.0,1.0)),
             overtime_deltas=((7,0),(0,7)),
-            train_seasons=(2015,2025),
+            train_seasons=(2021,2025),
             ridge_alpha=10.0,
         )
         authority={
@@ -92,7 +92,7 @@ class CFBSelectedCandidateFreezeActivationTests(unittest.TestCase):
             "predictive_code_manifest_sha256":"c"*64,
             "acquisition_code_manifest_sha256":"d"*64,
             "model_code_surface_sha256":code_sha,
-            "train_seasons":[2015,2025],
+            "train_seasons":[2021,2025],
             "authority":dict(authority),
         }
         registry={
