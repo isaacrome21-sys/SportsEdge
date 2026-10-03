@@ -53,6 +53,7 @@ class CFBSelectedCandidateRuntimeAdapter:
 
     selected_model: CFBSelectedCandidateScoreModel
     candidate_rows_by_game_id: Mapping[str, Mapping[str, Any]]
+    frozen_artifact_sha256: str | None = None
 
     model_id: str = CFB_JOINT_MODEL_ID
     feature_contract: str = CFB_FEATURE_CONTRACT
@@ -66,7 +67,7 @@ class CFBSelectedCandidateRuntimeAdapter:
         return self.selected_model.overtime_deltas
 
     def artifact_sha256(self) -> str:
-        return self.selected_model.artifact_sha256()
+        return self.frozen_artifact_sha256 or self.selected_model.artifact_sha256()
 
     def predict_means(self, row: Mapping[str, Any]) -> tuple[float, float]:
         game_id = str(row.get("game_id") or "").strip()
@@ -127,6 +128,7 @@ def build_selected_candidate_runtime_adapter(
     model: CFBSelectedCandidateScoreModel,
     games: Sequence[CFBGame],
     candidate_snapshots: Mapping[str, Mapping[str, Mapping[str, Any]]],
+    frozen_artifact_sha256: str | None = None,
 ) -> tuple[CFBSelectedCandidateRuntimeAdapter, dict[str, CFBTeamMetrics]]:
     if not isinstance(model, CFBSelectedCandidateScoreModel):
         raise CFBSelectedCandidateRuntimeError("CFB_SELECTED_RUNTIME_MODEL_REQUIRED")
@@ -154,7 +156,16 @@ def build_selected_candidate_runtime_adapter(
         )
     if not rows:
         raise CFBSelectedCandidateRuntimeError("CFB_SELECTED_RUNTIME_GAMES_EMPTY")
-    return CFBSelectedCandidateRuntimeAdapter(model, rows), current_metrics
+    if frozen_artifact_sha256 is not None:
+        token = str(frozen_artifact_sha256).strip().lower()
+        if len(token) != 64 or any(ch not in "0123456789abcdef" for ch in token):
+            raise CFBSelectedCandidateRuntimeError("CFB_SELECTED_RUNTIME_ARTIFACT_SHA_INVALID")
+        frozen_artifact_sha256 = token
+    return CFBSelectedCandidateRuntimeAdapter(
+        model,
+        rows,
+        frozen_artifact_sha256=frozen_artifact_sha256,
+    ), current_metrics
 
 
 def run_selected_candidate_cfb_machine(
@@ -174,6 +185,7 @@ def run_selected_candidate_cfb_machine(
     root_seed: int = 20260826,
     n_paths: int = 20000,
     quote_ttl_seconds: int = DEFAULT_QUOTE_TTL_SECONDS,
+    frozen_artifact_sha256: str | None = None,
     opener: Callable = urlopen,
     team_fetcher=fetch_cfbd_teams,
     game_fetcher=fetch_cfbd_games,
@@ -254,6 +266,7 @@ def run_selected_candidate_cfb_machine(
         model=model,
         games=canonical_games,
         candidate_snapshots=snapshots,
+        frozen_artifact_sha256=frozen_artifact_sha256,
     )
     report = run_cfb_machine(
         mode="MANUAL",
