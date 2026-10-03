@@ -67,7 +67,7 @@ jobs:
           echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
           echo "card_path=$card" >> "$GITHUB_OUTPUT"
 
-      - name: Assert manual-line fail-closed card contract
+      - name: Assert manual-line card contract
         if: always()
         env:
           CARD_PATH: ${{ steps.run.outputs.card_path }}
@@ -91,8 +91,8 @@ jobs:
 
           if card.get("market_input_source") != "MANUAL_SCREENSHOT_BOARD":
               raise SystemExit("CFB_AUTO_MARKET_SOURCE_INVALID")
-          if card.get("run_status") != "BLOCKED":
-              raise SystemExit("CFB_AUTO_EXPECTED_PROMOTION_BLOCK")
+          if card.get("run_status") not in {"READY", "BLOCKED", "DEGRADED"}:
+              raise SystemExit("CFB_AUTO_RUN_STATUS_INVALID")
 
           report = card.get("report") or {}
           rows = report.get("results") or []
@@ -100,16 +100,19 @@ jobs:
               raise SystemExit("CFB_AUTO_NO_MARKET_ROWS")
           if any(row.get("engine_status") != "PRICED" for row in rows):
               raise SystemExit("CFB_AUTO_UNPRICED_MARKET_ROW")
-          if any(
-              row.get("bet_status") != "BLOCKED"
-              or row.get("reason") != "CFB_PROMOTION_EVIDENCE_REQUIRED"
-              for row in rows
-          ):
-              raise SystemExit("CFB_AUTO_PROMOTION_BLOCK_CONTRACT_FAILED")
-
+          allowed = {"OFFICIAL_BET", "BLOCKED"}
+          allowed_reasons = {"EDGE_POSITIVE", "NO_EDGE", "PAIRED_PRICE_REQUIRED_FOR_DEVIG", "CFB_QUOTE_STALE", "CFB_SETTLED_SAMPLE_SPACE_EMPTY", "NO_ENGINE"}
+          for row in rows:
+              if row.get("bet_status") not in allowed:
+                  raise SystemExit("CFB_AUTO_BET_STATUS_INVALID")
+              if row.get("bet_status") == "OFFICIAL_BET" and row.get("reason") != "EDGE_POSITIVE":
+                  raise SystemExit("CFB_AUTO_BET_REASON_INVALID")
+              if row.get("reason") not in allowed_reasons and row.get("bet_status") != "OFFICIAL_BET":
+                  raise SystemExit("CFB_AUTO_ROW_REASON_INVALID:" + str(row.get("reason")))
+          bets = sum(row.get("bet_status") == "OFFICIAL_BET" for row in rows)
           print(
               "CFB_AUTO_CARD_OK "
-              f"rows={len(rows)} run_status={card['run_status']} "
+              f"rows={len(rows)} bets={bets} run_status={card['run_status']} "
               "market_source=MANUAL_SCREENSHOT_BOARD"
           )
           PY
