@@ -209,6 +209,23 @@ def _unmatched_advanced_game_ids(datasets: Mapping[str, list[dict[str, str]]]) -
     return sorted(observed - schedule_ids)
 
 
+def _scope_advanced_to_schedule(
+    datasets: Mapping[str, list[dict[str, str]]],
+    *,
+    unmatched_game_ids: list[int],
+) -> dict[str, list[dict[str, str]]]:
+    unmatched = set(int(x) for x in unmatched_game_ids)
+    out = {name: list(rows) for name, rows in datasets.items()}
+    if not unmatched:
+        return out
+    for dataset in ("espn_cfb_adv_team", "espn_cfb_adv_situational", "espn_cfb_adv_drives"):
+        out[dataset] = [
+            row for row in out[dataset]
+            if int(row["game_id"]) not in unmatched
+        ]
+    return out
+
+
 def _snapshots(datasets: Mapping[str, list[dict[str, str]]]):
     schedule = datasets["cfb_schedules"]
     kwargs = dict(
@@ -427,7 +444,11 @@ def build_training_bundle(*, cache_root: Path) -> dict[str, Any]:
     datasets, raw_receipts, parsed_receipts = _acquire_sdv(cache_root)
     games = _completed_regular_fbs_games(datasets["cfb_schedules"])
     unmatched_advanced_game_ids = _unmatched_advanced_game_ids(datasets)
-    current, prior = _snapshots(datasets)
+    scoped_datasets = _scope_advanced_to_schedule(
+        datasets,
+        unmatched_game_ids=unmatched_advanced_game_ids,
+    )
+    current, prior = _snapshots(scoped_datasets)
     predictive, exclusions = _predictive_surface(
         games=games,
         current_snapshots=current,
