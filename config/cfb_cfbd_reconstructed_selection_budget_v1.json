@@ -1,31 +1,34 @@
 {
   "schema_version": "CFB_CFBD_RECONSTRUCTED_SELECTION_BUDGET_V1",
-  "purpose": "Verify the authenticated CFBD account and a conservative CFBD replay-call budget before reconstructed historical selection acquisition begins. Weather is reconstructed separately from CFBD venue metadata plus public Open-Meteo historical reanalysis and is never promotion/PIT evidence.",
-  "selection_start_season": 2015,
+  "purpose": "Verify the authenticated CFBD account and a quota-feasible 2021-2025 reconstructed CFB replay-call budget before candidate selection acquisition begins. Weather is reconstructed separately from CFBD venue metadata plus public Open-Meteo historical reanalysis and is never promotion/PIT evidence.",
+  "selection_start_season": 2021,
   "selection_end_season": 2025,
-  "prior_fallback_season": 2014,
+  "prior_fallback_season": 2020,
   "max_regular_week_planning_bound": 16,
   "planned_new_calls_upper_bound": {
-    "games": 12,
-    "fbs_membership": 11,
+    "games": 6,
+    "fbs_membership": 5,
     "venues": 1,
-    "advanced_metrics": 176,
+    "advanced_metrics": 80,
     "cfbd_weather": 0,
-    "total": 200
+    "total": 92
   },
   "advanced_metrics_budget_basis": {
-    "selection_seasons": 11,
+    "selection_seasons": 5,
     "pregame_current_snapshots_per_selection_season": 15,
-    "prior_season_fallback_snapshots": 11,
+    "prior_season_fallback_snapshots": 5,
     "provider_week_contract_max": 16,
-    "formula": "11*15 + 11 = 176; games through provider week 16 require current-season endWeek 1-15 and week 1 requires an explicit immediately-prior-season snapshot, including 2014 for the 2015 fold"
+    "formula": "5*15 + 5 = 80; games through provider week 16 require current-season endWeek 1-15 and week 1 requires an explicit immediately-prior-season snapshot, including 2020 for the 2021 fold"
   },
   "weather_reconstruction": {
     "contract": "CFBD_VENUES_OPEN_METEO_ERA5_RECONSTRUCTED_CURRENT_PROVIDER_VINTAGE",
     "venue_endpoint": "/venues",
     "archive_endpoint": "https://archive-api.open-meteo.com/v1/archive",
     "archive_model": "era5",
-    "hourly_variables": ["temperature_2m", "wind_speed_10m"],
+    "hourly_variables": [
+      "temperature_2m",
+      "wind_speed_10m"
+    ],
     "temperature_unit": "fahrenheit",
     "wind_speed_unit": "mph",
     "time_selection": "UTC_KICKOFF_HOUR_FLOOR_NO_INTERPOLATION",
@@ -33,7 +36,7 @@
     "provenance_class": "RECONSTRUCTED_HISTORICAL_NOT_PIT",
     "promotion_authority": false
   },
-  "retry_reserve_calls": 50,
+  "retry_reserve_calls": 3,
   "standard_tier_monthly_quotas": {
     "0": 1000,
     "1": 5000,
@@ -77,5 +80,13 @@
     "staking": false,
     "official": false,
     "backfill": false
+  },
+  "quota_driven_window_freeze": {
+    "status": "FROZEN_BEFORE_FIRST_EVALUATION",
+    "reason": "LONGEST_FULL_CFBD_PLAN_GUARANTEED_TO_FIT_REDACTED_REMAINING_CAPACITY",
+    "evidence": "2026-10-03 redacted preflight: recent_6_seasons_advanced=true proves remaining>=96 while recent_7_seasons_advanced=false; five-season full CFBD plan=92 and 3-call reserve =>95",
+    "performance_results_inspected": false,
+    "candidate_evaluation_performed": false,
+    "attempts_consumed": 0
   }
 }
