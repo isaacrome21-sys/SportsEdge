@@ -17,6 +17,25 @@ from sportsedge.prediction_journal import journal_reference, write_prediction_jo
 CHICAGO_TZ = ZoneInfo("America/Chicago")
 
 
+
+def _attach_mlb_board(payload: dict) -> dict:
+    """Keep every prop, side, and total visible even when the slate is blocked."""
+    from sportsedge.mlb_full_board import build_mlb_full_board
+
+    rows = payload.get("results") or []
+    board = build_mlb_full_board(rows if isinstance(rows, list) else [])
+    payload["full_board"] = board
+    summary = dict(payload.get("summary") or {})
+    summary["both_sides"] = board["summary"]["both_sides"]
+    summary["side_rows"] = board["summary"]["side_rows"]
+    summary["total_rows"] = board["summary"]["total_rows"]
+    summary["prop_rows"] = board["summary"]["prop_rows"]
+    summary["priced_complement_rows"] = board["summary"]["priced_complement_rows"]
+    summary["catalog_complete"] = board["summary"]["both_sides"] is True and summary["side_rows"] >= 8 and summary["total_rows"] >= 12 and summary["prop_rows"] >= 40
+    payload["summary"] = summary
+    return payload
+
+
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--output", default="artifacts/live_mlb_card.json")
@@ -90,6 +109,7 @@ def main() -> int:
             "reason": f"{type(exc).__name__}: {exc}",
         })
 
+    _attach_mlb_board(payload)
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")

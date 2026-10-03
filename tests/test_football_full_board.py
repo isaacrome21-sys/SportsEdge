@@ -89,6 +89,7 @@ def test_machine_results_cover_every_side_total_and_prop_without_authority():
     assert board["summary"]["side_rows"] >= 2
     assert board["summary"]["total_rows"] >= 2
     assert board["summary"]["prop_rows"] > 1
+    assert board["summary"]["both_sides"] is True
     assert board["official_authority"] is False
     assert board["prop_engine_state"] == "NO_ENGINE"
     assert all(row["official_eligible"] is False for row in board["rows"])

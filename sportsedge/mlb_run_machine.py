@@ -94,6 +94,12 @@ class MLBMachineResult:
     scored_market_p: float | None = None
     score_reason_codes: tuple[str, ...] = ()
     timestamp_source: str | None = None
+    opposite_odds: Any = None
+    push_p: float | None = None
+    tie_p: float | None = None
+    complement_model_p: float | None = None
+    opposite_model_p: float | None = None
+    count_pmf: tuple[float, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -235,7 +241,8 @@ def _summary(results: Sequence[MLBMachineResult]) -> dict[str, Any]:
         "side_rows": board["summary"]["side_rows"],
         "total_rows": board["summary"]["total_rows"],
         "prop_rows": board["summary"]["prop_rows"],
-        "catalog_complete": board["summary"]["side_rows"] >= 4 and board["summary"]["total_rows"] >= 6 and board["summary"]["prop_rows"] >= 20 and board["summary"]["catalog_markets"] >= 38,
+        "both_sides": board["summary"]["both_sides"],
+        "catalog_complete": board["summary"]["both_sides"] is True and board["summary"]["side_rows"] >= 8 and board["summary"]["total_rows"] >= 12 and board["summary"]["prop_rows"] >= 40 and board["summary"]["catalog_markets"] >= 38,
     }
 
 
@@ -282,6 +289,24 @@ def _timestamp_source(row: Any, stamp: datetime | None, problem: str | None, int
     if intake_stamp is not None and stamp == _aware_utc(intake_stamp):
         return TIMESTAMP_SOURCE_INTAKE_STAMPED
     return TIMESTAMP_SOURCE_PROVIDED
+
+
+
+def _count_pmf(value: Any) -> tuple[float, ...] | None:
+    if not isinstance(value, (list, tuple)) or not value:
+        return None
+    weights: list[float] = []
+    for item in value:
+        if isinstance(item, bool):
+            return None
+        try:
+            number = float(item)
+        except (TypeError, ValueError):
+            return None
+        if number != number or number < 0.0:
+            return None
+        weights.append(number)
+    return tuple(weights)
 
 
 def _machine_result(source_index: int, row: Any, *, current: datetime | None = None,
@@ -336,6 +361,12 @@ def _machine_result(source_index: int, row: Any, *, current: datetime | None = N
         scored_market_p=scored.market_p,
         score_reason_codes=scored.reason_codes + extra_codes + tuple(f"MISSING_FEATURE_FAMILY:{x}" for x in missing_families),
         timestamp_source=timestamp_source,
+        opposite_odds=opposite_odds,
+        push_p=_row_value(row, "push_p"),
+        tie_p=_row_value(row, "tie_p"),
+        complement_model_p=_row_value(row, "complement_model_p"),
+        opposite_model_p=_row_value(row, "opposite_model_p"),
+        count_pmf=_count_pmf(_row_value(row, "count_pmf")),
     )
 
 

@@ -256,7 +256,9 @@ def _summary(results: Sequence[CFBMachineResult]) -> dict[str, Any]:
             "full_board": board,
             "side_rows": board["summary"]["side_rows"],
             "total_rows": board["summary"]["total_rows"],
-            "prop_rows": board["summary"]["prop_rows"]}
+            "prop_rows": board["summary"]["prop_rows"],
+            "both_sides": board["summary"]["both_sides"],
+            "catalog_complete": board["summary"]["both_sides"] is True and board["summary"]["side_rows"] >= 2 and board["summary"]["total_rows"] >= 2 and board["summary"]["prop_rows"] >= 2}
 
 
 def _run_canonical(*, mode: str, season: int, week: int, now: datetime, model: CFBJointScoreModel,

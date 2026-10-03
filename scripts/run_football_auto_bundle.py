@@ -116,7 +116,13 @@ def main() -> int:
     lower = sport.lower()
     game_out = ROOT / f"artifacts/run_it/{lower}_game_card.json"
     prop_out = ROOT / f"artifacts/run_it/{lower}_prop_card.json"
-    game_cmd = [sys.executable, str(ROOT / f"scripts/run_{lower}_auto.py"), "--output", str(game_out)]
+    if sport == "NFL":
+        # Frozen scripts/run_nfl_auto.py stays on the M2 code surface. The sidecar
+        # runs it, then attaches both sides of every prop, side, and total.
+        game_script = ROOT / "scripts/emit_nfl_both_side_board.py"
+    else:
+        game_script = ROOT / f"scripts/run_{lower}_auto.py"
+    game_cmd = [sys.executable, str(game_script), "--output", str(game_out)]
     prop_cmd = [
         sys.executable, str(ROOT / "scripts/run_football_props_auto.py"),
         "--sport", sport, "--output", str(prop_out),
@@ -194,6 +200,8 @@ def main() -> int:
         "side_rows": full_board["summary"]["side_rows"],
         "total_rows": full_board["summary"]["total_rows"],
         "prop_rows": full_board["summary"]["prop_rows"],
+        "both_sides": full_board["summary"].get("both_sides"),
+        "catalog_complete": full_board["summary"].get("both_sides") is True and full_board["summary"]["side_rows"] >= 2 and full_board["summary"]["total_rows"] >= 2 and full_board["summary"]["prop_rows"] >= 2,
         "output": str(args.output),
     }, sort_keys=True))
     return 2 if status == "BLOCKED" else 0

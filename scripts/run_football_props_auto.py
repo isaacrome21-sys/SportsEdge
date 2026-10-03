@@ -256,11 +256,14 @@ def main() -> int:
             n_paths=int(args.n_paths),
             book_key=str(args.bookmaker),
         )
+        from sportsedge.football_full_board import board_from_machine_results
+        prop_results = report.get("results") if isinstance(report, dict) else []
         payload = {
             "schema_version": "FOOTBALL_PROP_AUTO_RUN_V4",
             "status": "SUCCESS",
             "sport": sport,
             "report": report,
+            "full_board": board_from_machine_results(sport, prop_results if isinstance(prop_results, list) else []),
             "model_code_attestation": code_attestation,
             "governance": {
                 "model_fit_performed": False,
@@ -273,9 +276,10 @@ def main() -> int:
             },
         }
         _write(output, payload)
-        print(json.dumps({"status": "SUCCESS", "sport": sport, "output": str(output)}, sort_keys=True))
+        print(json.dumps({"status": "SUCCESS", "sport": sport, "both_sides": payload["full_board"]["summary"].get("both_sides"), "prop_rows": payload["full_board"]["summary"].get("prop_rows"), "output": str(output)}, sort_keys=True))
         return 0
     except (FootballPropAutoError, FootballPropRunError, ValueError) as exc:
+        from sportsedge.football_full_board import board_from_machine_results
         payload = {
             "schema_version": "FOOTBALL_PROP_AUTO_RUN_V4",
             "status": "BLOCKED",
@@ -286,6 +290,7 @@ def main() -> int:
                 "run_status": "BLOCKED",
                 "results": [{"sport": sport, "market": "FOOTBALL_PLAYER_PROPS", "model_p": None, "bet_status": "BLOCKED", "reason": str(exc)}],
             },
+            "full_board": board_from_machine_results(sport, []),
             "governance": {
                 "model_fit_performed": False,
                 "evidence_resolution_performed": True,
