@@ -114,6 +114,7 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: write
+      pull-requests: write
     env:
       CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
       PYTHONPATH: .
@@ -269,6 +270,51 @@ jobs:
             --bakeoff-result artifacts/cfb/candidate_bakeoff_result.json \
             --out artifacts/cfb/cfb_selected_candidate_model_proposal.json \
             --attestation-out artifacts/cfb/cfb_selected_candidate_model_build_attestation.json
+
+      - name: Stage selected-candidate freeze bytes for separate main PR
+        if: github.event_name == 'workflow_dispatch' && steps.preflight.outputs.state == 'VERIFIED_BEFORE_FIRST_REPLAY_CALL' && inputs.evaluation_mode == 'CONSUME_ALL_FOUR_CFB_ATTEMPTS'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          status="$(python - <<'PY'
+          import json
+          print(json.load(open('artifacts/cfb/candidate_bakeoff_result.json'))['status'])
+          PY
+          )"
+          if [[ "$status" == "NO_CANDIDATE_DEMONSTRATED_SIGNAL_AT_THIS_SAMPLE" ]]; then
+            echo 'CFB_SELECTED_FREEZE_PR_NOT_STAGED reason=NO_CANDIDATE_DEMONSTRATED_SIGNAL_AT_THIS_SAMPLE'
+            exit 0
+          fi
+          test "$status" = "WINNER_SELECTED_FOR_FREEZE"
+          python scripts/stage_cfb_selected_candidate_freeze.py \
+            --model-proposal artifacts/cfb/cfb_selected_candidate_model_proposal.json \
+            --build-attestation artifacts/cfb/cfb_selected_candidate_model_build_attestation.json \
+            --selection-bundle artifacts/cfb/selection_bundle_manifest.json \
+            --source-manifest artifacts/cfb/reconstructed_source_manifest.json \
+            --acquisition-manifest artifacts/cfb/acquisition_manifest.json \
+            --bakeoff-result artifacts/cfb/candidate_bakeoff_result.json \
+            --artifact-output models/cfb_joint_v1.json \
+            --registry-output config/cfb_game_model_freeze.json \
+            --evidence-output config/cfb_selected_candidate_freeze_evidence_v1.json
+
+          freeze_branch="cfb/selected-candidate-freeze-${GITHUB_RUN_ID}"
+          git config user.name 'SportsEdge CFB automation'
+          git config user.email 'actions@github.com'
+          git checkout -b "$freeze_branch"
+          git add -f \
+            models/cfb_joint_v1.json \
+            config/cfb_game_model_freeze.json \
+            config/cfb_selected_candidate_freeze_evidence_v1.json
+          git commit -m 'CFB: stage selected candidate freeze'
+          git push origin "HEAD:$freeze_branch"
+          gh pr create \
+            --repo "${{ github.repository }}" \
+            --base main \
+            --head "$freeze_branch" \
+            --title "CFB: activate selected candidate frozen artifact" \
+            --body "Stages the preregistered selected-candidate winner as the canonical CFB artifact and freeze registry. This PR grants no promotion, evidence-clock, staking, or OFFICIAL authority. Merge only after full CI green; activation occurs only if these exact bytes land on main."
 
       - name: Assert public outputs contain zero authority and no raw provider rows
         if: always()
