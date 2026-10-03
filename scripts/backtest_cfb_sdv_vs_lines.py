@@ -119,6 +119,81 @@ def evaluate(preds: dict, lines: dict) -> dict:
             "ats": ats, "totals": tot}
 
 
+BLEND_THRESHOLDS = (0.5, 1.0, 1.5, 2.0, 3.0)
+
+
+def _ols(xs, ys):
+    n = len(xs)
+    mx, my = sum(xs) / n, sum(ys) / n
+    sxx = sum((x - mx) ** 2 for x in xs)
+    sxy = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
+    w = sxy / sxx if sxx > 0 else 0.0
+    return my - w * mx, w
+
+
+def market_anchored(preds: dict, lines: dict) -> dict:
+    """LOSO: adjusted = market + b + w*(model - market); bet when |adjustment| >= T."""
+    joined = []
+    for gid, p in preds.items():
+        ln = lines.get(gid)
+        if not ln:
+            continue
+        joined.append((p, ln))
+    seasons = sorted({p["season"] for p, _ in joined})
+    out = {"spread": {"w_by_season": {}, "ats": {t: [0, 0, 0] for t in BLEND_THRESHOLDS}, "by_season": {}},
+           "total": {"w_by_season": {}, "ou": {t: [0, 0, 0] for t in BLEND_THRESHOLDS}}}
+    for s in seasons:
+        tr = [(p, l) for p, l in joined if p["season"] != s]
+        te = [(p, l) for p, l in joined if p["season"] == s]
+        # spread
+        xs = [(p["home_pred"] - p["away_pred"]) - (-l["spread"]) for p, l in tr]
+        ys = [(p["home_pts"] - p["away_pts"]) - (-l["spread"]) for p, l in tr]
+        b, w = _ols(xs, ys)
+        out["spread"]["w_by_season"][s] = (round(b, 3), round(w, 4))
+        season_rec = [0, 0]
+        for p, l in te:
+            adj = b + w * ((p["home_pred"] - p["away_pred"]) + l["spread"])
+            cover = (p["home_pts"] - p["away_pts"]) + l["spread"]
+            res = (1 if adj > 0 else -1) * cover
+            for t in BLEND_THRESHOLDS:
+                if abs(adj) >= t:
+                    out["spread"]["ats"][t][0 if res > 0 else 1 if res < 0 else 2] += 1
+            if abs(adj) >= 1.0 and res != 0:
+                season_rec[0 if res > 0 else 1] += 1
+        out["spread"]["by_season"][s] = season_rec
+        # totals
+        trt = [(p, l) for p, l in tr if l["total"] is not None]
+        tet = [(p, l) for p, l in te if l["total"] is not None]
+        if len(trt) > 50:
+            xs = [(p["home_pred"] + p["away_pred"]) - l["total"] for p, l in trt]
+            ys = [(p["home_pts"] + p["away_pts"]) - l["total"] for p, l in trt]
+            b, w = _ols(xs, ys)
+            out["total"]["w_by_season"][s] = (round(b, 3), round(w, 4))
+            for p, l in tet:
+                adj = b + w * ((p["home_pred"] + p["away_pred"]) - l["total"])
+                res = (1 if adj > 0 else -1) * ((p["home_pts"] + p["away_pts"]) - l["total"])
+                for t in BLEND_THRESHOLDS:
+                    if abs(adj) >= t:
+                        out["total"]["ou"][t][0 if res > 0 else 1 if res < 0 else 2] += 1
+    return out
+
+
+def fmt_blend(bl: dict) -> str:
+    def pct(w, l):
+        return f"{100.0 * w / (w + l):.1f}%" if w + l else "n/a"
+    lines = ["MARKET-ANCHORED (LOSO): adj = b + w*(model - market)",
+             "spread (b, w) by held-out season: " + ", ".join(f"{s}:{v}" for s, v in bl["spread"]["w_by_season"].items()),
+             "ATS when |adjustment| >= T pts:"]
+    for t, (w, l, p) in bl["spread"]["ats"].items():
+        lines.append(f"  >= {t}: {w}-{l}-{p} hit {pct(w, l)}")
+    lines.append("ATS by season at T>=1: " + ", ".join(f"{s}:{pct(*v)}({v[0]+v[1]})" for s, v in bl["spread"]["by_season"].items()))
+    lines.append("total (b, w): " + ", ".join(f"{s}:{v}" for s, v in bl["total"]["w_by_season"].items()))
+    lines.append("O/U when |adjustment| >= T pts:")
+    for t, (w, l, p) in bl["total"]["ou"].items():
+        lines.append(f"  >= {t}: {w}-{l}-{p} hit {pct(w, l)}")
+    return "\n".join(lines)
+
+
 def fmt(ev: dict) -> str:
     def pct(w, l):
         return f"{100.0 * w / (w + l):.1f}%" if w + l else "n/a"
@@ -156,8 +231,10 @@ def main(argv=None) -> int:
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     Path(args.output).write_text(json.dumps({"family": FAMILY, "alpha": ALPHA, "seasons": seasons,
                                              "evaluation": {k: v for k, v in ev.items()}}, indent=2, default=str))
+    bl = market_anchored(preds, lines)
     print("CFB_SDV_BACKTEST_SUMMARY")
     print(fmt(ev))
+    print(fmt_blend(bl))
     return 0
 
 
