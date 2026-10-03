@@ -133,6 +133,14 @@ def evaluate_account(info: Mapping[str, Any], config: Mapping[str, Any]) -> tupl
         "advanced_plus_4": remaining >= advanced_only + 4,
         "advanced_plus_10": remaining >= advanced_only + 10,
         "advanced_plus_20": remaining >= advanced_only + 20,
+        # One contiguous selection season needs 15 current endWeek advanced
+        # snapshots plus one prior-season advanced fallback = 16 CFBD calls.
+        "recent_10_seasons_advanced": remaining >= 160,
+        "recent_9_seasons_advanced": remaining >= 144,
+        "recent_8_seasons_advanced": remaining >= 128,
+        "recent_7_seasons_advanced": remaining >= 112,
+        "recent_6_seasons_advanced": remaining >= 96,
+        "recent_5_seasons_advanced": remaining >= 80,
         "plan_only": remaining >= planned,
         "reserve_10": remaining >= planned + 10,
         "reserve_20": remaining >= planned + 20,
