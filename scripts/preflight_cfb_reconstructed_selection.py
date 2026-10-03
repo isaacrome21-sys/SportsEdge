@@ -167,7 +167,7 @@ def evaluate_account(info: Mapping[str, Any], config: Mapping[str, Any]) -> tupl
         "weather_transport_ready": weather_transport_ready,
         "verified_cache_reuse": True,
         "resume_from_verified_cache": True,
-        "restart_from_2015": False,
+        "restart_from_selection_start": False,
         "retry_backoff": True,
         "historical_replay_calls_performed": 0,
         "blockers": blockers,
