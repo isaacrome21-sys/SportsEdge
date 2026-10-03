@@ -105,9 +105,13 @@ def test_run_summary_board_keeps_every_side_total_and_prop():
     assert set(catalog_markets()) <= markets
     assert SIDE_MARKETS <= markets
     assert TOTAL_MARKETS <= markets
-    assert board["summary"]["prop_rows"] >= 20
+    assert board["summary"]["both_sides"] is True
+    assert board["summary"]["prop_rows"] >= 40
+    assert board["summary"]["side_rows"] >= 8
+    assert board["summary"]["total_rows"] >= 12
     assert board["official_authority"] is False
     assert board["summary"]["official_bets"] == 0
-    missing = [row for row in board["rows"] if row["market"] == "PITCHER_K"][0]
-    assert missing["presentation"] == "BLOCKED"
-    assert missing["reason"] == "NO_QUOTE_OR_ENGINE_ROW"
+    missing = [row for row in board["rows"] if row["market"] == "PITCHER_K"]
+    assert {row["side"] for row in missing} == {"OVER", "UNDER"}
+    assert all(row["presentation"] == "BLOCKED" for row in missing)
+    assert all(row["reason"] == "NO_QUOTE_OR_ENGINE_ROW" for row in missing)
