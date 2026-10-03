@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       board_json:
-        description: "DK board JSON transcribed from screenshots (list of {game_id, quotes}). No sportsbook API."
+        description: "DK board JSON from screenshots. No sportsbook API and no CFBD API."
         required: true
         type: string
       season:
@@ -45,7 +45,6 @@ jobs:
       - name: Price board
         if: github.event_name == 'workflow_dispatch'
         env:
-          CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
           BOARD_JSON: ${{ inputs.board_json }}
           INPUT_SEASON: ${{ inputs.season }}
           INPUT_WEEK: ${{ inputs.week }}

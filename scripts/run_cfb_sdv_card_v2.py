@@ -105,37 +105,26 @@ def price_game(game_id, home: float, away: float, quotes: list) -> list:
 
 
 def build_rows(board: list, season: int, week: int, asof):
-    from sportsedge.sports.cfb.candidate_live_source import (
-        attach_candidate_snapshots_to_game_row,
-        fetch_cfbd_candidate_metric_snapshots,
-    )
-    from sportsedge.sports.cfb.source import attach_weather, fetch_cfbd_games, fetch_cfbd_weather
-
-    key = os.environ.get("CFBD_API_KEY") or os.environ.get("SPORTSEDGE_CFBD_API_KEY") or ""
-    if not key:
-        raise SystemExit("CFB_SDV_CFBD_API_KEY_REQUIRED")
-    now = datetime.fromisoformat(asof.replace("Z", "+00:00")) if asof else datetime.now(timezone.utc)
-    games = attach_weather(
-        fetch_cfbd_games(season=season, week=week, cfbd_api_key=key),
-        fetch_cfbd_weather(season=season, week=week, cfbd_api_key=key),
-    )
-    snaps = fetch_cfbd_candidate_metric_snapshots(season=season, week=week, cfbd_api_key=key, now=now)
-    by_id = {g.game_id: g for g in games}
+    """Price only from the manual board. No CFBD call and no sportsbook API."""
+    del season, week, asof
     rows = []
     for row in board:
-        game = by_id.get(str(row.get("game_id")))
-        if game is None:
-            raise SystemExit("CFB_SDV_GAME_UNRESOLVED:" + str(row.get("game_id")))
-        base = {
-            "game_id": game.game_id,
-            "home_team": game.home_team,
-            "away_team": game.away_team,
-            "neutral_site": bool(game.neutral_site),
-            "weather": dict(game.weather or {}),
+        if not isinstance(row, dict):
+            raise SystemExit("CFB_SDV_BOARD_ROW_INVALID")
+        rows.append({
+            "game_id": str(row.get("game_id") or ""),
+            "home_team": row.get("home"),
+            "away_team": row.get("away"),
+            "neutral_site": bool(row.get("neutral_site") or False),
+            "weather": row.get("weather") or {"game_indoor": False, "temperature": 70.0, "wind_speed": 0.0},
             "quotes": row.get("quotes") or [],
-        }
-        rows.append(attach_candidate_snapshots_to_game_row(
-            base, home_team=game.home_team, away_team=game.away_team, snapshots=snaps))
+            "home_prior_metrics": row.get("home_prior_metrics"),
+            "away_prior_metrics": row.get("away_prior_metrics"),
+            "home_current_metrics": row.get("home_current_metrics"),
+            "away_current_metrics": row.get("away_current_metrics"),
+            "home_mean": row.get("home_mean"),
+            "away_mean": row.get("away_mean"),
+        })
     return rows
 
 
@@ -157,7 +146,18 @@ def main() -> int:
     model = load_selected_sdv_fit(args.fit)
     results = []
     for row in build_rows(board, args.season, args.week, args.asof):
-        home, away = score_selected_game(model, row)
+        if row.get("home_mean") is not None and row.get("away_mean") is not None:
+            home, away = float(row["home_mean"]), float(row["away_mean"])
+        elif row.get("home_prior_metrics") and row.get("away_prior_metrics"):
+            home, away = score_selected_game(model, row)
+        else:
+            results.append({
+                "game_id": row["game_id"],
+                "matchup": f"{row.get('away_team')} @ {row.get('home_team')}",
+                "bet_status": "PASS",
+                "reason": "METRICS_NOT_ON_BOARD_NO_API",
+            })
+            continue
         priced = price_game(row["game_id"], home, away, row.get("quotes") or [])
         for r in priced:
             r["matchup"] = f"{row.get('away_team')} @ {row.get('home_team')}"
@@ -170,6 +170,7 @@ def main() -> int:
         "combined_sigma": round(COMBINED_SIGMA, 4),
         "edge_floor": EDGE_FLOOR,
         "sportsbook_api_used": False,
+        "cfbd_api_used": False,
         "bets": sum(r.get("bet_status") == "BET" for r in results),
         "results": sorted(results, key=lambda r: -(r.get("edge") or -9)),
     }
