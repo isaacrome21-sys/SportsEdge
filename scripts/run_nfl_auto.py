@@ -318,9 +318,12 @@ def main() -> int:
         }, sort_keys=True))
         return 0
     except (NFLAutoError, NFLRunMachineError, ValueError) as exc:
+        from sportsedge.nfl_both_side_summary import attach_nfl_both_sides
+        blocked = attach_nfl_both_sides({"results": [], "summary": {}})
         payload = {
             "schema_version": "NFL_AUTO_RUN_V2", "status": "BLOCKED",
             "blocker": str(exc), "generated_at_utc": current.isoformat(),
+            "report": blocked,
             "governance": {
                 "model_fit_performed": False,
                 "promotion_registry_resolved": True,

@@ -423,11 +423,13 @@ def main() -> int:
         }, sort_keys=True))
         return 0
     except (CFBAutoError, ValueError) as exc:
+        from sportsedge.football_full_board import board_from_machine_results
         payload = {
             "schema_version": "CFB_AUTO_RUN_V1",
             "status": "BLOCKED",
             "blocker": str(exc),
             "generated_at_utc": current.isoformat(),
+            "report": board_from_machine_results("CFB", []),
             "governance": {
                 "model_fit_performed": False,
                 "promotion_changed": False,

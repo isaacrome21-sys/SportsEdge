@@ -98,3 +98,59 @@ def test_football_prices_push_free_complement_and_nfl_report_attaches_board():
     assert attached["summary"]["both_sides"] is True
     assert attached["summary"]["prop_rows"] >= 2
     assert attached["summary"]["catalog_complete"] is True
+
+
+def test_mlb_prices_integer_complement_from_supplied_push_or_count_pmf():
+    board = emit_all_props_side_totals([
+        {"market": "RBI", "entity_id": "batter", "side": "OVER", "line": 1.0, "model_p": 0.42, "american_odds": 150, "opposite_odds": -180, "push_p": 0.18},
+        {"market": "HITS", "entity_id": "batter", "side": "OVER", "line": 1.0, "model_p": 0.30, "american_odds": -110, "opposite_odds": -110, "count_pmf": [0.20, 0.50, 0.30]},
+    ])
+    rbi = {row["side"]: row for row in board["rows"] if row["market"] == "RBI" and row["entity_id"] == "batter"}
+    assert rbi["UNDER"]["model_p"] == 0.40
+    assert rbi["UNDER"]["reason"] == "COMPLEMENT_PRICED_FROM_QUOTED_SIDE"
+    assert rbi["UNDER"]["official_eligible"] is False
+    hits = {row["side"]: row for row in board["rows"] if row["market"] == "HITS" and row["entity_id"] == "batter"}
+    assert hits["UNDER"]["model_p"] == 0.20
+    assert hits["UNDER"]["reason"] == "COMPLEMENT_PRICED_FROM_QUOTED_SIDE"
+    assert board["summary"]["priced_complement_rows"] >= 2
+
+
+def test_mlb_run_result_keeps_opposite_quote_for_the_board():
+    from dataclasses import asdict
+    from sportsedge.mlb_run_machine import MLBMachineResult
+    from sportsedge.mlb_full_board import build_mlb_full_board
+
+    result = MLBMachineResult(
+        source_index=0, game_id="1", market="TOTALS", entity_id="game", line=8.5, side="OVER",
+        american_odds=-105, model_p=0.54, bet_status="BLOCKED", reason="RESEARCH_ROW",
+        opposite_odds=-115,
+    )
+    board = build_mlb_full_board([asdict(result)])
+    totals = {row["side"]: row for row in board["rows"] if row["market"] == "TOTALS" and row["game_id"] == "1"}
+    assert totals["UNDER"]["american_odds"] == -115
+    assert totals["UNDER"]["model_p"] == 0.46
+    assert totals["UNDER"]["reason"] == "COMPLEMENT_PRICED_FROM_QUOTED_SIDE"
+
+
+def test_football_emits_both_sides_of_remaining_prop_families():
+    board = emit_football(sport="NFL")
+    for market in ("receiving_tds", "rushing_tds", "rush_rec_tds", "solo_tackles", "tds_over"):
+        sides = {row["selection"] for row in board["rows"] if row["market"] == market}
+        assert sides == {"OVER", "UNDER"}, market
+    quoted = emit_football(
+        sport="CFB",
+        prop_rows=[{
+            "provider_market": "player_reception_tds",
+            "entity_id": "wr",
+            "side": "OVER",
+            "line": 0.5,
+            "model_p": 0.41,
+            "american_odds": 120,
+            "opposite_odds": -150,
+        }],
+    )
+    props = {row["selection"]: row for row in quoted["rows"] if row["market"] == "receiving_tds" and row["entity_id"] == "wr"}
+    assert props["UNDER"]["model_p"] == 0.59
+    assert props["UNDER"]["american_odds"] == -150
+    assert quoted["summary"]["both_sides"] is True
+    assert quoted["official_authority"] is False

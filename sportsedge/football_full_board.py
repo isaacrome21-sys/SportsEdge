@@ -39,8 +39,13 @@ PROVIDER_TO_SURFACE = {
     "player_pass_yds": "passing_yards",
     "player_receptions": "receptions",
     "player_reception_longest": "longest_reception",
+    "player_reception_tds": "receiving_tds",
     "player_reception_yds": "receiving_yards",
     "player_rush_attempts": "rush_attempts",
+    "player_rush_tds": "rushing_tds",
+    "player_rush_reception_tds": "rush_rec_tds",
+    "player_solo_tackles": "solo_tackles",
+    "player_tds_over": "tds_over",
     "player_rush_longest": "longest_rush",
     "player_rush_reception_yds": "rush_plus_rec_yards",
     "player_rush_yds": "rushing_yards",
@@ -138,6 +143,9 @@ def _row(
         "model_p": model_p,
         "push_p": raw.get("push_p"),
         "tie_p": raw.get("tie_p"),
+        "complement_model_p": raw.get("complement_model_p"),
+        "opposite_model_p": raw.get("opposite_model_p"),
+        "count_pmf": raw.get("count_pmf"),
         "engine_state": engine_state,
         "research_only": True,
         "official_eligible": False,
@@ -351,6 +359,9 @@ def board_from_machine_results(
             "model_p": _field(raw, "model_p"),
             "push_p": _field(raw, "push_p"),
             "tie_p": _field(raw, "tie_p"),
+            "complement_model_p": _field(raw, "complement_model_p"),
+            "opposite_model_p": _field(raw, "opposite_model_p"),
+            "count_pmf": _field(raw, "count_pmf"),
             "reason": _field(raw, "reason"),
             "provider_market": _field(raw, "provider_market"),
         }
@@ -489,14 +500,16 @@ def build_football_full_board(
                 engine_state=engine_state,
             ))
     for market in sorted(PROVIDER_MARKETS):
-        if market in seen or PROVIDER_TO_SURFACE.get(market) in seen:
+        mapped = PROVIDER_TO_SURFACE.get(market, market)
+        if market in seen or mapped in seen:
             continue
-        for side in pair_sides(market, "PROP"):
+        for side in pair_sides(mapped, "PROP"):
             emitted.append(_row(
-                sport=resolved, lane="PROP", market=market,
+                sport=resolved, lane="PROP", market=mapped,
                 raw={"provider_market": market, "family": "prop", "side": side},
                 presentation="BLOCKED", reason="NO_QUOTE_OR_ENGINE_ROW", engine_state="NO_ENGINE",
             ))
+            seen.add(mapped)
     emitted = _with_complements(resolved, emitted)
     return {
         "schema_version": SCHEMA_VERSION,
@@ -516,7 +529,11 @@ def build_football_full_board(
             "both_sides": all(
                 {str(row.get("selection") or "") for row in emitted if row["market"] == spec["market"]} >= set(pair_sides(str(spec["market"]), family_for(str(spec["market"]), str(spec.get("family") or ""))))
                 for spec in specs
+            ) and all(
+                {str(row.get("selection") or "") for row in emitted if row["market"] == PROVIDER_TO_SURFACE.get(market, market)} >= set(pair_sides(PROVIDER_TO_SURFACE.get(market, market), "PROP"))
+                for market in PROVIDER_MARKETS
             ),
+            "priced_complement_rows": sum(1 for row in emitted if row.get("reason") == "COMPLEMENT_PRICED_FROM_QUOTED_SIDE"),
             "official_bets": 0,
         },
         "rows": emitted,

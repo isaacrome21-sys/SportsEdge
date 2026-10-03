@@ -235,6 +235,7 @@ def build_mlb_full_board(
     summary = {
         "catalog_markets": len(markets),
         "priced_rows": sum(1 for row in emitted if row["model_p"] is not None),
+        "priced_complement_rows": sum(1 for row in emitted if row.get("reason") == "COMPLEMENT_PRICED_FROM_QUOTED_SIDE"),
         "blocked_family_rows": sum(1 for row in emitted if row["reason"] == "NO_QUOTE_OR_ENGINE_ROW"),
         "side_rows": sum(1 for row in emitted if row["lane"] == "SIDE"),
         "total_rows": sum(1 for row in emitted if row["lane"] == "TOTAL"),
