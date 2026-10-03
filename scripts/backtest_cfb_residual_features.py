@@ -13,7 +13,6 @@ Evaluation only.
 """
 from __future__ import annotations
 
-import json
 import os
 import sys
 from pathlib import Path
@@ -35,26 +34,20 @@ def _load_bt():
     return bt
 
 
-def fetch_team_tables(seasons, key):
-    from sportsedge.sports.cfb.source import _auth, _cfbd_url, _json_get
+def cached_lines(seasons, cache):
+    out = {}
+    for s in seasons:
+        out.update(cache.get(f"lines_{s}") or {})
+    return out
+
+
+def team_tables(seasons, cache):
+    """talent / returning production for season s and SP+ for s-1 (preseason-known), from the cache."""
     talent, ret, sp = {}, {}, {}
     for s in seasons:
-        for name, path, params, sink, fn in (
-            ("talent", "/talent", {"year": s}, talent, lambda r: float(r.get("talent"))),
-            ("returning", "/player/returning", {"year": s}, ret, lambda r: float(r.get("percentPPA"))),
-            ("sp_prev", "/ratings/sp", {"year": s - 1}, sp, lambda r: float(r.get("rating"))),
-        ):
-            try:
-                data = _json_get(_cfbd_url(path, params), headers=_auth(key))
-            except Exception as exc:
-                print(f"FETCH_FAILED {name} {s} {type(exc).__name__}: {str(exc)[:80]}")
-                continue
-            for r in data or []:
-                team = r.get("team") or r.get("school")
-                try:
-                    sink[(s, team)] = fn(r)
-                except (TypeError, ValueError):
-                    pass
+        for sink, name in ((talent, f"talent_{s}"), (ret, f"returning_{s}"), (sp, f"sp_{s - 1}")):
+            for team, v in (cache.get(name) or {}).items():
+                sink[(s, team)] = v
     return talent, ret, sp
 
 
@@ -99,6 +92,7 @@ def loso(X, y, meta, cols):
         coefs[s] = np.round(beta, 3).tolist()
         pred = X[te][:, cols] @ beta
         rec = [0, 0]
+        rec05 = [0, 0]
         for pr, (_, spread, am) in zip(pred, [m for m, k in zip(meta, te) if k]):
             res = (1 if pr > 0 else -1) * (am + spread)
             for t in THRESH:
@@ -106,7 +100,9 @@ def loso(X, y, meta, cols):
                     ats[t][0 if res > 0 else 1 if res < 0 else 2] += 1
             if abs(pr) >= 1.0 and res != 0:
                 rec[0 if res > 0 else 1] += 1
-        per[s] = rec
+            if abs(pr) >= 0.5 and res != 0:
+                rec05[0 if res > 0 else 1] += 1
+        per[s] = (rec, rec05)
     return ats, per, coefs
 
 
@@ -118,12 +114,16 @@ def main(argv=None) -> int:
     key = os.environ.get("CFBD_API_KEY") or os.environ.get("SPORTSEDGE_CFBD_API_KEY") or ""
     if not key:
         raise SystemExit("CFB_SDV_CFBD_API_KEY_REQUIRED")
+    from sportsedge.sports.cfb import cfbd_issue_cache as cc
+    # Fill the reusable CFBD cache first (only missing items, small budget, stops on 429).
+    cache = cc.ensure(cc.history_names(), key, budget=int(os.environ.get("CFB_CACHE_BUDGET", "12")))
+    print("CFB_SDV_CACHE_SUMMARY " + cc.coverage(cache, cc.history_names()))
     bt = _load_bt()
     rows = bt.load_rows(None)
     preds = bt.loso_predictions(rows)
     seasons = sorted({p["season"] for p in preds.values()})
-    lines = bt.fetch_lines(seasons, key)
-    talent, ret, sp = fetch_team_tables(seasons, key)
+    lines = cached_lines(seasons, cache)
+    talent, ret, sp = team_tables(seasons, cache)
     X, y, meta = build(preds, lines, talent, ret, sp)
     print("CFB_RESIDUAL_FEATURES_SUMMARY")
     print(f"games with lines + talent + returning + prior SP+: {len(y)} (talent {len(talent)}, ret {len(ret)}, sp {len(sp)} team-seasons)")
@@ -136,7 +136,8 @@ def main(argv=None) -> int:
         ats, per, coefs = loso(X, y, meta, cols)
         print(f"== {name} ==")
         print("  ATS vs CLOSE by |pred residual|: " + "; ".join(f">={t}:{w}-{l} {pct(w, l)}" for t, (w, l, p) in ats.items()))
-        print("  by season (>=1): " + ", ".join(f"{s}:{pct(*v)}({v[0] + v[1]})" for s, v in per.items()))
+        print("  by season (>=1): " + ", ".join(f"{s}:{pct(*v[0])}({v[0][0] + v[0][1]})" for s, v in per.items()))
+        print("  by season (>=0.5): " + ", ".join(f"{s}:{pct(*v[1])}({v[1][0] + v[1][1]})" for s, v in per.items()))
         last = coefs[max(coefs)]
         print(f"  coefs (held-out {max(coefs)}): {last}")
     return 0
