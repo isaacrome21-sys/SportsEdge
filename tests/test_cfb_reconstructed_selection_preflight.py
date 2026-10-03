@@ -111,10 +111,6 @@ class TestCFBReconstructedSelectionPreflight(unittest.TestCase):
         self.assertEqual(seen["timeout"], 20)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
     def test_advanced_only_band_can_fit_when_full_plan_does_not(self):
         _, public = evaluate_account({"patronLevel": 1, "remainingCalls": 180}, CONFIG)
         self.assertTrue(public["capacity_bands"]["advanced_metrics_only"])
@@ -123,3 +119,7 @@ if __name__ == "__main__":
         self.assertFalse(public["capacity_bands"]["plan_only"])
         self.assertFalse(public["call_plan_fits"])
         self.assertNotIn("remaining_quota", public)
+
+
+if __name__ == "__main__":
+    unittest.main()
