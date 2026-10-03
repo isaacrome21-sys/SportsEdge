@@ -346,6 +346,16 @@ def _with_complements(sport: str, rows: list[dict[str, Any]]) -> list[dict[str, 
     return rows + extra
 
 
+def catalog_complete(summary: Mapping[str, Any]) -> bool:
+    """True only when every surface and provider family has both sides."""
+    return (
+        summary.get("both_sides") is True
+        and int(summary.get("side_rows") or 0) >= 16
+        and int(summary.get("total_rows") or 0) >= 10
+        and int(summary.get("prop_rows") or 0) >= 40
+    )
+
+
 def emit_all_props_side_totals(**kwargs: Any) -> dict[str, Any]:
     return build_football_full_board(**kwargs)
 

@@ -245,7 +245,7 @@ def _blocked_no_engine(q: Mapping[str, Any]) -> CFBMachineResult:
 
 
 def _summary(results: Sequence[CFBMachineResult]) -> dict[str, Any]:
-    from sportsedge.football_full_board import board_from_machine_results
+    from sportsedge.football_full_board import board_from_machine_results, catalog_complete
 
     board = board_from_machine_results("CFB", results)
     return {"quote_count": len(results), "priced": sum(r.engine_status == "PRICED" for r in results),
@@ -258,7 +258,7 @@ def _summary(results: Sequence[CFBMachineResult]) -> dict[str, Any]:
             "total_rows": board["summary"]["total_rows"],
             "prop_rows": board["summary"]["prop_rows"],
             "both_sides": board["summary"]["both_sides"],
-            "catalog_complete": board["summary"]["both_sides"] is True and board["summary"]["side_rows"] >= 2 and board["summary"]["total_rows"] >= 2 and board["summary"]["prop_rows"] >= 2}
+            "catalog_complete": catalog_complete(board["summary"])}
 
 
 def _run_canonical(*, mode: str, season: int, week: int, now: datetime, model: CFBJointScoreModel,

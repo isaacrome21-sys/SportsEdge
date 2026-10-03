@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from sportsedge.football_full_board import board_from_machine_results
+from sportsedge.football_full_board import board_from_machine_results, catalog_complete
 from sportsedge.football_prop_surface import load_prop_surface, require_executable_prop_surface
 from sportsedge.run_it_card import bettor_card_rows
 
@@ -201,7 +201,7 @@ def main() -> int:
         "total_rows": full_board["summary"]["total_rows"],
         "prop_rows": full_board["summary"]["prop_rows"],
         "both_sides": full_board["summary"].get("both_sides"),
-        "catalog_complete": full_board["summary"].get("both_sides") is True and full_board["summary"]["side_rows"] >= 2 and full_board["summary"]["total_rows"] >= 2 and full_board["summary"]["prop_rows"] >= 2,
+        "catalog_complete": catalog_complete(full_board["summary"]),
         "output": str(args.output),
     }, sort_keys=True))
     return 2 if status == "BLOCKED" else 0

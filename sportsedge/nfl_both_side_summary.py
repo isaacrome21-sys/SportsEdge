@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from sportsedge.football_full_board import board_from_machine_results
+from sportsedge.football_full_board import board_from_machine_results, catalog_complete
 
 
 def attach_nfl_both_sides(report: Mapping[str, Any]) -> dict[str, Any]:
@@ -23,7 +23,7 @@ def attach_nfl_both_sides(report: Mapping[str, Any]) -> dict[str, Any]:
     summary["side_rows"] = board["summary"]["side_rows"]
     summary["total_rows"] = board["summary"]["total_rows"]
     summary["prop_rows"] = board["summary"]["prop_rows"]
-    summary["catalog_complete"] = board["summary"]["both_sides"] is True and summary["side_rows"] >= 2 and summary["total_rows"] >= 2 and summary["prop_rows"] >= 2
+    summary["catalog_complete"] = catalog_complete(board["summary"])
     out = dict(report)
     out["summary"] = summary
     return out
