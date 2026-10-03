@@ -285,10 +285,13 @@ def main() -> int:
             quote_ttl_seconds=int(args.quote_ttl_seconds),
             feature_ttl_seconds=int(args.feature_ttl_seconds),
         )
+        from sportsedge.nfl_both_side_summary import attach_nfl_both_sides
+
+        report_dict = attach_nfl_both_sides(report.to_dict())
         payload = {
             "schema_version": "NFL_AUTO_RUN_V2",
             "status": "SUCCESS",
-            "report": report.to_dict(),
+            "report": report_dict,
             "runtime_code_git_sha": actual_runtime_sha,
             "model_binding_git_sha": model_binding_sha,
             "compatible_code_surface": compatibility,
@@ -307,6 +310,10 @@ def main() -> int:
         print(json.dumps({
             "status": "SUCCESS", "mode": report.mode, "run_status": report.run_status,
             "priced": report.summary["priced"], "official_bets": report.summary["official_bets"],
+            "both_sides": report_dict["summary"]["both_sides"],
+            "side_rows": report_dict["summary"]["side_rows"],
+            "total_rows": report_dict["summary"]["total_rows"],
+            "prop_rows": report_dict["summary"]["prop_rows"],
             "output": str(args.output),
         }, sort_keys=True))
         return 0

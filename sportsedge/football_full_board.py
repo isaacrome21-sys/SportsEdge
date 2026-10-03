@@ -130,11 +130,14 @@ def _row(
         "family": raw.get("family"),
         "game_id": raw.get("game_id"),
         "entity_id": raw.get("entity_id") or raw.get("player_id") or raw.get("team_side"),
+        "team_side": raw.get("team_side"),
         "selection": raw.get("selection") or raw.get("side") or raw.get("quoted_side") or raw.get("player_name"),
         "line": raw.get("line"),
         "opposite_odds": raw.get("opposite_odds"),
         "american_odds": raw.get("american_odds") or raw.get("price_american"),
         "model_p": model_p,
+        "push_p": raw.get("push_p"),
+        "tie_p": raw.get("tie_p"),
         "engine_state": engine_state,
         "research_only": True,
         "official_eligible": False,
@@ -264,7 +267,9 @@ def _selection(row: Mapping[str, Any]) -> str:
 
 
 def _with_complements(sport: str, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Append the unquoted side. Does not invent a probability."""
+    """Append the unquoted side. Price it only from a supplied opposite quote."""
+    from sportsedge.both_side_pricing import complement_model_p
+
     grouped: dict[tuple[Any, ...], set[str]] = {}
     templates: dict[tuple[Any, ...], dict[str, Any]] = {}
     for row in rows:
@@ -272,6 +277,7 @@ def _with_complements(sport: str, rows: list[dict[str, Any]]) -> list[dict[str, 
             row.get("market"),
             row.get("game_id"),
             row.get("entity_id"),
+            row.get("team_side"),
             row.get("line"),
             row.get("provider_market"),
         )
@@ -284,12 +290,24 @@ def _with_complements(sport: str, rows: list[dict[str, Any]]) -> list[dict[str, 
         for side in (left, right):
             if side in present:
                 continue
+            opposite = template.get("opposite_odds")
+            model_p = complement_model_p(template, market=str(template.get("market") or "")) if opposite is not None else None
+            if opposite is None:
+                reason = "COMPLEMENT_SIDE_NOT_QUOTED"
+                presentation = "BLOCKED"
+            elif model_p is None:
+                reason = "COMPLEMENT_PRICE_ONLY"
+                presentation = "BLOCKED"
+            else:
+                reason = "COMPLEMENT_PRICED_FROM_QUOTED_SIDE"
+                presentation = "LEAN"
             complement = dict(template)
             complement["selection"] = side
-            complement["model_p"] = None
-            complement["american_odds"] = template.get("opposite_odds")
-            complement["presentation"] = "BLOCKED"
-            complement["reason"] = "COMPLEMENT_SIDE_NOT_QUOTED"
+            complement["side"] = side
+            complement["model_p"] = model_p
+            complement["american_odds"] = opposite
+            complement["presentation"] = presentation
+            complement["reason"] = reason
             complement["research_only"] = True
             complement["official_eligible"] = False
             extra.append(complement)
@@ -325,10 +343,14 @@ def board_from_machine_results(
             "market": key,
             "game_id": _field(raw, "game_id"),
             "entity_id": _field(raw, "entity_id") or _field(raw, "player_id"),
+            "team_side": _field(raw, "team_side"),
             "side": _field(raw, "side") or _field(raw, "selection"),
             "line": _field(raw, "line"),
             "american_odds": _field(raw, "american_odds") or _field(raw, "price_american"),
+            "opposite_odds": _field(raw, "opposite_odds"),
             "model_p": _field(raw, "model_p"),
+            "push_p": _field(raw, "push_p"),
+            "tie_p": _field(raw, "tie_p"),
             "reason": _field(raw, "reason"),
             "provider_market": _field(raw, "provider_market"),
         }

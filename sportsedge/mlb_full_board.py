@@ -120,7 +120,19 @@ def _group_key(market: str, raw: Mapping[str, Any]) -> tuple[Any, ...]:
 
 
 def _complement_row(market: str, raw: Mapping[str, Any], side: str) -> dict[str, Any]:
+    from sportsedge.both_side_pricing import complement_model_p
+
     opposite = raw.get("opposite_odds")
+    model_p = complement_model_p(raw, market=market) if opposite is not None else None
+    if opposite is None:
+        reason = "COMPLEMENT_SIDE_NOT_QUOTED"
+        presentation = "BLOCKED"
+    elif model_p is None:
+        reason = "COMPLEMENT_PRICE_ONLY"
+        presentation = "BLOCKED"
+    else:
+        reason = "COMPLEMENT_PRICED_FROM_QUOTED_SIDE"
+        presentation = "LEAN"
     return {
         "lane": family_for(market),
         "market": market,
@@ -130,11 +142,11 @@ def _complement_row(market: str, raw: Mapping[str, Any], side: str) -> dict[str,
         "side": side,
         "line": raw.get("line"),
         "american_odds": opposite,
-        "model_p": None,
+        "model_p": model_p,
         "research_only": True,
         "official_eligible": False,
-        "presentation": "BLOCKED",
-        "reason": "COMPLEMENT_SIDE_NOT_QUOTED" if opposite is None else "COMPLEMENT_PRICE_ONLY",
+        "presentation": presentation,
+        "reason": reason,
     }
 
 
@@ -143,7 +155,11 @@ def emit_all_props_side_totals(
     *,
     catalog: Sequence[str] | None = None,
 ) -> dict[str, Any]:
-    """Emit both sides of every quoted prop, side, and total, plus catalog blockers."""
+    """Emit both sides of every quoted prop, side, and total, plus catalog blockers.
+
+    A complement is priced only when the opposite quote was supplied and the
+    other-side probability is already determined by the quoted row.
+    """
     return build_mlb_full_board(rows, catalog=catalog)
 
 def build_mlb_full_board(

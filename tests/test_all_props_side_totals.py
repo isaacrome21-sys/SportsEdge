@@ -56,3 +56,45 @@ def test_football_emits_both_sides_of_props_sides_and_totals():
     assert board["official_authority"] is False
     assert board["prop_engine_state"] == "NO_ENGINE"
     assert all(row["official_eligible"] is False for row in board["rows"])
+
+def test_mlb_prices_push_free_complement_only_when_opposite_quote_exists():
+    board = emit_all_props_side_totals([
+        {"market": "HITS", "entity_id": "batter", "side": "OVER", "line": 1.5, "model_p": 0.57, "american_odds": -110, "opposite_odds": -110},
+        {"market": "TOTAL_BASES", "entity_id": "batter", "side": "OVER", "line": 1.5, "model_p": 0.48, "american_odds": 120},
+        {"market": "RBI", "entity_id": "batter", "side": "OVER", "line": 1.0, "model_p": 0.42, "american_odds": 150, "opposite_odds": -180},
+    ])
+    hits = {row["side"]: row for row in board["rows"] if row["market"] == "HITS" and row["entity_id"] == "batter"}
+    assert hits["UNDER"]["model_p"] == 0.43
+    assert hits["UNDER"]["american_odds"] == -110
+    assert hits["UNDER"]["reason"] == "COMPLEMENT_PRICED_FROM_QUOTED_SIDE"
+    assert hits["UNDER"]["official_eligible"] is False
+    bases = {row["side"]: row for row in board["rows"] if row["market"] == "TOTAL_BASES" and row["entity_id"] == "batter"}
+    assert bases["UNDER"]["model_p"] is None
+    assert bases["UNDER"]["reason"] == "COMPLEMENT_SIDE_NOT_QUOTED"
+    rbi = {row["side"]: row for row in board["rows"] if row["market"] == "RBI" and row["entity_id"] == "batter"}
+    assert rbi["UNDER"]["american_odds"] == -180
+    assert rbi["UNDER"]["model_p"] is None
+    assert rbi["UNDER"]["reason"] == "COMPLEMENT_PRICE_ONLY"
+
+
+def test_football_prices_push_free_complement_and_nfl_report_attaches_board():
+    board = emit_football(
+        sport="NFL",
+        game_rows=[
+            {"market": "total", "game_id": "g", "side": "OVER", "line": 47.5, "model_p": 0.52, "american_odds": -110, "opposite_odds": -110},
+        ],
+        prop_rows=[
+            {"provider_market": "player_pass_yds", "entity_id": "qb", "side": "OVER", "line": 245.5, "model_p": 0.55, "american_odds": -115, "opposite_odds": -105},
+        ],
+    )
+    totals = {row["selection"]: row for row in board["rows"] if row["market"] == "total" and row["game_id"] == "g"}
+    assert totals["UNDER"]["model_p"] == 0.48
+    assert totals["UNDER"]["reason"] == "COMPLEMENT_PRICED_FROM_QUOTED_SIDE"
+    props = {row["selection"]: row for row in board["rows"] if row["market"] == "passing_yards" and row["entity_id"] == "qb"}
+    assert props["UNDER"]["model_p"] == 0.45
+    assert props["UNDER"]["american_odds"] == -105
+    from sportsedge.nfl_both_side_summary import attach_nfl_both_sides
+    attached = attach_nfl_both_sides({"results": [], "summary": {"priced": 0}})
+    assert attached["summary"]["both_sides"] is True
+    assert attached["summary"]["prop_rows"] >= 2
+    assert attached["summary"]["catalog_complete"] is True
