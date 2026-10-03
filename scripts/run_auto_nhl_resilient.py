@@ -91,10 +91,12 @@ def _side_probability(paths, quote: dict) -> float | None:
         line = quote.get("line", quote.get("point"))
         if line is None or side not in {"HOME", "AWAY"}:
             return None
-        # Intake stores the home puck line. Away is the opposite number.
-        home_line = float(line) if side == "HOME" else -float(line)
-        mass = home_puck_line(paths, home_line if side == "HOME" else -float(line))
-        return mass.win if side == "HOME" else home_puck_line(paths, -float(line)).win
+        # Intake stores one home puck-line number and both prices.
+        home_line = float(line)
+        mass = home_puck_line(paths, home_line)
+        if side == "HOME":
+            return mass.win
+        return mass.loss
     if market in {"TOTAL", "TOTALS"}:
         line = quote.get("line", quote.get("point"))
         if line is None or side not in {"OVER", "UNDER"}:
