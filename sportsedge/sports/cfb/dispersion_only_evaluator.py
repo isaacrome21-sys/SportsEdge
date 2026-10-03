@@ -13,8 +13,8 @@ from .candidate_bakeoff import _hash
 from .joint_model_v2_challenger import MIN_OOF_RESIDUAL_PAIRS, _fit_scale
 
 EVALUATOR_ID = "CFB_DISPERSION_ONLY_EVALUATOR_V1"
-SCORING_SEASONS = tuple(range(2019, 2026))
-RESIDUAL_SEED_SEASON = 2018
+SCORING_SEASONS = (2025,)
+RESIDUAL_SEED_SEASON = 2024
 N_PATHS = 5000
 BASE_SEED = 20260925
 BOOTSTRAP_SEED = 20260926
@@ -93,7 +93,7 @@ def _validate_inputs(
         if season in folds:
             raise CFBDispersionEvaluationError("CFB_DISPERSION_CAPTURE_FOLD_DUPLICATE")
         folds[season] = fold
-    if set(folds) != set(range(2018, 2026)):
+    if set(folds) != {2024, 2025}:
         raise CFBDispersionEvaluationError("CFB_DISPERSION_CAPTURE_FOLD_WINDOW_INVALID")
 
     ordered_ids = [_rid(r) for r in data]
@@ -354,7 +354,7 @@ def evaluate_cfb_dispersion_only(
         "additional_exclusions": 0,
         "mean_predictions_identical_v1_v2": True,
         "overtime_profile_shared_v1_v2": True,
-        "frozen_alphas_by_outer_season": {str(s): float(folds[s]["frozen_alpha"]) for s in range(2018, 2026)},
+        "frozen_alphas_by_outer_season": {str(s): float(folds[s]["frozen_alpha"]) for s in (2024, 2025)},
         "primary_metric": {
             "name": "MEAN_RANKED_PROBABILITY_SCORE_MARGIN_AND_TOTAL",
             "v1_rps": v1_mean,
