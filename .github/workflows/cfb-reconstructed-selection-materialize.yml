@@ -324,6 +324,15 @@ jobs:
           cp artifacts/cfb/acquisition_manifest.json "$target/acquisition_manifest.json"
           cp artifacts/cfb/selection_bundle_manifest.json "$target/selection_bundle_manifest.json"
           cp artifacts/cfb/reconstructed_source_manifest.json "$target/reconstructed_source_manifest.json"
+          for optional in \
+            candidate_bakeoff_result.json \
+            cfb_selected_candidate_model_proposal.json \
+            cfb_selected_candidate_model_build_attestation.json
+          do
+            if [[ -s "artifacts/cfb/$optional" ]]; then
+              cp "artifacts/cfb/$optional" "$target/$optional"
+            fi
+          done
           git -C _cfb_data config user.name 'SportsEdge CFB automation'
           git -C _cfb_data config user.email 'actions@github.com'
           git -C _cfb_data add history/cfb/reconstructed-selection
