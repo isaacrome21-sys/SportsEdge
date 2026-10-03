@@ -68,7 +68,8 @@
     "cfbd_paid_weather_entitlement_not_required_for_selection": true,
     "weather_reconstruction_must_preserve_frozen_indoor_wind_temperature_features": true,
     "weather_reconstruction_may_not_claim_historical_pit": true,
-    "raw_cfbd_data_may_not_be_persisted_to_public_repository": true
+    "raw_cfbd_data_may_not_be_persisted_to_public_repository": true,
+    "partial_restart_from_selection_start_prohibited_when_verified_cache_exists": true
   },
   "authority": {
     "attempt_consumed": false,
