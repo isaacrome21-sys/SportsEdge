@@ -115,7 +115,7 @@ class TestCFBReconstructedSelectionMaterializer(unittest.TestCase):
             "retry_reserve_calls": 25,
             "verified_cache_reuse": True,
             "resume_from_verified_cache": True,
-            "restart_from_2015": False,
+            "restart_from_selection_start": False,
             "retry_backoff": True,
         }
         source_manifest = {
