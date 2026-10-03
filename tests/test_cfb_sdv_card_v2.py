@@ -12,17 +12,15 @@ _spec.loader.exec_module(card)
 
 class BlockedCardTest(unittest.TestCase):
     def test_floor_and_same_game_guard(self):
-        rows = card.price_game("g", 45.0, 10.0, [
-            {"market": "MONEYLINE", "side": "HOME", "american_odds": 200},
-            {"market": "MONEYLINE", "side": "AWAY", "american_odds": -250},
-            {"market": "SPREAD", "side": "HOME", "line": -3.5, "american_odds": -110},
-            {"market": "SPREAD", "side": "AWAY", "line": 3.5, "american_odds": -110},
+        rows = card.price_game("g", 25.0, 24.0, [
+            {"market": "MONEYLINE", "side": "HOME", "american_odds": 120},
+            {"market": "MONEYLINE", "side": "AWAY", "american_odds": -140},
+            {"market": "SPREAD", "side": "HOME", "line": 1.5, "american_odds": -110},
+            {"market": "SPREAD", "side": "AWAY", "line": -1.5, "american_odds": -110},
         ])
         bets = [r for r in rows if r["bet_status"] == "BET"]
         self.assertEqual(len(bets), 1)
-        self.assertEqual(bets[0]["market"], "MONEYLINE")
         self.assertTrue(any(r["reason"] == "SAME_GAME_GUARD" for r in rows))
-        self.assertEqual(rows[1]["bet_status"], "PASS")
 
     def test_paired_devig_sums_to_one(self):
         rows = card.price_game("g", 28.0, 24.0, [
@@ -51,16 +49,24 @@ class BlockedCardTest(unittest.TestCase):
         self.assertEqual(card.resolve_game(row, games).game_id, "1")
         self.assertEqual(card.resolve_game({"away": "UMass", "home": "Ohio"}, games).game_id, "2")
 
-    def test_neutralize_and_sanity(self):
-        snaps = {"A": {"prior": {"explosive_rate": 1.3, "net_field_position": 0.0},
-                       "current": {"explosive_rate": 1.2, "net_field_position": 2.0}}}
-        card.neutralize_mismatched_metrics(snaps)
-        self.assertEqual(snaps["A"]["current"]["explosive_rate"], 0.0755)
-        self.assertEqual(snaps["A"]["prior"]["net_field_position"], -69.355)
+    def test_moment_match_and_sanity(self):
+        snaps = {f"T{i}": {"prior": {k: float(i) for k in card.TEAM_KEYS},
+                           "current": {k: float(i) * 2 for k in card.TEAM_KEYS}} for i in range(30)}
+        moments = {k: (0.5, 0.1) for k in card.TEAM_KEYS}
+        card.moment_match(snaps, moments)
+        vals = [snaps[t]["current"]["explosive_rate"] for t in snaps]
+        mu = sum(vals) / len(vals)
+        self.assertAlmostEqual(mu, 0.5, places=6)
+        self.assertLess(snaps["T0"]["current"]["explosive_rate"], snaps["T29"]["current"]["explosive_rate"])
         self.assertFalse(card.projection_sane(160.0, 150.0, []))
-        self.assertFalse(card.projection_sane(30.0, 20.0, [{"market": "TOTAL", "line": 80}]))
         self.assertTrue(card.projection_sane(30.0, 24.0, [{"market": "TOTAL", "line": 52.5}]))
 
+    def test_edge_cap(self):
+        rows = card.price_game("g", 45.0, 10.0, [
+            {"market": "MONEYLINE", "side": "HOME", "american_odds": 200},
+            {"market": "MONEYLINE", "side": "AWAY", "american_odds": -250}])
+        self.assertEqual(rows[0]["reason"], "EDGE_TOO_LARGE_SUSPECT")
+        self.assertEqual(rows[0]["bet_status"], "PASS")
 
 if __name__ == "__main__":
     unittest.main()

@@ -36,6 +36,8 @@ TEAM_SCORE_RMSE = 12.018
 # Margin and total sigma assuming independent home/away residuals.
 COMBINED_SIGMA = TEAM_SCORE_RMSE * sqrt(2.0)
 EDGE_FLOOR = 0.02  # same floor as the MLB card (#1230)
+# An edge this large vs a liquid CFB market is far more likely model error than value.
+EDGE_CAP = 0.12
 
 
 def phi(x: float) -> float:
@@ -97,8 +99,9 @@ def price_game(game_id, home: float, away: float, quotes: list) -> list:
             "market_p": round(fair if fair is not None else raw, 4),
             "devig": "PAIRED_PROPORTIONAL" if fair is not None else "UNPAIRED_RAW_IMPLIED",
             "edge": round(edge, 4),
-            "bet_status": "BET" if edge >= EDGE_FLOOR else "PASS",
-            "reason": "EDGE_CLEARS_FLOOR" if edge >= EDGE_FLOOR else "BELOW_FLOOR",
+            "bet_status": "BET" if EDGE_FLOOR <= edge <= EDGE_CAP else "PASS",
+            "reason": ("EDGE_CLEARS_FLOOR" if EDGE_FLOOR <= edge <= EDGE_CAP
+                       else "EDGE_TOO_LARGE_SUSPECT" if edge > EDGE_CAP else "BELOW_FLOOR"),
         })
     # Same-game guard: one team-outcome bet (ML or spread) and one total per game.
     for fam in (("MONEYLINE", "SPREAD"), ("TOTAL",)):
@@ -169,21 +172,51 @@ def resolve_game(row: dict, games: list):
     return hit[0]
 
 
-# Live CFBD fields that are NOT on the training scale (training = SportsDataverse):
-#   explosive_rate: training = share of explosive plays (~0.075); live = CFBD
-#     'explosiveness' (avg EPA of successful plays, ~1.2) -> ~100 SD off.
-#   net_field_position: training = -avg drive field position (~-69); live =
-#     offense minus defense average start (~0) -> ~14 SD off.
-# Until the live source is rebuilt, pin both to their training means (zero effect).
-TRAINING_MEANS = {"explosive_rate": 0.0755, "net_field_position": -69.355}
+# Live CFBD team metrics are defined differently from the SportsDataverse
+# training metrics (e.g. CFBD 'explosiveness' ~1.2 vs SDV explosive-play share
+# ~0.075; CFBD off-minus-def start ~0 vs SDV -avg drive field position ~-69;
+# yardage success rate vs EPA success rate). Map each live metric onto the
+# training scale by matching its cross-team mean/SD to the training feature's
+# mean/SD (moment matching). Rank order within the live population is kept.
+TEAM_KEYS = ("off_ppa_rush", "off_ppa_dropback", "def_ppa_rush_allowed", "def_ppa_dropback_allowed",
+             "off_success_rate", "def_success_rate_allowed", "standard_down_ppa",
+             "passing_down_success_rate", "explosive_rate", "net_field_position")
 
 
-def neutralize_mismatched_metrics(snaps) -> None:
-    for team_snap in snaps.values():
-        for side in ("prior", "current"):
-            m = team_snap.get(side)
-            if isinstance(m, dict):
-                m.update(TRAINING_MEANS)
+def training_moments(fit_path) -> dict:
+    fit = json.loads(Path(fit_path).read_text(encoding="utf-8"))
+    names = list(fit["feature_names"])
+    out = {}
+    for k in TEAM_KEYS:
+        ih, ia = names.index("home_" + k), names.index("away_" + k)
+        out[k] = ((fit["means"][ih] + fit["means"][ia]) / 2.0, (fit["scales"][ih] + fit["scales"][ia]) / 2.0)
+    return out
+
+
+def moment_match(snaps, moments) -> list:
+    report = []
+    for side in ("prior", "current"):
+        for k in TEAM_KEYS:
+            vals = []
+            for t in snaps.values():
+                m = t.get(side)
+                if isinstance(m, dict):
+                    try:
+                        vals.append(float(m[k]))
+                    except (KeyError, TypeError, ValueError):
+                        pass
+            if len(vals) < 20:
+                continue
+            mu = sum(vals) / len(vals)
+            sd = (sum((v - mu) ** 2 for v in vals) / len(vals)) ** 0.5
+            tmu, tsd = moments[k]
+            for t in snaps.values():
+                m = t.get(side)
+                if isinstance(m, dict) and k in m:
+                    z = (float(m[k]) - mu) / sd if sd > 1e-12 else 0.0
+                    m[k] = tmu + z * tsd
+            report.append((side, k, round(mu, 4), round(sd, 4), round(tmu, 4), round(tsd, 4)))
+    return report
 
 
 # Sanity band: a projection outside this means the inputs are broken -> PASS.
@@ -201,7 +234,7 @@ def projection_sane(home: float, away: float, quotes: list) -> bool:
     return True
 
 
-def build_rows(board: list, season: int, week: int, asof):
+def build_rows(board: list, season: int, week: int, asof, fit_path=None):
     from sportsedge.sports.cfb.candidate_live_source import (
         attach_candidate_snapshots_to_game_row,
         fetch_cfbd_candidate_metric_snapshots,
@@ -250,7 +283,8 @@ def build_rows(board: list, season: int, week: int, asof):
     neutral = {"game_indoor": False, "wind_speed": 6.89, "temperature": 64.6, "fallback": "TRAINING_MEAN"}
     games = attach_weather(raw_games, {g.game_id: weather.get(g.game_id) or neutral for g in raw_games})
     snaps = fetch_cfbd_candidate_metric_snapshots(season=season, week=week, cfbd_api_key=key, now=now)
-    neutralize_mismatched_metrics(snaps)
+    for line in moment_match(snaps, training_moments(fit_path)):
+        print("MOMENT_MATCH side=%s %s live_mean=%s live_sd=%s -> train_mean=%s train_sd=%s" % line)
     rows = []
     unresolved = []
     for row in board:
@@ -297,7 +331,7 @@ def main() -> int:
         raise SystemExit("CFB_SDV_BOARD_ARRAY_REQUIRED")
     model = load_selected_sdv_fit(args.fit)
     results = []
-    for row in build_rows(board, args.season, args.week, args.asof):
+    for row in build_rows(board, args.season, args.week, args.asof, args.fit):
         try:
             blind = {k: v for k, v in row.items() if k != "quotes"}  # model is market-blind
             home, away = score_selected_game(model, blind)
