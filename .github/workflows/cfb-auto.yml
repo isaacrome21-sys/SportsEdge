@@ -19,6 +19,12 @@ on:
         description: "Optional timezone-aware ISO timestamp. Blank uses runner UTC now."
         required: false
         type: string
+  pull_request:
+    paths:
+      - scripts/run_auto_cfb_resilient.py
+      - scripts/render_cfb_myspari_card.py
+      - tests/test_run_auto_cfb_resilient.py
+      - .github/workflows/cfb-auto.yml
 
 permissions:
   contents: read
@@ -45,8 +51,13 @@ jobs:
       - name: Install runtime dependencies
         run: python -m pip install --disable-pip-version-check -r requirements-test.txt
 
-      - name: Run frozen CFB model against screenshot-supplied lines
+      - name: Test selected PRIOR_CURRENT_BLEND card emit
+        if: github.event_name == 'pull_request'
+        run: python -m unittest tests.test_run_auto_cfb_resilient -v
+
+      - name: Run selected PRIOR_CURRENT_BLEND card against screenshot-supplied lines
         id: run
+        if: github.event_name == 'workflow_dispatch'
         env:
           INPUT_SEASON: ${{ inputs.season }}
           INPUT_WEEK: ${{ inputs.week }}
@@ -54,21 +65,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p artifacts/run_it
-          card="artifacts/run_it/cfb_auto_card_$(date -u +%F).json"
-          args=(--output "$card" --bookmaker draftkings)
+          mkdir -p artifacts/run_it artifacts/cfb_myspari
+          card="artifacts/live_cfb_card.json"
+          args=(--output "$card")
           [ -z "$INPUT_SEASON" ] || args+=(--season "$INPUT_SEASON")
           [ -z "$INPUT_WEEK" ] || args+=(--week "$INPUT_WEEK")
           [ -z "$INPUT_ASOF" ] || args+=(--asof "$INPUT_ASOF")
           set +e
-          python scripts/run_cfb_auto.py "${args[@]}"
+          python scripts/run_auto_cfb_resilient.py "${args[@]}"
           rc=$?
           set -e
+          cp "$card" "artifacts/run_it/cfb_auto_card_$(date -u +%F).json"
           echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
           echo "card_path=$card" >> "$GITHUB_OUTPUT"
 
       - name: Assert manual-line card contract
-        if: always()
+        if: github.event_name == 'workflow_dispatch'
         env:
           CARD_PATH: ${{ steps.run.outputs.card_path }}
         run: |
@@ -85,34 +97,30 @@ jobs:
               raise SystemExit("CFB_AUTO_SPORTSBOOK_API_GUARD_FAILED")
           if gov.get("manual_market_board_required") is not True:
               raise SystemExit("CFB_AUTO_MANUAL_BOARD_GUARD_FAILED")
-
-          if card.get("status") != "SUCCESS":
-              raise SystemExit("CFB_AUTO_BLOCKED:" + str(card.get("blocker")))
-
+          if gov.get("freeze_status") == "FROZEN" or gov.get("artifact_sha256"):
+              raise SystemExit("CFB_AUTO_FREEZE_WITH_NULL_HASH_FORBIDDEN")
+          if gov.get("odds_api_called") is not False:
+              raise SystemExit("CFB_AUTO_ODDS_API_GUARD_FAILED")
           if card.get("market_input_source") != "MANUAL_SCREENSHOT_BOARD":
               raise SystemExit("CFB_AUTO_MARKET_SOURCE_INVALID")
-          if card.get("run_status") not in {"READY", "BLOCKED", "DEGRADED"}:
-              raise SystemExit("CFB_AUTO_RUN_STATUS_INVALID")
-
-          report = card.get("report") or {}
-          rows = report.get("results") or []
+          funnel = card.get("funnel") or {}
+          quotes = int(funnel.get("odds_rows_fetched") or 0)
+          if quotes == 0 or card.get("run_status") == "BLOCKED_NO_ODDS":
+              raise SystemExit("CFB_AUTO_ZERO_QUOTES")
+          rows = card.get("results") or []
           if not rows:
               raise SystemExit("CFB_AUTO_NO_MARKET_ROWS")
-          if any(row.get("engine_status") != "PRICED" for row in rows):
-              raise SystemExit("CFB_AUTO_UNPRICED_MARKET_ROW")
-          allowed = {"OFFICIAL_BET", "BLOCKED"}
-          allowed_reasons = {"EDGE_POSITIVE", "NO_EDGE", "PAIRED_PRICE_REQUIRED_FOR_DEVIG", "CFB_QUOTE_STALE", "CFB_SETTLED_SAMPLE_SPACE_EMPTY", "NO_ENGINE"}
-          for row in rows:
-              if row.get("bet_status") not in allowed:
-                  raise SystemExit("CFB_AUTO_BET_STATUS_INVALID")
-              if row.get("bet_status") == "OFFICIAL_BET" and row.get("reason") != "EDGE_POSITIVE":
-                  raise SystemExit("CFB_AUTO_BET_REASON_INVALID")
-              if row.get("reason") not in allowed_reasons and row.get("bet_status") != "OFFICIAL_BET":
-                  raise SystemExit("CFB_AUTO_ROW_REASON_INVALID:" + str(row.get("reason")))
-          bets = sum(row.get("bet_status") == "OFFICIAL_BET" for row in rows)
+          bets = [
+              row for row in rows
+              if row.get("model_p") is not None and row.get("edge") is not None and float(row["edge"]) > 0
+          ]
+          if any(row.get("reason") == "CFB_PROMOTION_EVIDENCE_REQUIRED" for row in rows):
+              raise SystemExit("CFB_AUTO_FORCED_PROMOTION_BLOCK")
+          if int(funnel.get("bets_emitted") or 0) != len(bets):
+              raise SystemExit("CFB_AUTO_BET_EMIT_MISMATCH")
           print(
               "CFB_AUTO_CARD_OK "
-              f"rows={len(rows)} bets={bets} run_status={card['run_status']} "
+              f"rows={len(rows)} bets={len(bets)} run_status={card['run_status']} "
               "market_source=MANUAL_SCREENSHOT_BOARD"
           )
           summary = card.get("summary") or {}
@@ -122,6 +130,9 @@ jobs:
               raise SystemExit("CFB_AUTO_PROP_SIDE_TOTAL_COVERAGE")
           PY
 
+      - name: Render CFB phone card
+        if: github.event_name == 'workflow_dispatch' && hashFiles('artifacts/live_cfb_card.json') != ''
+        run: python scripts/render_cfb_myspari_card.py --engine-output artifacts/live_cfb_card.json --out-dir artifacts/cfb_myspari
       - name: Render CFB both-side board
         if: always() && steps.run.outputs.card_path != ''
         env:
@@ -129,11 +140,12 @@ jobs:
         run: python scripts/render_football_board_card.py --engine-output "$CARD_PATH" --out-dir artifacts/cfb_myspari
 
       - name: Upload CFB auto card
-        if: always()
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: cfb-auto-card
           path: |
+            artifacts/live_cfb_card.json
             artifacts/run_it/cfb_auto_card_*.json
             artifacts/cfb_myspari/
           if-no-files-found: error
