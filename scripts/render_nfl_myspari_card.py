@@ -12,6 +12,31 @@ from sportsedge.nfl_attempt9_live_forecast import load_model_p
 
 PRE_CONTEXT = "PRE-CONTEXT · NOT FINAL"
 FOOTER = "NOT Model_P / NOT Truth Gate / NOT OFFICIAL"
+# research_notes/nfl_team_total_prop_backtest_20261003.md
+TEAM_TOTAL_NOTE = (
+    "TRACK ONLY (not a bet): team totals tested, no edge "
+    "(51.5% OOS 2018-26 vs closing implied team total; breakeven 52.4%)"
+)
+PROP_NOTE = (
+    "TRACK ONLY (not a bet): no free historical prop closing lines, "
+    "so props can't be backtested"
+)
+
+
+def fmt_price(price: object) -> str:
+    try:
+        value = int(price)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return str(price)
+    return f"+{value}" if value > 0 else str(value)
+
+
+def _track_note(row: dict) -> str | None:
+    if row.get("player"):
+        return PROP_NOTE
+    if str(row.get("market")) == "team_total":
+        return TEAM_TOTAL_NOTE
+    return None
 
 
 def main() -> int:
@@ -28,6 +53,10 @@ def main() -> int:
         lines.append(f"{game.get('away')} @ {game.get('home')}")
         for row in game.get("markets") or []:
             reason = row.get("no_model") or market_eligibility(row.get("market"), row.get("line"))
+            note = _track_note(row)
+            if note:
+                lines.append(f"- {row.get('raw') or row.get('market')}: {note}")
+                continue
             if reason:
                 lines.append(f"- {row.get('raw') or row.get('market')}: {reason}")
                 continue
@@ -35,7 +64,7 @@ def main() -> int:
             lean = row.get("lean")
             if not pick and lean:
                 lines.append(
-                    f"- LEAN (no proven edge, not a bet): {lean['selection']} {lean.get('line', '')} @ {lean['price_american']}"
+                    f"- LEAN (no proven edge, not a bet): {lean['selection']} {lean.get('line', '')} @ {fmt_price(lean['price_american'])}"
                     f"  model EV {lean.get('ev_per_dollar', 0):+.3f}"
                 )
                 continue
@@ -43,7 +72,7 @@ def main() -> int:
                 lines.append(f"- {row.get('market')}: no pick")
                 continue
             lines.append(
-                f"- {pick['selection']} {pick.get('line', '')} @ {pick['price_american']}"
+                f"- {pick['selection']} {pick.get('line', '')} @ {fmt_price(pick['price_american'])}"
                 f"  Score-B {pick.get('score_0_100', '—')}"
                 f"  EV {pick.get('ev_per_dollar', 0):+.3f}"
             )
