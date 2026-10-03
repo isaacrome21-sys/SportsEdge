@@ -31,6 +31,10 @@ def _ticket() -> dict:
                     {"market": "spread", "line": 3.5, "away_or_over_price": -110, "home_or_under_price": -110, "raw": "Spread +3.5 -110 -110"},
                     # Absurdly low total so the frozen model is guaranteed to like the over.
                     {"market": "total", "line": 20.5, "away_or_over_price": 100, "home_or_under_price": -120, "raw": "Total 20.5 +100 -120"},
+                    {"market": "team_total", "line": 10.5, "away_or_over_price": -110, "home_or_under_price": -110,
+                     "raw": "TeamTotal Ravens 10.5 -110 -110", "team": "BAL", "player": None},
+                    {"market": "pass_yards", "line": 245.5, "away_or_over_price": -110, "home_or_under_price": -110,
+                     "raw": 'Prop "Lamar Jackson" PassYards 245.5 -110 -110', "team": None, "player": "Lamar Jackson"},
                 ],
             }
         ],
@@ -69,6 +73,21 @@ class NflCardLeanTests(unittest.TestCase):
         self.assertIn("LEAN (no proven edge, not a bet): Over 20.5", md)
         self.assertIn("No bets", md)
         self.assertNotIn("Score-B", md)
+
+    def test_plus_money_shows_plus_sign(self):
+        _, md = self._run()
+        self.assertIn("Over 20.5 @ +100", md)
+
+    def test_team_total_and_prop_are_track_only(self):
+        engine, md = self._run()
+        game = engine["games"][0]
+        self.assertEqual(game["picks"], [])
+        for m in game["markets"]:
+            if m["market"] in {"team_total", "pass_yards"}:
+                self.assertIsNone(m.get("pick"))
+                self.assertTrue(m["no_model"].startswith("NO_MODEL"))
+        self.assertIn("TeamTotal Ravens 10.5 -110 -110: TRACK ONLY (not a bet): team totals tested, no edge", md)
+        self.assertIn("PassYards 245.5 -110 -110: TRACK ONLY (not a bet): no free historical prop closing lines", md)
 
     def test_spread_still_held(self):
         engine, md = self._run()
