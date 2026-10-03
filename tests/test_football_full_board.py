@@ -68,3 +68,31 @@ def test_team_total_without_distribution_stays_no_model():
     assert row["reason"] == "TEAM_TOTAL_DISTRIBUTION_REQUIRED"
     assert board["summary"]["official_bets"] == 0
     assert board["summary"]["surface_markets"] >= 51
+
+
+def test_machine_results_cover_every_side_total_and_prop_without_authority():
+    from types import SimpleNamespace
+
+    from sportsedge.football_full_board import board_from_machine_results, surface_markets
+
+    results = [
+        SimpleNamespace(market="MONEYLINE", game_id="g1", side="HOME", line=None, american_odds=-120, model_p=0.57, reason="RESEARCH"),
+        SimpleNamespace(market="SPREAD", game_id="g1", side="HOME", line=-3.5, american_odds=-110, model_p=0.52, reason="RESEARCH"),
+        SimpleNamespace(market="TOTAL", game_id="g1", side="OVER", line=47.5, american_odds=-110, model_p=0.51, reason="RESEARCH"),
+        SimpleNamespace(market="TEAM_TOTAL", game_id="g1", side="OVER", line=24.5, american_odds=-115, model_p=0.49, reason="RESEARCH"),
+        SimpleNamespace(market="GAME", game_id="g1", side=None, line=None, american_odds=None, model_p=None, reason="GAME_OUTPUT_MISSING"),
+        SimpleNamespace(market="PLAYER_PROPS", game_id=None, side=None, line=None, american_odds=None, model_p=None, reason="NFL_PROPS_NO_ENGINE"),
+    ]
+    board = board_from_machine_results("NFL", results)
+    surface = {row["market"] for row in surface_markets()}
+    assert surface <= {row["market"] for row in board["rows"]}
+    assert board["summary"]["side_rows"] >= 2
+    assert board["summary"]["total_rows"] >= 2
+    assert board["summary"]["prop_rows"] > 1
+    assert board["official_authority"] is False
+    assert board["prop_engine_state"] == "NO_ENGINE"
+    assert all(row["official_eligible"] is False for row in board["rows"])
+    priced = [row for row in board["rows"] if row["market"] == "moneyline"][0]
+    assert priced["model_p"] == 0.57
+    blocked = [row for row in board["rows"] if row["market"] == "rushing_yards"][0]
+    assert blocked["presentation"] == "BLOCKED"
