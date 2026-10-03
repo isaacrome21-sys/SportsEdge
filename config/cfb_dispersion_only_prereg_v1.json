@@ -173,7 +173,7 @@
   "reference_equivalence": {
     "required": true,
     "rule": "Using the V1 feature family fixture, the capture-driven V2 simulation must reproduce the bound joint_model_v2_challenger home and away path arrays bit-for-bit at identical seed and n_paths.",
-    "bound_test_blob": "9d4ee5f4a5059ca682543f8ea836b762b830a247"
+    "bound_test_blob": "bfb9edc4ba0ab2643a18f24ab3a8368aeca3952b"
   },
   "decision_effect": {
     "v2_positive_result_label": "V2_DEMONSTRATED_DISPERSION_IMPROVEMENT_DIAGNOSTIC_ONLY",
