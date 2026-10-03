@@ -37,19 +37,53 @@ NFL_TEAMS = {
 }
 
 
+# DraftKings shows teams as "<prefix> <Nickname>" (e.g. "PIT Steelers",
+# "LA Rams", "NY Jets"). Prefixes that are not the nflverse abbreviation.
+DK_PREFIXES = {
+    "ny": {"NYG", "NYJ"},
+    "la": {"LAR", "LAC"},
+    "wsh": {"WAS"},
+    "jac": {"JAX"},
+    "lvr": {"LV"},
+}
+
+
 class NflTeamAliasError(ValueError):
     pass
+
+
+def _exact(needle: str) -> list[str]:
+    hits = []
+    for abbr, names in NFL_TEAMS.items():
+        aliases = {abbr.lower(), *(n.lower() for n in names)}
+        if needle in aliases:
+            hits.append(abbr)
+    return hits
+
+
+def _dk_prefixed(needle: str) -> str | None:
+    """Resolve "PIT Steelers" only when prefix and nickname name the same team."""
+    prefix, _, rest = needle.partition(" ")
+    if not rest:
+        return None
+    hits = _exact(rest)
+    if len(hits) != 1 or rest == "la":
+        return None
+    team = hits[0]
+    if prefix == team.lower() or team in DK_PREFIXES.get(prefix, set()):
+        return team
+    return None
 
 
 def resolve_team(text: str) -> str:
     needle = " ".join(str(text).strip().lower().split())
     if not needle:
         raise NflTeamAliasError("NFL_TEAM_BLANK")
-    hits = []
-    for abbr, names in NFL_TEAMS.items():
-        aliases = {abbr.lower(), *(n.lower() for n in names)}
-        if needle in aliases:
-            hits.append(abbr)
+    hits = _exact(needle)
+    if not hits:
+        dk = _dk_prefixed(needle)
+        if dk:
+            hits = [dk]
     if needle == "la":
         raise NflTeamAliasError("NFL_TEAM_AMBIGUOUS:LA")
     if len(hits) != 1:
