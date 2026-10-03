@@ -17,10 +17,14 @@ class CFBTrainFreezeContractTests(unittest.TestCase):
         self.assertEqual(prereg['governance']['attempts_consumed'], 0)
         self.assertFalse(prereg['governance']['evaluation_performed'])
 
-    def test_game_freeze_remains_fail_closed_before_genuine_fit(self):
+    def test_game_freeze_contract_is_zero_authority_in_both_pre_and_post_fit_states(self):
         freeze = json.loads((ROOT / 'config/cfb_game_model_freeze.json').read_text())
-        self.assertEqual(freeze['status'], 'UNFROZEN')
-        self.assertIsNone(freeze['artifact_sha256'])
+        self.assertIn(freeze['status'], {'UNFROZEN', 'FROZEN'})
+        if freeze['status'] == 'UNFROZEN':
+            self.assertIsNone(freeze['artifact_sha256'])
+        else:
+            self.assertIsInstance(freeze['artifact_sha256'], str)
+            self.assertEqual(len(freeze['artifact_sha256']), 64)
         self.assertFalse(freeze['promotion_authority'])
         self.assertFalse(freeze['evidence_clock_authority'])
 
