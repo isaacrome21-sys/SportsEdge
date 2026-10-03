@@ -4,6 +4,7 @@ import pytest
 
 from sportsedge.sports.cfb.sportsdataverse_venue_source import (
     SDVVenueSourceError,
+    apply_pinned_venue_supplements,
     git_blob_sha1,
     parse_pinned_venues,
 )
@@ -57,3 +58,27 @@ def test_unreferenced_missing_coordinates_are_preserved_as_source_gap():
         expected_row_count=2,
     )
     assert set(venues)=={1}
+
+
+def test_explicit_supplement_adds_missing_venue_without_override():
+    base={1:{"venue_id":1,"name":"Pinned","latitude":40.0,"longitude":-88.0,"game_indoor":False}}
+    merged=apply_pinned_venue_supplements(base,[{
+        "venue_id":5960,
+        "name":"Levi's Stadium",
+        "latitude":37.4033889,
+        "longitude":-121.97,
+        "game_indoor":False,
+        "source_identities":["WIKIDATA_Q7419343","LEVIS_STADIUM_OPEN_AIR"],
+    }])
+    assert merged[5960]["game_indoor"] is False
+    assert merged[5960]["latitude"]==pytest.approx(37.4033889)
+    assert merged[1]["name"]=="Pinned"
+
+
+def test_explicit_supplement_cannot_override_pinned_venue():
+    base={5960:{"venue_id":5960,"name":"Pinned","latitude":1.0,"longitude":2.0,"game_indoor":False}}
+    with pytest.raises(SDVVenueSourceError,match="OVERRIDE_FORBIDDEN"):
+        apply_pinned_venue_supplements(base,[{
+            "venue_id":5960,"name":"Override","latitude":37.4,"longitude":-121.97,
+            "game_indoor":False,"source_identities":["TEST"],
+        }])
