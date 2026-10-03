@@ -73,6 +73,43 @@ def _prior_rows(snapshot_path: str | None, extra: str | None) -> list[dict]:
     return rows
 
 
+
+def both_side_board_section(payload: dict) -> str:
+    """List both sides of every prop, side, and total. Missing quotes stay blocked."""
+    board = payload.get("full_board") or {}
+    rows = list(board.get("rows") or [])
+    if not rows:
+        return ""
+    summary = board.get("summary") or payload.get("summary") or {}
+    lines = [
+        "",
+        "All props, sides, and totals",
+        f"both_sides={summary.get('both_sides')} catalog_complete={payload.get('summary', {}).get('catalog_complete')} "
+        f"sides={summary.get('side_rows')} totals={summary.get('total_rows')} props={summary.get('prop_rows')}",
+        "Both sides are listed. A missing quote is BLOCKED, not omitted. Complements are priced only from a supplied opposite quote.",
+        "NOT Model_P / NOT Truth Gate / NOT OFFICIAL.",
+        "",
+        "| lane | market | side | line | odds | model_p | status | reason |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    rows.sort(key=lambda row: (str(row.get("lane") or ""), str(row.get("market") or ""), str(row.get("entity_id") or ""), str(row.get("side") or "")))
+    for row in rows:
+        model_p = row.get("model_p")
+        lines.append(
+            "| {lane} | {market} | {side} | {line} | {odds} | {model_p} | {status} | {reason} |".format(
+                lane=row.get("lane") or "",
+                market=row.get("market") or "",
+                side=row.get("side") or "",
+                line="" if row.get("line") is None else row.get("line"),
+                odds="" if row.get("american_odds") is None else row.get("american_odds"),
+                model_p="" if model_p is None else round(float(model_p), 4),
+                status=row.get("presentation") or "",
+                reason=row.get("reason") or "",
+            )
+        )
+    return "\n".join(lines) + "\n"
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--engine-output", default="artifacts/manual_mlb_snapshot_card.json")
@@ -164,6 +201,7 @@ def main() -> int:
         phase = "CONTEXT_BOUND_CARD" if args.context_dir else "CARD"
 
     text = render_markdown(display_rows, header=header, notes=notes)
+    text += both_side_board_section(payload)
     if args.context_dir:
         text += "\n".join(context_section(bundles, failures=failures)) + "\n"
     (out / "card.md").write_text(text)

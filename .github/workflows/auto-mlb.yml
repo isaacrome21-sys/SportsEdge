@@ -84,6 +84,21 @@ jobs:
           SPORTSEDGE_PROVIDER_TOKEN: ${{ secrets.SPORTSEDGE_PROVIDER_TOKEN }}
           SPORTSEDGE_HISTORY_CACHE_DIR: .cache/sportsedge/mlb-history
         run: python scripts/run_auto_mlb_resilient.py --output artifacts/live_mlb_card.json
+      - name: Require both sides of every MLB prop, side, and total
+        if: always() && hashFiles('artifacts/live_mlb_card.json') != ''
+        run: |
+          python - << 'PY'
+          import json
+          from pathlib import Path
+          card = json.loads(Path("artifacts/live_mlb_card.json").read_text())
+          summary = card.get("summary") or {}
+          board = (card.get("full_board") or {}).get("summary") or {}
+          if summary.get("both_sides") is not True or summary.get("catalog_complete") is not True:
+              raise SystemExit("MLB_AUTO_PROP_SIDE_TOTAL_INCOMPLETE")
+          if int(summary.get("prop_rows") or board.get("prop_rows") or 0) < 40 or int(summary.get("side_rows") or 0) < 8 or int(summary.get("total_rows") or 0) < 12:
+              raise SystemExit("MLB_AUTO_PROP_SIDE_TOTAL_COVERAGE")
+          print(f"MLB_AUTO_BOARD_OK sides={summary.get('side_rows')} totals={summary.get('total_rows')} props={summary.get('prop_rows')}")
+          PY
       - name: Retrieve automated pregame context
         if: always() && github.event_name == 'workflow_dispatch' && hashFiles('artifacts/live_mlb_card.json') != ''
         run: PYTHONPATH=. python scripts/acquire_mlb_card_context.py --engine-output artifacts/live_mlb_card.json --out-dir artifacts/mlb_context

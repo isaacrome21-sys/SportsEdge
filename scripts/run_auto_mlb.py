@@ -20,7 +20,7 @@ CHICAGO_TZ = ZoneInfo("America/Chicago")
 
 def _attach_mlb_board(payload: dict) -> dict:
     """Keep every prop, side, and total visible even when the slate is blocked."""
-    from sportsedge.mlb_full_board import build_mlb_full_board
+    from sportsedge.mlb_full_board import build_mlb_full_board, catalog_complete
 
     rows = payload.get("results") or []
     board = build_mlb_full_board(rows if isinstance(rows, list) else [])
@@ -31,7 +31,7 @@ def _attach_mlb_board(payload: dict) -> dict:
     summary["total_rows"] = board["summary"]["total_rows"]
     summary["prop_rows"] = board["summary"]["prop_rows"]
     summary["priced_complement_rows"] = board["summary"]["priced_complement_rows"]
-    summary["catalog_complete"] = board["summary"]["both_sides"] is True and summary["side_rows"] >= 8 and summary["total_rows"] >= 12 and summary["prop_rows"] >= 40
+    summary["catalog_complete"] = catalog_complete(board["summary"])
     payload["summary"] = summary
     return payload
 
