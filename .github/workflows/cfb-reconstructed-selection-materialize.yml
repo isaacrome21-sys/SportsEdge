@@ -25,7 +25,11 @@ on:
       - 'scripts/acquire_cfb_reconstructed_selection.py'
       - 'scripts/materialize_cfb_reconstructed_selection.py'
       - 'scripts/build_cfb_selected_candidate_artifact.py'
+      - 'scripts/stage_cfb_selected_candidate_freeze.py'
+      - 'scripts/run_cfb_auto.py'
       - 'sportsedge/sports/cfb/reconstructed_selection.py'
+      - 'sportsedge/sports/cfb/selected_candidate_runtime.py'
+      - 'sportsedge/sports/cfb/game_freeze.py'
       - 'sportsedge/sports/cfb/candidate_bakeoff_v2.py'
       - 'sportsedge/sports/cfb/candidate_bakeoff_v3.py'
       - 'sportsedge/sports/cfb/selected_candidate_model.py'
@@ -39,6 +43,10 @@ on:
       - 'tests/test_cfb_reconstructed_selection_acquisition.py'
       - 'tests/test_cfb_reconstructed_selection_materializer.py'
       - 'tests/test_cfb_selected_candidate_artifact_builder.py'
+      - 'tests/test_cfb_selected_candidate_freeze_stage.py'
+      - 'tests/test_cfb_selected_candidate_runtime.py'
+      - 'tests/test_cfb_auto_cli.py'
+      - 'tests/test_cfb_game_freeze.py'
       - '.github/workflows/cfb-reconstructed-selection-materialize.yml'
 
 permissions:
@@ -74,7 +82,11 @@ jobs:
             scripts/run_cfb_candidate_bakeoff.py \
             sportsedge/sports/cfb/selected_candidate_model.py \
             sportsedge/sports/cfb/selected_candidate_artifact.py \
-            scripts/build_cfb_selected_candidate_artifact.py
+            sportsedge/sports/cfb/selected_candidate_runtime.py \
+            sportsedge/sports/cfb/game_freeze.py \
+            scripts/build_cfb_selected_candidate_artifact.py \
+            scripts/stage_cfb_selected_candidate_freeze.py \
+            scripts/run_cfb_auto.py
 
       - name: Run reconstructed-selection contract tests
         run: |
@@ -86,7 +98,10 @@ jobs:
             tests.test_cfb_candidate_bakeoff_v2 \
             tests.test_cfb_candidate_bakeoff_v3 \
             tests.test_cfb_dispersion_only_prereg_v1 \
-            tests.test_cfb_selected_candidate_artifact_builder
+            tests.test_cfb_selected_candidate_artifact_builder \
+            tests.test_cfb_selected_candidate_freeze_stage \
+            tests.test_cfb_selected_candidate_runtime \
+            tests.test_cfb_game_freeze
 
       - name: Prove final-fit policy is frozen before first evaluation
         run: |
