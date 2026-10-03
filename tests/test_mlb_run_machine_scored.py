@@ -93,3 +93,21 @@ def test_intake_stamped_result_is_labeled_not_book_observed():
     assert out.timestamp_source=="INTAKE_STAMPED"
     provided=_machine_result(0,_row(),current=NOW,intake_stamp=NOW)
     assert provided.timestamp_source=="PROVIDED"
+
+
+def test_run_summary_board_keeps_every_side_total_and_prop():
+    from sportsedge.mlb_full_board import SIDE_MARKETS, TOTAL_MARKETS, catalog_markets
+    from sportsedge.mlb_run_machine import _summary
+
+    result = _machine_result(0, _row(market="HITS", entity_id="p", line=1.5, side="OVER"), current=NOW)
+    board = _summary((result,))["full_board"]
+    markets = {row["market"] for row in board["rows"]}
+    assert set(catalog_markets()) <= markets
+    assert SIDE_MARKETS <= markets
+    assert TOTAL_MARKETS <= markets
+    assert board["summary"]["prop_rows"] >= 20
+    assert board["official_authority"] is False
+    assert board["summary"]["official_bets"] == 0
+    missing = [row for row in board["rows"] if row["market"] == "PITCHER_K"][0]
+    assert missing["presentation"] == "BLOCKED"
+    assert missing["reason"] == "NO_QUOTE_OR_ENGINE_ROW"

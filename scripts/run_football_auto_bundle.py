@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from sportsedge.football_full_board import board_from_machine_results
 from sportsedge.football_prop_surface import load_prop_surface, require_executable_prop_surface
 from sportsedge.run_it_card import bettor_card_rows
 
@@ -145,6 +146,7 @@ def main() -> int:
 
     rows = game_rows + prop_rows
     bettor_card = bettor_card_rows(rows)
+    full_board = board_from_machine_results(sport, rows)
     if game.returncode != 0:
         status = "BLOCKED"
     elif prop_executable and prop_exit_code == 0:
@@ -160,6 +162,7 @@ def main() -> int:
             "run_status": status,
             "results": rows,
             "bettor_card": bettor_card,
+            "full_board": full_board,
             "lane_status": {
                 "GAME": game_payload.get("status", "BLOCKED"),
                 "PLAYER_PROPS": prop_status,
@@ -188,6 +191,9 @@ def main() -> int:
         "status": status,
         "sport": sport,
         "bettor_card_count": len(bettor_card),
+        "side_rows": full_board["summary"]["side_rows"],
+        "total_rows": full_board["summary"]["total_rows"],
+        "prop_rows": full_board["summary"]["prop_rows"],
         "output": str(args.output),
     }, sort_keys=True))
     return 2 if status == "BLOCKED" else 0

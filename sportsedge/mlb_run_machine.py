@@ -220,6 +220,7 @@ def _summary(results: Sequence[MLBMachineResult]) -> dict[str, Any]:
             markets.add(row.market)
         if row.model_p is not None:
             model_priced += 1
+    board = build_mlb_full_board([asdict(x) for x in results])
     return {
         "quote_count": len(results),
         "markets_seen": sorted(markets),
@@ -230,7 +231,11 @@ def _summary(results: Sequence[MLBMachineResult]) -> dict[str, Any]:
         "official_bets": statuses.get("OFFICIAL_BET", 0),
         "blocked": statuses.get("BLOCKED", 0),
         "scored_market_dispositions": market_dispositions([asdict(x) for x in results]),
-        "full_board": build_mlb_full_board([asdict(x) for x in results]),
+        "full_board": board,
+        "side_rows": board["summary"]["side_rows"],
+        "total_rows": board["summary"]["total_rows"],
+        "prop_rows": board["summary"]["prop_rows"],
+        "catalog_complete": board["summary"]["side_rows"] >= 4 and board["summary"]["total_rows"] >= 6 and board["summary"]["prop_rows"] >= 20 and board["summary"]["catalog_markets"] >= 38,
     }
 
 

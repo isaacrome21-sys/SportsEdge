@@ -18,6 +18,7 @@ from sportsedge.sports.nfl.team_totals import price_nfl_team_totals
 
 SCHEMA_VERSION = "FOOTBALL_FULL_BOARD_V2"
 DEFAULT_SURFACE = Path("config/football_market_surface.json")
+_PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 
 SIDE_MARKETS = frozenset({
     "moneyline", "spread", "first_half_moneyline", "first_half_spread",
@@ -68,8 +69,18 @@ class FootballFullBoardError(ValueError):
     pass
 
 
+def _resolve_surface(surface_path: str | Path = DEFAULT_SURFACE) -> Path:
+    path = Path(surface_path)
+    if path.is_file():
+        return path
+    rooted = _PACKAGE_ROOT / path
+    if rooted.is_file():
+        return rooted
+    return path
+
+
 def surface_markets(surface_path: str | Path = DEFAULT_SURFACE) -> tuple[dict[str, Any], ...]:
-    payload = json.loads(Path(surface_path).read_text(encoding="utf-8"))
+    payload = json.loads(_resolve_surface(surface_path).read_text(encoding="utf-8"))
     rows = payload.get("markets")
     if not isinstance(rows, list) or len(rows) < 51:
         raise FootballFullBoardError("FOOTBALL_FULL_BOARD_SURFACE_INCOMPLETE")
@@ -227,6 +238,60 @@ def _price_period(
         presentation="LEAN",
         reason="PERIOD_DERIVATIVE_NOT_PROMOTION",
         engine_state=engine_state,
+    )
+
+
+
+def _field(raw: Any, name: str) -> Any:
+    if isinstance(raw, Mapping):
+        return raw.get(name)
+    return getattr(raw, name, None)
+
+
+def board_from_machine_results(
+    sport: str,
+    results: Sequence[Any],
+    *,
+    surface: Sequence[Mapping[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Presentation board for a football run.
+
+    Priced machine rows stay research rows. Families with no quote or engine row
+    stay explicit blockers. This does not price a missing distribution and does
+    not grant Model_P, Truth Gate, or OFFICIAL authority.
+    """
+    specs = tuple(surface) if surface is not None else surface_markets()
+    by_market = {str(spec["market"]): spec for spec in specs}
+    game_rows: list[dict[str, Any]] = []
+    prop_rows: list[dict[str, Any]] = []
+    for raw in results:
+        market = str(_field(raw, "market") or "").strip()
+        key = market.lower()
+        if not key or key in {"game", "player_props"}:
+            continue
+        payload = {
+            "market": key,
+            "game_id": _field(raw, "game_id"),
+            "entity_id": _field(raw, "entity_id") or _field(raw, "player_id"),
+            "side": _field(raw, "side") or _field(raw, "selection"),
+            "line": _field(raw, "line"),
+            "american_odds": _field(raw, "american_odds") or _field(raw, "price_american"),
+            "model_p": _field(raw, "model_p"),
+            "reason": _field(raw, "reason"),
+            "provider_market": _field(raw, "provider_market"),
+        }
+        spec = by_market.get(key)
+        provider = str(payload.get("provider_market") or "")
+        if provider or key in PROVIDER_TO_SURFACE or (spec and spec.get("family") not in {"", "game"}):
+            prop_rows.append({**payload, "provider_market": provider or key})
+            continue
+        if key in SIDE_MARKETS or key in TOTAL_MARKETS or spec is not None:
+            game_rows.append(payload)
+    return build_football_full_board(
+        sport=sport,
+        game_rows=game_rows,
+        prop_rows=prop_rows,
+        surface=specs,
     )
 
 
