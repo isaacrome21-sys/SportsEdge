@@ -64,6 +64,19 @@ class TestCFBReconstructedSelectionPreflight(unittest.TestCase):
         private, _ = evaluate_account({"patronLevel": 1, "remainingCalls": 250}, CONFIG)
         self.assertEqual(private["status"], "VERIFIED_BEFORE_FIRST_REPLAY_CALL")
 
+
+    def test_capacity_bands_redact_exact_remaining_quota(self):
+        _, public = evaluate_account({"patronLevel": 1, "remainingCalls": 223}, CONFIG)
+        self.assertEqual(public["capacity_bands"], {
+            "plan_only": True,
+            "reserve_10": True,
+            "reserve_20": True,
+            "reserve_30": False,
+            "reserve_40": False,
+            "reserve_50": False,
+        })
+        self.assertNotIn("remaining_quota", public)
+
     def test_invalid_weather_transport_fails_closed(self):
         bad = {**CONFIG, "weather_reconstruction": {**CONFIG["weather_reconstruction"], "archive_model": "best_match"}}
         private, public = evaluate_account({"patronLevel": 1, "remainingCalls": 4700}, bad)
