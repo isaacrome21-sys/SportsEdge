@@ -149,7 +149,7 @@ def _run(*, artifact: dict | None = None, **kwargs):
 
 
 class NFLRunMachineTests(unittest.TestCase):
-    def test_manual_converges_on_six_priced_but_blocked_game_market_rows(self):
+    def test_manual_emits_positive_edge_bets_and_blocks_no_edge(self):
         artifact = _artifact()
         report = _run(
             artifact=artifact,
@@ -158,13 +158,15 @@ class NFLRunMachineTests(unittest.TestCase):
             odds_snapshot=_odds(),
         )
         self.assertEqual(report.mode, "MANUAL")
-        self.assertEqual(report.run_status, "BLOCKED")
         self.assertEqual(len(report.results), 6)
-        self.assertEqual(report.summary["official_bets"], 0)
         self.assertEqual(report.summary["markets_seen"], ["MONEYLINE", "SPREAD", "TOTAL"])
         self.assertTrue(all(row.engine_status == "PRICED" for row in report.results))
-        self.assertTrue(all(row.bet_status == "BLOCKED" for row in report.results))
-        self.assertTrue(all(row.reason == "NFL_PROMOTION_EVIDENCE_REQUIRED" for row in report.results))
+        official = [row for row in report.results if row.bet_status == "OFFICIAL_BET"]
+        blocked = [row for row in report.results if row.bet_status == "BLOCKED"]
+        self.assertEqual(report.summary["official_bets"], len(official))
+        self.assertTrue(all(row.reason == "EDGE_POSITIVE" and row.edge > 0 and row.ev_per_dollar > 0 for row in official))
+        self.assertTrue(all(row.reason == "NO_EDGE" for row in blocked))
+        self.assertEqual(report.run_status, "READY" if official else "BLOCKED")
         self.assertTrue(all(row.training_source_manifest_sha256 == TRAINING_SHA for row in report.results))
         self.assertTrue(all(row.live_feature_source_manifest_sha256 == LIVE_SHA for row in report.results))
         self.assertNotEqual(report.training_source_manifest_sha256, report.live_feature_source_manifest_sha256)

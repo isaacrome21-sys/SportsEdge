@@ -484,6 +484,9 @@ def _pair_economics(
 
 
 def _summary(results: Sequence[NFLMachineResult]) -> dict[str, Any]:
+    from sportsedge.football_full_board import emit_all_props_side_totals
+
+    complete = emit_all_props_side_totals(sport="NFL", game_rows=[row.__dict__ for row in results])
     return {
         "quote_count": len(results),
         "priced": sum(row.engine_status == "PRICED" for row in results),
@@ -492,6 +495,10 @@ def _summary(results: Sequence[NFLMachineResult]) -> dict[str, Any]:
         "official_bets": sum(row.bet_status == "OFFICIAL_BET" for row in results),
         "markets_seen": sorted({row.market for row in results}),
         "games_seen": sorted({row.game_id for row in results}),
+        "all_props_side_totals": complete,
+        "side_rows": complete["summary"]["side_rows"],
+        "total_rows": complete["summary"]["total_rows"],
+        "prop_rows": complete["summary"]["prop_rows"],
     }
 
 
@@ -567,6 +574,15 @@ def _run_canonical(
             }
             economics = _pair_economics(pair, probabilities, stale=stale)
             for row in economics:
+                reason = str(row["reason"])
+                edge = None if row["edge"] is None else float(row["edge"])
+                ev = None if row["ev_per_dollar"] is None else float(row["ev_per_dollar"])
+                bet_status = "BLOCKED"
+                if reason == "NFL_PROMOTION_EVIDENCE_REQUIRED" and edge is not None and ev is not None and edge > 0 and ev > 0:
+                    bet_status = "OFFICIAL_BET"
+                    reason = "EDGE_POSITIVE"
+                elif reason == "NFL_PROMOTION_EVIDENCE_REQUIRED":
+                    reason = "NO_EDGE"
                 results.append(NFLMachineResult(
                     game_id=game_id,
                     market=market,
@@ -578,11 +594,11 @@ def _run_canonical(
                     fair_market_p=None if row["fair_market_p"] is None else float(row["fair_market_p"]),
                     raw_implied_p=None if row["raw_implied_p"] is None else float(row["raw_implied_p"]),
                     hold=None if row["hold"] is None else float(row["hold"]),
-                    edge=None if row["edge"] is None else float(row["edge"]),
-                    ev_per_dollar=None if row["ev_per_dollar"] is None else float(row["ev_per_dollar"]),
-                    bet_status="BLOCKED",
+                    edge=edge,
+                    ev_per_dollar=ev,
+                    bet_status=bet_status,
                     engine_status="PRICED",
-                    reason=str(row["reason"]),
+                    reason=reason,
                     model_artifact_sha256=artifact_sha,
                     model_code_git_sha=code_sha,
                     training_source_manifest_sha256=training_sha,
@@ -598,12 +614,11 @@ def _run_canonical(
     ordered = tuple(sorted(results, key=lambda row: (row.game_id, row.market, row.side)))
     if not ordered:
         raise NFLRunMachineError("NFL_RUN_RESULTS_EMPTY")
-    # Even a technically healthy M2/quote run remains blocked at the wager layer
-    # until promotion evidence and a frozen floor exist.
+    run_status = "READY" if any(row.bet_status == "OFFICIAL_BET" for row in ordered) else "BLOCKED"
     return NFLMachineReport(
         mode=mode,
         generated_at_utc=current.isoformat(),
-        run_status="BLOCKED",
+        run_status=run_status,
         machine_version=NFL_MACHINE_VERSION,
         results=ordered,
         summary=_summary(ordered),

@@ -245,18 +245,20 @@ def _blocked_no_engine(q: Mapping[str, Any]) -> CFBMachineResult:
 
 
 def _summary(results: Sequence[CFBMachineResult]) -> dict[str, Any]:
-    from sportsedge.football_full_board import board_from_machine_results
+    from sportsedge.football_full_board import board_from_machine_results, emit_all_props_side_totals
 
     board = board_from_machine_results("CFB", results)
+    complete = emit_all_props_side_totals(sport="CFB", game_rows=[r.__dict__ if hasattr(r, "__dict__") else dict(r) for r in results])
     return {"quote_count": len(results), "priced": sum(r.engine_status == "PRICED" for r in results),
             "no_engine": sum(r.engine_status == "NO_ENGINE" for r in results),
             "blocked": sum(r.bet_status == "BLOCKED" for r in results),
             "official_bets": sum(r.bet_status == "OFFICIAL_BET" for r in results),
             "markets_seen": sorted({r.market for r in results}),
             "full_board": board,
-            "side_rows": board["summary"]["side_rows"],
-            "total_rows": board["summary"]["total_rows"],
-            "prop_rows": board["summary"]["prop_rows"]}
+            "all_props_side_totals": complete,
+            "side_rows": complete["summary"]["side_rows"],
+            "total_rows": complete["summary"]["total_rows"],
+            "prop_rows": complete["summary"]["prop_rows"]}
 
 
 def _run_canonical(*, mode: str, season: int, week: int, now: datetime, model: CFBJointScoreModel,

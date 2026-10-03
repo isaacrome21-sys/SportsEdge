@@ -101,6 +101,15 @@ def surface_markets(surface_path: str | Path = DEFAULT_SURFACE) -> tuple[dict[st
     return tuple(out)
 
 
+def _number(value):
+    if isinstance(value, bool) or value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def family_for(market: str, family: str = "") -> str:
     key = str(market or "").strip()
     if key in SIDE_MARKETS or family == "game" and key in SIDE_MARKETS:
@@ -433,6 +442,128 @@ def build_football_full_board(
             "prop_rows": sum(1 for row in emitted if row["lane"] == "PROP"),
             "situational_rows": sum(1 for row in emitted if row["lane"] == "SITUATIONAL"),
             "priced_rows": sum(1 for row in emitted if row["model_p"] is not None),
+            "official_bets": 0,
+        },
+        "all_props_side_totals": emit_all_props_side_totals(
+            sport=resolved, game_rows=game_rows, prop_rows=prop_rows,
+        ),
+        "rows": emitted,
+    }
+
+
+def emit_all_props_side_totals(
+    *,
+    sport: str,
+    game_rows: Sequence[Mapping[str, Any]] | None = None,
+    prop_rows: Sequence[Mapping[str, Any]] | None = None,
+    surface_path: str | Path = DEFAULT_SURFACE,
+) -> dict[str, Any]:
+    """Emit both sides of every football side, total, and prop on the board.
+
+    Quoted rows keep their probability. Missing complements stay explicit.
+    Surface markets with no quote stay blockers. No official authority.
+    """
+    resolved = str(sport or "").strip().upper()
+    if resolved not in {"NFL", "CFB"}:
+        raise FootballFullBoardError(f"FOOTBALL_SPORT_UNSUPPORTED:{sport}")
+    specs = surface_markets(surface_path)
+    by_market = {str(spec["market"]): spec for spec in specs}
+    pairs = {
+        "moneyline": ("HOME", "AWAY"),
+        "spread": ("HOME", "AWAY"),
+        "first_half_moneyline": ("HOME", "AWAY"),
+        "first_half_spread": ("HOME", "AWAY"),
+        "second_half_moneyline": ("HOME", "AWAY"),
+        "second_half_spread": ("HOME", "AWAY"),
+        "quarter_moneyline": ("HOME", "AWAY"),
+        "quarter_spread": ("HOME", "AWAY"),
+        "alternate_spread": ("HOME", "AWAY"),
+        "total": ("OVER", "UNDER"),
+        "team_total": ("OVER", "UNDER"),
+        "first_half_total": ("OVER", "UNDER"),
+        "second_half_total": ("OVER", "UNDER"),
+        "quarter_total": ("OVER", "UNDER"),
+        "alternate_total": ("OVER", "UNDER"),
+    }
+    grouped: dict[tuple[str, str, str, str], dict[str, Mapping[str, Any]]] = {}
+    order: list[tuple[str, str, str, str]] = []
+    for raw in list(game_rows or []) + list(prop_rows or []):
+        if not isinstance(raw, Mapping):
+            raise FootballFullBoardError("FOOTBALL_ALL_SIDES_ROW_INVALID")
+        market = str(raw.get("market") or raw.get("provider_market") or "").strip()
+        if not market or market.upper() in {"GAME", "PLAYER_PROPS", "UNKNOWN"}:
+            continue
+        market = PROVIDER_TO_SURFACE.get(market, market)
+        key = (
+            market,
+            str(raw.get("game_id") or ""),
+            str(raw.get("entity_id") or raw.get("player") or raw.get("team_side") or ""),
+            "" if raw.get("line") is None else str(raw.get("line")),
+        )
+        side = str(raw.get("side") or raw.get("quoted_side") or "").strip().upper()
+        if not side:
+            side = "HOME" if market in {"moneyline", "spread", "first_half_moneyline", "first_half_spread", "second_half_moneyline", "second_half_spread", "quarter_moneyline", "quarter_spread", "alternate_spread"} else "OVER"
+        if key not in grouped:
+            grouped[key] = {}
+            order.append(key)
+        grouped[key][side] = raw
+    emitted: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for key in order:
+        market = key[0]
+        seen.add(market)
+        present = grouped[key]
+        left, right = pairs.get(market, ("OVER", "UNDER"))
+        spec = by_market.get(market)
+        lane = family_for(market, str((spec or {}).get("family") or ""))
+        for side in (left, right):
+            raw = present.get(side)
+            if raw is None:
+                donor = next(iter(present.values()))
+                model_p = _number(donor.get("model_p"))
+                emitted.append(_row(
+                    sport=resolved, lane=lane, market=market,
+                    raw={**dict(donor), "side": side, "model_p": None if model_p is None else max(0.0, 1.0 - model_p), "american_odds": donor.get("opposite_odds")},
+                    presentation="COMPLEMENT" if donor.get("opposite_odds") is not None else "NO_QUOTE",
+                    reason="COMPLEMENT_SIDE_NOT_QUOTED",
+                    engine_state=_engine_state(resolved, spec),
+                ))
+                continue
+            model_p = _number(raw.get("model_p"))
+            emitted.append(_row(
+                sport=resolved, lane=lane, market=market,
+                raw={**dict(raw), "side": side, "model_p": model_p},
+                presentation="LEAN" if model_p is not None else "NO_MODEL",
+                reason=str(raw.get("reason") or "RESEARCH_ROW"),
+                engine_state=_engine_state(resolved, spec),
+            ))
+    for spec in specs:
+        market = str(spec["market"])
+        if market in seen:
+            continue
+        left, right = pairs.get(market, ("OVER", "UNDER"))
+        for side in (left, right):
+            emitted.append(_row(
+                sport=resolved, lane=family_for(market, str(spec.get("family") or "")), market=market,
+                raw={"family": spec.get("family"), "side": side},
+                presentation="BLOCKED",
+                reason="NO_ENGINE" if _engine_state(resolved, spec) == "NO_ENGINE" else "NO_QUOTE_OR_ENGINE_ROW",
+                engine_state=_engine_state(resolved, spec),
+            ))
+    return {
+        "schema_version": "FOOTBALL_ALL_PROPS_SIDE_TOTALS_V1",
+        "sport": resolved,
+        "authority": "PRESENTATION_ONLY",
+        "prop_engine_state": "NO_ENGINE",
+        "model_p_authority": False,
+        "truth_gate_authority": False,
+        "official_authority": False,
+        "summary": {
+            "surface_markets": len(specs),
+            "quoted_groups": len(order),
+            "side_rows": sum(1 for row in emitted if row["lane"] == "SIDE"),
+            "total_rows": sum(1 for row in emitted if row["lane"] == "TOTAL"),
+            "prop_rows": sum(1 for row in emitted if row["lane"] == "PROP"),
             "official_bets": 0,
         },
         "rows": emitted,
