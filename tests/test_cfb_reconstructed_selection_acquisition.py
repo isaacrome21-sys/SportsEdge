@@ -30,17 +30,18 @@ class TestCFBReconstructedSelectionAcquisition(unittest.TestCase):
             (ROOT / "config/cfb_cfbd_reconstructed_selection_budget_v1.json").read_text()
         )
 
-    def test_frozen_plan_has_exact_200_unique_cfbd_requests(self):
+    def test_frozen_plan_matches_quota_safe_config_exactly(self):
         plan = build_request_plan(self.config)
-        self.assertEqual(len(plan), 200)
-        self.assertEqual(len({row["query_sha256"] for row in plan}), 200)
+        expected = self.config["planned_new_calls_upper_bound"]
+        self.assertEqual(len(plan), expected["total"])
+        self.assertEqual(len({row["query_sha256"] for row in plan}), expected["total"])
         counts = {}
         for row in plan:
             counts[row["endpoint"]] = counts.get(row["endpoint"], 0) + 1
-        self.assertEqual(counts["/games"], 12)
-        self.assertEqual(counts["/teams/fbs"], 11)
-        self.assertEqual(counts["/venues"], 1)
-        self.assertEqual(counts["/stats/season/advanced"], 176)
+        self.assertEqual(counts["/games"], expected["games"])
+        self.assertEqual(counts["/teams/fbs"], expected["fbs_membership"])
+        self.assertEqual(counts["/venues"], expected["venues"])
+        self.assertEqual(counts["/stats/season/advanced"], expected["advanced_metrics"])
         self.assertNotIn("/games/weather", counts)
 
     def test_current_end_week_surface_is_single_source_of_truth(self):
@@ -49,10 +50,10 @@ class TestCFBReconstructedSelectionAcquisition(unittest.TestCase):
         mutated["max_regular_week_planning_bound"] = 10
         self.assertEqual(list(_current_end_weeks(mutated)), list(range(1, 10)))
 
-    def test_advanced_plan_includes_2014_prior_and_stops_at_contract_week_16(self):
+    def test_advanced_plan_includes_frozen_prior_and_stops_at_contract_week_16(self):
         plan = build_request_plan(self.config)
         advanced = [row for row in plan if row["endpoint"] == "/stats/season/advanced"]
-        self.assertTrue(any(row["params"].get("year") == 2014 and "endWeek" not in row["params"] for row in advanced))
+        self.assertTrue(any(row["params"].get("year") == self.config["prior_fallback_season"] and "endWeek" not in row["params"] for row in advanced))
         self.assertTrue(any(row["params"].get("year") == 2025 and row["params"].get("endWeek") == 15 for row in advanced))
         self.assertFalse(any(int(row["params"].get("endWeek", 0)) > 15 for row in advanced))
 
@@ -63,10 +64,13 @@ class TestCFBReconstructedSelectionAcquisition(unittest.TestCase):
                     "schema_version": "CFB_CFBD_PROVIDER_PREFLIGHT_V1",
                     "status": "BLOCKED_PROVIDER_PREFLIGHT",
                 },
-                200,
+                self.config["planned_new_calls_upper_bound"]["total"],
             )
 
     def test_preflight_requires_transport_zero_authority_and_sufficient_quota(self):
+        planned = self.config["planned_new_calls_upper_bound"]["total"]
+        reserve = self.config["retry_reserve_calls"]
+        quota = planned + reserve
         base = {
             "schema_version": "CFB_CFBD_PROVIDER_PREFLIGHT_V1",
             "status": "VERIFIED_BEFORE_FIRST_REPLAY_CALL",
@@ -74,18 +78,18 @@ class TestCFBReconstructedSelectionAcquisition(unittest.TestCase):
             "cfbd_weather_required_for_selection": False,
             "weather_source_contract": WEATHER_CONTRACT,
             "historical_replay_calls_performed": 0,
-            "planned_new_calls": 200,
-            "retry_reserve_calls": 50,
-            "remaining_quota": 250,
+            "planned_new_calls": planned,
+            "retry_reserve_calls": reserve,
+            "remaining_quota": quota,
             "authority": {"attempt_consumed": False, "model_p": False},
         }
-        self.assertEqual(_validate_private_preflight(base, 200)["remaining_quota"], 250)
+        self.assertEqual(_validate_private_preflight(base, planned)["remaining_quota"], quota)
         with self.assertRaisesRegex(CFBAcquisitionError, "QUOTA_INSUFFICIENT"):
-            _validate_private_preflight({**base, "remaining_quota": 249}, 200)
+            _validate_private_preflight({**base, "remaining_quota": quota - 1}, planned)
         with self.assertRaisesRegex(CFBAcquisitionError, "WEATHER_TRANSPORT_NOT_READY"):
-            _validate_private_preflight({**base, "weather_transport_ready": False}, 200)
+            _validate_private_preflight({**base, "weather_transport_ready": False}, planned)
         with self.assertRaisesRegex(CFBAcquisitionError, "AUTHORITY_LEAK"):
-            _validate_private_preflight({**base, "authority": {"attempt_consumed": True}}, 200)
+            _validate_private_preflight({**base, "authority": {"attempt_consumed": True}}, planned)
 
     def test_verified_cache_reuse_does_not_open_network(self):
         item = build_request_plan(self.config)[0]
@@ -164,7 +168,7 @@ class TestCFBReconstructedSelectionAcquisition(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaisesRegex(
                 CFBAcquisitionError,
-                r"HTTP_400:year=2014:endWeek=None",
+                rf"HTTP_400:year={self.config['prior_fallback_season']}:endWeek=None",
             ):
                 _fetch_one(
                     item,
