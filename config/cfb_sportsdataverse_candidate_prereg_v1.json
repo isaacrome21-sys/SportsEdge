@@ -95,8 +95,8 @@
     "official_authority": false
   },
   "hash_binding": {
-    "code_manifest_sha256": "496e1cfb440349986ec9f67ef71f99cd8061ac695c2fc9888aba06a33387c4c9",
-    "config_bundle_sha256": "02cd18a71b5bf527c4c2d07a78b966444a4aecc0f06859ccf6cc87104625ee01"
+    "code_manifest_sha256": "a8e79216577981e2c815cc6c5ab29636b4029e68657509c19d5fe4b1b8003e81",
+    "config_bundle_sha256": "e5d494dbace98549f7864b9e829f6715f3c12e04b3fc979af8a973a5b81d85b9"
   },
   "candidate_selection_policy": {
     "metric": "JOINT_HOME_AWAY_SCORE_RMSE",

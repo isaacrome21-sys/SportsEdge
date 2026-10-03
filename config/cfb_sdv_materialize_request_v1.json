@@ -1,16 +1,16 @@
 {
   "schema": "CFB_SDV_MATERIALIZE_REQUEST_V1",
   "mode": "ZERO_ATTEMPT_PUBLIC_TRAINING_MATERIALIZATION",
-  "requested_after_main_sha": "9545510bc33d474c8e753aac7a0defc417cc8b3b",
+  "requested_after_main_sha": "14fd0611db2c5929abaf8beccc8bd3654aac8a75",
   "expected_hash_binding": {
-    "code_manifest_sha256": "496e1cfb440349986ec9f67ef71f99cd8061ac695c2fc9888aba06a33387c4c9",
-    "config_bundle_sha256": "02cd18a71b5bf527c4c2d07a78b966444a4aecc0f06859ccf6cc87104625ee01"
+    "code_manifest_sha256": "a8e79216577981e2c815cc6c5ab29636b4029e68657509c19d5fe4b1b8003e81",
+    "config_bundle_sha256": "e5d494dbace98549f7864b9e829f6715f3c12e04b3fc979af8a973a5b81d85b9"
   },
   "consume_candidate_attempts": false,
   "run_candidate_evaluation": false,
   "model_p_created": false,
   "promotion_authority": false,
   "official_authority": false,
-  "request_revision": 5,
-  "retry_reason": "BLANK_NUMERIC_SOURCE_CELL_FIX"
+  "request_revision": 7,
+  "retry_reason": "ADVANCED_JOIN_COVERAGE_POLICY_AND_PROVENANCE_PR_CI_REFRESH"
 }
