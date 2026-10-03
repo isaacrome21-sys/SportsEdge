@@ -16,6 +16,7 @@ from .generic_card_pipeline import run_generic_card
 from .live_slate import LiveGame, TeamLineup
 from .manual_quote import ManualQuote, validate_manual_quote
 from .mlb_all_market_features import EITHER_PITCHER_MARKETS, MLBAllMarketHistorySource
+from .mlb_generic_features import MLBGenericFeatureError
 from .mlb_history_cache import MLBHistoryCachedOpener
 from .mlb_pitcher_subject import resolve_pitcher_subject
 from .mlb_source import GameSnapshot, fetch_schedule, parse_game_start
@@ -247,16 +248,21 @@ def run_canonical_manual_mlb(rows: Iterable[Mapping[str, Any]], *, opener=urlope
     target_date = datetime.fromisoformat(str(g.official_date)).date() if g.official_date else captured.date()
     quotes, features, resolutions, seen = [], [], [], set()
     blocked_subject_rows: list[dict[str, Any]] = []
+    feature_errors: dict[tuple[str, str], str] = {}
+
+    def _block_row(row: ManualQuote, market: str, entity: str, reason: str) -> None:
+        # Both sides of the quote stay on the card as BLOCKED (never priced, never dropped).
+        for side, price, line in ((row.side, row.price, row.line), (row.paired_side, row.paired_price, -row.line if row.market_type in {"RUN_LINE","FIRST_FIVE_RUN_LINE"} else row.line)):
+            blocked_subject_rows.append({"game_id":str(g.game_pk),"market":market,"entity_id":entity,"line":line,"side":_side(row.market_type, side),
+                "american_odds":price,"model_p":None,"bet_status":"BLOCKED","reason":reason,"book_key":row.book,"sportsbook":row.book,
+                "quote_retrieved_at":row.observed_at.isoformat()})
+        resolutions.append({"market_type":row.market_type,"engine_market":market,"subject_id":row.subject_id,"subject_name":row.subject_name,
+            "observed_at":row.observed_at.isoformat(),"resolution_status":"BLOCKED","reason":reason})
+
     for row, (subject_id, subject_team_id), subject_error in zip(parsed, resolved_subjects, subject_errors):
         market = _engine_market(row)
         if subject_error:
-            entity = str(row.subject_id or row.subject_name or "UNRESOLVED")
-            for side, price, line in ((row.side, row.price, row.line), (row.paired_side, row.paired_price, -row.line if row.market_type in {"RUN_LINE","FIRST_FIVE_RUN_LINE"} else row.line)):
-                blocked_subject_rows.append({"game_id":str(g.game_pk),"market":market,"entity_id":entity,"line":line,"side":_side(row.market_type, side),
-                    "american_odds":price,"model_p":None,"bet_status":"BLOCKED","reason":subject_error,"book_key":row.book,"sportsbook":row.book,
-                    "quote_retrieved_at":row.observed_at.isoformat()})
-            resolutions.append({"market_type":row.market_type,"engine_market":market,"subject_id":row.subject_id,"subject_name":row.subject_name,
-                "observed_at":row.observed_at.isoformat(),"resolution_status":"BLOCKED","reason":subject_error})
+            _block_row(row, market, str(row.subject_id or row.subject_name or "UNRESOLVED"), subject_error)
             continue
         is_player_market = market in PLAYER_MARKETS
         if is_player_market and not subject_id:
@@ -274,13 +280,21 @@ def run_canonical_manual_mlb(rows: Iterable[Mapping[str, Any]], *, opener=urlope
             feature_team_id = None
         else:
             entity_id = subject_id or str(g.game_pk)
-        quotes.extend(_pair(row, market, entity_id, resolved_game_id=str(g.game_pk)))
         key = (market, entity_id)
         if key not in seen:
             seen.add(key)
-            features.append(hist.feature_row(game_pk=g.game_pk,market=market,entity_id=entity_id,target_date=target_date,
-                away_team_id=int(g.away_id),home_team_id=int(g.home_id),player_id=int(subject_id) if subject_id else None,
-                team_id=feature_team_id,away_pitcher_id=g.away_probable_pitcher_id,home_pitcher_id=g.home_probable_pitcher_id))
+            try:
+                features.append(hist.feature_row(game_pk=g.game_pk,market=market,entity_id=entity_id,target_date=target_date,
+                    away_team_id=int(g.away_id),home_team_id=int(g.home_id),player_id=int(subject_id) if subject_id else None,
+                    team_id=feature_team_id,away_pitcher_id=g.away_probable_pitcher_id,home_pitcher_id=g.home_probable_pitcher_id))
+            except MLBGenericFeatureError as exc:
+                # Isolate the failure to this market: one thin-history prop (e.g. an
+                # opener with 1 start) must not block the rest of the game's board.
+                feature_errors[key] = f"FEATURE_UNAVAILABLE:{exc}"
+        if key in feature_errors:
+            _block_row(row, market, entity_id, feature_errors[key])
+            continue
+        quotes.extend(_pair(row, market, entity_id, resolved_game_id=str(g.game_pk)))
         resolutions.append({"market_type":row.market_type,"engine_market":market,"subject_id":subject_id,"subject_name":row.subject_name,
             "team_side":row.team_side,"entity_id":entity_id,"observed_at":row.observed_at.isoformat()})
     results = run_generic_card(games=[live],feature_rows=features,quotes=quotes,ingestion_now=captured,finalization_now=captured,
