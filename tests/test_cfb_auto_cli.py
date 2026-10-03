@@ -1,4 +1,5 @@
 import json
+from hashlib import sha256
 import os
 from pathlib import Path
 import subprocess
@@ -7,7 +8,7 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-from scripts.run_cfb_auto import _credentials, _manual_board, discover_cfb_week
+from scripts.run_cfb_auto import _credentials, _manual_board, _model as load_auto_model, discover_cfb_week
 from sportsedge.sports.cfb.joint_model import CFB_FEATURE_CONTRACT, CFB_JOINT_MODEL_ID, CFBJointScoreModel
 from sportsedge.sports.cfb.model_artifact import (
     CFBModelArtifactError,
@@ -15,6 +16,14 @@ from sportsedge.sports.cfb.model_artifact import (
     load_cfb_model_artifact,
 )
 from sportsedge.sports.cfb.source import CFBGame
+from sportsedge.sports.cfb.candidate_model_v2 import candidate_feature_names
+from sportsedge.sports.cfb.candidate_registry_v2 import EQUAL
+from sportsedge.sports.cfb.selected_candidate_artifact import build_cfb_selected_candidate_artifact
+from sportsedge.sports.cfb.selected_candidate_model import (
+    CFB_SELECTED_CANDIDATE_FEATURE_CONTRACT,
+    CFB_SELECTED_CANDIDATE_MODEL_ID,
+    CFBSelectedCandidateScoreModel,
+)
 
 
 class CFBModelArtifactAndAutoCLITests(unittest.TestCase):
@@ -58,6 +67,47 @@ class CFBModelArtifactAndAutoCLITests(unittest.TestCase):
         )
         with self.assertRaisesRegex(CFBModelArtifactError, "CFB_MODEL_CODE_SHA256_MISMATCH"):
             load_cfb_model_artifact(artifact, expected_model_code_sha256="c" * 64)
+
+    def test_auto_loader_accepts_frozen_selected_candidate_schema(self):
+        names = candidate_feature_names(EQUAL)
+        selected = CFBSelectedCandidateScoreModel(
+            model_id=CFB_SELECTED_CANDIDATE_MODEL_ID,
+            feature_contract=CFB_SELECTED_CANDIDATE_FEATURE_CONTRACT,
+            family=EQUAL,
+            feature_names=names,
+            feature_means=tuple(0.0 for _ in names),
+            feature_scales=tuple(1.0 for _ in names),
+            home_coefficients=(24.0, *tuple(0.0 for _ in names)),
+            away_coefficients=(21.0, *tuple(0.0 for _ in names)),
+            residual_pairs=((1.0, -1.0), (-2.0, 2.0)),
+            overtime_deltas=((7, 0), (0, 7)),
+            train_seasons=(2024, 2025),
+            ridge_alpha=10.0,
+        )
+        artifact = build_cfb_selected_candidate_artifact(
+            selected,
+            model_code_sha256="a" * 64,
+            training_source_sha256="b" * 64,
+            selection_result_sha256="c" * 64,
+        )
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "selected.json"
+            raw = (json.dumps(artifact, indent=2, sort_keys=True) + "\n").encode()
+            path.write_bytes(raw)
+            registry = {
+                "artifact_sha256": artifact["artifact_sha256"],
+                "artifact_file_sha256": sha256(raw).hexdigest(),
+                "model_code_sha256": "a" * 64,
+                "training_source_sha256": "b" * 64,
+                "selection_result_sha256": "c" * 64,
+                "registry_sha256": "d" * 64,
+            }
+            with patch("scripts.run_cfb_auto.load_cfb_game_freeze", return_value=registry), \
+                 patch("scripts.run_cfb_auto.cfb_selected_candidate_code_surface_sha256", return_value="a" * 64):
+                loaded, payload, returned_registry = load_auto_model(path, repo_root=Path(tmp))
+            self.assertIsInstance(loaded, CFBSelectedCandidateScoreModel)
+            self.assertEqual(payload["candidate_family"], EQUAL)
+            self.assertEqual(returned_registry["selection_result_sha256"], "c" * 64)
 
     def test_auto_week_discovery_uses_earliest_future_fbs_kickoff(self):
         def games(*, season, week, cfbd_api_key):
