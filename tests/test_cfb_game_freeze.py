@@ -11,6 +11,10 @@ from sportsedge.sports.cfb.game_freeze import (
     load_cfb_game_freeze,
     verify_frozen_cfb_game_artifact,
 )
+from sportsedge.sports.cfb.selected_candidate_artifact import (
+    cfb_selected_candidate_code_surface_sha256,
+    load_cfb_selected_candidate_artifact,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -30,6 +34,21 @@ class CFBGameFreezeTests(unittest.TestCase):
         else:
             row = load_cfb_game_freeze(ROOT / "config/cfb_game_model_freeze.json")
             self.assertEqual(row["status"], "FROZEN")
+            artifact_path = ROOT / row["artifact_path"]
+            raw = artifact_path.read_bytes()
+            artifact = json.loads(raw.decode("utf-8"))
+            verify_frozen_cfb_game_artifact(artifact, artifact_bytes=raw, registry=row)
+            if row.get("model_family") == "CFB_SELECTED_CANDIDATE_MODEL_V1":
+                self.assertEqual(
+                    cfb_selected_candidate_code_surface_sha256(ROOT),
+                    row["model_code_sha256"],
+                )
+                load_cfb_selected_candidate_artifact(
+                    artifact,
+                    expected_model_code_sha256=row["model_code_sha256"],
+                    expected_training_source_sha256=row["training_source_sha256"],
+                    expected_selection_result_sha256=row["selection_result_sha256"],
+                )
 
 
     def test_frozen_registry_requires_all_identity_hashes(self):
