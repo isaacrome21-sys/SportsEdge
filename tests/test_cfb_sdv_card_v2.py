@@ -17,7 +17,7 @@ class BlockedCardTest(unittest.TestCase):
             {"market": "MONEYLINE", "side": "AWAY", "american_odds": -140},
             {"market": "SPREAD", "side": "HOME", "line": 1.5, "american_odds": -110},
             {"market": "SPREAD", "side": "AWAY", "line": -1.5, "american_odds": -110},
-        ])
+        ], validated={"MONEYLINE", "SPREAD", "TOTAL"})
         bets = [r for r in rows if r["bet_status"] == "BET"]
         self.assertEqual(len(bets), 1)
         self.assertTrue(any(r["reason"] == "SAME_GAME_GUARD" for r in rows))
@@ -67,6 +67,19 @@ class BlockedCardTest(unittest.TestCase):
             {"market": "MONEYLINE", "side": "AWAY", "american_odds": -250}])
         self.assertEqual(rows[0]["reason"], "EDGE_TOO_LARGE_SUSPECT")
         self.assertEqual(rows[0]["bet_status"], "PASS")
+
+    def test_unvalidated_edges_are_leans(self):
+        quotes = [{"market": "MONEYLINE", "side": "HOME", "american_odds": 120},
+                  {"market": "MONEYLINE", "side": "AWAY", "american_odds": -140},
+                  {"market": "SPREAD", "side": "HOME", "line": 1.5, "american_odds": -110},
+                  {"market": "SPREAD", "side": "AWAY", "line": -1.5, "american_odds": -110}]
+        rows = card.price_game("g", 25.0, 24.0, quotes)
+        self.assertFalse(any(r["bet_status"] == "BET" for r in rows))
+        leans = [r for r in rows if r["bet_status"] == "LEAN"]
+        self.assertEqual(len(leans), 1)
+        self.assertEqual(leans[0]["reason"], "MODEL_EDGE_NOT_VALIDATED_VS_CLOSE")
+        self.assertEqual(card.VALIDATED_MARKETS, frozenset())
+
 
 if __name__ == "__main__":
     unittest.main()

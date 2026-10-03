@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 """Price a manual DK CFB board with the bakeoff-selected PRIOR_CURRENT_BLEND fit.
 
-Works like the MLB card: a quote is a BET when its edge against the
-de-vigged price clears the 2% floor; one team-outcome bet per game
+Works like the MLB card: a quote clears when its edge against the
+de-vigged price clears the 2% floor; one team-outcome pick per game
 (best of moneyline/spread), totals judged separately. No sportsbook API.
+
+A cleared pick is a BET only if its market is in VALIDATED_MARKETS (beat
+52.4% out of sample vs closing lines). The SDV efficiency model failed that
+test (#1471: 48.6-49.6% ATS vs close, ~51-52.7% O/U), so today every cleared
+pick is a LEAN -- shown for tracking, not a bet.
 
 Board JSON: a list of
   {"game_id": "<CFBD id>",
@@ -38,6 +43,8 @@ COMBINED_SIGMA = TEAM_SCORE_RMSE * sqrt(2.0)
 EDGE_FLOOR = 0.02  # same floor as the MLB card (#1230)
 # An edge this large vs a liquid CFB market is far more likely model error than value.
 EDGE_CAP = 0.12
+# Markets where this model beat 52.4% out of sample vs closing lines. None yet (#1471, #1476).
+VALIDATED_MARKETS: frozenset = frozenset()
 
 
 def phi(x: float) -> float:
@@ -71,7 +78,8 @@ def pair_key(market: str, side: str, line):
     return (market, float(line))
 
 
-def price_game(game_id, home: float, away: float, quotes: list) -> list:
+def price_game(game_id, home: float, away: float, quotes: list, validated=None) -> list:
+    validated = VALIDATED_MARKETS if validated is None else frozenset(validated)
     norm = []
     for q in quotes:
         market = str(q.get("market") or "MONEYLINE").upper()
@@ -109,6 +117,10 @@ def price_game(game_id, home: float, away: float, quotes: list) -> list:
         bets.sort(key=lambda r: -r["edge"])
         for r in bets[1:]:
             r["bet_status"], r["reason"] = "PASS", "SAME_GAME_GUARD"
+    # Never call an unvalidated model edge a bet.
+    for r in out:
+        if r["bet_status"] == "BET" and r["market"] not in validated:
+            r["bet_status"], r["reason"] = "LEAN", "MODEL_EDGE_NOT_VALIDATED_VS_CLOSE"
     return out
 
 
@@ -366,11 +378,22 @@ def main() -> int:
         "combined_sigma": round(COMBINED_SIGMA, 4),
         "edge_floor": EDGE_FLOOR,
         "sportsbook_api_used": False,
+        "validated_markets": sorted(VALIDATED_MARKETS),
         "bets": sum(r.get("bet_status") == "BET" for r in results),
+        "leans": sum(r.get("bet_status") == "LEAN" for r in results),
         "results": sorted(results, key=lambda r: -(r.get("edge") or -9)),
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    # Visible in the phone comment (lines containing CFB_SDV_ are echoed).
+    leans = [r for r in payload["results"] if r.get("bet_status") == "LEAN"]
+    if not VALIDATED_MARKETS:
+        print("CFB_SDV_NO_VALIDATED_EDGE model failed out-of-sample test vs closing lines (#1471); "
+              f"{len(leans)} leans below are tracking only, not bets")
+    for r in leans:
+        ln = "" if r["line"] in (None, "") else (f" {float(r['line']):+g}" if r["market"] == "SPREAD" else f" {float(r['line']):g}")
+        print(f"CFB_SDV_LEAN {r['matchup']}: {r['market'].title()} {r['side'].title()}{ln} {r['american_odds']:+.0f} "
+              f"model {r['model_p']*100:.1f}% vs mkt {r['market_p']*100:.1f}% ({r['edge']*100:+.1f}%)")
     for r in payload["results"]:
         if "edge" in r:
             print(f"{r['bet_status']:4s} {r['matchup']:45s} {r['market']:9s} {r['side']:5s} {str(r['line'] or ''):6s} "
