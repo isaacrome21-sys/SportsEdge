@@ -51,6 +51,16 @@ class BlockedCardTest(unittest.TestCase):
         self.assertEqual(card.resolve_game(row, games).game_id, "1")
         self.assertEqual(card.resolve_game({"away": "UMass", "home": "Ohio"}, games).game_id, "2")
 
+    def test_neutralize_and_sanity(self):
+        snaps = {"A": {"prior": {"explosive_rate": 1.3, "net_field_position": 0.0},
+                       "current": {"explosive_rate": 1.2, "net_field_position": 2.0}}}
+        card.neutralize_mismatched_metrics(snaps)
+        self.assertEqual(snaps["A"]["current"]["explosive_rate"], 0.0755)
+        self.assertEqual(snaps["A"]["prior"]["net_field_position"], -69.355)
+        self.assertFalse(card.projection_sane(160.0, 150.0, []))
+        self.assertFalse(card.projection_sane(30.0, 20.0, [{"market": "TOTAL", "line": 80}]))
+        self.assertTrue(card.projection_sane(30.0, 24.0, [{"market": "TOTAL", "line": 52.5}]))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -169,6 +169,38 @@ def resolve_game(row: dict, games: list):
     return hit[0]
 
 
+# Live CFBD fields that are NOT on the training scale (training = SportsDataverse):
+#   explosive_rate: training = share of explosive plays (~0.075); live = CFBD
+#     'explosiveness' (avg EPA of successful plays, ~1.2) -> ~100 SD off.
+#   net_field_position: training = -avg drive field position (~-69); live =
+#     offense minus defense average start (~0) -> ~14 SD off.
+# Until the live source is rebuilt, pin both to their training means (zero effect).
+TRAINING_MEANS = {"explosive_rate": 0.0755, "net_field_position": -69.355}
+
+
+def neutralize_mismatched_metrics(snaps) -> None:
+    for team_snap in snaps.values():
+        for side in ("prior", "current"):
+            m = team_snap.get(side)
+            if isinstance(m, dict):
+                m.update(TRAINING_MEANS)
+
+
+# Sanity band: a projection outside this means the inputs are broken -> PASS.
+MAX_TEAM_POINTS = 75.0
+MAX_TOTAL_GAP = 25.0
+
+
+def projection_sane(home: float, away: float, quotes: list) -> bool:
+    if not (0.0 <= home <= MAX_TEAM_POINTS and 0.0 <= away <= MAX_TEAM_POINTS):
+        return False
+    for q in quotes:
+        if str(q.get("market", "")).upper() == "TOTAL" and q.get("line") is not None:
+            if abs((home + away) - float(q["line"])) > MAX_TOTAL_GAP:
+                return False
+    return True
+
+
 def build_rows(board: list, season: int, week: int, asof):
     from sportsedge.sports.cfb.candidate_live_source import (
         attach_candidate_snapshots_to_game_row,
@@ -218,6 +250,7 @@ def build_rows(board: list, season: int, week: int, asof):
     neutral = {"game_indoor": False, "wind_speed": 6.89, "temperature": 64.6, "fallback": "TRAINING_MEAN"}
     games = attach_weather(raw_games, {g.game_id: weather.get(g.game_id) or neutral for g in raw_games})
     snaps = fetch_cfbd_candidate_metric_snapshots(season=season, week=week, cfbd_api_key=key, now=now)
+    neutralize_mismatched_metrics(snaps)
     rows = []
     unresolved = []
     for row in board:
@@ -270,6 +303,9 @@ def main() -> int:
             home, away = score_selected_game(model, blind)
         except Exception as exc:
             print("SKIPPED CFB_SDV_SCORE_FAILED", row.get("away_team"), "@", row.get("home_team"), exc)
+            continue
+        if not projection_sane(home, away, row.get("quotes") or []):
+            print(f"SKIPPED CFB_SDV_PROJECTION_INSANE {row.get('away_team')} @ {row.get('home_team')} {away:.1f}-{home:.1f}")
             continue
         priced = price_game(row["game_id"], home, away, row.get("quotes") or [])
         for r in priced:
