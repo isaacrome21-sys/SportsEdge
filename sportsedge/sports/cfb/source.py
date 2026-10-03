@@ -13,7 +13,9 @@ import json
 from math import isfinite
 from typing import Any, Callable, Iterable, Mapping
 from urllib.parse import urlencode
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
+import time
 
 CFBD_BASE = "https://api.collegefootballdata.com"
 ODDS_BASE = "https://api.the-odds-api.com/v4/sports/americanfootball_ncaaf/odds"
@@ -117,13 +119,47 @@ def _norm_name(value: Any) -> str:
     return " ".join(str(value or "").strip().lower().split())
 
 
-def _json_get(url: str, *, headers: Mapping[str, str] | None, opener: Callable = urlopen) -> Any:
+def _json_get(
+    url: str,
+    *,
+    headers: Mapping[str, str] | None,
+    opener: Callable = urlopen,
+    max_attempts: int = 4,
+    sleeper: Callable[[float], None] = time.sleep,
+) -> Any:
+    """Fetch JSON with bounded retry for provider throttles/transient 5xx failures.
+
+    Retries never change the requested resource or PIT boundary. 429 honors
+    Retry-After when present, otherwise uses a short exponential delay.
+    """
     req = Request(url, headers=dict(headers or {}))
-    try:
-        with opener(req, timeout=20) as response:
-            raw = response.read()
-    except Exception as exc:
-        raise CFBSourceError(f"SOURCE_FETCH_FAILED:{type(exc).__name__}:{exc}") from exc
+    attempts = max(1, int(max_attempts))
+    for attempt in range(attempts):
+        try:
+            with opener(req, timeout=20) as response:
+                raw = response.read()
+            break
+        except HTTPError as exc:
+            retryable = exc.code == 429 or 500 <= int(exc.code) < 600
+            if retryable and attempt + 1 < attempts:
+                retry_after = None
+                try:
+                    retry_after = exc.headers.get("Retry-After") if exc.headers else None
+                except Exception:
+                    retry_after = None
+                try:
+                    delay = float(retry_after) if retry_after is not None else float(2 ** attempt)
+                except (TypeError, ValueError):
+                    delay = float(2 ** attempt)
+                sleeper(max(0.0, min(delay, 8.0)))
+                continue
+            raise CFBSourceError(
+                f"SOURCE_FETCH_FAILED:{type(exc).__name__}:{exc}"
+            ) from exc
+        except Exception as exc:
+            raise CFBSourceError(f"SOURCE_FETCH_FAILED:{type(exc).__name__}:{exc}") from exc
+    else:
+        raise CFBSourceError("SOURCE_FETCH_FAILED:RETRY_EXHAUSTED")
     try:
         return json.loads(raw.decode("utf-8"))
     except Exception as exc:
