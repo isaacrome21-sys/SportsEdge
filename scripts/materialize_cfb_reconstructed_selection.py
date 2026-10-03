@@ -47,10 +47,13 @@ def _sha_file(path: Path) -> str:
 
 def _code_manifest_sha256() -> str:
     paths = [
+        ROOT / "scripts/preflight_cfb_reconstructed_selection.py",
+        ROOT / "scripts/acquire_cfb_reconstructed_selection.py",
+        ROOT / "scripts/materialize_cfb_reconstructed_selection.py",
         ROOT / "sportsedge/sports/cfb/source.py",
+        ROOT / "sportsedge/sports/cfb/venue_coordinates.py",
         ROOT / "sportsedge/sports/cfb/reconstructed_selection.py",
         ROOT / "sportsedge/sports/cfb/candidate_history.py",
-        ROOT / "scripts/materialize_cfb_reconstructed_selection.py",
         ROOT / "config/cfb_cfbd_reconstructed_selection_budget_v1.json",
     ]
     manifest = {str(path.relative_to(ROOT)): _sha_file(path) for path in paths}
