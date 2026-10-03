@@ -12,7 +12,7 @@
     },
     "bakeoff_v3_config": {
       "path": "config/cfb_candidate_bakeoff_evaluator_v3.json",
-      "git_blob": "da78ba32ad3c48dd61e4dc418c39950b69343e8b",
+      "git_blob": "fb703e2dd683cd87759ad62327bf599e8ec0eb8e",
       "required_schema": "CFB_CANDIDATE_BAKEOFF_EVALUATOR_V3",
       "required_status": "FROZEN_BEFORE_FIRST_EVALUATION"
     },
@@ -26,11 +26,11 @@
     },
     "dispersion_evaluator": {
       "path": "sportsedge/sports/cfb/dispersion_only_evaluator.py",
-      "git_blob": "b1420f28b6534e21b66c474b57c563a04ff4c673"
+      "git_blob": "442b8526ae821c50a19bd0baaad7be56064087b1"
     },
     "dispersion_evaluator_tests": {
       "path": "tests/test_cfb_dispersion_only_evaluator.py",
-      "git_blob": "9d4ee5f4a5059ca682543f8ea836b762b830a247"
+      "git_blob": "bfb9edc4ba0ab2643a18f24ab3a8368aeca3952b"
     },
     "direct_dispersion_dependency_blobs": {
       "sportsedge/sports/cfb/candidate_bakeoff.py": "064208efaae1b96a5e466066404c71e78191f6c3",
@@ -64,7 +64,12 @@
     "provider_metric_materialization_mode": "UNKNOWN_PROVIDER_IMPLEMENTATION",
     "provider_vintage_warning": "PPA, explosiveness, and other model-derived CFBD advanced metrics do not expose a bindable model version in the /stats/season/advanced contract. Replayed historical values may therefore reflect a later provider model vintage. This contamination is shared context, not proof that relative candidate ranking is unbiased.",
     "historical_pit_created": false,
-    "promotion_evidence": false
+    "promotion_evidence": false,
+    "quota_frozen_parent_window": [
+      2021,
+      2025
+    ],
+    "quota_window_selection_basis": "PROVIDER_CAPACITY_ONLY_BEFORE_FIRST_EVALUATION"
   },
   "capture_contract": {
     "required_schema": "CFB_CANDIDATE_BAKEOFF_PRIVATE_CAPTURE_V1",
@@ -76,7 +81,10 @@
     "parent_selection_rows_sha256_must_match": true,
     "new_mean_fit_allowed": false,
     "post_bakeoff_mean_reproduction_allowed": false,
-    "required_outer_folds": [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025],
+    "required_outer_folds": [
+      2024,
+      2025
+    ],
     "per_outer_fold_required": [
       "frozen_alpha",
       "outer_predictions for every parent materialized row in that outer season",
@@ -84,16 +92,19 @@
     ]
   },
   "folds": {
-    "parent_outer_validation_seasons": [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025],
-    "first_scored_dispersion_season": 2019,
+    "parent_outer_validation_seasons": [
+      2024,
+      2025
+    ],
+    "first_scored_dispersion_season": 2025,
     "last_scored_dispersion_season": 2025,
     "early_season_roles": {
-      "2015-2017": "PARENT_TRAINING_ONLY; no dispersion role",
-      "2018": "RESIDUAL_SEED_ONLY; not scored"
+      "2024": "RESIDUAL_SEED_ONLY; not scored",
+      "2021-2023": "PARENT_TRAINING_ONLY; no dispersion role"
     },
     "v1_residual_rule": "For scored season s, V1 residuals are the paired in-sample training residuals captured from the exact winner-family fold-s fit on rows with season < s at fold s's frozen alpha.",
-    "v2_residual_rule": "For scored season s, V2 residuals for every season r from 2018 through s-1 are exactly realized scores minus the captured parent outer-fold winner predictions for r. No additional mean fits and no alpha selection occur.",
-    "scored_row_identity": "Scored rows are exactly the parent materialized rows with season 2019-2025, in ascending (season, week, game_id) order.",
+    "v2_residual_rule": "For scored season 2025, V2 residuals are exactly realized scores minus the captured parent 2024 outer-fold winner predictions. No additional mean fits and no alpha selection occur.",
+    "scored_row_identity": "Scored rows are exactly the parent materialized rows with season 2025, in ascending (season, week, game_id) order.",
     "additional_exclusions_allowed": false,
     "unscorable_required_row_rule": "FAIL_WHOLE_RUN_CLOSED"
   },
