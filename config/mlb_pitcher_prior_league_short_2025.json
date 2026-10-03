@@ -1,0 +1,53 @@
+{
+  "schema": "MLB_PITCHER_PRIOR_POOL_V1",
+  "pool": "league_short",
+  "season": 2025,
+  "definition": "regular-season starts in `season` made when the pitcher had <5 prior starts in seasons season-1..season (production window)",
+  "starts": 547,
+  "counts": {
+    "outs": {
+      "1": 6,
+      "2": 6,
+      "3": 50,
+      "4": 8,
+      "5": 14,
+      "6": 21,
+      "7": 7,
+      "8": 13,
+      "9": 30,
+      "10": 9,
+      "11": 15,
+      "12": 58,
+      "13": 27,
+      "14": 25,
+      "15": 112,
+      "16": 34,
+      "17": 14,
+      "18": 68,
+      "19": 4,
+      "20": 8,
+      "21": 16,
+      "24": 1,
+      "27": 1
+    },
+    "strikeouts": {
+      "0": 26,
+      "1": 74,
+      "2": 81,
+      "3": 88,
+      "4": 75,
+      "5": 59,
+      "6": 61,
+      "7": 37,
+      "8": 30,
+      "9": 8,
+      "10": 5,
+      "11": 1,
+      "12": 2
+    }
+  },
+  "source": "MLB StatsAPI people/{id}/stats gameLog group=pitching gameType=R",
+  "built_by": "scripts/research_mlb_pitcher_prior_fallback.py --emit-pool",
+  "validation": "#1495 (pre-registration sha256 8a80a715b39ac656c8795fd6b3d5e11e5c8f340768d93a523ebe5f6aca144839)",
+  "emitted_on": "#1497 (issuecomment-5974285441)"
+}
