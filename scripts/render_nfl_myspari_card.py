@@ -32,6 +32,13 @@ def main() -> int:
                 lines.append(f"- {row.get('raw') or row.get('market')}: {reason}")
                 continue
             pick = row.get("pick")
+            lean = row.get("lean")
+            if not pick and lean:
+                lines.append(
+                    f"- LEAN (no proven edge, not a bet): {lean['selection']} {lean.get('line', '')} @ {lean['price_american']}"
+                    f"  model EV {lean.get('ev_per_dollar', 0):+.3f}"
+                )
+                continue
             if not pick:
                 lines.append(f"- {row.get('market')}: no pick")
                 continue
@@ -44,6 +51,8 @@ def main() -> int:
     if not any(g.get("picks") for g in engine.get("games") or []):
         if engine.get("empty_reason"):
             lines.append(str(engine["empty_reason"]))
+    if any(g.get("leans") for g in engine.get("games") or []):
+        lines.append("Leans: Attempt 9 totals hit 49.7% out of sample vs closing lines (breakeven 52.4%). Track only.")
     lines.append(FOOTER)
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
