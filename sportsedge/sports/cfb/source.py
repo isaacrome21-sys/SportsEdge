@@ -124,13 +124,15 @@ def _json_get(
     *,
     headers: Mapping[str, str] | None,
     opener: Callable = urlopen,
-    max_attempts: int = 4,
+    max_attempts: int = 6,
     sleeper: Callable[[float], None] = time.sleep,
+    clock: Callable[[], float] = time.time,
 ) -> Any:
     """Fetch JSON with bounded retry for provider throttles/transient 5xx failures.
 
-    Retries never change the requested resource or PIT boundary. 429 honors
-    Retry-After when present, otherwise uses a short exponential delay.
+    Retries never change the requested resource or PIT boundary. For 429 responses
+    prefer provider reset headers; otherwise wait long enough to cross a typical
+    minute-rate window. Nonretryable HTTP errors still fail closed immediately.
     """
     req = Request(url, headers=dict(headers or {}))
     attempts = max(1, int(max_attempts))
@@ -140,18 +142,31 @@ def _json_get(
                 raw = response.read()
             break
         except HTTPError as exc:
-            retryable = exc.code == 429 or 500 <= int(exc.code) < 600
+            code = int(exc.code)
+            retryable = code == 429 or 500 <= code < 600
             if retryable and attempt + 1 < attempts:
-                retry_after = None
-                try:
-                    retry_after = exc.headers.get("Retry-After") if exc.headers else None
-                except Exception:
-                    retry_after = None
-                try:
-                    delay = float(retry_after) if retry_after is not None else float(2 ** attempt)
-                except (TypeError, ValueError):
-                    delay = float(2 ** attempt)
-                sleeper(max(0.0, min(delay, 8.0)))
+                hdrs = exc.headers or {}
+                delay: float | None = None
+                if code == 429:
+                    retry_after = hdrs.get("Retry-After")
+                    if retry_after is not None:
+                        try:
+                            delay = float(retry_after)
+                        except (TypeError, ValueError):
+                            delay = None
+                    if delay is None:
+                        reset_at = hdrs.get("X-RateLimit-Reset")
+                        if reset_at is not None:
+                            try:
+                                delay = max(0.0, float(reset_at) - float(clock()) + 1.0)
+                            except (TypeError, ValueError):
+                                delay = None
+                    if delay is None:
+                        delay = float(min(60, 15 * (2 ** attempt)))
+                    delay = min(max(0.0, delay), 120.0)
+                else:
+                    delay = float(min(8, 2 ** attempt))
+                sleeper(delay)
                 continue
             raise CFBSourceError(
                 f"SOURCE_FETCH_FAILED:{type(exc).__name__}:{exc}"
