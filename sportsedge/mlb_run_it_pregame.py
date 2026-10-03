@@ -19,7 +19,7 @@ from .mlb_statcast_preview_source import acquire_statcast_preview
 from .mlb_umpire_source import acquire_umpire_context
 from .mlb_weather_roof_source import acquire_weather_roof_context
 from .source_lineage import canonical_json_sha256
-from .statcast_daily_source import StatcastSnapshot
+from .statcast_daily_source import StatcastSnapshot, StatcastSourceError
 
 LIVE_FEED_BASE = "https://statsapi.mlb.com/api/v1.1/game"
 SCHEMA_VERSION = "mlb_run_it_pregame_v4"
@@ -135,6 +135,7 @@ def acquire_mlb_run_it_pregame(
     nws_hourly_payload: Mapping[str, Any] | None = None,
     dk_quotes: Sequence[Mapping[str, Any]] | None = None,
     bullpen_context: Mapping[str, Any] | None = None,
+    statcast_unavailable_reason: str | None = None,
 ) -> dict[str, Any]:
     if as_of.tzinfo is None or as_of.utcoffset() is None:
         raise ValueError("as_of must be timezone-aware")
@@ -189,15 +190,30 @@ def acquire_mlb_run_it_pregame(
         history_rows=umpire_history_rows,
         prior_config=umpire_prior_config,
     )
-    statcast = acquire_statcast_preview(
-        game_pk=int(game_pk),
-        as_of=as_of,
-        live_payload=live,
-        official_date=day,
-        opener=opener,
-        snapshot=statcast_snapshot,
-        capture_html=bool(include_statcast_html),
-    )
+    try:
+        if statcast_unavailable_reason:
+            # The slate-wide fetch already failed; don't re-download per game.
+            raise StatcastSourceError(statcast_unavailable_reason)
+        statcast = acquire_statcast_preview(
+            game_pk=int(game_pk),
+            as_of=as_of,
+            live_payload=live,
+            official_date=day,
+            opener=opener,
+            snapshot=statcast_snapshot,
+            capture_html=bool(include_statcast_html),
+        )
+    except StatcastSourceError as exc:
+        # A Savant timeout degrades only the Statcast lane; every other lane
+        # (starters, lineups, umpire, weather, park, bullpen) is still reported.
+        statcast = {
+            "game_pk": int(game_pk),
+            "as_of_utc": as_of.astimezone(timezone.utc).isoformat(),
+            "source": "BASEBALL_SAVANT_STATCAST",
+            "status": "SOURCE_FAILED",
+            "error": str(exc),
+            "model_p_eligible": False,
+        }
     park_venue = acquire_park_venue_context(
         game_pk=int(game_pk),
         as_of=as_of,
