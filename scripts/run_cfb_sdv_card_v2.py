@@ -327,6 +327,13 @@ def main() -> int:
     from sportsedge.sports.cfb.sdv_selected_fit import load_selected_sdv_fit, score_selected_game
 
     board = json.loads(args.board_json)
+    if isinstance(board, dict) and board.get("backtest"):
+        # Phone-issue hook: run the leave-one-season-out backtest vs CFBD closing lines.
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("cfb_bt", ROOT / "scripts" / "backtest_cfb_sdv_vs_lines.py")
+        bt = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(bt)
+        return bt.main([])
     if not isinstance(board, list) or not board:
         raise SystemExit("CFB_SDV_BOARD_ARRAY_REQUIRED")
     model = load_selected_sdv_fit(args.fit)
