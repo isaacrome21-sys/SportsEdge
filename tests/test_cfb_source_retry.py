@@ -48,6 +48,54 @@ class CFBSourceRetryTests(unittest.TestCase):
         self.assertTrue(all(url == "https://example.test/cfb" for url, _ in calls))
         self.assertEqual(delays, [0.0, 0.0])
 
+    def test_429_honors_rate_limit_reset_epoch(self):
+        calls = []
+        delays = []
+
+        def opener(req, timeout=20):
+            calls.append(req.full_url)
+            if len(calls) == 1:
+                raise HTTPError(
+                    req.full_url,
+                    429,
+                    "Too Many Requests",
+                    {"X-RateLimit-Reset": "1060"},
+                    None,
+                )
+            return _Response(b'{"ok": true}')
+
+        payload = _json_get(
+            "https://example.test/cfb",
+            headers={},
+            opener=opener,
+            sleeper=delays.append,
+            clock=lambda: 1000.0,
+        )
+
+        self.assertEqual(payload, {"ok": True})
+        self.assertEqual(delays, [61.0])
+
+    def test_429_without_headers_uses_long_bounded_backoff(self):
+        calls = []
+        delays = []
+
+        def opener(req, timeout=20):
+            calls.append(req.full_url)
+            if len(calls) < 4:
+                raise HTTPError(req.full_url, 429, "Too Many Requests", {}, None)
+            return _Response(b'{"ok": true}')
+
+        payload = _json_get(
+            "https://example.test/cfb",
+            headers={},
+            opener=opener,
+            max_attempts=4,
+            sleeper=delays.append,
+        )
+
+        self.assertEqual(payload, {"ok": True})
+        self.assertEqual(delays, [15.0, 30.0, 60.0])
+
     def test_nonretryable_http_error_still_fails_closed(self):
         delays = []
 
