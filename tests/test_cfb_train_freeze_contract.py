@@ -28,6 +28,16 @@ class CFBTrainFreezeContractTests(unittest.TestCase):
         self.assertFalse(freeze['promotion_authority'])
         self.assertFalse(freeze['evidence_clock_authority'])
 
+    def test_reconstructed_winner_stages_only_a_separate_freeze_pr(self):
+        text = (ROOT / '.github/workflows/cfb-reconstructed-selection-materialize.yml').read_text()
+        self.assertIn('scripts/stage_cfb_selected_candidate_freeze.py', text)
+        self.assertIn('gh pr create', text)
+        self.assertIn('pull-requests: write', text)
+        self.assertIn('cfb/selected-candidate-freeze-${GITHUB_RUN_ID}', text)
+        self.assertNotIn('git push origin main', text)
+        self.assertNotIn('git push origin HEAD:main', text)
+        self.assertIn('NO_CANDIDATE_DEMONSTRATED_SIGNAL_AT_THIS_SAMPLE', text)
+
     def test_train_freeze_workflow_never_pushes_main(self):
         text = (ROOT / '.github/workflows/cfb-train-freeze.yml').read_text()
         self.assertNotIn('git push origin main', text)
