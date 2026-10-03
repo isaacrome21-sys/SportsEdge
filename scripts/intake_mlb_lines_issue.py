@@ -19,6 +19,44 @@ from sportsedge.mlb_source import fetch_schedule  # noqa: E402
 
 CHICAGO = ZoneInfo("America/Chicago")
 
+# Phone-issue research hooks (same pattern as the CFB {"backtest": ...} board):
+# a fenced body whose first line is "RESEARCH <name>" runs a pre-registered
+# validation and posts its report on the issue. No lines are read and no card is run.
+RESEARCH_DIRECTIVES = {
+    "pitcher_prior_fallback": "scripts/research_mlb_pitcher_prior_fallback.py",
+}
+
+
+def research_directive(body: str) -> str | None:
+    first = (body.strip().splitlines() or [""])[0].strip()
+    parts = first.split()
+    if len(parts) == 2 and parts[0].upper() == "RESEARCH":
+        name = parts[1].lower()
+        if name not in RESEARCH_DIRECTIVES:
+            raise IssueLinesError(f"MLB_UNKNOWN_RESEARCH_DIRECTIVE {name}; known: {', '.join(sorted(RESEARCH_DIRECTIVES))}")
+        return name
+    return None
+
+
+def run_research(name: str, issue: str) -> int:
+    import subprocess
+    import traceback
+
+    root = Path(__file__).resolve().parents[1]
+    out_dir = Path("artifacts") / f"mlb_research_{name}"
+    try:
+        proc = subprocess.run([sys.executable, str(root / RESEARCH_DIRECTIVES[name]), "--out-dir", str(out_dir)],
+                              capture_output=True, text=True, timeout=11 * 60)
+        if proc.returncode != 0:
+            raise RuntimeError((proc.stderr or proc.stdout)[-3000:])
+        subprocess.run(["gh", "issue", "comment", str(issue), "--body-file", str(out_dir / "report.md")], check=True)
+        msg = f"RESEARCH_DIRECTIVE_DONE {name}: report posted above. This was a research run, not a lines board."
+    except Exception:  # surface the failure on the issue instead of a silent red job
+        msg = f"RESEARCH_DIRECTIVE_FAILED {name}:\n{traceback.format_exc()[-3000:]}"
+    Path("intake_error.txt").write_text(msg, encoding="utf-8")
+    print(msg, file=sys.stderr)
+    return 2
+
 
 def main() -> int:
     ap = argparse.ArgumentParser()
@@ -36,6 +74,13 @@ def main() -> int:
         Path("intake_error.txt").write_text(str(exc), encoding="utf-8")
         print(f"INTAKE_FAILED: {exc}", file=sys.stderr)
         return 2
+    try:
+        directive = research_directive(body)
+    except IssueLinesError as exc:
+        Path("intake_error.txt").write_text(str(exc), encoding="utf-8")
+        return 2
+    if directive:
+        return run_research(directive, args.issue)
     try:
         nxt = (observed.date() + timedelta(days=1)).isoformat()
         schedule = list(fetch_schedule(slate)) + list(fetch_schedule(nxt))
