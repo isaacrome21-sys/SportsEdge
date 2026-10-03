@@ -184,5 +184,35 @@ class TestCFBReconstructedSelectionMaterializer(unittest.TestCase):
         self.assertEqual(len(manifest["source_manifest_sha256"]), 64)
 
 
+    def test_bundle_manifest_requires_every_frozen_selection_season(self):
+        rows = [
+            {
+                "season": season,
+                "game_id": str(season),
+                "provenance_class": RECONSTRUCTED_PROVENANCE,
+                "historical_pit_created": False,
+            }
+            for season in (2021, 2022, 2024, 2025)
+        ]
+        policy = {
+            "feature_semantics": "AS_OF_WEEK_MATCHED_V1",
+            "feature_value_source_contract": "CFBD_STATS_SEASON_ADVANCED_ENDWEEK_V1",
+            "provider_metric_model_vintage": "UNKNOWN_CURRENT_PROVIDER_VINTAGE",
+            "provider_metric_materialization_mode": "UNKNOWN_PROVIDER_IMPLEMENTATION",
+        }
+        with self.assertRaisesRegex(
+            CFBReconstructedSelectionError,
+            "CFB_RECONSTRUCTED_SELECTION_WINDOW_INCOMPLETE",
+        ):
+            build_selection_bundle_manifest(
+                rows=rows,
+                source_manifest={"responses": [{"response_sha256": "a" * 64}]},
+                policy=policy,
+                predictive_code_manifest_sha256="b" * 64,
+                acquisition_code_manifest_sha256="c" * 64,
+                weather_source_contract="CFBD_VENUES_OPEN_METEO_ERA5_RECONSTRUCTED_CURRENT_PROVIDER_VINTAGE",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
