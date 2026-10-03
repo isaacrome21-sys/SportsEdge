@@ -4,6 +4,7 @@ import pytest
 
 from sportsedge.sports.cfb.sportsdataverse_venue_source import (
     SDVVenueSourceError,
+    apply_pinned_venue_aliases,
     apply_pinned_venue_supplements,
     git_blob_sha1,
     parse_pinned_venues,
@@ -81,4 +82,38 @@ def test_explicit_supplement_cannot_override_pinned_venue():
         apply_pinned_venue_supplements(base,[{
             "venue_id":5960,"name":"Override","latitude":37.4,"longitude":-121.97,
             "game_indoor":False,"source_identities":["TEST"],
+        }])
+
+
+def test_explicit_alias_reuses_pinned_physical_venue_coordinates():
+    base={218:{
+        "venue_id":218,"name":"FIU Stadium","latitude":25.7525014,
+        "longitude":-80.3778912,"game_indoor":False,
+    }}
+    merged=apply_pinned_venue_aliases(base,[{
+        "venue_id":2031,
+        "source_venue_id":218,
+        "expected_source_name":"FIU Stadium",
+        "name":"Pitbull Stadium",
+    }])
+    assert merged[2031]["venue_id"]==2031
+    assert merged[2031]["name"]=="Pitbull Stadium"
+    assert merged[2031]["latitude"]==pytest.approx(25.7525014)
+    assert merged[2031]["longitude"]==pytest.approx(-80.3778912)
+    assert merged[2031]["game_indoor"] is False
+    assert merged[2031]["alias_source_venue_id"]==218
+    assert merged[218]["name"]=="FIU Stadium"
+
+
+def test_explicit_alias_fails_closed_on_source_name_mismatch():
+    base={218:{
+        "venue_id":218,"name":"FIU Stadium","latitude":25.7525014,
+        "longitude":-80.3778912,"game_indoor":False,
+    }}
+    with pytest.raises(SDVVenueSourceError,match="SOURCE_NAME_MISMATCH"):
+        apply_pinned_venue_aliases(base,[{
+            "venue_id":2031,
+            "source_venue_id":218,
+            "expected_source_name":"Different Stadium",
+            "name":"Pitbull Stadium",
         }])
