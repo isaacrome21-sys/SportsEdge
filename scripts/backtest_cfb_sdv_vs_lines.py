@@ -75,7 +75,14 @@ def fetch_lines(seasons, key: str) -> dict:
                 total = float(pick["overUnder"]) if pick.get("overUnder") is not None else None
             except (TypeError, ValueError):
                 continue
-            out[str(g.get("id"))] = {"spread": spread, "total": total, "provider": pick.get("provider")}
+            def _f(v):
+                try:
+                    return float(v) if v is not None else None
+                except (TypeError, ValueError):
+                    return None
+            out[str(g.get("id"))] = {"spread": spread, "total": total, "provider": pick.get("provider"),
+                                     "spread_open": _f(pick.get("spreadOpen")),
+                                     "total_open": _f(pick.get("overUnderOpen"))}
     return out
 
 
@@ -194,6 +201,60 @@ def fmt_blend(bl: dict) -> str:
     return "\n".join(lines)
 
 
+def opening_view(lines: dict) -> dict:
+    """Re-key lines so 'spread'/'total' are the OPENING numbers (bet-at-open view)."""
+    out = {}
+    for gid, l in lines.items():
+        if l.get("spread_open") is None:
+            continue
+        out[gid] = {"spread": l["spread_open"], "total": l.get("total_open")}
+    return out
+
+
+def line_move_toward_model(preds: dict, lines: dict) -> dict:
+    """How often the line moved from open to close in the model's direction (CLV proxy)."""
+    res = {"spread": {b: [0, 0, 0] for b in BUCKETS}, "total": {b: [0, 0, 0] for b in BUCKETS}}
+    for gid, p in preds.items():
+        l = lines.get(gid)
+        if not l or l.get("spread_open") is None:
+            continue
+        d = (p["home_pred"] - p["away_pred"]) + l["spread_open"]       # model margin - open market margin
+        mv = (-l["spread"]) - (-l["spread_open"])                       # market margin move open->close
+        for b in BUCKETS:
+            if abs(d) >= b and d != 0:
+                res["spread"][b][0 if mv * d > 0 else 1 if mv * d < 0 else 2] += 1
+        if l.get("total_open") is not None and l.get("total") is not None:
+            dt = (p["home_pred"] + p["away_pred"]) - l["total_open"]
+            mt = l["total"] - l["total_open"]
+            for b in BUCKETS:
+                if abs(dt) >= b and dt != 0:
+                    res["total"][b][0 if mt * dt > 0 else 1 if mt * dt < 0 else 2] += 1
+    return res
+
+
+def fmt_open(ev: dict, bl: dict, mv: dict) -> str:
+    def pct(w, l):
+        return f"{100.0 * w / (w + l):.1f}%" if w + l else "n/a"
+    out = ["=== VS OPENING LINES (bet at open) ===",
+           f"games w/ opener: {ev['games_joined']} | margin MAE model {ev['margin_mae_model']:.2f} vs open {ev['margin_mae_market']:.2f}"
+           f" | total MAE model {ev['total_mae_model']:.2f} vs open {ev['total_mae_market']:.2f}",
+           "ATS vs OPEN by model-open gap (breakeven 52.4%):"]
+    for b, (w, l, p) in ev["ats"].items():
+        out.append(f"  >= {b:>4}: {w}-{l}-{p} {pct(w, l)}")
+    out.append("O/U vs OPEN by gap:")
+    for b, (w, l, p) in ev["totals"].items():
+        out.append(f"  >= {b:>4}: {w}-{l}-{p} {pct(w, l)}")
+    out.append("Line moved TOWARD model open->close (spread / total), toward-away-flat:")
+    for b in BUCKETS:
+        s_, t_ = mv["spread"][b], mv["total"][b]
+        out.append(f"  >= {b:>4}: spread {s_[0]}-{s_[1]}-{s_[2]} {pct(s_[0], s_[1])} | total {t_[0]}-{t_[1]}-{t_[2]} {pct(t_[0], t_[1])}")
+    out.append("Anchored-to-open w by season (spread): " + ", ".join(f"{s}:{v[1]}" for s, v in bl["spread"]["w_by_season"].items()))
+    out.append("Anchored-to-open ATS by |adj|: " + "; ".join(f">={t}:{w}-{l} {pct(w, l)}" for t, (w, l, p) in bl["spread"]["ats"].items()))
+    out.append("Anchored-to-open w by season (total): " + ", ".join(f"{s}:{v[1]}" for s, v in bl["total"]["w_by_season"].items()))
+    out.append("Anchored-to-open O/U by |adj|: " + "; ".join(f">={t}:{w}-{l} {pct(w, l)}" for t, (w, l, p) in bl["total"]["ou"].items()))
+    return "\n".join(out)
+
+
 def fmt(ev: dict) -> str:
     def pct(w, l):
         return f"{100.0 * w / (w + l):.1f}%" if w + l else "n/a"
@@ -232,9 +293,13 @@ def main(argv=None) -> int:
     Path(args.output).write_text(json.dumps({"family": FAMILY, "alpha": ALPHA, "seasons": seasons,
                                              "evaluation": {k: v for k, v in ev.items()}}, indent=2, default=str))
     bl = market_anchored(preds, lines)
+    op = opening_view(lines)
+    ev_o = evaluate(preds, op)
+    bl_o = market_anchored(preds, op)
+    mv = line_move_toward_model(preds, lines)
     print("CFB_SDV_BACKTEST_SUMMARY")
-    print(fmt(ev))
-    print(fmt_blend(bl))
+    print(f"vs CLOSE: ATS any-gap {ev['ats'][0.0][:2]}, 5+ {ev['ats'][5.0][:2]}; O/U 5+ {ev['totals'][5.0][:2]}")
+    print(fmt_open(ev_o, bl_o, mv))
     return 0
 
 
