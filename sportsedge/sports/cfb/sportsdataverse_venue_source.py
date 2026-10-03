@@ -105,6 +105,50 @@ def parse_pinned_venues(
     return out
 
 
+
+def apply_pinned_venue_supplements(
+    venues: Mapping[int, Mapping[str, Any]],
+    supplements: object,
+) -> dict[int, dict[str, Any]]:
+    """Merge explicit hash-bound venue supplements without overriding pinned rows."""
+    out={int(k):dict(v) for k,v in venues.items()}
+    if supplements in (None, []):
+        return out
+    if not isinstance(supplements, list):
+        raise SDVVenueSourceError("CFB_SDV_VENUE_SUPPLEMENTS_LIST_REQUIRED")
+    seen=set()
+    for index,item in enumerate(supplements):
+        if not isinstance(item, Mapping):
+            raise SDVVenueSourceError(f"CFB_SDV_VENUE_SUPPLEMENT_OBJECT_REQUIRED:{index}")
+        try:
+            venue_id=int(item.get("venue_id"))
+            lat=float(item.get("latitude"))
+            lon=float(item.get("longitude"))
+        except (TypeError,ValueError) as exc:
+            raise SDVVenueSourceError(f"CFB_SDV_VENUE_SUPPLEMENT_VALUE_INVALID:{index}") from exc
+        if venue_id in seen:
+            raise SDVVenueSourceError(f"CFB_SDV_VENUE_SUPPLEMENT_DUPLICATE:{venue_id}")
+        seen.add(venue_id)
+        if venue_id in out:
+            raise SDVVenueSourceError(f"CFB_SDV_VENUE_SUPPLEMENT_OVERRIDE_FORBIDDEN:{venue_id}")
+        if not isfinite(lat) or not isfinite(lon) or not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
+            raise SDVVenueSourceError(f"CFB_SDV_VENUE_SUPPLEMENT_COORDINATES_INVALID:{venue_id}")
+        indoor=item.get("game_indoor")
+        if type(indoor) is not bool:
+            raise SDVVenueSourceError(f"CFB_SDV_VENUE_SUPPLEMENT_INDOOR_BOOL_REQUIRED:{venue_id}")
+        sources=item.get("source_identities")
+        if not isinstance(sources,list) or not sources or any(not str(x).strip() for x in sources):
+            raise SDVVenueSourceError(f"CFB_SDV_VENUE_SUPPLEMENT_SOURCES_REQUIRED:{venue_id}")
+        out[venue_id]={
+            "venue_id":venue_id,
+            "name":str(item.get("name") or "").strip() or None,
+            "latitude":lat,
+            "longitude":lon,
+            "game_indoor":indoor,
+            "supplement_source_identities":[str(x).strip() for x in sources],
+        }
+    return out
+
 def venue_source_attestation(raw: bytes, *, usable_rows: int) -> dict[str, Any]:
     return {
         "byte_count": len(raw),
@@ -119,5 +163,6 @@ __all__ = [
     "SDVVenueSourceError",
     "git_blob_sha1",
     "parse_pinned_venues",
+    "apply_pinned_venue_supplements",
     "venue_source_attestation",
 ]
