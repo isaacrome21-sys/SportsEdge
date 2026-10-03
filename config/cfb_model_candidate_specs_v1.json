@@ -20,7 +20,7 @@
       "extra_feature_list": [],
       "formula": "For each team metric, w = games_in_sample/(games_in_sample+4.0); blended = w*current + (1-w)*prior. Feed the blended metrics into the common standardized joint-score ridge surface.",
       "weighting_blending_constants": {
-        "prior_equivalent_games": 4.0
+        "prior_equivalent_games": 4
       }
     },
     "RELIABILITY_WEIGHTED_HARD_SWITCH": {
@@ -80,12 +80,12 @@
     "post_result_retuning_allowed": false,
     "ridge_alpha_grid": [
       0.1,
-      1.0,
-      3.0,
-      10.0,
-      30.0,
-      100.0,
-      300.0
+      1,
+      3,
+      10,
+      30,
+      100,
+      300
     ],
     "selection_metric": "JOINT_HOME_AWAY_SCORE_RMSE",
     "tie_break": "LOWEST_MEAN_RMSE_THEN_LOWEST_ALPHA"
@@ -96,7 +96,7 @@
     "evaluation": "EXPANDING_SEASON_OUTER_FOLDS",
     "no_2026_forward_outcomes": true,
     "season_type": "REGULAR",
-    "start_season": 2015
+    "start_season": 2021
   },
   "governance": {
     "attempts_consumed": 0,
@@ -106,5 +106,12 @@
   },
   "schema": "CFB_MODEL_CANDIDATE_SPEC_BUNDLE_V1",
   "source_contract_identity": "AS_OF_WEEK_MATCHED_V1|CFBD_STATS_SEASON_ADVANCED_ENDWEEK_V1|CFB_JOINT_HISTORY_PIT_V1|CFB_CANDIDATE_DUAL_SNAPSHOT_V1",
-  "status": "FROZEN_BEFORE_CANDIDATE_EVALUATION"
+  "status": "FROZEN_BEFORE_CANDIDATE_EVALUATION",
+  "window_freeze_basis": {
+    "status": "FROZEN_BEFORE_FIRST_EVALUATION",
+    "reason": "CFBD_REMAINING_QUOTA_CAPACITY_ONLY",
+    "selection_rule": "LONGEST_RECENT_CONTIGUOUS_FULL_CFBD_WINDOW_GUARANTEED_TO_FIT_WITH_EXPLICIT_RETRY_RESERVE",
+    "performance_results_inspected": false,
+    "attempts_consumed": 0
+  }
 }
