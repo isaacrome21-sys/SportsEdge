@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
+from math import isfinite
 from typing import Iterable, Mapping, Any
 
 SOURCE_CONTRACT = "SPORTSDATAVERSE_ESPN_CFB_ADV_V1|RECONSTRUCTED_PRIOR_WEEK_V1"
@@ -133,7 +134,22 @@ def _pos_team_id(row: Mapping[str, Any]) -> int:
     return value
 
 def _mean(rows: list[Mapping[str, Any]], key: str) -> float:
-    vals = [float(r[key]) for r in rows if r.get(key) is not None]
+    vals: list[float] = []
+    for row in rows:
+        raw = row.get(key)
+        if raw is None or str(raw).strip() == "":
+            continue
+        try:
+            value = float(raw)
+        except (TypeError, ValueError) as exc:
+            raise SportsDataverseHistoryError(
+                f"CFB_SDV_REQUIRED_METRIC_INVALID:{key}:{raw}"
+            ) from exc
+        if not isfinite(value):
+            raise SportsDataverseHistoryError(
+                f"CFB_SDV_REQUIRED_METRIC_INVALID:{key}:{raw}"
+            )
+        vals.append(value)
     if not vals:
         raise SportsDataverseHistoryError(f"CFB_SDV_REQUIRED_METRIC_MISSING:{key}")
     return sum(vals) / len(vals)
