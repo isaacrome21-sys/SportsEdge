@@ -67,6 +67,19 @@ def load_cfb_game_freeze(path: str | Path = CFB_GAME_FREEZE_PATH) -> dict[str, A
         raise CFBGameFreezeError("CFB_GAME_FREEZE_FIT_MAX_SEASON_INVALID")
     if row.get("promotion_authority") is not False or row.get("evidence_clock_authority") is not False:
         raise CFBGameFreezeError("CFB_GAME_FREEZE_AUTHORITY_INVALID")
+    if str(row.get("model_family") or "") == "CFB_SELECTED_CANDIDATE_MODEL_V1":
+        row["selection_result_sha256"] = _hex64(
+            row.get("selection_result_sha256"),
+            "CFB_GAME_FREEZE_SELECTION_RESULT_SHA_INVALID",
+        )
+        row["freeze_evidence_file_sha256"] = _hex64(
+            row.get("freeze_evidence_file_sha256"),
+            "CFB_GAME_FREEZE_EVIDENCE_FILE_SHA_INVALID",
+        )
+        if not str(row.get("candidate_family") or "").strip():
+            raise CFBGameFreezeError("CFB_GAME_FREEZE_CANDIDATE_FAMILY_REQUIRED")
+        if str(row.get("provenance_class") or "") != "RECONSTRUCTED_HISTORICAL_NOT_PIT":
+            raise CFBGameFreezeError("CFB_GAME_FREEZE_SELECTED_PROVENANCE_INVALID")
     row["fit_max_season"] = fit_max
     return row
 
