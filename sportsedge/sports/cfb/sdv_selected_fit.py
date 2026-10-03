@@ -24,3 +24,8 @@ def load_selected_sdv_fit(path: str | Path = DEFAULT_FIT_PATH) -> NativeScoreMod
         away_coef=tuple(float(x) for x in payload["away_coef"]),
         ridge_alpha=float(payload["ridge_alpha"]),
     )
+
+
+def score_selected_game(model: NativeScoreModel, row: dict) -> tuple[float, float]:
+    """Score one training-shaped or live dual-snapshot row. No bet authority."""
+    return model.predict_means(row, {"prior_equivalent_games": 4})
