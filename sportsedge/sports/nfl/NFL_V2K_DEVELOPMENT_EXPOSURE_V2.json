@@ -1,0 +1,52 @@
+{
+  "schema": "NFL_V2K_DEVELOPMENT_EXPOSURE_V2",
+  "status": "ATTEMPT2_CONSUMED_ATTEMPT3_PREREGISTRATION_REQUIRED",
+  "max_development_attempts": 5,
+  "development_budget_units_used": 2,
+  "development_budget_units_remaining": 3,
+  "untouched_readout_allowed": false,
+  "authority": {
+    "model_p": false,
+    "pricing": false,
+    "promotion": false,
+    "staking": false,
+    "official": false,
+    "untouched_readout": false
+  },
+  "exposures": [
+    {
+      "budget_unit": 1,
+      "candidate_family": "NFL_V2K_DRIVE_HIERARCHICAL_JOINT_G1",
+      "evidence_role": "REUSED_RESEARCH_HISTORY_NOT_FINAL_HOLDOUT",
+      "source": {
+        "pr": 1534,
+        "comment_id": 5981843976
+      },
+      "accounting": {
+        "consumes_development_budget": true
+      }
+    },
+    {
+      "budget_unit": 2,
+      "candidate_family": "NFL_V2K_DRIVE_HIERARCHICAL_JOINT_G2",
+      "evidence_role": "CANONICAL_ATTEMPT2_DEVELOPMENT_READOUT",
+      "source": {
+        "workflow_run_id": 37239231204,
+        "artifact_id": 11316753318,
+        "artifact_digest": "sha256:c3bea7f623d0292b285ebbc063f7d8cee556619022b35e681e4addc487d6c6bd",
+        "issue": 1539,
+        "result_comment_id": 5985299453
+      },
+      "accounting": {
+        "consumes_development_budget": true,
+        "result": "FAIL"
+      }
+    }
+  ],
+  "policy": {
+    "max_development_attempts": 5,
+    "threshold_tuning_after_readout_forbidden": true,
+    "materially_different_successor_requires_preregistration": true,
+    "no_relabel_as_untouched": true
+  }
+}
