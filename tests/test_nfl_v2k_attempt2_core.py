@@ -1,5 +1,5 @@
 from sportsedge.sports.nfl.v2k_drive_core import DriveRow
-from sportsedge.sports.nfl.v2k_drive_core_v2 import fit_attempt2
+from sportsedge.sports.nfl.v2k_drive_core_v2 import fit_attempt2, simulate_joint_game_v2
 
 def row(g,i,off,defn,ob,db,oa,da,out="PUNT_OTHER"):
     return DriveRow(g,2020,1,"2020-01-01",i,off,defn,75.0,out,ob,db,oa,da,4,60,source_manifest_sha256="x",source_code_sha="y")
@@ -39,3 +39,38 @@ def test_scoring_calibration_is_not_algebraic_identity():
     scoring={fit.scoring.outcome_factor[k] for k in ("TD","FG","SAFETY","DEF_ST_SCORE")}
     assert len(scoring)==1
     assert next(iter(scoring)) != 1.0
+
+
+def test_attempt2_simulation_replay_is_deterministic():
+    rows=(
+        row("g1",0,"A","B",0,0,7,0,"TD"),
+        row("g1",1,"B","A",0,7,3,7,"FG"),
+        row("g2",0,"A","B",0,0,0,0,"PUNT_OTHER"),
+        row("g2",1,"B","A",0,0,0,0,"PUNT_OTHER"),
+    )
+    fit=fit_attempt2(rows,{
+        "g1":{"home_team":"A","away_team":"B"},
+        "g2":{"home_team":"A","away_team":"B"},
+    })
+    a=simulate_joint_game_v2(fit,"A","B",season=2025,seed=12345,regulation_drives=4)
+    b=simulate_joint_game_v2(fit,"A","B",season=2025,seed=12345,regulation_drives=4)
+    assert a==b
+    assert a.margin==a.home_score-a.away_score
+    assert a.total==a.home_score+a.away_score
+    assert a.team_totals=={"A":a.home_score,"B":a.away_score}
+
+
+def test_attempt2_simulation_rejects_invalid_identity_and_drive_count():
+    rows=(row("g",0,"A","B",0,0,0,0),)
+    fit=fit_attempt2(rows,{"g":{"home_team":"A","away_team":"B"}})
+    for kwargs,message in (
+        ({"home_team":"A","away_team":"A"},"V2K_TEAMS_MUST_DIFFER"),
+        ({"home_team":"A","away_team":"B","regulation_drives":0},"V2K_REGULATION_DRIVES_INVALID"),
+        ({"home_team":"A","away_team":"B","opening_possession":"C"},"V2K_OPENING_POSSESSION_INVALID"),
+    ):
+        try:
+            simulate_joint_game_v2(fit,season=2025,seed=1,**kwargs)
+        except ValueError as e:
+            assert str(e)==message
+        else:
+            raise AssertionError(message+" accepted")
