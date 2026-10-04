@@ -161,6 +161,7 @@
         ".github/workflows/football-nfl-promotion-evidence.yml",
         ".github/workflows/mlb-additional-pit-archive.yml",
         ".github/workflows/mlb-authentic-provider-freeze.yml",
+        ".github/workflows/mlb-lines-issue.yml",
         ".github/workflows/mlb-paired-window-plan-smoke.yml",
         ".github/workflows/mlb-pit-lineup-starter-contract.yml",
         ".github/workflows/mlb-promotion-readiness-audit.yml",
@@ -230,11 +231,13 @@
         "scripts/capture_mlb_v8_forward_evidence.py",
         "scripts/collect_mlb_the_odds_api_history.py",
         "scripts/ev_tracker.py",
+        "scripts/intake_mlb_lines_issue.py",
         "scripts/mlb_38_market_replay.py",
         "scripts/mlb_build_historical_request_plan.py",
         "scripts/mlb_pit_replay_metrics.py",
         "scripts/normalize_fanduel_nfl_markets.py",
         "scripts/normalize_pinnacle_nfl_markets.py",
+        "scripts/research_mlb_pitcher_prop_promotion.py",
         "scripts/run_it_mlb_pregame.py",
         "scripts/run_live_run_it.py",
         "scripts/run_mlb_v8_forward_lane_v2.py",
@@ -254,7 +257,8 @@
         "sportsedge/sports/mlb/replay_policy.py",
         "sportsedge/sports/mlb/the_odds_api_history.py",
         "sportsedge/sports/mlb/the_odds_api_materializer.py",
-        "sportsedge/sports/mlb/the_odds_api_pairing.py"
+        "sportsedge/sports/mlb/the_odds_api_pairing.py",
+        "tests/test_research_mlb_pitcher_prop_promotion.py"
       ],
       "coverage_prefixes": []
     }
