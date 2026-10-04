@@ -60,6 +60,36 @@ def test_attempt2_simulation_replay_is_deterministic():
     assert a.team_totals=={"A":a.home_score,"B":a.away_score}
 
 
+def test_attempt2_histograms_preserve_joint_score_support_and_marginals():
+    from collections import Counter
+    from sportsedge.sports.nfl.v2k_attempt2_validation import simulate_game_histograms
+
+    rows=(
+        row("g1",0,"A","B",0,0,7,0,"TD"),
+        row("g1",1,"B","A",0,7,3,7,"FG"),
+        row("g2",0,"A","B",0,0,0,0,"PUNT_OTHER"),
+        row("g2",1,"B","A",0,0,0,0,"PUNT_OTHER"),
+    )
+    fit=fit_attempt2(rows,{
+        "g1":{"home_team":"A","away_team":"B"},
+        "g2":{"home_team":"A","away_team":"B"},
+    })
+    game={"game_id":"future","season":2025,"week":1,"home_team":"A","away_team":"B"}
+    out=simulate_game_histograms(fit,game,root_seed=99,paths=32)
+    assert sum(out["score_hist"].values())==32
+    score_pairs=Counter()
+    for key,count in out["score_hist"].items():
+        h,a=(int(part) for part in key.split(",",1))
+        score_pairs[(h,a)]+=count
+    margin=Counter()
+    total=Counter()
+    for (h,a),count in score_pairs.items():
+        margin[h-a]+=count
+        total[h+a]+=count
+    assert margin==Counter({int(k):v for k,v in out["margin_hist"].items()})
+    assert total==Counter({int(k):v for k,v in out["total_hist"].items()})
+
+
 def test_attempt2_simulation_rejects_invalid_identity_and_drive_count():
     rows=(row("g",0,"A","B",0,0,0,0),)
     fit=fit_attempt2(rows,{"g":{"home_team":"A","away_team":"B"}})
