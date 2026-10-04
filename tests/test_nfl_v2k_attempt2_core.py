@@ -128,3 +128,18 @@ def test_attempt2_simulation_rejects_invalid_overtime_limit():
     import pytest
     with pytest.raises(ValueError,match="V2K_MAX_OVERTIME_DRIVES_INVALID"):
         simulate_joint_game_v2(fit,"A","B",season=2025,seed=1,max_overtime_drives=1)
+
+
+def test_attempt2_preflight_accepts_exact_frozen_identity():
+    from sportsedge.sports.nfl import v2k_attempt2_validation as v
+    result=v.preflight(paths=1,smoke=True)
+    assert result["root_seed"]==13631901020752177054
+    assert result["contract"]["status"]=="FROZEN_ATTEMPT2_READY_FOR_DEVELOPMENT_VALIDATION"
+    assert result["smoke"] is True
+
+
+def test_attempt2_preflight_rejects_non_smoke_below_floor():
+    import pytest
+    from sportsedge.sports.nfl import v2k_attempt2_validation as v
+    with pytest.raises(SystemExit,match="V2K_ATTEMPT2_PATH_COUNT_INVALID"):
+        v.preflight(paths=9999,smoke=False)
