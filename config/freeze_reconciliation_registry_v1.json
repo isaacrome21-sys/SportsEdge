@@ -1665,10 +1665,22 @@
       "merge_sha": "4307c46bb5f2e19fd6fb5afb6315bf9c9bf4b59f",
       "pr": 1533,
       "note": "NFL V2K canonical attempt-1 freeze repair. Registers main movement only."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_0CCA7A0C_PR_1535",
+      "merge_sha": "0cca7a0cd0e6329ee2ed92800d6dbebe270e57ba",
+      "pr": 1535,
+      "note": "Prior reconciliation merge; no model authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_A8F37D4B_PR_1536",
+      "merge_sha": "a8f37d4b898c7534963dea635f5336406150e3cc",
+      "pr": 1536,
+      "note": "MLB lineup-K preregistered research and intake hook; no production probabilities or promotion changed."
     }
   ],
-  "inventory_block_reason": "Fresh hosted zero-unmapped proof remains the inventory-completion authority; current main through PR #1533 is registered for complete reconciliation provenance. Reconciliation grants no model or betting authority.",
+  "inventory_block_reason": "Current main through PR #1536 registered for reconciliation provenance. Fresh hosted inventory proof remains required. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "4307c46bb5f2e19fd6fb5afb6315bf9c9bf4b59f",
+  "reconciled_through_sha": "a8f37d4b898c7534963dea635f5336406150e3cc",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
