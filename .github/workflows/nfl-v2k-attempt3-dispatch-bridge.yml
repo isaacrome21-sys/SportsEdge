@@ -1,0 +1,33 @@
+name: nfl-v2k-attempt3-dispatch-bridge
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: write
+  contents: read
+  issues: write
+
+jobs:
+  dispatch:
+    if: >-
+      github.actor == github.repository_owner &&
+      github.event.issue.number == 1561 &&
+      github.event.comment.body == 'CONSUME_ATTEMPT_3'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Dispatch frozen Attempt-3 workflow on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/nfl-v2k-attempt3-development-validation.yml/dispatches" \
+            -f ref=main \
+            -f 'inputs[confirm]=CONSUME_ATTEMPT_3'
+      - name: Record dispatch receipt on issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue comment 1561 --body "DISPATCHED frozen NFL V2K Attempt-3 on `main` with exact confirm token `CONSUME_ATTEMPT_3`. This bridge changes no model, fit, threshold, seed, source binding, simulation count, or authority."
