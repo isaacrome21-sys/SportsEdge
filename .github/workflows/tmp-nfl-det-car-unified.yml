@@ -1,5 +1,5 @@
 name: tmp-nfl-det-car-unified-research
-# rerun after signed raw-yardage domain fix
+# fast prop validation run after signed raw-yardage domain fix
 
 on:
   push:
@@ -79,7 +79,7 @@ jobs:
               player_rows=player_rows,
               injury_rows=[],
               injury_source_ready=True,
-              n_sims=50000,
+              n_sims=10000,
               seed=21,
           )
           payload["source_status"]={
