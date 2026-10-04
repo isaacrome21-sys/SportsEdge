@@ -61,4 +61,16 @@ def run_fold_shard(*,fold,drives_by_season,identity,root_seed,paths,shard_index,
             "fold_test_game_count":len(games),"games":results,"sportsbook_prices_consumed":False}
 
 def evaluate(shards,schedule,contract):
-    raise SystemExit("V2K_ATTEMPT2_EVALUATION_NOT_FROZEN")
+    # Reuse the established market-blind-after-simulation evaluator by adapting
+    # only schema/binding names. No market fields are introduced upstream.
+    adapted=[]
+    for s in shards:
+        x=dict(s); x["schema"]=a1.SHARD_SCHEMA
+        adapted.append(x)
+    shadow=dict(contract)
+    shadow["attempt1_issue_binding"]=contract["attempt2_issue_binding"]
+    result=a1.evaluate(adapted,schedule,shadow)
+    result["schema"]=RESULT_SCHEMA
+    result["candidate_family"]=contract["candidate_family"]
+    result["verdict"]="ATTEMPT2_PASS" if result["verdict"]=="ATTEMPT1_PASS" else "ATTEMPT2_FAIL"
+    return result
