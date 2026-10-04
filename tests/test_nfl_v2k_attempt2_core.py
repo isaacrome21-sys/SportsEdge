@@ -199,3 +199,42 @@ def test_attempt2_parallel_fold_matches_serial():
     serial=run_fold_shard(fold=fold,drives_by_season=drives,identity=identity,root_seed=99,paths=8,shard_index=0,shard_count=1,workers=1)
     parallel=run_fold_shard(fold=fold,drives_by_season=drives,identity=identity,root_seed=99,paths=8,shard_index=0,shard_count=1,workers=2)
     assert serial==parallel
+
+def test_attempt2_evaluate_emits_moneyline_and_team_total_diagnostics():
+    from sportsedge.sports.nfl import v2k_attempt2_validation as v
+
+    contract=v.a1._load_json(v.CONTRACT_PATH)
+    root=contract["attempt2_issue_binding"]["root_seed"]
+    schedule={}
+    shards=[]
+    for idx, season in enumerate(range(2021, 2026), start=1):
+        gid=f"g{season}"
+        schedule[gid]={
+            "game_id":gid,"season":season,"week":1,
+            "home_team":"A","away_team":"B","home_score":21,"away_score":17,
+            "_market":{
+                "spread_line":0.5,"total_line":37.5,
+                "home_spread_odds":"-110","away_spread_odds":"-110",
+                "over_odds":"-110","under_odds":"-110",
+            },
+        }
+        shards.append({
+            "schema":v.SHARD_SCHEMA,"fold_id":f"F{idx}","train_seasons":[],
+            "test_season":season,"shard_index":0,"shard_count":1,
+            "root_seed":root,"paths_per_game":4,"training_drive_rows":1,
+            "fold_test_game_count":1,"sportsbook_prices_consumed":False,
+            "games":[{
+                "game_id":gid,"season":season,"week":1,
+                "home_team":"A","away_team":"B","paths":4,
+                "score_hist":{"17,21":1,"21,17":3},
+                "margin_hist":{"-4":1,"4":3},
+                "total_hist":{"38":4},
+            }],
+        })
+    out=v.evaluate(shards,schedule,contract)
+    assert out["score_derived_diagnostics"]["moneyline"]["overall"]["n"]==5
+    assert out["score_derived_diagnostics"]["team_total"]["overall"]["n_team_scores"]==10
+    assert out["score_derived_diagnostics"]["moneyline"]["folds"][0]["candidate_brier"] < 0.25
+    assert out["game_rows"][0]["sim_mean_home_score"]==20.0
+    assert out["game_rows"][0]["sim_mean_away_score"]==18.0
+
