@@ -12,7 +12,7 @@ from sportsedge.sports.nfl.code_surface import (
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "config/nfl_m2_code_surface_v1.json"
-MANIFEST_SHA256 = "e3296a45fe07521f3851986afc4554e161e4c3183ee2b9c75e5e4ad5ddea67f2"
+MANIFEST_SHA256 = "d2c57a570ea1584745d218869f50a857f8cecb6c8b710b776850c00a0ed5b1e6"
 FIT_SHA = "d0609a44cb3c379fcb4d09afc9249dd8f9b54ef9"
 
 
