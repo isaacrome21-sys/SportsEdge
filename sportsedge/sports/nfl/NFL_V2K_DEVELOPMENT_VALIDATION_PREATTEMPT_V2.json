@@ -107,7 +107,7 @@
   "simulation": {
     "paths_per_game": 50000,
     "absolute_floor": 10000,
-    "root_seed": null,
+    "root_seed": 13631901020752177000,
     "rng": "NUMPY_PCG64_SEEDSEQUENCE_V1"
   },
   "implementation_identity": {
@@ -119,8 +119,7 @@
     "canonical_main_anchor_sha": null
   },
   "blocker_codes": [
-    "ATTEMPT2_CODE_IDENTITY_NOT_FROZEN",
-    "ATTEMPT2_ROOT_SEED_NOT_FROZEN"
+    "ATTEMPT2_CODE_IDENTITY_NOT_FROZEN"
   ],
   "attempt_budget": {
     "max_development_attempts": 5,
@@ -135,9 +134,9 @@
     "smoke_below_floor_is_not_an_attempt": true
   },
   "attempt2_issue_binding": {
-    "issue": null,
-    "status": "DEVELOPMENT_NOT_FROZEN",
-    "root_seed": null,
+    "issue": 1539,
+    "status": "FREEZE_RECORD_BOUND",
+    "root_seed": 13631901020752177000,
     "simulation_count_paths_per_game": 50000,
     "absolute_simulation_floor_paths_per_game": 10000,
     "fold_plan": {
@@ -215,5 +214,11 @@
     "interpretation": "ENGINEERING_DIAGNOSTICS_ONLY_NOT_AUTHORITY_GATES",
     "predictive_readout": "CHRONOLOGICAL_FOLD_LOG_LOSS_VS_FROZEN_MARKET_BASELINE",
     "threshold_tuning_after_readout_forbidden": true
+  },
+  "seed_derivation": {
+    "version": "SHA256_FIRST8_BIG_ENDIAN_V1",
+    "literal": "SportsEdge|NFL_V2K_DRIVE_HIERARCHICAL_JOINT_G2|ATTEMPT_2|ROOT_SEED_V1",
+    "sha256": "bd2e3dc0e337e79ec17e22deffe3f0b406fe5a4745ef20d75b9d1e5a8f38c085",
+    "root_seed": 13631901020752177000
   }
 }
