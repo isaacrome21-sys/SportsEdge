@@ -72,5 +72,17 @@ def evaluate(shards,schedule,contract):
     result=a1.evaluate(adapted,schedule,shadow)
     result["schema"]=RESULT_SCHEMA
     result["candidate_family"]=contract["candidate_family"]
-    result["verdict"]="ATTEMPT2_PASS" if result["verdict"]=="ATTEMPT1_PASS" else "ATTEMPT2_FAIL"
+    # Attempt 2 keeps these as diagnostics. The retired legacy Truth Gate does
+    # not grant or deny model authority; predictive and structural readouts are
+    # reported independently for engineering review.
+    legacy_verdict=result.pop("verdict",None)
+    result["evaluation_status"]="ATTEMPT2_READOUT_COMPLETE"
+    result["legacy_attempt1_gate_verdict_diagnostic"]=legacy_verdict
+    result["diagnostics_only"]=True
+    result["authority"]={
+        "pricing":False,
+        "staking":False,
+        "production_release":False,
+        "untouched_readout":False,
+    }
     return result
