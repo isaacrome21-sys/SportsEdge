@@ -21,6 +21,8 @@ class HomeFieldEffect:
 @dataclass(frozen=True)
 class MarginClustering:
     signed_key_mass: Mapping[int, float]
+    fg_rate: float
+    td_rate: float
 
 @dataclass(frozen=True)
 class Attempt2Fit:
@@ -72,7 +74,10 @@ def fit_margin_clustering(rows: Sequence[DriveRow], schedule_identity: Mapping[s
         else: margin=last.defense_score_after-last.offense_score_after
         if margin in counts: counts[margin]+=1
     n=len(games)
-    return MarginClustering({k:counts[k]/n for k in counts})
+    outcomes=[r.outcome for r in rows]
+    return MarginClustering({k:counts[k]/n for k in counts},
+                            outcomes.count("FG")/max(1,len(outcomes)),
+                            outcomes.count("TD")/max(1,len(outcomes)))
 
 def fit_attempt2(rows: Sequence[DriveRow], schedule_identity: Mapping[str, Mapping]) -> Attempt2Fit:
     baseline=fit_hierarchical_strength(rows)
@@ -86,6 +91,15 @@ def _corrected_probs(model: Attempt2Fit, offense: str, defense: str, *, home_tea
     h=model.home_field.team_points.get(home_team,model.home_field.league_points)
     mult=max(0.5,min(1.5,1.0+(h/100.0)*(1.0 if offense==home_team else -1.0)))
     for o in ("TD","FG"): vals[o]*=mult
+    # Key-number structure must arise from football scoring events, not from
+    # rewriting final margins. Training-only empirical FG/TD balance adjusts
+    # the relative probability of 3- and 7-point scoring opportunities.
+    if model.margin_clustering.td_rate>0 and model.margin_clustering.fg_rate>0:
+        observed_ratio=model.margin_clustering.fg_rate/model.margin_clustering.td_rate
+        raw_ratio=max(float(raw["FG"]),1e-12)/max(float(raw["TD"]),1e-12)
+        ratio=(observed_ratio/raw_ratio)**0.5
+        vals["FG"]*=ratio
+        vals["TD"]/=ratio
     z=sum(vals.values())
     return {o:vals[o]/z for o in DRIVE_OUTCOMES}
 
