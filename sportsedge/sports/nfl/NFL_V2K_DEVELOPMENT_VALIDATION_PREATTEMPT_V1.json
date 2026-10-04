@@ -149,7 +149,7 @@
     "status": "CONTROLLING_PRE_SCORE_FREEZE_REQUIREMENTS",
     "rng_algorithm": "NUMPY_PCG64",
     "seed_derivation": "NUMPY_SEEDSEQUENCE_EXPLICIT_INTEGER_ROOT_DETERMINISTIC_PER_GAME_PER_PATH",
-    "root_seed": 15264549103493747000,
+    "root_seed": 15264549103493747052,
     "simulation_count_paths_per_game": 50000,
     "absolute_simulation_floor_paths_per_game": 10000,
     "shuffled_rows_forbidden": true,
@@ -161,7 +161,7 @@
       "method": "UINT64_BIG_ENDIAN_FIRST_8_BYTES_OF_SHA256_UTF8",
       "input": "NFL_V2K_DRIVE_HIERARCHICAL_JOINT_G1|ATTEMPT1|MODERN_REG_2018_2025|PCG64_SEEDSEQUENCE_V1",
       "sha256": "d3d69288da40916c79f1675a968b3a51900b871212a113844df39381dc43f1af",
-      "output_integer": 15264549103493747000,
+      "output_integer": 15264549103493747052,
       "performance_data_used": false
     },
     "fold_plan": {
