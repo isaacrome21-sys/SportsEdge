@@ -1635,10 +1635,64 @@
       "merge_sha": "5b543d258284f8da3ae354649686558b8d3ff9e8",
       "pr": 1515,
       "note": "Registers NFL V2K machine-enforced pre-attempt validation freeze on main. Attempt ledger remains unconsumed; reconciliation grants zero Model_P, promotion, staking, OFFICIAL, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_AA8BD1BC_PR_1530",
+      "merge_sha": "aa8bd1bcb3b2548ce5d371f3a8c55bae1426d5da",
+      "pr": 1530,
+      "note": "Reconciliation merge advancing main after PR #1515."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_86A8D844_PR_1514",
+      "merge_sha": "86a8d844d1b78c843ec8b5caf942058083926330",
+      "pr": 1514,
+      "note": "NFL candidate release proposal bridge; no production activation."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_E2B6155A_PR_1532",
+      "merge_sha": "e2b6155a2089cec7bf7351c2269743634267a40f",
+      "pr": 1532,
+      "note": "MLB plate-umpire walk-index main advance; registered for repository provenance only."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_6E3FFA75_PR_1531",
+      "merge_sha": "6e3ffa7566dd5b7b81a7ba55d5fbd3e975e7c1d2",
+      "pr": 1531,
+      "note": "NFL V2K attempt-1 freeze PR main advance; later repaired by PR #1533."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_4307C46B_PR_1533",
+      "merge_sha": "4307c46bb5f2e19fd6fb5afb6315bf9c9bf4b59f",
+      "pr": 1533,
+      "note": "NFL V2K canonical attempt-1 freeze repair. Registers main movement only."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_0CCA7A0C_PR_1535",
+      "merge_sha": "0cca7a0cd0e6329ee2ed92800d6dbebe270e57ba",
+      "pr": 1535,
+      "note": "Prior reconciliation merge; no model authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_A8F37D4B_PR_1536",
+      "merge_sha": "a8f37d4b898c7534963dea635f5336406150e3cc",
+      "pr": 1536,
+      "note": "MLB lineup-K preregistered research and intake hook; no production probabilities or promotion changed."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_4C5FFEA5_PR_1541",
+      "merge_sha": "4c5ffea576e7a033013c46072c9a1fa001a518ad",
+      "pr": 1541,
+      "note": "Prior reconciliation merge; no model or betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_9599A655_PR_1537",
+      "merge_sha": "9599a6554562ca7c0e1bf7d63189ac72573e4e1e",
+      "pr": 1537,
+      "note": "NFL V2K Attempt-2 development-validation runner and frozen execution surface. No Attempt-2 historical readout was executed by the merge and no Model_P, pricing, promotion, staking, OFFICIAL, or untouched-readout authority is created."
     }
   ],
-  "inventory_block_reason": "Fresh hosted zero-unmapped proof remains the inventory-completion authority; current main through PR #1515 is registered for complete reconciliation provenance. This reconciliation grants zero model or betting authority.",
+  "inventory_block_reason": "Current main through merge 9599a655 / PR #1537 registered for reconciliation provenance. Fresh hosted inventory proof remains required. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "5b543d258284f8da3ae354649686558b8d3ff9e8",
+  "reconciled_through_sha": "9599a6554562ca7c0e1bf7d63189ac72573e4e1e",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }

@@ -28,6 +28,7 @@ RESEARCH_DIRECTIVES = {
     "opp_k_context": ["scripts/research_mlb_opp_k_context.py"],
     "opp_outs_context": ["scripts/research_mlb_opp_outs_context.py"],
     "umpire_context": ["scripts/research_mlb_umpire_context.py"],
+    "lineup_k_context": ["scripts/research_mlb_lineup_k_context.py"],
 }
 
 

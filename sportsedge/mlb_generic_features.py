@@ -468,6 +468,25 @@ class MLBGenericHistorySource:
         except Exception as exc:  # noqa: BLE001
             return None, f"umpire walk index invalid ({exc})"
 
+    def _lineup_boxscore(self, game_pk):
+        from .mlb_lineup_k_context_research import parse_boxscore
+        cache = self.__dict__.setdefault("_lineup_boxscore_cache", {})
+        if game_pk not in cache:
+            cache[game_pk] = parse_boxscore(_read_json(
+                f"https://statsapi.mlb.com/api/v1/game/{int(game_pk)}/boxscore", opener=self.opener))
+        return cache[game_pk]
+
+    def _lineup_k_payload(self, **kwargs):
+        from .mlb_lineup_k_context import build_payload
+        key = tuple(sorted(kwargs.items()))
+        cache = self.__dict__.setdefault("_lineup_k_payload_cache", {})
+        if key not in cache:
+            try:
+                cache[key] = (build_payload(self, **kwargs), None)
+            except Exception as exc:  # Optional lane retains validated opp-K on any missing input.
+                cache[key] = (None, str(exc))
+        return cache[key]
+
     def _opp_k_payload(self, *, player_id: int, target_date: date, team_id: int | None,
                        away_team_id: int, home_team_id: int) -> tuple[dict[str, Any] | None, str | None]:
         """Validated opp-K lane (#1509) for the k>=5 path; (payload, None) or (None, why unadjusted)."""
@@ -549,6 +568,13 @@ class MLBGenericHistorySource:
                         if adj is not None:
                             base["features"]["opp_k_adjustment"] = adj
                             base["joint_feature_version"] = "mlb_pitcher_joint_history_opp_k_v1"
+                            lane, why = self._lineup_k_payload(game_pk=int(game_pk), player_id=player_id,
+                                target_date=target_date, opponent_id=adj["opponent_team_id"])
+                            if lane is not None:
+                                adj["lineup_k_adjustment"] = lane
+                                base["joint_feature_version"] = "mlb_pitcher_joint_history_lineup_k_v1"
+                            else:
+                                base["lineup_k_unadjusted"] = why
                         else:
                             base["opp_k_unadjusted"] = why
                     elif market == "PITCHER_OUTS":
