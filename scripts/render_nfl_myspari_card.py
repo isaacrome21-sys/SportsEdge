@@ -83,9 +83,6 @@ def main() -> int:
     if any(g.get("leans") for g in engine.get("games") or []):
         lines.append("Leans: Attempt 9 totals hit 49.7% out of sample vs closing lines (breakeven 52.4%). Track only.")
     lines.append(FOOTER)
-    from scripts.render_football_board_card import both_side_catalog_section
-    engine.setdefault("sport", "NFL")
-    lines.append(both_side_catalog_section(engine).rstrip("\n"))
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
     (out / "card.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
