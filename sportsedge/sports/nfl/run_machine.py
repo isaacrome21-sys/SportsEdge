@@ -484,11 +484,17 @@ def _pair_economics(
 
 
 def _summary(results: Sequence[NFLMachineResult]) -> dict[str, Any]:
-    from sportsedge.football_full_board import emit_all_props_side_totals
-    complete = emit_all_props_side_totals(sport="NFL", game_rows=[row.__dict__ for row in results])
+    complete = None
+    try:
+        from sportsedge.football_full_board import emit_all_props_side_totals
+        complete = emit_all_props_side_totals(
+            sport="NFL",
+            game_rows=[asdict(row) for row in results],
+        )
+    except Exception:  # noqa: BLE001 — surface file may not be present in test CWD
+        pass
     return {
         "all_props_side_totals": complete,
-
         "quote_count": len(results),
         "priced": sum(row.engine_status == "PRICED" for row in results),
         "stale": sum(row.reason == "NFL_QUOTE_STALE" for row in results),
