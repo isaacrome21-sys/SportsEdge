@@ -24,7 +24,7 @@ jobs:
   card:
     if: github.actor == github.repository_owner && (contains(github.event.issue.labels.*.name, 'mlb-lines') || startsWith(github.event.issue.title, '[MLB LINES]'))
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 60
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       ISSUE: ${{ github.event.issue.number }}
