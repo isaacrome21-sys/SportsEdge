@@ -289,29 +289,28 @@ def _with_complements(sport: str, rows: list[dict[str, Any]]) -> list[dict[str, 
 
     from sportsedge.both_side_pricing import attach_sibling_quotes
 
-    rows = attach_sibling_quotes(
-        rows,
-        group_key=lambda row: (
+    def identity(row):
+        line = row.get("line")
+        if str(row.get("market") or "").endswith("spread") and _selection(row) == "AWAY" and line is not None:
+            line = -float(line)
+        return (
             row.get("market"),
             row.get("game_id"),
             row.get("entity_id"),
             row.get("team_side"),
-            row.get("line"),
+            line,
             row.get("provider_market"),
-        ),
+        )
+
+    rows = attach_sibling_quotes(
+        rows,
+        group_key=identity,
         side_of=_selection,
     )
     grouped: dict[tuple[Any, ...], set[str]] = {}
     templates: dict[tuple[Any, ...], dict[str, Any]] = {}
     for row in rows:
-        key = (
-            row.get("market"),
-            row.get("game_id"),
-            row.get("entity_id"),
-            row.get("team_side"),
-            row.get("line"),
-            row.get("provider_market"),
-        )
+        key = identity(row)
         grouped.setdefault(key, set()).add(_selection(row))
         templates.setdefault(key, row)
     extra: list[dict[str, Any]] = []
@@ -335,6 +334,8 @@ def _with_complements(sport: str, rows: list[dict[str, Any]]) -> list[dict[str, 
             complement = dict(template)
             complement["selection"] = side
             complement["side"] = side
+            if str(template.get("market") or "").endswith("spread") and template.get("line") is not None:
+                complement["line"] = -float(template["line"])
             complement["model_p"] = model_p
             complement["american_odds"] = opposite
             complement["presentation"] = presentation
