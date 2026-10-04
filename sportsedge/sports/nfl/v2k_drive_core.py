@@ -300,7 +300,7 @@ def simulate_joint_game(
     path: list[Mapping[str, object]] = []
     ot_drives = 0
 
-    while state.drive_index < regulation_drives or (state.home_score == state.away_score and ot_drives < max_overtime_drives):
+    while state.drive_index < regulation_drives or (ot_drives < max_overtime_drives and (ot_drives < 2 or state.home_score == state.away_score)):
         in_ot = state.drive_index >= regulation_drives
         if in_ot:
             ot_drives += 1
