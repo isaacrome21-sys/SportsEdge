@@ -106,14 +106,10 @@
   },
   "unresolved_required_freezes": {
     "final_hardened_implementation_identity": null,
-    "chronological_fold_plan": null,
-    "root_seed_and_per_game_path_keying": null,
     "predictive_acceptance_thresholds": null
   },
   "blocker_codes": [
     "V2K_FINAL_IMPLEMENTATION_IDENTITY_NOT_FROZEN",
-    "V2K_FOLD_PLAN_NOT_FROZEN",
-    "V2K_ROOT_SEED_KEYING_NOT_FROZEN",
     "V2K_PREDICTIVE_THRESHOLDS_NOT_FROZEN"
   ],
   "attempt_budget": {
@@ -153,13 +149,96 @@
     "status": "CONTROLLING_PRE_SCORE_FREEZE_REQUIREMENTS",
     "rng_algorithm": "NUMPY_PCG64",
     "seed_derivation": "NUMPY_SEEDSEQUENCE_EXPLICIT_INTEGER_ROOT_DETERMINISTIC_PER_GAME_PER_PATH",
-    "root_seed": null,
+    "root_seed": 15264549103493747000,
     "simulation_count_paths_per_game": 50000,
     "absolute_simulation_floor_paths_per_game": 10000,
     "shuffled_rows_forbidden": true,
     "chronological_walk_forward_required": true,
     "calibrators_fit_on_training_only": true,
     "reused_history_role": "REUSED_RESEARCH_HISTORY_NOT_FINAL_HOLDOUT",
-    "no_fresh_untouched_population_terminal_state": "INSUFFICIENT_FRESH_UNTOUCHED_EVIDENCE"
+    "no_fresh_untouched_population_terminal_state": "INSUFFICIENT_FRESH_UNTOUCHED_EVIDENCE",
+    "root_seed_derivation": {
+      "method": "UINT64_BIG_ENDIAN_FIRST_8_BYTES_OF_SHA256_UTF8",
+      "input": "NFL_V2K_DRIVE_HIERARCHICAL_JOINT_G1|ATTEMPT1|MODERN_REG_2018_2025|PCG64_SEEDSEQUENCE_V1",
+      "sha256": "d3d69288da40916c79f1675a968b3a51900b871212a113844df39381dc43f1af",
+      "output_integer": 15264549103493747000,
+      "performance_data_used": false
+    },
+    "fold_plan": {
+      "policy": "EXPANDING_SEASON_WALK_FORWARD_V1",
+      "population_seasons": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025
+      ],
+      "minimum_training_seasons": 3,
+      "folds": [
+        {
+          "fold_id": "F1",
+          "train_seasons": [
+            2018,
+            2019,
+            2020
+          ],
+          "test_season": 2021
+        },
+        {
+          "fold_id": "F2",
+          "train_seasons": [
+            2018,
+            2019,
+            2020,
+            2021
+          ],
+          "test_season": 2022
+        },
+        {
+          "fold_id": "F3",
+          "train_seasons": [
+            2018,
+            2019,
+            2020,
+            2021,
+            2022
+          ],
+          "test_season": 2023
+        },
+        {
+          "fold_id": "F4",
+          "train_seasons": [
+            2018,
+            2019,
+            2020,
+            2021,
+            2022,
+            2023
+          ],
+          "test_season": 2024
+        },
+        {
+          "fold_id": "F5",
+          "train_seasons": [
+            2018,
+            2019,
+            2020,
+            2021,
+            2022,
+            2023,
+            2024
+          ],
+          "test_season": 2025
+        }
+      ],
+      "calibrator_fit_scope": "TRAINING_SEASONS_ONLY_WITHIN_EACH_FOLD",
+      "shuffle": false,
+      "test_season_may_influence_fit": false,
+      "role": "REUSED_RESEARCH_HISTORY_NOT_FINAL_HOLDOUT",
+      "performance_data_used_to_choose_geometry": false
+    }
   }
 }
