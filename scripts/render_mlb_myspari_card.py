@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sportsedge.mlb_card_blocked import blocked_notes  # noqa: E402
 from sportsedge.mlb_pitcher_prior import fallback_notes  # noqa: E402
 from sportsedge.mlb_context_card import context_section  # noqa: E402
-from sportsedge.mlb_myspari_own_model import MYSPARI_OWN_MODEL_VERSION, myspari_rows, render_markdown, team_entity_names  # noqa: E402
+from sportsedge.mlb_myspari_own_model import LABEL, MYSPARI_OWN_MODEL_VERSION, myspari_rows, render_markdown, team_entity_names  # noqa: E402
 from sportsedge.mlb_quote_move_guard import apply_quote_move_guard  # noqa: E402
 
 
@@ -199,7 +199,7 @@ def main() -> int:
     notes.append("Scores rank the available estimates; missing evaluations remain marked.")
 
     if any("QUOTE_MOVE_NEEDS_CONFIRM" in (r.get("presentation_reason_codes") or ()) for r in rows):
-        notes.append("NEEDS_CONFIRM: a price moved past the frozen screenshot-misread thresholds vs an earlier same-game board. Look twice. Model_p is unchanged.")
+        notes.append("NEEDS_CONFIRM: a price moved past the frozen screenshot-misread thresholds vs an earlier same-game board. Recheck the price before using this card.")
 
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -212,7 +212,7 @@ def main() -> int:
         header = f"SportsEdge MLB card ({MYSPARI_OWN_MODEL_VERSION})"
         phase = "CONTEXT_BOUND_CARD" if args.context_dir else "CARD"
 
-    text = render_markdown(display_rows, header=header, notes=notes)
+    text = render_markdown(display_rows, header=header, notes=notes).replace(LABEL, "SportsEdge projections and price comparisons")
     text += both_side_board_section(payload)
     if args.context_dir:
         text += "\n".join(context_section(bundles, failures=failures)) + "\n"

@@ -71,6 +71,11 @@ def render_markdown(payload: dict) -> str:
         "| Game | Market | Pick | Line | Price | Score / 100 | Note |",
         "| --- | --- | --- | --- | --- | --- | --- |",
     ]
+    candidates = payload.get("research_leans") or []
+    if candidates:
+        lines[2:2] = ["Top price comparisons", ""]
+        lines.extend(_fmt_board_row(row) for row in candidates)
+        lines += ["", "Full market board", "", "| Game | Market | Pick | Line | Price | Score / 100 | Note |", "| --- | --- | --- | --- | --- | --- | --- |"]
     board_rows = sorted(board.get("rows") or [], key=lambda r: (
         str(r.get("game_id") or ""), str(r.get("market") or ""),
         float(r.get("line") or 0), str(r.get("selection") or r.get("side") or ""),

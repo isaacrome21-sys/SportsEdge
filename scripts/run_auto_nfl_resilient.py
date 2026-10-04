@@ -230,7 +230,7 @@ def _price_quote(
     model_p = quote.get("model_p") if supported else None
     push_p = quote.get("push_p")
     push_unknown = surface_market in {"spread", "alternate_spread", "total", "alternate_total"} and line is not None and line.is_integer() and push_p is None
-    if supported and model_p is None and margin_total is not None:
+    if supported and not push_unknown and model_p is None and margin_total is not None and not (line is not None and line.is_integer()):
         model_p = _side_probability(
             margin_total[0], margin_total[1],
             surface_market, side, line,
