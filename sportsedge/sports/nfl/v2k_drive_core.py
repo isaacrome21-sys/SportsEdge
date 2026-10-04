@@ -318,7 +318,7 @@ def simulate_joint_game(
         if in_ot:
             ot_drives += 1
         if in_ot and ot_drives == 1:
-            offense = home_team if rng.randrange(2) == 0 else away_team
+            offense = home_team if int(rng.integers(2)) == 0 else away_team
         else:
             offense = state.possession
         defense = away_team if offense == home_team else home_team
