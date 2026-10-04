@@ -240,6 +240,7 @@
         "scripts/research_mlb_pitcher_prop_promotion.py",
         "scripts/run_it_mlb_pregame.py",
         "scripts/run_live_run_it.py",
+        "scripts/run_mlb_moneyline_warning_resolution_diagnostic.py",
         "scripts/run_mlb_v8_forward_lane_v2.py",
         "scripts/run_nfl_external_evidence.sh",
         "scripts/verify_mlb_odds_api_freeze.py",
