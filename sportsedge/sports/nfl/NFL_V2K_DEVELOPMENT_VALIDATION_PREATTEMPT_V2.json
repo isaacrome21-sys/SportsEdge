@@ -1,0 +1,138 @@
+{
+  "schema": "NFL_V2K_DEVELOPMENT_VALIDATION_PREATTEMPT_V2",
+  "status": "DEVELOPMENT_NOT_FROZEN",
+  "candidate_family": "NFL_V2K_DRIVE_HIERARCHICAL_JOINT_G2",
+  "purpose": "Attempt-2 development contract. Structural corrections target scoring level, schedule-bound home-field effect, and empirical signed-key structure. Execution remains fail-closed until exact code identity, seed, and simulation mechanics are frozen.",
+  "inherits_from": "NFL_V2K_DEVELOPMENT_VALIDATION_PREATTEMPT_V1",
+  "source_binding": {
+    "source_freeze_path": "config/nfl_promotion_source_freeze_v1.json",
+    "source_manifest_sha256": "b7ff10325b69dd140e8c9d40971475595871e43f8d5a3c2ed2d9ffa8774c0723",
+    "pbp_seasons": [
+      2018,
+      2019,
+      2020,
+      2021,
+      2022,
+      2023,
+      2024,
+      2025
+    ]
+  },
+  "development_changes": [
+    {
+      "id": "SCORING_LEVEL_CALIBRATION",
+      "fit_scope": "TRAINING_FOLD_ONLY",
+      "market_fields_forbidden": true
+    },
+    {
+      "id": "SCHEDULE_BOUND_HOME_FIELD",
+      "fit_scope": "TRAINING_FOLD_ONLY",
+      "home_identity_source": "OFFICIAL_FROZEN_SCHEDULE",
+      "market_fields_forbidden": true
+    },
+    {
+      "id": "SIGNED_KEY_STRUCTURE",
+      "fit_scope": "TRAINING_FOLD_ONLY",
+      "keys": [
+        -7,
+        -3,
+        3,
+        7
+      ],
+      "posthoc_test_outcome_forcing_forbidden": true
+    }
+  ],
+  "fold_plan": {
+    "policy": "EXPANDING_SEASON_WALK_FORWARD_V1",
+    "folds": [
+      {
+        "fold_id": "F1",
+        "train_seasons": [
+          2018,
+          2019,
+          2020
+        ],
+        "test_season": 2021
+      },
+      {
+        "fold_id": "F2",
+        "train_seasons": [
+          2018,
+          2019,
+          2020,
+          2021
+        ],
+        "test_season": 2022
+      },
+      {
+        "fold_id": "F3",
+        "train_seasons": [
+          2018,
+          2019,
+          2020,
+          2021,
+          2022
+        ],
+        "test_season": 2023
+      },
+      {
+        "fold_id": "F4",
+        "train_seasons": [
+          2018,
+          2019,
+          2020,
+          2021,
+          2022,
+          2023
+        ],
+        "test_season": 2024
+      },
+      {
+        "fold_id": "F5",
+        "train_seasons": [
+          2018,
+          2019,
+          2020,
+          2021,
+          2022,
+          2023,
+          2024
+        ],
+        "test_season": 2025
+      }
+    ],
+    "shuffle": false,
+    "test_season_may_influence_fit": false
+  },
+  "simulation": {
+    "paths_per_game": 50000,
+    "absolute_floor": 10000,
+    "root_seed": null,
+    "rng": "NUMPY_PCG64_SEEDSEQUENCE_V1"
+  },
+  "implementation_identity": {
+    "status": "NOT_FROZEN",
+    "core_path": "sportsedge/sports/nfl/v2k_drive_core_v2.py",
+    "validation_path": "sportsedge/sports/nfl/v2k_attempt2_validation.py",
+    "core_git_blob_sha1": null,
+    "validation_git_blob_sha1": null,
+    "canonical_main_anchor_sha": null
+  },
+  "blocker_codes": [
+    "ATTEMPT2_SIMULATION_MECHANICS_NOT_IMPLEMENTED",
+    "ATTEMPT2_CODE_IDENTITY_NOT_FROZEN",
+    "ATTEMPT2_ROOT_SEED_NOT_FROZEN"
+  ],
+  "attempt_budget": {
+    "max_development_attempts": 5,
+    "attempts_used_expected_before_attempt2": 1,
+    "this_artifact_consumes_attempt": false,
+    "attempt_2_scoring_allowed": false
+  },
+  "integrity": {
+    "market_features_in_fit_forbidden": true,
+    "chronological_walk_forward_required": true,
+    "calibrators_fit_on_training_only": true,
+    "smoke_below_floor_is_not_an_attempt": true
+  }
+}
