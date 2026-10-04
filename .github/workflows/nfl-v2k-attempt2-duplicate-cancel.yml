@@ -1,0 +1,36 @@
+name: nfl-v2k-attempt2-duplicate-cancel
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: write
+  contents: read
+  issues: write
+
+jobs:
+  cancel-duplicate:
+    if: >-
+      github.actor == github.repository_owner &&
+      github.event.issue.number == 1539 &&
+      github.event.comment.body == 'CANCEL_DUPLICATE_ATTEMPT_2_RUN_72'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Cancel only duplicate Attempt-2 workflow run 72
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DUPLICATE_RUN_ID: '37239288703'
+        run: |
+          status="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${DUPLICATE_RUN_ID}" --jq .status)"
+          if [ "$status" = "completed" ]; then
+            echo "duplicate run already completed; refusing any broader cancellation"
+            exit 0
+          fi
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/runs/${DUPLICATE_RUN_ID}/cancel"
+      - name: Record duplicate-cancel receipt
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue comment 1539 --body 'CANCEL REQUEST sent only for duplicate NFL V2K Attempt-2 run 37239288703 (#72). Canonical run 37239231204 (#71) was not targeted. No model, source, seed, threshold, path-count, readout, or authority change.'
