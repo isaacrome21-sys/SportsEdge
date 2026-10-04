@@ -226,8 +226,10 @@ def test_mlb_phone_card_lists_catalog_when_engine_payload_has_no_board():
     ]})
     assert "HITS" in text
     assert "UNDER" in text
-    assert "NO_QUOTE_OR_ENGINE_ROW" in text
-    assert "NOT OFFICIAL" in text
+    assert "Price needed" in text
+    assert "OFFICIAL" not in text
+    assert "Truth Gate" not in text
+    assert "model_p" not in text
     assert "catalog_complete=True" in text or "both_sides=True" in text
 
 
@@ -239,5 +241,7 @@ def test_football_phone_card_lists_catalog_when_engine_payload_has_no_board():
     ]})
     assert "passing_yards" in text
     assert "moneyline" in text
-    assert "NOT OFFICIAL" in text
-    assert "NO_QUOTE_OR_ENGINE_ROW" in text
+    assert "OFFICIAL" not in text
+    assert "Truth Gate" not in text
+    assert "model_p" not in text
+    assert "Price needed" in text

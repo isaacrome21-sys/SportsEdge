@@ -18,16 +18,16 @@ def _board(payload: dict) -> dict:
         nested = summary.get("full_board") or summary.get("all_props_side_totals")
     if isinstance(nested, dict) and nested.get("rows"):
         return nested
-    from sportsedge.football_full_board import catalog_complete, emit_all_props_side_totals
+    from sportsedge.football_full_board import board_from_machine_results, catalog_complete
 
     sport = str(payload.get("sport") or report.get("sport") or "NFL").upper()
     if sport not in {"NFL", "CFB"}:
         sport = "NFL"
-    source = payload.get("results") or payload.get("rows") or []
-    if not isinstance(source, list) and isinstance(report, dict):
-        source = report.get("results") or []
+    source = payload.get("results") or payload.get("rows") or report.get("results") or []
+    if not isinstance(source, list):
+        source = []
     game_rows = [row for row in source if isinstance(row, dict)]
-    board = emit_all_props_side_totals(sport=sport, game_rows=game_rows)
+    board = board_from_machine_results(sport, game_rows)
     payload["full_board"] = board
     card_summary = dict(payload.get("summary") or {})
     card_summary["both_sides"]      = board["summary"]["both_sides"]
@@ -39,96 +39,50 @@ def _board(payload: dict) -> dict:
     return board
 
 
+def _display_note(row: dict) -> str:
+    if row.get("sgp_leg"):
+        return "Combination cannot be evaluated yet"
+    if row.get("american_odds") is None:
+        return "Price needed"
+    if row.get("model_p") is None:
+        return "Cannot evaluate yet"
+    return "Research estimate"
+
+
 def _fmt_board_row(row: dict) -> str:
-    model_p = row.get("model_p")
-    edge    = row.get("edge")
-    return "| {lane} | {market} | {side} | {line} | {odds} | {mp} | {ed} | {status} | {reason} |".format(
-        lane=row.get("lane") or "",
+    # Scores must arrive from the scoring system; probability is not a score.
+    score = row.get("score")
+    return "| {game} | {market} | {side} | {line} | {odds} | {score} | {note} |".format(
+        game=row.get("game_id") or "",
         market=row.get("market") or "",
         side=row.get("selection") or row.get("side") or "",
         line="" if row.get("line") is None else row["line"],
         odds="" if row.get("american_odds") is None else row["american_odds"],
-        mp="" if model_p is None else round(float(model_p), 4),
-        ed="" if edge is None else round(float(edge), 4),
-        status=row.get("presentation") or row.get("bet_status") or "",
-        reason=row.get("reason") or "",
+        score="—" if score is None else score,
+        note=_display_note(row),
     )
 
 
 def render_markdown(payload: dict) -> str:
-    board    = _board(payload)
-    summary  = payload.get("summary") or board.get("summary") or {}
-    funnel   = payload.get("funnel") or {}
-    sgp_legs = payload.get("sgp_legs") or []
-
+    board = _board(payload)
     lines = [
-        f"SportsEdge {payload.get('sport') or board.get('sport') or 'FOOTBALL'}"
-        " — sides, totals, alt lines, props, SGP legs",
-        f"run_status={payload.get('run_status') or payload.get('status')}  "
-        f"both_sides={summary.get('both_sides')}  "
-        f"catalog_complete={summary.get('catalog_complete')}",
-        f"sides={summary.get('side_rows')}  "
-        f"totals={summary.get('total_rows')}  "
-        f"props={summary.get('prop_rows')}  "
-        f"sgp_legs={funnel.get('sgp_legs_parsed', len(sgp_legs))}  "
-        f"bets={funnel.get('bets_emitted', 0)}  "
-        f"sgp_edge+={funnel.get('sgp_edge_positive', 0)}",
+        f"SportsEdge {payload.get('sport') or board.get('sport') or 'FOOTBALL'}",
         "",
-        "Both sides listed. Missing quote = BLOCKED, not omitted.",
-        "Alt lines appear in SIDE/TOTAL lane under surface market name.",
-        "Complement priced only from supplied opposite quote.",
-        "NOT Model_P / NOT Truth Gate / NOT OFFICIAL.",
-        "",
-        "## SIDES / TOTALS / ALT LINES / PROPS",
-        "| lane | market | side | line | odds | model_p | edge | status | reason |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Game | Market | Pick | Line | Price | Score / 100 | Note |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
     ]
-
-    board_rows = list(board.get("rows") or [])
-    board_rows.sort(key=lambda r: (
-        str(r.get("lane") or ""),
-        str(r.get("market") or ""),
-        float(r.get("line") or 0),
-        str(r.get("selection") or r.get("side") or ""),
+    board_rows = sorted(board.get("rows") or [], key=lambda r: (
+        str(r.get("game_id") or ""), str(r.get("market") or ""),
+        float(r.get("line") or 0), str(r.get("selection") or r.get("side") or ""),
     ))
-    for row in board_rows:
-        lines.append(_fmt_board_row(row))
+    lines.extend(_fmt_board_row(row) for row in board_rows)
     if not board_rows:
-        lines.append("|  |  |  |  |  |  |  |  | no board rows |")
-
-    # ---- SGP legs section ----
-    if sgp_legs:
-        lines += [
-            "",
-            "## SGP LEGS (independent prices — correlation NOT modeled)",
-            "Each leg priced in isolation. SGP true probability requires",
-            "joint simulation. Use as per-leg floor checks only.",
-            "",
-            "| leg | game | market | side | line | odds | model_p | edge | status |",
-            "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
-        ]
-        for leg in sgp_legs:
-            mp = leg.get("model_p")
-            ed = leg.get("edge")
-            lines.append(
-                "| {idx} | {game} | {mkt} | {side} | {line} | {odds} | {mp} | {ed} | {st} |".format(
-                    idx=leg.get("leg_index", ""),
-                    game=leg.get("game_id", ""),
-                    mkt=leg.get("market", ""),
-                    side=leg.get("side", ""),
-                    line="" if leg.get("line") is None else leg["line"],
-                    odds="" if leg.get("american_odds") is None else leg["american_odds"],
-                    mp="" if mp is None else round(float(mp), 4),
-                    ed="" if ed is None else round(float(ed), 4),
-                    st=leg.get("bet_status", ""),
-                )
-            )
-
-    lines += [
-        "",
-        "Prop engines remain NO_ENGINE until independently validated.",
-        "SGP correlation not modeled. Card does not grant staking authority.",
-    ]
+        lines.append("| | | | | | | No prices supplied |")
+    if payload.get("sgp_legs"):
+        lines += ["", "SGP legs", "", "Individual legs do not establish a combination's probability.", "",
+                  "| Game | Market | Pick | Line | Price | Score / 100 | Note |",
+                  "| --- | --- | --- | --- | --- | --- | --- |"]
+        lines.extend(_fmt_board_row({**leg, "sgp_leg": True}) for leg in payload["sgp_legs"])
     return "\n".join(lines) + "\n"
 
 

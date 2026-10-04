@@ -39,10 +39,6 @@ from .model_artifact import load_nfl_m2_model_artifact
 
 VALID_MODES = frozenset({"AUTO_SELECT", "MANUAL", "HYBRID", "AUTOMATIC"})
 SUPPORTED_GAME_MARKETS = frozenset({"MONEYLINE", "SPREAD", "TOTAL"})
-# Markets that already carry NO_ENGINE on the machine result and must be
-# skipped before forwarding game rows to build_football_full_board.
-# That function is fail-closed on any unsupported market key.
-_BOARD_SKIP_MARKETS = frozenset({"TEASER", "PARLAY", "SGP", "LIVE_MONEYLINE"})
 NFL_MACHINE_VERSION = "NFL_RUN_MACHINE_V1"
 DEFAULT_QUOTE_TTL_SECONDS = 180
 # The canonical live-feature builder targets games in a 120-minute horizon. A
@@ -488,24 +484,7 @@ def _pair_economics(
 
 
 def _summary(results: Sequence[NFLMachineResult]) -> dict[str, Any]:
-    complete = None
-    try:
-        from sportsedge.football_full_board import emit_all_props_side_totals
-        # TEASER, PARLAY, SGP, and LIVE_MONEYLINE already carry NO_ENGINE on
-        # the machine result. build_football_full_board is fail-closed on any
-        # game market key it does not recognise, so skip these before forwarding.
-        board_rows = [
-            asdict(row) for row in results
-            if str(row.market or "").upper() not in _BOARD_SKIP_MARKETS
-        ]
-        complete = emit_all_props_side_totals(
-            sport="NFL",
-            game_rows=board_rows,
-        )
-    except Exception:  # noqa: BLE001 — surface file may not be present in test CWD
-        pass
     return {
-        "all_props_side_totals": complete,
         "quote_count": len(results),
         "priced": sum(row.engine_status == "PRICED" for row in results),
         "stale": sum(row.reason == "NFL_QUOTE_STALE" for row in results),
@@ -588,15 +567,6 @@ def _run_canonical(
             }
             economics = _pair_economics(pair, probabilities, stale=stale)
             for row in economics:
-                reason = str(row["reason"])
-                edge = None if row["edge"] is None else float(row["edge"])
-                ev = None if row["ev_per_dollar"] is None else float(row["ev_per_dollar"])
-                bet_status = "BLOCKED"
-                if reason == "NFL_PROMOTION_EVIDENCE_REQUIRED" and edge is not None and ev is not None and edge > 0 and ev > 0:
-                    bet_status = "OFFICIAL_BET"
-                    reason = "EDGE_POSITIVE"
-                elif reason == "NFL_PROMOTION_EVIDENCE_REQUIRED":
-                    reason = "NO_EDGE"
                 results.append(NFLMachineResult(
                     game_id=game_id,
                     market=market,
@@ -608,11 +578,11 @@ def _run_canonical(
                     fair_market_p=None if row["fair_market_p"] is None else float(row["fair_market_p"]),
                     raw_implied_p=None if row["raw_implied_p"] is None else float(row["raw_implied_p"]),
                     hold=None if row["hold"] is None else float(row["hold"]),
-                    edge=edge,
-                    ev_per_dollar=ev,
-                    bet_status=bet_status,
+                    edge=None if row["edge"] is None else float(row["edge"]),
+                    ev_per_dollar=None if row["ev_per_dollar"] is None else float(row["ev_per_dollar"]),
+                    bet_status="BLOCKED",
                     engine_status="PRICED",
-                    reason=reason,
+                    reason=str(row["reason"]),
                     model_artifact_sha256=artifact_sha,
                     model_code_git_sha=code_sha,
                     training_source_manifest_sha256=training_sha,
@@ -628,11 +598,12 @@ def _run_canonical(
     ordered = tuple(sorted(results, key=lambda row: (row.game_id, row.market, row.side)))
     if not ordered:
         raise NFLRunMachineError("NFL_RUN_RESULTS_EMPTY")
-    run_status = "READY" if any(row.bet_status == "OFFICIAL_BET" for row in ordered) else "BLOCKED"
+    # Even a technically healthy M2/quote run remains blocked at the wager layer
+    # until promotion evidence and a frozen floor exist.
     return NFLMachineReport(
         mode=mode,
         generated_at_utc=current.isoformat(),
-        run_status=run_status,
+        run_status="BLOCKED",
         machine_version=NFL_MACHINE_VERSION,
         results=ordered,
         summary=_summary(ordered),

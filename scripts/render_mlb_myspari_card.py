@@ -100,24 +100,22 @@ def both_side_board_section(payload: dict) -> str:
         f"both_sides={summary.get('both_sides')} catalog_complete={payload.get('summary', {}).get('catalog_complete')} "
         f"sides={summary.get('side_rows')} totals={summary.get('total_rows')} props={summary.get('prop_rows')}",
         "Both sides are listed. A missing quote is BLOCKED, not omitted. Complements are priced only from a supplied opposite quote.",
-        "NOT Model_P / NOT Truth Gate / NOT OFFICIAL.",
         "",
-        "| lane | market | side | line | odds | model_p | status | reason |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| lane | market | side | line | odds | score / 100 | note |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
     ]
     rows.sort(key=lambda row: (str(row.get("lane") or ""), str(row.get("market") or ""), str(row.get("entity_id") or ""), str(row.get("side") or "")))
     for row in rows:
         model_p = row.get("model_p")
         lines.append(
-            "| {lane} | {market} | {side} | {line} | {odds} | {model_p} | {status} | {reason} |".format(
+            "| {lane} | {market} | {side} | {line} | {odds} | {score} | {note} |".format(
                 lane=row.get("lane") or "",
                 market=row.get("market") or "",
                 side=row.get("side") or "",
                 line="" if row.get("line") is None else row.get("line"),
                 odds="" if row.get("american_odds") is None else row.get("american_odds"),
-                model_p="" if model_p is None else round(float(model_p), 4),
-                status=row.get("presentation") or "",
-                reason=row.get("reason") or "",
+                score="—" if row.get("score") is None else row["score"],
+                note="Price needed" if row.get("american_odds") is None else "Cannot evaluate yet" if model_p is None else "Research estimate",
             )
         )
     return "\n".join(lines) + "\n"
@@ -198,8 +196,8 @@ def main() -> int:
             notes.append("Timestamp provenance: INTAKE_STAMPED at GitHub issue intake/edit time; not a sportsbook timestamp.")
         elif timestamp_sources:
             notes.append(f"Timestamp provenance: {', '.join(timestamp_sources)}.")
-    notes.append("Probabilities are the SportsEdge engines' own model_p (engine_registry); this card only pairs, scores and ranks them.")
-    notes.append("NOT Truth Gate / NOT OFFICIAL. Unpriceable = NO_MODEL.")
+    notes.append("Scores rank the available estimates; missing evaluations remain marked.")
+
     if any("QUOTE_MOVE_NEEDS_CONFIRM" in (r.get("presentation_reason_codes") or ()) for r in rows):
         notes.append("NEEDS_CONFIRM: a price moved past the frozen screenshot-misread thresholds vs an earlier same-game board. Look twice. Model_p is unchanged.")
 

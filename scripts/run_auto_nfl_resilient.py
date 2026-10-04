@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 from datetime import date, datetime, timezone
 import json
+import math
 import os
 from pathlib import Path
 import sys
@@ -132,38 +133,22 @@ def _side_probability(
     spread_sigma: float,
     total_sigma: float,
 ) -> float | None:
-    """Price any side/spread/total market through the sigma model."""
-    s = surface_market
+    """Research estimates for supported full-game markets only."""
     sd = side.upper()
-
-    # moneyline family (half/quarter get tighter sigma)
-    if s in {"moneyline", "first_half_moneyline", "second_half_moneyline", "quarter_moneyline"}:
-        sigma = spread_sigma * (0.65 if "half" in s else 0.45 if "quarter" in s else 1.0)
-        home_p = _phi(margin / sigma)
-        if sd in {"HOME", "H"}:   return home_p
-        if sd in {"AWAY", "A"}:   return 1.0 - home_p
-        return None
-
-    # spread family (main + alts + halves + quarters)
-    if s in {"spread", "alternate_spread", "first_half_spread", "second_half_spread", "quarter_spread"}:
+    if surface_market == "moneyline":
+        home_p = _phi(margin / spread_sigma)
+        return home_p if sd in {"HOME", "H"} else 1.0 - home_p if sd in {"AWAY", "A"} else None
+    if surface_market in {"spread", "alternate_spread"}:
         if line is None or sd not in {"HOME", "AWAY"}:
             return None
-        sigma = spread_sigma * (0.65 if "half" in s else 0.45 if "quarter" in s else 1.0)
         home_line = float(line) if sd == "HOME" else -float(line)
-        cover = _phi((margin + home_line) / sigma)
+        cover = _phi((margin + home_line) / spread_sigma)
         return cover if sd == "HOME" else 1.0 - cover
-
-    # total family (main + alts + team + halves + quarters)
-    if s in {"total", "alternate_total", "team_total",
-             "first_half_total", "second_half_total", "quarter_total"}:
+    if surface_market in {"total", "alternate_total"}:
         if line is None or sd not in {"OVER", "UNDER"}:
             return None
-        # team totals: approximate as ~45% of game total
-        ref = total * 0.45 if s == "team_total" else total
-        sigma = total_sigma * (0.65 if "half" in s else 0.45 if "quarter" in s else 1.0)
-        over = _phi((ref - float(line)) / sigma)
+        over = _phi((total - float(line)) / total_sigma)
         return over if sd == "OVER" else 1.0 - over
-
     return None
 
 
@@ -241,14 +226,25 @@ def _price_quote(
         or f"{game_row.get('away_team') or game_row.get('away')}@{game_row.get('home_team') or game_row.get('home')}"
     )
 
-    model_p = quote.get("model_p", game_row.get("model_p"))
-    if model_p is None and margin_total is not None:
+    supported = surface_market in {"moneyline", "spread", "alternate_spread", "total", "alternate_total"}
+    model_p = quote.get("model_p") if supported else None
+    push_p = quote.get("push_p")
+    push_unknown = surface_market in {"spread", "alternate_spread", "total", "alternate_total"} and line is not None and line.is_integer() and push_p is None
+    if supported and model_p is None and margin_total is not None:
         model_p = _side_probability(
             margin_total[0], margin_total[1],
             surface_market, side, line,
             spread_sigma, total_sigma,
         )
 
+    if push_unknown:
+        model_p = None
+    if model_p is not None and (not math.isfinite(float(model_p)) or not 0 <= float(model_p) <= 1):
+        raise ValueError("NFL_PROBABILITY_INVALID")
+    if push_p is not None and (not math.isfinite(float(push_p)) or not 0 <= float(push_p) <= 1 or float(model_p or 0) + float(push_p) > 1):
+        raise ValueError("NFL_PUSH_PROBABILITY_INVALID")
+    if odds is not None and (not math.isfinite(odds) or abs(odds) < 100):
+        raise ValueError("NFL_AMERICAN_ODDS_INVALID")
     edge = None
     if model_p is not None and odds is not None:
         edge = float(model_p) - _american_implied(float(odds))
@@ -265,14 +261,54 @@ def _price_quote(
         "american_odds": odds,
         "opposite_odds": quote.get("opposite_odds"),
         "model_p":       None if model_p is None else float(model_p),
+        "push_p":        push_p,
         "edge":          edge,
-        "bet_status":    "BET" if is_bet else "NO_BET",
+        "bet_status":    "RESEARCH_LEAN" if is_bet else "BLOCKED",
         "reason": (
-            "EDGE_POSITIVE" if is_bet
+            "NO_ENGINE" if not supported else "PUSH_PROBABILITY_REQUIRED" if push_unknown else
+            "RESEARCH_EDGE_POSITIVE" if is_bet
             else ("NO_EDGE" if model_p is not None else "MODEL_P_UNAVAILABLE")
         ),
         "official_eligible": False,
     }
+
+
+def _comparison_rows(results: list[dict]) -> list[dict]:
+    """Compare exact opposing quotes; never manufacture a missing price."""
+    def identity(row):
+        line = row.get("line")
+        if row["market"] in {"spread", "alternate_spread"} and row["side"] == "AWAY" and line is not None:
+            line = -line
+        return row["game_id"], row["market"], line
+
+    for row in results:
+        p, odds = row.get("model_p"), row.get("american_odds")
+        row.update(fair_market_p=None, ev_per_dollar=None, edge=None)
+        opposite_side = {"HOME": "AWAY", "AWAY": "HOME", "OVER": "UNDER", "UNDER": "OVER"}.get(row["side"])
+        siblings = [other for other in results if other is not row and identity(other) == identity(row) and other["side"] == opposite_side and other.get("american_odds") is not None]
+        opposite = row.get("opposite_odds")
+        if opposite is None and len(siblings) == 1:
+            opposite = siblings[0]["american_odds"]
+            row["opposite_odds"] = opposite
+        if odds is None or p is None:
+            continue
+        decimal = 1 + (odds / 100 if odds > 0 else 100 / abs(odds))
+        push = float(row.get("push_p") or 0)
+        row["ev_per_dollar"] = p * (decimal - 1) - (1 - p - push)
+        if opposite is None:
+            row.update(bet_status="BLOCKED", reason="PAIRED_PRICE_REQUIRED")
+            continue
+        opposite = float(opposite)
+        if not math.isfinite(opposite) or abs(opposite) < 100:
+            raise ValueError("NFL_OPPOSITE_ODDS_INVALID")
+        raw = _american_implied(odds)
+        fair = raw / (raw + _american_implied(opposite))
+        row["fair_market_p"] = fair
+        row["edge"] = p / (1 - push) - fair if push < 1 else None
+        positive = row["edge"] is not None and row["edge"] > 0 and row["ev_per_dollar"] > 0
+        row["bet_status"] = "RESEARCH_LEAN" if positive and odds >= -165 else "BLOCKED"
+        row["reason"] = "PRICE_ABOVE_STRAIGHT_LIMIT" if odds < -165 else "RESEARCH_EDGE_POSITIVE" if positive else "NO_EDGE"
+    return results
 
 
 def build_card(
@@ -335,9 +371,11 @@ def build_card(
         result = _price_quote(leg, leg, forecasts.get(game_id), spread_sigma, total_sigma)
         result["leg_index"] = idx
         result["sgp_leg"] = True
+        result["bet_status"] = "BLOCKED"
+        result["reason"] = "SGP_JOINT_ENGINE_UNAVAILABLE"
         result["correlation_note"] = (
-            "UNCORRELATED_INDEPENDENT_PRICE — SGP true probability requires "
-            "joint simulation; this is a per-leg floor only."
+            "INDIVIDUAL_LEG_ONLY — no joint SGP probability or bound; "
+            "joint simulation and separate validation are required."
         )
         sgp_results.append(result)
 
@@ -347,8 +385,10 @@ def build_card(
         prop_rows=prop_rows_board,
     )
 
-    bets     = [r for r in results    if r.get("bet_status") == "BET"]
-    sgp_bets = [r for r in sgp_results if r.get("bet_status") == "BET"]
+    _comparison_rows(results)
+    research_leans = sorted([r for r in results if r.get("bet_status") == "RESEARCH_LEAN"], key=lambda r: r["ev_per_dollar"], reverse=True)
+    bets = []
+    sgp_bets = []
     blocked  = quote_rows == 0 and not sgp_results
 
     return {
@@ -362,6 +402,7 @@ def build_card(
         "total_sigma":         total_sigma,
         "results":             results,
         "bets":                bets,
+        "research_leans":      research_leans,
         "sgp_legs":            sgp_results,
         "sgp_bets":            sgp_bets,
         "full_board":          board,
@@ -375,7 +416,7 @@ def build_card(
         "funnel": {
             "odds_rows_fetched":  quote_rows,
             "model_priced":       sum(r.get("model_p") is not None for r in results),
-            "edge_positive":      len(bets),
+            "edge_positive":      len(research_leans),
             "bets_emitted":       len(bets),
             "sgp_legs_parsed":    len(sgp_results),
             "sgp_edge_positive":  len(sgp_bets),
