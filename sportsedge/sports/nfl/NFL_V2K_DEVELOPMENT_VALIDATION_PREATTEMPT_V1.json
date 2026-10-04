@@ -106,14 +106,12 @@
   },
   "unresolved_required_freezes": {
     "chronological_fold_plan": null,
-    "rng_algorithm_version_and_seed_policy": null,
-    "simulation_count": null,
+    "root_seed_and_per_game_path_keying": null,
     "predictive_acceptance_thresholds": null
   },
   "blocker_codes": [
     "V2K_FOLD_PLAN_NOT_FROZEN",
-    "V2K_RNG_SEED_POLICY_NOT_FROZEN",
-    "V2K_SIMULATION_COUNT_NOT_FROZEN",
+    "V2K_ROOT_SEED_KEYING_NOT_FROZEN",
     "V2K_PREDICTIVE_THRESHOLDS_NOT_FROZEN"
   ],
   "attempt_budget": {
@@ -151,5 +149,19 @@
     "empirical_reference_git_blob_sha1": "7483f6c2a9a09c4b260797010d3765601dedd9ed",
     "attempt_ledger_git_blob_sha1": "14022680891de3c3d73013ffabc8aee4611e86e6",
     "implementation_admission_git_blob_sha1": "0f836c435cb78586da0cf6f609fcbec008fcad93"
+  },
+  "attempt1_issue_binding": {
+    "issue": 693,
+    "status": "CONTROLLING_PRE_SCORE_FREEZE_REQUIREMENTS",
+    "rng_algorithm": "NUMPY_PCG64",
+    "seed_derivation": "NUMPY_SEEDSEQUENCE_EXPLICIT_INTEGER_ROOT_DETERMINISTIC_PER_GAME_PER_PATH",
+    "root_seed": null,
+    "simulation_count_paths_per_game": 50000,
+    "absolute_simulation_floor_paths_per_game": 10000,
+    "shuffled_rows_forbidden": true,
+    "chronological_walk_forward_required": true,
+    "calibrators_fit_on_training_only": true,
+    "reused_history_role": "REUSED_RESEARCH_HISTORY_NOT_FINAL_HOLDOUT",
+    "no_fresh_untouched_population_terminal_state": "INSUFFICIENT_FRESH_UNTOUCHED_EVIDENCE"
   }
 }
