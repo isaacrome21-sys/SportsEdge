@@ -246,6 +246,52 @@ def projection_sane(home: float, away: float, quotes: list) -> bool:
     return True
 
 
+def market_implied_scores(quotes: list):
+    """(home, away) points implied by the quoted spread and total; None if either is missing."""
+    hl = tot = None
+    for q in quotes:
+        m, side = str(q.get("market", "")).upper(), str(q.get("side", "")).upper()
+        if m == "SPREAD" and q.get("line") is not None and hl is None:
+            hl = float(q["line"]) if side == "HOME" else -float(q["line"])
+        if m == "TOTAL" and q.get("line") is not None and tot is None:
+            tot = float(q["line"])
+    if hl is None or tot is None:
+        return None
+    return (tot - hl) / 2.0, (tot + hl) / 2.0
+
+
+def market_only_rows(board: list, reason: str) -> list:
+    """Card rows when the model's data source (CFBD) is down: de-vigged market only.
+
+    model_p is set to the no-vig market price, so edge is 0 and nothing is a bet
+    or a lean. Every row is TRACK. This keeps the phone card working (prices,
+    fair odds, market-implied scores) instead of posting a traceback.
+    """
+    out = []
+    for i, row in enumerate(board):
+        row = expand_compact(row)
+        quotes = row.get("quotes") or []
+        if not quotes:
+            continue
+        matchup = (f"{row.get('away')} @ {row.get('home')}" if row.get("away") and row.get("home")
+                   else str(row.get("game_id") or f"game {i + 1}"))
+        scores = market_implied_scores(quotes)
+        home, away = scores if scores else (float("nan"), float("nan"))
+        priced = price_game(row.get("game_id"), 0.0, 0.0, quotes)
+        for r in priced:
+            r.update({
+                "matchup": matchup,
+                "model_p": r["market_p"],
+                "edge": 0.0,
+                "home_mean": round(home, 2) if home == home else home,
+                "away_mean": round(away, 2) if away == away else away,
+                "bet_status": "TRACK",
+                "reason": "MODEL_UNAVAILABLE:" + reason,
+            })
+            out.append(r)
+    return out
+
+
 def build_rows(board: list, season: int, week: int, asof, fit_path=None):
     from sportsedge.sports.cfb.candidate_live_source import (
         attach_candidate_snapshots_to_game_row,
@@ -356,7 +402,22 @@ def main() -> int:
         raise SystemExit("CFB_SDV_BOARD_ARRAY_REQUIRED")
     model = load_selected_sdv_fit(args.fit)
     results = []
-    for row in build_rows(board, args.season, args.week, args.asof, args.fit):
+    fallback = None
+    try:
+        game_rows = build_rows(board, args.season, args.week, args.asof, args.fit)
+    except (Exception, SystemExit) as exc:  # CFBD quota/outage or unresolvable names
+        msg = str(exc)
+        fallback = ("CFBD_RATE_LIMITED" if "429" in msg else
+                    "CFBD_KEY_MISSING" if "API_KEY_REQUIRED" in msg else
+                    "NO_GAMES_RESOLVED" if "NO_GAMES_RESOLVED" in msg else
+                    "CFBD_SOURCE_FAILED")
+        print(f"CFB_SDV_MARKET_ONLY model data unavailable ({fallback}: {msg[:160]}); "
+              "card shows no-vig market prices and market-implied scores only, 0 bets, 0 leans")
+        game_rows = []
+        results = market_only_rows(board, fallback)
+        if not results:
+            raise
+    for row in game_rows:
         try:
             blind = {k: v for k, v in row.items() if k != "quotes"}  # model is market-blind
             home, away = score_selected_game(model, blind)
@@ -379,6 +440,7 @@ def main() -> int:
         "edge_floor": EDGE_FLOOR,
         "sportsbook_api_used": False,
         "validated_markets": sorted(VALIDATED_MARKETS),
+        "model_status": "MARKET_ONLY:" + fallback if fallback else "MODEL",
         "bets": sum(r.get("bet_status") == "BET" for r in results),
         "leans": sum(r.get("bet_status") == "LEAN" for r in results),
         "results": sorted(results, key=lambda r: -(r.get("edge") or -9)),
@@ -387,7 +449,7 @@ def main() -> int:
     args.output.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     # Visible in the phone comment (lines containing CFB_SDV_ are echoed).
     leans = [r for r in payload["results"] if r.get("bet_status") == "LEAN"]
-    if not VALIDATED_MARKETS:
+    if not VALIDATED_MARKETS and not fallback:
         print("CFB_SDV_NO_VALIDATED_EDGE model failed out-of-sample test vs closing lines (#1471); "
               f"{len(leans)} leans below are tracking only, not bets")
     for r in leans:
