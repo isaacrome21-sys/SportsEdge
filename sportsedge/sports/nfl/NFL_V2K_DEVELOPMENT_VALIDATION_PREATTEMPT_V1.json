@@ -105,11 +105,13 @@
     "key_success_cannot_rescue_calibration_failure": true
   },
   "unresolved_required_freezes": {
+    "final_hardened_implementation_identity": null,
     "chronological_fold_plan": null,
     "root_seed_and_per_game_path_keying": null,
     "predictive_acceptance_thresholds": null
   },
   "blocker_codes": [
+    "V2K_FINAL_IMPLEMENTATION_IDENTITY_NOT_FROZEN",
     "V2K_FOLD_PLAN_NOT_FROZEN",
     "V2K_ROOT_SEED_KEYING_NOT_FROZEN",
     "V2K_PREDICTIVE_THRESHOLDS_NOT_FROZEN"
@@ -135,20 +137,16 @@
   "governance_provenance": {
     "human_policy_selection_issue": 616,
     "human_policy_selection_comment_id": 5662476744,
-    "human_policy_selection_body_sha256": "22598423589abda5ea2ad7754189411477738d07c6911cd468bbcdc57fc55ddf",
     "attempt0_design_issue": 620,
     "attempt0_finalization_comment_id": 5664137348,
     "attempt0_merge_commit": "7ed79c51e790d393108864513c34dd296d9fd175"
   },
   "implementation_identity": {
-    "v2k_drive_core_path": "sportsedge/sports/nfl/v2k_drive_core.py",
-    "v2k_drive_core_git_blob_sha1": "fa05003b05bbb953a83b6572d4ccd0fd312445c4",
-    "v2k_drive_source_path": "sportsedge/sports/nfl/v2k_drive_source.py",
-    "v2k_drive_source_git_blob_sha1": "6cd506e7985d957b6c4f156ae5ff1a24a5bc8023",
-    "preregistration_git_blob_sha1": "f8487883186fc85b77f4e632b1aa710327473b8a",
-    "empirical_reference_git_blob_sha1": "7483f6c2a9a09c4b260797010d3765601dedd9ed",
-    "attempt_ledger_git_blob_sha1": "14022680891de3c3d73013ffabc8aee4611e86e6",
-    "implementation_admission_git_blob_sha1": "0f836c435cb78586da0cf6f609fcbec008fcad93"
+    "status": "PENDING_POST_RNG_HARDENING_BINDING",
+    "required_successor_pr": 1516,
+    "baseline_attempt0_merge_commit": "7ed79c51e790d393108864513c34dd296d9fd175",
+    "exact_code_identity_frozen_for_attempt1": false,
+    "reason": "Issue #693 requires PCG64/SeedSequence hardening before attempt-1 freeze. Bind exact implementation bytes only after the hardened core is canonical."
   },
   "attempt1_issue_binding": {
     "issue": 693,
