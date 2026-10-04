@@ -1,9 +1,8 @@
-# MLB backlog E: can pitcher props leave the LEAN tier? — pre-registration (v1, 2026-10-04)
+# MLB backlog E: can pitcher props leave the LEAN tier? — pre-registration (v2, 2026-10-04)
 
 Tracking: #1482 (backlog item E). Written and committed **before** any graded result was
 seen: no outcome has been joined to any archived quote, and no model price has been
-computed for any archived quote. The runner will print the SHA-256 of this file so the
-result comment is bound to this exact protocol.
+computed for any archived quote. **v2 was amended before any outcome/price join** solely because PR #1542 landed the validated announced-lineup K production adjustment after v1 was written. No archived result was inspected between v1 and v2. The runner will print the SHA-256 of this file so the result comment is bound to this exact protocol.
 
 ## Question
 Pitcher props (PITCHER_K, PITCHER_BB, PITCHER_ER, PITCHER_HITS_ALLOWED) are capped at LEAN
@@ -41,11 +40,14 @@ One unit = (provider event, pitcher, market). Built as follows, in order:
    completed, the unit is dropped (counted). These would be voided by the book.
 4. **Production parity:** compute model_p with the production pricing path for that
    date: own last ≤10 starts in seasons Y-1 and Y strictly before the game date; k ≥ 5
-   path with the shipped lanes (K: opp-K beta = 1; BB: umpire W = 6000, beta = 2, using
-   the game's actual plate umpire; ER and HITS_ALLOWED: own history); k = 1..4 has no
-   validated path for these four markets, so those units are BLOCKED and dropped
-   (counted). The runner must reuse the research `predict` functions already proven equal
-   to `pitcher_joint_engine` to 1e-12, and a test must re-check that equality.
+   path with the shipped lanes (K: opp-K beta = 1 plus the announced-lineup K layer
+   validated in #1540 when the lineup is posted, W = 200 and gamma = 0.5; if that lineup
+   input is unavailable, production retains the opp-K price; BB: umpire W = 6000,
+   beta = 2, using the game's actual plate umpire; ER and HITS_ALLOWED: own history).
+   k = 1..4 has no validated path for these four promotion markets, so those units are
+   BLOCKED and dropped (counted). The runner must use the same production feature builder
+   and `pitcher_joint_engine` pricing path and must include parity tests against the frozen
+   research implementations for every shipped adjustment it exercises.
    History is regular-season only (`gameType=R`), as in production today, so a
    postseason unit is priced from regular-season starts.
 
@@ -83,8 +85,11 @@ result; this study exists so the tier is set by evidence, not by default.
 
 ## What this study does not do
 - It does not change model_p and does not tune anything: every model parameter is the
-  one already shipped. No market-anchored blend is tested here (that would need its own
-  pre-registration and a tune/test split).
+  one already shipped as of the preregistration freeze, including the #1540 lineup-K
+  layer now wired by #1542. If any covered production pricing code changes again before
+  the one allowed final look, this protocol must be re-frozen before that look. No
+  market-anchored blend is tested here (that would need its own pre-registration and a
+  tune/test split).
 - PITCHER_OUTS, PITCHER_HITS_WALKS_ER and EITHER_PITCHER markets are out of scope
   (the archive has almost no two-sided quotes for them).
 - Batter props are out of scope.
