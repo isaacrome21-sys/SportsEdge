@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from scripts.acquire_cfb_reconstructed_selection import _resolve_venue
 from sportsedge.sports.cfb.venue_coordinates import try_venue_coordinates, venue_indexes
 
 
@@ -16,6 +17,19 @@ class TestAcquireVenueSkipContract(unittest.TestCase):
         self.assertEqual(set(by_id), {"10", "12"})
         self.assertIn("camp randall", by_name)
         self.assertIsNone(try_venue_coordinates(rows[1]))
+
+    def test_unresolved_game_is_omitted_without_placeholder(self):
+        by_id, by_name = venue_indexes([
+            {"id": 10, "name": "Camp Randall", "dome": False, "latitude": 43.07, "longitude": -89.41},
+        ])
+        resolved = _resolve_venue(
+            {"game_id": "99", "venue_id": "404", "venue": "Unknown Bowl"},
+            by_id=by_id,
+            by_name=by_name,
+        )
+        self.assertIsNone(resolved)
+        blob = str(by_id)
+        self.assertNotIn("PLACEHOLDER", blob)
 
 
 if __name__ == "__main__":

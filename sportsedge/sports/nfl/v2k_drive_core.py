@@ -10,15 +10,22 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from math import isfinite
-from random import Random
+import hashlib
+
+from numpy.random import Generator, PCG64, SeedSequence
 from typing import Iterable, Mapping, Sequence
 
 DRIVE_OUTCOMES = ("TD", "FG", "TURNOVER", "PUNT_OTHER", "SAFETY", "DEF_ST_SCORE")
-STATE_BUCKETS = ("NORMAL", "LATE_TIED", "LATE_TRAILING", "LATE_LEADING", "OVERTIME")
+STATE_BUCKETS = ("NORMAL", "LATE_TIED", "LATE_TRAILING_ONE_POSSESSION", "LATE_TRAILING_MULTI_POSSESSION", "LATE_LEADING", "OVERTIME")
 FIELD_BUCKETS = ("SHORT_FIELD", "MID_FIELD", "LONG_FIELD")
 TERMINATION_REASONS = ("NORMAL", "END_OF_HALF", "END_OF_GAME")
-OVERTIME_RULE_VERSION = "NFL_2025_REG_BOTH_TEAMS_POSSESS_V1"
+OVERTIME_RULE_2017_2024 = "NFL_2017_2024_REG_MODIFIED_SUDDEN_DEATH_V1"
+OVERTIME_RULE_2025_PLUS = "NFL_2025_REG_BOTH_TEAMS_POSSESS_V1"
+# Backward-compatible name for callers that only need the current ruleset.
+OVERTIME_RULE_VERSION = OVERTIME_RULE_2025_PLUS
 TRUNCATION_POLICY_VERSION = "V2K_DRIVE_LEVEL_HALF_GAME_TRUNCATION_V1"
+RNG_ALGORITHM_VERSION = "NUMPY_PCG64_SEEDSEQUENCE_V1"
+SEED_DERIVATION_VERSION = "V2K_SHA256_GAME_KEY_SEEDSEQUENCE_SPAWN_V1"
 
 
 def _field_bucket(yardline_100: float) -> str:
@@ -33,14 +40,23 @@ def _field_bucket(yardline_100: float) -> str:
 def _state_bucket(period: int, clock_seconds: int, offense_score: int, defense_score: int, *, overtime: bool = False) -> str:
     if overtime:
         return "OVERTIME"
-    if int(period) < 4 or int(clock_seconds) > 300:
+    # Attempt-0 design freeze uses the NFL two-minute boundary, not an
+    # arbitrary five-minute window.
+    if int(period) < 4 or int(clock_seconds) > 120:
         return "NORMAL"
     diff = int(offense_score) - int(defense_score)
     if diff == 0:
         return "LATE_TIED"
     if diff < 0:
-        return "LATE_TRAILING"
+        return "LATE_TRAILING_ONE_POSSESSION" if diff >= -8 else "LATE_TRAILING_MULTI_POSSESSION"
     return "LATE_LEADING"
+
+
+def overtime_rule_version(season: int) -> str:
+    """Return the regular-season overtime ruleset frozen for a season."""
+    if isinstance(season, bool) or not isinstance(season, int) or season < 2017:
+        raise ValueError("V2K_OVERTIME_SEASON_INVALID")
+    return OVERTIME_RULE_2025_PLUS if season >= 2025 else OVERTIME_RULE_2017_2024
 
 
 @dataclass(frozen=True)
@@ -236,7 +252,7 @@ class SimulationResult:
     path: tuple[Mapping[str, object], ...]
 
 
-def _draw_named(probs: Mapping[object, float], order: Sequence[object], rng: Random):
+def _draw_named(probs: Mapping[object, float], order: Sequence[object], rng: Generator):
     u = rng.random()
     c = 0.0
     for key in order:
@@ -256,11 +272,33 @@ def _clock_state(next_drive_index: int, regulation_drives: int) -> tuple[int, in
     return period, seconds
 
 
+def _seed_sequence_for_path(*, root_seed: int, game_key: str, path_index: int) -> SeedSequence:
+    if isinstance(root_seed, bool) or not isinstance(root_seed, int):
+        raise ValueError("V2K_ROOT_SEED_REQUIRED")
+    if not str(game_key or "").strip():
+        raise ValueError("V2K_GAME_KEY_REQUIRED")
+    if isinstance(path_index, bool) or not isinstance(path_index, int) or path_index < 0:
+        raise ValueError("V2K_PATH_INDEX_INVALID")
+    digest = hashlib.sha256(str(game_key).encode("utf-8")).digest()
+    game_words = [
+        int.from_bytes(digest[offset : offset + 4], "big")
+        for offset in range(0, 16, 4)
+    ]
+    return SeedSequence([root_seed, *game_words, path_index])
+
+
+def derive_path_seed(*, root_seed: int, game_key: str, path_index: int) -> int:
+    """Derive one deterministic integer seed without consuming a shared RNG stream."""
+    ss = _seed_sequence_for_path(root_seed=root_seed, game_key=game_key, path_index=path_index)
+    return int(ss.generate_state(1, dtype="uint64")[0])
+
+
 def simulate_joint_game(
     model: HierarchicalStrength,
     home_team: str,
     away_team: str,
     *,
+    season: int,
     seed: int,
     regulation_drives: int | None = None,
     max_overtime_drives: int = 8,
@@ -268,15 +306,18 @@ def simulate_joint_game(
 ) -> SimulationResult:
     if home_team == away_team or max_overtime_drives <= 0:
         raise ValueError("V2K_SIMULATION_ARGUMENT_INVALID")
-    rng = Random(seed)
+    ot_rule = overtime_rule_version(season)
+    if isinstance(seed, bool) or not isinstance(seed, int):
+        raise ValueError("V2K_SEED_REQUIRED")
+    rng = Generator(PCG64(SeedSequence(seed)))
     if regulation_drives is None:
         if not model.regulation_drive_counts:
             raise ValueError("V2K_POSSESSION_DISTRIBUTION_REQUIRED")
-        regulation_drives = int(model.regulation_drive_counts[rng.randrange(len(model.regulation_drive_counts))])
+        regulation_drives = int(model.regulation_drive_counts[int(rng.integers(len(model.regulation_drive_counts)))])
     if regulation_drives <= 0:
         raise ValueError("V2K_SIMULATION_ARGUMENT_INVALID")
     if opening_possession is None:
-        opening_possession = home_team if rng.randrange(2) == 0 else away_team
+        opening_possession = home_team if int(rng.integers(2)) == 0 else away_team
     if opening_possession not in (home_team, away_team):
         raise ValueError("V2K_OPENING_POSSESSION_INVALID")
 
@@ -286,18 +327,18 @@ def simulate_joint_game(
     path: list[Mapping[str, object]] = []
     ot_drives = 0
 
-    while state.drive_index < regulation_drives or (state.home_score == state.away_score and ot_drives < max_overtime_drives):
+    while state.drive_index < regulation_drives or (ot_drives < max_overtime_drives and (ot_drives < 2 or state.home_score == state.away_score)):
         in_ot = state.drive_index >= regulation_drives
         if in_ot:
             ot_drives += 1
         if in_ot and ot_drives == 1:
-            offense = home_team if rng.randrange(2) == 0 else away_team
+            offense = home_team if int(rng.integers(2)) == 0 else away_team
         else:
             offense = state.possession
         defense = away_team if offense == home_team else home_team
         offense_score = state.home_score if offense == home_team else state.away_score
         defense_score = state.away_score if offense == home_team else state.home_score
-        start_field = model.start_field_positions[rng.randrange(len(model.start_field_positions))]
+        start_field = model.start_field_positions[int(rng.integers(len(model.start_field_positions)))]
         bucket = _state_bucket(state.period, state.seconds_remaining_period, offense_score, defense_score, overtime=in_ot)
         outcome_probs = model.probabilities(offense, defense, start_yardline_100=start_field, state_bucket=bucket)
         outcome = _draw_named(outcome_probs, DRIVE_OUTCOMES, rng)
@@ -314,7 +355,7 @@ def simulate_joint_game(
         elif outcome == "DEF_ST_SCORE":
             if not model.exceptional_score_points:
                 raise ValueError("V2K_EXCEPTIONAL_SCORE_EMPIRICAL_SUPPORT_REQUIRED")
-            pts_def = int(model.exceptional_score_points[rng.randrange(len(model.exceptional_score_points))])
+            pts_def = int(model.exceptional_score_points[int(rng.integers(len(model.exceptional_score_points)))])
 
         first_ot_defensive_score = in_ot and ot_drives == 1 and pts_def > 0
         home, away = state.home_score, state.away_score
@@ -350,19 +391,27 @@ def simulate_joint_game(
             "termination_reason": termination_reason,
             "truncation_policy_version": TRUNCATION_POLICY_VERSION,
             "overtime": in_ot,
-            "overtime_rule_version": OVERTIME_RULE_VERSION if in_ot else None,
+            "overtime_rule_version": ot_rule if in_ot else None,
         })
 
         period, seconds = _clock_state(next_index, regulation_drives)
         if termination_reason == "END_OF_HALF":
             next_possession = second_half_opening
+        elif outcome == "DEF_ST_SCORE":
+            # A defensive/special-teams touchdown is followed by a kickoff from
+            # the scoring defense back to the prior offense.
+            next_possession = offense
         else:
             next_possession = defense
         state = GameState(home_team, away_team, next_possession, home, away, 5 if in_ot else period, 0 if in_ot else seconds, next_index, in_ot)
         if first_ot_defensive_score:
             break
-        # 2025 regular-season rule: both teams get one possession even after an
-        # opening offensive TD/FG; after both opportunities, a lead ends the game.
+        # 2017-2024 regular season: an opening-possession offensive TD ends OT.
+        # A first-possession FG/no-score still gives the opponent an opportunity.
+        if in_ot and ot_drives == 1 and ot_rule == OVERTIME_RULE_2017_2024 and pts_off >= 6:
+            break
+        # 2025+ regular season guarantees both teams an initial possession even
+        # after an opening offensive TD. After both opportunities, a lead ends.
         if in_ot and home != away and ot_drives >= 2:
             break
 
