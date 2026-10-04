@@ -1071,10 +1071,16 @@
       "merge_sha": "4a132b1a68f4e84ee00499dabb3520199aac4948",
       "pr": 1377,
       "note": "Registers the merged NFL unified MLB-style card/runtime surface. Reconciliation determines any covered-bundle impact; this provenance record grants no model, validation, promotion, staking, Truth Gate, or OFFICIAL authority."
+    },
+    {
+      "delta_id": "PR_1452_RECONCILIATION_HEAD",
+      "merge_sha": "3d9b595d71fea2a994494866814d460281bdab84",
+      "pr": 1452,
+      "note": "Hash-bound reconciliation head after syncing current main into #1452. Hosted audit run 37195840000 proved 522/522 candidate surfaces mapped or exactly exempt with zero unmapped and no stale exemptions. This record grants zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
     }
   ],
-  "inventory_block_reason": "Bundle inventory remains intentionally incomplete; current main through PR_1377 is registered, affected covered freezes remain fail-closed, and this reconciliation grants zero model or betting authority.",
+  "inventory_block_reason": "Completion is asserted only through the hash-bound hosted zero-unmapped proof in config/reconciliation_coverage_v1.json; base registry flag remains false by design.",
   "issue": 686,
-  "reconciled_through_sha": "4a132b1a68f4e84ee00499dabb3520199aac4948",
+  "reconciled_through_sha": "3d9b595d71fea2a994494866814d460281bdab84",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
