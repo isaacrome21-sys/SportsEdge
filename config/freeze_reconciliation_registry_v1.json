@@ -1707,10 +1707,16 @@
       "merge_sha": "52fd1e6afeed517751c6aba608279c03e419f6d7",
       "pr": 1543,
       "note": "NFL V2K Attempt-2 readout freeze and score-derived diagnostics. No attempt consumed by merge; no Model_P, promotion, staking, production release, or OFFICIAL authority created."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_7D4CE8E4_PR_1547",
+      "merge_sha": "7d4ce8e4adde7450196d811e00e218e4ad02fd75",
+      "pr": 1547,
+      "note": "Owner-only NFL V2K Attempt-2 workflow dispatch bridge. Zero model change and zero Model_P, promotion, staking, production-release, or OFFICIAL authority."
     }
   ],
-  "inventory_block_reason": "Current main through merge 52fd1e6a / PR #1543 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
+  "inventory_block_reason": "Current main through merge 7d4ce8e4 / PR #1547 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "52fd1e6afeed517751c6aba608279c03e419f6d7",
+  "reconciled_through_sha": "7d4ce8e4adde7450196d811e00e218e4ad02fd75",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
