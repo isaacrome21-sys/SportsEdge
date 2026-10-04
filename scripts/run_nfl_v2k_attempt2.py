@@ -24,9 +24,31 @@ def _fold(contract, fold_id):
         if f["fold_id"]==fold_id: return f
     raise SystemExit("V2K_UNKNOWN_FOLD:"+fold_id)
 
+def _source_verifier_contract(contract):
+    """Adapt the frozen source manifest to the legacy verifier without changing model identity."""
+    binding=dict(contract.get("source_binding") or {})
+    freeze_path=binding.get("source_freeze_path")
+    seasons=binding.get("pbp_seasons")
+    if not freeze_path or not isinstance(seasons,list) or not seasons:
+        raise SystemExit("V2K_SOURCE_BINDING_INCOMPLETE")
+    freeze=json.loads((v.ROOT / freeze_path).read_text(encoding="utf-8"))
+    expected=((freeze.get("seasonal_sources") or {}).get("pbp") or {}).get("expected_sha256_by_season") or {}
+    selected={}
+    for season in seasons:
+        sha=expected.get(str(season))
+        if not sha:
+            raise SystemExit(f"V2K_SOURCE_FREEZE_PBP_SHA_MISSING:{season}")
+        selected[str(season)]=sha
+    adapted=dict(contract)
+    adapted["source_binding"]={**binding,"pbp_sha256_by_season":selected}
+    return adapted
+
+def _verify_frozen_sources(pbp_dir, schedule, contract):
+    return v.verify_sources(pbp_dir,schedule,_source_verifier_contract(contract))
+
 def cmd_simulate(a):
     pf=v.preflight(paths=a.paths, smoke=a.smoke); contract=pf["contract"]
-    sources=v.verify_sources(a.pbp_dir,a.schedule,contract)
+    sources=_verify_frozen_sources(a.pbp_dir,a.schedule,contract)
     identity=v.schedule_identity(v.load_schedule(a.schedule))
     fold=_fold(contract,a.fold); manifest=contract["source_binding"]["source_manifest_sha256"]
     seasons=sorted(set(fold["train_seasons"])|{fold["test_season"]})
@@ -41,7 +63,7 @@ def cmd_evaluate(a):
     smoke={s.get("smoke") for s in shards}; paths={s["paths_per_game"] for s in shards}; codes={s.get("code_sha") for s in shards}
     if len(smoke)!=1 or len(paths)!=1 or len(codes)!=1: raise SystemExit("V2K_SHARDS_MIXED_RUNS")
     is_smoke=smoke.pop(); pf=v.preflight(paths=paths.pop(),smoke=is_smoke); contract=pf["contract"]
-    v.verify_sources(a.pbp_dir,a.schedule,contract)
+    _verify_frozen_sources(a.pbp_dir,a.schedule,contract)
     result=v.evaluate(shards,v.load_schedule(a.schedule),contract)
     result.update({"code_sha":codes.pop(),"smoke":is_smoke,"run_status":"NOT_AN_ATTEMPT_SMOKE" if is_smoke else "ATTEMPT2_CONSUMED","attempt_consumed":not is_smoke,"root_seed":_binding(contract)["root_seed"],"paths_per_game":shards[0]["paths_per_game"]})
     a.out.parent.mkdir(parents=True,exist_ok=True); a.out.write_text(json.dumps(result,indent=2,sort_keys=True)+"\n")
