@@ -52,15 +52,11 @@ class NflV2KReferenceV2ProposalTest(unittest.TestCase):
         self.assertFalse(self.proposal["build_attestation"]["frozen_v1_reference_mutated"])
         self.assertFalse(self.proposal["implementation_admitted"])
 
-    def test_attempt_ledger_records_attempt1_exposure_without_authority(self):
-        self.assertEqual(self.ledger["status"], "ATTEMPT1_EXPOSURE_RECORDED_ATTEMPT2_PENDING")
-        self.assertEqual(self.ledger["attempts_used"], 1)
+    def test_attempt_ledger_remains_frozen_before_implementation(self):
+        self.assertEqual(self.ledger["status"], "FROZEN_BEFORE_IMPLEMENTATION")
+        self.assertEqual(self.ledger["attempts_used"], 0)
         self.assertFalse(self.ledger["untouched_readout_allowed"])
-        self.assertEqual(len(self.ledger["attempts"]), 1)
-        attempt = self.ledger["attempts"][0]
-        self.assertEqual(attempt["attempt_number"], 1)
-        self.assertFalse(attempt["execution"]["valid_scored_attempt"])
-        self.assertTrue(attempt["budget_accounting"]["consumes_development_attempt_budget"])
+        self.assertEqual(self.ledger["attempts"], [])
         self.assertTrue(all(v is False for v in self.ledger["authority"].values()))
 
     def test_both_conflicting_reference_windows_are_reported_without_default(self):
