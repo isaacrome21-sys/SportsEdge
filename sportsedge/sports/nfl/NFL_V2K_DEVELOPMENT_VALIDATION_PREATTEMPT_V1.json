@@ -1,0 +1,137 @@
+{
+  "schema": "NFL_V2K_DEVELOPMENT_VALIDATION_PREATTEMPT_V1",
+  "status": "BLOCKED_PRE_ATTEMPT_FREEZE_INCOMPLETE",
+  "candidate_family": "NFL_V2K_DRIVE_HIERARCHICAL_JOINT_G1",
+  "purpose": "Machine-enforce the V2K development-validation prerequisites that are already fixed, and refuse scoring until every remaining preregistered identity is explicitly frozen. This artifact does not consume an attempt and grants no bettor-facing authority.",
+  "population_contract": {
+    "selected_policy": "MODERN_REG_2018_2025",
+    "first_season": 2018,
+    "last_season": 2025,
+    "season_types": [
+      "REG"
+    ],
+    "covid_2020": "INCLUDED_PRIMARY_NORMAL_WEIGHT_FLAGGED_SENSITIVITY_ONLY",
+    "market_features_in_fit_forbidden": true,
+    "v2j_untouched_values_for_tuning_forbidden": true,
+    "use_2026": "SHADOW_ARCHIVE_ONLY"
+  },
+  "source_binding": {
+    "source_freeze_path": "config/nfl_promotion_source_freeze_v1.json",
+    "source_freeze_contract": "NFL_PROMOTION_SOURCE_FREEZE_V1",
+    "source_manifest_sha256": "b7ff10325b69dd140e8c9d40971475595871e43f8d5a3c2ed2d9ffa8774c0723",
+    "pbp_seasons": [
+      2018,
+      2019,
+      2020,
+      2021,
+      2022,
+      2023,
+      2024,
+      2025
+    ],
+    "pbp_sha256_by_season": {
+      "2018": "d37899610b397b96a90da6902827de5b46c5457b93e0e16d5f95a8eb524e4a7d",
+      "2019": "b764668137052be23745953cbc33fa17e537a70c81e9b73785a19a15e7288216",
+      "2020": "bc954b5780e325df4faa255fac092585c981a4de5d2f553a8a4e0a3c8b3a3cf2",
+      "2021": "e8743a568f99667a8bdcd29ba12224ee1782ad2b7916bee78ee335c099383739",
+      "2022": "0c69a71eb39498956c7b1d5c1ca52ce7fe679934a95d1af249facb5ea9829ea4",
+      "2023": "4649804ee0f0a40b41e51ec75a1ce921949d7fab5459213488656b92f78560e8",
+      "2024": "23370d5d10f8104d80d46a1fc5e61f4f6f5a3263fe96fe2dd629913cfcb08c06",
+      "2025": "2f135887790a013fd004e609e37096bb4816d5cc80b9f19122e1bad478961978"
+    }
+  },
+  "feature_contract": {
+    "source_adapter": "sportsedge.sports.nfl.v2k_drive_source:build_drive_rows_from_pbp",
+    "required_input_fields": [
+      "game_id",
+      "season",
+      "week",
+      "kickoff_utc",
+      "drive_id",
+      "play_index",
+      "offense",
+      "defense",
+      "start_yardline_100",
+      "drive_result",
+      "offense_score_before",
+      "defense_score_before",
+      "offense_score_after",
+      "defense_score_after",
+      "period",
+      "clock_seconds_remaining_period"
+    ],
+    "optional_input_fields": [
+      "conversion_points",
+      "drive_order"
+    ],
+    "forbidden_market_fields": [
+      "spread",
+      "closing_spread",
+      "total",
+      "closing_total",
+      "moneyline",
+      "home_odds",
+      "away_odds",
+      "implied_probability",
+      "market_probability"
+    ],
+    "drive_outcomes": [
+      "TD",
+      "FG",
+      "TURNOVER",
+      "PUNT_OTHER",
+      "SAFETY",
+      "DEF_ST_SCORE"
+    ],
+    "overtime_rule_version": "NFL_2025_REG_BOTH_TEAMS_POSSESS_V1",
+    "truncation_policy_version": "V2K_DRIVE_LEVEL_HALF_GAME_TRUNCATION_V1"
+  },
+  "already_frozen_gates": {
+    "signed_keys": [
+      -7,
+      -3,
+      3,
+      7
+    ],
+    "absolute_signed_key_mass_error_max": 0.005,
+    "control_calibration_slope": 0.6559729344130425,
+    "control_calibration_slope_metric": 0.3440270655869575,
+    "candidate_calibration_slope_metric_must_be_strictly_less_than_control": true,
+    "control_signed_key_mass_rmse": 0.03333957857632348,
+    "candidate_signed_key_mass_rmse_must_be_strictly_less_than_control": true,
+    "both_structural_improvements_required": true,
+    "calibration_cannot_rescue_predictive_failure": true,
+    "predictive_success_cannot_rescue_key_failure": true,
+    "key_success_cannot_rescue_calibration_failure": true
+  },
+  "unresolved_required_freezes": {
+    "chronological_fold_plan": null,
+    "rng_algorithm_version_and_seed_policy": null,
+    "simulation_count": null,
+    "predictive_acceptance_thresholds": null
+  },
+  "blocker_codes": [
+    "V2K_FOLD_PLAN_NOT_FROZEN",
+    "V2K_RNG_SEED_POLICY_NOT_FROZEN",
+    "V2K_SIMULATION_COUNT_NOT_FROZEN",
+    "V2K_PREDICTIVE_THRESHOLDS_NOT_FROZEN"
+  ],
+  "attempt_budget": {
+    "max_development_attempts": 5,
+    "attempts_used": 0,
+    "this_artifact_consumes_attempt": false,
+    "attempt_1_scoring_allowed": false,
+    "untouched_readout_allowed": false
+  },
+  "authority": {
+    "research_contract": true,
+    "development_validation_execution": false,
+    "untouched_readout": false,
+    "model_p": false,
+    "pricing": false,
+    "promotion": false,
+    "staking": false,
+    "run_it": false,
+    "official": false
+  }
+}
