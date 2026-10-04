@@ -151,26 +151,10 @@
         "tests/test_cfb_model_selection"
       ],
       "disposition": {
-        "authority": {
-          "eligibility": false,
-          "model_p": false,
-          "official": false,
-          "promotion": false,
-          "staking": false,
-          "truth_gate": false,
-          "validation_attempt": false
-        },
-        "forward_clock_restart_at": "2026-09-18T12:01:33Z",
-        "new_bundle_id": "CFB_CANDIDATE_PREREG_FREEZE_V3",
-        "new_freeze_sha": "529b06af94061a5eb86efd9909b15b62cefce938",
-        "prior_bundle_freeze_sha": "4629afd60972fe73eb0217508dc7a4ae51ce6ccf",
+        "state": "REVOKED",
+        "revoked_at": "2026-10-04T10:29:44Z",
         "prior_forward_clock_invalidated": true,
-        "reason": "MACHINE_VERIFIED_POST_PR833_WEEK1_CORRECTED_CANDIDATE_BYTES_AND_CODE_MANIFEST; PR833_IN_ANCESTRY; ZERO_ATTEMPTS; NO_EVALUATION_ROWS; REFROZEN_FAIL_CLOSED_FOR_SELECTION_SCOPE_ONLY",
-        "row_admissibility_semantics": "PREREGISTRATION_ONLY_NO_EVALUATION_ROWS_V1",
-        "selection_scope_only": true,
-        "state": "REFROZEN",
-        "trigger_delta_sha": "4fc4aa9a60b69137a0efc4d7d59ccee95f53b0bb",
-        "verification_schema": "CFB_CANDIDATE_PREREG_REFREEZE_V1"
+        "reason": "HOSTED_AUDIT_RUN_37195515830_CONFIRMED_POST_REFREEZE_COVERED_SURFACE_EXPANSION; MACHINE_VERIFIED_V3_REFREEZE_NO_LONGER_COVERS_EFFECTIVE_CANDIDATE_SURFACE; REVOKED_FAIL_CLOSED_NO_AUTHORITY"
       },
       "freeze_sha": "4629afd60972fe73eb0217508dc7a4ae51ce6ccf"
     },

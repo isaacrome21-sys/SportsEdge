@@ -190,8 +190,11 @@
         "config/run_it_surface.json",
         "config/ufc_promotion_contract_v1.json",
         "docs/CFB_FREEZE_CARD_PROTOCOL.md",
+        "docs/CFB_RESEARCH_RANK_PREREG_V1.md",
         "docs/LIVE_DATA_ARCHIVE_V1.md",
         "docs/LIVE_ENGINE_V1.md",
+        "docs/MLB_OPP_K_CONTEXT_PREREG.md",
+        "docs/MLB_PITCHER_PRIOR_FALLBACK_PREREG.md",
         "docs/MLB_RUN_IT_PREGAME.md",
         "docs/MLB_V8_RUN_IT_SCHEMA_2026-09-03.json",
         "docs/football/FRESH_VALIDATION_WINDOW_V1.md",
@@ -203,8 +206,6 @@
         "docs/mlb_historical_dk_replay_audit.md",
         "docs/nrfi_durable_evidence_recovery.md",
         "docs/shared_acquisition_contract.md",
-        "docs/MLB_PITCHER_PRIOR_FALLBACK_PREREG.md",
-        "docs/CFB_RESEARCH_RANK_PREREG_V1.md",
         "scripts/archive_mlb_pit_lineup_starters.py",
         "scripts/archive_raw_game_odds_paired.py",
         "scripts/attest_mlb_v8_actual_starts.py",
@@ -359,7 +360,8 @@
     "sportsedge/sports/nhl/official_roster_source.py": "NHL_NO_ACTIVE_BUNDLE",
     "sportsedge/sports/nhl/public_baseline.py": "NHL_NO_ACTIVE_BUNDLE",
     "sportsedge/sports/nhl/team_shot_history.py": "NHL_NO_ACTIVE_BUNDLE",
-    "tests/test_cfb_reconstructed_selection_preflight.py": "TEST_ONLY_CFB_PROVIDER_PREFLIGHT_NO_RUNTIME_AUTHORITY"
+    "tests/test_cfb_reconstructed_selection_preflight.py": "TEST_ONLY_CFB_PROVIDER_PREFLIGHT_NO_RUNTIME_AUTHORITY",
+    "config/reconciliation_coverage_v1.json": "RECONCILIATION_COVERAGE_EXTENSION_GOVERNANCE_CONTROL_ZERO_MODEL_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY"
   },
   "inventory_completion_claim": null,
   "bundle_dispositions": {
@@ -376,12 +378,6 @@
       "reason": "CONFIRMED_DRIFT_REVOKED_PENDING_STABLE_MAIN_REFREEZE"
     },
     "CFB_PROP_MODEL_FREEZE_V1": {
-      "state": "REVOKED",
-      "revoked_at": "2026-09-14T17:10:32Z",
-      "prior_forward_clock_invalidated": true,
-      "reason": "CONFIRMED_DRIFT_REVOKED_PENDING_STABLE_MAIN_REFREEZE"
-    },
-    "CFB_CANDIDATE_PREREG_FREEZE_V1": {
       "state": "REVOKED",
       "revoked_at": "2026-09-14T17:10:32Z",
       "prior_forward_clock_invalidated": true,
