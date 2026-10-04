@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sportsedge.mlb_card_blocked import blocked_notes  # noqa: E402
 from sportsedge.mlb_pitcher_prior import fallback_notes  # noqa: E402
+from sportsedge.mlb_opp_k_context import opp_k_notes  # noqa: E402
 from sportsedge.mlb_context_card import context_section  # noqa: E402
 from sportsedge.mlb_myspari_own_model import MYSPARI_OWN_MODEL_VERSION, myspari_rows, render_markdown, team_entity_names  # noqa: E402
 from sportsedge.mlb_quote_move_guard import apply_quote_move_guard  # noqa: E402
@@ -172,6 +173,7 @@ def main() -> int:
             notes.append(f"{rg.get('game_pk')}: {rg.get('away_team')} @ {rg.get('home_team')}, first pitch {rg.get('scheduled_start_utc')}")
     notes.extend(blocked_notes(payload))
     notes.extend(fallback_notes(payload, names))
+    notes.extend(opp_k_notes(payload, names))
     notes.append(f"Lines observed {observed.isoformat() if observed else 'unknown'}; card built {now.isoformat(timespec='seconds')}.")
     if args.snapshot and Path(args.snapshot).is_file():
         raw = Path(args.snapshot).read_bytes()

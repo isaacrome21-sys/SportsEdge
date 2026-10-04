@@ -115,7 +115,9 @@ def _splits(payload: Mapping[str, Any], *, target_date: date) -> list[Mapping[st
                 continue
             stat = split.get("stat")
             if isinstance(stat, Mapping):
-                rows.append({"date": d, "stat": stat})
+                opponent = split.get("opponent")
+                opp_id = _nonnegative_integer(opponent.get("id")) if isinstance(opponent, Mapping) else None
+                rows.append({"date": d, "stat": stat, "opponent_id": opp_id})
     rows.sort(key=lambda x: x["date"])
     return rows
 
@@ -348,8 +350,12 @@ class MLBGenericHistorySource:
 
     def pitcher_joint_rows(self, *, player_id: int, target_date: date) -> list[dict[str, int]]:
         """Last <=10 strictly-prior regular-season starts, without a minimum-size gate."""
+        return [row for row, _, _ in self._pitcher_start_rows(player_id=player_id, target_date=target_date)]
+
+    def _pitcher_start_rows(self, *, player_id: int, target_date: date) -> list[tuple[dict[str, int], date, int | None]]:
+        """(joint row, game date, opponent team id) for the last <=10 strictly-prior starts."""
         rows = self.player_rows(player_id=player_id, group="pitching", target_date=target_date)
-        out: list[dict[str, int]] = []
+        out: list[tuple[dict[str, int], date, int | None]] = []
         for row in rows:
             s = row["stat"]
             if _number(s.get("gamesStarted", 0), "gamesStarted") < 1:
@@ -364,8 +370,43 @@ class MLBGenericHistorySource:
             walks = _nonnegative_integer(s.get("baseOnBalls", 0))
             if None in {ks, er, hits, walks} or not 0 <= outs <= 27:
                 continue
-            out.append({"strikeouts": ks, "outs": outs, "earned_runs": er, "hits_allowed": hits, "walks_allowed": walks})
+            out.append(({"strikeouts": ks, "outs": outs, "earned_runs": er, "hits_allowed": hits, "walks_allowed": walks},
+                        row["date"], row.get("opponent_id")))
         return out[-10:]
+
+    def _mlb_team_ids(self, season: int) -> list[int]:
+        payload = _read_json(f"https://statsapi.mlb.com/api/v1/teams?{urlencode({'sportId': 1, 'season': int(season)})}", opener=self.opener)
+        return sorted(int(t["id"]) for t in payload.get("teams") or [] if isinstance(t, Mapping) and _nonnegative_integer(t.get("id")))
+
+    def opp_k_index(self, target_date: date):
+        """Opponent strikeout index for the slate (built once, memoized, failures memoized too)."""
+        from .mlb_opp_k_context import build_index
+        cache = self.__dict__.setdefault("_opp_k_index_cache", {})
+        if target_date not in cache:
+            try:
+                cache[target_date] = build_index(self._team_season, self._mlb_team_ids(target_date.year), target_date)
+            except Exception as exc:  # noqa: BLE001 - lane degrades to the unadjusted price
+                cache[target_date] = exc
+        return cache[target_date]
+
+    def _opp_k_payload(self, *, player_id: int, target_date: date, team_id: int | None,
+                       away_team_id: int, home_team_id: int) -> tuple[dict[str, Any] | None, str | None]:
+        """Validated opp-K lane (#1509) for the k>=5 path; (payload, None) or (None, why unadjusted)."""
+        from .mlb_opp_k_context import adjustment_features, opponent_of
+        opp = opponent_of(team_id, away_team_id, home_team_id)
+        if opp is None:
+            return None, "pitcher's team not resolved to this game"
+        starts = self._pitcher_start_rows(player_id=player_id, target_date=target_date)
+        if any(o is None for _, _, o in starts):
+            return None, "opponent missing on a prior start"
+        index = self.opp_k_index(target_date)
+        if isinstance(index, Exception):
+            return None, f"opponent K index unavailable ({type(index).__name__})"
+        try:
+            return adjustment_features(index, target_opp_id=opp, target_date=target_date,
+                                       history=[(d, int(o)) for _, d, o in starts]), None
+        except Exception as exc:  # noqa: BLE001
+            return None, f"opponent K index invalid ({exc})"
 
     def pitcher_win_probability(self, *, player_id: int, target_date: date) -> float:
         rows = self.player_rows(player_id=player_id, group="pitching", target_date=target_date)
@@ -401,6 +442,15 @@ class MLBGenericHistorySource:
                     pool = self.pitcher_joint_history(player_id=player_id, target_date=target_date)
                     base["features"] = {"history_pool": pool}
                     base["joint_feature_version"] = "mlb_pitcher_joint_history_v1"
+                    if market == "PITCHER_K":
+                        # Validated context lane 1 (#1508/#1509): opponent K index, k>=5 only.
+                        adj, why = self._opp_k_payload(player_id=player_id, target_date=target_date, team_id=team_id,
+                                                       away_team_id=away_team_id, home_team_id=home_team_id)
+                        if adj is not None:
+                            base["features"]["opp_k_adjustment"] = adj
+                            base["joint_feature_version"] = "mlb_pitcher_joint_history_opp_k_v1"
+                        else:
+                            base["opp_k_unadjusted"] = why
                 except MLBGenericFeatureError:
                     # Validated few-starts fallback (#1482/#1495): PITCHER_OUTS/PITCHER_K with
                     # 1..4 own starts, shrunk toward the frozen prior-season league_short pool.
