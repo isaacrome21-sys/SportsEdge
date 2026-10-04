@@ -1,0 +1,405 @@
+{
+  "observed_at": "2026-10-04T18:05:30-05:00",
+  "games": [
+    {
+      "away": "DET",
+      "home": "CAR",
+      "markets": [
+        {
+          "market": "moneyline",
+          "away_or_over_price": -198,
+          "home_or_under_price": 164,
+          "raw": "DET ML -198 / CAR ML +164"
+        },
+        {
+          "market": "spread",
+          "line": -3.5,
+          "away_or_over_price": -120,
+          "home_or_under_price": 100,
+          "raw": "DET -3.5 -120 / CAR +3.5 +100"
+        },
+        {
+          "market": "total",
+          "line": 51.5,
+          "away_or_over_price": -112,
+          "home_or_under_price": -108,
+          "raw": "O 51.5 -112 / U 51.5 -108"
+        },
+        {
+          "market": "spread",
+          "line": -4.5,
+          "away_or_over_price": -109,
+          "home_or_under_price": -122,
+          "raw": "DET -4.5 -109 / CAR +4.5 -122"
+        },
+        {
+          "market": "total",
+          "line": 52.5,
+          "away_or_over_price": -104,
+          "home_or_under_price": -128,
+          "raw": "O 52.5 -104 / U 52.5 -128"
+        },
+        {
+          "player": "Jared Goff",
+          "market": "passing_yards",
+          "line": 257.5,
+          "away_or_over_price": -112,
+          "home_or_under_price": -112,
+          "raw": "Goff pass yds 257.5"
+        },
+        {
+          "player": "Bryce Young",
+          "market": "passing_yards",
+          "line": 243.5,
+          "away_or_over_price": -111,
+          "home_or_under_price": -113,
+          "raw": "Young pass yds 243.5"
+        },
+        {
+          "player": "Jared Goff",
+          "market": "pass_tds",
+          "line": 1.5,
+          "away_or_over_price": -195,
+          "home_or_under_price": 152,
+          "raw": "Goff pass TD 1.5"
+        },
+        {
+          "player": "Bryce Young",
+          "market": "pass_tds",
+          "line": 1.5,
+          "away_or_over_price": -133,
+          "home_or_under_price": 104,
+          "raw": "Young pass TD 1.5"
+        },
+        {
+          "player": "Jared Goff",
+          "market": "interceptions",
+          "line": 0.5,
+          "away_or_over_price": 112,
+          "home_or_under_price": -143,
+          "raw": "Goff INT 0.5"
+        },
+        {
+          "player": "Bryce Young",
+          "market": "interceptions",
+          "line": 0.5,
+          "away_or_over_price": -128,
+          "home_or_under_price": 100,
+          "raw": "Young INT 0.5"
+        },
+        {
+          "player": "Bryce Young",
+          "market": "pass_attempts",
+          "line": 35.5,
+          "away_or_over_price": -104,
+          "home_or_under_price": -123,
+          "raw": "Young pass attempts 35.5"
+        },
+        {
+          "player": "Jared Goff",
+          "market": "pass_attempts",
+          "line": 32.5,
+          "away_or_over_price": -119,
+          "home_or_under_price": -107,
+          "raw": "Goff pass attempts 32.5"
+        },
+        {
+          "player": "Jared Goff",
+          "market": "completions",
+          "line": 22.5,
+          "away_or_over_price": -119,
+          "home_or_under_price": -107,
+          "raw": "Goff completions 22.5"
+        },
+        {
+          "player": "Bryce Young",
+          "market": "completions",
+          "line": 21.5,
+          "away_or_over_price": -111,
+          "home_or_under_price": -115,
+          "raw": "Young completions 21.5"
+        },
+        {
+          "player": "Jahmyr Gibbs",
+          "market": "rushing_yards",
+          "line": 96.5,
+          "away_or_over_price": -110,
+          "home_or_under_price": -114,
+          "raw": "Gibbs rush yds 96.5"
+        },
+        {
+          "player": "Chuba Hubbard",
+          "market": "rushing_yards",
+          "line": 66.5,
+          "away_or_over_price": -113,
+          "home_or_under_price": -111,
+          "raw": "Hubbard rush yds 66.5"
+        },
+        {
+          "player": "Bryce Young",
+          "market": "rushing_yards",
+          "line": 12.5,
+          "away_or_over_price": -115,
+          "home_or_under_price": -109,
+          "raw": "Young rush yds 12.5"
+        },
+        {
+          "player": "AJ Dillon",
+          "market": "rushing_yards",
+          "line": 12.5,
+          "away_or_over_price": -113,
+          "home_or_under_price": -111,
+          "raw": "AJ Dillon rush yds 12.5"
+        },
+        {
+          "player": "Sione Vaki",
+          "market": "rushing_yards",
+          "line": 11.5,
+          "away_or_over_price": -115,
+          "home_or_under_price": -109,
+          "raw": "Sione Vaki rush yds 11.5"
+        },
+        {
+          "player": "Jared Goff",
+          "market": "rushing_yards",
+          "line": 1.5,
+          "away_or_over_price": -104,
+          "home_or_under_price": -121,
+          "raw": "Goff rush yds 1.5"
+        },
+        {
+          "player": "Jahmyr Gibbs",
+          "market": "rush_attempts",
+          "line": 20.5,
+          "away_or_over_price": -124,
+          "home_or_under_price": -103,
+          "raw": "Gibbs rush attempts 20.5"
+        },
+        {
+          "player": "Chuba Hubbard",
+          "market": "rush_attempts",
+          "line": 16.5,
+          "away_or_over_price": -123,
+          "home_or_under_price": -103,
+          "raw": "Hubbard rush attempts 16.5"
+        },
+        {
+          "player": "Bryce Young",
+          "market": "rush_attempts",
+          "line": 2.5,
+          "away_or_over_price": -132,
+          "home_or_under_price": 103,
+          "raw": "Young rush attempts 2.5"
+        },
+        {
+          "player": "Jahmyr Gibbs",
+          "market": "rush_receiving_yards",
+          "line": 138.5,
+          "away_or_over_price": -113,
+          "home_or_under_price": -112,
+          "raw": "Gibbs rush+rec yds 138.5"
+        },
+        {
+          "player": "Chuba Hubbard",
+          "market": "rush_receiving_yards",
+          "line": 90.5,
+          "away_or_over_price": -113,
+          "home_or_under_price": -113,
+          "raw": "Hubbard rush+rec yds 90.5"
+        },
+        {
+          "player": "Amon-Ra St. Brown",
+          "market": "receiving_yards",
+          "line": 78.5,
+          "away_or_over_price": -109,
+          "home_or_under_price": -115,
+          "raw": "St. Brown rec yds 78.5"
+        },
+        {
+          "player": "Tetairoa McMillan",
+          "market": "receiving_yards",
+          "line": 73.5,
+          "away_or_over_price": -110,
+          "home_or_under_price": -114,
+          "raw": "McMillan rec yds 73.5"
+        },
+        {
+          "player": "Jameson Williams",
+          "market": "receiving_yards",
+          "line": 51.5,
+          "away_or_over_price": -110,
+          "home_or_under_price": -114,
+          "raw": "Jameson Williams rec yds 51.5"
+        },
+        {
+          "player": "Sam LaPorta",
+          "market": "receiving_yards",
+          "line": 49.5,
+          "away_or_over_price": -110,
+          "home_or_under_price": -114,
+          "raw": "LaPorta rec yds 49.5"
+        },
+        {
+          "player": "Jahmyr Gibbs",
+          "market": "receiving_yards",
+          "line": 37.5,
+          "away_or_over_price": -113,
+          "home_or_under_price": -111,
+          "raw": "Gibbs rec yds 37.5"
+        },
+        {
+          "player": "Darren Waller",
+          "market": "receiving_yards",
+          "line": 37.5,
+          "away_or_over_price": -109,
+          "home_or_under_price": -115,
+          "raw": "Waller rec yds 37.5"
+        },
+        {
+          "player": "Brycen Tremayne",
+          "market": "receiving_yards",
+          "line": 33.5,
+          "away_or_over_price": -111,
+          "home_or_under_price": -113,
+          "raw": "Brycen Tremayne rec yds 33.5"
+        },
+        {
+          "player": "Chuba Hubbard",
+          "market": "receiving_yards",
+          "line": 18.5,
+          "away_or_over_price": -112,
+          "home_or_under_price": -112,
+          "raw": "Hubbard rec yds 18.5"
+        },
+        {
+          "player": "Isaac TeSlaa",
+          "market": "receiving_yards",
+          "line": 17.5,
+          "away_or_over_price": -112,
+          "home_or_under_price": -112,
+          "raw": "Isaac TeSlaa rec yds 17.5"
+        },
+        {
+          "player": "Tommy Tremble",
+          "market": "receiving_yards",
+          "line": 13.5,
+          "away_or_over_price": -113,
+          "home_or_under_price": -111,
+          "raw": "Tommy Tremble rec yds 13.5"
+        },
+        {
+          "player": "Mitchell Evans",
+          "market": "receiving_yards",
+          "line": 7.5,
+          "away_or_over_price": -116,
+          "home_or_under_price": -108,
+          "raw": "Mitchell Evans rec yds 7.5"
+        },
+        {
+          "player": "Brock Wright",
+          "market": "receiving_yards",
+          "line": 5.5,
+          "away_or_over_price": -109,
+          "home_or_under_price": -115,
+          "raw": "Brock Wright rec yds 5.5"
+        },
+        {
+          "player": "Amon-Ra St. Brown",
+          "market": "receptions",
+          "line": 7.5,
+          "away_or_over_price": 115,
+          "home_or_under_price": -146,
+          "raw": "St. Brown receptions 7.5"
+        },
+        {
+          "player": "Tetairoa McMillan",
+          "market": "receptions",
+          "line": 5.5,
+          "away_or_over_price": 111,
+          "home_or_under_price": -142,
+          "raw": "McMillan receptions 5.5"
+        },
+        {
+          "player": "Jahmyr Gibbs",
+          "market": "receptions",
+          "line": 4.5,
+          "away_or_over_price": -125,
+          "home_or_under_price": -102,
+          "raw": "Gibbs receptions 4.5"
+        },
+        {
+          "player": "Sam LaPorta",
+          "market": "receptions",
+          "line": 4.5,
+          "away_or_over_price": 116,
+          "home_or_under_price": -149,
+          "raw": "LaPorta receptions 4.5"
+        },
+        {
+          "player": "Darren Waller",
+          "market": "receptions",
+          "line": 3.5,
+          "away_or_over_price": -111,
+          "home_or_under_price": -114,
+          "raw": "Waller receptions 3.5"
+        },
+        {
+          "player": "Jameson Williams",
+          "market": "receptions",
+          "line": 3.5,
+          "away_or_over_price": -104,
+          "home_or_under_price": -123,
+          "raw": "Jameson Williams receptions 3.5"
+        },
+        {
+          "player": "Chuba Hubbard",
+          "market": "receptions",
+          "line": 2.5,
+          "away_or_over_price": -161,
+          "home_or_under_price": 126,
+          "raw": "Hubbard receptions 2.5"
+        },
+        {
+          "player": "Brycen Tremayne",
+          "market": "receptions",
+          "line": 2.5,
+          "away_or_over_price": -122,
+          "home_or_under_price": -105,
+          "raw": "Brycen Tremayne receptions 2.5"
+        },
+        {
+          "player": "Tommy Tremble",
+          "market": "receptions",
+          "line": 1.5,
+          "away_or_over_price": -152,
+          "home_or_under_price": 119,
+          "raw": "Tommy Tremble receptions 1.5"
+        },
+        {
+          "player": "Isaac TeSlaa",
+          "market": "receptions",
+          "line": 1.5,
+          "away_or_over_price": -101,
+          "home_or_under_price": -126,
+          "raw": "Isaac TeSlaa receptions 1.5"
+        },
+        {
+          "player": "Mitchell Evans",
+          "market": "receptions",
+          "line": 1.5,
+          "away_or_over_price": 166,
+          "home_or_under_price": -214,
+          "raw": "Mitchell Evans receptions 1.5"
+        },
+        {
+          "player": "Brock Wright",
+          "market": "receptions",
+          "line": 0.5,
+          "away_or_over_price": -145,
+          "home_or_under_price": 113,
+          "raw": "Brock Wright receptions 0.5"
+        }
+      ]
+    }
+  ]
+}
