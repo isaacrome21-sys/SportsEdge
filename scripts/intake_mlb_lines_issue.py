@@ -29,7 +29,13 @@ RESEARCH_DIRECTIVES = {
     "opp_outs_context": ["scripts/research_mlb_opp_outs_context.py"],
     "umpire_context": ["scripts/research_mlb_umpire_context.py"],
     "lineup_k_context": ["scripts/research_mlb_lineup_k_context.py"],
+    "pitcher_prop_promotion": ["scripts/research_mlb_pitcher_prop_promotion.py"],
 }
+
+RESEARCH_TIMEOUT_SECONDS = {
+    "pitcher_prop_promotion": 50 * 60,
+}
+
 
 
 def research_directive(body: str) -> str | None:
@@ -52,7 +58,7 @@ def run_research(name: str, issue: str) -> int:
     try:
         script, *extra = RESEARCH_DIRECTIVES[name]
         proc = subprocess.run([sys.executable, str(root / script), *extra, "--out-dir", str(out_dir)],
-                              capture_output=True, text=True, timeout=11 * 60)
+                              capture_output=True, text=True, timeout=RESEARCH_TIMEOUT_SECONDS.get(name, 11 * 60))
         if proc.returncode != 0:
             raise RuntimeError((proc.stderr or proc.stdout)[-3000:])
         subprocess.run(["gh", "issue", "comment", str(issue), "--body-file", str(out_dir / "report.md")], check=True)
