@@ -4,6 +4,7 @@
     "NFL_V2J_V2K_GOVERNANCE_FREEZE_V1": {
       "coverage_paths": [
         ".github/workflows/nfl-attempt9-model-p-contract.yml",
+        ".github/workflows/nfl-v2k-attempt2-dispatch-bridge.yml",
         "config/nfl_2026_capture_adjudication.json",
         "config/nfl_attempt9_prospective_inference_v1.json",
         "config/nfl_discrete_v2_eval_freeze.json",
@@ -30,7 +31,8 @@
         "sportsedge/sports/nfl/discrete_v2.py",
         "sportsedge/sports/nfl/discrete_v2_fit.py",
         "sportsedge/sports/nfl/unified_market_engine.py",
-        "sportsedge/sports/nfl/unified_run_it.py"
+        "sportsedge/sports/nfl/unified_run_it.py",
+        "tests/test_nfl_v2k_attempt2_dispatch_bridge.py"
       ],
       "coverage_prefixes": [
         "sportsedge/sports/nfl/m2_v2j_",
