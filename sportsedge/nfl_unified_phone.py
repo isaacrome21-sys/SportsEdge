@@ -196,9 +196,24 @@ def _decorate(
             "status": "NO_MODEL",
             "reason": engine_row.get("reason") or engine_row.get("status") or "UNPRICED",
         }
+    estimate_p = float(engine_row["estimate_p"])
+    push_p = float(engine_row.get("push_p") or 0.0)
+    loss_p = max(0.0, 1.0 - estimate_p - push_p)
+    # A finite Monte Carlo sample can legitimately return a boundary estimate
+    # (0 wins or 0 losses). The downstream American fair-price formatter has no
+    # representation for p=0 or p=1, so fail closed for only that side instead
+    # of crashing the entire phone board.
+    if estimate_p <= 0.0 or loss_p <= 0.0:
+        return {
+            **base,
+            "status": "NO_MODEL",
+            "reason": "EMPIRICAL_BOUNDARY_PROBABILITY",
+            "estimate_p": estimate_p,
+            "push_p": push_p,
+        }
     priced = price_run_it_pick(
-        estimate_p=float(engine_row["estimate_p"]),
-        push_p=float(engine_row.get("push_p") or 0.0),
+        estimate_p=estimate_p,
+        push_p=push_p,
         price_american=int(price),
         market_no_vig_p=float(market_no_vig_p),
         qualification_flags=qualification_flags,
