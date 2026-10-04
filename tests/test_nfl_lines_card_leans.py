@@ -71,6 +71,12 @@ class NflCardLeanTests(unittest.TestCase):
         self.assertTrue(total["lean"]["lean_only"])
         self.assertEqual(total["lean"]["selection"], "Over")
         self.assertIn("LEAN (no proven edge, not a bet): Over 20.5", md)
+        self.assertIn("All props, sides, and totals", md)
+        self.assertIn("both_sides=True", md)
+        self.assertIn("passing_yards", md)
+        self.assertIn("Price needed", md)
+        self.assertIn("NOT OFFICIAL", md)
+        self.assertNotIn("OFFICIAL_BET", md)
         self.assertIn("No bets", md)
         self.assertNotIn("Score-B", md)
 

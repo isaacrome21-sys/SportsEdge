@@ -34,6 +34,9 @@ def render_markdown(payload: dict) -> str:
         lines.append("|  |  |  |  |  |  | no rows |")
     lines.append("")
     lines.append("Lines are user-supplied. Zero quotes is the only infrastructure block.")
+    from scripts.render_football_board_card import both_side_catalog_section
+    payload.setdefault("sport", "CFB")
+    lines.append(both_side_catalog_section(payload).rstrip("\n"))
     return "\n".join(lines) + "\n"
 
 
