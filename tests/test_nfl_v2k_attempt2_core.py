@@ -110,6 +110,10 @@ def test_attempt2_key_mix_changes_fg_td_balance_without_margin_forcing():
     from sportsedge.sports.nfl.v2k_drive_core_v2 import _corrected_probs
     raw=fit.baseline.probabilities("A","B",start_yardline_100=75.0,state_bucket="NORMAL")
     corrected=_corrected_probs(fit,"A","B",home_team="A",start_field=75.0,bucket="NORMAL")
-    assert corrected["FG"]/max(corrected["TD"],1e-12) != raw["FG"]/max(raw["TD"],1e-12)
+    observed=fit.margin_clustering.fg_rate/fit.margin_clustering.td_rate
+    raw_ratio=raw["FG"]/max(raw["TD"],1e-12)
+    corrected_ratio=corrected["FG"]/max(corrected["TD"],1e-12)
+    # Correction should move the contextual ratio toward the training scoring mix.
+    assert abs(corrected_ratio-observed) <= abs(raw_ratio-observed)+1e-12
     assert set(corrected)==set(raw)
     assert abs(sum(corrected.values())-1.0)<1e-12
