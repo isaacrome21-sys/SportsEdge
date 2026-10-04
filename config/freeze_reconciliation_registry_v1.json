@@ -1623,10 +1623,16 @@
       "merge_sha": "b54667d7d370b56da99ccc987a1fa9cc21db4253",
       "pr": 1521,
       "note": "Registers NFL V2K pre-attempt OT/endgame contract alignment on main. Attempt ledger remains unconsumed; reconciliation grants zero model or betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_ABFFDC63_PR_1527",
+      "merge_sha": "abffdc63d7f0f983c1fed3c16fcbd32b40d4e86e",
+      "pr": 1527,
+      "note": "Registers repository-wide main advance from research-only PR #1527. Reconciliation only; authority remains unchanged."
     }
   ],
-  "inventory_block_reason": "Fresh hosted zero-unmapped proof remains the inventory-completion authority; current main through PR #1521 is registered for complete reconciliation provenance. This reconciliation grants zero model or betting authority.",
+  "inventory_block_reason": "Fresh hosted zero-unmapped proof remains the inventory-completion authority; current main through PR #1527 is registered for complete reconciliation provenance. Authority remains unchanged.",
   "issue": 686,
-  "reconciled_through_sha": "b54667d7d370b56da99ccc987a1fa9cc21db4253",
+  "reconciled_through_sha": "abffdc63d7f0f983c1fed3c16fcbd32b40d4e86e",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
