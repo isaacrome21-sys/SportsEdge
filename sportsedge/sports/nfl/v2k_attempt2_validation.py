@@ -143,8 +143,10 @@ def evaluate(shards,schedule,contract):
         n=sum(count for _,count in mh)
         if sum(score_pairs.values())!=n:
             raise SystemExit("V2K_JOINT_SCORE_PATH_COUNT_MISMATCH:"+gid)
-        projected_margins=Counter({h-a:c for (h,a),c in score_pairs.items()})
-        projected_totals=Counter({h+a:c for (h,a),c in score_pairs.items()})
+        projected_margins=Counter(); projected_totals=Counter()
+        for (home_s,away_s),count_i in score_pairs.items():
+            projected_margins[home_s-away_s]+=count_i
+            projected_totals[home_s+away_s]+=count_i
         if projected_margins!=Counter(dict(mh)) or projected_totals!=Counter(dict(th)):
             raise SystemExit("V2K_JOINT_SCORE_MARGINAL_MISMATCH:"+gid)
         for k in a1.KEYS: key_sum[k]+=sum(count for value,count in mh if value==k)/n
