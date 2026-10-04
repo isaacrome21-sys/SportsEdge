@@ -1,9 +1,9 @@
 {
   "schema": "NFL_V2K_ATTEMPT_LEDGER_V1",
   "candidate_family": "NFL_V2K_DRIVE_HIERARCHICAL_JOINT_G1",
-  "status": "ATTEMPT1_EXPOSURE_RECORDED_ATTEMPT2_PENDING",
+  "status": "FROZEN_BEFORE_IMPLEMENTATION",
   "max_development_attempts": 5,
-  "attempts_used": 1,
+  "attempts_used": 0,
   "untouched_readout_allowed": false,
   "authority": {
     "model_p": false,
@@ -22,49 +22,5 @@
     "preregistration_must_be_merged": true,
     "uploaded_demo_coefficients_may_be_used_as_fitted_parameters": false
   },
-  "attempts": [
-    {
-      "attempt_number": 1,
-      "candidate_family": "NFL_V2K_DRIVE_HIERARCHICAL_JOINT_G1",
-      "status": "EXPOSED_REUSED_DEVELOPMENT_HISTORY_FAIL_CLOSED",
-      "evidence_role": "REUSED_RESEARCH_HISTORY_NOT_FINAL_HOLDOUT",
-      "exposure_source": {
-        "pr": 1534,
-        "comment_id": 5981843976,
-        "disclosure": "300-path smoke over real 2021-2025 development window"
-      },
-      "execution": {
-        "paths_per_game": 300,
-        "required_floor_paths_per_game": 10000,
-        "full_frozen_attempt_execution": false,
-        "valid_scored_attempt": false
-      },
-      "observed_summary": {
-        "spread_fold_wins": "1/3",
-        "total_fold_wins": "0/3",
-        "signed_key_mass_approx": 0.032,
-        "reference_plus3_mass_approx": 0.077,
-        "simulated_mean_total_approx": 52,
-        "actual_mean_total_approx": 45,
-        "simulated_mean_margin_approx": 0,
-        "actual_mean_margin_approx": 2.1
-      },
-      "budget_accounting": {
-        "consumes_development_attempt_budget": true,
-        "reason": "Historical development outcomes were exposed before Attempt 2; count conservatively to prevent re-use or relabeling."
-      },
-      "authority": {
-        "model_p": false,
-        "promotion": false,
-        "staking": false,
-        "official": false,
-        "untouched_readout": false
-      }
-    }
-  ],
-  "exposure_policy": {
-    "below_floor_smoke_is_not_a_valid_scored_attempt": true,
-    "observed_reused_history_exposure_consumes_budget_conservatively": true,
-    "no_relabel_as_untouched": true
-  }
+  "attempts": []
 }
