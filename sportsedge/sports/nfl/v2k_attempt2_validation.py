@@ -72,13 +72,14 @@ def preflight(*,paths:int,smoke:bool)->dict:
     return {"contract":contract,"root_seed":root_seed,"paths":paths,"smoke":smoke,"attempts_used":exposure.get("development_budget_units_used")}
 
 def simulate_game_histograms(model,game:Mapping,*,root_seed:int,paths:int)->dict:
-    margins=Counter(); totals=Counter()
+    margins=Counter(); totals=Counter(); scores=Counter()
     for idx in range(paths):
         seed=derive_path_seed(root_seed=root_seed,game_key=game["game_id"],path_index=idx)
         s=simulate_joint_game_v2(model,game["home_team"],game["away_team"],season=game["season"],seed=seed)
-        margins[s.margin]+=1; totals[s.total]+=1
+        margins[s.margin]+=1; totals[s.total]+=1; scores[(s.home_score,s.away_score)]+=1
     return {"game_id":game["game_id"],"season":game["season"],"week":game["week"],
             "home_team":game["home_team"],"away_team":game["away_team"],"paths":paths,
+            "score_hist":{f"{h},{a}":count for (h,a),count in sorted(scores.items())},
             "margin_hist":{str(k):v for k,v in sorted(margins.items())},
             "total_hist":{str(k):v for k,v in sorted(totals.items())}}
 def run_fold_shard(*,fold,drives_by_season,identity,root_seed,paths,shard_index,shard_count,workers):
@@ -126,7 +127,26 @@ def evaluate(shards,schedule,contract):
         if (g["home_team"],g["away_team"])!=(sched["home_team"],sched["away_team"]):
             raise SystemExit("V2K_HOME_AWAY_DRIFT:"+gid)
         mh,th=a1._hist(g["margin_hist"]),a1._hist(g["total_hist"])
+        score_hist=g.get("score_hist")
+        if not isinstance(score_hist,dict) or not score_hist:
+            raise SystemExit("V2K_JOINT_SCORE_HIST_MISSING:"+gid)
+        score_pairs=Counter()
+        for key,count in score_hist.items():
+            try:
+                home_s,away_s=(int(part) for part in str(key).split(",",1))
+                count_i=int(count)
+            except (TypeError,ValueError):
+                raise SystemExit("V2K_JOINT_SCORE_HIST_INVALID:"+gid)
+            if count_i<0:
+                raise SystemExit("V2K_JOINT_SCORE_HIST_INVALID:"+gid)
+            score_pairs[(home_s,away_s)]+=count_i
         n=sum(count for _,count in mh)
+        if sum(score_pairs.values())!=n:
+            raise SystemExit("V2K_JOINT_SCORE_PATH_COUNT_MISMATCH:"+gid)
+        projected_margins=Counter({h-a:c for (h,a),c in score_pairs.items()})
+        projected_totals=Counter({h+a:c for (h,a),c in score_pairs.items()})
+        if projected_margins!=Counter(dict(mh)) or projected_totals!=Counter(dict(th)):
+            raise SystemExit("V2K_JOINT_SCORE_MARGINAL_MISMATCH:"+gid)
         for k in a1.KEYS: key_sum[k]+=sum(count for value,count in mh if value==k)/n
         m=sched["_market"]; margin=sched["home_score"]-sched["away_score"]; total=sched["home_score"]+sched["away_score"]
         sl,tl=m["spread_line"],m["total_line"]
