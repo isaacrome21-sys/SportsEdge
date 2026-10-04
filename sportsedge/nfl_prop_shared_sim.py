@@ -26,6 +26,7 @@ ROLE_KEYS = (
     "receiving_yards_per_reception",
 )
 RATE_KEYS = frozenset({"completion_rate", "pass_td_rate", "interception_rate", "catch_rate"})
+SIGNED_ROLE_KEYS = frozenset({"rush_yards_per_attempt"})
 RARE_RATE_KEYS = frozenset({"pass_td_rate", "interception_rate"})
 DEFAULT_VOLUME_PRIOR_STRENGTH = 8.0
 DEFAULT_RARE_PRIOR_STRENGTH = 40.0
@@ -162,7 +163,7 @@ def stabilized_role(
         o = p if k not in trailing else _num(trailing[k], k)
         s = s_rare if k in RARE_RATE_KEYS else s_vol
         v = (s * p + n * o) / (s + n)
-        if v < 0 or (k in RATE_KEYS and v > 1):
+        if (v < 0 and k not in SIGNED_ROLE_KEYS) or (k in RATE_KEYS and v > 1):
             raise NflPropSimulationError(f"ROLE_VALUE_INVALID:{k}")
         out[k] = v
     return out
