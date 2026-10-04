@@ -73,12 +73,10 @@ def test_unresolved_freezes_are_explicit_and_authority_remains_zero() -> None:
     unresolved = c["unresolved_required_freezes"]
     assert set(unresolved) == {
         "final_hardened_implementation_identity",
-        "chronological_fold_plan",
-        "root_seed_and_per_game_path_keying",
         "predictive_acceptance_thresholds",
     }
     assert all(value is None for value in unresolved.values())
-    assert len(c["blocker_codes"]) == 4
+    assert len(c["blocker_codes"]) == 2
     for key, value in c["authority"].items():
         if key == "research_contract":
             assert value is True
@@ -98,7 +96,7 @@ def test_issue_693_freezes_rng_family_and_simulation_count_but_not_root_seed() -
     assert a1["issue"] == 693
     assert a1["rng_algorithm"] == "NUMPY_PCG64"
     assert a1["seed_derivation"] == "NUMPY_SEEDSEQUENCE_EXPLICIT_INTEGER_ROOT_DETERMINISTIC_PER_GAME_PER_PATH"
-    assert a1["root_seed"] is None
+    assert a1["root_seed"] == 15264549103493747052
     assert a1["simulation_count_paths_per_game"] == 50000
     assert a1["absolute_simulation_floor_paths_per_game"] == 10000
     assert a1["chronological_walk_forward_required"] is True
@@ -126,3 +124,34 @@ def test_attempt1_code_identity_stays_blocked_until_rng_hardening_is_canonical()
     assert identity["required_successor_pr"] == 1516
     assert identity["exact_code_identity_frozen_for_attempt1"] is False
     assert "V2K_FINAL_IMPLEMENTATION_IDENTITY_NOT_FROZEN" in c["blocker_codes"]
+
+
+def test_attempt1_fold_geometry_is_expanding_chronological_and_leakage_closed() -> None:
+    c = _load(CONTRACT)
+    plan = c["attempt1_issue_binding"]["fold_plan"]
+    assert plan["policy"] == "EXPANDING_SEASON_WALK_FORWARD_V1"
+    assert plan["population_seasons"] == list(range(2018, 2026))
+    assert plan["minimum_training_seasons"] == 3
+    assert plan["shuffle"] is False
+    assert plan["test_season_may_influence_fit"] is False
+    assert plan["calibrator_fit_scope"] == "TRAINING_SEASONS_ONLY_WITHIN_EACH_FOLD"
+    assert plan["role"] == "REUSED_RESEARCH_HISTORY_NOT_FINAL_HOLDOUT"
+    folds = plan["folds"]
+    assert [f["test_season"] for f in folds] == [2021, 2022, 2023, 2024, 2025]
+    for fold in folds:
+        test_season = fold["test_season"]
+        assert fold["train_seasons"] == list(range(2018, test_season))
+        assert test_season not in fold["train_seasons"]
+
+
+def test_root_seed_is_identity_derived_before_scoring() -> None:
+    import hashlib
+    c = _load(CONTRACT)
+    a1 = c["attempt1_issue_binding"]
+    binding = a1["root_seed_derivation"]
+    digest = hashlib.sha256(binding["input"].encode("utf-8")).digest()
+    expected = int.from_bytes(digest[:8], "big", signed=False)
+    assert binding["method"] == "UINT64_BIG_ENDIAN_FIRST_8_BYTES_OF_SHA256_UTF8"
+    assert hashlib.sha256(binding["input"].encode("utf-8")).hexdigest() == binding["sha256"]
+    assert expected == binding["output_integer"] == a1["root_seed"] == 15264549103493747052
+    assert binding["performance_data_used"] is False
