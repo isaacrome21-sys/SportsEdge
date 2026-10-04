@@ -238,7 +238,8 @@
     "root_seed": 13631901020752177054
   },
   "execution_incident_receipt": {
-    "run_id": 37238130956,
+    "run_ids": [37238130956, 37238300790],
+    "primary_run_id": 37238130956,
     "head_sha": "7d4ce8e4adde7450196d811e00e218e4ad02fd75",
     "failure_code": "SOURCE_BINDING_SCHEMA_ADAPTER_MISMATCH",
     "failure_point": "BEFORE_DRIVE_LOADING_AND_BEFORE_SIMULATION",
