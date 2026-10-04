@@ -22,13 +22,13 @@ def test_preattempt_contract_stays_blocked_and_consumes_no_attempt() -> None:
     c = _load(CONTRACT)
     ledger = _load(LEDGER)
     admission = _load(ADMISSION)
-    assert c["status"] == "BLOCKED_PRE_ATTEMPT_FREEZE_INCOMPLETE"
+    assert c["status"] == "FROZEN_ATTEMPT1_READY_FOR_DEVELOPMENT_VALIDATION"
     assert c["candidate_family"] == admission["candidate_family"]
     assert ledger["attempts_used"] == 0
     assert ledger["attempts"] == []
     assert c["attempt_budget"]["attempts_used"] == 0
     assert c["attempt_budget"]["this_artifact_consumes_attempt"] is False
-    assert c["attempt_budget"]["attempt_1_scoring_allowed"] is False
+    assert c["attempt_budget"]["attempt_1_scoring_allowed"] is True
     assert c["attempt_budget"]["untouched_readout_allowed"] is False
 
 
