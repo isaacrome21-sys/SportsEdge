@@ -88,8 +88,8 @@ def test_attempt2_home_field_moves_home_scoring_probability_up():
         "g2":{"home_team":"A","away_team":"B"},
     })
     from sportsedge.sports.nfl.v2k_drive_core_v2 import _corrected_probs
-    home=_corrected_probs(fit,"A","B",home_team="A",start_field=75.0,bucket="REGULATION")
-    away=_corrected_probs(fit,"B","A",home_team="A",start_field=75.0,bucket="REGULATION")
+    home=_corrected_probs(fit,"A","B",home_team="A",start_field=75.0,bucket="NORMAL")
+    away=_corrected_probs(fit,"B","A",home_team="A",start_field=75.0,bucket="NORMAL")
     assert home["TD"]+home["FG"] > away["TD"]+away["FG"]
 
 
@@ -105,8 +105,8 @@ def test_attempt2_key_mix_changes_fg_td_balance_without_margin_forcing():
         "g2":{"home_team":"A","away_team":"B"},
     })
     from sportsedge.sports.nfl.v2k_drive_core_v2 import _corrected_probs
-    raw=fit.baseline.probabilities("A","B",start_yardline_100=75.0,state_bucket="REGULATION")
-    corrected=_corrected_probs(fit,"A","B",home_team="A",start_field=75.0,bucket="REGULATION")
+    raw=fit.baseline.probabilities("A","B",start_yardline_100=75.0,state_bucket="NORMAL")
+    corrected=_corrected_probs(fit,"A","B",home_team="A",start_field=75.0,bucket="NORMAL")
     assert corrected["FG"]/max(corrected["TD"],1e-12) != raw["FG"]/max(raw["TD"],1e-12)
     assert set(corrected)==set(raw)
     assert abs(sum(corrected.values())-1.0)<1e-12
