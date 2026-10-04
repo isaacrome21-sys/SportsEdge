@@ -30,7 +30,7 @@ class _BytesResponse:
 
 
 class MLBHistoryCachedOpener:
-    """Callable opener that caches only StatsAPI person gameLog responses."""
+    """Callable opener that caches only StatsAPI person/team gameLog responses."""
 
     def __init__(self, *, target_date: date, cache_dir: str | Path | None = None, opener: Callable = urlopen):
         if not isinstance(target_date, date):
@@ -47,7 +47,8 @@ class MLBHistoryCachedOpener:
 
     def _cache_key(self, url: str) -> str | None:
         parsed = urlparse(url)
-        if parsed.netloc != "statsapi.mlb.com" or not parsed.path.startswith("/api/v1/people/") or not parsed.path.endswith("/stats"):
+        # Person and team gameLogs only (team hitting logs feed the opp-K index, #1482 D1b).
+        if parsed.netloc != "statsapi.mlb.com" or not parsed.path.startswith(("/api/v1/people/", "/api/v1/teams/")) or not parsed.path.endswith("/stats"):
             return None
         query = parse_qs(parsed.query)
         if query.get("stats") != ["gameLog"]:

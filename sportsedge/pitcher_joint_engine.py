@@ -79,6 +79,33 @@ def _price_prior_fallback(features:Mapping[str,Any],line:float,side:str,market:s
     meta={"raw_empirical_p":over if side=="OVER" else under,"raw_push_p":0.0,"effective_history_starts":float(n),"posterior_prior":post["prior"],"prior_fallback":{"own_starts":k,"pseudo_starts":m,"pool":fb.get("pool"),"season":fb.get("season"),"artifact_sha256":fb.get("artifact_sha256")}}
     identity={"history_pool":pool,"prior_fallback":{"market":market,"pseudo_starts":m,"counts":{str(v):table[v] for v in sorted(table)},"pool":fb.get("pool"),"season":fb.get("season"),"artifact_sha256":fb.get("artifact_sha256")}}
     return (post["p_over"] if side=="OVER" else post["p_under"]),post["p_push"],meta,identity
+_OPP_K_CAP=20
+def _price_opp_k(features:Mapping[str,Any],line:float,side:str,market:str)->tuple[float,float,dict[str,Any],dict[str,Any]]:
+    """Validated opponent-K context lane (#1509): rescale own K by (rel*/rel_i)**beta, split floor/ceil, n = k."""
+    adj=features.get("opp_k_adjustment")
+    if not isinstance(adj,Mapping):raise PitcherJointEngineError("opp_k_adjustment must be object")
+    if market!="PITCHER_K" or adj.get("market")!="PITCHER_K":raise PitcherJointEngineError(f"OPP_K_ADJ_NOT_VALIDATED_FOR_{market}")
+    if features.get("history_weights") is not None:raise PitcherJointEngineError("opp_k_adjustment does not accept history_weights")
+    pool=_normalize_pool(features.get("history_pool"),"history_pool")
+    if len(pool)>10:raise PitcherJointEngineError("opp_k_adjustment requires the last <=10 own starts")
+    beta=_f(adj.get("beta"),"opp_k_adjustment.beta");target=_f(adj.get("target_rel"),"opp_k_adjustment.target_rel")
+    rels=adj.get("history_rel")
+    if not isinstance(rels,Sequence) or isinstance(rels,(str,bytes)) or len(rels)!=len(pool):raise PitcherJointEngineError("opp_k_adjustment.history_rel must align with history_pool")
+    rels=[_f(r,f"opp_k_adjustment.history_rel[{i}]") for i,r in enumerate(rels)]
+    if target<=0 or any(r<=0 for r in rels):raise PitcherJointEngineError("opp_k_adjustment indices must be positive")
+    k=len(pool);raw=[r["strikeouts"] for r in pool];xs=[min(max(v*(target/h)**beta,0.0),float(_OPP_K_CAP)) for v,h in zip(raw,rels)]
+    over=0.0
+    for x in xs:
+        lo=int(x//1);frac=x-lo
+        if lo>=_OPP_K_CAP:over+=1.0 if _OPP_K_CAP>line else 0.0;continue
+        over+=(1.0-frac)*(1.0 if lo>line else 0.0)+frac*(1.0 if lo+1>line else 0.0)
+    over/=k;under=1.0-over
+    post=_posterior(over,under,0.0,float(k),line,market)
+    factor=(sum(xs)/sum(raw)) if sum(raw)>0 else 1.0
+    info={"beta":beta,"target_rel":target,"history_rel_mean":sum(rels)/k,"factor":factor,"own_starts":k,"opponent_team_id":adj.get("opponent_team_id"),"validated_in":adj.get("validated_in")}
+    meta={"raw_empirical_p":over if side=="OVER" else under,"raw_push_p":0.0,"effective_history_starts":float(k),"posterior_prior":post["prior"],"opp_k_adjustment":info}
+    identity={"history_pool":pool,"opp_k_adjustment":{"beta":beta,"target_rel":target,"history_rel":rels}}
+    return (post["p_over"] if side=="OVER" else post["p_under"]),post["p_push"],meta,identity
 def price_pitcher_market(model_input:Mapping[str,Any])->dict[str,Any]:
     market=str(model_input.get("market","")).upper()
     if market not in PITCHER_MARKETS:raise PitcherJointEngineError(f"unsupported pitcher market {market}")
@@ -92,6 +119,8 @@ def price_pitcher_market(model_input:Mapping[str,Any])->dict[str,Any]:
         if side=="OVER":raw=sum(w for x,y,w in states if (x>line) or (y>line));raw_push=sum(w for x,y,w in states if not((x>line) or (y>line)) and ((x==line) or (y==line))) if float(line).is_integer() else 0.0
         else:raw=sum(w for x,y,w in states if (x<line) or (y<line));raw_push=sum(w for x,y,w in states if not((x<line) or (y<line)) and ((x==line) or (y==line))) if float(line).is_integer() else 0.0
         raw_other=1.0-raw-raw_push;over,under=(raw,raw_other) if side=="OVER" else (raw_other,raw);eff=min(effective_sample_size(wa,len(wa)),effective_sample_size(wb,len(wb)));post=_posterior(over,under,raw_push,eff,line,base);p=post["p_over"] if side=="OVER" else post["p_under"];p_push=post["p_push"];meta={"raw_empirical_p":raw,"raw_push_p":raw_push,"effective_history_starts":float(eff),"posterior_prior":post["prior"],"weighted":features.get("pitcher_a_weights") is not None or features.get("pitcher_b_weights") is not None};identity_features={"pitcher_a_history":a,"pitcher_b_history":b,"pitcher_a_weights":wa,"pitcher_b_weights":wb}
+    elif features.get("opp_k_adjustment") is not None and market=="PITCHER_K" and not float(line).is_integer():
+        p,p_push,meta,identity_features=_price_opp_k(features,line,side,market);meta["weighted"]=False
     elif features.get("prior_fallback") is not None:
         p,p_push,meta,identity_features=_price_prior_fallback(features,line,side,market);meta["weighted"]=True
     else:
