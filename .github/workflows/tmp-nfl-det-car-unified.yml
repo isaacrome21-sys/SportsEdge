@@ -1,5 +1,5 @@
 name: tmp-nfl-det-car-unified-research
-# fast prop validation run after signed raw-yardage domain fix
+# fast prop validation run after boundary-price guard
 
 on:
   push:
