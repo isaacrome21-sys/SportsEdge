@@ -117,7 +117,9 @@ def _splits(payload: Mapping[str, Any], *, target_date: date) -> list[Mapping[st
             if isinstance(stat, Mapping):
                 opponent = split.get("opponent")
                 opp_id = _nonnegative_integer(opponent.get("id")) if isinstance(opponent, Mapping) else None
-                rows.append({"date": d, "stat": stat, "opponent_id": opp_id})
+                game = split.get("game")
+                game_pk = _nonnegative_integer(game.get("gamePk")) if isinstance(game, Mapping) else None
+                rows.append({"date": d, "stat": stat, "opponent_id": opp_id, "game_pk": game_pk})
     rows.sort(key=lambda x: x["date"])
     return rows
 
@@ -354,8 +356,12 @@ class MLBGenericHistorySource:
 
     def _pitcher_start_rows(self, *, player_id: int, target_date: date) -> list[tuple[dict[str, int], date, int | None]]:
         """(joint row, game date, opponent team id) for the last <=10 strictly-prior starts."""
+        return [(row, d, opp) for row, d, opp, _ in self._pitcher_start_rows_pk(player_id=player_id, target_date=target_date)]
+
+    def _pitcher_start_rows_pk(self, *, player_id: int, target_date: date) -> list[tuple[dict[str, int], date, int | None, int | None]]:
+        """Same starts as ``_pitcher_start_rows`` plus each start's gamePk (None if absent)."""
         rows = self.player_rows(player_id=player_id, group="pitching", target_date=target_date)
-        out: list[tuple[dict[str, int], date, int | None]] = []
+        out: list[tuple[dict[str, int], date, int | None, int | None]] = []
         for row in rows:
             s = row["stat"]
             if _number(s.get("gamesStarted", 0), "gamesStarted") < 1:
@@ -371,7 +377,7 @@ class MLBGenericHistorySource:
             if None in {ks, er, hits, walks} or not 0 <= outs <= 27:
                 continue
             out.append(({"strikeouts": ks, "outs": outs, "earned_runs": er, "hits_allowed": hits, "walks_allowed": walks},
-                        row["date"], row.get("opponent_id")))
+                        row["date"], row.get("opponent_id"), row.get("game_pk")))
         return out[-10:]
 
     def _mlb_team_ids(self, season: int) -> list[int]:
@@ -407,6 +413,60 @@ class MLBGenericHistorySource:
             except Exception as exc:  # noqa: BLE001 - lane degrades to the unadjusted price
                 cache[target_date] = exc
         return cache[target_date]
+
+    def _ump_schedule(self, start: date, end: date) -> Mapping[str, Any]:
+        """Regular-season schedule with officials for [start, end] (one call per month chunk)."""
+        query = urlencode({"sportId": 1, "gameType": "R", "hydrate": "officials",
+                           "startDate": start.isoformat(), "endDate": end.isoformat()})
+        return _read_json(f"https://statsapi.mlb.com/api/v1/schedule?{query}", opener=self.opener)
+
+    def ump_bb_index(self, target_date: date):
+        """Umpire walk index for the slate (built once, memoized, failures memoized too)."""
+        from .mlb_umpire_bb_context import build_index
+        cache = self.__dict__.setdefault("_ump_bb_index_cache", {})
+        if target_date not in cache:
+            try:
+                cache[target_date] = build_index(self._memo_team_season, self._mlb_team_ids(target_date.year),
+                                                 self._ump_schedule, target_date)
+            except Exception as exc:  # noqa: BLE001 - lane degrades to the unadjusted price
+                cache[target_date] = exc
+        return cache[target_date]
+
+    def plate_umpire(self, *, game_pk: int, target_date: date) -> dict[str, Any] | None:
+        """Tonight's home-plate umpire from the schedule officials hydration (any game type); None if unassigned."""
+        from .mlb_umpire_source import home_plate_from_schedule
+        cache = self.__dict__.setdefault("_plate_schedule_cache", {})
+        if target_date not in cache:
+            query = urlencode({"sportId": 1, "date": target_date.isoformat(), "hydrate": "officials"})
+            try:
+                cache[target_date] = _read_json(f"https://statsapi.mlb.com/api/v1/schedule?{query}", opener=self.opener)
+            except Exception as exc:  # noqa: BLE001
+                cache[target_date] = exc
+        payload = cache[target_date]
+        if isinstance(payload, Exception):
+            raise payload
+        return home_plate_from_schedule(payload, game_pk=int(game_pk))
+
+    def _ump_bb_payload(self, *, player_id: int, target_date: date, game_pk: int) -> tuple[dict[str, Any] | None, str | None]:
+        """Validated umpire-BB lane (#1528) for the k>=5 path; (payload, None) or (None, why unadjusted)."""
+        from .mlb_umpire_bb_context import adjustment_features
+        try:
+            ump = self.plate_umpire(game_pk=game_pk, target_date=target_date)
+        except Exception as exc:  # noqa: BLE001
+            return None, f"plate umpire lookup failed ({type(exc).__name__})"
+        if ump is None:
+            return None, "plate umpire not assigned yet"
+        starts = self._pitcher_start_rows_pk(player_id=player_id, target_date=target_date)
+        if len(starts) < 5:
+            return None, "fewer than 5 own starts"
+        index = self.ump_bb_index(target_date)
+        if isinstance(index, Exception):
+            return None, f"umpire walk index unavailable ({type(index).__name__})"
+        try:
+            return adjustment_features(index, target_umpire=ump, target_date=target_date,
+                                       history=[(d, pk) for _, d, _, pk in starts]), None
+        except Exception as exc:  # noqa: BLE001
+            return None, f"umpire walk index invalid ({exc})"
 
     def _opp_k_payload(self, *, player_id: int, target_date: date, team_id: int | None,
                        away_team_id: int, home_team_id: int) -> tuple[dict[str, Any] | None, str | None]:
@@ -500,6 +560,14 @@ class MLBGenericHistorySource:
                             base["joint_feature_version"] = "mlb_pitcher_joint_history_opp_outs_v1"
                         else:
                             base["opp_outs_unadjusted"] = why
+                    elif market == "PITCHER_BB":
+                        # Validated context lane 2b-BB (#1527/#1528): plate-umpire walk index, k>=5, half lines.
+                        adj, why = self._ump_bb_payload(player_id=player_id, target_date=target_date, game_pk=int(game_pk))
+                        if adj is not None:
+                            base["features"]["ump_bb_adjustment"] = adj
+                            base["joint_feature_version"] = "mlb_pitcher_joint_history_ump_bb_v1"
+                        else:
+                            base["ump_bb_unadjusted"] = why
                 except MLBGenericFeatureError:
                     # Validated few-starts fallback (#1482/#1495): PITCHER_OUTS/PITCHER_K with
                     # 1..4 own starts, shrunk toward the frozen prior-season league_short pool.

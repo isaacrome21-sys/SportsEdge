@@ -1,6 +1,6 @@
 {
   "schema": "NFL_V2K_DEVELOPMENT_VALIDATION_PREATTEMPT_V1",
-  "status": "FROZEN_ATTEMPT1_READY_FOR_DEVELOPMENT_VALIDATION",
+  "status": "BLOCKED_PRE_ATTEMPT_FREEZE_INCOMPLETE",
   "candidate_family": "NFL_V2K_DRIVE_HIERARCHICAL_JOINT_G1",
   "purpose": "Machine-enforce the V2K development-validation prerequisites that are already fixed, and refuse scoring until every remaining preregistered identity is explicitly frozen. This artifact does not consume an attempt and grants no bettor-facing authority.",
   "population_contract": {
@@ -105,47 +105,23 @@
     "key_success_cannot_rescue_calibration_failure": true
   },
   "unresolved_required_freezes": {
-    "final_hardened_implementation_identity": {
-      "canonical_main_anchor_sha": "86a8d844d1b78c843ec8b5caf942058083926330",
-      "core_path": "sportsedge/sports/nfl/v2k_drive_core.py",
-      "core_git_blob_sha1": "886eadf85c9cc95ed34feea78fde528de79b8fa2",
-      "source_adapter_path": "sportsedge/sports/nfl/v2k_drive_source.py",
-      "source_adapter_git_blob_sha1": "6cd506e7985d957b6c4f156ae5ff1a24a5bc8023",
-      "runtime": {
-        "python": "3.12",
-        "numpy": "2.5.3",
-        "pytest": "9.1.1"
-      },
-      "rng_algorithm_version": "NUMPY_PCG64_SEEDSEQUENCE_V1",
-      "seed_derivation_version": "V2K_SHA256_GAME_KEY_SEEDSEQUENCE_SPAWN_V1",
-      "exact_code_identity_frozen_for_attempt1": true
-    },
-    "predictive_acceptance_thresholds": {
-      "provenance": "PREEXISTING_NFL_V2_VALIDATION_GATE_BEFORE_V2K_ATTEMPT1",
-      "source_path": "sportsedge/sports/nfl/m2_v2j_validation.py",
-      "source_git_blob_sha1": "3a122a2bf01964a62b9552343bc509caec0edb05",
-      "markets": [
-        "spread",
-        "total"
-      ],
-      "metric": "CHRONOLOGICAL_FOLD_CANDIDATE_LOG_LOSS_STRICTLY_LESS_THAN_FROZEN_COMPARISON_BASELINE",
-      "minimum_fold_win_rate": 0.65,
-      "calibration_max_nonempty_bin_deviation": 0.05,
-      "conjunctive_with_structural_gate": true,
-      "threshold_tuning_after_readout_forbidden": true
-    }
+    "final_hardened_implementation_identity": null,
+    "predictive_acceptance_thresholds": null
   },
-  "blocker_codes": [],
+  "blocker_codes": [
+    "V2K_FINAL_IMPLEMENTATION_IDENTITY_NOT_FROZEN",
+    "V2K_PREDICTIVE_THRESHOLDS_NOT_FROZEN"
+  ],
   "attempt_budget": {
     "max_development_attempts": 5,
     "attempts_used": 0,
     "this_artifact_consumes_attempt": false,
-    "attempt_1_scoring_allowed": true,
+    "attempt_1_scoring_allowed": false,
     "untouched_readout_allowed": false
   },
   "authority": {
     "research_contract": true,
-    "development_validation_execution": true,
+    "development_validation_execution": false,
     "untouched_readout": false,
     "model_p": false,
     "pricing": false,
@@ -162,14 +138,11 @@
     "attempt0_merge_commit": "7ed79c51e790d393108864513c34dd296d9fd175"
   },
   "implementation_identity": {
-    "status": "FROZEN_FOR_ATTEMPT1",
+    "status": "PENDING_POST_RNG_HARDENING_BINDING",
     "required_successor_pr": 1516,
     "baseline_attempt0_merge_commit": "7ed79c51e790d393108864513c34dd296d9fd175",
-    "canonical_main_anchor_sha": "86a8d844d1b78c843ec8b5caf942058083926330",
-    "core_git_blob_sha1": "886eadf85c9cc95ed34feea78fde528de79b8fa2",
-    "source_adapter_git_blob_sha1": "6cd506e7985d957b6c4f156ae5ff1a24a5bc8023",
-    "exact_code_identity_frozen_for_attempt1": true,
-    "reason": "PCG64/SeedSequence hardening and OT/endgame alignment are canonical; exact implementation blobs and runtime are frozen before attempt-1 scoring."
+    "exact_code_identity_frozen_for_attempt1": false,
+    "reason": "Issue #693 requires PCG64/SeedSequence hardening before attempt-1 freeze. Bind exact implementation bytes only after the hardened core is canonical."
   },
   "attempt1_issue_binding": {
     "issue": 693,
