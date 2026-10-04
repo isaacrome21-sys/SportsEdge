@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Emit the football side, total, and prop presentation board.
 
-Game and prop probabilities must already exist. Team totals and period markets
-can be derived only from a supplied market-blind score distribution. Prop engine
-authority stays NO_ENGINE.
+Game and prop probabilities must already exist on the supplied rows, or on a
+card JSON written by scripts/run_auto_nfl_resilient.py / the CFB card runner.
+Team totals and period markets can be derived only from a supplied market-blind
+score distribution. Prop engine authority stays NO_ENGINE. No Odds API.
 """
 from __future__ import annotations
 
@@ -16,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from sportsedge.football_full_board import build_football_full_board
+from sportsedge.football_full_board import board_from_machine_results, build_football_full_board
 
 
 def _load(path: Path | None) -> dict:
@@ -28,9 +29,24 @@ def _load(path: Path | None) -> dict:
     return payload
 
 
+def rows_from_card(payload: dict) -> list[dict]:
+    """Present card rows that the MLB-shaped runner already priced."""
+    results = payload.get("results")
+    if not isinstance(results, list):
+        raise SystemExit("FOOTBALL_FULL_BOARD_CARD_RESULTS_INVALID")
+    return [row for row in results if isinstance(row, dict)]
+
+
+def board_from_card(sport: str, payload: dict) -> dict:
+    if payload.get("odds_api_called") is True:
+        raise SystemExit("FOOTBALL_FULL_BOARD_ODDS_API_FORBIDDEN")
+    return board_from_machine_results(sport, rows_from_card(payload))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--sport", required=True, choices=("NFL", "CFB"))
+    parser.add_argument("--card", type=Path, help="live_*_card.json from the manual-line runner")
     parser.add_argument("--game-rows", type=Path)
     parser.add_argument("--prop-rows", type=Path)
     parser.add_argument("--team-total-requests", type=Path)
@@ -38,19 +54,22 @@ def main() -> int:
     parser.add_argument("--distribution", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    game = _load(args.game_rows).get("rows", [])
-    props = _load(args.prop_rows).get("rows", [])
-    requests = _load(args.team_total_requests).get("rows", [])
-    periods = _load(args.period_requests).get("rows", [])
-    distribution = _load(args.distribution).get("rows") if args.distribution else None
-    board = build_football_full_board(
-        sport=args.sport,
-        game_rows=game,
-        prop_rows=props,
-        team_total_requests=requests,
-        period_requests=periods,
-        distribution=distribution,
-    )
+    if args.card:
+        board = board_from_card(args.sport, _load(args.card))
+    else:
+        game = _load(args.game_rows).get("rows", [])
+        props = _load(args.prop_rows).get("rows", [])
+        requests = _load(args.team_total_requests).get("rows", [])
+        periods = _load(args.period_requests).get("rows", [])
+        distribution = _load(args.distribution).get("rows") if args.distribution else None
+        board = build_football_full_board(
+            sport=args.sport,
+            game_rows=game,
+            prop_rows=props,
+            team_total_requests=requests,
+            period_requests=periods,
+            distribution=distribution,
+        )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(board, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps(board["summary"], sort_keys=True))
