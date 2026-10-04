@@ -32,37 +32,53 @@ jobs:
           from urllib.request import Request, urlopen
           from sportsedge.nfl_unified_phone import build_unified_phone_card
           from sportsedge.sports.nfl.full_auto import fetch_nflverse_depth_charts
-          from sportsedge.sports.nfl.injury_report_source import fetch_nflverse_injuries
+
+          def fetch_csv(uri):
+              req=Request(uri,headers={"User-Agent":"SportsEdge/1.0","Accept":"text/csv"})
+              with urlopen(req,timeout=60) as resp:
+                  raw=resp.read()
+              rows=[dict(r) for r in csv.DictReader(io.StringIO(raw.decode("utf-8-sig")))]
+              return rows, sha256(raw).hexdigest()
 
           def fetch_stats(seasons):
-              all_rows=[]
-              receipts=[]
+              all_rows=[]; receipts=[]
               for season in seasons:
                   uri=f"https://github.com/nflverse/nflverse-data/releases/download/stats_player/stats_player_week_{season}.csv"
-                  req=Request(uri,headers={"User-Agent":"SportsEdge/1.0","Accept":"text/csv"})
-                  with urlopen(req,timeout=60) as resp:
-                      raw=resp.read()
-                  rows=[dict(r) for r in csv.DictReader(io.StringIO(raw.decode("utf-8-sig")))]
+                  rows,digest=fetch_csv(uri)
                   for r in rows:
                       if not r.get("recent_team") and r.get("team"):
                           r["recent_team"]=r.get("team")
                   all_rows.extend(rows)
-                  receipts.append({"season":str(season),"source_uri":uri,"raw_sha256":sha256(raw).hexdigest()})
+                  receipts.append({"season":str(season),"source_uri":uri,"raw_sha256":digest})
               return all_rows, receipts
+
+          def fetch_injuries(season):
+              uri=f"https://github.com/nflverse/nflverse-data/releases/download/injuries/injuries_{season}.csv"
+              rows,digest=fetch_csv(uri)
+              if not rows:
+                  raise RuntimeError("INJURY_ROWS_EMPTY")
+              keys=set(rows[0])
+              print("INJURY_COLUMNS",sorted(keys))
+              alias=None
+              for cand in ("date_modified","last_modified","report_date","date_updated","modified","date"):
+                  if cand in keys:
+                      alias=cand; break
+              if alias is None:
+                  raise RuntimeError("INJURY_DATE_ALIAS_NOT_FOUND")
+              for r in rows:
+                  if not r.get("date_modified"):
+                      r["date_modified"]=r.get(alias)
+              return rows,uri,digest,alias
 
           ticket=json.loads(Path("manual_inputs/nfl_det_car_20261004.json").read_text())
           history=json.loads(Path("manual_inputs/nfl_det_car_history_20261004.json").read_text())
           schedule_games=[{
-              "game_id":"2026_04_DET_CAR",
-              "away_team":"DET",
-              "home_team":"CAR",
-              "season":2026,
-              "week":4,
-              "kickoff_ts":"2026-10-05T00:20:00+00:00"
+              "game_id":"2026_04_DET_CAR","away_team":"DET","home_team":"CAR",
+              "season":2026,"week":4,"kickoff_ts":"2026-10-05T00:20:00+00:00"
           }]
           depth_rows, depth_uri, depth_sha = fetch_nflverse_depth_charts(season=2026)
           player_rows, player_receipts = fetch_stats([2025,2026])
-          injury_rows, injury_uri, injury_sha = fetch_nflverse_injuries(season=2026)
+          injury_rows, injury_uri, injury_sha, injury_date_alias = fetch_injuries(2026)
 
           payload=build_unified_phone_card(
               ticket,
@@ -79,14 +95,12 @@ jobs:
               "schedule":"MANUAL_EXACT_FROM_SCREENSHOT_MATCHUP",
               "depth":"AVAILABLE",
               "player_stats":"AVAILABLE_SCHEMA_ADAPTED_TEAM_TO_RECENT_TEAM",
-              "injuries":"AVAILABLE",
+              "injuries":f"AVAILABLE_DATE_ALIAS:{injury_date_alias}",
           }
           payload["source_receipts"]={
-              "depth_uri":depth_uri,
-              "depth_sha256":depth_sha,
+              "depth_uri":depth_uri,"depth_sha256":depth_sha,
               "player_stats":player_receipts,
-              "injury_uri":injury_uri,
-              "injury_sha256":injury_sha,
+              "injury_uri":injury_uri,"injury_sha256":injury_sha,
           }
           out=Path("artifacts/run_it/nfl_det_car_20261004.json")
           out.parent.mkdir(parents=True,exist_ok=True)
