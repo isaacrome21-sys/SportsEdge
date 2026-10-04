@@ -162,6 +162,9 @@ class TestNFLV2KAttempt0Core(unittest.TestCase):
         for left, right in zip(a.path, a.path[1:]):
             if left["termination_reason"] == "END_OF_HALF":
                 continue
+            if right["overtime"] and not left["overtime"]:
+                # Overtime begins with a new opening-possession draw.
+                continue
             if left["outcome"] == "DEF_ST_SCORE":
                 self.assertEqual(left["offense"], right["offense"])
             else:
