@@ -60,6 +60,15 @@ def support_evidence(feature: Mapping[str, Any], row: Mapping[str, Any]) -> dict
             extra["opp_outs_unadjusted"] = "integer line (only half lines were validated)"
         elif feature.get("opp_outs_unadjusted"):
             extra["opp_outs_unadjusted"] = str(feature["opp_outs_unadjusted"])
+    if str(row["market"]) == "PITCHER_BB" and not isinstance(fallback, Mapping):
+        # Validated plate-umpire walk lane (#1528); presentation only, the engine priced it.
+        from .mlb_umpire_bb_context import applies, summary
+        if applies(features, "PITCHER_BB", line):
+            extra["ump_bb_adjustment"] = summary(pool, features["ump_bb_adjustment"])
+        elif isinstance(features.get("ump_bb_adjustment"), Mapping):
+            extra["ump_bb_unadjusted"] = "integer line (only half lines were validated)"
+        elif feature.get("ump_bb_unadjusted"):
+            extra["ump_bb_unadjusted"] = str(feature["ump_bb_unadjusted"])
     return {**extra,
         "sample_size": len(pool), "sample_unit": unit,
         "wins": over if row["side"] == "OVER" else under,
