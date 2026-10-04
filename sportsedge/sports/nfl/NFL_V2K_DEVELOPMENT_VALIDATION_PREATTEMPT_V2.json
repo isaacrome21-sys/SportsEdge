@@ -107,7 +107,7 @@
   "simulation": {
     "paths_per_game": 50000,
     "absolute_floor": 10000,
-    "root_seed": 13631901020752177054,
+    "root_seed": 13631901020752177000,
     "rng": "NUMPY_PCG64_SEEDSEQUENCE_V1"
   },
   "implementation_identity": {
@@ -115,7 +115,7 @@
     "core_path": "sportsedge/sports/nfl/v2k_drive_core_v2.py",
     "validation_path": "sportsedge/sports/nfl/v2k_attempt2_validation.py",
     "core_git_blob_sha1": "cf9daf707f2cbf8412c357c592e2a0a18bcc8499",
-    "validation_git_blob_sha1": "a5d5bd6e56284f23fc90ec1891104a8c9d8d2502",
+    "validation_git_blob_sha1": "1150c183150ee0050121b54070a8f245e2388465",
     "canonical_main_anchor_sha": "4307c46bb5f2e19fd6fb5afb6315bf9c9bf4b59f"
   },
   "blocker_codes": [],
@@ -123,18 +123,27 @@
     "max_development_attempts": 5,
     "attempts_used_expected_before_attempt2": 1,
     "this_artifact_consumes_attempt": false,
-    "attempt_2_scoring_allowed": true
+    "attempt_2_scoring_allowed": true,
+    "attempt1_exposure_receipt": {
+      "ledger_path": "sportsedge/sports/nfl/NFL_V2K_ATTEMPT_LEDGER_V1.json",
+      "attempts_used_required": 1,
+      "pr": 1534,
+      "comment_id": 5981843976,
+      "authority_created": false
+    }
   },
   "integrity": {
     "market_features_in_fit_forbidden": true,
     "chronological_walk_forward_required": true,
     "calibrators_fit_on_training_only": true,
-    "smoke_below_floor_is_not_an_attempt": true
+    "below_floor_smoke_is_not_a_valid_scored_attempt": true,
+    "observed_attempt1_reused_history_exposure_consumes_budget_conservatively": true,
+    "threshold_tuning_after_readout_forbidden": true
   },
   "attempt2_issue_binding": {
     "issue": 1539,
     "status": "FROZEN_ATTEMPT2_READY_FOR_DEVELOPMENT_VALIDATION",
-    "root_seed": 13631901020752177054,
+    "root_seed": 13631901020752177000,
     "simulation_count_paths_per_game": 50000,
     "absolute_simulation_floor_paths_per_game": 10000,
     "fold_plan": {
@@ -217,6 +226,6 @@
     "version": "SHA256_FIRST8_BIG_ENDIAN_V1",
     "literal": "SportsEdge|NFL_V2K_DRIVE_HIERARCHICAL_JOINT_G2|ATTEMPT_2|ROOT_SEED_V1",
     "sha256": "bd2e3dc0e337e79ec17e22deffe3f0b406fe5a4745ef20d75b9d1e5a8f38c085",
-    "root_seed": 13631901020752177054
+    "root_seed": 13631901020752177000
   }
 }
