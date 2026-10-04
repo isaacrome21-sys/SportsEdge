@@ -363,7 +363,17 @@
     "tests/test_cfb_reconstructed_selection_preflight.py": "TEST_ONLY_CFB_PROVIDER_PREFLIGHT_NO_RUNTIME_AUTHORITY",
     "config/reconciliation_coverage_v1.json": "RECONCILIATION_COVERAGE_EXTENSION_GOVERNANCE_CONTROL_ZERO_MODEL_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY"
   },
-  "inventory_completion_claim": null,
+  "inventory_completion_claim": {
+    "status": "HOSTED_AUDIT_ZERO_UNMAPPED",
+    "set_effective_registry_complete": true,
+    "candidate_count": 522,
+    "unmapped_count": 0,
+    "proof_head_sha": "510f3b30cdf92f8b423a9ea453820b8f6c74e5f4",
+    "proof_run_id": 37196388506,
+    "proof_artifact_id": 11300498365,
+    "proof_artifact_digest_sha256": "44130f284f54db8d9245c9c24a63bbf6bde4249eb60db04fd8dd61e99acef440",
+    "proof_extension_canonical_sha256": "acc5be9e0ac37fde4d5e3183a7014da253c9649df0185f2b996370cf437f5bf1"
+  },
   "bundle_dispositions": {
     "NFL_V2J_V2K_GOVERNANCE_FREEZE_V1": {
       "state": "REVOKED",
