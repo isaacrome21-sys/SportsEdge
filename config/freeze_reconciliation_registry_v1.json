@@ -1689,10 +1689,22 @@
       "merge_sha": "9599a6554562ca7c0e1bf7d63189ac72573e4e1e",
       "pr": 1537,
       "note": "NFL V2K Attempt-2 development-validation runner and frozen execution surface. No Attempt-2 historical readout was executed by the merge and no Model_P, pricing, promotion, staking, OFFICIAL, or untouched-readout authority is created."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_EBAB94F9_PR_1544",
+      "merge_sha": "ebab94f94b949b48b5481015f96ef081567e3b6f",
+      "pr": 1544,
+      "note": "Prior reconciliation merge; no model or betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_9DDBAA28_PR_1542",
+      "merge_sha": "9ddbaa28ae3d59a0f470f7e097b9c509a04f0b76",
+      "pr": 1542,
+      "note": "MLB announced-lineup pitcher-K adjustment validated in research and wired to production inputs, but pitcher props remain LEAN and this merge grants no deployment, promotion, staking, OFFICIAL, or other betting authority."
     }
   ],
-  "inventory_block_reason": "Current main through merge 9599a655 / PR #1537 registered for reconciliation provenance. Fresh hosted inventory proof remains required. Reconciliation grants no model or betting authority.",
+  "inventory_block_reason": "Current main through merge 9ddbaa28 / PR #1542 registered for reconciliation provenance. Fresh hosted inventory proof remains required. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "9599a6554562ca7c0e1bf7d63189ac72573e4e1e",
+  "reconciled_through_sha": "9ddbaa28ae3d59a0f470f7e097b9c509a04f0b76",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
