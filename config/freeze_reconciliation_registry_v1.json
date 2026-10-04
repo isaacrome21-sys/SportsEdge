@@ -1635,10 +1635,40 @@
       "merge_sha": "5b543d258284f8da3ae354649686558b8d3ff9e8",
       "pr": 1515,
       "note": "Registers NFL V2K machine-enforced pre-attempt validation freeze on main. Attempt ledger remains unconsumed; reconciliation grants zero Model_P, promotion, staking, OFFICIAL, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_AA8BD1BC_PR_1530",
+      "merge_sha": "aa8bd1bcb3b2548ce5d371f3a8c55bae1426d5da",
+      "pr": 1530,
+      "note": "Reconciliation merge advancing main after PR #1515."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_86A8D844_PR_1514",
+      "merge_sha": "86a8d844d1b78c843ec8b5caf942058083926330",
+      "pr": 1514,
+      "note": "NFL candidate release proposal bridge; no production activation."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_E2B6155A_PR_1532",
+      "merge_sha": "e2b6155a2089cec7bf7351c2269743634267a40f",
+      "pr": 1532,
+      "note": "MLB plate-umpire walk-index main advance; registered for repository provenance only."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_6E3FFA75_PR_1531",
+      "merge_sha": "6e3ffa7566dd5b7b81a7ba55d5fbd3e975e7c1d2",
+      "pr": 1531,
+      "note": "NFL V2K attempt-1 freeze PR main advance; later repaired by PR #1533."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_4307C46B_PR_1533",
+      "merge_sha": "4307c46bb5f2e19fd6fb5afb6315bf9c9bf4b59f",
+      "pr": 1533,
+      "note": "NFL V2K canonical attempt-1 freeze repair. Registers main movement only."
     }
   ],
-  "inventory_block_reason": "Fresh hosted zero-unmapped proof remains the inventory-completion authority; current main through PR #1515 is registered for complete reconciliation provenance. This reconciliation grants zero model or betting authority.",
+  "inventory_block_reason": "Fresh hosted zero-unmapped proof remains the inventory-completion authority; current main through PR #1533 is registered for complete reconciliation provenance. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "5b543d258284f8da3ae354649686558b8d3ff9e8",
+  "reconciled_through_sha": "4307c46bb5f2e19fd6fb5afb6315bf9c9bf4b59f",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
