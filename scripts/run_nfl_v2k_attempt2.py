@@ -25,7 +25,7 @@ def _fold(contract, fold_id):
     raise SystemExit("V2K_UNKNOWN_FOLD:"+fold_id)
 
 def cmd_simulate(a):
-    contract=v.preflight(paths=a.paths, smoke=a.smoke)
+    pf=v.preflight(paths=a.paths, smoke=a.smoke); contract=pf["contract"]
     sources=v.verify_sources(a.pbp_dir,a.schedule,contract)
     identity=v.schedule_identity(v.load_schedule(a.schedule))
     fold=_fold(contract,a.fold); manifest=contract["source_binding"]["source_manifest_sha256"]
@@ -40,7 +40,7 @@ def cmd_evaluate(a):
     if not shards: raise SystemExit("V2K_NO_SHARDS")
     smoke={s.get("smoke") for s in shards}; paths={s["paths_per_game"] for s in shards}; codes={s.get("code_sha") for s in shards}
     if len(smoke)!=1 or len(paths)!=1 or len(codes)!=1: raise SystemExit("V2K_SHARDS_MIXED_RUNS")
-    is_smoke=smoke.pop(); contract=v.preflight(paths=paths.pop(),smoke=is_smoke)
+    is_smoke=smoke.pop(); pf=v.preflight(paths=paths.pop(),smoke=is_smoke); contract=pf["contract"]
     v.verify_sources(a.pbp_dir,a.schedule,contract)
     result=v.evaluate(shards,v.load_schedule(a.schedule),contract)
     result.update({"code_sha":codes.pop(),"smoke":is_smoke,"run_status":"NOT_AN_ATTEMPT_SMOKE" if is_smoke else "ATTEMPT2_CONSUMED","attempt_consumed":not is_smoke,"root_seed":_binding(contract)["root_seed"],"paths_per_game":shards[0]["paths_per_game"]})
