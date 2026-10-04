@@ -100,7 +100,7 @@ def test_attempt2_key_mix_changes_fg_td_balance_without_margin_forcing():
         row("g2",0,"A","B",0,0,3,0,"FG"),
         row("g2",1,"B","A",0,3,0,3,"PUNT_OTHER"),
         row("g3",0,"A","B",0,0,7,0,"TD"),
-        row("g3",1,"B","A",0,7,0,7,"PUNT_OTHER"),
+        row("g3",1,"B","A",0,7,3,7,"FG"),
     )
     fit=fit_attempt2(rows,{
         "g1":{"home_team":"A","away_team":"B"},
