@@ -96,13 +96,16 @@ def test_attempt2_home_field_moves_home_scoring_probability_up():
 def test_attempt2_key_mix_changes_fg_td_balance_without_margin_forcing():
     rows=(
         row("g1",0,"A","B",0,0,3,0,"FG"),
-        row("g1",1,"B","A",0,3,0,3,"PUNT_OTHER"),
+        row("g1",1,"B","A",0,3,7,3,"TD"),
         row("g2",0,"A","B",0,0,3,0,"FG"),
-        row("g2",1,"B","A",0,3,7,3,"TD"),
+        row("g2",1,"B","A",0,3,0,3,"PUNT_OTHER"),
+        row("g3",0,"A","B",0,0,7,0,"TD"),
+        row("g3",1,"B","A",0,7,0,7,"PUNT_OTHER"),
     )
     fit=fit_attempt2(rows,{
         "g1":{"home_team":"A","away_team":"B"},
         "g2":{"home_team":"A","away_team":"B"},
+        "g3":{"home_team":"A","away_team":"B"},
     })
     from sportsedge.sports.nfl.v2k_drive_core_v2 import _corrected_probs
     raw=fit.baseline.probabilities("A","B",start_yardline_100=75.0,state_bucket="NORMAL")
