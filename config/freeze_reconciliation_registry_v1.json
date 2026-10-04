@@ -1629,10 +1629,16 @@
       "merge_sha": "abffdc63d7f0f983c1fed3c16fcbd32b40d4e86e",
       "pr": 1527,
       "note": "Registers repository-wide main advance from research-only PR #1527. Reconciliation only; authority remains unchanged."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_5B543D25_PR_1515",
+      "merge_sha": "5b543d258284f8da3ae354649686558b8d3ff9e8",
+      "pr": 1515,
+      "note": "Registers NFL V2K machine-enforced pre-attempt validation freeze on main. Attempt ledger remains unconsumed; reconciliation grants zero Model_P, promotion, staking, OFFICIAL, or untouched-readout authority."
     }
   ],
-  "inventory_block_reason": "Fresh hosted zero-unmapped proof remains the inventory-completion authority; current main through PR #1527 is registered for complete reconciliation provenance. Authority remains unchanged.",
+  "inventory_block_reason": "Fresh hosted zero-unmapped proof remains the inventory-completion authority; current main through PR #1515 is registered for complete reconciliation provenance. This reconciliation grants zero model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "abffdc63d7f0f983c1fed3c16fcbd32b40d4e86e",
+  "reconciled_through_sha": "5b543d258284f8da3ae354649686558b8d3ff9e8",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
