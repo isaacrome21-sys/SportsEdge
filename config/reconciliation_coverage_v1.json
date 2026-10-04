@@ -22,6 +22,7 @@
         "scripts/render_nfl_myspari_card.py",
         "scripts/run_auto_nfl_resilient.py",
         "scripts/run_nfl_lines_card.py",
+        "scripts/run_nfl_v2k_attempt2.py",
         "sportsedge/sports/nfl/attempt9_inference.py",
         "sportsedge/sports/nfl/attempt9_model_p.py",
         "sportsedge/sports/nfl/attempt9_prospective.py",
@@ -32,7 +33,8 @@
         "sportsedge/sports/nfl/discrete_v2_fit.py",
         "sportsedge/sports/nfl/unified_market_engine.py",
         "sportsedge/sports/nfl/unified_run_it.py",
-        "tests/test_nfl_v2k_attempt2_dispatch_bridge.py"
+        "tests/test_nfl_v2k_attempt2_dispatch_bridge.py",
+        "tests/test_nfl_v2k_attempt2_source_adapter.py"
       ],
       "coverage_prefixes": [
         "sportsedge/sports/nfl/m2_v2j_",
