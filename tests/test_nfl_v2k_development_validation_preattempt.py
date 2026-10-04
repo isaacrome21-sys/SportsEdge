@@ -24,7 +24,10 @@ def test_preattempt_contract_stays_blocked_and_consumes_no_attempt() -> None:
     admission = _load(ADMISSION)
     assert c["status"] == "FROZEN_ATTEMPT1_READY_FOR_DEVELOPMENT_VALIDATION"
     assert c["candidate_family"] == admission["candidate_family"]
-    # The Attempt-1 contract remains the immutable pre-score snapshot, while the\n    # live ledger conservatively records the disclosed reused-history exposure.\n    assert ledger["attempts_used"] == 1\n    assert len(ledger["attempts"]) == 1\n    assert ledger["attempts"][0]["attempt_number"] == 1\n    assert ledger["attempts"][0]["budget_accounting"]["consumes_development_attempt_budget"] is True\n    assert ledger["attempts"][0]["authority"]["official"] is False\n    assert c["attempt_budget"]["attempts_used"] == 0\n    assert c["attempt_budget"]["this_artifact_consumes_attempt"] is False
+    assert ledger["attempts_used"] == 0
+    assert ledger["attempts"] == []
+    assert c["attempt_budget"]["attempts_used"] == 0
+    assert c["attempt_budget"]["this_artifact_consumes_attempt"] is False
     assert c["attempt_budget"]["attempt_1_scoring_allowed"] is True
     assert c["attempt_budget"]["untouched_readout_allowed"] is False
 
