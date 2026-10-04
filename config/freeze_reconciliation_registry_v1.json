@@ -1713,10 +1713,16 @@
       "merge_sha": "7d4ce8e4adde7450196d811e00e218e4ad02fd75",
       "pr": 1547,
       "note": "Owner-only NFL V2K Attempt-2 workflow dispatch bridge. Zero model change and zero Model_P, promotion, staking, production-release, or OFFICIAL authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_934FC53F_PR_1551",
+      "merge_sha": "934fc53f13f0311a4cea71e3e34dae9f578574bb",
+      "pr": 1551,
+      "note": "NFL V2K Attempt-2 source-manifest verifier adapter repair. Infrastructure-only; frozen model/core/validator/seed/folds/path count/readout unchanged. Failed pre-fix executions produced no scored readout and no Model_P, promotion, staking, production-release, or OFFICIAL authority."
     }
   ],
-  "inventory_block_reason": "Current main through merge 7d4ce8e4 / PR #1547 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
+  "inventory_block_reason": "Current main through merge 934fc53f / PR #1551 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "7d4ce8e4adde7450196d811e00e218e4ad02fd75",
+  "reconciled_through_sha": "934fc53f13f0311a4cea71e3e34dae9f578574bb",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
