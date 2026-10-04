@@ -148,7 +148,12 @@ def simulate_joint_game_v2(model: Attempt2Fit,home_team:str,away_team:str,*,seas
     if isinstance(seed,bool) or not isinstance(seed,int): raise ValueError("V2K_SEED_REQUIRED")
     if regulation_drives is not None and (isinstance(regulation_drives,bool) or not isinstance(regulation_drives,int) or regulation_drives<=0): raise ValueError("V2K_REGULATION_DRIVES_INVALID")
     if opening_possession is not None and opening_possession not in (home_team,away_team): raise ValueError("V2K_OPENING_POSSESSION_INVALID")
-    b=model.baseline; rng=Generator(PCG64(SeedSequence(seed)))
+    if isinstance(max_overtime_drives,bool) or not isinstance(max_overtime_drives,int) or max_overtime_drives<2: raise ValueError("V2K_MAX_OVERTIME_DRIVES_INVALID")
+    b=model.baseline
+    if not b.start_field_positions: raise ValueError("V2K_START_FIELD_SUPPORT_EMPTY")
+    if not b.regulation_drive_counts: raise ValueError("V2K_REGULATION_DRIVE_SUPPORT_EMPTY")
+    if float(b.league_baseline.get("DEF_ST_SCORE",0.0))>0 and not b.exceptional_score_points: raise ValueError("V2K_EXCEPTIONAL_SCORE_SUPPORT_EMPTY")
+    rng=Generator(PCG64(SeedSequence(seed)))
     if regulation_drives is None: regulation_drives=int(b.regulation_drive_counts[int(rng.integers(len(b.regulation_drive_counts)))])
     if opening_possession is None: opening_possession=home_team if int(rng.integers(2))==0 else away_team
     second=away_team if opening_possession==home_team else home_team; half=max(1,regulation_drives//2)
