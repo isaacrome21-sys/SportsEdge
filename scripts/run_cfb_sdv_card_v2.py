@@ -43,7 +43,8 @@ COMBINED_SIGMA = TEAM_SCORE_RMSE * sqrt(2.0)
 EDGE_FLOOR = 0.02  # same floor as the MLB card (#1230)
 # An edge this large vs a liquid CFB market is far more likely model error than value.
 EDGE_CAP = 0.12
-# Markets where this model beat 52.4% out of sample vs closing lines. None yet (#1471, #1476).
+# Markets where this model beat 52.4% out of sample vs closing lines. None yet (#1471, #1476):
+# the SDV efficiency model and preseason 247 talent (2016-2025 LOSO, 52.3% vs close) both failed.
 VALIDATED_MARKETS: frozenset = frozenset()
 
 
@@ -385,6 +386,13 @@ def main() -> int:
     from sportsedge.sports.cfb.sdv_selected_fit import load_selected_sdv_fit, score_selected_game
 
     board = json.loads(args.board_json)
+    if isinstance(board, dict) and board.get("backtest") == "talent_mirror":
+        # No CFBD calls: talent vs closing spread from pinned public mirrors (#1476).
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("cfb_tm", ROOT / "scripts" / "backtest_cfb_talent_mirror.py")
+        tm = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(tm)
+        return tm.main([], board=board)
     if isinstance(board, dict) and board.get("backtest") == "residual":
         import importlib.util
         spec = importlib.util.spec_from_file_location("cfb_rf", ROOT / "scripts" / "backtest_cfb_residual_features.py")
@@ -459,7 +467,7 @@ def main() -> int:
     for r in payload["results"]:
         if "edge" in r:
             print(f"{r['bet_status']:4s} {r['matchup']:45s} {r['market']:9s} {r['side']:5s} {str(r['line'] or ''):6s} "
-                  f"{r['american_odds']:+6.0f}  model {r['model_p']:.3f}  mkt {r['market_p']:.3f}  edge {r['edge']:+.3f}")
+                  f"{r['american_odds']:+6.0f}  model {r['model_p']*1:.3f}  mkt {r['market_p']:.3f}  edge {r['edge']:+.3f}")
     return 0
 
 
