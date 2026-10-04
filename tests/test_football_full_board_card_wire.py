@@ -27,10 +27,13 @@ class FootballFullBoardCardWireTest(unittest.TestCase):
             ],
         }
         board = board_from_card("NFL", card)
-        priced = [row for row in board["rows"] if row.get("model_p") is not None and row.get("market") == "moneyline"]
+        priced = [
+            row for row in board["rows"]
+            if row.get("model_p") is not None and row.get("market") == "moneyline" and row.get("selection") == "HOME"
+        ]
         self.assertTrue(priced)
         self.assertEqual(priced[0]["american_odds"], -110)
-        self.assertIsNone(board["rows"][0].get("official_eligible") or False)
+        self.assertFalse(priced[0]["official_eligible"])
 
     def test_script_accepts_card_and_rejects_odds_api_cards(self):
         from scripts.run_football_full_board import board_from_card
