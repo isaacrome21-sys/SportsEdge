@@ -31,13 +31,29 @@ pbp_game_drive_records=a1.pbp_game_drive_records
 build_season_drives=a1.build_season_drives
 
 def preflight(*,paths:int,smoke:bool)->dict:
-    contract=a1._load_json(CONTRACT_PATH); ledger=a1._load_json(LEDGER_PATH)
+    contract=a1._load_json(CONTRACT_PATH)
     problems=[]
-    if contract.get("status")!="DEVELOPMENT_NOT_FROZEN":
-        problems.append("V2K_ATTEMPT2_UNEXPECTED_STATUS")
-    # Phase 2 is intentionally non-executable until freeze.
-    problems.append("V2K_ATTEMPT2_CODE_IDENTITY_NOT_FROZEN")
-    raise SystemExit("PREFLIGHT_FAILED:"+";".join(problems))
+    if contract.get("status")!="FROZEN_ATTEMPT2_READY_FOR_DEVELOPMENT_VALIDATION":
+        problems.append("V2K_ATTEMPT2_NOT_FROZEN_READY")
+    binding=contract.get("attempt2_issue_binding",{})
+    if binding.get("issue")!=1539 or binding.get("status")!="FROZEN_ATTEMPT2_READY_FOR_DEVELOPMENT_VALIDATION":
+        problems.append("V2K_ATTEMPT2_BINDING_INVALID")
+    root_seed=contract.get("simulation",{}).get("root_seed")
+    if root_seed is None or root_seed!=binding.get("root_seed"):
+        problems.append("V2K_ATTEMPT2_ROOT_SEED_INVALID")
+    floor=int(contract.get("simulation",{}).get("absolute_floor",10000))
+    default=int(contract.get("simulation",{}).get("paths_per_game",50000))
+    if paths<1 or (not smoke and paths<floor) or paths>default:
+        problems.append("V2K_ATTEMPT2_PATH_COUNT_INVALID")
+    ident=contract.get("implementation_identity",{})
+    if ident.get("status")!="FROZEN":
+        problems.append("V2K_ATTEMPT2_CODE_IDENTITY_NOT_FROZEN")
+    if git_blob_sha1(Path(ident.get("core_path","")))!=ident.get("core_git_blob_sha1"):
+        problems.append("V2K_ATTEMPT2_CORE_IDENTITY_DRIFT")
+    if git_blob_sha1(Path(ident.get("validation_path","")))!=ident.get("validation_git_blob_sha1"):
+        problems.append("V2K_ATTEMPT2_VALIDATION_IDENTITY_DRIFT")
+    if problems: raise SystemExit("PREFLIGHT_FAILED:"+";".join(problems))
+    return {"contract":contract,"root_seed":root_seed,"paths":paths,"smoke":smoke}
 
 def simulate_game_histograms(model,game:Mapping,*,root_seed:int,paths:int)->dict:
     margins=Counter(); totals=Counter()
