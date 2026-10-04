@@ -37,12 +37,52 @@ def _games(rows: Sequence[DriveRow]) -> dict[str, list[DriveRow]]:
     return out
 
 def fit_scoring(rows: Sequence[DriveRow], baseline: HierarchicalStrength) -> ScoringCalibration:
-    if not rows: raise ValueError("V2K_ATTEMPT2_TRAINING_ROWS_REQUIRED")
-    outcomes=tuple(baseline.league_baseline)
-    n=len(rows)
-    empirical={o:sum(r.outcome==o for r in rows)/n for o in outcomes}
-    factors={o:empirical[o]/max(float(baseline.league_baseline[o]),1e-12) for o in outcomes}
-    return ScoringCalibration(factors)
+    """Fit one training-only scoring-propensity scalar.
+
+    The old implementation divided empirical league outcome rates by the
+    baseline league rates fitted from the same rows, making the correction
+    effectively identity.  Here the target is actual points per drive and the
+    predictor is the fully contextual hierarchical probability for each
+    training drive.  A single scalar is solved before renormalization and is
+    applied to scoring outcomes only; no market or held-out outcome is used.
+    """
+    if not rows:
+        raise ValueError("V2K_ATTEMPT2_TRAINING_ROWS_REQUIRED")
+    conv=sum(float(k)*float(v) for k,v in baseline.conversion_probabilities.items())
+    exceptional=(sum(baseline.exceptional_score_points)/len(baseline.exceptional_score_points)
+                 if baseline.exceptional_score_points else 6.0)
+    points={"TD":6.0+conv,"FG":3.0,"TURNOVER":0.0,"PUNT_OTHER":0.0,
+            "SAFETY":2.0,"DEF_ST_SCORE":exceptional}
+    actual=sum(max(0.0,float(r.offense_score_after-r.offense_score_before))+
+               max(0.0,float(r.defense_score_after-r.defense_score_before))
+               for r in rows)/len(rows)
+    raw=[]
+    for r in rows:
+        bucket=_state_bucket(r.period,r.clock_seconds_remaining_period,
+                             r.offense_score_before,r.defense_score_before)
+        raw.append(baseline.probabilities(r.offense,r.defense,
+                    start_yardline_100=r.start_yardline_100,state_bucket=bucket))
+    scoring={"TD","FG","SAFETY","DEF_ST_SCORE"}
+    def expected(mult: float) -> float:
+        total=0.0
+        for p in raw:
+            z=sum(float(v)*(mult if o in scoring else 1.0) for o,v in p.items())
+            total+=sum(points[o]*float(v)*(mult if o in scoring else 1.0)
+                       for o,v in p.items())/z
+        return total/len(raw)
+    lo,hi=0.05,5.0
+    if actual<=expected(lo):
+        mult=lo
+    elif actual>=expected(hi):
+        mult=hi
+    else:
+        for _ in range(60):
+            mid=(lo+hi)/2.0
+            if expected(mid)<actual: lo=mid
+            else: hi=mid
+        mult=(lo+hi)/2.0
+    return ScoringCalibration({o:(mult if o in scoring else 1.0)
+                               for o in DRIVE_OUTCOMES})
 
 def fit_home_field(rows: Sequence[DriveRow], schedule_identity: Mapping[str, Mapping]) -> HomeFieldEffect:
     games=_games(rows)
