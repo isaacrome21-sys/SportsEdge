@@ -3,7 +3,6 @@
   "bundle_extensions": {
     "NFL_V2J_V2K_GOVERNANCE_FREEZE_V1": {
       "coverage_paths": [
-        "scripts/audit_nfl_real_history.py",
         ".github/workflows/nfl-attempt9-model-p-contract.yml",
         "config/nfl_2026_capture_adjudication.json",
         "config/nfl_attempt9_prospective_inference_v1.json",
@@ -14,10 +13,11 @@
         "docs/research/nfl_attempt9_2026_weeks_prereg.md",
         "docs/research/nfl_attempt9_2026_weeks_results.md",
         "docs/research/nfl_discrete_score_spec_v2_1_freeze.md",
-        "scripts/capture_nfl_dk_confirmation.py",
-        "scripts/evaluate_nfl_attempt9_2026_weeks.py",
+        "scripts/audit_nfl_real_history.py",
         "scripts/build_nfl_attempt9_model_p_artifact.py",
         "scripts/build_nfl_attempt9_runtime_artifact.py",
+        "scripts/capture_nfl_dk_confirmation.py",
+        "scripts/evaluate_nfl_attempt9_2026_weeks.py",
         "scripts/render_nfl_myspari_card.py",
         "scripts/run_auto_nfl_resilient.py",
         "scripts/run_nfl_lines_card.py",
@@ -26,6 +26,7 @@
         "sportsedge/sports/nfl/attempt9_prospective.py",
         "sportsedge/sports/nfl/attempt9_prospective_evidence.py",
         "sportsedge/sports/nfl/attempt9_truth_gate.py",
+        "sportsedge/sports/nfl/candidate_release.py",
         "sportsedge/sports/nfl/discrete_v2.py",
         "sportsedge/sports/nfl/discrete_v2_fit.py",
         "sportsedge/sports/nfl/unified_market_engine.py",
@@ -194,6 +195,7 @@
         "docs/LIVE_DATA_ARCHIVE_V1.md",
         "docs/LIVE_ENGINE_V1.md",
         "docs/MLB_OPP_K_CONTEXT_PREREG.md",
+        "docs/MLB_OPP_OUTS_CONTEXT_PREREG.md",
         "docs/MLB_PITCHER_PRIOR_FALLBACK_PREREG.md",
         "docs/MLB_RUN_IT_PREGAME.md",
         "docs/MLB_V8_RUN_IT_SCHEMA_2026-09-03.json",
