@@ -25,13 +25,62 @@ jobs:
         run: python -m pip install --disable-pip-version-check numpy==2.5.3
       - name: Run unified NFL research model
         run: |
-          python scripts/run_nfl_unified_lines_card.py \
-            --input manual_inputs/nfl_det_car_20261004.json \
-            --history manual_inputs/nfl_det_car_history_20261004.json \
-            --output artifacts/run_it/nfl_det_car_20261004.json \
-            --n-sims 50000 \
-            --seed 21 \
-            --horizon-days 1
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from sportsedge.nfl_unified_phone import build_unified_phone_card
+          from sportsedge.sports.nfl.full_auto import fetch_nflverse_depth_charts
+          from sportsedge.sports.nfl.injury_report_source import fetch_nflverse_injuries
+          from sportsedge.sports.nfl.live_role_source import fetch_nflverse_player_stats
+
+          ticket=json.loads(Path("manual_inputs/nfl_det_car_20261004.json").read_text())
+          history=json.loads(Path("manual_inputs/nfl_det_car_history_20261004.json").read_text())
+          schedule_games=[{
+              "game_id":"2026_04_DET_CAR",
+              "away_team":"DET",
+              "home_team":"CAR",
+              "season":2026,
+              "week":4,
+              "kickoff_ts":"2026-10-05T00:20:00+00:00"
+          }]
+          depth_rows, depth_uri, depth_sha = fetch_nflverse_depth_charts(season=2026)
+          player_rows, player_receipts = fetch_nflverse_player_stats(seasons=[2025,2026])
+          injury_rows, injury_uri, injury_sha = fetch_nflverse_injuries(season=2026)
+
+          payload=build_unified_phone_card(
+              ticket,
+              history=history,
+              schedule_games=schedule_games,
+              depth_rows=depth_rows,
+              player_rows=player_rows,
+              injury_rows=injury_rows,
+              injury_source_ready=True,
+              n_sims=50000,
+              seed=21,
+          )
+          payload["source_status"]={
+              "schedule":"MANUAL_EXACT_FROM_SCREENSHOT_MATCHUP",
+              "depth":"AVAILABLE",
+              "player_stats":"AVAILABLE",
+              "injuries":"AVAILABLE",
+          }
+          payload["source_receipts"]={
+              "depth_uri":depth_uri,
+              "depth_sha256":depth_sha,
+              "player_stats":player_receipts,
+              "injury_uri":injury_uri,
+              "injury_sha256":injury_sha,
+          }
+          out=Path("artifacts/run_it/nfl_det_car_20261004.json")
+          out.parent.mkdir(parents=True,exist_ok=True)
+          out.write_text(json.dumps(payload,indent=2,sort_keys=True,default=str)+"\n")
+          print(json.dumps({
+              "status":"OK",
+              "rows":len(payload.get("rows") or []),
+              "selected_rows":len(payload.get("selected_rows") or []),
+              "source_status":payload.get("source_status")
+          },sort_keys=True))
+          PY
       - name: Print model readout
         if: always() && hashFiles('artifacts/run_it/nfl_det_car_20261004.json') != ''
         run: |
