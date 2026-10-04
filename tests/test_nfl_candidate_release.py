@@ -10,7 +10,6 @@ from sportsedge.sports.nfl.candidate_release import (
     canonical_payload_sha256,
     validate_non_authoritative_release_proposal,
 )
-from sportsedge.sports.nfl.m2 import PRODUCTION_NFL_M2_MODEL_ID
 
 CODE_SHA = "a" * 40
 SOURCE_SHA = "b" * 64
@@ -60,38 +59,27 @@ class NFLCandidateReleaseProposalTests(unittest.TestCase):
         self.assertIsNone(proposal["production_release_identity"])
         self.assertFalse(proposal["frozen_artifact_binding"])
         self.assertFalse(proposal["activation_implemented"])
-        self.assertFalse(proposal["legacy_m2_evidence_transfer_allowed"])
         self.assertFalse(proposal["promotion_authority"])
         self.assertFalse(proposal["model_p_authority"])
         self.assertFalse(proposal["staking_authority"])
-        self.assertFalse(proposal["truth_gate_authority"])
         self.assertFalse(proposal["official_authority"])
         self.assertTrue(proposal["forward_clv_must_start_after_freeze"])
         self.assertFalse(proposal["historical_or_backfilled_clv_allowed"])
+        self.assertEqual(proposal["candidate"]["code_git_sha"], CODE_SHA)
+        self.assertEqual(proposal["candidate"]["source_manifest_sha256"], SOURCE_SHA)
+        self.assertEqual(proposal["candidate"]["preregistration_sha256"], PREREG_SHA)
         self.assertEqual(
             proposal["candidate"]["untouched_readout_sha256"],
             canonical_payload_sha256(_evidence()),
         )
-        self.assertEqual(
-            validate_non_authoritative_release_proposal(proposal),
-            proposal,
-        )
-
-    def test_legacy_production_m2_relabel_is_forbidden(self):
-        evidence = _evidence()
-        evidence["model_id"] = PRODUCTION_NFL_M2_MODEL_ID
-        with self.assertRaisesRegex(
-            NFLCandidateReleaseError,
-            "LEGACY_M2_RELABEL_PROHIBITED",
-        ):
-            _proposal(evidence)
+        self.assertEqual(validate_non_authoritative_release_proposal(proposal), proposal)
 
     def test_promoted_label_alone_cannot_enter_release_bridge(self):
         evidence = _evidence()
         evidence["status"] = "PROMOTED"
         with self.assertRaisesRegex(
             NFLCandidateReleaseError,
-            "READOUT_STATUS_INVALID",
+            "NFL_CANDIDATE_RELEASE_READOUT_STATUS_INVALID",
         ):
             _proposal(evidence)
 
@@ -107,7 +95,7 @@ class NFLCandidateReleaseProposalTests(unittest.TestCase):
             evidence[field] = True
             with self.subTest(field=field), self.assertRaisesRegex(
                 NFLCandidateReleaseError,
-                "ZERO_AUTHORITY_REQUIRED",
+                "NFL_CANDIDATE_RELEASE_ZERO_AUTHORITY_REQUIRED",
             ):
                 _proposal(evidence)
 
@@ -116,7 +104,7 @@ class NFLCandidateReleaseProposalTests(unittest.TestCase):
         evidence["post_readout_retuning_allowed"] = True
         with self.assertRaisesRegex(
             NFLCandidateReleaseError,
-            "POST_READOUT_RETUNING_FORBIDDEN",
+            "NFL_CANDIDATE_RELEASE_POST_READOUT_RETUNING_FORBIDDEN",
         ):
             _proposal(evidence)
 
@@ -124,7 +112,7 @@ class NFLCandidateReleaseProposalTests(unittest.TestCase):
         evidence = _evidence()
         with self.assertRaisesRegex(
             NFLCandidateReleaseError,
-            "SOURCE_MANIFEST_MISMATCH",
+            "NFL_CANDIDATE_RELEASE_SOURCE_MANIFEST_MISMATCH",
         ):
             build_candidate_release_proposal(
                 evidence,
@@ -138,12 +126,10 @@ class NFLCandidateReleaseProposalTests(unittest.TestCase):
     def test_changed_readout_bytes_fail_hash_binding(self):
         evidence = _evidence()
         original_sha = canonical_payload_sha256(evidence)
-        evidence["candidate_historical_evidence"]["spread"][
-            "historical_predictive_pass"
-        ] = False
+        evidence["candidate_historical_evidence"]["spread"]["historical_predictive_pass"] = False
         with self.assertRaisesRegex(
             NFLCandidateReleaseError,
-            "EVIDENCE_SHA256_MISMATCH",
+            "NFL_CANDIDATE_RELEASE_EVIDENCE_SHA256_MISMATCH",
         ):
             build_candidate_release_proposal(
                 evidence,
@@ -154,31 +140,31 @@ class NFLCandidateReleaseProposalTests(unittest.TestCase):
                 proposal_id="tampered-readout",
             )
 
+    def test_missing_candidate_identity_fails_closed(self):
+        for field, message in (
+            ("model_id", "MODEL_ID_REQUIRED"),
+            ("distribution_contract", "DISTRIBUTION_CONTRACT_REQUIRED"),
+            ("event_contract", "EVENT_CONTRACT_REQUIRED"),
+        ):
+            evidence = _evidence()
+            evidence[field] = ""
+            with self.subTest(field=field), self.assertRaisesRegex(
+                NFLCandidateReleaseError,
+                message,
+            ):
+                _proposal(evidence)
+
     def test_proposal_mutation_cannot_self_activate(self):
         for field, value, message in (
             ("selected_for_production", True, "SELECTION_NOT_ALLOWED"),
-            (
-                "production_release_identity",
-                {"model_id": "laundered"},
-                "PRODUCTION_IDENTITY_NOT_ALLOWED",
-            ),
+            ("production_release_identity", {"model_id": "laundered"}, "PRODUCTION_IDENTITY_NOT_ALLOWED"),
             ("frozen_artifact_binding", True, "FREEZE_NOT_ALLOWED"),
             ("activation_implemented", True, "ACTIVATION_NOT_ALLOWED"),
-            (
-                "legacy_m2_evidence_transfer_allowed",
-                True,
-                "LEGACY_M2_EVIDENCE_TRANSFER_FORBIDDEN",
-            ),
             ("promotion_authority", True, "AUTHORITY_NOT_ALLOWED"),
             ("model_p_authority", True, "AUTHORITY_NOT_ALLOWED"),
             ("staking_authority", True, "AUTHORITY_NOT_ALLOWED"),
-            ("truth_gate_authority", True, "AUTHORITY_NOT_ALLOWED"),
             ("official_authority", True, "AUTHORITY_NOT_ALLOWED"),
-            (
-                "historical_or_backfilled_clv_allowed",
-                True,
-                "BACKFILL_FORBIDDEN",
-            ),
+            ("historical_or_backfilled_clv_allowed", True, "BACKFILL_FORBIDDEN"),
         ):
             proposal = copy.deepcopy(_proposal())
             proposal[field] = value
