@@ -117,3 +117,14 @@ def test_attempt2_key_mix_changes_fg_td_balance_without_margin_forcing():
     assert abs(corrected_ratio-observed) <= abs(raw_ratio-observed)+1e-12
     assert set(corrected)==set(raw)
     assert abs(sum(corrected.values())-1.0)<1e-12
+
+
+def test_attempt2_simulation_rejects_invalid_overtime_limit():
+    rows=(
+        row("g1",0,"A","B",0,0,7,0,"TD"),
+        row("g1",1,"B","A",0,7,0,7,"PUNT_OTHER"),
+    )
+    fit=fit_attempt2(rows,{"g1":{"home_team":"A","away_team":"B"}})
+    import pytest
+    with pytest.raises(ValueError,match="V2K_MAX_OVERTIME_DRIVES_INVALID"):
+        simulate_joint_game_v2(fit,"A","B",season=2025,seed=1,max_overtime_drives=1)
