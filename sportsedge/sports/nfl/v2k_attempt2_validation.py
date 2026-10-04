@@ -33,12 +33,21 @@ build_season_drives=a1.build_season_drives
 
 def preflight(*,paths:int,smoke:bool)->dict:
     contract=a1._load_json(CONTRACT_PATH)
+    ledger=a1._load_json(LEDGER_PATH)
     problems=[]
     if contract.get("status")!="FROZEN_ATTEMPT2_READY_FOR_DEVELOPMENT_VALIDATION":
         problems.append("V2K_ATTEMPT2_NOT_FROZEN_READY")
     binding=contract.get("attempt2_issue_binding",{})
     if binding.get("issue")!=1539 or binding.get("status")!="FROZEN_ATTEMPT2_READY_FOR_DEVELOPMENT_VALIDATION":
         problems.append("V2K_ATTEMPT2_BINDING_INVALID")
+    expected_used=int(contract.get("attempt_budget",{}).get("attempts_used_expected_before_attempt2",-1))
+    attempts=ledger.get("attempts") or []
+    if ledger.get("attempts_used")!=expected_used or expected_used!=1:
+        problems.append("V2K_ATTEMPT1_EXPOSURE_LEDGER_COUNT_INVALID")
+    if not attempts or attempts[-1].get("attempt_number")!=1 or not attempts[-1].get("budget_accounting",{}).get("consumes_development_attempt_budget"):
+        problems.append("V2K_ATTEMPT1_EXPOSURE_NOT_RECORDED")
+    if any(bool((ledger.get("authority") or {}).get(k)) for k in ("model_p","promotion","staking","official")):
+        problems.append("V2K_ATTEMPT_LEDGER_AUTHORITY_ESCALATION")
     root_seed=contract.get("simulation",{}).get("root_seed")
     if root_seed is None or root_seed!=binding.get("root_seed"):
         problems.append("V2K_ATTEMPT2_ROOT_SEED_INVALID")
@@ -54,7 +63,7 @@ def preflight(*,paths:int,smoke:bool)->dict:
     if git_blob_sha1(Path(ident.get("validation_path","")))!=ident.get("validation_git_blob_sha1"):
         problems.append("V2K_ATTEMPT2_VALIDATION_IDENTITY_DRIFT")
     if problems: raise SystemExit("PREFLIGHT_FAILED:"+";".join(problems))
-    return {"contract":contract,"root_seed":root_seed,"paths":paths,"smoke":smoke}
+    return {"contract":contract,"root_seed":root_seed,"paths":paths,"smoke":smoke,"attempts_used":ledger.get("attempts_used")}
 
 def simulate_game_histograms(model,game:Mapping,*,root_seed:int,paths:int)->dict:
     margins=Counter(); totals=Counter()
