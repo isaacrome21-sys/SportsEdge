@@ -1,8 +1,8 @@
 {
   "schema": "NFL_V2K_DEVELOPMENT_EXPOSURE_V1",
-  "status": "ATTEMPT1_REUSED_HISTORY_EXPOSURE_RECORDED_ATTEMPT2_PENDING",
+  "status": "ATTEMPT2_CONSUMED_MODEL_FAIL",
   "max_development_attempts": 5,
-  "development_budget_units_used": 1,
+  "development_budget_units_used": 2,
   "untouched_readout_allowed": false,
   "authority": {
     "model_p": false,
@@ -42,11 +42,56 @@
         "consumes_development_budget": true,
         "reason": "Historical development outcomes were exposed before Attempt 2; count conservatively to prevent re-use or relabeling."
       }
+    },
+    {
+      "budget_unit": 2,
+      "candidate_family": "NFL_V2K_DRIVE_HIERARCHICAL_JOINT_G2",
+      "evidence_role": "CANONICAL_DEVELOPMENT_VALIDATION_ATTEMPT",
+      "source": {
+        "workflow_run_id": 37239231204,
+        "artifact_id": 11316753318,
+        "artifact_name": "nfl-v2k-attempt2-f95800d6975ff91cd890b8a363d37bd352ed3f1a",
+        "artifact_digest": "sha256:c3bea7f623d0292b285ebbc063f7d8cee556619022b35e681e4addc487d6c6bd",
+        "code_sha": "f95800d6975ff91cd890b8a363d37bd352ed3f1a",
+        "issue": 1539,
+        "comment_id": 5985438395
+      },
+      "execution": {
+        "root_seed": 13631901020752177000,
+        "paths_per_game": 50000,
+        "evaluated_game_count": 1359,
+        "full_frozen_attempt_execution": true,
+        "valid_scored_attempt": true,
+        "all_ten_shards_success": true,
+        "evaluator_success": true
+      },
+      "observed_summary": {
+        "spread_fold_wins": "0/5",
+        "total_fold_wins": "0/5",
+        "moneyline_candidate_brier": 0.2486358462975959,
+        "moneyline_reference_0_5_brier": 0.25,
+        "moneyline_candidate_log_loss": 0.6921413017148035,
+        "moneyline_reference_0_5_log_loss": 0.6931471805599212,
+        "team_score_mae": 8.480545651214129,
+        "team_score_rmse": 10.540989536103202,
+        "signed_key_mass_rmse": 0.02900706497968003,
+        "candidate_plus3_mass": 0.03268401766004414,
+        "reference_plus3_mass": 0.07710390220968501,
+        "candidate_minus3_mass": 0.03227190581309782,
+        "reference_minus3_mass": 0.06723084156088388,
+        "result": "MODEL_FAIL"
+      },
+      "accounting": {
+        "consumes_development_budget": true,
+        "reason": "Canonical 50,000-path/game Attempt-2 readout exposed the preregistered 2021-2025 development/validation outcomes."
+      }
     }
   ],
   "policy": {
     "below_floor_smoke_is_not_a_valid_scored_attempt": true,
     "observed_reused_history_exposure_consumes_budget_conservatively": true,
-    "no_relabel_as_untouched": true
+    "no_relabel_as_untouched": true,
+    "remaining_development_budget_units": 3,
+    "attempt2_threshold_retuning_forbidden": true
   }
 }
