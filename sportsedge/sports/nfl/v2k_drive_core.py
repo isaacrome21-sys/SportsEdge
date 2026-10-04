@@ -370,6 +370,10 @@ def simulate_joint_game(
         period, seconds = _clock_state(next_index, regulation_drives)
         if termination_reason == "END_OF_HALF":
             next_possession = second_half_opening
+        elif outcome == "DEF_ST_SCORE":
+            # A defensive/special-teams touchdown is followed by a kickoff from
+            # the scoring defense back to the prior offense.
+            next_possession = offense
         else:
             next_possession = defense
         state = GameState(home_team, away_team, next_possession, home, away, 5 if in_ot else period, 0 if in_ot else seconds, next_index, in_ot)

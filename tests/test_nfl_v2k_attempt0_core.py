@@ -160,9 +160,33 @@ class TestNFLV2KAttempt0Core(unittest.TestCase):
         self.assertEqual(a.team_totals["A"], a.home_score)
         self.assertEqual(a.team_totals["B"], a.away_score)
         for left, right in zip(a.path, a.path[1:]):
-            if left["termination_reason"] != "END_OF_HALF":
+            if left["termination_reason"] == "END_OF_HALF":
+                continue
+            if left["outcome"] == "DEF_ST_SCORE":
+                self.assertEqual(left["offense"], right["offense"])
+            else:
                 self.assertEqual(left["defense"], right["offense"])
         self.assertTrue(all(0.0 <= p["start_yardline_100"] <= 100.0 for p in a.path))
+
+    def test_defensive_special_teams_score_kicks_back_to_prior_offense(self):
+        baseline = {o: 0.0 for o in DRIVE_OUTCOMES}
+        baseline["DEF_ST_SCORE"] = 1.0
+        zero = {o: 0.0 for o in DRIVE_OUTCOMES}
+        model = HierarchicalStrength(
+            league_baseline=baseline, offense_effect={}, defense_effect={}, shrinkage_weight={},
+            state_effect={s: dict(zero) for s in STATE_BUCKETS},
+            field_effect={f: dict(zero) for f in FIELD_BUCKETS},
+            conversion_probabilities={0: 1.0, 1: 0.0, 2: 0.0},
+            start_field_positions=(75.0,), regulation_drive_counts=(4,),
+            exceptional_score_points=(6,),
+        )
+        result = simulate_joint_game(
+            model, "A", "B", season=2025, seed=17,
+            regulation_drives=4, max_overtime_drives=2, opening_possession="A"
+        )
+        self.assertEqual(result.path[0]["outcome"], "DEF_ST_SCORE")
+        self.assertEqual(result.path[0]["offense"], "A")
+        self.assertEqual(result.path[1]["offense"], "A")
 
     def test_half_and_game_truncation_are_explicit_and_halftime_possession_resets(self):
         model = fit_hierarchical_strength(training_rows())
