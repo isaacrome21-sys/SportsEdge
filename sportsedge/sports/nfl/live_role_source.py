@@ -33,7 +33,7 @@ DEFAULT_DECAY = 0.85
 # NFL rushing yardage is a signed stat: sacks/kneels and short negative runs can
 # legitimately make a weekly player's rushing_yards negative. Counts and the
 # remaining efficiency inputs stay nonnegative.
-SIGNED_STAT_FIELDS = frozenset({"rushing_yards"})
+SIGNED_STAT_FIELDS = frozenset({"passing_yards", "rushing_yards", "receiving_yards"})
 
 
 def _team(value: Any) -> str:
