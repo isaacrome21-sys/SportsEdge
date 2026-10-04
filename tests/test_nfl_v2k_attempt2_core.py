@@ -60,6 +60,36 @@ def test_attempt2_simulation_replay_is_deterministic():
     assert a.team_totals=={"A":a.home_score,"B":a.away_score}
 
 
+def test_attempt2_histograms_preserve_joint_score_support_and_marginals():
+    from collections import Counter
+    from sportsedge.sports.nfl.v2k_attempt2_validation import simulate_game_histograms
+
+    rows=(
+        row("g1",0,"A","B",0,0,7,0,"TD"),
+        row("g1",1,"B","A",0,7,3,7,"FG"),
+        row("g2",0,"A","B",0,0,0,0,"PUNT_OTHER"),
+        row("g2",1,"B","A",0,0,0,0,"PUNT_OTHER"),
+    )
+    fit=fit_attempt2(rows,{
+        "g1":{"home_team":"A","away_team":"B"},
+        "g2":{"home_team":"A","away_team":"B"},
+    })
+    game={"game_id":"future","season":2025,"week":1,"home_team":"A","away_team":"B"}
+    out=simulate_game_histograms(fit,game,root_seed=99,paths=32)
+    assert sum(out["score_hist"].values())==32
+    score_pairs=Counter()
+    for key,count in out["score_hist"].items():
+        h,a=(int(part) for part in key.split(",",1))
+        score_pairs[(h,a)]+=count
+    margin=Counter()
+    total=Counter()
+    for (h,a),count in score_pairs.items():
+        margin[h-a]+=count
+        total[h+a]+=count
+    assert margin==Counter({int(k):v for k,v in out["margin_hist"].items()})
+    assert total==Counter({int(k):v for k,v in out["total_hist"].items()})
+
+
 def test_attempt2_simulation_rejects_invalid_identity_and_drive_count():
     rows=(row("g",0,"A","B",0,0,0,0),)
     fit=fit_attempt2(rows,{"g":{"home_team":"A","away_team":"B"}})
@@ -169,3 +199,42 @@ def test_attempt2_parallel_fold_matches_serial():
     serial=run_fold_shard(fold=fold,drives_by_season=drives,identity=identity,root_seed=99,paths=8,shard_index=0,shard_count=1,workers=1)
     parallel=run_fold_shard(fold=fold,drives_by_season=drives,identity=identity,root_seed=99,paths=8,shard_index=0,shard_count=1,workers=2)
     assert serial==parallel
+
+def test_attempt2_evaluate_emits_moneyline_and_team_total_diagnostics():
+    from sportsedge.sports.nfl import v2k_attempt2_validation as v
+
+    contract=v.a1._load_json(v.CONTRACT_PATH)
+    root=contract["attempt2_issue_binding"]["root_seed"]
+    schedule={}
+    shards=[]
+    for idx, season in enumerate(range(2021, 2026), start=1):
+        gid=f"g{season}"
+        schedule[gid]={
+            "game_id":gid,"season":season,"week":1,
+            "home_team":"A","away_team":"B","home_score":21,"away_score":17,
+            "_market":{
+                "spread_line":0.5,"total_line":37.5,
+                "home_spread_odds":"-110","away_spread_odds":"-110",
+                "over_odds":"-110","under_odds":"-110",
+            },
+        }
+        shards.append({
+            "schema":v.SHARD_SCHEMA,"fold_id":f"F{idx}","train_seasons":[],
+            "test_season":season,"shard_index":0,"shard_count":1,
+            "root_seed":root,"paths_per_game":4,"training_drive_rows":1,
+            "fold_test_game_count":1,"sportsbook_prices_consumed":False,
+            "games":[{
+                "game_id":gid,"season":season,"week":1,
+                "home_team":"A","away_team":"B","paths":4,
+                "score_hist":{"17,21":1,"21,17":3},
+                "margin_hist":{"-4":1,"4":3},
+                "total_hist":{"38":4},
+            }],
+        })
+    out=v.evaluate(shards,schedule,contract)
+    assert out["score_derived_diagnostics"]["moneyline"]["overall"]["n"]==5
+    assert out["score_derived_diagnostics"]["team_total"]["overall"]["n_team_scores"]==10
+    assert out["score_derived_diagnostics"]["moneyline"]["folds"][0]["candidate_brier"] < 0.25
+    assert out["game_rows"][0]["sim_mean_home_score"]==20.0
+    assert out["game_rows"][0]["sim_mean_away_score"]==18.0
+
