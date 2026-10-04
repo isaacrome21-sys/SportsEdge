@@ -150,8 +150,8 @@ class TestNFLV2KAttempt0Core(unittest.TestCase):
 
     def test_joint_simulation_is_deterministic_stateful_and_coherent(self):
         model = fit_hierarchical_strength(training_rows())
-        a = simulate_joint_game(model, "A", "B", seed=20260914, regulation_drives=12, max_overtime_drives=4, opening_possession="A")
-        b = simulate_joint_game(model, "A", "B", seed=20260914, regulation_drives=12, max_overtime_drives=4, opening_possession="A")
+        a = simulate_joint_game(model, "A", "B", season=2025, seed=20260914, regulation_drives=12, max_overtime_drives=4, opening_possession="A")
+        b = simulate_joint_game(model, "A", "B", season=2025, seed=20260914, regulation_drives=12, max_overtime_drives=4, opening_possession="A")
         self.assertEqual(a, b)
         self.assertEqual(a.margin, a.home_score - a.away_score)
         self.assertEqual(a.total, a.home_score + a.away_score)
@@ -164,7 +164,7 @@ class TestNFLV2KAttempt0Core(unittest.TestCase):
 
     def test_half_and_game_truncation_are_explicit_and_halftime_possession_resets(self):
         model = fit_hierarchical_strength(training_rows())
-        result = simulate_joint_game(model, "A", "B", seed=31, regulation_drives=4, max_overtime_drives=2, opening_possession="A")
+        result = simulate_joint_game(model, "A", "B", season=2025, seed=31, regulation_drives=4, max_overtime_drives=2, opening_possession="A")
         regulation = [p for p in result.path if not p["overtime"]]
         half = [p for p in regulation if p["termination_reason"] == "END_OF_HALF"]
         game = [p for p in regulation if p["termination_reason"] == "END_OF_GAME"]
@@ -177,25 +177,58 @@ class TestNFLV2KAttempt0Core(unittest.TestCase):
     def test_empirical_possession_count_is_deterministic_under_seed(self):
         model = fit_hierarchical_strength(training_rows())
         self.assertEqual(
-            simulate_joint_game(model, "A", "B", seed=11, max_overtime_drives=2),
-            simulate_joint_game(model, "A", "B", seed=11, max_overtime_drives=2),
+            simulate_joint_game(model, "A", "B", season=2025, seed=11, max_overtime_drives=2),
+            simulate_joint_game(model, "A", "B", season=2025, seed=11, max_overtime_drives=2),
         )
 
-    def test_2025_regular_season_overtime_gives_both_teams_initial_possession(self):
+    def _overtime_td_model(self):
         baseline = {o: 0.0 for o in DRIVE_OUTCOMES}
         baseline["PUNT_OTHER"] = 1.0
         zero = {o: 0.0 for o in DRIVE_OUTCOMES}
-        model = HierarchicalStrength(
+        state_effect = {s: dict(zero) for s in STATE_BUCKETS}
+        state_effect["OVERTIME"]["PUNT_OTHER"] = -1.0
+        state_effect["OVERTIME"]["TD"] = 1.0
+        return HierarchicalStrength(
             league_baseline=baseline, offense_effect={}, defense_effect={}, shrinkage_weight={},
-            state_effect={s: dict(zero) for s in STATE_BUCKETS}, field_effect={f: dict(zero) for f in FIELD_BUCKETS},
-            conversion_probabilities={0: 1.0, 1: 0.0, 2: 0.0}, start_field_positions=(75.0,),
+            state_effect=state_effect, field_effect={f: dict(zero) for f in FIELD_BUCKETS},
+            conversion_probabilities={0: 0.0, 1: 1.0, 2: 0.0}, start_field_positions=(75.0,),
             regulation_drive_counts=(4,), exceptional_score_points=(),
         )
-        result = simulate_joint_game(model, "A", "B", seed=7, regulation_drives=4, max_overtime_drives=2, opening_possession="A")
-        self.assertEqual(len(result.path), 6)
-        self.assertTrue(result.path[-1]["overtime"] and result.path[-2]["overtime"])
-        self.assertEqual(result.path[-1]["overtime_rule_version"], OVERTIME_RULE_VERSION)
+
+    def test_late_game_state_uses_two_minute_boundary_and_one_possession_split(self):
+        self.assertEqual(_state_bucket(4, 121, 0, 7), "NORMAL")
+        self.assertEqual(_state_bucket(4, 120, 0, 7), "LATE_TRAILING_ONE_POSSESSION")
+        self.assertEqual(_state_bucket(4, 120, 0, 9), "LATE_TRAILING_MULTI_POSSESSION")
+        self.assertEqual(_state_bucket(4, 120, 7, 7), "LATE_TIED")
+
+    def test_2018_2024_regular_season_opening_overtime_td_ends_game(self):
+        model = self._overtime_td_model()
+        result = simulate_joint_game(
+            model, "A", "B", season=2024, seed=7,
+            regulation_drives=4, max_overtime_drives=4, opening_possession="A"
+        )
+        overtime = [p for p in result.path if p["overtime"]]
+        self.assertEqual(len(overtime), 1)
+        self.assertEqual(overtime[0]["overtime_rule_version"], OVERTIME_RULE_2017_2024)
+        self.assertNotEqual(result.home_score, result.away_score)
+
+    def test_2025_regular_season_overtime_gives_both_teams_initial_possession(self):
+        model = self._overtime_td_model()
+        result = simulate_joint_game(
+            model, "A", "B", season=2025, seed=7,
+            regulation_drives=4, max_overtime_drives=2, opening_possession="A"
+        )
+        overtime = [p for p in result.path if p["overtime"]]
+        self.assertEqual(len(overtime), 2)
+        self.assertEqual(overtime[-1]["overtime_rule_version"], OVERTIME_RULE_2025_PLUS)
         self.assertEqual(result.home_score, result.away_score)
+
+    def test_overtime_season_is_required_and_fail_closed(self):
+        model = fit_hierarchical_strength(training_rows())
+        with self.assertRaisesRegex(TypeError, "season"):
+            simulate_joint_game(model, "A", "B", seed=7, regulation_drives=4)
+        with self.assertRaisesRegex(ValueError, "V2K_OVERTIME_SEASON_INVALID"):
+            simulate_joint_game(model, "A", "B", season=2016, seed=7, regulation_drives=4)
 
     def test_attempt_zero_has_literal_zero_downstream_authority(self):
         self.assertTrue(AUTHORITY)

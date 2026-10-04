@@ -14,10 +14,10 @@ from random import Random
 from typing import Iterable, Mapping, Sequence
 
 DRIVE_OUTCOMES = ("TD", "FG", "TURNOVER", "PUNT_OTHER", "SAFETY", "DEF_ST_SCORE")
-STATE_BUCKETS = ("NORMAL", "LATE_TIED", "LATE_TRAILING", "LATE_LEADING", "OVERTIME")
+STATE_BUCKETS = ("NORMAL", "LATE_TIED", "LATE_TRAILING_ONE_POSSESSION", "LATE_TRAILING_MULTI_POSSESSION", "LATE_LEADING", "OVERTIME")
 FIELD_BUCKETS = ("SHORT_FIELD", "MID_FIELD", "LONG_FIELD")
 TERMINATION_REASONS = ("NORMAL", "END_OF_HALF", "END_OF_GAME")
-OVERTIME_RULE_VERSION = "NFL_2025_REG_BOTH_TEAMS_POSSESS_V1"
+OVERTIME_RULE_2017_2024 = "NFL_2017_2024_REG_MODIFIED_SUDDEN_DEATH_V1"\nOVERTIME_RULE_2025_PLUS = "NFL_2025_REG_BOTH_TEAMS_POSSESS_V1"\n# Backward-compatible name for callers that only need the current ruleset.\nOVERTIME_RULE_VERSION = OVERTIME_RULE_2025_PLUS
 TRUNCATION_POLICY_VERSION = "V2K_DRIVE_LEVEL_HALF_GAME_TRUNCATION_V1"
 
 
@@ -33,14 +33,23 @@ def _field_bucket(yardline_100: float) -> str:
 def _state_bucket(period: int, clock_seconds: int, offense_score: int, defense_score: int, *, overtime: bool = False) -> str:
     if overtime:
         return "OVERTIME"
-    if int(period) < 4 or int(clock_seconds) > 300:
+    # Attempt-0 design freeze uses the NFL two-minute boundary, not an
+    # arbitrary five-minute window.
+    if int(period) < 4 or int(clock_seconds) > 120:
         return "NORMAL"
     diff = int(offense_score) - int(defense_score)
     if diff == 0:
         return "LATE_TIED"
     if diff < 0:
-        return "LATE_TRAILING"
+        return "LATE_TRAILING_ONE_POSSESSION" if diff >= -8 else "LATE_TRAILING_MULTI_POSSESSION"
     return "LATE_LEADING"
+
+
+def overtime_rule_version(season: int) -> str:
+    """Return the regular-season overtime ruleset frozen for a season."""
+    if isinstance(season, bool) or not isinstance(season, int) or season < 2017:
+        raise ValueError("V2K_OVERTIME_SEASON_INVALID")
+    return OVERTIME_RULE_2025_PLUS if season >= 2025 else OVERTIME_RULE_2017_2024
 
 
 @dataclass(frozen=True)
@@ -261,6 +270,7 @@ def simulate_joint_game(
     home_team: str,
     away_team: str,
     *,
+    season: int,
     seed: int,
     regulation_drives: int | None = None,
     max_overtime_drives: int = 8,
@@ -268,6 +278,7 @@ def simulate_joint_game(
 ) -> SimulationResult:
     if home_team == away_team or max_overtime_drives <= 0:
         raise ValueError("V2K_SIMULATION_ARGUMENT_INVALID")
+    ot_rule = overtime_rule_version(season)
     rng = Random(seed)
     if regulation_drives is None:
         if not model.regulation_drive_counts:
@@ -350,7 +361,7 @@ def simulate_joint_game(
             "termination_reason": termination_reason,
             "truncation_policy_version": TRUNCATION_POLICY_VERSION,
             "overtime": in_ot,
-            "overtime_rule_version": OVERTIME_RULE_VERSION if in_ot else None,
+            "overtime_rule_version": ot_rule if in_ot else None,
         })
 
         period, seconds = _clock_state(next_index, regulation_drives)
@@ -361,8 +372,12 @@ def simulate_joint_game(
         state = GameState(home_team, away_team, next_possession, home, away, 5 if in_ot else period, 0 if in_ot else seconds, next_index, in_ot)
         if first_ot_defensive_score:
             break
-        # 2025 regular-season rule: both teams get one possession even after an
-        # opening offensive TD/FG; after both opportunities, a lead ends the game.
+        # 2017-2024 regular season: an opening-possession offensive TD ends OT.
+        # A first-possession FG/no-score still gives the opponent an opportunity.
+        if in_ot and ot_drives == 1 and ot_rule == OVERTIME_RULE_2017_2024 and pts_off >= 6:
+            break
+        # 2025+ regular season guarantees both teams an initial possession even
+        # after an opening offensive TD. After both opportunities, a lead ends.
         if in_ot and home != away and ot_drives >= 2:
             break
 
