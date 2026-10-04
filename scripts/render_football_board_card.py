@@ -8,13 +8,35 @@ from pathlib import Path
 
 
 def _board(payload: dict) -> dict:
-    board = payload.get("full_board") or {}
+    board = payload.get("full_board") or payload.get("all_props_side_totals") or {}
     if board.get("rows"):
         return board
     report = payload.get("report") or {}
     summary = report.get("summary") if isinstance(report, dict) else {}
-    nested = (summary or {}).get("full_board") if isinstance(summary, dict) else None
-    return nested or {}
+    nested = None
+    if isinstance(summary, dict):
+        nested = summary.get("full_board") or summary.get("all_props_side_totals")
+    if isinstance(nested, dict) and nested.get("rows"):
+        return nested
+    from sportsedge.football_full_board import catalog_complete, emit_all_props_side_totals
+
+    sport = str(payload.get("sport") or report.get("sport") or "NFL").upper()
+    if sport not in {"NFL", "CFB"}:
+        sport = "NFL"
+    source = payload.get("results") or payload.get("rows") or []
+    if not isinstance(source, list) and isinstance(report, dict):
+        source = report.get("results") or []
+    game_rows = [row for row in source if isinstance(row, dict)]
+    board = emit_all_props_side_totals(sport=sport, game_rows=game_rows)
+    payload["full_board"] = board
+    card_summary = dict(payload.get("summary") or {})
+    card_summary["both_sides"] = board["summary"]["both_sides"]
+    card_summary["side_rows"] = board["summary"]["side_rows"]
+    card_summary["total_rows"] = board["summary"]["total_rows"]
+    card_summary["prop_rows"] = board["summary"]["prop_rows"]
+    card_summary["catalog_complete"] = catalog_complete(board["summary"])
+    payload["summary"] = card_summary
+    return board
 
 
 def render_markdown(payload: dict) -> str:

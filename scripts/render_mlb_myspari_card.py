@@ -77,10 +77,22 @@ def _prior_rows(snapshot_path: str | None, extra: str | None) -> list[dict]:
 
 def both_side_board_section(payload: dict) -> str:
     """List both sides of every prop, side, and total. Missing quotes stay blocked."""
-    board = payload.get("full_board") or {}
+    board = payload.get("full_board") or payload.get("all_props_side_totals") or {}
     rows = list(board.get("rows") or [])
     if not rows:
-        return ""
+        from sportsedge.mlb_full_board import catalog_complete, emit_all_props_side_totals
+
+        source = payload.get("results") or payload.get("rows") or []
+        board = emit_all_props_side_totals([row for row in source if isinstance(row, dict)])
+        rows = list(board.get("rows") or [])
+        payload["full_board"] = board
+        summary = dict(payload.get("summary") or {})
+        summary["both_sides"] = board["summary"]["both_sides"]
+        summary["side_rows"] = board["summary"]["side_rows"]
+        summary["total_rows"] = board["summary"]["total_rows"]
+        summary["prop_rows"] = board["summary"]["prop_rows"]
+        summary["catalog_complete"] = catalog_complete(board["summary"])
+        payload["summary"] = summary
     summary = board.get("summary") or payload.get("summary") or {}
     lines = [
         "",
@@ -207,7 +219,7 @@ def main() -> int:
     if args.context_dir:
         text += "\n".join(context_section(bundles, failures=failures)) + "\n"
     (out / "card.md").write_text(text)
-    (out / "card.json").write_text(json.dumps({"version": MYSPARI_OWN_MODEL_VERSION, "phase": phase, "rows": rows}, indent=2, default=str))
+    (out / "card.json").write_text(json.dumps({"version": MYSPARI_OWN_MODEL_VERSION, "phase": phase, "rows": rows, "full_board": payload.get("full_board")}, indent=2, default=str))
     print(text)
     return 0
 
