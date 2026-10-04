@@ -1,6 +1,6 @@
 {
   "schema": "NFL_V2K_DEVELOPMENT_VALIDATION_PREATTEMPT_V2",
-  "status": "DEVELOPMENT_NOT_FROZEN",
+  "status": "FROZEN_ATTEMPT2_READY_FOR_DEVELOPMENT_VALIDATION",
   "candidate_family": "NFL_V2K_DRIVE_HIERARCHICAL_JOINT_G2",
   "purpose": "Attempt-2 development contract. Structural corrections target scoring level, schedule-bound home-field effect, and football scoring-event key-number structure. Execution remains fail-closed until exact code identity and root seed are frozen.",
   "inherits_from": "NFL_V2K_DEVELOPMENT_VALIDATION_PREATTEMPT_V1",
@@ -107,25 +107,23 @@
   "simulation": {
     "paths_per_game": 50000,
     "absolute_floor": 10000,
-    "root_seed": 13631901020752177000,
+    "root_seed": 13631901020752177054,
     "rng": "NUMPY_PCG64_SEEDSEQUENCE_V1"
   },
   "implementation_identity": {
-    "status": "NOT_FROZEN",
+    "status": "FROZEN",
     "core_path": "sportsedge/sports/nfl/v2k_drive_core_v2.py",
     "validation_path": "sportsedge/sports/nfl/v2k_attempt2_validation.py",
-    "core_git_blob_sha1": null,
-    "validation_git_blob_sha1": null,
-    "canonical_main_anchor_sha": null
+    "core_git_blob_sha1": "cf9daf707f2cbf8412c357c592e2a0a18bcc8499",
+    "validation_git_blob_sha1": "8763e52da16923b86dda1091970b93e5b38e5b25",
+    "canonical_main_anchor_sha": "4307c46bb5f2e19fd6fb5afb6315bf9c9bf4b59f"
   },
-  "blocker_codes": [
-    "ATTEMPT2_CODE_IDENTITY_NOT_FROZEN"
-  ],
+  "blocker_codes": [],
   "attempt_budget": {
     "max_development_attempts": 5,
     "attempts_used_expected_before_attempt2": 1,
     "this_artifact_consumes_attempt": false,
-    "attempt_2_scoring_allowed": false
+    "attempt_2_scoring_allowed": true
   },
   "integrity": {
     "market_features_in_fit_forbidden": true,
@@ -135,8 +133,8 @@
   },
   "attempt2_issue_binding": {
     "issue": 1539,
-    "status": "FREEZE_RECORD_BOUND",
-    "root_seed": 13631901020752177000,
+    "status": "FROZEN_ATTEMPT2_READY_FOR_DEVELOPMENT_VALIDATION",
+    "root_seed": 13631901020752177054,
     "simulation_count_paths_per_game": 50000,
     "absolute_simulation_floor_paths_per_game": 10000,
     "fold_plan": {
@@ -219,6 +217,6 @@
     "version": "SHA256_FIRST8_BIG_ENDIAN_V1",
     "literal": "SportsEdge|NFL_V2K_DRIVE_HIERARCHICAL_JOINT_G2|ATTEMPT_2|ROOT_SEED_V1",
     "sha256": "bd2e3dc0e337e79ec17e22deffe3f0b406fe5a4745ef20d75b9d1e5a8f38c085",
-    "root_seed": 13631901020752177000
+    "root_seed": 13631901020752177054
   }
 }
