@@ -30,6 +30,10 @@ COUNT_FIELDS = (
 )
 DEFAULT_LOOKBACK_GAMES = 8
 DEFAULT_DECAY = 0.85
+# NFL rushing yardage is a signed stat: sacks/kneels and short negative runs can
+# legitimately make a weekly player's rushing_yards negative. Counts and the
+# remaining efficiency inputs stay nonnegative.
+SIGNED_STAT_FIELDS = frozenset({"rushing_yards"})
 
 
 def _team(value: Any) -> str:
@@ -56,7 +60,9 @@ def _number(value: Any, field: str) -> float:
         out = float(value)
     except (TypeError, ValueError) as exc:
         raise NFLContextError(f"{field} numeric required") from exc
-    if not isfinite(out) or out < 0:
+    if not isfinite(out):
+        raise NFLContextError(f"{field} finite required")
+    if out < 0 and field not in SIGNED_STAT_FIELDS:
         raise NFLContextError(f"{field} nonnegative finite required")
     return out
 
