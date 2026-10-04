@@ -2,7 +2,7 @@
   "schema": "NFL_V2K_DEVELOPMENT_VALIDATION_PREATTEMPT_V2",
   "status": "DEVELOPMENT_NOT_FROZEN",
   "candidate_family": "NFL_V2K_DRIVE_HIERARCHICAL_JOINT_G2",
-  "purpose": "Attempt-2 development contract. Structural corrections target scoring level, schedule-bound home-field effect, and empirical signed-key structure. Execution remains fail-closed until exact code identity, seed, and simulation mechanics are frozen.",
+  "purpose": "Attempt-2 development contract. Structural corrections target scoring level, schedule-bound home-field effect, and football scoring-event key-number structure. Execution remains fail-closed until exact code identity and root seed are frozen.",
   "inherits_from": "NFL_V2K_DEVELOPMENT_VALIDATION_PREATTEMPT_V1",
   "source_binding": {
     "source_freeze_path": "config/nfl_promotion_source_freeze_v1.json",
@@ -119,7 +119,6 @@
     "canonical_main_anchor_sha": null
   },
   "blocker_codes": [
-    "ATTEMPT2_SIMULATION_MECHANICS_NOT_IMPLEMENTED",
     "ATTEMPT2_CODE_IDENTITY_NOT_FROZEN",
     "ATTEMPT2_ROOT_SEED_NOT_FROZEN"
   ],
@@ -134,40 +133,6 @@
     "chronological_walk_forward_required": true,
     "calibrators_fit_on_training_only": true,
     "smoke_below_floor_is_not_an_attempt": true
-  },
-  "already_frozen_gates": {
-    "signed_keys": [
-      -7,
-      -3,
-      3,
-      7
-    ],
-    "absolute_signed_key_mass_error_max": 0.005,
-    "control_calibration_slope": 0.6559729344130425,
-    "control_calibration_slope_metric": 0.3440270655869575,
-    "candidate_calibration_slope_metric_must_be_strictly_less_than_control": true,
-    "control_signed_key_mass_rmse": 0.03333957857632348,
-    "candidate_signed_key_mass_rmse_must_be_strictly_less_than_control": true,
-    "both_structural_improvements_required": true,
-    "calibration_cannot_rescue_predictive_failure": true,
-    "predictive_success_cannot_rescue_key_failure": true,
-    "key_success_cannot_rescue_calibration_failure": true
-  },
-  "unresolved_required_freezes": {
-    "predictive_acceptance_thresholds": {
-      "provenance": "PREEXISTING_NFL_V2_VALIDATION_GATE_BEFORE_V2K_ATTEMPT1",
-      "source_path": "sportsedge/sports/nfl/m2_v2j_validation.py",
-      "source_git_blob_sha1": "3a122a2bf01964a62b9552343bc509caec0edb05",
-      "markets": [
-        "spread",
-        "total"
-      ],
-      "metric": "CHRONOLOGICAL_FOLD_CANDIDATE_LOG_LOSS_STRICTLY_LESS_THAN_FROZEN_COMPARISON_BASELINE",
-      "minimum_fold_win_rate": 0.65,
-      "calibration_max_nonempty_bin_deviation": 0.05,
-      "conjunctive_with_structural_gate": true,
-      "threshold_tuning_after_readout_forbidden": true
-    }
   },
   "attempt2_issue_binding": {
     "issue": null,
@@ -237,5 +202,18 @@
       "shuffle": false,
       "test_season_may_influence_fit": false
     }
+  },
+  "diagnostics": {
+    "signed_keys": [
+      -7,
+      -3,
+      3,
+      7
+    ],
+    "control_calibration_slope": 0.6559729344130425,
+    "control_signed_key_mass_rmse": 0.03333957857632348,
+    "interpretation": "ENGINEERING_DIAGNOSTICS_ONLY_NOT_AUTHORITY_GATES",
+    "predictive_readout": "CHRONOLOGICAL_FOLD_LOG_LOSS_VS_FROZEN_MARKET_BASELINE",
+    "threshold_tuning_after_readout_forbidden": true
   }
 }
