@@ -81,5 +81,25 @@ class BlockedCardTest(unittest.TestCase):
         self.assertEqual(card.VALIDATED_MARKETS, frozenset())
 
 
+class MarketOnlyFallbackTest(unittest.TestCase):
+    def test_market_implied_scores(self):
+        row = card.expand_compact({"away": "Michigan", "home": "Minnesota",
+                                   "spread": [-6, -110, -110], "total": [43.5, -105, -115]})
+        home, away = card.market_implied_scores(row["quotes"])
+        self.assertAlmostEqual(away - home, 6.0)
+        self.assertAlmostEqual(home + away, 43.5)
+
+    def test_market_only_rows_never_bet_or_lean(self):
+        rows = card.market_only_rows([
+            {"away": "Michigan", "home": "Minnesota", "ml": [-225, 185],
+             "spread": [-6, -110, -110], "total": [43.5, -105, -115]},
+            {"away": "A", "home": "B", "ml": [-150, 130]},
+        ], "CFBD_RATE_LIMITED")
+        self.assertEqual(len(rows), 8)
+        self.assertTrue(all(r["bet_status"] == "TRACK" and r["edge"] == 0.0 for r in rows))
+        self.assertTrue(all(r["model_p"] == r["market_p"] for r in rows))
+        self.assertEqual(rows[0]["matchup"], "Michigan @ Minnesota")
+
+
 if __name__ == "__main__":
     unittest.main()
