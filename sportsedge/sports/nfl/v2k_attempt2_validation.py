@@ -68,7 +68,8 @@ def simulate_game_histograms(model,game:Mapping,*,root_seed:int,paths:int)->dict
             "total_hist":{str(k):v for k,v in sorted(totals.items())}}
 def run_fold_shard(*,fold,drives_by_season,identity,root_seed,paths,shard_index,shard_count,workers):
     train=[r for y in fold["train_seasons"] for r in drives_by_season[y]]
-    train_ids={g:m for g,m in identity.items() if m["season"] in fold["train_seasons"]}
+    train_game_ids={r.game_id for r in train}
+    train_ids={g:m for g,m in identity.items() if g in train_game_ids}
     model=fit_attempt2(train,train_ids)
     games=sorted((g for g in identity.values() if g["season"]==fold["test_season"]),key=lambda g:g["game_id"])
     mine=[g for i,g in enumerate(games) if i%shard_count==shard_index]
