@@ -8,6 +8,7 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from math import sqrt
 from pathlib import Path
+from concurrent.futures import ProcessPoolExecutor
 from typing import Mapping
 from . import v2k_attempt1_validation as a1
 from .v2k_drive_core import derive_path_seed
@@ -71,7 +72,13 @@ def run_fold_shard(*,fold,drives_by_season,identity,root_seed,paths,shard_index,
     model=fit_attempt2(train,train_ids)
     games=sorted((g for g in identity.values() if g["season"]==fold["test_season"]),key=lambda g:g["game_id"])
     mine=[g for i,g in enumerate(games) if i%shard_count==shard_index]
-    results=[simulate_game_histograms(model,g,root_seed=root_seed,paths=paths) for g in mine]
+    if workers is None or workers<1: raise ValueError("V2K_WORKERS_INVALID")
+    if workers==1 or len(mine)<2:
+        results=[simulate_game_histograms(model,g,root_seed=root_seed,paths=paths) for g in mine]
+    else:
+        with ProcessPoolExecutor(max_workers=min(workers,len(mine))) as pool:
+            futures=[pool.submit(simulate_game_histograms,model,g,root_seed=root_seed,paths=paths) for g in mine]
+            results=[f.result() for f in futures]
     return {"schema":SHARD_SCHEMA,"fold_id":fold["fold_id"],"train_seasons":list(fold["train_seasons"]),
             "test_season":fold["test_season"],"shard_index":shard_index,"shard_count":shard_count,
             "root_seed":root_seed,"paths_per_game":paths,"training_drive_rows":len(train),
