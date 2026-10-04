@@ -115,7 +115,7 @@
     "core_path": "sportsedge/sports/nfl/v2k_drive_core_v2.py",
     "validation_path": "sportsedge/sports/nfl/v2k_attempt2_validation.py",
     "core_git_blob_sha1": "cf9daf707f2cbf8412c357c592e2a0a18bcc8499",
-    "validation_git_blob_sha1": "dbf82e772e98a2fb8bdda5801a1806fb3c6a6d0a",
+    "validation_git_blob_sha1": "88fdcbefe0622e0965b038bbf3b7b065c66b7841",
     "canonical_main_anchor_sha": "4307c46bb5f2e19fd6fb5afb6315bf9c9bf4b59f"
   },
   "blocker_codes": [],
