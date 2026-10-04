@@ -26,12 +26,29 @@ jobs:
       - name: Run unified NFL research model
         run: |
           python - <<'PY'
-          import json
+          import csv, io, json
+          from hashlib import sha256
           from pathlib import Path
+          from urllib.request import Request, urlopen
           from sportsedge.nfl_unified_phone import build_unified_phone_card
           from sportsedge.sports.nfl.full_auto import fetch_nflverse_depth_charts
           from sportsedge.sports.nfl.injury_report_source import fetch_nflverse_injuries
-          from sportsedge.sports.nfl.live_role_source import fetch_nflverse_player_stats
+
+          def fetch_stats(seasons):
+              all_rows=[]
+              receipts=[]
+              for season in seasons:
+                  uri=f"https://github.com/nflverse/nflverse-data/releases/download/stats_player/stats_player_week_{season}.csv"
+                  req=Request(uri,headers={"User-Agent":"SportsEdge/1.0","Accept":"text/csv"})
+                  with urlopen(req,timeout=60) as resp:
+                      raw=resp.read()
+                  rows=[dict(r) for r in csv.DictReader(io.StringIO(raw.decode("utf-8-sig")))]
+                  for r in rows:
+                      if not r.get("recent_team") and r.get("team"):
+                          r["recent_team"]=r.get("team")
+                  all_rows.extend(rows)
+                  receipts.append({"season":str(season),"source_uri":uri,"raw_sha256":sha256(raw).hexdigest()})
+              return all_rows, receipts
 
           ticket=json.loads(Path("manual_inputs/nfl_det_car_20261004.json").read_text())
           history=json.loads(Path("manual_inputs/nfl_det_car_history_20261004.json").read_text())
@@ -44,7 +61,7 @@ jobs:
               "kickoff_ts":"2026-10-05T00:20:00+00:00"
           }]
           depth_rows, depth_uri, depth_sha = fetch_nflverse_depth_charts(season=2026)
-          player_rows, player_receipts = fetch_nflverse_player_stats(seasons=[2025,2026])
+          player_rows, player_receipts = fetch_stats([2025,2026])
           injury_rows, injury_uri, injury_sha = fetch_nflverse_injuries(season=2026)
 
           payload=build_unified_phone_card(
@@ -61,7 +78,7 @@ jobs:
           payload["source_status"]={
               "schedule":"MANUAL_EXACT_FROM_SCREENSHOT_MATCHUP",
               "depth":"AVAILABLE",
-              "player_stats":"AVAILABLE",
+              "player_stats":"AVAILABLE_SCHEMA_ADAPTED_TEAM_TO_RECENT_TEAM",
               "injuries":"AVAILABLE",
           }
           payload["source_receipts"]={
@@ -74,12 +91,7 @@ jobs:
           out=Path("artifacts/run_it/nfl_det_car_20261004.json")
           out.parent.mkdir(parents=True,exist_ok=True)
           out.write_text(json.dumps(payload,indent=2,sort_keys=True,default=str)+"\n")
-          print(json.dumps({
-              "status":"OK",
-              "rows":len(payload.get("rows") or []),
-              "selected_rows":len(payload.get("selected_rows") or []),
-              "source_status":payload.get("source_status")
-          },sort_keys=True))
+          print(json.dumps({"status":"OK","rows":len(payload.get("rows") or []),"selected_rows":len(payload.get("selected_rows") or []),"source_status":payload.get("source_status")},sort_keys=True))
           PY
       - name: Print model readout
         if: always() && hashFiles('artifacts/run_it/nfl_det_car_20261004.json') != ''
@@ -92,13 +104,7 @@ jobs:
           print("SOURCE_STATUS",json.dumps(p.get("source_status"),sort_keys=True))
           print("SELECTED_ROWS",len(p.get("selected_rows") or []))
           for row in sorted(p.get("selected_rows") or [],key=lambda x:float(x.get("ev_per_dollar") or -999),reverse=True):
-              print(json.dumps({
-                  "market":row.get("market"),"player":row.get("player"),"selection":row.get("selection"),
-                  "line":row.get("line"),"price":row.get("price_american"),
-                  "estimate_p":row.get("estimate_p"),"edge":row.get("edge_probability_points"),
-                  "ev":row.get("ev_per_dollar"),"score":row.get("score_0_100"),
-                  "raw":row.get("raw")
-              },sort_keys=True))
+              print(json.dumps({"market":row.get("market"),"player":row.get("player"),"selection":row.get("selection"),"line":row.get("line"),"price":row.get("price_american"),"estimate_p":row.get("estimate_p"),"edge":row.get("edge_probability_points"),"ev":row.get("ev_per_dollar"),"score":row.get("score_0_100"),"raw":row.get("raw")},sort_keys=True))
           reasons={}
           for row in p.get("rows") or []:
               if row.get("status")=="NO_MODEL":
