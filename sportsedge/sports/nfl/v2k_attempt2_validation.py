@@ -52,7 +52,13 @@ def run_fold_shard(*,fold,drives_by_season,identity,root_seed,paths,shard_index,
     train=[r for y in fold["train_seasons"] for r in drives_by_season[y]]
     train_ids={g:m for g,m in identity.items() if m["season"] in fold["train_seasons"]}
     model=fit_attempt2(train,train_ids)
-    raise SystemExit("V2K_ATTEMPT2_SIMULATION_MECHANICS_NOT_IMPLEMENTED")
+    games=sorted((g for g in identity.values() if g["season"]==fold["test_season"]),key=lambda g:g["game_id"])
+    mine=[g for i,g in enumerate(games) if i%shard_count==shard_index]
+    results=[simulate_game_histograms(model,g,root_seed=root_seed,paths=paths) for g in mine]
+    return {"schema":SHARD_SCHEMA,"fold_id":fold["fold_id"],"train_seasons":list(fold["train_seasons"]),
+            "test_season":fold["test_season"],"shard_index":shard_index,"shard_count":shard_count,
+            "root_seed":root_seed,"paths_per_game":paths,"training_drive_rows":len(train),
+            "fold_test_game_count":len(games),"games":results,"sportsbook_prices_consumed":False}
 
 def evaluate(shards,schedule,contract):
     raise SystemExit("V2K_ATTEMPT2_EVALUATION_NOT_FROZEN")
