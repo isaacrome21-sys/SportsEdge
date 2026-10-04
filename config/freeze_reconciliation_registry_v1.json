@@ -1731,10 +1731,16 @@
       "merge_sha": "eb522825dc8cc1bfeff043f4a12f8bd6ac110b6d",
       "pr": 1548,
       "note": "MLB sealed pitcher-prop promotion final-look runner and research hook. Execution remains fail-closed before postseason completion; no outcome look, Model_P change, deployment, promotion, staking, or OFFICIAL authority is created."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_2E2F0055_PR_1522",
+      "merge_sha": "2e2f0055ba84d892f7c1695fe1b3c52847a5b5df",
+      "pr": 1522,
+      "note": "MLB moneyline warning-resolution diagnostic only. Zero-authority evidence inspection; it cannot self-issue SIGNED_OFF or change deployment, staking, promotion, Model_P, or OFFICIAL state."
     }
   ],
-  "inventory_block_reason": "Current main through merge eb522825 / PR #1548 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
+  "inventory_block_reason": "Current main through merge 2e2f0055 / PR #1522 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "eb522825dc8cc1bfeff043f4a12f8bd6ac110b6d",
+  "reconciled_through_sha": "2e2f0055ba84d892f7c1695fe1b3c52847a5b5df",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
