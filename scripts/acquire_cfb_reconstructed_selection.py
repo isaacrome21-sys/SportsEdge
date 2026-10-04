@@ -412,14 +412,15 @@ def _resolve_venue(
     *,
     by_id: Mapping[str, Mapping[str, Any]],
     by_name: Mapping[str, Mapping[str, Any]],
-) -> dict[str, Any]:
+) -> dict[str, Any] | None:
+    """Resolve a venue with real coordinates. Incomplete rows are skipped, never placeholder-filled."""
     venue_id = str(game.get("venueId") or game.get("venue_id") or "").strip()
     if venue_id and venue_id in by_id:
         return dict(by_id[venue_id])
     venue_name = str(game.get("venue") or "").strip()
     if venue_name and venue_name.casefold() in by_name:
         return dict(by_name[venue_name.casefold()])
-    raise CFBAcquisitionError(f"CFB_GAME_VENUE_UNRESOLVED:{game.get('id') or game.get('game_id')}")
+    return None
 
 
 def _normalize_open_meteo_payload(payload: Any, expected: int) -> list[Mapping[str, Any]]:
@@ -473,19 +474,31 @@ def _build_weather(
     config: Mapping[str, Any],
     weather_cache_root: Path,
     opener: Callable = urlopen,
-) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]], int, int]:
+) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]], int, int, list[dict[str, str]]]:
     by_id, by_name = _venue_indexes(venues_raw)
     resolved: dict[str, dict[str, Any]] = {}
+    skipped_venues: list[dict[str, str]] = []
     for game in games:
         gid = str(game["game_id"])
-        resolved[gid] = _resolve_venue(game, by_id=by_id, by_name=by_name)
+        venue = _resolve_venue(game, by_id=by_id, by_name=by_name)
+        if venue is None:
+            skipped_venues.append({
+                "game_id": gid,
+                "reason": "VENUE_UNRESOLVED_NO_PLACEHOLDER",
+                "venue_id": str(game.get("venue_id") or game.get("venueId") or ""),
+                "venue": str(game.get("venue") or ""),
+            })
+            continue
+        resolved[gid] = venue
 
     weather_by_game: dict[str, dict[str, Any]] = {}
     outdoor_by_season: dict[int, list[Mapping[str, Any]]] = {}
     venue_retrieved = _now()
     for game in games:
         gid = str(game["game_id"])
-        venue = resolved[gid]
+        venue = resolved.get(gid)
+        if venue is None:
+            continue
         if venue["dome"]:
             weather_by_game[gid] = {
                 "gameIndoors": True,
@@ -559,10 +572,14 @@ def _build_weather(
                     "time_selection": "UTC_KICKOFF_HOUR_FLOOR_NO_INTERPOLATION",
                 }
 
-    missing = sorted(str(game["game_id"]) for game in games if str(game["game_id"]) not in weather_by_game)
+    missing = sorted(
+        str(game["game_id"])
+        for game in games
+        if str(game["game_id"]) in resolved and str(game["game_id"]) not in weather_by_game
+    )
     if missing:
         raise CFBAcquisitionError(f"CFB_RECONSTRUCTED_WEATHER_MISSING:{missing[0]}")
-    return weather_by_game, weather_metas, weather_calls, weather_cache_hits
+    return weather_by_game, weather_metas, weather_calls, weather_cache_hits, skipped_venues
 
 
 def _build_private_payload(
@@ -636,13 +653,17 @@ def _build_private_payload(
                 ) else {}),
             })
 
-    weather_by_game, weather_metas, weather_calls, weather_cache_hits = _build_weather(
+    weather_by_game, weather_metas, weather_calls, weather_cache_hits, skipped_venues = _build_weather(
         games=games,
         venues_raw=[dict(row) for row in venues_raw if isinstance(row, Mapping)],
         config=config,
         weather_cache_root=weather_cache_root,
         opener=weather_opener,
     )
+    skipped_ids = {row["game_id"] for row in skipped_venues}
+    games = [game for game in games if game["game_id"] not in skipped_ids]
+    if not games:
+        raise CFBAcquisitionError("CFB_ACQUISITION_ALL_GAMES_VENUE_SKIPPED")
 
     metrics: list[dict[str, Any]] = []
     for season in range(2014, 2025):
@@ -693,8 +714,11 @@ def _build_private_payload(
         "games": games,
         "metrics": metrics,
         "weather_by_game": weather_by_game,
+        "skipped_unresolved_venues": skipped_venues,
+        "venue_skip_policy": "OMIT_UNRESOLVED_NO_PLACEHOLDER",
         "fbs_membership_by_season": {str(k): v for k, v in membership_by_season.items()},
         "weather_source_contract": WEATHER_CONTRACT,
+        "official_authority": False,
     }
     return payload, weather_calls, weather_cache_hits
 
@@ -782,6 +806,8 @@ def main(argv: list[str] | None = None) -> int:
         "source_response_count": len(response_hashes),
         "source_response_hash_set_sha256": _sha(_canonical_bytes(sorted(response_hashes))),
         "raw_provider_data_persisted_publicly": False,
+        "venue_skip_policy": "OMIT_UNRESOLVED_NO_PLACEHOLDER",
+        "skipped_unresolved_venue_count": len(private_payload.get("skipped_unresolved_venues") or []),
         "authority": _zero_authority(),
     }
     args.public_attestation_out.parent.mkdir(parents=True, exist_ok=True)
