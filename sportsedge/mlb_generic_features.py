@@ -378,13 +378,32 @@ class MLBGenericHistorySource:
         payload = _read_json(f"https://statsapi.mlb.com/api/v1/teams?{urlencode({'sportId': 1, 'season': int(season)})}", opener=self.opener)
         return sorted(int(t["id"]) for t in payload.get("teams") or [] if isinstance(t, Mapping) and _nonnegative_integer(t.get("id")))
 
+    def _memo_team_season(self, team: int, season: int):
+        """One team hitting gameLog per slate; lane 1 and lane 2a share it."""
+        cache = self.__dict__.setdefault("_team_season_memo", {})
+        key = (int(team), int(season))
+        if key not in cache:
+            cache[key] = self._team_season(team, season)
+        return cache[key]
+
     def opp_k_index(self, target_date: date):
         """Opponent strikeout index for the slate (built once, memoized, failures memoized too)."""
         from .mlb_opp_k_context import build_index
         cache = self.__dict__.setdefault("_opp_k_index_cache", {})
         if target_date not in cache:
             try:
-                cache[target_date] = build_index(self._team_season, self._mlb_team_ids(target_date.year), target_date)
+                cache[target_date] = build_index(self._memo_team_season, self._mlb_team_ids(target_date.year), target_date)
+            except Exception as exc:  # noqa: BLE001 - lane degrades to the unadjusted price
+                cache[target_date] = exc
+        return cache[target_date]
+
+    def opp_outs_index(self, target_date: date):
+        """Opponent on-base index (H+BB+HBP per PA) from the same cached team logs."""
+        from .mlb_opp_outs_context import build_index
+        cache = self.__dict__.setdefault("_opp_outs_index_cache", {})
+        if target_date not in cache:
+            try:
+                cache[target_date] = build_index(self._memo_team_season, self._mlb_team_ids(target_date.year), target_date)
             except Exception as exc:  # noqa: BLE001 - lane degrades to the unadjusted price
                 cache[target_date] = exc
         return cache[target_date]
@@ -407,6 +426,27 @@ class MLBGenericHistorySource:
                                        history=[(d, int(o)) for _, d, o in starts]), None
         except Exception as exc:  # noqa: BLE001
             return None, f"opponent K index invalid ({exc})"
+
+    def _opp_outs_payload(self, *, player_id: int, target_date: date, team_id: int | None,
+                          away_team_id: int, home_team_id: int) -> tuple[dict[str, Any] | None, str | None]:
+        """Validated opp-outs lane (#1523) for the k>=5 path; (payload, None) or (None, why unadjusted)."""
+        from .mlb_opp_outs_context import adjustment_features, opponent_of
+        opp = opponent_of(team_id, away_team_id, home_team_id)
+        if opp is None:
+            return None, "pitcher's team not resolved to this game"
+        starts = self._pitcher_start_rows(player_id=player_id, target_date=target_date)
+        if len(starts) < 5:
+            return None, "fewer than 5 own starts"
+        if any(o is None for _, _, o in starts):
+            return None, "opponent missing on a prior start"
+        index = self.opp_outs_index(target_date)
+        if isinstance(index, Exception):
+            return None, f"opponent on-base index unavailable ({type(index).__name__})"
+        try:
+            return adjustment_features(index, target_opp_id=opp, target_date=target_date,
+                                       history=[(d, int(o)) for _, d, o in starts]), None
+        except Exception as exc:  # noqa: BLE001
+            return None, f"opponent on-base index invalid ({exc})"
 
     def pitcher_win_probability(self, *, player_id: int, target_date: date) -> float:
         rows = self.player_rows(player_id=player_id, group="pitching", target_date=target_date)
@@ -451,6 +491,15 @@ class MLBGenericHistorySource:
                             base["joint_feature_version"] = "mlb_pitcher_joint_history_opp_k_v1"
                         else:
                             base["opp_k_unadjusted"] = why
+                    elif market == "PITCHER_OUTS":
+                        # Validated context lane 2a (#1520/#1523): opponent on-base index, k>=5, half lines.
+                        adj, why = self._opp_outs_payload(player_id=player_id, target_date=target_date, team_id=team_id,
+                                                          away_team_id=away_team_id, home_team_id=home_team_id)
+                        if adj is not None:
+                            base["features"]["opp_outs_adjustment"] = adj
+                            base["joint_feature_version"] = "mlb_pitcher_joint_history_opp_outs_v1"
+                        else:
+                            base["opp_outs_unadjusted"] = why
                 except MLBGenericFeatureError:
                     # Validated few-starts fallback (#1482/#1495): PITCHER_OUTS/PITCHER_K with
                     # 1..4 own starts, shrunk toward the frozen prior-season league_short pool.

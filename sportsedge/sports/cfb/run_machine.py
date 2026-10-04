@@ -244,16 +244,24 @@ def _blocked_no_engine(q: Mapping[str, Any]) -> CFBMachineResult:
         offer_id=str(q.get("offer_id") or "") or None, scorecard=None)
 
 
-def _summary(results: Sequence[CFBMachineResult]) -> dict[str, Any]:
-    from sportsedge.football_full_board import board_from_machine_results, catalog_complete
+NO_ENGINE_BOARD_SKIP = frozenset({"TEASER", "PARLAY", "SGP", "LIVE_MONEYLINE"})
 
-    board = board_from_machine_results("CFB", results)
+
+def _summary(results: Sequence[CFBMachineResult]) -> dict[str, Any]:
+    from sportsedge.football_full_board import board_from_machine_results, catalog_complete, emit_all_props_side_totals
+
+    # These labels are already NO_ENGINE on the machine result. The presentation
+    # board stays fail-closed, so they are not forwarded as game rows.
+    board_rows = [row for row in results if str(row.market or "").strip().upper() not in NO_ENGINE_BOARD_SKIP]
+    board = board_from_machine_results("CFB", board_rows)
+    complete = emit_all_props_side_totals(sport="CFB", game_rows=[asdict(row) for row in board_rows])
     return {"quote_count": len(results), "priced": sum(r.engine_status == "PRICED" for r in results),
             "no_engine": sum(r.engine_status == "NO_ENGINE" for r in results),
             "blocked": sum(r.bet_status == "BLOCKED" for r in results),
             "official_bets": sum(r.bet_status == "OFFICIAL_BET" for r in results),
             "markets_seen": sorted({r.market for r in results}),
             "full_board": board,
+            "all_props_side_totals": complete,
             "side_rows": board["summary"]["side_rows"],
             "total_rows": board["summary"]["total_rows"],
             "prop_rows": board["summary"]["prop_rows"],

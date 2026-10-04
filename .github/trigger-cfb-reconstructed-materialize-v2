@@ -1,7 +1,8 @@
-CFB_RECONSTRUCTED_MATERIALIZE_REQUEST_V9
+CFB_RECONSTRUCTED_MATERIALIZE_REQUEST_V10
 requested_mode=MATERIALIZE_ONLY
-requested_utc=2026-10-03
-requested_reason=measure_redacted_recent_window_replay_capacity
+requested_utc=2026-10-04
+requested_reason=post_1452_1504_merge_venue_skip_active
 no_evaluation_attempt=true
 no_backfill=true
-request_nonce=20261003Tbe1e79cc
+venue_skip=VENUE_UNRESOLVED_NO_PLACEHOLDER
+request_nonce=20261004T89dfe5a6

@@ -151,26 +151,10 @@
         "tests/test_cfb_model_selection"
       ],
       "disposition": {
-        "authority": {
-          "eligibility": false,
-          "model_p": false,
-          "official": false,
-          "promotion": false,
-          "staking": false,
-          "truth_gate": false,
-          "validation_attempt": false
-        },
-        "forward_clock_restart_at": "2026-09-18T12:01:33Z",
-        "new_bundle_id": "CFB_CANDIDATE_PREREG_FREEZE_V3",
-        "new_freeze_sha": "529b06af94061a5eb86efd9909b15b62cefce938",
-        "prior_bundle_freeze_sha": "4629afd60972fe73eb0217508dc7a4ae51ce6ccf",
+        "state": "REVOKED",
+        "revoked_at": "2026-10-04T10:29:44Z",
         "prior_forward_clock_invalidated": true,
-        "reason": "MACHINE_VERIFIED_POST_PR833_WEEK1_CORRECTED_CANDIDATE_BYTES_AND_CODE_MANIFEST; PR833_IN_ANCESTRY; ZERO_ATTEMPTS; NO_EVALUATION_ROWS; REFROZEN_FAIL_CLOSED_FOR_SELECTION_SCOPE_ONLY",
-        "row_admissibility_semantics": "PREREGISTRATION_ONLY_NO_EVALUATION_ROWS_V1",
-        "selection_scope_only": true,
-        "state": "REFROZEN",
-        "trigger_delta_sha": "4fc4aa9a60b69137a0efc4d7d59ccee95f53b0bb",
-        "verification_schema": "CFB_CANDIDATE_PREREG_REFREEZE_V1"
+        "reason": "HOSTED_AUDIT_RUN_37195515830_CONFIRMED_POST_REFREEZE_COVERED_SURFACE_EXPANSION; MACHINE_VERIFIED_V3_REFREEZE_NO_LONGER_COVERS_EFFECTIVE_CANDIDATE_SURFACE; REVOKED_FAIL_CLOSED_NO_AUTHORITY"
       },
       "freeze_sha": "4629afd60972fe73eb0217508dc7a4ae51ce6ccf"
     },
@@ -1087,10 +1071,556 @@
       "merge_sha": "4a132b1a68f4e84ee00499dabb3520199aac4948",
       "pr": 1377,
       "note": "Registers the merged NFL unified MLB-style card/runtime surface. Reconciliation determines any covered-bundle impact; this provenance record grants no model, validation, promotion, staking, Truth Gate, or OFFICIAL authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_0366838C_PR_1380",
+      "merge_sha": "0366838c98e1f6cf2ec9106086c9352e0161faa6",
+      "pr": 1380,
+      "note": "Merge pull request #1380 from isaacrome21-sys/fix/freeze-reconciliation-post-1377-20261002. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_E83CB00B_PR_1381",
+      "merge_sha": "e83cb00b6f915bd33927955dd46a543cf56d9248",
+      "pr": 1381,
+      "note": "Merge pull request #1381 from isaacrome21-sys/cfb/sportsdataverse-source-current-main-v3. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_C20021A4_PR_1383",
+      "merge_sha": "c20021a44e895000ce85495e53102a21f5d70be9",
+      "pr": 1383,
+      "note": "Merge pull request #1383 from isaacrome21-sys/mlb/finish-line-current-main-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_E8AD9225_PR_1388",
+      "merge_sha": "e8ad92253a4c931f78276bea3924ce97f19857c8",
+      "pr": 1388,
+      "note": "Merge pull request #1388 from isaacrome21-sys/nfl/scoring-composition-current-main-v2. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_0FE2CBBC_PR_1391",
+      "merge_sha": "0fe2cbbc73b4e0b7566296aa8f13b07939e4dc21",
+      "pr": 1391,
+      "note": "Merge pull request #1391 from isaacrome21-sys/cfb/sdv-pipeline-post-nfl-v2. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_1585702C_PR_1393",
+      "merge_sha": "1585702c72a6c6f63ebef7dc71281c0be6694c84",
+      "pr": 1393,
+      "note": "Merge pull request #1393 from isaacrome21-sys/cfb/sdv-native-evaluator-current-main-v2. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_C5A0C796_PR_1394",
+      "merge_sha": "c5a0c79657cca85a2eddcdee5aa7686077cb9b20",
+      "pr": 1394,
+      "note": "Merge pull request #1394 from isaacrome21-sys/cfb/sdv-week1-boundary-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_D8CE1385_PR_1395",
+      "merge_sha": "d8ce1385bd392ef4786a1f5a49c88622843892c3",
+      "pr": 1395,
+      "note": "Merge pull request #1395 from isaacrome21-sys/cfb/sdv-converted-ingestion-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_AD471A0E_PR_1396",
+      "merge_sha": "ad471a0efd13fc9a8ab145bc3315b649d46d56b2",
+      "pr": 1396,
+      "note": "Merge pull request #1396 from isaacrome21-sys/cfb/sdv-csv-acquisition-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_6D8AA9F8_PR_1397",
+      "merge_sha": "6d8aa9f85a24500309a617f20eee30e0915f88b2",
+      "pr": 1397,
+      "note": "Merge pull request #1397 from isaacrome21-sys/cfb/sdv-weather-source-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_B86173BB_PR_1398",
+      "merge_sha": "b86173bb8e29def9cf99010e543fb7ed3cfcefc5",
+      "pr": 1398,
+      "note": "Merge pull request #1398 from isaacrome21-sys/cfb/sdv-weather-receipts-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_49111C4E_PR_1399",
+      "merge_sha": "49111c4e05e2ae10171d869eda1fd71d9c19494b",
+      "pr": 1399,
+      "note": "Merge pull request #1399 from isaacrome21-sys/cfb/sdv-scope-hardening-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_4B8962A8_PR_1400",
+      "merge_sha": "4b8962a82636924e2a3f3c4db837eff18a580e67",
+      "pr": 1400,
+      "note": "Merge pull request #1400 from isaacrome21-sys/cfb/historical-weather-transport-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_F685DD9C_PR_1401",
+      "merge_sha": "f685dd9c3da6930742ac0dbc2acf665f5ca447c7",
+      "pr": 1401,
+      "note": "Merge pull request #1401 from isaacrome21-sys/cfb/sdv-csv-parser-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_B3F39831_PR_1402",
+      "merge_sha": "b3f39831367a74e0c472e42ef4b3b5f9950d534e",
+      "pr": 1402,
+      "note": "Merge pull request #1402 from isaacrome21-sys/cfb/sdv-prereg-freeze-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_156BEB5C_PR_1403",
+      "merge_sha": "156beb5cf7094e0428c90d86db8a97d9ea7fefe6",
+      "pr": 1403,
+      "note": "Merge pull request #1403 from isaacrome21-sys/cfb/sdv-governed-bakeoff-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_D7B15351_PR_1404",
+      "merge_sha": "d7b15351b0940ee7e600814dc07ebc5caeb65a0d",
+      "pr": 1404,
+      "note": "Merge pull request #1404 from isaacrome21-sys/cfb/sdv-runner-hash-binding-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_0EA9F36A_PR_1405",
+      "merge_sha": "0ea9f36ade800dd5ff7f92c24cbde09ee3584ea2",
+      "pr": 1405,
+      "note": "CFB: refreeze SportsDataverse prereg hash after #1404 (#1405). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_83AD5A2D_PR_1406",
+      "merge_sha": "83ad5a2d42fc0eea669189730c70f50884af734d",
+      "pr": 1406,
+      "note": "CFB: use screenshot-supplied lines in auto card (#1406). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_5E3A21FF_PR_1407",
+      "merge_sha": "5e3a21ff05ec52e4346c437a54fa3c9b9d6d287d",
+      "pr": 1407,
+      "note": "CFB SDV: fix schedule transport and historical context identity (#1407). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_BBED8882_PR_1409",
+      "merge_sha": "bbed8882fb80edab8d802be5f346c435f9613760",
+      "pr": 1409,
+      "note": "CFB SDV: refreeze prereg hash after schedule context fix (#1409). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_394ED977_PR_1411",
+      "merge_sha": "394ed977bacb2caf01e09ed4ca03a2d16ac164cc",
+      "pr": 1411,
+      "note": "Merge pull request #1411 from isaacrome21-sys/cfb/sdv-public-training-materializer-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_0B13FEA6_PR_1412",
+      "merge_sha": "0b13fea65e024ac52116dc72946ce8bda5c4d47f",
+      "pr": 1412,
+      "note": "Merge pull request #1412 from isaacrome21-sys/cfb/sdv-prereg-refreeze-after-1411-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_5DD45D7D_PR_1413",
+      "merge_sha": "5dd45d7d6bfb6ccd62dd904aa2ead8ad3f302c84",
+      "pr": 1413,
+      "note": "Merge pull request #1413 from isaacrome21-sys/cfb/sdv-materialize-main-trigger-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_C5B3B79B_PR_1414",
+      "merge_sha": "c5b3b79b2a4b68b2b20bcc64320d4cf913745052",
+      "pr": 1414,
+      "note": "Merge pull request #1414 from isaacrome21-sys/cfb/sdv-materialize-pythonpath-fix-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_AAF15D48_PR_1415",
+      "merge_sha": "aaf15d4874ff558d4d2639dc695543293ff39b18",
+      "pr": 1415,
+      "note": "Merge pull request #1415 from isaacrome21-sys/cfb/sdv-full-schedule-provenance-fix-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_5B914032_PR_1416",
+      "merge_sha": "5b914032193c7d3cde74f5cf620cc74410c967af",
+      "pr": 1416,
+      "note": "Merge pull request #1416 from isaacrome21-sys/cfb/sdv-refreeze-retry-after-1415-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_08B5685D_PR_1417",
+      "merge_sha": "08b5685d3882c0a1dba26d1f62f23f2e3948d645",
+      "pr": 1417,
+      "note": "Merge pull request #1417 from isaacrome21-sys/cfb/sdv-pos-team-id-compat-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_324AD935_PR_1420",
+      "merge_sha": "324ad93593c363dac4b4e73feb721d890a640750",
+      "pr": 1420,
+      "note": "Merge pull request #1420 from isaacrome21-sys/cfb/sdv-refreeze-pos-team-id-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_9545510B_PR_1422",
+      "merge_sha": "9545510bc33d474c8e753aac7a0defc417cc8b3b",
+      "pr": 1422,
+      "note": "Merge pull request #1422 from isaacrome21-sys/cfb/sdv-blank-numeric-cells-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_034EFAFA_PR_1423",
+      "merge_sha": "034efafafb13e712820e252961f76abe212dec5a",
+      "pr": 1423,
+      "note": "Merge pull request #1423 from isaacrome21-sys/cfb/sdv-refreeze-blank-cells-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_14FD0611_PR_1424",
+      "merge_sha": "14fd0611db2c5929abaf8beccc8bd3654aac8a75",
+      "pr": 1424,
+      "note": "Merge pull request #1424 from isaacrome21-sys/cfb/sdv-advanced-join-coverage-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_842100E0_PR_1426",
+      "merge_sha": "842100e07293f95b4355b38a3f44aadda8bc8e6b",
+      "pr": 1426,
+      "note": "Merge pull request #1426 from isaacrome21-sys/cfb/sdv-refreeze-advanced-join-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_88085793_PR_1427",
+      "merge_sha": "88085793217df8f10a644e880d9a745cf127757d",
+      "pr": 1427,
+      "note": "Merge pull request #1427 from isaacrome21-sys/cfb/sdv-temporal-join-identity-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_81832F6F_PR_1428",
+      "merge_sha": "81832f6fda6e093f82288caf14ae1ce7471123ac",
+      "pr": 1428,
+      "note": "Merge pull request #1428 from isaacrome21-sys/cfb/sdv-refreeze-temporal-join-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_3D64F1F1_PR_1429",
+      "merge_sha": "3d64f1f1f91fcbe0935164f9b18653ec62c11827",
+      "pr": 1429,
+      "note": "Merge pull request #1429 from isaacrome21-sys/cfb/reconstructed-materialize-request-v6. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_5C243027_PR_1431",
+      "merge_sha": "5c2430270f7c14bf2b12a2f7446be2fe8c48dc76",
+      "pr": 1431,
+      "note": "Merge pull request #1431 from isaacrome21-sys/cfb/sdv-venue-supplement-v2. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_C373FC9C_PR_1432",
+      "merge_sha": "c373fc9c5e741c2437bb70a1396d447453551061",
+      "pr": 1432,
+      "note": "Merge pull request #1432 from isaacrome21-sys/cfb/sdv-refreeze-venue-supplement-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_1F7607CD_PR_1434",
+      "merge_sha": "1f7607cd355d0977176e8fda11bcdd4d5e26b1fe",
+      "pr": 1434,
+      "note": "Merge pull request #1434 from isaacrome21-sys/cfb/reconstructed-preflight-capacity-bands-v2. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_714394CB_PR_1435",
+      "merge_sha": "714394cb182ba27e79873f61b5cb6ea216d3462d",
+      "pr": 1435,
+      "note": "Merge pull request #1435 from isaacrome21-sys/cfb/reconstructed-materialize-capacity-bands-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_BE1E79CC_PR_1437",
+      "merge_sha": "be1e79cce80f9b0fc933c1df8dcfe0734ad93128",
+      "pr": 1437,
+      "note": "Merge pull request #1437 from isaacrome21-sys/cfb/reconstructed-advanced-capacity-bands-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_76E628FB_PR_1439",
+      "merge_sha": "76e628fb20d853ad733cb4bc9722913259b71cbe",
+      "pr": 1439,
+      "note": "Merge pull request #1439 from isaacrome21-sys/cfb/selected-candidate-auto-serving-v3. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_7262FD60_PR_1440",
+      "merge_sha": "7262fd600cc866d7c0728b344081da802ad209ec",
+      "pr": 1440,
+      "note": "Merge pull request #1440 from isaacrome21-sys/cfb/reconstructed-window-capacity-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_AA63FC15_DIRECT",
+      "merge_sha": "aa63fc152410bfbe25615320a03497a9d457c405",
+      "pr": 0,
+      "note": "cfb: venue 2031 (Pitbull Stadium / FIU) supplement + refreeze hashes rev10. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_4AB015F6_PR_1445",
+      "merge_sha": "4ab015f63e3b4e61aaad74578780882f2091052a",
+      "pr": 1445,
+      "note": "Merge pull request #1445 from isaacrome21-sys/mlb/full-board-sides-totals-props-v3. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_D2D5C7AB_PR_1446",
+      "merge_sha": "d2d5c7ab1aab5dfa1f7a73b06f6f8746e7be53bf",
+      "pr": 1446,
+      "note": "Merge pull request #1446 from isaacrome21-sys/football/full-board-sides-totals-props-v3. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_61E611B2_PR_1447",
+      "merge_sha": "61e611b2d4763105be6cf99b17d343c7438fa198",
+      "pr": 1447,
+      "note": "Merge pull request #1447 from isaacrome21-sys/mlb-football/full-board-run-emission-v1. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_A9D2718A_DIRECT",
+      "merge_sha": "a9d2718af3eb651e547bac1e0c4cb6cea2d9b3a5",
+      "pr": 0,
+      "note": "cfb: emit positive-edge bets like MLB. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_606D6E6C_DIRECT",
+      "merge_sha": "606d6e6c1373e993d86d78f5ba343d97ed645fd3",
+      "pr": 0,
+      "note": "cfb: store selected PRIOR_CURRENT_BLEND fit and card runner. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_3DB4643D_DIRECT",
+      "merge_sha": "3db4643df42f5158efa527ac3edbb85bf32fabeb",
+      "pr": 0,
+      "note": "MLB/Football: emit both sides of every prop, side, and total. Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_5C1C9C56_PR_1456",
+      "merge_sha": "5c1c9c56395a7f814f94eb8b3b441ff62609ec8f",
+      "pr": 1456,
+      "note": "cfb: MLB-style ML/spread/total card from PRIOR_CURRENT_BLEND fit (#1456). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_5196BCF8_PR_1458",
+      "merge_sha": "5196bcf81deb19ed6ff4e66fa9763d58c4957892",
+      "pr": 1458,
+      "note": "cfb: accept team names and compact phone board in SDV card (#1458). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_609DB693_PR_1461",
+      "merge_sha": "609db69332e41c700420af6f391602be759cdd90",
+      "pr": 1461,
+      "note": "cfb: neutral weather fallback when CFBD weather endpoint is unauthorized (#1461). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_B6B49477_PR_1462",
+      "merge_sha": "b6b49477e12c61d5290f48363e95465ba6144409",
+      "pr": 1462,
+      "note": "cfb: auto-detect the CFBD week from the board's matchups (#1462). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_28635407_PR_1464",
+      "merge_sha": "2863540760ec8df9e608b8d6702487e0742a0ae2",
+      "pr": 1464,
+      "note": "Add GitHub Actions workflow for CFB lines issue (#1464). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_FA923320_PR_1466",
+      "merge_sha": "fa9233207bc8df8e49ea889bcab278495a3cc0ca",
+      "pr": 1466,
+      "note": "cfb: skip games with missing team snapshots instead of failing the card (#1466). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_092D90D2_PR_1467",
+      "merge_sha": "092d90d22ca341f451cdbac744004f381b3090d7",
+      "pr": 1467,
+      "note": "cfb: score SDV card rows market-blind; match raw and aliased team names (#1467). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_15814CBA_PR_1468",
+      "merge_sha": "15814cbacb3a146ba6f837def2d0e7e988494ffd",
+      "pr": 1468,
+      "note": "cfb: neutralize live features off the training scale; sanity-guard projections (#1468). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_849A8586_PR_1469",
+      "merge_sha": "849a8586dcdee40350a5871dd15ca0cca655de99",
+      "pr": 1469,
+      "note": "cfb: moment-match live CFBD metrics to training scale; cap suspect edges (#1469). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_A5026797_PR_1470",
+      "merge_sha": "a5026797dfc42cd828a9024e8a8bd971f30530e2",
+      "pr": 1470,
+      "note": "cfb: leave-one-season-out backtest of selected fit vs CFBD closing lines (#1470). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_1F11DA5C_PR_1459",
+      "merge_sha": "1f11da5c3837dc1b8381a80b7660053e51d43de3",
+      "pr": 1459,
+      "note": "MLB/Football: finish both-side prop, side, and total cards (#1459). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_E32196F8_PR_1472",
+      "merge_sha": "e32196f825f30f1318e7ac0f6a040be864482242",
+      "pr": 1472,
+      "note": "cfb: market-anchored LOSO evaluation in backtest (#1472). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_B2091106_PR_1473",
+      "merge_sha": "b20911067dcd43ea0fdd246c6d6cb35656c300ef",
+      "pr": 1473,
+      "note": "cfb: backtest vs opening lines and open-to-close movement (#1473). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_CD4917BF_PR_1474",
+      "merge_sha": "cd4917bfa41679f3b2f8828d8e3682cea4afb1f3",
+      "pr": 1474,
+      "note": "cfb: test preseason talent/returning/prior-SP+ vs closing spread (#1474). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_8CB32802_PR_1477",
+      "merge_sha": "8cb3280234c003da2522a24ad1fff89815f28fe4",
+      "pr": 1477,
+      "note": "nfl card: show totals as no-edge leans, never picks (#1477). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_0E7CEE4F_PR_1487",
+      "merge_sha": "0e7cee4fec2e06d69384ab5f1fb19f5525b21029",
+      "pr": 1487,
+      "note": "nfl intake: resolve DraftKings team names like \"PIT Steelers\" (#1487). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_8F003501_PR_1478",
+      "merge_sha": "8f003501fe4a908659435e856e5fa8dd2de72223",
+      "pr": 1478,
+      "note": "MLB: isolate per-market feature failures instead of blocking the whole game (#1478). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_AC5F16BB_PR_1486",
+      "merge_sha": "ac5f16bb5fb6c9031ec9c1a47312a63310c7800b",
+      "pr": 1486,
+      "note": "MLB context: Statcast failure degrades one lane, fetched once per slate (#1486). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_AB79C6C5_PR_1484",
+      "merge_sha": "ab79c6c5a44a3eb14bed94ceca39bd605932922d",
+      "pr": 1484,
+      "note": "nba: ratings model, out-of-sample backtest vs closing lines, [NBA LINES] card (#1484). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_38D0B90F_PR_1491",
+      "merge_sha": "38d0b90fc065b7bb617985e2923d3e4011a6bf17",
+      "pr": 1491,
+      "note": "CFB card: unvalidated model edges are LEANs, not BETs (#1491). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_A879731A_PR_1480",
+      "merge_sha": "a879731a80df4974416d7901b9682d0c79918f7a",
+      "pr": 1480,
+      "note": "nhl card: fix away goal rate, exact push-aware totals/puck line, no BET without backtest (#1480). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_D658F0C6_PR_1483",
+      "merge_sha": "d658f0c6971d5f448ed53d7893bd560a42d40802",
+      "pr": 1483,
+      "note": "CFB: cache CFBD history in issue #1475 comments; residual backtest reads cache (#1483). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_0FA3F73A_PR_1492",
+      "merge_sha": "0fa3f73a0c7c9d0a8f8a6604c4949b90bf6039c7",
+      "pr": 1492,
+      "note": "NFL: backtest team totals (no edge) and mark team totals/props track-only on card; +price sign (#1492). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_2F241B03_PR_1493",
+      "merge_sha": "2f241b0382c48e0aa0d779acebda9e94f99a6370",
+      "pr": 1493,
+      "note": "MLB: pre-registered held-out test for few-starts pitcher fallback (#1493). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_D879ADE7_PR_1496",
+      "merge_sha": "d879ade7ffdd9923791ad64439af94116beb059e",
+      "pr": 1496,
+      "note": "MLB: RESEARCH pitcher_prior_pool emits the frozen league_short prior (#1496). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_DDD0D6A3_PR_1501",
+      "merge_sha": "ddd0d6a3806d5b7f84f8322d5b571345ab9844ec",
+      "pr": 1501,
+      "note": "CFB: survive CFBD 429 throttles on phone cards (#1501). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_284A1F19_PR_1500",
+      "merge_sha": "284a1f19590063f667a16463a39ca0379cb95a16",
+      "pr": 1500,
+      "note": "MLB: few-starts pitcher prior fallback for Outs/K, k=1..4 (#1500). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_74FA60B1_PR_1503",
+      "merge_sha": "74fa60b12f7d2f8243d845989bf4395b84ffd9a4",
+      "pr": 1503,
+      "note": "CFB: honor long CFBD rate-limit windows (#1503). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_9031B687_PR_1463",
+      "merge_sha": "9031b687a3c2e62d152896394e954eac4c3a92c1",
+      "pr": 1463,
+      "note": "CFB: emit PRIOR_CURRENT_BLEND card like MLB (#1463). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_22632492_PR_1507",
+      "merge_sha": "22632492e9e36cb5e203312fc301ef0f985703e5",
+      "pr": 1507,
+      "note": "CFB: market-only card when CFBD is rate-limited (no more traceback cards) (#1507). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_2313D287_PR_1508",
+      "merge_sha": "2313d2873b20b486938777491e3cc04dfa3bebf0",
+      "pr": 1508,
+      "note": "MLB: pre-registered held-out test for context lane 1 (opponent K -> pitcher K) (#1508). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_242C9CD7_PR_1510",
+      "merge_sha": "242c9cd71f3a6264712f7fe8918be40b93b3668e",
+      "pr": 1510,
+      "note": "NBA: v2 rest/back-to-back backtest (pre-registered) — no market validated (#1510). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_CE310364_PR_1476",
+      "merge_sha": "ce3103645f2142936511a682db612117b24aa9b2",
+      "pr": 1476,
+      "note": "CFB: talent-vs-close backtest from public mirrors, no CFBD calls (#1476) (#1511). Registered as first-parent main movement after PR_1377 for complete reconciliation provenance. Zero Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_6D6D7B4E_PR_1513",
+      "merge_sha": "6d6d7b4e3a4b36826c092985adc89f2675cab690",
+      "pr": 1513,
+      "note": "MLB opponent-K context lane production change on current main. Registers governed main movement only; no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority is created by reconciliation."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_89DFE5A6_PR_1452",
+      "merge_sha": "89dfe5a6bb09b8b77e0f1e2691191e9a2c5977c1",
+      "pr": 1452,
+      "note": "Registers merged all-props/side/totals integration and reconciliation lineage on main. No Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority is created by this reconciliation."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_D0DCF778_PR_1504",
+      "merge_sha": "d0dcf778b7c24b5ccc61d3b40c4c102f052ec2b1",
+      "pr": 1504,
+      "note": "Registers merged CFB venue-skip acquisition change on main. No model or betting authority is created by this reconciliation."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_EC6E4EBD_PR_1518",
+      "merge_sha": "ec6e4ebdd7b8cec96cae4e571237c5b42f56f92d",
+      "pr": 1518,
+      "note": "Registers merged NFL zero-authority candidate release bridge on main. Candidate release remains fail-closed; no production activation or betting authority is created."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_5F167B1E_PR_1520",
+      "merge_sha": "5f167b1e769fd5c078974fc9d2353832ed3e5585",
+      "pr": 1520,
+      "note": "Registers MLB research preregistration movement on main. No model or betting authority is created by this reconciliation."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_B6C3BC50_PR_1519",
+      "merge_sha": "b6c3bc50ac1cb9876c5ac545ee6ba38335bf0a8c",
+      "pr": 1519,
+      "note": "Registers CFB reconstructed materialization trigger movement on main. No model or betting authority is created by this reconciliation."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_72B3E9E7_PR_1524",
+      "merge_sha": "72b3e9e757690b313b3da09a1b1d34ec75986fd3",
+      "pr": 1524,
+      "note": "Registers MLB opponent on-base context production change on main. No NFL authority or additional betting authority is created by this reconciliation."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_F164500A_PR_1516",
+      "merge_sha": "f164500afb65b42e0f5abb001c4c1a9c4e133e69",
+      "pr": 1516,
+      "note": "Registers NFL V2K PCG64/SeedSequence pre-attempt RNG hardening on main. Attempt ledger remains unconsumed and no Model_P, promotion, staking, OFFICIAL, or untouched-readout authority is created."
     }
   ],
-  "inventory_block_reason": "Bundle inventory remains intentionally incomplete; current main through PR_1377 is registered, affected covered freezes remain fail-closed, and this reconciliation grants zero model or betting authority.",
+  "inventory_block_reason": "Fresh hosted zero-unmapped proof remains the inventory-completion authority; current main through PR #1516 is registered for complete reconciliation provenance. This reconciliation grants zero model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "4a132b1a68f4e84ee00499dabb3520199aac4948",
+  "reconciled_through_sha": "f164500afb65b42e0f5abb001c4c1a9c4e133e69",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }

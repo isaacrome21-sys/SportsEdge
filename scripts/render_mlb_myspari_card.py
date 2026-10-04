@@ -18,8 +18,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sportsedge.mlb_card_blocked import blocked_notes  # noqa: E402
 from sportsedge.mlb_pitcher_prior import fallback_notes  # noqa: E402
 from sportsedge.mlb_opp_k_context import opp_k_notes  # noqa: E402
+from sportsedge.mlb_opp_outs_context import opp_outs_notes  # noqa: E402
 from sportsedge.mlb_context_card import context_section  # noqa: E402
-from sportsedge.mlb_myspari_own_model import MYSPARI_OWN_MODEL_VERSION, myspari_rows, render_markdown, team_entity_names  # noqa: E402
+from sportsedge.mlb_myspari_own_model import LABEL, MYSPARI_OWN_MODEL_VERSION, myspari_rows, render_markdown, team_entity_names  # noqa: E402
 from sportsedge.mlb_quote_move_guard import apply_quote_move_guard  # noqa: E402
 
 
@@ -78,10 +79,22 @@ def _prior_rows(snapshot_path: str | None, extra: str | None) -> list[dict]:
 
 def both_side_board_section(payload: dict) -> str:
     """List both sides of every prop, side, and total. Missing quotes stay blocked."""
-    board = payload.get("full_board") or {}
+    board = payload.get("full_board") or payload.get("all_props_side_totals") or {}
     rows = list(board.get("rows") or [])
     if not rows:
-        return ""
+        from sportsedge.mlb_full_board import catalog_complete, emit_all_props_side_totals
+
+        source = payload.get("results") or payload.get("rows") or []
+        board = emit_all_props_side_totals([row for row in source if isinstance(row, dict)])
+        rows = list(board.get("rows") or [])
+        payload["full_board"] = board
+        summary = dict(payload.get("summary") or {})
+        summary["both_sides"] = board["summary"]["both_sides"]
+        summary["side_rows"] = board["summary"]["side_rows"]
+        summary["total_rows"] = board["summary"]["total_rows"]
+        summary["prop_rows"] = board["summary"]["prop_rows"]
+        summary["catalog_complete"] = catalog_complete(board["summary"])
+        payload["summary"] = summary
     summary = board.get("summary") or payload.get("summary") or {}
     lines = [
         "",
@@ -89,24 +102,22 @@ def both_side_board_section(payload: dict) -> str:
         f"both_sides={summary.get('both_sides')} catalog_complete={payload.get('summary', {}).get('catalog_complete')} "
         f"sides={summary.get('side_rows')} totals={summary.get('total_rows')} props={summary.get('prop_rows')}",
         "Both sides are listed. A missing quote is BLOCKED, not omitted. Complements are priced only from a supplied opposite quote.",
-        "NOT Model_P / NOT Truth Gate / NOT OFFICIAL.",
         "",
-        "| lane | market | side | line | odds | model_p | status | reason |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| lane | market | side | line | odds | score / 100 | note |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
     ]
     rows.sort(key=lambda row: (str(row.get("lane") or ""), str(row.get("market") or ""), str(row.get("entity_id") or ""), str(row.get("side") or "")))
     for row in rows:
         model_p = row.get("model_p")
         lines.append(
-            "| {lane} | {market} | {side} | {line} | {odds} | {model_p} | {status} | {reason} |".format(
+            "| {lane} | {market} | {side} | {line} | {odds} | {score} | {note} |".format(
                 lane=row.get("lane") or "",
                 market=row.get("market") or "",
                 side=row.get("side") or "",
                 line="" if row.get("line") is None else row.get("line"),
                 odds="" if row.get("american_odds") is None else row.get("american_odds"),
-                model_p="" if model_p is None else round(float(model_p), 4),
-                status=row.get("presentation") or "",
-                reason=row.get("reason") or "",
+                score="—" if row.get("score") is None else row["score"],
+                note="Price needed" if row.get("american_odds") is None else "Cannot evaluate yet" if model_p is None else "Research estimate",
             )
         )
     return "\n".join(lines) + "\n"
@@ -174,6 +185,7 @@ def main() -> int:
     notes.extend(blocked_notes(payload))
     notes.extend(fallback_notes(payload, names))
     notes.extend(opp_k_notes(payload, names))
+    notes.extend(opp_outs_notes(payload, names))
     notes.append(f"Lines observed {observed.isoformat() if observed else 'unknown'}; card built {now.isoformat(timespec='seconds')}.")
     if args.snapshot and Path(args.snapshot).is_file():
         raw = Path(args.snapshot).read_bytes()
@@ -188,10 +200,10 @@ def main() -> int:
             notes.append("Timestamp provenance: INTAKE_STAMPED at GitHub issue intake/edit time; not a sportsbook timestamp.")
         elif timestamp_sources:
             notes.append(f"Timestamp provenance: {', '.join(timestamp_sources)}.")
-    notes.append("Probabilities are the SportsEdge engines' own model_p (engine_registry); this card only pairs, scores and ranks them.")
-    notes.append("NOT Truth Gate / NOT OFFICIAL. Unpriceable = NO_MODEL.")
+    notes.append("Scores rank the available estimates; missing evaluations remain marked.")
+
     if any("QUOTE_MOVE_NEEDS_CONFIRM" in (r.get("presentation_reason_codes") or ()) for r in rows):
-        notes.append("NEEDS_CONFIRM: a price moved past the frozen screenshot-misread thresholds vs an earlier same-game board. Look twice. Model_p is unchanged.")
+        notes.append("NEEDS_CONFIRM: a price moved past the frozen screenshot-misread thresholds vs an earlier same-game board. Recheck the price before using this card.")
 
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -204,12 +216,12 @@ def main() -> int:
         header = f"SportsEdge MLB card ({MYSPARI_OWN_MODEL_VERSION})"
         phase = "CONTEXT_BOUND_CARD" if args.context_dir else "CARD"
 
-    text = render_markdown(display_rows, header=header, notes=notes)
+    text = render_markdown(display_rows, header=header, notes=notes).replace(LABEL, "SportsEdge projections and price comparisons")
     text += both_side_board_section(payload)
     if args.context_dir:
         text += "\n".join(context_section(bundles, failures=failures)) + "\n"
     (out / "card.md").write_text(text)
-    (out / "card.json").write_text(json.dumps({"version": MYSPARI_OWN_MODEL_VERSION, "phase": phase, "rows": rows}, indent=2, default=str))
+    (out / "card.json").write_text(json.dumps({"version": MYSPARI_OWN_MODEL_VERSION, "phase": phase, "rows": rows, "full_board": payload.get("full_board")}, indent=2, default=str))
     print(text)
     return 0
 
