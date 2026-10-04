@@ -39,6 +39,10 @@ from .model_artifact import load_nfl_m2_model_artifact
 
 VALID_MODES = frozenset({"AUTO_SELECT", "MANUAL", "HYBRID", "AUTOMATIC"})
 SUPPORTED_GAME_MARKETS = frozenset({"MONEYLINE", "SPREAD", "TOTAL"})
+# Markets that already carry NO_ENGINE on the machine result and must be
+# skipped before forwarding game rows to build_football_full_board.
+# That function is fail-closed on any unsupported market key.
+_BOARD_SKIP_MARKETS = frozenset({"TEASER", "PARLAY", "SGP", "LIVE_MONEYLINE"})
 NFL_MACHINE_VERSION = "NFL_RUN_MACHINE_V1"
 DEFAULT_QUOTE_TTL_SECONDS = 180
 # The canonical live-feature builder targets games in a 120-minute horizon. A
@@ -487,9 +491,16 @@ def _summary(results: Sequence[NFLMachineResult]) -> dict[str, Any]:
     complete = None
     try:
         from sportsedge.football_full_board import emit_all_props_side_totals
+        # TEASER, PARLAY, SGP, and LIVE_MONEYLINE already carry NO_ENGINE on
+        # the machine result. build_football_full_board is fail-closed on any
+        # game market key it does not recognise, so skip these before forwarding.
+        board_rows = [
+            asdict(row) for row in results
+            if str(row.market or "").upper() not in _BOARD_SKIP_MARKETS
+        ]
         complete = emit_all_props_side_totals(
             sport="NFL",
-            game_rows=[asdict(row) for row in results],
+            game_rows=board_rows,
         )
     except Exception:  # noqa: BLE001 — surface file may not be present in test CWD
         pass
