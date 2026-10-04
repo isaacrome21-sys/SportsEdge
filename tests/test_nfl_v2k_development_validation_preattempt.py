@@ -73,12 +73,11 @@ def test_unresolved_freezes_are_explicit_and_authority_remains_zero() -> None:
     unresolved = c["unresolved_required_freezes"]
     assert set(unresolved) == {
         "chronological_fold_plan",
-        "rng_algorithm_version_and_seed_policy",
-        "simulation_count",
+        "root_seed_and_per_game_path_keying",
         "predictive_acceptance_thresholds",
     }
     assert all(value is None for value in unresolved.values())
-    assert len(c["blocker_codes"]) == 4
+    assert len(c["blocker_codes"]) == 3
     for key, value in c["authority"].items():
         if key == "research_contract":
             assert value is True
@@ -109,3 +108,19 @@ def test_exact_attempt0_implementation_and_governance_inputs_are_bound() -> None
     assert provenance["human_policy_selection_comment_id"] == 5662476744
     assert provenance["human_policy_selection_body_sha256"] == "22598423589abda5ea2ad7754189411477738d07c6911cd468bbcdc57fc55ddf"
     assert provenance["attempt0_merge_commit"] == "7ed79c51e790d393108864513c34dd296d9fd175"
+
+
+def test_issue_693_freezes_rng_family_and_simulation_count_but_not_root_seed() -> None:
+    c = _load(CONTRACT)
+    a1 = c["attempt1_issue_binding"]
+    assert a1["issue"] == 693
+    assert a1["rng_algorithm"] == "NUMPY_PCG64"
+    assert a1["seed_derivation"] == "NUMPY_SEEDSEQUENCE_EXPLICIT_INTEGER_ROOT_DETERMINISTIC_PER_GAME_PER_PATH"
+    assert a1["root_seed"] is None
+    assert a1["simulation_count_paths_per_game"] == 50000
+    assert a1["absolute_simulation_floor_paths_per_game"] == 10000
+    assert a1["chronological_walk_forward_required"] is True
+    assert a1["shuffled_rows_forbidden"] is True
+    assert a1["calibrators_fit_on_training_only"] is True
+    assert a1["reused_history_role"] == "REUSED_RESEARCH_HISTORY_NOT_FINAL_HOLDOUT"
+    assert a1["no_fresh_untouched_population_terminal_state"] == "INSUFFICIENT_FRESH_UNTOUCHED_EVIDENCE"
