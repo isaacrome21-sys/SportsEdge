@@ -244,11 +244,17 @@ def _blocked_no_engine(q: Mapping[str, Any]) -> CFBMachineResult:
         offer_id=str(q.get("offer_id") or "") or None, scorecard=None)
 
 
+NO_ENGINE_BOARD_SKIP = frozenset({"TEASER", "PARLAY", "SGP", "LIVE_MONEYLINE"})
+
+
 def _summary(results: Sequence[CFBMachineResult]) -> dict[str, Any]:
     from sportsedge.football_full_board import board_from_machine_results, catalog_complete, emit_all_props_side_totals
 
-    board = board_from_machine_results("CFB", results)
-    complete = emit_all_props_side_totals(sport="CFB", game_rows=[asdict(row) for row in results])
+    # These labels are already NO_ENGINE on the machine result. The presentation
+    # board stays fail-closed, so they are not forwarded as game rows.
+    board_rows = [row for row in results if str(row.market or "").strip().upper() not in NO_ENGINE_BOARD_SKIP]
+    board = board_from_machine_results("CFB", board_rows)
+    complete = emit_all_props_side_totals(sport="CFB", game_rows=[asdict(row) for row in board_rows])
     return {"quote_count": len(results), "priced": sum(r.engine_status == "PRICED" for r in results),
             "no_engine": sum(r.engine_status == "NO_ENGINE" for r in results),
             "blocked": sum(r.bet_status == "BLOCKED" for r in results),
