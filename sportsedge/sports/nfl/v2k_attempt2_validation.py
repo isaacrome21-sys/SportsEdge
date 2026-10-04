@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Mapping
 from . import v2k_attempt1_validation as a1
 from .v2k_drive_core import derive_path_seed, simulate_joint_game
-from .v2k_drive_core_v2 import fit_attempt2
+from .v2k_drive_core_v2 import fit_attempt2, simulate_joint_game_v2
 
 NFL=Path(__file__).resolve().parent
 ROOT=NFL.parents[2]
@@ -40,10 +40,14 @@ def preflight(*,paths:int,smoke:bool)->dict:
 
 def simulate_game_histograms(model,game:Mapping,*,root_seed:int,paths:int)->dict:
     margins=Counter(); totals=Counter()
-    # Phase-2 core does not yet alter simulation mechanics. Refuse rather than
-    # silently scoring Attempt 2 with Attempt-1 mechanics.
-    raise SystemExit("V2K_ATTEMPT2_SIMULATION_MECHANICS_NOT_IMPLEMENTED")
-
+    for idx in range(paths):
+        seed=derive_path_seed(root_seed=root_seed,game_key=game["game_id"],path_index=idx)
+        s=simulate_joint_game_v2(model,game["home_team"],game["away_team"],season=game["season"],seed=seed)
+        margins[s.margin]+=1; totals[s.total]+=1
+    return {"game_id":game["game_id"],"season":game["season"],"week":game["week"],
+            "home_team":game["home_team"],"away_team":game["away_team"],"paths":paths,
+            "margin_hist":{str(k):v for k,v in sorted(margins.items())},
+            "total_hist":{str(k):v for k,v in sorted(totals.items())}}
 def run_fold_shard(*,fold,drives_by_season,identity,root_seed,paths,shard_index,shard_count,workers):
     train=[r for y in fold["train_seasons"] for r in drives_by_season[y]]
     train_ids={g:m for g,m in identity.items() if m["season"] in fold["train_seasons"]}
