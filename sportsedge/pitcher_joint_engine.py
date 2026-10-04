@@ -120,7 +120,10 @@ def _price_opp_k(features:Mapping[str,Any],line:float,side:str,market:str)->tupl
     if not isinstance(rels,Sequence) or isinstance(rels,(str,bytes)) or len(rels)!=len(pool):raise PitcherJointEngineError("opp_k_adjustment.history_rel must align with history_pool")
     rels=[_f(r,f"opp_k_adjustment.history_rel[{i}]") for i,r in enumerate(rels)]
     if target<=0 or any(r<=0 for r in rels):raise PitcherJointEngineError("opp_k_adjustment indices must be positive")
-    k=len(pool);raw=[r["strikeouts"] for r in pool];xs=[min(max(v*(target/h)**beta,0.0),float(_OPP_K_CAP)) for v,h in zip(raw,rels)]
+    from .mlb_lineup_k_context import adjusted_values
+    k=len(pool);raw=[r["strikeouts"] for r in pool]
+    try: xs=adjusted_values(raw,adj)
+    except (ValueError, TypeError, KeyError) as exc: raise PitcherJointEngineError(str(exc)) from exc
     over=0.0
     for x in xs:
         lo=int(x//1);frac=x-lo
@@ -132,6 +135,9 @@ def _price_opp_k(features:Mapping[str,Any],line:float,side:str,market:str)->tupl
     info={"beta":beta,"target_rel":target,"history_rel_mean":sum(rels)/k,"factor":factor,"own_starts":k,"opponent_team_id":adj.get("opponent_team_id"),"validated_in":adj.get("validated_in")}
     meta={"raw_empirical_p":over if side=="OVER" else under,"raw_push_p":0.0,"effective_history_starts":float(k),"posterior_prior":post["prior"],"opp_k_adjustment":info}
     identity={"history_pool":pool,"opp_k_adjustment":{"beta":beta,"target_rel":target,"history_rel":rels}}
+    if adj.get("lineup_k_adjustment") is not None:
+        meta["lineup_k_adjustment"]=dict(adj["lineup_k_adjustment"])
+        identity["opp_k_adjustment"]["lineup_k_adjustment"]=dict(adj["lineup_k_adjustment"])
     return (post["p_over"] if side=="OVER" else post["p_under"]),post["p_push"],meta,identity
 _UMP_BB_CAP=10
 def _price_ump_bb(features:Mapping[str,Any],line:float,side:str,market:str)->tuple[float,float,dict[str,Any],dict[str,Any]]:

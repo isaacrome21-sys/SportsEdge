@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sportsedge.mlb_card_blocked import blocked_notes  # noqa: E402
 from sportsedge.mlb_pitcher_prior import fallback_notes  # noqa: E402
+from sportsedge.mlb_lineup_k_context import lineup_k_notes
 from sportsedge.mlb_opp_k_context import opp_k_notes  # noqa: E402
 from sportsedge.mlb_opp_outs_context import opp_outs_notes  # noqa: E402
 from sportsedge.mlb_umpire_bb_context import ump_bb_notes  # noqa: E402
@@ -186,6 +187,7 @@ def main() -> int:
     notes.extend(blocked_notes(payload))
     notes.extend(fallback_notes(payload, names))
     notes.extend(opp_k_notes(payload, names))
+    notes.extend(lineup_k_notes(payload, names))
     notes.extend(opp_outs_notes(payload, names))
     notes.extend(ump_bb_notes(payload, names))
     notes.append(f"Lines observed {observed.isoformat() if observed else 'unknown'}; card built {now.isoformat(timespec='seconds')}.")

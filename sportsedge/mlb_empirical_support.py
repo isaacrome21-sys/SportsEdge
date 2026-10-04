@@ -48,8 +48,14 @@ def support_evidence(feature: Mapping[str, Any], row: Mapping[str, Any]) -> dict
         from .mlb_opp_k_context import applies, summary
         if applies(features, "PITCHER_K", line):
             extra["opp_k_adjustment"] = summary(pool, features["opp_k_adjustment"])
+            lane = features["opp_k_adjustment"].get("lineup_k_adjustment")
+            if lane:
+                extra["lineup_k_adjustment"] = lane
+            elif feature.get("lineup_k_unadjusted"):
+                extra["lineup_k_unadjusted"] = feature["lineup_k_unadjusted"]
         elif isinstance(features.get("opp_k_adjustment"), Mapping):
             extra["opp_k_unadjusted"] = "integer line (only half lines were validated)"
+            extra["lineup_k_unadjusted"] = "integer line (only half lines were validated)"
         elif feature.get("opp_k_unadjusted"):
             extra["opp_k_unadjusted"] = str(feature["opp_k_unadjusted"])
     if str(row["market"]) == "PITCHER_OUTS" and not isinstance(fallback, Mapping):
