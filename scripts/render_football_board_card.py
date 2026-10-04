@@ -63,36 +63,6 @@ def _fmt_board_row(row: dict) -> str:
     )
 
 
-
-def both_side_catalog_section(payload: dict) -> str:
-    """Append-only catalog: both sides of every prop, side, and total. No official labels."""
-    board = _board(payload)
-    summary = board.get("summary") or {}
-    lines = [
-        "",
-        "All props, sides, and totals",
-        f"both_sides={summary.get('both_sides')} catalog_complete={__import__('sportsedge.football_full_board', fromlist=['catalog_complete']).catalog_complete(summary)} "
-        f"sides={summary.get('side_rows')} totals={summary.get('total_rows')} props={summary.get('prop_rows')}",
-        "Both sides are listed. A missing quote is Price needed, not omitted. Missing engines stay unevaluated. Not a bet.",
-        "",
-        "| lane | market | side | line | odds | note |",
-        "| --- | --- | --- | --- | --- | --- |",
-    ]
-    rows = sorted(board.get("rows") or [], key=lambda row: (
-        str(row.get("lane") or ""), str(row.get("market") or ""), str(row.get("entity_id") or ""), str(row.get("selection") or row.get("side") or ""),
-    ))
-    for row in rows:
-        lines.append("| {lane} | {market} | {side} | {line} | {odds} | {note} |".format(
-            lane=row.get("lane") or "",
-            market=row.get("market") or "",
-            side=row.get("selection") or row.get("side") or "",
-            line="" if row.get("line") is None else row.get("line"),
-            odds="" if row.get("american_odds") is None else row.get("american_odds"),
-            note=_display_note(row),
-        ))
-    return "\n".join(lines) + "\n"
-
-
 def render_markdown(payload: dict) -> str:
     board = _board(payload)
     lines = [
