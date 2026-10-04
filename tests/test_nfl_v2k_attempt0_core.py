@@ -5,10 +5,12 @@ from sportsedge.sports.nfl.v2k_drive_core import (
     AUTHORITY,
     DRIVE_OUTCOMES,
     FIELD_BUCKETS,
-    OVERTIME_RULE_VERSION,
+    OVERTIME_RULE_2017_2024,
+    OVERTIME_RULE_2025_PLUS,
     STATE_BUCKETS,
     TRUNCATION_POLICY_VERSION,
     HierarchicalStrength,
+    _state_bucket,
     fit_hierarchical_strength,
     simulate_joint_game,
 )
