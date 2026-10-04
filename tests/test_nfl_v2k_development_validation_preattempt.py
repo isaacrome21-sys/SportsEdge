@@ -72,12 +72,13 @@ def test_unresolved_freezes_are_explicit_and_authority_remains_zero() -> None:
     c = _load(CONTRACT)
     unresolved = c["unresolved_required_freezes"]
     assert set(unresolved) == {
+        "final_hardened_implementation_identity",
         "chronological_fold_plan",
         "root_seed_and_per_game_path_keying",
         "predictive_acceptance_thresholds",
     }
     assert all(value is None for value in unresolved.values())
-    assert len(c["blocker_codes"]) == 3
+    assert len(c["blocker_codes"]) == 4
     for key, value in c["authority"].items():
         if key == "research_contract":
             assert value is True
@@ -89,25 +90,6 @@ def _git_blob_sha(path: Path) -> str:
     import hashlib
     raw = path.read_bytes()
     return hashlib.sha1(f"blob {len(raw)}\\0".encode() + raw).hexdigest()
-
-
-def test_exact_attempt0_implementation_and_governance_inputs_are_bound() -> None:
-    c = _load(CONTRACT)
-    identity = c["implementation_identity"]
-    expected = {
-        "v2k_drive_core_git_blob_sha1": NFL / "v2k_drive_core.py",
-        "v2k_drive_source_git_blob_sha1": NFL / "v2k_drive_source.py",
-        "preregistration_git_blob_sha1": NFL / "NFL_V2K_CLEAN_PREREG_2026-09-13.md",
-        "empirical_reference_git_blob_sha1": NFL / "NFL_V2K_EMPIRICAL_KEY_REFERENCE_V1.json",
-        "attempt_ledger_git_blob_sha1": NFL / "NFL_V2K_ATTEMPT_LEDGER_V1.json",
-        "implementation_admission_git_blob_sha1": NFL / "NFL_V2K_IMPLEMENTATION_ADMISSION_V3.json",
-    }
-    for key, path in expected.items():
-        assert identity[key] == _git_blob_sha(path), key
-    provenance = c["governance_provenance"]
-    assert provenance["human_policy_selection_comment_id"] == 5662476744
-    assert provenance["human_policy_selection_body_sha256"] == "22598423589abda5ea2ad7754189411477738d07c6911cd468bbcdc57fc55ddf"
-    assert provenance["attempt0_merge_commit"] == "7ed79c51e790d393108864513c34dd296d9fd175"
 
 
 def test_issue_693_freezes_rng_family_and_simulation_count_but_not_root_seed() -> None:
@@ -124,3 +106,23 @@ def test_issue_693_freezes_rng_family_and_simulation_count_but_not_root_seed() -
     assert a1["calibrators_fit_on_training_only"] is True
     assert a1["reused_history_role"] == "REUSED_RESEARCH_HISTORY_NOT_FINAL_HOLDOUT"
     assert a1["no_fresh_untouched_population_terminal_state"] == "INSUFFICIENT_FRESH_UNTOUCHED_EVIDENCE"
+
+
+def test_governance_provenance_uses_verifiable_ids_without_unverified_body_hash() -> None:
+    c = _load(CONTRACT)
+    p = c["governance_provenance"]
+    assert p["human_policy_selection_issue"] == 616
+    assert p["human_policy_selection_comment_id"] == 5662476744
+    assert "human_policy_selection_body_sha256" not in p
+    assert p["attempt0_design_issue"] == 620
+    assert p["attempt0_finalization_comment_id"] == 5664137348
+    assert p["attempt0_merge_commit"] == "7ed79c51e790d393108864513c34dd296d9fd175"
+
+
+def test_attempt1_code_identity_stays_blocked_until_rng_hardening_is_canonical() -> None:
+    c = _load(CONTRACT)
+    identity = c["implementation_identity"]
+    assert identity["status"] == "PENDING_POST_RNG_HARDENING_BINDING"
+    assert identity["required_successor_pr"] == 1516
+    assert identity["exact_code_identity_frozen_for_attempt1"] is False
+    assert "V2K_FINAL_IMPLEMENTATION_IDENTITY_NOT_FROZEN" in c["blocker_codes"]
