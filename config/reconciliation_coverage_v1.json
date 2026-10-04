@@ -198,6 +198,7 @@
         "docs/MLB_OPP_OUTS_CONTEXT_PREREG.md",
         "docs/MLB_PITCHER_PRIOR_FALLBACK_PREREG.md",
         "docs/MLB_RUN_IT_PREGAME.md",
+        "docs/MLB_UMPIRE_CONTEXT_PREREG.md",
         "docs/MLB_V8_RUN_IT_SCHEMA_2026-09-03.json",
         "docs/football/FRESH_VALIDATION_WINDOW_V1.md",
         "docs/hybrid_provenance_contract.md",
