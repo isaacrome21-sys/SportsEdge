@@ -82,14 +82,31 @@ def test_effective_view_respects_latest_candidate_prereg_disposition() -> None:
     state = registry_bundle["disposition"]["state"]
     assert bundle["disposition"]["state"] == state
 
+    extension_disposition = (extension.get("bundle_dispositions") or {}).get(
+        "CFB_CANDIDATE_PREREG_FREEZE_V1"
+    )
     if state == "REFROZEN":
+        assert extension_disposition is not None
         assert "CFB_CANDIDATE_PREREG_FREEZE_V1" in attestation["superseded_extension_revocations"]
     else:
         assert state == "REVOKED"
-        assert "CFB_CANDIDATE_PREREG_FREEZE_V1" in attestation["merged_fail_closed_revocations"]
+        if extension_disposition is None:
+            # A base-registry revocation is already fail-closed; there is
+            # nothing for the coverage extension to merge or supersede.
+            assert "CFB_CANDIDATE_PREREG_FREEZE_V1" not in attestation["merged_fail_closed_revocations"]
+            assert "CFB_CANDIDATE_PREREG_FREEZE_V1" not in attestation["superseded_extension_revocations"]
+        else:
+            assert "CFB_CANDIDATE_PREREG_FREEZE_V1" in attestation["merged_fail_closed_revocations"]
 
     bad = json.loads(json.dumps(registry))
     bad_bundle = next(row for row in bad["bundles"] if row["bundle_id"] == "CFB_CANDIDATE_PREREG_FREEZE_V1")
     bad_bundle["disposition"] = {"state": "ACTIVE"}
+    conflicting_extension = json.loads(json.dumps(extension))
+    conflicting_extension.setdefault("bundle_dispositions", {})["CFB_CANDIDATE_PREREG_FREEZE_V1"] = {
+        "state": "REVOKED",
+        "revoked_at": "2026-10-04T10:29:44Z",
+        "prior_forward_clock_invalidated": True,
+        "reason": "SYNTHETIC_FAIL_CLOSED_CONFLICT_TEST",
+    }
     with pytest.raises(SystemExit, match="BUNDLE_DISPOSITION_CONFLICT:CFB_CANDIDATE_PREREG_FREEZE_V1"):
-        merge_view(policy, bad, extension)
+        merge_view(policy, bad, conflicting_extension)

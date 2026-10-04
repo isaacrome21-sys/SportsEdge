@@ -46,7 +46,9 @@ def test_quoted_nfl_prop_keeps_both_sides_and_does_not_invent_the_complement():
     assert card["summary"]["catalog_complete"] is True
     text = render_markdown(card)
     assert "passing_yards" in text
-    assert "NOT OFFICIAL" in text
+    assert "OFFICIAL" not in text
+    assert "Truth Gate" not in text
+    assert "model_p" not in text
 
 
 def test_cfb_machine_summary_requires_full_prop_side_total_catalog():
