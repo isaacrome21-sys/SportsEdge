@@ -12,6 +12,6 @@
     "sportsedge/sports/nfl/m2_history_features.py": "aef283cf951ee2276674dd21d778346010582ef1",
     "sportsedge/sports/nfl/m2_history_policy.py": "1014b4c85772e5c7c4483554a5eebd3b5438ba8c",
     "sportsedge/sports/nfl/model_artifact.py": "467ce742631e3451f630e0abf5cead262676a745",
-    "sportsedge/sports/nfl/run_machine.py": "e303e8aa75ba8cb265e017129401cb8ac0afe26f"
+    "sportsedge/sports/nfl/run_machine.py": "53d8cffe38b64d22f1f77a9186f747443b5ae7dc"
   }
 }
