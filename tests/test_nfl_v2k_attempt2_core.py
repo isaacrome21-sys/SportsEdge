@@ -21,3 +21,21 @@ def test_key_structure_uses_training_scoring_mix():
     fit=fit_attempt2(rows,{"g":{"home_team":"A","away_team":"B"}})
     assert fit.margin_clustering.fg_rate==0.5
     assert fit.margin_clustering.td_rate==0.5
+
+
+def test_scoring_calibration_is_not_algebraic_identity():
+    # Context effects can overstate scoring even when the league baseline is
+    # fitted on these same rows. Attempt 2 must be able to move scoring mass.
+    rows=(
+        row("g1",0,"A","B",0,0,7,0,"TD"),
+        row("g1",1,"B","A",0,7,0,7,"PUNT_OTHER"),
+        row("g2",0,"A","B",0,0,0,0,"PUNT_OTHER"),
+        row("g2",1,"B","A",0,0,0,0,"PUNT_OTHER"),
+    )
+    fit=fit_attempt2(rows,{
+        "g1":{"home_team":"A","away_team":"B"},
+        "g2":{"home_team":"A","away_team":"B"},
+    })
+    scoring={fit.scoring.outcome_factor[k] for k in ("TD","FG","SAFETY","DEF_ST_SCORE")}
+    assert len(scoring)==1
+    assert next(iter(scoring)) != 1.0
