@@ -1737,10 +1737,16 @@
       "merge_sha": "2e2f0055ba84d892f7c1695fe1b3c52847a5b5df",
       "pr": 1522,
       "note": "MLB moneyline warning-resolution diagnostic only. Zero-authority evidence inspection; it cannot self-issue SIGNED_OFF or change deployment, staking, promotion, Model_P, or OFFICIAL state."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_CD469F2E_PR_1559",
+      "merge_sha": "cd469f2e293d2f0c3232d1faf07b4b70572a2569",
+      "pr": 1559,
+      "note": "NFL V2K operational duplicate-run cancellation bridge targeting only workflow run 37239596001. No model, source, seed, threshold, path-count, readout, Model_P, promotion, staking, or OFFICIAL authority."
     }
   ],
-  "inventory_block_reason": "Current main through merge 2e2f0055 / PR #1522 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
+  "inventory_block_reason": "Current main through merge cd469f2e / PR #1559 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "2e2f0055ba84d892f7c1695fe1b3c52847a5b5df",
+  "reconciled_through_sha": "cd469f2e293d2f0c3232d1faf07b4b70572a2569",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
