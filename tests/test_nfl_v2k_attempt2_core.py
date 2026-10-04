@@ -15,3 +15,9 @@ def test_attempt2_refuses_missing_home_identity():
     try: fit_attempt2(rows,{})
     except ValueError as e: assert str(e)=="V2K_ATTEMPT2_HOME_IDENTITY_MISSING"
     else: raise AssertionError("missing schedule identity accepted")
+
+def test_key_structure_uses_training_scoring_mix():
+    rows=(row("g",0,"A","B",0,0,3,0,"FG"),row("g",1,"B","A",0,3,7,3,"TD"))
+    fit=fit_attempt2(rows,{"g":{"home_team":"A","away_team":"B"}})
+    assert fit.margin_clustering.fg_rate==0.5
+    assert fit.margin_clustering.td_rate==0.5
