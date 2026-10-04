@@ -1,0 +1,164 @@
+{
+  "games": [
+    {
+      "date": "2025-11-23",
+      "id": "2025_12_NYG_DET",
+      "home": "DET",
+      "away": "NYG",
+      "hs": 34,
+      "as": 27
+    },
+    {
+      "date": "2025-11-27",
+      "id": "2025_13_GB_DET",
+      "home": "DET",
+      "away": "GB",
+      "hs": 24,
+      "as": 31
+    },
+    {
+      "date": "2025-12-04",
+      "id": "2025_14_DAL_DET",
+      "home": "DET",
+      "away": "DAL",
+      "hs": 44,
+      "as": 30
+    },
+    {
+      "date": "2025-12-14",
+      "id": "2025_15_DET_LA",
+      "home": "LA",
+      "away": "DET",
+      "hs": 41,
+      "as": 34
+    },
+    {
+      "date": "2025-12-21",
+      "id": "2025_16_PIT_DET",
+      "home": "DET",
+      "away": "PIT",
+      "hs": 24,
+      "as": 29
+    },
+    {
+      "date": "2025-12-25",
+      "id": "2025_17_DET_MIN",
+      "home": "MIN",
+      "away": "DET",
+      "hs": 23,
+      "as": 10
+    },
+    {
+      "date": "2026-01-04",
+      "id": "2025_18_DET_CHI",
+      "home": "CHI",
+      "away": "DET",
+      "hs": 16,
+      "as": 19
+    },
+    {
+      "date": "2026-09-13",
+      "id": "2026_01_NO_DET",
+      "home": "DET",
+      "away": "NO",
+      "hs": 31,
+      "as": 30
+    },
+    {
+      "date": "2026-09-17",
+      "id": "2026_02_DET_BUF",
+      "home": "BUF",
+      "away": "DET",
+      "hs": 41,
+      "as": 31
+    },
+    {
+      "date": "2026-09-27",
+      "id": "2026_03_NYJ_DET",
+      "home": "DET",
+      "away": "NYJ",
+      "hs": 31,
+      "as": 24
+    },
+    {
+      "date": "2025-11-24",
+      "id": "2025_12_CAR_SF",
+      "home": "SF",
+      "away": "CAR",
+      "hs": 20,
+      "as": 9
+    },
+    {
+      "date": "2025-11-30",
+      "id": "2025_13_LA_CAR",
+      "home": "CAR",
+      "away": "LA",
+      "hs": 31,
+      "as": 28
+    },
+    {
+      "date": "2025-12-14",
+      "id": "2025_15_CAR_NO",
+      "home": "NO",
+      "away": "CAR",
+      "hs": 20,
+      "as": 17
+    },
+    {
+      "date": "2025-12-21",
+      "id": "2025_16_TB_CAR",
+      "home": "CAR",
+      "away": "TB",
+      "hs": 23,
+      "as": 20
+    },
+    {
+      "date": "2025-12-28",
+      "id": "2025_17_SEA_CAR",
+      "home": "CAR",
+      "away": "SEA",
+      "hs": 10,
+      "as": 27
+    },
+    {
+      "date": "2026-01-03",
+      "id": "2025_18_CAR_TB",
+      "home": "TB",
+      "away": "CAR",
+      "hs": 16,
+      "as": 14
+    },
+    {
+      "date": "2026-01-10",
+      "id": "2025_19_LA_CAR",
+      "home": "CAR",
+      "away": "LA",
+      "hs": 31,
+      "as": 34
+    },
+    {
+      "date": "2026-09-13",
+      "id": "2026_01_CHI_CAR",
+      "home": "CAR",
+      "away": "CHI",
+      "hs": 37,
+      "as": 59
+    },
+    {
+      "date": "2026-09-20",
+      "id": "2026_02_CAR_ATL",
+      "home": "ATL",
+      "away": "CAR",
+      "hs": 3,
+      "as": 34
+    },
+    {
+      "date": "2026-09-27",
+      "id": "2026_03_CAR_CLE",
+      "home": "CLE",
+      "away": "CAR",
+      "hs": 21,
+      "as": 18
+    }
+  ]
+}
