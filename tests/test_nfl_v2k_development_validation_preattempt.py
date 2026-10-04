@@ -68,26 +68,19 @@ def test_structural_thresholds_are_copied_from_frozen_empirical_reference() -> N
     assert c["both_structural_improvements_required"] is (not gate["either_dimension_alone_counts_as_pass"])
 
 
-def test_unresolved_freezes_are_explicit_and_authority_remains_zero() -> None:
+def test_attempt1_freezes_are_complete_and_bettor_authority_remains_zero() -> None:
     c = _load(CONTRACT)
-    unresolved = c["unresolved_required_freezes"]
-    assert set(unresolved) == {
-        "final_hardened_implementation_identity",
-        "predictive_acceptance_thresholds",
-    }
-    assert all(value is None for value in unresolved.values())
-    assert len(c["blocker_codes"]) == 2
-    for key, value in c["authority"].items():
-        if key == "research_contract":
-            assert value is True
-        else:
-            assert value is False
-
-
-def _git_blob_sha(path: Path) -> str:
-    import hashlib
-    raw = path.read_bytes()
-    return hashlib.sha1(f"blob {len(raw)}\\0".encode() + raw).hexdigest()
+    frozen = c["unresolved_required_freezes"]
+    assert frozen["final_hardened_implementation_identity"]["exact_code_identity_frozen_for_attempt1"] is True
+    thresholds = frozen["predictive_acceptance_thresholds"]
+    assert thresholds["minimum_fold_win_rate"] == 0.65
+    assert thresholds["calibration_max_nonempty_bin_deviation"] == 0.05
+    assert thresholds["threshold_tuning_after_readout_forbidden"] is True
+    assert c["blocker_codes"] == []
+    assert c["authority"]["research_contract"] is True
+    assert c["authority"]["development_validation_execution"] is True
+    for key in ("untouched_readout", "model_p", "pricing", "promotion", "staking", "run_it", "official"):
+        assert c["authority"][key] is False
 
 
 def test_issue_693_freezes_rng_family_and_simulation_count_but_not_root_seed() -> None:
@@ -117,13 +110,15 @@ def test_governance_provenance_uses_verifiable_ids_without_unverified_body_hash(
     assert p["attempt0_merge_commit"] == "7ed79c51e790d393108864513c34dd296d9fd175"
 
 
-def test_attempt1_code_identity_stays_blocked_until_rng_hardening_is_canonical() -> None:
+def test_attempt1_code_identity_is_frozen_after_rng_hardening() -> None:
     c = _load(CONTRACT)
     identity = c["implementation_identity"]
-    assert identity["status"] == "PENDING_POST_RNG_HARDENING_BINDING"
+    assert identity["status"] == "FROZEN_FOR_ATTEMPT1"
     assert identity["required_successor_pr"] == 1516
-    assert identity["exact_code_identity_frozen_for_attempt1"] is False
-    assert "V2K_FINAL_IMPLEMENTATION_IDENTITY_NOT_FROZEN" in c["blocker_codes"]
+    assert identity["exact_code_identity_frozen_for_attempt1"] is True
+    assert len(identity["core_git_blob_sha1"]) == 40
+    assert len(identity["source_adapter_git_blob_sha1"]) == 40
+    assert c["blocker_codes"] == []
 
 
 def test_attempt1_fold_geometry_is_expanding_chronological_and_leakage_closed() -> None:
