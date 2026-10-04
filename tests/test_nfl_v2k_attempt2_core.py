@@ -143,3 +143,28 @@ def test_attempt2_preflight_rejects_non_smoke_below_floor():
     from sportsedge.sports.nfl import v2k_attempt2_validation as v
     with pytest.raises(SystemExit,match="V2K_ATTEMPT2_PATH_COUNT_INVALID"):
         v.preflight(paths=9999,smoke=False)
+
+
+def test_attempt2_parallel_fold_matches_serial():
+    from sportsedge.sports.nfl.v2k_attempt2_validation import run_fold_shard
+    rows=(
+        row("g1",0,"A","B",0,0,7,0,"TD"),
+        row("g1",1,"B","A",0,7,3,7,"FG"),
+        row("g2",0,"C","D",0,0,3,0,"FG"),
+        row("g2",1,"D","C",0,3,0,3,"PUNT_OTHER"),
+        row("g3",0,"A","B",0,0,7,0,"TD"),
+        row("g3",1,"B","A",0,7,0,7,"PUNT_OTHER"),
+        row("g4",0,"C","D",0,0,3,0,"FG"),
+        row("g4",1,"D","C",0,3,0,3,"PUNT_OTHER"),
+    )
+    identity={
+        "g1":{"game_id":"g1","season":2020,"week":1,"home_team":"A","away_team":"B"},
+        "g2":{"game_id":"g2","season":2020,"week":1,"home_team":"C","away_team":"D"},
+        "g3":{"game_id":"g3","season":2021,"week":1,"home_team":"A","away_team":"B"},
+        "g4":{"game_id":"g4","season":2021,"week":1,"home_team":"C","away_team":"D"},
+    }
+    fold={"fold_id":"FX","train_seasons":[2020],"test_season":2021}
+    drives={2020:[r for r in rows if r.season==2020],2021:[r for r in rows if r.season==2021]}
+    serial=run_fold_shard(fold=fold,drives_by_season=drives,identity=identity,root_seed=99,paths=8,shard_index=0,shard_count=1,workers=1)
+    parallel=run_fold_shard(fold=fold,drives_by_season=drives,identity=identity,root_seed=99,paths=8,shard_index=0,shard_count=1,workers=2)
+    assert serial==parallel
