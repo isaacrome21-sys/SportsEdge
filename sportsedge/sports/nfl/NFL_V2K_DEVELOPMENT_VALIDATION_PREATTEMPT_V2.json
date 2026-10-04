@@ -115,7 +115,7 @@
     "core_path": "sportsedge/sports/nfl/v2k_drive_core_v2.py",
     "validation_path": "sportsedge/sports/nfl/v2k_attempt2_validation.py",
     "core_git_blob_sha1": "cf9daf707f2cbf8412c357c592e2a0a18bcc8499",
-    "validation_git_blob_sha1": "a9b4e78651e8dafe9e2ffa1f206cb3500aca2dc3",
+    "validation_git_blob_sha1": "f21dbeae99183ecc7418b163c592ac5205178a17",
     "canonical_main_anchor_sha": "4307c46bb5f2e19fd6fb5afb6315bf9c9bf4b59f"
   },
   "blocker_codes": [],
@@ -140,7 +140,11 @@
     "calibrators_fit_on_training_only": true,
     "below_floor_smoke_is_not_a_valid_scored_attempt": true,
     "observed_attempt1_reused_history_exposure_consumes_budget_conservatively": true,
-    "threshold_tuning_after_readout_forbidden": true
+    "threshold_tuning_after_readout_forbidden": true,
+    "joint_final_score_histogram_preserved": true,
+    "joint_score_marginals_must_reproduce_margin_and_total_histograms": true,
+    "score_derived_moneyline_diagnostics_frozen_before_readout": true,
+    "team_total_continuous_diagnostics_frozen_before_readout": true
   },
   "attempt2_issue_binding": {
     "issue": 1539,
@@ -222,7 +226,9 @@
     "control_signed_key_mass_rmse": 0.03333957857632348,
     "interpretation": "ENGINEERING_DIAGNOSTICS_ONLY_NOT_AUTHORITY_GATES",
     "predictive_readout": "CHRONOLOGICAL_FOLD_LOG_LOSS_VS_FROZEN_MARKET_BASELINE",
-    "threshold_tuning_after_readout_forbidden": true
+    "threshold_tuning_after_readout_forbidden": true,
+    "score_derived_readout": "MONEYLINE_LOG_LOSS_AND_BRIER_VS_UNINFORMATIVE_0_5_PLUS_TEAM_SCORE_MAE_RMSE",
+    "team_total_scope": "CONTINUOUS_TEAM_SCORE_DIAGNOSTIC_NOT_BOOK_LINE"
   },
   "seed_derivation": {
     "version": "SHA256_FIRST8_BIG_ENDIAN_V1",

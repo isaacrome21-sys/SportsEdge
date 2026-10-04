@@ -72,13 +72,14 @@ def preflight(*,paths:int,smoke:bool)->dict:
     return {"contract":contract,"root_seed":root_seed,"paths":paths,"smoke":smoke,"attempts_used":exposure.get("development_budget_units_used")}
 
 def simulate_game_histograms(model,game:Mapping,*,root_seed:int,paths:int)->dict:
-    margins=Counter(); totals=Counter()
+    margins=Counter(); totals=Counter(); scores=Counter()
     for idx in range(paths):
         seed=derive_path_seed(root_seed=root_seed,game_key=game["game_id"],path_index=idx)
         s=simulate_joint_game_v2(model,game["home_team"],game["away_team"],season=game["season"],seed=seed)
-        margins[s.margin]+=1; totals[s.total]+=1
+        margins[s.margin]+=1; totals[s.total]+=1; scores[(s.home_score,s.away_score)]+=1
     return {"game_id":game["game_id"],"season":game["season"],"week":game["week"],
             "home_team":game["home_team"],"away_team":game["away_team"],"paths":paths,
+            "score_hist":{f"{h},{a}":count for (h,a),count in sorted(scores.items())},
             "margin_hist":{str(k):v for k,v in sorted(margins.items())},
             "total_hist":{str(k):v for k,v in sorted(totals.items())}}
 def run_fold_shard(*,fold,drives_by_season,identity,root_seed,paths,shard_index,shard_count,workers):
@@ -126,16 +127,40 @@ def evaluate(shards,schedule,contract):
         if (g["home_team"],g["away_team"])!=(sched["home_team"],sched["away_team"]):
             raise SystemExit("V2K_HOME_AWAY_DRIFT:"+gid)
         mh,th=a1._hist(g["margin_hist"]),a1._hist(g["total_hist"])
+        score_hist=g.get("score_hist")
+        if not isinstance(score_hist,dict) or not score_hist:
+            raise SystemExit("V2K_JOINT_SCORE_HIST_MISSING:"+gid)
+        score_pairs=Counter()
+        for key,count in score_hist.items():
+            try:
+                home_s,away_s=(int(part) for part in str(key).split(",",1))
+                count_i=int(count)
+            except (TypeError,ValueError):
+                raise SystemExit("V2K_JOINT_SCORE_HIST_INVALID:"+gid)
+            if count_i<0:
+                raise SystemExit("V2K_JOINT_SCORE_HIST_INVALID:"+gid)
+            score_pairs[(home_s,away_s)]+=count_i
         n=sum(count for _,count in mh)
+        if sum(score_pairs.values())!=n:
+            raise SystemExit("V2K_JOINT_SCORE_PATH_COUNT_MISMATCH:"+gid)
+        projected_margins=Counter(); projected_totals=Counter()
+        for (home_s,away_s),count_i in score_pairs.items():
+            projected_margins[home_s-away_s]+=count_i
+            projected_totals[home_s+away_s]+=count_i
+        if projected_margins!=Counter(dict(mh)) or projected_totals!=Counter(dict(th)):
+            raise SystemExit("V2K_JOINT_SCORE_MARGINAL_MISMATCH:"+gid)
         for k in a1.KEYS: key_sum[k]+=sum(count for value,count in mh if value==k)/n
         m=sched["_market"]; margin=sched["home_score"]-sched["away_score"]; total=sched["home_score"]+sched["away_score"]
         sl,tl=m["spread_line"],m["total_line"]
+        sim_mean_home_score=sum(h*count for (h,_),count in score_pairs.items())/n
+        sim_mean_away_score=sum(a*count for (_,a),count in score_pairs.items())/n
         rows.append({
             "game_id":gid,"season":sched["season"],"week":sched["week"],
             "home_score":sched["home_score"],"away_score":sched["away_score"],
             "spread_line":sl,"total_line":tl,
             "home_cover_outcome":None if sl is None or margin==sl else int(margin>sl),
             "over_outcome":None if tl is None or total==tl else int(total>tl),
+            "home_win_outcome":None if sched["home_score"]==sched["away_score"] else int(sched["home_score"]>sched["away_score"]),
             "baseline_home_cover_prob":a1._novig(m["home_spread_odds"],m["away_spread_odds"]),
             "baseline_over_prob":a1._novig(m["over_odds"],m["under_odds"]),
             "candidate_home_cover_prob":a1._over_prob(mh,sl),
@@ -143,6 +168,8 @@ def evaluate(shards,schedule,contract):
             "candidate_home_win_prob":a1._over_prob(mh,0.0),
             "sim_mean_margin":sum(v*count for v,count in mh)/n,
             "sim_mean_total":sum(v*count for v,count in th)/n,
+            "sim_mean_home_score":sim_mean_home_score,
+            "sim_mean_away_score":sim_mean_away_score,
         })
 
     folds=[]; predictive={}
@@ -162,6 +189,66 @@ def evaluate(shards,schedule,contract):
         predictive[market]={"fold_wins":wins,"fold_total":total_folds,
                             "fold_win_rate":wins/total_folds if total_folds else None}
 
+    ml_folds=[]
+    team_total_folds=[]
+    for season in sorted({r["season"] for r in rows}):
+        season_rows=[r for r in rows if r["season"]==season]
+        ml=[r for r in season_rows if r["home_win_outcome"] in (0,1) and r["candidate_home_win_prob"] is not None]
+        if ml:
+            candidate_pairs=[(r["home_win_outcome"],r["candidate_home_win_prob"]) for r in ml]
+            reference_pairs=[(r["home_win_outcome"],0.5) for r in ml]
+            ml_folds.append({
+                "season":season,"n":len(ml),
+                "candidate_log_loss":a1._log_loss(candidate_pairs),
+                "reference_0_5_log_loss":a1._log_loss(reference_pairs),
+                "candidate_brier":sum((float(p)-float(o))**2 for o,p in candidate_pairs)/len(candidate_pairs),
+                "reference_0_5_brier":sum((0.5-float(o))**2 for o,_ in reference_pairs)/len(reference_pairs),
+            })
+        errors=[]
+        for r in season_rows:
+            errors.extend([
+                r["sim_mean_home_score"]-r["home_score"],
+                r["sim_mean_away_score"]-r["away_score"],
+            ])
+        if errors:
+            team_total_folds.append({
+                "season":season,"n_team_scores":len(errors),
+                "mae":sum(abs(e) for e in errors)/len(errors),
+                "rmse":sqrt(sum(e*e for e in errors)/len(errors)),
+            })
+
+    ml_all=[r for r in rows if r["home_win_outcome"] in (0,1) and r["candidate_home_win_prob"] is not None]
+    ml_pairs=[(r["home_win_outcome"],r["candidate_home_win_prob"]) for r in ml_all]
+    team_errors=[]
+    for r in rows:
+        team_errors.extend([
+            r["sim_mean_home_score"]-r["home_score"],
+            r["sim_mean_away_score"]-r["away_score"],
+        ])
+    score_derived={
+        "moneyline":{
+            "scope":"BINARY_HOME_WIN_DIAGNOSTIC_TIES_EXCLUDED",
+            "reference":"UNINFORMATIVE_0.5_NOT_MARKET_BASELINE",
+            "folds":ml_folds,
+            "overall":{
+                "n":len(ml_pairs),
+                "candidate_log_loss":a1._log_loss(ml_pairs) if ml_pairs else None,
+                "reference_0_5_log_loss":a1._log_loss([(o,0.5) for o,_ in ml_pairs]) if ml_pairs else None,
+                "candidate_brier":sum((float(p)-float(o))**2 for o,p in ml_pairs)/len(ml_pairs) if ml_pairs else None,
+                "reference_0_5_brier":sum((0.5-float(o))**2 for o,_ in ml_pairs)/len(ml_pairs) if ml_pairs else None,
+            },
+        },
+        "team_total":{
+            "scope":"CONTINUOUS_TEAM_SCORE_DIAGNOSTIC_NOT_BOOK_LINE",
+            "folds":team_total_folds,
+            "overall":{
+                "n_team_scores":len(team_errors),
+                "mae":sum(abs(e) for e in team_errors)/len(team_errors) if team_errors else None,
+                "rmse":sqrt(sum(e*e for e in team_errors)/len(team_errors)) if team_errors else None,
+            },
+        },
+    }
+
     n_games=len(games)
     key_prob={str(k):key_sum[k]/n_games for k in a1.KEYS}
     reference=a1._load_json(REFERENCE_PATH)["reference"]["signed_margin_mass"]
@@ -171,6 +258,7 @@ def evaluate(shards,schedule,contract):
         "schema":RESULT_SCHEMA,"candidate_family":contract["candidate_family"],
         "evaluation_status":"ATTEMPT2_READOUT_COMPLETE","diagnostics_only":True,
         "predictive_diagnostics":predictive,"folds":folds,
+        "score_derived_diagnostics":score_derived,
         "structural_diagnostics":{"candidate_signed_key_probability":key_prob,
             "reference_signed_key_probability":{str(k):float(reference[str(k)]) for k in a1.KEYS},
             "abs_error_by_key":key_err,"candidate_signed_key_mass_rmse":key_rmse},
