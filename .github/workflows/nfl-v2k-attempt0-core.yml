@@ -24,7 +24,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install deterministic RNG dependency
-        run: python -m pip install --disable-pip-version-check numpy==2.5.3
+        run: python -m pip install --disable-pip-version-check numpy==2.5.3 pytest==9.1.1
       - name: Compile attempt-0 surface
         run: python -m py_compile sportsedge/sports/nfl/v2k_drive_core.py sportsedge/sports/nfl/v2k_drive_source.py tests/test_nfl_v2k_attempt0_core.py tests/test_nfl_v2k_rng_identity.py
       - name: Prove deterministic mechanics and zero authority
