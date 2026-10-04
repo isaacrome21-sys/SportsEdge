@@ -1743,10 +1743,16 @@
       "merge_sha": "cd469f2e293d2f0c3232d1faf07b4b70572a2569",
       "pr": 1559,
       "note": "NFL V2K operational duplicate-run cancellation bridge targeting only workflow run 37239596001. No model, source, seed, threshold, path-count, readout, Model_P, promotion, staking, or OFFICIAL authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_B76932E8_PR_1562",
+      "merge_sha": "b76932e8d1314e1dbee6fee36617fd2017d461c9",
+      "pr": 1562,
+      "note": "NFL V2K Attempt-2 canonical development failure record and Attempt-3 preregistration. Attempt-2 consumes budget unit 2; Attempt-3 scoring remains disabled pending implementation freeze. No Model_P, pricing, promotion, staking, release, or OFFICIAL authority."
     }
   ],
-  "inventory_block_reason": "Current main through merge cd469f2e / PR #1559 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
+  "inventory_block_reason": "Current main through merge b76932e8 / PR #1562 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "cd469f2e293d2f0c3232d1faf07b4b70572a2569",
+  "reconciled_through_sha": "b76932e8d1314e1dbee6fee36617fd2017d461c9",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
