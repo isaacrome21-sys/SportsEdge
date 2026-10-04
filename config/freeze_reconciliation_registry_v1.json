@@ -1725,10 +1725,16 @@
       "merge_sha": "8686613b36cafb0079aa04c53d95f6b7181747fc",
       "pr": 1538,
       "note": "MLB pitcher-prop promotion preregistration only. Registers the main advance for provenance; no outcome look, Model_P change, deployment, promotion, staking, or OFFICIAL authority is created."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_EB522825_PR_1548",
+      "merge_sha": "eb522825dc8cc1bfeff043f4a12f8bd6ac110b6d",
+      "pr": 1548,
+      "note": "MLB sealed pitcher-prop promotion final-look runner and research hook. Execution remains fail-closed before postseason completion; no outcome look, Model_P change, deployment, promotion, staking, or OFFICIAL authority is created."
     }
   ],
-  "inventory_block_reason": "Current main through merge 8686613b / PR #1538 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
+  "inventory_block_reason": "Current main through merge eb522825 / PR #1548 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "8686613b36cafb0079aa04c53d95f6b7181747fc",
+  "reconciled_through_sha": "eb522825dc8cc1bfeff043f4a12f8bd6ac110b6d",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
