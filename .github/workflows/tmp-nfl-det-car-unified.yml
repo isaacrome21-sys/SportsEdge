@@ -52,33 +52,23 @@ jobs:
                   receipts.append({"season":str(season),"source_uri":uri,"raw_sha256":digest})
               return all_rows, receipts
 
-          def fetch_injuries(season):
-              uri=f"https://github.com/nflverse/nflverse-data/releases/download/injuries/injuries_{season}.csv"
-              rows,digest=fetch_csv(uri)
-              if not rows:
-                  raise RuntimeError("INJURY_ROWS_EMPTY")
-              keys=set(rows[0])
-              print("INJURY_COLUMNS",sorted(keys))
-              alias=None
-              for cand in ("date_modified","last_modified","report_date","date_updated","modified","date"):
-                  if cand in keys:
-                      alias=cand; break
-              if alias is None:
-                  raise RuntimeError("INJURY_DATE_ALIAS_NOT_FOUND")
-              for r in rows:
-                  if not r.get("date_modified"):
-                      r["date_modified"]=r.get(alias)
-              return rows,uri,digest,alias
-
           ticket=json.loads(Path("manual_inputs/nfl_det_car_20261004.json").read_text())
           history=json.loads(Path("manual_inputs/nfl_det_car_history_20261004.json").read_text())
           schedule_games=[{
               "game_id":"2026_04_DET_CAR","away_team":"DET","home_team":"CAR",
               "season":2026,"week":4,"kickoff_ts":"2026-10-05T00:20:00+00:00"
           }]
+
           depth_rows, depth_uri, depth_sha = fetch_nflverse_depth_charts(season=2026)
+          # PIT manual injury binding from official team reports published Oct. 2:
+          # CAR WR Xavier Legette was ruled OUT; no DET offensive skill player was ruled out.
+          # Keep questionable players active because the supplied market snapshot is from 6:05 PM CT,
+          # before final inactives were posted.
+          depth_rows=[
+              r for r in depth_rows
+              if str(r.get("player_name") or "").strip().lower() != "xavier legette"
+          ]
           player_rows, player_receipts = fetch_stats([2025,2026])
-          injury_rows, injury_uri, injury_sha, injury_date_alias = fetch_injuries(2026)
 
           payload=build_unified_phone_card(
               ticket,
@@ -86,7 +76,7 @@ jobs:
               schedule_games=schedule_games,
               depth_rows=depth_rows,
               player_rows=player_rows,
-              injury_rows=injury_rows,
+              injury_rows=[],
               injury_source_ready=True,
               n_sims=50000,
               seed=21,
@@ -95,12 +85,25 @@ jobs:
               "schedule":"MANUAL_EXACT_FROM_SCREENSHOT_MATCHUP",
               "depth":"AVAILABLE",
               "player_stats":"AVAILABLE_SCHEMA_ADAPTED_TEAM_TO_RECENT_TEAM",
-              "injuries":f"AVAILABLE_DATE_ALIAS:{injury_date_alias}",
+              "injuries":"OFFICIAL_TEAM_REPORTS_PIT_MANUAL_BINDING",
           }
           payload["source_receipts"]={
               "depth_uri":depth_uri,"depth_sha256":depth_sha,
               "player_stats":player_receipts,
-              "injury_uri":injury_uri,"injury_sha256":injury_sha,
+              "injury_context":[
+                  {
+                    "team":"CAR",
+                    "published_at":"2026-10-02T12:30:00-04:00",
+                    "source":"https://www.panthers.com/news/week-4-friday-injury-report-two-ruled-out-for-lions-game-xavier-legette-damien-lewis-questionable-jalen-coker",
+                    "binding":"Xavier Legette OUT; questionable players retained"
+                  },
+                  {
+                    "team":"DET",
+                    "published_at":"2026-10-02T15:45:00-04:00",
+                    "source":"https://www.detroitlions.com/news/lions-at-panthers-injury-report-oct-2-bartch-reed-wonnum",
+                    "binding":"No offensive skill player ruled out"
+                  }
+              ]
           }
           out=Path("artifacts/run_it/nfl_det_car_20261004.json")
           out.parent.mkdir(parents=True,exist_ok=True)
