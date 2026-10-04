@@ -1,0 +1,58 @@
+{
+  "schema": "NFL_V2K_ATTEMPT2_READOUT_RECEIPT_V1",
+  "status": "ATTEMPT2_CONSUMED_MODEL_FAIL",
+  "candidate_family": "NFL_V2K_DRIVE_HIERARCHICAL_JOINT_G2",
+  "development_budget": {
+    "max_development_attempts": 5,
+    "prior_units_used": 1,
+    "this_attempt_unit": 2,
+    "development_budget_units_used_after_attempt2": 2,
+    "remaining_development_attempts": 3
+  },
+  "source": {
+    "workflow_run_id": 37239231204,
+    "artifact_id": 11316753318,
+    "artifact_name": "nfl-v2k-attempt2-f95800d6975ff91cd890b8a363d37bd352ed3f1a",
+    "artifact_digest": "sha256:c3bea7f623d0292b285ebbc063f7d8cee556619022b35e681e4addc487d6c6bd",
+    "code_sha": "f95800d6975ff91cd890b8a363d37bd352ed3f1a",
+    "issue": 1539,
+    "comment_id": 5985438395
+  },
+  "execution": {
+    "root_seed": "13631901020752177054",
+    "paths_per_game": 50000,
+    "evaluated_game_count": 1359,
+    "all_ten_shards_success": true,
+    "evaluator_success": true,
+    "valid_scored_attempt": true,
+    "sportsbook_prices_consumed_in_fit": false
+  },
+  "observed_summary": {
+    "spread_fold_wins": "0/5",
+    "total_fold_wins": "0/5",
+    "moneyline_candidate_brier": 0.2486358462975959,
+    "moneyline_reference_0_5_brier": 0.25,
+    "moneyline_candidate_log_loss": 0.6921413017148035,
+    "moneyline_reference_0_5_log_loss": 0.6931471805599212,
+    "team_score_mae": 8.480545651214129,
+    "team_score_rmse": 10.540989536103202,
+    "signed_key_mass_rmse": 0.02900706497968003,
+    "candidate_plus3_mass": 0.03268401766004414,
+    "reference_plus3_mass": 0.07710390220968501,
+    "candidate_minus3_mass": 0.03227190581309782,
+    "reference_minus3_mass": 0.06723084156088388,
+    "result": "MODEL_FAIL"
+  },
+  "governance": {
+    "attempt_consumed": true,
+    "threshold_retuning_after_readout_forbidden": true,
+    "rerun_as_untouched_forbidden": true,
+    "model_p_authority": false,
+    "pricing_authority": false,
+    "promotion_authority": false,
+    "staking_authority": false,
+    "production_release_authority": false,
+    "official_authority": false
+  },
+  "note": "Post-readout accounting receipt only. The frozen pre-Attempt-2 exposure file is intentionally preserved byte-for-byte so the historical execution contract remains immutable."
+}
