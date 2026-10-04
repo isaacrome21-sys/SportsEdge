@@ -107,7 +107,7 @@
   "simulation": {
     "paths_per_game": 50000,
     "absolute_floor": 10000,
-    "root_seed": 13631901020752177000,
+    "root_seed": 13631901020752177054,
     "rng": "NUMPY_PCG64_SEEDSEQUENCE_V1"
   },
   "implementation_identity": {
@@ -149,7 +149,7 @@
   "attempt2_issue_binding": {
     "issue": 1539,
     "status": "FROZEN_ATTEMPT2_READY_FOR_DEVELOPMENT_VALIDATION",
-    "root_seed": 13631901020752177000,
+    "root_seed": 13631901020752177054,
     "simulation_count_paths_per_game": 50000,
     "absolute_simulation_floor_paths_per_game": 10000,
     "fold_plan": {
@@ -234,6 +234,6 @@
     "version": "SHA256_FIRST8_BIG_ENDIAN_V1",
     "literal": "SportsEdge|NFL_V2K_DRIVE_HIERARCHICAL_JOINT_G2|ATTEMPT_2|ROOT_SEED_V1",
     "sha256": "bd2e3dc0e337e79ec17e22deffe3f0b406fe5a4745ef20d75b9d1e5a8f38c085",
-    "root_seed": 13631901020752177000
+    "root_seed": 13631901020752177054
   }
 }
