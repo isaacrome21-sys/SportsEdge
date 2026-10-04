@@ -134,9 +134,7 @@ def test_attempt2_preflight_accepts_exact_frozen_identity():
     from sportsedge.sports.nfl import v2k_attempt2_validation as v
     result=v.preflight(paths=1,smoke=True)
     assert result["root_seed"]==13631901020752177054
-    assert result["contract"]["status"]=="FROZEN_ATTEMPT2_READY_FOR_DEVELOPMENT_VALIDATION"
-    assert result["smoke"] is True
-
+    assert result["contract"]["status"]=="FROZEN_ATTEMPT2_READY_FOR_DEVELOPMENT_VALIDATION"\n    assert result["attempts_used"]==1\n    assert result["smoke"] is True\n
 
 def test_attempt2_preflight_rejects_non_smoke_below_floor():
     import pytest
