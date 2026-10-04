@@ -1575,10 +1575,52 @@
       "merge_sha": "6d6d7b4e3a4b36826c092985adc89f2675cab690",
       "pr": 1513,
       "note": "MLB opponent-K context lane production change on current main. Registers governed main movement only; no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or readout authority is created by reconciliation."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_89DFE5A6_PR_1452",
+      "merge_sha": "89dfe5a6bb09b8b77e0f1e2691191e9a2c5977c1",
+      "pr": 1452,
+      "note": "Registers merged all-props/side/totals integration and reconciliation lineage on main. No Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority is created by this reconciliation."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_D0DCF778_PR_1504",
+      "merge_sha": "d0dcf778b7c24b5ccc61d3b40c4c102f052ec2b1",
+      "pr": 1504,
+      "note": "Registers merged CFB venue-skip acquisition change on main. No model or betting authority is created by this reconciliation."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_EC6E4EBD_PR_1518",
+      "merge_sha": "ec6e4ebdd7b8cec96cae4e571237c5b42f56f92d",
+      "pr": 1518,
+      "note": "Registers merged NFL zero-authority candidate release bridge on main. Candidate release remains fail-closed; no production activation or betting authority is created."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_5F167B1E_PR_1520",
+      "merge_sha": "5f167b1e769fd5c078974fc9d2353832ed3e5585",
+      "pr": 1520,
+      "note": "Registers MLB research preregistration movement on main. No model or betting authority is created by this reconciliation."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_B6C3BC50_PR_1519",
+      "merge_sha": "b6c3bc50ac1cb9876c5ac545ee6ba38335bf0a8c",
+      "pr": 1519,
+      "note": "Registers CFB reconstructed materialization trigger movement on main. No model or betting authority is created by this reconciliation."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_72B3E9E7_PR_1524",
+      "merge_sha": "72b3e9e757690b313b3da09a1b1d34ec75986fd3",
+      "pr": 1524,
+      "note": "Registers MLB opponent on-base context production change on main. No NFL authority or additional betting authority is created by this reconciliation."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_F164500A_PR_1516",
+      "merge_sha": "f164500afb65b42e0f5abb001c4c1a9c4e133e69",
+      "pr": 1516,
+      "note": "Registers NFL V2K PCG64/SeedSequence pre-attempt RNG hardening on main. Attempt ledger remains unconsumed and no Model_P, promotion, staking, OFFICIAL, or untouched-readout authority is created."
     }
   ],
-  "inventory_block_reason": "Fresh hosted zero-unmapped proof required after current-main advancement to PR #1513 and reconciliation test fixture correction; effective completion claim remains unset until that proof is captured.",
+  "inventory_block_reason": "Fresh hosted zero-unmapped proof remains the inventory-completion authority; current main through PR #1516 is registered for complete reconciliation provenance. This reconciliation grants zero model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "6d6d7b4e3a4b36826c092985adc89f2675cab690",
+  "reconciled_through_sha": "f164500afb65b42e0f5abb001c4c1a9c4e133e69",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
