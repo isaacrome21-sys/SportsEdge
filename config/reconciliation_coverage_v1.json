@@ -14,6 +14,7 @@
         "docs/research/nfl_attempt9_2026_weeks_prereg.md",
         "docs/research/nfl_attempt9_2026_weeks_results.md",
         "docs/research/nfl_discrete_score_spec_v2_1_freeze.md",
+        "docs/research/nfl_v2k_attempt3_prereg.md",
         "scripts/audit_nfl_real_history.py",
         "scripts/build_nfl_attempt9_model_p_artifact.py",
         "scripts/build_nfl_attempt9_runtime_artifact.py",
