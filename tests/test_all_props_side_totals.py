@@ -216,3 +216,32 @@ def test_mlb_empty_board_lists_both_sides_of_every_catalog_market():
         sides = {row["side"] for row in board["rows"] if row["market"] == market}
         assert set(pair_sides(market)) <= sides
         assert all(row["official_eligible"] is False for row in board["rows"] if row["market"] == market)
+
+
+def test_mlb_phone_card_lists_catalog_when_engine_payload_has_no_board():
+    from scripts.render_mlb_myspari_card import both_side_board_section
+
+    text = both_side_board_section({"results": [
+        {"market": "HITS", "entity_id": "batter", "side": "OVER", "line": 1.5, "model_p": 0.57, "american_odds": -110, "opposite_odds": -110},
+    ]})
+    assert "HITS" in text
+    assert "UNDER" in text
+    assert "Price needed" in text
+    assert "OFFICIAL" not in text
+    assert "Truth Gate" not in text
+    assert "model_p" not in text
+    assert "catalog_complete=True" in text or "both_sides=True" in text
+
+
+def test_football_phone_card_lists_catalog_when_engine_payload_has_no_board():
+    from scripts.render_football_board_card import render_markdown
+
+    text = render_markdown({"sport": "NFL", "results": [
+        {"market": "moneyline", "game_id": "g", "side": "HOME", "model_p": 0.57, "american_odds": -130, "opposite_odds": 110},
+    ]})
+    assert "passing_yards" in text
+    assert "moneyline" in text
+    assert "OFFICIAL" not in text
+    assert "Truth Gate" not in text
+    assert "model_p" not in text
+    assert "Price needed" in text

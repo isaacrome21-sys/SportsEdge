@@ -43,6 +43,15 @@ def support_evidence(feature: Mapping[str, Any], row: Mapping[str, Any]) -> dict
             "pool": fallback.get("pool"), "season": fallback.get("season"),
             "artifact_sha256": fallback.get("artifact_sha256"),
         }
+    if str(row["market"]) == "PITCHER_K" and not isinstance(fallback, Mapping):
+        # Validated opponent-K context lane (#1509); presentation only, the engine priced it.
+        from .mlb_opp_k_context import applies, summary
+        if applies(features, "PITCHER_K", line):
+            extra["opp_k_adjustment"] = summary(pool, features["opp_k_adjustment"])
+        elif isinstance(features.get("opp_k_adjustment"), Mapping):
+            extra["opp_k_unadjusted"] = "integer line (only half lines were validated)"
+        elif feature.get("opp_k_unadjusted"):
+            extra["opp_k_unadjusted"] = str(feature["opp_k_unadjusted"])
     return {**extra,
         "sample_size": len(pool), "sample_unit": unit,
         "wins": over if row["side"] == "OVER" else under,

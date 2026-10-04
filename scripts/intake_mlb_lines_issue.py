@@ -25,6 +25,7 @@ CHICAGO = ZoneInfo("America/Chicago")
 RESEARCH_DIRECTIVES = {
     "pitcher_prior_fallback": ["scripts/research_mlb_pitcher_prior_fallback.py"],
     "pitcher_prior_pool": ["scripts/research_mlb_pitcher_prior_fallback.py", "--emit-pool", "2025"],
+    "opp_k_context": ["scripts/research_mlb_opp_k_context.py"],
 }
 
 
