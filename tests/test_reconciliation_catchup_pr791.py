@@ -82,11 +82,21 @@ def test_effective_view_respects_latest_candidate_prereg_disposition() -> None:
     state = registry_bundle["disposition"]["state"]
     assert bundle["disposition"]["state"] == state
 
+    extension_disposition = (extension.get("bundle_dispositions") or {}).get(
+        "CFB_CANDIDATE_PREREG_FREEZE_V1"
+    )
     if state == "REFROZEN":
+        assert extension_disposition is not None
         assert "CFB_CANDIDATE_PREREG_FREEZE_V1" in attestation["superseded_extension_revocations"]
     else:
         assert state == "REVOKED"
-        assert "CFB_CANDIDATE_PREREG_FREEZE_V1" in attestation["merged_fail_closed_revocations"]
+        if extension_disposition is None:
+            # A base-registry revocation is already fail-closed; there is
+            # nothing for the coverage extension to merge or supersede.
+            assert "CFB_CANDIDATE_PREREG_FREEZE_V1" not in attestation["merged_fail_closed_revocations"]
+            assert "CFB_CANDIDATE_PREREG_FREEZE_V1" not in attestation["superseded_extension_revocations"]
+        else:
+            assert "CFB_CANDIDATE_PREREG_FREEZE_V1" in attestation["merged_fail_closed_revocations"]
 
     bad = json.loads(json.dumps(registry))
     bad_bundle = next(row for row in bad["bundles"] if row["bundle_id"] == "CFB_CANDIDATE_PREREG_FREEZE_V1")
