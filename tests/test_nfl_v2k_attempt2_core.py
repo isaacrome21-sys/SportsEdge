@@ -158,10 +158,10 @@ def test_attempt2_parallel_fold_matches_serial():
         row("g4",1,"D","C",0,3,0,3,"PUNT_OTHER"),
     )
     identity={
-        "g1":{"game_id":"g1","season":2020,"week":1,"home_team":"A","away_team":"B"},
-        "g2":{"game_id":"g2","season":2020,"week":1,"home_team":"C","away_team":"D"},
-        "g3":{"game_id":"g3","season":2021,"week":1,"home_team":"A","away_team":"B"},
-        "g4":{"game_id":"g4","season":2021,"week":1,"home_team":"C","away_team":"D"},
+        "g1":{"game_id":"g1","season":2020,"week":1,"home_team":"A","away_team":"B","home_score":7,"away_score":3},
+        "g2":{"game_id":"g2","season":2020,"week":1,"home_team":"C","away_team":"D","home_score":3,"away_score":0},
+        "g3":{"game_id":"g3","season":2021,"week":1,"home_team":"A","away_team":"B","home_score":7,"away_score":0},
+        "g4":{"game_id":"g4","season":2021,"week":1,"home_team":"C","away_team":"D","home_score":3,"away_score":0},
     }
     fold={"fold_id":"FX","train_seasons":[2020],"test_season":2021}
     drives={2020:[r for r in rows if r.season==2020],2021:[r for r in rows if r.season==2021]}
