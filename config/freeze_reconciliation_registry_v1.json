@@ -1719,10 +1719,16 @@
       "merge_sha": "934fc53f13f0311a4cea71e3e34dae9f578574bb",
       "pr": 1551,
       "note": "NFL V2K Attempt-2 source-manifest verifier adapter repair. Infrastructure-only; frozen model/core/validator/seed/folds/path count/readout unchanged. Failed pre-fix executions produced no scored readout and no Model_P, promotion, staking, production-release, or OFFICIAL authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_8686613B_PR_1538",
+      "merge_sha": "8686613b36cafb0079aa04c53d95f6b7181747fc",
+      "pr": 1538,
+      "note": "MLB pitcher-prop promotion preregistration only. Registers the main advance for provenance; no outcome look, Model_P change, deployment, promotion, staking, or OFFICIAL authority is created."
     }
   ],
-  "inventory_block_reason": "Current main through merge 934fc53f / PR #1551 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
+  "inventory_block_reason": "Current main through merge 8686613b / PR #1538 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "934fc53f13f0311a4cea71e3e34dae9f578574bb",
+  "reconciled_through_sha": "8686613b36cafb0079aa04c53d95f6b7181747fc",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
