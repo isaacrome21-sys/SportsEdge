@@ -84,3 +84,28 @@ def test_unresolved_freezes_are_explicit_and_authority_remains_zero() -> None:
             assert value is True
         else:
             assert value is False
+
+
+def _git_blob_sha(path: Path) -> str:
+    import hashlib
+    raw = path.read_bytes()
+    return hashlib.sha1(f"blob {len(raw)}\\0".encode() + raw).hexdigest()
+
+
+def test_exact_attempt0_implementation_and_governance_inputs_are_bound() -> None:
+    c = _load(CONTRACT)
+    identity = c["implementation_identity"]
+    expected = {
+        "v2k_drive_core_git_blob_sha1": NFL / "v2k_drive_core.py",
+        "v2k_drive_source_git_blob_sha1": NFL / "v2k_drive_source.py",
+        "preregistration_git_blob_sha1": NFL / "NFL_V2K_CLEAN_PREREG_2026-09-13.md",
+        "empirical_reference_git_blob_sha1": NFL / "NFL_V2K_EMPIRICAL_KEY_REFERENCE_V1.json",
+        "attempt_ledger_git_blob_sha1": NFL / "NFL_V2K_ATTEMPT_LEDGER_V1.json",
+        "implementation_admission_git_blob_sha1": NFL / "NFL_V2K_IMPLEMENTATION_ADMISSION_V3.json",
+    }
+    for key, path in expected.items():
+        assert identity[key] == _git_blob_sha(path), key
+    provenance = c["governance_provenance"]
+    assert provenance["human_policy_selection_comment_id"] == 5662476744
+    assert provenance["human_policy_selection_body_sha256"] == "22598423589abda5ea2ad7754189411477738d07c6911cd468bbcdc57fc55ddf"
+    assert provenance["attempt0_merge_commit"] == "7ed79c51e790d393108864513c34dd296d9fd175"
