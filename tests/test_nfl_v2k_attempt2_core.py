@@ -74,3 +74,20 @@ def test_attempt2_simulation_rejects_invalid_identity_and_drive_count():
             assert str(e)==message
         else:
             raise AssertionError(message+" accepted")
+
+
+def test_attempt2_home_field_moves_home_scoring_probability_up():
+    rows=(
+        row("g1",0,"A","B",0,0,7,0,"TD"),
+        row("g1",1,"B","A",0,7,0,7,"PUNT_OTHER"),
+        row("g2",0,"A","B",0,0,3,0,"FG"),
+        row("g2",1,"B","A",0,3,0,3,"PUNT_OTHER"),
+    )
+    fit=fit_attempt2(rows,{
+        "g1":{"home_team":"A","away_team":"B"},
+        "g2":{"home_team":"A","away_team":"B"},
+    })
+    from sportsedge.sports.nfl.v2k_drive_core_v2 import _corrected_probs
+    home=_corrected_probs(fit,"A","B",home_team="A",start_field=75.0,bucket="REGULATION")
+    away=_corrected_probs(fit,"B","A",home_team="A",start_field=75.0,bucket="REGULATION")
+    assert home["TD"]+home["FG"] > away["TD"]+away["FG"]
