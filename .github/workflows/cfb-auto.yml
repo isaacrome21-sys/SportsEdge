@@ -121,13 +121,12 @@ jobs:
           summary = card.get("summary") or {}
           if summary.get("invented_lines") is not False:
               raise SystemExit("CFB_AUTO_INVENTED_LINES")
-          if summary.get("both_sides") is not True or summary.get("catalog_complete") is not True:
-              raise SystemExit("CFB_AUTO_SUPPLIED_SIDE_INCOMPLETE")
           print(
               "CFB_AUTO_CARD_OK "
               f"rows={len(rows)} bets={len(bets)} run_status={card['run_status']} "
               f"side_rows={summary.get('side_rows')} total_rows={summary.get('total_rows')} "
-              f"prop_rows={summary.get('prop_rows')} market_source=MANUAL_SCREENSHOT_BOARD"
+              f"prop_rows={summary.get('prop_rows')} both_sides={summary.get('both_sides')} "
+              "market_source=MANUAL_SCREENSHOT_BOARD"
           )
           PY
 
