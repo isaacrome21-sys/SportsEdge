@@ -1,0 +1,48 @@
+{
+  "schema": "SPORTSEDGE_NFL_PROP_USAGE_V1_2025_FINAL_V1",
+  "status": "VALIDATION_WINDOW_SPENT_TECHNICAL_FAILURE_NO_RESULT",
+  "validation_season": 2025,
+  "one_look": true,
+  "window_spent": true,
+  "second_look_allowed": false,
+  "retune_allowed": false,
+  "statistical_verdict": null,
+  "model_scoring_completed": false,
+  "fit_identity": {
+    "fit_head_sha": "dfe1914d6c5b70e727c17273dabd0bb033dc816d",
+    "fit_artifact_sha256": "ef38c7101da0977f27b71a7cbbe40321149ee2e0fda3bb8371f04d8423c9c555",
+    "fit_workflow_run_id": 36962280655,
+    "fit_workflow_artifact_id": 11208336341
+  },
+  "source_identity": {
+    "source_audit_head_sha": "438147dc660b9b62d54ad08511a441a7375cc650",
+    "source_audit_sha256": "ee2de204bfb7e3ef1a5e5d054a448bc761e91acffa8717f252b635d585691560",
+    "pre_kick_inactive_audit_sha256": "67c2b5e598dfa3dfe4ff0f0d1f9e312cf4a5facc34fb0306f242466deda93623"
+  },
+  "canonical_execution": {
+    "head_sha": "b531aa965a0c3ed17a167f3c028d987376942170",
+    "workflow_run_id": 36976714292,
+    "workflow_artifact_id": 11213747098,
+    "workflow_artifact_digest": "sha256:432886b51b40a8a5d0edcb08e5552d7760bb8b7a4cfe8d1f21cd2c06b6920f07",
+    "spend_receipt_written_before_target_source_access": true,
+    "failure_stage": "TARGET_SOURCE_ACCESS",
+    "failure": "HTTP_404_PLAYER_STATS_2025",
+    "calibration_computed": false,
+    "brier_computed": false
+  },
+  "policy": {
+    "2025_retry_forbidden": true,
+    "post_result_retune_forbidden": true,
+    "fresh_predeclared_window_required_for_any_future_validation": true,
+    "no_backfill": true
+  },
+  "authority": {
+    "research_only": true,
+    "creates_model_p": false,
+    "truth_gate": false,
+    "official": false,
+    "promotion": false,
+    "staking": false,
+    "backfill": false
+  }
+}
