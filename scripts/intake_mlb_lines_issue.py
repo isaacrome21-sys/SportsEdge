@@ -29,10 +29,12 @@ RESEARCH_DIRECTIVES = {
     "opp_outs_context": ["scripts/research_mlb_opp_outs_context.py"],
     "umpire_context": ["scripts/research_mlb_umpire_context.py"],
     "lineup_k_context": ["scripts/research_mlb_lineup_k_context.py"],
+    "f5_nrfi_tightening": ["scripts/research_mlb_f5_nrfi_tightening.py"],
     "pitcher_prop_promotion": ["scripts/research_mlb_pitcher_prop_promotion.py"],
 }
 
 RESEARCH_TIMEOUT_SECONDS = {
+    "f5_nrfi_tightening": 15 * 60,
     "pitcher_prop_promotion": 50 * 60,
 }
 
