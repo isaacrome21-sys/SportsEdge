@@ -1,6 +1,8 @@
+from pathlib import Path
 import pytest
 
 from sportsedge.nfl_score_counts_phone import build_score_count_phone_card
+from scripts.run_nfl_score_counts_lines_card import _game_only_ticket
 from sportsedge.nfl_unified_phone import UnifiedNflPhoneError
 
 
@@ -213,3 +215,30 @@ def test_prediction_at_same_instant_as_quote_is_rejected():
             prediction=prediction(prediction_at="2026-10-05T15:00:00+00:00"),
             schedule_games=schedule(),
         )
+
+
+def test_fast_game_ticket_preserves_all_game_markets_and_strips_props():
+    full = ticket()
+    full["games"][0]["markets"].append({
+        "market": "receiving_yards",
+        "player": "A_WR",
+        "line": 55.5,
+        "away_or_over_price": -110,
+        "home_or_under_price": -110,
+    })
+    fast = _game_only_ticket(full)
+    markets = fast["games"][0]["markets"]
+    assert [row["market"] for row in markets] == [
+        "moneyline", "spread", "total", "team_total"
+    ]
+    assert fast["observed_at"] == full["observed_at"]
+    assert all(not str(row.get("player") or "").strip() for row in markets)
+
+
+def test_fast_game_output_precedes_prop_context_fetch():
+    text = Path("scripts/run_nfl_score_counts_lines_card.py").read_text(encoding="utf-8")
+    fast = text.index("if args.fast_game_output:")
+    props = text.index("if _has_props(ticket):", fast)
+    assert fast < props
+    assert "fast_game_markets_only" in text
+    assert "NOT_REQUIRED_FOR_GAME_MARKETS" in text
