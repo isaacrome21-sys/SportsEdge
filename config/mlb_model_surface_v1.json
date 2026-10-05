@@ -11,14 +11,19 @@
     "sportsedge/generic_market_engine.py": "bc966f42f70b0d3abbc33c50de8a827c81a34aaa",
     "sportsedge/shared_game_engine.py": "3c60d644703c637434eded508c71934de5aa9a00",
     "sportsedge/shared_f5_engine.py": "d1ea46d5701008fe1bf81f679591d85cbc7291bd",
-    "sportsedge/hitter_joint_engine.py": "5e2afa848a0ba32e1835fb34426dd48ca526f0da",
-    "sportsedge/pitcher_joint_engine.py": "3b78a17b533457dd99d2feaa2b47b116fc06cdc2",
+    "sportsedge/hitter_joint_engine.py": "0f578b591af85806ae692913bfe7a00c250c99f4",
+    "sportsedge/pitcher_joint_engine.py": "cb11f6c30077ba04788acaa8a561dcadb8bef8fa",
     "sportsedge/first_hr_order_engine.py": "a7d273a5b8d25b20d5863a74bb3e015bbe6490b4",
     "sportsedge/pitcher_record_win_engine.py": "9a477ea82daf28562e8d6e449acfbf42402e3f6d",
     "sportsedge/mlb_empirical_bayes.py": "3fe48bf0afcd82dd108dba3412df9fab0a2a4390",
     "sportsedge/mlb_lineup_k_context.py": "75f30be0967f946acde0e47ce2f20a116af5653e",
     "sportsedge/mlb_lineup_k_context_research.py": "6ecdc785c777a3c13aab7fdc2ee1c4b408ec3269",
     "sportsedge/mlb_opp_k_context_research.py": "20df1497b9dfeda5843cceb1d9b769c11203591e",
-    "sportsedge/mlb_generic_features.py": "9a9be082a837aaf0b13a5ab1c6ae2fac3cbaaf62"
+    "sportsedge/mlb_generic_features.py": "3f9822de0e405eb7801520158cbbd8f86e50b69e",
+    "sportsedge/mlb_all_market_features.py": "e9ba5d538d78b10936eb8875c036a4f8f578be52",
+    "sportsedge/mlb_joint_features.py": "dc55910de54266435cf7125c03c9cd2c24320220",
+    "sportsedge/f5_distribution.py": "83c38b8c51d536ae416a01cfa9545131c1decf69",
+    "sportsedge/shared_first_inning_engine.py": "6aa0991399a2170a1e23e5113a7b77f3e57ebc1a",
+    "sportsedge/mlb_f5_features.py": "1832afd9a0983da9f2bff2230ace3efd3ae5ddee"
   }
 }
