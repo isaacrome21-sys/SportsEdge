@@ -267,6 +267,7 @@
         "sportsedge/sports/mlb/the_odds_api_history.py",
         "sportsedge/sports/mlb/the_odds_api_materializer.py",
         "sportsedge/sports/mlb/the_odds_api_pairing.py",
+        "tests/test_mlb_issue_research_completion.py",
         "tests/test_research_mlb_f5_nrfi_tightening.py",
         "tests/test_research_mlb_pitcher_prop_promotion.py"
       ],
