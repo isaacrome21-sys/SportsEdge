@@ -5,7 +5,8 @@ from math import isfinite
 from typing import Any,Mapping,Sequence
 from .mlb_empirical_bayes import effective_sample_size,feasible_settlements,posterior_settlement_mass
 _UPPER_SUPPORT={"PITCHER_OUTS":27}
-ENGINE_VERSION="mlb_pitcher_joint_empirical_bayes_v4_long_window_prior"\nLONG_WINDOW_PRIOR_POLICY="STRICT_PRIOR_EMPIRICAL_POOL_CAPPED_AT_RECENT_EFFECTIVE_N"
+ENGINE_VERSION="mlb_pitcher_joint_empirical_bayes_v4_long_window_prior"
+LONG_WINDOW_PRIOR_POLICY="STRICT_PRIOR_EMPIRICAL_POOL_CAPPED_AT_RECENT_EFFECTIVE_N"
 PITCHER_MARKETS=frozenset({"PITCHER_K","PITCHER_OUTS","PITCHER_ER","PITCHER_HITS_ALLOWED","PITCHER_BB","PITCHER_HITS_WALKS_ER","EITHER_PITCHER_HITS_ALLOWED","EITHER_PITCHER_BB","EITHER_PITCHER_ER"})
 class PitcherJointEngineError(ValueError):pass
 def _f(v:Any,name:str,lo:float=0.0)->float:
