@@ -109,7 +109,7 @@ def evaluate(schedule: Mapping[str, Mapping], contract: Mapping) -> dict:
         "fair_spread_scale": FAIR_SPREAD_SCALE,
         "fair_total_scale": FAIR_TOTAL_SCALE,
         "fair_center_formula": "line + fair_scale*logit(calibrated_market_probability)",
-        "fit_scope": "ALL_FROZEN_2016_2025_ROWS_AFTER_ATTEMPT5_DECISION_RULES_FIXED",
+        "fit_scope": "ALL_FROZEN_2018_2025_ROWS_AFTER_ATTEMPT5_DECISION_RULES_FIXED",
     }
     return {
         "schema": RESULT_SCHEMA,
