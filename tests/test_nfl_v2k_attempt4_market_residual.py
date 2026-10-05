@@ -1,3 +1,4 @@
+from sportsedge.sports.nfl import v2k_attempt4_validation as V4
 from sportsedge.sports.nfl.v2k_attempt4_market_residual import (
     build_residual_rows,
     candidate_probability,
@@ -53,3 +54,9 @@ def test_beta_selection_can_choose_market_only_when_residual_has_no_signal():
                 "spread_signal": 0.0,
             })
     assert choose_beta(rows, market="spread") == 0.0
+
+
+def test_attempt4_frozen_identity_preflight_matches_branch_bytes():
+    contract = V4.preflight()
+    assert contract["candidate_family"] == "NFL_MARKET_ANCHORED_TEAM_RESIDUAL_G4"
+    assert contract["attempt_budget"]["development_budget_units_used_before_attempt4"] == 3
