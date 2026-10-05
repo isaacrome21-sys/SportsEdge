@@ -13,8 +13,8 @@ from sportsedge.sports.nfl.score_counts_artifact import (
 )
 from sportsedge.sports.nfl.score_counts_g1 import (
     FEATURE_NAMES,
-    FG_ATTEMPT2_ALPHA_GRID,
-    FG_ATTEMPT2_FEATURE_NAMES,
+    FG_ATTEMPT_FEATURE_NAMES,
+    FG_MODEL_ATTEMPT_RATE_X_PRIOR_MAKE,
     predict_mean,
 )
 
@@ -44,6 +44,10 @@ def team_row(season: int, game: int, home: bool) -> dict:
     strength = (season - 2018) * 0.08 + game * 0.11 + (0.25 if home else 0.0)
     row["offense_touchdowns"] = int(max(0, round(1.4 + strength % 2.8)))
     row["made_field_goals"] = int(max(0, round(0.8 + (strength * 1.7) % 2.2)))
+    row["field_goal_attempts"] = row["made_field_goals"] + int((season + game + int(home)) % 3 == 0)
+    row["fg_attempts_per_game"] = 2.0 + 0.04 * game + (0.08 if home else 0.0)
+    row["opp_fg_attempts_allowed_per_game"] = 2.1 + 0.02 * game - (0.05 if home else 0.0)
+    row["fg_make_rate_shrunk"] = 0.82 + 0.01 * ((season + game) % 5)
     row["def_st_touchdowns"] = int((season + game + int(home)) % 19 == 0)
     row["safeties"] = int((season + 2 * game + int(home)) % 47 == 0)
     total_td = row["offense_touchdowns"] + row["def_st_touchdowns"]
@@ -77,8 +81,8 @@ def forward_rows() -> list[dict]:
     for home in (True, False):
         row = team_row(2025, 5, home)
         for key in (
-            "offense_touchdowns", "made_field_goals", "def_st_touchdowns",
-            "safeties", "pat_made", "two_point_made", "no_conversion",
+            "offense_touchdowns", "made_field_goals", "field_goal_attempts",
+            "def_st_touchdowns", "safeties", "pat_made", "two_point_made", "no_conversion",
         ):
             row.pop(key, None)
         row["game_id"] = "2026_05_TB_DAL"
@@ -214,19 +218,48 @@ def test_uninformative_model_fails_strict_development_gate():
         assert result["pass"] is False
 
 
-def test_attempt2_changes_only_fg_mean_specification():
-    art = build_attempt_fit_artifact(
-        development_rows(),
-        attempt_number=2,
+def test_attempt2_artifact_uses_frozen_two_stage_fg_spec_and_same_td_fit():
+    rows = development_rows()
+    attempt1 = build_attempt_fit_artifact(
+        rows,
+        attempt_number=1,
         source_manifest_sha256=SOURCE,
         code_identity=CODE,
         prereg_addendum_sha256=PREREG,
     )
-    assert art["attempt_number"] == 2
-    assert art["fit"]["td_model"]["feature_names"] == list(FEATURE_NAMES)
-    assert art["fit"]["fg_model"]["feature_names"] == list(FG_ATTEMPT2_FEATURE_NAMES)
-    assert art["selection"]["fg_feature_names"] == list(FG_ATTEMPT2_FEATURE_NAMES)
-    assert art["selection"]["fg_alpha_grid"] == list(FG_ATTEMPT2_ALPHA_GRID)
-    fit = fit_from_artifact(art)
-    assert fit.td_model.feature_names == FEATURE_NAMES
-    assert fit.fg_model.feature_names == FG_ATTEMPT2_FEATURE_NAMES
+    attempt2 = build_attempt_fit_artifact(
+        rows,
+        attempt_number=2,
+        source_manifest_sha256=SOURCE,
+        code_identity=CODE,
+        prereg_addendum_sha256="c" * 64,
+    )
+    assert attempt2["attempt_number"] == 2
+    assert attempt2["fit"]["fg_model_kind"] == FG_MODEL_ATTEMPT_RATE_X_PRIOR_MAKE
+    assert attempt2["fit"]["fg_model"]["target"] == "field_goal_attempts"
+    assert tuple(attempt2["fit"]["fg_model"]["feature_names"]) == FG_ATTEMPT_FEATURE_NAMES
+    assert attempt2["development_gate"]["targets"]["made_field_goals"]["model_target"] == "field_goal_attempts"
+    assert attempt2["development_gate"]["targets"]["made_field_goals"]["minimum_fold_wins"] == 3
+    assert attempt2["fit"]["td_model"] == attempt1["fit"]["td_model"]
+    replay = fit_from_artifact(attempt2)
+    assert replay.fg_model_kind == FG_MODEL_ATTEMPT_RATE_X_PRIOR_MAKE
+
+
+def test_forward_rows_reject_current_game_field_goal_attempt_label():
+    fit = build_attempt_fit_artifact(
+        development_rows(),
+        attempt_number=2,
+        source_manifest_sha256=SOURCE,
+        code_identity=CODE,
+        prereg_addendum_sha256="c" * 64,
+    )
+    rows = forward_rows()
+    rows[0]["field_goal_attempts"] = 2
+    with pytest.raises(ScoreCountArtifactError, match="FORWARD_ROW_FORBIDDEN_FIELD"):
+        build_forward_prediction(
+            fit,
+            rows,
+            prediction_at="2026-10-08T23:00:00Z",
+            source_manifest_sha256=SOURCE,
+            code_identity=CODE,
+        )
