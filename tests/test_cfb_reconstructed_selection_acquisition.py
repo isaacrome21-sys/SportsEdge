@@ -74,18 +74,42 @@ class TestCFBReconstructedSelectionAcquisition(unittest.TestCase):
             "cfbd_weather_required_for_selection": False,
             "weather_source_contract": WEATHER_CONTRACT,
             "historical_replay_calls_performed": 0,
+            "planned_total_calls": 200,
+            "verified_cache_hits": 0,
             "planned_new_calls": 200,
             "retry_reserve_calls": 50,
             "remaining_quota": 250,
             "authority": {"attempt_consumed": False, "model_p": False},
         }
-        self.assertEqual(_validate_private_preflight(base, 200)["remaining_quota"], 250)
+        self.assertEqual(_validate_private_preflight(base, 200, 0)["remaining_quota"], 250)
         with self.assertRaisesRegex(CFBAcquisitionError, "QUOTA_INSUFFICIENT"):
-            _validate_private_preflight({**base, "remaining_quota": 249}, 200)
+            _validate_private_preflight({**base, "remaining_quota": 249}, 200, 0)
         with self.assertRaisesRegex(CFBAcquisitionError, "WEATHER_TRANSPORT_NOT_READY"):
-            _validate_private_preflight({**base, "weather_transport_ready": False}, 200)
+            _validate_private_preflight({**base, "weather_transport_ready": False}, 200, 0)
         with self.assertRaisesRegex(CFBAcquisitionError, "AUTHORITY_LEAK"):
-            _validate_private_preflight({**base, "authority": {"attempt_consumed": True}}, 200)
+            _validate_private_preflight({**base, "authority": {"attempt_consumed": True}}, 200, 0)
+
+
+    def test_preflight_must_match_actual_verified_cache_misses(self):
+        base = {
+            "schema_version": "CFB_CFBD_PROVIDER_PREFLIGHT_V1",
+            "status": "VERIFIED_BEFORE_FIRST_REPLAY_CALL",
+            "weather_transport_ready": True,
+            "cfbd_weather_required_for_selection": False,
+            "weather_source_contract": WEATHER_CONTRACT,
+            "historical_replay_calls_performed": 0,
+            "planned_total_calls": 200,
+            "verified_cache_hits": 150,
+            "planned_new_calls": 50,
+            "retry_reserve_calls": 50,
+            "remaining_quota": 100,
+            "authority": {"attempt_consumed": False, "model_p": False},
+        }
+        self.assertEqual(_validate_private_preflight(base, 200, 150)["planned_new_calls"], 50)
+        with self.assertRaisesRegex(CFBAcquisitionError, "PLAN_COUNT_MISMATCH"):
+            _validate_private_preflight(base, 200, 149)
+        with self.assertRaisesRegex(CFBAcquisitionError, "PLAN_COUNT_MISMATCH"):
+            _validate_private_preflight({**base, "planned_new_calls": 51}, 200, 150)
 
     def test_verified_cache_reuse_does_not_open_network(self):
         item = build_request_plan(self.config)[0]
