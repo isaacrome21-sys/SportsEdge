@@ -5,8 +5,8 @@ import pytest
 
 from sportsedge.sports.nfl.score_counts_g1 import (
     FEATURE_NAMES,
-    FG_ATTEMPT2_ALPHA_GRID,
-    FG_ATTEMPT2_FEATURE_NAMES,
+    FG_ATTEMPT_FEATURE_NAMES,
+    FG_MODEL_ATTEMPT_RATE_X_PRIOR_MAKE,
     ROOT_SEED_UINT64,
     ScoreCountsError,
     child_seed,
@@ -14,6 +14,7 @@ from sportsedge.sports.nfl.score_counts_g1 import (
     fit_core,
     fit_poisson_ridge,
     market_probability,
+    predict_field_goal_mean,
     predict_mean,
     simulate_game,
 )
@@ -34,6 +35,10 @@ def row(season: int, strength: float, *, home: bool, td: int, fg: int):
             values[name] = strength * 0.5
         else:
             values[name] = 1.0 + strength * (0.2 + idx * 0.01)
+    values["field_goal_attempts"] = max(fg, fg + 1)
+    values["fg_attempts_per_game"] = 2.1 + 0.25 * strength
+    values["opp_fg_attempts_allowed_per_game"] = 2.0 - 0.15 * strength
+    values["fg_make_rate_shrunk"] = min(0.95, max(0.60, 0.82 + 0.02 * strength))
     return values
 
 
@@ -187,29 +192,48 @@ def test_partial_or_invalid_team_conversion_override_fails_closed():
         simulate_game(model, game_id="BAD-CONV", home_row=home, away_row=away, paths=100, seed=4)
 
 
-def test_attempt2_fg_subset_is_supported_without_changing_td_identity():
+def test_attempt2_field_goal_model_is_attempt_rate_times_prior_make_rate():
     rows = training_rows()
-    fg_alpha = FG_ATTEMPT2_ALPHA_GRID[-1]
-    model = fit_poisson_ridge(
-        rows,
-        target="made_field_goals",
-        alpha=fg_alpha,
-        feature_names=FG_ATTEMPT2_FEATURE_NAMES,
-    )
-    assert model.feature_names == FG_ATTEMPT2_FEATURE_NAMES
-    assert model.alpha == fg_alpha
-    assert predict_mean(model, rows[0]) > 0
-
-    fitted = fit_core(
+    model = fit_core(
         rows,
         shared_sigma=0.10,
         def_st_td_rate=0.08,
         safety_rate=0.015,
         conversion_probabilities=(0.92, 0.05, 0.03),
         source_manifest_sha256="a" * 64,
-        code_identity="attempt2-subset-test",
-        fg_feature_names=FG_ATTEMPT2_FEATURE_NAMES,
-        fg_alphas=FG_ATTEMPT2_ALPHA_GRID,
+        code_identity="synthetic-attempt2-test",
+        attempt_number=2,
     )
-    assert fitted.td_model.feature_names == FEATURE_NAMES
-    assert fitted.fg_model.feature_names == FG_ATTEMPT2_FEATURE_NAMES
+    assert model.fg_model_kind == FG_MODEL_ATTEMPT_RATE_X_PRIOR_MAKE
+    assert model.fg_model.target == "field_goal_attempts"
+    assert model.fg_model.feature_names == FG_ATTEMPT_FEATURE_NAMES
+    sample = row(2022, 0.4, home=True, td=0, fg=0)
+    attempt_mean = predict_mean(model.fg_model, sample)
+    made_mean = predict_field_goal_mean(model, sample)
+    assert made_mean == pytest.approx(attempt_mean * sample["fg_make_rate_shrunk"])
+    assert made_mean < attempt_mean
+
+
+def test_attempt2_does_not_change_touchdown_fit_for_same_rows():
+    rows = training_rows()
+    attempt1 = fit_core(
+        rows,
+        shared_sigma=0.10,
+        def_st_td_rate=0.08,
+        safety_rate=0.015,
+        conversion_probabilities=(0.92, 0.05, 0.03),
+        source_manifest_sha256="a" * 64,
+        code_identity="same",
+        attempt_number=1,
+    )
+    attempt2 = fit_core(
+        rows,
+        shared_sigma=0.10,
+        def_st_td_rate=0.08,
+        safety_rate=0.015,
+        conversion_probabilities=(0.92, 0.05, 0.03),
+        source_manifest_sha256="a" * 64,
+        code_identity="same",
+        attempt_number=2,
+    )
+    assert attempt1.td_model == attempt2.td_model
