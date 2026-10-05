@@ -429,6 +429,8 @@ def simulate_game(
         "paths": int(paths),
         "home_score": home_score,
         "away_score": away_score,
+        "home_team_tds": home_td,
+        "away_team_tds": away_td,
         "margin": margin,
         "total": total,
         "means": {
