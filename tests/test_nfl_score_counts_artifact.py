@@ -99,6 +99,8 @@ def test_attempt_fit_artifact_is_deterministic_and_replayable():
     assert a["artifact_sha256"] == b["artifact_sha256"]
     assert a["attempt_number"] == 1
     assert a["development_seasons"] == list(range(2018, 2026))
+    assert a["development_gate"]["market_data_used"] is False
+    assert a["status"] == ("DEVELOPMENT_ATTEMPT_PASS" if a["development_gate"]["pass"] else "DEVELOPMENT_ATTEMPT_FAIL")
     assert a["selection"]["shared_sigma"]["selected_sigma"] in [0.0, 0.1, 0.2, 0.3]
     fit = fit_from_artifact(a)
     assert fit.source_manifest_sha256 == SOURCE
@@ -178,3 +180,28 @@ def test_attempt_budget_is_exactly_three():
             rows, attempt_number=4, source_manifest_sha256=SOURCE,
             code_identity=CODE, prereg_addendum_sha256=PREREG,
         )
+
+
+def test_uninformative_model_fails_strict_development_gate():
+    rows = development_rows()
+    for row in rows:
+        for name in FEATURE_NAMES:
+            if name != "home_indicator":
+                row[name] = 0.0
+        row["home_indicator"] = 0.0
+        row["offense_touchdowns"] = 2
+        row["made_field_goals"] = 1
+    art = build_attempt_fit_artifact(
+        rows,
+        attempt_number=1,
+        source_manifest_sha256=SOURCE,
+        code_identity=CODE,
+        prereg_addendum_sha256=PREREG,
+    )
+    assert art["development_gate"]["pass"] is False
+    assert art["status"] == "DEVELOPMENT_ATTEMPT_FAIL"
+    for target in ("offense_touchdowns", "made_field_goals"):
+        result = art["development_gate"]["targets"][target]
+        assert result["fold_wins"] == 0
+        assert result["minimum_fold_wins"] == 3
+        assert result["pass"] is False
