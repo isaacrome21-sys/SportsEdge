@@ -1845,10 +1845,16 @@
       "merge_sha": "e6f719b5e4abcbc81fd04b11815c4683477b0be4",
       "pr": 1636,
       "note": "NFL market-context player-prop research adapter and unified phone routing merged. Failed V2K game edges remain disabled; posted spread/total are context only for research player simulation. Reconciliation creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, production game-market, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_18A2EA5B_PR_1637",
+      "merge_sha": "18a2ea5bafe9ef68879c1a9bbf5bc722dba674c2",
+      "pr": 1637,
+      "note": "CFB completed SDV selection accounting and market-anchored spread challenger merged. Records all four spent SDV candidate attempts, binds PRIOR_CURRENT_BLEND and the frozen spread anchor, and keeps spread rows forward TRACK/LEAN only; totals and player props remain disabled in this lane. Reconciliation creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
     }
   ],
-  "inventory_block_reason": "Current main through merge e6f719b5 / PR #1636 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
+  "inventory_block_reason": "Current main through merge 18a2ea5b / PR #1637 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "e6f719b5e4abcbc81fd04b11815c4683477b0be4",
+  "reconciled_through_sha": "18a2ea5bafe9ef68879c1a9bbf5bc722dba674c2",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
