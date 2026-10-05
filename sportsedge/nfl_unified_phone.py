@@ -251,6 +251,87 @@ def _mark_pair_selections(rows: list[dict[str, Any]]) -> None:
         keeper["selected"] = True
 
 
+def _market_context_forecast(markets: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    spreads = [
+        row for row in markets
+        if str(row.get("market") or "").strip().lower() == "spread"
+        and not str(row.get("player") or "").strip()
+    ]
+    totals = [
+        row for row in markets
+        if str(row.get("market") or "").strip().lower() == "total"
+        and not str(row.get("player") or "").strip()
+    ]
+    if len(spreads) != 1:
+        raise UnifiedNflPhoneError(f"MARKET_CONTEXT_SPREAD_REQUIRED:count={len(spreads)}")
+    if len(totals) != 1:
+        raise UnifiedNflPhoneError(f"MARKET_CONTEXT_TOTAL_REQUIRED:count={len(totals)}")
+    try:
+        away_spread = float(spreads[0]["line"])
+        total_line = float(totals[0]["line"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise UnifiedNflPhoneError("MARKET_CONTEXT_LINE_INVALID") from exc
+    if not isfinite(away_spread) or not isfinite(total_line) or total_line <= 0:
+        raise UnifiedNflPhoneError("MARKET_CONTEXT_LINE_INVALID")
+    return {
+        "margin": away_spread,
+        "total": total_line,
+        "away_spread": away_spread,
+        "home_spread": -away_spread,
+        "source": "SPORTSBOOK_MARKET_CENTER_CONTEXT_ONLY",
+        "market_prices_are_model_features": False,
+    }
+
+
+def _disabled_game_rows(
+    *,
+    schedule: Mapping[str, Any],
+    input_index: int,
+    market: str,
+    raw: Mapping[str, Any],
+    pair_id: str,
+    prices: Sequence[int],
+    no_vig: Sequence[float],
+    away: str,
+    home: str,
+) -> list[dict[str, Any]]:
+    if market == "moneyline":
+        specs = [(away, None), (home, None)]
+    elif market == "spread":
+        away_line = float(raw["line"])
+        specs = [(away, away_line), (home, -away_line)]
+    elif market == "total":
+        line = float(raw["line"])
+        specs = [("Over", line), ("Under", line)]
+    elif market == "team_total":
+        line = float(raw["line"])
+        team = str(raw.get("team") or "").upper()
+        if team not in {away, home}:
+            raise UnifiedNflPhoneError(f"TEAM_TOTAL_TEAM_NOT_IN_GAME:{team}")
+        specs = [(f"{team} Over", line), (f"{team} Under", line)]
+    else:
+        raise UnifiedNflPhoneError(f"GAME_MARKET_DISABLE_UNSUPPORTED:{market}")
+    rows = []
+    for side_index, (selection, display_line) in enumerate(specs):
+        rows.append({
+            "pair_id": pair_id,
+            "input_index": input_index,
+            "side_index": side_index,
+            "market": market,
+            "selection": selection,
+            "line": display_line,
+            "player": None,
+            "team": raw.get("team"),
+            "price_american": int(prices[side_index]),
+            "market_no_vig_p": float(no_vig[side_index]),
+            "raw": str(raw.get("raw") or market),
+            "selected": False,
+            "status": "NO_MODEL",
+            "reason": "GAME_EDGE_MODEL_DISABLED_V2K_NO_PASS",
+        })
+    return rows
+
+
 def build_unified_phone_card(
     ticket: Mapping[str, Any],
     *,
@@ -264,13 +345,14 @@ def build_unified_phone_card(
     scoring_prior: ScoringCompositionPrior | None = None,
     n_sims: int = 20000,
     seed: int = 21,
+    market_context_props_only: bool = False,
 ) -> dict[str, Any]:
     """Price one full pasted board from a single model run per game."""
     if not isinstance(ticket, Mapping):
         raise UnifiedNflPhoneError("TICKET_OBJECT_REQUIRED")
     observed = _utc(ticket.get("observed_at"), "observed_at")
     history_rows = _history_rows(history)
-    model = dict(runtime or load_runtime())
+    model = None if market_context_props_only else dict(runtime or load_runtime())
     games_out: list[dict[str, Any]] = []
 
     for game_index, game in enumerate(ticket.get("games") or []):
@@ -285,24 +367,33 @@ def build_unified_phone_card(
             observed_at=observed,
         )
         kickoff = _utc(schedule["kickoff"], "kickoff")
-        feat = recency_features(
-            history_rows,
-            home=home,
-            away=away,
-            asof=kickoff.date(),
-        )
-        if not feat.get("ok"):
-            games_out.append({
-                **schedule,
-                "features": feat,
-                "rows": [],
-                "status": "NO_MODEL",
-                "reason": feat.get("reason") or "ATTEMPT9_FEATURES_UNAVAILABLE",
-            })
-            continue
-        forecast = raw_forecasts(model, feat["vector"])
-
         markets = [row for row in game.get("markets") or [] if isinstance(row, Mapping)]
+        if market_context_props_only:
+            forecast = _market_context_forecast(markets)
+            feat = {
+                "ok": True,
+                "source": "SPORTSBOOK_MARKET_CENTER_CONTEXT_ONLY",
+                "market_prices_are_model_features": False,
+            }
+        else:
+            feat = recency_features(
+                history_rows,
+                home=home,
+                away=away,
+                asof=kickoff.date(),
+            )
+            if not feat.get("ok"):
+                games_out.append({
+                    **schedule,
+                    "features": feat,
+                    "rows": [],
+                    "status": "NO_MODEL",
+                    "reason": feat.get("reason") or "ATTEMPT9_FEATURES_UNAVAILABLE",
+                })
+                continue
+            assert model is not None
+            forecast = raw_forecasts(model, feat["vector"])
+
         prop_inputs = [row for row in markets if str(row.get("player") or "").strip()]
         home_model = away_model = None
         role_error = None
@@ -335,6 +426,7 @@ def build_unified_phone_card(
 
         game_requests: list[dict[str, Any]] = []
         prop_requests: list[dict[str, Any]] = []
+        disabled_game_rows: list[dict[str, Any]] = []
         game_meta: list[dict[str, Any]] = []
         prop_meta: list[dict[str, Any]] = []
 
@@ -343,6 +435,20 @@ def build_unified_phone_card(
             no_vig, prices = _decimal_pair(raw)
             pair_id = f"{schedule['game_id']}:{input_index}:{market}"
             raw_text = str(raw.get("raw") or market)
+
+            if market_context_props_only and market in {"moneyline", "spread", "total", "team_total"}:
+                disabled_game_rows.extend(_disabled_game_rows(
+                    schedule=schedule,
+                    input_index=input_index,
+                    market=market,
+                    raw=raw,
+                    pair_id=pair_id,
+                    prices=prices,
+                    no_vig=no_vig,
+                    away=away,
+                    home=home,
+                ))
+                continue
 
             if market == "moneyline":
                 specs = [
@@ -475,7 +581,7 @@ def build_unified_phone_card(
             seed=int(seed) + game_index,
         )
 
-        rows: list[dict[str, Any]] = []
+        rows: list[dict[str, Any]] = list(disabled_game_rows)
         for engine_row, meta in zip(engine["game_markets"], game_meta):
             rows.append(_decorate(
                 engine_row,
@@ -542,6 +648,12 @@ def build_unified_phone_card(
             "straight_price_ceiling": MAX_STRAIGHT_PRICE,
             "score_uses_price_edge_ev": False,
             "live_props_require_injury_source": True,
+            "game_edge_model": "DISABLED_V2K_NO_PASS" if market_context_props_only else "ATTEMPT9_RESEARCH",
+            "prop_game_environment": (
+                "SPORTSBOOK_MARKET_CENTER_CONTEXT_ONLY"
+                if market_context_props_only
+                else "ATTEMPT9_RESEARCH"
+            ),
         },
         "authority": {
             "research_only": True,
