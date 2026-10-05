@@ -22,7 +22,17 @@
     ],
     "team_result_state_used": false,
     "drive_data_used": false,
-    "game_outcomes_used_only_for_prior_season_parameter_selection_and_test_scoring": true
+    "game_outcomes_used_only_for_prior_season_parameter_selection_and_test_scoring": true,
+    "schedule_seasons": [
+      2018,
+      2019,
+      2020,
+      2021,
+      2022,
+      2023,
+      2024,
+      2025
+    ]
   },
   "fold_plan": {
     "policy": "EXPANDING_SEASON_OUTER_FOLDS_WITH_TRAINING_ONLY_CALIBRATION_SELECTION",
@@ -103,7 +113,7 @@
     "core_path": "sportsedge/sports/nfl/v2k_attempt5_market_calibration.py",
     "core_git_blob_sha1": "caff8dfbc079e44b530fcc81521ef31707aeb426",
     "validation_path": "sportsedge/sports/nfl/v2k_attempt5_validation.py",
-    "validation_git_blob_sha1": "ae14106536e4c5c00e57a892b0f03f1d4f96402b",
+    "validation_git_blob_sha1": "ede06ea52cf770b341d3da2cd4a38b3c55987bf5",
     "runner_path": "scripts/run_nfl_v2k_attempt5.py",
     "runner_git_blob_sha1": "f5ad81afe51f5c6f9ffc151cb14d859a1f6f28fa"
   },
