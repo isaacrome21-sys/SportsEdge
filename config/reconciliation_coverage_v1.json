@@ -421,7 +421,7 @@
     "sportsedge/sports/nfl/score_counts_source_manifest.py": "NFL_SCORE_COUNTS_G1_SOURCE_RECEIPT_VERIFIER_RESEARCH_PROVENANCE_ONLY_NO_ACTIVE_BUNDLE",
     "tests/test_nfl_score_counts_source_contract.py": "TEST_ONLY_NFL_SCORE_COUNTS_G1_SOURCE_CONTRACT_NO_RUNTIME_AUTHORITY",
     "sportsedge/sports/nfl/score_counts_features.py": "NFL_POST_V2K_SCORE_COUNTS_PIT_FEATURE_BUILDER_ZERO_AUTHORITY_NO_ACTIVE_BUNDLE",
-    "tests/test_nfl_score_counts_features.py": "TEST_ONLY_NFL_POST_V2K_SCORE_COUNTS_FEATURE_BUILDER_NO_RUNTIME_AUTHORITY"
+    "tests/test_nfl_score_counts_features.py": "TEST_ONLY_NFL_POST_V2K_SCORE_COUNTS_FEATURE_BUILDER_NO_RUNTIME_AUTHORITY",\n    "sportsedge/sports/nfl/score_counts_artifact.py": "NFL_SCORE_COUNTS_G1_DETERMINISTIC_FIT_AND_FORWARD_ARTIFACT_RESEARCH_ONLY_NO_ACTIVE_BUNDLE",\n    "tests/test_nfl_score_counts_artifact.py": "TEST_ONLY_NFL_SCORE_COUNTS_G1_FIT_FORWARD_ARTIFACT_NO_RUNTIME_AUTHORITY"
   },
   "inventory_completion_claim": {
     "status": "HOSTED_AUDIT_ZERO_UNMAPPED",
