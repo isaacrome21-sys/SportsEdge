@@ -1,9 +1,9 @@
 {
   "schema": "NFL_V2K_DEVELOPMENT_VALIDATION_PREATTEMPT_V3",
-  "status": "PREREGISTERED_ATTEMPT3_IMPLEMENTATION_NOT_FROZEN",
+  "status": "FROZEN_ATTEMPT3_READY_FOR_DEVELOPMENT_VALIDATION",
   "candidate_family": "NFL_V2K_CONTEXT_SKELETON_LOGRATIO_G3",
   "issue": 1561,
-  "purpose": "Attempt-3 materially different development specification. Replace additive independent-context drive probabilities with recency-weighted log-ratio hierarchy and historical drive-context skeleton sampling. No scoring is allowed until implementation blobs are frozen in a successor artifact.",
+  "purpose": "Attempt-3 materially different development specification, implementation-frozen for one governed development/validation execution. Replace additive independent-context drive probabilities with recency-weighted log-ratio hierarchy and historical drive-context skeleton sampling.",
   "predecessor_result_path": "sportsedge/sports/nfl/NFL_V2K_ATTEMPT2_RESULT_V1.json",
   "source_binding": {
     "source_freeze_path": "config/nfl_promotion_source_freeze_v1.json",
@@ -181,17 +181,24 @@
     "development_budget_units_used_before_attempt3": 2,
     "development_budget_units_remaining_before_attempt3": 3,
     "this_artifact_consumes_attempt": false,
-    "attempt3_scoring_allowed": false
+    "attempt3_scoring_allowed": true
   },
   "implementation_identity": {
-    "status": "NOT_YET_FROZEN",
+    "status": "FROZEN",
     "core_path": "sportsedge/sports/nfl/v2k_drive_core_v3.py",
+    "core_git_blob_sha1": "72aa99128b122b67051d199aadff4897b349f625",
     "validation_path": "sportsedge/sports/nfl/v2k_attempt3_validation.py",
-    "runner_path": "scripts/run_nfl_v2k_attempt3.py"
+    "validation_git_blob_sha1": "5e619e4d3f49ce6059c802cbe0c859519b46df56",
+    "runner_path": "scripts/run_nfl_v2k_attempt3.py",
+    "runner_git_blob_sha1": "4430a334cf7d28e15b1bb3618d429b3b8415591d",
+    "workflow_path": ".github/workflows/nfl-v2k-attempt3-development-validation.yml",
+    "workflow_git_blob_sha1": "5e86913357d94c678d0b9246527e58306b4d75af",
+    "implementation_pr": 1564,
+    "frozen_from_head_sha": "a06426f871c5cbd5691026a3c1738b39088105ee"
   },
   "authority": {
     "research_contract": true,
-    "development_validation_execution": false,
+    "development_validation_execution": true,
     "model_p": false,
     "pricing": false,
     "promotion": false,
