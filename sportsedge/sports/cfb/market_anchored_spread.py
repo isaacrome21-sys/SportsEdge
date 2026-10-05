@@ -10,11 +10,14 @@ no promotion, staking, or OFFICIAL authority.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from math import isfinite
+from pathlib import Path
 from typing import Any, Mapping
 
 VERSION = "CFB_MARKET_ANCHORED_SPREAD_V1"
 FORWARD_MIN_ABS_ADJUSTMENT = 0.5
+DEFAULT_FIT_PATH = Path(__file__).resolve().parents[3] / "config" / "cfb_market_anchored_spread_fit_v1.json"
 
 
 class CFBMarketAnchoredSpreadError(ValueError):
@@ -111,6 +114,28 @@ def fit_market_anchored_spread(
     )
 
 
+
+def load_frozen_fit(path: str | Path = DEFAULT_FIT_PATH) -> dict[str, Any]:
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    if payload.get("schema") != "CFB_MARKET_ANCHORED_SPREAD_FIT_V1":
+        raise CFBMarketAnchoredSpreadError("CFB_ANCHORED_SPREAD_FIT_SCHEMA_INVALID")
+    if payload.get("version") != VERSION or payload.get("status") != "FROZEN_FORWARD_TRACKING_READY":
+        raise CFBMarketAnchoredSpreadError("CFB_ANCHORED_SPREAD_FIT_IDENTITY_INVALID")
+    if float(payload.get("forward_min_abs_adjustment_points")) != FORWARD_MIN_ABS_ADJUSTMENT:
+        raise CFBMarketAnchoredSpreadError("CFB_ANCHORED_SPREAD_FORWARD_THRESHOLD_DRIFT")
+    if int(payload.get("n", 0)) < 1000 or int(payload.get("season_start", 0)) != 2016 or int(payload.get("season_end", 0)) != 2025:
+        raise CFBMarketAnchoredSpreadError("CFB_ANCHORED_SPREAD_FIT_SCOPE_INVALID")
+    _finite(payload.get("intercept"), "intercept")
+    _finite(payload.get("weight"), "weight")
+    authority = payload.get("authority") or {}
+    if any(bool(authority.get(k)) for k in ("model_p", "promotion", "staking", "official")):
+        raise CFBMarketAnchoredSpreadError("CFB_ANCHORED_SPREAD_AUTHORITY_ESCALATION")
+    if payload.get("evidence_role") != "DEVELOPMENT_ONLY_ALREADY_TOUCHED" or payload.get("no_backfill") is not True:
+        raise CFBMarketAnchoredSpreadError("CFB_ANCHORED_SPREAD_PROVENANCE_INVALID")
+    if payload.get("totals_enabled") is not False:
+        raise CFBMarketAnchoredSpreadError("CFB_ANCHORED_SPREAD_TOTALS_MUST_STAY_DISABLED")
+    return payload
+
 def adjusted_home_margin(
     *,
     raw_model_home_margin: float,
@@ -133,9 +158,11 @@ def forward_track_eligible(*, adjusted_margin: float, market_home_margin: float)
 __all__ = [
     "CFBMarketAnchoredSpreadError",
     "FORWARD_MIN_ABS_ADJUSTMENT",
+    "DEFAULT_FIT_PATH",
     "MarketAnchoredSpreadFit",
     "VERSION",
     "adjusted_home_margin",
     "fit_market_anchored_spread",
     "forward_track_eligible",
+    "load_frozen_fit",
 ]
