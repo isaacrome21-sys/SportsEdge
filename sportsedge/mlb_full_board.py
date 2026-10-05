@@ -20,6 +20,8 @@ SIDE_MARKETS = frozenset({
 TOTAL_MARKETS = frozenset({
     "TOTALS", "TEAM_TOTALS", "F5_TOTALS", "F5_TEAM_TOTALS", "NRFI", "YRFI",
 })
+TEAM_TOTAL_MARKETS = frozenset({"TEAM_TOTALS", "F5_TEAM_TOTALS"})
+TEAM_SIDES = ("HOME", "AWAY")
 _GROUPS = (
     "game_markets",
     "batter_markets",
@@ -241,22 +243,47 @@ def build_mlb_full_board(
         if market in seen:
             continue
         left, right = pair_sides(market)
-        for side in (left, right):
-            emitted.append({
-                "lane": family_for(market),
-                "market": market,
-                "game_id": None,
-                "entity_id": None,
-                "team_side": None,
-                "side": side,
-                "line": None,
-                "american_odds": None,
-                "model_p": None,
-                "research_only": True,
-                "official_eligible": False,
-                "presentation": "BLOCKED",
-                "reason": "NO_QUOTE_OR_ENGINE_ROW",
-            })
+        team_sides = TEAM_SIDES if market in TEAM_TOTAL_MARKETS else (None,)
+        for team_side in team_sides:
+            for side in (left, right):
+                emitted.append({
+                    "lane": family_for(market),
+                    "market": market,
+                    "game_id": None,
+                    "entity_id": None,
+                    "team_side": team_side,
+                    "side": side,
+                    "line": None,
+                    "american_odds": None,
+                    "model_p": None,
+                    "research_only": True,
+                    "official_eligible": False,
+                    "presentation": "BLOCKED",
+                    "reason": "NO_QUOTE_OR_ENGINE_ROW",
+                })
+    for market in TEAM_TOTAL_MARKETS:
+        if market not in seen:
+            continue
+        present = {str(row.get("team_side") or "") for row in emitted if row["market"] == market}
+        for team_side in TEAM_SIDES:
+            if team_side in present:
+                continue
+            for side in pair_sides(market):
+                emitted.append({
+                    "lane": "TOTAL",
+                    "market": market,
+                    "game_id": None,
+                    "entity_id": None,
+                    "team_side": team_side,
+                    "side": side,
+                    "line": None,
+                    "american_odds": None,
+                    "model_p": None,
+                    "research_only": True,
+                    "official_eligible": False,
+                    "presentation": "BLOCKED",
+                    "reason": "NO_QUOTE_OR_ENGINE_ROW",
+                })
     summary = {
         "catalog_markets": len(markets),
         "priced_rows": sum(1 for row in emitted if row["model_p"] is not None),
@@ -267,6 +294,10 @@ def build_mlb_full_board(
         "prop_rows": sum(1 for row in emitted if row["lane"] == "PROP"),
         "both_sides": all(
             {str(row.get("side") or "") for row in emitted if row["market"] == market} >= set(pair_sides(market))
+            and (
+                market not in TEAM_TOTAL_MARKETS
+                or {str(row.get("team_side") or "") for row in emitted if row["market"] == market} >= set(TEAM_SIDES)
+            )
             for market in markets
         ),
         "official_bets": 0,

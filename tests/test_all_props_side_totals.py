@@ -21,6 +21,10 @@ def test_mlb_emits_both_sides_of_props_sides_and_totals():
     moneyline = [row for row in board["rows"] if row["market"] == "MONEYLINE"]
     assert {row["side"] for row in moneyline} == {"HOME", "AWAY"}
     assert board["summary"]["both_sides"] is True
+    team_totals = [row for row in board["rows"] if row["market"] == "TEAM_TOTALS"]
+    assert {row["team_side"] for row in team_totals} == {"HOME", "AWAY"}
+    assert {row["side"] for row in team_totals if row["team_side"] == "HOME"} == {"OVER", "UNDER"}
+    assert {row["side"] for row in team_totals if row["team_side"] == "AWAY"} == {"OVER", "UNDER"}
     assert board["summary"]["prop_rows"] >= 40
     assert board["summary"]["side_rows"] >= 8
     assert board["summary"]["total_rows"] >= 12
@@ -53,6 +57,9 @@ def test_football_emits_both_sides_of_props_sides_and_totals():
     assert board["summary"]["side_rows"] >= 2
     assert board["summary"]["total_rows"] >= 2
     assert board["summary"]["both_sides"] is True
+    team_totals = [row for row in board["rows"] if row["market"] == "team_total"]
+    assert {row["team_side"] for row in team_totals} >= {"HOME", "AWAY"}
+    assert {row["selection"] for row in team_totals if row["team_side"] == "AWAY"} >= {"OVER", "UNDER"}
     assert board["official_authority"] is False
     assert board["prop_engine_state"] == "NO_ENGINE"
     assert all(row["official_eligible"] is False for row in board["rows"])

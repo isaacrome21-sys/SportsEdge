@@ -524,16 +524,21 @@ def build_football_full_board(
         engine_state = _engine_state(resolved, spec)
         lane = family_for(market, str(spec.get("family") or ""))
         reason = "NO_ENGINE" if engine_state == "NO_ENGINE" else "NO_QUOTE_OR_ENGINE_ROW"
-        for side in pair_sides(market, lane):
-            emitted.append(_row(
-                sport=resolved,
-                lane=lane,
-                market=market,
-                raw={"family": spec.get("family"), "side": side},
-                presentation="BLOCKED",
-                reason=reason,
-                engine_state=engine_state,
-            ))
+        team_sides = ("HOME", "AWAY") if market == "team_total" else (None,)
+        for team_side in team_sides:
+            for side in pair_sides(market, lane):
+                raw = {"family": spec.get("family"), "side": side}
+                if team_side:
+                    raw["team_side"] = team_side
+                emitted.append(_row(
+                    sport=resolved,
+                    lane=lane,
+                    market=market,
+                    raw=raw,
+                    presentation="BLOCKED",
+                    reason=reason,
+                    engine_state=engine_state,
+                ))
     for market in sorted(PROVIDER_MARKETS):
         mapped = PROVIDER_TO_SURFACE.get(market, market)
         if market in seen or mapped in seen:
@@ -546,6 +551,19 @@ def build_football_full_board(
             ))
             seen.add(mapped)
     emitted = _with_complements(resolved, emitted)
+    if any(row.get("market") == "team_total" for row in emitted):
+        present = {str(row.get("team_side") or "") for row in emitted if row.get("market") == "team_total"}
+        spec = by_market.get("team_total")
+        engine_state = _engine_state(resolved, spec)
+        for team_side in ("HOME", "AWAY"):
+            if team_side in present:
+                continue
+            for side in pair_sides("team_total", "TOTAL"):
+                emitted.append(_row(
+                    sport=resolved, lane="TOTAL", market="team_total",
+                    raw={"family": "game", "team_side": team_side, "side": side},
+                    presentation="BLOCKED", reason="NO_QUOTE_OR_ENGINE_ROW", engine_state=engine_state,
+                ))
     return {
         "schema_version": SCHEMA_VERSION,
         "sport": resolved,
@@ -563,6 +581,10 @@ def build_football_full_board(
             "priced_rows": sum(1 for row in emitted if row["model_p"] is not None),
             "both_sides": all(
                 {str(row.get("selection") or "") for row in emitted if row["market"] == spec["market"]} >= set(pair_sides(str(spec["market"]), family_for(str(spec["market"]), str(spec.get("family") or ""))))
+                and (
+                    spec["market"] != "team_total"
+                    or {str(row.get("team_side") or "") for row in emitted if row["market"] == "team_total"} >= {"HOME", "AWAY"}
+                )
                 for spec in specs
             ) and all(
                 {str(row.get("selection") or "") for row in emitted if row["market"] == PROVIDER_TO_SURFACE.get(market, market)} >= set(pair_sides(PROVIDER_TO_SURFACE.get(market, market), "PROP"))
