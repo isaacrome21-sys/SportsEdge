@@ -68,6 +68,43 @@ class BlockedCardTest(unittest.TestCase):
         self.assertEqual(rows[0]["reason"], "EDGE_TOO_LARGE_SUSPECT")
         self.assertEqual(rows[0]["bet_status"], "PASS")
 
+    def test_paired_spread_anchor_uses_only_spread_market(self):
+        quotes = [
+            {"market": "SPREAD", "side": "AWAY", "line": -6.0, "american_odds": -110},
+            {"market": "SPREAD", "side": "HOME", "line": 6.0, "american_odds": -110},
+            {"market": "TOTAL", "side": "OVER", "line": 52.5, "american_odds": -110},
+            {"market": "TOTAL", "side": "UNDER", "line": 52.5, "american_odds": -110},
+        ]
+        ctx = card.anchored_spread_context(30.0, 20.0, quotes)
+        self.assertIsNotNone(ctx)
+        self.assertAlmostEqual(ctx["market_home_margin"], -6.0)
+        self.assertAlmostEqual(ctx["raw_model_home_margin"], 10.0)
+        self.assertTrue(ctx["forward_track_eligible"])
+        rows = card.price_game("g", 30.0, 20.0, quotes, spread_context=ctx)
+        spread = [r for r in rows if r["market"] == "SPREAD"]
+        totals = [r for r in rows if r["market"] == "TOTAL"]
+        self.assertTrue(all(r["anchor_version"] == "CFB_MARKET_ANCHORED_SPREAD_V1" for r in spread))
+        self.assertAlmostEqual(totals[0]["model_p"], card.model_prob("TOTAL", "OVER", 52.5, 30.0, 20.0), places=4)
+
+    def test_incomplete_spread_pair_does_not_create_anchor(self):
+        quotes = [{"market": "SPREAD", "side": "HOME", "line": -3.5, "american_odds": -110}]
+        self.assertIsNone(card.anchored_spread_context(27.0, 24.0, quotes))
+
+    def test_anchor_below_half_point_cannot_be_forward_lean(self):
+        fit = {
+            "intercept": 0.0,
+            "weight": 0.01,
+            "n": 6498,
+        }
+        quotes = [
+            {"market": "SPREAD", "side": "HOME", "line": -3.0, "american_odds": 120},
+            {"market": "SPREAD", "side": "AWAY", "line": 3.0, "american_odds": -140},
+        ]
+        ctx = card.anchored_spread_context(27.0, 23.0, quotes, fit=fit)
+        self.assertFalse(ctx["forward_track_eligible"])
+        rows = card.price_game("g", 27.0, 23.0, quotes, spread_context=ctx)
+        self.assertFalse(any(r["bet_status"] == "LEAN" for r in rows if r["market"] == "SPREAD"))
+
     def test_unvalidated_edges_are_leans(self):
         quotes = [{"market": "MONEYLINE", "side": "HOME", "american_odds": 120},
                   {"market": "MONEYLINE", "side": "AWAY", "american_odds": -140},
