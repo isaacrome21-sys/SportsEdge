@@ -1785,10 +1785,16 @@
       "merge_sha": "70ac6942673f9720d9fa6ea838caffd561c8488f",
       "pr": 1577,
       "note": "MLB held-out F5 and NRFI/YRFI tightening research merge. Research/prereg/test surfaces only; no Model_P, pricing, promotion, staking, release, OFFICIAL, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_FA56DE60_PR_1580",
+      "merge_sha": "fa56de609aa7be7ac27c6f75b9639db3bb3b808e",
+      "pr": 1580,
+      "note": "MLB fixed-m30 2026 production-parity research merge. Research/prereg/test surfaces only; no Model_P, pricing, promotion, staking, release, OFFICIAL, or untouched-readout authority."
     }
   ],
-  "inventory_block_reason": "Current main through merge 70ac6942 / PR #1577 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
+  "inventory_block_reason": "Current main through merge fa56de60 / PR #1580 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "70ac6942673f9720d9fa6ea838caffd561c8488f",
+  "reconciled_through_sha": "fa56de609aa7be7ac27c6f75b9639db3bb3b808e",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
