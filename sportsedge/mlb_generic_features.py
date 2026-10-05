@@ -182,7 +182,7 @@ class MLBGenericHistorySource:
         self.retrieved_at = (retrieved_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
         self._player_cache: dict[tuple[int, str, int], Mapping[str, Any]] = {}
         self._team_cache: dict[tuple[int, int], Mapping[str, Any]] = {}
-        self._f5_cache: dict[tuple[int, date], tuple[tuple[int, int], ...]] = {}
+        self._f5_cache: dict[tuple[int, date], tuple[tuple[int, int], ...]] = {}\n        self._canonical_f5_source = None
 
     def _player_season(self, player_id: int, group: str, season: int) -> Mapping[str, Any]:
         key = (int(player_id), group, int(season))
@@ -712,10 +712,12 @@ class MLBGenericHistorySource:
                 # 240-day team history plus the separate 370-day regular-season
                 # m30 league prior. Do not duplicate those semantics here.
                 from .mlb_f5_features import MLBF5HistorySource
-                matchup = MLBF5HistorySource(
-                    opener=self.opener,
-                    retrieved_at=self.retrieved_at,
-                ).matchup_features(
+                if self._canonical_f5_source is None:
+                    self._canonical_f5_source = MLBF5HistorySource(
+                        opener=self.opener,
+                        retrieved_at=self.retrieved_at,
+                    )
+                matchup = self._canonical_f5_source.matchup_features(
                     away_team_id=int(away_team_id),
                     home_team_id=int(home_team_id),
                     target_date=target_date,
