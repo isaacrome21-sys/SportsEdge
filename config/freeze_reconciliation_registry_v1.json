@@ -1749,10 +1749,40 @@
       "merge_sha": "b76932e8d1314e1dbee6fee36617fd2017d461c9",
       "pr": 1562,
       "note": "NFL V2K Attempt-2 canonical development failure record and Attempt-3 preregistration. Attempt-2 consumes budget unit 2; Attempt-3 scoring remains disabled pending implementation freeze. No Model_P, pricing, promotion, staking, release, or OFFICIAL authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_392A65EC_PR_1568",
+      "merge_sha": "392a65eca15346d5e1cf74110509ca455be17fb6",
+      "pr": 1568,
+      "note": "Governance reconciliation merge registering main through NFL V2K Attempt-3 preregistration. Reconciliation-only main movement; no model or betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_D681887A_PR_1571",
+      "merge_sha": "d681887a87016702ce0960ff6e27d20c7799fc7e",
+      "pr": 1571,
+      "note": "MLB pitcher-context plumbing plus F5 and first-inning tightening main advance. Registered for reconciliation provenance only; no additional Model_P, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority is created by reconciliation."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_E1B308C1_PR_1554",
+      "merge_sha": "e1b308c1af23d1ee2fb2c24e2ce8b131cb018036",
+      "pr": 1554,
+      "note": "MLB/football both-side phone-card presentation main advance. Presentation-only; reconciliation creates no model or betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_4BB35E35_PR_1573",
+      "merge_sha": "4bb35e353201498d48e1e6574653273d5df6b4b9",
+      "pr": 1573,
+      "note": "MLB weak hitter and pitcher prop-tail stabilization main advance. Registered for reconciliation provenance; reconciliation itself creates no deployment, promotion, staking, OFFICIAL, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_303545E3_PR_1574",
+      "merge_sha": "303545e3ca1d4ec1217c721dd5208bab6128947d",
+      "pr": 1574,
+      "note": "NFL V2K frozen Attempt-3 clean-port onto current main. The merge lands the frozen execution surface; reconciliation creates no Model_P, pricing, promotion, staking, release, or OFFICIAL authority."
     }
   ],
-  "inventory_block_reason": "Current main through merge b76932e8 / PR #1562 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
+  "inventory_block_reason": "Current main through merge 303545e3 / PR #1574 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "b76932e8d1314e1dbee6fee36617fd2017d461c9",
+  "reconciled_through_sha": "303545e3ca1d4ec1217c721dd5208bab6128947d",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
