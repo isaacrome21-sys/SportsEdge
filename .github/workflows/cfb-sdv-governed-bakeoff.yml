@@ -7,12 +7,17 @@ on:
         description: Type CONSUME_ALL_FOUR_CFB_SDV_ATTEMPTS
         required: true
         type: string
+  issues:
+    types: [opened]
 
 permissions:
   contents: read
 
 jobs:
   bakeoff:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.confirm == 'CONSUME_ALL_FOUR_CFB_SDV_ATTEMPTS') ||
+      (github.event_name == 'issues' && github.event.issue.body == 'CONSUME_ALL_FOUR_CFB_SDV_ATTEMPTS')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -44,10 +49,12 @@ jobs:
           test -f "$p" || { echo 'CFB_SDV_TRAINING_ROWS_MISSING'; exit 1; }
           echo "path=$p" >> "$GITHUB_OUTPUT"
       - name: Consume governed four-candidate attempt budget
+        env:
+          CONFIRM: ${{ github.event_name == 'issues' && github.event.issue.body || inputs.confirm }}
         run: |
           python scripts/run_cfb_sportsdataverse_bakeoff.py \
             --rows "${{ steps.rows.outputs.path }}" \
-            --confirm "${{ inputs.confirm }}" \
+            --confirm "$CONFIRM" \
             --out artifacts/cfb/sportsdataverse_bakeoff_result.json
       - name: Upload immutable result evidence
         if: always()
