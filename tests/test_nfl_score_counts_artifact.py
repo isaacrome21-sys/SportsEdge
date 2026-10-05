@@ -11,7 +11,12 @@ from sportsedge.sports.nfl.score_counts_artifact import (
     build_forward_prediction,
     fit_from_artifact,
 )
-from sportsedge.sports.nfl.score_counts_g1 import FEATURE_NAMES, predict_mean
+from sportsedge.sports.nfl.score_counts_g1 import (
+    FEATURE_NAMES,
+    FG_ATTEMPT2_ALPHA_GRID,
+    FG_ATTEMPT2_FEATURE_NAMES,
+    predict_mean,
+)
 
 
 SOURCE = "a" * 64
@@ -207,3 +212,21 @@ def test_uninformative_model_fails_strict_development_gate():
         assert result["fold_wins"] == 0
         assert result["minimum_fold_wins"] == 3
         assert result["pass"] is False
+
+
+def test_attempt2_changes_only_fg_mean_specification():
+    art = build_attempt_fit_artifact(
+        development_rows(),
+        attempt_number=2,
+        source_manifest_sha256=SOURCE,
+        code_identity=CODE,
+        prereg_addendum_sha256=PREREG,
+    )
+    assert art["attempt_number"] == 2
+    assert art["fit"]["td_model"]["feature_names"] == list(FEATURE_NAMES)
+    assert art["fit"]["fg_model"]["feature_names"] == list(FG_ATTEMPT2_FEATURE_NAMES)
+    assert art["selection"]["fg_feature_names"] == list(FG_ATTEMPT2_FEATURE_NAMES)
+    assert art["selection"]["fg_alpha_grid"] == list(FG_ATTEMPT2_ALPHA_GRID)
+    fit = fit_from_artifact(art)
+    assert fit.td_model.feature_names == FEATURE_NAMES
+    assert fit.fg_model.feature_names == FG_ATTEMPT2_FEATURE_NAMES
