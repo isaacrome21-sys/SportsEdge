@@ -50,10 +50,9 @@ def test_attempt2_prereg_is_bound_into_runner_identity():
     assert PREREG_BY_ATTEMPT[2] == Path(path)
 
 
-def test_attempt3_fails_closed_until_preregistered(tmp_path):
-    with pytest.raises(RuntimeError, match="ATTEMPT_PREREG_REQUIRED:3"):
-        run_attempt(
-            attempt_number=3,
-            confirm="CONSUME_SCORE_COUNTS_ATTEMPT_3",
-            output_dir=tmp_path / "attempt3",
-        )
+def test_attempt3_prereg_and_attempt2_result_are_bound_into_runner_identity():
+    prereg = "config/research/nfl_score_counts_g1_attempt3_fg_prereg_v1.json"
+    result = "config/research/nfl_score_counts_g1_attempt2_result_v1.json"
+    assert prereg in IDENTITY_PATHS
+    assert result in IDENTITY_PATHS
+    assert PREREG_BY_ATTEMPT[3] == Path(prereg)
