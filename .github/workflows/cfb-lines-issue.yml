@@ -74,13 +74,29 @@ jobs:
                           f"{r['model_p']*100:.1f}% | {r['market_p']*100:.1f}% | {r['edge']*100:+.1f}% | {r['bet_status']} |")
               hdr = ["| Game | Pick | Odds | Model | Market | Edge | Status |", "|---|---|---|---|---|---|---|"]
               bets = [r for r in rows if r["bet_status"] == "BET"]
-              lines += [f"**{len(bets)} bets** (edge >= {card['edge_floor']*100:.0f}% vs no-vig, one side + one total per game)", ""]
+              lines += [f"**{len(bets)} bets** (edge >= {card['edge_floor']*100:.0f}% vs no-vig; same-game guard keeps one team-outcome and one total). Both sides of every prop, side, and total are listed below.", ""]
               lines += hdr + [fmt(r) for r in bets] + [""]
               lines += ["<details><summary>All priced rows</summary>", ""] + hdr + [fmt(r) for r in rows] + ["", "</details>"]
               proj = {}
               for r in rows:
                   proj[r["matchup"]] = (r["away_mean"], r["home_mean"])
               lines += ["", "**Projected scores (away-home):** " + "; ".join(f"{k} {a:.1f}-{h:.1f}" for k, (a, h) in proj.items())]
+              board = card.get("full_board") or {}
+              summary = board.get("summary") or {}
+              quoted = [r for r in board.get("rows") or [] if r.get("reason") != "NO_QUOTE_OR_ENGINE_ROW"]
+              missing = sorted({str(r.get("market") or "") for r in board.get("rows") or [] if r.get("reason") == "NO_QUOTE_OR_ENGINE_ROW"})
+              lines += ["", "All props, sides, and totals",
+                        f"both_sides={card.get('both_sides')} catalog_complete={card.get('catalog_complete')} sides={summary.get('side_rows')} totals={summary.get('total_rows')} props={summary.get('prop_rows')}",
+                        "Quoted markets list both sides. A missing quote is BLOCKED, not omitted. Not official.",
+                        "",
+                        "| game | market | side | line | odds | note |",
+                        "| --- | --- | --- | --- | --- | --- |"]
+              for r in quoted:
+                  lines.append(f"| {r.get('game_id') or ''} | {r.get('market') or ''} | {r.get('selection') or r.get('side') or ''} | {'' if r.get('line') is None else r.get('line')} | {'' if r.get('american_odds') is None else r.get('american_odds')} | TRACK ONLY |")
+              if not quoted:
+                  lines.append("| | | | | | No quoted props, sides, or totals |")
+              if missing:
+                  lines += ["", "Unquoted catalog families (both sides BLOCKED, not omitted): " + ", ".join(missing)]
           log = Path("card.txt").read_text() if Path("card.txt").exists() else ""
           skipped = [l for l in log.splitlines() if l.startswith("SKIPPED") or "CFB_SDV_" in l]
           if skipped:

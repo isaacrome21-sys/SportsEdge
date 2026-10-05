@@ -85,6 +85,28 @@ def _run_canonical_rows(rows, *, history_cache_dir: str, schedule: list[GameSnap
     }, blocked
 
 
+
+def attach_mlb_both_sides(payload: dict) -> dict:
+    """Persist both sides of every prop, side, and total on the engine payload.
+
+    Presentation only. A missing quote stays BLOCKED. This does not create model_p.
+    """
+    from sportsedge.mlb_full_board import build_mlb_full_board, catalog_complete
+
+    rows = [row for row in (payload.get("results") or []) if isinstance(row, dict)]
+    rows.extend(row for row in (payload.get("blocked") or []) if isinstance(row, dict))
+    board = build_mlb_full_board(rows)
+    payload["full_board"] = board
+    summary = dict(payload.get("summary") or {})
+    summary["both_sides"] = board["summary"]["both_sides"]
+    summary["side_rows"] = board["summary"]["side_rows"]
+    summary["total_rows"] = board["summary"]["total_rows"]
+    summary["prop_rows"] = board["summary"]["prop_rows"]
+    summary["catalog_complete"] = catalog_complete(board["summary"])
+    payload["summary"] = summary
+    return payload
+
+
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--input", required=True)
@@ -119,6 +141,7 @@ def main() -> int:
         payload = run_manual_mlb_snapshot(snapshot, history_cache_dir=args.history_cache_dir)
     payload["blocked"] = list(blocked) + list(extra_blocked)
     payload["quote_notes"] = notes
+    payload = attach_mlb_both_sides(payload)
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n")

@@ -63,3 +63,45 @@ def test_cfb_machine_summary_requires_full_prop_side_total_catalog():
     payload = json.loads(Path("config/football_prop_engine_surface.json").read_text(encoding="utf-8"))
     assert payload["sports"]["NFL"]["engine_state"] == "NO_ENGINE"
     assert payload["sports"]["CFB"]["engine_state"] == "NO_ENGINE"
+
+
+def test_nfl_phone_card_lists_both_sides_of_props_sides_and_totals():
+    from scripts.run_nfl_lines_card import attach_nfl_phone_board
+    from scripts.render_nfl_myspari_card import both_side_section
+
+    payload = attach_nfl_phone_board({
+        "games": [{
+            "away": "BUF",
+            "home": "KC",
+            "markets": [
+                {"market": "moneyline", "away_or_over_price": 130, "home_or_under_price": -150, "raw": "ML"},
+                {"market": "total", "line": 47.5, "away_or_over_price": -110, "home_or_under_price": -110, "raw": "total"},
+                {"market": "passing_yards", "player": "Mahomes", "line": 245.5, "away_or_over_price": -115, "home_or_under_price": -105, "raw": "PassYards"},
+            ],
+        }]
+    })
+    assert payload["summary"]["both_sides"] is True
+    assert payload["summary"]["catalog_complete"] is True
+    text = both_side_section(payload)
+    assert "passing_yards" in text
+    assert "Mahomes" in text
+    assert "OVER" in text and "UNDER" in text
+    assert "HOME" in text and "AWAY" in text
+    assert "OFFICIAL" not in text
+    assert payload["full_board"]["authority"] != "OFFICIAL"
+
+
+def test_cfb_card_payload_keeps_both_sides_without_changing_bets():
+    from scripts.run_cfb_sdv_card_v2 import attach_cfb_both_sides
+
+    payload = attach_cfb_both_sides({
+        "results": [
+            {"game_id": "g", "matchup": "A @ B", "market": "TOTAL", "side": "OVER", "line": 54.5, "american_odds": -110, "model_p": 0.52, "edge": 0.01, "bet_status": "PASS"},
+            {"game_id": "g", "matchup": "A @ B", "market": "TOTAL", "side": "UNDER", "line": 54.5, "american_odds": -110, "model_p": 0.48, "edge": -0.01, "bet_status": "PASS"},
+        ]
+    })
+    totals = {row["selection"] for row in payload["full_board"]["rows"] if row["market"] == "total" and row["game_id"] == "g"}
+    assert totals == {"OVER", "UNDER"}
+    assert payload["both_sides"] is True
+    assert payload["catalog_complete"] is True
+    assert payload["results"][0]["bet_status"] == "PASS"
