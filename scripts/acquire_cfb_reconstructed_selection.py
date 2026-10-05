@@ -75,7 +75,11 @@ def _zero_authority() -> dict[str, bool]:
     }
 
 
-def _validate_private_preflight(raw: object, expected_calls: int) -> Mapping[str, Any]:
+def _validate_private_preflight(
+    raw: object,
+    expected_total_calls: int,
+    verified_cache_hits: int = 0,
+) -> Mapping[str, Any]:
     if not isinstance(raw, Mapping):
         raise CFBAcquisitionError("CFB_ACQUISITION_PRIVATE_PREFLIGHT_MISSING")
     if raw.get("schema_version") != "CFB_CFBD_PROVIDER_PREFLIGHT_V1":
@@ -91,13 +95,25 @@ def _validate_private_preflight(raw: object, expected_calls: int) -> Mapping[str
     if raw.get("historical_replay_calls_performed") != 0:
         raise CFBAcquisitionError("CFB_ACQUISITION_PREFLIGHT_REPLAY_CALL_LEAK")
     try:
+        planned_total = int(raw["planned_total_calls"])
+        preflight_cache_hits = int(raw["verified_cache_hits"])
         planned = int(raw["planned_new_calls"])
         reserve = int(raw["retry_reserve_calls"])
         remaining = int(raw["remaining_quota"])
     except (KeyError, TypeError, ValueError) as exc:
         raise CFBAcquisitionError("CFB_ACQUISITION_PREFLIGHT_QUOTA_INVALID") from exc
-    if planned != expected_calls:
-        raise CFBAcquisitionError(f"CFB_ACQUISITION_PLAN_COUNT_MISMATCH:{planned}:{expected_calls}")
+    expected_new_calls = expected_total_calls - int(verified_cache_hits)
+    if (
+        planned_total != expected_total_calls
+        or preflight_cache_hits != int(verified_cache_hits)
+        or planned != expected_new_calls
+    ):
+        raise CFBAcquisitionError(
+            "CFB_ACQUISITION_PLAN_COUNT_MISMATCH:"
+            f"total={planned_total}:{expected_total_calls}:"
+            f"cache={preflight_cache_hits}:{verified_cache_hits}:"
+            f"new={planned}:{expected_new_calls}"
+        )
     if remaining < planned + reserve:
         raise CFBAcquisitionError("CFB_ACQUISITION_VERIFIED_QUOTA_INSUFFICIENT")
     authority = raw.get("authority")
@@ -733,7 +749,20 @@ def main(argv: list[str] | None = None) -> int:
 
     config = _load(CONFIG)
     plan = build_request_plan(config)
-    preflight = _validate_private_preflight(_load(args.private_preflight), len(plan))
+    cfbd_cache_root = args.private_cache_root / "cfbd"
+    verified_cache_hits = sum(
+        1
+        for item in plan
+        if _load_verified_cache(
+            cache_root=cfbd_cache_root,
+            query_sha=str(item["query_sha256"]),
+        ) is not None
+    )
+    preflight = _validate_private_preflight(
+        _load(args.private_preflight),
+        len(plan),
+        verified_cache_hits,
+    )
     api_key = os.environ.get("CFBD_API_KEY", "")
     if not api_key.strip():
         raise SystemExit("CFBD_API_KEY_MISSING")
@@ -748,7 +777,7 @@ def main(argv: list[str] | None = None) -> int:
             payload, meta, cached = _fetch_one(
                 item,
                 api_key=api_key,
-                cache_root=args.private_cache_root / "cfbd",
+                cache_root=cfbd_cache_root,
             )
             fetched[str(item["query_sha256"])] = (payload, meta)
             if cached:
