@@ -4,6 +4,7 @@ import pytest
 
 from scripts.run_nfl_score_counts_attempt import (
     IDENTITY_PATHS,
+    attempt_prereg_path,
     code_identity,
     run_attempt,
 )
@@ -16,6 +17,7 @@ def test_code_identity_is_stable_sha256():
     assert len(first) == 64
     int(first, 16)
     assert "sportsedge/sports/nfl/score_counts_source_projection.py" in IDENTITY_PATHS
+    assert "config/research/nfl_score_counts_g1_attempt2_fg_addendum_v1.json" in IDENTITY_PATHS
 
 
 def test_attempt_confirmation_is_required_before_any_source_access(tmp_path):
@@ -41,3 +43,8 @@ def test_source_root_cannot_live_inside_uploaded_artifact_tree(tmp_path):
             output_dir=output,
             source_root=output / "sources",
         )
+
+
+def test_attempt2_uses_frozen_field_goal_prereg_addendum():
+    assert str(attempt_prereg_path(1)).endswith("nfl_score_counts_g1_prereg_addendum_v2.json")
+    assert str(attempt_prereg_path(2)).endswith("nfl_score_counts_g1_attempt2_fg_addendum_v1.json")
