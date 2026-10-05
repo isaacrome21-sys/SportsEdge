@@ -344,6 +344,38 @@ class MLBGenericHistorySource:
             raise MLBGenericFeatureError(f"hitter:joint: insufficient chronological sample {len(out)}<10")
         return out
 
+    def hitter_joint_prior_history(self, *, player_id: int, target_date: date) -> list[dict[str, int]]:
+        """Older strictly-prior hitter rows used only as a capped empirical prior."""
+        rows = self.player_rows(player_id=player_id, group="hitting", target_date=target_date)[-60:-30]
+        out: list[dict[str, int]] = []
+        for row in rows:
+            s = row["stat"]
+            pa = _nonnegative_integer(s.get("plateAppearances"))
+            hits = _nonnegative_integer(s.get("hits"))
+            doubles = _nonnegative_integer(s.get("doubles"))
+            triples = _nonnegative_integer(s.get("triples"))
+            hrs = _nonnegative_integer(s.get("homeRuns"))
+            if None in {pa, hits, doubles, triples, hrs} or pa < 1 or pa > 9:
+                continue
+            singles = hits - doubles - triples - hrs
+            if singles < 0:
+                continue
+            walks = _nonnegative_integer(s.get("baseOnBalls", 0))
+            strikeouts = _nonnegative_integer(s.get("strikeOuts", 0))
+            rbi = _nonnegative_integer(s.get("rbi", 0))
+            runs = _nonnegative_integer(s.get("runs", 0))
+            sb = _nonnegative_integer(s.get("stolenBases", 0))
+            if None in {walks, strikeouts, rbi, runs, sb} or hits + walks > pa:
+                continue
+            out.append({
+                "plate_appearances": pa, "hits": hits, "singles": singles, "doubles": doubles,
+                "triples": triples, "home_runs": hrs,
+                "total_bases": singles + 2*doubles + 3*triples + 4*hrs,
+                "rbi": rbi, "runs": runs, "stolen_bases": sb, "walks": walks,
+                "strikeouts": strikeouts, "extra_base_hits": doubles + triples + hrs,
+            })
+        return out if len(out) >= 10 else []
+
     def pitcher_joint_history(self, *, player_id: int, target_date: date) -> list[dict[str, int]]:
         out = self.pitcher_joint_rows(player_id=player_id, target_date=target_date)
         if len(out) < 5:
@@ -353,6 +385,34 @@ class MLBGenericHistorySource:
     def pitcher_joint_rows(self, *, player_id: int, target_date: date) -> list[dict[str, int]]:
         """Last <=10 strictly-prior regular-season starts, without a minimum-size gate."""
         return [row for row, _, _ in self._pitcher_start_rows(player_id=player_id, target_date=target_date)]
+
+    def pitcher_joint_prior_rows(self, *, player_id: int, target_date: date) -> list[dict[str, int]]:
+        """Starts 11-30 back, never overlapping the recent <=10-start likelihood pool."""
+        rows = self.player_rows(player_id=player_id, group="pitching", target_date=target_date)
+        starts: list[dict[str, int]] = []
+        for row in rows:
+            s = row["stat"]
+            if _number(s.get("gamesStarted", 0), "gamesStarted") < 1:
+                continue
+            try:
+                outs = int(_outs_from_ip(s.get("inningsPitched")))
+            except Exception:
+                continue
+            ks = _nonnegative_integer(s.get("strikeOuts", 0))
+            er = _nonnegative_integer(s.get("earnedRuns", 0))
+            hits = _nonnegative_integer(s.get("hits", 0))
+            walks = _nonnegative_integer(s.get("baseOnBalls", 0))
+            if None in {ks, er, hits, walks} or not 0 <= outs <= 27:
+                continue
+            starts.append({
+                "strikeouts": ks,
+                "outs": outs,
+                "earned_runs": er,
+                "hits_allowed": hits,
+                "walks_allowed": walks,
+            })
+        older = starts[-30:-10]
+        return older if len(older) >= 5 else []
 
     def _pitcher_start_rows(self, *, player_id: int, target_date: date) -> list[tuple[dict[str, int], date, int | None]]:
         """(joint row, game date, opponent team id) for the last <=10 strictly-prior starts."""
@@ -561,6 +621,13 @@ class MLBGenericHistorySource:
                     pool = self.pitcher_joint_history(player_id=player_id, target_date=target_date)
                     base["features"] = {"history_pool": pool}
                     base["joint_feature_version"] = "mlb_pitcher_joint_history_v1"
+                    if market in {"PITCHER_ER", "PITCHER_HITS_ALLOWED", "PITCHER_HITS_WALKS_ER"}:
+                        prior_pool = self.pitcher_joint_prior_rows(
+                            player_id=player_id, target_date=target_date
+                        )
+                        if prior_pool:
+                            base["features"]["prior_pool"] = prior_pool
+                            base["joint_feature_version"] = "mlb_pitcher_joint_history_long_prior_v1"
                     if market == "PITCHER_K":
                         # Validated context lane 1 (#1508/#1509): opponent K index, k>=5 only.
                         adj, why = self._opp_k_payload(player_id=player_id, target_date=target_date, team_id=team_id,
@@ -613,7 +680,14 @@ class MLBGenericHistorySource:
             elif market in JOINT_HITTER_MARKETS:
                 pool = self.hitter_joint_history(player_id=player_id, target_date=target_date)
                 base["features"] = {"history_pool": pool}
-                base["joint_feature_version"] = "mlb_hitter_joint_history_v1"
+                prior_pool = self.hitter_joint_prior_history(
+                    player_id=player_id, target_date=target_date
+                )
+                if prior_pool:
+                    base["features"]["prior_pool"] = prior_pool
+                    base["joint_feature_version"] = "mlb_hitter_joint_history_long_prior_v1"
+                else:
+                    base["joint_feature_version"] = "mlb_hitter_joint_history_v1"
             elif market.startswith("PITCHER_"):
                 base["expected_count"] = self.pitcher_expected(player_id=player_id, market=market, target_date=target_date)
             elif market in PA_BOUNDED_BATTER_MARKETS:
