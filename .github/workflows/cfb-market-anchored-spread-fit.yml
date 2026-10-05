@@ -4,9 +4,12 @@ on:
   pull_request:
     paths:
       - 'config/cfb_market_anchored_spread_challenger_v1.json'
+      - 'config/cfb_market_anchored_spread_fit_v1.json'
       - 'sportsedge/sports/cfb/market_anchored_spread.py'
       - 'scripts/fit_cfb_market_anchored_spread.py'
+      - 'scripts/run_cfb_sdv_card_v2.py'
       - 'tests/test_cfb_market_anchored_spread.py'
+      - 'tests/test_cfb_sdv_card_v2.py'
       - '.github/workflows/cfb-market-anchored-spread-fit.yml'
   workflow_dispatch:
 
@@ -27,7 +30,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install --disable-pip-version-check numpy==2.5.3 pytest==9.1.1
-      - run: python -m pytest -q tests/test_cfb_market_anchored_spread.py
+      - run: python -m pytest -q tests/test_cfb_market_anchored_spread.py tests/test_cfb_sdv_card_v2.py
       - name: Fit quota-free cached development anchor
         run: python scripts/fit_cfb_market_anchored_spread.py --output artifacts/cfb/market_anchored_spread_fit.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
