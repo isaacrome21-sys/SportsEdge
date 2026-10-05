@@ -163,12 +163,17 @@ def build_forward_source_manifest(
     for idx, raw in enumerate(receipts):
         if not isinstance(raw, Mapping):
             raise ScoreCountForwardSourceError(f"receipt[{idx}]:OBJECT_REQUIRED")
+        retrieved = _utc(
+            raw.get("retrieved_at_utc"), f"receipt[{idx}].retrieved_at_utc"
+        )
+        if not retrieved < stamp:
+            raise ScoreCountForwardSourceError(
+                f"receipt[{idx}]:SOURCE_NOT_PREGAME"
+            )
         item = {
             "name": str(raw.get("name") or "").strip(),
             "source_uri": str(raw.get("source_uri") or "").strip(),
-            "retrieved_at_utc": _utc(
-                raw.get("retrieved_at_utc"), f"receipt[{idx}].retrieved_at_utc"
-            ).isoformat(),
+            "retrieved_at_utc": retrieved.isoformat(),
             "byte_sha256": str(raw.get("byte_sha256") or "").strip().lower(),
             "immutable_expected_sha256": (
                 str(raw.get("immutable_expected_sha256")).strip().lower()
