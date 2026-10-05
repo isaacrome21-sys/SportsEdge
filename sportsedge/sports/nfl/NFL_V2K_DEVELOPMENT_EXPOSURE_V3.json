@@ -1,0 +1,76 @@
+{
+  "schema": "NFL_V2K_DEVELOPMENT_EXPOSURE_V3",
+  "status": "ATTEMPT3_CONSUMED_ATTEMPT4_PREREGISTERED",
+  "max_development_attempts": 5,
+  "development_budget_units_used": 3,
+  "development_budget_units_remaining": 2,
+  "untouched_readout_allowed": false,
+  "authority": {
+    "model_p": false,
+    "pricing": false,
+    "promotion": false,
+    "staking": false,
+    "official": false,
+    "untouched_readout": false
+  },
+  "exposures": [
+    {
+      "budget_unit": 1,
+      "candidate_family": "NFL_V2K_DRIVE_HIERARCHICAL_JOINT_G1",
+      "evidence_role": "REUSED_RESEARCH_HISTORY_NOT_FINAL_HOLDOUT",
+      "source": {
+        "pr": 1534,
+        "comment_id": 5981843976
+      },
+      "accounting": {
+        "consumes_development_budget": true
+      }
+    },
+    {
+      "budget_unit": 2,
+      "candidate_family": "NFL_V2K_DRIVE_HIERARCHICAL_JOINT_G2",
+      "evidence_role": "CANONICAL_ATTEMPT2_DEVELOPMENT_READOUT",
+      "source": {
+        "workflow_run_id": 37239231204,
+        "artifact_id": 11316753318,
+        "artifact_digest": "sha256:c3bea7f623d0292b285ebbc063f7d8cee556619022b35e681e4addc487d6c6bd",
+        "issue": 1539,
+        "result_comment_id": 5985299453
+      },
+      "accounting": {
+        "consumes_development_budget": true,
+        "result": "FAIL"
+      }
+    },
+    {
+      "budget_unit": 3,
+      "candidate_family": "NFL_V2K_CONTEXT_SKELETON_LOGRATIO_G3",
+      "evidence_role": "CANONICAL_ATTEMPT3_DEVELOPMENT_READOUT",
+      "source": {
+        "workflow_run_id": 37252842295,
+        "artifact_id": 11322188844,
+        "artifact_digest": "sha256:93c1c457f66bc8d5eb486ecc7b404ef6fd22203d371deab7b7a41923e3bb3472",
+        "code_sha": "303545e3ca1d4ec1217c721dd5208bab6128947d"
+      },
+      "accounting": {
+        "consumes_development_budget": true,
+        "result": "FAIL"
+      },
+      "diagnostics": {
+        "spread_fold_wins": 0,
+        "spread_fold_total": 3,
+        "total_fold_wins": 0,
+        "total_fold_total": 3,
+        "spread_calibration_max_deviation": 0.2556950689378533,
+        "total_calibration_max_deviation": 0.1390605404240941,
+        "signed_key_mass_rmse": 0.021496987010989947
+      }
+    }
+  ],
+  "policy": {
+    "max_development_attempts": 5,
+    "threshold_tuning_after_readout_forbidden": true,
+    "materially_different_successor_requires_preregistration": true,
+    "no_relabel_as_untouched": true
+  }
+}

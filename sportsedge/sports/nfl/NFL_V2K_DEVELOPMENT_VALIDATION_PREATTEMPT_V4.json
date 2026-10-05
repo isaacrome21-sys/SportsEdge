@@ -1,0 +1,118 @@
+{
+  "schema": "NFL_V2K_DEVELOPMENT_VALIDATION_PREATTEMPT_V4",
+  "status": "FROZEN_ATTEMPT4_READY_FOR_DEVELOPMENT_VALIDATION",
+  "candidate_family": "NFL_MARKET_ANCHORED_TEAM_RESIDUAL_G4",
+  "purpose": "Test whether strictly-prior team ATS/total residual state adds repeatable information on top of the sportsbook no-vig baseline. This is materially different from drive-simulation Attempts 1-3 and directly targets their overconfidence failure.",
+  "predecessor": {
+    "workflow_run_id": 37252842295,
+    "artifact_id": 11322188844,
+    "verdict": "ATTEMPT3_FAIL"
+  },
+  "source_binding": {
+    "source_freeze_path": "config/nfl_promotion_source_freeze_v1.json",
+    "source_manifest_sha256": "b7ff10325b69dd140e8c9d40971475595871e43f8d5a3c2ed2d9ffa8774c0723",
+    "schedule_only_for_candidate": true,
+    "market_fields_used": [
+      "spread_line",
+      "total_line",
+      "home_spread_odds",
+      "away_spread_odds",
+      "over_odds",
+      "under_odds"
+    ],
+    "game_outcomes_used_only_after_each_week_predictions_are_fixed": true
+  },
+  "fold_plan": {
+    "policy": "EXPANDING_SEASON_OUTER_FOLDS_WITH_TRAINING_ONLY_BETA_SELECTION",
+    "test_seasons": [
+      2021,
+      2022,
+      2023,
+      2024,
+      2025
+    ],
+    "same_week_outcome_leakage_forbidden": true
+  },
+  "architecture": {
+    "baseline": "TWO_WAY_NO_VIG_MARKET_PROBABILITY",
+    "residual_state": {
+      "family": "TEAM_EWMA_RESULT_MINUS_MARKET_LINE",
+      "ewma_alpha": 0.18,
+      "offseason_retention": 0.35,
+      "reliability_prior_games": 8,
+      "spread_residual_cap_points": 21,
+      "total_residual_cap_points": 28,
+      "spread_signal": "HOME_TEAM_ATS_RESIDUAL_MINUS_AWAY_TEAM_ATS_RESIDUAL",
+      "total_signal": "MEAN_HOME_AWAY_TOTAL_RESIDUAL",
+      "state_update_timing": "AFTER_ALL_GAMES_IN_SAME_SEASON_WEEK_HAVE_BEEN_PREDICTED"
+    },
+    "overlay": {
+      "formula": "sigmoid(logit(no_vig_market_p) + beta * team_residual_signal / scale)",
+      "spread_scale": 13.5,
+      "total_scale": 13,
+      "beta_grid": [
+        -2,
+        -1,
+        -0.5,
+        -0.25,
+        0,
+        0.25,
+        0.5,
+        1,
+        2
+      ],
+      "beta_selection": "LOWEST_PRIOR_SEASONS_LOG_LOSS_TIE_LOWEST_ABS_BETA_THEN_NUMERIC",
+      "post_result_retuning_forbidden": true
+    },
+    "market_role": "BASELINE_ANCHOR_NOT_TARGET_LEAKAGE",
+    "downstream_joint_score_mapping": {
+      "status": "FROZEN_BEFORE_ATTEMPT4_READOUT",
+      "fair_spread_center": "spread_line + spread_scale*logit(no_vig_home_cover_p) + spread_beta*spread_signal",
+      "fair_total_center": "total_line + total_scale*logit(no_vig_over_p) + total_beta*total_signal",
+      "team_score_means": "home=(fair_total+fair_spread)/2; away=(fair_total-fair_spread)/2",
+      "purpose": "If Attempt 4 passes, these centers can feed the existing discrete joint-score/team-total/QB-RB-WR research surface without inventing a post-result mapping.",
+      "negative_team_mean_policy": "FAIL_CLOSED",
+      "post_result_remapping_forbidden": true
+    }
+  },
+  "acceptance": {
+    "predictive": {
+      "markets": [
+        "spread",
+        "total"
+      ],
+      "metric": "LOG_LOSS_VS_NO_VIG_MARKET_BASELINE",
+      "minimum_fold_win_rate": 0.65,
+      "overall_log_loss_must_be_strictly_lower": true,
+      "calibration_max_nonempty_bin_deviation": 0.05
+    },
+    "conjunctive": true
+  },
+  "attempt_budget": {
+    "max_development_attempts": 5,
+    "development_budget_units_used_before_attempt4": 3,
+    "development_budget_units_remaining_before_attempt4": 2,
+    "this_artifact_consumes_attempt": false,
+    "attempt4_scoring_allowed": true
+  },
+  "implementation_identity": {
+    "status": "FROZEN",
+    "core_path": "sportsedge/sports/nfl/v2k_attempt4_market_residual.py",
+    "core_git_blob_sha1": "21dfad78975e12d8315deb185138cdba31aa430c",
+    "validation_path": "sportsedge/sports/nfl/v2k_attempt4_validation.py",
+    "validation_git_blob_sha1": "a041aca26bf2df2831774a9613dc9c8c9355ae04",
+    "runner_path": "scripts/run_nfl_v2k_attempt4.py",
+    "runner_git_blob_sha1": "5596ee39878c8dfdb2a61bba40c22359814b051c"
+  },
+  "authority": {
+    "research_contract": true,
+    "development_validation_execution": true,
+    "model_p": false,
+    "pricing": false,
+    "promotion": false,
+    "staking": false,
+    "production_release": false,
+    "official": false,
+    "untouched_readout": false
+  }
+}
