@@ -121,6 +121,71 @@ def score_count_paths(game: Mapping[str, Any]) -> list[dict[str, int]]:
     return out
 
 
+def score_count_component_paths(game: Mapping[str, Any]) -> list[dict[str, int]]:
+    """Expand exact score+TD component mass while preserving score marginals."""
+    # Validate the canonical score distribution first.
+    score_count_grid(game)
+    paths = _int(game.get("paths"), "paths")
+    rows = game.get("joint_score_td_distribution")
+    if not isinstance(rows, Sequence) or isinstance(rows, (str, bytes, bytearray)) or not rows:
+        raise ScoreCountMarketBridgeError("JOINT_SCORE_TD_DISTRIBUTION_REQUIRED")
+
+    parsed: list[tuple[int, int, int, int, int]] = []
+    seen: set[tuple[int, int, int, int]] = set()
+    marginal: dict[tuple[int, int], int] = {}
+    total = 0
+    for idx, raw in enumerate(rows):
+        if not isinstance(raw, Sequence) or isinstance(raw, (str, bytes, bytearray)) or len(raw) != 5:
+            raise ScoreCountMarketBridgeError(f"JOINT_SCORE_TD_ROW_INVALID:{idx}")
+        home = _int(raw[0], f"td_row[{idx}].home_score")
+        away = _int(raw[1], f"td_row[{idx}].away_score")
+        home_tds = _int(raw[2], f"td_row[{idx}].home_team_tds")
+        away_tds = _int(raw[3], f"td_row[{idx}].away_team_tds")
+        count = _int(raw[4], f"td_row[{idx}].count")
+        if min(home, away, home_tds, away_tds) < 0 or count <= 0:
+            raise ScoreCountMarketBridgeError(f"JOINT_SCORE_TD_ROW_OUT_OF_RANGE:{idx}")
+        key = (home, away, home_tds, away_tds)
+        if key in seen:
+            raise ScoreCountMarketBridgeError(
+                f"JOINT_SCORE_TD_DUPLICATE:{home}:{away}:{home_tds}:{away_tds}"
+            )
+        seen.add(key)
+        parsed.append((home, away, home_tds, away_tds, count))
+        marginal[(home, away)] = marginal.get((home, away), 0) + count
+        total += count
+
+    if total != paths:
+        raise ScoreCountMarketBridgeError(
+            f"JOINT_SCORE_TD_PATH_MASS_MISMATCH:{total}:{paths}"
+        )
+
+    expected = {
+        (_int(raw[0], "home_score"), _int(raw[1], "away_score")):
+        _int(raw[2], "count")
+        for raw in game["joint_score_distribution"]
+    }
+    if marginal != expected:
+        raise ScoreCountMarketBridgeError("JOINT_SCORE_TD_MARGINAL_MISMATCH")
+
+    out: list[dict[str, int]] = []
+    simulation_id = 0
+    for home, away, home_tds, away_tds, count in sorted(parsed):
+        for _ in range(count):
+            out.append({
+                "simulation_id": simulation_id,
+                "home_score": home,
+                "away_score": away,
+                "home_team_tds": home_tds,
+                "away_team_tds": away_tds,
+            })
+            simulation_id += 1
+    if len(out) != paths:
+        raise ScoreCountMarketBridgeError(
+            f"EXPANDED_SCORE_TD_PATH_COUNT_INVALID:{len(out)}"
+        )
+    return out
+
+
 def price_score_count_game_markets(
     prediction: Mapping[str, Any],
     *,
@@ -171,4 +236,5 @@ __all__ = [
     "score_count_prediction_game",
     "score_count_grid",
     "score_count_paths",
+    "score_count_component_paths",
 ]
