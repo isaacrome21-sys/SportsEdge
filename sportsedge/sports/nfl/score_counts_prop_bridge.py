@@ -18,6 +18,7 @@ from sportsedge.nfl_score_td_composition import (
 )
 from sportsedge.nfl_scoring_composition_fit import ScoringCompositionPrior
 from sportsedge.sports.nfl.score_counts_market_bridge import (
+    score_count_component_paths,
     score_count_paths,
     score_count_prediction_game,
 )
@@ -172,7 +173,15 @@ def price_score_count_props_from_paths(
     td_error: str | None = None
     td_paths: Sequence[Mapping[str, Any]] = score_paths
     if home_needs_td or away_needs_td:
-        if scoring_prior is None:
+        direct_flags = [
+            "home_team_tds" in row and "away_team_tds" in row
+            for row in score_paths
+        ]
+        if any(direct_flags) and not all(direct_flags):
+            td_error = "DIRECT_TD_PATHS_INCOMPLETE"
+        elif direct_flags and all(direct_flags):
+            td_paths = score_paths
+        elif scoring_prior is None:
             td_error = "SCORING_COMPOSITION_PRIOR_REQUIRED_FOR_TD_PROPS"
         else:
             try:
@@ -292,7 +301,10 @@ def price_score_count_prop_markets(
     seed: int = 21,
 ) -> dict[str, Any]:
     game = score_count_prediction_game(prediction, game_id)
-    paths = score_count_paths(game)
+    if game.get("joint_score_td_distribution") is not None:
+        paths = score_count_component_paths(game)
+    else:
+        paths = score_count_paths(game)
     out = price_score_count_props_from_paths(
         game_id=game_id,
         score_paths=paths,
