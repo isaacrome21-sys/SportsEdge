@@ -5,7 +5,14 @@ from pathlib import Path
 from typing import Mapping
 
 from . import v2k_attempt1_validation as a1
-from .v2k_attempt4_market_residual import build_residual_rows, evaluate_fold, calibration
+from .v2k_attempt4_market_residual import (
+    SPREAD_SIGNAL_SCALE,
+    TOTAL_SIGNAL_SCALE,
+    build_residual_rows,
+    choose_beta,
+    evaluate_fold,
+    calibration,
+)
 
 NFL = Path(__file__).resolve().parent
 ROOT = NFL.parents[2]
@@ -93,12 +100,21 @@ def evaluate(schedule: Mapping[str, Mapping], contract: Mapping) -> dict:
         }
 
     overall = all(v["pass"] for v in predictive.values())
+    live_parameters = {
+        "spread_beta": choose_beta(rows, market="spread"),
+        "total_beta": choose_beta(rows, market="total"),
+        "spread_scale": SPREAD_SIGNAL_SCALE,
+        "total_scale": TOTAL_SIGNAL_SCALE,
+        "fair_center_formula": "line + scale*logit(no_vig_market_p) + beta*team_residual_signal",
+        "fit_scope": "ALL_FROZEN_2018_2025_ROWS_AFTER_ATTEMPT4_DECISION_RULES_FIXED",
+    }
     return {
         "schema": RESULT_SCHEMA,
         "candidate_family": contract["candidate_family"],
         "verdict": "ATTEMPT4_PASS" if overall else "ATTEMPT4_FAIL",
         "predictive_gate": predictive,
         "folds": fold_rows,
+        "live_parameters": live_parameters,
         "evaluated_row_count": len(rows),
         "sportsbook_prices_consumed_in_fit": True,
         "market_role": "BASELINE_ANCHOR_PLUS_STRICTLY_PRIOR_TEAM_RESIDUAL",
