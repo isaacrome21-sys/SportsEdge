@@ -1,0 +1,38 @@
+{
+  "schema": "SPORTSEDGE_NFL_SCORE_COUNTS_G1_ATTEMPT1_PREFIT_FAILURE_V1",
+  "candidate_family": "NFL_SCORE_COUNTS_G1",
+  "recorded_date": "2026-10-05",
+  "attempt_number": 1,
+  "workflow_run_id": 37333803086,
+  "workflow_job_id": 111843331071,
+  "workflow_artifact_id": 11356145088,
+  "main_sha": "e7568dd4de319cb0f1ab957cf06471296aa1af8e",
+  "stage": "TRAINING_ROW_MATERIALIZATION",
+  "error": "SCRIMMAGE_IDENTITY_OR_EPA_MISSING:2019_01_PIT_NE:4166",
+  "diagnosis": {
+    "frozen_row_is_valid_scrimmage": true,
+    "play_type": "pass",
+    "posteam": "PIT",
+    "defteam": "NE",
+    "pass_complete": true,
+    "passing_yards": 21,
+    "top_level_epa_missing": true,
+    "source_substitution_used": false,
+    "market_data_used_for_fit": false
+  },
+  "attempt_accounting": {
+    "fit_artifact_created": false,
+    "development_gate_evaluated": false,
+    "historical_candidate_scored": false,
+    "attempt_consumed": false,
+    "classification": "IMPLEMENTATION_BUG_FIX_SAME_FROZEN_MATH"
+  },
+  "authority": {
+    "research_only": true,
+    "creates_model_p": false,
+    "pricing": false,
+    "promotion": false,
+    "staking": false,
+    "official": false
+  }
+}
