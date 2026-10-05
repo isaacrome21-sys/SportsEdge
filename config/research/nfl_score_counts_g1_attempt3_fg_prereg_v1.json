@@ -55,8 +55,7 @@
     "opportunity_target": "FIELD_GOAL_ATTEMPTS",
     "field_goal_result_policy": {
       "made_values": [
-        "made",
-        "good"
+        "made"
       ],
       "missed_values": [
         "missed"
@@ -66,7 +65,6 @@
       ],
       "attempt_values": [
         "made",
-        "good",
         "missed",
         "blocked"
       ],
