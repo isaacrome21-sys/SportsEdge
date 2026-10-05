@@ -23,7 +23,8 @@ PLAYER_STATS_URL = "https://github.com/nflverse/nflverse-data/releases/download/
 SKILL_POSITIONS = frozenset({"RB", "HB", "FB", "WR", "TE"})
 TEAM_ALIASES = {"LA": "LAR", "WSH": "WAS"}
 FORBIDDEN = ("odds", "price", "vig", "sportsbook", "market", "closing_line", "implied")
-SIGNED_YARD_FIELDS = frozenset({"passing_yards", "rushing_yards", "receiving_yards"})\nCOUNT_FIELDS = (
+SIGNED_YARD_FIELDS = frozenset({"passing_yards", "rushing_yards", "receiving_yards"})
+COUNT_FIELDS = (
     "attempts", "completions", "passing_yards", "passing_tds", "interceptions",
     "carries", "rushing_yards", "rushing_tds", "targets", "receptions",
     "receiving_yards", "receiving_tds",
