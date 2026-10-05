@@ -1791,10 +1791,16 @@
       "merge_sha": "fa56de609aa7be7ac27c6f75b9639db3bb3b808e",
       "pr": 1580,
       "note": "MLB fixed-m30 2026 production-parity research merge. Research/prereg/test surfaces only; no Model_P, pricing, promotion, staking, release, OFFICIAL, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_EB3DC0D1_PR_1585",
+      "merge_sha": "eb3dc0d16d98267af70f4bfaec6fc7c4b1e84955",
+      "pr": 1585,
+      "note": "CFB governed owner-trigger workflow merge. Execution plumbing only; no candidate formula, Model_P, pricing, promotion, staking, release, OFFICIAL, or untouched-readout authority."
     }
   ],
-  "inventory_block_reason": "Current main through merge fa56de60 / PR #1580 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
+  "inventory_block_reason": "Current main through merge eb3dc0d1 / PR #1585 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "fa56de609aa7be7ac27c6f75b9639db3bb3b808e",
+  "reconciled_through_sha": "eb3dc0d16d98267af70f4bfaec6fc7c4b1e84955",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
