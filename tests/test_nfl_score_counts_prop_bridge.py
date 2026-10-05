@@ -9,6 +9,7 @@ def qb(name="QB"):
     return {
         "player": name,
         "position": "QB",
+        "rushing_td_share": 0.08,
         "role_prior": {
             "pass_attempts": 34.0,
             "completion_rate": 0.66,
@@ -31,6 +32,8 @@ def skill(name, position, targets, catch_rate, ypr, carries, ypc):
     return {
         "player": name,
         "position": position,
+        "receiving_td_share": 0.12 if position == "RB" else (0.38 if position == "WR" else 0.10),
+        "rushing_td_share": 0.45 if position == "RB" else (0.02 if position == "WR" else 0.18),
         "role_prior": {
             "pass_attempts": 0.0,
             "completion_rate": 0.0,
