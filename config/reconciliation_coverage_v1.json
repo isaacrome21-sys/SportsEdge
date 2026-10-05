@@ -427,7 +427,10 @@
     "sportsedge/sports/nfl/score_counts_source_projection.py": "NFL_SCORE_COUNTS_G1_EXPLICIT_MARKET_BLIND_SOURCE_PROJECTION_ZERO_AUTHORITY_NO_ATTEMPT",
     "scripts/preflight_nfl_score_counts_sources.py": "NFL_SCORE_COUNTS_G1_SOURCE_SCHEMA_PREFLIGHT_ZERO_AUTHORITY_NO_ATTEMPT",
     "tests/test_preflight_nfl_score_counts_sources.py": "TEST_ONLY_NFL_SCORE_COUNTS_G1_SOURCE_SCHEMA_PREFLIGHT_NO_AUTHORITY",
-    ".github/workflows/nfl-score-counts-source-preflight.yml": "NFL_SCORE_COUNTS_G1_SOURCE_PREFLIGHT_WORKFLOW_ZERO_AUTHORITY_NO_ATTEMPT"
+    ".github/workflows/nfl-score-counts-source-preflight.yml": "NFL_SCORE_COUNTS_G1_SOURCE_PREFLIGHT_WORKFLOW_ZERO_AUTHORITY_NO_ATTEMPT",
+    "scripts/run_nfl_score_counts_attempt.py": "NFL_SCORE_COUNTS_G1_GOVERNED_DEVELOPMENT_ATTEMPT_RUNNER_NO_BETTING_AUTHORITY",
+    "tests/test_run_nfl_score_counts_attempt.py": "TEST_ONLY_NFL_SCORE_COUNTS_G1_ATTEMPT_RUNNER_NO_RUNTIME_AUTHORITY",
+    ".github/workflows/nfl-score-counts-attempt.yml": "NFL_SCORE_COUNTS_G1_EXPLICIT_ATTEMPT_DISPATCH_WORKFLOW_NO_BETTING_AUTHORITY"
   },
   "inventory_completion_claim": {
     "status": "HOSTED_AUDIT_ZERO_UNMAPPED",
