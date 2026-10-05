@@ -1,0 +1,52 @@
+{
+  "schema": "SPORTSEDGE_NFL_SCORE_COUNTS_PHONE_CARD_V1",
+  "status": "FROZEN_BEFORE_IMPLEMENTATION",
+  "frozen_date": "2026-10-05",
+  "candidate_family": "NFL_SCORE_COUNTS_G1",
+  "input_contract": {
+    "model_prediction": "FROZEN_PREGAME_SCORE_COUNT_PREDICTION_WRITTEN_BEFORE_MARKET_BINDING",
+    "manual_board": "TWO_SIDED_SPORTSBOOK_QUOTES",
+    "player_role_models": "PIT_SAFE_LIVE_ROLE_MODELS_REQUIRED_FOR_PROPS",
+    "sportsbook_api_required": false
+  },
+  "markets": [
+    "moneyline",
+    "spread",
+    "total",
+    "team_total",
+    "pass_attempts",
+    "completions",
+    "passing_yards",
+    "pass_tds",
+    "interceptions",
+    "rush_attempts",
+    "rushing_yards",
+    "receptions",
+    "receiving_yards",
+    "rush_receiving_yards",
+    "receiving_tds",
+    "rushing_tds",
+    "anytime_tds"
+  ],
+  "pricing": {
+    "two_sided_devig_required": true,
+    "ev_floor": 0.02,
+    "max_straight_price": -165,
+    "score_rule": "QUALIFICATION_ROLE_FLAGS_ONLY",
+    "edge_or_ev_feeds_score": false,
+    "one_selected_side_per_two_sided_pair": true
+  },
+  "model_market_separation": {
+    "quotes_may_change_edge_ev_and_selection": true,
+    "quotes_may_change_model_probability": false,
+    "quotes_may_change_score_distribution": false,
+    "quotes_may_change_player_simulation": false
+  },
+  "authority": {
+    "research_only": true,
+    "creates_model_p": false,
+    "promotion": false,
+    "staking": false,
+    "official": false
+  }
+}
