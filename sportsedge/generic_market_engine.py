@@ -220,47 +220,16 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
     if market in FAIL_CLOSED_MARKETS:
         raise GenericMarketEngineError(f"{market}_STATE_MODEL_REBUILD_REQUIRED")
 
+    if market in {"NRFI", "YRFI"}:
+        # Price inning one from actual strictly-prior inning-one outcomes rather
+        # than scaling full-game means by one fixed share.
+        from .shared_first_inning_engine import build_shared_first_inning_engine_session
+        return build_shared_first_inning_engine_session()(model_input)
+
     away_mean = _finite(model_input.get("away_mean_runs"), "away_mean_runs", lower=0.000001)
     home_mean = _finite(model_input.get("home_mean_runs"), "home_mean_runs", lower=0.000001)
     line = _finite(model_input.get("line", 0.0), "line")
     side = str(model_input.get("side", "")).upper()
-
-    if market in {"NRFI", "YRFI"}:
-        nrfi, yrfi = first_inning_probabilities(
-            away_mean_runs=away_mean,
-            home_mean_runs=home_mean,
-            first_inning_share=DEFAULT_FIRST_INNING_SHARE,
-            dispersion_r=DEFAULT_FIRST_INNING_DISPERSION_R,
-        )
-        if market == "NRFI":
-            if side in {"YES", "NRFI"}:
-                p = nrfi
-            elif side == "NO":
-                p = yrfi
-            else:
-                raise GenericMarketEngineError("NRFI side must be YES/NO")
-        else:
-            if side in {"YES", "YRFI"}:
-                p = yrfi
-            elif side == "NO":
-                p = nrfi
-            else:
-                raise GenericMarketEngineError("YRFI side must be YES/NO")
-        digest = _canonical_json_sha256({
-            "engine": FIRST_INNING_MODEL_VERSION,
-            "game_id": model_input.get("game_id"),
-            "away_mean_runs": away_mean,
-            "home_mean_runs": home_mean,
-            "first_inning_share": DEFAULT_FIRST_INNING_SHARE,
-            "dispersion_r": DEFAULT_FIRST_INNING_DISPERSION_R,
-            "feature_source_hash": model_input.get("feature_source_hash"),
-        })
-        out = _base_output(model_input, p, model_hash=digest)
-        out["engine_version"] = FIRST_INNING_MODEL_VERSION
-        out["seed_policy"] = "analytic_negative_binomial_marginal"
-        out["mc_paths"] = 0
-        out["push_p"] = 0.0
-        return out
 
     # MONEYLINE / RUN_LINE / TOTALS / TEAM_TOTALS: same frozen full-game dispersion
     # as Stage-1 shared_game_engine. F5 remains fail-closed above.
