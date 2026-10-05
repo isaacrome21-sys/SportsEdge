@@ -460,7 +460,8 @@ def test_frozen_pit_ne_completion_keeps_factual_dropback():
 
 def test_attempt2_field_goal_opportunity_counts_misses_and_shrinks_make_rate():
     custom = pbp(n=5)
-    custom.append({
+    g5_start = next(i for i, row in enumerate(custom) if row["game_id"] == "g5")
+    custom.insert(g5_start, {
         "game_id": "g4", "play_id": "499",
         "posteam": "H", "defteam": "A",
         "field_goal_result": "missed",
