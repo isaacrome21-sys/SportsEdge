@@ -70,7 +70,8 @@
         "scripts/run_nfl_coherent_props.py",
         "sportsedge/sports/nfl/live_role_source.py",
         "sportsedge/sports/nfl/nflverse_role_bridge.py",
-        "sportsedge/sports/nfl/unified_auto_roles.py"
+        "sportsedge/sports/nfl/unified_auto_roles.py",
+        "tests/test_nfl_market_context_prop_v1_forward_lock.py"
       ],
       "coverage_prefixes": [
         "sportsedge/sports/nfl/computed_prop_",
