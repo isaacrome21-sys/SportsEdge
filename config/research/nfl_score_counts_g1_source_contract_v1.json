@@ -1,0 +1,189 @@
+{
+  "schema": "SPORTSEDGE_NFL_SCORE_COUNTS_G1_SOURCE_CONTRACT_V1",
+  "status": "FROZEN_BEFORE_ATTEMPT1_SOURCE_ACCESS",
+  "frozen_date": "2026-10-05",
+  "candidate_family": "NFL_SCORE_COUNTS_G1",
+  "schedule": {
+    "fetch_uri": "https://raw.githubusercontent.com/nflverse/nfldata/be9813d153e6694af4d98c7287a7db32225806ae/data/games.csv",
+    "origin_repository": "nflverse/nfldata",
+    "origin_commit_sha": "be9813d153e6694af4d98c7287a7db32225806ae",
+    "origin_path": "data/games.csv",
+    "expected_sha256": "59c8bea7e185dde9e6053a06c24c34f6e5a91dcaea3187c0d9bab12759bb05fb",
+    "season_scope": [
+      2018,
+      2019,
+      2020,
+      2021,
+      2022,
+      2023,
+      2024,
+      2025
+    ]
+  },
+  "frozen_store": {
+    "repository": "isaacrome21-sys/SportsEdge",
+    "release_tag": "nfl-source-freeze-v1",
+    "overwrite_forbidden": true,
+    "provenance_parent": "config/nfl_promotion_source_freeze_v1.json"
+  },
+  "pbp": {
+    "2018": {
+      "fetch_uri": "https://github.com/isaacrome21-sys/SportsEdge/releases/download/nfl-source-freeze-v1/play_by_play_2018.csv.gz",
+      "origin_uri": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2018.csv.gz",
+      "expected_sha256": "d37899610b397b96a90da6902827de5b46c5457b93e0e16d5f95a8eb524e4a7d",
+      "season_scope": [
+        2018
+      ]
+    },
+    "2019": {
+      "fetch_uri": "https://github.com/isaacrome21-sys/SportsEdge/releases/download/nfl-source-freeze-v1/play_by_play_2019.csv.gz",
+      "origin_uri": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2019.csv.gz",
+      "expected_sha256": "b764668137052be23745953cbc33fa17e537a70c81e9b73785a19a15e7288216",
+      "season_scope": [
+        2019
+      ]
+    },
+    "2020": {
+      "fetch_uri": "https://github.com/isaacrome21-sys/SportsEdge/releases/download/nfl-source-freeze-v1/play_by_play_2020.csv.gz",
+      "origin_uri": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2020.csv.gz",
+      "expected_sha256": "bc954b5780e325df4faa255fac092585c981a4de5d2f553a8a4e0a3c8b3a3cf2",
+      "season_scope": [
+        2020
+      ]
+    },
+    "2021": {
+      "fetch_uri": "https://github.com/isaacrome21-sys/SportsEdge/releases/download/nfl-source-freeze-v1/play_by_play_2021.csv.gz",
+      "origin_uri": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2021.csv.gz",
+      "expected_sha256": "e8743a568f99667a8bdcd29ba12224ee1782ad2b7916bee78ee335c099383739",
+      "season_scope": [
+        2021
+      ]
+    },
+    "2022": {
+      "fetch_uri": "https://github.com/isaacrome21-sys/SportsEdge/releases/download/nfl-source-freeze-v1/play_by_play_2022.csv.gz",
+      "origin_uri": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2022.csv.gz",
+      "expected_sha256": "0c69a71eb39498956c7b1d5c1ca52ce7fe679934a95d1af249facb5ea9829ea4",
+      "season_scope": [
+        2022
+      ]
+    },
+    "2023": {
+      "fetch_uri": "https://github.com/isaacrome21-sys/SportsEdge/releases/download/nfl-source-freeze-v1/play_by_play_2023.csv.gz",
+      "origin_uri": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2023.csv.gz",
+      "expected_sha256": "4649804ee0f0a40b41e51ec75a1ce921949d7fab5459213488656b92f78560e8",
+      "season_scope": [
+        2023
+      ]
+    },
+    "2024": {
+      "fetch_uri": "https://github.com/isaacrome21-sys/SportsEdge/releases/download/nfl-source-freeze-v1/play_by_play_2024.csv.gz",
+      "origin_uri": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2024.csv.gz",
+      "expected_sha256": "23370d5d10f8104d80d46a1fc5e61f4f6f5a3263fe96fe2dd629913cfcb08c06",
+      "season_scope": [
+        2024
+      ]
+    },
+    "2025": {
+      "fetch_uri": "https://github.com/isaacrome21-sys/SportsEdge/releases/download/nfl-source-freeze-v1/play_by_play_2025.csv.gz",
+      "origin_uri": "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2025.csv.gz",
+      "expected_sha256": "2f135887790a013fd004e609e37096bb4816d5cc80b9f19122e1bad478961978",
+      "season_scope": [
+        2025
+      ]
+    }
+  },
+  "depth": {
+    "2018": {
+      "fetch_uri": "https://github.com/isaacrome21-sys/SportsEdge/releases/download/nfl-source-freeze-v1/depth_charts_2018.csv",
+      "origin_uri": "https://github.com/nflverse/nflverse-data/releases/download/depth_charts/depth_charts_2018.csv",
+      "expected_sha256": "2c44efb1d96f8b8fef8a8ae42c44db340e97921745420d96b012778e184255bb",
+      "season_scope": [
+        2018
+      ]
+    },
+    "2019": {
+      "fetch_uri": "https://github.com/isaacrome21-sys/SportsEdge/releases/download/nfl-source-freeze-v1/depth_charts_2019.csv",
+      "origin_uri": "https://github.com/nflverse/nflverse-data/releases/download/depth_charts/depth_charts_2019.csv",
+      "expected_sha256": "328405d1feb09cc4b23922c26bf23adf7d6a6e894ba0e7305b88dda793710647",
+      "season_scope": [
+        2019
+      ]
+    },
+    "2020": {
+      "fetch_uri": "https://github.com/isaacrome21-sys/SportsEdge/releases/download/nfl-source-freeze-v1/depth_charts_2020.csv",
+      "origin_uri": "https://github.com/nflverse/nflverse-data/releases/download/depth_charts/depth_charts_2020.csv",
+      "expected_sha256": "45a315dd7f3e7837faf06a9c9cf995e1c131017a748482b2caaa111ffa0b9372",
+      "season_scope": [
+        2020
+      ]
+    },
+    "2021": {
+      "fetch_uri": "https://github.com/isaacrome21-sys/SportsEdge/releases/download/nfl-source-freeze-v1/depth_charts_2021.csv",
+      "origin_uri": "https://github.com/nflverse/nflverse-data/releases/download/depth_charts/depth_charts_2021.csv",
+      "expected_sha256": "91e3384ff13146c77f02fed2c3eca163d35868dd62da6b794c5b51df1d15b724",
+      "season_scope": [
+        2021
+      ]
+    },
+    "2022": {
+      "fetch_uri": "https://github.com/isaacrome21-sys/SportsEdge/releases/download/nfl-source-freeze-v1/depth_charts_2022.csv",
+      "origin_uri": "https://github.com/nflverse/nflverse-data/releases/download/depth_charts/depth_charts_2022.csv",
+      "expected_sha256": "4c64ee59666431c49cbc0a818cc3165886012cf72b545771a77c0805aa621b9c",
+      "season_scope": [
+        2022
+      ]
+    },
+    "2023": {
+      "fetch_uri": "https://github.com/isaacrome21-sys/SportsEdge/releases/download/nfl-source-freeze-v1/depth_charts_2023.csv",
+      "origin_uri": "https://github.com/nflverse/nflverse-data/releases/download/depth_charts/depth_charts_2023.csv",
+      "expected_sha256": "583f83842590e7e7d3417e0cd9c5c9e38f8696353bb754561d80e5583d2a98cf",
+      "season_scope": [
+        2023
+      ]
+    },
+    "2024": {
+      "fetch_uri": "https://github.com/isaacrome21-sys/SportsEdge/releases/download/nfl-source-freeze-v1/depth_charts_2024.csv",
+      "origin_uri": "https://github.com/nflverse/nflverse-data/releases/download/depth_charts/depth_charts_2024.csv",
+      "expected_sha256": "f210a33774611f7f78a89af789b61c6289a2631a21227a1a3c63c973c23588b7",
+      "season_scope": [
+        2024
+      ]
+    },
+    "2025": {
+      "fetch_uri": "https://github.com/isaacrome21-sys/SportsEdge/releases/download/nfl-source-freeze-v1/depth_charts_2025.csv",
+      "origin_uri": "https://github.com/nflverse/nflverse-data/releases/download/depth_charts/depth_charts_2025.csv",
+      "expected_sha256": "f5a4aa3fa70150e810b2255200c8735a6c1cc8ff77361308ce39149345b39b4a",
+      "season_scope": [
+        2025
+      ]
+    }
+  },
+  "parser_contract": {
+    "required_paths": [
+      "sportsedge/sports/nfl/score_counts_features.py",
+      "sportsedge/sports/nfl/score_counts_g1.py",
+      "sportsedge/sports/nfl/score_counts_artifact.py"
+    ],
+    "exact_blob_sha_binding_deferred_to_attempt_freeze": true,
+    "no_parser_substitution_after_attempt_freeze": true
+  },
+  "rules": {
+    "direct_mutable_provider_refetch_for_attempt_execution": false,
+    "expected_sha256_must_match_before_parse": true,
+    "source_substitution_forbidden": true,
+    "transport_retry_same_uri_and_sha_allowed": true,
+    "schedule_market_columns_may_exist_but_predictive_builder_must_ignore_them": true,
+    "target_game_pbp_for_forward_prediction_forbidden": true
+  },
+  "authority": {
+    "research_only": true,
+    "creates_model_p": false,
+    "pricing": false,
+    "truth_gate": false,
+    "promotion": false,
+    "staking": false,
+    "official": false,
+    "backfill": false,
+    "validation_attempt": false
+  }
+}
