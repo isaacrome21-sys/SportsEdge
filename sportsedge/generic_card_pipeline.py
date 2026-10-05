@@ -175,7 +175,13 @@ def _model_input(*, game, quote, feature, require_confirmed_lineup: bool):
     if market in TEAM_TOTAL_MARKETS:
         out["team_side"] = _team_side(game, entity_id)
     if market == "HOME_RUNS":
-        out["expected_count"] = feature.get("expected_count")
+        payload = feature.get("features")
+        if isinstance(payload, Mapping) and "history_pool" in payload:
+            out["features"] = dict(payload)
+        else:
+            # Backward-compatible legacy count feature; canonical joint/auto
+            # feature construction now supplies the joint history payload.
+            out["expected_count"] = feature.get("expected_count")
     elif market in F5_MARKETS or market in {"NRFI", "YRFI", "FIRST_HOME_RUN"}:
         payload = feature.get("features")
         if not isinstance(payload, Mapping):
