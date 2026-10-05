@@ -1,4 +1,4 @@
-"""Parse phone NHL lines. Fail closed on one-sided rows."""
+"""Parse phone NHL lines. Fail closed on one-sided or direction-ambiguous rows."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -61,7 +61,27 @@ def parse_nhl_lines(body: str) -> list[NhlGameTicket]:
         elif kind in {"pl", "puck", "puckline"}:
             if len(parts) != 4:
                 raise NhlLinesIntakeError(f"NHL_INTAKE_ONE_SIDED_OR_MALFORMED:{line}")
-            current.markets.append(NhlMarketLine("PUCK_LINE", float(parts[1]), _american(parts[2]), _american(parts[3]), line))
+            try:
+                puck_line = float(parts[1])
+            except ValueError as exc:
+                raise NhlLinesIntakeError(f"NHL_INTAKE_PUCK_LINE_INVALID:{parts[1]}") from exc
+            # The current frozen card contract interprets prices as
+            # Away +1.5 first / Home -1.5 second. Until side-specific line
+            # identity is carried through the ticket, accepting -1.5 here
+            # would silently reverse favorite/underdog probabilities.
+            if puck_line != 1.5:
+                raise NhlLinesIntakeError(
+                    f"NHL_INTAKE_PUCK_LINE_DIRECTION_UNSUPPORTED:{parts[1]}"
+                )
+            current.markets.append(
+                NhlMarketLine(
+                    "PUCK_LINE",
+                    puck_line,
+                    _american(parts[2]),
+                    _american(parts[3]),
+                    line,
+                )
+            )
         elif kind in {"total", "ou"}:
             if len(parts) != 4:
                 raise NhlLinesIntakeError(f"NHL_INTAKE_ONE_SIDED_OR_MALFORMED:{line}")
