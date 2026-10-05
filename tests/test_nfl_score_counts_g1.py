@@ -7,6 +7,8 @@ from sportsedge.sports.nfl.score_counts_g1 import (
     FEATURE_NAMES,
     FG_ATTEMPT2_ALPHA_GRID,
     FG_ATTEMPT2_FEATURE_NAMES,
+    FG_ATTEMPT3_ALPHA_GRID,
+    FG_ATTEMPT3_FEATURE_NAMES,
     ROOT_SEED_UINT64,
     ScoreCountsError,
     child_seed,
@@ -15,6 +17,7 @@ from sportsedge.sports.nfl.score_counts_g1 import (
     fit_poisson_ridge,
     market_probability,
     predict_mean,
+    predict_made_field_goal_mean,
     simulate_game,
 )
 
@@ -24,6 +27,10 @@ def row(season: int, strength: float, *, home: bool, td: int, fg: int):
         "season": season,
         "offense_touchdowns": td,
         "made_field_goals": fg,
+        "field_goal_attempts": fg + 1,
+        "fg_attempts_per_game": 1.8 + 0.15 * strength,
+        "opp_fg_attempts_allowed_per_game": 1.9 - 0.08 * strength,
+        "fg_make_rate_shrunk": 0.82 + 0.01 * max(-1.0, min(1.0, strength)),
     }
     for idx, name in enumerate(FEATURE_NAMES):
         if name == "home_indicator":
@@ -213,3 +220,62 @@ def test_attempt2_fg_subset_is_supported_without_changing_td_identity():
     )
     assert fitted.td_model.feature_names == FEATURE_NAMES
     assert fitted.fg_model.feature_names == FG_ATTEMPT2_FEATURE_NAMES
+
+
+
+def test_attempt3_fg_opportunity_model_preserves_td_specification():
+    rows = training_rows()
+    attempt_model = fit_poisson_ridge(
+        rows,
+        target="field_goal_attempts",
+        alpha=FG_ATTEMPT3_ALPHA_GRID[-1],
+        feature_names=FG_ATTEMPT3_FEATURE_NAMES,
+    )
+    assert attempt_model.target == "field_goal_attempts"
+    assert attempt_model.feature_names == FG_ATTEMPT3_FEATURE_NAMES
+    row0 = rows[0]
+    assert predict_made_field_goal_mean(attempt_model, row0) == pytest.approx(
+        predict_mean(attempt_model, row0) * row0["fg_make_rate_shrunk"]
+    )
+
+    parent = fit_core(
+        rows,
+        shared_sigma=0.10,
+        def_st_td_rate=0.08,
+        safety_rate=0.015,
+        conversion_probabilities=(0.92, 0.05, 0.03),
+        source_manifest_sha256="a" * 64,
+        code_identity="parent",
+        fg_feature_names=FG_ATTEMPT2_FEATURE_NAMES,
+        fg_alphas=FG_ATTEMPT2_ALPHA_GRID,
+    )
+    final = fit_core(
+        rows,
+        shared_sigma=0.10,
+        def_st_td_rate=0.08,
+        safety_rate=0.015,
+        conversion_probabilities=(0.92, 0.05, 0.03),
+        source_manifest_sha256="a" * 64,
+        code_identity="final",
+        fg_feature_names=FG_ATTEMPT3_FEATURE_NAMES,
+        fg_alphas=FG_ATTEMPT3_ALPHA_GRID,
+        fg_target="field_goal_attempts",
+    )
+    assert final.td_model == parent.td_model
+    assert final.td_model.feature_names == FEATURE_NAMES
+    assert final.fg_model.target == "field_goal_attempts"
+    assert final.fg_model.feature_names == FG_ATTEMPT3_FEATURE_NAMES
+
+
+def test_attempt3_make_rate_must_be_valid():
+    rows = training_rows()
+    model = fit_poisson_ridge(
+        rows,
+        target="field_goal_attempts",
+        alpha=100.0,
+        feature_names=FG_ATTEMPT3_FEATURE_NAMES,
+    )
+    bad = dict(rows[0])
+    bad["fg_make_rate_shrunk"] = 1.1
+    with pytest.raises(ScoreCountsError, match="FG_MAKE_RATE_OUT_OF_RANGE"):
+        predict_made_field_goal_mean(model, bad)
