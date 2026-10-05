@@ -1,0 +1,44 @@
+{
+  "schema": "SPORTSEDGE_NFL_SCORE_COUNTS_SCORING_COMPOSITION_PRIOR_BUILD_V1",
+  "status": "FROZEN_BEFORE_PRIOR_BUILD",
+  "source_contract_path": "config/research/nfl_score_counts_g1_source_contract_v1.json",
+  "source_contract_git_blob": "987eb9eecd072d6e73baffc32ebe742d80011806",
+  "seasons": [
+    2018,
+    2019,
+    2020,
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+  ],
+  "as_of": "2026-10-09T00:15:00Z",
+  "conservative_completion_lag_hours": 24,
+  "excluded_games": [
+    {
+      "game_id": "2022_17_BUF_CIN",
+      "reason": "SUSPENDED_AND_CANCELED_NO_OFFICIAL_FINAL"
+    }
+  ],
+  "rules": {
+    "frozen_source_bytes_only": true,
+    "expected_sha256_must_match": true,
+    "score_must_reconstruct_from_pbp_components": true,
+    "reconstructed_score_must_match_frozen_schedule": true,
+    "market_inputs_prohibited": true,
+    "source_substitution_forbidden": true,
+    "post_build_retuning_prohibited": true,
+    "prior_build_consumes_score_count_attempt": false
+  },
+  "authority": {
+    "model_p": false,
+    "truth_gate": false,
+    "promotion": false,
+    "staking": false,
+    "official": false,
+    "validation_attempt": false,
+    "score_count_attempt": false,
+    "backfill": false
+  }
+}

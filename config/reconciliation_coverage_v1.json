@@ -447,7 +447,12 @@
     "sportsedge/sports/nfl/score_counts_market_bridge.py": "NFL_SCORE_COUNTS_G1_RESEARCH_GAME_MARKET_DERIVATION_FROM_FROZEN_JOINT_DISTRIBUTION_NO_PROMOTION_OR_OFFICIAL_AUTHORITY",
     "tests/test_nfl_score_counts_market_bridge.py": "TEST_ONLY_NFL_SCORE_COUNTS_G1_GAME_MARKET_BRIDGE_NO_RUNTIME_AUTHORITY",
     "sportsedge/sports/nfl/score_counts_prop_bridge.py": "NFL_SCORE_COUNTS_G1_RESEARCH_PLAYER_PROP_COUPLING_TO_EXISTING_ROLE_MODELS_NO_PROMOTION_OR_OFFICIAL_AUTHORITY",
-    "tests/test_nfl_score_counts_prop_bridge.py": "TEST_ONLY_NFL_SCORE_COUNTS_G1_PLAYER_PROP_BRIDGE_NO_RUNTIME_AUTHORITY"
+    "tests/test_nfl_score_counts_prop_bridge.py": "TEST_ONLY_NFL_SCORE_COUNTS_G1_PLAYER_PROP_BRIDGE_NO_RUNTIME_AUTHORITY",
+    ".github/workflows/nfl-score-counts-scoring-prior-build.yml": "NFL_SCORE_COUNTS_G1_SCORING_COMPOSITION_PRIOR_EXPLICIT_BUILD_WORKFLOW_ZERO_BETTING_AUTHORITY",
+    "config/research/nfl_score_counts_scoring_composition_prior_v1.json": "NFL_SCORE_COUNTS_G1_SCORING_COMPOSITION_PRIOR_BUILD_FREEZE_ZERO_BETTING_AUTHORITY",
+    "sportsedge/sports/nfl/score_counts_scoring_prior.py": "NFL_SCORE_COUNTS_G1_MARKET_BLIND_SCORING_COMPOSITION_ROW_MATERIALIZER_NO_PROMOTION_OR_OFFICIAL_AUTHORITY",
+    "scripts/build_nfl_score_counts_scoring_prior.py": "NFL_SCORE_COUNTS_G1_HASH_BOUND_SCORING_COMPOSITION_PRIOR_BUILDER_NO_BETTING_AUTHORITY",
+    "tests/test_nfl_score_counts_scoring_prior.py": "TEST_ONLY_NFL_SCORE_COUNTS_G1_SCORING_COMPOSITION_PRIOR_BUILD_NO_RUNTIME_AUTHORITY"
   },
   "inventory_completion_claim": {
     "status": "HOSTED_AUDIT_ZERO_UNMAPPED",
