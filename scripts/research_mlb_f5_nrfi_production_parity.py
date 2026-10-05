@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts import research_mlb_f5_nrfi_tightening as R  # noqa: E402
 
 SEASONS = (2025, 2026)
+MONTHS = ((2, 1, 2, 28),) + R.MONTHS + ((11, 1, 11, 30),)
 TEST = 2026
 PRODUCTION_LOOKBACK_DAYS = 240
 LEAGUE_LOOKBACK_DAYS = 370
@@ -64,7 +65,7 @@ def fetch(cache: Path, workers: int):
     jobs = [
         (season, month, regular)
         for season in SEASONS
-        for month in R.MONTHS
+        for month in MONTHS
         for regular in (False, True)
     ]
     all_by_pk = {}
