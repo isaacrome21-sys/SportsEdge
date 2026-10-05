@@ -379,7 +379,10 @@
     "sportsedge/sports/nhl/public_baseline.py": "NHL_NO_ACTIVE_BUNDLE",
     "sportsedge/sports/nhl/team_shot_history.py": "NHL_NO_ACTIVE_BUNDLE",
     "tests/test_cfb_reconstructed_selection_preflight.py": "TEST_ONLY_CFB_PROVIDER_PREFLIGHT_NO_RUNTIME_AUTHORITY",
-    "config/reconciliation_coverage_v1.json": "RECONCILIATION_COVERAGE_EXTENSION_GOVERNANCE_CONTROL_ZERO_MODEL_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY"
+    "config/reconciliation_coverage_v1.json": "RECONCILIATION_COVERAGE_EXTENSION_GOVERNANCE_CONTROL_ZERO_MODEL_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY",
+    "docs/MLB_F5_NRFI_PRODUCTION_PARITY_2026.md": "MLB_RESEARCH_PREREG_NO_MODEL_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY",
+    "scripts/research_mlb_f5_nrfi_production_parity.py": "MLB_RESEARCH_VALIDATION_ONLY_NO_MODEL_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY",
+    "tests/test_research_mlb_f5_nrfi_production_parity.py": "TEST_ONLY_MLB_RESEARCH_NO_RUNTIME_AUTHORITY"
   },
   "inventory_completion_claim": {
     "status": "HOSTED_AUDIT_ZERO_UNMAPPED",
