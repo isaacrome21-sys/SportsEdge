@@ -1,0 +1,63 @@
+{
+  "schema": "SPORTSEDGE_NFL_SCORE_COUNTS_G1_ATTEMPT2_RESULT_V1",
+  "status": "DEVELOPMENT_ATTEMPT_FAIL",
+  "recorded_date": "2026-10-05",
+  "candidate_family": "NFL_SCORE_COUNTS_G1",
+  "attempt_number": 2,
+  "attempt_consumed": true,
+  "workflow_run_id": 37346097842,
+  "artifact_id": 11364065014,
+  "artifact_archive_sha256": "57c306f9fcc3c6cc53c721831b664b13e9c653877bed6816a3858a18439e79c0",
+  "fit_file_sha256": "61592d26c5c8c961cec47ac7a72cc8f2fce56833f44d08e671358cbc625b1c2f",
+  "fit_artifact_sha256": "8fcfc6ade9acb88d27426a012e62a2020ca982148d17c443d1367697b16cca3b",
+  "artifact_self_digest_verified": true,
+  "source_manifest_sha256": "00841dca7d5671d6055d02eea90c21089633eb196eeeeca769a38f9abde4e5d4",
+  "code_identity": "80fc6e9aa7f051fa4e446c6f36b3d86af8bf048fea8ac4a275a0d341a23eea3e",
+  "prereg_sha256": "bb7e1a44654858a177696e5c51892016a8f0ffbab4cecb6ba85d4249665a7a77",
+  "training_row_count": 3934,
+  "development_gate": {
+    "pass": false,
+    "all_targets_must_pass": true,
+    "minimum_fold_wins_each": 3,
+    "touchdowns": {
+      "pass": true,
+      "fold_wins": 5,
+      "folds_total": 5,
+      "pooled_candidate_poisson_deviance": 0.8640739939949063,
+      "pooled_intercept_baseline_poisson_deviance": 0.9429609486409716,
+      "pooled_improvement_fraction": 0.08365877161695823
+    },
+    "made_field_goals": {
+      "pass": false,
+      "fold_wins": 2,
+      "folds_total": 5,
+      "pooled_candidate_poisson_deviance": 1.0487832615085937,
+      "pooled_intercept_baseline_poisson_deviance": 1.0488367803645573,
+      "pooled_improvement_fraction": 0.000051026868017543906,
+      "winning_validation_seasons": [
+        2021,
+        2025
+      ],
+      "losing_validation_seasons": [
+        2022,
+        2023,
+        2024
+      ]
+    }
+  },
+  "attempt_accounting": {
+    "maximum": 3,
+    "consumed_after_attempt": 2,
+    "remaining_after_attempt": 1,
+    "next_attempt": 3
+  },
+  "authority": {
+    "research_only": true,
+    "creates_model_p": false,
+    "pricing": false,
+    "promotion": false,
+    "staking": false,
+    "official": false,
+    "backfill": false
+  }
+}
