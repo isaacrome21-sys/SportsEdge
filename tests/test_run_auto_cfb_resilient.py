@@ -50,6 +50,13 @@ class RunAutoCfbResilientTest(unittest.TestCase):
         self.assertFalse(priced["governance"]["odds_api_called"])
         self.assertEqual(priced["family"], "PRIOR_CURRENT_BLEND")
         self.assertEqual(priced["bakeoff_run"], 37093707442)
+        self.assertTrue(priced["summary"]["both_sides"])
+        self.assertTrue(priced["summary"]["catalog_complete"])
+        self.assertFalse(priced["summary"]["invented_lines"])
+        self.assertEqual(priced["summary"]["side_rows"], 2)
+        away = [row for row in priced["results"] if row["side"] == "AWAY"][0]
+        self.assertIsNone(away["american_odds"])
+        self.assertEqual(away["bet_status"], "NO_BET")
 
         no_edge = build_card([_row(-5000)], model=model)
         self.assertEqual(no_edge["run_status"], "READY")
@@ -77,6 +84,7 @@ class RunAutoCfbResilientTest(unittest.TestCase):
         self.assertIn("scripts/run_auto_cfb_resilient.py", workflow)
         self.assertIn("CFB_AUTO_FORCED_PROMOTION_BLOCK", workflow)
         self.assertNotIn("run_cfb_auto.py", workflow)
+        self.assertNotIn("CFB_AUTO_PROP_SIDE_TOTAL_COVERAGE", workflow)
         self.assertIn("artifacts/live_cfb_card.json", workflow)
         self.assertIn("render_cfb_myspari_card.py", workflow)
         self.assertNotIn("SPORTSEDGE_ODDS_API_KEY", workflow)
