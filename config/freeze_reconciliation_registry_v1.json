@@ -1863,10 +1863,16 @@
       "merge_sha": "82cde52548e857dc799edbdea9c84977956f4cac",
       "pr": 1649,
       "note": "NFL post-V2K NFL_SCORE_COUNTS_G1 preregistration merged. New research-only scoring-count family; not V2K Attempt 6, no old V2L revival, historical 2018-2025 development-only and 2026 Week-5-forward no-backfill boundary frozen. Reconciliation creates no Model_P, pricing, Truth Gate, promotion, staking, OFFICIAL, prop, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_AB9EEDA5_PR_1653",
+      "merge_sha": "ab9eeda575e93fd1cfb5121502d309df91043ee6",
+      "pr": 1653,
+      "note": "NFL_SCORE_COUNTS_G1 synthetic research core merged after preregistration. Deterministic Poisson TD/FG fits, shared scoring latent, explicit rare scores/conversions and one joint game-market path set; no historical or 2026 scoring. Reconciliation creates no Model_P, pricing, Truth Gate, promotion, staking, OFFICIAL, prop, validation-attempt, or untouched-readout authority."
     }
   ],
-  "inventory_block_reason": "Current main through merge 82cde525 / PR #1649 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
+  "inventory_block_reason": "Current main through merge ab9eeda5 / PR #1653 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "82cde52548e857dc799edbdea9c84977956f4cac",
+  "reconciled_through_sha": "ab9eeda575e93fd1cfb5121502d309df91043ee6",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
