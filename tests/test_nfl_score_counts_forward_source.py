@@ -107,14 +107,14 @@ def test_forward_manifest_binds_raw_bytes_parser_and_fit_provenance():
             {
                 "name": "pbp_2026_snapshot",
                 "source_uri": "https://example.test/pbp.csv.gz",
-                "retrieved_at_utc": "2026-10-05T16:00:00Z",
+                "retrieved_at_utc": "2026-10-05T15:59:00Z",
                 "byte_sha256": "1" * 64,
                 "season_scope": [2026],
             },
             {
                 "name": "pbp_2025_frozen",
                 "source_uri": "https://example.test/pbp2025.csv.gz",
-                "retrieved_at_utc": "2026-10-05T16:00:00Z",
+                "retrieved_at_utc": "2026-10-05T15:59:00Z",
                 "byte_sha256": "2" * 64,
                 "immutable_expected_sha256": "2" * 64,
                 "season_scope": [2025],
@@ -144,10 +144,31 @@ def test_immutable_receipt_sha_mismatch_fails_closed():
             [{
                 "name": "pbp_2025_frozen",
                 "source_uri": "https://example.test/pbp2025.csv.gz",
-                "retrieved_at_utc": "2026-10-05T16:00:00Z",
+                "retrieved_at_utc": "2026-10-05T15:59:00Z",
                 "byte_sha256": "1" * 64,
                 "immutable_expected_sha256": "2" * 64,
                 "season_scope": [2025],
+            }],
+            prediction_at="2026-10-05T16:00:00Z",
+            target_game_ids=["2026_05_A_B"],
+            fit_artifact_sha256="a" * 64,
+            fit_training_source_manifest_sha256="b" * 64,
+            serving_code_identity="c" * 64,
+        )
+
+
+def test_forward_manifest_rejects_source_at_or_after_prediction():
+    with pytest.raises(
+        ScoreCountForwardSourceError,
+        match="SOURCE_NOT_PREGAME",
+    ):
+        build_forward_source_manifest(
+            [{
+                "name": "pbp_2026_snapshot",
+                "source_uri": "https://example.test/pbp.csv.gz",
+                "retrieved_at_utc": "2026-10-05T16:00:00Z",
+                "byte_sha256": "1" * 64,
+                "season_scope": [2026],
             }],
             prediction_at="2026-10-05T16:00:00Z",
             target_game_ids=["2026_05_A_B"],
