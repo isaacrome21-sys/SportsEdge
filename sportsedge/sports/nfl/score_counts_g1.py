@@ -48,6 +48,18 @@ FG_ATTEMPT2_FEATURE_NAMES = (
     "home_indicator",
 )
 FG_ATTEMPT2_ALPHA_GRID = (0.1, 1.0, 10.0, 100.0, 1000.0)
+FG_ATTEMPT3_FEATURE_NAMES = (
+    "fg_attempts_per_game",
+    "opp_fg_attempts_allowed_per_game",
+    "made_fg_per_game",
+    "opp_fg_allowed_per_game",
+    "home_indicator",
+)
+FG_ATTEMPT3_ALPHA_GRID = (0.1, 1.0, 10.0, 100.0, 1000.0)
+FG_ONLY_FEATURE_NAMES = (
+    "fg_attempts_per_game",
+    "opp_fg_attempts_allowed_per_game",
+)
 SIGMA_GRID = (0.0, 0.10, 0.20, 0.30)
 
 
@@ -106,7 +118,7 @@ def _validated_feature_names(feature_names: Sequence[str]) -> tuple[str, ...]:
     names = tuple(str(name) for name in feature_names)
     if not names or len(set(names)) != len(names):
         raise ScoreCountsError("FEATURE_IDENTITY_MISMATCH")
-    if any(name not in FEATURE_NAMES for name in names):
+    if any(name not in (*FEATURE_NAMES, *FG_ONLY_FEATURE_NAMES) for name in names):
         raise ScoreCountsError("FEATURE_IDENTITY_MISMATCH")
     return names
 
