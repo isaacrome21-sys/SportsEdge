@@ -16,7 +16,7 @@ class NflAutoEmitTest(unittest.TestCase):
         self.assertFalse(card["governance"]["official_model_p"])
         self.assertFalse(card["governance"]["truth_gate"])
 
-    def test_positive_edge_side_is_a_bet_without_invented_lines(self) -> None:
+    def test_intercept_fallback_is_track_only_without_invented_edge(self) -> None:
         card = build_card([
             {
                 "game_id": "KC@BUF",
@@ -33,10 +33,11 @@ class NflAutoEmitTest(unittest.TestCase):
         self.assertEqual(card["forecast_source"], "ATTEMPT9_INTERCEPT_BASELINE")
         priced = [row for row in card["results"] if row.get("model_p") is not None]
         self.assertEqual(len(priced), 2)
-        bets = [row for row in card["results"] if row.get("model_p") is not None and row.get("edge") is not None and float(row["edge"]) > 0]
-        self.assertEqual(card["funnel"]["bets_emitted"], len(bets))
-        self.assertGreaterEqual(len(bets), 1)
-        self.assertTrue(all(row["bet_status"] == "BET" for row in bets))
+        self.assertEqual(card["funnel"]["bets_emitted"], 0)
+        self.assertTrue(all(row["bet_status"] == "TRACK" for row in priced))
+        self.assertTrue(all(row["edge"] is None for row in priced))
+        self.assertTrue(all(row["research_edge"] is not None for row in priced))
+        self.assertTrue(all(row["reason"] == "INTERCEPT_BASELINE_ONLY" for row in priced))
         self.assertEqual(card["results"][0]["line"], 3.0)
         self.assertIsNotNone(card.get("full_board"))
 
@@ -53,7 +54,9 @@ class NflAutoEmitTest(unittest.TestCase):
         ])
         self.assertEqual(card["run_status"], "READY")
         self.assertEqual(card["funnel"]["bets_emitted"], 0)
-        self.assertEqual(card["results"][0]["reason"], "NO_EDGE")
+        self.assertEqual(card["results"][0]["reason"], "INTERCEPT_BASELINE_ONLY")
+        self.assertEqual(card["results"][0]["bet_status"], "TRACK")
+        self.assertIsNone(card["results"][0]["edge"])
 
 
 if __name__ == "__main__":
