@@ -43,13 +43,13 @@ def _prediction_identity(
     observed_at,
 ) -> dict[str, Any]:
     prediction_at = _utc(prediction.get("prediction_at"), "prediction_at")
-    if prediction_at > observed_at:
-        raise UnifiedNflPhoneError("SCORE_COUNT_PREDICTION_AFTER_QUOTE_BINDING")
+    if prediction_at >= observed_at:
+        raise UnifiedNflPhoneError("SCORE_COUNT_PREDICTION_NOT_BEFORE_QUOTE_BINDING")
     game = score_count_prediction_game(prediction, game_id)
     game_prediction_at = _utc(game.get("prediction_at"), "game.prediction_at")
     kickoff = _utc(game.get("kickoff_at"), "game.kickoff_at")
-    if game_prediction_at > observed_at:
-        raise UnifiedNflPhoneError("SCORE_COUNT_GAME_PREDICTION_AFTER_QUOTE_BINDING")
+    if game_prediction_at >= observed_at:
+        raise UnifiedNflPhoneError("SCORE_COUNT_GAME_PREDICTION_NOT_BEFORE_QUOTE_BINDING")
     if not game_prediction_at < kickoff:
         raise UnifiedNflPhoneError("SCORE_COUNT_PREDICTION_NOT_PREGAME")
     if str(game.get("away_team") or "").strip().upper() != away:
