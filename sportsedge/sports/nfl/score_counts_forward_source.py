@@ -206,6 +206,8 @@ def build_forward_source_manifest(
     code = str(serving_code_identity or "").strip()
     if not code:
         raise ScoreCountForwardSourceError("SERVING_CODE_IDENTITY_REQUIRED")
+    for item in normalized:
+        item["parser_code_sha256"] = code
 
     payload: dict[str, Any] = {
         "schema": SCHEMA,
