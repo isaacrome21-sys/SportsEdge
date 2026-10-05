@@ -320,6 +320,11 @@ def generic_market_engine_adapter(model_input: Mapping[str, Any]) -> dict[str, A
     market = str(model_input.get("market"))
     if market in GAME_MARKETS:
         return _game_probability(model_input)
+    if market == "HOME_RUNS":
+        features = model_input.get("features")
+        if isinstance(features, Mapping) and "history_pool" in features:
+            from .hitter_joint_engine import price_hitter_market
+            return price_hitter_market(model_input)
     if market in COUNT_MARKETS:
         return _count_probability(model_input)
     if market in BINARY_MARKETS:
