@@ -56,7 +56,9 @@ def _number(value: Any, field: str) -> float:
         out = float(value)
     except (TypeError, ValueError) as exc:
         raise NFLContextError(f"{field} numeric required") from exc
-    if not isfinite(out) or out < 0:
+    if not isfinite(out):
+        raise NFLContextError(f"{field} finite required")
+    if out < 0 and field not in SIGNED_YARD_FIELDS:
         raise NFLContextError(f"{field} nonnegative finite required")
     return out
 
