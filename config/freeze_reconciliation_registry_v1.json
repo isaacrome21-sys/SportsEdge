@@ -1839,10 +1839,16 @@
       "merge_sha": "b658cf0282495f31d98b556039c1510e32b27890",
       "pr": 1630,
       "note": "MLB pitcher-prop final-look PIT-context hardening merged. Binds current-game lineup/plate-umpire inputs to fresh archived decision-time context, fixes real archive-path matching, and fails closed on missing/stale proof. No model parameter, threshold, promotion, staking, or OFFICIAL authority change."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_E6F719B5_PR_1636",
+      "merge_sha": "e6f719b5e4abcbc81fd04b11815c4683477b0be4",
+      "pr": 1636,
+      "note": "NFL market-context player-prop research adapter and unified phone routing merged. Failed V2K game edges remain disabled; posted spread/total are context only for research player simulation. Reconciliation creates no Model_P, Truth Gate, promotion, staking, OFFICIAL, production game-market, validation-attempt, or untouched-readout authority."
     }
   ],
-  "inventory_block_reason": "Current main through merge b658cf02 / PR #1630 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
+  "inventory_block_reason": "Current main through merge e6f719b5 / PR #1636 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "b658cf0282495f31d98b556039c1510e32b27890",
+  "reconciled_through_sha": "e6f719b5e4abcbc81fd04b11815c4683477b0be4",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
