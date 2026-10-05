@@ -95,6 +95,9 @@ def verify_forward_receipts(
     if roles["schedule"] != 1 or not roles["pbp"] or not roles["depth"]:
         raise ScoreCountForwardError("FORWARD_SOURCE_ROLES_INCOMPLETE")
     required = set(range(2018, 2027))
+    schedule_scope = set(next(x["season_scope"] for x in out if x["role"] == "schedule"))
+    if schedule_scope != required:
+        raise ScoreCountForwardError("FORWARD_SOURCE_SEASON_COVERAGE_REQUIRED:schedule")
     for role in ("pbp", "depth"):
         if coverage[role] != required:
             raise ScoreCountForwardError(f"FORWARD_SOURCE_SEASON_COVERAGE_REQUIRED:{role}")
