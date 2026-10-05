@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -33,7 +34,7 @@ def test_spent_attempt_refused_before_reading_training_rows(tmp_path):
         sys.executable, "scripts/run_cfb_sportsdataverse_bakeoff.py",
         "--rows", str(tmp_path / "nonexistent.json"),
         "--confirm", "CONSUME_ALL_FOUR_CFB_SDV_ATTEMPTS", "--out", str(out),
-    ], capture_output=True, text=True)
+    ], capture_output=True, text=True, env={**os.environ, "PYTHONPATH": "."})
     assert run.returncode != 0
     assert "CFB_SDV_ATTEMPT_BUDGET_NOT_FRESH" in run.stderr
     assert not out.exists()
