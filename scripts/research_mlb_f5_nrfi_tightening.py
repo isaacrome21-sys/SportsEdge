@@ -19,6 +19,8 @@ from statistics import fmean
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from sportsedge.mlb_empirical_bayes import posterior_settlement_mass
+
 API = "https://statsapi.mlb.com/api/v1"
 SEASONS = (2023, 2024, 2025)
 TUNE = 2024
@@ -201,7 +203,15 @@ def blend(a: dict[int, float], b: dict[int, float]) -> dict[int, float]:
     return out
 
 
-def f5_metrics(away: dict[int, float], home: dict[int, float], ar_obs: int, hr_obs: int) -> dict:
+def f5_metrics(
+    away: dict[int, float],
+    home: dict[int, float],
+    ar_obs: int,
+    hr_obs: int,
+    *,
+    effective_n: int,
+) -> dict:
+    """Distribution NLL plus market metrics after the current production readout."""
     observed = away.get(ar_obs, 0.0) * home.get(hr_obs, 0.0)
     p_away = p_tie = p_home = p_over45 = 0.0
     for ar, ap in away.items():
@@ -215,11 +225,30 @@ def f5_metrics(away: dict[int, float], home: dict[int, float], ar_obs: int, hr_o
                 p_tie += p
             if ar + hr > 4.5:
                 p_over45 += p
+
+    state = posterior_settlement_mass(
+        over_mass=p_away,
+        under_mass=p_home,
+        push_mass=p_tie,
+        effective_n=float(effective_n),
+        has_push=True,
+    )
+    total45 = posterior_settlement_mass(
+        over_mass=p_over45,
+        under_mass=1.0 - p_over45,
+        push_mass=0.0,
+        effective_n=float(effective_n),
+        has_push=False,
+    )
     y = (int(ar_obs > hr_obs), int(ar_obs == hr_obs), int(hr_obs > ar_obs))
     return {
         "nll": -math.log(max(EPS, observed)),
-        "state_brier": (p_away-y[0])**2 + (p_tie-y[1])**2 + (p_home-y[2])**2,
-        "total45_brier": (p_over45-int(ar_obs+hr_obs > 4.5))**2,
+        "state_brier": (
+            (state["p_over"]-y[0])**2
+            + (state["p_push"]-y[1])**2
+            + (state["p_under"]-y[2])**2
+        ),
+        "total45_brier": (total45["p_over"]-int(ar_obs+hr_obs > 4.5))**2,
     }
 
 
@@ -274,7 +303,10 @@ def evaluate(games: list[dict]):
                 smoothed_pmf([r["f5_for"] for r in home], league_f5, strength),
                 smoothed_pmf([r["f5_against"] for r in away], league_f5, strength),
             )
-            frow[name] = f5_metrics(away_p, home_p, g["away_f5"], g["home_f5"])
+            frow[name] = f5_metrics(
+                away_p, home_p, g["away_f5"], g["home_f5"],
+                effective_n=min(len(away), len(home)),
+            )
         f5_rows.append(frow)
 
         y = int(g["away_i1"] == 0 and g["home_i1"] == 0)
