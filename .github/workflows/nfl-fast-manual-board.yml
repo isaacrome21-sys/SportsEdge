@@ -63,7 +63,7 @@ jobs:
             --input "${{ steps.input.outputs.path }}" \
             --history .cache/nfl-history/nflverse_games.json \
             --output artifacts/unified_full_card.json \
-            --n-sims 50000 \
+            --n-sims 20000 \
             --seed 21
       - name: Print compact results
         if: always()
