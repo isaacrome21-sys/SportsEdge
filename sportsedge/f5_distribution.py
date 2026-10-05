@@ -15,10 +15,12 @@ from typing import Any, Mapping, Sequence
 from .mlb_empirical_bayes import posterior_settlement_mass
 from .source_lineage import canonical_json_sha256
 
-F5_DISTRIBUTION_VERSION = "mlb_f5_empirical_state_v1_candidate"
+F5_DISTRIBUTION_VERSION = "mlb_f5_empirical_state_m30_v2"
 F5_READOUT_VERSION = "mlb_f5_readout_v2_jeffreys"
 F5_MARKETS = frozenset({"F5_MONEYLINE", "F5_RUN_LINE", "F5_TOTALS", "F5_TEAM_TOTALS"})
 MIN_HISTORY_GAMES = 10
+MIN_LEAGUE_HALVES = 200
+LEAGUE_PRIOR_STRENGTH = 30
 
 
 class F5DistributionError(ValueError):
@@ -75,6 +77,35 @@ def _empirical_pmf(values: tuple[int, ...]) -> dict[int, float]:
     return {key: count / n for key, count in counts.items()}
 
 
+def _league_pool(value: Any) -> tuple[int, ...]:
+    pool = _count_pool(value, "league_f5_runs")
+    if len(pool) < MIN_LEAGUE_HALVES:
+        raise F5DistributionError(
+            f"league_f5_runs requires at least {MIN_LEAGUE_HALVES} strictly-prior half-games"
+        )
+    return pool
+
+
+def _smoothed_pmf(
+    values: tuple[int, ...],
+    league_values: tuple[int, ...],
+    strength: int = LEAGUE_PRIOR_STRENGTH,
+) -> dict[int, float]:
+    league = _empirical_pmf(league_values)
+    counts: dict[int, float] = {}
+    for value in values:
+        counts[value] = counts.get(value, 0.0) + 1.0
+    keys = set(counts) | set(league)
+    denom = float(len(values) + strength)
+    out = {
+        key: (counts.get(key, 0.0) + float(strength) * league.get(key, 0.0)) / denom
+        for key in keys
+    }
+    if abs(sum(out.values()) - 1.0) > 1e-12:
+        raise F5DistributionError("smoothed F5 marginal does not conserve probability")
+    return out
+
+
 def _blend(left: dict[int, float], right: dict[int, float]) -> dict[int, float]:
     keys = set(left) | set(right)
     out = {key: 0.5 * left.get(key, 0.0) + 0.5 * right.get(key, 0.0) for key in keys}
@@ -90,13 +121,31 @@ def build_f5_distribution(features: Mapping[str, Any]) -> F5Distribution:
     away_against = _count_pool(features.get("away_f5_runs_against"), "away_f5_runs_against")
     home_for = _count_pool(features.get("home_f5_runs_for"), "home_f5_runs_for")
     home_against = _count_pool(features.get("home_f5_runs_against"), "home_f5_runs_against")
+    league_f5 = _league_pool(features.get("league_f5_runs"))
+    strength = features.get("league_prior_strength", LEAGUE_PRIOR_STRENGTH)
+    if isinstance(strength, bool):
+        raise F5DistributionError("league_prior_strength must be integer")
+    try:
+        strength = int(strength)
+    except (TypeError, ValueError) as exc:
+        raise F5DistributionError("league_prior_strength must be integer") from exc
+    if strength != LEAGUE_PRIOR_STRENGTH:
+        raise F5DistributionError(
+            f"league_prior_strength must equal held-out selection {LEAGUE_PRIOR_STRENGTH}"
+        )
     if len(away_for) != len(away_against):
         raise F5DistributionError("away F5 history arrays must align")
     if len(home_for) != len(home_against):
         raise F5DistributionError("home F5 history arrays must align")
 
-    away_scoring = _blend(_empirical_pmf(away_for), _empirical_pmf(home_against))
-    home_scoring = _blend(_empirical_pmf(home_for), _empirical_pmf(away_against))
+    away_scoring = _blend(
+        _smoothed_pmf(away_for, league_f5, strength),
+        _smoothed_pmf(home_against, league_f5, strength),
+    )
+    home_scoring = _blend(
+        _smoothed_pmf(home_for, league_f5, strength),
+        _smoothed_pmf(away_against, league_f5, strength),
+    )
     joint: dict[str, float] = {}
     for away_runs, away_p in sorted(away_scoring.items()):
         for home_runs, home_p in sorted(home_scoring.items()):
@@ -106,7 +155,10 @@ def build_f5_distribution(features: Mapping[str, Any]) -> F5Distribution:
 
     digest = canonical_json_sha256({
         "version": F5_DISTRIBUTION_VERSION,
-        "blend_policy": "equal_offense_opponent_allowed_empirical_marginals",
+        "blend_policy": "equal_offense_opponent_allowed_m30_league_prior_marginals",
+        "league_prior_strength": strength,
+        "league_half_innings": len(league_f5),
+        "league_f5_pmf": _empirical_pmf(league_f5),
         "joint_score_pmf": joint,
     })
     return F5Distribution(
