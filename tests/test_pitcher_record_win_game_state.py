@@ -72,6 +72,11 @@ class _F5Source:
                 "home_f5_runs_for": [0] * 10,
                 "home_f5_runs_against": [1] * 10,
             }
+        features.update({
+            "league_f5_pmf": {"0": 0.5, "1": 0.5},
+            "league_prior_halves": 1000,
+            "league_prior_strength": 30,
+        })
         return {
             "feature_version": "test_f5",
             "feature_source_hash": "1" * 64,
@@ -170,26 +175,36 @@ class PitcherRecordWinCreditStateTests(unittest.TestCase):
         engine = build_shared_pitcher_record_win_engine_session()
         qualified = engine(_input(outs=(15, 15, 15, 15, 15), state="LEAD"))
         short = engine(_input(outs=(12, 12, 12, 12, 12), state="LEAD"))
-        self.assertAlmostEqual(qualified["model_p"], 1.0)
+        self.assertGreater(qualified["f5_state_probabilities"]["LEAD"], 0.0)
+        self.assertAlmostEqual(
+            qualified["model_p"],
+            qualified["f5_state_probabilities"]["LEAD"],
+        )
         self.assertAlmostEqual(short["model_p"], 0.0)
         self.assertAlmostEqual(qualified["qualification_rate"], 1.0)
         self.assertAlmostEqual(short["qualification_rate"], 0.0)
 
     def test_exit_depth_controls_tie_to_permanent_lead_credit(self):
-        paths = {"LEAD": [], "TIE": [18, 18, 18, 18, 18], "TRAIL": []}
+        paths = {"LEAD": [99], "TIE": [18, 18, 18, 18, 18], "TRAIL": [99]}
         engine = build_shared_pitcher_record_win_engine_session()
         six_inning = engine(_input(outs=(18, 18, 18, 18, 18), state="TIE", paths=paths))
         five_inning = engine(_input(outs=(15, 15, 15, 15, 15), state="TIE", paths=paths))
-        self.assertAlmostEqual(six_inning["f5_state_probabilities"]["TIE"], 1.0)
-        self.assertAlmostEqual(six_inning["model_p"], 1.0)
+        self.assertGreater(six_inning["f5_state_probabilities"]["TIE"], 0.0)
+        self.assertAlmostEqual(
+            six_inning["model_p"],
+            six_inning["f5_state_probabilities"]["TIE"],
+        )
         self.assertAlmostEqual(five_inning["model_p"], 0.0)
 
     def test_bullpen_late_game_path_failure_contributes_zero(self):
-        paths = {"LEAD": [15, None, 15, None, 15], "TIE": [], "TRAIL": []}
+        paths = {"LEAD": [15, None, 15, None, 15], "TIE": [99], "TRAIL": [99]}
         engine = build_shared_pitcher_record_win_engine_session()
         result = engine(_input(outs=(18, 18, 18, 18, 18), state="LEAD", paths=paths))
         self.assertAlmostEqual(result["credit_probability_by_state"]["LEAD"], 0.6)
-        self.assertAlmostEqual(result["model_p"], 0.6)
+        self.assertAlmostEqual(
+            result["model_p"],
+            0.6 * result["f5_state_probabilities"]["LEAD"],
+        )
 
     def test_yes_no_and_quote_line_share_same_latent_identity(self):
         engine = build_shared_pitcher_record_win_engine_session()
@@ -203,7 +218,7 @@ class PitcherRecordWinCreditStateTests(unittest.TestCase):
         self.assertEqual(yes["mc_paths"], 0)
 
     def test_missing_credit_history_for_live_f5_state_fails_closed(self):
-        paths = {"LEAD": [], "TIE": [18], "TRAIL": []}
+        paths = {"LEAD": [], "TIE": [18], "TRAIL": [21]}
         engine = build_shared_pitcher_record_win_engine_session()
         with self.assertRaisesRegex(Exception, "CREDIT_PATH_STATE_MISSING:LEAD"):
             engine(_input(outs=(18, 18, 18, 18, 18), state="LEAD", paths=paths))
