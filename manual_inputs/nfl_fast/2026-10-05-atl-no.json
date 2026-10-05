@@ -1,0 +1,492 @@
+{
+  "sport": "NFL",
+  "observed_at": "2026-10-05T18:16:24-05:00",
+  "slate": "2026-10-05",
+  "source": "DraftKings screenshots supplied in chat",
+  "games": [
+    {
+      "away": "ATL",
+      "home": "NO",
+      "header": "ATL Falcons @ NO Saints",
+      "markets": [
+        {
+          "market": "moneyline",
+          "line": null,
+          "away_or_over_price": 100,
+          "home_or_under_price": -120,
+          "raw": "ML +100 -120",
+          "team": null,
+          "player": null
+        },
+        {
+          "market": "spread",
+          "line": 1.5,
+          "away_or_over_price": -115,
+          "home_or_under_price": -105,
+          "raw": "Spread ATL +1.5 -115 / NO -1.5 -105",
+          "team": null,
+          "player": null
+        },
+        {
+          "market": "total",
+          "line": 47.5,
+          "away_or_over_price": -112,
+          "home_or_under_price": -108,
+          "raw": "Total 47.5 O -112 / U -108",
+          "team": null,
+          "player": null
+        },
+        {
+          "market": "team_total",
+          "line": 23.5,
+          "away_or_over_price": -120,
+          "home_or_under_price": -110,
+          "raw": "ATL team total 23.5 O -120 / U -110",
+          "team": "ATL",
+          "player": null
+        },
+        {
+          "market": "team_total",
+          "line": 23.5,
+          "away_or_over_price": -125,
+          "home_or_under_price": -105,
+          "raw": "NO team total 23.5 O -125 / U -105",
+          "team": "NO",
+          "player": null
+        },
+        {
+          "market": "passing_yards",
+          "line": 258.5,
+          "away_or_over_price": -111,
+          "home_or_under_price": -113,
+          "raw": "Tyler Shough pass yards 258.5 O -111 / U -113",
+          "team": null,
+          "player": "Tyler Shough"
+        },
+        {
+          "market": "passing_yards",
+          "line": 225.5,
+          "away_or_over_price": -111,
+          "home_or_under_price": -113,
+          "raw": "Michael Penix Jr. pass yards 225.5 O -111 / U -113",
+          "team": null,
+          "player": "Michael Penix Jr."
+        },
+        {
+          "market": "pass_tds",
+          "line": 1.5,
+          "away_or_over_price": -131,
+          "home_or_under_price": 103,
+          "raw": "Tyler Shough pass TDs 1.5 O -131 / U +103",
+          "team": null,
+          "player": "Tyler Shough"
+        },
+        {
+          "market": "pass_tds",
+          "line": 1.5,
+          "away_or_over_price": 117,
+          "home_or_under_price": -149,
+          "raw": "Michael Penix Jr. pass TDs 1.5 O +117 / U -149",
+          "team": null,
+          "player": "Michael Penix Jr."
+        },
+        {
+          "market": "interceptions",
+          "line": 0.5,
+          "away_or_over_price": 102,
+          "home_or_under_price": -130,
+          "raw": "Michael Penix Jr. interceptions 0.5 O +102 / U -130",
+          "team": null,
+          "player": "Michael Penix Jr."
+        },
+        {
+          "market": "interceptions",
+          "line": 0.5,
+          "away_or_over_price": 101,
+          "home_or_under_price": -128,
+          "raw": "Tyler Shough interceptions 0.5 O +101 / U -128",
+          "team": null,
+          "player": "Tyler Shough"
+        },
+        {
+          "market": "pass_attempts",
+          "line": 37.5,
+          "away_or_over_price": -117,
+          "home_or_under_price": -109,
+          "raw": "Tyler Shough pass attempts 37.5 O -117 / U -109",
+          "team": null,
+          "player": "Tyler Shough"
+        },
+        {
+          "market": "pass_attempts",
+          "line": 30.5,
+          "away_or_over_price": -118,
+          "home_or_under_price": -108,
+          "raw": "Michael Penix Jr. pass attempts 30.5 O -118 / U -108",
+          "team": null,
+          "player": "Michael Penix Jr."
+        },
+        {
+          "market": "completions",
+          "line": 23.5,
+          "away_or_over_price": -119,
+          "home_or_under_price": -107,
+          "raw": "Tyler Shough completions 23.5 O -119 / U -107",
+          "team": null,
+          "player": "Tyler Shough"
+        },
+        {
+          "market": "completions",
+          "line": 20.5,
+          "away_or_over_price": 104,
+          "home_or_under_price": -132,
+          "raw": "Michael Penix Jr. completions 20.5 O +104 / U -132",
+          "team": null,
+          "player": "Michael Penix Jr."
+        },
+        {
+          "market": "receiving_yards",
+          "line": 86.5,
+          "away_or_over_price": -110,
+          "home_or_under_price": -114,
+          "raw": "Chris Olave receiving yards 86.5 O -110 / U -114",
+          "team": null,
+          "player": "Chris Olave"
+        },
+        {
+          "market": "receiving_yards",
+          "line": 80.5,
+          "away_or_over_price": -113,
+          "home_or_under_price": -111,
+          "raw": "Drake London receiving yards 80.5 O -113 / U -111",
+          "team": null,
+          "player": "Drake London"
+        },
+        {
+          "market": "receiving_yards",
+          "line": 47.5,
+          "away_or_over_price": -110,
+          "home_or_under_price": -114,
+          "raw": "Juwan Johnson receiving yards 47.5 O -110 / U -114",
+          "team": null,
+          "player": "Juwan Johnson"
+        },
+        {
+          "market": "receiving_yards",
+          "line": 45.5,
+          "away_or_over_price": -114,
+          "home_or_under_price": -110,
+          "raw": "Devaughn Vele receiving yards 45.5 O -114 / U -110",
+          "team": null,
+          "player": "Devaughn Vele"
+        },
+        {
+          "market": "receiving_yards",
+          "line": 36.5,
+          "away_or_over_price": -112,
+          "home_or_under_price": -112,
+          "raw": "Bijan Robinson receiving yards 36.5 O -112 / U -112",
+          "team": null,
+          "player": "Bijan Robinson"
+        },
+        {
+          "market": "receiving_yards",
+          "line": 31.5,
+          "away_or_over_price": -109,
+          "home_or_under_price": -115,
+          "raw": "Kyle Pitts receiving yards 31.5 O -109 / U -115",
+          "team": null,
+          "player": "Kyle Pitts"
+        },
+        {
+          "market": "receiving_yards",
+          "line": 18.5,
+          "away_or_over_price": -116,
+          "home_or_under_price": -108,
+          "raw": "Jahan Dotson receiving yards 18.5 O -116 / U -108",
+          "team": null,
+          "player": "Jahan Dotson"
+        },
+        {
+          "market": "receiving_yards",
+          "line": 16.5,
+          "away_or_over_price": -111,
+          "home_or_under_price": -113,
+          "raw": "Alvin Kamara receiving yards 16.5 O -111 / U -113",
+          "team": null,
+          "player": "Alvin Kamara"
+        },
+        {
+          "market": "receiving_yards",
+          "line": 15.5,
+          "away_or_over_price": -116,
+          "home_or_under_price": -108,
+          "raw": "Bryce Lance receiving yards 15.5 O -116 / U -108",
+          "team": null,
+          "player": "Bryce Lance"
+        },
+        {
+          "market": "receiving_yards",
+          "line": 8.5,
+          "away_or_over_price": -115,
+          "home_or_under_price": -109,
+          "raw": "Olamide Zaccheaus receiving yards 8.5 O -115 / U -109",
+          "team": null,
+          "player": "Olamide Zaccheaus"
+        },
+        {
+          "market": "receiving_yards",
+          "line": 6.5,
+          "away_or_over_price": -105,
+          "home_or_under_price": -120,
+          "raw": "Austin Hooper receiving yards 6.5 O -105 / U -120",
+          "team": null,
+          "player": "Austin Hooper"
+        },
+        {
+          "market": "receiving_yards",
+          "line": 6.5,
+          "away_or_over_price": -105,
+          "home_or_under_price": -120,
+          "raw": "Kendre Miller receiving yards 6.5 O -105 / U -120",
+          "team": null,
+          "player": "Kendre Miller"
+        },
+        {
+          "market": "receiving_yards",
+          "line": 5.5,
+          "away_or_over_price": -109,
+          "home_or_under_price": -116,
+          "raw": "Zachariah Branch receiving yards 5.5 O -109 / U -116",
+          "team": null,
+          "player": "Zachariah Branch"
+        },
+        {
+          "market": "receptions",
+          "line": 6.5,
+          "away_or_over_price": -139,
+          "home_or_under_price": 109,
+          "raw": "Chris Olave receptions 6.5 O -139 / U +109",
+          "team": null,
+          "player": "Chris Olave"
+        },
+        {
+          "market": "receptions",
+          "line": 6.5,
+          "away_or_over_price": 114,
+          "home_or_under_price": -146,
+          "raw": "Drake London receptions 6.5 O +114 / U -146",
+          "team": null,
+          "player": "Drake London"
+        },
+        {
+          "market": "receptions",
+          "line": 4.5,
+          "away_or_over_price": 110,
+          "home_or_under_price": -140,
+          "raw": "Bijan Robinson receptions 4.5 O +110 / U -140",
+          "team": null,
+          "player": "Bijan Robinson"
+        },
+        {
+          "market": "receptions",
+          "line": 4.5,
+          "away_or_over_price": 118,
+          "home_or_under_price": -151,
+          "raw": "Juwan Johnson receptions 4.5 O +118 / U -151",
+          "team": null,
+          "player": "Juwan Johnson"
+        },
+        {
+          "market": "receptions",
+          "line": 3.5,
+          "away_or_over_price": -153,
+          "home_or_under_price": 120,
+          "raw": "Devaughn Vele receptions 3.5 O -153 / U +120",
+          "team": null,
+          "player": "Devaughn Vele"
+        },
+        {
+          "market": "receptions",
+          "line": 2.5,
+          "away_or_over_price": -178,
+          "home_or_under_price": 139,
+          "raw": "Alvin Kamara receptions 2.5 O -178 / U +139",
+          "team": null,
+          "player": "Alvin Kamara"
+        },
+        {
+          "market": "receptions",
+          "line": 2.5,
+          "away_or_over_price": -169,
+          "home_or_under_price": 132,
+          "raw": "Kyle Pitts receptions 2.5 O -169 / U +132",
+          "team": null,
+          "player": "Kyle Pitts"
+        },
+        {
+          "market": "receptions",
+          "line": 1.5,
+          "away_or_over_price": -135,
+          "home_or_under_price": 106,
+          "raw": "Jahan Dotson receptions 1.5 O -135 / U +106",
+          "team": null,
+          "player": "Jahan Dotson"
+        },
+        {
+          "market": "receptions",
+          "line": 1.5,
+          "away_or_over_price": 114,
+          "home_or_under_price": -146,
+          "raw": "Bryce Lance receptions 1.5 O +114 / U -146",
+          "team": null,
+          "player": "Bryce Lance"
+        },
+        {
+          "market": "receptions",
+          "line": 1.5,
+          "away_or_over_price": 132,
+          "home_or_under_price": -170,
+          "raw": "Olamide Zaccheaus receptions 1.5 O +132 / U -170",
+          "team": null,
+          "player": "Olamide Zaccheaus"
+        },
+        {
+          "market": "receptions",
+          "line": 1.5,
+          "away_or_over_price": 166,
+          "home_or_under_price": -215,
+          "raw": "Kendre Miller receptions 1.5 O +166 / U -215",
+          "team": null,
+          "player": "Kendre Miller"
+        },
+        {
+          "market": "receptions",
+          "line": 0.5,
+          "away_or_over_price": -206,
+          "home_or_under_price": 160,
+          "raw": "Austin Hooper receptions 0.5 O -206 / U +160",
+          "team": null,
+          "player": "Austin Hooper"
+        },
+        {
+          "market": "receptions",
+          "line": 0.5,
+          "away_or_over_price": -159,
+          "home_or_under_price": 125,
+          "raw": "Zachariah Branch receptions 0.5 O -159 / U +125",
+          "team": null,
+          "player": "Zachariah Branch"
+        },
+        {
+          "market": "rushing_yards",
+          "line": 88.5,
+          "away_or_over_price": -112,
+          "home_or_under_price": -112,
+          "raw": "Bijan Robinson rushing yards 88.5 O -112 / U -112",
+          "team": null,
+          "player": "Bijan Robinson"
+        },
+        {
+          "market": "rushing_yards",
+          "line": 35.5,
+          "away_or_over_price": -109,
+          "home_or_under_price": -115,
+          "raw": "Alvin Kamara rushing yards 35.5 O -109 / U -115",
+          "team": null,
+          "player": "Alvin Kamara"
+        },
+        {
+          "market": "rushing_yards",
+          "line": 30.5,
+          "away_or_over_price": -108,
+          "home_or_under_price": -116,
+          "raw": "Brian Robinson Jr. rushing yards 30.5 O -108 / U -116",
+          "team": null,
+          "player": "Brian Robinson Jr."
+        },
+        {
+          "market": "rushing_yards",
+          "line": 26.5,
+          "away_or_over_price": -116,
+          "home_or_under_price": -108,
+          "raw": "Kendre Miller rushing yards 26.5 O -116 / U -108",
+          "team": null,
+          "player": "Kendre Miller"
+        },
+        {
+          "market": "rushing_yards",
+          "line": 17.5,
+          "away_or_over_price": -107,
+          "home_or_under_price": -118,
+          "raw": "Tyler Shough rushing yards 17.5 O -107 / U -118",
+          "team": null,
+          "player": "Tyler Shough"
+        },
+        {
+          "market": "rushing_yards",
+          "line": 3.5,
+          "away_or_over_price": -122,
+          "home_or_under_price": -103,
+          "raw": "Michael Penix Jr. rushing yards 3.5 O -122 / U -103",
+          "team": null,
+          "player": "Michael Penix Jr."
+        },
+        {
+          "market": "rush_attempts",
+          "line": 19.5,
+          "away_or_over_price": -104,
+          "home_or_under_price": -123,
+          "raw": "Bijan Robinson rush attempts 19.5 O -104 / U -123",
+          "team": null,
+          "player": "Bijan Robinson"
+        },
+        {
+          "market": "rush_attempts",
+          "line": 11.5,
+          "away_or_over_price": 106,
+          "home_or_under_price": -135,
+          "raw": "Alvin Kamara rush attempts 11.5 O +106 / U -135",
+          "team": null,
+          "player": "Alvin Kamara"
+        },
+        {
+          "market": "rush_attempts",
+          "line": 7.5,
+          "away_or_over_price": 103,
+          "home_or_under_price": -132,
+          "raw": "Kendre Miller rush attempts 7.5 O +103 / U -132",
+          "team": null,
+          "player": "Kendre Miller"
+        },
+        {
+          "market": "rush_attempts",
+          "line": 4.5,
+          "away_or_over_price": 110,
+          "home_or_under_price": -141,
+          "raw": "Tyler Shough rush attempts 4.5 O +110 / U -141",
+          "team": null,
+          "player": "Tyler Shough"
+        },
+        {
+          "market": "rush_receiving_yards",
+          "line": 130.5,
+          "away_or_over_price": -112,
+          "home_or_under_price": -113,
+          "raw": "Bijan Robinson rush+rec yards 130.5 O -112 / U -113",
+          "team": null,
+          "player": "Bijan Robinson"
+        },
+        {
+          "market": "rush_receiving_yards",
+          "line": 55.5,
+          "away_or_over_price": -114,
+          "home_or_under_price": -112,
+          "raw": "Alvin Kamara rush+rec yards 55.5 O -114 / U -112",
+          "team": null,
+          "player": "Alvin Kamara"
+        }
+      ]
+    }
+  ]
+}
