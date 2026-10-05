@@ -92,22 +92,30 @@ def score_count_grid(game: Mapping[str, Any]) -> list[list[float]]:
 def score_count_paths(game: Mapping[str, Any]) -> list[dict[str, int]]:
     """Expand the exact empirical distribution back to its 50k score paths.
 
-    Ordering is canonical by home score then away score. Player workload models
-    may use these paths without introducing a second score-distribution model.
+    Ordering is canonical by home score then away score. Stored integer counts
+    are expanded directly; no probability round-trip can alter path mass.
     """
-    grid = score_count_grid(game)
+    # Reuse the full validator first.
+    score_count_grid(game)
+    raw_rows = game["joint_score_distribution"]
+    parsed = sorted(
+        (
+            _int(raw[0], "home_score"),
+            _int(raw[1], "away_score"),
+            _int(raw[2], "count"),
+        )
+        for raw in raw_rows
+    )
     out: list[dict[str, int]] = []
     simulation_id = 0
-    for home, row in enumerate(grid):
-        for away, probability in enumerate(row):
-            count = int(round(probability * 50000))
-            for _ in range(count):
-                out.append({
-                    "simulation_id": simulation_id,
-                    "home_score": home,
-                    "away_score": away,
-                })
-                simulation_id += 1
+    for home, away, count in parsed:
+        for _ in range(count):
+            out.append({
+                "simulation_id": simulation_id,
+                "home_score": home,
+                "away_score": away,
+            })
+            simulation_id += 1
     if len(out) != 50000:
         raise ScoreCountMarketBridgeError(f"EXPANDED_SCORE_PATH_COUNT_INVALID:{len(out)}")
     return out
