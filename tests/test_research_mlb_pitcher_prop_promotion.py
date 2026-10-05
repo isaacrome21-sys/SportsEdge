@@ -218,3 +218,10 @@ def test_pit_present_umpire_uses_archived_assignment():
     got = src.plate_umpire(game_pk=99, target_date=datetime(2026, 10, 1).date())
     assert got["umpire_id"] == 777
     assert got["umpire_name"] == "Test Ump"
+
+
+def test_pit_context_path_regex_matches_real_archive_path():
+    path = "runtime/mlb-context/runs/37267617765/2026-10-05/game_849834.json"
+    match = R.CONTEXT_PATH_RE.match(path)
+    assert match is not None
+    assert match.group(1) == "849834"
