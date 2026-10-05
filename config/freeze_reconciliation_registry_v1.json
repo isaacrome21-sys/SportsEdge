@@ -1827,10 +1827,16 @@
       "merge_sha": "dc95904565e58277c516578e28ed4b306a017bcc",
       "pr": 1620,
       "note": "NFL V2K final development result persisted after canonical Attempt-5 failure. Records 5/5 development budget exhausted and blocks further scored development runs; no Model_P, pricing, promotion, staking, release, OFFICIAL, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_A4D73FDB_PR_1624",
+      "merge_sha": "a4d73fdb85fddde7b8228b8b5b021dfad5259588",
+      "pr": 1624,
+      "note": "NFL prop usage V1 2025 validation finality receipt merged. Canonical one-look was spent by technical source-access failure before model scoring; no statistical verdict and no Model_P, Truth Gate, promotion, staking, OFFICIAL, or backfill authority."
     }
   ],
-  "inventory_block_reason": "Current main through merge dc959045 / PR #1620 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
+  "inventory_block_reason": "Current main through merge a4d73fdb / PR #1624 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "dc95904565e58277c516578e28ed4b306a017bcc",
+  "reconciled_through_sha": "a4d73fdb85fddde7b8228b8b5b021dfad5259588",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
