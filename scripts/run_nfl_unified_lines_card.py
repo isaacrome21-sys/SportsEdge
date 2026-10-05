@@ -107,6 +107,24 @@ def main() -> int:
                 source_status["injuries"] = "AVAILABLE"
                 injury_source_ready = True
 
+            # One-off phone runs may bind an official game-day inactive list
+            # supplied alongside the sportsbook board. This only removes
+            # confirmed inactive players from the PIT depth pool.
+            official_inactives = {
+                " ".join(str(name or "").strip().lower().split())
+                for name in (ticket.get("official_inactives") or [])
+                if str(name or "").strip()
+            }
+            if official_inactives:
+                depth_rows = [
+                    row for row in depth_rows
+                    if " ".join(str(row.get("player_name") or "").strip().lower().split())
+                    not in official_inactives
+                ]
+                injury_rows = []
+                source_status["injuries"] = "AVAILABLE:OFFICIAL_INACTIVES_MANUAL_BIND"
+                injury_source_ready = True
+
     scoring_prior = load_prior_file(args.scoring_prior) if args.scoring_prior else None
 
     payload = build_unified_phone_card(
