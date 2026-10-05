@@ -1,0 +1,55 @@
+{
+  "schema": "NFL_V2K_DEVELOPMENT_FINAL_V1",
+  "status": "DEVELOPMENT_BUDGET_EXHAUSTED_NO_PASS",
+  "max_development_attempts": 5,
+  "development_budget_units_used": 5,
+  "development_budget_units_remaining": 0,
+  "canonical_final_attempt": {
+    "budget_unit": 5,
+    "candidate_family": "NFL_MARKET_CALIBRATION_LINE_G5",
+    "result": "FAIL",
+    "workflow_run_id": 37297530783,
+    "artifact_id": 11340321865,
+    "artifact_digest": "sha256:b712e0d8bdcb92af67ebfae59e423c076c0fbdac7a3319de9182f8e5a150edc2",
+    "code_sha": "e02495cd54ecb60b1bfc549aabecb6e5820f315c",
+    "issue": 1614,
+    "diagnostics": {
+      "evaluated_rows": 2127,
+      "spread": {
+        "fold_wins": 1,
+        "fold_total": 5,
+        "fold_win_rate": 0.2,
+        "baseline_log_loss": 0.6926994212469693,
+        "candidate_log_loss": 0.6934737126775558,
+        "calibration_pass": true,
+        "overall_log_loss_pass": false,
+        "pass": false
+      },
+      "total": {
+        "fold_wins": 3,
+        "fold_total": 5,
+        "fold_win_rate": 0.6,
+        "baseline_log_loss": 0.6927381111477684,
+        "candidate_log_loss": 0.6930339041822584,
+        "calibration_pass": true,
+        "overall_log_loss_pass": false,
+        "pass": false
+      }
+    }
+  },
+  "policy": {
+    "additional_v2k_development_attempts_allowed": false,
+    "identical_deterministic_reruns_do_not_create_new_attempt_or_authority": true,
+    "post_result_retuning_forbidden": true,
+    "failed_candidate_may_not_be_served_as_edge_model": true
+  },
+  "authority": {
+    "model_p": false,
+    "pricing": false,
+    "promotion": false,
+    "staking": false,
+    "production_release": false,
+    "official": false,
+    "untouched_readout": false
+  }
+}
