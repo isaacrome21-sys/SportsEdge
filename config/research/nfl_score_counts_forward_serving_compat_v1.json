@@ -1,0 +1,51 @@
+{
+  "schema": "SPORTSEDGE_NFL_SCORE_COUNTS_G1_FORWARD_SERVING_COMPAT_V1",
+  "status": "FROZEN_BEFORE_FIRST_2026_WEEK5_FORWARD_PREDICTION",
+  "frozen_date": "2026-10-05",
+  "candidate_family": "NFL_SCORE_COUNTS_G1",
+  "purpose": "Separate historical fit provenance from fresh forward-serving provenance without changing fitted score-count math.",
+  "fit_requirements": {
+    "development_status": "DEVELOPMENT_ATTEMPT_PASS_REQUIRED",
+    "historical_fit_artifact_digest": "REQUIRED_AND_REPLAYED",
+    "training_source_manifest": "PRESERVED_FROM_FIT_ARTIFACT",
+    "fit_code_identity": "PRESERVED_FROM_FIT_ARTIFACT"
+  },
+  "forward_requirements": {
+    "fresh_source_manifest_sha256": "REQUIRED",
+    "serving_code_identity": "REQUIRED",
+    "prediction_before_kickoff": true,
+    "target_game_pbp_forbidden": true,
+    "market_data_in_model_rows": false,
+    "prediction_persisted_before_quote_binding": true
+  },
+  "permitted_serving_delta": {
+    "direct_td_component_retention": "ALLOWED_ONLY_IF_SCORE_MARGINAL_IS_EXACTLY_UNCHANGED",
+    "fit_vs_forward_provenance_split": "ALLOWED",
+    "fitted_td_mean_model": "UNCHANGED",
+    "fitted_fg_mean_model": "UNCHANGED",
+    "shared_sigma": "UNCHANGED",
+    "rare_score_rates": "UNCHANGED",
+    "conversion_rates": "UNCHANGED",
+    "rng_root_and_child_seed": "UNCHANGED",
+    "score_formula": "UNCHANGED",
+    "paths_per_game": 50000
+  },
+  "forbidden": [
+    "REFIT_AFTER_GATE_PASS",
+    "COEFFICIENT_OVERRIDE",
+    "FEATURE_VECTOR_CHANGE_AT_SERVE",
+    "MARKET_CENTERING",
+    "POSTHOC_SCORE_REDISTRIBUTION",
+    "SOURCE_BACKFILL_AFTER_KICKOFF",
+    "TARGET_GAME_PBP",
+    "SPORTSBOOK_INPUT_TO_MODEL_DISTRIBUTION"
+  ],
+  "authority": {
+    "research_only": true,
+    "creates_model_p": false,
+    "promotion": false,
+    "staking": false,
+    "official": false,
+    "backfill": false
+  }
+}
