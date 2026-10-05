@@ -1,0 +1,26 @@
+{
+  "schema": "NFL_V2K_DEVELOPMENT_FINAL_V1",
+  "status": "BUDGET_EXHAUSTED_NO_PASS",
+  "attempts_used": 5,
+  "attempts_remaining": 0,
+  "canonical_run_id": 37297530783,
+  "artifact_id": 11340321865,
+  "artifact_sha256": "b712e0d8bdcb92af67ebfae59e423c076c0fbdac7a3319de9182f8e5a150edc2",
+  "code_sha": "e02495cd54ecb60b1bfc549aabecb6e5820f315c",
+  "verdict": "ATTEMPT5_FAIL",
+  "spread": {
+    "fold_wins": 1,
+    "fold_total": 5,
+    "baseline_log_loss": 0.6926994212469693,
+    "candidate_log_loss": 0.6934737126775558,
+    "passed": false
+  },
+  "total": {
+    "fold_wins": 3,
+    "fold_total": 5,
+    "baseline_log_loss": 0.6927381111477684,
+    "candidate_log_loss": 0.6930339041822584,
+    "passed": false
+  },
+  "additional_development_attempts_allowed": false
+}
