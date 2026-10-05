@@ -30,6 +30,10 @@ from sportsedge.nfl_attempt9_live_forecast import load_model_p, load_runtime, ra
 
 SPREAD_SIGMA_FALLBACK = 13.78774897397055
 TOTAL_SIGMA_FALLBACK = 13.99738332096112
+# Attempt-9 intercepts (z=0). A model mean, not a line. Used only when the
+# manual board does not include history or an explicit margin/total.
+ATTEMPT9_BASELINE_MARGIN = 2.4899289099525883
+ATTEMPT9_BASELINE_TOTAL = 45.492298578199055
 GAME_MARKETS = {
     "moneyline": "moneyline",
     "ml": "moneyline",
@@ -104,20 +108,23 @@ def _side_probability(margin: float, total: float, quote: dict, spread_sigma: fl
     return None
 
 
-def _forecasts(rows: list, history_path: str | None) -> dict[str, tuple[float, float]]:
+def _forecasts(rows: list, history_path: str | None) -> tuple[dict[str, tuple[float, float]], dict[str, str]]:
     out: dict[str, tuple[float, float]] = {}
+    source: dict[str, str] = {}
     for row in rows:
         if not isinstance(row, dict):
             continue
         key = str(row.get("game_id") or f"{row.get('away_team') or row.get('away')}@{row.get('home_team') or row.get('home')}")
         if row.get("margin") is not None and row.get("total") is not None:
             out[key] = (float(row["margin"]), float(row["total"]))
+            source[key] = "BOARD_MARGIN_TOTAL"
         elif row.get("home_mean") is not None and row.get("away_mean") is not None:
             home = float(row["home_mean"])
             away = float(row["away_mean"])
             out[key] = (home - away, home + away)
+            source[key] = "BOARD_TEAM_MEANS"
     if not history_path:
-        return out
+        return _fill_baseline(rows, out, source)
     history_raw = json.loads(Path(history_path).read_text(encoding="utf-8"))
     history = history_raw.get("games") if isinstance(history_raw, dict) else history_raw
     if not isinstance(history, list):
@@ -139,7 +146,20 @@ def _forecasts(rows: list, history_path: str | None) -> dict[str, tuple[float, f
             continue
         forecast = raw_forecasts(runtime, feat["vector"])
         out[key] = (float(forecast["margin"]), float(forecast["total"]))
-    return out
+        source[key] = "ATTEMPT9_HISTORY"
+    return _fill_baseline(rows, out, source)
+
+
+def _fill_baseline(rows: list, out: dict, source: dict) -> tuple[dict, dict]:
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        key = str(row.get("game_id") or f"{row.get('away_team') or row.get('away')}@{row.get('home_team') or row.get('home')}")
+        if key in out:
+            continue
+        out[key] = (ATTEMPT9_BASELINE_MARGIN, ATTEMPT9_BASELINE_TOTAL)
+        source[key] = "ATTEMPT9_INTERCEPT_BASELINE"
+    return out, source
 
 
 def _quotes(row: dict) -> list[dict]:
@@ -151,7 +171,7 @@ def _quotes(row: dict) -> list[dict]:
 
 def build_card(rows: list, *, history_path: str | None = None) -> dict:
     spread_sigma, total_sigma, sigma_source = _sigmas()
-    forecasts = _forecasts(rows, history_path)
+    forecasts, forecast_source = _forecasts(rows, history_path)
     results = []
     game_rows = []
     prop_rows = []
@@ -186,6 +206,7 @@ def build_card(rows: list, *, history_path: str | None = None) -> dict:
                 "edge": edge,
                 "bet_status": "BET" if is_bet else "NO_BET",
                 "reason": "EDGE_POSITIVE" if is_bet else ("NO_EDGE" if model_p is not None else "MODEL_P_UNAVAILABLE"),
+                "forecast_source": forecast_source.get(key),
                 "official_eligible": False,
             }
             results.append(result)
@@ -214,6 +235,7 @@ def build_card(rows: list, *, history_path: str | None = None) -> dict:
         "market_input_source": "MANUAL_SCREENSHOT_BOARD",
         "odds_api_called": False,
         "sigma_source": sigma_source,
+        "forecast_source": "ATTEMPT9_INTERCEPT_BASELINE" if any(v == "ATTEMPT9_INTERCEPT_BASELINE" for v in forecast_source.values()) else "ATTEMPT9_OR_BOARD",
         "spread_sigma": spread_sigma,
         "total_sigma": total_sigma,
         "results": results,

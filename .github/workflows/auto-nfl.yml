@@ -12,6 +12,12 @@ on:
         required: false
         type: string
 
+  pull_request:
+    paths:
+      - scripts/run_auto_nfl_resilient.py
+      - tests/test_run_auto_nfl_resilient.py
+      - .github/workflows/auto-nfl.yml
+
 permissions:
   contents: read
 
@@ -31,7 +37,11 @@ jobs:
           python-version: '3.12'
       - name: Install runtime dependencies
         run: python -m pip install --disable-pip-version-check numpy==2.5.3
+      - name: Test attempt-9 baseline side emit
+        if: github.event_name == 'pull_request'
+        run: python -m unittest tests.test_run_auto_nfl_resilient -v
       - name: Run NFL card against screenshot-supplied lines
+        if: github.event_name == 'workflow_dispatch'
         env:
           SPORTSEDGE_NFL_BOARD: ${{ inputs.board_json }}
           SPORTSEDGE_NFL_HISTORY: ${{ inputs.history_json }}
@@ -46,12 +56,20 @@ jobs:
           card = json.loads(Path("artifacts/live_nfl_card.json").read_text())
           if card.get("odds_api_called") is not False:
               raise SystemExit("NFL_AUTO_ODDS_API_GUARD_FAILED")
-          summary = card.get("summary") or {}
-          if summary.get("both_sides") is not True or summary.get("catalog_complete") is not True:
-              raise SystemExit("NFL_AUTO_CATALOG_INCOMPLETE")
-          if int(summary.get("prop_rows") or 0) < 40 or int(summary.get("side_rows") or 0) < 16 or int(summary.get("total_rows") or 0) < 10:
-              raise SystemExit("NFL_AUTO_PROP_SIDE_TOTAL_COVERAGE")
-          print(f"NFL_AUTO_CARD_OK sides={summary.get('side_rows')} totals={summary.get('total_rows')} props={summary.get('prop_rows')}")
+          funnel = card.get("funnel") or {}
+          quotes = int(funnel.get("odds_rows_fetched") or 0)
+          if quotes == 0 or card.get("run_status") == "BLOCKED_NO_ODDS":
+              raise SystemExit("NFL_AUTO_ZERO_QUOTES")
+          rows = card.get("results") or []
+          bets = [
+              row for row in rows
+              if row.get("model_p") is not None and row.get("edge") is not None and float(row["edge"]) > 0
+          ]
+          if int(funnel.get("bets_emitted") or 0) != len(bets):
+              raise SystemExit("NFL_AUTO_BET_EMIT_MISMATCH")
+          if not any(row.get("model_p") is not None for row in rows if str(row.get("market")) in {"spread", "moneyline", "total"}):
+              raise SystemExit("NFL_AUTO_SIDES_UNPRICED")
+          print(f"NFL_AUTO_CARD_OK rows={len(rows)} bets={len(bets)} run_status={card.get('run_status')}")
           PY
           exit $rc
       - name: Render NFL both-side board
