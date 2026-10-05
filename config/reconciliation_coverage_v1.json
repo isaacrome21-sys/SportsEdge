@@ -200,6 +200,7 @@
         "docs/CFB_RESEARCH_RANK_PREREG_V1.md",
         "docs/LIVE_DATA_ARCHIVE_V1.md",
         "docs/LIVE_ENGINE_V1.md",
+        "docs/MLB_F5_NRFI_TIGHTENING_PREREG.md",
         "docs/MLB_LINEUP_K_CONTEXT_PREREG.md",
         "docs/MLB_OPP_K_CONTEXT_PREREG.md",
         "docs/MLB_OPP_OUTS_CONTEXT_PREREG.md",
@@ -238,6 +239,7 @@
         "scripts/mlb_pit_replay_metrics.py",
         "scripts/normalize_fanduel_nfl_markets.py",
         "scripts/normalize_pinnacle_nfl_markets.py",
+        "scripts/research_mlb_f5_nrfi_tightening.py",
         "scripts/research_mlb_pitcher_prop_promotion.py",
         "scripts/run_it_mlb_pregame.py",
         "scripts/run_live_run_it.py",
@@ -260,6 +262,7 @@
         "sportsedge/sports/mlb/the_odds_api_history.py",
         "sportsedge/sports/mlb/the_odds_api_materializer.py",
         "sportsedge/sports/mlb/the_odds_api_pairing.py",
+        "tests/test_research_mlb_f5_nrfi_tightening.py",
         "tests/test_research_mlb_pitcher_prop_promotion.py"
       ],
       "coverage_prefixes": []
