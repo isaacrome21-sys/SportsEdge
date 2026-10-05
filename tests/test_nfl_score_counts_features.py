@@ -240,3 +240,56 @@ def test_insufficient_qb_prior_fails_closed_without_partial_game_row():
         seasons=[2020],
     )
     assert out == []
+
+
+def test_rare_score_context_is_strictly_prior_and_updates_next_game():
+    original = rows_for()
+    changed_pbp = deepcopy(pbp())
+    changed_pbp.extend([
+        {
+            "game_id": "g5", "play_id": "5901",
+            "posteam": "A", "defteam": "H",
+            "touchdown": 1, "td_team": "H", "return_touchdown": 1,
+        },
+        {
+            "game_id": "g5", "play_id": "5902",
+            "posteam": "H", "defteam": "A", "safety": 1,
+        },
+    ])
+    changed = rows_for(pbp_rows=changed_pbp)
+
+    g5_h_a = by_game_team(original, "g5", "H")
+    g5_h_b = by_game_team(changed, "g5", "H")
+    g5_a_a = by_game_team(original, "g5", "A")
+    g5_a_b = by_game_team(changed, "g5", "A")
+    assert g5_h_a["def_st_td_rate"] == g5_h_b["def_st_td_rate"]
+    assert g5_a_a["safety_rate"] == g5_a_b["safety_rate"]
+
+    g6_h_a = by_game_team(original, "g6", "H")
+    g6_h_b = by_game_team(changed, "g6", "H")
+    g6_a_a = by_game_team(original, "g6", "A")
+    g6_a_b = by_game_team(changed, "g6", "A")
+    assert g6_h_b["def_st_td_rate"] > g6_h_a["def_st_td_rate"]
+    assert g6_a_b["safety_rate"] > g6_a_a["safety_rate"]
+
+
+def test_conversion_context_uses_league_until_50_team_opportunities_then_team_rate():
+    out = build_score_count_training_rows(
+        schedule_rows=schedule(n=52),
+        pbp_rows=pbp(n=52),
+        depth_rows=depth(n=52),
+        seasons=[2020],
+    )
+    early_h = by_game_team(out, "g5", "H")
+    early_a = by_game_team(out, "g5", "A")
+    assert early_h["conversion_pat_p"] == pytest.approx(0.5)
+    assert early_h["conversion_two_p"] == pytest.approx(0.5)
+    assert early_a["conversion_pat_p"] == pytest.approx(0.5)
+    assert early_a["conversion_two_p"] == pytest.approx(0.5)
+
+    mature_h = by_game_team(out, "g51", "H")
+    mature_a = by_game_team(out, "g51", "A")
+    assert mature_h["conversion_pat_p"] == pytest.approx(1.0)
+    assert mature_h["conversion_two_p"] == pytest.approx(0.0)
+    assert mature_a["conversion_pat_p"] == pytest.approx(0.0)
+    assert mature_a["conversion_two_p"] == pytest.approx(1.0)
