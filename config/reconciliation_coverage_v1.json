@@ -92,6 +92,7 @@
         "config/cfb_candidate_bakeoff_evaluator_v3.json",
         "config/cfb_dispersion_only_prereg_v1.json",
         "config/cfb_market_anchored_spread_challenger_v1.json",
+        "config/cfb_market_anchored_spread_fit_v1.json",
         "config/cfb_sdv_completed_selection_v1.json",
         "config/cfb_sdv_materialize_request_v1.json",
         "config/cfb_sdv_prior_current_blend_fit_v1.json",
@@ -113,6 +114,7 @@
         "scripts/run_auto_cfb_resilient.py",
         "scripts/run_cfb_candidate_bakeoff.py",
         "scripts/run_cfb_game_model_candidate.py",
+        "scripts/run_cfb_sdv_card_v2.py",
         "scripts/run_cfb_sportsdataverse_bakeoff.py",
         "sportsedge/sports/cfb/altitude_features.py",
         "sportsedge/sports/cfb/altitude_prereg.py",
@@ -137,7 +139,8 @@
         "sportsedge/sports/cfb/sportsdataverse_history.py",
         "sportsedge/sports/cfb/sportsdataverse_manifest.py",
         "sportsedge/sports/cfb/sportsdataverse_prereg_hash.py",
-        "tests/test_cfb_market_anchored_spread.py"
+        "tests/test_cfb_market_anchored_spread.py",
+        "tests/test_cfb_sdv_card_v2.py"
       ],
       "coverage_prefixes": []
     },
