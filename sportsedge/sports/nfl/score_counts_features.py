@@ -14,7 +14,7 @@ from typing import Any, Iterable, Mapping, Sequence
 from zoneinfo import ZoneInfo
 
 from sportsedge.sports.nfl.m2_history_features import select_starting_qb
-from sportsedge.sports.nfl.score_counts_g1 import FEATURE_NAMES, ScoreCountsError, empirical_bayes_rate
+from sportsedge.sports.nfl.score_counts_g1 import FEATURE_NAMES, ScoreCountsError
 
 _EASTERN = ZoneInfo("America/New_York")
 TEAM_ALIASES = {"LA": "LAR", "WSH": "WAS", "OAK": "LV", "SD": "LAC", "STL": "LAR"}
@@ -339,24 +339,19 @@ def _rare_and_conversion_context(
     league_games = float(len(league_prior))
     league_dst = sum(float(r.def_st_touchdowns) for r in league_prior) / league_games
     league_safety = sum(float(r.safeties) for r in league_prior) / league_games
-    if not 0.0 <= league_dst <= 1.0:
-        raise ScoreCountFeatureError("LEAGUE_DEF_ST_TD_RATE_OUT_OF_RANGE")
-    if not 0.0 <= league_safety <= 1.0:
-        raise ScoreCountFeatureError("LEAGUE_SAFETY_RATE_OUT_OF_RANGE")
+    if league_dst < 0.0 or league_safety < 0.0:
+        raise ScoreCountFeatureError("LEAGUE_RARE_SCORE_RATE_NEGATIVE")
 
     team_games = float(len(team_prior))
-    dst = empirical_bayes_rate(
-        events=sum(float(r.def_st_touchdowns) for r in team_prior),
-        exposure=team_games,
-        league_rate=league_dst,
-        prior_exposure=25.0,
-    )
-    safety = empirical_bayes_rate(
-        events=sum(float(r.safeties) for r in team_prior),
-        exposure=team_games,
-        league_rate=league_safety,
-        prior_exposure=25.0,
-    )
+    prior_games = 25.0
+    dst = (
+        sum(float(r.def_st_touchdowns) for r in team_prior)
+        + prior_games * league_dst
+    ) / (team_games + prior_games)
+    safety = (
+        sum(float(r.safeties) for r in team_prior)
+        + prior_games * league_safety
+    ) / (team_games + prior_games)
 
     def conversion_counts(rows: Sequence[TeamGame]) -> tuple[float, float, float]:
         td = sum(float(r.offense_touchdowns + r.def_st_touchdowns) for r in rows)
