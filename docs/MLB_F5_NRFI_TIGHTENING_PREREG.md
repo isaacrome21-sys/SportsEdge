@@ -1,4 +1,4 @@
-# MLB F5 + NRFI/YRFI tightening pre-registration (v1, 2026-10-04)
+# MLB F5 + NRFI/YRFI tightening pre-registration (v2, 2026-10-04)
 
 Tracking: #1482 follow-on after the announced-lineup K production wiring. This
 protocol is committed before any result is viewed. The research run changes no
@@ -9,10 +9,10 @@ production probability and grants no promotion, OFFICIAL, or staking authority.
 F5 already uses actual strictly-prior first-five scores, but its last-30 team
 marginals are unsmoothed. Unseen F5 score states can receive exactly zero mass.
 
-NRFI/YRFI still derives inning-one scoring from recent full-game run means with
-the fixed production first-inning share 0.118 and NB dispersion r=0.35. It does
-not directly model each offense's inning-one scoreless rate or its opponent's
-inning-one prevention rate.
+NRFI/YRFI now uses actual strictly-prior inning-one offense and opponent-allow
+history with Jeffreys Beta(1/2, 1/2) stabilization. That current production lane
+prevents 0%/100% short-sample probabilities, but it does not borrow broader
+strictly-prior league information when a team's recent 30-game history is thin.
 
 ## Data and PIT rules
 
@@ -51,21 +51,22 @@ F5 ships only if all 2025 rules pass:
 
 ## NRFI/YRFI candidates
 
-production_nb reproduces the current path: each team's recent full-game
-runs-for mean, first-inning share 0.118, NB dispersion r=0.35, with NRFI equal
-to the product of the two zero-run half-inning probabilities.
+production_empirical_jeffreys reproduces the current #1571 path exactly: for
+each offense and opponent-allow component, the scoreless probability is the
+Jeffreys Beta(1/2, 1/2) posterior mean from the recent strictly-prior inning-one
+binary outcomes; the two components are averaged 50/50 for each half inning,
+and NRFI is the product of the two half-inning zero probabilities.
 
-Direct candidates use actual inning-one outcomes. A half-inning zero
-probability is the 50/50 average of the batting team's recent scoreless rate and
-the opponent's recent prevention rate. Each component can be shrunk toward the
-strictly-prior league inning-one scoreless rate. Candidates are direct_m0,
-direct_m5, direct_m15, and direct_m30.
+Challengers retain that Jeffreys 1.0 effective observation and add 5, 15, or 30
+pseudo-games from the strictly-prior league inning-one scoreless rate. Candidates
+are direct_m5, direct_m15, and direct_m30. There is no obsolete full-game/NB
+baseline in this study.
 
-Select on 2024 by lowest binary log loss; ties favor production_nb and then the
-earlier direct candidate.
+Select on 2024 by lowest binary log loss; ties favor
+production_empirical_jeffreys and then the smaller league prior.
 
 NRFI/YRFI ships only if all 2025 rules pass:
-1. selected candidate is not production_nb;
+1. selected candidate is not production_empirical_jeffreys;
 2. date-clustered 95% bootstrap CI of delta log loss is below 0;
 3. Brier is no worse than production;
 4. 10-bin ECE is no worse than production + 0.005;
