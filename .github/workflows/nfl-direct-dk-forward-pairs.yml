@@ -1,0 +1,67 @@
+name: NFL direct DK prospective pairs
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Free acquisition lane. Five-minute cadence allows the frozen prospective
+    # decision/close windows to be observed without The Odds API credits.
+    - cron: '1,6,11,16,21,26,31,36,41,46,51,56 * * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sportsedge-direct-dk-forward-pairs
+  cancel-in-progress: false
+
+jobs:
+  pair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Restore immutable direct-DK archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin data:data
+          git worktree add .data-dk data
+          mkdir -p .data-dk/evidence/direct_dk_forward_pairs
+      - name: Verify bridge contracts
+        run: |
+          python3 -m py_compile scripts/materialize_direct_dk_forward_pairs.py sportsedge/validation/direct_dk_forward_pairing.py
+          python3 -m unittest -q tests.test_direct_dk_forward_pairing
+      - name: Materialize prospective NFL pairs
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive=.data-dk/evidence/direct_dk_closing_lines
+          if [ ! -d "$archive" ]; then
+            echo DIRECT_DK_ARCHIVE_NOT_PRESENT
+            exit 0
+          fi
+          day="$(date -u +%F)"
+          out=".data-dk/evidence/direct_dk_forward_pairs/nfl/${day}/pairs_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}.json"
+          PYTHONPATH=. python3 scripts/materialize_direct_dk_forward_pairs.py \
+            --archive-root "$archive" \
+            --sport americanfootball_nfl \
+            --out "$out"
+      - name: Persist immutable pairing report
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd .data-dk
+          git config user.name sportsedge-direct-dk-bot
+          git config user.email sportsedge-direct-dk-bot@users.noreply.github.com
+          git add evidence/direct_dk_forward_pairs || true
+          if git diff --cached --quiet; then
+            echo DIRECT_DK_NO_NEW_PAIR_REPORT
+            exit 0
+          fi
+          git commit -m "evidence: direct DK prospective NFL pairs ${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}"
+          for attempt in 1 2 3 4 5; do
+            if git pull --rebase --quiet origin data && git push --quiet origin HEAD:data; then exit 0; fi
+            sleep $((attempt * 2))
+          done
+          echo DIRECT_DK_PAIR_PERSIST_FAILED >&2
+          exit 98
