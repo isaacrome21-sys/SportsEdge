@@ -203,9 +203,9 @@ def build_forward_source_manifest(
     ):
         if len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value):
             raise ScoreCountForwardSourceError(f"{field}:SHA256_REQUIRED")
-    code = str(serving_code_identity or "").strip()
-    if not code:
-        raise ScoreCountForwardSourceError("SERVING_CODE_IDENTITY_REQUIRED")
+    code = str(serving_code_identity or "").strip().lower()
+    if len(code) != 64 or any(ch not in "0123456789abcdef" for ch in code):
+        raise ScoreCountForwardSourceError("SERVING_CODE_IDENTITY_SHA256_REQUIRED")
     for item in normalized:
         item["parser_code_sha256"] = code
 
