@@ -14,7 +14,7 @@ from types import SimpleNamespace
 from typing import Any, Mapping
 from urllib.parse import urlencode
 
-from .mlb_f5_features import MLBF5HistorySource
+from .mlb_f5_features import MLBF5FeatureError, MLBF5HistorySource
 from .mlb_generic_features import (
     F5_MARKETS,
     GENERIC_FEATURE_VERSION,
@@ -392,6 +392,29 @@ class MLBAllMarketHistorySource(MLBGenericHistorySource):
             row["joint_feature_version"] = str(payload["feature_version"])
             return _seal(row)
 
+        if market in F5_MARKETS or market in {"NRFI", "YRFI"}:
+            inning_source = _StatsAPIF5ShapeAdapter(
+                opener=self.opener,
+                retrieved_at=self.retrieved_at,
+            )
+            try:
+                matchup = inning_source.matchup_features(
+                    away_team_id=int(away_team_id),
+                    home_team_id=int(home_team_id),
+                    target_date=target_date,
+                )
+            except MLBF5FeatureError as exc:
+                raise MLBGenericFeatureError(str(exc)) from exc
+            row = _base(self, game_pk=game_pk, market=market, entity_id=entity_id)
+            row["features"] = dict(matchup["features"])
+            row["feature_source_hash"] = str(matchup["feature_source_hash"])
+            row["joint_feature_version"] = str(matchup["feature_version"])
+            row["away_history_games"] = int(matchup["away_history_games"])
+            row["home_history_games"] = int(matchup["home_history_games"])
+            row["league_prior_source_hash"] = str(matchup["league_prior_source_hash"])
+            row["source"] = "MLB_STATSAPI_STRICT_PRIOR_F5_AND_INNING1_LINESCORE"
+            return _seal(row)
+
         row = super().feature_row(
             game_pk=game_pk,
             market=market,
@@ -402,11 +425,4 @@ class MLBAllMarketHistorySource(MLBGenericHistorySource):
             player_id=player_id,
             team_id=team_id,
         )
-        if market in F5_MARKETS:
-            missing = [key for key in _F5_FEATURE_KEYS if key not in row]
-            if missing:
-                raise MLBGenericFeatureError(f"F5 state features missing: {missing}")
-            row["features"] = {key: list(row[key]) for key in _F5_FEATURE_KEYS}
-            row["joint_feature_version"] = "mlb_f5_strict_prior_linescore_v1"
-            return _seal(row)
         return row
