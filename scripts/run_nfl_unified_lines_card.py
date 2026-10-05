@@ -36,16 +36,17 @@ def _has_props(ticket: dict) -> bool:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--input", required=True)
-    ap.add_argument("--history", required=True)
+    ap.add_argument("--history", default="")
     ap.add_argument("--output", required=True)
     ap.add_argument("--n-sims", type=int, default=20000)
     ap.add_argument("--seed", type=int, default=21)
     ap.add_argument("--horizon-days", type=int, default=10)
     ap.add_argument("--scoring-prior")
+    ap.add_argument("--market-context-props-only", action="store_true")
     args = ap.parse_args()
 
     ticket = _read(args.input)
-    history = _read(args.history)
+    history = _read(args.history) if args.history else []
     observed_at = ticket.get("observed_at")
     if not observed_at:
         raise SystemExit("NFL_UNIFIED_PHONE_OBSERVED_AT_REQUIRED")
@@ -120,6 +121,7 @@ def main() -> int:
         scoring_prior=scoring_prior,
         n_sims=int(args.n_sims),
         seed=int(args.seed),
+        market_context_props_only=bool(args.market_context_props_only),
     )
     payload["source_status"] = source_status
     payload["schedule_source_sha256"] = plan.get("schedule_source_sha256")
