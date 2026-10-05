@@ -103,13 +103,18 @@ jobs:
           set -euo pipefail
           RUN_DATE="$(TZ=America/Chicago date +%F)"
 
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          use_regression_fixture() {
             REGRESSION_FIXTURE="tests/fixtures/manual_mlb_snapshot_supported.json"
             [[ -f "$REGRESSION_FIXTURE" ]] || { echo "NO_REGRESSION_FIXTURE: $REGRESSION_FIXTURE" >&2; exit 1; }
             echo "path=$REGRESSION_FIXTURE" >> "$GITHUB_OUTPUT"
             echo "run_date=$RUN_DATE" >> "$GITHUB_OUTPUT"
             echo "live=false" >> "$GITHUB_OUTPUT"
+            echo "Using regression fixture: $REGRESSION_FIXTURE"
             exit 0
+          }
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            use_regression_fixture
           fi
 
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${DISPATCH_INPUT:-}" ]]; then
@@ -135,10 +140,14 @@ jobs:
             fi
             if [[ -z "$INPUT" ]]; then
             mapfile -t MATCHES < <(find manual_inputs/mlb -maxdepth 1 -type f -name '20??-??-??*.json' | sort)
-            [[ ${#MATCHES[@]} -gt 0 ]] || {
+            if [[ ${#MATCHES[@]} -eq 0 ]]; then
+              if [[ "$EVENT_NAME" == "push" ]]; then
+                echo "NO_DATED_MLB_SNAPSHOT_ON_CODE_PUSH: falling back to regression fixture"
+                use_regression_fixture
+              fi
               echo "DATED_INPUT_NOT_LOADED: no dated manual_inputs/mlb snapshot" >&2
               exit 1
-            }
+            fi
             # Earliest current/future slate date wins; several files for that date is
             # ambiguous and fails instead of silently taking the alphabetically last.
             NEXT_DATE=""
@@ -148,7 +157,14 @@ jobs:
                 NEXT_DATE="$CANDIDATE_DATE"
               fi
             done
-            [[ -n "$NEXT_DATE" ]] || { echo "NO_CURRENT_OR_FUTURE_MLB_SNAPSHOT" >&2; exit 1; }
+            if [[ -z "$NEXT_DATE" ]]; then
+              if [[ "$EVENT_NAME" == "push" ]]; then
+                echo "NO_CURRENT_OR_FUTURE_MLB_SNAPSHOT_ON_CODE_PUSH: falling back to regression fixture"
+                use_regression_fixture
+              fi
+              echo "NO_CURRENT_OR_FUTURE_MLB_SNAPSHOT" >&2
+              exit 1
+            fi
             mapfile -t SAME_DAY < <(printf '%s\n' "${MATCHES[@]}" | grep "/${NEXT_DATE}" )
             if [[ ${#SAME_DAY[@]} -ne 1 ]]; then
               echo "AMBIGUOUS_MLB_SNAPSHOT for ${NEXT_DATE}: ${SAME_DAY[*]} — dispatch with input_path to choose one" >&2
