@@ -535,6 +535,9 @@ def build_forward_prediction(
         )
         home_scores = np.asarray(simulation["home_score"], dtype=int)
         away_scores = np.asarray(simulation["away_score"], dtype=int)
+        home_tds = np.asarray(simulation["home_team_tds"], dtype=int)
+        away_tds = np.asarray(simulation["away_team_tds"], dtype=int)
+
         pairs = np.column_stack([home_scores, away_scores])
         unique, counts = np.unique(pairs, axis=0, return_counts=True)
         distribution = [
@@ -542,6 +545,24 @@ def build_forward_prediction(
             for score, count in zip(unique, counts)
         ]
         dist_sha = _digest(distribution)
+
+        component_pairs = np.column_stack(
+            [home_scores, away_scores, home_tds, away_tds]
+        )
+        component_unique, component_counts = np.unique(
+            component_pairs, axis=0, return_counts=True
+        )
+        td_distribution = [
+            [
+                int(state[0]),
+                int(state[1]),
+                int(state[2]),
+                int(state[3]),
+                int(count),
+            ]
+            for state, count in zip(component_unique, component_counts)
+        ]
+        td_dist_sha = _digest(td_distribution)
         feature_digest = {
             "home": str(home.get("feature_digest") or ""),
             "away": str(away.get("feature_digest") or ""),
@@ -561,6 +582,8 @@ def build_forward_prediction(
             "paths": 50000,
             "joint_score_distribution": distribution,
             "joint_score_distribution_sha256": dist_sha,
+            "joint_score_td_distribution": td_distribution,
+            "joint_score_td_distribution_sha256": td_dist_sha,
             "means": dict(simulation["means"]),
             "model": dict(simulation["model"]),
         })
