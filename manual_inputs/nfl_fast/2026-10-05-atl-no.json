@@ -490,5 +490,21 @@
     }
   ],
   "run_nonce": "diag-headers-4",
-  "rerun_token": "fix-board-resolution-v2"
+  "rerun_token": "official-inactives-player-schema-v3",
+  "official_inactives_source": "NFL.com Week 4 Monday night inactives, published 2026-10-05 18:49 ET",
+  "official_inactives": [
+    "Cooper Rush",
+    "Jack Strand",
+    "Malcom Dewalt IV",
+    "Roger Longerbeam",
+    "Jared Ivey",
+    "Ethan Onianwa",
+    "Zach Wilson",
+    "Decamerion Richardson",
+    "Anfernee Jennings",
+    "Christen Miller",
+    "Kaden Elliss",
+    "Noah Fant",
+    "Carl Granderson"
+  ]
 }
