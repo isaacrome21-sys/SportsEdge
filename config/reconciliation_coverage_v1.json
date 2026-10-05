@@ -432,7 +432,9 @@
     "tests/test_run_nfl_score_counts_attempt.py": "TEST_ONLY_NFL_SCORE_COUNTS_G1_ATTEMPT_RUNNER_NO_RUNTIME_AUTHORITY",
     ".github/workflows/nfl-score-counts-attempt.yml": "NFL_SCORE_COUNTS_G1_EXPLICIT_ATTEMPT_DISPATCH_WORKFLOW_NO_BETTING_AUTHORITY",
     "sportsedge/sports/nfl/score_counts_market_bridge.py": "NFL_SCORE_COUNTS_G1_RESEARCH_GAME_MARKET_DERIVATION_FROM_FROZEN_JOINT_DISTRIBUTION_NO_PROMOTION_OR_OFFICIAL_AUTHORITY",
-    "tests/test_nfl_score_counts_market_bridge.py": "TEST_ONLY_NFL_SCORE_COUNTS_G1_GAME_MARKET_BRIDGE_NO_RUNTIME_AUTHORITY"
+    "tests/test_nfl_score_counts_market_bridge.py": "TEST_ONLY_NFL_SCORE_COUNTS_G1_GAME_MARKET_BRIDGE_NO_RUNTIME_AUTHORITY",
+    "sportsedge/sports/nfl/score_counts_prop_bridge.py": "NFL_SCORE_COUNTS_G1_RESEARCH_PLAYER_PROP_COUPLING_TO_EXISTING_ROLE_MODELS_NO_PROMOTION_OR_OFFICIAL_AUTHORITY",
+    "tests/test_nfl_score_counts_prop_bridge.py": "TEST_ONLY_NFL_SCORE_COUNTS_G1_PLAYER_PROP_BRIDGE_NO_RUNTIME_AUTHORITY"
   },
   "inventory_completion_claim": {
     "status": "HOSTED_AUDIT_ZERO_UNMAPPED",
