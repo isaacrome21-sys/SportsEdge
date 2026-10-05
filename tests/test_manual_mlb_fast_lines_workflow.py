@@ -35,6 +35,14 @@ class ManualMlbFastLinesWorkflowTests(unittest.TestCase):
         self.assertIn("steps.normalize.outputs.path", text)
         self.assertIn("tests.test_intake_mlb_lines_file", text)
 
+    def test_fast_runtime_prints_actionable_game_bets_for_early_chat_readout(self):
+        text = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("Print actionable game bets first", text)
+        self.assertIn("scripts/print_mlb_fast_game_markets.py", text)
+        self.assertIn("FAST_MLB_CARD_BEGIN", text)
+        self.assertIn("artifacts/mlb_fast_game_bets.txt", text)
+        self.assertIn("tests.test_print_mlb_fast_game_markets", text)
+
     def test_fast_runtime_prices_same_engine_then_marks_pre_context(self):
         text = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("scripts/run_manual_mlb_snapshot.py", text)
