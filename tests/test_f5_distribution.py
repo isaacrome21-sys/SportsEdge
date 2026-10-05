@@ -8,11 +8,14 @@ from sportsedge.f5_distribution import (
 from sportsedge.shared_f5_engine import build_shared_f5_engine_session
 
 
+LEAGUE = ([0] * 80) + ([1] * 70) + ([2] * 45) + ([3] * 25) + ([4] * 10)
 FEATURES = {
     "away_f5_runs_for": [0, 1, 2, 3, 1, 0, 4, 2, 1, 3],
     "away_f5_runs_against": [1, 2, 1, 0, 3, 2, 2, 4, 0, 1],
     "home_f5_runs_for": [2, 1, 3, 0, 2, 4, 1, 2, 3, 1],
     "home_f5_runs_against": [0, 2, 1, 3, 1, 2, 4, 1, 2, 0],
+    "league_f5_runs": LEAGUE,
+    "league_prior_strength": 30,
 }
 
 
@@ -63,7 +66,14 @@ class F5DistributionTests(unittest.TestCase):
         )
 
     def test_sparse_empirical_certainty_is_shrunk(self):
-        zero = {key: [0] * 10 for key in FEATURES}
+        zero = {
+            "away_f5_runs_for": [0] * 10,
+            "away_f5_runs_against": [0] * 10,
+            "home_f5_runs_for": [0] * 10,
+            "home_f5_runs_against": [0] * 10,
+            "league_f5_runs": LEAGUE,
+            "league_prior_strength": 30,
+        }
         distribution = build_f5_distribution(zero)
         home = read_f5_probability(distribution, market="F5_MONEYLINE", side="HOME")
         total_over = read_f5_probability(
@@ -73,6 +83,22 @@ class F5DistributionTests(unittest.TestCase):
         self.assertLess(home.push_probability, 1.0)
         self.assertGreater(total_over.probability, 0.0)
         self.assertLess(total_over.probability, 0.10)
+
+    def test_m30_matches_held_out_smoothed_marginal_formula(self):
+        distribution = build_f5_distribution(FEATURES)
+        league_zero = LEAGUE.count(0) / len(LEAGUE)
+        away_zero = (
+            FEATURES["away_f5_runs_for"].count(0) + 30 * league_zero
+        ) / (len(FEATURES["away_f5_runs_for"]) + 30)
+        home_allowed_zero = (
+            FEATURES["home_f5_runs_against"].count(0) + 30 * league_zero
+        ) / (len(FEATURES["home_f5_runs_against"]) + 30)
+        expected_away_zero = 0.5 * away_zero + 0.5 * home_allowed_zero
+        actual_away_zero = sum(
+            p for key, p in distribution.joint_score_pmf.items()
+            if int(key.split(",", 1)[0]) == 0
+        )
+        self.assertAlmostEqual(actual_away_zero, expected_away_zero, places=12)
 
     def test_history_floor_fails_closed(self):
         bad = dict(FEATURES)
