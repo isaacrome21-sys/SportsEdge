@@ -220,18 +220,24 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
     if market in FAIL_CLOSED_MARKETS:
         raise GenericMarketEngineError(f"{market}_STATE_MODEL_REBUILD_REQUIRED")
 
-    away_mean = _finite(model_input.get("away_mean_runs"), "away_mean_runs", lower=0.000001)
-    home_mean = _finite(model_input.get("home_mean_runs"), "home_mean_runs", lower=0.000001)
-    line = _finite(model_input.get("line", 0.0), "line")
-    side = str(model_input.get("side", "")).upper()
-
     if market in {"NRFI", "YRFI"}:
+        # Canonical joint/auto rows carry actual strictly-prior inning-one state.
+        # Keep the former full-game-rate calculation only as a compatibility
+        # fallback for legacy/manual direct engine callers that lack that state.
+        features = model_input.get("features")
+        if isinstance(features, Mapping) and "away_first_inning_runs_for" in features:
+            from .shared_first_inning_engine import build_shared_first_inning_engine_session
+            return build_shared_first_inning_engine_session()(model_input)
+
+        away_mean = _finite(model_input.get("away_mean_runs"), "away_mean_runs", lower=0.000001)
+        home_mean = _finite(model_input.get("home_mean_runs"), "home_mean_runs", lower=0.000001)
         nrfi, yrfi = first_inning_probabilities(
             away_mean_runs=away_mean,
             home_mean_runs=home_mean,
             first_inning_share=DEFAULT_FIRST_INNING_SHARE,
             dispersion_r=DEFAULT_FIRST_INNING_DISPERSION_R,
         )
+        side = str(model_input.get("side", "")).upper()
         if market == "NRFI":
             if side in {"YES", "NRFI"}:
                 p = nrfi
@@ -261,6 +267,11 @@ def _game_probability(model_input: Mapping[str, Any]) -> dict[str, Any]:
         out["mc_paths"] = 0
         out["push_p"] = 0.0
         return out
+
+    away_mean = _finite(model_input.get("away_mean_runs"), "away_mean_runs", lower=0.000001)
+    home_mean = _finite(model_input.get("home_mean_runs"), "home_mean_runs", lower=0.000001)
+    line = _finite(model_input.get("line", 0.0), "line")
+    side = str(model_input.get("side", "")).upper()
 
     # MONEYLINE / RUN_LINE / TOTALS / TEAM_TOTALS: same frozen full-game dispersion
     # as Stage-1 shared_game_engine. F5 remains fail-closed above.
@@ -351,6 +362,11 @@ def generic_market_engine_adapter(model_input: Mapping[str, Any]) -> dict[str, A
     market = str(model_input.get("market"))
     if market in GAME_MARKETS:
         return _game_probability(model_input)
+    if market == "HOME_RUNS":
+        features = model_input.get("features")
+        if isinstance(features, Mapping) and "history_pool" in features:
+            from .hitter_joint_engine import price_hitter_market
+            return price_hitter_market(model_input)
     if market in COUNT_MARKETS:
         return _count_probability(model_input)
     if market in BINARY_MARKETS:

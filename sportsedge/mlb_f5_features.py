@@ -20,7 +20,7 @@ from urllib.request import urlopen
 from .mlb_generic_features import _read_json
 from .source_lineage import canonical_json_sha256
 
-F5_FEATURE_VERSION = "mlb_f5_actual_innings_v1"
+F5_FEATURE_VERSION = "mlb_f5_actual_innings_v2_first_inning"
 WIN_CREDIT_PATH_FEATURE_VERSION = "mlb_win_credit_score_path_v1"
 MIN_HISTORY_GAMES = 10
 HISTORY_WINDOW_GAMES = 30
@@ -63,6 +63,51 @@ def _team_id(game: Mapping[str, Any], side: str) -> int | None:
     return value if value > 0 else None
 
 
+def _inning_teams(inning: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    """Accept both current StatsAPI direct away/home rows and legacy teams wrapper."""
+    teams = inning.get("teams")
+    if isinstance(teams, Mapping):
+        return teams
+    away = inning.get("away")
+    home = inning.get("home")
+    if isinstance(away, Mapping) and isinstance(home, Mapping):
+        return {"away": away, "home": home}
+    return None
+
+
+def _first_inning_score(game: Mapping[str, Any]) -> tuple[int, int] | None:
+    """Return actual inning-one runs, never a full-game-rate proxy."""
+    linescore = game.get("linescore")
+    if not isinstance(linescore, Mapping):
+        return None
+    innings = linescore.get("innings")
+    if not isinstance(innings, list):
+        return None
+    for inning in innings:
+        if not isinstance(inning, Mapping):
+            continue
+        try:
+            num = int(inning.get("num"))
+        except (TypeError, ValueError):
+            continue
+        if num != 1:
+            continue
+        teams = _inning_teams(inning)
+        if teams is None:
+            return None
+        away_row = teams.get("away")
+        home_row = teams.get("home")
+        if not isinstance(away_row, Mapping) or not isinstance(home_row, Mapping):
+            return None
+        if away_row.get("runs") is None or home_row.get("runs") is None:
+            return None
+        return (
+            _int(away_row.get("runs"), "inning_1.away_runs"),
+            _int(home_row.get("runs"), "inning_1.home_runs"),
+        )
+    return None
+
+
 def _first_five_score(game: Mapping[str, Any]) -> tuple[int, int] | None:
     linescore = game.get("linescore")
     if not isinstance(linescore, Mapping):
@@ -85,8 +130,8 @@ def _first_five_score(game: Mapping[str, Any]) -> tuple[int, int] | None:
     away = 0
     home = 0
     for num in range(1, 6):
-        teams = by_num[num].get("teams")
-        if not isinstance(teams, Mapping):
+        teams = _inning_teams(by_num[num])
+        if teams is None:
             return None
         away_row = teams.get("away")
         home_row = teams.get("home")
@@ -140,8 +185,8 @@ def _all_inning_runs(game: Mapping[str, Any]) -> tuple[tuple[int, int, int], ...
             num = int(inning.get("num"))
         except (TypeError, ValueError):
             continue
-        teams = inning.get("teams")
-        if num < 1 or not isinstance(teams, Mapping):
+        teams = _inning_teams(inning)
+        if num < 1 or teams is None:
             continue
         away_row = teams.get("away")
         home_row = teams.get("home")
@@ -296,9 +341,11 @@ class MLBF5HistorySource:
             if int(team_id) not in {away_id, home_id}:
                 continue
             score = _first_five_score(game)
-            if score is None:
+            first_inning = _first_inning_score(game)
+            if score is None or first_inning is None:
                 continue
             away_runs, home_runs = score
+            away_first, home_first = first_inning
             is_away = away_id == int(team_id)
             try:
                 game_pk = int(game.get("gamePk"))
@@ -312,6 +359,8 @@ class MLBF5HistorySource:
                 "side": "AWAY" if is_away else "HOME",
                 "runs_for": away_runs if is_away else home_runs,
                 "runs_against": home_runs if is_away else away_runs,
+                "first_inning_runs_for": away_first if is_away else home_first,
+                "first_inning_runs_against": home_first if is_away else away_first,
             })
         rows.sort(key=lambda row: (row["date"], row["game_pk"]))
         self._cache[key] = tuple(rows)
@@ -418,6 +467,10 @@ class MLBF5HistorySource:
             "away_f5_runs_against": [int(row["runs_against"]) for row in away_rows],
             "home_f5_runs_for": [int(row["runs_for"]) for row in home_rows],
             "home_f5_runs_against": [int(row["runs_against"]) for row in home_rows],
+            "away_first_inning_runs_for": [int(row["first_inning_runs_for"]) for row in away_rows],
+            "away_first_inning_runs_against": [int(row["first_inning_runs_against"]) for row in away_rows],
+            "home_first_inning_runs_for": [int(row["first_inning_runs_for"]) for row in home_rows],
+            "home_first_inning_runs_against": [int(row["first_inning_runs_against"]) for row in home_rows],
         }
         identity = {
             "feature_version": F5_FEATURE_VERSION,

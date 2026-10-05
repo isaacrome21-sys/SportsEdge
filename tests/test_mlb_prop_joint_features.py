@@ -4,6 +4,7 @@ import unittest
 from sportsedge.mlb_generic_features import MLBGenericHistorySource
 from sportsedge.hitter_joint_engine import price_hitter_market
 from sportsedge.pitcher_joint_engine import price_pitcher_market
+from sportsedge.generic_market_engine import generic_market_engine_adapter
 
 
 class StubHistory(MLBGenericHistorySource):
@@ -33,6 +34,38 @@ class MLBPropJointFeatureTests(unittest.TestCase):
         self.assertGreater(priced["model_p"], 0.0)
         self.assertLess(priced["model_p"], 1.0)
         self.assertEqual(priced["meta"]["posterior_prior"], "JEFFREYS_SETTLEMENT_DIRICHLET_0_5")
+
+    def test_canonical_home_runs_delegates_to_joint_hitter_distribution(self):
+        pool = []
+        for i in range(12):
+            hr = 1 if i in {2, 7} else 0
+            pool.append({
+                "plate_appearances": 4,
+                "hits": 1 + hr,
+                "singles": 1,
+                "doubles": 0,
+                "triples": 0,
+                "home_runs": hr,
+                "total_bases": 1 + 4 * hr,
+                "rbi": hr,
+                "runs": hr,
+                "stolen_bases": 0,
+                "walks": 0,
+                "strikeouts": 1,
+                "extra_base_hits": hr,
+            })
+        out = generic_market_engine_adapter({
+            "game_id": "1",
+            "market": "HOME_RUNS",
+            "entity_id": "10",
+            "line": 0.5,
+            "side": "OVER",
+            "feature_source_hash": "a" * 64,
+            "features": {"history_pool": pool},
+        })
+        self.assertTrue(out["engine_version"].startswith("mlb_hitter_joint_empirical_bayes"))
+        self.assertGreater(out["model_p"], 0.0)
+        self.assertLess(out["model_p"], 1.0)
 
     def test_pitcher_history_builds_joint_pool_accepted_by_engine_without_certainty(self):
         rows = []

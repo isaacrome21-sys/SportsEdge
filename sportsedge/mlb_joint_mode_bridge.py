@@ -126,17 +126,27 @@ def build_canonical_feature_row(
     }
 
     if market == "HOME_RUNS":
+        # Preserve the measured legacy HR baseline when live matchup context is
+        # genuinely unavailable. Canonical live cards with a mapped venue and
+        # opposing probable starter continue into the joint whole-game hitter
+        # distribution below.
         team_id = _batter_team(game, entity_id)
-        return source.feature_row(
-            game_pk=int(game.game_pk),
-            market=market,
-            entity_id=entity_id,
-            target_date=target_date,
-            away_team_id=int(game.away_team_id),
-            home_team_id=int(game.home_team_id),
-            player_id=int(entity_id),
-            team_id=team_id,
+        opposing_missing = (
+            game.home_probable_pitcher_id is None
+            if team_id == int(game.away_team_id)
+            else game.away_probable_pitcher_id is None
         )
+        if game.venue_id is None or opposing_missing:
+            return source.feature_row(
+                game_pk=int(game.game_pk),
+                market=market,
+                entity_id=entity_id,
+                target_date=target_date,
+                away_team_id=int(game.away_team_id),
+                home_team_id=int(game.home_team_id),
+                player_id=int(entity_id),
+                team_id=team_id,
+            )
 
     if market == "FIRST_HOME_RUN":
         team_id = _batter_team(game, entity_id)
@@ -232,18 +242,39 @@ def build_canonical_feature_row(
             raise MLBJointModeBridgeError("pitcher entity_id must be MLB player id") from exc
         if pid not in {game.away_probable_pitcher_id, game.home_probable_pitcher_id}:
             raise MLBJointModeBridgeError("NON_PROBABLE_PITCHER")
-        built = build_pitcher_joint_features(source, pitcher_id=pid, target_date=target_date)
+        team_id = (
+            int(game.away_team_id)
+            if pid == int(game.away_probable_pitcher_id)
+            else int(game.home_team_id)
+        )
+        # Route the canonical single-pitcher path through the native feature
+        # builder. This is where the validated opponent-K + announced-lineup-K,
+        # opponent-outs, umpire-BB, and few-start fallback lanes are attached.
+        # The prior bridge called build_pitcher_joint_features() directly and
+        # silently discarded all of those production context payloads.
+        built = source.feature_row(
+            game_pk=int(game.game_pk),
+            market=market,
+            entity_id=entity_id,
+            target_date=target_date,
+            away_team_id=int(game.away_team_id),
+            home_team_id=int(game.home_team_id),
+            player_id=pid,
+            team_id=team_id,
+        )
         return {
             **base,
-            "joint_feature_version": built["feature_version"],
-            "feature_source_hash": built["feature_source_hash"],
-            "features": {"history_pool": built["history_pool"]},
+            **dict(built),
+            "team_id": team_id,
+            "feature_source_hash": built.get(
+                "feature_source_hash", built.get("source_subset_hash")
+            ),
         }
 
     if market in GAME_MARKETS:
         live_state = _live_game_state(game)
         live_state_hash = _content_sha(live_state)
-        if market.startswith("F5_"):
+        if market.startswith("F5_") or market in {"NRFI", "YRFI"}:
             f5 = f5_source or MLBF5HistorySource(opener=source.opener, retrieved_at=source.retrieved_at)
             built = f5.matchup_features(
                 away_team_id=int(game.away_team_id),
@@ -252,7 +283,11 @@ def build_canonical_feature_row(
             )
             row = {
                 **base,
-                "source": "MLB_STATSAPI_STRICTLY_PRIOR_ACTUAL_F5_INNINGS",
+                "source": (
+                    "MLB_STATSAPI_STRICTLY_PRIOR_ACTUAL_FIRST_INNING"
+                    if market in {"NRFI", "YRFI"}
+                    else "MLB_STATSAPI_STRICTLY_PRIOR_ACTUAL_F5_INNINGS"
+                ),
                 "f5_feature_version": built["feature_version"],
                 "live_game_state_hash": live_state_hash,
                 "feature_source_hash": _content_sha({
