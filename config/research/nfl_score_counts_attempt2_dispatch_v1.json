@@ -1,0 +1,36 @@
+{
+  "schema": "SPORTSEDGE_NFL_SCORE_COUNTS_G1_ATTEMPT2_DISPATCH_V1",
+  "status": "ARMED_SINGLE_MAIN_PUSH",
+  "candidate_family": "NFL_SCORE_COUNTS_G1",
+  "attempt_number": 2,
+  "confirmation": "CONSUME_SCORE_COUNTS_ATTEMPT_2",
+  "runner": "scripts/run_nfl_score_counts_attempt.py",
+  "source_contract": "config/research/nfl_score_counts_g1_source_contract_v1.json",
+  "prereg_addendum": "config/research/nfl_score_counts_g1_attempt2_fg_addendum_v1.json",
+  "reason": "The connected GitHub capability cannot initiate workflow_dispatch. This hash-reviewed one-shot protected-main marker executes the preregistered Attempt 2 only after its implementation is merged.",
+  "attempt_ledger": {
+    "attempt1_consumed": true,
+    "attempt1_status": "DEVELOPMENT_ATTEMPT_FAIL",
+    "attempt1_artifact_sha256": "882861e89602432aa8622f78e89fc84c30602c0e7f079235dad73f3980526520",
+    "attempt1_td_fold_wins": 5,
+    "attempt1_fg_fold_wins": 0,
+    "attempts_remaining_before_attempt2": 2
+  },
+  "rules": {
+    "trigger_only_when_this_marker_lands_on_main": true,
+    "attempt_2_only": true,
+    "backfill": false,
+    "market_data_for_model_fit": false,
+    "source_substitution": false,
+    "requires_exact_confirmation_token": true,
+    "requires_attempt2_prereg": true
+  },
+  "authority": {
+    "research_only": true,
+    "creates_model_p": false,
+    "pricing": false,
+    "promotion": false,
+    "staking": false,
+    "official": false
+  }
+}
