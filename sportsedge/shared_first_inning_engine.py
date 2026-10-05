@@ -15,9 +15,11 @@ from typing import Any, Mapping, Sequence
 
 from .source_lineage import canonical_json_sha256
 
-FIRST_INNING_EMPIRICAL_VERSION = "mlb_first_inning_empirical_jeffreys_v1"
+FIRST_INNING_EMPIRICAL_VERSION = "mlb_first_inning_empirical_m30_v2"
 FIRST_INNING_MARKETS = frozenset({"NRFI", "YRFI"})
 MIN_HISTORY_GAMES = 10
+MIN_LEAGUE_HALVES = 200
+LEAGUE_PRIOR_STRENGTH = 30
 
 
 class FirstInningEmpiricalError(ValueError):
@@ -47,20 +49,41 @@ def _count_pool(value: Any, field: str) -> tuple[int, ...]:
     return tuple(out)
 
 
-def _jeffreys_score_probability(values: Sequence[int]) -> float:
+def _probability(value: Any, field: str) -> float:
+    if isinstance(value, bool):
+        raise FirstInningEmpiricalError(f"{field} must be probability")
+    try:
+        out = float(value)
+    except (TypeError, ValueError) as exc:
+        raise FirstInningEmpiricalError(f"{field} must be probability") from exc
+    if not isfinite(out) or not 0.0 <= out <= 1.0:
+        raise FirstInningEmpiricalError(f"{field} must be in [0,1]")
+    return out
+
+
+def _league_shrunk_zero_probability(
+    values: Sequence[int],
+    league_zero: float,
+    strength: int = LEAGUE_PRIOR_STRENGTH,
+) -> float:
     n = len(values)
     if n <= 0:
         raise FirstInningEmpiricalError("first-inning history cannot be empty")
-    scored = sum(1 for value in values if int(value) > 0)
-    return (float(scored) + 0.5) / (float(n) + 1.0)
+    zero = sum(1 for value in values if int(value) == 0)
+    return (
+        float(zero) + 0.5 + float(strength) * float(league_zero)
+    ) / (float(n) + 1.0 + float(strength))
 
 
-def _matchup_score_probability(offense: Sequence[int], opponent_allowed: Sequence[int]) -> float:
-    # Equal source weighting prevents the longer history from silently dominating
-    # when one club has fewer admissible strictly-prior games.
+def _matchup_zero_probability(
+    offense: Sequence[int],
+    opponent_allowed: Sequence[int],
+    league_zero: float,
+) -> float:
+    # Exact held-out recipe: equal offense/prevention blend after m30 league shrinkage.
     return 0.5 * (
-        _jeffreys_score_probability(offense)
-        + _jeffreys_score_probability(opponent_allowed)
+        _league_shrunk_zero_probability(offense, league_zero)
+        + _league_shrunk_zero_probability(opponent_allowed, league_zero)
     )
 
 
@@ -97,6 +120,32 @@ def build_shared_first_inning_engine_session():
             features.get("home_first_inning_runs_against"),
             "home_first_inning_runs_against",
         )
+        league_zero = _probability(
+            features.get("league_first_inning_zero_rate"),
+            "league_first_inning_zero_rate",
+        )
+        league_halves = features.get("league_half_innings")
+        if isinstance(league_halves, bool):
+            raise FirstInningEmpiricalError("league_half_innings must be integer")
+        try:
+            league_halves = int(league_halves)
+        except (TypeError, ValueError) as exc:
+            raise FirstInningEmpiricalError("league_half_innings must be integer") from exc
+        if league_halves < MIN_LEAGUE_HALVES:
+            raise FirstInningEmpiricalError(
+                f"league_half_innings requires at least {MIN_LEAGUE_HALVES}"
+            )
+        strength = features.get("league_prior_strength", LEAGUE_PRIOR_STRENGTH)
+        if isinstance(strength, bool):
+            raise FirstInningEmpiricalError("league_prior_strength must be integer")
+        try:
+            strength = int(strength)
+        except (TypeError, ValueError) as exc:
+            raise FirstInningEmpiricalError("league_prior_strength must be integer") from exc
+        if strength != LEAGUE_PRIOR_STRENGTH:
+            raise FirstInningEmpiricalError(
+                f"league_prior_strength must equal held-out selection {LEAGUE_PRIOR_STRENGTH}"
+            )
 
         identity = {
             "engine": FIRST_INNING_EMPIRICAL_VERSION,
@@ -106,13 +155,16 @@ def build_shared_first_inning_engine_session():
             "away_first_inning_runs_against": away_against,
             "home_first_inning_runs_for": home_for,
             "home_first_inning_runs_against": home_against,
+            "league_first_inning_zero_rate": league_zero,
+            "league_half_innings": league_halves,
+            "league_prior_strength": strength,
         }
         model_input_hash = canonical_json_sha256(identity)
         cached = cache.get(model_input_hash)
         if cached is None:
-            away_score_p = _matchup_score_probability(away_for, home_against)
-            home_score_p = _matchup_score_probability(home_for, away_against)
-            nrfi = (1.0 - away_score_p) * (1.0 - home_score_p)
+            away_zero_p = _matchup_zero_probability(away_for, home_against, league_zero)
+            home_zero_p = _matchup_zero_probability(home_for, away_against, league_zero)
+            nrfi = away_zero_p * home_zero_p
             nrfi = min(1.0, max(0.0, nrfi))
             cached = (nrfi, 1.0 - nrfi)
             cache[model_input_hash] = cached
@@ -144,7 +196,7 @@ def build_shared_first_inning_engine_session():
             "push_p": 0.0,
             "model_input_hash": model_input_hash,
             "engine_version": FIRST_INNING_EMPIRICAL_VERSION,
-            "seed_policy": "analytic_strict_prior_first_inning_jeffreys",
+            "seed_policy": "analytic_strict_prior_first_inning_jeffreys_plus_m30_league_prior",
             "mc_paths": 0,
         }
 
