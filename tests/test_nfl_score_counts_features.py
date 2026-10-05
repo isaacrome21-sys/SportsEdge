@@ -437,3 +437,17 @@ def test_missing_epa_policy_is_bound_to_attempt_identity_and_parent_bytes():
         assert hashlib.sha256(Path(parent).read_bytes()).hexdigest() == digest
     assert policy["attempt_accounting"]["next_attempt"] == 1
     assert policy["attempt_accounting"]["changes_model_inputs"] is True
+
+
+def test_frozen_pit_ne_completion_keeps_factual_dropback():
+    from sportsedge.sports.nfl.score_counts_source_projection import project_pbp_row
+    teams, qbs = aggregate_game_pbp([project_pbp_row({
+        "game_id": "2019_01_PIT_NE", "play_id": "4166",
+        "posteam": "PIT", "defteam": "NE", "play_type_nfl": "PASS",
+        "pass": "1", "rush": "0", "qb_dropback": "1",
+        "epa": "", "qb_epa": "", "passer_player_id": "00-0022924",
+    })])
+    assert teams[("2019_01_PIT_NE", "PIT")].pass_dropbacks == 1
+    assert teams[("2019_01_PIT_NE", "PIT")].pass_epa_n == 0
+    assert qbs[("2019_01_PIT_NE", "00-0022924")].dropbacks == 1
+    assert qbs[("2019_01_PIT_NE", "00-0022924")].epa_n == 0
