@@ -26,6 +26,28 @@ jobs:
       - run: PYTHONPATH=. python -m pytest -q tests/test_preflight_nfl_score_counts_sources.py
       - name: Verify exact frozen bytes and raw schema only
         run: PYTHONPATH=. python scripts/preflight_nfl_score_counts_sources.py
+      - name: Diagnostic exact 2019 PIT-NE play 4166
+        run: |
+          python - <<'PY'
+          import csv, gzip, json
+          from pathlib import Path
+          p = Path("artifacts/football/score_counts/source_preflight/pbp/pbp_2019.csv.gz")
+          found = None
+          with gzip.open(p, "rt", encoding="utf-8-sig", newline="") as f:
+              for row in csv.DictReader(f):
+                  if row.get("game_id") == "2019_01_PIT_NE" and str(row.get("play_id")) in {"4166", "4166.0"}:
+                      found = {k: v for k, v in row.items() if v not in (None, "", "NA", "NaN")}
+                      break
+          if found is None:
+              raise SystemExit("DIAGNOSTIC_ROW_NOT_FOUND")
+          keys = [
+              "game_id","play_id","desc","play_type","posteam","defteam","epa","qb_dropback",
+              "pass","rush","rush_attempt","qb_kneel","qb_spike","no_play","two_point_attempt",
+              "penalty","penalty_team","timeout","touchdown","field_goal_result"
+          ]
+          print("DIAGNOSTIC_SELECTED=" + json.dumps({k: found.get(k) for k in keys}, sort_keys=True))
+          print("DIAGNOSTIC_NONEMPTY=" + json.dumps(found, sort_keys=True))
+          PY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
