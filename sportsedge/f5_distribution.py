@@ -85,9 +85,14 @@ def _league_pmf(value: Any) -> dict[int, float]:
     total = 0.0
     for raw_key, raw_p in value.items():
         try:
-            key = int(raw_key)
+            numeric_key = float(raw_key)
+            if isinstance(raw_key, bool) or not isfinite(numeric_key) or numeric_key != int(numeric_key):
+                raise ValueError("score state must be an integer")
+            key = int(numeric_key)
+            if isinstance(raw_p, bool):
+                raise ValueError("probability must not be boolean")
             probability = float(raw_p)
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError, OverflowError) as exc:
             raise F5DistributionError("league_f5_pmf contains invalid state") from exc
         if key < 0 or not isfinite(probability) or probability < 0:
             raise F5DistributionError("league_f5_pmf contains invalid probability")

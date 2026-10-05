@@ -140,6 +140,16 @@ class F5DistributionTests(unittest.TestCase):
         with self.assertRaises(F5DistributionError):
             build_f5_distribution(bad, league_prior_strength=30)
 
+    def test_malformed_league_score_states_fail_closed(self):
+        # Fractional score keys used to truncate into plausible integer states.
+        for key in (1.5, True, float("inf"), float("nan"), -0.5):
+            with self.subTest(key=key):
+                bad = {**FEATURES, "league_f5_pmf": {key: 1.0}}
+                with self.assertRaises(F5DistributionError):
+                    build_f5_distribution(bad, league_prior_strength=30)
+        with self.assertRaises(F5DistributionError):
+            build_f5_distribution({**FEATURES, "league_f5_pmf": {"0": True}}, league_prior_strength=30)
+
     def test_history_floor_fails_closed(self):
         bad = dict(FEATURES)
         bad["away_f5_runs_for"] = [1] * 9
