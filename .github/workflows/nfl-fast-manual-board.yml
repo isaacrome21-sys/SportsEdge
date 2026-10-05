@@ -57,6 +57,26 @@ jobs:
                   first = r.readline().decode("utf-8-sig").strip()
               print(label + "_HEADER=" + first)
           PY
+      - name: Diagnose NO live role priors
+        run: |
+          python - <<'PY'
+          import json
+          from sportsedge.sports.nfl.auto_slate import discover_nfl_auto_games
+          from sportsedge.sports.nfl.full_auto import fetch_nflverse_depth_charts
+          from sportsedge.sports.nfl.live_role_source import fetch_nflverse_player_stats, build_live_team_model
+          ticket=json.load(open("manual_inputs/nfl_fast/2026-10-05-atl-no.json"))
+          obs=ticket["observed_at"]
+          plan=discover_nfl_auto_games(as_of=obs,min_lead_minutes=0,horizon_minutes=14400,game_types=("REG","POST"))
+          game=[g for g in plan["games"] if g["away_team_id"]=="ATL" and g["home_team_id"]=="NO"][0]
+          depth,_,_=fetch_nflverse_depth_charts(season=game["season"])
+          stats,_=fetch_nflverse_player_stats(seasons=[game["season"]-1,game["season"]])
+          m=build_live_team_model(team="NO",target_season=game["season"],target_week=game["week"],kickoff=game["kickoff_ts"],observed_at=obs,depth_rows=depth,player_rows=stats,injury_rows=[])
+          for row in [m["qb"],*m["skill_players"]]:
+              rp=row["role_prior"]
+              bad={k:v for k,v in rp.items() if isinstance(v,(int,float)) and v < 0}
+              if bad or rp.get("receiving_yards_per_reception",0) <= 0:
+                  print("ROLE_DIAG",row["player"],row.get("position"),"YPR",rp.get("receiving_yards_per_reception"),"BAD",bad)
+          PY
       - name: Run unified full-board research engine
         run: |
           python scripts/run_nfl_unified_lines_card.py \
