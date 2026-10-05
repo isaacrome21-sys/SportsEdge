@@ -44,18 +44,26 @@ class ScoreCountFeatureError(ValueError):
 @dataclass
 class TeamGame:
     off_epa_sum: float = 0.0
+    off_epa_plays: int = 0
     off_plays: int = 0
     def_epa_sum: float = 0.0
+    def_epa_plays: int = 0
     def_plays: int = 0
     off_success: int = 0
+    off_success_plays: int = 0
     def_success: int = 0
+    def_success_plays: int = 0
     pass_epa_sum: float = 0.0
+    pass_epa_dropbacks: int = 0
     pass_dropbacks: int = 0
     def_pass_epa_sum: float = 0.0
+    def_pass_epa_dropbacks: int = 0
     def_pass_dropbacks: int = 0
     rush_epa_sum: float = 0.0
+    rush_epa_attempts: int = 0
     rush_attempts: int = 0
     def_rush_epa_sum: float = 0.0
+    def_rush_epa_attempts: int = 0
     def_rush_attempts: int = 0
     turnovers: int = 0
     takeaways: int = 0
@@ -85,6 +93,7 @@ class TeamGame:
 @dataclass
 class QBGame:
     epa_sum: float = 0.0
+    epa_dropbacks: int = 0
     dropbacks: int = 0
     cpoe_sum: float = 0.0
     cpoe_n: int = 0
@@ -228,43 +237,65 @@ def aggregate_game_pbp(
         epa = _float(row.get("epa"))
         scrimmage, dropback, rush = _scrimmage_flags(row)
         if scrimmage:
-            if not offense or not defense or epa is None:
-                raise ScoreCountFeatureError(f"SCRIMMAGE_IDENTITY_OR_EPA_MISSING:{gid}:{play_id}")
+            if not offense or not defense:
+                raise ScoreCountFeatureError(f"SCRIMMAGE_IDENTITY_MISSING:{gid}:{play_id}")
             off = stat(gid, offense)
             deff = stat(gid, defense)
-            off.off_epa_sum += epa
+
+            # nflverse has a small number of otherwise-valid scrimmage rows with
+            # missing top-level EPA. Keep their observed football facts (pace,
+            # dropback/rush volume, sacks, turnovers, CPOE) but never invent EPA.
+            # EPA/success rate denominators therefore count only rows on which
+            # those metrics are actually observed.
             off.off_plays += 1
-            deff.def_epa_sum += epa
             deff.def_plays += 1
+            if epa is not None:
+                off.off_epa_sum += epa
+                off.off_epa_plays += 1
+                deff.def_epa_sum += epa
+                deff.def_epa_plays += 1
+
             success = _float(row.get("success"))
-            success_flag = (epa > 0.0) if success is None else (success > 0.0)
-            off.off_success += int(success_flag)
-            deff.def_success += int(success_flag)
+            if success is not None or epa is not None:
+                success_flag = (epa > 0.0) if success is None else (success > 0.0)
+                off.off_success += int(success_flag)
+                off.off_success_plays += 1
+                deff.def_success += int(success_flag)
+                deff.def_success_plays += 1
 
             if dropback:
-                off.pass_epa_sum += epa
                 off.pass_dropbacks += 1
-                deff.def_pass_epa_sum += epa
                 deff.def_pass_dropbacks += 1
+                if epa is not None:
+                    off.pass_epa_sum += epa
+                    off.pass_epa_dropbacks += 1
+                    deff.def_pass_epa_sum += epa
+                    deff.def_pass_epa_dropbacks += 1
                 sack = _flag(row.get("sack"))
                 off.sacks_allowed += int(sack)
                 deff.sacks_for += int(sack)
                 passer = str(row.get("passer_player_id") or row.get("passer_id") or "").strip()
                 if passer:
                     qb = qbs.setdefault((gid, passer), QBGame())
-                    qb_epa = _float(row.get("qb_epa"))
-                    qb.epa_sum += epa if qb_epa is None else qb_epa
                     qb.dropbacks += 1
+                    qb_epa = _float(row.get("qb_epa"))
+                    observed_qb_epa = qb_epa if qb_epa is not None else epa
+                    if observed_qb_epa is not None:
+                        qb.epa_sum += observed_qb_epa
+                        qb.epa_dropbacks += 1
                     cpoe = _float(row.get("cpoe"))
                     if cpoe is not None:
                         qb.cpoe_sum += cpoe
                         qb.cpoe_n += 1
 
             if rush:
-                off.rush_epa_sum += epa
                 off.rush_attempts += 1
-                deff.def_rush_epa_sum += epa
                 deff.def_rush_attempts += 1
+                if epa is not None:
+                    off.rush_epa_sum += epa
+                    off.rush_epa_attempts += 1
+                    deff.def_rush_epa_sum += epa
+                    deff.def_rush_epa_attempts += 1
 
             turnover = _flag(row.get("interception")) or _flag(row.get("fumble_lost"))
             off.turnovers += int(turnover)
@@ -326,14 +357,14 @@ def _team_features(history: Sequence[TeamGame]) -> dict[str, float]:
     if len(history) < 4:
         raise ScoreCountFeatureError("MINIMUM_PRIOR_TEAM_GAMES")
     return {
-        "off_epa_per_play": _weighted(history, lambda r: _rate(r.off_epa_sum, r.off_plays)),
-        "def_epa_allowed_per_play": _weighted(history, lambda r: _rate(r.def_epa_sum, r.def_plays)),
-        "off_success_rate": _weighted(history, lambda r: _rate(r.off_success, r.off_plays)),
-        "def_success_rate_allowed": _weighted(history, lambda r: _rate(r.def_success, r.def_plays)),
-        "off_pass_epa_per_dropback": _weighted(history, lambda r: _rate(r.pass_epa_sum, r.pass_dropbacks)),
-        "def_pass_epa_allowed_per_dropback": _weighted(history, lambda r: _rate(r.def_pass_epa_sum, r.def_pass_dropbacks)),
-        "off_rush_epa_per_rush": _weighted(history, lambda r: _rate(r.rush_epa_sum, r.rush_attempts)),
-        "def_rush_epa_allowed_per_rush": _weighted(history, lambda r: _rate(r.def_rush_epa_sum, r.def_rush_attempts)),
+        "off_epa_per_play": _weighted(history, lambda r: _rate(r.off_epa_sum, r.off_epa_plays)),
+        "def_epa_allowed_per_play": _weighted(history, lambda r: _rate(r.def_epa_sum, r.def_epa_plays)),
+        "off_success_rate": _weighted(history, lambda r: _rate(r.off_success, r.off_success_plays)),
+        "def_success_rate_allowed": _weighted(history, lambda r: _rate(r.def_success, r.def_success_plays)),
+        "off_pass_epa_per_dropback": _weighted(history, lambda r: _rate(r.pass_epa_sum, r.pass_epa_dropbacks)),
+        "def_pass_epa_allowed_per_dropback": _weighted(history, lambda r: _rate(r.def_pass_epa_sum, r.def_pass_epa_dropbacks)),
+        "off_rush_epa_per_rush": _weighted(history, lambda r: _rate(r.rush_epa_sum, r.rush_epa_attempts)),
+        "def_rush_epa_allowed_per_rush": _weighted(history, lambda r: _rate(r.def_rush_epa_sum, r.def_rush_epa_attempts)),
         "off_plays_per_game": _weighted(history, lambda r: float(r.off_plays)),
         "off_td_per_game": _weighted(history, lambda r: float(r.offense_touchdowns)),
         "td_allowed_per_game": _weighted(history, lambda r: float(r.offensive_tds_allowed)),
@@ -358,17 +389,18 @@ def _qb_prior(
         raise ScoreCountFeatureError(f"QB_PRIOR_DROPBACKS_INSUFFICIENT:{player_id}:{dropbacks}")
 
     league = [stats for (gid, _pid), stats in game_qbs.items() if gid in prior_game_ids]
-    league_dropbacks = sum(s.dropbacks for s in league)
-    if league_dropbacks <= 0:
+    league_epa_dropbacks = sum(s.epa_dropbacks for s in league)
+    if league_epa_dropbacks <= 0:
         raise ScoreCountFeatureError("QB_LEAGUE_PRIOR_EMPTY")
-    league_epa = sum(s.epa_sum for s in league) / league_dropbacks
+    league_epa = sum(s.epa_sum for s in league) / league_epa_dropbacks
     league_cpoe_n = sum(s.cpoe_n for s in league)
     league_cpoe = sum(s.cpoe_sum for s in league) / league_cpoe_n if league_cpoe_n > 0 else 0.0
 
     epa_sum = sum(s.epa_sum for s in player)
+    epa_dropbacks = sum(s.epa_dropbacks for s in player)
     cpoe_sum = sum(s.cpoe_sum for s in player)
     cpoe_n = sum(s.cpoe_n for s in player)
-    epa = (epa_sum + QB_PSEUDO_DROPBACKS * league_epa) / (dropbacks + QB_PSEUDO_DROPBACKS)
+    epa = (epa_sum + QB_PSEUDO_DROPBACKS * league_epa) / (epa_dropbacks + QB_PSEUDO_DROPBACKS)
     cpoe = (cpoe_sum + QB_PSEUDO_DROPBACKS * league_cpoe) / (cpoe_n + QB_PSEUDO_DROPBACKS)
     return float(epa), float(cpoe), int(dropbacks)
 
