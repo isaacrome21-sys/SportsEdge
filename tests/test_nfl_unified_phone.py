@@ -292,3 +292,60 @@ def test_live_prop_board_fails_closed_when_injury_source_is_not_ready():
     assert all(row["status"] == "PRICED" for row in totals)
     assert all(row["status"] == "NO_MODEL" for row in props)
     assert all(row["reason"] == "INJURY_SOURCE_REQUIRED_FOR_LIVE_PROPS" for row in props)
+
+
+def test_market_context_props_only_uses_ticket_center_and_disables_game_edges():
+    out = build_unified_phone_card(
+        full_board(),
+        history=[],
+        schedule_games=schedule(),
+        depth_rows=depth(),
+        player_rows=player_stats(),
+        injury_source_ready=True,
+        runtime=None,
+        n_sims=400,
+        seed=51,
+        market_context_props_only=True,
+    )
+    game = out["games"][0]
+    assert game["forecast"]["source"] == "SPORTSBOOK_MARKET_CENTER_CONTEXT_ONLY"
+    assert game["forecast"]["margin"] == pytest.approx(3.5)
+    assert game["forecast"]["total"] == pytest.approx(47.5)
+    game_rows = [
+        row for row in game["rows"]
+        if row["market"] in {"moneyline", "spread", "total", "team_total"}
+    ]
+    prop_rows = [
+        row for row in game["rows"]
+        if row["market"] in {"passing_yards", "rushing_yards", "receiving_yards", "receptions"}
+    ]
+    assert len(game_rows) == 8
+    assert all(row["status"] == "NO_MODEL" for row in game_rows)
+    assert all(row["reason"] == "GAME_EDGE_MODEL_DISABLED_V2K_NO_PASS" for row in game_rows)
+    assert all(row["selected"] is False for row in game_rows)
+    assert len(prop_rows) == 8
+    assert all(row["status"] == "PRICED" for row in prop_rows)
+    assert out["pricing_policy"]["game_edge_model"] == "DISABLED_V2K_NO_PASS"
+    assert out["pricing_policy"]["prop_game_environment"] == "SPORTSBOOK_MARKET_CENTER_CONTEXT_ONLY"
+
+
+def test_market_context_props_only_requires_one_spread_and_total():
+    board = ticket(
+        """
+        Chiefs @ Ravens
+        Total 47.5 -108 -112
+        Prop "Lamar Jackson" PassYards 249.5 -110 -110
+        """
+    )
+    with pytest.raises(Exception, match="MARKET_CONTEXT_SPREAD_REQUIRED"):
+        build_unified_phone_card(
+            board,
+            history=[],
+            schedule_games=schedule(),
+            depth_rows=depth(),
+            player_rows=player_stats(),
+            injury_source_ready=True,
+            n_sims=100,
+            seed=2,
+            market_context_props_only=True,
+        )
