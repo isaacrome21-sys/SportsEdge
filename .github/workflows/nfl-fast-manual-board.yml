@@ -32,7 +32,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t FILES < <(git diff-tree --no-commit-id --name-only -r HEAD -- 'manual_inputs/nfl_fast/*.json')
+          mapfile -t FILES < <(find manual_inputs/nfl_fast -maxdepth 1 -type f -name '*.json' -print | sort)
           [[ ${#FILES[@]} -eq 1 ]] || { echo "NFL_FAST_EXACTLY_ONE_INPUT_REQUIRED count=${#FILES[@]}" >&2; exit 1; }
           echo "path=${FILES[0]}" >> "$GITHUB_OUTPUT"
       - name: Fetch strictly-prior NFL history
