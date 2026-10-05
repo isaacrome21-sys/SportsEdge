@@ -9,6 +9,8 @@ on:
       - 'sportsedge/sports/nfl/NFL_V2K_DEVELOPMENT_EXPOSURE_V4.json'
       - 'sportsedge/sports/nfl/NFL_V2K_DEVELOPMENT_VALIDATION_PREATTEMPT_V5.json'
       - 'tests/test_nfl_v2k_attempt5_market_calibration.py'
+      - 'sportsedge/sports/nfl/NFL_V2K_DEVELOPMENT_FINAL_V1.json'
+      - 'tests/test_nfl_v2k_development_finality.py'
       - '.github/workflows/nfl-v2k-attempt5-development-validation.yml'
   workflow_dispatch:
     inputs:
@@ -52,6 +54,13 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install --disable-pip-version-check numpy==2.5.3
+      - name: Refuse another scored development run after finality
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          if Path('sportsedge/sports/nfl/NFL_V2K_DEVELOPMENT_FINAL_V1.json').exists():
+              raise SystemExit('NFL_V2K_DEVELOPMENT_BUDGET_EXHAUSTED')
+          PY
       - name: Materialize frozen NFL sources
         run: python scripts/materialize_nfl_frozen_sources.py --source-contract config/nfl_promotion_source_freeze_v1.json --output-root artifacts/football/v2k/sources --attestation-out artifacts/football/v2k/source_attestation.json
       - name: Score frozen final Attempt 5
