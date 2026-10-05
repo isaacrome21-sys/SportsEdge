@@ -124,6 +124,19 @@ class MLBGenericF5FeatureTests(unittest.TestCase):
         self.assertEqual(distribution.away_history_games, 10)
         self.assertEqual(distribution.home_history_games, 10)
 
+    def test_f5_source_reuses_team_and_league_fetches_across_market_rows(self):
+        for market, entity in (("F5_TOTALS", "g"), ("F5_MONEYLINE", "g")):
+            self.source.feature_row(
+                game_pk=123456,
+                market=market,
+                entity_id=entity,
+                target_date=date(2026, 9, 14),
+                away_team_id=101,
+                home_team_id=202,
+            )
+        # Two team histories + one league prior, once for the whole source session.
+        self.assertEqual(len(self.urls), 3)
+
     def test_f5_team_totals_resolves_on_same_actual_history_surface(self):
         row = self.source.feature_row(
             game_pk=123456,
