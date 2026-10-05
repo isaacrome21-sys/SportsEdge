@@ -61,6 +61,7 @@
         ".github/workflows/football-prop-run-machine-contract.yml",
         "config/football_prop_engine_surface.json",
         "config/research/nfl_prop_usage_v1_fit_freeze.json",
+        "config/research/nfl_market_context_prop_v1_2026_forward_lock.json",
         "docs/research/nfl_prop_usage_v1_prelock.md",
         "scripts/build_nfl_prop_model_artifact.py",
         "scripts/fit_nfl_prop_usage_v1.py",
