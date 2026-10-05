@@ -344,6 +344,8 @@ def run(
             "serving_compatibility_sha256"
         ],
         "prediction_sha256": prediction["prediction_sha256"],
+        "raw_sources_persisted": True,
+        "raw_sources_dir": "raw_sources",
         "market_data_used": False,
         "backfill": False,
         "authority": prediction["authority"],
