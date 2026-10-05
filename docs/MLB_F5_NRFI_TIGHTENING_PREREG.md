@@ -30,10 +30,12 @@ enter model inputs.
 
 ## F5 candidates
 
-m0 reproduces the current F5 state: each scoring marginal is a 50/50 blend of
-that team's empirical F5 runs-for PMF and the opponent's empirical F5
+m0 reproduces the current F5 score state: each scoring marginal is a 50/50
+blend of that team's empirical F5 runs-for PMF and the opponent's empirical F5
 runs-allowed PMF, then the two team marginals form one independent joint score
-state.
+state. For the held-out W/T/L and over-4.5 guards, every candidate is passed
+through the same current production Jeffreys settlement readout before scoring;
+exact-score NLL remains a distribution-level tuning metric.
 
 m5, m15, and m30 use the same construction after shrinking each team marginal
 toward the strictly-prior league F5-runs PMF with 5, 15, or 30 pseudo-games.
@@ -45,8 +47,9 @@ F5 ships only if all 2025 rules pass:
 1. selected candidate is not m0;
 2. date-clustered 95% bootstrap CI of delta exact-score NLL versus m0 is below 0
    (2,000 reps, seed 20261004);
-3. W/T/L state Brier is no worse than m0 + 0.002;
-4. F5 over-4.5 Brier is no worse than m0 + 0.002;
+3. W/T/L state Brier after the current production Jeffreys settlement readout
+   is no worse than m0 + 0.002;
+4. F5 over-4.5 Brier after that same readout is no worse than m0 + 0.002;
 5. at least 1,000 held-out games are scored.
 
 ## NRFI/YRFI candidates
