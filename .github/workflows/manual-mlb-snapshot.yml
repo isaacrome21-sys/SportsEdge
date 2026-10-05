@@ -7,6 +7,8 @@ on:
       - sportsedge/manual_quote.py
       - sportsedge/canonical_manual_mlb.py
       - sportsedge/manual_mlb_snapshot.py
+      - sportsedge/mlb_all_market_features.py
+      - tests/test_mlb_all_market_state_wiring.py
       - sportsedge/engine_registry.py
       - sportsedge/generic_market_engine.py
       - sportsedge/quote_bridge.py
@@ -34,6 +36,8 @@ on:
       - sportsedge/manual_quote.py
       - sportsedge/canonical_manual_mlb.py
       - sportsedge/manual_mlb_snapshot.py
+      - sportsedge/mlb_all_market_features.py
+      - tests/test_mlb_all_market_state_wiring.py
       - sportsedge/engine_registry.py
       - sportsedge/generic_market_engine.py
       - sportsedge/quote_bridge.py
@@ -84,7 +88,7 @@ jobs:
       - name: Install runtime dependencies
         run: python -m pip install --disable-pip-version-check numpy==2.5.3
       - name: Verify canonical manual market contract and live guards
-        run: PYTHONPATH=. python -m unittest tests.test_manual_quote_contract tests.test_manual_mlb_live_guards tests.test_mlb_myspari_own_model tests.test_mlb_empirical_support tests.test_mlb_context_card tests.test_mlb_same_game_guard tests.test_mlb_lines_intake
+        run: PYTHONPATH=. python -m unittest tests.test_manual_quote_contract tests.test_manual_mlb_live_guards tests.test_mlb_myspari_own_model tests.test_mlb_empirical_support tests.test_mlb_context_card tests.test_mlb_same_game_guard tests.test_mlb_lines_intake tests.test_mlb_all_market_state_wiring tests.test_mlb_first_inning_empirical
       - name: Resolve input
         id: resolve
         shell: bash
