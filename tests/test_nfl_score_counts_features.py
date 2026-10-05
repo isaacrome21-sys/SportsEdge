@@ -369,3 +369,46 @@ def test_csv_numeric_string_flags_are_parsed_as_boolean_indicators():
     assert _flag("0.0") is False
     assert _flag("0") is False
     assert _flag("") is False
+
+
+
+def test_valid_scrimmage_with_missing_epa_keeps_volume_without_inventing_rate_value():
+    from sportsedge.sports.nfl.score_counts_features import _team_features
+
+    rows = [
+        _pass("g1", 1, "H", "A", "QB-H", 0.5, cpoe=2.0),
+        _pass("g1", 2, "H", "A", "QB-H", None, cpoe=3.0),
+    ]
+    teams, qbs = aggregate_game_pbp(rows)
+    home = teams[("g1", "H")]
+    qb = qbs[("g1", "QB-H")]
+
+    # Both real snaps count toward pace/dropback volume.
+    assert home.off_plays == 2
+    assert home.pass_dropbacks == 2
+    assert qb.dropbacks == 2
+
+    # Only the observed EPA row enters EPA numerators/denominators.
+    assert home.off_epa_sum == pytest.approx(0.5)
+    assert home.off_epa_plays == 1
+    assert home.pass_epa_sum == pytest.approx(0.5)
+    assert home.pass_epa_dropbacks == 1
+    assert qb.epa_sum == pytest.approx(0.5)
+    assert qb.epa_dropbacks == 1
+
+    # CPOE remains observed on both rows.
+    assert qb.cpoe_n == 2
+    assert qb.cpoe_sum == pytest.approx(5.0)
+
+    features = _team_features([home, home, home, home])
+    assert features["off_plays_per_game"] == pytest.approx(2.0)
+    assert features["off_epa_per_play"] == pytest.approx(0.5)
+    assert features["off_pass_epa_per_dropback"] == pytest.approx(0.5)
+    assert features["off_success_rate"] == pytest.approx(1.0)
+
+
+def test_missing_scrimmage_team_identity_still_fails_closed():
+    row = _pass("g1", 1, "H", "A", "QB-H", None)
+    row["posteam"] = ""
+    with pytest.raises(ScoreCountFeatureError, match="SCRIMMAGE_IDENTITY_MISSING"):
+        aggregate_game_pbp([row])
