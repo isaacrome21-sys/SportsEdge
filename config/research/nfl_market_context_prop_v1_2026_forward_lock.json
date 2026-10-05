@@ -1,0 +1,185 @@
+{
+  "schema": "SPORTSEDGE_NFL_MARKET_CONTEXT_PROP_V1_2026_FORWARD_LOCK",
+  "status": "FROZEN_BEFORE_2026_WEEK5_FORWARD_EVIDENCE",
+  "frozen_date": "2026-10-05",
+  "candidate_identity": {
+    "family": "NFL_MARKET_CONTEXT_PROP_V1",
+    "implementation_merge_sha": "e6f719b5e4abcbc81fd04b11815c4683477b0be4",
+    "reconciliation_main_sha": "099f68f84fc5b827125b858e2f6a0e30bdca23af",
+    "refit_allowed": false,
+    "retune_allowed": false,
+    "code_surface": [
+      {
+        "path": "sportsedge/sports/nfl/market_context_props.py",
+        "git_blob_sha1": "1047a382c1b6630d0cabbea0cca007c3c623ac28"
+      },
+      {
+        "path": "sportsedge/nfl_unified_phone.py",
+        "git_blob_sha1": "0e0c554bcbcc776f57cab797d426bdce2dbe6534"
+      },
+      {
+        "path": "sportsedge/sports/nfl/unified_run_it.py",
+        "git_blob_sha1": "bd87f6a7ae7680108d6490a223abd3fea02b650f"
+      },
+      {
+        "path": "sportsedge/sports/nfl/unified_auto_roles.py",
+        "git_blob_sha1": "9cd60fe09748ccf31d540ba132a062d9879cba1e"
+      },
+      {
+        "path": "sportsedge/sports/nfl/unified_market_engine.py",
+        "git_blob_sha1": "f50c86540f997040e98812effd302f1b4c4900e9"
+      },
+      {
+        "path": "sportsedge/sports/nfl/live_role_source.py",
+        "git_blob_sha1": "54df0060c5b3d0858fb397af855001de3e7d197e"
+      },
+      {
+        "path": "sportsedge/sports/nfl/nflverse_role_bridge.py",
+        "git_blob_sha1": "1859b6c2a8a45bfc528cce4b4fcb0c1c50404dc8"
+      }
+    ]
+  },
+  "model_contract": {
+    "game_environment": {
+      "source": "SPORTSBOOK_MARKET_CENTER_CONTEXT_ONLY",
+      "required_inputs": [
+        "pregame_home_spread",
+        "pregame_game_total"
+      ],
+      "game_market_prices_create_edge": false,
+      "game_market_model_authority": false,
+      "v2k_game_edge_status": "DISABLED_DEVELOPMENT_BUDGET_EXHAUSTED"
+    },
+    "player_probability_source": "PIT_SAFE_PLAYER_ROLE_USAGE_AND_SHARED_SIMULATION",
+    "player_prop_line_as_predictive_feature": false,
+    "player_prop_price_as_predictive_feature": false,
+    "public_splits_as_predictive_feature": false,
+    "capper_opinion_as_predictive_feature": false,
+    "postkickoff_features_forbidden": true
+  },
+  "markets": {
+    "pass_attempts": {
+      "positions": [
+        "QB"
+      ],
+      "provider_market": "player_pass_attempts"
+    },
+    "completions": {
+      "positions": [
+        "QB"
+      ],
+      "provider_market": "player_pass_completions"
+    },
+    "passing_yards": {
+      "positions": [
+        "QB"
+      ],
+      "provider_market": "player_pass_yds"
+    },
+    "rush_attempts": {
+      "positions": [
+        "QB",
+        "RB",
+        "FB",
+        "WR"
+      ],
+      "provider_market": "player_rush_attempts"
+    },
+    "rushing_yards": {
+      "positions": [
+        "QB",
+        "RB",
+        "FB",
+        "WR"
+      ],
+      "provider_market": "player_rush_yds"
+    },
+    "receptions": {
+      "positions": [
+        "RB",
+        "FB",
+        "WR",
+        "TE"
+      ],
+      "provider_market": "player_receptions"
+    },
+    "receiving_yards": {
+      "positions": [
+        "RB",
+        "FB",
+        "WR",
+        "TE"
+      ],
+      "provider_market": "player_reception_yds"
+    }
+  },
+  "excluded_phase1_markets": {
+    "td_family": "Requires separately frozen scoring-composition prior and validation.",
+    "interceptions": "Deferred from Phase 1 probability validation.",
+    "longest_props": "Deferred from Phase 1 probability validation.",
+    "kicker_defense": "No current market-context player probability lane."
+  },
+  "forward_window": {
+    "season": 2026,
+    "season_type": "REG",
+    "first_eligible_week": 5,
+    "last_eligible_week": 18,
+    "first_eligible_kickoff_utc": "2026-10-09T00:15:00Z",
+    "evidence_clock_starts_only_after_this_lock_is_merged_to_main": true,
+    "prelock_rows_admissible": false,
+    "weeks_1_through_4_admissible": false,
+    "backfill_allowed": false
+  },
+  "decision_snapshot": {
+    "book": "draftkings",
+    "paired_over_under_required": true,
+    "line_must_match_pair": true,
+    "exclusive_min_minutes_before_kickoff": 15,
+    "inclusive_max_minutes_before_kickoff": 75,
+    "selection_rule": "LATEST_ADMISSIBLE_SNAPSHOT_AT_OR_BEFORE_T_MINUS_15",
+    "prop_quote_may_bind_threshold_and_ev_after_prediction": true,
+    "prop_quote_may_change_player_projection": false
+  },
+  "close_snapshot": {
+    "book": "draftkings",
+    "paired_over_under_required": true,
+    "line_must_match_pair": true,
+    "exclusive_min_minutes_before_kickoff": 0,
+    "inclusive_max_minutes_before_kickoff": 15,
+    "selection_rule": "LATEST_ADMISSIBLE_SNAPSHOT_BEFORE_KICKOFF",
+    "missing_close": "KEEP_VALIDATION_ROW_EXCLUDE_FROM_CLV_ONLY"
+  },
+  "pit_player_eligibility": {
+    "prekick_active_status_required": true,
+    "latest_depth_snapshot_at_or_before_decision_required": true,
+    "unique_starting_qb_required_for_qb_markets": true,
+    "skill_player_must_be_present_in_latest_depth_snapshot": true,
+    "missing_or_ambiguous_context": "ZERO_MODEL_ROW"
+  },
+  "validation": {
+    "evaluation_timing": "AFTER_WEEK_18_WINDOW_CLOSE_ONLY",
+    "per_market_independent": true,
+    "minimum_decision_rows_per_market": 100,
+    "calibration_metric": "ABS_MEAN_P_OVER_MINUS_OBSERVED_OVER_RATE",
+    "calibration_max": 0.06,
+    "candidate_brier_must_be_lte_devigged_market_brier": true,
+    "candidate_log_loss_must_be_lte_devigged_market_log_loss": true,
+    "missing_sample_behavior": "MARKET_STAYS_RESEARCH_NO_MODEL",
+    "no_market_can_borrow_another_markets_sample": true
+  },
+  "promotion_boundary": {
+    "validation_pass_creates_runtime_engine_authority": false,
+    "separate_forward_clv_and_promotion_evidence_required": true,
+    "football_prop_engine_surface_must_remain_no_engine_until_separate_promotion": true
+  },
+  "authority": {
+    "research_only": true,
+    "creates_model_p": false,
+    "truth_gate": false,
+    "official": false,
+    "promotion": false,
+    "staking": false,
+    "game_market_edge": false,
+    "backfill": false
+  }
+}
