@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime, timezone
+from hashlib import sha256
+import json
 
 import pytest
 
@@ -72,6 +74,21 @@ def fit_artifact():
     )
 
 
+def passed_fit_artifact():
+    art = fit_artifact()
+    if art["development_gate"]["pass"]:
+        return art
+    art = deepcopy(art)
+    art["status"] = "DEVELOPMENT_ATTEMPT_PASS"
+    art["development_gate"]["pass"] = True
+    art.pop("artifact_sha256", None)
+    canonical = json.dumps(
+        art, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    ).encode("utf-8")
+    art["artifact_sha256"] = sha256(canonical).hexdigest()
+    return art
+
+
 def forward_rows() -> list[dict]:
     out = []
     for home in (True, False):
@@ -121,7 +138,7 @@ def test_tampered_fit_artifact_fails_digest():
 
 
 def test_forward_prediction_is_deterministic_market_blind_and_50k_paths():
-    fit = fit_artifact()
+    fit = passed_fit_artifact()
     kwargs = dict(
         prediction_at=datetime(2026, 10, 8, 23, 0, tzinfo=timezone.utc),
         source_manifest_sha256=SOURCE,
@@ -153,7 +170,7 @@ def test_forward_prediction_is_deterministic_market_blind_and_50k_paths():
 
 
 def test_forward_outcome_or_market_data_fails_closed():
-    fit = fit_artifact()
+    fit = passed_fit_artifact()
     rows = forward_rows()
     rows[0]["home_score"] = 27
     with pytest.raises(ScoreCountArtifactError, match="FORWARD_ROW_FORBIDDEN_FIELD"):
@@ -170,22 +187,58 @@ def test_forward_outcome_or_market_data_fails_closed():
         )
 
 
-def test_forward_identity_and_time_boundaries_fail_closed():
-    fit = fit_artifact()
-    with pytest.raises(ScoreCountArtifactError, match="FORWARD_SOURCE_MANIFEST_MISMATCH"):
+def test_forward_fit_and_serving_provenance_are_separate_and_bound():
+    fit = passed_fit_artifact()
+    out = build_forward_prediction(
+        fit, forward_rows(), prediction_at="2026-10-08T23:00:00Z",
+        source_manifest_sha256="e" * 64, code_identity=CODE,
+    )
+    assert out["training_source_manifest_sha256"] == SOURCE
+    assert out["forward_source_manifest_sha256"] == "e" * 64
+    assert out["fit_code_identity"] == CODE
+    assert out["serving_code_identity"] == CODE
+    assert out["serving_compatibility_sha256"] is None
+
+    with pytest.raises(ScoreCountArtifactError, match="serving_compatibility_sha256:SHA256_REQUIRED"):
         build_forward_prediction(
             fit, forward_rows(), prediction_at="2026-10-08T23:00:00Z",
-            source_manifest_sha256="e" * 64, code_identity=CODE,
+            source_manifest_sha256="e" * 64, code_identity="different",
         )
-    with pytest.raises(ScoreCountArtifactError, match="FORWARD_CODE_IDENTITY_MISMATCH"):
-        build_forward_prediction(
-            fit, forward_rows(), prediction_at="2026-10-08T23:00:00Z",
-            source_manifest_sha256=SOURCE, code_identity="different",
-        )
+
+    changed = build_forward_prediction(
+        fit, forward_rows(), prediction_at="2026-10-08T23:00:00Z",
+        source_manifest_sha256="e" * 64, code_identity="different",
+        serving_compatibility_sha256="f" * 64,
+    )
+    assert changed["fit_code_identity"] == CODE
+    assert changed["serving_code_identity"] == "different"
+    assert changed["serving_compatibility_sha256"] == "f" * 64
+
     with pytest.raises(ScoreCountArtifactError, match="PREDICTION_MUST_PRECEDE_KICKOFF"):
         build_forward_prediction(
             fit, forward_rows(), prediction_at="2026-10-09T00:15:00Z",
-            source_manifest_sha256=SOURCE, code_identity=CODE,
+            source_manifest_sha256="e" * 64, code_identity=CODE,
+        )
+
+
+def test_forward_requires_passed_development_artifact():
+    fit = fit_artifact()
+    if fit["development_gate"]["pass"]:
+        fit = deepcopy(fit)
+        fit["status"] = "DEVELOPMENT_ATTEMPT_FAIL"
+        fit["development_gate"]["pass"] = False
+        fit.pop("artifact_sha256", None)
+        canonical = json.dumps(
+            fit, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+        ).encode("utf-8")
+        fit["artifact_sha256"] = sha256(canonical).hexdigest()
+    with pytest.raises(
+        ScoreCountArtifactError,
+        match="FORWARD_REQUIRES_PASSED_DEVELOPMENT_ARTIFACT",
+    ):
+        build_forward_prediction(
+            fit, forward_rows(), prediction_at="2026-10-08T23:00:00Z",
+            source_manifest_sha256="e" * 64, code_identity=CODE,
         )
 
 
