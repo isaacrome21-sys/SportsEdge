@@ -136,21 +136,35 @@ def _group_games(rows: list[dict]) -> list[tuple[dict, list[dict]]]:
     return list(groups.values())
 
 
+def _norm_market(value) -> str:
+    market = str(value or "MONEYLINE").upper()
+    if market in {"ML", "H2H"}:
+        return "MONEYLINE"
+    if market == "TOTALS":
+        return "TOTAL"
+    return market
+
+
+def _away_line(market: str, side: str, line):
+    """lines_card stores the away spread. A home quote carries the home number."""
+    if line is None or market != "SPREAD":
+        return line
+    value = float(line)
+    return -value if side == "HOME" else value
+
+
 def _markets(quotes: list[dict]) -> list[Market]:
     paired: dict[tuple, dict] = {}
     for quote in quotes:
-        market = str(quote.get("market") or "MONEYLINE").upper()
-        if market in {"ML", "H2H"}:
-            market = "MONEYLINE"
-        if market in {"TOTALS"}:
-            market = "TOTAL"
+        market = _norm_market(quote.get("market"))
         if market not in {"MONEYLINE", "SPREAD", "TOTAL"}:
             continue
         side = str(quote.get("side") or "").upper()
         odds = _odds(quote)
         if odds is None or side not in {"HOME", "AWAY", "OVER", "UNDER"}:
             continue
-        slot = paired.setdefault((market, quote.get("line")), {"line": quote.get("line"), "raw": quote.get("raw") or market})
+        line = _away_line(market, side, quote.get("line"))
+        slot = paired.setdefault((market, line), {"line": line, "raw": quote.get("raw") or market})
         if side in {"AWAY", "OVER"}:
             slot["p1"] = odds
         else:
@@ -194,24 +208,24 @@ def build_card(rows: list[dict], *, ratings, source_failures: list[dict]) -> dic
             reason = "TEAM_UNRESOLVED"
         for quote in quotes:
             odds = _odds(quote)
-            market = str(quote.get("market") or "MONEYLINE").upper()
-            if market in {"ML", "H2H"}:
-                market = "MONEYLINE"
-            if market == "TOTALS":
-                market = "TOTAL"
+            market = _norm_market(quote.get("market"))
             side = str(quote.get("side") or "").upper()
             label = None
             model_p = None
             market_p = None
-            if side in {"AWAY", "OVER"}:
-                label = f"{away} ML" if market == "MONEYLINE" else (
-                    f"{away} {float(quote.get('line')):+g}" if market == "SPREAD" and quote.get("line") is not None else f"Over {float(quote.get('line')):g}" if quote.get("line") is not None else None
-                )
-            elif side in {"HOME", "UNDER"}:
-                home_line = None if quote.get("line") is None else -float(quote.get("line"))
-                label = f"{home} ML" if market == "MONEYLINE" else (
-                    f"{home} {home_line:+g}" if market == "SPREAD" and home_line is not None else f"Under {float(quote.get('line')):g}" if quote.get("line") is not None else None
-                )
+            away_line = _away_line(market, side, quote.get("line"))
+            if side == "AWAY" and market == "MONEYLINE":
+                label = f"{away} ML"
+            elif side == "HOME" and market == "MONEYLINE":
+                label = f"{home} ML"
+            elif side == "AWAY" and market == "SPREAD" and away_line is not None:
+                label = f"{away} {float(away_line):+g}"
+            elif side == "HOME" and market == "SPREAD" and away_line is not None:
+                label = f"{home} {-float(away_line):+g}"
+            elif side == "OVER" and quote.get("line") is not None:
+                label = f"Over {float(quote.get('line')):g}"
+            elif side == "UNDER" and quote.get("line") is not None:
+                label = f"Under {float(quote.get('line')):g}"
             hit = priced.get((market, label, odds)) if label is not None and odds is not None else None
             if hit is not None:
                 model_p = float(hit.model_p)
