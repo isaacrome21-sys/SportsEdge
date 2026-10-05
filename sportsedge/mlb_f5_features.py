@@ -20,7 +20,7 @@ from urllib.request import urlopen
 from .mlb_generic_features import _read_json
 from .source_lineage import canonical_json_sha256
 
-F5_FEATURE_VERSION = "mlb_f5_actual_innings_v1"
+F5_FEATURE_VERSION = "mlb_f5_actual_innings_v2_first_inning"
 WIN_CREDIT_PATH_FEATURE_VERSION = "mlb_win_credit_score_path_v1"
 MIN_HISTORY_GAMES = 10
 HISTORY_WINDOW_GAMES = 30
