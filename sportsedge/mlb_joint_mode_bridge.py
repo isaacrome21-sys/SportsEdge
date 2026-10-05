@@ -125,19 +125,6 @@ def build_canonical_feature_row(
         "source": "MLB_STATSAPI_STRICTLY_PRIOR_JOINT_FEATURES",
     }
 
-    if market == "HOME_RUNS":
-        team_id = _batter_team(game, entity_id)
-        return source.feature_row(
-            game_pk=int(game.game_pk),
-            market=market,
-            entity_id=entity_id,
-            target_date=target_date,
-            away_team_id=int(game.away_team_id),
-            home_team_id=int(game.home_team_id),
-            player_id=int(entity_id),
-            team_id=team_id,
-        )
-
     if market == "FIRST_HOME_RUN":
         team_id = _batter_team(game, entity_id)
         built = build_first_hr_features(source, game=game, target_date=target_date)
