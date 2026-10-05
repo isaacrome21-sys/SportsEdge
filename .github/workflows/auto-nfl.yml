@@ -60,11 +60,11 @@ jobs:
           quotes = int(funnel.get("odds_rows_fetched") or 0)
           if quotes == 0 or card.get("run_status") == "BLOCKED_NO_ODDS":
               raise SystemExit("NFL_AUTO_ZERO_QUOTES")
+          summary = card.get("summary") or {}
+          if summary.get("both_sides") is not True or summary.get("catalog_complete") is not True:
+              raise SystemExit("NFL_AUTO_CATALOG_INCOMPLETE")
           rows = card.get("results") or []
-          bets = [
-              row for row in rows
-              if row.get("model_p") is not None and row.get("edge") is not None and float(row["edge"]) > 0
-          ]
+          bets = [row for row in rows if row.get("bet_status") == "BET"]
           if int(funnel.get("bets_emitted") or 0) != len(bets):
               raise SystemExit("NFL_AUTO_BET_EMIT_MISMATCH")
           if not any(row.get("model_p") is not None for row in rows if str(row.get("market")) in {"spread", "moneyline", "total"}):
@@ -73,10 +73,10 @@ jobs:
           PY
           exit $rc
       - name: Render NFL both-side board
-        if: always() && hashFiles('artifacts/live_nfl_card.json') != ''
+        if: always() && github.event_name == 'workflow_dispatch' && hashFiles('artifacts/live_nfl_card.json') != ''
         run: python scripts/render_football_board_card.py --engine-output artifacts/live_nfl_card.json --out-dir artifacts/nfl_myspari
       - name: Upload NFL auto card
-        if: always()
+        if: always() && github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: live-nfl-card
