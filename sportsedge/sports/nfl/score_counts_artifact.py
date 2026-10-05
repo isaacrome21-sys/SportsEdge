@@ -18,6 +18,9 @@ import numpy as np
 from sportsedge.sports.nfl.score_counts_g1 import (
     ALPHA_GRID,
     FEATURE_NAMES,
+    FG_ATTEMPT_FEATURE_NAMES,
+    FG_MODEL_ATTEMPT_RATE_X_PRIOR_MAKE,
+    FG_MODEL_DIRECT_MADE,
     ROOT_SEED_LITERAL,
     ROOT_SEED_UINT64,
     SIGMA_GRID,
@@ -39,7 +42,8 @@ FORWARD_SEASON = 2026
 FORWARD_FIRST_WEEK = 5
 FORWARD_FIRST_KICKOFF = "2026-10-09T00:15:00Z"
 FORBIDDEN_FORWARD_FIELDS = {
-    "offense_touchdowns", "made_field_goals", "def_st_touchdowns", "safeties",
+    "offense_touchdowns", "made_field_goals", "field_goal_attempts",
+    "def_st_touchdowns", "safeties",
     "pat_made", "two_point_made", "no_conversion", "home_score", "away_score",
     "spread_line", "total_line", "odds", "price", "result", "outcome",
 }
@@ -100,12 +104,12 @@ def _poisson_dict(model: PoissonRidge) -> dict[str, Any]:
 
 def _poisson_from_dict(value: Mapping[str, Any]) -> PoissonRidge:
     names = tuple(str(x) for x in value.get("feature_names") or ())
-    if names != FEATURE_NAMES:
+    if names not in {FEATURE_NAMES, FG_ATTEMPT_FEATURE_NAMES}:
         raise ScoreCountArtifactError("FIT_FEATURE_IDENTITY_MISMATCH")
     mean = tuple(float(x) for x in value.get("mean") or ())
     scale = tuple(float(x) for x in value.get("scale") or ())
     coef = tuple(float(x) for x in value.get("coefficients") or ())
-    if not (len(mean) == len(scale) == len(coef) == len(FEATURE_NAMES)):
+    if not (len(mean) == len(scale) == len(coef) == len(names)):
         raise ScoreCountArtifactError("FIT_VECTOR_LENGTH_MISMATCH")
     if any((not isfinite(v)) for v in (*mean, *scale, *coef)):
         raise ScoreCountArtifactError("FIT_VECTOR_NONFINITE")
@@ -139,6 +143,7 @@ def fit_from_artifact(artifact: Mapping[str, Any]) -> ScoreCountFit:
     return ScoreCountFit(
         td_model=_poisson_from_dict(fit["td_model"]),
         fg_model=_poisson_from_dict(fit["fg_model"]),
+        fg_model_kind=str(fit.get("fg_model_kind") or FG_MODEL_DIRECT_MADE),
         shared_sigma=float(fit["shared_sigma"]),
         def_st_td_rate=float(fit["def_st_td_rate"]),
         safety_rate=float(fit["safety_rate"]),
@@ -172,10 +177,19 @@ def _poisson_deviance(y: np.ndarray, mu: np.ndarray) -> float:
     return float(2.0 * np.mean(term))
 
 
+def _fg_attempt2_prediction(model: PoissonRidge, row: Mapping[str, Any]) -> float:
+    rate = _finite(row.get("fg_make_rate_shrunk"), "fg_make_rate_shrunk")
+    if not 0.0 <= rate <= 1.0:
+        raise ScoreCountArtifactError("FG_MAKE_RATE_OUT_OF_RANGE")
+    return float(predict_mean(model, row) * rate)
+
+
 def _development_count_gate(
     rows: Sequence[Mapping[str, Any]],
+    *,
+    attempt_number: int,
 ) -> dict[str, Any]:
-    """Frozen Attempt-1 historical gate, entirely market-blind."""
+    """Frozen historical gate; Attempt 2 changes only the FG candidate mean."""
     target_results: dict[str, Any] = {}
     all_pass = True
     for target in ("offense_touchdowns", "made_field_goals"):
@@ -184,16 +198,41 @@ def _development_count_gate(
         pooled_candidate: list[float] = []
         pooled_baseline: list[float] = []
         wins = 0
+        is_attempt2_fg = int(attempt_number) == 2 and target == "made_field_goals"
+        model_target = "field_goal_attempts" if is_attempt2_fg else target
+        feature_names = FG_ATTEMPT_FEATURE_NAMES if is_attempt2_fg else FEATURE_NAMES
+        model_kind = (
+            FG_MODEL_ATTEMPT_RATE_X_PRIOR_MAKE
+            if is_attempt2_fg
+            else (FG_MODEL_DIRECT_MADE if target == "made_field_goals" else "DIRECT_COUNT_POISSON_V1")
+        )
         for validation_season in SIGMA_VALIDATION_SEASONS:
             train = [row for row in rows if int(row["season"]) < validation_season]
             valid = [row for row in rows if int(row["season"]) == validation_season]
             train_seasons = sorted({int(row["season"]) for row in train})
             if len(train_seasons) < 3 or not valid:
-                raise ScoreCountArtifactError(f"DEVELOPMENT_GATE_FOLD_INCOMPLETE:{target}:{validation_season}")
-            alpha, _ = choose_alpha(train, target=target, alphas=ALPHA_GRID)
-            model = fit_poisson_ridge(train, target=target, alpha=alpha)
+                raise ScoreCountArtifactError(
+                    f"DEVELOPMENT_GATE_FOLD_INCOMPLETE:{target}:{validation_season}"
+                )
+            alpha, _ = choose_alpha(
+                train,
+                target=model_target,
+                alphas=ALPHA_GRID,
+                feature_names=feature_names,
+            )
+            model = fit_poisson_ridge(
+                train,
+                target=model_target,
+                alpha=alpha,
+                feature_names=feature_names,
+            )
             y = np.asarray([_finite(row.get(target), target) for row in valid], dtype=float)
-            candidate = np.asarray([predict_mean(model, row) for row in valid], dtype=float)
+            if is_attempt2_fg:
+                candidate = np.asarray(
+                    [_fg_attempt2_prediction(model, row) for row in valid], dtype=float
+                )
+            else:
+                candidate = np.asarray([predict_mean(model, row) for row in valid], dtype=float)
             train_y = np.asarray([_finite(row.get(target), target) for row in train], dtype=float)
             baseline_mean = max(float(np.mean(train_y)), 1e-12)
             baseline = np.full_like(y, baseline_mean, dtype=float)
@@ -205,6 +244,8 @@ def _development_count_gate(
                 "validation_season": validation_season,
                 "training_seasons": train_seasons,
                 "n_team_rows": len(valid),
+                "model_target": model_target,
+                "model_kind": model_kind,
                 "selected_alpha": alpha,
                 "candidate_poisson_deviance": candidate_dev,
                 "intercept_baseline_poisson_deviance": baseline_dev,
@@ -222,6 +263,8 @@ def _development_count_gate(
         passed = bool(candidate_dev < baseline_dev and wins >= 3)
         all_pass = all_pass and passed
         target_results[target] = {
+            "model_target": model_target,
+            "model_kind": model_kind,
             "pooled_candidate_poisson_deviance": candidate_dev,
             "pooled_intercept_baseline_poisson_deviance": baseline_dev,
             "pooled_improvement": baseline_dev - candidate_dev,
@@ -244,26 +287,53 @@ def _development_count_gate(
 
 def _select_shared_sigma(
     rows: Sequence[Mapping[str, Any]],
+    *,
+    attempt_number: int,
 ) -> tuple[float, dict[str, Any]]:
     seasons = sorted({int(row["season"]) for row in rows})
     if seasons != list(DEVELOPMENT_SEASONS):
         raise ScoreCountArtifactError(f"DEVELOPMENT_SEASONS_EXACT_REQUIRED:{seasons}")
     residual_rows: list[dict[str, float | int | str]] = []
     fold_meta: list[dict[str, Any]] = []
+    attempt2 = int(attempt_number) == 2
     for validation_season in SIGMA_VALIDATION_SEASONS:
         train = [row for row in rows if int(row["season"]) < validation_season]
         valid = [row for row in rows if int(row["season"]) == validation_season]
         train_seasons = sorted({int(row["season"]) for row in train})
         if len(train_seasons) < 3 or not valid:
             raise ScoreCountArtifactError(f"SIGMA_FOLD_INCOMPLETE:{validation_season}")
-        td_alpha, td_cv = choose_alpha(train, target="offense_touchdowns", alphas=ALPHA_GRID)
-        fg_alpha, fg_cv = choose_alpha(train, target="made_field_goals", alphas=ALPHA_GRID)
+        td_alpha, td_cv = choose_alpha(
+            train, target="offense_touchdowns", alphas=ALPHA_GRID
+        )
+        if attempt2:
+            fg_target = "field_goal_attempts"
+            fg_features = FG_ATTEMPT_FEATURE_NAMES
+        else:
+            fg_target = "made_field_goals"
+            fg_features = FEATURE_NAMES
+        fg_alpha, fg_cv = choose_alpha(
+            train,
+            target=fg_target,
+            alphas=ALPHA_GRID,
+            feature_names=fg_features,
+        )
         td = fit_poisson_ridge(train, target="offense_touchdowns", alpha=td_alpha)
-        fg = fit_poisson_ridge(train, target="made_field_goals", alpha=fg_alpha)
+        fg = fit_poisson_ridge(
+            train,
+            target=fg_target,
+            alpha=fg_alpha,
+            feature_names=fg_features,
+        )
         pairs = _game_pairs(valid)
         for gid, (home, away) in sorted(pairs.items()):
-            h_mu = predict_mean(td, home) + predict_mean(fg, home)
-            a_mu = predict_mean(td, away) + predict_mean(fg, away)
+            home_fg = (
+                _fg_attempt2_prediction(fg, home) if attempt2 else predict_mean(fg, home)
+            )
+            away_fg = (
+                _fg_attempt2_prediction(fg, away) if attempt2 else predict_mean(fg, away)
+            )
+            h_mu = predict_mean(td, home) + home_fg
+            a_mu = predict_mean(td, away) + away_fg
             h_obs = _finite(home.get("offense_touchdowns"), "home.offense_touchdowns") + _finite(
                 home.get("made_field_goals"), "home.made_field_goals"
             )
@@ -284,6 +354,10 @@ def _select_shared_sigma(
             "n_games": len(pairs),
             "td_alpha": td_alpha,
             "fg_alpha": fg_alpha,
+            "fg_model_target": fg_target,
+            "fg_model_kind": (
+                FG_MODEL_ATTEMPT_RATE_X_PRIOR_MAKE if attempt2 else FG_MODEL_DIRECT_MADE
+            ),
             "td_alpha_cv": {str(k): td_cv[k] for k in sorted(td_cv)},
             "fg_alpha_cv": {str(k): fg_cv[k] for k in sorted(fg_cv)},
         })
@@ -294,7 +368,9 @@ def _select_shared_sigma(
     for sigma in SIGMA_GRID:
         errors = []
         for row in residual_rows:
-            implied = float(row["home_mu"]) * float(row["away_mu"]) * (exp(float(sigma) ** 2) - 1.0)
+            implied = float(row["home_mu"]) * float(row["away_mu"]) * (
+                exp(float(sigma) ** 2) - 1.0
+            )
             errors.append((float(row["residual_product"]) - implied) ** 2)
         mse[float(sigma)] = float(np.mean(np.asarray(errors, dtype=float)))
     best = min(mse, key=lambda s: (mse[s], s))
@@ -306,7 +382,6 @@ def _select_shared_sigma(
         "oof_game_count": len(residual_rows),
         "folds": fold_meta,
     }
-
 
 def _league_priors(rows: Sequence[Mapping[str, Any]]) -> tuple[float, float, tuple[float, float, float]]:
     n = len(rows)
@@ -342,11 +417,30 @@ def build_attempt_fit_artifact(
     materialized = [dict(row) for row in rows]
     if sorted({int(row["season"]) for row in materialized}) != list(DEVELOPMENT_SEASONS):
         raise ScoreCountArtifactError("DEVELOPMENT_SEASONS_EXACT_REQUIRED")
-    development_gate = _development_count_gate(materialized)
-    sigma, sigma_diag = _select_shared_sigma(materialized)
+    development_gate = _development_count_gate(
+        materialized, attempt_number=int(attempt_number)
+    )
+    sigma, sigma_diag = _select_shared_sigma(
+        materialized, attempt_number=int(attempt_number)
+    )
     dst, safety, conversions = _league_priors(materialized)
-    td_alpha, td_cv = choose_alpha(materialized, target="offense_touchdowns", alphas=ALPHA_GRID)
-    fg_alpha, fg_cv = choose_alpha(materialized, target="made_field_goals", alphas=ALPHA_GRID)
+    td_alpha, td_cv = choose_alpha(
+        materialized, target="offense_touchdowns", alphas=ALPHA_GRID
+    )
+    if int(attempt_number) == 2:
+        fg_target = "field_goal_attempts"
+        fg_features = FG_ATTEMPT_FEATURE_NAMES
+        fg_model_kind = FG_MODEL_ATTEMPT_RATE_X_PRIOR_MAKE
+    else:
+        fg_target = "made_field_goals"
+        fg_features = FEATURE_NAMES
+        fg_model_kind = FG_MODEL_DIRECT_MADE
+    fg_alpha, fg_cv = choose_alpha(
+        materialized,
+        target=fg_target,
+        alphas=ALPHA_GRID,
+        feature_names=fg_features,
+    )
     fit = fit_core(
         materialized,
         shared_sigma=sigma,
@@ -355,6 +449,7 @@ def build_attempt_fit_artifact(
         conversion_probabilities=conversions,
         source_manifest_sha256=source_sha,
         code_identity=code,
+        attempt_number=int(attempt_number),
     )
     if fit.td_model.alpha != td_alpha or fit.fg_model.alpha != fg_alpha:
         raise ScoreCountArtifactError("FIT_ALPHA_REPLAY_MISMATCH")
@@ -381,6 +476,8 @@ def build_attempt_fit_artifact(
             "alpha_grid": list(ALPHA_GRID),
             "td_alpha": td_alpha,
             "fg_alpha": fg_alpha,
+            "fg_model_target": fg_target,
+            "fg_model_kind": fg_model_kind,
             "td_alpha_cv": {str(k): td_cv[k] for k in sorted(td_cv)},
             "fg_alpha_cv": {str(k): fg_cv[k] for k in sorted(fg_cv)},
             "shared_sigma": sigma_diag,
@@ -388,6 +485,7 @@ def build_attempt_fit_artifact(
         "fit": {
             "td_model": _poisson_dict(fit.td_model),
             "fg_model": _poisson_dict(fit.fg_model),
+            "fg_model_kind": fit.fg_model_kind,
             "shared_sigma": fit.shared_sigma,
             "def_st_td_rate": fit.def_st_td_rate,
             "safety_rate": fit.safety_rate,
