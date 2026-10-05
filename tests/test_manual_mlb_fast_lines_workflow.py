@@ -27,6 +27,14 @@ class ManualMlbFastLinesWorkflowTests(unittest.TestCase):
         self.assertIn("--history-cache-dir .cache/mlb-history", text)
         self.assertIn("mlb-history-", text)
 
+    def test_fast_runtime_accepts_plain_text_and_normalizes_before_pricing(self):
+        text = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("*.json|*.txt", text)
+        self.assertIn("scripts/intake_mlb_lines_file.py", text)
+        self.assertIn("github.event.head_commit.timestamp", text)
+        self.assertIn("steps.normalize.outputs.path", text)
+        self.assertIn("tests.test_intake_mlb_lines_file", text)
+
     def test_fast_runtime_prices_same_engine_then_marks_pre_context(self):
         text = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("scripts/run_manual_mlb_snapshot.py", text)

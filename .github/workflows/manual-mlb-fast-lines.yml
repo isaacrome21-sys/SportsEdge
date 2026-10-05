@@ -50,6 +50,7 @@ jobs:
           tests.test_manual_mlb_live_guards
           tests.test_mlb_all_market_state_wiring
           tests.test_manual_mlb_all_market_source
+          tests.test_intake_mlb_lines_file
 
       - name: Resolve exactly one supplied lines file
         id: resolve
@@ -66,7 +67,7 @@ jobs:
           elif ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
             git fetch --no-tags --depth=1 origin "$BASE"
           fi
-          CHANGED="$(git diff --name-only --diff-filter=AM "$BASE" "$PUSH_AFTER" -- 'manual_inputs/mlb/*.json')"
+          CHANGED="$(git diff --name-only --diff-filter=AM "$BASE" "$PUSH_AFTER" -- 'manual_inputs/mlb/*')"
           mapfile -t FILES < <(printf '%s\n' "$CHANGED" | sed '/^$/d')
           [[ ${#FILES[@]} -eq 1 ]] || {
             echo "FAST_MLB_REQUIRES_EXACTLY_ONE_CHANGED_INPUT: count=${#FILES[@]} files=${FILES[*]-}" >&2
@@ -83,14 +84,38 @@ jobs:
             echo "FAST_MLB_PAST_SLATE_REFUSED: file_date=$FILE_DATE today=$RUN_DATE" >&2
             exit 1
           }
-          echo "path=$INPUT" >> "$GITHUB_OUTPUT"
+          case "$INPUT" in
+            *.json|*.txt) ;;
+            *) echo "FAST_MLB_INPUT_EXTENSION_REQUIRED_JSON_OR_TXT: $INPUT" >&2; exit 1 ;;
+          esac
+          echo "source_path=$INPUT" >> "$GITHUB_OUTPUT"
           echo "run_date=$FILE_DATE" >> "$GITHUB_OUTPUT"
           echo "FAST_MLB_INPUT=$INPUT"
+
+      - name: Normalize supplied lines
+        id: normalize
+        shell: bash
+        env:
+          SOURCE_PATH: ${{ steps.resolve.outputs.source_path }}
+          OBSERVED_AT: ${{ github.event.head_commit.timestamp }}
+        run: |
+          set -euo pipefail
+          if [[ "$SOURCE_PATH" == *.txt ]]; then
+            OUT="artifacts/fast_intake.json"
+            PYTHONPATH=. python scripts/intake_mlb_lines_file.py \
+              --input "$SOURCE_PATH" \
+              --observed-at "$OBSERVED_AT" \
+              --output "$OUT"
+            echo "path=$OUT" >> "$GITHUB_OUTPUT"
+            echo "FAST_MLB_TEXT_INTAKE_NORMALIZED=$OUT"
+          else
+            echo "path=$SOURCE_PATH" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Price supplied lines with SportsEdge
         run: |
           PYTHONPATH=. python scripts/run_manual_mlb_snapshot.py \
-            --input "${{ steps.resolve.outputs.path }}" \
+            --input "${{ steps.normalize.outputs.path }}" \
             --history-cache-dir .cache/mlb-history \
             --run-date "${{ steps.resolve.outputs.run_date }}" \
             --max-age-minutes 60 \
@@ -100,7 +125,7 @@ jobs:
         run: |
           PYTHONPATH=. python scripts/render_mlb_myspari_card.py \
             --engine-output artifacts/manual_mlb_fast.json \
-            --snapshot "${{ steps.resolve.outputs.path }}" \
+            --snapshot "${{ steps.normalize.outputs.path }}" \
             --pre-context \
             --out-dir artifacts/mlb_myspari_fast
           echo "FAST_MLB_CARD_BEGIN"
