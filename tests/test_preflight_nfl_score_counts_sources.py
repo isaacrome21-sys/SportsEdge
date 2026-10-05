@@ -45,3 +45,26 @@ def test_timestamped_depth_schema_requires_asof_timestamp():
         assert "dt" in str(exc)
     else:
         raise AssertionError("timestamped depth schema must require dt")
+
+
+def test_pbp_projection_drops_market_columns_and_keeps_model_inputs():
+    from sportsedge.sports.nfl.score_counts_source_projection import project_pbp_row
+
+    raw = {
+        "game_id": "2025_01_A_B",
+        "posteam": "A",
+        "defteam": "B",
+        "epa": 0.25,
+        "spread_line": -3.5,
+        "total_line": 47.5,
+        "home_opening_kickoff": "A",
+        "sportsbook_price": -110,
+    }
+    out = project_pbp_row(raw)
+    assert out == {
+        "game_id": "2025_01_A_B",
+        "posteam": "A",
+        "defteam": "B",
+        "epa": 0.25,
+    }
+    assert not any("spread" in key or "total_line" in key or "opening" in key for key in out)
