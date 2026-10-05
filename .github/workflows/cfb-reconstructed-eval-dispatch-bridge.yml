@@ -1,0 +1,131 @@
+name: cfb-reconstructed-eval-dispatch-bridge
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'config/research/cfb_reconstructed_eval_dispatch_v1.json'
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: cfb-reconstructed-eval-dispatch-bridge
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+
+      - name: Validate frozen one-shot CFB evaluation marker
+        run: |
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+
+          def sha(path):
+              return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+          marker_path = Path("config/research/cfb_reconstructed_eval_dispatch_v1.json")
+          x = json.loads(marker_path.read_text(encoding="utf-8"))
+          bindings = {
+              "candidate_prereg_sha256": "config/cfb_model_candidate_prereg_v1.json",
+              "evaluator_v3_sha256": "config/cfb_candidate_bakeoff_evaluator_v3.json",
+              "final_fit_policy_sha256": "config/cfb_selected_candidate_final_fit_policy_v1.json",
+              "materializer_workflow_sha256": ".github/workflows/cfb-reconstructed-selection-materialize.yml",
+          }
+          assert x["schema"] == "SPORTSEDGE_CFB_RECONSTRUCTED_EVAL_DISPATCH_V1"
+          assert x["status"] == "ARMED_SINGLE_MAIN_PUSH"
+          assert x["confirmation"] == "CONSUME_ALL_FOUR_CFB_ATTEMPTS"
+          for key, path in bindings.items():
+              assert x[key] == sha(path), (key, x[key], sha(path))
+
+          prereg = json.loads(Path(bindings["candidate_prereg_sha256"]).read_text())
+          assert prereg["status"] == "FROZEN_BEFORE_FIRST_EVALUATION"
+          assert prereg["governance"]["attempts_consumed"] == 0
+          assert prereg["governance"]["evaluation_performed"] is False
+
+          evaluator = json.loads(Path(bindings["evaluator_v3_sha256"]).read_text())
+          assert evaluator["status"] == "FROZEN_BEFORE_FIRST_EVALUATION"
+          assert evaluator["attempt_accounting"]["attempt_budget"] == 4
+          assert evaluator["attempt_accounting"]["single_bakeoff_consumes_all_four_attempts"] is True
+
+          final_fit = json.loads(Path(bindings["final_fit_policy_sha256"]).read_text())
+          assert final_fit["status"] == "FROZEN_BEFORE_FIRST_EVALUATION"
+          assert final_fit["post_result_retuning_allowed"] is False
+
+          rules = x["rules"]
+          assert rules["materialization_must_exist_on_data"] is True
+          assert rules["attempt_budget_must_be_fresh"] is True
+          assert rules["no_backfill"] is True
+          assert rules["no_market_data_for_model_fit"] is True
+          assert rules["no_partial_candidate_evaluation"] is True
+          assert rules["no_post_result_retuning"] is True
+          print("CFB_RECONSTRUCTED_EVAL_MARKER_VALID")
+          PY
+
+      - name: Verify persisted materialization readiness
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin data:data
+          git worktree add _cfb_data data
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("_cfb_data/history/cfb/reconstructed-selection")
+          bundle = json.loads((root / "selection_bundle_manifest.json").read_text())
+          source = json.loads((root / "reconstructed_source_manifest.json").read_text())
+          acquisition = json.loads((root / "acquisition_manifest.json").read_text())
+
+          assert bundle["schema"] == "CFB_RECONSTRUCTED_SELECTION_BUNDLE_V1"
+          assert bundle["status"] == "READY_FOR_CANDIDATE_EVALUATION"
+          assert bundle["start_season"] == 2015 and bundle["end_season"] == 2025
+          assert bundle["no_2026_forward_outcomes"] is True
+          assert bundle["market_data_in_predictive_features"] is False
+          assert bundle["historical_pit_created"] is False
+          assert bundle["attempt_consumed"] is False
+          assert bundle["evaluation_performed"] is False
+          assert int(bundle["selection_row_count"]) > 0
+          assert len(str(bundle["selection_rows_sha256"])) == 64
+          assert len(str(bundle["source_manifest_sha256"])) == 64
+
+          assert isinstance(source.get("responses"), list) and source["responses"]
+          assert acquisition["schema"] == "CFB_RECONSTRUCTED_ACQUISITION_READINESS_PUBLIC_V1"
+          assert acquisition["status"] == "ACQUISITION_COMPLETE_READY_FOR_SELECTION"
+          authority = acquisition.get("authority") or {}
+          assert not any(bool(v) for v in authority.values())
+          print("CFB_RECONSTRUCTED_PERSISTED_MATERIALIZATION_READY")
+          PY
+
+      - name: Refuse duplicate active evaluation dispatch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          active="$(
+            gh run list               --repo "${{ github.repository }}"               --workflow cfb-reconstructed-selection-materialize.yml               --limit 30               --json status,event               --jq '[.[] | select(.status == "queued" or .status == "in_progress")] | length'
+          )"
+          if [[ "$active" -gt 0 ]]; then
+            echo "CFB_RECONSTRUCTED_EVAL_DISPATCH_BLOCKED active_materializer_runs=$active"
+            exit 1
+          fi
+
+      - name: Dispatch frozen four-family evaluation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run cfb-reconstructed-selection-materialize.yml             --repo "${{ github.repository }}"             --ref main             -f evaluation_mode=CONSUME_ALL_FOUR_CFB_ATTEMPTS

@@ -444,6 +444,7 @@
     "tests/test_nfl_score_counts_attempt3_prereg.py": "TEST_ONLY_NFL_SCORE_COUNTS_G1_ATTEMPT3_PREREG_NO_RUNTIME_AUTHORITY",
     ".github/workflows/nfl-score-counts-attempt3-main-trigger.yml": "NFL_SCORE_COUNTS_G1_FINAL_ATTEMPT3_ONE_SHOT_MAIN_TRIGGER_WORKFLOW_RESEARCH_ONLY_NO_BETTING_AUTHORITY",
     "tests/test_nfl_score_counts_attempt3_main_trigger.py": "TEST_ONLY_NFL_SCORE_COUNTS_G1_ATTEMPT3_MAIN_TRIGGER_NO_RUNTIME_AUTHORITY",
+    ".github/workflows/cfb-reconstructed-eval-dispatch-bridge.yml": "CFB_RECONSTRUCTED_SELECTION_FROZEN_EVALUATION_DISPATCH_ONLY_ZERO_MODEL_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY",
     "scripts/warm_cfb_reconstructed_selection_cache.py": "CFB_RECONSTRUCTED_SELECTION_PARTIAL_VERIFIED_CACHE_WARM_TRANSPORT_ONLY_ZERO_MODEL_TRUTH_GATE_PROMOTION_STAKING_OR_OFFICIAL_AUTHORITY"
   },
   "inventory_completion_claim": {
