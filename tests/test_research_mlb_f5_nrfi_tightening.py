@@ -54,6 +54,23 @@ class F5NRFITighteningResearchTests(unittest.TestCase):
         self.assertLessEqual(p, 1.0)
         self.assertAlmostEqual(p + (1.0-p), 1.0, places=12)
 
+    def test_strength_zero_exactly_matches_current_jeffreys_production_math(self):
+        start = date(2026, 9, 1)
+        away = [row(start + timedelta(days=i), i1_for=0 if i < 7 else 1, i1_against=0 if i < 6 else 1) for i in range(10)]
+        home = [row(start + timedelta(days=i), i1_for=0 if i < 6 else 1, i1_against=0 if i < 8 else 1) for i in range(10)]
+
+        def zero_probability(values):
+            return (sum(values) + 0.5) / (len(values) + 1.0)
+
+        away_off = zero_probability([int(r["i1_for"] == 0) for r in away])
+        home_def = zero_probability([int(r["i1_against"] == 0) for r in home])
+        home_off = zero_probability([int(r["i1_for"] == 0) for r in home])
+        away_def = zero_probability([int(r["i1_against"] == 0) for r in away])
+        expected = (0.5 * away_off + 0.5 * home_def) * (0.5 * home_off + 0.5 * away_def)
+
+        self.assertAlmostEqual(R.direct_nrfi(away, home, 0.72, 0), expected, places=12)
+        self.assertEqual(R.NRFI_BASE, "production_empirical_jeffreys")
+
     def test_same_day_games_are_not_prior_history(self):
         target = date(2026, 9, 2)
         rows = [row(date(2026, 9, 1)), row(target), row(target)]
