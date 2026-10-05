@@ -1833,10 +1833,16 @@
       "merge_sha": "a4d73fdb85fddde7b8228b8b5b021dfad5259588",
       "pr": 1624,
       "note": "NFL prop usage V1 2025 validation finality receipt merged. Canonical one-look was spent by technical source-access failure before model scoring; no statistical verdict and no Model_P, Truth Gate, promotion, staking, OFFICIAL, or backfill authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_B658CF02_PR_1630",
+      "merge_sha": "b658cf0282495f31d98b556039c1510e32b27890",
+      "pr": 1630,
+      "note": "MLB pitcher-prop final-look PIT-context hardening merged. Binds current-game lineup/plate-umpire inputs to fresh archived decision-time context, fixes real archive-path matching, and fails closed on missing/stale proof. No model parameter, threshold, promotion, staking, or OFFICIAL authority change."
     }
   ],
-  "inventory_block_reason": "Current main through merge a4d73fdb / PR #1624 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
+  "inventory_block_reason": "Current main through merge b658cf02 / PR #1630 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "a4d73fdb85fddde7b8228b8b5b021dfad5259588",
+  "reconciled_through_sha": "b658cf0282495f31d98b556039c1510e32b27890",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
