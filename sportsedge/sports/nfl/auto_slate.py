@@ -67,6 +67,15 @@ def discover_nfl_auto_games(
         game_id = str(row.get("game_id") or "").strip()
         if not game_id:
             continue
+        # The nflverse schedule contains older historical rows with no kickoff
+        # timestamp. They cannot be in a current/future slate, so discard
+        # clearly historical seasons before applying the strict kickoff parser.
+        try:
+            row_season = int(float(row.get("season"))) if row.get("season") not in (None, "") else None
+        except (TypeError, ValueError):
+            row_season = None
+        if row_season is not None and row_season < pit.year - 1:
+            continue
         kickoff = _kickoff(row)
         if not lower <= kickoff <= upper:
             continue
