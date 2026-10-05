@@ -44,10 +44,12 @@
         "sportsedge/sports/nfl/unified_run_it.py",
         "sportsedge/sports/nfl/v2k_attempt5_market_calibration.py",
         "sportsedge/sports/nfl/v2k_attempt5_validation.py",
+        "sportsedge/sports/nfl/v2k_attempt5_serving.py",
         "tests/test_nfl_v2k_attempt2_dispatch_bridge.py",
         "tests/test_nfl_v2k_attempt2_source_manifest_adapter.py",
         "tests/test_nfl_v2k_attempt4_market_residual.py",
-        "tests/test_nfl_v2k_attempt5_market_calibration.py"
+        "tests/test_nfl_v2k_attempt5_market_calibration.py",
+        "tests/test_nfl_v2k_attempt5_serving.py"
       ],
       "coverage_prefixes": [
         "sportsedge/sports/nfl/m2_v2j_",
