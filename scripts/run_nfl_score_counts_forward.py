@@ -319,6 +319,12 @@ def run(
             encoding="utf-8",
         )
 
+        # Persist the exact current/raw source bytes. The 2026 schedule/PBP/depth
+        # URLs are rolling inputs, so a hash receipt without retained bytes is
+        # insufficient for a later byte-for-byte audit.
+        persisted_raw = output_dir / "raw_sources"
+        shutil.copytree(raw_root, persisted_raw, dirs_exist_ok=True)
+
     summary = {
         "schema": "SPORTSEDGE_NFL_SCORE_COUNTS_G1_FORWARD_RUN_SUMMARY_V1",
         "status": "FROZEN_PREGAME_RESEARCH_PREDICTION",
