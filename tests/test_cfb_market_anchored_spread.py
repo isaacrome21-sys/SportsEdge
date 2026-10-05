@@ -5,6 +5,7 @@ from sportsedge.sports.cfb.market_anchored_spread import (
     adjusted_home_margin,
     fit_market_anchored_spread,
     forward_track_eligible,
+    load_frozen_fit,
 )
 
 
@@ -58,3 +59,13 @@ def test_fit_rejects_small_join():
     predictions, lines = _fixture(999)
     with pytest.raises(CFBMarketAnchoredSpreadError, match="ROWS_INSUFFICIENT"):
         fit_market_anchored_spread(predictions, lines)
+
+
+def test_frozen_fit_binds_exact_development_output():
+    fit = load_frozen_fit()
+    assert fit["status"] == "FROZEN_FORWARD_TRACKING_READY"
+    assert fit["n"] == 6498
+    assert fit["intercept"] == pytest.approx(-0.036762711059469516)
+    assert fit["weight"] == pytest.approx(-0.03317410378163576)
+    assert fit["totals_enabled"] is False
+    assert fit["authority"]["model_p"] is False
