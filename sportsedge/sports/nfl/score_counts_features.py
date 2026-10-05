@@ -18,6 +18,7 @@ from zoneinfo import ZoneInfo
 from sportsedge.sports.nfl.m2_history_features import select_starting_qb
 from sportsedge.sports.nfl.score_counts_g1 import (
     FEATURE_NAMES,
+    FG_ATTEMPT_FEATURE_NAMES,
     empirical_bayes_rate,
 )
 
@@ -30,6 +31,7 @@ QB_MIN_PRIOR_DROPBACKS = 20
 RARE_SCORE_PRIOR_GAMES = 25.0
 TEAM_CONVERSION_MIN_TDS = 50
 CONVERSION_PRIOR_TDS = 25.0
+FG_MAKE_PRIOR_ATTEMPTS = 25.0
 
 FORBIDDEN_KEYS = (
     "odds", "price", "sportsbook", "market", "spread_line", "total_line",
@@ -71,6 +73,8 @@ class TeamGame:
     offensive_tds_allowed: int = 0
     made_field_goals: int = 0
     field_goals_allowed: int = 0
+    field_goal_attempts: int = 0
+    field_goal_attempts_allowed: int = 0
     def_st_touchdowns: int = 0
     safeties: int = 0
     pat_made: int = 0
@@ -307,12 +311,16 @@ def aggregate_game_pbp(
                 stat(gid, td_team).def_st_touchdowns += 1
 
         fg_result = str(row.get("field_goal_result") or "").strip().lower()
-        if fg_result in {"made", "good"}:
+        if fg_result:
             if not offense:
                 raise ScoreCountFeatureError(f"FG_TEAM_REQUIRED:{gid}:{play_id}")
-            stat(gid, offense).made_field_goals += 1
+            stat(gid, offense).field_goal_attempts += 1
             if defense:
-                stat(gid, defense).field_goals_allowed += 1
+                stat(gid, defense).field_goal_attempts_allowed += 1
+            if fg_result in {"made", "good"}:
+                stat(gid, offense).made_field_goals += 1
+                if defense:
+                    stat(gid, defense).field_goals_allowed += 1
 
         xp = str(row.get("extra_point_result") or "").strip().lower()
         if xp in {"good", "made"}:
@@ -363,6 +371,10 @@ def _team_features(history: Sequence[TeamGame]) -> dict[str, float]:
         "td_allowed_per_game": _weighted(history, lambda r: float(r.offensive_tds_allowed)),
         "made_fg_per_game": _weighted(history, lambda r: float(r.made_field_goals)),
         "fg_allowed_per_game": _weighted(history, lambda r: float(r.field_goals_allowed)),
+        "fg_attempts_per_game": _weighted(history, lambda r: float(r.field_goal_attempts)),
+        "fg_attempts_allowed_per_game": _weighted(
+            history, lambda r: float(r.field_goal_attempts_allowed)
+        ),
         "off_turnover_rate": _weighted(history, lambda r: _rate(r.turnovers, r.off_plays)),
         "def_takeaway_rate": _weighted(history, lambda r: _rate(r.takeaways, r.def_plays)),
         "off_sack_rate_allowed": _weighted(history, lambda r: _rate(r.sacks_allowed, r.pass_dropbacks)),
@@ -422,6 +434,8 @@ def _flatten(
         "opp_td_allowed_per_game": opponent["td_allowed_per_game"],
         "made_fg_per_game": own["made_fg_per_game"],
         "opp_fg_allowed_per_game": opponent["fg_allowed_per_game"],
+        "fg_attempts_per_game": own["fg_attempts_per_game"],
+        "opp_fg_attempts_allowed_per_game": opponent["fg_attempts_allowed_per_game"],
         "off_turnover_rate": own["off_turnover_rate"],
         "opp_takeaway_rate": opponent["def_takeaway_rate"],
         "off_sack_rate_allowed": own["off_sack_rate_allowed"],
@@ -430,7 +444,8 @@ def _flatten(
         "starting_qb_cpoe_shrunk": float(qb_cpoe),
         "home_indicator": 1.0 if home else 0.0,
     }
-    if set(row) != set(FEATURE_NAMES):
+    required = set(FEATURE_NAMES) | set(FG_ATTEMPT_FEATURE_NAMES)
+    if set(row) != required:
         raise ScoreCountFeatureError("FROZEN_FEATURE_IDENTITY_MISMATCH")
     return row
 
@@ -460,6 +475,28 @@ def _rare_score_overrides(
             prior_exposure=RARE_SCORE_PRIOR_GAMES,
         ),
     }
+
+
+def _fg_make_rate_override(
+    *,
+    team_history: Sequence[TeamGame],
+    all_completed_team_games: Sequence[TeamGame],
+) -> dict[str, float]:
+    if not team_history or not all_completed_team_games:
+        raise ScoreCountFeatureError("FG_MAKE_RATE_HISTORY_REQUIRED")
+    league_attempts = sum(r.field_goal_attempts for r in all_completed_team_games)
+    if league_attempts <= 0:
+        raise ScoreCountFeatureError("FG_MAKE_RATE_LEAGUE_ATTEMPTS_REQUIRED")
+    league_made = sum(r.made_field_goals for r in all_completed_team_games)
+    league_rate = float(league_made / league_attempts)
+    team_attempts = sum(r.field_goal_attempts for r in team_history)
+    team_made = sum(r.made_field_goals for r in team_history)
+    posterior = (
+        team_made + FG_MAKE_PRIOR_ATTEMPTS * league_rate
+    ) / (team_attempts + FG_MAKE_PRIOR_ATTEMPTS)
+    if not 0.0 <= posterior <= 1.0:
+        raise ScoreCountFeatureError("FG_MAKE_RATE_OUT_OF_RANGE")
+    return {"fg_make_rate_shrunk": float(posterior)}
 
 
 def _conversion_override(
@@ -504,6 +541,8 @@ def _feature_digest(row: Mapping[str, Any]) -> str:
         "game_id", "season", "week", "game_start_ts", "team", "opponent",
         "starting_qb_id", "starting_qb_prior_dropbacks",
         *FEATURE_NAMES,
+        "fg_attempts_per_game", "opp_fg_attempts_allowed_per_game",
+        "fg_make_rate_shrunk",
         "def_st_td_rate", "safety_rate",
         "conversion_pat_p", "conversion_two_p", "conversion_no_p",
     )
@@ -642,6 +681,10 @@ def _build_rows(
                             team_history=full_history[team_id],
                             all_completed_team_games=all_completed_team_games,
                         ),
+                        **_fg_make_rate_override(
+                            team_history=full_history[team_id],
+                            all_completed_team_games=all_completed_team_games,
+                        ),
                         **_conversion_override(
                             team_history=full_history[team_id],
                             all_completed_team_games=all_completed_team_games,
@@ -651,6 +694,7 @@ def _build_rows(
                         item.update({
                             "offense_touchdowns": int(label.offense_touchdowns),
                             "made_field_goals": int(label.made_field_goals),
+                            "field_goal_attempts": int(label.field_goal_attempts),
                             "def_st_touchdowns": int(label.def_st_touchdowns),
                             "safeties": int(label.safeties),
                             "pat_made": int(label.pat_made),
@@ -726,6 +770,7 @@ def build_score_count_forward_rows(
 
 __all__ = [
     "CONVERSION_PRIOR_TDS",
+    "FG_MAKE_PRIOR_ATTEMPTS",
     "DECAY",
     "LOOKBACK_GAMES",
     "QB_MIN_PRIOR_DROPBACKS",
