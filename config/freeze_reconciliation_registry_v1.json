@@ -1869,10 +1869,16 @@
       "merge_sha": "ab9eeda575e93fd1cfb5121502d309df91043ee6",
       "pr": 1653,
       "note": "NFL_SCORE_COUNTS_G1 synthetic research core merged after preregistration. Deterministic Poisson TD/FG fits, shared scoring latent, explicit rare scores/conversions and one joint game-market path set; no historical or 2026 scoring. Reconciliation creates no Model_P, pricing, Truth Gate, promotion, staking, OFFICIAL, prop, validation-attempt, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_7FAC11F4_PR_1661",
+      "merge_sha": "7fac11f443e0ef0b69a0f7fcc788dc934b0d96b7",
+      "pr": 1661,
+      "note": "NFL_SCORE_COUNTS_G1 versioned preregistration addendum merged before any historical scoring. Clarifies shared-latent sigma identification via development OOF residual covariance and freezes rare-score/conversion shrinkage. Parent prereg bytes unchanged; no Model_P, pricing, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, forward-prediction, or untouched-readout authority."
     }
   ],
-  "inventory_block_reason": "Current main through merge ab9eeda5 / PR #1653 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
+  "inventory_block_reason": "Current main through merge 7fac11f4 / PR #1661 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "ab9eeda575e93fd1cfb5121502d309df91043ee6",
+  "reconciled_through_sha": "7fac11f443e0ef0b69a0f7fcc788dc934b0d96b7",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
