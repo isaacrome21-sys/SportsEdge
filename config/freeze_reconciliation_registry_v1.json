@@ -1875,10 +1875,28 @@
       "merge_sha": "7fac11f443e0ef0b69a0f7fcc788dc934b0d96b7",
       "pr": 1661,
       "note": "NFL_SCORE_COUNTS_G1 versioned preregistration addendum merged before any historical scoring. Clarifies shared-latent sigma identification via development OOF residual covariance and freezes rare-score/conversion shrinkage. Parent prereg bytes unchanged; no Model_P, pricing, Truth Gate, promotion, staking, OFFICIAL, validation-attempt, forward-prediction, or untouched-readout authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_75AA6E9F_PR_1663",
+      "merge_sha": "75aa6e9f73a3f5039052db3eb8e96917d690813e",
+      "pr": 1663,
+      "note": "Governance reconciliation merge registering main through the NFL_SCORE_COUNTS_G1 preregistration addendum. Reconciliation-only main movement; no model or betting authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_B198EA28_PR_1667",
+      "merge_sha": "b198ea2897e27c008b10a329c9f46cba8126f59f",
+      "pr": 1667,
+      "note": "NFL_SCORE_COUNTS_G1 exact Attempt-1 source-byte contract and receipt verifier merged. Exact immutable source identities only; no historical scoring, attempt consumption, forward prediction, Model_P, pricing, promotion, staking, OFFICIAL, or backfill authority."
+    },
+    {
+      "delta_id": "MAIN_ADVANCE_DCA09063_PR_1668",
+      "merge_sha": "dca0906393cd0479bdd0907bf42219f486fd3bc1",
+      "pr": 1668,
+      "note": "NFL_SCORE_COUNTS_G1 PIT-safe historical/forward feature builder merged. Frozen team/QB transforms and leakage guards only; no historical scoring, attempt consumption, forward prediction, Model_P, pricing, promotion, staking, OFFICIAL, or backfill authority."
     }
   ],
-  "inventory_block_reason": "Current main through merge 7fac11f4 / PR #1661 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
+  "inventory_block_reason": "Current main through merge dca09063 / PR #1668 registered for reconciliation provenance. Reconciliation grants no model or betting authority.",
   "issue": 686,
-  "reconciled_through_sha": "7fac11f443e0ef0b69a0f7fcc788dc934b0d96b7",
+  "reconciled_through_sha": "dca0906393cd0479bdd0907bf42219f486fd3bc1",
   "schema": "SPORTSEDGE_FREEZE_RECONCILIATION_REGISTRY_V1"
 }
