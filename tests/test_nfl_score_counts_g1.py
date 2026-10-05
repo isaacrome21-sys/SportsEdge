@@ -213,3 +213,17 @@ def test_attempt2_fg_subset_is_supported_without_changing_td_identity():
     )
     assert fitted.td_model.feature_names == FEATURE_NAMES
     assert fitted.fg_model.feature_names == FG_ATTEMPT2_FEATURE_NAMES
+
+
+def test_simulation_retains_team_td_components_used_to_build_scores():
+    model = fit()
+    home = row(2022, 0.8, home=True, td=0, fg=0)
+    away = row(2022, -0.3, home=False, td=0, fg=0)
+    a = simulate_game(model, game_id="TD-COMP", home_row=home, away_row=away, paths=10000, seed=19)
+    b = simulate_game(model, game_id="TD-COMP", home_row=home, away_row=away, paths=10000, seed=19)
+    assert np.array_equal(a["home_team_tds"], b["home_team_tds"])
+    assert np.array_equal(a["away_team_tds"], b["away_team_tds"])
+    assert len(a["home_team_tds"]) == 10000
+    assert len(a["away_team_tds"]) == 10000
+    assert np.all(a["home_team_tds"] >= 0)
+    assert np.all(a["away_team_tds"] >= 0)
